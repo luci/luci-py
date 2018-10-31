@@ -67,7 +67,6 @@ class CanFulfillTest(test_case.TestCase):
             memory_gb=8.0,
             num_cpus=2,
             os_family=rpc_messages.OSFamily.LINUX,
-            snapshot_labels=['label1', 'label2'],
         ),
     )
 
@@ -93,7 +92,35 @@ class CanFulfillTest(test_case.TestCase):
 
     self.assertFalse(handlers_cron.can_fulfill(entry, request))
 
-  def test_mismatch_repeated(self):
+  def test_multi_value_empty_subset_match(self):
+    request = rpc_messages.LeaseRequest(
+        dimensions=rpc_messages.Dimensions(
+            snapshot_labels=[],
+        ),
+    )
+    entry = models.CatalogMachineEntry(
+        dimensions=rpc_messages.Dimensions(
+            snapshot_labels=['label1', 'label2'],
+        ),
+    )
+
+    self.assertTrue(handlers_cron.can_fulfill(entry, request))
+
+  def test_multi_value_subset_match(self):
+    request = rpc_messages.LeaseRequest(
+        dimensions=rpc_messages.Dimensions(
+            snapshot_labels=['label1'],
+        ),
+    )
+    entry = models.CatalogMachineEntry(
+        dimensions=rpc_messages.Dimensions(
+            snapshot_labels=['label1', 'label2'],
+        ),
+    )
+
+    self.assertTrue(handlers_cron.can_fulfill(entry, request))
+
+  def test_multi_value_exact_match(self):
     request = rpc_messages.LeaseRequest(
         dimensions=rpc_messages.Dimensions(
             snapshot_labels=['label1', 'label2'],
@@ -101,12 +128,49 @@ class CanFulfillTest(test_case.TestCase):
     )
     entry = models.CatalogMachineEntry(
         dimensions=rpc_messages.Dimensions(
-            disk_gb=100,
-            hostname='fake-host',
-            memory_gb=8.0,
-            num_cpus=2,
-            os_family=rpc_messages.OSFamily.LINUX,
-            snapshot_labels=['label1'],
+            snapshot_labels=['label1', 'label2'],
+        ),
+    )
+
+    self.assertTrue(handlers_cron.can_fulfill(entry, request))
+
+  def test_multi_value_mismatch(self):
+    request = rpc_messages.LeaseRequest(
+        dimensions=rpc_messages.Dimensions(
+            snapshot_labels=['label3'],
+        ),
+    )
+    entry = models.CatalogMachineEntry(
+        dimensions=rpc_messages.Dimensions(
+            snapshot_labels=['label1', 'label2'],
+        ),
+    )
+
+    self.assertFalse(handlers_cron.can_fulfill(entry, request))
+
+  def test_multi_value_superset_mismatch(self):
+    request = rpc_messages.LeaseRequest(
+        dimensions=rpc_messages.Dimensions(
+            snapshot_labels=['label1', 'label2', 'label3'],
+        ),
+    )
+    entry = models.CatalogMachineEntry(
+        dimensions=rpc_messages.Dimensions(
+            snapshot_labels=['label1', 'label2'],
+        ),
+    )
+
+    self.assertFalse(handlers_cron.can_fulfill(entry, request))
+
+  def test_multi_value_superset_empty_mismatch(self):
+    request = rpc_messages.LeaseRequest(
+        dimensions=rpc_messages.Dimensions(
+            snapshot_labels=['label1', 'label2', 'label3'],
+        ),
+    )
+    entry = models.CatalogMachineEntry(
+        dimensions=rpc_messages.Dimensions(
+            snapshot_labels=[],
         ),
     )
 

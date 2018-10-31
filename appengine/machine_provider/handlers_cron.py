@@ -55,7 +55,7 @@ def can_fulfill(entry, request):
       if isinstance(request_value, messages.FieldList):
         if request_value:
           # For a non-empty list, ensure every specified value matches.
-          if set(entry_value) < set(request_value):
+          if set(request_value) - set(entry_value):
             return False
       elif entry_value != request_value:
         # There is a mismatched dimension, and the requested dimension was
