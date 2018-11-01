@@ -4,8 +4,6 @@
 
 syntax = "proto3";
 
-import "google/protobuf/timestamp.proto";
-
 package swarming;
 
 // TaskState represents the different allowed states for a Task.
@@ -56,41 +54,4 @@ enum TaskState {
   // are situations where it is known that in some not-too-distant future a wild
   // bot will appear that will be able to run this task.
   NO_RESOURCE = 0x100;
-}
-
-// TaskSpec describes a task request and its state, for the purposes of the
-// external scheduler API.
-//
-// It intentionally elides aspects of a task request that are irrelevant
-// to scheduling decisions, to keep this proto small for performance reasons.
-//
-// This message format is in its early stages, and may be subject to frequent
-// or even breaking changes as the external scheduler API is rolled out.
-message TaskSpec {
-  // ID is the swarming task request it.
-  string id = 1;
-
-  // Tags is the list of tags applied to this task request.
-  repeated string tags = 2;
-
-  // Slices is the set of task slices for this spec. A TaskSpec must contain
-  // at least 1 slice.
-  repeated SliceSpec slices = 3;
-
-  // State is the current state of this task.
-  TaskState state = 4;
-
-  // BotID is the id of the bot that this task is running on. It is only
-  // valid if state=RUNNING.
-  string bot_id = 5;
-
-  // EnqueuedTime is the time at which a task was enqueued. It is only valid
-  // if state=PENDING.
-  google.protobuf.Timestamp enqueued_time = 6;
-}
-
-// SliceSpec describes a task request slice, for the purposes of TaskSpec.
-message SliceSpec {
-  // Dimensions is set dimension strings for this slice.
-  repeated string dimensions = 1;
 }
