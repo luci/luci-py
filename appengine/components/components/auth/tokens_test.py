@@ -4,6 +4,7 @@
 # that can be found in the LICENSE file.
 
 import datetime
+import json
 import string
 import sys
 import unittest
@@ -11,7 +12,9 @@ import unittest
 from test_support import test_env
 test_env.setup_test_env()
 
+from components import utils
 from components.auth import api
+from components.auth import signature
 from components.auth import tokens
 from test_support import test_case
 
@@ -376,6 +379,148 @@ class TestToken(test_case.TestCase):
       version = 256
     with self.assertRaises(ValueError):
       BadToken.generate()
+
+
+def to_json_b64(d):
+  return tokens.base64_encode(json.dumps(d, sort_keys=True))
+
+
+class TestVerifyJWT(test_case.TestCase):
+  NOW = datetime.datetime(2018, 1, 1, 1, 1, 1)
+  KEY = 'valid-key'
+  SIG = 'valid-sig'
+  OMIT = object()
+
+  def setUp(self):
+    super(TestVerifyJWT, self).setUp()
+    self.mock_now(self.NOW)
+
+  def mock_certs_bundle(self, valid_key=KEY, valid_sig=SIG, expected_blob=None):
+    class MockedBundle(object):
+      def check_signature(_, blob, key_name, sig):
+        if expected_blob is not None:
+          self.assertEqual(blob, expected_blob)
+        if key_name != valid_key:
+          raise signature.CertificateError('No such key')
+        return sig == valid_sig
+    return MockedBundle()
+
+  def make_jwt(self, hdr, payload, sig=SIG):
+    return '%s.%s.%s' % (
+        to_json_b64(hdr), to_json_b64(payload), tokens.base64_encode(sig))
+
+  def make_good_jwt(self, iat=None, exp=None, nbf=OMIT):
+    hdr = {'alg': 'RS256', 'kid': self.KEY}
+    payload = {'aud': 'audience blah-blah'}
+    if iat is not self.OMIT:
+      payload['iat'] = iat or int(utils.time_time())
+    if exp is not self.OMIT:
+      payload['exp'] = exp or int(utils.time_time() + 3600)
+    if nbf is not self.OMIT:
+      payload['nbf'] = nbf or int(utils.time_time())
+    jwt = self.make_jwt(hdr, payload)
+    return hdr, payload, jwt
+
+  def test_happy_path(self):
+    hdr, payload, jwt = self.make_good_jwt()
+    bundle = self.mock_certs_bundle(
+        expected_blob='%s.%s' % (to_json_b64(hdr), to_json_b64(payload)))
+    verified_hdr, verified_payload = tokens.verify_jwt(jwt, bundle)
+    self.assertEqual(verified_hdr, hdr)
+    self.assertEqual(verified_payload, payload)
+
+  def test_wrong_number_of_segments(self):
+    _, _, jwt = self.make_good_jwt()
+    with self.assertRaises(tokens.InvalidTokenError) as err:
+      tokens.verify_jwt(jwt+'.aaaa', self.mock_certs_bundle())
+    self.assertIn('should have 3 segments', err.exception.message)
+
+  def test_bad_base64(self):
+    with self.assertRaises(tokens.InvalidTokenError) as err:
+      tokens.verify_jwt('x.x.x', self.mock_certs_bundle())
+    self.assertIn('not valid base64', err.exception.message)
+
+  def test_header_not_a_dict(self):
+    with self.assertRaises(tokens.InvalidTokenError) as err:
+      tokens.verify_jwt(
+          '%s.%s.aaaa' % (to_json_b64([]), to_json_b64({})),
+          self.mock_certs_bundle())
+    self.assertIn('not a dict', err.exception.message)
+
+  def test_typ_not_jwt(self):
+    with self.assertRaises(tokens.InvalidTokenError) as err:
+      tokens.verify_jwt(
+          self.make_jwt({'typ': 'NOTJWT', 'alg': 'RS256', 'kid': self.KEY}, {}),
+          self.mock_certs_bundle())
+    self.assertIn('Only JWT tokens are supported', err.exception.message)
+
+  def test_alg_not_rs256(self):
+    with self.assertRaises(tokens.InvalidTokenError) as err:
+      tokens.verify_jwt(
+          self.make_jwt({'alg': 'NOTRS256', 'kid': self.KEY}, {}),
+          self.mock_certs_bundle())
+    self.assertIn('Only RS256 tokens are supported', err.exception.message)
+
+  def test_kid_is_required(self):
+    with self.assertRaises(tokens.InvalidTokenError) as err:
+      tokens.verify_jwt(
+          self.make_jwt({'alg': 'RS256'}, {}),
+          self.mock_certs_bundle())
+    self.assertIn('Key ID is not specified', err.exception.message)
+
+  def test_unknown_key(self):
+    _, _, jwt = self.make_good_jwt()
+    with self.assertRaises(signature.CertificateError) as err:
+      tokens.verify_jwt(jwt, self.mock_certs_bundle(valid_key='some-other-key'))
+    self.assertIn('No such key', err.exception.message)
+
+  def test_bad_signature(self):
+    _, _, jwt = self.make_good_jwt()
+    with self.assertRaises(tokens.InvalidSignatureError) as err:
+      tokens.verify_jwt(jwt, self.mock_certs_bundle(valid_sig='some-other-sig'))
+    self.assertIn('invalid signature', err.exception.message)
+
+  def test_iat_and_exp_are_required(self):
+    for key in ('iat', 'exp'):
+      _, _, jwt = self.make_good_jwt(**{key: self.OMIT})
+      with self.assertRaises(tokens.InvalidTokenError) as err:
+        tokens.verify_jwt(jwt, self.mock_certs_bundle())
+      self.assertIn("has no '%s' field" % key, err.exception.message)
+
+  def test_iat_and_exp_are_numbers(self):
+    for key in ('iat', 'exp'):
+      _, _, jwt = self.make_good_jwt(**{key: 'z'})
+      with self.assertRaises(tokens.InvalidTokenError) as err:
+        tokens.verify_jwt(jwt, self.mock_certs_bundle())
+      self.assertIn("'%s' (u'z') is not a number" % key, err.exception.message)
+
+  def test_cant_be_used_before_iat(self):
+    future = utils.time_time() + tokens.ALLOWED_CLOCK_DRIFT_SEC + 1
+    _, _, jwt = self.make_good_jwt(iat=future, exp=future+3600)
+    with self.assertRaises(tokens.InvalidTokenError) as err:
+      tokens.verify_jwt(jwt, self.mock_certs_bundle())
+    self.assertIn(
+        'Bad JWT: too early (now 1514768461 < nbf 1514768492)',
+        err.exception.message)
+
+  def test_cant_be_used_before_nbf(self):
+    now = utils.time_time()
+    future = now + tokens.ALLOWED_CLOCK_DRIFT_SEC + 1
+    _, _, jwt = self.make_good_jwt(iat=now, nbf=future, exp=future+3600)
+    with self.assertRaises(tokens.InvalidTokenError) as err:
+      tokens.verify_jwt(jwt, self.mock_certs_bundle())
+    self.assertIn(
+        'Bad JWT: too early (now 1514768461 < nbf 1514768492)',
+        err.exception.message)
+
+  def test_cant_be_used_after_exp(self):
+    past = utils.time_time() - tokens.ALLOWED_CLOCK_DRIFT_SEC - 1
+    _, _, jwt = self.make_good_jwt(iat=past-3600, exp=past)
+    with self.assertRaises(tokens.InvalidTokenError) as err:
+      tokens.verify_jwt(jwt, self.mock_certs_bundle())
+    self.assertIn(
+        'Bad JWT: expired (now 1514768461 > exp 1514768430)',
+        err.exception.message)
 
 
 if __name__ == '__main__':

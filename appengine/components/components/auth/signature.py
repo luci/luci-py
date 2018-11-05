@@ -27,12 +27,18 @@ from components import utils
 __all__ = [
   'CertificateBundle',
   'CertificateError',
+  'get_google_oauth2_certs',
   'get_own_public_certificates',
   'get_service_account_certificates',
   'get_service_public_certificates',
   'sign_blob',
 ]
 
+
+# Base URL to fetch Google service account certs from.
+_GOOGLE_ROBOT_CERTS_URL = 'https://www.googleapis.com/robot/v1/metadata/x509/'
+# URL to fetch Google root OAuth2 certs from.
+_GOOGLE_OAUTH2_CERTS_URL = 'https://www.googleapis.com/oauth2/v1/certs'
 
 # For how long to cache the certificates. Due to the way how local memory cache
 # and memcache are used, the actual expiration time can be up to 2 times larger.
@@ -200,6 +206,13 @@ def sign_blob(blob, deadline=None):
   return app_identity.sign_blob(blob, deadline)
 
 
+def get_google_oauth2_certs():
+  """Returns CertificateBundle with Google's public OAuth2 certificates."""
+  return _use_cached_or_fetch(
+      'v1:google_auth2_certs',
+      lambda: _fetch_certs_from_json(_GOOGLE_OAUTH2_CERTS_URL))
+
+
 @utils.cache_with_expiration(3600)
 def get_own_public_certificates():
   """Returns CertificateBundle with certificates of the current service."""
@@ -249,7 +262,10 @@ def get_service_account_certificates(service_account_name):
   """
   return _use_cached_or_fetch(
       'v1:service_account_certs:%s' % service_account_name,
-      lambda: _fetch_robot_certs(service_account_name))
+      lambda: _fetch_certs_from_json(
+          url=_GOOGLE_ROBOT_CERTS_URL+urllib.quote_plus(service_account_name),
+          service_account_name=service_account_name,
+      ))
 
 
 def _fetch_service_certs(service_url):
@@ -294,10 +310,8 @@ def _fetch_service_certs(service_url):
   raise CertificateError(msg, transient=True)
 
 
-def _fetch_robot_certs(service_account_name):
-  url = 'https://www.googleapis.com/robot/v1/metadata/x509/'
-  url += urllib.quote_plus(service_account_name)
-
+def _fetch_certs_from_json(url, service_account_name=None):
+  """Fetches certs from a JSON bundle in form {<key_id>: <pem encoded cert>}."""
   # Retry code is adapted from components/net.py. net.py can't be used directly
   # since it depends on components.auth (and dependency cycles between
   # components are bad).
