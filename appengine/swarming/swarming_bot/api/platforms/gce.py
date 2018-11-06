@@ -4,12 +4,14 @@
 
 """Google Compute Engine specific utility functions."""
 
+import base64
 import json
 import logging
 import re
 import socket
 import threading
 import time
+import urllib
 import urllib2
 
 from api import oauth
@@ -19,9 +21,52 @@ from utils import tools
 ### Private stuff.
 
 
+# One-tuple that contains cached metadata, as returned by get_metadata.
+_CACHED_METADATA = None
+
+
 # Cache of GCE OAuth2 token.
 _CACHED_OAUTH2_TOKEN = {}
 _CACHED_OAUTH2_TOKEN_LOCK = threading.Lock()
+
+
+# Cached signed GCE VM metadata (keyed by the audience URL).
+_CACHED_METADATA_TOKEN = {}
+_CACHED_METADATA_TOKEN_LOCK = threading.Lock()
+
+
+def _padded_b64_decode(data):
+  mod = len(data) % 4
+  if mod:
+    data += '=' * (4 - mod)
+  return base64.urlsafe_b64decode(data)
+
+
+def _raw_metadata_request(path):
+  """Sends a request to metadata.google.internal, retrying on errors.
+
+  Returns raw response as str or None if not running on GCE or if the metadata
+  server is unreachable (after multiple attempts). Logs errors internally.
+
+  Args:
+    path: path on the metadata server to query ('/computeMetadata/...').
+  """
+  assert path.startswith('/'), path
+  if not is_gce():
+    logging.info('GCE metadata is not available: not on GCE')
+    return None
+  url = 'http://metadata.google.internal' + path
+  headers = {'Metadata-Flavor': 'Google'}
+  for i in xrange(0, 10):
+    time.sleep(i*2)
+    try:
+      resp = urllib2.urlopen(urllib2.Request(url, headers=headers), timeout=10)
+      return resp.read()
+    except IOError as e:
+      logging.warning(
+          'Failed to grab GCE metadata from %s on attempt #%d: %s',
+          path, i+1, e)
+  return None
 
 
 ## Public API.
@@ -56,24 +101,8 @@ def get_metadata_uncached():
       http://metadata.google.internal/computeMetadata/v1/?recursive=true \
       -H "Metadata-Flavor: Google" | python -m json.tool | less
   """
-  if not is_gce():
-    logging.info('GCE metadata is not available: not on GCE')
-    return None
-  url = 'http://metadata.google.internal/computeMetadata/v1/?recursive=true'
-  headers = {'Metadata-Flavor': 'Google'}
-  for i in xrange(0, 10):
-    if i:
-      time.sleep(5)
-    try:
-      return json.load(
-          urllib2.urlopen(urllib2.Request(url, headers=headers), timeout=10))
-    except IOError as e:
-      logging.warning('Failed to grab GCE metadata: %s', e)
-  return None
-
-
-# One-tuple that contains cached metadata, as returned by get_metadata.
-_CACHED_METADATA = None
+  raw = _raw_metadata_request('/computeMetadata/v1/?recursive=true')
+  return json.loads(raw) if raw else None
 
 
 def wait_for_metadata(quit_bit):
@@ -152,6 +181,50 @@ def oauth2_available_scopes(account='default'):
     return []
   accounts = metadata['instance']['serviceAccounts']
   return accounts.get(account, {}).get('scopes') or []
+
+
+def signed_metadata_token(audience):
+  """Returns tuple (signed GCE metadata JWT, expiration timestamp).
+
+  Returns (None, None) if not running on GCE or the metadata server is
+  unreachable or misbehaves. More details are available in the log.
+
+  The returned token has at least 5 min of lifetime left.
+
+  Args:
+    audience: audience URL to put into the token (usually Swarming server URL).
+  """
+  with _CACHED_METADATA_TOKEN_LOCK:
+    cached_tok = _CACHED_METADATA_TOKEN.get(audience)
+    if cached_tok and cached_tok['exp'] >= time.time() + 5*60:
+      return cached_tok['jwt'], cached_tok['exp']
+
+    jwt = _raw_metadata_request(
+        '/computeMetadata/v1/instance/service-accounts/default/'
+        'identity?audience=%s&format=full' % urllib.quote_plus(audience))
+    if not jwt:
+      return None, None
+
+    # Extract lifetime of the token from JWT's payload (the second segment).
+    # Use now+(expiry-issued_at) to account for possible clock skew between GCE
+    # backend clock and our machine's clock (expiry and issued_at are expressed
+    # in GCE backend clock time, but we want to compare the expiry to our
+    # clock). We assume that issued_at ('iat') in the token matches current
+    # timestamp.
+    #
+    # Note that we don't do any strict validation here, since we trust the
+    # metadata server on the bot. Swarming backend does full validation though,
+    # so if metadata server returns something crazy, we'll know on the server
+    # side.
+    try:
+      payload = json.loads(_padded_b64_decode(jwt.split('.')[1]))
+      exp = int(time.time()) + (payload['exp'] - payload['iat'])
+    except (IndexError, KeyError, TypeError, ValueError) as exc:
+      logging.error('Metadata server returned invalid JWT (%s):\n%s', exc, jwt)
+      return None, None
+
+    _CACHED_METADATA_TOKEN[audience] = {'jwt': jwt, 'exp': exp}
+    return jwt, exp
 
 
 @tools.cached
