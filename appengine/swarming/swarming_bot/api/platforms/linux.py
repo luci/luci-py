@@ -256,6 +256,15 @@ def get_uptime():
     return 0.
 
 
+def get_reboot_required():
+  """Returns True if the system should be rebooted to apply updates.
+
+  This only checks /var/run/reboot-required, which not all distros support and
+  which is not set for all conditions requiring reboot.
+  """
+  return os.path.exists('/var/run/reboot-required')
+
+
 @tools.cached
 def get_ssd():
   """Returns a list of SSD disks."""

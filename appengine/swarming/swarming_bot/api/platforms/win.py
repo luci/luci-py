@@ -479,6 +479,30 @@ def get_uptime():
   return 0.
 
 
+def get_reboot_required():
+  """Returns True if the system should be rebooted to apply updates.
+
+  This is not guaranteed to notice all conditions that could require reboot.
+  """
+  # Based on https://stackoverflow.com/a/45717438
+  k = None
+  import _winreg
+  try:
+    k = _winreg.OpenKey(
+        _winreg.HKEY_LOCAL_MACHINE,
+        'SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\WindowsUpdate\\'
+        'Auto Update\\RebootRequired')
+    _, num_values, _ = _winreg.QueryInfoKey(k)
+    return num_values > 0
+  except WindowsError:  # pylint: disable=undefined-variable
+    # This error very likely means the RebootRequired key does not exist,
+    # meaning reboot is not required.
+    return False
+  finally:
+    if k:
+      k.Close()
+
+
 def list_top_windows():
   """Returns a list of the class names of topmost windows.
 

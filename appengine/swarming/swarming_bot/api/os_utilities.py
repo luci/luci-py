@@ -591,6 +591,19 @@ def get_uptime():
   return platforms.linux.get_uptime()
 
 
+def get_reboot_required():
+  """Returns True if the system should be rebooted to apply updates.
+
+  This is not guaranteed to notice all conditions that could require reboot.
+  """
+  if sys.platform == 'darwin':
+    # There doesn't seem to be a good way to do this for OSX.
+    return False
+  if sys.platform == 'win32' or sys.platform == 'cygwin':
+    return platforms.win.get_reboot_required()
+  return platforms.linux.get_reboot_required()
+
+
 def get_ssd():
   """Returns a list of SSD disks."""
   if sys.platform == 'darwin':
@@ -1048,6 +1061,8 @@ def get_state():
     u'uptime': int(round(get_uptime())),
     u'user': getpass.getuser().decode('utf-8'),
   }
+  if get_reboot_required():
+    state[u'reboot_required'] = True
   cache = get_named_caches_info()
   if cache:
     state[u'named_caches'] = cache
