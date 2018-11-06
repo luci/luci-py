@@ -75,9 +75,12 @@ def compile_proto(proto_file, import_paths, output_path=None):
   cmd = [get_protoc()]
   cmd.extend('--proto_path=%s' % p for p in import_paths)
   cmd.append('--python_out=%s' % output_path)
+  cmd.append('--prpc-python_out=%s' % output_path)
   cmd.append(proto_file)
   logging.debug('Running %s', cmd)
-  return not subprocess.call(cmd)
+  env = os.environ.copy()
+  env['PATH'] = os.pathsep.join([THIS_DIR, env.get('PATH', '')])
+  return not subprocess.call(cmd, env=env)
 
 
 def check_proto_compiled(proto_file, import_paths):
