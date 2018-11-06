@@ -353,6 +353,12 @@ the fleet.">
             } else if (rest === "false") {
               params["is_mp"] = ["FALSE"];
             }
+          } else if (col === "task") {
+             if (rest === "busy") {
+              params["is_busy"] = ["TRUE"];
+            } else if (rest === "idle") {
+              params["is_busy"] = ["FALSE"];
+            }
             // else if -- may be malformed, don't do anything.
           }
         }.bind(this));

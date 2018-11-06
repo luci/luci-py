@@ -104,6 +104,10 @@ bot-list {
       tr > * {
         min-width: 2.0em;
       }
+
+      .fleet_header {
+        cursor: pointer;
+      }
     }
   }
 

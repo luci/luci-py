@@ -143,15 +143,15 @@ const summaryQueryRow = (ele, count) => html`
 // TODO(kjlubick): This could maybe be a generic helper function.
 const fleetCountsToggleSwitch = (ele) => {
   if (ele._showFleetCounts) {
-    return html`<expand-less-icon-sk @click=${ele._toggleFleetsCount}></expand-less-icon-sk>`;
+    return html`<expand-less-icon-sk></expand-less-icon-sk>`;
   } else {
-    return html`<expand-more-icon-sk @click=${ele._toggleFleetsCount}></expand-more-icon-sk>`;
+    return html`<expand-more-icon-sk></expand-more-icon-sk>`;
   }
 };
 
 const summary = (ele) => html`
 <div class=summary ?hidden=${!ele._showFleetCounts}>
-  <div class="fleet_header hider title">
+  <div class="fleet_header hider title" @click=${ele._toggleFleetsCount}>
     <span>Fleet</span>
     ${fleetCountsToggleSwitch(ele)}
   </div>
@@ -161,7 +161,7 @@ const summary = (ele) => html`
 </div>
 
 <div class=summary>
-  <div class="fleet_header shower title" ?hidden=${ele._showFleetCounts}>
+  <div class="fleet_header shower title" ?hidden=${ele._showFleetCounts} @click=${ele._toggleFleetsCount}>
     <span>Fleet</span>
     ${fleetCountsToggleSwitch(ele)}
   </div>
@@ -271,6 +271,10 @@ const template = (ele) => html`
       </thead>
       <tbody>${ele._sortBots().map((bot) => botRow(bot,ele))}</tbody>
     </table>
+    <button ?hidden=${!!ele._filters.length || ele._showAll}
+            @click=${ele._forceShowAll}>
+      Show All
+    </button>
   </main>
   <footer><error-toast-sk></error-toast-sk></footer>
 </swarming-app>`;
@@ -307,6 +311,7 @@ window.customElements.define('bot-list', class extends SwarmingAppBoilerplate {
     this._primaryKey = '';
     this._verbose = false;
     this._showFleetCounts = false;
+    this._showAll = false;
 
     this._fleetCounts = initCounts();
     this._queryCounts = initCounts();
@@ -317,11 +322,12 @@ window.customElements.define('bot-list', class extends SwarmingAppBoilerplate {
           // provide empty values
           'c': this._cols,
           'd': this._dir,
+          'e': this._showFleetCounts, // 'e' because 'f', 'l', are taken
           'f': this._filters,
           'k': this._primaryKey,
           's': this._sort,
+          'show_all': this._showAll,
           'v': this._verbose,
-          'e': this._showFleetCounts, // 'e' because 'f', 'l', are taken
         }
     }, /*setState*/(newState) => {
       // default values if not specified.
@@ -336,6 +342,7 @@ window.customElements.define('bot-list', class extends SwarmingAppBoilerplate {
       this._verbose = newState.v;         // default to false
       this._showFleetCounts = newState.e; // default to false
       this._limit = INITIAL_LOAD;
+      this._showAll = newState.show_all; // default to false
       this._fetch();
       this.render();
     });
@@ -471,8 +478,9 @@ window.customElements.define('bot-list', class extends SwarmingAppBoilerplate {
           this._bots = this._bots.concat(processBots(json.items));
           this.render();
           // Special case: Don't load all the bots when filters is empty to avoid
-          // loading many many bots unintentionally.
-          if (this._filters.length && json.cursor) {
+          // loading many many bots unintentionally. A user can over-ride this
+          // with the showAll button.
+          if ((this._filters.length || this._showAll) && json.cursor) {
             this._limit = BATCH_LOAD;
             queryParams = listQueryParams(this._filters, BATCH_LOAD, json.cursor);
             fetch(`/_ah/api/swarming/v1/bots/list?${queryParams}`, extra)
@@ -563,6 +571,12 @@ window.customElements.define('bot-list', class extends SwarmingAppBoilerplate {
     }
     this._addFilter(newFilter);
     this._refilterPrimaryKeys();
+  }
+
+  _forceShowAll() {
+    this._showAll = true;
+    this._stateChanged();
+    this._fetch();
   }
 
   _makeSummaryURL(newFilter, preserveOthers) {

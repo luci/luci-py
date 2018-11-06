@@ -290,6 +290,12 @@ export function listQueryParams(filters, limit, cursor) {
       } else if (rest === 'false') {
         params['is_mp'] = ['FALSE'];
       }
+    } else if (col === 'task') {
+       if (rest === 'busy') {
+        params['is_busy'] = ['TRUE'];
+      } else if (rest === 'idle') {
+        params['is_busy'] = ['FALSE'];
+      }
     } else {
       // We can assume dimension here. The only other possibility
       // is that a user has changed their filters w/o using the UI
@@ -427,7 +433,9 @@ export function processBots(arr) {
 export function processCounts(output, countJSON) {
   // output is expected to be in the order described by countTypes.
   output[0].value = parseInt(countJSON.count);                            // All
-  output[1].value = parseInt(countJSON.count) - parseInt(countJSON.dead); // Alive
+  output[1].value = parseInt(countJSON.count) - parseInt(countJSON.dead)
+                  - parseInt(countJSON.quarantined)
+                  - parseInt(countJSON.maintenance);                      // Alive
   output[2].value = parseInt(countJSON.busy);                             // Busy
   output[3].value = parseInt(countJSON.count) - parseInt(countJSON.busy); // Idle
   output[4].value = parseInt(countJSON.dead);                             // Dead

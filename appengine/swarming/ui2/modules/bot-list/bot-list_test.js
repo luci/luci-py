@@ -317,7 +317,7 @@ describe('bot-list', function() {
             expect(tds.length).toBe(2);
             expect(tds[0]).toMatchTextContent('Alive:');
             expect(tds[0].innerHTML).toContain(encodeURIComponent('status:alive'));
-            expect(tds[1]).toMatchTextContent('429');
+            expect(tds[1]).toMatchTextContent('426');
 
             tds = $('tr:nth-child(8) td', queryTable);
             expect(tds).toBeTruthy();
@@ -1165,6 +1165,11 @@ describe('bot-list', function() {
           'limit': 2,
           'filters': ['status:quarantined', 'is_mp_bot:false'],
           'output':  'is_mp=FALSE&limit=2&quarantined=TRUE',
+        },
+        { // is_busy
+          'limit': 7,
+          'filters': ['task:busy'],
+          'output':  'is_busy=TRUE&limit=7',
         }
       ];
 
