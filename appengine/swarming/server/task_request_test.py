@@ -698,7 +698,8 @@ class TaskRequestApiTest(TestCase):
         service_accounts=(),
         service_accounts_groups=(),
         task_template_deployment=deployment,
-        bot_monitoring=None)
+        bot_monitoring=None,
+        external_schedulers=None,)
 
   def test_init_new_request_skip_template(self):
     self._set_pool_config_with_templates(_gen_task_template(env={'hi': 'prod'}))

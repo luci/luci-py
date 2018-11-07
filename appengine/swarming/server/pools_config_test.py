@@ -49,6 +49,11 @@ TEST_CONFIG = pools_pb2.PoolsCfg(
           'accounts_group2',
         ],
         bot_monitoring='bots',
+        external_schedulers=[pools_pb2.ExternalSchedulerConfig(
+          address='externalscheduler.google.com',
+          id='ext1',
+          dimensions=['key1:value1', 'key2:value2'],
+        )],
       ),
     ],
     bot_monitoring=[
@@ -97,7 +102,15 @@ class PoolsConfigTest(test_case.TestCase):
         service_accounts=frozenset([u'a2@example.com', u'a1@example.com']),
         service_accounts_groups=(u'accounts_group1', u'accounts_group2'),
         task_template_deployment=None,
-        bot_monitoring=None)
+        bot_monitoring=None,
+        external_schedulers=(
+          pools_config.ExternalSchedulerConfig(
+            address=u'externalscheduler.google.com',
+            id=u'ext1',
+            dimensions=frozenset(['key2:value2', 'key1:value1'])
+          ),
+        ),
+    )
     expected2 = expected1._replace(name='another_name')
 
     self.assertEqual(expected1, pools_config.get_pool_config('pool_name'))

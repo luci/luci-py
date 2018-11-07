@@ -178,7 +178,8 @@ class AppTestBase(test_case.TestCase):
                   inclusions=()),
                 canary_chance=0.5,
             ),
-            bot_monitoring=None)
+            bot_monitoring=None,
+            external_schedulers=None,)
 
       if pool != 'default':
         return None
@@ -197,7 +198,8 @@ class AppTestBase(test_case.TestCase):
           service_accounts=frozenset(service_accounts),
           service_accounts_groups=(),
           task_template_deployment=None,
-          bot_monitoring=None)
+          bot_monitoring=None,
+          external_schedulers=None,)
     self.mock(pools_config, 'get_pool_config', mocked_get_pool_config)
 
   # Bot

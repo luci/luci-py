@@ -46,6 +46,8 @@ PoolConfig = collections.namedtuple('PoolConfig', [
   'task_template_deployment',
   # resolved BotMonitoring.
   'bot_monitoring',
+  # Tuple of ExternalSchedulerConfigs for this pool, if defined (or None).
+  'external_schedulers',
 ])
 
 
@@ -55,6 +57,17 @@ TrustedDelegatee = collections.namedtuple('TrustedDelegatee', [
   'peer_id',
   # A set of tags to look for in the delegation token to allow the delegation.
   'required_delegation_tags',
+])
+
+
+# Read-only hashable representation of a single ExtenalSchedulerConfig
+ExternalSchedulerConfig = collections.namedtuple('ExternalScheduler', [
+  # Service address.
+  'address',
+  # Scheduler ID (opaque to swarming).
+  'id',
+  # Dimension set in {'key1:value1', 'key2:value2'} format.
+  'dimensions',
 ])
 
 
@@ -424,6 +437,13 @@ def _resolve_bot_monitoring(ctx, bot_monitorings):
   return out
 
 
+def _resolve_external_schedulers(external_schedulers):
+  """Turns external_schedulers into a hashable representation."""
+  return tuple(
+      ExternalSchedulerConfig(e.address, e.id, frozenset(e.dimensions))
+      for e in external_schedulers)
+
+
 def _to_ident(s):
   if ':' not in s:
     s = 'user:' + s
@@ -478,7 +498,9 @@ def _fetch_pools_config():
           service_accounts_groups=tuple(msg.allowed_service_account_group),
           task_template_deployment=_resolve_deployment(
               ctx, msg, template_map, deployment_map),
-          bot_monitoring=bot_monitorings.get(name))
+          bot_monitoring=bot_monitorings.get(name),
+          external_schedulers=_resolve_external_schedulers(
+              msg.external_schedulers))
   return _PoolsCfg(pools)
 
 
@@ -542,6 +564,11 @@ def _validate_pools_cfg(cfg, ctx):
         if not auth.is_valid_group_name(group):
           ctx.error('bad allowed_service_account_group #%d "%s"', i, group)
 
+      # Validate external schedulers.
+      for i, es in enumerate(msg.external_schedulers):
+        if not es.address:
+          ctx.error('%sth external scheduler config had no address', i)
+
       _resolve_deployment(ctx, msg, template_map, deployment_map)
 
       if msg.bot_monitoring:
@@ -574,5 +601,6 @@ def bootstrap_dev_server_acls():
             service_accounts_groups=tuple(),
             task_template_deployment=None,
             bot_monitoring=None,
+            external_schedulers=None,
         ),
       })
