@@ -421,6 +421,22 @@ describe('bot-list', function() {
       });
     });
 
+    it('can sort times correctly', function(done){
+      loggedInBotlist((ele) => {
+        ele._verbose = false;
+        ele._sort = 'last_seen';
+        ele._dir = 'asc';
+        ele.render();
+
+        let actualIDOrder = ele._bots.map((b) => b.bot_id);
+
+        expect(actualIDOrder).toEqual([
+          'somebot12-a9', 'somebot13-a2', 'somebot17-a9', 'somebot16-a9', 'somebot10-a9',
+          'somebot77-a3', 'somebot15-a9', 'somebot18-a9', 'somebot11-a9', 'somebot13-a9']);
+        done();
+      });
+    });
+
     it('toggles columns by clicking on the boxes in the "column selector"', function(done) {
       loggedInBotlist((ele) => {
         ele._cols = ['id', 'task', 'os', 'status'];

@@ -663,7 +663,12 @@ const BATTERY_STATUS_ALIASES = {
  *  and -1 for descending and both bots and should return a number a la compare.
  */
 export const specialSortMap = {
+  disk_space: (dir, botA, botB) => dir * naturalSort(botA.disks[0].mb, botB.disks[0].mb),
   id: (dir, botA, botB) => dir * naturalSort(botA.bot_id, botB.bot_id),
+  first_seen: (dir, botA, botB) => dir * naturalSort(botA.first_seen_ts, botB.first_seen_ts),
+  last_seen: (dir, botA, botB) => dir * naturalSort(botA.last_seen_ts, botB.last_seen_ts),
+  running_time: (dir, botA, botB) => dir * naturalSort(fromState(botA, 'running_time'), fromState(botB, 'running_time')),
+  uptime: (dir, botA, botB) => dir * naturalSort(fromState(botA, 'uptime'), fromState(botB, 'uptime')),
 };
 
 function deviceHelper(callback) {
