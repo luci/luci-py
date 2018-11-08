@@ -47,7 +47,7 @@
       }
     </style>
 
-  <h2>Are you sure you want to retry task [[task_id]]?</h2>
+  <h2>Are you sure you want to [[_retryOrDebug(is_debug_task)]] task [[task_id]]?</h2>
 
   <template is="dom-if" if="[[is_debug_task]]">
     <paper-input auto-validate pattern="[1-9][0-9]*[smh]" error-message="enter a duration (e.g. 30s, 2m, 6h)" label="Lease duration" value="{{lease_duration}}"></paper-input>
@@ -101,6 +101,7 @@
       properties: {
         is_debug_task: {
           type: Boolean,
+          value: false,
         },
         lease_duration: {
           // TODO: make this an Integer, so this element is entirely responsible
@@ -119,6 +120,13 @@
           type: Boolean,
           notify: true,
         },
+      },
+
+      _retryOrDebug: function(is_debug_task) {
+        if (is_debug_task) {
+          return "debug";
+        }
+        return "retry";
       },
 
       setDimensions: function(dims) {

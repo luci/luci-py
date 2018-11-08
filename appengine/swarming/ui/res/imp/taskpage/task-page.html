@@ -255,7 +255,7 @@
                 <button on-click="_promptCancel"
                     disabled$="[[!_permissions.cancel_task]]"
                     title="[[_cancelTaskText(_permissions,_profile)]]">
-                  Cancel
+                  [[_cancelOrKill(_result)]]
                 </button>
               </template>
             </div>
@@ -1047,6 +1047,15 @@
         return result && (result.state === "PENDING" || result.state === "RUNNING");
       },
 
+      _cancelOrKill: function(result) {
+        if (result.state === "PENDING") {
+          return "Cancel";
+        } else if (result.state === "RUNNING") {
+          return "Kill";
+        }
+        return "";
+      },
+
       _cancelTaskText: function(permissions, profile){
         if (permissions.cancel_task) {
           return "Cancel a pending task. Running tasks can not (yet) be canceled."
@@ -1311,7 +1320,11 @@
       },
 
       _promptCancel: function() {
-        this.set("_dialog_prompt", "cancel task "+this.task_id);
+        var prompt = "cancel task "+this.task_id;
+        if (this._result.state === "RUNNING") {
+          prompt = "kill task "+this.task_id;
+        }
+        this.set("_dialog_prompt", prompt);
         this.$.prompt.open();
       },
 
