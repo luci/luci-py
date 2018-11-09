@@ -38,3 +38,5 @@ ALL_CODES = frozenset(
     getattr(StatusCode, k)
     for k in dir(StatusCode)
     if isinstance(getattr(StatusCode, k), StatusCodeBase))
+
+INT_TO_CODE = {c[0]: c for c in ALL_CODES}
