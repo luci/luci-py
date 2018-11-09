@@ -5,6 +5,7 @@
 
 """Starts a local bot to connect to a local server."""
 
+import argparse
 import glob
 import logging
 import os
@@ -147,13 +148,13 @@ class LocalBot(object):
 
 
 def main():
+  parser = argparse.ArgumentParser(description=sys.modules[__name__].__doc__)
+  parser.add_argument('server', help='Swarming server to connect bot to.')
+  args = parser.parse_args()
   fix_encoding.fix_encoding()
-  if len(sys.argv) != 2:
-    print >> sys.stderr, 'Specify url to Swarming server'
-    return 1
   botdir = tempfile.mkdtemp(prefix='start_bot')
   try:
-    bot = LocalBot(sys.argv[1], False, botdir)
+    bot = LocalBot(args.server, False, botdir)
     try:
       bot.start()
       bot.wait()
