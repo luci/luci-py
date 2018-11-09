@@ -48,7 +48,10 @@ TEST_CONFIG = bots_pb2.BotsCfg(
   bot_group=[
     bots_pb2.BotGroup(
       bot_id=['bot1', 'bot{2..3}'],
-      auth=bots_pb2.BotAuth(require_luci_machine_token=True),
+      auth=[
+        bots_pb2.BotAuth(require_luci_machine_token=True),
+        bots_pb2.BotAuth(require_service_account=['z@example.com']),
+      ],
       owners=['owner@example.com'],
       dimensions=['pool:A', 'pool:B', 'other:D'],
     ),
@@ -57,11 +60,11 @@ TEST_CONFIG = bots_pb2.BotsCfg(
       bot_id=['other_bot'],
       bot_id_prefix=['bot'],
       machine_type=[MACHINE_TYPE_1, MACHINE_TYPE_2],
-      auth=bots_pb2.BotAuth(require_service_account=('a@example.com',)),
+      auth=[bots_pb2.BotAuth(require_service_account=['a@example.com'])],
       bot_config_script='foo.py',
       system_service_account='bot'),
     bots_pb2.BotGroup(
-      auth=bots_pb2.BotAuth(ip_whitelist='bots'),
+      auth=[bots_pb2.BotAuth(ip_whitelist='bots')],
       dimensions=['pool:default']),
   ],
 )
@@ -73,6 +76,11 @@ EXPECTED_GROUP_1 = bot_groups_config._make_bot_group_config(
       bot_groups_config.BotAuth(
         require_luci_machine_token=True,
         require_service_account=(),
+        ip_whitelist=u'',
+      ),
+      bot_groups_config.BotAuth(
+        require_luci_machine_token=False,
+        require_service_account=('z@example.com',),
         ip_whitelist=u'',
       ),
     ),
@@ -110,7 +118,7 @@ EXPECTED_GROUP_3 = bot_groups_config._make_bot_group_config(
     system_service_account='')
 
 
-DEFAULT_AUTH_CFG = bots_pb2.BotAuth(ip_whitelist='bots')
+DEFAULT_AUTH_CFG = [bots_pb2.BotAuth(ip_whitelist='bots')]
 
 
 class ValidationCtx(validation.Context):
@@ -140,7 +148,7 @@ class BotGroupsConfigTest(test_case.TestCase):
     bot_groups_config.clear_cache()
 
   def test_version(self):
-    self.assertEqual('hash:a1cb8e030615d3', EXPECTED_GROUP_1.version)
+    self.assertEqual('hash:7854e3d3c41023', EXPECTED_GROUP_1.version)
     self.assertEqual('hash:8a870232025b97', EXPECTED_GROUP_2.version)
 
   def test_expand_bot_id_expr_success(self):
@@ -278,13 +286,18 @@ class BotGroupsConfigTest(test_case.TestCase):
         'in group #2'),
     ])
 
+  def test_bad_auth_completely_missing(self):
+    cfg = bots_pb2.BotsCfg(bot_group=[bots_pb2.BotGroup()])
+    self.validator_test(cfg, ['bot_group #0: an "auth" entry is required'])
+
   def test_bad_auth_cfg_two_methods(self):
     cfg = bots_pb2.BotsCfg(
       bot_group=[
-        bots_pb2.BotGroup(auth=bots_pb2.BotAuth(
-          require_luci_machine_token=True,
-          require_service_account=['abc@example.com'],
-        ))
+        bots_pb2.BotGroup(auth=[
+          bots_pb2.BotAuth(
+            require_luci_machine_token=True,
+            require_service_account=['abc@example.com']),
+        ])
       ])
     self.validator_test(cfg, [
       'bot_group #0: require_luci_machine_token and require_service_account '
@@ -294,7 +307,7 @@ class BotGroupsConfigTest(test_case.TestCase):
   def test_bad_auth_cfg_no_ip_whitelist(self):
     cfg = bots_pb2.BotsCfg(
       bot_group=[
-        bots_pb2.BotGroup(auth=bots_pb2.BotAuth())
+        bots_pb2.BotGroup(auth=[bots_pb2.BotAuth()])
       ])
     self.validator_test(cfg, [
       'bot_group #0: if both require_luci_machine_token and '
@@ -304,9 +317,9 @@ class BotGroupsConfigTest(test_case.TestCase):
   def test_bad_required_service_account(self):
     cfg = bots_pb2.BotsCfg(
       bot_group=[
-        bots_pb2.BotGroup(auth=bots_pb2.BotAuth(
-          require_service_account=['not-an-email'],
-        ))
+        bots_pb2.BotGroup(auth=[
+          bots_pb2.BotAuth(require_service_account=['not-an-email']),
+        ])
       ])
     self.validator_test(cfg, [
       'bot_group #0: invalid service account email "not-an-email"'
@@ -315,9 +328,9 @@ class BotGroupsConfigTest(test_case.TestCase):
   def test_bad_ip_whitelist_name(self):
     cfg = bots_pb2.BotsCfg(
       bot_group=[
-        bots_pb2.BotGroup(auth=bots_pb2.BotAuth(
-          ip_whitelist='bad ## name'
-        ))
+        bots_pb2.BotGroup(auth=[
+          bots_pb2.BotAuth(ip_whitelist='bad ## name'),
+        ])
       ])
     self.validator_test(cfg, [
       'bot_group #0: invalid ip_whitelist name "bad ## name"'
@@ -1236,7 +1249,7 @@ class BotGroupsConfigTest(test_case.TestCase):
       bot_group=[
         bots_pb2.BotGroup(
           bot_id=['blah'],
-          auth=bots_pb2.BotAuth(ip_whitelist='bots'),
+          auth=[bots_pb2.BotAuth(ip_whitelist='bots')],
           system_service_account='bot'),
       ])
     self.validator_test(cfg, [
@@ -1249,7 +1262,7 @@ class BotGroupsConfigTest(test_case.TestCase):
       bot_group=[
         bots_pb2.BotGroup(
           bot_id=['blah'],
-          auth=bots_pb2.BotAuth(require_service_account=['blah@example.com']),
+          auth=[bots_pb2.BotAuth(require_service_account=['blah@example.com'])],
           system_service_account='bot'),
       ])
     self.validator_test(cfg, [])
@@ -1447,12 +1460,12 @@ class CacheTest(test_case.TestCase):
         bot_group=[
           bots_pb2.BotGroup(
             bot_id=['bot1'],
-            auth=bots_pb2.BotAuth(require_luci_machine_token=True),
+            auth=[bots_pb2.BotAuth(require_luci_machine_token=True)],
             bot_config_script='script.py',
           ),
           bots_pb2.BotGroup(
             bot_id=['bot2'],
-            auth=bots_pb2.BotAuth(require_luci_machine_token=True),
+            auth=[bots_pb2.BotAuth(require_luci_machine_token=True)],
             bot_config_script='script.py',
           ),
         ],
@@ -1466,13 +1479,13 @@ class CacheTest(test_case.TestCase):
       bot_group=[
         bots_pb2.BotGroup(
           bot_id=['bot1'],
-          auth=bots_pb2.BotAuth(require_luci_machine_token=True),
+          auth=[bots_pb2.BotAuth(require_luci_machine_token=True)],
           bot_config_script='script.py',
           bot_config_script_content=good_script,
         ),
         bots_pb2.BotGroup(
           bot_id=['bot2'],
-          auth=bots_pb2.BotAuth(require_luci_machine_token=True),
+          auth=[bots_pb2.BotAuth(require_luci_machine_token=True)],
           bot_config_script='script.py',
           bot_config_script_content=good_script,
         ),
@@ -1487,7 +1500,7 @@ class CacheTest(test_case.TestCase):
       'bots.cfg': ('rev1', bots_pb2.BotsCfg(
         bot_group=[
           bots_pb2.BotGroup(
-            auth=bots_pb2.BotAuth(require_luci_machine_token=True),
+            auth=[bots_pb2.BotAuth(require_luci_machine_token=True)],
             bot_config_script='script.py',
           ),
         ],

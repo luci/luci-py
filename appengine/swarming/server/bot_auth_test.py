@@ -27,31 +27,45 @@ TEST_CONFIG = bots_pb2.BotsCfg(
   bot_group=[
     bots_pb2.BotGroup(
       bot_id=['bot_with_token'],
-      auth=bots_pb2.BotAuth(require_luci_machine_token=True),
+      auth=[bots_pb2.BotAuth(require_luci_machine_token=True)],
       dimensions=['pool:with_token']),
     bots_pb2.BotGroup(
       bot_id=['bot_with_service_account'],
-      auth=bots_pb2.BotAuth(require_service_account=[
-        'a@example.com',
-        'x@example.com',
-      ]),
+      auth=[
+        bots_pb2.BotAuth(require_service_account=[
+          'a@example.com',
+          'x@example.com',
+        ]),
+      ],
       dimensions=['pool:with_service_account']),
     bots_pb2.BotGroup(
       bot_id=['bot_with_ip_whitelist'],
-      auth=bots_pb2.BotAuth(ip_whitelist='ip_whitelist'),
+      auth=[bots_pb2.BotAuth(ip_whitelist='ip_whitelist')],
       dimensions=['pool:with_ip_whitelist']),
     bots_pb2.BotGroup(
       bot_id=['bot_with_service_account_and_ip_whitelist'],
-      auth=bots_pb2.BotAuth(
+      auth=[
+        bots_pb2.BotAuth(
           require_service_account=['a@example.com'],
           ip_whitelist='ip_whitelist',
-      ),
+        ),
+      ],
       dimensions=['pool:with_service_account_and_ip_whitelist']),
     bots_pb2.BotGroup(
       bot_id=['bot_with_token_and_ip_whitelist'],
-      auth=bots_pb2.BotAuth(
-          require_luci_machine_token=True, ip_whitelist='ip_whitelist'),
+      auth=[
+        bots_pb2.BotAuth(
+          require_luci_machine_token=True,
+          ip_whitelist='ip_whitelist'),
+      ],
       dimensions=['pool:with_token_and_ip_whitelist']),
+    bots_pb2.BotGroup(
+      bot_id=['bot_with_fallback_to_ip_wl'],
+      auth=[
+        bots_pb2.BotAuth(require_luci_machine_token=True),
+        bots_pb2.BotAuth(ip_whitelist='ip_whitelist'),
+      ],
+      dimensions=['pool:with_fallback_to_ip_wl']),
   ],
 )
 
@@ -215,6 +229,30 @@ class BotAuthTest(test_case.TestCase):
       bot_auth.validate_bot_id_and_fetch_config('bot_with_token--vm123', None)
     self.assert_error_log('bot ID doesn\'t match the machine token used')
     self.assert_error_log('bot_id: "bot_with_token"')
+
+  def test_first_method_is_used(self):
+    self.mock_config(TEST_CONFIG)
+    self.mock_caller('bot:bot_with_fallback_to_ip_wl.domain', '2.2.2.2')
+    cfg = bot_auth.validate_bot_id_and_fetch_config(
+        'bot_with_fallback_to_ip_wl', None)
+    self.assertEquals({u'pool': [u'with_fallback_to_ip_wl']}, cfg.dimensions)
+
+  def test_fallback_to_another_method(self):
+    self.mock_config(TEST_CONFIG)
+    self.mock_caller('anonymous:anonymous', '1.1.1.1')
+    cfg = bot_auth.validate_bot_id_and_fetch_config(
+        'bot_with_fallback_to_ip_wl', None)
+    self.assertEquals({u'pool': [u'with_fallback_to_ip_wl']}, cfg.dimensions)
+
+  def test_multiple_methods_fail(self):
+    self.mock_config(TEST_CONFIG)
+    self.mock_caller('anonymous:anonymous', '2.2.2.2')
+    with self.assertRaises(auth.AuthorizationError) as err:
+      bot_auth.validate_bot_id_and_fetch_config(
+          'bot_with_fallback_to_ip_wl', None)
+    self.assertEqual(
+        "All auth methods failed: Bot ID doesn't match the token used; "
+        "Not IP whitelisted", err.exception.message)
 
 
 if __name__ == '__main__':

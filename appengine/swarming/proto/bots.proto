@@ -168,10 +168,10 @@ message BotGroup {
 
   ////////////////////////
 
-  // Defines authentication method for bots from this group.
+  // Defines authentication methods for bots from this group.
   //
-  // If missing or empty, bot connections are rejected.
-  BotAuth auth = 20;
+  // Evaluated sequentially until first match.
+  repeated BotAuth auth = 20;
 
   // Emails of owners of these bots. Optional.
   repeated string owners = 21;

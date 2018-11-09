@@ -574,15 +574,14 @@ def _bot_group_proto_to_tuple(msg, trusted_dimensions):
     k, v = parts[0], parts[1]
     dimensions.setdefault(k, set()).add(v)
 
-  # TODO(vadimsh): msg.auth soon will become repeated field.
-  auth_cfg = msg.auth or bots_pb2.BotAuth()
   return _make_bot_group_config(
     owners=tuple(msg.owners),
-    auth=(
+    auth=tuple(
       BotAuth(
-        require_luci_machine_token=auth_cfg.require_luci_machine_token,
-        require_service_account=tuple(auth_cfg.require_service_account),
-        ip_whitelist=auth_cfg.ip_whitelist),
+        require_luci_machine_token=cfg.require_luci_machine_token,
+        require_service_account=tuple(cfg.require_service_account),
+        ip_whitelist=cfg.ip_whitelist)
+      for cfg in msg.auth
     ),
     dimensions={k: sorted(v) for k, v in dimensions.iteritems()},
     bot_config_script=msg.bot_config_script or '',
@@ -973,8 +972,7 @@ def _validate_group_bot_id_prefixes(
     known_bot_id_prefixes[bot_id_prefix] = group_idx
 
 
-def _validate_group_auth_and_system_service_account(ctx, bot_group):
-  a = bot_group.auth
+def _validate_auth(ctx, a):
   if a.require_luci_machine_token and a.require_service_account:
     ctx.error(
         'require_luci_machine_token and require_service_account can\'t '
@@ -990,10 +988,12 @@ def _validate_group_auth_and_system_service_account(ctx, bot_group):
   if a.ip_whitelist and not auth.is_valid_ip_whitelist_name(a.ip_whitelist):
     ctx.error('invalid ip_whitelist name "%s"', a.ip_whitelist)
 
+
+def _validate_system_service_account(ctx, bot_group):
   if bot_group.system_service_account == 'bot':
     # If it is 'bot', the bot auth must be configured to use OAuth, since we
     # need to get a bot token somewhere.
-    if not a.require_service_account:
+    if not any(a.require_service_account for a in bot_group.auth):
       ctx.error(
           'system_service_account "bot" requires '
           'auth.require_service_account to be used')
@@ -1050,7 +1050,11 @@ def _validate_bots_cfg(cfg, ctx):
           _validate_machine_type(ctx, machine_type, machine_type_names)
 
       # Validate 'auth' and 'system_service_account' fields.
-      _validate_group_auth_and_system_service_account(ctx, entry)
+      if not entry.auth:
+        ctx.error('an "auth" entry is required')
+      for a in entry.auth:
+        _validate_auth(ctx, a)
+      _validate_system_service_account(ctx, entry)
 
       # Validate 'owners'. Just check they are emails.
       for own in entry.owners:
