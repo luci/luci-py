@@ -26,26 +26,33 @@ from server import config as local_config
 BOTS_CFG_FILENAME = 'bots.cfg'
 
 
+# Validated and "frozen" bots_pb2.BotAuth proto, see its doc for meaning of
+# fields.
+BotAuth = collections.namedtuple('BotAuth', [
+  'require_luci_machine_token',
+  'require_service_account',
+  'ip_whitelist',
+])
+
+
 # Configuration that applies to some group of bots. Derived from BotsCfg and
 # BotGroup in bots.proto. See comments there. This tuple contains already
 # validated values.
 BotGroupConfig = collections.namedtuple('BotGroupConfig', [
   # The hash of the rest of the data in this tuple, see _gen_version.
+  #
+  # TODO(vadimsh): Should we rename it to bot_config_script_ver and hash only
+  # bot_config_script_content? There's little value in restarting bots when e.g.
+  # only 'owners' changes.
   'version',
-
-  # If True, the bot is expected to authenticate as "bot:<bot-id>.*".
-  'require_luci_machine_token',
-
-  # A list of service account emails the bot is expected to authenticate as.
-  # If empty, OAuth authentication is disabled.
-  'require_service_account',
-
-  # If set to non empty string, name of IP whitelist that's expected to contain
-  # bot's IP.
-  'ip_whitelist',
 
   # Tuple with emails of bot owners.
   'owners',
+
+  # A list of BotAuth tuples with all applicable authentication methods.
+  #
+  # The bot is considered authenticated if at least one method applies.
+  'auth',
 
   # Dict {key => list of values}. Always contains all the keys specified by
   # 'trusted_dimensions' set in BotsCfg. If BotGroup doesn't define some
@@ -510,10 +517,13 @@ def _default_bot_groups():
     machine_types_raw={},
     default_group=BotGroupConfig(
         version='default',
-        require_luci_machine_token=False,
-        require_service_account=None,
-        ip_whitelist=auth.bots_ip_whitelist(),
         owners=(),
+        auth=(
+          BotAuth(
+              require_luci_machine_token=False,
+              require_service_account=None,
+              ip_whitelist=auth.bots_ip_whitelist()),
+        ),
         dimensions={},
         bot_config_script='',
         bot_config_script_content='',
@@ -537,6 +547,8 @@ def _gen_version(fields):
   # Just hash JSON representation (with sorted keys). Assumes it is stable
   # enough. Add a prefix and trim a bit, to clarify that is it not git hash or
   # anything like that, but just a dumb hash of the actual config.
+  fields = fields.copy()
+  fields['auth'] = [a._asdict() for a in fields['auth']]
   digest = hashlib.sha256(utils.encode_to_json(fields)).hexdigest()
   return 'hash:' + digest[:14]
 
@@ -562,12 +574,16 @@ def _bot_group_proto_to_tuple(msg, trusted_dimensions):
     k, v = parts[0], parts[1]
     dimensions.setdefault(k, set()).add(v)
 
+  # TODO(vadimsh): msg.auth soon will become repeated field.
   auth_cfg = msg.auth or bots_pb2.BotAuth()
   return _make_bot_group_config(
-    require_luci_machine_token=auth_cfg.require_luci_machine_token,
-    require_service_account=list(auth_cfg.require_service_account),
-    ip_whitelist=auth_cfg.ip_whitelist,
     owners=tuple(msg.owners),
+    auth=(
+      BotAuth(
+        require_luci_machine_token=auth_cfg.require_luci_machine_token,
+        require_service_account=tuple(auth_cfg.require_service_account),
+        ip_whitelist=auth_cfg.ip_whitelist),
+    ),
     dimensions={k: sorted(v) for k, v in dimensions.iteritems()},
     bot_config_script=msg.bot_config_script or '',
     bot_config_script_content=msg.bot_config_script_content or '',

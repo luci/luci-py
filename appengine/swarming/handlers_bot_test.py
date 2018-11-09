@@ -454,10 +454,14 @@ class BotApiTest(test_env_handlers.AppTestBase):
 
     self.mock_bot_group_config(
         version='default',
-        require_luci_machine_token=False,
-        require_service_account=None,
-        ip_whitelist=None,
         owners=None,
+        auth=(
+          bot_groups_config.BotAuth(
+            require_luci_machine_token=False,
+            require_service_account=None,
+            ip_whitelist=None,
+          ),
+        ),
         dimensions={u'pool': [u'server-side']},
         bot_config_script=None,
         bot_config_script_content=None,
@@ -475,10 +479,14 @@ class BotApiTest(test_env_handlers.AppTestBase):
   def test_poll_extra_bot_config(self):
     self.mock_bot_group_config(
         version='default',
-        require_luci_machine_token=False,
-        require_service_account=None,
-        ip_whitelist=None,
         owners=None,
+        auth=(
+          bot_groups_config.BotAuth(
+            require_luci_machine_token=False,
+            require_service_account=None,
+            ip_whitelist=None,
+          ),
+        ),
         dimensions={},
         bot_config_script='foo.py',
         bot_config_script_content='print "Hi";import sys; sys.exit(1)',
@@ -1305,10 +1313,14 @@ class BotApiTest(test_env_handlers.AppTestBase):
     self.set_as_bot()
     self.mock_bot_group_config(
         version='default',
-        require_luci_machine_token=False,
-        require_service_account=None,
-        ip_whitelist=None,
         owners=None,
+        auth=(
+          bot_groups_config.BotAuth(
+            require_luci_machine_token=False,
+            require_service_account=None,
+            ip_whitelist=None,
+          ),
+        ),
         dimensions={},
         bot_config_script=None,
         bot_config_script_content=None,

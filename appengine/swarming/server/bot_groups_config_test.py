@@ -57,7 +57,7 @@ TEST_CONFIG = bots_pb2.BotsCfg(
       bot_id=['other_bot'],
       bot_id_prefix=['bot'],
       machine_type=[MACHINE_TYPE_1, MACHINE_TYPE_2],
-      auth=bots_pb2.BotAuth(require_service_account=['a@example.com']),
+      auth=bots_pb2.BotAuth(require_service_account=('a@example.com',)),
       bot_config_script='foo.py',
       system_service_account='bot'),
     bots_pb2.BotGroup(
@@ -68,30 +68,42 @@ TEST_CONFIG = bots_pb2.BotsCfg(
 
 
 EXPECTED_GROUP_1 = bot_groups_config._make_bot_group_config(
-    require_luci_machine_token=True,
-    require_service_account=[],
-    ip_whitelist=u'',
     owners=(u'owner@example.com',),
+    auth=(
+      bot_groups_config.BotAuth(
+        require_luci_machine_token=True,
+        require_service_account=(),
+        ip_whitelist=u'',
+      ),
+    ),
     dimensions={u'pool': [u'A', u'B'], u'other': [u'D']},
     bot_config_script='',
     bot_config_script_content='',
     system_service_account='')
 
 EXPECTED_GROUP_2 = bot_groups_config._make_bot_group_config(
-    require_luci_machine_token=False,
-    require_service_account=[u'a@example.com'],
-    ip_whitelist=u'',
     owners=(),
+    auth=(
+      bot_groups_config.BotAuth(
+        require_luci_machine_token=False,
+        require_service_account=(u'a@example.com',),
+        ip_whitelist=u'',
+      ),
+    ),
     dimensions={u'pool': []},
     bot_config_script='foo.py',
     bot_config_script_content='print "Hi"',
     system_service_account='bot')
 
 EXPECTED_GROUP_3 = bot_groups_config._make_bot_group_config(
-    require_luci_machine_token=False,
-    require_service_account=[],
-    ip_whitelist=u'bots',
     owners=(),
+    auth=(
+      bot_groups_config.BotAuth(
+        require_luci_machine_token=False,
+        require_service_account=(),
+        ip_whitelist=u'bots',
+      ),
+    ),
     dimensions={u'pool': [u'default']},
     bot_config_script='',
     bot_config_script_content='',
@@ -128,8 +140,8 @@ class BotGroupsConfigTest(test_case.TestCase):
     bot_groups_config.clear_cache()
 
   def test_version(self):
-    self.assertEqual('hash:06a8c8330221ff', EXPECTED_GROUP_1.version)
-    self.assertEqual('hash:4b0d816826c1ad', EXPECTED_GROUP_2.version)
+    self.assertEqual('hash:a1cb8e030615d3', EXPECTED_GROUP_1.version)
+    self.assertEqual('hash:8a870232025b97', EXPECTED_GROUP_2.version)
 
   def test_expand_bot_id_expr_success(self):
     def check(expected, expr):
