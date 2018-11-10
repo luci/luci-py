@@ -360,5 +360,14 @@ message ExternalSchedulerConfig {
   // Dimensions is a list of dimension strings in "key:value" format (e.g.
   // ["os:foo", "featureX:bar"]). A task or bot will use this external scheduler
   // if and only if the task or bot contains all of these dimensions.
+  //
+  // Note of care: if this list is empty, that means all requests in the pool
+  // are eligible to be forwarded to it.
   repeated string dimensions = 3;
+
+  // If not enabled, this external scheduler config will be ignored. This
+  // makes it safer to add new configs (the naive approach of adding a config
+  // with empty dimentions list would cause all requests to be routed to
+  // that config).
+  bool enabled = 4;
 }

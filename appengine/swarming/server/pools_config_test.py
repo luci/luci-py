@@ -53,6 +53,7 @@ TEST_CONFIG = pools_pb2.PoolsCfg(
           address='externalscheduler.google.com',
           id='ext1',
           dimensions=['key1:value1', 'key2:value2'],
+          enabled=True,
         )],
       ),
     ],
@@ -107,7 +108,8 @@ class PoolsConfigTest(test_case.TestCase):
           pools_config.ExternalSchedulerConfig(
             address=u'externalscheduler.google.com',
             id=u'ext1',
-            dimensions=frozenset(['key2:value2', 'key1:value1'])
+            dimensions=frozenset(['key2:value2', 'key1:value1']),
+            enabled=True,
           ),
         ),
     )

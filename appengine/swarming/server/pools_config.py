@@ -68,6 +68,8 @@ ExternalSchedulerConfig = collections.namedtuple('ExternalScheduler', [
   'id',
   # Dimension set in {'key1:value1', 'key2:value2'} format.
   'dimensions',
+  # Whether this config is enabled.
+  'enabled',
 ])
 
 
@@ -440,7 +442,8 @@ def _resolve_bot_monitoring(ctx, bot_monitorings):
 def _resolve_external_schedulers(external_schedulers):
   """Turns external_schedulers into a hashable representation."""
   return tuple(
-      ExternalSchedulerConfig(e.address, e.id, frozenset(e.dimensions))
+      ExternalSchedulerConfig(
+          e.address, e.id, frozenset(e.dimensions), e.enabled)
       for e in external_schedulers)
 
 
