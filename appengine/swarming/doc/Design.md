@@ -35,7 +35,8 @@ immediately.
 
 Choosing the right bot for the right task is tedious, so Swarming use an evolved
 technique using **list based properties** to do task request -> bot matching
-using a **priority queue of time based FIFO queues**.
+using a **priority queue of time based queues**. These can be either FIFO or
+LIFO depending on configuration.
 
 All 4 combined result in an incredible reduction of maintenance, where there's
 no server to maintain, not much network to setup beside having HTTPS access to
@@ -52,7 +53,7 @@ the internet and bots manage their version by themselves.
   - **Secure**; SSL certificate is verified to detect MITM attacks. All
     communications are encrypted. Strong ACLs with authentication via OAuth2.
   - **Multi-project aware**; seamlessly distribute tasks across an heterogeneous
-    fleet with priority queue of FIFO queues.
+    fleet with priority queue of FIFO or LIFO queues.
   - **Task deduplication**; do not run the same task twice, returns the results
     from previous requests if possible.
 

@@ -40,6 +40,7 @@ from google.appengine.ext import ndb
 
 from components import utils
 from server import bot_management
+from server import config
 from server import task_pack
 from server import task_queues
 from server import task_request
@@ -134,7 +135,8 @@ def _gen_queue_number(dimensions_hash, timestamp, priority):
   Arguments:
   - dimensions_hash: 32 bit integer to classify in a queue.
   - timestamp: datetime.datetime when the TaskRequest was filed in. This value
-        is used for FIFO ordering with a 100ms granularity; the year is ignored.
+        is used for FIFO or LIFO ordering (depending on configuration) with a
+        100ms granularity; the year is ignored.
   - priority: priority of the TaskRequest. It's a 8 bit integer. Lower is higher
         priority.
 
@@ -151,10 +153,18 @@ def _gen_queue_number(dimensions_hash, timestamp, priority):
   task_request.validate_priority(priority)
 
   # Ignore the year.
-  year_start = datetime.datetime(timestamp.year, 1, 1)
-  # It is guaranteed to fit 32 bits but upgrade to long right away to ensure
-  # assert works.
-  t = long(round((timestamp - year_start).total_seconds() * 10.))
+
+  if config.settings().use_lifo:
+    next_year = datetime.datetime(timestamp.year + 1, 1, 1)
+    # It is guaranteed to fit 32 bits but upgrade to long right away to ensure
+    # assert works.
+    t = long(round((next_year - timestamp).total_seconds() * 10.))
+  else:
+    year_start = datetime.datetime(timestamp.year, 1, 1)
+    # It is guaranteed to fit 32 bits but upgrade to long right away to ensure
+    # assert works.
+    t = long(round((timestamp - year_start).total_seconds() * 10.))
+
   assert t >= 0 and t <= 0x7FFFFFFF, (
       hex(t), dimensions_hash, timestamp, priority)
   # 31-22 == 9, leaving room for overflow with the addition.
@@ -170,7 +180,7 @@ def _gen_queue_number(dimensions_hash, timestamp, priority):
   return high_part | low_part
 
 
-def _queue_number_fifo_priority(v):
+def _queue_number_order_priority(v):
   """Returns the number to be used as a comparison for priority.
 
   Lower values are more important. The queue priority is the lowest 31 bits,
@@ -187,7 +197,7 @@ def _queue_number_priority(v):
   part of the year, so the result is between 0 and 330. See _gen_queue_number()
   for the details.
   """
-  return int(_queue_number_fifo_priority(v) >> 22)
+  return int(_queue_number_order_priority(v) >> 22)
 
 
 def _memcache_to_run_key(to_run_key):
@@ -412,7 +422,7 @@ def _yield_potential_tasks(bot_id):
           futures[i] = next(yielders[i], None)
 
     # That's going to be our search space for now.
-    items.sort(key=_queue_number_fifo_priority)
+    items.sort(key=_queue_number_order_priority)
 
     # It is possible that there is no items yet, in case all futures are taking
     # more than 1 second.
@@ -433,7 +443,7 @@ def _yield_potential_tasks(bot_id):
           futures[i] = next(yielders[i], None)
           changed = True
       if changed:
-        items.sort(key=_queue_number_fifo_priority)
+        items.sort(key=_queue_number_order_priority)
   except apiproxy_errors.DeadlineExceededError as e:
     # This is normally due to: "The API call datastore_v3.RunQuery() took too
     # long to respond and was cancelled."
@@ -588,7 +598,7 @@ def yield_next_available_task_to_dispatch(bot_dimensions, deadline):
       futures.append(
           _validate_task_async(bot_dimensions, deadline, stats, now, ttr))
       while futures:
-        # Keep a FIFO queue ordering.
+        # Keep a FIFO or LIFO queue ordering, depending on configuration.
         if futures[0].done():
           request, task = futures[0].get_result()
           if request:

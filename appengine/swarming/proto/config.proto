@@ -64,6 +64,9 @@ message SettingsCfg {
   // This originally added things to child-src, which was deprecated:
   // https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Security-Policy/child-src
   repeated string extra_child_src_csp_url = 16;
+
+  // Whether tasks should be run in FIFO or LIFO order.
+  bool use_lifo = 17;
 }
 
 

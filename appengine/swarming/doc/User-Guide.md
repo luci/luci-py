@@ -148,8 +148,8 @@ The request is the metadata around the task properties requested. This defines:
     a key in a cache of available results when evaluating idempotent tasks.
 *   Why: display name, tags. Tags are used to enable searching for tasks.
 *   A numerical priority is associated to the tag between 0 and 255. Lower means
-    most important. This is effectively a [FIFO
-    queue](Detailed-Design.md#priority-fifo-task-queues) of tasks.
+    most important. This is effectively a [FIFO or LIFO
+    queue](Detailed-Design.md#priority-task-queues) of tasks.
 
 
 ### Result

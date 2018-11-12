@@ -85,12 +85,13 @@ The task ID is the milliseconds since epoch plus low order random bits and the
 last byte set to 0. The last byte is used to differentiate between each try.
 
 
-#### Priority FIFO task queues
+#### Priority task queues
 
-The server implements a Priority FIFO queue based on the creation timestamp of
+The server implements a Priority queue based on the creation timestamp of
 request. The priority is a 0-255 value with lower is higher priority. The
 priority enforces ordering, higher priority (lower value) tasks are run first.
-Then tasks *with the same priority* are run in FIFO order.
+Then tasks *with the same priority* are run in either FIFO or LIFO order,
+depending on the server's configuration.
 
 Technically speaking, it's possible to do more elastic priority scheduling, like
 old pending requests have their priority slowly increasing over time but the
