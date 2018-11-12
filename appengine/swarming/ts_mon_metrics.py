@@ -247,6 +247,18 @@ _machine_types_connection_time = gae_ts_mon.CumulativeDistributionMetric(
     ])
 
 
+# Instance metric. Metric fields:
+# - auth_method = one of 'luci_token', 'service_account', 'ip_whitelist'.
+# - condition = depends on the auth method (e.g. email for 'service_account').
+_bot_auth_successes = gae_ts_mon.CounterMetric(
+    'swarming/bot_auth/success',
+    'Number of successful bot authentication events',
+    [
+        gae_ts_mon.StringField('auth_method'),
+        gae_ts_mon.StringField('condition'),
+    ])
+
+
 ### Private stuff.
 
 
@@ -498,6 +510,13 @@ def on_task_completed(summary):
 
 def on_machine_connected_time(seconds, fields):
   _machine_types_connection_time.add(seconds, fields=fields)
+
+
+def on_bot_auth_success(auth_method, condition):
+  _bot_auth_successes.increment(fields={
+      'auth_method': auth_method,
+      'condition': condition,
+  })
 
 
 def set_global_metrics(kind, payload=None):

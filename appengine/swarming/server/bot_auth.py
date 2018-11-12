@@ -13,6 +13,7 @@ import logging
 from components import auth
 from components.auth import ipaddr
 
+import ts_mon_metrics
 from server import bot_groups_config
 
 
@@ -41,7 +42,7 @@ def validate_bot_id_and_fetch_config(bot_id, machine_type):
   credentials.
 
   On success returns the configuration for this bot (BotGroupConfig tuple), as
-  defined in bots.cfg
+  defined in bots.cfg.
   """
   bot_id = _extract_primary_hostname(bot_id)
   cfg = bot_groups_config.get_bot_group_config(bot_id, machine_type)
@@ -105,6 +106,19 @@ def _check_bot_auth(bot_auth, bot_id, peer_ident, ip):
   def error(msg, *args):
     errors.append(msg % args)
 
+  # Check that IP whitelist applies (in addition to credentials), and increment
+  # the monitoring counter with number of successful auth events.
+  def check_ip_and_finish(auth_method, condition):
+    if bot_auth.ip_whitelist:
+      if not auth.is_in_ip_whitelist(bot_auth.ip_whitelist, ip):
+        error(
+            'bot_auth: bot IP is not whitelisted\n'
+            'bot_id: "%s", peer_ip: "%s", ip_whitelist: "%s"',
+            bot_id, ipaddr.ip_to_string(ip), bot_auth.ip_whitelist)
+        return 'Not IP whitelisted', errors
+    ts_mon_metrics.on_bot_auth_success(auth_method, condition)
+    return None, []
+
   if bot_auth.require_luci_machine_token:
     if not _is_valid_ident_for_bot(peer_ident, bot_id):
       error(
@@ -112,7 +126,9 @@ def _check_bot_auth(bot_auth, bot_id, peer_ident, ip):
           'bot_id: "%s", peer_ident: "%s"',
           bot_id, peer_ident.to_bytes())
       return 'Bot ID doesn\'t match the token used', errors
-  elif bot_auth.require_service_account:
+    return check_ip_and_finish('luci_token', '-')
+
+  if bot_auth.require_service_account:
     expected_ids = [
       auth.Identity(auth.IDENTITY_USER, email)
       for email in bot_auth.require_service_account
@@ -127,24 +143,16 @@ def _check_bot_auth(bot_auth, bot_id, peer_ident, ip):
             'Bot is identifying as anonymous. Is the "userinfo" scope enabled '
             'for this instance?')
       return 'Bot is not using expected service account', errors
-  elif not bot_auth.ip_whitelist:
-    # This branch should not be hit for validated configs.
-    error(
-        'bot_auth: invalid bot group config, no auth method defined\n'
-        'bot_id: "%s"', bot_id)
-    return 'Invalid bot group config', errors
+    return check_ip_and_finish('service_account', peer_ident.name)
 
-  # Check that IP whitelist applies (in addition to credentials).
   if bot_auth.ip_whitelist:
-    if not auth.is_in_ip_whitelist(bot_auth.ip_whitelist, ip):
-      error(
-          'bot_auth: bot IP is not whitelisted\n'
-          'bot_id: "%s", peer_ip: "%s", ip_whitelist: "%s"',
-          bot_id, ipaddr.ip_to_string(ip), bot_auth.ip_whitelist)
-      return 'Not IP whitelisted', errors
+    return check_ip_and_finish('ip_whitelist', bot_auth.ip_whitelist)
 
-  # Success!
-  return None, []
+  # This branch should not be hit for validated configs.
+  error(
+      'bot_auth: invalid bot group config, no auth method defined\n'
+      'bot_id: "%s"', bot_id)
+  return 'Invalid bot group config', errors
 
 
 def _is_valid_ident_for_bot(ident, bot_id):
