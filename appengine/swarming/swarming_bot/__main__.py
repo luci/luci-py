@@ -204,14 +204,6 @@ def CMDversion(_args):
 
 
 def main():
-  if os.getenv('CHROME_REMOTE_DESKTOP_SESSION') == '1':
-    # Disable itself when run under Google Chrome Remote Desktop, as it's
-    # normally started at the console and starting up via Remote Desktop would
-    # cause multiple bots to run concurrently on the host.
-    print >> sys.stderr, (
-        'Inhibiting Swarming bot under Google Chrome Remote Desktop.')
-    return 0
-
   # Always make the current working directory the directory containing this
   # file. It simplifies assumptions.
   base_dir = os.path.dirname(THIS_FILE)
