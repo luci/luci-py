@@ -10,6 +10,8 @@ automatic_scaling:
   min_idle_instances: 2
   min_pending_latency: 50ms
   max_pending_latency: 250ms
+  # TODO(tikuta): Increase more if possible.
+  max_concurrent_requests: 30
 
 handlers:
 - url: /_ah/api/.*
