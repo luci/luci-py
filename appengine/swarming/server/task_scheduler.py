@@ -91,7 +91,7 @@ def _expire_task_tx(now, request, to_run_key, result_summary_key, capacity):
   result_summary.modified_ts = now
 
   futures = ndb.put_multi_async(to_put)
-  _maybe_taskupdate_notify_via_tq(result_summary, request)
+  _maybe_pubsub_notify_via_tq(result_summary, request)
   for f in futures:
     f.check_success()
 
@@ -220,7 +220,7 @@ def _reap_task(bot_dimensions, bot_version, to_run_key, request):
     result_summary.set_from_run_result(run_result, request)
     ndb.put_multi([to_run, run_result, result_summary])
     if result_summary.state != orig_summary_state:
-      _maybe_taskupdate_notify_via_tq(result_summary, request)
+      _maybe_pubsub_notify_via_tq(result_summary, request)
     return run_result, secret_bytes
 
   # Add it to the negative cache *before* running the transaction. This will
@@ -339,7 +339,7 @@ def _handle_dead_bot(run_result_key):
     futures = ndb.put_multi_async(to_put)
     # if result_summary.state != orig_summary_state:
     if orig_summary_state != result_summary.state:
-      _maybe_taskupdate_notify_via_tq(result_summary, request)
+      _maybe_pubsub_notify_via_tq(result_summary, request)
     for f in futures:
       f.check_success()
 
@@ -370,7 +370,7 @@ def _copy_summary(src, dst, skip_list):
   dst.populate(**kwargs)
 
 
-def _maybe_taskupdate_notify_now(result_summary, request):
+def _maybe_pubsub_notify_now(result_summary, request):
   """Examines result_summary and sends task completion PubSub message.
 
   Does it only if result_summary indicates a task in some finished state and
@@ -399,7 +399,7 @@ def _maybe_taskupdate_notify_now(result_summary, request):
   return True
 
 
-def _maybe_taskupdate_notify_via_tq(result_summary, request):
+def _maybe_pubsub_notify_via_tq(result_summary, request):
   """Examines result_summary and enqueues a task to send PubSub message.
 
   Must be called within a transaction.
@@ -1039,7 +1039,7 @@ def bot_update_task(
     logging.error('Task %s %s', packed, error)
     return None
   # Caller must retry if PubSub enqueue fails.
-  if not _maybe_taskupdate_notify_now(smry, request):
+  if not _maybe_pubsub_notify_now(smry, request):
     return None
   if smry.state not in task_result.State.STATES_RUNNING:
     event_mon_metrics.send_task_event(smry)
@@ -1085,7 +1085,7 @@ def bot_kill_task(run_result_key, bot_id):
     result_summary.set_from_run_result(run_result, request)
 
     futures = ndb.put_multi_async((run_result, result_summary))
-    _maybe_taskupdate_notify_via_tq(result_summary, request)
+    _maybe_pubsub_notify_via_tq(result_summary, request)
     for f in futures:
       f.check_success()
 
@@ -1168,7 +1168,7 @@ def cancel_task(request, result_key, kill_running):
     result_summary.modified_ts = now
 
     futures = ndb.put_multi_async(entities)
-    _maybe_taskupdate_notify_via_tq(result_summary, request)
+    _maybe_pubsub_notify_via_tq(result_summary, request)
     for f in futures:
       f.check_success()
     return True, was_running
