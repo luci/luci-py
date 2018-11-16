@@ -103,10 +103,10 @@ def _prepare_auth_context(metadata, peer_ip):
   ctx = api.reinitialize_request_cache()
 
   # Verify the OAuth token (including client_id check), if given.
-  is_superuser = False
+  auth_details = None
   auth_header = _grab_metadata(metadata, _AUTHORIZATION_METADATA_KEY)
   if auth_header:
-    peer_identity, is_superuser = api.check_oauth_access_token(auth_header)
+    peer_identity, auth_details = api.check_oauth_access_token(auth_header)
   else:
     peer_identity = model.Anonymous
 
@@ -117,7 +117,7 @@ def _prepare_auth_context(metadata, peer_ip):
       ctx=ctx,
       peer_identity=peer_identity,
       peer_ip=peer_ip,
-      is_superuser=is_superuser,
+      auth_details=auth_details,
       delegation_token=_grab_metadata(metadata, _DELEGATION_METADATA_KEY),
       use_bots_ip_whitelist=True)
 

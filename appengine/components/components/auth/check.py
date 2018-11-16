@@ -14,7 +14,7 @@ from . import model
 
 
 def check_request(
-    ctx, peer_identity, peer_ip, is_superuser,
+    ctx, peer_identity, peer_ip, auth_details,
     delegation_token, use_bots_ip_whitelist):
   """Prepares the request context, checking IP whitelist and delegation token.
 
@@ -24,13 +24,13 @@ def check_request(
 
   It checks IP whitelist, and delegation token, and updates the request auth
   context accordingly, populating peer_identity, peer_ip, current_identity and
-  is_superuser fields.
+  auth_details fields.
 
   Args:
     ctx: instance of api.RequestCache to update.
     peer_identity: caller's identity.
     peer_ip: instance of ipaddr.IP.
-    is_superuser: true if peer is authenticated as a superuser (e.g. GAE admin).
+    auth_details: api.AuthDetails tuple (or None) with additional auth info.
     delegation_token: the token from X-Delegation-Token-V1 header.
     use_bots_ip_whitelist: [DEPRECATED] if true, treat anonymous access from
       IPs in "<appid>-bots" whitelist as coming from "bot:whitelisted-ip"
@@ -62,7 +62,7 @@ def check_request(
   auth_db.verify_ip_whitelisted(peer_identity, peer_ip)
 
   # Parse the delegation token, if given, to deduce end-user identity. We clear
-  # 'is_superuser' bit if the delegation is used, since it no longer applies to
+  # auth_details if the delegation is used, since it no longer applies to
   # the delegated identity.
   if delegation_token:
     try:
@@ -70,9 +70,9 @@ def check_request(
           delegation_token, peer_identity, auth_db)
       ctx.current_identity = ident
       ctx.delegation_token = unwrapped_tok
-      ctx.is_superuser = False
+      ctx.auth_details = None
     except delegation.BadTokenError as exc:
       raise api.AuthorizationError('Bad delegation token: %s' % exc)
   else:
     ctx.current_identity = ctx.peer_identity
-    ctx.is_superuser = is_superuser
+    ctx.auth_details = auth_details

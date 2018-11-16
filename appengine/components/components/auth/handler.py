@@ -126,10 +126,10 @@ class AuthenticatingHandler(webapp2.RequestHandler):
       self.response.headers['X-Frame-Options'] = self.frame_options
 
     peer_identity = None
-    is_superuser = False
+    auth_details = None
     for method_func in self.get_auth_methods(conf):
       try:
-        peer_identity, is_superuser = method_func(self.request)
+        peer_identity, auth_details = method_func(self.request)
         if peer_identity:
           break
       except api.AuthenticationError as err:
@@ -145,7 +145,7 @@ class AuthenticatingHandler(webapp2.RequestHandler):
     # If no authentication method is applicable, default to anonymous identity.
     if not peer_identity:
       peer_identity = model.Anonymous
-      is_superuser = False
+      auth_details = None
 
     try:
       # Verify the caller is allowed to make calls from the given IP and use the
@@ -155,7 +155,7 @@ class AuthenticatingHandler(webapp2.RequestHandler):
           ctx=ctx,
           peer_identity=peer_identity,
           peer_ip=ipaddr.ip_from_string(self.request.remote_addr),
-          is_superuser=is_superuser,
+          auth_details=auth_details,
           delegation_token=self.request.headers.get(delegation.HTTP_HEADER),
           use_bots_ip_whitelist=self.use_bots_ip_whitelist)
 
@@ -208,9 +208,11 @@ class AuthenticatingHandler(webapp2.RequestHandler):
       request and next method should be tried (for example cookie-based
       authentication is not applicable when there's no cookies).
 
-    * Returns (Identity, is_superuser). It means the authentication method
-      is applicable and caller is authenticated as 'Identity'. If caller is
-      GAE-level admin, is_superuser is set to True.
+    * Returns (Identity, AuthDetails). It means the authentication method
+      is applicable and the caller is authenticated as 'Identity'. All
+      additional information extracted from the credentials (like if the caller
+      is a GAE-level admin) is returned through AuthDetails tuple. It can be
+      None if there are no extra information.
 
     * Raises AuthenticationError: authentication method is applicable, but
       request contains bad credentials or invalid token, etc. For example,
@@ -518,18 +520,20 @@ def get_authenticated_routes(app):
 def gae_cookie_authentication(_request):
   """AppEngine cookie based authentication via users.get_current_user()."""
   user = users.get_current_user()
+  if not user:
+    return None, None
   try:
-    ident = model.Identity(model.IDENTITY_USER, user.email()) if user else None
+    ident = model.Identity(model.IDENTITY_USER, user.email())
   except ValueError:
     raise api.AuthenticationError('Unsupported user email: %s' % user.email())
-  return ident, users.is_current_user_admin()
+  return ident, api.new_auth_details(is_superuser=users.is_current_user_admin())
 
 
 def oauth_authentication(request):
   """OAuth2 based authentication via access tokens."""
   auth_header = request.headers.get('Authorization')
   if not auth_header:
-    return None, False
+    return None, None
   return api.check_oauth_access_token(auth_header)
 
 
@@ -544,7 +548,7 @@ def service_to_service_authentication(request):
     ident = model.Identity(model.IDENTITY_SERVICE, app_id) if app_id else None
   except ValueError:
     raise api.AuthenticationError('Unsupported application ID: %s' % app_id)
-  return ident, False
+  return ident, None
 
 
 ################################################################################

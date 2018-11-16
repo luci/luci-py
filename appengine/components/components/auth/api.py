@@ -38,11 +38,13 @@ from .proto import delegation_pb2
 
 # Part of public API of 'auth' component, exposed by this module.
 __all__ = [
+  'AuthDetails',
   'AuthenticationError',
   'AuthorizationError',
   'autologin',
   'disable_process_cache',
   'Error',
+  'get_auth_details',
   'get_current_identity',
   'get_delegation_token',
   'get_peer_identity',
@@ -694,7 +696,7 @@ def extract_oauth_caller_identity():
   client_id doesn't have to be in client_id whitelist.
 
   Returns:
-    (Identity, is_superuser).
+    (Identity, AuthDetails).
 
   Raises:
     AuthenticationError in case access_token is missing or invalid.
@@ -733,7 +735,8 @@ def extract_oauth_caller_identity():
     ident = model.Identity(model.IDENTITY_USER, email)
   except ValueError:
     raise AuthenticationError('Unsupported user email: %s' % email)
-  return ident, oauth.is_current_user_admin(oauth_scope)
+  return ident, new_auth_details(
+      is_superuser=oauth.is_current_user_admin(oauth_scope))
 
 
 def check_oauth_access_token(header):
@@ -758,9 +761,10 @@ def check_oauth_access_token(header):
     header: a value of Authorization header (as is in the request).
 
   Returns:
-    Tuple (ident, is_superuser), where ident is an identity of the caller in
+    Tuple (ident, AuthDetails), where ident is an identity of the caller in
     case the request was successfully validated (always 'user:...', never
-    anonymous), and is_superuser is true if the caller is GAE-level admin.
+    anonymous), and AuthDetails.is_superuser is true if the caller is GAE-level
+    admin.
 
   Raises:
     AuthenticationError in case the access token is invalid.
@@ -777,10 +781,10 @@ def check_oauth_access_token(header):
   # but real) OAuth2 API endpoint instead to validate access_token. It is also
   # what Cloud Endpoints do on a local server.
   if utils.is_local_dev_server():
-    # auth_call returns tuple (Identity, is_superuser). Superuser is always
-    # False if not using native GAE OAuth API.
+    # auth_call returns tuple (Identity, AuthDetails). There are no additional
+    # details if not using native GAE OAuth API.
     auth_call = lambda: (
-        dev_oauth_authentication(header, TOKEN_INFO_ENDPOINT), False)
+        dev_oauth_authentication(header, TOKEN_INFO_ENDPOINT), None)
   else:
     auth_call = extract_oauth_caller_identity
 
@@ -797,7 +801,7 @@ def check_oauth_access_token(header):
   except AuthenticationError:
     ident = dev_oauth_authentication(header, cfg.token_info_endpoint, '.dev')
     logging.warning('Authenticated as dev account: %s', ident.to_bytes())
-    return ident, False
+    return ident, None
 
 
 def dev_oauth_authentication(header, token_info_endpoint, suffix=''):
@@ -851,6 +855,21 @@ def dev_oauth_authentication(header, token_info_endpoint, suffix=''):
 ## RequestCache.
 
 
+# Additional information extracted from the credentials by an auth method.
+#
+# Lives in the request authentication context (aka RequestCache). Cleared in
+# a presence of a delegation token.
+AuthDetails = collections.namedtuple('AuthDetails', [
+  'is_superuser',  # True if the caller is GAE-level administrator
+])
+
+
+# pylint: disable=redefined-outer-name
+def new_auth_details(is_superuser=False):
+  """Constructs AuthDetails, filling in defaults."""
+  return AuthDetails(is_superuser=is_superuser)
+
+
 class RequestCache(object):
   """Holds authentication related information for the current request.
 
@@ -873,7 +892,7 @@ class RequestCache(object):
     self._delegation_token = None
     self._peer_identity = None
     self._peer_ip = None
-    self._is_superuser = None
+    self._auth_details = None
 
   @property
   def auth_db(self):
@@ -881,6 +900,16 @@ class RequestCache(object):
     if self._auth_db is None:
       self._auth_db = get_process_auth_db()
     return self._auth_db
+
+  @property
+  def auth_details(self):
+    return self._auth_details or new_auth_details()
+
+  @auth_details.setter
+  def auth_details(self, value):
+    assert self._auth_details is None # haven't been set yet
+    assert value is None or isinstance(value, AuthDetails), value
+    self._auth_details = value or new_auth_details()
 
   @property
   def current_identity(self):
@@ -933,15 +962,6 @@ class RequestCache(object):
     assert not self._peer_ip
     self._peer_ip = peer_ip
 
-  @property
-  def is_superuser(self):
-    return bool(self._is_superuser)
-
-  @is_superuser.setter
-  def is_superuser(self, value):
-    assert self._is_superuser is None # haven't been set yet
-    self._is_superuser = bool(value)
-
   def close(self):
     """Helps GC to collect garbage faster."""
     self._auth_db = None
@@ -949,6 +969,7 @@ class RequestCache(object):
     self._delegation_token = None
     self._peer_identity = None
     self._peer_ip = None
+    self._auth_details = None
 
 
 def disable_process_cache():
@@ -1402,6 +1423,11 @@ def get_peer_ip():
   return get_request_cache().peer_ip
 
 
+def get_auth_details():
+  """Returns AuthDetails with extra information extracted from credentials."""
+  return get_request_cache().auth_details
+
+
 def is_group_member(group_name, identity=None):
   """Returns True if |identity| (or current identity if None) is in the group.
 
@@ -1427,7 +1453,7 @@ def is_superuser():
 
   This works only for requests authenticated via GAE Users API or OAuth APIs.
   """
-  return get_request_cache().is_superuser
+  return get_request_cache().auth_details.is_superuser
 
 
 def list_group(group_name, recursive=True):

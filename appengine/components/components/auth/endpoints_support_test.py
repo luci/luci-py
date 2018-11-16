@@ -54,7 +54,7 @@ class EndpointsAuthTest(test_case.TestCase):
     ident = model.Anonymous
     if email:
       ident = model.Identity(model.IDENTITY_USER, email)
-    self.mock(api, 'check_oauth_access_token', lambda _: (ident, False))
+    self.mock(api, 'check_oauth_access_token', lambda _: (ident, None))
 
     # Mock auth implemented by the Cloud Endpoints.
     class User(object):

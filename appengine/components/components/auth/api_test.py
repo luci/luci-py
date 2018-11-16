@@ -817,7 +817,7 @@ class OAuthAccountsTest(test_case.TestCase):
   def test_is_allowed_oauth_client_id_ok(self):
     self.mock_all('email@email.com', 'some-client-id', ['some-client-id'])
     self.assertEqual(
-        (self.user('email@email.com'), False),
+        (self.user('email@email.com'), api.new_auth_details()),
         api.extract_oauth_caller_identity())
 
   def test_is_allowed_oauth_client_id_not_ok(self):
