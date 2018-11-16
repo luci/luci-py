@@ -315,7 +315,6 @@ discard the data if there is a mismatch.
     distribution efficient.
   - The code is all contained in the repository
     https://chromium.googlesource.com/infra/luci/luci-py.git.
-  - Code reviews are done with Rietveld.
   - The primary consumer project is the Chromium project. As such some
     chromium-specific assumptions still remain throughout the code base but it
     is designed by the team to get rid of them.

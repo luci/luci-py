@@ -77,8 +77,7 @@ There are three types of configs:
 
     *   list of builds that have to pass for a CL to be committed.
     *   list of builder names that can close the tree if failed.
-    *   Code review info: type (rietveld, gerrit, etc), URL and
-        codereview-specific details.
+    *   Code review info: type (gerrit), URL and codereview-specific details.
 
     Ref configs live in `projects/<project_id>/<ref_name>` config
     set, where `<ref_name>` always starts with `refs/`.

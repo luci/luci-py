@@ -28,7 +28,6 @@ DIMENSIONS = (
 TAGS = {
     'build_id': ['buildnumber'],
     'buildername': ['buildername'],
-    'codereview': ['rietveld'],
     'master': ['master'],
     'name': ['name'],
     'patch_project': ['patch_project'],

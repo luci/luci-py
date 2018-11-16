@@ -195,7 +195,6 @@ as found in the Chromium project as a real world example.
   - The isolate code is subsumed by the Swarming project.
   - The code is all contained in the directory
     [client](https://chromium.googlesource.com/infra/luci/luci-py.git/+/master/client).
-  - Code reviews are done with Rietveld.
   - The primary consumer project is the Chromium project. As such some
     chromium-specific assumptions still remain throughout the code base but it
     is designed by the team to get rid of them.
