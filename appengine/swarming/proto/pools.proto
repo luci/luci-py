@@ -22,6 +22,10 @@ message PoolsCfg {
   // Currently ignored. To be removed.
   bool forbid_unknown_pools = 2;
 
+  // Configures the default isolate and CIPD services to use for all pools on
+  // this server.
+  ExternalServices default_external_services = 6;
+
   // This is the "shared namespace" of task templates.
   //
   // Task templates allow pools to specify some property defaults (particularly
@@ -370,4 +374,37 @@ message ExternalSchedulerConfig {
   // with empty dimentions list would cause all requests to be routed to
   // that config).
   bool enabled = 4;
+}
+
+message ExternalServices {
+  message Isolate {
+    // (required) URL of the default isolate server to use if it is not
+    // specified in the task.
+    //
+    // Must start with "https://" or "http://".
+    //
+    // e.g. "https://isolateserver.appspot.com"
+    string server = 1;
+
+    // (required) Default namespace to use if it is not specified in a task,
+    // e.g. "default-gzip"
+    string namespace = 2;
+  }
+  Isolate isolate = 1;
+
+  message CIPD {
+    // (required) URL of the default CIPD server to use, if it is not specified
+    // in the task.
+    //
+    // Must start with "https://" or "http://".
+    //
+    // e.g. "https://chrome-infra-packages.appspot.com"
+    string server = 1;
+
+    // (required) The version of the cipd client to use. This is the
+    // 'infra/tools/cipd/${platform}' package, but because it's part of the
+    // bootstrap needs special logic to handle its installation.
+    string client_version = 2;
+  }
+  CIPD cipd = 2;
 }

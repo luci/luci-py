@@ -24,10 +24,10 @@ message SettingsCfg {
   // Enable ts_mon based monitoring.
   bool enable_ts_monitoring = 4;
 
-  // Configuration for swarming-isolate integration.
+  // (deprecated, see pools.proto) Configuration for swarming-isolate integration.
   IsolateSettings isolate = 5;
 
-  // Configuration for swarming-cipd integration.
+  // (deprecated, see pools.proto) Configuration for swarming-cipd integration.
   CipdSettings cipd = 6;
 
   // Configuration for swarming-mp integration.

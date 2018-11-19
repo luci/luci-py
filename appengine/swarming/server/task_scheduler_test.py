@@ -1969,6 +1969,8 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
             service_accounts_groups=tuple(service_accounts_groups or []),
             task_template_deployment=None,
             bot_monitoring=None,
+            default_isolate=None,
+            default_cipd=None,
             external_schedulers=None,)
       return None
     self.mock(pools_config, 'get_pool_config', mocked_get_pool_config)

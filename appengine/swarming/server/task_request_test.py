@@ -699,6 +699,8 @@ class TaskRequestApiTest(TestCase):
         service_accounts_groups=(),
         task_template_deployment=deployment,
         bot_monitoring=None,
+        default_isolate=None,
+        default_cipd=None,
         external_schedulers=None,)
 
   def test_init_new_request_skip_template(self):

@@ -178,6 +178,14 @@ class AppTestBase(test_case.TestCase):
                   inclusions=()),
                 canary_chance=0.5,
             ),
+            default_isolate=pools_config.IsolateServer(
+              server='https://pool.config.isolate.example.com',
+              namespace='default-gzip',
+            ),
+            default_cipd=pools_config.CipdServer(
+              server='https://pool.config.cipd.example.com',
+              client_version='from_pool_config',
+            ),
             bot_monitoring=None,
             external_schedulers=None,)
 
@@ -199,6 +207,8 @@ class AppTestBase(test_case.TestCase):
           service_accounts_groups=(),
           task_template_deployment=None,
           bot_monitoring=None,
+          default_isolate=None,
+          default_cipd=None,
           external_schedulers=None,)
     self.mock(pools_config, 'get_pool_config', mocked_get_pool_config)
 

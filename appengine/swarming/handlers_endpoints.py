@@ -32,6 +32,7 @@ from server import acl
 from server import bot_code
 from server import bot_management
 from server import config
+from server import pools_config
 from server import lease_management
 from server import service_accounts
 from server import task_pack
@@ -145,29 +146,41 @@ def get_or_raise(key):
 
 def apply_server_property_defaults(properties):
   """Fills ndb task properties with default values read from server settings."""
-  cfg = config.settings()
-  if not cfg:
+  settings = config.settings()
+  pool_cfg = pools_config.get_pool_config(properties.pool)
+  if not settings and not pool_cfg:
     return
 
-  cfg = config.settings()
-  if cfg.isolate.default_server and cfg.isolate.default_namespace:
+  iso_server = settings.isolate.default_server
+  iso_ns = settings.isolate.default_namespace
+  if pool_cfg and pool_cfg.default_isolate:
+    iso_server = pool_cfg.default_isolate.server
+    iso_ns = pool_cfg.default_isolate.namespace
+
+  if iso_server and iso_ns:
     properties.inputs_ref = properties.inputs_ref or task_request.FilesRef()
     properties.inputs_ref.isolatedserver = (
-        properties.inputs_ref.isolatedserver or cfg.isolate.default_server)
+        properties.inputs_ref.isolatedserver or iso_server)
     properties.inputs_ref.namespace = (
-        properties.inputs_ref.namespace or cfg.isolate.default_namespace)
+        properties.inputs_ref.namespace or iso_ns)
 
-  if cfg.HasField('cipd') and properties.cipd_input:
+  cipd_server = settings.cipd.default_server
+  cipd_vers = settings.cipd.default_client_package.version
+  if pool_cfg and pool_cfg.default_cipd:
+    cipd_server = pool_cfg.default_cipd.server
+    cipd_vers = pool_cfg.default_cipd.client_version
+
+  if cipd_server and properties.cipd_input:
     properties.cipd_input.server = (
-        properties.cipd_input.server or cfg.cipd.default_server)
+        properties.cipd_input.server or cipd_server)
     properties.cipd_input.client_package = (
         properties.cipd_input.client_package or task_request.CipdPackage())
+    # TODO(iannucci) - finish removing 'client_package' as a task-configurable
+    # setting.
     properties.cipd_input.client_package.package_name = (
-        properties.cipd_input.client_package.package_name or
-        cfg.cipd.default_client_package.package_name)
+      'infra/tools/cipd/${platform}')
     properties.cipd_input.client_package.version = (
-        properties.cipd_input.client_package.version or
-        cfg.cipd.default_client_package.version)
+        properties.cipd_input.client_package.version or cipd_vers)
 
 
 ### API

@@ -318,15 +318,21 @@ class TasksApiTest(BaseTest):
     self.mock(random, 'getrandbits', lambda _: 0x88)
     self.mock(random, 'randint', lambda *_: 10000) # always pick prod
 
+    props = self.create_props(
+      command=['rm', '-rf', '/'],
+      execution_timeout_secs=30,
+      grace_period_secs=15,
+      dimensions=[
+        {u'key': u'os', u'value': u'Amiga'},
+        {u'key': u'pool', u'value': u'template'},
+      ])
+
+    # We want to observe the pool default
+    props[u'cipd_input'][u'client_package'] = None
+    props[u'cipd_input'][u'server'] = None
+
     request = self.create_new_request(
-        properties=self.create_props(
-            command=['rm', '-rf', '/'],
-            execution_timeout_secs=30,
-            grace_period_secs=15,
-            dimensions=[
-              {u'key': u'os', u'value': u'Amiga'},
-              {u'key': u'pool', u'value': u'template'},
-            ]),
+        properties=props,
         tags=[u'a:tag'])
     expected_props = self.gen_props(
         command=[u'rm', u'-rf', u'/'],
@@ -336,7 +342,19 @@ class TasksApiTest(BaseTest):
         dimensions=[
           {u'key': u'os', u'value': u'Amiga'},
           {u'key': u'pool', u'value': u'template'},
-        ])
+        ],
+        inputs_ref={
+          u'isolatedserver': u'https://pool.config.isolate.example.com',
+          u'namespace': u'default-gzip',
+        },
+    )
+    expected_props[u'cipd_input'][u'client_package'] = {
+      u'package_name': u'infra/tools/cipd/${platform}',
+      u'version': u'from_pool_config',
+    }
+    expected_props[u'cipd_input'][u'server'] = (
+      u'https://pool.config.cipd.example.com')
+
     expected = {
       u'request': self.gen_request(
         created_ts=fmtdate(self.now),

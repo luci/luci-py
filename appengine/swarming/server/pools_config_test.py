@@ -57,6 +57,16 @@ TEST_CONFIG = pools_pb2.PoolsCfg(
         )],
       ),
     ],
+    default_external_services=pools_pb2.ExternalServices(
+      isolate=pools_pb2.ExternalServices.Isolate(
+        server='https://isolate.server.example.com',
+        namespace='default-gzip',
+      ),
+      cipd=pools_pb2.ExternalServices.CIPD(
+        server='https://cipd.server.example.com',
+        client_version='latest',
+      )
+    ),
     bot_monitoring=[
       pools_pb2.BotMonitoring(name='bots', dimension_key=['os', 'bool']),
     ],
@@ -104,6 +114,14 @@ class PoolsConfigTest(test_case.TestCase):
         service_accounts_groups=(u'accounts_group1', u'accounts_group2'),
         task_template_deployment=None,
         bot_monitoring=None,
+        default_isolate=pools_config.IsolateServer(
+          server='https://isolate.server.example.com',
+          namespace='default-gzip',
+        ),
+        default_cipd=pools_config.CipdServer(
+          server='https://cipd.server.example.com',
+          client_version='latest',
+        ),
         external_schedulers=(
           pools_config.ExternalSchedulerConfig(
             address=u'externalscheduler.google.com',
