@@ -246,10 +246,26 @@ class BotEvent(_BotCommon):
   This entity is created on each bot state transition.
   """
   ALLOWED_EVENTS = {
-    'bot_connected', 'bot_error', 'bot_leased', 'bot_log', 'bot_rebooting',
-    'bot_shutdown', 'bot_terminate',
-    'request_restart', 'request_update', 'request_sleep', 'request_task',
-    'task_completed', 'task_error', 'task_killed', 'task_update',
+    # Bot specific events that are outside the scope of a task:
+    'bot_connected',
+    'bot_error',
+    'bot_leased',
+    'bot_log',
+    'bot_rebooting',
+    'bot_shutdown',
+    'bot_terminate',
+
+    # Bot polling result:
+    'request_restart',
+    'request_sleep',
+    'request_task',
+    'request_update',
+
+    # Task lifetime as processed by the bot:
+    'task_completed',
+    'task_error',
+    'task_killed',
+    'task_update',
   }
 
   # Common properties for all events (which includes everything in _BotCommon).
