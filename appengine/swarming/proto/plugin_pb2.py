@@ -21,12 +21,38 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   name='plugin.proto',
   package='swarming',
   syntax='proto3',
-  serialized_pb=_b('\n\x0cplugin.proto\x12\x08swarming\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x0btasks.proto\"\xb0\x01\n\x08TaskSpec\x12\n\n\x02id\x18\x01 \x01(\t\x12\x0c\n\x04tags\x18\x02 \x03(\t\x12#\n\x06slices\x18\x03 \x03(\x0b\x32\x13.swarming.SliceSpec\x12\"\n\x05state\x18\x04 \x01(\x0e\x32\x13.swarming.TaskState\x12\x0e\n\x06\x62ot_id\x18\x05 \x01(\t\x12\x31\n\renqueued_time\x18\x06 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\"\x1f\n\tSliceSpec\x12\x12\n\ndimensions\x18\x01 \x03(\t\"-\n\x07IdleBot\x12\x0e\n\x06\x62ot_id\x18\x01 \x01(\t\x12\x12\n\ndimensions\x18\x02 \x03(\t\"z\n\x12\x41ssignTasksRequest\x12\x14\n\x0cscheduler_id\x18\x01 \x01(\t\x12$\n\tidle_bots\x18\x02 \x03(\x0b\x32\x11.swarming.IdleBot\x12(\n\x04time\x18\x03 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\"D\n\x13\x41ssignTasksResponse\x12-\n\x0b\x61ssignments\x18\x01 \x03(\x0b\x32\x18.swarming.TaskAssignment\"1\n\x0eTaskAssignment\x12\x0e\n\x06\x62ot_id\x18\x01 \x01(\t\x12\x0f\n\x07task_id\x18\x02 \x01(\t\"/\n\x17GetCancellationsRequest\x12\x14\n\x0cscheduler_id\x18\x01 \x01(\t\"\x93\x01\n\x18GetCancellationsResponse\x12\x46\n\rcancellations\x18\x01 \x03(\x0b\x32/.swarming.GetCancellationsResponse.Cancellation\x1a/\n\x0c\x43\x61ncellation\x12\x0e\n\x06\x62ot_id\x18\x01 \x01(\t\x12\x0f\n\x07task_id\x18\x02 \x01(\t\"]\n\x0fNotifyTasksItem\x12(\n\x04time\x18\x01 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12 \n\x04task\x18\x02 \x01(\x0b\x32\x12.swarming.TaskSpec\"\\\n\x12NotifyTasksRequest\x12\x14\n\x0cscheduler_id\x18\x01 \x01(\t\x12\x30\n\rnotifications\x18\x02 \x03(\x0b\x32\x19.swarming.NotifyTasksItem\"\x15\n\x13NotifyTasksResponse2\x86\x02\n\x11\x45xternalScheduler\x12J\n\x0b\x41ssignTasks\x12\x1c.swarming.AssignTasksRequest\x1a\x1d.swarming.AssignTasksResponse\x12Y\n\x10GetCancellations\x12!.swarming.GetCancellationsRequest\x1a\".swarming.GetCancellationsResponse\x12J\n\x0bNotifyTasks\x12\x1c.swarming.NotifyTasksRequest\x1a\x1d.swarming.NotifyTasksResponseb\x06proto3')
+  serialized_pb=_b('\n\x0cplugin.proto\x12\x08swarming\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x0btasks.proto\"\xb0\x01\n\x08TaskSpec\x12\n\n\x02id\x18\x01 \x01(\t\x12\x0c\n\x04tags\x18\x02 \x03(\t\x12#\n\x06slices\x18\x03 \x03(\x0b\x32\x13.swarming.SliceSpec\x12\"\n\x05state\x18\x04 \x01(\x0e\x32\x13.swarming.TaskState\x12\x0e\n\x06\x62ot_id\x18\x05 \x01(\t\x12\x31\n\renqueued_time\x18\x06 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\"\x1f\n\tSliceSpec\x12\x12\n\ndimensions\x18\x01 \x03(\t\"-\n\x07IdleBot\x12\x0e\n\x06\x62ot_id\x18\x01 \x01(\t\x12\x12\n\ndimensions\x18\x02 \x03(\t\"z\n\x12\x41ssignTasksRequest\x12\x14\n\x0cscheduler_id\x18\x01 \x01(\t\x12$\n\tidle_bots\x18\x02 \x03(\x0b\x32\x11.swarming.IdleBot\x12(\n\x04time\x18\x03 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\"D\n\x13\x41ssignTasksResponse\x12-\n\x0b\x61ssignments\x18\x01 \x03(\x0b\x32\x18.swarming.TaskAssignment\"G\n\x0eTaskAssignment\x12\x0e\n\x06\x62ot_id\x18\x01 \x01(\t\x12\x0f\n\x07task_id\x18\x02 \x01(\t\x12\x14\n\x0cslice_number\x18\x03 \x01(\x05\"/\n\x17GetCancellationsRequest\x12\x14\n\x0cscheduler_id\x18\x01 \x01(\t\"\xa1\x02\n\x18GetCancellationsResponse\x12\x46\n\rcancellations\x18\x01 \x03(\x0b\x32/.swarming.GetCancellationsResponse.Cancellation\x1a\xbc\x01\n\x0c\x43\x61ncellation\x12\x0e\n\x06\x62ot_id\x18\x01 \x01(\t\x12\x0f\n\x07task_id\x18\x02 \x01(\t\x12\x46\n\x06reason\x18\x03 \x01(\x0e\x32\x36.swarming.GetCancellationsResponse.Cancellation.Reason\x12\x12\n\nextra_info\x18\x04 \x01(\t\"/\n\x06Reason\x12\x0b\n\x07INVALID\x10\x00\x12\r\n\tPREEMPTED\x10\x01\x12\t\n\x05\x45RROR\x10\x02\"]\n\x0fNotifyTasksItem\x12(\n\x04time\x18\x01 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12 \n\x04task\x18\x02 \x01(\x0b\x32\x12.swarming.TaskSpec\"\\\n\x12NotifyTasksRequest\x12\x14\n\x0cscheduler_id\x18\x01 \x01(\t\x12\x30\n\rnotifications\x18\x02 \x03(\x0b\x32\x19.swarming.NotifyTasksItem\"\x15\n\x13NotifyTasksResponse2\x86\x02\n\x11\x45xternalScheduler\x12J\n\x0b\x41ssignTasks\x12\x1c.swarming.AssignTasksRequest\x1a\x1d.swarming.AssignTasksResponse\x12Y\n\x10GetCancellations\x12!.swarming.GetCancellationsRequest\x1a\".swarming.GetCancellationsResponse\x12J\n\x0bNotifyTasks\x12\x1c.swarming.NotifyTasksRequest\x1a\x1d.swarming.NotifyTasksResponseb\x06proto3')
   ,
   dependencies=[google_dot_protobuf_dot_timestamp__pb2.DESCRIPTOR,tasks__pb2.DESCRIPTOR,])
 _sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
 
+
+_GETCANCELLATIONSRESPONSE_CANCELLATION_REASON = _descriptor.EnumDescriptor(
+  name='Reason',
+  full_name='swarming.GetCancellationsResponse.Cancellation.Reason',
+  filename=None,
+  file=DESCRIPTOR,
+  values=[
+    _descriptor.EnumValueDescriptor(
+      name='INVALID', index=0, number=0,
+      options=None,
+      type=None),
+    _descriptor.EnumValueDescriptor(
+      name='PREEMPTED', index=1, number=1,
+      options=None,
+      type=None),
+    _descriptor.EnumValueDescriptor(
+      name='ERROR', index=2, number=2,
+      options=None,
+      type=None),
+  ],
+  containing_type=None,
+  options=None,
+  serialized_start=890,
+  serialized_end=937,
+)
+_sym_db.RegisterEnumDescriptor(_GETCANCELLATIONSRESPONSE_CANCELLATION_REASON)
 
 
 _TASKSPEC = _descriptor.Descriptor(
@@ -261,6 +287,13 @@ _TASKASSIGNMENT = _descriptor.Descriptor(
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
+    _descriptor.FieldDescriptor(
+      name='slice_number', full_name='swarming.TaskAssignment.slice_number', index=2,
+      number=3, type=5, cpp_type=1, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
   ],
   extensions=[
   ],
@@ -274,7 +307,7 @@ _TASKASSIGNMENT = _descriptor.Descriptor(
   oneofs=[
   ],
   serialized_start=525,
-  serialized_end=574,
+  serialized_end=596,
 )
 
 
@@ -304,8 +337,8 @@ _GETCANCELLATIONSREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=576,
-  serialized_end=623,
+  serialized_start=598,
+  serialized_end=645,
 )
 
 
@@ -330,11 +363,26 @@ _GETCANCELLATIONSRESPONSE_CANCELLATION = _descriptor.Descriptor(
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
+    _descriptor.FieldDescriptor(
+      name='reason', full_name='swarming.GetCancellationsResponse.Cancellation.reason', index=2,
+      number=3, type=14, cpp_type=8, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='extra_info', full_name='swarming.GetCancellationsResponse.Cancellation.extra_info', index=3,
+      number=4, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=_b("").decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
   ],
   extensions=[
   ],
   nested_types=[],
   enum_types=[
+    _GETCANCELLATIONSRESPONSE_CANCELLATION_REASON,
   ],
   options=None,
   is_extendable=False,
@@ -342,8 +390,8 @@ _GETCANCELLATIONSRESPONSE_CANCELLATION = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=726,
-  serialized_end=773,
+  serialized_start=749,
+  serialized_end=937,
 )
 
 _GETCANCELLATIONSRESPONSE = _descriptor.Descriptor(
@@ -372,8 +420,8 @@ _GETCANCELLATIONSRESPONSE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=626,
-  serialized_end=773,
+  serialized_start=648,
+  serialized_end=937,
 )
 
 
@@ -410,8 +458,8 @@ _NOTIFYTASKSITEM = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=775,
-  serialized_end=868,
+  serialized_start=939,
+  serialized_end=1032,
 )
 
 
@@ -448,8 +496,8 @@ _NOTIFYTASKSREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=870,
-  serialized_end=962,
+  serialized_start=1034,
+  serialized_end=1126,
 )
 
 
@@ -472,8 +520,8 @@ _NOTIFYTASKSRESPONSE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=964,
-  serialized_end=985,
+  serialized_start=1128,
+  serialized_end=1149,
 )
 
 _TASKSPEC.fields_by_name['slices'].message_type = _SLICESPEC
@@ -482,7 +530,9 @@ _TASKSPEC.fields_by_name['enqueued_time'].message_type = google_dot_protobuf_dot
 _ASSIGNTASKSREQUEST.fields_by_name['idle_bots'].message_type = _IDLEBOT
 _ASSIGNTASKSREQUEST.fields_by_name['time'].message_type = google_dot_protobuf_dot_timestamp__pb2._TIMESTAMP
 _ASSIGNTASKSRESPONSE.fields_by_name['assignments'].message_type = _TASKASSIGNMENT
+_GETCANCELLATIONSRESPONSE_CANCELLATION.fields_by_name['reason'].enum_type = _GETCANCELLATIONSRESPONSE_CANCELLATION_REASON
 _GETCANCELLATIONSRESPONSE_CANCELLATION.containing_type = _GETCANCELLATIONSRESPONSE
+_GETCANCELLATIONSRESPONSE_CANCELLATION_REASON.containing_type = _GETCANCELLATIONSRESPONSE_CANCELLATION
 _GETCANCELLATIONSRESPONSE.fields_by_name['cancellations'].message_type = _GETCANCELLATIONSRESPONSE_CANCELLATION
 _NOTIFYTASKSITEM.fields_by_name['time'].message_type = google_dot_protobuf_dot_timestamp__pb2._TIMESTAMP
 _NOTIFYTASKSITEM.fields_by_name['task'].message_type = _TASKSPEC
