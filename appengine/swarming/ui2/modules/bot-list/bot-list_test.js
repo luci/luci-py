@@ -939,6 +939,11 @@ describe('bot-list', function() {
         // spot check
         expect(values.children[0]).toMatchTextContent('NVIDIA (10de)');
         expect(values.children[8]).toMatchTextContent('Matrox MGA G200e (102b:0522)');
+
+        // Don't use UNKNOWN for aliasing
+        for (let c of values.children) {
+          expect(c.textContent).not.toContain('UNKNOWN');
+        }
         done();
       });
     });

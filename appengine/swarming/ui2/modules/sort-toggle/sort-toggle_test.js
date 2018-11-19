@@ -87,4 +87,24 @@ describe('sort-toggle', function() {
       ele.click();
     });
   });
+
+  it('defaults to ascending when changing "currentKey"', function(done) {
+    createElement((ele) => {
+      ele.currentKey = 'alpha';
+      ele.key = 'beta';
+      ele.direction = 'asc';
+
+      ele.addEventListener('sort-change', (e) => {
+        // No matter what the old direction was, the first
+        // click on change should be ascending
+        expect(e.detail.direction).toBe('asc');
+        expect(e.detail.key).toBe('beta');
+
+        expect(ele.direction).toBe('asc');
+        done();
+      });
+
+      ele.click();
+    });
+  });
 });

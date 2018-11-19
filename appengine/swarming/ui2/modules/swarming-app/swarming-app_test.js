@@ -132,6 +132,22 @@ describe('swarming-app', function() {
     });
   }); // end describe('sidebar')
 
+  describe('footer', function() {
+    it('has general purpose elements', function(done) {
+      createElement((ele) => {
+        let errorToast = ele.querySelector('footer error-toast-sk');
+        expect(errorToast).toBeTruthy();
+        let fab = ele.querySelector('footer .fab');
+        expect(fab).toBeTruthy();
+
+        // fab should be in an anchor tab
+        expect(fab.parentElement.tagName).toEqual('A');
+        expect(fab.parentElement.outerHTML).toContain('bugs.chromium.org/p/chromium/issues/entry');
+        done();
+      });
+    });
+  }); // end describe('footer')
+
   describe('spinner and busy property', function() {
     it('becomes busy while there are tasks to be done', function(done) {
       createElement((ele) => {

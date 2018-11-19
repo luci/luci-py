@@ -94,4 +94,16 @@ swarming-app > {
     }
   }
 
+  footer {
+    .fab {
+      position: fixed;
+      bottom: 5px;
+      right: 5px;
+      background-color: #1F78B4;
+      fill: #FFF;
+      border-radius: 50px;
+      padding: 4px;
+    }
+  }
+
 }

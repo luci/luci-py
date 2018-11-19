@@ -20,8 +20,6 @@ import { upgradeProperty } from 'elements-sk/upgradeProperty'
 import { jsonOrThrow } from 'common-sk/modules/jsonOrThrow'
 import { errorMessage } from 'elements-sk/errorMessage'
 
-import 'elements-sk/error-toast-sk'
-
 import SwarmingAppBoilerplate from '../SwarmingAppBoilerplate'
 
 import '../swarming-app'
@@ -116,7 +114,7 @@ const template = (ele) => html`
     </ul>
     ${ele.permissions.get_bootstrap_token ? bootstrapTemplate(ele): ''}
   </main>
-  <footer><error-toast-sk></error-toast-sk></footer>
+  <footer></footer>
 </swarming-app>`;
 
 window.customElements.define('swarming-index', class extends SwarmingAppBoilerplate {

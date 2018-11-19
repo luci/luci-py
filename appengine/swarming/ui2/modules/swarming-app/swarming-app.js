@@ -35,6 +35,8 @@ import { ifDefined } from 'lit-html/directives/if-defined';
 import { jsonOrThrow } from 'common-sk/modules/jsonOrThrow'
 import { upgradeProperty } from 'elements-sk/upgradeProperty'
 
+import 'elements-sk/error-toast-sk'
+import 'elements-sk/icon/bug-report-icon-sk'
 import 'elements-sk/icon/menu-icon-sk'
 import 'elements-sk/spinner-sk'
 
@@ -75,8 +77,14 @@ const dynamic_content_template = (ele) => html`
 </div>
 <oauth-login client_id=${ele.client_id}
              ?testing_offline=${ele.testing_offline}>
-</oauth-login>
-`;
+</oauth-login>`;
+
+const fab_template = document.createElement('template');
+fab_template.innerHTML = `
+<a target=_blank rel=noopener
+   href="https://bugs.chromium.org/p/chromium/issues/entry?components=Infra%3EPlatform%3ESwarming%3EWebUI&owner=kjlubick@chromium.org&status=Assigned">
+  <bug-report-icon-sk class=fab></bug-report-icon-sk>
+</a>`;
 
 window.customElements.define('swarming-app', class extends HTMLElement {
 
@@ -183,6 +191,8 @@ window.customElements.define('swarming-app', class extends HTMLElement {
    *   <li> A spacer span to right-align the following elements.</li>
    *   <li> A placeholder in which to render information about the server.</li>
    *   <li> A placeholder in which to render the login-element.</li>
+   *   <li> An error-toast-sk element in the footer. </li>
+   *   <li> A floating action button for feedback in the footer. </li>
    * </ol>
    *
    * This function need only be called once, when the element is created.
@@ -190,6 +200,7 @@ window.customElements.define('swarming-app', class extends HTMLElement {
   _addHTML() {
     let header = this.querySelector('header');
     let sidebar = header && header.querySelector('aside');
+    let footer = this.querySelector('footer');
     if (!(header && sidebar && sidebar.classList.contains('hideable'))) {
       return;
     }
@@ -220,6 +231,13 @@ window.customElements.define('swarming-app', class extends HTMLElement {
     this._dynamicEle = document.createElement('div');
     this._dynamicEle.classList.add('right');
     header.appendChild(this._dynamicEle);
+
+    // Add things to the footer
+    let errorToast = document.createElement('error-toast-sk');
+    footer.append(errorToast);
+
+    let fab = fab_template.content.cloneNode(true);
+    footer.append(fab);
   }
 
   _toggleMenu(e, sidebar) {

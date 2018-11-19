@@ -9,12 +9,15 @@ export function applyAlias(value, key) {
   if (!aliasMap[key] || value === 'none') {
     return value;
   }
-  let alias = aliasMap[key][value] || 'UNKNOWN';
+  let alias = aliasMap[key][value];
   if (key === 'gpu') {
     // the longest gpu string looks like [pci id]-[driver version],
     // so we trim that off if needed.
     let trimmed = value.split('-')[0];
-    alias = aliasMap[key][trimmed] || 'UNKNOWN';
+    alias = aliasMap[key][trimmed];
+  }
+  if (!alias) {
+    return value;
   }
   return `${alias} (${value})`;
 }

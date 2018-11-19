@@ -16,6 +16,9 @@ import 'elements-sk/icon/arrow-drop-up-icon-sk'
  *   An element that indicates sort direction of ascending, descending
  *   or none. They can be joined together via the <code>currentKey</code> property
  *   So that only one is 'active' at a time.
+ *
+ *   It can be clicked to change what is sorted by and which direction
+ *   it is being sorted.
  * </p>
  *
  * @fires sort-change
@@ -78,11 +81,17 @@ window.customElements.define('sort-toggle', class extends HTMLElement {
   set direction(val) { this._direction = val; this._render();}
 
   toggle() {
-    if (this.direction === 'asc') {
-      this.direction = 'desc';
+    if (this.currentKey === this.key) {
+      if (this.direction === 'asc') {
+        this.direction = 'desc';
+      } else {
+        this.direction = 'asc';
+      }
     } else {
+      // Force ascending when we switch what is being sorted by.
       this.direction = 'asc';
     }
+
     /**
      * Sort change event - a user has indicated the sort direction
      * should be changed.

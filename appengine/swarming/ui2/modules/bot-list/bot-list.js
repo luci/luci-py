@@ -26,7 +26,6 @@ import * as query from 'common-sk/modules/query'
 import { stateReflector } from 'common-sk/modules/stateReflector'
 
 import 'elements-sk/checkbox-sk'
-import 'elements-sk/error-toast-sk'
 import 'elements-sk/icon/add-circle-icon-sk'
 import 'elements-sk/icon/cancel-icon-sk'
 import 'elements-sk/icon/expand-less-icon-sk'
@@ -276,7 +275,7 @@ const template = (ele) => html`
       Show All
     </button>
   </main>
-  <footer><error-toast-sk></error-toast-sk></footer>
+  <footer></footer>
 </swarming-app>`;
 
 // How many items to load on the first load of bots
