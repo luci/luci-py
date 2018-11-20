@@ -861,13 +861,20 @@ def dev_oauth_authentication(header, token_info_endpoint, suffix=''):
 # a presence of a delegation token.
 AuthDetails = collections.namedtuple('AuthDetails', [
   'is_superuser',  # True if the caller is GAE-level administrator
+
+  # Populated when using 'gce_vm_authentication' method.
+  'gce_instance',  # name of a GCE VM that is making the call
+  'gce_project',   # name of a GCE project that owns a VM making the call
 ])
 
 
 # pylint: disable=redefined-outer-name
-def new_auth_details(is_superuser=False):
+def new_auth_details(is_superuser=False, gce_instance=None, gce_project=None):
   """Constructs AuthDetails, filling in defaults."""
-  return AuthDetails(is_superuser=is_superuser)
+  return AuthDetails(
+      is_superuser=is_superuser,
+      gce_instance=gce_instance,
+      gce_project=gce_project)
 
 
 class RequestCache(object):
