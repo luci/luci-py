@@ -5,7 +5,9 @@ medium (10000s) scale. It is focused to survive network with low reliability,
 high latency while still having low bot maintenance, and no server maintenance
 at all since it's running on AppEngine.
 
-Swarming is purely a task scheduler service.
+Swarming is purely a task scheduler service. File I/O is done through
+[Isolate](../isolate).
+
 
 [Documentation](doc)
 
