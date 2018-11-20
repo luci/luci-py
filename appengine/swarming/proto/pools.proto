@@ -16,11 +16,10 @@ package swarming;
 // and capacity reasons. Two different pools should not interfere with each
 // other at all (unless explicitly configured to share bots or accounts).
 message PoolsCfg {
+  reserved 2;
+
   // List of all defined pools.
   repeated Pool pool = 1;
-
-  // Currently ignored. To be removed.
-  bool forbid_unknown_pools = 2;
 
   // Configures the default isolate and CIPD services to use for all pools on
   // this server.
