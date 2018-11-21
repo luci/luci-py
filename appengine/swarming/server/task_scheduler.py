@@ -25,6 +25,7 @@ import ts_mon_metrics
 
 from server import bot_management
 from server import config
+from server import external_scheduler
 from server import pools_config
 from server import service_accounts
 from server import task_pack
@@ -45,7 +46,8 @@ def _secs_to_ms(value):
   return int(round(value * 1000.))
 
 
-def _expire_task_tx(now, request, to_run_key, result_summary_key, capacity):
+def _expire_task_tx(now, request, to_run_key, result_summary_key, capacity,
+                    es_cfg):
   """Expires a to_run_key and look for a TaskSlice fallback.
 
   Called as a ndb transaction by _expire_task().
@@ -91,7 +93,7 @@ def _expire_task_tx(now, request, to_run_key, result_summary_key, capacity):
   result_summary.modified_ts = now
 
   futures = ndb.put_multi_async(to_put)
-  _maybe_taskupdate_notify_via_tq(result_summary, request)
+  _maybe_taskupdate_notify_via_tq(result_summary, request, es_cfg)
   for f in futures:
     f.check_success()
 
@@ -149,9 +151,11 @@ def _expire_task(to_run_key, request, inline):
   # When running inline, do not retry too much.
   retries = 1 if inline else 4
 
+  es_cfg = external_scheduler.config_for_task(request)
+
   # It'll be caught by next cron job execution in case of failure.
   run = lambda: _expire_task_tx(
-      now, request, to_run_key, result_summary_key, capacity)
+      now, request, to_run_key, result_summary_key, capacity, es_cfg)
   try:
     summary, new_to_run = datastore_utils.transaction(run, retries=retries)
   except datastore_utils.CommitError:
@@ -181,6 +185,8 @@ def _reap_task(bot_dimensions, bot_version, to_run_key, request):
   # case is specifically handled in cron_handle_bot_died().
   logging.info(
       '_reap_task(%s)', task_pack.pack_result_summary_key(result_summary_key))
+
+  es_cfg = external_scheduler.config_for_task(request)
 
   def run():
     # 3 GET, 1 PUT at the end.
@@ -220,7 +226,7 @@ def _reap_task(bot_dimensions, bot_version, to_run_key, request):
     result_summary.set_from_run_result(run_result, request)
     ndb.put_multi([to_run, run_result, result_summary])
     if result_summary.state != orig_summary_state:
-      _maybe_taskupdate_notify_via_tq(result_summary, request)
+      _maybe_taskupdate_notify_via_tq(result_summary, request, es_cfg)
     return run_result, secret_bytes
 
   # Add it to the negative cache *before* running the transaction. This will
@@ -276,6 +282,7 @@ def _handle_dead_bot(run_result_key):
   server_version = utils.get_app_version()
   packed = task_pack.pack_run_result_key(run_result_key)
   request = request_future.get_result()
+  es_cfg = external_scheduler.config_for_task(request)
 
   def run():
     """Returns tuple(task_is_retried or None, bot_id).
@@ -339,7 +346,7 @@ def _handle_dead_bot(run_result_key):
     futures = ndb.put_multi_async(to_put)
     # if result_summary.state != orig_summary_state:
     if orig_summary_state != result_summary.state:
-      _maybe_taskupdate_notify_via_tq(result_summary, request)
+      _maybe_taskupdate_notify_via_tq(result_summary, request, es_cfg)
     for f in futures:
       f.check_success()
 
@@ -399,8 +406,14 @@ def _maybe_pubsub_notify_now(result_summary, request):
   return True
 
 
-def _maybe_taskupdate_notify_via_tq(result_summary, request):
+def _maybe_taskupdate_notify_via_tq(result_summary, request, es_cfg):
   """Examines result_summary and enqueues a task to send PubSub message.
+
+  Arguments:
+    result_summary: a task_result.TaskResultSummary instance.
+    request: a task_request.TaskRequest instance.
+    es_cfg: a pool_config.ExternalSchedulerConfig instance if one exists
+            for this task, or None otherwise.
 
   Must be called within a transaction.
 
@@ -424,6 +437,13 @@ def _maybe_taskupdate_notify_via_tq(result_summary, request):
         }))
     if not ok:
       raise datastore_utils.CommitError('Failed to enqueue task')
+
+  if es_cfg:
+    # TODO(akeshet): Put these calls on a task queue so they do not block the
+    # transaction we are in (via a similar mechanism to the pubsub messages
+    # above). In the meantime, only tasks that use an external scheduler will
+    # be adversely affected by this code.
+    external_scheduler.notify_request(es_cfg, request, result_summary)
 
 
 def _pubsub_notify(task_id, topic, auth_token, userdata):
@@ -685,6 +705,49 @@ def _bot_update_tx(
   return result_summary, run_result, None
 
 
+def _get_task_from_external_scheduler(es_cfg, bot_dimensions):
+  """Gets a task to run from external scheduler.
+
+  Arguments:
+    es_cfg: pool_config.ExternalSchedulerConfig instance.
+    bot_dimensions: dimensions {string key: list of string values}
+
+  Returns: [(TaskRequest, TaskToRun)] if a task was available,
+           or [] otherwise.
+  """
+  task_id, slice_number = external_scheduler.assign_task(es_cfg, bot_dimensions)
+  if not task_id:
+    return []
+
+  logging.info('Got task id %s', task_id)
+  request_key, result_key = task_pack.get_request_and_result_keys(task_id)
+  # Note (per maruel@): the result key will be a TaskRunResult if it is encoded
+  # as such ending with '1' or '2'. When '0' is the trailing number, it refers
+  # to the overall TaskResultSummary.
+  # TODO(akeshet): Decide whether we want the external scheduler to deal with
+  # per-try task IDs, or per-request task IDs.
+  logging.info('Determined request_key, result_key %s, %s', request_key,
+               result_key)
+  request = request_key.get()
+  result_summary = result_key.get()
+
+  # result_summary.try_number is:
+  # 0 or None when the first try is pending.
+  # 1 once the first try started.
+  # 1 when the second try is pending.
+  # 2 once the second try started.
+  try_number = (result_summary.try_number or 0) + 1
+
+  logging.info('Determined try_number, slice_number %s %s', try_number,
+               slice_number)
+  to_run_key = task_to_run.request_to_task_to_run_key(request, try_number,
+                                                      slice_number)
+  to_run = to_run_key.get()
+  # TODO(akeshet/maruel): Figure out how to unpack a TaskToRun from the
+  # returned result_key.
+  return [(request, to_run)]
+
+
 ### Public API.
 
 
@@ -839,12 +902,27 @@ def schedule_request(request, secret_bytes):
       result_summary.abandoned_ts = result_summary.created_ts
       result_summary.state = task_result.State.NO_RESOURCE
 
+  # Determine external scheduler (if relevant) prior to making task live, to
+  # make HTTP handler return as fast as possible after making task live.
+  es_cfg = external_scheduler.config_for_task(request)
+
   # Storing these entities makes this task live. It is important at this point
   # that the HTTP handler returns as fast as possible, otherwise the task will
   # be run but the client will not know about it.
   _gen_key = lambda: _gen_new_keys(result_summary, to_run, secret_bytes)
   extra = filter(bool, [result_summary, to_run, secret_bytes])
   datastore_utils.insert(request, new_key_callback=_gen_key, extra=extra)
+
+  # TODO(akeshet): This external_scheduler call is blocking, and adds risk
+  # of the HTTP handler being slow or dying after the task was already made
+  # live. On the other hand, this call is only being made for tasks in a pool
+  # that use an external scheduler, and which are not effectively live unless
+  # the external scheduler is aware of them. Consider a mechanism where this
+  # call could be made asynchronously, but errors back-propagated to the task.
+  if es_cfg:
+    # TODO(akeshet): Add error handling.
+    external_scheduler.notify_request(es_cfg, request, result_summary)
+
   if dupe_summary:
     logging.debug(
         'New request %s reusing %s', result_summary.task_id,
@@ -889,6 +967,13 @@ def bot_reap_task(bot_dimensions, bot_version, deadline):
   The process is to find a TaskToRun where its .queue_number is set, then
   create a TaskRunResult for it.
 
+  Arguments:
+  - bot_dimensions: The dimensions of the bot as a dictionary in
+          {string key: list of string values} format.
+  - bot_version: String version of the bot client.
+  - deadline: UTC timestamp (as an int) that the bot must be able to
+              complete the task by. None if there is no such deadline.
+
   Returns:
     tuple of (TaskRequest, SecretBytes, TaskRunResult) for the task that was
     reaped. The TaskToRun involved is not returned.
@@ -901,8 +986,12 @@ def bot_reap_task(bot_dimensions, bot_version, deadline):
   failures = 0
   stale_index = 0
   try:
-    q = task_to_run.yield_next_available_task_to_dispatch(
-        bot_dimensions, deadline)
+    es_cfg = external_scheduler.config_for_bot(bot_dimensions)
+    if es_cfg:
+      q = _get_task_from_external_scheduler(es_cfg, bot_dimensions)
+    else:
+      q = task_to_run.yield_next_available_task_to_dispatch(bot_dimensions,
+                                                            deadline)
     for request, to_run in q:
       iterated += 1
       slice_index = task_to_run.task_to_run_key_slice_index(to_run.key)
@@ -1065,6 +1154,7 @@ def bot_kill_task(run_result_key, bot_id):
   server_version = utils.get_app_version()
   now = utils.utcnow()
   packed = task_pack.pack_run_result_key(run_result_key)
+  es_cfg = external_scheduler.config_for_task(request)
 
   def run():
     run_result, result_summary = ndb.get_multi(
@@ -1085,7 +1175,7 @@ def bot_kill_task(run_result_key, bot_id):
     result_summary.set_from_run_result(run_result, request)
 
     futures = ndb.put_multi_async((run_result, result_summary))
-    _maybe_taskupdate_notify_via_tq(result_summary, request)
+    _maybe_taskupdate_notify_via_tq(result_summary, request, es_cfg)
     for f in futures:
       f.check_success()
 
@@ -1124,6 +1214,7 @@ def cancel_task(request, result_key, kill_running):
     # "pending".
     result_key = task_pack.run_result_key_to_result_summary_key(result_key)
   now = utils.utcnow()
+  es_cfg = external_scheduler.config_for_task(request)
 
   def run():
     """1 DB GET, 1 memcache write, 2x DB PUTs, 1x task queue."""
@@ -1168,7 +1259,7 @@ def cancel_task(request, result_key, kill_running):
     result_summary.modified_ts = now
 
     futures = ndb.put_multi_async(entities)
-    _maybe_taskupdate_notify_via_tq(result_summary, request)
+    _maybe_taskupdate_notify_via_tq(result_summary, request, es_cfg)
     for f in futures:
       f.check_success()
     return True, was_running

@@ -102,8 +102,8 @@ message Pool {
 
   // If specified, this is the description of the external schedulers to be used
   // for tasks and bots for this pool that match the dimension set of a scheduler.
-  // If there are multiple items in this list, then the first one that matches
-  // the dimension set of a given task or bot will be used for that task or bot.
+  // For a given task or bot, the first entry in this list that matches based on
+  // dimension eligibility will be used.
   repeated ExternalSchedulerConfig external_schedulers = 9;
 }
 
@@ -361,8 +361,10 @@ message ExternalSchedulerConfig {
   string id = 2;
 
   // Dimensions is a list of dimension strings in "key:value" format (e.g.
-  // ["os:foo", "featureX:bar"]). A task or bot will use this external scheduler
-  // if and only if the task or bot contains all of these dimensions.
+  // ["os:foo", "featureX:bar"]) that determines eligibility for a bot or task
+  // to use this external scheduler. In particular:
+  // - a bot will be eligible if it contains all of these dimensions.
+  // - a task will be eligible if all its slices contain all these dimensions.
   //
   // Note of care: if this list is empty, that means all requests in the pool
   // are eligible to be forwarded to it.
