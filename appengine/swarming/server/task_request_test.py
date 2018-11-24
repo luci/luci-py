@@ -1409,23 +1409,24 @@ class TaskRequestApiTest(TestCase):
       pass
     now = utils.utcnow()
     self.mock_now(now, 0)
-    request_1 = _gen_request_slices()
-    request_1.key = task_request.new_request_key()
-    request_1.put()
-    foo_1 = Foo(parent=request_1.key, id=1)
-    foo_1.put()
+    request_old = _gen_request_slices()
+    request_old.key = task_request.new_request_key()
+    request_old.put()
+    # Create a dummy child entity to ensure it's deleted too.
+    foo_old = Foo(parent=request_old.key, id=1)
+    foo_old.put()
     self.mock_now(now, 1)
-    request_2 = _gen_request_slices()
-    request_2.key = task_request.new_request_key()
-    request_2.put()
-    foo_2 = Foo(parent=request_2.key, id=2)
-    foo_2.put()
+    request_newer = _gen_request_slices()
+    request_newer.key = task_request.new_request_key()
+    request_newer.put()
+    foo_newer = Foo(parent=request_newer.key, id=2)
+    foo_newer.put()
     self.mock_now(now + task_request._OLD_TASK_REQUEST_CUT_OFF, 0)
     self.assertEqual(1, task_request.cron_delete_old_task_requests())
-    # Make sure the right one still exists.
+    # Make sure the newer one still exists.
     actual = task_request.TaskRequest.query().fetch(keys_only=True)
-    self.assertEqual([request_1.key], actual)
-    self.assertEqual([foo_1.key], Foo.query().fetch(keys_only=True))
+    self.assertEqual([request_newer.key], actual)
+    self.assertEqual([foo_newer.key], Foo.query().fetch(keys_only=True))
 
 
 if __name__ == '__main__':
