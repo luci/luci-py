@@ -17,7 +17,7 @@ from components import net
 from components.prpc import codes
 from components.prpc import encoding
 
-_BINARY_MIME_TYPE = encoding.Encoding.header(encoding.Encoding.BINARY)
+_BINARY_MEDIA_TYPE = encoding.Encoding.media_type(encoding.Encoding.BINARY)
 
 
 # A low-level pRPC request to be sent using components.net module.
@@ -118,8 +118,8 @@ def rpc_async(req):
   timeout = req.timeout or 10
 
   headers = (req.metadata or {}).copy()
-  headers['Content-Type'] = _BINARY_MIME_TYPE
-  headers['Accept'] = _BINARY_MIME_TYPE
+  headers['Content-Type'] = _BINARY_MEDIA_TYPE
+  headers['Accept'] = _BINARY_MEDIA_TYPE
   headers['X-Prpc-Timeout'] = '%dS' % timeout
 
   try:

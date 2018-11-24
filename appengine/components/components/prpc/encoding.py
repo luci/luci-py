@@ -7,11 +7,11 @@ from google.protobuf import json_format, text_format
 
 class Encoding(object):
   BINARY = (0, 'application/prpc; encoding=binary')
-  JSON   = (1, 'application/prpc; encoding=json')
+  JSON   = (1, 'application/json')
   TEXT   = (2, 'application/prpc; encoding=text')
 
   @staticmethod
-  def header(encoding):
+  def media_type(encoding):
     return encoding[1]
 
 

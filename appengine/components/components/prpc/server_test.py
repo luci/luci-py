@@ -95,6 +95,7 @@ class PRPCServerTestCase(test_case.TestCase):
       self.assertEqual(headers['Access-Control-Allow-Origin'], origin)
       self.assertEqual(headers['Vary'], 'Origin')
       self.assertEqual(headers['Access-Control-Allow-Credentials'], 'true')
+    self.assertEqual(headers['X-Content-Type-Options'], 'nosniff')
     self.assertEqual(headers['X-Prpc-Grpc-Code'], str(prpc_code.value))
     self.assertEqual(
         headers['Access-Control-Expose-Headers'],

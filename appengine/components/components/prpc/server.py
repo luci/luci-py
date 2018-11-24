@@ -171,8 +171,9 @@ class Server(object):
         self.response.headers['X-Prpc-Grpc-Code'] = str(context._code.value)
         self.response.headers['Access-Control-Expose-Headers'] = (
             'X-Prpc-Grpc-Code')
+        self.response.headers['X-Content-Type-Options'] = 'nosniff'
         if content is not None:
-          self.response.headers['Content-Type'] = encoding.Encoding.header(
+          self.response.headers['Content-Type'] = encoding.Encoding.media_type(
               context._response_encoding)
           self.response.out.write(content)
         elif context._details is not None:
