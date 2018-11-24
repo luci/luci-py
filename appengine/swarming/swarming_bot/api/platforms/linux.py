@@ -94,6 +94,23 @@ def _get_nvidia_version():
     return None
 
 
+@tools.cached
+def _get_intel_version():
+  """Retrieves the Mesa DRI driver version, which is usable as the Intel GPU
+  driver version.
+  """
+  try:
+    out = subprocess.check_output(['dpkg', '-s', 'libgl1-mesa-dri'])
+    # Looks like 'Version: 17.2.8-0ubuntu0~17.10.1', and we need '17.2.8'.
+    for line in out.splitlines():
+      match = re.match(r'^Version: (\d+.\d+.\d+)', line)
+      if match:
+        return match.group(1)
+    return None
+  except (OSError, subprocess.CalledProcessError):
+    return None
+
+
 def _read_cpuinfo():
   with open('/proc/cpuinfo', 'rb') as f:
     return f.read()
@@ -232,6 +249,8 @@ def get_gpu():
     version = u''
     if ven_id == gpu.NVIDIA:
       version = _get_nvidia_version()
+    elif ven_id == gpu.INTEL:
+      version = _get_intel_version()
     ven_name, dev_name = gpu.ids_to_names(ven_id, ven_name, dev_id, dev_name)
 
     dimensions.add(unicode(ven_id))
