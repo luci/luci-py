@@ -452,7 +452,7 @@ class SwarmingTasksService(remote.Service):
       # otherwise.
       request_obj._pre_put_hook()
     except (datastore_errors.BadValueError, TypeError, ValueError) as e:
-      logging.exception('Here\'s what was wrong in the user new task request:')
+      logging.warning('Incorrect new task request', exc_info=True)
       raise endpoints.BadRequestException(e.message)
 
     # Make sure the caller is actually allowed to schedule the task before
