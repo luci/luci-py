@@ -174,7 +174,7 @@ def endpoints_method(
         return func(service, *args, **kwargs)
       except endpoints.BadRequestException as e:
         # Useful to debug HTTP 400s.
-        logging.exception('%s', e)
+        logging.warning('%s', e, exc_info=True)
         raise
       except api.AuthenticationError as ex:
         logging.warning(
