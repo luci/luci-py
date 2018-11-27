@@ -10,6 +10,7 @@ import getpass
 import logging
 import optparse
 import os
+import string
 import subprocess
 import sys
 
@@ -108,46 +109,67 @@ def calculate_version(root, tag, additional_chars=0):
   """Returns a tag for a git checkout.
 
   Uses the pseudo revision number from the upstream commit this branch is based
-  on, the abbreviated commit hash. Adds -tainted-<username> if the code is not
-  pristine and optionally adds a tag to further describe it. If version is over
-  63 characters, some truncation is attempted, potentially raising an error if
-  we can't get the version under 63 characters. 'additional_chars' indicates
-  that additional characters will be added, and thus that the limit for version
+  on, the abbreviated commit hash. Adds -tainted-<username>-<tag> if the code is
+  not pristine. Use the branch name is tag is not specified. If version is over
+  63 characters, truncation is done. 'additional_chars' indicates that
+  additional characters will be added, and thus that the limit for version
   should actually be 63 - additional_chars.
-
-  Raises:
-    VersionError: version cannot be generated using at most 63 characters.
   """
   pseudo_revision, mergebase = get_head_pseudo_revision(root, 'origin/master')
   pristine = is_pristine(root, mergebase)
   user = getpass.getuser()
+  if not pristine and not tag:
+    # Automatically add the branch name as a tag if possible.
+    tag = _get_cleaned_git_branch_name(root)
 
   # Per https://tools.ietf.org/html/rfc1035#section-2.3.1 and
   # https://tools.ietf.org/html/rfc2181#section-11, labels in domains can't be
   # more than 63 chars - additional_chars.
-  return get_limited_version(pseudo_revision, mergebase, pristine, user, tag,
+  return _get_limited_version(pseudo_revision, mergebase, pristine, user, tag,
                              63 - additional_chars)
 
 
-def get_limited_version(pseudo_revision, mergebase, pristine, user, tag, limit):
+def _get_cleaned_git_branch_name(root):
+  """Returns the current git branch name if appropriate to use as an AppEngine
+  version tag.
+  """
+  branch = git(['rev-parse', '--abbrev-ref', 'HEAD'], cwd=root).strip()
+  if branch == 'HEAD':
+    return ''
+  # The official regexp is '^(?:^(?!-)[a-z\d\-]{0,62}[a-z\d]$)$'.
+  valid = string.ascii_lowercase + string.digits + '-'
+  # Strip unexpected characters. At worst it'll be an empty string, which will
+  # result in no tag.
+  clean = branch.lower().replace('_', '-').strip('-').lower()
+  return ''.join(b for b in clean if b in valid)
+
+
+def _get_limited_version(
+    pseudo_revision, mergebase, pristine, user, tag, limit):
   """Return version, limited to the given 'limit' number of chars.
 
-  Raises:
-    VersionError: version cannot be generated using at most 'limit' chars.
+  Arguments:
+  - pseudo_revision (int): representing the number of commits since the root
+        commit.
+  - mergebase (str): commit hash of the root commit upstream this branch is
+        based on.
+  - pristine (bool): specify if HEAD is a commit in upstream.
+  - user (str): current user name.
+  - tag (str): suffix to append.
+  - limit (int): maximum number of characters the returned string will have.
+
+  If it's short enough, return it as-is. Otherwise:
+  - trim '-tainted'.
+  - trim username while keeping a minimum of 6 characters.
+  - cut the tag off.
   """
   tainted_text = '-tainted-%s' % user if not pristine else ''
-  version = get_version(pseudo_revision, mergebase, tainted_text, tag)
+  version = _get_version(pseudo_revision, mergebase, tainted_text, tag)
 
   # If already under the limit, return what we have.
   orig_version_len = len(version)
   if orig_version_len <= limit:
     return version
-
-  # All our attempts to shorten the version currently involve shortening
-  # tainted_text, so if there is no tainted_text, we're powerless, bail now.
-  if not tainted_text:
-    raise VersionError('Failed to truncate "%s" ' % version +
-      '(length=%d, limit=%d): version is pristine.' % (len(version), limit))
 
   # Shorten tainted_text by excluding '-tainted' (saves 8 chars) and truncating
   # user as needed to fit in the char limit, though (somewhat arbitrarily) we
@@ -157,7 +179,7 @@ def get_limited_version(pseudo_revision, mergebase, pristine, user, tag, limit):
   min_user_chars = 6
 
   # Try with full username (just removing '-tainted').
-  version = get_version(pseudo_revision, mergebase, '-%s' % user, tag)
+  version = _get_version(pseudo_revision, mergebase, '-%s' % user, tag)
   if len(version) <= limit:
     return version
 
@@ -165,27 +187,17 @@ def get_limited_version(pseudo_revision, mergebase, pristine, user, tag, limit):
   # 8 chars of tainted), bailing if we try to go lower than min_user_chars.
   current_chars_without_user = orig_version_len - len(user) - 8
   chars_for_user = limit - current_chars_without_user
-  if chars_for_user < min_user_chars:
-    tainted_text = '-%s' % user[:min_user_chars]
-    version = get_version(pseudo_revision, mergebase, tainted_text, tag)
-    raise VersionError('Failed to truncate "%s" ' % version +
-      '(length=%d, limit=%d): ' % (len(version), limit) +
-      'refusing to truncate username to %d (< %d) chars.' %
-        (chars_for_user, min_user_chars))
+  tainted_text = '-%s' % user[:max(min_user_chars, chars_for_user)]
+  version = _get_version(
+      pseudo_revision, mergebase, tainted_text, tag).strip('-')
+  if len(version) <= limit:
+    return version
 
-  # Regenerate smaller version.
-  tainted_text = '-%s' % user[:chars_for_user]
-  version = get_version(pseudo_revision, mergebase, tainted_text, tag)
-
-  # Sanity check that version is now at most 'limit' chars.
-  if len(version) > limit:
-    raise VersionError('Internal error: failed to truncate "%s" ' % version +
-      '(length=%d, limit=%d)' % (len(version), limit))
-
-  return version
+  # Regenerate an even smaller version by cutting off the tag.
+  return version[:limit].rstrip('-')
 
 
-def get_version(pseudo_revision, mergebase, tainted_text, tag):
+def _get_version(pseudo_revision, mergebase, tainted_text, tag):
   """Returns version based on given args."""
 
   # Build version, trimming mergebase to 7 characters like 'git describe' does
