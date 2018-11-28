@@ -337,10 +337,16 @@ def get_info_key(bot_id):
 def get_events_query(bot_id, order):
   """Returns an ndb.Query for most recent events in reverse chronological order.
   """
-  query = BotEvent.query(ancestor=get_root_key(bot_id))
+  # Disable the in-process local cache. This is important, as there can be up to
+  # a thousand entities loaded in memory, and this is a pure memory leak, as
+  # there's no chance this specific instance will need these again, therefore
+  # this leads to 'Exceeded soft memory limit' AppEngine errors.
+  q = BotEvent.query(
+      default_options=ndb.QueryOptions(use_cache=False),
+      ancestor=get_root_key(bot_id))
   if order:
-    query = query.order(BotEvent.key)
-  return query
+    q = q.order(BotEvent.key)
+  return q
 
 
 def get_settings_key(bot_id):

@@ -637,13 +637,17 @@ class SwarmingTasksService(remote.Service):
           'You must specify tags when cancelling multiple tasks.')
 
     now = utils.utcnow()
-    query = task_result.TaskResultSummary.query(
-        task_result.TaskResultSummary.state == task_result.State.PENDING)
+    # Disable the in-process local cache. This is important, as there can be up
+    # to a thousand entities loaded in memory, and this is a pure memory leak,
+    # as there's no chance this specific instance will need these again,
+    # therefore this leads to 'Exceeded soft memory limit' AppEngine errors.
+    q = task_result.TaskResultSummary.query(
+        task_result.TaskResultSummary.state == task_result.State.PENDING,
+        default_options=ndb.QueryOptions(use_cache=False))
     for tag in request.tags:
-      query = query.filter(task_result.TaskResultSummary.tags == tag)
+      q = q.filter(task_result.TaskResultSummary.tags == tag)
 
-    tasks, cursor = datastore_utils.fetch_page(query, request.limit,
-                                               request.cursor)
+    tasks, cursor = datastore_utils.fetch_page(q, request.limit, request.cursor)
 
     if tasks:
       payload = json.dumps(
@@ -737,7 +741,12 @@ class SwarmingQueuesService(remote.Service):
   def list(self, request):
     logging.debug('%s', request)
     now = utils.utcnow()
-    q = task_queues.TaskDimensions.query()
+    # Disable the in-process local cache. This is important, as there can be up
+    # to a thousand entities loaded in memory, and this is a pure memory leak,
+    # as there's no chance this specific instance will need these again,
+    # therefore this leads to 'Exceeded soft memory limit' AppEngine errors.
+    q = task_queues.TaskDimensions.query(
+        default_options=ndb.QueryOptions(use_cache=False))
     cursor = request.cursor
     out = []
     count = 0
@@ -897,16 +906,15 @@ class SwarmingBotService(remote.Service):
       start = message_conversion.epoch_to_datetime(request.start)
       end = message_conversion.epoch_to_datetime(request.end)
       order = not (start or end)
-      query = bot_management.get_events_query(request.bot_id, order)
+      q = bot_management.get_events_query(request.bot_id, order)
       if not order:
-        query = query.order(
-            -bot_management.BotEvent.ts, bot_management.BotEvent.key)
+        q = q.order(-bot_management.BotEvent.ts, bot_management.BotEvent.key)
       if start:
-        query = query.filter(bot_management.BotEvent.ts >= start)
+        q = q.filter(bot_management.BotEvent.ts >= start)
       if end:
-        query = query.filter(bot_management.BotEvent.ts < end)
+        q = q.filter(bot_management.BotEvent.ts < end)
       items, cursor = datastore_utils.fetch_page(
-          query, request.limit, request.cursor)
+          q, request.limit, request.cursor)
     except ValueError as e:
       raise endpoints.BadRequestException(
           'Inappropriate filter for bot.events: %s' % e)
@@ -973,13 +981,13 @@ class SwarmingBotService(remote.Service):
       start = message_conversion.epoch_to_datetime(request.start)
       end = message_conversion.epoch_to_datetime(request.end)
       now = utils.utcnow()
-      query = task_result.get_run_results_query(
+      q = task_result.get_run_results_query(
           start, end,
           request.sort.name.lower(),
           request.state.name.lower(),
           request.bot_id)
       items, cursor = datastore_utils.fetch_page(
-          query, request.limit, request.cursor)
+          q, request.limit, request.cursor)
     except ValueError as e:
       raise endpoints.BadRequestException(
           'Inappropriate filter for bot.tasks: %s' % e)
@@ -1030,7 +1038,12 @@ class SwarmingBotsService(remote.Service):
     """
     logging.debug('%s', request)
     now = utils.utcnow()
-    q = bot_management.BotInfo.query()
+    # Disable the in-process local cache. This is important, as there can be up
+    # to a thousand entities loaded in memory, and this is a pure memory leak,
+    # as there's no chance this specific instance will need these again,
+    # therefore this leads to 'Exceeded soft memory limit' AppEngine errors.
+    q = bot_management.BotInfo.query(
+        default_options=ndb.QueryOptions(use_cache=False))
     try:
       q = bot_management.filter_dimensions(q, request.dimensions)
       q = bot_management.filter_availability(

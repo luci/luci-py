@@ -1148,69 +1148,71 @@ def _datetime_to_key(date):
   return task_request.convert_to_request_key(date)
 
 
-def _filter_query(cls, query, start, end, sort, state):
+def _filter_query(cls, q, start, end, sort, state):
   """Filters a query by creation time, state and order."""
   # Inequalities are <= and >= because keys are in reverse chronological
   # order.
   start_key = _datetime_to_key(start)
   if start_key:
-    query = query.filter(TaskRunResult.key <= start_key)
+    q = q.filter(TaskRunResult.key <= start_key)
   end_key = _datetime_to_key(end)
   if end_key:
-    query = query.filter(TaskRunResult.key >= end_key)
-  query = query.order(_sort_property(sort))
+    q = q.filter(TaskRunResult.key >= end_key)
+  q = q.order(_sort_property(sort))
 
   if sort != 'created_ts' and (start or end):
     raise ValueError('Cannot both sort and use timestamp filtering')
 
   if state == 'all':
-    return query
+    return q
 
   if state == 'pending':
-    return query.filter(cls.state == State.PENDING)
+    return q.filter(cls.state == State.PENDING)
 
   if state == 'running':
-    return query.filter(cls.state == State.RUNNING)
+    return q.filter(cls.state == State.RUNNING)
 
   if state == 'pending_running':
     # cls.state <= State.PENDING would work.
-    return query.filter(
+    return q.filter(
         ndb.OR(
             cls.state == State.PENDING,
             cls.state == State.RUNNING))
 
   if state == 'completed':
-    return query.filter(cls.state == State.COMPLETED)
+    return q.filter(cls.state == State.COMPLETED)
 
   if state == 'completed_success':
-    query = query.filter(cls.state == State.COMPLETED)
-    return query.filter(cls.failure == False)
+    q = q.filter(cls.state == State.COMPLETED)
+    # pylint: disable=singleton-comparison
+    return q.filter(cls.failure == False)
 
   if state == 'completed_failure':
-    query = query.filter(cls.state == State.COMPLETED)
-    return query.filter(cls.failure == True)
+    q = q.filter(cls.state == State.COMPLETED)
+    # pylint: disable=singleton-comparison
+    return q.filter(cls.failure == True)
 
   if state == 'deduped':
-    query = query.filter(cls.state == State.COMPLETED)
-    return query.filter(cls.try_number == 0)
+    q = q.filter(cls.state == State.COMPLETED)
+    return q.filter(cls.try_number == 0)
 
   if state == 'expired':
-    return query.filter(cls.state == State.EXPIRED)
+    return q.filter(cls.state == State.EXPIRED)
 
   if state == 'timed_out':
-    return query.filter(cls.state == State.TIMED_OUT)
+    return q.filter(cls.state == State.TIMED_OUT)
 
   if state == 'bot_died':
-    return query.filter(cls.state == State.BOT_DIED)
+    return q.filter(cls.state == State.BOT_DIED)
 
   if state == 'canceled':
-    return query.filter(cls.state == State.CANCELED)
+    return q.filter(cls.state == State.CANCELED)
 
   if state == 'killed':
-    return query.filter(cls.state == State.KILLED)
+    return q.filter(cls.state == State.KILLED)
 
   if state == 'no_resource':
-    return query.filter(cls.state == State.NO_RESOURCE)
+    return q.filter(cls.state == State.NO_RESOURCE)
 
   raise ValueError('Invalid state')
 
@@ -1287,8 +1289,14 @@ def get_run_results_query(start, end, sort, state, bot_id):
   """
   if not bot_id:
     raise ValueError('bot_id is required')
-  query = TaskRunResult.query(TaskRunResult.bot_id == bot_id)
-  return _filter_query(TaskRunResult, query, start, end, sort, state)
+  # Disable the in-process local cache. This is important, as there can be up to
+  # a thousand entities loaded in memory, and this is a pure memory leak, as
+  # there's no chance this specific instance will need these again, therefore
+  # this leads to 'Exceeded soft memory limit' AppEngine errors.
+  q = TaskRunResult.query(
+      TaskRunResult.bot_id == bot_id,
+      default_options=ndb.QueryOptions(use_cache=False))
+  return _filter_query(TaskRunResult, q, start, end, sort, state)
 
 
 def get_result_summaries_query(start, end, sort, state, tags):
@@ -1302,7 +1310,12 @@ def get_result_summaries_query(start, end, sort, state, tags):
     state: One of State enum value as str. Use 'all' to get all tasks.
     tags: List of search for one or multiple task tags.
   """
-  query = TaskResultSummary.query()
+  # Disable the in-process local cache. This is important, as there can be up to
+  # a thousand entities loaded in memory, and this is a pure memory leak, as
+  # there's no chance this specific instance will need these again, therefore
+  # this leads to 'Exceeded soft memory limit' AppEngine errors.
+  q = TaskResultSummary.query(
+      default_options=ndb.QueryOptions(use_cache=False))
   # Filter by one or more tags.
   if tags:
     # Add TaskResultSummary indexes if desired.
@@ -1312,8 +1325,8 @@ def get_result_summaries_query(start, end, sort, state, tags):
     tags_filter = TaskResultSummary.tags == tags[0]
     for tag in tags[1:]:
       tags_filter = ndb.AND(tags_filter, TaskResultSummary.tags == tag)
-    query = query.filter(tags_filter)
-  return _filter_query(TaskResultSummary, query, start, end, sort, state)
+    q = q.filter(tags_filter)
+  return _filter_query(TaskResultSummary, q, start, end, sort, state)
 
 
 def cron_delete_old_task_output_chunks():
