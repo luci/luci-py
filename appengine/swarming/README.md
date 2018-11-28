@@ -18,7 +18,6 @@ Visit https://goto.google.com/swarming-releases for the Chrome Operations
 release process.
 
 
-
 ## Setting up
 
 *   Visit http://console.cloud.google.com and create a project. Replace
