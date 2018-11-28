@@ -25,6 +25,16 @@ cron:
   schedule: every 1 minutes synchronized
   target: backend
 
+- description: Delete old TaskOutputChunk
+  url: /internal/cron/delete_old_task_output_chunks
+  schedule: every 5 minutes synchronized
+  target: backend
+
+- description: Delete old TaskRequest
+  url: /internal/cron/delete_old_tasks
+  schedule: every 5 minutes synchronized
+  target: backend
+
 
 ### Bots
 
