@@ -221,6 +221,9 @@ KNOWN_CPU_SCALING_GOVERNOR_VALUES = (
     # hotplug is alike ondemand but enables turning off unused CPU cores during
     # periods of low utilization.
     'hotplug',
+    # schedutil uses CPU utilization data available from the CPU scheduler
+    # https://www.kernel.org/doc/html/v4.14/admin-guide/pm/cpufreq.html#schedutil
+    'schedutil',
 )
 
 
