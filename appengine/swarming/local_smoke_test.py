@@ -181,14 +181,14 @@ class SwarmingClient(object):
     except ValueError:
       print >> sys.stderr, 'Bad json:\n%s' % data
       raise
-    outputs = {}
+    file_outputs = {}
     for root, _, files in fs.walk(tmpdir):
       for i in files:
         p = os.path.join(root, i)
         name = p[len(tmpdir)+1:]
         with fs.open(p, 'rb') as f:
-          outputs[name] = f.read()
-    return summary, outputs
+          file_outputs[name] = f.read()
+    return summary, file_outputs
 
   def task_cancel(self, task_id, args):
     """Cancels a task."""
@@ -269,22 +269,16 @@ class SwarmingClient(object):
 
 def gen_expected(**kwargs):
   expected = {
-    u'abandoned_ts': None,
     u'bot_dimensions': None,
     u'bot_id': unicode(socket.getfqdn().split('.', 1)[0]),
-    u'children_task_ids': [],
-    u'cost_saved_usd': None,
     u'current_task_slice': u'0',
-    u'deduped_from': None,
-    u'exit_codes': [0],
+    u'exit_code': u'0',
     u'failure': False,
     u'internal_failure': False,
-    u'isolated_out': None,
     u'name': u'',
-    u'outputs': [u'hi\n'],
-    u'outputs_ref': None,
+    u'output': u'hi\n',
     u'server_versions': [u'N/A'],
-    u'state': 0x70,  # task_result.State.COMPLETED.
+    u'state': u'COMPLETED',
     u'tags': [
       u'pool:default',
       u'priority:200',
@@ -293,13 +287,9 @@ def gen_expected(**kwargs):
       u'swarming.pool.version:pools_cfg_rev',
       u'user:joe@localhost',
     ],
-    u'try_number': 1,
+    u'try_number': u'1',
     u'user': u'joe@localhost',
   }
-  # This is not part of the 'old' protocol that is emulated in
-  # convert_to_old_format.py in //client/swarming.py.
-  keys = set(expected) | {u'performance_stats'}
-  assert keys.issuperset(kwargs)
   expected.update({unicode(k): v for k, v in kwargs.iteritems()})
   return expected
 
@@ -352,12 +342,14 @@ class Test(unittest.TestCase):
       # This assumes that starting the bot and running the previous test case
       # took more than 1s.
       if not started_ts or new_started_ts != started_ts:
-        dimensions = {i['key']: i['value'] for i in state['dimensions']}
-        self.assertNotIn(u'caches', dimensions)
+        self.assertNotIn(u'caches', state['dimensions'])
         break
 
   def gen_expected(self, **kwargs):
-    return gen_expected(bot_dimensions=self.dimensions, **kwargs)
+    dims = [
+      {u'key': k, u'value': v} for k, v in sorted(self.dimensions.iteritems())
+    ]
+    return gen_expected(bot_dimensions=dims, **kwargs)
 
   def test_raw_bytes_and_dupe_dimensions(self):
     # A string of a letter 'A', UTF-8 BOM then UTF-16 BOM then UTF-EDBCDIC then
@@ -378,7 +370,7 @@ class Test(unittest.TestCase):
     summary = self.gen_expected(
         name=u'non_utf8',
         # The string is mostly converted to 'Replacement Character'.
-        outputs=[u'A\ufeff\ufffd\ufffd\ufffdsfs\ufffd(B\n'],
+        output=u'A\ufeff\ufffd\ufffd\ufffdsfs\ufffd(B\n',
         tags=sorted([
           u'os:' + self.dimensions['os'][0],
           u'os:' + self.dimensions['os'][1],
@@ -395,9 +387,9 @@ class Test(unittest.TestCase):
     args = ['-T', 'invalid', '--', 'unknown_invalid_command']
     summary = self.gen_expected(
         name=u'invalid',
-        exit_codes=[1],
+        exit_code=u'1',
         failure=True,
-        outputs=re.compile(
+        output=re.compile(
             u'^<The executable does not exist or a dependent library is '
             u'missing>'))
     self.assertOneTask(args, summary, {})
@@ -412,9 +404,9 @@ class Test(unittest.TestCase):
     ]
     summary = self.gen_expected(
         name=u'hard_timeout',
-        exit_codes=[SIGNAL_TERM],
+        exit_code=unicode(SIGNAL_TERM),
         failure=True,
-        state=0x40)  # task_result.State.TIMED_OUT
+        state=u'TIMED_OUT')
     self.assertOneTask(args, summary, {})
 
   def test_io_timeout(self):
@@ -427,9 +419,9 @@ class Test(unittest.TestCase):
     ]
     summary = self.gen_expected(
         name=u'io_timeout',
-        exit_codes=[SIGNAL_TERM],
+        exit_code=unicode(SIGNAL_TERM),
         failure=True,
-        state=0x40)  # task_result.State.TIMED_OUT
+        state=u'TIMED_OUT')
     self.assertOneTask(args, summary, {})
 
   def test_success_fails(self):
@@ -449,7 +441,7 @@ class Test(unittest.TestCase):
         get_cmd('simple_failure', 1),
         (
           self.gen_expected(
-              name=u'simple_failure', exit_codes=[1], failure=True),
+              name=u'simple_failure', exit_code=u'1', failure=True),
           {},
         ),
       ),
@@ -484,12 +476,11 @@ class Test(unittest.TestCase):
           f.write('test_isolated')
         """),
     }
-    isolated_out = self._out(u'f067c9cf13dcc90f2fe269499d44082150876126')
+    outputs_ref = self._out(u'f067c9cf13dcc90f2fe269499d44082150876126')
     items_in = [sum(len(c) for c in content.itervalues()), 214]
     items_out = [len('test_isolated'), 125]
     expected_summary = self.gen_expected(
         name=u'isolated_task',
-        isolated_out=isolated_out,
         performance_stats={
           u'isolated_download': {
             u'initial_number_items': u'0',
@@ -506,8 +497,8 @@ class Test(unittest.TestCase):
             u'total_bytes_items_cold': unicode(sum(items_out)),
           },
         },
-        outputs=[u'hi\n'],
-        outputs_ref=isolated_out)
+        output=u'hi\n',
+        outputs_ref=outputs_ref)
     expected_files = {
       os.path.join(u'0', u'💣.txt'.encode('utf-8')): 'test_isolated',
     }
@@ -539,12 +530,11 @@ class Test(unittest.TestCase):
           f.write('hey2')
         """),
     }
-    isolated_out = self._out(u'fc04fe5eee668c35c81db590a76c0da9cbcdae90')
+    outputs_ref = self._out(u'fc04fe5eee668c35c81db590a76c0da9cbcdae90')
     items_in = [sum(len(c) for c in content.itervalues()), 150]
     items_out = [len('hey2'), len(u'bar💩'.encode('utf-8')), 191]
     expected_summary = self.gen_expected(
         name=u'separate_cmd',
-        isolated_out=isolated_out,
         performance_stats={
           u'isolated_download': {
             u'initial_number_items': u'0',
@@ -561,8 +551,8 @@ class Test(unittest.TestCase):
             u'total_bytes_items_cold': unicode(sum(items_out)),
           },
         },
-        outputs=[u'hi💩\n%s\n' % os.sep.join(['$CWD', 'local', 'path'])],
-        outputs_ref=isolated_out)
+        output=u'hi💩\n%s\n' % os.sep.join(['$CWD', 'local', 'path']),
+        outputs_ref=outputs_ref)
     expected_files = {
       os.path.join('0', 'result.txt'): 'hey2',
       os.path.join('0', 'FOO.txt'): u'bar💩'.encode('utf-8'),
@@ -602,7 +592,7 @@ class Test(unittest.TestCase):
     items_in = [sum(len(c) for c in content.itervalues()), 214]
     expected_summary = self.gen_expected(
         name=u'isolated_hard_timeout',
-        exit_codes=[SIGNAL_TERM],
+        exit_code=unicode(SIGNAL_TERM),
         failure=True,
         performance_stats={
           u'isolated_download': {
@@ -618,7 +608,7 @@ class Test(unittest.TestCase):
             u'items_hot': [],
           },
         },
-        state=0x40)  # task_result.State.TIMED_OUT
+        state=u'TIMED_OUT')
     # Hard timeout is enforced by run_isolated, I/O timeout by task_runner.
     self._run_isolated(
         content, 'isolated_hard_timeout',
@@ -650,12 +640,11 @@ class Test(unittest.TestCase):
         """ % ('SIGBREAK' if sys.platform == 'win32' else 'SIGTERM')
         ),
     }
-    isolated_out = self._out(u'53b4ab0562f05135e20ec91b473e5ca2282edc2b')
+    outputs_ref = self._out(u'53b4ab0562f05135e20ec91b473e5ca2282edc2b')
     items_in = [sum(len(c) for c in content.itervalues()), 214]
     items_out = [len('test_isolated_hard_timeout_grace'), 119]
     expected_summary = self.gen_expected(
         name=u'isolated_hard_timeout_grace',
-        isolated_out=isolated_out,
         performance_stats={
           u'isolated_download': {
             u'initial_number_items': u'0',
@@ -672,10 +661,10 @@ class Test(unittest.TestCase):
             u'total_bytes_items_cold': unicode(sum(items_out)),
           },
         },
-        outputs=[u'hi\ngot signal 15\n'],
-        outputs_ref=isolated_out,
+        output=u'hi\ngot signal 15\n',
+        outputs_ref=outputs_ref,
         failure=True,
-        state=0x40)  # task_result.State.TIMED_OUT
+        state=u'TIMED_OUT')
     expected_files = {
       os.path.join('0', 'result.txt'): 'test_isolated_hard_timeout_grace',
     }
@@ -712,11 +701,10 @@ class Test(unittest.TestCase):
 
     # The task name changes, there's a bit less data but the rest is the same.
     expected_summary[u'name'] = u'idempotent_reuse2'
-    expected_summary[u'costs_usd'] = None
     expected_summary.pop('performance_stats')
     expected_summary[u'cost_saved_usd'] = 0.02
-    expected_summary[u'deduped_from'] = task_id[:-1] + '1'
-    expected_summary[u'try_number'] = 0
+    expected_summary[u'deduped_from'] = task_id[:-1] + u'1'
+    expected_summary[u'try_number'] = u'0'
     self._run_isolated(
         content, 'idempotent_reuse2', ['--idempotent'], expected_summary, {},
         deduped=True, isolate_content=DEFAULT_ISOLATE_HELLO)
@@ -737,12 +725,11 @@ class Test(unittest.TestCase):
           print >> f, data['swarming']['secret_bytes'].decode('base64')
       """),
     }
-    isolated_out = self._out(u'd2eca4d860e4f1728272f6a736fd1c9ac6e98c4f')
+    outputs_ref = self._out(u'd2eca4d860e4f1728272f6a736fd1c9ac6e98c4f')
     items_in = [sum(len(c) for c in content.itervalues()), 214]
     items_out = [len('foobar\n'), 114]
     expected_summary = self.gen_expected(
       name=u'secret_bytes',
-      isolated_out=isolated_out,
       performance_stats={
         u'isolated_download': {
           u'initial_number_items': u'0',
@@ -759,7 +746,7 @@ class Test(unittest.TestCase):
           u'total_bytes_items_cold': unicode(sum(items_out)),
         },
       },
-      outputs_ref=isolated_out,
+      outputs_ref=outputs_ref,
     )
     tmp = os.path.join(self.tmpdir, 'test_secret_bytes')
     with fs.open(tmp, 'wb') as f:
@@ -814,12 +801,11 @@ class Test(unittest.TestCase):
         isolate_content=DEFAULT_ISOLATE_HELLO)
 
     # Second run with a cache available.
-    isolated_out = self._out(u'63fc667fd217ebabdf60ca143fe25998b5ea5c77')
+    outputs_ref = self._out(u'63fc667fd217ebabdf60ca143fe25998b5ea5c77')
     items_out = [3, 110]
     expected_summary = self.gen_expected(
       name=u'cache_second',
-      isolated_out=isolated_out,
-      outputs_ref=isolated_out,
+      outputs_ref=outputs_ref,
       performance_stats={
         u'isolated_download': {
           u'initial_number_items': unicode(len(items_in)),
@@ -839,9 +825,14 @@ class Test(unittest.TestCase):
       },
     )
     # The previous task caused the bot to have a named cache.
+    # pylint: disable=not-an-iterable,unsubscriptable-object
     expected_summary['bot_dimensions'] = (
-        expected_summary['bot_dimensions'].copy())
-    expected_summary['bot_dimensions'][u'caches'] = [u'fuu']
+        expected_summary['bot_dimensions'][:])
+    self.assertNotIn(
+        'caches', [i['key'] for i in expected_summary['bot_dimensions']])
+    expected_summary['bot_dimensions'] = [
+      {u'key': u'caches', u'value': [u'fuu']}
+    ] + expected_summary['bot_dimensions']
     self._run_isolated(
         content, 'cache_second',
         ['--named-cache', 'fuu', 'p/b', '--', '${ISOLATED_OUTDIR}/yo'],
@@ -894,7 +885,7 @@ class Test(unittest.TestCase):
       actual_summary, actual_files = self.client.task_collect(task_id)
       t = tags[:] + [u'priority:%d' % priority]
       expected_summary = self.gen_expected(
-          name=task_name, tags=sorted(t), outputs=[u'%d\n' % priority])
+          name=task_name, tags=sorted(t), output=u'%d\n' % priority)
       self.assertResults(expected_summary, actual_summary)
       self.assertEqual(['summary.json'], actual_files.keys())
       results.append(
@@ -917,14 +908,11 @@ class Test(unittest.TestCase):
     with self._make_wait_task('test_cancel_pending'):
       task_id = self.client.task_trigger_raw(args)
       actual, _ = self.client.task_collect(task_id, timeout=-1)
-      self.assertEqual(
-          0x20,  # task_result.PENDING
-          actual[u'shards'][0][u'state'])
+      self.assertEqual(u'PENDING', actual[u'shards'][0][u'state'])
       self.assertTrue(self.client.task_cancel(task_id, []))
     actual, _ = self.client.task_collect(task_id, timeout=-1)
     self.assertEqual(
-        0x60,  # task_result.State.CANCELED
-        actual[u'shards'][0][u'state'], actual[u'shards'][0])
+        u'CANCELED', actual[u'shards'][0][u'state'], actual[u'shards'][0])
 
   def test_cancel_running(self):
     # Cancel a running task. Make sure the target process handles the signal
@@ -1011,7 +999,7 @@ class Test(unittest.TestCase):
     task_id = self.client.task_trigger_post(json.dumps(request))
     expected_summary = self.gen_expected(
         name=u'task_slice',
-        outputs=[u'first\n'],
+        output=u'first\n',
         tags=[
           u'pool:default',
           u'priority:40',
@@ -1072,7 +1060,7 @@ class Test(unittest.TestCase):
     expected_summary = self.gen_expected(
         name=u'task_slice_fallback',
         current_task_slice=u'1',
-        outputs=[u'second\n'],
+        output=u'second\n',
         tags=[
           # Bug!
           u'invalidkey:invalidvalue',
@@ -1119,9 +1107,7 @@ class Test(unittest.TestCase):
     actual_summary, _ = self.client.task_collect(task_id)
     summary = actual_summary[u'shards'][0]
     # Immediately cancelled.
-    self.assertEqual(
-        0x100,  # task_result.State.NO_RESOURCE
-        summary[u'state'])
+    self.assertEqual(u'NO_RESOURCE', summary[u'state'])
     self.assertTrue(summary[u'abandoned_ts'])
 
   @contextlib.contextmanager
@@ -1161,8 +1147,7 @@ class Test(unittest.TestCase):
       u'user:joe@localhost',
     ]
     self.assertResults(
-        self.gen_expected(
-            name=u'wait', tags=tags, outputs=['hi\nhi again\n']),
+        self.gen_expected(name=u'wait', tags=tags, output=u'hi\nhi again\n'),
         actual_summary)
     self.assertEqual(['summary.json'], actual_files.keys())
 
@@ -1233,16 +1218,16 @@ class Test(unittest.TestCase):
 
     bot_version = result.pop(u'bot_version')
     self.assertTrue(bot_version)
-    if result[u'costs_usd'] is not None:
+    if result.get(u'costs_usd') is not None:
       expected.pop(u'costs_usd', None)
       self.assertLess(0, result.pop(u'costs_usd'))
-    if result[u'cost_saved_usd'] is not None:
+    if result.get(u'cost_saved_usd') is not None:
       expected.pop(u'cost_saved_usd', None)
       self.assertLess(0, result.pop(u'cost_saved_usd'))
     self.assertTrue(result.pop(u'created_ts'))
     self.assertTrue(result.pop(u'completed_ts'))
-    self.assertLess(0, result.pop(u'durations'))
-    task_id = result.pop(u'id')
+    self.assertLess(0, result.pop(u'duration'))
+    task_id = result.pop(u'task_id')
     run_id = result.pop(u'run_id')
     self.assertTrue(task_id)
     self.assertTrue(task_id.endswith('0'), task_id)
@@ -1251,12 +1236,12 @@ class Test(unittest.TestCase):
     self.assertTrue(result.pop(u'modified_ts'))
     self.assertTrue(result.pop(u'started_ts'))
 
-    if getattr(expected.get(u'outputs'), 'match', None):
-      expected_outputs = expected.pop(u'outputs')
-      outputs = '\n'.join(result.pop(u'outputs'))
+    if getattr(expected.get(u'output'), 'match', None):
+      expected_output = expected.pop(u'output')
+      output = result.pop('output')
       self.assertTrue(
-          expected_outputs.match(outputs),
-          '%s does not match %s' % (outputs, expected_outputs.pattern))
+          expected_output.match(output),
+          '%s does not match %s' % (output, expected_output.pattern))
 
     self.assertEqual(expected, result)
     return bot_version
