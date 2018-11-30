@@ -341,7 +341,7 @@ class CancelTasksHandler(webapp2.RequestHandler):
         logging.error('Request for %s was not found.', request_key.id())
         continue
       ok, was_running = task_scheduler.cancel_task(
-          request_obj, result_key, kill_running)
+          request_obj, result_key, kill_running, None)
       logging.info('task %s canceled: %s was running: %s',
                    task_id, ok, was_running)
 

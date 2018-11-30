@@ -1190,7 +1190,7 @@ def bot_kill_task(run_result_key, bot_id):
   return msg
 
 
-def cancel_task(request, result_key, kill_running):
+def cancel_task(request, result_key, kill_running, bot_id):
   """Cancels a task if possible, setting it to either CANCELED or KILLED.
 
   Ensures that the associated TaskToRun is canceled (when pending) and updates
@@ -1198,6 +1198,13 @@ def cancel_task(request, result_key, kill_running):
   immediately set to KILLED for running tasks.
 
   Warning: ACL check must have been done before.
+
+  Arguments:
+    request: TaskRequest instance to cancel.
+    result_key: result key for request to cancel.
+    kill_running: if true, allow cancelling a task in RUNNING state.
+    bot_id: if specified, only cancel task if it is RUNNING on this bot. Cannot
+            be specified if kill_running is False.
 
   Returns:
     tuple(bool, bool)
@@ -1208,6 +1215,8 @@ def cancel_task(request, result_key, kill_running):
   Raises:
     datastore_utils.CommitError if the transaction failed.
   """
+  if bot_id:
+    assert kill_running, "Can't use bot_id if kill_running is False."
   if result_key.kind() == 'TaskRunResult':
     # Ignore the try number. A user may ask to cancel run result 1, but if it
     # BOT_DIED, it is accepted to cancel try number #2 since the task is still
@@ -1226,6 +1235,9 @@ def cancel_task(request, result_key, kill_running):
 
     entities = [result_summary]
     if not was_running:
+      if bot_id:
+        # Deny cancelling a non-running task if bot_id was specified.
+        return False, was_running
       # PENDING.
       result_summary.state = task_result.State.CANCELED
       to_run_key = task_to_run.request_to_task_to_run_key(
@@ -1243,6 +1255,10 @@ def cancel_task(request, result_key, kill_running):
     else:
       if not kill_running:
         # Deny canceling a task that started.
+        return False, was_running
+      if bot_id and bot_id != result_summary.bot_id:
+        # Deny cancelling a task if bot_id was specified, but task is not
+        # on this bot.
         return False, was_running
       # RUNNING.
       run_result = result_summary.run_result_key.get()

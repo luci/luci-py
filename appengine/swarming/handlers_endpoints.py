@@ -361,7 +361,7 @@ class SwarmingTaskService(remote.Service):
     request_obj = _get_task_request_async(
         request.task_id, request_key, _EDIT).get_result()
     ok, was_running = task_scheduler.cancel_task(
-        request_obj, result_key, request.kill_running or False)
+        request_obj, result_key, request.kill_running or False, None)
     return swarming_rpcs.CancelResponse(ok=ok, was_running=was_running)
 
   @gae_ts_mon.instrument_endpoint()
