@@ -328,20 +328,8 @@ class CancelTasksHandler(webapp2.RequestHandler):
     kill_running = payload['kill_running']
     # TODO(maruel): Parallelize.
     for task_id in payload['tasks']:
-      if not task_id:
-        logging.error('Cannot cancel a blank task')
-        continue
-      request_key, result_key = task_pack.get_request_and_result_keys(task_id)
-      if not request_key or not result_key:
-        logging.error('Cannot search for a falsey key. Request: %s Result: %s',
-                      request_key, result_key)
-        continue
-      request_obj = request_key.get()
-      if not request_obj:
-        logging.error('Request for %s was not found.', request_key.id())
-        continue
-      ok, was_running = task_scheduler.cancel_task(
-          request_obj, result_key, kill_running, None)
+      ok, was_running = task_scheduler.cancel_task_with_id(
+          task_id, kill_running, None)
       logging.info('task %s canceled: %s was running: %s',
                    task_id, ok, was_running)
 

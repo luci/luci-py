@@ -1361,6 +1361,31 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     actual = task_to_run._lookup_cache_is_taken_async(to_run_key).get_result()
     self.assertEqual(True, actual)
 
+  def test_cancel_task_with_id(self):
+    # Cancel a pending task.
+    pub_sub_calls = self.mock_pub_sub()
+    self._register_bot(0, self.bot_dimensions)
+    result_summary = self._quick_schedule(
+        1, pubsub_topic='projects/abc/topics/def')
+    self.assertEqual(0, len(pub_sub_calls)) # Nothing yet.
+
+    ok, was_running = task_scheduler.cancel_task_with_id(
+        result_summary.task_id, False, None)
+    self.assertEqual(True, ok)
+    self.assertEqual(False, was_running)
+    self.assertEqual(1, self.execute_tasks())
+    self.assertEqual(1, len(pub_sub_calls)) # CANCELED
+
+    result_summary = result_summary.key.get()
+    self.assertEqual(State.CANCELED, result_summary.state)
+    self.assertEqual(1, len(pub_sub_calls)) # No other message.
+
+    # Make sure the TaskToRun is added to the negative cache.
+    request = result_summary.request_key.get()
+    to_run_key = task_to_run.request_to_task_to_run_key(request, 1, 0)
+    actual = task_to_run._lookup_cache_is_taken_async(to_run_key).get_result()
+    self.assertEqual(True, actual)
+
   def test_cancel_task_running(self):
     # Cancel a running task.
     pub_sub_calls = self.mock_pub_sub()

@@ -1190,6 +1190,28 @@ def bot_kill_task(run_result_key, bot_id):
   return msg
 
 
+def cancel_task_with_id(task_id, kill_running, bot_id):
+  """Cancels a task if possible, setting it to either CANCELED or KILLED.
+
+  Warning: ACL check must have been done before.
+
+  See cancel_task for argument and return value details."""
+  if not task_id:
+    logging.error('Cannot cancel a blank task')
+    return False, False
+  request_key, result_key = task_pack.get_request_and_result_keys(task_id)
+  if not request_key or not result_key:
+    logging.error('Cannot search for a falsey key. Request: %s Result: %s',
+                  request_key, result_key)
+    return False, False
+  request_obj = request_key.get()
+  if not request_obj:
+    logging.error('Request for %s was not found.', request_key.id())
+    return False, False
+
+  return cancel_task(request_obj, result_key, kill_running, bot_id)
+
+
 def cancel_task(request, result_key, kill_running, bot_id):
   """Cancels a task if possible, setting it to either CANCELED or KILLED.
 
