@@ -132,6 +132,7 @@ class TestCPUInfo(unittest.TestCase):
       u'name': 'Cavium Octeon II V0.1',
     }, self.get_cpuinfo(MIPS64_CPU_INFO))
 
+  @unittest.skipIf(sys.platform != 'linux2', 'linux only test')
   def test_get_num_processors(self):
     self.assertTrue(linux.get_num_processors() != 0)
 

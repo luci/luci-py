@@ -13,24 +13,26 @@ import logging
 import os
 import time
 
+try:
+  from adb import adb_protocol
+  from adb import common
+  from adb.contrib import adb_commands_safe
+  from adb.contrib import high
+  from api import parallel
+  from api.platforms import gce
 
-from adb import adb_protocol
-from adb import common
-from adb.contrib import adb_commands_safe
-from adb.contrib import high
-from api import parallel
-from api.platforms import gce
-
-
-# Master switch that can easily be temporarily increased to INFO or even DEBUG
-# when needed by simply pushing a new tainted swarming server version. This
-# helps quickly debugging issues. On the other hand, even INFO level is quite
-# verbose so keep it at WARNING by default.
-LEVEL = logging.WARNING
-adb_commands_safe._LOG.setLevel(LEVEL)
-adb_protocol._LOG.setLevel(LEVEL)
-common._LOG.setLevel(LEVEL)
-high._LOG.setLevel(LEVEL)
+  # Master switch that can easily be temporarily increased to INFO or even DEBUG
+  # when needed by simply pushing a new tainted swarming server version. This
+  # helps quickly debugging issues. On the other hand, even INFO level is quite
+  # verbose so keep it at WARNING by default.
+  LEVEL = logging.WARNING
+  adb_commands_safe._LOG.setLevel(LEVEL)
+  adb_protocol._LOG.setLevel(LEVEL)
+  common._LOG.setLevel(LEVEL)
+  high._LOG.setLevel(LEVEL)
+except OSError:
+  # This can fail on macOS if libusb-1.0.dylib is not installed.
+  pass
 
 
 # This list of third party apps embedded in the base OS image varies from

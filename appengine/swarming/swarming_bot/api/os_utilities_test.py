@@ -54,6 +54,7 @@ class TestOsUtilities(auto_stub.TestCase):
     self.assertGreater(len(values), 1)
 
   def test_get_cpu_dimensions_mips(self):
+    self.mock(sys, 'platform', 'linux2')
     self.mock(platform, 'machine', lambda: 'mips64')
     self.mock(
         os_utilities, 'get_cpuinfo',
@@ -188,9 +189,20 @@ class TestOsUtilities(auto_stub.TestCase):
   def test_get_hostname_gce_nodocker(self):
     self.mock(platforms, 'is_gce', lambda: True)
     self.mock(os.path, 'isfile', lambda _: False)
-    self.mock(platforms.gce, 'get_metadata',
-              lambda: {'instance': {'hostname': 'gcehost'}})
-    self.assertEqual(os_utilities.get_hostname(), 'gcehost')
+    manual_mock = not hasattr(platforms, 'gce')
+    if manual_mock:
+      # On macOS.
+      class Mock(object):
+        def get_metadata(self):
+          return None
+      platforms.gce = Mock()
+    try:
+      self.mock(platforms.gce, 'get_metadata',
+                lambda: {'instance': {'hostname': 'gcehost'}})
+      self.assertEqual(os_utilities.get_hostname(), 'gcehost')
+    finally:
+      if manual_mock:
+        del platforms.gce
 
   def test_get_hostname_nogce(self):
     self.mock(platforms, 'is_gce', lambda: False)
