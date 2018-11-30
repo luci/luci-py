@@ -9,7 +9,7 @@ release: package-lock.json
 serve: package-lock.json
 	npx webpack-dev-server --mode=development --watch-poll
 
-test:
+test: default
 	# Run the generated tests just once under Xvfb.
 	xvfb-run --auto-servernum --server-args "-screen 0 1280x1024x24" npx karma start
 
