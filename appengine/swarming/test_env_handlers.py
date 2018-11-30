@@ -149,68 +149,75 @@ class AppTestBase(test_case.TestCase):
   def mock_default_pool_acl(self, service_accounts):
     """Mocks ACLs of 'default' pool to allow usage of given service accounts."""
     assert isinstance(service_accounts, (list, tuple)), service_accounts
-    def mocked_get_pool_config(pool):
-      if pool == 'template':
-        return pools_config.PoolConfig(
-            name='template',
-            rev='pools_cfg_rev',
-            scheduling_users=frozenset([
-              # See setUp above. We just duplicate the first ACL layer here
-              auth.Identity(auth.IDENTITY_USER, 'super-admin@example.com'),
-              auth.Identity(auth.IDENTITY_USER, 'admin@example.com'),
-              auth.Identity(auth.IDENTITY_USER, 'priv@example.com'),
-              auth.Identity(auth.IDENTITY_USER, 'user@example.com'),
-            ]),
-            scheduling_groups=frozenset(),
-            trusted_delegatees={},
-            service_accounts=frozenset(service_accounts),
-            service_accounts_groups=(),
-            task_template_deployment=pools_config.TaskTemplateDeployment(
-                prod=pools_config.TaskTemplate(
-                  cache=(),
-                  cipd_package=(),
-                  env=(pools_config.Env('VAR', 'prod', (), False),),
-                  inclusions=()),
-                canary=pools_config.TaskTemplate(
-                  cache=(),
-                  cipd_package=(),
-                  env=(pools_config.Env('VAR', 'canary', (), False),),
-                  inclusions=()),
-                canary_chance=0.5,
+    def mocked_fetch_pools_config():
+      default_isolate = pools_config.IsolateServer(
+        server='https://pool.config.isolate.example.com',
+        namespace='default-gzip',
+      )
+      default_cipd = pools_config.CipdServer(
+        server='https://pool.config.cipd.example.com',
+        client_version='from_pool_config',
+      )
+      return pools_config._PoolsCfg(
+          {
+            "template": pools_config.PoolConfig(
+              name='template',
+              rev='pools_cfg_rev',
+              scheduling_users=frozenset([
+                # See setUp above. We just duplicate the first ACL layer here
+                auth.Identity(auth.IDENTITY_USER, 'super-admin@example.com'),
+                auth.Identity(auth.IDENTITY_USER, 'admin@example.com'),
+                auth.Identity(auth.IDENTITY_USER, 'priv@example.com'),
+                auth.Identity(auth.IDENTITY_USER, 'user@example.com'),
+              ]),
+              scheduling_groups=frozenset(),
+              trusted_delegatees={},
+              service_accounts=frozenset(service_accounts),
+              service_accounts_groups=(),
+              task_template_deployment=pools_config.TaskTemplateDeployment(
+                  prod=pools_config.TaskTemplate(
+                    cache=(),
+                    cipd_package=(),
+                    env=(pools_config.Env('VAR', 'prod', (), False),),
+                    inclusions=()),
+                  canary=pools_config.TaskTemplate(
+                    cache=(),
+                    cipd_package=(),
+                    env=(pools_config.Env('VAR', 'canary', (), False),),
+                    inclusions=()),
+                  canary_chance=0.5,
+              ),
+              default_isolate=default_isolate,
+              default_cipd=default_cipd,
+              bot_monitoring=None,
+              external_schedulers=None,
             ),
-            default_isolate=pools_config.IsolateServer(
-              server='https://pool.config.isolate.example.com',
-              namespace='default-gzip',
-            ),
-            default_cipd=pools_config.CipdServer(
-              server='https://pool.config.cipd.example.com',
-              client_version='from_pool_config',
-            ),
-            bot_monitoring=None,
-            external_schedulers=None,)
 
-      if pool != 'default':
-        return None
-      return pools_config.PoolConfig(
-          name='default',
-          rev='pools_cfg_rev',
-          scheduling_users=frozenset([
-            # See setUp above. We just duplicate the first ACL layer here
-            auth.Identity(auth.IDENTITY_USER, 'super-admin@example.com'),
-            auth.Identity(auth.IDENTITY_USER, 'admin@example.com'),
-            auth.Identity(auth.IDENTITY_USER, 'priv@example.com'),
-            auth.Identity(auth.IDENTITY_USER, 'user@example.com'),
-          ]),
-          scheduling_groups=frozenset(),
-          trusted_delegatees={},
-          service_accounts=frozenset(service_accounts),
-          service_accounts_groups=(),
-          task_template_deployment=None,
-          bot_monitoring=None,
-          default_isolate=None,
-          default_cipd=None,
-          external_schedulers=None,)
-    self.mock(pools_config, 'get_pool_config', mocked_get_pool_config)
+            "default": pools_config.PoolConfig(
+              name='default',
+              rev='pools_cfg_rev',
+              scheduling_users=frozenset([
+                # See setUp above. We just duplicate the first ACL layer here
+                auth.Identity(auth.IDENTITY_USER, 'super-admin@example.com'),
+                auth.Identity(auth.IDENTITY_USER, 'admin@example.com'),
+                auth.Identity(auth.IDENTITY_USER, 'priv@example.com'),
+                auth.Identity(auth.IDENTITY_USER, 'user@example.com'),
+              ]),
+              scheduling_groups=frozenset(),
+              trusted_delegatees={},
+              service_accounts=frozenset(service_accounts),
+              service_accounts_groups=(),
+              task_template_deployment=None,
+              bot_monitoring=None,
+              default_isolate=default_isolate,
+              default_cipd=default_cipd,
+              external_schedulers=None,
+            ),
+          },
+        (default_isolate, default_cipd)
+    )
+
+    self.mock(pools_config, '_fetch_pools_config', mocked_fetch_pools_config)
 
   # Bot
 
@@ -311,7 +318,7 @@ class AppTestBase(test_case.TestCase):
           u'path': u'bin',
           u'version': u'git_revision:deadbeef',
         }],
-        u'server': u'https://chrome-infra-packages.appspot.com',
+        u'server': u'https://pool.config.cipd.example.com',
       },
       u'dimensions': [
         {u'key': u'os', u'value': u'Amiga'},
@@ -393,7 +400,7 @@ class AppTestBase(test_case.TestCase):
           u'path': u'bin',
           u'version': u'git_revision:deadbeef',
         }],
-        u'server': u'https://chrome-infra-packages.appspot.com',
+        u'server': u'https://pool.config.cipd.example.com',
       },
       u'dimensions': [
         {u'key': u'os', u'value': u'Amiga'},
@@ -402,6 +409,10 @@ class AppTestBase(test_case.TestCase):
       u'execution_timeout_secs': u'3600',
       u'grace_period_secs': u'30',
       u'idempotent': False,
+      u'inputs_ref': {
+        'isolatedserver': 'https://pool.config.isolate.example.com',
+        'namespace': 'default-gzip',
+      },
       u'io_timeout_secs': u'1200',
       u'outputs': [u'foo', u'path/to/foobar']
     }

@@ -167,7 +167,7 @@ def _validate_url(prop, value):
 
 def _validate_namespace(prop, value):
   _validate_length(prop, value, 128)
-  if not config.NAMESPACE_RE.match(value):
+  if not pools_config.NAMESPACE_RE.match(value):
     raise datastore_errors.BadValueError('malformed %s' % prop._name)
 
 

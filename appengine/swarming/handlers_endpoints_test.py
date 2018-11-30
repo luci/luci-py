@@ -89,12 +89,8 @@ class ServerApiTest(BaseTest):
 
   def test_details(self):
     """Asserts that server_details returns the correct version."""
+    self.mock_default_pool_acl([])
     self.mock(config.config, 'config_service_hostname', lambda: 'a.server')
-
-    cfg = config.settings()
-    cfg.isolate.default_server = 'https://isolateserver.appspot.com'
-    cfg.isolate.default_namespace = 'default-gzip'
-    self.mock(config, 'settings', lambda: cfg)
 
     response = self.call_api('details')
     expected = {
@@ -102,7 +98,7 @@ class ServerApiTest(BaseTest):
           bot_code.get_bot_version('https://testbed.example.com')[0]),
       u'display_server_url_template': u'',
       u'luci_config': u'a.server',
-      u'default_isolate_server': u'https://isolateserver.appspot.com',
+      u'default_isolate_server': u'https://pool.config.isolate.example.com',
       u'default_isolate_namespace': u'default-gzip',
       u'machine_provider_template':
           u'https://machine-provider.appspot.com/leases/%s',
@@ -660,18 +656,13 @@ class TasksApiTest(BaseTest):
   def test_new_ok_isolated_with_defaults(self):
     self.mock(random, 'getrandbits', lambda _: 0x88)
 
-    cfg = config.settings()
-    cfg.isolate.default_server = 'https://isolateserver.appspot.com'
-    cfg.isolate.default_namespace = 'default-gzip'
-    self.mock(config, 'settings', lambda: cfg)
-
     request = self.create_new_request(
         properties=self.create_props(
             inputs_ref=swarming_rpcs.FilesRef(isolated='1'*40)))
     expected_props = self.gen_props(
         inputs_ref={
           u'isolated': u'1'*40,
-          u'isolatedserver': u'https://isolateserver.appspot.com',
+          u'isolatedserver': u'https://pool.config.isolate.example.com',
           u'namespace': u'default-gzip',
         })
     expected = {
@@ -716,19 +707,11 @@ class TasksApiTest(BaseTest):
   def test_new_cipd_package_with_defaults(self):
     self.mock(random, 'getrandbits', lambda _: 0x88)
 
-    # Define settings on the server.
-    cfg = config.settings()
-    cfg.cipd.default_client_package.package_name = (
-        'infra/tools/cipd/${platform}')
-    cfg.cipd.default_client_package.version = 'git_revision:deadbeef'
-    cfg.cipd.default_server = 'https://chrome-infra-packages.appspot.com'
-    self.mock(config, 'settings', lambda: cfg)
-
     expected_props = self.gen_props(
         cipd_input={
           u'client_package': {
             u'package_name': u'infra/tools/cipd/${platform}',
-            u'version': u'git_revision:deadbeef',
+            u'version': u'from_pool_config',
           },
           u'packages': [
             {
@@ -737,7 +720,7 @@ class TasksApiTest(BaseTest):
               u'version': u'latest',
             },
           ],
-          u'server': u'https://chrome-infra-packages.appspot.com',
+          u'server': u'https://pool.config.cipd.example.com',
         },
         command=[u'rm', u'-rf', u'/'],
         env=[{u'key': u'PATH', u'value': u'/'}])
@@ -918,11 +901,6 @@ class TasksApiTest(BaseTest):
     self.mock(random, 'getrandbits', lambda _: 0x88)
     now = datetime.datetime(2010, 1, 2, 3, 4, 5)
     self.mock_now(now)
-
-    cfg = config.settings()
-    cfg.isolate.default_server = 'https://isolateserver.appspot.com'
-    cfg.isolate.default_namespace = 'default-gzip'
-    self.mock(config, 'settings', lambda: cfg)
 
     task_slices = [
       {

@@ -147,7 +147,15 @@ def get_or_raise(key):
 def apply_server_property_defaults(properties):
   """Fills ndb task properties with default values read from server settings."""
   settings = config.settings()
-  pool_cfg = pools_config.get_pool_config(properties.pool)
+  # TODO(iannucci): This was an artifact of the existing test harnesses;
+  # get_pool_config raises on None, but the way it's mocked in
+  # ./test_env_handlers.py allows `get_pool_config` to return None in this case.
+  # This try/except will be cleaned up in a subsequent CL, once I remove these
+  # default services from `config`.
+  try:
+    pool_cfg = pools_config.get_pool_config(properties.pool)
+  except ValueError:
+    pool_cfg = None
   if not settings and not pool_cfg:
     return
 
@@ -206,6 +214,13 @@ class SwarmingServerService(remote.Service):
     host = 'https://' + os.environ['HTTP_HOST']
 
     cfg = config.settings()
+    isolate, _cipd = pools_config.get_default_external_services()
+
+    default_isolate_server = cfg.isolate.default_server
+    default_isolate_namespace = cfg.isolate.default_namespace
+    if isolate:
+      default_isolate_server = isolate.server
+      default_isolate_namespace = isolate.namespace
 
     mpp = ''
     if cfg.mp and cfg.mp.server:
@@ -222,8 +237,8 @@ class SwarmingServerService(remote.Service):
         machine_provider_template=mpp,
         display_server_url_template=cfg.display_server_url_template,
         luci_config=config.config.config_service_hostname(),
-        default_isolate_server=cfg.isolate.default_server,
-        default_isolate_namespace=cfg.isolate.default_namespace)
+        default_isolate_server=default_isolate_server,
+        default_isolate_namespace=default_isolate_namespace)
 
   @gae_ts_mon.instrument_endpoint()
   @auth.endpoints_method(

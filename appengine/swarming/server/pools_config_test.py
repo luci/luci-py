@@ -137,6 +137,89 @@ class PoolsConfigTest(test_case.TestCase):
     self.assertEqual(expected2, pools_config.get_pool_config('another_name'))
     self.assertEqual(['another_name', 'pool_name'], pools_config.known())
 
+
+  def test_validate_external_services_isolate(self):
+    def msg(**kwargs):
+      return pools_pb2.PoolsCfg(
+        default_external_services=pools_pb2.ExternalServices(
+          isolate=pools_pb2.ExternalServices.Isolate(**kwargs),
+          cipd=pools_pb2.ExternalServices.CIPD(
+            server="https://example.com",
+            client_version="test",
+          ),
+        ))
+
+    self.validator_test(
+        msg(server='https://isolateserver.appspot.com'),
+        ['isolate namespace is not set'])
+
+    self.validator_test(
+        msg(
+            server='isolateserver.appspot.com',
+            namespace='abc',
+        ),
+        [
+          'isolate server must start with "https://" or "http://localhost"',
+        ])
+
+    self.validator_test(
+        msg(
+          server='https://isolateserver.appspot.com',
+          namespace='bad namespace',
+        ),
+        [
+          'isolate namespace is invalid "bad namespace"'
+        ])
+
+    self.validator_test(
+        msg(
+          server='https://isolateserver.appspot.com',
+          namespace='abc',
+        ),
+        [])
+
+    self.validator_test(
+        msg(),
+        [
+          'isolate server is not set',
+          'isolate namespace is not set',
+        ])
+
+  def test_validate_external_services_cipd(self):
+    def msg(**kwargs):
+      return pools_pb2.PoolsCfg(
+        default_external_services=pools_pb2.ExternalServices(
+          isolate=pools_pb2.ExternalServices.Isolate(
+            server="https://example.com",
+            namespace="test",
+          ),
+          cipd=pools_pb2.ExternalServices.CIPD(**kwargs),
+        ))
+
+    self.validator_test(
+        msg(),
+        [
+          'cipd server is not set',
+          'cipd client_version is invalid ""',
+        ])
+
+    self.validator_test(
+        msg(
+            server='chrome-infra-packages.appspot.com',
+            client_version='git_revision:deadbeef',
+        ),
+        [
+          'cipd server must start with "https://" or "http://localhost"',
+        ])
+
+    self.validator_test(
+        msg(
+            server='https://chrome-infra-packages.appspot.com',
+            client_version='git_revision:deadbeef',
+        ),
+        [])
+
+
   def test_empty_config_is_valid(self):
     self.validator_test(pools_pb2.PoolsCfg(), [])
 

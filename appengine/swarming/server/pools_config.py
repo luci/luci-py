@@ -357,6 +357,11 @@ def get_pool_config(pool_name):
   return _fetch_pools_config().pools.get(pool_name)
 
 
+def get_default_external_services():
+  """Returns the globally configured (IsolateServer, CipdServer)."""
+  return _fetch_pools_config().default_external_services
+
+
 def known():
   """Returns the list of all pool names."""
   return sorted(_fetch_pools_config().pools)
@@ -373,6 +378,8 @@ _LOCAL_FAKE_CONFIG = None
 # Parsed representation of pools.cfg ready for queries.
 _PoolsCfg = collections.namedtuple('_PoolsCfg', [
   'pools',  # dict {pool name => PoolConfig tuple}
+
+  'default_external_services', # (IsolateServer, CipdServer)
 ])
 
 
@@ -489,24 +496,26 @@ def _validate_url(ctx, value):
 
 
 def _validate_external_services_isolate(ctx, cfg):
-  with ctx.prefix('server '):
-    _validate_url(ctx, cfg.server)
+  with ctx.prefix('isolate '):
+    with ctx.prefix('server '):
+      _validate_url(ctx, cfg.server)
 
-  with ctx.prefix('namespace '):
-    if not cfg.namespace:
-      ctx.error('is not set')
-    elif not NAMESPACE_RE.match(cfg.namespace):
-      ctx.error('is invalid "%s"', cfg.namespace)
+    with ctx.prefix('namespace '):
+      if not cfg.namespace:
+        ctx.error('is not set')
+      elif not NAMESPACE_RE.match(cfg.namespace):
+        ctx.error('is invalid "%s"', cfg.namespace)
 
 
 def _validate_external_services_cipd(ctx, cfg):
   """Validates ExternalServices.CIPD message."""
-  with ctx.prefix('server '):
-    _validate_url(ctx, cfg.server)
+  with ctx.prefix('cipd '):
+    with ctx.prefix('server '):
+      _validate_url(ctx, cfg.server)
 
-  with ctx.prefix('client_version: '):
-    if not cipd.is_valid_version(cfg.client_version):
-      ctx.error('invalid version "%s"', cfg.client_version)
+    with ctx.prefix('client_version '):
+      if not cipd.is_valid_version(cfg.client_version):
+        ctx.error('is invalid "%s"', cfg.client_version)
 
 
 def _validate_external_services(ctx, cfg):
@@ -528,7 +537,7 @@ def _fetch_pools_config():
       assert utils.is_local_dev_server()
       return _LOCAL_FAKE_CONFIG
     logging.error('There is no pools.cfg, no task is accepted')
-    return _PoolsCfg({})
+    return _PoolsCfg({}, (None, None))
 
   # The config is already validated at this point.
 
@@ -567,7 +576,7 @@ def _fetch_pools_config():
               msg.external_schedulers),
           default_isolate=default_isolate,
           default_cipd=default_cipd)
-  return _PoolsCfg(pools)
+  return _PoolsCfg(pools, (default_isolate, default_cipd))
 
 
 @validation.self_rule(POOLS_CFG_FILENAME, pools_pb2.PoolsCfg)
@@ -675,4 +684,6 @@ def bootstrap_dev_server_acls():
             default_cipd=None,
             external_schedulers=None,
         ),
-      })
+      },
+      (None, None),
+  )
