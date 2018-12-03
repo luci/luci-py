@@ -148,8 +148,6 @@ def notify_request(es_cfg, request, result_summary):
     request: task_request.TaskRequest
     result_summary: task_result.TaskResultSummary
   """
-  c = _get_client(es_cfg.address)
-
   req = plugin_pb2.NotifyTasksRequest()
   item = req.notifications.add()
   # TODO(akeshet): This time should possibly come from the read time from
@@ -174,3 +172,12 @@ def notify_request(es_cfg, request, result_summary):
 
   c = _get_client(es_cfg.address)
   c.NotifyTasks(req)
+
+
+def get_cancellations(es_cfg):
+  """Calls external scheduler and returns task cancellations."""
+  req = plugin_pb2.GetCancellationsRequest()
+  req.scheduler_id = es_cfg.id
+  c = _get_client(es_cfg.address)
+  resp = c.GetCancellations(req)
+  return resp.cancellations

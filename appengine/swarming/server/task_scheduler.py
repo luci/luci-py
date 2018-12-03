@@ -1391,6 +1391,24 @@ def cron_handle_bot_died(host):
   return killed, retried, ignored
 
 
+def cron_handle_external_cancellations():
+  """Fetch and handle external scheduler cancellations for all pools."""
+  known_pools = pools_config.known()
+  for pool in known_pools:
+    pool_cfg = pools_config.get_pool_config(pool)
+    if not pool_cfg.external_schedulers:
+      continue
+    for es_cfg in pool_cfg.external_schedulers:
+      if es_cfg.enabled:
+        # TODO(akeshet): Push this call onto a task queue so it can
+        # be performed concurrently for all pools.
+        cancellations = external_scheduler.get_cancellations(es_cfg)
+        if cancellations:
+          # TODO(akeshet): Push a cancel-task-on-bot-with-reason call onto
+          # task queue (implementation forthcoming).
+          pass
+
+
 ## Task queue tasks.
 
 

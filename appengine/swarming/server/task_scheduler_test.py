@@ -32,6 +32,7 @@ from components.auth.proto import delegation_pb2
 
 from server import bot_management
 from server import config
+from server import external_scheduler
 from server import pools_config
 from server import task_pack
 from server import task_queues
@@ -136,6 +137,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
       u'os': [u'Windows', u'Windows-3.1.1'],
       u'pool': [u'default'],
     }
+    self._known_pools = None
 
   def _enqueue(self, *args, **kwargs):
     return self._enqueue_orig(*args, use_dedicated_module=False, **kwargs)
@@ -1999,6 +2001,26 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         (['1d69b9f088008911'], 0, 0),
         task_scheduler.cron_handle_bot_died('f.local'))
 
+  def test_cron_handle_external_cancellations(self):
+    es_address = 'externalscheduler_address'
+    es_id = 'es_id'
+    external_schedulers = [
+        pools_config.ExternalSchedulerConfig(es_address, es_id, None, True),
+        pools_config.ExternalSchedulerConfig(es_address, es_id, None, True),
+        pools_config.ExternalSchedulerConfig(es_address, es_id, None, False),
+    ]
+    self.mock_pool_config('es-pool', external_schedulers=external_schedulers)
+    known_pools = pools_config.known()
+    self.assertEqual(len(known_pools), 1)
+    calls = []
+    def mock_get_cancellations(es_cfg):
+      calls.append(es_cfg)
+    self.mock(external_scheduler, 'get_cancellations', mock_get_cancellations)
+
+    task_scheduler.cron_handle_external_cancellations()
+
+    self.assertEqual(len(calls), 2)
+
   def mock_pool_config(
       self,
       name,
@@ -2006,7 +2028,10 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
       scheduling_groups=None,
       trusted_delegatees=None,
       service_accounts=None,
-      service_accounts_groups=None):
+      service_accounts_groups=None,
+      external_schedulers=None):
+    self._known_pools = self._known_pools or set()
+    self._known_pools.add(name)
     def mocked_get_pool_config(pool):
       if pool == name:
         return pools_config.PoolConfig(
@@ -2024,9 +2049,12 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
             bot_monitoring=None,
             default_isolate=None,
             default_cipd=None,
-            external_schedulers=None,)
+            external_schedulers=external_schedulers,)
       return None
+    def mocked_known_pools():
+      return list(self._known_pools)
     self.mock(pools_config, 'get_pool_config', mocked_get_pool_config)
+    self.mock(pools_config, 'known', mocked_known_pools)
 
   def mock_delegation(self, peer_id, tags):
     self.mock(auth, 'get_peer_identity', lambda: peer_id)
@@ -2046,7 +2074,6 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
             **kwargs))
 
   def test_check_schedule_request_acl(self):
-    self.mock_pool_config('some-other-pool')
 
     # There's no "default ACL" anymore if there's no pool config.
     with self.assertRaises(auth.AuthorizationError) as ctx:
