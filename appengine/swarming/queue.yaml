@@ -9,6 +9,9 @@ queue:
 - name: cancel-tasks
   rate: 500/s
 
+- name: cancel-task-on-bot
+  rate: 500/s
+
 - name: pubsub
   rate: 500/s
 

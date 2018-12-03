@@ -308,6 +308,7 @@ class BackendTest(AppTestBase):
     )
     # Format: (<queue-name>, <base-url>, <argument>).
     task_queues = [
+      ('cancel-task-on-bot', '/internal/taskqueue/cancel-task-on-bot', ''),
       ('cancel-tasks', '/internal/taskqueue/cancel-tasks', ''),
       ('machine-provider-manage',
        '/internal/taskqueue/machine-provider-manage', ''),

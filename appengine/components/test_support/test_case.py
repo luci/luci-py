@@ -110,7 +110,10 @@ class TestCase(auto_stub.TestCase):
   def tearDown(self):
     try:
       if not self.has_failed():
-        self.assertEqual(0, self.execute_tasks())
+        remaining = self.execute_tasks()
+        self.assertEqual(0, remaining,
+            'Passing tests must leave behind no pending tasks, found %d.'
+            % remaining)
       self.testbed.deactivate()
     finally:
       super(TestCase, self).tearDown()

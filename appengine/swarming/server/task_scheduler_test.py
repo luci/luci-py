@@ -43,6 +43,7 @@ from server import task_to_run
 from server.task_result import State
 
 from proto import config_pb2
+from proto import plugin_pb2
 
 
 # pylint: disable=W0212,W0612
@@ -125,6 +126,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
           'REMOTE_ADDR': self.source_ip,
           'SERVER_SOFTWARE': os.environ['SERVER_SOFTWARE'],
         })
+    self._enqueue_calls = []
     self._enqueue_orig = self.mock(utils, 'enqueue_task', self._enqueue)
     # See mock_pub_sub()
     self._pub_sub_mocked = False
@@ -140,6 +142,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self._known_pools = None
 
   def _enqueue(self, *args, **kwargs):
+    self._enqueue_calls.append((args, kwargs))
     return self._enqueue_orig(*args, use_dedicated_module=False, **kwargs)
 
   def _getrandbits(self, bits):
@@ -2015,11 +2018,47 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     calls = []
     def mock_get_cancellations(es_cfg):
       calls.append(es_cfg)
+      c = plugin_pb2.GetCancellationsResponse.Cancellation()
+      # Note: This task key is invalid, but that helps to exercise
+      # the exception handling in the handler.
+      # Also, in the wild we would not be making duplicate calls with the same
+      # task and bot; this is simply convenient for testing.
+      c.task_id = "task1"
+      c.bot_id = "bot1"
+      return [c]
+
+    self.mock(external_scheduler, 'get_cancellations', mock_get_cancellations)
+
+    task_scheduler.cron_handle_external_cancellations()
+
+    self.execute_tasks()
+
+    self.assertEqual(len(calls), 2)
+    self.assertEqual(len(self._enqueue_calls), 2)
+
+  def test_cron_handle_external_cancellations_none(self):
+    es_address = 'externalscheduler_address'
+    es_id = 'es_id'
+    external_schedulers = [
+        pools_config.ExternalSchedulerConfig(es_address, es_id, None, True),
+        pools_config.ExternalSchedulerConfig(es_address, es_id, None, True),
+        pools_config.ExternalSchedulerConfig(es_address, es_id, None, False),
+    ]
+    self.mock_pool_config('es-pool', external_schedulers=external_schedulers)
+    known_pools = pools_config.known()
+    self.assertEqual(len(known_pools), 1)
+    calls = []
+    def mock_get_cancellations(es_cfg):
+      calls.append(es_cfg)
+      return None
+
     self.mock(external_scheduler, 'get_cancellations', mock_get_cancellations)
 
     task_scheduler.cron_handle_external_cancellations()
 
     self.assertEqual(len(calls), 2)
+    self.assertEqual(len(self._enqueue_calls), 0)
+
 
   def mock_pool_config(
       self,
