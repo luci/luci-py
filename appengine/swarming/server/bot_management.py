@@ -72,8 +72,8 @@ from server import task_pack
 from server import task_queues
 
 
-# BotEvent entities are deleted after a while.
-_OLD_BOT_EVENTS_CUT_OFF = datetime.timedelta(days=366*2)
+# BotEvent entities are deleted when they are older than the cutoff.
+_OLD_BOT_EVENTS_CUT_OFF = datetime.timedelta(days=366)
 
 
 ### Models.

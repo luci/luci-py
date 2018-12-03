@@ -125,8 +125,8 @@ _CACHE_NAME_RE = re.compile(ur'^[a-z0-9_]{1,4096}$')
 _ENV_KEY_RE = re.compile(r'^[A-Za-z_][A-Za-z0-9_]*$')
 
 
-# TaskRequest entity groups are deleted after a while.
-_OLD_TASK_REQUEST_CUT_OFF = datetime.timedelta(days=366*4)
+# TaskRequest entity groups are deleted when they are older than the cutoff.
+_OLD_TASK_REQUEST_CUT_OFF = datetime.timedelta(days=18*31)
 
 
 ### Properties validators must come before the models.
