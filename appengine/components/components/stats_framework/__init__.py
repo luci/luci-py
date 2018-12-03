@@ -644,4 +644,5 @@ def get_stats(handler, resolution, now, num_items, as_dict):
       i.get_result() for i in _get_snapshot_as_dict_future(keys)
       if i.get_result()
     ]
+  # Automatically skip missing entities.
   return [i for i in ndb.get_multi(keys) if i]

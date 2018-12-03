@@ -20,9 +20,9 @@ THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
 # Minimally required protoc version.
-MIN_SUPPORTED_PROTOC_VERSION = (3, 0, 0)
+MIN_SUPPORTED_PROTOC_VERSION = (3, 6, 1)
 # Maximally supported protoc version.
-MAX_SUPPORTED_PROTOC_VERSION = (3, 2, 0)
+MAX_SUPPORTED_PROTOC_VERSION = (3, 6, 1)
 
 
 # Printed if protoc is missing or too old.
@@ -80,6 +80,9 @@ def compile_proto(proto_file, import_paths, output_path=None):
   logging.debug('Running %s', cmd)
   env = os.environ.copy()
   env['PATH'] = os.pathsep.join([THIS_DIR, env.get('PATH', '')])
+  # Reuse embedded google protobuf.
+  root = os.path.dirname(os.path.dirname(os.path.dirname(THIS_DIR)))
+  env['PYTHONPATH'] = os.path.join(root, 'client', 'third_party')
   return not subprocess.call(cmd, env=env)
 
 
