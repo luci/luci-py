@@ -96,10 +96,6 @@ import cipd
 BOT_PING_TOLERANCE = datetime.timedelta(seconds=6*60)
 
 
-# TaskOutputChunk entities are be deleted after a while.
-_OLD_TASK_OUTPUT_CHUNKS_CUT_OFF = datetime.timedelta(days=366*2)
-
-
 class State(object):
   """Represents the current task state.
 
@@ -1327,38 +1323,3 @@ def get_result_summaries_query(start, end, sort, state, tags):
       tags_filter = ndb.AND(tags_filter, TaskResultSummary.tags == tag)
     q = q.filter(tags_filter)
   return _filter_query(TaskResultSummary, q, start, end, sort, state)
-
-
-def cron_delete_old_task_output_chunks():
-  """Deletes very old TaskOutputChunk entities."""
-  start = utils.utcnow()
-  # Run for 4.5 minutes and schedule the cron job every 5 minutes. Running for
-  # 9.5 minutes (out of 10 allowed for a cron job) results in 'Exceeded soft
-  # private memory limit of 512 MB with 512 MB' even if this loop should be
-  # fairly light on memory usage.
-  time_to_stop = start + datetime.timedelta(seconds=int(4.5*60))
-  more = True
-  cursor = None
-  count = 0
-  end_ts = start - _OLD_TASK_OUTPUT_CHUNKS_CUT_OFF
-  end = task_request.convert_to_request_key(end_ts, suffix=0xffff).integer_id()
-  try:
-    # Order is by key, so it is naturally ordered by TaskRequest creation time.
-    opt = ndb.QueryOptions(keys_only=True)
-    q = TaskOutputChunk.query(default_options=opt).order(TaskOutputChunk.key)
-    while more:
-      keys, cursor, more = q.fetch_page(10, start_cursor=cursor)
-      keys = [
-        k for k in keys if _outputchunk_key_to_request(k).integer_id() > end
-      ]
-      if not keys:
-        break
-      ndb.delete_multi(keys)
-      count += len(keys)
-      if utils.utcnow() >= time_to_stop:
-        break
-    return count
-  except runtime.DeadlineExceededError:
-    pass
-  finally:
-    logging.info('Deleted %d TaskOutputChunk entities', count)

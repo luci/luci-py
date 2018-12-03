@@ -584,25 +584,6 @@ class TaskResultApiTest(TestCase):
     # Indirectly tested by API.
     pass
 
-  def test_cron_delete_old_task_output_chunks(self):
-    # Create a TaskOutputChunk 3 years ago right at the cron job cut off,
-    # and another one one second later (that will be kept).
-    run_result_1 = _gen_result()
-    ndb.put_multi(run_result_1.append_output(
-        'Wow', task_result.TaskOutput.CHUNK_SIZE + 11))
-    now = self.now
-    self.mock_now(now, 1)
-    run_result_2 = _gen_result()
-    ndb.put_multi(run_result_2.append_output(
-        'Yay', task_result.TaskOutput.CHUNK_SIZE + 11))
-    self.mock_now(now + task_result._OLD_TASK_OUTPUT_CHUNKS_CUT_OFF, 0)
-    self.assertEqual(1, task_result.cron_delete_old_task_output_chunks())
-    # Make sure the right one still exists.
-    output_chunk_key = task_result._output_key_to_output_chunk_key(
-        task_result._run_result_key_to_output_key(run_result_2.key), 1)
-    actual = task_result.TaskOutputChunk.query().fetch(keys_only=True)
-    self.assertEqual([output_chunk_key], actual)
-
 
 class TestOutput(TestCase):
   def assertTaskOutputChunk(self, expected):
