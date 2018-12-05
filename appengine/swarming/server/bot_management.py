@@ -646,7 +646,16 @@ def cron_delete_old_bot_events():
       if not first_ts:
         # Fetch the very first entity to get an idea of the range being
         # processed.
-        first_ts = keys[0].get().ts
+        while keys:
+          # It's possible that the query returns ndb.Key for entities that do
+          # not exist anymore due to an inconsistent index. Handle this
+          # explicitly.
+          e = keys[0].get()
+          if not e:
+            keys = keys[1:]
+            continue
+          first_ts = e.ts
+          break
       ndb.delete_multi(keys)
       count += len(keys)
       if utils.utcnow() >= time_to_stop:
