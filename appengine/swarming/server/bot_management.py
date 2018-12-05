@@ -622,23 +622,31 @@ def cron_update_bot_info():
 
 
 def cron_delete_old_bot_events():
-  """Deletes very old BotEvent entites."""
+  """Deletes very old BotEvent entities."""
   start = utils.utcnow()
   # Run for 4.5 minutes and schedule the cron job every 5 minutes. Running for
   # 9.5 minutes (out of 10 allowed for a cron job) results in 'Exceeded soft
   # private memory limit of 512 MB with 512 MB' even if this loop should be
   # fairly light on memory usage.
   time_to_stop = start + datetime.timedelta(seconds=int(4.5*60))
+  end_ts = start - _OLD_BOT_EVENTS_CUT_OFF
   more = True
   cursor = None
   count = 0
+  first_ts = None
   try:
     # Order is by key, so it is naturally ordered by bot, which means the
     # operations will mainly operate on one root entity at a time.
     q = BotEvent.query(default_options=ndb.QueryOptions(keys_only=True)).filter(
-        BotEvent.ts <= start - _OLD_BOT_EVENTS_CUT_OFF)
+        BotEvent.ts <= end_ts)
     while more:
       keys, cursor, more = q.fetch_page(10, start_cursor=cursor)
+      if not keys:
+        break
+      if not first_ts:
+        # Fetch the very first entity to get an idea of the range being
+        # processed.
+        first_ts = keys[0].get().ts
       ndb.delete_multi(keys)
       count += len(keys)
       if utils.utcnow() >= time_to_stop:
@@ -647,4 +655,48 @@ def cron_delete_old_bot_events():
   except runtime.DeadlineExceededError:
     pass
   finally:
-    logging.info('Deleted %d BotEvent entities', count)
+    logging.info(
+        'Deleted %d BotEvent entities; from %s\nCut off was %s',
+        count, first_ts, end_ts)
+
+
+def cron_delete_old_bot():
+  """Deletes stale BotRoot entity groups.
+
+  This is especially important for Machine Provider bots, as they keep on being
+  created and accumulate forever.
+  """
+  start = utils.utcnow()
+  # Run for 4.5 minutes and schedule the cron job every 5 minutes. Running for
+  # 9.5 minutes (out of 10 allowed for a cron job) results in 'Exceeded soft
+  # private memory limit of 512 MB with 512 MB' even if this loop should be
+  # fairly light on memory usage.
+  time_to_stop = start + datetime.timedelta(seconds=int(4.5*60))
+  total = 0
+  deleted = []
+  try:
+    q = BotRoot.query(default_options=ndb.QueryOptions(keys_only=True))
+    for bot_root_key in q:
+      # Check if it has any BotEvent left. If not, it means that the entity is
+      # older than _OLD_BOT_EVENTS_CUF_OFF, so the whole thing can be deleted
+      # now.
+      # In particular, ignore the fact that BotInfo may still exist, since if
+      # there's no BotEvent left, it's probably a broken entity or a forgotten
+      # dead bot.
+      if BotEvent.query(ancestor=bot_root_key).count(limit=1):
+        continue
+      deleted.append(bot_root_key.string_id())
+      # Delete the whole group. An ancestor query will retrieve the entity
+      # itself too, so no need to explicitly delete it.
+      keys = ndb.Query(ancestor=bot_root_key).fetch(keys_only=True)
+      ndb.delete_multi(keys)
+      total += len(keys)
+      if utils.utcnow() >= time_to_stop:
+        break
+    return total
+  except runtime.DeadlineExceededError:
+    pass
+  finally:
+    logging.info(
+        'Deleted %d entities from the following bots:\n%s',
+        total, ', '.join(sorted(deleted)))

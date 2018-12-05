@@ -39,14 +39,14 @@ def _bot_event(
     task_name=None,
     **kwargs):
   """Calls bot_management.bot_event with default arguments."""
+  if not bot_id:
+    bot_id = u'id1'
   if not dimensions:
     dimensions = {
-      u'id': [u'id1'],
+      u'id': [bot_id],
       u'os': [u'Ubuntu', u'Ubuntu-16.04'],
       u'pool': [u'default'],
     }
-  if not bot_id:
-    bot_id = dimensions[u'id'][0]
   if not authenticated_as:
     authenticated_as = u'bot:%s.domain' % bot_id
   return bot_management.bot_event(
@@ -315,8 +315,8 @@ class BotManagementTest(test_case.TestCase):
     check([bot1_dead], [bot2_alive])
 
   def test_cron_delete_old_bot_events(self):
-    # Create a BotEvent 3 years ago right at the cron job cut off,
-    # and another one one second later (that will be kept).
+    # Create an old BotEvent right at the cron job cut off, and another one one
+    # second later (that will be kept).
     _bot_event(event_type='bot_connected')
     now = self.now
     self.mock_now(now, 1)
@@ -325,6 +325,20 @@ class BotManagementTest(test_case.TestCase):
     self.assertEqual(1, bot_management.cron_delete_old_bot_events())
     actual = bot_management.BotEvent.query().fetch(keys_only=True)
     self.assertEqual([event_key], actual)
+
+  def test_cron_delete_old_bot(self):
+    # Create a Bot with no BotEvent and another bot with one.
+    event_key = _bot_event(bot_id=u'id1', event_type='bot_connected')
+    # Delete the BotEvent entity.
+    _bot_event(bot_id=u'id2', event_type='bot_connected').delete()
+    # BotRoot + BotInfo.
+    self.assertEqual(2, bot_management.cron_delete_old_bot())
+    actual = bot_management.BotEvent.query().fetch(keys_only=True)
+    self.assertEqual([event_key], actual)
+    self.assertEqual(
+        [u'id1'],
+        [k.string_id() for k in
+          bot_management.BotRoot.query().fetch(keys_only=True)])
 
   def test_filter_dimensions(self):
     pass # Tested in handlers_endpoints_test

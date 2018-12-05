@@ -1403,8 +1403,8 @@ class TaskRequestApiTest(TestCase):
       task_request.SecretBytes(secret_bytes='a'*(20*1024+1)).put()
 
   def test_cron_delete_old_task_requests(self):
-    # Create a TaskRequest 4 years ago right at the cron job cut off,
-    # and another one one second later (that will be kept).
+    # Create an old TaskRequest right at the cron job cut off, and another one
+    # one second later (that will be kept).
     class Foo(ndb.Model):
       pass
     now = utils.utcnow()

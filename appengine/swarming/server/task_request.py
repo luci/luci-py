@@ -1462,7 +1462,9 @@ def cron_delete_old_task_requests():
   time_to_stop = start + datetime.timedelta(seconds=int(4.5*60))
   count = 0
   total = 0
-  end = start - _OLD_TASK_REQUEST_CUT_OFF
+  end_ts = start - _OLD_TASK_REQUEST_CUT_OFF
+  first = None
+  last = None
   try:
     # Key ordering is by most recent first. We want the reverse, delete the
     # oldest first. That would require ordering by -TaskRequest.key, which would
@@ -1473,8 +1475,11 @@ def cron_delete_old_task_requests():
     # risky. Here this is fine because this is year+ old entities, so the index
     # should be consistent. :)
     q = TaskRequest.query(default_options=opt).filter(
-        TaskRequest.created_ts <= end)
+        TaskRequest.created_ts <= end_ts)
     for request_key in q:
+      if not first:
+        first = request_key
+      last = request_key
       # Delete the whole group. An ancestor query will retrieve the entity
       # itself too, so no need to explicitly delete it.
       keys = ndb.Query(default_options=opt, ancestor=request_key).fetch()
@@ -1488,4 +1493,9 @@ def cron_delete_old_task_requests():
     pass
   finally:
     logging.info(
-        'Deleted %d TaskRequest entities; %d entities in total', count, total)
+        'Deleted %d TaskRequest entities; %d entities in total from %s to %s\n'
+        'Cut off was %s',
+        count, total,
+        request_key_to_datetime(first) if first else None,
+        request_key_to_datetime(last) if last else None,
+        end_ts)
