@@ -18,9 +18,6 @@ from components.stats_framework import stats_logs
 from components import utils
 
 
-# Class has no __init__ method - pylint: disable=W0232
-
-
 ### Models
 
 
@@ -41,36 +38,8 @@ class _Snapshot(ndb.Model):
   # Number of non-200 requests.
   failures = ndb.IntegerProperty(default=0, indexed=False)
 
-  def to_dict(self):
-    """Mangles to make it easier to graph."""
-    out = super(_Snapshot, self).to_dict()
-    out['other_requests'] = (
-        out['requests'] - out['downloads'] - out['contains_requests'] -
-        out['uploads'])
-    return out
-
   def accumulate(self, rhs):
     return stats_framework.accumulate(self, rhs, [])
-
-  def requests_as_text(self):
-    return '%s (%s failed)' % (
-      utils.to_units(self.requests),
-      utils.to_units(self.failures))
-
-  def downloads_as_text(self):
-    return '%s (%sb)' % (
-        utils.to_units(self.downloads),
-        utils.to_units(self.downloads_bytes))
-
-  def uploads_as_text(self):
-    return '%s (%sb)' % (
-        utils.to_units(self.uploads),
-        utils.to_units(self.uploads_bytes))
-
-  def lookups_as_text(self):
-    return '%s (%s items)' % (
-        utils.to_units(self.contains_requests),
-        utils.to_units(self.contains_lookups))
 
 
 ### Utility

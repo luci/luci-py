@@ -3,7 +3,6 @@
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
 
-import datetime
 import hashlib
 import logging
 import os
@@ -25,13 +24,11 @@ from components import template
 from components import utils
 from test_support import test_case
 
-import acl
 import config
 import gcs
 import handlers_backend
 import handlers_frontend
 import model
-import stats
 
 # Access to a protected member _XXX of a client class
 # pylint: disable=W0212
@@ -102,30 +99,6 @@ class MainTest(test_case.TestCase):
   def set_as_reader(self):
     self.set_as_anonymous()
     self.testbed.setup_env(USER_EMAIL='reader@example.com', overwrite=True)
-
-  def _gen_stats(self):
-    # Generates data for the last 10 days, last 10 hours and last 10 minutes.
-    # TODO(maruel): Stop accessing the DB directly. Use stats_framework_mock to
-    # generate it.
-    now = datetime.datetime(2010, 1, 2, 3, 4, 5, 6)
-    self.mock_now(now, 0)
-    handler = stats.STATS_HANDLER
-    for i in xrange(10):
-      s = stats._Snapshot(requests=100 + i)
-      day = (now - datetime.timedelta(days=i)).date()
-      handler.stats_day_cls(key=handler.day_key(day), values_compressed=s).put()
-
-    for i in xrange(10):
-      s = stats._Snapshot(requests=10 + i)
-      timestamp = (now - datetime.timedelta(hours=i))
-      handler.stats_hour_cls(
-          key=handler.hour_key(timestamp), values_compressed=s).put()
-
-    for i in xrange(10):
-      s = stats._Snapshot(requests=1 + i)
-      timestamp = (now - datetime.timedelta(minutes=i))
-      handler.stats_minute_cls(
-          key=handler.minute_key(timestamp), values_compressed=s).put()
 
   @staticmethod
   def gen_content_inline(namespace='default', content='Foo'):
@@ -257,70 +230,6 @@ class MainTest(test_case.TestCase):
     resp = self.app_frontend.post('/restricted/config', params)
     self.assertIn('Update conflict', resp)
     self.assertEqual('', config.settings().google_analytics)
-
-  def disabled_test_stats(self):
-    self._gen_stats()
-    response = self.app_frontend.get('/stats')
-    # Just ensure something is returned.
-    self.assertGreater(response.content_length, 4000)
-
-  def disabled_test_api_stats_days(self):
-    self._gen_stats()
-    # It's cheezy but at least it asserts that the data makes sense.
-    expected = (
-        'google.visualization.Query.setResponse({"status":"ok","table":{"rows":'
-        '[{"c":[{"v":"Date(2010,0,2)"},{"v":100},{"v":100},{"v":0},{"v":0},{"v"'
-        ':0},{"v":0},{"v":0},{"v":0},{"v":0}]}],"cols":[{"type":"date","id":"ke'
-        'y","label":"Day"},{"type":"number","id":"requests","label":"Total"},{"'
-        'type":"number","id":"other_requests","label":"Other"},{"type":"number"'
-        ',"id":"failures","label":"Failures"},{"type":"number","id":"uploads","'
-        'label":"Uploads"},{"type":"number","id":"downloads","label":"Downloads'
-        '"},{"type":"number","id":"contains_requests","label":"Lookups"},{"type'
-        '":"number","id":"uploads_bytes","label":"Uploaded"},{"type":"number","'
-        'id":"downloads_bytes","label":"Downloaded"},{"type":"number","id":"con'
-        'tains_lookups","label":"Items looked up"}]},"reqId":"0","version":"0.6'
-        '"});')
-    response = self.app_frontend.get('/isolate/api/v1/stats/days?duration=1')
-    self.assertEqual(expected, response.body)
-
-  def disabled_test_api_stats_hours(self):
-    self._gen_stats()
-    # It's cheezy but at least it asserts that the data makes sense.
-    expected = (
-        'google.visualization.Query.setResponse({"status":"ok","table":{"rows":'
-        '[{"c":[{"v":"Date(2010,0,2,3,0,0)"},{"v":10},{"v":10},{"v":0},{"v":0},'
-        '{"v":0},{"v":0},{"v":0},{"v":0},{"v":0}]}],"cols":[{"type":"datetime",'
-        '"id":"key","label":"Time"},{"type":"number","id":"requests","label":"T'
-        'otal"},{"type":"number","id":"other_requests","label":"Other"},{"type"'
-        ':"number","id":"failures","label":"Failures"},{"type":"number","id":"u'
-        'ploads","label":"Uploads"},{"type":"number","id":"downloads","label":"'
-        'Downloads"},{"type":"number","id":"contains_requests","label":"Lookups'
-        '"},{"type":"number","id":"uploads_bytes","label":"Uploaded"},{"type":"'
-        'number","id":"downloads_bytes","label":"Downloaded"},{"type":"number",'
-        '"id":"contains_lookups","label":"Items looked up"}]},"reqId":"0","vers'
-        'ion":"0.6"});')
-    response = self.app_frontend.get(
-        '/isolate/api/v1/stats/hours?duration=1&now=')
-    self.assertEqual(expected, response.body)
-
-  def disabled_test_api_stats_minutes(self):
-    self._gen_stats()
-    # It's cheezy but at least it asserts that the data makes sense.
-    expected = (
-        'google.visualization.Query.setResponse({"status":"ok","table":{"rows":'
-        '[{"c":[{"v":"Date(2010,0,2,3,4,0)"},{"v":1},{"v":1},{"v":0},{"v":0},{"'
-        'v":0},{"v":0},{"v":0},{"v":0},{"v":0}]}],"cols":[{"type":"datetime","i'
-        'd":"key","label":"Time"},{"type":"number","id":"requests","label":"Tot'
-        'al"},{"type":"number","id":"other_requests","label":"Other"},{"type":"'
-        'number","id":"failures","label":"Failures"},{"type":"number","id":"upl'
-        'oads","label":"Uploads"},{"type":"number","id":"downloads","label":"Do'
-        'wnloads"},{"type":"number","id":"contains_requests","label":"Lookups"}'
-        ',{"type":"number","id":"uploads_bytes","label":"Uploaded"},{"type":"nu'
-        'mber","id":"downloads_bytes","label":"Downloaded"},{"type":"number","i'
-        'd":"contains_lookups","label":"Items looked up"}]},"reqId":"0","versio'
-        'n":"0.6"});')
-    response = self.app_frontend.get('/isolate/api/v1/stats/minutes?duration=1')
-    self.assertEqual(expected, response.body)
 
 
 if __name__ == '__main__':

@@ -83,3 +83,12 @@ scheduler is needed.
     mode](https://chromium.googlesource.com/infra/luci/luci-py/+/master/appengine/components/components/config/README.md#fs-mode).
     You'll need to add an entry to settings.cfg like `ui_client_id:
     "server@<appid>.iam.gserviceaccount.com"`
+
+
+## Stats
+
+Use prpc CLI client from https://go.chromium.org/luci/grpc/cmd/prpc:
+
+```
+echo '{"resolution":"MINUTE","limit":20}' | prpc call -verbose <host> isolated.Isolated.Stats
+```

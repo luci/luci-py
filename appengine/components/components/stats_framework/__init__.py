@@ -387,18 +387,18 @@ def _generate_stats_day_cls(snapshot_cls):
     def values(self):
       return self.values_compressed or self.values_uncompressed
 
-    def get_timestamp(self):
-      return self.to_date()
+    @property
+    def timestamp(self):
+      """Returns a datetime.datetime representing the start of the period
+      covered.
+      """
+      year, month, day = self.key.id().split('-', 2)
+      return datetime.datetime(int(year), int(month), int(day))
 
     def to_dict(self):
       out = self.values.to_dict()
-      out['key'] = self.get_timestamp()
+      out['key'] = self.timestamp.date()
       return out
-
-    def to_date(self):
-      """Returns the datetime.date instance for this instance."""
-      year, month, day = self.key.id().split('-', 2)
-      return datetime.date(int(year), int(month), int(day))
 
     def _pre_put_hook(self):
       if bool(self.values_compressed) == bool(self.values_uncompressed):
@@ -436,20 +436,20 @@ def _generate_stats_hour_cls(snapshot_cls):
     def values(self):
       return self.values_compressed or self.values_uncompressed
 
-    def get_timestamp(self):
-      return self.to_datetime()
-
-    def to_dict(self):
-      out = self.values.to_dict()
-      out['key'] = self.get_timestamp()
-      return out
-
-    def to_datetime(self):
-      """Returns the datetime.datetime instance for this instance."""
+    @property
+    def timestamp(self):
+      """Returns a datetime.datetime representing the start of the period
+      covered.
+      """
       key = self.key
       year, month, day = key.parent().id().split('-', 2)
       return datetime.datetime(
           int(year), int(month), int(day), int(key.id()))
+
+    def to_dict(self):
+      out = self.values.to_dict()
+      out['key'] = self.timestamp
+      return out
 
     def _pre_put_hook(self):
       if bool(self.values_compressed) == bool(self.values_uncompressed):
@@ -480,21 +480,22 @@ def _generate_stats_minute_cls(snapshot_cls):
     def values(self):
       return self.values_compressed or self.values_uncompressed
 
-    def get_timestamp(self):
-      return self.to_datetime()
+    @property
+    def timestamp(self):
+      """Returns a datetime.datetime representing the start of the period
+      covered.
+      """
+      key = self.key
+      parent = key.parent()
+      year, month, day = parent.parent().id().split('-', 2)
+      hour = parent.id()
+      return datetime.datetime(
+          int(year), int(month), int(day), int(hour), int(key.id()))
 
     def to_dict(self):
       out = self.values.to_dict()
-      out['key'] = self.get_timestamp()
+      out['key'] = self.timestamp
       return out
-
-    def to_datetime(self):
-      """Returns the datetime.datetime instance for this instance."""
-      key = self.key
-      year, month, day = key.parent().parent().id().split('-', 2)
-      hour = key.parent().id()
-      return datetime.datetime(
-          int(year), int(month), int(day), int(hour), int(key.id()))
 
     def _pre_put_hook(self):
       if bool(self.values_compressed) == bool(self.values_uncompressed):

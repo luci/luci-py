@@ -18,6 +18,10 @@ handlers:
   script: main_frontend.endpoints_app
   secure: always
 
+- url: /prpc/.*
+  script: main_frontend.prpc_app
+  secure: always
+
 - url: /mapreduce(/.*)?
   script: mapreduce.main.APP
   secure: always

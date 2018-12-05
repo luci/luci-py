@@ -91,7 +91,6 @@ class StatsTest(test_case.TestCase):
         'downloads_bytes': 0,
         'failures': 0,
         'key': datetime.datetime(2010, 1, 2, 3, 4),
-        'other_requests': 0,
         'requests': 1,
         'uploads': 0,
         'uploads_bytes': 0,
@@ -122,9 +121,7 @@ class StatsTest(test_case.TestCase):
     self._test_handler('/lookup', expected)
 
   def test_dupe(self):
-    expected = {
-      'other_requests': 1,
-    }
+    expected = {}
     self._test_handler('/dupe', expected)
 
 

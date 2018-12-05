@@ -28,8 +28,9 @@ from components import endpoints_webapp2
 import gae_ts_mon
 
 import config
-import handlers_frontend
 import handlers_endpoints_v1
+import handlers_frontend
+import handlers_prpc
 
 
 def create_application():
@@ -43,13 +44,15 @@ def create_application():
 
   gae_ts_mon.initialize(frontend, is_enabled_fn=is_enabled_callback)
   # App that serves new endpoints API.
-  api = endpoints_webapp2.api_server([
+  endpoints_api = endpoints_webapp2.api_server([
       handlers_endpoints_v1.IsolateService,
       # components.config endpoints for validation and configuring of
       # luci-config service URL.
       config.ConfigApi,
   ])
-  return frontend, api
+
+  prpc_api = webapp2.WSGIApplication(handlers_prpc.get_routes())
+  return frontend, endpoints_api, prpc_api
 
 
-frontend_app, endpoints_app = create_application()
+frontend_app, endpoints_app, prpc_app = create_application()

@@ -1,0 +1,58 @@
+// Copyright 2018 The LUCI Authors. All rights reserved.
+// Use of this source code is governed under the Apache License, Version 2.0
+// that can be found in the LICENSE file.
+
+syntax = "proto3";
+
+package isolated;
+
+import "google/protobuf/timestamp.proto";
+
+service Isolated {
+  // Stats returns statistics for this time range at the requested resolution.
+  rpc Stats(StatsRequest) returns (StatsResponse) {};
+}
+
+// Resolution to use for Service.Stats request.
+enum Resolution {
+  RESOLUTION_UNSPECIFIED = 0;
+  MINUTE = 1;
+  HOUR = 2;
+  DAY = 3;
+}
+
+message StatsRequest {
+  // latest is the last entry to be specified in the request. If not specified,
+  // latest defaults to the current time. If |latest| is too recent recent
+  // entries will be missing as they are not yet computed.
+  google.protobuf.Timestamp latest = 1;
+  // Requested resolution.
+  Resolution resolution = 2;
+  // Maximum number of StatsSnapshot entries to return.
+  int32 page_size = 3;
+}
+
+message StatsResponse {
+  // Statistics snapshot in reverse chronological ordering. There can be holes
+  // in the list; there's a delay before recent entries are created.
+  repeated StatsSnapshot measurements = 1;
+}
+
+// StatsSnapshot contains service statistics.
+message StatsSnapshot {
+  google.protobuf.Timestamp ts = 1;
+
+  int64 uploads = 2;
+  int64 uploads_bytes = 3;
+  int64 downloads = 4;
+  int64 downloads_bytes = 5;
+
+  // Number of /contains requests and total number of items looked up.
+  int64 contains_requests = 6;
+  int64 contains_lookups = 7;
+
+  // Total number of requests to calculate QPS.
+  int64 requests = 8;
+  // Number of non-200 requests.
+  int64 failures = 9;
+}
