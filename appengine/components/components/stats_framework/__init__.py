@@ -246,7 +246,8 @@ class StatisticsFramework(object):
       # sealed sequence of self.stats_day_cls, the non-sealed entity will be
       # skipped.
       # TODO(maruel): Fix this.
-      key_id = str(last_sealed_day.to_date() + datetime.timedelta(days=1))
+      key_id = str(
+          (last_sealed_day.timestamp + datetime.timedelta(days=1)).date())
       day = self.stats_day_cls.get_or_insert(
           key_id, parent=self.root_key, values_compressed=self.snapshot_cls())
       logging.info('Selected: %s', key_id)
@@ -254,14 +255,14 @@ class StatisticsFramework(object):
     # TODO(maruel): Should we trust it all the time or do an explicit query? For
     # now, trust the bitmap.
     hour_bit = _lowest_missing_bit(day.hours_bitmap)
-    assert hour_bit < 24, (hour_bit, day.to_date())
+    assert hour_bit < 24, (hour_bit, day.timestamp.date())
 
     hour = self.stats_hour_cls.get_or_insert(
         '%02d' % hour_bit, parent=day.key,
         values_compressed=self.snapshot_cls())
     minute_bit = _lowest_missing_bit(hour.minutes_bitmap)
     assert minute_bit < 60, minute_bit
-    date = day.to_date()
+    date = day.timestamp.date()
     result = datetime.datetime(
         date.year, date.month, date.day, hour_bit, minute_bit)
     logging.info('Using: %s', result)
