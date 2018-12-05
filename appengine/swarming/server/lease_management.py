@@ -177,7 +177,7 @@ class MachineTypeUtilization(ndb.Model):
 
 
 @ndb.transactional_tasklet
-def create_machine_lease(machine_lease_key, machine_type):
+def _create_machine_lease(machine_lease_key, machine_type):
   """Creates a MachineLease from the given MachineType and MachineLease key.
 
   Args:
@@ -202,7 +202,7 @@ def create_machine_lease(machine_lease_key, machine_type):
 
 
 @ndb.transactional_tasklet
-def update_machine_lease(machine_lease_key, machine_type):
+def _update_machine_lease(machine_lease_key, machine_type):
   """Updates the given MachineLease from the given MachineType.
 
   Args:
@@ -220,7 +220,7 @@ def update_machine_lease(machine_lease_key, machine_type):
   put = False
   drain = False
 
-  # See ensure_entity_exists below for why we only update leased machines.
+  # See _ensure_entity_exists below for why we only update leased machines.
   if not machine_lease.lease_expiration_ts:
     if not machine_lease.leased_indefinitely:
       return
@@ -254,7 +254,7 @@ def update_machine_lease(machine_lease_key, machine_type):
 
 
 @ndb.tasklet
-def ensure_entity_exists(machine_type, n):
+def _ensure_entity_exists(machine_type, n):
   """Ensures the nth MachineLease for the given MachineType exists.
 
   Args:
@@ -266,7 +266,7 @@ def ensure_entity_exists(machine_type, n):
   machine_lease = yield machine_lease_key.get_async()
 
   if not machine_lease:
-    yield create_machine_lease(machine_lease_key, machine_type)
+    yield _create_machine_lease(machine_lease_key, machine_type)
     return
 
   # If there is a MachineLease, we may need to update it if the MachineType's
@@ -281,10 +281,10 @@ def ensure_entity_exists(machine_type, n):
         or machine_lease.lease_indefinitely != machine_type.lease_indefinitely
         or machine_lease.mp_dimensions != machine_type.mp_dimensions
     ):
-      yield update_machine_lease(machine_lease_key, machine_type)
+      yield _update_machine_lease(machine_lease_key, machine_type)
 
 
-def machine_type_pb2_to_entity(pb2):
+def _machine_type_pb2_to_entity(pb2):
   """Creates a MachineType entity from the given bots_pb2.MachineType.
 
   Args:
@@ -315,7 +315,7 @@ def machine_type_pb2_to_entity(pb2):
   )
 
 
-def get_target_size(schedule, machine_type, current, default, now=None):
+def _get_target_size(schedule, machine_type, current, default, now=None):
   """Returns the current target size for the MachineType.
 
   Args:
@@ -410,10 +410,10 @@ def ensure_entities_exist(max_concurrent=50):
     # Check the MachineType in the datastore against its config.
     # If it no longer exists, just disable it here. If it exists but
     # doesn't match, update it.
-    config = machine_types.pop(machine_type.key.id(), None)
+    machine_type_cfg = machine_types.pop(machine_type.key.id(), None)
 
     # If there is no config, disable the MachineType.
-    if not config:
+    if not machine_type_cfg:
       if machine_type.enabled:
         machine_type.enabled = False
         futures.append(machine_type.put_async())
@@ -429,12 +429,12 @@ def ensure_entities_exist(max_concurrent=50):
       put = True
 
     # Handle scheduled config changes.
-    if config.schedule:
-      target_size = get_target_size(
-          config.schedule,
+    if machine_type_cfg.schedule:
+      target_size = _get_target_size(
+          machine_type_cfg.schedule,
           machine_type.key.id(),
           machine_type.target_size,
-          config.target_size,
+          machine_type_cfg.target_size,
           now=now,
       )
       if machine_type.target_size != target_size:
@@ -450,11 +450,11 @@ def ensure_entities_exist(max_concurrent=50):
     # If the MachineType does not match the config, update it. Copy the values
     # of certain fields so we can compare the MachineType to the config to check
     # for differences in all other fields.
-    config = machine_type_pb2_to_entity(config)
-    config.target_size = machine_type.target_size
-    if machine_type != config:
-      logging.info('Updating MachineType: %s', config)
-      machine_type = config
+    ent = _machine_type_pb2_to_entity(machine_type_cfg)
+    ent.target_size = machine_type.target_size
+    if machine_type != ent:
+      logging.info('Updating MachineType: %s', ent)
+      machine_type = ent
       put = True
 
     # If there's anything to update, update it once here.
@@ -469,7 +469,7 @@ def ensure_entities_exist(max_concurrent=50):
     cursor = 0
     while cursor < machine_type.target_size:
       while len(futures) < max_concurrent and cursor < machine_type.target_size:
-        futures.append(ensure_entity_exists(machine_type, cursor))
+        futures.append(_ensure_entity_exists(machine_type, cursor))
         cursor += 1
       ndb.Future.wait_any(futures)
       # We don't bother checking success or failure. If a transient error
@@ -487,7 +487,7 @@ def ensure_entities_exist(max_concurrent=50):
     num_futures = len(futures)
     if num_futures < max_concurrent:
       futures.extend([
-          machine_type_pb2_to_entity(machine_type).put_async()
+          _machine_type_pb2_to_entity(machine_type).put_async()
           for machine_type in machine_types[:max_concurrent - num_futures]
       ])
       machine_types = machine_types[max_concurrent - num_futures:]
@@ -499,7 +499,7 @@ def ensure_entities_exist(max_concurrent=50):
 
 
 @ndb.transactional_tasklet
-def drain_entity(key):
+def _drain_entity(key):
   """Drains the given MachineLease.
 
   Args:
@@ -523,7 +523,7 @@ def drain_entity(key):
 
 
 @ndb.tasklet
-def ensure_entity_drained(machine_lease):
+def _ensure_entity_drained(machine_lease):
   """Ensures the given MachineLease is drained.
 
   Args:
@@ -532,7 +532,7 @@ def ensure_entity_drained(machine_lease):
   if machine_lease.drained:
     return
 
-  yield drain_entity(machine_lease.key)
+  yield _drain_entity(machine_lease.key)
 
 
 def drain_excess(max_concurrent=50):
@@ -563,7 +563,7 @@ def drain_excess(max_concurrent=50):
         if len(futures) == max_concurrent:
           ndb.Future.wait_any(futures)
           futures = [future for future in futures if not future.done()]
-        futures.append(ensure_entity_drained(machine_lease))
+        futures.append(_ensure_entity_drained(machine_lease))
 
   if futures:
     ndb.Future.wait_all(futures)
@@ -597,7 +597,7 @@ def schedule_lease_management():
 
 
 @ndb.transactional
-def clear_lease_request(key, request_id):
+def _clear_lease_request(key, request_id):
   """Clears information about given lease request.
 
   Args:
@@ -635,7 +635,7 @@ def clear_lease_request(key, request_id):
 
 
 @ndb.transactional
-def clear_termination_task(key, task_id):
+def _clear_termination_task(key, task_id):
   """Clears the termination task associated with the given lease request.
 
   Args:
@@ -664,7 +664,7 @@ def clear_termination_task(key, task_id):
 
 
 @ndb.transactional
-def associate_termination_task(key, hostname, task_id):
+def _associate_termination_task(key, hostname, task_id):
   """Associates a termination task with the given lease request.
 
   Args:
@@ -700,7 +700,7 @@ def associate_termination_task(key, hostname, task_id):
 
 
 @ndb.transactional
-def log_lease_fulfillment(
+def _log_lease_fulfillment(
     key, request_id, hostname, lease_expiration_ts, leased_indefinitely,
     lease_id):
   """Logs lease fulfillment.
@@ -746,7 +746,7 @@ def log_lease_fulfillment(
 
 
 @ndb.transactional
-def update_client_request_id(key):
+def _update_client_request_id(key):
   """Sets the client request ID used to lease a machine.
 
   Args:
@@ -771,7 +771,7 @@ def update_client_request_id(key):
 
 
 @ndb.transactional
-def delete_machine_lease(key):
+def _delete_machine_lease(key):
   """Deletes the given MachineLease if it is drained and has no active lease.
 
   Args:
@@ -792,7 +792,7 @@ def delete_machine_lease(key):
 
 
 @ndb.transactional
-def associate_bot_id(key, bot_id):
+def _associate_bot_id(key, bot_id):
   """Associates a bot with the given machine lease.
 
   Args:
@@ -820,7 +820,7 @@ def associate_bot_id(key, bot_id):
   machine_lease.put()
 
 
-def ensure_bot_info_exists(machine_lease):
+def _ensure_bot_info_exists(machine_lease):
   """Ensures a BotInfo entity exists and has Machine Provider-related fields.
 
   Args:
@@ -869,7 +869,7 @@ def ensure_bot_info_exists(machine_lease):
         and bot_info.machine_type
         and bot_info.machine_lease
     ):
-      # If associate_bot_id isn't called, cron will try again later.
+      # If _associate_bot_id isn't called, cron will try again later.
       logging.error(
           'Failed to put BotInfo\nKey: %s\nHostname: %s\nBotInfo: %s',
           machine_lease.key,
@@ -890,11 +890,11 @@ def ensure_bot_info_exists(machine_lease):
         machine_lease.hostname,
         bot_info,
     )
-  associate_bot_id(machine_lease.key, machine_lease.hostname)
+  _associate_bot_id(machine_lease.key, machine_lease.hostname)
 
 
 @ndb.transactional
-def associate_instruction_ts(key, instruction_ts):
+def _associate_instruction_ts(key, instruction_ts):
   """Associates an instruction time with the given machine lease.
 
   Args:
@@ -917,7 +917,7 @@ def associate_instruction_ts(key, instruction_ts):
   machine_lease.put()
 
 
-def send_connection_instruction(machine_lease):
+def _send_connection_instruction(machine_lease):
   """Sends an instruction to the given machine to connect to the server.
 
   Args:
@@ -941,7 +941,7 @@ def send_connection_instruction(machine_lease):
         machine_lease.key,
         machine_lease.hostname,
     )
-    associate_instruction_ts(machine_lease.key, now)
+    _associate_instruction_ts(machine_lease.key, now)
   elif response['error'] == 'ALREADY_RECLAIMED':
     # Can happen if lease duration is very short or there is a significant delay
     # in creating the BotInfo or instructing the machine. Consider it an error.
@@ -950,7 +950,7 @@ def send_connection_instruction(machine_lease):
         machine_lease.key,
         machine_lease.hostname,
     )
-    clear_lease_request(machine_lease.key, machine_lease.client_request_id)
+    _clear_lease_request(machine_lease.key, machine_lease.client_request_id)
   else:
     logging.warning(
         'MachineLease instruction error:\nKey: %s\nHostname: %s\nError: %s',
@@ -961,7 +961,7 @@ def send_connection_instruction(machine_lease):
 
 
 @ndb.transactional
-def associate_connection_ts(key, connection_ts):
+def _associate_connection_ts(key, connection_ts):
   """Associates a connection time with the given machine lease.
 
   Args:
@@ -987,7 +987,7 @@ def associate_connection_ts(key, connection_ts):
   machine_lease.put()
 
 
-def check_for_connection(machine_lease):
+def _check_for_connection(machine_lease):
   """Checks for a bot_connected event.
 
   Args:
@@ -1019,7 +1019,7 @@ def check_for_connection(machine_lease):
           machine_lease.hostname,
           event.ts,
       )
-      associate_connection_ts(machine_lease.key, event.ts)
+      _associate_connection_ts(machine_lease.key, event.ts)
       ts_mon_metrics.on_machine_connected_time(
           (event.ts - machine_lease.instruction_ts).total_seconds(),
           fields={
@@ -1044,7 +1044,7 @@ def check_for_connection(machine_lease):
         machine_lease.hostname, wait_for_capacity=True)
     task_scheduler.schedule_request(task, secret_bytes=None)
     if release(machine_lease):
-      clear_lease_request(machine_lease.key, machine_lease.client_request_id)
+      _clear_lease_request(machine_lease.key, machine_lease.client_request_id)
     return
   if bot_info.is_dead:
     logging.warning(
@@ -1065,7 +1065,7 @@ def cleanup_bot(machine_lease):
   # The bot is being removed, remove it from the task queues.
   task_queues.cleanup_after_bot(bot_root_key)
   bot_management.get_info_key(machine_lease.hostname).delete()
-  clear_lease_request(machine_lease.key, machine_lease.client_request_id)
+  _clear_lease_request(machine_lease.key, machine_lease.client_request_id)
   logging.info('MachineLease cleared:\nKey: %s', machine_lease.key)
 
 
@@ -1117,7 +1117,7 @@ def release(machine_lease):
   return True
 
 
-def handle_termination_task(machine_lease):
+def _handle_termination_task(machine_lease):
   """Checks the state of the termination task, releasing the lease if completed.
 
   Args:
@@ -1135,7 +1135,7 @@ def handle_termination_task(machine_lease):
         machine_lease.termination_task,
         task_result.State.to_string(task_result_summary.state),
     )
-    clear_termination_task(machine_lease.key, machine_lease.termination_task)
+    _clear_termination_task(machine_lease.key, machine_lease.termination_task)
     return
 
   if task_result_summary.state == task_result.State.COMPLETED:
@@ -1156,7 +1156,7 @@ def handle_termination_task(machine_lease):
       cleanup_bot(machine_lease)
 
 
-def handle_early_release(machine_lease):
+def _handle_early_release(machine_lease):
   """Handles the early release of a leased machine.
 
   Early release can be due to configured early release time, or being drained.
@@ -1184,11 +1184,11 @@ def handle_early_release(machine_lease):
       machine_lease.hostname, wait_for_capacity=True)
   task_result_summary = task_scheduler.schedule_request(
       task, secret_bytes=None)
-  associate_termination_task(
+  _associate_termination_task(
       machine_lease.key, machine_lease.hostname, task_result_summary.task_id)
 
 
-def manage_leased_machine(machine_lease):
+def _manage_leased_machine(machine_lease):
   """Manages a leased machine.
 
   Args:
@@ -1202,17 +1202,17 @@ def manage_leased_machine(machine_lease):
 
   # Handle a newly leased machine.
   if not machine_lease.bot_id:
-    ensure_bot_info_exists(machine_lease)
+    _ensure_bot_info_exists(machine_lease)
     return
 
   # Once BotInfo is created, send the instruction to join the server.
   if not machine_lease.instruction_ts:
-    send_connection_instruction(machine_lease)
+    _send_connection_instruction(machine_lease)
     return
 
   # Once the instruction is sent, check for connection.
   if not machine_lease.connection_ts:
-    check_for_connection(machine_lease)
+    _check_for_connection(machine_lease)
     return
 
   # Handle an expired lease.
@@ -1235,16 +1235,16 @@ def manage_leased_machine(machine_lease):
         machine_lease.hostname,
         machine_lease.termination_task,
     )
-    handle_termination_task(machine_lease)
+    _handle_termination_task(machine_lease)
     return
 
   # Handle a lease ready for early release.
   if machine_lease.early_release_secs or machine_lease.drained:
-    handle_early_release(machine_lease)
+    _handle_early_release(machine_lease)
     return
 
 
-def handle_lease_request_error(machine_lease, response):
+def _handle_lease_request_error(machine_lease, response):
   """Handles an error in the lease request response from Machine Provider.
 
   Args:
@@ -1269,10 +1269,10 @@ def handle_lease_request_error(machine_lease, response):
         response['client_request_id'],
         response['error'],
     )
-    clear_lease_request(machine_lease.key, machine_lease.client_request_id)
+    _clear_lease_request(machine_lease.key, machine_lease.client_request_id)
 
 
-def handle_lease_request_response(machine_lease, response):
+def _handle_lease_request_response(machine_lease, response):
   """Handles a successful lease request response from Machine Provider.
 
   Args:
@@ -1291,7 +1291,7 @@ def handle_lease_request_response(machine_lease, response):
           machine_lease.client_request_id,
           response['lease_expiration_ts'],
       )
-      clear_lease_request(machine_lease.key, machine_lease.client_request_id)
+      _clear_lease_request(machine_lease.key, machine_lease.client_request_id)
     else:
       expires = response['lease_expiration_ts']
       if response.get('leased_indefinitely'):
@@ -1303,7 +1303,7 @@ def handle_lease_request_response(machine_lease, response):
           response['hostname'],
           expires,
       )
-      log_lease_fulfillment(
+      _log_lease_fulfillment(
           machine_lease.key,
           machine_lease.client_request_id,
           response['hostname'],
@@ -1317,10 +1317,10 @@ def handle_lease_request_response(machine_lease, response):
         machine_lease.key,
         machine_lease.client_request_id,
     )
-    clear_lease_request(machine_lease.key, machine_lease.client_request_id)
+    _clear_lease_request(machine_lease.key, machine_lease.client_request_id)
 
 
-def manage_pending_lease_request(machine_lease):
+def _manage_pending_lease_request(machine_lease):
   """Manages a pending lease request.
 
   Args:
@@ -1344,10 +1344,10 @@ def manage_pending_lease_request(machine_lease):
   )
 
   if response.get('error'):
-    handle_lease_request_error(machine_lease, response)
+    _handle_lease_request_error(machine_lease, response)
     return
 
-  handle_lease_request_response(machine_lease, response)
+  _handle_lease_request_response(machine_lease, response)
 
 
 def manage_lease(key):
@@ -1362,7 +1362,7 @@ def manage_lease(key):
 
   # Manage a leased machine.
   if machine_lease.lease_expiration_ts or machine_lease.leased_indefinitely:
-    manage_leased_machine(machine_lease)
+    _manage_leased_machine(machine_lease)
     return
 
   # Lease expiration time is unknown, so there must be no leased machine.
@@ -1371,16 +1371,16 @@ def manage_lease(key):
 
   # Manage a pending lease request.
   if machine_lease.client_request_id:
-    manage_pending_lease_request(machine_lease)
+    _manage_pending_lease_request(machine_lease)
     return
 
   # Manage an uninitiated lease request.
   if not machine_lease.drained:
-    update_client_request_id(key)
+    _update_client_request_id(key)
     return
 
   # Manage an uninitiated, drained lease request.
-  delete_machine_lease(key)
+  _delete_machine_lease(key)
 
 
 def compute_utilization():
