@@ -176,6 +176,9 @@ class MachineTypeUtilization(ndb.Model):
   last_updated_ts = ndb.DateTimeProperty()
 
 
+## Private stuff.
+
+
 @ndb.transactional_tasklet
 def _create_machine_lease(machine_lease_key, machine_type):
   """Creates a MachineLease from the given MachineType and MachineLease key.
@@ -388,7 +391,7 @@ def _get_target_size(schedule, machine_type, current, default, now=None):
   return default
 
 
-def ensure_entities_exist(max_concurrent=50):
+def _ensure_entities_exist(max_concurrent=50):
   """Ensures MachineType entities are correct, and MachineLease entities exist.
 
   Updates MachineType entities based on the config and creates corresponding
@@ -405,6 +408,7 @@ def ensure_entities_exist(max_concurrent=50):
   # too many in flight at a time.
   futures = []
   machine_types = bot_groups_config.fetch_machine_types().copy()
+  total = len(machine_types)
 
   for machine_type in MachineType.query():
     # Check the MachineType in the datastore against its config.
@@ -480,22 +484,22 @@ def ensure_entities_exist(max_concurrent=50):
 
   # Create MachineTypes that never existed before.
   # The next iteration of this cron job will create their MachineLeases.
-  if machine_types:
-    machine_types = machine_types.values()
+  machine_types_values = machine_types.values()
 
-  while machine_types:
+  while machine_types_values:
     num_futures = len(futures)
     if num_futures < max_concurrent:
-      futures.extend([
-          _machine_type_pb2_to_entity(machine_type).put_async()
-          for machine_type in machine_types[:max_concurrent - num_futures]
-      ])
-      machine_types = machine_types[max_concurrent - num_futures:]
+      futures.extend(
+          _machine_type_pb2_to_entity(m).put_async()
+          for m in machine_types_values[:max_concurrent - num_futures]
+      )
+      machine_types_values = machine_types_values[max_concurrent - num_futures:]
     ndb.Future.wait_any(futures)
     futures = [future for future in futures if not future.done()]
 
   if futures:
     ndb.Future.wait_all(futures)
+  return total
 
 
 @ndb.transactional_tasklet
@@ -535,7 +539,7 @@ def _ensure_entity_drained(machine_lease):
   yield _drain_entity(machine_lease.key)
 
 
-def drain_excess(max_concurrent=50):
+def _drain_excess(max_concurrent=50):
   """Marks MachineLeases beyond what is needed by their MachineType as drained.
 
   Args:
@@ -569,9 +573,10 @@ def drain_excess(max_concurrent=50):
     ndb.Future.wait_all(futures)
 
 
-def schedule_lease_management():
+def cron_schedule_lease_management():
   """Schedules task queues to process each MachineLease."""
   now = utils.utcnow()
+  total = 0
   for machine_lease in MachineLease.query():
     # If there's no connection_ts, we're waiting on a bot so schedule the
     # management job to check on it. If there is a connection_ts, then don't
@@ -585,6 +590,7 @@ def schedule_lease_management():
         if machine_lease.lease_expiration_ts > now + datetime.timedelta(
             seconds=machine_lease.early_release_secs or 0):
           continue
+    total += 1
     if not utils.enqueue_task(
         '/internal/taskqueue/machine-provider-manage',
         'machine-provider-manage',
@@ -594,6 +600,7 @@ def schedule_lease_management():
     ):
       logging.warning(
           'Failed to enqueue task for MachineLease: %s', machine_lease.key)
+  return total
 
 
 @ndb.transactional
@@ -1083,6 +1090,7 @@ def last_shutdown_ts(hostname):
   bot_event = bot_management.get_events_query(hostname, True).get()
   if bot_event and bot_event.event_type == 'bot_shutdown':
     return bot_event.ts
+  return None
 
 
 def release(machine_lease):
@@ -1350,7 +1358,7 @@ def _manage_pending_lease_request(machine_lease):
   _handle_lease_request_response(machine_lease, response)
 
 
-def manage_lease(key):
+def task_manage_lease(key):
   """Manages a MachineLease.
 
   Args:
@@ -1383,7 +1391,7 @@ def manage_lease(key):
   _delete_machine_lease(key)
 
 
-def compute_utilization():
+def cron_compute_utilization():
   """Computes bot utilization per machine type."""
   # A query that requires multiple batches may produce duplicate results. To
   # ensure each bot is only counted once, map machine types to [busy, idle]
@@ -1412,7 +1420,9 @@ def compute_utilization():
   # The number of machine types isn't very large, in the few tens, so no need to
   # rate limit parallelism yet.
   futures = []
+  total = 0
   for machine_type, (busy, idle) in machine_types.iteritems():
+    total += 1
     busy = len(busy)
     idle = len(idle)
     logging.info('Utilization for %s: %s/%s', machine_type, busy, busy + idle)
@@ -1423,6 +1433,20 @@ def compute_utilization():
     futures.append(obj.put_async())
   for f in futures:
     f.get_result()
+  return total
+
+
+def cron_sync_config(server):
+  """Updates MP related configuration."""
+  if server:
+    current_config = machine_provider.MachineProviderConfiguration().cached()
+    if server != current_config.instance_url:
+      logging.info('Updating Machine Provider server to %s', server)
+      current_config.modify(updated_by='', instance_url=server)
+  else:
+    logging.info('No MP server specified')
+  _ensure_entities_exist()
+  return _drain_excess()
 
 
 def set_global_metrics():
