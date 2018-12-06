@@ -1492,10 +1492,22 @@ def cron_delete_old_task_requests():
   except runtime.DeadlineExceededError:
     pass
   finally:
+    first_ts = request_key_to_datetime(first) if first else None
+    last_ts = request_key_to_datetime(last) if last else None
+
+    def _format_ts(t):
+      # datetime.datetime
+      return t.strftime(u'%Y-%m-%d %H:%M') if t else 'N/A'
+
+    def _format_delta(e, s):
+      # datetime.timedelta
+      return str(e-s).rsplit('.', 1)[0] if e and s else 'N/A'
+
     logging.info(
-        'Deleted %d TaskRequest entities; %d entities in total from %s to %s\n'
-        'Cut off was %s',
+        'Deleted %d TaskRequest entities; %d entities in total.\n'
+        'From %s to %s (%s)\n'
+        'Cut off was %s; trailing by %s',
         count, total,
-        request_key_to_datetime(first) if first else None,
-        request_key_to_datetime(last) if last else None,
-        end_ts)
+        _format_ts(first_ts), _format_ts(last_ts),
+        _format_delta(last_ts, first_ts),
+        _format_ts(end_ts), _format_delta(end_ts, last_ts))
