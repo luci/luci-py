@@ -129,7 +129,8 @@ def assign_task(es_cfg, bot_dimensions):
   c = _get_client(es_cfg.address)
 
   # TODO(akeshet): Catch or handle errors appropriately.
-  resp = c.AssignTasks(req)
+  resp = c.AssignTasks(req,
+      credentials=client.service_account_credentials())
 
   if not resp or not resp.assignments:
     return None, None
@@ -171,7 +172,7 @@ def notify_request(es_cfg, request, result_summary):
   req.scheduler_id = es_cfg.id
 
   c = _get_client(es_cfg.address)
-  c.NotifyTasks(req)
+  c.NotifyTasks(req, credentials=client.service_account_credentials())
 
 
 def get_cancellations(es_cfg):
@@ -179,5 +180,6 @@ def get_cancellations(es_cfg):
   req = plugin_pb2.GetCancellationsRequest()
   req.scheduler_id = es_cfg.id
   c = _get_client(es_cfg.address)
-  resp = c.GetCancellations(req)
+  resp = c.GetCancellations(
+    req, credentials=client.service_account_credentials())
   return resp.cancellations
