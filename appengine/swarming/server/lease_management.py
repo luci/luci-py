@@ -573,36 +573,6 @@ def _drain_excess(max_concurrent=50):
     ndb.Future.wait_all(futures)
 
 
-def cron_schedule_lease_management():
-  """Schedules task queues to process each MachineLease."""
-  now = utils.utcnow()
-  total = 0
-  for machine_lease in MachineLease.query():
-    # If there's no connection_ts, we're waiting on a bot so schedule the
-    # management job to check on it. If there is a connection_ts, then don't
-    # schedule the management job until it's time to release the machine.
-    if machine_lease.connection_ts:
-      if not machine_lease.drained:
-        # lease_expiration_ts is None if leased_indefinitely, check it first.
-        if machine_lease.leased_indefinitely:
-          continue
-        assert machine_lease.lease_expiration_ts, machine_lease
-        if machine_lease.lease_expiration_ts > now + datetime.timedelta(
-            seconds=machine_lease.early_release_secs or 0):
-          continue
-    total += 1
-    if not utils.enqueue_task(
-        '/internal/taskqueue/machine-provider-manage',
-        'machine-provider-manage',
-        params={
-            'key': machine_lease.key.urlsafe(),
-        },
-    ):
-      logging.warning(
-          'Failed to enqueue task for MachineLease: %s', machine_lease.key)
-  return total
-
-
 @ndb.transactional
 def _clear_lease_request(key, request_id):
   """Clears information about given lease request.
@@ -1066,65 +1036,6 @@ def _check_for_connection(machine_lease):
       cleanup_bot(machine_lease)
 
 
-def cleanup_bot(machine_lease):
-  """Cleans up entities after a bot is removed."""
-  bot_root_key = bot_management.get_root_key(machine_lease.hostname)
-  # The bot is being removed, remove it from the task queues.
-  task_queues.cleanup_after_bot(bot_root_key)
-  bot_management.get_info_key(machine_lease.hostname).delete()
-  _clear_lease_request(machine_lease.key, machine_lease.client_request_id)
-  logging.info('MachineLease cleared:\nKey: %s', machine_lease.key)
-
-
-def last_shutdown_ts(hostname):
-  """Returns the time the given bot posted a final bot_shutdown event.
-
-  The bot_shutdown event is only considered if it is the last recorded event.
-
-  Args:
-    hostname: Hostname of the machine.
-
-  Returns:
-    datetime.datetime or None if the last recorded event is not bot_shutdown.
-  """
-  bot_event = bot_management.get_events_query(hostname, True).get()
-  if bot_event and bot_event.event_type == 'bot_shutdown':
-    return bot_event.ts
-  return None
-
-
-def release(machine_lease):
-  """Releases the given lease.
-
-  Args:
-    machine_lease: MachineLease instance.
-
-  Returns:
-    True if the lease was released, False otherwise.
-  """
-  response = machine_provider.release_machine(machine_lease.client_request_id)
-  if response.get('error'):
-    error = machine_provider.LeaseReleaseRequestError.lookup_by_name(
-        response['error'])
-    if error not in (
-        machine_provider.LeaseReleaseRequestError.ALREADY_RECLAIMED,
-        machine_provider.LeaseReleaseRequestError.NOT_FOUND,
-    ):
-      logging.error(
-          'Lease release failed\nKey: %s\nRequest ID: %s\nError: %s',
-          machine_lease.key,
-          response['client_request_id'],
-          response['error'],
-      )
-      return False
-  logging.info(
-      'MachineLease released:\nKey: %s\nHostname: %s',
-      machine_lease.key,
-      machine_lease.hostname,
-  )
-  return True
-
-
 def _handle_termination_task(machine_lease):
   """Checks the state of the termination task, releasing the lease if completed.
 
@@ -1358,6 +1269,68 @@ def _manage_pending_lease_request(machine_lease):
   _handle_lease_request_response(machine_lease, response)
 
 
+## Public API.
+
+
+def cleanup_bot(machine_lease):
+  """Cleans up entities after a bot is removed."""
+  bot_root_key = bot_management.get_root_key(machine_lease.hostname)
+  # The bot is being removed, remove it from the task queues.
+  task_queues.cleanup_after_bot(bot_root_key)
+  bot_management.get_info_key(machine_lease.hostname).delete()
+  _clear_lease_request(machine_lease.key, machine_lease.client_request_id)
+  logging.info('MachineLease cleared:\nKey: %s', machine_lease.key)
+
+
+def last_shutdown_ts(hostname):
+  """Returns the time the given bot posted a final bot_shutdown event.
+
+  The bot_shutdown event is only considered if it is the last recorded event.
+
+  Args:
+    hostname: Hostname of the machine.
+
+  Returns:
+    datetime.datetime or None if the last recorded event is not bot_shutdown.
+  """
+  bot_event = bot_management.get_events_query(hostname, True).get()
+  if bot_event and bot_event.event_type == 'bot_shutdown':
+    return bot_event.ts
+  return None
+
+
+def release(machine_lease):
+  """Releases the given lease.
+
+  Args:
+    machine_lease: MachineLease instance.
+
+  Returns:
+    True if the lease was released, False otherwise.
+  """
+  response = machine_provider.release_machine(machine_lease.client_request_id)
+  if response.get('error'):
+    error = machine_provider.LeaseReleaseRequestError.lookup_by_name(
+        response['error'])
+    if error not in (
+        machine_provider.LeaseReleaseRequestError.ALREADY_RECLAIMED,
+        machine_provider.LeaseReleaseRequestError.NOT_FOUND,
+    ):
+      logging.error(
+          'Lease release failed\nKey: %s\nRequest ID: %s\nError: %s',
+          machine_lease.key,
+          response['client_request_id'],
+          response['error'],
+      )
+      return False
+  logging.info(
+      'MachineLease released:\nKey: %s\nHostname: %s',
+      machine_lease.key,
+      machine_lease.hostname,
+  )
+  return True
+
+
 def task_manage_lease(key):
   """Manages a MachineLease.
 
@@ -1433,6 +1406,36 @@ def cron_compute_utilization():
     futures.append(obj.put_async())
   for f in futures:
     f.get_result()
+  return total
+
+
+def cron_schedule_lease_management():
+  """Schedules task queues to process each MachineLease."""
+  now = utils.utcnow()
+  total = 0
+  for machine_lease in MachineLease.query():
+    # If there's no connection_ts, we're waiting on a bot so schedule the
+    # management job to check on it. If there is a connection_ts, then don't
+    # schedule the management job until it's time to release the machine.
+    if machine_lease.connection_ts:
+      if not machine_lease.drained:
+        # lease_expiration_ts is None if leased_indefinitely, check it first.
+        if machine_lease.leased_indefinitely:
+          continue
+        assert machine_lease.lease_expiration_ts, machine_lease
+        if machine_lease.lease_expiration_ts > now + datetime.timedelta(
+            seconds=machine_lease.early_release_secs or 0):
+          continue
+    total += 1
+    if not utils.enqueue_task(
+        '/internal/taskqueue/machine-provider-manage',
+        'machine-provider-manage',
+        params={
+            'key': machine_lease.key.urlsafe(),
+        },
+    ):
+      logging.warning(
+          'Failed to enqueue task for MachineLease: %s', machine_lease.key)
   return total
 
 
