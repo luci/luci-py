@@ -1323,3 +1323,36 @@ def get_result_summaries_query(start, end, sort, state, tags):
       tags_filter = ndb.AND(tags_filter, TaskResultSummary.tags == tag)
     q = q.filter(tags_filter)
   return _filter_query(TaskResultSummary, q, start, end, sort, state)
+
+
+def cron_update_tags():
+  """Populates TagAggregation entities."""
+  seen = {}
+  now = utils.utcnow()
+  count = 0
+  end = now - datetime.timedelta(hours=1)
+  q = TaskResultSummary.query(TaskResultSummary.modified_ts > end)
+  cursor = None
+  while True:
+    tasks, cursor = datastore_utils.fetch_page(q, 1000, cursor)
+    count += len(tasks)
+    for t in tasks:
+      for i in t.tags:
+        k, v = i.split(':', 1)
+        s = seen.setdefault(k, set())
+        if s is not None:
+          s.add(v)
+          # 128 is an arbitrary large number to avoid OOM.
+          if len(s) >= 128:
+            logging.info('Limiting tag %s because there are too many', k)
+            seen[k] = None
+    if not cursor or not tasks:
+      break
+
+  tags = [
+    TagValues(tag=k, values=sorted(values or []))
+    for k, values in sorted(seen.iteritems())
+  ]
+  logging.info('From %d tasks, saw %d tags', count, len(tags))
+  TagAggregation(key=TagAggregation.KEY, tags=tags, ts=now).put()
+  return len(tags)

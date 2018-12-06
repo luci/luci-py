@@ -7,12 +7,14 @@
 This is the interface closest to the HTTP handlers.
 """
 
+import collections
 import datetime
 import logging
 import math
 import random
 import time
 
+from google.appengine.api import datastore_errors
 from google.appengine.ext import ndb
 
 from components import auth
@@ -1367,28 +1369,36 @@ def cron_handle_bot_died(host):
   - number of task retried
   - number of task ignored
   """
-  ignored = 0
-  killed = []
-  retried = 0
   try:
-    for run_result_key in task_result.yield_run_result_keys_with_dead_bot():
-      result = _handle_dead_bot(run_result_key)
-      if result is True:
-        retried += 1
-      elif result is False:
-        killed.append(task_pack.pack_run_result_key(run_result_key))
-      else:
-        ignored += 1
-  finally:
-    if killed:
-      logging.error(
-          'BOT_DIED!\n%d tasks:\n%s',
-          len(killed),
-          '\n'.join('  %s/user/task/%s' % (host, i) for i in killed))
-    logging.info(
-        'Killed %d; retried %d; ignored: %d', len(killed), retried, ignored)
-  # These are returned primarily for unit testing verification.
-  return killed, retried, ignored
+    ignored = 0
+    killed = []
+    retried = 0
+    try:
+      for run_result_key in task_result.yield_run_result_keys_with_dead_bot():
+        result = _handle_dead_bot(run_result_key)
+        if result is True:
+          retried += 1
+        elif result is False:
+          killed.append(task_pack.pack_run_result_key(run_result_key))
+        else:
+          ignored += 1
+    finally:
+      if killed:
+        logging.error(
+            'BOT_DIED!\n%d tasks:\n%s',
+            len(killed),
+            '\n'.join('  %s/user/task/%s' % (host, i) for i in killed))
+      logging.info(
+          'Killed %d; retried %d; ignored: %d', len(killed), retried, ignored)
+    # These are returned primarily for unit testing verification.
+    return killed, retried, ignored
+  except datastore_errors.NeedIndexError as e:
+    # When a fresh new instance is deployed, it takes a few minutes for the
+    # composite indexes to be created even if they are empty. Ignore the case
+    # where the index is defined but still being created by AppEngine.
+    if not str(e).startswith(
+        'NeedIndexError: The index for this query is not ready to serve.'):
+      raise
 
 
 def cron_handle_external_cancellations():
@@ -1414,6 +1424,58 @@ def cron_handle_external_cancellations():
             if not utils.enqueue_task(
                 url, queue_name='cancel-task-on-bot', payload=payload):
               logging.error('Failed to enqueue task-cancellation.')
+
+
+def cron_task_bot_distribution():
+  """Sends to TS mon data about the fleet size for each runnable task queues."""
+  # TODO(maruel): This shouls be rewritten in term of task queues.
+
+  # First, build a dictionary mapping dimensions to a count of how many
+  # tasks have those dimensions (exclude id from dimensions).
+  n_tasks_by_dimensions = collections.Counter()
+  q = task_result.TaskResultSummary.query(
+      task_result.TaskResultSummary.state.IN(task_result.State.STATES_RUNNING))
+  for result in q:
+    # Make dimensions immutable so they can be used to index a key.
+    req = result.request
+    for i in xrange(req.num_task_slices):
+      t = req.task_slice(i)
+      dimensions = tuple(sorted(
+            (k, tuple(sorted(v)))
+            for k, v in t.properties.dimensions.iteritems()))
+      n_tasks_by_dimensions[dimensions] += 1
+
+  # Second, count how many bots have those dimensions for each set.
+  n_bots_by_dimensions = {}
+  for dimensions, n_tasks in n_tasks_by_dimensions.iteritems():
+    filter_dimensions = []
+    for k, values in dimensions:
+      for v in values:
+        filter_dimensions.append(u'%s:%s' % (k, v))
+    q = bot_management.BotInfo.query()
+    try:
+      q = bot_management.filter_dimensions(q, filter_dimensions)
+    except ValueError as e:
+      # If there's a problem getting dimensions here, we just don't add the
+      # async result to n_bots_by_dimensions, then below treat it as zero
+      # (no bots could run this task).
+      # This results in overly-pessimistic monitoring, which means someone
+      # might look into it to and find the actual error here.
+      logging.error('%s', e)
+      continue
+    n_bots_by_dimensions[dimensions] = q.count_async()
+
+  # Third, multiply out, aggregating by fixed dimensions.
+  for dimensions, n_tasks in n_tasks_by_dimensions.iteritems():
+    n_bots = 0
+    if dimensions in n_bots_by_dimensions:
+      n_bots = n_bots_by_dimensions[dimensions].get_result()
+
+    dimensions = dict(dimensions)
+    fields = {'pool': dimensions.get('pool', [''])[0]}
+    for _ in range(n_tasks):
+      ts_mon_metrics._task_bots_runnable.add(n_bots, fields)
+  return len(n_bots_by_dimensions)
 
 
 ## Task queue tasks.

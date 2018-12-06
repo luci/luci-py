@@ -576,6 +576,10 @@ class TaskResultApiTest(TestCase):
     with self.assertRaises(datastore_errors.BadValueError):
       task_result.PerformanceStats().put()
 
+  def test_cron_update_tags(self):
+    # TODO(maruel): https://crbug.com/912154
+    self.assertEqual(0, task_result.cron_update_tags())
+
   def test_get_result_summaries_query(self):
     # Indirectly tested by API.
     pass

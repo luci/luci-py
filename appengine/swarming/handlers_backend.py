@@ -4,27 +4,19 @@
 
 """Main entry point for Swarming backend handlers."""
 
-import collections
-import datetime
 import json
 import logging
 
 import webapp2
-from google.appengine.api import datastore_errors
 from google.appengine.ext import ndb
-
-from components import utils
 
 import mapreduce_jobs
 from components import decorators
-from components import datastore_utils
-from components import machine_provider
 from server import bot_groups_config
 from server import bot_management
 from server import config
 from server import lease_management
 from server import named_caches
-from server import task_pack
 from server import task_queues
 from server import task_request
 from server import task_result
@@ -32,28 +24,32 @@ from server import task_scheduler
 import ts_mon_metrics
 
 
-class CronBotDiedHandler(webapp2.RequestHandler):
+## Cron jobs.
+
+
+class _CronHandlerBase(webapp2.RequestHandler):
+  @decorators.require_cronjob
+  def get(self):
+    # Disable the in-process cache for all handlers; most of the cron jobs load
+    # a tons of instances, causing excessive memory usage if the entities are
+    # kept in memory.
+    ndb.get_context().set_cache_policy(lambda _: False)
+    self.run_cron()
+
+  def run_cron(self):
+    raise NotImplementedError()
+
+
+class CronBotDiedHandler(_CronHandlerBase):
   """Sets running tasks where the bot is not sending ping updates for several
   minutes as BOT_DIED.
   """
 
-  @decorators.require_cronjob
-  def get(self):
-    ndb.get_context().set_cache_policy(lambda _: False)
-    try:
-      task_scheduler.cron_handle_bot_died(self.request.host_url)
-    except datastore_errors.NeedIndexError as e:
-      # When a fresh new instance is deployed, it takes a few minutes for the
-      # composite indexes to be created even if they are empty. Ignore the case
-      # where the index is defined but still being created by AppEngine.
-      if not str(e).startswith(
-          'NeedIndexError: The index for this query is not ready to serve.'):
-        raise
-    self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
-    self.response.out.write('Success.')
+  def run_cron(self):
+    task_scheduler.cron_handle_bot_died(self.request.host_url)
 
 
-class CronAbortExpiredShardToRunHandler(webapp2.RequestHandler):
+class CronAbortExpiredShardToRunHandler(_CronHandlerBase):
   """Set tasks that haven't started before their expiration_ts timestamp as
   EXPIRED.
 
@@ -61,78 +57,53 @@ class CronAbortExpiredShardToRunHandler(webapp2.RequestHandler):
   but tasks where the bots are not polling will be expired by this cron job.
   """
 
-  @decorators.require_cronjob
-  def get(self):
-    ndb.get_context().set_cache_policy(lambda _: False)
+  def run_cron(self):
     task_scheduler.cron_abort_expired_task_to_run(self.request.host_url)
-    self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
-    self.response.out.write('Success.')
 
 
-class CronTidyTaskQueues(webapp2.RequestHandler):
+class CronTidyTaskQueues(_CronHandlerBase):
   """Removes unused tasks queues, the 'dimensions sets' without active task
   flows.
   """
 
-  @decorators.require_cronjob
-  def get(self):
-    ndb.get_context().set_cache_policy(lambda _: False)
+  def run_cron(self):
     task_queues.cron_tidy_stale()
-    self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
-    self.response.out.write('Success.')
 
 
-class CronUpdateBotInfoComposite(webapp2.RequestHandler):
+class CronUpdateBotInfoComposite(_CronHandlerBase):
   """Updates BotInfo.composite if needed, e.g. the bot became dead because it
   hasn't pinged for a while.
   """
 
-  @decorators.require_cronjob
-  def get(self):
-    ndb.get_context().set_cache_policy(lambda _: False)
+  def run_cron(self):
     bot_management.cron_update_bot_info()
-    self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
-    self.response.out.write('Success.')
 
 
-class CronDeleteOldBots(webapp2.RequestHandler):
+class CronDeleteOldBots(_CronHandlerBase):
   """Deletes old BotRoot entity groups."""
 
-  @decorators.require_cronjob
-  def get(self):
-    ndb.get_context().set_cache_policy(lambda _: False)
+  def run_cron(self):
     bot_management.cron_delete_old_bot()
-    self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
-    self.response.out.write('Success.')
 
 
-class CronDeleteOldBotEvents(webapp2.RequestHandler):
+class CronDeleteOldBotEvents(_CronHandlerBase):
   """Deletes old BotEvent entities."""
 
-  @decorators.require_cronjob
-  def get(self):
-    ndb.get_context().set_cache_policy(lambda _: False)
+  def run_cron(self):
     bot_management.cron_delete_old_bot_events()
-    self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
-    self.response.out.write('Success.')
 
 
-class CronDeleteOldTasks(webapp2.RequestHandler):
+class CronDeleteOldTasks(_CronHandlerBase):
   """Deletes old TaskRequest entities and all their decendants."""
 
-  @decorators.require_cronjob
-  def get(self):
-    ndb.get_context().set_cache_policy(lambda _: False)
+  def run_cron(self):
     task_request.cron_delete_old_task_requests()
-    self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
-    self.response.out.write('Success.')
 
 
-class CronMachineProviderBotsUtilizationHandler(webapp2.RequestHandler):
+class CronMachineProviderBotsUtilizationHandler(_CronHandlerBase):
   """Determines Machine Provider bot utilization."""
 
-  @decorators.require_cronjob
-  def get(self):
+  def run_cron(self):
     ndb.get_context().set_cache_policy(lambda _: False)
     if not config.settings().mp.enabled:
       logging.info('MP support is disabled')
@@ -141,11 +112,10 @@ class CronMachineProviderBotsUtilizationHandler(webapp2.RequestHandler):
     lease_management.cron_compute_utilization()
 
 
-class CronMachineProviderConfigHandler(webapp2.RequestHandler):
+class CronMachineProviderConfigHandler(_CronHandlerBase):
   """Configures entities to lease bots from the Machine Provider."""
 
-  @decorators.require_cronjob
-  def get(self):
+  def run_cron(self):
     ndb.get_context().set_cache_policy(lambda _: False)
     if not config.settings().mp.enabled:
       logging.info('MP support is disabled')
@@ -154,11 +124,10 @@ class CronMachineProviderConfigHandler(webapp2.RequestHandler):
     lease_management.cron_sync_config(config.settings().mp.server)
 
 
-class CronMachineProviderManagementHandler(webapp2.RequestHandler):
+class CronMachineProviderManagementHandler(_CronHandlerBase):
   """Manages leases for bots from the Machine Provider."""
 
-  @decorators.require_cronjob
-  def get(self):
+  def run_cron(self):
     ndb.get_context().set_cache_policy(lambda _: False)
     if not config.settings().mp.enabled:
       logging.info('MP support is disabled')
@@ -167,155 +136,52 @@ class CronMachineProviderManagementHandler(webapp2.RequestHandler):
     lease_management.cron_schedule_lease_management()
 
 
-class CronNamedCachesUpdate(webapp2.RequestHandler):
+class CronNamedCachesUpdate(_CronHandlerBase):
   """Updates named caches hints."""
 
-  @decorators.require_cronjob
-  def get(self):
+  def run_cron(self):
     named_caches.cron_update_named_caches()
 
 
-class CronCountTaskBotDistributionHandler(webapp2.RequestHandler):
+class CronCountTaskBotDistributionHandler(_CronHandlerBase):
   """Counts how many runnable bots per task for monitoring."""
 
-  @decorators.require_cronjob
-  def get(self):
-    ndb.get_context().set_cache_policy(lambda _: False)
-
-    # Step one: build a dictionary mapping dimensions to a count of how many
-    # tasks have those dimensions (exclude id from dimensions).
-    n_tasks_by_dimensions = collections.Counter()
-    q = task_result.TaskResultSummary.query(
-        task_result.TaskResultSummary.state.IN(
-            task_result.State.STATES_RUNNING))
-    for result in q:
-      # Make dimensions immutable so they can be used to index a key.
-      req = result.request
-      for i in xrange(req.num_task_slices):
-        t = req.task_slice(i)
-        dimensions = tuple(sorted(
-              (k, tuple(sorted(v)))
-              for k, v in t.properties.dimensions.iteritems()))
-        n_tasks_by_dimensions[dimensions] += 1
-
-    # Count how many bots have those dimensions for each set.
-    n_bots_by_dimensions = {}
-    for dimensions, n_tasks in n_tasks_by_dimensions.iteritems():
-      filter_dimensions = []
-      for k, values in dimensions:
-        for v in values:
-          filter_dimensions.append(u'%s:%s' % (k, v))
-      q = bot_management.BotInfo.query()
-      try:
-        q = bot_management.filter_dimensions(q, filter_dimensions)
-      except ValueError as e:
-        # If there's a problem getting dimensions here, we just don't add the
-        # async result to n_bots_by_dimensions, then below treat it as zero
-        # (no bots could run this task).
-        # This results in overly-pessimistic monitoring, which means someone
-        # might look into it to and find the actual error here.
-        logging.error('%s', e)
-        continue
-      n_bots_by_dimensions[dimensions] = q.count_async()
-
-    # Multiply out, aggregating by fixed dimensions
-    for dimensions, n_tasks in n_tasks_by_dimensions.iteritems():
-      n_bots = 0
-      if dimensions in n_bots_by_dimensions:
-        n_bots = n_bots_by_dimensions[dimensions].get_result()
-
-      dimensions = dict(dimensions)
-      fields = {'pool': dimensions.get('pool', [''])[0]}
-      for _ in range(n_tasks):
-        ts_mon_metrics._task_bots_runnable.add(n_bots, fields)
+  def run_cron(self):
+    task_scheduler.cron_task_bot_distribution()
 
 
-class CronBotsDimensionAggregationHandler(webapp2.RequestHandler):
+class CronBotsDimensionAggregationHandler(_CronHandlerBase):
   """Aggregates all bots dimensions (except id) in the fleet."""
 
-  @decorators.require_cronjob
-  def get(self):
-    ndb.get_context().set_cache_policy(lambda _: False)
-    seen = {}
-    now = utils.utcnow()
-    for b in bot_management.BotInfo.query():
-      for i in b.dimensions_flat:
-        k, v = i.split(':', 1)
-        if k != 'id':
-          seen.setdefault(k, set()).add(v)
-    dims = [
-      bot_management.DimensionValues(dimension=k, values=sorted(values))
-      for k, values in sorted(seen.iteritems())
-    ]
-
-    logging.info('Saw dimensions %s', dims)
-    bot_management.DimensionAggregation(
-        key=bot_management.DimensionAggregation.KEY,
-        dimensions=dims,
-        ts=now).put()
+  def run_cron(self):
+    bot_management.cron_aggregate_dimensions()
 
 
-class CronTasksTagsAggregationHandler(webapp2.RequestHandler):
+class CronTasksTagsAggregationHandler(_CronHandlerBase):
   """Aggregates all task tags from the last hour."""
 
-  @decorators.require_cronjob
-  def get(self):
-    ndb.get_context().set_cache_policy(lambda _: False)
-    seen = {}
-    now = utils.utcnow()
-    count = 0
-    q = task_result.TaskResultSummary.query(
-        task_result.TaskResultSummary.modified_ts >
-        now - datetime.timedelta(hours=1))
-    cursor = None
-    while True:
-      tasks, cursor = datastore_utils.fetch_page(q, 1000, cursor)
-      count += len(tasks)
-      for t in tasks:
-        for i in t.tags:
-          k, v = i.split(':', 1)
-          s = seen.setdefault(k, set())
-          if s is not None:
-            s.add(v)
-            # 128 is arbitrary large number to avoid OOM
-            if len(s) >= 128:
-              logging.info('Limiting tag %s because there are too many', k)
-              seen[k] = None
-      if not cursor or len(tasks) == 0:
-        break
-
-    tags = [
-      task_result.TagValues(tag=k, values=sorted(values or []))
-      for k, values in sorted(seen.iteritems())
-    ]
-    logging.info('From %d tasks, saw %d tags', count, len(tags))
-    task_result.TagAggregation(
-        key=task_result.TagAggregation.KEY,
-        tags=tags,
-        ts=now).put()
+  def run_cron(self):
+    task_result.cron_update_tags()
 
 
-class CronBotGroupsConfigHandler(webapp2.RequestHandler):
+class CronBotGroupsConfigHandler(_CronHandlerBase):
   """Fetches bots.cfg with all includes, assembles the final config."""
 
-  @decorators.require_cronjob
-  def get(self):
-    ndb.get_context().set_cache_policy(lambda _: False)
-    ok = True
+  def run_cron(self):
     try:
       bot_groups_config.refetch_from_config_service()
     except bot_groups_config.BadConfigError:
-      ok = False
-    self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
-    self.response.out.write('Success.' if ok else 'Fail.')
+      pass
 
 
-class CronExternalSchedulerCancellationsHandler(webapp2.RequestHandler):
+class CronExternalSchedulerCancellationsHandler(_CronHandlerBase):
   """Fetches cancelled tasks from external scheulers, and cancels them."""
 
-  @decorators.require_cronjob
-  def get(self):
+  def run_cron(self):
     task_scheduler.cron_handle_external_cancellations()
+
+
+## Task queues.
 
 
 class CancelTasksHandler(webapp2.RequestHandler):
@@ -323,6 +189,7 @@ class CancelTasksHandler(webapp2.RequestHandler):
 
   @decorators.require_taskqueue('cancel-tasks')
   def post(self):
+    ndb.get_context().set_cache_policy(lambda _: False)
     payload = json.loads(self.request.body)
     logging.info('Cancelling tasks with ids: %s', payload['tasks'])
     kill_running = payload['kill_running']
@@ -338,10 +205,12 @@ class CancelTaskOnBotHandler(webapp2.RequestHandler):
   """Cancels a given task if it is running on the given bot.
 
   If bot is not specified, cancel task unconditionally.
-  If bot is specified, and task is not running on bot, then do nothing."""
+  If bot is specified, and task is not running on bot, then do nothing.
+  """
 
   @decorators.require_taskqueue('cancel-task-on-bot')
   def post(self):
+    ndb.get_context().set_cache_policy(lambda _: False)
     payload = json.loads(self.request.body)
     task_id = payload.get('task_id')
     if not task_id:
@@ -364,15 +233,12 @@ class TaskDimensionsHandler(webapp2.RequestHandler):
 
   @decorators.require_taskqueue('rebuild-task-cache')
   def post(self):
-    self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
+    ndb.get_context().set_cache_policy(lambda _: False)
     if not task_queues.rebuild_task_cache(self.request.body):
       # The task needs to be retried. Reply that the service is unavailable
       # (503) instead of an internal server error (500) to help differentiating
       # in the logs, even if it is not technically correct.
       self.response.set_status(503)
-    else:
-      self.response.out.write('Success.')
-
 
 
 class TaskSendPubSubMessage(webapp2.RequestHandler):
@@ -381,9 +247,8 @@ class TaskSendPubSubMessage(webapp2.RequestHandler):
   # Add task_id to the URL for better visibility in request logs.
   @decorators.require_taskqueue('pubsub')
   def post(self, task_id):  # pylint: disable=unused-argument
+    ndb.get_context().set_cache_policy(lambda _: False)
     task_scheduler.task_handle_pubsub_task(json.loads(self.request.body))
-    self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
-    self.response.out.write('Success.')
 
 
 class TaskMachineProviderManagementHandler(webapp2.RequestHandler):
@@ -402,6 +267,7 @@ class TaskNamedCachesPool(webapp2.RequestHandler):
 
   @decorators.require_taskqueue('named-cache-task')
   def post(self):
+    ndb.get_context().set_cache_policy(lambda _: False)
     params = json.loads(self.request.body)
     logging.info('Handling pool: %s', params['pool'])
     named_caches.task_update_pool(params['pool'])
@@ -412,6 +278,7 @@ class TaskGlobalMetrics(webapp2.RequestHandler):
 
   @decorators.require_taskqueue('tsmon')
   def post(self, kind):
+    ndb.get_context().set_cache_policy(lambda _: False)
     if kind == 'machine_types':
       # Avoid a circular dependency. lease_management imports task_scheduler
       # which imports ts_mon_metrics, so invoke lease_management directly to

@@ -2219,6 +2219,10 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
           service_account='bad@example.com')
     self.assertTrue('is not allowed in the pool' in str(ctx.exception))
 
+  def test_cron_task_bot_distribution(self):
+    # TODO(maruel): https://crbug.com/912154
+    self.assertEqual(0, task_scheduler.cron_task_bot_distribution())
+
 
 if __name__ == '__main__':
   if '-v' in sys.argv:
