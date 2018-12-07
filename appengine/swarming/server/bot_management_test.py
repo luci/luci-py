@@ -159,6 +159,10 @@ class BotManagementTest(test_case.TestCase):
     self.assertEqual(
         expected, bot_management.get_info_key('id1').get().to_dict())
 
+    self.assertEqual(
+        ['bot_connected', 5],
+        memcache.get('id1:2010-01-02T03:04', namespace='BotEvents'))
+
   def test_get_events_query(self):
     _bot_event(event_type='bot_connected')
     expected = [_gen_bot_event(event_type=u'bot_connected')]
@@ -186,6 +190,7 @@ class BotManagementTest(test_case.TestCase):
     self.assertEqual([], bot_management.get_events_query('id1', True).fetch())
 
   def test_bot_event_busy(self):
+    _bot_event(event_type='bot_connected')
     _bot_event(event_type='request_task', task_id='12311', task_name='yo')
     expected = _gen_bot_info(
         composite=[
@@ -202,10 +207,15 @@ class BotManagementTest(test_case.TestCase):
 
     expected = [
       _gen_bot_event(event_type=u'request_task', task_id=u'12311'),
+      _gen_bot_event(event_type=u'bot_connected'),
     ]
     self.assertEqual(
         expected,
         [e.to_dict() for e in bot_management.get_events_query('id1', True)])
+
+    self.assertEqual(
+        ['bot_connected', 5, 'request_task', 5],
+        memcache.get('id1:2010-01-02T03:04', namespace='BotEvents'))
 
   def test_get_info_key(self):
     self.assertEqual(

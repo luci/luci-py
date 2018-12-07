@@ -63,6 +63,7 @@ import logging
 
 from google.appengine import runtime
 from google.appengine.api import datastore_errors
+from google.appengine.api import memcache
 from google.appengine.ext import ndb
 
 from components import datastore_utils
@@ -453,7 +454,8 @@ def bot_event(
   bot_info = info_key.get()
   if not bot_info:
     bot_info = BotInfo(key=info_key)
-  bot_info.last_seen_ts = utils.utcnow()
+  now = utils.utcnow()
+  bot_info.last_seen_ts = now
   bot_info.external_ip = external_ip
   bot_info.authenticated_as = authenticated_as
   bot_info.maintenance_msg = maintenance_msg
@@ -486,33 +488,52 @@ def bot_event(
     # Make sure it is not in the queue since it can't reap anything.
     task_queues.cleanup_after_bot(info_key.parent())
 
-  if event_type in ('request_sleep', 'task_update'):
-    # Handle this specifically. It's not much of an even worth saving a BotEvent
-    # for but it's worth updating BotInfo. The only reason BotInfo is GET is to
-    # keep first_seen_ts. It's not necessary to use a transaction here since no
-    # BotEvent is being added, only last_seen_ts is really updated.
-    bot_info.put()
-    return
+  try:
+    if event_type in ('request_sleep', 'task_update'):
+      # Handle this specifically. It's not much of an even worth saving a
+      # BotEvent for but it's worth updating BotInfo. The only reason BotInfo is
+      # GET is to keep first_seen_ts. It's not necessary to use a transaction
+      # here since no BotEvent is being added, only last_seen_ts is really
+      # updated.
+      bot_info.put()
+      return
 
-  event = BotEvent(
-      parent=get_root_key(bot_id),
-      event_type=event_type,
-      external_ip=external_ip,
-      authenticated_as=authenticated_as,
-      dimensions_flat=bot_info.dimensions_flat,
-      quarantined=bot_info.quarantined,
-      maintenance_msg=bot_info.maintenance_msg,
-      state=bot_info.state,
-      task_id=bot_info.task_id,
-      version=bot_info.version,
-      **kwargs)
+    event = BotEvent(
+        parent=get_root_key(bot_id),
+        event_type=event_type,
+        external_ip=external_ip,
+        authenticated_as=authenticated_as,
+        dimensions_flat=bot_info.dimensions_flat,
+        quarantined=bot_info.quarantined,
+        maintenance_msg=bot_info.maintenance_msg,
+        state=bot_info.state,
+        task_id=bot_info.task_id,
+        version=bot_info.version,
+        **kwargs)
 
-  if event_type in ('task_completed', 'task_error', 'task_killed'):
-    # Special case to keep the task_id in the event but not in the summary.
-    bot_info.task_id = ''
+    if event_type in ('task_completed', 'task_error', 'task_killed'):
+      # Special case to keep the task_id in the event but not in the summary.
+      bot_info.task_id = ''
 
-  datastore_utils.store_new_version(event, BotRoot, [bot_info])
-  return event.key
+    datastore_utils.store_new_version(event, BotRoot, [bot_info])
+    return event.key
+  finally:
+    # Store the event in memcache to accelerate monitoring.
+    # key is at minute resolution, because that's the monitoring precision.
+    key = '%s:%s' % (bot_id, now.strftime('%Y-%m-%dT%H:%M'))
+    m = memcache.Client()
+    while True:
+      data = [event_type, now.second]
+      if m.add(key, data, time=3600, namespace='BotEvents'):
+        break
+      prev_val = m.get(key, for_cas=True, namespace='BotEvents')
+      if prev_val is None:
+        continue
+      data = prev_val + [event_type, now.second]
+      # Keep the data for one hour. If the cron job cannot reap it within 1h,
+      # it's probably broken.
+      if m.cas(key, data, time=3600, namespace='BotEvents'):
+        break
 
 
 def has_capacity(dimensions):
@@ -576,6 +597,7 @@ def cron_update_bot_info():
     if (bot and bot.last_seen_ts <= cutoff and
         (BotInfo.ALIVE in bot.composite or BotInfo.DEAD not in bot.composite)):
       # Updating it recomputes composite.
+      # TODO(maruel): BotEvent.
       yield bot.put_async()
       logging.info('DEAD: %s', bot.id)
       raise ndb.Return(1)
