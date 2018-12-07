@@ -7,7 +7,6 @@ from google.protobuf import descriptor as _descriptor
 from google.protobuf import message as _message
 from google.protobuf import reflection as _reflection
 from google.protobuf import symbol_database as _symbol_database
-from google.protobuf import descriptor_pb2
 # @@protoc_insertion_point(imports)
 
 _sym_db = _symbol_database.Default()
@@ -21,10 +20,10 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   name='plugin.proto',
   package='swarming',
   syntax='proto3',
+  serialized_options=None,
   serialized_pb=_b('\n\x0cplugin.proto\x12\x08swarming\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x0btasks.proto\"\xb0\x01\n\x08TaskSpec\x12\n\n\x02id\x18\x01 \x01(\t\x12\x0c\n\x04tags\x18\x02 \x03(\t\x12#\n\x06slices\x18\x03 \x03(\x0b\x32\x13.swarming.SliceSpec\x12\"\n\x05state\x18\x04 \x01(\x0e\x32\x13.swarming.TaskState\x12\x0e\n\x06\x62ot_id\x18\x05 \x01(\t\x12\x31\n\renqueued_time\x18\x06 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\"\x1f\n\tSliceSpec\x12\x12\n\ndimensions\x18\x01 \x03(\t\"-\n\x07IdleBot\x12\x0e\n\x06\x62ot_id\x18\x01 \x01(\t\x12\x12\n\ndimensions\x18\x02 \x03(\t\"z\n\x12\x41ssignTasksRequest\x12\x14\n\x0cscheduler_id\x18\x01 \x01(\t\x12$\n\tidle_bots\x18\x02 \x03(\x0b\x32\x11.swarming.IdleBot\x12(\n\x04time\x18\x03 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\"D\n\x13\x41ssignTasksResponse\x12-\n\x0b\x61ssignments\x18\x01 \x03(\x0b\x32\x18.swarming.TaskAssignment\"G\n\x0eTaskAssignment\x12\x0e\n\x06\x62ot_id\x18\x01 \x01(\t\x12\x0f\n\x07task_id\x18\x02 \x01(\t\x12\x14\n\x0cslice_number\x18\x03 \x01(\x05\"/\n\x17GetCancellationsRequest\x12\x14\n\x0cscheduler_id\x18\x01 \x01(\t\"\xa1\x02\n\x18GetCancellationsResponse\x12\x46\n\rcancellations\x18\x01 \x03(\x0b\x32/.swarming.GetCancellationsResponse.Cancellation\x1a\xbc\x01\n\x0c\x43\x61ncellation\x12\x0e\n\x06\x62ot_id\x18\x01 \x01(\t\x12\x0f\n\x07task_id\x18\x02 \x01(\t\x12\x46\n\x06reason\x18\x03 \x01(\x0e\x32\x36.swarming.GetCancellationsResponse.Cancellation.Reason\x12\x12\n\nextra_info\x18\x04 \x01(\t\"/\n\x06Reason\x12\x0b\n\x07INVALID\x10\x00\x12\r\n\tPREEMPTED\x10\x01\x12\t\n\x05\x45RROR\x10\x02\"]\n\x0fNotifyTasksItem\x12(\n\x04time\x18\x01 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12 \n\x04task\x18\x02 \x01(\x0b\x32\x12.swarming.TaskSpec\"\\\n\x12NotifyTasksRequest\x12\x14\n\x0cscheduler_id\x18\x01 \x01(\t\x12\x30\n\rnotifications\x18\x02 \x03(\x0b\x32\x19.swarming.NotifyTasksItem\"\x15\n\x13NotifyTasksResponse2\x86\x02\n\x11\x45xternalScheduler\x12J\n\x0b\x41ssignTasks\x12\x1c.swarming.AssignTasksRequest\x1a\x1d.swarming.AssignTasksResponse\x12Y\n\x10GetCancellations\x12!.swarming.GetCancellationsRequest\x1a\".swarming.GetCancellationsResponse\x12J\n\x0bNotifyTasks\x12\x1c.swarming.NotifyTasksRequest\x1a\x1d.swarming.NotifyTasksResponseb\x06proto3')
   ,
   dependencies=[google_dot_protobuf_dot_timestamp__pb2.DESCRIPTOR,tasks__pb2.DESCRIPTOR,])
-_sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
 
 
@@ -36,19 +35,19 @@ _GETCANCELLATIONSRESPONSE_CANCELLATION_REASON = _descriptor.EnumDescriptor(
   values=[
     _descriptor.EnumValueDescriptor(
       name='INVALID', index=0, number=0,
-      options=None,
+      serialized_options=None,
       type=None),
     _descriptor.EnumValueDescriptor(
       name='PREEMPTED', index=1, number=1,
-      options=None,
+      serialized_options=None,
       type=None),
     _descriptor.EnumValueDescriptor(
       name='ERROR', index=2, number=2,
-      options=None,
+      serialized_options=None,
       type=None),
   ],
   containing_type=None,
-  options=None,
+  serialized_options=None,
   serialized_start=890,
   serialized_end=937,
 )
@@ -68,49 +67,49 @@ _TASKSPEC = _descriptor.Descriptor(
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='tags', full_name='swarming.TaskSpec.tags', index=1,
       number=2, type=9, cpp_type=9, label=3,
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='slices', full_name='swarming.TaskSpec.slices', index=2,
       number=3, type=11, cpp_type=10, label=3,
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='state', full_name='swarming.TaskSpec.state', index=3,
       number=4, type=14, cpp_type=8, label=1,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='bot_id', full_name='swarming.TaskSpec.bot_id', index=4,
       number=5, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='enqueued_time', full_name='swarming.TaskSpec.enqueued_time', index=5,
       number=6, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
   ],
   extensions=[
   ],
   nested_types=[],
   enum_types=[
   ],
-  options=None,
+  serialized_options=None,
   is_extendable=False,
   syntax='proto3',
   extension_ranges=[],
@@ -134,14 +133,14 @@ _SLICESPEC = _descriptor.Descriptor(
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
   ],
   extensions=[
   ],
   nested_types=[],
   enum_types=[
   ],
-  options=None,
+  serialized_options=None,
   is_extendable=False,
   syntax='proto3',
   extension_ranges=[],
@@ -165,21 +164,21 @@ _IDLEBOT = _descriptor.Descriptor(
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='dimensions', full_name='swarming.IdleBot.dimensions', index=1,
       number=2, type=9, cpp_type=9, label=3,
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
   ],
   extensions=[
   ],
   nested_types=[],
   enum_types=[
   ],
-  options=None,
+  serialized_options=None,
   is_extendable=False,
   syntax='proto3',
   extension_ranges=[],
@@ -203,28 +202,28 @@ _ASSIGNTASKSREQUEST = _descriptor.Descriptor(
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='idle_bots', full_name='swarming.AssignTasksRequest.idle_bots', index=1,
       number=2, type=11, cpp_type=10, label=3,
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='time', full_name='swarming.AssignTasksRequest.time', index=2,
       number=3, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
   ],
   extensions=[
   ],
   nested_types=[],
   enum_types=[
   ],
-  options=None,
+  serialized_options=None,
   is_extendable=False,
   syntax='proto3',
   extension_ranges=[],
@@ -248,14 +247,14 @@ _ASSIGNTASKSRESPONSE = _descriptor.Descriptor(
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
   ],
   extensions=[
   ],
   nested_types=[],
   enum_types=[
   ],
-  options=None,
+  serialized_options=None,
   is_extendable=False,
   syntax='proto3',
   extension_ranges=[],
@@ -279,28 +278,28 @@ _TASKASSIGNMENT = _descriptor.Descriptor(
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='task_id', full_name='swarming.TaskAssignment.task_id', index=1,
       number=2, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='slice_number', full_name='swarming.TaskAssignment.slice_number', index=2,
       number=3, type=5, cpp_type=1, label=1,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
   ],
   extensions=[
   ],
   nested_types=[],
   enum_types=[
   ],
-  options=None,
+  serialized_options=None,
   is_extendable=False,
   syntax='proto3',
   extension_ranges=[],
@@ -324,14 +323,14 @@ _GETCANCELLATIONSREQUEST = _descriptor.Descriptor(
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
   ],
   extensions=[
   ],
   nested_types=[],
   enum_types=[
   ],
-  options=None,
+  serialized_options=None,
   is_extendable=False,
   syntax='proto3',
   extension_ranges=[],
@@ -355,28 +354,28 @@ _GETCANCELLATIONSRESPONSE_CANCELLATION = _descriptor.Descriptor(
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='task_id', full_name='swarming.GetCancellationsResponse.Cancellation.task_id', index=1,
       number=2, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='reason', full_name='swarming.GetCancellationsResponse.Cancellation.reason', index=2,
       number=3, type=14, cpp_type=8, label=1,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='extra_info', full_name='swarming.GetCancellationsResponse.Cancellation.extra_info', index=3,
       number=4, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
   ],
   extensions=[
   ],
@@ -384,7 +383,7 @@ _GETCANCELLATIONSRESPONSE_CANCELLATION = _descriptor.Descriptor(
   enum_types=[
     _GETCANCELLATIONSRESPONSE_CANCELLATION_REASON,
   ],
-  options=None,
+  serialized_options=None,
   is_extendable=False,
   syntax='proto3',
   extension_ranges=[],
@@ -407,14 +406,14 @@ _GETCANCELLATIONSRESPONSE = _descriptor.Descriptor(
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
   ],
   extensions=[
   ],
   nested_types=[_GETCANCELLATIONSRESPONSE_CANCELLATION, ],
   enum_types=[
   ],
-  options=None,
+  serialized_options=None,
   is_extendable=False,
   syntax='proto3',
   extension_ranges=[],
@@ -438,21 +437,21 @@ _NOTIFYTASKSITEM = _descriptor.Descriptor(
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='task', full_name='swarming.NotifyTasksItem.task', index=1,
       number=2, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
   ],
   extensions=[
   ],
   nested_types=[],
   enum_types=[
   ],
-  options=None,
+  serialized_options=None,
   is_extendable=False,
   syntax='proto3',
   extension_ranges=[],
@@ -476,21 +475,21 @@ _NOTIFYTASKSREQUEST = _descriptor.Descriptor(
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='notifications', full_name='swarming.NotifyTasksRequest.notifications', index=1,
       number=2, type=11, cpp_type=10, label=3,
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      serialized_options=None, file=DESCRIPTOR),
   ],
   extensions=[
   ],
   nested_types=[],
   enum_types=[
   ],
-  options=None,
+  serialized_options=None,
   is_extendable=False,
   syntax='proto3',
   extension_ranges=[],
@@ -514,7 +513,7 @@ _NOTIFYTASKSRESPONSE = _descriptor.Descriptor(
   nested_types=[],
   enum_types=[
   ],
-  options=None,
+  serialized_options=None,
   is_extendable=False,
   syntax='proto3',
   extension_ranges=[],
@@ -548,6 +547,7 @@ DESCRIPTOR.message_types_by_name['GetCancellationsResponse'] = _GETCANCELLATIONS
 DESCRIPTOR.message_types_by_name['NotifyTasksItem'] = _NOTIFYTASKSITEM
 DESCRIPTOR.message_types_by_name['NotifyTasksRequest'] = _NOTIFYTASKSREQUEST
 DESCRIPTOR.message_types_by_name['NotifyTasksResponse'] = _NOTIFYTASKSRESPONSE
+_sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
 TaskSpec = _reflection.GeneratedProtocolMessageType('TaskSpec', (_message.Message,), dict(
   DESCRIPTOR = _TASKSPEC,
@@ -634,5 +634,47 @@ NotifyTasksResponse = _reflection.GeneratedProtocolMessageType('NotifyTasksRespo
   ))
 _sym_db.RegisterMessage(NotifyTasksResponse)
 
+
+
+_EXTERNALSCHEDULER = _descriptor.ServiceDescriptor(
+  name='ExternalScheduler',
+  full_name='swarming.ExternalScheduler',
+  file=DESCRIPTOR,
+  index=0,
+  serialized_options=None,
+  serialized_start=1152,
+  serialized_end=1414,
+  methods=[
+  _descriptor.MethodDescriptor(
+    name='AssignTasks',
+    full_name='swarming.ExternalScheduler.AssignTasks',
+    index=0,
+    containing_service=None,
+    input_type=_ASSIGNTASKSREQUEST,
+    output_type=_ASSIGNTASKSRESPONSE,
+    serialized_options=None,
+  ),
+  _descriptor.MethodDescriptor(
+    name='GetCancellations',
+    full_name='swarming.ExternalScheduler.GetCancellations',
+    index=1,
+    containing_service=None,
+    input_type=_GETCANCELLATIONSREQUEST,
+    output_type=_GETCANCELLATIONSRESPONSE,
+    serialized_options=None,
+  ),
+  _descriptor.MethodDescriptor(
+    name='NotifyTasks',
+    full_name='swarming.ExternalScheduler.NotifyTasks',
+    index=2,
+    containing_service=None,
+    input_type=_NOTIFYTASKSREQUEST,
+    output_type=_NOTIFYTASKSRESPONSE,
+    serialized_options=None,
+  ),
+])
+_sym_db.RegisterServiceDescriptor(_EXTERNALSCHEDULER)
+
+DESCRIPTOR.services_by_name['ExternalScheduler'] = _EXTERNALSCHEDULER
 
 # @@protoc_insertion_point(module_scope)

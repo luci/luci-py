@@ -471,6 +471,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
           bot_groups_config.BotAuth(
             require_luci_machine_token=False,
             require_service_account=None,
+            require_gce_vm_token=None,
             ip_whitelist=None,
           ),
         ),
@@ -496,6 +497,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
           bot_groups_config.BotAuth(
             require_luci_machine_token=False,
             require_service_account=None,
+            require_gce_vm_token=None,
             ip_whitelist=None,
           ),
         ),
@@ -1330,6 +1332,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
           bot_groups_config.BotAuth(
             require_luci_machine_token=False,
             require_service_account=None,
+            require_gce_vm_token=None,
             ip_whitelist=None,
           ),
         ),

@@ -31,9 +31,12 @@ BOTS_CFG_FILENAME = 'bots.cfg'
 BotAuth = collections.namedtuple('BotAuth', [
   'require_luci_machine_token',
   'require_service_account',
+  'require_gce_vm_token',  # this is BotAuthGCE
   'ip_whitelist',
 ])
 
+# Validated and "frozen" bots_pb2.BotAuth.GCE proto.
+BotAuthGCE = collections.namedtuple('BotAuthGCE', ['project'])
 
 # Configuration that applies to some group of bots. Derived from BotsCfg and
 # BotGroup in bots.proto. See comments there. This tuple contains already
@@ -522,6 +525,7 @@ def _default_bot_groups():
           BotAuth(
               require_luci_machine_token=False,
               require_service_account=None,
+              require_gce_vm_token=None,
               ip_whitelist=auth.bots_ip_whitelist()),
         ),
         dimensions={},
@@ -580,6 +584,10 @@ def _bot_group_proto_to_tuple(msg, trusted_dimensions):
       BotAuth(
         require_luci_machine_token=cfg.require_luci_machine_token,
         require_service_account=tuple(cfg.require_service_account),
+        require_gce_vm_token=(
+            BotAuthGCE(cfg.require_gce_vm_token.project)
+            if cfg.HasField('require_gce_vm_token') else None
+        ),
         ip_whitelist=cfg.ip_whitelist)
       for cfg in msg.auth
     ),
@@ -973,18 +981,26 @@ def _validate_group_bot_id_prefixes(
 
 
 def _validate_auth(ctx, a):
-  if a.require_luci_machine_token and a.require_service_account:
-    ctx.error(
-        'require_luci_machine_token and require_service_account can\'t '
-        'both be used at the same time')
-  if not a.require_luci_machine_token and not a.require_service_account:
-    if not a.ip_whitelist:
-      ctx.error(
-        'if both require_luci_machine_token and require_service_account '
-        'are unset, ip_whitelist is required')
+  fields = []
+  if a.require_luci_machine_token:
+    fields.append('require_luci_machine_token')
+  if a.require_service_account:
+    fields.append('require_service_account')
+  if a.HasField('require_gce_vm_token'):
+    fields.append('require_gce_vm_token')
+
+  if len(fields) > 1:
+    ctx.error('%s can\'t be used at the same time', ' and '.join(fields))
+  if not fields and not a.ip_whitelist:
+    ctx.error('if all auth requirements are unset, ip_whitelist must be set')
+
   if a.require_service_account:
     for email in a.require_service_account:
       _validate_email(ctx, email, 'service account')
+
+  if a.HasField('require_gce_vm_token') and not a.require_gce_vm_token.project:
+    ctx.error('missing project in require_gce_vm_token')
+
   if a.ip_whitelist and not auth.is_valid_ip_whitelist_name(a.ip_whitelist):
     ctx.error('invalid ip_whitelist name "%s"', a.ip_whitelist)
 

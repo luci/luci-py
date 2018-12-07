@@ -221,13 +221,23 @@ message BotGroup {
 
 // Defines what kind of authentication to perform when handling requests from
 // bots belonging to some bot group.
+//
+// The following combinations are valid:
+//   * Either one of require_* alone.
+//   * IP whitelist alone.
+//   * IP + require_luci_machine_token: requires both to pass.
+//   * IP + require_service_account: requires both to pass.
+//   * IP + require_gce_vm_token: requires both to pass.
 message BotAuth {
+  // See require_gce_vm_token below.
+  message GCE {
+    string project = 1;
+  }
+
   // If true, the bot should provide valid X-Luci-Machine-Token header.
   //
   // The machine FQDN embedded in the token should have hostname equal to the
   // bot_id.
-  //
-  // Incompatible with require_service_account.
   bool require_luci_machine_token = 1;
 
   // If set, the bot should use OAuth access token belonging to any of these
@@ -235,22 +245,27 @@ message BotAuth {
   //
   // The token should have "https://www.googleapis.com/auth/userinfo.email"
   // scope.
-  //
-  // Incompatible with require_luci_machine_token.
   repeated string require_service_account = 2;
+
+  // If set, the bot should provide valid X-Luci-Gce-Vm-Token header.
+  //
+  // This header should contain JWT with signed VM metadata with the following
+  // expectations:
+  //   * Audience matches https://[*-dot-]<app>.appspot.com
+  //   * google.compute_engine.project_id field matches the value of 'project'.
+  //   * instance_name matches bot_id reported by the bot (case insensitive).
+  GCE require_gce_vm_token = 4;
 
   // If set, defines an IP whitelist name (in auth_service database) with a set
   // of IPs allowed to be used by the bots in this group.
   //
-  // Works in conjunction with require_luci_machine_token and
-  // require_service_account, e.g if require_luci_machine_token is true, both
-  // valid X-Luci-Machine-Token and whitelisted IP are needed to successfully
-  // authenticate.
+  // Works in conjunction with other checks, e.g. if require_luci_machine_token
+  // is true, both valid X-Luci-Machine-Token and a whitelisted IP are needed to
+  // successfully authenticate.
   //
-  // Can also be used on its own (when both require_luci_machine_token and
-  // require_service_account are false). In that case IP whitelist is the
-  // primary authentication mechanism. Note that in this case all bots that
-  // share the IP whitelist are effectively in a single trust domain (any bots
-  // can pretend to be some other bot).
+  // Can also be used on its own (when all other fields are empty). In that case
+  // the IP whitelist is the primary authentication mechanism. Note that in this
+  // case all bots that share the IP whitelist are effectively in a single trust
+  // domain (any bot can pretend to be some other bot).
   string ip_whitelist = 3;
 }

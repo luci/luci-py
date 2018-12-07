@@ -145,6 +145,10 @@ def _check_bot_auth(bot_auth, bot_id, peer_ident, ip):
       return 'Bot is not using expected service account', errors
     return check_ip_and_finish('service_account', peer_ident.name)
 
+  # TODO(vadimsh): Implement require_gce_vm_token.
+  if bot_auth.require_gce_vm_token:
+    return 'require_gce_vm_token is not implemente yet', errors
+
   if bot_auth.ip_whitelist:
     return check_ip_and_finish('ip_whitelist', bot_auth.ip_whitelist)
 
