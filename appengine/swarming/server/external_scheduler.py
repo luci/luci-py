@@ -24,6 +24,12 @@ def _get_client(address):
       insecure=utils.is_local_dev_server())
 
 
+def _creds():
+  """Get the correct credentials argument for this environment."""
+  return (None if utils.is_local_dev_server() else
+          client.service_account_credentials())
+
+
 def _bot_pool_cfg(bot_dimensions):
   """Retrieves the PoolConfig for a bot.
 
@@ -129,8 +135,7 @@ def assign_task(es_cfg, bot_dimensions):
   c = _get_client(es_cfg.address)
 
   # TODO(akeshet): Catch or handle errors appropriately.
-  resp = c.AssignTasks(req,
-      credentials=client.service_account_credentials())
+  resp = c.AssignTasks(req, credentials=_creds())
 
   if not resp or not resp.assignments:
     return None, None
@@ -172,7 +177,7 @@ def notify_request(es_cfg, request, result_summary):
   req.scheduler_id = es_cfg.id
 
   c = _get_client(es_cfg.address)
-  c.NotifyTasks(req, credentials=client.service_account_credentials())
+  c.NotifyTasks(req, credentials=_creds())
 
 
 def get_cancellations(es_cfg):
@@ -180,6 +185,5 @@ def get_cancellations(es_cfg):
   req = plugin_pb2.GetCancellationsRequest()
   req.scheduler_id = es_cfg.id
   c = _get_client(es_cfg.address)
-  resp = c.GetCancellations(
-    req, credentials=client.service_account_credentials())
+  resp = c.GetCancellations(req, credentials=_creds())
   return resp.cancellations
