@@ -601,7 +601,7 @@ def yield_next_available_task_to_dispatch(bot_dimensions, deadline):
         # Keep a FIFO or LIFO queue ordering, depending on configuration.
         if futures[0].done():
           request, task = futures[0].get_result()
-          if request:
+          if request and task:
             yield request, task
             # If the code is still executed, it means that the task reaping
             # wasn't successful. Note that this includes expired ones, which is
@@ -616,7 +616,7 @@ def yield_next_available_task_to_dispatch(bot_dimensions, deadline):
     # No more tasks to yield. Empty the pending futures.
     while futures:
       request, task = futures[0].get_result()
-      if request:
+      if request and task:
         yield request, task
         # If the code is still executed, it means that the task reaping
         # wasn't successful. Same as above about expired.
