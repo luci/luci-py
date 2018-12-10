@@ -9,6 +9,44 @@ potential datastore inconsistencies, in a transaction-less and efficient manner.
 
 This framework doesn't gather data by itself. Data harvesting, the actual
 measurements saved and presentations must be supplied by the user.
+
+The entities are stored as a hierarchy based on time. All the entities are in a
+single entity group. There is one entitiy per day, and children entities per
+hour, then grand children entities per minute. As StatsMinute entities are
+created, parent StatsHour and StatsDay are updated.
+
+    +------------------------------+
+    |StatsRoot                     |
+    |id=<root_key>                 |
+    |timestamp=<last minute stored>|
+    +------+-----------------------+
+           |
+           +--------------------------+
+           |                          |
+           v                          v
+    +------------------+     +------------------+
+    |StatsDay          |     |StatsDay          |
+    |id=<YYYY-MM-DD>   | ... |id=<YYYY-MM-DD>   |
+    |value=snapshot_cls|     |value=snapshot_cls|
+    +-------+----------+     +------------------+
+            |
+            +-------------------------+------------------------+
+            |                         |                        |
+            v                         v                        v
+    +------------------+     +------------------+     +------------------+
+    |StatsHour         |     |StatsHour         |     |StatsHour         |
+    |id="00"           | ... |id=<HH>           | ... |id="23"           |
+    |value=snapshot_cls|     |value=snapshot_cls|     |value=snapshot_cls|
+    +-------+----------+     +------------------+     +------------------+
+            |
+            +-------------------------+------------------------+
+            |                         |                        |
+            v                         v                        v
+    +------------------+     +------------------+     +------------------+
+    |StatsMinute       |     |StatsMinute       |     |StatsMinute       |
+    |id="00"           | ... |id=<MM>           | ... |id="59"           |
+    |value=snapshot_cls|     |value=snapshot_cls|     |value=snapshot_cls|
+    +------------------+     +------------------+     +------------------+
 """
 
 import calendar
@@ -350,6 +388,8 @@ class StatisticsFramework(object):
 class StatsRoot(ndb.Model):
   """Used as a base class for transaction coherency.
 
+  Key id: root for specific StatisticsFramework instance.
+
   It will be updated once every X minutes when the cron job runs to gather new
   data.
   """
@@ -367,6 +407,9 @@ def _generate_stats_day_cls(snapshot_cls):
     This entity is updated every time a new self.stats_hour_cls is sealed, so ~1
     update per hour.
     """
+    # Disable ndb in-process cache.
+    _use_cache = False
+
     created = ndb.DateTimeProperty(indexed=False, auto_now=True)
     modified = ndb.DateTimeProperty(indexed=False, auto_now_add=True)
 
@@ -384,6 +427,9 @@ def _generate_stats_day_cls(snapshot_cls):
     # Used for queries.
     SEALED_BITMAP = 0xFFFFFF
 
+    # The span of this snapshot.
+    span = datetime.timedelta(seconds=24*60*60)
+
     @property
     def values(self):
       return self.values_compressed or self.values_uncompressed
@@ -396,9 +442,14 @@ def _generate_stats_day_cls(snapshot_cls):
       year, month, day = self.key.id().split('-', 2)
       return datetime.datetime(int(year), int(month), int(day))
 
+    @property
+    def timestamp_str(self):
+      """Returns the timestamp as a string."""
+      return self.key.string_id()
+
     def to_dict(self):
       out = self.values.to_dict()
-      out['key'] = self.timestamp.date()
+      out['key'] = self.timestamp_str
       return out
 
     def _pre_put_hook(self):
@@ -412,12 +463,15 @@ def _generate_stats_hour_cls(snapshot_cls):
   class StatsHour(ndb.Model):
     """Statistics for a single hour.
 
-    The Key format is HH with 0 prefix so the key sort naturally. Ancestor is
-    self.stats_day_cls.
+    Key id is 'HH' as a string with 0 prefix so the key sort naturally. Ancestor
+    is self.stats_day_cls.
 
     This entity is updated every time a new self.stats_minute_cls is generated
     under a transaction, so ~1 transaction per minute.
     """
+    # Disable ndb in-process cache.
+    _use_cache = False
+
     created = ndb.DateTimeProperty(indexed=False, auto_now=True)
     # Statistics for the hour.
     values_compressed = ndb.LocalStructuredProperty(
@@ -433,6 +487,9 @@ def _generate_stats_hour_cls(snapshot_cls):
     # Used for queries.
     SEALED_BITMAP = 0xFFFFFFFFFFFFFFF
 
+    # The span of this snapshot.
+    span = datetime.timedelta(seconds=60*60)
+
     @property
     def values(self):
       return self.values_compressed or self.values_uncompressed
@@ -447,9 +504,15 @@ def _generate_stats_hour_cls(snapshot_cls):
       return datetime.datetime(
           int(year), int(month), int(day), int(key.id()))
 
+    @property
+    def timestamp_str(self):
+      """Returns the timestamp as a string."""
+      key = self.key
+      return '%sT%s' % (key.parent().string_id(), key.string_id())
+
     def to_dict(self):
       out = self.values.to_dict()
-      out['key'] = self.timestamp
+      out['key'] = self.timestamp_str
       return out
 
     def _pre_put_hook(self):
@@ -469,6 +532,9 @@ def _generate_stats_minute_cls(snapshot_cls):
     This entity is written once and never modified so it is sealed by
     definition.
     """
+    # Disable ndb in-process cache.
+    _use_cache = False
+
     created = ndb.DateTimeProperty(indexed=False, auto_now=True)
     # Statistics for one minute.
     values_compressed = ndb.LocalStructuredProperty(
@@ -476,6 +542,9 @@ def _generate_stats_minute_cls(snapshot_cls):
     # This is needed for backward compatibility
     values_uncompressed = ndb.LocalStructuredProperty(
         snapshot_cls, name='values')
+
+    # The span of this snapshot.
+    span = datetime.timedelta(seconds=60)
 
     @property
     def values(self):
@@ -493,9 +562,17 @@ def _generate_stats_minute_cls(snapshot_cls):
       return datetime.datetime(
           int(year), int(month), int(day), int(hour), int(key.id()))
 
+    @property
+    def timestamp_str(self):
+      """Returns the timestamp as a string."""
+      key = self.key
+      parent = key.parent()
+      return '%sT%s:%s' % (
+          parent.parent().string_id(), parent.string_id(), key.string_id())
+
     def to_dict(self):
       out = self.values.to_dict()
-      out['key'] = self.timestamp
+      out['key'] = self.timestamp_str
       return out
 
     def _pre_put_hook(self):

@@ -90,7 +90,7 @@ class StatsTest(test_case.TestCase):
         'downloads': 0,
         'downloads_bytes': 0,
         'failures': 0,
-        'key': datetime.datetime(2010, 1, 2, 3, 4),
+        'key': '2010-01-02T03:04',
         'requests': 1,
         'uploads': 0,
         'uploads_bytes': 0,
