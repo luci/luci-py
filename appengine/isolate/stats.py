@@ -217,6 +217,9 @@ def cron_send_to_bq():
 
   Logs insert errors and returns a list of timestamps of snapshots that could
   not be inserted.
+
+  Returns:
+    total number of statistics snapshot sent to BQ.
   """
   total = 0
   start = utils.utcnow()

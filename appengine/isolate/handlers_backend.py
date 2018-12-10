@@ -431,9 +431,7 @@ class InternalStatsSendToBQHandler(webapp2.RequestHandler):
   """Called every few minutes to update statistics."""
   @decorators.require_cronjob
   def get(self):
-    failed = stats.cron_send_to_bq()
-    if failed:
-      logging.error('Failed: %s', failed)
+    stats.cron_send_to_bq()
 
 
 ### Mapreduce related handlers
