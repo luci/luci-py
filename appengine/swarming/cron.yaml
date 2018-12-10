@@ -83,6 +83,13 @@ cron:
   target: backend
 
 
+### External schedulers
+
+- description: Cancel tasks at the behest of external scheduler.
+  url: /internal/cron/external_scheduler_cancellations
+  schedule: every 1 minutes
+  target: backend
+
 ### ereporter2
 
 - description: ereporter2 cleanup
