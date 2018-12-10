@@ -266,7 +266,6 @@ def cron_send_to_bq():
       # floating point. :/
       size = int(round((recent - state.last).total_seconds() / 60)) + 1
       if size <= 0 and not state.failed:
-        logging.info('Up to date')
         return total
 
       # Send at most 500 items at a time to reduce the risks of failure.
