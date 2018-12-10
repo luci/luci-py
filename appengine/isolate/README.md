@@ -59,6 +59,9 @@ scheduler is needed.
         *   Set Google login Cookie expiration to: 2 weeks.
         *   Click `Save`.
 *   Upload the code with: `./tools/gae upl -x -A <appid>`
+*   Run [setup_bigquery.sh](setup_bigquery.sh) to create the BigQuery
+    `isolated.stat` table and grant write access to the AppEngine app. The cron
+    job will fail meanwhile.
 *   If you plan to use an [auth_service](../auth_service),
     *   Make sure it is setup already.
     *   [Follow instructions

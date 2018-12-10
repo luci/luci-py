@@ -174,6 +174,49 @@ class StatsTest(test_case.TestCase):
     # It generates empty stats.
     self.assertEqual(120, stats.cron_generate_stats())
 
+  def test_cron_send_to_bq_empty(self):
+    # Empty, nothing is done. No need to mock the HTTP client.
+    self.assertEqual(0, stats.cron_send_to_bq())
+    # State is not stored if nothing was found.
+    self.assertEqual(None, stats.BqStateStats.get_by_id(1))
+
+  def test_cron_send_to_bq(self):
+    # Generate entities.
+    self.assertEqual(120, stats.cron_generate_stats())
+
+    payloads = []
+    def json_request(url, method, payload, scopes, deadline):
+      self.assertEqual(
+          'https://www.googleapis.com/bigquery/v2/projects/sample-app/datasets/'
+            'isolated/tables/stats/insertAll',
+          url)
+      payloads.append(payload)
+      self.assertEqual('POST', method)
+      self.assertEqual(stats.bqh.INSERT_ROWS_SCOPE, scopes)
+      self.assertEqual(600, deadline)
+      return {'insertErrors': []}
+    self.mock(stats.net, 'json_request', json_request)
+
+    self.assertEqual(120, stats.cron_send_to_bq())
+    expected = {
+      'failed': [],
+      'last': datetime.datetime(2009, 12, 28, 2, 0),
+      'ts': datetime.datetime(2010, 1, 2, 3, 4, 5, 6),
+    }
+    self.assertEqual(
+        expected, stats.BqStateStats.get_by_id(1).to_dict())
+
+    expected = [
+      {
+        'ignoreUnknownValues': False,
+        'kind': 'bigquery#tableDataInsertAllRequest',
+        'skipInvalidRows': True,
+      },
+    ]
+    actual_rows = payloads[0].pop('rows')
+    self.assertEqual(expected, payloads)
+    self.assertEqual(120, len(actual_rows))
+
 
 if __name__ == '__main__':
   if '-v' in sys.argv:
