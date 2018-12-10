@@ -28,6 +28,11 @@ fi
 
 APPID=$1
 
+echo "- Make sure the BigQuery API is enabled for the project:"
+# It is enabled by default for new projects, but it wasn't for older projects.
+gcloud services enable --project ${APPID} bigquery-json.googleapis.com
+
+
 echo "- Create the dataset:"
 echo ""
 echo "  Warning: On first 'bq' invocation, it'll try to find out default"
@@ -44,7 +49,8 @@ echo ""
 echo "  Warning: On first 'bqschemaupdater' invocation, it'll request default"
 echo "    credentials which is stored independently than 'bq'."
 cd proto
-bqschemaupdater -message isolated.StatsSnapshot -table ${APPID}.isolated.stats
+bqschemaupdater -force -message isolated.StatsSnapshot \
+  -table ${APPID}.isolated.stats
 cd ..
 
 # TODO(maruel): The stock role "roles/bigquery.dataEditor" grants too much
@@ -57,7 +63,6 @@ cd ..
 # https://cloud.google.com/iam/docs/granting-roles-to-service-accounts
 # https://cloud.google.com/bigquery/docs/access-control
 echo "- Grant access to the AppEngine app to the role account:"
-roles/bigquery.user
 gcloud projects add-iam-policy-binding ${APPID} \
     --member serviceAccount:${APPID}@appspot.gserviceaccount.com \
     --role roles/bigquery.dataEditor
