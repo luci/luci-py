@@ -18,19 +18,6 @@ from proto import isolated_prpc_pb2 # pylint: disable=no-name-in-module
 import stats
 
 
-def _stats_to_proto(s, dt, out):
-  """Converts a stats._Snapshot to isolated_pb2.Stats."""
-  out.ts.FromDatetime(dt)
-  out.uploads = s.uploads
-  out.uploads_bytes = s.uploads_bytes
-  out.downloads = s.downloads
-  out.downloads_bytes = s.downloads_bytes
-  out.contains_requests = s.contains_requests
-  out.contains_lookups = s.contains_lookups
-  out.requests = s.requests
-  out.failures = s.failures
-
-
 class IsolatedService(object):
   """Service implements the pRPC service in isolated.proto."""
 
@@ -63,7 +50,7 @@ class IsolatedService(object):
         stats.STATS_HANDLER, res, now, request.page_size, False)
     out = isolated_pb2.StatsResponse()
     for s in entities:
-      _stats_to_proto(s.values, s.timestamp, out.measurements.add())
+      stats.snapshot_to_proto(s, out.measurements.add())
     logging.info('Found %d entities', len(entities))
     return out
 

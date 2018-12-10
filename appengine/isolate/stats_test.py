@@ -4,6 +4,7 @@
 # that can be found in the LICENSE file.
 
 import datetime
+import logging
 import sys
 import unittest
 
@@ -19,6 +20,7 @@ from components.stats_framework import stats_logs
 from test_support import stats_framework_logs_mock
 from test_support import test_case
 
+from proto import isolated_pb2
 import stats
 
 
@@ -72,6 +74,16 @@ class StatsTest(test_case.TestCase):
     self.now = datetime.datetime(2010, 1, 2, 3, 4, 5, 6)
     self.mock_now(self.now, 0)
 
+  def test_all_apis_are_tested(self):
+    # Ensures there's a test for each public API.
+    module = stats
+    expected = frozenset(
+        i for i in dir(module)
+        if i[0] != '_' and hasattr(getattr(module, i), 'func_name'))
+    missing = expected - frozenset(
+        i[5:] for i in dir(self) if i.startswith('test_'))
+    self.assertFalse(missing)
+
   def _test_handler(self, url, added_data):
     stats_framework_logs_mock.reset_timestamp(stats.STATS_HANDLER, self.now)
 
@@ -79,7 +91,7 @@ class StatsTest(test_case.TestCase):
     self.assertEqual(1, len(list(stats_logs.yield_entries(None, None))))
 
     self.mock_now(self.now, 60)
-    self.assertEqual(10, stats.generate_stats())
+    self.assertEqual(10, stats.cron_generate_stats())
 
     actual = stats_framework.get_stats(
         stats.STATS_HANDLER, 'minutes', self.now, 1, True)
@@ -124,8 +136,49 @@ class StatsTest(test_case.TestCase):
     expected = {}
     self._test_handler('/dupe', expected)
 
+  def test_add_entry(self):
+    # Tested by other test cases.
+    pass
+
+  def test_snapshot_to_proto(self):
+    s = stats.STATS_HANDLER.stats_minute_cls(
+        key=stats.STATS_HANDLER.minute_key(self.now),
+        created=self.now,
+        values_compressed=stats._Snapshot(
+          uploads=1,
+          uploads_bytes=2,
+          downloads=3,
+          downloads_bytes=4,
+          contains_requests=5,
+          contains_lookups=6,
+          requests=7,
+          failures=8,
+        ))
+    p = isolated_pb2.StatsSnapshot()
+    stats.snapshot_to_proto(s, p)
+    expected = (
+      u'ts {\n'
+      u'  seconds: 1262401440\n'
+      u'}\n'
+      u'uploads: 1\n'
+      u'uploads_bytes: 2\n'
+      u'downloads: 3\n'
+      u'downloads_bytes: 4\n'
+      u'contains_requests: 5\n'
+      u'contains_lookups: 6\n'
+      u'requests: 7\n'
+      u'failures: 8\n')
+    self.assertEqual(expected, unicode(p))
+
+  def test_cron_generate_stats(self):
+    # It generates empty stats.
+    self.assertEqual(120, stats.cron_generate_stats())
+
 
 if __name__ == '__main__':
   if '-v' in sys.argv:
     unittest.TestCase.maxDiff = None
+    logging.basicConfig(level=logging.DEBUG)
+  else:
+    logging.basicConfig(level=logging.FATAL)
   unittest.main()

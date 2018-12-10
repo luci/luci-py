@@ -422,12 +422,9 @@ class InternalStatsUpdateHandler(webapp2.RequestHandler):
   """Called every few minutes to update statistics."""
   @decorators.require_cronjob
   def get(self):
-    self.response.headers['Content-Type'] = 'text/plain'
-    minutes = stats.generate_stats()
+    minutes = stats.cron_generate_stats()
     if minutes is not None:
-      msg = 'Processed %d minutes' % minutes
-      logging.info(msg)
-      self.response.write(msg)
+      logging.info('Processed %d minutes', minutes)
 
 
 ### Mapreduce related handlers

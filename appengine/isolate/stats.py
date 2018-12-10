@@ -119,6 +119,20 @@ def add_entry(action, number, where):
   stats_logs.add_entry('%s; %d; %s' % (_ACTION_NAMES[action], number, where))
 
 
-def generate_stats():
+def snapshot_to_proto(s, out):
+  """Converts a stats._Snapshot to isolated_pb2.Snapshot."""
+  out.ts.FromDatetime(s.timestamp)
+  v = s.values
+  out.uploads = v.uploads
+  out.uploads_bytes = v.uploads_bytes
+  out.downloads = v.downloads
+  out.downloads_bytes = v.downloads_bytes
+  out.contains_requests = v.contains_requests
+  out.contains_lookups = v.contains_lookups
+  out.requests = v.requests
+  out.failures = v.failures
+
+
+def cron_generate_stats():
   """Returns the number of minutes processed."""
   return STATS_HANDLER.process_next_chunk(stats_framework.TOO_RECENT)
