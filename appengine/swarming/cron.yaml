@@ -38,6 +38,11 @@ cron:
   schedule: every 1 minutes
   target: backend
 
+- description: Delete old Bot entity groups
+  url: /internal/cron/delete_old_bot
+  schedule: every 5 minutes synchronized
+  target: backend
+
 - description: Delete old BotEvent
   url: /internal/cron/delete_old_bot_events
   schedule: every 5 minutes synchronized
