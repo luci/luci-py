@@ -93,7 +93,7 @@ def decode_message(remote_method_info, request):
 def add_cors_headers(headers):
   headers['Access-Control-Allow-Origin'] = '*'
   headers['Access-Control-Allow-Headers'] = (
-    'Origin, Authorization, Content-Type, Accept')
+    'Origin, Authorization, Content-Type, Accept, User-Agent')
   headers['Access-Control-Allow-Methods'] = (
     'DELETE, GET, OPTIONS, POST, PUT')
 
