@@ -742,12 +742,62 @@ def _get_task_from_external_scheduler(es_cfg, bot_dimensions):
 
   logging.info('Determined try_number, slice_number %s %s', try_number,
                slice_number)
-  to_run_key = task_to_run.request_to_task_to_run_key(request, try_number,
-                                                      slice_number)
-  to_run = to_run_key.get()
-  # TODO(akeshet/maruel): Figure out how to unpack a TaskToRun from the
-  # returned result_key.
-  return [(request, to_run)]
+
+  to_run = _ensure_active_slice(request, try_number, slice_number)
+  if to_run:
+    return [(request, to_run)]
+
+  return []
+
+
+def _ensure_active_slice(request, try_number, task_slice_index):
+  """Ensures the existence of a TaskToRun for the given request, try, slice.
+
+  Ensure that the given request is currently active at a given try_number and
+  task_slice_index (modifying the current try or slice if necessary), and that
+  no other TaskToRun is pending.
+
+  This is intended for use as part of the external scheduler flow.
+
+  Internally, this runs a 1 GET 1 (possible) PUT transaction.
+
+  Arguments:
+    request: TaskRequest instance
+    try_number: try_number to ensure exists.
+    task_slice_index: slice index to ensure is active.
+
+  Returns:
+    A saved TaskToRun instance corresponding to the given request, try_number,
+    and slice, if exists, or None otherwise.
+  """
+  def run():
+    to_runs = task_to_run.TaskToRun.query(ancestor=request.key).fetch()
+    to_runs = [r for r in to_runs if r.queue_number]
+    if to_runs:
+      if len(to_runs) != 1:
+        logging.error('Too many pending TaskToRuns.')
+        return None
+      assert len(to_runs) == 1, 'Too many pending TaskToRuns.'
+
+    to_run = to_runs[0] if to_runs else None
+
+    if to_run:
+      if (to_run.try_number == try_number and
+          to_run.task_slice_index == task_slice_index):
+        return to_run
+
+      # Deactivate old TaskToRun, create new one.
+      to_run.queue_number = None
+      new_to_run = task_to_run.new_task_to_run(request, try_number,
+                                               task_slice_index)
+      ndb.put_multi([to_run, new_to_run])
+      return new_to_run
+
+    logging.error('Attempted to _ensure_active_slice on a task with no '
+                  'currently pending TaskToRun: %s', request)
+    return None
+
+  return datastore_utils.transaction(run)
 
 
 ### Public API.
