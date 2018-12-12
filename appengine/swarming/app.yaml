@@ -17,6 +17,10 @@ handlers:
   script: main_frontend.endpoints_app
   secure: always
 
+- url: /prpc/.*
+  script: main_frontend.prpc_app
+  secure: always
+
 # Old API URLs.
 - url: /api/.*
   script: main_frontend.app
