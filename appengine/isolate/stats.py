@@ -58,10 +58,13 @@ class BqStateStats(ndb.Model):
   By storing the successful writes, this enables not having to read from BQ. Not
   having to sync state *from* BQ means one less RPC that could fail randomly.
   """
+  # Last time this entity was updated.
   ts = ndb.DateTimeProperty(indexed=False)
+  # Timestamp of the last STATS_HANDLER.stats_minute_cls uploaded.
   last = ndb.DateTimeProperty(indexed=False)
+  # Timestamp of the STATS_HANDLER.stats_minute_cls previously uploaded that had
+  # failed and should be retried.
   failed = ndb.DateTimeProperty(repeated=True, indexed=False)
-
 
 
 ### Utility
@@ -129,7 +132,11 @@ def _to_proto(s):
 
 
 def _send_to_bq(snapshots):
-  """Sends the snapshots to BigQuery."""
+  """Sends the snapshots to BigQuery.
+
+  Returns:
+    Timestamps, encoded as strings, of snapshots that failed to be sent
+  """
   # See doc/Monitoring.md.
   dataset = 'isolated'
   table_name = 'stats'
@@ -218,6 +225,9 @@ def cron_send_to_bq():
   Logs insert errors and returns a list of timestamps of snapshots that could
   not be inserted.
 
+  This cron job is surprisingly fast, it processes a year of backlog within a
+  few hours.
+
   Returns:
     total number of statistics snapshot sent to BQ.
   """
@@ -233,8 +243,6 @@ def cron_send_to_bq():
       logging.info('No Stats found!')
       return total
 
-    # TODO(maruel): We may want to limit on old entities to something like 2
-    # years ago, since it can take a while to process years long backlog.
     state = BqStateStats(id=1, ts=start, last=oldest.timestamp)
     state.put()
 

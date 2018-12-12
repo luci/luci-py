@@ -217,6 +217,9 @@ class StatsTest(test_case.TestCase):
     self.assertEqual(expected, payloads)
     self.assertEqual(120, len(actual_rows))
 
+    # Next cron skips everything that was processed.
+    self.assertEqual(0, stats.cron_send_to_bq())
+
 
 if __name__ == '__main__':
   if '-v' in sys.argv:

@@ -25,13 +25,15 @@ import stats
 
 def _decode(raw, dst):
   # Skip escaping characters.
-  return encoding.get_decoder(encoding.Encoding.JSON)(raw[4:], dst)
+  assert raw[:5] == ')]}\'\n', raw[:5]
+  return encoding.get_decoder(encoding.Encoding.JSON)(raw[5:], dst)
 
 
 def _encode(d):
   # Skip escaping characters.
   raw = encoding.get_encoder(encoding.Encoding.JSON)(d)
-  return raw[4:]
+  assert raw[:5] == ')]}\'\n', raw[:5]
+  return raw[5:]
 
 
 class PRPCTest(test_case.TestCase):
