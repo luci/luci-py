@@ -225,7 +225,7 @@ class Server(object):
           decoder = encoding.get_decoder(parsed_headers.content_type)
           decoder(self.request.body, request)
         except Exception as e:
-          logging.warning('Failed to decode request: %s' % e)
+          logging.warning('Failed to decode request: %s', e, exc_info=True)
           context.set_code(StatusCode.INVALID_ARGUMENT)
           context.set_details('Error parsing request')
           return None
