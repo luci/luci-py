@@ -77,7 +77,6 @@ def validate_bot_id_and_fetch_config(bot_id, machine_type):
     public_errs.append(err)
     internal_details.extend(details)
 
-  logging.error('All %d auth methods failed:', len(cfg.auth))
   for msg in internal_details:
     logging.error('%s', msg)
 
@@ -145,9 +144,34 @@ def _check_bot_auth(bot_auth, bot_id, peer_ident, ip):
       return 'Bot is not using expected service account', errors
     return check_ip_and_finish('service_account', peer_ident.name)
 
-  # TODO(vadimsh): Implement require_gce_vm_token.
   if bot_auth.require_gce_vm_token:
-    return 'require_gce_vm_token is not implemente yet', errors
+    expected_proj = bot_auth.require_gce_vm_token.project
+
+    details = auth.get_auth_details()
+    bot_vm_inst = details.gce_instance
+    bot_vm_proj = details.gce_project
+
+    if not bot_vm_proj:
+      error(
+          'bot_auth: bot is not using X-Luci-Gce-Vm-Token auth\n'
+          'bot_id: "%s", peer_ident: "%s", expected_proj: "%s"',
+          bot_id, peer_ident.to_bytes(), expected_proj)
+      return 'Bot is expected to send X-Luci-Gce-Vm-Token, it didn\'t', errors
+    if bot_vm_proj != expected_proj:
+      error(
+          'bot_auth: got GCE VM token from unexpected project\n'
+          'bot_id: "%s", peer_ident: "%s", expected_proj: "%s"',
+          bot_id, peer_ident.to_bytes(), expected_proj)
+      return 'Unexpected GCE project %s in the auth token' % bot_vm_proj, errors
+    if bot_vm_inst != bot_id:
+      error(
+          'bot_auth: bot ID and GCE instance name do not match\n'
+          'bot_id: "%s", peer_ident: "%s"', bot_id, peer_ident.to_bytes())
+      return (
+          'Bot ID %s doesn\'t match GCE instance ID %s' % (bot_id, bot_vm_proj),
+          errors
+      )
+    return check_ip_and_finish('gce_vm_token', expected_proj)
 
   if bot_auth.ip_whitelist:
     return check_ip_and_finish('ip_whitelist', bot_auth.ip_whitelist)

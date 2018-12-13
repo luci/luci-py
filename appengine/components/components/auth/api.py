@@ -59,6 +59,7 @@ __all__ = [
   'is_in_ip_whitelist',
   'is_superuser',
   'list_group',
+  'new_auth_details',
   'public',
   'require',
   'SecretKey',

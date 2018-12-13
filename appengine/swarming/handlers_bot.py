@@ -32,6 +32,17 @@ from server import task_result
 from server import task_scheduler
 
 
+# Methods used to authenticate requests from bots, see get_auth_methods().
+#
+# Order matters if a single request have multiple credentials of different
+# kinds: the first method that found its corresponding header wins.
+_BOT_AUTH_METHODS = (
+    auth.optional_gce_vm_authentication,  # ignore present, but broken header
+    auth.machine_authentication,
+    auth.oauth_authentication,
+)
+
+
 def has_unexpected_subset_keys(expected_keys, minimum_keys, actual_keys, name):
   """Returns an error if unexpected keys are present or expected keys are
   missing.
@@ -129,7 +140,7 @@ class _BotAuthenticatingHandler(auth.AuthenticatingHandler):
 
   @classmethod
   def get_auth_methods(cls, conf):
-    return [auth.machine_authentication, auth.oauth_authentication]
+    return _BOT_AUTH_METHODS
 
   def check_bot_code_access(self, bot_id, generate_token):
     """Raises AuthorizationError if caller is not authorized to access bot code.
@@ -224,7 +235,7 @@ class _BotApiHandler(auth.ApiHandler):
 
   @classmethod
   def get_auth_methods(cls, conf):
-    return [auth.machine_authentication, auth.oauth_authentication]
+    return _BOT_AUTH_METHODS
 
 
 ### Bot Session API RPC handlers
