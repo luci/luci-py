@@ -28,30 +28,17 @@ fi
 
 APPID=$1
 
+# Configuration:
+DATASET_DESC="Isolate server statistics"
+DATASET=isolated
+TABLE=stats
+TABLE_PROTO_MSG=isolated.v1.StatsSnapshot
+
+
 echo "- Make sure the BigQuery API is enabled for the project:"
 # It is enabled by default for new projects, but it wasn't for older projects.
 gcloud services enable --project ${APPID} bigquery-json.googleapis.com
 
-
-echo "- Create the dataset:"
-echo ""
-echo "  Warning: On first 'bq' invocation, it'll try to find out default"
-echo "    credentials and will ask to select a default app; just press enter to"
-echo "    not select a default."
-
-# Optional: --default_table_expiration 63244800
-bq --location=US mk --dataset \
-  --description 'Isolate server statistics' ${APPID}:isolated
-
-
-echo "- Populate the BigQuery schema:"
-echo ""
-echo "  Warning: On first 'bqschemaupdater' invocation, it'll request default"
-echo "    credentials which is stored independently than 'bq'."
-cd proto
-bqschemaupdater -force -message isolated.StatsSnapshot \
-  -table ${APPID}.isolated.stats
-cd ..
 
 # TODO(maruel): The stock role "roles/bigquery.dataEditor" grants too much
 # rights. Create a new custom role with only access
@@ -66,3 +53,37 @@ echo "- Grant access to the AppEngine app to the role account:"
 gcloud projects add-iam-policy-binding ${APPID} \
     --member serviceAccount:${APPID}@appspot.gserviceaccount.com \
     --role roles/bigquery.dataEditor
+
+
+echo "- Create the dataset:"
+echo ""
+echo "  Warning: On first 'bq' invocation, it'll try to find out default"
+echo "    credentials and will ask to select a default app; just press enter to"
+echo "    not select a default."
+
+# Optional: --default_table_expiration 63244800
+if ! (bq --location=US mk --dataset --description "${DATASET_DESC}" \
+  ${APPID}:${DATASET}); then
+  echo ""
+  echo "Dataset creation failed. Assuming the dataset already exists. At worst"
+  echo "the following command will fail."
+fi
+
+
+echo "- Populate the BigQuery schema:"
+echo ""
+echo "  Warning: On first 'bqschemaupdater' invocation, it'll request default"
+echo "    credentials which is stored independently than 'bq'."
+cd proto
+if ! (bqschemaupdater -force -message ${TABLE_PROTO_MSG} \
+  -table ${APPID}.${DATASET}.${TABLE}); then
+  echo ""
+  echo ""
+  echo "Oh no! You may need to restart from scratch. You can do so with:"
+  echo ""
+  echo "  bq rm ${APPID}:${DATASET}.${TABLE}"
+  echo ""
+  echo "and run this script again."
+  exit 1
+fi
+cd -

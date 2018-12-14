@@ -80,11 +80,11 @@ class PRPCTest(test_case.TestCase):
     self._gen_stats()
     msg = isolated_pb2.StatsRequest()
     if time:
-      msg.latest.FromDatetime(time)
+      msg.latest_time.FromDatetime(time)
     msg.resolution = resolution
     msg.page_size = page_size
     raw_resp = self.app.post(
-        '/prpc/isolated.Isolated/Stats', _encode(msg), self._headers)
+        '/prpc/isolated.v1.Isolated/Stats', _encode(msg), self._headers)
     resp = isolated_pb2.StatsResponse()
     _decode(raw_resp.body, resp)
     self.assertEqual(expected, unicode(resp))
@@ -93,7 +93,7 @@ class PRPCTest(test_case.TestCase):
     msg = isolated_pb2.StatsRequest()
     msg.page_size = 1
     raw_resp = self.app.post(
-        '/prpc/isolated.Isolated/Stats', _encode(msg), self._headers,
+        '/prpc/isolated.v1.Isolated/Stats', _encode(msg), self._headers,
         expect_errors=True)
     self.assertEqual(raw_resp.body, 'Invalid resolution')
 
@@ -101,7 +101,7 @@ class PRPCTest(test_case.TestCase):
     msg = isolated_pb2.StatsRequest()
     msg.resolution = isolated_pb2.MINUTE
     raw_resp = self.app.post(
-        '/prpc/isolated.Isolated/Stats', _encode(msg), self._headers,
+        '/prpc/isolated.v1.Isolated/Stats', _encode(msg), self._headers,
         expect_errors=True)
     self.assertEqual(
         raw_resp.body, 'Invalid page_size; must be between 1 and 1000')
@@ -110,31 +110,31 @@ class PRPCTest(test_case.TestCase):
     # Limit the number of entities created.
     expected = (
       u'measurements {\n'
-      u'  ts {\n'
+      u'  start_time {\n'
       u'    seconds: 1262390400\n'
       u'  }\n'
       u'  requests: 100\n'
       u'}\n'
       u'measurements {\n'
-      u'  ts {\n'
+      u'  start_time {\n'
       u'    seconds: 1262304000\n'
       u'  }\n'
       u'  requests: 101\n'
       u'}\n'
       u'measurements {\n'
-      u'  ts {\n'
+      u'  start_time {\n'
       u'    seconds: 1262217600\n'
       u'  }\n'
       u'  requests: 102\n'
       u'}\n'
       u'measurements {\n'
-      u'  ts {\n'
+      u'  start_time {\n'
       u'    seconds: 1262131200\n'
       u'  }\n'
       u'  requests: 103\n'
       u'}\n'
       u'measurements {\n'
-      u'  ts {\n'
+      u'  start_time {\n'
       u'    seconds: 1262044800\n'
       u'  }\n'
       u'  requests: 104\n'
@@ -145,62 +145,62 @@ class PRPCTest(test_case.TestCase):
     # There are fewer entries than the requested limit.
     expected = (
       u'measurements {\n'
-      u'  ts {\n'
+      u'  start_time {\n'
       u'    seconds: 1262401200\n'
       u'  }\n'
       u'  requests: 10\n'
       u'}\n'
       u'measurements {\n'
-      u'  ts {'
+      u'  start_time {'
       u'\n'
       u'    seconds: 1262397600\n'
       u'  }\n'
       u'  requests: 11\n'
       u'}\n'
       u'measurements {\n'
-      u'  ts {\n'
+      u'  start_time {\n'
       u'    seconds: 1262394000\n'
       u'  }\n'
       u'  requests: 12\n'
       u'}\n'
       u'measurements {\n'
-      u'  ts {\n'
+      u'  start_time {\n'
       u'    seconds: 1262390400\n'
       u'  }\n'
       u'  requests: 13\n'
       u'}\n'
       u'measurements {\n'
-      u'  ts {\n'
+      u'  start_time {\n'
       u'    seconds: 1262386800\n'
       u'  }\n'
       u'  requests: 14\n'
       u'}\n'
       u'measurements {\n'
-      u'  ts {\n'
+      u'  start_time {\n'
       u'    seconds: 1262383200\n'
       u'  }\n'
       u'  requests: 15\n'
       u'}\n'
       u'measurements {\n'
-      u'  ts {\n'
+      u'  start_time {\n'
       u'    seconds: 1262379600\n'
       u'  }\n'
       u'  requests: 16\n'
       u'}\n'
       u'measurements {\n'
-      u'  ts {\n'
+      u'  start_time {\n'
       u'    seconds: 1262376000\n'
       u'  }\n'
       u'  requests: 17\n'
       u'}\n'
       u'measurements {\n'
-      u'  ts {\n'
+      u'  start_time {\n'
       u'    seconds: 1262372400\n'
       u'  }\n'
       u'  requests: 18\n'
       u'}\n'
       u'measurements {\n'
-      u'  ts {\n'
+      u'  start_time {\n'
       u'    seconds: 1262368800\n'
       u'  }\n'
       u'  requests: 19\n'
@@ -211,7 +211,7 @@ class PRPCTest(test_case.TestCase):
     # Intentionally take one from the middle.
     expected = (
       u'measurements {\n'
-      u'  ts {\n'
+      u'  start_time {\n'
       u'    seconds: 1262401140\n'
       u'  }\n'
       u'  requests: 6\n'

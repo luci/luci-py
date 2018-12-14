@@ -40,8 +40,8 @@ class IsolatedService(object):
       context.set_details('Invalid page_size; must be between 1 and 1000')
       return None
 
-    if request.latest.seconds:
-      now = request.latest.ToDatetime()
+    if request.latest_time.seconds:
+      now = request.latest_time.ToDatetime()
     else:
       now = utils.utcnow()
     # Round time to the minute.

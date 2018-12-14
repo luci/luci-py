@@ -157,7 +157,7 @@ class StatsTest(test_case.TestCase):
     p = isolated_pb2.StatsSnapshot()
     stats.snapshot_to_proto(s, p)
     expected = (
-      u'ts {\n'
+      u'start_time {\n'
       u'  seconds: 1262401440\n'
       u'}\n'
       u'uploads: 1\n'

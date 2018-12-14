@@ -195,7 +195,7 @@ def add_entry(action, number, where):
 
 def snapshot_to_proto(s, out):
   """Converts a stats._Snapshot to isolated_pb2.Snapshot."""
-  out.ts.FromDatetime(s.timestamp)
+  out.start_time.FromDatetime(s.timestamp)
   v = s.values
   out.uploads = v.uploads
   out.uploads_bytes = v.uploads_bytes
