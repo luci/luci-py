@@ -18,6 +18,7 @@ from google.appengine.ext import ndb
 from components import utils
 from test_support import test_case
 
+from proto import swarming_pb2  # pylint: disable=no-name-in-module
 from server import bot_management
 from server import config
 from server import task_queues
@@ -141,6 +142,55 @@ class BotManagementTest(test_case.TestCase):
         if i[0] != '_' and hasattr(getattr(bot_management, i), 'func_name'))
     missing = expected - actual
     self.assertFalse(missing)
+
+  def test_BotEvent_proto_events(self):
+    # Ensures all bot event states can be converted to a proto.
+    dimensions = {
+      u'id': [u'id1'],
+      u'os': [u'Ubuntu', u'Ubuntu-16.04'],
+      u'pool': [u'default'],
+    }
+    for name in bot_management.BotEvent.ALLOWED_EVENTS:
+      event_key = bot_management.bot_event(
+          event_type=name, bot_id=u'id1',
+          external_ip=u'8.8.4.4', authenticated_as=u'bot:id1.domain',
+          dimensions=dimensions, state={u'ram': 65}, version=_VERSION,
+          quarantined=False, maintenance_msg=None, task_id=None, task_name=None)
+      if name in (u'request_sleep', u'task_update'):
+        # TODO(maruel): Store request_sleep IFF the state changed.
+        self.assertIsNone(event_key, name)
+        continue
+      event = event_key.get()
+      p = swarming_pb2.BotEvent()
+      event.to_proto(p)
+
+  def test_BotEvent_proto_maintenance(self):
+    event_key = bot_management.bot_event(
+        event_type=u'bot_connected', bot_id=u'id1',
+        external_ip=u'8.8.4.4', authenticated_as=u'bot:id1.domain',
+        dimensions={u'id': [u'id1']}, state={u'ram': 65}, version=_VERSION,
+        quarantined=False, maintenance_msg=u'Too hot', task_id=None,
+        task_name=None)
+    event = event_key.get()
+    p = swarming_pb2.BotEvent()
+    event.to_proto(p)
+    self.assertEqual(p.bot.status, swarming_pb2.OVERHEAD_MAINTENANCE_EXTERNAL)
+    self.assertEqual(p.bot.status_msg, u'Too hot')
+
+  def test_BotEvent_proto_quarantine(self):
+    event_key = bot_management.bot_event(
+        event_type=u'bot_connected', bot_id=u'id1',
+        external_ip=u'8.8.4.4', authenticated_as=u'bot:id1.domain',
+        dimensions={u'id': [u'id1']},
+        state={u'ram': 65, u'quarantined': u'sad bot'},
+        version=_VERSION,
+        quarantined=True, maintenance_msg=None, task_id=None,
+        task_name=None)
+    event = event_key.get()
+    p = swarming_pb2.BotEvent()
+    event.to_proto(p)
+    self.assertEqual(p.bot.status, swarming_pb2.QUARANTINED_BY_BOT)
+    self.assertEqual(p.bot.status_msg, u'sad bot')
 
   def test_bot_event(self):
     # connected.

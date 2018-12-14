@@ -68,6 +68,7 @@ from google.appengine.ext import ndb
 
 from components import datastore_utils
 from components import utils
+from proto import swarming_pb2  # pylint: disable=no-name-in-module
 from server import config
 from server import task_pack
 from server import task_queues
@@ -86,7 +87,10 @@ BotRoot = datastore_utils.get_versioned_root_model('BotRoot')
 
 
 class _BotCommon(ndb.Model):
-  """Data that is copied from the BotEvent into BotInfo for performance."""
+  """Common data between BotEvent and BotInfo.
+
+  Parent is BotRoot.
+  """
   # State is purely informative. It is completely free form.
   state = datastore_utils.DeterministicJsonProperty(json_type=dict)
 
@@ -158,6 +162,42 @@ class _BotCommon(ndb.Model):
     out = super(_BotCommon, self).to_dict(exclude=exclude)
     out['dimensions'] = self.dimensions
     return out
+
+  def to_proto(self, out):
+    """Populates an empty swarming_pb2.Bot with this _BotCommon."""
+    # Used by BotEvent.to_proto().
+    out.bot_id = self.key.parent().string_id()
+    #out.session_id = ''  # https://crbug.com/786735
+
+    # TODO(maruel): Many state cannot be discovered here.
+    #out.status = swarming_pb2.BOTSTATE_UNSPECIFIED
+    #out.status_msg = ''
+    if self.quarantined:
+      out.status = swarming_pb2.QUARANTINED_BY_BOT
+      msg = self.state.get(u'quarantined')
+      if msg:
+        out.status_msg = msg
+    elif self.maintenance_msg:
+      out.status = swarming_pb2.OVERHEAD_MAINTENANCE_EXTERNAL
+      out.status_msg = self.maintenance_msg
+    elif self.task_id:
+      out.status = swarming_pb2.BUSY
+
+    if self.task_id:
+      out.current_task_id = self.task_id
+    for key, values in sorted(self.dimensions.iteritems()):
+      d = out.dimensions.add()
+      d.key = key
+      for value in values:
+        d.values.append(value)
+    if self.state:
+      out.info.raw.update(self.state)
+    if self.version:
+      out.info.version = self.version
+    if self.authenticated_as:
+      out.info.authenticated_as = self.authenticated_as
+    if self.external_ip:
+      out.info.external_ip = self.external_ip
 
   def _pre_put_hook(self):
     super(_BotCommon, self)._pre_put_hook()
@@ -246,11 +286,48 @@ class BotEvent(_BotCommon):
 
   This entity is created on each bot state transition.
   """
+  _MAPPING = {
+    'bot_connected': swarming_pb2.BOT_NEW_SESSION,
+    'bot_internal_failure': swarming_pb2.BOT_INTERNAL_FAILURE,
+    'bot_hook_error': swarming_pb2.BOT_HOOK_ERROR,
+    'bot_hook_log': swarming_pb2.BOT_HOOK_LOG,
+    # Historically ambiguous. It used to be both bot_internal_failure and
+    # bot_hook_error.
+    'bot_error': swarming_pb2.BOT_HOOK_ERROR,
+    # Historical misnaming. This is equivalent to bot_hook_log.
+    'bot_log': swarming_pb2.BOT_HOOK_LOG,
+    # TODO(maruel): Add definition if desired.
+    'bot_leased': None,
+    # Historical misnaming.
+    'bot_rebooting': swarming_pb2.BOT_REBOOTING_HOST,
+    'bot_shutdown': swarming_pb2.BOT_SHUTDOWN,
+    # Historical misnaming.
+    'bot_terminate': swarming_pb2.INSTRUCT_TERMINATE_BOT,
+    'request_restart': swarming_pb2.INSTRUCT_RESTART_BOT,
+    # Shall only be sorted when there is a significant difference in the bot
+    # state versus the previous event.
+    'request_sleep': swarming_pb2.INSTRUCT_IDLE,
+    'request_task': swarming_pb2.INSTRUCT_START_TASK,
+    'request_update': swarming_pb2.INSTRUCT_UPDATE_BOT_CODE,
+    'task_completed': swarming_pb2.TASK_COMPLETED,
+    'task_error': swarming_pb2.TASK_INTERNAL_FAILURE,
+    'task_killed': swarming_pb2.TASK_KILLED,
+    # This value is not registered in the API.
+    'task_update': None
+  }
+
   ALLOWED_EVENTS = {
     # Bot specific events that are outside the scope of a task:
     'bot_connected',
+    # Deprecated. Use bot_hook_error or bot_internal_failure.
+    # TODO(maruel): Remove 2020-01-01.
     'bot_error',
+    'bot_internal_failure',
+    'bot_hook_error',
+    'bot_hook_log',
     'bot_leased',
+    # Deprecated. Use bot_hook_log.
+    # TODO(maruel): Remove 2020-01-01.
     'bot_log',
     'bot_rebooting',
     'bot_shutdown',
@@ -281,6 +358,18 @@ class BotEvent(_BotCommon):
     """Returns the ndb.Key to the previous event."""
     return ndb.Key(
         self.__class__, self.key.integer_id()+1, parent=self.key.parent())
+
+  def to_proto(self, out):
+    """Populates a swarming_pb2.BotEvent with this BotEvent."""
+    # See ../proto/swarming.proto.
+    out.event_time.FromDatetime(self.ts)
+    # Populates out.bot with _BotCommon.
+    _BotCommon.to_proto(self, out.bot)
+    e = self._MAPPING[self.event_type]
+    if e:
+      out.event = e
+    if self.message:
+      out.event_msg = self.message
 
 
 class BotSettings(ndb.Model):

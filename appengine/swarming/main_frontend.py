@@ -81,4 +81,4 @@ def create_application():
   return frontend_app, endpoints_api, prpc_api, main.APP
 
 
-app, endpoints_app, prpc_api, mapreduce_app = create_application()
+app, endpoints_app, prpc_app, mapreduce_app = create_application()
