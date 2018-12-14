@@ -13,20 +13,342 @@ syntax = "proto3";
 
 package swarming;
 
-// API.
+import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
 
-service Swarming {
-  // TODO(maruel): Finish implementation. https://913953
+// APIs.
+
+service BotAPI {
+  // Events returns events relating to one bot.
+  rpc Events(BotEventsRequest) returns (BotEventsResponse) {};
+
+  // TODO(maruel): Finish implementation. https://crbug.com/913953
+}
+
+// Request for BotAPI.Events.
+message BotEventsRequest {
+  // Required. Bot ID to retrieve results from.
+  string bot_id = 1;
+  // Optional. Use this field to specify the maximum number of results to be
+  // returned by the server.
+  //
+  // The server may further constrain the maximum number of results returned in
+  // a single page. If the page_size is 0, the server will decide the number of
+  // results to be returned.
+  int32 page_size = 2;
+  // Optional. Use this field to request a specific page of the list results,
+  // following a previous call.
+  //
+  // When specified, page_size, start_time and end_time must match exactly the
+  // previous call's argument.
+  string page_token = 3;
+  // Optional. Earliest time to return bot event. Inclusive.
+  //
+  // If not specified, pagination is done until all events are returned.
+  google.protobuf.Timestamp start_time = 4;
+  // Optional. Most recent time to return bot event. Exclusive.
+  //
+  // If not specified, defaults to the current time.
+  google.protobuf.Timestamp end_time = 5;
+}
+
+// Response of BotAPI.Events.
+message BotEventsResponse {
+  // Events are in reverse chronological order, most recents first and going
+  // down to older events.
+  repeated BotEvent events = 1;
+  // This field represents the pagination token to retrieve the next page of
+  // results. If the value is "", it means no further results for the request.
+  string next_page_token = 2;
+}
+
+
+// Bot description.
+
+// Bot describes a Swarming bot.
+//
+// Because a Swarming bot is a single execution unit unlike RBE, it doesn't have
+// a concept of owned device at the moment. This may change later.
+message Bot {
+  // Bot ID. This value is also normally included in dimensions.
+  string bot_id = 1;
+  // Bot session ID. An opaque value.
+  //
+  // There is one bot session ID per bot process ID on the host. When the bot
+  // self-upgrades, it creates a new bot session ID.
+  string session_id = 2; // Not used yet. https://crbug.com/786735
+
+  // Current bot status. A bot status is a state in which the bot is for a
+  // certain amount of time.
+  BotStatusType status = 3;
+  // Supplemental information to describe the bot status. Human readable.
+  //
+  // See BotStatusType for the meaning of this string for each status.
+  string status_msg = 4;
+  // Current task being handled by the bot, if there is one.
+  //
+  // In Swarming, only a single task can be assigned to a bot at any given time.
+  string current_task_id = 5;
+
+  // Bot reported dimensions. This can be used for the host or for the DUT
+  // (Device Under Test) under control.
+  //
+  // In RBE, this is called Property. The difference is that RBE's Property is a
+  // string:string flat dictionary, it doesn't allow repeated values.
+  //
+  // https://chromium.googlesource.com/infra/luci/luci-py.git/+/master/appengine/swarming/doc/Detailed-Design.md#bot-dimensions
+  //
+  // To be valid, dimension MUST be sorted by keys.
+  //
+  // This is used for task selection.
+  repeated Dimension dimensions = 6;
+
+  // Bot reported informational state. This can be used to describe the host,
+  // the bot itself and the DUT (Device Under Test) under control as applicable.
+  //
+  // This is NOT used for task selection.
+  BotInfo info = 7;
+
+  // TODO(maruel): Add lease_id, lease_expiration_ts, leased_indefinitely,
+  // machine_type, machine_lease.
+}
+
+// BotStatusType is one of the states the bot can be in.
+//
+// A bot status implies being in this status for a certain amount of time, for
+// example a hook running for N seconds, contrary to BotEventType which is about
+// an event that doesn't have an inherent duration.
+//
+// Some values are more important than others. For example if a bot is now
+// MISSING but used to be QUARANTINED, the value is still MISSING.
+enum BotStatusType {
+  // Invalid bot status, do not use.
+  BOT_STATUS_UNSPECIFIED = 0;
+
+  // Bad states
+
+  // The server detected that the bot is not pinging the server anymore. Unlike
+  // other statuses, this value is set after a timeout.
+  //
+  // Bot.status_msg shall not be set.
+  MISSING = 1;
+  // Bot was quarantined by the server.
+  //
+  // Bot.status_msg shall include the server provided rationale.
+  QUARANTINED_BY_SERVER = 2; // Not used yet. https://crbug.com/757931
+  // Bot self-reported as unhealthy.
+  //
+  // What is currently called as 'quarantined' in the old API.
+  //
+  // Bot.status_msg shall include the bot provided rationale.
+  QUARANTINED_BY_BOT = 3;
+
+  // Overhead states, healthy but unproductive
+
+  // Bot self-reported as unable to run tasks due to externally induced
+  // overhead.
+  //
+  // Examples include:
+  // - The temperature of the DUT (Device Under Test) is too high, and the bot
+  //   is waiting for cool down
+  // - host is doing self-cleaning work out of the bot's control (puppet is
+  //   running), etc.
+  //
+  // Bot.status_msg shall include the bot provided rationale.
+  OVERHEAD_MAINTENANCE_EXTERNAL = 4;
+  // Bot self-reported as unable to run tasks due to doing internal overhead.
+  //
+  // Examples include:
+  // - Running hooks
+  // - Cleaning up or verifying its local cache
+  // - Bot is starting for a version upgrade
+  //
+  // Bot.status_msg shall disambiguate the type of work item done.
+  OVERHEAD_BOT_INTERNAL = 5;
+  // Bot is down as its host is rebooting and contact was lost.
+  //
+  // If the bot doesn't contact back soon enough, it will be considered MISSING.
+  //
+  // Bot.status_msg shall not be set.
+  HOST_REBOOTING = 6;
+
+  // Healthy states
+
+  // Running a task.
+  //
+  // Bot.status_msg shall not be set.
+  BUSY = 7;
+  // Bot is 'reserved' for operations outside of normal operations. This can be
+  // relevant for SUT (System Under Test).
+  //
+  // Bot.status_msg shall not be set.
+  RESERVED = 8;  // Not used yet. https://crbug.com/913978
+  // Bot is healthy and waiting for tasks.
+  //
+  // Bot.status_msg shall not be set.
+  IDLE = 9;
+}
+
+// Bot reported informational state. This can be used to describe the host,
+// the bot itself and the DUT (Device Under Test) under control as applicable.
+//
+// This is NOT used for task selection.
+message BotInfo {
+  // raw contains the current free form json data. This will eventually be
+  // subsumed by structured data below.
+  google.protobuf.Struct raw = 1;
+  // Bot's version. An opaque valueg.
+  //
+  // This value is Swarming instance and configuration dependent. Bot are
+  // updated through the process described at
+  // https://chromium.googlesource.com/infra/luci/luci-py.git/+/master/appengine/swarming/doc/Bot.md#update
+  string version = 2;
+  // External IP address as visible by the server. Can be either IPv4 or IPv6.
+  // This could be a NAT'ing router external IP.
+  string external_ip = 3;
+  // Authentication identity that the bot identified as. An opaque value.
+  string authenticated_as = 4;
+}
+
+// BotEventType defines the reason why BotEvent was created.
+enum BotEventType {
+  // Invalid bot event type, do not use.
+  BOT_EVENT_TYPE_UNSPECIFIED = 0;
+
+  // Bot specific events that are outside the scope of a task.
+
+  // Bot connected and started a new session.
+  //
+  // BotEvent.event_msg shall not be set.
+  BOT_NEW_SESSION = 1;
+  // Bot had an internal failure to report to the server outside of a task
+  // context. This shall send a report to the administrator of the instance and
+  // service author.
+  //
+  // BotEvent.event_msg shall contain the error message.
+  BOT_INTERNAL_FAILURE = 2;
+  // Bot had an hook error to report to the server. This shall send a report to
+  // the administrator of the instance.
+  //
+  // BotEvent.event_msg shall contain the error message.
+  BOT_HOOK_ERROR = 3;
+  // Bot hook logged information. The bot hooks can log locally to the local log
+  // file, which itself can be streamed out of band. For special notifications
+  // that are worth notifying the administrator, this event can be used to raise
+  // these. Due to the cost of doing an RPC just for this, this should be used
+  // sparingly; vs local logging.
+  //
+  // BotEvent.event_msg shall contain the log entry.
+  BOT_HOOK_LOG = 4;
+  // Bot initiated a host reboot. An example is a bot hook requesting to reboot
+  // the host after a task failure.
+  //
+  // BotEvent.event_msg shall contain the reason for rebooting the host, if any.
+  BOT_REBOOTING_HOST = 5;
+  // Bot is shutting down. It may be restarting for an update.
+  //
+  // BotEvent.event_msg shall contain the reason.
+  BOT_SHUTDOWN = 6;
+
+  // Bot polling results; these are commands sent to the bot to do actions.
+
+  // The server instructs the bot to stay idle. This is when there is no task
+  // pending for this bot. Will only be stored when there are other state
+  // changes.
+  //
+  // BotEvent.event_msg shall not be set.
+  INSTRUCT_IDLE = 10;
+  // The server instructs the bot to start a task.
+  //
+  // BotEvent.event_msg shall not be set. BotEvent.bot.current_task_id shall
+  // contain the task ID.
+  INSTRUCT_START_TASK = 11;
+  // The server instructs the bot to restart without self-updating. This is to
+  // initiate a new bot session.
+  //
+  // BotEvent.event_msg can be set to the rationale, if any.
+  INSTRUCT_RESTART_BOT = 12;
+  // The server instructs the bot to self-update.
+  //
+  // BotEvent.event_msg shall be set to the version to update to.
+  // BotEvent.bot.info.version contains the bot's previous version.
+  INSTRUCT_UPDATE_BOT_CODE = 13;
+  // The server instructs the bot to stop its process.
+  //
+  // BotEvent.event_msg shall not be set. BotEvent.bot.current_task_id shall
+  // contain the task ID.
+  INSTRUCT_TERMINATE_BOT = 14;
+
+  // Task lifecycle events as processed by the bot. In these event types,
+  // Bot.bot.current_task_id shall be set.
+
+  // Bot completed a task.
+  //
+  // BotEvent.event_msg shall not be set. BotEvent.bot.current_task_id shall
+  // contain the task ID.
+  TASK_COMPLETED = 20;
+  // Bot had an internal failure to report to the server while processing a
+  // task. This shall send a report to the administrator of the instance and
+  // service author.
+  //
+  // BotEvent.event_msg shall contain the error message.
+  // BotEvent.bot.current_task_id shall contain the task ID.
+  TASK_INTERNAL_FAILURE = 21;
+  // Bot is forcibly killing the task.
+  //
+  // BotEvent.event_msg shall not be set. BotEvent.bot.current_task_id shall
+  // contain the task ID.
+  TASK_KILLED = 22;
+}
+
+// BotEvent represents an event on the bot.
+//
+// This message is used both in the API and as a BigQuery table description for
+// the table 'bot_events' in dataset 'swarming'.
+message BotEvent {
+  google.protobuf.Timestamp event_time = 1;
+
+  // Snapshot of the Bot that had this event.
+  //
+  // Eventually we'd want to only snapshot the difference from the previous
+  // event, but this would make the SQL queries much more complicated.
+  Bot bot = 2;
+  // Type of state change (event) that trigger this message.
+  BotEventType event = 3;
+  // Supplementation information to describe the bot event. Human readable.
+  //
+  // See BotEventType for the meaning of this string for each status.
+  string event_msg = 4;
 }
 
 // Task scheduling.
+
+// Dimension is a {key: [values]} dictionary for either a bot exposed dimension,
+// or for a task request dimension.
+//
+// In the case of dimensions exposed by bot, the values is effectively an OR, a
+// task may match any of the value.
+//
+// In the case of dimensions included in a task request, the values is
+// effectively an AND, a bot must expose every single value to be selected.
+message Dimension {
+  // The dimension key. Must be unique in a repeated Dimension property. Human
+  // readable.
+  //
+  // This string should make sense to a user.
+  string key = 1;
+  // All the values valid for this key. values MUST be sorted. Human readable.
+  //
+  // This string should make sense to a user in the context of 'key'.
+  repeated string values = 2;
+}
 
 // TaskState represents the different allowed states for a Task.
 //
 // This is taken from swarming_rpcs.py:TaskState
 enum TaskState {
-  // Invalid state, do not use.
-  TASKSTATE_UNSPECIFIED = 0;
+  // Invalid task state, do not use.
+  TASK_STATE_UNSPECIFIED = 0;
   // The task is currently running. This is in fact 3 phases: the initial
   // overhead to fetch input files, the actual task running, and the tear down
   // overhead to archive output files to the server.
