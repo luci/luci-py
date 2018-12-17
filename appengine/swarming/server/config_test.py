@@ -14,7 +14,7 @@ from components.config import validation
 from components import utils
 from test_support import test_case
 
-from proto import config_pb2
+from proto.config import config_pb2
 from server import config
 
 

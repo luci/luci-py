@@ -23,7 +23,7 @@ from google.protobuf import timestamp_pb2
 from components import utils
 from components.prpc import encoding
 
-from proto import swarming_pb2  # pylint: disable=no-name-in-module
+from proto.api import swarming_pb2  # pylint: disable=no-name-in-module
 from server import task_queues
 
 import handlers_bot
@@ -82,7 +82,7 @@ class PRPCTest(test_env_handlers.AppTestBase):
     self.do_handshake()
     self.set_as_user()
     raw_resp = self.app.post(
-        '/prpc/swarming.BotAPI/Events', _encode(request), self._headers)
+        '/prpc/swarming.v1.BotAPI/Events', _encode(request), self._headers)
     expected = swarming_pb2.BotEventsResponse(
       events=[
         swarming_pb2.BotEvent(
@@ -126,7 +126,7 @@ class PRPCTest(test_env_handlers.AppTestBase):
     # No such bot.
     msg = swarming_pb2.BotEventsRequest(bot_id=u'unknown')
     raw_resp = self.app.post(
-        '/prpc/swarming.BotAPI/Events', _encode(msg), self._headers,
+        '/prpc/swarming.v1.BotAPI/Events', _encode(msg), self._headers,
         expect_errors=True)
     self.assertEqual(raw_resp.status, '404 Not Found')
     self.assertEqual(raw_resp.body, 'Bot does not exist')
@@ -134,7 +134,7 @@ class PRPCTest(test_env_handlers.AppTestBase):
   def test_botevents_invalid_page_size(self):
     msg = swarming_pb2.BotEventsRequest(bot_id=u'bot1', page_size=-1)
     raw_resp = self.app.post(
-        '/prpc/swarming.BotAPI/Events', _encode(msg), self._headers,
+        '/prpc/swarming.v1.BotAPI/Events', _encode(msg), self._headers,
         expect_errors=True)
     self.assertEqual(raw_resp.status, '400 Bad Request')
     self.assertEqual(raw_resp.body, 'page_size must be positive')
@@ -143,7 +143,7 @@ class PRPCTest(test_env_handlers.AppTestBase):
     # Missing bot_id
     msg = swarming_pb2.BotEventsRequest()
     raw_resp = self.app.post(
-        '/prpc/swarming.BotAPI/Events', _encode(msg), self._headers,
+        '/prpc/swarming.v1.BotAPI/Events', _encode(msg), self._headers,
         expect_errors=True)
     self.assertEqual(raw_resp.status, '400 Bad Request')
     self.assertEqual(raw_resp.body, 'specify bot_id')
@@ -153,7 +153,7 @@ class PRPCTest(test_env_handlers.AppTestBase):
     msg.start_time.FromDatetime(self.now)
     msg.end_time.FromDatetime(self.now)
     raw_resp = self.app.post(
-        '/prpc/swarming.BotAPI/Events', _encode(msg), self._headers,
+        '/prpc/swarming.v1.BotAPI/Events', _encode(msg), self._headers,
         expect_errors=True)
     self.assertEqual(raw_resp.status, '400 Bad Request')
     self.assertEqual(raw_resp.body, 'start_time must be before end_time')
@@ -185,7 +185,7 @@ class PRPCTest(test_env_handlers.AppTestBase):
     self.set_as_privileged_user()
     msg = swarming_pb2.BotEventsRequest(bot_id=u'bot1', page_size=1001)
     raw_resp = self.app.post(
-        '/prpc/swarming.BotAPI/Events', _encode(msg), self._headers)
+        '/prpc/swarming.v1.BotAPI/Events', _encode(msg), self._headers)
     resp = swarming_pb2.BotEventsResponse()
     _decode(raw_resp.body, resp)
 
@@ -267,7 +267,7 @@ class PRPCTest(test_env_handlers.AppTestBase):
     msg.start_time.FromDatetime(now_60)
     msg.end_time.FromDatetime(now_180 + datetime.timedelta(seconds=1))
     raw_resp = self.app.post(
-        '/prpc/swarming.BotAPI/Events', _encode(msg), self._headers)
+        '/prpc/swarming.v1.BotAPI/Events', _encode(msg), self._headers)
     resp = swarming_pb2.BotEventsResponse()
     _decode(raw_resp.body, resp)
     self.assertEqual(

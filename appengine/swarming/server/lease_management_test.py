@@ -24,7 +24,7 @@ from test_support import test_case
 
 import bot_management
 import lease_management
-from proto import bots_pb2
+from proto.config import bots_pb2
 
 
 def rpc_to_json(rpc_message):

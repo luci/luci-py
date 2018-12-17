@@ -17,7 +17,7 @@ from components import utils
 from server import config
 from test_support import test_case
 
-from proto import config_pb2
+from proto.config import config_pb2
 
 from server import acl
 from server import task_request

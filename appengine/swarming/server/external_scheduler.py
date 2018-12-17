@@ -10,8 +10,8 @@ from components import utils
 
 from components.prpc import client
 
-from proto import plugin_pb2
-from proto import plugin_prpc_pb2
+from proto.api import plugin_pb2
+from proto.api import plugin_prpc_pb2
 
 from server import pools_config
 from server import task_queues

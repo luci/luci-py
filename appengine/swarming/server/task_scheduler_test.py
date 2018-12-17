@@ -42,8 +42,7 @@ from server import task_scheduler
 from server import task_to_run
 from server.task_result import State
 
-from proto import config_pb2
-from proto import plugin_pb2
+from proto.api import plugin_pb2
 
 
 # pylint: disable=W0212,W0612

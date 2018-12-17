@@ -19,7 +19,7 @@ from components import machine_provider
 from components import utils
 from components.config import validation
 
-from proto import bots_pb2
+from proto.config import bots_pb2
 from server import config as local_config
 
 

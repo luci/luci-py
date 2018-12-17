@@ -18,7 +18,7 @@ from google.appengine.ext import ndb
 from components import utils
 from test_support import test_case
 
-from proto import swarming_pb2  # pylint: disable=no-name-in-module
+from proto.api import swarming_pb2  # pylint: disable=no-name-in-module
 from server import bot_management
 from server import config
 from server import task_queues

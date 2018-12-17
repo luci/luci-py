@@ -9,7 +9,7 @@ syntax = "proto3";
 import "google/protobuf/timestamp.proto";
 import "swarming.proto";
 
-package swarming;
+package swarming.v1;
 
 // Basic types used by the plugin API.
 

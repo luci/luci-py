@@ -13,7 +13,7 @@ import bot_archive
 import test_env
 test_env.setup_test_env()
 
-from proto import config_pb2
+from proto.config import config_pb2
 
 
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

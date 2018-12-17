@@ -15,7 +15,7 @@ from components import net
 from components import utils
 from components.config import validation
 
-from proto import config_pb2
+from proto.config import config_pb2
 
 import cipd
 

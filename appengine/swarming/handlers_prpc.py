@@ -10,8 +10,8 @@ from components import prpc
 from components.prpc.codes import StatusCode
 
 from components import datastore_utils
-from proto import swarming_prpc_pb2  # pylint: disable=no-name-in-module
-from proto import swarming_pb2  # pylint: disable=no-name-in-module
+from proto.api import swarming_prpc_pb2  # pylint: disable=no-name-in-module
+from proto.api import swarming_pb2  # pylint: disable=no-name-in-module
 from server import bot_management
 
 

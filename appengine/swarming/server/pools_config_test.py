@@ -17,7 +17,7 @@ from components import utils
 from components.config import validation
 from test_support import test_case
 
-from proto import pools_pb2
+from proto.config import pools_pb2
 from server import pools_config
 from server import task_request
 

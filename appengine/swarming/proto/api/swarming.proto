@@ -11,7 +11,7 @@
 
 syntax = "proto3";
 
-package swarming;
+package swarming.v1;
 
 import "google/protobuf/struct.proto";
 import "google/protobuf/timestamp.proto";

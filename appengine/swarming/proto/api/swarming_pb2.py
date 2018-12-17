@@ -19,16 +19,16 @@ from google.protobuf import timestamp_pb2 as google_dot_protobuf_dot_timestamp__
 
 DESCRIPTOR = _descriptor.FileDescriptor(
   name='swarming.proto',
-  package='swarming',
+  package='swarming.v1',
   syntax='proto3',
   serialized_options=None,
-  serialized_pb=_b('\n\x0eswarming.proto\x12\x08swarming\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xa7\x01\n\x10\x42otEventsRequest\x12\x0e\n\x06\x62ot_id\x18\x01 \x01(\t\x12\x11\n\tpage_size\x18\x02 \x01(\x05\x12\x12\n\npage_token\x18\x03 \x01(\t\x12.\n\nstart_time\x18\x04 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12,\n\x08\x65nd_time\x18\x05 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\"P\n\x11\x42otEventsResponse\x12\"\n\x06\x65vents\x18\x01 \x03(\x0b\x32\x12.swarming.BotEvent\x12\x17\n\x0fnext_page_token\x18\x02 \x01(\t\"\xc9\x01\n\x03\x42ot\x12\x0e\n\x06\x62ot_id\x18\x01 \x01(\t\x12\x12\n\nsession_id\x18\x02 \x01(\t\x12\'\n\x06status\x18\x03 \x01(\x0e\x32\x17.swarming.BotStatusType\x12\x12\n\nstatus_msg\x18\x04 \x01(\t\x12\x17\n\x0f\x63urrent_task_id\x18\x05 \x01(\t\x12\'\n\ndimensions\x18\x06 \x03(\x0b\x32\x13.swarming.Dimension\x12\x1f\n\x04info\x18\x07 \x01(\x0b\x32\x11.swarming.BotInfo\"o\n\x07\x42otInfo\x12$\n\x03raw\x18\x01 \x01(\x0b\x32\x17.google.protobuf.Struct\x12\x0f\n\x07version\x18\x02 \x01(\t\x12\x13\n\x0b\x65xternal_ip\x18\x03 \x01(\t\x12\x18\n\x10\x61uthenticated_as\x18\x04 \x01(\t\"\x90\x01\n\x08\x42otEvent\x12.\n\nevent_time\x18\x01 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x1a\n\x03\x62ot\x18\x02 \x01(\x0b\x32\r.swarming.Bot\x12%\n\x05\x65vent\x18\x03 \x01(\x0e\x32\x16.swarming.BotEventType\x12\x11\n\tevent_msg\x18\x04 \x01(\t\"(\n\tDimension\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\x0e\n\x06values\x18\x02 \x03(\t*\xdf\x01\n\rBotStatusType\x12\x1a\n\x16\x42OT_STATUS_UNSPECIFIED\x10\x00\x12\x0b\n\x07MISSING\x10\x01\x12\x19\n\x15QUARANTINED_BY_SERVER\x10\x02\x12\x16\n\x12QUARANTINED_BY_BOT\x10\x03\x12!\n\x1dOVERHEAD_MAINTENANCE_EXTERNAL\x10\x04\x12\x19\n\x15OVERHEAD_BOT_INTERNAL\x10\x05\x12\x12\n\x0eHOST_REBOOTING\x10\x06\x12\x08\n\x04\x42USY\x10\x07\x12\x0c\n\x08RESERVED\x10\x08\x12\x08\n\x04IDLE\x10\t*\xed\x02\n\x0c\x42otEventType\x12\x1e\n\x1a\x42OT_EVENT_TYPE_UNSPECIFIED\x10\x00\x12\x13\n\x0f\x42OT_NEW_SESSION\x10\x01\x12\x18\n\x14\x42OT_INTERNAL_FAILURE\x10\x02\x12\x12\n\x0e\x42OT_HOOK_ERROR\x10\x03\x12\x10\n\x0c\x42OT_HOOK_LOG\x10\x04\x12\x16\n\x12\x42OT_REBOOTING_HOST\x10\x05\x12\x10\n\x0c\x42OT_SHUTDOWN\x10\x06\x12\x11\n\rINSTRUCT_IDLE\x10\n\x12\x17\n\x13INSTRUCT_START_TASK\x10\x0b\x12\x18\n\x14INSTRUCT_RESTART_BOT\x10\x0c\x12\x1c\n\x18INSTRUCT_UPDATE_BOT_CODE\x10\r\x12\x1a\n\x16INSTRUCT_TERMINATE_BOT\x10\x0e\x12\x12\n\x0eTASK_COMPLETED\x10\x14\x12\x19\n\x15TASK_INTERNAL_FAILURE\x10\x15\x12\x0f\n\x0bTASK_KILLED\x10\x16*\xa7\x01\n\tTaskState\x12\x1a\n\x16TASK_STATE_UNSPECIFIED\x10\x00\x12\x0b\n\x07RUNNING\x10\x10\x12\x0b\n\x07PENDING\x10 \x12\x0b\n\x07\x45XPIRED\x10\x30\x12\r\n\tTIMED_OUT\x10@\x12\x0c\n\x08\x42OT_DIED\x10P\x12\x0c\n\x08\x43\x41NCELED\x10`\x12\r\n\tCOMPLETED\x10p\x12\x0b\n\x06KILLED\x10\x80\x01\x12\x10\n\x0bNO_RESOURCE\x10\x80\x02\x32M\n\x06\x42otAPI\x12\x43\n\x06\x45vents\x12\x1a.swarming.BotEventsRequest\x1a\x1b.swarming.BotEventsResponse\"\x00\x62\x06proto3')
+  serialized_pb=_b('\n\x0eswarming.proto\x12\x0bswarming.v1\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xa7\x01\n\x10\x42otEventsRequest\x12\x0e\n\x06\x62ot_id\x18\x01 \x01(\t\x12\x11\n\tpage_size\x18\x02 \x01(\x05\x12\x12\n\npage_token\x18\x03 \x01(\t\x12.\n\nstart_time\x18\x04 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12,\n\x08\x65nd_time\x18\x05 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\"S\n\x11\x42otEventsResponse\x12%\n\x06\x65vents\x18\x01 \x03(\x0b\x32\x15.swarming.v1.BotEvent\x12\x17\n\x0fnext_page_token\x18\x02 \x01(\t\"\xd2\x01\n\x03\x42ot\x12\x0e\n\x06\x62ot_id\x18\x01 \x01(\t\x12\x12\n\nsession_id\x18\x02 \x01(\t\x12*\n\x06status\x18\x03 \x01(\x0e\x32\x1a.swarming.v1.BotStatusType\x12\x12\n\nstatus_msg\x18\x04 \x01(\t\x12\x17\n\x0f\x63urrent_task_id\x18\x05 \x01(\t\x12*\n\ndimensions\x18\x06 \x03(\x0b\x32\x16.swarming.v1.Dimension\x12\"\n\x04info\x18\x07 \x01(\x0b\x32\x14.swarming.v1.BotInfo\"o\n\x07\x42otInfo\x12$\n\x03raw\x18\x01 \x01(\x0b\x32\x17.google.protobuf.Struct\x12\x0f\n\x07version\x18\x02 \x01(\t\x12\x13\n\x0b\x65xternal_ip\x18\x03 \x01(\t\x12\x18\n\x10\x61uthenticated_as\x18\x04 \x01(\t\"\x96\x01\n\x08\x42otEvent\x12.\n\nevent_time\x18\x01 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x1d\n\x03\x62ot\x18\x02 \x01(\x0b\x32\x10.swarming.v1.Bot\x12(\n\x05\x65vent\x18\x03 \x01(\x0e\x32\x19.swarming.v1.BotEventType\x12\x11\n\tevent_msg\x18\x04 \x01(\t\"(\n\tDimension\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\x0e\n\x06values\x18\x02 \x03(\t*\xdf\x01\n\rBotStatusType\x12\x1a\n\x16\x42OT_STATUS_UNSPECIFIED\x10\x00\x12\x0b\n\x07MISSING\x10\x01\x12\x19\n\x15QUARANTINED_BY_SERVER\x10\x02\x12\x16\n\x12QUARANTINED_BY_BOT\x10\x03\x12!\n\x1dOVERHEAD_MAINTENANCE_EXTERNAL\x10\x04\x12\x19\n\x15OVERHEAD_BOT_INTERNAL\x10\x05\x12\x12\n\x0eHOST_REBOOTING\x10\x06\x12\x08\n\x04\x42USY\x10\x07\x12\x0c\n\x08RESERVED\x10\x08\x12\x08\n\x04IDLE\x10\t*\xed\x02\n\x0c\x42otEventType\x12\x1e\n\x1a\x42OT_EVENT_TYPE_UNSPECIFIED\x10\x00\x12\x13\n\x0f\x42OT_NEW_SESSION\x10\x01\x12\x18\n\x14\x42OT_INTERNAL_FAILURE\x10\x02\x12\x12\n\x0e\x42OT_HOOK_ERROR\x10\x03\x12\x10\n\x0c\x42OT_HOOK_LOG\x10\x04\x12\x16\n\x12\x42OT_REBOOTING_HOST\x10\x05\x12\x10\n\x0c\x42OT_SHUTDOWN\x10\x06\x12\x11\n\rINSTRUCT_IDLE\x10\n\x12\x17\n\x13INSTRUCT_START_TASK\x10\x0b\x12\x18\n\x14INSTRUCT_RESTART_BOT\x10\x0c\x12\x1c\n\x18INSTRUCT_UPDATE_BOT_CODE\x10\r\x12\x1a\n\x16INSTRUCT_TERMINATE_BOT\x10\x0e\x12\x12\n\x0eTASK_COMPLETED\x10\x14\x12\x19\n\x15TASK_INTERNAL_FAILURE\x10\x15\x12\x0f\n\x0bTASK_KILLED\x10\x16*\xa7\x01\n\tTaskState\x12\x1a\n\x16TASK_STATE_UNSPECIFIED\x10\x00\x12\x0b\n\x07RUNNING\x10\x10\x12\x0b\n\x07PENDING\x10 \x12\x0b\n\x07\x45XPIRED\x10\x30\x12\r\n\tTIMED_OUT\x10@\x12\x0c\n\x08\x42OT_DIED\x10P\x12\x0c\n\x08\x43\x41NCELED\x10`\x12\r\n\tCOMPLETED\x10p\x12\x0b\n\x06KILLED\x10\x80\x01\x12\x10\n\x0bNO_RESOURCE\x10\x80\x02\x32S\n\x06\x42otAPI\x12I\n\x06\x45vents\x12\x1d.swarming.v1.BotEventsRequest\x1a\x1e.swarming.v1.BotEventsResponse\"\x00\x62\x06proto3')
   ,
   dependencies=[google_dot_protobuf_dot_struct__pb2.DESCRIPTOR,google_dot_protobuf_dot_timestamp__pb2.DESCRIPTOR,])
 
 _BOTSTATUSTYPE = _descriptor.EnumDescriptor(
   name='BotStatusType',
-  full_name='swarming.BotStatusType',
+  full_name='swarming.v1.BotStatusType',
   filename=None,
   file=DESCRIPTOR,
   values=[
@@ -75,15 +75,15 @@ _BOTSTATUSTYPE = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   serialized_options=None,
-  serialized_start=850,
-  serialized_end=1073,
+  serialized_start=871,
+  serialized_end=1094,
 )
 _sym_db.RegisterEnumDescriptor(_BOTSTATUSTYPE)
 
 BotStatusType = enum_type_wrapper.EnumTypeWrapper(_BOTSTATUSTYPE)
 _BOTEVENTTYPE = _descriptor.EnumDescriptor(
   name='BotEventType',
-  full_name='swarming.BotEventType',
+  full_name='swarming.v1.BotEventType',
   filename=None,
   file=DESCRIPTOR,
   values=[
@@ -150,15 +150,15 @@ _BOTEVENTTYPE = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   serialized_options=None,
-  serialized_start=1076,
-  serialized_end=1441,
+  serialized_start=1097,
+  serialized_end=1462,
 )
 _sym_db.RegisterEnumDescriptor(_BOTEVENTTYPE)
 
 BotEventType = enum_type_wrapper.EnumTypeWrapper(_BOTEVENTTYPE)
 _TASKSTATE = _descriptor.EnumDescriptor(
   name='TaskState',
-  full_name='swarming.TaskState',
+  full_name='swarming.v1.TaskState',
   filename=None,
   file=DESCRIPTOR,
   values=[
@@ -205,8 +205,8 @@ _TASKSTATE = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   serialized_options=None,
-  serialized_start=1444,
-  serialized_end=1611,
+  serialized_start=1465,
+  serialized_end=1632,
 )
 _sym_db.RegisterEnumDescriptor(_TASKSTATE)
 
@@ -251,41 +251,41 @@ NO_RESOURCE = 256
 
 _BOTEVENTSREQUEST = _descriptor.Descriptor(
   name='BotEventsRequest',
-  full_name='swarming.BotEventsRequest',
+  full_name='swarming.v1.BotEventsRequest',
   filename=None,
   file=DESCRIPTOR,
   containing_type=None,
   fields=[
     _descriptor.FieldDescriptor(
-      name='bot_id', full_name='swarming.BotEventsRequest.bot_id', index=0,
+      name='bot_id', full_name='swarming.v1.BotEventsRequest.bot_id', index=0,
       number=1, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
-      name='page_size', full_name='swarming.BotEventsRequest.page_size', index=1,
+      name='page_size', full_name='swarming.v1.BotEventsRequest.page_size', index=1,
       number=2, type=5, cpp_type=1, label=1,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
-      name='page_token', full_name='swarming.BotEventsRequest.page_token', index=2,
+      name='page_token', full_name='swarming.v1.BotEventsRequest.page_token', index=2,
       number=3, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
-      name='start_time', full_name='swarming.BotEventsRequest.start_time', index=3,
+      name='start_time', full_name='swarming.v1.BotEventsRequest.start_time', index=3,
       number=4, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
-      name='end_time', full_name='swarming.BotEventsRequest.end_time', index=4,
+      name='end_time', full_name='swarming.v1.BotEventsRequest.end_time', index=4,
       number=5, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
@@ -303,27 +303,27 @@ _BOTEVENTSREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=92,
-  serialized_end=259,
+  serialized_start=95,
+  serialized_end=262,
 )
 
 
 _BOTEVENTSRESPONSE = _descriptor.Descriptor(
   name='BotEventsResponse',
-  full_name='swarming.BotEventsResponse',
+  full_name='swarming.v1.BotEventsResponse',
   filename=None,
   file=DESCRIPTOR,
   containing_type=None,
   fields=[
     _descriptor.FieldDescriptor(
-      name='events', full_name='swarming.BotEventsResponse.events', index=0,
+      name='events', full_name='swarming.v1.BotEventsResponse.events', index=0,
       number=1, type=11, cpp_type=10, label=3,
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
-      name='next_page_token', full_name='swarming.BotEventsResponse.next_page_token', index=1,
+      name='next_page_token', full_name='swarming.v1.BotEventsResponse.next_page_token', index=1,
       number=2, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
@@ -341,62 +341,62 @@ _BOTEVENTSRESPONSE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=261,
-  serialized_end=341,
+  serialized_start=264,
+  serialized_end=347,
 )
 
 
 _BOT = _descriptor.Descriptor(
   name='Bot',
-  full_name='swarming.Bot',
+  full_name='swarming.v1.Bot',
   filename=None,
   file=DESCRIPTOR,
   containing_type=None,
   fields=[
     _descriptor.FieldDescriptor(
-      name='bot_id', full_name='swarming.Bot.bot_id', index=0,
+      name='bot_id', full_name='swarming.v1.Bot.bot_id', index=0,
       number=1, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
-      name='session_id', full_name='swarming.Bot.session_id', index=1,
+      name='session_id', full_name='swarming.v1.Bot.session_id', index=1,
       number=2, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
-      name='status', full_name='swarming.Bot.status', index=2,
+      name='status', full_name='swarming.v1.Bot.status', index=2,
       number=3, type=14, cpp_type=8, label=1,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
-      name='status_msg', full_name='swarming.Bot.status_msg', index=3,
+      name='status_msg', full_name='swarming.v1.Bot.status_msg', index=3,
       number=4, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
-      name='current_task_id', full_name='swarming.Bot.current_task_id', index=4,
+      name='current_task_id', full_name='swarming.v1.Bot.current_task_id', index=4,
       number=5, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
-      name='dimensions', full_name='swarming.Bot.dimensions', index=5,
+      name='dimensions', full_name='swarming.v1.Bot.dimensions', index=5,
       number=6, type=11, cpp_type=10, label=3,
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
-      name='info', full_name='swarming.Bot.info', index=6,
+      name='info', full_name='swarming.v1.Bot.info', index=6,
       number=7, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
@@ -414,41 +414,41 @@ _BOT = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=344,
-  serialized_end=545,
+  serialized_start=350,
+  serialized_end=560,
 )
 
 
 _BOTINFO = _descriptor.Descriptor(
   name='BotInfo',
-  full_name='swarming.BotInfo',
+  full_name='swarming.v1.BotInfo',
   filename=None,
   file=DESCRIPTOR,
   containing_type=None,
   fields=[
     _descriptor.FieldDescriptor(
-      name='raw', full_name='swarming.BotInfo.raw', index=0,
+      name='raw', full_name='swarming.v1.BotInfo.raw', index=0,
       number=1, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
-      name='version', full_name='swarming.BotInfo.version', index=1,
+      name='version', full_name='swarming.v1.BotInfo.version', index=1,
       number=2, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
-      name='external_ip', full_name='swarming.BotInfo.external_ip', index=2,
+      name='external_ip', full_name='swarming.v1.BotInfo.external_ip', index=2,
       number=3, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
-      name='authenticated_as', full_name='swarming.BotInfo.authenticated_as', index=3,
+      name='authenticated_as', full_name='swarming.v1.BotInfo.authenticated_as', index=3,
       number=4, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
@@ -466,41 +466,41 @@ _BOTINFO = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=547,
-  serialized_end=658,
+  serialized_start=562,
+  serialized_end=673,
 )
 
 
 _BOTEVENT = _descriptor.Descriptor(
   name='BotEvent',
-  full_name='swarming.BotEvent',
+  full_name='swarming.v1.BotEvent',
   filename=None,
   file=DESCRIPTOR,
   containing_type=None,
   fields=[
     _descriptor.FieldDescriptor(
-      name='event_time', full_name='swarming.BotEvent.event_time', index=0,
+      name='event_time', full_name='swarming.v1.BotEvent.event_time', index=0,
       number=1, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
-      name='bot', full_name='swarming.BotEvent.bot', index=1,
+      name='bot', full_name='swarming.v1.BotEvent.bot', index=1,
       number=2, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
-      name='event', full_name='swarming.BotEvent.event', index=2,
+      name='event', full_name='swarming.v1.BotEvent.event', index=2,
       number=3, type=14, cpp_type=8, label=1,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
-      name='event_msg', full_name='swarming.BotEvent.event_msg', index=3,
+      name='event_msg', full_name='swarming.v1.BotEvent.event_msg', index=3,
       number=4, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
@@ -518,27 +518,27 @@ _BOTEVENT = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=661,
-  serialized_end=805,
+  serialized_start=676,
+  serialized_end=826,
 )
 
 
 _DIMENSION = _descriptor.Descriptor(
   name='Dimension',
-  full_name='swarming.Dimension',
+  full_name='swarming.v1.Dimension',
   filename=None,
   file=DESCRIPTOR,
   containing_type=None,
   fields=[
     _descriptor.FieldDescriptor(
-      name='key', full_name='swarming.Dimension.key', index=0,
+      name='key', full_name='swarming.v1.Dimension.key', index=0,
       number=1, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
-      name='values', full_name='swarming.Dimension.values', index=1,
+      name='values', full_name='swarming.v1.Dimension.values', index=1,
       number=2, type=9, cpp_type=9, label=3,
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
@@ -556,8 +556,8 @@ _DIMENSION = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=807,
-  serialized_end=847,
+  serialized_start=828,
+  serialized_end=868,
 )
 
 _BOTEVENTSREQUEST.fields_by_name['start_time'].message_type = google_dot_protobuf_dot_timestamp__pb2._TIMESTAMP
@@ -584,42 +584,42 @@ _sym_db.RegisterFileDescriptor(DESCRIPTOR)
 BotEventsRequest = _reflection.GeneratedProtocolMessageType('BotEventsRequest', (_message.Message,), dict(
   DESCRIPTOR = _BOTEVENTSREQUEST,
   __module__ = 'swarming_pb2'
-  # @@protoc_insertion_point(class_scope:swarming.BotEventsRequest)
+  # @@protoc_insertion_point(class_scope:swarming.v1.BotEventsRequest)
   ))
 _sym_db.RegisterMessage(BotEventsRequest)
 
 BotEventsResponse = _reflection.GeneratedProtocolMessageType('BotEventsResponse', (_message.Message,), dict(
   DESCRIPTOR = _BOTEVENTSRESPONSE,
   __module__ = 'swarming_pb2'
-  # @@protoc_insertion_point(class_scope:swarming.BotEventsResponse)
+  # @@protoc_insertion_point(class_scope:swarming.v1.BotEventsResponse)
   ))
 _sym_db.RegisterMessage(BotEventsResponse)
 
 Bot = _reflection.GeneratedProtocolMessageType('Bot', (_message.Message,), dict(
   DESCRIPTOR = _BOT,
   __module__ = 'swarming_pb2'
-  # @@protoc_insertion_point(class_scope:swarming.Bot)
+  # @@protoc_insertion_point(class_scope:swarming.v1.Bot)
   ))
 _sym_db.RegisterMessage(Bot)
 
 BotInfo = _reflection.GeneratedProtocolMessageType('BotInfo', (_message.Message,), dict(
   DESCRIPTOR = _BOTINFO,
   __module__ = 'swarming_pb2'
-  # @@protoc_insertion_point(class_scope:swarming.BotInfo)
+  # @@protoc_insertion_point(class_scope:swarming.v1.BotInfo)
   ))
 _sym_db.RegisterMessage(BotInfo)
 
 BotEvent = _reflection.GeneratedProtocolMessageType('BotEvent', (_message.Message,), dict(
   DESCRIPTOR = _BOTEVENT,
   __module__ = 'swarming_pb2'
-  # @@protoc_insertion_point(class_scope:swarming.BotEvent)
+  # @@protoc_insertion_point(class_scope:swarming.v1.BotEvent)
   ))
 _sym_db.RegisterMessage(BotEvent)
 
 Dimension = _reflection.GeneratedProtocolMessageType('Dimension', (_message.Message,), dict(
   DESCRIPTOR = _DIMENSION,
   __module__ = 'swarming_pb2'
-  # @@protoc_insertion_point(class_scope:swarming.Dimension)
+  # @@protoc_insertion_point(class_scope:swarming.v1.Dimension)
   ))
 _sym_db.RegisterMessage(Dimension)
 
@@ -627,16 +627,16 @@ _sym_db.RegisterMessage(Dimension)
 
 _BOTAPI = _descriptor.ServiceDescriptor(
   name='BotAPI',
-  full_name='swarming.BotAPI',
+  full_name='swarming.v1.BotAPI',
   file=DESCRIPTOR,
   index=0,
   serialized_options=None,
-  serialized_start=1613,
-  serialized_end=1690,
+  serialized_start=1634,
+  serialized_end=1717,
   methods=[
   _descriptor.MethodDescriptor(
     name='Events',
-    full_name='swarming.BotAPI.Events',
+    full_name='swarming.v1.BotAPI.Events',
     index=0,
     containing_service=None,
     input_type=_BOTEVENTSREQUEST,

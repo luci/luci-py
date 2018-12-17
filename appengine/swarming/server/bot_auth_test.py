@@ -16,7 +16,7 @@ from components import config
 from components.auth import ipaddr
 from test_support import test_case
 
-from proto import bots_pb2
+from proto.config import bots_pb2
 from server import bot_auth
 from server import bot_groups_config
 from server import config as srv_cfg
