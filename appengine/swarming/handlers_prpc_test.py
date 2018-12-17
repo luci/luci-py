@@ -89,6 +89,7 @@ class PRPCTest(test_env_handlers.AppTestBase):
           event_time=timestamp_pb2.Timestamp(seconds=1262401445),
           bot=swarming_pb2.Bot(
             bot_id='bot1',
+            pools=[u'default'],
             info=swarming_pb2.BotInfo(
               raw=struct_pb2.Struct(
                 fields={
@@ -101,9 +102,9 @@ class PRPCTest(test_env_handlers.AppTestBase):
               version='123',
               ),
             dimensions=[
-              swarming_pb2.Dimension(key='id', values=['bot1']),
-              swarming_pb2.Dimension(key='os', values=['Amiga']),
-              swarming_pb2.Dimension(key='pool', values=['default']),
+              swarming_pb2.StringListPair(key='id', values=['bot1']),
+              swarming_pb2.StringListPair(key='os', values=['Amiga']),
+              swarming_pb2.StringListPair(key='pool', values=['default']),
             ]),
           event=swarming_pb2.BOT_NEW_SESSION,
         ),
@@ -190,9 +191,9 @@ class PRPCTest(test_env_handlers.AppTestBase):
     _decode(raw_resp.body, resp)
 
     dimensions = [
-      swarming_pb2.Dimension(key='id', values=['bot1']),
-      swarming_pb2.Dimension(key='os', values=['Amiga']),
-      swarming_pb2.Dimension(key='pool', values=['default']),
+      swarming_pb2.StringListPair(key='id', values=['bot1']),
+      swarming_pb2.StringListPair(key='os', values=['Amiga']),
+      swarming_pb2.StringListPair(key='pool', values=['default']),
     ]
     common_info = swarming_pb2.BotInfo(
         raw=struct_pb2.Struct(
@@ -212,6 +213,7 @@ class PRPCTest(test_env_handlers.AppTestBase):
           event_time=timestamp_pb2.Timestamp(seconds=1262401685),
           bot=swarming_pb2.Bot(
               bot_id='bot1',
+              pools=[u'default'],
               status=swarming_pb2.BOT_STATUS_UNSPECIFIED,
               info=common_info,
               dimensions=dimensions),
@@ -222,6 +224,7 @@ class PRPCTest(test_env_handlers.AppTestBase):
           event_time=timestamp_pb2.Timestamp(seconds=1262401625),
           bot=swarming_pb2.Bot(
               bot_id='bot1',
+              pools=[u'default'],
               status=swarming_pb2.BUSY,
               current_task_id='5cfcee8008811',
               info=common_info,
@@ -232,6 +235,7 @@ class PRPCTest(test_env_handlers.AppTestBase):
           event_time=timestamp_pb2.Timestamp(seconds=1262401565),
           bot=swarming_pb2.Bot(
               bot_id='bot1',
+              pools=[u'default'],
               current_task_id='5cfcee8008811',
               status=swarming_pb2.BUSY,
               info=common_info,
@@ -242,6 +246,7 @@ class PRPCTest(test_env_handlers.AppTestBase):
           event_time=timestamp_pb2.Timestamp(seconds=1262401445),
           bot=swarming_pb2.Bot(
               bot_id='bot1',
+              pools=[u'default'],
               status=swarming_pb2.BOT_STATUS_UNSPECIFIED,
               info=swarming_pb2.BotInfo(
                   raw=struct_pb2.Struct(

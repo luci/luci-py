@@ -63,6 +63,24 @@ message BotEventsResponse {
 }
 
 
+// Common messages.
+
+// Represents a mapping of string to a list of strings.
+//
+// The same as a map<key, repeated values>, except that the encoding is
+// deterministic.
+//
+// If the StringListPair is itself repeated inside another message, the list
+// must be sorted by key and the keys must be unique.
+message StringListPair {
+  string key = 1;
+  // All the values for this key. values must be sorted. Human readable.
+  //
+  // This string should make sense to a user in the context of 'key'.
+  repeated string values = 2;
+}
+
+
 // Bot description.
 
 // Bot describes a Swarming bot.
@@ -70,44 +88,60 @@ message BotEventsResponse {
 // Because a Swarming bot is a single execution unit unlike RBE, it doesn't have
 // a concept of owned device at the moment. This may change later.
 message Bot {
-  // Bot ID. This value is also normally included in dimensions.
+  // Bot ID. It must be unique accross the Swarming fleet. Generally based on
+  // the hostname where the bot runs, but that's not a requirement. Must be
+  // predefined in bots.cfg.
+  //
+  // This value is also included in dimensions for the key 'id'.
   string bot_id = 1;
   // Bot session ID. An opaque value.
   //
   // There is one bot session ID per bot process ID on the host. When the bot
   // self-upgrades, it creates a new bot session ID.
   string session_id = 2; // Not used yet. https://crbug.com/786735
+  // Pools that this bot belongs to. Normally assigned via bots.cfg. The
+  // pools must be defined in pools.cfg.
+  //
+  // Normally a bot shall belong to a single pool, but belonging to multiple
+  // pool is allowed. This is generally helpful for transitioning bots.
+  //
+  // This value is also included in dimensions for the key 'pool'.
+  repeated string pools = 3;
 
   // Current bot status. A bot status is a state in which the bot is for a
   // certain amount of time.
-  BotStatusType status = 3;
+  BotStatusType status = 4;
   // Supplemental information to describe the bot status. Human readable.
   //
   // See BotStatusType for the meaning of this string for each status.
-  string status_msg = 4;
+  string status_msg = 5;
   // Current task being handled by the bot, if there is one.
   //
   // In Swarming, only a single task can be assigned to a bot at any given time.
-  string current_task_id = 5;
+  string current_task_id = 6;
 
-  // Bot reported dimensions. This can be used for the host or for the DUT
-  // (Device Under Test) under control.
+  // Bot reported dimensions. dimensions is a {key: [values]} dictionary. This
+  // can be used to declare the properties of the host or for the DUT (Device
+  // Under Test) under control. This is used for task selection.
   //
   // In RBE, this is called Property. The difference is that RBE's Property is a
   // string:string flat dictionary, it doesn't allow repeated values.
   //
   // https://chromium.googlesource.com/infra/luci/luci-py.git/+/master/appengine/swarming/doc/Detailed-Design.md#bot-dimensions
   //
-  // To be valid, dimension MUST be sorted by keys.
+  // dimensions MUST be sorted by keys, and each values list must be sorted.
+  // Each dimension key must be unique.
   //
-  // This is used for task selection.
-  repeated Dimension dimensions = 6;
+  // The values are effectively an OR, a task may match any of the value.
+  //
+  // Human readable.
+  repeated StringListPair dimensions = 7;
 
   // Bot reported informational state. This can be used to describe the host,
   // the bot itself and the DUT (Device Under Test) under control as applicable.
   //
   // This is NOT used for task selection.
-  BotInfo info = 7;
+  BotInfo info = 8;
 
   // TODO(maruel): Add lease_id, lease_expiration_ts, leased_indefinitely,
   // machine_type, machine_lease.
@@ -197,7 +231,7 @@ message BotInfo {
   // raw contains the current free form json data. This will eventually be
   // subsumed by structured data below.
   google.protobuf.Struct raw = 1;
-  // Bot's version. An opaque valueg.
+  // Bot's version. An opaque value.
   //
   // This value is Swarming instance and configuration dependent. Bot are
   // updated through the process described at
@@ -208,6 +242,42 @@ message BotInfo {
   string external_ip = 3;
   // Authentication identity that the bot identified as. An opaque value.
   string authenticated_as = 4;
+
+  // State of the content addressed cache on the bot. This is used for inputs
+  // files.
+  CASStats cas_stats = 5;
+  // State of the named caches (used by incremental tasks) on the bot. This is
+  // used for task that benefits from incrementality, like builds.
+  //
+  // Should be sorted by name.
+  repeated NameCacheStats named_caches_stats = 6;
+  // State of the CIPD packages cache on the bot. This is use for installable,
+  // versioned packages.
+  //
+  // Should be sorted by package name, then version.
+  repeated CIPDPackageCacheStats cipd_packages_cache_stats = 7;
+}
+
+// Bot local content addressed cache information.
+message CASStats {
+  int64 number_items = 1;
+  int64 size = 2;
+  google.protobuf.Timestamp oldest_time = 3;
+}
+
+// Bot local named cache information.
+message NameCacheStats {
+  string name = 1;
+  int64 size = 2;
+  google.protobuf.Timestamp last_use_time = 3;
+}
+
+// Bot local CIPD package cache information.
+message CIPDPackageCacheStats {
+  string name = 1;
+  string version = 2;
+  int64 size = 3;
+  google.protobuf.Timestamp last_use_time = 4;
 }
 
 // BotEventType defines the reason why BotEvent was created.
@@ -321,27 +391,8 @@ message BotEvent {
   string event_msg = 4;
 }
 
-// Task scheduling.
 
-// Dimension is a {key: [values]} dictionary for either a bot exposed dimension,
-// or for a task request dimension.
-//
-// In the case of dimensions exposed by bot, the values is effectively an OR, a
-// task may match any of the value.
-//
-// In the case of dimensions included in a task request, the values is
-// effectively an AND, a bot must expose every single value to be selected.
-message Dimension {
-  // The dimension key. Must be unique in a repeated Dimension property. Human
-  // readable.
-  //
-  // This string should make sense to a user.
-  string key = 1;
-  // All the values valid for this key. values MUST be sorted. Human readable.
-  //
-  // This string should make sense to a user in the context of 'key'.
-  repeated string values = 2;
-}
+// Task scheduling.
 
 // TaskState represents the different allowed states for a Task.
 //

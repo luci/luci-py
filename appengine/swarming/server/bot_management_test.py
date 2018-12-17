@@ -12,6 +12,8 @@ import unittest
 import test_env
 test_env.setup_test_env()
 
+from google.protobuf import struct_pb2
+
 from google.appengine.api import memcache
 from google.appengine.ext import ndb
 
@@ -160,37 +162,81 @@ class BotManagementTest(test_case.TestCase):
         # TODO(maruel): Store request_sleep IFF the state changed.
         self.assertIsNone(event_key, name)
         continue
-      event = event_key.get()
-      p = swarming_pb2.BotEvent()
-      event.to_proto(p)
+      # Just asserts it doesn't crash.
+      actual = swarming_pb2.BotEvent()
+      event_key.get().to_proto(actual)
 
   def test_BotEvent_proto_maintenance(self):
+    # Also test a misconfigured bot not in a pool.
     event_key = bot_management.bot_event(
         event_type=u'bot_connected', bot_id=u'id1',
         external_ip=u'8.8.4.4', authenticated_as=u'bot:id1.domain',
-        dimensions={u'id': [u'id1']}, state={u'ram': 65}, version=_VERSION,
+        dimensions={u'id': [u'id1']}, state={u'ram': 65.0}, version=_VERSION,
         quarantined=False, maintenance_msg=u'Too hot', task_id=None,
         task_name=None)
-    event = event_key.get()
-    p = swarming_pb2.BotEvent()
-    event.to_proto(p)
-    self.assertEqual(p.bot.status, swarming_pb2.OVERHEAD_MAINTENANCE_EXTERNAL)
-    self.assertEqual(p.bot.status_msg, u'Too hot')
+    actual = swarming_pb2.BotEvent()
+    event_key.get().to_proto(actual)
+    expected = swarming_pb2.BotEvent(
+        event=swarming_pb2.BOT_NEW_SESSION,
+        bot=swarming_pb2.Bot(
+            bot_id=u'id1',
+            dimensions=[
+              swarming_pb2.StringListPair(key=u'id', values=[u'id1']),
+            ],
+            status=swarming_pb2.OVERHEAD_MAINTENANCE_EXTERNAL,
+            status_msg=u'Too hot',
+            info=swarming_pb2.BotInfo(
+                raw=struct_pb2.Struct(
+                    fields={
+                      u'ram': struct_pb2.Value(number_value=65.0),
+                    }),
+                version=_VERSION,
+                external_ip=u'8.8.4.4',
+                authenticated_as=u'bot:id1.domain',
+            ),
+        ),
+    )
+    expected.event_time.FromDatetime(self.now)
+    self.assertEqual(unicode(expected), unicode(actual))
 
   def test_BotEvent_proto_quarantine(self):
+    # Also test that a bot can belong to two pools.
     event_key = bot_management.bot_event(
         event_type=u'bot_connected', bot_id=u'id1',
         external_ip=u'8.8.4.4', authenticated_as=u'bot:id1.domain',
-        dimensions={u'id': [u'id1']},
-        state={u'ram': 65, u'quarantined': u'sad bot'},
+        dimensions={u'id': [u'id1'], u'pool': [u'next', u'previous']},
+        state={u'ram': 65.0, u'quarantined': u'sad bot'},
         version=_VERSION,
         quarantined=True, maintenance_msg=None, task_id=None,
         task_name=None)
-    event = event_key.get()
-    p = swarming_pb2.BotEvent()
-    event.to_proto(p)
-    self.assertEqual(p.bot.status, swarming_pb2.QUARANTINED_BY_BOT)
-    self.assertEqual(p.bot.status_msg, u'sad bot')
+    actual = swarming_pb2.BotEvent()
+    event_key.get().to_proto(actual)
+    expected = swarming_pb2.BotEvent(
+        event=swarming_pb2.BOT_NEW_SESSION,
+        bot=swarming_pb2.Bot(
+            bot_id=u'id1',
+            pools=[u'next', u'previous'],
+            dimensions=[
+              swarming_pb2.StringListPair(key=u'id', values=[u'id1']),
+              swarming_pb2.StringListPair(
+                  key=u'pool', values=[u'next', u'previous']),
+            ],
+            status=swarming_pb2.QUARANTINED_BY_BOT,
+            status_msg=u'sad bot',
+            info=swarming_pb2.BotInfo(
+                raw=struct_pb2.Struct(
+                    fields={
+                      u'quarantined': struct_pb2.Value(string_value=u'sad bot'),
+                      u'ram': struct_pb2.Value(number_value=65.0),
+                    }),
+                version=_VERSION,
+                external_ip=u'8.8.4.4',
+                authenticated_as=u'bot:id1.domain',
+            ),
+        ),
+    )
+    expected.event_time.FromDatetime(self.now)
+    self.assertEqual(unicode(expected), unicode(actual))
 
   def test_bot_event(self):
     # connected.
