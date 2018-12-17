@@ -15,6 +15,3 @@ deploy: build
 
 upload: build
 	tools/gae upload
-
-rollback:
-	appcfg.py -V `tools/gae version` rollback .
