@@ -13,18 +13,22 @@ test_env_platforms.setup_test_env()
 import android
 
 
+GMS_PACKAGE = 'com.google.android.gms'
+PLAYSTORE_PACKAGE = 'com.android.vending'
+
+
 class TestGetDimensions(unittest.TestCase):
 
   def empty_object(self):
     return lambda: None
 
-  def mock_android_device(self, build_props, serial, gmscore):
+  def mock_android_device(self, build_props, serial, package_versions):
     cache = self.empty_object()
     setattr(cache, 'build_props', build_props)
     base = self.empty_object()
     setattr(base, 'cache', cache)
     setattr(base, 'serial', serial)
-    setattr(base, 'GetGMSCoreVersion', lambda: gmscore)
+    setattr(base, 'GetPackageVersion', lambda p: package_versions[p])
 
     return base
 
@@ -43,7 +47,7 @@ class TestGetDimensions(unittest.TestCase):
           'ro.product.device': 'darcy'
         },
         'mock_nvidia_shield',
-        None)
+        {GMS_PACKAGE: None, PLAYSTORE_PACKAGE: None})
 
   def get_mock_nexus5x(self):
     return self.mock_android_device(
@@ -60,7 +64,7 @@ class TestGetDimensions(unittest.TestCase):
         'ro.product.device': 'bullhead'
       },
       'mock_nexus5x',
-      '8.1.86')
+      {GMS_PACKAGE: '8.1.86', PLAYSTORE_PACKAGE: '1.2.3'})
 
   def get_mock_pixel2xl(self):
     return self.mock_android_device(
@@ -75,7 +79,7 @@ class TestGetDimensions(unittest.TestCase):
         'ro.product.device': 'taimen'
       },
       'mock_nexus5x',
-      '12.8.62')
+      {GMS_PACKAGE: '12.8.62', PLAYSTORE_PACKAGE: '1.2.3'})
 
   def get_mock_galaxyS6(self):
     return self.mock_android_device(
@@ -92,7 +96,7 @@ class TestGetDimensions(unittest.TestCase):
         'ro.product.device': 'zerofltetmo'
       },
       'mock_galaxyS6',
-      '11.5.09')
+      {GMS_PACKAGE: '11.5.09', PLAYSTORE_PACKAGE: '1.2.3'})
 
   def test_shield_get_dimensions(self):
     self.assertEqual({
@@ -100,6 +104,7 @@ class TestGetDimensions(unittest.TestCase):
         u'device_gms_core_version': ['unknown'],
         u'device_os': ['N', 'NRD90M'],
         u'device_os_flavor': ['nvidia'],
+        u'device_playstore_version': ['unknown'],
         u'device_type': ['darcy', 'foster'],
         u'os': ['Android'],
       },
@@ -111,6 +116,7 @@ class TestGetDimensions(unittest.TestCase):
         u'device_gms_core_version': ['8.1.86'],
         u'device_os': ['M', 'MMB29Q'],
         u'device_os_flavor': ['google'],
+        u'device_playstore_version': ['1.2.3'],
         u'device_type': ['bullhead'],
         u'os': ['Android'],
       },
@@ -122,6 +128,7 @@ class TestGetDimensions(unittest.TestCase):
         u'device_gms_core_version': ['12.8.62'],
         u'device_os': ['P', 'PPR1.180610.009'],
         u'device_os_flavor': ['google'],
+        u'device_playstore_version': ['1.2.3'],
         u'device_type': ['taimen'],
         u'os': ['Android'],
       },
@@ -133,6 +140,7 @@ class TestGetDimensions(unittest.TestCase):
         u'device_gms_core_version': ['11.5.09'],
         u'device_os': ['N', 'NRD90M'],
         u'device_os_flavor': ['samsung'],
+        u'device_playstore_version': ['1.2.3'],
         u'device_type': ['universal7420', 'zerofltetmo'],
         u'os': ['Android'],
       },

@@ -760,16 +760,18 @@ class HighDevice(object):
         u'system': props[u'System-Free'],
     }
 
-  def GetGMSCoreVersion(self):
-    """Returns GMS core version."""
-    out = self.Dumpsys('package com.google.android.gms')
+  def GetPackageVersion(self, package):
+    """Returns the installed version of the given package."""
+    out = self.Dumpsys('package %s' % package)
     if out is None:
       return None
-    version = None
     for line in out.splitlines():
-      match = re.search('versionName=(.*) \(', line)
-      if match:
-        return match.group(1)
+      if 'versionName=' in line:
+        # Version format is wildly different for different packages, or even
+        # sometimes within different builds for the same package. However, they
+        # all seem to start it "versionName=" and have some sort of whitespace
+        # after the actual version string.
+        return line.split('=', 1)[1].split()[0]
     return None
 
   def GetIMEI(self):

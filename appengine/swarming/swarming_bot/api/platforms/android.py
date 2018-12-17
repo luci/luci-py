@@ -213,14 +213,20 @@ def get_dimensions(devices):
       'get_dimensions() (device part) took %gs' %
       round(time.time() - start, 1))
 
-  # Add gms core version
-  gms_core_versions = set()
-  for device in devices:
-    version = device.GetGMSCoreVersion()
-    if version:
-      gms_core_versions.add(version)
-  dimensions[u'device_gms_core_version'] = (sorted(gms_core_versions) or
-                                            ['unknown'])
+  def _get_package_versions(package):
+    versions = set()
+    for device in devices:
+      version = device.GetPackageVersion(package)
+      if version:
+        versions.add(version)
+    return sorted(versions)
+
+  # Add gms core and Playstore versions
+  dimensions[u'device_gms_core_version'] = (
+      _get_package_versions('com.google.android.gms') or ['unknown'])
+  dimensions[u'device_playstore_version'] = (
+      _get_package_versions('com.android.vending') or ['unknown'])
+
   return dimensions
 
 
