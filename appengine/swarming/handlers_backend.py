@@ -197,6 +197,13 @@ class CronTasksStats(_CronHandlerBase):
     stats_tasks.cron_generate_stats()
 
 
+class CronBotsSendToBQ(_CronHandlerBase):
+  """Streams BotEvent to BigQuery."""
+
+  def run_cron(self):
+    bot_management.cron_send_to_bq()
+
+
 ## Task queues.
 
 
@@ -333,6 +340,7 @@ def get_routes():
     ('/internal/cron/delete_old_tasks', CronDeleteOldTasks),
     ('/internal/cron/bots/stats', CronBotsStats),
     ('/internal/cron/tasks/stats', CronTasksStats),
+    ('/internal/cron/bots/send_to_bq', CronBotsSendToBQ),
 
     ('/internal/cron/count_task_bot_distribution',
         CronCountTaskBotDistributionHandler),

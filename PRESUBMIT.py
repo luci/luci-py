@@ -35,8 +35,9 @@ def CommonChecks(input_api, output_api):
     r'.+_pb2\.py$',
     r'.+_pb2_grpc\.py$',
     r'.*third_party.*',
-    # This is a symlink to third_party, so it shouldn't be checked.
+    # These are a symlink to third_party, so it shouldn't be checked.
     r'appengine/isolate/bqh\.py$',
+    r'appengine/swarming/bqh\.py$',
   ]
   return input_api.canned_checks.PanProjectChecks(
       input_api, output_api,
