@@ -77,6 +77,7 @@ from google.appengine.ext import ndb
 
 from components import datastore_utils
 from components import utils
+from proto.api import swarming_pb2  # pylint: disable=no-name-in-module
 from server import large
 from server import task_pack
 from server import task_request
@@ -631,6 +632,43 @@ class _TaskResultCommon(ndb.Model):
   def run_result_key(self):
     """Returns the active TaskRunResult key."""
     raise NotImplementedError()
+
+  @property
+  def task_state(self):
+    """Returns the swarming.pb2.TaskState."""
+    # TODO(maruel): Add these:
+    # PENDING_DEDUPING
+    # RUNNING_OVERHEAD_START
+    # RUNNING_OVERHEAD_END
+    # TERMINATING
+    # DUT_FAILURE
+    # BOT_DISAPPEARED
+    # PREEMPTED
+    # TIMED_OUT_SILENCE
+    # LOAD_SHED
+    # RESOURCE_EXHAUSTED
+    if self.deduped_from:
+      return swarming_pb2.DEDUPED
+    if self.internal_failure:
+      return swarming_pb2.INTERNAL_FAILURE
+    if self.state == State.PENDING:
+      return swarming_pb2.PENDING
+    if self.state == State.RUNNING:
+      return swarming_pb2.RUNNING
+    if self.state == State.COMPLETED:
+      return swarming_pb2.COMPLETED
+    if self.state == State.TIMED_OUT:
+      return swarming_pb2.TIMED_OUT
+    if self.state == State.KILLED:
+      return swarming_pb2.KILLED
+    if self.state == State.EXPIRED:
+      return swarming_pb2.EXPIRED
+    if self.state == State.CANCELED:
+      return swarming_pb2.CANCELED
+    if self.state == State.NO_RESOURCE:
+      return swarming_pb2.NO_RESOURCE
+    # Internal error.
+    return swarming_pb2.TASK_STATE_INVALID
 
   def to_string(self):
     return state_to_string(self)

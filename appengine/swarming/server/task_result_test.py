@@ -22,6 +22,7 @@ from components import auth_testing
 from components import utils
 from test_support import test_case
 
+from proto.api import swarming_pb2  # pylint: disable=no-name-in-module
 from server import large
 from server import task_pack
 from server import task_request
@@ -571,6 +572,38 @@ class TaskResultApiTest(TestCase):
     result_summary = result_summary.key.get()
     self.assertEqual(True, run_result.failure)
     self.assertEqual(True, result_summary.failure)
+
+  def test_result_task_state(self):
+    def check(expected, **kwargs):
+      self.assertEqual(
+          expected, task_result.TaskResultSummary(**kwargs).task_state)
+
+    # That's an incorrect state:
+    check(swarming_pb2.TASK_STATE_INVALID, state=task_result.State.BOT_DIED)
+    check(swarming_pb2.PENDING, state=task_result.State.PENDING)
+    # Not implemented: PENDING_DEDUPING
+    check(swarming_pb2.RUNNING, state=task_result.State.RUNNING)
+    # Not implemented: RUNNING_OVERHEAD_SETUP
+    # Not implemented: RUNNING_OVERHEAD_TEARDOWN
+    # Not implemented: TERMINATING
+    check(
+        swarming_pb2.INTERNAL_FAILURE,
+        internal_failure=True, state=task_result.State.BOT_DIED)
+    # Not implemented: DUT_FAILURE
+    # Not implemented: BOT_DISAPPEARED
+    # Not implemented: PREEMPTED
+    check(swarming_pb2.COMPLETED, state=task_result.State.COMPLETED)
+    check(swarming_pb2.TIMED_OUT, state=task_result.State.TIMED_OUT)
+    # Not implemented: TIMED_OUT_SILENCE
+    check(swarming_pb2.KILLED, state=task_result.State.KILLED)
+    check(
+        swarming_pb2.DEDUPED,
+        state=task_result.State.COMPLETED, deduped_from=u'123')
+    check(swarming_pb2.EXPIRED, state=task_result.State.EXPIRED)
+    check(swarming_pb2.CANCELED, state=task_result.State.CANCELED)
+    check(swarming_pb2.NO_RESOURCE, state=task_result.State.NO_RESOURCE)
+    # Not implemented: LOAD_SHED
+    # Not implemented: RESOURCE_EXHAUSTED
 
   def test_performance_stats_pre_put_hook(self):
     with self.assertRaises(datastore_errors.BadValueError):
