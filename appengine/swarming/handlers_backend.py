@@ -48,7 +48,7 @@ class CronBotDiedHandler(_CronHandlerBase):
   """
 
   def run_cron(self):
-    task_scheduler.cron_handle_bot_died(self.request.host_url)
+    task_scheduler.cron_handle_bot_died()
 
 
 class CronAbortExpiredShardToRunHandler(_CronHandlerBase):
@@ -60,7 +60,7 @@ class CronAbortExpiredShardToRunHandler(_CronHandlerBase):
   """
 
   def run_cron(self):
-    task_scheduler.cron_abort_expired_task_to_run(self.request.host_url)
+    task_scheduler.cron_abort_expired_task_to_run()
 
 
 class CronTidyTaskQueues(_CronHandlerBase):

@@ -1542,7 +1542,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         self.now, result_summary.request_key.get().expiration_secs+1)
     self.assertEqual(
         (['1d69b9f088008910'], []),
-        task_scheduler.cron_abort_expired_task_to_run('f.local'))
+        task_scheduler.cron_abort_expired_task_to_run())
     self.assertEqual([], task_result.TaskRunResult.query().fetch())
     expected = self._gen_result_summary_pending(
         abandoned_ts=abandoned_ts,
@@ -1568,7 +1568,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     # Fake first try bot died.
     self.assertEqual(1, len(pub_sub_calls)) # PENDING -> RUNNING
     now_1 = self.mock_now(self.now + task_result.BOT_PING_TOLERANCE, 1)
-    self.assertEqual(([], 1, 0), task_scheduler.cron_handle_bot_died('f.local'))
+    self.assertEqual(([], 1, 0), task_scheduler.cron_handle_bot_died())
     self.assertEqual(State.BOT_DIED, run_result.key.get().state)
     self.assertEqual(State.PENDING, run_result.result_summary_key.get().state)
     self.assertEqual(1, self.execute_tasks())
@@ -1579,7 +1579,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         self.now, run_result.request_key.get().expiration_secs+1)
     self.assertEqual(
         (['1d69b9f088008910'], []),
-        task_scheduler.cron_abort_expired_task_to_run('f.local'))
+        task_scheduler.cron_abort_expired_task_to_run())
     self.assertEqual(1, len(task_result.TaskRunResult.query().fetch()))
     expected = self._gen_result_summary_reaped(
         abandoned_ts=abandoned_ts,
@@ -1627,7 +1627,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     # cron job 'expires' the task slices but not the whole task.
     self.assertEqual(
         ([], ['1d69b9f088008910']),
-        task_scheduler.cron_abort_expired_task_to_run('f.local'))
+        task_scheduler.cron_abort_expired_task_to_run())
     result_summary = result_summary.key.get()
     self.assertEqual(State.PENDING, result_summary.state)
     # Skipped the second and third TaskSlice.
@@ -1658,7 +1658,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.mock_now(self.now, 601)
     self.assertEqual(
         ([], ['1d69b9f088008910']),
-        task_scheduler.cron_abort_expired_task_to_run('f.local'))
+        task_scheduler.cron_abort_expired_task_to_run())
     result_summary = result_summary.key.get()
     self.assertEqual(State.PENDING, result_summary.state)
     # Wait for the second TaskSlice even if there is no capacity.
@@ -1687,7 +1687,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(False, is_in_negative_cache(2))
 
     now_1 = self.mock_now(self.now + task_result.BOT_PING_TOLERANCE, 1)
-    self.assertEqual(([], 1, 0), task_scheduler.cron_handle_bot_died('f.local'))
+    self.assertEqual(([], 1, 0), task_scheduler.cron_handle_bot_died())
     self.assertEqual(1, self.execute_tasks())
     self.assertEqual(2, len(pub_sub_calls)) # RUNNING -> PENDING
     self.assertEqual(False, is_in_negative_cache(1))
@@ -1773,7 +1773,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
 
     # Bot becomes MIA.
     now_1 = self.mock_now(self.now + task_result.BOT_PING_TOLERANCE, 1)
-    self.assertEqual(([], 1, 0), task_scheduler.cron_handle_bot_died('f.local'))
+    self.assertEqual(([], 1, 0), task_scheduler.cron_handle_bot_died())
     self.assertEqual(1, self.execute_tasks())
     self.assertEqual(2, len(pub_sub_calls)) # RUNNING -> PENDING
 
@@ -1857,7 +1857,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     # See _handle_dead_bot() with special case about non-idempotent task that
     # were never updated.
     now_1 = self.mock_now(self.now + task_result.BOT_PING_TOLERANCE, 1)
-    self.assertEqual(([], 1, 0), task_scheduler.cron_handle_bot_died('f.local'))
+    self.assertEqual(([], 1, 0), task_scheduler.cron_handle_bot_died())
 
     # Now the task is available. Bot magically wakes up (let's say a laptop that
     # went to sleep). The update is denied.
@@ -1901,7 +1901,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(1, run_result.try_number)
     self.assertEqual(State.RUNNING, run_result.state)
     now_1 = self.mock_now(self.now + task_result.BOT_PING_TOLERANCE, 1)
-    self.assertEqual(([], 1, 0), task_scheduler.cron_handle_bot_died('f.local'))
+    self.assertEqual(([], 1, 0), task_scheduler.cron_handle_bot_died())
 
     # Refresh and compare:
     # The interesting point here is that even though the task is PENDING, it has
@@ -1951,7 +1951,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(False, is_in_negative_cache(2))
     self.assertEqual(State.RUNNING, run_result.state)
     self.mock_now(self.now + task_result.BOT_PING_TOLERANCE, 1)
-    self.assertEqual(([], 1, 0), task_scheduler.cron_handle_bot_died('f.local'))
+    self.assertEqual(([], 1, 0), task_scheduler.cron_handle_bot_died())
     self.assertEqual(False, is_in_negative_cache(1))
     self.assertEqual(False, is_in_negative_cache(2))
 
@@ -1968,9 +1968,8 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(True, is_in_negative_cache(2))
     now_2 = self.mock_now(self.now + 2 * task_result.BOT_PING_TOLERANCE, 3)
     self.assertEqual(
-        (['1d69b9f088008912'], 0, 0),
-        task_scheduler.cron_handle_bot_died('f.local'))
-    self.assertEqual(([], 0, 0), task_scheduler.cron_handle_bot_died('f.local'))
+        (['1d69b9f088008912'], 0, 0), task_scheduler.cron_handle_bot_died())
+    self.assertEqual(([], 0, 0), task_scheduler.cron_handle_bot_died())
     self.assertEqual(False, is_in_negative_cache(1))
     self.assertEqual(False, is_in_negative_cache(2))
     expected = self._gen_result_summary_reaped(
@@ -2000,8 +1999,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(State.RUNNING, run_result.state)
     self.mock_now(self.now + task_result.BOT_PING_TOLERANCE, 601)
     self.assertEqual(
-        (['1d69b9f088008911'], 0, 0),
-        task_scheduler.cron_handle_bot_died('f.local'))
+        (['1d69b9f088008911'], 0, 0), task_scheduler.cron_handle_bot_died())
 
   def test_cron_handle_external_cancellations(self):
     es_address = 'externalscheduler_address'

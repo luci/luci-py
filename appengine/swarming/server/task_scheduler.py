@@ -1360,7 +1360,7 @@ def cancel_task(request, result_key, kill_running, bot_id):
 ### Cron job.
 
 
-def cron_abort_expired_task_to_run(host):
+def cron_abort_expired_task_to_run():
   """Aborts expired TaskToRun requests to execute a TaskRequest on a bot.
 
   Three reasons can cause this situation:
@@ -1398,8 +1398,8 @@ def cron_abort_expired_task_to_run(host):
           'EXPIRED!\n%d tasks:\n%s',
           len(killed),
           '\n'.join(
-            '  %s/user/task/%s  %s' % (
-              host, i.task_id, i.task_slice(0).properties.dimensions)
+            '  %s  %s' % (
+              i.task_id, i.task_slice(0).properties.dimensions)
             for i in killed))
     logging.info(
         'Reenqueued %d tasks, killed %d, skipped %d',
@@ -1408,7 +1408,7 @@ def cron_abort_expired_task_to_run(host):
   return [i.task_id for i in killed], [i.task_id for i in reenqueued]
 
 
-def cron_handle_bot_died(host):
+def cron_handle_bot_died():
   """Aborts or retry stale TaskRunResult where the bot stopped sending updates.
 
   If the task was at its first try, it'll be retried. Otherwise the task will be
@@ -1437,7 +1437,7 @@ def cron_handle_bot_died(host):
         logging.error(
             'BOT_DIED!\n%d tasks:\n%s',
             len(killed),
-            '\n'.join('  %s/user/task/%s' % (host, i) for i in killed))
+            '\n'.join('  %s' % i for i in killed))
       logging.info(
           'Killed %d; retried %d; ignored: %d', len(killed), retried, ignored)
     # These are returned primarily for unit testing verification.
