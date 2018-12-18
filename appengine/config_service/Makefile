@@ -10,8 +10,21 @@ compile-proto:
 test: build
 	tools/run_coverage.py
 
+deploy_dev: build
+	tools/gae upload -x -A luci-config-dev
+
+upload_dev: build
+	tools/gae upload -A luci-config-dev
+
+deploy_staging: build
+	tools/gae upload -x -A luci-config-staging
+
+upload_staging: build
+	tools/gae upload -A luci-config-staging
+
 deploy: build
-	tools/gae upload -x
+	tools/gae upload -x -A luci-config
 
 upload: build
-	tools/gae upload
+	tools/gae upload -A luci-config
+
