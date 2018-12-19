@@ -581,29 +581,30 @@ class TaskResultApiTest(TestCase):
     # That's an incorrect state:
     check(swarming_pb2.TASK_STATE_INVALID, state=task_result.State.BOT_DIED)
     check(swarming_pb2.PENDING, state=task_result.State.PENDING)
-    # Not implemented: PENDING_DEDUPING
+    # https://crbug.com/915342: PENDING_DEDUPING
     check(swarming_pb2.RUNNING, state=task_result.State.RUNNING)
-    # Not implemented: RUNNING_OVERHEAD_SETUP
-    # Not implemented: RUNNING_OVERHEAD_TEARDOWN
-    # Not implemented: TERMINATING
+    # https://crbug.com/796757: RUNNING_OVERHEAD_SETUP
+    # https://crbug.com/813412: RUNNING_OVERHEAD_TEARDOWN
+    # https://crbug.com/916560: TERMINATING
     check(
-        swarming_pb2.INTERNAL_FAILURE,
+        swarming_pb2.RAN_INTERNAL_FAILURE,
         internal_failure=True, state=task_result.State.BOT_DIED)
-    # Not implemented: DUT_FAILURE
-    # Not implemented: BOT_DISAPPEARED
-    # Not implemented: PREEMPTED
+    # https://crbug.com/902807: DUT_FAILURE
+    # https://crbug.com/916553: BOT_DISAPPEARED
+    # https://crbug.com/916559: PREEMPTED
     check(swarming_pb2.COMPLETED, state=task_result.State.COMPLETED)
     check(swarming_pb2.TIMED_OUT, state=task_result.State.TIMED_OUT)
-    # Not implemented: TIMED_OUT_SILENCE
+    # https://crbug.com/916556: TIMED_OUT_SILENCE
     check(swarming_pb2.KILLED, state=task_result.State.KILLED)
+    # https://crbug.com/916553: MISSING_INPUTS
     check(
         swarming_pb2.DEDUPED,
         state=task_result.State.COMPLETED, deduped_from=u'123')
     check(swarming_pb2.EXPIRED, state=task_result.State.EXPIRED)
     check(swarming_pb2.CANCELED, state=task_result.State.CANCELED)
     check(swarming_pb2.NO_RESOURCE, state=task_result.State.NO_RESOURCE)
-    # Not implemented: LOAD_SHED
-    # Not implemented: RESOURCE_EXHAUSTED
+    # https://crbug.com/916562: LOAD_SHED
+    # https://crbug.com/916557: RESOURCE_EXHAUSTED
 
   def test_performance_stats_pre_put_hook(self):
     with self.assertRaises(datastore_errors.BadValueError):

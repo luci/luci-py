@@ -186,7 +186,7 @@ class BotManagementTest(test_case.TestCase):
             status=swarming_pb2.OVERHEAD_MAINTENANCE_EXTERNAL,
             status_msg=u'Too hot',
             info=swarming_pb2.BotInfo(
-                raw=struct_pb2.Struct(
+                supplemental=struct_pb2.Struct(
                     fields={
                       u'ram': struct_pb2.Value(number_value=65.0),
                     }),
@@ -224,7 +224,7 @@ class BotManagementTest(test_case.TestCase):
             status=swarming_pb2.QUARANTINED_BY_BOT,
             status_msg=u'sad bot',
             info=swarming_pb2.BotInfo(
-                raw=struct_pb2.Struct(
+                supplemental=struct_pb2.Struct(
                     fields={
                       u'quarantined': struct_pb2.Value(string_value=u'sad bot'),
                       u'ram': struct_pb2.Value(number_value=65.0),

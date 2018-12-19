@@ -636,21 +636,21 @@ class _TaskResultCommon(ndb.Model):
   @property
   def task_state(self):
     """Returns the swarming.pb2.TaskState."""
-    # TODO(maruel): Add these:
-    # PENDING_DEDUPING
-    # RUNNING_OVERHEAD_START
-    # RUNNING_OVERHEAD_END
-    # TERMINATING
-    # DUT_FAILURE
-    # BOT_DISAPPEARED
-    # PREEMPTED
-    # TIMED_OUT_SILENCE
-    # LOAD_SHED
-    # RESOURCE_EXHAUSTED
+    # https://crbug.com/915342: PENDING_DEDUPING
+    # https://crbug.com/796757: RUNNING_OVERHEAD_SETUP
+    # https://crbug.com/813412: RUNNING_OVERHEAD_TEARDOWN
+    # https://crbug.com/916560: TERMINATING
+    # https://crbug.com/902807: DUT_FAILURE
+    # https://crbug.com/916553: BOT_DISAPPEARED
+    # https://crbug.com/916559: PREEMPTED
+    # https://crbug.com/916556: TIMED_OUT_SILENCE
+    # https://crbug.com/916553: MISSING_INPUTS
+    # https://crbug.com/916562: LOAD_SHED
+    # https://crbug.com/916557: RESOURCE_EXHAUSTED
     if self.deduped_from:
       return swarming_pb2.DEDUPED
     if self.internal_failure:
-      return swarming_pb2.INTERNAL_FAILURE
+      return swarming_pb2.RAN_INTERNAL_FAILURE
     if self.state == State.PENDING:
       return swarming_pb2.PENDING
     if self.state == State.RUNNING:

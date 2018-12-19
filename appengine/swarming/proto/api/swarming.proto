@@ -211,13 +211,13 @@ enum BotStatusType {
   // - Bot is starting for a version upgrade
   //
   // Bot.status_msg shall disambiguate the type of work item done.
-  OVERHEAD_BOT_INTERNAL = 5;
+  OVERHEAD_BOT_INTERNAL = 5;  // Not used yet. https://crbug.com/870723
   // Bot is down as its host is rebooting and contact was lost.
   //
   // If the bot doesn't contact back soon enough, it will be considered MISSING.
   //
   // Bot.status_msg shall not be set.
-  HOST_REBOOTING = 6;
+  HOST_REBOOTING = 6;  // Not used yet. https://crbug.com/870723
 
   // Healthy states
 
@@ -241,17 +241,23 @@ enum BotStatusType {
 //
 // This is NOT used for task selection.
 message BotInfo {
-  // raw contains the current free form json data. This will eventually be
-  // subsumed by structured data below.
-  google.protobuf.Struct raw = 1;
+  // supplemental contains the free form JSON data that includes interesting
+  // information about the bot that doesn't fit in any of the fields below.
+  //
+  // Anything that is usable by multiple customers should eventually be moved to
+  // a new field below.
+  google.protobuf.Struct supplemental = 1;
   // Bot's version. An opaque value.
   //
   // This value is Swarming instance and configuration dependent. Bot are
   // updated through the process described at
   // https://chromium.googlesource.com/infra/luci/luci-py.git/+/master/appengine/swarming/doc/Bot.md#update
   string version = 2;
-  // External IP address as visible by the server. Can be either IPv4 or IPv6.
+  // External IP address as visible by the server.
+  //
   // This could be a NAT'ing router external IP.
+  //
+  // Can be either IPv4 or IPv6.
   string external_ip = 3;
   // Authentication identity that the bot identified as. An opaque value.
   string authenticated_as = 4;
@@ -269,6 +275,50 @@ message BotInfo {
   //
   // Should be sorted by package name, then version.
   repeated CIPDPackageCacheStats cipd_packages_cache_stats = 7;
+
+  // Information about the host.
+  PhysicalEntity host = 8;
+  // Information about the devices connected to the host.
+  //
+  // This can be the DUT (Device Under Test) or other peripherals.
+  repeated PhysicalEntity devices = 9;
+}
+
+// PhysicalEntity includes information about an host or device.
+//
+// This can be the host where the bot runs, or a device under control of the
+// bot.
+//
+// If the bot runs inside a docker container, this information is about the
+// container, or whatever the bot can observe from its vantage point.
+message PhysicalEntity {
+  // Name that represents this physical entity.
+  //
+  // For a host, it shall be the hostname. For a device, it should be the device
+  // hostname, if any. Failing that, something that makes sense to the users.
+  string name = 1;
+  // supplemental contains the free form JSON data that includes interesting
+  // information about the device that doesn't fit in any of the fields below.
+  //
+  // Anything that is usable by multiple customers should eventually be moved to
+  // a new field below.
+  google.protobuf.Struct supplemental = 2;
+
+  // IP address as visible by the bot process (bot_main) itself.
+  //
+  // In the case of the host, it will be one of the IP addresses assigned to it.
+  // In the case of the host where the bot is running inside docker, it will be
+  // the IP address assigned to the docker container.
+  // In the case of a device, it is the IP address of the device, if any.
+  //
+  // Can be either IPv4 or IPv6.
+  string ip = 3;
+
+  // TODO(maruel): https://crbug.com/916570
+  // - Temperature, already included in state for most host and devices
+  // - disks, already included in state for host, can be added for devices
+  // - OS version. The OS version is repeated here since the dimension 'os'
+  //   could be about the DUT (device under test) or the host.
 }
 
 // Bot local content addressed cache information.
@@ -332,6 +382,11 @@ enum BotEventType {
   //
   // BotEvent.event_msg shall contain the reason.
   BOT_SHUTDOWN = 6;
+  // Knowledge of the bot by the server was deleted.
+  //
+  // In this case, the bot's historical data is still kept in the Swarming
+  // server's DB for a year, but the bot is not shown anywhere.
+  BOT_DELETED = 7;  // Not used yet. https://crbug.com/905087
 
   // Bot polling results; these are commands sent to the bot to do actions.
 
@@ -370,14 +425,19 @@ enum BotEventType {
   // BotEvent.event_msg shall not be set. BotEvent.bot.current_task_id shall
   // contain the task ID.
   TASK_COMPLETED = 20;
-  // Bot had an internal failure to report to the server while processing a
-  // task. This shall send a report to the administrator of the instance and
-  // service author.
+  // Bot had an internal failure (RAN_INTERNAL_FAILURE) to report to the server
+  // while processing a task. This shall send a report to the administrator of
+  // the instance and service author.
+  //
+  // This event shall not be filed in case of a MISSING_INPUTS.
   //
   // BotEvent.event_msg shall contain the error message.
   // BotEvent.bot.current_task_id shall contain the task ID.
   TASK_INTERNAL_FAILURE = 21;
   // Bot is forcibly killing the task.
+  //
+  // This can be induced by a server side request (KILLED, PREEMPTED) or by a
+  // bot side decision (TIMED_OUT, TIMED_OUT_SILENCE).
   //
   // BotEvent.event_msg shall not be set. BotEvent.bot.current_task_id shall
   // contain the task ID.
@@ -420,9 +480,10 @@ message CASTree {
   // The isolated server to fetch (or push) content from. Must contain
   // "https://" or "http://" prefix.
   string server = 1;
-  // The hash of an isolated archive. It is expected to be a SHA-1 or SHA-256,
-  // based on the namespace value below.
-  bytes digest = 2;
+  // The hex encoded hash of an isolated archive. It is expected to be a SHA-1
+  // (40 characters) or SHA-256 (64 characters), based on the namespace value
+  // below.
+  string digest = 2;
   // Namespace on the isolate server. This currently defines the hashing
   // algorithm and compression algorithm but is currently loosely defined.
   //
@@ -473,6 +534,21 @@ message NamedCacheEntry {
   // A path cannot be shared among multiple caches or CIPD installations.
   // A task will fail if a file/dir with the same name already exists.
   string dest_path = 2;
+}
+
+// Defines the type of containment to use to put the task primary process
+// inside.
+//
+// This is highly OS specific:
+// - Lower the integrity level on Windows. https://crbug.com/916586
+// - Job Object on Windows. https://crbug.com/732818
+// - Docker on Linux or Windows. https://crbug.com/916584
+// - cgroup on Linux. https://crbug.com/764493
+// - Creating a temporary user on Windows and macOS. https://crbug.com/916585
+// - Lightweight home directory override on Windows, Linux and macOS.
+//   https://crbug.com/811411
+message Containment {
+ // TODO(maruel): https://crbug.com/808836
 }
 
 // Defines the 'what' to run.
@@ -561,31 +637,35 @@ message TaskProperties {
   //
   // Items must be sorted by key, but exceptionally not by values.
   repeated StringListPair env_paths = 11;
+  // Declare what kind of containment shall be used to run the task process
+  // in.
+  Containment containment = 12;  // Not used yet. https://crbug.com/808836
 
   // Timing.
 
   // Maximum number of seconds the task can run before its process is forcibly
   // terminated and the task results in TIMED_OUT.
-  google.protobuf.Duration execution_timeout = 12;
+  google.protobuf.Duration execution_timeout = 13;
   // Maximum number of seconds the task may be silent (no output to stdout nor
   // stderr) before it is considered hung and it forcibly terminated early and
   // the task results in TIMED_OUT_SILENCE.
-  google.protobuf.Duration io_timeout = 13;
+  google.protobuf.Duration io_timeout = 14;
   // Number of second to give the child process after a SIGTERM before sending a
   // SIGKILL. See ../../doc/Bot.md#timeout-handling
-  google.protobuf.Duration grace_period = 14;
+  google.protobuf.Duration grace_period = 15;
 
   // True if the task does not access any service through the network and is
   // believed to be certain to produce the same output given the same input. In
   // the case of a successful task, previous results will be reused if possible,
   // leading to DEDUPED task result for the tasks that could reuse previous
   // task's outcome.
-  bool idempotent = 15;
+  bool idempotent = 16;
 
-  // Paths in the working directory to archive back.
+  // Paths in the working directory to archive back and store as
+  // TaskResult.outputs.
   //
   // Items must be sorted.
-  repeated string outputs = 16;
+  repeated string outputs = 17;
 }
 
 // Defines a possible task execution for a task request to be run on the
@@ -612,9 +692,10 @@ message TaskSlice {
   bool wait_for_capacity = 3;
 }
 
-// Description of a new task request as described by the client.
+// This message is used to create a new task and can be retrieved back, except
+// for a few write-only fields.
 //
-// This message is used to create a new task.
+// A TaskRequest is immutable, it cannot be updated once created.
 message TaskRequest {
   // Scheduling: what to run, when to run, under which service account.
 
@@ -677,7 +758,8 @@ message TaskRequest {
   // Swarming tasks. This way, the tree of tasks can be presented in the UI. The
   // parent task can list all the children tasks that were triggered.
   //
-  // TODO(maruel): Should not be necessary at task creation, can be infered.
+  // TODO(maruel): Should not be necessary to specify at task creation, can be
+  // inferred.
   string parent_task_id = 7;
   // Send notification to this pubsub topic for updates of this task.
   PubSub pubsub_notification = 8;
@@ -798,20 +880,20 @@ enum TaskState {
   //
   // See
   // https://chromium.googlesource.com/infra/luci/luci-py.git/+/master/appengine/swarming/doc/Bot.md#graceful-termination_aka-the-sigterm-and-sigkill-dance
-  TERMINATING = 0x23;  // Not used yet.
+  TERMINATING = 0x23;  // Not used yet. https://crbug.com/916560
   // Task completed, result metadata and task outputs are available. There's
   // still some overhead being finished like attaching relevant bot logs to the
   // task.
   //
   // The client can return right away unless infrastructure issue debugging is
-  // needed. 
+  // needed.
   COMPLETING = 0x2F; // Not used yet, https://crbug.com/813412
 
   // Task states in TRANSIENT_DONE_MASK:
 
   // The task ran but the bot had an internal failure, unrelated to the task
   // itself. It can be due to disk or network I/O issues.
-  INTERNAL_FAILURE = 0x30;
+  RAN_INTERNAL_FAILURE = 0x30;
   // The task ran and completed normally, but returned an exit code that was
   // provided in the TaskProperties as signaling an hardware failure of the DUT
   // (Device Under Test).
@@ -821,14 +903,14 @@ enum TaskState {
   // The task started but the bot failed to keep the connection to the server
   // alive. This can be due to the bot's host crashing, or network connectivity
   // issues.
-  BOT_DISAPPEARED = 0x32;  // Not used yet.
+  BOT_DISAPPEARED = 0x32;  // Not used yet. https://crbug.com/916553
   // The task ran but was killed by the client or an external scheduler in a way
   // that it should still be retried as another task try.
   //
   // This can happen via the external scheduler or an API yet to be defined. The
   // rationale is to kill slow running low priority task, without disrupting the
   // client and simply postponing the task for later.
-  PREEMPTED = 0x33;  // Not used yet, TODO(maruel): File bug.
+  PREEMPTED = 0x33;  // Not used yet. https://crbug.com/916559
 
   //
   // All the states below are inactive final states.
@@ -852,12 +934,18 @@ enum TaskState {
   //
   // This means the bot forcefully killed the task process as described in the
   // graceful termination dance in the documentation.
-  TIMED_OUT_SILENCE = 0x42;
+  TIMED_OUT_SILENCE = 0x42;  // Not used yet. https://crbug.com/916556
   // The task ran but was manually killed via the 'cancel' API.
   //
   // This means the bot forcefully killed the task process as described in the
   // graceful termination dance in the documentation.
   KILLED = 0x43;
+  // The task had specified invalid inputs. This is found out by the bot while
+  // RUNNING_OVERHEAD_SETUP.
+  //
+  // For example, the cas_inputs or cipd_inputs refers to missing items,
+  // or the requested containment cannot be achieved.
+  MISSING_INPUTS = 0x44;  // Not used yet. https://crbug.com/916553
 
   // Task states in NEVER_RAN_DONE_MASK:
 
@@ -889,7 +977,10 @@ enum TaskState {
   // The task was valid but was denied due to a temporary capacity surcharge.
   // The user should try again after a delay, or surface the lack of capacity to
   // the user.
-  LOAD_SHED = 0x54;  // Not used yet. https://crbug.com/729565
+  LOAD_SHED = 0x54;  // Not used yet. https://crbug.com/916562
   // The task is valid but was denied due to insufficient quota.
-  RESOURCE_EXHAUSTED = 0x55;  // Not used yet.
+  RESOURCE_EXHAUSTED = 0x55;  // Not used yet. https://crbug.com/916557
+  // The task never ran, the server had an internal failure, unrelated to the
+  // task itself. It can be due to a server bug or network I/O issues.
+  SKIPPED_INTERNAL_FAILURE = 0x56;  // Not used yet. https://crbug.com/916553
 }

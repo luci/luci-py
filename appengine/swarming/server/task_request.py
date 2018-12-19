@@ -456,7 +456,7 @@ class FilesRef(ndb.Model):
   def to_proto(self, out):
     """Converts self to a swarming_pb2.CASTree."""
     if self.isolated:
-      out.digest = str(self.isolated).decode('hex')
+      out.digest = self.isolated
     if self.isolatedserver:
       out.server = self.isolatedserver
     if self.namespace:
@@ -762,6 +762,7 @@ class TaskProperties(ndb.Model):
       v = out.env_paths.add()
       v.key = key
       v.values.extend(sorted(values))
+    # TODO(maruel): Define containment; https://crbug.com/808836
     if self.execution_timeout_secs:
       out.execution_timeout.seconds = self.execution_timeout_secs
     if self.io_timeout_secs:

@@ -865,7 +865,7 @@ class TaskRequestApiTest(TestCase):
 
     expected_props = swarming_pb2.TaskProperties(
         cas_inputs=swarming_pb2.CASTree(
-            digest='\001#Eg\211\001#Eg\211\001#Eg\211\001#Eg\211',
+            digest=u'0123456789012345678901234567890123456789',
             server=u'http://localhost:1',
             namespace=u'default-gzip',
         ),

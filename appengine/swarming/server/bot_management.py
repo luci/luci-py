@@ -167,17 +167,19 @@ class _BotCommon(ndb.Model):
     return out
 
   def to_proto(self, out):
-    """Populates an empty swarming_pb2.Bot with this _BotCommon."""
-    # Used by BotEvent.to_proto().
+    """Converts self to a swarming_pb2.Bot."""
+    # Used by BotEvent.to_proto() and BotInfo.to_proto().
     out.bot_id = self.key.parent().string_id()
     #out.session_id = ''  # https://crbug.com/786735
     for l in self.dimensions_flat:
       if l.startswith(u'pool:'):
         out.pools.append(l[len(u'pool:'):])
 
-    # TODO(maruel): Many state cannot be discovered here.
-    #out.status = swarming_pb2.BOTSTATE_UNSPECIFIED
-    #out.status_msg = ''
+    # https://crbug.com/916578: MISSSING
+    # https://crbug.com/757931: QUARANTINED_BY_SERVER
+    # https://crbug.com/870723: OVERHEAD_BOT_INTERNAL
+    # https://crbug.com/870723: HOST_REBOOTING
+    # https://crbug.com/913978: RESERVED
     if self.quarantined:
       out.status = swarming_pb2.QUARANTINED_BY_BOT
       msg = self.state.get(u'quarantined')
@@ -196,14 +198,18 @@ class _BotCommon(ndb.Model):
       d.key = key
       for value in values:
         d.values.append(value)
+
+    # The BotInfo part.
     if self.state:
-      out.info.raw.update(self.state)
+      out.info.supplemental.update(self.state)
     if self.version:
       out.info.version = self.version
     if self.authenticated_as:
       out.info.authenticated_as = self.authenticated_as
     if self.external_ip:
       out.info.external_ip = self.external_ip
+    # TODO(maruel): Populate bot.info.host and bot.info.devices.
+    # https://crbug.com/916570
 
   def _pre_put_hook(self):
     super(_BotCommon, self)._pre_put_hook()
@@ -276,6 +282,20 @@ class BotInfo(_BotCommon):
     out['id'] = self.id
     out['is_dead'] = self.is_dead
     return out
+
+  def to_proto(self, out):
+    """Converts self to a swarming_pb2.Bot."""
+    # This populates most of the data.
+    super(BotInfo, self).to_proto(out)
+    if self.is_dead:
+      out.state = swarming_pb2.MISSING
+      out.state_msg = ''
+    # https://crbug.com/757931: QUARANTINED_BY_SERVER
+    # https://crbug.com/870723: OVERHEAD_BOT_INTERNAL
+    # https://crbug.com/870723: HOST_REBOOTING
+    # https://crbug.com/913978: RESERVED
+    # TODO(maruel): Populate bot.info.host and bot.info.devices.
+    # https://crbug.com/916570
 
   def _pre_put_hook(self):
     super(BotInfo, self)._pre_put_hook()
@@ -366,11 +386,11 @@ class BotEvent(_BotCommon):
         self.__class__, self.key.integer_id()+1, parent=self.key.parent())
 
   def to_proto(self, out):
-    """Populates a swarming_pb2.BotEvent with this BotEvent."""
-    # See ../proto/swarming.proto.
+    """Converts self to a swarming_pb2.BotEvent."""
     out.event_time.FromDatetime(self.ts)
     # Populates out.bot with _BotCommon.
     _BotCommon.to_proto(self, out.bot)
+    # https://crbug.com/905087: BOT_DELETED
     e = self._MAPPING[self.event_type]
     if e:
       out.event = e
