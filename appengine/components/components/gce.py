@@ -13,6 +13,9 @@ AUTH_SCOPES = [
     'https://www.googleapis.com/auth/compute',
 ]
 
+# custom-<# CPUs>-<memory MB>
+CUSTOM_MACHINE_TYPE_RE = r'^custom-([0-9]+)-([0-9]+)$'
+
 
 DISK_TYPES = {
     'local-ssd': {'ssd': True},
@@ -769,11 +772,17 @@ def region_from_zone(zone):
 
 def machine_type_to_num_cpus(machine_type):
   """Given a machine type returns its number of CPUs."""
-  assert machine_type in MACHINE_TYPES, machine_type
-  return MACHINE_TYPES[machine_type]['cpus']
+  if machine_type in MACHINE_TYPES:
+    return MACHINE_TYPES[machine_type]['cpus']
+  m = re.match(CUSTOM_MACHINE_TYPE_RE, machine_type)
+  assert m, machine_type
+  return int(m.group(1))
 
 
 def machine_type_to_memory(machine_type):
   """Given a machine type returns its memory in GB."""
-  assert machine_type in MACHINE_TYPES, machine_type
-  return MACHINE_TYPES[machine_type]['memory']
+  if machine_type in MACHINE_TYPES:
+    return MACHINE_TYPES[machine_type]['memory']
+  m = re.match(CUSTOM_MACHINE_TYPE_RE, machine_type)
+  assert m, machine_type
+  return int(m.group(2)) / 1024

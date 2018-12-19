@@ -355,14 +355,19 @@ def ensure_entities_exist(template_cfg, manager_cfgs, max_concurrent=50):
 
   # Ensure InstanceTemplate exists and has the correct active
   # InstanceTemplateRevision.
+  put_it = False
   if not instance_template:
     logging.info('Creating InstanceTemplate: %s', instance_template_key)
     instance_template = models.InstanceTemplate(key=instance_template_key)
+    put_it = True
   if ensure_instance_template_revision_active(template_cfg, instance_template):
+    put_it = True
+  if put_it:
     modified.append(instance_template)
 
   # Ensure InstanceTemplateRevision exists and has the correct active
   # InstanceGroupManagers.
+  put_itr = False
   if not instance_template_revision:
     logging.info(
         'Creating InstanceTemplateRevision: %s', instance_template_revision_key)
@@ -384,8 +389,11 @@ def ensure_entities_exist(template_cfg, manager_cfgs, max_concurrent=50):
         snapshot_name=template_cfg.snapshot_name,
         tags=list(template_cfg.tags),
     )
+    put_itr = True
   if ensure_instance_group_managers_active(
       template_cfg, manager_cfgs, instance_template_revision):
+    put_itr = True
+  if put_itr:
     modified.append(instance_template_revision)
 
   # Ensure InstanceGroupManagers exist and have correct minimum/maximum sizes.

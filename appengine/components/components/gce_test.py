@@ -41,6 +41,18 @@ class GceTest(test_case.TestCase):
     self.mock(net, 'json_request', mocked_request)
     return requests
 
+  def test_machine_type_to_num_cpus(self):
+    self.assertEqual(8, gce.machine_type_to_num_cpus('n1-standard-8'))
+    self.assertEqual(1, gce.machine_type_to_num_cpus('custom-1-2048'))
+    with self.assertRaises(AssertionError):
+      gce.machine_type_to_num_cpus('incorrect-machine-type')
+
+  def test_machine_type_to_memory(self):
+    self.assertEqual(30, gce.machine_type_to_memory('n1-standard-8'))
+    self.assertEqual(2, gce.machine_type_to_memory('custom-1-2048'))
+    with self.assertRaises(AssertionError):
+      gce.machine_type_to_memory('incorrect-machine-type')
+
   def test_project_id(self):
     self.assertEqual('123', gce.Project('123').project_id)
 
