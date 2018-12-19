@@ -185,6 +185,12 @@
                   <td colspan="2" class="message">[[_quarantineMessage(_bot)]]</td>
                 </tr>
               </template>
+              <template is="dom-if" if="[[_isDead(_bot)]]">
+                <tr class="dead">
+                  <td>Dead</td>
+                  <td colspan="2" class="message">Bot has been missing longer than 10 minutes</td>
+                </tr>
+              </template>
               <template is="dom-if" if="[[_bot.maintenance_msg]]">
                 <tr class="maintenance">
                   <td>In Maintenance</td>

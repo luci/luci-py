@@ -845,6 +845,31 @@ describe('bot-list', function() {
       });
     });
 
+    it('filters keys/values by partial filters', function(done) {
+      loggedInBotlist((ele) => {
+        ele._filters = [];
+        ele.render();
+
+        let filterInput = $$('#filter_search', ele);
+        filterInput.value = 'cores:2';
+        ele._refilterPrimaryKeys();
+
+        // Auto selects the first one
+        expect(ele._primaryKey).toEqual('cores');
+
+        let children = $$('.selector.keys', ele).children;
+        expect(children.length).toEqual(1, 'only cores should show up');
+        expect(children[0].textContent).toContain('cores');
+
+        let row = getChildItemWithText($$('.selector.values'), '16', ele);
+        expect(row).toBeFalsy('16 does not match');
+        row = getChildItemWithText($$('.selector.values'), '24', ele);
+        expect(row).toBeTruthy('24 matches');
+
+        done();
+      });
+    });
+
     it('searches columns by typing in the text box', function(done) {
       loggedInBotlist((ele) => {
         ele._cols = ['id', 'task', 'os', 'status'];

@@ -112,18 +112,27 @@ export function filterPossibleKeys(allKeys, keyMap, query) {
   if (!query) {
     return allKeys;
   }
-  // Allow partially typed filters to still match parts.
-  query = query.replace(':', ' ').trim();
-  return allKeys.filter((k) => {
-    if (matchPartCaseInsensitive(k, query)) {
-      return true;
-    }
-    let values = keyMap[k] || [];
-    for (let value of values) {
-      value = applyAlias(value, k);
-      if (matchPartCaseInsensitive(value, query)) {
+  query = query.trim();
+  if (query.indexOf(':') === -1) {
+    return allKeys.filter((k) => {
+      if (matchPartCaseInsensitive(k, query)) {
         return true;
       }
+      let values = keyMap[k] || [];
+      for (let value of values) {
+        value = applyAlias(value, k);
+        if (matchPartCaseInsensitive(value, query)) {
+          return true;
+        }
+      }
+      return false;
+    });
+  }
+  // partial queries should only show the key that exactly matches
+  query = query.split(':')[0];
+  return allKeys.filter((k) => {
+    if (k === query) {
+      return true;
     }
     return false;
   });
@@ -135,7 +144,12 @@ export function filterPossibleKeys(allKeys, keyMap, query) {
  * element, only show those secondary elements that do.
  */
 export function filterPossibleValues(allValues, selectedKey, query) {
-  query = query.replace(':', ' ').trim();
+  // only look for first index, since value can have colons (e.g. gpu)
+  query = query.trim();
+  let colonIdx = query.indexOf(':');
+  if (colonIdx !== -1) {
+    query = query.substring(colonIdx+1);
+  }
   if (!query || matchPartCaseInsensitive(selectedKey, query)) {
     return allValues;
   }
