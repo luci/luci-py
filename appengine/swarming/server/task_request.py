@@ -453,6 +453,15 @@ class FilesRef(ndb.Model):
   # Namespace on the isolate server.
   namespace = ndb.StringProperty(validator=_validate_namespace, indexed=False)
 
+  def to_proto(self, out):
+    """Converts self to a swarming_pb2.CASTree."""
+    if self.isolated:
+      out.digest = str(self.isolated).decode('hex')
+    if self.isolatedserver:
+      out.server = self.isolatedserver
+    if self.namespace:
+      out.namespace = self.namespace
+
   def _pre_put_hook(self):
     # TODO(maruel): Get default value from config
     # IsolateSettings.default_server.
@@ -490,6 +499,15 @@ class CipdPackage(ndb.Model):
   # If empty, the package will be installed in the run dir.
   path = ndb.StringProperty(indexed=False, validator=_validate_package_path)
 
+  def to_proto(self, out):
+    """Converts self to a swarming_pb2.CIPDPackage."""
+    if self.package_name:
+      out.package_name = self.package_name
+    if self.version:
+      out.version = self.version
+    if self.path:
+      out.dest_path = self.path
+
   def __str__(self):
     return '%s:%s' % (self.package_name, self.version)
 
@@ -516,6 +534,14 @@ class CipdInput(ndb.Model):
 
   # List of packages to install.
   packages = ndb.LocalStructuredProperty(CipdPackage, repeated=True)
+
+  def to_proto(self, out):
+    """Converts self to a swarming_pb2.CIPDInputs."""
+    if self.server:
+      out.server = self.server
+    for c in self.packages:
+      dst = out.packages.add()
+      c.to_proto(dst)
 
   def _pre_put_hook(self):
     if not self.server:
@@ -558,6 +584,11 @@ class CacheEntry(ndb.Model):
   """Describes a named cache that should be present on the bot."""
   name = ndb.StringProperty(validator=_validate_cache_name)
   path = ndb.StringProperty(validator=_validate_cache_path)
+
+  def to_proto(self, out):
+    """Converts self to a swarming_pb2.NamedCacheEntry."""
+    out.name = self.name
+    out.dest_path = self.path
 
   def _pre_put_hook(self):
     if not self.name:
@@ -703,6 +734,44 @@ class TaskProperties(ndb.Model):
     out['dimensions'] = self.dimensions_data
     return out
 
+  def to_proto(self, out):
+    """Converts self to a swarming_pb2.TaskProperties."""
+    self.inputs_ref.to_proto(out.cas_inputs)
+    for c in self.cipd_input.packages:
+      dst = out.cipd_inputs.add()
+      c.to_proto(dst)
+    for c in self.caches:
+      dst = out.named_caches.add()
+      c.to_proto(dst)
+    if self.command:
+      out.command.extend(self.command)
+    if self.relative_cwd:
+      out.relative_cwd = self.relative_cwd
+    if self.extra_args:
+      out.extra_args.extend(self.extra_args)
+    out.has_secret_bytes = self.has_secret_bytes
+    for key, values in sorted(self.dimensions.iteritems()):
+      v = out.dimensions.add()
+      v.key = key
+      v.values.extend(sorted(values))
+    for key, value in sorted(self.env.iteritems()):
+      v = out.env.add()
+      v.key = key
+      v.value = value
+    for key, values in sorted(self.env_prefixes.iteritems()):
+      v = out.env_paths.add()
+      v.key = key
+      v.values.extend(sorted(values))
+    if self.execution_timeout_secs:
+      out.execution_timeout.seconds = self.execution_timeout_secs
+    if self.io_timeout_secs:
+      out.io_timeout.seconds = self.io_timeout_secs
+    if self.grace_period_secs:
+      out.grace_period.seconds = self.grace_period_secs
+    out.idempotent = self.idempotent
+    if self.outputs:
+      out.outputs.extend(self.outputs)
+
   def _pre_put_hook(self):
     super(TaskProperties, self)._pre_put_hook()
     if self.is_terminate:
@@ -836,6 +905,12 @@ class TaskSlice(ndb.Model):
     out = super(TaskSlice, self).to_dict(exclude=['properties'])
     out['properties'] = self.properties.to_dict()
     return out
+
+  def to_proto(self, out):
+    """Converts self to a swarming_pb2.TaskSlice."""
+    self.properties.to_proto(out.properties)
+    out.wait_for_capacity = self.wait_for_capacity
+    out.expiration.seconds = self.expiration_secs
 
   def _pre_put_hook(self):
     # _pre_put_hook() doesn't recurse correctly into
@@ -1012,6 +1087,32 @@ class TaskRequest(ndb.Model):
     if self.task_slices:
       out['task_slices'] = [t.to_dict() for t in self.task_slices]
     return out
+
+  def to_proto(self, out):
+    """Converts self to a swarming_pb2.TaskRequest."""
+    # Scheduling.
+    for task_slice in self.task_slices:
+      t = out.task_slices.add()
+      task_slice.to_proto(t)
+    out.priority = self.priority
+    if self.service_account:
+      out.service_account = self.service_account
+
+    # Information.
+    if self.name:
+      out.name = self.name
+    out.tags.extend(self.tags)
+    if self.user:
+      out.user = self.user
+
+    # Hierarchy and notifications.
+    if self.parent_task_id:
+      out.parent_task_id = self.parent_task_id
+    if self.pubsub_topic:
+      out.pubsub_notification.topic = self.pubsub_topic
+    # self.pubsub_auth_token cannot be retrieved.
+    if self.pubsub_userdata:
+      out.pubsub_notification.userdata = self.pubsub_userdata
 
   def _pre_put_hook(self):
     super(TaskRequest, self)._pre_put_hook()

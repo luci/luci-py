@@ -13,6 +13,8 @@ import unittest
 import test_env
 test_env.setup_test_env()
 
+from google.protobuf import duration_pb2
+
 from google.appengine.api import datastore_errors
 from google.appengine.ext import ndb
 
@@ -20,6 +22,7 @@ from components import auth_testing
 from components import utils
 from test_support import test_case
 
+from proto.api import swarming_pb2
 from server import config
 from server import pools_config
 from server import task_pack
@@ -66,7 +69,7 @@ def _gen_properties(**kwargs):
         isolatedserver=u'https://isolateserver.appspot.com',
         namespace=u'default-gzip'),
     u'io_timeout_secs': None,
-    u'has_secret_bytes': u'secret_bytes' in kwargs,
+    u'has_secret_bytes': False,
   }
   args.update(kwargs)
   args[u'dimensions_data'] = args.pop(u'dimensions')
@@ -818,6 +821,116 @@ class TaskRequestApiTest(TestCase):
     self.assertNotEqual(
         request_1.task_slice(0).properties_hash(),
         request_2.task_slice(0).properties_hash())
+
+  def test_to_proto(self):
+    # Try to set as much things as possible to exercise most code paths.
+    # Except parent_task_id because I'd need to create a parent task and I'm
+    # lazy.
+    request_props = _gen_properties(
+        inputs_ref={
+          'isolated': '0123456789012345678901234567890123456789',
+          'isolatedserver': 'http://localhost:1',
+          'namespace': 'default-gzip',
+        },
+        relative_cwd=u'subdir',
+        caches=[
+          task_request.CacheEntry(name=u'git_chromium', path=u'git_cache'),
+        ],
+        cipd_input=_gen_cipd_input(
+            packages=[
+              task_request.CipdPackage(
+                  package_name=u'foo', path=u'tool', version=u'git:12345'),
+            ],
+        ),
+        idempotent=True,
+        outputs=[u'foo'],
+        has_secret_bytes=True,
+    )
+    request = _gen_request_slices(
+        task_slices=[
+          task_request.TaskSlice(
+              expiration_secs=30,
+              properties=request_props,
+              wait_for_capacity=True,
+          ),
+        ],
+        user=u'Joe',
+        service_account=u'foo@gserviceaccount.com',
+        pubsub_topic=u'projects/a/topics/abc',
+        pubsub_auth_token=u'sekret',
+        pubsub_userdata=u'obscure_reference',
+    )
+    request.put()
+    _gen_secret(request, 'I am a banana')
+
+    expected_props = swarming_pb2.TaskProperties(
+        cas_inputs=swarming_pb2.CASTree(
+            digest='\001#Eg\211\001#Eg\211\001#Eg\211\001#Eg\211',
+            server=u'http://localhost:1',
+            namespace=u'default-gzip',
+        ),
+        cipd_inputs=[
+          swarming_pb2.CIPDPackage(
+              package_name=u'foo', version=u'git:12345', dest_path=u'tool'),
+        ],
+        named_caches=[
+            swarming_pb2.NamedCacheEntry(
+                name=u'git_chromium', dest_path=u'git_cache'),
+        ],
+        command=[u'command1', u'arg1'],
+        relative_cwd=u'subdir',
+        # extra_args cannot be specified with command.
+        # secret_bytes cannot be retrieved.
+        has_secret_bytes=True,
+        dimensions=[
+          swarming_pb2.StringListPair(key=u'OS', values=[u'Windows-3.1.1']),
+          swarming_pb2.StringListPair(key=u'hostname', values=[u'localhost']),
+          swarming_pb2.StringListPair(key=u'pool', values=[u'default']),
+        ],
+        env=[
+          swarming_pb2.StringPair(key=u'foo', value=u'bar'),
+          swarming_pb2.StringPair(key=u'joe', value=u'2'),
+        ],
+        env_paths=[
+          swarming_pb2.StringListPair(key=u'PATH', values=[u'local/path']),
+        ],
+        execution_timeout=duration_pb2.Duration(seconds=30),
+        grace_period=duration_pb2.Duration(seconds=30),
+        idempotent=True,
+        outputs=[u'foo'],
+    )
+    expected = swarming_pb2.TaskRequest(
+        # Scheduling.
+        task_slices=[
+          swarming_pb2.TaskSlice(
+              properties=expected_props,
+              expiration=duration_pb2.Duration(seconds=30),
+              wait_for_capacity=True,
+          ),
+        ],
+        priority=50,
+        service_account=u'foo@gserviceaccount.com',
+        # Information.
+        name=u'Request name',
+        tags=[
+          u'OS:Windows-3.1.1',
+          u'hostname:localhost',
+          u'pool:default',
+          u'priority:50',
+          u'service_account:foo@gserviceaccount.com',
+          u'swarming.pool.template:no_config',
+          u'tag:1',
+          u'user:Joe',
+        ],
+        user=u'Joe',
+        # Notification. auth_token cannot be retrieved.
+        pubsub_notification=swarming_pb2.PubSub(
+            topic=u'projects/a/topics/abc', userdata=u'obscure_reference'),
+    )
+
+    actual = swarming_pb2.TaskRequest()
+    request.to_proto(actual)
+    self.assertEqual(unicode(expected), unicode(actual))
 
   def test_request_bad_values(self):
     with self.assertRaises(AttributeError):
