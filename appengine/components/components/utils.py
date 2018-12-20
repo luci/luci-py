@@ -32,6 +32,7 @@ from google.appengine.api import memcache as gae_memcache
 from google.appengine.api import modules
 from google.appengine.api import taskqueue
 from google.appengine.ext import ndb
+from google.appengine.runtime import apiproxy_errors
 
 from protorpc import messages
 from protorpc.remote import protojson
@@ -93,6 +94,14 @@ def is_unit_test():
       for p in sys.meta_path)
 
 
+def _get_memory_usage():
+  """Returns the amount of memory available as an float in MiB."""
+  try:
+    return apiruntime.runtime.memory_usage().current()
+  except (AssertionError, apiproxy_errors.CancelledError):
+    return None
+
+
 ## Handler
 
 
@@ -110,19 +119,15 @@ def report_memory(app):
   """Wraps an app so handlers log when memory usage increased by at least 0.5MB
   after the handler completed.
   """
-  if is_unit_test():
-    # Otherwise this fails with:
-    # AssertionError: No api proxy found for service "system"
-    return
   min_delta = 0.5
   old_dispatcher = app.router.dispatch
   def dispatch_and_report(*args, **kwargs):
-    before = apiruntime.runtime.memory_usage().current()
+    before = _get_memory_usage()
     try:
       return old_dispatcher(*args, **kwargs)
     finally:
-      after = apiruntime.runtime.memory_usage().current()
-      if after >= before + min_delta:
+      after = _get_memory_usage()
+      if before and after and after >= before + min_delta:
         logging.debug(
             'Memory usage: %.1f -> %.1f MB; delta: %.1f MB',
             before, after, after-before)
