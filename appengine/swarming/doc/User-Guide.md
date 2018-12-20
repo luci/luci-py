@@ -5,7 +5,7 @@ has inputs and generates outputs. A bot can run tasks. Simple, right?
 
 *   [Task](#task): everything to understand Swarming tasks
     *   [Properties](#properties): the task request data to describe a task
-        *   [Idempotency](#idempotency): flag to improve effeciency
+        *   [Idempotency](#idempotency): flag to improve efficiency
     *   [Request](#request): the task request metadata to explain a task
     *   [Results](#results): the result of a task request
 *   [Bot](#bot): everything to understand Swarming bots
@@ -34,7 +34,7 @@ There are 3 important classes of data:
 Task request (and task properties as part of it) are set when the task is
 created and do not change.
 
-A task is referenced to via a task id. It looks like an hex number but should be
+A task is referenced to via a task ID. It looks like an hex number but should be
 treated as a string.
 
 
@@ -56,7 +56,7 @@ Inputs can be a mix of all 4 of:
 *   Named cache(s): local cache directory(ies) to do incremental work to be
     mapped in the task working directory. This tells the worker to create
     directory(ies) to keep even _after_ the task is completed, so files can be
-    resued by some later task that requests the exact same cache. Examples are
+    reused by some later task that requests the exact same cache. Examples are
     local git clone caches, incremental build directories, etc. This adds
     transitivity to the task (non-determinism).
 *   Secret bytes. This data is sent to the task via
@@ -77,7 +77,7 @@ Command execution environment is defined as:
 *   Timeouts:
     *   Hard timeout: the maximum allocated time to run the task.
     *   I/O timeout: the maximum allowed time between output to stdout or
-        stderr.  For example, an I/O timeout of 20 minutes and a Hard timeout of
+        stderr. For example, an I/O timeout of 20 minutes and a Hard timeout of
         60 minutes, a task sleeping for 20 minutes will be killed, even if still
         has allocated time. This catches hung tests faster.
 *   Environment variables can be leveraged to create side effects, for example
@@ -200,7 +200,7 @@ There's 4 ways to interact with Swarming:
 *   Swarming web UI. It is primarily a way to _view_ state, not change it. Two
     exceptions are cancelling a task and retrying a task. The Web UI doesn't
     provide a way to trigger a new task (ping the author if this feature is
-    desireable).
+    desirable).
 *   CLI command line tool. There's a [python
     client](https://github.com/luci/luci-py/tree/master/client) and eventually a
     [Go

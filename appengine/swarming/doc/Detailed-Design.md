@@ -12,7 +12,7 @@ network or device flakiness.
 
 The server runs on [AppEngine](https://developers.google.com/appengine/) and is
 the only communication point for any client or bot that wants to use Swarming.
-Clients send task requests to the server and receive a task id. It's up to the
+Clients send task requests to the server and receive a task ID. It's up to the
 client to poll the server to know when a task is done.
 
 The server uses its DB to store the tasks, the bots' state and stdout from the
@@ -54,7 +54,7 @@ guarantee.
 ### Server configuration
 
 The server has a few major configuration points;
-  - Authentication, usually deletaged to the [auth_service](../../auth_service/)
+  - Authentication, usually delegated to the [auth_service](../../auth_service/)
     instance.
   - [config_service](../../config_service) manages
   - [bootstrap.py](../swarming_bot/config/bootstrap.py) which permits automatic
@@ -107,7 +107,7 @@ Matching is done via the dimensions of the request vs the dimensions of the bot.
 The bot must have all the dimensions listed on the request to be given the task.
 For example, it could be "os=Windows-Vista-SP2; gpu=15ad:0405".
 
-To make the proces efficient, the dimensions are MD5 hashed and only the first
+To make the process efficient, the dimensions are MD5 hashed and only the first
 32 bits are saved so integer comparison can be used. This greatly reduce the
 size of the hot `TaskToRun` entities used for task scheduling and the amount of
 memory necessary on the frontend server.
@@ -219,7 +219,7 @@ The bot's code is served directly from the server as a self-packaged
 `swarming_bot.zip`. The server generates it on the fly and embeds its own URL in
 it. The server can also optionally have a custom
 [bootstrap.py](../swarming_bot/config/bootstrap.py) to further automate the bot
-bootstraping process.
+bootstrapping process.
 
 
 ### Self updating
@@ -329,7 +329,7 @@ See [APIs](#apis) above to write your own client.
 
 ### Requesting a task
 
-When a client wishes to run something on swarming, they can use the REST API or
+When a client wishes to run something on Swarming, they can use the REST API or
 use the client script `swarming.py trigger`. It's a simple HTTPS POST with the
 `TaskRequest` and `TaskProperties` serialized as JSON.
 
@@ -339,7 +339,7 @@ The request message is `NewTaskRequest` as defined in
 
 ### Task -> Bot assignment
 
-The bot selection process is inveryed. It's the bot that polls for tasks. It
+The bot selection process is inverted. It's the bot that polls for tasks. It
 looks at all the products of all the `dimensions` it has and look at the oldest
 task with highest priority that has `dimensions` which are also defined on the
 bot.

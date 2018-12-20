@@ -49,7 +49,7 @@ This schema is an example of a task with two tries. This happens when the first
 try resulted in `TaskRunResult.state == BOT_DIED`. This is a relatively rare
 case.
 
-**Note**: Entities marked with an asterix `*` may not be stored in certain
+**Note**: Entities marked with an asterisk `*` may not be stored in certain
 situations, like for deduplicated tasks, tasks that didn't run due to internal
 failure, or tasks with no secret bytes provided (for SecretBytes).
 
@@ -202,12 +202,12 @@ reduce DB contention.
 
   - TaskRequest has almost monotonically decreasing key ids based on time NOT'ed
     to make it decreasing. See task_request.py for more detail.
-  - TaskResultSummary has key id = 1.
-  - TaskRunResult has monotonically increasing key id starting at 1.
-  - TaskToRun has the key id as `dimensions_hash` value is calculated as an
+  - TaskResultSummary has key ID = 1.
+  - TaskRunResult has monotonically increasing key ID starting at 1.
+  - TaskToRun has the key ID as `dimensions_hash` value is calculated as an
     int32 from the TaskRequest.properties.dimensions dictionary.
-  - PerformanceStats has key id = 1.
-  - BotTaskDimensions and TaskDimensions have key id `dimensions_hash`. This
+  - PerformanceStats has key ID = 1.
+  - BotTaskDimensions and TaskDimensions have key ID `dimensions_hash`. This
     value is calculated as an int32 from the TaskRequest.properties.dimensions
     dictionary.
 

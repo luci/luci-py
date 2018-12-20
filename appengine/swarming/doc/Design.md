@@ -23,7 +23,7 @@ scale.
 We also wanted to go "outside the lab" so that everything would be **encrypted
 over HTTPS and accessible from the internet** by default. Network management,
 like NAT'ing switches, vlan, etc can take a significant amount of time to do and
-to do proper bookeeping. By having the service accessible from the internet with
+to do proper bookkeeping. By having the service accessible from the internet with
 one way connections always initiated from the bot, it saves a lot of network
 topology configuration.
 

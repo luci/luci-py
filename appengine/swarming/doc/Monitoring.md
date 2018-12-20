@@ -3,7 +3,7 @@
 Monitoring is done in two parts: capacity and throughput.
 
 Capacity is about the bots and what they are doing. Are bots efficient, mostly
-dead, or wasting their time either continously rebooting or running bot\_config
+dead, or wasting their time either continuously rebooting or running bot\_config
 hooks?
 
 Throughput is about the tasks that are enqueued and executed. Are tasks pending

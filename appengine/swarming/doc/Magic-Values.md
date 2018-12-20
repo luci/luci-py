@@ -1,14 +1,14 @@
 # Magic Values
 
-Describes magic values on the swarming server
+Describes magic values on the Swarming server
 
 ## Introduction
 
-There are a few "magic" values in the isolate and swarming server. Also some
+There are a few "magic" values in the isolate and Swarming server. Also some
 dimensions and state values have special meaning.
 
 
-## client tools environment variables
+## client tool environment variables
 
 For tools in luci-py/client, the following environment variables have effect:
 
@@ -27,16 +27,16 @@ environment variables passed in the command line with the `--env` option.
     variable, it will be replaced by the temporary directory that is uploaded
     back to the server after the task execution.
 *   `${SWARMING_BOT_FILE}`: If found on command line argument or environment
-    variable, it will replaced by a file written to by the swarming bot's
-    on_before_task() hook in the swarming server's custom bot_config.py. This is
-    used by a swarming bot to communicate state of the bot to tasks.
+    variable, it will replaced by a file written to by the Swarming bot's
+    on_before_task() hook in the Swarming server's custom bot_config.py. This is
+    used by a Swarming bot to communicate state of the bot to tasks.
 
 
 ## Swarming
 
 ### Bot
 
-The bot exposes two differents set of values, the dimensions and the states. The
+The bot exposes two different set of values, the dimensions and the states. The
 dimensions are what is used for task selection, so they are very important. The
 states are for monitoring purposes, thus are not strictly required but are
 useful to report information about the bot like the amount of free disk space.
@@ -60,10 +60,10 @@ starting `swarming_bot.zip` to alter the bot's behavior:
     information.
 *   `LUCI_GRPC_PROXY_VERBOSE` dumps out additional gRPC proxy information if set
     to a truthy value (e.g. `1`).
-*   `SWARMING_BOT_ID` can be used to override hostname-based bot id with a
-    custom value. Must be specified before swarming script is started. Note that
+*   `SWARMING_BOT_ID` can be used to override hostname-based bot ID with a
+    custom value. Must be specified before Swarming script is started. Note that
     this environment variable will be set even if it was not specified manually
-    and will always contain the bot id used.
+    and will always contain the bot ID used.
 *   `SWARMING_EXTERNAL_BOT_SETUP=1` disables `bot_config.setup_bot()` hook.
 *   `SWARMING_GRPC_PROXY=<url>` and `ISOLATED_GRPC_PROXY=<url>` override the
     equivalent value in the bot config.
@@ -127,8 +127,8 @@ When a Swarming bot is running a task, the following environment variables are
 always set while running the task:
 
 *   `SWARMING_HEADLESS=1` is always set.
-*   `SWARMING_BOT_ID` is set to the bot id.
-*   `SWARMING_TASK_ID` is set to the task id.
+*   `SWARMING_BOT_ID` is set to the bot ID.
+*   `SWARMING_TASK_ID` is set to the task ID.
 
 
 ### Task dimensions
@@ -155,7 +155,7 @@ user chosen. A small subset of the tags have predefined meaning:
     Milo](https://chromium.googlesource.com/infra/luci/luci-go/+/master/milo/)
     annotation processing support.
 *   `source_revision`: if present, it specifies the SCM revision related to the
-    task.  This allows the UI to link to the relevant revision.
+    task. This allows the UI to link to the relevant revision.
 *   `source_repo`: if present, it is a url to the hosted SCM related to the
-    task, with a %s where the revision should be placed.  This allows the UI
+    task, with a %s where the revision should be placed. This allows the UI
     to link to the relevant revision.
