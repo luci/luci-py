@@ -736,7 +736,8 @@ class TaskProperties(ndb.Model):
 
   def to_proto(self, out):
     """Converts self to a swarming_pb2.TaskProperties."""
-    self.inputs_ref.to_proto(out.cas_inputs)
+    if self.inputs_ref:
+      self.inputs_ref.to_proto(out.cas_inputs)
     for c in self.cipd_input.packages:
       dst = out.cipd_inputs.add()
       c.to_proto(dst)

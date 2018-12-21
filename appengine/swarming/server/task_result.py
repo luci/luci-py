@@ -340,6 +340,17 @@ class OperationStats(ndb.Model):
     out['total_bytes_items_hot'] = self.total_bytes_items_hot
     return out
 
+  def to_proto(self, out):
+    """Converts self to a swarming_pb2.CASEntriesStats."""
+    if self.duration:
+      out.duration.FromTimedelta(datetime.timedelta(seconds=self.duration))
+    # TODO(maruel): Process items_cold and items_hot.
+    # out.cold
+    # out.hot
+    # TODO(maruel): Put initial_number_items and initial_size in the bot
+    # snapshot for now, until this is better restructured later.
+    # https://crbug.com/850560
+
   def _ensure_cache(self):
     if self._num_items_cold is None and self.items_cold:
       items_cold = large.unpack(self.items_cold)
@@ -388,6 +399,22 @@ class PerformanceStats(ndb.Model):
     out['isolated_download'] = self.isolated_download.to_dict()
     out['isolated_upload'] = self.isolated_upload.to_dict()
     return out
+
+  def to_proto(self, out):
+    """Converts self to a swarming_pb2.TaskPerformance"""
+    # out.cost_usd is not set here.
+    if self.bot_overhead:
+      out.other_overhead.FromTimedelta(
+          datetime.timedelta(seconds=self.bot_overhead))
+
+    dur = (
+        (self.package_installation.duration or 0.) +
+        (self.isolated_download.duration or 0.))
+    if dur:
+      out.setup.duration.FromTimedelta(datetime.timedelta(seconds=dur))
+
+    if self.isolated_upload.duration:
+      self.isolated_upload.to_proto(out.teardown)
 
   def _pre_put_hook(self):
     if self.bot_overhead is None:
@@ -679,6 +706,67 @@ class _TaskResultCommon(ndb.Model):
     out.pop('stdout_chunks')
     out['id'] = self.task_id
     return out
+
+  def to_proto(self, out):
+    """Converts self to a swarming_pb2.TaskResult"""
+    out.create_time.FromDatetime(self.created_ts)
+    if self.started_ts:
+      out.start_time.FromDatetime(self.started_ts)
+    if self.completed_ts:
+      out.end_time.FromDatetime(self.completed_ts)
+    if self.abandoned_ts:
+      out.abandon_time.FromDatetime(self.abandoned_ts)
+      # Eventually abandoned_ts will be when the task is killed or timed out,
+      # and completed_ts always when the task completed. Stay compatible with
+      # entities not storing completed_ts in this case by copying the value in
+      # the proto.
+      if not self.completed_ts:
+        out.end_time.FromDatetime(self.abandoned_ts)
+    if self.duration:
+      out.duration.FromTimedelta(datetime.timedelta(seconds=self.duration))
+    out.state = self.task_state
+    # Convert state to category.
+    out.state_category = self.task_state & 0xF0
+    out.try_number = self.try_number
+    out.current_task_slice = self.current_task_slice
+    if self.bot_dimensions:
+      # TODO(maruel): Keep a complete snapshot. This is a bit clunky at the
+      # moment. https://crbug.com/850560
+      for key, values in sorted(self.bot_dimensions.iteritems()):
+        dst = out.bot.dimensions.add()
+        dst.key = key
+        dst.values.extend(values)
+        if key == u'id':
+          out.bot.bot_id = values[0]
+        elif key == u'pool':
+          out.bot.pools.extend(values)
+    out.server_versions.extend(self.server_versions)
+    out.children_task_ids.extend(self.children_task_ids)
+    if self.deduped_from:
+      out.deduped_from = self.deduped_from
+    out.task_id = task_pack.pack_result_summary_key(self.result_summary_key)
+    if self.run_result_key:
+      out.run_id = task_pack.pack_run_result_key(self.run_result_key)
+
+    # TODO(maruel): Make sure we enforce the same CIPD server for all TaskSlice.
+    props = self.request.task_slices[0].properties
+    if props.cipd_input:
+      out.cipd_pins.server = props.cipd_input.server
+    if self.cipd_pins:
+      if self.cipd_pins.client_package:
+        self.cipd_pins.client_package.to_proto(out.cipd_pins.client_package)
+      for pkg in self.cipd_pins.packages:
+        dst = out.cipd_pins.packages.add()
+        pkg.to_proto(dst)
+
+    if self.cost_usd:
+      out.performance.cost_usd = self.cost_usd
+    if self.performance_stats:
+      self.performance_stats.to_proto(out.performance)
+    if self.exit_code is not None:
+      out.exit_code = self.exit_code
+    if self.outputs_ref:
+      self.outputs_ref.to_proto(out.outputs)
 
   def signal_server_version(self, server_version):
     """Adds `server_version` to self.server_versions if relevant."""

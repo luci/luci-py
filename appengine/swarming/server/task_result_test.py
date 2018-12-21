@@ -13,6 +13,8 @@ import unittest
 import test_env
 test_env.setup_test_env()
 
+from google.protobuf import duration_pb2
+
 from google.appengine.api import datastore_errors
 from google.appengine.ext import ndb
 
@@ -605,6 +607,117 @@ class TaskResultApiTest(TestCase):
     check(swarming_pb2.NO_RESOURCE, state=task_result.State.NO_RESOURCE)
     # https://crbug.com/916562: LOAD_SHED
     # https://crbug.com/916557: RESOURCE_EXHAUSTED
+
+  def test_to_proto(self):
+    cipd_client_pkg = task_request.CipdPackage(
+        package_name=u'infra/tools/cipd/${platform}',
+        version=u'git_revision:deadbeef')
+    run_result = _gen_result(
+        properties=_gen_properties(
+            cipd_input={
+              u'client_package': cipd_client_pkg,
+              u'packages': [
+                task_request.CipdPackage(
+                    package_name=u'rm',
+                    path=u'bin',
+                    version=u'latest'),
+              ],
+              u'server': u'http://localhost:2'
+            },
+        ),
+    )
+    run_result.started_ts = self.now + datetime.timedelta(seconds=20)
+    run_result.abandoned_ts = self.now + datetime.timedelta(seconds=30)
+    run_result.completed_ts = self.now + datetime.timedelta(seconds=40)
+    run_result.modified_ts = self.now + datetime.timedelta(seconds=50)
+    run_result.duration = 1.
+    run_result.current_task_slice = 2
+    run_result.exit_code = 1
+    run_result.children_task_ids = [u'12310']
+    run_result.outputs_ref = task_request.FilesRef(
+        isolated=u'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef',
+        isolatedserver=u'http://localhost:1',
+        namespace=u'default-gzip')
+    run_result.cipd_pins = task_result.CipdPins(
+        client_package=cipd_client_pkg,
+        packages=[
+          task_request.CipdPackage(
+              package_name=u'rm', path=u'bin', version=u'stable'),
+        ])
+    task_result.PerformanceStats(
+        key=task_pack.run_result_key_to_performance_stats_key(run_result.key),
+        bot_overhead=0.1,
+        isolated_download=task_result.OperationStats(
+            duration=0.05, initial_number_items=10, initial_size=10000,
+            items_cold=large.pack([1, 2]),
+            items_hot=large.pack([3, 4, 5])),
+        isolated_upload=task_result.OperationStats(
+            duration=0.01,
+            items_cold=large.pack([10]))).put()
+
+    # Note: It cannot be both TIMED_OUT and have run_result.deduped_from set.
+    run_result.state = task_result.State.TIMED_OUT
+    run_result.bot_dimensions = {u'id': [u'bot1'], u'pool': [u'default']}
+    run_result.put()
+
+    expected = swarming_pb2.TaskResult(
+        duration=duration_pb2.Duration(seconds=1),
+        state=swarming_pb2.TIMED_OUT,
+        state_category=swarming_pb2.CATEGORY_EXECUTION_DONE,
+        try_number=1,
+        current_task_slice=2,
+        bot=swarming_pb2.Bot(
+            bot_id=u'bot1',
+            pools=[u'default'],
+            dimensions=[
+              swarming_pb2.StringListPair(key=u'id', values=[u'bot1']),
+              swarming_pb2.StringListPair(key=u'pool', values=[u'default']),
+            ],
+        ),
+        server_versions=[u'v1a'],
+        children_task_ids=[u'12310'],
+        #deduped_from=u'123410',
+        task_id=u'1d69b9f088008810',
+        run_id=u'1d69b9f088008811',
+        cipd_pins=swarming_pb2.CIPDPins(
+            server=u'http://localhost:2',
+            client_package=swarming_pb2.CIPDPackage(
+                package_name=u'infra/tools/cipd/${platform}',
+                version=u'git_revision:deadbeef',
+            ),
+            packages=[
+              swarming_pb2.CIPDPackage(
+                  package_name=u'rm',
+                  version=u'stable',
+                  dest_path=u'bin',
+              ),
+            ],
+        ),
+        performance=swarming_pb2.TaskPerformance(
+            other_overhead=duration_pb2.Duration(nanos=100000000),
+            setup=swarming_pb2.TaskOverheadStats(
+              duration=duration_pb2.Duration(nanos=50000000),
+            ),
+            teardown=swarming_pb2.TaskOverheadStats(
+              duration=duration_pb2.Duration(nanos=10000000),
+            ),
+        ),
+        exit_code=1,
+        outputs=swarming_pb2.CASTree(
+            digest=u'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef',
+            server=u'http://localhost:1',
+            namespace=u'default-gzip')
+    )
+    expected.create_time.FromDatetime(self.now)
+    expected.start_time.FromDatetime(
+        self.now + datetime.timedelta(seconds=20))
+    expected.abandon_time.FromDatetime(
+        self.now + datetime.timedelta(seconds=30))
+    expected.end_time.FromDatetime(self.now + datetime.timedelta(seconds=40))
+
+    actual = swarming_pb2.TaskResult()
+    run_result.to_proto(actual)
+    self.assertEqual(unicode(expected), unicode(actual))
 
   def test_performance_stats_pre_put_hook(self):
     with self.assertRaises(datastore_errors.BadValueError):

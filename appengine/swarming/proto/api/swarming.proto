@@ -798,6 +798,176 @@ message PubSub {
   string userdata = 3;
 }
 
+// TaskResult is the state of a TaskRequest as it is processed by Swarming.
+//
+// When stored in BigQuery, it is stored once per try attempt, once the
+// state_category is one of CATEGORY_TRANSIENT_DONE or CATEGORY_EXECUTION_DONE.
+//
+// Also doing it for CATEGORY_NEVER_RAN_DONE is https://crbug.com/917106.
+message TaskResult {
+  TaskRequest request = 1;
+
+  // Timing information.
+
+  // Time the task was requested.
+  google.protobuf.Timestamp create_time = 2;
+  // Time the task started being run by a bot, before RUNNING_OVERHEAD_SETUP.
+  //
+  // Doing "start_time - create_time" gives the task pending time.
+  google.protobuf.Timestamp start_time = 3;
+  // Time when the task was abandoned instead of normal completion.
+  //
+  // This happens for example when a task was KILLED, this then represents the
+  // time a client requested the task to be killed, which is before end_time.
+  // Same for TIMED_OUT state, this then represents the time when the bot
+  // decided to abort the task.
+  google.protobuf.Timestamp abandon_time = 4;
+  // Time the task completed and teared down, after RUNNING_OVERHEAD_TEARDOWN.
+  //
+  // Doing "end_time - start_time" will not lead to the exact task duration,
+  // since this time frame includes overheads.
+  google.protobuf.Timestamp end_time = 5;
+  // Duration of the task. This excludes overheads.
+  google.protobuf.Duration duration = 6;
+
+  // Execution information.
+
+  // Current state of the task (e.g. PENDING, RUNNING, COMPLETED, EXPIRED, etc).
+  TaskState state = 7;
+  // The category of the current task state. This is primarily useful to
+  // simplify BigQuery queries. This can be used to determine if a task is done
+  // or if still considered for execution.
+  TaskStateCategory state_category = 8;
+  // The task try number.
+  //
+  // It is 0 for a deduped task, since nothing ran. It is 0 if the task is still
+  // PENDING.
+  //
+  // It is normally 1 for a task that started running and runs a normal flow.
+  //
+  // A number above 1 means that the the task was tried multiple times. It can
+  // be due to a previous try resulting in a task state in the category
+  // CATEGORY_TRANSIENT_DONE.
+  int32 try_number = 9;
+  // Index in the TaskRequest.task_slices (TaskSlice instance) that this result
+  // represents. This is updated when a TaskSlice is enqueued to run. It can be
+  // updated until the task state is in either category CATEGORY_EXECUTION_DONE
+  // or CATEGORY_NEVER_RAN_DONE.
+  //
+  // The TaskSlice contains a TaskProperties, which defines what is run.
+  int32 current_task_slice = 10;
+  // Snapshot of the bot that was assigned to this task at the start of the
+  // task. This includes bot local cache information.
+  Bot bot = 11;
+  // Server versions that touched this task.
+  //
+  // A different version of the server may get the request and hand it to the
+  // bot. This is primarily useful to detect if a new server version introduced
+  // a bug and for canarying purpose.
+  repeated string server_versions = 12;
+
+  // Task identity and hierarchy information.
+
+  // List of children task IDs that this task triggered, if any.
+  //
+  // This happens only in the case of reentrant tasks, a Swarming task that
+  // itself triggers more Swarming task. Each of these task will have 'run_id'
+  // set as their 'TaskRequest.parent_task_id'.
+  repeated string children_task_ids = 13;
+  // Task ID which results was reused for state DEDUPED.
+  string deduped_from = 14;
+  // Summary task ID (ending with '0') when creating a new task.
+  string task_id = 15;
+  // Actual executed task id that this task represents.
+  //
+  // This value is only set if it ran, that is, the task went through one of the
+  // state in CATEGORY_RUNNING.
+  //
+  // A task_id can have multiple run_id associated to it, they will have the
+  // corresponding try_number incremented starting at 1.
+  string run_id = 16;
+
+  // Task metadata for inputs (reproducibility) and performance.
+
+  // Listing of the actual pinned CIPDPackages that the task used.
+  //
+  // These can vary from the input packages if the inputs included non-identity
+  // versions (e.g. a ref like "latest"). This can be available once task setup
+  // is completed.
+  CIPDPins cipd_pins = 17;
+  // Statistics about overhead for an isolated task. This is populated as the
+  // task goes through setup, execution and teardown.
+  TaskPerformance performance = 18;
+
+  // Task's process result.
+
+  // Process exit code if relevant. May be forcibly set to -1 in exceptional
+  // cases.
+  sint32 exit_code = 19;
+  // Isolated outputs, if any.
+  CASTree outputs = 20;
+}
+
+// Defines pinned CIPD packages that were installed during the task.
+message CIPDPins {
+  // The CIPD server where the CIPD packages were fetched from. Must contain
+  // "https://" or "http://" prefix.
+  //
+  // This field or its subfields are optional if default CIPD client is defined
+  // in the server config.
+  string server = 1;
+  // The pinned package + version of the CIPD client that was actually used.
+  CIPDPackage client_package = 2;
+  // List of CIPD packages that were installed in the task with fully resolved
+  // package names and versions.
+  repeated CIPDPackage packages = 3;
+}
+
+// Information about the task's performance.
+message TaskPerformance {
+  // Total cost of running this task in $USD. In the case of DEDUPED task, this
+  // represents the amount saved.
+  float cost_usd = 1;
+  // Overhead that is caused by the bot server that is not accounted for by the
+  // other overheads.
+  google.protobuf.Duration other_overhead = 2;
+  // Task environment setup overhead. This is the task state
+  // RUNNING_OVERHEAD_SETUP.
+  TaskOverheadStats setup = 3;
+  // Task environment teardown overhead. This is the task state
+  // RUNNING_OVERHEAD_TEARDOWN.
+  TaskOverheadStats teardown = 4;
+}
+
+// Information about setup or teardown.
+message TaskOverheadStats {
+  // Duration of this overhead.
+  google.protobuf.Duration duration = 1;
+
+  // CAS entries that were not present in the local or remote cache and had to
+  // be sent across the network.
+  CASEntriesStats cold = 2;
+  // CAS entries that were in the cache and thus didn't have to be transferred.
+  CASEntriesStats hot = 3;
+
+  // CIPD information:
+  // TODO(maruel): Add.
+
+  // Named cache information:
+  // TODO(maruel): Add.
+}
+
+// Statistics for differential CAS entries in the context of I/O for a task.
+message CASEntriesStats {
+  int64 num_items = 1;
+  int64 total_bytes_items = 2;
+  // This buffer is compressed as deflate'd delta-encoded varints. This is the
+  // list of all the item size for an I/O operation, which can scale in the 100k
+  // range. So this can be large! See //client/utils/large.py for the code to
+  // handle these.
+  bytes items = 6;
+}
+
 // TaskStateCategory represents the 5 different categories of task state.
 //
 // For active state categories (RUNNING_MASK and TRANSIENT_DONE_MASK), it is
