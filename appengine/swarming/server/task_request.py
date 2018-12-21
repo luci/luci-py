@@ -738,9 +738,11 @@ class TaskProperties(ndb.Model):
     """Converts self to a swarming_pb2.TaskProperties."""
     if self.inputs_ref:
       self.inputs_ref.to_proto(out.cas_inputs)
-    for c in self.cipd_input.packages:
-      dst = out.cipd_inputs.add()
-      c.to_proto(dst)
+    if self.cipd_input:
+      # It's possible for self.cipd_input to be None.
+      for c in self.cipd_input.packages:
+        dst = out.cipd_inputs.add()
+        c.to_proto(dst)
     for c in self.caches:
       dst = out.named_caches.add()
       c.to_proto(dst)
@@ -1101,6 +1103,7 @@ class TaskRequest(ndb.Model):
       out.service_account = self.service_account
 
     # Information.
+    out.create_time.FromDatetime(self.created_ts)
     if self.name:
       out.name = self.name
     out.tags.extend(self.tags)
@@ -1108,6 +1111,9 @@ class TaskRequest(ndb.Model):
       out.user = self.user
 
     # Hierarchy and notifications.
+    if self.key:
+      # The task_id can only be set if the TaskRequest entity has a valid key.
+      out.task_id = self.task_id
     if self.parent_task_id:
       out.parent_task_id = self.parent_task_id
     if self.pubsub_topic:

@@ -732,11 +732,13 @@ message TaskRequest {
 
   // Task information metadata: doesn't affect what is run.
 
+  // When the task was created.
+  google.protobuf.Timestamp create_time = 4;
   // Task name for display purpose.
   //
   // Note: this value is not indexed. If you want to be able to query for tasks
   // based on names, use tags below.
-  string name = 4;
+  string name = 5;
   // Tags are 'key:value' strings that describes what the task is about (it's
   // semantic meaning).
   //
@@ -746,12 +748,14 @@ message TaskRequest {
   // The tags are indexed, thus can be used for search with exact matches.
   //
   // Items must be sorted.
-  repeated string tags = 5;
+  repeated string tags = 6;
   // User for this task is run, if relevant. Not validated.
-  string user = 6;
+  string user = 7;
 
   // Task hierarchy and notifications
 
+  // Its own task result ID.
+  string task_id = 8;
   // Parent Swarming task ID of the process requesting this task.
   //
   // This is to tell the server about reentrancy: when a task creates children
@@ -760,9 +764,9 @@ message TaskRequest {
   //
   // TODO(maruel): Should not be necessary to specify at task creation, can be
   // inferred.
-  string parent_task_id = 7;
+  string parent_task_id = 9;
   // Send notification to this pubsub topic for updates of this task.
-  PubSub pubsub_notification = 8;
+  PubSub pubsub_notification = 10;
 }
 
 // PubSub is a Cloud Pub/Sub topic to send task updates to.

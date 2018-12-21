@@ -14,6 +14,7 @@ import test_env
 test_env.setup_test_env()
 
 from google.protobuf import duration_pb2
+from google.protobuf import timestamp_pb2
 
 from google.appengine.api import datastore_errors
 from google.appengine.ext import ndb
@@ -824,8 +825,20 @@ class TaskRequestApiTest(TestCase):
 
   def test_to_proto(self):
     # Try to set as much things as possible to exercise most code paths.
-    # Except parent_task_id because I'd need to create a parent task and I'm
-    # lazy.
+    def getrandbits(i):
+      self.assertEqual(i, 16)
+      return 0x7766
+    self.mock(random, 'getrandbits', getrandbits)
+    self.mock_now(task_request._BEGINING_OF_THE_WORLD)
+
+    # Parent entity must have a valid key id and be stored.
+    # This task uses user:Jesus, which will be inherited automatically.
+    parent = _gen_request()
+    parent.key = task_request.new_request_key()
+    parent.put()
+    # The reference is to the TaskRunResult.
+    parent_id = task_pack.pack_request_key(parent.key) + u'1'
+
     request_props = _gen_properties(
         inputs_ref={
           'isolated': '0123456789012345678901234567890123456789',
@@ -854,12 +867,18 @@ class TaskRequestApiTest(TestCase):
               wait_for_capacity=True,
           ),
         ],
+        # The user is ignored; the value is overridden by the parent task's
+        # user.
         user=u'Joe',
+        parent_task_id=parent_id,
         service_account=u'foo@gserviceaccount.com',
         pubsub_topic=u'projects/a/topics/abc',
         pubsub_auth_token=u'sekret',
         pubsub_userdata=u'obscure_reference',
     )
+    # Necessary to have a valid task_id:
+    request.key = task_request.new_request_key()
+    # Necessary to attach a secret to the request:
     request.put()
     _gen_secret(request, 'I am a banana')
 
@@ -911,6 +930,7 @@ class TaskRequestApiTest(TestCase):
         priority=50,
         service_account=u'foo@gserviceaccount.com',
         # Information.
+        create_time=timestamp_pb2.Timestamp(seconds=1262304000),
         name=u'Request name',
         tags=[
           u'OS:Windows-3.1.1',
@@ -920,9 +940,12 @@ class TaskRequestApiTest(TestCase):
           u'service_account:foo@gserviceaccount.com',
           u'swarming.pool.template:no_config',
           u'tag:1',
-          u'user:Joe',
+          u'user:Jesus',
         ],
-        user=u'Joe',
+        user=u'Jesus',
+        # Hierarchy.
+        task_id=u'776610',
+        parent_task_id=parent_id,
         # Notification. auth_token cannot be retrieved.
         pubsub_notification=swarming_pb2.PubSub(
             topic=u'projects/a/topics/abc', userdata=u'obscure_reference'),
