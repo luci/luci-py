@@ -460,7 +460,8 @@ class BotManagementTest(test_case.TestCase):
     # Empty, nothing is done. No need to mock the HTTP client.
     self.assertEqual(0, bot_management.cron_send_to_bq())
     # State is not stored if nothing was found.
-    self.assertEqual(None, bot_management.BqStateBotEvents.get_by_id(1))
+    self.assertEqual(
+        None, bot_management.bq_state.BqState.get_by_id('bot_events'))
 
   def test_cron_send_to_bq(self):
     payloads = []
@@ -471,10 +472,10 @@ class BotManagementTest(test_case.TestCase):
           url)
       payloads.append(payload)
       self.assertEqual('POST', method)
-      self.assertEqual(bot_management.bqh.INSERT_ROWS_SCOPE, scopes)
+      self.assertEqual(bot_management.bq_state.bqh.INSERT_ROWS_SCOPE, scopes)
       self.assertEqual(600, deadline)
       return {'insertErrors': []}
-    self.mock(bot_management.net, 'json_request', json_request)
+    self.mock(bot_management.bq_state.net, 'json_request', json_request)
 
     # Generate a few events.
     self.mock_now(self.now, 10)
@@ -488,12 +489,16 @@ class BotManagementTest(test_case.TestCase):
     # request_sleep is not streamed.
     self.assertEqual(2, bot_management.cron_send_to_bq())
     expected = {
-      'failed': [],
-      'last': self.now + datetime.timedelta(seconds=30),
+      'failed_bq_keys': [],
+      'failed_db_keys': [],
+      'last_bq_key': u'id1:2010-01-02T03:04:35.000006Z',
+      'last_db_key':
+        u'agpzYW1wbGUtYXBwciQLEgdCb3RSb290IgNpZDEMCxIIQm90RXZlbnQY_v______Hww',
       'ts': self.now + datetime.timedelta(seconds=40),
     }
     self.assertEqual(
-        expected, bot_management.BqStateBotEvents.get_by_id(1).to_dict())
+        expected,
+        bot_management.bq_state.BqState.get_by_id('bot_events').to_dict())
 
     expected = [
       {
@@ -520,7 +525,7 @@ class BotManagementTest(test_case.TestCase):
       first = not payloads
       payloads.append(payload)
       self.assertEqual('POST', method)
-      self.assertEqual(bot_management.bqh.INSERT_ROWS_SCOPE, scopes)
+      self.assertEqual(bot_management.bq_state.bqh.INSERT_ROWS_SCOPE, scopes)
       self.assertEqual(600, deadline)
       # Return an error on the first call.
       if first:
@@ -533,7 +538,7 @@ class BotManagementTest(test_case.TestCase):
           ],
         }
       return {'insertErrors': []}
-    self.mock(bot_management.net, 'json_request', json_request)
+    self.mock(bot_management.bq_state.net, 'json_request', json_request)
 
     # Generate two events.
     self.mock_now(self.now, 10)
@@ -545,12 +550,16 @@ class BotManagementTest(test_case.TestCase):
     # The cron job will loop twice.
     self.assertEqual(2, bot_management.cron_send_to_bq())
     expected = {
-      'failed': [],
-      'last': self.now + datetime.timedelta(seconds=20),
+      'failed_bq_keys': [],
+      'failed_db_keys': [],
+      'last_bq_key': u'id1:2010-01-02T03:04:25.000006Z',
+      'last_db_key':
+        u'agpzYW1wbGUtYXBwciQLEgdCb3RSb290IgNpZDEMCxIIQm90RXZlbnQY_v______Hww',
       'ts': self.now + datetime.timedelta(seconds=30),
     }
     self.assertEqual(
-        expected, bot_management.BqStateBotEvents.get_by_id(1).to_dict())
+        expected,
+        bot_management.bq_state.BqState.get_by_id('bot_events').to_dict())
 
     self.assertEqual(2, len(payloads), payloads)
     expected = {
@@ -573,7 +582,6 @@ class BotManagementTest(test_case.TestCase):
 
     # Next cron skips everything that was processed.
     self.assertEqual(0, bot_management.cron_send_to_bq())
-
 
 
 if __name__ == '__main__':

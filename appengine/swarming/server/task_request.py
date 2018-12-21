@@ -66,6 +66,8 @@ from components import pubsub
 from components import utils
 from components.config import validation
 
+from proto.api import swarming_pb2
+from server import bq_state
 from server import config
 from server import directory_occlusion
 from server import pools_config
@@ -1620,3 +1622,51 @@ def cron_delete_old_task_requests():
         _format_ts(first_ts), _format_ts(last_ts),
         _format_delta(last_ts, first_ts),
         _format_ts(end_ts), _format_delta(end_ts, last_ts))
+
+
+def cron_send_to_bq():
+  """Sends the TaskRequest to BigQuery.
+
+  Returns:
+    total number of task requests sent to BQ.
+  """
+  fmt = u'%Y-%m-%dT%H:%M:%S.%fZ'
+  def _convert(e):
+    """Returns a tuple(db_key, bq_key, row)."""
+    out = swarming_pb2.TaskRequest()
+    e.to_proto(out)
+    return (e.created_ts.strftime(fmt), e.task_id, out)
+
+  def get_oldest_key():
+    """Returns a tuple(db_key, bq_key)."""
+    # BigQuery requires partitioned table to not insert items older than 365
+    # days old, so start at entities only 364 days old.
+    cutoff = (utils.utcnow() - datetime.timedelta(days=364))
+    cutoff = datetime.datetime(cutoff.year, cutoff.month, cutoff.day)
+    oldest = TaskRequest.query(TaskRequest.created_ts >= cutoff).order(
+        TaskRequest.created_ts).get()
+    if not oldest:
+      return None, None
+    # Since the query is an inequality > (and not >=), go back in time.
+    return (
+      (oldest.created_ts - datetime.timedelta(seconds=1)).strftime(fmt),
+      oldest.task_id,
+    )
+
+  def get_rows(db_key, _bq_key, size):
+    """Returns a list of tuple(db_key, bq_key, row)."""
+    earliest = datetime.datetime.strptime(db_key, fmt)
+    return [
+        _convert(e) for e in
+        TaskRequest.query(TaskRequest.created_ts > earliest).order(
+            TaskRequest.created_ts).fetch(limit=size)
+        if e
+    ]
+
+  def fetch_rows(_db_keys, bq_keys):
+    """Returns a list of tuple(db_key, bq_key, row)."""
+    keys = (task_pack.unpack_request_key(k[:-1]) for k in bq_keys)
+    return [_convert(e) for e in ndb.get_multi(keys) if e]
+
+  return bq_state.cron_send_to_bq(
+      'task_requests', get_oldest_key, get_rows, fetch_rows)

@@ -68,13 +68,41 @@ echo ""
 echo "  Warning: On first 'bqschemaupdater' invocation, it'll request default"
 echo "    credentials which is stored independently than 'bq'."
 cd proto/api
-if ! (bqschemaupdater -force -message swarming.v1.BotEvent \
-  -table ${APPID}.swarming.bot_events); then
+if ! (bqschemaupdater -force \
+    -message swarming.v1.BotEvent \
+    -table ${APPID}.swarming.bot_events \
+    -partitioning-field event_time); then
   echo ""
   echo ""
   echo "Oh no! You may need to restart from scratch. You can do so with:"
   echo ""
   echo "  bq rm ${APPID}:swarming.bot_events"
+  echo ""
+  echo "and run this script again."
+  exit 1
+fi
+if ! (bqschemaupdater -force \
+    -message swarming.v1.TaskRequest \
+    -table ${APPID}.swarming.task_requests \
+    -partitioning-field created_time); then
+  echo ""
+  echo ""
+  echo "Oh no! You may need to restart from scratch. You can do so with:"
+  echo ""
+  echo "  bq rm ${APPID}:swarming.task_requests"
+  echo ""
+  echo "and run this script again."
+  exit 1
+fi
+if ! (bqschemaupdater -force \
+    -message swarming.v1.TaskResult \
+    -table ${APPID}.swarming.task_results \
+    -partitioning-field completed_time); then
+  echo ""
+  echo ""
+  echo "Oh no! You may need to restart from scratch. You can do so with:"
+  echo ""
+  echo "  bq rm ${APPID}:swarming.task_results"
   echo ""
   echo "and run this script again."
   exit 1

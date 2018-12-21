@@ -78,6 +78,7 @@ from google.appengine.ext import ndb
 from components import datastore_utils
 from components import utils
 from proto.api import swarming_pb2  # pylint: disable=no-name-in-module
+from server import bq_state
 from server import large
 from server import task_pack
 from server import task_request
@@ -749,7 +750,7 @@ class _TaskResultCommon(ndb.Model):
       out.run_id = task_pack.pack_run_result_key(self.run_result_key)
 
     # TODO(maruel): Make sure we enforce the same CIPD server for all TaskSlice.
-    props = self.request.task_slices[0].properties
+    props = self.request.task_slice(0).properties
     if props.cipd_input:
       out.cipd_pins.server = props.cipd_input.server
     if self.cipd_pins:
@@ -1339,6 +1340,64 @@ def _filter_query(cls, q, start, end, sort, state):
   raise ValueError('Invalid state')
 
 
+def _yield_done_tasks(earliest, size_hint):
+  """Yields oldest TaskRunResult entities starting a earliest."""
+  # The query is a bit tricky, as there's no property in the TaskRunResult
+  # model to declare if a task is 'done'.
+  #
+  # Oops.
+  #
+  # So for now process all tasks with two queries, even if this is both
+  # inefficient and incorrect; see TaskResult in swarming.proto for more
+  # details.
+  # Use a large batch_size, otherwise the log is littered with 'suspended
+  # generator run_to_queue' log warnings and it helps performance, at the cost
+  # of higher DB RPC usage than strictly necessary.
+  batch_size = max(2, size_hint/4)
+  queries = [
+      TaskRunResult.query(
+          TaskRunResult.completed_ts > earliest).order(
+              TaskRunResult.completed_ts).iter(
+                  batch_size=batch_size, deadline=30),
+      TaskRunResult.query(
+          TaskRunResult.abandoned_ts > earliest).order(
+              TaskRunResult.abandoned_ts).iter(
+                  batch_size=batch_size, deadline=30),
+  ]
+  # Fetch the first entities, if any.
+  entities = [[] for _ in xrange(len(queries))]
+  for i, q in enumerate(queries):
+    try:
+      entities[i].append(q.next())
+    except StopIteration:
+      pass
+  # Loop while there's still entities to yield.
+  while any(entities):
+    # Take the earliest of the entities found, then fill back.
+    selected = None
+    index = None
+    for i, es in enumerate(entities):
+      if not es:
+        continue
+      e = es[0]
+      t1 = e.ended_ts
+      if selected and selected.ended_ts <= t1:
+        continue
+      # We found the earliest.
+      if selected:
+        # Push back the previously found item.
+        entities[index].insert(0, selected)
+      selected = es.pop(0)
+      index = i
+      # Prefetch the next one.
+      try:
+        entities[i].append(queries[i].next())
+      except StopIteration:
+        # This query is done.
+        pass
+    yield selected
+
+
 ### Public API.
 
 
@@ -1482,3 +1541,61 @@ def cron_update_tags():
   logging.info('From %d tasks, saw %d tags', count, len(tags))
   TagAggregation(key=TagAggregation.KEY, tags=tags, ts=now).put()
   return len(tags)
+
+
+def cron_send_to_bq():
+  """Sends the completed TaskRunResult to BigQuery.
+
+  Returns:
+    total number of task results sent to BQ.
+  """
+  fmt = u'%Y-%m-%dT%H:%M:%S.%fZ'
+  def _convert(e):
+    """Converts a TaskRunResult to a tuple(db_key, bq_key, row)."""
+    out = swarming_pb2.TaskResult()
+    e.to_proto(out)
+    return (e.ended_ts.strftime(fmt), e.task_id, out)
+
+  def get_oldest_key():
+    """Returns a tuple(db_key, bq_key)."""
+    # BigQuery requires partitioned table to not insert items older than 365
+    # days old, so start at entities only 364 days old.
+    cutoff = (utils.utcnow() - datetime.timedelta(days=364))
+    cutoff = datetime.datetime(cutoff.year, cutoff.month, cutoff.day)
+    oldest = TaskRunResult.query(TaskRunResult.modified_ts >= cutoff).order(
+        TaskRunResult.modified_ts).get()
+    if not oldest:
+      return None, None
+    # Since the query is an inequality > (and not >=), go back in time 1 second
+    # to not discard the very first entity. Use modified_ts here instead of
+    # completed_ts/abandoned_ts, since modified_ts will always be lower or equal
+    # to these two values.
+    # This means that the task_id is unusable in get_rows().
+    return (
+      (oldest.modified_ts - datetime.timedelta(seconds=1)).strftime(fmt),
+      oldest.task_id,
+    )
+
+  def get_rows(db_key, _bq_key, size):
+    """Returns a list of tuple(db_key, bq_key, row)."""
+    # bq_key is not usable here, see get_oldest_key() to see why.
+    rows = []
+    earliest = datetime.datetime.strptime(db_key, fmt)
+    for e in _yield_done_tasks(earliest, size):
+      rows.append(_convert(e))
+      if len(rows) == size:
+        # We have enough.
+        break
+    return rows
+
+  def fetch_rows(_db_keys, bq_keys):
+    """Returns a list of tuple(db_key, bq_key, row)."""
+    return [
+      _convert(e)
+      for e in ndb.get_multi(
+          task_pack.unpack_run_result_key(k) for k in bq_keys)
+      if e
+    ]
+
+  return bq_state.cron_send_to_bq(
+      'task_results', get_oldest_key, get_rows, fetch_rows)
