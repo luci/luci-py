@@ -40,19 +40,19 @@ BLACKLISTED_PATHS = [
 ]
 
 
-def is_blacklisted(path):
+def is_blacklisted(path, blacklist):
   """True if |path| matches any regexp in |blacklist|."""
-  return any(b.match(path) for b in BLACKLISTED_PATHS)
+  return any(b.match(path) for b in blacklist)
 
 
-def find_proto_files(path):
+def find_proto_files(path, blacklist):
   """Recursively searches for *.proto files, yields absolute paths to them."""
   path = os.path.abspath(path)
   for dirpath, dirnames, filenames in os.walk(path, followlinks=True):
     # Skip hidden and blacklisted directories
     skipped = [
       x for x in dirnames
-      if x[0] == '.' or is_blacklisted(os.path.join(dirpath, x))
+      if x[0] == '.' or is_blacklisted(os.path.join(dirpath, x), blacklist)
     ]
     for dirname in skipped:
       dirnames.remove(dirname)
@@ -66,15 +66,14 @@ def get_protoc():
   """Returns protoc executable path (maybe relative to PATH)."""
   return 'protoc.exe' if sys.platform == 'win32' else 'protoc'
 
-def compile_proto(proto_file, output_path, proto_path):
-  """Invokes 'protoc', compiling single *.proto file into *_pb2.py file.
 
-  Returns:
-      The path of the generated _pb2.py file.
-  """
+def compile_proto(proto_file, import_paths, output_path=None):
+  """Invokes 'protoc', compiling single *.proto file into *_pb2.py file."""
+  base_dir = os.path.dirname(proto_file)
+  import_paths = [base_dir] + list(import_paths or [])
+  output_path = output_path or base_dir
   cmd = [get_protoc()]
-  proto_path = proto_path or os.path.dirname(proto_file)
-  cmd.append('--proto_path=%s' % proto_path)
+  cmd.extend('--proto_path=%s' % p for p in import_paths)
   cmd.append('--python_out=%s' % output_path)
   cmd.append('--prpc-python_out=%s' % output_path)
   cmd.append(proto_file)
@@ -84,12 +83,10 @@ def compile_proto(proto_file, output_path, proto_path):
   # Reuse embedded google protobuf.
   root = os.path.dirname(os.path.dirname(os.path.dirname(THIS_DIR)))
   env['PYTHONPATH'] = os.path.join(root, 'client', 'third_party')
-  subprocess.check_call(cmd, env=env)
-  return proto_file.replace('.proto', '_pb2.py').replace(proto_path,
-                                                         output_path)
+  return not subprocess.call(cmd, env=env)
 
 
-def check_proto_compiled(proto_file, proto_path):
+def check_proto_compiled(proto_file, import_paths):
   """Return True if *_pb2.py on disk is up to date."""
   # Missing?
   expected_path = proto_file.replace('.proto', '_pb2.py')
@@ -104,36 +101,33 @@ def check_proto_compiled(proto_file, proto_path):
   # Compile *.proto into temp file to compare the result with existing file.
   tmp_dir = tempfile.mkdtemp()
   try:
-    try:
-      compiled = compile_proto(proto_file, tmp_dir, proto_path)
-    except subprocess.CalledProcessError:
+    if not compile_proto(proto_file, import_paths, tmp_dir):
       return False
+    compiled = os.path.join(tmp_dir, os.path.basename(expected_path))
     return read(compiled) == read(expected_path)
   finally:
     shutil.rmtree(tmp_dir)
 
 
-def compile_all_files(root_dir, proto_path):
+def compile_all_files(root_dir, import_paths, blacklisted_paths):
   """Compiles all *.proto files it recursively finds in |root_dir|."""
   root_dir = os.path.abspath(root_dir)
   success = True
-  for path in find_proto_files(root_dir):
-    try:
-      compile_proto(path, os.getcwd(), proto_path)
-    except subprocess.CalledProcessError:
+  for path in find_proto_files(root_dir, blacklisted_paths):
+    if not compile_proto(path, import_paths):
       print >> sys.stderr, 'Failed to compile: %s' % path[len(root_dir)+1:]
       success = False
   return success
 
 
-def check_all_files(root_dir, proto_path):
+def check_all_files(root_dir, import_paths, blacklisted_paths):
   """Returns True if all *_pb2.py files on disk are up to date."""
   root_dir = os.path.abspath(root_dir)
-  success = True
-  for path in find_proto_files(root_dir):
-    if not check_proto_compiled(path, proto_path):
+  success = False
+  for path in find_proto_files(root_dir, blacklisted_paths):
+    if not check_proto_compiled(path, import_paths):
       print >> sys.stderr, (
-          'Need to recompile file: %s' % path[len(root_dir)+1:])
+          'Need to recompile *.proto file: %s' % path[len(root_dir)+1:])
       success = False
   return success
 
@@ -158,7 +152,7 @@ def get_protoc_version():
   return tuple(map(int, match.group(1).split('.')))
 
 
-def main(args, app_dir=None):
+def main(args, app_dir=None, import_paths=None, blacklisted_paths=None):
   parser = optparse.OptionParser(
       description=sys.modules['__main__'].__doc__,
       usage='%prog [options]' + ('' if app_dir else ' <root dir>'))
@@ -166,14 +160,10 @@ def main(args, app_dir=None):
       '-c', '--check', action='store_true',
       help='Only check that all *.proto files are up to date')
   parser.add_option('-v', '--verbose', action='store_true')
-  parser.add_option(
-      '--proto_path',
-      help=('Passed through to protoc. If not set, will be set to the directory'
-            'containing the proto file being compiled.')
-  )
 
   options, args = parser.parse_args(args)
   logging.basicConfig(level=logging.DEBUG if options.verbose else logging.ERROR)
+
   root_dir = None
   if not app_dir:
     if len(args) != 1:
@@ -205,13 +195,14 @@ def main(args, app_dir=None):
     sys.stderr.write(PROTOC_INSTALL_HELP)
     return 1
 
-  if options.proto_path:
-    options.proto_path = os.path.abspath(options.proto_path)
+  # Include default blacklisted paths.
+  blacklisted_paths = list(blacklisted_paths or [])
+  blacklisted_paths.extend(BLACKLISTED_PATHS)
 
   if options.check:
-    success = check_all_files(root_dir, options.proto_path)
+    success = check_all_files(root_dir, import_paths, blacklisted_paths)
   else:
-    success = compile_all_files(root_dir, options.proto_path)
+    success = compile_all_files(root_dir, import_paths, blacklisted_paths)
 
   return int(not success)
 

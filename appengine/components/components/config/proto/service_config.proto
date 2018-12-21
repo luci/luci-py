@@ -205,12 +205,10 @@ message ValidationResponseMessage {
   }
   // A message that explains why a config is valid or not.
   message Message {
-    // Path of the config file that has an error.
-    string path = 1;
+    // Textual representation of the message.
+    string text = 1;
     // If an error, a config is considered invalid. Defaults to INFO.
     Severity severity = 2;
-    // Textual representation of the message.
-    string text = 3;
   }
   // Errors, warnings and other information found during validation.
   // If at least one error is found, the config is considered invalid.

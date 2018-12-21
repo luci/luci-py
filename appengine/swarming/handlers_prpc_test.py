@@ -25,7 +25,6 @@ from components.prpc import encoding
 
 from proto.api import swarming_pb2  # pylint: disable=no-name-in-module
 from server import task_queues
-
 import handlers_bot
 import handlers_prpc
 

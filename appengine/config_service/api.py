@@ -78,8 +78,7 @@ def attempt_to_msg(entity):
     success=entity.success,
     message=entity.message,
     validation_messages=[
-      cfg_endpoint.ValidationMessage(
-          path=m.path, severity=m.severity, text=m.text)
+      cfg_endpoint.ValidationMessage(severity=m.severity, text=m.text)
       for m in entity.validation_messages
     ],
   )
@@ -198,16 +197,18 @@ class ConfigApi(remote.Service):
             request.config_set, f.path, f.content, ctx=ctx))
 
     ndb.Future.wait_all(futs)
-    # return the severities and the texts
-    msgs = []
-    for f, fut in zip(request.files, futs):
-      for msg in fut.get_result().messages:
-        msgs.append(cfg_endpoint.ValidationMessage(
-          path=f.path,
-          severity=common.Severity.lookup_by_number(msg.severity),
-          text=msg.text))
+    messages = []
+    for fut in futs:
+      messages.extend(fut.get_result().messages)
 
-    return self.ValidateConfigResponseMessage(messages=msgs)
+    # return the severities and the texts
+    return self.ValidateConfigResponseMessage(messages=[
+      cfg_endpoint.ValidationMessage(
+          severity=common.Severity.lookup_by_number(msg.severity),
+          text=msg.text,
+      )
+      for msg in messages
+    ])
 
   ##############################################################################
   # endpoint: get_config_sets

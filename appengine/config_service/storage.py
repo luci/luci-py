@@ -84,7 +84,6 @@ class ImportAttempt(ndb.Model):
   message = ndb.StringProperty(required=True, indexed=False)
 
   class ValidationMessage(ndb.Model):
-    path = ndb.StringProperty(indexed=False)
     severity = msgprop.EnumProperty(config.Severity, indexed=False)
     text = ndb.StringProperty(indexed=False)
 

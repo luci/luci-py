@@ -81,7 +81,7 @@ class EndpointTestCase(test_case.EndpointsTestCase):
     resp = self.call_api('validate', req).json_body
     self.assertEqual(resp, {
       'messages': [
-        {'path': 'bar.cfg', 'severity': 'ERROR', 'text': u'a\ufffdb'},
+        {'severity': 'ERROR', 'text': u'a\ufffdb'},
       ],
     })
 

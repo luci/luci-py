@@ -7,4 +7,4 @@ compile:
 	# Move the root of proto compilation to //appengine/components.
 	# This is consistent with other components assuming that "components"
 	# is in the import path.
-	cd ../../../ && tools/compile_proto.py --proto_path=. components/config/proto
+	cd ../../../ && tools/compile_proto.py components/config/proto
