@@ -40,8 +40,9 @@ class ValidateRequestMessage(messages.Message):
 
 
 class ValidationMessage(messages.Message):
-  text = messages.StringField(1, required=True)
+  path = messages.StringField(1)
   severity = messages.EnumField(common.Severity, 2, required=True)
+  text = messages.StringField(3, required=True)
 
 
 class ValidateResponseMessage(messages.Message):
@@ -146,6 +147,7 @@ class ConfigApi(remote.Service):
       if isinstance(m.text, str):
         text = text.decode('ascii', errors='replace')
       res.messages.append(ValidationMessage(
+          path=request.path,
           severity=common.Severity.lookup_by_number(m.severity),
           text=text,
       ))

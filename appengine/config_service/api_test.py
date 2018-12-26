@@ -290,10 +290,12 @@ class ApiTest(test_case.EndpointsTestCase):
         message='Validation errors',
         validation_messages=[
           storage.ImportAttempt.ValidationMessage(
+              path='foo.cfg',
               severity=config.Severity.ERROR,
               text='error!',
           ),
           storage.ImportAttempt.ValidationMessage(
+              path='bar.cfg',
               severity=config.Severity.WARNING,
               text='warning!',
           ),
@@ -338,10 +340,12 @@ class ApiTest(test_case.EndpointsTestCase):
       'message': 'Validation errors',
       'validation_messages': [
         {
+          'path': 'foo.cfg',
           'severity': 'ERROR',
           'text': 'error!',
         },
         {
+          'path': 'bar.cfg',
           'severity': 'WARNING',
           'text': 'warning!',
         },
@@ -783,7 +787,8 @@ class ApiTest(test_case.EndpointsTestCase):
   def test_validate_config(self):
 
     def validate_mock(_config_set, _path, _content, ctx=None):
-      ctx.warning('problem')
+      ctx.warning('potential problem')
+      ctx.error('real problem')
       return future(ctx.result())
 
     self.mock(validation, 'validate_config_async', mock.Mock())
@@ -801,7 +806,12 @@ class ApiTest(test_case.EndpointsTestCase):
     resp = self.call_api('validate_config', req).json_body
     self.assertEqual(resp, {
       'messages': [
-        {'severity': 'WARNING', 'text': 'myproj.cfg: problem'},
+        {'path': 'myproj.cfg',
+         'severity': 'WARNING',
+         'text': 'myproj.cfg: potential problem'},
+        {'path': 'myproj.cfg',
+         'severity': 'ERROR',
+         'text': 'myproj.cfg: real problem'},
       ]
     })
 
