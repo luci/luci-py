@@ -1,7 +1,18 @@
-#!/usr/bin/env python
+#!/usr/bin/env vpython
 # Copyright 2017 The LUCI Authors. All rights reserved.
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
+
+# [VPYTHON:BEGIN]
+# wheel: <
+#   name: "infra/python/wheels/protobuf-py2_py3"
+#   version: "version:3.6.1"
+# >
+# wheel: <
+#   name: "infra/python/wheels/six-py2_py3"
+#   version: "version:1.10.0"
+# >
+# [VPYTHON:END]
 
 import base64
 import sys
