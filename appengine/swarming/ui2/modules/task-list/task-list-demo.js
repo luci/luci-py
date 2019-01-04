@@ -1,0 +1,26 @@
+// Copyright 2018 The LUCI Authors. All rights reserved.
+// Use of this source code is governed under the Apache License, Version 2.0
+// that can be found in the LICENSE file.
+
+import './index.js'
+
+import { tasks_20 } from './test_data'
+import { requireLogin, mockAuthdAppGETs } from '../test_util'
+
+
+(function(){
+// Can't use import fetch-mock because the library isn't quite set up
+// correctly for it, and we get strange errors about 'this' not being defined.
+const fetchMock = require('fetch-mock');
+
+mockAuthdAppGETs(fetchMock, {});
+
+fetchMock.get('glob:/_ah/api/swarming/v1/tasks/list?*',
+              requireLogin(tasks_20));
+
+// Everything else
+fetchMock.catch(404);
+
+// autologin for ease of testing locally
+document.querySelector('oauth-login')._logIn();
+})();

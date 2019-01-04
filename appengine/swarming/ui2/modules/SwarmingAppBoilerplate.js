@@ -53,9 +53,14 @@ export default class SwarmingAppBoilerplate extends HTMLElement {
     upgradeProperty(this, 'client_id');
     upgradeProperty(this, 'testing_offline');
 
-    this.addEventListener('log-in', (e) => {
+    this._authHeaderEvent = (e) => {
       this._auth_header = e.detail.auth_header;
-    });
+    };
+    this.addEventListener('log-in', this._authHeaderEvent);
+  }
+
+  disconnectedCallback() {
+    this.removeEventListener('log-in', this._authHeaderEvent);
   }
 
   static get observedAttributes() {

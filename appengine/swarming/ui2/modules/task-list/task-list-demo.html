@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<title>Task List - Swarming</title>
+<title>task-list demo</title>
 <meta charset="utf-8" />
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -11,12 +11,15 @@
     document.write(s.outerHTML);
   }
 </script>
-<script src="https://apis.google.com/js/platform.js?onload=init" async defer></script>
+<!-- Comment out the scripts below if using real OAuth flow-->
+<!-- <script src="https://apis.google.com/js/platform.js?onload=init" async defer></script>
 <script type="text/javascript" charset="utf-8">
   function init() {
     gapi.load('auth2', function() {
       document.dispatchEvent(new CustomEvent('oauth-lib-loaded'));
     })
   }
-</script>
-<task-list client_id="{{client_id}}"></task-list>
+</script> -->
+<task-list client_id="foo" testing_offline></task-list>
+<!-- <task-list client_id="20770472288-t5smpbpjptka4nd888fv0ctd23ftba2o.apps.googleusercontent.com"></task-list> -->
+

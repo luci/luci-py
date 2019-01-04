@@ -383,17 +383,26 @@ window.customElements.define('bot-list', class extends SwarmingAppBoilerplate {
   connectedCallback() {
     super.connectedCallback();
 
-    this.addEventListener('log-in', (e) => {
+    this._loginEvent = (e) => {
       this._fetch();
       this.render();
-    });
+    };
+    this.addEventListener('log-in', this._loginEvent);
 
-    this.addEventListener('sort-change', (e) => {
+    this._sortEvent = (e) => {
       this._sort = e.detail.key;
       this._dir = e.detail.direction;
       this._stateChanged();
       this.render();
-    });
+    };
+    this.addEventListener('sort-change', this._sortEvent);
+  }
+
+  disconnectedCallback() {
+    super.disconnectedCallback();
+
+    this.removeEventListener('log-in', this._loginEvent);
+    this.removeEventListener('sort-change', this._sortEvent);
   }
 
   _addFilter(filter) {

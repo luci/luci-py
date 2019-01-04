@@ -69,6 +69,12 @@ export function botLink(botId) {
  *  A custom version can be specified in colMap, with the default being
  *  The longest (assumed to be most specific) item returned from
  *  attribute()).
+ *
+ * @param {string} col - The 'key' of the data to pull.
+ * @param {Object} bot - The bot from which to extract data.
+ * @param {Object} ele - The entire bot-list object, for context.
+ *
+ * @returns {String} - The requested column, ready for display.
  */
 export function column(col, bot, ele) {
   if (!bot) {
@@ -375,6 +381,8 @@ const BOT_TIMES = ['first_seen_ts', 'last_seen_ts', 'lease_expiration_ts'];
 
 /** processBots processes the array of bots from the server and returns it.
  *  The primary goal is to get the data ready for display.
+ *
+ * @param cols Array<Object> The raw bots objects.
  */
 export function processBots(arr) {
   if (!arr) {
