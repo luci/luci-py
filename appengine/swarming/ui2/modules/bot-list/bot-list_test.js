@@ -55,7 +55,7 @@ describe('bot-list', function() {
 
   beforeEach(function() {
     // Fix the time so all of our relative dates work.
-    // Note, this turns the default behavior of setTimeout and related.
+    // Note, this turns off the default behavior of setTimeout and related.
     jasmine.clock().install();
     jasmine.clock().mockDate(new Date(Date.UTC(2018, 5, 14, 12, 46, 22, 1234)));
   });
@@ -128,6 +128,8 @@ describe('bot-list', function() {
           let botTable = $$('.bot-table', ele);
           expect(botTable).toBeTruthy();
           expect(botTable.hidden).toBeTruthy('.bot-table should be hidden');
+          expect($$('main button:not([hidden])', ele)).toBeFalsy('no buttons seen');
+          expect($$('.header', ele)).toBeFalsy('no filters seen');
           done();
         })
       });
@@ -334,30 +336,6 @@ describe('bot-list', function() {
           });
         });
 
-        // disabled because it is causing flakes on Chrome
-        // pushState doesn't appear to be synchronous on Chrome and thus
-        // we have strange behavior.
-        // https://bugs.chromium.org/p/chromium/issues/detail?id=510026
-        xit('fills out the query params with the defaults', function(done) {
-          let before = window.location.search;
-          loggedInBotlist((ele) => {
-              jasmine.clock().uninstall();
-              // Run on a slight delay because the location doesn't seem to
-              // be updated synchronously on some platforms (Chrome).
-              setTimeout(() => {
-                let queryParams = window.location.search
-                console.log('before', before, 'after', queryParams);
-                // The single letters are defined in bot-list constructor when
-                // the stateReflector is set up.
-                expect(queryParams).toContain('c=id');
-                expect(queryParams).toContain('c=task');
-                expect(queryParams).toContain('l=100');
-                expect(queryParams).toContain('s=id');
-                done();
-              }, 50);
-          });
-        });
-
       }); // end describe('default landing page')
 
     });// end describe('when logged in as user')
@@ -522,55 +500,6 @@ describe('bot-list', function() {
         expect(counts).toHaveAttribute('hidden');
 
         done();
-      });
-    });
-
-     // Disabled because it's causing some flakes on Chrome.
-     xit('reads some values from query params', function(done) {
-       jasmine.clock().uninstall();
-       history.pushState(null, '', window.location.origin + window.location.pathname + '?'+
-                                   's=delta&l=200&c=epsilon&c=zeta&c=theta');
-       // Run on a slight delay because the location doesn't seem to
-       // be updated synchronously on some platforms (Chrome).
-       setTimeout(() => {
-         loggedInBotlist((ele) => {
-             expect(ele._sort).toBe('delta');
-             expect(ele._limit).toBe(200);
-             expect(ele._cols).toEqual(['epsilon', 'theta', 'zeta']);
-
-             done();
-         });
-       }, 50);
-     });
-
-    // Disabled because it's causing some flakes on Chrome.
-    xit('updates query params on render()', function(done) {
-      loggedInBotlist((ele) => {
-          ele._cols = ['id', 'task', 'os', 'gamma'];
-          ele._filters = ['alpha:beta'];
-          ele.render();
-
-          let queryParams = window.location.search
-          expect(queryParams).toContain('c=id');
-          expect(queryParams).not.toContain('c=epsilon');
-          expect(queryParams).toContain('c=gamma');
-          expect(queryParams).toContain('l=100');
-          expect(queryParams).toContain(`f=${encodeURIComponent('alpha:beta')}`);
-          expect(queryParams).not.toContain(`f=${encodeURIComponent('alpha:omega')}`);
-
-          ele._cols = ['id', 'task', 'os', 'epsilon'];
-          ele._filters = ['alpha:omega'];
-          ele.render();
-
-          queryParams = window.location.search
-          expect(queryParams).toContain('c=id');
-          expect(queryParams).toContain('c=epsilon');
-          expect(queryParams).not.toContain('c=gamma');
-          expect(queryParams).toContain('l=100');
-          expect(queryParams).not.toContain(`f=${encodeURIComponent('alpha:beta')}`);
-          expect(queryParams).toContain(`f=${encodeURIComponent('alpha:omega')}`);
-
-          done();
       });
     });
 

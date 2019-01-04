@@ -44,7 +44,7 @@ import { aggregateTemps, attribute, botLink, column, colHeaderMap,
          filterPossibleValues, fromDimension, fromState, initCounts,
          listQueryParams, longestOrAll, makeFilter, processBots, processCounts,
          processDimensions, processPrimaryMap, sortColumns, sortPossibleColumns,
-         specialFilters, specialSortMap, taskLink } from './bot-list-helpers'
+         specialFilters, specialSortMap } from './bot-list-helpers'
 import SwarmingAppBoilerplate from '../SwarmingAppBoilerplate'
 
 const colHead = (col, ele) => html`
@@ -58,7 +58,7 @@ const botCol = (col, bot, ele) => html`
 
 const botRow = (bot, ele) => html`
 <tr class="bot-row ${ele._botClass(bot)}">
-  ${ele._cols.map((col) => botCol(col,bot,ele))}
+  ${ele._cols.map((col) => botCol(col, bot, ele))}
 </tr>`;
 
 const primaryOption = (key, ele) => html`
@@ -103,7 +103,7 @@ const filterChip = (filter, ele) => html`
 const filters = (ele) => html`
 <!-- primary key selector-->
 <select-sk class="selector keys"
-           @selection-changed=${(e) => ele._primayKeyChanged(e)}>
+           @selection-changed=${(e) => ele._primaryKeyChanged(e)}>
   ${ele._filteredPrimaryArr.map((key) => primaryOption(key, ele))}
 </select-sk>
 <!-- secondary value selector-->
@@ -263,14 +263,14 @@ const template = (ele) => html`
         <tr>
           ${col_options(ele)}
           <!-- Slice off the first column (which is always 'id') so we can
-               have a custom first box (including the widget to select columns.
+               have a custom first box (including the widget to select columns).
             -->
-          ${ele._cols.slice(1).map((col) => colHead(col,ele))}
+          ${ele._cols.slice(1).map((col) => colHead(col, ele))}
         </tr>
       </thead>
       <tbody>${ele._sortBots().map((bot) => botRow(bot,ele))}</tbody>
     </table>
-    <button ?hidden=${!!ele._filters.length || ele._showAll}
+    <button ?hidden=${!ele.loggedInAndAuthorized || !!ele._filters.length || ele._showAll}
             @click=${ele._forceShowAll}>
       Show All
     </button>
@@ -623,7 +623,7 @@ window.customElements.define('bot-list', class extends SwarmingAppBoilerplate {
     return taskListLink(dimensionFilters, cols);
   }
 
-  _primayKeyChanged(e) {
+  _primaryKeyChanged(e) {
     this._primaryKey = this._filteredPrimaryArr[e.detail.selection];
     this._stateChanged();
     this.render();

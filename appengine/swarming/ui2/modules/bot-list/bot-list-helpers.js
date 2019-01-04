@@ -13,7 +13,7 @@ import * as human from 'common-sk/modules/human'
 import * as query from 'common-sk/modules/query'
 import { html } from 'lit-html'
 import naturalSort from 'javascript-natural-sort/naturalSort'
-import { sanitizeAndHumanizeTime } from '../util'
+import { compareWithFixedOrder, sanitizeAndHumanizeTime, taskPageLink } from '../util'
 import { applyAlias } from '../alias'
 
 /** aggregateTemps looks through the temperature data and computes an
@@ -524,27 +524,8 @@ export function processPrimaryMap(dimensions) {
   return pMap;
 }
 
-
 const specialColOrder = ['id', 'task'];
-
-// Returns the sort order of 2 columns. Puts 'special' columns first and then
-// sorts the rest alphabetically.
-function compareColumns(a, b) {
-  let aSpecial = specialColOrder.indexOf(a);
-  if (aSpecial === -1) {
-    aSpecial = specialColOrder.length+1;
-  }
-  let bSpecial = specialColOrder.indexOf(b);
-  if (bSpecial === -1) {
-    bSpecial = specialColOrder.length+1;
-  }
-  if (aSpecial === bSpecial) {
-    // Don't need naturalSort unless we get some funky column names.
-    return a.localeCompare(b);
-  }
-  // Lower rank in specialColOrder prevails.
-  return aSpecial - bSpecial;
-}
+const compareColumns = compareWithFixedOrder(specialColOrder);
 
 /** sortColumns sorts the bot-list columns in mostly alphabetical order. Some
   columns (id, task) go first to maintain with behavior from previous
@@ -582,22 +563,6 @@ export function sortPossibleColumns(keys, selectedCols) {
       // neither column was selected, fallback to alphabetical sorting.
       return a.localeCompare(b);
   });
-}
-
-/** taskLink creates the href attribute for linking to a single task.*/
-export function taskLink(taskId, disableCanonicalID) {
-  if (!taskId) {
-    return undefined;
-  }
-  if (!disableCanonicalID) {
-    // task abcefgh0 is the 'canonical' task id. The first try has the id
-    // abcefgh1. If there is a second (transparent retry), it will be
-    // abcefgh2.  We almost always want to link to the canonical one,
-    // because the milo output (if any) will only be generated for
-    // abcefgh0, not abcefgh1 or abcefgh2.
-    taskId = taskId.substring(0, taskId.length - 1) + '0';
-  }
-  return `/task?id=${taskId}`;
 }
 
 function timeDiffApprox(date) {
@@ -854,7 +819,7 @@ const colMap = {
     return html`<a target=_blank
                    rel=noopener
                    title=${bot.task_name}
-                   href=${taskLink(bot.task_id)}>${bot.task_id}</a>`;
+                   href=${taskPageLink(bot.task_id)}>${bot.task_id}</a>`;
   },
   uptime: (bot, ele) => {
     let u = fromState(bot, 'uptime');

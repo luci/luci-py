@@ -10,7 +10,74 @@
  * </p>
  */
 
+import * as human from 'common-sk/modules/human'
 import * as query from 'common-sk/modules/query'
+
+export function botPageLink(bot_id) {
+  if (!bot_id) {
+    return undefined;
+  }
+  return '/bot?id=' + bot_id;
+}
+
+/** compareWithFixedOrder returns the sort order of 2 strings. It puts
+ * fixedOrder elements first and then sorts the rest alphabetically.
+ *
+ * @param {Array<String>} fixedOrder - special elements that should be sorted
+ *    in the order provided.
+ */
+export function compareWithFixedOrder(fixedOrder) {
+  if (!fixedOrder) {
+    fixedOrder = [];
+  }
+  return function(a, b) {
+    let aSpecial = fixedOrder.indexOf(a);
+    if (aSpecial === -1) {
+      aSpecial = fixedOrder.length+1;
+    }
+    let bSpecial = fixedOrder.indexOf(b);
+    if (bSpecial === -1) {
+      bSpecial = fixedOrder.length+1;
+    }
+    if (aSpecial === bSpecial) {
+      // Don't need naturalSort since elements shouldn't
+      // have numbers as prefixes.
+      return a.localeCompare(b);
+    }
+    // Lower rank in fixedOrder prevails.
+    return aSpecial - bSpecial;
+  }
+}
+
+/** humanDuration formats a duration to be more human readable.
+ *
+ * @param {Number} timeInSecs - The duration to be formatted.
+ */
+export function humanDuration(timeInSecs) {
+  // If the timeInSecs is 0 (e.g. duration of Terminate bot tasks), we
+  // still want to display 0s.
+  if (timeInSecs === 0 || timeInSecs === '0') {
+    return '0s';
+  }
+  // Otherwise, if timeInSecs is falsey (e.g. undefined), return empty
+  // string to reflect that.
+  if (!timeInSecs) {
+    return '‑‑';
+  }
+  let ptimeInSecs = parseFloat(timeInSecs);
+  // On a bad parse (shouldn't happen), show original.
+  if (!ptimeInSecs) {
+    return timeInSecs + ' seconds';
+  }
+
+  // For times greater than a minute, make them human readable
+  // e.g. 2h 43m or 13m 42s
+  if (ptimeInSecs > 60) {
+    return human.strDuration(ptimeInSecs);
+  }
+  // For times less than a minute, add 10ms resolution.
+  return ptimeInSecs.toFixed(2)+'s';
+}
 
 /** sanitizeAndHumanizeTime parses a date string or ms_since_epoch into a JS
  *  Date object, assuming UTC time. It also creates a human readable form in
@@ -55,8 +122,8 @@ export function sanitizeAndHumanizeTime(obj, key) {
  *  @param {Array<String|Object> filters - If Array<Object>, Object
  *    should be {key:String, value:String} or
  *    {key:String, value:Array<String>}. If Array<String>, the Strings
- *    should be valid filters (e.g. "foo:bar").
- *  @param {Array<String>} columns -the column names that should be shown.
+ *    should be valid filters (e.g. 'foo:bar').
+ *  @param {Array<String>} columns - the column names that should be shown.
  *
  *  Any trailing args after columns will be assumed to be strings that
  *  should be treated as valid filters.
@@ -87,4 +154,24 @@ export function taskListLink(filters, columns) {
     c: columns,
   }
   return '/tasklist?' + query.fromParamSet(obj);
+}
+
+/** taskPageLink creates the href attribute for linking to a single task.
+ *
+ * @param {String} taskId - The full taskID
+ * @param {Boolean} disableCanonicalID - For a given task, a canonical task id
+ *   will look like 'abcefgh0'. The first try has the id
+ *   abcefgh1. If there is a second (transparent retry), it will be
+ *   abcefgh2.  We almost always want to link to the canonical one,
+ *   because the milo output (if any) will only be generated for
+ *   abcefgh0, not abcefgh1 or abcefgh2.
+ */
+export function taskPageLink(taskId, disableCanonicalID) {
+  if (!taskId) {
+    return undefined;
+  }
+  if (!disableCanonicalID) {
+    taskId = taskId.substring(0, taskId.length - 1) + '0';
+  }
+  return `/task?id=${taskId}`;
 }

@@ -167,7 +167,7 @@
         if (!timeInSecs) {
           return "‑‑";
         }
-        ptimeInSecs = parseFloat(timeInSecs);
+        var ptimeInSecs = parseFloat(timeInSecs);
         // On a bad parse (shouldn't happen), show original.
         if (!ptimeInSecs) {
           return timeInSecs + " seconds";
