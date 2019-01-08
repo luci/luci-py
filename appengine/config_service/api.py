@@ -383,7 +383,7 @@ class ConfigApi(remote.Service):
     projs = get_projects()
     has_access = acl.has_projects_access([p.id for p in projs])
     return self.GetProjectsResponseMessage(
-        projects=[p for p in get_projects() if has_access[p.id]],
+        projects=[p for p in projs if has_access[p.id]],
     )
 
   ##############################################################################
