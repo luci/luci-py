@@ -4,15 +4,13 @@
 
 import 'modules/swarming-index'
 
-if (!mockAppGETs) {
-  // ES6 Modules don't support conditional imports (yet), and if we did this
-  // the normal way, mockAppGETs would get declared multiple times (because
-  // of the concatenate hack we have to do with Karma and Webpack).
-  var mockAppGETs = require('modules/test_util').mockAppGETs;
-}
-
 describe('swarming-index', function() {
+  // Instead of using import, we use require. Otherwise,
+  // the concatenation trick we do doesn't play well with webpack, which would
+  // leak dependencies (e.g. bot-list's 'column' function to task-list) and
+  // try to import things multiple times.
   const { fetchMock, MATCHED, UNMATCHED } = require('fetch-mock');
+  const { mockAppGETs } = require('modules/test_util');
 
   beforeEach(function(){
     // These are the default responses to the expected API calls (aka 'matched')

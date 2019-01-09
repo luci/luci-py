@@ -5,9 +5,10 @@
 import 'modules/swarming-app'
 
 describe('swarming-app', function() {
-  // Things that get imported multiple times go here, using require. Otherwise,
-  // the concatenation trick we do doesn't play well with webpack, which tries
-  // to include it multiple times.
+  // Instead of using import, we use require. Otherwise,
+  // the concatenation trick we do doesn't play well with webpack, which would
+  // leak dependencies (e.g. bot-list's 'column' function to task-list) and
+  // try to import things multiple times.
   const { mockAppGETs } = require('modules/test_util');
   const { fetchMock, MATCHED, UNMATCHED } = require('fetch-mock');
 

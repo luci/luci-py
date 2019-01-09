@@ -16,6 +16,8 @@ import naturalSort from 'javascript-natural-sort/naturalSort'
 import { compareWithFixedOrder, sanitizeAndHumanizeTime, taskPageLink } from '../util'
 import { applyAlias } from '../alias'
 
+const EMPTY_VAL = '--';
+
 /** aggregateTemps looks through the temperature data and computes an
  *  average temp. Beyond that, it prepares the temperature data for
  *  better displaying.
@@ -85,7 +87,11 @@ export function column(col, bot, ele) {
   if (c) {
     return c(bot, ele);
   }
-  let values = attribute(bot, col, 'none');
+  let emptyVal = EMPTY_VAL;
+  if (noneDimensions.indexOf(col) !== -1) {
+    emptyVal = 'none';
+  }
+  let values = attribute(bot, col, emptyVal);
   values = values.map((v) => applyAlias(v, col));
   return longestOrAll(values, ele._verbose);
 }
@@ -96,76 +102,6 @@ export function column(col, bot, ele) {
  */
 export function devices(bot) {
   return bot.state.devices || [];
-}
-
-/** filterPossibleColumns shows only those columns that match the given query.
- *  This means, if there is a part of the query in the column (ignoring case).
- */
-export function filterPossibleColumns(allCols, query) {
-  if (!query) {
-    return allCols;
-  }
-  return allCols.filter((c) => {
-    return matchPartCaseInsensitive(c, query);
-  });
-}
-
-/** filterPossibleKeys shows only those keys that match the given query.
- *  This means, if there is a part of the key in the column (ignoring case),
- *  or if any value associated to the key (via keyMap) matches.
- */
-export function filterPossibleKeys(allKeys, keyMap, query) {
-  if (!query) {
-    return allKeys;
-  }
-  query = query.trim();
-  if (query.indexOf(':') === -1) {
-    return allKeys.filter((k) => {
-      if (matchPartCaseInsensitive(k, query)) {
-        return true;
-      }
-      let values = keyMap[k] || [];
-      for (let value of values) {
-        value = applyAlias(value, k);
-        if (matchPartCaseInsensitive(value, query)) {
-          return true;
-        }
-      }
-      return false;
-    });
-  }
-  // partial queries should only show the key that exactly matches
-  query = query.split(':')[0];
-  return allKeys.filter((k) => {
-    if (k === query) {
-      return true;
-    }
-    return false;
-  });
-}
-
-/** filterPossibleValues shows some values associated with the given query.
- * If the user has typed in a query, show all secondary elements if
- * their primary element matches.  If it doesn't match the primary
- * element, only show those secondary elements that do.
- */
-export function filterPossibleValues(allValues, selectedKey, query) {
-  // only look for first index, since value can have colons (e.g. gpu)
-  query = query.trim();
-  let colonIdx = query.indexOf(':');
-  if (colonIdx !== -1) {
-    query = query.substring(colonIdx+1);
-  }
-  if (!query || matchPartCaseInsensitive(selectedKey, query)) {
-    return allValues;
-  }
-  return allValues.filter((v) => {
-    v = applyAlias(v, selectedKey);
-    if (matchPartCaseInsensitive(v, query)) {
-      return true;
-    }
-    return false;
-  });
 }
 
 // A list of special rules for filters. In practice, this is anything
@@ -228,7 +164,8 @@ export function filterBots(filters, bots) {
       if (specialFilters[key]) {
         matches &= specialFilters[key](bot, value);
       } else {
-        // it's a dimension
+        // it's a dimension, which is *not* aliased, so we can just
+        // do an exact match (reminder, aliasing only happens in column);
         matches &= (attribute(bot, key, []).indexOf(value) !== -1);
       }
     }
@@ -350,32 +287,27 @@ export function longestOrAll(arr, verbose) {
   return most;
 }
 
-/** makeFilter returns a filter based on the key and value. */
-export function makeFilter(key, value) {
-  return `${key}:${value}`;
-}
-
-/** matchPartCaseInsensitive returns true or false if str matches any
- *of a space separated list of queries,
+/** makePossibleColumns processes the array of dimensions from the server
+ *  and returns it. The primary objective is to remove blacklisted
+ *  dimensions and make sure any are there that the server doesn't provide.
+ *  This will be turned into possible columns
  */
-export function matchPartCaseInsensitive(str, queries) {
-  if (!queries) {
-    return true;
+export function makePossibleColumns(arr) {
+  if (!arr) {
+    return [];
   }
-  if (!str) {
-    return false
-  }
-  queries = queries.trim().toLocaleLowerCase();
-  str = str.toLocaleLowerCase();
-  let xq = queries.split(' ');
-  for (let query of xq) {
-    let idx = str.indexOf(query);
-    if (idx !== -1) {
-      return true;
+  let dims = [];
+  arr.forEach(function(d) {
+    if (blacklistDimensions.indexOf(d.key) === -1) {
+      dims.push(d.key);
     }
-  }
-  return false;
-};
+  });
+  // Make sure 'id' is in there, but not duplicated (see blacklistDimensions)
+  dims.push('id');
+  Array.prototype.push.apply(dims, extraKeys);
+  dims.sort();
+  return dims;
+}
 
 const BOT_TIMES = ['first_seen_ts', 'last_seen_ts', 'lease_expiration_ts'];
 
@@ -466,28 +398,9 @@ export function processCounts(output, countJSON) {
   return output;
 }
 
-/** processDimensions processes the array of dimensions from the server
- *  and returns it. The primary objective is to remove blacklisted
- *  dimensions and make sure any are there that the server doesn't provide.
- *  It will get fed into processPrimaryMap.
- */
-export function processDimensions(arr) {
-  if (!arr) {
-    return [];
-  }
-  let dims = [];
-  arr.forEach(function(d) {
-    if (blacklistDimensions.indexOf(d.key) === -1) {
-      dims.push(d.key);
-    }
-  });
-  // Make sure 'id' is in there, but not duplicated (see blacklistDimensions)
-  dims.push('id');
-  dims.sort();
-  return dims;
-}
+const noneDimensions = ['device_os', 'device_type', 'gpu'];
 
-/** processDimensions creates a map of primary keys (e.g. left column) based
+/** processPrimaryMap creates a map of primary keys (e.g. left column) based
  *  on dimensions and other interesting options (e.g. device-related things).
  *  The primary keys map to the values they could be filtered by.
  */
@@ -517,8 +430,11 @@ export function processPrimaryMap(dimensions) {
 
   // Add some options that might not show up.
   pMap['android_devices'] && pMap['android_devices'].push('0');
-  pMap['device_os'] && pMap['device_os'].push('none');
-  pMap['device_type'] && pMap['device_type'].push('none');
+  for (let key of noneDimensions) {
+    if (pMap[key] && pMap[key].indexOf('none') === -1) {
+      pMap[key].push('none');
+    }
+  }
 
   pMap['id'] = null;
 
@@ -585,7 +501,7 @@ const blacklistDimensions = ['quarantined', 'error', 'id'];
 /** extraKeys is a list of things we want to be able to sort by or display
  *  that are not dimensions.
 .*/
-export const extraKeys = ['disk_space', 'uptime', 'running_time', 'task',
+const extraKeys = ['disk_space', 'uptime', 'running_time', 'task',
 'status', 'version', 'external_ip', 'internal_ip', 'mp_lease_id',
 'mp_lease_expires', 'last_seen', 'first_seen', 'battery_level',
 'battery_voltage', 'battery_temperature', 'battery_status', 'battery_health',
@@ -727,7 +643,7 @@ const colMap = {
     return aliased[0];
   },
   external_ip: (bot, ele) => {
-    return bot.external_ip || 'none';
+    return bot.external_ip || EMPTY_VAL;
   },
   first_seen: (bot, ele) => {
     return human.localeTime(bot.first_seen_ts);
@@ -736,7 +652,7 @@ const colMap = {
                             rel=noopener
                             href=${botLink(bot.bot_id)}>${bot.bot_id}</a>`,
   internal_ip: (bot, ele) => {
-    return attribute(bot, 'ip', 'none')[0];
+    return attribute(bot, 'ip', EMPTY_VAL)[0];
   },
   last_seen: (bot, ele) => {
     if (ele._verbose) {
@@ -746,7 +662,7 @@ const colMap = {
   },
   mp_lease_id: (bot, ele) => {
     if (!bot.lease_id) {
-      return 'none';
+      return EMPTY_VAL;
     }
     let id = bot.lease_id;
     if (!ele._verbose) {
@@ -764,7 +680,7 @@ const colMap = {
   },
   mp_lease_expires: (bot, ele) => {
     if (!bot.lease_expiration_ts) {
-      return 'N/A';
+      return EMPTY_VAL;
     }
     if (ele._verbose) {
       return human.localeTime(bot.lease_expiration_ts);

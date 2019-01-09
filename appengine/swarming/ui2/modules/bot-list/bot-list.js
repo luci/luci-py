@@ -40,11 +40,12 @@ import '../swarming-app'
 import { taskListLink } from '../util'
 import { applyAlias } from '../alias'
 import { aggregateTemps, attribute, botLink, column, colHeaderMap,
-         devices, extraKeys, filterBots, filterPossibleColumns, filterPossibleKeys,
-         filterPossibleValues, fromDimension, fromState, initCounts,
-         listQueryParams, longestOrAll, makeFilter, processBots, processCounts,
-         processDimensions, processPrimaryMap, sortColumns, sortPossibleColumns,
+         devices, filterBots,  fromDimension, fromState, initCounts,
+         listQueryParams, longestOrAll, processBots, processCounts,
+         makePossibleColumns, processPrimaryMap, sortColumns, sortPossibleColumns,
          specialFilters, specialSortMap } from './bot-list-helpers'
+import { filterPossibleColumns, filterPossibleKeys,
+         filterPossibleValues, makeFilter } from '../queryfilter'
 import SwarmingAppBoilerplate from '../SwarmingAppBoilerplate'
 
 const colHead = (col, ele) => html`
@@ -103,7 +104,7 @@ const filterChip = (filter, ele) => html`
 const filters = (ele) => html`
 <!-- primary key selector-->
 <select-sk class="selector keys"
-           @selection-changed=${(e) => ele._primaryKeyChanged(e)}>
+           @selection-changed=${ele._primaryKeyChanged}>
   ${ele._filteredPrimaryArr.map((key) => primaryOption(key, ele))}
 </select-sk>
 <!-- secondary value selector-->
@@ -179,8 +180,8 @@ const header = (ele) => html`
     <input id=filter_search class=search type=text
            placeholder='Search filters or supply a filter
                         and press enter'
-           @input=${e => ele._refilterPrimaryKeys(e)}
-           @keyup=${e => ele._filterSearch(e)}>
+           @input=${ele._refilterPrimaryKeys}
+           @keyup=${ele._filterSearch}>
     </input>
     <!-- The following div has display:block and divides the above and
          below inline-block groups-->
@@ -203,7 +204,8 @@ const columnOption = (key, ele) => html`
   <span class=flex></span>
   <checkbox-sk ?checked=${ele._cols.indexOf(key) >= 0}
                ?disabled=${ele._forcedColumns.indexOf(key) >= 0}
-               @click=${(e) => ele._toggleCol(e, key)}>
+               @click=${(e) => ele._toggleCol(e, key)}
+               @keypress=${(e) => ele._toggleCol(e, key)}>
   </checkbox-sk>
 </div>`;
 
@@ -216,11 +218,11 @@ const col_selector = (ele) => {
 <div class=col_selector @click=${e => e.stopPropagation()}>
   <input id=column_search class=search type=text
          placeholder='Search columns to show'
-         @input=${e => ele._refilterPossibleColumns(e)}
+         @input=${ele._refilterPossibleColumns}
          <!-- Looking at the change event, but that had the behavior of firing
               any time the user clicked away, with seemingly no differentiation.
               Instead, we watch keyup and wait for the 'Enter' key. -->
-         @keyup=${e => ele._columnSearch(e)}>
+         @keyup=${ele._columnSearch}>
   </input>
   ${ele._filteredPossibleColumns.map((key) => columnOption(key, ele))}
 </div>`;
@@ -230,7 +232,7 @@ const col_options = (ele) => html`
 <!-- Put the click action here to make it bigger, especially for mobile.-->
 <th class=col_options @click=${ele._toggleColSelector}>
   <span class=show_widget>
-    <more-vert-icon-sk></more-vert-icon-sk>
+    <more-vert-icon-sk tabindex=0 @keypress=${ele._toggleColSelector}></more-vert-icon-sk>
   </span>
   <span>Bot Id</span>
   <sort-toggle @click=${e => (e.stopPropagation() && e.preventDefault())}
@@ -306,11 +308,11 @@ window.customElements.define('bot-list', class extends SwarmingAppBoilerplate {
                      // So, we keep limit 0 until our params have been read in
                      // from the URL to avoid making a request until we are
                      // ready.
-    this._sort = '';
     this._primaryKey = '';
-    this._verbose = false;
-    this._showFleetCounts = false;
     this._showAll = false;
+    this._showFleetCounts = false;
+    this._sort = '';
+    this._verbose = false;
 
     this._fleetCounts = initCounts();
     this._queryCounts = initCounts();
@@ -450,13 +452,13 @@ window.customElements.define('bot-list', class extends SwarmingAppBoilerplate {
     input.value = '';
     this._columnQuery = '';
     if (this._cols.indexOf(newCol) !== -1) {
-      this.render();
+      this._refilterPossibleColumns();
       errorMessage(`Column "${newCol}" already displayed.`, 5000);
       return;
     }
     this._cols.push(newCol);
     this._stateChanged();
-    this.render();
+    this._refilterPossibleColumns();
   }
 
   _fetch() {
@@ -534,20 +536,19 @@ window.customElements.define('bot-list', class extends SwarmingAppBoilerplate {
     // fetch dimensions so we can fill out the filters.
     // We only need to do this once, because we don't expect it to
     // change (much) after the page has been loaded.
-    if (!this._possibleColumns.length) {
+    if (!this._fetchedDimensions) {
+      this._fetchedDimensions = true;
       this.app.addBusyTasks(1);
       extra = {
         headers: {'authorization': this.auth_header},
         // No signal here because we shouldn't need to abort it.
         // This request does not depend on the filters.
       };
-      // Only need to fetch this once.
       fetch('/_ah/api/swarming/v1/bots/dimensions', extra)
       .then(jsonOrThrow)
       .then((json) => {
-        let dimensions = processDimensions(json.bots_dimensions);
         this._primaryMap = processPrimaryMap(json.bots_dimensions);
-        this._possibleColumns = dimensions.concat(extraKeys);
+        this._possibleColumns = makePossibleColumns(json.bots_dimensions);
         this._filteredPossibleColumns = this._possibleColumns.slice();
         this._primaryArr = Object.keys(this._primaryMap);
         this._primaryArr.sort();
@@ -712,12 +713,12 @@ window.customElements.define('bot-list', class extends SwarmingAppBoilerplate {
       let aCol = column(sortOn, botA, this);
       if (aCol === 'none') {
         // put "none" at the bottom of the sort order
-        aCol = 'ZZZ';
+        aCol = 'zzz';
       }
       let bCol = column(sortOn, botB, this);
       if (bCol === 'none') {
         // put "none" at the bottom of the sort order
-        bCol = 'ZZZ';
+        bCol = 'zzz';
       }
       return dir * naturalSort(aCol, bCol);
     });

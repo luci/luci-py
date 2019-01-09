@@ -150,3 +150,22 @@ export function requireLogin(logged_in, delay=100) {
     }
   };
 }
+
+export function getChildItemWithText(ele, value) {
+  expect(ele).toBeTruthy();
+
+  for (let i = 0; i < ele.children.length; i++) {
+    let child = ele.children[i];
+    let text = child.firstElementChild;
+    if (text && text.textContent.trim() === value) {
+      return child;
+    }
+  }
+  // uncomment below when debugging
+  // fail(`Could not find child of ${ele} with text value ${value}`);
+  return null;
+}
+
+export function childrenAsArray(ele) {
+  return Array.prototype.slice.call(ele.children);
+}

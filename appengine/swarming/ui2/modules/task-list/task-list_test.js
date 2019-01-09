@@ -4,15 +4,19 @@
 
 import 'modules/task-list'
 
-import { processTasks } from 'modules/task-list/task-list-helpers'
-import { tasks_20 } from 'modules/task-list/test_data'
-
 describe('task-list', function() {
-  // Things that get imported multiple times go here, using require. Otherwise,
-  // the concatenation trick we do doesn't play well with webpack, which tries
-  // to include it multiple times.
-  const { mockAppGETs, customMatchers}  = require('modules/test_util');
+  // Instead of using import, we use require. Otherwise,
+  // the concatenation trick we do doesn't play well with webpack, which would
+  // leak dependencies (e.g. bot-list's 'column' function to task-list) and
+  // try to import things multiple times.
+  const { deepCopy } = require('common-sk/modules/object');
+  const { $, $$ } = require('common-sk/modules/dom');
+  const { childrenAsArray, customMatchers, getChildItemWithText, mockAppGETs } = require('modules/test_util');
   const { fetchMock, MATCHED, UNMATCHED } = require('fetch-mock');
+
+  const { column, filterTasks, getColHeader, processTasks } = require('modules/task-list/task-list-helpers');
+  const { tasks_20 } = require('modules/task-list/test_data');
+  const { fleetDimensions } = require('modules/bot-list/test_data');
 
   beforeEach(function() {
     jasmine.addMatchers(customMatchers);

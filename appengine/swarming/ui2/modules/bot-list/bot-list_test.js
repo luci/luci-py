@@ -3,19 +3,20 @@
 // that can be found in the LICENSE file.
 
 import 'modules/bot-list'
-import { deepCopy } from 'common-sk/modules/object'
-import { $, $$ } from 'common-sk/modules/dom'
-
-import { data_s10, fleetCount, fleetDimensions, queryCount } from 'modules/bot-list/test_data'
-import { colHeaderMap, column, listQueryParams, processBots, processDimensions,
-         processPrimaryMap } from 'modules/bot-list/bot-list-helpers'
 
 describe('bot-list', function() {
-  // Things that get imported multiple times go here, using require. Otherwise,
-  // the concatenation trick we do doesn't play well with webpack, which tries
-  // to include it multiple times.
-  const { mockAppGETs, customMatchers}  = require('modules/test_util');
+  // Instead of using import, we use require. Otherwise,
+  // the concatenation trick we do doesn't play well with webpack, which would
+  // leak dependencies (e.g. bot-list's 'column' function to task-list) and
+  // try to import things multiple times.
+  const { deepCopy } = require('common-sk/modules/object');
+  const { $, $$ } = require('common-sk/modules/dom');
+  const { childrenAsArray, customMatchers, getChildItemWithText, mockAppGETs } = require('modules/test_util');
   const { fetchMock, MATCHED, UNMATCHED } = require('fetch-mock');
+
+  const { colHeaderMap, column, filterBots, listQueryParams, processBots, makePossibleColumns,
+         processPrimaryMap } = require('modules/bot-list/bot-list-helpers');
+  const { bots_10, fleetCount, fleetDimensions, queryCount } = require('modules/bot-list/test_data');
 
   beforeEach(function() {
     jasmine.addMatchers(customMatchers);
@@ -30,7 +31,7 @@ describe('bot-list', function() {
       delete_bot: true
     });
 
-    fetchMock.get('glob:/_ah/api/swarming/v1/bots/list?*', data_s10);
+    fetchMock.get('glob:/_ah/api/swarming/v1/bots/list?*', bots_10);
     fetchMock.get('/_ah/api/swarming/v1/bots/dimensions', fleetDimensions);
     fetchMock.get('/_ah/api/swarming/v1/bots/count', fleetCount);
     fetchMock.get('glob:/_ah/api/swarming/v1/bots/count?*', queryCount);
@@ -206,11 +207,11 @@ describe('bot-list', function() {
             expect(rows).toBeTruthy();
             expect(rows.length).toBe(10, '10 rows');
 
-            let cols = $('.bot-table .bot-row td', ele);
-            expect(cols).toBeTruthy();
-            expect(cols.length).toBe(4 * 10, '4 columns * 10 rows');
+            let cells = $('.bot-table .bot-row td', ele);
+            expect(cells).toBeTruthy();
+            expect(cells.length).toBe(4 * 10, '4 columns * 10 rows');
             // little helper for readability
-            let cell = (r, c) => cols[4*r+c];
+            let cell = (r, c) => cells[4*r+c];
 
             // Check the content of the first few rows (after sorting)
             expect(rows[0]).not.toHaveClass('dead');
@@ -345,7 +346,7 @@ describe('bot-list', function() {
   describe('dynamic behavior', function() {
     // This is done w/o interacting with the sort-toggles because that is more
     // complicated with adding the event listener and so on.
-    it('can stable sort in ascending order', function(done){
+    it('can stable sort in ascending order', function(done) {
       loggedInBotlist((ele) => {
         ele._verbose = false;
         // First sort in descending id order
@@ -372,7 +373,7 @@ describe('bot-list', function() {
       });
     });
 
-    it('can stable sort in descending order', function(done){
+    it('can stable sort in descending order', function(done) {
       loggedInBotlist((ele) => {
         ele._verbose = false;
         // First sort in asc id order
@@ -399,7 +400,7 @@ describe('bot-list', function() {
       });
     });
 
-    it('can sort times correctly', function(done){
+    it('can sort times correctly', function(done) {
       loggedInBotlist((ele) => {
         ele._verbose = false;
         ele._sort = 'last_seen';
@@ -469,7 +470,6 @@ describe('bot-list', function() {
         colHeaders = $('.bot-table thead th');
         expect(colHeaders).toBeTruthy();
         expect(colHeaders.length).toBe(4, '(num colHeaders)');
-        expectedHeader = colHeaderMap[keyToClick] || keyToClick;
         expect(colHeaders.map((c) => c.textContent.trim())).not.toContain(expectedHeader);
         done();
       });
@@ -519,21 +519,6 @@ describe('bot-list', function() {
       });
     });
 
-    function getChildItemWithText(ele, value) {
-      expect(ele).toBeTruthy();
-
-      for (let i = 0; i < ele.children.length; i++) {
-        let child = ele.children[i];
-        let text = child.firstElementChild;
-        if (text && text.textContent.trim() === value) {
-          return child;
-        }
-      }
-      // uncomment below when debugging
-      // fail(`Could not find child of ${ele} with text value ${value}`);
-      return null;
-    }
-
     it('does not toggle forced columns (like "id")', function(done) {
       loggedInBotlist((ele) => {
         ele._cols = ['id', 'task', 'os', 'status'];
@@ -554,10 +539,6 @@ describe('bot-list', function() {
         done();
       });
     });
-
-    function childrenAsArray(ele) {
-      return Array.prototype.slice.call(ele.children);
-    }
 
     it('shows values when a key row is selected', function(done) {
       loggedInBotlist((ele) => {
@@ -597,7 +578,7 @@ describe('bot-list', function() {
       });
     });
 
-    it('orders columns alphabetically with selected cols on top', function(done) {
+    it('orders columns in selector alphabetically with selected cols on top', function(done) {
       loggedInBotlist((ele) => {
         ele._cols = ['id', 'os', 'task', 'status'];
         ele._showColSelector = true;
@@ -811,7 +792,7 @@ describe('bot-list', function() {
 
         let colSelector = $$('.col_selector', ele);
         expect(colSelector).toBeTruthy();
-        expect(colSelector.children.length).toEqual(6);
+        expect(colSelector.children.length).toEqual(6); // 5 hits + the input box
 
         let row = getChildItemWithText(colSelector, 'gpu');
         expect(row).toBeFalsy('gpu should be hiding');
@@ -847,7 +828,7 @@ describe('bot-list', function() {
         expect(cell(0, 3)).toMatchTextContent('7h  1m 48s');
 
         expect(cell(1, 0)).toMatchTextContent('somebot10-a9');
-        expect(cell(1, 1)).toMatchTextContent('N/A');
+        expect(cell(1, 1)).toMatchTextContent('--');
         expect(cell(1, 2).innerHTML).not.toContain('<a ', 'no mp link');
         expect(cell(1, 3)).toMatchTextContent('5h 53m 32s');
         done();
@@ -990,8 +971,8 @@ describe('bot-list', function() {
   }); // end describe('api calls')
 
   describe('data parsing', function() {
-    const LINUX_BOT = data_s10.items[0];
-    const MULTI_ANDROID_BOT = data_s10.items[2];
+    const LINUX_BOT = bots_10.items[0];
+    const MULTI_ANDROID_BOT = bots_10.items[2];
 
     it('inflates the state', function() {
       // Make a copy of the object because _processBots will modify it in place.
@@ -1052,24 +1033,26 @@ describe('bot-list', function() {
     });
 
     it('turns the dimension map into a list', function() {
-      // processDimensions may modify the passed in variable.
-      let dimensions = processDimensions(deepCopy(fleetDimensions.bots_dimensions));
+      // makePossibleColumns may modify the passed in variable.
+      let possibleCols = makePossibleColumns(deepCopy(fleetDimensions.bots_dimensions));
 
-      expect(dimensions).toBeTruthy();
-      expect(dimensions.length).toBe(14);
-      expect(dimensions).toContain('id');
-      expect(dimensions).toContain('cores');
-      expect(dimensions).toContain('device_type');
-      expect(dimensions).toContain('xcode_version');
-      expect(dimensions).not.toContain('error');
+      expect(possibleCols).toBeTruthy();
+      expect(possibleCols.length).toBe(34);
+      expect(possibleCols).toContain('id');
+      expect(possibleCols).toContain('cores');
+      expect(possibleCols).toContain('device_type');
+      expect(possibleCols).toContain('xcode_version');
+      expect(possibleCols).toContain('mp_lease_id');
+      expect(possibleCols).toContain('battery_health');
+      expect(possibleCols).not.toContain('error');
     });
 
     it('gracefully handles null data', function() {
-      // processDimensions may modify the passed in variable.
-      let dimensions = processDimensions(null);
+      // makePossibleColumns may modify the passed in variable.
+      let possibleCols = makePossibleColumns(null);
 
-      expect(dimensions).toBeTruthy();
-      expect(dimensions.length).toBe(0);
+      expect(possibleCols).toBeTruthy();
+      expect(possibleCols.length).toBe(0);
 
       let bots = processBots(null);
 
@@ -1078,7 +1061,7 @@ describe('bot-list', function() {
     });
 
     it('extracts the key->value map', function() {
-      // processDimensions may modify the passed in variable.
+      // makePossibleColumns may modify the passed in variable.
       let pMap = processPrimaryMap(deepCopy(fleetDimensions.bots_dimensions));
 
       expect(pMap).toBeTruthy();
@@ -1108,6 +1091,42 @@ describe('bot-list', function() {
       expect(pMap['is_mp_bot']).toBeTruthy();
       expect(pMap['is_mp_bot']).toContain('false');
       expect(pMap['id']).toEqual(null);
+    });
+
+    it('filters bots based on special keys', function() {
+      let bots = processBots(deepCopy(bots_10.items));
+
+      expect(bots).toBeTruthy();
+      expect(bots.length).toBe(10);
+
+      let filtered = filterBots(['status:quarantined'], bots);
+      expect(filtered.length).toBe(1);
+      expect(filtered[0].bot_id).toEqual('somebot11-a9');
+
+      filtered = filterBots(['is_mp_bot:true'], bots);
+      expect(filtered.length).toBe(1);
+      expect(filtered[0].bot_id).toEqual('somebot18-a9');
+
+      filtered = filterBots(['task:busy'], bots);
+      expect(filtered.length).toBe(4);
+      const expectedIds = ['somebot12-a9', 'somebot16-a9', 'somebot17-a9', 'somebot77-a3'];
+      let actualIds = filtered.map((bot) => bot.bot_id);
+      actualIds.sort();
+      expect(actualIds).toEqual(expectedIds);
+    });
+
+    it('filters bots based on dimensions', function() {
+      let bots = processBots(deepCopy(bots_10.items));
+
+      expect(bots).toBeTruthy();
+      expect(bots.length).toBe(10);
+
+      let filtered = filterBots(['os:Ubuntu-17.04', 'gpu:10de:1cb3'], bots);
+      expect(filtered.length).toBe(5);
+      const expectedIds = ['somebot10-a9', 'somebot13-a2', 'somebot13-a9', 'somebot15-a9', 'somebot77-a3'];
+      let actualIds = filtered.map((bot) => bot.bot_id);
+      actualIds.sort();
+      expect(actualIds).toEqual(expectedIds);
     });
 
     it('correctly makes query params from filters', function() {

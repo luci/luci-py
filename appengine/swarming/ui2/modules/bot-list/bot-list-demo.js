@@ -4,7 +4,7 @@
 
 import './index.js'
 
-import { data_s10, fleetCount, fleetDimensions, queryCount } from './test_data'
+import { bots_10, fleetCount, fleetDimensions, queryCount } from './test_data'
 import { requireLogin, mockAuthdAppGETs } from '../test_util'
 
 (function(){
@@ -13,22 +13,22 @@ import { requireLogin, mockAuthdAppGETs } from '../test_util'
 const fetchMock = require('fetch-mock');
 
 // uncomment to stress test with 5120 items
-// data_s10.items.push(...data_s10.items);
-// data_s10.items.push(...data_s10.items);
-// data_s10.items.push(...data_s10.items);
-// data_s10.items.push(...data_s10.items);
-// data_s10.items.push(...data_s10.items);
-// data_s10.items.push(...data_s10.items);
-// data_s10.items.push(...data_s10.items);
-// data_s10.items.push(...data_s10.items);
-// data_s10.items.push(...data_s10.items);
+// bots_10.items.push(...bots_10.items);
+// bots_10.items.push(...bots_10.items);
+// bots_10.items.push(...bots_10.items);
+// bots_10.items.push(...bots_10.items);
+// bots_10.items.push(...bots_10.items);
+// bots_10.items.push(...bots_10.items);
+// bots_10.items.push(...bots_10.items);
+// bots_10.items.push(...bots_10.items);
+// bots_10.items.push(...bots_10.items);
 
 mockAuthdAppGETs(fetchMock, {
   delete_bot: false,
 });
 
 fetchMock.get('glob:/_ah/api/swarming/v1/bots/list?*',
-              requireLogin(data_s10, 500));
+              requireLogin(bots_10, 500));
 
 fetchMock.get('/_ah/api/swarming/v1/bots/dimensions',
               requireLogin(fleetDimensions));
