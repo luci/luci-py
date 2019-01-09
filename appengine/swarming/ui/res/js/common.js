@@ -85,7 +85,7 @@ this.swarming = this.swarming || function() {
   // Date object and foo["human_some_ts"] is the human formated version from
   // sk.human.localeTime.
   swarming.sanitizeAndHumanizeTime = function(obj, key) {
-    obj["human_"+key] = "‑‑";
+    obj["human_"+key] = "--";
     if (obj[key]) {
       if (obj[key].endsWith && !obj[key].endsWith('Z')) {
         // Timestamps from the server are missing the 'Z' that specifies Zulu

@@ -62,7 +62,7 @@ export function humanDuration(timeInSecs) {
   // Otherwise, if timeInSecs is falsey (e.g. undefined), return empty
   // string to reflect that.
   if (!timeInSecs) {
-    return '‑‑';
+    return '--';
   }
   let ptimeInSecs = parseFloat(timeInSecs);
   // On a bad parse (shouldn't happen), show original.
@@ -88,7 +88,7 @@ export function humanDuration(timeInSecs) {
  *  human.localeTime.
  */
 export function sanitizeAndHumanizeTime(obj, key) {
-  obj['human_'+key] = '‑‑';
+  obj['human_'+key] = '--';
   if (obj[key]) {
     if (obj[key].endsWith && !obj[key].endsWith('Z')) {
       // Timestamps from the server are missing the 'Z' that specifies Zulu
