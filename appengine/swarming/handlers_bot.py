@@ -318,7 +318,7 @@ class _BotBaseHandler(_BotApiHandler):
     leased_indefinitely = None
     machine_type = None
     if bot_id:
-      logging.debug('Fetching bot info and settings')
+      logging.debug('Fetching bot info and settings for bot id: %s', bot_id)
       bot_info, bot_settings = ndb.get_multi([
           bot_management.get_info_key(bot_id),
           bot_management.get_settings_key(bot_id)])
@@ -329,7 +329,6 @@ class _BotBaseHandler(_BotApiHandler):
 
     # Make sure bot self-reported ID matches the authentication token. Raises
     # auth.AuthorizationError if not.
-    logging.debug('Fetching bot group config')
     bot_group_cfg = bot_auth.validate_bot_id_and_fetch_config(
         bot_id, machine_type)
 
