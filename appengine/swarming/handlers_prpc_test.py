@@ -204,8 +204,7 @@ class PRPCTest(test_env_handlers.AppTestBase):
             }),
         external_ip='192.168.2.2',
         authenticated_as='bot:whitelisted-ip',
-        version=
-            'bd5fadf7768b3f4965cf1fe8b58c6c4018d1039e40eb253215dac1193372ffeb',
+        version=self.bot_version,
     )
     events = [
       swarming_pb2.BotEvent(
