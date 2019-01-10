@@ -303,7 +303,9 @@ class ContentHandler(auth.AuthenticatingHandler):
     if not isinstance(json_data, dict):
       return False
     actual = set(json_data)
-    return actual.issubset(_ISOLATED_ROOT_MEMBERS) and 'files' in actual
+    return actual.issubset(_ISOLATED_ROOT_MEMBERS) and (
+        'files' in actual or 'includes' in actual
+    )
 
 
 class StatsHandler(webapp2.RequestHandler):

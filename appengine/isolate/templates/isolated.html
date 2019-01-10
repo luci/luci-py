@@ -16,8 +16,8 @@
     {{isolated.get('command', '')|join('\n    ')}}
 algo: {{isolated.get('algo', '')}}
 includes:
-{% for digest in isolated.get('includes', '') %}
-    <a target="_blank" href="/browse?namespace{{namespace}}&digest={{digest}}">{{digest}}</a>
+{% for digest in isolated.get('includes', []) %}
+    <a target="_blank" href="/browse?namespace={{namespace}}&digest={{digest}}">{{digest}}</a>
 {% endfor %}
 read_only: {{isolated.get('read_only', '')}}
 relative_cwd: {{isolated.get('relative_cwd', '')}}
