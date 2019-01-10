@@ -333,9 +333,20 @@ def get_device_tree_compatible():
   """
   try:
     with open('/sys/firmware/devicetree/base/compatible', 'rb') as f:
-      return unicode(f.read().strip()).split(u',')
+      items = f.read().strip().split(',')
   except IOError:
     return None
+  # The data could contain nul byte or other invalid data, we've observed this
+  # on ODROID-C2.
+  for i, item in enumerate(items):
+    if '\x00' in item:
+      items[i] = None
+    else:
+      try:
+        items[i] = item.decode('utf-8', 'replace')
+      except UnicodeDecodeError:
+        items[i] = None
+  return sorted(i for i in items if i)
 
 
 def get_cpu_scaling_governor(cpu_num):
