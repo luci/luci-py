@@ -710,6 +710,7 @@ class _TaskResultCommon(ndb.Model):
 
   def to_proto(self, out):
     """Converts self to a swarming_pb2.TaskResult"""
+    self.request.to_proto(out.request)
     out.create_time.FromDatetime(self.created_ts)
     if self.started_ts:
       out.start_time.FromDatetime(self.started_ts)

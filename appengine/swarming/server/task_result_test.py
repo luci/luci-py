@@ -661,6 +661,42 @@ class TaskResultApiTest(TestCase):
     run_result.put()
 
     expected = swarming_pb2.TaskResult(
+        request=swarming_pb2.TaskRequest(
+            task_slices=[
+              swarming_pb2.TaskSlice(
+                  properties=swarming_pb2.TaskProperties(
+                    cipd_inputs=[
+                      swarming_pb2.CIPDPackage(
+                          package_name=u'rm',
+                          version=u'latest',
+                          dest_path=u'bin',
+                      ),
+                    ],
+                    command=[u'command1'],
+                    dimensions=[
+                      swarming_pb2.StringListPair(
+                          key=u'pool', values=[u'default']),
+                    ],
+                    execution_timeout=duration_pb2.Duration(seconds=86400),
+                    grace_period=duration_pb2.Duration(seconds=30),
+                  ),
+                  expiration=duration_pb2.Duration(seconds=60),
+              ),
+            ],
+            priority=50,
+            service_account=u'none',
+            name=u'Request name',
+            tags=[
+              u'pool:default',
+              u'priority:50',
+              u'service_account:none',
+              u'swarming.pool.template:no_config',
+              u'tag:1',
+              u'user:Jesus',
+            ],
+            user=u'Jesus',
+            task_id=u'1d69b9f088008810',
+        ),
         duration=duration_pb2.Duration(seconds=1),
         state=swarming_pb2.TIMED_OUT,
         state_category=swarming_pb2.CATEGORY_EXECUTION_DONE,
@@ -708,6 +744,7 @@ class TaskResultApiTest(TestCase):
             server=u'http://localhost:1',
             namespace=u'default-gzip')
     )
+    expected.request.create_time.FromDatetime(self.now)
     expected.create_time.FromDatetime(self.now)
     expected.start_time.FromDatetime(
         self.now + datetime.timedelta(seconds=20))
