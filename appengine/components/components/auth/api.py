@@ -1537,7 +1537,7 @@ def public(func):
   return func
 
 
-def require(callback):
+def require(callback, error_msg=None):
   """Decorator that checks current identity's permissions.
 
   Args:
@@ -1545,6 +1545,8 @@ def require(callback):
         to grant access to current identity (by calling decorated function) or
         False to forbid it (by raising AuthorizationError). It can
         use get_current_identity() (and other request state) to figure this out.
+    error_msg: string that is included as the message in the AuthorizationError
+        raised if callback returns False.
 
   Multiple @require decorators can be safely nested on top of each other to
   check multiple permissions. In that case a current identity needs to have all
@@ -1573,7 +1575,7 @@ def require(callback):
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
       if not callback():
-        raise AuthorizationError()
+        raise AuthorizationError(error_msg)
       return func(*args, **kwargs)
 
     # Propagate reference to original function, mark function as decorated.

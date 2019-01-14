@@ -653,6 +653,14 @@ class ApiTest(test_case.TestCase):
       forbidden()
     self.assertFalse(forbidden_calls)
 
+  def test_require_decorator_error_msg(self):
+    @api.require(lambda: False, 'Forbidden!')
+    def forbidden():
+      pass
+
+    with self.assertRaisesRegexp(api.AuthorizationError, 'Forbidden!'):
+      forbidden()
+
   def test_require_decorator_nesting_ok(self):
     """Permission checks are called in order."""
     calls = []

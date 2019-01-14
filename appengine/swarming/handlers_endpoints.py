@@ -437,7 +437,7 @@ class SwarmingTasksService(remote.Service):
   @gae_ts_mon.instrument_endpoint()
   @auth.endpoints_method(
       swarming_rpcs.NewTaskRequest, swarming_rpcs.TaskRequestMetadata)
-  @auth.require(acl.can_create_task)
+  @auth.require(acl.can_create_task, 'User cannot create tasks.')
   def new(self, request):
     """Creates a new task.
 
