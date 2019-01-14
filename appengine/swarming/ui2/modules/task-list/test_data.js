@@ -899,7 +899,7 @@ export const tasks_20 = {
         "service_account:none",
         "swarming.pool.template:none",
         "swarming.pool.version:a951373af11284d7583d5fd2ca25a760bc744af6",
-        "user:skiabot@google.com"
+        "user:skiabot@example.com"
       ],
       "server_versions": [
         "3945-402d3be"
@@ -907,12 +907,12 @@ export const tasks_20 = {
       "costs_usd": [
         0.05177581497216855
       ],
-      "name": "Leased by benjaminwagner@google.com using leasing.skia.org",
+      "name": "Leased by user@example.com using leasing.skia.org",
       "abandoned_ts": "2018-12-19T16:22:04.935851",
       "failure": false,
       "state": "BOT_DIED",
       "modified_ts": "2018-12-19T16:22:04.935851",
-      "user": "skiabot@google.com",
+      "user": "skiabot@example.com",
       "bot_id": "skia-e-win-352",
       "current_task_slice": "0",
       "try_number": "1",
@@ -1701,11 +1701,11 @@ export const tasks_20 = {
         "source_revision:77e1ccf3cd19ed079a3c590a67f28f0fa1d73511",
         "swarming.pool.template:none",
         "swarming.pool.version:a951373af11284d7583d5fd2ca25a760bc744af6",
-        "user:skiabot@google.com"
+        "user:skiabot@example.com"
       ],
       "failure": true,
       "modified_ts": "2018-12-19T16:52:11.201276",
-      "user": "skiabot@google.com",
+      "user": "skiabot@example.com",
       "created_ts": "2018-12-19T16:50:27.556151",
       "name": "Build-Win-Clang-x86_64-Debug-ANGLE",
       "task_id": "41e031b2c8b46710",
@@ -2151,12 +2151,12 @@ export const tasks_20 = {
         "source_revision:c59caa406007b0ead362dd7eb013a1b635e6742a",
         "swarming.pool.template:none",
         "swarming.pool.version:a951373af11284d7583d5fd2ca25a760bc744af6",
-        "user:skiabot@google.com",
+        "user:skiabot@example.com",
         "valgrind:1"
       ],
       "failure": false,
       "modified_ts": "2018-12-19T16:36:02.766665",
-      "user": "skiabot@google.com",
+      "user": "skiabot@example.com",
       "created_ts": "2018-12-19T14:19:38.149850",
       "name": "Perf-Ubuntu17-GCC-Golo-GPU-QuadroP400-x86_64-Release-All-Valgrind_SK_CPU_LIMIT_SSE41",
       "task_id": "41dfa79d3bf29010",
@@ -2380,12 +2380,12 @@ export const tasks_20 = {
         "source_revision:1a237195b527640c6a365affa7d9941d71321c98",
         "swarming.pool.template:none",
         "swarming.pool.version:a951373af11284d7583d5fd2ca25a760bc744af6",
-        "user:skiabot@google.com",
+        "user:skiabot@example.com",
         "valgrind:1"
       ],
       "failure": false,
       "modified_ts": "2018-12-19T14:19:39.025593",
-      "user": "skiabot@google.com",
+      "user": "skiabot@example.com",
       "created_ts": "2018-12-19T13:09:32.739908",
       "name": "Test-Ubuntu17-GCC-Golo-GPU-QuadroP400-x86_64-Release-All-Valgrind_PreAbandonGpuContext_SK_CPU_LIMIT_SSE41",
       "task_id": "41df677202f20310",

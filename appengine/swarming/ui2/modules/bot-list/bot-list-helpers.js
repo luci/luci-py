@@ -141,10 +141,10 @@ export const specialFilters = {
 };
 
 /** Filters the bots like they would be filtered from the server
- * filters: Array<String>: like ['alpha:beta']
- * bots: Array<Object>: the bot objects.
+ * @param {Array<String>} filters - e.g. ['alpha:beta']
+ * @param {Array<Object>} bots - the bot objects to filter.
  *
- * returns the bots that match the filters.
+ * @returns {Array<Object>} the bots that match the filters.
 */
 export function filterBots(filters, bots) {
   let parsedFilters = [];
@@ -204,6 +204,12 @@ export function fromState(bot, attr) {
     return state;
   }
   return [state];
+}
+
+/** getColHeader returns the human-readable header for a given column.
+ */
+export function getColHeader(col) {
+  return colHeaderMap[col] || col;
 }
 
 // The list of things we do count data for, in the order they are presented.
@@ -452,10 +458,10 @@ const specialColOrder = ['id', 'task'];
 const compareColumns = compareWithFixedOrder(specialColOrder);
 
 /** sortColumns sorts the bot-list columns in mostly alphabetical order. Some
-  columns (id, task) go first to maintain with behavior from previous
-  versions.
-  @param cols Array<String> The columns
-*/
+ *  columns (id, task) go first to maintain with behavior from previous
+ *  versions.
+ *  @param {Array<String>} cols - The columns
+ */
 export function sortColumns(cols) {
   cols.sort(compareColumns);
 }
@@ -463,14 +469,18 @@ export function sortColumns(cols) {
 /** sortPossibleColumns sorts the columns in the column selector. It puts the
  *  selected ones on top in the order they are displayed and the rest below
  *  in alphabetical order.
+ *
+ * @param {Array<String>} columns - The columns to sort. They will be sorted
+ *          in place.
+ * @param {Array<String>} selectedCols - The currently selected columns.
  */
-export function sortPossibleColumns(keys, selectedCols) {
+export function sortPossibleColumns(columns, selectedCols) {
   let selected = {};
   for (let c of selectedCols) {
     selected[c] = true;
   }
 
-  keys.sort((a, b) => {
+  columns.sort((a, b) => {
       // Show selected columns above non selected columns
       let selA = selected[a];
       let selB = selected[b];
@@ -508,7 +518,7 @@ const extraKeys = ['disk_space', 'uptime', 'running_time', 'task',
 'bot_temperature', 'device_temperature', 'serial_number'];
 
 /** colHeaderMap maps keys to their human readable name.*/
-export const colHeaderMap = {
+const colHeaderMap = {
   'id': 'Bot Id',
   'mp_lease_id': 'Machine Provider Lease Id',
   'task': 'Current Task',

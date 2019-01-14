@@ -151,6 +151,10 @@ export function requireLogin(logged_in, delay=100) {
   };
 }
 
+/** getChildItemWithText looks at the children of the given element
+ *  and returns the element that has textContent that matches the
+ *  passed in value.
+ */
 export function getChildItemWithText(ele, value) {
   expect(ele).toBeTruthy();
 
@@ -166,6 +170,9 @@ export function getChildItemWithText(ele, value) {
   return null;
 }
 
+/** childrenAsArray looks at an HTML element and returns the children
+ *  as a real array (e.g. with .forEach)
+ */
 export function childrenAsArray(ele) {
   return Array.prototype.slice.call(ele.children);
 }

@@ -39,8 +39,8 @@ import '../swarming-app'
 
 import { taskListLink } from '../util'
 import { applyAlias } from '../alias'
-import { aggregateTemps, attribute, botLink, column, colHeaderMap,
-         devices, filterBots,  fromDimension, fromState, initCounts,
+import { aggregateTemps, attribute, botLink, column, devices,
+         filterBots,  fromDimension, fromState, getColHeader, initCounts,
          listQueryParams, longestOrAll, processBots, processCounts,
          makePossibleColumns, processPrimaryMap, sortColumns, sortPossibleColumns,
          specialFilters, specialSortMap } from './bot-list-helpers'
@@ -49,7 +49,7 @@ import { filterPossibleColumns, filterPossibleKeys,
 import SwarmingAppBoilerplate from '../SwarmingAppBoilerplate'
 
 const colHead = (col, ele) => html`
-<th>${colHeaderMap[col] || col}
+<th>${getColHeader(col)}
   <sort-toggle .key=${col} .currentKey=${ele._sort} .direction=${ele._dir}>
   </sort-toggle>
 </th>`;

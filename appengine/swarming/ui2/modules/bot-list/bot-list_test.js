@@ -14,7 +14,7 @@ describe('bot-list', function() {
   const { childrenAsArray, customMatchers, getChildItemWithText, mockAppGETs } = require('modules/test_util');
   const { fetchMock, MATCHED, UNMATCHED } = require('fetch-mock');
 
-  const { colHeaderMap, column, filterBots, listQueryParams, processBots, makePossibleColumns,
+  const { column, filterBots, getColHeader, listQueryParams, processBots, makePossibleColumns,
          processPrimaryMap } = require('modules/bot-list/bot-list-helpers');
   const { bots_10, fleetCount, fleetDimensions, queryCount } = require('modules/bot-list/test_data');
 
@@ -446,7 +446,7 @@ describe('bot-list', function() {
         let colHeaders = $('.bot-table thead th');
         expect(colHeaders).toBeTruthy();
         expect(colHeaders.length).toBe(5, '(num colHeaders)');
-        let expectedHeader = colHeaderMap[keyToClick] || keyToClick;
+        let expectedHeader = getColHeader(keyToClick);
         expect(colHeaders.map((c) => c.textContent.trim())).toContain(expectedHeader);
 
         // We have to find the checkbox again because the order
@@ -708,7 +708,7 @@ describe('bot-list', function() {
         // Leave the input to let the user correct their mistake.
         expect(filterInput.value).toEqual('invalid filter');
 
-        // Spy on the list call to make sure a request is made with the
+        // Spy on the list call to make sure a request is made with the right filter.
         let calledTimes = 0;
         fetchMock.get('glob:/_ah/api/swarming/v1/bots/list?*', (url, _) => {
           expect(url).toContain(encodeURIComponent('valid:filter:gpu:can:have:many:colons'));

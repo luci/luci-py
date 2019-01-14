@@ -32,6 +32,7 @@ describe('task-list', function() {
     });
 
     fetchMock.get('glob:/_ah/api/swarming/v1/tasks/list?*', tasks_20);
+    fetchMock.get('/_ah/api/swarming/v1/bots/dimensions', fleetDimensions);
 
     // Everything else
     fetchMock.catch(404);
@@ -178,14 +179,500 @@ describe('task-list', function() {
             done();
           });
         });
-      }); // end describe('default landing page')
 
+        it('shows the default set of columns', function(done) {
+          loggedInTasklist((ele) => {
+            // ensure sorting is deterministic.
+            ele._sort = 'created_ts';
+            ele._dir = 'desc';
+            ele._verbose = false;
+            ele.render();
+
+            let colHeaders = $('.task-table thead th', ele);
+            expect(colHeaders).toBeTruthy();
+            expect(colHeaders.length).toBe(7, '(num colHeaders)');
+            expect(colHeaders[0].innerHTML).toContain('<more-vert-icon-sk');
+            expect(colHeaders[0]).toMatchTextContent('name');
+            expect(colHeaders[1]).toMatchTextContent('Created On');
+            expect(colHeaders[2]).toMatchTextContent('Time Spent Pending');
+            expect(colHeaders[3]).toMatchTextContent('Duration');
+            expect(colHeaders[4]).toMatchTextContent('Bot Assigned');
+            expect(colHeaders[5]).toMatchTextContent('pool (tag)');
+            expect(colHeaders[6]).toMatchTextContent('state');
+
+            let rows = $('.task-table .task-row', ele);
+            expect(rows).toBeTruthy();
+            expect(rows.length).toBe(20, '20 rows');
+
+            let cells = $('.task-table .task-row td', ele);
+            expect(cells).toBeTruthy();
+            expect(cells.length).toBe(7 * 20, '7 columns * 20 rows');
+            // little helper for readability
+            let cell = (r, c) => cells[7*r+c];
+
+            expect(rows[0]).toHaveClass('failed_task');
+            expect(rows[0]).not.toHaveClass('exception');
+            expect(rows[0]).not.toHaveClass('pending_task');
+            expect(rows[0]).not.toHaveClass('bot_died');
+            expect(cell(0, 0)).toMatchTextContent('Build-Win-Clang-x86_64-Debug-ANGLE');
+            expect(cell(0, 0).innerHTML).toContain('<a ', 'has a link');
+            expect(cell(0, 0).innerHTML).toContain('href="/task?id=41e031b2c8b46710"', 'link is correct');
+            expect(cell(0, 2)).toMatchTextContent('2.36s'); // pending
+            expect(cell(0, 4)).toMatchTextContent('skia-gce-610');
+            expect(cell(0, 4).innerHTML).toContain('<a ', 'has a link');
+            expect(cell(0, 4).innerHTML).toContain('href="/bot?id=skia-gce-610"', 'link is correct');
+            expect(cell(0, 5)).toMatchTextContent('Skia');
+            expect(cell(0, 6)).toMatchTextContent('COMPLETED (FAILURE)');
+
+            expect(rows[2]).not.toHaveClass('failed_task');
+            expect(rows[2]).not.toHaveClass('exception');
+            expect(rows[2]).not.toHaveClass('pending_task');
+            expect(rows[2]).not.toHaveClass('bot_died');
+            expect(cell(2, 2)).toMatchTextContent('--'); // pending
+
+            expect(rows[4]).not.toHaveClass('failed_task');
+            expect(rows[4]).toHaveClass('exception');
+            expect(rows[4]).not.toHaveClass('pending_task');
+            expect(rows[4]).not.toHaveClass('bot_died');
+
+            expect(rows[5]).not.toHaveClass('failed_task');
+            expect(rows[5]).not.toHaveClass('exception');
+            expect(rows[5]).toHaveClass('pending_task');
+            expect(rows[5]).not.toHaveClass('bot_died');
+            expect(cell(5, 3).textContent).toContain('12m 54s*'); // duration
+
+            expect(rows[14]).not.toHaveClass('failed_task');
+            expect(rows[14]).not.toHaveClass('exception');
+            expect(rows[14]).not.toHaveClass('pending_task');
+            expect(rows[14]).toHaveClass('bot_died');
+
+            done();
+          });
+        });
+
+        it('updates the sort-toggles based on the current sort direction', function(done) {
+          loggedInTasklist((ele) => {
+            ele._sort = 'name';
+            ele._dir = 'desc';
+            ele.render();
+
+            let sortToggles = $('.task-table thead sort-toggle', ele);
+            expect(sortToggles).toBeTruthy();
+            expect(sortToggles.length).toBe(7, '(num sort-toggles)');
+
+            expect(sortToggles[0].key).toBe('name');
+            expect(sortToggles[0].currentKey).toBe('name');
+            expect(sortToggles[0].direction).toBe('desc');
+            // spot check one of the other ones
+            expect(sortToggles[5].key).toBe('pool-tag');
+            expect(sortToggles[5].currentKey).toBe('name');
+            expect(sortToggles[5].direction).toBe('desc');
+
+            ele._sort = 'created_ts';
+            ele._dir = 'asc';
+            ele.render();
+
+            expect(sortToggles[0].key).toBe('name');
+            expect(sortToggles[0].currentKey).toBe('created_ts');
+            expect(sortToggles[0].direction).toBe('asc');
+
+            expect(sortToggles[1].key).toBe('created_ts');
+            expect(sortToggles[1].currentKey).toBe('created_ts');
+            expect(sortToggles[1].direction).toBe('asc');
+            done();
+          });
+        });
+      }); // end describe('default landing page')
     });// end describe('when logged in as user')
 
   }); // end describe('html structure')
 
   describe('dynamic behavior', function() {
-    // TODO
+    // This is done w/o interacting with the sort-toggles because that is more
+    // complicated with adding the event listener and so on.
+    it('can stable sort', function(done) {
+      loggedInTasklist((ele) => {
+        ele._verbose = false;
+        // First sort in descending created_ts order
+        ele._sort = 'created_ts';
+        ele._dir = 'desc';
+        ele.render();
+        // next sort in ascending pool-tag
+        ele._sort = 'pool-tag';
+        ele._dir = 'asc';
+        ele.render();
+
+        let actualIDOrder = ele._tasks.map((t) => t.task_id);
+        let actualPoolOrder = ele._tasks.map((t) => column('pool-tag', t, ele));
+
+        expect(actualIDOrder).toEqual(['41e0284bc3ef4f10', '41e023035ecced10',
+            '41e0222076a33010', '41e020504d0a5110', '41e0204f39d06210',
+            '41e01fe02b981410',     '41dfffb4970ae410', '41e0284bf01aef10',
+            '41e0222290be8110', '41e031b2c8b46710',     '41dfffb8b1414b10',
+            '41dfa79d3bf29010', '41df677202f20310', '41e019d8b7aa2f10',
+            '41e015d550464910', '41e0310fe0b7c410', '41e0182a00fcc110',
+            '41e016dc85735b10',     '41dd3d950bb52710', '41dd3d9564402e10']);
+        expect(actualPoolOrder).toEqual(['Chrome', 'Chrome', 'Chrome',
+            'Chrome', 'Chrome', 'Chrome', 'Chrome', 'Chrome-CrOS-VM', 'Chrome-GPU',
+            'Skia', 'Skia', 'Skia', 'Skia', 'fuchsia.tests', 'fuchsia.tests',
+            'luci.chromium.ci', 'luci.chromium.ci', 'luci.chromium.ci',
+            'luci.fuchsia.try', 'luci.fuchsia.try']);
+        done();
+      });
+    });
+
+    it('can sort durations correctly', function(done) {
+      loggedInTasklist((ele) => {
+        ele._verbose = false;
+        ele._sort = 'duration';
+        ele._dir = 'asc';
+        ele.render();
+
+        let actualDurationsOrder = ele._tasks.map((t) => column('duration', t, ele).trim());
+
+        expect(actualDurationsOrder).toEqual(['0.62s', '2.90s', '17.84s', '1m 38s',
+            '2m  1s', '2m  1s', '1h  9m 47s', '2h 16m 15s', '4w  2d 22h 12m 54s*',
+            '4w  2d 22h 12m 55s*', '--', '--', '--', '--', '--', '--', '--', '--', '--', '--']);
+
+        ele._verbose = false;
+        ele._sort = 'pending_time';
+        ele._dir = 'asc';
+        ele.render();
+
+        let actualPendingOrder = ele._tasks.map((t) => column('human_pending_time', t, ele).trim());
+
+        expect(actualPendingOrder).toEqual(['0s', '0s', '0.63s', '0.66s', '0.72s', '2.35s', '2.36s',
+          '2.58s', '5.74s', '8.21s', '24.58s', '1m 11s', '1m 17s', '5m  5s', '5m 36s', '11m 28s',
+          '4w  2d 22h 14m 54s*', '4w  2d 22h 14m 55s*', '--', '--']);
+        done();
+      });
+    });
+
+    it('toggles columns by clicking on the boxes in the "column selector"', function(done) {
+      loggedInTasklist((ele) => {
+        ele._cols = ['name'];
+        ele._showColSelector = true;
+        ele.render();
+
+        let keySelector = $$('.col_selector', ele);
+        expect(keySelector).toBeTruthy();
+
+        // click on first non checked checkbox.
+        let keyToClick = null;
+        let checkbox = null;
+        for (let i = 0; i < keySelector.children.length; i++) {
+          let child = keySelector.children[i];
+          checkbox = $$('checkbox-sk', child);
+          keyToClick = $$('.key', child);
+          if (checkbox && !checkbox.checked) {
+            expect(keyToClick).toBeTruthy();
+            keyToClick = keyToClick.textContent.trim();
+            break;
+          }
+        }
+        checkbox.click(); // click is synchronous, it returns after
+                          // the clickHandler is run.
+        // Check underlying data
+        expect(ele._cols).toContain(keyToClick);
+        // check the rendering changed
+        let colHeaders = $('.task-table thead th');
+        expect(colHeaders).toBeTruthy();
+        expect(colHeaders.length).toBe(2, '(num colHeaders)');
+        let expectedHeader = getColHeader(keyToClick);
+        expect(colHeaders.map((c) => c.textContent.trim())).toContain(expectedHeader);
+
+        // We have to find the checkbox again because the order
+        // shuffles to keep selected ones on top.
+        checkbox = null;
+        for (let i = 0; i < keySelector.children.length; i++) {
+          let child = keySelector.children[i];
+          checkbox = $$('checkbox-sk', child);
+          let key = $$('.key', child);
+          if (key && key.textContent.trim() === keyToClick) {
+            break;
+          }
+        }
+
+        // click it again
+        checkbox.click();
+
+        // Check underlying data
+        expect(ele._cols).not.toContain(keyToClick);
+        // check the rendering changed
+        colHeaders = $('.task-table thead th');
+        expect(colHeaders).toBeTruthy();
+        expect(colHeaders.length).toBe(1, '(num colHeaders)');
+        expect(colHeaders.map((c) => c.textContent.trim())).not.toContain(expectedHeader);
+        done();
+      });
+    });
+
+    it('shows values when a key row is selected', function(done) {
+      loggedInTasklist((ele) => {
+        ele._cols = ['name'];
+        ele.render();
+        let row = getChildItemWithText($$('.selector.keys'), 'device_type-tag', ele);
+        expect(row).toBeTruthy();
+        row.click();
+        expect(row.hasAttribute('selected')).toBeTruthy();
+        expect(ele._primaryKey).toBe('device_type-tag');
+
+        let valueSelector = $$('.selector.values');
+        expect(valueSelector).toBeTruthy();
+        let values = childrenAsArray(valueSelector).map((c) => c.textContent.trim());
+        // spot check
+        expect(values.length).toBe(15);
+        expect(values).toContain('Nexus 9 (flounder)');
+        expect(values).toContain('iPhone X');
+
+        let oldRow = row;
+        row = getChildItemWithText($$('.selector.keys'), 'state', ele);
+        expect(row).toBeTruthy();
+        row.click();
+        expect(row.hasAttribute('selected')).toBeTruthy('new row only one selected');
+        expect(oldRow.hasAttribute('selected')).toBeFalsy('old row unselected');
+        expect(ele._primaryKey).toBe('state');
+
+        valueSelector = $$('.selector.values');
+        expect(valueSelector).toBeTruthy();
+        values = childrenAsArray(valueSelector).map((c) => c.textContent.trim());
+        // spot check
+        expect(values.length).toBe(13);
+        expect(values).toContain('RUNNING');
+        expect(values).toContain('COMPLETED_FAILURE');
+
+        done();
+      });
+    });
+
+    it('orders columns in selector alphabetically with selected cols on top', function(done) {
+      loggedInTasklist((ele) => {
+        ele._cols = ['duration', 'created_ts', 'state', 'name'];
+        ele._showColSelector = true;
+        ele._refilterPossibleColumns(); // also calls render
+
+        let keySelector = $$('.col_selector');
+        expect(keySelector).toBeTruthy();
+        let keys = childrenAsArray(keySelector).map((c) => c.textContent.trim());
+
+        // Skip the first child, which is the input box
+        expect(keys.slice(1, 7)).toEqual(['name', 'created_ts', 'duration', 'state',
+                                          'abandoned_ts', 'allow_milo-tag']);
+
+        done();
+      });
+    });
+
+    it('adds a filter when the addIcon is clicked', function(done) {
+      loggedInTasklist((ele) => {
+        ele._cols = ['duration', 'created_ts', 'state', 'name'];
+        ele._primaryKey = 'state';  // set 'os' selected
+        ele._filters = [];  // no filters
+        ele.render();
+
+        let valueRow = getChildItemWithText($$('.selector.values'), 'BOT_DIED', ele);
+        let addIcon = $$('add-circle-icon-sk', valueRow);
+        expect(addIcon).toBeTruthy('there should be an icon for adding');
+        addIcon.click();
+
+        expect(ele._filters.length).toBe(1, 'a filter should be added');
+        expect(ele._filters[0]).toEqual('state:BOT_DIED');
+
+        let chipContainer = $$('.chip_container', ele);
+        expect(chipContainer).toBeTruthy('there should be a filter chip container');
+        expect(chipContainer.children.length).toBe(1);
+        expect(addIcon.hasAttribute('hidden'))
+              .toBeTruthy('addIcon should go away after being clicked');
+        done();
+      });
+    });
+
+    it('removes a filter when the circle clicked', function(done) {
+      loggedInTasklist((ele) => {
+        ele._cols = ['duration', 'created_ts', 'state', 'name'];
+        ele._primaryKey = 'pool-tag';
+        ele._filters = ['pool-tag:Skia', 'state:BOT_DIED'];
+        ele.render();
+
+        let filterChip = getChildItemWithText($$('.chip_container'), 'pool-tag:Skia', ele);
+        let icon = $$('cancel-icon-sk', filterChip);
+        expect(icon).toBeTruthy('there should be a icon to remove it');
+        icon.click();
+
+        expect(ele._filters.length).toBe(1, 'a filter should be removed');
+        expect(ele._filters[0]).toEqual('state:BOT_DIED', 'pool-tag:Skia should be removed');
+
+        let chipContainer = $$('.chip_container', ele);
+        expect(chipContainer).toBeTruthy('there should be a filter chip container');
+        expect(chipContainer.children.length).toBe(1);
+        done();
+      });
+    });
+
+    it('shows and hides the column selector', function(done) {
+      loggedInTasklist((ele) => {
+        ele._showColSelector = false;
+        ele.render();
+
+        let cs = $$('.col_selector', ele);
+        expect(cs).toBeFalsy();
+
+        let toClick = $$('.col_options', ele);
+        expect(toClick).toBeTruthy('Thing to click to show col selector');
+        toClick.click();
+
+        cs = $$('.col_selector', ele);
+        expect(cs).toBeTruthy();
+
+        // click anywhere else to hide the column selector
+        toClick = $$('.header', ele);
+        expect(toClick).toBeTruthy('Thing to click to hide col selector');
+        toClick.click();
+
+        cs = $$('.col_selector', ele);
+        expect(cs).toBeFalsy();
+
+        done();
+      });
+    });
+
+    it('filters the data it has when waiting for another request', function(done) {
+      loggedInTasklist((ele) => {
+        ele._cols = ['name'];
+        ele._filters = [];
+        ele.render();
+
+        expect(ele._tasks.length).toBe(20, 'All 20 at the start');
+
+        let wasCalled = false;
+        fetchMock.get('glob:/_ah/api/swarming/v1/tasks/list?*', () => {
+          expect(ele._tasks.length).toBe(2, '2 BOT_DIED there now.');
+          wasCalled = true;
+          return '[]'; // pretend no tasks match
+        }, { overwriteRoutes: true });
+
+        ele._addFilter('state:BOT_DIED');
+        // The true on flush waits for res.json() to resolve too, which
+        // is when we know the element has updated the _tasks.
+        fetchMock.flush(true).then(() => {
+          expect(wasCalled).toBeTruthy();
+          expect(ele._tasks.length).toBe(0, 'none were actually returned');
+
+          done();
+        });
+      });
+    });
+
+    it('allows filters to be added from the search box', function(done) {
+      loggedInTasklist((ele) => {
+        ele._filters = [];
+        ele.render();
+
+        let filterInput = $$('#filter_search', ele);
+        filterInput.value = 'invalid filter';
+        ele._filterSearch({key: 'Enter'});
+        expect(ele._filters).toEqual([]);
+        // Leave the input to let the user correct their mistake.
+        expect(filterInput.value).toEqual('invalid filter');
+
+        // Spy on the list call to make sure a request is made with the right filter.
+        let calledTimes = 0;
+        fetchMock.get('glob:/_ah/api/swarming/v1/tasks/list?*', (url, _) => {
+          // TODO(kjlubick)
+          //expect(url).toContain(encodeURIComponent('valid:filter:gpu:can:have:many:colons'));
+          calledTimes++;
+          return '[]'; // pretend no bots match
+        }, {overwriteRoutes: true});
+
+        filterInput.value = 'valid:filter:gpu:can:have:many:colons';
+        ele._filterSearch({key: 'Enter'});
+        expect(ele._filters).toEqual(['valid:filter:gpu:can:have:many:colons']);
+        // Empty the input for next time.
+        expect(filterInput.value).toEqual('');
+        filterInput.value = 'valid:filter:gpu:can:have:many:colons';
+        ele._filterSearch({key: 'Enter'});
+        // No duplicates
+        expect(ele._filters).toEqual(['valid:filter:gpu:can:have:many:colons']);
+
+        fetchMock.flush(true).then(() => {
+          expect(calledTimes).toEqual(1, 'Only request tasks once');
+
+          done();
+        });
+      });
+    });
+
+    it('searches filters by typing in the text box', function(done) {
+      loggedInTasklist((ele) => {
+        ele._filters = [];
+        ele.render();
+
+        let filterInput = $$('#filter_search', ele);
+        filterInput.value = 'dev';
+        ele._refilterPrimaryKeys();
+
+        // Auto selects the first one
+        expect(ele._primaryKey).toEqual('android_devices-tag');
+
+        let row = getChildItemWithText($$('.selector.keys'), 'cpu-tag', ele);
+        expect(row).toBeFalsy('cpu-tag should be hiding');
+        row = getChildItemWithText($$('.selector.keys'), 'device_type-tag', ele);
+        expect(row).toBeTruthy('device_type-tag should be there');
+        row = getChildItemWithText($$('.selector.keys'), 'stepname-tag', ele);
+        expect(row).toBeTruthy('stepname-tag should be there, because some values match');
+
+        done();
+      });
+    });
+
+    it('filters keys/values by partial filters', function(done) {
+      loggedInTasklist((ele) => {
+        ele._filters = [];
+        ele.render();
+
+        let filterInput = $$('#filter_search', ele);
+        filterInput.value = 'pool-tag:Ski';
+        ele._refilterPrimaryKeys();
+
+        // Auto selects the first one
+        expect(ele._primaryKey).toEqual('pool-tag');
+
+        let children = $$('.selector.keys', ele).children;
+        expect(children.length).toEqual(1, 'only pool-tag should show up');
+        expect(children[0].textContent).toContain('pool-tag');
+
+        let row = getChildItemWithText($$('.selector.values'), 'Chrome', ele);
+        expect(row).toBeFalsy('Chrome does not match');
+        row = getChildItemWithText($$('.selector.values'), 'SkiaTriggers', ele);
+        expect(row).toBeTruthy('SkiaTriggers matches');
+
+        done();
+      });
+    });
+
+    it('searches columns by typing in the text box', function(done) {
+      loggedInTasklist((ele) => {
+        ele._cols = ['name'];
+        ele._showColSelector = true;
+        ele.render();
+
+        let columnInput = $$('#column_search', ele);
+        columnInput.value = 'build';
+        ele._refilterPossibleColumns();
+
+        let colSelector = $$('.col_selector', ele);
+        expect(colSelector).toBeTruthy();
+        expect(colSelector.children.length).toEqual(12); // 11 hits + the input box
+
+        let row = getChildItemWithText(colSelector, 'state');
+        expect(row).toBeFalsy('state should be hiding');
+        row = getChildItemWithText(colSelector, 'build_is_experimental-tag');
+        expect(row).toBeTruthy('build_is_experimental-tag should be there');
+
+        done();
+      });
+    });
+
   }); // end describe('dynamic behavior')
 
   describe('api calls', function() {
@@ -228,7 +715,7 @@ describe('task-list', function() {
     it('makes auth\'d API calls when a logged in user views landing page', function(done) {
       loggedInTasklist((ele) => {
         let calls = fetchMock.calls(MATCHED, 'GET');
-        expect(calls.length).toBe(2+1, '2 GETs from swarming-app, 1 from task-list');
+        expect(calls.length).toBe(2+2, '2 GETs from swarming-app, 2 from task-list');
         // calls is an array of 2-length arrays with the first element
         // being the string of the url and the second element being
         // the options that were passed in
@@ -248,8 +735,8 @@ describe('task-list', function() {
 
     it('turns the dates into DateObjects', function() {
       // Make a copy of the object because processTasks will modify it in place.
-      let tasks = processTasks([deepCopy(ANDROID_TASK)]);
-      let task = tasks[0]
+      let tasks = processTasks([deepCopy(ANDROID_TASK)], {});
+      let task = tasks[0];
       expect(task.created_ts).toBeTruthy();
       expect(task.created_ts instanceof Date).toBeTruthy('Should be a date object');
       expect(task.human_created_ts).toBeTruthy();
@@ -262,6 +749,63 @@ describe('task-list', function() {
 
       expect(tasks).toBeTruthy();
       expect(tasks.length).toBe(0);
+    });
+
+    it('produces a list of tags', function() {
+      let tags = {};
+      let tasks = processTasks(deepCopy(tasks_20.items), tags);
+      let keys = Object.keys(tags);
+      expect(keys).toBeTruthy();
+      expect(keys.length).toBe(76);
+      expect(keys).toContain('pool');
+      expect(keys).toContain('purpose');
+      expect(keys).toContain('source_revision');
+
+      expect(tasks.length).toBe(20);
+    });
+
+    it('filters tasks based on special keys', function() {
+      let tasks = processTasks(deepCopy(tasks_20.items), {});
+
+      expect(tasks).toBeTruthy();
+      expect(tasks.length).toBe(20);
+
+      let filtered = filterTasks(['state:COMPLETED_FAILURE'], tasks);
+      expect(filtered.length).toBe(2);
+      const expectedIds = ['41e0310fe0b7c410', '41e031b2c8b46710'];
+      let actualIds = filtered.map((task) => task.task_id);
+      actualIds.sort();
+      expect(actualIds).toEqual(expectedIds);
+    });
+
+    it('filters tasks based on dimensions', function() {
+      let tasks = processTasks(deepCopy(tasks_20.items), {});
+
+      expect(tasks).toBeTruthy();
+      expect(tasks.length).toBe(20);
+
+      let filtered = filterTasks(['pool-tag:Chrome'], tasks);
+      expect(filtered.length).toBe(7);
+      let actualIds = filtered.map((task) => task.task_id);
+      expect(actualIds).toContain('41e0204f39d06210'); // spot check
+      expect(actualIds).not.toContain('41e0182a00fcc110');
+
+      // some tasks have multiple 'purpose' tags
+      filtered = filterTasks(['purpose-tag:luci'], tasks);
+      expect(filtered.length).toBe(8);
+      actualIds = filtered.map((task) => task.task_id);
+      expect(actualIds).toContain('41e020504d0a5110'); // spot check
+      expect(actualIds).not.toContain('41e0310fe0b7c410');
+
+      filtered = filterTasks(['pool-tag:Skia', 'gpu-tag:none'], tasks);
+      expect(filtered.length).toBe(1);
+      expect(filtered[0].task_id).toBe('41e031b2c8b46710');
+
+      filtered = filterTasks(['pool-tag:Skia', 'gpu-tag:10de:1cb3-384.59'], tasks);
+      expect(filtered.length).toBe(2);
+      actualIds = filtered.map((task) => task.task_id);
+      expect(actualIds).toContain('41dfa79d3bf29010');
+      expect(actualIds).toContain('41df677202f20310');
     });
 
   }); //end describe('data parsing')
