@@ -492,7 +492,7 @@ window.customElements.define('bot-list', class extends SwarmingAppBoilerplate {
           // with the showAll button.
           if ((this._filters.length || this._showAll) && json.cursor) {
             this._limit = BATCH_LOAD;
-            queryParams = listQueryParams(this._filters, BATCH_LOAD, json.cursor);
+            queryParams = listQueryParams(this._filters, this._limit, json.cursor);
             fetch(`/_ah/api/swarming/v1/bots/list?${queryParams}`, extra)
               .then(jsonOrThrow)
               .then(maybeLoadMore)

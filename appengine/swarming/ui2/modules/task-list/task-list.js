@@ -34,8 +34,13 @@ import 'elements-sk/styles/buttons'
 import '../sort-toggle'
 import '../swarming-app'
 
+import flatpickr from 'flatpickr'
+import 'flatpickr/dist/flatpickr.css'
+
 import { applyAlias } from '../alias'
-import { appendPossibleColumns, appendPrimaryMap, column, filterTasks, getColHeader, processTasks, sortColumns, sortPossibleColumns, specialSortMap, stripTag, taskClass } from './task-list-helpers'
+import { appendPossibleColumns, appendPrimaryMap, column, filterTasks, getColHeader,
+         listQueryParams, processTasks, sortColumns, sortPossibleColumns, specialSortMap,
+         stripTag, taskClass } from './task-list-helpers'
 import { filterPossibleColumns, filterPossibleKeys,
          filterPossibleValues, makeFilter } from '../queryfilter'
 import SwarmingAppBoilerplate from '../SwarmingAppBoilerplate'
@@ -150,11 +155,24 @@ const options = (ele) => html`
 <div class=options>
   <div class=verbose>
     <checkbox-sk ?checked=${ele._verbose}
-                 @click=${ele._toggleVerbose}>
+                 @click=${ele._toggleVerbose}
+                 label="Verbose Entries">
     </checkbox-sk>
-    <span>Verbose Entries</span>
   </div>
-  <div>TODO datepicker</div>
+  <div class=picker>
+    <div class=time>
+      <span class=label>Start:</span>
+      <input id=start_time></input>
+    </div>
+    <div class=time>
+      <span class=label>End:</span>
+      <input id=end_time ?disabled=${ele._now}></input>
+      <checkbox-sk ?checked=${ele._now}
+                   @click=${ele._toggleNow}>
+      </checkbox-sk>
+      <span>Now</span>
+    </div>
+  </div>
   <a href=${ele._matchingBotsLink()}>View Matching Bots</a>
   <button
       ?disabled=${!ele.permissions.cancel_task}
@@ -181,8 +199,8 @@ const summary = (ele) => html`
 </div>`;
 
 const header = (ele) => html`
-<div class=header>
-  <div class=filter_box ?hidden=${!ele.loggedInAndAuthorized}>
+<div class=header ?hidden=${!ele.loggedInAndAuthorized}>
+  <div class=filter_box>
     <search-icon-sk></search-icon-sk>
     <input id=filter_search class=search type=text
            placeholder='Search filters or supply a filter
@@ -222,7 +240,7 @@ const template = (ele) => html`
   <main @click=${e => ele._showColSelector && ele._toggleColSelector(e)}>
     <h2 class=message ?hidden=${ele.loggedInAndAuthorized}>${ele._message}</h2>
 
-    ${ele.loggedInAndAuthorized ? header(ele): ''}
+    ${header(ele)}
 
     <table class=task-table ?hidden=${!ele.loggedInAndAuthorized}>
       <thead>
@@ -262,15 +280,17 @@ window.customElements.define('task-list', class extends SwarmingAppBoilerplate {
 
     this._cols = [];
     this._dir = '';
+    this._endTime = 0;
     this._filters = [];
     this._limit = 0; // _limit being 0 is a sentinel value for _fetch()
                      // We won't actually make a request if _limit is 0.
                      // So, we keep limit 0 until our params have been read in
                      // from the URL to avoid making a request until we are
                      // ready.
+    this._now = true;
     this._primaryKey = '';
-    this._showAll = false;
     this._sort = '';
+    this._startTime = 0;
     this._verbose = false;
 
     this._queryCounts = [
@@ -291,12 +311,14 @@ window.customElements.define('task-list', class extends SwarmingAppBoilerplate {
       /*getState*/() => {
         return {
           // provide empty values
-          'c': this._cols,
-          'd': this._dir,
-          'f': this._filters,
-          'k': this._primaryKey,
-          's': this._sort,
-          'show_all': this._showAll,
+          'c' : this._cols,
+          'd' : this._dir,
+          'et': this._endTime,
+          'f' : this._filters,
+          'k' : this._primaryKey,
+          'n' : this._now,
+          's' : this._sort,
+          'st': this._startTime,
           'v': this._verbose,
         }
     }, /*setState*/(newState) => {
@@ -308,13 +330,22 @@ window.customElements.define('task-list', class extends SwarmingAppBoilerplate {
       }
       this._dir = newState.d || 'desc';
       this._filters = newState.f; // default to []
-      this._primaryKey = newState.k; // default to ''
-      this._verbose = newState.v;         // default to false
-      this._sort = newState.s || 'created_ts';
       this._limit = INITIAL_LOAD;
-      this._showAll = newState.show_all; // default to false
+      this._now = newState.n; // default to true
+      this._primaryKey = newState.k; // default to ''
+      // default to 24 hours ago, or if now is checked, update it to now
+      if (this._now || !newState.et) {
+        this._endTime = Date.now();
+      } else {
+        this._endTime = newState.et;
+      }
+      // default to 24 hours ago
+      this._startTime = newState.st || Date.now() - 24*60*60*1000;
+      this._sort = newState.s || 'created_ts';
+      this._verbose = newState.v;         // default to false
       this._fetch();
       this.render();
+      this._initDatePickers();
     });
 
     this._filteredPrimaryArr = [];
@@ -407,7 +438,11 @@ window.customElements.define('task-list', class extends SwarmingAppBoilerplate {
     };
     // Fetch the tasks
     this.app.addBusyTasks(1);
-    let queryParams = `?limit=${INITIAL_LOAD}`; // TODO
+    let queryParams = listQueryParams(this._filters, {
+      limit: this._limit,
+      start: this._startTime,
+      end: this._now ? Date.now() : this._endTime,
+    });
     fetch(`/_ah/api/swarming/v1/tasks/list?${queryParams}`, extra)
       .then(jsonOrThrow)
       .then((json) => {
@@ -421,11 +456,15 @@ window.customElements.define('task-list', class extends SwarmingAppBoilerplate {
 
           this.render();
           // Special case: Don't load all the tasks when filters is empty to avoid
-          // loading many many tasks unintentionally. A user can over-ride this
-          // with the showAll button.
-          if ((this._filters.length || this._showAll) && json.cursor) {
+          // loading many many tasks unintentionally.
+          if (this._filters.length && json.cursor) {
             this._limit = BATCH_LOAD;
-            queryParams = `?limit=${BATCH_LOAD}&json.cursor`; // TODO
+            queryParams = listQueryParams(this._filters, {
+              cursor: json.cursor,
+              limit: this._limit,
+              start: this._startTime,
+              end: this._now ? Date.now() : this._endTime,
+            });
             fetch(`/_ah/api/swarming/v1/tasks/list?${queryParams}`, extra)
               .then(jsonOrThrow)
               .then(maybeLoadMore)
@@ -469,9 +508,16 @@ window.customElements.define('task-list', class extends SwarmingAppBoilerplate {
     }
     let input = $$('#filter_search', this);
     let newFilter = input.value.trim();
-    if (newFilter.indexOf(':') === -1) {
+    let idx = newFilter.indexOf(':');
+    if (idx === -1) {
       errorMessage('Invalid filter.  Should be like "foo:bar"', 5000);
       return;
+    }
+    let key = newFilter.substring(0, idx);
+    if (key !== 'state' && !key.endsWith('-tag')) {
+      errorMessage(`Filters should only be on state or something-tag.
+                   Auto-correcting ${key} to ${key}-tag.`, 6000);
+      newFilter = key + '-tag' + newFilter.substring(idx);
     }
     input.value = '';
     this._filterQuery = '';
@@ -483,6 +529,44 @@ window.customElements.define('task-list', class extends SwarmingAppBoilerplate {
     }
     this._addFilter(newFilter);
     this._refilterPrimaryKeys();
+  }
+
+  _initDatePickers() {
+    if (this._startEle || this._endEle) {
+      return;
+    }
+    this._startEle = $$('#start_time', this);
+    this._endEle = $$('#end_time', this);
+    if (!this._startEle || !this._endEle) {
+      // prevents errors in tests after element has been torn down.
+      return;
+    }
+    flatpickr(this._startEle, {
+      appendTo: $$('.picker', this), // otherwise, it leaks the calendar to <body>
+      defaultDate: this._startTime,
+      enableTime: true,
+      onClose: (dates) => {
+        this._startTime = dates[0].getTime(),
+        this._stateChanged();
+        this._fetch();
+      },
+      onOpen: () => {
+        // prevent the end time picker from covering up the start time
+        if (this._endEle._flatpickr.isOpen) {
+          this._endEle._flatpickr.close();
+        }
+      }
+    });
+    flatpickr(this._endEle, {
+      appendTo: $$('.picker', this), // otherwise, it leaks the calendar to <body>
+      defaultDate: this._endTime,
+      enableTime: true,
+      onClose: (dates) => {
+        this._endTime = dates[0].getTime(),
+        this._stateChanged();
+        this._fetch();
+      }
+    });
   }
 
   _makeSummaryURL() {
@@ -618,6 +702,15 @@ window.customElements.define('task-list', class extends SwarmingAppBoilerplate {
     e.stopPropagation();
     this._showColSelector = !this._showColSelector;
     this._refilterPossibleColumns(); // also renders
+  }
+
+  _toggleNow(e) {
+    // This prevents a double event from happening.
+    e.preventDefault();
+    this._now = !this._now;
+    this._stateChanged();
+    this._fetch();
+    this.render();
   }
 
   _toggleVerbose(e) {

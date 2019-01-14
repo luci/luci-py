@@ -2,6 +2,9 @@
 // Use of this source code is governed under the Apache License, Version 2.0
 // that can be found in the LICENSE file.
 
+// query.fromObject is more readable than just 'fromObject'
+import * as query from 'common-sk/modules/query'
+
 import { applyAlias } from '../alias'
 import { html } from 'lit-html'
 import naturalSort from 'javascript-natural-sort/naturalSort'
@@ -213,6 +216,43 @@ function _insertUnique(arr, value) {
   // value must be bigger than all elements, append to end.
   arr.push(value);
   return arr;
+}
+
+/** listQueryParams returns a query string for the /list API based on the
+ *  passed in args.
+ *  @param {Array<string>} filters - a list of colon-separated key-values.
+ *  @param {Object} extra - Additional filter params: limit, startTime,
+ *          endTime, cursor.
+ */
+export function listQueryParams(filters, extra) {
+  let params = {};
+  let tags = [];
+  for (let f of filters) {
+    let split = f.split(':', 1)
+    let key = split[0];
+    let rest = f.substring(key.length + 1);
+    // we use the -tag as a UI thing to differentiate tags
+    // from 'magic values' like name.
+    key = stripTag(key);
+    if (key === 'state') {
+      params['state'] = rest;
+    } else {
+      tags.push(key + ':' + rest);
+    }
+  }
+  params['tags'] = tags;
+  params['limit'] = extra.limit;
+  if (extra.cursor) {
+    params['cursor'] = extra.cursor;
+  }
+  // The server expects these in epoch seconds, so we trim off the last 3
+  // digits representing milliseconds.
+  let ts = '' + extra.start;
+  params['start'] = ts.substring(0, ts.length - 3);
+  ts = '' + extra.end;
+  params['end'] = ts.substring(0, ts.length - 3);
+
+  return query.fromObject(params);
 }
 
 /** processTasks processes the array of tasks from the server and returns it.

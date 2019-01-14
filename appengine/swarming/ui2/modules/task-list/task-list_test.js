@@ -14,7 +14,7 @@ describe('task-list', function() {
   const { childrenAsArray, customMatchers, getChildItemWithText, mockAppGETs } = require('modules/test_util');
   const { fetchMock, MATCHED, UNMATCHED } = require('fetch-mock');
 
-  const { column, filterTasks, getColHeader, processTasks } = require('modules/task-list/task-list-helpers');
+  const { column, filterTasks, getColHeader, listQueryParams, processTasks } = require('modules/task-list/task-list-helpers');
   const { tasks_20 } = require('modules/task-list/test_data');
   const { fleetDimensions } = require('modules/bot-list/test_data');
 
@@ -56,7 +56,7 @@ describe('task-list', function() {
     // Fix the time so all of our relative dates work.
     // Note, this turns off the default behavior of setTimeout and related.
     jasmine.clock().install();
-    jasmine.clock().mockDate(new Date(Date.UTC(2018, 12, 19, 14, 46, 22, 1234)));
+    jasmine.clock().mockDate(new Date(Date.UTC(2018, 11, 19, 16, 46, 22, 1234)));
   });
 
   afterEach(function() {
@@ -125,8 +125,7 @@ describe('task-list', function() {
           let taskTable = $$('.task-table', ele);
           expect(taskTable).toBeTruthy();
           expect(taskTable.hidden).toBeTruthy('.task-table should be hidden');
-          expect($$('main button:not([hidden])', ele)).toBeFalsy('no buttons seen');
-          expect($$('.header', ele)).toBeFalsy('no filters seen');
+          expect($$('.header', ele).hidden).toBeTruthy('no filters seen');
           done();
         })
       });
@@ -160,9 +159,7 @@ describe('task-list', function() {
           let taskTable = $$('.task-table', ele);
           expect(taskTable).toBeTruthy();
           expect(taskTable.hidden).toBeTruthy('.task-table should be hidden');
-
-          expect($$('main button:not([hidden])', ele)).toBeFalsy('no buttons seen');
-          expect($$('.header', ele)).toBeFalsy('no filters seen');
+          expect($$('.header', ele).hidden).toBeTruthy('no filters seen');
           done();
         });
       });
@@ -250,6 +247,25 @@ describe('task-list', function() {
           });
         });
 
+        it('supplies past 24 hours for the time pickers', function(done) {
+          loggedInTasklist((ele) => {
+            let start = $$('#start_time', ele);
+            expect(start).toBeTruthy();
+            expect(start.disabled).toBeFalsy();
+            expect(start.value).toBe('2018-12-18 11:46', '(start time is 24 hours ago)');
+
+            let end = $$('#end_time', ele);
+            expect(end).toBeTruthy();
+            expect(end.disabled).toBeTruthy();
+            expect(end.value).toBe('2018-12-19 11:46', '(end time is now)');
+
+            let checkbox = $$('.picker checkbox-sk', ele);
+            expect(checkbox).toBeTruthy();
+            expect(checkbox.checked).toBeTruthy(); // defaults to using now
+            done();
+          });
+        });
+
         it('updates the sort-toggles based on the current sort direction', function(done) {
           loggedInTasklist((ele) => {
             ele._sort = 'name';
@@ -331,8 +347,8 @@ describe('task-list', function() {
         let actualDurationsOrder = ele._tasks.map((t) => column('duration', t, ele).trim());
 
         expect(actualDurationsOrder).toEqual(['0.62s', '2.90s', '17.84s', '1m 38s',
-            '2m  1s', '2m  1s', '1h  9m 47s', '2h 16m 15s', '4w  2d 22h 12m 54s*',
-            '4w  2d 22h 12m 55s*', '--', '--', '--', '--', '--', '--', '--', '--', '--', '--']);
+            '2m  1s', '2m  1s', '12m 54s*', '12m 55s*', '1h  9m 47s', '2h 16m 15s',
+            '--', '--', '--', '--', '--', '--', '--', '--', '--', '--']);
 
         ele._verbose = false;
         ele._sort = 'pending_time';
@@ -343,7 +359,7 @@ describe('task-list', function() {
 
         expect(actualPendingOrder).toEqual(['0s', '0s', '0.63s', '0.66s', '0.72s', '2.35s', '2.36s',
           '2.58s', '5.74s', '8.21s', '24.58s', '1m 11s', '1m 17s', '5m  5s', '5m 36s', '11m 28s',
-          '4w  2d 22h 14m 54s*', '4w  2d 22h 14m 55s*', '--', '--']);
+          '14m 54s*', '14m 55s*', '--', '--']);
         done();
       });
     });
@@ -578,27 +594,51 @@ describe('task-list', function() {
         // Spy on the list call to make sure a request is made with the right filter.
         let calledTimes = 0;
         fetchMock.get('glob:/_ah/api/swarming/v1/tasks/list?*', (url, _) => {
-          // TODO(kjlubick)
-          //expect(url).toContain(encodeURIComponent('valid:filter:gpu:can:have:many:colons'));
+          expect(url).toContain(encodeURIComponent('valid:filter:gpu:can:have:many:colons'));
           calledTimes++;
           return '[]'; // pretend no bots match
         }, {overwriteRoutes: true});
 
-        filterInput.value = 'valid:filter:gpu:can:have:many:colons';
+        filterInput.value = 'valid-tag:filter:gpu:can:have:many:colons';
         ele._filterSearch({key: 'Enter'});
-        expect(ele._filters).toEqual(['valid:filter:gpu:can:have:many:colons']);
+        expect(ele._filters).toEqual(['valid-tag:filter:gpu:can:have:many:colons']);
         // Empty the input for next time.
         expect(filterInput.value).toEqual('');
-        filterInput.value = 'valid:filter:gpu:can:have:many:colons';
+        filterInput.value = 'valid-tag:filter:gpu:can:have:many:colons';
         ele._filterSearch({key: 'Enter'});
         // No duplicates
-        expect(ele._filters).toEqual(['valid:filter:gpu:can:have:many:colons']);
+        expect(ele._filters).toEqual(['valid-tag:filter:gpu:can:have:many:colons']);
 
         fetchMock.flush(true).then(() => {
           expect(calledTimes).toEqual(1, 'Only request tasks once');
 
           done();
         });
+      });
+    });
+
+    it('allows auto-corrects filters added from the search box', function(done) {
+      loggedInTasklist((ele) => {
+        ele._filters = [];
+        ele._limit = 0; // turn off requests
+        ele.render();
+
+        let filterInput = $$('#filter_search', ele);
+        filterInput.value = 'state:BOT_DIED';
+        ele._filterSearch({key: 'Enter'});
+        expect(ele._filters).toEqual(['state:BOT_DIED']);
+
+        filterInput.value = 'gpu-tag:something';
+        ele._filterSearch({key: 'Enter'});
+        expect(ele._filters).toContain('gpu-tag:something');
+
+        // there are no valid filters that aren't a tag or state, so
+        // correct those that don't have a -tag.
+        filterInput.value = 'gpu:something-else';
+        ele._filterSearch({key: 'Enter'});
+        expect(ele._filters).toContain('gpu-tag:something-else');
+
+        done();
       });
     });
 
@@ -778,7 +818,7 @@ describe('task-list', function() {
       expect(actualIds).toEqual(expectedIds);
     });
 
-    it('filters tasks based on dimensions', function() {
+    it('filters tasks based on tags', function() {
       let tasks = processTasks(deepCopy(tasks_20.items), {});
 
       expect(tasks).toBeTruthy();
@@ -806,6 +846,50 @@ describe('task-list', function() {
       actualIds = filtered.map((task) => task.task_id);
       expect(actualIds).toContain('41dfa79d3bf29010');
       expect(actualIds).toContain('41df677202f20310');
+    });
+
+    it('correctly makes query params from filters', function() {
+      // We know query.fromObject is used and it puts the query params in
+      // a deterministic, sorted order. This means we can compare
+      const expectations = [
+        { // basic 'state'
+          'extra': {
+            'limit': 7,
+            'start': 12345678,
+            'end': 456789012,
+          },
+          'filters': ['state:BOT_DIED'],
+          'output': 'end=456789&limit=7&start=12345&state=BOT_DIED',
+        },
+        { // two tags
+          'extra': {
+            'limit': 342,
+            'start': 12345678,
+            'end': 456789012,
+          },
+          'filters': ['os-tag:Window', 'gpu-tag:10de'],
+          'output': 'end=456789&limit=342&start=12345&tags=os%3AWindow&tags=gpu%3A10de',
+        },
+        { // tags and state
+          'extra': {
+            'limit': 57,
+            'start': 12345678,
+            'end': 456789012,
+          },
+          'filters': ['os-tag:Window', 'state:RUNNING', 'gpu-tag:10de'],
+          'output': 'end=456789&limit=57&start=12345&state=RUNNING&tags=os%3AWindow&tags=gpu%3A10de',
+        },
+      ];
+
+      for (let testcase of expectations) {
+        let qp = listQueryParams(testcase.filters, testcase.extra);
+        expect(qp).toEqual(testcase.output);
+      }
+
+      let testcase = expectations[0];
+      testcase.extra.cursor = 'mock_cursor12345';
+      let qp = listQueryParams(testcase.filters, testcase.extra);
+      expect(qp).toEqual('cursor=mock_cursor12345&'+testcase.output);
     });
 
   }); //end describe('data parsing')

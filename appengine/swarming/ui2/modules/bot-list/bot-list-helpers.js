@@ -231,7 +231,7 @@ export function initCounts() {
 export function listQueryParams(filters, limit, cursor) {
   let params = {};
   let dims = [];
-  filters.forEach((f) => {
+  for (const f of filters) {
     let split = f.split(':', 1)
     let col = split[0];
     let rest = f.substring(col.length + 1);
@@ -265,7 +265,7 @@ export function listQueryParams(filters, limit, cursor) {
       // (which checks proper dimensions) and garbage in == garbage out.
       dims.push(col + ':' + rest);
     }
-  });
+  };
   params['dimensions'] = dims;
   params['limit'] = limit;
   if (cursor) {
