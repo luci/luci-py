@@ -33,6 +33,7 @@ describe('task-list', function() {
 
     fetchMock.get('glob:/_ah/api/swarming/v1/tasks/list?*', tasks_20);
     fetchMock.get('/_ah/api/swarming/v1/bots/dimensions', fleetDimensions);
+    fetchMock.get('glob:/_ah/api/swarming/v1/tasks/count?*', {'count': 12345});
 
     // Everything else
     fetchMock.catch(404);
@@ -140,6 +141,10 @@ describe('task-list', function() {
         fetchMock.get('/_ah/api/swarming/v1/server/permissions', {},
                       { overwriteRoutes: true });
         fetchMock.get('glob:/_ah/api/swarming/v1/tasks/list?*', 403,
+                      { overwriteRoutes: true });
+        fetchMock.get('/_ah/api/swarming/v1/bots/dimensions', 403,
+                      { overwriteRoutes: true });
+        fetchMock.get('/_ah/api/swarming/v1/tasks/count', 403,
                       { overwriteRoutes: true });
       }
 
@@ -266,36 +271,22 @@ describe('task-list', function() {
           });
         });
 
-        it('updates the sort-toggles based on the current sort direction', function(done) {
+        it('shows the counts of the first 8 states', function(done) {
           loggedInTasklist((ele) => {
-            ele._sort = 'name';
-            ele._dir = 'desc';
             ele.render();
 
-            let sortToggles = $('.task-table thead sort-toggle', ele);
-            expect(sortToggles).toBeTruthy();
-            expect(sortToggles.length).toBe(7, '(num sort-toggles)');
+            let countRows = $('#query_counts tr', ele);
+            expect(countRows).toBeTruthy();
+            expect(countRows.length).toBe(1+8, '(num counts, displayed + 8 states)');
 
-            expect(sortToggles[0].key).toBe('name');
-            expect(sortToggles[0].currentKey).toBe('name');
-            expect(sortToggles[0].direction).toBe('desc');
-            // spot check one of the other ones
-            expect(sortToggles[5].key).toBe('pool-tag');
-            expect(sortToggles[5].currentKey).toBe('name');
-            expect(sortToggles[5].direction).toBe('desc');
+            expect(countRows[0]).toMatchTextContent('Displayed: 20');
 
-            ele._sort = 'created_ts';
-            ele._dir = 'asc';
-            ele.render();
+            // The true on flush waits for res.json() to resolve too
+            fetchMock.flush(true).then(() => {
+              expect(countRows[5]).toMatchTextContent('Running: 12345');
+              done();
+            });
 
-            expect(sortToggles[0].key).toBe('name');
-            expect(sortToggles[0].currentKey).toBe('created_ts');
-            expect(sortToggles[0].direction).toBe('asc');
-
-            expect(sortToggles[1].key).toBe('created_ts');
-            expect(sortToggles[1].currentKey).toBe('created_ts');
-            expect(sortToggles[1].direction).toBe('asc');
-            done();
           });
         });
       }); // end describe('default landing page')
@@ -304,6 +295,38 @@ describe('task-list', function() {
   }); // end describe('html structure')
 
   describe('dynamic behavior', function() {
+    it('updates the sort-toggles based on the current sort direction', function(done) {
+      loggedInTasklist((ele) => {
+        ele._sort = 'name';
+        ele._dir = 'desc';
+        ele.render();
+
+        let sortToggles = $('.task-table thead sort-toggle', ele);
+        expect(sortToggles).toBeTruthy();
+        expect(sortToggles.length).toBe(7, '(num sort-toggles)');
+
+        expect(sortToggles[0].key).toBe('name');
+        expect(sortToggles[0].currentKey).toBe('name');
+        expect(sortToggles[0].direction).toBe('desc');
+        // spot check one of the other ones
+        expect(sortToggles[5].key).toBe('pool-tag');
+        expect(sortToggles[5].currentKey).toBe('name');
+        expect(sortToggles[5].direction).toBe('desc');
+
+        ele._sort = 'created_ts';
+        ele._dir = 'asc';
+        ele.render();
+
+        expect(sortToggles[0].key).toBe('name');
+        expect(sortToggles[0].currentKey).toBe('created_ts');
+        expect(sortToggles[0].direction).toBe('asc');
+
+        expect(sortToggles[1].key).toBe('created_ts');
+        expect(sortToggles[1].currentKey).toBe('created_ts');
+        expect(sortToggles[1].direction).toBe('asc');
+        done();
+      });
+    });
     // This is done w/o interacting with the sort-toggles because that is more
     // complicated with adding the event listener and so on.
     it('can stable sort', function(done) {
@@ -713,6 +736,39 @@ describe('task-list', function() {
       });
     });
 
+    it('shows and hide the extra state counts', function(done) {
+          loggedInTasklist((ele) => {
+            ele._allStates = false;
+            ele.render();
+
+            let countRows = $('#query_counts tr', ele);
+            expect(countRows).toBeTruthy();
+            expect(countRows.length).toBe(1+8, '(num counts, displayed + 8 states)');
+
+            let showMore = $$('.summary expand-more-icon-sk');
+            expect(showMore).toBeTruthy();
+            expect(showMore.hasAttribute('hidden')).toBeFalsy();
+            showMore.click();
+
+            expect(ele._allStates).toBeTruthy();
+            countRows = $('#query_counts tr', ele);
+            expect(countRows).toBeTruthy();
+            expect(countRows.length).toBe(1+11, '(num counts, displayed + 11 states)');
+            expect(showMore.hasAttribute('hidden')).toBeTruthy();
+
+            let showLess = $$('.summary expand-less-icon-sk');
+            expect(showLess).toBeTruthy();
+            showLess.click();
+
+            expect(ele._allStates).toBeFalsy();
+            countRows = $('#query_counts tr', ele);
+            expect(countRows).toBeTruthy();
+            expect(countRows.length).toBe(1+8, '(num counts, displayed + 8 states)');
+            done();
+
+          });
+        });
+
   }); // end describe('dynamic behavior')
 
   describe('api calls', function() {
@@ -755,7 +811,7 @@ describe('task-list', function() {
     it('makes auth\'d API calls when a logged in user views landing page', function(done) {
       loggedInTasklist((ele) => {
         let calls = fetchMock.calls(MATCHED, 'GET');
-        expect(calls.length).toBe(2+2, '2 GETs from swarming-app, 2 from task-list');
+        expect(calls.length).toBe(2+2+11, '2 GETs from swarming-app, 2 from task-list (11 counts)');
         // calls is an array of 2-length arrays with the first element
         // being the string of the url and the second element being
         // the options that were passed in

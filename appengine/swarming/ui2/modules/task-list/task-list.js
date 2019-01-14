@@ -20,6 +20,7 @@ import { $, $$ } from 'common-sk/modules/dom'
 import { errorMessage } from 'elements-sk/errorMessage'
 import { html, render } from 'lit-html'
 import { ifDefined } from 'lit-html/directives/if-defined';
+import { until } from 'lit-html/directives/until';
 import { jsonOrThrow } from 'common-sk/modules/jsonOrThrow'
 import naturalSort from 'javascript-natural-sort/naturalSort'
 import { stateReflector } from 'common-sk/modules/stateReflector'
@@ -27,6 +28,8 @@ import { stateReflector } from 'common-sk/modules/stateReflector'
 import 'elements-sk/checkbox-sk'
 import 'elements-sk/icon/add-circle-icon-sk'
 import 'elements-sk/icon/cancel-icon-sk'
+import 'elements-sk/icon/expand-less-icon-sk'
+import 'elements-sk/icon/expand-more-icon-sk'
 import 'elements-sk/icon/more-vert-icon-sk'
 import 'elements-sk/icon/search-icon-sk'
 import 'elements-sk/select-sk'
@@ -191,10 +194,19 @@ const summaryQueryRow = (ele, count) => html`
 // (deduped?) and hide the rest by default
 const summary = (ele) => html`
 <div class=summary>
-  <div class=title>Selected Tasks</div>
+  <div class=title>
+    Selected Tasks
+    <expand-more-icon-sk ?hidden=${ele._allStates}
+                         @click=${ele._toggleAllStates}>
+    </expand-more-icon-sk>
+    <expand-less-icon-sk ?hidden=${!ele._allStates}
+                         @click=${ele._toggleAllStates}>
+    </expand-less-icon-sk>
+  </div>
   <table id=query_counts>
     ${summaryQueryRow(ele, {label: 'Displayed', value: ele._tasks.length})}
-    ${ele._queryCounts.map((count) => summaryQueryRow(ele, count))}
+    ${ele._queryCounts.filter(ele._filterCounts.bind(ele))
+                      .map((count) => summaryQueryRow(ele, count))}
   </table>
 </div>`;
 
@@ -292,20 +304,7 @@ window.customElements.define('task-list', class extends SwarmingAppBoilerplate {
     this._sort = '';
     this._startTime = 0;
     this._verbose = false;
-
-    this._queryCounts = [
-      {label: 'Total', value: 90000},
-      {label: 'Total', value: 90000},
-      {label: 'Total', value: 90000},
-      {label: 'Total', value: 90000},
-      {label: 'Completed (Failure)', value: 90000},
-      {label: 'Completed (Success)', value: 90000},
-      {label: 'Total', value: 90000},
-      {label: 'Total', value: 90000},
-      {label: 'Total', value: 90000},
-      {label: 'Total', value: 90000},
-      {label: 'Completed (Failure)', value: 90000},
-    ];
+    this._allStates = false;
 
     this._stateChanged = stateReflector(
       /*getState*/() => {
@@ -319,10 +318,12 @@ window.customElements.define('task-list', class extends SwarmingAppBoilerplate {
           'n' : this._now,
           's' : this._sort,
           'st': this._startTime,
+          'at': this._allStates,
           'v': this._verbose,
         }
     }, /*setState*/(newState) => {
       // default values if not specified.
+      this._allStates = newState.at; // default to false
       this._cols = newState.c;
       if (!newState.c.length) {
         this._cols = ['name', 'state', 'bot', 'created_ts', 'pending_time',
@@ -352,6 +353,20 @@ window.customElements.define('task-list', class extends SwarmingAppBoilerplate {
 
     this._possibleColumns = {};
     this._primaryMap = {};
+
+    this._queryCounts = [
+      {label: 'Total', value: '...'},
+      {label: 'Success', value: '...'},
+      {label: 'Failure', value: '...'},
+      {label: 'Pending', value: '...'},
+      {label: 'Running', value: '...'},
+      {label: 'Timed Out', value: '...'},
+      {label: 'Bot Died', value: '...'},
+      {label: 'Deduplicated', value: '...'},
+      {label: 'Expired', value: '...'},
+      {label: 'No Resource', value: '...'},
+      {label: 'Canceled', value: '...'},
+    ];
 
     this._message = 'You must sign in to see anything useful.';
     this._showColSelector = false;
@@ -477,6 +492,8 @@ window.customElements.define('task-list', class extends SwarmingAppBoilerplate {
       })
       .catch((e) => this.fetchError(e, 'tasks/list'));
 
+    this._fetchCounts(queryParams, extra);
+
     // fetch dimensions so we can fill out the filters.
     // We only need to do this once, because we don't expect it to
     // change (much) after the page has been loaded.
@@ -499,6 +516,33 @@ window.customElements.define('task-list', class extends SwarmingAppBoilerplate {
         this.app.finishedTask();
       })
       .catch((e) => this.fetchError(e, 'bots/dimensions'));
+    }
+  }
+
+  _fetchCounts(queryParams, extra) {
+    const states = ['COMPLETED_SUCCESS', 'COMPLETED_FAILURE', 'PENDING',
+                    'RUNNING', 'TIMED_OUT', 'BOT_DIED', 'DEDUPED', 'EXPIRED',
+                    'NO_RESOURCE', 'CANCELED'];
+
+    this.app.addBusyTasks(1 + states.length);
+    let totalPromise = fetch(`/_ah/api/swarming/v1/tasks/count?${queryParams}`, extra)
+      .then(jsonOrThrow)
+      .then((json) => {
+        this.app.finishedTask();
+        return json.count;
+      })
+      .catch((e) => this.fetchError(e, 'count/total'))
+    this._queryCounts[0].value = html`${until(totalPromise, '...')}`;
+
+    for (let i = 0; i < states.length; i++) {
+      let promise = fetch(`/_ah/api/swarming/v1/tasks/count?${queryParams}&state=${states[i]}`, extra)
+        .then(jsonOrThrow)
+        .then((json) => {
+          this.app.finishedTask();
+          return json.count;
+        })
+        .catch((e) => this.fetchError(e, `count/${states[i]}`))
+      this._queryCounts[1 + i].value = html`${until(promise, '...')}`;
     }
   }
 
@@ -549,6 +593,7 @@ window.customElements.define('task-list', class extends SwarmingAppBoilerplate {
         this._startTime = dates[0].getTime(),
         this._stateChanged();
         this._fetch();
+        this._render();
       },
       onOpen: () => {
         // prevent the end time picker from covering up the start time
@@ -565,8 +610,18 @@ window.customElements.define('task-list', class extends SwarmingAppBoilerplate {
         this._endTime = dates[0].getTime(),
         this._stateChanged();
         this._fetch();
+        this._render();
       }
     });
+  }
+
+  _filterCounts(count, idx) {
+    if (this._allStates) {
+      return true;
+    }
+    // The top 8 entries are ones that the users are most likely
+    // going to care about by default. 8 uses the space most efficiently.
+    return idx < 8;
   }
 
   _makeSummaryURL() {
@@ -675,6 +730,12 @@ window.customElements.define('task-list', class extends SwarmingAppBoilerplate {
       return dir * naturalSort(aCol, bCol);
     });
     return this._tasks;
+  }
+
+  _toggleAllStates(e) {
+    this._allStates = !this._allStates;
+    this._stateChanged();
+    this.render();
   }
 
   _toggleCol(e, col) {
