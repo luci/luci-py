@@ -39,7 +39,7 @@ CLIENT_DIR = os.path.normpath(
     os.path.join(test_env_bot_code.BOT_DIR, '..', '..', '..', 'client'))
 
 sys.path.insert(0, os.path.join(CLIENT_DIR, 'tests'))
-import isolateserver_mock
+import isolateserver_fake
 
 
 def get_manifest(script=None, isolated=None, **kwargs):
@@ -1144,7 +1144,7 @@ class TestTaskRunnerNoTimeMock(TestTaskRunnerBase):
     ]
     self.expected_requests(requests)
 
-    server = isolateserver_mock.MockIsolateServer()
+    server = isolateserver_fake.FakeIsolateServer()
     try:
       isolated = json.dumps({
         'command': ['python', 'parent.py'],
@@ -1266,7 +1266,7 @@ class TestTaskRunnerNoTimeMock(TestTaskRunnerBase):
     ]
     self.expected_requests(requests)
 
-    server = isolateserver_mock.MockIsolateServer()
+    server = isolateserver_fake.FakeIsolateServer()
     try:
       # TODO(maruel): -u is needed if you don't want python buffering to
       # interfere.
