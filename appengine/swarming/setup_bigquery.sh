@@ -84,7 +84,7 @@ fi
 if ! (bqschemaupdater -force \
     -message swarming.v1.TaskRequest \
     -table ${APPID}.swarming.task_requests \
-    -partitioning-field created_time); then
+    -partitioning-field create_time); then
   echo ""
   echo ""
   echo "Oh no! You may need to restart from scratch. You can do so with:"
@@ -97,7 +97,7 @@ fi
 if ! (bqschemaupdater -force \
     -message swarming.v1.TaskResult \
     -table ${APPID}.swarming.task_results \
-    -partitioning-field completed_time); then
+    -partitioning-field end_time); then
   echo ""
   echo ""
   echo "Oh no! You may need to restart from scratch. You can do so with:"
