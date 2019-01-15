@@ -23,23 +23,31 @@ test_env_bot_code.setup_test_env()
 # Creates a server mock for functions in net.py.
 import net_utils
 
+CLIENT_DIR = os.path.normpath(
+    os.path.join(test_env_bot_code.BOT_DIR, '..', '..', '..', 'client'))
+
+# Needed for local_caching, and others on Windows when symlinks are not enabled.
+sys.path.insert(0, CLIENT_DIR)
+# Needed for isolateserver_fake.
+sys.path.insert(0, os.path.join(CLIENT_DIR, 'tests'))
+
+# client/third_party/
 from depot_tools import fix_encoding
+# client/tests/
+import isolateserver_fake
+# client/
 from utils import file_path
 from utils import large
 from utils import logging_utils
 from utils import subprocess42
 from libs import luci_context
-import bot_auth
-import fake_swarming
 import local_caching
+# swarming_bot/
+import swarmingserver_bot_fake
+# bot_code/
+import bot_auth
 import remote_client
 import task_runner
-
-CLIENT_DIR = os.path.normpath(
-    os.path.join(test_env_bot_code.BOT_DIR, '..', '..', '..', 'client'))
-
-sys.path.insert(0, os.path.join(CLIENT_DIR, 'tests'))
-import isolateserver_fake
 
 
 def get_manifest(script=None, isolated=None, **kwargs):
@@ -1319,11 +1327,11 @@ class TaskRunnerSmoke(unittest.TestCase):
     super(TaskRunnerSmoke, self).setUp()
     self.root_dir = tempfile.mkdtemp(prefix='task_runner')
     logging.info('Temp: %s', self.root_dir)
-    self._server = fake_swarming.Server(self)
+    self._server = swarmingserver_bot_fake.Server()
 
   def tearDown(self):
     try:
-      self._server.shutdown()
+      self._server.close()
     finally:
       try:
         file_path.rmtree(self.root_dir)
@@ -1355,7 +1363,7 @@ class TaskRunnerSmoke(unittest.TestCase):
       json.dump(manifest, f)
 
     bot = os.path.join(self.root_dir, 'swarming_bot.1.zip')
-    code, _ = fake_swarming.gen_zip(self._server.url)
+    code, _ = swarmingserver_bot_fake.gen_zip(self._server.url)
     with open(bot, 'wb') as f:
       f.write(code)
     cmd = [

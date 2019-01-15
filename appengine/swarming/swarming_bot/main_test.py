@@ -16,13 +16,16 @@ BOT_DIR = os.path.dirname(os.path.abspath(__file__))
 import test_env_bot
 test_env_bot.setup_test_env()
 
-from utils import subprocess42
-
-import fake_swarming
-from bot_code import bot_main
+# client/third_party/
 from depot_tools import auto_stub
 from depot_tools import fix_encoding
+
+# client/
+from utils import subprocess42
 from utils import file_path
+
+import swarmingserver_bot_fake
+from bot_code import bot_main
 
 
 class TestCase(auto_stub.TestCase):
@@ -30,7 +33,7 @@ class TestCase(auto_stub.TestCase):
     super(TestCase, self).setUp()
     self._tmpdir = tempfile.mkdtemp(prefix='swarming_main')
     self._zip_file = os.path.join(self._tmpdir, 'swarming_bot.zip')
-    code, _ = fake_swarming.gen_zip(self.url)
+    code, _ = swarmingserver_bot_fake.gen_zip(self.url)
     with open(self._zip_file, 'wb') as f:
       f.write(code)
 
@@ -82,12 +85,12 @@ class SimpleMainTest(TestCase):
 
 class MainTest(TestCase):
   def setUp(self):
-    self._server = fake_swarming.Server(self)
+    self._server = swarmingserver_bot_fake.Server()
     super(MainTest, self).setUp()
 
   def tearDown(self):
     try:
-      self._server.shutdown()
+      self._server.close()
     finally:
       super(MainTest, self).tearDown()
 
