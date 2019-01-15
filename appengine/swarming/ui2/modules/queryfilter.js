@@ -1,6 +1,16 @@
 // Copyright 2019 The LUCI Authors. All rights reserved.
 // Use of this source code is governed under the Apache License, Version 2.0
 // that can be found in the LICENSE file.
+
+/** @module swarming-ui/modules/queryfilter
+ * @description <h2><code>queryfilter</code></h2>
+ *
+ * <p>
+ *  This module contains some shared logic for having a map of
+ *  key-values and being able to use an input box to query and filter
+ *  some of them. This is primarily used by task-list and bot-list.
+ * </p>
+ */
 import { applyAlias } from './alias'
 
 /** filterPossibleColumns shows only those columns that match the given query.

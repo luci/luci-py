@@ -13,5 +13,6 @@ document.addEventListener('sort-change', (e) => {
   for (let i = 0; i < scs.length; i++) {
     scs[i].currentKey = e.detail.key;
   }
+  display.textContent = `Now sorting by ${e.detail.key} (${e.detail.direction})`;
 });
 })();

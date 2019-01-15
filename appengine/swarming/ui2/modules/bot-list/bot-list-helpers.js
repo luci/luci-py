@@ -2,6 +2,7 @@
 // Use of this source code is governed under the Apache License, Version 2.0
 // that can be found in the LICENSE file.
 
+/** @module swarming-ui/modules/bot-list */
 // This file contains a large portion of the JS logic of bot-list.
 // By keeping JS logic here, the functions can more easily be unit tested
 // and it declutters the main bot-list.js.
@@ -421,17 +422,9 @@ export function processPrimaryMap(dimensions) {
     if (blacklistDimensions.indexOf(d.key) >= 0) {
       return;
     }
-    // TODO(kjlubick): Are we aliasing things?
-    if (true || swarming.alias.DIMENSIONS_WITH_ALIASES.indexOf(d.key) === -1) {
-      // value is an array of all seen values for the dimension d.key
-      pMap[d.key] = d.value;
-    } else {
-      var aliased = [];
-      d.value.forEach(function(value) {
-        aliased.push(swarming.alias.apply(value, d.key));
-      });
-      pMap[d.key] = aliased;
-    }
+    // value is an array of all seen values for the dimension d.key
+    // We keep it unaliased, because aliases will be applied when displayed.
+    pMap[d.key] = d.value;
   });
 
   // Add some options that might not show up.

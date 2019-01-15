@@ -131,6 +131,13 @@ export function requireLogin(logged_in, delay=100) {
             logged_in.items = original_items.slice(original_items.length/2);
           }
         }
+        if (logged_in instanceof Function) {
+          return {
+            status: 200,
+            body: JSON.stringify(logged_in()),
+            headers: {'Content-Type':'application/json'},
+          };
+        }
         return {
           status: 200,
           body: JSON.stringify(logged_in),

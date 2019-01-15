@@ -2,6 +2,13 @@
 // Use of this source code is governed under the Apache License, Version 2.0
 // that can be found in the LICENSE file.
 
+/** @module swarming-ui/modules/task-list */
+// This file contains a large portion of the JS logic of task-list.
+// By keeping JS logic here, the functions can more easily be unit tested
+// and it declutters the main task-list.js.
+// If a function doesn't refer to 'this', it should go here, otherwise
+// it should go inside the element declaration.
+
 // query.fromObject is more readable than just 'fromObject'
 import * as query from 'common-sk/modules/query'
 

@@ -37,9 +37,19 @@ To build the pages locally for demoing/developing, run:
 
     make serve
 
-Then, navigate to [http://localhost:8080/newres/swarming-index.html] to see
+Then, navigate to <http://localhost:8080/newres/swarming-index.html> to see
 one of the demo pages.  You can navigate to newres/[foo] where foo is one
-of the top level HTML files (found in ./pages/).
+of the modules (found in ./modules/) or one of the top level HTML files
+(found in ./pages/). The pages in ./modules have mock data, so those are
+generally more useful.
+
+The list of all demo pages so far (for easy clicking):
+
+  - [bot-list](http://localhost:8080/newres/bot-list.html)
+  - [sort-toggle](http://localhost:8080/newres/sort-toggle.html)
+  - [swarming-app](http://localhost:8080/newres/swarming-app.html)
+  - [swarming-index](http://localhost:8080/newres/swarming-index.html)
+  - [task-list](http://localhost:8080/newres/task-list.html)
 
 By default, the login is mocked so it works w/o an internet connection,
 but if testing the real OAuth 2.0 flow is desired, a client_id may be

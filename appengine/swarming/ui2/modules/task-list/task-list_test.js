@@ -746,17 +746,19 @@ describe('task-list', function() {
             expect(countRows.length).toBe(1+8, '(num counts, displayed + 8 states)');
 
             let showMore = $$('.summary expand-more-icon-sk');
+            let showLess = $$('.summary expand-less-icon-sk');
             expect(showMore).toBeTruthy();
-            expect(showMore.hasAttribute('hidden')).toBeFalsy();
+            expect(showLess).toBeFalsy();
             showMore.click();
 
             expect(ele._allStates).toBeTruthy();
             countRows = $('#query_counts tr', ele);
             expect(countRows).toBeTruthy();
             expect(countRows.length).toBe(1+11, '(num counts, displayed + 11 states)');
-            expect(showMore.hasAttribute('hidden')).toBeTruthy();
 
-            let showLess = $$('.summary expand-less-icon-sk');
+            showMore = $$('.summary expand-more-icon-sk');
+            showLess = $$('.summary expand-less-icon-sk');
+            expect(showMore).toBeFalsy()
             expect(showLess).toBeTruthy();
             showLess.click();
 
@@ -764,8 +766,13 @@ describe('task-list', function() {
             countRows = $('#query_counts tr', ele);
             expect(countRows).toBeTruthy();
             expect(countRows.length).toBe(1+8, '(num counts, displayed + 8 states)');
-            done();
 
+            showMore = $$('.summary expand-more-icon-sk');
+            showLess = $$('.summary expand-less-icon-sk');
+            expect(showMore).toBeTruthy();
+            expect(showLess).toBeFalsy()
+
+            done();
           });
         });
 
