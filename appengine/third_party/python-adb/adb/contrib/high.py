@@ -862,8 +862,10 @@ class HighDevice(object):
     # output can be reliably parsed. So only return success if the package
     # is missing afterwards.
     if not exit_code:
-      _, exit_code = self.Shell('pm path %s' % pipes.quote(package))
-      if exit_code:  # Should be non-zero. (Hopefully)
+      out, _ = self.Shell('pm path %s' % pipes.quote(package))
+      # Ignore the exit code of "pm path" since it can't be trusted. (On K, it
+      # always returns 0.)
+      if 'package:' not in out:
         return True
     _LOG.info('%s: %s', cmd, out)
     return False
