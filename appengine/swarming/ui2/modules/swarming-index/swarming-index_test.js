@@ -10,7 +10,7 @@ describe('swarming-index', function() {
   // leak dependencies (e.g. bot-list's 'column' function to task-list) and
   // try to import things multiple times.
   const { fetchMock, MATCHED, UNMATCHED } = require('fetch-mock');
-  const { mockAppGETs } = require('modules/test_util');
+  const { expectNoUnmatchedCalls, mockAppGETs } = require('modules/test_util');
 
   beforeEach(function(){
     // These are the default responses to the expected API calls (aka 'matched')
@@ -222,13 +222,6 @@ describe('swarming-index', function() {
   }); // end describe('html structure')
 
   describe('api calls', function() {
-    function expectNoUnmatchedCalls() {
-      let calls = fetchMock.calls(UNMATCHED, 'GET');
-      expect(calls.length).toBe(0, 'no unmatched (unexpected) GETs');
-      calls = fetchMock.calls(UNMATCHED, 'POST');
-      expect(calls.length).toBe(0, 'no unmatched (unexpected) POSTs');
-    }
-
     it('makes no API calls when not logged in', function(done) {
       createElement((ele) => {
         fetchMock.flush().then(() => {
@@ -239,7 +232,7 @@ describe('swarming-index', function() {
           calls = fetchMock.calls(MATCHED, 'POST');
           expect(calls.length).toBe(0);
 
-          expectNoUnmatchedCalls();
+          expectNoUnmatchedCalls(fetchMock);
           done();
         });
       });
@@ -252,7 +245,7 @@ describe('swarming-index', function() {
           let calls = fetchMock.calls(MATCHED, 'POST');
           expect(calls.length).toBe(0);
 
-          expectNoUnmatchedCalls();
+          expectNoUnmatchedCalls(fetchMock);
           done();
         });
       });
@@ -275,7 +268,7 @@ describe('swarming-index', function() {
             expect(c[1].headers.authorization).toContain('Bearer ');
           })
 
-          expectNoUnmatchedCalls();
+          expectNoUnmatchedCalls(fetchMock);
           done();
         });
       });

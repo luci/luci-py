@@ -50,8 +50,13 @@ const template = (ele) => html`
   </button>
 
   <div>
-    <div ?hidden=${!ele._started}>Progress: ${ele._progress} deleted${ele._finished ? ' - DONE': ''}.</div>
-    <div>Note: the bot deletion is being done in browser - closing the window will stop the mass deletion.</div>
+    <div ?hidden=${!ele._started}>
+      Progress: ${ele._progress} deleted${ele._finished ? ' - DONE.': '.'}
+    </div>
+    <div>
+      Note: the bot deletion is being done in browser -
+      closing the window will stop the mass deletion.
+    </div>
   </div>
 `;
 
@@ -81,6 +86,7 @@ window.customElements.define('bot-mass-delete', class extends HTMLElement {
     }
     // sort for determinism
     this.dimensions.sort();
+    this.render();
   }
 
   _deleteAll() {

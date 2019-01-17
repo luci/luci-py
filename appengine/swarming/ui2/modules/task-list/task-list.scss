@@ -209,4 +209,14 @@ task-list {
     /* This also hides sub-elements*/
     display: none;
   }
+
+  .cancel.content {
+    max-width: 500px;
+    padding: 10px;
+
+    button.goback {
+      display:block;
+      margin: 10 0 0 auto;
+    }
+  }
 }

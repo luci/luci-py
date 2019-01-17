@@ -14,7 +14,7 @@ import { requireLogin, mockAuthdAppGETs } from '../test_util'
 // correctly for it, and we get strange errors about 'this' not being defined.
 const fetchMock = require('fetch-mock');
 
-mockAuthdAppGETs(fetchMock, {});
+mockAuthdAppGETs(fetchMock, {cancel_task: true});
 
 fetchMock.get('glob:/_ah/api/swarming/v1/tasks/list?*',
               requireLogin(tasks_20, 200));
@@ -26,6 +26,9 @@ fetchMock.get('glob:/_ah/api/swarming/v1/tasks/count?*',
               requireLogin(() => {
                 return {'count': Math.round(Math.random() * 10000)};
               }, 800));
+
+
+fetchMock.post('/_ah/api/swarming/v1/tasks/cancel', requireLogin({'matched': 17}, 1000));
 
 // Everything else
 fetchMock.catch(404);

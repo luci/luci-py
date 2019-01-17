@@ -5,8 +5,12 @@
 import 'modules/bot-mass-delete'
 
 describe('bot-mass-delete', function() {
+  // Instead of using import, we use require. Otherwise,
+  // the concatenation trick we do doesn't play well with webpack, which would
+  // leak dependencies (e.g. bot-list's 'column' function to task-list) and
+  // try to import things multiple times.
   const { $, $$ } = require('common-sk/modules/dom');
-  const { customMatchers, mockAppGETs } = require('modules/test_util');
+  const { customMatchers, expectNoUnmatchedCalls, mockAppGETs } = require('modules/test_util');
   const { fetchMock, MATCHED, UNMATCHED } = require('fetch-mock');
 
   // A reusable HTML element in which we create our element under test.
@@ -17,8 +21,6 @@ describe('bot-mass-delete', function() {
     jasmine.addMatchers(customMatchers);
 
     mockAppGETs(fetchMock, {delete_bot: true});
-
-    fetchMock.get('/_ah/api/swarming/v1/bots/count?dimensions=os%3AAndroid&dimensions=pool%3AChrome', {'dead': 532});
 
     // Everything else
     fetchMock.catch(404);
@@ -52,11 +54,8 @@ describe('bot-mass-delete', function() {
     });
   });
 
-
   it('has a list of the passed in dimensions', function(done) {
     createElement((ele) => {
-      ele.render();
-
       let listedDims = $('ul li', ele);
       expect(listedDims.length).toBe(2);
       expect(listedDims[0]).toMatchTextContent('os:Android');
@@ -64,20 +63,23 @@ describe('bot-mass-delete', function() {
     });
   });
 
-  function expectNoUnmatchedCalls() {
-    let calls = fetchMock.calls(UNMATCHED, 'GET');
-    expect(calls.length).toBe(0, 'no unmatched (unexpected) GETs');
-    calls = fetchMock.calls(UNMATCHED, 'POST');
-    expect(calls.length).toBe(0, 'no unmatched (unexpected) POSTs');
-  }
+  it('makes no API calls if show() is not calleds', function(done) {
+    createElement((ele) => {
+      expectNoUnmatchedCalls(fetchMock);
+      done();
+    });
+  });
 
   it('makes an API call to count when loading', function(done) {
     createElement((ele) => {
+      fetchMock.get('/_ah/api/swarming/v1/bots/count?dimensions=os%3AAndroid' +
+                    '&dimensions=pool%3AChrome', {'dead': 532});
+
       ele.show();
       // The true on flush waits for res.json() to resolve too, which
       // is when we know the element has updated the _tasks.
       fetchMock.flush(true).then(() => {
-        expectNoUnmatchedCalls()
+        expectNoUnmatchedCalls(fetchMock);
         let calls = fetchMock.calls(MATCHED, 'GET');
         expect(calls.length).toBe(1);
         done();
@@ -89,8 +91,8 @@ describe('bot-mass-delete', function() {
     createElement((ele) => {
 
       // create a shortened version of the returned data
-      fetchMock.get('/_ah/api/swarming/v1/bots/list?dimensions=os%3AAndroid&dimensions=pool%3AChrome' +
-                    '&fields=items%2Fbot_id&limit=200&is_dead=TRUE',
+      fetchMock.get('/_ah/api/swarming/v1/bots/list?dimensions=os%3AAndroid' +
+                    '&dimensions=pool%3AChrome&fields=items%2Fbot_id&limit=200&is_dead=TRUE',
         {
           items: [{bot_id: 'bot-1'}, {bot_id: 'bot-2'}, {bot_id: 'bot-3'}],
         }
@@ -107,7 +109,7 @@ describe('bot-mass-delete', function() {
 
       ele.addEventListener('bots-deleting-finished', () => {
         expect(sawStartEvent).toBeTruthy();
-        expectNoUnmatchedCalls();
+        expectNoUnmatchedCalls(fetchMock);
         let calls = fetchMock.calls(MATCHED, 'GET');
         expect(calls.length).toBe(1, '1 from list (ele.show() was not called)');
 

@@ -9,7 +9,7 @@ describe('swarming-app', function() {
   // the concatenation trick we do doesn't play well with webpack, which would
   // leak dependencies (e.g. bot-list's 'column' function to task-list) and
   // try to import things multiple times.
-  const { mockAppGETs } = require('modules/test_util');
+  const { expectNoUnmatchedCalls, mockAppGETs } = require('modules/test_util');
   const { fetchMock, MATCHED, UNMATCHED } = require('fetch-mock');
 
   beforeEach(function(){
@@ -214,13 +214,6 @@ describe('swarming-app', function() {
     });
 
     describe('api calls', function(){
-      function expectNoUnmatchedCalls() {
-        let calls = fetchMock.calls(UNMATCHED, 'GET');
-        expect(calls.length).toBe(0, 'no unmatched (unexpected) GETs');
-        calls = fetchMock.calls(UNMATCHED, 'POST');
-        expect(calls.length).toBe(0, 'no unmatched (unexpected) POSTs');
-      }
-
       it('makes no API calls when not logged in', function(done) {
         createElement((ele) => {
           fetchMock.flush().then(() => {
@@ -229,7 +222,7 @@ describe('swarming-app', function() {
             let calls = fetchMock.calls(MATCHED, 'GET');
             expect(calls.length).toBe(0);
 
-            expectNoUnmatchedCalls();
+            expectNoUnmatchedCalls(fetchMock);
             done();
           });
         });
@@ -253,7 +246,7 @@ describe('swarming-app', function() {
               expect(c[1].headers.authorization).toContain('Bearer ');
             })
 
-            expectNoUnmatchedCalls();
+            expectNoUnmatchedCalls(fetchMock);
             done();
           });
         });

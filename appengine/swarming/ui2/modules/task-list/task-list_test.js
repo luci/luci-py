@@ -11,7 +11,7 @@ describe('task-list', function() {
   // try to import things multiple times.
   const { deepCopy } = require('common-sk/modules/object');
   const { $, $$ } = require('common-sk/modules/dom');
-  const { childrenAsArray, customMatchers, getChildItemWithText, mockAppGETs } = require('modules/test_util');
+  const { childrenAsArray, customMatchers, expectNoUnmatchedCalls, getChildItemWithText, mockAppGETs } = require('modules/test_util');
   const { fetchMock, MATCHED, UNMATCHED } = require('fetch-mock');
 
   const { column, filterTasks, getColHeader, listQueryParams, processTasks } = require('modules/task-list/task-list-helpers');
@@ -779,13 +779,6 @@ describe('task-list', function() {
   }); // end describe('dynamic behavior')
 
   describe('api calls', function() {
-    function expectNoUnmatchedCalls() {
-      let calls = fetchMock.calls(UNMATCHED, 'GET');
-      expect(calls.length).toBe(0, 'no unmatched (unexpected) GETs');
-      calls = fetchMock.calls(UNMATCHED, 'POST');
-      expect(calls.length).toBe(0, 'no unmatched (unexpected) POSTs');
-    }
-
     it('makes no API calls when not logged in', function(done) {
       createElement((ele) => {
         fetchMock.flush().then(() => {
@@ -796,7 +789,7 @@ describe('task-list', function() {
           calls = fetchMock.calls(MATCHED, 'POST');
           expect(calls.length).toBe(0);
 
-          expectNoUnmatchedCalls();
+          expectNoUnmatchedCalls(fetchMock);
           done();
         });
       });
@@ -812,7 +805,7 @@ describe('task-list', function() {
       calls = fetchMock.calls(MATCHED, 'POST');
       expect(calls.length).toBe(0, 'no POSTs on task-list');
 
-      expectNoUnmatchedCalls();
+      expectNoUnmatchedCalls(fetchMock);
     }
 
     it('makes auth\'d API calls when a logged in user views landing page', function(done) {

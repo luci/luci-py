@@ -65,5 +65,4 @@ window.customElements.define('dialog-pop-over', class extends HTMLElement {
     this._backdrop.classList.add('opened');
     this._content.classList.add('opened');
   }
-
 });

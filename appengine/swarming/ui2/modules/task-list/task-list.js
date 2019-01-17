@@ -32,8 +32,10 @@ import 'elements-sk/icon/more-vert-icon-sk'
 import 'elements-sk/icon/search-icon-sk'
 import 'elements-sk/select-sk'
 import 'elements-sk/styles/buttons'
+import '../dialog-pop-over'
 import '../sort-toggle'
 import '../swarming-app'
+import '../task-mass-cancel'
 
 import flatpickr from 'flatpickr'
 import 'flatpickr/dist/flatpickr.css'
@@ -178,7 +180,7 @@ const options = (ele) => html`
   <a href=${ele._matchingBotsLink()}>View Matching Bots</a>
   <button
       ?disabled=${!ele.permissions.cancel_task}
-      @click=${(e) => alert('use the dialog on the old tasklist UI for now.')}>
+      @click=${ele._promptMassCancel}>
     CANCEL ALL TASKS
   </button>
 </div>`;
@@ -263,6 +265,15 @@ const template = (ele) => html`
 
   </main>
   <footer></footer>
+  <dialog-pop-over>
+    <div class='cancel content'>
+      <task-mass-cancel .auth_header=${ele.auth_header} .tags=${ele._filters}></task-mass-cancel>
+      <button class=goback @click=${ele._closePopup}
+              ?disabled=${ele._startedCanceling && !ele._finishedCanceling}>
+        ${ele._startedCanceling ? 'DISMISS': "GO BACK - DON'T CANCEL ANYTHING"}
+      </button>
+    </div>
+  </dialog-pop-over>
 </swarming-app>`;
 
 // How many items to load on the first load of tasks
@@ -383,12 +394,27 @@ window.customElements.define('task-list', class extends SwarmingAppBoilerplate {
       this.render();
     };
     this.addEventListener('sort-change', this._sortEvent);
+
+    this._startedMassCancelingEvent = (e) => {
+      this._startedCanceling = true;
+      this._finishedCanceling = false;
+      this.render();
+    }
+    this.addEventListener('tasks-canceling-started', this._startedMassCancelingEvent);
+    this._finishedMassCancelingEvent = (e) => {
+      this._startedCanceling = true;
+      this._finishedCanceling = true;
+      this.render();
+    }
+    this.addEventListener('tasks-canceling-finished', this._finishedMassCancelingEvent);
   }
 
   disconnectedCallback() {
     super.disconnectedCallback();
 
     this.removeEventListener('log-in', this._loginEvent);
+    this.removeEventListener('tasks-canceling-started', this._startedMassCancelingEvent);
+    this.removeEventListener('tasks-canceling-finished', this._finishedMassCancelingEvent);
   }
 
   _addFilter(filter) {
@@ -403,6 +429,13 @@ window.customElements.define('task-list', class extends SwarmingAppBoilerplate {
     this._fetch();
     // render what we have now.  When _fetch() resolves it will
     // re-render.
+    this.render();
+  }
+
+  _closePopup(e) {
+    $$('dialog-pop-over', this).hide();
+    this._startedCanceling = false;
+    this._finishedCanceling = false;
     this.render();
   }
 
@@ -585,7 +618,7 @@ window.customElements.define('task-list', class extends SwarmingAppBoilerplate {
         this._startTime = dates[0].getTime(),
         this._stateChanged();
         this._fetch();
-        this._render();
+        this.render();
       },
       onOpen: () => {
         // prevent the end time picker from covering up the start time
@@ -602,7 +635,7 @@ window.customElements.define('task-list', class extends SwarmingAppBoilerplate {
         this._endTime = dates[0].getTime(),
         this._stateChanged();
         this._fetch();
-        this._render();
+        this.render();
       }
     });
   }
@@ -617,6 +650,7 @@ window.customElements.define('task-list', class extends SwarmingAppBoilerplate {
   }
 
   _makeSummaryURL() {
+    // TODO(kjlubick)
     return undefined;
   }
 
@@ -628,6 +662,11 @@ window.customElements.define('task-list', class extends SwarmingAppBoilerplate {
     this._primaryKey = this._filteredPrimaryArr[e.detail.selection];
     this._stateChanged();
     this.render();
+  }
+
+  _promptMassCancel(e) {
+    $$('task-mass-cancel', this).show();
+    $$('dialog-pop-over', this).show();
   }
 
   _rebuildFilterables() {

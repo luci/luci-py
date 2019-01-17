@@ -11,6 +11,8 @@
  * </p>
  */
 
+ import { UNMATCHED } from 'fetch-mock';
+
 export const customMatchers = {
   // see https://jasmine.github.io/tutorials/custom_matcher
   // for docs on the factory that returns a matcher.
@@ -158,6 +160,29 @@ export function requireLogin(logged_in, delay=100) {
   };
 }
 
+/** childrenAsArray looks at an HTML element and returns the children
+ *  as a real array (e.g. with .forEach)
+ */
+export function childrenAsArray(ele) {
+  return Array.prototype.slice.call(ele.children);
+}
+
+/** expectNoUnmatchedCalls assets that there were no
+ *  unexpected (unmatched) calls to fetchMock.
+ */
+export function expectNoUnmatchedCalls(fetchMock) {
+    let calls = fetchMock.calls(UNMATCHED, 'GET');
+    expect(calls.length).toBe(0, 'no unmatched (unexpected) GETs');
+    if (calls.length) {
+      console.warn(calls);
+    }
+    calls = fetchMock.calls(UNMATCHED, 'POST');
+    expect(calls.length).toBe(0, 'no unmatched (unexpected) POSTs');
+    if (calls.length) {
+      console.warn(calls);
+    }
+}
+
 /** getChildItemWithText looks at the children of the given element
  *  and returns the element that has textContent that matches the
  *  passed in value.
@@ -177,9 +202,3 @@ export function getChildItemWithText(ele, value) {
   return null;
 }
 
-/** childrenAsArray looks at an HTML element and returns the children
- *  as a real array (e.g. with .forEach)
- */
-export function childrenAsArray(ele) {
-  return Array.prototype.slice.call(ele.children);
-}
