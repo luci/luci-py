@@ -759,15 +759,14 @@ class TaskProperties(ndb.Model):
       v = out.dimensions.add()
       v.key = key
       v.values.extend(sorted(values))
-    for key, value in sorted(self.env.iteritems()):
+    for key, value in sorted((self.env or {}).iteritems()):
       v = out.env.add()
       v.key = key
       v.value = value
-    if self.env_prefixes:
-      for key, values in sorted(self.env_prefixes.iteritems()):
-        v = out.env_paths.add()
-        v.key = key
-        v.values.extend(sorted(values))
+    for key, values in sorted((self.env_prefixes or {}).iteritems()):
+      v = out.env_paths.add()
+      v.key = key
+      v.values.extend(sorted(values))
     # TODO(maruel): Define containment; https://crbug.com/808836
     if self.execution_timeout_secs:
       out.execution_timeout.seconds = self.execution_timeout_secs
