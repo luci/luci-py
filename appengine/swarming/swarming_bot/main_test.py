@@ -116,7 +116,7 @@ class MainTest(TestCase):
       print 'ERROR LOG:'
       print out
     self.assertEqual(0, proc.returncode)
-    events = self._server.get_events()
+    events = self._server.get_bot_events()
     for event in events:
       event.pop('dimensions')
       event.pop('state')

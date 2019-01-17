@@ -434,15 +434,19 @@ class _OutputBuffer(object):
   This data is buffered and must be sent to the Swarming server when
   self.should_post_update() is True.
   """
+  # To be mocked in tests.
+  _MIN_PACKET_INTERVAL = 10
+  _MAX_PACKET_INTERVAL = 30
+
   def __init__(self, task_details, start):
     self._task_details = task_details
     self._start = start
     # Sends a maximum of 100kb of stdout per task_update packet.
     self._max_chunk_size = 102400
     # Minimum wait between task_update packet when there's output.
-    self._min_packet_internal = 10
+    self._min_packet_interval = self._MIN_PACKET_INTERVAL
     # Maximum wait between task_update packet when there's no output.
-    self._max_packet_interval = 30
+    self._max_packet_interval = self._MAX_PACKET_INTERVAL
 
     # Mutable:
     # Buffered data to send to the server.
@@ -494,12 +498,12 @@ class _OutputBuffer(object):
 
     Sends a packet when one of this condition is met:
     - more than self._max_chunk_size of stdout is buffered.
-    - self._last_pop was more than "self._min_packet_internal seconds ago"
+    - self._last_pop was more than "self._min_packet_interval seconds ago"
       and there was stdout.
     - self._last_pop was more than "self._max_packet_interval seconds ago".
     """
     packet_interval = (
-        self._min_packet_internal if self._stdout
+        self._min_packet_interval if self._stdout
         else self._max_packet_interval)
     return (
         len(self._stdout) >= self._max_chunk_size or
@@ -520,7 +524,7 @@ class _OutputBuffer(object):
       return 0.
 
     out = (
-        self._min_packet_internal if self._stdout
+        self._min_packet_interval if self._stdout
         else self._max_packet_interval)
     now = monotonic_time()
     if self._task_details.hard_timeout:
@@ -589,6 +593,7 @@ def run_command(remote, task_details, work_dir, cost_usd_hour,
     exit_code = None
     had_io_timeout = False
     must_signal_internal_failure = None
+    term_sent = False
     kill_sent = False
     timed_out = None
     try:
@@ -603,10 +608,11 @@ def run_command(remote, task_details, work_dir, cost_usd_hour,
           if not remote.post_task_update(
               task_details.task_id, task_details.bot_id, params, buf.pop()):
             # Server is telling us to stop. Normally task cancellation.
-            if not kill_sent:
+            if not kill_sent and not term_sent:
               logging.warning('Server induced stop; sending SIGTERM')
-            proc.terminate()
-            timed_out = monotonic_time()
+              term_sent = True
+              proc.terminate()
+              timed_out = monotonic_time()
 
         # Send signal on timeout if necessary. Both are failures, not
         # internal_failures.
@@ -615,11 +621,12 @@ def run_command(remote, task_details, work_dir, cost_usd_hour,
           if (task_details.io_timeout and
               buf.since_last_io > task_details.io_timeout):
             had_io_timeout = True
-            logging.warning(
-                'I/O timeout is %.3fs; no update for %.3fs sending SIGTERM',
-                task_details.io_timeout, buf.since_last_io)
-            proc.terminate()
-            timed_out = monotonic_time()
+            if not term_sent:
+              logging.warning(
+                  'I/O timeout is %.3fs; no update for %.3fs sending SIGTERM',
+                  task_details.io_timeout, buf.since_last_io)
+              proc.terminate()
+              timed_out = monotonic_time()
         else:
           # During grace period.
           if (not kill_sent and

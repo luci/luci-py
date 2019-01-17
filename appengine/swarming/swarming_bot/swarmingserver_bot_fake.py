@@ -28,6 +28,23 @@ def gen_zip(url):
       BOT_DIR, url, '1', {'config/bot_config.py': bot_config_content}, None)
 
 
+def flatten_task_updates(updates):
+  """Flatten a list of task updates into a single result.
+
+  This is more or less the equivalent of what task_scheduler.bot_update_task()
+  would do after all the bot API calls.
+  """
+  out = {}
+  for update in updates:
+    if out.get('output') and update.get('output'):
+      # Accumulate output.
+      update = update.copy()
+      out['output'] += update.pop('output')
+      update.pop('output_chunk_start')
+    out.update(update)
+  return out
+
+
 class Handler(httpserver.Handler):
   """Minimal Swarming bot server fake implementation."""
   def do_GET(self):
@@ -49,7 +66,7 @@ class Handler(httpserver.Handler):
       return self.send_json({'xsrf_token': 'a'})
 
     if self.path == '/swarming/api/v1/bot/event':
-      self.server.parent.add_event(data)
+      self.server.parent._add_bot_event(data)
       return self.send_json({})
 
     if self.path == '/swarming/api/v1/bot/handshake':
@@ -61,12 +78,12 @@ class Handler(httpserver.Handler):
 
     if self.path.startswith('/swarming/api/v1/bot/task_update/'):
       task_id = self.path[len('/swarming/api/v1/bot/task_update/'):]
-      self.server.parent.task_update(task_id, data)
-      return self.send_json({'ok': True})
+      must_stop = self.server.parent._on_task_update(task_id, data)
+      return self.send_json({'ok': True, 'must_stop': must_stop})
 
     if self.path.startswith('/swarming/api/v1/bot/task_error'):
       task_id = self.path[len('/swarming/api/v1/bot/task_error/'):]
-      self.server.parent.task_error(task_id, data)
+      self.server.parent._add_task_error(task_id, data)
       return self.send_json({'resp': 1})
 
     raise NotImplementedError(self.path)
@@ -82,31 +99,44 @@ class Server(httpserver.Server):
   def __init__(self):
     super(Server, self).__init__()
     self._lock = threading.Lock()
-    self._events = []
+    # Accumulated bot events.
+    self._bot_events = []
+    # Running tasks.
     self._tasks = {}
-    self._errors = {}
+    # Bot reported task errors.
+    self._task_errors = {}
     self.has_polled = threading.Event()
+    self.has_updated_task = threading.Event()
+    self.must_stop = False
 
-  def add_event(self, data):
+  def get_bot_events(self):
+    """Returns the events reported by the bots."""
     with self._lock:
-      self._events.append(data)
-
-  def task_update(self, task_id, data):
-    with self._lock:
-      self._tasks.setdefault(task_id, []).append(data)
-
-  def task_error(self, task_id, data):
-    with self._lock:
-      self._errors.setdefault(task_id, []).append(data)
-
-  def get_events(self):
-    with self._lock:
-      return self._events[:]
+      return self._bot_events[:]
 
   def get_tasks(self):
+    """Returns the tasks run by the bots."""
     with self._lock:
       return self._tasks.copy()
 
-  def get_errors(self):
+  def get_task_errors(self):
+    """Returns the task errors reported by the bots."""
     with self._lock:
-      return self._errors.copy()
+      return self._task_errors.copy()
+
+  def _add_bot_event(self, data):
+    # Used by the handler.
+    with self._lock:
+      self._bot_events.append(data)
+
+  def _on_task_update(self, task_id, data):
+    with self._lock:
+      self._tasks.setdefault(task_id, []).append(data)
+      must_stop = self.must_stop
+      self.has_updated_task.set()
+      return must_stop
+
+  def _add_task_error(self, task_id, data):
+    # Used by the handler.
+    with self._lock:
+      self._task_errors.setdefault(task_id, []).append(data)
