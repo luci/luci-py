@@ -33,6 +33,7 @@ import 'elements-sk/icon/search-icon-sk'
 import 'elements-sk/select-sk'
 import 'elements-sk/styles/buttons'
 import '../bot-mass-delete'
+import '../dialog-pop-over'
 import '../sort-toggle'
 import '../swarming-app'
 
@@ -269,16 +270,15 @@ const template = (ele) => html`
     </button>
   </main>
   <footer></footer>
-  <!-- TODO(kjlubick) make this a re-usable component -->
-  <div class=backdrop></div>
-  <div class=popup>
-    <bot-mass-delete .auth_header=${ele.auth_header} .dimensions=${ele._filters}></bot-mass-delete>
-    <button class=goback
-          @click=${ele._closePopup}
-          ?disabled=${ele._startedDeleting && !ele._finishedDeleting}>
-      ${ele._startedDeleting ? 'DISMISS': "GO BACK - DON'T DELETE ANYTHING"}
-    </button>
-  </div>
+  <dialog-pop-over>
+    <div class='delete content'>
+      <bot-mass-delete .auth_header=${ele.auth_header} .dimensions=${ele._filters}></bot-mass-delete>
+      <button class=goback @click=${ele._closePopup}
+              ?disabled=${ele._startedDeleting && !ele._finishedDeleting}>
+        ${ele._startedDeleting ? 'DISMISS': "GO BACK - DON'T DELETE ANYTHING"}
+      </button>
+    </div>
+  </dialog-pop-over>
 </swarming-app>`;
 
 // How many items to load on the first load of bots
@@ -456,10 +456,7 @@ window.customElements.define('bot-list', class extends SwarmingAppBoilerplate {
   }
 
   _closePopup(e) {
-    let backdrop = $$('.backdrop', this);
-    backdrop.classList.remove('opened');
-    let popup = $$('.popup', this);
-    popup.classList.remove('opened');
+    $$('dialog-pop-over', this).hide();
     this._startedDeleting = false;
     this._finishedDeleting = false;
   }
@@ -665,23 +662,8 @@ window.customElements.define('bot-list', class extends SwarmingAppBoilerplate {
   }
 
   _promptMassDelete(e) {
-    let backdrop = $$('.backdrop', this);
-    backdrop.classList.add('opened');
-    let popup = $$('.popup', this);
-    popup.classList.add('opened');
-
-    // Do some math to center it. This cannot be done in pure CSS because
-    // calc doesn't support min/max.
-    let availWidth = window.innerWidth;
-    let availHeight = window.innerHeight;
-
-    let width = Math.min(700, availWidth - 50);
-    let height = Math.min(500, availHeight - 50);
-    popup.style.width = width;
-    popup.style.left = (availWidth - width) / 2;
-    popup.style.top = (availHeight - height) / 2;
-
-    $$('bot-mass-delete').show();
+    $$('bot-mass-delete', this).show();
+    $$('dialog-pop-over', this).show();
   }
 
   _refilterPossibleColumns(e) {
