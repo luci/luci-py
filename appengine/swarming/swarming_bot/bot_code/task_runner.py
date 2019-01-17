@@ -68,9 +68,11 @@ def monotonic_time():
 def get_run_isolated():
   """Returns the path to itself to run run_isolated.
 
+  Use -u to disable stdout buffering by python.
+
   Mocked in test to point to the real run_isolated.py script.
   """
-  return [sys.executable, THIS_FILE, 'run_isolated']
+  return [sys.executable, '-u', THIS_FILE, 'run_isolated']
 
 
 def get_isolated_args(work_dir, task_details, isolated_result,
@@ -350,11 +352,11 @@ def kill_and_wait(proc, grace_period, reason):
   proc.terminate()
   try:
     proc.wait(grace_period)
-  except subprocess42.TimeoutError:
+  except subprocess42.TimeoutExpired:
     logging.warning('SIGKILL finally due to %s', reason)
     proc.kill()
   exit_code = proc.wait()
-  logging.info('Waiting for process exit in finally - done')
+  logging.info('Process exited with: %d', exit_code)
   return exit_code
 
 

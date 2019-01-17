@@ -1038,6 +1038,40 @@ class TestTaskRunnerKilled(TestTaskRunnerBase):
           },
         })
 
+  def test_kill_and_wait(self):
+    # Test the case where the script swallows the SIGTERM/SIGBREAK signal and
+    # hangs.
+    script = os.path.join(self.root_dir, 'ignore_sigterm.py')
+    with open(script, 'wb') as f:
+      # The warning signal is received as SIGTERM on posix and SIGBREAK on
+      # Windows.
+      sig = 'SIGBREAK' if sys.platform == 'win32' else 'SIGTERM'
+      f.write((
+          'import signal, sys, time\n'
+          'def handler(_signum, _frame):\n'
+          '  sys.stdout.write("got it\\n")\n'
+          'signal.signal(signal.%s, handler)\n'
+          'sys.stdout.write("ok\\n")\n'
+          'while True:\n'
+          '  try:\n'
+          '    time.sleep(1)\n'
+          '  except IOError:\n'
+          '    pass\n') % sig)
+    cmd = [sys.executable, '-u', script]
+    # detached=True is required on Windows for SIGBREAK to propagate properly.
+    p = subprocess42.Popen(cmd, detached=True, stdout=subprocess42.PIPE)
+
+    # Wait for it to write 'ok', so we know it's handling signals. It's
+    # important because otherwise SIGTERM/SIGBREAK could be sent before the
+    # signal handler is installed, and this is not what we're testing here.
+    self.assertEqual('ok\n', p.stdout.readline())
+
+    # Send a SIGTERM/SIGBREAK, the process ignores it, send a SIGKILL.
+    exit_code = task_runner.kill_and_wait(p, 0.1, 'testing purposes')
+    expected = 1 if sys.platform == 'win32' else -signal.SIGKILL
+    self.assertEqual(expected, exit_code)
+    self.assertEqual('got it\n', p.stdout.readline())
+
   def test_signal(self):
     # Tests when task_runner gets a SIGTERM.
     signal_file = os.path.join(self.work_dir, 'signal')
