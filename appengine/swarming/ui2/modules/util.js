@@ -12,6 +12,7 @@
 
 import * as human from 'common-sk/modules/human'
 import * as query from 'common-sk/modules/query'
+import { upgradeProperty } from 'elements-sk/upgradeProperty'
 
 export function botPageLink(bot_id) {
   if (!bot_id) {
@@ -77,6 +78,25 @@ export function humanDuration(timeInSecs) {
   }
   // For times less than a minute, add 10ms resolution.
   return ptimeInSecs.toFixed(2)+'s';
+}
+
+/** initPropertyFromAttrOrProperty looks to initialize a property from either
+ *  a property or an attribute set on this element.
+ *
+ * @param {Element} ele -The element.
+ * @param {string} prop - The name of the property to initialize.
+ * @param {boolean} removeAttr - If the attribute is found, if it should be
+ *            removed to avoid stale data.
+ *
+*/
+export function initPropertyFromAttrOrProperty(ele, prop, removeAttr=true) {
+  upgradeProperty(ele, prop);
+  if (ele[prop] === undefined && ele.hasAttribute(prop)) {
+    ele[prop] = ele.getAttribute(prop);
+    if (removeAttr) {
+      ele.removeAttribute(prop);
+    }
+  }
 }
 
 /** sanitizeAndHumanizeTime parses a date string or ms_since_epoch into a JS

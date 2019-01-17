@@ -3,7 +3,7 @@
 // that can be found in the LICENSE file.
 
 import { html, render } from 'lit-html'
-import { upgradeProperty } from 'elements-sk/upgradeProperty'
+import { initPropertyFromAttrOrProperty } from '../util'
 
 import 'elements-sk/icon/arrow-drop-down-icon-sk'
 import 'elements-sk/icon/arrow-drop-up-icon-sk'
@@ -24,17 +24,7 @@ import 'elements-sk/icon/arrow-drop-up-icon-sk'
  * @fires sort-change
  */
 
-// Looks to properties set, then attributes to initialize ele[prop]
-// using the proper setters.  Optionally removes the attr to avoid stale data.
-function initPropertyFromAttrOrProperty(ele, prop, removeAttr=true) {
-  upgradeProperty(ele, prop);
-  if (ele[prop] === undefined && ele.hasAttribute(prop)) {
-    ele[prop] = ele.getAttribute(prop);
-    if (removeAttr) {
-      ele.removeAttribute(prop);
-    }
-  }
-}
+
 
 const template = (ele) => html`
 <arrow-drop-down-icon-sk ?hidden=${ele.key === ele.currentKey && ele.direction === 'asc'}>
@@ -45,7 +35,7 @@ const template = (ele) => html`
 window.customElements.define('sort-toggle', class extends HTMLElement {
 
   constructor() {
-    super()
+    super();
     // _currentKey, _key, _direction are private members
   }
 
@@ -57,6 +47,7 @@ window.customElements.define('sort-toggle', class extends HTMLElement {
     this.addEventListener('click', () => {
       this.toggle();
     });
+    this._render();
   }
 
   /** @prop {string} currentKey - The currently selected sort key for a
@@ -112,7 +103,7 @@ window.customElements.define('sort-toggle', class extends HTMLElement {
   }
 
   _render() {
-    render(template(this), this);
+    render(template(this), this, {eventContext: this});
   }
 
 });

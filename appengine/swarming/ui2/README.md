@@ -46,10 +46,12 @@ generally more useful.
 The list of all demo pages so far (for easy clicking):
 
   - [bot-list](http://localhost:8080/newres/bot-list.html)
+  - [bot-mass-delete](http://localhost:8080/newres/bot-mass-delete.html)
   - [sort-toggle](http://localhost:8080/newres/sort-toggle.html)
   - [swarming-app](http://localhost:8080/newres/swarming-app.html)
   - [swarming-index](http://localhost:8080/newres/swarming-index.html)
   - [task-list](http://localhost:8080/newres/task-list.html)
+  - [task-mass-cancel](http://localhost:8080/newres/task-mass-cancel.html)
 
 By default, the login is mocked so it works w/o an internet connection,
 but if testing the real OAuth 2.0 flow is desired, a client_id may be

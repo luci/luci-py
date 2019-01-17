@@ -19,7 +19,7 @@
 import { $, $$ } from 'common-sk/modules/dom'
 import { errorMessage } from 'elements-sk/errorMessage'
 import { html, render } from 'lit-html'
-import { ifDefined } from 'lit-html/directives/if-defined';
+import { ifDefined } from 'lit-html/directives/if-defined'
 import { jsonOrThrow } from 'common-sk/modules/jsonOrThrow'
 import naturalSort from 'javascript-natural-sort/naturalSort'
 import * as query from 'common-sk/modules/query'
@@ -32,6 +32,7 @@ import 'elements-sk/icon/more-vert-icon-sk'
 import 'elements-sk/icon/search-icon-sk'
 import 'elements-sk/select-sk'
 import 'elements-sk/styles/buttons'
+import '../bot-mass-delete'
 import '../sort-toggle'
 import '../swarming-app'
 
@@ -122,7 +123,7 @@ const options = (ele) => html`
   <a href=${ele._matchingTasksLink()}>View Matching Tasks</a>
   <button
       ?disabled=${!ele.permissions.delete_bot}
-      @click=${(e) => alert('use the dialog on the old botlist UI for now.')}>
+      @click=${ele._promptMassDelete}>
     DELETE ALL DEAD BOTS
   </button>
 </div>`;
@@ -268,6 +269,16 @@ const template = (ele) => html`
     </button>
   </main>
   <footer></footer>
+  <!-- TODO(kjlubick) make this a re-usable component -->
+  <div class=backdrop></div>
+  <div class=popup>
+    <bot-mass-delete .auth_header=${ele.auth_header} .dimensions=${ele._filters}></bot-mass-delete>
+    <button class=goback
+          @click=${ele._closePopup}
+          ?disabled=${ele._startedDeleting && !ele._finishedDeleting}>
+      ${ele._startedDeleting ? 'DISMISS': "GO BACK - DON'T DELETE ANYTHING"}
+    </button>
+  </div>
 </swarming-app>`;
 
 // How many items to load on the first load of bots
@@ -388,6 +399,19 @@ window.customElements.define('bot-list', class extends SwarmingAppBoilerplate {
       this.render();
     };
     this.addEventListener('sort-change', this._sortEvent);
+
+    this._startedMassDeletingEvent = (e) => {
+      this._startedDeleting = true;
+      this._finishedDeleting = false;
+      this.render();
+    }
+    this.addEventListener('bots-deleting-started', this._startedMassDeletingEvent);
+    this._finishedMassDeletingEvent = (e) => {
+      this._startedDeleting = true;
+      this._finishedDeleting = true;
+      this.render();
+    }
+    this.addEventListener('bots-deleting-finished', this._finishedMassDeletingEvent);
   }
 
   disconnectedCallback() {
@@ -395,6 +419,8 @@ window.customElements.define('bot-list', class extends SwarmingAppBoilerplate {
 
     this.removeEventListener('log-in', this._loginEvent);
     this.removeEventListener('sort-change', this._sortEvent);
+    this.removeEventListener('bots-deleting-started', this._startedMassDeletingEvent);
+    this.removeEventListener('bots-deleting-finished', this._finishedMassDeletingEvent);
   }
 
   _addFilter(filter) {
@@ -427,6 +453,15 @@ window.customElements.define('bot-list', class extends SwarmingAppBoilerplate {
       classes += 'old_version';
     }
     return classes;
+  }
+
+  _closePopup(e) {
+    let backdrop = $$('.backdrop', this);
+    backdrop.classList.remove('opened');
+    let popup = $$('.popup', this);
+    popup.classList.remove('opened');
+    this._startedDeleting = false;
+    this._finishedDeleting = false;
   }
 
   _columnSearch(e) {
@@ -627,6 +662,26 @@ window.customElements.define('bot-list', class extends SwarmingAppBoilerplate {
     this._primaryKey = this._filteredPrimaryArr[e.detail.selection];
     this._stateChanged();
     this.render();
+  }
+
+  _promptMassDelete(e) {
+    let backdrop = $$('.backdrop', this);
+    backdrop.classList.add('opened');
+    let popup = $$('.popup', this);
+    popup.classList.add('opened');
+
+    // Do some math to center it. This cannot be done in pure CSS because
+    // calc doesn't support min/max.
+    let availWidth = window.innerWidth;
+    let availHeight = window.innerHeight;
+
+    let width = Math.min(700, availWidth - 50);
+    let height = Math.min(500, availHeight - 50);
+    popup.style.width = width;
+    popup.style.left = (availWidth - width) / 2;
+    popup.style.top = (availHeight - height) / 2;
+
+    $$('bot-mass-delete').show();
   }
 
   _refilterPossibleColumns(e) {

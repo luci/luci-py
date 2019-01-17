@@ -24,7 +24,7 @@ const fetchMock = require('fetch-mock');
 // bots_10.items.push(...bots_10.items);
 
 mockAuthdAppGETs(fetchMock, {
-  delete_bot: false,
+  delete_bot: true,
 });
 
 fetchMock.get('glob:/_ah/api/swarming/v1/bots/list?*',
@@ -37,6 +37,8 @@ fetchMock.get('/_ah/api/swarming/v1/bots/count',
               requireLogin(fleetCount));
 fetchMock.get('glob:/_ah/api/swarming/v1/bots/count?*',
               requireLogin(queryCount));
+
+fetchMock.post('glob:/_ah/api/swarming/v1/bot/*/delete', requireLogin(200, 750));
 
 // Everything else
 fetchMock.catch(404);
