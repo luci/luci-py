@@ -171,7 +171,8 @@ class _BotCommon(ndb.Model):
   def to_proto(self, out):
     """Converts self to a swarming_pb2.Bot."""
     # Used by BotEvent.to_proto() and BotInfo.to_proto().
-    out.bot_id = self.key.parent().string_id()
+    if self.key:
+      out.bot_id = self.key.parent().string_id()
     #out.session_id = ''  # https://crbug.com/786735
     for l in self.dimensions_flat:
       if l.startswith(u'pool:'):
@@ -184,7 +185,7 @@ class _BotCommon(ndb.Model):
     # https://crbug.com/913978: RESERVED
     if self.quarantined:
       out.status = swarming_pb2.QUARANTINED_BY_BOT
-      msg = self.state.get(u'quarantined')
+      msg = (self.state or {}).get(u'quarantined')
       if msg:
         out.status_msg = msg
     elif self.maintenance_msg:
@@ -385,11 +386,12 @@ class BotEvent(_BotCommon):
 
   def to_proto(self, out):
     """Converts self to a swarming_pb2.BotEvent."""
-    out.event_time.FromDatetime(self.ts)
+    if self.ts:
+      out.event_time.FromDatetime(self.ts)
     # Populates out.bot with _BotCommon.
     _BotCommon.to_proto(self, out.bot)
     # https://crbug.com/905087: BOT_DELETED
-    e = self._MAPPING[self.event_type]
+    e = self._MAPPING.get(self.event_type)
     if e:
       out.event = e
     if self.message:

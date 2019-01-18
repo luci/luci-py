@@ -702,12 +702,13 @@ class TaskProperties(ndb.Model):
     """
     # Just look at the first one. The property is guaranteed to be internally
     # consistent.
-    for v in self.dimensions_data.itervalues():
+    data = self.dimensions_data or {}
+    for v in data.itervalues():
       if isinstance(v, (list, tuple)):
         return self.dimensions_data
       break
     # Compatibility code for old entities.
-    return {k: [v] for k, v in self.dimensions_data.iteritems()}
+    return {k: [v] for k, v in data.iteritems()}
 
   @property
   def is_terminate(self):
@@ -914,9 +915,11 @@ class TaskSlice(ndb.Model):
 
   def to_proto(self, out):
     """Converts self to a swarming_pb2.TaskSlice."""
-    self.properties.to_proto(out.properties)
+    if self.properties:
+      self.properties.to_proto(out.properties)
     out.wait_for_capacity = self.wait_for_capacity
-    out.expiration.seconds = self.expiration_secs
+    if self.expiration_secs:
+      out.expiration.seconds = self.expiration_secs
 
   def _pre_put_hook(self):
     # _pre_put_hook() doesn't recurse correctly into
@@ -1100,12 +1103,14 @@ class TaskRequest(ndb.Model):
     for task_slice in self.task_slices:
       t = out.task_slices.add()
       task_slice.to_proto(t)
-    out.priority = self.priority
+    if self.priority:
+      out.priority = self.priority
     if self.service_account:
       out.service_account = self.service_account
 
     # Information.
-    out.create_time.FromDatetime(self.created_ts)
+    if self.created_ts:
+      out.create_time.FromDatetime(self.created_ts)
     if self.name:
       out.name = self.name
     out.tags.extend(self.tags)

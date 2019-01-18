@@ -756,6 +756,42 @@ class TaskResultApiTest(TestCase):
     run_result.to_proto(actual)
     self.assertEqual(unicode(expected), unicode(actual))
 
+  def test_TaskResultSummary_to_proto_empty(self):
+    # Assert that it doesn't throw on empty entity.
+    actual = swarming_pb2.TaskResult()
+    # It's unreasonable to expect the entity key to be unset, which complicates
+    # this test a bit.
+    req = task_request.TaskRequest(id=1230)
+    res = task_result.TaskResultSummary(parent=req.key)
+    res._request_cache = req
+    res.to_proto(actual)
+    expected = swarming_pb2.TaskResult(
+        request=swarming_pb2.TaskRequest(task_id='7ffffffffffffb310'),
+        state=swarming_pb2.PENDING,
+        state_category=swarming_pb2.CATEGORY_PENDING,
+        task_id='7ffffffffffffb310')
+    self.assertEqual(expected, actual)
+
+  def test_TaskRunResult_to_proto_empty(self):
+    # Assert that it doesn't throw on empty entity.
+    actual = swarming_pb2.TaskResult()
+    # It's unreasonable to expect the entity key to be unset, which complicates
+    # this test a bit.
+    req = task_request.TaskRequest(id=1230)
+    res_sum = task_result.TaskResultSummary(parent=req.key, id=1)
+    res_sum._request_cache = req
+    res = task_result.TaskRunResult(parent=res_sum.key, id=1)
+    res._request_cache = req
+    res.to_proto(actual)
+    expected = swarming_pb2.TaskResult(
+        request=swarming_pb2.TaskRequest(task_id='7ffffffffffffb310'),
+        state=swarming_pb2.RUNNING,
+        state_category=swarming_pb2.CATEGORY_RUNNING,
+        try_number=1,
+        task_id='7ffffffffffffb310',
+        run_id='7ffffffffffffb311')
+    self.assertEqual(expected, actual)
+
   def test_performance_stats_pre_put_hook(self):
     with self.assertRaises(datastore_errors.BadValueError):
       task_result.PerformanceStats().put()

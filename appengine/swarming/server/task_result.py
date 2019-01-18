@@ -711,7 +711,9 @@ class _TaskResultCommon(ndb.Model):
   def to_proto(self, out):
     """Converts self to a swarming_pb2.TaskResult"""
     self.request.to_proto(out.request)
-    out.create_time.FromDatetime(self.created_ts)
+    if self.created_ts:
+      # Can only be unset in test case.
+      out.create_time.FromDatetime(self.created_ts)
     if self.started_ts:
       out.start_time.FromDatetime(self.started_ts)
     if self.completed_ts:
@@ -729,7 +731,8 @@ class _TaskResultCommon(ndb.Model):
     out.state = self.task_state
     # Convert state to category.
     out.state_category = self.task_state & 0xF0
-    out.try_number = self.try_number
+    if self.try_number is not None:
+      out.try_number = self.try_number
     out.current_task_slice = self.current_task_slice
     if self.bot_dimensions:
       # TODO(maruel): Keep a complete snapshot. This is a bit clunky at the
@@ -746,14 +749,18 @@ class _TaskResultCommon(ndb.Model):
     out.children_task_ids.extend(self.children_task_ids)
     if self.deduped_from:
       out.deduped_from = self.deduped_from
-    out.task_id = task_pack.pack_result_summary_key(self.result_summary_key)
-    if self.run_result_key:
-      out.run_id = task_pack.pack_run_result_key(self.run_result_key)
+    key = self.result_summary_key
+    if key:
+      out.task_id = task_pack.pack_result_summary_key(key)
+    key = self.run_result_key
+    if key:
+      out.run_id = task_pack.pack_run_result_key(key)
 
     # TODO(maruel): Make sure we enforce the same CIPD server for all TaskSlice.
-    props = self.request.task_slice(0).properties
-    if props.cipd_input:
-      out.cipd_pins.server = props.cipd_input.server
+    if self.request.num_task_slices:
+      props = self.request.task_slice(0).properties
+      if props.cipd_input:
+        out.cipd_pins.server = props.cipd_input.server
     if self.cipd_pins:
       if self.cipd_pins.client_package:
         self.cipd_pins.client_package.to_proto(out.cipd_pins.client_package)
@@ -1013,6 +1020,10 @@ class TaskResultSummary(_TaskResultCommon):
   def request_key(self):
     """Returns the TaskRequest ndb.Key that is related to this entity."""
     return task_pack.result_summary_key_to_request_key(self.key)
+
+  @property
+  def result_summary_key(self):
+    return self.key
 
   @property
   def run_result_key(self):

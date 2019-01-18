@@ -955,6 +955,26 @@ class TaskRequestApiTest(TestCase):
     request.to_proto(actual)
     self.assertEqual(unicode(expected), unicode(actual))
 
+  def test_TaskRequest_to_proto_empty(self):
+    # Assert that it doesn't throw on empty entity.
+    actual = swarming_pb2.TaskRequest()
+    task_request.TaskRequest().to_proto(actual)
+    self.assertEqual(swarming_pb2.TaskRequest(), actual)
+
+  def test_TaskSlice_to_proto_empty(self):
+    # Assert that it doesn't throw on empty entity.
+    actual = swarming_pb2.TaskSlice()
+    task_request.TaskSlice().to_proto(actual)
+    self.assertEqual(swarming_pb2.TaskSlice(), actual)
+
+  def test_TaskProperties_to_proto_empty(self):
+    # Assert that it doesn't throw on empty entity.
+    actual = swarming_pb2.TaskProperties()
+    task_request.TaskProperties().to_proto(actual)
+    expected = swarming_pb2.TaskProperties()
+    expected.grace_period.seconds = 30
+    self.assertEqual(expected, actual)
+
   def test_request_bad_values(self):
     with self.assertRaises(AttributeError):
       _gen_request(properties=_gen_properties(foo='bar'))

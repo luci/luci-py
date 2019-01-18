@@ -145,6 +145,12 @@ class BotManagementTest(test_case.TestCase):
     missing = expected - actual
     self.assertFalse(missing)
 
+  def test_BotEvent_proto_empty(self):
+    # Assert that it doesn't throw on empty entity.
+    actual = swarming_pb2.BotEvent()
+    bot_management.BotEvent().to_proto(actual)
+    self.assertEqual(swarming_pb2.BotEvent(), actual)
+
   def test_BotEvent_proto_events(self):
     # Ensures all bot event states can be converted to a proto.
     dimensions = {
