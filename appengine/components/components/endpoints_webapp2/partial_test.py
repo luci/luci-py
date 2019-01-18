@@ -585,6 +585,18 @@ class ParseTestCase(test_case.TestCase):
         'c': {},
       },
     })
+    self.assertEqual(partial._parse('a(b, c)'), {
+      'a': {
+        'b': {},
+        'c': {},
+      },
+    })
+    self.assertEqual(partial._parse('a (b,c)'), {
+      'a': {
+        'b': {},
+        'c': {},
+      },
+    })
     self.assertEqual(partial._parse('a/b(c,d)'), {
       'a': {
         'b': {
