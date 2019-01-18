@@ -14,7 +14,7 @@ describe('bot-mass-delete', function() {
   const { fetchMock, MATCHED, UNMATCHED } = require('fetch-mock');
 
   // A reusable HTML element in which we create our element under test.
-  let container = document.createElement('div');
+  const container = document.createElement('div');
   document.body.appendChild(container);
 
   beforeEach(function() {
@@ -56,7 +56,7 @@ describe('bot-mass-delete', function() {
 
   it('has a list of the passed in dimensions', function(done) {
     createElement((ele) => {
-      let listedDims = $('ul li', ele);
+      const listedDims = $('ul li', ele);
       expect(listedDims.length).toBe(2);
       expect(listedDims[0]).toMatchTextContent('os:Android');
       done();
@@ -80,7 +80,7 @@ describe('bot-mass-delete', function() {
       // is when we know the element has updated the _tasks.
       fetchMock.flush(true).then(() => {
         expectNoUnmatchedCalls(fetchMock);
-        let calls = fetchMock.calls(MATCHED, 'GET');
+        const calls = fetchMock.calls(MATCHED, 'GET');
         expect(calls.length).toBe(1);
         done();
       });
@@ -120,7 +120,7 @@ describe('bot-mass-delete', function() {
 
       ele._readyToDelete = true;
       ele.render();
-      let button = $$('button.delete', ele);
+      const button = $$('button.delete', ele);
       button.click();
     });
   });

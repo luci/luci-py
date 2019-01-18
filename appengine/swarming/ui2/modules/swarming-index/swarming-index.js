@@ -122,7 +122,7 @@ window.customElements.define('swarming-index', class extends SwarmingAppBoilerpl
   constructor() {
     super(template);
     this._bootstrap_token = '...';
-    let idx = location.hostname.indexOf('.appspot.com');
+    const idx = location.hostname.indexOf('.appspot.com');
     this._project_id = location.hostname.substring(0, idx) || 'not_found';
     this._host_url = location.origin;
   }
@@ -145,7 +145,7 @@ window.customElements.define('swarming-index', class extends SwarmingAppBoilerpl
   }
 
   _fetchToken() {
-    let post_extra = {
+    const post_extra = {
       headers: {'authorization': this.auth_header},
       method: 'POST',
     };

@@ -449,8 +449,8 @@ window.customElements.define('task-list', class extends SwarmingAppBoilerplate {
     if (e.key !== 'Enter') {
       return;
     }
-    let input = $$('#column_search', this);
-    let newCol = input.value.trim();
+    const input = $$('#column_search', this);
+    const newCol = input.value.trim();
     if (!this._possibleColumns[newCol]) {
       errorMessage(`Column "${newCol}" is not valid.`, 5000);
       return;
@@ -478,7 +478,7 @@ window.customElements.define('task-list', class extends SwarmingAppBoilerplate {
     // Make a fresh abort controller for each set of fetches. AFAIK, they
     // cannot be re-used once aborted.
     this._fetchController = new AbortController();
-    let extra = {
+    const extra = {
       headers: {'authorization': this.auth_header},
       signal: this._fetchController.signal,
     };
@@ -494,7 +494,7 @@ window.customElements.define('task-list', class extends SwarmingAppBoilerplate {
       .then((json) => {
         this._tasks = [];
         const maybeLoadMore = (json) => {
-          let tags = {};
+          const tags = {};
           this._tasks = this._tasks.concat(processTasks(json.items, tags));
           appendPossibleColumns(this._possibleColumns, tags);
           appendPrimaryMap(this._primaryMap, tags);
@@ -531,7 +531,7 @@ window.customElements.define('task-list', class extends SwarmingAppBoilerplate {
     if (!this._fetchedDimensions) {
       this._fetchedDimensions = true;
       this.app.addBusyTasks(1);
-      extra = {
+      const extra = {
         headers: {'authorization': this.auth_header},
         // No signal here because we shouldn't need to abort it.
         // This request does not depend on the filters.
@@ -557,7 +557,7 @@ window.customElements.define('task-list', class extends SwarmingAppBoilerplate {
                     'NO_RESOURCE', 'CANCELED'];
 
     this.app.addBusyTasks(1 + states.length);
-    let totalPromise = fetch(`/_ah/api/swarming/v1/tasks/count?${queryParams}`, extra)
+    const totalPromise = fetch(`/_ah/api/swarming/v1/tasks/count?${queryParams}`, extra)
       .then(jsonOrThrow)
       .then((json) => {
         this.app.finishedTask();
@@ -566,9 +566,9 @@ window.customElements.define('task-list', class extends SwarmingAppBoilerplate {
       .catch((e) => this.fetchError(e, 'count/total'))
     this._queryCounts[0].value = html`${until(totalPromise, '...')}`;
 
-    let stateRemoved = queryParams.replace(/state=.+?&/g, '');
+    const stateRemoved = queryParams.replace(/state=.+?&/g, '');
     for (let i = 0; i < states.length; i++) {
-      let promise = fetch(`/_ah/api/swarming/v1/tasks/count?${stateRemoved}&state=${states[i]}`, extra)
+      const promise = fetch(`/_ah/api/swarming/v1/tasks/count?${stateRemoved}&state=${states[i]}`, extra)
         .then(jsonOrThrow)
         .then((json) => {
           this.app.finishedTask();
@@ -583,14 +583,14 @@ window.customElements.define('task-list', class extends SwarmingAppBoilerplate {
     if (e.key !== 'Enter') {
       return;
     }
-    let input = $$('#filter_search', this);
+    const input = $$('#filter_search', this);
     let newFilter = input.value.trim();
-    let idx = newFilter.indexOf(':');
+    const idx = newFilter.indexOf(':');
     if (idx === -1) {
       errorMessage('Invalid filter.  Should be like "foo:bar"', 5000);
       return;
     }
-    let key = newFilter.substring(0, idx);
+    const key = newFilter.substring(0, idx);
     if (key !== 'state' && !key.endsWith('-tag')) {
       errorMessage(`Filters should only be on state or something-tag.
                    Auto-correcting ${key} to ${key}-tag.`, 6000);
@@ -662,11 +662,11 @@ window.customElements.define('task-list', class extends SwarmingAppBoilerplate {
       return undefined;
     }
     // strip out any conflicting state filters.
-    let withNewState = this._filters.filter((f) => {
+    const withNewState = this._filters.filter((f) => {
       return !f.startsWith('state');
     });
     withNewState.push(`state:${state}`);
-    let queryParams = query.fromObject({
+    const queryParams = query.fromObject({
           // provide empty values
           'c' : this._cols,
           'd' : this._dir,
@@ -683,17 +683,17 @@ window.customElements.define('task-list', class extends SwarmingAppBoilerplate {
   }
 
   _matchingBotsLink() {
-    let cols = ['id', 'os', 'task', 'status'];
+    const cols = ['id', 'os', 'task', 'status'];
 
-    let dimensions = this._filters.map((f) => {
+    const dimensions = this._filters.map((f) => {
       return f.replace('-tag', '');
     }).filter((f) => {
-      let tag = f.split(':')[0];
+      const tag = f.split(':')[0];
       return tag !== 'state' && this._knownDimensions.indexOf(tag) !== -1;
     });
 
-    for (let dim of dimensions) {
-      let col = dim.split(':', 1)[0];
+    for (const dim of dimensions) {
+      const col = dim.split(':', 1)[0];
       if (cols.indexOf(col) === -1) {
         cols.push(col);
       }
@@ -737,7 +737,7 @@ window.customElements.define('task-list', class extends SwarmingAppBoilerplate {
   }
 
   _refilterPossibleColumns(e) {
-    let input = $$('#column_search', this);
+    const input = $$('#column_search', this);
     // If the column selector box is hidden, input will be null
     this._columnQuery = (input && input.value) || '';
     this._filteredPossibleColumns = filterPossibleColumns(Object.keys(this._possibleColumns), this._columnQuery);
@@ -746,7 +746,7 @@ window.customElements.define('task-list', class extends SwarmingAppBoilerplate {
   }
 
   _removeFilter(filter) {
-    let idx = this._filters.indexOf(filter);
+    const idx = this._filters.indexOf(filter);
     if (idx === -1) {
       return;
     }
@@ -761,7 +761,7 @@ window.customElements.define('task-list', class extends SwarmingAppBoilerplate {
     sortColumns(this._cols);
     super.render();
     if (this._primaryKey) {
-      let selectedKey = $$('.keys.selector .item[selected]', this);
+      const selectedKey = $$('.keys.selector .item[selected]', this);
       // Especially on a page reload, the selected key won't be viewable.
       // This scrolls the little box into view if it's not and, since it
       // runs every render, keeps it in view.
@@ -778,7 +778,7 @@ window.customElements.define('task-list', class extends SwarmingAppBoilerplate {
     // All major supported browsers are now stable (or stable-ish)
     // https://stackoverflow.com/a/3027715
     this._tasks.sort((taskA, taskB) => {
-      let sortOn = this._sort;
+      const sortOn = this._sort;
       if (!sortOn) {
         return 0;
       }
@@ -786,7 +786,7 @@ window.customElements.define('task-list', class extends SwarmingAppBoilerplate {
       if (this._dir === 'desc') {
         dir = -1;
       }
-      let sorter = specialSortMap[sortOn];
+      const sorter = specialSortMap[sortOn];
       if (sorter) {
         return sorter(dir, taskA, taskB);
       }
@@ -819,7 +819,7 @@ window.customElements.define('task-list', class extends SwarmingAppBoilerplate {
     // this prevents the click from bubbling up and being seen by the
     // <select-sk>
     e.stopPropagation();
-    let idx = this._cols.indexOf(col);
+    const idx = this._cols.indexOf(col);
     if (idx >= 0) {
       this._cols.splice(idx, 1);
     } else {

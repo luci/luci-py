@@ -27,9 +27,9 @@ export function aggregateTemps(temps) {
   if (!temps) {
     return {};
   }
-  let zones = [];
+  const zones = [];
   let avg = 0;
-  for (let k in temps) {
+  for (const k in temps) {
     zones.push(k +': '+temps[k]);
     avg += (+temps[k]);
   }
@@ -84,7 +84,7 @@ export function column(col, bot, ele) {
     console.warn('falsey bot passed into column');
     return '';
   }
-  let c = colMap[col];
+  const c = colMap[col];
   if (c) {
     return c(bot, ele);
   }
@@ -92,8 +92,8 @@ export function column(col, bot, ele) {
   if (noneDimensions.indexOf(col) !== -1) {
     emptyVal = 'none';
   }
-  let values = attribute(bot, col, emptyVal);
-  values = values.map((v) => applyAlias(v, col));
+  const values = attribute(bot, col, emptyVal)
+                    .map((v) => applyAlias(v, col));
   return longestOrAll(values, ele._verbose);
 }
 
@@ -148,20 +148,20 @@ export const specialFilters = {
  * @returns {Array<Object>} the bots that match the filters.
 */
 export function filterBots(filters, bots) {
-  let parsedFilters = [];
+  const parsedFilters = [];
   // Preprocess the filters
-  for (let filterString of filters) {
-    let idx = filterString.indexOf(':');
-    let key = filterString.slice(0, idx);
-    let value = filterString.slice(idx + 1);
+  for (const filterString of filters) {
+    const idx = filterString.indexOf(':');
+    const key = filterString.slice(0, idx);
+    const value = filterString.slice(idx + 1);
     parsedFilters.push([key, value]);
   }
   // apply the filters in an AND way, that is, it must
   // match all the filters
   return bots.filter((bot) => {
     let matches = true;
-    for (let filter of parsedFilters) {
-      let [key, value] = filter;
+    for (const filter of parsedFilters) {
+      const [key, value] = filter;
       if (specialFilters[key]) {
         matches &= specialFilters[key](bot, value);
       } else {
@@ -200,7 +200,7 @@ export function fromState(bot, attr) {
   if (!bot || !bot.state || !bot.state[attr]) {
     return null;
   }
-  let state = bot.state[attr];
+  const state = bot.state[attr];
   if (Array.isArray(state)) {
     return state;
   }
@@ -230,12 +230,12 @@ export function initCounts() {
  *  @param {String} cursor - An optional cursor for server pagination.
  */
 export function listQueryParams(filters, limit, cursor) {
-  let params = {};
-  let dims = [];
+  const params = {};
+  const dims = [];
   for (const f of filters) {
-    let split = f.split(':', 1)
-    let col = split[0];
-    let rest = f.substring(col.length + 1);
+    const split = f.split(':', 1)
+    const col = split[0];
+    const rest = f.substring(col.length + 1);
     if (col === 'status') {
       if (rest === 'alive') {
         params['is_dead'] = ['FALSE'];
@@ -286,7 +286,7 @@ export function longestOrAll(arr, verbose) {
     return arr.join(' | ');
   }
   let most = '';
-  for(let i = 0; i < arr.length; i++) {
+  for (let i = 0; i < arr.length; i++) {
     if (arr[i] && arr[i].length > most.length) {
       most = arr[i];
     }
@@ -303,7 +303,7 @@ export function makePossibleColumns(arr) {
   if (!arr) {
     return [];
   }
-  let dims = [];
+  const dims = [];
   arr.forEach(function(d) {
     if (blacklistDimensions.indexOf(d.key) === -1) {
       dims.push(d.key);
@@ -327,11 +327,11 @@ export function processBots(arr) {
   if (!arr) {
     return [];
   }
-  for (let bot of arr) {
+  for (const bot of arr) {
     bot.state = (bot.state && JSON.parse(bot.state)) || {};
     // get the disks in an easier to deal with format, sorted by size.
-    let disks = bot.state.disks || {};
-    let keys = Object.keys(disks);
+    const disks = bot.state.disks || {};
+    const keys = Object.keys(disks);
     if (!keys.length) {
       bot.disks = [{'id': 'unknown', 'mb': 0}];
     } else {
@@ -349,11 +349,11 @@ export function processBots(arr) {
     // average and list of temps by zone if applicable.
     bot.state.temp = aggregateTemps(bot.state.temp);
 
-    let devices = [];
-    let d = (bot && bot.state && bot.state.devices) || {};
+    const devices = [];
+    const d = (bot && bot.state && bot.state.devices) || {};
     // state.devices is like {Serial:Object}, so we need to keep the serial
-    for (let key in d) {
-      let o = d[key];
+    for (const key in d) {
+      const o = d[key];
       o.serial = key;
       o.okay = (o.state === 'available');
       // It is easier to assume all devices on a bot are of the same type
@@ -362,7 +362,7 @@ export function processBots(arr) {
       // still have devices in their state (the last known device attached)
       // but don't have the device_type dimension. In that case, we punt
       // on device type.
-      let types = fromDimension(bot, 'device_type') || ['UNKNOWN'];
+      const types = fromDimension(bot, 'device_type') || ['UNKNOWN'];
       o.device_type = types[0];
       o.temp = aggregateTemps(o.temp);
       devices.push(o);
@@ -380,7 +380,7 @@ export function processBots(arr) {
     });
     bot.state.devices = devices;
 
-    for (let time of BOT_TIMES) {
+    for (const time of BOT_TIMES) {
       sanitizeAndHumanizeTime(bot, time);
     };
   };
@@ -429,7 +429,7 @@ export function processPrimaryMap(dimensions) {
 
   // Add some options that might not show up.
   pMap['android_devices'] && pMap['android_devices'].push('0');
-  for (let key of noneDimensions) {
+  for (const key of noneDimensions) {
     if (pMap[key] && pMap[key].indexOf('none') === -1) {
       pMap[key].push('none');
     }
@@ -468,15 +468,15 @@ export function sortColumns(cols) {
  * @param {Array<String>} selectedCols - The currently selected columns.
  */
 export function sortPossibleColumns(columns, selectedCols) {
-  let selected = {};
-  for (let c of selectedCols) {
+  const selected = {};
+  for (const c of selectedCols) {
     selected[c] = true;
   }
 
   columns.sort((a, b) => {
       // Show selected columns above non selected columns
-      let selA = selected[a];
-      let selB = selected[b];
+      const selA = selected[a];
+      const selB = selected[b];
       if (selA && !selB) {
         return -1;
       }
@@ -579,7 +579,7 @@ export const specialSortMap = {
 
 function deviceHelper(callback) {
   return (bot, ele) => {
-    let devices = bot.state.devices;
+    const devices = bot.state.devices;
     if (!devices || !devices.length) {
       return 'N/A - no devices';
     }
@@ -589,7 +589,7 @@ function deviceHelper(callback) {
 
 const colMap = {
   android_devices: (bot, ele) => {
-    let devs = attribute(bot, 'android_devices', '0');
+    const devs = attribute(bot, 'android_devices', '0');
     if (ele._verbose) {
       return devs.join(' | ') + ' devices available';
     }
@@ -597,16 +597,16 @@ const colMap = {
     return Math.max(...devs) + ' devices available';
   },
   battery_health: deviceHelper((device) => {
-    let h = (device.battery && device.battery.health) || 'UNKNOWN';
-    let alias = BATTERY_HEALTH_ALIASES[h] || '';
+    const h = (device.battery && device.battery.health) || 'UNKNOWN';
+    const alias = BATTERY_HEALTH_ALIASES[h] || '';
     return `${alias} (${h})`;
   }),
   battery_level: deviceHelper((device) => {
     return (device.battery && device.battery.level) || 'UNKNOWN';
   }),
   battery_status: deviceHelper((device) => {
-    let h = (device.battery && device.battery.status) || 'UNKNOWN';
-    let alias = BATTERY_STATUS_ALIASES[h] || '';
+    const h = (device.battery && device.battery.status) || 'UNKNOWN';
+    const alias = BATTERY_STATUS_ALIASES[h] || '';
     return `${alias} (${h})`;
   }),
   battery_temperature: deviceHelper((device) => {
@@ -623,7 +623,7 @@ const colMap = {
     return bot.state.temp.average || 'UNKNOWN';
   },
   device_temperature: (bot, ele) => {
-    let devices = bot.state.devices;
+    const devices = bot.state.devices;
     if (!devices || !devices.length) {
       return 'N/A - no devices';
     }
@@ -635,9 +635,9 @@ const colMap = {
     }).join(' | ');
   },
   disk_space: (bot, ele) => {
-    let aliased = [];
-    for (let disk of bot.disks) {
-      let alias = human.bytes(disk.mb, human.MB);
+    const aliased = [];
+    for (const disk of bot.disks) {
+      const alias = human.bytes(disk.mb, human.MB);
       aliased.push(`${disk.id} ${alias} (${disk.mb})`);
     }
     if (ele._verbose) {
@@ -673,7 +673,7 @@ const colMap = {
     }
     if (ele.server_details && ele.server_details.machine_provider_template) {
       // Might not be loaded yet.
-      let mp_url = ele.server_details.machine_provider_template
+      const mp_url = ele.server_details.machine_provider_template
                       .replace('%s', bot.lease_id);
       return html`<a target=_blank
                      rel=noopener
@@ -694,7 +694,7 @@ const colMap = {
     return 'in ' + timeDiffApprox(bot.lease_expiration_ts);
   },
   running_time:  (bot, ele) => {
-    let r = fromState(bot, 'running_time');
+    const r = fromState(bot, 'running_time');
     if (!r) {
       return 'UNKNOWN';
     }
@@ -722,7 +722,7 @@ const colMap = {
       if (msg === 'UNKNOWN') {
         msg = fromDimension(bot, 'quarantined') || 'UNKNOWN';
       }
-      let deviceStates = [];
+      const deviceStates = [];
       // Show all the errors that are active on devices to make it more
       // clear if this is a transient error (e.g. device is too hot)
       // or if it is requires human interaction (e.g. device is unauthorized)
@@ -749,14 +749,14 @@ const colMap = {
                    href=${taskPageLink(bot.task_id)}>${bot.task_id}</a>`;
   },
   uptime: (bot, ele) => {
-    let u = fromState(bot, 'uptime');
+    const u = fromState(bot, 'uptime');
     if (!u) {
       return 'UNKNOWN';
     }
     return human.strDuration(u);
   },
   version: (bot, ele) => {
-    let v = bot.version || 'UNKNOWN';
+    const v = bot.version || 'UNKNOWN';
     if (ele._verbose) {
       return v;
     }

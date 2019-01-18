@@ -12,7 +12,7 @@ describe('dialog-pop-over', function() {
   const { $$ } = require('common-sk/modules/dom');
 
   // A reusable HTML element in which we create our element under test.
-  let container = document.createElement('div');
+  const container = document.createElement('div');
   document.body.appendChild(container);
 
   afterEach(function() {
@@ -36,7 +36,7 @@ describe('dialog-pop-over', function() {
 
   it('appends a backdrop element', function(done) {
     createElement((ele) => {
-      let backdrop = $$('.backdrop', ele);
+      const backdrop = $$('.backdrop', ele);
       expect(backdrop).toBeTruthy();
       done();
     });
@@ -44,8 +44,8 @@ describe('dialog-pop-over', function() {
 
   it('toggles .opened on .content and .backdrop on show/hide', function(done) {
     createElement((ele) => {
-      let backdrop = $$('.backdrop', ele);
-      let content = $$('.content', ele);
+      const backdrop = $$('.backdrop', ele);
+      const content = $$('.content', ele);
       expect(backdrop).not.toHaveClass('opened');
       expect(content).not.toHaveClass('opened');
 

@@ -15,9 +15,9 @@ mockAuthdAppGETs(fetchMock, {
   can_pet_dogs: true
 });
 
-let btn = document.getElementById('test-button');
+const btn = document.getElementById('test-button');
 btn.addEventListener('click', () => {
-  let swapp = document.getElementsByTagName('swarming-app');
+  const swapp = document.getElementsByTagName('swarming-app');
   swapp[0].addBusyTasks(1);
 });
 

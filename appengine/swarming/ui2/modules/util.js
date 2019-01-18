@@ -31,7 +31,7 @@ export function botPageLink(bot_id) {
  * @param {Array<String>} columns - the column names that should be shown.
  */
 export function botListLink(filters=[], columns=[]) {
-  let fArr = [];
+  const fArr = [];
   for (const f of filters) {
     if (f.key && f.value) {
       if (Array.isArray(f.value)) {
@@ -45,7 +45,7 @@ export function botListLink(filters=[], columns=[]) {
       fArr.push(f);
     }
   };
-  let obj = {
+  const obj = {
     f: fArr,
     c: columns,
   }
@@ -96,7 +96,7 @@ export function humanDuration(timeInSecs) {
   if (!timeInSecs) {
     return '--';
   }
-  let ptimeInSecs = parseFloat(timeInSecs);
+  const ptimeInSecs = parseFloat(timeInSecs);
   // On a bad parse (shouldn't happen), show original.
   if (!ptimeInSecs) {
     return timeInSecs + ' seconds';
@@ -182,8 +182,8 @@ export function sanitizeAndHumanizeTime(obj, key) {
 export function taskListLink(filters, columns) {
   filters = filters || [];
   columns = columns || [];
-  let fArr = [];
-  for (let f of filters) {
+  const fArr = [];
+  for (const f of filters) {
     if (f.key && f.value) {
       if (Array.isArray(f.value)) {
         f.value.forEach(function(v) {
@@ -200,7 +200,7 @@ export function taskListLink(filters, columns) {
   for (let i = 2; i < arguments.length; i++) {
     fArr.push(arguments[i]);
   }
-  let obj = {
+  const obj = {
     f: fArr,
     c: columns,
   }

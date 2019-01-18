@@ -29,7 +29,7 @@ window.customElements.define('dialog-pop-over', class extends HTMLElement {
   }
 
   connectedCallback() {
-    let backdrop = backdrop_template.content.cloneNode(true);
+    const backdrop = backdrop_template.content.cloneNode(true);
     this.appendChild(backdrop);
     // variable backdrop is a #document-fragment, so we need to
     // search for the expanded node after it has been added.
@@ -53,11 +53,11 @@ window.customElements.define('dialog-pop-over', class extends HTMLElement {
   show() {
     // Do some math to center it. This cannot be done in pure CSS because
     // calc doesn't support min/max.
-    let availWidth = window.innerWidth;
-    let availHeight = window.innerHeight;
+    const availWidth = window.innerWidth;
+    const availHeight = window.innerHeight;
 
-    let width = Math.min(this._content.offsetWidth, availWidth - 50);
-    let height = Math.min(this._content.offsetHeight, availHeight - 50);
+    const width = Math.min(this._content.offsetWidth, availWidth - 50);
+    const height = Math.min(this._content.offsetHeight, availHeight - 50);
     this._content.style.width = width;
     this._content.style.left = (availWidth - width) / 2;
     this._content.style.top = (availHeight - height) / 2;

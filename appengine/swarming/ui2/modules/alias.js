@@ -13,7 +13,7 @@ export function applyAlias(value, key) {
   if (key === 'gpu') {
     // the longest gpu string looks like [pci id]-[driver version],
     // so we trim that off if needed.
-    let trimmed = value.split('-')[0];
+    const trimmed = value.split('-')[0];
     alias = aliasMap[key][trimmed];
   }
   if (!alias) {

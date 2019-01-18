@@ -35,20 +35,20 @@ const EMPTY_VAL = '--';
 export function appendPossibleColumns(possibleColumns, data) {
   // Use name as a sentinel value
   if (!possibleColumns['name']) {
-    for (let col of extraKeys) {
+    for (const col of extraKeys) {
       possibleColumns[col] = true;
     }
   }
   if (Array.isArray(data)) {
     // we have a list of dimensions, which are {key: String, value: Array}
-    for (let dim of data) {
+    for (const dim of data) {
       if (BLACKLIST_DIMENSIONS.indexOf(dim.key) === -1) {
         possibleColumns[dim.key + '-tag'] = true;
       }
     }
   } else {
     // data is a map of tag -> values
-    for (let tag in data) {
+    for (const tag in data) {
       possibleColumns[tag + '-tag'] = true;
     }
   }
@@ -74,10 +74,10 @@ export function appendPrimaryMap(primaryMap, data) {
   }
   if (Array.isArray(data)) {
     // we have a list of dimensions, which are {key: String, value: Array}
-    for (let dim of data) {
+    for (const dim of data) {
       if (BLACKLIST_DIMENSIONS.indexOf(dim.key) === -1) {
         let existing = primaryMap[dim.key + '-tag'];
-        for (let value of dim.value) {
+        for (const value of dim.value) {
           existing = _insertUnique(existing, value);
         }
         primaryMap[dim.key + '-tag'] = existing;
@@ -85,9 +85,9 @@ export function appendPrimaryMap(primaryMap, data) {
     }
   } else {
     // data is a map of tag -> values
-    for (let tag in data) {
+    for (const tag in data) {
       let existing = primaryMap[tag + '-tag'];
-        for (let value of data[tag]) {
+        for (const value of data[tag]) {
           existing = _insertUnique(existing, value);
         }
         primaryMap[tag + '-tag'] = existing;
@@ -112,7 +112,7 @@ export function column(col, task, ele) {
     console.warn('falsey task passed into column');
     return '';
   }
-  let c = colMap[col];
+  const c = colMap[col];
   if (c) {
     return c(task, ele);
   }
@@ -138,21 +138,21 @@ export function column(col, task, ele) {
  */
 export const specialFilters = {
   state: function(task, s) {
-    let state = task.state;
+    const state = task.state;
     if (s === state || s === 'ALL') {
       return true;
     }
     if (s === 'PENDING_RUNNING') {
       return state === 'PENDING' || state === 'RUNNING';
     }
-    let failure = task.failure;
+    const failure = task.failure;
     if (s === 'COMPLETED_SUCCESS') {
       return state === 'COMPLETED' && !failure;
     }
     if (s === 'COMPLETED_FAILURE') {
       return state === 'COMPLETED' && failure;
     }
-    let tryNum = task.try_number;
+    const tryNum = task.try_number;
     if (s === 'DEDUPED') {
       return state === 'COMPLETED' && tryNum === '0';
     }
@@ -167,19 +167,19 @@ export const specialFilters = {
  * @returns {Array<Object>} the tasks that match the filters.
 */
 export function filterTasks(filters, tasks) {
-  let parsedFilters = [];
+  const parsedFilters = [];
   // Preprocess the filters
-  for (let filterString of filters) {
-    let idx = filterString.indexOf(':');
-    let key = filterString.slice(0, idx);
-    let value = filterString.slice(idx + 1);
+  for (const filterString of filters) {
+    const idx = filterString.indexOf(':');
+    const key = filterString.slice(0, idx);
+    const value = filterString.slice(idx + 1);
     parsedFilters.push([key, value]);
   }
   // apply the filters in an AND way, that is, it must
   // match all the filters
   return tasks.filter((task) => {
     let matches = true;
-    for (let filter of parsedFilters) {
+    for (const filter of parsedFilters) {
       let [key, value] = filter;
       if (specialFilters[key]) {
         matches &= specialFilters[key](task, value);
@@ -216,11 +216,10 @@ function _insertUnique(arr, value) {
   if (!arr || !arr.length) {
     return [value];
   }
+  if (arr.indexOf(value) !== -1) {
+    return arr;
+  }
   for (let i = 0; i < arr.length; i++) {
-    // Do not add duplicates
-    if (value === arr[i]) {
-      return arr;
-    }
     // We have found where value should go in sorted order.
     if (value < arr[i]) {
       arr.splice(i, 0, value);
@@ -239,12 +238,12 @@ function _insertUnique(arr, value) {
  *          endTime, cursor.
  */
 export function listQueryParams(filters, extra) {
-  let params = {};
-  let tags = [];
-  for (let f of filters) {
-    let split = f.split(':', 1)
+  const params = {};
+  const tags = [];
+  for (const f of filters) {
+    const split = f.split(':', 1)
     let key = split[0];
-    let rest = f.substring(key.length + 1);
+    const rest = f.substring(key.length + 1);
     // we use the -tag as a UI thing to differentiate tags
     // from 'magic values' like name.
     key = stripTag(key);
@@ -282,15 +281,15 @@ export function processTasks(arr, existingTags) {
   if (!arr) {
     return [];
   }
-  let now = new Date();
+  const now = new Date();
 
-  for (let task of arr) {
-    let tagMap = {};
+  for (const task of arr) {
+    const tagMap = {};
     task.tags = task.tags || [];
-    for (let tag of task.tags) {
-      let split = tag.split(':', 1)
-      let key = split[0];
-      let rest = tag.substring(key.length + 1);
+    for (const tag of task.tags) {
+      const split = tag.split(':', 1)
+      const key = split[0];
+      const rest = tag.substring(key.length + 1);
       // tags are free-form, and could be duplicated
       if (!tagMap[key]) {
         tagMap[key] = [rest];
@@ -312,7 +311,7 @@ export function processTasks(arr, existingTags) {
       });
     }
 
-    for (let time of TASK_TIMES) {
+    for (const time of TASK_TIMES) {
       sanitizeAndHumanizeTime(task, time);
 
       // Running tasks have no duration set, so we can figure it out.
@@ -327,8 +326,8 @@ export function processTasks(arr, existingTags) {
 
       // Deduplicated tasks usually have tasks that ended before they were
       // created, so we need to account for that.
-      let et = task.started_ts || task.abandoned_ts || new Date();
-      let deduped = (task.created_ts && et < task.created_ts);
+      const et = task.started_ts || task.abandoned_ts || new Date();
+      const deduped = (task.created_ts && et < task.created_ts);
 
       task.pending_time = undefined;
       if (!deduped && task.created_ts) {
@@ -367,15 +366,15 @@ export function sortColumns(cols) {
  * @param {Array<String>} selectedCols - The currently selected columns.
  */
 export function sortPossibleColumns(columns, selectedCols) {
-  let selected = {};
-  for (let c of selectedCols) {
+  const selected = {};
+  for (const c of selectedCols) {
     selected[c] = true;
   }
 
   columns.sort((a, b) => {
       // Show selected columns above non selected columns
-      let selA = selected[a];
-      let selB = selected[b];
+      const selA = selected[a];
+      const selB = selected[b];
       if (selA && !selB) {
         return -1;
       }
@@ -405,7 +404,7 @@ export function stripTag(s) {
  *  of said task.
  */
 export function taskClass(task) {
-  let state = column('state', task);
+  const state = column('state', task);
    if (state === 'CANCELED' || state === 'TIMED_OUT' || state === 'EXPIRED' || state === 'NO_RESOURCE') {
       return 'exception';
     }
@@ -445,7 +444,7 @@ const extraKeys = ['name', 'state', 'costs_usd', 'deduped_from', 'duration', 'pe
 const colMap = {
   abandoned_ts: (task) => task.human_abandoned_ts,
   bot: (task) => {
-    let id = task.bot_id;
+    const id = task.bot_id;
     if (id) {
       return html`<a target=_blank
                    rel=noopener
@@ -472,12 +471,12 @@ const colMap = {
   },
   pending_time: (task) => task.human_pending_time,
   source_revision: (task) => {
-    let r = task.source_revision;
+    const r = task.source_revision;
     return r.substring(0, 8);
   },
   started_ts: (task) => task.human_started_ts,
   state: (task) => {
-    let state = task.state;
+    const state = task.state;
     if (state === 'COMPLETED') {
       if (task.failure) {
         return 'COMPLETED (FAILURE)';
@@ -517,8 +516,8 @@ function sortableTime(attr) {
   // '2016-08-16T13:12:40.606300' which sorts correctly.  Locale time
   // (used in the columns), does not.
   return (dir, a, b) => {
-    let aCol = a[attr] || '9999';
-    let bCol = b[attr] || '9999';
+    const aCol = a[attr] || '9999';
+    const bCol = b[attr] || '9999';
 
     return dir * (aCol - bCol);
   }
@@ -532,8 +531,8 @@ function sortableTime(attr) {
  */
 function sortableDuration(attr) {
   return (dir, a, b) => {
-    let aCol = a[attr] !== undefined ? a[attr] : 1e12;
-    let bCol = b[attr] !== undefined ? b[attr] : 1e12;
+    const aCol = a[attr] !== undefined ? a[attr] : 1e12;
+    const bCol = b[attr] !== undefined ? b[attr] : 1e12;
 
     return dir * (aCol - bCol);
   }

@@ -32,7 +32,7 @@ describe('swarming-index', function() {
   });
 
   // A reusable HTML element in which we create our element under test.
-  let container = document.createElement('div');
+  const container = document.createElement('div');
   document.body.appendChild(container);
 
   afterEach(function() {
@@ -63,7 +63,7 @@ describe('swarming-index', function() {
       ran = true; // prevent multiple runs if the test makes the
                   // app go busy (e.g. if it calls fetch).
     });
-    let login = ele.querySelector('oauth-login');
+    const login = ele.querySelector('oauth-login');
     login._logIn();
     fetchMock.flush();
   }
@@ -93,7 +93,7 @@ describe('swarming-index', function() {
     describe('when not logged in', function() {
       it('tells the user they should log in', function(done) {
         createElement((ele) => {
-          let serverVersion = ele.querySelector('swarming-app>main .server_version');
+          const serverVersion = ele.querySelector('swarming-app>main .server_version');
           expect(serverVersion).toBeTruthy();
           expect(serverVersion.innerText).toContain('must log in');
           done();
@@ -101,7 +101,7 @@ describe('swarming-index', function() {
       })
       it('does not display the bootstrapping section', function(done) {
         createElement((ele) => {
-          let sectionHeaders = ele.querySelectorAll('swarming-app>main h2');
+          const sectionHeaders = ele.querySelectorAll('swarming-app>main h2');
           expect(sectionHeaders).toBeTruthy();
           expect(sectionHeaders.length).toBe(2);
           done();
@@ -124,7 +124,7 @@ describe('swarming-index', function() {
       it('tells the user to try a different account', function(done){
         createElement((ele) => {
           userLogsIn(ele, () => {
-            let serverVersion = ele.querySelector('swarming-app>main .server_version');
+            const serverVersion = ele.querySelector('swarming-app>main .server_version');
             expect(serverVersion).toBeTruthy();
             expect(serverVersion.innerText).toContain('different account');
             done();
@@ -134,7 +134,7 @@ describe('swarming-index', function() {
       it('does not displays the bootstrapping section', function(done){
         createElement((ele) => {
           userLogsIn(ele, () => {
-            let sectionHeaders = ele.querySelectorAll('swarming-app>main h2');
+            const sectionHeaders = ele.querySelectorAll('swarming-app>main h2');
             expect(sectionHeaders).toBeTruthy();
             expect(sectionHeaders.length).toBe(2);
             done();
@@ -144,7 +144,7 @@ describe('swarming-index', function() {
       it('does not display the bootstrap token', function(done){
         createElement((ele) => {
           userLogsIn(ele, () => {
-            let commandBox = ele.querySelector('swarming-app>main .command');
+            const commandBox = ele.querySelector('swarming-app>main .command');
             expect(commandBox).toBeNull();
             done();
           });
@@ -156,7 +156,7 @@ describe('swarming-index', function() {
       it('displays the server version', function(done) {
         createElement((ele) => {
           userLogsIn(ele, () => {
-            let serverVersion = ele.querySelector('swarming-app>main .server_version');
+            const serverVersion = ele.querySelector('swarming-app>main .server_version');
             expect(serverVersion).toBeTruthy();
             expect(serverVersion.innerText).toContain('1234-abcdefg');
             done();
@@ -166,7 +166,7 @@ describe('swarming-index', function() {
       it('does not displays the bootstrapping section', function(done) {
         createElement((ele) => {
           userLogsIn(ele, () => {
-            let sectionHeaders = ele.querySelectorAll('swarming-app>main h2');
+            const sectionHeaders = ele.querySelectorAll('swarming-app>main h2');
             expect(sectionHeaders).toBeTruthy();
             expect(sectionHeaders.length).toBe(2);
             done();
@@ -176,7 +176,7 @@ describe('swarming-index', function() {
       it('does not display the bootstrap token', function(done) {
         createElement((ele) => {
           userLogsIn(ele, () => {
-            let commandBox = ele.querySelector('swarming-app>main .command');
+            const commandBox = ele.querySelector('swarming-app>main .command');
             expect(commandBox).toBeNull();
             done();
           });
@@ -190,7 +190,7 @@ describe('swarming-index', function() {
       it('displays the server version', function(done) {
         createElement((ele) => {
           userLogsIn(ele, () => {
-            let serverVersion = ele.querySelector('swarming-app>main .server_version');
+            const serverVersion = ele.querySelector('swarming-app>main .server_version');
             expect(serverVersion).toBeTruthy();
             expect(serverVersion.innerText).toContain('1234-abcdefg');
             done();
@@ -200,7 +200,7 @@ describe('swarming-index', function() {
       it('displays the bootstrapping section', function(done) {
         createElement((ele) => {
           userLogsIn(ele, () => {
-            let sectionHeaders = ele.querySelectorAll('swarming-app>main h2');
+            const sectionHeaders = ele.querySelectorAll('swarming-app>main h2');
             expect(sectionHeaders).toBeTruthy();
             expect(sectionHeaders.length).toBe(3);
             done();
@@ -211,7 +211,7 @@ describe('swarming-index', function() {
         createElement((ele) => {
           userLogsIn(ele, () => {
             // There are several of these, but we'll just check one of them.
-            let commandBox = ele.querySelector('swarming-app>main .command');
+            const commandBox = ele.querySelector('swarming-app>main .command');
             expect(commandBox).toBeTruthy();
             expect(commandBox.innerText).toContain('8675309');
             done();
@@ -242,7 +242,7 @@ describe('swarming-index', function() {
       createElement((ele) => {
         userLogsIn(ele, () => {
           // swarming-app makes some GETs and swarming-app_test.js tests that.
-          let calls = fetchMock.calls(MATCHED, 'POST');
+          const calls = fetchMock.calls(MATCHED, 'POST');
           expect(calls.length).toBe(0);
 
           expectNoUnmatchedCalls(fetchMock);
@@ -257,8 +257,8 @@ describe('swarming-index', function() {
         userLogsIn(ele, () => {
            // swarming-app makes the GETs and swarming-app_test.js tests that.
 
-          let calls = fetchMock.calls(MATCHED, 'POST');
-          let posts = calls.map((c) => c[0]);
+          const calls = fetchMock.calls(MATCHED, 'POST');
+          const posts = calls.map((c) => c[0]);
           expect(calls.length).toBe(1);
           expect(posts).toContain('/_ah/api/swarming/v1/server/token');
 

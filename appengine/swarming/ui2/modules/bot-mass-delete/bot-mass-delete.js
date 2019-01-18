@@ -100,7 +100,7 @@ window.customElements.define('bot-mass-delete', class extends HTMLElement {
     });
     queryParams += '&is_dead=TRUE';
 
-    let extra = {
+    const extra = {
       headers: {'authorization': this.auth_header},
     };
 
@@ -126,7 +126,7 @@ window.customElements.define('bot-mass-delete', class extends HTMLElement {
             // Now that we have the complete list of bots (e.g. no paging left)
             // delete the bots one at a time, updating this._progress to be the
             // number completed.
-            let post = {
+            const post = {
               headers: {'authorization': this.auth_header},
               method: 'POST',
             };
@@ -137,7 +137,7 @@ window.customElements.define('bot-mass-delete', class extends HTMLElement {
                 this.dispatchEvent(new CustomEvent('bots-deleting-finished', {bubbles: true}));
                 return;
               }
-              let toDelete = bots.pop();
+              const toDelete = bots.pop();
               fetch(`/_ah/api/swarming/v1/bot/${toDelete.bot_id}/delete`, post)
                 .then(() => {
                   this._progress++;
@@ -160,12 +160,12 @@ window.customElements.define('bot-mass-delete', class extends HTMLElement {
       console.warn('no auth_header recieved, try refreshing the page?');
       return;
     }
-    let extra = {
+    const extra = {
       headers: {'authorization': this.auth_header},
     };
-    let queryParams = query.fromObject({dimensions: this.dimensions});
+    const queryParams = query.fromObject({dimensions: this.dimensions});
 
-    let countPromise = fetch(`/_ah/api/swarming/v1/bots/count?${queryParams}`, extra)
+    const countPromise = fetch(`/_ah/api/swarming/v1/bots/count?${queryParams}`, extra)
       .then(jsonOrThrow)
       .then((json) => {
         this._readyToDelete = true;

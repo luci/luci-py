@@ -67,7 +67,7 @@ export function filterPossibleKeys(allKeys, keyMap, query) {
 export function filterPossibleValues(allValues, selectedKey, query) {
   // only look for first index, since value can have colons (e.g. gpu)
   query = query.trim();
-  let colonIdx = query.indexOf(':');
+  const colonIdx = query.indexOf(':');
   if (colonIdx !== -1) {
     query = query.substring(colonIdx+1);
   }
@@ -100,9 +100,9 @@ function matchPartCaseInsensitive(str, queries) {
   }
   queries = queries.trim().toLocaleLowerCase();
   str = str.toLocaleLowerCase();
-  let xq = queries.split(' ');
-  for (let query of xq) {
-    let idx = str.indexOf(query);
+  const xq = queries.split(' ');
+  for (const query of xq) {
+    const idx = str.indexOf(query);
     if (idx !== -1) {
       return true;
     }

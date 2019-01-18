@@ -191,8 +191,8 @@ export function getChildItemWithText(ele, value) {
   expect(ele).toBeTruthy();
 
   for (let i = 0; i < ele.children.length; i++) {
-    let child = ele.children[i];
-    let text = child.firstElementChild;
+    const child = ele.children[i];
+    const text = child.firstElementChild;
     if (text && text.textContent.trim() === value) {
       return child;
     }

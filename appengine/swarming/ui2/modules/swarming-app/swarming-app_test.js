@@ -31,7 +31,7 @@ describe('swarming-app', function() {
   });
 
   // A reusable HTML element in which we create our element under test.
-  let container = document.createElement('div');
+  const container = document.createElement('div');
   document.body.appendChild(container);
 
   afterEach(function() {
@@ -67,7 +67,7 @@ describe('swarming-app', function() {
       ran = true; // prevent multiple runs if the test makes the
                   // app go busy (e.g. if it calls fetch).
     });
-    let login = ele.querySelector('oauth-login');
+    const login = ele.querySelector('oauth-login');
     login._logIn();
     fetchMock.flush();
   }
@@ -78,15 +78,15 @@ describe('swarming-app', function() {
 
     it('injects login element and sidebar buttons', function(done) {
       createElement((ele) => {
-        let button = ele.querySelector('header button');
+        const button = ele.querySelector('header button');
         expect(button).toBeTruthy();
-        let spacer = ele.querySelector('header .grow');
+        const spacer = ele.querySelector('header .grow');
         expect(spacer).toBeTruthy();
-        let login = ele.querySelector('header oauth-login');
+        const login = ele.querySelector('header oauth-login');
         expect(login).toBeTruthy();
-        let spinner = ele.querySelector('header spinner-sk');
+        const spinner = ele.querySelector('header spinner-sk');
         expect(spinner).toBeTruthy();
-        let serverVersion = ele.querySelector('header .server-version');
+        const serverVersion = ele.querySelector('header .server-version');
         expect(serverVersion).toBeTruthy();
         done();
       });
@@ -102,13 +102,13 @@ describe('swarming-app', function() {
           <main></main>
           <footer></footer>
         </swarming-app>`;
-        let ele = container.firstElementChild;
+        const ele = container.firstElementChild;
         expect(ele).toBeTruthy();
-        let button = ele.querySelector('header button');
+        const button = ele.querySelector('header button');
         expect(button).toBeNull();
-        let spacer = ele.querySelector('header .grow');
+        const spacer = ele.querySelector('header .grow');
         expect(spacer).toBeNull();
-        let login = ele.querySelector('header oauth-login');
+        const login = ele.querySelector('header oauth-login');
         expect(login).toBeNull();
         done();
       });
@@ -118,9 +118,9 @@ describe('swarming-app', function() {
   describe('sidebar', function() {
     it('should toggle', function(done) {
       createElement((ele) => {
-        let button = ele.querySelector('header button');
+        const button = ele.querySelector('header button');
         expect(button).toBeTruthy();
-        let sidebar = ele.querySelector('header aside');
+        const sidebar = ele.querySelector('header aside');
         expect(sidebar).toBeTruthy();
 
         expect(sidebar.classList).not.toContain('shown');
@@ -136,9 +136,9 @@ describe('swarming-app', function() {
   describe('footer', function() {
     it('has general purpose elements', function(done) {
       createElement((ele) => {
-        let errorToast = ele.querySelector('footer error-toast-sk');
+        const errorToast = ele.querySelector('footer error-toast-sk');
         expect(errorToast).toBeTruthy();
-        let fab = ele.querySelector('footer .fab');
+        const fab = ele.querySelector('footer .fab');
         expect(fab).toBeTruthy();
 
         // fab should be in an anchor tab
@@ -165,7 +165,7 @@ describe('swarming-app', function() {
 
     it('keeps spinner active while busy', function(done) {
       createElement((ele) => {
-        let spinner = ele.querySelector('header spinner-sk');
+        const spinner = ele.querySelector('header spinner-sk');
         expect(spinner.active).toBeFalsy();
         ele.addBusyTasks(2);
         expect(spinner.active).toBeTruthy();
@@ -200,12 +200,12 @@ describe('swarming-app', function() {
         createElement((ele) => {
           ele.addEventListener('server-details-loaded', (e) => {
             e.stopPropagation();
-            let serverVersion = ele.querySelector('header .server-version');
+            const serverVersion = ele.querySelector('header .server-version');
             expect(serverVersion).toBeTruthy();
             expect(serverVersion.textContent).toContain('1234-abcdefg');
             done();
           });
-          let serverVersion = ele.querySelector('header .server-version');
+          const serverVersion = ele.querySelector('header .server-version');
           expect(serverVersion).toBeTruthy();
           expect(serverVersion.textContent).toContain('must log in');
           userLogsIn(ele, () => {});
@@ -219,7 +219,7 @@ describe('swarming-app', function() {
           fetchMock.flush().then(() => {
             // MATCHED calls are calls that we expect and specified in the
             // beforeEach at the top of this file.
-            let calls = fetchMock.calls(MATCHED, 'GET');
+            const calls = fetchMock.calls(MATCHED, 'GET');
             expect(calls.length).toBe(0);
 
             expectNoUnmatchedCalls(fetchMock);
@@ -231,12 +231,12 @@ describe('swarming-app', function() {
       it('makes authenticated calls when a user logs in', function(done) {
         createElement((ele) => {
           userLogsIn(ele, () => {
-            let calls = fetchMock.calls(MATCHED, 'GET');
+            const calls = fetchMock.calls(MATCHED, 'GET');
             expect(calls.length).toBe(2);
             // calls is an array of 2-length arrays with the first element
             // being the string of the url and the second element being
             // the options that were passed in
-            let gets = calls.map((c) => c[0]);
+            const gets = calls.map((c) => c[0]);
             expect(gets).toContain('/_ah/api/swarming/v1/server/details');
             expect(gets).toContain('/_ah/api/swarming/v1/server/permissions');
 

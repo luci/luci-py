@@ -13,7 +13,7 @@ describe('task-mass-cancel', function() {
   const { customMatchers, expectNoUnmatchedCalls, mockAppGETs } = require('modules/test_util');
   const { fetchMock, MATCHED, UNMATCHED } = require('fetch-mock');
   // A reusable HTML element in which we create our element under test.
-  let container = document.createElement('div');
+  const container = document.createElement('div');
   document.body.appendChild(container);
 
   beforeEach(function() {
@@ -58,7 +58,7 @@ describe('task-mass-cancel', function() {
 
   it('has a list of the passed in dimensions', function(done) {
     createElement((ele) => {
-      let tags = $('ul li', ele);
+      const tags = $('ul li', ele);
       expect(tags.length).toBe(2);
       expect(tags[0]).toMatchTextContent('os:Android');
       done();
@@ -72,7 +72,7 @@ describe('task-mass-cancel', function() {
       // is when we know the element has updated the _tasks.
       fetchMock.flush(true).then(() => {
         expectNoUnmatchedCalls(fetchMock);
-        let calls = fetchMock.calls(MATCHED, 'GET');
+        const calls = fetchMock.calls(MATCHED, 'GET');
         expect(calls.length).toBe(2);
         done();
       });
@@ -93,14 +93,14 @@ describe('task-mass-cancel', function() {
         expect(sawStartEvent).toBeTruthy();
         expectNoUnmatchedCalls(fetchMock);
 
-        let calls = fetchMock.calls(MATCHED, 'POST');
+        const calls = fetchMock.calls(MATCHED, 'POST');
         expect(calls.length).toBe(1, '1 to delete');
         done();
       });
 
       ele._readyToCancel = true;
       ele.render();
-      let button = $$('button.cancel', ele);
+      const button = $$('button.cancel', ele);
       button.click();
     });
   });

@@ -42,8 +42,8 @@ import { errorMessage } from 'elements-sk/errorMessage'
 
 // gapiLoaded is a promise that resolves when the 'gapi' JS library is
 // finished loading.
-let gapiLoaded = new Promise((resolve, reject) => {
-  let check = () => {
+const gapiLoaded = new Promise((resolve, reject) => {
+  const check = () => {
     if (window.gapi !== undefined) {
       resolve();
     } else {
@@ -83,8 +83,6 @@ window.customElements.define('oauth-login', class extends HTMLElement {
         email: 'missing@chromium.org',
         imageURL: 'http://storage.googleapis.com/gd-wagtail-prod-assets/original_images/logo_google_fonts_color_2x_web_64dp.png',
       };
-      // Stop the gapiLoaded promise
-      window.gapi = true;
     } else {
       this._profile = null;
       gapiLoaded.then(() => {
@@ -129,17 +127,17 @@ window.customElements.define('oauth-login', class extends HTMLElement {
   }
 
   _maybeFireLoginEvent() {
-    let user = gapi.auth2.getAuthInstance().currentUser.get();
+    const user = gapi.auth2.getAuthInstance().currentUser.get();
     if (user.isSignedIn()) {
-      let profile = user.getBasicProfile();
+      const profile = user.getBasicProfile();
       this._profile = {
         email: profile.getEmail(),
         imageURL: profile.getImageUrl()
       };
       // Need the true here to get an access_token on the response.
-      let auth = user.getAuthResponse(true);
+      const auth = user.getAuthResponse(true);
 
-      let header = `${auth.token_type} ${auth.access_token}`
+      const header = `${auth.token_type} ${auth.access_token}`
       this.dispatchEvent(new CustomEvent('log-in', {
         detail: {
           'auth_header': header,
@@ -166,7 +164,7 @@ window.customElements.define('oauth-login', class extends HTMLElement {
         }));
         this.render();
       } else {
-        let auth = gapi.auth2.getAuthInstance();
+        const auth = gapi.auth2.getAuthInstance();
         if (auth) {
           auth.signIn({
             scope: 'email',
@@ -188,7 +186,7 @@ window.customElements.define('oauth-login', class extends HTMLElement {
       // reload the page to clear any sensitive data being displayed.
       window.location.reload();
     } else {
-      let auth = gapi.auth2.getAuthInstance();
+      const auth = gapi.auth2.getAuthInstance();
       if (auth) {
         auth.signOut().then(() => {
           this._auth_header = '';

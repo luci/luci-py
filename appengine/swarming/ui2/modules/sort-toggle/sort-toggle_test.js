@@ -6,7 +6,7 @@ import 'modules/sort-toggle'
 
 describe('sort-toggle', function() {
   // A reusable HTML element in which we create our element under test.
-  let container = document.createElement('div');
+  const container = document.createElement('div');
   document.body.appendChild(container);
 
   afterEach(function() {

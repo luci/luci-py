@@ -6,7 +6,7 @@ import 'modules/oauth-login'
 
 describe('oauth-login', function() {
   // A reusable HTML element in which we create our element under test.
-  let container = document.createElement('div');
+  const container = document.createElement('div');
   document.body.appendChild(container);
 
   afterEach(function() {
@@ -75,7 +75,8 @@ describe('oauth-login', function() {
       window.gapi = {
         auth2: {
           init: jasmine.createSpy('init').and.returnValue(new Promise(()=>{})),
-        }
+        },
+        load: jasmine.createSpy('load').and.returnValue(new Promise(()=>{})),
       };
     });
 
@@ -92,7 +93,7 @@ describe('oauth-login', function() {
         // createSpyObj is a little different than createSpy in that it can make
         // multiple spies at once (the array) and packages them in an object
         // such that you can do something like mockAuthInstance.signIn()
-        let mockAuthInstance = jasmine.createSpyObj('authInstance', ['signIn']);
+        const mockAuthInstance = jasmine.createSpyObj('authInstance', ['signIn']);
 
         mockAuthInstance.signIn.and.callFake((obj) => {
           expect(obj.scope).toBe('email');
@@ -103,7 +104,8 @@ describe('oauth-login', function() {
         window.gapi = {
           auth2: {
             getAuthInstance: jasmine.createSpy('getAuthInstance').and.returnValue(mockAuthInstance),
-          }
+          },
+          load: jasmine.createSpy('load').and.returnValue(new Promise(()=>{})),
         };
 
         ele._logIn();
@@ -112,7 +114,7 @@ describe('oauth-login', function() {
 
     it('calls gapi.signOut on call to _logOut', function(done) {
       createElement((ele) => {
-        let mockAuthInstance = jasmine.createSpyObj('authInstance', ['signOut']);
+        const mockAuthInstance = jasmine.createSpyObj('authInstance', ['signOut']);
 
         mockAuthInstance.signOut.and.callFake(() => {
           done();
@@ -121,7 +123,8 @@ describe('oauth-login', function() {
         window.gapi = {
           auth2: {
             getAuthInstance: jasmine.createSpy('getAuthInstance').and.returnValue(mockAuthInstance),
-          }
+          },
+          load: jasmine.createSpy('load').and.returnValue(new Promise(()=>{})),
         };
 
         ele._logOut();

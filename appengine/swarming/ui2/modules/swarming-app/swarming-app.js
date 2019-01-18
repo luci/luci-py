@@ -198,9 +198,9 @@ window.customElements.define('swarming-app', class extends HTMLElement {
    * This function need only be called once, when the element is created.
    */
   _addHTML() {
-    let header = this.querySelector('header');
-    let sidebar = header && header.querySelector('aside');
-    let footer = this.querySelector('footer');
+    const header = this.querySelector('header');
+    const sidebar = header && header.querySelector('aside');
+    const footer = this.querySelector('footer');
     if (!(header && sidebar && sidebar.classList.contains('hideable'))) {
       return;
     }
@@ -215,13 +215,13 @@ window.customElements.define('swarming-app', class extends HTMLElement {
 
     // Add the spinner that will visually indicate the state of the
     // busy property.
-    let spinner = spinner_template.content.cloneNode(true);
+    const spinner = spinner_template.content.cloneNode(true);
     header.insertBefore(spinner, sidebar);
     // The real spinner is a child of the template, so we need to grab it
     // from the header after the template has been expanded.
     this._spinner = header.querySelector('spinner-sk');
 
-    let spacer = document.createElement('span');
+    const spacer = document.createElement('span');
     spacer.classList.add('grow');
     header.appendChild(spacer);
 
@@ -233,10 +233,10 @@ window.customElements.define('swarming-app', class extends HTMLElement {
     header.appendChild(this._dynamicEle);
 
     // Add things to the footer
-    let errorToast = document.createElement('error-toast-sk');
+    const errorToast = document.createElement('error-toast-sk');
     footer.append(errorToast);
 
-    let fab = fab_template.content.cloneNode(true);
+    const fab = fab_template.content.cloneNode(true);
     footer.append(fab);
   }
 
@@ -252,7 +252,7 @@ window.customElements.define('swarming-app', class extends HTMLElement {
       server_version: '<loading>',
       bot_version: '<loading>',
     };
-    let auth = {
+    const auth = {
       headers: {'authorization': this._auth_header}
     };
     this.addBusyTasks(2);
