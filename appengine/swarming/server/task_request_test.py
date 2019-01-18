@@ -1676,7 +1676,12 @@ class TaskRequestApiTest(TestCase):
           'insertErrors': [
             {
               'index': 0,
-              'errors': 'Oh gosh',
+              'errors': [
+                {
+                  'reason': 'sadness',
+                  'message': 'Oh gosh',
+                },
+              ],
             },
           ],
         }

@@ -83,13 +83,30 @@ def _send_to_bq(table_name, rows):
 
   failed_db_keys = []
   failed_bq_keys = []
-  for err in res.get('insertErrors', []):
-    db_key, bq_key, _row = rows[err['index']]
+  dropped = 0
+  # Use this error message string to detect the error where we're pushing data
+  # that is too old. This can occasionally happen as a cron job looks for old
+  # entity and by the time it's sending them BigQuery doesn't accept them, just
+  # skip these and log a warning.
+  out_of_time = (
+      'You can only stream to date range within 365 days in the past '
+      'and 183 days in the future relative to the current date')
+  # https://cloud.google.com/bigquery/docs/reference/rest/v2/tabledata/insertAll#response
+  for line in res.get('insertErrors', []):
+    db_key, bq_key, _row = rows[line['index']]
+    err = line['errors'][0]
+    if err['reason'] == 'invalid' and out_of_time in err['message']:
+      # Silently drop it. The rationale is that if it is not skipped, the loop
+      # will get stuck on it.
+      dropped += 1
+      continue
     if not failed_db_keys:
       # Log the error for the first entry, useful to diagnose schema failure.
-      logging.error('Failed to insert row %s: %r', db_key, err['errors'])
+      logging.error('Failed to insert row %s: %r', db_key, err)
     failed_db_keys.append(db_key)
     failed_bq_keys.append(bq_key)
+  if dropped:
+    logging.warning('%d old rows silently dropped')
   return failed_db_keys, failed_bq_keys
 
 
