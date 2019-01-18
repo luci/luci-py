@@ -47,7 +47,7 @@ describe('bot-list', function() {
   });
 
   // A reusable HTML element in which we create our element under test.
-  let container = document.createElement('div');
+  const container = document.createElement('div');
   document.body.appendChild(container);
 
   afterEach(function() {
@@ -87,7 +87,7 @@ describe('bot-list', function() {
         callback();
       }
     });
-    let login = $$('oauth-login', ele);
+    const login = $$('oauth-login', ele);
     login._logIn();
     fetchMock.flush();
   }
@@ -117,7 +117,7 @@ describe('bot-list', function() {
     describe('when not logged in', function() {
       it('tells the user they should log in', function(done) {
         createElement((ele) => {
-          let loginMessage = $$('swarming-app>main .message', ele);
+          const loginMessage = $$('swarming-app>main .message', ele);
           expect(loginMessage).toBeTruthy();
           expect(loginMessage.hidden).toBeFalsy('Message should not be hidden');
           expect(loginMessage.textContent).toContain('must sign in');
@@ -126,7 +126,7 @@ describe('bot-list', function() {
       })
       it('does not display filters or bots', function(done) {
         createElement((ele) => {
-          let botTable = $$('.bot-table', ele);
+          const botTable = $$('.bot-table', ele);
           expect(botTable).toBeTruthy();
           expect(botTable.hidden).toBeTruthy('.bot-table should be hidden');
           expect($$('main button:not([hidden])', ele)).toBeFalsy('no buttons seen');
@@ -154,7 +154,7 @@ describe('bot-list', function() {
 
       it('tells the user they should change accounts', function(done) {
         loggedInBotlist((ele) => {
-          let loginMessage = $$('swarming-app>main .message', ele);
+          const loginMessage = $$('swarming-app>main .message', ele);
           expect(loginMessage).toBeTruthy();
           expect(loginMessage.hidden).toBeFalsy('Message should not be hidden');
           expect(loginMessage.textContent).toContain('different account');
@@ -163,11 +163,11 @@ describe('bot-list', function() {
       });
       it('does not display filters or bots', function(done) {
         loggedInBotlist((ele) => {
-          let botTable = $$('.bot-table', ele);
+          const botTable = $$('.bot-table', ele);
           expect(botTable).toBeTruthy();
           expect(botTable.hidden).toBeTruthy('.bot-table should be hidden');
 
-          let filters = $$('.filters', ele);
+          const filters = $$('.filters', ele);
           expect(filters).toBeFalsy('.filters should not be shown');
           done();
         });
@@ -179,7 +179,7 @@ describe('bot-list', function() {
       describe('default landing page', function() {
         it('displays whatever bots show up', function(done) {
           loggedInBotlist((ele) => {
-            let botRows = $('.bot-table .bot-row', ele);
+            const botRows = $('.bot-table .bot-row', ele);
             expect(botRows).toBeTruthy();
             expect(botRows.length).toBe(10, '(num botRows)');
             done();
@@ -194,7 +194,7 @@ describe('bot-list', function() {
             ele._verbose = false;
             ele.render();
 
-            let colHeaders = $('.bot-table thead th', ele);
+            const colHeaders = $('.bot-table thead th', ele);
             expect(colHeaders).toBeTruthy();
             expect(colHeaders.length).toBe(4, '(num colHeaders)');
             expect(colHeaders[0].innerHTML).toContain('<more-vert-icon-sk');
@@ -203,15 +203,15 @@ describe('bot-list', function() {
             expect(colHeaders[2]).toMatchTextContent('OS');
             expect(colHeaders[3]).toMatchTextContent('Status');
 
-            let rows = $('.bot-table .bot-row', ele);
+            const rows = $('.bot-table .bot-row', ele);
             expect(rows).toBeTruthy();
             expect(rows.length).toBe(10, '10 rows');
 
-            let cells = $('.bot-table .bot-row td', ele);
+            const cells = $('.bot-table .bot-row td', ele);
             expect(cells).toBeTruthy();
             expect(cells.length).toBe(4 * 10, '4 columns * 10 rows');
             // little helper for readability
-            let cell = (r, c) => cells[4*r+c];
+            const cell = (r, c) => cells[4*r+c];
 
             // Check the content of the first few rows (after sorting)
             expect(rows[0]).not.toHaveClass('dead');
@@ -260,7 +260,7 @@ describe('bot-list', function() {
             ele._dir = 'asc';
             ele.render();
 
-            let sortToggles = $('.bot-table thead sort-toggle', ele);
+            const sortToggles = $('.bot-table thead sort-toggle', ele);
             expect(sortToggles).toBeTruthy();
             expect(sortToggles.length).toBe(4, '(num sort-toggles)');
 
@@ -289,10 +289,10 @@ describe('bot-list', function() {
 
         it('displays counts', function(done) {
           loggedInBotlist((ele) => {
-            let summaryTables = $('.summary table', ele);
+            const summaryTables = $('.summary table', ele);
             expect(summaryTables).toBeTruthy();
             expect(summaryTables.length).toBe(2, '(num summaryTables');
-            let [fleetTable, queryTable] = summaryTables;
+            const [fleetTable, queryTable] = summaryTables;
             // spot check some values
             let tds = $('tr:first-child td', fleetTable);
             expect(tds).toBeTruthy();
@@ -358,8 +358,8 @@ describe('bot-list', function() {
         ele._dir = 'asc';
         ele.render();
 
-        let actualOSOrder = ele._bots.map((b) => column('os', b, ele));
-        let actualIDOrder = ele._bots.map((b) => b.bot_id);
+        const actualOSOrder = ele._bots.map((b) => column('os', b, ele));
+        const actualIDOrder = ele._bots.map((b) => b.bot_id);
 
         expect(actualOSOrder).toEqual(['Android', 'Ubuntu-17.04', 'Ubuntu-17.04', 'Ubuntu-17.04',
           'Ubuntu-17.04', 'Ubuntu-17.04', 'Windows-10-16299.309', 'Windows-10-16299.309',
@@ -385,8 +385,8 @@ describe('bot-list', function() {
         ele._dir = 'desc';
         ele.render();
 
-        let actualOSOrder = ele._bots.map((b) => column('os', b, ele));
-        let actualIDOrder = ele._bots.map((b) => b.bot_id);
+        const actualOSOrder = ele._bots.map((b) => column('os', b, ele));
+        const actualIDOrder = ele._bots.map((b) => b.bot_id);
 
         expect(actualOSOrder).toEqual(['Windows-10-16299.431', 'Windows-10-16299.431',
           'Windows-10-16299.309', 'Windows-10-16299.309', 'Ubuntu-17.04', 'Ubuntu-17.04',
@@ -407,7 +407,7 @@ describe('bot-list', function() {
         ele._dir = 'asc';
         ele.render();
 
-        let actualIDOrder = ele._bots.map((b) => b.bot_id);
+        const actualIDOrder = ele._bots.map((b) => b.bot_id);
 
         expect(actualIDOrder).toEqual([
           'somebot12-a9', 'somebot13-a2', 'somebot17-a9', 'somebot16-a9', 'somebot10-a9',
@@ -422,14 +422,14 @@ describe('bot-list', function() {
         ele._showColSelector = true;
         ele.render();
 
-        let keySelector = $$('.col_selector', ele);
+        const keySelector = $$('.col_selector', ele);
         expect(keySelector).toBeTruthy();
 
         // click on first non checked checkbox.
         let keyToClick = null;
         let checkbox = null;
         for (let i = 0; i < keySelector.children.length; i++) {
-          let child = keySelector.children[i];
+          const child = keySelector.children[i];
           checkbox = $$('checkbox-sk', child);
           keyToClick = $$('.key', child);
           if (checkbox && !checkbox.checked) {
@@ -446,16 +446,16 @@ describe('bot-list', function() {
         let colHeaders = $('.bot-table thead th');
         expect(colHeaders).toBeTruthy();
         expect(colHeaders.length).toBe(5, '(num colHeaders)');
-        let expectedHeader = getColHeader(keyToClick);
+        const expectedHeader = getColHeader(keyToClick);
         expect(colHeaders.map((c) => c.textContent.trim())).toContain(expectedHeader);
 
         // We have to find the checkbox again because the order
         // shuffles to keep selected ones on top.
         checkbox = null;
         for (let i = 0; i < keySelector.children.length; i++) {
-          let child = keySelector.children[i];
+          const child = keySelector.children[i];
           checkbox = $$('checkbox-sk', child);
-          let key = $$('.key', child);
+          const key = $$('.key', child);
           if (key && key.textContent.trim() === keyToClick) {
             break;
           }
@@ -482,7 +482,7 @@ describe('bot-list', function() {
 
         let showMore = $$('.fleet_header.shower expand-more-icon-sk', ele);
         expect(showMore).toBeTruthy();
-        let counts = $$('#fleet_counts').parentElement;
+        const counts = $$('#fleet_counts').parentElement;
         expect(counts).toHaveAttribute('hidden');
 
         showMore.click();
@@ -508,12 +508,12 @@ describe('bot-list', function() {
         ele._cols = ['status', 'os', 'id', 'xcode_version', 'task', 'android_devices'];
         ele.render();
 
-        let expectedOrder = ['id', 'task', 'android_devices', 'os', 'status', 'xcode_version'];
+        const expectedOrder = ['id', 'task', 'android_devices', 'os', 'status', 'xcode_version'];
         expect(ele._cols).toEqual(expectedOrder);
 
-        let expectedHeaders = ['Bot Id', 'Current Task', 'Android Devices', 'OS',
+        const expectedHeaders = ['Bot Id', 'Current Task', 'Android Devices', 'OS',
                                'Status', 'XCode Version'];
-        let colHeaders = $('.bot-table thead th');
+        const colHeaders = $('.bot-table thead th');
         expect(colHeaders.map((c) => c.textContent.trim())).toEqual(expectedHeaders);
         done();
       });
@@ -525,15 +525,15 @@ describe('bot-list', function() {
         ele._showColSelector = true;
         ele.render();
 
-        let row = getChildItemWithText($$('.col_selector'), 'id', ele);
-        let checkbox = $$('checkbox-sk', row);
+        const row = getChildItemWithText($$('.col_selector'), 'id', ele);
+        const checkbox = $$('checkbox-sk', row);
         expect(checkbox.checked).toBeTruthy();
         checkbox.click(); // click is synchronous, it returns after
                           // the clickHandler is run.
         // Check underlying data
         expect(ele._cols).toContain('id');
         // check there are still headers.
-        let colHeaders = $('.bot-table thead th');
+        const colHeaders = $('.bot-table thead th');
         expect(colHeaders).toBeTruthy();
         expect(colHeaders.length).toBe(4, '(num colHeaders)');
         done();
@@ -584,9 +584,9 @@ describe('bot-list', function() {
         ele._showColSelector = true;
         ele._refilterPossibleColumns(); // also calls render
 
-        let keySelector = $$('.col_selector');
+        const keySelector = $$('.col_selector');
         expect(keySelector).toBeTruthy();
-        let keys = childrenAsArray(keySelector).map((c) => c.textContent.trim());
+        const keys = childrenAsArray(keySelector).map((c) => c.textContent.trim());
 
         // Skip the first child, which is the input box
         expect(keys.slice(1, 7)).toEqual(['id', 'task', 'os', 'status',
@@ -603,15 +603,15 @@ describe('bot-list', function() {
         ele._filters = [];  // no filters
         ele.render();
 
-        let valueRow = getChildItemWithText($$('.selector.values'), 'Android', ele);
-        let addIcon = $$('add-circle-icon-sk', valueRow);
+        const valueRow = getChildItemWithText($$('.selector.values'), 'Android', ele);
+        const addIcon = $$('add-circle-icon-sk', valueRow);
         expect(addIcon).toBeTruthy('there should be an icon for adding');
         addIcon.click();
 
         expect(ele._filters.length).toBe(1, 'a filter should be added');
         expect(ele._filters[0]).toEqual('os:Android');
 
-        let chipContainer = $$('.chip_container', ele);
+        const chipContainer = $$('.chip_container', ele);
         expect(chipContainer).toBeTruthy('there should be a filter chip container');
         expect(chipContainer.children.length).toBe(1);
         expect(addIcon.hasAttribute('hidden'))
@@ -627,15 +627,15 @@ describe('bot-list', function() {
         ele._filters = ['device_type:bullhead', 'os:Android'];
         ele.render();
 
-        let filterChip = getChildItemWithText($$('.chip_container'), 'os:Android', ele);
-        let icon = $$('cancel-icon-sk', filterChip);
+        const filterChip = getChildItemWithText($$('.chip_container'), 'os:Android', ele);
+        const icon = $$('cancel-icon-sk', filterChip);
         expect(icon).toBeTruthy('there should be a icon to remove it');
         icon.click();
 
         expect(ele._filters.length).toBe(1, 'a filter should be removed');
         expect(ele._filters[0]).toEqual('device_type:bullhead', 'os:Android should be removed');
 
-        let chipContainer = $$('.chip_container', ele);
+        const chipContainer = $$('.chip_container', ele);
         expect(chipContainer).toBeTruthy('there should be a filter chip container');
         expect(chipContainer.children.length).toBe(1);
         done();
@@ -701,7 +701,7 @@ describe('bot-list', function() {
         ele._filters = [];
         ele.render();
 
-        let filterInput = $$('#filter_search', ele);
+        const filterInput = $$('#filter_search', ele);
         filterInput.value = 'invalid filter';
         ele._filterSearch({key: 'Enter'});
         expect(ele._filters).toEqual([]);
@@ -739,7 +739,7 @@ describe('bot-list', function() {
         ele._filters = [];
         ele.render();
 
-        let filterInput = $$('#filter_search', ele);
+        const filterInput = $$('#filter_search', ele);
         filterInput.value = 'dev';
         ele._refilterPrimaryKeys();
 
@@ -760,14 +760,14 @@ describe('bot-list', function() {
         ele._filters = [];
         ele.render();
 
-        let filterInput = $$('#filter_search', ele);
+        const filterInput = $$('#filter_search', ele);
         filterInput.value = 'cores:2';
         ele._refilterPrimaryKeys();
 
         // Auto selects the first one
         expect(ele._primaryKey).toEqual('cores');
 
-        let children = $$('.selector.keys', ele).children;
+        const children = $$('.selector.keys', ele).children;
         expect(children.length).toEqual(1, 'only cores should show up');
         expect(children[0].textContent).toContain('cores');
 
@@ -786,11 +786,11 @@ describe('bot-list', function() {
         ele._showColSelector = true;
         ele.render();
 
-        let columnInput = $$('#column_search', ele);
+        const columnInput = $$('#column_search', ele);
         columnInput.value = 'batt';
         ele._refilterPossibleColumns();
 
-        let colSelector = $$('.col_selector', ele);
+        const colSelector = $$('.col_selector', ele);
         expect(colSelector).toBeTruthy();
         expect(colSelector.children.length).toEqual(6); // 5 hits + the input box
 
@@ -810,15 +810,15 @@ describe('bot-list', function() {
         ele._dir = 'desc';
         ele.render();
 
-        let rows = $('.bot-table .bot-row', ele);
+        const rows = $('.bot-table .bot-row', ele);
         expect(rows).toBeTruthy();
         expect(rows.length).toBe(10, '10 rows');
 
-        let cols = $('.bot-table .bot-row td', ele);
+        const cols = $('.bot-table .bot-row td', ele);
         expect(cols).toBeTruthy();
         expect(cols.length).toBe(4 * 10, '4 columns * 10 rows');
         // little helper for readability
-        let cell = (r, c) => cols[4*r+c];
+        const cell = (r, c) => cols[4*r+c];
 
         // Check the content of the first few rows (after sorting)
         expect(cell(0, 0)).toMatchTextContent('somebot18-a9');
@@ -842,15 +842,15 @@ describe('bot-list', function() {
         ele._dir = 'asc';
         ele.render();
 
-        let rows = $('.bot-table .bot-row', ele);
+        const rows = $('.bot-table .bot-row', ele);
         expect(rows).toBeTruthy();
         expect(rows.length).toBe(10, '10 rows');
 
-        let cols = $('.bot-table .bot-row td', ele);
+        const cols = $('.bot-table .bot-row td', ele);
         expect(cols).toBeTruthy();
         expect(cols.length).toBe(3 * 10, '3 columns * 10 rows');
         // little helper for readability
-        let cell = (r, c) => cols[3*r+c];
+        const cell = (r, c) => cols[3*r+c];
 
         // Check the content of the first few rows (after sorting)
         expect(cell(0, 0)).toMatchTextContent('somebot11-a9');
@@ -869,14 +869,14 @@ describe('bot-list', function() {
         ele._primaryKey = 'gpu';
         ele.render();
 
-        let values = $$('.values.selector', ele);
+        const values = $$('.values.selector', ele);
         expect(values).toBeTruthy();
         // spot check
         expect(values.children[0]).toMatchTextContent('NVIDIA (10de)');
         expect(values.children[8]).toMatchTextContent('Matrox MGA G200e (102b:0522)');
 
         // Don't use UNKNOWN for aliasing
-        for (let c of values.children) {
+        for (const c of values.children) {
           expect(c.textContent).not.toContain('UNKNOWN');
         }
         done();
@@ -969,7 +969,7 @@ describe('bot-list', function() {
 
     it('inflates the state', function() {
       // Make a copy of the object because _processBots will modify it in place.
-      let bots = processBots([deepCopy(LINUX_BOT)]);
+      const bots = processBots([deepCopy(LINUX_BOT)]);
       expect(bots).toBeTruthy();
       expect(bots.length).toBe(1);
       expect(typeof bots[0].state).toBe('object');
@@ -977,8 +977,8 @@ describe('bot-list', function() {
 
     it('makes a disk cache using the free space of disks', function() {
       // Make a copy of the object because _processBots will modify it in place.
-      let bots = processBots([deepCopy(LINUX_BOT)]);
-      let disks = bots[0].disks;
+      const bots = processBots([deepCopy(LINUX_BOT)]);
+      const disks = bots[0].disks;
       expect(disks).toBeTruthy();
       expect(disks.length).toBe(2, 'Two disks');
       expect(disks[0]).toEqual({id: '/', mb: 680751.3}, 'biggest disk first');
@@ -987,8 +987,8 @@ describe('bot-list', function() {
 
     it('aggregates the temperatures of the host bot', function() {
       // Make a copy of the object because _processBots will modify it in place.
-      let bots = processBots([deepCopy(LINUX_BOT)]);
-      let temp = bots[0].state.temp;
+      const bots = processBots([deepCopy(LINUX_BOT)]);
+      const temp = bots[0].state.temp;
       expect(temp).toBeTruthy();
       expect(temp.average).toBe('34.8', 'rounds to one decimal place');
       expect(temp.zones).toBe('thermal_zone0: 34.5 | thermal_zone1: 35', 'joins with |');
@@ -996,16 +996,16 @@ describe('bot-list', function() {
 
     it('turns the dates into DateObjects', function() {
       // Make a copy of the object because _processBots will modify it in place.
-      let bots = processBots([deepCopy(LINUX_BOT)]);
-      let ts = bots[0].first_seen_ts
+      const bots = processBots([deepCopy(LINUX_BOT)]);
+      const ts = bots[0].first_seen_ts
       expect(ts).toBeTruthy();
       expect(ts instanceof Date).toBeTruthy('Should be a date object');
     });
 
     it('turns the device map into a list', function() {
       // Make a copy of the object because _processBots will modify it in place.
-      let bots = processBots([deepCopy(MULTI_ANDROID_BOT)]);
-      let devices = bots[0].state.devices;
+      const bots = processBots([deepCopy(MULTI_ANDROID_BOT)]);
+      const devices = bots[0].state.devices;
       expect(devices).toBeTruthy();
       expect(devices.length).toBe(3, '3 devices attached to this bot');
 
@@ -1027,7 +1027,7 @@ describe('bot-list', function() {
 
     it('turns the dimension map into a list', function() {
       // makePossibleColumns may modify the passed in variable.
-      let possibleCols = makePossibleColumns(deepCopy(fleetDimensions.bots_dimensions));
+      const possibleCols = makePossibleColumns(deepCopy(fleetDimensions.bots_dimensions));
 
       expect(possibleCols).toBeTruthy();
       expect(possibleCols.length).toBe(34);
@@ -1042,12 +1042,12 @@ describe('bot-list', function() {
 
     it('gracefully handles null data', function() {
       // makePossibleColumns may modify the passed in variable.
-      let possibleCols = makePossibleColumns(null);
+      const possibleCols = makePossibleColumns(null);
 
       expect(possibleCols).toBeTruthy();
       expect(possibleCols.length).toBe(0);
 
-      let bots = processBots(null);
+      const bots = processBots(null);
 
       expect(bots).toBeTruthy();
       expect(bots.length).toBe(0);
@@ -1055,14 +1055,14 @@ describe('bot-list', function() {
 
     it('extracts the key->value map', function() {
       // makePossibleColumns may modify the passed in variable.
-      let pMap = processPrimaryMap(deepCopy(fleetDimensions.bots_dimensions));
+      const pMap = processPrimaryMap(deepCopy(fleetDimensions.bots_dimensions));
 
       expect(pMap).toBeTruthy();
       // Note this list doesn't include the blacklisted keys.
-      let expectedKeys = ['android_devices', 'cores', 'cpu', 'device', 'device_os',
+      const expectedKeys = ['android_devices', 'cores', 'cpu', 'device', 'device_os',
           'device_type', 'gpu', 'hidpi', 'machine_type', 'os', 'pool',
           'xcode_version', 'zone', 'id', 'task', 'status', 'is_mp_bot'];
-      let actualKeys = Object.keys(pMap);
+      const actualKeys = Object.keys(pMap);
       actualKeys.sort();
       expectedKeys.sort();
       expect(expectedKeys).toEqual(actualKeys);
@@ -1087,7 +1087,7 @@ describe('bot-list', function() {
     });
 
     it('filters bots based on special keys', function() {
-      let bots = processBots(deepCopy(bots_10.items));
+      const bots = processBots(deepCopy(bots_10.items));
 
       expect(bots).toBeTruthy();
       expect(bots.length).toBe(10);
@@ -1103,21 +1103,21 @@ describe('bot-list', function() {
       filtered = filterBots(['task:busy'], bots);
       expect(filtered.length).toBe(4);
       const expectedIds = ['somebot12-a9', 'somebot16-a9', 'somebot17-a9', 'somebot77-a3'];
-      let actualIds = filtered.map((bot) => bot.bot_id);
+      const actualIds = filtered.map((bot) => bot.bot_id);
       actualIds.sort();
       expect(actualIds).toEqual(expectedIds);
     });
 
     it('filters bots based on dimensions', function() {
-      let bots = processBots(deepCopy(bots_10.items));
+      const bots = processBots(deepCopy(bots_10.items));
 
       expect(bots).toBeTruthy();
       expect(bots.length).toBe(10);
 
-      let filtered = filterBots(['os:Ubuntu-17.04', 'gpu:10de:1cb3'], bots);
+      const filtered = filterBots(['os:Ubuntu-17.04', 'gpu:10de:1cb3'], bots);
       expect(filtered.length).toBe(5);
       const expectedIds = ['somebot10-a9', 'somebot13-a2', 'somebot13-a9', 'somebot15-a9', 'somebot77-a3'];
-      let actualIds = filtered.map((bot) => bot.bot_id);
+      const actualIds = filtered.map((bot) => bot.bot_id);
       actualIds.sort();
       expect(actualIds).toEqual(expectedIds);
     });
@@ -1125,7 +1125,7 @@ describe('bot-list', function() {
     it('correctly makes query params from filters', function() {
       // We know query.fromObject is used and it puts the query params in
       // a deterministic, sorted order. This means we can compare
-      let expectations = [
+      const expectations = [
         { // basic 'alive'
           'limit': 256,
           'filters': ['pool:Skia','os:Android', 'status:alive'],
@@ -1160,13 +1160,13 @@ describe('bot-list', function() {
         }
       ];
 
-      for (let testcase of expectations) {
-        let qp = listQueryParams(testcase.filters, testcase.limit);
+      for (const testcase of expectations) {
+        const qp = listQueryParams(testcase.filters, testcase.limit);
         expect(qp).toEqual(testcase.output);
       }
 
-      let testcase = expectations[0];
-      let qp = listQueryParams(testcase.filters, testcase.limit, 'mock_cursor12345');
+      const testcase = expectations[0];
+      const qp = listQueryParams(testcase.filters, testcase.limit, 'mock_cursor12345');
       expect(qp).toEqual('cursor=mock_cursor12345&'+testcase.output);
 
     });

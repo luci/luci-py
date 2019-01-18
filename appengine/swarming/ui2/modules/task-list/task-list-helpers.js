@@ -195,6 +195,13 @@ export function filterTasks(filters, tasks) {
   return tasks;
 }
 
+/** floorSecond rounds the timestamp down to the second (i.e. removes milliseconds).
+ *  @param {Number} ts - a milliseconds since epoch value, e.g. Date.now()
+ */
+export function floorSecond(ts) {
+  return Math.round(ts / 1000) * 1000;
+}
+
 /** getColHeader returns the human-readable header for a given column.
  */
 export function getColHeader(col) {

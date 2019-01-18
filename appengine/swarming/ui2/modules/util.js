@@ -14,11 +14,42 @@ import * as human from 'common-sk/modules/human'
 import * as query from 'common-sk/modules/query'
 import { upgradeProperty } from 'elements-sk/upgradeProperty'
 
+/** botPageLink creates a URL to a given bot */
 export function botPageLink(bot_id) {
   if (!bot_id) {
     return undefined;
   }
   return '/bot?id=' + bot_id;
+}
+
+/** Create a link to a bot list with the preloaded filters and columns.
+ *
+ * @param {Array<Object|String>} filters - If Array<Object>, Object
+ *     should be {key:String, value:String} or
+ *     {key:String, value:Array<String>}. If Array<String>, the Strings
+ *     should be valid filters (e.g. 'foo:bar').
+ * @param {Array<String>} columns - the column names that should be shown.
+ */
+export function botListLink(filters=[], columns=[]) {
+  let fArr = [];
+  for (const f of filters) {
+    if (f.key && f.value) {
+      if (Array.isArray(f.value)) {
+        for (const v of f.value) {
+          fArr.push(f.key + ':' + v);
+        }
+      } else {
+        fArr.push(f.key + ':' + f.value);
+      }
+    } else {
+      fArr.push(f);
+    }
+  };
+  let obj = {
+    f: fArr,
+    c: columns,
+  }
+  return '/botlist?' + query.fromParamSet(obj);
 }
 
 /** compareWithFixedOrder returns the sort order of 2 strings. It puts

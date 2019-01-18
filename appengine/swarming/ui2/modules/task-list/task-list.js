@@ -40,13 +40,18 @@ import '../task-mass-cancel'
 import flatpickr from 'flatpickr'
 import 'flatpickr/dist/flatpickr.css'
 
+// query.fromObject is more readable than just 'fromObject'
+import * as query from 'common-sk/modules/query'
+
 import { applyAlias } from '../alias'
-import { appendPossibleColumns, appendPrimaryMap, column, filterTasks, getColHeader,
+import { appendPossibleColumns, appendPrimaryMap, column, filterTasks, floorSecond, getColHeader,
          listQueryParams, processTasks, sortColumns, sortPossibleColumns, specialSortMap,
          stripTag, taskClass } from './task-list-helpers'
+import { botListLink } from '../util'
 import { filterPossibleColumns, filterPossibleKeys,
          filterPossibleValues, makeFilter } from '../queryfilter'
 import { moreOrLess } from '../templates'
+
 import SwarmingAppBoilerplate from '../SwarmingAppBoilerplate'
 
 
@@ -187,7 +192,7 @@ const options = (ele) => html`
 
 const summaryQueryRow = (ele, count) => html`
 <tr>
-  <td><a href=${ifDefined(ele._makeSummaryURL(count, true))}>${count.label}</a>:</td>
+  <td><a href=${ifDefined(ele._makeSummaryURL(count.filter))}>${count.label}</a>:</td>
   <td>${count.value}</td>
 </tr>`;
 
@@ -344,7 +349,7 @@ window.customElements.define('task-list', class extends SwarmingAppBoilerplate {
         this._endTime = newState.et;
       }
       // default to 24 hours ago
-      this._startTime = newState.st || Date.now() - 24*60*60*1000;
+      this._startTime = newState.st || floorSecond(Date.now() - 24*60*60*1000);
       this._sort = newState.s || 'created_ts';
       this._verbose = newState.v;         // default to false
       this._fetch();
@@ -358,17 +363,17 @@ window.customElements.define('task-list', class extends SwarmingAppBoilerplate {
     this._primaryMap = {};
 
     this._queryCounts = [
-      {label: 'Total', value: '...'},
-      {label: 'Success', value: '...'},
-      {label: 'Failure', value: '...'},
-      {label: 'Pending', value: '...'},
-      {label: 'Running', value: '...'},
-      {label: 'Timed Out', value: '...'},
-      {label: 'Bot Died', value: '...'},
-      {label: 'Deduplicated', value: '...'},
-      {label: 'Expired', value: '...'},
-      {label: 'No Resource', value: '...'},
-      {label: 'Canceled', value: '...'},
+      {label: 'Total',        value: '...'},
+      {label: 'Success',      value: '...', filter: 'COMPLETED_SUCCESS'},
+      {label: 'Failure',      value: '...', filter: 'COMPLETED_FAILURE'},
+      {label: 'Pending',      value: '...', filter: 'PENDING'},
+      {label: 'Running',      value: '...', filter: 'RUNNING'},
+      {label: 'Timed Out',    value: '...', filter: 'TIMED_OUT'},
+      {label: 'Bot Died',     value: '...', filter: 'BOT_DIED'},
+      {label: 'Deduplicated', value: '...', filter: 'DEDUPED'},
+      {label: 'Expired',      value: '...', filter: 'EXPIRED'},
+      {label: 'No Resource',  value: '...', filter: 'NO_RESOURCE'},
+      {label: 'Canceled',     value: '...', filter: 'CANCELED'},
     ];
 
     this._message = 'You must sign in to see anything useful.';
@@ -376,6 +381,7 @@ window.customElements.define('task-list', class extends SwarmingAppBoilerplate {
     this._columnQuery = ''; // tracks what's typed into the input to search columns
     this._filterQuery = ''; // tracks what's typed into the input to search filters
     this._fetchController = null;
+    this._knownDimensions = [];
   }
 
   connectedCallback() {
@@ -480,8 +486,8 @@ window.customElements.define('task-list', class extends SwarmingAppBoilerplate {
     this.app.addBusyTasks(1);
     let queryParams = listQueryParams(this._filters, {
       limit: this._limit,
-      start: this._startTime,
-      end: this._now ? Date.now() : this._endTime,
+      start: floorSecond(this._startTime),
+      end: floorSecond(this._now ? Date.now() : this._endTime),
     });
     fetch(`/_ah/api/swarming/v1/tasks/list?${queryParams}`, extra)
       .then(jsonOrThrow)
@@ -502,8 +508,8 @@ window.customElements.define('task-list', class extends SwarmingAppBoilerplate {
             queryParams = listQueryParams(this._filters, {
               cursor: json.cursor,
               limit: this._limit,
-              start: this._startTime,
-              end: this._now ? Date.now() : this._endTime,
+              start: floorSecond(this._startTime),
+              end: floorSecond(this._now ? Date.now() : this._endTime),
             });
             fetch(`/_ah/api/swarming/v1/tasks/list?${queryParams}`, extra)
               .then(jsonOrThrow)
@@ -535,6 +541,7 @@ window.customElements.define('task-list', class extends SwarmingAppBoilerplate {
       .then((json) => {
         appendPossibleColumns(this._possibleColumns, json.bots_dimensions);
         appendPrimaryMap(this._primaryMap, json.bots_dimensions);
+        this._knownDimensions = json.bots_dimensions.map((d) => d.key);
         this._rebuildFilterables();
 
         this.render();
@@ -559,8 +566,9 @@ window.customElements.define('task-list', class extends SwarmingAppBoilerplate {
       .catch((e) => this.fetchError(e, 'count/total'))
     this._queryCounts[0].value = html`${until(totalPromise, '...')}`;
 
+    let stateRemoved = queryParams.replace(/state=.+?&/g, '');
     for (let i = 0; i < states.length; i++) {
-      let promise = fetch(`/_ah/api/swarming/v1/tasks/count?${queryParams}&state=${states[i]}`, extra)
+      let promise = fetch(`/_ah/api/swarming/v1/tasks/count?${stateRemoved}&state=${states[i]}`, extra)
         .then(jsonOrThrow)
         .then((json) => {
           this.app.finishedTask();
@@ -649,13 +657,48 @@ window.customElements.define('task-list', class extends SwarmingAppBoilerplate {
     return idx < 8;
   }
 
-  _makeSummaryURL() {
-    // TODO(kjlubick)
-    return undefined;
+  _makeSummaryURL(state) {
+    if (!state) {
+      return undefined;
+    }
+    // strip out any conflicting state filters.
+    let withNewState = this._filters.filter((f) => {
+      return !f.startsWith('state');
+    });
+    withNewState.push(`state:${state}`);
+    let queryParams = query.fromObject({
+          // provide empty values
+          'c' : this._cols,
+          'd' : this._dir,
+          'et': this._endTime,
+          'f' : withNewState,
+          'k' : this._primaryKey,
+          'n' : this._now,
+          's' : this._sort,
+          'st': this._startTime,
+          'at': this._allStates,
+          'v': this._verbose,
+        });
+    return `/tasklist?${queryParams}`;
   }
 
   _matchingBotsLink() {
-    return 'example.com/botlist';
+    let cols = ['id', 'os', 'task', 'status'];
+
+    let dimensions = this._filters.map((f) => {
+      return f.replace('-tag', '');
+    }).filter((f) => {
+      let tag = f.split(':')[0];
+      return tag !== 'state' && this._knownDimensions.indexOf(tag) !== -1;
+    });
+
+    for (let dim of dimensions) {
+      let col = dim.split(':', 1)[0];
+      if (cols.indexOf(col) === -1) {
+        cols.push(col);
+      }
+    }
+    return botListLink(dimensions, cols);
   }
 
   _primaryKeyChanged(e) {

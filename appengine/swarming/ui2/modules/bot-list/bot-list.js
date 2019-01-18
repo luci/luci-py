@@ -37,7 +37,7 @@ import '../dialog-pop-over'
 import '../sort-toggle'
 import '../swarming-app'
 
-import { taskListLink } from '../util'
+
 import { applyAlias } from '../alias'
 import { aggregateTemps, attribute, botLink, column, devices,
          filterBots,  fromDimension, fromState, getColHeader, initCounts,
@@ -47,6 +47,8 @@ import { aggregateTemps, attribute, botLink, column, devices,
 import { filterPossibleColumns, filterPossibleKeys,
          filterPossibleValues, makeFilter } from '../queryfilter'
 import { moreOrLess } from '../templates'
+import { taskListLink } from '../util'
+
 import SwarmingAppBoilerplate from '../SwarmingAppBoilerplate'
 
 const colHead = (col, ele) => html`

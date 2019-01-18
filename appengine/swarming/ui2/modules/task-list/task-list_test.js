@@ -46,7 +46,7 @@ describe('task-list', function() {
   });
 
   // A reusable HTML element in which we create our element under test.
-  let container = document.createElement('div');
+  const container = document.createElement('div');
   document.body.appendChild(container);
 
   afterEach(function() {
@@ -86,7 +86,7 @@ describe('task-list', function() {
         callback();
       }
     });
-    let login = $$('oauth-login', ele);
+    const login = $$('oauth-login', ele);
     login._logIn();
     fetchMock.flush();
   }
@@ -114,7 +114,7 @@ describe('task-list', function() {
     describe('when not logged in', function() {
       it('tells the user they should log in', function(done) {
         createElement((ele) => {
-          let loginMessage = $$('swarming-app>main .message', ele);
+          const loginMessage = $$('swarming-app>main .message', ele);
           expect(loginMessage).toBeTruthy();
           expect(loginMessage.hidden).toBeFalsy('Message should not be hidden');
           expect(loginMessage.textContent).toContain('must sign in');
@@ -123,7 +123,7 @@ describe('task-list', function() {
       })
       it('does not display filters or tasks', function(done) {
         createElement((ele) => {
-          let taskTable = $$('.task-table', ele);
+          const taskTable = $$('.task-table', ele);
           expect(taskTable).toBeTruthy();
           expect(taskTable.hidden).toBeTruthy('.task-table should be hidden');
           expect($$('.header', ele).hidden).toBeTruthy('no filters seen');
@@ -152,7 +152,7 @@ describe('task-list', function() {
 
       it('tells the user they should change accounts', function(done) {
         loggedInTasklist((ele) => {
-          let loginMessage = $$('swarming-app>main .message', ele);
+          const loginMessage = $$('swarming-app>main .message', ele);
           expect(loginMessage).toBeTruthy();
           expect(loginMessage.hidden).toBeFalsy('Message should not be hidden');
           expect(loginMessage.textContent).toContain('different account');
@@ -161,7 +161,7 @@ describe('task-list', function() {
       });
       it('does not display filters or tasks', function(done) {
         loggedInTasklist((ele) => {
-          let taskTable = $$('.task-table', ele);
+          const taskTable = $$('.task-table', ele);
           expect(taskTable).toBeTruthy();
           expect(taskTable.hidden).toBeTruthy('.task-table should be hidden');
           expect($$('.header', ele).hidden).toBeTruthy('no filters seen');
@@ -175,7 +175,7 @@ describe('task-list', function() {
       describe('default landing page', function() {
         it('displays whatever tasks show up', function(done) {
           loggedInTasklist((ele) => {
-            let rows = $('.task-table .task-row', ele);
+            const rows = $('.task-table .task-row', ele);
             expect(rows).toBeTruthy();
             expect(rows.length).toBe(20, '(num taskRows)');
             done();
@@ -190,7 +190,7 @@ describe('task-list', function() {
             ele._verbose = false;
             ele.render();
 
-            let colHeaders = $('.task-table thead th', ele);
+            const colHeaders = $('.task-table thead th', ele);
             expect(colHeaders).toBeTruthy();
             expect(colHeaders.length).toBe(7, '(num colHeaders)');
             expect(colHeaders[0].innerHTML).toContain('<more-vert-icon-sk');
@@ -202,15 +202,15 @@ describe('task-list', function() {
             expect(colHeaders[5]).toMatchTextContent('pool (tag)');
             expect(colHeaders[6]).toMatchTextContent('state');
 
-            let rows = $('.task-table .task-row', ele);
+            const rows = $('.task-table .task-row', ele);
             expect(rows).toBeTruthy();
             expect(rows.length).toBe(20, '20 rows');
 
-            let cells = $('.task-table .task-row td', ele);
+            const cells = $('.task-table .task-row td', ele);
             expect(cells).toBeTruthy();
             expect(cells.length).toBe(7 * 20, '7 columns * 20 rows');
             // little helper for readability
-            let cell = (r, c) => cells[7*r+c];
+            const cell = (r, c) => cells[7*r+c];
 
             expect(rows[0]).toHaveClass('failed_task');
             expect(rows[0]).not.toHaveClass('exception');
@@ -254,17 +254,17 @@ describe('task-list', function() {
 
         it('supplies past 24 hours for the time pickers', function(done) {
           loggedInTasklist((ele) => {
-            let start = $$('#start_time', ele);
+            const start = $$('#start_time', ele);
             expect(start).toBeTruthy();
             expect(start.disabled).toBeFalsy();
             expect(start.value).toBe('2018-12-18 11:46', '(start time is 24 hours ago)');
 
-            let end = $$('#end_time', ele);
+            const end = $$('#end_time', ele);
             expect(end).toBeTruthy();
             expect(end.disabled).toBeTruthy();
             expect(end.value).toBe('2018-12-19 11:46', '(end time is now)');
 
-            let checkbox = $$('.picker checkbox-sk', ele);
+            const checkbox = $$('.picker checkbox-sk', ele);
             expect(checkbox).toBeTruthy();
             expect(checkbox.checked).toBeTruthy(); // defaults to using now
             done();
@@ -275,11 +275,17 @@ describe('task-list', function() {
           loggedInTasklist((ele) => {
             ele.render();
 
-            let countRows = $('#query_counts tr', ele);
+            const countRows = $('#query_counts tr', ele);
             expect(countRows).toBeTruthy();
             expect(countRows.length).toBe(1+8, '(num counts, displayed + 8 states)');
 
             expect(countRows[0]).toMatchTextContent('Displayed: 20');
+
+            expect(countRows[3].innerHTML).toContain('<a ', 'contains a link');
+            const link = $$('a', countRows[3]);
+            expect(link.href).toContain('/tasklist?at=false&c=name&c=created_ts&c=pending_time&' +
+                  'c=duration&c=bot&c=pool-tag&c=state&d=desc&et=1545237983234&' +
+                  'f=state%3ACOMPLETED_FAILURE&k=&n=true&s=created_ts&st=1545151583000&v=false');
 
             // The true on flush waits for res.json() to resolve too
             fetchMock.flush(true).then(() => {
@@ -301,7 +307,7 @@ describe('task-list', function() {
         ele._dir = 'desc';
         ele.render();
 
-        let sortToggles = $('.task-table thead sort-toggle', ele);
+        const sortToggles = $('.task-table thead sort-toggle', ele);
         expect(sortToggles).toBeTruthy();
         expect(sortToggles.length).toBe(7, '(num sort-toggles)');
 
@@ -341,8 +347,8 @@ describe('task-list', function() {
         ele._dir = 'asc';
         ele.render();
 
-        let actualIDOrder = ele._tasks.map((t) => t.task_id);
-        let actualPoolOrder = ele._tasks.map((t) => column('pool-tag', t, ele));
+        const actualIDOrder = ele._tasks.map((t) => t.task_id);
+        const actualPoolOrder = ele._tasks.map((t) => column('pool-tag', t, ele));
 
         expect(actualIDOrder).toEqual(['41e0284bc3ef4f10', '41e023035ecced10',
             '41e0222076a33010', '41e020504d0a5110', '41e0204f39d06210',
@@ -367,7 +373,7 @@ describe('task-list', function() {
         ele._dir = 'asc';
         ele.render();
 
-        let actualDurationsOrder = ele._tasks.map((t) => column('duration', t, ele).trim());
+        const actualDurationsOrder = ele._tasks.map((t) => column('duration', t, ele).trim());
 
         expect(actualDurationsOrder).toEqual(['0.62s', '2.90s', '17.84s', '1m 38s',
             '2m  1s', '2m  1s', '12m 54s*', '12m 55s*', '1h  9m 47s', '2h 16m 15s',
@@ -378,7 +384,7 @@ describe('task-list', function() {
         ele._dir = 'asc';
         ele.render();
 
-        let actualPendingOrder = ele._tasks.map((t) => column('human_pending_time', t, ele).trim());
+        const actualPendingOrder = ele._tasks.map((t) => column('human_pending_time', t, ele).trim());
 
         expect(actualPendingOrder).toEqual(['0s', '0s', '0.63s', '0.66s', '0.72s', '2.35s', '2.36s',
           '2.58s', '5.74s', '8.21s', '24.58s', '1m 11s', '1m 17s', '5m  5s', '5m 36s', '11m 28s',
@@ -393,14 +399,14 @@ describe('task-list', function() {
         ele._showColSelector = true;
         ele.render();
 
-        let keySelector = $$('.col_selector', ele);
+        const keySelector = $$('.col_selector', ele);
         expect(keySelector).toBeTruthy();
 
         // click on first non checked checkbox.
         let keyToClick = null;
         let checkbox = null;
         for (let i = 0; i < keySelector.children.length; i++) {
-          let child = keySelector.children[i];
+          const child = keySelector.children[i];
           checkbox = $$('checkbox-sk', child);
           keyToClick = $$('.key', child);
           if (checkbox && !checkbox.checked) {
@@ -417,16 +423,16 @@ describe('task-list', function() {
         let colHeaders = $('.task-table thead th');
         expect(colHeaders).toBeTruthy();
         expect(colHeaders.length).toBe(2, '(num colHeaders)');
-        let expectedHeader = getColHeader(keyToClick);
+        const expectedHeader = getColHeader(keyToClick);
         expect(colHeaders.map((c) => c.textContent.trim())).toContain(expectedHeader);
 
         // We have to find the checkbox again because the order
         // shuffles to keep selected ones on top.
         checkbox = null;
         for (let i = 0; i < keySelector.children.length; i++) {
-          let child = keySelector.children[i];
+          const child = keySelector.children[i];
           checkbox = $$('checkbox-sk', child);
-          let key = $$('.key', child);
+          const key = $$('.key', child);
           if (key && key.textContent.trim() === keyToClick) {
             break;
           }
@@ -490,9 +496,9 @@ describe('task-list', function() {
         ele._showColSelector = true;
         ele._refilterPossibleColumns(); // also calls render
 
-        let keySelector = $$('.col_selector');
+        const keySelector = $$('.col_selector');
         expect(keySelector).toBeTruthy();
-        let keys = childrenAsArray(keySelector).map((c) => c.textContent.trim());
+        const keys = childrenAsArray(keySelector).map((c) => c.textContent.trim());
 
         // Skip the first child, which is the input box
         expect(keys.slice(1, 7)).toEqual(['name', 'created_ts', 'duration', 'state',
@@ -509,15 +515,15 @@ describe('task-list', function() {
         ele._filters = [];  // no filters
         ele.render();
 
-        let valueRow = getChildItemWithText($$('.selector.values'), 'BOT_DIED', ele);
-        let addIcon = $$('add-circle-icon-sk', valueRow);
+        const valueRow = getChildItemWithText($$('.selector.values'), 'BOT_DIED', ele);
+        const addIcon = $$('add-circle-icon-sk', valueRow);
         expect(addIcon).toBeTruthy('there should be an icon for adding');
         addIcon.click();
 
         expect(ele._filters.length).toBe(1, 'a filter should be added');
         expect(ele._filters[0]).toEqual('state:BOT_DIED');
 
-        let chipContainer = $$('.chip_container', ele);
+        const chipContainer = $$('.chip_container', ele);
         expect(chipContainer).toBeTruthy('there should be a filter chip container');
         expect(chipContainer.children.length).toBe(1);
         expect(addIcon.hasAttribute('hidden'))
@@ -533,15 +539,15 @@ describe('task-list', function() {
         ele._filters = ['pool-tag:Skia', 'state:BOT_DIED'];
         ele.render();
 
-        let filterChip = getChildItemWithText($$('.chip_container'), 'pool-tag:Skia', ele);
-        let icon = $$('cancel-icon-sk', filterChip);
+        const filterChip = getChildItemWithText($$('.chip_container'), 'pool-tag:Skia', ele);
+        const icon = $$('cancel-icon-sk', filterChip);
         expect(icon).toBeTruthy('there should be a icon to remove it');
         icon.click();
 
         expect(ele._filters.length).toBe(1, 'a filter should be removed');
         expect(ele._filters[0]).toEqual('state:BOT_DIED', 'pool-tag:Skia should be removed');
 
-        let chipContainer = $$('.chip_container', ele);
+        const chipContainer = $$('.chip_container', ele);
         expect(chipContainer).toBeTruthy('there should be a filter chip container');
         expect(chipContainer.children.length).toBe(1);
         done();
@@ -607,7 +613,7 @@ describe('task-list', function() {
         ele._filters = [];
         ele.render();
 
-        let filterInput = $$('#filter_search', ele);
+        const filterInput = $$('#filter_search', ele);
         filterInput.value = 'invalid filter';
         ele._filterSearch({key: 'Enter'});
         expect(ele._filters).toEqual([]);
@@ -646,7 +652,7 @@ describe('task-list', function() {
         ele._limit = 0; // turn off requests
         ele.render();
 
-        let filterInput = $$('#filter_search', ele);
+        const filterInput = $$('#filter_search', ele);
         filterInput.value = 'state:BOT_DIED';
         ele._filterSearch({key: 'Enter'});
         expect(ele._filters).toEqual(['state:BOT_DIED']);
@@ -670,7 +676,7 @@ describe('task-list', function() {
         ele._filters = [];
         ele.render();
 
-        let filterInput = $$('#filter_search', ele);
+        const filterInput = $$('#filter_search', ele);
         filterInput.value = 'dev';
         ele._refilterPrimaryKeys();
 
@@ -693,14 +699,14 @@ describe('task-list', function() {
         ele._filters = [];
         ele.render();
 
-        let filterInput = $$('#filter_search', ele);
+        const filterInput = $$('#filter_search', ele);
         filterInput.value = 'pool-tag:Ski';
         ele._refilterPrimaryKeys();
 
         // Auto selects the first one
         expect(ele._primaryKey).toEqual('pool-tag');
 
-        let children = $$('.selector.keys', ele).children;
+        const children = $$('.selector.keys', ele).children;
         expect(children.length).toEqual(1, 'only pool-tag should show up');
         expect(children[0].textContent).toContain('pool-tag');
 
@@ -719,11 +725,11 @@ describe('task-list', function() {
         ele._showColSelector = true;
         ele.render();
 
-        let columnInput = $$('#column_search', ele);
+        const columnInput = $$('#column_search', ele);
         columnInput.value = 'build';
         ele._refilterPossibleColumns();
 
-        let colSelector = $$('.col_selector', ele);
+        const colSelector = $$('.col_selector', ele);
         expect(colSelector).toBeTruthy();
         expect(colSelector.children.length).toEqual(12); // 11 hits + the input box
 
@@ -776,6 +782,41 @@ describe('task-list', function() {
           });
         });
 
+    it('updates the links with filters and other settings', function(done) {
+      loggedInTasklist((ele) => {
+        ele._startTime = 1545151583000;
+        ele._endTime = 1545237981000;
+        ele._sort = 'completed_ts';
+        ele._filters = ['pool-tag:Chrome', 'state:DEDUPED'];
+        ele.render();
+
+        const countRows = $('#query_counts tr', ele);
+        expect(countRows).toBeTruthy();
+
+        expect(countRows[3].innerHTML).toContain('<a ', 'contains a link');
+        const link = $$('a', countRows[3]);
+        expect(link.href).toContain('/tasklist?at=false&c=name&c=created_ts&' +
+            'c=pending_time&c=duration&c=bot&c=pool-tag&c=state&d=desc&et=1545237981000&' +
+            'f=pool-tag%3AChrome&f=state%3ACOMPLETED_FAILURE&k=&n=true&s=completed_ts&' +
+            'st=1545151583000&v=false');
+        done();
+      });
+    });
+
+    it('updates the matching bots link', function(done) {
+      loggedInTasklist((ele) => {
+        ele._filters = ['device_type-tag:nemo', 'state:DEDUPED'];
+        ele._knownDimensions = ['device_type', 'os'];
+        ele.render();
+
+        const link = $$('.options > a', ele);
+        expect(link).toBeTruthy();
+
+        expect(link.href).toContain('/botlist?c=id&c=os&c=task&c=status&c=device_type' +
+                                    '&f=device_type%3Anemo');
+        done();
+      });
+    });
   }); // end describe('dynamic behavior')
 
   describe('api calls', function() {
@@ -815,13 +856,35 @@ describe('task-list', function() {
         // calls is an array of 2-length arrays with the first element
         // being the string of the url and the second element being
         // the options that were passed in
-        let gets = calls.map((c) => c[0]);
+        const gets = calls.map((c) => c[0]);
 
         // limit=100 comes from the default limit value.
         expect(gets).toContainRegex(/\/_ah\/api\/swarming\/v1\/tasks\/list.+limit=100.*/);
 
-        checkAuthorizationAndNoPosts(calls)
+        checkAuthorizationAndNoPosts(calls);
         done();
+      });
+    });
+
+    it('counts correctly with filters', function(done) {
+      loggedInTasklist((ele) => {
+        ele._filters = ['os-tag:Android'];
+        fetchMock.resetHistory();
+        ele._addFilter('state:PENDING_RUNNING');
+        fetchMock.flush(true).then(() => {
+          const calls = fetchMock.calls(MATCHED, 'GET');
+          expect(calls.length).toBe(1+11, '1 from task-list and 11 counts');
+
+          const gets = calls.map((c) => c[0]);
+          for (const get of gets) {
+            // make sure there aren't two states when we do the count (which
+            // appends a state)
+            expect(get).not.toMatch(/state.+state/);
+            // %3A is url encoded colon (:)
+            expect(get).toMatch(/tags=os%3AAndroid/);
+          }
+          done();
+        });
       });
     });
   }); // end describe('api calls')
@@ -831,8 +894,8 @@ describe('task-list', function() {
 
     it('turns the dates into DateObjects', function() {
       // Make a copy of the object because processTasks will modify it in place.
-      let tasks = processTasks([deepCopy(ANDROID_TASK)], {});
-      let task = tasks[0];
+      const tasks = processTasks([deepCopy(ANDROID_TASK)], {});
+      const task = tasks[0];
       expect(task.created_ts).toBeTruthy();
       expect(task.created_ts instanceof Date).toBeTruthy('Should be a date object');
       expect(task.human_created_ts).toBeTruthy();
@@ -841,16 +904,16 @@ describe('task-list', function() {
     });
 
     it('gracefully handles null data', function() {
-      let tasks = processTasks(null);
+      const tasks = processTasks(null);
 
       expect(tasks).toBeTruthy();
       expect(tasks.length).toBe(0);
     });
 
     it('produces a list of tags', function() {
-      let tags = {};
-      let tasks = processTasks(deepCopy(tasks_20.items), tags);
-      let keys = Object.keys(tags);
+      const tags = {};
+      const tasks = processTasks(deepCopy(tasks_20.items), tags);
+      const keys = Object.keys(tags);
       expect(keys).toBeTruthy();
       expect(keys.length).toBe(76);
       expect(keys).toContain('pool');
@@ -861,21 +924,21 @@ describe('task-list', function() {
     });
 
     it('filters tasks based on special keys', function() {
-      let tasks = processTasks(deepCopy(tasks_20.items), {});
+      const tasks = processTasks(deepCopy(tasks_20.items), {});
 
       expect(tasks).toBeTruthy();
       expect(tasks.length).toBe(20);
 
-      let filtered = filterTasks(['state:COMPLETED_FAILURE'], tasks);
+      const filtered = filterTasks(['state:COMPLETED_FAILURE'], tasks);
       expect(filtered.length).toBe(2);
       const expectedIds = ['41e0310fe0b7c410', '41e031b2c8b46710'];
-      let actualIds = filtered.map((task) => task.task_id);
+      const actualIds = filtered.map((task) => task.task_id);
       actualIds.sort();
       expect(actualIds).toEqual(expectedIds);
     });
 
     it('filters tasks based on tags', function() {
-      let tasks = processTasks(deepCopy(tasks_20.items), {});
+      const tasks = processTasks(deepCopy(tasks_20.items), {});
 
       expect(tasks).toBeTruthy();
       expect(tasks.length).toBe(20);
@@ -937,14 +1000,14 @@ describe('task-list', function() {
         },
       ];
 
-      for (let testcase of expectations) {
-        let qp = listQueryParams(testcase.filters, testcase.extra);
+      for (const testcase of expectations) {
+        const qp = listQueryParams(testcase.filters, testcase.extra);
         expect(qp).toEqual(testcase.output);
       }
 
-      let testcase = expectations[0];
+      const testcase = expectations[0];
       testcase.extra.cursor = 'mock_cursor12345';
-      let qp = listQueryParams(testcase.filters, testcase.extra);
+      const qp = listQueryParams(testcase.filters, testcase.extra);
       expect(qp).toEqual('cursor=mock_cursor12345&'+testcase.output);
     });
 
