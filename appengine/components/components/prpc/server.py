@@ -227,7 +227,7 @@ class Server(object):
         except Exception as e:
           logging.warning('Failed to decode request: %s', e, exc_info=True)
           context.set_code(StatusCode.INVALID_ARGUMENT)
-          context.set_details('Error parsing request')
+          context.set_details('Error parsing request: %s' % e.message)
           return None
 
         context._timeout = parsed_headers.timeout
