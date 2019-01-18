@@ -11,12 +11,5 @@
     document.write(s.outerHTML);
   }
 </script>
-<script src="https://apis.google.com/js/platform.js?onload=init" async defer></script>
-<script type="text/javascript" charset="utf-8">
-  function init() {
-    gapi.load('auth2', function() {
-      document.dispatchEvent(new CustomEvent('oauth-lib-loaded'));
-    })
-  }
-</script>
+<script async defer src="https://apis.google.com/js/api.js"></script>
 <swarming-index client_id="{{client_id}}"></swarming-index>

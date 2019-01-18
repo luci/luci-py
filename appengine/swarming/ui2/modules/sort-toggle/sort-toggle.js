@@ -47,7 +47,7 @@ window.customElements.define('sort-toggle', class extends HTMLElement {
     this.addEventListener('click', () => {
       this.toggle();
     });
-    this._render();
+    this.render();
   }
 
   /** @prop {string} currentKey - The currently selected sort key for a
@@ -56,20 +56,20 @@ window.customElements.define('sort-toggle', class extends HTMLElement {
    *                  observed.
    */
   get currentKey() { return this._currentKey; }
-  set currentKey(val) { this._currentKey = val; this._render();}
+  set currentKey(val) { this._currentKey = val; this.render();}
 
   /** @prop {string} key - An arbitrary, unique string that this sort-toggle
    *                  represents.
    */
   get key() { return this._key; }
-  set key(val) { this._key = val; this._render();}
+  set key(val) { this._key = val; this.render();}
 
   /** @prop {string} direction - Either 'asc' or 'desc' indicating which
    *                  direction the user indicated. Is ignored if currentKey
    *                  does not equal this.key.
    */
   get direction() { return this._direction; }
-  set direction(val) { this._direction = val; this._render();}
+  set direction(val) { this._direction = val; this.render();}
 
   toggle() {
     if (this.currentKey === this.key) {
@@ -102,7 +102,7 @@ window.customElements.define('sort-toggle', class extends HTMLElement {
     }));
   }
 
-  _render() {
+  render() {
     render(template(this), this, {eventContext: this});
   }
 

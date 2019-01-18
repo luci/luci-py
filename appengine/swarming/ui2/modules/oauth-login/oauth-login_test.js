@@ -87,22 +87,6 @@ describe('oauth-login', function() {
       });
     });
 
-    it('waits for the oauth-lib-loaded event and then calls init', function(done) {
-      window.gapi = {
-        auth2: {
-          init: jasmine.createSpy('init').and.callFake((obj) => {
-            expect(obj.client_id).toBe('fake');
-            done();
-            return new Promise(()=>{});
-          }),
-        }
-      };
-      createElement((ele) => {
-        // fire event and then check on mock
-        document.dispatchEvent(new CustomEvent('oauth-lib-loaded'));
-      });
-    });
-
     it('calls gapi.signIn on call to _logIn', function(done) {
       createElement((ele) => {
         // createSpyObj is a little different than createSpy in that it can make

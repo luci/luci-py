@@ -13,6 +13,12 @@
  *  authenticated requests.
  * </p>
  *
+ * <p>
+ *  Clients should include the following JS script to supply the Google OAuth
+ *  code:
+ *    <script src="https://apis.google.com/js/api.js" async defer></script>
+ * </p>
+ *
  * @attr client_id - The Client ID for authenticating via OAuth.
  * @attr testing_offline - If true, the real OAuth flow won't be used.
  *    Instead, dummy data will be used. Ideal for local testing.
@@ -34,6 +40,19 @@ import { html, render } from 'lit-html'
 import { upgradeProperty } from 'elements-sk/upgradeProperty'
 import { errorMessage } from 'elements-sk/errorMessage'
 
+// gapiLoaded is a promise that resolves when the 'gapi' JS library is
+// finished loading.
+let gapiLoaded = new Promise((resolve, reject) => {
+  let check = () => {
+    if (window.gapi !== undefined) {
+      resolve();
+    } else {
+      setTimeout(check, 10)
+    }
+  }
+  setTimeout(check, 10)
+});
+
 const template = (ele) => {
   if (ele.auth_header) {
     return html`
@@ -41,12 +60,12 @@ const template = (ele) => {
   <img class=center id=avatar src="${ele._profile.imageURL}" width=30 height=30>
   <span class=center>${ele._profile.email}</span>
   <span class=center>|</span>
-  <a class=center @click=${()=>ele._logOut()} href="#">Sign out</a>
+  <a class=center @click=${ele._logOut} href="#">Sign out</a>
 </div>`;
   } else {
     return html`
 <div>
-  <a @click=${()=>ele._logIn()} href="#">Sign in</a>
+  <a @click=${ele._logIn} href="#">Sign in</a>
 </div>`;
   }
 };
@@ -64,22 +83,26 @@ window.customElements.define('oauth-login', class extends HTMLElement {
         email: 'missing@chromium.org',
         imageURL: 'http://storage.googleapis.com/gd-wagtail-prod-assets/original_images/logo_google_fonts_color_2x_web_64dp.png',
       };
+      // Stop the gapiLoaded promise
+      window.gapi = true;
     } else {
       this._profile = null;
-      document.addEventListener('oauth-lib-loaded', ()=>{
-        gapi.auth2.init({
-          client_id: this.client_id,
-        }).then(() => {
-          this._maybeFireLoginEvent();
-          this._render();
-        }, (error) => {
-          console.error(error);
-          errorMessage(`Error initializing oauth: ${JSON.stringify(error)}`, 10000);
+      gapiLoaded.then(() => {
+        gapi.load('auth2', () => {
+          gapi.auth2.init({
+            client_id: this.client_id,
+          }).then(() => {
+            this._maybeFireLoginEvent();
+            this.render();
+          }, (error) => {
+            console.error(error);
+            errorMessage(`Error initializing oauth: ${JSON.stringify(error)}`, 10000);
+          });
         });
       });
 
     }
-    this._render();
+    this.render();
   }
 
   static get observedAttributes() {
@@ -141,7 +164,7 @@ window.customElements.define('oauth-login', class extends HTMLElement {
           },
           bubbles: true,
         }));
-        this._render();
+        this.render();
       } else {
         let auth = gapi.auth2.getAuthInstance();
         if (auth) {
@@ -152,7 +175,7 @@ window.customElements.define('oauth-login', class extends HTMLElement {
             if (!this._maybeFireLoginEvent()) {
               console.warn('login was not successful; maybe user canceled');
             }
-            this._render();
+            this.render();
           });
         }
       }
@@ -161,7 +184,7 @@ window.customElements.define('oauth-login', class extends HTMLElement {
   _logOut() {
     if (this.testing_offline) {
       this._auth_header = '';
-      this._render();
+      this.render();
       // reload the page to clear any sensitive data being displayed.
       window.location.reload();
     } else {
@@ -177,12 +200,12 @@ window.customElements.define('oauth-login', class extends HTMLElement {
     }
   }
 
-  _render() {
-    render(template(this), this);
+  render() {
+    render(template(this), this, {eventContext: this});
   }
 
   attributeChangedCallback(attrName, oldVal, newVal) {
-    this._render();
+    this.render();
   }
 
 });

@@ -43,6 +43,6 @@ fetchMock.post('glob:/_ah/api/swarming/v1/bot/*/delete', requireLogin(200, 750))
 // Everything else
 fetchMock.catch(404);
 
-// autologin for ease of testing locally
+// autologin for ease of testing locally - comment this out if using the real flow.
 document.querySelector('oauth-login')._logIn();
 })();

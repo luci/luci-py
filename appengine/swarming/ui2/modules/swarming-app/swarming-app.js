@@ -111,7 +111,7 @@ window.customElements.define('swarming-app', class extends HTMLElement {
       this._fetch();
     });
 
-    this._render();
+    this.render();
   }
 
   static get observedAttributes() {
@@ -227,7 +227,7 @@ window.customElements.define('swarming-app', class extends HTMLElement {
 
     // The placeholder for which the server details and login element (the only
     // dynamic content swarming-app manages) will be rendered into. See
-    // _render() for when that happens.
+    // render() for when that happens.
     this._dynamicEle = document.createElement('div');
     this._dynamicEle.classList.add('right');
     header.appendChild(this._dynamicEle);
@@ -260,7 +260,7 @@ window.customElements.define('swarming-app', class extends HTMLElement {
       .then(jsonOrThrow)
       .then((json) => {
         this._server_details = json;
-        this._render();
+        this.render();
         this.dispatchEvent(new CustomEvent('server-details-loaded',
                                            {bubbles: true}));
         this.finishedTask();
@@ -272,7 +272,7 @@ window.customElements.define('swarming-app', class extends HTMLElement {
                             'with a different account',
             bot_version: '',
           };
-          this._render();
+          this.render();
         } else {
           console.error(e);
           errorMessage(`Unexpected error loading details: ${e.message}`, 5000);
@@ -283,7 +283,7 @@ window.customElements.define('swarming-app', class extends HTMLElement {
       .then(jsonOrThrow)
       .then((json) => {
         this._permissions = json;
-        this._render();
+        this.render();
         this.dispatchEvent(new CustomEvent('permissions-loaded',
                                            {bubbles: true}));
         this.finishedTask();
@@ -298,7 +298,7 @@ window.customElements.define('swarming-app', class extends HTMLElement {
       });
   }
 
-  _render() {
+  render() {
     if (this._dynamicEle) {
       render(dynamic_content_template(this), this._dynamicEle);
     }
@@ -306,7 +306,7 @@ window.customElements.define('swarming-app', class extends HTMLElement {
   }
 
   attributeChangedCallback(attrName, oldVal, newVal) {
-    this._render();
+    this.render();
   }
 
 });
