@@ -106,7 +106,7 @@ def _send_to_bq(table_name, rows):
     failed_db_keys.append(db_key)
     failed_bq_keys.append(bq_key)
   if dropped:
-    logging.warning('%d old rows silently dropped')
+    logging.warning('%d old rows silently dropped', dropped)
   return failed_db_keys, failed_bq_keys
 
 
