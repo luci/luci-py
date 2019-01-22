@@ -155,6 +155,15 @@ class ValidationTestCase(test_case.TestCase):
       validation.validate_service_dynamic_metadata_blob(blob, ctx)
       self.assertEqual(
           [m.text for m in ctx.result().messages], expected_messages)
+    def expect_success(blob):
+      expect_errors(blob, [])
+
+    expect_success({
+        'version': '1.0',
+        'validation': {
+          'url' : 'https://something.example.com/validate',
+        },
+    })
 
     expect_errors([], ['Service dynamic metadata must be an object'])
     expect_errors({}, ['Expected format version 1.0, but found "None"'])

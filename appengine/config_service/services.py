@@ -52,8 +52,8 @@ def _dict_to_dynamic_metadata(data):
     metadata.validation.url = validation_meta['url']
     for p in validation_meta.get('patterns', []):
       pattern = metadata.validation.patterns.add()
-      pattern.config_set=p['config_set']
-      pattern.path=p['path']
+      pattern.config_set = p['config_set']
+      pattern.path = p['path']
   return metadata
 
 

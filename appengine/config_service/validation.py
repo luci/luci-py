@@ -204,7 +204,7 @@ def validate_service_dynamic_metadata_blob(metadata, ctx):
       return
     with ctx.prefix('url: '):
       validate_url(validation.get('url'), ctx)
-    patterns = validation.get('patterns')
+    patterns = validation.get('patterns', [])
     if not isinstance(patterns, list):
       ctx.error('patterns must be a list')
       return
