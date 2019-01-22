@@ -16,6 +16,7 @@ import contextlib
 import json
 import logging
 import os
+import random
 import re
 import StringIO
 import tarfile
@@ -453,6 +454,12 @@ def cron_run_import():  # pragma: no cover
     taskqueue.Task(url='/internal/task/luci-config/gitiles_import/%s' % cs)
     for cs in config_sets
   ]
+
+  # Task Queues try to preserve FIFO semantics. But if something is partially
+  # failing (e.g. LUCI Config hitting gitiles quota midway through update), we'd
+  # want to make a slow progress across all config sets. Shuffle tasks, so we
+  # don't give accidental priority to lexicographically first ones.
+  random.shuffle(tasks)
 
   q = taskqueue.Queue('gitiles-import')
   pending = tasks
