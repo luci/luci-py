@@ -86,7 +86,7 @@ class TestBotBase(net_utils.TestCase):
                                          self.root_dir,
                                          False),
         copy.deepcopy(self.attributes), 'https://localhost:1', 'version1',
-        self.root_dir, self.fail)
+        unicode(self.root_dir), self.fail)
 
 
 class TestBotMain(TestBotBase):
@@ -110,7 +110,7 @@ class TestBotMain(TestBotBase):
     self.mock(bot_main, '_bot_restart', self.fail)
     self.mock(
         bot_main, 'THIS_FILE',
-        os.path.join(test_env_bot_code.BOT_DIR, 'swarming_bot.zip'))
+        unicode(os.path.join(test_env_bot_code.BOT_DIR, 'swarming_bot.zip')))
     # Need to disable this otherwise it'd kill the current checkout.
     self.mock(bot_main, '_cleanup_bot_directory', lambda _: None)
     # Test results shouldn't depend on where they run. And they should not use
@@ -942,7 +942,7 @@ class TestBotMain(TestBotBase):
     # Mock the file to download in the temporary directory.
     self.mock(
         bot_main, 'THIS_FILE',
-        os.path.join(self.root_dir, 'swarming_bot.1.zip'))
+        unicode(os.path.join(self.root_dir, 'swarming_bot.1.zip')))
     new_zip = os.path.join(self.root_dir, 'swarming_bot.2.zip')
     # This is necessary otherwise zipfile will crash.
     self.mock(time, 'time', lambda: 1400000000)

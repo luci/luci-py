@@ -50,6 +50,7 @@ from api import os_utilities
 from api import platforms
 from infra_libs import ts_mon
 from utils import file_path
+from utils import fs
 from utils import net
 from utils import on_error
 from utils import subprocess42
@@ -68,7 +69,10 @@ _ERROR_HANDLER_WAS_REGISTERED = False
 # Set to the zip's name containing this file. This is set to the absolute path
 # to swarming_bot.zip when run as part of swarming_bot.zip. This value is
 # overriden in unit tests.
-THIS_FILE = os.path.abspath(zip_package.get_main_script_path())
+#
+# Note: this more or less requires the bot to be in a path without non-ASCII
+# characters.
+THIS_FILE = unicode(os.path.abspath(zip_package.get_main_script_path()))
 THIS_DIR = os.path.dirname(THIS_FILE)
 
 
@@ -637,12 +641,12 @@ def _cleanup_bot_directory(botobj):
     # really bad effects on normal host.
     logging.error('Not cleaning root directory because of bad base directory')
     return
-  for i in os.listdir(botobj.base_dir):
+  for i in fs.listdir(botobj.base_dir):
     if any(fnmatch.fnmatch(i, w) for w in PASSLIST):
       continue
     try:
       p = unicode(os.path.join(botobj.base_dir, i))
-      if os.path.isdir(p):
+      if fs.isdir(p):
         file_path.rmtree(p)
       else:
         file_path.remove(p)
@@ -801,10 +805,10 @@ def _run_manifest(botobj, manifest, start):
   auth_params_dumper = None
   must_reboot = False
   # Use 'w' instead of 'work' because path length is precious on Windows.
-  work_dir = os.path.join(botobj.base_dir, 'w')
+  work_dir = os.path.join(botobj.base_dir, u'w')
   try:
     try:
-      if os.path.isdir(work_dir):
+      if fs.isdir(work_dir):
         file_path.rmtree(work_dir)
     except OSError:
       # If a previous task created an undeleteable file/directory inside 'w',
@@ -812,9 +816,13 @@ def _run_manifest(botobj, manifest, start):
       # around the undeleteable directory by creating a temporary directory
       # instead. This is not normal behavior. The bot will report a failure on
       # start.
-      work_dir = tempfile.mkdtemp(dir=botobj.base_dir, prefix='w')
+      work_dir = tempfile.mkdtemp(dir=botobj.base_dir, prefix=u'w')
     else:
-      os.makedirs(work_dir)
+      try:
+        fs.makedirs(work_dir)
+      except OSError:
+        # Sometimes it's a race condition, so do a last ditch attempt.
+        work_dir = tempfile.mkdtemp(dir=botobj.base_dir, prefix=u'w')
 
     env = os.environ.copy()
     # Windows in particular does not tolerate unicode strings in environment
@@ -823,14 +831,14 @@ def _run_manifest(botobj, manifest, start):
     env['SWARMING_SERVER'] = botobj.server.encode('ascii')
 
     task_in_file = os.path.join(work_dir, 'task_runner_in.json')
-    with open(task_in_file, 'wb') as f:
+    with fs.open(task_in_file, 'wb') as f:
       f.write(json.dumps(manifest))
     handle, bot_file = tempfile.mkstemp(
         prefix='bot_file', suffix='.json', dir=work_dir)
     os.close(handle)
     task_result_file = os.path.join(work_dir, 'task_runner_out.json')
-    if os.path.exists(task_result_file):
-      os.remove(task_result_file)
+    if fs.exists(task_result_file):
+      fs.remove(task_result_file)
 
     # Start a thread that periodically puts authentication headers and other
     # authentication related information to a file on disk. task_runner reads it
@@ -864,15 +872,15 @@ def _run_manifest(botobj, manifest, start):
     _call_hook_safe(True, botobj, 'on_before_task', bot_file, command, env)
     logging.debug('Running command: %s', command)
 
-    base_log = os.path.join(botobj.base_dir, 'logs')
-    if not os.path.isdir(base_log):
+    base_log = os.path.join(botobj.base_dir, u'logs')
+    if not fs.isdir(base_log):
       # It was observed that this directory may be unexpectedly deleted.
       # Recreate as needed, otherwise it may throw at the open() call below.
-      os.mkdir(base_log)
+      fs.mkdir(base_log)
     log_path = os.path.join(base_log, 'task_runner_stdout.log')
     os_utilities.roll_log(log_path)
     os_utilities.trim_rolled_log(log_path)
-    with open(log_path, 'a+b') as f:
+    with fs.open(log_path, 'a+b') as f:
       proc = subprocess42.Popen(
           command,
           detached=True,
@@ -901,8 +909,8 @@ def _run_manifest(botobj, manifest, start):
         return False
 
     logging.info('task_runner exit: %d', proc.returncode)
-    if os.path.exists(task_result_file):
-      with open(task_result_file, 'rb') as fd:
+    if fs.exists(task_result_file):
+      with fs.open(task_result_file, 'rb') as fd:
         task_result = json.load(fd)
 
     if proc.returncode:
@@ -937,7 +945,7 @@ def _run_manifest(botobj, manifest, start):
     _call_hook_safe(
         True, botobj, 'on_after_task', failure, internal_failure,
         task_dimensions, task_result)
-    if os.path.isdir(work_dir):
+    if fs.isdir(work_dir):
       try:
         file_path.rmtree(work_dir)
       except Exception as e:
@@ -1237,7 +1245,7 @@ def _bot_restart(botobj, message, filepath=None):
   The function will return if the new bot code is not valid.
   """
   filepath = filepath or THIS_FILE
-  s = os.stat(filepath)
+  s = fs.stat(filepath)
   logging.info('Restarting to %s; %d bytes.', filepath, s.st_size)
   sys.stdout.flush()
   sys.stderr.flush()
@@ -1294,15 +1302,15 @@ def _update_lkgbc(botobj):
   Returns True if LKGBC was updated.
   """
   try:
-    if not os.path.isfile(THIS_FILE):
+    if not fs.isfile(THIS_FILE):
       # TODO(maruel): Try to download the code again from the server.
       botobj.post_error('Missing file %s for LKGBC' % THIS_FILE)
       return False
 
     golden = os.path.join(botobj.base_dir, 'swarming_bot.zip')
-    if os.path.isfile(golden):
-      org = os.stat(golden)
-      cur = os.stat(THIS_FILE)
+    if fs.isfile(golden):
+      org = fs.stat(golden)
+      cur = fs.stat(THIS_FILE)
       if org.st_size == org.st_size and org.st_mtime >= cur.st_mtime:
         return False
 
@@ -1332,13 +1340,13 @@ def _maybe_update_lkgbc(botobj):
   Returns True if LKGBC was updated.
   """
   try:
-    if not os.path.isfile(THIS_FILE):
+    if not fs.isfile(THIS_FILE):
       # TODO(maruel): Try to download the code again from the server.
       return False
-    golden = os.path.join(botobj.base_dir, 'swarming_bot.zip')
-    if os.path.isfile(golden):
-      org = os.stat(golden)
-      cur = os.stat(THIS_FILE)
+    golden = os.path.join(botobj.base_dir, u'swarming_bot.zip')
+    if fs.isfile(golden):
+      org = fs.stat(golden)
+      cur = fs.stat(THIS_FILE)
       if org.st_size == org.st_size and org.st_mtime >= cur.st_mtime:
         return False
       if org.st_mtime >= time.time() - 7*24*60*60:
