@@ -87,7 +87,7 @@ ExternalSchedulerConfig = collections.namedtuple('ExternalScheduler', [
   'address',
   # Scheduler ID (opaque to swarming).
   'id',
-  # Dimension set in {'key1:value1', 'key2:value2'} format.
+  # Dimension set in ['key1:value1', 'key2:value2'] format.
   'dimensions',
   # Whether this config is enabled.
   'enabled',

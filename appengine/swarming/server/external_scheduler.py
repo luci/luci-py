@@ -12,6 +12,7 @@ from components.prpc import client
 
 from proto.api import plugin_pb2
 from proto.api import plugin_prpc_pb2
+from proto.api import swarming_pb2
 
 from server import pools_config
 from server import task_queues
@@ -63,6 +64,9 @@ def _config_for_dimensions(pool_cfg, dimensions_flat):
   return None
 
 
+### Public API.
+
+
 def config_for_bot(bot_dimensions):
   """Retrieves the ExternalSchedulerConfig for this bot, if any.
 
@@ -71,7 +75,7 @@ def config_for_bot(bot_dimensions):
           {string key: list of string values} format.
 
   Returns:
-    pool_config.ExternalSchedulerConfig for external scheduler to use for
+    pools_config.ExternalSchedulerConfig for external scheduler to use for
     this bot, if it exists, or None otherwise.
   """
   pool_cfg = _bot_pool_cfg(bot_dimensions)
@@ -86,7 +90,7 @@ def config_for_task(request):
     request: a task_request.TaskRequest instance.
 
   Returns:
-    pool_config.ExternalSchedulerConfig for external scheduler to use for
+    pools_config.ExternalSchedulerConfig for external scheduler to use for
     this bot, if it exists, or None otherwise.
   """
   s0 = request.task_slice(0)
@@ -112,7 +116,7 @@ def assign_task(es_cfg, bot_dimensions):
   """Calls external scheduler for a single idle bot with given dimensions.
 
   Arguments:
-    es_cfg: pool_config.ExternalSchedulerConfig instance.
+    es_cfg: pools_config.ExternalSchedulerConfig instance.
     bot_dimensions: dimensions {string key: list of string values}
 
   Returns:
@@ -151,14 +155,16 @@ def notify_request(es_cfg, request, result_summary):
   """Calls external scheduler to notify it of a task state.
 
   Arguments:
-    request: task_request.TaskRequest
-    result_summary: task_result.TaskResultSummary
+    - es_cfg: pools_config.ExternalSchedulerConfig for external scheduler to
+        notify.
+    - request: task_request.TaskRequest
+    - result_summary: task_result.TaskResultSummary
   """
   req = plugin_pb2.NotifyTasksRequest()
   item = req.notifications.add()
   # TODO(akeshet): This time should possibly come from the read time from
   # datastore, rather than the local server clock.
-  item.time.GetCurrentTime()
+  item.time.FromDatetime(utils.utcnow())
   item.task.id = request.task_id
   item.task.tags.extend(request.tags)
   for i in range(request.num_task_slices):
@@ -167,7 +173,9 @@ def notify_request(es_cfg, request, result_summary):
     s_pb = item.task.slices.add()
     s_pb.dimensions.extend(flat_dimensions)
 
-  item.task.state = result_summary.state
+  res = swarming_pb2.TaskResult()
+  result_summary.to_proto(res)
+  item.task.state = res.state
   if result_summary.bot_id:
     # TODO(akeshet): We should only actually set this is state is running.
     item.task.bot_id = result_summary.bot_id
@@ -177,7 +185,7 @@ def notify_request(es_cfg, request, result_summary):
   req.scheduler_id = es_cfg.id
 
   c = _get_client(es_cfg.address)
-  c.NotifyTasks(req, credentials=_creds())
+  return c.NotifyTasks(req, credentials=_creds())
 
 
 def get_cancellations(es_cfg):
