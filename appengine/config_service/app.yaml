@@ -44,6 +44,8 @@ libraries:
   version: "2.6"
 - name: six
   version: "1.9.0"
+- name: ssl
+  version: "2.7.11"
 - name: webapp2
   version: "2.5.2"
 - name: webob
@@ -56,6 +58,7 @@ builtins:
 includes:
 - components/auth
 - components/ereporter2
+- gae_ts_mon
 
 inbound_services:
 - mail_bounce
