@@ -137,6 +137,56 @@ class BotApiTest(test_env_handlers.AppTestBase):
     ]
     self.assertEqual(expected, errors)
 
+  def test_handshake_long_dimension(self):
+    # Test a specific failure mode where '<key>:<value>' is over 1500 bytes.
+    # This throws a BadValueError while trying to save a
+    # BotEvent.dimensions_flat, even if the bot is forcibly quarantined.
+    errors = []
+    def add_error(request, source, message):
+      self.assertTrue(request)
+      self.assertEqual('bot', source)
+      errors.append(message)
+    self.mock(ereporter2, 'log_request', add_error)
+    params = {
+      'dimensions': {
+        'id': ['id1'],
+        'pool': ['default'],
+        'a': ['b' * 1499],
+      },
+      'state': {u'running_time': 0, u'sleep_streak': 0},
+      'version': '1',
+    }
+    response = self.app.post_json(
+        '/swarming/api/v1/bot/handshake', params=params).json
+    self.assertEqual(
+        [
+          u'bot_group_cfg',
+          u'bot_group_cfg_version',
+          u'bot_version',
+          u'server_version',
+        ],
+        sorted(response))
+    self.assertEqual({u'dimensions': {}}, response['bot_group_cfg'])
+    self.assertEqual('default', response['bot_group_cfg_version'])
+    self.assertEqual(64, len(response['bot_version']))
+    self.assertEqual(u'v1a', response['server_version'])
+    msg = (
+      u'Quarantined Bot\n'
+      'https://None/restricted/bot/id1\n'
+      'Invalid dimensions type:\n'
+      '{\n'
+      '  "a": [\n'
+      '    "%s"\n'
+      '  ],\n'
+      '  "id": [\n'
+      '    "id1"\n'
+      '  ],\n'
+      '  "pool": [\n'
+      '    "default"\n'
+      '  ]\n'
+      '}') % ('b' * 1499)
+    self.assertEqual([msg], errors)
+
   def test_handshake_extra(self):
     errors = []
     def add_error(request, source, message):

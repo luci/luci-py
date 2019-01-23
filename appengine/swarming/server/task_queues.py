@@ -1,3 +1,4 @@
+# coding: utf-8
 # Copyright 2017 The LUCI Authors. All rights reserved.
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
@@ -62,6 +63,7 @@ from google.appengine.ext import ndb
 
 from components import datastore_utils
 from components import utils
+from server import config
 from server import task_pack
 
 
@@ -639,11 +641,46 @@ def _assert_task_props(properties, expiration_ts):
 
 
 def dimensions_to_flat(dimensions):
-  """Returns a flat '<key>:<value>' sorted list of dimensions."""
+  """Returns a flat '<key>:<value>' sorted list of dimensions.
+
+  This function can be called with invalid dimensions that are reported by the
+  bot. Tolerate them, but trim dimensions longer than 321 characters (the limit
+  is 64+256+1=321). This is important, otherwise handling the returned values
+  that are too long can throw while trying to store this in the datastore.
+
+  The challenge here is that we're handling unicode strings, but we need to
+  count in term of utf-8 bytes while being efficient.
+
+  According to https://en.wikipedia.org/wiki/UTF-8, the longest UTF-8 encoded
+  character is 4 bytes.
+
+  Keys are strictly a subset of ASCII, thus valid keys are at most 64 bytes.
+
+  Values can be any unicode string limited to 256 characters. So the worst
+  case is 1024 bytes for a valid value.
+
+  This means that the maximum valid string is 64+1+1024 = 1089 bytes, where 1 is
+  the ':' character which is one byte.
+
+  One problem is that because surrogate code points are used to encode
+  characters outside the base plane in UTF-16, a UCS2 build of Python may use
+  two Unicode code points for one characters, so len('😬') returns 2, even
+  though it returns 1 on a UCS4 build.
+
+  So it means that the limit is effectively halved for non-BMP characters,
+  depending on the python build used.
+  """
+  cutoff = config.DIMENSION_KEY_LENGTH + 1 + config.DIMENSION_VALUE_LENGTH
   out = []
   for k, values in dimensions.iteritems():
     for v in values:
-      out.append('%s:%s' % (k, v))
+      flat = u'%s:%s' % (k, v)
+      if len(flat) > cutoff:
+        # An ellipsis is codepoint U+2026 which is encoded with 3 bytes in
+        # UTF-8. We're still well below the 1500 bytes limit. Datastore uses
+        # UTF-8.
+        flat = flat[:cutoff] + u'…'
+      out.append(flat)
   out.sort()
   return out
 
