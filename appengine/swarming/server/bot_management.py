@@ -187,6 +187,10 @@ class _BotCommon(ndb.Model):
       out.status = swarming_pb2.QUARANTINED_BY_BOT
       msg = (self.state or {}).get(u'quarantined')
       if msg:
+        if not isinstance(msg, basestring):
+          # Having {'quarantined': True} is valid for the state, convert this to
+          # a string.
+          msg = 'true'
         out.status_msg = msg
     elif self.maintenance_msg:
       out.status = swarming_pb2.OVERHEAD_MAINTENANCE_EXTERNAL
