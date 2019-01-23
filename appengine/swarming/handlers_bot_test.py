@@ -1099,6 +1099,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
     response = self.client_get_results(task_id)
     expected = self.gen_run_result(
         abandoned_ts=fmtdate(self.now),
+        completed_ts=fmtdate(self.now),
         created_ts=fmtdate(self.now),
         internal_failure=True,
         modified_ts=fmtdate(self.now),
@@ -1136,6 +1137,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
     # Now tagged with abandonned_ts, but state not yet updated.
     expected = self.gen_run_result(
         abandoned_ts=fmtdate(self.now),
+        completed_ts=fmtdate(self.now),
         created_ts=fmtdate(self.now),
         modified_ts=fmtdate(self.now),
         started_ts=fmtdate(self.now))
@@ -1147,6 +1149,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
 
     expected = self.gen_run_result(
         abandoned_ts=fmtdate(self.now),
+        completed_ts=fmtdate(self.now),
         costs_usd=[0.1],
         created_ts=fmtdate(self.now),
         duration=0.1,
@@ -1163,6 +1166,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
 
     expected = self.gen_run_result(
         abandoned_ts=fmtdate(self.now),
+        completed_ts=fmtdate(self.now),
         costs_usd=[0.1],
         created_ts=fmtdate(self.now),
         duration=0.1,

@@ -252,6 +252,7 @@ class TaskResultApiTest(TestCase):
     self.assertEqual(True, actual.can_be_canceled)
     actual.state = task_result.State.TIMED_OUT
     actual.duration = 0.1
+    actual.completed_ts = self.now
     self.assertEqual(False, actual.can_be_canceled)
 
     actual.children_task_ids = [
@@ -284,6 +285,7 @@ class TaskResultApiTest(TestCase):
     actual = task_result.new_run_result(
         request, to_run, u'localhost', u'abc',
         {u'id': [u'localhost'], u'foo': [u'bar', u'biz']})
+    actual.completed_ts = self.now
     actual.modified_ts = self.now
     actual.started_ts = self.now
     actual.duration = 1.
@@ -294,7 +296,7 @@ class TaskResultApiTest(TestCase):
     actual.state = task_result.State.TIMED_OUT
     actual.put()
     expected = self._gen_result(
-        duration=1., modified_ts=self.now, failure=True,
+        completed_ts=self.now, duration=1., modified_ts=self.now, failure=True,
         started_ts=self.now, state=task_result.State.TIMED_OUT)
     self.assertEqual(expected, actual.to_dict())
 

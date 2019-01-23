@@ -582,6 +582,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     # The task is immediately denied, without waiting.
     self.assertEqual(State.NO_RESOURCE, result_summary.state)
     self.assertEqual(self.now, result_summary.abandoned_ts)
+    self.assertEqual(self.now, result_summary.completed_ts)
     self.assertIsNone(result_summary.try_number)
     self.assertEqual(0, result_summary.current_task_slice)
 
@@ -627,6 +628,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     # The task fell back to the second slice, still pending.
     self.assertEqual(State.PENDING, result_summary.state)
     self.assertIsNone(result_summary.abandoned_ts)
+    self.assertIsNone(result_summary.completed_ts)
     self.assertIsNone(result_summary.try_number)
     self.assertEqual(1, result_summary.current_task_slice)
 
@@ -1317,6 +1319,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         None, task_scheduler.bot_kill_task(run_result.key, 'localhost'))
     expected = self._gen_result_summary_reaped(
         abandoned_ts=self.now,
+        completed_ts=self.now,
         costs_usd=[0.],
         id='1d69b9f088008910',
         internal_failure=True,
@@ -1325,6 +1328,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(expected, run_result.result_summary_key.get().to_dict())
     expected = self._gen_run_result(
         abandoned_ts=self.now,
+        completed_ts=self.now,
         id='1d69b9f088008911',
         internal_failure=True,
         state=State.BOT_DIED)
@@ -1546,6 +1550,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual([], task_result.TaskRunResult.query().fetch())
     expected = self._gen_result_summary_pending(
         abandoned_ts=abandoned_ts,
+        completed_ts=abandoned_ts,
         id='1d69b9f088008910',
         modified_ts=abandoned_ts,
         state=State.EXPIRED)
@@ -1583,6 +1588,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(1, len(task_result.TaskRunResult.query().fetch()))
     expected = self._gen_result_summary_reaped(
         abandoned_ts=abandoned_ts,
+        completed_ts=abandoned_ts,
         costs_usd=[0.],
         id='1d69b9f088008910',
         internal_failure=True,
@@ -1703,6 +1709,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(expected, run_result.result_summary_key.get().to_dict())
     expected = self._gen_run_result(
         abandoned_ts=now_1,
+        completed_ts=now_1,
         id='1d69b9f088008911',
         internal_failure=True,
         modified_ts=now_1,
@@ -1787,6 +1794,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(expected, run_result.result_summary_key.get().to_dict())
     expected = self._gen_run_result(
         abandoned_ts=now_1,
+        completed_ts=now_1,
         id='1d69b9f088008911',
         internal_failure=True,
         modified_ts=now_1,
@@ -1908,6 +1916,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     # worker information from the initial BOT_DIED task.
     expected = self._gen_run_result(
         abandoned_ts=now_1,
+        completed_ts=now_1,
         id='1d69b9f088008911',
         internal_failure=True,
         modified_ts=now_1,
@@ -1974,6 +1983,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(False, is_in_negative_cache(2))
     expected = self._gen_result_summary_reaped(
         abandoned_ts=now_2,
+        completed_ts=now_2,
         bot_dimensions=bot_dimensions_second,
         bot_id=u'localhost-second',
         costs_usd=[0., 0.],

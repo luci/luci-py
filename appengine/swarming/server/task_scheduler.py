@@ -92,6 +92,7 @@ def _expire_task_tx(now, request, to_run_key, result_summary_key, capacity,
     else:
       result_summary.state = task_result.State.EXPIRED
     result_summary.abandoned_ts = now
+    result_summary.completed_ts = now
   result_summary.modified_ts = now
 
   futures = ndb.put_multi_async(to_put)
@@ -313,6 +314,7 @@ def _handle_dead_bot(run_result_key):
       run_result.state = task_result.State.BOT_DIED
       run_result.internal_failure = True
       run_result.abandoned_ts = now
+      run_result.completed_ts = now
       task_is_retried = None
     elif (result_summary.try_number == 1 and now < request.expiration_ts and
           (request.task_slice(current_task_slice).properties.idempotent or
@@ -330,6 +332,7 @@ def _handle_dead_bot(run_result_key):
       run_result.state = task_result.State.BOT_DIED
       run_result.internal_failure = True
       run_result.abandoned_ts = now
+      run_result.completed_ts = now
       # Do not sync data from run_result to result_summary, since the task is
       # being retried.
       result_summary.reset_to_pending()
@@ -342,6 +345,7 @@ def _handle_dead_bot(run_result_key):
       run_result.state = task_result.State.BOT_DIED
       run_result.internal_failure = True
       run_result.abandoned_ts = now
+      run_result.completed_ts = now
       result_summary.set_from_run_result(run_result, request)
       task_is_retried = False
 
@@ -952,6 +956,7 @@ def schedule_request(request, secret_bytes):
       secret_bytes = None
       # Instantaneously denied.
       result_summary.abandoned_ts = result_summary.created_ts
+      result_summary.completed_ts = result_summary.created_ts
       result_summary.state = task_result.State.NO_RESOURCE
 
   # Determine external scheduler (if relevant) prior to making task live, to
@@ -1223,6 +1228,7 @@ def bot_kill_task(run_result_key, bot_id):
     run_result.state = task_result.State.BOT_DIED
     run_result.internal_failure = True
     run_result.abandoned_ts = now
+    run_result.completed_ts = now
     run_result.modified_ts = now
     result_summary.set_from_run_result(run_result, request)
 
@@ -1343,9 +1349,11 @@ def cancel_task(request, result_key, kill_running, bot_id):
       # - once the bot reports the task as terminated, set state to KILLED
       run_result.killing = True
       run_result.abandoned_ts = now
+      run_result.completed_ts = now
       run_result.modified_ts = now
       entities.append(run_result)
     result_summary.abandoned_ts = now
+    result_summary.completed_ts = now
     result_summary.modified_ts = now
 
     futures = ndb.put_multi_async(entities)
