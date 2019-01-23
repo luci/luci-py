@@ -99,15 +99,15 @@ class _ParsingContext(object):
     # Reset the index to the start of the accumulated string.
     i -= len(self.accumulator)
 
-    # Skip leading spaces.
-    while self.accumulator and self.accumulator[0] == ' ':
-      i += 1
-      self.accumulator.pop(0)
-
-    # Skip trailing spaces.
-    path = ''.join(self.accumulator).rstrip()
+    path = ''.join(self.accumulator).strip()
     if not path:
       raise ParsingError(i, 'expected name')
+
+    # Advance i to the first non-space char.
+    for char in self.accumulator:
+      if char != ' ':
+        break
+      i += 1
 
     # / has special meaning; a/b/c is shorthand for a(b(c)). Add subfield dicts
     # recursively. E.g. if the fields dict is empty then parsing a/b/c is like
@@ -165,6 +165,7 @@ def _parse(fields):
       if stack[-1].expecting_name:
         stack[-1].add_field(i)
       stack[-1].expecting_name = True
+
     elif fields[i] == '(':
       # Maintain accumulator invariant.
       # A name must occur before any (.
