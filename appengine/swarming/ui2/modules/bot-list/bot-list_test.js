@@ -321,6 +321,10 @@ describe('bot-list', function() {
             expect(tds[0]).toMatchTextContent('Alive:');
             expect(tds[0].innerHTML).toContain(encodeURIComponent('status:alive'));
             expect(tds[1]).toMatchTextContent('426');
+            const link = $$('a', tds[0]);
+            expect(link.href).toContain('f=status%3Aalive');
+            // the following happens if links are constructed poorly.
+            expect(link.href).not.toContain('?&');
 
             tds = $('tr:nth-child(8) td', queryTable);
             expect(tds).toBeTruthy();

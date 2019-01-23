@@ -439,7 +439,7 @@ const TASK_TIMES = ['abandoned_ts', 'completed_ts', 'created_ts', 'modified_ts',
                     'started_ts'];
 
 const extraKeys = ['name', 'state', 'costs_usd', 'deduped_from', 'duration', 'pending_time',
-  'server_versions', 'bot', ...TASK_TIMES];
+  'server_versions', 'bot', 'exit_code', ...TASK_TIMES];
 
 const colMap = {
   abandoned_ts: (task) => task.human_abandoned_ts,
@@ -458,6 +458,7 @@ const colMap = {
   },
   created_ts: (task) => task.human_created_ts,
   duration: (task) => task.human_duration,
+  exit_code: (task) => task.exit_code || '--',
   modified_ts: (task) => task.human_modified_ts,
   name: (task, ele) => {
     let name = task.name;

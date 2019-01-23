@@ -622,13 +622,14 @@ window.customElements.define('bot-list', class extends SwarmingAppBoilerplate {
     if (label === 'busy' || label === 'idle') {
       filterStr = 'task:' + label;
     }
+    const currentURL = new URL(window.location.href);
     if (preserveOthers) {
-      filterStr = encodeURIComponent(filterStr);
-      if (window.location.href.indexOf(filterStr) === -1) {
-        return window.location.href + '&f=' + filterStr;
+      if (currentURL.searchParams.getAll('f').indexOf(filterStr) !== -1) {
+        // The filter is already on the list.
+        return undefined;
       }
-      // The filter is already on the list.
-      return undefined;
+      currentURL.searchParams.append('f', filterStr);
+      return currentURL.href;
     }
 
     const params = {
@@ -636,9 +637,10 @@ window.customElements.define('bot-list', class extends SwarmingAppBoilerplate {
       c: this._cols,
       v: [this._verbose],
       f: [filterStr],
+      e: [true], // show fleet
     };
 
-    return window.location.href.split('?')[0] + '?' + query.fromParamSet(params);
+    return currentURL.pathname + '?' + query.fromParamSet(params);
   }
 
   _matchingTasksLink() {
