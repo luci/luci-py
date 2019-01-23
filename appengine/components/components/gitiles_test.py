@@ -281,6 +281,11 @@ class GitilesTestCase(test_case.TestCase):
         req_path,
         headers={'Accept': 'text/plain'})
 
+  def test_to_from_dict(self):
+    loc = gitiles.Location.parse(
+        'http://localhost/project/+/treeish/path/to/something')
+    self.assertEqual(loc, gitiles.Location.from_dict(loc.to_dict()))
+
   def test_parse_location(self):
     url = 'http://localhost/project/+/treeish/path/to/something'
     loc = gitiles.Location.parse(url)

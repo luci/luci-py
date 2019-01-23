@@ -21,8 +21,9 @@ import re
 import StringIO
 import tarfile
 
-from google.appengine.api import urlfetch_errors
+from google.appengine.api import memcache
 from google.appengine.api import taskqueue
+from google.appengine.api import urlfetch_errors
 from google.appengine.ext import ndb
 from google.protobuf import text_format
 
@@ -89,6 +90,22 @@ def get_gitiles_config():
 
 
 ## Low level import functions
+
+
+def _resolved_location(url):
+  """Gitiles URL string -> gitiles.Location.parse_resolve(url).
+
+  Does caching internally for X sec (X in [30m, 1h30m]) to avoid hitting Gitiles
+  all the time for data that is almost certainly static.
+  """
+  cache_key = 'gitiles_location:v1:' + url
+  as_dict = memcache.get(cache_key)
+  if as_dict is not None:
+    return gitiles.Location.from_dict(as_dict)
+  logging.debug('Cache miss when resolving gitiles location %s', url)
+  loc = gitiles.Location.parse_resolve(url)
+  memcache.set(cache_key, loc.to_dict(), time=random.randint(1800, 5400))
+  return loc
 
 
 def _import_revision(config_set, base_location, commit, force_update):
@@ -301,7 +318,7 @@ def import_service(service_id, conf=None):
     raise Error('services are not stored on Gitiles')
   if not conf.services_config_location:
     raise Error('services config location is not set')
-  location_root = gitiles.Location.parse_resolve(conf.services_config_location)
+  location_root = _resolved_location(conf.services_config_location)
   service_location = location_root._replace(
       path=os.path.join(location_root.path, service_id))
   _import_config_set('services/%s' % service_id, service_location)
@@ -320,7 +337,7 @@ def import_project(project_id):
     raise Error('project %s is not a Gitiles project' % project_id)
 
   try:
-    loc = gitiles.Location.parse_resolve(project.config_location.url)
+    loc = _resolved_location(project.config_location.url)
   except gitiles.TreeishResolutionError:
 
     @ndb.transactional
@@ -355,7 +372,7 @@ def import_ref(project_id, ref_name):
   if project.config_location.storage_type != GITILES_LOCATION_TYPE:
     raise Error('project %s is not a Gitiles project' % project_id)
 
-  # We don't call parse_resolve here because we are replacing treeish and
+  # We don't call _resolved_location here because we are replacing treeish and
   # path below anyway.
   loc = gitiles.Location.parse(project.config_location.url)
 
@@ -444,7 +461,7 @@ def cron_run_import():  # pragma: no cover
   config_sets = []
   if (conf and conf.services_config_storage_type == GITILES_STORAGE_TYPE and
       conf.services_config_location):
-    loc = gitiles.Location.parse_resolve(conf.services_config_location)
+    loc = _resolved_location(conf.services_config_location)
     config_sets += _service_config_sets(loc)
   config_sets += _project_and_ref_config_sets()
 

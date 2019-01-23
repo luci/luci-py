@@ -64,6 +64,36 @@ class Location(LocationTuple):
   def join(self, *parts):
     return self._replace(path=posixpath.join(self.path, *parts))
 
+  def to_dict(self):
+    """Serializes this Location to a jsonish dict."""
+    _validate_args(
+        self.hostname,
+        self.project,
+        self.treeish,
+        self.path,
+        path_required=True)
+    return {
+        'hostname': self.hostname,
+        'project': self.project,
+        'treeish': self.treeish,
+        'path': self.path,
+    }
+
+  @classmethod
+  def from_dict(cls, d):
+    """Restores Location from a dict produced by to_dict."""
+    hostname = d.get('hostname')
+    project = d.get('project')
+    treeish = d.get('treeish')
+    path = d.get('path')
+    _validate_args(
+        hostname,
+        project,
+        treeish,
+        path,
+        path_required=True)
+    return cls(hostname, project, treeish, path)
+
   @classmethod
   def parse(cls, url, treeishes=None):
     """Parses a Gitiles-formatted url.
