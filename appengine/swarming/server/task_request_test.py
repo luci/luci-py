@@ -326,6 +326,18 @@ class TaskRequestApiTest(TestCase):
     # appropriate data.
     self._pool_configs = {}
     self.mock(pools_config, 'get_pool_config', self._pool_configs.get)
+    self._enqueue_calls = []
+    self._enqueue_orig = self.mock(utils, 'enqueue_task', self._enqueue)
+
+  def tearDown(self):
+    try:
+      self.assertFalse(self._enqueue_calls)
+    finally:
+      super(TaskRequestApiTest, self).tearDown()
+
+  def _enqueue(self, *args, **kwargs):
+    self._enqueue_calls.append((args, kwargs))
+    return self._enqueue_orig(*args, use_dedicated_module=False, **kwargs)
 
   def test_all_apis_are_tested(self):
     # Ensures there's a test for each public API.
@@ -1559,30 +1571,69 @@ class TaskRequestApiTest(TestCase):
       task_request.SecretBytes(secret_bytes='a'*(20*1024+1)).put()
 
   def test_cron_delete_old_task_requests(self):
-    # Create an old TaskRequest right at the cron job cut off, and another one
-    # one second later (that will be kept).
+    # Creating 1000 tasks would make this test significantly slower.
+    self.mock(task_request, '_TASKS_DELETE_CHUNK_SIZE', 5)
+
+    now = utils.utcnow()
+    task_ids = []
+    for i in xrange(14):
+      self.mock_now(now, i)
+      request = _gen_request_slices()
+      request.key = task_request.new_request_key()
+      request.put()
+      task_ids.append(task_pack.pack_request_key(request.key))
+
+    # Use 11 seconds offset, so that entities 12, 13 are not deleted. Yet create
+    # 3 GAE tasks to delete the chunks limited at 5 items.
+    self.mock_now(now + task_request._OLD_TASK_REQUEST_CUT_OFF, 11)
+    self.assertEqual(12, task_request.cron_delete_old_task_requests())
+    expected = [
+      (
+        (),
+        {
+          'payload': utils.encode_to_json({u'task_ids': task_ids[0:5]}),
+          'queue_name': 'delete-tasks',
+          'url': '/internal/taskqueue/delete-tasks',
+        },
+      ),
+      (
+        (),
+        {
+          'payload': utils.encode_to_json({u'task_ids': task_ids[5:10]}),
+          'queue_name': 'delete-tasks',
+          'url': '/internal/taskqueue/delete-tasks',
+        },
+      ),
+      (
+        (),
+        {
+          'payload': utils.encode_to_json({u'task_ids': task_ids[10:12]}),
+          'queue_name': 'delete-tasks',
+          'url': '/internal/taskqueue/delete-tasks',
+        },
+      ),
+    ]
+    # task_ids[12:14] are not touched.
+    self.assertEqual(expected, self._enqueue_calls)
+    self._enqueue_calls = []
+
+  def test_task_delete_tasks(self):
+    # The data here should be the same as what is passed to the task queue in
+    # test_cron_delete_old_task_requests.
     class Foo(ndb.Model):
       pass
-    now = utils.utcnow()
-    self.mock_now(now, 0)
-    request_old = _gen_request_slices()
-    request_old.key = task_request.new_request_key()
-    request_old.put()
-    # Create a dummy child entity to ensure it's deleted too.
-    foo_old = Foo(parent=request_old.key, id=1)
-    foo_old.put()
-    self.mock_now(now, 1)
-    request_newer = _gen_request_slices()
-    request_newer.key = task_request.new_request_key()
-    request_newer.put()
-    foo_newer = Foo(parent=request_newer.key, id=2)
-    foo_newer.put()
-    self.mock_now(now + task_request._OLD_TASK_REQUEST_CUT_OFF, 0)
-    self.assertEqual(1, task_request.cron_delete_old_task_requests())
-    # Make sure the newer one still exists.
-    actual = task_request.TaskRequest.query().fetch(keys_only=True)
-    self.assertEqual([request_newer.key], actual)
-    self.assertEqual([foo_newer.key], Foo.query().fetch(keys_only=True))
+    task_ids = []
+    for _ in xrange(5):
+      request = _gen_request_slices()
+      request.key = task_request.new_request_key()
+      request.put()
+      # Create a dummy child entity to ensure it's deleted too.
+      Foo(parent=request.key, id=1).put()
+      task_ids.append(task_pack.pack_request_key(request.key))
+
+    self.assertEqual(5, task_request.task_delete_tasks(task_ids))
+    self.assertEqual(0, task_request.TaskRequest.query().count())
+    self.assertEqual(0, Foo.query().count())
 
   def test_cron_send_to_bq_empty(self):
     # Empty, nothing is done. No need to mock the HTTP client.

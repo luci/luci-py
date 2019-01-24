@@ -265,6 +265,16 @@ class CancelTaskOnBotHandler(webapp2.RequestHandler):
           exc_info=True)
 
 
+class DeleteTasksHandler(webapp2.RequestHandler):
+  """Deletes a list of tasks, given a list of their ids."""
+
+  @decorators.require_taskqueue('delete-tasks')
+  def post(self):
+    ndb.get_context().set_cache_policy(lambda _: False)
+    payload = json.loads(self.request.body)
+    task_request.task_delete_tasks(payload['task_ids'])
+
+
 class TaskDimensionsHandler(webapp2.RequestHandler):
   """Refreshes the active task queues."""
 
@@ -383,6 +393,7 @@ def get_routes():
     # Task queues.
     ('/internal/taskqueue/cancel-tasks', CancelTasksHandler),
     ('/internal/taskqueue/cancel-task-on-bot', CancelTaskOnBotHandler),
+    ('/internal/taskqueue/delete-tasks', DeleteTasksHandler),
     ('/internal/taskqueue/rebuild-task-cache', TaskDimensionsHandler),
     (r'/internal/taskqueue/pubsub/<task_id:[0-9a-f]+>', TaskSendPubSubMessage),
     ('/internal/taskqueue/machine-provider-manage',

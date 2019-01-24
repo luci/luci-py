@@ -12,6 +12,10 @@ queue:
 - name: cancel-task-on-bot
   rate: 500/s
 
+- name: delete-tasks
+  max_concurrent_requests: 20
+  rate: 1/s
+
 - name: pubsub
   rate: 500/s
 

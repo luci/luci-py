@@ -130,6 +130,13 @@ _ENV_KEY_RE = re.compile(r'^[A-Za-z_][A-Za-z0-9_]*$')
 # TaskRequest entity groups are deleted when they are older than the cutoff.
 _OLD_TASK_REQUEST_CUT_OFF = datetime.timedelta(days=18*31)
 
+# Number of TaskRequest entity groups to be deleted per GAE task. In practice
+# we've observed it's possible to delete 1500 TaskRequest groups per 4.5
+# minutes, so there's ~3x room.
+#
+# Defined here so it can be reduced in tests.
+_TASKS_DELETE_CHUNK_SIZE = 1000
+
 
 ### Properties validators must come before the models.
 
@@ -1569,15 +1576,26 @@ def validate_priority(priority):
 
 
 def cron_delete_old_task_requests():
-  """Deletes very old TaskRequest entities and their children entities."""
+  """Deletes very old TaskRequest entities and their children entities.
+
+  This function doesn't really delete the entities, instead of collect the
+  task_id for each of them, and trigger batches of deletion to a task queue.
+
+  This is needed because the rate of deletion is slower than the incoming rate,
+  so we need to delete batches of old TaskRequest in parallel on instances with
+  high utilization.
+  """
   start = utils.utcnow()
   # Run for 4.5 minutes and schedule the cron job every 5 minutes. Running for
   # 9.5 minutes (out of 10 allowed for a cron job) results in 'Exceeded soft
   # private memory limit of 512 MB with 512 MB' even if this loop should be
   # fairly light on memory usage.
   time_to_stop = start + datetime.timedelta(seconds=int(4.5*60))
-  count = 0
+  # Total TaskRequest entities processed
   total = 0
+  # GAE tasks queues that were created to do the actual deletion.
+  tasks_succeeded = 0
+  tasks_failed = 0
   end_ts = start - _OLD_TASK_REQUEST_CUT_OFF
   first = None
   last = None
@@ -1592,21 +1610,28 @@ def cron_delete_old_task_requests():
     # should be consistent. :)
     q = TaskRequest.query(default_options=opt).filter(
         TaskRequest.created_ts <= end_ts)
-    for request_key in q:
-      if not first:
-        first = request_key
-      last = request_key
-      # Delete the whole group. An ancestor query will retrieve the entity
-      # itself too, so no need to explicitly delete it.
-      keys = ndb.Query(default_options=opt, ancestor=request_key).fetch()
-      ndb.delete_multi(keys)
-      total += len(keys)
-      count += 1
-      if utils.utcnow() >= time_to_stop:
+    cursor = None
+    while utils.utcnow() <= time_to_stop:
+      keys, cursor, more = q.fetch_page(
+          _TASKS_DELETE_CHUNK_SIZE, start_cursor=cursor)
+      if not keys:
         break
-    return count
-  except runtime.DeadlineExceededError:
-    pass
+      total += len(keys)
+      data = {u'task_ids': [task_pack.pack_request_key(k) for k in keys]}
+      if not first:
+        first = keys[0]
+      last = keys[-1]
+      ok = utils.enqueue_task(
+          url='/internal/taskqueue/delete-tasks',
+          queue_name='delete-tasks',
+          payload=utils.encode_to_json(data))
+      if not ok:
+        logging.info('Failed to enqueue %d tasks for deletion', len(keys))
+        tasks_failed += 1
+      else:
+        tasks_succeeded += 1
+      if not more:
+        break
   finally:
     first_ts = request_key_to_datetime(first) if first else None
     last_ts = request_key_to_datetime(last) if last else None
@@ -1620,13 +1645,38 @@ def cron_delete_old_task_requests():
       return str(e-s).rsplit('.', 1)[0] if e and s else 'N/A'
 
     logging.info(
-        'Deleted %d TaskRequest entities; %d entities in total.\n'
+        'Found %d TaskRequest entities to delete. %d tasks triggered;'
+            ' %d failed\n'
         'From %s to %s (%s)\n'
         'Cut off was %s; trailing by %s',
-        count, total,
+        total, tasks_succeeded, tasks_failed,
         _format_ts(first_ts), _format_ts(last_ts),
         _format_delta(last_ts, first_ts),
         _format_ts(end_ts), _format_delta(end_ts, last_ts))
+  return total
+
+
+def task_delete_tasks(task_ids):
+  """Deletes the specified tasks, a list of string encoded task ids."""
+  total = 0
+  count = 0
+  opt = ndb.QueryOptions(use_cache=False, use_memcache=False, keys_only=True)
+  try:
+    for task_id in task_ids:
+      request_key = task_pack.unpack_request_key(task_id)
+      # Delete the whole group. An ancestor query will retrieve the entity
+      # itself too, so no need to explicitly delete it.
+      keys = ndb.Query(default_options=opt, ancestor=request_key).fetch()
+      if not keys:
+        # Can happen if it is a retry.
+        continue
+      ndb.delete_multi(keys)
+      total += len(keys)
+      count += 1
+    return count
+  finally:
+    logging.info(
+        'Deleted %d TaskRequest groups; %d entities in total', count, total)
 
 
 def cron_send_to_bq():
