@@ -24,9 +24,7 @@ import stats
 import template
 from components import auth
 from components import stats_framework
-from components.stats_framework import stats_gviz
 from components import utils
-from gviz import gviz_api
 
 
 # GViz data description.
@@ -308,63 +306,6 @@ class ContentHandler(auth.AuthenticatingHandler):
     )
 
 
-class StatsHandler(webapp2.RequestHandler):
-  """Returns the statistics web page."""
-  def get(self):
-    """Presents nice recent statistics.
-
-    It fetches data from the 'JSON' API.
-    """
-    # Preloads the data to save a complete request.
-    resolution = self.request.params.get('resolution', 'hours')
-    if resolution not in ('days', 'hours', 'minutes'):
-      resolution = 'hours'
-    duration = utils.get_request_as_int(self.request, 'duration', 120, 1, 1000)
-
-    description = _GVIZ_DESCRIPTION.copy()
-    description.update(stats_gviz.get_description_key(resolution))
-    table = stats_framework.get_stats(
-        stats.STATS_HANDLER, resolution, None, duration, True)
-    params = {
-      'duration': duration,
-      'initial_data': gviz_api.DataTable(description, table).ToJSon(
-          columns_order=_GVIZ_COLUMNS_ORDER),
-      'now': datetime.datetime.utcnow(),
-      'resolution': resolution,
-    }
-    self.response.write(template.render('isolate/stats.html', params))
-
-
-class StatsGvizHandlerBase(webapp2.RequestHandler):
-  RESOLUTION = None
-
-  def get(self):
-    description = _GVIZ_DESCRIPTION.copy()
-    description.update(stats_gviz.get_description_key(self.RESOLUTION))
-    try:
-      stats_gviz.get_json(
-          self.request,
-          self.response,
-          stats.STATS_HANDLER,
-          self.RESOLUTION,
-          description,
-          _GVIZ_COLUMNS_ORDER)
-    except ValueError as e:
-      self.abort(400, str(e))
-
-
-class StatsGvizDaysHandler(StatsGvizHandlerBase):
-  RESOLUTION = 'days'
-
-
-class StatsGvizHoursHandler(StatsGvizHandlerBase):
-  RESOLUTION = 'hours'
-
-
-class StatsGvizMinutesHandler(StatsGvizHandlerBase):
-  RESOLUTION = 'minutes'
-
-
 ###  Public pages.
 
 
@@ -445,12 +386,6 @@ def get_routes():
       # User web pages.
       webapp2.Route(r'/browse', BrowseHandler),
       webapp2.Route(r'/content', ContentHandler),
-      # TODO(maruel): These really need to be migrated to Cloud Endpoints, gviz
-      # is just too sorry.
-      #webapp2.Route(r'/stats', StatsHandler),
-      #webapp2.Route(r'/isolate/api/v1/stats/days', StatsGvizDaysHandler),
-      #webapp2.Route(r'/isolate/api/v1/stats/hours', StatsGvizHoursHandler),
-      #webapp2.Route(r'/isolate/api/v1/stats/minutes', StatsGvizMinutesHandler),
       webapp2.Route(r'/', RootHandler),
       webapp2.Route(r'/newui', UIHandler),
     ])
