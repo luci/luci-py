@@ -13,8 +13,9 @@ queue:
   rate: 500/s
 
 - name: delete-tasks
-  max_concurrent_requests: 20
-  rate: 1/s
+  bucket_size: 20
+  max_concurrent_requests: 500
+  rate: 100/s
 
 - name: pubsub
   rate: 500/s

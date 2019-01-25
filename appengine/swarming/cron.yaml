@@ -27,7 +27,7 @@ cron:
 
 - description: Delete old TaskRequest
   url: /internal/cron/delete_old_tasks
-  schedule: every 5 minutes synchronized
+  schedule: every 10 minutes synchronized
   target: backend
 
 - description: Send task requests to BigQuery
