@@ -6,6 +6,8 @@ syntax = "proto3";
 
 package swarming;
 
+option go_package = "go.chromium.org/luci/swarming/proto/config;configpb";
+
 // Schema for pools.cfg service config file in luci-config.
 //
 // It defined a set of Pool objects, each one corresponding to a single Swarming

@@ -6,6 +6,8 @@ syntax = "proto3";
 
 package swarming;
 
+option go_package = "go.chromium.org/luci/swarming/proto/config;configpb";
+
 // Schema for settings.cfg service config file in luci-config.
 message SettingsCfg {
   reserved 10;  // used to be dimension_acls

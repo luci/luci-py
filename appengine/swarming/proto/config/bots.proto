@@ -6,6 +6,8 @@ syntax = "proto3";
 
 package swarming;
 
+option go_package = "go.chromium.org/luci/swarming/proto/config;configpb";
+
 // Schema for bots.cfg service config file in luci-config.
 //
 // It defines a function bot_id => (required credentials, trusted_dimensions,
