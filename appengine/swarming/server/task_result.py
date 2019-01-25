@@ -1578,6 +1578,11 @@ def cron_send_to_bq():
     """Converts a TaskRunResult to a tuple(db_key, bq_key, row)."""
     out = swarming_pb2.TaskResult()
     e.to_proto(out)
+    if not e.ended_ts:
+      # Inconsistent query. This is extremely rare, a TaskRunResult was returned
+      # from the _yield_done_tasks() query but e.ended_ts isn't set after all
+      # due to an inconsistency in the database.
+      return None, None, None
     return (e.ended_ts.strftime(fmt), e.task_id, out)
 
   def get_oldest_key():
@@ -1606,7 +1611,10 @@ def cron_send_to_bq():
     rows = []
     earliest = datetime.datetime.strptime(db_key, fmt)
     for e in _yield_done_tasks(earliest, size):
-      rows.append(_convert(e))
+      line = _convert(e)
+      if not line[0]:
+        continue
+      rows.append(line)
       if len(rows) == size:
         # We have enough.
         break
@@ -1614,12 +1622,13 @@ def cron_send_to_bq():
 
   def fetch_rows(_db_keys, bq_keys):
     """Returns a list of tuple(db_key, bq_key, row)."""
-    return [
+    items = (
       _convert(e)
       for e in ndb.get_multi(
           task_pack.unpack_run_result_key(k) for k in bq_keys)
-      if e
-    ]
+      if e)
+    # Ignore _convert() failure.
+    return [e for e in items if e[0]]
 
   return bq_state.cron_send_to_bq(
       'task_results', get_oldest_key, get_rows, fetch_rows)
