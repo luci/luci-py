@@ -8,7 +8,6 @@ at all since it's running on AppEngine.
 Swarming is purely a task scheduler service. File I/O is done through
 [Isolate](../isolate).
 
-
 [Documentation](doc)
 
 
