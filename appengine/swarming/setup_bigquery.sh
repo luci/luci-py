@@ -54,7 +54,6 @@ echo "  Warning: On first 'bq' invocation, it'll try to find out default"
 echo "    credentials and will ask to select a default app; just press enter to"
 echo "    not select a default."
 
-# Optional: --default_table_expiration 63244800
 if ! (bq --location=US mk --dataset \
   --description 'Swarming statistics' ${APPID}:swarming); then
   echo ""
@@ -69,6 +68,7 @@ echo "  Warning: On first 'bqschemaupdater' invocation, it'll request default"
 echo "    credentials which is stored independently than 'bq'."
 cd proto/api
 if ! (bqschemaupdater -force \
+    -partitioning-expiration 4320h \
     -message swarming.v1.BotEvent \
     -table ${APPID}.swarming.bot_events \
     -partitioning-field event_time); then
@@ -82,6 +82,7 @@ if ! (bqschemaupdater -force \
   exit 1
 fi
 if ! (bqschemaupdater -force \
+    -partitioning-expiration 4320h \
     -message swarming.v1.TaskRequest \
     -table ${APPID}.swarming.task_requests \
     -partitioning-field create_time); then
@@ -95,6 +96,7 @@ if ! (bqschemaupdater -force \
   exit 1
 fi
 if ! (bqschemaupdater -force \
+    -partitioning-expiration 4320h \
     -message swarming.v1.TaskResult \
     -table ${APPID}.swarming.task_results \
     -partitioning-field end_time); then
@@ -108,3 +110,41 @@ if ! (bqschemaupdater -force \
   exit 1
 fi
 cd -
+
+echo "- Create BigQuery views:"
+echo ""
+echo " - swarming.bot_events_delta"
+QUERY="SELECT
+  DATE(event_time) AS day,
+  TIMESTAMP_TRUNC(event_time, SECOND) AS time,
+  ROUND(
+    TIMESTAMP_DIFF(
+      event_time,
+      CAST(
+        LEAD(event_time) OVER(PARTITION BY bot.bot_id ORDER BY event_time DESC)
+        AS TIMESTAMP),
+      MICROSECOND)*0.000001,
+    3) AS since_last,
+  ROUND(
+    TIMESTAMP_DIFF(
+      CAST(
+        LAG(event_time) OVER(PARTITION BY bot.bot_id ORDER BY event_time DESC)
+        AS TIMESTAMP),
+      event_time,
+      MICROSECOND)*0.000001,
+    3) AS until_next,
+  *
+FROM \`${APPID}.swarming.bot_events\`
+ORDER BY event_time DESC
+"
+if !(bq mk --use_legacy_sql=false --view "$QUERY" \
+  --description "Includes the delta since the last event for the same bot" \
+  --project_id ${APPID} swarming.bot_events_delta); then
+  echo ""
+  echo "The view already exists. You can delete it with:"
+  echo ""
+  echo "  bq rm ${APPID}:swarming.bot_events_delta"
+  echo ""
+  echo "and run this script again."
+  # Don't fail here.
+fi
