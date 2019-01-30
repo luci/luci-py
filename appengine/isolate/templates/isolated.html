@@ -25,7 +25,7 @@ version: {{isolated.get('version', '')}}
 <table>
     <thead><tr><th>file</th><th>digest</th><th>mode</th><th>size</th><th>symlink</th><th>filetype</th></tr></thead>
     <tbody>
-        {% for filepath, file in isolated.files.iteritems() %}
+        {% for filepath, file in isolated.get(files, {}).iteritems() %}
         <tr>
             <td>
             {% if 'h' in file %}
