@@ -1364,64 +1364,6 @@ def _filter_query(cls, q, start, end, sort, state):
   raise ValueError('Invalid state')
 
 
-def _yield_done_tasks(earliest, size_hint):
-  """Yields oldest TaskRunResult entities starting a earliest."""
-  # The query is a bit tricky, as there's no property in the TaskRunResult
-  # model to declare if a task is 'done'.
-  #
-  # Oops.
-  #
-  # So for now process all tasks with two queries, even if this is both
-  # inefficient and incorrect; see TaskResult in swarming.proto for more
-  # details.
-  # Use a large batch_size, otherwise the log is littered with 'suspended
-  # generator run_to_queue' log warnings and it helps performance, at the cost
-  # of higher DB RPC usage than strictly necessary.
-  batch_size = max(2, size_hint/4)
-  queries = [
-      TaskRunResult.query(
-          TaskRunResult.completed_ts > earliest).order(
-              TaskRunResult.completed_ts).iter(
-                  batch_size=batch_size, deadline=30),
-      TaskRunResult.query(
-          TaskRunResult.abandoned_ts > earliest).order(
-              TaskRunResult.abandoned_ts).iter(
-                  batch_size=batch_size, deadline=30),
-  ]
-  # Fetch the first entities, if any.
-  entities = [[] for _ in xrange(len(queries))]
-  for i, q in enumerate(queries):
-    try:
-      entities[i].append(q.next())
-    except StopIteration:
-      pass
-  # Loop while there's still entities to yield.
-  while any(entities):
-    # Take the earliest of the entities found, then fill back.
-    selected = None
-    index = None
-    for i, es in enumerate(entities):
-      if not es:
-        continue
-      e = es[0]
-      t1 = e.ended_ts
-      if selected and selected.ended_ts <= t1:
-        continue
-      # We found the earliest.
-      if selected:
-        # Push back the previously found item.
-        entities[index].insert(0, selected)
-      selected = es.pop(0)
-      index = i
-      # Prefetch the next one.
-      try:
-        entities[i].append(queries[i].next())
-      except StopIteration:
-        # This query is done.
-        pass
-    yield selected
-
-
 ### Public API.
 
 
@@ -1588,37 +1530,32 @@ def cron_send_to_bq():
   def get_oldest_key():
     """Returns a tuple(db_key, bq_key)."""
     # BigQuery requires partitioned table to not insert items older than 365
-    # days old, so start at entities only 364 days old.
-    cutoff = (utils.utcnow() - datetime.timedelta(days=364))
+    # days old. The problem with going back all the way to 364 days is that
+    # churning through the backlog can take a *long* time, so only go back 7
+    # days.
+    cutoff = (utils.utcnow() - datetime.timedelta(days=7))
     cutoff = datetime.datetime(cutoff.year, cutoff.month, cutoff.day)
-    oldest = TaskRunResult.query(TaskRunResult.modified_ts >= cutoff).order(
-        TaskRunResult.modified_ts).get()
+    oldest = TaskRunResult.query(TaskRunResult.completed_ts >= cutoff).order(
+        TaskRunResult.completed_ts).get()
     if not oldest:
       return None, None
     # Since the query is an inequality > (and not >=), go back in time 1 second
-    # to not discard the very first entity. Use modified_ts here instead of
-    # completed_ts/abandoned_ts, since modified_ts will always be lower or equal
-    # to these two values.
-    # This means that the task_id is unusable in get_rows().
+    # to not discard the very first entity.
     return (
-      (oldest.modified_ts - datetime.timedelta(seconds=1)).strftime(fmt),
+      (oldest.completed_ts - datetime.timedelta(seconds=1)).strftime(fmt),
       oldest.task_id,
     )
 
   def get_rows(db_key, _bq_key, size):
     """Returns a list of tuple(db_key, bq_key, row)."""
     # bq_key is not usable here, see get_oldest_key() to see why.
-    rows = []
     earliest = datetime.datetime.strptime(db_key, fmt)
-    for e in _yield_done_tasks(earliest, size):
-      line = _convert(e)
-      if not line[0]:
-        continue
-      rows.append(line)
-      if len(rows) == size:
-        # We have enough.
-        break
-    return rows
+    return [
+        _convert(e) for e in
+        TaskRunResult.query(TaskRunResult.completed_ts > earliest).order(
+            TaskRunResult.completed_ts).fetch(limit=size)
+        if e
+    ]
 
   def fetch_rows(_db_keys, bq_keys):
     """Returns a list of tuple(db_key, bq_key, row)."""
