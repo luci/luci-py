@@ -4,6 +4,7 @@
 # that can be found in the LICENSE file.
 
 import hashlib
+import json
 import logging
 import os
 import sys
@@ -101,12 +102,12 @@ class MainTest(test_case.TestCase):
     self.testbed.setup_env(USER_EMAIL='reader@example.com', overwrite=True)
 
   @staticmethod
-  def gen_content_inline(namespace='default', content='Foo'):
+  def gen_content_inline(namespace='default', content='Foo', is_isolated=False):
     hashhex = hashlib.sha1(content).hexdigest()
     key = model.get_entry_key(namespace, hashhex)
     model.new_content_entry(
         key,
-        is_isolated=False,
+        is_isolated=is_isolated,
         content=content,
         compressed_size=len(content),
         expanded_size=len(content),
@@ -131,6 +132,14 @@ class MainTest(test_case.TestCase):
     self.app_frontend.get(
       '/browse?namespace=default&digest=%s&as=file1.txt' % hashhex)
 
+  def test_browse_isolated(self):
+    self.set_as_reader()
+    content = json.dumps({'algo': 'sha1', 'includes': ['hash1']})
+    hashhex = self.gen_content_inline(content=content, is_isolated=True)
+    self.app_frontend.get('/browse?namespace=default&digest=%s' % hashhex)
+    self.app_frontend.get(
+      '/browse?namespace=default&digest=%s&as=file1.txt' % hashhex)
+
   def test_browse_missing(self):
     self.set_as_reader()
     hashhex = '0123456780123456780123456789990123456789'
@@ -146,6 +155,14 @@ class MainTest(test_case.TestCase):
     resp = self.app_frontend.get(
         '/content?namespace=default&digest=%s&as=file1.txt' % hashhex)
     self.assertEqual('Foo', resp.body)
+
+  def test_content_isolated(self):
+    self.set_as_reader()
+    content = json.dumps({'algo': 'sha1', 'includes': ['hash1']})
+    hashhex = self.gen_content_inline(content=content, is_isolated=True)
+    resp = self.app_frontend.get(
+        '/content?namespace=default&digest=%s' % hashhex)
+    self.assertTrue(resp.body.startswith('<style>'), resp.body)
 
   def test_content_gcs(self):
     content = 'Foo'

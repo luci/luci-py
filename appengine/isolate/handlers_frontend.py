@@ -281,10 +281,11 @@ class ContentHandler(auth.AuthenticatingHandler):
         json_data = json.loads(content)
         if self._is_isolated_format(json_data):
           self.response.headers['Content-Type'] = 'text/html; charset=utf-8'
-          json_data['files'] = collections.OrderedDict(
-            sorted(
-              json_data['files'].items(),
-              key=lambda (filepath, data): filepath))
+          if 'files' in json_data:
+            json_data['files'] = collections.OrderedDict(
+              sorted(
+                json_data['files'].items(),
+                key=lambda (filepath, data): filepath))
           params = {
             'namespace': namespace,
             'isolated': json_data,
