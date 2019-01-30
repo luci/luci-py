@@ -1,0 +1,94 @@
+task-page {
+
+  main {
+    > div {
+      border: 1px solid #daa; /*TODO REMOVE, just for initial development*/
+    }
+
+    .title {
+      font-size: 1.5em;
+      font-weight: 700;
+      margin: 5px;
+    }
+  }
+
+  .horizontal.layout {
+    display: flex;
+    flex-direction: row;
+
+    .grow {
+      flex: 1;
+      flex-basis: 0px;
+    }
+  }
+
+  .wrap.layout {
+    flex-wrap: wrap;
+  }
+
+
+  table {
+    border-collapse: collapse;
+    margin-left: 5px;
+    margin-bottom: 8px;
+  }
+  td, th {
+    border: 1px solid #BBB;
+    padding: 5px;
+  }
+
+  .task-info {
+    min-width: 500px;
+
+    /* Tell all the second td in a tr (i.e. the content) to break
+       to avoid wrapping.  This keeps the first columns nice and
+       unbroken without having to add a bunch of classes.*/
+    td:nth-child(2) {
+      word-break: break-word;
+    }
+
+    .pending {
+      color: #E69F00;
+    }
+    .overhead {
+      color: #D55E00;
+    }
+    .running {
+      color: #0072B2;
+    }
+  }
+
+  /* Adds | between the dimensions, if there are more than 1*/
+  span.dim~span.dim:before {
+    content: " | ";
+  }
+
+  .dim.bold {
+    font-weight: 700;
+  }
+
+  .highlight {
+    background-color: #FFFFE0;
+  }
+  .reproduce {
+    margin-left: 5px;
+  }
+  .bottom_space {
+    margin-bottom: 10px;
+  }
+
+  .code {
+    font-family: monospace;
+  }
+  .break-all {
+    word-break: break-all;
+  }
+  .cipd-header {
+    font-weight: 700;
+    /* Make it easier for users to copy-paste the versions by
+       making the header not selectable.*/
+    user-select: none;
+    margin-left: 8px;
+  }
+}
+]

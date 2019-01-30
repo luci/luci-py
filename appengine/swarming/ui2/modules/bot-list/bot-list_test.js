@@ -122,8 +122,8 @@ describe('bot-list', function() {
           expect(loginMessage.hidden).toBeFalsy('Message should not be hidden');
           expect(loginMessage.textContent).toContain('must sign in');
           done();
-        })
-      })
+        });
+      });
       it('does not display filters or bots', function(done) {
         createElement((ele) => {
           const botTable = $$('.bot-table', ele);
@@ -132,7 +132,7 @@ describe('bot-list', function() {
           expect($$('main button:not([hidden])', ele)).toBeFalsy('no buttons seen');
           expect($$('.header', ele)).toBeFalsy('no filters seen');
           done();
-        })
+        });
       });
     }); //end describe('when not logged in')
 
@@ -911,8 +911,7 @@ describe('bot-list', function() {
       calls.forEach((c) => {
         expect(c[1].headers).toBeDefined();
         expect(c[1].headers.authorization).toContain('Bearer ');
-      })
-
+      });
       calls = fetchMock.calls(MATCHED, 'POST');
       expect(calls.length).toBe(0, 'no POSTs on bot-list');
 

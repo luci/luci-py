@@ -226,3 +226,17 @@ export function taskPageLink(taskId, disableCanonicalID) {
   }
   return `/task?id=${taskId}`;
 }
+
+/** timeDiffExact returns the exact difference between the two specified
+ *  dates.  E.g. 2d 22h 22m 28s ago If a second date is not provided,
+ *  now is used.
+ */
+export function timeDiffExact(first, second) {
+  if (!first) {
+    return "eons";
+  }
+  if (!second) {
+    second = new Date();
+  }
+  return human.strDuration((second.getTime() - first.getTime())/1000);
+}

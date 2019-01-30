@@ -136,7 +136,7 @@ export function requireLogin(logged_in, delay=100) {
         if (logged_in instanceof Function) {
           return {
             status: 200,
-            body: JSON.stringify(logged_in()),
+            body: JSON.stringify(logged_in(url, opts)),
             headers: {'Content-Type':'application/json'},
           };
         }
@@ -174,12 +174,12 @@ export function expectNoUnmatchedCalls(fetchMock) {
     let calls = fetchMock.calls(UNMATCHED, 'GET');
     expect(calls.length).toBe(0, 'no unmatched (unexpected) GETs');
     if (calls.length) {
-      console.warn(calls);
+      console.warn('unmatched GETS', calls);
     }
     calls = fetchMock.calls(UNMATCHED, 'POST');
     expect(calls.length).toBe(0, 'no unmatched (unexpected) POSTs');
     if (calls.length) {
-      console.warn(calls);
+      console.warn('unmatched POSTS', calls);
     }
 }
 

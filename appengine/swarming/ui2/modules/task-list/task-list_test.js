@@ -102,6 +102,8 @@ describe('task-list', function() {
     });
   }
 
+//===============TESTS START====================================
+
   describe('html structure', function() {
     it('contains swarming-app as its only child', function(done) {
       createElement((ele) => {
@@ -119,8 +121,8 @@ describe('task-list', function() {
           expect(loginMessage.hidden).toBeFalsy('Message should not be hidden');
           expect(loginMessage.textContent).toContain('must sign in');
           done();
-        })
-      })
+        });
+      });
       it('does not display filters or tasks', function(done) {
         createElement((ele) => {
           const taskTable = $$('.task-table', ele);
@@ -128,7 +130,7 @@ describe('task-list', function() {
           expect(taskTable.hidden).toBeTruthy('.task-table should be hidden');
           expect($$('.header', ele).hidden).toBeTruthy('no filters seen');
           done();
-        })
+        });
       });
     }); //end describe('when not logged in')
 
@@ -841,8 +843,7 @@ describe('task-list', function() {
       calls.forEach((c) => {
         expect(c[1].headers).toBeDefined();
         expect(c[1].headers.authorization).toContain('Bearer ');
-      })
-
+      });
       calls = fetchMock.calls(MATCHED, 'POST');
       expect(calls.length).toBe(0, 'no POSTs on task-list');
 
