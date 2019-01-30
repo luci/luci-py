@@ -12,10 +12,15 @@ queue:
 - name: cancel-task-on-bot
   rate: 500/s
 
+# An heavy workload produces 1000 tasks per minute, 10000 tasks per 10 minutes.
+# The cron job runs every 10 minutes and leaves 5 minutes for the tasks to
+# complete.
+# Each task is 1000 tasks, and takes around 3 minutes to complete. This means
+# around 10 tasks in practice should be sufficient, set it to 20 to keep a
+# safety margin.
 - name: delete-tasks
-  bucket_size: 20
-  max_concurrent_requests: 500
-  rate: 100/s
+  max_concurrent_requests: 20
+  rate: 1/s
 
 - name: pubsub
   rate: 500/s
