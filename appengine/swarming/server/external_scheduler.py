@@ -167,6 +167,7 @@ def notify_request(es_cfg, request, result_summary):
   item.time.FromDatetime(utils.utcnow())
   item.task.id = request.task_id
   item.task.tags.extend(request.tags)
+  item.task.enqueued_time.FromDatetime(request.created_ts)
   for i in range(request.num_task_slices):
     s = request.task_slice(i)
     flat_dimensions = task_queues.dimensions_to_flat(s.properties.dimensions)
@@ -179,8 +180,6 @@ def notify_request(es_cfg, request, result_summary):
   if result_summary.bot_id:
     # TODO(akeshet): We should only actually set this is state is running.
     item.task.bot_id = result_summary.bot_id
-
-  # TODO(akeshet): set enqueued_time on item correctly.
 
   req.scheduler_id = es_cfg.id
 

@@ -68,30 +68,11 @@ class FakeExternalScheduler(object):
   # plugin_prpc_pb2.ExternalSchedulerServiceDescription.
   def __init__(self, test):
     self._test = test
+    self.called_with_requests = []
 
   def NotifyTasks(self, req, credentials):  # pylint: disable=unused-argument
     self._test.assertIsInstance(req, plugin_pb2.NotifyTasksRequest)
-    task = plugin_pb2.TaskSpec(
-        id=u'1d69b9f088008810',
-        tags=[
-          u'os:Windows-3.1.1',
-          u'pool:default',
-          u'priority:50',
-          u'service_account:none',
-          u'swarming.pool.template:no_config',
-          u'tag:1',
-          u'user:Jesus',
-        ],
-        slices=[
-          plugin_pb2.SliceSpec(
-              dimensions=[u'os:Windows-3.1.1', u'pool:default']),
-        ],
-        state=swarming_pb2.NO_RESOURCE)
-    notif = plugin_pb2.NotifyTasksItem(task=task)
-    notif.time.FromDatetime(utils.utcnow())
-    expected = plugin_pb2.NotifyTasksRequest(
-        scheduler_id=u'foo', notifications=[notif])
-    self._test.assertEqual(expected, req)
+    self.called_with_requests.append(req)
     return plugin_pb2.NotifyTasksResponse()
 
 
@@ -100,6 +81,11 @@ class ExternalSchedulerApiTest(test_case.TestCase):
 
   def setUp(self):
     super(ExternalSchedulerApiTest, self).setUp()
+    self.es_cfg = pools_config.ExternalSchedulerConfig(
+        address=u'http://localhost:1',
+        id=u'foo',
+        dimensions=['key1:value1', 'key2:value2'],
+        enabled=True)
     # Make the values deterministic.
     self.mock_now(datetime.datetime(2014, 1, 2, 3, 4, 5, 6))
     self.mock(random, 'getrandbits', lambda _: 0x88)
@@ -147,15 +133,22 @@ class ExternalSchedulerApiTest(test_case.TestCase):
     pass
 
   def test_notify_request(self):
-    es_cfg = pools_config.ExternalSchedulerConfig(
-        address=u'http://localhost:1',
-        id=u'foo',
-        dimensions=['key1:value1', 'key2:value2'],
-        enabled=True)
-    req = request = _gen_request()
+
+    request = _gen_request()
     result_summary = task_scheduler.schedule_request(request, None)
-    res = external_scheduler.notify_request(es_cfg, req, result_summary)
+    res = external_scheduler.notify_request(self.es_cfg, request,
+                                            result_summary)
     self.assertEqual(plugin_pb2.NotifyTasksResponse(), res)
+
+    self.assertEqual(len(self._client.called_with_requests), 1)
+    called_with = self._client.called_with_requests[0]
+    self.assertEqual(len(called_with.notifications), 1)
+    notification = called_with.notifications[0]
+
+    self.assertEqual(request.created_ts,
+                     notification.task.enqueued_time.ToDatetime())
+    self.assertEqual(request.task_id, notification.task.id)
+    self.assertEqual(request.num_task_slices, len(notification.task.slices))
 
 
 if __name__ == '__main__':
