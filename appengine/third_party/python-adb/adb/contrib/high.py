@@ -754,11 +754,12 @@ class HighDevice(object):
               'free_mb': round(float(match.group(1)) / 1024., 1),
               'size_mb': round(float(match.group(2)) / 1024., 1),
           }
-    return {
-        u'cache': props[u'Cache-Free'],
-        u'data': props[u'Data-Free'],
-        u'system': props[u'System-Free'],
+    km = {
+      u'cache': u'Cache-Free',
+      u'data': u'Data-Free',
+      u'system': u'System-Free',
     }
+    return {k: props[v] for k, v in km.iteritems() if v in props}
 
   def GetPackageVersion(self, package):
     """Returns the installed version of the given package."""
@@ -865,7 +866,7 @@ class HighDevice(object):
       out, _ = self.Shell('pm path %s' % pipes.quote(package))
       # Ignore the exit code of "pm path" since it can't be trusted. (On K, it
       # always returns 0.)
-      if 'package:' not in out:
+      if out is not None and 'package:' not in out:
         return True
     _LOG.info('%s: %s', cmd, out)
     return False
@@ -888,9 +889,10 @@ class HighDevice(object):
       - status: If not booted, string describing why.
     """
     if not skip_sd_card:
-      if not self.cache.external_storage_path:
+      ext = self.cache.external_storage_path
+      if not ext or not ext.startswith('/'):
         return False, 'external storage not ready'
-      if self.Stat(self.cache.external_storage_path)[0] is None:
+      if self.Stat(ext)[0] is None:
         return False, 'external storage not ready'
 
     # Check if the boot animation has stopped.
@@ -903,6 +905,9 @@ class HighDevice(object):
     # pm can be very slow at times. Use a longer timeout to prevent
     # confusing a long-running command with an interrupted connection.
     out, exit_code = self.Shell('pm path', timeout_ms=30000)
+    if out is None:
+      logging.warning('pm path (%s): failed', exit_code)
+      return False, 'pm not ready'
     if ('Error: no package specified' not in out and
         'Argument expected after "path"' not in out):
       # Accepts an empty string too, which has been observed only on Android 4.4

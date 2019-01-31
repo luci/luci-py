@@ -947,7 +947,11 @@ class AdbCommandsSafe(object):
     """
     items = [self.port_path, inspect.stack()[1][3]]
     items.extend(args)
-    msg = ('%s.%s' + fmt) % tuple(items)
+    try:
+      msg = (u'%s.%s' + fmt) % tuple(items)
+    except UnicodeDecodeError:
+      msg = u'%s.%s: failed to encode error message as unicode' % (
+          self.port_path, inspect.stack()[1][3])
     _LOG.error(msg)
     if self._on_error:
       self._on_error(msg)
