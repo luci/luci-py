@@ -182,28 +182,6 @@ class TaskRequestPrivateTest(TestCase):
     with self.assertRaises(ValueError):
       task_request._validate_task_run_id(Prop(), '1')
 
-  def test_validate_isolated(self):
-    task_request._validate_isolated(
-        Prop(), '0123456789012345678901234567890123456789')
-    task_request._validate_isolated(
-        Prop(), '0123456789012345678901234567890123abcdef')
-    task_request._validate_isolated(
-        Prop(), '0123456789abcdef'*4)
-    task_request._validate_isolated(
-        Prop(), '0123456789abcdef'*8)
-    with self.assertRaises(datastore_errors.BadValueError):
-      task_request._validate_isolated(
-          Prop(), '123456789012345678901234567890123456789')
-    with self.assertRaises(datastore_errors.BadValueError):
-      task_request._validate_isolated(
-          Prop(), 'g123456789012345678901234567890123456789')
-    with self.assertRaises(datastore_errors.BadValueError):
-      task_request._validate_isolated(
-          Prop(), '0123456789abcdef'*3)
-    with self.assertRaises(datastore_errors.BadValueError):
-      task_request._validate_isolated(
-          Prop(), '0123456789abcdef'*9)
-
   def test_apply_template_simple(self):
     tt = _gen_task_template(
       cache={'cache': 'c'},
@@ -686,9 +664,28 @@ class TaskRequestApiTest(TestCase):
 
   def test_init_new_request_bot_service_account(self):
     request = _gen_request(service_account='bot')
+    request.put()
     as_dict = request.to_dict()
     self.assertEqual('bot', as_dict['service_account'])
     self.assertIn(u'service_account:bot', as_dict['tags'])
+
+  def test_init_new_request_RBE_CAS(self):
+    request = _gen_request(
+        properties=_gen_properties(
+            inputs_ref=task_request.FilesRef(
+                isolated='dead' * (64/4),
+                isolatedserver='astuce-service',
+                namespace='sha256-GCP')))
+    request.put()
+    as_dict = request.to_dict()
+    expected = {
+      'isolated':
+          u'deaddeaddeaddeaddeaddeaddeaddeaddeaddeaddeaddeaddeaddeaddeaddead',
+      'isolatedserver': u'astuce-service',
+      'namespace': u'sha256-GCP',
+    }
+    self.assertEqual(
+        expected, as_dict['task_slices'][0]['properties']['inputs_ref'])
 
   def _set_pool_config_with_templates(
       self, prod=None, canary=None, canary_chance=None, pool_name=u'default'):
@@ -1465,33 +1462,46 @@ class TaskRequestApiTest(TestCase):
                 isolated='deadbeefdeadbeefdeadbeefdeadbeefdeadbeef',
                 isolatedserver='http://localhost:1',
                 namespace='default-gzip'))).put()
+    # Bad digest.
+    req = _gen_request(properties=_gen_properties(
+        command=['see', 'spot', 'run'],
+        inputs_ref=task_request.FilesRef(
+            isolated='deadbeef',
+            isolatedserver='http://localhost:1',
+            namespace='default-gzip')))
     with self.assertRaises(datastore_errors.BadValueError):
-      # Bad digest.
-      _gen_request(properties=_gen_properties(
-          command=['see', 'spot', 'run'],
-          inputs_ref=task_request.FilesRef(
-              isolated='deadbeef',
-              isolatedserver='http://localhost:1',
-              namespace='default-gzip')))
+      req.put()
     # inputs_ref without server/namespace.
     req = _gen_request(
         properties=_gen_properties(inputs_ref=task_request.FilesRef()))
     with self.assertRaises(datastore_errors.BadValueError):
       req.put()
+    # Without digest nor command.
+    req = _gen_request(properties=_gen_properties(
+        command=[],
+        inputs_ref=task_request.FilesRef(
+            isolatedserver='https://isolateserver.appspot.com',
+            namespace='default-gzip^^^')))
     with self.assertRaises(datastore_errors.BadValueError):
-      # Without digest nor command.
-      _gen_request(properties=_gen_properties(
-          command=[],
-          inputs_ref=task_request.FilesRef(
-              isolatedserver='https://isolateserver.appspot.com',
-              namespace='default-gzip^^^')))
-    # Command and server can be skipped.
-    _gen_request(properties=_gen_properties(
+      req.put()
+    # For 'sha256-GCP', the length must be 64.
+    req = _gen_request(properties=_gen_properties(
         command=[],
         inputs_ref=task_request.FilesRef(
             isolated='deadbeefdeadbeefdeadbeefdeadbeefdeadbeef',
-            isolatedserver='http://localhost:1',
-            namespace='default-gzip'))).put()
+            isolatedserver='foo-bar',
+            namespace='sha256-GCP')))
+    with self.assertRaises(datastore_errors.BadValueError):
+      req.put()
+    # For 'sha256-GCP', the isolatedserver value must not contain '://'.
+    req = _gen_request(properties=_gen_properties(
+        command=[],
+        inputs_ref=task_request.FilesRef(
+            isolated='dead' * (64/4),
+            isolatedserver='foo://bar',
+            namespace='sha256-GCP')))
+    with self.assertRaises(datastore_errors.BadValueError):
+      req.put()
 
   def test_request_bad_pubsub(self):
     _gen_request(pubsub_topic=u'projects/a/topics/abc').put()

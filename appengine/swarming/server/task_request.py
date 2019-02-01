@@ -151,33 +151,11 @@ def _get_validate_length(maximum):
   return lambda prop, value: _validate_length(prop, value, maximum)
 
 
-def _validate_isolated(prop, value):
-  if not value:
-    return
-
-  if not _HASH_CHARS.issuperset(value):
-    raise datastore_errors.BadValueError(
-        '%s must be lowercase hex, not %s' %
-        (prop._name, value))
-
-  length = len(value)
-  if length not in (40, 64, 128):
-    raise datastore_errors.BadValueError(
-        '%s must be lowercase hex of length 40, 64 or 128, but length is %d' %
-        (prop._name, length))
-
-
 def _validate_url(prop, value):
   _validate_length(prop, value, 1024)
   if value and not validation.is_valid_secure_url(value):
     raise datastore_errors.BadValueError(
         '%s must be valid HTTPS URL, not %s' % (prop._name, value))
-
-
-def _validate_namespace(prop, value):
-  _validate_length(prop, value, 128)
-  if not pools_config.NAMESPACE_RE.match(value):
-    raise datastore_errors.BadValueError('malformed %s' % prop._name)
 
 
 def _validate_dimensions(_prop, value):
@@ -447,20 +425,22 @@ def _validate_service_account(prop, value):
 
 
 class FilesRef(ndb.Model):
-  """Defines a data tree reference, normally a reference to a .isolated file."""
+  """Defines a data tree reference for Swarming task inputs or outputs.
 
-  # TODO(maruel): make this class have one responsibility. Currently it is used
-  # in two modes:
-  # - a reference to a tree, as class docstring says.
-  # - input/output settings in TaskProperties.
+  It can either be:
+    - a reference to an isolated file on an isolate server
+    - a reference to an isolated file on a RBE CAS server
 
+  In the RBE CAS case, the isolatedserver must be set to GCP name, and namespace
+  must be set to "sha256-GCP". For the moment, RBE CAS requires SHA-256 and
+  doesn't support precompressed data.
+  """
   # The hash of an isolated archive.
-  isolated = ndb.StringProperty(validator=_validate_isolated, indexed=False)
-  # The hostname of the isolated server to use.
-  isolatedserver = ndb.StringProperty(
-      validator=_validate_url, indexed=False)
-  # Namespace on the isolate server.
-  namespace = ndb.StringProperty(validator=_validate_namespace, indexed=False)
+  isolated = ndb.StringProperty(indexed=False)
+  # The hostname of the isolated server to use or the Google Cloud Project name.
+  isolatedserver = ndb.StringProperty(indexed=False)
+  # Namespace on the isolate server or "sha256-GCP" for a RBE CAS.
+  namespace = ndb.StringProperty(indexed=False)
 
   def to_proto(self, out):
     """Converts self to a swarming_pb2.CASTree."""
@@ -472,13 +452,38 @@ class FilesRef(ndb.Model):
       out.namespace = self.namespace
 
   def _pre_put_hook(self):
-    # TODO(maruel): Get default value from config
-    # IsolateSettings.default_server.
     super(FilesRef, self)._pre_put_hook()
     if not self.isolatedserver or not self.namespace:
       raise datastore_errors.BadValueError(
           'isolate server and namespace are required')
 
+    if self.namespace == 'sha256-GCP':
+      # Minimally validate GCP project name. For now, just assert length and
+      # that it doesn't contain '://'.
+      if ((not 3 <= len(self.isolatedserver) <= 30) or
+          '://' in self.isolatedserver):
+        raise datastore_errors.BadValueError(
+            'isolatedserver must be valid GCP project')
+    else:
+      _validate_url(self.__class__.isolatedserver, self.isolatedserver)
+      _validate_length(self.__class__.namespace, self.namespace, 128)
+      if not pools_config.NAMESPACE_RE.match(self.namespace):
+        raise datastore_errors.BadValueError('malformed namespace')
+
+    if self.isolated:
+      if not _HASH_CHARS.issuperset(self.isolated):
+        raise datastore_errors.BadValueError(
+            'isolated must be lowercase hex')
+      length = len(self.isolated)
+      expected = 40
+      if self.namespace.startswith('sha256-'):
+        expected = 64
+      if self.namespace.startswith('sha512-'):
+        expected = 128
+      if length != expected:
+        raise datastore_errors.BadValueError(
+            'isolated must be lowercase hex of length %d, but length is %d' %
+            (expected, length))
 
 class SecretBytes(ndb.Model):
   """Defines an optional secret byte string logically defined with the

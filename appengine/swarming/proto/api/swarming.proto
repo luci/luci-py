@@ -470,6 +470,8 @@ message BotEvent {
 // Defines a Content Addressed Storage (a cache in practice) data tree
 // reference, normally a reference to a .isolated file.
 //
+// This can be used to refer to either a task's inputs or a task's outputs.
+//
 // The .isolated file format is defined at
 // https://chromium.googlesource.com/infra/luci/luci-py.git/+/master/appengine/isolate/doc/Design.md#file-format
 // It is a JSON file listing all the inputs.
@@ -477,8 +479,10 @@ message BotEvent {
 // It is very different RBE's CAS format, which uses a merkel tree of protobuf
 // files.
 message CASTree {
-  // The isolated server to fetch (or push) content from. Must contain
-  // "https://" or "http://" prefix.
+  // server is one of:
+  // - The isolated server to fetch (or push) content from. Must contain
+  //   "https://" or "http://" prefix.
+  // - The Google Cloud Project name hosting the RBE CAS.
   string server = 1;
   // The hex encoded hash of an isolated archive. It is expected to be a SHA-1
   // (40 characters) or SHA-256 (64 characters), based on the namespace value
@@ -489,6 +493,10 @@ message CASTree {
   //
   // A prefix "sha256-" defines a SHA-256 hashing. Defaults to SHA-1.
   // A suffix "-flate" or "-gzip" defines a deflate algorithm.
+  //
+  // When referring to a RBE CAS instance, the namespace must be set to
+  // "sha256-GCP". The GCP RBE CAS requires SHA-256 and doesn't support
+  // precompressed data.
   string namespace = 3;
 }
 

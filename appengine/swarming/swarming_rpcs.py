@@ -222,12 +222,21 @@ class FileContent(messages.Message):
 
 
 class FilesRef(messages.Message):
-  """Defines a data tree reference, normally a reference to a .isolated file."""
+  """Defines a data tree reference for Swarming task inputs or outputs.
+
+  It can either be:
+    - a reference to an isolated file on an isolate server
+    - a reference to an isolated file on a RBE CAS server
+
+  In the RBE CAS case, the isolatedserver must be set to GCP name, and namespace
+  must be set to "sha256-GCP". For the moment, RBE CAS requires SHA-256 and
+  doesn't support precompressed data.
+  """
   # The hash of an isolated archive.
   isolated = messages.StringField(1)
-  # The hostname of the isolated server to use.
+  # The hostname of the isolated server to use or the Google Cloud Project name.
   isolatedserver = messages.StringField(2)
-  # Namespace on the isolate server.
+  # Namespace on the isolate server or "sha256-GCP" for a GCP hosted RBE CAS.
   namespace = messages.StringField(3)
 
 
