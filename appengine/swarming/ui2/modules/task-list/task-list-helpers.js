@@ -420,6 +420,25 @@ export function taskClass(task) {
     return '';
 }
 
+const naturalSortDims = {
+  'cores-tag': true,
+  'cpu-tag': true,
+  'gpu-tag': true,
+  'machine_type-tag': true,
+  'os-tag': true,
+  'priority-tag': true,
+  'python-tag': true,
+  'xcode_version-tag': true,
+  'zone-tag': true,
+};
+
+/** Returns true or false if a key is "special" enough to be sorted
+ *  via natural sort. Natural sort is more expensive and shouldn't be
+ *  used for large, arbitrary strings. https://crbug.com/927532
+ */
+export function useNaturalSort(key) {
+  return naturalSortDims[key];
+}
 
 /** colHeaderMap maps keys to their human readable name.*/
 const colHeaderMap = {

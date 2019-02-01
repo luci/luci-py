@@ -830,3 +830,17 @@ export const fleetDimensions = {
  "kind": "swarming#botsItem",
  "etag": "\"d6G6dOeYK-vHGD-PwSbeOsCnwa8/Bc6D9yOV3qWztuAExH_BbC_5oNM\""
 };
+
+let caches = new Array(400);
+caches.fill('builder_1f179f0f1635560dacd58f0e40b3454e2bb4599d6850bdacacb50f08879998e7_v2');
+caches = caches.map((b) => b += ('_' + Math.random() * 100));
+
+// For testing https://crbug.com/927532
+export const hardToSortDimensions = {
+ "ts": "2018-06-14T12:44:19.551385",
+ "bots_dimensions": [
+  {
+   "value": caches,
+   "key": "caches"
+  }],
+};

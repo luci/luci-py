@@ -46,7 +46,7 @@ import * as query from 'common-sk/modules/query'
 import { applyAlias } from '../alias'
 import { appendPossibleColumns, appendPrimaryMap, column, filterTasks, floorSecond, getColHeader,
          listQueryParams, processTasks, sortColumns, sortPossibleColumns, specialSortMap,
-         stripTag, taskClass } from './task-list-helpers'
+         stripTag, taskClass, useNaturalSort } from './task-list-helpers'
 import { botListLink } from '../util'
 import { filterPossibleColumns, filterPossibleKeys,
          filterPossibleValues, makeFilter } from '../queryfilter'
@@ -129,7 +129,11 @@ const secondaryOptions = (ele) => {
 </div>`;
   }
   values = filterPossibleValues(values, ele._primaryKey, ele._filterQuery);
-  values.sort(naturalSort);
+  if (useNaturalSort(ele._primaryKey)) {
+    values.sort(naturalSort);
+  } else {
+    values.sort();
+  }
   return values.map((value) =>
     html`
 <div class=item>

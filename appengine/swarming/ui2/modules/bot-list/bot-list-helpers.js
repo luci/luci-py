@@ -499,6 +499,26 @@ function timeDiffApprox(date) {
   return human.diffDate(date.getTime());
 }
 
+const naturalSortDims = {
+  'cores': true,
+  'cpu': true,
+  'gpu': true,
+  'host-cpu': true,
+  'machine_type': true,
+  'os': true,
+  'python': true,
+  'xcode_version': true,
+  'zone': true,
+};
+
+/** Returns true or false if a key is "special" enough to be sorted
+ *  via natural sort. Natural sort is more expensive and shouldn't be
+ *  used for large, arbitrary strings. https://crbug.com/927532
+ */
+export function useNaturalSort(key) {
+  return naturalSortDims[key];
+}
+
 const blacklistDimensions = ['quarantined', 'error', 'id'];
 
 /** extraKeys is a list of things we want to be able to sort by or display

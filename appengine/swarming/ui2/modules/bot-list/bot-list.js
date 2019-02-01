@@ -43,7 +43,7 @@ import { aggregateTemps, attribute, botLink, column, devices,
          filterBots,  fromDimension, fromState, getColHeader, initCounts,
          listQueryParams, longestOrAll, processBots, processCounts,
          makePossibleColumns, processPrimaryMap, sortColumns, sortPossibleColumns,
-         specialFilters, specialSortMap } from './bot-list-helpers'
+         specialFilters, specialSortMap, useNaturalSort } from './bot-list-helpers'
 import { filterPossibleColumns, filterPossibleKeys,
          filterPossibleValues, makeFilter } from '../queryfilter'
 import { moreOrLess } from '../templates'
@@ -83,7 +83,11 @@ const secondaryOptions = (ele) => {
 </div>`;
   }
   values = filterPossibleValues(values, ele._primaryKey, ele._filterQuery);
-  values.sort(naturalSort);
+  if (useNaturalSort(ele._primaryKey)) {
+    values.sort(naturalSort);
+  } else {
+    values.sort();
+  }
   return values.map((value) =>
     html`
 <div class=item>
