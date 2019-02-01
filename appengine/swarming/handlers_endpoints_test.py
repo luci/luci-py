@@ -1535,6 +1535,10 @@ class TaskApiTest(BaseTest):
     """Asserts that result raises 404 for unknown task IDs."""
     self.call_api('result', body={'task_id': '12310'}, status=404)
 
+  def test_result_long(self):
+    """Asserts that result raises 400 for wildly invalid task IDs."""
+    self.call_api('result', body={'task_id': '12310'*10}, status=400)
+
   def test_result_ok(self):
     """Asserts that result produces a result entity."""
     self.mock(random, 'getrandbits', lambda _: 0x88)

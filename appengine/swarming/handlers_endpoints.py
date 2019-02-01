@@ -341,7 +341,10 @@ class SwarmingTaskService(remote.Service):
     # on the very last store where the task is saved to NDB to be marked as
     # completed, and that the DB store succeeds *but* the memcache update fails,
     # this API will *always* return the stale version.
-    _, result = _get_request_and_result(request.task_id, _VIEW, False)
+    try:
+      _, result = _get_request_and_result(request.task_id, _VIEW, False)
+    except ValueError:
+      raise endpoints.BadRequestException('Invalid task ID')
     return message_conversion.task_result_to_rpc(
         result, request.include_performance_stats)
 
