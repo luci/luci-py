@@ -669,6 +669,8 @@ def dimensions_to_flat(dimensions):
 
   So it means that the limit is effectively halved for non-BMP characters,
   depending on the python build used.
+
+  Silently remove duplicate dimensions, for the same reason as for long ones.
   """
   cutoff = config.DIMENSION_KEY_LENGTH + 1 + config.DIMENSION_VALUE_LENGTH
   out = []
@@ -681,8 +683,9 @@ def dimensions_to_flat(dimensions):
         # UTF-8.
         flat = flat[:cutoff] + u'…'
       out.append(flat)
-  out.sort()
-  return out
+  # Remove duplicate dimensions. While invalid, we want to make sure they can be
+  # stored without throwing an exception.
+  return sorted(set(out))
 
 
 def hash_dimensions(dimensions):

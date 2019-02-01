@@ -394,7 +394,8 @@ class _BotBaseHandler(_BotApiHandler):
       if not all(
           config.validate_dimension_key(key) and
           isinstance(values, list) and
-          all(config.validate_dimension_value(value) for value in values)
+          all(config.validate_dimension_value(value) for value in values) and
+          len(values) == len(set(values))
           for key, values in dimensions.iteritems()):
         quarantined_msg = (
             'Invalid dimensions type:\n%s' % json.dumps(dimensions,

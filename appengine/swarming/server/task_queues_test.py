@@ -291,6 +291,10 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
     ]
     self.assertEqual(expected, actual)
 
+  def test_dimensions_to_flat_duplicate_value(self):
+    actual = task_queues.dimensions_to_flat({u'a': [u'c', u'c']})
+    self.assertEqual([u'a:c'], actual)
+
   def test_python_len_non_BMP(self):
     # Here are emojis in the base plane. They are 1 character.
     self.assertEqual(1, len(u'⌛'))
