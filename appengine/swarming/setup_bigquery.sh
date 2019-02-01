@@ -115,7 +115,7 @@ cd -
 echo "- Create BigQuery views:"
 echo ""
 echo " - swarming.bot_events_delta"
-QUERY="SELECT
+QUERY='SELECT
   DATE(event_time) AS day,
   TIMESTAMP_TRUNC(event_time, SECOND) AS time,
   ROUND(
@@ -134,12 +134,16 @@ QUERY="SELECT
       event_time,
       MICROSECOND)*0.000001,
     3) AS until_next,
+  ARRAY(SELECT FORMAT("%s:%s", d.key, v) FROM e.bot.dimensions d, d.values v)
+    AS dimensions_flat,
   *
-FROM \`${APPID}.swarming.bot_events\`
-ORDER BY event_time DESC
-"
-if !(bq mk --use_legacy_sql=false --view "$QUERY" \
-  --description "Includes the delta since the last event for the same bot" \
+FROM `'${APPID}'.swarming.bot_events` AS e
+WHERE event_time >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 22 DAY)
+ORDER BY event_time DESC'
+DESC="Augmented view of last 3 weeks with deltas between events and \
+dimensions_flat"
+if !(bq mk --use_legacy_sql=false --view "${QUERY}" \
+  --description "{$DESC}" \
   --project_id ${APPID} swarming.bot_events_delta); then
   echo ""
   echo "The view already exists. You can delete it with:"
