@@ -1843,6 +1843,29 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
 
     self.assertEqual(4, len(pub_sub_calls)) # RUNNING -> COMPLETED
 
+  def test_cron_handle_bot_died_broken_task(self):
+    # Not sure why, but this was observed on the fleet: the TaskRequest is
+    # missing from the DB. This test ensures the cron job doesn't throw in this
+    # situation.
+    run_result = self._quick_reap(
+        1,
+        0,
+        task_slices=[
+          task_request.TaskSlice(
+              expiration_secs=60,
+              properties=_gen_properties(),
+              wait_for_capacity=False),
+        ])
+    to_run_key = task_to_run.request_to_task_to_run_key(
+        run_result.request_key.get(), 1, 0)
+    now_1 = self.mock_now(self.now + task_result.BOT_PING_TOLERANCE, 1)
+
+    # Very unusual, the TaskRequest disappeared:
+    run_result.request_key.delete()
+
+    self.assertEqual(
+        (['1d69b9f088008911'], 0, 0), task_scheduler.cron_handle_bot_died())
+
   def test_bot_poll_http_500_but_bot_reapears_after_BOT_PING_TOLERANCE(self):
     # A bot reaped a task, sleeps for over BOT_PING_TOLERANCE (2 minutes), then
     # sends a ping.

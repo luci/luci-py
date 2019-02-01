@@ -285,6 +285,20 @@ def _handle_dead_bot(run_result_key):
   server_version = utils.get_app_version()
   packed = task_pack.pack_run_result_key(run_result_key)
   request = request_future.get_result()
+  if not request:
+    # That's a particularly broken task, there's no TaskRequest in the DB!
+    #
+    # The cleanest thing to do would be to delete the whole entity, but that's
+    # risky. Let's say there's a bug or a runtime issue that makes the DB GET
+    # fail spuriously, we don't want to delete a whole task due to a transient
+    # RPC failure.
+    #
+    # An other option is to create a temporary in-memory TaskRequest() entity,
+    # but it's more trouble than it look like, as we need to populate one that
+    # is valid, and the code in task_result really assumes it is in the DB.
+    #
+    # So for now, just skip it to unblock the cron job.
+    return False
   es_cfg = external_scheduler.config_for_task(request)
 
   def run():
