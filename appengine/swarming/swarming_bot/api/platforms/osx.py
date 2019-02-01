@@ -310,7 +310,7 @@ def _get_system_profiler(data_type):
   """Returns an XML about the system display properties."""
   sp = subprocess.check_output(
       ['system_profiler', data_type, '-xml'])
-  return plistlib.readPlistFromString(sp)[0]['_items']
+  return plistlib.readPlistFromString(sp)[0].get('_items', [])
 
 
 @tools.cached
