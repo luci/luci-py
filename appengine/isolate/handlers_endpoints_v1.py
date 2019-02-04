@@ -52,9 +52,11 @@ class Digest(messages.Message):
 
 class Namespace(messages.Message):
   """Encapsulates namespace, compression, and hash algorithm."""
+  # This defines the hashing and compression algorithms.
+  #
+  # A suffix '-flate' or '-gzip' signals that zlib deflate compression is used.
+  # Otherwise the content is stored as-is.
   namespace = messages.StringField(1, default='default')
-  digest_hash = messages.StringField(2, default='SHA-1')
-  compression = messages.StringField(3, default='flate')
 
 
 class DigestCollection(messages.Message):
