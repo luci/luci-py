@@ -12,6 +12,7 @@
 syntax = "proto3";
 
 package swarming.v1;
+option go_package = "swarming";
 
 import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
