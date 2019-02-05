@@ -96,6 +96,7 @@ export function mockAppGETs(fetchMock, permissions) {
     server_version: '1234-abcdefg',
     bot_version: 'abcdoeraymeyouandme',
     machine_provider_template: 'https://example.com/leases/%s',
+    display_server_url_template: 'https://example.com#id=%s',
   });
 
 
@@ -107,6 +108,7 @@ export function mockAuthdAppGETs(fetchMock, permissions) {
     server_version: '1234-abcdefg',
     bot_version: 'abcdoeraymeyouandme',
     machine_provider_template: 'https://example.com/leases/%s',
+    display_server_url_template: 'https://example.com#id=%s',
   }));
 
 

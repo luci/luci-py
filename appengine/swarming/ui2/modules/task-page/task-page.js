@@ -4,18 +4,20 @@
 
 import { $$ } from 'common-sk/modules/dom'
 import { html, render } from 'lit-html'
+import { ifDefined } from 'lit-html/directives/if-defined';
 import { jsonOrThrow } from 'common-sk/modules/jsonOrThrow'
 import { stateReflector } from 'common-sk/modules/stateReflector'
 
+import 'elements-sk/checkbox-sk'
 import 'elements-sk/icon/add-circle-outline-icon-sk'
 import 'elements-sk/styles/buttons'
 import '../swarming-app'
 
 import * as human from 'common-sk/modules/human'
 
-import { cipdLink, humanState, isolateLink, parseRequest, parseResult,
-         sliceExpires, taskCost, taskExpires, taskInfoClass, wasDeduped,
-         wasPickedUp} from './task-page-helpers'
+import { cipdLink, hasRichOutput, humanState, isolateLink, isSummaryTask,
+         parseRequest, parseResult, richLogsLink, sliceExpires, taskCost, taskExpires,
+         taskInfoClass, wasDeduped, wasPickedUp} from './task-page-helpers'
 import { botPageLink, humanDuration, taskPageLink } from '../util'
 
 import SwarmingAppBoilerplate from '../SwarmingAppBoilerplate'
@@ -194,7 +196,7 @@ ${dimensions.map(dimension_row)}
 
 const dimension_row = (dimension) => html`
 <tr>
-  <td><b>${dimension.key}:</b> ${dimension.value}</td>
+  <td class=break-all><b>${dimension.key}:</b> ${dimension.value}</td>
 </tr>
 `;
 
@@ -587,8 +589,44 @@ const reproduceSection = (ele, currentSlice) => {
 }
 
 const taskLogs = (ele) => html`
-  Task logs goes here
+<div class="horizontal layout">
+  <div class=output-picker>
+    <div class=tab ?selected=${!ele._showRawOutput && hasRichOutput(ele)}
+                   ?disabled=${!hasRichOutput(ele)}
+                   @click=${ele._toggleOutput}>
+      <a rel=noopener target=_blank href=${ifDefined(richLogsLink(ele))}>
+        Rich Output
+      </a>
+    </div>
+    <div class=tab ?selected=${ele._showRawOutput || !hasRichOutput(ele)}
+                   @click=${ele._toggleOutput}>
+      Raw Output
+    </div>
+    <checkbox-sk id=wide_logs ?checked=${ele._wideLogs} @click=${ele._toggleWidth}></checkbox-sk>
+    <span>Full Width Logs</span>
+  </div>
+</div>
+${richOrRawLogs(ele)}
 `;
+
+const richOrRawLogs = (ele) => {
+  if (ele._showRawOutput || !hasRichOutput(ele)) {
+    return html`
+<div class="code stdout tabbed break-all ${ele._wideLogs ? 'wide' : ''}">${ele._stdout}</div>
+`;
+  }
+  if (!isSummaryTask(ele._taskId)) {
+    return html`
+<div class=tabbed>
+  Milo results are only generated for task summaries, that is, tasks whose ids end in 0.
+  Tasks ending in 1 or 2 represent possible retries of tasks.
+  See <a href="//goo.gl/LE4rwV">the docs</a> for more.
+</div>`;
+  }
+  return html`
+<iframe id=richLogsFrame class=tabbed src=${ifDefined(richLogsLink(ele))}></iframe>
+`;
+}
 
 const template = (ele) => html`
 <swarming-app id=swapp
@@ -634,8 +672,9 @@ window.customElements.define('task-page', class extends SwarmingAppBoilerplate {
     // help stateReflector with types.
     this._taskId = '';
     this._showDetails = false;
-    this._refresh = 0;  // sentinal value for "URL params loaded"
     this._showRawOutput = false;
+    this._wideLogs = false;
+    this._urlParamsLoaded = false;
 
     this._stateChanged = stateReflector(
       /*getState*/() => {
@@ -643,15 +682,16 @@ window.customElements.define('task-page', class extends SwarmingAppBoilerplate {
           // provide empty values
           'id': this._taskId,
           'd': this._showDetails,
-          'r': this._refresh,
           'o': this._showRawOutput,
+          'w': this._wideLogs,
         }
     }, /*setState*/(newState) => {
       // default values if not specified.
       this._taskId = newState.id || this._taskId;
       this._showDetails = newState.d; // default to false
-      this._refresh = newState.r || 1000;
       this._showRawOutput = newState.o; // default to false
+      this._wideLogs = newState.w;
+      this._urlParamsLoaded = true;
       this._fetch();
       this.render();
     });
@@ -682,7 +722,7 @@ window.customElements.define('task-page', class extends SwarmingAppBoilerplate {
   }
 
   _fetch() {
-    if (!this.loggedInAndAuthorized || !this._refresh) {
+    if (!this.loggedInAndAuthorized || !this._urlParamsLoaded) {
       return;
     }
     if (this._fetchController) {
@@ -696,7 +736,7 @@ window.customElements.define('task-page', class extends SwarmingAppBoilerplate {
       headers: {'authorization': this.auth_header},
       signal: this._fetchController.signal,
     };
-    this.app.addBusyTasks(2);
+    this.app.addBusyTasks(3);
     let currIdx = -1;
     fetch(`/_ah/api/swarming/v1/task/${this._taskId}/request`, extra)
       .then(jsonOrThrow)
@@ -721,6 +761,14 @@ window.customElements.define('task-page', class extends SwarmingAppBoilerplate {
         this.app.finishedTask();
       })
       .catch((e) => this.fetchError(e, 'task/result'));
+    fetch(`/_ah/api/swarming/v1/task/${this._taskId}/stdout`, extra)
+      .then(jsonOrThrow)
+      .then((json) => {
+        this._stdout = json.output;
+        this.render();
+        this.app.finishedTask();
+      })
+      .catch((e) => this.fetchError(e, 'task/request'));
   }
 
   render() {
@@ -739,9 +787,21 @@ window.customElements.define('task-page', class extends SwarmingAppBoilerplate {
   }
 
   _toggleDetails(e) {
-    // This prevents a double event from happening.
-    e.preventDefault();
     this._showDetails = !this._showDetails;
+    this._stateChanged();
+    this.render();
+  }
+
+  _toggleOutput(e) {
+    this._showRawOutput = !this._showRawOutput;
+    this._stateChanged();
+    this.render();
+  }
+
+  _toggleWidth(e) {
+    // This prevents the checkbox from toggling twice.
+    e.preventDefault();
+    this._wideLogs = !this._wideLogs;
     this._stateChanged();
     this.render();
   }

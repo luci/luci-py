@@ -12,7 +12,7 @@ describe('task-page', function() {
   const { $, $$ } = require('common-sk/modules/dom');
   const { customMatchers, expectNoUnmatchedCalls, mockAppGETs } = require('modules/test_util');
   const { fetchMock, MATCHED, UNMATCHED } = require('fetch-mock');
-  const { taskResults, taskRequests } = require('modules/task-page/test_data');
+  const { taskOutput, taskResults, taskRequests } = require('modules/task-page/test_data');
 
   const TEST_TASK_ID = 'test0b3c0fac7810';
 
@@ -109,6 +109,7 @@ describe('task-page', function() {
 
     fetchMock.get(`/_ah/api/swarming/v1/task/${TEST_TASK_ID}/request`, request);
     fetchMock.get(`/_ah/api/swarming/v1/task/${TEST_TASK_ID}/result?include_performance_stats=true`, result);
+    fetchMock.get(`/_ah/api/swarming/v1/task/${TEST_TASK_ID}/stdout`, taskOutput);
   }
 
 //===============TESTS START====================================
@@ -282,8 +283,8 @@ describe('task-page', function() {
           expect(tabs.length).toEqual(2);
 
           // The 2nd tab ran, so it should be shown by default.
-          expect(tabs[0].hasAttribute('selected')).toBeFalsy();
-          expect(tabs[1].hasAttribute('selected')).toBeTruthy();
+          expect(tabs[0]).not.toHaveAttribute('selected');
+          expect(tabs[1]).toHaveAttribute('selected');
           done();
         });
       });
@@ -299,6 +300,53 @@ describe('task-page', function() {
           const message = stateRow.children[1];
           expect(message).toMatchTextContent('THIS SLICE DID NOT RUN. '+
                                              'Select another slice above.');
+          done();
+        });
+      });
+
+      it('shows rich logs in an iframe', function(done) {
+        loggedInTaskPage((ele) => {
+          ele._showRawOutput = false;
+          ele.render();
+
+          const frame = $$('#richLogsFrame', ele);
+          expect(frame).toBeTruthy();
+          expect(frame.src).toEqual('https://example.com/#id='+TEST_TASK_ID);
+
+          // Stdout logs aren't rendered then
+          const logs = $$('.stdout.code', ele);
+          expect(logs).toBeFalsy();
+          done();
+        });
+      });
+
+      it('shows stdout logs in a box', function(done) {
+        loggedInTaskPage((ele) => {
+          ele._showRawOutput = true;
+          ele._wideLogs = false;
+          ele.render();
+
+          // Rich logs aren't rendered then
+          const frame = $$('#richLogsFrame', ele);
+          expect(frame).toBeFalsy();
+
+          const logs = $$('.stdout.code', ele);
+          expect(logs).toBeTruthy();
+          expect(logs.textContent).toContain('Lorem ipsum dolor');
+          expect(logs).not.toHaveClass('wide');
+          done();
+        });
+      });
+
+      it('can show wide logs', function(done) {
+        loggedInTaskPage((ele) => {
+          ele._showRawOutput = true;
+          ele._wideLogs = true;
+          ele.render();
+
+          const logs = $$('.stdout.code.wide', ele);
+          expect(logs).toBeTruthy();
+          expect(logs.textContent).toContain('Lorem ipsum dolor');
           done();
         });
       });
@@ -347,6 +395,57 @@ describe('task-page', function() {
           done();
         });
       });
+
+      it('switches between log representations with a tab', function(done) {
+        loggedInTaskPage((ele) => {
+          ele._showRawOutput = false;
+          ele.render();
+          const tabs = $('.output-picker .tab', ele);
+          expect(tabs.length).toEqual(2);
+          expect(tabs[0]).not.toHaveAttribute('disabled');
+          expect(tabs[0]).toHaveAttribute('selected');
+          expect(tabs[1]).not.toHaveAttribute('selected');
+
+          tabs[1].click();
+
+          expect(tabs[0]).not.toHaveAttribute('disabled');
+          expect(tabs[0]).not.toHaveAttribute('selected');
+          expect(tabs[1]).toHaveAttribute('selected');
+
+          tabs[0].click();
+          expect(tabs[0]).not.toHaveAttribute('disabled');
+          expect(tabs[0]).toHaveAttribute('selected');
+          expect(tabs[1]).not.toHaveAttribute('selected');
+
+          done();
+        });
+      });
+
+      it('switches between wide and narrow logs', function(done) {
+        loggedInTaskPage((ele) => {
+          ele._wideLogs = false;
+          ele._showRawOutput = true;
+          ele.render();
+          const logs = $$('.stdout.code', ele);
+          expect(logs).toBeTruthy();
+
+          const checkbox = $$('#wide_logs', ele);
+          expect(checkbox).not.toHaveAttribute('checked');
+          expect(logs).not.toHaveClass('wide');
+
+          checkbox.click();
+
+          expect(checkbox).toHaveAttribute('checked');
+          expect(logs).toHaveClass('wide');
+
+          checkbox.click();
+
+          expect(checkbox).not.toHaveAttribute('checked');
+          expect(logs).not.toHaveClass('wide');
+
+          done();
+        });
+      });
     });
   });
 
@@ -384,7 +483,7 @@ describe('task-page', function() {
       serveTask(0, 'Completed task with 2 slices');
       loggedInTaskPage((ele) => {
         let calls = fetchMock.calls(MATCHED, 'GET');
-        expect(calls.length).toBe(2+2, '2 GETs from swarming-app, 2 from task-page');
+        expect(calls.length).toBe(2+3, '2 GETs from swarming-app, 3 from task-page');
         // calls is an array of 2-length arrays with the first element
         // being the string of the url and the second element being
         // the options that were passed in
@@ -392,6 +491,7 @@ describe('task-page', function() {
 
         expect(gets).toContain(`/_ah/api/swarming/v1/task/${TEST_TASK_ID}/request`);
         expect(gets).toContain(`/_ah/api/swarming/v1/task/${TEST_TASK_ID}/result?include_performance_stats=true`);
+        expect(gets).toContain(`/_ah/api/swarming/v1/task/${TEST_TASK_ID}/stdout`);
 
         checkAuthorizationAndNoPosts(calls);
         done();

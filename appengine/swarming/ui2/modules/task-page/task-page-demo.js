@@ -3,7 +3,7 @@
 // that can be found in the LICENSE file.
 import './index.js'
 
-import { taskResult, taskRequest } from './test_data'
+import { taskOutput, taskResult, taskRequest } from './test_data'
 import { requireLogin, mockAuthdAppGETs } from '../test_util'
 import { $$ } from 'common-sk/modules/dom'
 
@@ -21,6 +21,9 @@ fetchMock.get('glob:/_ah/api/swarming/v1/task/*/request',
 
 fetchMock.get('glob:/_ah/api/swarming/v1/task/*/result?include_performance_stats=true',
               requireLogin(taskResult, 200));
+
+fetchMock.get('glob:/_ah/api/swarming/v1/task/*/stdout',
+              requireLogin(taskOutput, 100));
 
 // Everything else
 fetchMock.catch(404);
