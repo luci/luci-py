@@ -493,7 +493,7 @@ message CASTree {
   // algorithm and compression algorithm but is currently loosely defined.
   //
   // A prefix "sha256-" defines a SHA-256 hashing. Defaults to SHA-1.
-  // A suffix "-flate" or "-gzip" defines a deflate algorithm.
+  // A suffix "-deflate" or "-gzip" defines a deflate algorithm.
   //
   // When referring to a RBE CAS instance, the namespace must be set to
   // "sha256-GCP". The GCP RBE CAS requires SHA-256 and doesn't support

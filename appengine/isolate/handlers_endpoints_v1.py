@@ -54,8 +54,11 @@ class Namespace(messages.Message):
   """Encapsulates namespace, compression, and hash algorithm."""
   # This defines the hashing and compression algorithms.
   #
-  # A suffix '-flate' or '-gzip' signals that zlib deflate compression is used.
-  # Otherwise the content is stored as-is.
+  # A prefix 'sha256-' or 'sha512-' respectively mean that the SHA-256 or
+  # SHA-512 hashing algorithm is used. Otherwise, the SHA-1 algorithm is used.
+  #
+  # A suffix '-deflate' or '-gzip' signals that zlib deflate compression is
+  # used. Otherwise the content is stored as-is.
   namespace = messages.StringField(1, default='default')
 
 
@@ -150,7 +153,7 @@ def entry_key_or_error(namespace, digest):
     raise endpoints.BadRequestException(error.message)
 
 
-def hash_content(content, namespace):
+def hash_compressed_content(namespace, content):
   """Decompresses and hashes given |content|.
 
   Returns tuple (hex digest, expanded size).
@@ -158,7 +161,7 @@ def hash_content(content, namespace):
   Raises ValueError in case of errors.
   """
   expanded_size = 0
-  digest = hashlib.sha1()
+  digest = model.get_hash(namespace)
   try:
     for data in model.expand_content(namespace, [content]):
       expanded_size += len(data)
@@ -384,11 +387,15 @@ class IsolateService(remote.Service):
     if not uploaded_to_gs:
       # Assert that embedded content is the data sent by the request.
       logging.debug('%s', digest)
-      if (digest, size) != hash_content(content, namespace):
+      try:
+        actual = hash_compressed_content(namespace, content)
+      except ValueError as e:
+        raise endpoints.BadRequestException(str(e))
+      if (digest, size) != actual:
         raise endpoints.BadRequestException(
             'Embedded digest does not match provided data: '
             '(digest, size): (%r, %r); expected: %r' % (
-                digest, size, hash_content(content, namespace)))
+                digest, size, actual))
       try:
         entry.put()
       except datastore_errors.Error as e:

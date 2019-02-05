@@ -87,7 +87,7 @@ class SwarmingClient(object):
     cmd = [
       sys.executable, 'isolate.py', 'archive',
       '-I', self._isolate_server,
-      '--namespace', 'default-gzip',
+      '--namespace', 'sha1-deflate',
       '-i', isolate_path,
       '-s', isolated_path,
     ]
@@ -125,7 +125,7 @@ class SwarmingClient(object):
       '--dump-json', tmp,
       '--task-name', name,
       '-I',  self._isolate_server,
-      '--namespace', 'default-gzip',
+      '--namespace', 'sha1-deflate',
       '-s', isolated_hash,
     ]
     if extra:
@@ -1278,8 +1278,8 @@ class Test(unittest.TestCase):
     return {
       u'isolated': isolated_hash,
       u'isolatedserver': unicode(self.servers.isolate_server.url),
-      u'namespace': u'default-gzip',
-      u'view_url': u'%s/browse?namespace=default-gzip&hash=%s' %
+      u'namespace': u'sha1-deflate',
+      u'view_url': u'%s/browse?namespace=sha1-deflate&hash=%s' %
           (self.servers.isolate_server.url, isolated_hash),
     }
 

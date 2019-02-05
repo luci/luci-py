@@ -117,13 +117,22 @@ def check_hash(hash_key, length):
     raise ValueError('Invalid \'%s\' as ContentEntry key' % hash_key)
 
 
+def get_hash(namespace):
+  """Returns an initialized hashlib object that corresponds to the namespace."""
+  if namespace.startswith('sha256-'):
+    return hashlib.sha256()
+  if namespace.startswith('sha512-'):
+    return hashlib.sha512()
+  return hashlib.sha1()
+
+
 def get_entry_key(namespace, hash_key):
   """Returns a valid ndb.Key for a ContentEntry."""
   if isinstance(namespace, unicode):
     namespace = namespace.encode('utf-8')
   if isinstance(hash_key, unicode):
     hash_key = hash_key.encode('utf-8')
-  check_hash(hash_key, hashlib.sha1().digest_size * 2)
+  check_hash(hash_key, get_hash(namespace).digest_size * 2)
   return entry_key_from_id('%s/%s' % (namespace, hash_key))
 
 
@@ -171,8 +180,7 @@ def expiration_jitter(now, expiration):
 
 def expand_content(namespace, source):
   """Yields expanded data from source."""
-  # TODO(maruel): Add bzip2.
-  # TODO(maruel): Remove '-gzip' since it's a misnomer.
+  # Note: '-gzip' since it's a misnomer.
   if namespace.endswith(('-deflate', '-gzip')):
     zlib_state = zlib.decompressobj()
     for i in source:

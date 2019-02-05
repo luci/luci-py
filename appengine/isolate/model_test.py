@@ -23,19 +23,10 @@ import model
 # pylint: disable=W0212
 
 
-def hash_item(content):
-  h = hashlib.sha1()
+def hash_item(namespace, content):
+  h = model.get_hash(namespace)
   h.update(content)
   return h.hexdigest()
-
-
-def gen_item(content):
-  """Returns data to send to /pre-upload to upload 'content'."""
-  return {
-    'h': hash_item(content),
-    'i': 0,
-    's': len(content),
-  }
 
 
 class MainTest(test_case.TestCase):
@@ -65,6 +56,22 @@ class MainTest(test_case.TestCase):
     k = datastore_utils.shard_key(
         actual_prefix, len(actual_prefix), 'ContentShard')
     self.assertEqual(2, len(list(model.ContentEntry.query(ancestor=k))))
+
+  def test_get_hash(self):
+    content = 'foo'
+    self.assertEqual(
+        '0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33',
+        hash_item('default-gzip', content))
+    self.assertEqual(
+        '0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33',
+        hash_item('sha1-gzip', content))
+    self.assertEqual(
+        '2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae',
+        hash_item('sha256-gzip', content))
+    self.assertEqual(
+        'f7fbba6e0636f890e56fbbf3283e524c6fa3204ae298382d624741d0dc6638326e282'
+          'c41be5e4254d8820772c5518a2c5a8c0c7f7eda19594a7eb539453e1ed7',
+        hash_item('sha512-gzip', content))
 
 
 if __name__ == '__main__':

@@ -73,12 +73,10 @@ def split_payload(request, chunk_size, max_chunks):
   return [content[i * chunk_size: (i + 1) * chunk_size] for i in xrange(count)]
 
 
-def payload_to_hashes(request):
-  """Converts a raw payload into SHA-1 hashes as bytes."""
-  return split_payload(
-      request,
-      hashlib.sha1().digest_size,
-      model.MAX_KEYS_PER_DB_OPS)
+def payload_to_hashes(request, namespace):
+  """Converts a raw payload into hashes as bytes."""
+  h = model.get_hash(namespace)
+  return split_payload(request, h.digest_size, model.MAX_KEYS_PER_DB_OPS)
 
 
 def incremental_delete(query, delete, check=None):
@@ -280,7 +278,7 @@ class InternalTagWorkerHandler(webapp2.RequestHandler):
     now = utils.timestamp_to_datetime(long(timestamp))
     expiration = config.settings().default_expiration
     try:
-      digests = payload_to_hashes(self)
+      digests = payload_to_hashes(self, namespace)
       # Requests all the entities at once.
       futures = ndb.get_multi_async(
           model.get_entry_key(namespace, binascii.hexlify(d)) for d in digests)
@@ -360,7 +358,7 @@ class InternalVerifyWorkerHandler(webapp2.RequestHandler):
         entry.compressed_size <= model.MAX_MEMCACHE_ISOLATED and
         entry.is_isolated)
     expanded_size = 0
-    digest = hashlib.sha1()
+    digest = model.get_hash(namespace)
     data = None
 
     try:
