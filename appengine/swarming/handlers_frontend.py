@@ -249,10 +249,10 @@ def get_routes():
     routes.extend([
       # Frontend pages. They return HTML.
       # Public pages.
-      ('/<page:(bot|task|tasklist)>', UIHandler),
+      ('/<page:(bot|task)>', UIHandler),
       # Send bot-list and index to NewUIHandler (i.e. WebComponents)
-      ('/<page:(botlist|)>', NewUIHandler),
-      ('/oldui/<page:(botlist|)>', UIHandler),
+      ('/<page:(botlist|tasklist|)>', NewUIHandler),
+      ('/oldui/<page:(botlist|tasklist)>', UIHandler),
 
       # Redirects to Polymer UI
       ('/user/tasks', TasksHandler),
