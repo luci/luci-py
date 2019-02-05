@@ -2,18 +2,20 @@
 // Use of this source code is governed under the Apache License, Version 2.0
 // that can be found in the LICENSE file.
 
+import { $$ } from 'common-sk/modules/dom'
 import { html, render } from 'lit-html'
 import { jsonOrThrow } from 'common-sk/modules/jsonOrThrow'
+import { stateReflector } from 'common-sk/modules/stateReflector'
 
-import 'elements-sk/styles/buttons'
 import 'elements-sk/icon/add-circle-outline-icon-sk'
+import 'elements-sk/styles/buttons'
 import '../swarming-app'
 
 import * as human from 'common-sk/modules/human'
 
 import { cipdLink, humanState, isolateLink, parseRequest, parseResult,
-         sliceExpires, taskCost, taskExpires, wasDeduped,
-         wasPickedUp } from './task-page-helpers'
+         sliceExpires, taskCost, taskExpires, taskInfoClass, wasDeduped,
+         wasPickedUp} from './task-page-helpers'
 import { botPageLink, humanDuration, taskPageLink } from '../util'
 
 import SwarmingAppBoilerplate from '../SwarmingAppBoilerplate'
@@ -34,15 +36,18 @@ const taskInfoTable = (ele, request, result, currentSlice) => {
   }
   return html`
 <div class=id_buttons>
-  <input class=id_input></input>
-  <button>refresh</button>
-  <button>retry</button>
-  <button>debug</button>
+  <input class=id_input placeholder="Task ID"></input>
+  <button title="Refresh data"
+          @click=${ele._fetch}>refresh</button>
+  <button title="Retry the task"
+          @click=${() => alert('use old ui for now')}>retry</button>
+  <button title="Re-queue the task, but don't run it automatically"
+          @click=${() => alert('use old ui for now')}>debug</button>
 </div>
 
-<!-- TODO(kjlubick) slices-->
+${slicePicker(ele)}
 
-<table class="task-info request-info">
+<table class="task-info request-info ${taskInfoClass(ele, result)}">
 <tbody>
   <tr>
     <td>Name</td>
@@ -50,7 +55,7 @@ const taskInfoTable = (ele, request, result, currentSlice) => {
   </tr>
   <tr>
     <td>State</td>
-    <td>${humanState(result)}</td>
+    <td>${humanState(result, ele._currentSliceIdx)}</td>
   </tr>
   <tr>
     <td>
@@ -122,6 +127,22 @@ const taskInfoTable = (ele, request, result, currentSlice) => {
 `;
 }
 
+const slicePicker = (ele) => {
+  if (!(ele._request.task_slices && ele._request.task_slices.length > 1)) {
+    return '';
+  }
+
+  return html`
+<div class=slice-picker>
+  ${ele._request.task_slices.map((_, idx) => sliceTab(ele, idx))}
+</div>
+`}
+
+const sliceTab = (ele, idx) => html`
+  <div class=tab ?selected=${ele._currentSliceIdx === idx}
+                 @click=${() => ele._setSlice(idx)}>Task Slice ${idx+1}</div>
+`;
+
 const requestBlock = (request, result, currentSlice) => html`
 <tr>
   <td>Priority</td>
@@ -189,7 +210,7 @@ const isolateBlock = (title, ref) => {
       ${ref.isolated}
     </a>
   </td>
-</tr>`
+</tr>`;
 };
 
 const arrayInTable = (array, label, keyFn) => {
@@ -578,7 +599,7 @@ const template = (ele) => html`
       <aside class=hideable>
         <a href=/>Home</a>
         <a href=/botlist>Bot List</a>
-        <a href=/oldui/botlist>Old Bot List</a>
+        <a href="/oldui/botpage?id=${ele._taskId}">Old Bot Page</a>
         <a href=/tasklist>Task List</a>
       </aside>
   </header>
@@ -608,14 +629,37 @@ window.customElements.define('task-page', class extends SwarmingAppBoilerplate {
 
   constructor() {
     super(template);
+    // Set empty values to allow empty rendering while we wait for
+    // stateReflector (which triggers on DomReady). Additionally, these values
+    // help stateReflector with types.
+    this._taskId = '';
+    this._showDetails = false;
+    this._refresh = 0;  // sentinal value for "URL params loaded"
+    this._showRawOutput = false;
+
+    this._stateChanged = stateReflector(
+      /*getState*/() => {
+        return {
+          // provide empty values
+          'id': this._taskId,
+          'd': this._showDetails,
+          'r': this._refresh,
+          'o': this._showRawOutput,
+        }
+    }, /*setState*/(newState) => {
+      // default values if not specified.
+      this._taskId = newState.id || this._taskId;
+      this._showDetails = newState.d; // default to false
+      this._refresh = newState.r || 1000;
+      this._showRawOutput = newState.o; // default to false
+      this._fetch();
+      this.render();
+    });
 
     this._request = {};
     this._result = {};
     this._currentSlice = {};
-    this._showDetails = false;
-
-    this._stateChanged = () => console.log('update state');
-
+    this._currentSliceIdx = -1;
     this._message = 'You must sign in to see anything useful.';
     // Allows us to abort fetches that are tied to the id when the id changes.
     this._fetchController = null;
@@ -638,7 +682,7 @@ window.customElements.define('task-page', class extends SwarmingAppBoilerplate {
   }
 
   _fetch() {
-    if (!this.loggedInAndAuthorized || !this._taskId) {
+    if (!this.loggedInAndAuthorized || !this._refresh) {
       return;
     }
     if (this._fetchController) {
@@ -653,13 +697,18 @@ window.customElements.define('task-page', class extends SwarmingAppBoilerplate {
       signal: this._fetchController.signal,
     };
     this.app.addBusyTasks(2);
+    let currIdx = -1;
     fetch(`/_ah/api/swarming/v1/task/${this._taskId}/request`, extra)
       .then(jsonOrThrow)
       .then((json) => {
         this._request = parseRequest(json);
-        // TODO(kjlubick): default this to the one that ran.
-        this._currentSlice = this._request.task_slices[0];
-        this.render();
+        // We need to set the slice if result has been loaded, otherwise
+        // when the slice loads, it will take care of it for us.
+        if (currIdx >= 0) {
+          this._setSlice(currIdx); // calls render
+        } else {
+          this.render();
+        }
         this.app.finishedTask();
       })
       .catch((e) => this.fetchError(e, 'task/request'));
@@ -667,7 +716,8 @@ window.customElements.define('task-page', class extends SwarmingAppBoilerplate {
       .then(jsonOrThrow)
       .then((json) => {
         this._result = parseResult(json);
-        this.render();
+        currIdx = +this._result.current_task_slice;
+        this._setSlice(currIdx); // calls render
         this.app.finishedTask();
       })
       .catch((e) => this.fetchError(e, 'task/result'));
@@ -675,6 +725,17 @@ window.customElements.define('task-page', class extends SwarmingAppBoilerplate {
 
   render() {
     super.render();
+    const idInput = $$('.id_input', this);
+    idInput.value = this._taskId;
+  }
+
+  _setSlice(idx) {
+    this._currentSliceIdx = idx;
+    if (!this._request.task_slices) {
+      return;
+    }
+    this._currentSlice = this._request.task_slices[idx];
+    this.render();
   }
 
   _toggleDetails(e) {

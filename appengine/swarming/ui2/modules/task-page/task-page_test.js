@@ -201,7 +201,8 @@ describe('task-page', function() {
           expect(rows[5].hidden).toBeTruthy();
           expect(cell(7, 0)).toMatchTextContent('Wait for Capacity');
           expect(cell(7, 1)).toMatchTextContent('false');
-          expect(cell(14, 0).rowSpan).toEqual(7); // 6 dimensions shown
+          expect(cell(14, 0).rowSpan).toEqual(6); // 5 dimensions shown on slice 2
+          expect(cell(14, 0).textContent).toContain('Dimensions');
 
           const subsections = $('tbody', taskInfo);
           expect(subsections.length).toEqual(2);
@@ -272,26 +273,79 @@ describe('task-page', function() {
           done();
         });
       });
-    });
+
+      it('shows a tab slice picker', function(done) {
+        loggedInTaskPage((ele) => {
+          const picker = $$('.slice-picker', ele);
+          expect(picker).toBeTruthy();
+          const tabs = $('.tab', picker);
+          expect(tabs.length).toEqual(2);
+
+          // The 2nd tab ran, so it should be shown by default.
+          expect(tabs[0].hasAttribute('selected')).toBeFalsy();
+          expect(tabs[1].hasAttribute('selected')).toBeTruthy();
+          done();
+        });
+      });
+
+      it('tells the user when slices did not run', function(done) {
+        loggedInTaskPage((ele) => {
+          ele._setSlice(0); // calls render
+
+          const stateRow = $$('.request-info.inactive tr:nth-child(2)', ele);
+          expect(stateRow).toBeTruthy();
+          const header = stateRow.children[0];
+          expect(header).toMatchTextContent('State');
+          const message = stateRow.children[1];
+          expect(message).toMatchTextContent('THIS SLICE DID NOT RUN. '+
+                                             'Select another slice above.');
+          done();
+        });
+      });
+    }); // end describe('Completed task with 2 slices')
 
   }); // end describe('html structure')
 
   describe('dynamic behavior', function() {
-    it('shows and hides the extra details', function(done) {
-      loggedInTaskPage((ele) => {
-        ele._showDetails = false;
-        ele.render();
+    describe('Completed task with 2 slices', function() {
+      beforeEach(() => serveTask(0, 'Completed task with 2 slices'));
 
-        const lowerHalf = $('.task-info > tbody', ele)[1];
-        expect(lowerHalf.hidden).toBeTruthy();
+      it('shows and hides the extra details', function(done) {
+        loggedInTaskPage((ele) => {
+          ele._showDetails = false;
+          ele.render();
 
-        const btn = $$('.details button', ele);
-        btn.click();
-        expect(lowerHalf.hidden).toBeFalsy();
-        btn.click();
-        expect(lowerHalf.hidden).toBeTruthy();
+          const lowerHalf = $('.task-info > tbody', ele)[1];
+          expect(lowerHalf.hidden).toBeTruthy();
 
-        done();
+          const btn = $$('.details button', ele);
+          btn.click();
+          expect(lowerHalf.hidden).toBeFalsy();
+          btn.click();
+          expect(lowerHalf.hidden).toBeTruthy();
+
+          done();
+        });
+      });
+
+      it('switches between slices with a tab', function(done) {
+        loggedInTaskPage((ele) => {
+          ele._setSlice(1); // also calls render
+
+          const taskinfo = $$('table.task-info', ele);
+          expect(taskinfo).not.toHaveClass('inactive');
+
+          const tabs = $('.slice-picker .tab', ele);
+          expect(tabs.length).toEqual(2);
+
+          tabs[0].click();
+          expect(taskinfo).toHaveClass('inactive');
+
+          tabs[1].click();
+          expect(taskinfo).not.toHaveClass('inactive');
+
+          done();
+        });
       });
     });
   });

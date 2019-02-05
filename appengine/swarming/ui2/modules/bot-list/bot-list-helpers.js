@@ -584,6 +584,8 @@ const BATTERY_STATUS_ALIASES = {
   5: 'Full',
 }
 
+export const forcedColumns = ['id'];
+
 /** specialSortMap maps keys to their special sort rules, encapsulated in a
  *  function. The function takes in the current sort direction (1 for ascending)
  *  and -1 for descending and both bots and should return a number a la compare.

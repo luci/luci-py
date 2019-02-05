@@ -40,10 +40,11 @@ import '../swarming-app'
 
 import { applyAlias, handleLegacyFilters, maybeApplyAlias } from '../alias'
 import { aggregateTemps, attribute, botLink, column, devices,
-         filterBots,  fromDimension, fromState, getColHeader,
+         filterBots, forcedColumns, fromDimension, fromState, getColHeader,
          initCounts, listQueryParams, longestOrAll, processBots, processCounts,
-         makePossibleColumns, processPrimaryMap, sortColumns, sortPossibleColumns,
-         specialFilters, specialSortMap, useNaturalSort } from './bot-list-helpers'
+         makePossibleColumns, processPrimaryMap, sortColumns,
+         sortPossibleColumns, specialFilters, specialSortMap,
+         useNaturalSort } from './bot-list-helpers'
 import { filterPossibleColumns, filterPossibleKeys,
          filterPossibleValues, makeFilter } from '../queryfilter'
 import { moreOrLess } from '../templates'
@@ -201,7 +202,7 @@ const columnOption = (key, ele) => html`
   <span class=key>${key}</span>
   <span class=flex></span>
   <checkbox-sk ?checked=${ele._cols.indexOf(key) >= 0}
-               ?disabled=${ele._forcedColumns.indexOf(key) >= 0}
+               ?disabled=${forcedColumns.indexOf(key) >= 0}
                @click=${(e) => ele._toggleCol(e, key)}
                @keypress=${(e) => ele._toggleCol(e, key)}>
   </checkbox-sk>
@@ -303,9 +304,8 @@ window.customElements.define('bot-list', class extends SwarmingAppBoilerplate {
   constructor() {
     super(template);
     this._bots = [];
-    this._forcedColumns = ['id'];
     // Set empty values to allow empty rendering while we wait for
-    // stateReflector (which triggers on DomReady). Additionlly, these values
+    // stateReflector (which triggers on DomReady). Additionally, these values
     // help stateReflector with types.
     this._cols = [];
     this._dir = '';
@@ -761,7 +761,7 @@ window.customElements.define('bot-list', class extends SwarmingAppBoilerplate {
   }
 
   _toggleCol(e, col) {
-    if (this._forcedColumns.indexOf(col) >= 0) {
+    if (forcedColumns.indexOf(col) >= 0) {
       return;
     }
     // This prevents a double event from happening (because of the

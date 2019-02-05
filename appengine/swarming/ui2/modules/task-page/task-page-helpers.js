@@ -25,11 +25,15 @@ export function cipdLink(actualVersion, server) {
 }
 
 /** humanState returns a human readable string corresponding to
- *  the task's state.
+ *  the task's state. It takes into account what slice this is
+ *  and what slice ran, so as not to confuse the user.
  */
-export function humanState(result) {
+export function humanState(result, currentSliceIdx) {
   if (!result || !result.state) {
     return '';
+  }
+  if (result.current_task_slice !== currentSliceIdx) {
+    return 'THIS SLICE DID NOT RUN. Select another slice above.';
   }
   const state = result.state;
   if (state === 'COMPLETED') {
@@ -111,6 +115,7 @@ export function parseResult(result) {
     result.pending = (end - result.created_ts) / 1000; // convert to seconds.
     result.human_pending = timeDiffExact(result.created_ts, end);
   }
+  result.current_task_slice = parseInt(result.current_task_slice) || 0;
   return result;
 }
 
@@ -142,6 +147,17 @@ export function taskExpires(request) {
   }
   const delta = request.expiration_secs * 1000;
   return human.localeTime(new Date(request.created_ts.getTime() + delta));
+}
+
+export function taskInfoClass(ele, result) {
+  // Prevents a flash of grey while request and result load.
+  if (!ele || !result || ele._currentSliceIdx === -1) {
+    return '';
+  }
+  if (ele._currentSliceIdx !== result.current_task_slice) {
+    return 'inactive';
+  }
+  return '';
 }
 
 /** wasDeduped returns true or false depending on if this task was de-duped.

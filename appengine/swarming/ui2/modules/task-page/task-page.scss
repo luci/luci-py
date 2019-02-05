@@ -1,16 +1,28 @@
 task-page {
 
   main {
-    > div {
-      border: 1px solid #daa; /*TODO REMOVE, just for initial development*/
-    }
 
     .title {
       font-size: 1.5em;
       font-weight: 700;
       margin: 5px;
     }
+
+    a[href] {
+      color: #1F78B4;
+    }
   }
+
+  .id_buttons {
+    display: flex;
+
+    .id_input {
+      font-size: 1.5em;
+      width: 10em;
+      margin: 8px 5px;
+    }
+  }
+
 
   .horizontal.layout {
     display: flex;
@@ -39,6 +51,9 @@ task-page {
 
   .task-info {
     min-width: 500px;
+    &.inactive {
+      background-color: #ddd;
+    }
 
     /* Tell all the second td in a tr (i.e. the content) to break
        to avoid wrapping.  This keeps the first columns nice and
@@ -89,5 +104,25 @@ task-page {
        making the header not selectable.*/
     user-select: none;
     margin-left: 8px;
+  }
+
+  .slice-picker {
+    margin-left: 5px;
+    display: flex;
+    > * {
+      display: inline-block;
+    }
+    .tab {
+      padding: 10px 20px;
+      margin: 0;
+      background-color: #a6cee3;
+      color: black;
+      cursor: pointer;
+    }
+    .tab[selected] {
+      background-color: #1f78b4;
+      color: white;
+      font-weight: 700;
+    }
   }
 }
