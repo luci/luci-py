@@ -231,6 +231,30 @@ function _insertUnique(arr, value) {
   return arr;
 }
 
+/** legacyTags goes through the list of key-value filters and
+ *  makes sure they all end in -tag. Old links (e.g. from the
+ *  Polymer version) might have omitted -tag, but the only valid
+ *  filters are ones that have -tag. This makes the system backwards
+ *  compatible with old links.
+ *  @param {Array<string>} filters - a list of colon-separated key-values.
+ *
+ *  @return {Array<string>} - the cleaned up filters.
+ */
+export function legacyTags(filters) {
+  return filters.map((filter) => {
+    const idx = filter.indexOf(':');
+    if (idx < 0) {
+      return filter;
+    }
+    let key = filter.substring(0, idx);
+    if (key.endsWith('-tag')) {
+      // this is fine
+      return filter;
+    }
+    return key + '-tag' + filter.substring(idx);
+  });
+}
+
 /** listQueryParams returns a query string for the /list API based on the
  *  passed in args.
  *  @param {Array<string>} filters - a list of colon-separated key-values.

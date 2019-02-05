@@ -14,6 +14,7 @@ describe('bot-list', function() {
   const { childrenAsArray, customMatchers, expectNoUnmatchedCalls, getChildItemWithText, mockAppGETs } = require('modules/test_util');
   const { fetchMock, MATCHED, UNMATCHED } = require('fetch-mock');
 
+  const { handleLegacyFilters } = require('modules/alias');
   const { column, filterBots, getColHeader, listQueryParams, processBots, makePossibleColumns,
          processPrimaryMap } = require('modules/bot-list/bot-list-helpers');
   const { bots_10, fleetCount, fleetDimensions, queryCount } = require('modules/bot-list/test_data');
@@ -1172,6 +1173,12 @@ describe('bot-list', function() {
       const qp = listQueryParams(testcase.filters, testcase.limit, 'mock_cursor12345');
       expect(qp).toEqual('cursor=mock_cursor12345&'+testcase.output);
 
+    });
+
+    it('remove aliases from legacy filters', function() {
+      const input = ['cpu:12354', 'gpu:NVIDIA Quadro P400 (10de:1cb3-415.27)'];
+      const output = handleLegacyFilters(input);
+      expect(output).toEqual(['cpu:12354', 'gpu:10de:1cb3-415.27']);
     });
   }); // end describe('data parsing')
 

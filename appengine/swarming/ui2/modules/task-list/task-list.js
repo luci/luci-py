@@ -43,9 +43,10 @@ import 'flatpickr/dist/flatpickr.css'
 // query.fromObject is more readable than just 'fromObject'
 import * as query from 'common-sk/modules/query'
 
-import { applyAlias } from '../alias'
-import { appendPossibleColumns, appendPrimaryMap, column, filterTasks, floorSecond, getColHeader,
-         listQueryParams, processTasks, sortColumns, sortPossibleColumns, specialSortMap,
+import { applyAlias, handleLegacyFilters, maybeApplyAlias } from '../alias'
+import { appendPossibleColumns, appendPrimaryMap, column, filterTasks, floorSecond,
+         getColHeader, legacyTags, listQueryParams, processTasks, sortColumns,
+         sortPossibleColumns, specialSortMap,
          stripTag, taskClass, useNaturalSort } from './task-list-helpers'
 import { botListLink } from '../util'
 import { filterPossibleColumns, filterPossibleKeys,
@@ -147,7 +148,7 @@ const secondaryOptions = (ele) => {
 
 const filterChip = (filter, ele) => html`
 <span class=chip>
-  <span>${filter}</span>
+  <span>${maybeApplyAlias(filter)}</span>
   <cancel-icon-sk @click=${() => ele._removeFilter(filter)}></cancel-icon-sk>
 </span>`;
 
@@ -342,7 +343,8 @@ window.customElements.define('task-list', class extends SwarmingAppBoilerplate {
                       'duration', 'pool-tag'];
       }
       this._dir = newState.d || 'desc';
-      this._filters = newState.f; // default to []
+      this._filters = handleLegacyFilters(newState.f); // default to []
+      this._filters = legacyTags(this._filters);
       this._limit = INITIAL_LOAD;
       this._now = newState.n; // default to true
       this._primaryKey = newState.k; // default to ''

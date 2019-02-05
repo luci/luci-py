@@ -38,10 +38,10 @@ import '../sort-toggle'
 import '../swarming-app'
 
 
-import { applyAlias } from '../alias'
+import { applyAlias, handleLegacyFilters, maybeApplyAlias } from '../alias'
 import { aggregateTemps, attribute, botLink, column, devices,
-         filterBots,  fromDimension, fromState, getColHeader, initCounts,
-         listQueryParams, longestOrAll, processBots, processCounts,
+         filterBots,  fromDimension, fromState, getColHeader,
+         initCounts, listQueryParams, longestOrAll, processBots, processCounts,
          makePossibleColumns, processPrimaryMap, sortColumns, sortPossibleColumns,
          specialFilters, specialSortMap, useNaturalSort } from './bot-list-helpers'
 import { filterPossibleColumns, filterPossibleKeys,
@@ -102,7 +102,7 @@ const secondaryOptions = (ele) => {
 
 const filterChip = (filter, ele) => html`
 <span class=chip>
-  <span>${filter}</span>
+  <span>${maybeApplyAlias(filter)}</span>
   <cancel-icon-sk @click=${() => ele._removeFilter(filter)}></cancel-icon-sk>
 </span>`;
 
@@ -344,7 +344,7 @@ window.customElements.define('bot-list', class extends SwarmingAppBoilerplate {
         this._cols = ['id', 'task', 'os', 'status'];
       }
       this._dir = newState.d || 'asc';
-      this._filters = newState.f; // default to []
+      this._filters = handleLegacyFilters(newState.f); // default to []
       this._primaryKey = newState.k; // default to ''
       this._sort = newState.s || 'id';
       this._verbose = newState.v;         // default to false

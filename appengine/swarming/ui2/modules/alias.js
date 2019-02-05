@@ -122,3 +122,55 @@ const aliasMap = {
   'device_type': ANDROID_ALIASES,
   'gpu': GPU_ALIASES,
 };
+
+const oldStyle = /.+\((.+)\)/;
+
+/** handle legacy filters goes through a list of filters and
+ *  transforms any from the "old-style" (e.g. Polymer version)
+ *  to the new version.
+ *
+ *  @param {Array<string>} filters - a list of colon-separated key-values.
+ *
+ *  @return {Array<string>} - the cleaned up filters.
+ */
+export function handleLegacyFilters(filters) {
+  if (!filters) {
+    return [];
+  }
+  return filters.map((f) => {
+    const potentialKey = f.split(':')[0];
+    if (aliasMap[potentialKey]) {
+      // This could be new/correct-style:
+      //   "gpu:10de:1cb3-415.27"
+      // or the old-style with the alias:
+      //   "gpu:NVIDIA Quadro P400 (10de:1cb3-415.27)"
+      // If it's the old-style, convert it to new-style.
+      const found = f.match(oldStyle);
+      if (found) {
+        return potentialKey + ':' + found[1];
+      } else {
+        return f;
+      }
+    } else {
+      return f;
+    }
+  });
+}
+
+/** maybeApplyAlias will take a filter (e.g. foo:bar) and apply
+ *  the alias to it inline, returning it to be displayed on the UI.
+ *  This means we can display it in a human-friendly way, without
+ *  the complexity of handling the alias when storing URL params
+ *  or making API requests.
+ */
+export function maybeApplyAlias(filter) {
+  const idx = filter.indexOf(':');
+  if (idx < 0) {
+    return filter;
+  }
+  const key = filter.substring(0, idx);
+  const value = filter.substring(idx+1);
+  // remove -tag for tasks if it exists
+  const trimmed = key.split('-tag')[0];
+  return `${key}:${applyAlias(value, trimmed)}`;
+}
