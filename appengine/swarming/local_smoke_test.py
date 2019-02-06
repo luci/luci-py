@@ -1442,7 +1442,7 @@ def main():
     bot = start_bot.LocalBot(servers.swarming_server.url, True, botdir)
     Test.bot = bot
     bot.start()
-    namespace = 'sha1-deflate'
+    namespace = 'sha256-deflate'
     client = SwarmingClient(
         servers.swarming_server.url, servers.isolate_server.url, namespace,
         Test.tmpdir)
