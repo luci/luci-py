@@ -211,6 +211,16 @@ export function getColHeader(col) {
   return colHeaderMap[col] || col;
 }
 
+export function humanizePrimaryKey(key) {
+  if (key && key.endsWith('-tag')) {
+    return `${stripTag(key)} (tag)`;
+  }
+  if (key === 'state') {
+    return 'state (of task)';
+  }
+  return key
+}
+
 function _insertUnique(arr, value) {
   // TODO(kjlubick): this could be tuned with binary search.
   if (!arr || !arr.length) {
@@ -472,8 +482,10 @@ const colHeaderMap = {
   'costs_usd': 'Cost (USD)',
   'created_ts': 'Created On',
   'duration': 'Duration',
+  'name': 'Task Name',
   'modified_ts': 'Last Modified',
   'started_ts': 'Started Working On',
+  'state': 'state (of task)',
   'user': 'Requesting User',
   'pending_time': 'Time Spent Pending',
 }
@@ -483,6 +495,9 @@ const TASK_TIMES = ['abandoned_ts', 'completed_ts', 'created_ts', 'modified_ts',
 
 const extraKeys = ['name', 'state', 'costs_usd', 'deduped_from', 'duration', 'pending_time',
   'server_versions', 'bot', 'exit_code', ...TASK_TIMES];
+
+const STILL_RUNNING_MSG = 'An asterisk indicates the task is still running '+
+                          'and thus the time is dynamic.';
 
 const colMap = {
   abandoned_ts: (task) => task.human_abandoned_ts,
@@ -500,7 +515,12 @@ const colMap = {
     return task.costs_usd;
   },
   created_ts: (task) => task.human_created_ts,
-  duration: (task) => task.human_duration,
+  duration: (task) => {
+    if (task.human_duration.indexOf('*')) {
+      return html`<span title=${STILL_RUNNING_MSG}>${task.human_duration}</span>`;
+    }
+    return task.human_duration;
+  },
   exit_code: (task) => task.exit_code || '--',
   modified_ts: (task) => task.human_modified_ts,
   name: (task, ele) => {
@@ -513,7 +533,12 @@ const colMap = {
                    title=${task.name}
                    href=${taskPageLink(task.task_id)}>${name}</a>`;
   },
-  pending_time: (task) => task.human_pending_time,
+  pending_time: (task) => {
+    if (task.human_pending_time.indexOf('*')) {
+      return html`<span title=${STILL_RUNNING_MSG}>${task.human_pending_time}</span>`;
+    }
+    return task.human_pending_time;
+  },
   source_revision: (task) => {
     const r = task.source_revision;
     return r.substring(0, 8);

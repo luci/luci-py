@@ -1,5 +1,15 @@
 task-list {
 
+  main {
+    a[href] {
+      color: #105d90;
+    }
+
+    more-horiz-icon-sk, expand-more-icon-sk, expand-less-icon-sk {
+      cursor: pointer;
+    }
+  }
+
   .task-table {
     border-collapse: collapse;
     margin-left: 5px;

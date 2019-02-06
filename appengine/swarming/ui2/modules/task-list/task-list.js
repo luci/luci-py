@@ -28,6 +28,7 @@ import { stateReflector } from 'common-sk/modules/stateReflector'
 import 'elements-sk/checkbox-sk'
 import 'elements-sk/icon/add-circle-icon-sk'
 import 'elements-sk/icon/cancel-icon-sk'
+import 'elements-sk/icon/more-horiz-icon-sk'
 import 'elements-sk/icon/more-vert-icon-sk'
 import 'elements-sk/icon/search-icon-sk'
 import 'elements-sk/select-sk'
@@ -45,10 +46,10 @@ import * as query from 'common-sk/modules/query'
 
 import { applyAlias, handleLegacyFilters, maybeApplyAlias } from '../alias'
 import { appendPossibleColumns, appendPrimaryMap, column, filterTasks, floorSecond,
-         getColHeader, legacyTags, listQueryParams, processTasks, sortColumns,
-         sortPossibleColumns, specialSortMap,
+         getColHeader, humanizePrimaryKey, legacyTags, listQueryParams,
+         processTasks, sortColumns, sortPossibleColumns, specialSortMap,
          stripTag, taskClass, useNaturalSort } from './task-list-helpers'
-import { botListLink } from '../util'
+import { botListLink, onSmallScreen } from '../util'
 import { filterPossibleColumns, filterPossibleKeys,
          filterPossibleValues, makeFilter } from '../queryfilter'
 import { moreOrLess } from '../templates'
@@ -72,11 +73,12 @@ const taskRow = (task, ele) => html`
 
 const columnOption = (key, ele) => html`
 <div class=item>
-  <span class=key>${key}</span>
+  <span class=key>${getColHeader(key)}</span>
   <span class=flex></span>
   <checkbox-sk ?checked=${ele._cols.indexOf(key) >= 0}
                @click=${(e) => ele._toggleCol(e, key)}
-               @keypress=${(e) => ele._toggleCol(e, key)}>
+               @keypress=${(e) => ele._toggleCol(e, key)}
+               data-key=${key}>
   </checkbox-sk>
 </div>`;
 
@@ -114,7 +116,7 @@ const col_options = (ele, firstCol) => html`
 
 const primaryOption = (key, ele) => html`
 <div class=item ?selected=${ele._primaryKey === key}>
-  <span class=key>${key}</span>
+  <span class=key>${humanizePrimaryKey(key)}</span>
 </div>`;
 
 const secondaryOptions = (ele) => {
@@ -157,7 +159,7 @@ const filterChip = (filter, ele) => html`
 const filters = (ele) => html`
 <!-- primary key selector-->
 <select-sk class="selector keys"
-           @selection-changed=${(e) => ele._primaryKeyChanged(e)}>
+           @selection-changed=${ele._primaryKeyChanged}>
   ${ele._filteredPrimaryArr.map((key) => primaryOption(key, ele))}
 </select-sk>
 <!-- secondary value selector-->
@@ -212,6 +214,9 @@ const summary = (ele) => html`
     ${ele._queryCounts.filter(ele._filterCounts.bind(ele))
                       .map((count) => summaryQueryRow(ele, count))}
   </table>
+  <more-horiz-icon-sk @click=${ele._toggleAllStates}
+                      ?hidden=${ele._allStates}>
+  </more-horiz-icon-sk>
 </div>`;
 
 const header = (ele) => html`
@@ -317,7 +322,8 @@ window.customElements.define('task-list', class extends SwarmingAppBoilerplate {
     this._sort = '';
     this._startTime = 0;
     this._verbose = false;
-    this._allStates = false;
+    // show it by default on small screens (e.g. mobile)
+    this._allStates = onSmallScreen();
 
     this._stateChanged = stateReflector(
       /*getState*/() => {
@@ -572,7 +578,7 @@ window.customElements.define('task-list', class extends SwarmingAppBoilerplate {
       .catch((e) => this.fetchError(e, 'count/total'))
     this._queryCounts[0].value = html`${until(totalPromise, '...')}`;
 
-    const stateRemoved = queryParams.replace(/state=.+?&/g, '');
+    const stateRemoved = queryParams.replace(/state=.+?(&|$)/g, '');
     for (let i = 0; i < states.length; i++) {
       const promise = fetch(`/_ah/api/swarming/v1/tasks/count?${stateRemoved}&state=${states[i]}`, extra)
         .then(jsonOrThrow)
@@ -658,9 +664,10 @@ window.customElements.define('task-list', class extends SwarmingAppBoilerplate {
     if (this._allStates) {
       return true;
     }
-    // The top 8 entries are ones that the users are most likely
-    // going to care about by default. 8 uses the space most efficiently.
-    return idx < 8;
+    // The top 7 entries are ones that the users are most likely
+    // going to care about by default. 7 uses the space most efficiently, with
+    // the ellipsis to give an affordance for showing more.
+    return idx < 7;
   }
 
   _makeSummaryURL(state) {
@@ -708,6 +715,7 @@ window.customElements.define('task-list', class extends SwarmingAppBoilerplate {
   }
 
   _primaryKeyChanged(e) {
+    // e.detail.selection is the index of what was clicked
     this._primaryKey = this._filteredPrimaryArr[e.detail.selection];
     this._stateChanged();
     this.render();
@@ -766,7 +774,7 @@ window.customElements.define('task-list', class extends SwarmingAppBoilerplate {
     // Incorporate any data changes before rendering.
     sortColumns(this._cols);
     super.render();
-    if (this._primaryKey) {
+    if (this._primaryKey && !onSmallScreen()) {
       const selectedKey = $$('.keys.selector .item[selected]', this);
       // Especially on a page reload, the selected key won't be viewable.
       // This scrolls the little box into view if it's not and, since it

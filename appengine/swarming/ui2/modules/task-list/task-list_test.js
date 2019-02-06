@@ -196,13 +196,13 @@ describe('task-list', function() {
             expect(colHeaders).toBeTruthy();
             expect(colHeaders.length).toBe(7, '(num colHeaders)');
             expect(colHeaders[0].innerHTML).toContain('<more-vert-icon-sk');
-            expect(colHeaders[0]).toMatchTextContent('name');
+            expect(colHeaders[0]).toMatchTextContent('Task Name');
             expect(colHeaders[1]).toMatchTextContent('Created On');
             expect(colHeaders[2]).toMatchTextContent('Time Spent Pending');
             expect(colHeaders[3]).toMatchTextContent('Duration');
             expect(colHeaders[4]).toMatchTextContent('Bot Assigned');
             expect(colHeaders[5]).toMatchTextContent('pool (tag)');
-            expect(colHeaders[6]).toMatchTextContent('state');
+            expect(colHeaders[6]).toMatchTextContent('state (of task)');
 
             const rows = $('.task-table .task-row', ele);
             expect(rows).toBeTruthy();
@@ -273,13 +273,13 @@ describe('task-list', function() {
           });
         });
 
-        it('shows the counts of the first 8 states', function(done) {
+        it('shows the counts of the first 7 states', function(done) {
           loggedInTasklist((ele) => {
             ele.render();
 
             const countRows = $('#query_counts tr', ele);
             expect(countRows).toBeTruthy();
-            expect(countRows.length).toBe(1+8, '(num counts, displayed + 8 states)');
+            expect(countRows.length).toBe(1+7, '(num counts, displayed + 7 states)');
 
             expect(countRows[0]).toMatchTextContent('Displayed: 20');
 
@@ -393,7 +393,7 @@ describe('task-list', function() {
         ele._dir = 'asc';
         ele.render();
 
-        const actualDurationsOrder = ele._tasks.map((t) => column('duration', t, ele).trim());
+        const actualDurationsOrder = ele._tasks.map((t) => t.human_duration.trim());
 
         expect(actualDurationsOrder).toEqual(['0.62s', '2.90s', '17.84s', '1m 38s',
             '2m  1s', '2m  1s', '12m 54s*', '12m 55s*', '1h  9m 47s', '2h 16m 15s',
@@ -404,8 +404,7 @@ describe('task-list', function() {
         ele._dir = 'asc';
         ele.render();
 
-        const actualPendingOrder = ele._tasks.map(
-            (t) => column('human_pending_time', t, ele).trim());
+        const actualPendingOrder = ele._tasks.map((t) => t.human_pending_time.trim());
 
         expect(actualPendingOrder).toEqual(['0s', '0s', '0.63s', '0.66s', '0.72s', '2.35s',
           '2.36s', '2.58s', '5.74s', '8.21s', '24.58s', '1m 11s', '1m 17s', '5m  5s', '5m 36s',
@@ -429,10 +428,8 @@ describe('task-list', function() {
         for (let i = 0; i < keySelector.children.length; i++) {
           const child = keySelector.children[i];
           checkbox = $$('checkbox-sk', child);
-          keyToClick = $$('.key', child);
           if (checkbox && !checkbox.checked) {
-            expect(keyToClick).toBeTruthy();
-            keyToClick = keyToClick.textContent.trim();
+            keyToClick = checkbox.getAttribute('data-key');
             break;
           }
         }
@@ -452,12 +449,14 @@ describe('task-list', function() {
         checkbox = null;
         for (let i = 0; i < keySelector.children.length; i++) {
           const child = keySelector.children[i];
-          checkbox = $$('checkbox-sk', child);
           const key = $$('.key', child);
-          if (key && key.textContent.trim() === keyToClick) {
+          if (key && key.textContent.trim() === getColHeader(keyToClick)) {
+            checkbox = $$('checkbox-sk', child);
             break;
           }
         }
+        expect(checkbox).toBeTruthy('We expected to find a checkbox with header '+
+                                    getColHeader(keyToClick));
 
         // click it again
         checkbox.click();
@@ -477,7 +476,7 @@ describe('task-list', function() {
       loggedInTasklist((ele) => {
         ele._cols = ['name'];
         ele.render();
-        let row = getChildItemWithText($$('.selector.keys'), 'device_type-tag', ele);
+        let row = getChildItemWithText($$('.selector.keys'), 'device_type (tag)', ele);
         expect(row).toBeTruthy();
         row.click();
         expect(row.hasAttribute('selected')).toBeTruthy();
@@ -492,7 +491,7 @@ describe('task-list', function() {
         expect(values).toContain('iPhone X');
 
         let oldRow = row;
-        row = getChildItemWithText($$('.selector.keys'), 'state', ele);
+        row = getChildItemWithText($$('.selector.keys'), 'state (of task)', ele);
         expect(row).toBeTruthy();
         row.click();
         expect(row.hasAttribute('selected')).toBeTruthy('new row only one selected');
@@ -522,8 +521,9 @@ describe('task-list', function() {
         const keys = childrenAsArray(keySelector).map((c) => c.textContent.trim());
 
         // Skip the first child, which is the input box
-        expect(keys.slice(1, 7)).toEqual(['name', 'created_ts', 'duration', 'state',
-                                          'abandoned_ts', 'allow_milo-tag']);
+        expect(keys.slice(1, 7)).toEqual(['Task Name', 'Created On', 'Duration',
+                                          'state (of task)', 'Abandoned On',
+                                          'allow_milo (tag)']);
 
         done();
       });
@@ -704,12 +704,12 @@ describe('task-list', function() {
         // Auto selects the first one
         expect(ele._primaryKey).toEqual('android_devices-tag');
 
-        let row = getChildItemWithText($$('.selector.keys'), 'cpu-tag', ele);
-        expect(row).toBeFalsy('cpu-tag should be hiding');
-        row = getChildItemWithText($$('.selector.keys'), 'device_type-tag', ele);
-        expect(row).toBeTruthy('device_type-tag should be there');
-        row = getChildItemWithText($$('.selector.keys'), 'stepname-tag', ele);
-        expect(row).toBeTruthy('stepname-tag should be there, because some values match');
+        let row = getChildItemWithText($$('.selector.keys'), 'cpu (tag)', ele);
+        expect(row).toBeFalsy('cpu (tag) should be hiding');
+        row = getChildItemWithText($$('.selector.keys'), 'device_type (tag)', ele);
+        expect(row).toBeTruthy('device_type (tag) should be there');
+        row = getChildItemWithText($$('.selector.keys'), 'stepname (tag)', ele);
+        expect(row).toBeTruthy('stepname (tag) should be there, because some values match');
 
         done();
       });
@@ -729,7 +729,7 @@ describe('task-list', function() {
 
         const children = $$('.selector.keys', ele).children;
         expect(children.length).toEqual(1, 'only pool-tag should show up');
-        expect(children[0].textContent).toContain('pool-tag');
+        expect(children[0].textContent).toContain('pool (tag)');
 
         let row = getChildItemWithText($$('.selector.values'), 'Chrome', ele);
         expect(row).toBeFalsy('Chrome does not match');
@@ -756,8 +756,8 @@ describe('task-list', function() {
 
         let row = getChildItemWithText(colSelector, 'state');
         expect(row).toBeFalsy('state should be hiding');
-        row = getChildItemWithText(colSelector, 'build_is_experimental-tag');
-        expect(row).toBeTruthy('build_is_experimental-tag should be there');
+        row = getChildItemWithText(colSelector, 'build_is_experimental (tag)');
+        expect(row).toBeTruthy('build_is_experimental (tag) should be there');
 
         done();
       });
@@ -770,11 +770,13 @@ describe('task-list', function() {
 
             let countRows = $('#query_counts tr', ele);
             expect(countRows).toBeTruthy();
-            expect(countRows.length).toBe(1+8, '(num counts, displayed + 8 states)');
+            expect(countRows.length).toBe(1+7, '(num counts, displayed + 7 states)');
 
-            let showMore = $$('.summary expand-more-icon-sk');
-            let showLess = $$('.summary expand-less-icon-sk');
+            let showMore  = $$('.summary expand-more-icon-sk');
+            let showMore2 = $$('.summary more-horiz-icon-sk');
+            let showLess  = $$('.summary expand-less-icon-sk');
             expect(showMore).toBeTruthy();
+            expect(showMore2).not.toHaveAttribute('hidden');
             expect(showLess).toBeFalsy();
             showMore.click();
 
@@ -783,21 +785,25 @@ describe('task-list', function() {
             expect(countRows).toBeTruthy();
             expect(countRows.length).toBe(1+11, '(num counts, displayed + 11 states)');
 
-            showMore = $$('.summary expand-more-icon-sk');
-            showLess = $$('.summary expand-less-icon-sk');
-            expect(showMore).toBeFalsy()
+            showMore  = $$('.summary expand-more-icon-sk');
+            showMore2 = $$('.summary more-horiz-icon-sk');
+            showLess  = $$('.summary expand-less-icon-sk');
+            expect(showMore).toBeFalsy();
+            expect(showMore2).toHaveAttribute('hidden');
             expect(showLess).toBeTruthy();
             showLess.click();
 
             expect(ele._allStates).toBeFalsy();
             countRows = $('#query_counts tr', ele);
             expect(countRows).toBeTruthy();
-            expect(countRows.length).toBe(1+8, '(num counts, displayed + 8 states)');
+            expect(countRows.length).toBe(1+7, '(num counts, displayed + 7 states)');
 
-            showMore = $$('.summary expand-more-icon-sk');
-            showLess = $$('.summary expand-less-icon-sk');
+            showMore  = $$('.summary expand-more-icon-sk');
+            showMore2 = $$('.summary more-horiz-icon-sk');
+            showLess  = $$('.summary expand-less-icon-sk');
             expect(showMore).toBeTruthy();
-            expect(showLess).toBeFalsy()
+            expect(showMore2).not.toHaveAttribute('hidden');
+            expect(showLess).toBeFalsy();
 
             done();
           });
@@ -902,6 +908,28 @@ describe('task-list', function() {
             expect(get).not.toMatch(/state.+state/);
             // %3A is url encoded colon (:)
             expect(get).toMatch(/tags=os%3AAndroid/);
+          }
+          done();
+        });
+      });
+    });
+
+    it('counts correctly with just states', function(done) {
+      loggedInTasklist((ele) => {
+        ele._filters = [];
+        fetchMock.resetHistory();
+        ele._addFilter('state:PENDING_RUNNING');
+        fetchMock.flush(true).then(() => {
+          const calls = fetchMock.calls(MATCHED, 'GET');
+          expect(calls.length).toBe(1+11, '1 from task-list and 11 counts');
+
+          const gets = calls.map((c) => c[0]);
+          for (const get of gets) {
+            // make sure there aren't two states when we do the count (which
+            // appends a state)
+            expect(get).not.toMatch(/state.+state/);
+            // Only one state requested.
+            expect(get).toMatch(/state=/);
           }
           done();
         });
