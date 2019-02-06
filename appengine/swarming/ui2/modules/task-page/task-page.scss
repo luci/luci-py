@@ -20,7 +20,7 @@ task-page {
   .id_buttons {
     display: flex;
 
-    .id_input {
+    #id_input {
       font-size: 1.5em;
       width: 10em;
       margin: 8px 5px;
@@ -82,7 +82,7 @@ task-page {
     content: " | ";
   }
 
-  .dim.bold {
+  .bold {
     font-weight: 700;
   }
 
@@ -95,7 +95,6 @@ task-page {
   .bottom_space {
     margin-bottom: 10px;
   }
-
   .code {
     font-family: monospace;
   }
@@ -171,5 +170,19 @@ task-page {
     a different domain than us, so there's no good way to avoid scrolling
      other than tell the iframe it is really tall.*/
     height: 2000px;
+  }
+
+/* These colors are from buildbot */
+  .failed_task {
+    background-color: #ffdddd;
+  }
+  .bot_died {
+    background-color: #cccccc;
+  }
+  .exception {
+    background-color: #edd2ff;
+  }
+  .pending_task {
+    background-color: #fffc6c;
   }
 }

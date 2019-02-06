@@ -170,6 +170,31 @@ export function sliceExpires(slice, request) {
   return human.localeTime(new Date(request.created_ts.getTime() + delta));
 }
 
+/** stateClass returns a class corresponding to the task's state.
+ */
+export function stateClass(result) {
+  if (!result || !result.state) {
+    return '';
+  }
+  const state = result.state;
+  if (state === 'CANCELED' || state === 'TIMED_OUT' || state === 'EXPIRED' ||
+      state === 'NO_RESOURCE') {
+    return 'exception';
+  }
+  if (state === 'BOT_DIED') {
+    return 'bot_died';
+  }
+  if (state === 'RUNNING' || state === 'PENDING') {
+    return 'pending_task';
+  }
+  if (state === 'COMPLETED') {
+    if (result.failure) {
+      return 'failed_task';
+    }
+  }
+  return '';
+}
+
 /** taskCost returns a human readable cost in USD for a task.
  */
 export function taskCost(result) {

@@ -16,7 +16,8 @@ import '../swarming-app'
 import * as human from 'common-sk/modules/human'
 
 import { cipdLink, hasRichOutput, humanState, isolateLink, isSummaryTask,
-         parseRequest, parseResult, richLogsLink, sliceExpires, taskCost, taskExpires,
+         parseRequest, parseResult, richLogsLink, sliceExpires, stateClass, 
+         taskCost, taskExpires,
          taskInfoClass, wasDeduped, wasPickedUp} from './task-page-helpers'
 import { botPageLink, humanDuration, taskPageLink } from '../util'
 
@@ -38,7 +39,7 @@ const taskInfoTable = (ele, request, result, currentSlice) => {
   }
   return html`
 <div class=id_buttons>
-  <input class=id_input placeholder="Task ID"></input>
+  <input id=id_input placeholder="Task ID" @change=${ele._updateID}></input>
   <button title="Refresh data"
           @click=${ele._fetch}>refresh</button>
   <button title="Retry the task"
@@ -55,37 +56,7 @@ ${slicePicker(ele)}
     <td>Name</td>
     <td>${request.name}</td>
   </tr>
-  <tr>
-    <td>State</td>
-    <td>${humanState(result, ele._currentSliceIdx)}</td>
-  </tr>
-  <tr>
-    <td>
-      ${result.state === 'PENDING' ? 'Why Pending' : 'Fleet Capacity'}
-    </td>
-    <!-- TODO(kjlubick) counts. don't forget itallics-->
-    <td>
-      11 bots could possibly run this task
-      (1 busy, 2 dead, 3 quarantined, 4 maintenance)
-    </td>
-  </tr>
-  <tr>
-    <td>Similar Load</td>
-    <!-- TODO(kjlubick) more counts -->
-    <td>57 similar pending tasks, 123 similar running tasks</td>
-  </tr>
-
-  <tr ?hidden=${!result.deduped_from}>
-    <td><b>Deduped From</b></td>
-    <td><a href=${taskPageLink(result.deduped_from)}</td>
-  </tr>
-  <tr ?hidden=${!result.deduped_from}>
-    <td>Deduped On</td>
-    <td title=${request.created_ts}>
-      ${request.human_created_ts}
-    </td>
-  </tr>
-
+  ${stateLoadBlock(ele, request, result)}
   ${requestBlock(request, result, currentSlice)}
   ${dimensionBlock(currentSlice.properties.dimensions || [])}
   ${isolateBlock('Isolated Inputs', currentSlice.properties.inputs_ref || {})}
@@ -145,6 +116,39 @@ const sliceTab = (ele, idx) => html`
                  @click=${() => ele._setSlice(idx)}>Task Slice ${idx+1}</div>
 `;
 
+const stateLoadBlock = (ele, request, result) => html`
+<tr>
+  <td>State</td>
+  <td class=${stateClass(result)}>${humanState(result, ele._currentSliceIdx)}</td>
+</tr>
+<tr>
+  <td class=${result.state === 'PENDING'? 'bold': ''}>
+    ${result.state === 'PENDING' ? 'Why Pending?' : 'Fleet Capacity'}
+  </td>
+  <!-- TODO(kjlubick) counts. don't forget itallics-->
+  <td>
+    11 bots could possibly run this task
+    (1 busy, 2 dead, 3 quarantined, 4 maintenance)
+  </td>
+</tr>
+<tr>
+  <td>Similar Load</td>
+  <!-- TODO(kjlubick) more counts -->
+  <td>57 similar pending tasks, 123 similar running tasks</td>
+</tr>
+
+<tr ?hidden=${!result.deduped_from}>
+  <td><b>Deduped From</b></td>
+  <td><a href=${taskPageLink(result.deduped_from)}</td>
+</tr>
+<tr ?hidden=${!result.deduped_from}>
+  <td>Deduped On</td>
+  <td title=${request.created_ts}>
+    ${request.human_created_ts}
+  </td>
+</tr>
+`;
+
 const requestBlock = (request, result, currentSlice) => html`
 <tr>
   <td>Priority</td>
@@ -172,7 +176,7 @@ const requestBlock = (request, result, currentSlice) => html`
 </tr>
 <tr ?hidden=${!currentSlice.properties.secret_bytes}>
   <td>Has Secret Bytes</td>
-  <td title="The secret bytes on present on the machine, but not in the UI/API">true</td>
+  <td title="The secret bytes are present on the machine, but not in the UI/API">true</td>
 </tr>
 <tr ?hidden=${!request.parent_task_id}>
   <td>Parent Task</td>
@@ -416,7 +420,7 @@ const taskExecutionSection = (ele, request, result, currentSlice) => {
   if (!result || !wasPickedUp(result)) {
     return html`
 <div class=title>Task Execution</div>
-<div>This space left blank until a bot is assigned to the task.</div>
+<div class=task-execution>This space left blank until a bot is assigned to the task.</div>
 `;
   }
   if (wasDeduped(result)) {
@@ -773,7 +777,7 @@ window.customElements.define('task-page', class extends SwarmingAppBoilerplate {
 
   render() {
     super.render();
-    const idInput = $$('.id_input', this);
+    const idInput = $$('#id_input', this);
     idInput.value = this._taskId;
   }
 
@@ -804,5 +808,12 @@ window.customElements.define('task-page', class extends SwarmingAppBoilerplate {
     this._wideLogs = !this._wideLogs;
     this._stateChanged();
     this.render();
+  }
+
+  _updateID(e) {
+    const idInput = $$('#id_input', this);
+    this._taskId = idInput.value;
+    this._stateChanged();
+    this._fetch();
   }
 });

@@ -352,6 +352,60 @@ describe('task-page', function() {
       });
     }); // end describe('Completed task with 2 slices')
 
+
+    describe('Pending task - 1 slice - no rich logs', function() {
+      beforeEach(() => serveTask(1, 'Pending task - 1 slice - no rich logs'));
+
+      it('has some pending specific request data', function(done) {
+        loggedInTaskPage((ele) => {
+          const taskInfo = $$('table.request-info', ele);
+          expect(taskInfo).toBeTruthy();
+          const rows = $('tr', taskInfo);
+          expect(rows.length).toBeTruthy('Has some rows');
+
+          // little helper for readability
+          const cell = (r, c) => rows[r].children[c];
+          // Spot check some of the content
+          expect(cell(1, 0)).toMatchTextContent('State');
+          expect(cell(1, 1)).toMatchTextContent('PENDING');
+          expect(cell(1, 1)).toHaveClass('pending_task');
+          expect(cell(2, 0)).toMatchTextContent('Why Pending?');
+          expect(rows[5].hidden).toBeTruthy();
+          expect(cell(14, 0).rowSpan).toEqual(5); // 4 dimensions
+
+          done();
+        });
+      });
+
+      it('shows rich output as disabled', function(done) {
+        loggedInTaskPage((ele) => {
+          const picker = $$('.output-picker', ele);
+          expect(picker).toBeTruthy();
+          const tabs = $('.tab', picker);
+          expect(tabs.length).toEqual(2);
+          expect(tabs[0]).toHaveAttribute('disabled');
+          expect(tabs[0]).not.toHaveAttribute('selected');
+          expect(tabs[1]).not.toHaveAttribute('disabled');
+          expect(tabs[1]).toHaveAttribute('selected');
+
+          done();
+        });
+      });
+
+      it('shows no task execution data', function(done) {
+        loggedInTaskPage((ele) => {
+          const output = $$('div.task-execution', ele);
+          expect(output).toBeTruthy();
+          expect(output.textContent).toContain('left blank');
+
+          const outTable = $$('table.task-execution', ele);
+          expect(outTable).toBeFalsy();
+
+          done();
+        });
+      });
+    }); // end describe('Pending task - 1 slice - no rich logs')
+
   }); // end describe('html structure')
 
   describe('dynamic behavior', function() {

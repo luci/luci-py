@@ -91,11 +91,11 @@ const col_selector = (ele) => {
 <div class=col_selector @click=${e => e.stopPropagation()}>
   <input id=column_search class=search type=text
          placeholder='Search columns to show'
-         @input=${e => ele._refilterPossibleColumns(e)}
+         @input=${ele._refilterPossibleColumns}
          <!-- Looking at the change event, but that had the behavior of firing
               any time the user clicked away, with seemingly no differentiation.
               Instead, we watch keyup and wait for the 'Enter' key. -->
-         @keyup=${e => ele._columnSearch(e)}>
+         @keyup=${ele._columnSearch}>
   </input>
   ${ele._filteredPossibleColumns.map((key) => columnOption(key, ele))}
 </div>`;

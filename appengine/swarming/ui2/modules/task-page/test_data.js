@@ -154,7 +154,7 @@ export const taskResults = [
     "user": "",
     "created_ts": "2019-01-21T10:24:15.851434",
     "name": "Completed task with 2 slices",
-    "task_id": "task000",
+    "task_id": "testid001",
     "bot_dimensions": [
       {
         "value": [
@@ -255,6 +255,44 @@ export const taskResults = [
       0.5054023369562476
     ],
     "bot_id": "swarm1931-c4"
+  },
+  {
+    "created_ts": "2019-02-04T15:57:17.067389",
+    "name": "Pending task - 1 slice - no rich logs",
+    "task_id": "testid001",
+    "tags": [
+      "build_is_experimental:false",
+      "buildername:Android FYI Release (NVIDIA Shield TV)",
+      "buildnumber:12247",
+      "data:a79744f6cd528bb345b6c79e001523a17e5c83b8",
+      "device_os:N",
+      "device_type:foster",
+      "master:chromium.gpu.fyi",
+      "name:gl_tests",
+      "os:Android",
+      "pool:Chrome-GPU",
+      "priority:25",
+      "project:chromium",
+      "purpose:CI",
+      "purpose:luci",
+      "purpose:post-commit",
+      "service_account:none",
+      "slavename:swarm571-c4",
+      "spec_name:chromium.ci:Android FYI Release (NVIDIA Shield TV)",
+      "stepname:gl_tests on Android device NVIDIA Shield",
+      "swarming.pool.template:none",
+      "swarming.pool.version:b5e45b934fd19ff0d75d58eb11cdcb149344e3f2",
+      "user:None"
+    ],
+    "internal_failure": false,
+    "server_versions": [
+      "4055-721ffb4"
+    ],
+    "failure": false,
+    "state": "PENDING",
+    "modified_ts": "2019-02-04T15:57:17.157718",
+    "user": "",
+    "current_task_slice": "0"
   }
 ];
 
@@ -935,7 +973,225 @@ export const taskRequests = [
         }
       ]
     }
-  }
+  },
+  {
+    "created_ts": "2019-02-04T15:57:17.067389",
+    "authenticated": "user:chromium-ci-gpu-builder@example.iam.gserviceaccount.com",
+    "name": "Pending task - 1 slice - no rich logs",
+    "tags": [
+      "build_is_experimental:false",
+      "buildername:Android FYI Release (NVIDIA Shield TV)",
+      "buildnumber:12247",
+      "data:a79744f6cd528bb345b6c79e001523a17e5c83b8",
+      "device_os:N",
+      "device_type:foster",
+      "master:chromium.gpu.fyi",
+      "name:gl_tests",
+      "os:Android",
+      "pool:Chrome-GPU",
+      "priority:25",
+      "project:chromium",
+      "purpose:CI",
+      "purpose:luci",
+      "purpose:post-commit",
+      "service_account:none",
+      "slavename:swarm571-c4",
+      "spec_name:chromium.ci:Android FYI Release (NVIDIA Shield TV)",
+      "stepname:gl_tests on Android device NVIDIA Shield",
+      "swarming.pool.template:none",
+      "swarming.pool.version:b5e45b934fd19ff0d75d58eb11cdcb149344e3f2",
+      "user:None"
+    ],
+    "priority": "25",
+    "parent_task_id": "42d7b13b82d74511",
+    "user": "",
+    "service_account": "none",
+    "task_slices": [
+      {
+        "expiration_secs": "3600",
+        "wait_for_capacity": false,
+        "properties": {
+          "dimensions": [
+            {
+              "value": "N",
+              "key": "device_os"
+            },
+            {
+              "value": "Android",
+              "key": "os"
+            },
+            {
+              "value": "Chrome-GPU",
+              "key": "pool"
+            },
+            {
+              "value": "foster",
+              "key": "device_type"
+            }
+          ],
+          "idempotent": true,
+          "cipd_input": {
+            "packages": [
+              {
+                "path": ".swarming_module",
+                "version": "version:2.7.14.chromium14",
+                "package_name": "infra/python/cpython/${platform}"
+              },
+              {
+                "path": ".swarming_module",
+                "version": "git_revision:e1abc57be62d198b5c2f487bfb2fa2d2eb0e867c",
+                "package_name": "infra/tools/luci/logdog/butler/${platform}"
+              },
+              {
+                "path": ".swarming_module",
+                "version": "git_revision:96f81e737868d43124b4661cf1c325296ca04944",
+                "package_name": "infra/tools/luci/vpython-native/${platform}"
+              },
+              {
+                "path": ".swarming_module",
+                "version": "git_revision:96f81e737868d43124b4661cf1c325296ca04944",
+                "package_name": "infra/tools/luci/vpython/${platform}"
+              },
+              {
+                "path": "bin",
+                "version": "git_revision:ff387eadf445b24c935f1cf7d6ddd279f8a6b04c",
+                "package_name": "infra/tools/luci/logdog/butler/${platform}"
+              }
+            ],
+            "client_package": {
+              "version": "git_revision:6e4acf51a635665e54acaceb8bd073e5c7b8259a",
+              "package_name": "infra/tools/cipd/${platform}"
+            },
+            "server": "https://chrome-infra-packages.appspot.com"
+          },
+          "extra_args": [
+            "--gs-results-bucket=chromium-result-details",
+            "--recover-devices",
+            "--test-launcher-summary-output=${ISOLATED_OUTDIR}/output.json"
+          ],
+          "io_timeout_secs": "1200",
+          "env_prefixes": [
+            {
+              "value": [
+                ".swarming_module",
+                ".swarming_module/bin"
+              ],
+              "key": "PATH"
+            },
+            {
+              "value": [
+                ".swarming_module_cache/vpython"
+              ],
+              "key": "VPYTHON_VIRTUALENV_ROOT"
+            }
+          ],
+          "execution_timeout_secs": "3600",
+          "inputs_ref": {
+            "isolatedserver": "https://isolateserver.appspot.com",
+            "namespace": "default-gzip",
+            "isolated": "a79744f6cd528bb345b6c79e001523a17e5c83b8"
+          },
+          "grace_period_secs": "30",
+          "caches": [
+            {
+              "path": ".swarming_module_cache/vpython",
+              "name": "swarming_module_cache_vpython"
+            }
+          ]
+        }
+      }
+    ],
+    "expiration_secs": "3600",
+    "properties": {
+      "dimensions": [
+        {
+          "value": "N",
+          "key": "device_os"
+        },
+        {
+          "value": "Android",
+          "key": "os"
+        },
+        {
+          "value": "Chrome-GPU",
+          "key": "pool"
+        },
+        {
+          "value": "foster",
+          "key": "device_type"
+        }
+      ],
+      "idempotent": true,
+      "cipd_input": {
+        "packages": [
+          {
+            "path": ".swarming_module",
+            "version": "version:2.7.14.chromium14",
+            "package_name": "infra/python/cpython/${platform}"
+          },
+          {
+            "path": ".swarming_module",
+            "version": "git_revision:e1abc57be62d198b5c2f487bfb2fa2d2eb0e867c",
+            "package_name": "infra/tools/luci/logdog/butler/${platform}"
+          },
+          {
+            "path": ".swarming_module",
+            "version": "git_revision:96f81e737868d43124b4661cf1c325296ca04944",
+            "package_name": "infra/tools/luci/vpython-native/${platform}"
+          },
+          {
+            "path": ".swarming_module",
+            "version": "git_revision:96f81e737868d43124b4661cf1c325296ca04944",
+            "package_name": "infra/tools/luci/vpython/${platform}"
+          },
+          {
+            "path": "bin",
+            "version": "git_revision:ff387eadf445b24c935f1cf7d6ddd279f8a6b04c",
+            "package_name": "infra/tools/luci/logdog/butler/${platform}"
+          }
+        ],
+        "client_package": {
+          "version": "git_revision:6e4acf51a635665e54acaceb8bd073e5c7b8259a",
+          "package_name": "infra/tools/cipd/${platform}"
+        },
+        "server": "https://chrome-infra-packages.appspot.com"
+      },
+      "extra_args": [
+        "--gs-results-bucket=chromium-result-details",
+        "--recover-devices",
+        "--test-launcher-summary-output=${ISOLATED_OUTDIR}/output.json"
+      ],
+      "io_timeout_secs": "1200",
+      "env_prefixes": [
+        {
+          "value": [
+            ".swarming_module",
+            ".swarming_module/bin"
+          ],
+          "key": "PATH"
+        },
+        {
+          "value": [
+            ".swarming_module_cache/vpython"
+          ],
+          "key": "VPYTHON_VIRTUALENV_ROOT"
+        }
+      ],
+      "execution_timeout_secs": "3600",
+      "inputs_ref": {
+        "isolatedserver": "https://isolateserver.appspot.com",
+        "namespace": "default-gzip",
+        "isolated": "a79744f6cd528bb345b6c79e001523a17e5c83b8"
+      },
+      "grace_period_secs": "30",
+      "caches": [
+        {
+          "path": ".swarming_module_cache/vpython",
+          "name": "swarming_module_cache_vpython"
+        }
+      ]
+    }
+  },
 ];
 
 export const taskOutput = {
