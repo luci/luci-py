@@ -133,12 +133,9 @@ class ExternalSchedulerApiTest(test_case.TestCase):
     pass
 
   def test_notify_request(self):
-
     request = _gen_request()
     result_summary = task_scheduler.schedule_request(request, None)
-    res = external_scheduler.notify_request(self.es_cfg, request,
-                                            result_summary)
-    self.assertEqual(plugin_pb2.NotifyTasksResponse(), res)
+    external_scheduler.notify_request(self.es_cfg, request, result_summary)
 
     self.assertEqual(len(self._client.called_with_requests), 1)
     called_with = self._client.called_with_requests[0]
@@ -149,6 +146,11 @@ class ExternalSchedulerApiTest(test_case.TestCase):
                      notification.task.enqueued_time.ToDatetime())
     self.assertEqual(request.task_id, notification.task.id)
     self.assertEqual(request.num_task_slices, len(notification.task.slices))
+
+  def test_notify_request_now(self):
+    r = plugin_pb2.NotifyTasksRequest()
+    res = external_scheduler.notify_request_now("http://localhost:1", r)
+    self.assertEqual(plugin_pb2.NotifyTasksResponse(), res)
 
 
 if __name__ == '__main__':
