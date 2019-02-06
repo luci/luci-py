@@ -28,6 +28,11 @@ queue:
 - name: rebuild-task-cache
   rate: 500/s
 
+## External Scheduler
+
+- name: es-notify-tasks
+  rate: 100/s
+
 
 ## Named caches
 
