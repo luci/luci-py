@@ -106,6 +106,7 @@ export function parseResult(result) {
     sanitizeAndHumanizeTime(result, time);
   });
 
+  const now = new Date();
   // Running and bot_died tasks have no duration set, so we can figure it out.
   if (!result.duration && result.state === 'RUNNING' && result.started_ts) {
     result.duration = (now - result.started_ts) / 1000;

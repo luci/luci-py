@@ -89,9 +89,11 @@ describe('task-page', function() {
   // convenience function to save indentation and boilerplate.
   // expects a function test that should be called with the created
   // <task-page> after the user has logged in.
-  function loggedInTaskPage(test) {
+  function loggedInTaskPage(test, emptyTaskId) {
     createElement((ele) => {
-      ele._taskId = TEST_TASK_ID;
+      if (!emptyTaskId) {
+        ele._taskId = TEST_TASK_ID;
+      }
       userLogsIn(ele, () => {
         test(ele);
       });
@@ -142,7 +144,7 @@ describe('task-page', function() {
         createElement((ele) => {
           const loginMessage = $$('swarming-app>main .message', ele);
           expect(loginMessage).toBeTruthy();
-          expect(loginMessage.hidden).toBeFalsy('Message should not be hidden');
+          expect(loginMessage).not.toHaveAttribute('hidden', 'Message should not be hidden');
           expect(loginMessage.textContent).toContain('must sign in');
           done();
         });
@@ -153,8 +155,8 @@ describe('task-page', function() {
           const topDivs = $('main > div', ele);
           expect(topDivs).toBeTruthy();
           expect(topDivs.length).toBe(2);
-          expect(topDivs[0].hidden).toBeTruthy('left side hidden');
-          expect(topDivs[1].hidden).toBeTruthy('right side hidden');
+          expect(topDivs[0]).toHaveAttribute('hidden', 'left side hidden');
+          expect(topDivs[1]).toHaveAttribute('hidden', 'right side hidden');
           done();
         });
       });
@@ -178,23 +180,46 @@ describe('task-page', function() {
         loggedInTaskPage((ele) => {
           const loginMessage = $$('swarming-app>main .message', ele);
           expect(loginMessage).toBeTruthy();
-          expect(loginMessage.hidden).toBeFalsy('Message should not be hidden');
+          expect(loginMessage).not.toHaveAttribute('hidden', 'Message should not be hidden');
           expect(loginMessage.textContent).toContain('different account');
           done();
         });
       });
 
-      it('does not display filters or tasks', function(done) {
-        createElement((ele) => {
+      it('does not display logs or task details', function(done) {
+        loggedInTaskPage((ele) => {
           const topDivs = $('main > div', ele);
           expect(topDivs).toBeTruthy();
           expect(topDivs.length).toBe(2);
-          expect(topDivs[0].hidden).toBeTruthy('left side hidden');
-          expect(topDivs[1].hidden).toBeTruthy('right side hidden');
+          expect(topDivs[0]).toHaveAttribute('hidden', 'left side hidden');
+          expect(topDivs[1]).toHaveAttribute('hidden', 'right side hidden');
           done();
         });
       });
     }); // end describe('when logged in as unauthorized user')
+
+    describe('authorized user, but no taskid', function() {
+
+      it('tells the user they should enter a task id', function(done) {
+        loggedInTaskPage((ele) => {
+          const loginMessage = $$('.id_buttons .message', ele);
+          expect(loginMessage).toBeTruthy();
+          expect(loginMessage.textContent).toContain('Enter a Task ID');
+          done();
+        }, true);
+      });
+
+      it('does not display filters or tasks', function(done) {
+        loggedInTaskPage((ele) => {
+          const topDivs = $('main > div', ele);
+          expect(topDivs).toBeTruthy();
+          expect(topDivs.length).toBe(2);
+          expect(topDivs[0].children.length).toEqual(1); // only .id_buttons
+          expect(topDivs[1].children.length).toEqual(0); // everything else removed
+          done();
+        }, true);
+      });
+    }); // end describe('authorized user, but no taskid')
 
     describe('Completed task with 2 slices', function() {
       beforeEach(() => serveTask(0, 'Completed task with 2 slices'));
@@ -217,7 +242,7 @@ describe('task-page', function() {
                                         '(1024 busy, 13 dead, 1 quarantined, 0 maintenance)');
           expect(cell(3, 1)).toMatchTextContent('123 similar pending tasks, '+
                                                 '56 similar running tasks');
-          expect(rows[5].hidden).toBeTruthy();
+          expect(rows[5]).toHaveAttribute('hidden', 'deduped message hidden');
           expect(cell(7, 0)).toMatchTextContent('Wait for Capacity');
           expect(cell(7, 1)).toMatchTextContent('false');
           expect(cell(14, 0).rowSpan).toEqual(6); // 5 dimensions shown on slice 2
@@ -225,8 +250,8 @@ describe('task-page', function() {
 
           const subsections = $('tbody', taskInfo);
           expect(subsections.length).toEqual(2);
-          expect(subsections[0].hidden).toBeFalsy();
-          expect(subsections[1].hidden).toBeTruthy();
+          expect(subsections[0]).not.toHaveAttribute('hidden');
+          expect(subsections[1]).toHaveAttribute('hidden');
 
           done();
         });
@@ -242,7 +267,7 @@ describe('task-page', function() {
           // little helper for readability
           const cell = (r, c) => rows[r].children[c];
           // Spot check some of the content
-          expect(rows[1].hidden).toBeFalsy();
+          expect(rows[1]).not.toHaveAttribute('hidden', 'show started');
           expect(cell(6, 0)).toMatchTextContent('Pending Time');
           expect(cell(6, 1)).toMatchTextContent('3m 22s');
           expect(cell(7, 0)).toMatchTextContent('Total Overhead');
@@ -388,7 +413,7 @@ describe('task-page', function() {
           expect(cell(1, 1)).toMatchTextContent('PENDING');
           expect(cell(1, 1)).toHaveClass('pending_task');
           expect(cell(2, 0)).toMatchTextContent('Why Pending?');
-          expect(rows[5].hidden).toBeTruthy();
+          expect(rows[5]).toHaveAttribute('hidden', 'deduped message hidden');
           expect(cell(14, 0).rowSpan).toEqual(5); // 4 dimensions
 
           done();
@@ -436,13 +461,13 @@ describe('task-page', function() {
           ele.render();
 
           const lowerHalf = $('.task-info > tbody', ele)[1];
-          expect(lowerHalf.hidden).toBeTruthy();
+          expect(lowerHalf).toHaveAttribute('hidden');
 
           const btn = $$('.details button', ele);
           btn.click();
-          expect(lowerHalf.hidden).toBeFalsy();
+          expect(lowerHalf).not.toHaveAttribute('hidden');
           btn.click();
-          expect(lowerHalf.hidden).toBeTruthy();
+          expect(lowerHalf).toHaveAttribute('hidden');
 
           done();
         });

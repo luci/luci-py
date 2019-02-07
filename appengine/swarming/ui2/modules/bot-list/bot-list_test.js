@@ -120,7 +120,7 @@ describe('bot-list', function() {
         createElement((ele) => {
           const loginMessage = $$('swarming-app>main .message', ele);
           expect(loginMessage).toBeTruthy();
-          expect(loginMessage.hidden).toBeFalsy('Message should not be hidden');
+          expect(loginMessage).not.toHaveAttribute('hidden', 'Message should not be hidden');
           expect(loginMessage.textContent).toContain('must sign in');
           done();
         });
@@ -129,7 +129,7 @@ describe('bot-list', function() {
         createElement((ele) => {
           const botTable = $$('.bot-table', ele);
           expect(botTable).toBeTruthy();
-          expect(botTable.hidden).toBeTruthy('.bot-table should be hidden');
+          expect(botTable).toHaveAttribute('hidden', '.bot-table should be hidden');
           expect($$('main button:not([hidden])', ele)).toBeFalsy('no buttons seen');
           expect($$('.header', ele)).toBeFalsy('no filters seen');
           done();
@@ -157,7 +157,7 @@ describe('bot-list', function() {
         loggedInBotlist((ele) => {
           const loginMessage = $$('swarming-app>main .message', ele);
           expect(loginMessage).toBeTruthy();
-          expect(loginMessage.hidden).toBeFalsy('Message should not be hidden');
+          expect(loginMessage).not.toHaveAttribute('hidden', 'Message should not be hidden');
           expect(loginMessage.textContent).toContain('different account');
           done();
         });
@@ -166,7 +166,7 @@ describe('bot-list', function() {
         loggedInBotlist((ele) => {
           const botTable = $$('.bot-table', ele);
           expect(botTable).toBeTruthy();
-          expect(botTable.hidden).toBeTruthy('.bot-table should be hidden');
+          expect(botTable).toHaveAttribute('hidden', '.bot-table should be hidden');
 
           const filters = $$('.filters', ele);
           expect(filters).toBeFalsy('.filters should not be shown');

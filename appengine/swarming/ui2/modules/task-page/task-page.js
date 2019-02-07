@@ -35,9 +35,13 @@ import SwarmingAppBoilerplate from '../SwarmingAppBoilerplate'
  *
  */
 
-const taskInfoTable = (ele, request, result, currentSlice) => {
-  if (!currentSlice.properties) {
-    currentSlice.properties = {};
+const idAndButtons = (ele) => {
+  if (!ele._taskId) {
+    return html`
+<div class=id_buttons>
+  <input id=id_input placeholder="Task ID" @change=${ele._updateID}></input>
+  <span class=message>Enter a Task ID to get started.</span>
+</div>`;
   }
   return html`
 <div class=id_buttons>
@@ -48,10 +52,36 @@ const taskInfoTable = (ele, request, result, currentSlice) => {
           @click=${() => alert('use old ui for now')}>retry</button>
   <button title="Re-queue the task, but don't run it automatically"
           @click=${() => alert('use old ui for now')}>debug</button>
-</div>
+</div>`;
+}
 
-${slicePicker(ele)}
+const slicePicker = (ele) => {
+  if (!ele._taskId) {
+    return '';
+  }
+  if (!(ele._request.task_slices && ele._request.task_slices.length > 1)) {
+    return '';
+  }
 
+  return html`
+<div class=slice-picker>
+  ${ele._request.task_slices.map((_, idx) => sliceTab(ele, idx))}
+</div>`;
+}
+
+const sliceTab = (ele, idx) => html`
+  <div class=tab ?selected=${ele._currentSliceIdx === idx}
+                 @click=${() => ele._setSlice(idx)}>Task Slice ${idx+1}</div>
+`;
+
+const taskInfoTable = (ele, request, result, currentSlice) => {
+  if (!ele._taskId) {
+    return '';
+  }
+  if (!currentSlice.properties) {
+    currentSlice.properties = {};
+  }
+  return html`
 <table class="task-info request-info ${taskInfoClass(ele, result)}">
 <tbody>
   <tr>
@@ -104,22 +134,6 @@ ${slicePicker(ele)}
 </table>
 `;
 }
-
-const slicePicker = (ele) => {
-  if (!(ele._request.task_slices && ele._request.task_slices.length > 1)) {
-    return '';
-  }
-
-  return html`
-<div class=slice-picker>
-  ${ele._request.task_slices.map((_, idx) => sliceTab(ele, idx))}
-</div>
-`}
-
-const sliceTab = (ele, idx) => html`
-  <div class=tab ?selected=${ele._currentSliceIdx === idx}
-                 @click=${() => ele._setSlice(idx)}>Task Slice ${idx+1}</div>
-`;
 
 const stateLoadBlock = (ele, request, result) => html`
 <tr>
@@ -376,7 +390,7 @@ const cipdRowSet = (pkg, cipdInput, actualAvailable) => html`
 `;
 
 const taskTimingSection = (ele, request, result) => {
-  if (wasDeduped(result)) {
+  if (!ele._taskId || wasDeduped(result)) {
     // Don't show timing info when task was deduped because the info
     // in the result is from the original task, which can be confusing
     // when juxtaposed with the data from this task.
@@ -441,6 +455,9 @@ const taskTimingSection = (ele, request, result) => {
 }
 
 const taskExecutionSection = (ele, request, result, currentSlice) => {
+  if (!ele._taskId) {
+    return '';
+  }
   if (!result || !wasPickedUp(result)) {
     return html`
 <div class=title>Task Execution</div>
@@ -540,7 +557,7 @@ const botDimensionValue = (value) => html`
 `;
 
 const performanceStatsSection = (ele, performanceStats) => {
-  if (!performanceStats) {
+  if (!ele._taskId || !performanceStats) {
     return '';
   }
   return html`
@@ -587,6 +604,9 @@ const performanceStatsSection = (ele, performanceStats) => {
 }
 
 const reproduceSection = (ele, currentSlice) => {
+  if (!ele._taskId) {
+    return '';
+  }
   const ref =  currentSlice.properties && currentSlice.properties.inputs_ref || {};
   const hasIsolated = !!ref.isolated;
   const hostUrl = window.location.hostname;
@@ -616,7 +636,11 @@ const reproduceSection = (ele, currentSlice) => {
 `;
 }
 
-const taskLogs = (ele) => html`
+const taskLogs = (ele) => {
+  if (!ele._taskId) {
+    return '';
+  }
+  return html`
 <div class="horizontal layout">
   <div class=output-picker>
     <div class=tab ?selected=${!ele._showRawOutput && hasRichOutput(ele)}
@@ -636,6 +660,8 @@ const taskLogs = (ele) => html`
 </div>
 ${richOrRawLogs(ele)}
 `;
+}
+
 
 const richOrRawLogs = (ele) => {
   if (ele._showRawOutput || !hasRichOutput(ele)) {
@@ -674,6 +700,10 @@ const template = (ele) => html`
     <h2 class=message ?hidden=${ele.loggedInAndAuthorized}>${ele._message}</h2>
 
     <div class="left grow" ?hidden=${!ele.loggedInAndAuthorized}>
+    ${idAndButtons(ele)}
+
+    ${slicePicker(ele)}
+
     ${taskInfoTable(ele, ele._request, ele._result, ele._currentSlice)}
 
     ${taskTimingSection(ele, ele._request, ele._result)}
@@ -758,7 +788,7 @@ window.customElements.define('task-page', class extends SwarmingAppBoilerplate {
   }
 
   _fetch() {
-    if (!this.loggedInAndAuthorized || !this._urlParamsLoaded) {
+    if (!this.loggedInAndAuthorized || !this._urlParamsLoaded || !this._taskId) {
       return;
     }
     if (this._fetchController) {
@@ -905,5 +935,6 @@ window.customElements.define('task-page', class extends SwarmingAppBoilerplate {
     this._taskId = idInput.value;
     this._stateChanged();
     this._fetch();
+    this.render();
   }
 });

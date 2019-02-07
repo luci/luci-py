@@ -118,7 +118,7 @@ describe('task-list', function() {
         createElement((ele) => {
           const loginMessage = $$('swarming-app>main .message', ele);
           expect(loginMessage).toBeTruthy();
-          expect(loginMessage.hidden).toBeFalsy('Message should not be hidden');
+          expect(loginMessage).not.toHaveAttribute('hidden', 'Message should not be hidden');
           expect(loginMessage.textContent).toContain('must sign in');
           done();
         });
@@ -127,8 +127,8 @@ describe('task-list', function() {
         createElement((ele) => {
           const taskTable = $$('.task-table', ele);
           expect(taskTable).toBeTruthy();
-          expect(taskTable.hidden).toBeTruthy('.task-table should be hidden');
-          expect($$('.header', ele).hidden).toBeTruthy('no filters seen');
+          expect(taskTable).toHaveAttribute('hidden', '.task-table should be hidden');
+          expect($$('.header', ele)).toHaveAttribute('hidden', 'no filters seen');
           done();
         });
       });
@@ -156,7 +156,7 @@ describe('task-list', function() {
         loggedInTasklist((ele) => {
           const loginMessage = $$('swarming-app>main .message', ele);
           expect(loginMessage).toBeTruthy();
-          expect(loginMessage.hidden).toBeFalsy('Message should not be hidden');
+          expect(loginMessage).not.toHaveAttribute('hidden', 'Message should not be hidden');
           expect(loginMessage.textContent).toContain('different account');
           done();
         });
@@ -165,8 +165,8 @@ describe('task-list', function() {
         loggedInTasklist((ele) => {
           const taskTable = $$('.task-table', ele);
           expect(taskTable).toBeTruthy();
-          expect(taskTable.hidden).toBeTruthy('.task-table should be hidden');
-          expect($$('.header', ele).hidden).toBeTruthy('no filters seen');
+          expect(taskTable).toHaveAttribute('hidden', '.task-table should be hidden');
+          expect($$('.header', ele)).toHaveAttribute('hidden', 'no filters seen');
           done();
         });
       });
