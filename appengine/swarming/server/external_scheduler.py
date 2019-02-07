@@ -7,8 +7,11 @@
 import logging
 
 from components import utils
+from components import datastore_utils
 
 from components.prpc import client
+
+from google.protobuf import json_format
 
 from proto.api import plugin_pb2
 from proto.api import plugin_prpc_pb2
@@ -150,8 +153,7 @@ def assign_task(es_cfg, bot_dimensions):
   return resp.assignments[0].task_id, resp.assignments[0].slice_number
 
 
-# TODO(akeshet): Add a blocking and non-blocking variant of this.
-def notify_request(es_cfg, request, result_summary, use_tq=False):
+def notify_request(es_cfg, request, result_summary, use_tq, transactional):
   """Calls external scheduler to notify it of a task state.
 
   Arguments:
@@ -159,8 +161,11 @@ def notify_request(es_cfg, request, result_summary, use_tq=False):
         notify.
     - request: task_request.TaskRequest
     - result_summary: task_result.TaskResultSummary
-    - use_tq: If true, make this call asynchronously on a task queue (not
-              yet implemented).
+    - use_tq: If true, make this call on a task queue (within the current
+              datastore transaction).
+    - transactional: If use_tq is True, then specify whether the this call
+                     should be made on a task queue as part of a datastore
+                     transaction.
 
   Returns: Nothing.
   """
@@ -188,9 +193,14 @@ def notify_request(es_cfg, request, result_summary, use_tq=False):
   req.scheduler_id = es_cfg.id
 
   if use_tq:
-    # Push a payload containing |req| proto and es_host to
-    # a task-queue.
-    pass
+    request_json = json_format.MessageToJson(req)
+    enqueued = utils.enqueue_task(
+        url='/internal/taskqueue/es-notify-tasks',
+        queue_name='es-notify-tasks',
+        params={'es_host': es_cfg.address, 'request_json': request_json},
+        transactional=transactional)
+    if not enqueued:
+      raise datastore_utils.CommitError('Failed to enqueue task')
   else:
     # Ignore return value, the response proto is empty.
     notify_request_now(es_cfg.address, req)

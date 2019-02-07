@@ -10,11 +10,16 @@ import logging
 import webapp2
 from google.appengine.ext import ndb
 
+from google.protobuf import json_format
+
+from proto.api import plugin_pb2
+
 import mapreduce_jobs
 from components import decorators
 from server import bot_groups_config
 from server import bot_management
 from server import config
+from server import external_scheduler
 from server import lease_management
 from server import named_caches
 from server import stats_bots
@@ -298,6 +303,18 @@ class TaskSendPubSubMessage(webapp2.RequestHandler):
     task_scheduler.task_handle_pubsub_task(json.loads(self.request.body))
 
 
+class TaskESNotifyTasksHandler(webapp2.RequestHandler):
+  """Sends task notifications to external scheduler."""
+
+  @decorators.require_taskqueue('es-notify-tasks')
+  def post(self):
+    es_host = self.request.get('es_host')
+    request_json = self.request.get('request_json')
+    request = plugin_pb2.NotifyTasksRequest()
+    json_format.Parse(request_json, request)
+    external_scheduler.notify_request_now(es_host, request)
+
+
 class TaskMachineProviderManagementHandler(webapp2.RequestHandler):
   """Manages a lease for a Machine Provider bot."""
 
@@ -396,6 +413,7 @@ def get_routes():
     ('/internal/taskqueue/delete-tasks', DeleteTasksHandler),
     ('/internal/taskqueue/rebuild-task-cache', TaskDimensionsHandler),
     (r'/internal/taskqueue/pubsub/<task_id:[0-9a-f]+>', TaskSendPubSubMessage),
+    ('/internal/taskqueue/es-notify-tasks', TaskESNotifyTasksHandler),
     ('/internal/taskqueue/machine-provider-manage',
         TaskMachineProviderManagementHandler),
     (r'/internal/taskqueue/update_named_cache', TaskNamedCachesPool),

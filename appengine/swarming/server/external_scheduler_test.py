@@ -6,13 +6,18 @@
 
 import datetime
 import logging
+import os
 import random
 import sys
 import unittest
 
 # Setups environment.
-import test_env
-test_env.setup_test_env()
+APP_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, APP_DIR)
+import test_env_handlers
+
+import webtest
+import handlers_backend
 
 from test_support import test_case
 
@@ -76,8 +81,7 @@ class FakeExternalScheduler(object):
     return plugin_pb2.NotifyTasksResponse()
 
 
-class ExternalSchedulerApiTest(test_case.TestCase):
-  APP_DIR = test_env.APP_DIR
+class ExternalSchedulerApiTest(test_env_handlers.AppTestBase):
 
   def setUp(self):
     super(ExternalSchedulerApiTest, self).setUp()
@@ -86,20 +90,26 @@ class ExternalSchedulerApiTest(test_case.TestCase):
         id=u'foo',
         dimensions=['key1:value1', 'key2:value2'],
         enabled=True)
+
     # Make the values deterministic.
     self.mock_now(datetime.datetime(2014, 1, 2, 3, 4, 5, 6))
     self.mock(random, 'getrandbits', lambda _: 0x88)
-    # Skip task_scheduler.schedule_request() enqueued work.
-    self.mock(utils, 'enqueue_task', self._enqueue)
-    # Use the local fake.
+
+    # Use the local fake client to external scheduler..
     self.mock(external_scheduler, '_get_client', self._get_client)
     self._client = None
 
-  def _enqueue(self, url, queue_name, payload):
-    self.assertEqual('/internal/taskqueue/rebuild-task-cache', url)
-    self.assertEqual('rebuild-task-cache', queue_name)
-    self.assertTrue(payload)
-    return True
+    # Setup the backend to handle task queues.
+    self.app = webtest.TestApp(
+        handlers_backend.create_application(True),
+        extra_environ={
+          'REMOTE_ADDR': self.source_ip,
+          'SERVER_SOFTWARE': os.environ['SERVER_SOFTWARE'],
+        })
+    self._enqueue_orig = self.mock(utils, 'enqueue_task', self._enqueue)
+
+  def _enqueue(self, *args, **kwargs):
+    return self._enqueue_orig(*args, use_dedicated_module=False, **kwargs)
 
   def _get_client(self, addr):
     self.assertEqual(u'http://localhost:1', addr)
@@ -135,8 +145,33 @@ class ExternalSchedulerApiTest(test_case.TestCase):
   def test_notify_request(self):
     request = _gen_request()
     result_summary = task_scheduler.schedule_request(request, None)
-    external_scheduler.notify_request(self.es_cfg, request, result_summary)
+    external_scheduler.notify_request(
+        self.es_cfg, request, result_summary, False, False)
 
+    self.assertEqual(len(self._client.called_with_requests), 1)
+    called_with = self._client.called_with_requests[0]
+    self.assertEqual(len(called_with.notifications), 1)
+    notification = called_with.notifications[0]
+
+    self.assertEqual(request.created_ts,
+                     notification.task.enqueued_time.ToDatetime())
+    self.assertEqual(request.task_id, notification.task.id)
+    self.assertEqual(request.num_task_slices, len(notification.task.slices))
+
+    self.execute_tasks()
+
+  def test_notify_request_with_tq(self):
+    request = _gen_request()
+    result_summary = task_scheduler.schedule_request(request, None)
+    external_scheduler.notify_request(
+      self.es_cfg, request, result_summary, True, False)
+
+    # There should have been no call to _get_client yet.
+    self.assertEqual(self._client, None)
+
+    self.execute_tasks()
+
+    # After taskqueue executes, there should be a call to the client.
     self.assertEqual(len(self._client.called_with_requests), 1)
     called_with = self._client.called_with_requests[0]
     self.assertEqual(len(called_with.notifications), 1)

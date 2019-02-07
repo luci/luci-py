@@ -463,7 +463,8 @@ def _maybe_taskupdate_notify_via_tq(result_summary, request, es_cfg):
     # transaction we are in (via a similar mechanism to the pubsub messages
     # above). In the meantime, only tasks that use an external scheduler will
     # be adversely affected by this code.
-    external_scheduler.notify_request(es_cfg, request, result_summary)
+    external_scheduler.notify_request(
+        es_cfg, request, result_summary, False, False)
 
 
 def _pubsub_notify(task_id, topic, auth_token, userdata):
@@ -992,7 +993,8 @@ def schedule_request(request, secret_bytes):
   # call could be made asynchronously, but errors back-propagated to the task.
   if es_cfg:
     # TODO(akeshet): Add error handling.
-    external_scheduler.notify_request(es_cfg, request, result_summary)
+    external_scheduler.notify_request(
+        es_cfg, request, result_summary, False, False)
 
   if dupe_summary:
     logging.debug(

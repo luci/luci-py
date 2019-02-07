@@ -311,6 +311,7 @@ class BackendTest(AppTestBase):
       ('cancel-task-on-bot', '/internal/taskqueue/cancel-task-on-bot', ''),
       ('cancel-tasks', '/internal/taskqueue/cancel-tasks', ''),
       ('delete-tasks', '/internal/taskqueue/delete-tasks', ''),
+      ('es-notify-tasks', '/internal/taskqueue/es-notify-tasks', ''),
       ('machine-provider-manage',
        '/internal/taskqueue/machine-provider-manage', ''),
       ('pubsub', '/internal/taskqueue/pubsub/', 'abcabcabc'),
