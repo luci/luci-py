@@ -160,11 +160,11 @@ export function sanitizeAndHumanizeTime(obj, key) {
     obj[key] = new Date(obj[key]);
 
     // Extract the timezone.
-    var str = obj[key].toString();
-    var timezone = str.substring(str.indexOf('('));
+    const str = obj[key].toString();
+    const timezone = str.substring(str.indexOf('('));
 
     // If timestamp is today, skip the date.
-    var now = new Date();
+    const now = new Date();
     if (obj[key].getDate() == now.getDate() &&
         obj[key].getMonth() == now.getMonth() &&
         obj[key].getYear() == now.getYear()) {
@@ -240,7 +240,7 @@ export function taskPageLink(taskId, disableCanonicalID) {
  */
 export function timeDiffExact(first, second) {
   if (!first) {
-    return "eons";
+    return 'eons';
   }
   if (!second) {
     second = new Date();

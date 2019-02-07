@@ -29,8 +29,12 @@ swarming-app > {
     flex-grow: 1;
   }
 
-  header .title, header aside {
-    font-size: 20px;
+  header .title {
+    font-size: 1.25em;
+  }
+  header aside a {
+    font-size: 1.1em;
+    margin: 0 2px;
   }
 
   header .right {

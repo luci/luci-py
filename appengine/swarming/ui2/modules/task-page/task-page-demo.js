@@ -25,6 +25,31 @@ fetchMock.get('glob:/_ah/api/swarming/v1/task/*/result?include_performance_stats
 fetchMock.get('glob:/_ah/api/swarming/v1/task/*/stdout',
               requireLogin(taskOutput, 100));
 
+function randomInt(min, max) {
+  return Math.floor(Math.random() * (max-min) + min);
+}
+
+function randomBotCounts() {
+  const total = randomInt(10, 200);
+  return {
+    busy: Math.floor(total * .84),
+    count: total,
+    dead: randomInt(0, total*.1),
+    quarantined: randomInt(1, total*.1),
+    maintenance: randomInt(0, total*.1),
+  }
+}
+fetchMock.get('glob:/_ah/api/swarming/v1/bots/count?*',
+              requireLogin(randomBotCounts, 300));
+
+function randomTaskCounts() {
+  return {
+    count: randomInt(10, 2000)
+  }
+}
+fetchMock.get('glob:/_ah/api/swarming/v1/tasks/count?*',
+              requireLogin(randomTaskCounts, 300));
+
 // Everything else
 fetchMock.catch(404);
 

@@ -10,13 +10,15 @@ import { stateReflector } from 'common-sk/modules/stateReflector'
 
 import 'elements-sk/checkbox-sk'
 import 'elements-sk/icon/add-circle-outline-icon-sk'
+import 'elements-sk/icon/remove-circle-outline-icon-sk'
 import 'elements-sk/styles/buttons'
 import '../swarming-app'
 
 import * as human from 'common-sk/modules/human'
+import * as query from 'common-sk/modules/query'
 
 import { cipdLink, hasRichOutput, humanState, isolateLink, isSummaryTask,
-         parseRequest, parseResult, richLogsLink, sliceExpires, stateClass, 
+         parseRequest, parseResult, richLogsLink, sliceExpires, stateClass,
          taskCost, taskExpires,
          taskInfoClass, wasDeduped, wasPickedUp} from './task-page-helpers'
 import { botPageLink, humanDuration, taskPageLink } from '../util'
@@ -65,10 +67,13 @@ ${slicePicker(ele)}
   ${commitBlock(request.tagMap)}
 
   <tr class=details>
-    <td>Show Details</td>
+    <td>More Details</td>
     <td>
-      <button @click=${ele._toggleDetails}>
+      <button @click=${ele._toggleDetails} ?hidden=${ele._showDetails}>
         <add-circle-outline-icon-sk></add-circle-outline-icon-sk>
+      </button>
+      <button @click=${ele._toggleDetails} ?hidden=${!ele._showDetails}>
+        <remove-circle-outline-icon-sk></remove-circle-outline-icon-sk>
       </button>
     </td>
   </tr>
@@ -121,22 +126,9 @@ const stateLoadBlock = (ele, request, result) => html`
   <td>State</td>
   <td class=${stateClass(result)}>${humanState(result, ele._currentSliceIdx)}</td>
 </tr>
-<tr>
-  <td class=${result.state === 'PENDING'? 'bold': ''}>
-    ${result.state === 'PENDING' ? 'Why Pending?' : 'Fleet Capacity'}
-  </td>
-  <!-- TODO(kjlubick) counts. don't forget itallics-->
-  <td>
-    11 bots could possibly run this task
-    (1 busy, 2 dead, 3 quarantined, 4 maintenance)
-  </td>
-</tr>
-<tr>
-  <td>Similar Load</td>
-  <!-- TODO(kjlubick) more counts -->
-  <td>57 similar pending tasks, 123 similar running tasks</td>
-</tr>
-
+${countBlocks(result, ele._capacityCounts[ele._currentSliceIdx],
+                      ele._pendingCounts[ele._currentSliceIdx],
+                      ele._runningCounts[ele._currentSliceIdx])}
 <tr ?hidden=${!result.deduped_from}>
   <td><b>Deduped From</b></td>
   <td><a href=${taskPageLink(result.deduped_from)}</td>
@@ -148,6 +140,38 @@ const stateLoadBlock = (ele, request, result) => html`
   </td>
 </tr>
 `;
+
+const countBlocks = (result, capacityCount, pendingCount, runningCount) => html`
+<tr>
+  <td class=${result.state === 'PENDING'? 'bold': ''}>
+    ${result.state === 'PENDING' ? 'Why Pending?' : 'Fleet Capacity'}
+  </td>
+  <td>
+    ${count(capacityCount, 'count')} bots could possibly run this task
+    (${count(capacityCount, 'busy')} busy,
+    ${count(capacityCount, 'dead')} dead,
+    ${count(capacityCount, 'quarantined')} quarantined,
+    ${count(capacityCount, 'maintenance')} maintenance)
+  </td>
+</tr>
+<tr>
+  <td>Similar Load</td>
+  <td>
+      ${count(pendingCount)} similar pending tasks,
+      ${count(runningCount)} similar running tasks
+  </td>
+</tr>
+`;
+
+const count = (obj, value) => {
+  if (!obj || (value && obj[value] === undefined)) {
+    return html`<span class=italic>&lt;counting&gt</span>`
+  }
+  if (value) {
+    return obj[value];
+  }
+  return obj;
+}
 
 const requestBlock = (request, result, currentSlice) => html`
 <tr>
@@ -641,8 +665,9 @@ const template = (ele) => html`
       <aside class=hideable>
         <a href=/>Home</a>
         <a href=/botlist>Bot List</a>
-        <a href="/oldui/botpage?id=${ele._taskId}">Old Bot Page</a>
         <a href=/tasklist>Task List</a>
+        <a href=/bot>Bot Page</a>
+        <a href="/oldui/task?id=${ele._taskId}">Old Task Page</a>
       </aside>
   </header>
   <main class="horizontal layout wrap">
@@ -704,6 +729,13 @@ window.customElements.define('task-page', class extends SwarmingAppBoilerplate {
     this._result = {};
     this._currentSlice = {};
     this._currentSliceIdx = -1;
+    // Track counts a set of parallel arrays, that is, the nth index in
+    // each of these corresponds to the counts for the nth slice.
+    // They will be filled in index by index when each fetch from
+    // _fetchCounts returns a value.
+    this._capacityCounts = [];
+    this._pendingCounts = [];
+    this._runningCounts = [];
     this._message = 'You must sign in to see anything useful.';
     // Allows us to abort fetches that are tied to the id when the id changes.
     this._fetchController = null;
@@ -746,6 +778,9 @@ window.customElements.define('task-page', class extends SwarmingAppBoilerplate {
       .then(jsonOrThrow)
       .then((json) => {
         this._request = parseRequest(json);
+        // Note, this triggers more fetch requests, which also adds to
+        // app's busy task counts.
+        this._fetchCounts(this._request, extra);
         // We need to set the slice if result has been loaded, otherwise
         // when the slice loads, it will take care of it for us.
         if (currIdx >= 0) {
@@ -773,6 +808,61 @@ window.customElements.define('task-page', class extends SwarmingAppBoilerplate {
         this.app.finishedTask();
       })
       .catch((e) => this.fetchError(e, 'task/request'));
+  }
+
+  _fetchCounts(request, extra) {
+    const numSlices = request.task_slices.length;
+    this.app.addBusyTasks(numSlices * 3);
+    // reset current viewings
+    this._capacityCounts = [];
+    this._pendingCounts = [];
+    this._runningCounts = [];
+    for (let i = 0; i < numSlices; i++) {
+      const bParams = {
+        dimensions: [],
+      }
+      for (const dim of request.task_slices[i].properties.dimensions) {
+        bParams.dimensions.push(`${dim.key}:${dim.value}`);
+      }
+      fetch(`/_ah/api/swarming/v1/bots/count?${query.fromObject(bParams)}`, extra)
+        .then(jsonOrThrow)
+        .then((json) => {
+          this._capacityCounts[i] = json;
+          this.render();
+          this.app.finishedTask();
+        })
+        .catch((e) => this.fetchError(e, 'bots/count slice ' + i));
+
+      let start = new Date();
+      start.setSeconds(0);
+      // go back 24 hours, rounded to the nearest minute for better caching.
+      start = '' + (start.getTime() - 24*60*60*1000);
+      // convert to seconds, because that's what the API expects.
+      start = start.substring(0, start.length-3);
+      const tParams = {
+        start: [start],
+        state: ['RUNNING'],
+        tags: bParams.dimensions,
+      }
+      fetch(`/_ah/api/swarming/v1/tasks/count?${query.fromObject(tParams)}`, extra)
+        .then(jsonOrThrow)
+        .then((json) => {
+          this._runningCounts[i] = json.count;
+          this.render();
+          this.app.finishedTask();
+        })
+        .catch((e) => this.fetchError(e, 'tasks/running slice ' + i));
+
+      tParams.state = ['PENDING'];
+      fetch(`/_ah/api/swarming/v1/tasks/count?${query.fromObject(tParams)}`, extra)
+        .then(jsonOrThrow)
+        .then((json) => {
+          this._pendingCounts[i] = json.count;
+          this.render();
+          this.app.finishedTask();
+        })
+        .catch((e) => this.fetchError(e, 'tasks/pending slice ' + i));
+    }
   }
 
   render() {

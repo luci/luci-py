@@ -110,6 +110,20 @@ describe('task-page', function() {
     fetchMock.get(`/_ah/api/swarming/v1/task/${TEST_TASK_ID}/request`, request);
     fetchMock.get(`/_ah/api/swarming/v1/task/${TEST_TASK_ID}/result?include_performance_stats=true`, result);
     fetchMock.get(`/_ah/api/swarming/v1/task/${TEST_TASK_ID}/stdout`, taskOutput);
+    fetchMock.get('glob:/_ah/api/swarming/v1/bots/count?*', {
+      busy: 1024,
+      count: 1337,
+      dead: 13,
+      quarantined: 1,
+      maintenance: 0,
+    });
+    fetchMock.get('glob:/_ah/api/swarming/v1/tasks/count?*', (url, opts) => {
+      if (url.indexOf('PENDING') !== -1) {
+        return {count: 123};
+      } else {
+        return {count: 56};
+      }
+    });
   }
 
 //===============TESTS START====================================
@@ -199,6 +213,10 @@ describe('task-page', function() {
           expect(cell(0, 1)).toMatchTextContent('Completed task with 2 slices');
           expect(cell(1, 0)).toMatchTextContent('State');
           expect(cell(1, 1)).toMatchTextContent('COMPLETED (SUCCESS)');
+          expect(cell(2, 1)).toMatchTextContent('1337 bots could possibly run this task ' +
+                                        '(1024 busy, 13 dead, 1 quarantined, 0 maintenance)');
+          expect(cell(3, 1)).toMatchTextContent('123 similar pending tasks, '+
+                                                '56 similar running tasks');
           expect(rows[5].hidden).toBeTruthy();
           expect(cell(7, 0)).toMatchTextContent('Wait for Capacity');
           expect(cell(7, 1)).toMatchTextContent('false');
@@ -537,15 +555,45 @@ describe('task-page', function() {
       serveTask(0, 'Completed task with 2 slices');
       loggedInTaskPage((ele) => {
         let calls = fetchMock.calls(MATCHED, 'GET');
-        expect(calls.length).toBe(2+3, '2 GETs from swarming-app, 3 from task-page');
+        expect(calls.length).toBe(2+3+6, '2 GETs from swarming-app, 3 from task-page, 3 counts * 2 slices');
         // calls is an array of 2-length arrays with the first element
         // being the string of the url and the second element being
         // the options that were passed in
         const gets = calls.map((c) => c[0]);
 
         expect(gets).toContain(`/_ah/api/swarming/v1/task/${TEST_TASK_ID}/request`);
-        expect(gets).toContain(`/_ah/api/swarming/v1/task/${TEST_TASK_ID}/result?include_performance_stats=true`);
+        expect(gets).toContain(`/_ah/api/swarming/v1/task/${TEST_TASK_ID}/result`+
+                               '?include_performance_stats=true');
         expect(gets).toContain(`/_ah/api/swarming/v1/task/${TEST_TASK_ID}/stdout`);
+        // spot check one of the counts
+        expect(gets).toContain('/_ah/api/swarming/v1/bots/count?'+
+          'dimensions=builder%3Alinux_chromium_cfi_rel_ng&'+
+          'dimensions=cores%3A32&dimensions=os%3AUbuntu-14.04&dimensions=cpu%3Ax86-64&'+
+          'dimensions=pool%3Aluci.chromium.try&'+
+          'dimensions=caches%3Abuilder_86e11e72bf6f8c2c424eb2189ffc073b483485cf12a42'+
+          'b403fb5526a59936253_v2');
+
+        checkAuthorizationAndNoPosts(calls);
+        done();
+      });
+    });
+
+    it('makes counts correctly with 1 slice', function(done) {
+      serveTask(1, 'Pending task - 1 slice - no rich logs');
+      loggedInTaskPage((ele) => {
+        let calls = fetchMock.calls(MATCHED, 'GET');
+        expect(calls.length).toBe(2+3+3, '2 GETs from swarming-app, 3 from task-page, 3 counts * 1 slice');
+        // calls is an array of 2-length arrays with the first element
+        // being the string of the url and the second element being
+        // the options that were passed in
+        const gets = calls.map((c) => c[0]);
+
+        expect(gets).toContain(`/_ah/api/swarming/v1/task/${TEST_TASK_ID}/request`);
+        expect(gets).toContain(`/_ah/api/swarming/v1/task/${TEST_TASK_ID}/result`+
+                               '?include_performance_stats=true');
+        expect(gets).toContain(`/_ah/api/swarming/v1/task/${TEST_TASK_ID}/stdout`);
+        expect(gets).toContain('/_ah/api/swarming/v1/tasks/count?start=1549212360&state=RUNNING&'+
+          'tags=device_os%3AN&tags=os%3AAndroid&tags=pool%3AChrome-GPU&tags=device_type%3Afoster');
 
         checkAuthorizationAndNoPosts(calls);
         done();
