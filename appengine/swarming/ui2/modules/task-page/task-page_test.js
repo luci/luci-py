@@ -245,8 +245,8 @@ describe('task-page', function() {
           expect(cell(1, 1)).toMatchTextContent('COMPLETED (SUCCESS)');
           expect(cell(2, 1)).toMatchTextContent('1337 bots could possibly run this task ' +
                                         '(1024 busy, 13 dead, 1 quarantined, 0 maintenance)');
-          expect(cell(3, 1)).toMatchTextContent('123 similar pending tasks, '+
-                                                '56 similar running tasks');
+          expect(cell(3, 1)).toMatchTextContent('123  similar pending tasks, '+
+                                                '56  similar running tasks');
           expect(rows[5]).toHaveAttribute('hidden', 'deduped message hidden');
           expect(cell(7, 0)).toMatchTextContent('Wait for Capacity');
           expect(cell(7, 1)).toMatchTextContent('false');

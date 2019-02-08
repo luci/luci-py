@@ -186,16 +186,14 @@ export function sanitizeAndHumanizeTime(obj, key) {
  *  Any trailing args after columns will be assumed to be strings that
  *  should be treated as valid filters.
  */
-export function taskListLink(filters, columns) {
-  filters = filters || [];
-  columns = columns || [];
+export function taskListLink(filters=[], columns=[]) {
   const fArr = [];
   for (const f of filters) {
     if (f.key && f.value) {
       if (Array.isArray(f.value)) {
-        f.value.forEach(function(v) {
+        for (v of f.value) {
           fArr.push(f.key + ':' + v);
-        });
+        }
       } else {
         fArr.push(f.key + ':' + f.value);
       }
