@@ -111,6 +111,11 @@ describe('task-page', function() {
 
     fetchMock.get(`/_ah/api/swarming/v1/task/${TEST_TASK_ID}/request`, request);
     fetchMock.get(`/_ah/api/swarming/v1/task/${TEST_TASK_ID}/result?include_performance_stats=true`, result);
+    if (idx === 0) {
+      // The index 0 data has multiple tries that it requests data for (no perf stats),
+      // so pass in some data for that.
+      fetchMock.get('glob:/_ah/api/swarming/v1/task/*/result', taskResults[1]);
+    }
     fetchMock.get(`/_ah/api/swarming/v1/task/${TEST_TASK_ID}/stdout`, taskOutput);
     fetchMock.get('glob:/_ah/api/swarming/v1/bots/count?*', {
       busy: 1024,
@@ -222,7 +227,7 @@ describe('task-page', function() {
     }); // end describe('authorized user, but no taskid')
 
     describe('Completed task with 2 slices', function() {
-      beforeEach(() => serveTask(0, 'Completed task with 2 slices'));
+      beforeEach(() => serveTask(1, 'Completed task with 2 slices'));
 
       it('shows relevent task request data', function(done) {
         loggedInTaskPage((ele) => {
@@ -253,15 +258,18 @@ describe('task-page', function() {
           expect(subsections[0]).not.toHaveAttribute('hidden');
           expect(subsections[1]).toHaveAttribute('hidden');
 
+          const taskDisamb = $$('table.task-disambiguation', ele);
+          expect(taskDisamb).toBeFalsy();
+
           done();
         });
       });
 
       it('shows relevent task timing data', function(done) {
         loggedInTaskPage((ele) => {
-          const taskInfo = $$('table.task-timing', ele);
-          expect(taskInfo).toBeTruthy();
-          const rows = $('tr', taskInfo);
+          const taskTiming = $$('table.task-timing', ele);
+          expect(taskTiming).toBeTruthy();
+          const rows = $('tr', taskTiming);
           expect(rows.length).toEqual(9);
 
           // little helper for readability
@@ -293,6 +301,9 @@ describe('task-page', function() {
           expect(cell(0, 1).innerHTML).toContain('<a ', 'has a link');
           expect(cell(0, 1).innerHTML).toContain('href="/bot?id=swarm1931-c4"', 'link is correct');
           expect(cell(1, 0).rowSpan).toEqual(15); // 14 dimensions shown
+          expect(cell(5, 0)).toMatchTextContent('gpu:  Intel (8086)  ' +
+                    'Intel Sandy Bridge HD Graphics 2000 (8086:0102)');
+
 
           done();
         });
@@ -397,7 +408,7 @@ describe('task-page', function() {
 
 
     describe('Pending task - 1 slice - no rich logs', function() {
-      beforeEach(() => serveTask(1, 'Pending task - 1 slice - no rich logs'));
+      beforeEach(() => serveTask(2, 'Pending task - 1 slice - no rich logs'));
 
       it('has some pending specific request data', function(done) {
         loggedInTaskPage((ele) => {
@@ -449,11 +460,142 @@ describe('task-page', function() {
       });
     }); // end describe('Pending task - 1 slice - no rich logs')
 
+    describe('running task on try number 3', function() {
+      beforeEach(() => serveTask(0, 'running task on try number 3'));
+
+      it('has some running specific request data', function(done) {
+        loggedInTaskPage((ele) => {
+          const taskInfo = $$('table.request-info', ele);
+          expect(taskInfo).toBeTruthy();
+          const rows = $('tr', taskInfo);
+          expect(rows.length).toBeTruthy('Has some rows');
+
+          // little helper for readability
+          const cell = (r, c) => rows[r].children[c];
+          // Spot check some of the content
+          expect(cell(1, 0)).toMatchTextContent('State');
+          expect(cell(1, 1)).toMatchTextContent('RUNNING');
+          expect(cell(1, 1)).toHaveClass('pending_task');
+          expect(cell(2, 0)).toMatchTextContent('Fleet Capacity');
+          expect(rows[5]).toHaveAttribute('hidden', 'deduped message hidden');
+          expect(cell(14, 0).rowSpan).toEqual(5); // 4 dimensions
+
+          done();
+        });
+      });
+
+      it('shows task execution data', function(done) {
+        loggedInTaskPage((ele) => {
+          const output = $$('div.task-execution', ele);
+          expect(output).toBeFalsy();
+
+          const outTable = $$('table.task-execution', ele);
+          expect(outTable).toBeTruthy();
+          const rows = $('tr', outTable);
+          expect(rows.length).toBeTruthy('Has some rows');
+
+          // little helper for readability
+          const cell = (r, c) => rows[r].children[c];
+
+          expect(cell(18, 0)).toMatchTextContent('Try Number');
+          expect(cell(18, 1)).toMatchTextContent('3');
+          done();
+        });
+      });
+
+      it('shows relevent task timing data', function(done) {
+        loggedInTaskPage((ele) => {
+          const taskTiming = $$('table.task-timing', ele);
+          expect(taskTiming).toBeTruthy();
+          const rows = $('tr', taskTiming);
+          expect(rows.length).toEqual(9);
+
+          // little helper for readability
+          const cell = (r, c) => rows[r].children[c];
+          // Spot check some of the content
+          expect(rows[1]).not.toHaveAttribute('hidden', 'show started');
+          expect(cell(6, 0)).toMatchTextContent('Pending Time');
+          expect(cell(6, 1)).toMatchTextContent('31s');
+          expect(cell(7, 0)).toMatchTextContent('Total Overhead');
+          expect(cell(7, 1)).toMatchTextContent('--');
+          expect(cell(8, 0)).toMatchTextContent('Running Time');
+          expect(cell(8, 1)).toMatchTextContent('40m 33s*');
+
+          done();
+        });
+      });
+
+      it('tells the user about the other running tries', function(done) {
+        loggedInTaskPage((ele) => {
+          const taskDisamb = $$('table.task-disambiguation', ele);
+          expect(taskDisamb).toBeTruthy();
+          const rows = $('tr', taskDisamb);
+          expect(rows.length).toEqual(4);
+
+          // little helper for readability
+          const cell = (r, c) => rows[r].children[c];
+
+          expect(cell(1, 0)).toMatchTextContent('testid001');
+          expect(cell(1, 0).innerHTML).toContain('<a href');
+          expect(cell(2, 0)).toMatchTextContent('testid002');
+          expect(cell(2, 0).innerHTML).toContain('<a href');
+          expect(cell(3, 0)).toMatchTextContent('testid003');
+          expect(cell(3, 0).innerHTML).toContain('<a href');
+          done();
+        });
+      });
+    }); // end describe('running task on try number 3')
+
+    describe('deduplicated task with gpu dim', function() {
+      beforeEach(() => serveTask(3, 'deduplicated task with gpu dim'));
+
+      it('has some running specific request data', function(done) {
+        loggedInTaskPage((ele) => {
+          const taskInfo = $$('table.request-info', ele);
+          expect(taskInfo).toBeTruthy();
+          const rows = $('tr', taskInfo);
+          expect(rows.length).toBeTruthy('Has some rows');
+
+          // little helper for readability
+          const cell = (r, c) => rows[r].children[c];
+          // Spot check some of the content
+          expect(cell(1, 0)).toMatchTextContent('State');
+          expect(cell(1, 1)).toMatchTextContent('COMPLETED (DEDUPED)');
+          expect(cell(2, 0)).toMatchTextContent('Fleet Capacity');
+          expect(rows[4]).not.toHaveAttribute('hidden', 'deduped message shown');
+          expect(rows[5]).not.toHaveAttribute('hidden', 'deduped message shown');
+          expect(cell(4, 0)).toMatchTextContent('Deduped From');
+          expect(cell(4, 1)).toMatchTextContent('42e0ec5f54b04411');
+          expect(cell(5, 0)).toMatchTextContent('Deduped On');
+
+          expect(cell(14, 0).rowSpan).toEqual(4); // 3 dimensions
+          expect(cell(16, 0)).toMatchTextContent(
+                  'gpu: Intel Sandy Bridge HD Graphics 2000 (8086:0102)');
+
+          done();
+        });
+      });
+      it('shows a deduplication message instead of execution', function(done) {
+        loggedInTaskPage((ele) => {
+          const output = $$('div.task-execution', ele);
+          expect(output).toBeFalsy();
+          const outTable = $$('table.task-execution', ele);
+          expect(outTable).toBeFalsy();
+
+          const dedupedText = $$('p.deduplicated', ele);
+          expect(dedupedText).toBeTruthy();
+          expect(dedupedText.innerHTML).toContain('<a href');
+
+          done();
+        });
+      });
+    }); // end describe('deduplicated task with gpu dim')
+
   }); // end describe('html structure')
 
   describe('dynamic behavior', function() {
     describe('Completed task with 2 slices', function() {
-      beforeEach(() => serveTask(0, 'Completed task with 2 slices'));
+      beforeEach(() => serveTask(1, 'Completed task with 2 slices'));
 
       it('shows and hides the extra details', function(done) {
         loggedInTaskPage((ele) => {
@@ -576,11 +718,35 @@ describe('task-page', function() {
       expectNoUnmatchedCalls(fetchMock);
     }
 
-    it('makes auth\'d API calls when a logged in user views landing page', function(done) {
-      serveTask(0, 'Completed task with 2 slices');
+    it('fetches some extra requests with try number > 1', function(done) {
+      serveTask(0, 'running task on try number 3');
       loggedInTaskPage((ele) => {
         let calls = fetchMock.calls(MATCHED, 'GET');
-        expect(calls.length).toBe(2+3+6, '2 GETs from swarming-app, 3 from task-page, 3 counts * 2 slices');
+        expect(calls.length).toBe(2+3+3+2, '2 GETs from swarming-app, 3 from task-page,' +
+                                           '3 counts * 1 slice, 2 from extra tries');
+        // calls is an array of 2-length arrays with the first element
+        // being the string of the url and the second element being
+        // the options that were passed in
+        const gets = calls.map((c) => c[0]);
+
+        expect(gets).toContain(`/_ah/api/swarming/v1/task/${TEST_TASK_ID}/request`);
+        expect(gets).toContain(`/_ah/api/swarming/v1/task/${TEST_TASK_ID}/result`+
+                               '?include_performance_stats=true');
+        expect(gets).toContain(`/_ah/api/swarming/v1/task/${TEST_TASK_ID}/stdout`);
+        expect(gets).toContain('/_ah/api/swarming/v1/task/test0b3c0fac78101/result');
+        expect(gets).toContain('/_ah/api/swarming/v1/task/test0b3c0fac78102/result');
+
+        checkAuthorizationAndNoPosts(calls);
+        done();
+      });
+    });
+
+    it('makes auth\'d API calls when a logged in user views landing page', function(done) {
+      serveTask(1, 'Completed task with 2 slices');
+      loggedInTaskPage((ele) => {
+        let calls = fetchMock.calls(MATCHED, 'GET');
+        expect(calls.length).toBe(2+3+6, '2 GETs from swarming-app, 3 from task-page, ' +
+                                         '3 counts * 2 slices');
         // calls is an array of 2-length arrays with the first element
         // being the string of the url and the second element being
         // the options that were passed in
@@ -604,10 +770,11 @@ describe('task-page', function() {
     });
 
     it('makes counts correctly with 1 slice', function(done) {
-      serveTask(1, 'Pending task - 1 slice - no rich logs');
+      serveTask(2, 'Pending task - 1 slice - no rich logs');
       loggedInTaskPage((ele) => {
         let calls = fetchMock.calls(MATCHED, 'GET');
-        expect(calls.length).toBe(2+3+3, '2 GETs from swarming-app, 3 from task-page, 3 counts * 1 slice');
+        expect(calls.length).toBe(2+3+3, '2 GETs from swarming-app, 3 from task-page, '+
+                                         '3 counts * 1 slice');
         // calls is an array of 2-length arrays with the first element
         // being the string of the url and the second element being
         // the options that were passed in

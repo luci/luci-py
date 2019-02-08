@@ -19,6 +19,152 @@ export function taskResult(url, opts) {
 
 export const taskResults = [
   {
+    "created_ts": "2019-02-04T16:05:17.601476",
+    "bot_dimensions": [
+      {
+        "value": [
+          "swarming_module_cache_vpython"
+        ],
+        "key": "caches"
+      },
+      {
+        "value": [
+          "8"
+        ],
+        "key": "cores"
+      },
+      {
+        "value": [
+          "x86",
+          "x86-64",
+          "x86-64-Broadwell_GCE",
+          "x86-64-avx2"
+        ],
+        "key": "cpu"
+      },
+      {
+        "value": [
+          "1"
+        ],
+        "key": "gce"
+      },
+      {
+        "value": [
+          "none"
+        ],
+        "key": "gpu"
+      },
+      {
+        "value": [
+          "gce-trusty-e833d7b0-us-east1-b-s2c5"
+        ],
+        "key": "id"
+      },
+      {
+        "value": [
+          "chrome-trusty-18091700-38cc06ee3ee"
+        ],
+        "key": "image"
+      },
+      {
+        "value": [
+          "0"
+        ],
+        "key": "inside_docker"
+      },
+      {
+        "value": [
+          "1"
+        ],
+        "key": "kvm"
+      },
+      {
+        "value": [
+          "n1-standard-8"
+        ],
+        "key": "machine_type"
+      },
+      {
+        "value": [
+          "Linux",
+          "Ubuntu",
+          "Ubuntu-14.04"
+        ],
+        "key": "os"
+      },
+      {
+        "value": [
+          "Chrome"
+        ],
+        "key": "pool"
+      },
+      {
+        "value": [
+          "2.7.6"
+        ],
+        "key": "python"
+      },
+      {
+        "value": [
+          "4064-3687a02"
+        ],
+        "key": "server_version"
+      },
+      {
+        "value": [
+          "us",
+          "us-east",
+          "us-east1",
+          "us-east1-b"
+        ],
+        "key": "zone"
+      }
+    ],
+    "bot_version": "31e15677c83a483c3fc713eb537f60555797bef859c50bbe39c1de2a413adf38",
+    "task_id": "testid000",
+    "run_id": "42e18650b1b4e411",
+    "internal_failure": false,
+    "tags": [
+      "build_is_experimental:false",
+      "buildername:Linux ChromiumOS MSan Tests",
+      "buildnumber:11160",
+      "cpu:x86-64",
+      "data:cdf03f96d6b922b0ef716a69567c7e29014f70d0",
+      "gpu:none",
+      "master:chromium.memory",
+      "name:webui_polymer2_browser_tests",
+      "os:Ubuntu-14.04",
+      "pool:Chrome",
+      "priority:25",
+      "project:chromium",
+      "purpose:CI",
+      "purpose:luci",
+      "purpose:post-commit",
+      "service_account:none",
+      "slavename:swarm2374-c4",
+      "spec_name:chromium.ci:Linux ChromiumOS MSan Tests",
+      "stepname:webui_polymer2_browser_tests",
+      "swarming.pool.template:none",
+      "swarming.pool.version:decf85fc72c7df6f8d2d10fd8ede6d81a9699677",
+      "user:None"
+    ],
+    "server_versions": [
+      "4064-3687a02"
+    ],
+    "costs_usd": [
+      0.03154403773658218
+    ],
+    "name": "running task on try number 3",
+    "failure": false,
+    "state": "RUNNING",
+    "modified_ts": "2019-02-04T16:45:51.928202",
+    "user": "",
+    "bot_id": "gce-trusty-e833d7b0-us-east1-b-s2c5",
+    "current_task_slice": "0",
+    "try_number": "3",
+    "started_ts": "2019-02-04T16:05:49.489858"
+  },
+  {
     "cipd_pins": {
       "packages": [
         {
@@ -179,7 +325,7 @@ export const taskResults = [
       },
       {
         "value": [
-          "none"
+          "8086", "8086:0102"
         ],
         "key": "gpu"
       },
@@ -259,7 +405,7 @@ export const taskResults = [
   {
     "created_ts": "2019-02-04T15:57:17.067389",
     "name": "Pending task - 1 slice - no rich logs",
-    "task_id": "testid001",
+    "task_id": "testid002",
     "tags": [
       "build_is_experimental:false",
       "buildername:Android FYI Release (NVIDIA Shield TV)",
@@ -293,7 +439,183 @@ export const taskResults = [
     "modified_ts": "2019-02-04T15:57:17.157718",
     "user": "",
     "current_task_slice": "0"
-  }
+  },
+  {
+    "cipd_pins": {
+      "packages": [
+        {
+          "path": ".swarming_module",
+          "version": "1ba7d485930b05eb07f6bc7724447d6a7c22a6b6",
+          "package_name": "infra/python/cpython/windows-amd64"
+        },
+        {
+          "path": ".swarming_module",
+          "version": "6ebe1bb92c2ff24f74be618f56f4219b8eba551b",
+          "package_name": "infra/tools/luci/logdog/butler/windows-amd64"
+        },
+        {
+          "path": ".swarming_module",
+          "version": "gdyQzhhSN4yori6wIMZjsqGpgDrkuaB-NREYz4BZ_rMC",
+          "package_name": "infra/tools/luci/vpython-native/windows-amd64"
+        },
+        {
+          "path": ".swarming_module",
+          "version": "EUJh_9q20TnqjtRumVX8fcDubyBDjOpzAl-sJSKGN2EC",
+          "package_name": "infra/tools/luci/vpython/windows-amd64"
+        }
+      ],
+      "client_package": {
+        "version": "zdnhfpa9SEHKowDgpeM5nc673_9w-3_EmegrKl-VwPcC",
+        "package_name": "infra/tools/cipd/windows-amd64"
+      }
+    },
+    "run_id": "42e0ec5f54b04411",
+    "outputs_ref": {
+      "isolatedserver": "https://isolateserver.appspot.com",
+      "namespace": "default-gzip",
+      "isolated": "d50a6620dd3d7907be0d8f79d9aab89c4a7d07e7"
+    },
+    "server_versions": [
+      "4064-3687a02"
+    ],
+    "duration": 5.328999996185303,
+    "completed_ts": "2019-02-04T13:17:34.704866",
+    "started_ts": "2019-02-04T13:17:13.632384",
+    "cost_saved_usd": 0.002234630678665479,
+    "internal_failure": false,
+    "exit_code": "0",
+    "state": "COMPLETED",
+    "bot_version": "31e15677c83a483c3fc713eb537f60555797bef859c50bbe39c1de2a413adf38",
+    "tags": [
+      "build_is_experimental:false",
+      "buildername:Win32 Release (Clang)",
+      "buildnumber:15083",
+      "gpu:8086:0102",
+      "data:4d4a0d0e1d2c04e3530d07f190911235e1209e44",
+      "master:client.webrtc",
+      "name:video_capture_tests",
+      "os:Windows",
+      "pool:WebRTC-baremetal",
+      "priority:25",
+      "project:webrtc",
+      "purpose:CI",
+      "purpose:luci",
+      "purpose:post-commit",
+      "service_account:none",
+      "slavename:win10-webrtc-8983f7d1-us-central1-c-n32z",
+      "spec_name:webrtc.ci:Win32 Release (Clang)",
+      "stepname:video_capture_tests on Windows",
+      "swarming.pool.template:none",
+      "swarming.pool.version:decf85fc72c7df6f8d2d10fd8ede6d81a9699677",
+      "user:None"
+    ],
+    "deduped_from": "42e0ec5f54b04411",
+    "failure": false,
+    "modified_ts": "2019-02-04T14:28:06.873956",
+    "user": "",
+    "created_ts": "2019-02-04T14:28:06.823317",
+    "name": "deduplicated task with gpu dim",
+    "task_id": "testid003",
+    "bot_dimensions": [
+      {
+        "value": [
+          "swarming_module_cache_vpython"
+        ],
+        "key": "caches"
+      },
+      {
+        "value": [
+          "4"
+        ],
+        "key": "cores"
+      },
+      {
+        "value": [
+          "x86",
+          "x86-64",
+          "x86-64-E3-1220_V2"
+        ],
+        "key": "cpu"
+      },
+      {
+        "value": [
+          "0"
+        ],
+        "key": "gce"
+      },
+      {
+        "value": [
+          "8086:0102",
+          "8086:0102",
+          "8086:0102-6.1.7600.16385"
+        ],
+        "key": "gpu"
+      },
+      {
+        "value": [
+          "build20-b3"
+        ],
+        "key": "id"
+      },
+      {
+        "value": [
+          "high"
+        ],
+        "key": "integrity"
+      },
+      {
+        "value": [
+          "en_US.cp1252"
+        ],
+        "key": "locale"
+      },
+      {
+        "value": [
+          "n1-standard-4"
+        ],
+        "key": "machine_type"
+      },
+      {
+        "value": [
+          "Windows",
+          "Windows-2008ServerR2",
+          "Windows-2008ServerR2-SP1"
+        ],
+        "key": "os"
+      },
+      {
+        "value": [
+          "WebRTC-baremetal"
+        ],
+        "key": "pool"
+      },
+      {
+        "value": [
+          "2.7.13"
+        ],
+        "key": "python"
+      },
+      {
+        "value": [
+          "4064-3687a02"
+        ],
+        "key": "server_version"
+      },
+      {
+        "value": [
+          "us",
+          "us-mtv",
+          "us-mtv-chops",
+          "us-mtv-chops-b",
+          "us-mtv-chops-b-3"
+        ],
+        "key": "zone"
+      }
+    ],
+    "try_number": "0",
+    "current_task_slice": "0",
+    "bot_id": "build20-b3"
+  },
 ];
 
 
@@ -313,6 +635,238 @@ export function taskRequest(url, opts) {
 }
 
 export const taskRequests = [
+  {
+    "created_ts": "2019-02-04T16:05:17.601476",
+    "authenticated": "user:chromium-ci-builder@chops-service-accounts.iam.gserviceaccount.com",
+    "name": "running task on try number 3",
+    "tags": [
+      "build_is_experimental:false",
+      "buildername:Linux ChromiumOS MSan Tests",
+      "buildnumber:11160",
+      "cpu:x86-64",
+      "data:cdf03f96d6b922b0ef716a69567c7e29014f70d0",
+      "gpu:none",
+      "master:chromium.memory",
+      "name:webui_polymer2_browser_tests",
+      "os:Ubuntu-14.04",
+      "pool:Chrome",
+      "priority:25",
+      "project:chromium",
+      "purpose:CI",
+      "purpose:luci",
+      "purpose:post-commit",
+      "service_account:none",
+      "slavename:swarm2374-c4",
+      "spec_name:chromium.ci:Linux ChromiumOS MSan Tests",
+      "stepname:webui_polymer2_browser_tests",
+      "swarming.pool.template:none",
+      "swarming.pool.version:decf85fc72c7df6f8d2d10fd8ede6d81a9699677",
+      "user:None"
+    ],
+    "priority": "25",
+    "parent_task_id": "42e182c20fc94311",
+    "user": "",
+    "service_account": "none",
+    "task_slices": [
+      {
+        "expiration_secs": "3600",
+        "wait_for_capacity": false,
+        "properties": {
+          "dimensions": [
+            {
+              "value": "none",
+              "key": "gpu"
+            },
+            {
+              "value": "Ubuntu-14.04",
+              "key": "os"
+            },
+            {
+              "value": "x86-64",
+              "key": "cpu"
+            },
+            {
+              "value": "Chrome",
+              "key": "pool"
+            }
+          ],
+          "idempotent": true,
+          "cipd_input": {
+            "packages": [
+              {
+                "path": ".swarming_module",
+                "version": "version:2.7.14.chromium14",
+                "package_name": "infra/python/cpython/${platform}"
+              },
+              {
+                "path": ".swarming_module",
+                "version": "git_revision:e1abc57be62d198b5c2f487bfb2fa2d2eb0e867c",
+                "package_name": "infra/tools/luci/logdog/butler/${platform}"
+              },
+              {
+                "path": ".swarming_module",
+                "version": "git_revision:96f81e737868d43124b4661cf1c325296ca04944",
+                "package_name": "infra/tools/luci/vpython-native/${platform}"
+              },
+              {
+                "path": ".swarming_module",
+                "version": "git_revision:96f81e737868d43124b4661cf1c325296ca04944",
+                "package_name": "infra/tools/luci/vpython/${platform}"
+              }
+            ],
+            "client_package": {
+              "version": "git_revision:6e4acf51a635665e54acaceb8bd073e5c7b8259a",
+              "package_name": "infra/tools/cipd/${platform}"
+            },
+            "server": "https://chrome-infra-packages.appspot.com"
+          },
+          "extra_args": [
+            "--enable-features=WebUIPolymer2",
+            "--disable-features=WebUIPolymer2Exceptions",
+            "--test-launcher-filter-file=../../testing/buildbot/filters/webui_polymer2_browser_tests.filter",
+            "--test-launcher-print-test-stdio=always",
+            "--test-launcher-summary-output=${ISOLATED_OUTDIR}/output.json"
+          ],
+          "io_timeout_secs": "1200",
+          "env_prefixes": [
+            {
+              "value": [
+                ".swarming_module",
+                ".swarming_module/bin"
+              ],
+              "key": "PATH"
+            },
+            {
+              "value": [
+                ".swarming_module_cache/vpython"
+              ],
+              "key": "VPYTHON_VIRTUALENV_ROOT"
+            }
+          ],
+          "env": [
+            {
+              "value": "2",
+              "key": "GTEST_SHARD_INDEX"
+            },
+            {
+              "value": "4",
+              "key": "GTEST_TOTAL_SHARDS"
+            }
+          ],
+          "execution_timeout_secs": "3600",
+          "inputs_ref": {
+            "isolatedserver": "https://isolateserver.appspot.com",
+            "namespace": "default-gzip",
+            "isolated": "cdf03f96d6b922b0ef716a69567c7e29014f70d0"
+          },
+          "grace_period_secs": "30",
+          "caches": [
+            {
+              "path": ".swarming_module_cache/vpython",
+              "name": "swarming_module_cache_vpython"
+            }
+          ]
+        }
+      }
+    ],
+    "expiration_secs": "3600",
+    "properties": {
+      "dimensions": [
+        {
+          "value": "none",
+          "key": "gpu"
+        },
+        {
+          "value": "Ubuntu-14.04",
+          "key": "os"
+        },
+        {
+          "value": "x86-64",
+          "key": "cpu"
+        },
+        {
+          "value": "Chrome",
+          "key": "pool"
+        }
+      ],
+      "idempotent": true,
+      "cipd_input": {
+        "packages": [
+          {
+            "path": ".swarming_module",
+            "version": "version:2.7.14.chromium14",
+            "package_name": "infra/python/cpython/${platform}"
+          },
+          {
+            "path": ".swarming_module",
+            "version": "git_revision:e1abc57be62d198b5c2f487bfb2fa2d2eb0e867c",
+            "package_name": "infra/tools/luci/logdog/butler/${platform}"
+          },
+          {
+            "path": ".swarming_module",
+            "version": "git_revision:96f81e737868d43124b4661cf1c325296ca04944",
+            "package_name": "infra/tools/luci/vpython-native/${platform}"
+          },
+          {
+            "path": ".swarming_module",
+            "version": "git_revision:96f81e737868d43124b4661cf1c325296ca04944",
+            "package_name": "infra/tools/luci/vpython/${platform}"
+          }
+        ],
+        "client_package": {
+          "version": "git_revision:6e4acf51a635665e54acaceb8bd073e5c7b8259a",
+          "package_name": "infra/tools/cipd/${platform}"
+        },
+        "server": "https://chrome-infra-packages.appspot.com"
+      },
+      "extra_args": [
+        "--enable-features=WebUIPolymer2",
+        "--disable-features=WebUIPolymer2Exceptions",
+        "--test-launcher-filter-file=../../testing/buildbot/filters/webui_polymer2_browser_tests.filter",
+        "--test-launcher-print-test-stdio=always",
+        "--test-launcher-summary-output=${ISOLATED_OUTDIR}/output.json"
+      ],
+      "io_timeout_secs": "1200",
+      "env_prefixes": [
+        {
+          "value": [
+            ".swarming_module",
+            ".swarming_module/bin"
+          ],
+          "key": "PATH"
+        },
+        {
+          "value": [
+            ".swarming_module_cache/vpython"
+          ],
+          "key": "VPYTHON_VIRTUALENV_ROOT"
+        }
+      ],
+      "env": [
+        {
+          "value": "2",
+          "key": "GTEST_SHARD_INDEX"
+        },
+        {
+          "value": "4",
+          "key": "GTEST_TOTAL_SHARDS"
+        }
+      ],
+      "execution_timeout_secs": "3600",
+      "inputs_ref": {
+        "isolatedserver": "https://isolateserver.appspot.com",
+        "namespace": "default-gzip",
+        "isolated": "cdf03f96d6b922b0ef716a69567c7e29014f70d0"
+      },
+      "grace_period_secs": "30",
+      "caches": [
+        {
+          "path": ".swarming_module_cache/vpython",
+          "name": "swarming_module_cache_vpython"
+        }
+      ]
+    }
+  },
   {
     "created_ts": "2019-01-21T10:24:15.851434",
     "authenticated": "user:iamuser@example.com",
@@ -1182,6 +1736,203 @@ export const taskRequests = [
         "isolatedserver": "https://isolateserver.appspot.com",
         "namespace": "default-gzip",
         "isolated": "a79744f6cd528bb345b6c79e001523a17e5c83b8"
+      },
+      "grace_period_secs": "30",
+      "caches": [
+        {
+          "path": ".swarming_module_cache/vpython",
+          "name": "swarming_module_cache_vpython"
+        }
+      ]
+    }
+  },
+  {
+    "created_ts": "2019-02-04T14:28:06.823317",
+    "authenticated": "user:webrtc-ci-builder@chops-service-accounts.iam.gserviceaccount.com",
+    "name": "deduplicated task with gpu dim",
+    "tags": [
+      "build_is_experimental:false",
+      "buildername:Win32 Release (Clang)",
+      "buildnumber:15083",
+      "cpu:x86",
+      "data:4d4a0d0e1d2c04e3530d07f190911235e1209e44",
+      "master:client.webrtc",
+      "name:video_capture_tests",
+      "os:Windows",
+      "pool:WebRTC-baremetal",
+      "priority:25",
+      "project:webrtc",
+      "purpose:CI",
+      "purpose:luci",
+      "purpose:post-commit",
+      "service_account:none",
+      "slavename:win10-webrtc-8983f7d1-us-central1-c-n32z",
+      "spec_name:webrtc.ci:Win32 Release (Clang)",
+      "stepname:video_capture_tests on Windows",
+      "swarming.pool.template:none",
+      "swarming.pool.version:decf85fc72c7df6f8d2d10fd8ede6d81a9699677",
+      "user:None"
+    ],
+    "priority": "25",
+    "parent_task_id": "42e129d60f62f911",
+    "user": "",
+    "service_account": "none",
+    "task_slices": [
+      {
+        "expiration_secs": "3600",
+        "wait_for_capacity": false,
+        "properties": {
+          "dimensions": [
+            {
+              "value": "Windows",
+              "key": "os"
+            },
+            {
+              "value": "8086:0102",
+              "key": "gpu"
+            },
+            {
+              "value": "WebRTC-baremetal",
+              "key": "pool"
+            }
+          ],
+          "idempotent": true,
+          "cipd_input": {
+            "packages": [
+              {
+                "path": ".swarming_module",
+                "version": "version:2.7.14.chromium14",
+                "package_name": "infra/python/cpython/${platform}"
+              },
+              {
+                "path": ".swarming_module",
+                "version": "git_revision:e1abc57be62d198b5c2f487bfb2fa2d2eb0e867c",
+                "package_name": "infra/tools/luci/logdog/butler/${platform}"
+              },
+              {
+                "path": ".swarming_module",
+                "version": "git_revision:96f81e737868d43124b4661cf1c325296ca04944",
+                "package_name": "infra/tools/luci/vpython-native/${platform}"
+              },
+              {
+                "path": ".swarming_module",
+                "version": "git_revision:96f81e737868d43124b4661cf1c325296ca04944",
+                "package_name": "infra/tools/luci/vpython/${platform}"
+              }
+            ],
+            "client_package": {
+              "version": "git_revision:6e4acf51a635665e54acaceb8bd073e5c7b8259a",
+              "package_name": "infra/tools/cipd/${platform}"
+            },
+            "server": "https://chrome-infra-packages.appspot.com"
+          },
+          "extra_args": [
+            "--isolated-script-test-output=${ISOLATED_OUTDIR}/output.json",
+            "--isolated-script-test-perf-output=${ISOLATED_OUTDIR}/perftest-output.json"
+          ],
+          "io_timeout_secs": "1200",
+          "env_prefixes": [
+            {
+              "value": [
+                ".swarming_module",
+                ".swarming_module/bin"
+              ],
+              "key": "PATH"
+            },
+            {
+              "value": [
+                ".swarming_module_cache/vpython"
+              ],
+              "key": "VPYTHON_VIRTUALENV_ROOT"
+            }
+          ],
+          "execution_timeout_secs": "3600",
+          "inputs_ref": {
+            "isolatedserver": "https://isolateserver.appspot.com",
+            "namespace": "default-gzip",
+            "isolated": "4d4a0d0e1d2c04e3530d07f190911235e1209e44"
+          },
+          "grace_period_secs": "30",
+          "caches": [
+            {
+              "path": ".swarming_module_cache/vpython",
+              "name": "swarming_module_cache_vpython"
+            }
+          ]
+        }
+      }
+    ],
+    "expiration_secs": "3600",
+    "properties": {
+      "dimensions": [
+        {
+          "value": "Windows",
+          "key": "os"
+        },
+        {
+          "value": "8086:0102",
+          "key": "gpu"
+        },
+        {
+          "value": "WebRTC-baremetal",
+          "key": "pool"
+        }
+      ],
+      "idempotent": true,
+      "cipd_input": {
+        "packages": [
+          {
+            "path": ".swarming_module",
+            "version": "version:2.7.14.chromium14",
+            "package_name": "infra/python/cpython/${platform}"
+          },
+          {
+            "path": ".swarming_module",
+            "version": "git_revision:e1abc57be62d198b5c2f487bfb2fa2d2eb0e867c",
+            "package_name": "infra/tools/luci/logdog/butler/${platform}"
+          },
+          {
+            "path": ".swarming_module",
+            "version": "git_revision:96f81e737868d43124b4661cf1c325296ca04944",
+            "package_name": "infra/tools/luci/vpython-native/${platform}"
+          },
+          {
+            "path": ".swarming_module",
+            "version": "git_revision:96f81e737868d43124b4661cf1c325296ca04944",
+            "package_name": "infra/tools/luci/vpython/${platform}"
+          }
+        ],
+        "client_package": {
+          "version": "git_revision:6e4acf51a635665e54acaceb8bd073e5c7b8259a",
+          "package_name": "infra/tools/cipd/${platform}"
+        },
+        "server": "https://chrome-infra-packages.appspot.com"
+      },
+      "extra_args": [
+        "--isolated-script-test-output=${ISOLATED_OUTDIR}/output.json",
+        "--isolated-script-test-perf-output=${ISOLATED_OUTDIR}/perftest-output.json"
+      ],
+      "io_timeout_secs": "1200",
+      "env_prefixes": [
+        {
+          "value": [
+            ".swarming_module",
+            ".swarming_module/bin"
+          ],
+          "key": "PATH"
+        },
+        {
+          "value": [
+            ".swarming_module_cache/vpython"
+          ],
+          "key": "VPYTHON_VIRTUALENV_ROOT"
+        }
+      ],
+      "execution_timeout_secs": "3600",
+      "inputs_ref": {
+        "isolatedserver": "https://isolateserver.appspot.com",
+        "namespace": "default-gzip",
+        "isolated": "4d4a0d0e1d2c04e3530d07f190911235e1209e44"
       },
       "grace_period_secs": "30",
       "caches": [

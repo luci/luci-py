@@ -44,7 +44,7 @@ export function humanState(result, currentSliceIdx) {
   if (!result || !result.state) {
     return '';
   }
-  if (result.current_task_slice !== currentSliceIdx) {
+  if (currentSliceIdx !== undefined && result.current_task_slice !== currentSliceIdx) {
     return 'THIS SLICE DID NOT RUN. Select another slice above.';
   }
   const state = result.state;
@@ -105,6 +105,9 @@ export function parseResult(result) {
   TASK_TIMES.forEach((time) => {
     sanitizeAndHumanizeTime(result, time);
   });
+
+  // In the JSON, this is a string
+  result.try_number = +result.try_number;
 
   const now = new Date();
   // Running and bot_died tasks have no duration set, so we can figure it out.
@@ -230,8 +233,7 @@ export function taskInfoClass(ele, result) {
 /** wasDeduped returns true or false depending on if this task was de-duped.
  */
 export function wasDeduped(result) {
-  // Should always be a string, but this futureproofs it.
-  return result.try_number == '0';
+  return result.try_number === 0;
 }
 
 /** wasPickedUp returns true iff a task was started.

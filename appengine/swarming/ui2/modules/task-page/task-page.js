@@ -17,6 +17,7 @@ import '../swarming-app'
 import * as human from 'common-sk/modules/human'
 import * as query from 'common-sk/modules/query'
 
+import { applyAlias } from '../alias'
 import { cipdLink, hasRichOutput, humanState, isolateLink, isSummaryTask,
          parseRequest, parseResult, richLogsLink, sliceExpires, stateClass,
          taskCost, taskExpires,
@@ -54,6 +55,56 @@ const idAndButtons = (ele) => {
           @click=${() => alert('use old ui for now')}>debug</button>
 </div>`;
 }
+
+const taskDisambiguation = (ele, result) => {
+  // Only tasks with id ending in 0 can be summaries
+  if (!ele._taskId || !ele._taskId.endsWith('0')) {
+    return '';
+  }
+  // This is the most frequent case - no automatic retry
+  if (result.try_number === 1) {
+    return '';
+  }
+  return html`
+<h2>Displaying a summary for a task with multiple tries</h2>
+<table class=task-disambiguation>
+  <thead>
+    <tr>
+      <th>Try ID</th>
+      <th>Bot ID</th>
+      <th>Status</th>
+    </tr>
+  </thead>
+  <tbody>
+    ${ele._extraTries.map(taskRow)}
+  </tbody>
+</table>`;
+}
+
+const taskRow = (result, idx) => {
+  if (!result.task_id) {
+    return html`<tr><td>&lt;loading&gt;</td><td></td><td></td></tr>`;
+  }
+  // Convert the summary id to the run id
+  let taskId = result.task_id.substring(0, result.task_id.length - 1);
+  taskId += (idx+1);
+  return html`
+<tr>
+  <td>
+    <a href=${ifDefined(taskPageLink(taskId, true))} target=_blank>
+      ${taskId}
+    </a>
+  </td>
+  <td>
+    <a href=${ifDefined(botPageLink(result.bot_id))} target=_blank>
+      ${result.bot_id}
+    </a>
+  </td>
+  <td class=${stateClass(result)}>${humanState(result)}</td>
+</tr>
+`;
+}
+
 
 const slicePicker = (ele) => {
   if (!ele._taskId) {
@@ -143,9 +194,13 @@ const stateLoadBlock = (ele, request, result) => html`
 ${countBlocks(result, ele._capacityCounts[ele._currentSliceIdx],
                       ele._pendingCounts[ele._currentSliceIdx],
                       ele._runningCounts[ele._currentSliceIdx])}
-<tr ?hidden=${!result.deduped_from}>
+<tr ?hidden=${!result.deduped_from} class=highlighted>
   <td><b>Deduped From</b></td>
-  <td><a href=${taskPageLink(result.deduped_from)}</td>
+  <td>
+    <a href=${taskPageLink(result.deduped_from)} target=_blank>
+      ${result.deduped_from}
+    </a>
+  </td>
 </tr>
 <tr ?hidden=${!result.deduped_from}>
   <td>Deduped On</td>
@@ -238,7 +293,7 @@ ${dimensions.map(dimension_row)}
 
 const dimension_row = (dimension) => html`
 <tr>
-  <td class=break-all><b>${dimension.key}:</b> ${dimension.value}</td>
+  <td class=break-all><b>${dimension.key}:</b> ${applyAlias(dimension.value, dimension.key)}</td>
 </tr>
 `;
 
@@ -468,7 +523,16 @@ const taskExecutionSection = (ele, request, result, currentSlice) => {
     // Don't show timing info when task was deduped because the info
     // in the result is from the original task, which can be confusing
     // when juxtaposed with the data from this task.
-    return '';
+    return html`
+<div class=title>Task was Deduplicated</div>
+
+<p class=deduplicated>
+  This task was deduplicated from task
+  <a href=${taskPageLink(result.deduped_from)}>${result.deduped_from}</a>.
+  For more information on deduplication, see
+  <a href="https://chromium.googlesource.com/infra/luci/luci-py/+/master/appengine/swarming/doc/Detailed-Design.md#task-deduplication">
+  the docs</a>.
+</p>`;
   }
 
   if (!currentSlice.properties) {
@@ -488,7 +552,7 @@ const taskExecutionSection = (ele, request, result, currentSlice) => {
     const values = [];
     // despite the name, dim.value is an array of values
     for (const v of dim.value) {
-      const newValue = {name: v};
+      const newValue = {name: applyAlias(v, dim.key)};
       for (const d of usedDimensions) {
         if (d.key === dim.key && d.value === v) {
           newValue.bold = true;
@@ -513,11 +577,11 @@ const taskExecutionSection = (ele, request, result, currentSlice) => {
   </tr>
   ${botDimensions.map((dim) => botDimensionRow(dim, usedDimensions))}
   <tr>
-    <td>Exit code</td>
+    <td>Exit Code</td>
     <td>${result.exit_code}</td>
   </tr>
   <tr>
-    <td>Try number</td>
+    <td>Try Number</td>
     <td>${result.try_number}</td>
   </tr>
   <tr>
@@ -534,11 +598,11 @@ const taskExecutionSection = (ele, request, result, currentSlice) => {
   </tr>
   ${isolateBlock('Isolated Outputs', result.outputs_ref || {})}
   <tr>
-    <td>Bot version</td>
+    <td>Bot Version</td>
     <td>${result.bot_version}</td>
   </tr>
   <tr>
-    <td>Server version</td>
+    <td>Server Version</td>
     <td>${result.server_versions}</td>
   </tr>
 </table>`;
@@ -702,6 +766,8 @@ const template = (ele) => html`
     <div class="left grow" ?hidden=${!ele.loggedInAndAuthorized}>
     ${idAndButtons(ele)}
 
+    ${taskDisambiguation(ele, ele._result)}
+
     ${slicePicker(ele)}
 
     ${taskInfoTable(ele, ele._request, ele._result, ele._currentSlice)}
@@ -759,6 +825,9 @@ window.customElements.define('task-page', class extends SwarmingAppBoilerplate {
     this._result = {};
     this._currentSlice = {};
     this._currentSliceIdx = -1;
+    // When swarming does an automatic retry (or multiple), we should
+    // fetch the results for those retries and display them.
+    this._extraTries = [];
     // Track counts a set of parallel arrays, that is, the nth index in
     // each of these corresponds to the counts for the nth slice.
     // They will be filled in index by index when each fetch from
@@ -821,10 +890,17 @@ window.customElements.define('task-page', class extends SwarmingAppBoilerplate {
         this.app.finishedTask();
       })
       .catch((e) => this.fetchError(e, 'task/request'));
+    this._extraTries = [];
     fetch(`/_ah/api/swarming/v1/task/${this._taskId}/result?include_performance_stats=true`, extra)
       .then(jsonOrThrow)
       .then((json) => {
         this._result = parseResult(json);
+        if (this._result.try_number > 1) {
+          this._extraTries[this._result.try_number - 1] = this._result;
+          // put placeholder objects in the rest
+          this._extraTries.fill({}, 0, this._result.try_number - 1);
+          this._fetchExtraTries(this._taskId, this._result.try_number - 1, extra);
+        }
         currIdx = +this._result.current_task_slice;
         this._setSlice(currIdx); // calls render
         this.app.finishedTask();
@@ -892,6 +968,22 @@ window.customElements.define('task-page', class extends SwarmingAppBoilerplate {
           this.app.finishedTask();
         })
         .catch((e) => this.fetchError(e, 'tasks/pending slice ' + i));
+    }
+  }
+
+  _fetchExtraTries(taskId, tries, extra) {
+    this.app.addBusyTasks(tries);
+    const baseTaskId = taskId.substring(0, taskId.length - 1);
+    for (let i = 0; i < tries; i++) {
+      fetch(`/_ah/api/swarming/v1/task/${taskId + (i+1)}/result`, extra)
+      .then(jsonOrThrow)
+      .then((json) => {
+        const result = parseResult(json);
+        this._extraTries[i] = result;
+        this.render();
+        this.app.finishedTask();
+      })
+      .catch((e) => this.fetchError(e, 'task/result'));
     }
   }
 

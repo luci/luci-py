@@ -22,6 +22,9 @@ fetchMock.get('glob:/_ah/api/swarming/v1/task/*/request',
 fetchMock.get('glob:/_ah/api/swarming/v1/task/*/result?include_performance_stats=true',
               requireLogin(taskResult, 200));
 
+fetchMock.get('glob:/_ah/api/swarming/v1/task/*/result',
+              requireLogin(taskResult, 600));
+
 fetchMock.get('glob:/_ah/api/swarming/v1/task/*/stdout',
               requireLogin(taskOutput, 100));
 
