@@ -459,12 +459,8 @@ def _maybe_taskupdate_notify_via_tq(result_summary, request, es_cfg):
       raise datastore_utils.CommitError('Failed to enqueue task')
 
   if es_cfg:
-    # TODO(akeshet): Put these calls on a task queue so they do not block the
-    # transaction we are in (via a similar mechanism to the pubsub messages
-    # above). In the meantime, only tasks that use an external scheduler will
-    # be adversely affected by this code.
     external_scheduler.notify_request(
-        es_cfg, request, result_summary, False, False)
+        es_cfg, request, result_summary, True, True)
 
 
 def _pubsub_notify(task_id, topic, auth_token, userdata):
@@ -989,10 +985,8 @@ def schedule_request(request, secret_bytes):
   # of the HTTP handler being slow or dying after the task was already made
   # live. On the other hand, this call is only being made for tasks in a pool
   # that use an external scheduler, and which are not effectively live unless
-  # the external scheduler is aware of them. Consider a mechanism where this
-  # call could be made asynchronously, but errors back-propagated to the task.
+  # the external scheduler is aware of them.
   if es_cfg:
-    # TODO(akeshet): Add error handling.
     external_scheduler.notify_request(
         es_cfg, request, result_summary, False, False)
 
