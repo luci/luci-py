@@ -23,8 +23,8 @@
  * @evt busy-end This event is emitted whenever the app transitions from
  *               busy to not busy.
  *
- * @attr client_id - The Client ID for authenticating via OAuth.
- * @attr testing_offline - If true, the real OAuth flow won't be used.
+ * @prop client_id - The Client ID for authenticating via OAuth.
+ * @prop testing_offline - If true, the real OAuth flow won't be used.
  *    Instead, dummy data will be used. Ideal for local testing.
  *
  */

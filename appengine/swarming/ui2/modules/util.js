@@ -191,7 +191,7 @@ export function taskListLink(filters=[], columns=[]) {
   for (const f of filters) {
     if (f.key && f.value) {
       if (Array.isArray(f.value)) {
-        for (v of f.value) {
+        for (const v of f.value) {
           fArr.push(f.key + ':' + v);
         }
       } else {

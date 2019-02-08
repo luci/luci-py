@@ -245,12 +245,13 @@ describe('task-page', function() {
           expect(cell(1, 1)).toMatchTextContent('COMPLETED (SUCCESS)');
           expect(cell(2, 1)).toMatchTextContent('1337 bots could possibly run this task ' +
                                         '(1024 busy, 13 dead, 1 quarantined, 0 maintenance)');
-          expect(cell(3, 1)).toMatchTextContent('123  similar pending tasks, '+
-                                                '56  similar running tasks');
+          expect(cell(3, 1)).toMatchTextContent('123 similar pending tasks, '+
+                                                '56 similar running tasks');
           expect(rows[5]).toHaveAttribute('hidden', 'deduped message hidden');
           expect(cell(7, 0)).toMatchTextContent('Wait for Capacity');
           expect(cell(7, 1)).toMatchTextContent('false');
-          expect(cell(14, 0).rowSpan).toEqual(6); // 5 dimensions shown on slice 2
+          // 5 dimensions shown on slice 2 + 1 for header
+          expect(cell(14, 0).rowSpan).toEqual(6);
           expect(cell(14, 0).textContent).toContain('Dimensions');
 
           const subsections = $('tbody', taskInfo);
@@ -300,10 +301,9 @@ describe('task-page', function() {
           expect(cell(0, 0)).toMatchTextContent('Bot assigned to task');
           expect(cell(0, 1).innerHTML).toContain('<a ', 'has a link');
           expect(cell(0, 1).innerHTML).toContain('href="/bot?id=swarm1931-c4"', 'link is correct');
-          expect(cell(1, 0).rowSpan).toEqual(15); // 14 dimensions shown
+          expect(cell(1, 0).rowSpan).toEqual(15); // 14 dimensions shown + 1 for header
           expect(cell(5, 0)).toMatchTextContent('gpu:  Intel (8086)  ' +
                     'Intel Sandy Bridge HD Graphics 2000 (8086:0102)');
-
 
           done();
         });
@@ -425,7 +425,7 @@ describe('task-page', function() {
           expect(cell(1, 1)).toHaveClass('pending_task');
           expect(cell(2, 0)).toMatchTextContent('Why Pending?');
           expect(rows[5]).toHaveAttribute('hidden', 'deduped message hidden');
-          expect(cell(14, 0).rowSpan).toEqual(5); // 4 dimensions
+          expect(cell(14, 0).rowSpan).toEqual(5); // 4 dimensions + 1 for header
 
           done();
         });
@@ -478,7 +478,7 @@ describe('task-page', function() {
           expect(cell(1, 1)).toHaveClass('pending_task');
           expect(cell(2, 0)).toMatchTextContent('Fleet Capacity');
           expect(rows[5]).toHaveAttribute('hidden', 'deduped message hidden');
-          expect(cell(14, 0).rowSpan).toEqual(5); // 4 dimensions
+          expect(cell(14, 0).rowSpan).toEqual(5); // 4 dimensions + 1 for header
 
           done();
         });
@@ -568,7 +568,7 @@ describe('task-page', function() {
           expect(cell(4, 1)).toMatchTextContent('42e0ec5f54b04411');
           expect(cell(5, 0)).toMatchTextContent('Deduped On');
 
-          expect(cell(14, 0).rowSpan).toEqual(4); // 3 dimensions
+          expect(cell(14, 0).rowSpan).toEqual(4); // 3 dimensions + 1 for header
           expect(cell(16, 0)).toMatchTextContent(
                   'gpu: Intel Sandy Bridge HD Graphics 2000 (8086:0102)');
 

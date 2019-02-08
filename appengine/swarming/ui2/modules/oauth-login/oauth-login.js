@@ -19,8 +19,8 @@
  *    <script src="https://apis.google.com/js/api.js" async defer></script>
  * </p>
  *
- * @attr client_id - The Client ID for authenticating via OAuth.
- * @attr testing_offline - If true, the real OAuth flow won't be used.
+ * @prop client_id - The Client ID for authenticating via OAuth.
+ * @prop testing_offline - If true, the real OAuth flow won't be used.
  *    Instead, dummy data will be used. Ideal for local testing.
  *
  * @evt log-in The event that is fired when the user has logged in

@@ -13,14 +13,15 @@ import 'elements-sk/icon/add-circle-outline-icon-sk'
 import 'elements-sk/icon/remove-circle-outline-icon-sk'
 import 'elements-sk/styles/buttons'
 import '../swarming-app'
+import '../stacked-time-chart'
 
 import * as human from 'common-sk/modules/human'
 import * as query from 'common-sk/modules/query'
 
 import { applyAlias } from '../alias'
-import { cipdLink, hasRichOutput, humanState, isolateLink, isSummaryTask,
-         parseRequest, parseResult, richLogsLink, sliceExpires, stateClass,
-         taskCost, taskExpires,
+import { cipdLink, durationChart, hasRichOutput, humanState,
+         isolateLink, isSummaryTask, parseRequest, parseResult,
+         richLogsLink, sliceExpires, stateClass, taskCost, taskExpires,
          taskInfoClass, wasDeduped, wasPickedUp} from './task-page-helpers'
 import { botListLink, botPageLink, humanDuration, taskListLink,
          taskPageLink } from '../util'
@@ -32,9 +33,14 @@ import SwarmingAppBoilerplate from '../SwarmingAppBoilerplate'
  * @description <h2><code>task-page<code></h2>
  *
  * <p>
- *   TODO
+ *   Task Page shows the request, results, stats, and standard output of a task.
  * </p>
  *
+ * <p>This is a top-level element.</p>
+ *
+ * @prop client_id - The Client ID for authenticating via OAuth.
+ * @prop testing_offline - If true, the real OAuth flow won't be used.
+ *    Instead, dummy data will be used. Ideal for local testing.
  */
 
 const idAndButtons = (ele) => {
@@ -77,7 +83,7 @@ const taskDisambiguation = (ele, result) => {
     </tr>
   </thead>
   <tbody>
-${ele._extraTries.map(taskRow)}
+    ${ele._extraTries.map(taskRow)}
   </tbody>
 </table>`;
 }
@@ -88,16 +94,16 @@ const taskRow = (result, idx) => {
   }
   // Convert the summary id to the run id
   let taskId = result.task_id.substring(0, result.task_id.length - 1);
-  taskId += (idx)+1;
+  taskId += (idx+1);
   return html`
 <tr>
   <td>
-    <a href=${ifDefined(taskPageLink(taskId, true))}>
+    <a href=${ifDefined(taskPageLink(taskId, true))} target=_blank>
       ${taskId}
     </a>
   </td>
   <td>
-    <a href=${ifDefined(botPageLink(result.bot_id))}>
+    <a href=${ifDefined(botPageLink(result.bot_id))} target=_blank>
       ${result.bot_id}
     </a>
   </td>
@@ -510,11 +516,10 @@ const taskTimingSection = (ele, request, result) => {
     </tbody>
   </table>
   <div class=right>
-    <!-- TODO(kjlubick) -->
     <stacked-time-chart
       labels='["Pending", "Overhead", "Running", "Overhead"]'
       colors='["#E69F00", "#D55E00", "#0072B2", "#D55E00"]'
-      values='[[_durationChart(_result, _result.*)}'>
+      .values=${durationChart(result)}>
     </stacked-time-chart>
   </div>
 </div>
