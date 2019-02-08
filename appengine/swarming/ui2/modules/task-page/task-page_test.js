@@ -245,8 +245,8 @@ describe('task-page', function() {
           expect(cell(1, 1)).toMatchTextContent('COMPLETED (SUCCESS)');
           expect(cell(2, 1)).toMatchTextContent('1337 bots could possibly run this task ' +
                                         '(1024 busy, 13 dead, 1 quarantined, 0 maintenance)');
-          expect(cell(3, 1)).toMatchTextContent('123 similar pending tasks, '+
-                                                '56 similar running tasks');
+          expect(cell(3, 1)).toMatchTextContent('123  similar pending tasks, '+
+                                                '56  similar running tasks');
           expect(rows[5]).toHaveAttribute('hidden', 'deduped message hidden');
           expect(cell(7, 0)).toMatchTextContent('Wait for Capacity');
           expect(cell(7, 1)).toMatchTextContent('false');
@@ -536,11 +536,14 @@ describe('task-page', function() {
           const cell = (r, c) => rows[r].children[c];
 
           expect(cell(1, 0)).toMatchTextContent('testid001');
-          expect(cell(1, 0).innerHTML).toContain('<a href');
+          expect(cell(1, 0).innerHTML).toContain('<a', 'has a link');
+          expect(cell(1, 0).innerHTML).toContain('href="/task?id=testid001"', 'link is correct');
           expect(cell(2, 0)).toMatchTextContent('testid002');
-          expect(cell(2, 0).innerHTML).toContain('<a href');
+          expect(cell(2, 0).innerHTML).toContain('<a', 'has a link');
+          expect(cell(2, 0).innerHTML).toContain('href="/task?id=testid002"', 'link is correct');
           expect(cell(3, 0)).toMatchTextContent('testid003');
-          expect(cell(3, 0).innerHTML).toContain('<a href');
+          expect(cell(3, 0).innerHTML).toContain('<a', 'has a link');
+          expect(cell(3, 0).innerHTML).toContain('href="/task?id=testid003"', 'link is correct');
           done();
         });
       });
@@ -789,6 +792,42 @@ describe('task-page', function() {
 
         checkAuthorizationAndNoPosts(calls);
         done();
+      });
+    });
+
+    it('makes a POST to retry a job', function(done) {
+      serveTask(1, 'Completed task with 2 slices');
+      loggedInTaskPage((ele) => {
+        fetchMock.resetHistory();
+        fetchMock.post('/_ah/api/swarming/v1/tasks/new', {task_id: TEST_TASK_ID});
+
+        const retryBtn = $$('.id_buttons button.retry', ele);
+        expect(retryBtn).toBeTruthy();
+
+        retryBtn.click();
+
+        const dialog = $$('.retry-dialog', ele);
+        expect(dialog).toBeTruthy();
+        expect(dialog).toHaveClass('opened');
+
+        const okBtn = $$('button.ok', dialog);
+        expect(okBtn).toBeTruthy();
+
+        // stub out the fetch so the new task doesn't load.
+        ele._fetch = () => {};
+        okBtn.click();
+
+        fetchMock.flush().then(() => {
+          // MATCHED calls are calls that we expect and specified in the
+          // beforeEach at the top of this file.
+          let calls = fetchMock.calls(MATCHED, 'GET');
+          expect(calls.length).toBe(0);
+          calls = fetchMock.calls(MATCHED, 'POST');
+          expect(calls.length).toBe(1);
+
+          expectNoUnmatchedCalls(fetchMock);
+          done();
+        });
       });
     });
 

@@ -30,10 +30,10 @@ import { initPropertyFromAttrOrProperty } from '../util'
  *   See stacked-time-chart-demo.html.
  * </p>
  *
- * @attr {Array<String>} values - The floating point values to display, in the order
+ * @prop {Array<String>} values - The floating point values to display, in the order
  *                       they should be displayed.
- * @attr {Array<String>} labels - The human readable labels associated with values.
- * @attr {Array<String>} colors - The hex colors that the data should be, associated
+ * @prop {Array<String>} labels - The human readable labels associated with values.
+ * @prop {Array<String>} colors - The hex colors that the data should be, associated
  *                       with values.
  */
 
@@ -85,11 +85,11 @@ window.customElements.define('stacked-time-chart', class extends HTMLElement {
     this.render();
   }
 
-  get labels() { return this._labels; }
-  set labels(val) { this._labels = val; this.render();}
-
   get colors() { return this._colors; }
   set colors(val) { this._colors = val; this.render();}
+
+  get labels() { return this._labels; }
+  set labels(val) { this._labels = val; this.render();}
 
   get values() { return this._values; }
   set values(val) { this._values = val; this.render();}

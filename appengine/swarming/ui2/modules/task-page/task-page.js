@@ -2,7 +2,8 @@
 // Use of this source code is governed under the Apache License, Version 2.0
 // that can be found in the LICENSE file.
 
-import { $$ } from 'common-sk/modules/dom'
+import { $, $$ } from 'common-sk/modules/dom'
+import { errorMessage } from 'elements-sk/errorMessage'
 import { html, render } from 'lit-html'
 import { ifDefined } from 'lit-html/directives/if-defined';
 import { jsonOrThrow } from 'common-sk/modules/jsonOrThrow'
@@ -12,19 +13,20 @@ import 'elements-sk/checkbox-sk'
 import 'elements-sk/icon/add-circle-outline-icon-sk'
 import 'elements-sk/icon/remove-circle-outline-icon-sk'
 import 'elements-sk/styles/buttons'
-import '../swarming-app'
+import '../dialog-pop-over'
 import '../stacked-time-chart'
+import '../swarming-app'
 
 import * as human from 'common-sk/modules/human'
 import * as query from 'common-sk/modules/query'
 
 import { applyAlias } from '../alias'
-import { cipdLink, durationChart, hasRichOutput, humanState,
+import { cipdLink, durationChart, hasRichOutput, humanState, firstDimension,
          isolateLink, isSummaryTask, parseRequest, parseResult,
          richLogsLink, sliceExpires, stateClass, taskCost, taskExpires,
          taskInfoClass, wasDeduped, wasPickedUp} from './task-page-helpers'
-import { botListLink, botPageLink, humanDuration, taskListLink,
-         taskPageLink } from '../util'
+import { botListLink, botPageLink, humanDuration, parseDuration,
+         taskListLink, taskPageLink } from '../util'
 
 import SwarmingAppBoilerplate from '../SwarmingAppBoilerplate'
 
@@ -38,8 +40,8 @@ import SwarmingAppBoilerplate from '../SwarmingAppBoilerplate'
  *
  * <p>This is a top-level element.</p>
  *
- * @prop client_id - The Client ID for authenticating via OAuth.
- * @prop testing_offline - If true, the real OAuth flow won't be used.
+ * @attr client_id - The Client ID for authenticating via OAuth.
+ * @attr testing_offline - If true, the real OAuth flow won't be used.
  *    Instead, dummy data will be used. Ideal for local testing.
  */
 
@@ -57,9 +59,9 @@ const idAndButtons = (ele) => {
   <button title="Refresh data"
           @click=${ele._fetch}>refresh</button>
   <button title="Retry the task"
-          @click=${() => alert('use old ui for now')}>retry</button>
+          @click=${ele._promptRetry} class=retry>retry</button>
   <button title="Re-queue the task, but don't run it automatically"
-          @click=${() => alert('use old ui for now')}>debug</button>
+          @click=${ele._promptDebug} class=debug>debug</button>
 </div>`;
 }
 
@@ -743,7 +745,6 @@ ${richOrRawLogs(ele)}
 `;
 }
 
-
 const richOrRawLogs = (ele) => {
   if (ele._showRawOutput || !hasRichOutput(ele)) {
     return html`
@@ -762,6 +763,48 @@ const richOrRawLogs = (ele) => {
 <iframe id=richLogsFrame class=tabbed src=${ifDefined(richLogsLink(ele))}></iframe>
 `;
 }
+
+const retryOrDebugPrompt = (ele, sliceProps) => {
+  const dimensions = sliceProps.dimensions || [];
+  return html`
+<div class=prompt>
+  <h2>
+    Are you sure you want to ${ele._isPromptDebug? 'debug': 'retry'}
+    task ${ele._taskId}?
+  </h2>
+  <div>
+    <div class=ib ?hidden=${!ele._isPromptDebug}>
+      <span>Lease Duration</span>
+      <input id=lease_duration value=4h></input>
+    </div>
+    <div class=ib>
+      <checkbox-sk ?checked=${ele._useSameBot} @click=${ele._toggleSameBot}></checkbox-sk>
+      <span>Run task on the same bot</span>
+    </div>
+    <br>
+  </div>
+  <div>If you want to modify any dimensions (e.g. specify a bot's id), do so now.</div>
+  <table ?hidden=${ele._useSameBot}>
+    <thead>
+      <tr>
+        <th>Key</th>
+        <th>Value</th>
+      </tr>
+    </thead>
+    <tbody id=retry_inputs>
+      ${dimensions.map(promptRow)}
+      ${promptRow({key: '', value: ''})}
+    </tbody>
+  </table>
+</div>`;
+}
+
+const promptRow = (dim) => html`
+<tr>
+  <td><input value=${dim.key}></input></td>
+  <td><input value=${dim.value}></input></td>
+</tr>
+`;
 
 const template = (ele) => html`
 <swarming-app id=swapp
@@ -802,6 +845,15 @@ const template = (ele) => html`
     </div>
   </main>
   <footer></footer>
+  <dialog-pop-over>
+    <div class='retry-dialog content'>
+      ${retryOrDebugPrompt(ele, ele._currentSlice.properties || {})}
+      <div class="horizontal layout end">
+        <button @click=${ele._closePopup} class=cancel>Cancel</button>
+        <button @click=${ele._promptCallback} class=ok>OK</button>
+      </div>
+    </div>
+  </dialog-pop-over>
 </swarming-app>
 `;
 
@@ -855,6 +907,10 @@ window.customElements.define('task-page', class extends SwarmingAppBoilerplate {
     this._message = 'You must sign in to see anything useful.';
     // Allows us to abort fetches that are tied to the id when the id changes.
     this._fetchController = null;
+    // The callback for use when prompting to retry or debug
+    this._promptCallback = () => {};
+    this._isPromptDebug = false;
+    this._useSameBot = false;
   }
 
   connectedCallback() {
@@ -871,6 +927,72 @@ window.customElements.define('task-page', class extends SwarmingAppBoilerplate {
   disconnectedCallback() {
     super.disconnectedCallback();
     this.removeEventListener('log-in', this._loginEvent);
+  }
+
+  _closePopup() {
+    this._promptCallback = () => {};
+    $$('dialog-pop-over', this).hide();
+  }
+
+  // Look at the inputs in the prompt dialog for potential key:value pairs
+  // or use just the id of the bot.
+  _collectDimensions() {
+    const newDimensions = [];
+    if (this._useSameBot) {
+      newDimensions.push({
+        key: 'id',
+        value: firstDimension(this._result.bot_dimensions, 'id'),
+      });
+    } else {
+      const inputRows = $('#retry_inputs tr', this);
+      for (const row of inputRows) {
+        const key = row.children[0].firstElementChild.value;
+        const value = row.children[1].firstElementChild.value;
+        if (key && value) {
+          newDimensions.push({
+            key: key,
+            value: value,
+          });
+        }
+      }
+    }
+    return newDimensions;
+  }
+
+  _debugTask() {
+    this._closePopup();
+
+    const newTask = {
+      expiration_secs: this._request.expiration_secs,
+      name: `leased to ${this.profile.email} for debugging`,
+      parent_task_id: this._request.parent_task_id,
+      priority: 20,
+      properties: this._currentSlice.properties,
+      service_account: this._request.service_account,
+      tags: ['debug_task:1'],
+      user: this.profile.email,
+    }
+
+    const leaseDurationEle = $$('#lease_duration').value;
+    const leaseDuration = parseDuration(leaseDurationEle);
+
+    newTask.properties.command = ['python', '-c', `import os, sys, time
+print 'Mapping task: ${location.origin}/task?id=${this._taskId}'
+print 'Files are mapped into: ' + os.getcwd()
+print ''
+print 'Bot id: ' + os.environ['SWARMING_BOT_ID']
+print 'Bot leased for: ${leaseDuration} seconds'
+print 'How to access this bot: http://go/swarming-ssh'
+print 'When done, reboot the host'
+sys.stdout.flush()
+time.sleep(${leaseDuration})`];
+    delete newTask.properties.extra_args;
+
+    newTask.properties.execution_timeout_secs = leaseDuration;
+    newTask.properties.io_timeout_secs = leaseDuration;
+    newTask.properties.dimensions = this._collectDimensions();
+
+    this._newTask(newTask);
   }
 
   _fetch() {
@@ -1004,10 +1126,81 @@ window.customElements.define('task-page', class extends SwarmingAppBoilerplate {
     }
   }
 
+  // _newTask makes a request to the server to start a new task, given a request.
+  _newTask(newTask) {
+    if (!newTask.properties.dimensions || !newTask.properties.dimensions.length) {
+      errorMessage('Your retried task must specify dimensions', 5000);
+      return;
+    }
+    newTask.properties.idempotent = false;
+    this.app.addBusyTasks(1);
+    fetch('/_ah/api/swarming/v1/tasks/new', {
+      method: 'POST',
+      headers: {
+        'authorization': this.auth_header,
+        'Content-Type': 'application/json; charset=UTF-8',
+      },
+      body: JSON.stringify(newTask),
+    })
+      .then(jsonOrThrow)
+      .then((response) => {
+      if (response && response.task_id) {
+        this._taskId = response.task_id;
+        this._stateChanged();
+        this._fetch();
+        this.render();
+        this.app.finishedTask();
+      }
+    }).catch((e) => this.fetchError(e, 'newtask'));
+  }
+
+  _promptDebug() {
+    if (!this._request) {
+      errorMessage('Task not yet loaded', 3000);
+      return;
+    }
+    this._isPromptDebug = true;
+    this._promptCallback = this._debugTask;
+    this.render();
+    $$('dialog-pop-over', this).show();
+
+  }
+
+  _promptRetry() {
+    if (!this._request) {
+      errorMessage('Task not yet loaded', 3000);
+      return;
+    }
+    this._isPromptDebug = false;
+    this._promptCallback = this._retryTask;
+    this.render();
+    $$('dialog-pop-over', this).show();
+  }
+
   render() {
     super.render();
     const idInput = $$('#id_input', this);
     idInput.value = this._taskId;
+  }
+
+  _retryTask() {
+    this._closePopup();
+
+    const newTask = {
+      expiration_secs: this._request.expiration_secs,
+      name: this._request.name + ' (retry)',
+      parent_task_id: this._request.parent_task_id,
+      priority: this._request.priority,
+      properties: this._currentSlice.properties,
+      service_account: this._request.service_account,
+      tags: this._request.tags,
+      user: this.profile.email,
+    }
+    newTask.tags.push('retry:1');
+
+    newTask.properties.dimensions = this._collectDimensions();
+
+    this._newTask(newTask);
   }
 
   _setSlice(idx) {
@@ -1022,6 +1215,13 @@ window.customElements.define('task-page', class extends SwarmingAppBoilerplate {
   _toggleDetails(e) {
     this._showDetails = !this._showDetails;
     this._stateChanged();
+    this.render();
+  }
+
+  _toggleSameBot(e) {
+    // This prevents the checkbox from toggling twice.
+    e.preventDefault();
+    this._useSameBot = !this._useSameBot;
     this.render();
   }
 

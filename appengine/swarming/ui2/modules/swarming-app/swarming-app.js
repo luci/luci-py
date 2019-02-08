@@ -23,8 +23,8 @@
  * @evt busy-end This event is emitted whenever the app transitions from
  *               busy to not busy.
  *
- * @prop client_id - The Client ID for authenticating via OAuth.
- * @prop testing_offline - If true, the real OAuth flow won't be used.
+ * @attr client_id - The Client ID for authenticating via OAuth.
+ * @attr testing_offline - If true, the real OAuth flow won't be used.
  *    Instead, dummy data will be used. Ideal for local testing.
  *
  */
@@ -94,6 +94,7 @@ window.customElements.define('swarming-app', class extends HTMLElement {
     this._spinner = null;
     this._dynamicEle = null;
     this._auth_header = '';
+    this._profile = {};
     this._server_details = {
       server_version: 'You must log in to see more details',
       bot_version: '',
@@ -108,6 +109,7 @@ window.customElements.define('swarming-app', class extends HTMLElement {
 
     this.addEventListener('log-in', (e) => {
       this._auth_header = e.detail.auth_header;
+      this._profile = e.detail.profile;
       this._fetch();
     });
 
@@ -128,6 +130,10 @@ window.customElements.define('swarming-app', class extends HTMLElement {
                      user has. This is empty object if user is not logged in.
    *                 Read-only. */
   get permissions() { return this._permissions; }
+
+  /** @prop {Object} profile An object with keys email and imageURL of the
+                             logged in user. Read Only. */
+  get profile() { return this._profile; }
 
   /** @prop {Object} server_details The details about the server or a
                      placeholder object if the user is not logged in or

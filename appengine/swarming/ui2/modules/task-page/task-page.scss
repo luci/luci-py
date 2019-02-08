@@ -31,6 +31,9 @@ task-page {
     }
   }
 
+  .ib > * {
+    display: inline-block;
+  }
 
   .horizontal.layout {
     display: flex;
@@ -39,6 +42,9 @@ task-page {
     .grow {
       flex: 1;
       flex-basis: 0px;
+    }
+    &.end {
+      justify-content: flex-end;
     }
   }
 
@@ -190,5 +196,25 @@ task-page {
   }
   .pending_task, .highlighted {
     background-color: #fffc6c;
+  }
+
+  .retry-prompt {
+    padding: 10px;
+  }
+
+  .prompt {
+    padding: 10px 20px;
+
+    *[hidden] {
+      display: none;
+    }
+
+    #retry_inputs {
+      input {
+        border: none;
+        min-width: 200px;
+      }
+    }
+
   }
 }

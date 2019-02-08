@@ -29,6 +29,10 @@
  * <pre>
  * {
  *   auth_header: "Bearer abc12d",
+ *   profile: {
+ *     email: 'foo@example.com',
+ *     imageURL: 'http://example.com/img.png',
+ *   }
  * }
  * </pre>
  * where auth_header is a string that should be used as the
@@ -116,6 +120,10 @@ window.customElements.define('oauth-login', class extends HTMLElement {
   get client_id() { return this.getAttribute('client_id');}
   set client_id(val) { return this.setAttribute('client_id', val);}
 
+  /** @prop {Object} profile An object with keys email and imageURL of the
+                             logged in user. Read Only. */
+  get profile() { return this._profile; }
+
   /** @prop {bool} testing_offline Mirrors the attribute 'testing_offline'. */
   get testing_offline() { return this.hasAttribute('testing_offline');}
   set testing_offline(val) {
@@ -141,6 +149,7 @@ window.customElements.define('oauth-login', class extends HTMLElement {
       this.dispatchEvent(new CustomEvent('log-in', {
         detail: {
           'auth_header': header,
+          'profile': this._profile,
         },
         bubbles: true,
       }));
@@ -159,6 +168,7 @@ window.customElements.define('oauth-login', class extends HTMLElement {
         this.dispatchEvent(new CustomEvent('log-in', {
           detail: {
             'auth_header': this._auth_header,
+            'profile': this._profile,
           },
           bubbles: true,
         }));
