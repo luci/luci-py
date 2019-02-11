@@ -427,7 +427,7 @@ def _maybe_pubsub_notify_now(result_summary, request):
 
 
 def _maybe_taskupdate_notify_via_tq(result_summary, request, es_cfg):
-  """Examines result_summary and enqueues a task to send PubSub message.
+  """Enqueues tasks to send PubSub and es notifications for given request.
 
   Arguments:
     result_summary: a task_result.TaskResultSummary instance.
@@ -790,7 +790,8 @@ def _ensure_active_slice(request, try_number, task_slice_index):
     to_runs = [r for r in to_runs if r.queue_number]
     if to_runs:
       if len(to_runs) != 1:
-        logging.error('Too many pending TaskToRuns.')
+        logging.error('_ensure_active_slice(%s, %d, %d): %s != 1 TaskToRuns',
+                      request, try_number, task_slice_index, len(to_runs))
         return None
       assert len(to_runs) == 1, 'Too many pending TaskToRuns.'
 
@@ -799,6 +800,8 @@ def _ensure_active_slice(request, try_number, task_slice_index):
     if to_run:
       if (to_run.try_number == try_number and
           to_run.task_slice_index == task_slice_index):
+        logging.debug('_ensure_active_slice(%s, %d, %d): already active',
+                      request, try_number, task_slice_index)
         return to_run
 
       # Deactivate old TaskToRun, create new one.
@@ -806,10 +809,12 @@ def _ensure_active_slice(request, try_number, task_slice_index):
       new_to_run = task_to_run.new_task_to_run(request, try_number,
                                                task_slice_index)
       ndb.put_multi([to_run, new_to_run])
+      logging.debug('_ensure_active_slice(%s, %d, %d): added new TaskToRun',
+                    request, try_number, task_slice_index)
       return new_to_run
 
-    logging.error('Attempted to _ensure_active_slice on a task with no '
-                  'currently pending TaskToRun: %s', request)
+    logging.error('_ensure_active_slice(%s, %d, %d): no pending TaskToRun',
+                  request, try_number, task_slice_index)
     return None
 
   return datastore_utils.transaction(run)
