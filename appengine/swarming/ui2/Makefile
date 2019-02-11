@@ -37,3 +37,6 @@ docs: package-lock.json
 
 package-lock.json: package.json
 	npm install
+	# This should tell Makefile that the "built" package-lock.json file is older than
+	# the "source" package.json and thus does not require to be "rebuilt".
+	touch package-lock.json

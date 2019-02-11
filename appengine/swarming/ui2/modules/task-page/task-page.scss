@@ -168,6 +168,9 @@ task-page {
     margin-left: 5px;
     min-height: 80vh;
     min-width: 550px;
+    /* lets the logs take up as much space as possible, while still
+    sharing with the left side */
+    width: calc(100% - 15px);
   }
   .stdout {
     white-space: pre-wrap;
