@@ -729,12 +729,12 @@ def _get_task_from_external_scheduler(es_cfg, bot_dimensions):
     es_cfg: pool_config.ExternalSchedulerConfig instance.
     bot_dimensions: dimensions {string key: list of string values}
 
-  Returns: [(TaskRequest, TaskToRun)] if a task was available,
-           or [] otherwise.
+  Returns: (TaskRequest, TaskToRun) if a task was available,
+           or (None, None) otherwise.
   """
   task_id, slice_number = external_scheduler.assign_task(es_cfg, bot_dimensions)
   if not task_id:
-    return []
+    return None, None
 
   logging.info('Got task id %s', task_id)
   request_key, result_key = task_pack.get_request_and_result_keys(task_id)
@@ -760,9 +760,9 @@ def _get_task_from_external_scheduler(es_cfg, bot_dimensions):
 
   to_run = _ensure_active_slice(request, try_number, slice_number)
   if to_run:
-    return [(request, to_run)]
+    return request, to_run
 
-  return []
+  return None, None
 
 
 def _ensure_active_slice(request, try_number, task_slice_index):
@@ -813,6 +813,33 @@ def _ensure_active_slice(request, try_number, task_slice_index):
     return None
 
   return datastore_utils.transaction(run)
+
+
+def _bot_reap_task_external_scheduler(bot_dimensions, bot_version, es_cfg):
+  """Reaps a TaskToRun (chosen by external scheduler) if available.
+
+  This is a simpler version of bot_reap_task that skips a lot of the steps
+  normally taken by the native scheduler.
+
+  Arguments:
+    - bot_dimensions: The dimensions of the bot as a dictionary in
+          {string key: list of string values} format.
+    - bot_version: String version of the bot client.
+    - es_cfg: ExternalSchedulerConfig for this bot.
+
+  """
+  request, to_run = _get_task_from_external_scheduler(es_cfg, bot_dimensions)
+  if not request:
+    return None, None, None
+
+  run_result, secret_bytes = _reap_task(
+      bot_dimensions, bot_version, to_run.key, request)
+  if not run_result:
+      logging.info(
+          'failed to reap (external scheduler): %s0',
+          task_pack.pack_request_key(to_run.request_key))
+  logging.info('Reaped (external scheduler): %s', run_result.task_id)
+  return request, secret_bytes, run_result
 
 
 ### Public API.
@@ -1047,18 +1074,19 @@ def bot_reap_task(bot_dimensions, bot_version, deadline):
   """
   start = time.time()
   bot_id = bot_dimensions[u'id'][0]
+  es_cfg = external_scheduler.config_for_bot(bot_dimensions)
+  if es_cfg:
+    return _bot_reap_task_external_scheduler(bot_dimensions, bot_version,
+                                             es_cfg)
+
   iterated = 0
   reenqueued = 0
   expired = 0
   failures = 0
   stale_index = 0
   try:
-    es_cfg = external_scheduler.config_for_bot(bot_dimensions)
-    if es_cfg:
-      q = _get_task_from_external_scheduler(es_cfg, bot_dimensions)
-    else:
-      q = task_to_run.yield_next_available_task_to_dispatch(bot_dimensions,
-                                                            deadline)
+    q = task_to_run.yield_next_available_task_to_dispatch(bot_dimensions,
+                                                          deadline)
     for request, to_run in q:
       iterated += 1
       slice_index = task_to_run.task_to_run_key_slice_index(to_run.key)
