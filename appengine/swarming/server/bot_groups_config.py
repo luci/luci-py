@@ -29,6 +29,7 @@ BOTS_CFG_FILENAME = 'bots.cfg'
 # Validated and "frozen" bots_pb2.BotAuth proto, see its doc for meaning of
 # fields.
 BotAuth = collections.namedtuple('BotAuth', [
+  'log_if_failed',
   'require_luci_machine_token',
   'require_service_account',
   'require_gce_vm_token',  # this is BotAuthGCE
@@ -523,6 +524,7 @@ def _default_bot_groups():
         owners=(),
         auth=(
           BotAuth(
+              log_if_failed=False,
               require_luci_machine_token=False,
               require_service_account=None,
               require_gce_vm_token=None,
@@ -582,6 +584,7 @@ def _bot_group_proto_to_tuple(msg, trusted_dimensions):
     owners=tuple(msg.owners),
     auth=tuple(
       BotAuth(
+        log_if_failed=cfg.log_if_failed,
         require_luci_machine_token=cfg.require_luci_machine_token,
         require_service_account=tuple(cfg.require_service_account),
         require_gce_vm_token=(

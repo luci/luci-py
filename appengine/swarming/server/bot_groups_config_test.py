@@ -77,18 +77,21 @@ EXPECTED_GROUP_1 = bot_groups_config._make_bot_group_config(
     owners=(u'owner@example.com',),
     auth=(
       bot_groups_config.BotAuth(
+        log_if_failed=False,
         require_luci_machine_token=True,
         require_service_account=(),
         require_gce_vm_token=None,
         ip_whitelist=u'',
       ),
       bot_groups_config.BotAuth(
+        log_if_failed=False,
         require_luci_machine_token=False,
         require_service_account=('z@example.com',),
         require_gce_vm_token=None,
         ip_whitelist=u'',
       ),
       bot_groups_config.BotAuth(
+        log_if_failed=False,
         require_luci_machine_token=False,
         require_service_account=(),
         require_gce_vm_token=bot_groups_config.BotAuthGCE('proj'),
@@ -104,6 +107,7 @@ EXPECTED_GROUP_2 = bot_groups_config._make_bot_group_config(
     owners=(),
     auth=(
       bot_groups_config.BotAuth(
+        log_if_failed=False,
         require_luci_machine_token=False,
         require_service_account=(u'a@example.com',),
         require_gce_vm_token=None,
@@ -119,6 +123,7 @@ EXPECTED_GROUP_3 = bot_groups_config._make_bot_group_config(
     owners=(),
     auth=(
       bot_groups_config.BotAuth(
+        log_if_failed=False,
         require_luci_machine_token=False,
         require_service_account=(),
         require_gce_vm_token=None,
@@ -161,8 +166,8 @@ class BotGroupsConfigTest(test_case.TestCase):
     bot_groups_config.clear_cache()
 
   def test_version(self):
-    self.assertEqual('hash:20aa341004c31f', EXPECTED_GROUP_1.version)
-    self.assertEqual('hash:7074c01e3b7f5d', EXPECTED_GROUP_2.version)
+    self.assertEqual('hash:d7d5710aeedb26', EXPECTED_GROUP_1.version)
+    self.assertEqual('hash:7fae1886301611', EXPECTED_GROUP_2.version)
 
   def test_expand_bot_id_expr_success(self):
     def check(expected, expr):

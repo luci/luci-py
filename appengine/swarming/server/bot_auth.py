@@ -59,33 +59,41 @@ def validate_bot_id_and_fetch_config(bot_id, machine_type):
   ip = auth.get_peer_ip()
   peer_ident = auth.get_peer_identity()
 
-  # Sequentially try all auth methods. If at least one applies, the bot is
-  # successfully authenticated (and logs from unsuccessful methods are emitted
-  # at 'debug' level). If none applies, dump all errors messages to the log and
-  # raise AuthorizationError with a list of rejection reasons from all auth
-  # methods.
-  public_errs = []
-  internal_details = []
-  for i, bot_auth in enumerate(cfg.auth):
+  # Errors from all auth methods.
+  auth_errs = []
+  # Logs to emit if all methods fail. Omitted if some method succeeds.
+  delayed_logs = []
+
+  # Try all auth methods sequentially until a first success. When migrating
+  # between different methods it may be important to know when a method is
+  # skipped. Logs from such methods are always emitted at 'error' level. Other
+  # logs are buffered and emitted only if all methods fail.
+  for bot_auth in cfg.auth:
     err, details = _check_bot_auth(bot_auth, bot_id, peer_ident, ip)
     if not err:
-      if internal_details:
-        logging.debug('Auth method #%d succeeded! Logs from other methods:', i)
-        for msg in internal_details:
-          logging.debug('%s', msg)
+      logging.debug('Using auth method: %s', bot_auth)
       return cfg
-    public_errs.append(err)
-    internal_details.extend(details)
+    auth_errs.append(err)
+    if bot_auth.log_if_failed:
+      logging.error('Preferred auth method failed: %s', err)
+      logging.error('Failed auth method: %s', bot_auth)
+      for msg in details:
+        logging.error('%s', msg)
+    else:
+      delayed_logs.append('Auth method failed: %s' % (err,))
+      delayed_logs.append('Failed auth method: %s' % (bot_auth,))
+      delayed_logs.extend(details)
 
-  for msg in internal_details:
+  # All fallback methods failed. Need their logs to investigate.
+  for msg in delayed_logs:
     logging.error('%s', msg)
 
   # In most cases there's only one auth method used, so we can simplify the
   # error message to be less confusing.
-  if len(public_errs) == 1:
-    raise auth.AuthorizationError(public_errs[0])
+  if len(auth_errs) == 1:
+    raise auth.AuthorizationError(auth_errs[0])
   raise auth.AuthorizationError(
-      'All auth methods failed: %s' % '; '.join(public_errs))
+      'All auth methods failed: %s' % '; '.join(auth_errs))
 
 
 def _check_bot_auth(bot_auth, bot_id, peer_ident, ip):

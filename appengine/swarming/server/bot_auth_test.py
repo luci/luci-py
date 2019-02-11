@@ -70,7 +70,7 @@ TEST_CONFIG = bots_pb2.BotsCfg(
     bots_pb2.BotGroup(
       bot_id=['bot_with_fallback_to_ip_wl'],
       auth=[
-        bots_pb2.BotAuth(require_luci_machine_token=True),
+        bots_pb2.BotAuth(require_luci_machine_token=True, log_if_failed=True),
         bots_pb2.BotAuth(ip_whitelist='ip_whitelist'),
       ],
       dimensions=['pool:with_fallback_to_ip_wl']),
