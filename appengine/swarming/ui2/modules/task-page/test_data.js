@@ -616,6 +616,36 @@ export const taskResults = [
     "current_task_slice": "0",
     "bot_id": "build20-b3"
   },
+  {
+    "created_ts": "2019-02-04T13:27:06.891224",
+    "name": "Expired Task",
+    "task_id": "42f58eef9464ab10",
+    "tags": [
+      "background_task:Repair_2edf5fd5-8898-46b4-b9af-bdc41cba65ea",
+      "dut_id:2edf5fd5-8898-46b4-b9af-bdc41cba65ea",
+      "dut_state:needs_repair",
+      "log_location:logdog://example.com/chromeos/moonshark/86c6d31f-267d-4749-8fcb-18397e3eac7a/+/annotations",
+      "luci_project:chromeos",
+      "pool:ChromeOSSkylab",
+      "priority:30",
+      "service_account:none",
+      "moonshark:fleet_admin",
+      "swarming.pool.template:none",
+      "swarming.pool.version:1c55a1fcfe44ea9af5180cbc762b83a830b34e39",
+      "user:None"
+    ],
+    "internal_failure": false,
+    "server_versions": [
+      "4080-d2e3428"
+    ],
+    "abandoned_ts": "2019-02-04T13:37:13.437068",
+    "failure": false,
+    "state": "EXPIRED",
+    "modified_ts": "2019-02-04T13:37:13.437068",
+    "user": "",
+    "completed_ts": "2019-02-04T13:37:13.437068",
+    "current_task_slice": "0"
+  },
 ];
 
 
@@ -1941,6 +1971,95 @@ export const taskRequests = [
           "name": "swarming_module_cache_vpython"
         }
       ]
+    }
+  },
+  {
+    "created_ts": "2019-02-04T13:27:06.891224",
+    "authenticated": "user:staging-user@appspot.gserviceaccount.com",
+    "name": "Expired Task",
+    "tags": [
+      "background_task:Repair_2edf5fd5-8898-46b4-b9af-bdc41cba65ea",
+      "dut_id:2edf5fd5-8898-46b4-b9af-bdc41cba65ea",
+      "dut_state:needs_repair",
+      "log_location:logdog://example.com/chromeos/moonshark/86c6d31f-267d-4749-8fcb-18397e3eac7a/+/annotations",
+      "luci_project:chromeos",
+      "moonshark:fleet_admin",
+      "pool:ChromeOSSkylab",
+      "priority:30",
+      "service_account:none",
+      "swarming.pool.template:none",
+      "swarming.pool.version:1c55a1fcfe44ea9af5180cbc762b83a830b34e39",
+      "user:None"
+    ],
+    "priority": "30",
+    "user": "",
+    "service_account": "none",
+    "task_slices": [
+      {
+        "expiration_secs": "600",
+        "wait_for_capacity": true,
+        "properties": {
+          "dimensions": [
+            {
+              "value": "needs_repair",
+              "key": "dut_state"
+            },
+            {
+              "value": "ChromeOSSkylab",
+              "key": "pool"
+            },
+            {
+              "value": "2edf5fd5-8898-46b4-b9af-bdc41cba65ea",
+              "key": "dut_id"
+            }
+          ],
+          "idempotent": false,
+          "inputs_ref": {
+            "isolatedserver": "https://isolateserver-dev.appspot.com",
+            "namespace": "default-gzip"
+          },
+          "command": [
+            "/opt/infra-tools/moonshark_swarming_worker",
+            "-task-name",
+            "admin_repair",
+            "-logdog-annotation-url",
+            "logdog://example.com/chromeos/moonshark/86c6d31f-267d-4749-8fcb-18397e3eac7a/+/annotations"
+          ],
+          "execution_timeout_secs": "5400",
+          "grace_period_secs": "30"
+        }
+      }
+    ],
+    "expiration_secs": "600",
+    "properties": {
+      "dimensions": [
+        {
+          "value": "needs_repair",
+          "key": "dut_state"
+        },
+        {
+          "value": "ChromeOSSkylab",
+          "key": "pool"
+        },
+        {
+          "value": "2edf5fd5-8898-46b4-b9af-bdc41cba65ea",
+          "key": "dut_id"
+        }
+      ],
+      "idempotent": false,
+      "inputs_ref": {
+        "isolatedserver": "https://isolateserver-dev.appspot.com",
+        "namespace": "default-gzip"
+      },
+      "command": [
+        "/opt/infra-tools/moonshark_swarming_worker",
+        "-task-name",
+        "admin_repair",
+        "-logdog-annotation-url",
+        "logdog://example.com/chromeos/moonshark/86c6d31f-267d-4749-8fcb-18397e3eac7a/+/annotations"
+      ],
+      "execution_timeout_secs": "5400",
+      "grace_period_secs": "30"
     }
   },
 ];

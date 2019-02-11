@@ -4,6 +4,16 @@
 
 import 'modules/task-page'
 
+// Tip from https://stackoverflow.com/a/37348710
+// for catching "full page reload" errors.
+beforeAll(() => {
+  window.onbeforeunload = () => {
+    expect(false).toBeTruthy();
+    console.error('We should not have modified window.location.href directly.');
+    throw 'We should not have modified window.location.href directly.';
+  }
+});
+
 describe('task-page', function() {
   // Instead of using import, we use require. Otherwise,
   // the concatenation trick we do doesn't play well with webpack, which would
@@ -229,7 +239,7 @@ describe('task-page', function() {
     describe('Completed task with 2 slices', function() {
       beforeEach(() => serveTask(1, 'Completed task with 2 slices'));
 
-      it('shows relevent task request data', function(done) {
+      it('shows relevant task request data', function(done) {
         loggedInTaskPage((ele) => {
           const taskInfo = $$('table.request-info', ele);
           expect(taskInfo).toBeTruthy();
@@ -266,7 +276,7 @@ describe('task-page', function() {
         });
       });
 
-      it('shows relevent task timing data', function(done) {
+      it('shows relevant task timing data', function(done) {
         loggedInTaskPage((ele) => {
           const taskTiming = $$('table.task-timing', ele);
           expect(taskTiming).toBeTruthy();
@@ -288,7 +298,7 @@ describe('task-page', function() {
         });
       });
 
-      it('shows relevent task execution data', function(done) {
+      it('shows relevant task execution data', function(done) {
         loggedInTaskPage((ele) => {
           const taskExecution = $$('table.task-execution', ele);
           expect(taskExecution).toBeTruthy();
@@ -309,7 +319,7 @@ describe('task-page', function() {
         });
       });
 
-      it('shows relevent performance stats', function(done) {
+      it('shows relevant performance stats', function(done) {
         loggedInTaskPage((ele) => {
           const taskPerformance = $$('table.performance-stats', ele);
           expect(taskPerformance).toBeTruthy();
@@ -503,7 +513,7 @@ describe('task-page', function() {
         });
       });
 
-      it('shows relevent task timing data', function(done) {
+      it('shows relevant task timing data', function(done) {
         loggedInTaskPage((ele) => {
           const taskTiming = $$('table.task-timing', ele);
           expect(taskTiming).toBeTruthy();
@@ -578,6 +588,7 @@ describe('task-page', function() {
           done();
         });
       });
+
       it('shows a deduplication message instead of execution', function(done) {
         loggedInTaskPage((ele) => {
           const output = $$('div.task-execution', ele);
@@ -592,7 +603,50 @@ describe('task-page', function() {
           done();
         });
       });
+
+      it('does not show the multiple tries summary', function(done) {
+        loggedInTaskPage((ele) => {
+          const dTable = $$('table.task-disambiguation', ele);
+          expect(dTable).toBeFalsy();
+          done();
+        });
+      });
     }); // end describe('deduplicated task with gpu dim')
+
+    describe('Expired Task', function() {
+      beforeEach(() => serveTask(4, 'Expired Task'));
+
+      it('shows relevant task timing data', function(done) {
+        loggedInTaskPage((ele) => {
+          const taskTiming = $$('table.task-timing', ele);
+          expect(taskTiming).toBeTruthy();
+          const rows = $('tr', taskTiming);
+          expect(rows.length).toEqual(9);
+
+          // little helper for readability
+          const cell = (r, c) => rows[r].children[c];
+          // Spot check some of the content
+          expect(rows[1]).toHaveAttribute('hidden', 'Started hidden');
+          expect(rows[4]).not.toHaveAttribute('hidden', 'Abandoned shown');
+          expect(cell(6, 0)).toMatchTextContent('Pending Time');
+          expect(cell(6, 1)).toMatchTextContent('10m  6s');
+          expect(cell(7, 0)).toMatchTextContent('Total Overhead');
+          expect(cell(7, 1)).toMatchTextContent('--');
+          expect(cell(8, 0)).toMatchTextContent('Running Time');
+          expect(cell(8, 1)).toMatchTextContent('--');
+
+          done();
+        });
+      });
+
+      it('does not show the multiple tries summary', function(done) {
+        loggedInTaskPage((ele) => {
+          const dTable = $$('table.task-disambiguation', ele);
+          expect(dTable).toBeFalsy();
+          done();
+        });
+      });
+    }); // end describe('Expired Task')
 
   }); // end describe('html structure')
 

@@ -71,7 +71,8 @@ const taskDisambiguation = (ele, result) => {
     return '';
   }
   // This is the most frequent case - no automatic retry
-  if (result.try_number === 1) {
+  // or task was deduped/expired
+  if (result.try_number === 1 || !result.try_number) {
     return '';
   }
   return html`

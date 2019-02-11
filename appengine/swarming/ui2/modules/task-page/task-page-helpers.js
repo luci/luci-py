@@ -149,7 +149,9 @@ export function parseResult(result) {
   });
 
   // In the JSON, this is a string
-  result.try_number = +result.try_number;
+  if (result.try_number) {
+    result.try_number = +result.try_number;
+  }
 
   const now = new Date();
   // Running and bot_died tasks have no duration set, so we can figure it out.
