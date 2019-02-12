@@ -372,40 +372,89 @@ def get_routes():
   routes = [
     # Cron jobs.
     ('/internal/cron/abort_bot_died', CronBotDiedHandler),
+    ('/internal/cron/important/scheduler/abort_bot_missing',
+      CronBotDiedHandler),
+
     ('/internal/cron/abort_expired_task_to_run',
         CronAbortExpiredShardToRunHandler),
+    ('/internal/cron/important/scheduler/abort_expired',
+        CronAbortExpiredShardToRunHandler),
+
     ('/internal/cron/task_queues_tidy', CronTidyTaskQueues),
+    ('/internal/cron/cleanup/task_queues', CronTidyTaskQueues),
+
     ('/internal/cron/update_bot_info', CronUpdateBotInfoComposite),
+    ('/internal/cron/monitoring/bots/update_bot_info',
+      CronUpdateBotInfoComposite),
+
     ('/internal/cron/delete_old_bot', CronDeleteOldBots),
+    ('/internal/cron/cleanup/bots/delete_old', CronDeleteOldBots),
+
     ('/internal/cron/delete_old_bot_events', CronDeleteOldBotEvents),
+    ('/internal/cron/cleanup/bots/delete_old_bot_events',
+      CronDeleteOldBotEvents),
+
     ('/internal/cron/delete_old_tasks', CronDeleteOldTasks),
-    ('/internal/cron/bots/stats', CronBotsStats),
-    ('/internal/cron/tasks/stats', CronTasksStats),
+    ('/internal/cron/cleanup/tasks/delete_old', CronDeleteOldTasks),
+
+    # Not yet used.
+    ('/internal/cron/monitoring/bots/stats', CronBotsStats),
+
+    # Not yet used.
+    ('/internal/cron/monitoring/tasks/stats', CronTasksStats),
+
     ('/internal/cron/bots/send_to_bq', CronBotsSendToBQ),
+    ('/internal/cron/monitoring/bots/send_to_bq', CronBotsSendToBQ),
+
     ('/internal/cron/tasks/send_requests_to_bq', CronTasksSendRequestsToBQ),
+    ('/internal/cron/monitoring/tasks/send_requests_to_bq',
+      CronTasksSendRequestsToBQ),
+
     ('/internal/cron/tasks/send_results_to_bq', CronTasksSendResultsToBQ),
+    ('/internal/cron/monitoring/tasks/send_results_to_bq',
+      CronTasksSendResultsToBQ),
 
     ('/internal/cron/count_task_bot_distribution',
+        CronCountTaskBotDistributionHandler),
+    ('/internal/cron/monitoring/count_task_bot_distribution',
         CronCountTaskBotDistributionHandler),
 
     ('/internal/cron/aggregate_bots_dimensions',
         CronBotsDimensionAggregationHandler),
+    ('/internal/cron/monitoring/bots/aggregate_dimensions',
+        CronBotsDimensionAggregationHandler),
+
     ('/internal/cron/aggregate_tasks_tags',
+        CronTasksTagsAggregationHandler),
+    ('/internal/cron/monitoring/tasks/aggregate_tags',
         CronTasksTagsAggregationHandler),
 
     ('/internal/cron/bot_groups_config', CronBotGroupsConfigHandler),
+    ('/internal/cron/important/bot_groups_config', CronBotGroupsConfigHandler),
 
     ('/internal/cron/external_scheduler_cancellations',
+        CronExternalSchedulerCancellationsHandler),
+    ('/internal/cron/important/external_scheduler/cancellations',
         CronExternalSchedulerCancellationsHandler),
 
     # Machine Provider.
     ('/internal/cron/machine_provider_bot_usage',
         CronMachineProviderBotsUtilizationHandler),
+    ('/internal/cron/monitoring/machine_provider/bot_usage',
+        CronMachineProviderBotsUtilizationHandler),
+
     ('/internal/cron/machine_provider_config',
         CronMachineProviderConfigHandler),
+    ('/internal/cron/important/machine_provider/update_config',
+        CronMachineProviderConfigHandler),
+
     ('/internal/cron/machine_provider_manage',
         CronMachineProviderManagementHandler),
+    ('/internal/cron/important/machine_provider/manage_leases',
+        CronMachineProviderManagementHandler),
+
     ('/internal/cron/named_caches_update', CronNamedCachesUpdate),
+    ('/internal/cron/important/named_caches/update', CronNamedCachesUpdate),
 
     # Task queues.
     ('/internal/taskqueue/cancel-tasks', CancelTasksHandler),

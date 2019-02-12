@@ -3,41 +3,51 @@ cron:
 
 ### Tasks
 
-- description:
+- description: >-
     Catch TaskRunResult's where the bot died and failed sending updates.
   url: /internal/cron/abort_bot_died
+  #url: /internal/cron/important/scheduler/abort_bot_missing
   schedule: every 1 minutes
   target: backend
 
 - description: Catch TaskToRun's that are expired.
   url: /internal/cron/abort_expired_task_to_run
+  #url: /internal/cron/important/scheduler/abort_expired
   schedule: every 1 minutes
   target: backend
 
-- description:
-    Clean up stale BotTaskDimensions and TaskDimensions so no composite indexes are needed.
+- description: >-
+    Clean up stale BotTaskDimensions and TaskDimensions so no composite indexes
+    are needed.
   url: /internal/cron/task_queues_tidy
+  #url: /internal/cron/cleanup/task_queues
   schedule: every 10 minutes
   target: backend
 
-- description: Count how many runnable bots per task for monitoring.
+- description: >-
+    Count how many runnable bots per task queues for monitoring; send this to
+    ts_mon.
   url: /internal/cron/count_task_bot_distribution
+  #url: ('/internal/cron/monitoring/count_task_bot_distribution
   schedule: every 1 minutes synchronized
   target: backend
 
 - description: Delete old TaskRequest
   url: /internal/cron/delete_old_tasks
+  #url: /internal/cron/cleanup/tasks/delete_old
   schedule: every 10 minutes synchronized
   target: backend
 
 - description: Send task requests to BigQuery
   target: backend
   url: /internal/cron/tasks/send_requests_to_bq
+  #url: /internal/cron/monitoring/tasks/send_requests_to_bq
   schedule: every 1 minutes
 
 - description: Send task results to BigQuery
   target: backend
   url: /internal/cron/tasks/send_results_to_bq
+  #url: /internal/cron/monitoring/tasks/send_results_to_bq
   schedule: every 1 minutes
 
 
@@ -45,29 +55,36 @@ cron:
 
 - description: Update BotInfo.composite for dead bots.
   url: /internal/cron/update_bot_info
+  #url: /internal/cron/monitoring/bots/update_bot_info
   schedule: every 1 minutes
   target: backend
 
 - description: Delete old Bot entity groups
   url: /internal/cron/delete_old_bot
+  #url: /internal/cron/cleanup/bots/delete_old
   schedule: every 5 minutes synchronized
   target: backend
 
 - description: Delete old BotEvent
   url: /internal/cron/delete_old_bot_events
+  #url: /internal/cron/cleanup/bots/delete_old_bot_events
   schedule: every 5 minutes synchronized
   target: backend
 
 - description: Send bot events to BigQuery
   target: backend
   url: /internal/cron/bots/send_to_bq
+  #url: /internal/cron/monitoring/bots/send_to_bq
   schedule: every 1 minutes
 
 
 ### Named caches
 
-- description: Update named caches cache
+- description: >-
+    Update named caches cache sizes; this is important to ensure the bots have
+    enough free disk space for cold named cache.
   url: /internal/cron/named_caches_update
+  #url: /internal/cron/important/named_caches/update
   schedule: every 10 minutes synchronized
   target: backend
 
@@ -76,16 +93,19 @@ cron:
 
 - description: Compute Machine Provider bot utilization.
   url: /internal/cron/machine_provider_bot_usage
+  #url: /internal/cron/monitoring/machine_provider/bot_usage
   schedule: every 1 minutes synchronized
   target: backend
 
 - description: Configure Machine Provider leases.
   url: /internal/cron/machine_provider_config
+  #url: /internal/cron/important/machine_provider/update_config
   schedule: every 1 minutes synchronized
   target: backend
 
 - description: Manage Machine Provider leases.
   url: /internal/cron/machine_provider_manage
+  #url: /internal/cron/important/machine_provider/manage_leases
   schedule: every 1 minutes synchronized
   target: backend
 
@@ -94,11 +114,13 @@ cron:
 
 - description: Aggregate all bots dimensions for easier sorting.
   url: /internal/cron/aggregate_bots_dimensions
+  #url: /internal/cron/monitoring/bots/aggregate_dimensions
   schedule: every 5 minutes
   target: backend
 
 - description: Aggregate all tasks tags for easier sorting.
   url: /internal/cron/aggregate_tasks_tags
+  #url: /internal/cron/monitoring/tasks/aggregate_tags
   schedule: every 1 hours
   target: backend
 
@@ -107,6 +129,7 @@ cron:
 
 - description: Cancel tasks at the behest of external scheduler.
   url: /internal/cron/external_scheduler_cancellations
+  #url: /internal/cron/important/external_scheduler/cancellations
   schedule: every 1 minutes
   target: backend
 
@@ -141,5 +164,6 @@ cron:
 
 - description: assemble bot groups configs
   url: /internal/cron/bot_groups_config
+  #url: /internal/cron/important/bot_groups_config
   schedule: every 1 minutes
   target: backend
