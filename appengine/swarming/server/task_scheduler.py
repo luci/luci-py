@@ -831,7 +831,6 @@ def _bot_reap_task_external_scheduler(bot_dimensions, bot_version, es_cfg):
           {string key: list of string values} format.
     - bot_version: String version of the bot client.
     - es_cfg: ExternalSchedulerConfig for this bot.
-
   """
   request, to_run = _get_task_from_external_scheduler(es_cfg, bot_dimensions)
   if not request:
@@ -840,9 +839,10 @@ def _bot_reap_task_external_scheduler(bot_dimensions, bot_version, es_cfg):
   run_result, secret_bytes = _reap_task(
       bot_dimensions, bot_version, to_run.key, request)
   if not run_result:
-      logging.info(
-          'failed to reap (external scheduler): %s0',
-          task_pack.pack_request_key(to_run.request_key))
+    logging.error(
+        'failed to reap (external scheduler): %s0',
+        task_pack.pack_request_key(to_run.request_key))
+    return None, None, None
   logging.info('Reaped (external scheduler): %s', run_result.task_id)
   return request, secret_bytes, run_result
 
