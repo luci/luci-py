@@ -425,13 +425,20 @@ export function sortPossibleColumns(columns, selectedCols) {
 }
 
 /** stripTag removes the '-tag' suffix from a string, if there is one, and
- *  returns what remains.
+ *  returns what remains. e.g. 'pool-tag' => 'pool'
  */
 export function stripTag(s) {
   if (s && s.endsWith('-tag')) {
     return s.substring(0, s.length - 4);
   }
   return s;
+}
+
+/** stripTag removes the '-tag' suffix from a filter string, if there is one, and
+ *  returns what remains.  e.g. 'pool-tag:Chrome' => 'pool:Chrome'
+ */
+export function stripTagFromFilter(s) {
+  return s.replace('-tag:', ':');
 }
 
 /** taskClass returns the CSS class for the given task, based on the state

@@ -73,6 +73,11 @@ function fetchError(e, loadingWhat) {
   errorMessage(message, 5000);
 }
 
+function nowInSeconds() {
+  // convert milliseconds to seconds
+  return Math.round(Date.now() / 1000);
+}
+
 const CANCEL_BATCH_SIZE = 100;
 
 window.customElements.define('task-mass-cancel', class extends HTMLElement {
@@ -184,8 +189,8 @@ window.customElements.define('task-mass-cancel', class extends HTMLElement {
       tags: this.tags,
       // Search in the last week to get the count.  PENDING tasks should expire
       // well before then, so this should be pretty accurate.
-      start: (Date.now() - 7*24*60*60*1000) / 1000,
-      end: Date.now() / 1000,
+      start: nowInSeconds() - 7*24*60*60,
+      end: nowInSeconds(),
     });
 
     let pendingPromise = fetch(`/_ah/api/swarming/v1/tasks/count?${pendingParams}`, extra)
@@ -199,8 +204,8 @@ window.customElements.define('task-mass-cancel', class extends HTMLElement {
       tags: this.tags,
       // Search in the last week to get the count.  RUNNING tasks should finish
       // well before then, so this should be pretty accurate.
-      start: (Date.now() - 7*24*60*60*1000) / 1000,
-      end: Date.now() / 1000,
+      start: nowInSeconds() - 7*24*60*60,
+      end: nowInSeconds(),
     });
 
     let runningPromise = fetch(`/_ah/api/swarming/v1/tasks/count?${runningParams}`, extra)

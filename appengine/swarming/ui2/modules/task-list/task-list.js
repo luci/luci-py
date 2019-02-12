@@ -48,7 +48,7 @@ import { applyAlias, handleLegacyFilters, maybeApplyAlias } from '../alias'
 import { appendPossibleColumns, appendPrimaryMap, column, filterTasks, floorSecond,
          getColHeader, humanizePrimaryKey, legacyTags, listQueryParams,
          processTasks, sortColumns, sortPossibleColumns, specialSortMap,
-         stripTag, taskClass, useNaturalSort } from './task-list-helpers'
+         stripTag, stripTagFromFilter, taskClass, useNaturalSort } from './task-list-helpers'
 import { botListLink, onSmallScreen } from '../util'
 import { filterPossibleColumns, filterPossibleKeys,
          filterPossibleValues, makeFilter } from '../queryfilter'
@@ -190,7 +190,7 @@ const options = (ele) => html`
     </div>
   </div>
   <a href=${ele._matchingBotsLink()}>View Matching Bots</a>
-  <button
+  <button id=cancel_all
       ?disabled=${!ele.permissions.cancel_task}
       @click=${ele._promptMassCancel}>
     CANCEL ALL TASKS
@@ -283,7 +283,9 @@ const template = (ele) => html`
   <footer></footer>
   <dialog-pop-over>
     <div class='cancel content'>
-      <task-mass-cancel .auth_header=${ele.auth_header} .tags=${ele._filters}></task-mass-cancel>
+      <task-mass-cancel
+          .auth_header=${ele.auth_header}
+          .tags=${ele._filters.map(stripTagFromFilter)}></task-mass-cancel>
       <button class=goback @click=${ele._closePopup}
               ?disabled=${ele._startedCanceling && !ele._finishedCanceling}>
         ${ele._startedCanceling ? 'DISMISS': "GO BACK - DON'T CANCEL ANYTHING"}
