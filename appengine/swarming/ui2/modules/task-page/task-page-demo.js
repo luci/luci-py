@@ -26,7 +26,7 @@ fetchMock.get('glob:/_ah/api/swarming/v1/task/*/result',
               requireLogin(taskResult, 600));
 
 fetchMock.get('glob:/_ah/api/swarming/v1/task/*/stdout',
-              requireLogin(taskOutput, 100));
+              requireLogin(taskOutput, 2000));
 
 function randomInt(min, max) {
   return Math.floor(Math.random() * (max-min) + min);

@@ -51,8 +51,10 @@ export function filterPossibleKeys(allKeys, keyMap, query) {
   }
   // partial queries should only show the key that exactly matches
   query = query.split(':')[0];
+  // allows users to not have to type '-tag', which is non-obvious
+  const withTag = query + '-tag';
   return allKeys.filter((k) => {
-    if (k === query) {
+    if (k === query || k === withTag) {
       return true;
     }
     return false;

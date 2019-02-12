@@ -312,7 +312,7 @@ describe('task-page', function() {
           expect(cell(0, 1).innerHTML).toContain('<a ', 'has a link');
           expect(cell(0, 1).innerHTML).toContain('href="/bot?id=swarm1931-c4"', 'link is correct');
           expect(cell(1, 0).rowSpan).toEqual(15); // 14 dimensions shown + 1 for header
-          expect(cell(5, 0)).toMatchTextContent('gpu:  Intel (8086)  ' +
+          expect(cell(5, 0)).toMatchTextContent('gpu:Intel (8086)' +
                     'Intel Sandy Bridge HD Graphics 2000 (8086:0102)');
 
           done();
@@ -583,7 +583,7 @@ describe('task-page', function() {
 
           expect(cell(14, 0).rowSpan).toEqual(4); // 3 dimensions + 1 for header
           expect(cell(16, 0)).toMatchTextContent(
-                  'gpu: Intel Sandy Bridge HD Graphics 2000 (8086:0102)');
+                  'gpu:Intel Sandy Bridge HD Graphics 2000 (8086:0102)');
 
           done();
         });

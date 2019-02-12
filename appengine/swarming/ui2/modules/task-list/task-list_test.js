@@ -711,6 +711,23 @@ describe('task-list', function() {
         row = getChildItemWithText($$('.selector.keys'), 'stepname (tag)', ele);
         expect(row).toBeTruthy('stepname (tag) should be there, because some values match');
 
+        filterInput.value = 'pool:Chro';
+        ele._refilterPrimaryKeys();
+        // Auto selects the first one
+        expect(ele._primaryKey).toEqual('pool-tag');
+
+        row = getChildItemWithText($$('.selector.keys'), 'stepname (tag)', ele);
+        expect(row).toBeFalsy('stepname (tag) should be hidden');
+        row = getChildItemWithText($$('.selector.keys'), 'pool (tag)', ele);
+        expect(row).toBeTruthy('pool (tag) should be visible');
+        row = getChildItemWithText($$('.selector.keys'), 'sk_dim_pool (tag)', ele);
+        expect(row).toBeFalsy('sk_dim_pool (tag) is not an exact match');
+
+        row = getChildItemWithText($$('.selector.values'), 'Chrome-perf', ele);
+        expect(row).toBeTruthy('Chrome-perf should be visible');
+        row = getChildItemWithText($$('.selector.values'), 'AndroidBuilder', ele);
+        expect(row).toBeFalsy('AndroidBuilder should be hidden, does not match Chro');
+
         done();
       });
     });

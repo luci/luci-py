@@ -4,8 +4,9 @@
 
 import { $, $$ } from 'common-sk/modules/dom'
 import { errorMessage } from 'elements-sk/errorMessage'
+import {guard} from 'lit-html/directives/guard'
 import { html, render } from 'lit-html'
-import { ifDefined } from 'lit-html/directives/if-defined';
+import { ifDefined } from 'lit-html/directives/if-defined'
 import { jsonOrThrow } from 'common-sk/modules/jsonOrThrow'
 import { stateReflector } from 'common-sk/modules/stateReflector'
 
@@ -309,12 +310,12 @@ const dimensionBlock = (dimensions) => html`
         href=${taskListLink(dimensions)}>Tasks</a>
   </td>
 </tr>
-${dimensions.map(dimension_row)}
+${dimensions.map(dimensionRow)}
 `;
 
-const dimension_row = (dimension) => html`
+const dimensionRow = (dimension) => html`
 <tr>
-  <td class=break-all><b>${dimension.key}:</b> ${applyAlias(dimension.value, dimension.key)}</td>
+  <td class=break-all><b class=dim_key>${dimension.key}:</b>${applyAlias(dimension.value, dimension.key)}</td>
 </tr>
 `;
 
@@ -630,15 +631,14 @@ const taskExecutionSection = (ele, request, result, currentSlice) => {
 
 const botDimensionRow = (dim, usedDimensions) => html`
 <tr>
-  <td class=${dim.highlight ? 'highlight': ''}><b>${dim.key}:</b>
-    ${dim.values.map(botDimensionValue)}
+  <td class=${dim.highlight ? 'highlight': ''}>
+    <b class=dim_key>${dim.key}:</b>${dim.values.map(botDimensionValue)}
   </td>
 </tr>
 `;
 
-const botDimensionValue = (value) => html`
-<span class="break-all dim ${value.bold ? 'bold': ''}">${value.name}</span>
-`;
+const botDimensionValue = (value) =>
+html`<span class="break-all dim ${value.bold ? 'bold': ''}">${value.name}</span>`;
 
 const performanceStatsSection = (ele, performanceStats) => {
   if (!ele._taskId || !performanceStats) {
@@ -760,9 +760,11 @@ const richOrRawLogs = (ele) => {
   See <a href="//goo.gl/LE4rwV">the docs</a> for more.
 </div>`;
   }
-  return html`
+  // guard should prevent the iframe from reloading on any render
+  // and only if ele._request changes (e.g. user hits refresh).
+  return guard(ele._request, () => html`
 <iframe id=richLogsFrame class=tabbed src=${ifDefined(richLogsLink(ele))}></iframe>
-`;
+`);
 }
 
 const retryOrDebugPrompt = (ele, sliceProps) => {
