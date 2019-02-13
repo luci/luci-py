@@ -261,6 +261,16 @@ export function taskPageLink(taskId, disableCanonicalID) {
   return `/task?id=${taskId}`;
 }
 
+/** timeDiffApprox returns the approximate difference between now and
+ *  the specified date.
+ */
+export function timeDiffApprox(date){
+  if (!date) {
+    return 'eons';
+  }
+  return human.diffDate(date.getTime());
+}
+
 /** timeDiffExact returns the exact difference between the two specified
  *  dates.  E.g. 2d 22h 22m 28s ago If a second date is not provided,
  *  now is used.

@@ -1,0 +1,76 @@
+bot-page {
+
+  main {
+
+    .title {
+      font-size: 1.5em;
+      font-weight: 700;
+      margin: 5px;
+    }
+
+    a[href] {
+      color: #105d90;
+    }
+
+    .top {
+      width: 100%;
+    }
+
+  }
+
+  .id_buttons {
+    display: flex;
+
+    #id_input {
+      font-size: 1.5em;
+      width: 10em;
+      margin: 8px 5px;
+    }
+    .message {
+      margin: auto 5px;
+      font-size: 1.2em;
+    }
+  }
+
+  .horizontal.layout {
+    display: flex;
+    flex-direction: row;
+
+    .grow {
+      flex: 1;
+      flex-basis: 0px;
+    }
+    .stats {
+      flex-grow: 1.5;
+    }
+    &.end {
+      justify-content: flex-end;
+    }
+  }
+
+  .wrap.layout {
+    flex-wrap: wrap;
+  }
+
+  .old_version {
+    background-color: #ffffdd;
+  }
+
+  .bot_state {
+    white-space: pre-wrap;
+    font-family: monospace;
+    margin-bottom: 10px;
+    word-break: break-all;
+  }
+
+  table {
+    border-collapse: collapse;
+    margin-left: 5px;
+    margin-bottom: 8px;
+  }
+  td, th {
+    border: 1px solid #BBB;
+    padding: 5px;
+  }
+
+}

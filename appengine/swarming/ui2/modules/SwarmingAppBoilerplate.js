@@ -46,7 +46,7 @@ export default class SwarmingAppBoilerplate extends HTMLElement {
     this._app = null;
     this._auth_header = '';
     this._profile = null;
-    // True until we see a 403 and get a call to setUserNotAuthorized();
+    // False until we see a 403 and get a call to setUserNotAuthorized();
     this._notAuthorized = false;
   }
 

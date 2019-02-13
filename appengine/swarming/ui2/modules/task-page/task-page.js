@@ -4,7 +4,7 @@
 
 import { $, $$ } from 'common-sk/modules/dom'
 import { errorMessage } from 'elements-sk/errorMessage'
-import {guard} from 'lit-html/directives/guard'
+import { guard } from 'lit-html/directives/guard'
 import { html, render } from 'lit-html'
 import { ifDefined } from 'lit-html/directives/if-defined'
 import { jsonOrThrow } from 'common-sk/modules/jsonOrThrow'
