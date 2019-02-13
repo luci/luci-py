@@ -738,11 +738,6 @@ def _get_task_from_external_scheduler(es_cfg, bot_dimensions):
 
   logging.info('Got task id %s', task_id)
   request_key, result_key = task_pack.get_request_and_result_keys(task_id)
-  # Note (per maruel@): the result key will be a TaskRunResult if it is encoded
-  # as such ending with '1' or '2'. When '0' is the trailing number, it refers
-  # to the overall TaskResultSummary.
-  # TODO(akeshet): Decide whether we want the external scheduler to deal with
-  # per-try task IDs, or per-request task IDs.
   logging.info('Determined request_key, result_key %s, %s', request_key,
                result_key)
   request = request_key.get()
@@ -1013,7 +1008,7 @@ def schedule_request(request, secret_bytes):
   extra = filter(bool, [result_summary, to_run, secret_bytes])
   datastore_utils.insert(request, new_key_callback=_gen_key, extra=extra)
 
-  # TODO(akeshet): This external_scheduler call is blocking, and adds risk
+  # Note: This external_scheduler call is blocking, and adds risk
   # of the HTTP handler being slow or dying after the task was already made
   # live. On the other hand, this call is only being made for tasks in a pool
   # that use an external scheduler, and which are not effectively live unless
@@ -1511,8 +1506,6 @@ def cron_handle_external_cancellations():
       continue
     for es_cfg in pool_cfg.external_schedulers:
       if es_cfg.enabled:
-        # TODO(akeshet): Push this call onto a task queue so it can
-        # be performed concurrently for all pools.
         cancellations = external_scheduler.get_cancellations(es_cfg)
         if cancellations:
           for c in cancellations:
