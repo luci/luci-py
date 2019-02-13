@@ -203,13 +203,14 @@ class BackendTest(AppTestBase):
 
   def testCronJobTasks(self):
     # Tests all the cron tasks are securely handled.
-    cron_job_urls = [
-        r for r in self._GetRoutes() if r.startswith('/internal/cron/')
-    ]
-    self.assertTrue(cron_job_urls, cron_job_urls)
+    prefix = '/internal/cron/'
+    cron_job_urls = [r for r in self._GetRoutes() if r.startswith(prefix)]
+    self.assertTrue(cron_job_urls)
 
-    # For ereporter.
     for cron_job_url in cron_job_urls:
+      rest = cron_job_url[len(prefix):]
+      section = rest.split('/', 2)[0]
+      self.assertIn(section, ('cleanup', 'monitoring', 'important'), rest)
       self.app.get(
           cron_job_url, headers={'X-AppEngine-Cron': 'true'}, status=200)
 
@@ -240,7 +241,7 @@ class BackendTest(AppTestBase):
         version='123456789', quarantined=True, maintenance_msg=None,
         task_id='987', task_name=None)
 
-    self.app.get('/internal/cron/aggregate_bots_dimensions',
+    self.app.get('/internal/cron/monitoring/bots/aggregate_dimensions',
         headers={'X-AppEngine-Cron': 'true'}, status=200)
     actual = bot_management.DimensionAggregation.KEY.get()
     expected = bot_management.DimensionAggregation(
@@ -263,7 +264,7 @@ class BackendTest(AppTestBase):
     self.client_create_task_raw(tags=['alpha:epsilon', 'zeta:theta'])
     self.assertEqual(0, self.execute_tasks())
 
-    self.app.get('/internal/cron/aggregate_tasks_tags',
+    self.app.get('/internal/cron/monitoring/tasks/aggregate_tags',
         headers={'X-AppEngine-Cron': 'true'}, status=200)
     actual = task_result.TagAggregation.KEY.get()
     expected = task_result.TagAggregation(
@@ -296,7 +297,7 @@ class BackendTest(AppTestBase):
     self.client_create_task_raw(tags=['alpha:epsilon', 'zeta:theta'])
     self.assertEqual(0, self.execute_tasks())
 
-    self.app.get('/internal/cron/count_task_bot_distribution',
+    self.app.get('/internal/cron/monitoring/count_task_bot_distribution',
         headers={'X-AppEngine-Cron': 'true'}, status=200)
 
   def testTaskQueueUrls(self):
