@@ -34,7 +34,7 @@ from test_support import test_case
 
 def ErrorRecord(**kwargs):
   """Returns an ErrorRecord filled with default dummy values."""
-  default_values = {
+  vals = {
       'request_id': '123',
       'start_time': None,
       'exception_time': None,
@@ -84,8 +84,11 @@ def ErrorRecord(**kwargs):
           '    p.set_meaning(entity_pb.Property.GD_WHEN)\n'
           'DeadlineExceededError\n')
   }
-  default_values.update(kwargs)
-  return logscraper._ErrorRecord(**default_values)
+  vals.update(kwargs)
+  signature, exception_type = logscraper._signature_from_message(
+      vals['message'])
+  return logscraper._ErrorRecord(
+      signature=signature, exception_type=exception_type, **vals)
 
 
 class Base(test_case.TestCase):

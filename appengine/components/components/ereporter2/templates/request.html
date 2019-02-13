@@ -61,7 +61,7 @@
       <td>{{request.user_agent|utf8}}</td>
     </tr>
     <tr>
-      <td>IP</td>
+      <td>Client IP</td>
       <td>{{request.ip|utf8}}</td>
     </tr>
     <tr>
@@ -85,11 +85,11 @@
       <td>{{request.response_size}}</td>
     </tr>
     <tr>
-      <td>Start time</td>
+      <td>Start time (UTC)</td>
       <td>{{request.start_time|epochformat('%Y-%m-%d %H:%M:%S.%f')}}</td>
     </tr>
     <tr>
-      <td>End time</td>
+      <td>End time (UTC)</td>
       <td>{{request.end_time|epochformat('%Y-%m-%d %H:%M:%S.%f')}}</td>
     </tr>
     <tr>
@@ -137,6 +137,14 @@
     <tr>
       <td>Appengine version</td>
       <td>{{request.app_engine_release|utf8}}</td>
+    </tr>
+    <tr>
+      <td>Instance ID</td>
+      <td>{{request.instance_key|utf8}}</td>
+    </tr>
+    <tr>
+      <td>Request ID</td>
+      <td>{{request.request_id|utf8}}</td>
     </tr>
   </tbody>
 </table>

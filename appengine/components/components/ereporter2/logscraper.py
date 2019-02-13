@@ -20,8 +20,16 @@ from . import formatter
 from . import models
 
 
-# Handle this error message specifically.
-SOFT_MEMORY = u'Exceeded soft private memory limit'
+# Silence this error message specifically. There's no action item here.
+SOFT_MEMORY_EXCEEDED = u'Exceeded soft memory limit'
+
+# These are stronger statements, so do not silence them, but still group them.
+MEMORY_EXCEEDED_PREFIXES = (
+    u'Exceeded medium memory limit',
+    u'Exceeded hard memory limit',
+)
+
+MEMORY_EXCEEDED = u'Exceeded memory limit'
 
 
 ### Private constants.
@@ -149,7 +157,7 @@ class _ErrorRecord(object):
       host, resource, method, task_queue_name,
       was_loading_request, version, module, handler_module, gae_version,
       instance,
-      status, message):
+      status, message, signature, exception_type):
     assert isinstance(message, unicode), repr(message)
     # Unique identifier.
     self.request_id = request_id
@@ -185,9 +193,8 @@ class _ErrorRecord(object):
     # What happened.
     self.status = status
     self.message = message
-
-    # Creates an unique signature string based on the message.
-    self.signature, self.exception_type = _signature_from_message(message)
+    self.signature = signature
+    self.exception_type = exception_type
     if not self.signature:
       # Default the signature to the exception type if None.
       self.signature = self.exception_type
@@ -219,9 +226,12 @@ def _signature_from_message(message):
     # Not an exception. Use the first line as the 'signature'.
 
     # Look for special messages to reduce.
-    if lines[0].startswith(SOFT_MEMORY):
-      # Consider SOFT_MEMORY an 'exception'.
-      return SOFT_MEMORY, SOFT_MEMORY
+    if lines[0].startswith(SOFT_MEMORY_EXCEEDED):
+      # Ignore soft memory, it's just noise.
+      return '', None
+    if lines[0].startswith(MEMORY_EXCEEDED_PREFIXES):
+      # Consider (non-soft) memory exceeded an 'exception'.
+      return MEMORY_EXCEEDED, MEMORY_EXCEEDED
     return _shorten(lines[0].strip()), None
 
   # It is a stack trace.
@@ -323,14 +333,18 @@ def _extract_exceptions_from_logs(start_time, end_time, module_versions):
         msgs.append(msg)
         log_time = log_time or log_line.time
 
-      yield _ErrorRecord(
-          entry.request_id,
-          entry.start_time, log_time, entry.latency, entry.mcycles,
-          entry.ip, entry.nickname, entry.referrer, entry.user_agent,
-          entry.host, entry.resource, entry.method, entry.task_queue_name,
-          entry.was_loading_request, entry.version_id, entry.module_id,
-          entry.url_map_entry, entry.app_engine_release, entry.instance_key,
-          entry.status, '\n'.join(msgs))
+      message = '\n'.join(msgs)
+      # Creates a unique signature string based on the message.
+      signature, exception_type = _signature_from_message(message)
+      if exception_type:
+        yield _ErrorRecord(
+            entry.request_id,
+            entry.start_time, log_time, entry.latency, entry.mcycles,
+            entry.ip, entry.nickname, entry.referrer, entry.user_agent,
+            entry.host, entry.resource, entry.method, entry.task_queue_name,
+            entry.was_loading_request, entry.version_id, entry.module_id,
+            entry.url_map_entry, entry.app_engine_release, entry.instance_key,
+            entry.status, message, signature, exception_type)
   except logservice.Error as e:
     # It's not worth generating an error log when logservice is temporarily
     # down. Retrying is not worth either.

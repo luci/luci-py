@@ -29,7 +29,7 @@ ROOT_DIR = os.path.dirname(ABS_PATH)
 
 def ErrorRecord(**kwargs):
   """Returns an ErrorRecord filled with default dummy values."""
-  default_values = {
+  vals = {
       'request_id': 'a',
       'start_time': None,
       'exception_time': None,
@@ -52,8 +52,11 @@ def ErrorRecord(**kwargs):
       'status': 200,
       'message': u'Failed',
   }
-  default_values.update(kwargs)
-  return logscraper._ErrorRecord(**default_values)
+  vals.update(kwargs)
+  signature, exception_type = logscraper._signature_from_message(
+      vals['message'])
+  return logscraper._ErrorRecord(
+      signature=signature, exception_type=exception_type, **vals)
 
 
 class Ereporter2Test(test_case.TestCase):

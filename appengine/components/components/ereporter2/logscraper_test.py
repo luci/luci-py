@@ -107,6 +107,20 @@ class Ereporter2LogscraperTest(test_case.TestCase):
         u'DeadlineExceededError@utils.py:28',
         u'DeadlineExceededError',
       ),
+      (
+        (u'Exceeded hard memory limit of 1024 MB with 1027 MB after servicing '
+        '44603 requests total. Consider setting a larger instance class in '
+        'app.yaml.'),
+        logscraper.MEMORY_EXCEEDED,
+        logscraper.MEMORY_EXCEEDED,
+      ),
+      (
+        (u'Exceeded soft memory limit of 1024 MB with 1027 MB after servicing '
+        '44603 requests total. Consider setting a larger instance class in '
+        'app.yaml.'),
+        '',
+        None,
+      ),
     ]
 
     for (message, expected_signature, excepted_exception) in messages:
