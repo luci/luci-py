@@ -91,10 +91,13 @@ const template = (ele) => html`
         <a href=${instancesURL(ele)}>View version's instances on Cloud Console</a>
       </li>
       <li>
-        <a><a href=${errorsURL(ele._project_id)}>View server errors on Cloud Console</a></a>
+        <a href=${errorsURL(ele._project_id)}>View server errors on Cloud Console</a>
       </li>
       <li>
-        <a><a href=${logsURL(ele._project_id)}>View logs for HTTP 5xx on Cloud Console</a></a>
+        <a href=${logsURL(ele._project_id)}>View logs for HTTP 5xx on Cloud Console</a>
+      </li>
+      <li>
+        <a href="/restricted/ereporter2/report">View ereporter2 report</a>
       </li>
     </ul>
 
