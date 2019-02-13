@@ -54,6 +54,7 @@ TEST_CONFIG = pools_pb2.PoolsCfg(
           id='ext1',
           dimensions=['key1:value1', 'key2:value2'],
           enabled=True,
+          fallback_when_empty=True,
         )],
       ),
     ],
@@ -128,6 +129,7 @@ class PoolsConfigTest(test_case.TestCase):
             id=u'ext1',
             dimensions=frozenset(['key2:value2', 'key1:value1']),
             enabled=True,
+            fallback_when_empty=True,
           ),
         ),
     )

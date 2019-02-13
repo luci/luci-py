@@ -98,7 +98,8 @@ class ExternalSchedulerApiTest(test_env_handlers.AppTestBase):
         address=u'http://localhost:1',
         id=u'foo',
         dimensions=['key1:value1', 'key2:value2'],
-        enabled=True)
+        enabled=True,
+        fallback_when_empty=True)
 
     # Make the values deterministic.
     self.mock_now(datetime.datetime(2014, 1, 2, 3, 4, 5, 6))

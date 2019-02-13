@@ -91,6 +91,9 @@ ExternalSchedulerConfig = collections.namedtuple('ExternalScheduler', [
   'dimensions',
   # Whether this config is enabled.
   'enabled',
+  # Whether to fall back to native scheduling algorithm if external scheduler
+  # has no tasks for a bot.
+  'fallback_when_empty',
 ])
 
 
@@ -471,7 +474,8 @@ def _resolve_external_schedulers(external_schedulers):
   """Turns external_schedulers into a hashable representation."""
   return tuple(
       ExternalSchedulerConfig(
-          e.address, e.id, frozenset(e.dimensions), e.enabled)
+          e.address, e.id, frozenset(e.dimensions), e.enabled,
+          e.fallback_when_empty)
       for e in external_schedulers)
 
 
