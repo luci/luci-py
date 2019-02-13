@@ -63,6 +63,14 @@ const idAndButtons = (ele) => {
           @click=${ele._promptRetry} class=retry>retry</button>
   <button title="Re-queue the task, but don't run it automatically"
           @click=${ele._promptDebug} class=debug>debug</button>
+  <button title="Cancel a pending task, so it does not start"
+          ?hidden=${ele._result.state !== 'PENDING'}
+          ?disabled=${!ele.permissions.cancel_task}
+          @click=${ele._promptCancel} class=cancel>cancel</button>
+  <button title="Kill a running task, so it stops as soon as possible"
+          ?hidden=${ele._result.state !== 'RUNNING'}
+          ?disabled=${!ele.permissions.cancel_task}
+          @click=${ele._promptCancel} class=kill>kill</button>
 </div>`;
 }
 
@@ -848,12 +856,21 @@ const template = (ele) => html`
     </div>
   </main>
   <footer></footer>
-  <dialog-pop-over>
+  <dialog-pop-over id=retry>
     <div class='retry-dialog content'>
       ${retryOrDebugPrompt(ele, ele._currentSlice.properties || {})}
       <div class="horizontal layout end">
-        <button @click=${ele._closePopup} class=cancel>Cancel</button>
+        <button @click=${ele._closePopups} class=cancel>Cancel</button>
         <button @click=${ele._promptCallback} class=ok>OK</button>
+      </div>
+    </div>
+  </dialog-pop-over>
+  <dialog-pop-over id=cancel>
+    <div class='cancel-dialog content'>
+      Are you sure you want to ${ele._prompt} task ${ele._taskId}?
+      <div class="horizontal layout end">
+        <button @click=${ele._closePopups} class=cancel>NO</button>
+        <button @click=${ele._promptCallback} class=ok>YES</button>
       </div>
     </div>
   </dialog-pop-over>
@@ -932,9 +949,33 @@ window.customElements.define('task-page', class extends SwarmingAppBoilerplate {
     this.removeEventListener('log-in', this._loginEvent);
   }
 
-  _closePopup() {
+  _cancelTask() {
+    const body = {};
+    if (this._result.state === 'RUNNING') {
+      body.kill_running = true;
+    }
+    this.app.addBusyTasks(1);
+    fetch(`/_ah/api/swarming/v1/task/${this._taskId}/cancel`, {
+      method: 'POST',
+      headers: {
+        'authorization': this.auth_header,
+        'Content-Type': 'application/json; charset=UTF-8',
+      },
+      body: JSON.stringify(body),
+    }).then(jsonOrThrow)
+      .then((response) => {
+        this._closePopups();
+        errorMessage('Request sent', 4000);
+        this.render();
+        this.app.finishedTask();
+      })
+      .catch((e) => this.fetchError(e, 'task/cancel'));
+  }
+
+  _closePopups() {
     this._promptCallback = () => {};
-    $$('dialog-pop-over', this).hide();
+    // close all dialogs
+    $('dialog-pop-over', this).map((d) => d.hide());
   }
 
   // Look at the inputs in the prompt dialog for potential key:value pairs
@@ -963,7 +1004,7 @@ window.customElements.define('task-page', class extends SwarmingAppBoilerplate {
   }
 
   _debugTask() {
-    this._closePopup();
+    this._closePopups();
 
     const newTask = {
       expiration_secs: this._request.expiration_secs,
@@ -1157,6 +1198,16 @@ time.sleep(${leaseDuration})`];
     }).catch((e) => this.fetchError(e, 'newtask'));
   }
 
+  _promptCancel() {
+    this._prompt = 'cancel';
+    if (this._result.state === 'RUNNING') {
+      this._prompt = 'kill';
+    }
+    this._promptCallback = this._cancelTask;
+    this.render();
+    $$('dialog-pop-over#cancel', this).show();
+  }
+
   _promptDebug() {
     if (!this._request) {
       errorMessage('Task not yet loaded', 3000);
@@ -1165,8 +1216,7 @@ time.sleep(${leaseDuration})`];
     this._isPromptDebug = true;
     this._promptCallback = this._debugTask;
     this.render();
-    $$('dialog-pop-over', this).show();
-
+    $$('dialog-pop-over#retry', this).show();
   }
 
   _promptRetry() {
@@ -1177,7 +1227,7 @@ time.sleep(${leaseDuration})`];
     this._isPromptDebug = false;
     this._promptCallback = this._retryTask;
     this.render();
-    $$('dialog-pop-over', this).show();
+    $$('dialog-pop-over#retry', this).show();
   }
 
   render() {
@@ -1187,7 +1237,7 @@ time.sleep(${leaseDuration})`];
   }
 
   _retryTask() {
-    this._closePopup();
+    this._closePopups();
 
     const newTask = {
       expiration_secs: this._request.expiration_secs,

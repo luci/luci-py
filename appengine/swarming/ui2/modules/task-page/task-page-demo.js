@@ -56,6 +56,9 @@ fetchMock.get('glob:/_ah/api/swarming/v1/tasks/count?*',
 fetchMock.post('/_ah/api/swarming/v1/tasks/new',
                requireLogin({task_id: 'testid002'}, 800))
 
+fetchMock.post('glob:/_ah/api/swarming/v1/task/*/cancel',
+               requireLogin({success:true}, 200));
+
 // Everything else
 fetchMock.catch(404);
 

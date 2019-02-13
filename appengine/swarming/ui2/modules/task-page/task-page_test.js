@@ -414,6 +414,20 @@ describe('task-page', function() {
           done();
         });
       });
+
+       it('shows neither a cancel button nor a kill button', function(done) {
+        loggedInTaskPage((ele) => {
+          const cancelBtn = $$('.id_buttons button.cancel', ele);
+          expect(cancelBtn).toBeTruthy();
+          expect(cancelBtn).toHaveAttribute('hidden', 'cancel should be hidden');
+
+          const killBtn = $$('.id_buttons button.kill', ele);
+          expect(killBtn).toBeTruthy();
+          expect(killBtn).toHaveAttribute('hidden', 'Kill should be hidden');
+
+          done();
+        });
+      });
     }); // end describe('Completed task with 2 slices')
 
 
@@ -468,6 +482,29 @@ describe('task-page', function() {
           done();
         });
       });
+
+      it('shows a cancel button', function(done) {
+        loggedInTaskPage((ele) => {
+          ele.permissions.cancel_task = true;
+          ele.render();
+          const cancelBtn = $$('.id_buttons button.cancel', ele);
+          expect(cancelBtn).toBeTruthy();
+          expect(cancelBtn).not.toHaveAttribute('hidden', 'cancel should be showing');
+          expect(cancelBtn).not.toHaveAttribute('disabled', 'cancel should be enabled');
+
+          const killBtn = $$('.id_buttons button.kill', ele);
+          expect(killBtn).toBeTruthy();
+          // Kill is only for running tasks.
+          expect(killBtn).toHaveAttribute('hidden', 'Kill should be hidden');
+
+          ele.permissions.cancel_task = false;
+          ele.render();
+          expect(cancelBtn).not.toHaveAttribute('hidden', 'cancel should be showing');
+          expect(cancelBtn).toHaveAttribute('disabled', 'cancel should be disabled');
+          done();
+        });
+      });
+
     }); // end describe('Pending task - 1 slice - no rich logs')
 
     describe('running task on try number 3', function() {
@@ -554,6 +591,28 @@ describe('task-page', function() {
           expect(cell(3, 0)).toMatchTextContent('testid003');
           expect(cell(3, 0).innerHTML).toContain('<a', 'has a link');
           expect(cell(3, 0).innerHTML).toContain('href="/task?id=testid003"', 'link is correct');
+          done();
+        });
+      });
+
+      it('shows a kill button', function(done) {
+        loggedInTaskPage((ele) => {
+          ele.permissions.cancel_task = true;
+          ele.render();
+          const cancelBtn = $$('.id_buttons button.cancel', ele);
+          expect(cancelBtn).toBeTruthy();
+          // Cacnel is only for pending tasks.
+          expect(cancelBtn).toHaveAttribute('hidden', 'cancel should be hidden');
+
+          const killBtn = $$('.id_buttons button.kill', ele);
+          expect(killBtn).toBeTruthy();
+          expect(killBtn).not.toHaveAttribute('hidden', 'Kill should be shown');
+          expect(killBtn).not.toHaveAttribute('disabled', 'Kill should be enabled');
+
+          ele.permissions.cancel_task = false;
+          ele.render();
+          expect(killBtn).not.toHaveAttribute('hidden', 'Kill should be shown');
+          expect(killBtn).toHaveAttribute('disabled', 'Kill should be disabled');
           done();
         });
       });
@@ -878,6 +937,84 @@ describe('task-page', function() {
           expect(calls.length).toBe(0);
           calls = fetchMock.calls(MATCHED, 'POST');
           expect(calls.length).toBe(1);
+
+          expectNoUnmatchedCalls(fetchMock);
+          done();
+        });
+      });
+    });
+
+    it('makes a post to cancel a pending job', function(done) {
+      serveTask(2, 'Pending task - 1 slice - no rich logs');
+      loggedInTaskPage((ele) => {
+        ele.permissions.cancel_task = true;
+        ele.render();
+        fetchMock.resetHistory();
+        fetchMock.post(`/_ah/api/swarming/v1/task/${TEST_TASK_ID}/cancel`, {success: true});
+
+        const cancelBtn = $$('.id_buttons button.cancel', ele);
+        expect(cancelBtn).toBeTruthy();
+
+        cancelBtn.click();
+
+        const dialog = $$('.cancel-dialog', ele);
+        expect(dialog).toBeTruthy();
+        expect(dialog).toHaveClass('opened');
+
+        const okBtn = $$('button.ok', dialog);
+        expect(okBtn).toBeTruthy();
+
+        okBtn.click();
+
+        fetchMock.flush().then(() => {
+          // MATCHED calls are calls that we expect and specified in the
+          // beforeEach at the top of this file.
+          let calls = fetchMock.calls(MATCHED, 'GET');
+          expect(calls.length).toBe(0);
+          calls = fetchMock.calls(MATCHED, 'POST');
+          expect(calls.length).toBe(1);
+          const call = calls[0];
+          const options = call[1];
+          expect(options.body).toEqual('{}');
+
+          expectNoUnmatchedCalls(fetchMock);
+          done();
+        });
+      });
+    });
+
+    it('makes a post to kill a running job', function(done) {
+      serveTask(0, 'running task on try number 3');
+      loggedInTaskPage((ele) => {
+        ele.permissions.cancel_task = true;
+        ele.render();
+        fetchMock.resetHistory();
+        fetchMock.post(`/_ah/api/swarming/v1/task/${TEST_TASK_ID}/cancel`, {success: true});
+
+        const killBtn = $$('.id_buttons button.kill', ele);
+        expect(killBtn).toBeTruthy();
+
+        killBtn.click();
+
+        const dialog = $$('.cancel-dialog', ele);
+        expect(dialog).toBeTruthy();
+        expect(dialog).toHaveClass('opened');
+
+        const okBtn = $$('button.ok', dialog);
+        expect(okBtn).toBeTruthy();
+
+        okBtn.click();
+
+        fetchMock.flush().then(() => {
+          // MATCHED calls are calls that we expect and specified in the
+          // beforeEach at the top of this file.
+          let calls = fetchMock.calls(MATCHED, 'GET');
+          expect(calls.length).toBe(0);
+          calls = fetchMock.calls(MATCHED, 'POST');
+          expect(calls.length).toBe(1);
+          const call = calls[0];
+          const options = call[1];
+          expect(options.body).toEqual('{"kill_running":true}');
 
           expectNoUnmatchedCalls(fetchMock);
           done();
