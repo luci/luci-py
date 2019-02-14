@@ -1076,8 +1076,15 @@ def bot_reap_task(bot_dimensions, bot_version, deadline):
   bot_id = bot_dimensions[u'id'][0]
   es_cfg = external_scheduler.config_for_bot(bot_dimensions)
   if es_cfg:
-    return _bot_reap_task_external_scheduler(bot_dimensions, bot_version,
-                                             es_cfg)
+    request, secret_bytes, to_run_result = _bot_reap_task_external_scheduler(
+        bot_dimensions, bot_version, es_cfg)
+    if request:
+      return request, secret_bytes, to_run_result
+    if not es_cfg.fallback_when_empty:
+      logging.info('External scheduler did not reap any tasks, giving up.')
+      return None, None, None
+    logging.info('External scheduler did not reap any tasks, trying native '
+                 'scheduler.')
 
   iterated = 0
   reenqueued = 0
