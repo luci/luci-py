@@ -904,7 +904,7 @@ window.customElements.define('task-page', class extends SwarmingAppBoilerplate {
       this._taskId = newState.id || this._taskId;
       this._showDetails = newState.d; // default to false
       this._showRawOutput = newState.o; // default to false
-      this._wideLogs = newState.w;
+      this._wideLogs = newState.w; // default to false
       this._urlParamsLoaded = true;
       this._fetch();
       this.render();

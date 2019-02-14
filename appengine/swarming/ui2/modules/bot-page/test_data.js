@@ -125,6 +125,243 @@ export const botDataMap = {
     "last_seen_ts": "2019-02-12T14:54:12.335408",
     "bot_id": "running"
   },
+  'quarantined': {
+    "authenticated_as": "bot-with-really-long-service-account-name:running.chromium.org",
+    "dimensions": [
+      {
+        "value": [
+          "1"
+        ],
+        "key": "android_devices"
+      },
+      {
+        "value": [
+          "vpython"
+        ],
+        "key": "caches"
+      },
+      {
+        "value": [
+          "ondemand"
+        ],
+        "key": "cpu_governor"
+      },
+      {
+        "value": [
+          "12.5.21"
+        ],
+        "key": "device_gms_core_version"
+      },
+      {
+        "value": [
+          "O",
+          "OPR2.170623.027"
+        ],
+        "key": "device_os"
+      },
+      {
+        "value": [
+          "google"
+        ],
+        "key": "device_os_flavor"
+      },
+      {
+        "value": [
+          "9.2.32-xhdpi"
+        ],
+        "key": "device_playstore_version"
+      },
+      {
+        "value": [
+          "brcm"
+        ],
+        "key": "device_tree_compatible"
+      },
+      {
+        "value": [
+          "fugu"
+        ],
+        "key": "device_type"
+      },
+      {
+        "value": [
+          "0"
+        ],
+        "key": "gce"
+      },
+      {
+        "value": [
+          "quarantined"
+        ],
+        "key": "id"
+      },
+      {
+        "value": [
+          "0"
+        ],
+        "key": "inside_docker"
+      },
+      {
+        "value": [
+          "Android"
+        ],
+        "key": "os"
+      },
+      {
+        "value": [
+          "Skia"
+        ],
+        "key": "pool"
+      },
+      {
+        "value": [
+          "2.7.9"
+        ],
+        "key": "python"
+      },
+      {
+        "value": [
+          "4098-34330fc"
+        ],
+        "key": "server_version"
+      },
+      {
+        "value": [
+          "us",
+          "us-skolo",
+          "us-skolo-1"
+        ],
+        "key": "zone"
+      }
+    ],
+    "task_id": "",
+    "external_ip": "100.115.95.143",
+    "is_dead": false,
+    "quarantined": true,
+    "deleted": false,
+    "state": "{\"audio\":null,\"bot_group_cfg_version\":\"hash:0d12ff88393b4d\",\"cost_usd_hour\":0.15235460069444445,\"cpu_name\":\"BCM2709\",\"cwd\":\"/b/s\",\"devices\":{\"3BE9F057\":{\"battery\":{\"current\":null,\"health\":2,\"level\":100,\"power\":[\"AC\"],\"status\":2,\"temperature\":424,\"voltage\":0},\"build\":{\"board.platform\":\"<missing>\",\"build.fingerprint\":\"google/fugu/fugu:8.0.0/OPR2.170623.027/4397545:userdebug/dev-keys\",\"build.id\":\"OPR2.170623.027\",\"build.product\":\"fugu\",\"build.version.sdk\":\"26\",\"product.board\":\"fugu\",\"product.cpu.abi\":\"x86\",\"product.device\":\"fugu\"},\"cpu\":{\"cur\":\"1833000\",\"governor\":\"interactive\"},\"disk\":{},\"imei\":null,\"ip\":[],\"max_uid\":null,\"mem\":{},\"other_packages\":[\"com.intel.thermal\",\"android.autoinstalls.config.google.fugu\"],\"port_path\":\"1/4\",\"processes\":2,\"state\":\"still booting (sys.boot_completed)\",\"temp\":{},\"uptime\":129027.39}},\"disks\":{\"/b\":{\"free_mb\":4314.0,\"size_mb\":26746.5},\"/boot\":{\"free_mb\":40.4,\"size_mb\":59.9},\"/home/chrome-bot\":{\"free_mb\":986.2,\"size_mb\":988.9},\"/tmp\":{\"free_mb\":974.6,\"size_mb\":975.9},\"/var\":{\"free_mb\":223.6,\"size_mb\":975.9}},\"env\":{\"PATH\":\"/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/local/games:/usr/games\"},\"gpu\":null,\"host_dimensions\":{\"caches\":[\"vpython\"],\"cores\":[\"4\"],\"cpu\":[\"arm\",\"arm-32\",\"armv7l\",\"armv7l-32\",\"armv7l-32-BCM2709\"],\"cpu_governor\":[\"ondemand\"],\"device_tree_compatible\":[\"brcm\"],\"gce\":[\"0\"],\"gpu\":[\"none\"],\"id\":[\"quarantined\"],\"inside_docker\":[\"0\"],\"kvm\":[\"0\"],\"machine_type\":[\"n1-highcpu-4\"],\"os\":[\"Linux\",\"Raspbian\",\"Raspbian-8.0\"],\"python\":[\"2.7.9\"],\"ssd\":[\"1\"]},\"hostname\":\"quarantined\",\"ip\":\"192.168.1.152\",\"named_caches\":{\"vpython\":[[\"sQ\",92420605],1550019574.0]},\"nb_files_in_temp\":6,\"pid\":499,\"python\":{\"executable\":\"/usr/bin/python\",\"packages\":[\"M2Crypto==0.21.1\",\"RPi.GPIO==0.6.3\",\"argparse==1.2.1\",\"chardet==2.3.0\",\"colorama==0.3.2\",\"html5lib==0.999\",\"libusb1==1.5.0\",\"ndg-httpsclient==0.3.2\",\"pyOpenSSL==0.13.1\",\"pyasn1==0.1.7\",\"requests==2.4.3\",\"rsa==3.4.2\",\"six==1.8.0\",\"urllib3==1.9.1\",\"wheel==0.24.0\",\"wsgiref==0.1.2\"],\"version\":\"2.7.9 (default, Sep 17 2016, 20:26:04) \\n[GCC 4.9.2]\"},\"quarantined\":\"No available devices.\",\"ram\":926,\"running_time\":23283,\"sleep_streak\":63,\"ssd\":[\"mmcblk0\"],\"started_ts\":1550125333,\"temp\":{\"thermal_zone0\":47.774},\"uptime\":23954,\"user\":\"chrome-bot\"}",
+    "version": "f775dd9893167e6fee31b96ef20f7218f07fa437ea9d6fc44496208784108545",
+    "first_seen_ts": "2016-09-09T21:05:34.439930",
+    "last_seen_ts": "2019-02-12T12:50:20.961462",
+    "bot_id": "quarantined"
+  },
+  'dead': {
+    "lease_id": "f69394d5f68b1f1e6c5f13e82ba4ccf72de7e6a0",
+    "authenticated_as": "bot:running.chromium.org",
+    "dimensions": [
+      {
+        "value": [
+          "swarming_module_cache_vpython"
+        ],
+        "key": "caches"
+      },
+      {
+        "value": [
+          "8"
+        ],
+        "key": "cores"
+      },
+      {
+        "value": [
+          "x86",
+          "x86-64",
+          "x86-64-Broadwell_GCE",
+          "x86-64-avx2"
+        ],
+        "key": "cpu"
+      },
+      {
+        "value": [
+          "1"
+        ],
+        "key": "gce"
+      },
+      {
+        "value": [
+          "none"
+        ],
+        "key": "gpu"
+      },
+      {
+        "value": [
+          "dead"
+        ],
+        "key": "id"
+      },
+      {
+        "value": [
+          "chrome-trusty-18091700-38cc06ee3ee"
+        ],
+        "key": "image"
+      },
+      {
+        "value": [
+          "0"
+        ],
+        "key": "inside_docker"
+      },
+      {
+        "value": [
+          "1"
+        ],
+        "key": "kvm"
+      },
+      {
+        "value": [
+          "n1-standard-8"
+        ],
+        "key": "machine_type"
+      },
+      {
+        "value": [
+          "Linux",
+          "Ubuntu",
+          "Ubuntu-14.04"
+        ],
+        "key": "os"
+      },
+      {
+        "value": [
+          "Chrome"
+        ],
+        "key": "pool"
+      },
+      {
+        "value": [
+          "2.7.6"
+        ],
+        "key": "python"
+      },
+      {
+        "value": [
+          "3986-3c043d8"
+        ],
+        "key": "server_version"
+      },
+      {
+        "value": [
+          "us",
+          "us-east",
+          "us-east1",
+          "us-east1-b"
+        ],
+        "key": "zone"
+      }
+    ],
+    "task_id": "",
+    "external_ip": "35.229.11.33",
+    "machine_lease": "gce-trusty-176",
+    "is_dead": true,
+    "deleted": false,
+    "quarantined": false,
+    "lease_expiration_ts": "2019-01-15T00:39:04",
+    "state": "{\"audio\":[],\"bot_group_cfg_version\":\"hash:5bbd7d8f05c65e\",\"cost_usd_hour\":0.41316150716145833,\"cpu_name\":\"Intel(R) Xeon(R) CPU Broadwell GCE\",\"cwd\":\"/b/s\",\"disks\":{\"/\":{\"free_mb\":246117.8,\"size_mb\":302347.0}},\"env\":{\"PATH\":\"/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin\"},\"files\":{\"/usr/share/fonts/truetype/\":[\"Gubbi\",\"Navilu\",\"dejavu\",\"fonts-japanese-gothic.ttf\",\"fonts-japanese-mincho.ttf\",\"kochi\",\"liberation\",\"msttcorefonts\",\"pagul\",\"tlwg\",\"ttf-bengali-fonts\",\"ttf-dejavu\",\"ttf-devanagari-fonts\",\"ttf-gujarati-fonts\",\"ttf-indic-fonts-core\",\"ttf-kannada-fonts\",\"ttf-malayalam-fonts\",\"ttf-oriya-fonts\",\"ttf-punjabi-fonts\",\"ttf-tamil-fonts\",\"ttf-telugu-fonts\"]},\"gpu\":[],\"hostname\":\"dead.us-east1-b.c.chromecompute.google.com.internal\",\"ip\":\"10.0.8.219\",\"named_caches\":{\"swarming_module_cache_vpython\":[[\"kL\",887763447],1547511540.0]},\"nb_files_in_temp\":8,\"pid\":1117,\"python\":{\"executable\":\"/usr/bin/python\",\"packages\":[\"Cheetah==2.4.4\",\"CherryPy==3.2.2\",\"Landscape-Client==14.12\",\"PAM==0.4.2\",\"PyYAML==3.10\",\"Routes==2.0\",\"Twisted-Core==13.2.0\",\"Twisted-Names==13.2.0\",\"Twisted-Web==13.2.0\",\"WebOb==1.3.1\",\"apt-xapian-index==0.45\",\"argparse==1.2.1\",\"boto==2.20.1\",\"chardet==2.0.1\",\"cloud-init==0.7.5\",\"colorama==0.2.5\",\"configobj==4.7.2\",\"coverage==3.7.1\",\"crcmod==1.7\",\"google-compute-engine==2.2.4\",\"html5lib==0.999\",\"iotop==0.6\",\"jsonpatch==1.3\",\"jsonpointer==1.0\",\"numpy==1.8.2\",\"oauth==1.0.1\",\"pexpect==3.1\",\"prettytable==0.7.2\",\"psutil==1.2.1\",\"pyOpenSSL==0.13\",\"pycrypto==2.6.1\",\"pycurl==7.19.3\",\"pyserial==2.6\",\"python-apt==0.9.3.5ubuntu2\",\"python-debian==0.1.21-nmu2ubuntu2\",\"pyxdg==0.25\",\"repoze.lru==0.6\",\"requests==2.2.1\",\"six==1.5.2\",\"ssh-import-id==3.21\",\"urllib3==1.7.1\",\"wheel==0.24.0\",\"wsgiref==0.1.2\",\"zope.interface==4.0.5\"],\"version\":\"2.7.6 (default, Nov 13 2018, 12:45:42) \\n[GCC 4.8.4]\"},\"ram\":30159,\"running_time\":7309,\"sleep_streak\":22,\"ssd\":[],\"started_ts\":1547505598,\"uptime\":7321,\"user\":\"chrome-bot\"}",
+    "version": "9644ba2fcbeafe7628828602251e5405db3d79b9cd230523bdf7927e204d664e",
+    "first_seen_ts": "2019-01-14T00:40:11.400947",
+    "last_seen_ts": "2019-01-15T00:42:19.613017",
+    "machine_type": "gce-trusty",
+    "bot_id": "dead"
+  },
 }
 
 // These lists are really long, and likely will not have the data modified,

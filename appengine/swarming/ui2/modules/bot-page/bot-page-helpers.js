@@ -5,6 +5,19 @@
 import { applyAlias } from '../alias'
 import { humanDuration, sanitizeAndHumanizeTime, timeDiffExact } from '../util'
 
+
+/** mpLink produces a machine provider link for this bot
+ *  @param {Object} bot - The bot object
+ *  @param {Object} serverDetails - The server details returned via the API.
+ */
+export function mpLink(bot, serverDetails) {
+  const template = serverDetails.machine_provider_template
+  if (!bot.lease_id || !template) {
+    return undefined;
+  }
+  return template.replace('%s', bot.lease_id);
+}
+
 /** parseBotData pre-processes any data in the bot data object.
  *  @param {Object} bot - The raw bot object
  */
@@ -15,27 +28,36 @@ export function parseBotData(bot) {
   bot.state = bot.state || '{}';
   bot.state = JSON.parse(bot.state) || {};
 
-  // get the disks in an easier to deal with format, sorted by size.
-  const disks = bot.state.disks || {};
-  const keys = Object.keys(disks);
-  if (!keys.length) {
-    bot.disks = [{'id': 'unknown', 'mb': 0}];
-  } else {
-    bot.disks = [];
-    for (let i = 0; i < keys.length; i++) {
-      bot.disks.push({'id':keys[i], 'mb':disks[keys[i]].free_mb});
-    }
-    // Sort these so the biggest disk comes first.
-    bot.disks.sort(function(a, b) {
-      return b.mb - a.mb;
-    });
-  }
-
   bot.dimensions = bot.dimensions || [];
   for (const dim of bot.dimensions) {
     dim.value.forEach(function(value, i) {
       dim.value[i] = applyAlias(value, dim.key);
     });
+  }
+
+  bot.device_list = [];
+  const devices = bot.state.devices;
+  if (devices) {
+    for (const id in devices) {
+      if (devices.hasOwnProperty(id)) {
+        const device = devices[id];
+        device.id = id;
+        bot.device_list.push(device);
+        let count = 0;
+        let total = 0;
+        // device.temp is a map of zone: "value"
+        device.temp = device.temp || {};
+        for (const t in device.temp) {
+          total += parseFloat(device.temp[t]);
+          count++;
+        }
+        if (count) {
+          device.averageTemp = (total/count).toFixed(1);
+        } else {
+          device.averageTemp = '???';
+        }
+      }
+    }
   }
 
   for (const time of BOT_TIMES) {
@@ -102,6 +124,22 @@ export function parseTasks(tasks) {
     return b.started_ts - a.started_ts;
   });
   return tasks;
+}
+
+/** quarantineMessage produces a quarantined message for this bot.
+ *  @param {Object} bot - The bot object
+ */
+export function quarantineMessage(bot) {
+  if (bot && bot.quarantined) {
+    let msg = bot.state.quarantined;
+    // Sometimes, the quarantined message is actually in 'error'.  This
+    // happens when the bot code has thrown an exception.
+    if (msg === undefined || msg === 'true' || msg === true) {
+      msg = bot.state && bot.state.error;
+    }
+    return msg || 'True';
+  }
+  return '';
 }
 
 const BOT_TIMES = ['first_seen_ts', 'last_seen_ts', 'lease_expiration_ts'];

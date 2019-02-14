@@ -33,6 +33,9 @@ fetchMock.post('/_ah/api/swarming/v1/task/42fb00e06d95be11/cancel',
 fetchMock.post('glob:/_ah/api/swarming/v1/bot/*/terminate',
                requireLogin({success:true}, 200));
 
+fetchMock.post('glob:/_ah/api/swarming/v1/bot/dead/delete',
+               requireLogin({success:true}, 200));
+
 // Everything else
 fetchMock.catch(404);
 

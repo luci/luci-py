@@ -205,16 +205,26 @@ describe('bot-page', function() {
           // little helper for readability
           const cell = (r, c) => rows[r].children[c];
 
-          expect(cell(1, 0)).toMatchTextContent('Current Task');
-          expect(cell(1, 1)).toMatchTextContent('42fb00e06d95be11');
-          expect(cell(1, 1).innerHTML).toContain('<a ', 'has a link');
-          expect(cell(1, 1).innerHTML).toContain('href="/task?id=42fb00e06d95be10"');
-          expect(cell(2, 0)).toMatchTextContent('Dimensions');
-          expect(cell(7, 0)).toMatchTextContent('gpu');
-          expect(cell(7, 1)).toMatchTextContent('NVIDIA (10de) | ' +
+          const deleteBtn = $$('button.delete', cell(0, 2));
+          expect(deleteBtn).toBeTruthy();
+          expect(deleteBtn).toHaveClass('hidden');
+          const shutDownBtn = $$('button.shut_down', cell(0, 2));
+          expect(shutDownBtn).toBeTruthy();
+          expect(shutDownBtn).not.toHaveClass('hidden');
+
+          expect(rows[2]).toHaveClass('hidden', 'not quarantined');
+          expect(rows[3]).toHaveClass('hidden', 'not dead');
+          expect(rows[4]).toHaveClass('hidden', 'not in maintenance');
+          expect(cell(5, 0)).toMatchTextContent('Current Task');
+          expect(cell(5, 1)).toMatchTextContent('42fb00e06d95be11');
+          expect(cell(5, 1).innerHTML).toContain('<a ', 'has a link');
+          expect(cell(5, 1).innerHTML).toContain('href="/task?id=42fb00e06d95be10"');
+          expect(cell(6, 0)).toMatchTextContent('Dimensions');
+          expect(cell(11, 0)).toMatchTextContent('gpu');
+          expect(cell(11, 1)).toMatchTextContent('NVIDIA (10de) | ' +
             'NVIDIA Quadro P400 (10de:1cb3) | NVIDIA Quadro P400 (10de:1cb3-25.21.14.1678)');
-          expect(cell(19, 0)).toMatchTextContent('Bot Version');
-          expect(rows[19]).toHaveClass('old_version');
+          expect(cell(23, 0)).toMatchTextContent('Bot Version');
+          expect(rows[23]).toHaveClass('old_version');
           done();
         });
       });
@@ -313,11 +323,16 @@ describe('bot-page', function() {
       it('disables buttons for unprivileged users', function(done) {
         loggedInBotPage((ele) => {
           ele.permissions.cancel_task = false;
+          ele.permissions.delete_bot = false;
           ele.permissions.terminate_bot = false;
           ele.render();
           const killBtn = $$('main button.kill', ele);
           expect(killBtn).toBeTruthy();
           expect(killBtn).toHaveAttribute('disabled');
+
+          const deleteBtn = $$('main button.delete', ele);
+          expect(deleteBtn).toBeTruthy();
+          expect(deleteBtn).toHaveAttribute('disabled');
 
           const tBtn = $$('main button.shut_down', ele);
           expect(tBtn).toBeTruthy();
@@ -330,11 +345,16 @@ describe('bot-page', function() {
       it('enables buttons for privileged users', function(done) {
         loggedInBotPage((ele) => {
           ele.permissions.cancel_task = true;
+          ele.permissions.delete_bot = true;
           ele.permissions.terminate_bot = true;
           ele.render();
           const killBtn = $$('main button.kill', ele);
           expect(killBtn).toBeTruthy();
           expect(killBtn).not.toHaveAttribute('disabled');
+
+          const deleteBtn = $$('main button.delete', ele);
+          expect(deleteBtn).toBeTruthy();
+          expect(deleteBtn).not.toHaveAttribute('disabled');
 
           const tBtn = $$('main button.shut_down', ele);
           expect(tBtn).toBeTruthy();
@@ -343,12 +363,128 @@ describe('bot-page', function() {
           done();
         });
       });
+
+      it('does not show android devices section', function(done) {
+        loggedInBotPage((ele) => {
+          const devTable = $$('table.devices', ele);
+          expect(devTable).toBeFalsy();
+          done();
+        });
+      });
     }); // end describe('gpu bot with a running task')
+
+    describe('quarantined android bot', function() {
+      beforeEach(() => serveBot('quarantined'));
+
+      it('displays a quarantined message', function(done) {
+        loggedInBotPage((ele) => {
+          const dataTable = $$('table.data_table', ele);
+          expect(dataTable).toBeTruthy();
+
+          const rows = $('tr', dataTable);
+          expect(rows).toBeTruthy();
+          expect(rows.length).toBeTruthy();
+
+          // little helper for readability
+          const cell = (r, c) => rows[r].children[c];
+
+          expect(rows[2]).not.toHaveClass('hidden', 'quarantined');
+          expect(cell(2, 1)).toMatchTextContent('No available devices.');
+          expect(rows[3]).toHaveClass('hidden', 'not dead');
+          expect(rows[4]).toHaveClass('hidden', 'not in maintenance');
+          expect(cell(5, 0)).toMatchTextContent('Current Task');
+          expect(cell(5, 1)).toMatchTextContent('idle');
+
+          done();
+        });
+      });
+
+      it('shows android devices section', function(done) {
+        loggedInBotPage((ele) => {
+          const devTable = $$('table.devices', ele);
+          expect(devTable).toBeTruthy();
+
+          const rows = $('tr', devTable);
+          expect(rows).toBeTruthy();
+          expect(rows.length).toEqual(2); // 1 for header, 1 device
+
+          // little helper for readability
+          const cell = (r, c) => rows[r].children[c];
+
+          expect(cell(1, 0)).toMatchTextContent('3BE9F057');
+          expect(cell(1, 1)).toMatchTextContent('100');
+          expect(cell(1, 2)).toMatchTextContent('???');
+          expect(cell(1, 3)).toMatchTextContent('still booting (sys.boot_completed)');
+
+          done();
+        });
+      });
+    }); // describe('quarantined android bot')
+
+    describe('dead machine provider bot', function() {
+      beforeEach(() => serveBot('dead'));
+
+      it('displays dead and mp related info', function(done) {
+        loggedInBotPage((ele) => {
+          const dataTable = $$('table.data_table', ele);
+          expect(dataTable).toBeTruthy();
+
+          const rows = $('tr', dataTable);
+          expect(rows).toBeTruthy();
+          expect(rows.length).toBeTruthy();
+
+          // little helper for readability
+          const cell = (r, c) => rows[r].children[c];
+
+          const deleteBtn = $$('button.delete', cell(0, 2));
+          expect(deleteBtn).toBeTruthy();
+          expect(deleteBtn).not.toHaveClass('hidden');
+          const shutDownBtn = $$('button.shut_down', cell(0, 2));
+          expect(shutDownBtn).toBeTruthy();
+          expect(shutDownBtn).toHaveClass('hidden');
+
+          expect(rows[1]).toHaveClass('dead');
+          expect(rows[2]).toHaveClass('hidden', 'not quarantined');
+          expect(rows[3]).not.toHaveClass('hidden', 'dead');
+          expect(rows[4]).toHaveClass('hidden', 'not in maintenance');
+          expect(rows[27]).not.toHaveAttribute('hidden');
+          expect(cell(27, 0)).toMatchTextContent('Machine Provider Lease ID');
+          expect(cell(27, 1)).toMatchTextContent('f69394d5f68b1f1e6c5f13e82ba4ccf72de7e6a0');
+          expect(cell(27, 1).innerHTML).toContain('<a ', 'has a link');
+          expect(cell(27, 1).innerHTML).toContain('href="https://example.com/leases/'+
+                                                  'f69394d5f68b1f1e6c5f13e82ba4ccf72de7e6a0"');
+
+          done();
+        });
+      });
+    }); // describe('dead machine provider bot')
 
   }); // end describe('html structure')
 
   describe('dynamic behavior', function() {
-    //TODO
+    it('hides and unhides extra details with a button', function(done) {
+      serveBot('running');
+      loggedInBotPage((ele) => {
+        ele._showState = false;
+        ele.render();
+
+        const state = $$('.bot_state', ele);
+        expect(state).toBeTruthy();
+        expect(state).toHaveAttribute('hidden');
+
+        const stateBtn = $$('button.state', ele);
+        expect(stateBtn).toBeTruthy();
+
+        stateBtn.click();
+
+        expect(state).not.toHaveAttribute('hidden');
+
+        stateBtn.click();
+        expect(state).toHaveAttribute('hidden');
+
+        done();
+      });
+    });
   }); // end describe('dynamic behavior')
 
   describe('api calls', function() {
@@ -450,6 +586,43 @@ describe('bot-page', function() {
         expect(tBtn).toBeTruthy();
 
         tBtn.click();
+
+        const dialog = $$('.prompt-dialog', ele);
+        expect(dialog).toBeTruthy();
+        expect(dialog).toHaveClass('opened');
+
+        const okBtn = $$('button.ok', dialog);
+        expect(okBtn).toBeTruthy();
+
+        okBtn.click();
+
+        fetchMock.flush().then(() => {
+          // MATCHED calls are calls that we expect and specified in the
+          // beforeEach at the top of this file.
+          let calls = fetchMock.calls(MATCHED, 'GET');
+          expect(calls.length).toBe(0);
+          calls = fetchMock.calls(MATCHED, 'POST');
+          expect(calls.length).toBe(1);
+
+          expectNoUnmatchedCalls(fetchMock);
+          done();
+        });
+      });
+    });
+
+    it('can delete a dead bot', function(done) {
+      serveBot('dead');
+      loggedInBotPage((ele) => {
+        ele.permissions.delete_bot = true;
+        ele.render();
+        fetchMock.resetHistory();
+        // This is the task_id on the 'running' bot.
+        fetchMock.post(`/_ah/api/swarming/v1/bot/${TEST_BOT_ID}/delete`, {success: true});
+
+        const deleteBtn = $$('main button.delete', ele);
+        expect(deleteBtn).toBeTruthy();
+
+        deleteBtn.click();
 
         const dialog = $$('.prompt-dialog', ele);
         expect(dialog).toBeTruthy();

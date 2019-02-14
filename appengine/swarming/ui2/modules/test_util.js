@@ -136,9 +136,17 @@ export function requireLogin(logged_in, delay=100) {
           }
         }
         if (logged_in instanceof Function) {
+          const val = logged_in(url, opts);
+          if (!val) {
+            return {
+              status: 404,
+              body: JSON.stringify({'error': {'message': 'bot not found.'}}),
+              headers: {'content-type':'application/json'},
+            };
+          }
           return {
             status: 200,
-            body: JSON.stringify(logged_in(url, opts)),
+            body: JSON.stringify(val),
             headers: {'content-type':'application/json'},
           };
         }

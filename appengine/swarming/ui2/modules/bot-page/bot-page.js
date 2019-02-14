@@ -7,6 +7,7 @@ import { errorMessage } from 'elements-sk/errorMessage'
 import { html, render } from 'lit-html'
 import { ifDefined } from 'lit-html/directives/if-defined'
 import { jsonOrThrow } from 'common-sk/modules/jsonOrThrow'
+import { stateReflector } from 'common-sk/modules/stateReflector'
 
 import 'elements-sk/checkbox-sk'
 import 'elements-sk/icon/add-circle-outline-icon-sk'
@@ -15,8 +16,8 @@ import 'elements-sk/styles/buttons'
 import '../dialog-pop-over'
 import '../swarming-app'
 
-import { EVENTS_QUERY_PARAMS, parseBotData, parseEvents,
-         parseTasks, TASKS_QUERY_PARAMS } from './bot-page-helpers'
+import { EVENTS_QUERY_PARAMS, mpLink, parseBotData, parseEvents,
+         parseTasks, quarantineMessage, TASKS_QUERY_PARAMS } from './bot-page-helpers'
 import { stateClass as taskClass } from '../task-page/task-page-helpers'
 import { timeDiffApprox, timeDiffExact, taskPageLink } from '../util'
 import SwarmingAppBoilerplate from '../SwarmingAppBoilerplate'
@@ -56,24 +57,50 @@ const statusAndTask = (ele, bot) => {
   if (!ele._botId) {
     return '';
   }
+  // Using the hidden classes instead of the attribute lets us
+  // more easily default to hidden (.hidden) when the data
+  // is loading, so the elements are not shown prematurely.
   return html`
-<tr>
+<tr class="dead ${bot.deleted ? '' : 'hidden'}"
+    title="This bot was deleted.">
+  <td colspan=3>THIS BOT WAS DELETED</td>
+</tr>
+<tr class=${bot.is_dead ? 'dead': ''}>
   <td>Last Seen</td>
   <td title=${bot.human_last_seen_ts}>${timeDiffExact(bot.last_seen_ts)} ago</td>
   <td>
-      <button class=shut_down
-            ?hidden=${bot.is_dead}
-            ?disabled=${!ele.permissions.terminate_bot}
-            @click=${ele._promptShutdown}>
-        Shut down gracefully
-      </button>
-    </td>
+    <button class='shut_down ${(!bot.is_dead && bot.first_seen_ts) ? '' : 'hidden'}'
+          ?hidden=${bot.is_dead}
+          ?disabled=${!ele.permissions.terminate_bot}
+          @click=${ele._promptShutdown}>
+      Shut down gracefully
+    </button>
+    <button class='delete ${bot.is_dead && !bot.deleted ? '' : 'hidden'}'
+          ?disabled=${!ele.permissions.delete_bot}
+          @click=${ele._promptDelete}>
+      Delete
+    </button>
+  </td>
+</tr>
+<tr class="quarantined ${bot.quarantined ? '' : 'hidden'}">
+  <td>Quarantined</td>
+  <td colspan=2 class=code>
+    ${quarantineMessage(bot)}
+  </td>
+</tr>
+<tr class="dead ${(bot.is_dead && !bot.deleted) ? '' : 'hidden'}">
+  <td>Dead</td>
+  <td colspan=2 class=code>Bot has been missing longer than 10 minutes</td>
+</tr>
+<tr class="maintenance ${bot.maintenance_msg ? '' : 'hidden'}">
+  <td>In Maintenance</td>
+  <td colspan=2 class=code>${bot.maintenance_msg}</td>
 </tr>
 <tr>
   <td>Current Task</td>
   <td>
     <a target=_blank rel=noopener
-        href="${ifDefined(taskPageLink(bot.task_id))}">
+        href=${ifDefined(taskPageLink(bot.task_id))}>
       ${bot.task_id || 'idle'}
     </a>
   </td>
@@ -133,7 +160,7 @@ const dataAndMPBlock = (ele, bot) => html`
 <tr ?hidden=${!bot.lease_id}>
   <td>Machine Provider Lease ID</td>
   <td colspan=2>
-    <a href$="[[_mpLink(_bot,_server_details.machine_provider_template)]]">
+    <a href=${ifDefined(mpLink(bot, ele.server_details))}>
       ${bot.lease_id}
     </a>
   </td>
@@ -144,12 +171,43 @@ const dataAndMPBlock = (ele, bot) => html`
 </tr>
 `
 
-// TODO
-const deviceSection = (ele) => '';
+const deviceSection = (ele, bot) => {
+  if (!bot.device_list || !bot.device_list.length) {
+    return '';
+  }
+  // At the moment, this only supports Android devices
+  // It would be nice to handle other devices, like Chromebooks.
+  // https://crbug.com/814515
+  return html`
+<h2>Android Devices</h2>
+
+<table class=devices>
+  <thead>
+    <tr>
+      <th>ID</th>
+      <th>Battery</th>
+      <th>Avg Temp. (°C)</th>
+      <th>State</th>
+    </tr>
+  </thead>
+  <tbody>
+    ${bot.device_list.map(deviceRow)}
+  </tbody>
+</table>`;
+}
+
+const deviceRow = (device) => html`
+<tr>
+  <td>${device.id}</td>
+  <td>${(device.battery && device.battery.level) || '???'}</td>
+  <td>${device.averageTemp}</td>
+  <td>${device.state}</td>
+</tr>
+`;
 
 const stateSection = (ele, bot) => html`
 <span class=title>State</span>
-<button @click=${ele._toggleBotState}>
+<button class=state @click=${ele._toggleBotState}>
   <add-circle-outline-icon-sk ?hidden=${ele._showState}></add-circle-outline-icon-sk>
   <remove-circle-outline-icon-sk ?hidden=${!ele._showState}></remove-circle-outline-icon-sk>
 </button>
@@ -160,7 +218,7 @@ const stateSection = (ele, bot) => html`
 `;
 
 const tasksTable = (ele, tasks) => {
-  if (!ele._botId || ele._showEvents) {
+  if (!ele._botId || ele._showEvents || ele._notFound) {
     return '';
   }
   return html`
@@ -200,7 +258,7 @@ const taskRow = (task) => html`
 `;
 
 const eventsTable = (ele, events) => {
-  if (!ele._botId || !ele._showEvents) {
+  if (!ele._botId || !ele._showEvents || ele._notFound) {
     return '';
   }
   return html`
@@ -272,23 +330,27 @@ const template = (ele) => html`
 
     <div class=top>
       ${idAndButtons(ele)}
+      <h2 class=not_found ?hidden=${!ele._notFound || !ele._botId}>
+        Bot not found
+      </h2>
     </div>
     <div class="horizontal layout wrap content"
-         ?hidden=${!ele.loggedInAndAuthorized || !ele._botId}>
+         ?hidden=${!ele.loggedInAndAuthorized || !ele._botId || ele._notFound}>
       <div class=grow>
         <table class=data_table>
           ${statusAndTask(ele, ele._bot)}
           ${dimensionBlock(ele._bot.dimensions || [])}
           ${dataAndMPBlock(ele, ele._bot)}
         </table>
-        ${deviceSection(ele)}
+        ${deviceSection(ele, ele._bot)}
         ${stateSection(ele, ele._bot)}
       </div>
 
       <div class="stats grow">Stats Table will go here</div>
     </div>
 
-    <div class=tasks-events-picker>
+    <div class=tasks-events-picker
+         ?hidden=${!ele.loggedInAndAuthorized || !ele._botId || ele._notFound}>
       <div class=tab
            @click=${(e) => ele._setShowEvents(false)}
            ?selected=${!ele._showEvents}>
@@ -328,13 +390,32 @@ window.customElements.define('bot-page', class extends SwarmingAppBoilerplate {
     // help stateReflector with types.
     this._botId = '';
     this._showState = false;
-    this._showEvents = true;
-    this._showAll = true;
+    this._showEvents = false;
+    this._showAll = false;
 
-    this._urlParamsLoaded = true;
-    this._stateChanged = () => console.log('TODO');
+    this._urlParamsLoaded = false;
+    this._stateChanged = stateReflector(
+      /*getState*/() => {
+        return {
+          // provide empty values
+          'id': this._botId,
+          's': this._showState,
+          'e': this._showEvents,
+          'a': this._showAll,
+        }
+    }, /*setState*/(newState) => {
+      // default values if not specified.
+      this._botId = newState.id || this._botId;
+      this._showState = newState.s; // default to false
+      this._showEvents = newState.e; // default to false
+      this._showAll = newState.a; // default to false
+      this._urlParamsLoaded = true;
+      this._fetch();
+      this.render();
+    });
 
     this._bot = {};
+    this._notFound = false;
     this._tasks = [];
     this._events = [];
     this._resetCursors();
@@ -366,6 +447,28 @@ window.customElements.define('bot-page', class extends SwarmingAppBoilerplate {
     $$('dialog-pop-over', this).hide();
   }
 
+  _deleteBot() {
+    this.app.addBusyTasks(1);
+    fetch(`/_ah/api/swarming/v1/bot/${this._botId}/delete`, {
+      method: 'POST',
+      headers: {
+        'authorization': this.auth_header,
+        'content-type': 'application/json; charset=UTF-8',
+      },
+    }).then(jsonOrThrow)
+      .then((response) => {
+        this._closePopup();
+        errorMessage('Request to delete bot sent', 4000);
+        this.render();
+        this.app.finishedTask();
+      })
+      .catch((e) => {
+        this._closePopup();
+        this.fetchError(e, 'bot/delete'); // calls app.finishedTask()
+        this.render();
+      });
+  }
+
   _fetch() {
     if (!this.loggedInAndAuthorized || !this._urlParamsLoaded || !this._botId) {
       return;
@@ -385,11 +488,19 @@ window.customElements.define('bot-page', class extends SwarmingAppBoilerplate {
     fetch(`/_ah/api/swarming/v1/bot/${this._botId}/get`, extra)
       .then(jsonOrThrow)
       .then((json) => {
+        this._notFound = false;
         this._bot = parseBotData(json);
         this.render();
         this.app.finishedTask();
       })
-      .catch((e) => this.fetchError(e, 'bot/data'));
+      .catch((e) => {
+        if (e.status === 404) {
+          this._bot = {};
+          this._notFound = true;
+          this.render();
+        }
+        this.fetchError(e, 'bot/data');
+      });
     if (!this._taskCursor) {
       this.app.addBusyTasks(1);
       fetch(`/_ah/api/swarming/v1/bot/${this._botId}/tasks?${TASKS_QUERY_PARAMS}`, extra)
@@ -436,7 +547,11 @@ window.customElements.define('bot-page', class extends SwarmingAppBoilerplate {
         this.render();
         this.app.finishedTask();
       })
-      .catch((e) => this.fetchError(e, 'task/kill'));
+      .catch((e) => {
+        this._closePopup();
+        this.fetchError(e, 'task/kill'); // calls app.finishedTask()
+        this.render();
+      });
   }
 
   _moreEvents() {
@@ -481,8 +596,16 @@ window.customElements.define('bot-page', class extends SwarmingAppBoilerplate {
       .catch((e) => this.fetchError(e, 'bot/more_tasks'));
   }
 
+  _promptDelete() {
+    this._prompt = `delete dead bot '${this._botId}'`;
+    this._promptCallback = this._deleteBot;
+    this.render();
+
+    $$('dialog-pop-over', this).show();
+  }
+
   _promptKill() {
-    this._prompt = `kill running task ${this._bot.task_id}`;
+    this._prompt = `kill running task '${this._bot.task_id}'`;
     this._promptCallback = this._killTask;
     this.render();
 
@@ -512,6 +635,7 @@ window.customElements.define('bot-page', class extends SwarmingAppBoilerplate {
 
   _setShowEvents(shouldShow) {
     this._showEvents = shouldShow;
+    this._stateChanged();
     this.render();
   }
 
@@ -530,7 +654,11 @@ window.customElements.define('bot-page', class extends SwarmingAppBoilerplate {
         this.render();
         this.app.finishedTask();
       })
-      .catch((e) => this.fetchError(e, 'bot/terminate'));
+      .catch((e) => {
+        this._closePopup();
+        this.fetchError(e, 'bot/terminate'); // calls app.finishedTask()
+        this.render();
+      });
   }
 
   _toggleBotState(e) {

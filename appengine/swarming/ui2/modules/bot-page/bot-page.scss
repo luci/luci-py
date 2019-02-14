@@ -113,10 +113,10 @@ bot-page {
   }
 
   /* These colors are from buildbot */
-  .failed_task {
+  .failed_task, .quarantined {
     background-color: #ffdddd;
   }
-  .bot_died {
+  .bot_died, .dead {
     background-color: #cccccc;
   }
   .exception {
@@ -128,5 +128,8 @@ bot-page {
 
   .prompt-dialog {
     padding: 10px;
+  }
+  *[hidden], .hidden {
+    display: none !important;
   }
 }
