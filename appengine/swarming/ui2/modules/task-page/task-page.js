@@ -959,7 +959,7 @@ window.customElements.define('task-page', class extends SwarmingAppBoilerplate {
       method: 'POST',
       headers: {
         'authorization': this.auth_header,
-        'Content-Type': 'application/json; charset=UTF-8',
+        'content-type': 'application/json; charset=UTF-8',
       },
       body: JSON.stringify(body),
     }).then(jsonOrThrow)
@@ -1182,7 +1182,7 @@ time.sleep(${leaseDuration})`];
       method: 'POST',
       headers: {
         'authorization': this.auth_header,
-        'Content-Type': 'application/json; charset=UTF-8',
+        'content-type': 'application/json; charset=UTF-8',
       },
       body: JSON.stringify(newTask),
     })

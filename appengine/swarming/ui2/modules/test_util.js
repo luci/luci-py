@@ -139,13 +139,13 @@ export function requireLogin(logged_in, delay=100) {
           return {
             status: 200,
             body: JSON.stringify(logged_in(url, opts)),
-            headers: {'Content-Type':'application/json'},
+            headers: {'content-type':'application/json'},
           };
         }
         return {
           status: 200,
           body: JSON.stringify(logged_in),
-          headers: {'Content-Type':'application/json'},
+          headers: {'content-type':'application/json'},
         };
       });
     } else {
@@ -155,7 +155,7 @@ export function requireLogin(logged_in, delay=100) {
         return {
           status: 403,
           body: 'Try logging in',
-          headers: {'Content-Type':'text/plain'},
+          headers: {'content-type':'text/plain'},
         };
       });
     }

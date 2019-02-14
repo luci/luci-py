@@ -309,6 +309,40 @@ describe('bot-page', function() {
           done();
         });
       });
+
+      it('disables buttons for unprivileged users', function(done) {
+        loggedInBotPage((ele) => {
+          ele.permissions.cancel_task = false;
+          ele.permissions.terminate_bot = false;
+          ele.render();
+          const killBtn = $$('main button.kill', ele);
+          expect(killBtn).toBeTruthy();
+          expect(killBtn).toHaveAttribute('disabled');
+
+          const tBtn = $$('main button.shut_down', ele);
+          expect(tBtn).toBeTruthy();
+          expect(tBtn).toHaveAttribute('disabled');
+
+          done();
+        });
+      });
+
+      it('enables buttons for privileged users', function(done) {
+        loggedInBotPage((ele) => {
+          ele.permissions.cancel_task = true;
+          ele.permissions.terminate_bot = true;
+          ele.render();
+          const killBtn = $$('main button.kill', ele);
+          expect(killBtn).toBeTruthy();
+          expect(killBtn).not.toHaveAttribute('disabled');
+
+          const tBtn = $$('main button.shut_down', ele);
+          expect(tBtn).toBeTruthy();
+          expect(tBtn).not.toHaveAttribute('disabled');
+
+          done();
+        });
+      });
     }); // end describe('gpu bot with a running task')
 
   }); // end describe('html structure')
@@ -363,5 +397,81 @@ describe('bot-page', function() {
       });
     });
 
+    it('can kill a running task', function(done) {
+      serveBot('running');
+      loggedInBotPage((ele) => {
+        ele.permissions.cancel_task = true;
+        ele.render();
+        fetchMock.resetHistory();
+        // This is the task_id on the 'running' bot.
+        fetchMock.post('/_ah/api/swarming/v1/task/42fb00e06d95be11/cancel', {success: true});
+
+        const killBtn = $$('main button.kill', ele);
+        expect(killBtn).toBeTruthy();
+
+        killBtn.click();
+
+        const dialog = $$('.prompt-dialog', ele);
+        expect(dialog).toBeTruthy();
+        expect(dialog).toHaveClass('opened');
+
+        const okBtn = $$('button.ok', dialog);
+        expect(okBtn).toBeTruthy();
+
+        okBtn.click();
+
+        fetchMock.flush().then(() => {
+          // MATCHED calls are calls that we expect and specified in the
+          // beforeEach at the top of this file.
+          let calls = fetchMock.calls(MATCHED, 'GET');
+          expect(calls.length).toBe(0);
+          calls = fetchMock.calls(MATCHED, 'POST');
+          expect(calls.length).toBe(1);
+          const call = calls[0];
+          const options = call[1];
+          expect(options.body).toEqual('{"kill_running":true}');
+
+          expectNoUnmatchedCalls(fetchMock);
+          done();
+        });
+      });
+    });
+
+    it('can terminate a non-dead bot', function(done) {
+      serveBot('running');
+      loggedInBotPage((ele) => {
+        ele.permissions.terminate_bot = true;
+        ele.render();
+        fetchMock.resetHistory();
+        // This is the task_id on the 'running' bot.
+        fetchMock.post(`/_ah/api/swarming/v1/bot/${TEST_BOT_ID}/terminate`, {success: true});
+
+        const tBtn = $$('main button.shut_down', ele);
+        expect(tBtn).toBeTruthy();
+
+        tBtn.click();
+
+        const dialog = $$('.prompt-dialog', ele);
+        expect(dialog).toBeTruthy();
+        expect(dialog).toHaveClass('opened');
+
+        const okBtn = $$('button.ok', dialog);
+        expect(okBtn).toBeTruthy();
+
+        okBtn.click();
+
+        fetchMock.flush().then(() => {
+          // MATCHED calls are calls that we expect and specified in the
+          // beforeEach at the top of this file.
+          let calls = fetchMock.calls(MATCHED, 'GET');
+          expect(calls.length).toBe(0);
+          calls = fetchMock.calls(MATCHED, 'POST');
+          expect(calls.length).toBe(1);
+
+          expectNoUnmatchedCalls(fetchMock);
+          done();
+        });
+      });
+    });
   }); // end describe('api calls')
 });

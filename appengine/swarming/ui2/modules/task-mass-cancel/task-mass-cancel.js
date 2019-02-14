@@ -120,7 +120,7 @@ window.customElements.define('task-mass-cancel', class extends HTMLElement {
     let options = {
       headers: {
         'authorization': this.auth_header,
-        'Content-Type': 'application/json',
+        'content-type': 'application/json',
       },
       method: 'POST',
       body: JSON.stringify(payload),
@@ -141,7 +141,7 @@ window.customElements.define('task-mass-cancel', class extends HTMLElement {
         let options = {
           headers: {
             'authorization': this.auth_header,
-            'Content-Type': 'application/json',
+            'content-type': 'application/json',
           },
           method: 'POST',
           body: JSON.stringify(payload),

@@ -3,6 +3,7 @@
 // that can be found in the LICENSE file.
 
 import { $, $$ } from 'common-sk/modules/dom'
+import { errorMessage } from 'elements-sk/errorMessage'
 import { html, render } from 'lit-html'
 import { ifDefined } from 'lit-html/directives/if-defined'
 import { jsonOrThrow } from 'common-sk/modules/jsonOrThrow'
@@ -11,6 +12,7 @@ import 'elements-sk/checkbox-sk'
 import 'elements-sk/icon/add-circle-outline-icon-sk'
 import 'elements-sk/icon/remove-circle-outline-icon-sk'
 import 'elements-sk/styles/buttons'
+import '../dialog-pop-over'
 import '../swarming-app'
 
 import { EVENTS_QUERY_PARAMS, parseBotData, parseEvents,
@@ -58,7 +60,14 @@ const statusAndTask = (ele, bot) => {
 <tr>
   <td>Last Seen</td>
   <td title=${bot.human_last_seen_ts}>${timeDiffExact(bot.last_seen_ts)} ago</td>
-  <td><button>Shut down gracefully</button></td>
+  <td>
+      <button class=shut_down
+            ?hidden=${bot.is_dead}
+            ?disabled=${!ele.permissions.terminate_bot}
+            @click=${ele._promptShutdown}>
+        Shut down gracefully
+      </button>
+    </td>
 </tr>
 <tr>
   <td>Current Task</td>
@@ -68,7 +77,14 @@ const statusAndTask = (ele, bot) => {
       ${bot.task_id || 'idle'}
     </a>
   </td>
-  <td><button>Kill task</button></td>
+  <td>
+    <button class=kill
+            ?hidden=${!bot.task_id}
+            ?disabled=${!ele.permissions.cancel_task}
+            @click=${ele._promptKill}>
+        Kill task
+      </button>
+  </td>
 </tr>`;
 }
 
@@ -290,6 +306,15 @@ const template = (ele) => html`
 
   </main>
   <footer></footer>
+  <dialog-pop-over>
+    <div class='prompt-dialog content'>
+      Are you sure you want to ${ele._prompt}?
+      <div class="horizontal layout end">
+        <button @click=${ele._closePopup} class=cancel>NO</button>
+        <button @click=${ele._promptCallback} class=ok>YES</button>
+      </div>
+    </div>
+  </dialog-pop-over>
 </swarming-app>
 `;
 
@@ -314,6 +339,8 @@ window.customElements.define('bot-page', class extends SwarmingAppBoilerplate {
     this._events = [];
     this._resetCursors();
 
+    this._promptCallback = () => {};
+
     this._message = 'You must sign in to see anything useful.';
     // Allows us to abort fetches that are tied to the id when the id changes.
     this._fetchController = null;
@@ -333,6 +360,10 @@ window.customElements.define('bot-page', class extends SwarmingAppBoilerplate {
   disconnectedCallback() {
     super.disconnectedCallback();
     this.removeEventListener('log-in', this._loginEvent);
+  }
+
+  _closePopup() {
+    $$('dialog-pop-over', this).hide();
   }
 
   _fetch() {
@@ -386,6 +417,28 @@ window.customElements.define('bot-page', class extends SwarmingAppBoilerplate {
     }
   }
 
+  _killTask() {
+    const body = {
+      kill_running: true,
+    };
+    this.app.addBusyTasks(1);
+    fetch(`/_ah/api/swarming/v1/task/${this._bot.task_id}/cancel`, {
+      method: 'POST',
+      headers: {
+        'authorization': this.auth_header,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    }).then(jsonOrThrow)
+      .then((response) => {
+        this._closePopup();
+        errorMessage('Request to kill task sent', 4000);
+        this.render();
+        this.app.finishedTask();
+      })
+      .catch((e) => this.fetchError(e, 'task/kill'));
+  }
+
   _moreEvents() {
     if (!this._eventsCursor) {
       return;
@@ -428,6 +481,22 @@ window.customElements.define('bot-page', class extends SwarmingAppBoilerplate {
       .catch((e) => this.fetchError(e, 'bot/more_tasks'));
   }
 
+  _promptKill() {
+    this._prompt = `kill running task ${this._bot.task_id}`;
+    this._promptCallback = this._killTask;
+    this.render();
+
+    $$('dialog-pop-over', this).show();
+  }
+
+  _promptShutdown() {
+    this._prompt = `gracefully shut down bot '${this._botId}'`;
+    this._promptCallback = this._shutdownBot;
+    this.render();
+
+    $$('dialog-pop-over', this).show();
+  }
+
   render() {
     super.render();
     const idInput = $$('#id_input', this);
@@ -444,6 +513,24 @@ window.customElements.define('bot-page', class extends SwarmingAppBoilerplate {
   _setShowEvents(shouldShow) {
     this._showEvents = shouldShow;
     this.render();
+  }
+
+  _shutdownBot() {
+    this.app.addBusyTasks(1);
+    fetch(`/_ah/api/swarming/v1/bot/${this._botId}/terminate`, {
+      method: 'POST',
+      headers: {
+        'authorization': this.auth_header,
+        'content-type': 'application/json',
+      },
+    }).then(jsonOrThrow)
+      .then((response) => {
+        this._closePopup();
+        errorMessage('Request to shutdown bot sent', 4000);
+        this.render();
+        this.app.finishedTask();
+      })
+      .catch((e) => this.fetchError(e, 'bot/terminate'));
   }
 
   _toggleBotState(e) {

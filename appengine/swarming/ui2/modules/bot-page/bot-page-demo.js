@@ -15,6 +15,7 @@ const fetchMock = require('fetch-mock');
 mockAuthdAppGETs(fetchMock, {
   delete_bot: true,
   terminate_bot: true,
+  cancel_task: true,
 });
 
 fetchMock.get('glob:/_ah/api/swarming/v1/bot/*/get',
@@ -25,6 +26,12 @@ fetchMock.get('glob:/_ah/api/swarming/v1/bot/*/tasks?*',
 
 fetchMock.get('glob:/_ah/api/swarming/v1/bot/*/events?*',
               requireLogin({items: eventsMap['SkiaGPU']}, 100));
+
+fetchMock.post('/_ah/api/swarming/v1/task/42fb00e06d95be11/cancel',
+               requireLogin({success:true}, 200));
+
+fetchMock.post('glob:/_ah/api/swarming/v1/bot/*/terminate',
+               requireLogin({success:true}, 200));
 
 // Everything else
 fetchMock.catch(404);
