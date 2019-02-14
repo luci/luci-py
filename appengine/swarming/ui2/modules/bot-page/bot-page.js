@@ -13,6 +13,7 @@ import 'elements-sk/checkbox-sk'
 import 'elements-sk/icon/add-circle-outline-icon-sk'
 import 'elements-sk/icon/remove-circle-outline-icon-sk'
 import 'elements-sk/styles/buttons'
+import '../bot-page-summary'
 import '../dialog-pop-over'
 import '../swarming-app'
 
@@ -346,7 +347,9 @@ const template = (ele) => html`
         ${stateSection(ele, ele._bot)}
       </div>
 
-      <div class="stats grow">Stats Table will go here</div>
+      <div class="stats grow">
+        <bot-page-summary .tasks=${ele._tasks}></bot-page-summary>
+      </div>
     </div>
 
     <div class=tasks-events-picker

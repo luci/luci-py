@@ -109,6 +109,7 @@ export function parseTasks(tasks) {
     // being "busy", e.g. when uploading isolated outputs.
     task.total_duration = task.duration + total_overhead;
     task.human_total_duration = humanDuration(task.total_duration);
+    task.total_overhead = total_overhead;
 
     task.human_state = task.state || 'UNKNOWN';
     if (task.state === 'COMPLETED') {

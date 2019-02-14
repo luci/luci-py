@@ -263,7 +263,7 @@
         // to compute wall_time, we find the latest task (and assume tasks
         // come to us chronologically) and find the difference between then
         // and now.
-        totalStats.wall_time = (now - this.tasks[this.tasks.length - 1].started_ts) / 1000,
+        totalStats.wall_time = (now - this.tasks[this.tasks.length - 1].started_ts) / 1000;
         this.tasks.forEach(function(t) {
           var n = t.name.trim();
           var pieces = n.split('/');

@@ -371,6 +371,35 @@ describe('bot-page', function() {
           done();
         });
       });
+
+      it('has a summary table of the tasks', function(done) {
+        loggedInBotPage((ele) => {
+          const sTable = $$('bot-page-summary table', ele);
+          expect(sTable).toBeTruthy();
+
+          const rows = $('tr', sTable);
+          expect(rows).toBeTruthy();
+          expect(rows.length).toEqual(1 + 15 + 1, 'header, 15 tasks, footer');
+
+          // little helper for readability
+          const cell = (r, c) => rows[r].children[c];
+
+          expect(cell(2, 0)).toMatchTextContent(
+                'Perf-Win10-Clang-Golo-GPU-QuadroP400-x86_64-Rel...');
+
+          expect(cell(5, 0)).toMatchTextContent(
+                'Perf-Win10-Clang-Golo-GPU-QuadroP400-x86_64-Deb...');
+          expect(cell(5, 1)).toMatchTextContent('2'); // Total
+          expect(cell(5, 2)).toMatchTextContent('0'); // Success
+          expect(cell(5, 3)).toMatchTextContent('1'); // Failed
+          expect(cell(5, 4)).toMatchTextContent('1'); // Died
+          expect(cell(5, 5)).toMatchTextContent('16m 57s'); // duration
+          expect(cell(5, 6)).toMatchTextContent('11.85s'); // overhead
+          expect(cell(5, 7)).toMatchTextContent('10.5%'); // percent
+
+          done();
+        });
+      });
     }); // end describe('gpu bot with a running task')
 
     describe('quarantined android bot', function() {

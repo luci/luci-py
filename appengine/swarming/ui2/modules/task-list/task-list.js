@@ -434,6 +434,7 @@ window.customElements.define('task-list', class extends SwarmingAppBoilerplate {
     super.disconnectedCallback();
 
     this.removeEventListener('log-in', this._loginEvent);
+    this.removeEventListener('sort-change', this._sortEvent);
     this.removeEventListener('tasks-canceling-started', this._startedMassCancelingEvent);
     this.removeEventListener('tasks-canceling-finished', this._finishedMassCancelingEvent);
   }
