@@ -2,16 +2,15 @@ queue:
 
 ## Tasks
 
-- name: cleanup
-  max_concurrent_requests: 1
-  rate: 1/m
-
+# /internal/taskqueue/important/tasks/cancel
 - name: cancel-tasks
   rate: 500/s
 
+# /internal/taskqueue/important/tasks/cancel-task-on-bot
 - name: cancel-task-on-bot
   rate: 500/s
 
+# /internal/taskqueue/cleanup/tasks/delete
 # An heavy workload produces 1000 tasks per minute, 10000 tasks per 10 minutes.
 # The cron job runs every 10 minutes and leaves 5 minutes for the tasks to
 # complete.
@@ -22,20 +21,25 @@ queue:
   max_concurrent_requests: 20
   rate: 1/s
 
+# /internal/taskqueue/important/pubsub/notify-task/<task_id:[0-9a-f]+>
 - name: pubsub
   rate: 500/s
 
+# /internal/taskqueue/important/task_queues/rebuild-cache
 - name: rebuild-task-cache
   rate: 500/s
 
+
 ## External Scheduler
 
+# /internal/taskqueue/important/external_scheduler/notify-tasks
 - name: es-notify-tasks
   rate: 100/s
 
 
 ## Named caches
 
+# /internal/taskqueue/important/named_cache/update-pool
 - name: named-cache-task
   rate: 10/s
   # Cron will reschedule, so don't retry on failure.
@@ -47,6 +51,7 @@ queue:
 
 ## MP
 
+# /internal/taskqueue/important/machine-provider/manage
 - name: machine-provider-manage
   rate: 500/s
   # Cron will reschedule, so don't retry on failure.
@@ -58,6 +63,7 @@ queue:
 
 ## General
 
+# /internal/taskqueue/mapreduce/launch/<job_id:[^\/]+>
 - name: mapreduce-jobs
   bucket_size: 500
   rate: 500/s
@@ -68,6 +74,7 @@ queue:
     min_backoff_seconds: 1
     max_backoff_seconds: 600
 
+# /internal/taskqueue/monitoring/tsmon/<kind:[0-9A-Za-z_]+>
 - name: tsmon
   bucket_size: 10
   rate: 10/s

@@ -674,7 +674,8 @@ class SwarmingTasksService(remote.Service):
             'kill_running': request.kill_running or False,
           })
       ok = utils.enqueue_task(
-          '/internal/taskqueue/cancel-tasks', 'cancel-tasks', payload=payload)
+          '/internal/taskqueue/important/tasks/cancel', 'cancel-tasks',
+          payload=payload)
       if not ok:
         raise endpoints.InternalServerErrorException(
             'Could not enqueue cancel request, try again later')

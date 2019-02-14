@@ -1599,28 +1599,16 @@ class TaskRequestApiTest(TestCase):
     self.assertEqual(12, task_request.cron_delete_old_task_requests())
     expected = [
       (
-        (),
-        {
-          'payload': utils.encode_to_json({u'task_ids': task_ids[0:5]}),
-          'queue_name': 'delete-tasks',
-          'url': '/internal/taskqueue/delete-tasks',
-        },
+        ('/internal/taskqueue/cleanup/tasks/delete', 'delete-tasks'),
+        {'payload': utils.encode_to_json({u'task_ids': task_ids[0:5]})},
       ),
       (
-        (),
-        {
-          'payload': utils.encode_to_json({u'task_ids': task_ids[5:10]}),
-          'queue_name': 'delete-tasks',
-          'url': '/internal/taskqueue/delete-tasks',
-        },
+        ('/internal/taskqueue/cleanup/tasks/delete', 'delete-tasks'),
+        {'payload': utils.encode_to_json({u'task_ids': task_ids[5:10]})},
       ),
       (
-        (),
-        {
-          'payload': utils.encode_to_json({u'task_ids': task_ids[10:12]}),
-          'queue_name': 'delete-tasks',
-          'url': '/internal/taskqueue/delete-tasks',
-        },
+        ('/internal/taskqueue/cleanup/tasks/delete', 'delete-tasks'),
+        {'payload': utils.encode_to_json({u'task_ids': task_ids[10:12]})},
       ),
     ]
     # task_ids[12:14] are not touched.

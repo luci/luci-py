@@ -445,16 +445,17 @@ def _maybe_taskupdate_notify_via_tq(result_summary, request, es_cfg):
   assert isinstance(request, task_request.TaskRequest), request
   if request.pubsub_topic:
     task_id = task_pack.pack_result_summary_key(result_summary.key)
+    payload = {
+      'task_id': task_id,
+      'topic': request.pubsub_topic,
+      'auth_token': request.pubsub_auth_token,
+      'userdata': request.pubsub_userdata,
+    }
     ok = utils.enqueue_task(
-        url='/internal/taskqueue/pubsub/%s' % task_id,
-        queue_name='pubsub',
+        '/internal/taskqueue/important/pubsub/notify-task/%s' % task_id,
+        'pubsub',
         transactional=True,
-        payload=utils.encode_to_json({
-          'task_id': task_id,
-          'topic': request.pubsub_topic,
-          'auth_token': request.pubsub_auth_token,
-          'userdata': request.pubsub_userdata,
-        }))
+        payload=utils.encode_to_json(payload))
     if not ok:
       raise datastore_utils.CommitError('Failed to enqueue task')
 
@@ -1530,9 +1531,9 @@ def cron_handle_external_cancellations():
               u'task_id': c.task_id,
             }
             payload = utils.encode_to_json(data)
-            url = '/internal/taskqueue/cancel-task-on-bot'
             if not utils.enqueue_task(
-                url, queue_name='cancel-task-on-bot', payload=payload):
+                '/internal/taskqueue/important/tasks/cancel-task-on-bot',
+                queue_name='cancel-task-on-bot', payload=payload):
               logging.error('Failed to enqueue task-cancellation.')
 
 

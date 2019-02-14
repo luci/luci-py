@@ -1627,8 +1627,8 @@ def cron_delete_old_task_requests():
         first = keys[0]
       last = keys[-1]
       ok = utils.enqueue_task(
-          url='/internal/taskqueue/delete-tasks',
-          queue_name='delete-tasks',
+          '/internal/taskqueue/cleanup/tasks/delete',
+          'delete-tasks',
           payload=utils.encode_to_json(data))
       if not ok:
         logging.info('Failed to enqueue %d tasks for deletion', len(keys))

@@ -1428,11 +1428,9 @@ def cron_schedule_lease_management():
           continue
     total += 1
     if not utils.enqueue_task(
-        '/internal/taskqueue/machine-provider-manage',
+        '/internal/taskqueue/important/machine-provider/manage',
         'machine-provider-manage',
-        params={
-            'key': machine_lease.key.urlsafe(),
-        },
+        params={'key': machine_lease.key.urlsafe()},
     ):
       logging.warning(
           'Failed to enqueue task for MachineLease: %s', machine_lease.key)

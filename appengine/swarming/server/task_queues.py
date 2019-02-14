@@ -628,9 +628,10 @@ def _assert_task_props(properties, expiration_ts):
 
   # We can't use the request ID since the request was not stored yet, so embed
   # all the necessary information.
-  url = '/internal/taskqueue/rebuild-task-cache'
   if not utils.enqueue_task(
-      url, queue_name='rebuild-task-cache', payload=payload):
+      '/internal/taskqueue/important/task_queues/rebuild-cache',
+      'rebuild-task-cache',
+      payload=payload):
     logging.error('Failed to enqueue TaskDimensions update %x', dimensions_hash)
     # Technically we'd want to raise a endpoints.InternalServerErrorException.
     # Raising anything that is not TypeError or ValueError is fine.

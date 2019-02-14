@@ -198,8 +198,8 @@ class BackendTest(AppTestBase):
     self._enqueue_task_orig = self.mock(
         utils, 'enqueue_task', self._enqueue_task)
 
-  def _enqueue_task(self, url, **kwargs):
-    return self._enqueue_task_orig(url, use_dedicated_module=False, **kwargs)
+  def _enqueue_task(self, *args, **kwargs):
+    return self._enqueue_task_orig(*args, use_dedicated_module=False, **kwargs)
 
   def testCronJobTasks(self):
     # Tests all the cron tasks are securely handled.
@@ -307,19 +307,37 @@ class BackendTest(AppTestBase):
       r for r in self._GetRoutes() if r.startswith('/internal/taskqueue/')
       if not r.startswith('/internal/taskqueue/mapreduce/launch/')
     )
+    # This help to keep queue.yaml and handlers_backend.py up to date.
     # Format: (<queue-name>, <base-url>, <argument>).
-    task_queues = [
-      ('cancel-task-on-bot', '/internal/taskqueue/cancel-task-on-bot', ''),
-      ('cancel-tasks', '/internal/taskqueue/cancel-tasks', ''),
-      ('delete-tasks', '/internal/taskqueue/delete-tasks', ''),
-      ('es-notify-tasks', '/internal/taskqueue/es-notify-tasks', ''),
-      ('machine-provider-manage',
-       '/internal/taskqueue/machine-provider-manage', ''),
-      ('pubsub', '/internal/taskqueue/pubsub/', 'abcabcabc'),
-      ('rebuild-task-cache', '/internal/taskqueue/rebuild-task-cache', ''),
-      ('tsmon', '/internal/taskqueue/tsmon/', 'executors'),
-      ('named-cache-task', '/internal/taskqueue/update_named_cache', ''),
-    ]
+    task_queues = sorted(
+      [
+        ('cancel-task-on-bot', '/internal/taskqueue/cancel-task-on-bot', ''),
+        ('cancel-task-on-bot',
+          '/internal/taskqueue/important/tasks/cancel-task-on-bot', ''),
+        ('cancel-tasks', '/internal/taskqueue/cancel-tasks', ''),
+        ('cancel-tasks', '/internal/taskqueue/important/tasks/cancel', ''),
+        ('delete-tasks', '/internal/taskqueue/delete-tasks', ''),
+        ('delete-tasks', '/internal/taskqueue/cleanup/tasks/delete', ''),
+        ('es-notify-tasks', '/internal/taskqueue/es-notify-tasks', ''),
+        ('es-notify-tasks',
+          '/internal/taskqueue/important/external_scheduler/notify-tasks', ''),
+        ('machine-provider-manage',
+        '/internal/taskqueue/machine-provider-manage', ''),
+        ('machine-provider-manage',
+        '/internal/taskqueue/important/machine-provider/manage', ''),
+        ('pubsub', '/internal/taskqueue/pubsub/', 'abcabcabc'),
+        ('pubsub', '/internal/taskqueue/important/pubsub/notify-task/',
+          'abcabcabc'),
+        ('rebuild-task-cache', '/internal/taskqueue/rebuild-task-cache', ''),
+        ('rebuild-task-cache',
+          '/internal/taskqueue/important/task_queues/rebuild-cache', ''),
+        ('tsmon', '/internal/taskqueue/tsmon/', 'executors'),
+        ('tsmon', '/internal/taskqueue/monitoring/tsmon/', 'executors'),
+        ('named-cache-task', '/internal/taskqueue/update_named_cache', ''),
+        ('named-cache-task',
+          '/internal/taskqueue/important/named_cache/update-pool', ''),
+      ],
+      key=lambda x: x[1])
     self.assertEqual(len(task_queues), len(task_queue_urls))
     for i, url in enumerate(task_queue_urls):
       self.assertTrue(

@@ -1003,7 +1003,7 @@ class TasksApiTest(BaseTest):
       e = {'tasks': [second, first], 'kill_running': False}
       self.assertEqual(e, json.loads(kwargs.get('payload')))
       # check URL
-      self.assertEqual('/internal/taskqueue/cancel-tasks', args[0])
+      self.assertEqual('/internal/taskqueue/important/tasks/cancel', args[0])
       # check task queue
       self.assertEqual('cancel-tasks', args[1])
       return True

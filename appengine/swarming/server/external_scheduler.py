@@ -195,8 +195,8 @@ def notify_request(es_cfg, request, result_summary, use_tq, transactional):
   if use_tq:
     request_json = json_format.MessageToJson(req)
     enqueued = utils.enqueue_task(
-        url='/internal/taskqueue/es-notify-tasks',
-        queue_name='es-notify-tasks',
+        '/internal/taskqueue/important/external_scheduler/notify-tasks',
+        'es-notify-tasks',
         params={'es_host': es_cfg.address, 'request_json': request_json},
         transactional=transactional)
     if not enqueued:

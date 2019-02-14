@@ -223,7 +223,7 @@ def cron_update_named_caches():
   total = 0
   for pool in pools_config.known():
     if not utils.enqueue_task(
-        '/internal/taskqueue/update_named_cache',
+        '/internal/taskqueue/important/named_cache/update-pool',
         'named-cache-task',
         payload=json.dumps({'pool': pool}),
     ):

@@ -296,9 +296,10 @@ def _set_jobs_metrics(payload):
     if jobs_total >= _JOBS_PER_SHARD or runtime > _REQUEST_TIMEOUT_SEC:
       params.cursor = query_iter.cursor_after()
       params.task_count += 1
-      utils.enqueue_task(url='/internal/taskqueue/tsmon/jobs',
-                         queue_name='tsmon',
-                         payload=params.json())
+      utils.enqueue_task(
+          '/internal/taskqueue/monitoring/tsmon/jobs',
+          'tsmon',
+          payload=params.json())
       params.task_count -= 1  # For accurate logging below.
       break
 
@@ -357,9 +358,10 @@ def _set_executors_metrics(payload):
         runtime > _REQUEST_TIMEOUT_SEC):
       params.cursor = query_iter.cursor_after()
       params.task_count += 1
-      utils.enqueue_task(url='/internal/taskqueue/tsmon/executors',
-                         queue_name='tsmon',
-                         payload=params.json())
+      utils.enqueue_task(
+          '/internal/taskqueue/monitoring/tsmon/executors',
+          'tsmon',
+          payload=params.json())
       params.task_count -= 1  # For accurate logging below.
       break
 
@@ -410,11 +412,10 @@ def _set_mp_metrics(payload):
 
 
 def _set_global_metrics():
-  utils.enqueue_task(url='/internal/taskqueue/tsmon/jobs', queue_name='tsmon')
-  utils.enqueue_task(url='/internal/taskqueue/tsmon/executors',
-                     queue_name='tsmon')
-  utils.enqueue_task(url='/internal/taskqueue/tsmon/machine_types',
-                     queue_name='tsmon')
+  utils.enqueue_task('/internal/taskqueue/monitoring/tsmon/jobs', 'tsmon')
+  utils.enqueue_task('/internal/taskqueue/monitoring/tsmon/executors', 'tsmon')
+  utils.enqueue_task(
+      '/internal/taskqueue/monitoring/tsmon/machine_types', 'tsmon')
 
 
 class _ShardParams(object):
