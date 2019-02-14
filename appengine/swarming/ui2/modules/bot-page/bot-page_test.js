@@ -12,7 +12,7 @@ describe('bot-page', function() {
   const { $, $$ } = require('common-sk/modules/dom');
   const { customMatchers, expectNoUnmatchedCalls, mockAppGETs } = require('modules/test_util');
   const { fetchMock, MATCHED, UNMATCHED } = require('fetch-mock');
-  const { botDataMap } = require('modules/bot-page/test_data');
+  const { botDataMap, eventsMap, tasksMap } = require('modules/bot-page/test_data');
 
 
   const TEST_BOT_ID = 'example-gce-001';
@@ -103,8 +103,12 @@ describe('bot-page', function() {
 
   function serveBot(botName) {
     const data = botDataMap[botName];
+    const tasks = {items: tasksMap['SkiaGPU']};
+    const events = {items: eventsMap['SkiaGPU']};
 
     fetchMock.get(`/_ah/api/swarming/v1/bot/${TEST_BOT_ID}/get`, data);
+    fetchMock.get(`glob:/_ah/api/swarming/v1/bot/${TEST_BOT_ID}/tasks*`, tasks);
+    fetchMock.get(`glob:/_ah/api/swarming/v1/bot/${TEST_BOT_ID}/events*`, events);
   }
 
 
@@ -157,7 +161,7 @@ describe('bot-page', function() {
 
       it('does not display logs or task details', function(done) {
         loggedInBotPage((ele) => {
-          const content = $$('main .content');
+          const content = $$('main .content', ele);
           expect(content).toBeTruthy();
           expect(content).toHaveAttribute('hidden');
           done();
@@ -178,7 +182,7 @@ describe('bot-page', function() {
 
       it('does not display filters or tasks', function(done) {
         loggedInBotPage((ele) => {
-          const content = $$('main .content');
+          const content = $$('main .content', ele);
           expect(content).toBeTruthy();
           expect(content).toHaveAttribute('hidden');
           done();
@@ -189,8 +193,123 @@ describe('bot-page', function() {
     describe('gpu bot with a running task', function() {
       beforeEach(() => serveBot('running'));
 
-      // TODO
-    });
+      it('renders some of the bot data', function(done) {
+        loggedInBotPage((ele) => {
+          const dataTable = $$('table.data_table', ele);
+          expect(dataTable).toBeTruthy();
+
+          const rows = $('tr', dataTable);
+          expect(rows).toBeTruthy();
+          expect(rows.length).toBeTruthy();
+
+          // little helper for readability
+          const cell = (r, c) => rows[r].children[c];
+
+          expect(cell(1, 0)).toMatchTextContent('Current Task');
+          expect(cell(1, 1)).toMatchTextContent('42fb00e06d95be11');
+          expect(cell(1, 1).innerHTML).toContain('<a ', 'has a link');
+          expect(cell(1, 1).innerHTML).toContain('href="/task?id=42fb00e06d95be10"');
+          expect(cell(2, 0)).toMatchTextContent('Dimensions');
+          expect(cell(7, 0)).toMatchTextContent('gpu');
+          expect(cell(7, 1)).toMatchTextContent('NVIDIA (10de) | ' +
+            'NVIDIA Quadro P400 (10de:1cb3) | NVIDIA Quadro P400 (10de:1cb3-25.21.14.1678)');
+          expect(cell(19, 0)).toMatchTextContent('Bot Version');
+          expect(rows[19]).toHaveClass('old_version');
+          done();
+        });
+      });
+
+      it('renders the tasks in a table', function(done) {
+        loggedInBotPage((ele) => {
+          ele._showEvents = false;
+          ele.render();
+          const tasksTable = $$('table.tasks_table', ele);
+          expect(tasksTable).toBeTruthy();
+
+          const rows = $('tr', tasksTable);
+          expect(rows).toBeTruthy();
+          expect(rows.length).toEqual(1 + 30, '1 for header, 30 tasks');
+
+          // little helper for readability
+          const cell = (r, c) => rows[r].children[c];
+
+          // row 0 is the header
+          expect(cell(1, 0)).toMatchTextContent('Perf-Win10-Clang-Golo-GPU-QuadroP400-x86_64-Debug-All-ANGLE');
+          expect(cell(1, 0).innerHTML).toContain('<a ', 'has a link');
+          expect(cell(1, 0).innerHTML).toContain('href="/task?id=43004cb4fca98110"');
+          expect(cell(1, 2)).toMatchTextContent('7m 20s');
+          expect(cell(1, 3)).toMatchTextContent('RUNNING');
+          expect(rows[1]).toHaveClass('pending_task');
+          expect(cell(2, 2)).toMatchTextContent('3m 51s');
+          expect(cell(2, 3)).toMatchTextContent('SUCCESS');
+          expect(rows[2]).not.toHaveClass('pending_task');
+          expect(rows[2]).not.toHaveClass('failed_task)');
+          expect(rows[2]).not.toHaveClass('exception');
+          expect(rows[2]).not.toHaveClass('bot_died');
+
+          done();
+        });
+      });
+
+      it('renders all events in a table', function(done) {
+        loggedInBotPage((ele) => {
+          ele._showEvents = true;
+          ele._showAll = true;
+          ele.render();
+          const eventsTable = $$('table.events_table', ele);
+          expect(eventsTable).toBeTruthy();
+
+          const rows = $('tr', eventsTable);
+          expect(rows).toBeTruthy();
+          expect(rows.length).toEqual(1 + 50, '1 for header, 50 events');
+
+          // little helper for readability
+          const cell = (r, c) => rows[r].children[c];
+
+          // row 0 is the header
+          expect(cell(1, 0)).toMatchTextContent('');
+          expect(cell(1, 1)).toMatchTextContent('request_task');
+          expect(cell(1, 3).innerHTML).toContain('<a ', 'has a link');
+          expect(cell(1, 3).innerHTML).toContain('href="/task?id=4300ceb85b93e010"');
+          expect(cell(1, 4)).toMatchTextContent('abcdoeraym');
+          expect(cell(1, 4)).not.toHaveClass('old_version');
+
+          expect(cell(15, 0)).toMatchTextContent('About to restart: ' +
+                'Updating to abcdoeraymeyouandme');
+          expect(cell(15, 1)).toMatchTextContent('bot_shutdown');
+          expect(cell(15, 3)).toMatchTextContent('');
+          expect(cell(15, 4)).toMatchTextContent('6fda8587d8');
+          expect(cell(15, 4)).toHaveClass('old_version');
+          done();
+        });
+      });
+
+      it('renders some events in a table', function(done) {
+        loggedInBotPage((ele) => {
+          ele._showEvents = true;
+          ele._showAll = false;
+          ele.render();
+          const eventsTable = $$('table.events_table', ele);
+          expect(eventsTable).toBeTruthy();
+
+          const rows = $('tr', eventsTable);
+          expect(rows).toBeTruthy();
+          expect(rows.length).toEqual(1 + 1, '1 for header, 1 shown event');
+
+          // little helper for readability
+          const cell = (r, c) => rows[r].children[c];
+
+          // row 0 is the header
+          expect(cell(1, 0)).toMatchTextContent('About to restart: ' +
+                'Updating to abcdoeraymeyouandme');
+          expect(cell(1, 1)).toMatchTextContent('bot_shutdown');
+          expect(cell(1, 3)).toMatchTextContent('');
+          expect(cell(1, 4)).toMatchTextContent('6fda8587d8');
+          expect(cell(1, 4)).toHaveClass('old_version');
+          done();
+        });
+      });
+    }); // end describe('gpu bot with a running task')
 
   }); // end describe('html structure')
 
@@ -232,7 +351,7 @@ describe('bot-page', function() {
       serveBot('running');
       loggedInBotPage((ele) => {
         let calls = fetchMock.calls(MATCHED, 'GET');
-        expect(calls.length).toBe(2+1, '2 GETs from swarming-app, 1 from bot-page');
+        expect(calls.length).toBe(2+3, '2 GETs from swarming-app, 3 from bot-page');
         // calls is an array of 2-length arrays with the first element
         // being the string of the url and the second element being
         // the options that were passed in

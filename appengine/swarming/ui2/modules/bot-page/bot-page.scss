@@ -48,8 +48,22 @@ bot-page {
     }
   }
 
+  .all-events {
+    border: 3px solid #1F78B4;
+    border-bottom: none;
+    margin-left: 5px;
+    width: 300px;
+    > * {
+      display: inline-block;
+    }
+  }
+
   .wrap.layout {
     flex-wrap: wrap;
+  }
+
+  .break-all {
+    word-break: break-all;
   }
 
   .old_version {
@@ -73,4 +87,42 @@ bot-page {
     padding: 5px;
   }
 
+  .tasks-events-picker {
+    margin-left: 5px;
+    display: flex;
+    > * {
+      display: inline-block;
+    }
+    .tab {
+      padding: 10px 40px;
+      margin: 0;
+      background-color: #a6cee3;
+      color: black;
+      cursor: pointer;
+      &[selected] {
+        background-color: #1f78b4;
+        color: white;
+        font-weight: 700;
+      }
+    }
+  }
+
+  .tasks_table,
+  .events_table {
+    border: 3px solid #1F78B4;
+  }
+
+  /* These colors are from buildbot */
+  .failed_task {
+    background-color: #ffdddd;
+  }
+  .bot_died {
+    background-color: #cccccc;
+  }
+  .exception {
+    background-color: #edd2ff;
+  }
+  .pending_task, .highlighted {
+    background-color: #fffc6c;
+  }
 }

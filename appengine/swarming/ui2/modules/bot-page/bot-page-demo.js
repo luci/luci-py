@@ -3,7 +3,7 @@
 // that can be found in the LICENSE file.
 import './index.js'
 
-import { botData } from './test_data'
+import { botData, eventsMap, tasksMap } from './test_data'
 import { requireLogin, mockAuthdAppGETs } from '../test_util'
 import { $$ } from 'common-sk/modules/dom'
 
@@ -19,6 +19,12 @@ mockAuthdAppGETs(fetchMock, {
 
 fetchMock.get('glob:/_ah/api/swarming/v1/bot/*/get',
               requireLogin(botData, 100));
+
+fetchMock.get('glob:/_ah/api/swarming/v1/bot/*/tasks?*',
+              requireLogin({items: tasksMap['SkiaGPU']}, 100));
+
+fetchMock.get('glob:/_ah/api/swarming/v1/bot/*/events?*',
+              requireLogin({items: eventsMap['SkiaGPU']}, 100));
 
 // Everything else
 fetchMock.catch(404);
