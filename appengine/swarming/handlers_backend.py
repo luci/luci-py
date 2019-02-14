@@ -415,38 +415,20 @@ def get_routes():
     ('/internal/cron/important/named_caches/update', CronNamedCachesUpdate),
 
     # Task queues.
-    ('/internal/taskqueue/cancel-tasks', CancelTasksHandler),
     ('/internal/taskqueue/important/tasks/cancel', CancelTasksHandler),
-
-    ('/internal/taskqueue/cancel-task-on-bot', CancelTaskOnBotHandler),
     ('/internal/taskqueue/important/tasks/cancel-task-on-bot',
         CancelTaskOnBotHandler),
-
-    ('/internal/taskqueue/delete-tasks', DeleteTasksHandler),
     ('/internal/taskqueue/cleanup/tasks/delete', DeleteTasksHandler),
-
-    ('/internal/taskqueue/rebuild-task-cache', TaskDimensionsHandler),
     ('/internal/taskqueue/important/task_queues/rebuild-cache',
         TaskDimensionsHandler),
-
-    (r'/internal/taskqueue/pubsub/<task_id:[0-9a-f]+>', TaskSendPubSubMessage),
     (r'/internal/taskqueue/important/pubsub/notify-task/<task_id:[0-9a-f]+>',
         TaskSendPubSubMessage),
-
-    ('/internal/taskqueue/es-notify-tasks', TaskESNotifyTasksHandler),
     ('/internal/taskqueue/important/external_scheduler/notify-tasks',
         TaskESNotifyTasksHandler),
-
-    ('/internal/taskqueue/machine-provider-manage',
-        TaskMachineProviderManagementHandler),
     ('/internal/taskqueue/important/machine-provider/manage',
         TaskMachineProviderManagementHandler),
-
-    (r'/internal/taskqueue/update_named_cache', TaskNamedCachesPool),
     (r'/internal/taskqueue/important/named_cache/update-pool',
         TaskNamedCachesPool),
-
-    (r'/internal/taskqueue/tsmon/<kind:[0-9A-Za-z_]+>', TaskGlobalMetrics),
     (r'/internal/taskqueue/monitoring/tsmon/<kind:[0-9A-Za-z_]+>',
         TaskGlobalMetrics),
 
