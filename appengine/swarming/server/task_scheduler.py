@@ -684,8 +684,17 @@ def _bot_update_tx(
         run_result.state = task_result.State.KILLED
     else:
       if hard_timeout or io_timeout:
+        # This needs to be changed with new state TERMINATING;
+        # https://crbug.com/916560
         run_result.state = task_result.State.TIMED_OUT
         run_result.completed_ts = now
+        # It may happen that the bot reports no exit code or duration, make sure
+        # a value is set.
+        if run_result.exit_code is None:
+          run_result.exit_code = -1
+        if run_result.duration is None:
+          # Calculate an approximate time.
+          run_result.duration = (now - run_result.started_ts).total_seconds()
       elif run_result.exit_code is not None:
         run_result.state = task_result.State.COMPLETED
         run_result.completed_ts = now

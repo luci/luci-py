@@ -976,6 +976,31 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(expected, parent_run_result_key.get().children_task_ids)
     self.assertEqual(expected, parent_res_summary_key.get().children_task_ids)
 
+  def test_task_timeout(self):
+    # Create a task, but the bot tries to timeout but fails to report exit code
+    # and duration.
+    run_result = self._quick_reap(1, 0)
+    to_run_key = _run_result_to_to_run_key(run_result)
+    self.mock_now(self.now, 10.5)
+    self.assertEqual(
+        State.TIMED_OUT,
+        task_scheduler.bot_update_task(
+            run_result_key=run_result.key,
+            bot_id='localhost',
+            cipd_pins=None,
+            output='Foo1',
+            output_chunk_start=0,
+            exit_code=None,
+            duration=None,
+            hard_timeout=True,
+            io_timeout=False,
+            cost_usd=0.1,
+            outputs_ref=None,
+            performance_stats=None))
+    run_result = run_result.key.get()
+    self.assertEqual(-1, run_result.exit_code)
+    self.assertEqual(10.5, run_result.duration)
+
   def test_get_results(self):
     # TODO(maruel): Split in more focused tests.
     created_ts = self.now
