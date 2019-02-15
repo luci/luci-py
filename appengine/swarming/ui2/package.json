@@ -16,7 +16,7 @@
     "flatpickr": "~4.5.2",
     "google-charts": "^2.0.0",
     "javascript-natural-sort": "~0.7.1",
-    "lit-html": "1.0.0-rc.2"
+    "lit-html": "~1.0.0"
   },
   "devDependencies": {
     "babel-core": "~6.26.3",
@@ -41,7 +41,7 @@
     "karma-firefox-launcher": "~1.1.0",
     "karma-jasmine": "~1.1.2",
     "karma-spec-reporter": "0.0.32",
-    "karma-webpack": "~3.0.0",
+    "karma-webpack": "^3.0.5",
     "postcss-loader": "~2.1.5",
     "pulito": "~4.2.0",
     "sass-loader": "~7.0.0",
