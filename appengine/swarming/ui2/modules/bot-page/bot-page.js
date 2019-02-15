@@ -18,7 +18,7 @@ import '../dialog-pop-over'
 import '../swarming-app'
 
 import { EVENTS_QUERY_PARAMS, mpLink, parseBotData, parseEvents,
-         parseTasks, quarantineMessage, TASKS_QUERY_PARAMS } from './bot-page-helpers'
+         parseTasks, quarantineMessage, siblingBotsLink, TASKS_QUERY_PARAMS } from './bot-page-helpers'
 import { stateClass as taskClass } from '../task-page/task-page-helpers'
 import { timeDiffApprox, timeDiffExact, taskPageLink } from '../util'
 import SwarmingAppBoilerplate from '../SwarmingAppBoilerplate'
@@ -119,7 +119,9 @@ const statusAndTask = (ele, bot) => {
 const dimensionBlock = (dimensions) => html`
 <tr>
   <td rowspan=${dimensions.length+1}>
-    Dimensions <!-- TODO add link -->
+    <a href=${siblingBotsLink(dimensions)}>
+      Dimensions
+    </a>
   </td>
 </tr>
 ${dimensions.map(dimensionRow)}

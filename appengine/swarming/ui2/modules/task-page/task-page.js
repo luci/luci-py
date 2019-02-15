@@ -47,7 +47,7 @@ import SwarmingAppBoilerplate from '../SwarmingAppBoilerplate'
  */
 
 const idAndButtons = (ele) => {
-  if (!ele._taskId) {
+  if (!ele._taskId || ele._notFound) {
     return html`
 <div class=id_buttons>
   <input id=id_input placeholder="Task ID" @change=${ele._updateID}></input>
@@ -76,7 +76,7 @@ const idAndButtons = (ele) => {
 
 const taskDisambiguation = (ele, result) => {
   // Only tasks with id ending in 0 can be summaries
-  if (!ele._taskId || !ele._taskId.endsWith('0')) {
+  if (!ele._taskId || ele._notFound || !ele._taskId.endsWith('0')) {
     return '';
   }
   // This is the most frequent case - no automatic retry
@@ -126,7 +126,7 @@ const taskRow = (result, idx) => {
 
 
 const slicePicker = (ele) => {
-  if (!ele._taskId) {
+  if (!ele._taskId || ele._notFound) {
     return '';
   }
   if (!(ele._request.task_slices && ele._request.task_slices.length > 1)) {
@@ -145,7 +145,7 @@ const sliceTab = (ele, idx) => html`
 `;
 
 const taskInfoTable = (ele, request, result, currentSlice) => {
-  if (!ele._taskId) {
+  if (!ele._taskId || ele._notFound) {
     return '';
   }
   if (!currentSlice.properties) {
@@ -475,7 +475,7 @@ const cipdRowSet = (pkg, cipdInput, actualAvailable) => html`
 `;
 
 const taskTimingSection = (ele, request, result) => {
-  if (!ele._taskId || wasDeduped(result)) {
+  if (!ele._taskId || ele._notFound || wasDeduped(result)) {
     // Don't show timing info when task was deduped because the info
     // in the result is from the original task, which can be confusing
     // when juxtaposed with the data from this task.
@@ -539,7 +539,7 @@ const taskTimingSection = (ele, request, result) => {
 }
 
 const taskExecutionSection = (ele, request, result, currentSlice) => {
-  if (!ele._taskId) {
+  if (!ele._taskId || ele._notFound) {
     return '';
   }
   if (!result || !wasPickedUp(result)) {
@@ -649,7 +649,7 @@ const botDimensionValue = (value) =>
 html`<span class="break-all dim ${value.bold ? 'bold': ''}">${value.name}</span>`;
 
 const performanceStatsSection = (ele, performanceStats) => {
-  if (!ele._taskId || !performanceStats) {
+  if (!ele._taskId || ele._notFound || !performanceStats ) {
     return '';
   }
   return html`
@@ -696,7 +696,7 @@ const performanceStatsSection = (ele, performanceStats) => {
 }
 
 const reproduceSection = (ele, currentSlice) => {
-  if (!ele._taskId) {
+  if (!ele._taskId || ele._notFound) {
     return '';
   }
   const ref =  currentSlice.properties && currentSlice.properties.inputs_ref || {};
@@ -729,7 +729,7 @@ const reproduceSection = (ele, currentSlice) => {
 }
 
 const taskLogs = (ele) => {
-  if (!ele._taskId) {
+  if (!ele._taskId || ele._notFound) {
     return '';
   }
   return html`
@@ -837,6 +837,10 @@ const template = (ele) => html`
     <div class="left grow" ?hidden=${!ele.loggedInAndAuthorized}>
     ${idAndButtons(ele)}
 
+    <h2 class=not_found ?hidden=${!ele._notFound || !ele._taskId}>
+      Task not found
+    </h2>
+
     ${taskDisambiguation(ele, ele._result)}
 
     ${slicePicker(ele)}
@@ -914,6 +918,7 @@ window.customElements.define('task-page', class extends SwarmingAppBoilerplate {
     this._result = {};
     this._currentSlice = {};
     this._currentSliceIdx = -1;
+    this._notFound = false;
     // When swarming does an automatic retry (or multiple), we should
     // fetch the results for those retries and display them.
     this._extraTries = [];
@@ -1059,6 +1064,7 @@ time.sleep(${leaseDuration})`];
     fetch(`/_ah/api/swarming/v1/task/${this._taskId}/request`, extra)
       .then(jsonOrThrow)
       .then((json) => {
+        this._notFound = false;
         this._request = parseRequest(json);
         // Note, this triggers more fetch requests, which also adds to
         // app's busy task counts.
@@ -1072,7 +1078,14 @@ time.sleep(${leaseDuration})`];
         }
         this.app.finishedTask();
       })
-      .catch((e) => this.fetchError(e, 'task/request'));
+      .catch((e) => {
+        if (e.status === 404) {
+          this._request = {};
+          this._notFound = true;
+          this.render();
+        }
+        this.fetchError(e, 'task/request')
+      });
     this._extraTries = [];
     fetch(`/_ah/api/swarming/v1/task/${this._taskId}/result?include_performance_stats=true`, extra)
       .then(jsonOrThrow)

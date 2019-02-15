@@ -229,7 +229,7 @@ describe('task-page', function() {
           const topDivs = $('main > div', ele);
           expect(topDivs).toBeTruthy();
           expect(topDivs.length).toBe(2);
-          expect(topDivs[0].children.length).toEqual(1); // only .id_buttons
+          expect(topDivs[0].children.length).toEqual(2); // only .id_buttons and task not found
           expect(topDivs[1].children.length).toEqual(0); // everything else removed
           done();
         }, true);

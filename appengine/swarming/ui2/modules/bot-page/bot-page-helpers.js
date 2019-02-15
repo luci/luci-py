@@ -3,7 +3,7 @@
 // that can be found in the LICENSE file.
 
 import { applyAlias } from '../alias'
-import { humanDuration, sanitizeAndHumanizeTime, timeDiffExact } from '../util'
+import { botListLink, humanDuration, sanitizeAndHumanizeTime, timeDiffExact } from '../util'
 
 
 /** mpLink produces a machine provider link for this bot
@@ -45,7 +45,7 @@ export function parseBotData(bot) {
         bot.device_list.push(device);
         let count = 0;
         let total = 0;
-        // device.temp is a map of zone: "value"
+        // device.temp is a map of zone: 'value'
         device.temp = device.temp || {};
         for (const t in device.temp) {
           total += parseFloat(device.temp[t]);
@@ -106,7 +106,7 @@ export function parseTasks(tasks) {
     const total_overhead = (task.performance_stats &&
                             task.performance_stats.bot_overhead) || 0;
     // total_duration includes overhead, to give a better sense of the bot
-    // being "busy", e.g. when uploading isolated outputs.
+    // being 'busy', e.g. when uploading isolated outputs.
     task.total_duration = task.duration + total_overhead;
     task.human_total_duration = humanDuration(task.total_duration);
     task.total_overhead = total_overhead;
@@ -141,6 +141,34 @@ export function quarantineMessage(bot) {
     return msg || 'True';
   }
   return '';
+}
+
+// Hand-picked list of dimensions that can vary a lot machine to machine,
+// that is, dimensions that can be 'too unique'.
+const dimensionsToStrip = ['id', 'caches', 'server_version'];
+
+/** siblingBotsLink returns a url to a bot-list that has similar
+ *  dimensions to the ones passed in
+ *  @param {Array<Object>} dimensions - have 'key' and 'value'. To be
+ *                         matched against.
+ */
+export function siblingBotsLink(dimensions) {
+  const cols = ['id', 'os', 'task', 'status'];
+   if (!dimensions) {
+    return botListLink([], cols);
+  }
+
+  dimensions = dimensions.filter((dim) => {
+    return dimensionsToStrip.indexOf(dim.key) === -1;
+  });
+
+  for (const dim of dimensions) {
+    if (cols.indexOf(dim.key) === -1) {
+      cols.push(dim.key);
+    }
+  }
+
+  return botListLink(dimensions, cols);
 }
 
 const BOT_TIMES = ['first_seen_ts', 'last_seen_ts', 'lease_expiration_ts'];
