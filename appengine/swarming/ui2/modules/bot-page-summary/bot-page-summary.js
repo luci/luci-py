@@ -149,9 +149,7 @@ const template = (ele) => html`
 </div>
 `;
 
-// exported only for testing purposes
-export function prettifyName(name) {
-  name = name.trim();
+function chromiumNameRules(name) {
   const pieces = name.split('/');
   if (pieces.length === 5) {
     // this appears to be a buildbot name
@@ -160,11 +158,19 @@ export function prettifyName(name) {
     // can identify the "true name".
     name = pieces[0] + '/' + pieces[3];
   }
+  name = name.replace(' (with patch)', '');
+  return name;
+}
+
+// exported only for testing purposes
+export function prettifyName(name) {
+  name = name.trim();
+  name = chromiumNameRules(name);
   // Strip out 'stop' word/phrases that are appended, but don't really
   // change the core of the task.
   name = name.replace(/ \(retry\)/g, '');
   name = name.replace(/ \(debug\)/g, '');
-  name = name.replace(' (with patch)', '');
+
   return name;
 }
 
