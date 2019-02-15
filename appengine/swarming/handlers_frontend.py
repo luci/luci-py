@@ -249,10 +249,8 @@ def get_routes():
     routes.extend([
       # Frontend pages. They return HTML.
       # Public pages.
-      ('/<page:(bot)>', UIHandler),
-      # Send bot-list and index to NewUIHandler (i.e. WebComponents)
-      ('/<page:(botlist|tasklist|task|)>', NewUIHandler),
-      ('/oldui/<page:(botlist|tasklist|task)>', UIHandler),
+      ('/<page:(botlist|tasklist|task|bot|)>', NewUIHandler),
+      ('/oldui/<page:(botlist|tasklist|task|bot)>', UIHandler),
 
       # These were the very old (pre-2016) links, so this redirects
       # them to the modern url style.
@@ -261,7 +259,6 @@ def get_routes():
       ('/restricted/bots', BotsListHandler),
       ('/restricted/bot/<bot_id:[^/]+>', BotHandler),
 
-      # Some of these don't exist yet. That's ok for now.
       ('/wcui/<page:(bot|botlist|task|tasklist|)>', NewUIHandler),
 
       # Admin pages.
