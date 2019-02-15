@@ -34,9 +34,6 @@ describe('task-mass-cancel', function() {
     fetchMock.reset();
   });
 
-
-//===============TESTS START====================================
-
   // calls the test callback with one element 'ele', a created <task-mass-cancel>.
   function createElement(test) {
     return window.customElements.whenDefined('task-mass-cancel').then(() => {
@@ -45,6 +42,8 @@ describe('task-mass-cancel', function() {
       test(container.firstElementChild);
     });
   }
+
+//===============TESTS START====================================
 
   it('can read in attributes', function(done) {
     createElement((ele) => {

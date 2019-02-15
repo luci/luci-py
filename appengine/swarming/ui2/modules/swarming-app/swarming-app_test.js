@@ -216,7 +216,7 @@ describe('swarming-app', function() {
     describe('api calls', function(){
       it('makes no API calls when not logged in', function(done) {
         createElement((ele) => {
-          fetchMock.flush().then(() => {
+          fetchMock.flush(true).then(() => {
             // MATCHED calls are calls that we expect and specified in the
             // beforeEach at the top of this file.
             const calls = fetchMock.calls(MATCHED, 'GET');

@@ -268,7 +268,7 @@ export function timeDiffApprox(date){
   if (!date) {
     return 'eons';
   }
-  return human.diffDate(date.getTime());
+  return human.diffDate(date.getTime()) || '0s';
 }
 
 /** timeDiffExact returns the exact difference between the two specified
@@ -282,5 +282,5 @@ export function timeDiffExact(first, second) {
   if (!second) {
     second = new Date();
   }
-  return human.strDuration((second.getTime() - first.getTime())/1000);
+  return human.strDuration((second.getTime() - first.getTime())/1000) || '0s';
 }

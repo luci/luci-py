@@ -149,6 +149,25 @@ const template = (ele) => html`
 </div>
 `;
 
+// exported only for testing purposes
+export function prettifyName(name) {
+  name = name.trim();
+  const pieces = name.split('/');
+  if (pieces.length === 5) {
+    // this appears to be a buildbot name
+    // piece 0 is tag "name", piece 3 is "buildername"
+    // We throw the rest away (OS, commit hash, build number) so we
+    // can identify the "true name".
+    name = pieces[0] + '/' + pieces[3];
+  }
+  // Strip out 'stop' word/phrases that are appended, but don't really
+  // change the core of the task.
+  name = name.replace(/ \(retry\)/g, '');
+  name = name.replace(/ \(debug\)/g, '');
+  name = name.replace(' (with patch)', '');
+  return name;
+}
+
 window.customElements.define('bot-page-summary', class extends HTMLElement {
 
   constructor() {
@@ -211,7 +230,7 @@ window.customElements.define('bot-page-summary', class extends HTMLElement {
     for (const t of this.tasks) {
       // TODO(kjlubick): maybe have this reason about one or more tags, like
       // if there is a tag called 'name' or something.
-      const name = t.name.trim();
+      const name = prettifyName(t.name);
 
       // don't tabulate the running task, as it throws off the averages.
       if (t.state === 'RUNNING') {

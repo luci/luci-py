@@ -239,7 +239,8 @@ const tasksTable = (ele, tasks) => {
   </tbody>
 </table>
 
-<button ?disabled=${!ele._taskCursor}
+<button class=more_tasks
+        ?disabled=${!ele._taskCursor}
         @click=${ele._moreTasks}>
   Show More
 </button>
@@ -286,7 +287,8 @@ const eventsTable = (ele, events) => {
   </tbody>
 </table>
 
-<button ?disabled=${!ele._eventsCursor}
+<button class=more_events
+        ?disabled=${!ele._eventsCursor}
         @click=${ele._moreEvents}>
   Show More
 </button>
@@ -590,7 +592,7 @@ window.customElements.define('bot-page', class extends SwarmingAppBoilerplate {
     };
     this.app.addBusyTasks(1);
     fetch(`/_ah/api/swarming/v1/bot/${this._botId}/tasks?cursor=${this._taskCursor}&` +
-          EVENTS_QUERY_PARAMS, extra)
+          TASKS_QUERY_PARAMS, extra)
       .then(jsonOrThrow)
       .then((json) => {
         this._taskCursor = json.cursor;

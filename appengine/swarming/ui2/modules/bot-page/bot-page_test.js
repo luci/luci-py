@@ -519,7 +519,7 @@ describe('bot-page', function() {
   describe('api calls', function() {
     it('makes no API calls when not logged in', function(done) {
       createElement((ele) => {
-        fetchMock.flush().then(() => {
+        fetchMock.flush(true).then(() => {
           // MATCHED calls are calls that we expect and specified in the
           // beforeEach at the top of this file.
           let calls = fetchMock.calls(MATCHED, 'GET');
@@ -585,9 +585,10 @@ describe('bot-page', function() {
 
         okBtn.click();
 
-        fetchMock.flush().then(() => {
+        fetchMock.flush(true).then(() => {
           // MATCHED calls are calls that we expect and specified in the
           // beforeEach at the top of this file.
+          expectNoUnmatchedCalls(fetchMock);
           let calls = fetchMock.calls(MATCHED, 'GET');
           expect(calls.length).toBe(0);
           calls = fetchMock.calls(MATCHED, 'POST');
@@ -596,7 +597,6 @@ describe('bot-page', function() {
           const options = call[1];
           expect(options.body).toEqual('{"kill_running":true}');
 
-          expectNoUnmatchedCalls(fetchMock);
           done();
         });
       });
@@ -625,15 +625,15 @@ describe('bot-page', function() {
 
         okBtn.click();
 
-        fetchMock.flush().then(() => {
+        fetchMock.flush(true).then(() => {
           // MATCHED calls are calls that we expect and specified in the
           // beforeEach at the top of this file.
+          expectNoUnmatchedCalls(fetchMock);
           let calls = fetchMock.calls(MATCHED, 'GET');
           expect(calls.length).toBe(0);
           calls = fetchMock.calls(MATCHED, 'POST');
           expect(calls.length).toBe(1);
 
-          expectNoUnmatchedCalls(fetchMock);
           done();
         });
       });
@@ -662,18 +662,99 @@ describe('bot-page', function() {
 
         okBtn.click();
 
-        fetchMock.flush().then(() => {
+        fetchMock.flush(true).then(() => {
           // MATCHED calls are calls that we expect and specified in the
           // beforeEach at the top of this file.
+          expectNoUnmatchedCalls(fetchMock);
           let calls = fetchMock.calls(MATCHED, 'GET');
           expect(calls.length).toBe(0);
           calls = fetchMock.calls(MATCHED, 'POST');
           expect(calls.length).toBe(1);
 
-          expectNoUnmatchedCalls(fetchMock);
           done();
         });
       });
     });
+
+    it('can fetch more tasks', function(done) {
+      serveBot('running');
+      loggedInBotPage((ele) => {
+        ele._taskCursor = 'myCursor';
+        ele._showEvents = false;
+        ele.render();
+        fetchMock.reset(); // clears history and routes
+
+        fetchMock.get(`glob:/_ah/api/swarming/v1/bot/${TEST_BOT_ID}/tasks*`, {
+          items: tasksMap['SkiaGPU'],
+          cursor: 'newCursor',
+        });
+
+        const tBtn = $$('main button.more_tasks', ele);
+        expect(tBtn).toBeTruthy();
+
+        tBtn.click();
+
+        fetchMock.flush(true).then(() => {
+          // MATCHED calls are calls that we expect and specified in the
+          // beforeEach at the top of this file.
+          expectNoUnmatchedCalls(fetchMock);
+          let calls = fetchMock.calls(MATCHED, 'GET');
+          expect(calls.length).toBe(1);
+
+          const url = calls[0][0];
+          // spot check a few fields
+          expect(url).toContain('state');
+          expect(url).toContain('name');
+          expect(url).toContain('limit=30');
+          // validate cursor
+          expect(url).toContain('cursor=myCursor');
+          expect(ele._taskCursor).toEqual('newCursor', 'cursor should update');
+          expect(ele._tasks.length).toEqual(30+30, '30 initial tasks, 30 new tasks');
+
+          done();
+        });
+      });
+    });
+
+    it('can fetch more tasks', function(done) {
+      serveBot('running');
+      loggedInBotPage((ele) => {
+        ele._eventsCursor = 'myCursor';
+        ele._showEvents = true;
+        ele.render();
+        fetchMock.reset(); // clears history and routes
+
+        fetchMock.get(`glob:/_ah/api/swarming/v1/bot/${TEST_BOT_ID}/events*`, {
+          items: eventsMap['SkiaGPU'],
+          cursor: 'newCursor',
+        });
+
+        const eBtn = $$('main button.more_events', ele);
+        expect(eBtn).toBeTruthy();
+
+        eBtn.click();
+
+        fetchMock.flush(true).then(() => {
+          // MATCHED calls are calls that we expect and specified in the
+          // beforeEach at the top of this file.
+          expectNoUnmatchedCalls(fetchMock);
+          let calls = fetchMock.calls(MATCHED, 'GET');
+          expect(calls.length).toBe(1);
+
+          const url = calls[0][0];
+          // spot check a few fields
+          expect(url).toContain('event_type');
+          expect(url).toContain('task_id');
+          expect(url).toContain('limit=50');
+          // validate cursor
+          expect(url).toContain('cursor=myCursor');
+          expect(ele._eventsCursor).toEqual('newCursor', 'cursor should update');
+          expect(ele._events.length).toEqual(50+50, '50 initial tasks, 50 new tasks');
+
+          done();
+        });
+      });
+    });
+
   }); // end describe('api calls')
 });
