@@ -16,6 +16,8 @@ from components import template
 from components import utils
 from google.appengine.api import app_identity
 
+import gae_ts_mon
+
 import admin
 import api
 import handlers
@@ -54,4 +56,7 @@ def create_backend_app():  # pragma: no cover
 def initialize():  # pragma: no cover
   """Bootstraps the global state and creates WSGI applications."""
   ereporter2.register_formatter()
-  return create_html_app(), create_endpoints_app(), create_backend_app()
+  apps = (create_html_app(), create_endpoints_app(), create_backend_app())
+  for app in apps:
+    gae_ts_mon.initialize(app=app)
+  return apps
