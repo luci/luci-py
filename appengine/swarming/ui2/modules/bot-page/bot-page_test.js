@@ -257,6 +257,11 @@ describe('bot-page', function() {
           expect(rows[2]).not.toHaveClass('exception');
           expect(rows[2]).not.toHaveClass('bot_died');
 
+          const eBtn = $$('main button.more_events', ele);
+          expect(eBtn).toBeFalsy();
+
+          const tBtn = $$('main button.more_tasks', ele);
+          expect(tBtn).toBeTruthy();
           done();
         });
       });
@@ -316,6 +321,12 @@ describe('bot-page', function() {
           expect(cell(1, 3)).toMatchTextContent('');
           expect(cell(1, 4)).toMatchTextContent('6fda8587d8');
           expect(cell(1, 4)).toHaveClass('old_version');
+
+          const eBtn = $$('main button.more_events', ele);
+          expect(eBtn).toBeTruthy();
+
+          const tBtn = $$('main button.more_tasks', ele);
+          expect(tBtn).toBeFalsy();
           done();
         });
       });
@@ -716,7 +727,7 @@ describe('bot-page', function() {
       });
     });
 
-    it('can fetch more tasks', function(done) {
+    it('can fetch more events', function(done) {
       serveBot('running');
       loggedInBotPage((ele) => {
         ele._eventsCursor = 'myCursor';
@@ -750,6 +761,31 @@ describe('bot-page', function() {
           expect(url).toContain('cursor=myCursor');
           expect(ele._eventsCursor).toEqual('newCursor', 'cursor should update');
           expect(ele._events.length).toEqual(50+50, '50 initial tasks, 50 new tasks');
+
+          done();
+        });
+      });
+    });
+
+    it('reloads tasks and events on refresh', function(done) {
+      serveBot('running');
+      loggedInBotPage((ele) => {
+        ele.render();
+        fetchMock.reset(); // clears history and routes
+
+        serveBot('running');
+
+        const rBtn = $$('main button.refresh', ele);
+        expect(rBtn).toBeTruthy();
+
+        rBtn.click();
+
+        fetchMock.flush(true).then(() => {
+          // MATCHED calls are calls that we expect and specified in the
+          // beforeEach at the top of this file.
+          expectNoUnmatchedCalls(fetchMock);
+          let calls = fetchMock.calls(MATCHED, 'GET');
+          expect(calls.length).toBe(3);
 
           done();
         });

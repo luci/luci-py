@@ -257,7 +257,7 @@ export function legacyTags(filters) {
       return filter;
     }
     let key = filter.substring(0, idx);
-    if (key.endsWith('-tag')) {
+    if (key.endsWith('-tag') || key === 'state') {
       // this is fine
       return filter;
     }
@@ -343,6 +343,10 @@ export function processTasks(arr, existingTags) {
           task.costs_usd[idx] = task.costs_usd[idx] + '*';
         }
       });
+    }
+
+    if (task.cost_saved_usd) {
+      task.cost_saved_usd = '-$'+task.cost_saved_usd.toFixed(4);
     }
 
     for (const time of TASK_TIMES) {
@@ -519,6 +523,9 @@ const colMap = {
   },
   completed_ts: (task) => task.human_completed_ts,
   costs_usd: function(task) {
+    if (task.cost_saved_usd) {
+      return task.cost_saved_usd;
+    }
     return task.costs_usd;
   },
   created_ts: (task) => task.human_created_ts,

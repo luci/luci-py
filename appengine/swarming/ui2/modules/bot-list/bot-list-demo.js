@@ -31,12 +31,12 @@ fetchMock.get('glob:/_ah/api/swarming/v1/bots/list?*',
               requireLogin(bots_10, 500));
 
 fetchMock.get('/_ah/api/swarming/v1/bots/dimensions',
-              requireLogin(fleetDimensions));
+              requireLogin(fleetDimensions, 400));
 
 fetchMock.get('/_ah/api/swarming/v1/bots/count',
               requireLogin(fleetCount));
 fetchMock.get('glob:/_ah/api/swarming/v1/bots/count?*',
-              requireLogin(queryCount));
+              requireLogin(queryCount, 100));
 
 fetchMock.post('glob:/_ah/api/swarming/v1/bot/*/delete', requireLogin(200, 750));
 

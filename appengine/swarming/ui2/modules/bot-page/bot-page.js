@@ -49,8 +49,8 @@ const idAndButtons = (ele) => {
   return html`
 <div class=id_buttons>
   <input id=id_input placeholder="Bot ID" @change=${ele._updateID}></input>
-  <button title="Refresh data"
-          @click=${ele._fetch}>refresh</button>
+  <button title="Refresh data" class=refresh
+          @click=${ele._refresh}>refresh</button>
 </div>`;
 }
 
@@ -625,6 +625,12 @@ window.customElements.define('bot-page', class extends SwarmingAppBoilerplate {
     this.render();
 
     $$('dialog-pop-over', this).show();
+  }
+
+  _refresh() {
+    this._resetCursors();
+    this._fetch();
+    this.render();
   }
 
   render() {

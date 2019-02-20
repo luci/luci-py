@@ -731,7 +731,8 @@ window.customElements.define('task-list', class extends SwarmingAppBoilerplate {
   }
 
   _rebuildFilterables() {
-    this._filteredPossibleColumns = Object.keys(this._possibleColumns);
+    this._filteredPossibleColumns = filterPossibleColumns(Object.keys(this._possibleColumns),
+                                                          this._columnQuery);
 
     this._primaryArr = Object.keys(this._primaryMap);
     this._primaryArr.sort();
@@ -758,7 +759,8 @@ window.customElements.define('task-list', class extends SwarmingAppBoilerplate {
     const input = $$('#column_search', this);
     // If the column selector box is hidden, input will be null
     this._columnQuery = (input && input.value) || '';
-    this._filteredPossibleColumns = filterPossibleColumns(Object.keys(this._possibleColumns), this._columnQuery);
+    this._filteredPossibleColumns = filterPossibleColumns(Object.keys(this._possibleColumns),
+                                                          this._columnQuery);
     sortPossibleColumns(this._filteredPossibleColumns, this._cols);
     this.render();
   }

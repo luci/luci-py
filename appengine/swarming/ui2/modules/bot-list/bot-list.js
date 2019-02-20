@@ -582,7 +582,7 @@ window.customElements.define('bot-list', class extends SwarmingAppBoilerplate {
         this._primaryArr = Object.keys(this._primaryMap);
         this._primaryArr.sort();
         this._filteredPrimaryArr = this._primaryArr.slice();
-        this.render();
+        this._refilterPossibleColumns(); // calls render
         this.app.finishedTask();
       })
       .catch((e) => this.fetchError(e, 'bots/dimensions'));
