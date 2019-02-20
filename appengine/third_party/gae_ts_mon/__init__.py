@@ -7,19 +7,6 @@ import imp
 import os
 import sys
 
-# Adds third_party to sys.path so the packages inside work.  Do not
-# import third_party directly - it mysteriously flakes on GAE under
-# heavy load.
-third_party_dir = os.path.join(os.path.dirname(__file__), 'third_party')
-if third_party_dir not in sys.path:  # pragma: no cover
-  sys.path.insert(0, third_party_dir)
-
-# Add the gae_ts_mon/protobuf directory into the path for the google package, so
-# "import google.protobuf" works.
-protobuf_dir = os.path.join(os.path.dirname(__file__), 'protobuf')
-google.__path__.append(os.path.join(protobuf_dir, 'google'))
-sys.path.insert(0, protobuf_dir)
-
 # Pretend that we are the infra_libs.ts_mon package, so users can use the same
 # import lines in gae and non-gae code.
 if 'infra_libs' not in sys.modules:  # pragma: no cover
