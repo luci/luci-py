@@ -891,7 +891,7 @@ class SwarmingBotService(remote.Service):
     if bot_info.machine_lease:
       ml = lease_management.MachineLease.get_by_id(bot_info.machine_lease)
       # MachineLease entities persist, ensure it's still referring to this bot.
-      if ml.hostname == bot_info.id:
+      if ml and ml.hostname == bot_info.id:
         if lease_management.release(ml):
           # This calls task_queues.cleanup_after_bot and bot_info_key.delete.
           lease_management.cleanup_bot(ml)
