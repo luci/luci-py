@@ -96,7 +96,8 @@ def _expire_task_tx(now, request, to_run_key, result_summary_key, capacity,
   result_summary.modified_ts = now
 
   futures = ndb.put_multi_async(to_put)
-  _maybe_taskupdate_notify_via_tq(result_summary, request, es_cfg)
+  _maybe_taskupdate_notify_via_tq(
+      result_summary, request, es_cfg, transactional=True)
   for f in futures:
     f.check_success()
 
@@ -229,7 +230,8 @@ def _reap_task(bot_dimensions, bot_version, to_run_key, request):
     result_summary.set_from_run_result(run_result, request)
     ndb.put_multi([to_run, run_result, result_summary])
     if result_summary.state != orig_summary_state:
-      _maybe_taskupdate_notify_via_tq(result_summary, request, es_cfg)
+      _maybe_taskupdate_notify_via_tq(
+          result_summary, request, es_cfg, transactional=True)
     return run_result, secret_bytes
 
   # Add it to the negative cache *before* running the transaction. This will
@@ -366,7 +368,8 @@ def _handle_dead_bot(run_result_key):
     futures = ndb.put_multi_async(to_put)
     # if result_summary.state != orig_summary_state:
     if orig_summary_state != result_summary.state:
-      _maybe_taskupdate_notify_via_tq(result_summary, request, es_cfg)
+      _maybe_taskupdate_notify_via_tq(
+          result_summary, request, es_cfg, transactional=True)
     for f in futures:
       f.check_success()
 
@@ -426,7 +429,8 @@ def _maybe_pubsub_notify_now(result_summary, request):
   return True
 
 
-def _maybe_taskupdate_notify_via_tq(result_summary, request, es_cfg):
+def _maybe_taskupdate_notify_via_tq(
+    result_summary, request, es_cfg, transactional):
   """Enqueues tasks to send PubSub and es notifications for given request.
 
   Arguments:
@@ -434,12 +438,13 @@ def _maybe_taskupdate_notify_via_tq(result_summary, request, es_cfg):
     request: a task_request.TaskRequest instance.
     es_cfg: a pool_config.ExternalSchedulerConfig instance if one exists
             for this task, or None otherwise.
+    transactional: if runs as part of a db transaction.
 
   Must be called within a transaction.
 
   Raises CommitError on errors (to abort the transaction).
   """
-  assert ndb.in_transaction()
+  assert transactional == ndb.in_transaction()
   assert isinstance(
       result_summary, task_result.TaskResultSummary), result_summary
   assert isinstance(request, task_request.TaskRequest), request
@@ -454,7 +459,7 @@ def _maybe_taskupdate_notify_via_tq(result_summary, request, es_cfg):
     ok = utils.enqueue_task(
         '/internal/taskqueue/important/pubsub/notify-task/%s' % task_id,
         'pubsub',
-        transactional=True,
+        transactional=transactional,
         payload=utils.encode_to_json(payload))
     if not ok:
       raise datastore_utils.CommitError('Failed to enqueue task')
@@ -1062,6 +1067,11 @@ def schedule_request(request, secret_bytes):
     datastore_utils.transaction(run_parent)
 
   ts_mon_metrics.on_task_requested(result_summary, bool(dupe_summary))
+
+  # Either the task was deduped, or forcibly refused. Notify through PubSub.
+  if result_summary.state != task_result.State.PENDING:
+    _maybe_taskupdate_notify_via_tq(
+        result_summary, request, es_cfg, transactional=False)
   return result_summary
 
 
@@ -1288,7 +1298,8 @@ def bot_kill_task(run_result_key, bot_id):
     result_summary.set_from_run_result(run_result, request)
 
     futures = ndb.put_multi_async((run_result, result_summary))
-    _maybe_taskupdate_notify_via_tq(result_summary, request, es_cfg)
+    _maybe_taskupdate_notify_via_tq(
+        result_summary, request, es_cfg, transactional=True)
     for f in futures:
       f.check_success()
 
@@ -1412,7 +1423,8 @@ def cancel_task(request, result_key, kill_running, bot_id):
     result_summary.modified_ts = now
 
     futures = ndb.put_multi_async(entities)
-    _maybe_taskupdate_notify_via_tq(result_summary, request, es_cfg)
+    _maybe_taskupdate_notify_via_tq(
+        result_summary, request, es_cfg, transactional=True)
     for f in futures:
       f.check_success()
     return True, was_running

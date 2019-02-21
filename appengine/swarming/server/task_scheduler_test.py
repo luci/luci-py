@@ -342,6 +342,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
   def test_schedule_request_new_key_idempotent(self):
     # Ensure that _gen_new_keys work by generating deterministic key, but in the
     # case of task deduplication.
+    pub_sub_calls = self.mock_pub_sub()
     self.mock(random, 'getrandbits', lambda _bits: 42)
     task_id_1 = self._task_ran_successfully(1, 0)
     self.assertEqual('1d69b9f088002a11', task_id_1)
@@ -360,23 +361,47 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     # This leads into a constant TaskRequest key id, leading to conflict in
     # datastore_utils.insert(), which causes a call to _gen_new_keys().
     result_summary_2 = self._quick_schedule(
-        0,
+        1,
         task_slices=[
           task_request.TaskSlice(
               expiration_secs=60,
               properties=_gen_properties(idempotent=True),
               wait_for_capacity=False),
-        ])
+        ],
+        pubsub_topic='projects/abc/topics/def')
     self.assertEqual('1d69b9f088002b10', result_summary_2.task_id)
     self.assertEqual(State.COMPLETED, result_summary_2.state)
     self.assertEqual(task_id_1, result_summary_2.deduped_from)
+    expected = [
+      (
+        'directly',
+        {
+          'attributes': None,
+          'message': '{"task_id":"1d69b9f088002b10"}',
+          'topic': u'projects/abc/topics/def',
+        },
+      ),
+    ]
+    self.assertEqual(expected, pub_sub_calls)
 
   def test_schedule_request_no_capacity(self):
     # No capacity, denied. That's the default.
-    request = _gen_request_slices()
+    pub_sub_calls = self.mock_pub_sub()
+    request = _gen_request_slices(pubsub_topic='projects/abc/topics/def')
     result_summary = task_scheduler.schedule_request(request, None)
     self.assertEqual(State.NO_RESOURCE, result_summary.state)
-    self.assertEqual(1, self.execute_tasks())
+    self.assertEqual(2, self.execute_tasks())
+    expected = [
+      (
+        'directly',
+        {
+          'attributes': None,
+          'message': '{"task_id":"1d69b9f088008910"}',
+          'topic': u'projects/abc/topics/def',
+        },
+      ),
+    ]
+    self.assertEqual(expected, pub_sub_calls)
 
   def test_schedule_request_no_check_capacity(self):
     # No capacity, but check disabled, allowed.
