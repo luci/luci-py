@@ -221,7 +221,7 @@ const stateSection = (ele, bot) => html`
 `;
 
 const tasksTable = (ele, tasks) => {
-  if (!ele._botId || ele._showEvents || ele._notFound) {
+  if (!ele.loggedInAndAuthorized || !ele._botId || ele._showEvents || ele._notFound) {
     return '';
   }
   return html`
@@ -262,7 +262,7 @@ const taskRow = (task) => html`
 `;
 
 const eventsTable = (ele, events) => {
-  if (!ele._botId || !ele._showEvents || ele._notFound) {
+  if (!ele.loggedInAndAuthorized || !ele._botId || !ele._showEvents || ele._notFound) {
     return '';
   }
   return html`
@@ -333,7 +333,7 @@ const template = (ele) => html`
   <main>
     <h2 class=message ?hidden=${ele.loggedInAndAuthorized}>${ele._message}</h2>
 
-    <div class=top>
+    <div class=top ?hidden=${!ele.loggedInAndAuthorized}>
       ${idAndButtons(ele)}
       <h2 class=not_found ?hidden=${!ele._notFound || !ele._botId}>
         Bot not found

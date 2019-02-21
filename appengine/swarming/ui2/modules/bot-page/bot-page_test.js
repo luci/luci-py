@@ -133,6 +133,30 @@ describe('bot-page', function() {
           done();
         });
       });
+
+      it('hides all other elements', function(done) {
+        createElement((ele) => {
+          // other stuff is hidden
+          let content = $('main > *');
+          expect(content.length).toEqual(4); // 3 top level sections and a message
+          for (const div of content) {
+            if (div.tagName !== 'H2') {
+              expect(div).toHaveAttribute('hidden');
+            }
+          }
+          ele._botId = TEST_BOT_ID;
+          ele.render();
+          // even if an id was given
+          content = $('main > *');
+          expect(content.length).toEqual(4); // 3 top level sections and a message
+          for (const div of content) {
+            if (div.tagName !== 'H2') {
+              expect(div).toHaveAttribute('hidden');
+            }
+          }
+          done();
+        });
+      });
     }); //end describe('when not logged in')
 
     describe('when logged in as unauthorized user', function() {

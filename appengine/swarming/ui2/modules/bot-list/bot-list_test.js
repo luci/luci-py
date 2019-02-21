@@ -236,12 +236,12 @@ describe('bot-list', function() {
             expect(rows[2]).toHaveClass('dead');
             expect(rows[2]).toHaveClass('old_version');
             expect(cell(2, 0)).toMatchTextContent('somebot12-a9');
-            expect(cell(2, 1)).toMatchTextContent('3e17182091d7ae11');
+            expect(cell(2, 1)).toMatchTextContent('[died on task]');
             expect(cell(2, 1).innerHTML).toContain('<a ', 'has a link');
             expect(cell(2, 1).innerHTML).toContain('href="/task?id=3e17182091d7ae10"',
                                       'link is pointing to the cannonical (0 ending) page');
-            expect(cell(2, 1).innerHTML).toContain('title="Perf-Win10-Clang-Golo',
-                                      'Mouseover with task name');
+            expect(cell(2, 1).innerHTML).toContain('title="Bot somebot12-a9 was last seen',
+                                      'Mouseover with explanation');
             expect(cell(2, 2)).toMatchTextContent('Windows-10-16299.431');
             expect(cell(2, 3).textContent).toContain('Dead');
             expect(cell(2, 3).textContent).toContain('Last seen 1w ago');
@@ -251,6 +251,14 @@ describe('bot-list', function() {
             expect(cell(3, 3).textContent).toContain('Need to re-format the hard drive.');
 
             expect(rows[4]).toHaveClass('old_version');
+
+            expect(cell(6, 0)).toMatchTextContent('somebot16-a9');
+            expect(cell(6, 1)).toMatchTextContent('3e1723e23fd70811');
+            expect(cell(6, 1).innerHTML).toContain('<a ', 'has a link');
+            expect(cell(6, 1).innerHTML).toContain('href="/task?id=3e1723e23fd70810"',
+                                      'link is pointing to the cannonical (0 ending) page');
+            expect(cell(6, 1).innerHTML).toContain('title="Perf-Win10-Clang-Golo',
+                                      'Mouseover with task name');
             done();
           });
         });

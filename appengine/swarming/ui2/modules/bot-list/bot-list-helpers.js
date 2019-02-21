@@ -765,10 +765,18 @@ const colMap = {
     if (!bot.task_id) {
       return 'idle';
     }
+    let id = bot.task_id;
+    let mouseover = bot.task_name;
+    if (bot.is_dead) {
+      id = '[died on task]';
+      mouseover =
+        `Bot ${bot.bot_id} was last seen running task ${bot.task_id} (${bot.task_name})`;
+    }
+
     return html`<a target=_blank
                    rel=noopener
-                   title=${bot.task_name}
-                   href=${taskPageLink(bot.task_id)}>${bot.task_id}</a>`;
+                   title=${mouseover}
+                   href=${taskPageLink(bot.task_id)}>${id}</a>`;
   },
   uptime: (bot, ele) => {
     const u = fromState(bot, 'uptime');
