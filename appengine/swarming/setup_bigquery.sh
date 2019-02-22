@@ -134,8 +134,9 @@ QUERY='SELECT
       event_time,
       MICROSECOND)*0.000001,
     3) AS until_next,
-  ARRAY(SELECT FORMAT("%s:%s", d.key, v) FROM e.bot.dimensions d, d.values v)
-    AS dimensions_flat,
+  ARRAY(
+    SELECT FORMAT("%s:%s", d.key, v) FROM e.bot.dimensions AS d, d.values AS v)
+      AS dimensions_flat,
   *
 FROM `'${APPID}'.swarming.bot_events` AS e
 WHERE event_time >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 22 DAY)
@@ -149,6 +150,64 @@ if !(bq mk --use_legacy_sql=false --view "${QUERY}" \
   echo "The view already exists. You can delete it with:"
   echo ""
   echo "  bq rm ${APPID}:swarming.bot_events_delta"
+  echo ""
+  echo "and run this script again."
+  # Don't fail here.
+fi
+
+echo ""
+echo " - swarming.task_requests_flat"
+QUERY='SELECT
+  DATE(create_time) AS day,
+  TIMESTAMP_TRUNC(create_time, SECOND) AS time,
+  ARRAY(
+    SELECT DISTINCT FORMAT("%s:%s", dimensions.key, value)
+    FROM
+      UNNEST(r.task_slices) AS slice,
+      UNNEST(slice.properties.dimensions) AS dimensions,
+      UNNEST(dimensions.values) AS value)
+    AS dimensions_flat,
+  *
+FROM `'${APPID}'.swarming.task_requests` AS r
+WHERE create_time >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 22 DAY)
+ORDER BY create_time DESC'
+DESC="Augmented view of last 3 weeks with dimensions_flat"
+if !(bq mk --use_legacy_sql=false --view "${QUERY}" \
+  --description "{$DESC}" \
+  --project_id ${APPID} swarming.task_requests_flat); then
+  echo ""
+  echo "The view already exists. You can delete it with:"
+  echo ""
+  echo "  bq rm ${APPID}:swarming.task_requests_flat"
+  echo ""
+  echo "and run this script again."
+  # Don't fail here.
+fi
+
+echo ""
+echo " - swarming.task_results_flat"
+QUERY='SELECT
+  DATE(end_time) AS day,
+  TIMESTAMP_TRUNC(end_time, SECOND) AS time,
+  ARRAY(
+    SELECT DISTINCT FORMAT("%s:%s", dimensions.key, value)
+    FROM
+      UNNEST(r.request.task_slices[
+        OFFSET(r.current_task_slice)].properties.dimensions) AS dimensions,
+      UNNEST(dimensions.values) AS value)
+    AS dimensions_flat,
+  *
+FROM `'${APPID}'.swarming.task_results` AS r
+WHERE end_time >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 22 DAY)
+ORDER BY end_time DESC'
+DESC="Augmented view of last 3 weeks with dimensions_flat"
+if !(bq mk --use_legacy_sql=false --view "${QUERY}" \
+  --description "{$DESC}" \
+  --project_id ${APPID} swarming.task_results_flat); then
+  echo ""
+  echo "The view already exists. You can delete it with:"
+  echo ""
+  echo "  bq rm ${APPID}:swarming.task_results_flat"
   echo ""
   echo "and run this script again."
   # Don't fail here.
