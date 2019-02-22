@@ -440,8 +440,6 @@ def _maybe_taskupdate_notify_via_tq(
             for this task, or None otherwise.
     transactional: if runs as part of a db transaction.
 
-  Must be called within a transaction.
-
   Raises CommitError on errors (to abort the transaction).
   """
   assert transactional == ndb.in_transaction()
@@ -466,7 +464,7 @@ def _maybe_taskupdate_notify_via_tq(
 
   if es_cfg:
     external_scheduler.notify_request(
-        es_cfg, request, result_summary, True, True)
+        es_cfg, request, result_summary, True, transactional)
 
 
 def _pubsub_notify(task_id, topic, auth_token, userdata):
