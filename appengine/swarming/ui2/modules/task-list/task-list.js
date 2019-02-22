@@ -286,7 +286,8 @@ const template = (ele) => html`
       <task-mass-cancel
           .auth_header=${ele.auth_header}
           .tags=${ele._filters.map(stripTagFromFilter)}></task-mass-cancel>
-      <button class=goback @click=${ele._closePopup}
+      <button class=goback tabindex=0
+              @click=${ele._closePopup}
               ?disabled=${ele._startedCanceling && !ele._finishedCanceling}>
         ${ele._startedCanceling ? 'DISMISS': "GO BACK - DON'T CANCEL ANYTHING"}
       </button>
@@ -728,6 +729,7 @@ window.customElements.define('task-list', class extends SwarmingAppBoilerplate {
   _promptMassCancel(e) {
     $$('task-mass-cancel', this).show();
     $$('dialog-pop-over', this).show();
+    $$('dialog-pop-over button.goback', this).focus();
   }
 
   _rebuildFilterables() {
@@ -780,15 +782,25 @@ window.customElements.define('task-list', class extends SwarmingAppBoilerplate {
     // Incorporate any data changes before rendering.
     sortColumns(this._cols);
     super.render();
-    if (this._primaryKey && !onSmallScreen()) {
-      const selectedKey = $$('.keys.selector .item[selected]', this);
+    this._scrollToPrimaryKey();
+  }
+
+  _scrollToPrimaryKey() {
+    if (this._primaryKey) {
+      const keySelector = $$('.keys.selector', this);
+      const selectedKey = $$('.item[selected]', keySelector);
       // Especially on a page reload, the selected key won't be viewable.
       // This scrolls the little box into view if it's not and, since it
       // runs every render, keeps it in view.
-      selectedKey && selectedKey.scrollIntoView({
-        behavior: 'smooth',
-        block: 'center',
-      });
+      // Do not use selectedKey.scrollIntoView since that will make the
+      // whole page scroll and not just the selector box.
+      if (selectedKey) {
+        keySelector.scrollTo({
+          // 160 was found by experimentation with what looks good
+          top: selectedKey.offsetTop - 160,
+          behavior: 'smooth'
+        });
+      }
     }
   }
 

@@ -864,8 +864,8 @@ const template = (ele) => html`
     <div class='retry-dialog content'>
       ${retryOrDebugPrompt(ele, ele._currentSlice.properties || {})}
       <div class="horizontal layout end">
-        <button @click=${ele._closePopups} class=cancel>Cancel</button>
-        <button @click=${ele._promptCallback} class=ok>OK</button>
+        <button @click=${ele._closePopups} class=cancel tabindex=0>Cancel</button>
+        <button @click=${ele._promptCallback} class=ok tabindex=0>OK</button>
       </div>
     </div>
   </dialog-pop-over>
@@ -873,8 +873,8 @@ const template = (ele) => html`
     <div class='cancel-dialog content'>
       Are you sure you want to ${ele._prompt} task ${ele._taskId}?
       <div class="horizontal layout end">
-        <button @click=${ele._closePopups} class=cancel>NO</button>
-        <button @click=${ele._promptCallback} class=ok>YES</button>
+        <button @click=${ele._closePopups} class=cancel tabindex=0>NO</button>
+        <button @click=${ele._promptCallback} class=ok tabindex=0>YES</button>
       </div>
     </div>
   </dialog-pop-over>
@@ -1219,6 +1219,7 @@ time.sleep(${leaseDuration})`];
     this._promptCallback = this._cancelTask;
     this.render();
     $$('dialog-pop-over#cancel', this).show();
+    $$('dialog-pop-over#cancel button.cancel', this).focus();
   }
 
   _promptDebug() {
@@ -1230,6 +1231,7 @@ time.sleep(${leaseDuration})`];
     this._promptCallback = this._debugTask;
     this.render();
     $$('dialog-pop-over#retry', this).show();
+    $$('dialog-pop-over#retry button.cancel', this).focus();
   }
 
   _promptRetry() {
@@ -1241,6 +1243,7 @@ time.sleep(${leaseDuration})`];
     this._promptCallback = this._retryTask;
     this.render();
     $$('dialog-pop-over#retry', this).show();
+    $$('dialog-pop-over#retry button.cancel', this).focus();
   }
 
   render() {

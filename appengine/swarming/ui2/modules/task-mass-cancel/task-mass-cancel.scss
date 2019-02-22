@@ -11,6 +11,10 @@ task-mass-cancel {
     color: #333;
   }
 
+  button.cancel:focus {
+    border: 5px solid #eaa017;
+  }
+
    checkbox-sk {
     display: inline-block;
   }

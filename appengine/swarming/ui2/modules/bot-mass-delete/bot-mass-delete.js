@@ -45,7 +45,8 @@ const template = (ele) => html`
   </div>
 
   <button class=delete ?disabled=${!ele._readyToDelete || ele._started}
-                       @click=${ele._deleteAll}>
+                       @click=${ele._deleteAll}
+                       tabindex=0>
     Delete the bots
   </button>
 

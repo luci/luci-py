@@ -10,4 +10,8 @@ bot-mass-delete {
     background-color: #ddd;
     color: #333;
   }
+
+  button.delete:focus {
+    border: 5px solid #eaa017;
+  }
 }

@@ -40,7 +40,8 @@ const template = (ele) => html`
     <div>
       <checkbox-sk ?checked=${ele._both}
                    ?disabled=${ele._started}
-                   @click=${ele._toggleBoth}>
+                   @click=${ele._toggleBoth}
+                   tabindex=0>
       </checkbox-sk> Also include RUNNING tasks.
     </div>
 

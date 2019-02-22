@@ -283,7 +283,8 @@ const template = (ele) => html`
       <bot-mass-delete .auth_header=${ele.auth_header}
                        .dimensions=${dimensionsOnly(ele._filters)}>
       </bot-mass-delete>
-      <button class=goback @click=${ele._closePopup}
+      <button class=goback tabindex=0
+              @click=${ele._closePopup}
               ?disabled=${ele._startedDeleting && !ele._finishedDeleting}>
         ${ele._startedDeleting ? 'DISMISS': "GO BACK - DON'T DELETE ANYTHING"}
       </button>
@@ -675,6 +676,7 @@ window.customElements.define('bot-list', class extends SwarmingAppBoilerplate {
   _promptMassDelete(e) {
     $$('bot-mass-delete', this).show();
     $$('dialog-pop-over', this).show();
+    $$('dialog-pop-over button.goback', this).focus();
   }
 
   _refilterPossibleColumns(e) {
@@ -717,15 +719,25 @@ window.customElements.define('bot-list', class extends SwarmingAppBoilerplate {
     // Incorporate any data changes before rendering.
     sortColumns(this._cols);
     super.render();
+    this._scrollToPrimaryKey();
+  }
+
+  _scrollToPrimaryKey() {
     if (this._primaryKey) {
-      const selectedKey = $$('.keys.selector .item[selected]', this);
+      const keySelector = $$('.keys.selector', this);
+      const selectedKey = $$('.item[selected]', keySelector);
       // Especially on a page reload, the selected key won't be viewable.
       // This scrolls the little box into view if it's not and, since it
       // runs every render, keeps it in view.
-      selectedKey && selectedKey.scrollIntoView({
-        behavior: 'smooth',
-        block: 'center',
-      });
+      // Do not use selectedKey.scrollIntoView since that will make the
+      // whole page scroll and not just the selector box.
+      if (selectedKey) {
+        keySelector.scrollTo({
+          // 160 was found by experimentation with what looks good
+          top: selectedKey.offsetTop - 160,
+          behavior: 'smooth'
+        });
+      }
     }
   }
 

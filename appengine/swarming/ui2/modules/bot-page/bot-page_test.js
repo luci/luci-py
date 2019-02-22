@@ -511,12 +511,34 @@ describe('bot-page', function() {
           expect(rows[2]).toHaveClass('hidden', 'not quarantined');
           expect(rows[3]).not.toHaveClass('hidden', 'dead');
           expect(rows[4]).toHaveClass('hidden', 'not in maintenance');
+          expect(cell(5, 0)).toMatchTextContent('Died on Task');
           expect(rows[27]).not.toHaveAttribute('hidden');
           expect(cell(27, 0)).toMatchTextContent('Machine Provider Lease ID');
           expect(cell(27, 1)).toMatchTextContent('f69394d5f68b1f1e6c5f13e82ba4ccf72de7e6a0');
           expect(cell(27, 1).innerHTML).toContain('<a ', 'has a link');
           expect(cell(27, 1).innerHTML).toContain('href="https://example.com/leases/'+
                                                   'f69394d5f68b1f1e6c5f13e82ba4ccf72de7e6a0"');
+
+          done();
+        });
+      });
+
+      it('does not display kill task on dead bot', function(done) {
+        loggedInBotPage((ele) => {
+          ele._bot.task_id = 't1233';
+          const dataTable = $$('table.data_table', ele);
+          expect(dataTable).toBeTruthy();
+
+          const rows = $('tr', dataTable);
+          expect(rows).toBeTruthy();
+          expect(rows.length).toBeTruthy();
+
+          // little helper for readability
+          const cell = (r, c) => rows[r].children[c];
+
+          const killBtn = $$('button.kill', cell(5, 2));
+          expect(killBtn).toBeTruthy();
+          expect(killBtn).toHaveAttribute('hidden');
 
           done();
         });

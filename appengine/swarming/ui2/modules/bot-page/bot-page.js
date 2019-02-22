@@ -98,7 +98,7 @@ const statusAndTask = (ele, bot) => {
   <td colspan=2 class=code>${bot.maintenance_msg}</td>
 </tr>
 <tr>
-  <td>Current Task</td>
+  <td>${bot.is_dead ? 'Died on Task': 'Current Task'}</td>
   <td>
     <a target=_blank rel=noopener
         href=${ifDefined(taskPageLink(bot.task_id))}>
@@ -107,7 +107,7 @@ const statusAndTask = (ele, bot) => {
   </td>
   <td>
     <button class=kill
-            ?hidden=${!bot.task_id}
+            ?hidden=${!bot.task_id || bot.is_dead}
             ?disabled=${!ele.permissions.cancel_task}
             @click=${ele._promptKill}>
         Kill task
@@ -379,8 +379,8 @@ const template = (ele) => html`
     <div class='prompt-dialog content'>
       Are you sure you want to ${ele._prompt}?
       <div class="horizontal layout end">
-        <button @click=${ele._closePopup} class=cancel>NO</button>
-        <button @click=${ele._promptCallback} class=ok>YES</button>
+        <button @click=${ele._closePopup} class=cancel tabindex=0>NO</button>
+        <button @click=${ele._promptCallback} class=ok tabindex=0>YES</button>
       </div>
     </div>
   </dialog-pop-over>
@@ -609,6 +609,7 @@ window.customElements.define('bot-page', class extends SwarmingAppBoilerplate {
     this.render();
 
     $$('dialog-pop-over', this).show();
+    $$('dialog-pop-over button.cancel', this).focus();
   }
 
   _promptKill() {
@@ -617,6 +618,7 @@ window.customElements.define('bot-page', class extends SwarmingAppBoilerplate {
     this.render();
 
     $$('dialog-pop-over', this).show();
+    $$('dialog-pop-over button.cancel', this).focus();
   }
 
   _promptShutdown() {
@@ -625,6 +627,7 @@ window.customElements.define('bot-page', class extends SwarmingAppBoilerplate {
     this.render();
 
     $$('dialog-pop-over', this).show();
+    $$('dialog-pop-over button.cancel', this).focus();
   }
 
   _refresh() {
