@@ -39,7 +39,7 @@ import '../swarming-app'
 
 
 import { applyAlias, handleLegacyFilters, maybeApplyAlias } from '../alias'
-import { aggregateTemps, attribute, botLink, column, devices,
+import { aggregateTemps, attribute, botLink, column, devices, dimensionsOnly,
          filterBots, forcedColumns, fromDimension, fromState, getColHeader,
          initCounts, listQueryParams, longestOrAll, processBots, processCounts,
          makePossibleColumns, processPrimaryMap, sortColumns,
@@ -129,7 +129,7 @@ const options = (ele) => html`
     <span>Verbose Entries</span>
   </div>
   <a href=${ele._matchingTasksLink()}>View Matching Tasks</a>
-  <button
+  <button class=delete_all
       ?disabled=${!ele.permissions.delete_bot}
       @click=${ele._promptMassDelete}>
     DELETE ALL DEAD BOTS
@@ -280,7 +280,9 @@ const template = (ele) => html`
   <footer></footer>
   <dialog-pop-over>
     <div class='delete content'>
-      <bot-mass-delete .auth_header=${ele.auth_header} .dimensions=${ele._filters}></bot-mass-delete>
+      <bot-mass-delete .auth_header=${ele.auth_header}
+                       .dimensions=${dimensionsOnly(ele._filters)}>
+      </bot-mass-delete>
       <button class=goback @click=${ele._closePopup}
               ?disabled=${ele._startedDeleting && !ele._finishedDeleting}>
         ${ele._startedDeleting ? 'DISMISS': "GO BACK - DON'T DELETE ANYTHING"}

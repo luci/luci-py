@@ -141,6 +141,21 @@ export const specialFilters = {
   }
 };
 
+/** dimensionsOnly takes a list of filters in the form foo:bar
+ *  and filters out any that are not dimensions.
+ */
+export function dimensionsOnly(filters) {
+  const nonDimensions = Object.keys(specialFilters);
+  return filters.filter((f) => {
+    for (const nd of nonDimensions) {
+      if (f.startsWith(nd)) {
+        return false;
+      }
+    }
+    return true;
+  });
+}
+
 /** Filters the bots like they would be filtered from the server
  * @param {Array<String>} filters - e.g. ['alpha:beta']
  * @param {Array<Object>} bots - the bot objects to filter.
