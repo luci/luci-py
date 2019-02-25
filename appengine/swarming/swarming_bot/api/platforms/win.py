@@ -73,20 +73,21 @@ def _get_disk_info(mount_point):
 def _get_win32com():
   """Returns an uninitialized WMI client."""
   try:
+    import pythoncom
     from win32com import client  # pylint: disable=F0401
-    return client
+    return client, pythoncom
   except ImportError:
     # win32com is included in pywin32, which is an optional package that is
     # installed by Swarming devs. If you find yourself needing it to run without
     # pywin32, for example in cygwin, please send us a CL with the
     # implementation that doesn't use pywin32.
-    return None
+    return None, None
 
 
 @tools.cached
 def _get_wmi_wbem():
   """Returns a WMI client connected to localhost ready to do queries."""
-  client = _get_win32com()
+  client, _ = _get_win32com()
   if not client:
     return None
   wmi_service = client.Dispatch('WbemScripting.SWbemLocator')
@@ -291,7 +292,7 @@ def get_gpu():
   if not wbem:
     return None, None
 
-  client = _get_win32com()
+  _, pythoncom = _get_win32com()
   dimensions = set()
   state = set()
   # https://msdn.microsoft.com/library/aa394512.aspx
@@ -320,7 +321,7 @@ def get_gpu():
         state.add(u'%s %s %s' % (ven_name, dev_name, version))
       else:
         state.add(u'%s %s' % (ven_name, dev_name))
-  except client.com_error as e:
+  except pythoncom.com_error as e:
     # This generally happens when this is called as the host is shutting down.
     logging.error('get_gpu(): %s', e)
   return sorted(dimensions), sorted(state)
