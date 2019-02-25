@@ -1550,12 +1550,14 @@ def cron_send_to_bq():
     """Returns a list of tuple(db_key, bq_key, row)."""
     # bq_key is not usable here, see get_oldest_key() to see why.
     earliest = datetime.datetime.strptime(db_key, fmt)
-    return [
+    items = (
         _convert(e) for e in
         TaskRunResult.query(TaskRunResult.completed_ts > earliest).order(
             TaskRunResult.completed_ts).fetch(limit=size)
         if e
-    ]
+    )
+    # Ignore _convert() failure.
+    return [e for e in items if e[0]]
 
   def fetch_rows(_db_keys, bq_keys):
     """Returns a list of tuple(db_key, bq_key, row)."""
