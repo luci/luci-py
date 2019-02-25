@@ -905,10 +905,6 @@ class TaskSlice(ndb.Model):
     """
     if not self.properties.idempotent:
       return None
-    return self.properties_hash_raw().digest()
-
-  def properties_hash_raw(self):
-    """Calculates the properties_hash for this request."""
     props = self.properties.to_dict()
     if self.properties.has_secret_bytes:
       # When called from task_scheduler.schedule_task(), this function is called
@@ -920,7 +916,7 @@ class TaskSlice(ndb.Model):
       # inside a transaction.
       k = task_pack.request_key_to_secret_bytes_key(self._request.key)
       props['secret_bytes'] = k.get().secret_bytes.encode('hex')
-    return self.HASHING_ALGO(utils.encode_to_json(props))
+    return self.HASHING_ALGO(utils.encode_to_json(props)).digest()
 
   def to_dict(self):
     # to_dict() doesn't recurse correctly into ndb.LocalStructuredProperty! It
@@ -933,7 +929,6 @@ class TaskSlice(ndb.Model):
     """Converts self to a swarming_pb2.TaskSlice."""
     if self.properties:
       self.properties.to_proto(out.properties)
-      out.properties_hash = self.properties_hash_raw().hexdigest()
     out.wait_for_capacity = self.wait_for_capacity
     if self.expiration_secs:
       out.expiration.seconds = self.expiration_secs

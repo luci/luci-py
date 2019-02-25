@@ -889,10 +889,7 @@ class TaskRequestApiTest(TestCase):
     request.key = task_request.new_request_key()
     # Necessary to attach a secret to the request:
     request.put()
-    _gen_secret(request, 'I am a banana').put()
-    # TODO(maruel): Hack to prime the TaskSlice._request. This is not needed in
-    # the real code flow.
-    request.task_slice(0)
+    _gen_secret(request, 'I am a banana')
 
     expected_props = swarming_pb2.TaskProperties(
         cas_inputs=swarming_pb2.CASTree(
@@ -911,7 +908,7 @@ class TaskRequestApiTest(TestCase):
         command=[u'command1', u'arg1'],
         relative_cwd=u'subdir',
         # extra_args cannot be specified with command.
-        # secret_bytes cannot be retrieved, but is included in properties_hash.
+        # secret_bytes cannot be retrieved.
         has_secret_bytes=True,
         dimensions=[
           swarming_pb2.StringListPair(key=u'OS', values=[u'Windows-3.1.1']),
@@ -937,9 +934,6 @@ class TaskRequestApiTest(TestCase):
               properties=expected_props,
               expiration=duration_pb2.Duration(seconds=30),
               wait_for_capacity=True,
-              properties_hash=
-                  '575b14dc0f59f68d54e2264f51d3c88c41f1465852f99fc9f66a8aa770c2'
-                  '33f8',
           ),
         ],
         priority=50,

@@ -683,9 +683,6 @@ class TaskResultApiTest(TestCase):
                     grace_period=duration_pb2.Duration(seconds=30),
                   ),
                   expiration=duration_pb2.Duration(seconds=60),
-                  properties_hash=
-                      '17934af0f7d694d0fb1720ff970709a5fd150d4e532083173b9e38ec'
-                      'f027e563',
               ),
             ],
             priority=50,
