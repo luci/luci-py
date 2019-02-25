@@ -203,6 +203,7 @@ FILES = (
     'third_party/googleapiclient/schema.py',
     'third_party/httplib2/__init__.py',
     'third_party/httplib2/cacerts.txt',
+    'third_party/httplib2/certs.py',
     'third_party/httplib2/iri2uri.py',
     'third_party/httplib2/socks.py',
     'third_party/oauth2client/__init__.py',
