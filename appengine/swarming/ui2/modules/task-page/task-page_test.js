@@ -944,6 +944,67 @@ describe('task-page', function() {
       });
     });
 
+    it('makes a POST to debug a job', function(done) {
+      serveTask(1, 'Completed task with 2 slices');
+      loggedInTaskPage((ele) => {
+        fetchMock.resetHistory();
+        fetchMock.post('/_ah/api/swarming/v1/tasks/new', {task_id: TEST_TASK_ID});
+
+        const debugBtn = $$('.id_buttons button.debug', ele);
+        expect(debugBtn).toBeTruthy();
+
+        debugBtn.click();
+
+        const dialog = $$('.retry-dialog', ele);
+        expect(dialog).toBeTruthy();
+        expect(dialog).toHaveClass('opened');
+
+        // https://crbug.com/935736
+        const useSameBot = $$('checkbox-sk.same-bot');
+        expect(useSameBot).toBeTruthy();
+
+        useSameBot.click();
+
+        const okBtn = $$('button.ok', dialog);
+        expect(okBtn).toBeTruthy();
+
+        // stub out the fetch so the new task doesn't load.
+        ele._fetch = () => {};
+        okBtn.click();
+
+        fetchMock.flush(true).then(() => {
+          // MATCHED calls are calls that we expect and specified in the
+          // beforeEach at the top of this file.
+          let calls = fetchMock.calls(MATCHED, 'GET');
+          expect(calls.length).toBe(0);
+          calls = fetchMock.calls(MATCHED, 'POST');
+          expect(calls.length).toBe(1);
+
+          const options = calls[0][1];
+          expect(options.headers.authorization).toBeTruthy();
+
+          const body = JSON.parse(options.body);
+          expect(body.name).toContain('leased to');
+
+          const dims = body.properties.dimensions;
+          expect(dims).toBeTruthy();
+          dims.sort((a,b) => {
+            return a.key.localeCompare(b.key);
+          });
+          expect(dims).toEqual([{
+            key: 'id',
+            value: 'swarm1931-c4'
+          }, {
+            key: 'pool',
+            value: 'luci.chromium.try',
+          }]);
+
+          expectNoUnmatchedCalls(fetchMock);
+          done();
+        });
+      });
+    });
+
     it('makes a post to cancel a pending job', function(done) {
       serveTask(2, 'Pending task - 1 slice - no rich logs');
       loggedInTaskPage((ele) => {

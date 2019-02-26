@@ -789,7 +789,11 @@ const retryOrDebugPrompt = (ele, sliceProps) => {
       <input id=lease_duration value=4h></input>
     </div>
     <div class=ib>
-      <checkbox-sk ?checked=${ele._useSameBot} @click=${ele._toggleSameBot}></checkbox-sk>
+      <checkbox-sk class=same-bot
+          ?disabled=${!wasPickedUp(ele._result)}
+          ?checked=${ele._useSameBot}
+          @click=${ele._toggleSameBot}>
+      </checkbox-sk>
       <span>Run task on the same bot</span>
     </div>
     <br>
@@ -991,7 +995,12 @@ window.customElements.define('task-page', class extends SwarmingAppBoilerplate {
       newDimensions.push({
         key: 'id',
         value: firstDimension(this._result.bot_dimensions, 'id'),
-      });
+      }, {
+        // pool is always a required dimension
+        key: 'pool',
+        value: firstDimension(this._result.bot_dimensions, 'pool'),
+      }
+      );
     } else {
       const inputRows = $('#retry_inputs tr', this);
       for (const row of inputRows) {
@@ -1004,13 +1013,19 @@ window.customElements.define('task-page', class extends SwarmingAppBoilerplate {
           });
         }
       }
+      if (!newDimensions.length) {
+        errorMessage('You must specify some dimensions (pool is required)', 6000);
+        return null;
+      }
+      if (!firstDimension(newDimensions, 'pool')) {
+        errorMessage('The pool dimension is required');
+        return null;
+      }
     }
     return newDimensions;
   }
 
   _debugTask() {
-    this._closePopups();
-
     const newTask = {
       expiration_secs: this._request.expiration_secs,
       name: `leased to ${this.profile.email} for debugging`,
@@ -1039,9 +1054,13 @@ time.sleep(${leaseDuration})`];
 
     newTask.properties.execution_timeout_secs = leaseDuration;
     newTask.properties.io_timeout_secs = leaseDuration;
-    newTask.properties.dimensions = this._collectDimensions();
-
+    const dims = this._collectDimensions();
+    if (!dims) {
+      return;
+    }
+    newTask.properties.dimensions = dims;
     this._newTask(newTask);
+    this._closePopups();
   }
 
   _fetch() {
@@ -1185,10 +1204,6 @@ time.sleep(${leaseDuration})`];
 
   // _newTask makes a request to the server to start a new task, given a request.
   _newTask(newTask) {
-    if (!newTask.properties.dimensions || !newTask.properties.dimensions.length) {
-      errorMessage('Your retried task must specify dimensions', 5000);
-      return;
-    }
     newTask.properties.idempotent = false;
     this.app.addBusyTasks(1);
     fetch('/_ah/api/swarming/v1/tasks/new', {
@@ -1228,6 +1243,7 @@ time.sleep(${leaseDuration})`];
       return;
     }
     this._isPromptDebug = true;
+    this._useSameBot = false;
     this._promptCallback = this._debugTask;
     this.render();
     $$('dialog-pop-over#retry', this).show();
@@ -1240,6 +1256,7 @@ time.sleep(${leaseDuration})`];
       return;
     }
     this._isPromptDebug = false;
+    this._useSameBot = false;
     this._promptCallback = this._retryTask;
     this.render();
     $$('dialog-pop-over#retry', this).show();
@@ -1253,8 +1270,6 @@ time.sleep(${leaseDuration})`];
   }
 
   _retryTask() {
-    this._closePopups();
-
     const newTask = {
       expiration_secs: this._request.expiration_secs,
       name: this._request.name + ' (retry)',
@@ -1267,9 +1282,14 @@ time.sleep(${leaseDuration})`];
     }
     newTask.tags.push('retry:1');
 
-    newTask.properties.dimensions = this._collectDimensions();
+    const dims = this._collectDimensions();
+    if (!dims) {
+      return;
+    }
+    newTask.properties.dimensions = dims;
 
     this._newTask(newTask);
+    this._closePopups();
   }
 
   _setSlice(idx) {
@@ -1290,6 +1310,9 @@ time.sleep(${leaseDuration})`];
   _toggleSameBot(e) {
     // This prevents the checkbox from toggling twice.
     e.preventDefault();
+    if (!wasPickedUp(this._result)) {
+      return;
+    }
     this._useSameBot = !this._useSameBot;
     this.render();
   }
