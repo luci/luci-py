@@ -895,16 +895,17 @@ class TaskSlice(ndb.Model):
   # set to False to avoid unnecessary waiting.
   wait_for_capacity = ndb.BooleanProperty(default=False)
 
-  # Set at instantiation, needed to calculate properties_hash.
-  _request = None
-
-  def properties_hash(self):
+  def properties_hash(self, request):
     """Calculates the properties_hash for this request, if applicable.
 
     Note: if the property has secret bytes, this function call causes a DB GET.
     """
     if not self.properties.idempotent:
       return None
+    return self._properties_hash_raw(request).digest()
+
+  def _properties_hash_raw(self, request):
+    """Calculates the properties_hash for this request."""
     props = self.properties.to_dict()
     if self.properties.has_secret_bytes:
       # When called from task_scheduler.schedule_task(), this function is called
@@ -914,9 +915,9 @@ class TaskSlice(ndb.Model):
       # When called in the context of an idempotent TaskRunResult that is
       # COMPLETED with success, this is much more costly since this happens
       # inside a transaction.
-      k = task_pack.request_key_to_secret_bytes_key(self._request.key)
+      k = task_pack.request_key_to_secret_bytes_key(request.key)
       props['secret_bytes'] = k.get().secret_bytes.encode('hex')
-    return self.HASHING_ALGO(utils.encode_to_json(props)).digest()
+    return self.HASHING_ALGO(utils.encode_to_json(props))
 
   def to_dict(self):
     # to_dict() doesn't recurse correctly into ndb.LocalStructuredProperty! It
@@ -925,10 +926,11 @@ class TaskSlice(ndb.Model):
     out['properties'] = self.properties.to_dict()
     return out
 
-  def to_proto(self, out):
+  def to_proto(self, out, request):
     """Converts self to a swarming_pb2.TaskSlice."""
     if self.properties:
       self.properties.to_proto(out.properties)
+      out.properties_hash = self._properties_hash_raw(request).hexdigest()
     out.wait_for_capacity = self.wait_for_capacity
     if self.expiration_secs:
       out.expiration.seconds = self.expiration_secs
@@ -1050,7 +1052,6 @@ class TaskRequest(ndb.Model):
           properties=self.properties_old, expiration_secs=self.expiration_secs)
     else:
       t = self.task_slices[index]
-    t._request = self
     return t
 
   @property
@@ -1114,7 +1115,7 @@ class TaskRequest(ndb.Model):
     # Scheduling.
     for task_slice in self.task_slices:
       t = out.task_slices.add()
-      task_slice.to_proto(t)
+      task_slice.to_proto(t, self)
     if self.priority:
       out.priority = self.priority
     if self.service_account:

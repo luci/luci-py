@@ -1098,7 +1098,7 @@ class TaskResultSummary(_TaskResultCommon):
         not self.deduped_from):
       # Signal the results are valid and can be reused. If the request has a
       # SecretBytes, it is GET, which is a performance concern.
-      self.properties_hash = t.properties_hash()
+      self.properties_hash = t.properties_hash(request)
 
   def need_update_from_run_result(self, run_result):
     """Returns True if set_from_run_result() would modify this instance.

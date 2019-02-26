@@ -970,7 +970,7 @@ def schedule_request(request, secret_bytes):
   for i in xrange(request.num_task_slices):
     t = request.task_slice(i)
     if t.properties.idempotent:
-      dupe_summary = _find_dupe_task(now, t.properties_hash())
+      dupe_summary = _find_dupe_task(now, t.properties_hash(request))
       if dupe_summary:
         _dedupe_result_summary(dupe_summary, result_summary, i)
         # In this code path, there's not much to do as the task will not be run,

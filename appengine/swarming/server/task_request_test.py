@@ -533,7 +533,7 @@ class TaskRequestApiTest(TestCase):
     # Other unit tests should use the calculated value.
     self.assertEqual(
         'aa33c679b3ee30e37b9724d79a9d20bc767475c00e7f659b6191508f6b16f1ab',
-        req.task_slice(0).properties_hash().encode('hex'))
+        req.task_slice(0).properties_hash(req).encode('hex'))
 
   def test_init_new_request_isolated(self):
     parent = _gen_request(
@@ -633,7 +633,7 @@ class TaskRequestApiTest(TestCase):
     # Other unit tests should use the calculated value.
     self.assertEqual(
         '121c6bd6216a4cc9c4302a52da6292e5a240807ef13ace6f7f36a0c83aec6f55',
-        req.task_slice(0).properties_hash().encode('hex'))
+        req.task_slice(0).properties_hash(req).encode('hex'))
 
   def test_init_new_request_parent(self):
     parent = _gen_request()
@@ -660,7 +660,7 @@ class TaskRequestApiTest(TestCase):
     # Ensure the algorithm is deterministic.
     self.assertEqual(
         '58b6b8966199b901406b82ed15b23b7070cbf6ea8cba237838911939b387b4c6',
-        request.task_slice(0).properties_hash().encode('hex'))
+        request.task_slice(0).properties_hash(request).encode('hex'))
 
   def test_init_new_request_bot_service_account(self):
     request = _gen_request(service_account='bot')
@@ -817,9 +817,9 @@ class TaskRequestApiTest(TestCase):
               properties=_gen_properties(idempotent=True)),
         ])
     self.assertEqual(
-        request_1.task_slice(0).properties_hash(),
-        request_2.task_slice(0).properties_hash())
-    self.assertTrue(request_1.task_slice(0).properties_hash())
+        request_1.task_slice(0).properties_hash(request_1),
+        request_2.task_slice(0).properties_hash(request_2))
+    self.assertTrue(request_1.task_slice(0).properties_hash(request_1))
 
   def test_different(self):
     # Two TestRequest with different properties.
@@ -829,8 +829,8 @@ class TaskRequestApiTest(TestCase):
         properties=_gen_properties(
             execution_timeout_secs=129, idempotent=True))
     self.assertNotEqual(
-        request_1.task_slice(0).properties_hash(),
-        request_2.task_slice(0).properties_hash())
+        request_1.task_slice(0).properties_hash(request_1),
+        request_2.task_slice(0).properties_hash(request_2))
 
   def test_to_proto(self):
     # Try to set as much things as possible to exercise most code paths.
@@ -889,7 +889,7 @@ class TaskRequestApiTest(TestCase):
     request.key = task_request.new_request_key()
     # Necessary to attach a secret to the request:
     request.put()
-    _gen_secret(request, 'I am a banana')
+    _gen_secret(request, 'I am a banana').put()
 
     expected_props = swarming_pb2.TaskProperties(
         cas_inputs=swarming_pb2.CASTree(
@@ -908,7 +908,7 @@ class TaskRequestApiTest(TestCase):
         command=[u'command1', u'arg1'],
         relative_cwd=u'subdir',
         # extra_args cannot be specified with command.
-        # secret_bytes cannot be retrieved.
+        # secret_bytes cannot be retrieved, but is included in properties_hash.
         has_secret_bytes=True,
         dimensions=[
           swarming_pb2.StringListPair(key=u'OS', values=[u'Windows-3.1.1']),
@@ -934,6 +934,9 @@ class TaskRequestApiTest(TestCase):
               properties=expected_props,
               expiration=duration_pb2.Duration(seconds=30),
               wait_for_capacity=True,
+              properties_hash=
+                  '575b14dc0f59f68d54e2264f51d3c88c41f1465852f99fc9f66a8aa770c2'
+                  '33f8',
           ),
         ],
         priority=50,
@@ -972,8 +975,9 @@ class TaskRequestApiTest(TestCase):
 
   def test_TaskSlice_to_proto_empty(self):
     # Assert that it doesn't throw on empty entity.
+    request = task_request.TaskRequest()
     actual = swarming_pb2.TaskSlice()
-    task_request.TaskSlice().to_proto(actual)
+    task_request.TaskSlice().to_proto(actual, request)
     self.assertEqual(swarming_pb2.TaskSlice(), actual)
 
   def test_TaskProperties_to_proto_empty(self):
