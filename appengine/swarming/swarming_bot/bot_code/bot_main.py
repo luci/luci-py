@@ -755,17 +755,15 @@ def _run_manifest(botobj, manifest, start):
   # to execute the command. It is important to note that this data is extracted
   # before any I/O is done, like writting the manifest to disk.
   task_id = manifest['task_id']
-  hard_timeout = manifest['hard_timeout'] or None
-  # Default the grace period to 30s here, this doesn't affect the grace period
-  # for the actual task.
-  grace_period = manifest['grace_period'] or 30
-  if manifest['hard_timeout']:
+  last_ditch_timeout = manifest['hard_timeout'] or None
+  # The grace period is the time between SIGTERM and SIGKILL.
+  grace_period = max(manifest['grace_period'] or 0, 30)
+  if last_ditch_timeout:
     # One for the child process, one for run_isolated, one for task_runner.
-    hard_timeout += 3 * manifest['grace_period']
-    # For isolated task, download time is not counted for hard timeout so add
-    # more time.
-    if not manifest['command']:
-      hard_timeout += manifest['io_timeout'] or 600
+    last_ditch_timeout += 3 * grace_period
+    # CIPD, isolated download time, plus named cache cleanup is not counted for
+    # hard timeout so add more time; hard_timeout is handled by run_isolated.
+    last_ditch_timeout += max(manifest['io_timeout'] or 0, 1200)
 
   # Get the server info to pass to the task runner so it can provide updates.
   url = botobj.remote.server
@@ -891,17 +889,17 @@ def _run_manifest(botobj, manifest, start):
           stderr=subprocess42.STDOUT,
           close_fds=sys.platform != 'win32')
       try:
-        proc.wait(hard_timeout)
+        proc.wait(last_ditch_timeout)
       except subprocess42.TimeoutExpired:
         # That's the last ditch effort; as task_runner should have completed a
-        # while ago and had enforced the timeout itself (or run_isolated for
-        # hard_timeout for isolated task).
+        # while ago and had enforced the io_timeout or run_isolated for
+        # hard_timeout.
         logging.error('Sending SIGTERM to task_runner')
         proc.terminate()
         internal_failure = True
         msg = 'task_runner hung'
         try:
-          proc.wait(grace_period)
+          proc.wait(2*grace_period)
         except subprocess42.TimeoutExpired:
           logging.error('Sending SIGKILL to task_runner')
           proc.kill()

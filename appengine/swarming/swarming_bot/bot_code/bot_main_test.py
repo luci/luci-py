@@ -810,6 +810,7 @@ class TestBotMain(TestBotBase):
       'dimensions': {'os': 'Amiga', 'pool': 'default'},
       'grace_period': 30,
       'hard_timeout': 60,
+      'io_timeout': None,
       'host': 'https://localhost:3',
       'task_id': '24',
     }
@@ -847,6 +848,7 @@ class TestBotMain(TestBotBase):
       'dimensions': {'os': 'Amiga', 'pool': 'default'},
       'grace_period': 30,
       'hard_timeout': 60,
+      'io_timeout': None,
       'host': 'https://localhost:3',
       'service_accounts': {
         'system': {'service_account': 'robot@example.com'},
@@ -926,6 +928,7 @@ class TestBotMain(TestBotBase):
       'dimensions': {'pool': 'default'},
       'grace_period': 30,
       'hard_timeout': 60,
+      'io_timeout': None,
       'task_id': '24',
     }
     bot_main._run_manifest(self.bot, manifest, time.time())
