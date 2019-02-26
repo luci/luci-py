@@ -260,6 +260,12 @@ class ConfigApi(remote.Service):
     for cs, attempt in zip(config_sets, attempts):
       if not can_read[cs.key.id()]:
         continue
+
+      if common.REF_CONFIG_SET_RGX.match(cs.key.id()):
+        # Exclude ref configs from the listing for crbug.com/935667
+        # TODO(crbug.com/924803): remove ref configs altogether.
+        continue
+
       cs_msg = ConfigSet(
           config_set=cs.key.id(),
           location=cs.location,
