@@ -159,6 +159,7 @@ const filterChip = (filter, ele) => html`
 const filters = (ele) => html`
 <!-- primary key selector-->
 <select-sk class="selector keys"
+           @scroll=${ele._scrollCheck}
            @selection-changed=${ele._primaryKeyChanged}>
   ${ele._filteredPrimaryArr.map((key) => primaryOption(key, ele))}
 </select-sk>
@@ -398,6 +399,7 @@ window.customElements.define('task-list', class extends SwarmingAppBoilerplate {
     this._filterQuery = ''; // tracks what's typed into the input to search filters
     this._fetchController = null;
     this._knownDimensions = [];
+    this._ignoreScrolls = 0;
   }
 
   connectedCallback() {
@@ -785,20 +787,39 @@ window.customElements.define('task-list', class extends SwarmingAppBoilerplate {
     this._scrollToPrimaryKey();
   }
 
+  _scrollCheck() {
+    if (this._ignoreScrolls > 0) {
+      this._ignoreScrolls--;
+      return;
+    }
+    this._humanScrolledKeys = true;
+  }
+
   _scrollToPrimaryKey() {
-    if (this._primaryKey) {
+    // Especially on a page reload, the selected key won't be viewable.
+    // This scrolls the little primary key box into view if it's not and,
+    // since it runs every render, keeps it in view.
+    // Do not use selectedKey.scrollIntoView since that will make the
+    // whole page scroll and not just the selector box.
+    //
+    // We would like to avoid scrolling the primary key box if the user
+    // has scrolled in that box. We cannot simply listen to scroll events
+    // because calling element.scrollTo creates one scroll event that
+    // happens asynchronously.
+    // (of note, if 'smooth' scrolling behavior is specified, then an undetermined,
+    // but finite amount of events are created, which is a bit of a mess)
+    // So, anytime we trigger a scroll, we increment a counter and have
+    // the scroll listener ignore that many events - if it hears any more
+    // then the human must have scrolled.
+    if (this._primaryKey && !this._humanScrolledKeys) {
       const keySelector = $$('.keys.selector', this);
       const selectedKey = $$('.item[selected]', keySelector);
-      // Especially on a page reload, the selected key won't be viewable.
-      // This scrolls the little box into view if it's not and, since it
-      // runs every render, keeps it in view.
-      // Do not use selectedKey.scrollIntoView since that will make the
-      // whole page scroll and not just the selector box.
+
       if (selectedKey) {
+        this._ignoreScrolls++;
         keySelector.scrollTo({
           // 160 was found by experimentation with what looks good
           top: selectedKey.offsetTop - 160,
-          behavior: 'smooth'
         });
       }
     }

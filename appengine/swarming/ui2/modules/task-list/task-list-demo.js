@@ -17,7 +17,7 @@ const fetchMock = require('fetch-mock');
 mockAuthdAppGETs(fetchMock, {cancel_task: true});
 
 fetchMock.get('glob:/_ah/api/swarming/v1/tasks/list?*',
-              requireLogin(tasks_20, 200));
+              requireLogin(tasks_20, 2000));
 
 fetchMock.get('/_ah/api/swarming/v1/bots/dimensions',
               requireLogin(fleetDimensions));
