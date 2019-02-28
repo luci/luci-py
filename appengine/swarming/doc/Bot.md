@@ -229,9 +229,11 @@ are classified by a few categories via their prefix:
         rebooting).
 *   `get_*` are functions that return the bot's self-defined attributes:
     *   `get_dimensions` returns the properties that are used as part of the
-        task scheduler bot selection.
-    *   `get_state` returns purely informational data about the state of the
-        bot.
+        task scheduler bot selection. See also
+        [Magic Values](Magic-Values.md#bot-dimensions).
+    *   `get_state` returns data about the state of the bot.
+        Any key not mentioned in [Magic Values](Magic-Values.md#bot-states) is
+        purely informational.
     *   `get_authentication_headers` returns HTTP headers to use when sending
         requests to the server. The bot may pick different authentication
         methods based on where it runs. This should match to what the server
