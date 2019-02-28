@@ -915,8 +915,13 @@ class TaskSlice(ndb.Model):
       # When called in the context of an idempotent TaskRunResult that is
       # COMPLETED with success, this is much more costly since this happens
       # inside a transaction.
-      k = task_pack.request_key_to_secret_bytes_key(request.key)
-      props['secret_bytes'] = k.get().secret_bytes.encode('hex')
+      s = task_pack.request_key_to_secret_bytes_key(request.key).get()
+      if s:
+        props['secret_bytes'] = s.secret_bytes.encode('hex')
+      else:
+        # A TaskRequest is broken if the corresponding SecretBytes is not
+        # present. Tolerate it here but log a warning.
+        logging.warning('%s is broken; SecretBytes is missing', request.task_id)
     return self.HASHING_ALGO(utils.encode_to_json(props))
 
   def to_dict(self):
