@@ -22,8 +22,8 @@ import * as human from 'common-sk/modules/human'
 import * as query from 'common-sk/modules/query'
 
 import { applyAlias } from '../alias'
-import { cipdLink, durationChart, hasRichOutput, humanState, firstDimension,
-         isolateLink, isSummaryTask, parseRequest, parseResult,
+import { canRetry, cipdLink, durationChart, hasRichOutput, humanState,
+         firstDimension, isolateLink, isSummaryTask, parseRequest, parseResult,
          richLogsLink, sliceExpires, stateClass, taskCost, taskExpires,
          taskInfoClass, wasDeduped, wasPickedUp} from './task-page-helpers'
 import { botListLink, botPageLink, humanDuration, parseDuration,
@@ -60,7 +60,8 @@ const idAndButtons = (ele) => {
   <button title="Refresh data"
           @click=${ele._fetch}>refresh</button>
   <button title="Retry the task"
-          @click=${ele._promptRetry} class=retry>retry</button>
+          @click=${ele._promptRetry} class=retry
+          ?hidden=${!canRetry(ele._request)}>retry</button>
   <button title="Re-queue the task, but don't run it automatically"
           @click=${ele._promptDebug} class=debug>debug</button>
   <button title="Cancel a pending task, so it does not start"

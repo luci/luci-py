@@ -599,6 +599,15 @@ const BATTERY_STATUS_ALIASES = {
   5: 'Full',
 }
 
+function getStatusSortIndex(bot) {
+  if (bot.is_dead) return 4;
+  if (bot.quarantined) return 3;
+  if (bot.maintenance_msg) return 2;
+
+  // Bot is alive.
+  return 1;
+}
+
 export const forcedColumns = ['id'];
 
 /** specialSortMap maps keys to their special sort rules, encapsulated in a
@@ -610,6 +619,22 @@ export const specialSortMap = {
   id: (dir, botA, botB) => dir * naturalSort(botA.bot_id, botB.bot_id),
   first_seen: (dir, botA, botB) => dir * naturalSort(botA.first_seen_ts, botB.first_seen_ts),
   last_seen: (dir, botA, botB) => dir * naturalSort(botA.last_seen_ts, botB.last_seen_ts),
+  status: (dir, botA, botB) => {
+    const statusIndexA = getStatusSortIndex(botA);
+    const statusIndexB = getStatusSortIndex(botB);
+    if (statusIndexA !== statusIndexB) {
+      return dir * (statusIndexA - statusIndexB);
+    }
+
+    // Tiebreakers when in bad states are broken by last seen time.
+    if (botA.is_dead || botA.quarantined || botA.maintenance_msg) {
+      return dir * (botA.last_seen_ts - botB.last_seen_ts);
+    }
+
+    // When bots are alive, actually tie, and rely on the
+    // behavior of stable sort
+    return 0;
+  },
   running_time: (dir, botA, botB) => dir * naturalSort(fromState(botA, 'running_time'), fromState(botB, 'running_time')),
   uptime: (dir, botA, botB) => dir * naturalSort(fromState(botA, 'uptime'), fromState(botB, 'uptime')),
 };

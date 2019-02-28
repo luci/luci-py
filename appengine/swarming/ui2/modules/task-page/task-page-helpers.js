@@ -7,6 +7,13 @@ import * as human from 'common-sk/modules/human'
 import { humanDuration, sanitizeAndHumanizeTime, timeDiffExact } from '../util'
 
 
+/** canRetry returns if the given task can be retried.
+ *  See https://crbug.com/936530 for one case in which it should not.
+ */
+export function canRetry(request) {
+  return request && request.properties && request.properties.idempotent;
+}
+
 /** cipdLink constructs a URL to a CIPD resource given a version string
  *  and a CIPD server URL.
  */

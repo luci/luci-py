@@ -428,6 +428,20 @@ describe('task-page', function() {
           done();
         });
       });
+
+      it('hides the retry button (because idempotent:false)', function(done) {
+        loggedInTaskPage((ele) => {
+          const retryBtn = $$('.id_buttons button.retry', ele);
+          expect(retryBtn).toBeTruthy();
+          expect(retryBtn).toHaveAttribute('hidden', 'retry should be hidden');
+
+          const debugBtn = $$('.id_buttons button.debug', ele);
+          expect(debugBtn).toBeTruthy();
+          expect(debugBtn).not.toHaveAttribute('hidden', 'debug should be visible');
+
+          done();
+        });
+      });
     }); // end describe('Completed task with 2 slices')
 
 
@@ -501,6 +515,20 @@ describe('task-page', function() {
           ele.render();
           expect(cancelBtn).not.toHaveAttribute('hidden', 'cancel should be showing');
           expect(cancelBtn).toHaveAttribute('disabled', 'cancel should be disabled');
+          done();
+        });
+      });
+
+      it('shows the retry button (because idempotent:true)', function(done) {
+        loggedInTaskPage((ele) => {
+          const retryBtn = $$('.id_buttons button.retry', ele);
+          expect(retryBtn).toBeTruthy();
+          expect(retryBtn).not.toHaveAttribute('hidden', 'retry should be visible');
+
+          const debugBtn = $$('.id_buttons button.debug', ele);
+          expect(debugBtn).toBeTruthy();
+          expect(debugBtn).not.toHaveAttribute('hidden', 'debug should be visible');
+
           done();
         });
       });
@@ -909,7 +937,7 @@ describe('task-page', function() {
     });
 
     it('makes a POST to retry a job', function(done) {
-      serveTask(1, 'Completed task with 2 slices');
+      serveTask(0, 'running task on try number 3');
       loggedInTaskPage((ele) => {
         fetchMock.resetHistory();
         fetchMock.post('/_ah/api/swarming/v1/tasks/new', {task_id: TEST_TASK_ID});
