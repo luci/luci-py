@@ -49,18 +49,17 @@ class BqState(ndb.Model):
 ### Private APIs.
 
 
-def _send_to_bq(table_name, rows):
+def _send_to_bq_raw(dataset, table_name, rows):
   """Sends the rows to BigQuery.
 
   Arguments:
-    table_name: table to stream the rows to.
-    rows: list of tuple(db_key, bq_key, row); (bq_key, row) is to sent to BQ.
-        db_key and bq_key must be strings, row must be a protobuf message.
+    dataset: BigQuery dataset name that contains the table.
+    table_name: BigQuery table to stream the rows to.
+    rows: list of (row_id, row) rows to sent to BQ.
 
   Returns:
-    key of rows that failed to be sent.
+    indexes of rows that failed to be sent.
   """
-  dataset = 'swarming'
   # BigQuery API doc:
   # https://cloud.google.com/bigquery/docs/reference/rest/v2/tabledata/insertAll
   url = (
@@ -73,17 +72,16 @@ def _send_to_bq(table_name, rows):
     'skipInvalidRows': True,
     'ignoreUnknownValues': False,
     'rows': [
-      {'insertId': bq_key, 'json': bqh.message_to_dict(row)}
-      for _db_key, bq_key, row in rows
+      {'insertId': row_id, 'json': bqh.message_to_dict(row)}
+      for row_id, row in rows
     ],
   }
   res = net.json_request(
       url=url, method='POST', payload=payload, scopes=bqh.INSERT_ROWS_SCOPE,
       deadline=600)
 
-  failed_db_keys = []
-  failed_bq_keys = []
   dropped = 0
+  failed = []
   # Use this error message string to detect the error where we're pushing data
   # that is too old. This can occasionally happen as a cron job looks for old
   # entity and by the time it's sending them BigQuery doesn't accept them, just
@@ -93,20 +91,41 @@ def _send_to_bq(table_name, rows):
       'and 183 days in the future relative to the current date')
   # https://cloud.google.com/bigquery/docs/reference/rest/v2/tabledata/insertAll#response
   for line in res.get('insertErrors', []):
-    db_key, bq_key, _row = rows[line['index']]
+    i = line['index']
     err = line['errors'][0]
     if err['reason'] == 'invalid' and out_of_time in err['message']:
       # Silently drop it. The rationale is that if it is not skipped, the loop
       # will get stuck on it.
       dropped += 1
       continue
-    if not failed_db_keys:
+    if not failed:
       # Log the error for the first entry, useful to diagnose schema failure.
-      logging.error('Failed to insert row %s: %r', db_key, err)
-    failed_db_keys.append(db_key)
-    failed_bq_keys.append(bq_key)
+      logging.error('Failed to insert row %s: %r', i, err)
+    failed.append(i)
   if dropped:
     logging.warning('%d old rows silently dropped', dropped)
+  return failed
+
+
+def _send_to_bq(dataset, table_name, rows):
+  """Sends the rows to BigQuery.
+
+  Arguments:
+    dataset: BigQuery dataset name that contains the table.
+    table_name: BigQuery table to stream the rows to.
+    rows: list of tuple(db_key, bq_key, row); (bq_key, row) is to sent to BQ.
+        db_key and bq_key must be strings, row must be a protobuf message.
+
+  Returns:
+    Datastore keys and BQ keys of rows that failed to be sent.
+  """
+  failed = _send_to_bq_raw(dataset, table_name, [i[1:] for i in rows])
+  failed_db_keys = []
+  failed_bq_keys = []
+  for index in failed:
+    db_key, bq_key, _row = rows[index]
+    failed_db_keys.append(db_key)
+    failed_bq_keys.append(bq_key)
   return failed_db_keys, failed_bq_keys
 
 
@@ -114,7 +133,7 @@ def _send_to_bq(table_name, rows):
 
 
 def cron_send_to_bq(table_name, get_oldest_key, get_rows, fetch_rows):
-  """Sends the bot events to BigQuery.
+  """Sends rows to a BigQuery table.
 
   To ensure no items are missing, we query the last item in the table, then look
   up the last item in the DB, and stream these.
@@ -208,7 +227,7 @@ def cron_send_to_bq(table_name, get_oldest_key, get_rows, fetch_rows):
       if rows:
         logging.info('Sending %d rows', len(rows))
         state.failed_db_keys, state.failed_bq_keys = _send_to_bq(
-            table_name, rows)
+            'swarming', table_name, rows)
         if state.failed_db_keys:
           logging.error('Failed to insert %s rows', len(state.failed_db_keys))
         total += len(rows) - len(state.failed_db_keys)
