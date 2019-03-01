@@ -1140,7 +1140,8 @@ class TaskRequest(ndb.Model):
       # The task_id can only be set if the TaskRequest entity has a valid key.
       out.task_id = self.task_id
     if self.parent_task_id:
-      out.parent_task_id = self.parent_task_id
+      out.parent_run_id = self.parent_task_id
+      out.parent_task_id = self.parent_task_id[:-1] + '0'
     if self.pubsub_topic:
       out.pubsub_notification.topic = self.pubsub_topic
     # self.pubsub_auth_token cannot be retrieved.

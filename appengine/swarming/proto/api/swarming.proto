@@ -773,17 +773,22 @@ message TaskRequest {
   // The request wasn't "run" so it is the same ID as the summary (ending with
   // '0').
   string task_id = 8;
-  // Parent Swarming task ID of the process requesting this task.
+  // Parent Swarming task summary ID of the process requesting this task.
   //
-  // This is to tell the server about reentrancy: when a task creates children
-  // Swarming tasks. This way, the tree of tasks can be presented in the UI. The
-  // parent task can list all the children tasks that were triggered.
+  // This points to the TaskResult.task_id (ending with '0'). Note that an
+  // idempotent task can be automatically retried by Swarming, which may result
+  // in two TaskResult with the same task_id but different run_id.
   //
-  // This points to the run_id (ending with '1', '2' or more).
-  //
-  // TODO(maruel): Should not be necessary to specify at task creation, can be
-  // inferred.
+  // This field is read-only and derived from parent_run_id. It cannot be
+  // specified at task creation.
   string parent_task_id = 9;
+  // Parent Swarming task run ID of the process requesting this task.
+  //
+  // This field is set on the children tasks when a Swarming task creates
+  // children Swarming tasks.
+  //
+  // This points to the TaskResult.run_id (ending with '1', '2' or more).
+  string parent_run_id = 11;
   // Send notification to this pubsub topic for updates of this task.
   PubSub pubsub_notification = 10;
 }
@@ -821,22 +826,23 @@ message PubSub {
   string userdata = 3;
 }
 
-// TaskResult is the state of a TaskRequest as it is processed by Swarming.
+// TaskResult is the result of a TaskRequest as it is processed by Swarming.
 //
-// The TaskResult may represent one per attempt (run) and one for the final
-// result (summary). This happens because a task may be transparently retried
-// (for example with RAN_INTERNAL_FAILURE). In this case a second try may be
-// attempted. For the client's perspective when looking at the summary (ID
-// ending with '0'), the task went from PENDING to RUNNING and then back to
-// PENDING. The task run result (ending with '1') will contain the real result
-// for the attempt (e.g. RAN_INTERNAL_FAILURE) and the retry (ending with '2')
-// will contain the final result once it's done.
+// The TaskResult represents one attempt (run on a bot) and/or the final result
+// (summary). When the task never ran (for example EXPIRED), there's one summary
+// but no run.
 //
-// When stored in BigQuery, it is stored once per try attempt (run ID '1', '2',
-// etc), as soon as 'state_category' is one of CATEGORY_TRANSIENT_DONE or
-// CATEGORY_EXECUTION_DONE.
+// An idempotent task can be automatically retried by Swarming, which may result
+// in two TaskResult with the same task_id but different run_id; two runs, one
+// summary.
 //
-// Storing BQ for CATEGORY_NEVER_RAN_DONE is https://crbug.com/917106.
+// A retry is done when a task fails with a retriable error (for example with
+// RAN_INTERNAL_FAILURE). For the client's perspective when looking at the
+// summary (ID ending with '0'), the task went from PENDING to RUNNING and then
+// back to PENDING.
+//
+// When stored in BigQuery, the result is stored when it is done; when
+// state_category is one of CATEGORY_TRANSIENT_DONE or CATEGORY_EXECUTION_DONE.
 message TaskResult {
   TaskRequest request = 1;
 

@@ -846,7 +846,8 @@ class TaskRequestApiTest(TestCase):
     parent.key = task_request.new_request_key()
     parent.put()
     # The reference is to the TaskRunResult.
-    parent_id = task_pack.pack_request_key(parent.key) + u'1'
+    parent_id = task_pack.pack_request_key(parent.key) + u'0'
+    parent_run_id = task_pack.pack_request_key(parent.key) + u'1'
 
     request_props = _gen_properties(
         inputs_ref={
@@ -879,7 +880,7 @@ class TaskRequestApiTest(TestCase):
         # The user is ignored; the value is overridden by the parent task's
         # user.
         user=u'Joe',
-        parent_task_id=parent_id,
+        parent_task_id=parent_run_id,
         service_account=u'foo@gserviceaccount.com',
         pubsub_topic=u'projects/a/topics/abc',
         pubsub_auth_token=u'sekret',
@@ -958,6 +959,7 @@ class TaskRequestApiTest(TestCase):
         # Hierarchy.
         task_id=u'776610',
         parent_task_id=parent_id,
+        parent_run_id=parent_run_id,
         # Notification. auth_token cannot be retrieved.
         pubsub_notification=swarming_pb2.PubSub(
             topic=u'projects/a/topics/abc', userdata=u'obscure_reference'),
