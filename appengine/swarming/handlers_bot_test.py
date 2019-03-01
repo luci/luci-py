@@ -172,16 +172,8 @@ class BotApiTest(test_env_handlers.AppTestBase):
     msg = (
       u'Quarantined Bot\n'
       'https://None/restricted/bot/id1\n'
-      'Invalid dimensions type:\n'
-      '{\n'
-      '  "id": [\n'
-      '    "id1"\n'
-      '  ],\n'
-      '  "pool": [\n'
-      '    "default",\n'
-      '    "default"\n'
-      '  ]\n'
-      '}')
+      'Key pool has duplicate values: [u\'default\', u\'default\']'
+    )
     self.assertEqual([msg], errors)
 
   def test_handshake_long_dimension(self):
@@ -220,18 +212,8 @@ class BotApiTest(test_env_handlers.AppTestBase):
     msg = (
       u'Quarantined Bot\n'
       'https://None/restricted/bot/id1\n'
-      'Invalid dimensions type:\n'
-      '{\n'
-      '  "a": [\n'
-      '    "%s"\n'
-      '  ],\n'
-      '  "id": [\n'
-      '    "id1"\n'
-      '  ],\n'
-      '  "pool": [\n'
-      '    "default"\n'
-      '  ]\n'
-      '}') % ('b' * 1499)
+      'Key a has invalid value: u\'%s\'' % ('b' * 1499)
+    )
     self.assertEqual([msg], errors)
 
   def test_handshake_extra(self):
