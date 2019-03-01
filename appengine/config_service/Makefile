@@ -2,6 +2,8 @@
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
 
+GCBDIR := $(shell mktemp -d -p /tmp luci-config.XXXX)
+
 build: compile-proto
 
 compile-proto:
@@ -25,6 +27,15 @@ upload_staging: build
 deploy: build
 	tools/gae upload -x -A luci-config
 
+deploy-spin: build
+	# The protoc symlink points to nowhere.
+	# Is that expected?
+	rsync -aLK --exclude="tools/protoc" . $(GCBDIR)
+	cd $(GCBDIR) && gcloud builds submit --timeout 3600 --config cloudbuild.yaml . --project chrome-infra-spinnaker
+	rm -fr $(GCBDIR)
+
 upload: build
 	tools/gae upload -A luci-config
 
+external_deps:
+	cd ui && make
