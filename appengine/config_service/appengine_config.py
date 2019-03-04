@@ -3,3 +3,6 @@
 # that can be found in the LICENSE file.
 
 components_ereporter2_RECIPIENTS_AUTH_GROUP = 'config-ereporter2-reports'
+
+from components.utils import fix_protobuf_package
+fix_protobuf_package()
