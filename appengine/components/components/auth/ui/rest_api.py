@@ -842,13 +842,13 @@ class ReplicationHandler(handler.AuthenticatingHandler):
 
     # Deserialize the request, check it is valid.
     request = replication_pb2.ReplicationPushRequest.FromString(body)
-    if not request.HasField('revision') or not request.HasField('auth_db'):
+    if not request.revision or not request.HasField('auth_db'):
       self.send_error(replication_pb2.ReplicationPushResponse.BAD_REQUEST)
       return
 
     # Handle it.
     logging.info('Received AuthDB push: rev %d', request.revision.auth_db_rev)
-    if request.HasField('auth_code_version'):
+    if request.auth_code_version:
       logging.info(
           'Primary\'s auth component version: %s', request.auth_code_version)
     applied, state = replication.push_auth_db(request.revision, request.auth_db)

@@ -68,7 +68,7 @@ class FrontendHandlersTest(test_case.TestCase):
       if not hdr.startswith('Bearer '):
         raise auth.AuthenticationError()
       email = hdr[len('Bearer '):]
-      return auth.Identity(auth.IDENTITY_USER, email), False
+      return auth.Identity(auth.IDENTITY_USER, email), None
     self.mock(auth, 'oauth_authentication', mocked)
 
   def mock_ingest_tarball(self, raise_error=False):

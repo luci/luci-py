@@ -453,8 +453,6 @@ def push_to_replica(replica_url, auth_db_blob, key_name, sig):
   # Deserialize the response.
   cls = replication_pb2.ReplicationPushResponse
   response = cls.FromString(result.content)
-  if not response.HasField('status'):
-    raise FatalReplicaUpdateError('Incomplete response, status is missing')
 
   # Convert errors to exceptions.
   if response.status == cls.TRANSIENT_ERROR:
@@ -472,12 +470,7 @@ def push_to_replica(replica_url, auth_db_blob, key_name, sig):
     raise FatalReplicaUpdateError(
         'Incomplete response, current_revision is missing')
 
-  # Extract auth component version used by replica if proto is recent enough.
-  auth_code_version = None
-  if response.HasField('auth_code_version'):
-    auth_code_version = response.auth_code_version
-
-  raise ndb.Return((response.current_revision, auth_code_version))
+  raise ndb.Return((response.current_revision, response.auth_code_version))
 
 
 @ndb.transactional

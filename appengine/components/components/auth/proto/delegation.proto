@@ -4,7 +4,7 @@
 
 syntax = "proto3";
 
-package components.auth.proto.delegation;
+package components.auth;
 
 
 // Signed serialized Subtoken.
