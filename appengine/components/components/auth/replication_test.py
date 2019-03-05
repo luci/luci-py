@@ -46,7 +46,11 @@ def make_snapshot_obj(
   """Returns AuthDBSnapshot with omitted fields set to default values."""
   return replication.AuthDBSnapshot(
       global_config=global_config or model.AuthGlobalConfig(
-          key=model.root_key()),
+          key=model.root_key(),
+          oauth_client_id='oauth client id',
+          oauth_client_secret='oauth client secret',
+          token_server_url='token server',
+      ),
       groups=groups or [],
       ip_whitelists=ip_whitelists or [],
       ip_whitelist_assignments=(
@@ -264,9 +268,10 @@ class SnapshotToProtoConversionTest(test_case.TestCase):
     snapshot = make_snapshot_obj(
         global_config=model.AuthGlobalConfig(
             key=model.root_key(),
-            oauth_client_id='some-client-id',
-            oauth_client_secret='some-client-secret',
-            oauth_additional_client_ids=['id1', 'id2']))
+            oauth_client_id=u'some-client-id',
+            oauth_client_secret=u'some-client-secret',
+            oauth_additional_client_ids=[u'id1', u'id2'],
+            token_server_url=u'https://example.com'))
     self.assert_serialization_works(snapshot)
 
   def test_group_serialization(self):

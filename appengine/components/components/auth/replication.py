@@ -152,14 +152,23 @@ def auth_db_snapshot_to_proto(snapshot, auth_db_proto=None):
   """
   auth_db_proto = auth_db_proto or replication_pb2.AuthDB()
 
-  auth_db_proto.oauth_client_id = snapshot.global_config.oauth_client_id or ''
+  # Many fields in auth_db_proto were once 'required' and many clients still
+  # expect them to be populated. Unfortunately setting a proto3 string field
+  # to '' doesn't mark it as "set" from proto2 perspective. So inject some
+  # sentinel values instead.
+  #
+  # TODO(vadimsh): Remove this hack when all services (including Gerrit plugin)
+  # are switched to use proto3.
+  auth_db_proto.oauth_client_id = (
+      snapshot.global_config.oauth_client_id or 'empty')
   auth_db_proto.oauth_client_secret = (
-      snapshot.global_config.oauth_client_secret or '')
+      snapshot.global_config.oauth_client_secret or 'empty')
   if snapshot.global_config.oauth_additional_client_ids:
     auth_db_proto.oauth_additional_client_ids.extend(
         snapshot.global_config.oauth_additional_client_ids)
 
-  auth_db_proto.token_server_url = snapshot.global_config.token_server_url or ''
+  auth_db_proto.token_server_url = (
+      snapshot.global_config.token_server_url or 'empty')
 
   for ent in snapshot.groups:
     msg = auth_db_proto.groups.add()
@@ -167,7 +176,7 @@ def auth_db_snapshot_to_proto(snapshot, auth_db_proto=None):
     msg.members.extend(ident.to_bytes() for ident in ent.members)
     msg.globs.extend(glob.to_bytes() for glob in ent.globs)
     msg.nested.extend(ent.nested)
-    msg.description = ent.description
+    msg.description = ent.description or 'empty'
     msg.created_ts = utils.datetime_to_timestamp(ent.created_ts)
     msg.created_by = ent.created_by.to_bytes()
     msg.modified_ts = utils.datetime_to_timestamp(ent.modified_ts)
@@ -178,7 +187,7 @@ def auth_db_snapshot_to_proto(snapshot, auth_db_proto=None):
     msg = auth_db_proto.ip_whitelists.add()
     msg.name = ent.key.id()
     msg.subnets.extend(ent.subnets)
-    msg.description = ent.description
+    msg.description = ent.description or 'empty'
     msg.created_ts = utils.datetime_to_timestamp(ent.created_ts)
     msg.created_by = ent.created_by.to_bytes()
     msg.modified_ts = utils.datetime_to_timestamp(ent.modified_ts)
@@ -188,7 +197,7 @@ def auth_db_snapshot_to_proto(snapshot, auth_db_proto=None):
     msg = auth_db_proto.ip_whitelist_assignments.add()
     msg.identity = ent.identity.to_bytes()
     msg.ip_whitelist = ent.ip_whitelist
-    msg.comment = ent.comment or ''
+    msg.comment = ent.comment or 'empty'
     msg.created_ts = utils.datetime_to_timestamp(ent.created_ts)
     msg.created_by = ent.created_by.to_bytes()
 
