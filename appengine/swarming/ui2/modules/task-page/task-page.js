@@ -756,24 +756,26 @@ ${richOrRawLogs(ele)}
 }
 
 const richOrRawLogs = (ele) => {
-  if (ele._showRawOutput || !hasRichOutput(ele)) {
-    return html`
-<div class="code stdout tabbed break-all ${ele._wideLogs ? 'wide' : ''}">${ele._stdout}</div>
-`;
-  }
-  if (!isSummaryTask(ele._taskId)) {
-    return html`
+  // guard should prevent the iframe from reloading on any render,
+  // and only when something relevant changes.
+  return guard([ele._request, ele._showRawOutput, ele._stdout, ele._wideLogs], () => {
+    if (ele._showRawOutput || !hasRichOutput(ele)) {
+      return html`
+<div class="code stdout tabbed break-all ${ele._wideLogs ? 'wide' : ''}">
+  ${ele._stdout}
+</div>`;
+    }
+    if (!isSummaryTask(ele._taskId)) {
+      return html`
 <div class=tabbed>
   Milo results are only generated for task summaries, that is, tasks whose ids end in 0.
   Tasks ending in 1 or 2 represent possible retries of tasks.
   See <a href="//goo.gl/LE4rwV">the docs</a> for more.
 </div>`;
-  }
-  // guard should prevent the iframe from reloading on any render
-  // and only if ele._request changes (e.g. user hits refresh).
-  return guard(ele._request, () => html`
-<iframe id=richLogsFrame class=tabbed src=${ifDefined(richLogsLink(ele))}></iframe>
-`);
+    }
+    return html`
+<iframe id=richLogsFrame class=tabbed src=${ifDefined(richLogsLink(ele))}></iframe>`;
+  });
 }
 
 const retryOrDebugPrompt = (ele, sliceProps) => {
