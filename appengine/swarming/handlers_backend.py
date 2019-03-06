@@ -232,7 +232,7 @@ class CronSendToBQ(_CronHandlerBase):
   """Triggers many tasks queues to send data to BigQuery."""
 
   def run_cron(self):
-    # It can trigger up to 2*120 = 240 tasks.
+    # It can trigger up to the sum of all the max_taskqueues below.
     # It should complete within close to 50 seconds as each function will try to
     # limit itself to its allocated chunk.
     max_seconds = 50. / 2
@@ -241,13 +241,13 @@ class CronSendToBQ(_CronHandlerBase):
         '/internal/taskqueue/monitoring/bq/tasks/results/run/',
         'monitoring-bq-tasks-results-run',
         max_seconds,
-        max_taskqueues=120)
+        max_taskqueues=60)
     bq_state.cron_trigger_tasks(
         'task_results_summary',
         '/internal/taskqueue/monitoring/bq/tasks/results/summary/',
         'monitoring-bq-tasks-results-summary',
         max_seconds,
-        max_taskqueues=120)
+        max_taskqueues=60)
 
 
 ## Task queues.
