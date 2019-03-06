@@ -689,10 +689,15 @@ def _fetch_bot_groups():
 
     # Someone is already refreshing the cache? Let them finish.
     if _cache.fetcher_thread is not None:
-      logging.warning(
+      delta = utils.time_time() - exp
+      msg = (
           'Using stale cached bots.cfg at rev %s while another thread is '
-          'refreshing it. Cache expired %.1f sec ago.',
-          known_cfg.rev, utils.time_time() - exp)
+          'refreshing it. Cache expired %.1f sec ago.')
+      if delta > 5:
+        # Only warn if it's more than 5 seconds.
+        logging.warning(msg, known_cfg.rev, delta)
+      else:
+        logging.info(msg, known_cfg.rev, delta)
       return known_cfg
 
     # Ok, we'll do it, outside the lock.
