@@ -846,6 +846,8 @@ class TaskResultApiTest(TestCase):
       'failed_db_keys': [],
       'last_bq_key': u'1d69ba3ea8008811',
       'last_db_key': u'2014-01-02T03:04:25.000006Z',
+      'oldest': None,
+      'recent': None,
       'ts': self.now + datetime.timedelta(seconds=30),
     }
     self.assertEqual(
@@ -923,6 +925,8 @@ class TaskResultApiTest(TestCase):
       'failed_db_keys': [],
       'last_bq_key': u'1d69ba3ea8008811',
       'last_db_key': u'2014-01-02T03:04:25.000006Z',
+      'oldest': None,
+      'recent': None,
       'ts': self.now + datetime.timedelta(seconds=30),
     }
     self.assertEqual(

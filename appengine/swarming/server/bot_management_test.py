@@ -500,6 +500,8 @@ class BotManagementTest(test_case.TestCase):
       'last_bq_key': u'id1:2010-01-02T03:04:35.000006Z',
       'last_db_key':
         u'agpzYW1wbGUtYXBwciQLEgdCb3RSb290IgNpZDEMCxIIQm90RXZlbnQY_v______Hww',
+      'oldest': None,
+      'recent': None,
       'ts': self.now + datetime.timedelta(seconds=40),
     }
     self.assertEqual(
@@ -566,6 +568,8 @@ class BotManagementTest(test_case.TestCase):
       'last_bq_key': u'id1:2010-01-02T03:04:25.000006Z',
       'last_db_key':
         u'agpzYW1wbGUtYXBwciQLEgdCb3RSb290IgNpZDEMCxIIQm90RXZlbnQY_v______Hww',
+      'oldest': None,
+      'recent': None,
       'ts': self.now + datetime.timedelta(seconds=30),
     }
     self.assertEqual(

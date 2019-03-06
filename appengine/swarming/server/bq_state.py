@@ -3,12 +3,13 @@
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
 
-"""Common code to stream rows to BigQuery."""
+"""Common code to stream (and backfill) rows to BigQuery."""
 
 import datetime
 import logging
 
 from google.appengine.api import app_identity
+from google.appengine.api import datastore_errors
 from google.appengine.api import memcache
 from google.appengine.ext import ndb
 
@@ -35,15 +36,40 @@ class BqState(ndb.Model):
   # Last time this entity was updated.
   ts = ndb.DateTimeProperty(indexed=False)
 
+  # Deprecated.
   # db_key and bq_key of the last row uploaded. Some engines uses db_key, others
   # use bq_key, so simply save both.
   last_db_key = ndb.StringProperty(indexed=False)
   last_bq_key = ndb.StringProperty(indexed=False)
 
+  # Deprecated.
   # db_key and bq_key of the rows previously uploaded that had failed and should
   # be retried.
   failed_db_keys = ndb.StringProperty(repeated=True, indexed=False)
   failed_bq_keys = ndb.StringProperty(repeated=True, indexed=False)
+
+  # When in backfill mode, the time of the next item that should be processed.
+  # If it's over 18 months old, don't look at it.
+  # Exclusive.
+  oldest = ndb.DateTimeProperty(indexed=False)
+  # When in streaming mode, the most recent item that should be processed.
+  # Exclusive.
+  recent = ndb.DateTimeProperty(indexed=False)
+
+  def _pre_put_hook(self):
+    super(BqState, self)._pre_put_hook()
+    if bool(self.recent) != bool(self.oldest):
+      raise datastore_errors.BadValueError(
+          'Internal error; recent and oldest must both be set')
+    if self.oldest:
+      if self.oldest >= self.recent:
+        raise datastore_errors.BadValueError('Internal error; oldest >= recent')
+      if self.oldest.second or self.oldest.microsecond:
+        raise datastore_errors.BadValueError(
+            'Internal error; oldest has seconds')
+      if self.recent.second or self.recent.microsecond:
+        raise datastore_errors.BadValueError(
+            'Internal error; recent has seconds')
 
 
 ### Private APIs.
@@ -110,6 +136,8 @@ def _send_to_bq_raw(dataset, table_name, rows):
 def _send_to_bq(dataset, table_name, rows):
   """Sends the rows to BigQuery.
 
+  Deprecated.
+
   Arguments:
     dataset: BigQuery dataset name that contains the table.
     table_name: BigQuery table to stream the rows to.
@@ -138,6 +166,8 @@ def cron_send_to_bq(table_name, get_oldest_key, get_rows, fetch_rows):
   To ensure no items are missing, we query the last item in the table, then look
   up the last item in the DB, and stream these.
 
+  Deprecated.
+
   Logs insert errors and returns a list of timestamps of row that could
   not be inserted.
 
@@ -158,6 +188,10 @@ def cron_send_to_bq(table_name, get_oldest_key, get_rows, fetch_rows):
   total = 0
   start = utils.utcnow()
   state = BqState.get_by_id(table_name)
+  if state and not state.last_db_key:
+    logging.info('Skipping, new style task was initiated')
+    return
+
   if not state:
     # No saved state found. Find the oldest entity to send.
     db_key, bq_key = get_oldest_key()
@@ -238,3 +272,98 @@ def cron_send_to_bq(table_name, get_oldest_key, get_rows, fetch_rows):
       state.put()
   finally:
     memcache.delete('running', namespace=namespace)
+
+
+def cron_trigger_tasks(
+    table_name, baseurl, task_name, max_seconds, max_taskqueues):
+  """Triggers tasks to send rows to BigQuery via time based slicing.
+
+  It triggers one task queue task per 1 minute slice of time to process. It will
+  process up to 2 minutes before now, and up to 18 months ago. It tries to go
+  both ways, both keeping up with new items, and backfilling.
+
+  This function is expected to be called once per minute.
+
+  This function stores in BqState the timestamps of last enqueued events.
+
+  Arguments:
+    table_name: BigQuery table name. Also used as the key id to use for the
+        BqState entity.
+    baseurl: url for the task queue, which the timestamp will be appended to.
+    task_name: task name the URL represents.
+    max_seconds: the maximum amount of time to run; after which it should stop
+        early even if there is still work to do.
+    max_items: the maximum number of task queue triggered; to limit parallel
+        execution.
+
+  Returns:
+    total number of task queue tasks triggered.
+  """
+  OLDEST = datetime.timedelta(days=365+183)
+  RECENT_OFFSET = datetime.timedelta(seconds=120)
+  minute = datetime.timedelta(seconds=60)
+
+  start = utils.utcnow()
+  start_rounded = datetime.datetime(*start.timetuple()[:5])
+  recent_cutoff = start_rounded - RECENT_OFFSET
+  oldest_cutoff = start_rounded - OLDEST
+
+  total = 0
+  state = BqState.get_by_id(table_name)
+  if not state or not state.oldest:
+    # Flush the previous state, especially if it was the deprecated way, and
+    # start over.
+    state = BqState(
+        id=table_name, ts=start,
+        oldest=recent_cutoff - minute,
+        recent=recent_cutoff)
+    state.put()
+
+  # First trigger recent row(s).
+  while total < max_taskqueues:
+    if (state.recent >= recent_cutoff or
+        (utils.utcnow() - start).total_seconds() >= max_seconds):
+      break
+    t = state.recent.strftime(u'%Y-%m-%dT%H:%M')
+    if not utils.enqueue_task(baseurl + t, task_name):
+      logging.warning('Enqueue for %t failed')
+      break
+    state.recent += minute
+    state.ts = utils.utcnow()
+    state.put()
+    total += 1
+
+  # Then trigger for backfill of old rows.
+  while total < max_taskqueues:
+    if (state.oldest <= oldest_cutoff or
+        (utils.utcnow() - start).total_seconds() >= max_seconds):
+      break
+    t = state.oldest.strftime(u'%Y-%m-%dT%H:%M')
+    if not utils.enqueue_task(baseurl + t, task_name):
+      logging.warning('Enqueue for %t failed')
+      break
+    state.oldest -= minute
+    state.ts = utils.utcnow()
+    state.put()
+    total += 1
+
+  logging.info('Triggered %d tasks for %s', total, table_name)
+  return total
+
+
+def send_to_bq(table_name, rows):
+  """Sends rows to a BigQuery table.
+
+  Iterates until all rows are sent.
+  """
+  failures = 0
+  if rows:
+    logging.info('Sending %d rows', len(rows))
+    while rows:
+      failed = _send_to_bq_raw('swarming', table_name, rows)
+      if not failed:
+        break
+      failures += len(failed)
+      logging.warning('Failed to insert %s rows', len(failed))
+      rows = [rows[i] for i in failed]
+  return failures
