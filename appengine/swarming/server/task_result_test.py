@@ -25,6 +25,7 @@ from components import utils
 from test_support import test_case
 
 from proto.api import swarming_pb2  # pylint: disable=no-name-in-module
+from server import bq_state
 from server import large
 from server import task_pack
 from server import task_request
@@ -81,12 +82,19 @@ def _gen_request(properties=None, **kwargs):
       **kwargs)
 
 
-def _gen_result(**kwargs):
+def _gen_summary_result(**kwargs):
   """Creates a TaskRunResult."""
   request = _gen_request(**kwargs)
   result_summary = task_result.new_result_summary(request)
   result_summary.modified_ts = utils.utcnow()
   ndb.transaction(result_summary.put)
+  return result_summary.key.get()
+
+
+def _gen_run_result(**kwargs):
+  """Creates a TaskRunResult."""
+  result_summary = _gen_summary_result(**kwargs)
+  request = result_summary.request_key.get()
   to_run = task_to_run.new_task_to_run(request, 1, 0)
   run_result = task_result.new_run_result(
       request, to_run, 'localhost', 'abc', {})
@@ -614,7 +622,7 @@ class TaskResultApiTest(TestCase):
     cipd_client_pkg = task_request.CipdPackage(
         package_name=u'infra/tools/cipd/${platform}',
         version=u'git_revision:deadbeef')
-    run_result = _gen_result(
+    run_result = _gen_run_result(
         properties=_gen_properties(
             cipd_input={
               u'client_package': cipd_client_pkg,
@@ -805,155 +813,103 @@ class TaskResultApiTest(TestCase):
     # TODO(maruel): https://crbug.com/912154
     self.assertEqual(0, task_result.cron_update_tags())
 
-  def test_cron_send_to_bq_empty(self):
-    # Empty, nothing is done. No need to mock the HTTP client.
-    self.assertEqual(0, task_result.cron_send_to_bq())
-    # State is not stored if nothing was found.
-    self.assertEqual(
-        None, task_result.bq_state.BqState.get_by_id('task_results'))
-
   def test_cron_send_to_bq(self):
-    payloads = []
-    def json_request(url, method, payload, scopes, deadline):
-      self.assertEqual(
-          'https://www.googleapis.com/bigquery/v2/projects/sample-app/datasets/'
-            'swarming/tables/task_results/insertAll',
-          url)
-      payloads.append(payload)
-      self.assertEqual('POST', method)
-      self.assertEqual(task_result.bq_state.bqh.INSERT_ROWS_SCOPE, scopes)
-      self.assertEqual(600, deadline)
-      return {'insertErrors': []}
-    self.mock(task_result.bq_state.net, 'json_request', json_request)
+    # Deprecated.
+    pass
 
-    # Generate two tasks results.
+  def test_task_bq_run_empty(self):
+    # Empty, nothing is done.
+    start = utils.utcnow()
+    end = start+datetime.timedelta(seconds=60)
+    self.assertEqual((0, 0), task_result.task_bq_run(start, end))
+
+  def test_task_bq_run(self):
+    payloads = []
+    def send_to_bq(table_name, rows):
+      self.assertEqual('task_results_run', table_name)
+      payloads.append(rows)
+      return 0
+    self.mock(bq_state, 'send_to_bq', send_to_bq)
+
+    # Generate 4 tasks results to test boundaries.
     self.mock_now(self.now, 10)
-    run_result_1 = _gen_result()
+    run_result_1 = _gen_run_result()
     run_result_1.abandoned_ts = utils.utcnow()
     run_result_1.completed_ts = utils.utcnow()
     run_result_1.modified_ts = utils.utcnow()
     run_result_1.put()
-    self.mock_now(self.now, 20)
-    run_result_2 = _gen_result()
+    start = self.mock_now(self.now, 20)
+    run_result_2 = _gen_run_result()
     run_result_2.completed_ts = utils.utcnow()
     run_result_2.modified_ts = utils.utcnow()
     run_result_2.put()
-    self.mock_now(self.now, 30)
+    end = self.mock_now(self.now, 30)
+    run_result_3 = _gen_run_result()
+    run_result_3.completed_ts = utils.utcnow()
+    run_result_3.modified_ts = utils.utcnow()
+    run_result_3.put()
+    self.mock_now(self.now, 40)
+    run_result_4 = _gen_run_result()
+    run_result_4.completed_ts = utils.utcnow()
+    run_result_4.modified_ts = utils.utcnow()
+    run_result_4.put()
 
-    self.assertEqual(2, task_result.cron_send_to_bq())
-    expected = {
-      'failed_bq_keys': [],
-      'failed_db_keys': [],
-      'last_bq_key': u'1d69ba3ea8008811',
-      'last_db_key': u'2014-01-02T03:04:25.000006Z',
-      'oldest': None,
-      'recent': None,
-      'ts': self.now + datetime.timedelta(seconds=30),
-    }
-    self.assertEqual(
-        expected,
-        task_result.bq_state.BqState.get_by_id('task_results').to_dict())
-
-    expected = [
-      {
-        'ignoreUnknownValues': False,
-        'kind': 'bigquery#tableDataInsertAllRequest',
-        'skipInvalidRows': True,
-      },
-    ]
+    self.assertEqual((2, 0), task_result.task_bq_run(start, end))
     self.assertEqual(1, len(payloads), payloads)
-    actual_rows = payloads[0].pop('rows')
-    self.assertEqual(expected, payloads)
+    actual_rows = payloads[0]
     self.assertEqual(2, len(actual_rows))
     expected = [
-      run_result_1.task_id,
       run_result_2.task_id,
+      run_result_3.task_id,
     ]
-    self.assertEqual(expected, [r['insertId'] for r in actual_rows])
+    self.assertEqual(expected, [r[0] for r in actual_rows])
 
-    # Next cron skips everything that was processed.
-    self.assertEqual(0, task_result.cron_send_to_bq())
+  def test_task_bq_summary_empty(self):
+    # Empty, nothing is done.
+    start = utils.utcnow()
+    end = start+datetime.timedelta(seconds=60)
+    self.assertEqual((0, 0), task_result.task_bq_summary(start, end))
 
-  def test_cron_send_to_bq_fail(self):
+  def test_task_bq_summary(self):
     payloads = []
-    def json_request(url, method, payload, scopes, deadline):
-      self.assertEqual(
-          'https://www.googleapis.com/bigquery/v2/projects/sample-app/datasets/'
-            'swarming/tables/task_results/insertAll',
-          url)
-      first = not payloads
-      payloads.append(payload)
-      self.assertEqual('POST', method)
-      self.assertEqual(task_result.bq_state.bqh.INSERT_ROWS_SCOPE, scopes)
-      self.assertEqual(600, deadline)
-      # Return an error on the first call.
-      if first:
-        return {
-          'insertErrors': [
-            {
-              'index': 0,
-              'errors': [
-                {
-                  'reason': 'sadness',
-                  'message': 'Oh gosh',
-                },
-              ],
-            },
-          ],
-        }
-      return {'insertErrors': []}
-    self.mock(task_result.bq_state.net, 'json_request', json_request)
+    def send_to_bq(table_name, rows):
+      self.assertEqual('task_results_summary', table_name)
+      payloads.append(rows)
+      return 0
+    self.mock(bq_state, 'send_to_bq', send_to_bq)
 
-    # Generate two tasks results.
+    # Generate 4 tasks results to test boundaries.
     self.mock_now(self.now, 10)
-    run_result_1 = _gen_result()
-    run_result_1.abandoned_ts = utils.utcnow()
-    run_result_1.completed_ts = utils.utcnow()
-    run_result_1.modified_ts = utils.utcnow()
-    run_result_1.put()
-    self.mock_now(self.now, 20)
-    run_result_2 = _gen_result()
-    run_result_2.completed_ts = utils.utcnow()
-    run_result_2.modified_ts = utils.utcnow()
-    run_result_2.put()
-    self.mock_now(self.now, 30)
+    result_1 = _gen_summary_result()
+    result_1.abandoned_ts = utils.utcnow()
+    result_1.completed_ts = utils.utcnow()
+    result_1.modified_ts = utils.utcnow()
+    result_1.put()
+    start = self.mock_now(self.now, 20)
+    result_2 = _gen_summary_result()
+    result_2.completed_ts = utils.utcnow()
+    result_2.modified_ts = utils.utcnow()
+    result_2.put()
+    end = self.mock_now(self.now, 30)
+    result_3 = _gen_summary_result()
+    result_3.completed_ts = utils.utcnow()
+    result_3.modified_ts = utils.utcnow()
+    result_3.put()
+    self.mock_now(self.now, 40)
+    result_4 = _gen_summary_result()
+    result_4.completed_ts = utils.utcnow()
+    result_4.modified_ts = utils.utcnow()
+    result_4.put()
 
-    # The cron job will loop twice.
-    self.assertEqual(2, task_result.cron_send_to_bq())
-    expected = {
-      'failed_bq_keys': [],
-      'failed_db_keys': [],
-      'last_bq_key': u'1d69ba3ea8008811',
-      'last_db_key': u'2014-01-02T03:04:25.000006Z',
-      'oldest': None,
-      'recent': None,
-      'ts': self.now + datetime.timedelta(seconds=30),
-    }
-    self.assertEqual(
-        expected,
-        task_result.bq_state.BqState.get_by_id('task_results').to_dict())
-
-    self.assertEqual(2, len(payloads), payloads)
-    expected = {
-      'ignoreUnknownValues': False,
-      'kind': 'bigquery#tableDataInsertAllRequest',
-      'skipInvalidRows': True,
-    }
-    actual_rows = payloads[0].pop('rows')
-    self.assertEqual(expected, payloads[0])
+    self.assertEqual((2, 0), task_result.task_bq_summary(start, end))
+    self.assertEqual(1, len(payloads), payloads)
+    actual_rows = payloads[0]
     self.assertEqual(2, len(actual_rows))
-
-    expected = {
-      'ignoreUnknownValues': False,
-      'kind': 'bigquery#tableDataInsertAllRequest',
-      'skipInvalidRows': True,
-    }
-    actual_rows = payloads[1].pop('rows')
-    self.assertEqual(expected, payloads[1])
-    self.assertEqual(1, len(actual_rows))
-
-    # Next cron skips everything that was processed.
-    self.assertEqual(0, task_result.cron_send_to_bq())
+    expected = [
+      result_2.task_id,
+      result_3.task_id,
+    ]
+    self.assertEqual(expected, [r[0] for r in actual_rows])
 
   def test_get_result_summaries_query(self):
     # Indirectly tested by API.
@@ -971,7 +927,7 @@ class TestOutput(TestCase):
     self.assertEqual(expected, [t.to_dict() for t in q.fetch()])
 
   def test_append_output(self):
-    run_result = _gen_result()
+    run_result = _gen_run_result()
     # Test that one can stream output and it is returned fine.
     def run(*args):
       entities = run_result.append_output(*args)
@@ -983,7 +939,7 @@ class TestOutput(TestCase):
     self.assertEqual('Part1\nPPart3\n', run_result.get_output())
 
   def test_append_output_large(self):
-    run_result = _gen_result()
+    run_result = _gen_run_result()
     self.mock(logging, 'error', lambda *_: None)
     one_mb = '<3Google' * (1024*1024/8)
 
@@ -1002,7 +958,7 @@ class TestOutput(TestCase):
   def test_append_output_max_chunk(self):
     # This test case is very slow (1m25s locally) if running with the default
     # values, so scale it down a bit which results in ~2.5s.
-    run_result = _gen_result()
+    run_result = _gen_run_result()
     self.mock(
         task_result.TaskOutput, 'PUT_MAX_CONTENT',
         task_result.TaskOutput.PUT_MAX_CONTENT / 8)
@@ -1030,14 +986,14 @@ class TestOutput(TestCase):
     self.assertEqual(1, calls[0][1])
 
   def test_append_output_partial(self):
-    run_result = _gen_result()
+    run_result = _gen_run_result()
     ndb.put_multi(run_result.append_output('Foo', 10))
     expected_output = '\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00Foo'
     self.assertEqual(expected_output, run_result.get_output())
     self.assertTaskOutputChunk([{'chunk': expected_output, 'gaps': [0, 10]}])
 
   def test_append_output_partial_hole(self):
-    run_result = _gen_result()
+    run_result = _gen_run_result()
     ndb.put_multi(run_result.append_output('Foo', 0))
     ndb.put_multi(run_result.append_output('Bar', 10))
     expected_output = 'Foo\x00\x00\x00\x00\x00\x00\x00Bar'
@@ -1045,7 +1001,7 @@ class TestOutput(TestCase):
     self.assertTaskOutputChunk([{'chunk': expected_output, 'gaps': [3, 10]}])
 
   def test_append_output_partial_far(self):
-    run_result = _gen_result()
+    run_result = _gen_run_result()
     ndb.put_multi(run_result.append_output(
       'Foo', 10 + task_result.TaskOutput.CHUNK_SIZE))
     self.assertEqual(
@@ -1058,7 +1014,7 @@ class TestOutput(TestCase):
 
   def test_append_output_partial_far_split(self):
     # Missing, writing happens on two different TaskOutputChunk entities.
-    run_result = _gen_result()
+    run_result = _gen_run_result()
     ndb.put_multi(run_result.append_output(
         'FooBar', 2 * task_result.TaskOutput.CHUNK_SIZE - 3))
     self.assertEqual(
@@ -1075,7 +1031,7 @@ class TestOutput(TestCase):
 
   def test_append_output_overwrite(self):
     # Overwrite previously written data.
-    run_result = _gen_result()
+    run_result = _gen_run_result()
     ndb.put_multi(run_result.append_output('FooBar', 0))
     ndb.put_multi(run_result.append_output('X', 3))
     self.assertEqual('FooXar', run_result.get_output())
@@ -1083,7 +1039,7 @@ class TestOutput(TestCase):
 
   def test_append_output_reverse_order(self):
     # Write the data in reverse order in multiple calls.
-    run_result = _gen_result()
+    run_result = _gen_run_result()
     ndb.put_multi(run_result.append_output('Wow', 11))
     ndb.put_multi(run_result.append_output('Foo', 8))
     ndb.put_multi(run_result.append_output('Baz', 0))
@@ -1095,7 +1051,7 @@ class TestOutput(TestCase):
 
   def test_append_output_reverse_order_second_chunk(self):
     # Write the data in reverse order in multiple calls.
-    run_result = _gen_result()
+    run_result = _gen_run_result()
     ndb.put_multi(run_result.append_output(
         'Wow', task_result.TaskOutput.CHUNK_SIZE + 11))
     ndb.put_multi(run_result.append_output(

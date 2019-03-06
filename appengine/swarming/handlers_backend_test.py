@@ -43,7 +43,7 @@ class BackendTest(test_env_handlers.AppTestBase):
   def _enqueue_task(self, *args, **kwargs):
     return self._enqueue_task_orig(*args, use_dedicated_module=False, **kwargs)
 
-  def testCronJobTasks(self):
+  def test_crons(self):
     # Tests all the cron tasks are securely handled.
     prefix = '/internal/cron/'
     cron_job_urls = [r for r in self._GetRoutes() if r.startswith(prefix)]
@@ -65,7 +65,7 @@ class BackendTest(test_env_handlers.AppTestBase):
     # The actual number doesn't matter, just make sure they are unqueued.
     self.execute_tasks()
 
-  def testCronBotsAggregateTask(self):
+  def test_cron_monitoring_bots_aggregate_dimensions(self):
     # Tests that the aggregation works
     now = datetime.datetime(2010, 1, 2, 3, 4, 5)
     self.mock_now(now)
@@ -95,7 +95,7 @@ class BackendTest(test_env_handlers.AppTestBase):
         ts=now)
     self.assertEqual(expected, actual)
 
-  def testCronTagsAggregateTask(self):
+  def test_cron_monitoring_tasks_aggregate_tags(self):
     self.mock_default_pool_acl([])
     self.set_as_admin()
     now = datetime.datetime(2011, 1, 2, 3, 4, 5)
@@ -128,7 +128,7 @@ class BackendTest(test_env_handlers.AppTestBase):
         ts=now)
     self.assertEqual(expected, actual)
 
-  def testCronCountTaskBotDistributionHandler(self):
+  def test_cron_monitoring_count_task_bot_distribution(self):
     self.mock_default_pool_acl([])
     self.set_as_admin()
     now = datetime.datetime(2011, 1, 2, 3, 4, 5)
@@ -142,7 +142,7 @@ class BackendTest(test_env_handlers.AppTestBase):
     self.app.get('/internal/cron/monitoring/count_task_bot_distribution',
         headers={'X-AppEngine-Cron': 'true'}, status=200)
 
-  def testTaskQueueUrls(self):
+  def test_taskqueues(self):
     # Tests all the task queue tasks are securely handled.
     # TODO(maruel): Test mapreduce.
     task_queue_urls = sorted(
@@ -168,6 +168,12 @@ class BackendTest(test_env_handlers.AppTestBase):
         ('tsmon', '/internal/taskqueue/monitoring/tsmon/', 'executors'),
         ('named-cache-task',
           '/internal/taskqueue/important/named_cache/update-pool', ''),
+        ('monitoring-bq-tasks-results-run',
+          '/internal/taskqueue/monitoring/bq/tasks/results/run/',
+          '2020-01-01T01:01'),
+        ('monitoring-bq-tasks-results-summary',
+          '/internal/taskqueue/monitoring/bq/tasks/results/summary/',
+          '2020-01-01T01:01'),
       ],
       key=lambda x: x[1])
     self.assertEqual(len(task_queues), len(task_queue_urls))
@@ -177,8 +183,39 @@ class BackendTest(test_env_handlers.AppTestBase):
           '%s does not start with %s' % (url, task_queues[i][1]))
 
     for _, url, arg in task_queues:
-      self.app.post(
-          url+arg, headers={'X-AppEngine-QueueName': 'bogus name'}, status=403)
+      try:
+        self.app.post(
+            url+arg, headers={'X-AppEngine-QueueName': 'bogus name'},
+            status=403)
+      except Exception as e:
+        self.fail('%s: %s' % (url, e))
+
+  def test_taskqueue_monitoring_bq_tasks_results_run(self):
+    self.set_as_admin()
+    now = datetime.datetime(2020, 1, 2, 3, 4, 0)
+    def task_bq_run(start, end):
+      self.assertEqual(start, now)
+      self.assertEqual(end, now + datetime.timedelta(seconds=60))
+      return 0, 0
+    self.mock(task_result, 'task_bq_run', task_bq_run)
+    self.app.post(
+        '/internal/taskqueue/monitoring/bq/tasks/results/run/2020-01-02T03:04',
+        headers={'X-AppEngine-QueueName': 'monitoring-bq-tasks-results-run'})
+
+  def test_taskqueue_monitoring_bq_tasks_results_summary(self):
+    self.set_as_admin()
+    now = datetime.datetime(2020, 1, 2, 3, 4, 0)
+    def task_bq_summary(start, end):
+      self.assertEqual(start, now)
+      self.assertEqual(end, now + datetime.timedelta(seconds=60))
+      return 0, 0
+    self.mock(task_result, 'task_bq_summary', task_bq_summary)
+    self.app.post(
+        '/internal/taskqueue/monitoring/bq/tasks/results/summary/'
+          '2020-01-02T03:04',
+        headers={
+          'X-AppEngine-QueueName': 'monitoring-bq-tasks-results-summary',
+        })
 
 
 if __name__ == '__main__':

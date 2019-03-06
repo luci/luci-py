@@ -10,6 +10,22 @@ queue:
 - name: cancel-task-on-bot
   rate: 500/s
 
+# /internal/taskqueue/important/pubsub/notify-task/<task_id:[0-9a-f]+>
+- name: pubsub
+  rate: 500/s
+
+# /internal/taskqueue/important/task_queues/rebuild-cache
+- name: rebuild-task-cache
+  rate: 500/s
+
+# /internal/taskqueue/monitoring/bq/tasks/results/run/<timestamp:\d{4}-\d\d-\d\dT\d\d:\d\d>
+- name: monitoring-bq-tasks-results-run
+  rate: 10/s
+
+# /internal/taskqueue/monitoring/bq/tasks/results/summary/<timestamp:\d{4}-\d\d-\d\dT\d\d:\d\d>
+- name: monitoring-bq-tasks-results-summary
+  rate: 10/s
+
 # /internal/taskqueue/cleanup/tasks/delete
 # An heavy workload produces 1000 tasks per minute, 10000 tasks per 10 minutes.
 # The cron job runs every 10 minutes and leaves 5 minutes for the tasks to
@@ -20,14 +36,6 @@ queue:
 - name: delete-tasks
   max_concurrent_requests: 20
   rate: 1/s
-
-# /internal/taskqueue/important/pubsub/notify-task/<task_id:[0-9a-f]+>
-- name: pubsub
-  rate: 500/s
-
-# /internal/taskqueue/important/task_queues/rebuild-cache
-- name: rebuild-task-cache
-  rate: 500/s
 
 
 ## External Scheduler
