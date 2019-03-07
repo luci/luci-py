@@ -98,6 +98,14 @@ import cipd
 BOT_PING_TOLERANCE = datetime.timedelta(seconds=6*60)
 
 
+# Time at which we can assume completed_ts is always set for task results.
+#
+# TODO(maruel): Remove this constant and all the code paths where it's
+# referenced in 2020-07-01 once there's no task result entities (TaskRunResult
+# and TaskResultSummary) left without completed_ts set.
+_COMPLETED_TS_CUTOFF = datetime.datetime(2019, 3, 1)
+
+
 class State(object):
   """Represents the current task state.
 
@@ -1581,15 +1589,11 @@ def task_bq_run(start, end):
     """Returns a tuple(bq_key, row)."""
     out = swarming_pb2.TaskResult()
     e.to_proto(out)
-    if not e.ended_ts:
-      # Inconsistent query. This is extremely rare but may happen.
-      return None, None
     return (e.task_id, out)
 
   q = TaskRunResult.query(
       TaskRunResult.completed_ts >= start,
-      TaskRunResult.completed_ts <= end).order(
-          TaskRunResult.completed_ts)
+      TaskRunResult.completed_ts <= end)
   cursor = None
   more = True
   failed = 0
@@ -1597,34 +1601,25 @@ def task_bq_run(start, end):
   seen = set()
   while more:
     entities, cursor, more = q.fetch_page(500, start_cursor=cursor)
-    rows = []
-    for e in entities:
-      p = _convert(e)
-      if p:
-        rows.append(p)
-        seen.add(e.task_id)
+    rows = [_convert(e) for e in entities]
+    seen.update(e.task_id for e in entities)
     total += len(rows)
     failed += bq_state.send_to_bq('task_results_run', rows)
 
   # Compatibility code for old tasks that didn't set completed_ts.
-  # TODO(maruel): Remove in 2020-07-01 once there's no such entity left.
-  q = TaskRunResult.query(
-      TaskRunResult.abandoned_ts >= start,
-      TaskRunResult.abandoned_ts <= end).order(
-          TaskRunResult.abandoned_ts)
-  cursor = None
-  more = True
-  while more:
-    entities, cursor, more = q.fetch_page(500, start_cursor=cursor)
-    rows = []
-    for e in entities:
-      if e.task_id not in seen:
-        p = _convert(e)
-        if p:
-          rows.append(p)
-    if rows:
+  if start < _COMPLETED_TS_CUTOFF:
+    q = TaskRunResult.query(
+        TaskRunResult.abandoned_ts >= start,
+        TaskRunResult.abandoned_ts <= end)
+    cursor = None
+    more = True
+    while more:
+      entities, cursor, more = q.fetch_page(500, start_cursor=cursor)
+      rows = [_convert(e) for e in entities if e.task_id not in seen]
+      seen.update(e.task_id for e in entities)
       total += len(rows)
       failed += bq_state.send_to_bq('task_results_run', rows)
+
   return total, failed
 
 
@@ -1634,15 +1629,11 @@ def task_bq_summary(start, end):
     """Returns a tuple(bq_key, row)."""
     out = swarming_pb2.TaskResult()
     e.to_proto(out)
-    if not e.ended_ts:
-      # Inconsistent query. This is extremely rare but may happen.
-      return None, None
     return (e.task_id, out)
 
   q = TaskResultSummary.query(
       TaskResultSummary.completed_ts >= start,
-      TaskResultSummary.completed_ts <= end).order(
-          TaskResultSummary.completed_ts)
+      TaskResultSummary.completed_ts <= end)
   cursor = None
   more = True
   failed = 0
@@ -1650,32 +1641,23 @@ def task_bq_summary(start, end):
   seen = set()
   while more:
     entities, cursor, more = q.fetch_page(500, start_cursor=cursor)
-    rows = []
-    for e in entities:
-      p = _convert(e)
-      if p:
-        rows.append(p)
-        seen.add(e.task_id)
+    rows = [_convert(e) for e in entities]
+    seen.update(e.task_id for e in entities)
     total += len(rows)
     failed += bq_state.send_to_bq('task_results_summary', rows)
 
   # Compatibility code for old tasks that didn't set completed_ts.
-  # TODO(maruel): Remove in 2020-07-01 once there's no such entity left.
-  q = TaskResultSummary.query(
-      TaskResultSummary.abandoned_ts >= start,
-      TaskResultSummary.abandoned_ts <= end).order(
-          TaskResultSummary.abandoned_ts)
-  cursor = None
-  more = True
-  while more:
-    entities, cursor, more = q.fetch_page(500, start_cursor=cursor)
-    rows = []
-    for e in entities:
-      if e.task_id not in seen:
-        p = _convert(e)
-        if p:
-          rows.append(p)
-    if rows:
+  if start < _COMPLETED_TS_CUTOFF:
+    q = TaskResultSummary.query(
+        TaskResultSummary.abandoned_ts >= start,
+        TaskResultSummary.abandoned_ts <= end)
+    cursor = None
+    more = True
+    while more:
+      entities, cursor, more = q.fetch_page(500, start_cursor=cursor)
+      rows = [_convert(e) for e in entities if e.task_id not in seen]
+      seen.update(e.task_id for e in entities)
       total += len(rows)
       failed += bq_state.send_to_bq('task_results_summary', rows)
+
   return total, failed

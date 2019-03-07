@@ -817,6 +817,17 @@ class TaskResultApiTest(TestCase):
     # Deprecated.
     pass
 
+  def _mock_send_to_bq(self, expected_table_name):
+    payloads = []
+    def send_to_bq(table_name, rows):
+      self.assertEqual(expected_table_name, table_name)
+      if rows:
+        # When rows is empty, send_to_bq() can exit early.
+        payloads.append(rows)
+      return 0
+    self.mock(bq_state, 'send_to_bq', send_to_bq)
+    return payloads
+
   def test_task_bq_run_empty(self):
     # Empty, nothing is done.
     start = utils.utcnow()
@@ -824,12 +835,7 @@ class TaskResultApiTest(TestCase):
     self.assertEqual((0, 0), task_result.task_bq_run(start, end))
 
   def test_task_bq_run(self):
-    payloads = []
-    def send_to_bq(table_name, rows):
-      self.assertEqual('task_results_run', table_name)
-      payloads.append(rows)
-      return 0
-    self.mock(bq_state, 'send_to_bq', send_to_bq)
+    payloads = self._mock_send_to_bq('task_results_run')
 
     # Generate 4 tasks results to test boundaries.
     self.mock_now(self.now, 10)
@@ -864,6 +870,39 @@ class TaskResultApiTest(TestCase):
     ]
     self.assertEqual(expected, [r[0] for r in actual_rows])
 
+  def test_task_bq_run_old_abandoned_ts(self):
+    # Confirm that an old entity without completed_ts set is still found.
+    payloads = self._mock_send_to_bq('task_results_run')
+    self.now = task_result._COMPLETED_TS_CUTOFF - datetime.timedelta(days=1)
+    start = self.mock_now(self.now, 0)
+    run_result = _gen_run_result()
+    run_result.abandoned_ts = utils.utcnow()
+    run_result.modified_ts = utils.utcnow()
+    run_result.put()
+    self.assertIsNone(run_result.key.get().completed_ts)
+    end = self.mock_now(self.now, 60)
+
+    self.assertEqual((1, 0), task_result.task_bq_run(start, end))
+    self.assertEqual(1, len(payloads), payloads)
+    actual_rows = payloads[0]
+    self.assertEqual(1, len(actual_rows))
+    self.assertEqual([run_result.task_id], [r[0] for r in actual_rows])
+
+  def test_task_bq_run_recent_abandoned_ts(self):
+    # Confirm that a recent entity without completed_ts set is not found.
+    payloads = self._mock_send_to_bq('task_results_run')
+    self.now = task_result._COMPLETED_TS_CUTOFF + datetime.timedelta(days=1)
+    start = self.mock_now(self.now, 0)
+    run_result = _gen_run_result()
+    run_result.abandoned_ts = utils.utcnow()
+    run_result.modified_ts = utils.utcnow()
+    run_result.put()
+    self.assertIsNone(run_result.key.get().completed_ts)
+    end = self.mock_now(self.now, 60)
+
+    self.assertEqual((0, 0), task_result.task_bq_run(start, end))
+    self.assertEqual(0, len(payloads), payloads)
+
   def test_task_bq_summary_empty(self):
     # Empty, nothing is done.
     start = utils.utcnow()
@@ -871,12 +910,7 @@ class TaskResultApiTest(TestCase):
     self.assertEqual((0, 0), task_result.task_bq_summary(start, end))
 
   def test_task_bq_summary(self):
-    payloads = []
-    def send_to_bq(table_name, rows):
-      self.assertEqual('task_results_summary', table_name)
-      payloads.append(rows)
-      return 0
-    self.mock(bq_state, 'send_to_bq', send_to_bq)
+    payloads = self._mock_send_to_bq('task_results_summary')
 
     # Generate 4 tasks results to test boundaries.
     self.mock_now(self.now, 10)
@@ -910,6 +944,39 @@ class TaskResultApiTest(TestCase):
       result_3.task_id,
     ]
     self.assertEqual(expected, [r[0] for r in actual_rows])
+
+  def test_task_bq_summary_old_abandoned_ts(self):
+    # Confirm that an old entity without completed_ts set is still found.
+    payloads = self._mock_send_to_bq('task_results_summary')
+    self.now = task_result._COMPLETED_TS_CUTOFF - datetime.timedelta(days=1)
+    start = self.mock_now(self.now, 0)
+    result = _gen_summary_result()
+    result.abandoned_ts = utils.utcnow()
+    result.modified_ts = utils.utcnow()
+    result.put()
+    self.assertIsNone(result.key.get().completed_ts)
+    end = self.mock_now(self.now, 60)
+
+    self.assertEqual((1, 0), task_result.task_bq_summary(start, end))
+    self.assertEqual(1, len(payloads), payloads)
+    actual_rows = payloads[0]
+    self.assertEqual(1, len(actual_rows))
+    self.assertEqual([result.task_id], [r[0] for r in actual_rows])
+
+  def test_task_bq_summary_recent_abandoned_ts(self):
+    # Confirm that a recent entity without completed_ts set is not found.
+    payloads = self._mock_send_to_bq('task_results_summary')
+    self.now = task_result._COMPLETED_TS_CUTOFF + datetime.timedelta(days=1)
+    start = self.mock_now(self.now, 0)
+    result = _gen_summary_result()
+    result.abandoned_ts = utils.utcnow()
+    result.modified_ts = utils.utcnow()
+    result.put()
+    self.assertIsNone(result.key.get().completed_ts)
+    end = self.mock_now(self.now, 60)
+
+    self.assertEqual((0, 0), task_result.task_bq_summary(start, end))
+    self.assertEqual(0, len(payloads), payloads)
 
   def test_get_result_summaries_query(self):
     # Indirectly tested by API.
