@@ -6,6 +6,7 @@
 
 import json
 import logging
+import time
 import urllib
 import urlparse
 
@@ -19,7 +20,16 @@ from components.auth import delegation
 
 
 EMAIL_SCOPE = 'https://www.googleapis.com/auth/userinfo.email'
+TS_MON_CLIENT = "luci-py-server"
 
+
+# Maybe import gae_ts_mon
+# Not all users of this library will necessarily have gae_ts_mon,
+# So we need to tiptoe around them
+try:
+  from gae_ts_mon.common import http_metrics
+except ImportError:
+  http_metrics = None
 
 class Error(Exception):
   """Raised on non-transient errors.
@@ -72,6 +82,29 @@ def _error_class_for_status(status_code):
   return Error
 
 
+def _update_http_metrics(metrics_name, response, elapsed_ms, payload):
+  # <response> is possibly None
+  # set status_code to STATUS_EXCEPTION and response_size to None
+  # then update to real values if there actually is a <response>
+  status_code = http_metrics.STATUS_EXCEPTION
+  response_size = None
+  if response is not None:
+    status_code = response.status_code
+    response_size = len(response.content)
+  # The following code can be replaced with
+  # http_metrics.update_http_metrics() once it is rolled in from upstream
+  # infra repo
+  fields = {'client':TS_MON_CLIENT, 'status': status_code,
+            'name': metrics_name}
+  http_metrics.response_status.increment(fields=fields)
+  fields = {'client':TS_MON_CLIENT, 'name':metrics_name}
+  http_metrics.durations.add(elapsed_ms, fields=fields)
+  if payload is not None:
+    http_metrics.request_bytes.add(len(payload), fields=fields)
+  if response_size is not None:
+    http_metrics.response_bytes.add(response_size, fields=fields)
+
+
 @ndb.tasklet
 def request_async(
     url,
@@ -83,7 +116,8 @@ def request_async(
     service_account_key=None,
     delegation_token=None,
     deadline=None,
-    max_attempts=None):
+    max_attempts=None,
+    metrics_name=None):
   """Sends a REST API request, returns raw unparsed response.
 
   Retries the request on transient errors for up to |max_attempts| times.
@@ -99,6 +133,10 @@ def request_async(
     delegation_token: delegation token returned by auth.delegate.
     deadline: deadline for a single attempt (10 sec by default).
     max_attempts: how many times to retry on errors (4 times by default).
+    metrics_name: the name of the resource for the purpose of metrics collection
+      ie it will be assigned to the "name" field of various http metrics
+      recorded against the request. If None, then the domain name from <url>
+      will be used.
 
   Returns:
     Buffer with raw response.
@@ -138,11 +176,15 @@ def request_async(
   attempt = 0
   response = None
   last_status_code = None
+  if metrics_name is None:
+      parsed_url = urlparse.urlparse(url)
+      metrics_name = parsed_url.netloc
   while attempt < max_attempts:
     if attempt:
       logging.info('Retrying...')
     attempt += 1
     logging.info('%s %s', method, url)
+    start_timestamp = time.time()
     try:
       response = yield urlfetch_async(
           url=url,
@@ -156,6 +198,10 @@ def request_async(
       # Transient network error or URL fetch service RPC deadline.
       logging.warning('%s %s failed: %s', method, url, e)
       continue
+    finally:
+      if http_metrics is not None:
+        elapsed_ms = (time.time() - start_timestamp) * 1000
+        _update_http_metrics(metrics_name, response, elapsed_ms, payload)
 
     last_status_code = response.status_code
 
@@ -203,7 +249,8 @@ def json_request_async(
     service_account_key=None,
     delegation_token=None,
     deadline=None,
-    max_attempts=None):
+    max_attempts=None,
+    metrics_name=None):
   """Sends a JSON REST API request, returns deserialized response.
 
   Automatically strips prefixes formed from characters in the set ")]}'\n"
@@ -223,6 +270,10 @@ def json_request_async(
     delegation_token: delegation token returned by auth.delegate.
     deadline: deadline for a single attempt.
     max_attempts: how many times to retry on errors.
+    metrics_name: the name of the resource for the purpose of metrics collection
+      ie it will be assigned to the "name" field of various http metrics
+      recorded against the request. If None, then the domain name from <url>
+      will be used.
 
   Returns:
     Deserialized JSON response.
@@ -247,7 +298,8 @@ def json_request_async(
       service_account_key=service_account_key,
       delegation_token=delegation_token,
       deadline=deadline,
-      max_attempts=max_attempts)
+      max_attempts=max_attempts,
+      metrics_name=metrics_name)
   try:
     response = json.loads(response.lstrip(")]}'\n"))
   except ValueError as e:
