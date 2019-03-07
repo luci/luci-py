@@ -10,6 +10,8 @@ syntax = "proto3";
 
 package components.auth;
 
+option go_package = "go.chromium.org/luci/server/auth/service/protocol;protocol";
+
 
 ////////////////////////////////////////////////////////////////////////////////
 // Linking protocol, used to associate Replicas with Primary.
@@ -159,14 +161,28 @@ message AuthDB {
   string oauth_client_secret = 2;
   // Additional OAuth2 client_ids allowed to access the services.
   repeated string oauth_additional_client_ids = 3;
+
   // All groups.
   repeated AuthGroup groups = 4;
   // All IP whitelists.
   repeated AuthIPWhitelist ip_whitelists = 6;
   // Mapping 'account -> IP whitlist to use for that account'.
   repeated AuthIPWhitelistAssignment ip_whitelist_assignments = 7;
+
   // URL of a token server to use to generate delegation tokens.
   string token_server_url = 8;
+
+  // Serialized security_config.SecurityConfig proto with security-related
+  // configuration to distribute across all services.
+  //
+  // It is distributed in a serialized form to make sure old services ingest it
+  // fully, even if they don't understand some SecurityConfig proto fields
+  // (yet). As soon as their code is updated, they SHOULD start using all
+  // SecurityConfig fields, without waiting for another push from Auth Service.
+  //
+  // If we use SecurityConfig directly here, old services would just drop fields
+  // they don't understand when accepting an AuthDB push.
+  bytes security_config = 9;
 }
 
 

@@ -23,6 +23,7 @@ changes as well as removes a need to write some UI for them.
 import collections
 import logging
 import posixpath
+import re
 
 from google import protobuf
 from google.appengine.ext import ndb
@@ -33,6 +34,7 @@ from components import gitiles
 from components import utils
 from components.auth import ipaddr
 from components.auth import model
+from components.auth.proto import security_config_pb2
 from components.config import validation
 
 from proto import config_pb2
@@ -133,7 +135,7 @@ def refetch_config(force=False):
 
   # First update configs that do not touch AuthDB, one by one.
   for path, (rev, conf) in sorted(dirty.iteritems()):
-    dirty = _CONFIG_SCHEMAS[path]['updater'](rev, conf)
+    dirty = _CONFIG_SCHEMAS[path]['updater'](None, rev, conf)
     logging.info(
         'Processed %s at rev %s: %s', path, rev.revision,
         'updated' if dirty else 'up-to-date')
@@ -240,7 +242,7 @@ def _get_imports_config_revision_async():
   raise ndb.Return(Revision(desc.get('rev'), desc.get('url')))
 
 
-def _update_imports_config(rev, conf):
+def _update_imports_config(_root, rev, conf):
   """Applies imports.cfg config."""
   # Rewrite existing config even if it is the same (to update 'rev').
   cur = importer.read_config()
@@ -282,23 +284,46 @@ def _update_authdb_configs(configs):
 
   Args:
     configs: dict {config path -> (Revision tuple, <config>)}.
+
+  Returns:
+    True if anything has changed since last import.
   """
+  # Get model.AuthGlobalConfig entity, to potentially update it.
+  root = model.root_key().get()
+  orig = root.to_dict()
+
   revs = _imported_config_revisions_key().get()
   if not revs:
     revs = _ImportedConfigRevisions(
         key=_imported_config_revisions_key(),
         revisions={})
-  some_dirty = False
+
+  ingested_revs = {}  # path -> Revision
   for path, (rev, conf) in sorted(configs.iteritems()):
-    dirty = _CONFIG_SCHEMAS[path]['updater'](rev, conf)
+    dirty = _CONFIG_SCHEMAS[path]['updater'](root, rev, conf)
     revs.revisions[path] = {'rev': rev.revision, 'url': rev.url}
     logging.info(
         'Processed %s at rev %s: %s', path, rev.revision,
         'updated' if dirty else 'up-to-date')
-    some_dirty = some_dirty or dirty
+    if dirty:
+      ingested_revs[path] = rev
+
+  if root.to_dict() != orig:
+    assert ingested_revs
+    report = ', '.join(
+        '%s@%s' % (p, rev.revision) for p, rev in sorted(ingested_revs.items())
+    )
+    logging.info('Global config has been updated: %s', report)
+    root.record_revision(
+        modified_by=model.get_service_self_identity(),
+        modified_ts=utils.utcnow(),
+        comment='Importing configs: %s' % report)
+    root.put()
+
   revs.put()
-  if some_dirty:
+  if ingested_revs:
     model.replicate_auth_db()
+  return bool(ingested_revs)
 
 
 def _validate_ip_whitelist_config(conf):
@@ -353,8 +378,9 @@ def _resolve_ip_whitelist_includes(whitelists):
   return {m.name: sorted(resolve_one(m, [])) for m in whitelists}
 
 
-def _update_ip_whitelist_config(rev, conf):
+def _update_ip_whitelist_config(root, rev, conf):
   assert ndb.in_transaction(), 'Must be called in AuthDB transaction'
+  assert isinstance(root, model.AuthGlobalConfig), root
   now = utils.utcnow()
 
   # Existing whitelist entities.
@@ -450,14 +476,14 @@ def _validate_oauth_config(conf):
     utils.validate_root_service_url(conf.token_server_url)
 
 
-def _update_oauth_config(rev, conf):
+def _update_oauth_config(root, _rev, conf):
   assert ndb.in_transaction(), 'Must be called in AuthDB transaction'
-  existing = model.root_key().get()
+  assert isinstance(root, model.AuthGlobalConfig), root
   existing_as_dict = {
-    'oauth_client_id': existing.oauth_client_id,
-    'oauth_client_secret': existing.oauth_client_secret,
-    'oauth_additional_client_ids': list(existing.oauth_additional_client_ids),
-    'token_server_url': existing.token_server_url,
+    'oauth_client_id': root.oauth_client_id,
+    'oauth_client_secret': root.oauth_client_secret,
+    'oauth_additional_client_ids': list(root.oauth_additional_client_ids),
+    'token_server_url': root.token_server_url,
   }
   new_as_dict = {
     'oauth_client_id': conf.primary_client_id,
@@ -467,12 +493,37 @@ def _update_oauth_config(rev, conf):
   }
   if new_as_dict == existing_as_dict:
     return False
-  existing.populate(**new_as_dict)
-  existing.record_revision(
-      modified_by=model.get_service_self_identity(),
-      modified_ts=utils.utcnow(),
-      comment='Importing oauth.cfg at rev %s' % rev.revision)
-  existing.put()
+  root.populate(**new_as_dict)
+  return True
+
+
+### SecurityConfig ingestion.
+
+
+@validation.self_rule('security.cfg', security_config_pb2.SecurityConfig)
+def validate_security_config(conf, ctx):
+  with ctx.prefix('internal_service_regexp: '):
+    for regexp in conf.internal_service_regexp:
+      try:
+        re.compile('^' + regexp + '$')
+      except re.error as exc:
+        ctx.error('bad regexp %r - %s', str(regexp), exc)
+
+
+def _update_security_config(root, _rev, conf):
+  assert ndb.in_transaction(), 'Must be called in AuthDB transaction'
+  assert isinstance(root, model.AuthGlobalConfig), root
+
+  # Any changes? Compare semantically, not as byte blobs, since it is not
+  # guaranteed that the byte blob serialization is stable.
+  existing = security_config_pb2.SecurityConfig()
+  if root.security_config:
+    existing.MergeFromString(root.security_config)
+  if existing == conf:
+    return False
+
+  # Note: this byte blob will be pushed to all service as is.
+  root.security_config = conf.SerializeToString()
   return True
 
 
@@ -482,8 +533,10 @@ def _update_oauth_config(rev, conf):
 #   'proto_class': protobuf class of the config or None to keep it as text,
 #   'revision_getter': lambda: ndb.Future with <latest imported Revision>
 #   'validator': lambda config: <raises ValueError on invalid format>
-#   'updater': lambda rev, config: True if applied, False if not.
+#   'updater': lambda root, rev, config: True if applied, False if not.
 #   'use_authdb_transaction': True to call 'updater' in AuthDB transaction.
+#       Transactional updaters receive mutable AuthGlobalConfig entity as
+#       'root'. Non-transactional updaters receive None instead.
 #   'default': Default config value to use if the config file is missing.
 # }
 _CONFIG_SCHEMAS = {
@@ -509,8 +562,15 @@ _CONFIG_SCHEMAS = {
     'proto_class': None, # settings are stored as text in datastore
     'default': '',  # it's fine if config file is not there
     'revision_getter': lambda: _get_service_config_rev_async('settings.cfg'),
-    'updater': lambda rev, c: _update_service_config('settings.cfg', rev, c),
+    'updater': lambda _, rev, c: _update_service_config('settings.cfg', rev, c),
     'use_authdb_transaction': False,
+  },
+  'security.cfg': {
+    'proto_class': security_config_pb2.SecurityConfig,
+    'default': security_config_pb2.SecurityConfig(),
+    'revision_getter': lambda: _get_authdb_config_rev_async('security.cfg'),
+    'updater': _update_security_config,
+    'use_authdb_transaction': True,
   },
 }
 

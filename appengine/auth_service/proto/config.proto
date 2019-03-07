@@ -3,6 +3,10 @@
 // that can be found in the LICENSE file.
 
 // Configuration schema for configs fetched via a config service.
+//
+// See also //components/auth/proto/security_config.proto for the schema of
+// 'security.cfg', which is distributed to all linked services as is as part
+// of AuthDB proto.
 
 syntax = "proto3";
 

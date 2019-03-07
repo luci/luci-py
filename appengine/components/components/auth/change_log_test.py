@@ -15,6 +15,8 @@ from google.appengine.ext import ndb
 from components import utils
 from components.auth import change_log
 from components.auth import model
+from components.auth.proto import security_config_pb2
+
 from test_support import test_case
 
 
@@ -81,6 +83,11 @@ def make_ip_whitelist(name, comment, **kwargs):
       modified_ts=utils.utcnow(),
       comment=comment)
   wl.put()
+
+
+def security_config(regexps):
+  msg = security_config_pb2.SecurityConfig(internal_service_regexp=regexps)
+  return msg.SerializeToString()
 
 
 class GenerateChangesTest(test_case.TestCase):
@@ -740,6 +747,7 @@ class GenerateChangesTest(test_case.TestCase):
       c = model.root_key().get()
       c.oauth_additional_client_ids = ['1', '3']
       c.token_server_url = 'https://token-server'
+      c.security_config = security_config(['hi'])
       c.record_revision(
           modified_by=ident('me@example.com'),
           modified_ts=utils.utcnow(),
@@ -778,6 +786,18 @@ class GenerateChangesTest(test_case.TestCase):
         'comment': u'Config change',
         'target': u'AuthGlobalConfig$root',
         'token_server_url_new': u'https://token-server',
+        'when': datetime.datetime(2015, 1, 2, 3, 4, 5),
+        'who': model.Identity(kind='user', name='me@example.com'),
+      },
+      'AuthDBChange:AuthGlobalConfig$root!7400': {
+        'app_version': u'v1a',
+        'auth_db_rev': 2,
+        'change_type':
+            change_log.AuthDBChange.CHANGE_CONF_SECURITY_CONFIG_CHANGED,
+        'class_': [u'AuthDBChange', u'AuthDBConfigChange'],
+        'comment': u'Config change',
+        'security_config_new': security_config(['hi']),
+        'target': u'AuthGlobalConfig$root',
         'when': datetime.datetime(2015, 1, 2, 3, 4, 5),
         'who': model.Identity(kind='user', name='me@example.com'),
       },
@@ -839,6 +859,34 @@ class AuthDBChangeTest(test_case.TestCase):
       'identity': 'user:b@example.com',
       'ip_whitelist': 'whitelist',
       'target': 'AuthIPWhitelistAssignments$default',
+      'when': 1420167845000000,
+      'who': 'user:a@example.com',
+    }, c.to_jsonish())
+
+  def test_security_config_change_to_jsonish(self):
+    c = change_log.AuthDBConfigChange(
+        change_type=change_log.AuthDBChange.CHANGE_CONF_SECURITY_CONFIG_CHANGED,
+        target='AuthGlobalConfig$default',
+        auth_db_rev=123,
+        who=ident('a@example.com'),
+        when=datetime.datetime(2015, 1, 2, 3, 4, 5),
+        comment='A comment',
+        app_version='v123',
+        security_config_old=None,
+        security_config_new=security_config(['hi']))
+    self.assertEqual({
+      'app_version': 'v123',
+      'auth_db_rev': 123,
+      'change_type': 'CONF_SECURITY_CONFIG_CHANGED',
+      'comment': 'A comment',
+      'oauth_additional_client_ids': [],
+      'oauth_client_id': None,
+      'oauth_client_secret': None,
+      'security_config_new': {'internal_service_regexp': [u'hi']},
+      'security_config_old': None,
+      'target': 'AuthGlobalConfig$default',
+      'token_server_url_new': None,
+      'token_server_url_old': None,
       'when': 1420167845000000,
       'who': 'user:a@example.com',
     }, c.to_jsonish())

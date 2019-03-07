@@ -547,6 +547,8 @@ class AuthGlobalConfig(ndb.Model, AuthVersionedEntityMixin):
 
   # URL of a token server to use to generate delegation tokens.
   token_server_url = ndb.StringProperty(indexed=False, default='')
+  # Serialized security_config_pb2.SecurityConfig, see security_config.proto.
+  security_config = ndb.BlobProperty()
 
 
 class AuthReplicationState(ndb.Model, datastore_utils.SerializableModelMixin):

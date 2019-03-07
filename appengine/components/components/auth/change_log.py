@@ -15,12 +15,15 @@ from google.appengine.api import taskqueue
 from google.appengine.ext import ndb
 from google.appengine.ext.ndb import polymodel
 
+from google.protobuf import json_format
+
 from components import datastore_utils
 from components import decorators
 from components import utils
 
 from . import config
 from . import model
+from .proto import security_config_pb2
 
 
 def process_change(auth_db_rev):
@@ -121,6 +124,7 @@ class AuthDBChange(polymodel.PolyModel):
   CHANGE_CONF_CLIENT_IDS_ADDED         = 7100
   CHANGE_CONF_CLIENT_IDS_REMOVED       = 7200
   CHANGE_CONF_TOKEN_SERVER_URL_CHANGED = 7300
+  CHANGE_CONF_SECURITY_CONFIG_CHANGED  = 7400
 
   # What kind of a change this is (see CHANGE_*). Defines what subclass to use.
   change_type = ndb.IntegerProperty()
@@ -138,7 +142,7 @@ class AuthDBChange(polymodel.PolyModel):
   app_version = ndb.StringProperty()
 
   def to_jsonish(self):
-    """Returns JSON-serializable dict with entity properties."""
+    """Returns JSON-serializable dict with entity properties for REST API."""
     def simplify(v):
       if isinstance(v, list):
         return [simplify(i) for i in v]
@@ -151,7 +155,12 @@ class AuthDBChange(polymodel.PolyModel):
       return v
     as_dict = self.to_dict(exclude=['class_'])
     for k, v in as_dict.iteritems():
-      as_dict[k] = simplify(v)
+      if k.startswith('security_config_') and v:
+        as_dict[k] = json_format.MessageToDict(
+            security_config_pb2.SecurityConfig.FromString(v),
+            preserving_proto_field_name=True)
+      else:
+        as_dict[k] = simplify(v)
     as_dict['change_type'] = _CHANGE_TYPE_TO_STRING[self.change_type]
     return as_dict
 
@@ -479,6 +488,10 @@ class AuthDBConfigChange(AuthDBChange):
   token_server_url_old = ndb.StringProperty()
   # Valid for CHANGE_CONF_TOKEN_SERVER_URL_CHANGED.
   token_server_url_new = ndb.StringProperty()
+  # Valid for CHANGE_CONF_SECURITY_CONFIG_CHANGED.
+  security_config_old = ndb.BlobProperty()
+  # Valid for CHANGE_CONF_SECURITY_CONFIG_CHANGED.
+  security_config_new = ndb.BlobProperty()
 
 
 def diff_global_config(target, old, new):
@@ -495,6 +508,7 @@ def diff_global_config(target, old, new):
   prev_client_secret = old.oauth_client_secret if old else ''
   prev_client_ids = old.oauth_additional_client_ids if old else []
   prev_token_server_url = old.token_server_url if old else ''
+  prev_security_config = old.security_config if old else None
 
   if (prev_client_id != new.oauth_client_id or
       prev_client_secret != new.oauth_client_secret):
@@ -514,6 +528,12 @@ def diff_global_config(target, old, new):
         'TOKEN_SERVER_URL_CHANGED',
         token_server_url_old=prev_token_server_url,
         token_server_url_new=new.token_server_url)
+
+  if prev_security_config != new.security_config:
+    yield change(
+        'SECURITY_CONFIG_CHANGED',
+        security_config_old=prev_security_config,
+        security_config_new=new.security_config)
 
 
 ###

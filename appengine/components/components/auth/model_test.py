@@ -532,14 +532,16 @@ class AuditLogTest(test_case.TestCase):
     modify(oauth_client_id='2', oauth_additional_client_ids=['a'])
     modify(oauth_client_id='3', oauth_additional_client_ids=['a', 'b'])
     modify(oauth_client_id='4', oauth_additional_client_ids=[])
+    modify(oauth_client_id='4', security_config='zzz')
 
     # Final state.
     self.assertEqual({
-      'auth_db_rev': 4,
-      'auth_db_prev_rev': 3,
+      'auth_db_rev': 5,
+      'auth_db_prev_rev': 4,
       'oauth_additional_client_ids': [],
       'oauth_client_id': u'4',
       'oauth_client_secret': u'',
+      'security_config': 'zzz',
       'token_server_url': u'',
       'modified_by': model.Identity.from_bytes('user:a@example.com'),
       'modified_ts': datetime.datetime(2015, 1, 1, 1, 1),
@@ -558,6 +560,7 @@ class AuditLogTest(test_case.TestCase):
         'oauth_additional_client_ids': [],
         'oauth_client_id': u'1',
         'oauth_client_secret': u'',
+        'security_config': None,
         'token_server_url': u'',
         'modified_by': model.Identity.from_bytes('user:a@example.com'),
         'modified_ts': datetime.datetime(2015, 1, 1, 1, 1),
@@ -571,6 +574,7 @@ class AuditLogTest(test_case.TestCase):
         'oauth_additional_client_ids': [u'a'],
         'oauth_client_id': u'2',
         'oauth_client_secret': u'',
+        'security_config': None,
         'token_server_url': u'',
         'modified_by': model.Identity.from_bytes('user:a@example.com'),
         'modified_ts': datetime.datetime(2015, 1, 1, 1, 1),
@@ -584,6 +588,7 @@ class AuditLogTest(test_case.TestCase):
         'oauth_additional_client_ids': [u'a', u'b'],
         'oauth_client_id': u'3',
         'oauth_client_secret': u'',
+        'security_config': None,
         'token_server_url': u'',
         'modified_by': model.Identity.from_bytes('user:a@example.com'),
         'modified_ts': datetime.datetime(2015, 1, 1, 1, 1),
@@ -597,6 +602,21 @@ class AuditLogTest(test_case.TestCase):
         'oauth_additional_client_ids': [],
         'oauth_client_id': u'4',
         'oauth_client_secret': u'',
+        'security_config': None,
+        'token_server_url': u'',
+        'modified_by': model.Identity.from_bytes('user:a@example.com'),
+        'modified_ts': datetime.datetime(2015, 1, 1, 1, 1),
+      },
+      cpy(5): {
+        'auth_db_rev': 5,
+        'auth_db_prev_rev': 4,
+        'auth_db_app_version': u'v1a',
+        'auth_db_deleted': False,
+        'auth_db_change_comment': u'Comment',
+        'oauth_additional_client_ids': [],
+        'oauth_client_id': u'4',
+        'oauth_client_secret': u'',
+        'security_config': 'zzz',
         'token_server_url': u'',
         'modified_by': model.Identity.from_bytes('user:a@example.com'),
         'modified_ts': datetime.datetime(2015, 1, 1, 1, 1),

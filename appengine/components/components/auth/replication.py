@@ -169,6 +169,8 @@ def auth_db_snapshot_to_proto(snapshot, auth_db_proto=None):
 
   auth_db_proto.token_server_url = (
       snapshot.global_config.token_server_url or 'empty')
+  auth_db_proto.security_config = (
+      snapshot.global_config.security_config or 'empty')
 
   for ent in snapshot.groups:
     msg = auth_db_proto.groups.add()
@@ -214,7 +216,8 @@ def proto_to_auth_db_snapshot(auth_db_proto):
       oauth_client_secret=auth_db_proto.oauth_client_secret,
       oauth_additional_client_ids=list(
           auth_db_proto.oauth_additional_client_ids),
-      token_server_url=auth_db_proto.token_server_url)
+      token_server_url=auth_db_proto.token_server_url,
+      security_config=auth_db_proto.security_config)
 
   groups = [
     model.AuthGroup(

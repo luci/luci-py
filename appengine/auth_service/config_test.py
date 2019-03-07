@@ -16,6 +16,8 @@ from google.appengine.ext import ndb
 from components import config as config_component
 from components import utils
 from components.auth import model
+from components.auth.proto import security_config_pb2
+from components.config import validation
 from test_support import test_case
 
 from proto import config_pb2
@@ -25,6 +27,11 @@ import config
 class ConfigTest(test_case.TestCase):
   def setUp(self):
     super(ConfigTest, self).setUp()
+    self.mock_now(datetime.datetime(2014, 1, 2, 3, 4, 5))
+    model.AuthGlobalConfig(
+        key=model.root_key(),
+        auth_db_rev=0,
+    ).put()
 
   def test_refetch_config(self):
     initial_revs = {
@@ -52,7 +59,7 @@ class ConfigTest(test_case.TestCase):
         'proto_class': None,
         'revision_getter': lambda: get_rev_async('a.cfg'),
         'validator': lambda body: self.assertEqual(body, 'new a body'),
-        'updater': lambda rev, conf: bump_rev('a.cfg', rev, conf),
+        'updater': lambda root, rev, conf: bump_rev('a.cfg', rev, conf),
         'use_authdb_transaction': False,
       },
       # Will not be changed.
@@ -60,7 +67,7 @@ class ConfigTest(test_case.TestCase):
         'proto_class': None,
         'revision_getter': lambda: get_rev_async('b.cfg'),
         'validator': lambda _body: True,
-        'updater': lambda rev, conf: bump_rev('b.cfg', rev, conf),
+        'updater': lambda root, rev, conf: bump_rev('b.cfg', rev, conf),
         'use_authdb_transaction': False,
       },
       # Will be updated inside auth db transaction.
@@ -68,7 +75,7 @@ class ConfigTest(test_case.TestCase):
         'proto_class': None,
         'revision_getter': lambda: get_rev_async('c.cfg'),
         'validator': lambda body: self.assertEqual(body, 'new c body'),
-        'updater': lambda rev, conf: bump_rev('c.cfg', rev, conf),
+        'updater': lambda root, rev, conf: bump_rev('c.cfg', rev, conf),
         'use_authdb_transaction': True,
       },
     })
@@ -104,7 +111,7 @@ class ConfigTest(test_case.TestCase):
   def test_update_imports_config(self):
     new_rev = config.Revision('rev', 'url')
     body = 'tarball{url:"a" systems:"b"}'
-    self.assertTrue(config._update_imports_config(new_rev, body))
+    self.assertTrue(config._update_imports_config(None, new_rev, body))
     self.assertEqual(
         new_rev, config._get_imports_config_revision_async().get_result())
 
@@ -255,10 +262,12 @@ class ConfigTest(test_case.TestCase):
     config._validate_ip_whitelist_config(conf)
 
   def test_update_ip_whitelist_config(self):
-    @ndb.transactional
     def run(conf):
-      return config._update_ip_whitelist_config(
-          config.Revision('ip_whitelist_cfg_rev', 'http://url'), conf)
+      return config._update_authdb_configs({
+        'ip_whitelist.cfg': (
+          config.Revision('ip_whitelist_cfg_rev', 'http://url'), conf
+        ),
+      })
     # Pushing empty config to empty DB -> no changes.
     self.assertFalse(run(config_pb2.IPWhitelistConfig()))
 
@@ -284,7 +293,6 @@ class ConfigTest(test_case.TestCase):
               identity='user:xyz@example.com',
               ip_whitelist_name='bots'),
         ])
-    self.mock_now(datetime.datetime(2014, 1, 2, 3, 4, 5))
     self.assertTrue(run(conf))
 
     # Verify everything is there.
@@ -412,8 +420,8 @@ class ConfigTest(test_case.TestCase):
           'ip_whitelist': u'bots',
         },
       ],
-      'auth_db_rev': 1,
-      'auth_db_prev_rev': 1, # replicate_auth_db is mocked, so no version bump
+      'auth_db_rev': 2,
+      'auth_db_prev_rev': 1,
       'modified_by': model.get_service_self_identity(),
       'modified_ts': datetime.datetime(2014, 3, 2, 3, 4, 5),
     }, model.ip_whitelist_assignments_key().get().to_dict())
@@ -453,10 +461,12 @@ class ConfigTest(test_case.TestCase):
         })
 
   def test_update_ip_whitelist_config_with_includes(self):
-    @ndb.transactional
     def run(conf):
-      return config._update_ip_whitelist_config(
-          config.Revision('ip_whitelist_cfg_rev', 'http://url'), conf)
+      return config._update_authdb_configs({
+        'ip_whitelist.cfg': (
+          config.Revision('ip_whitelist_cfg_rev', 'http://url'), conf
+        ),
+      })
 
     conf = config_pb2.IPWhitelistConfig(
         ip_whitelists=[
@@ -475,7 +485,6 @@ class ConfigTest(test_case.TestCase):
               name='d',
               includes=['c']),
         ])
-    self.mock_now(datetime.datetime(2014, 1, 2, 3, 4, 5))
     self.assertTrue(run(conf))
 
     # Verify everything is there.
@@ -524,12 +533,10 @@ class ConfigTest(test_case.TestCase):
         })
 
   def test_update_oauth_config(self):
-    self.mock_now(datetime.datetime(2014, 1, 2, 3, 4, 5))
-    @ndb.transactional
     def run(conf):
-      return config._update_oauth_config(
-          config.Revision('oauth_cfg_rev', 'http://url'), conf)
-    model.AuthGlobalConfig(key=model.root_key()).put()
+      return config._update_authdb_configs({
+        'oauth.cfg': (config.Revision('oauth_cfg_rev', 'http://url'), conf),
+      })
     # Pushing empty config to empty state -> no changes.
     self.assertFalse(run(config_pb2.OAuthConfig()))
     # Updating config.
@@ -540,13 +547,14 @@ class ConfigTest(test_case.TestCase):
         token_server_url='https://token-server')))
     self.assertEqual({
       'auth_db_rev': 1,
-      'auth_db_prev_rev': None,
+      'auth_db_prev_rev': 0,
       'modified_by': model.get_service_self_identity(),
       'modified_ts': datetime.datetime(2014, 1, 2, 3, 4, 5),
-      'oauth_additional_client_ids': ['c', 'd'],
-      'oauth_client_id': 'a',
-      'oauth_client_secret': 'b',
-      'token_server_url': 'https://token-server',
+      'oauth_additional_client_ids': [u'c', u'd'],
+      'oauth_client_id': u'a',
+      'oauth_client_secret': u'b',
+      'security_config': None,
+      'token_server_url': u'https://token-server',
     }, model.root_key().get().to_dict())
     # Same config again -> no changes.
     self.assertFalse(run(config_pb2.OAuthConfig(
@@ -664,6 +672,93 @@ class ConfigTest(test_case.TestCase):
     # Verify defaults are restored.
     utils.clear_cache(config.get_settings)
     self.assertEqual(config_pb2.SettingsCfg(), config.get_settings())
+
+  def test_validate_security_config_ok(self):
+    ctx = validation.Context()
+    config.validate_security_config(security_config_pb2.SecurityConfig(), ctx)
+    self.assertEqual(ctx.result().messages, [])
+
+  def test_validate_security_config_bad_regexp(self):
+    ctx = validation.Context()
+    config.validate_security_config(security_config_pb2.SecurityConfig(
+        internal_service_regexp=['???'],
+    ), ctx)
+    self.assertEqual(ctx.result().messages, [
+      validation.Message(
+          "internal_service_regexp: bad regexp '???' - nothing to repeat", 40),
+    ])
+
+  def test_update_security_config(self):
+    def cfg(internal_service_regexp):
+      return security_config_pb2.SecurityConfig(
+          internal_service_regexp=internal_service_regexp)
+
+    def run(conf):
+      return config._update_authdb_configs({
+        'security.cfg': (config.Revision('cfg_rev', 'http://url'), conf),
+      })
+
+    def extract():
+      d = model.root_key().get()
+      return {
+        'auth_db_rev': d.auth_db_rev,
+        'security_config': security_config_pb2.SecurityConfig.FromString(
+            d.security_config),
+      }
+
+    # Pushing empty config -> no changes.
+    self.assertFalse(run(cfg([])))
+
+    # Updating the config.
+    self.assertTrue(run(cfg([r'example\.com'])))
+    self.assertEqual({
+      'auth_db_rev': 1,
+      'security_config': cfg([r'example\.com']),
+    }, extract())
+
+    # Pushing same config again. No changes.
+    self.assertFalse(run(cfg([r'example\.com'])))
+
+  def test_update_two_authdb_cfgs(self):
+    """It is OK to update oauth.cfg and security.cfg at once."""
+    def oauth_cfg(client_id):
+      return config_pb2.OAuthConfig(primary_client_id=client_id)
+    def sec_cfg(regexps):
+      return security_config_pb2.SecurityConfig(internal_service_regexp=regexps)
+
+    def run(oauth, sec):
+      return config._update_authdb_configs({
+        'oauth.cfg': (config.Revision('cfg_rev', 'http://url'), oauth),
+        'security.cfg': (config.Revision('cfg_rev', 'http://url'), sec),
+      })
+
+    def extract():
+      d = model.root_key().get()
+      sec = security_config_pb2.SecurityConfig()
+      if d.security_config:
+        sec.MergeFromString(d.security_config)
+      return {
+        'auth_db_rev': d.auth_db_rev,
+        'oauth_client_id': d.oauth_client_id,
+        'security_config': sec,
+      }
+
+    # Both are empty when applied to empty state. No changes.
+    self.assertFalse(run(oauth_cfg(''), sec_cfg([])))
+    self.assertEqual({
+      'auth_db_rev': 0,
+      'oauth_client_id': u'',
+      'security_config': sec_cfg([]),
+    }, extract())
+
+    # Both have changes. AuthDB revision is bumped only once. Both changes are
+    # preserved.
+    self.assertTrue(run(oauth_cfg('z'), sec_cfg(['z'])))
+    self.assertEqual({
+      'auth_db_rev': 1,
+      'oauth_client_id': u'z',
+      'security_config': sec_cfg(['z']),
+    }, extract())
 
 
 if __name__ == '__main__':

@@ -43,14 +43,14 @@ def snapshot_to_dict(snapshot):
 def make_snapshot_obj(
     global_config=None, groups=None,
     ip_whitelists=None, ip_whitelist_assignments=None):
-  """Returns AuthDBSnapshot with omitted fields set to default values."""
+  """Returns AuthDBSnapshot with empty list of groups and whitelists."""
   return replication.AuthDBSnapshot(
       global_config=global_config or model.AuthGlobalConfig(
           key=model.root_key(),
           oauth_client_id='oauth client id',
           oauth_client_secret='oauth client secret',
           token_server_url='token server',
-      ),
+          security_config='security config blob'),
       groups=groups or [],
       ip_whitelists=ip_whitelists or [],
       ip_whitelist_assignments=(
@@ -77,6 +77,7 @@ class NewAuthDBSnapshotTest(test_case.TestCase):
         'oauth_additional_client_ids': [],
         'oauth_client_id': u'',
         'oauth_client_secret': u'',
+        'security_config': None,
         'token_server_url': u'',
       },
       'groups': [],
@@ -110,7 +111,8 @@ class NewAuthDBSnapshotTest(test_case.TestCase):
         oauth_client_id='oauth_client_id',
         oauth_client_secret='oauth_client_secret',
         oauth_additional_client_ids=['a', 'b'],
-        token_server_url='https://token-server')
+        token_server_url='https://token-server',
+        security_config='security config blob')
     global_config.put()
 
     group = model.AuthGroup(
@@ -176,6 +178,7 @@ class NewAuthDBSnapshotTest(test_case.TestCase):
         'oauth_additional_client_ids': [u'a', u'b'],
         'oauth_client_id': u'oauth_client_id',
         'oauth_client_secret': u'oauth_client_secret',
+        'security_config': 'security config blob',
         'token_server_url': u'https://token-server',
       },
       'groups': [
@@ -271,7 +274,8 @@ class SnapshotToProtoConversionTest(test_case.TestCase):
             oauth_client_id=u'some-client-id',
             oauth_client_secret=u'some-client-secret',
             oauth_additional_client_ids=[u'id1', u'id2'],
-            token_server_url=u'https://example.com'))
+            token_server_url=u'https://example.com',
+            security_config='security config blob'))
     self.assert_serialization_works(snapshot)
 
   def test_group_serialization(self):
@@ -393,7 +397,8 @@ class ReplaceAuthDbTest(test_case.TestCase):
             oauth_client_id='another_oauth_client_id',
             oauth_client_secret='another_oauth_client_secret',
             oauth_additional_client_ids=[],
-            token_server_url='https://token-server'),
+            token_server_url='https://token-server',
+            security_config='security config blob'),
         groups=[
           group('New'),
           group('Modify', description='blah', owners='some-other-owners'),
@@ -443,6 +448,7 @@ class ReplaceAuthDbTest(test_case.TestCase):
         'oauth_additional_client_ids': [],
         'oauth_client_id': u'another_oauth_client_id',
         'oauth_client_secret': u'another_oauth_client_secret',
+        'security_config': 'security config blob',
         'token_server_url': u'https://token-server',
       },
       'groups': [
