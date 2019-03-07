@@ -241,13 +241,13 @@ class CronSendToBQ(_CronHandlerBase):
         '/internal/taskqueue/monitoring/bq/tasks/results/run/',
         'monitoring-bq-tasks-results-run',
         max_seconds,
-        max_taskqueues=60)
+        max_taskqueues=30)
     bq_state.cron_trigger_tasks(
         'task_results_summary',
         '/internal/taskqueue/monitoring/bq/tasks/results/summary/',
         'monitoring-bq-tasks-results-summary',
         max_seconds,
-        max_taskqueues=60)
+        max_taskqueues=30)
 
 
 ## Task queues.
