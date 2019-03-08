@@ -767,10 +767,15 @@ def _get_task_from_external_scheduler(es_cfg, bot_dimensions):
                slice_number)
 
   to_run = _ensure_active_slice(request, try_number, slice_number)
-  if to_run:
-    return request, to_run
+  if not to_run:
+    # We were unable to ensure the given request was at the desired slice. This
+    # means the external scheduler must have stale state about this request, so
+    # notify it of the newest state.
+    external_scheduler.notify_request(
+        es_cfg, request, result_summary, True, False)
+    return None, None
 
-  return None, None
+  return request, to_run
 
 
 def _ensure_active_slice(request, try_number, task_slice_index):

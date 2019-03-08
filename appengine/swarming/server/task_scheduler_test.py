@@ -509,6 +509,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(State.PENDING, result_summary.state)
 
   def _setup_es(self, fallback_enabled):
+    """Set up mock es_config."""
     es_address = 'externalscheduler_address'
     es_id = 'es_id'
     external_schedulers = [
@@ -517,6 +518,11 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     ]
     self.mock_pool_config('default', external_schedulers=external_schedulers)
 
+  def _mock_reap_calls(self):
+    """Mock out external scheduler and native scheduler reap calls.
+
+    Returns: (list of es calls, lisr of native reap calls)
+    """
     er_calls = []
     def ext_reap(*args):
       er_calls.append(args)
@@ -532,8 +538,25 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
 
     return er_calls, r_calls
 
+  def _mock_es_assign(self, task_id, slice_number):
+    """Mock out the return behavior from external_scheduler.assign_task"""
+    # pylint: disable=unused-argument
+    def mock_assign(*args):
+      return task_id, slice_number
+
+    self.mock(external_scheduler, "assign_task", mock_assign)
+
+  def _mock_es_notify(self):
+    """Mock out external_scheduler.notify_request"""
+    # pylint: disable=unused-argument
+    def mock_notify(*args):
+      return
+
+    self.mock(external_scheduler, "notify_request", mock_notify)
+
   def test_bot_reap_task_es_with_fallback(self):
-    er_calls, r_calls = self._setup_es(True)
+    self._setup_es(True)
+    er_calls, r_calls = self._mock_reap_calls()
 
     task_scheduler.bot_reap_task(self.bot_dimensions, 'abc', None)
 
@@ -543,7 +566,8 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         len(r_calls), 1, 'native scheduler was not called')
 
   def test_bot_reap_task_es_no_fallback(self):
-    er_calls, r_calls = self._setup_es(False)
+    self._setup_es(False)
+    er_calls, r_calls = self._mock_reap_calls()
 
     task_scheduler.bot_reap_task(self.bot_dimensions, 'abc', None)
 
@@ -551,6 +575,20 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         len(er_calls), 1, 'external scheduler was not called')
     self.assertEqual(
         len(r_calls), 0, 'native scheduler was called')
+
+  def test_bot_reap_task_es_no_task(self):
+    self._setup_es(False)
+    self._mock_es_assign(None, 0)
+
+    task_scheduler.bot_reap_task(self.bot_dimensions, 'abc', None)
+
+  def test_bot_reap_task_es_with_task(self):
+    self._setup_es(False)
+    self._mock_es_notify()
+    result_summary = self._quick_schedule(1)
+    self._mock_es_assign(result_summary.task_id, 0)
+
+    task_scheduler.bot_reap_task(self.bot_dimensions, 'abc', None)
 
   def test_schedule_request_slice_fallback_to_second_immediate(self):
     # First TaskSlice couldn't run so it was immediately skipped, the second ran
