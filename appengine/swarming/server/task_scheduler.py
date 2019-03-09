@@ -1537,19 +1537,22 @@ def cron_handle_external_cancellations():
     if not pool_cfg.external_schedulers:
       continue
     for es_cfg in pool_cfg.external_schedulers:
-      if es_cfg.enabled:
-        cancellations = external_scheduler.get_cancellations(es_cfg)
-        if cancellations:
-          for c in cancellations:
-            data = {
-              u'bot_id': c.bot_id,
-              u'task_id': c.task_id,
-            }
-            payload = utils.encode_to_json(data)
-            if not utils.enqueue_task(
-                '/internal/taskqueue/important/tasks/cancel-task-on-bot',
-                queue_name='cancel-task-on-bot', payload=payload):
-              logging.error('Failed to enqueue task-cancellation.')
+      if not es_cfg.enabled:
+        continue
+      cancellations = external_scheduler.get_cancellations(es_cfg)
+      if not cancellations:
+        continue
+
+      for c in cancellations:
+        data = {
+          u'bot_id': c.bot_id,
+          u'task_id': c.task_id,
+        }
+        payload = utils.encode_to_json(data)
+        if not utils.enqueue_task(
+            '/internal/taskqueue/important/tasks/cancel-task-on-bot',
+            queue_name='cancel-task-on-bot', payload=payload):
+          logging.error('Failed to enqueue task-cancellation.')
 
 
 def cron_task_bot_distribution():
