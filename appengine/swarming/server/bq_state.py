@@ -18,6 +18,14 @@ from components import utils
 import bqh
 
 
+# Oldest entity to backfill.
+#
+# This must match the BigQuery partitioned table expiration.
+# TODO(maruel): Switch back to 365+183 once quota issues are fixed.
+# https://crbug.com/939204
+_OLDEST_BACKFILL = datetime.timedelta(days=32)
+
+
 ### Models
 
 
@@ -49,7 +57,7 @@ class BqState(ndb.Model):
   failed_bq_keys = ndb.StringProperty(repeated=True, indexed=False)
 
   # When in backfill mode, the time of the next item that should be processed.
-  # If it's over 18 months old, don't look at it.
+  # If it's over _OLDEST_BACKFILL old, don't look at it.
   # Exclusive.
   oldest = ndb.DateTimeProperty(indexed=False)
   # When in streaming mode, the most recent item that should be processed.
@@ -279,8 +287,8 @@ def cron_trigger_tasks(
   """Triggers tasks to send rows to BigQuery via time based slicing.
 
   It triggers one task queue task per 1 minute slice of time to process. It will
-  process up to 2 minutes before now, and up to 18 months ago. It tries to go
-  both ways, both keeping up with new items, and backfilling.
+  process up to 2 minutes before now, and up to _OLDEST_BACKFILL time ago. It
+  tries to go both ways, both keeping up with new items, and backfilling.
 
   This function is expected to be called once per minute.
 
@@ -299,14 +307,13 @@ def cron_trigger_tasks(
   Returns:
     total number of task queue tasks triggered.
   """
-  OLDEST = datetime.timedelta(days=365+183)
   RECENT_OFFSET = datetime.timedelta(seconds=120)
   minute = datetime.timedelta(seconds=60)
 
   start = utils.utcnow()
   start_rounded = datetime.datetime(*start.timetuple()[:5])
   recent_cutoff = start_rounded - RECENT_OFFSET
-  oldest_cutoff = start_rounded - OLDEST
+  oldest_cutoff = start_rounded - _OLDEST_BACKFILL
 
   total = 0
   state = BqState.get_by_id(table_name)

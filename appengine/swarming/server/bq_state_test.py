@@ -100,19 +100,25 @@ class BotManagementTest(test_case.TestCase):
     # Triggers tasks for a cron job, when it happened before.
     # 2020-01-02T03:04:05.678900
     now = datetime.datetime(2020, 1, 2, 3, 4, 5, 678900)
+    now_trimmed = datetime.datetime(2020, 1, 2, 3, 4)
     self.mock_now(now)
+
+    oldest = (
+        now_trimmed - bq_state._OLDEST_BACKFILL +
+        datetime.timedelta(minutes=3))
     bq_state.BqState(
         id='mytable',
         ts=now,
-        # Nearly 18 months ago.
-        oldest=datetime.datetime(2018, 7, 3, 3, 7),
+        oldest=oldest,
         recent=datetime.datetime(2020, 1, 2, 2, 59)).put()
+
     urls = []
     def enqueue_task(url, task_name):
       urls.append(url)
       self.assertEqual('tqname', task_name)
       return True
     self.mock(utils, 'enqueue_task', enqueue_task)
+
     actual = bq_state.cron_trigger_tasks(
         'mytable', '/internal/taskqueue/foo/', 'tqname', 100, 10)
     self.assertEqual(6, actual)
@@ -122,7 +128,7 @@ class BotManagementTest(test_case.TestCase):
       'failed_db_keys': [],
       'last_bq_key': None,
       'last_db_key': None,
-      'oldest': datetime.datetime(2018, 7, 3, 3, 4),
+      'oldest': datetime.datetime(2019, 12, 1, 3, 4),
       'recent': datetime.datetime(2020, 1, 2, 3, 2),
       'ts': now,
     }
@@ -133,9 +139,9 @@ class BotManagementTest(test_case.TestCase):
       '/internal/taskqueue/foo/2020-01-02T03:00',
       '/internal/taskqueue/foo/2020-01-02T03:01',
       # Backfilling.
-      '/internal/taskqueue/foo/2018-07-03T03:07',
-      '/internal/taskqueue/foo/2018-07-03T03:06',
-      '/internal/taskqueue/foo/2018-07-03T03:05',
+      '/internal/taskqueue/foo/2019-12-01T03:07',
+      '/internal/taskqueue/foo/2019-12-01T03:06',
+      '/internal/taskqueue/foo/2019-12-01T03:05',
     ]
     self.assertEqual(expected, urls)
 
