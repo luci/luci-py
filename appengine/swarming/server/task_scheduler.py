@@ -1472,7 +1472,7 @@ def cron_abort_expired_task_to_run():
         skipped += 1
   finally:
     if killed:
-      logging.warning(
+      logging.info(
           'EXPIRED!\n%d tasks:\n%s',
           len(killed),
           '\n'.join(
