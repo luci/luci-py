@@ -547,12 +547,12 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.mock(external_scheduler, "assign_task", mock_assign)
 
   def _mock_es_notify(self):
-    """Mock out external_scheduler.notify_request"""
+    """Mock out external_scheduler.notify_requests"""
     # pylint: disable=unused-argument
     def mock_notify(*args):
       return
 
-    self.mock(external_scheduler, "notify_request", mock_notify)
+    self.mock(external_scheduler, "notify_requests", mock_notify)
 
   def test_bot_reap_task_es_with_fallback(self):
     self._setup_es(True)

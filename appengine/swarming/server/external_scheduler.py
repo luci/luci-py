@@ -153,14 +153,15 @@ def assign_task(es_cfg, bot_dimensions):
   return resp.assignments[0].task_id, resp.assignments[0].slice_number
 
 
-def notify_request(es_cfg, request, result_summary, use_tq, transactional):
+def notify_requests(es_cfg, requests, use_tq, transactional):
   """Calls external scheduler to notify it of a task state.
 
   Arguments:
     - es_cfg: pools_config.ExternalSchedulerConfig for external scheduler to
         notify.
-    - request: task_request.TaskRequest
-    - result_summary: task_result.TaskResultSummary
+    - requests:
+      A list of (task_request.TaskRequest, task_result.TaskResultSummary)
+      tuples.
     - use_tq: If true, make this call on a task queue (within the current
               datastore transaction).
     - transactional: If use_tq is True, then specify whether the this call
@@ -170,25 +171,27 @@ def notify_request(es_cfg, request, result_summary, use_tq, transactional):
   Returns: Nothing.
   """
   req = plugin_pb2.NotifyTasksRequest()
-  item = req.notifications.add()
-  # TODO(akeshet): This time should possibly come from the read time from
-  # datastore, rather than the local server clock.
-  item.time.FromDatetime(utils.utcnow())
-  item.task.id = request.task_id
-  item.task.tags.extend(request.tags)
-  item.task.enqueued_time.FromDatetime(request.created_ts)
-  for i in range(request.num_task_slices):
-    s = request.task_slice(i)
-    flat_dimensions = task_queues.dimensions_to_flat(s.properties.dimensions)
-    s_pb = item.task.slices.add()
-    s_pb.dimensions.extend(flat_dimensions)
 
-  res = swarming_pb2.TaskResult()
-  result_summary.to_proto(res)
-  item.task.state = res.state
-  if result_summary.bot_id:
-    # TODO(akeshet): We should only actually set this is state is running.
-    item.task.bot_id = result_summary.bot_id
+  for request, result_summary in requests:
+    item = req.notifications.add()
+    # TODO(akeshet): This time should possibly come from the read time from
+    # datastore, rather than the local server clock.
+    item.time.FromDatetime(utils.utcnow())
+    item.task.id = request.task_id
+    item.task.tags.extend(request.tags)
+    item.task.enqueued_time.FromDatetime(request.created_ts)
+    for i in range(request.num_task_slices):
+      s = request.task_slice(i)
+      flat_dimensions = task_queues.dimensions_to_flat(s.properties.dimensions)
+      s_pb = item.task.slices.add()
+      s_pb.dimensions.extend(flat_dimensions)
+
+    res = swarming_pb2.TaskResult()
+    result_summary.to_proto(res)
+    item.task.state = res.state
+    if result_summary.bot_id:
+      # TODO(akeshet): We should only actually set this is state is running.
+      item.task.bot_id = result_summary.bot_id
 
   req.scheduler_id = es_cfg.id
 
