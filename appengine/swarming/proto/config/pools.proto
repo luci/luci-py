@@ -370,6 +370,8 @@ message ExternalSchedulerConfig {
   //
   // Note of care: if this list is empty, that means all requests in the pool
   // are eligible to be forwarded to it.
+  //
+  // Note: To be deprecated, in favor of: any_dimensions and all_dimensions.
   repeated string dimensions = 3;
 
   // If not enabled, this external scheduler config will be ignored. This
@@ -393,6 +395,18 @@ message ExternalSchedulerConfig {
   //   case, the unusual task will be able to run on the bot whenever the
   //   external scheduler has no other work for the bot.
   bool fallback_when_empty = 5;
+
+  // A task or bot must have all of these dimensions in order to match this
+  // dimension set.
+  //
+  // Note: Support not yet implemented.
+  repeated string all_dimensions = 6;
+
+  // If any_dimensions is defined, a task or bot must have any of these
+  // dimensions in order to match this dimension set.
+  //
+  // Note: Support not yet implemented.
+  repeated string any_dimensions = 7;
 }
 
 message ExternalServices {
