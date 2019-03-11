@@ -23,7 +23,11 @@ import "swarming.proto";
 // This message format is in its early stages, and may be subject to frequent
 // or even breaking changes as the external scheduler API is rolled out.
 message TaskSpec {
-  // ID is the swarming task request it.
+  // Id is the swarming task request ID.
+  //
+  // Other than being a unique string to track the lifecycle of this request,
+  // it is opaque to external scheduler. By convention, swarming uses a task's
+  // summary ID (trailing '0') here, not the run ID.
   string id = 1;
 
   // Tags is the list of tags applied to this task request.
@@ -142,9 +146,26 @@ message NotifyTasksRequest {
 
   // Notifications is the set of task notifications to send to the scheduler.
   repeated NotifyTasksItem notifications = 2;
+
+  // IsCallback specifies whether these notifications are in response to
+  // updates that were requested by a previous DesiredCallbacks call.
+  //
+  // This is for diagnostic purposes only.
+  bool is_callback = 3;
 }
 
 message NotifyTasksResponse {}
+
+message GetCallbacksRequest {
+    // SchedulerID is the id of the scheduler that this request should be run on.
+    string scheduler_id = 1;
+}
+
+message GetCallbacksResponse {
+  // TaskIds is the list of tasks that the external scheduler would like
+  // callback notifications about.
+  repeated string task_ids = 1;
+}
 
 // Service definition.
 
@@ -163,4 +184,8 @@ service ExternalScheduler {
   // NotifyTasks informs the scheduler about the state of tasks (either new
   // tasks, or states of existing tasks).
   rpc NotifyTasks(NotifyTasksRequest) returns (NotifyTasksResponse);
+
+  // GetCallbacks asks the scheduler for a set of request ids that the
+  // external scheduler wants to receive callback NotifyTasks calls about.
+  rpc GetCallbacks(GetCallbacksRequest) returns (GetCallbacksResponse);
 }
