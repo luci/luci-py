@@ -11,6 +11,7 @@ from components import datastore_utils
 
 from components.prpc import client
 
+from google.appengine.ext import ndb
 from google.protobuf import json_format
 
 from proto.api import plugin_pb2
@@ -153,7 +154,7 @@ def assign_task(es_cfg, bot_dimensions):
   return resp.assignments[0].task_id, resp.assignments[0].slice_number
 
 
-def notify_requests(es_cfg, requests, use_tq, transactional):
+def notify_requests(es_cfg, requests, use_tq):
   """Calls external scheduler to notify it of a task state.
 
   Arguments:
@@ -164,9 +165,6 @@ def notify_requests(es_cfg, requests, use_tq, transactional):
       tuples.
     - use_tq: If true, make this call on a task queue (within the current
               datastore transaction).
-    - transactional: If use_tq is True, then specify whether the this call
-                     should be made on a task queue as part of a datastore
-                     transaction.
 
   Returns: Nothing.
   """
@@ -201,7 +199,7 @@ def notify_requests(es_cfg, requests, use_tq, transactional):
         '/internal/taskqueue/important/external_scheduler/notify-tasks',
         'es-notify-tasks',
         params={'es_host': es_cfg.address, 'request_json': request_json},
-        transactional=transactional)
+        transactional=ndb.in_transaction())
     if not enqueued:
       raise datastore_utils.CommitError('Failed to enqueue task')
   else:
