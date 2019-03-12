@@ -115,6 +115,8 @@ class ExternalSchedulerApiTest(test_env_handlers.AppTestBase):
         address=u'http://localhost:1',
         id=u'foo',
         dimensions=['key1:value1', 'key2:value2'],
+        all_dimensions=None,
+        any_dimensions=None,
         enabled=True,
         fallback_when_empty=True)
 

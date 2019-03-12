@@ -514,7 +514,13 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     es_id = 'es_id'
     external_schedulers = [
         pools_config.ExternalSchedulerConfig(
-            es_address, es_id, set(), True, fallback_enabled),
+            address=es_address,
+            id=es_id,
+            dimensions=set(),
+            all_dimensions=None,
+            any_dimensions=None,
+            enabled=True,
+            fallback_when_empty=fallback_enabled),
     ]
     self.mock_pool_config('default', external_schedulers=external_schedulers)
 
@@ -2178,11 +2184,11 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     es_id = 'es_id'
     external_schedulers = [
         pools_config.ExternalSchedulerConfig(
-            es_address, es_id, None, True, True),
+            es_address, es_id, None, None, None, True, True),
         pools_config.ExternalSchedulerConfig(
-            es_address, es_id, None, True, True),
+            es_address, es_id, None, None, None, True, True),
         pools_config.ExternalSchedulerConfig(
-            es_address, es_id, None, False, True),
+            es_address, es_id, None, None, None, False, True),
     ]
     self.mock_pool_config('es-pool', external_schedulers=external_schedulers)
     known_pools = pools_config.known()
@@ -2213,11 +2219,11 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     es_id = 'es_id'
     external_schedulers = [
         pools_config.ExternalSchedulerConfig(
-            es_address, es_id, None, True, True),
+            es_address, es_id, None, None, None, True, True),
         pools_config.ExternalSchedulerConfig(
-            es_address, es_id, None, True, True),
+            es_address, es_id, None, None, None, True, True),
         pools_config.ExternalSchedulerConfig(
-            es_address, es_id, None, False, True),
+            es_address, es_id, None, None, None, False, True),
     ]
     self.mock_pool_config('es-pool', external_schedulers=external_schedulers)
     known_pools = pools_config.known()
@@ -2240,11 +2246,11 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     es_id = 'es_id'
     external_schedulers = [
         pools_config.ExternalSchedulerConfig(
-            es_address, es_id, None, True, True),
+            es_address, es_id, None, None, None, True, True),
         pools_config.ExternalSchedulerConfig(
-            es_address, es_id, None, True, True),
+            es_address, es_id, None, None, None, True, True),
         pools_config.ExternalSchedulerConfig(
-            es_address, es_id, None, False, True),
+            es_address, es_id, None, None, None, False, True),
     ]
     self.mock_pool_config('es-pool', external_schedulers=external_schedulers)
     known_pools = pools_config.known()

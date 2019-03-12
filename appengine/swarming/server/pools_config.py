@@ -88,7 +88,21 @@ ExternalSchedulerConfig = collections.namedtuple('ExternalScheduler', [
   # Scheduler ID (opaque to swarming).
   'id',
   # Dimension set in ['key1:value1', 'key2:value2'] format.
+  #
+  # To-be-deprecated.
+  #
+  # Only 1 of this and 'all_dimensions' should be specified.
   'dimensions',
+  # Bot or task should have all of these dimensions in order to be eligible
+  # for scheduler.
+  #
+  # Dimensions should be in 'key1:value1' format.
+  #
+  # Only 1 of this and 'dimensions' should be specified.
+  'all_dimensions',
+  # If non-empty, bot or task should have any of these dimensions in order to be
+  # eligible for scheduler.
+  'any_dimensions',
   # Whether this config is enabled.
   'enabled',
   # Whether to fall back to native scheduling algorithm if external scheduler
@@ -474,8 +488,8 @@ def _resolve_external_schedulers(external_schedulers):
   """Turns external_schedulers into a hashable representation."""
   return tuple(
       ExternalSchedulerConfig(
-          e.address, e.id, frozenset(e.dimensions), e.enabled,
-          e.fallback_when_empty)
+          e.address, e.id, frozenset(e.dimensions), frozenset(e.all_dimensions),
+          frozenset(e.any_dimensions), e.enabled, e.fallback_when_empty)
       for e in external_schedulers)
 
 

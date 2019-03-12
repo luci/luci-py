@@ -128,6 +128,8 @@ class PoolsConfigTest(test_case.TestCase):
             address=u'externalscheduler.google.com',
             id=u'ext1',
             dimensions=frozenset(['key2:value2', 'key1:value1']),
+            all_dimensions=frozenset(),
+            any_dimensions=frozenset(),
             enabled=True,
             fallback_when_empty=True,
           ),
