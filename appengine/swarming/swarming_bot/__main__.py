@@ -39,12 +39,21 @@ sys.path.insert(0, os.path.join(THIS_FILE, 'third_party', 'rsa'))
 
 
 def fix_protobuf_package():
-  """Copied from components/utils.py"""
+  """Ensures that the bundled version of protobuf is used.
+
+  Inspired by components/utils.py
+  """
+  # Completely zap out preinstalled google. This works because package google
+  # itself has no functionality.
   path_to_google = os.path.join(THIS_FILE, 'third_party', 'google')
   import google
-  if google.__path__[0] != path_to_google:
-    # Or panic?
-    google = reload(google)
+  google.__path__.insert(0, path_to_google)
+  del google.__path__[1:]
+
+  # Sanity check.
+  import google.protobuf
+  # pylint: disable=unused-variable
+  from google.protobuf import symbol_database
 
 
 # Then it's safe to import the rest.
