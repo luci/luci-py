@@ -177,7 +177,7 @@ class ExternalSchedulerApiTest(test_env_handlers.AppTestBase):
     request = _gen_request()
     result_summary = task_scheduler.schedule_request(request, None)
     external_scheduler.notify_requests(
-        self.es_cfg, [(request, result_summary)], False)
+        self.es_cfg, [(request, result_summary)], False, False)
 
     self.assertEqual(len(self._client.called_with_requests), 1)
     called_with = self._client.called_with_requests[0]
@@ -195,7 +195,7 @@ class ExternalSchedulerApiTest(test_env_handlers.AppTestBase):
     request = _gen_request()
     result_summary = task_scheduler.schedule_request(request, None)
     external_scheduler.notify_requests(
-      self.es_cfg, [(request, result_summary)], True)
+      self.es_cfg, [(request, result_summary)], True, False)
 
     # There should have been no call to _get_client yet.
     self.assertEqual(self._client, None)

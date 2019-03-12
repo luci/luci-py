@@ -464,7 +464,7 @@ def _maybe_taskupdate_notify_via_tq(
 
   if es_cfg:
     external_scheduler.notify_requests(
-        es_cfg, [(request, result_summary)], True)
+        es_cfg, [(request, result_summary)], True, False)
 
 
 def _pubsub_notify(task_id, topic, auth_token, userdata):
@@ -772,7 +772,7 @@ def _get_task_from_external_scheduler(es_cfg, bot_dimensions):
     # means the external scheduler must have stale state about this request, so
     # notify it of the newest state.
     external_scheduler.notify_requests(
-        es_cfg, [(request, result_summary)], True)
+        es_cfg, [(request, result_summary)], True, False)
     return None, None
 
   return request, to_run
@@ -1033,7 +1033,7 @@ def schedule_request(request, secret_bytes):
   # the external scheduler is aware of them.
   if es_cfg:
     external_scheduler.notify_requests(
-        es_cfg, [(request, result_summary)], False)
+        es_cfg, [(request, result_summary)], False, False)
 
   if dupe_summary:
     logging.debug(
@@ -1575,7 +1575,7 @@ def cron_handle_get_callbacks():
         request = request_key.get()
         result = result_key.get()
         items.append((request, result))
-      external_scheduler.notify_requests(es_cfg, items, True, False)
+      external_scheduler.notify_requests(es_cfg, items, True, True)
 
 
 def cron_task_bot_distribution():

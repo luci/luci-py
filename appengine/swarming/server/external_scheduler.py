@@ -154,7 +154,7 @@ def assign_task(es_cfg, bot_dimensions):
   return resp.assignments[0].task_id, resp.assignments[0].slice_number
 
 
-def notify_requests(es_cfg, requests, use_tq):
+def notify_requests(es_cfg, requests, use_tq, is_callback):
   """Calls external scheduler to notify it of a task state.
 
   Arguments:
@@ -165,10 +165,14 @@ def notify_requests(es_cfg, requests, use_tq):
       tuples.
     - use_tq: If true, make this call on a task queue (within the current
               datastore transaction).
+    - is_callback: If true, indicates that this notification was in response
+                   to a external-scheduler-requested callback. This is for
+                   diagnostic purposes.
 
   Returns: Nothing.
   """
   req = plugin_pb2.NotifyTasksRequest()
+  req.is_callback = is_callback
 
   for request, result_summary in requests:
     item = req.notifications.add()
