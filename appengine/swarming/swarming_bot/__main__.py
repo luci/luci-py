@@ -43,6 +43,12 @@ def fix_protobuf_package():
 
   Inspired by components/utils.py
   """
+  # In some system, google is preloaded when using runit.py, which is implicitly
+  # loaded by using the zip support, as used with swarming_bot.zip. Using
+  # 'python -s -S' doesn't work to skip 'import site' in this case. So use the
+  # nuclear option, unload the package if found.
+  if 'google' in sys.modules:
+    del sys.modules['google']
   # Completely zap out preinstalled google. This works because package google
   # itself has no functionality.
   path_to_google = os.path.join(THIS_FILE, 'third_party', 'google')
