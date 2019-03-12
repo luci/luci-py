@@ -17,16 +17,16 @@ import shutil
 import sys
 import zipfile
 
-import signal_trace
 
-# That's from ../../../client/
-from third_party.depot_tools import fix_encoding
-from utils import logging_utils
+# We have to reorder imports to make sure the third parties included in the zip
+# are preferred over the ones on the system.
+# pylint: disable=ungrouped-imports
+
+
 from utils import zip_package
 
-# This file can only be run as a zip.
+# This file can *only* be run as a zip.
 THIS_FILE = os.path.abspath(zip_package.get_main_script_path())
-
 
 # libusb1 expects to be directly in sys.path.
 sys.path.insert(0, os.path.join(THIS_FILE, 'python_libusb1'))
@@ -37,21 +37,27 @@ sys.path.insert(0, os.path.join(THIS_FILE, 'third_party', 'pyasn1'))
 sys.path.insert(0, os.path.join(THIS_FILE, 'third_party', 'pyasn1-modules'))
 sys.path.insert(0, os.path.join(THIS_FILE, 'third_party', 'rsa'))
 
-# The google library can occasionally get imported prior to the path
-# maipulation above. If this happens, reload the module to pick up the version
-# packaged in the bot_code in third_party.
-path_to_zip = os.path.dirname(os.path.realpath(__file__))
-path_to_google = os.path.join(path_to_zip, 'third_party', 'google')
-import google
-if google.__path__[0] != path_to_google:
-  google = reload(google)
+
+def fix_protobuf_package():
+  """Copied from components/utils.py"""
+  path_to_google = os.path.join(THIS_FILE, 'third_party', 'google')
+  import google
+  if google.__path__[0] != path_to_google:
+    # Or panic?
+    google = reload(google)
+
+
+# Then it's safe to import the rest.
+fix_protobuf_package()
+
+
+import signal_trace
+
+# That's from ../../../client/
+from third_party.depot_tools import fix_encoding
+from utils import logging_utils
 
 from bot_code import common
-
-
-# TODO(maruel): Use depot_tools/subcommand.py. The goal here is to have all the
-# sub commands packed into the single .zip file as a swiss army knife (think
-# busybox but worse).
 
 
 def CMDattributes(_args):
