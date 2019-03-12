@@ -148,7 +148,7 @@ message NotifyTasksRequest {
   repeated NotifyTasksItem notifications = 2;
 
   // IsCallback specifies whether these notifications are in response to
-  // updates that were requested by a previous DesiredCallbacks call.
+  // updates that were requested by a previous GetCallbacks call.
   //
   // This is for diagnostic purposes only.
   bool is_callback = 3;

@@ -177,10 +177,17 @@ class CronBotGroupsConfigHandler(_CronHandlerBase):
 
 
 class CronExternalSchedulerCancellationsHandler(_CronHandlerBase):
-  """Fetches cancelled tasks from external scheulers, and cancels them."""
+  """Fetches cancelled tasks from external schedulers, and cancels them."""
 
   def run_cron(self):
     task_scheduler.cron_handle_external_cancellations()
+
+
+class CronExternalSchedulerGetCallbacksHandler(_CronHandlerBase):
+  """Fetches callbacks requests from external schedulers, and notifies them."""
+
+  def run_cron(self):
+    task_scheduler.cron_handle_get_callbacks()
 
 
 class CronBotsStats(_CronHandlerBase):
@@ -435,6 +442,8 @@ def get_routes():
     ('/internal/cron/important/bot_groups_config', CronBotGroupsConfigHandler),
     ('/internal/cron/important/external_scheduler/cancellations',
         CronExternalSchedulerCancellationsHandler),
+    ('/internal/cron/important/external_scheduler/get_callbacks',
+        CronExternalSchedulerGetCallbacksHandler),
 
     # Machine Provider.
     ('/internal/cron/monitoring/machine_provider/bot_usage',

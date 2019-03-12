@@ -1555,6 +1555,29 @@ def cron_handle_external_cancellations():
           logging.error('Failed to enqueue task-cancellation.')
 
 
+def cron_handle_get_callbacks():
+  """Fetch and handle external desired callbacks for all pools."""
+  known_pools = pools_config.known()
+  for pool in known_pools:
+    pool_cfg = pools_config.get_pool_config(pool)
+    if not pool_cfg.external_schedulers:
+      continue
+    for es_cfg in pool_cfg.external_schedulers:
+      if not es_cfg.enabled:
+        continue
+      request_ids = external_scheduler.get_callbacks(es_cfg)
+      if not request_ids:
+        continue
+
+      items = []
+      for task_id in request_ids:
+        request_key, result_key = task_pack.get_request_and_result_keys(task_id)
+        request = request_key.get()
+        result = result_key.get()
+        items.append((request, result))
+      external_scheduler.notify_requests(es_cfg, items, True, False)
+
+
 def cron_task_bot_distribution():
   """Sends to TS mon data about the fleet size for each runnable task queues."""
   # TODO(maruel): This shouls be rewritten in term of task queues.

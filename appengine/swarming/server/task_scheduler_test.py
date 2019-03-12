@@ -547,12 +547,19 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.mock(external_scheduler, "assign_task", mock_assign)
 
   def _mock_es_notify(self):
-    """Mock out external_scheduler.notify_requests"""
+    """Mock out external_scheduler.notify_requests
+
+    Returns a list that will receive any calls that were made to notify.
+    """
+    calls = []
     # pylint: disable=unused-argument
     def mock_notify(*args):
+      calls.append(args)
       return
 
     self.mock(external_scheduler, "notify_requests", mock_notify)
+
+    return calls
 
   def test_bot_reap_task_es_with_fallback(self):
     self._setup_es(True)
@@ -2227,6 +2234,43 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(len(calls), 2)
     self.assertEqual(len(self._enqueue_calls), 0)
 
+  def test_cron_handle_get_callbacks(self):
+    """Test that cron_handle_get_callbacks behaves as expected."""
+    es_address = 'externalscheduler_address'
+    es_id = 'es_id'
+    external_schedulers = [
+        pools_config.ExternalSchedulerConfig(
+            es_address, es_id, None, True, True),
+        pools_config.ExternalSchedulerConfig(
+            es_address, es_id, None, True, True),
+        pools_config.ExternalSchedulerConfig(
+            es_address, es_id, None, False, True),
+    ]
+    self.mock_pool_config('es-pool', external_schedulers=external_schedulers)
+    known_pools = pools_config.known()
+    self.assertEqual(len(known_pools), 1)
+    id1 = self._quick_schedule(1).task_id
+    id2 = self._quick_schedule(0).task_id
+    calls = []
+    def mock_get_callbacks(es_cfg):
+      calls.append(es_cfg)
+      return [id1, id2]
+
+    self.mock(external_scheduler, 'get_callbacks', mock_get_callbacks)
+
+    notify_calls = self._mock_es_notify()
+
+    task_scheduler.cron_handle_get_callbacks()
+
+    self.assertEqual(len(calls), 2)
+    self.assertEqual(len(notify_calls), 2)
+    for notify_call in notify_calls:
+      requests = notify_call[1]
+      self.assertEqual(len(requests), 2)
+      req1, _ = requests[0]
+      req2, _ = requests[1]
+      self.assertEqual(req1.task_id, id1)
+      self.assertEqual(req2.task_id, id2)
 
   def mock_pool_config(
       self,

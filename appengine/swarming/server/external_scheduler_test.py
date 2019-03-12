@@ -89,6 +89,14 @@ class FakeExternalScheduler(object):
     self.called_with_requests.append(req)
     return plugin_pb2.NotifyTasksResponse()
 
+  def GetCallbacks(self, req, credentials): # pylint: disable=unused-argument
+    self._test.assertIsInstance(req, plugin_pb2.GetCallbacksRequest)
+    self.called_with_requests.append(req)
+    resp = plugin_pb2.GetCallbacksResponse()
+    resp.task_ids.append('task A')
+    resp.task_ids.append('task B')
+    return resp
+
 
 class ExternalSchedulerApiTest(test_env_handlers.AppTestBase):
 
@@ -196,6 +204,10 @@ class ExternalSchedulerApiTest(test_env_handlers.AppTestBase):
     r = plugin_pb2.NotifyTasksRequest()
     res = external_scheduler.notify_request_now("http://localhost:1", r)
     self.assertEqual(plugin_pb2.NotifyTasksResponse(), res)
+
+  def test_get_callbacks(self):
+    tasks = external_scheduler.get_callbacks(self.es_cfg)
+    self.assertEqual(tasks, ['task A', 'task B'])
 
 
 if __name__ == '__main__':
