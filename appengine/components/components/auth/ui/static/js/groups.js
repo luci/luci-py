@@ -693,7 +693,7 @@ var waitForResult = function(defer, groupChooser, form) {
 var registerFormValidators = function() {
   // Regular expressions for form fields.
   var groupRe = /^[0-9a-zA-Z_\-\.\/@]{3,80}$/;
-  var membersRe = /^((user|bot|service|anonymous)\:)?[\w\-\+\%\.\@\*\[\]]+$/;
+  var membersRe = /^((user|bot|project|service|anonymous)\:)?[\w\-\+\%\.\@\*\[\]]+$/;
 
   // Splits |value| on lines boundary and checks that each line matches 're'.
   // Helper function use in validators below.

@@ -97,6 +97,7 @@ __all__ = [
   'Identity',
   'IDENTITY_ANONYMOUS',
   'IDENTITY_BOT',
+  'IDENTITY_PROJECT',
   'IDENTITY_SERVICE',
   'IDENTITY_USER',
   'IdentityGlob',
@@ -120,17 +121,22 @@ ADMIN_GROUP = 'administrators'
 
 # No identity information is provided. Identity name is always 'anonymous'.
 IDENTITY_ANONYMOUS = 'anonymous'
-# Using bot credentials. Identity name is bot's id.
+# Using bot credentials. Used primary by Swarming. Identity encodes bot's id.
 IDENTITY_BOT = 'bot'
-# Using App Engine service credentials. Identity name is app name.
+# Using X-Luci-Project header in an internal RPC. Identity name is project name.
+IDENTITY_PROJECT = 'project'
+# Using App Engine X-Appengine-Inbound-Appid header. Identity name is app name.
 IDENTITY_SERVICE = 'service'
-# Using user credentials. Identity name is user's email.
+# Using user credentials (cookies or access tokens). Identity name is email.
 IDENTITY_USER = 'user'
+
 
 # All allowed identity kinds + regexps to validate identity name.
 ALLOWED_IDENTITY_KINDS = {
   IDENTITY_ANONYMOUS: re.compile(r'^anonymous$'),
   IDENTITY_BOT: re.compile(r'^[0-9a-zA-Z_\-\.@]+$'),
+  # See also PROJECT_ID_RGX in components/config/common.py.
+  IDENTITY_PROJECT: re.compile(r'^[a-z0-9\-_]+$'),
   IDENTITY_SERVICE: re.compile(r'^[0-9a-zA-Z_\-\:\.]+$'),
   IDENTITY_USER: re.compile(r'^[0-9a-zA-Z_\-\.\+\%]+@[0-9a-zA-Z_\-\.]+$'),
 }
@@ -234,8 +240,13 @@ class Identity(
     return self.kind == IDENTITY_BOT
 
   @property
+  def is_project(self):
+    """True if this object represents a LUCI project."""
+    return self.kind == IDENTITY_PROJECT
+
+  @property
   def is_service(self):
-    """True if this object represents service account."""
+    """True if this object represents an appengine app."""
     return self.kind == IDENTITY_SERVICE
 
   @property

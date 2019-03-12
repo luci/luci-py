@@ -764,6 +764,14 @@ class GroupHandler(EntityHandlerBase):
         raise EntityOperationError(
             message='Groups can not have cyclic dependencies: %s.' % as_str,
             details={'cycle': cycle})
+    # TODO(vadimsh): Temporary forbid using 'project:...' identities in groups.
+    # They are not safe to be added to groups until all services that consume
+    # AuthDB understand them. Many services do an overzealous validation of
+    # AuthDB pushes and totally reject them if AuthDB contains some unrecognized
+    # identity kinds.
+    if any(m.is_project for m in entity.members):
+      raise EntityOperationError(
+          message='"project:..." identities aren\'t allowed in groups yet')
     # Good enough.
     entity.put()
 

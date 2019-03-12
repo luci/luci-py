@@ -54,6 +54,7 @@ class IdentityTest(test_case.TestCase):
       (model.IDENTITY_USER, r'abc%def.com@zzz.com'),
       (model.IDENTITY_USER, r'ABC_DEF@ABC_DEF.com'),
       (model.IDENTITY_SERVICE, 'domain.com:app-id'),
+      (model.IDENTITY_PROJECT, 'project-123_name'),
     )
     for kind, name in ok_identities:
       ident = model.Identity(kind, name)
@@ -71,7 +72,8 @@ class IdentityTest(test_case.TestCase):
       (model.IDENTITY_BOT, 'bad bot name - spaces'),
       (model.IDENTITY_SERVICE, 'spaces everywhere'),
       (model.IDENTITY_USER, 'even here'),
-      (model.IDENTITY_USER, u'\u043f\u0440\u0438\u0432\u0435\u0442')
+      (model.IDENTITY_USER, u'\u043f\u0440\u0438\u0432\u0435\u0442'),
+      (model.IDENTITY_PROJECT, 'UPPER_not_allowed'),
     )
     for kind, name in bad_identities:
       with self.assertRaises(ValueError):
