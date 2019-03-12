@@ -16,6 +16,7 @@ queue:
 
 # /internal/taskqueue/important/task_queues/rebuild-cache
 - name: rebuild-task-cache
+  bucket_size: 100
   rate: 500/s
 
 # /internal/taskqueue/monitoring/bq/tasks/results/run/<timestamp:\d{4}-\d\d-\d\dT\d\d:\d\d>
