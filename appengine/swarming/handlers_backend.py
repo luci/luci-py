@@ -39,10 +39,6 @@ import ts_mon_metrics
 class _CronHandlerBase(webapp2.RequestHandler):
   @decorators.require_cronjob
   def get(self):
-    # Disable the in-process cache for all handlers; most of the cron jobs load
-    # a tons of instances, causing excessive memory usage if the entities are
-    # kept in memory.
-    ndb.get_context().set_cache_policy(lambda _: False)
     self.run_cron()
 
   def run_cron(self):
@@ -113,7 +109,6 @@ class CronMachineProviderBotsUtilizationHandler(_CronHandlerBase):
   """Determines Machine Provider bot utilization."""
 
   def run_cron(self):
-    ndb.get_context().set_cache_policy(lambda _: False)
     if not config.settings().mp.enabled:
       logging.info('MP support is disabled')
       return
@@ -125,7 +120,6 @@ class CronMachineProviderConfigHandler(_CronHandlerBase):
   """Configures entities to lease bots from the Machine Provider."""
 
   def run_cron(self):
-    ndb.get_context().set_cache_policy(lambda _: False)
     if not config.settings().mp.enabled:
       logging.info('MP support is disabled')
       return
@@ -137,7 +131,6 @@ class CronMachineProviderManagementHandler(_CronHandlerBase):
   """Manages leases for bots from the Machine Provider."""
 
   def run_cron(self):
-    ndb.get_context().set_cache_policy(lambda _: False)
     if not config.settings().mp.enabled:
       logging.info('MP support is disabled')
       return
@@ -258,7 +251,6 @@ class CancelTasksHandler(webapp2.RequestHandler):
 
   @decorators.require_taskqueue('cancel-tasks')
   def post(self):
-    ndb.get_context().set_cache_policy(lambda _: False)
     payload = json.loads(self.request.body)
     logging.info('Cancelling tasks with ids: %s', payload['tasks'])
     kill_running = payload['kill_running']
@@ -279,7 +271,6 @@ class CancelTaskOnBotHandler(webapp2.RequestHandler):
 
   @decorators.require_taskqueue('cancel-task-on-bot')
   def post(self):
-    ndb.get_context().set_cache_policy(lambda _: False)
     payload = json.loads(self.request.body)
     task_id = payload.get('task_id')
     if not task_id:
@@ -302,7 +293,6 @@ class DeleteTasksHandler(webapp2.RequestHandler):
 
   @decorators.require_taskqueue('delete-tasks')
   def post(self):
-    ndb.get_context().set_cache_policy(lambda _: False)
     payload = json.loads(self.request.body)
     task_request.task_delete_tasks(payload['task_ids'])
 
@@ -312,7 +302,6 @@ class TaskDimensionsHandler(webapp2.RequestHandler):
 
   @decorators.require_taskqueue('rebuild-task-cache')
   def post(self):
-    ndb.get_context().set_cache_policy(lambda _: False)
     if not task_queues.rebuild_task_cache(self.request.body):
       # The task needs to be retried. Reply that the service is unavailable
       # (503) instead of an internal server error (500) to help differentiating
@@ -326,7 +315,6 @@ class TaskSendPubSubMessage(webapp2.RequestHandler):
   # Add task_id to the URL for better visibility in request logs.
   @decorators.require_taskqueue('pubsub')
   def post(self, task_id):  # pylint: disable=unused-argument
-    ndb.get_context().set_cache_policy(lambda _: False)
     task_scheduler.task_handle_pubsub_task(json.loads(self.request.body))
 
 
@@ -347,7 +335,6 @@ class TaskMachineProviderManagementHandler(webapp2.RequestHandler):
 
   @decorators.require_taskqueue('machine-provider-manage')
   def post(self):
-    ndb.get_context().set_cache_policy(lambda _: False)
     key = ndb.Key(urlsafe=self.request.get('key'))
     assert key.kind() == 'MachineLease', key
     lease_management.task_manage_lease(key)
@@ -358,7 +345,6 @@ class TaskNamedCachesPool(webapp2.RequestHandler):
 
   @decorators.require_taskqueue('named-cache-task')
   def post(self):
-    ndb.get_context().set_cache_policy(lambda _: False)
     params = json.loads(self.request.body)
     logging.info('Handling pool: %s', params['pool'])
     named_caches.task_update_pool(params['pool'])
@@ -369,7 +355,6 @@ class TaskMonitoringTasksResultsRunBQ(webapp2.RequestHandler):
 
   @decorators.require_taskqueue('monitoring-bq-tasks-results-run')
   def post(self, timestamp):
-    ndb.get_context().set_cache_policy(lambda _: False)
     start = datetime.datetime.strptime(timestamp, u'%Y-%m-%dT%H:%M')
     end = start + datetime.timedelta(seconds=60)
     task_result.task_bq_run(start, end)
@@ -380,7 +365,6 @@ class TaskMonitoringTasksResultsSummaryBQ(webapp2.RequestHandler):
 
   @decorators.require_taskqueue('monitoring-bq-tasks-results-summary')
   def post(self, timestamp):
-    ndb.get_context().set_cache_policy(lambda _: False)
     start = datetime.datetime.strptime(timestamp, u'%Y-%m-%dT%H:%M')
     end = start + datetime.timedelta(seconds=60)
     task_result.task_bq_summary(start, end)
@@ -391,7 +375,6 @@ class TaskMonitoringTSMon(webapp2.RequestHandler):
 
   @decorators.require_taskqueue('tsmon')
   def post(self, kind):
-    ndb.get_context().set_cache_policy(lambda _: False)
     if kind == 'machine_types':
       # Avoid a circular dependency. lease_management imports task_scheduler
       # which imports ts_mon_metrics, so invoke lease_management directly to
@@ -409,7 +392,6 @@ class InternalLaunchMapReduceJobWorkerHandler(webapp2.RequestHandler):
 
   @decorators.require_taskqueue(mapreduce_jobs.MAPREDUCE_TASK_QUEUE)
   def post(self, job_id):  # pylint: disable=R0201
-    ndb.get_context().set_cache_policy(lambda _: False)
     mapreduce_jobs.launch_job(job_id)
 
 

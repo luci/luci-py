@@ -15,6 +15,8 @@ import sys
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(APP_DIR, 'components', 'third_party'))
 
+from google.appengine.ext import ndb
+
 from components import ereporter2
 from components import utils
 
@@ -31,6 +33,14 @@ from server import pools_config
 # pylint: disable=redefined-outer-name
 def create_application():
   ereporter2.register_formatter()
+
+  # Zap out the ndb in-process cache by default.
+  # This cache causes excessive memory usage in in handler where a lot of
+  # entities are fetched in one query. When coupled with high concurrency
+  # as specified via max_concurrent_requests in app.yaml, this may cause out of
+  # memory errors.
+  ndb.Context.default_cache_policy = staticmethod(lambda _key: False)
+  ndb.Context._cache_policy = staticmethod(lambda _key: False)
 
   # If running on a local dev server, allow bots to connect without prior
   # groups configuration. Useful when running smoke test.
