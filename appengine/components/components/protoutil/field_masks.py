@@ -184,6 +184,42 @@ class Mask(object):
       return EXCLUDE
     return max(c._includes(path, start_at + 1) for c in children)
 
+  def merge(self, src, dest):
+    """Merges masked fields from src to dest.
+
+    Merges even empty/unset fields, as long as they are present in the mask.
+
+    Overwrites repeated/map fields entirely. Does not support partial updates of
+    such fields.
+    """
+    assert isinstance(src, protobuf.message.Message)
+    assert type(src) == type(dest)  # pylint: disable=unidiomatic-typecheck
+
+    for f_name, submask in self.children.iteritems():
+      include_partially = bool(submask.children)
+
+      dest_value = getattr(dest, f_name)
+      src_value = getattr(src, f_name)
+
+      f_desc = dest.DESCRIPTOR.fields_by_name[f_name]
+      is_repeated = f_desc.label == descriptor.FieldDescriptor.LABEL_REPEATED
+      is_message = f_desc.type == descriptor.FieldDescriptor.TYPE_MESSAGE
+
+      # Only non-repeated submessages can be merged partially.
+      if include_partially and is_message and not is_repeated:
+        submask.merge(src_value, dest_value)
+      # Otherwise overwrite entirely.
+      elif is_repeated:
+        dest.ClearField(f_name)
+        dest_value = getattr(dest, f_name)  # restore after ClearField.
+        dest_value.extend(src_value)
+      elif is_message:
+        dest_value.CopyFrom(src_value)
+      else:
+        # Scalar value.
+        setattr(dest, f_name, src_value)
+
+
   def submask(self, path):
     """Returns a sub-mask given a path from self to it.
 

@@ -18,9 +18,9 @@ from google.protobuf import field_mask_pb2
 import field_masks
 import test_proto_pb2
 
-
 # Shortcuts.
-TEST_DESC = test_proto_pb2.Msg.DESCRIPTOR
+TestMsg = test_proto_pb2.Msg
+TEST_DESC = TestMsg.DESCRIPTOR
 STAR = field_masks.STAR
 Mask = field_masks.Mask
 
@@ -358,122 +358,177 @@ class TrimTests(unittest.TestCase):
     mask.trim(msg)
 
   def test_scalar_trim(self):
-    msg = test_proto_pb2.Msg(num=1)
+    msg = TestMsg(num=1)
     self.trim(msg, 'str')
-    self.assertEqual(msg, test_proto_pb2.Msg())
+    self.assertEqual(msg, TestMsg())
 
   def test_scalar_leave(self):
-    msg = test_proto_pb2.Msg(num=1)
+    msg = TestMsg(num=1)
     self.trim(msg, 'num')
-    self.assertEqual(msg, test_proto_pb2.Msg(num=1))
+    self.assertEqual(msg, TestMsg(num=1))
 
   def test_scalar_repeated_trim(self):
-    msg = test_proto_pb2.Msg(nums=[1, 2])
+    msg = TestMsg(nums=[1, 2])
     self.trim(msg, 'str')
-    self.assertEqual(msg, test_proto_pb2.Msg())
+    self.assertEqual(msg, TestMsg())
 
   def test_scalar_repeated_leave(self):
-    msg = test_proto_pb2.Msg(nums=[1, 2])
+    msg = TestMsg(nums=[1, 2])
     self.trim(msg, 'nums')
-    self.assertEqual(msg, test_proto_pb2.Msg(nums=[1, 2]))
+    self.assertEqual(msg, TestMsg(nums=[1, 2]))
 
   def test_submessage_trim(self):
-    msg = test_proto_pb2.Msg(msg=test_proto_pb2.Msg(num=1))
+    msg = TestMsg(msg=TestMsg(num=1))
     self.trim(msg, 'str')
-    self.assertEqual(msg, test_proto_pb2.Msg())
+    self.assertEqual(msg, TestMsg())
 
   def test_submessage_leave_entirely(self):
-    msg = test_proto_pb2.Msg(msg=test_proto_pb2.Msg(num=1))
+    msg = TestMsg(msg=TestMsg(num=1))
     self.trim(msg, 'msg')
-    self.assertEqual(msg, test_proto_pb2.Msg(msg=test_proto_pb2.Msg(num=1)))
+    self.assertEqual(msg, TestMsg(msg=TestMsg(num=1)))
 
   def test_submessage_leave_partially(self):
-    msg = test_proto_pb2.Msg(msg=test_proto_pb2.Msg(num=1, str='x'))
+    msg = TestMsg(msg=TestMsg(num=1, str='x'))
     self.trim(msg, 'msg.num')
-    self.assertEqual(msg, test_proto_pb2.Msg(msg=test_proto_pb2.Msg(num=1)))
+    self.assertEqual(msg, TestMsg(msg=TestMsg(num=1)))
 
   def test_submessage_repeated_trim(self):
-    msg = test_proto_pb2.Msg(
-        msgs=[test_proto_pb2.Msg(num=1), test_proto_pb2.Msg(num=2)])
+    msg = TestMsg(
+        msgs=[TestMsg(num=1), TestMsg(num=2)])
     self.trim(msg, 'str')
-    self.assertEqual(msg, test_proto_pb2.Msg())
+    self.assertEqual(msg, TestMsg())
 
   def test_submessage_repeated_leave_entirely(self):
-    msg = test_proto_pb2.Msg(
-        msgs=[test_proto_pb2.Msg(num=1), test_proto_pb2.Msg(num=2)])
-    expected = test_proto_pb2.Msg(
-        msgs=[test_proto_pb2.Msg(num=1), test_proto_pb2.Msg(num=2)])
+    msg = TestMsg(
+        msgs=[TestMsg(num=1), TestMsg(num=2)])
+    expected = TestMsg(
+        msgs=[TestMsg(num=1), TestMsg(num=2)])
     self.trim(msg, 'msgs')
     self.assertEqual(msg, expected)
 
   def test_submessage_repeated_leave_entirely_trailing_star(self):
-    msg = test_proto_pb2.Msg(
-        msgs=[test_proto_pb2.Msg(num=1), test_proto_pb2.Msg(num=2)])
-    expected = test_proto_pb2.Msg(
-        msgs=[test_proto_pb2.Msg(num=1), test_proto_pb2.Msg(num=2)])
+    msg = TestMsg(
+        msgs=[TestMsg(num=1), TestMsg(num=2)])
+    expected = TestMsg(
+        msgs=[TestMsg(num=1), TestMsg(num=2)])
     self.trim(msg, 'msgs.*')
     self.assertEqual(msg, expected)
 
   def test_submessage_repeated_leave_partially(self):
-    msg = test_proto_pb2.Msg(msgs=[
-        test_proto_pb2.Msg(num=1, str='x'),
-        test_proto_pb2.Msg(num=2, str='y'),
+    msg = TestMsg(msgs=[
+        TestMsg(num=1, str='x'),
+        TestMsg(num=2, str='y'),
     ])
-    expected = test_proto_pb2.Msg(msgs=[
-        test_proto_pb2.Msg(num=1),
-        test_proto_pb2.Msg(num=2),
+    expected = TestMsg(msgs=[
+        TestMsg(num=1),
+        TestMsg(num=2),
     ])
     self.trim(msg, 'msgs.*.num')
     self.assertEqual(msg, expected)
 
   def test_map_str_num_trim(self):
-    msg = test_proto_pb2.Msg(map_str_num={'1': 1, '2': 2})
+    msg = TestMsg(map_str_num={'1': 1, '2': 2})
     self.trim(msg, 'str')
-    self.assertEqual(msg, test_proto_pb2.Msg())
+    self.assertEqual(msg, TestMsg())
 
   def test_map_str_num_leave_key(self):
-    msg = test_proto_pb2.Msg(map_str_num={'a': 1, 'b': 2})
+    msg = TestMsg(map_str_num={'a': 1, 'b': 2})
     self.trim(msg, 'map_str_num.a')
-    self.assertEqual(msg, test_proto_pb2.Msg(map_str_num={'a': 1}))
+    self.assertEqual(msg, TestMsg(map_str_num={'a': 1}))
 
   def test_map_str_num_leave_key_with_int_key(self):
-    msg = test_proto_pb2.Msg(map_str_num={'1': 1, '2': 2})
+    msg = TestMsg(map_str_num={'1': 1, '2': 2})
     self.trim(msg, 'map_str_num.`1`')
-    self.assertEqual(msg, test_proto_pb2.Msg(map_str_num={'1': 1}))
+    self.assertEqual(msg, TestMsg(map_str_num={'1': 1}))
 
   def test_map_str_num_leave_key_with_int_key_invalid(self):
-    msg = test_proto_pb2.Msg(map_str_num={'1': 1, '2': 2})
+    msg = TestMsg(map_str_num={'1': 1, '2': 2})
     with self.assertRaisesRegexp(ValueError, 'expected a string'):
       self.trim(msg, 'map_str_num.1')
 
   def test_map_str_msg_trim(self):
-    msg = test_proto_pb2.Msg(map_str_msg={'a': test_proto_pb2.Msg()})
+    msg = TestMsg(map_str_msg={'a': TestMsg()})
     self.trim(msg, 'str')
-    self.assertEqual(msg, test_proto_pb2.Msg())
+    self.assertEqual(msg, TestMsg())
 
   def test_map_str_msg_leave_key_entirely(self):
-    msg = test_proto_pb2.Msg(
+    msg = TestMsg(
         map_str_msg={
-            'a': test_proto_pb2.Msg(num=1),
-            'b': test_proto_pb2.Msg(num=2),
+            'a': TestMsg(num=1),
+            'b': TestMsg(num=2),
         },
         num=1)
     self.trim(msg, 'map_str_msg.a')
     self.assertEqual(
         msg,
-        test_proto_pb2.Msg(map_str_msg={'a': test_proto_pb2.Msg(num=1)}))
+        TestMsg(map_str_msg={'a': TestMsg(num=1)}))
 
   def test_map_str_msg_leave_key_partially(self):
-    msg = test_proto_pb2.Msg(
+    msg = TestMsg(
         map_str_msg={
-            'a': test_proto_pb2.Msg(num=1, str='a'),
-            'b': test_proto_pb2.Msg(num=2, str='b'),
+            'a': TestMsg(num=1, str='a'),
+            'b': TestMsg(num=2, str='b'),
         },
         num=1)
     self.trim(msg, 'map_str_msg.a.num')
     self.assertEqual(
         msg,
-        test_proto_pb2.Msg(map_str_msg={'a': test_proto_pb2.Msg(num=1)}))
+        TestMsg(map_str_msg={'a': TestMsg(num=1)}))
+
+
+class MergeTests(unittest.TestCase):
+
+  def mask(self, *paths):
+    return Mask.from_field_mask(
+        field_mask_pb2.FieldMask(paths=list(paths)),
+        TEST_DESC,
+        update_mask=True,
+    )
+
+  def test_scalar_field(self):
+    src = TestMsg(num=1)
+    dest = TestMsg(num=2)
+    self.mask('num').merge(src, dest)
+    self.assertEqual(dest.num, src.num)
+
+  def test_repeated_scalar(self):
+    src = TestMsg(nums=[1, 2])
+    dest = TestMsg(nums=[3, 4])
+    self.mask('nums').merge(src, dest)
+    self.assertEqual(dest.nums, src.nums)
+
+  def test_repeated_messages(self):
+    src = TestMsg(msgs=[TestMsg(num=1), TestMsg(num=2)])
+    dest = TestMsg(msgs=[TestMsg(num=3), TestMsg(num=4)])
+    self.mask('msgs').merge(src, dest)
+    self.assertEqual(dest.msgs, src.msgs)
+
+  def test_entire_submessage(self):
+    src = TestMsg(msg=TestMsg(num=1, str='a'))
+    dest = TestMsg(msg=TestMsg(num=1, str='a'))
+    self.mask('msg').merge(src, dest)
+    self.assertEqual(dest.msg, src.msg)
+
+
+  def test_unrelated_fields(self):
+    src = TestMsg(num=1, str='a')
+    dest = TestMsg(num=2, str='b')
+    self.mask('num').merge(src, dest)
+    self.assertEqual(dest.num, src.num)
+    self.assertEqual(dest.str, 'b')
+
+  def test_empty(self):
+    src = TestMsg(num=1)
+    dest = TestMsg(num=2)
+    self.mask().merge(src, dest)
+    self.assertEqual(dest.num, 2)
+
+  def test_multiple(self):
+    src = TestMsg(num=1, strs=['a', 'b'])
+    dest = TestMsg(num=2, strs=['c', 'd'])
+    self.mask('num', 'strs').merge(src, dest)
+    self.assertEqual(dest.num, src.num)
+    self.assertEqual(dest.strs, src.strs)
 
 
 class SubmaskTests(unittest.TestCase):
