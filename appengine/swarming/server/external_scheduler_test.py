@@ -76,13 +76,22 @@ class FakeExternalScheduler(object):
   def AssignTasks(self, req, credentials): # pylint: disable=unused-argument
     self._test.assertIsInstance(req, plugin_pb2.AssignTasksRequest)
     self.called_with_requests.append(req)
-    return plugin_pb2.AssignTasksResponse()
+    resp = plugin_pb2.AssignTasksResponse()
+    item = resp.assignments.add()
+    item.bot_id = req.idle_bots[0].bot_id
+    item.task_id = 'task A'
+    item.slice_number = 1
+    return resp
 
   # pylint: disable=unused-argument
   def GetCancellations(self, req, credentials):
     self._test.assertIsInstance(req, plugin_pb2.GetCancellationsRequest)
     self.called_with_requests.append(req)
-    return plugin_pb2.GetCancellationsResponse()
+    resp = plugin_pb2.GetCancellationsResponse()
+    item = resp.cancellations.add()
+    item.bot_id = 'bot_id'
+    item.task_id = 'task_id'
+    return resp
 
   def NotifyTasks(self, req, credentials):  # pylint: disable=unused-argument
     self._test.assertIsInstance(req, plugin_pb2.NotifyTasksRequest)
@@ -145,8 +154,10 @@ class ExternalSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertFalse(missing)
 
   def test_assign_task(self):
-    # TODO(akeshet): Add.
-    pass
+    task_id, slice_number = external_scheduler.assign_task(
+        self.es_cfg, {u'id': 'bot_id'})
+    self.assertEqual(task_id, 'task A')
+    self.assertEqual(slice_number, 1)
 
   def test_config_for_bot(self):
     # TODO(akeshet): Add.
@@ -157,8 +168,10 @@ class ExternalSchedulerApiTest(test_env_handlers.AppTestBase):
     pass
 
   def test_get_cancellations(self):
-    # TODO(akeshet): Add.
-    pass
+    c = external_scheduler.get_cancellations(self.es_cfg)
+    self.assertEqual(len(c), 1)
+    self.assertEqual(c[0].bot_id, 'bot_id')
+    self.assertEqual(c[0].task_id, 'task_id')
 
   def test_notify_requests(self):
     request = _gen_request()
