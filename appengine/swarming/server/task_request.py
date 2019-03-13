@@ -1691,58 +1691,6 @@ def task_delete_tasks(task_ids):
         'Deleted %d TaskRequest groups; %d entities in total', count, total)
 
 
-def cron_send_to_bq():
-  """Sends the TaskRequest to BigQuery.
-
-  Deprecated.
-
-  Returns:
-    total number of task requests sent to BQ.
-  """
-  fmt = u'%Y-%m-%dT%H:%M:%S.%fZ'
-  def _convert(e):
-    """Returns a tuple(db_key, bq_key, row)."""
-    out = swarming_pb2.TaskRequest()
-    e.to_proto(out)
-    return (e.created_ts.strftime(fmt), e.task_id, out)
-
-  def get_oldest_key():
-    """Returns a tuple(db_key, bq_key)."""
-    # BigQuery requires partitioned table to not insert items older than 365
-    # days old. The problem with going back all the way to 364 days is that
-    # churning through the backlog can take a *long* time, so only go back 7
-    # days.
-    cutoff = (utils.utcnow() - datetime.timedelta(days=7))
-    cutoff = datetime.datetime(cutoff.year, cutoff.month, cutoff.day)
-    oldest = TaskRequest.query(TaskRequest.created_ts >= cutoff).order(
-        TaskRequest.created_ts).get()
-    if not oldest:
-      return None, None
-    # Since the query is an inequality > (and not >=), go back in time.
-    return (
-      (oldest.created_ts - datetime.timedelta(seconds=1)).strftime(fmt),
-      oldest.task_id,
-    )
-
-  def get_rows(db_key, _bq_key, size):
-    """Returns a list of tuple(db_key, bq_key, row)."""
-    earliest = datetime.datetime.strptime(db_key, fmt)
-    return [
-        _convert(e) for e in
-        TaskRequest.query(TaskRequest.created_ts > earliest).order(
-            TaskRequest.created_ts).fetch(limit=size)
-        if e
-    ]
-
-  def fetch_rows(_db_keys, bq_keys):
-    """Returns a list of tuple(db_key, bq_key, row)."""
-    keys = (task_pack.unpack_request_key(k[:-1]) for k in bq_keys)
-    return [_convert(e) for e in ndb.get_multi(keys) if e]
-
-  return bq_state.cron_send_to_bq(
-      'task_requests', get_oldest_key, get_rows, fetch_rows)
-
-
 def task_bq(start, end):
   """Sends TaskRequest to BigQuery swarming.task_requests table."""
   def _convert(e):

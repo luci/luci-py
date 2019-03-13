@@ -32,10 +32,6 @@ class BotManagementTest(test_case.TestCase):
     missing = expected - actual
     self.assertFalse(missing)
 
-  def test_cron_send_to_bq(self):
-    # Deprecated.
-    pass
-
   def test_BqState(self):
     now = datetime.datetime(2020, 1, 2, 3, 4)
     bq_state.BqState(id='foo').put()
@@ -71,10 +67,6 @@ class BotManagementTest(test_case.TestCase):
     self.assertEqual(10, actual)
     self.assertEqual(1, bq_state.BqState.query().count())
     expected = {
-      'failed_bq_keys': [],
-      'failed_db_keys': [],
-      'last_bq_key': None,
-      'last_db_key': None,
       # Values are exclusive; they are the next values to process.
       'oldest': datetime.datetime(2020, 1, 2, 2, 51),
       'recent': datetime.datetime(2020, 1, 2, 3, 2),
@@ -124,10 +116,6 @@ class BotManagementTest(test_case.TestCase):
     self.assertEqual(6, actual)
     self.assertEqual(1, bq_state.BqState.query().count())
     expected = {
-      'failed_bq_keys': [],
-      'failed_db_keys': [],
-      'last_bq_key': None,
-      'last_db_key': None,
       'oldest': datetime.datetime(2019, 12, 1, 3, 4),
       'recent': datetime.datetime(2020, 1, 2, 3, 2),
       'ts': now,
@@ -155,10 +143,6 @@ class BotManagementTest(test_case.TestCase):
     self.assertEqual(0, actual)
     self.assertEqual(1, bq_state.BqState.query().count())
     expected = {
-      'failed_bq_keys': [],
-      'failed_db_keys': [],
-      'last_bq_key': None,
-      'last_db_key': None,
       'oldest': datetime.datetime(2020, 1, 2, 3, 1),
       'recent': datetime.datetime(2020, 1, 2, 3, 2),
       'ts': now,

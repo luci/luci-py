@@ -1640,10 +1640,6 @@ class TaskRequestApiTest(TestCase):
     self.assertEqual(0, task_request.TaskRequest.query().count())
     self.assertEqual(0, Foo.query().count())
 
-  def test_cron_send_to_bq(self):
-    # Deprecated.
-    pass
-
   def test_task_bq_empty(self):
     # Empty, nothing is done.
     start = utils.utcnow()

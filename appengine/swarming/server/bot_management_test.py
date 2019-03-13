@@ -463,10 +463,6 @@ class BotManagementTest(test_case.TestCase):
   def test_filter_availability(self):
     pass # Tested in handlers_endpoints_test
 
-  def test_cron_send_to_bq(self):
-    # Deprecated.
-    pass
-
   def test_task_bq_empty(self):
     # Empty, nothing is done.
     start = utils.utcnow()

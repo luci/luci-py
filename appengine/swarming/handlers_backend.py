@@ -204,30 +204,6 @@ class CronTasksStats(_CronHandlerBase):
     stats_tasks.cron_generate_stats()
 
 
-class CronBotsSendToBQ(_CronHandlerBase):
-  """Streams BotEvent to BigQuery."""
-
-  def run_cron(self):
-    # Deprecated.
-    bot_management.cron_send_to_bq()
-
-
-class CronTasksSendRequestsToBQ(_CronHandlerBase):
-  """Streams TaskRequest to BigQuery."""
-
-  def run_cron(self):
-    # Deprecated.
-    task_request.cron_send_to_bq()
-
-
-class CronTasksSendResultsToBQ(_CronHandlerBase):
-  """Streams TaskResult to BigQuery."""
-
-  def run_cron(self):
-    # Deprecated.
-    task_result.cron_send_to_bq()
-
-
 class CronSendToBQ(_CronHandlerBase):
   """Triggers many tasks queues to send data to BigQuery."""
 
@@ -461,11 +437,6 @@ def get_routes():
     # Not yet used.
     ('/internal/cron/monitoring/tasks/stats', CronTasksStats),
 
-    ('/internal/cron/monitoring/bots/send_to_bq', CronBotsSendToBQ),
-    ('/internal/cron/monitoring/tasks/send_requests_to_bq',
-      CronTasksSendRequestsToBQ),
-    ('/internal/cron/monitoring/tasks/send_results_to_bq',
-      CronTasksSendResultsToBQ),
     ('/internal/cron/monitoring/bq', CronSendToBQ),
     ('/internal/cron/monitoring/count_task_bot_distribution',
         CronCountTaskBotDistributionHandler),

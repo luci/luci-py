@@ -879,61 +879,6 @@ def cron_aggregate_dimensions():
   return len(dims)
 
 
-def cron_send_to_bq():
-  """Sends the BotEvent to BigQuery.
-
-  Deprecated.
-
-  Returns:
-    total number of bot events sent to BQ.
-  """
-  fmt = u'%Y-%m-%dT%H:%M:%S.%fZ'
-  def _convert(e):
-    """Returns a tuple(db_key, bq_key, row)."""
-    out = swarming_pb2.BotEvent()
-    e.to_proto(out)
-    # This is fine because bot_id cannot contain ':'. See
-    # config.DIMENSION_KEY_RE.
-    bq_key = e.id + ':' + e.ts.strftime(fmt)
-    return (e.key.urlsafe(), bq_key, out)
-
-  def get_oldest_key():
-    """Returns a tuple(db_key, bq_key)."""
-    # BigQuery requires partitioned table to not insert items older than 365
-    # days old. The problem with going back all the way to 364 days is that
-    # churning through the backlog can take a *long* time, so only go back 7
-    # days.
-    cutoff = (utils.utcnow() - datetime.timedelta(days=7))
-    cutoff = datetime.datetime(cutoff.year, cutoff.month, cutoff.day)
-    oldest = BotEvent.query(BotEvent.ts >= cutoff).order(BotEvent.ts).get()
-    if not oldest:
-      return None, None
-    # Since the query is an inequality > (and not >=), go back in time 1 second
-    # to not discard the very first entity.
-    ts = oldest.ts - datetime.timedelta(seconds=1)
-    bq_key = oldest.id + ':' + ts.strftime(fmt)
-    return (oldest.key.urlsafe(), bq_key)
-
-  def get_rows(_db_key, bq_key, size):
-    """Returns a list of tuple(db_key, bq_key, row)."""
-    start = datetime.datetime.strptime(bq_key.split(':', 1)[1], fmt)
-    return [
-      _convert(e) for e in
-      BotEvent.query(BotEvent.ts > start).order(BotEvent.ts).fetch(limit=size)
-      if e
-    ]
-
-  def fetch_rows(db_keys, _bq_key):
-    """Returns a list of tuple(db_key, bq_key, row)."""
-    return [
-      _convert(e) for e in ndb.get_multi(ndb.Key(urlsafe=k) for k in db_keys)
-      if e
-    ]
-
-  return bq_state.cron_send_to_bq(
-      'bot_events', get_oldest_key, get_rows, fetch_rows)
-
-
 def task_bq_events(start, end):
   """Sends BotEvents to BigQuery swarming.bot_events table."""
   def _convert(e):
