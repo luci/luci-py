@@ -157,11 +157,10 @@ class UIHandler(auth.AuthenticatingHandler):
     # We use iframes to display pages at display_server_url_template. Need to
     # allow it in CSP.
     csp = super(UIHandler, self).get_content_security_policy()
+    csp['frame-src'].append("'self'")
     tmpl = config.settings().display_server_url_template
     if tmpl:
-      if tmpl.startswith('/'):
-        csp['frame-src'].append("'self'")
-      else:
+      if not tmpl.startswith('/'):
         # We assume the template specifies '%s' in its last path component.
         # We strip it to get a "parent" path that we can put into CSP. Note that
         # whitelisting an entire display server domain is unnecessary wide.
