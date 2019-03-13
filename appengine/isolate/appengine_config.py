@@ -12,6 +12,8 @@ import os
 
 components_auth_UI_APP_NAME = 'Isolate Server'
 
+from components import utils
+utils.fix_protobuf_package()
 
 def hack_windows():
   """Adds support for symlink-as-file on Windows.

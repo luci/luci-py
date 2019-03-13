@@ -4,9 +4,6 @@
 
 """Handlers for HTTP requests."""
 
-from components import utils
-utils.fix_protobuf_package()
-
 import gae_ts_mon
 
 import config

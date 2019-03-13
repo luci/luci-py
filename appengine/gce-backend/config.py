@@ -7,9 +7,6 @@
 import collections
 import logging
 
-from components import utils
-utils.fix_protobuf_package()
-
 from google import protobuf
 from google.appengine.ext import ndb
 

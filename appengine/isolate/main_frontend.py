@@ -18,9 +18,6 @@ import webapp2
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(APP_DIR, 'components', 'third_party'))
 
-from components import utils
-utils.fix_protobuf_package()
-
 from components import auth
 from components import ereporter2
 from components import endpoints_webapp2

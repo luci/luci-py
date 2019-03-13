@@ -19,6 +19,14 @@
         includes:
         - gae_ts_mon  # handles /internal/cron/ts_mon/send
 
+1.  Fix protobuf package import path.
+
+    Make sure the following code is present in appengine_config.py in the root
+    of your AppEngine app. Create the file if it doesn't exist.
+
+        from components import utils
+        utils.fix_protobuf_package()
+
 1.  Initialize the library in your request handler.
 
         import gae_ts_mon
