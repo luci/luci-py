@@ -72,6 +72,18 @@ def _is_bootstrapper():
   return auth.is_group_member(bot_group) or _is_admin()
 
 
+def _is_project():
+  """Returns True if the request is authenticated as coming from "project:...".
+
+  This happens when the request is coming from a trusted LUCI service which
+  acts in a context of some LUCI project. We trust such services to authorize
+  access to Swarming however they like. Swarming may impose some additional
+  checks in pool ACLs though (e.g. make sure a pool is used only by some
+  specific projects).
+  """
+  return auth.get_current_identity().is_project
+
+
 ### Capabilities
 
 
@@ -87,7 +99,7 @@ def is_ip_whitelisted_machine():
 def can_access():
   """Minimally authenticated user."""
   return (
-      is_ip_whitelisted_machine() or _is_user() or
+      is_ip_whitelisted_machine() or _is_user() or _is_project() or
       _is_view_all_bots() or _is_view_all_tasks())
 
 
@@ -148,7 +160,7 @@ def can_create_task():
   Swarming is reentrant, a bot can create a new task as part of a task. This may
   change in the future.
   """
-  return is_ip_whitelisted_machine() or _is_user()
+  return is_ip_whitelisted_machine() or _is_user() or _is_project()
 
 
 def can_schedule_high_priority_tasks():

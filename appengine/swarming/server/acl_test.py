@@ -33,6 +33,9 @@ BOT_BOOTSTRAP_GROUP = ADMINS_GROUP
 class AclTest(test_case.TestCase):
   def setUp(self):
     super(AclTest, self).setUp()
+    auth_testing.reset_local_state()
+    auth_testing.mock_get_current_identity(self)
+
     def settings():
       return config_pb2.SettingsCfg(
           auth=config_pb2.AuthSettings(
@@ -43,7 +46,6 @@ class AclTest(test_case.TestCase):
             view_all_bots_group='view_all_bots',
             view_all_tasks_group='view_all_tasks'))
     self.mock(config, 'settings', settings)
-    auth_testing.reset_local_state()
     self._task_owned = task_request.TaskRequest(
         authenticated=auth.get_current_identity())
     self._task_other = task_request.TaskRequest(
@@ -55,7 +57,7 @@ class AclTest(test_case.TestCase):
     auth_testing.reset_local_state()
 
   def test_nobody(self):
-    self.mock(auth, 'get_current_identity', lambda: auth.IDENTITY_ANONYMOUS)
+    auth_testing.mock_get_current_identity(self, auth.Anonymous)
     self.assertFalse(acl.is_ip_whitelisted_machine())
     self.assertFalse(acl.can_access())
     self.assertFalse(acl.can_view_config())
