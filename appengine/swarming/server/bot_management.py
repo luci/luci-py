@@ -882,6 +882,8 @@ def cron_aggregate_dimensions():
 def cron_send_to_bq():
   """Sends the BotEvent to BigQuery.
 
+  Deprecated.
+
   Returns:
     total number of bot events sent to BQ.
   """
@@ -930,3 +932,25 @@ def cron_send_to_bq():
 
   return bq_state.cron_send_to_bq(
       'bot_events', get_oldest_key, get_rows, fetch_rows)
+
+
+def task_bq_events(start, end):
+  """Sends BotEvents to BigQuery swarming.bot_events table."""
+  def _convert(e):
+    """Returns a tuple(bq_key, row)."""
+    out = swarming_pb2.BotEvent()
+    e.to_proto(out)
+    bq_key = e.id + ':' + e.ts.strftime(u'%Y-%m-%dT%H:%M:%S.%fZ')
+    return (bq_key, out)
+
+  total = 0
+  failed = 0
+
+  q = BotEvent.query(BotEvent.ts >= start, BotEvent.ts <= end)
+  cursor = None
+  more = True
+  while more:
+    entities, cursor, more = q.fetch_page(500, start_cursor=cursor)
+    total += len(entities)
+    failed += bq_state.send_to_bq('bot_events', [_convert(e) for e in entities])
+  return total, failed

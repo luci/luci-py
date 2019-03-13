@@ -21,6 +21,7 @@ from components import utils
 from test_support import test_case
 
 from proto.api import swarming_pb2  # pylint: disable=no-name-in-module
+from server import bq_state
 from server import bot_management
 from server import config
 from server import task_queues
@@ -462,141 +463,42 @@ class BotManagementTest(test_case.TestCase):
   def test_filter_availability(self):
     pass # Tested in handlers_endpoints_test
 
-  def test_cron_send_to_bq_empty(self):
-    # Empty, nothing is done. No need to mock the HTTP client.
-    self.assertEqual(0, bot_management.cron_send_to_bq())
-    # State is not stored if nothing was found.
-    self.assertEqual(
-        None, bot_management.bq_state.BqState.get_by_id('bot_events'))
-
   def test_cron_send_to_bq(self):
+    # Deprecated.
+    pass
+
+  def test_task_bq_empty(self):
+    # Empty, nothing is done.
+    start = utils.utcnow()
+    end = start+datetime.timedelta(seconds=60)
+    self.assertEqual((0, 0), bot_management.task_bq_events(start, end))
+
+  def test_task_bq_events(self):
     payloads = []
-    def json_request(url, method, payload, scopes, deadline):
-      self.assertEqual(
-          'https://www.googleapis.com/bigquery/v2/projects/sample-app/datasets/'
-            'swarming/tables/bot_events/insertAll',
-          url)
-      payloads.append(payload)
-      self.assertEqual('POST', method)
-      self.assertEqual(bot_management.bq_state.bqh.INSERT_ROWS_SCOPE, scopes)
-      self.assertEqual(600, deadline)
-      return {'insertErrors': []}
-    self.mock(bot_management.bq_state.net, 'json_request', json_request)
+    def send_to_bq(table_name, rows):
+      self.assertEqual('bot_events', table_name)
+      payloads.append(rows)
+      return 0
+    self.mock(bq_state, 'send_to_bq', send_to_bq)
 
     # Generate a few events.
-    self.mock_now(self.now, 10)
+    start = self.mock_now(self.now, 10)
     _bot_event(bot_id=u'id1', event_type='bot_connected')
     self.mock_now(self.now, 20)
     _bot_event(event_type='request_sleep', quarantined=True)
     self.mock_now(self.now, 30)
     _bot_event(event_type='request_task', task_id='12311', task_name='yo')
-    self.mock_now(self.now, 40)
+    end = self.mock_now(self.now, 40)
 
     # request_sleep is not streamed.
-    self.assertEqual(2, bot_management.cron_send_to_bq())
-    expected = {
-      'failed_bq_keys': [],
-      'failed_db_keys': [],
-      'last_bq_key': u'id1:2010-01-02T03:04:35.000006Z',
-      'last_db_key':
-        u'agpzYW1wbGUtYXBwciQLEgdCb3RSb290IgNpZDEMCxIIQm90RXZlbnQY_v______Hww',
-      'oldest': None,
-      'recent': None,
-      'ts': self.now + datetime.timedelta(seconds=40),
-    }
-    self.assertEqual(
-        expected,
-        bot_management.bq_state.BqState.get_by_id('bot_events').to_dict())
-
+    self.assertEqual((2, 0), bot_management.task_bq_events(start, end))
+    self.assertEqual(1, len(payloads))
+    actual_rows = payloads[0]
+    self.assertEqual(2, len(actual_rows))
     expected = [
-      {
-        'ignoreUnknownValues': False,
-        'kind': 'bigquery#tableDataInsertAllRequest',
-        'skipInvalidRows': True,
-      },
+      'id1:2010-01-02T03:04:15.000006Z', 'id1:2010-01-02T03:04:35.000006Z',
     ]
-    actual_rows = payloads[0].pop('rows')
-    self.assertEqual(expected, payloads)
-    self.assertEqual(2, len(actual_rows))
-
-    # Next cron skips everything that was processed.
-    self.assertEqual(0, bot_management.cron_send_to_bq())
-
-  def test_cron_send_to_bq_fail(self):
-    # Test the failure code path.
-    payloads = []
-    def json_request(url, method, payload, scopes, deadline):
-      self.assertEqual(
-          'https://www.googleapis.com/bigquery/v2/projects/sample-app/datasets/'
-            'swarming/tables/bot_events/insertAll',
-          url)
-      first = not payloads
-      payloads.append(payload)
-      self.assertEqual('POST', method)
-      self.assertEqual(bot_management.bq_state.bqh.INSERT_ROWS_SCOPE, scopes)
-      self.assertEqual(600, deadline)
-      # Return an error on the first call.
-      if first:
-        return {
-          'insertErrors': [
-            {
-              'index': 0,
-              'errors': [
-                {
-                  'reason': 'sadness',
-                  'message': 'Oh gosh',
-                },
-              ],
-            },
-          ],
-        }
-      return {'insertErrors': []}
-    self.mock(bot_management.bq_state.net, 'json_request', json_request)
-
-    # Generate two events.
-    self.mock_now(self.now, 10)
-    _bot_event(bot_id=u'id1', event_type='bot_connected')
-    self.mock_now(self.now, 20)
-    _bot_event(event_type='request_task', task_id='12311', task_name='yo')
-    self.mock_now(self.now, 30)
-
-    # The cron job will loop twice.
-    self.assertEqual(2, bot_management.cron_send_to_bq())
-    expected = {
-      'failed_bq_keys': [],
-      'failed_db_keys': [],
-      'last_bq_key': u'id1:2010-01-02T03:04:25.000006Z',
-      'last_db_key':
-        u'agpzYW1wbGUtYXBwciQLEgdCb3RSb290IgNpZDEMCxIIQm90RXZlbnQY_v______Hww',
-      'oldest': None,
-      'recent': None,
-      'ts': self.now + datetime.timedelta(seconds=30),
-    }
-    self.assertEqual(
-        expected,
-        bot_management.bq_state.BqState.get_by_id('bot_events').to_dict())
-
-    self.assertEqual(2, len(payloads), payloads)
-    expected = {
-      'ignoreUnknownValues': False,
-      'kind': 'bigquery#tableDataInsertAllRequest',
-      'skipInvalidRows': True,
-    }
-    actual_rows = payloads[0].pop('rows')
-    self.assertEqual(expected, payloads[0])
-    self.assertEqual(2, len(actual_rows))
-
-    expected = {
-      'ignoreUnknownValues': False,
-      'kind': 'bigquery#tableDataInsertAllRequest',
-      'skipInvalidRows': True,
-    }
-    actual_rows = payloads[1].pop('rows')
-    self.assertEqual(expected, payloads[1])
-    self.assertEqual(1, len(actual_rows))
-
-    # Next cron skips everything that was processed.
-    self.assertEqual(0, bot_management.cron_send_to_bq())
+    self.assertEqual(expected, [r[0] for r in actual_rows])
 
 
 if __name__ == '__main__':

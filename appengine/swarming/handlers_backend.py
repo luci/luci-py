@@ -248,6 +248,18 @@ class CronSendToBQ(_CronHandlerBase):
         'monitoring-bq-tasks-results-summary',
         max_seconds,
         max_taskqueues=30)
+    bq_state.cron_trigger_tasks(
+        'bot_events',
+        '/internal/taskqueue/monitoring/bq/bots/events/',
+        'monitoring-bq-bots-events',
+        max_seconds,
+        max_taskqueues=30)
+    bq_state.cron_trigger_tasks(
+        'task_requests',
+        '/internal/taskqueue/monitoring/bq/tasks/requests/',
+        'monitoring-bq-tasks-requests',
+        max_seconds,
+        max_taskqueues=30)
 
 
 ## Task queues.
@@ -355,6 +367,28 @@ class TaskNamedCachesPool(webapp2.RequestHandler):
     params = json.loads(self.request.body)
     logging.info('Handling pool: %s', params['pool'])
     named_caches.task_update_pool(params['pool'])
+
+
+class TaskMonitoringBotsEventsBQ(webapp2.RequestHandler):
+  """Sends rows to BigQuery swarming.bot_events table."""
+
+  @decorators.require_taskqueue('monitoring-bq-bots-events')
+  def post(self, timestamp):
+    ndb.get_context().set_cache_policy(lambda _: False)
+    start = datetime.datetime.strptime(timestamp, u'%Y-%m-%dT%H:%M')
+    end = start + datetime.timedelta(seconds=60)
+    bot_management.task_bq_events(start, end)
+
+
+class TaskMonitoringTasksRequestsBQ(webapp2.RequestHandler):
+  """Sends rows to BigQuery swarming.task_requests table."""
+
+  @decorators.require_taskqueue('monitoring-bq-tasks-requests')
+  def post(self, timestamp):
+    ndb.get_context().set_cache_policy(lambda _: False)
+    start = datetime.datetime.strptime(timestamp, u'%Y-%m-%dT%H:%M')
+    end = start + datetime.timedelta(seconds=60)
+    task_request.task_bq(start, end)
 
 
 class TaskMonitoringTasksResultsRunBQ(webapp2.RequestHandler):
@@ -470,6 +504,12 @@ def get_routes():
         TaskMachineProviderManagementHandler),
     (r'/internal/taskqueue/important/named_cache/update-pool',
         TaskNamedCachesPool),
+    (r'/internal/taskqueue/monitoring/bq/bots/events/'
+        r'<timestamp:\d{4}-\d\d-\d\dT\d\d:\d\d>',
+        TaskMonitoringBotsEventsBQ),
+    (r'/internal/taskqueue/monitoring/bq/tasks/requests/'
+        r'<timestamp:\d{4}-\d\d-\d\dT\d\d:\d\d>',
+        TaskMonitoringTasksRequestsBQ),
     (r'/internal/taskqueue/monitoring/bq/tasks/results/run/'
         r'<timestamp:\d{4}-\d\d-\d\dT\d\d:\d\d>',
         TaskMonitoringTasksResultsRunBQ),
