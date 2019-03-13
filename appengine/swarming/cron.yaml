@@ -103,6 +103,11 @@ cron:
   schedule: every 1 minutes
   target: backend
 
+- description: Notify external scheduler based on its desired callbacks.
+  url: /internal/cron/important/external_scheduler/get_callbacks
+  schedule: every 1 minutes
+  target: backend
+
 ### ereporter2
 
 - description: ereporter2 cleanup
