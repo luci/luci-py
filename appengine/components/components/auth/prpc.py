@@ -121,7 +121,7 @@ def _prepare_auth_context(metadata, peer_ip):
       auth_details=auth_details,
       delegation_token=_grab_metadata(metadata, _DELEGATION_METADATA_KEY),
       project_header=_grab_metadata(metadata, _X_LUCI_PROJECT_METADATA_KEY),
-      use_project_identitites=conf.USE_PROJECT_IDENTITIES,
+      use_project_identites=conf.USE_PROJECT_IDENTITIES,
       use_bots_ip_whitelist=True)
 
 

@@ -36,7 +36,7 @@ def check_request(
     auth_details,
     delegation_token,
     project_header,
-    use_project_identitites,
+    use_project_identites,
     use_bots_ip_whitelist):
   """Prepares the request context, checking IP whitelist and delegation token.
 
@@ -55,7 +55,7 @@ def check_request(
     auth_details: api.AuthDetails tuple (or None) with additional auth info.
     delegation_token: the token from X-Delegation-Token-V1 header.
     project_header: a value of X-Luci-Project header (or None).
-    use_project_identitites: True to allow authenticating requests as coming
+    use_project_identites: True to allow authenticating requests as coming
       from 'project:...' identities (based on X-Luci-Project header).
     use_bots_ip_whitelist: [DEPRECATED] if true, treat anonymous access from
       IPs in "<appid>-bots" whitelist as coming from "bot:whitelisted-ip"
@@ -104,7 +104,7 @@ def check_request(
       ctx.delegation_token = unwrapped_tok
     except delegation.BadTokenError as exc:
       raise api.AuthorizationError('Bad delegation token: %s' % exc)
-  elif use_project_identitites and project_header:
+  elif use_project_identites and project_header:
     # X-Luci-Project header can be used only by LUCI services (which we
     # completely trust). Other callers must not provide it (most likely this
     # indicates a misconfiguration).

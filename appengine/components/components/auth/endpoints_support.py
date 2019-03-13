@@ -253,5 +253,5 @@ def initialize_request_auth(remote_address, headers):
       auth_details=auth_details,
       delegation_token=headers.get(delegation.HTTP_HEADER),
       project_header=headers.get(check.X_LUCI_PROJECT),
-      use_project_identitites=conf.USE_PROJECT_IDENTITIES,
+      use_project_identites=conf.USE_PROJECT_IDENTITIES,
       use_bots_ip_whitelist=True)
