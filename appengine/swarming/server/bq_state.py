@@ -23,7 +23,7 @@ import bqh
 # This must match the BigQuery partitioned table expiration.
 # TODO(maruel): Switch back to 365+183 once quota issues are fixed.
 # https://crbug.com/939204
-_OLDEST_BACKFILL = datetime.timedelta(days=32)
+_OLDEST_BACKFILL = datetime.timedelta(days=91)
 
 
 ### Models
