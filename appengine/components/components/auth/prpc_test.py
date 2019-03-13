@@ -16,10 +16,11 @@ from google.protobuf import empty_pb2
 from components import prpc as prpclib
 from components import utils
 from components.auth import api
-from components.auth import delegation
+from components.auth import check
 from components.auth import ipaddr
 from components.auth import model
 from components.auth import prpc
+from components.auth import testing
 from components.auth import tokens
 from components.auth.proto import delegation_pb2
 from test_support import test_case
@@ -54,21 +55,8 @@ class MockContext(object):
     self.details = details
 
 
-class PrpcAuthTest(test_case.TestCase):
+class PrpcAuthTest(testing.TestCase):
   # pylint: disable=unused-argument
-
-  def setUp(self):
-    super(PrpcAuthTest, self).setUp()
-    self.mock(logging, 'error', lambda *_args: None)
-    self.mock(logging, 'warning', lambda *_args: None)
-    self.mock(delegation, 'get_trusted_signers', self.mock_get_trusted_signers)
-
-  def mock_get_trusted_signers(self):
-    return {'user:token-server@example.com': self}
-
-  # Implements CertificateBundle interface, as used in mock_get_trusted_signers.
-  def check_signature(self, blob, key_name, signature):
-    return True
 
   def call(self, peer_id, email, headers=None):
     """Mocks pRPC environment and calls the interceptor.
@@ -236,6 +224,52 @@ class PrpcAuthTest(test_case.TestCase):
     self.assertEqual(ctx.code, prpclib.StatusCode.PERMISSION_DENIED)
     self.assertEqual(
         ctx.details, 'Bad delegation token: Bad proto: Truncated message.')
+
+  def test_x_luci_project_works(self):
+    self.mock_group(check.LUCI_SERVICES_GROUP, ['user:peer@a.com'])
+
+    # No header -> authenticated as is.
+    self.mock_config(USE_PROJECT_IDENTITIES=True)
+    state, ctx = self.call('ipv4:127.0.0.1', 'peer@a.com', {})
+    self.assertEqual(ctx.code, prpclib.StatusCode.OK)
+    self.assertEqual(state.current_identity, 'user:peer@a.com')
+    self.assertEqual(state.peer_identity, 'user:peer@a.com')
+
+    # With header, but X-Luci-Project auth is off -> authenticated as is.
+    self.mock_config(USE_PROJECT_IDENTITIES=False)
+    state, ctx = self.call(
+        'ipv4:127.0.0.1', 'peer@a.com', {check.X_LUCI_PROJECT: 'proj-name'})
+    self.assertEqual(ctx.code, prpclib.StatusCode.OK)
+    self.assertEqual(state.current_identity, 'user:peer@a.com')
+    self.assertEqual(state.peer_identity, 'user:peer@a.com')
+
+    # With header and X-Luci-Project auth is on -> authenticated as project.
+    self.mock_config(USE_PROJECT_IDENTITIES=True)
+    state, ctx = self.call(
+        'ipv4:127.0.0.1', 'peer@a.com', {check.X_LUCI_PROJECT: 'proj-name'})
+    self.assertEqual(ctx.code, prpclib.StatusCode.OK)
+    self.assertEqual(state.current_identity, 'project:proj-name')
+    self.assertEqual(state.peer_identity, 'user:peer@a.com')
+
+  def test_x_luci_project_from_unrecognized_service(self):
+    self.mock_config(USE_PROJECT_IDENTITIES=True)
+    _, ctx = self.call(
+        'ipv4:127.0.0.1', 'peer@a.com', {check.X_LUCI_PROJECT: 'proj-name'})
+    self.assertEqual(ctx.code, prpclib.StatusCode.UNAUTHENTICATED)
+    self.assertEqual(
+        ctx.details,
+        'Usage of X-Luci-Project is not allowed for user:peer@a.com: not a '
+        'member of auth-luci-services group')
+
+  def test_x_luci_project_with_delegation_token(self):
+    self.mock_config(USE_PROJECT_IDENTITIES=True)
+    _, ctx = self.call(
+        'ipv4:127.0.0.1', 'peer@a.com',
+        {check.X_LUCI_PROJECT: 'proj-name', 'X-Delegation-Token-V1': 'tok'})
+    self.assertEqual(ctx.code, prpclib.StatusCode.UNAUTHENTICATED)
+    self.assertEqual(
+        ctx.details,
+        'Delegation tokens and X-Luci-Project cannot be used together')
 
 
 if __name__ == '__main__':

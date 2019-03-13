@@ -19,10 +19,12 @@ import webtest
 
 from components import utils
 from components.auth import api
+from components.auth import check
 from components.auth import delegation
 from components.auth import handler
 from components.auth import ipaddr
 from components.auth import model
+from components.auth import testing
 from components.auth import tokens
 from components.auth.proto import delegation_pb2
 from test_support import test_case
@@ -57,37 +59,44 @@ class AuthenticatingHandlerMetaclassTest(test_case.TestCase):
           pass
 
 
-class AuthenticatingHandlerTest(test_case.TestCase):
+class AuthenticatingHandlerTest(testing.TestCase):
   """Tests for AuthenticatingHandler class."""
 
   # pylint: disable=unused-argument
-
-  def setUp(self):
-    super(AuthenticatingHandlerTest, self).setUp()
-    # Reset global config of auth library before each test.
-    api.reset_local_state()
-    # Capture error and warning log messages.
-    self.logged_errors = []
-    self.mock(handler.logging, 'error',
-        lambda *args, **kwargs: self.logged_errors.append((args, kwargs)))
-    self.logged_warnings = []
-    self.mock(handler.logging, 'warning',
-        lambda *args, **kwargs: self.logged_warnings.append((args, kwargs)))
-    # Don't actually check delegation token signatures.
-    self.mock(delegation, 'get_trusted_signers', self.mock_get_trusted_signers)
-
-  def mock_get_trusted_signers(self):
-    return {'user:token-server@example.com': self}
-
-  # Implements CertificateBundle interface, as used in mock_get_trusted_signers.
-  def check_signature(self, blob, key_name, signature):
-    return True
 
   def make_test_app(self, path, request_handler):
     """Returns webtest.TestApp with single route."""
     return webtest.TestApp(
         webapp2.WSGIApplication([(path, request_handler)], debug=True),
         extra_environ={'REMOTE_ADDR': '127.0.0.1'})
+
+  def make_test_app_with_peer(self, peer_ident):
+    """Returns a callback that calls a handler through webtest.TestApp.
+
+    Calls are authenticated as if coming from 'peer_ident'.
+
+    Returns:
+      call(headers) callback.
+    """
+    class Handler(handler.AuthenticatingHandler):
+      @classmethod
+      def get_auth_methods(cls, conf):
+        return [lambda _request: (model.Identity.from_bytes(peer_ident), None)]
+      @api.public
+      def get(self):
+        self.response.write(json.dumps({
+          'peer_id': api.get_peer_identity().to_bytes(),
+          'cur_id': api.get_current_identity().to_bytes(),
+        }))
+
+    app = self.make_test_app('/request', Handler)
+    def call(headers=None):
+      resp = app.get('/request', headers=headers, expect_errors=True)
+      return {
+        'status': resp.status_int,
+        'body': json.loads(resp.body) if resp.status_int == 200 else resp.body,
+      }
+    return call
 
   def test_anonymous(self):
     """If all auth methods are not applicable, identity is set to Anonymous."""
@@ -415,27 +424,16 @@ class AuthenticatingHandlerTest(test_case.TestCase):
     self.assertEqual('192.1.2.3', response.body)
 
   def test_delegation_token(self):
-    peer_ident = model.Identity.from_bytes('user:peer@a.com')
-
-    class Handler(handler.AuthenticatingHandler):
-      @classmethod
-      def get_auth_methods(cls, conf):
-        return [lambda _request: (peer_ident, None)]
-
-      @api.public
-      def get(self):
-        self.response.write(json.dumps({
-          'peer_id': api.get_peer_identity().to_bytes(),
-          'cur_id': api.get_current_identity().to_bytes(),
-        }))
-
-    app = self.make_test_app('/request', Handler)
-    def call(headers=None):
-      return json.loads(app.get('/request', headers=headers).body)
+    call = self.make_test_app_with_peer('user:peer@a.com')
 
     # No delegation.
-    self.assertEqual(
-        {u'cur_id': u'user:peer@a.com', u'peer_id': u'user:peer@a.com'}, call())
+    self.assertEqual({
+      'status': 200,
+      'body': {
+        u'cur_id': u'user:peer@a.com',
+        u'peer_id': u'user:peer@a.com',
+      },
+    }, call())
 
     # Grab a fake-signed delegation token.
     subtoken = delegation_pb2.Subtoken(
@@ -446,33 +444,87 @@ class AuthenticatingHandlerTest(test_case.TestCase):
         creation_time=int(utils.time_time()),
         validity_duration=3600)
     tok_pb = delegation_pb2.DelegationToken(
-      serialized_subtoken=subtoken.SerializeToString(),
-      signer_id='user:token-server@example.com',
-      signing_key_id='signing-key',
-      pkcs1_sha256_sig='fake-signature')
+        serialized_subtoken=subtoken.SerializeToString(),
+        signer_id='user:token-server@example.com',
+        signing_key_id='signing-key',
+        pkcs1_sha256_sig='fake-signature')
     tok = tokens.base64_encode(tok_pb.SerializeToString())
 
     # With valid delegation token.
-    self.assertEqual(
-        {u'cur_id': u'user:delegated@a.com', u'peer_id': u'user:peer@a.com'},
-        call({'X-Delegation-Token-V1': tok}))
+    self.assertEqual({
+      'status': 200,
+      'body': {
+        u'cur_id': u'user:delegated@a.com',
+        u'peer_id': u'user:peer@a.com',
+      },
+    }, call({'X-Delegation-Token-V1': tok}))
 
     # With invalid delegation token.
-    r = app.get(
-        '/request',
-        headers={'X-Delegation-Token-V1': tok + 'blah'},
-        expect_errors=True)
-    self.assertEqual(403, r.status_int)
+    resp = call({'X-Delegation-Token-V1': tok+'blah'})
+    self.assertEqual(403, resp['status'])
+    self.assertIn('Bad delegation token', resp['body'])
 
     # Transient error.
     def mocked_check(*_args):
       raise delegation.TransientError('Blah')
     self.mock(delegation, 'check_bearer_delegation_token', mocked_check)
-    r = app.get(
-        '/request',
-        headers={'X-Delegation-Token-V1': tok},
-        expect_errors=True)
-    self.assertEqual(500, r.status_int)
+    resp = call({'X-Delegation-Token-V1': tok})
+    self.assertEqual(500, resp['status'])
+    self.assertIn('Blah', resp['body'])
+
+  def test_x_luci_project_works(self):
+    self.mock_group(check.LUCI_SERVICES_GROUP, ['user:peer@a.com'])
+    call = self.make_test_app_with_peer('user:peer@a.com')
+
+    # No header -> authenticated as is.
+    self.mock_config(USE_PROJECT_IDENTITIES=True)
+    self.assertEqual({
+      'status': 200,
+      'body': {
+        u'cur_id': u'user:peer@a.com',
+        u'peer_id': u'user:peer@a.com',
+      },
+    }, call({}))
+
+    # With header, but X-Luci-Project auth is off -> authenticated as is.
+    self.mock_config(USE_PROJECT_IDENTITIES=False)
+    self.assertEqual({
+      'status': 200,
+      'body': {
+        u'cur_id': u'user:peer@a.com',
+        u'peer_id': u'user:peer@a.com',
+      },
+    }, call({check.X_LUCI_PROJECT: 'proj-name'}))
+
+    # With header and X-Luci-Project auth is on -> authenticated as project.
+    self.mock_config(USE_PROJECT_IDENTITIES=True)
+    self.assertEqual({
+      'status': 200,
+      'body': {
+        u'cur_id': u'project:proj-name',
+        u'peer_id': u'user:peer@a.com',
+      },
+    }, call({check.X_LUCI_PROJECT: 'proj-name'}))
+
+  def test_x_luci_project_from_unrecognized_service(self):
+    self.mock_config(USE_PROJECT_IDENTITIES=True)
+    call = self.make_test_app_with_peer('user:peer@a.com')
+    resp = call({check.X_LUCI_PROJECT: 'proj-name'})
+    self.assertEqual(401, resp['status'])
+    self.assertIn(
+        'Usage of X-Luci-Project is not allowed for user:peer@a.com: not a '
+        'member of auth-luci-services group', resp['body'])
+
+  def test_x_luci_project_with_delegation_token(self):
+    call = self.make_test_app_with_peer('user:peer@a.com')
+    resp = call({
+      check.X_LUCI_PROJECT: 'proj-name',
+      'X-Delegation-Token-V1': 'tok',
+    })
+    self.assertEqual(401, resp['status'])
+    self.assertIn(
+        'Delegation tokens and X-Luci-Project cannot be used together',
+        resp['body'])
 
 
 class GaeCookieAuthenticationTest(test_case.TestCase):

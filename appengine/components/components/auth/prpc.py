@@ -62,6 +62,7 @@ def prpc_interceptor(request, context, call_details, continuation):
 # Keys to look up in the metadata. Must be lowercase.
 _AUTHORIZATION_METADATA_KEY = 'authorization'
 _DELEGATION_METADATA_KEY = delegation.HTTP_HEADER.lower()
+_X_LUCI_PROJECT_METADATA_KEY = check.X_LUCI_PROJECT.lower()
 
 
 def _parse_rpc_peer(rpc_peer):
@@ -99,7 +100,7 @@ def _prepare_auth_context(metadata, peer_ip):
     api.AuthorizationError if the caller is not in the IP whitelist or not
       authorized to use the delegation token.
   """
-  config.ensure_configured()
+  conf = config.ensure_configured()
   ctx = api.reinitialize_request_cache()
 
   # Verify the OAuth token (including client_id check), if given.
@@ -119,6 +120,8 @@ def _prepare_auth_context(metadata, peer_ip):
       peer_ip=peer_ip,
       auth_details=auth_details,
       delegation_token=_grab_metadata(metadata, _DELEGATION_METADATA_KEY),
+      project_header=_grab_metadata(metadata, _X_LUCI_PROJECT_METADATA_KEY),
+      use_project_identitites=conf.USE_PROJECT_IDENTITIES,
       use_bots_ip_whitelist=True)
 
 

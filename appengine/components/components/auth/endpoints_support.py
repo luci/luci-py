@@ -228,7 +228,7 @@ def initialize_request_auth(remote_address, headers):
   Called before executing a cloud endpoints method. May raise AuthorizationError
   or AuthenticationError exceptions.
   """
-  config.ensure_configured()
+  conf = config.ensure_configured()
   ctx = api.reinitialize_request_cache()
 
   # Verify the validity of the token (including client_id check), if given.
@@ -252,4 +252,6 @@ def initialize_request_auth(remote_address, headers):
       peer_ip=ipaddr.ip_from_string(remote_address),
       auth_details=auth_details,
       delegation_token=headers.get(delegation.HTTP_HEADER),
+      project_header=headers.get(check.X_LUCI_PROJECT),
+      use_project_identitites=conf.USE_PROJECT_IDENTITIES,
       use_bots_ip_whitelist=True)

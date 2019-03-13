@@ -17,32 +17,20 @@ from protorpc import remote
 
 from components import utils
 from components.auth import api
-from components.auth import delegation
+from components.auth import check
 from components.auth import endpoints_support
 from components.auth import ipaddr
 from components.auth import model
+from components.auth import testing
 from components.auth import tokens
 from components.auth.proto import delegation_pb2
 from test_support import test_case
 
 
-class EndpointsAuthTest(test_case.TestCase):
+class EndpointsAuthTest(testing.TestCase):
   """Tests for auth.endpoints_support.initialize_request_auth function."""
 
   # pylint: disable=unused-argument
-
-  def setUp(self):
-    super(EndpointsAuthTest, self).setUp()
-    self.mock(logging, 'error', lambda *_args: None)
-    self.mock(logging, 'warning', lambda *_args: None)
-    self.mock(delegation, 'get_trusted_signers', self.mock_get_trusted_signers)
-
-  def mock_get_trusted_signers(self):
-    return {'user:token-server@example.com': self}
-
-  # Implements CertificateBundle interface, as used in mock_get_trusted_signers.
-  def check_signature(self, blob, key_name, signature):
-    return True
 
   def call(self, remote_address, email, headers=None):
     """Mocks current user in initialize_request_auth."""
@@ -67,6 +55,18 @@ class EndpointsAuthTest(test_case.TestCase):
     api.reset_local_state()
     endpoints_support.initialize_request_auth(remote_address, headers)
     return api.get_current_identity().to_bytes()
+
+  def call_with_tokens(self, delegation_tok=None, luci_project=None):
+    headers = {}
+    if delegation_tok:
+      headers['X-Delegation-Token-V1'] = delegation_tok
+    if luci_project:
+      headers[check.X_LUCI_PROJECT] = luci_project
+    self.call('127.0.0.1', 'peer@a.com', headers)
+    return {
+      'cur_id': api.get_current_identity().to_bytes(),
+      'peer_id': api.get_peer_identity().to_bytes(),
+    }
 
   def test_ip_whitelist_bot(self):
     """Requests from client in bots IP whitelist are authenticated as bot."""
@@ -107,17 +107,10 @@ class EndpointsAuthTest(test_case.TestCase):
     self.assertEqual(ipaddr.ip_from_string('1.2.3.4'), api.get_peer_ip())
 
   def test_delegation_token(self):
-    def call(tok=None):
-      headers = {'X-Delegation-Token-V1': tok} if tok else None
-      self.call('127.0.0.1', 'peer@a.com', headers)
-      return {
-        'cur_id': api.get_current_identity().to_bytes(),
-        'peer_id': api.get_current_identity().to_bytes(),
-      }
-
     # No delegation.
     self.assertEqual(
-        {'cur_id': 'user:peer@a.com', 'peer_id': 'user:peer@a.com'}, call())
+        {'cur_id': 'user:peer@a.com', 'peer_id': 'user:peer@a.com'},
+        self.call_with_tokens())
 
     # Grab a fake-signed delegation token.
     subtoken = delegation_pb2.Subtoken(
@@ -136,12 +129,43 @@ class EndpointsAuthTest(test_case.TestCase):
 
     # Valid delegation token.
     self.assertEqual(
-        {'cur_id': 'user:delegated@a.com', 'peer_id': 'user:delegated@a.com'},
-        call(tok))
+        {'cur_id': 'user:delegated@a.com', 'peer_id': 'user:peer@a.com'},
+        self.call_with_tokens(delegation_tok=tok))
 
     # Invalid delegation token.
     with self.assertRaises(api.AuthorizationError):
-      call(tok + 'blah')
+      self.call_with_tokens(delegation_tok=tok+'blah')
+
+  def test_x_luci_project_works(self):
+    self.mock_group(check.LUCI_SERVICES_GROUP, ['user:peer@a.com'])
+
+    # No header -> authenticated as is.
+    self.mock_config(USE_PROJECT_IDENTITIES=True)
+    self.assertEqual(
+        {'cur_id': 'user:peer@a.com', 'peer_id': 'user:peer@a.com'},
+        self.call_with_tokens())
+
+    # With header, but X-Luci-Project auth is off -> authenticated as is.
+    self.mock_config(USE_PROJECT_IDENTITIES=False)
+    self.assertEqual(
+        {'cur_id': 'user:peer@a.com', 'peer_id': 'user:peer@a.com'},
+        self.call_with_tokens(luci_project='proj-name'))
+
+    # With header and X-Luci-Project auth is on -> authenticated as project.
+    self.mock_config(USE_PROJECT_IDENTITIES=True)
+    self.assertEqual(
+        {'cur_id': 'project:proj-name', 'peer_id': 'user:peer@a.com'},
+        self.call_with_tokens(luci_project='proj-name'))
+
+  def test_x_luci_project_from_unrecognized_service(self):
+    self.mock_config(USE_PROJECT_IDENTITIES=True)
+    with self.assertRaises(api.AuthenticationError):
+      self.call_with_tokens(luci_project='proj-name')
+
+  def test_x_luci_project_with_delegation_token(self):
+    self.mock_config(USE_PROJECT_IDENTITIES=True)
+    with self.assertRaises(api.AuthenticationError):
+      self.call_with_tokens(delegation_tok='tok', luci_project='proj-name')
 
 
 @endpoints.api(name='testing', version='v1')

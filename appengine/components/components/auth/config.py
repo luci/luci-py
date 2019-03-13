@@ -42,6 +42,8 @@ _config = lib_config.register(
       'PROCESS_CHANGE_TASK_QUEUE': 'default',
       # A callback that returns a list of OAuth client IDs to accept.
       'OAUTH_CLIENT_IDS_PROVIDER': None,
+      # True to enable authentication based on 'X-Luci-Project' headers.
+      'USE_PROJECT_IDENTITIES': False,
     })
 
 
