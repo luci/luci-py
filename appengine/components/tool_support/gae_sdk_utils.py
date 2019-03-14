@@ -492,7 +492,6 @@ class Application(object):
       os.path.join(self.default_module_dir, 'queue.yaml'),
       os.path.join(self.default_module_dir, 'cron.yaml'),
       os.path.join(self.default_module_dir, 'dispatch.yaml'),
-      self.dispatch_yaml,
     ]
     for extra in possible_extra:
       if extra and os.path.isfile(extra):
