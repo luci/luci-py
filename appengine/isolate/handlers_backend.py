@@ -5,7 +5,6 @@
 """This module defines Isolate Server backend url handlers."""
 
 import binascii
-import hashlib
 import logging
 import time
 import zlib
@@ -46,7 +45,7 @@ class Accumulator(object):
       del i
 
 
-def split_payload(request, chunk_size, max_chunks):
+def _split_payload(request, chunk_size, max_chunks):
   """Splits a binary payload into elements of |chunk_size| length.
 
   Returns each chunks.
@@ -73,13 +72,13 @@ def split_payload(request, chunk_size, max_chunks):
   return [content[i * chunk_size: (i + 1) * chunk_size] for i in xrange(count)]
 
 
-def payload_to_hashes(request, namespace):
+def _payload_to_hashes(request, namespace):
   """Converts a raw payload into hashes as bytes."""
   h = model.get_hash(namespace)
-  return split_payload(request, h.digest_size, model.MAX_KEYS_PER_DB_OPS)
+  return _split_payload(request, h.digest_size, model.MAX_KEYS_PER_DB_OPS)
 
 
-def incremental_delete(query, delete, check=None):
+def _incremental_delete(query, delete):
   """Applies |delete| to objects in a query asynchrously.
 
   This function is itself synchronous.
@@ -89,8 +88,6 @@ def incremental_delete(query, delete, check=None):
   - delete: callback that accepts a list of objects to delete and returns a list
             of objects that have a method .wait() to make sure all calls
             completed.
-  - check: optional callback that can filter out items from |query| from
-          deletion.
 
   Returns the number of objects found.
   """
@@ -102,8 +99,6 @@ def incremental_delete(query, delete, check=None):
     count += 1
     if not (count % 1000):
       logging.debug('Found %d items', count)
-    if check and not check(item):
-      continue
     to_delete.append(item)
     deleted_count += 1
     if len(to_delete) == ITEMS_TO_DELETE_ASYNC:
@@ -126,6 +121,45 @@ def incremental_delete(query, delete, check=None):
   return deleted_count
 
 
+def _yield_orphan_gcs_files(gs_bucket):
+  """Iterates over the whole GCS bucket for unreferenced files.
+
+  Finds files in GCS that are not referred to by a ContentEntry.
+
+  Yields:
+    path of unreferenced files in the bucket
+  """
+  futures = {}
+  cutoff = time.time() - 60*60
+  for filepath, filestats in gcs.list_files(gs_bucket):
+    # If the file was uploaded in the last hour, ignore it.
+    if filestats.st_ctime >= cutoff:
+      continue
+
+    # This must match the logic in model.get_entry_key(). Since this request
+    # will in practice touch every item, do not use memcache since it'll
+    # mess it up by loading every item in it.
+    # TODO(maruel): Batch requests to use get_multi_async() similar to
+    # datastore_utils.page_queries().
+    future = model.entry_key_from_id(filepath).get_async(
+        use_cache=False, use_memcache=False)
+    futures[future] = filepath
+
+    if len(futures) > 20:
+      future = ndb.Future.wait_any(futures)
+      filepath = futures.pop(future)
+      if future.get_result():
+        continue
+      yield filepath
+  while futures:
+    future = ndb.Future.wait_any(futures)
+    filepath = futures.pop(future)
+    if future.get_result():
+      continue
+    yield filepath
+
+
+
 ### Restricted handlers
 
 
@@ -145,7 +179,7 @@ class InternalCleanupOldEntriesWorkerHandler(webapp2.RequestHandler):
     q = model.ContentEntry.query(
         model.ContentEntry.expiration_ts < utils.utcnow()
         ).iter(keys_only=True)
-    total = incremental_delete(q, delete=model.delete_entry_and_gs_entry)
+    total = _incremental_delete(q, model.delete_entry_and_gs_entry)
     logging.info('Deleting %s expired entries', total)
 
 
@@ -160,13 +194,13 @@ class InternalObliterateWorkerHandler(webapp2.RequestHandler):
   @decorators.require_taskqueue('cleanup')
   def post(self):
     logging.info('Deleting ContentEntry')
-    incremental_delete(
+    _incremental_delete(
         model.ContentEntry.query().iter(keys_only=True),
         ndb.delete_multi_async)
 
     gs_bucket = config.settings().gs_bucket
     logging.info('Deleting GS bucket %s', gs_bucket)
-    incremental_delete(
+    _incremental_delete(
         (i[0] for i in gcs.list_files(gs_bucket)),
         lambda filenames: gcs.delete_files(gs_bucket, filenames))
 
@@ -197,39 +231,8 @@ class InternalCleanupTrimLostWorkerHandler(webapp2.RequestHandler):
     ContentEntry.
     """
     gs_bucket = config.settings().gs_bucket
-
-    def filter_missing():
-      futures = {}
-      cutoff = time.time() - 60*60
-      for filepath, filestats in gcs.list_files(gs_bucket):
-        # If the file was uploaded in the last hour, ignore it.
-        if filestats.st_ctime >= cutoff:
-          continue
-
-        # This must match the logic in model.get_entry_key(). Since this request
-        # will in practice touch every item, do not use memcache since it'll
-        # mess it up by loading every items in it.
-        # TODO(maruel): Batch requests to use get_multi_async() similar to
-        # datastore_utils.page_queries().
-        future = model.entry_key_from_id(filepath).get_async(
-            use_cache=False, use_memcache=False)
-        futures[future] = filepath
-
-        if len(futures) > 20:
-          future = ndb.Future.wait_any(futures)
-          filepath = futures.pop(future)
-          if future.get_result():
-            continue
-          yield filepath
-      while futures:
-        future = ndb.Future.wait_any(futures)
-        filepath = futures.pop(future)
-        if future.get_result():
-          continue
-        yield filepath
-
     gs_delete = lambda filenames: gcs.delete_files(gs_bucket, filenames)
-    total = incremental_delete(filter_missing(), gs_delete)
+    total = _incremental_delete(_yield_orphan_gcs_files(gs_bucket), gs_delete)
     logging.info('Deleted %d lost GS files', total)
     # TODO(maruel): Find all the empty directories that are old and remove them.
     # We need to safe guard against the race condition where a user would upload
@@ -278,7 +281,7 @@ class InternalTagWorkerHandler(webapp2.RequestHandler):
     now = utils.timestamp_to_datetime(long(timestamp))
     expiration = config.settings().default_expiration
     try:
-      digests = payload_to_hashes(self, namespace)
+      digests = _payload_to_hashes(self, namespace)
       # Requests all the entities at once.
       futures = ndb.get_multi_async(
           model.get_entry_key(namespace, binascii.hexlify(d)) for d in digests)
@@ -414,6 +417,7 @@ class InternalVerifyWorkerHandler(webapp2.RequestHandler):
     if save_to_memcache:
       model.save_in_memcache(namespace, hash_key, ''.join(stream.accumulated))
     future.wait()
+    return
 
 
 class InternalStatsUpdateHandler(webapp2.RequestHandler):
