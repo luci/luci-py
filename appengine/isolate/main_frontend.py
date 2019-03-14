@@ -18,6 +18,8 @@ import webapp2
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(APP_DIR, 'components', 'third_party'))
 
+from google.appengine.ext import ndb
+
 from components import auth
 from components import ereporter2
 from components import endpoints_webapp2
@@ -32,6 +34,14 @@ import handlers_prpc
 
 def create_application():
   ereporter2.register_formatter()
+
+  # Zap out the ndb in-process cache by default.
+  # This cache causes excessive memory usage in in handler where a lot of
+  # entities are fetched in one query. When coupled with high concurrency
+  # as specified via max_concurrent_requests in app.yaml, this may cause out of
+  # memory errors.
+  ndb.Context.default_cache_policy = staticmethod(lambda _key: False)
+  ndb.Context._cache_policy = staticmethod(lambda _key: False)
 
   # App that serves HTML pages and old API.
   frontend = handlers_frontend.create_application(False)
