@@ -861,6 +861,26 @@ describe('task-list', function() {
         done();
       });
     });
+
+    it('only tries to cancel all tasks based on tags', function(done) {
+      loggedInTasklist((ele) => {
+        ele.permissions.cancel_task = true;
+        ele._filters = ['pool-tag:Skia', 'state:PENDING', 'os-tag:Windows'];
+        ele.render();
+
+        const cancelAll = $$('button#cancel_all', ele);
+        expect(cancelAll).toBeTruthy();
+
+        cancelAll.click();
+
+        const prompt = $$('task-mass-cancel', ele);
+        expect(prompt).toBeTruthy();
+
+        expect(prompt.tags).toEqual(['pool:Skia', 'os:Windows']);
+
+        done();
+      });
+    });
   }); // end describe('dynamic behavior')
 
   describe('api calls', function() {

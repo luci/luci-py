@@ -901,7 +901,7 @@ describe('bot-list', function() {
         ele._filters = ['pool:Skia', 'status:dead', 'is_mp_bot:true'];
         ele.render();
 
-        const deleteAll = $$('button.delete_all', ele);
+        const deleteAll = $$('button#delete_all', ele);
         expect(deleteAll).toBeTruthy();
 
         deleteAll.click();

@@ -130,7 +130,7 @@ const options = (ele) => html`
     <span>Verbose Entries</span>
   </div>
   <a href=${ele._matchingTasksLink()}>View Matching Tasks</a>
-  <button class=delete_all
+  <button id=delete_all
       ?disabled=${!ele.permissions.delete_bot}
       @click=${ele._promptMassDelete}>
     DELETE ALL DEAD BOTS

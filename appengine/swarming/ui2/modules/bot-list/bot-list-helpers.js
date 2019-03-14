@@ -148,7 +148,7 @@ export function dimensionsOnly(filters) {
   const nonDimensions = Object.keys(specialFilters);
   return filters.filter((f) => {
     for (const nd of nonDimensions) {
-      if (f.startsWith(nd)) {
+      if (f.startsWith(nd + ':')) {
         return false;
       }
     }

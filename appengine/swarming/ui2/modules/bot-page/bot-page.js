@@ -321,7 +321,7 @@ const template = (ele) => html`
               client_id=${ele.client_id}
               ?testing_offline=${ele.testing_offline}>
   <header>
-    <div class=title>Swarming Task Page</div>
+    <div class=title>Swarming Bot Page</div>
       <aside class=hideable>
         <a href=/>Home</a>
         <a href=/botlist>Bot List</a>

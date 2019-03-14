@@ -45,10 +45,11 @@ import 'flatpickr/dist/flatpickr.css'
 import * as query from 'common-sk/modules/query'
 
 import { applyAlias, handleLegacyFilters, maybeApplyAlias } from '../alias'
-import { appendPossibleColumns, appendPrimaryMap, column, filterTasks, floorSecond,
-         getColHeader, humanizePrimaryKey, legacyTags, listQueryParams,
+import { appendPossibleColumns, appendPrimaryMap, column, filterTasks,
+         floorSecond, getColHeader, humanizePrimaryKey, legacyTags, listQueryParams,
          processTasks, sortColumns, sortPossibleColumns, specialSortMap,
-         stripTag, stripTagFromFilter, taskClass, useNaturalSort } from './task-list-helpers'
+         stripTag, stripTagFromFilter,  tagsOnly, taskClass,
+         useNaturalSort } from './task-list-helpers'
 import { botListLink, onSmallScreen } from '../util'
 import { filterPossibleColumns, filterPossibleKeys,
          filterPossibleValues, makeFilter } from '../queryfilter'
@@ -286,7 +287,7 @@ const template = (ele) => html`
     <div class='cancel content'>
       <task-mass-cancel
           .auth_header=${ele.auth_header}
-          .tags=${ele._filters.map(stripTagFromFilter)}></task-mass-cancel>
+          .tags=${tagsOnly(ele._filters).map(stripTagFromFilter)}></task-mass-cancel>
       <button class=goback tabindex=0
               @click=${ele._closePopup}
               ?disabled=${ele._startedCanceling && !ele._finishedCanceling}>

@@ -159,7 +159,6 @@ export const specialFilters = {
   }
 };
 
-
 /** Filters the tasks like they would be filtered from the server
  * @param {Array<String>} filters - e.g. ['alpha:beta']
  * @param {Array<Object>} tasks: the task objects to filter.
@@ -443,6 +442,21 @@ export function stripTag(s) {
  */
 export function stripTagFromFilter(s) {
   return s.replace('-tag:', ':');
+}
+
+/** tagsOnly takes a list of filters in the form foo:bar
+ *  and filters out any that are not tags.
+ */
+export function tagsOnly(filters) {
+  const nonTags = Object.keys(specialFilters);
+  return filters.filter((f) => {
+    for (const nt of nonTags) {
+      if (f.startsWith(nt + ':')) {
+        return false;
+      }
+    }
+    return true;
+  });
 }
 
 /** taskClass returns the CSS class for the given task, based on the state
