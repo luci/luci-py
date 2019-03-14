@@ -92,12 +92,16 @@ TEMPLATE_CANARY_NEVER = TemplateApplyEnum('TEMPLATE_CANARY_NEVER')
 TEMPLATE_SKIP = TemplateApplyEnum('TEMPLATE_SKIP')
 
 
-# Three days in seconds. Add 10s to account for small jitter.
-_THREE_DAY_SECS = 3*24*60*60 + 10
+# Maximum allowed timeout for I/O and hard timeouts.
+#
+# Three days in seconds. Includes an additional 10s to account for small jitter.
+MAX_TIMEOUT_SECS = 3*24*60*60 + 10
 
 
-# Seven day in seconds. Add 10s to account for small jitter.
-_SEVEN_DAYS_SECS = 7*24*60*60 + 10
+# Maximum allowed expiration for a pending task.
+#
+# Seven days in seconds. Includes an additional 10s to account for small jitter.
+MAX_EXPIRATION_SECS = 7*24*60*60 + 10
 
 
 # Minimum value for timeouts.
@@ -273,7 +277,7 @@ def _validate_env_prefixes(prop, value):
 
 def _check_expiration_secs(name, value):
   """Validates expiration_secs."""
-  if not (_MIN_TIMEOUT_SECS <= value <= _SEVEN_DAYS_SECS):
+  if not (_MIN_TIMEOUT_SECS <= value <= MAX_EXPIRATION_SECS):
     raise datastore_errors.BadValueError(
         '%s (%s) must be between %ds and 7 days' %
         (name, value, _MIN_TIMEOUT_SECS))
@@ -317,7 +321,7 @@ def _validate_task_run_id(_prop, value):
 def _validate_timeout(prop, value):
   """Validates timeouts in seconds in TaskProperties."""
   # pylint: disable=protected-access
-  if value and not (_MIN_TIMEOUT_SECS <= value <= _THREE_DAY_SECS):
+  if value and not (_MIN_TIMEOUT_SECS <= value <= MAX_TIMEOUT_SECS):
     raise datastore_errors.BadValueError(
         '%s (%ds) must be 0 or between %ds and three days' %
             (prop._name, value, _MIN_TIMEOUT_SECS))

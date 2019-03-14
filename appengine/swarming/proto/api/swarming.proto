@@ -841,8 +841,14 @@ message PubSub {
 // summary (ID ending with '0'), the task went from PENDING to RUNNING and then
 // back to PENDING.
 //
-// When stored in BigQuery, the result is stored when it is done; when
-// state_category is one of CATEGORY_TRANSIENT_DONE or CATEGORY_EXECUTION_DONE.
+// When stored in BigQuery in table task_result_run and task_results_summary,
+// on-going tasks are in the __NULL__ partition since end_time is unset.
+//
+// There's a risk of duplicate rows because BigQuery is eventually consistent
+// with regards to duplicate rows. Set your filter to ignore the __NULL__
+// partition to enforce strong consistency and ignore on-going tasks. See
+// https://cloud.google.com/bigquery/streaming-data-into-bigquery#dataconsistency
+// for more information.
 message TaskResult {
   TaskRequest request = 1;
 

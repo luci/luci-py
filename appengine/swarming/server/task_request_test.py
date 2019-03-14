@@ -1414,10 +1414,10 @@ class TaskRequestApiTest(TestCase):
     with self.assertRaises(datastore_errors.BadValueError):
       _gen_request(
           properties=_gen_properties(
-              execution_timeout_secs=task_request._THREE_DAY_SECS+1))
+              execution_timeout_secs=task_request.MAX_TIMEOUT_SECS+1))
     _gen_request(
         properties=_gen_properties(
-            execution_timeout_secs=task_request._THREE_DAY_SECS)).put()
+            execution_timeout_secs=task_request.MAX_TIMEOUT_SECS)).put()
 
   def test_request_bad_expiration(self):
     now = utils.utcnow()
@@ -1442,7 +1442,7 @@ class TaskRequestApiTest(TestCase):
           created_ts=now,
           task_slices=[
             task_request.TaskSlice(
-                expiration_secs=task_request._SEVEN_DAYS_SECS+1,
+                expiration_secs=task_request.MAX_EXPIRATION_SECS+1,
                 properties=_gen_properties()),
           ])
     _gen_request_slices(
@@ -1456,7 +1456,7 @@ class TaskRequestApiTest(TestCase):
         created_ts=now,
         task_slices=[
           task_request.TaskSlice(
-              expiration_secs=task_request._SEVEN_DAYS_SECS,
+              expiration_secs=task_request.MAX_EXPIRATION_SECS,
               properties=_gen_properties()),
         ]).put()
 
