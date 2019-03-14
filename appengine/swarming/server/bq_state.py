@@ -20,10 +20,10 @@ import bqh
 
 # Oldest entity to backfill.
 #
-# This must match the BigQuery partitioned table expiration.
-# TODO(maruel): Switch back to 365+183 once quota issues are fixed.
-# https://crbug.com/939204
-_OLDEST_BACKFILL = datetime.timedelta(days=91)
+# https://cloud.google.com/bigquery/streaming-data-into-bigquery#streaming_into_partitioned_tables
+# states that the oldest row that can be streamed to a partitioned table by
+# TIMESTAMP is 1 year old. Use 364 days for safety.
+_OLDEST_BACKFILL = datetime.timedelta(days=364)
 
 
 ### Models

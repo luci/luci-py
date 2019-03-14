@@ -116,7 +116,7 @@ class BotManagementTest(test_case.TestCase):
     self.assertEqual(6, actual)
     self.assertEqual(1, bq_state.BqState.query().count())
     expected = {
-      'oldest': datetime.datetime(2019, 10, 3, 3, 4),
+      'oldest': datetime.datetime(2019, 1, 3, 3, 4),
       'recent': datetime.datetime(2020, 1, 2, 3, 2),
       'ts': now,
     }
@@ -127,9 +127,9 @@ class BotManagementTest(test_case.TestCase):
       '/internal/taskqueue/foo/2020-01-02T03:00',
       '/internal/taskqueue/foo/2020-01-02T03:01',
       # Backfilling.
-      '/internal/taskqueue/foo/2019-10-03T03:07',
-      '/internal/taskqueue/foo/2019-10-03T03:06',
-      '/internal/taskqueue/foo/2019-10-03T03:05',
+      '/internal/taskqueue/foo/2019-01-03T03:07',
+      '/internal/taskqueue/foo/2019-01-03T03:06',
+      '/internal/taskqueue/foo/2019-01-03T03:05',
     ]
     self.assertEqual(expected, urls)
 
