@@ -302,7 +302,7 @@ class TaskDimensionsHandler(webapp2.RequestHandler):
       # so we can reply that the service has had too many requests (429).
       # Using a 400-level response also prevents failures here from causing
       # unactionable alerts due to a high rate of 500s.
-      self.response.set_status(429)
+      self.response.set_status(429, 'Need to retry')
 
 
 class TaskSendPubSubMessage(webapp2.RequestHandler):

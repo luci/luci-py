@@ -18,6 +18,7 @@ import webtest
 import handlers_backend
 from components import utils
 from server import bot_management
+from server import task_queues
 from server import task_request
 from server import task_result
 
@@ -152,7 +153,7 @@ class BackendTest(test_env_handlers.AppTestBase):
     )
     # This help to keep queue.yaml and handlers_backend.py up to date.
     # Format: (<queue-name>, <base-url>, <argument>).
-    task_queues = sorted(
+    expected_task_queues = sorted(
       [
         ('cancel-task-on-bot',
           '/internal/taskqueue/important/tasks/cancel-task-on-bot', ''),
@@ -182,19 +183,28 @@ class BackendTest(test_env_handlers.AppTestBase):
           '2020-01-01T01:01'),
       ],
       key=lambda x: x[1])
-    self.assertEqual(len(task_queues), len(task_queue_urls))
+    self.assertEqual(len(expected_task_queues), len(task_queue_urls))
     for i, url in enumerate(task_queue_urls):
       self.assertTrue(
-          url.startswith(task_queues[i][1]),
-          '%s does not start with %s' % (url, task_queues[i][1]))
+          url.startswith(expected_task_queues[i][1]),
+          '%s does not start with %s' % (url, expected_task_queues[i][1]))
 
-    for _, url, arg in task_queues:
+    for _, url, arg in expected_task_queues:
       try:
         self.app.post(
             url+arg, headers={'X-AppEngine-QueueName': 'bogus name'},
             status=403)
       except Exception as e:
         self.fail('%s: %s' % (url, e))
+
+  def test_taskqueue_important_task_queues_rebuild_cache_fail(self):
+    self.set_as_admin()
+    def rebuild_task_cache(_body):
+      return False
+    self.mock(task_queues, 'rebuild_task_cache', rebuild_task_cache)
+    self.app.post(
+        '/internal/taskqueue/important/task_queues/rebuild-cache',
+        headers={'X-AppEngine-QueueName': 'rebuild-task-cache'}, status=429)
 
   def test_taskqueue_monitoring_bq_bots_events(self):
     self.set_as_admin()
