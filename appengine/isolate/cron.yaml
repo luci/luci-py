@@ -1,8 +1,8 @@
 cron:
-- description: old data cleanup
+- description: Delete old entities that have expired
   target: backend
-  url: /internal/cron/cleanup/trigger/old
-  schedule: every 9 minutes
+  url: /internal/cron/cleanup/trigger/expired
+  schedule: every 15 minutes
 
 - description: Cron job that gathers statistics
   target: backend

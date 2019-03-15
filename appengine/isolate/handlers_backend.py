@@ -159,16 +159,50 @@ def _yield_orphan_gcs_files(gs_bucket):
     yield filepath
 
 
+### Cron handlers
 
-### Restricted handlers
+
+class CronCleanupOldHandler(webapp2.RequestHandler):
+  """Triggers a taskqueue."""
+  @decorators.require_cronjob
+  def get(self):
+    # Deprecated.
+    if not utils.enqueue_task('/internal/taskqueue/cleanup/old', 'cleanup'):
+      logging.warning('Failed to trigger task')
 
 
-class InternalCleanupOldEntriesWorkerHandler(webapp2.RequestHandler):
-  """Removes the old data from the datastore.
+class CronCleanupExpiredHandler(webapp2.RequestHandler):
+  """Triggers a taskqueue."""
+  @decorators.require_cronjob
+  def get(self):
+    if not utils.enqueue_task(
+        '/internal/taskqueue/cleanup/expired',
+        'cleanup-expired'):
+      logging.warning('Failed to trigger task')
 
-  Only a task queue task can use this handler.
-  """
-  # pylint: disable=R0201
+
+class CronStatsUpdateHandler(webapp2.RequestHandler):
+  """Called every few minutes to update statistics."""
+  @decorators.require_cronjob
+  def get(self):
+    minutes = stats.cron_generate_stats()
+    if minutes is not None:
+      logging.info('Processed %d minutes', minutes)
+
+
+class CronStatsSendToBQHandler(webapp2.RequestHandler):
+  """Called every few minutes to send statistics to BigQuery."""
+  @decorators.require_cronjob
+  def get(self):
+    stats.cron_send_to_bq()
+
+
+### Task queue handlers
+
+
+class TaskCleanupOldHandler(webapp2.RequestHandler):
+  """Removes the old expired data from the datastore."""
+  # pylint: disable=no-self-use
   @decorators.silence(
       datastore_errors.InternalError,
       datastore_errors.Timeout,
@@ -176,16 +210,34 @@ class InternalCleanupOldEntriesWorkerHandler(webapp2.RequestHandler):
       runtime.DeadlineExceededError)
   @decorators.require_taskqueue('cleanup')
   def post(self):
+    # Deprecated.
     q = model.ContentEntry.query(
         model.ContentEntry.expiration_ts < utils.utcnow()
         ).iter(keys_only=True)
     total = _incremental_delete(q, model.delete_entry_and_gs_entry)
-    logging.info('Deleting %s expired entries', total)
+    logging.info('Deleted %d expired entries', total)
 
 
-class InternalObliterateWorkerHandler(webapp2.RequestHandler):
+class TaskCleanupExpiredHandler(webapp2.RequestHandler):
+  """Removes the old expired data from the datastore."""
+  # pylint: disable=no-self-use
+  @decorators.silence(
+      datastore_errors.InternalError,
+      datastore_errors.Timeout,
+      datastore_errors.TransactionFailedError,
+      runtime.DeadlineExceededError)
+  @decorators.require_taskqueue('cleanup-expired')
+  def post(self):
+    q = model.ContentEntry.query(
+        model.ContentEntry.expiration_ts < utils.utcnow()
+        ).iter(keys_only=True)
+    total = _incremental_delete(q, model.delete_entry_and_gs_entry)
+    logging.info('Deleted %d expired entries', total)
+
+
+class TaskObliterateWorkerHandler(webapp2.RequestHandler):
   """Deletes all the stuff."""
-  # pylint: disable=R0201
+  # pylint: disable=no-self-use
   @decorators.silence(
       datastore_errors.InternalError,
       datastore_errors.Timeout,
@@ -211,7 +263,7 @@ class InternalObliterateWorkerHandler(webapp2.RequestHandler):
     logging.info('Finally done!')
 
 
-class InternalCleanupTrimLostWorkerHandler(webapp2.RequestHandler):
+class TaskCleanupTrimLostWorkerHandler(webapp2.RequestHandler):
   """Removes the GS files that are not referenced anymore.
 
   It can happen for example when a ContentEntry is deleted without the file
@@ -219,7 +271,7 @@ class InternalCleanupTrimLostWorkerHandler(webapp2.RequestHandler):
 
   Only a task queue task can use this handler.
   """
-  # pylint: disable=R0201
+  # pylint: disable=no-self-use
   @decorators.silence(
       datastore_errors.InternalError,
       datastore_errors.Timeout,
@@ -239,30 +291,7 @@ class InternalCleanupTrimLostWorkerHandler(webapp2.RequestHandler):
     # to this directory.
 
 
-class InternalCleanupTriggerHandler(webapp2.RequestHandler):
-  """Triggers a taskqueue to clean up."""
-  @decorators.silence(
-      datastore_errors.InternalError,
-      datastore_errors.Timeout,
-      datastore_errors.TransactionFailedError,
-      runtime.DeadlineExceededError)
-  @decorators.require_cronjob
-  def get(self, name):
-    if name in ('obliterate', 'old', 'orphaned', 'trim_lost'):
-      url = '/internal/taskqueue/cleanup/' + name
-      # The push task queue name must be unique over a ~7 days period so use
-      # the date at second precision, there's no point in triggering each of
-      # time more than once a second anyway.
-      now = utils.utcnow().strftime('%Y-%m-%d_%I-%M-%S')
-      if utils.enqueue_task(url, 'cleanup', name=name + '_' + now):
-        self.response.out.write('Triggered %s' % url)
-      else:
-        self.abort(500, 'Failed to enqueue a cleanup task, see logs')
-    else:
-      self.abort(404, 'Unknown job')
-
-
-class InternalTagWorkerHandler(webapp2.RequestHandler):
+class TaskTagWorkerHandler(webapp2.RequestHandler):
   """Tags hot ContentEntry entities that were tested for presence.
 
   Updates .expiration_ts and .next_tag_ts in ContentEntry to note that a client
@@ -306,7 +335,7 @@ class InternalTagWorkerHandler(webapp2.RequestHandler):
       raise
 
 
-class InternalVerifyWorkerHandler(webapp2.RequestHandler):
+class TaskVerifyWorkerHandler(webapp2.RequestHandler):
   """Verify the SHA-1 matches for an object stored in Cloud Storage."""
 
   @staticmethod
@@ -420,29 +449,13 @@ class InternalVerifyWorkerHandler(webapp2.RequestHandler):
     return
 
 
-class InternalStatsUpdateHandler(webapp2.RequestHandler):
-  """Called every few minutes to update statistics."""
-  @decorators.require_cronjob
-  def get(self):
-    minutes = stats.cron_generate_stats()
-    if minutes is not None:
-      logging.info('Processed %d minutes', minutes)
-
-
-class InternalStatsSendToBQHandler(webapp2.RequestHandler):
-  """Called every few minutes to update statistics."""
-  @decorators.require_cronjob
-  def get(self):
-    stats.cron_send_to_bq()
-
-
 ### Mapreduce related handlers
 
 
-class InternalLaunchMapReduceJobWorkerHandler(webapp2.RequestHandler):
+class TaskLaunchMapReduceJobWorkerHandler(webapp2.RequestHandler):
   """Called via task queue or cron to start a map reduce job."""
   @decorators.require_taskqueue(mapreduce_jobs.MAPREDUCE_TASK_QUEUE)
-  def post(self, job_id):  # pylint: disable=R0201
+  def post(self, job_id):  # pylint: disable=no-self-use
     mapreduce_jobs.launch_job(job_id)
 
 
@@ -460,40 +473,46 @@ def get_routes():
   namespace_key = namespace + hashkey
 
   return [
-    # Triggers a taskqueue.
+    # Cron jobs.
     webapp2.Route(
-        r'/internal/cron/cleanup/trigger/<name:[a-z_]+>',
-        InternalCleanupTriggerHandler),
+        r'/internal/cron/cleanup/trigger/old',  # Deprecated
+        CronCleanupOldHandler),
+    webapp2.Route(
+        r'/internal/cron/cleanup/trigger/expired',
+        CronCleanupExpiredHandler),
 
     # Cleanup tasks.
     webapp2.Route(
-        r'/internal/taskqueue/cleanup/old',
-        InternalCleanupOldEntriesWorkerHandler),
+        r'/internal/taskqueue/cleanup/old',  # Deprecated
+        TaskCleanupOldHandler),
+    webapp2.Route(
+        r'/internal/taskqueue/cleanup/expired',
+        TaskCleanupExpiredHandler),
     webapp2.Route(
         r'/internal/taskqueue/cleanup/obliterate',
-        InternalObliterateWorkerHandler),
+        TaskObliterateWorkerHandler),
     webapp2.Route(
         r'/internal/taskqueue/cleanup/trim_lost',
-        InternalCleanupTrimLostWorkerHandler),
+        TaskCleanupTrimLostWorkerHandler),
 
     # Tasks triggered by other request handlers.
     webapp2.Route(
         r'/internal/taskqueue/tag%s/<timestamp:\d+>' % namespace,
-        InternalTagWorkerHandler),
+        TaskTagWorkerHandler),
     webapp2.Route(
         r'/internal/taskqueue/verify%s' % namespace_key,
-        InternalVerifyWorkerHandler),
+        TaskVerifyWorkerHandler),
 
     # Stats
     webapp2.Route(
-        r'/internal/cron/stats/update', InternalStatsUpdateHandler),
+        r'/internal/cron/stats/update', CronStatsUpdateHandler),
     webapp2.Route(
-        r'/internal/cron/stats/send_to_bq', InternalStatsSendToBQHandler),
+        r'/internal/cron/stats/send_to_bq', CronStatsSendToBQHandler),
 
     # Mapreduce related urls.
     webapp2.Route(
         r'/internal/taskqueue/mapreduce/launch/<job_id:[^\/]+>',
-        InternalLaunchMapReduceJobWorkerHandler),
+        TaskLaunchMapReduceJobWorkerHandler),
   ]
 
 

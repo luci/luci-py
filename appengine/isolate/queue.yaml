@@ -1,9 +1,19 @@
 queue:
+# Deprecated
 - name: cleanup
   rate: 2/m
   retry_parameters:
-    task_age_limit: 1d
+    # Do not retry these, they are triggered by a cron job.
+    task_retry_limit: 0
 
+# Delete old entities that have expired.
+- name: cleanup-expired
+  rate: 1/s
+  retry_parameters:
+    # Do not retry these, they are triggered by a cron job.
+    task_retry_limit: 0
+
+# Tag entities after a preupload to update their expiration.
 - name: tag
   bucket_size: 100
   max_concurrent_requests: 10000
@@ -11,6 +21,7 @@ queue:
   retry_parameters:
     task_age_limit: 1d
 
+# Verify uploaded content to ensure the hash matches.
 - name: verify
   bucket_size: 100
   max_concurrent_requests: 10000
