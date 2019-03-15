@@ -162,15 +162,6 @@ def _yield_orphan_gcs_files(gs_bucket):
 ### Cron handlers
 
 
-class CronCleanupOldHandler(webapp2.RequestHandler):
-  """Triggers a taskqueue."""
-  @decorators.require_cronjob
-  def get(self):
-    # Deprecated.
-    if not utils.enqueue_task('/internal/taskqueue/cleanup/old', 'cleanup'):
-      logging.warning('Failed to trigger task')
-
-
 class CronCleanupExpiredHandler(webapp2.RequestHandler):
   """Triggers a taskqueue."""
   @decorators.require_cronjob
@@ -200,24 +191,6 @@ class CronStatsSendToBQHandler(webapp2.RequestHandler):
 ### Task queue handlers
 
 
-class TaskCleanupOldHandler(webapp2.RequestHandler):
-  """Removes the old expired data from the datastore."""
-  # pylint: disable=no-self-use
-  @decorators.silence(
-      datastore_errors.InternalError,
-      datastore_errors.Timeout,
-      datastore_errors.TransactionFailedError,
-      runtime.DeadlineExceededError)
-  @decorators.require_taskqueue('cleanup')
-  def post(self):
-    # Deprecated.
-    q = model.ContentEntry.query(
-        model.ContentEntry.expiration_ts < utils.utcnow()
-        ).iter(keys_only=True)
-    total = _incremental_delete(q, model.delete_entry_and_gs_entry)
-    logging.info('Deleted %d expired entries', total)
-
-
 class TaskCleanupExpiredHandler(webapp2.RequestHandler):
   """Removes the old expired data from the datastore."""
   # pylint: disable=no-self-use
@@ -233,34 +206,6 @@ class TaskCleanupExpiredHandler(webapp2.RequestHandler):
         ).iter(keys_only=True)
     total = _incremental_delete(q, model.delete_entry_and_gs_entry)
     logging.info('Deleted %d expired entries', total)
-
-
-class TaskObliterateWorkerHandler(webapp2.RequestHandler):
-  """Deletes all the stuff."""
-  # pylint: disable=no-self-use
-  @decorators.silence(
-      datastore_errors.InternalError,
-      datastore_errors.Timeout,
-      datastore_errors.TransactionFailedError,
-      runtime.DeadlineExceededError)
-  @decorators.require_taskqueue('cleanup')
-  def post(self):
-    logging.info('Deleting ContentEntry')
-    _incremental_delete(
-        model.ContentEntry.query().iter(keys_only=True),
-        ndb.delete_multi_async)
-
-    gs_bucket = config.settings().gs_bucket
-    logging.info('Deleting GS bucket %s', gs_bucket)
-    _incremental_delete(
-        (i[0] for i in gcs.list_files(gs_bucket)),
-        lambda filenames: gcs.delete_files(gs_bucket, filenames))
-
-    logging.info('Flushing memcache')
-    # High priority (.isolated files) are cached explicitly. Make sure ghosts
-    # are zapped too.
-    memcache.flush_all()
-    logging.info('Finally done!')
 
 
 class TaskCleanupTrimLostWorkerHandler(webapp2.RequestHandler):
@@ -475,22 +420,13 @@ def get_routes():
   return [
     # Cron jobs.
     webapp2.Route(
-        r'/internal/cron/cleanup/trigger/old',  # Deprecated
-        CronCleanupOldHandler),
-    webapp2.Route(
         r'/internal/cron/cleanup/trigger/expired',
         CronCleanupExpiredHandler),
 
     # Cleanup tasks.
     webapp2.Route(
-        r'/internal/taskqueue/cleanup/old',  # Deprecated
-        TaskCleanupOldHandler),
-    webapp2.Route(
         r'/internal/taskqueue/cleanup/expired',
         TaskCleanupExpiredHandler),
-    webapp2.Route(
-        r'/internal/taskqueue/cleanup/obliterate',
-        TaskObliterateWorkerHandler),
     webapp2.Route(
         r'/internal/taskqueue/cleanup/trim_lost',
         TaskCleanupTrimLostWorkerHandler),
