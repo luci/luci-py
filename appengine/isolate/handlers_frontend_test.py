@@ -27,7 +27,6 @@ from test_support import test_case
 
 import config
 import gcs
-import handlers_backend
 import handlers_frontend
 import model
 
@@ -44,22 +43,10 @@ class MainTest(test_case.TestCase):
     super(MainTest, self).setUp()
     self.testbed.init_user_stub()
 
-    # When called during a taskqueue, the call to get_app_version() may fail so
-    # pre-fetch it.
-    version = utils.get_app_version()
-    self.mock(utils, 'get_task_queue_host', lambda: version)
     self.source_ip = '192.168.0.1'
-    self.app_frontend = webtest.TestApp(
+    self.app = webtest.TestApp(
         handlers_frontend.create_application(debug=True),
         extra_environ={'REMOTE_ADDR': self.source_ip})
-    # This is awkward but both the frontend and backend applications uses the
-    # same template variables.
-    template.reset()
-    self.app_backend = webtest.TestApp(
-        handlers_backend.create_application(debug=True),
-        extra_environ={'REMOTE_ADDR': self.source_ip})
-    # Tasks are enqueued on the backend.
-    self.app = self.app_backend
 
     self.auth_app = webtest.TestApp(
         auth.create_wsgi_application(debug=True),
@@ -80,8 +67,6 @@ class MainTest(test_case.TestCase):
     auth.bootstrap_group(
         full_access_group,
         [auth.Identity(auth.IDENTITY_USER, 'writer@example.com')])
-    # TODO(maruel): Create a BOTS_GROUP.
-
     self.set_as_anonymous()
 
   def tearDown(self):
@@ -123,36 +108,32 @@ class MainTest(test_case.TestCase):
 
   def test_root(self):
     # Just asserts it doesn't crash.
-    self.app_frontend.get('/')
+    self.app.get('/')
 
   def test_browse(self):
     self.set_as_reader()
     hashhex = self.gen_content_inline()
-    self.app_frontend.get('/browse?namespace=default&digest=%s' % hashhex)
-    self.app_frontend.get(
-      '/browse?namespace=default&digest=%s&as=file1.txt' % hashhex)
+    self.app.get('/browse?namespace=default&digest=%s' % hashhex)
+    self.app.get('/browse?namespace=default&digest=%s&as=file1.txt' % hashhex)
 
   def test_browse_isolated(self):
     self.set_as_reader()
     content = json.dumps({'algo': 'sha1', 'includes': ['hash1']})
     hashhex = self.gen_content_inline(content=content, is_isolated=True)
-    self.app_frontend.get('/browse?namespace=default&digest=%s' % hashhex)
-    self.app_frontend.get(
-      '/browse?namespace=default&digest=%s&as=file1.txt' % hashhex)
+    self.app.get('/browse?namespace=default&digest=%s' % hashhex)
+    self.app.get('/browse?namespace=default&digest=%s&as=file1.txt' % hashhex)
 
   def test_browse_missing(self):
     self.set_as_reader()
     hashhex = '0123456780123456780123456789990123456789'
-    self.app_frontend.get(
-      '/browse?namespace=default&digest=%s' % hashhex, status=404)
+    self.app.get('/browse?namespace=default&digest=%s' % hashhex, status=404)
 
   def test_content(self):
     self.set_as_reader()
     hashhex = self.gen_content_inline(content='Foo')
-    resp = self.app_frontend.get(
-        '/content?namespace=default&digest=%s' % hashhex)
+    resp = self.app.get('/content?namespace=default&digest=%s' % hashhex)
     self.assertEqual('Foo', resp.body)
-    resp = self.app_frontend.get(
+    resp = self.app.get(
         '/content?namespace=default&digest=%s&as=file1.txt' % hashhex)
     self.assertEqual('Foo', resp.body)
 
@@ -160,8 +141,7 @@ class MainTest(test_case.TestCase):
     self.set_as_reader()
     content = json.dumps({'algo': 'sha1', 'includes': ['hash1']})
     hashhex = self.gen_content_inline(content=content, is_isolated=True)
-    resp = self.app_frontend.get(
-        '/content?namespace=default&digest=%s' % hashhex)
+    resp = self.app.get('/content?namespace=default&digest=%s' % hashhex)
     self.assertTrue(resp.body.startswith('<style>'), resp.body)
 
   def test_content_gcs(self):
@@ -185,11 +165,10 @@ class MainTest(test_case.TestCase):
         is_verified=True).put()
 
     self.set_as_reader()
-    resp = self.app_frontend.get(
-        '/content?namespace=default-gzip&digest=%s' % hashhex)
+    resp = self.app.get('/content?namespace=default-gzip&digest=%s' % hashhex)
     self.assertEqual(content, resp.body)
-    resp = self.app_frontend.get(
-      '/content?namespace=default-gzip&digest=%s&as=file1.txt' % hashhex)
+    resp = self.app.get(
+        '/content?namespace=default-gzip&digest=%s&as=file1.txt' % hashhex)
     self.assertEqual(content, resp.body)
     self.assertNotEqual(None, key.get())
 
@@ -214,13 +193,13 @@ class MainTest(test_case.TestCase):
         is_verified=True).put()
 
     self.set_as_reader()
-    self.app_frontend.get(
+    self.app.get(
         '/content?namespace=default-gzip&digest=%s' % hashhex, status=404)
     self.assertEqual(None, key.get())
 
   def test_config(self):
     self.set_as_admin()
-    resp = self.app_frontend.get('/restricted/config')
+    resp = self.app.get('/restricted/config')
     # TODO(maruel): Use beautifulsoup?
     priv_key = 'test private key'
     params = {
@@ -229,13 +208,13 @@ class MainTest(test_case.TestCase):
       'xsrf_token': self.get_xsrf_token(),
     }
     self.assertEqual('', config.settings().gs_private_key)
-    resp = self.app_frontend.post('/restricted/config', params)
+    resp = self.app.post('/restricted/config', params)
     self.assertNotIn('Update conflict', resp)
     self.assertEqual(priv_key, config.settings().gs_private_key)
 
   def test_config_conflict(self):
     self.set_as_admin()
-    resp = self.app_frontend.get('/restricted/config')
+    resp = self.app.get('/restricted/config')
     # TODO(maruel): Use beautifulsoup?
     params = {
       'google_analytics': 'foobar',
@@ -244,7 +223,7 @@ class MainTest(test_case.TestCase):
       'xsrf_token': self.get_xsrf_token(),
     }
     self.assertEqual('', config.settings().google_analytics)
-    resp = self.app_frontend.post('/restricted/config', params)
+    resp = self.app.post('/restricted/config', params)
     self.assertIn('Update conflict', resp)
     self.assertEqual('', config.settings().google_analytics)
 

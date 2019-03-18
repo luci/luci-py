@@ -19,7 +19,6 @@ from google.appengine.api import memcache
 from google.appengine.api import taskqueue
 
 from protorpc.remote import protojson
-import webapp2
 import webtest
 
 from components import auth
@@ -27,7 +26,6 @@ from components import auth_testing
 from components import utils
 from test_support import test_case
 
-import acl
 import config
 import gcs
 import handlers_backend
@@ -46,6 +44,11 @@ def hash_content(namespace, content):
   d = model.get_hash(namespace)
   d.update(content)
   return d.hexdigest()
+
+
+def message_to_dict(message):
+  """Returns a JSON-ish dictionary corresponding to the RPC message."""
+  return json.loads(protojson.encode_message(message))
 
 
 def generate_digest(namespace, content):
@@ -132,23 +135,17 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
     # It is needed solely for self.execute_tasks(), which processes tasks queues
     # on the backend application.
     self.app = webtest.TestApp(
-        webapp2.WSGIApplication(handlers_backend.get_routes(), debug=True),
+        handlers_backend.create_application(debug=True),
         extra_environ={'REMOTE_ADDR': self.source_ip})
     # add a private key; signing depends on config.settings()
     make_private_key()
     # Remove the check for dev server in should_push_to_gs().
     self.mock(utils, 'is_local_dev_server', lambda: False)
 
-  @staticmethod
-  def message_to_dict(message):
-    """Returns a JSON-ish dictionary corresponding to the RPC message."""
-    return json.loads(protojson.encode_message(message))
-
   def store_request(self, namespace, content):
     """Generate a Storage/FinalizeRequest via preupload status."""
     collection = generate_collection(namespace, [content])
-    response = self.call_api(
-        'preupload', self.message_to_dict(collection), 200)
+    response = self.call_api('preupload', message_to_dict(collection), 200)
     message = response.json.get(u'items', [{}])[0]
     return preupload_status_to_request(message, content)
 
@@ -165,8 +162,7 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
     namespace = 'default-gzip'
     good_digests = generate_collection(namespace, ['a pony'])
     self.assertEqual(good_digests.namespace.namespace, namespace)
-    response = self.call_api(
-        'preupload', self.message_to_dict(good_digests), 200)
+    response = self.call_api('preupload', message_to_dict(good_digests), 200)
     message = response.json.get(u'items', [{}])[0]
     self.assertEqual('', message.get(u'gs_upload_url', ''))
     expected = validate(
@@ -179,7 +175,7 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
     """Assert that a finalize_url is generated when should_push_to_gs."""
     namespace = 'default-gzip'
     digests = generate_collection(namespace, [pad_string('duckling')])
-    response = self.call_api('preupload', self.message_to_dict(digests), 200)
+    response = self.call_api('preupload', message_to_dict(digests), 200)
     message = response.json.get(u'items', [{}])[0]
     self.assertTrue(message.get(u'gs_upload_url', '').startswith(
         self.store_prefix))
@@ -197,7 +193,7 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
     bad_collection.items.append(
         handlers_endpoints_v1.Digest(digest=bad_digest, size=10))
     with self.call_should_fail('400'):
-      self.call_api('preupload', self.message_to_dict(bad_collection), 200)
+      self.call_api('preupload', message_to_dict(bad_collection), 200)
 
   def test_pre_upload_invalid_namespace(self):
     """Assert that status 400 is returned when the namespace is invalid."""
@@ -206,7 +202,7 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
     bad_collection.items.append(
         generate_digest(bad_collection.namespace.namespace, 'pangolin'))
     with self.call_should_fail('400'):
-      self.call_api('preupload', self.message_to_dict(bad_collection), 200)
+      self.call_api('preupload', message_to_dict(bad_collection), 200)
 
   def test_check_existing_finds_existing_entities(self):
     """Assert that existence check is working."""
@@ -218,8 +214,7 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
 
     # guarantee that one digest already exists in the datastore
     model.new_content_entry(key).put()
-    response = self.call_api(
-        'preupload', self.message_to_dict(collection), 200)
+    response = self.call_api('preupload', message_to_dict(collection), 200)
 
     # we should see one enqueued task and two new URLs in the response
     items = response.json['items']
@@ -242,7 +237,7 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
 
     # guarantee that one digest already exists in the datastore
     model.new_content_entry(key).put()
-    self.call_api('preupload', self.message_to_dict(collection), 200)
+    self.call_api('preupload', message_to_dict(collection), 200)
 
     # find enqueued tasks
     self.assertEqual(1, self.execute_tasks())
@@ -256,7 +251,7 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
     key = model.get_entry_key(embedded['n'], embedded['d'])
 
     # assert that store_inline puts the correct entity into the datastore
-    self.call_api('store_inline', self.message_to_dict(request), 200)
+    self.call_api('store_inline', message_to_dict(request), 200)
     stored = key.get()
     self.assertEqual(key, stored.key)
 
@@ -275,7 +270,7 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
     key = model.get_entry_key(embedded['n'], embedded['d'])
 
     # assert that store_inline puts the correct entity into the datastore
-    self.call_api('store_inline', self.message_to_dict(request), 200)
+    self.call_api('store_inline', message_to_dict(request), 200)
     stored = key.get()
     self.assertEqual(key, stored.key)
 
@@ -291,7 +286,7 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
     request = self.store_request(namespace, 'sonority')
     request.upload_ticket += '7'
     with self.call_should_fail('400'):
-      self.call_api('store_inline', self.message_to_dict(request), 200)
+      self.call_api('store_inline', message_to_dict(request), 200)
 
   def test_store_inline_no_upload_ticket(self):
     """Assert that inline content storage fails when there is no ticket."""
@@ -299,7 +294,7 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
     request = self.store_request(namespace, 'silence')
     request.upload_ticket = None
     with self.call_should_fail('400'):
-      self.call_api('store_inline', self.message_to_dict(request), 200)
+      self.call_api('store_inline', message_to_dict(request), 200)
 
   def test_store_inline_bad_digest(self):
     """Assert that inline content storage fails when data do not match."""
@@ -307,7 +302,7 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
     request = self.store_request(namespace, 'anseres sacri')
     request.content = ':)' + request.content[2:]
     with self.call_should_fail('400'):
-      self.call_api('store_inline', self.message_to_dict(request), 200)
+      self.call_api('store_inline', message_to_dict(request), 200)
 
   def test_finalized_data_in_gs(self):
     """Assert that data are actually in GS when finalized."""
@@ -318,12 +313,12 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
 
     # this should succeed
     self.mock(gcs, 'get_file_info', get_file_info_factory(content))
-    self.call_api('finalize_gs_upload', self.message_to_dict(request), 200)
+    self.call_api('finalize_gs_upload', message_to_dict(request), 200)
 
     # this should fail
     self.mock(gcs, 'get_file_info', get_file_info_factory())
     with self.call_should_fail('400'):
-      self.call_api('finalize_gs_upload', self.message_to_dict(request), 200)
+      self.call_api('finalize_gs_upload', message_to_dict(request), 200)
     self.assertEqual(1, self.execute_tasks())
 
   def test_finalized_no_upload_ticket(self):
@@ -332,7 +327,7 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
     request = self.store_request(namespace, pad_string('silence'))
     request.upload_ticket = None
     with self.call_should_fail('400'):
-      self.call_api('finalize_gs_upload', self.message_to_dict(request), 200)
+      self.call_api('finalize_gs_upload', message_to_dict(request), 200)
 
   def test_finalize_gs_creates_content_entry(self):
     """Assert that finalize_gs_upload creates a content entry."""
@@ -345,7 +340,7 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
 
     # finalize_gs_upload should put a new ContentEntry into the database
     self.mock(gcs, 'get_file_info', get_file_info_factory(content))
-    self.call_api('finalize_gs_upload', self.message_to_dict(request), 200)
+    self.call_api('finalize_gs_upload', message_to_dict(request), 200)
     stored = key.get()
     self.assertEqual(key, stored.key)
 
@@ -382,12 +377,11 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
     # try the large entity
     self.mock(gcs, 'get_file_info', get_file_info_factory(large))
     with self.call_should_fail('400'):
-      self.call_api(
-          'finalize_gs_upload', self.message_to_dict(small_request), 200)
+      self.call_api('finalize_gs_upload', message_to_dict(small_request), 200)
 
     # try the inline stored entity
     with self.call_should_fail('400'):
-      self.call_api('store_inline', self.message_to_dict(large_request), 200)
+      self.call_api('store_inline', message_to_dict(large_request), 200)
 
   def test_storage_server_error(self):
     """Assert that GS storage raises appropriate error when storage fails."""
@@ -404,7 +398,7 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
 
     # should raise InternalServerErrorException
     with self.call_should_fail('500'):
-      self.call_api('finalize_gs_upload', self.message_to_dict(request), 200)
+      self.call_api('finalize_gs_upload', message_to_dict(request), 200)
 
   def test_retrieve_memcache_ok(self):
     """Assert that content retrieval goes off swimmingly in the normal case."""
@@ -413,11 +407,10 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
     request = self.store_request(namespace, content)
     embedded = validate(
         request.upload_ticket, handlers_endpoints_v1.UPLOAD_MESSAGES[0])
-    self.call_api('store_inline', self.message_to_dict(request), 200)
+    self.call_api('store_inline', message_to_dict(request), 200)
     retrieve_request = handlers_endpoints_v1.RetrieveRequest(
         digest=embedded['d'], namespace=handlers_endpoints_v1.Namespace())
-    response = self.call_api(
-        'retrieve', self.message_to_dict(retrieve_request), 200)
+    response = self.call_api('retrieve', message_to_dict(retrieve_request), 200)
     retrieved = response.json
     self.assertEqual(content, base64.b64decode(retrieved[u'content']))
 
@@ -428,12 +421,11 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
     request = self.store_request(namespace, content)
     embedded = validate(
         request.upload_ticket, handlers_endpoints_v1.UPLOAD_MESSAGES[0])
-    self.call_api('store_inline', self.message_to_dict(request), 200)
+    self.call_api('store_inline', message_to_dict(request), 200)
     retrieve_request = handlers_endpoints_v1.RetrieveRequest(
         digest=embedded['d'], namespace=handlers_endpoints_v1.Namespace())
     memcache.flush_all()
-    response = self.call_api(
-        'retrieve', self.message_to_dict(retrieve_request), 200)
+    response = self.call_api('retrieve', message_to_dict(retrieve_request), 200)
     retrieved = response.json
     self.assertEqual(content, base64.b64decode(retrieved[u'content']))
 
@@ -445,7 +437,7 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
     namespace = 'default'
     collection = generate_collection(namespace, [content])
     preupload_status = self.call_api(
-        'preupload', self.message_to_dict(collection), 200)
+        'preupload', message_to_dict(collection), 200)
     message = preupload_status.json.get(u'items', [{}])[0]
 
     # finalize GS upload
@@ -453,13 +445,13 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
     embedded = validate(
         request.upload_ticket, handlers_endpoints_v1.UPLOAD_MESSAGES[1])
     self.mock(gcs, 'get_file_info', get_file_info_factory(content))
-    self.call_api('finalize_gs_upload', self.message_to_dict(request), 200)
+    self.call_api('finalize_gs_upload', message_to_dict(request), 200)
 
     # retrieve the upload URL
     retrieve_request = handlers_endpoints_v1.RetrieveRequest(
         digest=embedded['d'], namespace=handlers_endpoints_v1.Namespace())
     retrieved_response = self.call_api(
-        'retrieve', self.message_to_dict(retrieve_request), 200)
+        'retrieve', message_to_dict(retrieve_request), 200)
     retrieved = retrieved_response.json
     self.assertNotEqual(message.get(u'gs_upload_url', ''), '')
     self.assertNotEqual(retrieved.get(u'url', ''), '')
@@ -476,13 +468,12 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
     request = self.store_request(namespace, content)
     embedded = validate(
         request.upload_ticket, handlers_endpoints_v1.UPLOAD_MESSAGES[0])
-    self.call_api('store_inline', self.message_to_dict(request), 200)
+    self.call_api('store_inline', message_to_dict(request), 200)
     retrieve_request = handlers_endpoints_v1.RetrieveRequest(
         digest=embedded['d'],
         namespace=handlers_endpoints_v1.Namespace(),
         offset=offset)  # TODO(cmassaro): determine where offsets come from
-    response = self.call_api(
-        'retrieve', self.message_to_dict(retrieve_request), 200)
+    response = self.call_api('retrieve', message_to_dict(retrieve_request), 200)
     retrieved = response.json
     self.assertEqual(content[offset:], base64.b64decode(retrieved[u'content']))
 
@@ -493,14 +484,14 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
     request = self.store_request(namespace, content)
     embedded = validate(
         request.upload_ticket, handlers_endpoints_v1.UPLOAD_MESSAGES[0])
-    self.call_api('store_inline', self.message_to_dict(request), 200)
+    self.call_api('store_inline', message_to_dict(request), 200)
     requests = [handlers_endpoints_v1.RetrieveRequest(
         digest=embedded['d'],
         namespace=handlers_endpoints_v1.Namespace(),
         offset=offset) for offset in [-1, len(content) + 1]]
     for request in requests:
       with self.call_should_fail('400'):
-        self.call_api('retrieve', self.message_to_dict(request), 200)
+        self.call_api('retrieve', message_to_dict(request), 200)
 
   def test_retrieve_not_found(self):
     """Assert that HTTP 404 response is served when content is absent."""
@@ -512,7 +503,7 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
     namespace = 'default'
     collection = generate_collection(namespace, [content])
     preupload_status = self.call_api(
-        'preupload', self.message_to_dict(collection), 200)
+        'preupload', message_to_dict(collection), 200)
     message = preupload_status.json.get(u'items', [{}])[0]
 
     # get the digest
@@ -524,7 +515,7 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
     retrieve_request = handlers_endpoints_v1.RetrieveRequest(
         digest=embedded['d'], namespace=handlers_endpoints_v1.Namespace())
     with self.call_should_fail('404'):
-      self.call_api('retrieve', self.message_to_dict(retrieve_request), 200)
+      self.call_api('retrieve', message_to_dict(retrieve_request), 200)
 
   def test_server_details_ok(self):
     """Assert that server_details returns the correct version."""
@@ -554,20 +545,20 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
 
     # Lookup
     collection = generate_collection(namespace, [content])
-    res = self.call_api('preupload', self.message_to_dict(collection), 200)
+    res = self.call_api('preupload', message_to_dict(collection), 200)
     message = res.json.get(u'items', [{}])[0]
     self.assertNotIn('gs_upload_url', message)
 
     # Upload
     request = handlers_endpoints_v1.StorageRequest(
         upload_ticket=message['upload_ticket'], content=data)
-    self.call_api('store_inline', self.message_to_dict(request), 200)
+    self.call_api('store_inline', message_to_dict(request), 200)
 
     # Download
     request = handlers_endpoints_v1.RetrieveRequest(
         digest=algo(content).hexdigest(),
         namespace=handlers_endpoints_v1.Namespace(namespace=namespace))
-    resp = self.call_api('retrieve', self.message_to_dict(request), 200)
+    resp = self.call_api('retrieve', message_to_dict(request), 200)
     actual = base64.b64decode(resp.json['content'])
     # It always returns the data as-is but base64 encoded.
     self.assertEqual(actual, data)
@@ -583,7 +574,7 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
 
     # Lookup
     collection = generate_collection(namespace, [content])
-    res = self.call_api('preupload', self.message_to_dict(collection), 200)
+    res = self.call_api('preupload', message_to_dict(collection), 200)
     message = res.json.get(u'items', [{}])[0]
 
     # Upload
@@ -592,7 +583,7 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
     self.mock(gcs, 'read_file', lambda _bucket, _key: data)
     request = handlers_endpoints_v1.FinalizeRequest(
         upload_ticket=message['upload_ticket'])
-    self.call_api('finalize_gs_upload', self.message_to_dict(request), 200)
+    self.call_api('finalize_gs_upload', message_to_dict(request), 200)
     self.assertEqual(1, self.execute_tasks())
 
     # Download
@@ -601,7 +592,7 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
         digest=digest,
         namespace=handlers_endpoints_v1.Namespace(namespace=namespace))
 
-    resp = self.call_api('retrieve', self.message_to_dict(request), 200)
+    resp = self.call_api('retrieve', message_to_dict(request), 200)
     prefix = (
         'https://storage.googleapis.com/sample-app/%s/%s?GoogleAccessId=&'
         'Expires=') % (namespace, digest)
