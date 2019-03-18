@@ -222,7 +222,7 @@ class TaskCleanupTrimLostWorkerHandler(webapp2.RequestHandler):
       datastore_errors.Timeout,
       datastore_errors.TransactionFailedError,
       runtime.DeadlineExceededError)
-  @decorators.require_taskqueue('cleanup')
+  @decorators.require_taskqueue('cleanup-orphan')
   def post(self):
     """Enumerates all GS files and delete those that do not have an associated
     ContentEntry.
