@@ -655,13 +655,13 @@ class SwarmingTasksService(remote.Service):
           'You must specify tags when cancelling multiple tasks.')
 
     now = utils.utcnow()
-    # Disable the in-process local cache. This is important, as there can be up
-    # to a thousand entities loaded in memory, and this is a pure memory leak,
-    # as there's no chance this specific instance will need these again,
-    # therefore this leads to 'Exceeded soft memory limit' AppEngine errors.
-    q = task_result.TaskResultSummary.query(
-        task_result.TaskResultSummary.state == task_result.State.PENDING,
-        default_options=ndb.QueryOptions(use_cache=False))
+    cond = task_result.TaskResultSummary.state == task_result.State.PENDING
+    if request.kill_running:
+      cond = ndb.OR(
+          cond,
+          task_result.TaskResultSummary.state == task_result.State.RUNNING)
+    q = task_result.TaskResultSummary.query(cond).order(
+        task_result.TaskResultSummary.key)
     for tag in request.tags:
       q = q.filter(task_result.TaskResultSummary.tags == tag)
 

@@ -985,22 +985,42 @@ class TasksApiTest(BaseTest):
     response = self.call_api('new', body=message_to_dict(request), status=200)
     self.assertEqual(u'5cee488008810', response.json[u'task_id'])
 
-  def test_mass_cancel(self):
-    # Create two tasks.
+  def _prepare_mass_cancel(self):
+    # Create 3 tasks: one pending, one running, one complete.
     self.mock(random, 'getrandbits', lambda _: 0x88)
     self.set_as_bot()
     self.do_handshake()
-    self.set_as_user()
-    first, second, _, _, now_120 = self._gen_three_pending_tasks()
 
-    expected = {
-      u'matched': u'2',
-      u'now': fmtdate(now_120),
-    }
-    self.set_as_admin()
+    # Completed.
+    self.set_as_user()
+    _, _ = self.client_create_task_raw(
+        name='first', tags=['project:yay', 'commit:abcd', 'os:Win'])
+    self.set_as_bot()
+    self.bot_run_task()
+
+    # Running.
+    self.set_as_user()
+    self.mock_now(self.now, 60)
+    _, running_id = self.client_create_task_raw(
+        name='second', user='jack@localhost',
+        tags=['project:yay', 'commit:efgh', 'os:Win'])
+    self.set_as_bot()
+    self.bot_poll()
+
+    # Pending.
+    self.set_as_user()
+    now_120 = self.mock_now(self.now, 120)
+    _, pending_id = self.client_create_task_raw(
+        name='third', user='jack@localhost',
+        tags=['project:yay', 'commit:ijkhl', 'os:Linux'])
+
+    return running_id, pending_id, now_120
+
+  def test_mass_cancel_pending(self):
+    _, pending_id, now_120 = self._prepare_mass_cancel()
 
     def enqueue_task(*args, **kwargs):
-      e = {'tasks': [second, first], 'kill_running': False}
+      e = {'tasks': [pending_id], 'kill_running': False}
       self.assertEqual(e, json.loads(kwargs.get('payload')))
       # check URL
       self.assertEqual('/internal/taskqueue/important/tasks/cancel', args[0])
@@ -1009,7 +1029,34 @@ class TasksApiTest(BaseTest):
       return True
     self.mock(utils, 'enqueue_task', enqueue_task)
 
-    response = self.call_api('cancel', body={u'tags': [u'os:Win']})
+    self.set_as_admin()
+    response = self.call_api('cancel', body={u'tags': [u'project:yay']})
+    expected = {
+      u'matched': u'1',
+      u'now': fmtdate(now_120),
+    }
+    self.assertEqual(expected, response.json)
+
+  def test_mass_cancel_running(self):
+    running_id, pending_id, now_120 = self._prepare_mass_cancel()
+
+    def enqueue_task(*args, **kwargs):
+      e = {'tasks': [pending_id, running_id], 'kill_running': True}
+      self.assertEqual(e, json.loads(kwargs.get('payload')))
+      # check URL
+      self.assertEqual('/internal/taskqueue/important/tasks/cancel', args[0])
+      # check task queue
+      self.assertEqual('cancel-tasks', args[1])
+      return True
+    self.mock(utils, 'enqueue_task', enqueue_task)
+
+    self.set_as_admin()
+    response = self.call_api(
+        'cancel', body={u'tags': [u'project:yay'], 'kill_running': True})
+    expected = {
+      u'matched': u'2',
+      u'now': fmtdate(now_120),
+    }
     self.assertEqual(expected, response.json)
 
   def test_list_ok(self):
@@ -1304,34 +1351,6 @@ class TasksApiTest(BaseTest):
         1000000.)
     self.set_as_privileged_user()
     return first, deduped, now_120, start, end
-
-  def _gen_three_pending_tasks(self):
-    # Creates three pending tasks, spaced 1 minute apart
-    self.mock(random, 'getrandbits', lambda _: 0x66)
-    _, first_id = self.client_create_task_raw(
-        name='first', tags=['project:yay', 'commit:abcd', 'os:Win'],
-        pubsub_topic='projects/abc/topics/def',
-        pubsub_userdata='1234',
-        properties=dict(idempotent=True))
-
-    now_60 = self.mock_now(self.now, 60)
-    self.mock(random, 'getrandbits', lambda _: 0x88)
-    _, second_id = self.client_create_task_raw(
-        name='second', user='jack@localhost',
-        pubsub_topic='projects/abc/topics/def',
-        pubsub_userdata='5678',
-        tags=['project:yay', 'commit:efgh', 'os:Win'],
-        properties=dict(idempotent=True))
-
-    now_120 = self.mock_now(self.now, 120)
-    _, third_id = self.client_create_task_raw(
-        name='third', user='jack@localhost',
-        pubsub_topic='projects/abc/topics/def',
-        pubsub_userdata='9000',
-        tags=['project:yay', 'commit:ijkhl', 'os:Linux'],
-        properties=dict(idempotent=True))
-
-    return first_id, second_id, third_id, now_60, now_120
 
 
 class TaskApiTest(BaseTest):
