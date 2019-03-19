@@ -46,7 +46,7 @@ def shard_key(key, number_of_letters, root_entity_type):
         ndb.Model class or just a string.
   """
   assert _HEX.issuperset(key), key
-  assert isinstance(key, str) and len(key) >= number_of_letters, key
+  assert isinstance(key, str) and len(key) >= number_of_letters, repr(key)
   # number_of_letters==10 means 1099511627776 shards, which is unreasonable.
   assert 1 <= number_of_letters < 10, number_of_letters
   assert isinstance(root_entity_type, (ndb.Model, str)) and root_entity_type, (

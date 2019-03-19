@@ -5,6 +5,7 @@
 """This module defines Isolate Server backend url handlers."""
 
 import binascii
+import json
 import logging
 import time
 import zlib
@@ -23,10 +24,6 @@ import stats
 import template
 from components import decorators
 from components import utils
-
-
-# The maximum number of items to delete at a time.
-ITEMS_TO_DELETE_ASYNC = 100
 
 
 ### Utility
@@ -78,46 +75,78 @@ def _payload_to_hashes(request, namespace):
   return _split_payload(request, h.digest_size, model.MAX_KEYS_PER_DB_OPS)
 
 
-def _incremental_delete(query, delete):
+def _throttle_futures(futures, limit):
+  finished = []
+  if len(futures) <= limit:
+    return futures, finished
+  while len(futures) > limit:
+    ndb.Future.wait_any(futures)
+    tmp = []
+    for f in futures:
+      if f.done():
+        f.get_result()
+        finished.append(f)
+      else:
+        tmp.append(f)
+    futures = tmp
+  return futures, finished
+
+
+def _incremental_delete(query, delete_async):
   """Applies |delete| to objects in a query asynchrously.
 
-  This function is itself synchronous.
+  This function is itself synchronous. It runs the query for at most 9 minutes
+  to try to have enough time to finish the deletion. Swallows most frequent
+  exceptions.
 
   Arguments:
   - query: iterator of items to process.
-  - delete: callback that accepts a list of objects to delete and returns a list
-            of objects that have a method .wait() to make sure all calls
-            completed.
+  - delete_async: callback that accepts an object to delete and returns a
+        ndb.Future.
 
   Returns the number of objects found.
   """
-  to_delete = []
-  count = 0
-  deleted_count = 0
-  futures = []
-  for item in query:
-    count += 1
-    if not (count % 1000):
-      logging.debug('Found %d items', count)
-    to_delete.append(item)
-    deleted_count += 1
-    if len(to_delete) == ITEMS_TO_DELETE_ASYNC:
-      logging.info('Deleting %s entries', len(to_delete))
-      futures.extend(delete(to_delete) or [])
-      to_delete = []
+  start = time.time()
+  try:
+    count = 0
+    deleted_count = 0
+    futures = []
+    for item in query:
+      count += 1
+      if not (count % 1000):
+        logging.debug('Found %d items', count)
+      futures.append(delete_async(item))
+      deleted_count += 1
 
-    # That's a lot of on-going operations which could take a significant amount
-    # of memory. Wait a little on the oldest operations.
-    # TODO(maruel): Profile memory usage to see if a few thousands of on-going
-    # RPC objects is a problem in practice.
-    while len(futures) > 10 * ITEMS_TO_DELETE_ASYNC:
-      futures.pop(0).wait()
+      # Throttle.
+      futures, _ = _throttle_futures(futures, 50)
 
-  if to_delete:
-    logging.info('Deleting %s entries', len(to_delete))
-    futures.extend(delete(to_delete) or [])
+      # Time to stop querying.
+      if (time.time() - start) > 9*60:
+        break
 
-  ndb.Future.wait_all(futures)
+    for f in futures:
+      f.get_result()
+  except (
+      datastore_errors.BadRequestError,
+      datastore_errors.InternalError,
+      datastore_errors.Timeout,
+      datastore_errors.TransactionFailedError,
+      runtime.DeadlineExceededError) as e:
+    logging.info('Silencing exception %s', e)
+
+  # Try to do the best it can.
+  for f in futures:
+    try:
+      f.get_result()
+    except (
+        datastore_errors.BadRequestError,
+        datastore_errors.InternalError,
+        datastore_errors.Timeout,
+        datastore_errors.TransactionFailedError,
+        runtime.DeadlineExceededError) as e:
+      logging.info('Silencing exception as last chance; %s', e)
+
   return deleted_count
 
 
@@ -126,49 +155,123 @@ def _yield_orphan_gcs_files(gs_bucket):
 
   Finds files in GCS that are not referred to by a ContentEntry.
 
+  Only return files at least 1 day old to reduce the risk of failure.
+
   Yields:
     path of unreferenced files in the bucket
   """
-  futures = {}
-  cutoff = time.time() - 60*60
-  for filepath, filestats in gcs.list_files(gs_bucket):
-    # If the file was uploaded in the last hour, ignore it.
-    if filestats.st_ctime >= cutoff:
-      continue
-
-    # This must match the logic in model.get_entry_key(). Since this request
-    # will in practice touch every item, do not use memcache since it'll
-    # mess it up by loading every item in it.
-    # TODO(maruel): Batch requests to use get_multi_async() similar to
-    # datastore_utils.page_queries().
-    future = model.entry_key_from_id(filepath).get_async(
-        use_cache=False, use_memcache=False)
-    futures[future] = filepath
-
-    if len(futures) > 20:
-      future = ndb.Future.wait_any(futures)
-      filepath = futures.pop(future)
-      if future.get_result():
+  good = 0
+  orphaned = 0
+  size_good = 0
+  size_orphaned = 0
+  # pylint: disable=too-many-nested-blocks
+  try:
+    futures = {}
+    cutoff = time.time() - 24*60*60
+    # https://cloud.google.com/appengine/docs/standard/python/googlecloudstorageclient/gcsfilestat_class
+    for filepath, filestats in gcs.list_files(gs_bucket):
+      # If the file was uploaded in the last hour, ignore it.
+      if filestats.st_ctime >= cutoff:
         continue
-      yield filepath
-  while futures:
-    future = ndb.Future.wait_any(futures)
-    filepath = futures.pop(future)
-    if future.get_result():
-      continue
-    yield filepath
+
+      # This must match the logic in model.get_entry_key(). Since this request
+      # will touch every ContentEntry, do not use memcache since it'll
+      # overflow it up by loading every items in it.
+      try:
+        # TODO(maruel): Handle non-ascii files, in practice they cannot be
+        # digests so they must be deleted anyway.
+        key = model.entry_key_from_id(str(filepath))
+      except AssertionError:
+        # It's not even a valid entry.
+        orphaned += 1
+        size_orphaned += filestats.st_size
+        yield filepath
+        continue
+
+      futures[key.get_async(use_memcache=False)] = (filepath, filestats)
+
+      if len(futures) > 100:
+        ndb.Future.wait_any(futures)
+        tmp = {}
+        # pylint: disable=redefined-outer-name
+        for f, (filepath, filestats) in futures.iteritems():
+          if f.done():
+            if not f.get_result():
+              # Orphaned, delete.
+              orphaned += 1
+              size_orphaned += filestats.st_size
+              yield filepath
+            else:
+              good += 1
+              size_good += filestats.st_size
+          else:
+            tmp[f] = (filepath, filestats)
+        futures = tmp
+
+    while futures:
+      ndb.Future.wait_any(futures)
+      tmp = {}
+      for f, (filepath, filestats) in futures.iteritems():
+        if f.done():
+          if not f.get_result():
+            # Orphaned, delete.
+            orphaned += 1
+            size_orphaned += filestats.st_size
+            yield filepath
+          else:
+            good += 1
+            size_good += filestats.st_size
+        else:
+          # Not done yet.
+          tmp[f] = (filepath, filestats)
+      futures = tmp
+  finally:
+    size_good_tb = size_good / 1024. / 1024. / 1024. / 1024.
+    size_orphaned_gb = size_orphaned / 1024. / 1024. / 1024.
+    logging.info(
+        'Found:\n'
+        '- %d good GCS files; %d bytes (%.1fTiB)\n'
+        '- %d orphaned files; %d bytes (%.1fGiB)',
+        good, size_good, size_good_tb,
+        orphaned, size_orphaned, size_orphaned_gb)
 
 
 ### Cron handlers
 
 
 class CronCleanupExpiredHandler(webapp2.RequestHandler):
+  """Triggers taskqueues to delete 500 items at a time."""
+  @decorators.require_cronjob
+  def get(self):
+    triggered = 0
+    total = 0
+    q = model.ContentEntry.query(
+        model.ContentEntry.expiration_ts < utils.utcnow())
+    cursor = None
+    more = True
+    while more:
+      keys, cursor, more = q.fetch_page(
+          500, start_cursor=cursor, keys_only=True)
+      if not keys:
+        break
+      total += len(keys)
+      data = utils.encode_to_json([k.string_id() for k in keys])
+      if utils.enqueue_task(
+          '/internal/taskqueue/cleanup/expired',
+          'cleanup-expired', payload=data):
+        triggered += 1
+      else:
+        logging.warning('Failed to trigger task')
+    logging.info('Triggered %d tasks for %d entries', triggered, total)
+
+
+class CronCleanupOrphanHandler(webapp2.RequestHandler):
   """Triggers a taskqueue."""
   @decorators.require_cronjob
   def get(self):
     if not utils.enqueue_task(
-        '/internal/taskqueue/cleanup/expired',
-        'cleanup-expired'):
+        '/internal/taskqueue/cleanup/orphan',
+        'cleanup-orphan'):
       logging.warning('Failed to trigger task')
 
 
@@ -194,21 +297,16 @@ class CronStatsSendToBQHandler(webapp2.RequestHandler):
 class TaskCleanupExpiredHandler(webapp2.RequestHandler):
   """Removes the old expired data from the datastore."""
   # pylint: disable=no-self-use
-  @decorators.silence(
-      datastore_errors.InternalError,
-      datastore_errors.Timeout,
-      datastore_errors.TransactionFailedError,
-      runtime.DeadlineExceededError)
   @decorators.require_taskqueue('cleanup-expired')
   def post(self):
-    q = model.ContentEntry.query(
-        model.ContentEntry.expiration_ts < utils.utcnow()
-        ).iter(keys_only=True)
-    total = _incremental_delete(q, model.delete_entry_and_gs_entry)
+    keys = [
+      model.entry_key_from_id(str(l)) for l in json.loads(self.request.body)
+    ]
+    total = _incremental_delete(keys, model.delete_entry_and_gs_entry_async)
     logging.info('Deleted %d expired entries', total)
 
 
-class TaskCleanupTrimLostWorkerHandler(webapp2.RequestHandler):
+class TaskCleanupOrphanHandler(webapp2.RequestHandler):
   """Removes the GS files that are not referenced anymore.
 
   It can happen for example when a ContentEntry is deleted without the file
@@ -217,19 +315,16 @@ class TaskCleanupTrimLostWorkerHandler(webapp2.RequestHandler):
   Only a task queue task can use this handler.
   """
   # pylint: disable=no-self-use
-  @decorators.silence(
-      datastore_errors.InternalError,
-      datastore_errors.Timeout,
-      datastore_errors.TransactionFailedError,
-      runtime.DeadlineExceededError)
   @decorators.require_taskqueue('cleanup-orphan')
   def post(self):
     """Enumerates all GS files and delete those that do not have an associated
     ContentEntry.
     """
     gs_bucket = config.settings().gs_bucket
-    gs_delete = lambda filenames: gcs.delete_files(gs_bucket, filenames)
-    total = _incremental_delete(_yield_orphan_gcs_files(gs_bucket), gs_delete)
+    logging.debug('Operating on GCS bucket: %s', gs_bucket)
+    total = _incremental_delete(
+        _yield_orphan_gcs_files(gs_bucket),
+        lambda f: gcs.delete_file_async(gs_bucket, f, True))
     logging.info('Deleted %d lost GS files', total)
     # TODO(maruel): Find all the empty directories that are old and remove them.
     # We need to safe guard against the race condition where a user would upload
@@ -251,30 +346,35 @@ class TaskTagWorkerHandler(webapp2.RequestHandler):
       runtime.DeadlineExceededError)
   @decorators.require_taskqueue('tag')
   def post(self, namespace, timestamp):
+    saved = 0
     digests = []
     now = utils.timestamp_to_datetime(long(timestamp))
     expiration = config.settings().default_expiration
     try:
       digests = _payload_to_hashes(self, namespace)
       # Requests all the entities at once.
-      futures = ndb.get_multi_async(
+      fetch_futures = ndb.get_multi_async(
           model.get_entry_key(namespace, binascii.hexlify(d)) for d in digests)
 
-      to_save = []
-      while futures:
+      save_futures = []
+      while fetch_futures:
         # Return opportunistically the first entity that can be retrieved.
-        future = ndb.Future.wait_any(futures)
-        futures.remove(future)
-        item = future.get_result()
-        if item and item.next_tag_ts < now:
-          # Update the timestamp. Add a bit of pseudo randomness.
-          item.expiration_ts, item.next_tag_ts = model.expiration_jitter(
-              now, expiration)
-          to_save.append(item)
-      if to_save:
-        ndb.put_multi(to_save)
+        fetch_futures, done = _throttle_futures(
+            fetch_futures, len(fetch_futures)-1)
+        for f in done:
+          item = f.get_result()
+          if item and item.next_tag_ts < now:
+            # Update the timestamp. Add a bit of pseudo randomness.
+            item.expiration_ts, item.next_tag_ts = model.expiration_jitter(
+                now, expiration)
+            save_futures.append(item.put_async())
+            saved += 1
+        save_futures, _ = _throttle_futures(save_futures, 100)
+
+      for f in save_futures:
+        f.get_result()
       logging.info(
-          'Timestamped %d entries out of %s', len(to_save), len(digests))
+          'Timestamped %d entries out of %d', saved, len(digests))
     except Exception as e:
       logging.error('Failed to stamp entries: %s\n%d entries', e, len(digests))
       raise
@@ -288,7 +388,9 @@ class TaskVerifyWorkerHandler(webapp2.RequestHandler):
     """Logs error message, deletes |entry| from datastore and GS."""
     logging.error(
         'Verification failed for %s: %s', entry.key.id(), message % args)
-    model.delete_entry_and_gs_entry([entry.key])
+    # pylint is confused that ndb.tasklet returns a ndb.Future.
+    # pylint: disable=no-member
+    model.delete_entry_and_gs_entry_async(entry.key).get_result()
 
   @decorators.silence(
       datastore_errors.InternalError,
@@ -422,14 +524,17 @@ def get_routes():
     webapp2.Route(
         r'/internal/cron/cleanup/trigger/expired',
         CronCleanupExpiredHandler),
+    webapp2.Route(
+        r'/internal/cron/cleanup/trigger/orphan',
+        CronCleanupOrphanHandler),
 
     # Cleanup tasks.
     webapp2.Route(
         r'/internal/taskqueue/cleanup/expired',
         TaskCleanupExpiredHandler),
     webapp2.Route(
-        r'/internal/taskqueue/cleanup/trim_lost',
-        TaskCleanupTrimLostWorkerHandler),
+        r'/internal/taskqueue/cleanup/orphan',
+        TaskCleanupOrphanHandler),
 
     # Tasks triggered by other request handlers.
     webapp2.Route(

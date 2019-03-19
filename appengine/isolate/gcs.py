@@ -27,6 +27,7 @@ import Crypto.Signature.PKCS1_v1_5 as PKCS1_v1_5
 # them.
 # pylint: disable=F0401
 import webapp2
+from google.appengine.ext import ndb
 # pylint: enable=F0401
 
 import cloudstorage
@@ -97,7 +98,8 @@ def list_files(bucket, subdir=None, batch_size=100):
       break
 
 
-def delete_file(bucket, filename, ignore_missing=False):
+@ndb.tasklet
+def delete_file_async(bucket, filename, ignore_missing):
   """Deletes one file stored in GS.
 
   Arguments:
@@ -108,10 +110,17 @@ def delete_file(bucket, filename, ignore_missing=False):
   """
   retry_params = _make_retry_params()
   max_tries = 4
+  # The cloudstorage library supports ndb future but for an unknown reason
+  # doesn't export it properly.
+  api = cloudstorage.storage_api._get_storage_api(
+      retry_params=retry_params, account_id=None)
+  p = cloudstorage.api_utils._quote_filename('/%s/%s' % (bucket, filename))
   for i in xrange(max_tries+1):
     try:
-      cloudstorage.delete(
-          '/%s/%s' % (bucket, filename), retry_params=retry_params)
+      # The equivalent of cloudstorage.delete(p, retry_params=retry_params)
+      status, resp_headers, content = yield api.delete_object_async(p)
+      cloudstorage.errors.check_status(
+          status, [204], p, resp_headers=resp_headers, body=content)
       return
     except cloudstorage.errors.NotFoundError:
       if not ignore_missing:
@@ -133,26 +142,6 @@ def delete_file(bucket, filename, ignore_missing=False):
         time.sleep(1 + i * 2)
         continue
       raise
-
-
-def delete_files(bucket, filenames, ignore_missing=False):
-  """Deletes multiple files stored in GS.
-
-  Arguments:
-    bucket: a bucket that contains the files.
-    filenames: list of file paths to delete (relative to a bucket root).
-    ignore_missing: if True, will silently skip missing files, otherwise will
-        print a warning to log.
-
-  Returns:
-    An empty list so this function can be used with functions that expect
-    the RPC to return a Future.
-  """
-  # Sadly Google Cloud Storage client library doesn't support batch deletes,
-  # so do it one by one.
-  for filename in filenames:
-    delete_file(bucket, filename, ignore_missing)
-  return []
 
 
 def get_file_info(bucket, filename):

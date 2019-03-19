@@ -8,11 +8,15 @@ import datetime
 import json
 import logging
 import sys
+import time
 import unittest
 from Crypto.PublicKey import RSA
 
 import test_env
 test_env.setup_test_env()
+
+import cloudstorage
+from google.appengine.ext import ndb
 
 from protorpc.remote import protojson
 import webtest
@@ -24,6 +28,7 @@ from components import utils
 from test_support import test_case
 
 import config
+import gcs
 import handlers_backend
 import handlers_endpoints_v1
 import model
@@ -137,9 +142,7 @@ class MainTest(test_case.EndpointsTestCase):
         '/internal/cron/cleanup/trigger/expired',
         headers={'X-AppEngine-Cron': 'true'})
     self.assertEqual(1, model.ContentEntry.query().count())
-
-    self.assertEqual(1, self.execute_tasks())
-    self.assertEqual(1, model.ContentEntry.query().count())
+    self.assertEqual(0, self.execute_tasks())
 
     # Try again, second later.
     self.mock_now(now, config.settings().default_expiration+1)
@@ -151,6 +154,47 @@ class MainTest(test_case.EndpointsTestCase):
     self.assertEqual(1, self.execute_tasks())
     # Boom it's gone.
     self.assertEqual(0, model.ContentEntry.query().count())
+
+  def test_cron_cleanup_trigger_orphan(self):
+    now = 12345678.
+    self.mock(time, 'time', lambda: now)
+    # Asserts that lost GCS files are deleted through a task queue.
+    def _list_files(bucket):
+      self.assertEqual('sample-app', bucket)
+      # Include two files, one recent, one old.
+      recent = cloudstorage.GCSFileStat(
+          filename=bucket + '/namespace/recent',
+          st_size=10,
+          etag='123',
+          st_ctime=now - 24*60*60,
+          content_type=None,
+          metadata=None,
+          is_dir=False)
+      old = cloudstorage.GCSFileStat(
+          filename=bucket + '/namespace/old',
+          st_size=11,
+          etag='123',
+          st_ctime=now - 24*60*60-1,
+          content_type=None,
+          metadata=None,
+          is_dir=False)
+      return [('namespace/recent', recent), ('namespace/old', old)]
+    self.mock(gcs, 'list_files', _list_files)
+
+    called = []
+    @ndb.tasklet
+    def _delete_file_async(bucket, filename, ignore_missing):
+      called.append(filename)
+      self.assertEqual('sample-app', bucket)
+      self.assertEqual(True, ignore_missing)
+      raise ndb.Return(None)
+    self.mock(gcs, 'delete_file_async', _delete_file_async)
+
+    self.app.get(
+        '/internal/cron/cleanup/trigger/orphan',
+        headers={'X-AppEngine-Cron': 'true'})
+    self.assertEqual(1, self.execute_tasks())
+    self.assertEqual(['namespace/old'], called)
 
 
 if __name__ == '__main__':
