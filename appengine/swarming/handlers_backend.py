@@ -9,6 +9,7 @@ import json
 import logging
 
 import webapp2
+from google.appengine.api import datastore_errors
 from google.appengine.ext import ndb
 
 from google.protobuf import json_format
@@ -17,6 +18,7 @@ from proto.api import plugin_pb2
 
 import mapreduce_jobs
 from components import decorators
+from components import datastore_utils
 from server import bq_state
 from server import bot_groups_config
 from server import bot_management
@@ -37,6 +39,11 @@ import ts_mon_metrics
 
 
 class _CronHandlerBase(webapp2.RequestHandler):
+  @decorators.silence(
+      datastore_errors.InternalError,
+      datastore_errors.Timeout,
+      datastore_errors.TransactionFailedError,
+      datastore_utils.CommitError)
   @decorators.require_cronjob
   def get(self):
     self.run_cron()

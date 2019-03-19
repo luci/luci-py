@@ -20,8 +20,8 @@ def silence(*exceptions):
       try:
         return f(self, *args, **kwargs)
       except tuple(exceptions) as e:  # pylint: disable=catching-non-exception
-        logging.warning('Silencing exception %s', e)
-        self.abort(500)
+        logging.warning('Silencing exception %s', e, exc_info=True)
+        self.abort(429, 'Silencing exception')
     return hook
   return decorator
 
