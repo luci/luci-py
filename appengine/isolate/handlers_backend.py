@@ -243,13 +243,17 @@ class CronCleanupExpiredHandler(webapp2.RequestHandler):
   """Triggers taskqueues to delete 500 items at a time."""
   @decorators.require_cronjob
   def get(self):
+    # Do not run for more than 9 minutes. Exceeding 10min hard limit causes 500.
+    end = time.time() + 9*60
     triggered = 0
     total = 0
     q = model.ContentEntry.query(
         model.ContentEntry.expiration_ts < utils.utcnow())
     cursor = None
     more = True
-    while more:
+    while more and time.time() < end:
+      # Since this query dooes not fetch the ContentEntry entities themselves,
+      # we cannot easily compute the size of the data deleted.
       keys, cursor, more = q.fetch_page(
           500, start_cursor=cursor, keys_only=True)
       if not keys:
