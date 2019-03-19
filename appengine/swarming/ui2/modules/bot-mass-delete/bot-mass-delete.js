@@ -171,7 +171,7 @@ window.customElements.define('bot-mass-delete', class extends HTMLElement {
       .then((json) => {
         this._readyToDelete = true;
         this.render();
-        return json.dead;
+        return parseInt(json.dead);
       }).catch((e) => fetchError(e, 'bot-mass-delete/count'));
     this._count = html`${until(countPromise, '...')}`;
   }

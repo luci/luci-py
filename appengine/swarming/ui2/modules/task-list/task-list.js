@@ -179,11 +179,11 @@ const options = (ele) => html`
   </div>
   <div class=picker>
     <div class=time>
-      <span class=label>Start:</span>
+      <span class=label title="Show only tasks created after this time">Start:</span>
       <input id=start_time></input>
     </div>
     <div class=time>
-      <span class=label>End:</span>
+      <span class=label title="Show only tasks created before this time">End:</span>
       <input id=end_time ?disabled=${ele._now}></input>
       <checkbox-sk ?checked=${ele._now}
                    @click=${ele._toggleNow}>

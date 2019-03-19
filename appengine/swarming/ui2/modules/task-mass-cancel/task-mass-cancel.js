@@ -197,7 +197,7 @@ window.customElements.define('task-mass-cancel', class extends HTMLElement {
     let pendingPromise = fetch(`/_ah/api/swarming/v1/tasks/count?${pendingParams}`, extra)
       .then(jsonOrThrow)
       .then((json) => {
-        this._pendingCount = json.count;
+        this._pendingCount = parseInt(json.count);
       }).catch((e) => fetchError(e, 'task-mass-cancel/pending'));
 
     let runningParams = query.fromObject({
@@ -212,7 +212,7 @@ window.customElements.define('task-mass-cancel', class extends HTMLElement {
     let runningPromise = fetch(`/_ah/api/swarming/v1/tasks/count?${runningParams}`, extra)
       .then(jsonOrThrow)
       .then((json) => {
-        this._runningCount = json.count;
+        this._runningCount = parseInt(json.count);
       }).catch((e) => fetchError(e, 'task-mass-cancel/running'));
 
     // re-render when both have returned

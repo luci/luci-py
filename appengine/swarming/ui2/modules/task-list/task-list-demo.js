@@ -24,7 +24,7 @@ fetchMock.get('/_ah/api/swarming/v1/bots/dimensions',
 
 fetchMock.get('glob:/_ah/api/swarming/v1/tasks/count?*',
               requireLogin(() => {
-                return {'count': Math.round(Math.random() * 10000)};
+                return {'count': "" + Math.round(Math.random() * 10000)};
               }, 800));
 
 
