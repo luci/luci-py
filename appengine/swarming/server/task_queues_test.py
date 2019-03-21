@@ -100,6 +100,7 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
     return self._enqueue_orig(*args, use_dedicated_module=False, **kwargs)
 
   def _assert_task(self, tasks=1):
+    """Creates one pending TaskRequest and asserts it in task_queues."""
     request = _gen_request()
     task_queues.assert_task(request)
     self.assertEqual(tasks, self.execute_tasks())
@@ -228,8 +229,44 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
     pass
 
   def test_rebuild_task_cache(self):
-    # Tested indirectly by self._assert_task()
-    pass
+    # Assert that expiration works.
+    now = datetime.datetime(2010, 1, 2, 3, 4, 5)
+    self.mock_now(now)
+
+    payloads = []
+    def _enqueue_task(url, name, payload):
+      self.assertEqual(
+          '/internal/taskqueue/important/task_queues/rebuild-cache', url)
+      self.assertEqual('rebuild-task-cache', name)
+      payloads.append(payload)
+      return True
+    self.mock(utils, 'enqueue_task', _enqueue_task)
+
+    # The equivalent of self._assert_task(tasks=1) except that we snapshot the
+    # payload.
+    request = _gen_request()
+    task_queues.assert_task(request)
+    self.assertEqual(1, len(payloads))
+    self.assertEqual(True, task_queues.rebuild_task_cache(payloads[0]))
+    self.assertEqual(
+        datetime.datetime(2010, 1, 2, 4, 15, 5),
+        task_queues.TaskDimensions.query().get().valid_until_ts)
+
+    # Now expire it, and rebuild the task queue.
+    self.mock_now(datetime.datetime(2010, 1, 2, 4, 15, 5), 1)
+    self.assertEqual(True, task_queues.rebuild_task_cache(payloads[0]))
+    self.assertEqual(0, task_queues.TaskDimensions.query().count())
+
+  def test_rebuild_task_cache_fail(self):
+    # pylint: disable=unused-argument
+    def _enqueue_task(url, name, payload):
+      # Enqueueing the task failed.
+      return False
+    self.mock(utils, 'enqueue_task', _enqueue_task)
+
+    request = _gen_request()
+    with self.assertRaises(task_queues.Error):
+      task_queues.assert_task(request)
 
   def test_dimensions_to_flat(self):
     actual = task_queues.dimensions_to_flat(

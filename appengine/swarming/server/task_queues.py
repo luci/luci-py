@@ -911,6 +911,9 @@ def rebuild_task_cache(payload):
       if not obj:
         obj = TaskDimensions(key=task_dims_key)
       if obj.assert_request(now, valid_until_ts, dimensions_flat):
+        if not obj.sets:
+          obj.key.delete()
+          return None
         obj.put()
       return obj
 
