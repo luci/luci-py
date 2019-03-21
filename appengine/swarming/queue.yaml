@@ -4,14 +4,17 @@ queue:
 
 # /internal/taskqueue/important/tasks/cancel
 - name: cancel-tasks
+  bucket_size: 100
   rate: 500/s
 
 # /internal/taskqueue/important/tasks/cancel-task-on-bot
 - name: cancel-task-on-bot
+  bucket_size: 100
   rate: 500/s
 
 # /internal/taskqueue/important/pubsub/notify-task/<task_id:[0-9a-f]+>
 - name: pubsub
+  bucket_size: 100
   rate: 500/s
 
 # /internal/taskqueue/important/task_queues/rebuild-cache
@@ -47,7 +50,8 @@ queue:
 
 # /internal/taskqueue/important/external_scheduler/notify-tasks
 - name: es-notify-tasks
-  rate: 100/s
+  bucket_size: 100
+  rate: 500/s
 
 
 ## Named caches
