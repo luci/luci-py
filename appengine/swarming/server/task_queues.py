@@ -313,17 +313,15 @@ def _cap_futures(futures):
   """
   out = []
   while len(futures) > 50:
-    # Give the event loop some time to run tasks.
-    r = ndb.eventloop.run0()
-    if r is not None:
-      time.sleep(r)
-    done = []
+    ndb.Future.wait_any(futures)
+    tmp = []
     for f in futures:
       if f.done():
         out.append(f.get_result())
-        done.append(f)
-    futures.difference_update(done)
-  return out
+      else:
+        tmp.append(tmp)
+    futures = tmp
+  return out, futures
 
 
 def _flush_futures(futures):
@@ -893,15 +891,17 @@ def rebuild_task_cache(payload):
   updated = 0
   viable = 0
   try:
-    pending = set()
+    pending = []
     for bot_task_key in _yield_BotTaskDimensions_keys(
         dimensions_hash, dimensions_flat):
       viable += 1
       future = _refresh_BotTaskDimensions(
           bot_task_key, dimensions_flat, now, valid_until_ts)
-      pending.add(future)
-      updated += sum(1 for i in _cap_futures(pending) if i)
+      pending.append(future)
+      done, pending = _cap_futures(pending)
+      updated += sum(1 for i in done if i)
     updated += sum(1 for i in _flush_futures(pending) if i)
+    logging.debug('updated %d; getting reading for transaction', updated)
 
     # Done updating, now store the entity. Must use a transaction as there could
     # be other dimensions set in the entity.
