@@ -5,6 +5,7 @@
 """This module defines Isolate Server backend url handlers."""
 
 import binascii
+import datetime
 import json
 import logging
 import time
@@ -243,30 +244,59 @@ class CronCleanupExpiredHandler(webapp2.RequestHandler):
   """Triggers taskqueues to delete 500 items at a time."""
   @decorators.require_cronjob
   def get(self):
+    # On the production instance, there's so many expired items that running the
+    # query serially takes more time than the rate of items that expires (!)
+    #
+    # So instead of running the query to fetch all the ContentEntry keys:
+    # - Find the lower and upper bounds of expiration_ts.
+    # - Trigger N query tasks, one per day:
+    #   - In each query task, run the query shard for ContentEntry entities with
+    #     expiration_ts set on this day.
+    #   - For each 500 ContentEntry keys found:
+    #     - Trigger a task that will delete these and their associated GCS file,
+    #       if any.
+
     # Do not run for more than 9 minutes. Exceeding 10min hard limit causes 500.
-    end = time.time() + 9*60
+    # Normally this cron job should complete within a few milliseconds.
+    time_to_stop = time.time() + 9*60
+    now = utils.utcnow()
+
+    # Get the very oldest item.
+    oldest = model.ContentEntry.query().order(
+        model.ContentEntry.expiration_ts).get()
+    if not oldest or oldest.expiration_ts >= now:
+      logging.debug('Nothing to delete')
+      return
+
+    # As a crude way to parallelise the query, shard subqueries to be bounded
+    # per day. Normally there should be one day (or two when crossing midnight)
+    # but not much more. When in backlogged mode, there could be many many days.
+    oldest = datetime.datetime(*oldest.expiration_ts.date().timetuple()[:3])
+    recent = datetime.datetime(*(now +
+      datetime.timedelta(days=1)).date().timetuple()[:3])
     triggered = 0
-    total = 0
-    q = model.ContentEntry.query(
-        model.ContentEntry.expiration_ts < utils.utcnow())
-    cursor = None
-    more = True
-    while more and time.time() < end:
-      # Since this query dooes not fetch the ContentEntry entities themselves,
-      # we cannot easily compute the size of the data deleted.
-      keys, cursor, more = q.fetch_page(
-          500, start_cursor=cursor, keys_only=True)
-      if not keys:
+    days = 0
+    while oldest < recent:
+      if time.time() >= time_to_stop:
+        # The cron job ran for too long. There's a lot of backlog. Not a big
+        # deal, it will be triggered again soon.
         break
-      total += len(keys)
-      data = utils.encode_to_json([k.string_id() for k in keys])
+      if days == 20:
+        # Limit for now to 20 parallel queries at a time, we don't want to blow
+        # up quota.
+        break
+
+      days += 1
+      data = {'start': oldest, 'end': oldest + datetime.timedelta(days=1)}
       if utils.enqueue_task(
-          '/internal/taskqueue/cleanup/expired',
-          'cleanup-expired', payload=data):
+          '/internal/taskqueue/cleanup/query_expired',
+          'cleanup-query-expired', payload=utils.encode_to_json(data)):
         triggered += 1
       else:
-        logging.warning('Failed to trigger task')
-    logging.info('Triggered %d tasks for %d entries', triggered, total)
+        logging.warning('Failed to trigger task for %s', data)
+      oldest = data['end']
+    logging.info(
+        'Triggered %d tasks for %d day(s) starting %s', triggered, days, oldest)
 
 
 class CronCleanupOrphanHandler(webapp2.RequestHandler):
@@ -296,6 +326,43 @@ class CronStatsSendToBQHandler(webapp2.RequestHandler):
 
 
 ### Task queue handlers
+
+
+class TaskCleanupQueryExpiredHandler(webapp2.RequestHandler):
+  """Runs a query for one day worth of expired ContentEntry."""
+  # pylint: disable=no-self-use
+  @decorators.require_taskqueue('cleanup-query-expired')
+  def post(self):
+    # Do not run for more than 9 minutes. Exceeding 10min hard limit causes 500.
+    time_to_stop = time.time() + 9*60
+
+    data = json.loads(self.request.body)
+    start = utils.parse_datetime(data['start'])
+    end = utils.parse_datetime(data['end'])
+
+    triggered = 0
+    total = 0
+    q = model.ContentEntry.query(
+        model.ContentEntry.expiration_ts >= start,
+        model.ContentEntry.expiration_ts < end)
+    cursor = None
+    more = True
+    while more and time.time() < time_to_stop:
+      # Since this query dooes not fetch the ContentEntry entities themselves,
+      # we cannot easily compute the size of the data deleted.
+      keys, cursor, more = q.fetch_page(
+          500, start_cursor=cursor, keys_only=True)
+      if not keys:
+        break
+      total += len(keys)
+      data = utils.encode_to_json([k.string_id() for k in keys])
+      if utils.enqueue_task(
+          '/internal/taskqueue/cleanup/expired',
+          'cleanup-expired', payload=data):
+        triggered += 1
+      else:
+        logging.warning('Failed to trigger task')
+    logging.info('Triggered %d tasks for %d entries', triggered, total)
 
 
 class TaskCleanupExpiredHandler(webapp2.RequestHandler):
@@ -533,6 +600,9 @@ def get_routes():
         CronCleanupOrphanHandler),
 
     # Cleanup tasks.
+    webapp2.Route(
+        r'/internal/taskqueue/cleanup/query_expired',
+        TaskCleanupQueryExpiredHandler),
     webapp2.Route(
         r'/internal/taskqueue/cleanup/expired',
         TaskCleanupExpiredHandler),

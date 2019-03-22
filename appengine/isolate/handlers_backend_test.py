@@ -151,7 +151,8 @@ class MainTest(test_case.EndpointsTestCase):
         headers={'X-AppEngine-Cron': 'true'})
     self.assertEqual(1, model.ContentEntry.query().count())
 
-    self.assertEqual(1, self.execute_tasks())
+    # The query task queue triggers deletion task queues.
+    self.assertEqual(2, self.execute_tasks())
     # Boom it's gone.
     self.assertEqual(0, model.ContentEntry.query().count())
 
