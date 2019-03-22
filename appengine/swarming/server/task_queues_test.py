@@ -30,8 +30,7 @@ from server import task_queues
 from server import task_request
 
 
-def _assert_bot(dimensions=None):
-  bot_id = u'bot1'
+def _assert_bot(bot_id=u'bot1', dimensions=None):
   bot_dimensions = {
     u'cpu': [u'x86-64', u'x64'],
     u'id': [bot_id],
@@ -40,7 +39,7 @@ def _assert_bot(dimensions=None):
   }
   bot_dimensions.update(dimensions or {})
   bot_management.bot_event(
-      'bot_connected', bot_id, '1.2.3.4', 'bot1', bot_dimensions, {},
+      'bot_connected', bot_id, '1.2.3.4', bot_id, bot_dimensions, {},
       '1234', False, None, None, None)
   bot_root_key = bot_management.get_root_key(bot_id)
   return task_queues.assert_bot_async(bot_root_key, bot_dimensions).get_result()
@@ -233,6 +232,20 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
     now = datetime.datetime(2010, 1, 2, 3, 4, 5)
     self.mock_now(now)
 
+    # We want _yield_BotTaskDimensions_keys() to return multiple
+    # BotTaskDimensions ndb.Key to confirm that the inner loops work. This
+    # requires a few bots.
+    _assert_bot(bot_id=u'bot1')
+    _assert_bot(bot_id=u'bot2')
+    _assert_bot(bot_id=u'bot3')
+    self.assertEqual(0, task_queues.BotTaskDimensions.query().count())
+    self.assertEqual(0, task_queues.TaskDimensions.query().count())
+
+    # Intentionally force the code to throttle the number of concurrent RPCs,
+    # otherwise the inner loops wouldn't be reached with less than 50 bots, and
+    # testing with 50 bots, would make the unit test slow.
+    self.mock(task_queues, '_CAP_FUTURES_LIMIT', 1)
+
     payloads = []
     def _enqueue_task(url, name, payload):
       self.assertEqual(
@@ -244,17 +257,42 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
 
     # The equivalent of self._assert_task(tasks=1) except that we snapshot the
     # payload.
-    request = _gen_request()
-    task_queues.assert_task(request)
+    # Trigger multiple task queues to go deeper in the code.
+    request_1 = _gen_request(
+        properties=_gen_properties(
+            dimensions={
+              u'cpu': [u'x86-64'],
+              u'pool': [u'default'],
+            }))
+    task_queues.assert_task(request_1)
     self.assertEqual(1, len(payloads))
-    self.assertEqual(True, task_queues.rebuild_task_cache(payloads[0]))
+    self.assertEqual(True, task_queues.rebuild_task_cache(payloads[-1]))
+    self.assertEqual(3, task_queues.BotTaskDimensions.query().count())
+    self.assertEqual(1, task_queues.TaskDimensions.query().count())
     self.assertEqual(
         datetime.datetime(2010, 1, 2, 4, 15, 5),
         task_queues.TaskDimensions.query().get().valid_until_ts)
 
-    # Now expire it, and rebuild the task queue.
+    request_2 = _gen_request(
+        properties=_gen_properties(
+            dimensions={
+              u'os': [u'Ubuntu-16.04'],
+              u'pool': [u'default'],
+            }))
+    task_queues.assert_task(request_2)
+    self.assertEqual(2, len(payloads))
+    self.assertEqual(True, task_queues.rebuild_task_cache(payloads[-1]))
+    self.assertEqual(6, task_queues.BotTaskDimensions.query().count())
+    self.assertEqual(2, task_queues.TaskDimensions.query().count())
+
+    # Now expire the two TaskDimensions, one at a time, and rebuild the task
+    # queue.
     self.mock_now(datetime.datetime(2010, 1, 2, 4, 15, 5), 1)
     self.assertEqual(True, task_queues.rebuild_task_cache(payloads[0]))
+    self.assertEqual(6, task_queues.BotTaskDimensions.query().count())
+    self.assertEqual(1, task_queues.TaskDimensions.query().count())
+    self.assertEqual(True, task_queues.rebuild_task_cache(payloads[1]))
+    self.assertEqual(6, task_queues.BotTaskDimensions.query().count())
     self.assertEqual(0, task_queues.TaskDimensions.query().count())
 
   def test_rebuild_task_cache_fail(self):
@@ -440,7 +478,7 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(1, _assert_bot())
     # One hour later, the bot changes dimensions.
     self.mock_now(now, task_queues._ADVANCE.total_seconds())
-    self.assertEqual(1, _assert_bot({u'gpu': u'Matrox'}))
+    self.assertEqual(1, _assert_bot(dimensions={u'gpu': u'Matrox'}))
     self.assert_count(1, task_queues.BotTaskDimensions)
     self.assert_count(1, task_queues.TaskDimensions)
     bot_root_key = bot_management.get_root_key(u'bot1')
@@ -448,7 +486,7 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
 
     # One second before expiration.
     self.mock_now(now, exp.total_seconds())
-    self.assertEqual(None, _assert_bot({u'gpu': u'Matrox'}))
+    self.assertEqual(None, _assert_bot(dimensions={u'gpu': u'Matrox'}))
     self.assert_count(1, task_queues.BotTaskDimensions)
     self.assert_count(1, task_queues.TaskDimensions)
     self.assertEqual([2980491642], task_queues.get_queues(bot_root_key))
