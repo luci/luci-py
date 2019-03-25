@@ -261,34 +261,49 @@ class CronCleanupExpiredHandler(webapp2.RequestHandler):
     time_to_stop = time.time() + 9*60
     now = utils.utcnow()
 
-    # Get the very oldest item. We suspect that the filter helps a bit with the
-    # query performance. This has to to be tested (and confirmed) on production.
+    # Get the very oldest item. The reason for keys_only=True is that we suspect
+    # (to be verified) that the datastore will accept more inconsistency, which
+    # increases the likelihood of not timing out.
     q = model.ContentEntry.query(
-          model.ContentEntry.expiration_ts < now).order(
-              model.ContentEntry.expiration_ts)
+        default_options=ndb.QueryOptions(keys_only=True)).order(
+            model.ContentEntry.expiration_ts)
+    entity = None
     try:
-      # This query may take more than 60s to complete, so increase the deadline.
-      entity = q.get(deadline=360)
-      if not entity:
-        logging.debug('No oldest found')
-        return
-      logging.debug('Oldest: %s', entity.expiration_ts)
-      if entity.expiration_ts >= now:
-        logging.info('Didn\'t expect %s, skipping', entity.expiration_ts)
-        return
+      key = q.get()
+      entity = key.get()
     except datastore_errors.Timeout:
-      logging.warning('Query timed out')
+      # This happens on prod instance with a huge table. We're talking range of
+      # 8 billions entities. This is because the query above is exact, not an
+      # estimation.
+      logging.warning('Query timed out; guessing instead')
+      for i in xrange(500, -1, -20):
+        q = model.ContentEntry.query(
+            model.ContentEntry.expiration_ts < now - datetime.timedelta(days=i))
+        try:
+          # Don't order() here otherwise the query will likely time out. Don't
+          # bother with keys_only=True since the lack of order() should suffice.
+          # Just find a goddam expired entity, that's sufficient for our needs.
+          entity = q.get()
+        except datastore_errors.Timeout:
+          logging.warning('Still no dice, got a timeout with %d days ago', i)
+        if entity:
+          logging.info('Found something %d days ago', i)
+          break
+    if not entity:
+      logging.debug('No oldest found')
       return
+    if entity.expiration_ts >= now:
+      logging.info('%s >= %s skipping', entity.expiration_ts, now)
+      return
+    logging.debug('Oldest: %s', entity.expiration_ts)
 
     # As a crude way to parallelise the query, shard subqueries to be bounded
     # per day. Normally there should be one day (or two when crossing midnight)
     # but not much more. When in backlogged mode, there could be many many days.
     oldest = datetime.datetime(*entity.expiration_ts.date().timetuple()[:3])
-    recent = datetime.datetime(*(now +
-      datetime.timedelta(days=1)).date().timetuple()[:3])
     triggered = 0
     days = 0
-    while oldest < recent:
+    while oldest < now:
       if time.time() >= time_to_stop:
         # The cron job ran for too long. There's a lot of backlog. Not a big
         # deal, it will be triggered again soon.
@@ -299,14 +314,17 @@ class CronCleanupExpiredHandler(webapp2.RequestHandler):
         break
 
       days += 1
-      data = {'start': oldest, 'end': oldest + datetime.timedelta(days=1)}
+      end = oldest + datetime.timedelta(days=1)
+      if end > now:
+        end = now
+      data = {'start': oldest, 'end': end}
       if utils.enqueue_task(
           '/internal/taskqueue/cleanup/query_expired',
           'cleanup-query-expired', payload=utils.encode_to_json(data)):
         triggered += 1
       else:
         logging.warning('Failed to trigger task for %s', data)
-      oldest = data['end']
+      oldest = end
     logging.info(
         'Triggered %d tasks for %d day(s) starting %s', triggered, days, oldest)
 
