@@ -261,17 +261,29 @@ class CronCleanupExpiredHandler(webapp2.RequestHandler):
     time_to_stop = time.time() + 9*60
     now = utils.utcnow()
 
-    # Get the very oldest item.
-    oldest = model.ContentEntry.query().order(
-        model.ContentEntry.expiration_ts).get()
-    if not oldest or oldest.expiration_ts >= now:
-      logging.debug('Nothing to delete')
+    # Get the very oldest item. We suspect that the filter helps a bit with the
+    # query performance. This has to to be tested (and confirmed) on production.
+    q = model.ContentEntry.query(
+          model.ContentEntry.expiration_ts < now).order(
+              model.ContentEntry.expiration_ts)
+    try:
+      # This query may take more than 60s to complete, so increase the deadline.
+      entity = q.get(deadline=360)
+      if not entity:
+        logging.debug('No oldest found')
+        return
+      logging.debug('Oldest: %s', entity.expiration_ts)
+      if entity.expiration_ts >= now:
+        logging.info('Didn\'t expect %s, skipping', entity.expiration_ts)
+        return
+    except datastore_errors.Timeout:
+      logging.warning('Query timed out')
       return
 
     # As a crude way to parallelise the query, shard subqueries to be bounded
     # per day. Normally there should be one day (or two when crossing midnight)
     # but not much more. When in backlogged mode, there could be many many days.
-    oldest = datetime.datetime(*oldest.expiration_ts.date().timetuple()[:3])
+    oldest = datetime.datetime(*entity.expiration_ts.date().timetuple()[:3])
     recent = datetime.datetime(*(now +
       datetime.timedelta(days=1)).date().timetuple()[:3])
     triggered = 0
@@ -281,8 +293,8 @@ class CronCleanupExpiredHandler(webapp2.RequestHandler):
         # The cron job ran for too long. There's a lot of backlog. Not a big
         # deal, it will be triggered again soon.
         break
-      if days == 20:
-        # Limit for now to 20 parallel queries at a time, we don't want to blow
+      if days == 40:
+        # Limit the number of parallel queries at a time, we don't want to blow
         # up quota.
         break
 
@@ -339,6 +351,7 @@ class TaskCleanupQueryExpiredHandler(webapp2.RequestHandler):
     data = json.loads(self.request.body)
     start = utils.parse_datetime(data['start'])
     end = utils.parse_datetime(data['end'])
+    logging.info('Deleting between %s and %s', start, end)
 
     triggered = 0
     total = 0

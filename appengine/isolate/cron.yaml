@@ -2,7 +2,7 @@ cron:
 - description: Delete old entities that have expired
   target: backend
   url: /internal/cron/cleanup/trigger/expired
-  schedule: every 15 minutes
+  schedule: every 20 minutes
 
 - description: Cron job that gathers statistics
   target: backend
