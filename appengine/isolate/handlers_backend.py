@@ -276,7 +276,7 @@ class CronCleanupExpiredHandler(webapp2.RequestHandler):
       # 8 billions entities. This is because the query above is exact, not an
       # estimation.
       logging.warning('Query timed out; guessing instead')
-      for i in xrange(500, -1, -20):
+      for i in xrange(360, -1, -20):
         q = model.ContentEntry.query(
             model.ContentEntry.expiration_ts < now - datetime.timedelta(days=i))
         try:
@@ -301,9 +301,10 @@ class CronCleanupExpiredHandler(webapp2.RequestHandler):
     # per day. Normally there should be one day (or two when crossing midnight)
     # but not much more. When in backlogged mode, there could be many many days.
     oldest = datetime.datetime(*entity.expiration_ts.date().timetuple()[:3])
+    current = oldest
     triggered = 0
     days = 0
-    while oldest < now:
+    while current < now:
       if time.time() >= time_to_stop:
         # The cron job ran for too long. There's a lot of backlog. Not a big
         # deal, it will be triggered again soon.
@@ -314,19 +315,20 @@ class CronCleanupExpiredHandler(webapp2.RequestHandler):
         break
 
       days += 1
-      end = oldest + datetime.timedelta(days=1)
+      end = current + datetime.timedelta(days=1)
       if end > now:
         end = now
-      data = {'start': oldest, 'end': end}
+      data = {'start': current, 'end': end}
       if utils.enqueue_task(
           '/internal/taskqueue/cleanup/query_expired',
           'cleanup-query-expired', payload=utils.encode_to_json(data)):
         triggered += 1
       else:
         logging.warning('Failed to trigger task for %s', data)
-      oldest = end
+      current = end
     logging.info(
-        'Triggered %d tasks for %d day(s) starting %s', triggered, days, oldest)
+        'Triggered %d tasks for %d day(s) starting %s up to %s',
+        triggered, days, oldest, now)
 
 
 class CronCleanupOrphanHandler(webapp2.RequestHandler):

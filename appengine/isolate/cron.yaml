@@ -7,7 +7,7 @@ cron:
 - description: Cron job that gathers statistics
   target: backend
   url: /internal/cron/stats/update
-  schedule: every 1 minutes
+  schedule: every 12 minutes
 
 - description: Cron job that sends statistics to BigQuery
   target: backend
