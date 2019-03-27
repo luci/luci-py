@@ -318,7 +318,7 @@ def update_replicas_task(auth_db_rev):
           'Datastore error when updating replica state: %s.\n'
           'Replica id is %s.', exc.__class__.__name__, replica.key.id())
       # Should retry the task because of this.
-      retry.add(replica)
+      retry.append(replica)
 
   # Retry the task if at least one replica reported a retryable error.
   return not retry
