@@ -1794,11 +1794,13 @@ class QueuesApiTest(BaseTest):
       u'items': [
         {
           u'dimensions': [u'id:bot123', u'pool:default'],
-          u'valid_until_ts': u'2010-01-03T04:14:07',
+          # This is a function of expiration_secs and
+          # task_queues._EXTEND_VALIDITY.
+          u'valid_until_ts': u'2010-01-03T07:14:07',
         },
         {
           u'dimensions': [u'os:Amiga', u'pool:default'],
-          u'valid_until_ts': u'2010-01-03T04:14:05',
+          u'valid_until_ts': u'2010-01-03T07:14:05',
         },
       ],
       u'now': u'2010-01-02T03:04:10',
@@ -1814,7 +1816,7 @@ class QueuesApiTest(BaseTest):
       u'items': [
         {
           u'dimensions': [u'os:Atari', u'pool:template'],
-          u'valid_until_ts': u'2010-01-03T04:14:06',
+          u'valid_until_ts': u'2010-01-03T07:14:06',
         },
       ],
       u'now': u'2010-01-02T03:04:10',

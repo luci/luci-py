@@ -55,7 +55,6 @@ import json
 import logging
 import random
 import struct
-import time
 
 from google.appengine.api import datastore_errors
 from google.appengine.api import memcache
@@ -64,17 +63,28 @@ from google.appengine.ext import ndb
 from components import datastore_utils
 from components import utils
 from server import config
-from server import task_pack
 
 
-# Frequency at which these entities must be refreshed. This value is a trade off
-# between constantly updating BotTaskDimensions and TaskDimensions vs keeping
-# them alive for longer than necessary, causing unnecessary queries in
-# get_queues() users.
+# Extends the validity of TaskDimensionsSet and BotTaskDimensions, added to the
+# incoming TaskRequest expiration_secs.
+#
+# This determines the frequency at which these entities must be refreshed. This
+# value is a trade off between constantly updating BotTaskDimensions and
+# TaskDimensions vs keeping them alive for longer than necessary, causing
+# unnecessary queries in get_queues() users.
 #
 # The 10 minutes delta is from assert_task() which advance the timer by a random
 # value to up 10 minutes early.
-_ADVANCE = datetime.timedelta(hours=1, minutes=10)
+#
+# For 8000 task queues, that gives a rate of (8000/(4*60*60)) 0.5QPS.
+_EXTEND_VALIDITY = datetime.timedelta(hours=4, minutes=10)
+
+
+# Additional time where TaskDimensionsSet (and by extension TaskDimensions) are
+# kept in the DB even if not applicable anymore. This is to reduce the
+# thundering-herd problem when a lot of tasks are created for queues with no
+# bot.
+_KEEP_DEAD = datetime.timedelta(days=1, minutes=10)
 
 
 class Error(Exception):
@@ -161,10 +171,16 @@ class TaskDimensionsSet(ndb.Model):
   # Validity time, at which this entity should be considered irrelevant.
   # Entities with valid_until_ts in the past are considered inactive and are not
   # used. valid_until_ts is set in assert_task() to "TaskRequest.expiration_ts +
-  # _ADVANCE". It is updated when an assert_task() call sees that valid_until_ts
-  # becomes lower than TaskRequest.expiration_ts for a later task. This enables
-  # not updating the entity too frequently, at the cost of keeping a dead queue
+  # _EXTEND_VALIDITY".
+  #
+  # It is updated when an assert_task() call sees that valid_until_ts becomes
+  # lower than TaskRequest.expiration_ts for a later task. This enables not
+  # updating the entity too frequently, at the cost of keeping a dead queue
   # "alive" for a bit longer than strictly necessary.
+  #
+  # In practice, do not remove this set until _KEEP_DEAD has expired, to
+  # further reduce the workload when tasks keep on coming when there's no bot
+  # available.
   valid_until_ts = ndb.DateTimeProperty()
 
   # 'key:value' strings. This is stored to enable match_bot(). This is important
@@ -174,6 +190,7 @@ class TaskDimensionsSet(ndb.Model):
 
   def match_bot(self, bot_dimensions):
     """Returns True if this bot can run this request dimensions set."""
+    # Always called via TaskDimensions.match_bot().
     for d in self.dimensions_flat:
       key, value = d.split(':', 1)
       if value not in bot_dimensions.get(key, []):
@@ -206,8 +223,10 @@ class TaskDimensions(ndb.Model):
   bot is triggered, which leads to have at <number of bots> TaskDimensions
   entities.
   """
-  # Lowest value of TaskDimensionsSet.valid_until_ts. See its documentation for
-  # more details.
+  # Lowest value of TaskDimensionsSet.valid_until_ts where this entity must be
+  # updated. See its documentation for more details.
+  #
+  # It may be in the past up to _KEEP_DEAD.
   valid_until_ts = ndb.ComputedProperty(
       lambda self: self._calc_valid_until_ts())
 
@@ -221,21 +240,24 @@ class TaskDimensions(ndb.Model):
       True if the entity was updated; it can be that a TaskDimensionsSet was
       added, updated or a stale one was removed.
     """
+    cutoff = now - _KEEP_DEAD
     s = self._match_request_flat(dimensions_flat)
-    if not s:
+    if s:
+      if s.valid_until_ts > valid_until_ts:
+        # It was updated already, skip storing again.
+        old = len(self.sets)
+        # Trim.
+        self.sets = [s for s in self.sets if s.valid_until_ts >= cutoff]
+        return len(self.sets) != old
+      # Bump valid_until_ts.
+      s.valid_until_ts = valid_until_ts
+    else:
       self.sets.append(
           TaskDimensionsSet(
               valid_until_ts=valid_until_ts, dimensions_flat=dimensions_flat))
-      self.sets = [s for s in self.sets if s.valid_until_ts >= now]
-      return True
-    if s.valid_until_ts < valid_until_ts:
-      s.valid_until_ts = valid_until_ts
-      self.sets = [s for s in self.sets if s.valid_until_ts >= now]
-      return True
-    # It was updated already, skip storing again.
-    old = len(self.sets)
-    self.sets = [s for s in self.sets if s.valid_until_ts >= now]
-    return len(self.sets) != old
+    # Trim.
+    self.sets = [s for s in self.sets if s.valid_until_ts >= cutoff]
+    return True
 
   def match_request(self, dimensions):
     """Confirms that this instance actually stores this set."""
@@ -251,6 +273,7 @@ class TaskDimensions(ndb.Model):
     for s in self.sets:
       if s.match_bot(bot_dimensions):
         return s
+    return None
 
   def _match_request_flat(self, dimensions_flat):
     d = frozenset(dimensions_flat)
@@ -362,7 +385,8 @@ def _update_BotTaskDimensions_slice(
   qit = q.iter(batch_size=100, deadline=15)
   while (yield qit.has_next_async()):
     task_dimensions = qit.next()
-    # match_bot() returns a TaskDimensionsSet if there's a match.
+    # match_bot() returns a TaskDimensionsSet if there's a match. It may still
+    # be expired.
     s = task_dimensions.match_bot(bot_dimensions)
     if s and s.valid_until_ts >= now:
       # Valid TaskDimensionsSet.
@@ -539,15 +563,19 @@ def _refresh_BotTaskDimensions(
 
 @ndb.tasklet
 def _tidy_stale_TaskDimensions(now):
-  """Removes all stale TaskDimensions entities."""
-  qit = TaskDimensions.query(TaskDimensions.valid_until_ts < now).iter(
+  """Removes all stale TaskDimensions entities.
+
+  Leave entities in the DB for at least _KEEP_DEAD to reduce churn.
+  """
+  cutoff = now - _KEEP_DEAD
+  qit = TaskDimensions.query(TaskDimensions.valid_until_ts < cutoff).iter(
       batch_size=64, keys_only=True)
   td = []
   while (yield qit.has_next_async()):
     key = qit.next()
     # This function takes care of confirming that the entity is indeed
     # expired.
-    res = yield _remove_old_entity_async(key, now)
+    res = yield _remove_old_entity_async(key, cutoff)
     td.append(res)
     if res:
       logging.info('- TD: %s', res.integer_id())
@@ -559,7 +587,7 @@ def _tidy_stale_BotTaskDimensions(now):
   """Removes all stale BotTaskDimensions entities.
 
   This also cleans up entities for bots that were deleted or that died, as the
-  corresponding will become stale after _ADVANCE.
+  corresponding will become stale after _EXTEND_VALIDITY.
   """
   qit = BotTaskDimensions.query(BotTaskDimensions.valid_until_ts < now).iter(
       batch_size=64, keys_only=True)
@@ -589,7 +617,7 @@ def _assert_task_props(properties, expiration_ts):
   if obj:
     # Reduce the check to be 5~10 minutes earlier to help reduce an attack of
     # task queues when there's a strong on-going load of tasks happening. This
-    # jitter is essentially removed from _ADVANCE window.
+    # jitter is essentially removed from _EXTEND_VALIDITY window.
     jitter = datetime.timedelta(seconds=random.randint(5*60, 10*60))
     valid_until_ts = expiration_ts - jitter
     s = obj.match_request(properties.dimensions)
@@ -617,7 +645,9 @@ def _assert_task_props(properties, expiration_ts):
   data = {
     u'dimensions': properties.dimensions,
     u'dimensions_hash': str(dimensions_hash),
-    u'valid_until_ts': expiration_ts + _ADVANCE,
+    # _EXTEND_VALIDITY here is a way to lower the QPS of the taskqueue
+    # 'rebuild-cache'.
+    u'valid_until_ts': expiration_ts + _EXTEND_VALIDITY,
   }
   payload = utils.encode_to_json(data)
 
@@ -794,6 +824,8 @@ def get_queues(bot_root_key):
   bot_id = bot_root_key.string_id()
   data = memcache.get(bot_id, namespace='task_queues')
   if data is not None:
+    # Note: This may return stale queues. We may want to change the format to
+    # include the expiration.
     logging.debug(
         'get_queues(%s): can run from %d queues (memcache)\n%s',
         bot_id, len(data), data)
@@ -874,8 +906,8 @@ def rebuild_task_cache(payload):
   - payload: dict as created in assert_task() with:
     - 'dimensions': dict of task dimensions to refresh
     - 'dimensions_hash': precalculated hash for dimensions
-    - 'valid_until_ts': expiration_ts + _ADVANCE for how long this cache is
-      valid
+    - 'valid_until_ts': expiration_ts + _EXTEND_VALIDITY for how long this cache
+      is valid
 
   Returns:
     True if everything was processed, False if it needs to be retried.
@@ -892,7 +924,9 @@ def rebuild_task_cache(payload):
   dimensions_flat.sort()
 
   now = utils.utcnow()
+  # Number of BotTaskDimensions entities that were created/updated in the DB.
   updated = 0
+  # Number of BotTaskDimensions entities that matched this task queue.
   viable = 0
   try:
     pending = []
@@ -905,41 +939,93 @@ def rebuild_task_cache(payload):
       done, pending = _cap_futures(pending)
       updated += sum(1 for i in done if i)
     updated += sum(1 for i in _flush_futures(pending) if i)
-    logging.debug('updated %d; getting reading for transaction', updated)
+    # The main reason for this log entry is to confirm the timing of the first
+    # part (updating BotTaskDimensions) versus the second part (updating
+    # TaskDimensions).
+    logging.debug('Updated %d BotTaskDimensions', updated)
 
     # Done updating, now store the entity. Must use a transaction as there could
     # be other dimensions set in the entity.
     task_dims_key = _get_task_dims_key(dimensions_hash, dimensions)
-    def run():
-      obj = task_dims_key.get()
-      if not obj:
-        obj = TaskDimensions(key=task_dims_key)
-      if obj.assert_request(now, valid_until_ts, dimensions_flat):
-        if not obj.sets:
-          obj.key.delete()
-          return None
-        obj.put()
-      return obj
 
-    try:
-      # Retry often. This transaction tends to fail frequently, and this is
-      # running from a task queue so it's fine if it takes more time, success is
-      # more important.
-      datastore_utils.transaction(run, retries=4)
-    except datastore_utils.CommitError as e:
-      # Still log an error but no need for a stack trace in the logs. It is
-      # important to surface that the call failed so the task queue is retried
-      # later.
-      logging.warning('Failed updating TaskDimensions: %s; reenqueuing', e)
-      return False
+    # First do a dry run. If the dry run passes, skip the transaction.
+    #
+    # The rationale is that there can be concurrent trigger of this taskqueue
+    # (rebuild-cache) when there are conccurent task creation. The dry run cost
+    # not much overhead and if it passes, it saves transaction contention.
+    #
+    # The transaction contention can be problematic on pool with a high
+    # cardinality of the dimension sets.
+    obj = task_dims_key.get()
+    if not obj or obj.assert_request(now, valid_until_ts, dimensions_flat):
+      def _run():
+        action = None
+        obj = task_dims_key.get()
+        if not obj:
+          obj = TaskDimensions(key=task_dims_key)
+          action = 'created'
+        if obj.assert_request(now, valid_until_ts, dimensions_flat):
+          if action:
+            action = 'updated'
+          if not obj.sets:
+            obj.key.delete()
+            return 'deleted'
+          obj.put()
+        return action
+
+      # Do an adhoc transaction instead of using datastore_utils.transaction().
+      # This is because for some pools, the transaction rate may be so high that
+      # it's impossible to get a good performance on the entity group.
+      #
+      # In practice the odds of conflict is ~nil, because it can only conflict
+      # if a TaskDimensions.set has more than one item and this happens when
+      # there's a hash conflict (odds 2^31) plus two concurrent task running
+      # simultaneously (over _EXTEND_VALIDITY period) so we can do it in a more
+      # adhoc way.
+      key = '%s:%s' % (
+          task_dims_key.parent().string_id(), task_dims_key.string_id())
+      if not memcache.add(key, True, time=60, namespace='task_queues_tx'):
+        # add() returns True if the entry was added, False otherwise. That's
+        # perfect.
+        logging.warning('Failed taking pseudo-lock for %s; reenqueuing', key)
+        return False
+      try:
+        action = _run()
+      finally:
+        memcache.delete(key, namespace='task_queues_tx')
+
+      # Keeping this dead code for now, in case we find a solution for the
+      # transaction rate issue.
+      #try:
+      #  action = datastore_utils.transaction(_run, retries=4)
+      #except datastore_utils.CommitError as e:
+      #  # Still log an error but no need for a stack trace in the logs. It is
+      #  # important to surface that the call failed so the task queue is
+      #  # retried later.
+      #  logging.warning('Failed updating TaskDimensions: %s; reenqueuing', e)
+      #  return False
+
+      if action:
+        # Only log at info level when something was done. This helps scanning
+        # quickly the logs.
+        logging.info('Did %s', action)
+      else:
+        logging.debug('Did nothing')
+    else:
+      logging.debug('Skipped transaction!')
   finally:
     # Any of the _refresh_BotTaskDimensions() calls above could throw. Still log
     # how far we went.
-    logging.debug(
-        'rebuild_task_cache(%d) in %.3fs. viable bots: %d; bots updated: %d\n'
-        '%s',
-        dimensions_hash, (utils.utcnow()-now).total_seconds(), viable, updated,
-        '\n'.join('  ' + d for d in dimensions_flat))
+    msg = (
+      'rebuild_task_cache(%d) in %.3fs. viable bots: %d; bots updated: %d\n%s')
+    dims = '\n'.join('  ' + d for d in dimensions_flat)
+    duration = (utils.utcnow()-now).total_seconds()
+    # Only log at info level when something was done. This helps scanning
+    # quickly the logs.
+    if updated:
+      logging.info(msg, dimensions_hash, duration, viable, updated, dims)
+    else:
+      logging.debug(msg, dimensions_hash, duration, viable, updated, dims)
   return True
 
 
