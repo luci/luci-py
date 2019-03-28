@@ -1656,16 +1656,27 @@ class TaskApiTest(BaseTest):
 
     self.set_as_privileged_user()
     run_id = task_id[:-1] + '1'
-    expected = {u'output': u'rÉsult string'}
+    expected = {u'output': u'rÉsult string', u'state': u'COMPLETED'}
     for i in (task_id, run_id):
       response = self.call_api('stdout', body={'task_id': i})
       self.assertEqual(expected, response.json)
+
+    # Partial fetch.
+    req = {'task_id': task_id, 'offset': 1, 'length': 2}
+    response = self.call_api('stdout', body=req)
+    # This is because it's counting in bytes, not in unicode characters:
+    expected = {u'output': u'É', u'state': u'COMPLETED'}
+    self.assertEqual(expected, response.json)
+    req = {'task_id': task_id, 'offset': 3, 'length': 5}
+    response = self.call_api('stdout', body=req)
+    expected = {u'output': u'sult ', u'state': u'COMPLETED'}
+    self.assertEqual(expected, response.json)
 
   def test_stdout_empty(self):
     """Asserts that incipient tasks produce no output."""
     _, task_id = self.client_create_task_raw()
     response = self.call_api('stdout', body={'task_id': task_id})
-    self.assertEqual({}, response.json)
+    self.assertEqual({u'state': u'NO_RESOURCE'}, response.json)
 
     run_id = task_id[:-1] + '1'
     self.call_api('stdout', body={'task_id': run_id}, status=404)
@@ -1701,7 +1712,8 @@ class TaskApiTest(BaseTest):
 
     # results shouldn't change, even if the second task wasn't executed
     response = self.call_api('stdout', body={'task_id': task_id_2})
-    self.assertEqual({'output': u'rÉsult string'}, response.json)
+    expected = {'output': u'rÉsult string', u'state': u'COMPLETED'}
+    self.assertEqual(expected, response.json)
 
   def test_request_unknown(self):
     """Asserts that 404 is raised for unknown tasks."""

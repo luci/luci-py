@@ -316,6 +316,13 @@ TaskCancel = endpoints.ResourceContainer(
     task_id=messages.StringField(1, required=True))
 
 
+TaskIdWithOffset = endpoints.ResourceContainer(
+    message_types.VoidMessage,
+    task_id=messages.StringField(1, required=True),
+    offset=messages.IntegerField(2, default=0),
+    length=messages.IntegerField(3, default=0))
+
+
 @swarming_api.api_class(resource_name='task', path='task')
 class SwarmingTaskService(remote.Service):
   """Swarming's task-related API."""
@@ -384,24 +391,27 @@ class SwarmingTaskService(remote.Service):
 
   @gae_ts_mon.instrument_endpoint()
   @auth.endpoints_method(
-      TaskId, swarming_rpcs.TaskOutput,
+      TaskIdWithOffset, swarming_rpcs.TaskOutput,
       name='stdout',
       path='{task_id}/stdout',
       http_method='GET')
   @auth.require(acl.can_access)
   def stdout(self, request):
     """Returns the output of the task corresponding to a task ID."""
-    # TODO(maruel): Add streaming. Real streaming is not supported by AppEngine
-    # v1.
-    # TODO(maruel): Send as raw content instead of encoded. This is not
-    # supported by cloud endpoints.
     logging.debug('%s', request)
-    # The result must be fetched to know the right run_result_key to use.
+    if not request.length:
+      # Maximum content fetched at once, mostly for compatibility with previous
+      # behavior. pRPC implementation should limit to a multiple of CHUNK_SIZE
+      # (one or two?) for efficiency.
+      request.length = 16*1000*1024
     _, result = _get_request_and_result(request.task_id, _VIEW, True)
-    output = result.get_output()
+    output = result.get_output(request.offset or 0, request.length)
     if output:
+      # That was an error, don't do that in pRPC:
       output = output.decode('utf-8', 'replace')
-    return swarming_rpcs.TaskOutput(output=output)
+    return swarming_rpcs.TaskOutput(
+        output=output,
+        state=swarming_rpcs.TaskState(result.state))
 
 
 TasksRequest = endpoints.ResourceContainer(

@@ -211,62 +211,17 @@ class TaskOutput(ndb.Model):
   # The maximum size for each TaskOutputChunk.chunk. The rationale is that
   # appending data to an entity requires reading it first, so it must not be too
   # big. On the other hand, having thousands of small entities is pure overhead.
-  # TODO(maruel): This value was selected from guts feeling. Do proper load
-  # testing to find the best value.
   # TODO(maruel): This value should be stored in the entity for future-proofing.
   # It can't be changed until then.
   CHUNK_SIZE = 100*1024
 
-  # Maximum content saved in a TaskOutput.
-  # It is a safe-guard for tasks that sends way too much data. 100Mb should be
-  # enough stdout.
-  PUT_MAX_CONTENT = 100*1024*1024
-
   # Maximum number of chunks.
-  PUT_MAX_CHUNKS = PUT_MAX_CONTENT / CHUNK_SIZE
+  PUT_MAX_CHUNKS = 1024
 
-  # Hard limit on the amount of data returned by get_output_async() at once.
-  # Eventually, we'll want to add support for chunked fetch, if desired. Because
-  # CHUNK_SIZE is hardcoded, it's not exactly 16Mb.
-  FETCH_MAX_CONTENT = 16*1000*1024
-
-  # Maximum number of chunks to fetch at once.
-  FETCH_MAX_CHUNKS = FETCH_MAX_CONTENT / CHUNK_SIZE
-
-  # It is easier if there is no remainder for efficiency.
-  assert (PUT_MAX_CONTENT % CHUNK_SIZE) == 0
-  assert (FETCH_MAX_CONTENT % CHUNK_SIZE) == 0
-
+  # Maximum content size saved in a TaskOutput.
   @classmethod
-  @ndb.tasklet
-  def get_output_async(cls, output_key, number_chunks):
-    """Returns the stdout for the task as a ndb.Future."""
-    # TODO(maruel): Save number_chunks locally in this entity.
-    if not number_chunks:
-      raise ndb.Return(None)
-
-    number_chunks = min(number_chunks, cls.FETCH_MAX_CHUNKS)
-
-    # TODO(maruel): Always get one more than necessary, in case number_chunks
-    # is invalid. If there's an unexpected TaskOutputChunk entity present,
-    # continue fetching for more incrementally.
-    parts = []
-    for f in ndb.get_multi_async(
-        _output_key_to_output_chunk_key(output_key, i)
-        for i in xrange(number_chunks)):
-      chunk = yield f
-      parts.append(chunk.chunk if chunk else None)
-
-    # Trim ending empty chunks.
-    while parts and not parts[-1]:
-      parts.pop()
-
-    # parts is now guaranteed to not end with an empty chunk.
-    # Replace any missing chunk.
-    for i in xrange(len(parts)):
-      if not parts[i]:
-        parts[i] = '\x00' * cls.CHUNK_SIZE
-    raise ndb.Return(''.join(parts))
+  def PUT_MAX_CONTENT(cls):
+    return cls.PUT_MAX_CHUNKS * cls.CHUNK_SIZE
 
 
 class TaskOutputChunk(ndb.Model):
@@ -787,24 +742,49 @@ class _TaskResultCommon(ndb.Model):
     if not self.server_versions or self.server_versions[-1] != server_version:
       self.server_versions.append(server_version)
 
-  def get_output(self):
-    """Returns the output, either as str or None if no output is present."""
-    return self.get_output_async().get_result()
+  def get_output(self, offset, length):
+    """Returns the stdout content for this task.
 
-  @ndb.tasklet
-  def get_output_async(self):
-    """Returns the stdout as a ndb.Future.
+    Arguments:
+      offset: offset in the stream which start returning the data.
+      length: chunk size to return. If 0, fetch the whole content.
 
-    Use out.get_result() to get the data as a str or None if no output is
-    present.
+    Returns:
+      str with content, None if there wasn't any content.
     """
-    if not self.run_result_key or not self.stdout_chunks:
-      # The task was not reaped or no output was streamed for this index yet.
-      raise ndb.Return(None)
+    run_result_key = self.run_result_key
+    if not run_result_key or not self.stdout_chunks:
+      # The task was not reaped or no output was streamed yet.
+      return None
 
-    output_key = _run_result_key_to_output_key(self.run_result_key)
-    out = yield TaskOutput.get_output_async(output_key, self.stdout_chunks)
-    raise ndb.Return(out)
+    chunk_size = TaskOutput.CHUNK_SIZE
+    length = length or (self.stdout_chunks * chunk_size - offset)
+
+    # Determine which chunks to fetch.
+    first_chunk = offset / chunk_size
+    end = offset + length
+    last_chunk = min((end + chunk_size-1) / chunk_size, self.stdout_chunks)
+
+    # Retrieve the subset of TaskOutputChunk needed.
+    output_key = _run_result_key_to_output_key(run_result_key)
+    keys = [
+      _output_key_to_output_chunk_key(output_key, i)
+      for i in xrange(first_chunk, last_chunk)
+    ]
+    void = None
+    parts = []
+    for e in ndb.get_multi(keys):
+      if e:
+        parts.append(e.chunk)
+      else:
+        if not void:
+          void = '\x00' * TaskOutput.CHUNK_SIZE
+        parts.append(void)
+
+    # Process the output.
+    start_offset = offset % chunk_size
+    end_offset = end - (first_chunk * chunk_size)
+    return ''.join(parts)[start_offset:end_offset]
 
   def _pre_put_hook(self):
     """Use extra validation that cannot be validated throught 'validator'."""

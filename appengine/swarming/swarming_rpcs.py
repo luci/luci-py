@@ -564,6 +564,8 @@ class TasksCancelResponse(messages.Message):
 class TaskOutput(messages.Message):
   """A task's output as a string."""
   output = messages.StringField(1)
+  # Current state of the task (e.g. PENDING, RUNNING, COMPLETED, EXPIRED, etc).
+  state = messages.EnumField(TaskState, 2)
 
 
 class TaskResult(messages.Message):

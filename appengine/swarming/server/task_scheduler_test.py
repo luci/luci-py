@@ -1256,6 +1256,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
           ])
 
   def test_bot_update_task(self):
+    self.mock(task_result.TaskOutput, 'CHUNK_SIZE', 2)
     run_result = self._quick_reap(1, 0)
     self.assertEqual(
         State.RUNNING,
@@ -1287,9 +1288,10 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
             cost_usd=0.1,
             outputs_ref=None,
             performance_stats=None))
-    self.assertEqual('hihey', run_result.key.get().get_output())
+    self.assertEqual('hihey', run_result.key.get().get_output(0, 0))
 
   def test_bot_update_task_new_overwrite(self):
+    self.mock(task_result.TaskOutput, 'CHUNK_SIZE', 2)
     run_result = self._quick_reap(1, 0)
     self.assertEqual(
         State.RUNNING,
@@ -1321,7 +1323,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
             cost_usd=0.1,
             outputs_ref=None,
             performance_stats=None))
-    self.assertEqual('hhey', run_result.key.get().get_output())
+    self.assertEqual('hhey', run_result.key.get().get_output(0, 0))
 
   def test_bot_update_exception(self):
     run_result = self._quick_reap(1, 0)
