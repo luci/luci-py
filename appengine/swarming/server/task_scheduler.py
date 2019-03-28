@@ -826,8 +826,8 @@ def _ensure_active_slice(request, try_number, task_slice_index):
                     request, try_number, task_slice_index)
       return new_to_run
 
-    logging.error('_ensure_active_slice(%s, %d, %d): no pending TaskToRun',
-                  request, try_number, task_slice_index)
+    logging.warning('_ensure_active_slice(%s, %d, %d): no pending TaskToRun',
+                    request, try_number, task_slice_index)
     return None
 
   return datastore_utils.transaction(run)
