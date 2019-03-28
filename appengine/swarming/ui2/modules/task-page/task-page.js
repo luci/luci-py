@@ -1127,7 +1127,10 @@ time.sleep(${leaseDuration})`];
     fetch(`/_ah/api/swarming/v1/task/${this._taskId}/stdout`, extra)
       .then(jsonOrThrow)
       .then((json) => {
-        this._stdout = json.output;
+        const s = json.output || '';
+        // Remove carriage returns for easier copy-paste and presentation.
+        // https://crbug.com/944974
+        this._stdout = s.replace(/\r\n/g, '\n');
         this.render();
         this.app.finishedTask();
       })

@@ -397,6 +397,9 @@ describe('task-page', function() {
           const logs = $$('.stdout.code', ele);
           expect(logs).toBeTruthy();
           expect(logs.textContent).toContain('Lorem ipsum dolor');
+          // The carriage returns can cause issues when copy-pasting
+          // https://crbug.com/944974
+          expect(logs.textContent).not.toContain('\r\n', `no \r\n`);
           expect(logs).not.toHaveClass('wide');
           done();
         });
