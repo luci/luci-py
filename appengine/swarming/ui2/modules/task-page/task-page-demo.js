@@ -25,8 +25,41 @@ fetchMock.get('glob:/_ah/api/swarming/v1/task/*/result?include_performance_stats
 fetchMock.get('glob:/_ah/api/swarming/v1/task/*/result',
               requireLogin(taskResult, 600));
 
-fetchMock.get('glob:/_ah/api/swarming/v1/task/*/stdout',
-              requireLogin(taskOutput, 2000));
+let stdoutCounter = 1; // put at 1 so in demo we don't have to wait
+fetchMock.get('glob:/_ah/api/swarming/v1/task/*/stdout*',
+              requireLogin((url, opts) => {
+                // Return pending and '',
+                // running and partial content
+                // stopped and remaining content
+                switch(stdoutCounter) {
+                  case 0:
+                    stdoutCounter++;
+                    return {
+                      'output': '',
+                      'state': 'PENDING',
+                    };
+                  case 1:
+                    stdoutCounter++;
+                    return {
+                      'output': taskOutput.substring(0, 100),
+                      'state': 'RUNNING',
+                    };
+                  case 2:
+                    stdoutCounter++;
+                    return {
+                      'output': taskOutput.substring(100, 300),
+                      'state': 'RUNNING',
+                    };
+                  case 3:
+                    stdoutCounter = 1; // skip pending for faster local dev
+                                       // set to 0 for fuller testing
+                    return {
+                      'output': taskOutput.substring(300),
+                      'state': 'COMPLETED',
+                    };
+                }
+
+              }, 800));
 
 function randomInt(min, max) {
   return Math.floor(Math.random() * (max-min) + min);

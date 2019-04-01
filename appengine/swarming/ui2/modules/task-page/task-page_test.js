@@ -104,13 +104,14 @@ describe('task-page', function() {
       if (!emptyTaskId) {
         ele._taskId = TEST_TASK_ID;
       }
+      ele._logFetchPeriod = 10; // 10ms
       userLogsIn(ele, () => {
         test(ele);
       });
     });
   }
 
-  function serveTask(idx, msg) {
+  function serveTask(idx, msg, nostdout) {
     // msg is the name field in the task request, used to 1) give a human
     // readable description of the task data inline of the test and 2)
     // lessen the risk of copy-pasta mistakes.
@@ -126,7 +127,13 @@ describe('task-page', function() {
       // so pass in some data for that.
       fetchMock.get('glob:/_ah/api/swarming/v1/task/*/result', taskResults[1]);
     }
-    fetchMock.get(`/_ah/api/swarming/v1/task/${TEST_TASK_ID}/stdout`, taskOutput);
+    if (!nostdout) {
+      fetchMock.get(`/_ah/api/swarming/v1/task/${TEST_TASK_ID}/stdout?offset=0&length=102400`, {
+        state: 'COMPLETED',
+        output: taskOutput,
+      });
+    }
+
     fetchMock.get('glob:/_ah/api/swarming/v1/bots/count?*', {
       busy: 1024,
       count: 1337,
@@ -879,7 +886,7 @@ describe('task-page', function() {
         expect(gets).toContain(`/_ah/api/swarming/v1/task/${TEST_TASK_ID}/request`);
         expect(gets).toContain(`/_ah/api/swarming/v1/task/${TEST_TASK_ID}/result`+
                                '?include_performance_stats=true');
-        expect(gets).toContain(`/_ah/api/swarming/v1/task/${TEST_TASK_ID}/stdout`);
+        expect(gets).toContain(`/_ah/api/swarming/v1/task/${TEST_TASK_ID}/stdout?offset=0&length=102400`);
         expect(gets).toContain('/_ah/api/swarming/v1/task/test0b3c0fac78101/result');
         expect(gets).toContain('/_ah/api/swarming/v1/task/test0b3c0fac78102/result');
 
@@ -902,7 +909,7 @@ describe('task-page', function() {
         expect(gets).toContain(`/_ah/api/swarming/v1/task/${TEST_TASK_ID}/request`);
         expect(gets).toContain(`/_ah/api/swarming/v1/task/${TEST_TASK_ID}/result`+
                                '?include_performance_stats=true');
-        expect(gets).toContain(`/_ah/api/swarming/v1/task/${TEST_TASK_ID}/stdout`);
+        expect(gets).toContain(`/_ah/api/swarming/v1/task/${TEST_TASK_ID}/stdout?offset=0&length=102400`);
         // spot check one of the counts
         expect(gets).toContain('/_ah/api/swarming/v1/bots/count?'+
           'dimensions=builder%3Alinux_chromium_cfi_rel_ng&'+
@@ -930,7 +937,7 @@ describe('task-page', function() {
         expect(gets).toContain(`/_ah/api/swarming/v1/task/${TEST_TASK_ID}/request`);
         expect(gets).toContain(`/_ah/api/swarming/v1/task/${TEST_TASK_ID}/result`+
                                '?include_performance_stats=true');
-        expect(gets).toContain(`/_ah/api/swarming/v1/task/${TEST_TASK_ID}/stdout`);
+        expect(gets).toContain(`/_ah/api/swarming/v1/task/${TEST_TASK_ID}/stdout?offset=0&length=102400`);
         expect(gets).toContain('/_ah/api/swarming/v1/tasks/count?start=1549212360&state=RUNNING&'+
           'tags=device_os%3AN&tags=os%3AAndroid&tags=pool%3AChrome-GPU&tags=device_type%3Afoster');
 
@@ -1111,6 +1118,36 @@ describe('task-page', function() {
           expectNoUnmatchedCalls(fetchMock);
           done();
         });
+      });
+    });
+
+    it('pages stdout', function(done) {
+      jasmine.clock().uninstall(); // re-enable setTimeout
+      serveTask(0, 'running task on try number 3', true);
+      const FIRST_LINE = 'first log line\n';
+      const SECOND_LINE = 'second log line\r\n';
+      const THIRD_LINE = 'third log line\n';
+      fetchMock.get(`/_ah/api/swarming/v1/task/${TEST_TASK_ID}/stdout?offset=0&length=102400`, {
+        state: 'RUNNING',
+        output: FIRST_LINE,
+      }, { overwriteRoutes: true });
+      fetchMock.get(`/_ah/api/swarming/v1/task/${TEST_TASK_ID}/stdout?offset=${FIRST_LINE.length}`+
+          '&length=102400', {
+        state: 'RUNNING',
+        output: SECOND_LINE,
+      }, { overwriteRoutes: true });
+      fetchMock.get(`/_ah/api/swarming/v1/task/${TEST_TASK_ID}/stdout?`+
+          `offset=${FIRST_LINE.length + SECOND_LINE.length}&length=102400`, {
+        state: 'COMPLETED',
+        output: THIRD_LINE,
+      }, { overwriteRoutes: true });
+
+      loggedInTaskPage((ele) => {
+        expectNoUnmatchedCalls(fetchMock);
+        // The \r\n should be filtered out, and everything is appended.
+        expect(ele._stdout).toBe('first log line\nsecond log line\nthird log line\n');
+
+        done();
       });
     });
 
