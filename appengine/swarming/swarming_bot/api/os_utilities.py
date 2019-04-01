@@ -201,9 +201,9 @@ def get_os_name():
       os_release = dict(l.split('=', 1) for l in content.splitlines() if l)
       os_id = os_release.get('ID').strip('"')
       # Uppercase the first letter for consistency with the other platforms.
-      return unicode(os_id[0].upper() + os_id[1:])
+      return (os_id[0].upper() + os_id[1:]).decode('utf-8')
 
-  return unicode(sys.platform)
+  return sys.platform.decode('utf-8')
 
 
 @tools.cached
@@ -216,7 +216,7 @@ def get_cpu_type():
     return u'arm64'
   if machine == 'mips64':
     return u'mips'
-  return unicode(machine)
+  return machine.decode('utf-8')
 
 
 @tools.cached
@@ -343,7 +343,7 @@ def get_hostname():
     meta = platforms.gce.get_metadata() or {}
     hostname = meta.get('instance', {}).get('hostname')
     if hostname:
-      return unicode(hostname)
+      return hostname.decode('utf-8')
 
   # Windows enjoys putting random case in there. Enforces lower case for sanity.
   hostname = socket.getfqdn().lower()
@@ -352,7 +352,7 @@ def get_hostname():
     # address reversed, which is not useful. Get the base hostname as defined by
     # the host itself instead of the FQDN since the returned FQDN is useless.
     hostname = socket.gethostname()
-  return unicode(hostname)
+  return hostname.decode('utf-8')
 
 
 @tools.cached
@@ -691,7 +691,7 @@ def get_python_packages():
     env = os.environ.copy()
     env['PIP_DISABLE_PIP_VERSION_CHECK'] = '1'
     cmd = ['pip', 'freeze']
-    return unicode(subprocess.check_output(cmd, env=env)).splitlines()
+    return subprocess.check_output(cmd, env=env).decode('utf-8').splitlines()
   except (subprocess.CalledProcessError, OSError):
     return None
 
@@ -936,13 +936,13 @@ def get_dimensions():
     u'os': get_os_values(),
     # This value is frequently overridden by bots.cfg via luci-config.
     u'pool': [u'default'],
-    u'python': [unicode(sys.version).split()[0]],
+    u'python': [sys.version.decode('utf-8').split()[0]],
   }
 
   # Conditional dimensions:
   id_override = os.environ.get('SWARMING_BOT_ID')
   if id_override:
-    dimensions[u'id'] = [unicode(id_override)]
+    dimensions[u'id'] = [id_override.decode('utf-8')]
 
   caches = get_named_caches_info()
   if caches:
@@ -1045,7 +1045,7 @@ def get_state():
     # Only including a subset of the environment variable, as state is not
     # designed to sustain large load at the moment.
     u'env': {
-      u'PATH': os.environ[u'PATH'],
+      u'PATH': os.environ[u'PATH'].decode('utf-8'),
     },
     u'gpu': get_gpu()[1],
     u'hostname': get_hostname(),
@@ -1053,9 +1053,9 @@ def get_state():
     u'nb_files_in_temp': nb_files_in_temp,
     u'pid': os.getpid(),
     u'python': {
-      u'executable': unicode(sys.executable),
+      u'executable': sys.executable.decode('utf-8'),
       u'packages': get_python_packages(),
-      u'version': unicode(sys.version),
+      u'version': sys.version.decode('utf-8'),
     },
     u'ram': get_physical_ram(),
     u'running_time': int(round(time.time() - _STARTED_TS)),
@@ -1083,7 +1083,7 @@ def get_state():
 
     docker_host_hostname = os.environ.get('DOCKER_HOST_HOSTNAME')
     if docker_host_hostname:
-      state[u'docker_host_hostname'] = unicode(docker_host_hostname)
+      state[u'docker_host_hostname'] = docker_host_hostname.decode('utf-8')
 
   # Put an arbitrary limit on the amount of junk that can stay in TEMP.
   if nb_files_in_temp == 'N/A':

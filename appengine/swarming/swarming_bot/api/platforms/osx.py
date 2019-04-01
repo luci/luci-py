@@ -350,9 +350,10 @@ def _get_xcode_version(xcode_app):
       xcode_app, 'Contents', 'Developer', 'usr', 'bin', 'xcodebuild')
   if os.path.exists(xcodebuild):
     try:
-      out = subprocess.check_output([xcodebuild, '-version']).splitlines()
+      out = subprocess.check_output([xcodebuild, '-version'])
     except subprocess.CalledProcessError:
       return None
+    out = out.decode('utf-8').splitlines()
     return out[0].split()[-1], out[1].split()[-1]
 
 
@@ -362,7 +363,7 @@ def _get_xcode_version(xcode_app):
 def get_xcode_state():
   """Returns the state of Xcode installations on this machine."""
   state = {}
-  applications_dir = os.path.join('/Applications')
+  applications_dir = u'/Applications'
   for app in os.listdir(applications_dir):
     name, ext = os.path.splitext(app)
     if name.startswith('Xcode') and ext == '.app':
@@ -370,14 +371,14 @@ def get_xcode_state():
       version = _get_xcode_version(xcode_app)
       if version:
         state[xcode_app] = {
-          'version': version[0],
-          'build version': version[1],
+          u'version': version[0],
+          u'build version': version[1],
         }
         device_support_dir = os.path.join(
             xcode_app, 'Contents', 'Developer', 'Platforms',
             'iPhoneOS.platform', 'DeviceSupport')
         if os.path.exists(device_support_dir):
-          state[xcode_app]['device support'] = os.listdir(device_support_dir)
+          state[xcode_app][u'device support'] = os.listdir(device_support_dir)
   return state
 
 
@@ -390,9 +391,10 @@ def get_xcode_versions():
 def get_current_xcode_version():
   """Returns the active version of Xcode."""
   try:
-    out = subprocess.check_output(['xcodebuild', '-version']).splitlines()
+    out = subprocess.check_output(['xcodebuild', '-version'])
   except (OSError, subprocess.CalledProcessError):
     return None
+  out = out.decode('utf-8').splitlines()
   return out[0].split()[-1], out[1].split()[-1]
 
 
