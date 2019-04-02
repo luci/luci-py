@@ -302,6 +302,7 @@ class DeleteTasksHandler(webapp2.RequestHandler):
 class TaskDimensionsHandler(webapp2.RequestHandler):
   """Refreshes the active task queues."""
 
+  @decorators.silence(datastore_errors.Timeout)
   @decorators.require_taskqueue('rebuild-task-cache')
   def post(self):
     if not task_queues.rebuild_task_cache(self.request.body):
