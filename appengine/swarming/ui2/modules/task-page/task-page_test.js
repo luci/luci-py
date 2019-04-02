@@ -1151,6 +1151,16 @@ describe('task-page', function() {
           'this is cutoff on the second log line\n',
           'third log line\n',
           ]);
+        const calls = fetchMock.calls(MATCHED, 'GET').map((arr) => arr[0]);
+        const callsToResult = calls.filter(
+          (url) => url.indexOf(`/_ah/api/swarming/v1/task/${TEST_TASK_ID}/result`) >= 0);
+        const callsToRequest = calls.filter(
+          (url) => url === `/_ah/api/swarming/v1/task/${TEST_TASK_ID}/request`);
+
+        // We expect the requests and results to be fetched after
+        // the logs notice the state has changed from RUNNING to COMPLETED.
+        expect(callsToResult.length).toEqual(2);
+        expect(callsToRequest.length).toEqual(2);
 
         done();
       });

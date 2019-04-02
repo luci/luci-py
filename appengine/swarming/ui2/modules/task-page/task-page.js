@@ -57,8 +57,6 @@ const idAndButtons = (ele) => {
   return html`
 <div class=id_buttons>
   <input id=id_input placeholder="Task ID" @change=${ele._updateID}></input>
-  <button title="Refresh data"
-          @click=${ele._fetch}>refresh</button>
   <button title="Retry the task"
           @click=${ele._promptRetry} class=retry
           ?hidden=${!canRetry(ele._request)}>retry</button>
@@ -1109,7 +1107,13 @@ time.sleep(${leaseDuration})`];
       headers: {'authorization': this.auth_header},
       signal: this._fetchController.signal,
     };
-    this.app.addBusyTasks(3);
+
+    this._fetchTaskInfo(extra);
+    this._fetchStdOut(extra);
+  }
+
+  _fetchTaskInfo(extra) {
+    this.app.addBusyTasks(2);
     let currIdx = -1;
     fetch(`/_ah/api/swarming/v1/task/${this._taskId}/request`, extra)
       .then(jsonOrThrow)
@@ -1152,16 +1156,23 @@ time.sleep(${leaseDuration})`];
         this.app.finishedTask();
       })
       .catch((e) => this.fetchError(e, 'task/result'));
+  }
 
+  _fetchStdOut(extra) {
+    this.app.addBusyTasks(1);
     // Fetching stdout piece by piece like this is not perfect. Namely, the server
     // breaks at arbitrary byte points, and JS will treat that as the end of a
     // string, so this may not look good if we routinely break multi-byte
     // unicode characters apart.
+    let previousState = '';
     const fetchNextStdout = () => {
     fetch(`/_ah/api/swarming/v1/task/${this._taskId}/stdout?offset=${this._stdoutOffset}&`+
           `length=${STDOUT_REQUEST_SIZE}`, extra)
       .then(jsonOrThrow)
       .then((json) => {
+        if (!previousState) {
+          previousState = json.state;
+        }
         const s = json.output || '';
         this._stdoutOffset += s.length;
         // Remove carriage returns for easier copy-paste and presentation.
@@ -1193,6 +1204,10 @@ time.sleep(${leaseDuration})`];
 
         this.render();
 
+        if (json.state !== previousState) {
+          this._fetchTaskInfo(extra);
+        }
+
         if (json.state === 'RUNNING' || json.state === 'PENDING') {
           if (s.length < STDOUT_REQUEST_SIZE) {
             // wait for more input because no new input from last fetch
@@ -1210,8 +1225,8 @@ time.sleep(${leaseDuration})`];
             //fetch right away because we are not at the end of input
             fetchNextStdout();
           }
-
         }
+        previousState = json.state;
       })
       .catch((e) => this.fetchError(e, 'task/request'));
     }

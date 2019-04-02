@@ -61,7 +61,7 @@ if (PERF_TEST_LOGS) {
 
   const start = Date.now();
 
-  let stdoutCounter = 1; // put at 1 so in demo we don't have to wait
+  let stdoutCounter = 0;
   fetchMock.get('glob:/_ah/api/swarming/v1/task/*/stdout*',
                 requireLogin((url, opts) => {
 
