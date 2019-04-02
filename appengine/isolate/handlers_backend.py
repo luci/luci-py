@@ -120,7 +120,7 @@ def _incremental_delete(query, delete_async):
       deleted_count += 1
 
       # Throttle.
-      futures, _ = _throttle_futures(futures, 50)
+      futures, _ = _throttle_futures(futures, 25)
 
       # Time to stop querying.
       if (time.time() - start) > 9*60:
