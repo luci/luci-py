@@ -4,7 +4,8 @@
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
 
-"""Integration test for the Swarming server, Swarming bot and Swarming client.
+"""Integration test for the Swarming server, bot and client and Isolate server
+and client.
 
 It starts a Swarming server, Isolate server and a Swarming bot, then triggers
 tasks with the Swarming client to ensure the system works end to end.
