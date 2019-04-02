@@ -1124,8 +1124,8 @@ describe('task-page', function() {
     it('pages stdout', function(done) {
       jasmine.clock().uninstall(); // re-enable setTimeout
       serveTask(0, 'running task on try number 3', true);
-      const FIRST_LINE = 'first log line\n';
-      const SECOND_LINE = 'second log line\r\n';
+      const FIRST_LINE = 'first log line\nthis is cut';
+      const SECOND_LINE = 'off on the second log line\r\n';
       const THIRD_LINE = 'third log line\n';
       fetchMock.get(`/_ah/api/swarming/v1/task/${TEST_TASK_ID}/stdout?offset=0&length=102400`, {
         state: 'RUNNING',
@@ -1144,8 +1144,13 @@ describe('task-page', function() {
 
       loggedInTaskPage((ele) => {
         expectNoUnmatchedCalls(fetchMock);
-        // The \r\n should be filtered out, and everything is appended.
-        expect(ele._stdout).toBe('first log line\nsecond log line\nthird log line\n');
+        // The \r\n should be filtered out and the second line should
+        // be concatenated correctly, despite being cut off.
+        expect(ele._stdout).toEqual([
+          'first log line\n',
+          'this is cutoff on the second log line\n',
+          'third log line\n',
+          ]);
 
         done();
       });

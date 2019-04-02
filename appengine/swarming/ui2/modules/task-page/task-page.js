@@ -755,14 +755,19 @@ ${richOrRawLogs(ele)}
 `;
 }
 
+// See comment on this._stdout for explanation on how breaking the logs up
+// increases page performance.
+const logBlock = (log) => html`<div>${log}</div>`;
+
 const richOrRawLogs = (ele) => {
   // guard should prevent the iframe from reloading on any render,
   // and only when something relevant changes.
-  return guard([ele._request, ele._showRawOutput, ele._stdout, ele._wideLogs], () => {
+  return guard([ele._request, ele._showRawOutput, ele._stdout.length,
+                ele._stdoutOffset, ele._wideLogs], () => {
     if (ele._showRawOutput || !hasRichOutput(ele)) {
       return html`
-<div class="code stdout tabbed break-all ${ele._wideLogs ? 'wide' : ''}">
-  ${ele._stdout}
+<div class="code stdout tabbed ${ele._wideLogs ? 'wide' : 'break-all'}"
+  >${ele._stdout.map(logBlock)}
 </div>`;
     }
     if (!isSummaryTask(ele._taskId)) {
@@ -927,7 +932,22 @@ window.customElements.define('task-page', class extends SwarmingAppBoilerplate {
 
     this._request = {};
     this._result = {};
-    this._stdout = '';
+    // For performance of rendering, we keep the stdout as an array
+    // of strings that are drawn in individual divs. This has a large
+    // performance boost over than the naive approach of drawing
+    // a single large string in a single div due to the cost of
+    // having to re-layout the entire large string. That cost is
+    // roughly quadratic with respect to the length of the string
+    // and while the browser is laying out the page, everything
+    // else is locked up. Using divs (broken up on the last newline
+    // of a log block), is better than simply splitting the logs
+    // into spans, because having many large spans adjacent to
+    // each other seems to incur a similar quadratic layout cost.
+    // With the divs, the browser seems to only have to worry about
+    // the layout of the last log block, which can still take
+    // 200-300ms, but is a constant time, no matter how many
+    // log chunks there are.
+    this._stdout = [];
     this._stdoutOffset = 0;
     this._currentSlice = {};
     this._currentSliceIdx = -1;
@@ -1146,7 +1166,31 @@ time.sleep(${leaseDuration})`];
         this._stdoutOffset += s.length;
         // Remove carriage returns for easier copy-paste and presentation.
         // https://crbug.com/944974
-        this._stdout += s.replace(/\r\n/g, '\n');
+        const newLogs = s.replace(/\r\n/g, '\n');
+        // split this log batch on the last newline
+        const lastNewline = newLogs.lastIndexOf('\n');
+        let block = newLogs;
+        let remainder = '';
+        if (lastNewline !== -1) {
+          block = newLogs.substring(0, lastNewline+1);
+          remainder = newLogs.substring(lastNewline+1);
+        }
+        // If the previous block doesn't end in newline, we assume this block
+        // should be appended to that one.
+        if (this._stdout.length && !this._stdout[this._stdout.length-1].endsWith('\n')) {
+          this._stdout[this._stdout.length-1] += block;
+          if (remainder) {
+            this._stdout.push(remainder);
+          }
+        } else {
+          // otherwise, just push what we have as a new block (usually this
+          // is the first logs loaded).
+          this._stdout.push(block);
+          if (remainder) {
+            this._stdout.push(remainder);
+          }
+        }
+
         this.render();
 
         if (json.state === 'RUNNING' || json.state === 'PENDING') {
@@ -1377,7 +1421,7 @@ time.sleep(${leaseDuration})`];
   _updateID(e) {
     const idInput = $$('#id_input', this);
     this._taskId = idInput.value;
-    this._stdout = ''; // erase stdout when switching tasks.
+    this._stdout = []; // erase stdout when switching tasks.
     this._stdoutOffset = 0;
     this._stateChanged();
     this._fetch();
