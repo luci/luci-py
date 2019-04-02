@@ -407,6 +407,12 @@ class AuthSystem(object):
       tok, service_account = self._grab_token_via_rpc(
           auth_params, rpc_client, account_id, scopes)
 
+    if tok.expiry - time.time() < 0:
+      raise auth_server.RPCError(
+          500, ('The new %r token (belonging to %r) has already expired (%d vs '
+                '%d). Check the system clock.' % (
+                    account_id, service_account, tok.expiry, time.time())))
+
     logging.info(
         'Got %r token (belongs to %r), expires in %d sec',
         account_id, service_account, tok.expiry - time.time())
