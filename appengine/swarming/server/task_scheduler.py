@@ -177,7 +177,8 @@ def _expire_task(to_run_key, request, inline):
   return summary, new_to_run
 
 
-def _reap_task(bot_dimensions, bot_version, to_run_key, request):
+def _reap_task(bot_dimensions, bot_version, to_run_key, request,
+               use_lookup_cache):
   """Reaps a task and insert the results entity.
 
   Returns:
@@ -243,7 +244,9 @@ def _reap_task(bot_dimensions, bot_version, to_run_key, request):
   # inhibit concurrently readers to try to reap this task. The downside is if
   # this request fails in the middle of the transaction, the task may stay
   # unreapable for up to 15 seconds.
-  if not task_to_run.set_lookup_cache(to_run_key, False):
+  # This is unnecessary and skipped when using an external scheduler, because
+  # that already avoids datastore entity contention.
+  if use_lookup_cache and not task_to_run.set_lookup_cache(to_run_key, False):
     logging.debug('hit negative cache')
     return None, None
 
@@ -855,7 +858,7 @@ def _bot_reap_task_external_scheduler(bot_dimensions, bot_version, es_cfg):
     return None, None, None
 
   run_result, secret_bytes = _reap_task(
-      bot_dimensions, bot_version, to_run.key, request)
+      bot_dimensions, bot_version, to_run.key, request, False)
   if not run_result:
     logging.error(
         'failed to reap (external scheduler): %s0',
@@ -1163,7 +1166,7 @@ def bot_reap_task(bot_dimensions, bot_version, deadline):
         to_run = new_to_run
 
       run_result, secret_bytes = _reap_task(
-          bot_dimensions, bot_version, to_run.key, request)
+          bot_dimensions, bot_version, to_run.key, request, True)
       if not run_result:
         failures += 1
         # Sad thing is that there is not way here to know the try number.
