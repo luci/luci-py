@@ -22,6 +22,10 @@ from server import pools_config
 from server import task_queues
 
 
+class ExternalSchedulerException(Exception):
+  """Raised when an external-scheduler related error occurs."""
+
+
 def _get_client(address):
   """Get a prpc client instance for given address."""
   return client.Client(

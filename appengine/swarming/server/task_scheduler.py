@@ -781,6 +781,9 @@ def _get_task_from_external_scheduler(es_cfg, bot_dimensions):
     # notify it of the newest state.
     external_scheduler.notify_requests(
         es_cfg, [(request, result_summary)], True, False)
+    # TODO(akeshet): Consider raising an exception here to hard fail, rather
+    # than returning an empty result which allows swarming native scheduler
+    # fallback to be attempted. See crbug.com/949380
     return None, None
 
   return request, to_run
@@ -860,10 +863,9 @@ def _bot_reap_task_external_scheduler(bot_dimensions, bot_version, es_cfg):
   run_result, secret_bytes = _reap_task(
       bot_dimensions, bot_version, to_run.key, request, False)
   if not run_result:
-    logging.error(
-        'failed to reap (external scheduler): %s0',
-        task_pack.pack_request_key(to_run.request_key))
-    return None, None, None
+    raise external_scheduler.ExternalSchedulerException(
+        'failed to reap %s' % task_pack.pack_request_key(to_run.request_key))
+
   logging.info('Reaped (external scheduler): %s', run_result.task_id)
   return request, secret_bytes, run_result
 
