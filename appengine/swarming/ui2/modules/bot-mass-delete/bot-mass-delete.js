@@ -94,12 +94,12 @@ window.customElements.define('bot-mass-delete', class extends HTMLElement {
     this._started = true;
     this.dispatchEvent(new CustomEvent('bots-deleting-started', {bubbles: true}));
 
-    let queryParams = query.fromObject({
+    const queryParams = query.fromObject({
       dimensions: this.dimensions,
       limit: 200, // see https://crbug.com/908423
-      fields: 'items/bot_id',
+      fields: 'cursor,items/bot_id',
+      is_dead: 'TRUE',
     });
-    queryParams += '&is_dead=TRUE';
 
     const extra = {
       headers: {'authorization': this.auth_header},
@@ -113,11 +113,12 @@ window.customElements.define('bot-mass-delete', class extends HTMLElement {
           bots = bots.concat(json.items);
           this.render();
           if (json.cursor) {
-            queryParams = query.fromObject({
+            const queryParams = query.fromObject({
               cursor: json.cursor,
               dimensions: this.dimensions,
               limit: 200, // see https://crbug.com/908423
-              fields: 'items/bot_id'
+              fields: 'cursor,items/bot_id',
+              is_dead: 'TRUE',
             });
             fetch(`/_ah/api/swarming/v1/bots/list?${queryParams}`, extra)
               .then(jsonOrThrow)

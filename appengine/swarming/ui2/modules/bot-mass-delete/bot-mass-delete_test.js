@@ -91,8 +91,8 @@ describe('bot-mass-delete', function() {
     createElement((ele) => {
 
       // create a shortened version of the returned data
-      fetchMock.get('/_ah/api/swarming/v1/bots/list?dimensions=os%3AAndroid' +
-                    '&dimensions=pool%3AChrome&fields=items%2Fbot_id&limit=200&is_dead=TRUE',
+      fetchMock.getOnce('/_ah/api/swarming/v1/bots/list?dimensions=os%3AAndroid' +
+                        '&dimensions=pool%3AChrome&fields=cursor%2Citems%2Fbot_id&is_dead=TRUE&limit=200',
         {
           items: [{bot_id: 'bot-1'}, {bot_id: 'bot-2'}, {bot_id: 'bot-3'}],
         }
@@ -112,6 +112,53 @@ describe('bot-mass-delete', function() {
         expectNoUnmatchedCalls(fetchMock);
         let calls = fetchMock.calls(MATCHED, 'GET');
         expect(calls.length).toBe(1, '1 from list (ele.show() was not called)');
+
+        calls = fetchMock.calls(MATCHED, 'POST');
+        expect(calls.length).toBe(3, '3 to delete');
+        done();
+      });
+
+      ele._readyToDelete = true;
+      ele.render();
+      const button = $$('button.delete', ele);
+      button.click();
+    });
+  });
+
+  it('pages the bot list calls before deleting', function(done) {
+    createElement((ele) => {
+
+      // create a shortened version of the returned data
+      fetchMock.getOnce('/_ah/api/swarming/v1/bots/list?dimensions=os%3AAndroid' +
+                        '&dimensions=pool%3AChrome&fields=cursor%2Citems%2Fbot_id&' +
+                        'is_dead=TRUE&limit=200',
+        {
+          items: [{bot_id: 'bot-1'}],
+          cursor: 'alpha',
+        }
+      );
+      fetchMock.getOnce('/_ah/api/swarming/v1/bots/list?cursor=alpha&dimensions=os%3AAndroid' +
+                        '&dimensions=pool%3AChrome&fields=cursor%2Citems%2Fbot_id'+
+                        '&is_dead=TRUE&limit=200',
+        {
+          items: [{bot_id: 'bot-2'}, {bot_id: 'bot-3'}],
+        }
+      );
+
+      fetchMock.post('/_ah/api/swarming/v1/bot/bot-1/delete', 200);
+      fetchMock.post('/_ah/api/swarming/v1/bot/bot-2/delete', 200);
+      fetchMock.post('/_ah/api/swarming/v1/bot/bot-3/delete', 200);
+
+      let sawStartEvent = false;
+      ele.addEventListener('bots-deleting-started', () => {
+        sawStartEvent = true;
+      });
+
+      ele.addEventListener('bots-deleting-finished', () => {
+        expect(sawStartEvent).toBeTruthy();
+        expectNoUnmatchedCalls(fetchMock);
+        let calls = fetchMock.calls(MATCHED, 'GET');
+        expect(calls.length).toBe(2, '2 from list (ele.show() was not called)');
 
         calls = fetchMock.calls(MATCHED, 'POST');
         expect(calls.length).toBe(3, '3 to delete');
