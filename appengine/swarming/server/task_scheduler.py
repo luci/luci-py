@@ -1177,12 +1177,7 @@ def bot_reap_task(bot_dimensions, bot_version, deadline):
             task_pack.pack_request_key(to_run.request_key))
         continue
 
-      # We successfully reaped a task.
       logging.info('Reaped: %s', run_result.task_id)
-      if es_cfg:
-        # We reaped a task after falling back from external scheduler. Keep
-        # it informed about the reaped task.
-        external_scheduler.notify_requests(es_cfg, [request], True, False)
       return request, secret_bytes, run_result
     return None, None, None
   finally:
