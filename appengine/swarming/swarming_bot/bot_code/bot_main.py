@@ -130,13 +130,6 @@ _IGNORED_DIMENSIONS = (
     'android_devices', 'caches', 'id', 'server_version', 'temp_band')
 
 
-_UNMONITORED_HOOKS = set([
-    # There's a suspicion that tsmon interaction breaks this hook, see
-    # https://bugs.chromium.org/p/chromium/issues/detail?id=948845#c16.
-    'get_authentication_headers',
-])
-
-
 ### Monitoring
 
 
@@ -175,7 +168,7 @@ def _monitor_call(func):
       return func(chained, botobj, name, *args, **kwargs)
     finally:
       duration = max(0, (time.time() - start) * 1000)
-      if name not in _UNMONITORED_HOOKS and botobj and botobj.dimensions:
+      if botobj and botobj.dimensions:
         flat_dims = _pool_from_dimensions(botobj.dimensions)
         if flat_dims:
           logging.info('ts_mon hook_name=%r pool=%r', name, flat_dims)
