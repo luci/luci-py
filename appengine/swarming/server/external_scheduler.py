@@ -165,7 +165,8 @@ def notify_requests(es_cfg, requests, use_tq, is_callback):
     - es_cfg: pools_config.ExternalSchedulerConfig for external scheduler to
         notify.
     - requests:
-      A list of (task_request.TaskRequest, task_result.TaskResultSummary)
+      A list of (task_request.TaskRequest,
+                 task_result.TaskResultSummary or task_result.TaskRunResult)
       tuples.
     - use_tq: If true, make this call on a task queue (within the current
               datastore transaction).
