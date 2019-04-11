@@ -147,8 +147,8 @@ def oauth2_access_token_with_expiration(account):
   # As seen in google-api-python-client/oauth2client/gce.py
   with _CACHED_OAUTH2_TOKEN_LOCK:
     cached_tok = _CACHED_OAUTH2_TOKEN.get(account)
-    # Cached and expires in more than 5 min from now.
-    if cached_tok and cached_tok['expiresAt'] >= time.time() + 5*60:
+    # Cached and expires in more than 10 min from now.
+    if cached_tok and cached_tok['expiresAt'] >= time.time() + 600:
       return cached_tok['accessToken'], cached_tok['expiresAt']
     # Grab the token.
     url = (
@@ -189,14 +189,14 @@ def signed_metadata_token(audience):
   Returns (None, None) if not running on GCE or the metadata server is
   unreachable or misbehaves. More details are available in the log.
 
-  The returned token has at least 5 min of lifetime left.
+  The returned token has at least 10 min of lifetime left.
 
   Args:
     audience: audience URL to put into the token (usually Swarming server URL).
   """
   with _CACHED_METADATA_TOKEN_LOCK:
     cached_tok = _CACHED_METADATA_TOKEN.get(audience)
-    if cached_tok and cached_tok['exp'] >= time.time() + 5*60:
+    if cached_tok and cached_tok['exp'] >= time.time() + 600:
       return cached_tok['jwt'], cached_tok['exp']
 
     jwt = _raw_metadata_request(
