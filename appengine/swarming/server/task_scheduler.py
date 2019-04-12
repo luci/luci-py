@@ -798,7 +798,7 @@ def _ensure_active_slice(request, try_number, task_slice_index):
 
   This is intended for use as part of the external scheduler flow.
 
-  Internally, this runs a 1 GET 1 (possible) PUT transaction.
+  Internally, this runs up to 2 GETs and 1 PUT in a transaction.
 
   Arguments:
     request: TaskRequest instance
@@ -836,8 +836,21 @@ def _ensure_active_slice(request, try_number, task_slice_index):
       logging.debug('_ensure_active_slice: added new TaskToRun')
       return new_to_run
 
-    logging.warning('_ensure_active_slice: no pending TaskToRun')
-    return None
+    result_summary = task_pack.request_key_to_result_summary_key(
+        request.key).get()
+    if not result_summary:
+      logging.error('_ensure_active_slice: no TaskToRun or TaskResultSummary')
+      return None
+
+    if not result_summary.is_pending:
+      logging.debug('_ensure_active_slice: request is not PENDING')
+      return None
+
+    new_to_run = task_to_run.new_task_to_run(request, try_number,
+        task_slice_index)
+    new_to_run.put()
+    logging.debug('ensure_active_slice: added new TaskToRun (no previous one)')
+    return new_to_run
 
   return datastore_utils.transaction(run)
 

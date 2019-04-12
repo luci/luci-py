@@ -2471,6 +2471,40 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     # TODO(maruel): https://crbug.com/912154
     self.assertEqual(0, task_scheduler.cron_task_bot_distribution())
 
+  def test_ensure_active_slice_nonpending(self):
+    # Non-PENDING task cannot have active slice set.
+    r = self._quick_schedule(1)
+    self.assertEqual(task_scheduler._ensure_active_slice(r.request, 1, 1), None)
+
+  def test_ensure_active_slice_pending(self):
+    # Pending task can be forced between different active slices via
+    # _ensure_active_slice.
+    r = self._quick_schedule(
+        2,
+        task_slices=[
+          task_request.TaskSlice(
+            expiration_secs=60,
+            properties=_gen_properties(dimensions={u'pool': [u'default'],
+                                                   u'foo': [u'bar']}),
+            wait_for_capacity=True),
+        task_request.TaskSlice(
+            expiration_secs=60,
+            properties=_gen_properties(dimensions={u'pool': [u'default'],
+                                                   u'foo': [u'qux']}),
+            wait_for_capacity=True),
+        ],
+    )
+
+    to_run = task_scheduler._ensure_active_slice(r.request, 1, 0)
+    self.assertEqual(to_run.task_slice_index, 0)
+    to_run = task_scheduler._ensure_active_slice(r.request, 1, 1)
+    self.assertEqual(to_run.task_slice_index, 1)
+    to_run = task_scheduler._ensure_active_slice(r.request, 1, 0)
+    self.assertEqual(to_run.task_slice_index, 0)
+    # This works even if there is no to_run entity.
+    to_run.key.delete()
+    to_run = task_scheduler._ensure_active_slice(r.request, 1, 1)
+    self.assertEqual(to_run.task_slice_index, 1)
 
 if __name__ == '__main__':
   if '-v' in sys.argv:
