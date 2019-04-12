@@ -33,7 +33,7 @@ DIMENSION_KEY_LENGTH = 64
 DIMENSION_VALUE_LENGTH = 256
 
 # Regular expression for dimension key.
-DIMENSION_KEY_RE = r'^[a-zA-Z\-\_\.]+$'
+DIMENSION_KEY_RE = r'^[a-zA-Z\-\_\.][0-9a-zA-Z\-\_\.]*$'
 
 
 def settings_info():

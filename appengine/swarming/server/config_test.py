@@ -56,6 +56,8 @@ class ConfigTest(test_case.TestCase):
   def test_validate_dimension_key(self):
     self.assertTrue(config.validate_dimension_key(u'b'))
     self.assertTrue(config.validate_dimension_key(u'-'))
+    self.assertTrue(config.validate_dimension_key(u'b1'))
+    self.assertFalse(config.validate_dimension_key(u'1b'))
     self.assertFalse(config.validate_dimension_key(u''))
     self.assertFalse(config.validate_dimension_key(u'+'))
 
