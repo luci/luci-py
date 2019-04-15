@@ -42,10 +42,10 @@ from server import task_to_run
 
 _PROBABILITY_OF_QUICK_COMEBACK = 0.05
 
-# When falling back from external scheduler, requests are ignored for this
-# duration at the beginning of their life. This number should be larger than the
-# tail of notify_requests handling time of external_scheduler.
-_ES_FALLBACK_SLACK = datetime.timedelta(seconds=10)
+# When falling back from external scheduler, requests that belong to any
+# external scheduler are ignored for this duration at the beginning of their
+# life. This number should be larger than the bot polling period.
+_ES_FALLBACK_SLACK = datetime.timedelta(minutes=6)
 
 
 def _secs_to_ms(value):
@@ -881,6 +881,20 @@ def _bot_reap_task_external_scheduler(bot_dimensions, bot_version, es_cfg):
   return request, secret_bytes, run_result
 
 
+def _should_allow_es_fallback(request, to_run, now):
+  """Determines whether to allow external scheduler fallback to the given task.
+
+  Arguments:
+    - request: TaskRequest in question to fallback to.
+    - to_run: TaskToRun in question to fallback to.
+    - now: datetime corresponding to RPC's current time.
+  """
+  if not external_scheduler.config_for_task(request):
+    return True
+
+  return to_run.created_ts + _ES_FALLBACK_SLACK < now
+
+
 ### Public API.
 
 
@@ -1143,7 +1157,10 @@ def bot_reap_task(bot_dimensions, bot_version, deadline):
       iterated += 1
       # When falling back from external scheduler, ignore requests for the
       # first few seconds of their life.
-      if es_cfg and to_run.created_ts + _ES_FALLBACK_SLACK > now:
+      if es_cfg and not _should_allow_es_fallback(request, to_run, now):
+        logging.debug(
+            'Skipped too-young es-owned request %s during es fallback',
+            request.task_id)
         continue
       slice_index = task_to_run.task_to_run_key_slice_index(to_run.key)
       t = request.task_slice(slice_index)
