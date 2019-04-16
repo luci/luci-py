@@ -623,13 +623,35 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
 
     task_scheduler.bot_reap_task(self.bot_dimensions, 'abc', None)
 
-  def test_bot_reap_task_es_with_task(self):
+  def test_bot_reap_task_es_with_nonpending_task(self):
     self._setup_es(False)
     self._mock_es_notify()
     result_summary = self._quick_schedule(1)
     self._mock_es_assign(result_summary.task_id, 0)
 
-    task_scheduler.bot_reap_task(self.bot_dimensions, 'abc', None)
+    # Exception is raised, because external scheduler attempts to reap a
+    # non-PENDING task.
+    with self.assertRaises(external_scheduler.ExternalSchedulerException):
+      task_scheduler.bot_reap_task(self.bot_dimensions, 'abc', None)
+
+  def test_bot_reap_task_es_with_pending_task(self):
+    self._setup_es(False)
+    self._mock_es_notify()
+    result_summary = self._quick_schedule(
+        1,
+        task_slices=[
+          task_request.TaskSlice(
+              expiration_secs=180,
+              properties=_gen_properties(),
+              wait_for_capacity=True)
+        ])
+
+    self._mock_es_assign(result_summary.task_id, 0)
+
+    # Able to successfully reap given PENDING task from external scheduler.
+    request, _, _ = task_scheduler.bot_reap_task(
+        self.bot_dimensions, 'abc', None)
+    self.assertEqual(request.task_id, result_summary.task_id)
 
   def test_schedule_request_slice_fallback_to_second_immediate(self):
     # First TaskSlice couldn't run so it was immediately skipped, the second ran

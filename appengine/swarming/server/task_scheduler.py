@@ -781,10 +781,8 @@ def _get_task_from_external_scheduler(es_cfg, bot_dimensions):
     # notify it of the newest state.
     external_scheduler.notify_requests(
         es_cfg, [(request, result_summary)], True, False)
-    # TODO(akeshet): Consider raising an exception here to hard fail, rather
-    # than returning an empty result which allows swarming native scheduler
-    # fallback to be attempted. See crbug.com/949380
-    return None, None
+    raise external_scheduler.ExternalSchedulerException(
+        'unable to ensure active slice for task %s' % task_id)
 
   return request, to_run
 
