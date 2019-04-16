@@ -1,67 +1,30 @@
-# Polymer Swarming web UI
+# Epitaph for Polymer Swarming web UI
 
-This contains all the Polymer 1.X elements used in swarming.
+**Oct 2016 - April 2019**
 
+Here (in version control history) lies the Polymer v1 version of the Swarming UI.
+At its birth, it was a huge upgrade from the previous UI, which was
+not much more than a raw JSON dump of the Datastore entities.
 
-## Building
+It allowed the UI to be interactive - the lists had dynamic columns, making finding relevant,
+information easier; the bot and task pages were more compact and loaded faster.
 
-To build the pages for deploying, run:
+See img/ for screenshots of the 4 main pages: Bot List, Bot Page, Task List, Task Page.
 
-    make vulcanize
+As time went on, this new shiny UI began to form patina. The Custom Elements V0 web spec (and others)
+that Polymer v1 was built on was rejected by many web browsers in favor of Custom Elements V1.
+Thus, the Polymer UI was destined to always run on polyfills.
 
-This combines all of the elements needed to display the page into several
-"single-page" apps, like the bot-list.
-These are checked into version control so that they may be easily redeployed w/o
-having to rebuild the pages if there were no changes.
+The Polymer UI lacked any tests and became fragile and a burden to maintain as
+new features were added on, sometimes breaking old features. Polymer did a lot of re-draws
+ by "magic", based on observing when data objects would change. This "magic" didn't work well
+for arrays of data, which Swarming has a lot of. Furthermore, the two-way bindings that made
+small Polymer apps easy to write did not scale up well in terms of complexity.
 
-To vulcanize and run appengine locally, run:
+Eventually, Polymer v1 reached end of life and an alternative was found based off of
+[lit-html](https://lit-html.polymer-project.org/): a subcomponent of Polymer that did
+one thing well - efficiently render and re-render HTML templates.
+While porting the UI, tests were added and certain pages were given a facelift to aid
+in usability. The final result was a faster, smaller, better tested, less complex UI.
 
-    make local_deploy
-
-To run appengine locally without vulcanizing (preferred debugging mode), run:
-
-    make debug_local_deploy
-
-To access the demo pages on localhost:9050, run:
-
-    make run
-
-
-## Prerequisites
-
-You will need to install a recent version of node.js, npm, and bower. You can
-either install it through `bash`, `apt` or manually download and install from
-the web site https://nodejs.org/en/download/.
-
-
-### npm via bash
-
-To install in the local user (as `~/nodejs` in this example), use:
-
-    echo prefix = ~/nodejs >> ~/.npmrc
-    mkdir ~/nodejs
-    cd ~/nodejs
-    curl https://nodejs.org/dist/v6.10.3/node-v6.10.3-linux-x64.tar.xz | tar xJ --strip-components=1
-    export PATH="$PATH:$HOME/nodejs/bin"
-    npm install -g bower
-
-
-### npm via apt
-
-    sudo apt-get install npm nodejs-legacy
-    # node and npm installed at this point are ancient, we need to update
-    sudo npm install npm@latest -g
-    # uninstall old npm
-    sudo apt-get purge npm
-    # make sure npm shows version 3.X or newer
-    npm -v
-    # you may need to add /usr/local/bin/npm to your superuser path
-    # or just use /usr/local/bin/npm instead of npm below
-    sudo npm cache clean -f
-    sudo npm install -g n
-    sudo n stable
-
-    # should return 6.x or higher
-    node -v
-
-    sudo npm install -g bower
+Good bye Polymer UI. Thank you for being better than once was.
