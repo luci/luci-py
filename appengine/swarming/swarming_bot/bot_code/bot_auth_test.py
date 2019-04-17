@@ -14,14 +14,15 @@ import unittest
 import test_env_bot_code
 test_env_bot_code.setup_test_env()
 
+# third_party/
 from depot_tools import auto_stub
 from depot_tools import fix_encoding
-from third_party import requests
-from utils import file_path
-from utils import auth_server
+import requests
 
 import bot_auth
 import remote_client
+from utils import file_path
+from utils import auth_server
 
 
 def global_test_setup():

@@ -2406,7 +2406,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     with self.assertRaises(auth.AuthorizationError) as ctx:
       self.check_schedule_request_acl(
           properties=_gen_properties(dimensions={u'pool': [u'some-pool']}))
-    self.assertTrue('not defined in pools.cfg', str(ctx.exception))
+    self.assertIn('not defined in pools.cfg', str(ctx.exception))
 
   def test_check_schedule_request_acl_forbidden(self):
     self.mock_pool_config('some-pool')

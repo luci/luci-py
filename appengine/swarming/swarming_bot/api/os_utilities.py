@@ -33,13 +33,15 @@ import time
 import urllib
 import urllib2
 
+# third_party/
+import httplib2
+from oauth2client import client
+
 from api import parallel
 from api import platforms
 from utils import file_path
 from utils import fs
 from utils import tools
-from third_party import httplib2
-from third_party.oauth2client import client
 
 
 # For compatibility with older bot_config.py files.
