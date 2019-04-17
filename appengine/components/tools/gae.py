@@ -33,9 +33,13 @@ while True:
   except OSError:
     break
 
-ROOT_DIR = os.path.dirname(os.path.dirname(SCRIPT_PATH))
-sys.path.insert(0, ROOT_DIR)
-sys.path.insert(0, os.path.join(ROOT_DIR, '..', 'third_party_local'))
+# It's appengine/components
+COMPONENTS_DIR = os.path.dirname(os.path.dirname(SCRIPT_PATH))
+# For tools/
+sys.path.insert(0, COMPONENTS_DIR)
+# For depot_tools/
+sys.path.insert(
+    0, os.path.join(COMPONENTS_DIR, '..', '..', 'client', 'third_party'))
 
 import colorama
 from depot_tools import subcommand
