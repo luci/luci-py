@@ -838,7 +838,6 @@ const template = (ele) => html`
         <a href=/botlist>Bot List</a>
         <a href=/tasklist>Task List</a>
         <a href=/bot>Bot Page</a>
-        <a href="/oldui/task?id=${ele._taskId}">Old Task Page</a>
       </aside>
   </header>
   <main class="horizontal layout wrap">

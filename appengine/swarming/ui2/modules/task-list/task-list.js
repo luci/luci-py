@@ -255,7 +255,6 @@ const template = (ele) => html`
       <aside class=hideable>
         <a href=/>Home</a>
         <a href=/botlist>Bot List</a>
-        <a href=/oldui/tasklist>Old Task List</a>
         <a href=/bot>Bot Page</a>
         <a href=/task>Task Page</a>
       </aside>

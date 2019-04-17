@@ -6,7 +6,7 @@ Here (in version control history) lies the Polymer v1 version of the Swarming UI
 At its birth, it was a huge upgrade from the previous UI, which was
 not much more than a raw JSON dump of the Datastore entities.
 
-It allowed the UI to be interactive - the lists had dynamic columns, making finding relevant,
+It allowed the UI to be interactive - the lists had dynamic columns, making finding relevent,
 information easier; the bot and task pages were more compact and loaded faster.
 
 See img/ for screenshots of the 4 main pages: Bot List, Bot Page, Task List, Task Page.

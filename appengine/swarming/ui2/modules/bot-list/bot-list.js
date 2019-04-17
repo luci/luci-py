@@ -249,7 +249,6 @@ const template = (ele) => html`
     <div class=title>Swarming Bot List</div>
       <aside class=hideable>
         <a href=/>Home</a>
-        <a href=/oldui/botlist>Old Bot List</a>
         <a href=/tasklist>Task List</a>
         <a href=/bot>Bot Page</a>
         <a href=/task>Task Page</a>

@@ -57,15 +57,6 @@ handlers:
   secure: always
   login: required
 
-- url: /res/(.+)
-  static_files: ui/build/\1
-  upload: ui/build/(.+)
-  secure: always
-  expiration: "1h"
-  http_headers:
-    Strict-Transport-Security: "max-age=31536000; includeSubDomains; preload"
-    X-Frame-Options: deny
-
 - url: /newres/(.+)
   static_files: ui2/dist/\1
   upload: ui2/dist/(.+)
@@ -130,6 +121,5 @@ skip_files:
 - ^doc/
 - ^[A-Z]+$
 - ^[A-Z]+\.[a-z]+$
-- ui/node_modules/
-- ui/res/imp/bower_components/
+- ui/img/.+
 - ui2/node_modules/.+
