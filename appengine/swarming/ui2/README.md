@@ -22,6 +22,14 @@ To install in the local user (as `~/nodejs` in this example), use:
     curl https://nodejs.org/dist/v8.11.2/node-v8.11.2-linux-x64.tar.xz | tar xJ --strip-components=1
     export PATH="$PATH:$HOME/nodejs/bin"
 
+## npm install
+
+After doing a git pull, before running any make commands, you must run:
+
+    npm install
+
+This should only be required once per pull (in case package.json was updated).
+
 ## Building
 
 To build the pages for deploying, run:
