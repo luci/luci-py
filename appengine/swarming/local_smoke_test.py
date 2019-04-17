@@ -29,16 +29,20 @@ import urllib
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 BOT_DIR = os.path.join(APP_DIR, 'swarming_bot')
 CLIENT_DIR = os.path.join(APP_DIR, '..', '..', 'client')
-
-from tools import start_bot
-from tools import start_servers
-
 sys.path.insert(0, CLIENT_DIR)
-from third_party.depot_tools import fix_encoding
+sys.path.insert(0, os.path.join(CLIENT_DIR, 'third_party'))
+
+# client/
 from utils import fs
 from utils import file_path
 from utils import large
 from utils import subprocess42
+from tools import start_bot
+from tools import start_servers
+
+# client/third_party/
+from depot_tools import fix_encoding
+sys.path.pop(0)
 sys.path.pop(0)
 
 sys.path.insert(0, BOT_DIR)

@@ -22,8 +22,10 @@ CLIENT_DIR = os.path.join(CHECKOUT_DIR, 'client')
 SWARMING_SCRIPT = os.path.join(CLIENT_DIR, 'swarming.py')
 
 sys.path.insert(0, CLIENT_DIR)
-from third_party.depot_tools import fix_encoding
+sys.path.insert(0, os.path.join(CLIENT_DIR, 'third_party'))
+from depot_tools import fix_encoding
 from utils import file_path
+sys.path.pop(0)
 sys.path.pop(0)
 
 

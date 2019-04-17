@@ -20,9 +20,11 @@ import urllib
 THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 CLIENT_DIR = os.path.join(THIS_DIR, '..', '..', '..', 'client')
 sys.path.insert(0, CLIENT_DIR)
-from third_party.depot_tools import fix_encoding
+sys.path.insert(0, os.path.join(CLIENT_DIR, 'third_party'))
+from depot_tools import fix_encoding
 from utils import file_path
 from utils import subprocess42
+sys.path.pop(0)
 sys.path.pop(0)
 
 

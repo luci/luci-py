@@ -16,8 +16,8 @@ APP_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CLIENT_DIR = os.path.join(os.path.dirname(os.path.dirname(APP_DIR)), 'client')
 sys.path.insert(0, APP_DIR)
 
-sys.path.insert(0, CLIENT_DIR)
-from third_party.depot_tools import fix_encoding
+sys.path.insert(0, os.path.join(CLIENT_DIR, 'third_party'))
+from depot_tools import fix_encoding
 sys.path.pop(0)
 
 import test_env

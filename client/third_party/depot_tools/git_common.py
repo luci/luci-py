@@ -4,6 +4,9 @@
 
 # Monkeypatch IMapIterator so that Ctrl-C can kill everything properly.
 # Derived from https://gist.github.com/aljungberg/626518
+
+from __future__ import print_function
+
 import multiprocessing.pool
 from multiprocessing.pool import IMapIterator
 def wrapper(func):
@@ -22,6 +25,8 @@ import functools
 import logging
 import os
 import re
+import setup_color
+import shutil
 import signal
 import sys
 import tempfile
@@ -30,10 +35,25 @@ import threading
 
 import subprocess2
 
-ROOT = os.path.abspath(os.path.dirname(__file__))
+from io import BytesIO
 
-GIT_EXE = ROOT+'\\git.bat' if sys.platform.startswith('win') else 'git'
+
+ROOT = os.path.abspath(os.path.dirname(__file__))
+IS_WIN = sys.platform == 'win32'
 TEST_MODE = False
+
+
+def win_find_git():
+  for elem in os.environ.get('PATH', '').split(os.pathsep):
+    for candidate in ('git.exe', 'git.bat'):
+      path = os.path.join(elem, candidate)
+      if os.path.isfile(path):
+        return path
+  raise ValueError('Could not find Git on PATH.')
+
+
+GIT_EXE = 'git' if not IS_WIN else win_find_git()
+
 
 FREEZE = 'FREEZE'
 FREEZE_SECTIONS = {
@@ -43,6 +63,14 @@ FREEZE_SECTIONS = {
 FREEZE_MATCHER = re.compile(r'%s.(%s)' % (FREEZE, '|'.join(FREEZE_SECTIONS)))
 
 
+# NOTE: This list is DEPRECATED in favor of the Infra Git wrapper:
+# https://chromium.googlesource.com/infra/infra/+/master/go/src/infra/tools/git
+#
+# New entries should be added to the Git wrapper, NOT to this list. "git_retry"
+# is, similarly, being deprecated in favor of the Git wrapper.
+#
+# ---
+#
 # Retry a git operation if git returns a error response with any of these
 # messages. It's all observed 'bad' GoB responses so far.
 #
@@ -87,6 +115,12 @@ GIT_TRANSIENT_ERRORS = (
     # crbug.com/430343
     # TODO(dnj): Resync with Chromite.
     r'The requested URL returned error: 5\d+',
+
+    r'Connection reset by peer',
+
+    r'Unable to look up',
+
+    r'Couldn\'t resolve host',
 )
 
 GIT_TRANSIENT_ERRORS_RE = re.compile('|'.join(GIT_TRANSIENT_ERRORS),
@@ -278,42 +312,57 @@ def once(function):
 
 ## Git functions
 
+def die(message, *args):
+  print(textwrap.dedent(message % args), file=sys.stderr)
+  sys.exit(1)
+
+
+def blame(filename, revision=None, porcelain=False, abbrev=None, *_args):
+  command = ['blame']
+  if porcelain:
+    command.append('-p')
+  if revision is not None:
+    command.append(revision)
+  if abbrev is not None:
+    command.append('--abbrev=%d' % abbrev)
+  command.extend(['--', filename])
+  return run(*command)
+
 
 def branch_config(branch, option, default=None):
-  return config('branch.%s.%s' % (branch, option), default=default)
+  return get_config('branch.%s.%s' % (branch, option), default=default)
 
 
 def branch_config_map(option):
   """Return {branch: <|option| value>} for all branches."""
   try:
     reg = re.compile(r'^branch\.(.*)\.%s$' % option)
-    lines = run('config', '--get-regexp', reg.pattern).splitlines()
+    lines = get_config_regexp(reg.pattern)
     return {reg.match(k).group(1): v for k, v in (l.split() for l in lines)}
   except subprocess2.CalledProcessError:
     return {}
 
 
-def branches(*args):
+def branches(use_limit=True, *args):
   NO_BRANCH = ('* (no branch', '* (detached', '* (HEAD detached')
 
   key = 'depot-tools.branch-limit'
-  limit = 20
-  try:
-    limit = int(config(key, limit))
-  except ValueError:
-    pass
+  limit = get_config_int(key, 20)
 
   raw_branches = run('branch', *args).splitlines()
 
   num = len(raw_branches)
-  if num > limit:
-    print >> sys.stderr, textwrap.dedent("""\
-    Your git repo has too many branches (%d/%d) for this tool to work well.
 
-    You may adjust this limit by running:
+  if use_limit and num > limit:
+    die("""\
+      Your git repo has too many branches (%d/%d) for this tool to work well.
+
+      You may adjust this limit by running:
       git config %s <new_limit>
-    """ % (num, limit, key))
-    sys.exit(1)
+
+      You may also try cleaning up your old branches by running:
+      git cl archive
+      """, num, limit, key)
 
   for line in raw_branches:
     if line.startswith(NO_BRANCH):
@@ -321,18 +370,35 @@ def branches(*args):
     yield line.split()[-1]
 
 
-def config(option, default=None):
+def get_config(option, default=None):
   try:
     return run('config', '--get', option) or default
   except subprocess2.CalledProcessError:
     return default
 
 
-def config_list(option):
+def get_config_int(option, default=0):
+  assert isinstance(default, int)
+  try:
+    return int(get_config(option, default))
+  except ValueError:
+    return default
+
+
+def get_config_list(option):
   try:
     return run('config', '--get-all', option).split()
   except subprocess2.CalledProcessError:
     return []
+
+
+def get_config_regexp(pattern):
+  if IS_WIN: # pragma: no cover
+    # this madness is because we call git.bat which calls git.exe which calls
+    # bash.exe (or something to that effect). Each layer divides the number of
+    # ^'s by 2.
+    pattern = pattern.replace('^', '^' * 8)
+  return run('config', '--get-regexp', pattern).splitlines()
 
 
 def current_branch():
@@ -353,8 +419,44 @@ def del_config(option, scope='local'):
     pass
 
 
+def diff(oldrev, newrev, *args):
+  return run('diff', oldrev, newrev, *args)
+
+
 def freeze():
   took_action = False
+  key = 'depot-tools.freeze-size-limit'
+  MB = 2**20
+  limit_mb = get_config_int(key, 100)
+  untracked_bytes = 0
+
+  root_path = repo_root()
+
+  for f, s in status():
+    if is_unmerged(s):
+      die("Cannot freeze unmerged changes!")
+    if limit_mb > 0:
+      if s.lstat == '?':
+        untracked_bytes += os.stat(os.path.join(root_path, f)).st_size
+  if limit_mb > 0 and untracked_bytes > limit_mb * MB:
+    die("""\
+      You appear to have too much untracked+unignored data in your git
+      checkout: %.1f / %d MB.
+
+      Run `git status` to see what it is.
+
+      In addition to making many git commands slower, this will prevent
+      depot_tools from freezing your in-progress changes.
+
+      You should add untracked data that you want to ignore to your repo's
+        .git/info/exclude
+      file. See `git help ignore` for the format of this file.
+
+      If this data is indended as part of your commit, you may adjust the
+      freeze limit by running:
+        git config %s <new_limit>
+      Where <new_limit> is an integer threshold in megabytes.""",
+      untracked_bytes / (MB * 1.0), limit_mb, key)
 
   try:
     run('commit', '--no-verify', '-m', FREEZE + '.indexed')
@@ -362,15 +464,24 @@ def freeze():
   except subprocess2.CalledProcessError:
     pass
 
+  add_errors = False
   try:
-    run('add', '-A')
+    run('add', '-A', '--ignore-errors')
+  except subprocess2.CalledProcessError:
+    add_errors = True
+
+  try:
     run('commit', '--no-verify', '-m', FREEZE + '.unindexed')
     took_action = True
   except subprocess2.CalledProcessError:
     pass
 
+  ret = []
+  if add_errors:
+    ret.append('Failed to index some unindexed files.')
   if not took_action:
-    return 'Nothing to freeze.'
+    ret.append('Nothing to freeze.')
+  return ' '.join(ret) or None
 
 
 def get_branch_tree():
@@ -411,7 +522,7 @@ def get_or_create_merge_base(branch, parent=None):
   def is_ancestor(a, b):
     return run_with_retcode('merge-base', '--is-ancestor', a, b) == 0
 
-  if base:
+  if base and base != actual_merge_base:
     if not is_ancestor(base, branch):
       logging.debug('Found WRONG pre-set merge-base for %s: %s', branch, base)
       base = None
@@ -463,6 +574,13 @@ def intern_f(f, kind='blob'):
 def is_dormant(branch):
   # TODO(iannucci): Do an oldness check?
   return branch_config(branch, 'dormant', 'false') != 'false'
+
+
+def is_unmerged(stat_value):
+  return (
+      'U' in (stat_value.lstat, stat_value.rstat) or
+      ((stat_value.lstat == stat_value.rstat) and stat_value.lstat in 'AD')
+  )
 
 
 def manual_merge_base(branch, base, parent):
@@ -535,8 +653,37 @@ def remove_merge_base(branch):
   del_branch_config(branch, 'base-upstream')
 
 
+def repo_root():
+  """Returns the absolute path to the repository root."""
+  return run('rev-parse', '--show-toplevel')
+
+
 def root():
-  return config('depot-tools.upstream', 'origin/master')
+  return get_config('depot-tools.upstream', 'origin/master')
+
+
+@contextlib.contextmanager
+def less():  # pragma: no cover
+  """Runs 'less' as context manager yielding its stdin as a PIPE.
+
+  Automatically checks if sys.stdout is a non-TTY stream. If so, it avoids
+  running less and just yields sys.stdout.
+  """
+  if not setup_color.IS_TTY:
+    yield sys.stdout
+    return
+
+  # Run with the same options that git uses (see setup_pager in git repo).
+  # -F: Automatically quit if the output is less than one screen.
+  # -R: Don't escape ANSI color codes.
+  # -X: Don't clear the screen before starting.
+  cmd = ('less', '-FRX')
+  try:
+    proc = subprocess2.Popen(cmd, stdin=subprocess2.PIPE)
+    yield proc.stdin
+  finally:
+    proc.stdin.close()
+    proc.wait()
 
 
 def run(*cmd, **kwargs):
@@ -552,7 +699,6 @@ def run_with_retcode(*cmd, **kwargs):
   except subprocess2.CalledProcessError as cpe:
     return cpe.returncode
 
-
 def run_stream(*cmd, **kwargs):
   """Runs a git command. Returns stdout as a PIPE (file-like object).
 
@@ -561,6 +707,7 @@ def run_stream(*cmd, **kwargs):
   """
   kwargs.setdefault('stderr', subprocess2.VOID)
   kwargs.setdefault('stdout', subprocess2.PIPE)
+  kwargs.setdefault('shell', False)
   cmd = (GIT_EXE, '-c', 'color.ui=never') + cmd
   proc = subprocess2.Popen(cmd, **kwargs)
   return proc.stdout
@@ -577,6 +724,7 @@ def run_stream_with_retcode(*cmd, **kwargs):
   """
   kwargs.setdefault('stderr', subprocess2.VOID)
   kwargs.setdefault('stdout', subprocess2.PIPE)
+  kwargs.setdefault('shell', False)
   cmd = (GIT_EXE, '-c', 'color.ui=never') + cmd
   try:
     proc = subprocess2.Popen(cmd, **kwargs)
@@ -600,6 +748,7 @@ def run_with_stderr(*cmd, **kwargs):
   kwargs.setdefault('stdin', subprocess2.PIPE)
   kwargs.setdefault('stdout', subprocess2.PIPE)
   kwargs.setdefault('stderr', subprocess2.PIPE)
+  kwargs.setdefault('shell', False)
   autostrip = kwargs.pop('autostrip', True)
   indata = kwargs.pop('indata', None)
 
@@ -632,19 +781,61 @@ def get_dirty_files():
 
 
 def is_dirty_git_tree(cmd):
+  w = lambda s: sys.stderr.write(s+"\n")
+
   dirty = get_dirty_files()
   if dirty:
-    print 'Cannot %s with a dirty tree. You must commit locally first.' % cmd
-    print 'Uncommitted files: (git diff-index --name-status HEAD)'
-    print dirty[:4096]
+    w('Cannot %s with a dirty tree. Commit, freeze or stash your changes first.'
+      % cmd)
+    w('Uncommitted files: (git diff-index --name-status HEAD)')
+    w(dirty[:4096])
     if len(dirty) > 4096: # pragma: no cover
-      print '... (run "git diff-index --name-status HEAD" to see full output).'
+      w('... (run "git diff-index --name-status HEAD" to see full output).')
     return True
   return False
 
 
+def status():
+  """Returns a parsed version of git-status.
+
+  Returns a generator of (current_name, (lstat, rstat, src)) pairs where:
+    * current_name is the name of the file
+    * lstat is the left status code letter from git-status
+    * rstat is the left status code letter from git-status
+    * src is the current name of the file, or the original name of the file
+      if lstat == 'R'
+  """
+  stat_entry = collections.namedtuple('stat_entry', 'lstat rstat src')
+
+  def tokenizer(stream):
+    acc = BytesIO()
+    c = None
+    while c != '':
+      c = stream.read(1)
+      if c in (None, '', '\0'):
+        if len(acc.getvalue()):
+          yield acc.getvalue()
+          acc = BytesIO()
+      else:
+        acc.write(c)
+
+  def parser(tokens):
+    while True:
+      # Raises StopIteration if it runs out of tokens.
+      status_dest = next(tokens)
+      stat, dest = status_dest[:2], status_dest[3:]
+      lstat, rstat = stat
+      if lstat == 'R':
+        src = next(tokens)
+      else:
+        src = dest
+      yield (dest, stat_entry(lstat, rstat, src))
+
+  return parser(tokenizer(run_stream('status', '-z', bufsize=-1)))
+
+
 def squash_current_branch(header=None, merge_base=None):
-  header = header or 'git squash commit.'
+  header = header or 'git squash commit for %s.' % current_branch()
   merge_base = merge_base or get_or_create_merge_base(current_branch())
   log_msg = header + '\n'
   if log_msg:
@@ -655,7 +846,7 @@ def squash_current_branch(header=None, merge_base=None):
   if not get_dirty_files():
     # Sometimes the squash can result in the same tree, meaning that there is
     # nothing to commit at this point.
-    print 'Nothing to commit; squashed branch is empty'
+    print('Nothing to commit; squashed branch is empty')
     return False
   run('commit', '--no-verify', '-a', '-F', '-', indata=log_msg)
   return True
@@ -734,7 +925,7 @@ def tree(treeref, recurse=False):
 
   Args:
     treeref (str) - a git ref which resolves to a tree (commits count as trees).
-    recurse (bool) - include all of the tree's decendants too. File names will
+    recurse (bool) - include all of the tree's descendants too. File names will
       take the form of 'some/path/to/file'.
 
   Return format:
@@ -764,6 +955,13 @@ def tree(treeref, recurse=False):
   except subprocess2.CalledProcessError:
     return None
   return ret
+
+
+def get_remote_url(remote='origin'):
+  try:
+    return run('config', 'remote.%s.url' % remote)
+  except subprocess2.CalledProcessError:
+    return None
 
 
 def upstream(branch):
@@ -817,3 +1015,42 @@ def get_branches_info(include_tracking_status):
       missing_upstreams[info.upstream] = None
 
   return dict(info_map.items() + missing_upstreams.items())
+
+
+def make_workdir_common(repository, new_workdir, files_to_symlink,
+                        files_to_copy, symlink=None):
+  if not symlink:
+    symlink = os.symlink
+  os.makedirs(new_workdir)
+  for entry in files_to_symlink:
+    clone_file(repository, new_workdir, entry, symlink)
+  for entry in files_to_copy:
+    clone_file(repository, new_workdir, entry, shutil.copy)
+
+
+def make_workdir(repository, new_workdir):
+  GIT_DIRECTORY_WHITELIST = [
+    'config',
+    'info',
+    'hooks',
+    'logs/refs',
+    'objects',
+    'packed-refs',
+    'refs',
+    'remotes',
+    'rr-cache',
+  ]
+  make_workdir_common(repository, new_workdir, GIT_DIRECTORY_WHITELIST,
+                      ['HEAD'])
+
+
+def clone_file(repository, new_workdir, link, operation):
+  if not os.path.exists(os.path.join(repository, link)):
+    return
+  link_dir = os.path.dirname(os.path.join(new_workdir, link))
+  if not os.path.exists(link_dir):
+    os.makedirs(link_dir)
+  src = os.path.join(repository, link)
+  if os.path.islink(src):
+    src = os.path.realpath(src)
+  operation(src, os.path.join(new_workdir, link))

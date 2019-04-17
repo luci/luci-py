@@ -69,7 +69,7 @@ fix_protobuf_package()
 import signal_trace
 
 # That's from ../../../client/
-from third_party.depot_tools import fix_encoding
+from depot_tools import fix_encoding
 from utils import logging_utils
 
 from bot_code import common
