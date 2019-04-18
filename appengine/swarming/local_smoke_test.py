@@ -24,7 +24,6 @@ import tempfile
 import textwrap
 import time
 import unittest
-import urllib
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 BOT_DIR = os.path.join(APP_DIR, 'swarming_bot')
@@ -140,7 +139,7 @@ class SwarmingClient(object):
       '-d', 'pool', 'default',
       '--dump-json', tmp,
       '--task-name', name,
-      '-I',  self._isolate_server,
+      '-I', self._isolate_server,
       '--namespace', self._namespace,
       '-s', isolated_hash,
     ]
@@ -1451,7 +1450,7 @@ def main():
     client = SwarmingClient(
         servers.swarming_server.url, servers.isolate_server.url, namespace,
         Test.tmpdir)
-    # Test cases only interract with the client; except for test_update_continue
+    # Test cases only interact with the client; except for test_update_continue
     # which mutates the bot.
     Test.client = client
     Test.servers = servers
