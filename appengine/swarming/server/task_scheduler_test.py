@@ -508,7 +508,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     result_summary = result_summary.key.get()
     self.assertEqual(State.PENDING, result_summary.state)
 
-  def _setup_es(self, fallback_enabled):
+  def _setup_es(self, allow_es_fallback):
     """Set up mock es_config."""
     es_address = 'externalscheduler_address'
     es_id = 'es_id'
@@ -520,7 +520,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
             all_dimensions=None,
             any_dimensions=None,
             enabled=True,
-            fallback_when_empty=fallback_enabled),
+            allow_es_fallback=allow_es_fallback),
     ]
     self.mock_pool_config('default', external_schedulers=external_schedulers)
 

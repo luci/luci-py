@@ -118,7 +118,7 @@ class ExternalSchedulerApiTest(test_env_handlers.AppTestBase):
         all_dimensions=None,
         any_dimensions=None,
         enabled=True,
-        fallback_when_empty=True)
+        allow_es_fallback=True)
 
     # Make the values deterministic.
     self.mock_now(datetime.datetime(2014, 1, 2, 3, 4, 5, 6))

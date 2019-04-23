@@ -105,9 +105,9 @@ ExternalSchedulerConfig = collections.namedtuple('ExternalScheduler', [
   'any_dimensions',
   # Whether this config is enabled.
   'enabled',
-  # Whether to fall back to native scheduling algorithm if external scheduler
-  # has no tasks for a bot.
-  'fallback_when_empty',
+  # Whether to allow fall back to other es-owned tasks if external scheduler has
+  # no tasks for a bot.
+  'allow_es_fallback',
 ])
 
 
@@ -489,7 +489,7 @@ def _resolve_external_schedulers(external_schedulers):
   return tuple(
       ExternalSchedulerConfig(
           e.address, e.id, frozenset(e.dimensions), frozenset(e.all_dimensions),
-          frozenset(e.any_dimensions), e.enabled, e.fallback_when_empty)
+          frozenset(e.any_dimensions), e.enabled, e.allow_es_fallback)
       for e in external_schedulers)
 
 
