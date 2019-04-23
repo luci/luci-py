@@ -380,23 +380,7 @@ message ExternalSchedulerConfig {
   // that config).
   bool enabled = 4;
 
-  // Whether to fall back to native scheduling algorithm if external scheduler
-  // has no tasks for a bot.
-  //
-  // This can be helpful when
-  // - The external scheduler's snapshot of state doesn't contain all of the
-  //   eligible tasks, due to a service restart causing its snapshot to be
-  //   outdated.
-  // - The external scheduler has a bug that causes it to fail to match tasks
-  //   to bots.
-  // - There are tasks in the swarming queue that are eligible for a bot, but
-  //   are not eligible for the external scheduler that bot belongs to (due to
-  //   the bot having additional dimensions that the task does not). In this
-  //   case, the unusual task will be able to run on the bot whenever the
-  //   external scheduler has no other work for the bot.
-  //
-  //   Note: To be deprecated soon.
-  bool fallback_when_empty = 5;
+  bool fallback_when_empty = 5 [deprecated=true];
 
   // A task or bot must have all of these dimensions in order to match this
   // dimension set.

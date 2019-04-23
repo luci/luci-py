@@ -1130,9 +1130,6 @@ def bot_reap_task(bot_dimensions, bot_version, deadline):
         bot_dimensions, bot_version, es_cfg)
     if request:
       return request, secret_bytes, to_run_result
-    if not es_cfg.fallback_when_empty:
-      logging.info('External scheduler did not reap any tasks, giving up.')
-      return None, None, None
     logging.info('External scheduler did not reap any tasks, trying native '
                  'scheduler.')
 

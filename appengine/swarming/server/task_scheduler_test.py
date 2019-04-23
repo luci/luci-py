@@ -599,24 +599,6 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(
         len(r_calls), 1, 'native scheduler was not called')
 
-  def test_bot_reap_task_es_no_fallback(self):
-    self._setup_es(False)
-    notify_calls = self._mock_es_notify()
-    er_calls, r_calls = self._mock_reap_calls()
-
-    # Ignore es notifications that were side-effects of the setup code, they
-    # are incidental to this test.
-    del notify_calls[:]
-
-    task_scheduler.bot_reap_task(self.bot_dimensions, 'abc', None)
-
-    self.assertEqual(
-        len(er_calls), 1, 'external scheduler was not called')
-    self.assertEqual(
-        len(r_calls), 0, 'native scheduler was called')
-    self.assertEqual(
-        len(notify_calls), 0, 'notify_requests was called')
-
   def test_bot_reap_task_es_no_task(self):
     self._setup_es(False)
     self._mock_es_assign(None, 0)
