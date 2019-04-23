@@ -879,19 +879,13 @@ def _bot_reap_task_external_scheduler(bot_dimensions, bot_version, es_cfg):
   return request, secret_bytes, run_result
 
 
-def _should_allow_es_fallback(request, to_run, now):
+def _should_allow_es_fallback(request):
   """Determines whether to allow external scheduler fallback to the given task.
 
   Arguments:
     - request: TaskRequest in question to fallback to.
-    - to_run: TaskToRun in question to fallback to.
-    - now: datetime corresponding to RPC's current time.
   """
-  if not external_scheduler.config_for_task(request):
-    return True
-
-  return to_run.created_ts + _ES_FALLBACK_SLACK < now
-
+  return not bool(external_scheduler.config_for_task(request))
 
 ### Public API.
 
@@ -1147,18 +1141,15 @@ def bot_reap_task(bot_dimensions, bot_version, deadline):
   expired = 0
   failures = 0
   stale_index = 0
-  now = utils.utcnow()
   try:
     q = task_to_run.yield_next_available_task_to_dispatch(bot_dimensions,
                                                           deadline)
     for request, to_run in q:
       iterated += 1
-      # When falling back from external scheduler, ignore requests for the
-      # first few seconds of their life.
-      if es_cfg and not _should_allow_es_fallback(request, to_run, now):
-        logging.debug(
-            'Skipped too-young es-owned request %s during es fallback',
-            request.task_id)
+      # When falling back from external scheduler, ignore other es-owned tasks.
+      if es_cfg and not _should_allow_es_fallback(request):
+        logging.debug('Skipped es-owned request %s during es fallback',
+                      request.task_id)
         continue
       slice_index = task_to_run.task_to_run_key_slice_index(to_run.key)
       t = request.task_slice(slice_index)
