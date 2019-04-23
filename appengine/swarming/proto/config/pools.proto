@@ -403,8 +403,6 @@ message ExternalSchedulerConfig {
   // to still have a chance to run. After prior tasks have aged out of the
   // system, this flag should be disabled, to get stricter consistency between
   // swarming's state and external scheduler's state.
-  //
-  // Note: Not yet implemented.
   bool allow_es_fallback = 8;
 }
 

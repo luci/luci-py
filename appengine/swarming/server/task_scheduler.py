@@ -879,13 +879,26 @@ def _bot_reap_task_external_scheduler(bot_dimensions, bot_version, es_cfg):
   return request, secret_bytes, run_result
 
 
-def _should_allow_es_fallback(request):
+def _should_allow_es_fallback(es_cfg, request):
   """Determines whether to allow external scheduler fallback to the given task.
 
   Arguments:
+    - es_cfg: ExternalSchedulerConfig to potentially fallback from.
     - request: TaskRequest in question to fallback to.
   """
-  return not bool(external_scheduler.config_for_task(request))
+  task_es_cfg = external_scheduler.config_for_task(request)
+  if not task_es_cfg:
+    # Other task is not es-owned. Allow fallback.
+    return True
+
+  if not es_cfg.allow_es_fallback:
+    # Fallback to es-owned task is disabled.
+    return False
+
+  # Allow fallback if task uses precisely the same external scheduler as
+  # the one we are falling back from.
+  return task_es_cfg == es_cfg
+
 
 ### Public API.
 
@@ -1144,7 +1157,7 @@ def bot_reap_task(bot_dimensions, bot_version, deadline):
     for request, to_run in q:
       iterated += 1
       # When falling back from external scheduler, ignore other es-owned tasks.
-      if es_cfg and not _should_allow_es_fallback(request):
+      if es_cfg and not _should_allow_es_fallback(es_cfg, request):
         logging.debug('Skipped es-owned request %s during es fallback',
                       request.task_id)
         continue
