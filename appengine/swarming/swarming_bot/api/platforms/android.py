@@ -147,7 +147,7 @@ def get_dimensions(devices):
   # https://android.googlesource.com/platform/build/+/master/tools/buildinfo.sh
   dimension_properties = {
     u'device_os': ['build.id'],
-    u'device_os_flavor': ['product.brand'],
+    u'device_os_flavor': ['product.brand', 'product.system.brand'],
     u'device_type': ['product.device', 'build.product', 'product.board'],
   }
   for dim in dimension_properties:
