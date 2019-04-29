@@ -15,6 +15,7 @@ import re
 
 from components import auth
 from components import config
+from components import cipd
 from components import utils
 from components.config import validation
 
@@ -22,8 +23,6 @@ from proto.config import pools_pb2
 from server import config as local_config
 from server import directory_occlusion
 from server import service_accounts
-
-import cipd
 
 
 POOLS_CFG_FILENAME = 'pools.cfg'

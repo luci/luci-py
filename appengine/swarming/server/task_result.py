@@ -83,8 +83,6 @@ from server import large
 from server import task_pack
 from server import task_request
 
-import cipd
-
 # Amount of time after which a bot is considered dead. In short, if a bot has
 # not sent an update in the last N minutes while running a task, it is
 # considered dead.

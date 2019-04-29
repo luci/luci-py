@@ -8,8 +8,8 @@ import logging
 import sys
 import unittest
 
-# Setups environment.
-import test_env_handlers
+from test_support import test_env
+test_env.setup_test_env()
 
 import cipd
 

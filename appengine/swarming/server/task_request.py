@@ -61,6 +61,7 @@ from google.appengine.api import datastore_errors
 from google.appengine.ext import ndb
 
 from components import auth
+from components import cipd
 from components import datastore_utils
 from components import pubsub
 from components import utils
@@ -73,8 +74,6 @@ from server import directory_occlusion
 from server import pools_config
 from server import service_accounts
 from server import task_pack
-
-import cipd
 
 
 # Maximum acceptable priority value, which is effectively the lowest priority.
