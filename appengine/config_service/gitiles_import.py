@@ -31,6 +31,7 @@ from components import config
 from components import gitiles
 from components import net
 from components.config.proto import service_config_pb2
+from gae_ts_mon.common import metrics
 
 import admin
 import common
@@ -47,6 +48,18 @@ DEFAULT_GITILES_IMPORT_CONFIG = service_config_pb2.ImportCfg.Gitiles(
     fetch_archive_deadline=15,
     ref_config_default_path='luci',
 )
+
+
+import_attempt_metric = metrics.CounterMetric(
+    'config_service/import_attempt',
+    'Counter of import attempts of a config set',
+    [metrics.StringField('config_set')])
+
+
+import_success_metric = metrics.CounterMetric(
+    'config_service/import_success',
+    'Counter of successful imports of a config set',
+    [metrics.StringField('config_set')])
 
 
 class Error(Exception):
@@ -286,12 +299,14 @@ def _import_config_set(config_set, location):
         and not force_update):
       save_attempt(True, 'Up-to-date')
       logging.debug('Up-to-date')
+      import_success_metric.increment(fields={'config_set': config_set})
       return
 
     logging.info(
         'Rolling %s => %s',
         config_set_entity and config_set_entity.latest_revision, commit.sha)
     _import_revision(config_set, location, commit, force_update)
+    import_success_metric.increment(fields={'config_set': config_set})
   except urlfetch_errors.DeadlineExceededError:
     save_attempt(False, 'Could not import: deadline exceeded')
     raise Error(
@@ -396,6 +411,7 @@ def import_ref(project_id, ref_name):
 
 def import_config_set(config_set):
   """Imports a config set."""
+  import_attempt_metric.increment(fields={'config_set': config_set})
   service_match = config.SERVICE_CONFIG_SET_RGX.match(config_set)
   if service_match:
     service_id = service_match.group(1)
