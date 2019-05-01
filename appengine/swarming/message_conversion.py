@@ -84,6 +84,10 @@ def _taskproperties_from_rpc(props):
           for p in props.cipd_input.packages
         ])
 
+  containment = task_request.Containment()
+  if props.containment:
+    containment = _rpc_to_ndb(task_request.Containment, props.containment)
+
   inputs_ref = None
   if props.inputs_ref:
     inputs_ref = _rpc_to_ndb(task_request.FilesRef, props.inputs_ref)
@@ -106,6 +110,7 @@ def _taskproperties_from_rpc(props):
       cipd_input=cipd_input,
       # Passing command=None is supported at API level but not at NDB level.
       command=props.command or [],
+      containment=containment,
       has_secret_bytes=secret_bytes is not None,
       secret_bytes=None, # ignore this, it's handled out of band
       dimensions=None, # it's named dimensions_data
@@ -135,6 +140,10 @@ def _taskproperties_to_rpc(props):
           for p in props.cipd_input.packages
         ])
 
+  containment = swarming_rpcs.Containment()
+  if props.containment:
+    containment = _ndb_to_rpc(swarming_rpcs.Containment, props.containment)
+
   inputs_ref = None
   if props.inputs_ref:
     inputs_ref = _ndb_to_rpc(swarming_rpcs.FilesRef, props.inputs_ref)
@@ -144,6 +153,7 @@ def _taskproperties_to_rpc(props):
       props,
       caches=[_ndb_to_rpc(swarming_rpcs.CacheEntry, c) for c in props.caches],
       cipd_input=cipd_input,
+      containment=containment,
       secret_bytes='<REDACTED>' if props.has_secret_bytes else None,
       dimensions=_duplicate_string_pairs_from_dict(props.dimensions),
       env=_string_pairs_from_dict(props.env),

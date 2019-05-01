@@ -155,6 +155,9 @@ def get_isolated_args(work_dir, task_details, isolated_result,
   for key, value in (task_details.env or {}).iteritems():
     cmd.extend(('--env', '%s=%s' % (key, value)))
 
+  if task_details.containment.lower_priority:
+    cmd.append('--lower-priority')
+
   cmd.extend(run_isolated_flags)
 
   for key, values in task_details.env_prefixes.iteritems():
@@ -172,7 +175,17 @@ def get_isolated_args(work_dir, task_details, isolated_result,
   return cmd
 
 
+class Containment(object):
+  """Containment details."""
+  def __init__(self, obj):
+    self.lower_priority = bool(obj.get('lower_priority'))
+
+
 class TaskDetails(object):
+  """A task_runner specific view of the server's TaskProperties.
+
+  It only contains what the bot needs to know.
+  """
   def __init__(self, data):
     logging.info('TaskDetails(%s)', data)
     if not isinstance(data, dict):
@@ -206,6 +219,7 @@ class TaskDetails(object):
     self.task_id = data['task_id']
     self.outputs = data.get('outputs', [])
     self.secret_bytes = data.get('secret_bytes')
+    self.containment = Containment(data.get('containment') or {})
 
   @staticmethod
   def load(path):

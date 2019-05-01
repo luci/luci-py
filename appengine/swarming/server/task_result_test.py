@@ -41,6 +41,9 @@ def _gen_properties(**kwargs):
   """Creates a TaskProperties."""
   args = {
     'command': [u'command1'],
+    'containment': {
+      u'lower_priority': True,
+    },
     'dimensions': {u'pool': [u'default']},
     'env': {},
     'execution_timeout_secs': 24*60*60,
@@ -639,6 +642,7 @@ class TaskResultApiTest(TestCase):
               ],
               u'server': u'http://localhost:2'
             },
+            containment=task_request.Containment(lower_priority=True),
         ),
     )
     run_result.started_ts = self.now + datetime.timedelta(seconds=20)
@@ -675,6 +679,7 @@ class TaskResultApiTest(TestCase):
     run_result.bot_dimensions = {u'id': [u'bot1'], u'pool': [u'default']}
     run_result.put()
 
+    props_h = 'a08108c912c00262c159288101ff9ef520c5c5b3f1d71e8fffc167c3340115b2'
     expected = swarming_pb2.TaskResult(
         request=swarming_pb2.TaskRequest(
             task_slices=[
@@ -687,6 +692,7 @@ class TaskResultApiTest(TestCase):
                           dest_path=u'bin',
                       ),
                     ],
+                    containment=swarming_pb2.Containment(lower_priority=True),
                     command=[u'command1'],
                     dimensions=[
                       swarming_pb2.StringListPair(
@@ -696,9 +702,7 @@ class TaskResultApiTest(TestCase):
                     grace_period=duration_pb2.Duration(seconds=30),
                   ),
                   expiration=duration_pb2.Duration(seconds=60),
-                  properties_hash=
-                      '17934af0f7d694d0fb1720ff970709a5fd150d4e532083173b9e38ec'
-                      'f027e563',
+                  properties_hash=props_h,
               ),
             ],
             priority=50,

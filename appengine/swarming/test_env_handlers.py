@@ -320,6 +320,9 @@ class AppTestBase(test_case.TestCase):
         }],
         u'server': u'https://pool.config.cipd.example.com',
       },
+      u'containment': {
+        u'lower_priority': False,
+      },
       u'dimensions': [
         {u'key': u'os', u'value': u'Amiga'},
         {u'key': u'pool', u'value': u'default'},
@@ -401,6 +404,9 @@ class AppTestBase(test_case.TestCase):
           u'version': u'git_revision:deadbeef',
         }],
         u'server': u'https://pool.config.cipd.example.com',
+      },
+      u'containment': {
+        u'lower_priority': False,
       },
       u'dimensions': [
         {u'key': u'os', u'value': u'Amiga'},

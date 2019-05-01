@@ -630,6 +630,7 @@ class BotPollHandler(_BotBaseHandler):
           'server': props.cipd_input.server,
         } if props.cipd_input else None,
         'command': props.command,
+        'containment': props.containment.to_dict() if props.containment else {},
         'dimensions': props.dimensions,
         'env': props.env,
         'env_prefixes': props.env_prefixes,

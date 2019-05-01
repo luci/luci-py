@@ -57,6 +57,7 @@ def _gen_properties(**kwargs):
   args = {
     u'cipd_input': _gen_cipd_input(),
     u'command': [u'command1', u'arg1'],
+    u'containment': {u'lower_priority': False},
     u'dimensions': {
       u'OS': [u'Windows-3.1.1'],
       u'hostname': [u'localhost'],
@@ -477,6 +478,9 @@ class TaskRequestApiTest(TestCase):
         'server': u'https://chrome-infra-packages.appspot.com'
       },
       'command': [u'command1', u'arg1'],
+      'containment': {
+        u'lower_priority': False,
+      },
       'relative_cwd': u'deeep',
       'dimensions': {
         u'OS': [u'Windows-3.1.1'],
@@ -533,7 +537,7 @@ class TaskRequestApiTest(TestCase):
     # Intentionally hard code the hash value since it has to be deterministic.
     # Other unit tests should use the calculated value.
     self.assertEqual(
-        'aa33c679b3ee30e37b9724d79a9d20bc767475c00e7f659b6191508f6b16f1ab',
+        '83118edf140817362a3bb7bf6022f749ca67bf183ebc271532e2173de309bc01',
         req.task_slice(0).properties_hash(req).encode('hex'))
 
   def test_init_new_request_isolated(self):
@@ -576,6 +580,9 @@ class TaskRequestApiTest(TestCase):
         'server': u'https://chrome-infra-packages.appspot.com'
       },
       'command': [u'command1', u'arg1'],
+      'containment': {
+        u'lower_priority': False,
+      },
       'relative_cwd': None,
       'dimensions': {
         u'OS': [u'Windows-3.1.1'],
@@ -633,7 +640,7 @@ class TaskRequestApiTest(TestCase):
     # Intentionally hard code the hash value since it has to be deterministic.
     # Other unit tests should use the calculated value.
     self.assertEqual(
-        '121c6bd6216a4cc9c4302a52da6292e5a240807ef13ace6f7f36a0c83aec6f55',
+        'e38e65301b39971b4a0b408dd57707d41feb752b6fae2a3641a5ba51db03de66',
         req.task_slice(0).properties_hash(req).encode('hex'))
 
   def test_init_new_request_parent(self):
@@ -660,7 +667,7 @@ class TaskRequestApiTest(TestCase):
     # Other unit tests should use the calculated value.
     # Ensure the algorithm is deterministic.
     self.assertEqual(
-        '58b6b8966199b901406b82ed15b23b7070cbf6ea8cba237838911939b387b4c6',
+        '9182acceac3e6fdf366ceceb6a406ba11af0c81b1923fc864254f025755bc217',
         request.task_slice(0).properties_hash(request).encode('hex'))
 
   def test_init_new_request_bot_service_account(self):
@@ -869,6 +876,7 @@ class TaskRequestApiTest(TestCase):
         idempotent=True,
         outputs=[u'foo'],
         has_secret_bytes=True,
+        containment=task_request.Containment(lower_priority=True),
     )
     request = _gen_request_slices(
         task_slices=[
@@ -907,6 +915,7 @@ class TaskRequestApiTest(TestCase):
             swarming_pb2.NamedCacheEntry(
                 name=u'git_chromium', dest_path=u'git_cache'),
         ],
+        containment=swarming_pb2.Containment(lower_priority=True),
         command=[u'command1', u'arg1'],
         relative_cwd=u'subdir',
         # extra_args cannot be specified with command.
@@ -929,6 +938,8 @@ class TaskRequestApiTest(TestCase):
         idempotent=True,
         outputs=[u'foo'],
     )
+    # To be updated every time the schema changes.
+    props_h = '5880c2298388df01339a2a50d02a848409badeb908de3e895af04f6aa4dc44f4'
     expected = swarming_pb2.TaskRequest(
         # Scheduling.
         task_slices=[
@@ -936,9 +947,7 @@ class TaskRequestApiTest(TestCase):
               properties=expected_props,
               expiration=duration_pb2.Duration(seconds=30),
               wait_for_capacity=True,
-              properties_hash=
-                  '575b14dc0f59f68d54e2264f51d3c88c41f1465852f99fc9f66a8aa770c2'
-                  '33f8',
+              properties_hash=props_h,
           ),
         ],
         priority=50,

@@ -59,6 +59,9 @@ def get_manifest(script=None, isolated=None, **kwargs):
     'bot_id': 'localhost',
     'command':
         [sys.executable, '-u', '-c', script] if not isolated_input else None,
+    'containment': {
+      'lower_priority': True,
+    },
     'env': {},
     'env_prefixes': {},
     'extra_args': [],

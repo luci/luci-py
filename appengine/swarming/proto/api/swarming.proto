@@ -548,6 +548,8 @@ message NamedCacheEntry {
 // Defines the type of containment to use to put the task primary process
 // inside.
 //
+// TODO(maruel): https://crbug.com/808836
+//
 // This is highly OS specific:
 // - Lower the integrity level on Windows. https://crbug.com/916586
 // - Job Object on Windows. https://crbug.com/732818
@@ -557,7 +559,8 @@ message NamedCacheEntry {
 // - Lightweight home directory override on Windows, Linux and macOS.
 //   https://crbug.com/811411
 message Containment {
- // TODO(maruel): https://crbug.com/808836
+  // Lowers the priority of the task process when started.
+  bool lower_priority = 1;
 }
 
 // Defines the 'what' to run.

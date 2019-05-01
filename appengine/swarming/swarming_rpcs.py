@@ -304,6 +304,18 @@ class CacheEntry(messages.Message):
   path = messages.StringField(2)
 
 
+class Containment(messages.Message):
+  """How to contain the task's process.
+
+  This is highly OS specific.
+
+  See https://crbug.com/808836.
+  """
+  # Lower the process' priority to give the bot a chance to survive when the
+  # task starts an overwhelming number of children processes.
+  lower_priority = messages.BooleanField(1)
+
+
 class TaskProperties(messages.Message):
   """Important metadata about a particular task."""
   # Specifies named caches to map into the working directory. These caches
@@ -379,6 +391,8 @@ class TaskProperties(messages.Message):
   outputs = messages.StringField(12, repeated=True)
   # Secret bytes to provide to the task. Cannot be retrieved back.
   secret_bytes = messages.BytesField(13)
+  # Containment of the task processes.
+  containment = messages.MessageField(Containment, 16)
 
 
 class TaskSlice(messages.Message):
