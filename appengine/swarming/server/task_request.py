@@ -612,13 +612,38 @@ class CacheEntry(ndb.Model):
       raise datastore_errors.BadValueError('name is not specified')
 
 
+class ContainmentType(object):
+  NOT_SPECIFIED = 0
+  NONE = 1
+  AUTO = 2
+  JOB_OBJECT = 3
+
+  values = [NOT_SPECIFIED, NONE, AUTO, JOB_OBJECT]
+
+
+class ContainmentTypeProperty(ndb.IntegerProperty):
+  """See ../proto/api/swarming.proto for details."""
+  def __init__(self, **kwargs):
+    super(ContainmentTypeProperty, self).__init__(
+        choices=ContainmentType.values, **kwargs)
+
+
 class Containment(ndb.Model):
-  """Describes the task process containment."""
+  """Describes the task process containment.
+
+  See ../proto/api/swarming.proto for details.
+  """
   lower_priority = ndb.BooleanProperty(default=False)
+  containment_type = ContainmentTypeProperty()
+  limit_processes = ndb.IntegerProperty()
+  limit_total_committed_memory = ndb.IntegerProperty()
 
   def to_proto(self, out):
     """Converts self to a swarming_pb2.Containment."""
     out.lower_priority = self.lower_priority
+    out.containment_type = self.containment_type or 0
+    out.limit_processes = self.limit_processes or 0
+    out.limit_total_committed_memory = self.limit_total_committed_memory or 0
 
 
 class TaskProperties(ndb.Model):

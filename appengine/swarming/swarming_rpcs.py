@@ -304,16 +304,20 @@ class CacheEntry(messages.Message):
   path = messages.StringField(2)
 
 
+class ContainmentType(messages.Enum):
+  """See proto/api/swarming.proto for description."""
+  NOT_SPECIFIED = 0
+  NONE = 1
+  AUTO = 2
+  JOB_OBJECT = 3
+
+
 class Containment(messages.Message):
-  """How to contain the task's process.
-
-  This is highly OS specific.
-
-  See https://crbug.com/808836.
-  """
-  # Lower the process' priority to give the bot a chance to survive when the
-  # task starts an overwhelming number of children processes.
+  """See proto/api/swarming.proto for description."""
   lower_priority = messages.BooleanField(1)
+  containment_type = messages.EnumField(ContainmentType, 2)
+  limit_processes = messages.IntegerField(3)
+  limit_total_committed_memory = messages.IntegerField(4)
 
 
 class TaskProperties(messages.Message):

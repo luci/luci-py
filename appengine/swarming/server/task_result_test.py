@@ -43,6 +43,9 @@ def _gen_properties(**kwargs):
     'command': [u'command1'],
     'containment': {
       u'lower_priority': True,
+      u'containment_type': None,
+      u'limit_processes': None,
+      u'limit_total_committed_memory': None,
     },
     'dimensions': {u'pool': [u'default']},
     'env': {},
@@ -679,7 +682,7 @@ class TaskResultApiTest(TestCase):
     run_result.bot_dimensions = {u'id': [u'bot1'], u'pool': [u'default']}
     run_result.put()
 
-    props_h = 'a08108c912c00262c159288101ff9ef520c5c5b3f1d71e8fffc167c3340115b2'
+    props_h = '1cae9073cfc09142530e40b9e251b378cbd1b1309bb3cd2f51c36e1d488e1bfa'
     expected = swarming_pb2.TaskResult(
         request=swarming_pb2.TaskRequest(
             task_slices=[

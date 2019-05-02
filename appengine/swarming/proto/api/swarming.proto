@@ -559,8 +559,31 @@ message NamedCacheEntry {
 // - Lightweight home directory override on Windows, Linux and macOS.
 //   https://crbug.com/811411
 message Containment {
-  // Lowers the priority of the task process when started.
+  enum ContainmentType {
+    // Historical value, not specified. Containment may or may not be used.
+    NOT_SPECIFIED = 0;
+    // No containment, the default for now.
+    NONE = 1;
+    // Use the containment appropriate on the platform.
+    AUTO = 2;
+    // Use Job Object on Windows. Will fail if used on other platforms.
+    JOB_OBJECT = 3;
+  }
+
+  // Lowers the priority of the task process when started. Doesn't require
+  // containment. This gives the bot a chance to survive when the task starts an
+  // overwhelming number of children processes.
   bool lower_priority = 1;
+
+  // Defines the type of containment used.
+  ContainmentType containment_type = 2;
+
+  // The values below require a form of containment to be enforced.
+
+  // Limits the number of concurrent active processes.
+  int64 limit_processes = 3;
+  // Limits the total amount of memory allocated by processes.
+  int64 limit_total_committed_memory = 4;
 }
 
 // Defines the 'what' to run.

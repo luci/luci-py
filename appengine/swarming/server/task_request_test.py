@@ -57,7 +57,12 @@ def _gen_properties(**kwargs):
   args = {
     u'cipd_input': _gen_cipd_input(),
     u'command': [u'command1', u'arg1'],
-    u'containment': {u'lower_priority': False},
+    u'containment': {
+      u'lower_priority': False,
+      u'containment_type': None,
+      u'limit_processes': None,
+      u'limit_total_committed_memory': None,
+    },
     u'dimensions': {
       u'OS': [u'Windows-3.1.1'],
       u'hostname': [u'localhost'],
@@ -480,6 +485,9 @@ class TaskRequestApiTest(TestCase):
       'command': [u'command1', u'arg1'],
       'containment': {
         u'lower_priority': False,
+        u'containment_type': None,
+        u'limit_processes': None,
+        u'limit_total_committed_memory': None,
       },
       'relative_cwd': u'deeep',
       'dimensions': {
@@ -537,7 +545,7 @@ class TaskRequestApiTest(TestCase):
     # Intentionally hard code the hash value since it has to be deterministic.
     # Other unit tests should use the calculated value.
     self.assertEqual(
-        '83118edf140817362a3bb7bf6022f749ca67bf183ebc271532e2173de309bc01',
+        'b179dd0164f0ddfe7a1a23542370cb8dbbf7abcc83197baf9dfbeed353c4f8f0',
         req.task_slice(0).properties_hash(req).encode('hex'))
 
   def test_init_new_request_isolated(self):
@@ -582,6 +590,9 @@ class TaskRequestApiTest(TestCase):
       'command': [u'command1', u'arg1'],
       'containment': {
         u'lower_priority': False,
+        u'containment_type': None,
+        u'limit_processes': None,
+        u'limit_total_committed_memory': None,
       },
       'relative_cwd': None,
       'dimensions': {
@@ -640,7 +651,7 @@ class TaskRequestApiTest(TestCase):
     # Intentionally hard code the hash value since it has to be deterministic.
     # Other unit tests should use the calculated value.
     self.assertEqual(
-        'e38e65301b39971b4a0b408dd57707d41feb752b6fae2a3641a5ba51db03de66',
+        'ba17d7977b38635c8495f52bba0cfb2fb6677d45a6eba11eaba39de94b63d5df',
         req.task_slice(0).properties_hash(req).encode('hex'))
 
   def test_init_new_request_parent(self):
@@ -667,7 +678,7 @@ class TaskRequestApiTest(TestCase):
     # Other unit tests should use the calculated value.
     # Ensure the algorithm is deterministic.
     self.assertEqual(
-        '9182acceac3e6fdf366ceceb6a406ba11af0c81b1923fc864254f025755bc217',
+        '64c02afb2e2ce06a482dab74cd557eb7c3ec092d27714752afa2858ef790dcf0',
         request.task_slice(0).properties_hash(request).encode('hex'))
 
   def test_init_new_request_bot_service_account(self):
@@ -876,7 +887,12 @@ class TaskRequestApiTest(TestCase):
         idempotent=True,
         outputs=[u'foo'],
         has_secret_bytes=True,
-        containment=task_request.Containment(lower_priority=True),
+        containment=task_request.Containment(
+            lower_priority=True,
+            containment_type=task_request.ContainmentType.JOB_OBJECT,
+            limit_processes=1000,
+            limit_total_committed_memory=1024**3,
+        ),
     )
     request = _gen_request_slices(
         task_slices=[
@@ -915,7 +931,12 @@ class TaskRequestApiTest(TestCase):
             swarming_pb2.NamedCacheEntry(
                 name=u'git_chromium', dest_path=u'git_cache'),
         ],
-        containment=swarming_pb2.Containment(lower_priority=True),
+        containment=swarming_pb2.Containment(
+            lower_priority=True,
+            containment_type=swarming_pb2.Containment.JOB_OBJECT,
+            limit_processes=1000,
+            limit_total_committed_memory=1024**3,
+        ),
         command=[u'command1', u'arg1'],
         relative_cwd=u'subdir',
         # extra_args cannot be specified with command.
@@ -939,7 +960,7 @@ class TaskRequestApiTest(TestCase):
         outputs=[u'foo'],
     )
     # To be updated every time the schema changes.
-    props_h = '5880c2298388df01339a2a50d02a848409badeb908de3e895af04f6aa4dc44f4'
+    props_h = 'b0855043d05450f3b31a63985a5a4de44a5da09828c1a7247832027a4960ee10'
     expected = swarming_pb2.TaskRequest(
         # Scheduling.
         task_slices=[

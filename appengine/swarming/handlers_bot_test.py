@@ -379,7 +379,10 @@ class BotApiTest(test_env_handlers.AppTestBase):
         },
         u'command': [u'python', u'run_test.py'],
         u'containment': {
-          u'lower_priority': False,
+          u'lower_priority': True,
+          u'containment_type': 2,
+          u'limit_processes': 1000,
+          u'limit_total_committed_memory': 1024**3,
         },
         u'relative_cwd': u'de/ep',
         u'dimensions': {
@@ -446,7 +449,10 @@ class BotApiTest(test_env_handlers.AppTestBase):
         },
         u'command': [u'python', u'run_test.py'],
         u'containment': {
-          u'lower_priority': False,
+          u'lower_priority': True,
+          u'containment_type': 2,
+          u'limit_processes': 1000,
+          u'limit_total_committed_memory': 1024**3,
         },
         u'relative_cwd': None,
         u'dimensions': {
@@ -518,7 +524,10 @@ class BotApiTest(test_env_handlers.AppTestBase):
         },
         u'command': [u'python', u'run_test.py'],
         u'containment': {
-          u'lower_priority': False,
+          u'lower_priority': True,
+          u'containment_type': 2,
+          u'limit_processes': 1000,
+          u'limit_total_committed_memory': 1024**3,
         },
         u'relative_cwd': None,
         u'dimensions': {
@@ -633,7 +642,10 @@ class BotApiTest(test_env_handlers.AppTestBase):
         },
         u'command': [],
         u'containment': {
-          u'lower_priority': False,
+          u'lower_priority': True,
+          u'containment_type': 2,
+          u'limit_processes': 1000,
+          u'limit_total_committed_memory': 1024**3,
         },
         u'relative_cwd': None,
         u'dimensions': {
@@ -792,7 +804,10 @@ class BotApiTest(test_env_handlers.AppTestBase):
         },
         u'command': [],
         u'containment': {
-          u'lower_priority': False,
+          u'lower_priority': True,
+          u'containment_type': 2,
+          u'limit_processes': 1000,
+          u'limit_total_committed_memory': 1024**3,
         },
         u'relative_cwd': None,
         u'dimensions': {

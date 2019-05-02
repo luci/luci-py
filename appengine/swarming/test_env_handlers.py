@@ -321,7 +321,10 @@ class AppTestBase(test_case.TestCase):
         u'server': u'https://pool.config.cipd.example.com',
       },
       u'containment': {
-        u'lower_priority': False,
+        u'lower_priority': True,
+        u'containment_type': swarming_rpcs.ContainmentType.AUTO,
+        u'limit_processes': 1000,
+        u'limit_total_committed_memory': 1024**3,
       },
       u'dimensions': [
         {u'key': u'os', u'value': u'Amiga'},
@@ -367,10 +370,10 @@ class AppTestBase(test_case.TestCase):
     """Creates a TaskRequest using an isolated tree via the Cloud Endpoints API.
     """
     properties = (properties or {}).copy()
-    properties['inputs_ref'] = {
-      'isolated': '0123456789012345678901234567890123456789',
-      'isolatedserver': 'http://localhost:1',
-      'namespace': 'default-gzip',
+    properties[u'inputs_ref'] = {
+      u'isolated': u'0123456789012345678901234567890123456789',
+      u'isolatedserver': u'http://localhost:1',
+      u'namespace': u'default-gzip',
     }
     return self.client_create_task(
         properties=self.create_props(**properties), **kwargs)
@@ -406,7 +409,10 @@ class AppTestBase(test_case.TestCase):
         u'server': u'https://pool.config.cipd.example.com',
       },
       u'containment': {
-        u'lower_priority': False,
+        u'lower_priority': True,
+        u'containment_type': u'AUTO',
+        u'limit_processes': u'1000',
+        u'limit_total_committed_memory': unicode(1024**3),
       },
       u'dimensions': [
         {u'key': u'os', u'value': u'Amiga'},
@@ -416,8 +422,8 @@ class AppTestBase(test_case.TestCase):
       u'grace_period_secs': u'30',
       u'idempotent': False,
       u'inputs_ref': {
-        'isolatedserver': 'https://pool.config.isolate.example.com',
-        'namespace': 'default-gzip',
+        u'isolatedserver': u'https://pool.config.isolate.example.com',
+        u'namespace': u'default-gzip',
       },
       u'io_timeout_secs': u'1200',
       u'outputs': [u'foo', u'path/to/foobar']
