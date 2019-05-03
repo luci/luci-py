@@ -151,7 +151,7 @@ class RestrictedPurgeHandler(auth.AuthenticatingHandler):
       params['message'] = 'Invalid entry: %s' % e
       key = None
     if key:
-      model.delete_entry_and_gs_entry([key])
+      model.delete_entry_and_gs_entry_async(key).get_result()
       params['message'] = 'Done'
     self.response.write(
         template.render('isolate/restricted_purge.html', params))
