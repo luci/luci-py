@@ -7,12 +7,12 @@ TARDIR ?= "/workspace"
 define FILEBUG
 
 \e[31m
-If you're using gae.py due to deploy/deploy-dev targets not working
+If you're using gae.py due to deploy/deploy_dev targets not working
 please file a bug at:
 
 https://bugs.chromium.org/p/chromium/issues/entry?components=Infra%3EProdTech%3EReleases
 
-If not, please use the deploy/deploy-dev targets.
+If not, please use the deploy/deploy_dev targets.
 \e[0m
 
 endef
@@ -28,7 +28,7 @@ test: build
 	tools/run_coverage.py
 
 # deploy_dev-gae deploys to the dev environmant using gae.py.
-# When using this due to deploy/deploy-dev targets not working, please file a bug at:
+# When using this due to deploy/deploy_dev targets not working, please file a bug at:
 #
 # https://bugs.chromium.org/p/chromium/issues/entry?components=Infra%3EProdTech%3EReleases
 deploy_dev_gae: build
@@ -51,7 +51,7 @@ deploy:
 	gcloud builds submit --no-source --substitutions=_PROJECT_DIR=luci/appengine/config_service --config cloudbuild.yaml --project chrome-infra-spinnaker
 	echo "Follow deployment at: go/luci-config-spin"
 
-# deploy-dev packs up the current folder and sends it off to Spinnaker for release to the Dev environment.
+# deploy_dev packs up the current folder and sends it off to Spinnaker for release to the Dev environment.
 #
 # See go/luci-config-spin for Spinnaker pipeline status.
 deploy_dev: build
@@ -59,7 +59,7 @@ deploy_dev: build
 	# The protoc symlink points to nowhere.
 	# Is that expected?
 	rsync -aLK --exclude="tools/protoc" . $(GCBDIR)
-	cd $(GCBDIR) && gcloud builds submit --config cloudbuild-dev.yaml . --project chrome-infra-spinnaker
+	cd $(GCBDIR) && gcloud builds submit --config cloudbuild_dev.yaml . --project chrome-infra-spinnaker
 	rm -fr $(GCBDIR)
 	@echo "Follow deployment at: go/luci-config-spin"
 
