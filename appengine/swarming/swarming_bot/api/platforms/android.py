@@ -238,6 +238,7 @@ def get_state(devices):
     u'build.product',
     u'build.fingerprint',
     u'build.id',
+    u'build.type',
     u'build.version.sdk',
     u'product.board',
     u'product.cpu.abi',
