@@ -157,7 +157,7 @@ to the client immediately, without ever scheduling a task.
 
 **Efficient task deduplication requires a deterministic build and no side
 effects in the tasks themselves**. On the other hand, successful task
-deduplication can results is large infrastructure savings.
+deduplication can result in large infrastructure savings.
 
 ☞ See [the user guide about idempotency](User-Guide.md#idempotency) for more
 information.
