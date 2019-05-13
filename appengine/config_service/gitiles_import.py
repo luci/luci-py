@@ -121,7 +121,8 @@ def _resolved_location(url):
   return loc
 
 
-def _import_revision(config_set, base_location, commit, force_update):
+def _import_revision(
+    config_set, base_location, commit, force_update, project_id):
   """Imports a referenced Gitiles revision into a config set.
 
   |base_location| will be used to set storage.ConfigSet.location.
@@ -163,6 +164,7 @@ def _import_revision(config_set, base_location, commit, force_update):
 
   # Fetch archive outside ConfigSet transaction.
   archive = location.get_archive(
+      project_id=project_id,
       deadline=get_gitiles_config().fetch_archive_deadline)
   if not archive:
     logging.warning(
@@ -249,12 +251,13 @@ def _read_and_validate_archive(config_set, rev_key, archive, location):
   return entities, ctx.result()
 
 
-def _import_config_set(config_set, location):
+def _import_config_set(config_set, location, project_id=None):
   """Imports the latest version of config set from a Gitiles location.
 
   Args:
     config_set (str): name of a config set to import.
     location (gitiles.Location): location of the config set.
+    project_id (str): name of the LUCI project related to the config set.
   """
   assert config_set
   assert location
@@ -272,7 +275,9 @@ def _import_config_set(config_set, location):
     logging.debug('Importing %s from %s', config_set, location)
 
     log = location.get_log(
-        limit=1, deadline=get_gitiles_config().fetch_log_deadline)
+        project_id=project_id,
+        limit=1,
+        deadline=get_gitiles_config().fetch_log_deadline)
     if not log or not log.commits:
 
       @ndb.transactional
@@ -305,7 +310,7 @@ def _import_config_set(config_set, location):
     logging.info(
         'Rolling %s => %s',
         config_set_entity and config_set_entity.latest_revision, commit.sha)
-    _import_revision(config_set, location, commit, force_update)
+    _import_revision(config_set, location, commit, force_update, project_id)
     import_success_metric.increment(fields={'config_set': config_set})
   except urlfetch_errors.DeadlineExceededError:
     save_attempt(False, 'Could not import: deadline exceeded')
@@ -372,7 +377,7 @@ def import_project(project_id):
   projects.update_import_info(
       project_id, projects.RepositoryType.GITILES, repo_url)
 
-  _import_config_set(config_set, loc)
+  _import_config_set(config_set, loc, project_id)
 
 
 def import_ref(project_id, ref_name):
