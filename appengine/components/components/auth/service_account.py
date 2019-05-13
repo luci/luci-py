@@ -25,6 +25,9 @@ from google.appengine.api import urlfetch
 from google.appengine.ext import ndb
 from google.appengine.runtime import apiproxy_errors
 
+from . import project_tokens
+from . import exceptions
+
 from components import utils
 
 
@@ -32,6 +35,8 @@ from components import utils
 __all__ = [
   'get_access_token',
   'get_access_token_async',
+  'get_project_access_token',
+  'get_project_access_token_async',
   'AccessTokenError',
   'ServiceAccountKey',
 ]
@@ -59,6 +64,130 @@ class AccessTokenError(Exception):
 
 # Do not log AccessTokenError exception raised from a tasklet.
 ndb.add_flow_exception(AccessTokenError)
+
+
+@ndb.tasklet
+def authenticated_request_async(url, method='GET', payload=None, params=None):
+  """Sends an authenticated JSON API request, returns deserialized response.
+
+  Raises:
+    TokenCreationError if request failed or response is malformed.
+    TokenAuthorizationError on HTTP 401 or 403 response from service.
+  """
+  scope = 'https://www.googleapis.com/auth/userinfo.email'
+  access_token = get_access_token(scope)[0]
+  headers = {
+    'Accept': 'application/json; charset=utf-8',
+    'Authorization': 'Bearer %s' % access_token,
+  }
+
+  if payload is not None:
+    assert method in ('CREATE', 'POST', 'PUT'), method
+    headers['Content-Type'] = 'application/json; charset=utf-8'
+    payload = utils.encode_to_json(payload)
+
+  if utils.is_local_dev_server():
+    protocols = ('http://', 'https://')
+  else:
+    protocols = ('https://',)
+  assert url.startswith(protocols) and '?' not in url, url
+  if params:
+    url += '?' + urllib.urlencode(params)
+
+  try:
+    res = yield _urlfetch_async(
+        url=url,
+        payload=payload,
+        method=method,
+        headers=headers,
+        follow_redirects=False,
+        deadline=10,
+        validate_certificate=True)
+  except (apiproxy_errors.DeadlineExceededError, urlfetch.Error) as e:
+    raise exceptions.TokenCreationError(str(e))
+
+  if res.status_code == 404:
+    logging.warning('Token server HTTP %d: %s', res.status_code, res.content)
+    raise exceptions.NotFoundError(
+        'HTTP %d: %s' % (res.status_code, res.content))
+
+  if res.status_code in (401, 403):
+    logging.error('Token server HTTP %d: %s', res.status_code, res.content)
+    raise exceptions.TokenAuthorizationError(
+        'HTTP %d: %s' % (res.status_code, res.content))
+
+  if res.status_code >= 300:
+    logging.error('Token server HTTP %d: %s', res.status_code, res.content)
+    raise exceptions.TokenCreationError(
+        'HTTP %d: %s' % (res.status_code, res.content))
+
+  try:
+    content = res.content
+    if content.startswith(")]}'\n"):
+      content = content[5:]
+    json_res = json.loads(content)
+  except ValueError as e:
+    raise exceptions.TokenCreationError('Bad JSON response: %s' % e)
+  raise ndb.Return(json_res)
+
+
+def authenticated_request(**kwargs):
+  """Blocking version of authenticated_request_async."""
+  return authenticated_request_async(**kwargs).get_result()
+
+
+@ndb.tasklet
+def get_project_access_token_async(
+    project_id, scopes, min_lifetime_sec=5*60):
+  """Returns an OAuth2 access token for a project.
+
+  Args:
+    project_id: id of the LUCI project to obtain a token for.
+    scopes: list of OAuth2 scopes to grant on the token.
+    min_lifetime_sec: desired minimal lifetime of the produced token.
+
+  Returns:
+    Tuple (access token, expiration time in seconds since the epoch).
+
+  Raises:
+    AccessTokenError on errors.
+  """
+  # Limit min_lifetime_sec, since requesting very long-lived tokens reduces
+  # efficiency of the cache (we need to constantly update it to keep tokens
+  # fresh).
+  if min_lifetime_sec <= 0 or min_lifetime_sec > 30 * 60:
+    raise ValueError(
+        '"min_lifetime_sec" should be in range (0; 1800], actual: %d'
+        % min_lifetime_sec)
+
+  # Accept a single string to mimic app_identity.get_access_token behavior.
+  if isinstance(scopes, basestring):
+    scopes = [scopes]
+  scopes = sorted(scopes)
+
+  # Cache key for the token.
+  cache_key = _memcache_key(
+      method='tokenserver',
+      email=project_id,
+      scopes=scopes,
+      key_id=None)
+  # We need token only on cache miss, so generate it lazily.
+  token = yield _get_or_mint_token_async(
+      cache_key,
+      min_lifetime_sec,
+      lambda: project_tokens.project_token_async(
+          project_id,
+          scopes,
+          authenticated_request_async,
+          min_lifetime_sec,
+      ))
+  raise ndb.Return(token)
+
+
+def get_project_access_token(*args, **kwargs):
+  """Blocking version of get_project_access_token_async."""
+  return get_project_access_token_async(*args, **kwargs).get_result()
+
 
 @ndb.tasklet
 def get_access_token_async(
@@ -168,16 +297,14 @@ def get_access_token(*args, **kwargs):
 
 ## Private stuff.
 
-
 _MEMCACHE_NS = 'access_tokens'
-
 
 def _memcache_key(method, email, scopes, key_id=None):
   """Returns a string to use as a memcache key for a token.
 
   Args:
     method: 'pkey' or 'iam'.
-    email: service account email we are getting a token for.
+    email: identity (usually service account email) we are getting a token for.
     scopes: list of strings with scopes.
     key_id: private key ID used (if known).
   """
@@ -190,14 +317,17 @@ def _memcache_key(method, email, scopes, key_id=None):
   return hashlib.sha256(blob).hexdigest()
 
 @ndb.tasklet
-def _get_or_mint_token_async(cache_key, min_lifetime_secs, minter):
+def _get_or_mint_token_async(cache_key,
+    min_lifetime_secs,
+    minter,
+    namespace=_MEMCACHE_NS):
   """Gets an accress token from the cache or triggers mint flow."""
   # Randomize refresh time to avoid thundering herd effect when token expires.
   # Also add 5 sec extra to make sure callers will get the token that lives for
   # at least min_lifetime_sec even taking into account possible delays in
   # propagating the token up the stack. We can't give any strict guarantees
   # here though (need to be able to stop time to do that).
-  token_info = yield _memcache_get(cache_key, namespace=_MEMCACHE_NS)
+  token_info = yield _memcache_get(cache_key, namespace=namespace)
 
   min_allowed_exp = (
     utils.time_time() +
@@ -206,7 +336,7 @@ def _get_or_mint_token_async(cache_key, min_lifetime_secs, minter):
   if not token_info or token_info['exp_ts'] < min_allowed_exp:
     token_info = yield minter()
     yield _memcache_set(cache_key, token_info,
-                        token_info['exp_ts'], namespace=_MEMCACHE_NS)
+                        token_info['exp_ts'], namespace=namespace)
   raise ndb.Return(token_info['access_token'], token_info['exp_ts'])
 
 @ndb.tasklet
@@ -468,4 +598,8 @@ class _LocalSigner(object):
     pkey = RSA.importKey(private_key_pem)
     return PKCS1_v1_5.new(pkey).sign(SHA256.new(blob))
 
+
+def _urlfetch_async(**kwargs):
+  """To be mocked in tests."""
+  return ndb.get_context().urlfetch(**kwargs)
 

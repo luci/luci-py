@@ -12,17 +12,15 @@ import datetime
 import hashlib
 import json
 import logging
-import urllib
 
-from google.appengine.api import urlfetch
 from google.appengine.ext import ndb
-from google.appengine.runtime import apiproxy_errors
 from google.protobuf import message
 
 from components import utils
 
 from . import api
 from . import model
+from . import exceptions
 from . import service_account
 from . import signature
 from . import tokens
@@ -33,7 +31,6 @@ __all__ = [
   'delegate',
   'delegate_async',
   'DelegationToken',
-  'DelegationTokenCreationError',
 ]
 
 
@@ -49,22 +46,6 @@ ALLOWED_CLOCK_DRIFT_SEC = 30
 
 # Name of the HTTP header to look for delegation token.
 HTTP_HEADER = 'X-Delegation-Token-V1'
-
-
-class BadTokenError(Exception):
-  """Raised on fatal errors (like bad signature). Results in 403 HTTP code."""
-
-
-class TransientError(Exception):
-  """Raised on errors that can go away with retry. Results in 500 HTTP code."""
-
-
-class DelegationTokenCreationError(Exception):
-  """Raised on delegation token creation errors."""
-
-
-class DelegationAuthorizationError(DelegationTokenCreationError):
-  """Raised on authorization error during delegation token creation."""
 
 
 # A minted delegation token returned by delegate_async and delegate.
@@ -122,13 +103,14 @@ def deserialize_token(blob):
   try:
     as_bytes = tokens.base64_decode(blob)
   except (TypeError, ValueError) as exc:
-    raise BadTokenError('Not base64: %s' % exc)
+    raise exceptions.BadTokenError('Not base64: %s' % exc)
   if len(as_bytes) > MAX_TOKEN_SIZE:
-    raise BadTokenError('Unexpectedly huge token (%d bytes)' % len(as_bytes))
+    raise exceptions.BadTokenError(
+        'Unexpectedly huge token (%d bytes)' % len(as_bytes))
   try:
     return delegation_pb2.DelegationToken.FromString(as_bytes)
   except message.DecodeError as exc:
-    raise BadTokenError('Bad proto: %s' % exc)
+    raise exceptions.BadTokenError('Bad proto: %s' % exc)
 
 
 def unseal_token(tok):
@@ -154,24 +136,25 @@ def unseal_token(tok):
   assert isinstance(tok, delegation_pb2.DelegationToken)
 
   if not tok.serialized_subtoken:
-    raise BadTokenError('serialized_subtoken is missing')
+    raise exceptions.BadTokenError('serialized_subtoken is missing')
   if not tok.signer_id:
-    raise BadTokenError('signer_id is missing')
+    raise exceptions.BadTokenError('signer_id is missing')
   if not tok.signing_key_id:
-    raise BadTokenError('signing_key_id is missing')
+    raise exceptions.BadTokenError('signing_key_id is missing')
   if not tok.pkcs1_sha256_sig:
-    raise BadTokenError('pkcs1_sha256_sig is missing')
+    raise exceptions.BadTokenError('pkcs1_sha256_sig is missing')
 
   # Make sure signer_id looks like model.Identity.
   try:
     model.Identity.from_bytes(tok.signer_id)
   except ValueError as exc:
-    raise BadTokenError('signer_id is not a valid identity: %s' % exc)
+    raise exceptions.BadTokenError(
+        'signer_id is not a valid identity: %s' % exc)
 
   # Validate the signature.
   certs = get_trusted_signers().get(tok.signer_id)
   if not certs:
-    raise BadTokenError('Not a trusted signer: %r' % tok.signer_id)
+    raise exceptions.BadTokenError('Not a trusted signer: %r' % tok.signer_id)
   try:
     is_valid_sig = certs.check_signature(
         blob=tok.serialized_subtoken,
@@ -180,11 +163,11 @@ def unseal_token(tok):
   except signature.CertificateError as exc:
     if exc.transient:
       raise TransientError(str(exc))
-    raise BadTokenError(
+    raise exceptions.BadTokenError(
         'Bad certificate (signer_id == %s, signing_key_id == %s): %s' % (
         tok.signer_id, tok.signing_key_id, exc))
   if not is_valid_sig:
-    raise BadTokenError(
+    raise exceptions.BadTokenError(
         'Invalid signature (signer_id == %s, signing_key_id == %s)' % (
         tok.signer_id, tok.signing_key_id))
 
@@ -192,76 +175,10 @@ def unseal_token(tok):
   try:
     return delegation_pb2.Subtoken.FromString(tok.serialized_subtoken)
   except message.DecodeError as exc:
-    raise BadTokenError('Bad serialized_subtoken: %s' % exc)
+    raise exceptions.BadTokenError('Bad serialized_subtoken: %s' % exc)
 
 
 ## Token creation.
-
-
-def _urlfetch_async(**kwargs):
-  """To be mocked in tests."""
-  return ndb.get_context().urlfetch(**kwargs)
-
-
-@ndb.tasklet
-def _authenticated_request_async(url, method='GET', payload=None, params=None):
-  """Sends an authenticated JSON API request, returns deserialized response.
-
-  Raises:
-    DelegationTokenCreationError if request failed or response is malformed.
-    DelegationAuthorizationError on HTTP 401 or 403 response from auth service.
-  """
-  scope = 'https://www.googleapis.com/auth/userinfo.email'
-  access_token = service_account.get_access_token(scope)[0]
-  headers = {
-    'Accept': 'application/json; charset=utf-8',
-    'Authorization': 'Bearer %s' % access_token,
-  }
-
-  if payload is not None:
-    assert method in ('CREATE', 'POST', 'PUT'), method
-    headers['Content-Type'] = 'application/json; charset=utf-8'
-    payload = utils.encode_to_json(payload)
-
-  if utils.is_local_dev_server():
-    protocols = ('http://', 'https://')
-  else:
-    protocols = ('https://',)
-  assert url.startswith(protocols) and '?' not in url, url
-  if params:
-    url += '?' + urllib.urlencode(params)
-
-  try:
-    res = yield _urlfetch_async(
-        url=url,
-        payload=payload,
-        method=method,
-        headers=headers,
-        follow_redirects=False,
-        deadline=10,
-        validate_certificate=True)
-  except (apiproxy_errors.DeadlineExceededError, urlfetch.Error) as e:
-    raise DelegationTokenCreationError(str(e))
-
-  if res.status_code in (401, 403):
-    logging.error('Token server HTTP %d: %s', res.status_code, res.content)
-    raise DelegationAuthorizationError(
-        'HTTP %d: %s' % (res.status_code, res.content))
-
-  if res.status_code >= 300:
-    logging.error('Token server HTTP %d: %s', res.status_code, res.content)
-    raise DelegationTokenCreationError(
-        'HTTP %d: %s' % (res.status_code, res.content))
-
-  try:
-    content = res.content
-    if content.startswith(")]}'\n"):
-      content = content[5:]
-    json_res = json.loads(content)
-  except ValueError as e:
-    raise DelegationTokenCreationError('Bad JSON response: %s' % e)
-  raise ndb.Return(json_res)
-
 
 @ndb.tasklet
 def delegate_async(
@@ -308,8 +225,8 @@ def delegate_async(
 
   Raises:
     ValueError if args are invalid.
-    DelegationTokenCreationError if could not create a token.
-    DelegationAuthorizationError on HTTP 403 response from auth service.
+    TokenCreationError if could not create a token.
+    TokenAuthorizationError on HTTP 403 response from auth service.
   """
   assert isinstance(audience, list), audience
   assert isinstance(services, list), services
@@ -372,7 +289,9 @@ def delegate_async(
   if not token_server_url:
     token_server_url = api.get_request_auth_db().token_server_url
     if not token_server_url:
-      raise DelegationTokenCreationError('Token server URL is not configured')
+      raise exceptions.TokenCreationError(
+          'Token server URL is not configured'
+      )
 
   # End of validation.
 
@@ -405,7 +324,7 @@ def delegate_async(
       'Minting a delegation token for %r',
       {k: v for k, v in req.iteritems() if v},
   )
-  res = yield _authenticated_request_async(
+  res = yield service_account.authenticated_request_async(
       '%s/prpc/tokenserver.minter.TokenMinter/MintDelegationToken' %
           token_server_url,
       method='POST',
@@ -414,22 +333,24 @@ def delegate_async(
   signed_token = res.get('token')
   if not signed_token or not isinstance(signed_token, basestring):
     logging.error('Bad MintDelegationToken response: %s', res)
-    raise DelegationTokenCreationError('Bad response, no token')
+    raise exceptions.TokenCreationError('Bad response, no token')
 
   token_struct = res.get('delegationSubtoken')
   if not token_struct or not isinstance(token_struct, dict):
     logging.error('Bad MintDelegationToken response: %s', res)
-    raise DelegationTokenCreationError('Bad response, no delegationSubtoken')
+    raise exceptions.TokenCreationError(
+        'Bad response, no delegationSubtoken'
+    )
 
   if token_struct.get('kind') != 'BEARER_DELEGATION_TOKEN':
     logging.error('Bad MintDelegationToken response: %s', res)
-    raise DelegationTokenCreationError(
+    raise exceptions.TokenCreationError(
         'Bad response, not BEARER_DELEGATION_TOKEN')
 
   actual_validity_duration_sec = token_struct.get('validityDuration')
   if not isinstance(actual_validity_duration_sec, (int, float)):
     logging.error('Bad MintDelegationToken response: %s', res)
-    raise DelegationTokenCreationError(
+    raise exceptions.TokenCreationError(
         'Unexpected response, validityDuration is absent or not a number')
 
   token = DelegationToken(
@@ -488,7 +409,7 @@ def check_subtoken(subtoken, peer_identity, auth_db):
   try:
     return model.Identity.from_bytes(subtoken.delegated_identity)
   except ValueError as exc:
-    raise BadTokenError('Invalid delegated_identity: %s' % exc)
+    raise exceptions.BadTokenError('Invalid delegated_identity: %s' % exc)
 
 
 def check_subtoken_expiration(subtoken, now):
@@ -502,17 +423,17 @@ def check_subtoken_expiration(subtoken, now):
     BadTokenError if token has expired or not valid yet.
   """
   if not subtoken.creation_time:
-    raise BadTokenError('Missing "creation_time" field')
+    raise exceptions.BadTokenError('Missing "creation_time" field')
   if subtoken.validity_duration <= 0:
-    raise BadTokenError(
+    raise exceptions.BadTokenError(
         'Invalid validity_duration: %d' % subtoken.validity_duration)
   if subtoken.creation_time >= now + ALLOWED_CLOCK_DRIFT_SEC:
-    raise BadTokenError(
+    raise exceptions.BadTokenError(
         'Token is not active yet (%d < %d)' %
         (subtoken.creation_time, now + ALLOWED_CLOCK_DRIFT_SEC))
   if subtoken.creation_time + subtoken.validity_duration < now:
     exp = now - (subtoken.creation_time + subtoken.validity_duration)
-    raise BadTokenError('Token has expired %d sec ago' % exp)
+    raise exceptions.BadTokenError('Token has expired %d sec ago' % exp)
 
 
 def check_subtoken_services(subtoken, service_id):
@@ -526,9 +447,11 @@ def check_subtoken_services(subtoken, service_id):
     BadTokenError if token is not intended for the current service.
   """
   if not subtoken.services:
-    raise BadTokenError('The token\'s services list is empty')
+    raise exceptions.BadTokenError(
+        'The token\'s services list is empty')
   if '*' not in subtoken.services and service_id not in subtoken.services:
-    raise BadTokenError('The token is not intended for %s' % service_id)
+    raise exceptions.BadTokenError(
+        'The token is not intended for %s' % service_id)
 
 
 def check_subtoken_audience(subtoken, current_identity, auth_db):
@@ -544,7 +467,7 @@ def check_subtoken_audience(subtoken, current_identity, auth_db):
   """
   # No audience at all -> forbid.
   if not subtoken.audience:
-    raise BadTokenError('The token\'s audience field is empty')
+    raise exceptions.BadTokenError('The token\'s audience field is empty')
   # '*' in audience -> allow all.
   if '*' in subtoken.audience:
     return
@@ -559,7 +482,8 @@ def check_subtoken_audience(subtoken, current_identity, auth_db):
     group = aud[len('group:'):]
     if auth_db.is_group_member(group, current_identity):
       return
-  raise BadTokenError('%s is not allowed to use the token' % ident_as_bytes)
+  raise exceptions.BadTokenError(
+      '%s is not allowed to use the token' % ident_as_bytes)
 
 
 ## High level API to parse, validate and traverse delegation token.
@@ -587,7 +511,8 @@ def check_bearer_delegation_token(token, peer_identity, auth_db=None):
       utils.get_token_fingerprint(token))
   subtoken = unseal_token(deserialize_token(token))
   if subtoken.kind != delegation_pb2.Subtoken.BEARER_DELEGATION_TOKEN:
-    raise BadTokenError('Not a valid delegation token kind: %s' % subtoken.kind)
+    raise exceptions.BadTokenError(
+        'Not a valid delegation token kind: %s' % subtoken.kind)
   ident = check_subtoken(
       subtoken, peer_identity, auth_db or api.get_request_auth_db())
   logging.info(

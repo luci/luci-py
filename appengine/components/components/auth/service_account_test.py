@@ -18,6 +18,7 @@ from google.appengine.api import urlfetch
 from google.appengine.ext import ndb
 
 from components import utils
+from components.auth import model
 from components.auth import service_account
 from test_support import test_case
 
@@ -41,6 +42,85 @@ class FakeSigner(object):
   def sign_claimset_async(self, claimset):
     self.claimsets.append(claimset)
     raise ndb.Return('fake_jwt')
+
+
+class GetProjectAccessTokenTest(test_case.TestCase):
+
+  Response = collections.namedtuple('Response', ['status_code', 'content'])
+
+  def setUp(self):
+    super(GetProjectAccessTokenTest, self).setUp()
+    self.log_lines = []
+    def mocked_log(msg, *args):
+      self.log_lines.append(msg % args)
+    self.mock(logging, 'info', mocked_log)
+    self.mock(logging, 'error', mocked_log)
+    self.mock(logging, 'warning', mocked_log)
+
+  def totimestamp(self, datetimeobj):
+    return utils.datetime_to_timestamp(datetimeobj) / 10**6
+
+  def test_success(self):
+
+    model.AuthReplicationState(
+      key=model.replication_state_key(),
+      primary_url='https://auth.example.com',
+      primary_id='example-app-id',
+    ).put()
+    model.AuthGlobalConfig(
+      key=model.root_key(),
+      token_server_url='https://tokens.example.com',
+    ).put()
+
+    calls = []
+    @ndb.tasklet
+    def mocked_urlfetch_async(*args, **_):
+      mocked_urlfetch_async.called = True
+      calls.append(('urlfetch', args))
+      expiry = utils.utcnow() + datetime.timedelta(seconds=1800)
+      res = {'accessToken':'someaccesstoken',
+             'serviceAccountEmail': 'service@account.com',
+             'expiry': expiry.isoformat('T') + 'Z'
+             }
+      raise ndb.Return(
+          self.Response(200, json.dumps(res, sort_keys=True))
+      )
+    self.mock(service_account, '_urlfetch_async', mocked_urlfetch_async)
+
+    # non-cached
+    token = service_account.get_project_access_token(
+        project_id='project1',
+        scopes=['https://www.googleapis.com/auth/cloud-platform'],
+    )
+    self.assertEqual(token[0], 'someaccesstoken')
+    self.assertEqual(token[1],
+                     self.totimestamp(
+                         utils.utcnow() + datetime.timedelta(seconds=1800)))
+    self.assertTrue(mocked_urlfetch_async.called)
+    mocked_urlfetch_async.called = False
+
+    # cached
+    token = service_account.get_project_access_token(
+        project_id='project1',
+        scopes=['https://www.googleapis.com/auth/cloud-platform'],
+    )
+    self.assertEqual(token[0], 'someaccesstoken')
+    self.assertEqual(token[1],
+                     self.totimestamp(
+                         utils.utcnow() + datetime.timedelta(seconds=1800)))
+    self.assertFalse(mocked_urlfetch_async.called)
+
+    # cache expired
+    token = service_account.get_project_access_token(
+        project_id='project1',
+        scopes=['https://www.googleapis.com/auth/cloud-platform'],
+        min_lifetime_sec=1800,
+    )
+    self.assertEqual(token[0], 'someaccesstoken')
+    self.assertEqual(token[1],
+                     self.totimestamp(
+                         utils.utcnow() + datetime.timedelta(seconds=1800)))
+    self.assertTrue(mocked_urlfetch_async.called)
 
 
 class GetAccessTokenTest(test_case.TestCase):

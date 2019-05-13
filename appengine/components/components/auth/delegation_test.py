@@ -17,8 +17,10 @@ from google.appengine.ext import ndb
 from components import utils
 from components.auth import api
 from components.auth import delegation
+from components.auth import exceptions
 from components.auth import model
 from components.auth import signature
+from components.auth import service_account
 from components.auth import tokens
 from components.auth.proto import delegation_pb2
 
@@ -71,19 +73,19 @@ class SerializationTest(test_case.TestCase):
     msg = fake_token_proto()
     msg.serialized_subtoken = 'huge' * 10000
     tok = tokens.base64_encode(msg.SerializeToString())
-    with self.assertRaises(delegation.BadTokenError):
+    with self.assertRaises(exceptions.BadTokenError):
       delegation.deserialize_token(tok)
 
   def test_deserialize_not_base64(self):
     msg = fake_token_proto()
     tok = serialize_token(msg)
     tok += 'not base 64'
-    with self.assertRaises(delegation.BadTokenError):
+    with self.assertRaises(exceptions.BadTokenError):
       delegation.deserialize_token(tok)
 
   def test_deserialize_bad_proto(self):
     tok = tokens.base64_encode('not a proto')
-    with self.assertRaises(delegation.BadTokenError):
+    with self.assertRaises(exceptions.BadTokenError):
       delegation.deserialize_token(tok)
 
 
@@ -118,25 +120,25 @@ class SignatureTest(test_case.TestCase):
   def test_bad_signer_id(self):
     msg = seal_token(fake_subtoken_proto())
     msg.signer_id = 'not an identity'
-    with self.assertRaises(delegation.BadTokenError):
+    with self.assertRaises(exceptions.BadTokenError):
       delegation.unseal_token(msg)
 
   def test_unknown_signer_id(self):
     # Empty dict, no trusted signers.
     self.mock(delegation, 'get_trusted_signers', lambda: {})
-    with self.assertRaises(delegation.BadTokenError):
+    with self.assertRaises(exceptions.BadTokenError):
       delegation.unseal_token(seal_token(fake_subtoken_proto()))
 
   def test_unknown_signing_key_id(self):
     msg = seal_token(fake_subtoken_proto())
     msg.signing_key_id = 'blah'
-    with self.assertRaises(delegation.BadTokenError):
+    with self.assertRaises(exceptions.BadTokenError):
       delegation.unseal_token(msg)
 
   def test_bad_signature(self):
     msg = seal_token(fake_subtoken_proto())
     msg.pkcs1_sha256_sig = msg.pkcs1_sha256_sig[:-1] + 'A'
-    with self.assertRaises(delegation.BadTokenError):
+    with self.assertRaises(exceptions.BadTokenError):
       delegation.unseal_token(msg)
 
 
@@ -148,20 +150,20 @@ class ValidationTest(test_case.TestCase):
 
   def test_negative_validatity_duration(self):
     tok = fake_subtoken_proto('user:abc@example.com', validity_duration=-3600)
-    with self.assertRaises(delegation.BadTokenError):
+    with self.assertRaises(exceptions.BadTokenError):
       delegation.check_subtoken(tok, FAKE_IDENT, api.AuthDB())
 
   def test_expired(self):
     now = int(utils.time_time())
     tok = fake_subtoken_proto(
         'user:abc@example.com', creation_time=now-120, validity_duration=60)
-    with self.assertRaises(delegation.BadTokenError):
+    with self.assertRaises(exceptions.BadTokenError):
       delegation.check_subtoken(tok, FAKE_IDENT, api.AuthDB())
 
   def test_not_active_yet(self):
     now = int(utils.time_time())
     tok = fake_subtoken_proto('user:abc@example.com', creation_time=now+120)
-    with self.assertRaises(delegation.BadTokenError):
+    with self.assertRaises(exceptions.BadTokenError):
       delegation.check_subtoken(tok, FAKE_IDENT, api.AuthDB())
 
   def test_allowed_clock_drift(self):
@@ -173,7 +175,7 @@ class ValidationTest(test_case.TestCase):
     self.assertTrue(delegation.check_subtoken(tok, FAKE_IDENT, api.AuthDB()))
     # Doesn't work before that.
     self.mock_now(now, -31)
-    with self.assertRaises(delegation.BadTokenError):
+    with self.assertRaises(exceptions.BadTokenError):
       delegation.check_subtoken(tok, FAKE_IDENT, api.AuthDB())
 
   def test_expiration_moment(self):
@@ -185,7 +187,7 @@ class ValidationTest(test_case.TestCase):
     self.assertTrue(delegation.check_subtoken(tok, FAKE_IDENT, api.AuthDB()))
     # Expired at now + 3601.
     self.mock_now(now, 3601)
-    with self.assertRaises(delegation.BadTokenError):
+    with self.assertRaises(exceptions.BadTokenError):
       delegation.check_subtoken(tok, FAKE_IDENT, api.AuthDB())
 
   def test_subtoken_services(self):
@@ -200,7 +202,7 @@ class ValidationTest(test_case.TestCase):
     self.mock(
         model, 'get_service_self_identity',
         lambda: model.Identity.from_bytes('service:another-app-id'))
-    with self.assertRaises(delegation.BadTokenError):
+    with self.assertRaises(exceptions.BadTokenError):
       delegation.check_subtoken(tok, FAKE_IDENT, api.AuthDB())
 
   def test_subtoken_audience(self):
@@ -216,7 +218,7 @@ class ValidationTest(test_case.TestCase):
     self.assertTrue(
         delegation.check_subtoken(tok, make_id('user:b@b.com'), auth_db))
     # Other ids are rejected.
-    with self.assertRaises(delegation.BadTokenError):
+    with self.assertRaises(exceptions.BadTokenError):
       delegation.check_subtoken(tok, make_id('user:c@c.com'), auth_db)
 
 
@@ -262,7 +264,7 @@ class CreateTokenTest(test_case.TestCase):
     }
     urlfetch.called = False
 
-    self.mock(delegation, '_urlfetch_async', urlfetch)
+    self.mock(service_account, '_urlfetch_async', urlfetch)
 
     model.AuthReplicationState(
         key=model.replication_state_key(),
@@ -316,9 +318,9 @@ class CreateTokenTest(test_case.TestCase):
   def test_http_500(self):
     res = ndb.Future()
     res.set_result(self.Response(500, 'Server internal error'))
-    self.mock(delegation, '_urlfetch_async', lambda  **_k: res)
+    self.mock(service_account, '_urlfetch_async', lambda  **_k: res)
 
-    with self.assertRaises(delegation.DelegationTokenCreationError):
+    with self.assertRaises(exceptions.TokenCreationError):
       delegation.delegate(
         audience=['*'],
         services=['*'],
@@ -327,9 +329,9 @@ class CreateTokenTest(test_case.TestCase):
   def test_http_403(self):
     res = ndb.Future()
     res.set_result(self.Response(403, 'Not authorized'))
-    self.mock(delegation, '_urlfetch_async', lambda  **_k: res)
+    self.mock(service_account, '_urlfetch_async', lambda  **_k: res)
 
-    with self.assertRaises(delegation.DelegationAuthorizationError):
+    with self.assertRaises(exceptions.TokenAuthorizationError):
       delegation.delegate(
         audience=['*'],
         services=['*'],
