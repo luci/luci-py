@@ -78,6 +78,43 @@ class NetTest(test_case.TestCase):
         max_attempts=5)
     self.assertEqual('response body', response)
 
+  def test_request_project_token_fallback_works(self):
+    @ndb.tasklet
+    def mocked_get_project_access_token_async(*args, **kwargs):
+      mocked_get_project_access_token_async.params = (args, kwargs)
+      mocked_get_project_access_token_async.called = True
+      raise auth.NotFoundError('testing fallback 1')
+    mocked_get_project_access_token_async.called = False
+
+    @ndb.tasklet
+    def mocked_get_access_token_async(*args, **kwargs):
+      mocked_get_access_token_async.params = (args, kwargs)
+      mocked_get_access_token_async.called = True
+      raise Exception('testing fallback 2')
+    mocked_get_access_token_async.called = False
+
+    self.mock(auth,
+              'get_project_access_token_async',
+              mocked_get_project_access_token_async)
+    self.mock(auth,
+              'get_access_token_async',
+              mocked_get_access_token_async)
+
+    with self.assertRaises(Exception):
+      _ = net.request(
+        url='http://localhost/123',
+        method='POST',
+        payload='post body',
+        params={'a': '=', 'b': '&'},
+        headers={'Accept': 'text/plain'},
+        scopes=['scope'],
+        service_account_key=auth.ServiceAccountKey('a', 'b', 'c'),
+        deadline=123,
+        max_attempts=5,
+        project_id='project1')
+    self.assertTrue(mocked_get_project_access_token_async.called)
+    self.assertTrue(mocked_get_access_token_async.called)
+
   def test_retries_transient_errors(self):
     self.mock_urlfetch([
       ({'url': 'http://localhost/123'}, urlfetch.Error()),

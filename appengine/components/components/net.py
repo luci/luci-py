@@ -82,6 +82,7 @@ def request_async(
     scopes=None,
     service_account_key=None,
     delegation_token=None,
+    project_id=None,
     deadline=None,
     max_attempts=None):
   """Sends a REST API request, returns raw unparsed response.
@@ -97,6 +98,7 @@ def request_async(
     scopes: OAuth2 scopes for the access token (ok skip auth if None).
     service_account_key: auth.ServiceAccountKey with credentials.
     delegation_token: delegation token returned by auth.delegate.
+    project_id: request should be performed under a project authority.
     deadline: deadline for a single attempt (10 sec by default).
     max_attempts: how many times to retry on errors (4 times by default).
 
@@ -121,8 +123,17 @@ def request_async(
 
   headers = (headers or {}).copy()
 
-  if scopes:
+  if project_id:
+    try:
+      tok, _ = yield auth.get_project_access_token_async(project_id, scopes)
+    # Fall back if project token acquisition failed
+    except auth.NotFoundError as e:
+      # TODO(fmatenaar): Remove this after migration.
+      logging.error('unable to obtain project token: %s', e)
+      tok, _ = yield auth.get_access_token_async(scopes, service_account_key)
+  elif scopes:
     tok, _ = yield auth.get_access_token_async(scopes, service_account_key)
+  if scopes or project_id:
     headers['Authorization'] = 'Bearer %s' % tok
 
   if delegation_token:
@@ -202,6 +213,7 @@ def json_request_async(
     scopes=None,
     service_account_key=None,
     delegation_token=None,
+    project_id=None,
     deadline=None,
     max_attempts=None):
   """Sends a JSON REST API request, returns deserialized response.
@@ -221,6 +233,7 @@ def json_request_async(
     scopes: OAuth2 scopes for the access token (or skip auth if None).
     service_account_key: auth.ServiceAccountKey with credentials.
     delegation_token: delegation token returned by auth.delegate.
+    project_id: request should be performed under a project authority.
     deadline: deadline for a single attempt.
     max_attempts: how many times to retry on errors.
 
@@ -246,6 +259,7 @@ def json_request_async(
       scopes=scopes,
       service_account_key=service_account_key,
       delegation_token=delegation_token,
+      project_id=project_id,
       deadline=deadline,
       max_attempts=max_attempts)
   try:
