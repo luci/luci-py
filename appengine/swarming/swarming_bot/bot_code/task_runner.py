@@ -155,9 +155,7 @@ def get_isolated_args(work_dir, task_details, isolated_result,
   for key, value in (task_details.env or {}).iteritems():
     cmd.extend(('--env', '%s=%s' % (key, value)))
 
-  if task_details.containment.lower_priority:
-    cmd.append('--lower-priority')
-
+  cmd.extend(task_details.containment.flags())
   cmd.extend(run_isolated_flags)
 
   for key, values in task_details.env_prefixes.iteritems():
@@ -177,8 +175,37 @@ def get_isolated_args(work_dir, task_details, isolated_result,
 
 class Containment(object):
   """Containment details."""
-  def __init__(self, obj):
-    self.lower_priority = bool(obj.get('lower_priority'))
+  _EXPECTED = frozenset(
+      (
+        'containment_type',
+        'limit_processes',
+        'limit_total_committed_memory',
+        'lower_priority',
+      ))
+
+  def __init__(self, data):
+    if set(data) != self._EXPECTED:
+      raise InternalError(
+          'Unexpected keys: %s != %s' % (sorted(data), sorted(self._EXPECTED)))
+    self.lower_priority = bool(data['lower_priority'])
+    self.containment_type = data['containment_type']
+    self.limit_processes = data['limit_processes']
+    self.limit_total_committed_memory = data['limit_total_committed_memory']
+
+  def flags(self):
+    """Returns flags to use for run_isolated.py."""
+    out = []
+    if self.lower_priority:
+      out.append('--lower-priority')
+    if self.containment_type != 'NONE':
+      pass
+    if self.limit_processes:
+      out.extend(('--limit-processes', str(self.limit_processes)))
+    if self.limit_total_committed_memory:
+      out.extend(
+          ('--limit-total-committed-memory',
+            str(self.limit_total_committed_memory)))
+    return out
 
 
 class TaskDetails(object):
@@ -186,25 +213,52 @@ class TaskDetails(object):
 
   It only contains what the bot needs to know.
   """
+  _EXPECTED = frozenset(
+      (
+        'bot_authenticated_as',
+        'bot_id',
+        'caches',
+        'cipd_input',
+        'command',
+        'containment',
+        'dimensions',
+        'env',
+        'env_prefixes',
+        'extra_args',
+        'grace_period',
+        'hard_timeout',
+        'host',
+        'io_timeout',
+        'isolated',
+        'outputs',
+        'relative_cwd',
+        'secret_bytes',
+        'service_accounts',
+        'task_id',
+      ))
+
   def __init__(self, data):
     logging.info('TaskDetails(%s)', data)
     if not isinstance(data, dict):
       raise InternalError('Expected dict in task_runner_in.json, got %r' % data)
+    if set(data) != self._EXPECTED:
+      raise InternalError(
+          'Unexpected keys: %s != %s' % (sorted(data), sorted(self._EXPECTED)))
 
     # Get all the data first so it fails early if the task details is invalid.
     self.bot_id = data['bot_id']
 
     # Raw command. Only self.command or self.isolated.input can be set.
     self.command = data['command'] or []
-    self.relative_cwd = data.get('relative_cwd')
+    self.relative_cwd = data['relative_cwd']
 
     # Isolated command. Is a serialized version of task_request.FilesRef.
     self.isolated = data['isolated']
     self.extra_args = data['extra_args']
 
-    self.cipd_input = data.get('cipd_input')
+    self.cipd_input = data['cipd_input']
 
-    self.caches = data.get('caches')
+    self.caches = data['caches']
 
     self.env = {
       k.encode('utf-8'): v.encode('utf-8') for k, v in data['env'].iteritems()
@@ -217,9 +271,9 @@ class TaskDetails(object):
     self.hard_timeout = data['hard_timeout']
     self.io_timeout = data['io_timeout']
     self.task_id = data['task_id']
-    self.outputs = data.get('outputs', [])
-    self.secret_bytes = data.get('secret_bytes')
-    self.containment = Containment(data.get('containment') or {})
+    self.outputs = data['outputs']
+    self.secret_bytes = data['secret_bytes']
+    self.containment = Containment(data['containment'])
 
   @staticmethod
   def load(path):

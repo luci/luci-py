@@ -56,19 +56,31 @@ def get_manifest(script=None, isolated=None, **kwargs):
   """
   isolated_input = isolated and isolated.get('input')
   out = {
+    'bot_authenticated_as': 'foo',
     'bot_id': 'localhost',
+    'caches': [],
+    'cipd_input': {},
     'command':
         [sys.executable, '-u', '-c', script] if not isolated_input else None,
     'containment': {
       'lower_priority': True,
+      'containment_type': 'NONE',
+      'limit_processes': 0,
+      'limit_total_committed_memory': 0,
     },
+    'dimensions': {},
     'env': {},
     'env_prefixes': {},
     'extra_args': [],
     'grace_period': 30.,
     'hard_timeout': 10.,
+    'host': 'bar',
     'io_timeout': 10.,
     'isolated': isolated,
+    'outputs': [],
+    'relative_cwd': None,
+    'secret_bytes': None,
+    'service_accounts': None,
     'task_id': 23,
   }
   out.update(kwargs)
