@@ -4,6 +4,8 @@
 
 """Common code for platforms."""
 
+from collections import namedtuple
+
 
 def _safe_parse(content, split=': '):
   """Safely parse a 'key: value' list of strings from a command."""
@@ -17,3 +19,7 @@ def _safe_parse(content, split=': '):
     values.setdefault(
         parts[0].strip().decode('utf-8'), parts[1].decode('utf-8'))
   return values
+
+
+ComputerSystemInfo = namedtuple('ComputerSystemInfo', [
+    'name', 'vendor', 'version', 'serial'])

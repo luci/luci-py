@@ -15,6 +15,7 @@ import sys
 
 from utils import tools
 
+import common
 import gpu
 
 
@@ -548,3 +549,25 @@ def list_top_windows():
 
   ctypes.windll.user32.EnumWindows(window_enum_proc_prototype(on_window), None)
   return out
+
+
+@tools.cached
+def get_computer_system_info():
+  """Return a named tuple, which lists the following params from the WMI class
+  Win32_ComputerSystemProduct:
+
+  name, vendor, version, uuid
+  """
+  wbem = _get_wmi_wbem()
+  if not wbem:
+    return None
+
+  info = None
+  # https://msdn.microsoft.com/en-us/library/aa394105
+  for device in wbem.ExecQuery('SELECT * FROM Win32_ComputerSystemProduct'):
+    info = common.ComputerSystemInfo(
+        name=device.Name,
+        vendor=device.Vendor,
+        version=device.Version,
+        serial=device.IdentifyingNumber)
+  return info

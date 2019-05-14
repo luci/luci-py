@@ -116,6 +116,14 @@ def _read_cpuinfo():
     return f.read()
 
 
+def _read_dmi_file(filename):
+  try:
+    with open('/sys/devices/virtual/dmi/id/' + filename, 'rb') as f:
+      return f.read().strip()
+  except (IOError, OSError):
+    return None
+
+
 ## Public API.
 
 
@@ -497,3 +505,16 @@ def generate_autostart_desktop(command, name):
       'cmd': ' '.join(pipes.quote(c) for c in command),
       'name': name,
     }
+
+
+@tools.cached
+def get_computer_system_info():
+  """Return a named tuple, which lists the following params:
+
+  name, vendor, version, uuid
+  """
+  return common.ComputerSystemInfo(
+      name=_read_dmi_file('product_name'),
+      vendor=_read_dmi_file('sys_vendor'),
+      version=_read_dmi_file('product_version'),
+      serial=_read_dmi_file('product_serial'))
