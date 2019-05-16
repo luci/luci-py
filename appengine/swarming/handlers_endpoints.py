@@ -23,7 +23,6 @@ from protorpc import remote
 from components import auth
 from components import datastore_utils
 from components import endpoints_webapp2
-from components import machine_provider
 from components import utils
 
 import message_conversion

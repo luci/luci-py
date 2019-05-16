@@ -15,7 +15,6 @@ from google.appengine.ext import ndb
 
 from components import auth
 from components import config
-from components import machine_provider
 from components import utils
 from components.config import validation
 

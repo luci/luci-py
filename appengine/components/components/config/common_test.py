@@ -31,7 +31,7 @@ class CommonCase(test_case.TestCase):
     )
 
   def test_trim_app_id(self):
-    trimmed_app_id = 'gce-backend'
+    trimmed_app_id = 'example'
     app_id_external = trimmed_app_id
     app_id_internal = 'google.com:%s' % trimmed_app_id
     app_id_empty = ''
