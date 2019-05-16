@@ -547,17 +547,11 @@ def bot_event(
   - task_id: packed task id if relevant. Set to '' to zap the stored value.
   - task_name: task name if relevant. Zapped when task_id is zapped.
   - kwargs: optional values to add to BotEvent relevant to event_type.
-  - lease_id (in kwargs): ID assigned by Machine Provider for this bot.
-  - lease_expiration_ts (in kwargs): UTC seconds from epoch when Machine
-        Provider lease expires. Only one of lease_expiration_ts and
-        leased_indefinitely must be specified.
-  - leased_indefinitely (in kwargs): Whether or not the Machine Provider
-        lease is indefinite. Only one of lease_expiration_ts and
-        leased_indefinitely must be specified.
-  - machine_type (in kwargs): ID of the lease_management.MachineType this
-        Machine Provider bot was leased for.
-  - machine_lease (in kwargs): ID of the lease_management.MachineType
-        corresponding to this bot.
+  - lease_id (in kwargs): UNUSED. TODO(crbug/897355): Remove.
+  - lease_expiration_ts (in kwargs): UNUSED.
+  - leased_indefinitely (in kwargs): UNUSED.
+  - machine_type (in kwargs): UNUSED.
+  - machine_lease (in kwargs): UNUSED.
 
   Returns:
     ndb.Key to BotEvent entity if one was added.

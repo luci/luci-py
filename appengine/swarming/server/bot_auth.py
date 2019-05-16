@@ -17,6 +17,7 @@ import ts_mon_metrics
 from server import bot_groups_config
 
 
+# TODO(crbug/897355): Remove machine_type argument.
 def is_authenticated_bot(bot_id, machine_type):
   """Returns True if bot with given ID is using correct credentials.
 
@@ -45,7 +46,7 @@ def validate_bot_id_and_fetch_config(bot_id, machine_type):
   defined in bots.cfg.
   """
   bot_id = _extract_primary_hostname(bot_id)
-  cfg = bot_groups_config.get_bot_group_config(bot_id, machine_type)
+  cfg = bot_groups_config.get_bot_group_config(bot_id)
   if not cfg:
     logging.error(
         'bot_auth: unknown bot_id, not in the config\nbot_id: "%s"', bot_id)

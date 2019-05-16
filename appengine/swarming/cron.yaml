@@ -65,24 +65,6 @@ cron:
   target: backend
 
 
-### MP
-
-- description: Compute Machine Provider bot utilization.
-  url: /internal/cron/monitoring/machine_provider/bot_usage
-  schedule: every 1 minutes synchronized
-  target: backend
-
-- description: Configure Machine Provider leases.
-  url: /internal/cron/important/machine_provider/update_config
-  schedule: every 1 minutes synchronized
-  target: backend
-
-- description: Manage Machine Provider leases.
-  url: /internal/cron/important/machine_provider/manage_leases
-  schedule: every 1 minutes synchronized
-  target: backend
-
-
 ### Caches for the UI
 
 - description: Aggregate all bots dimensions for easier sorting.

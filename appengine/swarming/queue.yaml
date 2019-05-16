@@ -73,18 +73,6 @@ queue:
   rate: 10/s
 
 
-## MP
-
-# /internal/taskqueue/important/machine-provider/manage
-- name: machine-provider-manage
-  rate: 500/s
-  # Cron will reschedule, so don't retry on failure.
-  # Need both limits, since AE semantics is "AND", not "OR".
-  retry_parameters:
-    task_retry_limit: 0
-    task_age_limit: 1s
-
-
 ## General
 
 # /internal/taskqueue/mapreduce/launch/<job_id:[^\/]+>

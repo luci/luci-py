@@ -24,7 +24,6 @@ from server import bot_groups_config
 from server import bot_management
 from server import config
 from server import external_scheduler
-from server import lease_management
 from server import named_caches
 from server import stats_bots
 from server import stats_tasks
@@ -110,39 +109,6 @@ class CronDeleteOldTasks(_CronHandlerBase):
 
   def run_cron(self):
     task_request.cron_delete_old_task_requests()
-
-
-class CronMachineProviderBotsUtilizationHandler(_CronHandlerBase):
-  """Determines Machine Provider bot utilization."""
-
-  def run_cron(self):
-    if not config.settings().mp.enabled:
-      logging.info('MP support is disabled')
-      return
-
-    lease_management.cron_compute_utilization()
-
-
-class CronMachineProviderConfigHandler(_CronHandlerBase):
-  """Configures entities to lease bots from the Machine Provider."""
-
-  def run_cron(self):
-    if not config.settings().mp.enabled:
-      logging.info('MP support is disabled')
-      return
-
-    lease_management.cron_sync_config(config.settings().mp.server)
-
-
-class CronMachineProviderManagementHandler(_CronHandlerBase):
-  """Manages leases for bots from the Machine Provider."""
-
-  def run_cron(self):
-    if not config.settings().mp.enabled:
-      logging.info('MP support is disabled')
-      return
-
-    lease_management.cron_schedule_lease_management()
 
 
 class CronNamedCachesUpdate(_CronHandlerBase):
@@ -334,16 +300,6 @@ class TaskESNotifyTasksHandler(webapp2.RequestHandler):
     external_scheduler.notify_request_now(es_host, request)
 
 
-class TaskMachineProviderManagementHandler(webapp2.RequestHandler):
-  """Manages a lease for a Machine Provider bot."""
-
-  @decorators.require_taskqueue('machine-provider-manage')
-  def post(self):
-    key = ndb.Key(urlsafe=self.request.get('key'))
-    assert key.kind() == 'MachineLease', key
-    lease_management.task_manage_lease(key)
-
-
 class TaskNamedCachesPool(webapp2.RequestHandler):
   """Update named caches cache for a pool."""
 
@@ -401,13 +357,7 @@ class TaskMonitoringTSMon(webapp2.RequestHandler):
 
   @decorators.require_taskqueue('tsmon')
   def post(self, kind):
-    if kind == 'machine_types':
-      # Avoid a circular dependency. lease_management imports task_scheduler
-      # which imports ts_mon_metrics, so invoke lease_management directly to
-      # calculate Machine Provider-related global metrics.
-      lease_management.set_global_metrics()
-    else:
-      ts_mon_metrics.set_global_metrics(kind, payload=self.request.body)
+    ts_mon_metrics.set_global_metrics(kind, payload=self.request.body)
 
 
 ### Mapreduce related handlers
@@ -459,14 +409,6 @@ def get_routes():
     ('/internal/cron/important/external_scheduler/get_callbacks',
         CronExternalSchedulerGetCallbacksHandler),
 
-    # Machine Provider.
-    ('/internal/cron/monitoring/machine_provider/bot_usage',
-        CronMachineProviderBotsUtilizationHandler),
-    ('/internal/cron/important/machine_provider/update_config',
-        CronMachineProviderConfigHandler),
-    ('/internal/cron/important/machine_provider/manage_leases',
-        CronMachineProviderManagementHandler),
-
     ('/internal/cron/important/named_caches/update', CronNamedCachesUpdate),
 
     # Task queues.
@@ -480,8 +422,6 @@ def get_routes():
         TaskSendPubSubMessage),
     ('/internal/taskqueue/important/external_scheduler/notify-tasks',
         TaskESNotifyTasksHandler),
-    ('/internal/taskqueue/important/machine-provider/manage',
-        TaskMachineProviderManagementHandler),
     (r'/internal/taskqueue/important/named_cache/update-pool',
         TaskNamedCachesPool),
     (r'/internal/taskqueue/monitoring/bq/bots/events/'

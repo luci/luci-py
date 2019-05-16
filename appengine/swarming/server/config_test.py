@@ -181,22 +181,6 @@ class ConfigTest(test_case.TestCase):
 
     self.validator_test(config._validate_settings, config_pb2.SettingsCfg(), [])
 
-    self.validator_test(
-        config._validate_settings,
-        config_pb2.SettingsCfg(
-            mp=config_pb2.MachineProviderSettings(server='http://url')),
-      [
-        'mp.server must start with "https://" or "http://localhost"',
-      ])
-
-    self.validator_test(
-        config._validate_settings,
-        config_pb2.SettingsCfg(
-            mp=config_pb2.MachineProviderSettings(server='url')),
-      [
-        'mp.server must start with "https://" or "http://localhost"',
-      ])
-
   def test_get_settings_with_defaults_from_none(self):
     """Make sure defaults are applied even if raw config is None."""
     self.mock(config, '_get_settings', lambda: (None, None))

@@ -97,8 +97,8 @@ class BadConfigError(Exception):
   """Raised if the current bots.cfg config is broken."""
 
 
-def get_bot_group_config(bot_id, machine_type):
-  """Returns BotGroupConfig for a bot with given ID or machine type.
+def get_bot_group_config(bot_id):
+  """Returns BotGroupConfig for a bot with given ID.
 
   Returns:
     BotGroupConfig or None if not found.
@@ -109,9 +109,6 @@ def get_bot_group_config(bot_id, machine_type):
   """
   cfg = _fetch_bot_groups()
 
-  if machine_type and cfg.machine_types.get(machine_type):
-    return cfg.machine_types[machine_type]
-
   gr = cfg.direct_matches.get(bot_id)
   if gr is not None:
     return gr
@@ -121,19 +118,6 @@ def get_bot_group_config(bot_id, machine_type):
       return gr
 
   return cfg.default_group
-
-
-def fetch_machine_types():
-  """Returns a dict of MachineTypes contained in bots.cfg.
-
-  Returns:
-    A dict mapping the name of a MachineType to a bots_pb2.MachineType.
-
-  Raises:
-    BadConfigError if there's no cached config and the current config at HEAD is
-    not passing validation.
-  """
-  return _fetch_bot_groups().machine_types_raw
 
 
 def warmup():
@@ -289,7 +273,7 @@ class BotsCfgBody(BotsCfgHead):
   """Contains prefetched and expanded bots.cfg file (with all includes).
 
   It is updated from a cron via 'refetch_from_config_service' and used for
-  serving configs to RPCs via 'get_bot_group_config' and 'fetch_machine_types'.
+  serving configs to RPCs via 'get_bot_group_config'.
 
   There's only one entity of this kind. Its ID is 1 and the parent key is
   corresponding BotsCfgHead.
@@ -470,8 +454,6 @@ _BotGroups = collections.namedtuple('_BotGroups', [
   'rev',                # a revision of root bots.cfg config file
   'direct_matches',     # dict bot_id => BotGroupConfig
   'prefix_matches',     # list of pairs (bot_id_prefix, BotGroupConfig)
-  'machine_types',      # dict machine_type.name => BotGroupConfig
-  'machine_types_raw',  # dict machine_type.name => bots_pb2.MachineType
   'default_group',      # fallback BotGroupConfig or None if not defined
 ])
 
@@ -517,8 +499,6 @@ def _default_bot_groups():
     rev='none',
     direct_matches={},
     prefix_matches=[],
-    machine_types={},
-    machine_types_raw={},
     default_group=BotGroupConfig(
         version='default',
         owners=(),
@@ -746,8 +726,6 @@ def _do_fetch_bot_groups(known_cfg=None):
 
   direct_matches = {}
   prefix_matches = []
-  machine_types = {}
-  machine_types_raw = {}
   default_group = None
 
   known_prefixes = set()
@@ -788,12 +766,8 @@ def _do_fetch_bot_groups(known_cfg=None):
       prefix_matches.append((bot_id_prefix, group_cfg))
       known_prefixes.add(bot_id_prefix)
 
-    for machine_type in entry.machine_type:
-      machine_types[machine_type.name] = group_cfg
-      machine_types_raw[machine_type.name] = machine_type
-
     # Default group?
-    if not entry.bot_id and not entry.bot_id_prefix and not entry.machine_type:
+    if not entry.bot_id and not entry.bot_id_prefix:
       if default_group is not None:
         logging.error('Default bot group is specified twice')
       else:
@@ -804,8 +778,6 @@ def _do_fetch_bot_groups(known_cfg=None):
       expanded_cfg.rev,
       direct_matches,
       prefix_matches,
-      machine_types,
-      machine_types_raw,
       default_group)
 
 
@@ -817,120 +789,6 @@ def _validate_email(ctx, email, designation):
     auth.Identity(auth.IDENTITY_USER, email)
   except ValueError:
     ctx.error('invalid %s email "%s"', designation, email)
-
-
-def _validate_machine_type(ctx, machine_type, known_machine_type_names):
-  """Validates machine_type section and updates known_machine_type_names set."""
-  if not machine_type.name:
-    ctx.error('name is required')
-    return
-  if machine_type.name in known_machine_type_names:
-    ctx.error('reusing name "%s"', machine_type.name)
-    return
-  known_machine_type_names.add(machine_type.name)
-  if not (machine_type.lease_duration_secs or machine_type.lease_indefinitely):
-    ctx.error('lease_duration_secs or lease_indefinitely must be specified')
-    return
-  if machine_type.lease_indefinitely and machine_type.early_release_secs:
-    ctx.error('early_release_secs cannot be specified with lease_indefinitely')
-    return
-  if machine_type.lease_duration_secs < 0:
-    ctx.error('lease_duration_secs must be positive')
-    return
-  if machine_type.early_release_secs < 0:
-    ctx.error('early_release_secs must be positive')
-    return
-  required = {'disk_type', 'num_cpus', 'project'}
-  seen = set()
-  for j, dim in enumerate(machine_type.mp_dimensions):
-    with ctx.prefix('mp_dimensions #%d: ', j):
-      if ':' not in dim:
-        ctx.error('bad dimension "%s", not a key:value pair', dim)
-        return
-      key = dim.split(':', 1)[0]
-      try:
-        field = machine_provider.Dimensions.field_by_name(key)
-      except KeyError:
-        ctx.error('unknown dimension "%s"', key)
-        return
-      if key in seen and not field.repeated:
-        ctx.error('duplicate value for non-repeated dimension "%s"', key)
-        return
-      seen.add(key)
-      required.discard(key)
-  if required:
-    ctx.error('missing required mp_dimensions: %s', ', '.join(sorted(required)))
-    return
-  if machine_type.target_size < 0:
-    ctx.error('target_size must be positive')
-    return
-  _validate_machine_type_schedule(ctx, machine_type.schedule)
-
-
-def _validate_machine_type_schedule(ctx, schedule):
-  if not schedule:
-    # No schedule is allowed.
-    return
-  # Maps day of the week to a list of 2-tuples (start time in minutes,
-  # end time in minutes). Used to ensure intervals do not intersect.
-  daily_schedules = {day: [] for day in xrange(7)}
-
-  for daily_schedule in schedule.daily:
-    if daily_schedule.target_size < 0:
-      ctx.error('target size must be non-negative')
-    if not daily_schedule.start or not daily_schedule.end:
-      ctx.error('daily schedule must have a start and end time')
-      continue
-    try:
-      h1, m1 = map(int, daily_schedule.start.split(':'))
-      h2, m2 = map(int, daily_schedule.end.split(':'))
-    except ValueError:
-      ctx.error('start and end times must be formatted as %%H:%%M')
-      continue
-    if m1 < 0 or m1 > 59 or m2 < 0 or m2 > 59:
-      ctx.error('start and end times must be formatted as %%H:%%M')
-      continue
-    if h1 < 0 or h1 > 23 or h2 < 0 or h2 > 23:
-      ctx.error('start and end times must be formatted as %%H:%%M')
-      continue
-    start = h1 * 60 + m1
-    end = h2 * 60 + m2
-    if daily_schedule.days_of_the_week:
-      for day in daily_schedule.days_of_the_week:
-        if day < 0 or day > 6:
-          ctx.error(
-              'days of the week must be between 0 (Mon) and 6 (Sun)')
-        else:
-          daily_schedules[day].append((start, end))
-    else:
-      # Unspecified means all days.
-      for day in xrange(7):
-        daily_schedules[day].append((start, end))
-    if start >= end:
-      ctx.error(
-          'end time "%s" must be later than start time "%s"',
-          daily_schedule.end,
-          daily_schedule.start,
-      )
-      continue
-
-  # Detect intersections. For each day of the week, sort by start time
-  # and ensure that the end of each interval is earlier than the start
-  # of the next interval.
-  for intervals in daily_schedules.itervalues():
-    intervals.sort(key=lambda i: i[0])
-    for i in xrange(len(intervals) - 1):
-      current_end = intervals[i][1]
-      next_start = intervals[i + 1][0]
-      if current_end >= next_start:
-        ctx.error('intervals must be disjoint')
-        continue
-
-  for load_based in schedule.load_based:
-    if load_based.maximum_size < load_based.minimum_size:
-      ctx.error('maximum size cannot be less than minimum size')
-    if load_based.minimum_size < 1:
-      ctx.error('minimum size must be positive')
 
 
 def _validate_group_bot_ids(
@@ -1044,8 +902,6 @@ def _validate_bots_cfg(cfg, ctx):
   bot_id_prefixes = {}
   # Index of a group to use as default fallback (there can be only one).
   default_group_idx = None
-  # machine_type names.
-  machine_type_names = set()
 
   for i, entry in enumerate(cfg.bot_group):
     with ctx.prefix('bot_group #%d: ', i):
@@ -1057,21 +913,13 @@ def _validate_bots_cfg(cfg, ctx):
       _validate_group_bot_id_prefixes(
           ctx, entry.bot_id_prefix, i, bot_id_prefixes, bot_ids)
 
-      # A group without bot_id, bot_id_prefix and machine_type is applied to
-      # bots that don't fit any other groups. There should be at most one such
-      # group.
-      if (not entry.bot_id and
-          not entry.bot_id_prefix and
-          not entry.machine_type):
+      # A group without bot_id and bot_id_prefix is applied to bots that don't
+      # fit any other groups. There should be at most one such group.
+      if not entry.bot_id and not entry.bot_id_prefix:
         if default_group_idx is not None:
           ctx.error('group #%d is already set as default', default_group_idx)
         else:
           default_group_idx = i
-
-      # Validate machine_type.
-      for i, machine_type in enumerate(entry.machine_type):
-        with ctx.prefix('machine_type #%d: ', i):
-          _validate_machine_type(ctx, machine_type, machine_type_names)
 
       # Validate 'auth' and 'system_service_account' fields.
       if not entry.auth:

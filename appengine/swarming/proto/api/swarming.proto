@@ -156,9 +156,6 @@ message Bot {
   //
   // This is NOT used for task selection.
   BotInfo info = 8;
-
-  // TODO(maruel): Add lease_id, lease_expiration_ts, leased_indefinitely,
-  // machine_type, machine_lease.
 }
 
 // BotStatusType is one of the states the bot can be in.

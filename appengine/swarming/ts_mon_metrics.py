@@ -216,37 +216,6 @@ _jobs_max_pending_duration = gae_ts_mon.FloatMetric(
     ])
 
 
-# Global metric. Metric fields:
-# - busy = Whether or not the count is for machines that are busy.
-# - machine_type = server.lease_management.MachineType.key.id().
-_machine_types_actual_size = gae_ts_mon.GaugeMetric(
-    'swarming/machine_types/actual_size',
-    'Actual number of Machine Provider bots per MachineType.', [
-        gae_ts_mon.BooleanField('busy'),
-        gae_ts_mon.StringField('machine_type'),
-  ])
-
-
-# Global metric. Metric fields:
-# - machine_type = server.lease_management.MachineType.key.id().
-# - enabled = server.lease_management.MachineType.enabled.
-_machine_types_target_size = gae_ts_mon.GaugeMetric(
-    'swarming/machine_types/target_size',
-    'Target number of Machine Provider bots per MachineType.', [
-        gae_ts_mon.BooleanField('enabled'),
-        gae_ts_mon.StringField('machine_type'),
-    ])
-
-
-# Instance metric. Metric fields:
-# - machine_type = server.lease_managment.MachineType.key.id().
-_machine_types_connection_time = gae_ts_mon.CumulativeDistributionMetric(
-    'swarming/machine_types/connection_time',
-    'Time between bot_leased and bot_connected events.', [
-        gae_ts_mon.StringField('machine_type'),
-    ])
-
-
 # Instance metric. Metric fields:
 # - auth_method = one of 'luci_token', 'service_account', 'ip_whitelist'.
 # - condition = depends on the auth method (e.g. email for 'service_account').
@@ -392,30 +361,9 @@ def _set_executors_metrics(payload):
        executors_count, params.count)
 
 
-def _set_mp_metrics(payload):
-  """Set global Machine Provider-related ts_mon metrics."""
-  # Consider utilization metrics over 2 minutes old to be outdated.
-  for name, data in sorted(payload.iteritems()):
-    _machine_types_target_size.set(
-        data['target_size'],
-        fields={'enabled': data['enabled'], 'machine_type': name},
-        target_fields=_TARGET_FIELDS)
-    if data.get('busy') is not None:
-      _machine_types_actual_size.set(
-          data['busy'],
-          fields={'busy': True, 'machine_type': name},
-          target_fields=_TARGET_FIELDS)
-      _machine_types_actual_size.set(
-          data['idle'],
-          fields={'busy': False, 'machine_type': name},
-          target_fields=_TARGET_FIELDS)
-
-
 def _set_global_metrics():
   utils.enqueue_task('/internal/taskqueue/monitoring/tsmon/jobs', 'tsmon')
   utils.enqueue_task('/internal/taskqueue/monitoring/tsmon/executors', 'tsmon')
-  utils.enqueue_task(
-      '/internal/taskqueue/monitoring/tsmon/machine_types', 'tsmon')
 
 
 class _ShardParams(object):
@@ -509,10 +457,6 @@ def on_task_completed(summary):
     _jobs_durations.add(summary.duration, fields=fields)
 
 
-def on_machine_connected_time(seconds, fields):
-  _machine_types_connection_time.add(seconds, fields=fields)
-
-
 def on_bot_auth_success(auth_method, condition):
   _bot_auth_successes.increment(fields={
       'auth_method': auth_method,
@@ -525,8 +469,6 @@ def set_global_metrics(kind, payload=None):
     _set_jobs_metrics(payload)
   elif kind == 'executors':
     _set_executors_metrics(payload)
-  elif kind == 'mp':
-    _set_mp_metrics(payload)
   else:
     logging.error('set_global_metrics(kind=%s): unknown kind.', kind)
 
@@ -540,7 +482,5 @@ def initialize():
       _jobs_max_pending_duration,
       _jobs_pending_durations,
       _jobs_running,
-      _machine_types_actual_size,
-      _machine_types_target_size,
   ])
   gae_ts_mon.register_global_metrics_callback('callback', _set_global_metrics)

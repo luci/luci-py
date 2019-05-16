@@ -160,10 +160,6 @@ def _validate_settings(cfg, ctx):
     with ctx.prefix('cipd: '):
       _validate_cipd_settings(cfg.cipd, ctx)
 
-  if cfg.HasField('mp') and cfg.mp.server:
-    with ctx.prefix('mp.server '):
-      _validate_url(cfg.mp.server, ctx)
-
   with ctx.prefix('display_server_url_template '):
     url = cfg.display_server_url_template
     if url and not validation.is_valid_secure_url(url):
