@@ -1745,7 +1745,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         pubsub_topic='projects/abc/topics/def',
         task_slices=[
           task_request.TaskSlice(
-              expiration_secs=600,
+              expiration_secs=1200,
               properties=_gen_properties(idempotent=True),
               wait_for_capacity=False),
         ])
@@ -1859,7 +1859,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         pubsub_topic='projects/abc/topics/def',
         task_slices=[
           task_request.TaskSlice(
-              expiration_secs=600,
+              expiration_secs=1200,
               properties=_gen_properties(idempotent=True),
               wait_for_capacity=False),
         ])
@@ -1951,7 +1951,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         pubsub_topic='projects/abc/topics/def',
         task_slices=[
           task_request.TaskSlice(
-              expiration_secs=600,
+              expiration_secs=1200,
               properties=_gen_properties(),
               wait_for_capacity=False),
         ])
@@ -2104,7 +2104,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         0,
         task_slices=[
           task_request.TaskSlice(
-              expiration_secs=600,
+              expiration_secs=1200,
               properties=_gen_properties(idempotent=True),
               wait_for_capacity=False),
         ])
@@ -2148,7 +2148,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         0,
         task_slices=[
           task_request.TaskSlice(
-              expiration_secs=600,
+              expiration_secs=1200,
               properties=_gen_properties(idempotent=True),
               wait_for_capacity=False),
         ])

@@ -89,11 +89,11 @@ from server import task_request
 #
 # task_runner.MAX_PACKET_INTERVAL is 30 seconds.
 #
-# https://crbug.com/863175 "Temporarily" increase from 2 minutes to 6 minutes,
-# as some task workload is so overwhelming on the host that the bot process
-# doesn't get CPU time for several minutes. This should be decreased once the
-# bot processes run at higher priority.
-BOT_PING_TOLERANCE = datetime.timedelta(seconds=6*60)
+# https://crbug.com/863175 and https://crbug.com/948845 "Temporarily" increase
+# from 2 minutes to 10 minutes, as some task workload is so overwhelming on the
+# host that the bot process doesn't get CPU time for several minutes. This
+# should be decreased once the bot processes run at higher priority.
+BOT_PING_TOLERANCE = datetime.timedelta(seconds=10*60)
 
 
 # Time at which we can assume completed_ts is always set for task results.
