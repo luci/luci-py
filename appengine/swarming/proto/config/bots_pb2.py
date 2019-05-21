@@ -16,10 +16,10 @@ _sym_db = _symbol_database.Default()
 
 DESCRIPTOR = _descriptor.FileDescriptor(
   name='bots.proto',
-  package='swarming',
+  package='swarming.config',
   syntax='proto3',
   serialized_options=_b('Z3go.chromium.org/luci/swarming/proto/config;configpb'),
-  serialized_pb=_b('\n\nbots.proto\x12\x08swarming\"L\n\x07\x42otsCfg\x12\x1a\n\x12trusted_dimensions\x18\x01 \x03(\t\x12%\n\tbot_group\x18\x02 \x03(\x0b\x32\x12.swarming.BotGroup\"\xda\x01\n\x08\x42otGroup\x12\x0e\n\x06\x62ot_id\x18\x01 \x03(\t\x12\x15\n\rbot_id_prefix\x18\x02 \x03(\t\x12\x1f\n\x04\x61uth\x18\x14 \x03(\x0b\x32\x11.swarming.BotAuth\x12\x0e\n\x06owners\x18\x15 \x03(\t\x12\x12\n\ndimensions\x18\x16 \x03(\t\x12\x19\n\x11\x62ot_config_script\x18\x17 \x01(\t\x12!\n\x19\x62ot_config_script_content\x18\x19 \x01(\x0c\x12\x1e\n\x16system_service_account\x18\x18 \x01(\tJ\x04\x08\x03\x10\x04\"\xc8\x01\n\x07\x42otAuth\x12\x15\n\rlog_if_failed\x18\x05 \x01(\x08\x12\"\n\x1arequire_luci_machine_token\x18\x01 \x01(\x08\x12\x1f\n\x17require_service_account\x18\x02 \x03(\t\x12\x33\n\x14require_gce_vm_token\x18\x04 \x01(\x0b\x32\x15.swarming.BotAuth.GCE\x12\x14\n\x0cip_whitelist\x18\x03 \x01(\t\x1a\x16\n\x03GCE\x12\x0f\n\x07project\x18\x01 \x01(\tB5Z3go.chromium.org/luci/swarming/proto/config;configpbb\x06proto3')
+  serialized_pb=_b('\n\nbots.proto\x12\x0fswarming.config\"S\n\x07\x42otsCfg\x12\x1a\n\x12trusted_dimensions\x18\x01 \x03(\t\x12,\n\tbot_group\x18\x02 \x03(\x0b\x32\x19.swarming.config.BotGroup\"\xe1\x01\n\x08\x42otGroup\x12\x0e\n\x06\x62ot_id\x18\x01 \x03(\t\x12\x15\n\rbot_id_prefix\x18\x02 \x03(\t\x12&\n\x04\x61uth\x18\x14 \x03(\x0b\x32\x18.swarming.config.BotAuth\x12\x0e\n\x06owners\x18\x15 \x03(\t\x12\x12\n\ndimensions\x18\x16 \x03(\t\x12\x19\n\x11\x62ot_config_script\x18\x17 \x01(\t\x12!\n\x19\x62ot_config_script_content\x18\x19 \x01(\x0c\x12\x1e\n\x16system_service_account\x18\x18 \x01(\tJ\x04\x08\x03\x10\x04\"\xcf\x01\n\x07\x42otAuth\x12\x15\n\rlog_if_failed\x18\x05 \x01(\x08\x12\"\n\x1arequire_luci_machine_token\x18\x01 \x01(\x08\x12\x1f\n\x17require_service_account\x18\x02 \x03(\t\x12:\n\x14require_gce_vm_token\x18\x04 \x01(\x0b\x32\x1c.swarming.config.BotAuth.GCE\x12\x14\n\x0cip_whitelist\x18\x03 \x01(\t\x1a\x16\n\x03GCE\x12\x0f\n\x07project\x18\x01 \x01(\tB5Z3go.chromium.org/luci/swarming/proto/config;configpbb\x06proto3')
 )
 
 
@@ -27,20 +27,20 @@ DESCRIPTOR = _descriptor.FileDescriptor(
 
 _BOTSCFG = _descriptor.Descriptor(
   name='BotsCfg',
-  full_name='swarming.BotsCfg',
+  full_name='swarming.config.BotsCfg',
   filename=None,
   file=DESCRIPTOR,
   containing_type=None,
   fields=[
     _descriptor.FieldDescriptor(
-      name='trusted_dimensions', full_name='swarming.BotsCfg.trusted_dimensions', index=0,
+      name='trusted_dimensions', full_name='swarming.config.BotsCfg.trusted_dimensions', index=0,
       number=1, type=9, cpp_type=9, label=3,
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
-      name='bot_group', full_name='swarming.BotsCfg.bot_group', index=1,
+      name='bot_group', full_name='swarming.config.BotsCfg.bot_group', index=1,
       number=2, type=11, cpp_type=10, label=3,
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
@@ -58,69 +58,69 @@ _BOTSCFG = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=24,
-  serialized_end=100,
+  serialized_start=31,
+  serialized_end=114,
 )
 
 
 _BOTGROUP = _descriptor.Descriptor(
   name='BotGroup',
-  full_name='swarming.BotGroup',
+  full_name='swarming.config.BotGroup',
   filename=None,
   file=DESCRIPTOR,
   containing_type=None,
   fields=[
     _descriptor.FieldDescriptor(
-      name='bot_id', full_name='swarming.BotGroup.bot_id', index=0,
+      name='bot_id', full_name='swarming.config.BotGroup.bot_id', index=0,
       number=1, type=9, cpp_type=9, label=3,
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
-      name='bot_id_prefix', full_name='swarming.BotGroup.bot_id_prefix', index=1,
+      name='bot_id_prefix', full_name='swarming.config.BotGroup.bot_id_prefix', index=1,
       number=2, type=9, cpp_type=9, label=3,
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
-      name='auth', full_name='swarming.BotGroup.auth', index=2,
+      name='auth', full_name='swarming.config.BotGroup.auth', index=2,
       number=20, type=11, cpp_type=10, label=3,
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
-      name='owners', full_name='swarming.BotGroup.owners', index=3,
+      name='owners', full_name='swarming.config.BotGroup.owners', index=3,
       number=21, type=9, cpp_type=9, label=3,
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
-      name='dimensions', full_name='swarming.BotGroup.dimensions', index=4,
+      name='dimensions', full_name='swarming.config.BotGroup.dimensions', index=4,
       number=22, type=9, cpp_type=9, label=3,
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
-      name='bot_config_script', full_name='swarming.BotGroup.bot_config_script', index=5,
+      name='bot_config_script', full_name='swarming.config.BotGroup.bot_config_script', index=5,
       number=23, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
-      name='bot_config_script_content', full_name='swarming.BotGroup.bot_config_script_content', index=6,
+      name='bot_config_script_content', full_name='swarming.config.BotGroup.bot_config_script_content', index=6,
       number=25, type=12, cpp_type=9, label=1,
       has_default_value=False, default_value=_b(""),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
-      name='system_service_account', full_name='swarming.BotGroup.system_service_account', index=7,
+      name='system_service_account', full_name='swarming.config.BotGroup.system_service_account', index=7,
       number=24, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
@@ -138,20 +138,20 @@ _BOTGROUP = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=103,
-  serialized_end=321,
+  serialized_start=117,
+  serialized_end=342,
 )
 
 
 _BOTAUTH_GCE = _descriptor.Descriptor(
   name='GCE',
-  full_name='swarming.BotAuth.GCE',
+  full_name='swarming.config.BotAuth.GCE',
   filename=None,
   file=DESCRIPTOR,
   containing_type=None,
   fields=[
     _descriptor.FieldDescriptor(
-      name='project', full_name='swarming.BotAuth.GCE.project', index=0,
+      name='project', full_name='swarming.config.BotAuth.GCE.project', index=0,
       number=1, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
@@ -169,47 +169,47 @@ _BOTAUTH_GCE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=502,
-  serialized_end=524,
+  serialized_start=530,
+  serialized_end=552,
 )
 
 _BOTAUTH = _descriptor.Descriptor(
   name='BotAuth',
-  full_name='swarming.BotAuth',
+  full_name='swarming.config.BotAuth',
   filename=None,
   file=DESCRIPTOR,
   containing_type=None,
   fields=[
     _descriptor.FieldDescriptor(
-      name='log_if_failed', full_name='swarming.BotAuth.log_if_failed', index=0,
+      name='log_if_failed', full_name='swarming.config.BotAuth.log_if_failed', index=0,
       number=5, type=8, cpp_type=7, label=1,
       has_default_value=False, default_value=False,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
-      name='require_luci_machine_token', full_name='swarming.BotAuth.require_luci_machine_token', index=1,
+      name='require_luci_machine_token', full_name='swarming.config.BotAuth.require_luci_machine_token', index=1,
       number=1, type=8, cpp_type=7, label=1,
       has_default_value=False, default_value=False,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
-      name='require_service_account', full_name='swarming.BotAuth.require_service_account', index=2,
+      name='require_service_account', full_name='swarming.config.BotAuth.require_service_account', index=2,
       number=2, type=9, cpp_type=9, label=3,
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
-      name='require_gce_vm_token', full_name='swarming.BotAuth.require_gce_vm_token', index=3,
+      name='require_gce_vm_token', full_name='swarming.config.BotAuth.require_gce_vm_token', index=3,
       number=4, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
-      name='ip_whitelist', full_name='swarming.BotAuth.ip_whitelist', index=4,
+      name='ip_whitelist', full_name='swarming.config.BotAuth.ip_whitelist', index=4,
       number=3, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
@@ -227,8 +227,8 @@ _BOTAUTH = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=324,
-  serialized_end=524,
+  serialized_start=345,
+  serialized_end=552,
 )
 
 _BOTSCFG.fields_by_name['bot_group'].message_type = _BOTGROUP
@@ -243,14 +243,14 @@ _sym_db.RegisterFileDescriptor(DESCRIPTOR)
 BotsCfg = _reflection.GeneratedProtocolMessageType('BotsCfg', (_message.Message,), dict(
   DESCRIPTOR = _BOTSCFG,
   __module__ = 'bots_pb2'
-  # @@protoc_insertion_point(class_scope:swarming.BotsCfg)
+  # @@protoc_insertion_point(class_scope:swarming.config.BotsCfg)
   ))
 _sym_db.RegisterMessage(BotsCfg)
 
 BotGroup = _reflection.GeneratedProtocolMessageType('BotGroup', (_message.Message,), dict(
   DESCRIPTOR = _BOTGROUP,
   __module__ = 'bots_pb2'
-  # @@protoc_insertion_point(class_scope:swarming.BotGroup)
+  # @@protoc_insertion_point(class_scope:swarming.config.BotGroup)
   ))
 _sym_db.RegisterMessage(BotGroup)
 
@@ -259,12 +259,12 @@ BotAuth = _reflection.GeneratedProtocolMessageType('BotAuth', (_message.Message,
   GCE = _reflection.GeneratedProtocolMessageType('GCE', (_message.Message,), dict(
     DESCRIPTOR = _BOTAUTH_GCE,
     __module__ = 'bots_pb2'
-    # @@protoc_insertion_point(class_scope:swarming.BotAuth.GCE)
+    # @@protoc_insertion_point(class_scope:swarming.config.BotAuth.GCE)
     ))
   ,
   DESCRIPTOR = _BOTAUTH,
   __module__ = 'bots_pb2'
-  # @@protoc_insertion_point(class_scope:swarming.BotAuth)
+  # @@protoc_insertion_point(class_scope:swarming.config.BotAuth)
   ))
 _sym_db.RegisterMessage(BotAuth)
 _sym_db.RegisterMessage(BotAuth.GCE)
