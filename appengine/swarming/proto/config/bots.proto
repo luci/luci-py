@@ -68,6 +68,8 @@ message BotsCfg {
 //
 // TODO(vadimsh): Introduce explicit field "use_as_default" instead.
 message BotGroup {
+  reserved 3;
+
   // Explicit enumeration of bot IDs belonging to this group.
   //
   // It supports subset of bash brace expansion syntax, in particular ranges

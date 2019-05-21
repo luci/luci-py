@@ -102,8 +102,8 @@ message StringListPair {
 // Because a Swarming bot is a single execution unit unlike RBE, it doesn't have
 // a concept of owned device at the moment. This may change later.
 message Bot {
-  // Bot ID. It must be unique accross the Swarming fleet. Generally based on
-  // the hostname where the bot runs, but that's not a requirement. Must be
+  // Bot ID. It must be unique across the Swarming fleet. Generally based on the
+  // hostname where the bot runs, but that's not a requirement. Must be
   // predefined in bots.cfg.
   //
   // This value is also included in dimensions for the key 'id'.

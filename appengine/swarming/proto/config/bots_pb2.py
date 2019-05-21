@@ -19,7 +19,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   package='swarming',
   syntax='proto3',
   serialized_options=_b('Z3go.chromium.org/luci/swarming/proto/config;configpb'),
-  serialized_pb=_b('\n\nbots.proto\x12\x08swarming\"L\n\x07\x42otsCfg\x12\x1a\n\x12trusted_dimensions\x18\x01 \x03(\t\x12%\n\tbot_group\x18\x02 \x03(\x0b\x32\x12.swarming.BotGroup\"\xd4\x01\n\x08\x42otGroup\x12\x0e\n\x06\x62ot_id\x18\x01 \x03(\t\x12\x15\n\rbot_id_prefix\x18\x02 \x03(\t\x12\x1f\n\x04\x61uth\x18\x14 \x03(\x0b\x32\x11.swarming.BotAuth\x12\x0e\n\x06owners\x18\x15 \x03(\t\x12\x12\n\ndimensions\x18\x16 \x03(\t\x12\x19\n\x11\x62ot_config_script\x18\x17 \x01(\t\x12!\n\x19\x62ot_config_script_content\x18\x19 \x01(\x0c\x12\x1e\n\x16system_service_account\x18\x18 \x01(\t\"\xc8\x01\n\x07\x42otAuth\x12\x15\n\rlog_if_failed\x18\x05 \x01(\x08\x12\"\n\x1arequire_luci_machine_token\x18\x01 \x01(\x08\x12\x1f\n\x17require_service_account\x18\x02 \x03(\t\x12\x33\n\x14require_gce_vm_token\x18\x04 \x01(\x0b\x32\x15.swarming.BotAuth.GCE\x12\x14\n\x0cip_whitelist\x18\x03 \x01(\t\x1a\x16\n\x03GCE\x12\x0f\n\x07project\x18\x01 \x01(\tB5Z3go.chromium.org/luci/swarming/proto/config;configpbb\x06proto3')
+  serialized_pb=_b('\n\nbots.proto\x12\x08swarming\"L\n\x07\x42otsCfg\x12\x1a\n\x12trusted_dimensions\x18\x01 \x03(\t\x12%\n\tbot_group\x18\x02 \x03(\x0b\x32\x12.swarming.BotGroup\"\xda\x01\n\x08\x42otGroup\x12\x0e\n\x06\x62ot_id\x18\x01 \x03(\t\x12\x15\n\rbot_id_prefix\x18\x02 \x03(\t\x12\x1f\n\x04\x61uth\x18\x14 \x03(\x0b\x32\x11.swarming.BotAuth\x12\x0e\n\x06owners\x18\x15 \x03(\t\x12\x12\n\ndimensions\x18\x16 \x03(\t\x12\x19\n\x11\x62ot_config_script\x18\x17 \x01(\t\x12!\n\x19\x62ot_config_script_content\x18\x19 \x01(\x0c\x12\x1e\n\x16system_service_account\x18\x18 \x01(\tJ\x04\x08\x03\x10\x04\"\xc8\x01\n\x07\x42otAuth\x12\x15\n\rlog_if_failed\x18\x05 \x01(\x08\x12\"\n\x1arequire_luci_machine_token\x18\x01 \x01(\x08\x12\x1f\n\x17require_service_account\x18\x02 \x03(\t\x12\x33\n\x14require_gce_vm_token\x18\x04 \x01(\x0b\x32\x15.swarming.BotAuth.GCE\x12\x14\n\x0cip_whitelist\x18\x03 \x01(\t\x1a\x16\n\x03GCE\x12\x0f\n\x07project\x18\x01 \x01(\tB5Z3go.chromium.org/luci/swarming/proto/config;configpbb\x06proto3')
 )
 
 
@@ -139,7 +139,7 @@ _BOTGROUP = _descriptor.Descriptor(
   oneofs=[
   ],
   serialized_start=103,
-  serialized_end=315,
+  serialized_end=321,
 )
 
 
@@ -169,8 +169,8 @@ _BOTAUTH_GCE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=496,
-  serialized_end=518,
+  serialized_start=502,
+  serialized_end=524,
 )
 
 _BOTAUTH = _descriptor.Descriptor(
@@ -227,8 +227,8 @@ _BOTAUTH = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=318,
-  serialized_end=518,
+  serialized_start=324,
+  serialized_end=524,
 )
 
 _BOTSCFG.fields_by_name['bot_group'].message_type = _BOTGROUP
