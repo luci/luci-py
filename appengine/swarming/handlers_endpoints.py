@@ -775,10 +775,8 @@ class SwarmingQueuesService(remote.Service):
       for i in items:
         for s in i.sets:
           # Ignore the tasks that are only id specific, since they are
-          # termination tasks. This happens in particular with Machine Provider
-          # managed bots, since they are recycled on a continuous basis. There
-          # may be one per bot, and it is not really useful for the user, the
-          # user may just query the list of bots.
+          # termination tasks. There may be one per bot, and it is not really
+          # useful for the user, the user may just query the list of bots.
           if (len(s.dimensions_flat) == 1 and
               s.dimensions_flat[0].startswith('id:')):
             # A terminate task.
@@ -841,7 +839,7 @@ class SwarmingBotService(remote.Service):
       # If there is not BotInfo, look if there are BotEvent child of this
       # entity. If this is the case, it means the bot was deleted but it's
       # useful to show information about it to the user even if the bot was
-      # deleted. For example, it could be an machine-provider bot.
+      # deleted.
       events = bot_management.get_events_query(bot_id, True).fetch(1)
       if not events:
         raise endpoints.NotFoundException('%s not found.' % bot_id)
@@ -856,12 +854,7 @@ class SwarmingBotService(remote.Service):
           quarantined=events[0].quarantined,
           maintenance_msg=events[0].maintenance_msg,
           task_id=events[0].task_id,
-          last_seen_ts=events[0].ts,
-          lease_id=events[0].lease_id,
-          lease_expiration_ts=events[0].lease_expiration_ts,
-          leased_indefinitely=events[0].leased_indefinitely,
-          machine_type=events[0].machine_type,
-          machine_lease=events[0].machine_lease)
+          last_seen_ts=events[0].ts)
       deleted = True
 
     return message_conversion.bot_info_to_rpc(bot, deleted=deleted)
@@ -1051,8 +1044,7 @@ class SwarmingBotsService(remote.Service):
           q, swarming_rpcs.to_bool(request.quarantined),
           swarming_rpcs.to_bool(request.in_maintenance),
           swarming_rpcs.to_bool(request.is_dead),
-          swarming_rpcs.to_bool(request.is_busy),
-          swarming_rpcs.to_bool(request.is_mp))
+          swarming_rpcs.to_bool(request.is_busy))
     except ValueError as e:
       raise endpoints.BadRequestException(str(e))
 
@@ -1080,13 +1072,13 @@ class SwarmingBotsService(remote.Service):
 
     f_count = q.count_async()
     f_dead = bot_management.filter_availability(
-        q, None, None, True, None, None).count_async()
+        q, None, None, True, None).count_async()
     f_quarantined = bot_management.filter_availability(
-        q, True, None, None, None, None).count_async()
+        q, True, None, None, None).count_async()
     f_maintenance = bot_management.filter_availability(
-        q, None, True, None, None, None).count_async()
+        q, None, True, None, None).count_async()
     f_busy = bot_management.filter_availability(
-        q, None, None, None, True, None).count_async()
+        q, None, None, None, True).count_async()
     return swarming_rpcs.BotsCount(
         count=f_count.get_result(),
         quarantined=f_quarantined.get_result(),

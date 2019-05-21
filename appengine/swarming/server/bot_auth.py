@@ -17,22 +17,21 @@ import ts_mon_metrics
 from server import bot_groups_config
 
 
-# TODO(crbug/897355): Remove machine_type argument.
-def is_authenticated_bot(bot_id, machine_type):
+def is_authenticated_bot(bot_id):
   """Returns True if bot with given ID is using correct credentials.
 
   Expected to be called in a context of a handler of a request coming from the
   bot with given ID.
   """
   try:
-    validate_bot_id_and_fetch_config(bot_id, machine_type)
+    validate_bot_id_and_fetch_config(bot_id)
     return True
   except auth.AuthorizationError:
     return False
 
 
 # pylint: disable=unused-argument
-def validate_bot_id_and_fetch_config(bot_id, machine_type):
+def validate_bot_id_and_fetch_config(bot_id):
   """Verifies ID reported by a bot matches the credentials being used.
 
   Expected to be called in a context of some bot API request handler. Uses

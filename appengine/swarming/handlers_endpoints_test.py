@@ -1852,7 +1852,7 @@ class BotsApiTest(BaseTest):
         external_ip='8.8.4.4', authenticated_as='bot:whitelisted-ip',
         dimensions={u'id': [u'id3'], u'pool': [u'default']}, state={'ram': 65},
         version='123456789', quarantined=False, maintenance_msg=None,
-        task_id=None, task_name=None, machine_type='mt')
+        task_id=None, task_name=None)
     self.mock_now(self.now)
     bot_management.bot_event(
         event_type='bot_connected', bot_id='id1',
@@ -1916,7 +1916,6 @@ class BotsApiTest(BaseTest):
       u'first_seen_ts': fmtdate(then, DATETIME_NO_MICRO),
       u'is_dead': False,
       u'last_seen_ts': fmtdate(then, DATETIME_NO_MICRO),
-      u'machine_type': u'mt',
       u'quarantined': False,
       u'state': u'{"ram":65}',
       u'version': u'123456789',
@@ -2036,17 +2035,6 @@ class BotsApiTest(BaseTest):
         quarantined=swarming_rpcs.ThreeStateBool.FALSE)
     response = self.call_api('list', body=message_to_dict(request))
     self.assertEqual(expected, response.json)
-    # only bot3 is a machine provider bot
-    expected[u'items'] = [bot3]
-    request = handlers_endpoints.BotsRequest.combined_message_class(
-        is_mp=swarming_rpcs.ThreeStateBool.TRUE)
-    response = self.call_api('list', body=message_to_dict(request))
-    self.assertEqual(expected, response.json)
-    expected[u'items'] = [bot1, bot2, bot4]
-    request = handlers_endpoints.BotsRequest.combined_message_class(
-        is_mp=swarming_rpcs.ThreeStateBool.FALSE)
-    response = self.call_api('list', body=message_to_dict(request))
-    self.assertEqual(expected, response.json)
     # not:existing is a dimension that doesn't exist, nothing returned.
     request = handlers_endpoints.BotsRequest.combined_message_class(
         dimensions=['not:existing'])
@@ -2070,12 +2058,6 @@ class BotsApiTest(BaseTest):
     # still work
     request = handlers_endpoints.BotsRequest.combined_message_class(
         is_dead=swarming_rpcs.ThreeStateBool.TRUE,
-        dimensions=['not:existing'])
-    response = self.call_api('list', body=message_to_dict(request))
-    self.assertEqual(expected, response.json)
-    # is_mp:true can be paired with other non-existing dimensions and still work
-    request = handlers_endpoints.BotsRequest.combined_message_class(
-        is_mp=swarming_rpcs.ThreeStateBool.TRUE,
         dimensions=['not:existing'])
     response = self.call_api('list', body=message_to_dict(request))
     self.assertEqual(expected, response.json)

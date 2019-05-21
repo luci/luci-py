@@ -200,6 +200,7 @@ def bot_info_to_rpc(entity, deleted=False):
       deleted=deleted,
       dimensions=_string_list_pairs_from_dict(entity.dimensions),
       is_dead=entity.is_dead,
+      # Deprecated. TODO(crbug/897355): Remove.
       machine_type=entity.machine_type,
       state=json.dumps(entity.state, sort_keys=True, separators=(',', ':')))
 

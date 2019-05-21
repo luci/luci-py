@@ -1118,7 +1118,7 @@ def schedule_request(request, secret_bytes):
   return result_summary
 
 
-def bot_reap_task(bot_dimensions, bot_version, deadline):
+def bot_reap_task(bot_dimensions, bot_version):
   """Reaps a TaskToRun if one is available.
 
   The process is to find a TaskToRun where its .queue_number is set, then
@@ -1128,8 +1128,6 @@ def bot_reap_task(bot_dimensions, bot_version, deadline):
   - bot_dimensions: The dimensions of the bot as a dictionary in
           {string key: list of string values} format.
   - bot_version: String version of the bot client.
-  - deadline: UTC timestamp (as an int) that the bot must be able to
-              complete the task by. None if there is no such deadline.
 
   Returns:
     tuple of (TaskRequest, SecretBytes, TaskRunResult) for the task that was
@@ -1152,8 +1150,7 @@ def bot_reap_task(bot_dimensions, bot_version, deadline):
   failures = 0
   stale_index = 0
   try:
-    q = task_to_run.yield_next_available_task_to_dispatch(bot_dimensions,
-                                                          deadline)
+    q = task_to_run.yield_next_available_task_to_dispatch(bot_dimensions)
     for request, to_run in q:
       iterated += 1
       # When falling back from external scheduler, ignore other es-owned tasks.

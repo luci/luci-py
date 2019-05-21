@@ -121,21 +121,11 @@ class _BotCommon(ndb.Model):
   # 'task_error'.
   task_id = ndb.StringProperty(indexed=False)
 
-  # Machine Provider lease ID, for bots acquired from Machine Provider.
+  # Deprecated. TODO(crbug/897355): Remove.
   lease_id = ndb.StringProperty(indexed=False)
-
-  # UTC seconds from epoch when bot will be reclaimed by Machine Provider.
-  # Only one of lease_expiration_ts and leased_indefinitely must be specified.
   lease_expiration_ts = ndb.DateTimeProperty(indexed=False)
-
-  # Whether or not the bot is leased indefinitely from Machine Provider.
-  # Only one of lease_expiration_ts and leased_indefinitely must be specified.
   leased_indefinitely = ndb.BooleanProperty(indexed=False)
-
-  # ID of the MachineType, for bots acquired from Machine Provider.
   machine_type = ndb.StringProperty(indexed=False)
-
-  # ID of the MachineLease, for bots acquired from Machine Provider.
   machine_lease = ndb.StringProperty(indexed=False)
 
   # Dimensions are used for task selection. They are encoded as a list of
@@ -221,9 +211,6 @@ class _BotCommon(ndb.Model):
   def _pre_put_hook(self):
     super(_BotCommon, self)._pre_put_hook()
     self.dimensions_flat.sort()
-    if self.lease_expiration_ts and self.leased_indefinitely:
-      raise datastore_errors.BadValueError(
-        'lease_expiration_ts and leased_indefinitely both set:\n%s' % self)
 
 
 class BotInfo(_BotCommon):
@@ -240,9 +227,6 @@ class BotInfo(_BotCommon):
   # One of:
   ALIVE = 1<<7 # 128
   DEAD = 1<<6  # 64
-  # One of:
-  NOT_MACHINE_PROVIDER = 1<<5 # 32
-  MACHINE_PROVIDER = 1<<4     # 16
   # One of:
   HEALTHY = 1<<3     # 8
   QUARANTINED = 1<<2 # 4
@@ -269,7 +253,6 @@ class BotInfo(_BotCommon):
     return [
       self.IN_MAINTENANCE if self.maintenance_msg else self.NOT_IN_MAINTENANCE,
       self.DEAD if is_dead else self.ALIVE,
-      self.MACHINE_PROVIDER if self.machine_type else self.NOT_MACHINE_PROVIDER,
       self.QUARANTINED if self.quarantined else self.HEALTHY,
       self.BUSY if self.task_id else self.IDLE
     ]
@@ -481,8 +464,7 @@ def filter_dimensions(q, dimensions):
   return q
 
 
-def filter_availability(
-    q, quarantined, in_maintenance, is_dead, is_busy, is_mp):
+def filter_availability(q, quarantined, in_maintenance, is_dead, is_busy):
   """Filters a ndb.Query for BotInfo based on quarantined/is_dead/is_busy."""
   if quarantined is not None:
     if quarantined:
@@ -506,12 +488,6 @@ def filter_availability(
     q = q.filter(BotInfo.composite == BotInfo.DEAD)
   elif is_dead is not None:
     q = q.filter(BotInfo.composite == BotInfo.ALIVE)
-
-  if is_mp is not None:
-    if is_mp:
-      q = q.filter(BotInfo.composite == BotInfo.MACHINE_PROVIDER)
-    else:
-      q = q.filter(BotInfo.composite == BotInfo.NOT_MACHINE_PROVIDER)
 
   # TODO(charliea): Add filtering based on the 'maintenance' field.
 
@@ -547,11 +523,6 @@ def bot_event(
   - task_id: packed task id if relevant. Set to '' to zap the stored value.
   - task_name: task name if relevant. Zapped when task_id is zapped.
   - kwargs: optional values to add to BotEvent relevant to event_type.
-  - lease_id (in kwargs): UNUSED. TODO(crbug/897355): Remove.
-  - lease_expiration_ts (in kwargs): UNUSED.
-  - leased_indefinitely (in kwargs): UNUSED.
-  - machine_type (in kwargs): UNUSED.
-  - machine_lease (in kwargs): UNUSED.
 
   Returns:
     ndb.Key to BotEvent entity if one was added.
@@ -581,18 +552,6 @@ def bot_event(
     bot_info.task_name = task_name
   if version is not None:
     bot_info.version = version
-  if kwargs.get('lease_id') is not None:
-    bot_info.lease_id = kwargs['lease_id']
-  if kwargs.get('lease_expiration_ts') is not None:
-    assert not kwargs.get('leased_indefinitely'), bot_id
-    bot_info.lease_expiration_ts = kwargs['lease_expiration_ts']
-  if kwargs.get('leased_indefinitely') is not None:
-    assert not kwargs.get('lease_expiration_ts'), bot_id
-    bot_info.leased_indefinitely = kwargs['leased_indefinitely']
-  if kwargs.get('machine_type') is not None:
-    bot_info.machine_type = kwargs['machine_type']
-  if kwargs.get('machine_lease') is not None:
-    bot_info.machine_lease = kwargs['machine_lease']
 
   if quarantined:
     # Make sure it is not in the queue since it can't reap anything.
@@ -667,12 +626,9 @@ def has_capacity(dimensions):
 
   # Add it to the 'quick cache' to improve performance. This cache is kept for
   # the same duration as how long bots are considered still alive without a
-  # ping. There are two uses case:
-  # - there's a single bot in the fleet for these dimensions and it takes a
-  #   long time rebooting. This is the case with Android with slow
-  #   initialization and some baremetal bots (thanks SCSI firmware!).
-  # - Machine Provider recycle the fleet simultaneously, which causes
-  #   instantaneous downtime. https://crbug.com/888603
+  # ping. Useful if there's a single bot in the fleet for these dimensions and
+  # it takes a long time to reboot. This is the case with Android with slow
+  # initialization and some baremetal bots (thanks SCSI firmware!).
   seconds = config.settings().bot_death_timeout_secs
 
   if q.count(limit=1):
@@ -812,11 +768,7 @@ def cron_delete_old_bot_events():
 
 
 def cron_delete_old_bot():
-  """Deletes stale BotRoot entity groups.
-
-  This is especially important for Machine Provider bots, as they keep on being
-  created and accumulate forever.
-  """
+  """Deletes stale BotRoot entity groups."""
   start = utils.utcnow()
   # Run for 4.5 minutes and schedule the cron job every 5 minutes. Running for
   # 9.5 minutes (out of 10 allowed for a cron job) results in 'Exceeded soft

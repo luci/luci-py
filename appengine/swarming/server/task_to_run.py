@@ -225,20 +225,17 @@ class _QueryStats(object):
   """Statistics for a yield_next_available_task_to_dispatch() loop."""
   broken = 0
   cache_lookup = 0
-  deadline = None
   expired = 0
   hash_mismatch = 0
   ignored = 0
   no_queue = 0
   real_mismatch = 0
-  too_long = 0
   total = 0
 
   def __str__(self):
     return (
         '%d total, %d exp %d no_queue, %d hash mismatch, %d cache negative, '
-        '%d dimensions mismatch, %d ignored, %d broken, '
-        '%d not executable by deadline (UTC %s)') % (
+        '%d dimensions mismatch, %d ignored, %d broken') % (
         self.total,
         self.expired,
         self.no_queue,
@@ -246,13 +243,11 @@ class _QueryStats(object):
         self.cache_lookup,
         self.real_mismatch,
         self.ignored,
-        self.broken,
-        self.too_long,
-        self.deadline)
+        self.broken)
 
 
 @ndb.tasklet
-def _validate_task_async(bot_dimensions, deadline, stats, now, to_run):
+def _validate_task_async(bot_dimensions, stats, now, to_run):
   """Validates the TaskToRun and updates stats.
 
   Returns:
@@ -284,39 +279,6 @@ def _validate_task_async(bot_dimensions, deadline, stats, now, to_run):
     logging.debug('_validate_task_async(%s): dimensions mismatch', packed)
     stats.real_mismatch += 1
     raise ndb.Return((None, None))
-
-  # If the bot has a deadline, don't allow it to reap the task unless it can be
-  # completed before the deadline. We have to assume the task takes the
-  # theoretical maximum amount of time possible, which is governed by
-  # execution_timeout_secs. An isolated task's download phase is not subject to
-  # this limit, so we need to add io_timeout_secs. When a task is signalled that
-  # it's about to be killed, it receives a grace period as well.
-  # grace_period_secs is given by run_isolated to the task execution process, by
-  # task_runner to run_isolated, and by bot_main to the task_runner. Lastly, add
-  # a few seconds to account for any overhead.
-  #
-  # Give an exemption to the special terminate task because it doesn't actually
-  # run anything.
-  if deadline is not None and not props.is_terminate:
-    if not props.execution_timeout_secs:
-      # Task never times out, so it cannot be accepted.
-      logging.debug(
-          '_validate_task_async(%s): deadline %s but no execution timeout',
-          packed, deadline)
-      stats.too_long += 1
-      raise ndb.Return((None, None))
-    hard = props.execution_timeout_secs
-    grace = 3 * (props.grace_period_secs or 30)
-    # Allowance buffer for overheads (scheduling and isolation)
-    overhead = 300
-    max_schedule = now + datetime.timedelta(seconds=hard + grace + overhead)
-    if deadline <= max_schedule:
-      logging.debug(
-          '_validate_task_async(%s): deadline and too late %s > %s (%s + %d + '
-          '%d + %d)',
-          packed, deadline, max_schedule, now, hard, grace, overhead)
-      stats.too_long += 1
-      raise ndb.Return((None, None))
 
   # Expire as the bot polls by returning it, and task_scheduler will handle it.
   if to_run.expiration_ts < now:
@@ -562,7 +524,7 @@ def set_lookup_cache(to_run_key, is_available_to_schedule):
   return memcache.add(key, True, time=cache_lifetime, namespace='task_to_run')
 
 
-def yield_next_available_task_to_dispatch(bot_dimensions, deadline):
+def yield_next_available_task_to_dispatch(bot_dimensions):
   """Yields next available (TaskRequest, TaskToRun) in decreasing order of
   priority.
 
@@ -574,14 +536,11 @@ def yield_next_available_task_to_dispatch(bot_dimensions, deadline):
   Arguments:
   - bot_dimensions: dimensions (as a dict) defined by the bot that can be
       matched.
-  - deadline: UTC timestamp (as an int) that the bot must be able to
-      complete the task by. None if there is no such deadline.
   """
   assert len(bot_dimensions['id']) == 1, bot_dimensions
   # List of all the valid dimensions hashed.
   now = utils.utcnow()
   stats = _QueryStats()
-  stats.deadline = deadline
   bot_id = bot_dimensions[u'id'][0]
   futures = collections.deque()
   try:
@@ -595,8 +554,7 @@ def yield_next_available_task_to_dispatch(bot_dimensions, deadline):
         # search to 40s, it gives 20s to complete the reaping and complete the
         # HTTP request.
         return
-      futures.append(
-          _validate_task_async(bot_dimensions, deadline, stats, now, ttr))
+      futures.append(_validate_task_async(bot_dimensions, stats, now, ttr))
       while futures:
         # Keep a FIFO or LIFO queue ordering, depending on configuration.
         if futures[0].done():

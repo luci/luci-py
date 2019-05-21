@@ -123,39 +123,39 @@ class BotAuthTest(test_case.TestCase):
     self.mock_config(None)
     self.mock_caller('anonymous:anonymous', '1.1.1.1')
     with self.assertRaises(auth.AuthorizationError):
-      bot_auth.validate_bot_id_and_fetch_config('some-bot', None)
+      bot_auth.validate_bot_id_and_fetch_config('some-bot')
 
   def test_default_config_ip_whitelisted(self):
     # With default config, callers in 'bots' IP whitelist are allowed.
     self.mock_config(None)
     self.mock_caller('anonymous:anonymous', '1.2.3.5')
-    bot_auth.validate_bot_id_and_fetch_config('some-bot', None)
+    bot_auth.validate_bot_id_and_fetch_config('some-bot')
 
   def test_ip_whitelist_based_auth_ok(self):
     # Caller passes 'bots' IP whitelist and belongs to 'ip_whitelist'.
     self.mock_caller('anonymous:anonymous', '1.2.3.4')
     cfg = bot_auth.validate_bot_id_and_fetch_config(
-        'bot_with_ip_whitelist', None)
+        'bot_with_ip_whitelist')
     self.assertEquals({u'pool': [u'with_ip_whitelist']}, cfg.dimensions)
 
   def test_unknown_bot_id(self):
     # Caller supplies bot_id not in the config.
     self.mock_caller('anonymous:anonymous', '1.2.3.4')
     with self.assertRaises(auth.AuthorizationError):
-      bot_auth.validate_bot_id_and_fetch_config('unknown_bot_id', None)
+      bot_auth.validate_bot_id_and_fetch_config('unknown_bot_id')
     self.assert_error_log('unknown bot_id, not in the config')
 
   def test_machine_token_ok(self):
     # Caller is using valid machine token.
     self.mock_caller('bot:bot_with_token.domain', '1.2.3.5')
-    cfg = bot_auth.validate_bot_id_and_fetch_config('bot_with_token', None)
+    cfg = bot_auth.validate_bot_id_and_fetch_config('bot_with_token')
     self.assertEquals({u'pool': [u'with_token']}, cfg.dimensions)
 
   def test_machine_token_bad_id(self):
     # Caller is using machine token that doesn't match bot_id.
     self.mock_caller('bot:some-other-bot.domain', '1.2.3.5')
     with self.assertRaises(auth.AuthorizationError):
-      bot_auth.validate_bot_id_and_fetch_config('bot_with_token', None)
+      bot_auth.validate_bot_id_and_fetch_config('bot_with_token')
     self.assert_error_log('bot ID doesn\'t match the machine token used')
     self.assert_error_log('bot_id: "bot_with_token"')
 
@@ -163,7 +163,7 @@ class BotAuthTest(test_case.TestCase):
     # Caller is using valid machine token and belongs to the IP whitelist.
     self.mock_caller('bot:bot_with_token_and_ip_whitelist.domain', '1.2.3.4')
     cfg = bot_auth.validate_bot_id_and_fetch_config(
-        'bot_with_token_and_ip_whitelist', None)
+        'bot_with_token_and_ip_whitelist')
     self.assertEquals(
         {u'pool': [u'with_token_and_ip_whitelist']}, cfg.dimensions)
 
@@ -173,21 +173,21 @@ class BotAuthTest(test_case.TestCase):
     self.mock_caller('bot:bot_with_token_and_ip_whitelist.domain', '1.2.3.5')
     with self.assertRaises(auth.AuthorizationError):
       bot_auth.validate_bot_id_and_fetch_config(
-          'bot_with_token_and_ip_whitelist', None)
+          'bot_with_token_and_ip_whitelist')
     self.assert_error_log('bot IP is not whitelisted')
 
   def test_service_account_ok(self):
     # Caller is using valid service account.
     self.mock_caller('user:a@example.com', '1.2.3.5')
     cfg = bot_auth.validate_bot_id_and_fetch_config(
-        'bot_with_service_account', None)
+        'bot_with_service_account')
     self.assertEquals({u'pool': [u'with_service_account']}, cfg.dimensions)
 
   def test_alternative_service_account_ok(self):
     # Caller is using the second service account.
     self.mock_caller('user:x@example.com', '1.2.3.5')
     cfg = bot_auth.validate_bot_id_and_fetch_config(
-        'bot_with_service_account', None)
+        'bot_with_service_account')
     self.assertEquals({u'pool': [u'with_service_account']}, cfg.dimensions)
 
   def test_service_account_not_ok(self):
@@ -195,14 +195,14 @@ class BotAuthTest(test_case.TestCase):
     self.mock_caller('user:b@example.com', '1.2.3.5')
     with self.assertRaises(auth.AuthorizationError):
       bot_auth.validate_bot_id_and_fetch_config(
-          'bot_with_service_account', None)
+          'bot_with_service_account')
     self.assert_error_log('bot is not using expected service account')
 
   def test_service_account_ip_whitelist_ok(self):
     # Caller is using valid service account and belongs to the IP whitelist.
     self.mock_caller('user:a@example.com', '1.2.3.4')
     cfg = bot_auth.validate_bot_id_and_fetch_config(
-        'bot_with_service_account_and_ip_whitelist', None)
+        'bot_with_service_account_and_ip_whitelist')
     self.assertEquals(
         {u'pool': [u'with_service_account_and_ip_whitelist']}, cfg.dimensions)
 
@@ -212,7 +212,7 @@ class BotAuthTest(test_case.TestCase):
     self.mock_caller('user:a@example.com', '1.2.3.5')
     with self.assertRaises(auth.AuthorizationError):
       bot_auth.validate_bot_id_and_fetch_config(
-          'bot_with_service_account_and_ip_whitelist', None)
+          'bot_with_service_account_and_ip_whitelist')
     self.assert_error_log('bot IP is not whitelisted')
 
   def test_gce_token_ok(self):
@@ -220,7 +220,7 @@ class BotAuthTest(test_case.TestCase):
         'bot:irrelevant', '1.2.3.4',
         gce_instance='bot_with_gce_token',
         gce_project='expected_proj')
-    cfg = bot_auth.validate_bot_id_and_fetch_config('bot_with_gce_token', None)
+    cfg = bot_auth.validate_bot_id_and_fetch_config('bot_with_gce_token')
     self.assertEquals({u'pool': [u'bot_with_gce_token']}, cfg.dimensions)
 
   def test_gce_token_not_present(self):
@@ -229,7 +229,7 @@ class BotAuthTest(test_case.TestCase):
         gce_instance=None,
         gce_project=None)
     with self.assertRaises(auth.AuthorizationError):
-      bot_auth.validate_bot_id_and_fetch_config('bot_with_gce_token', None)
+      bot_auth.validate_bot_id_and_fetch_config('bot_with_gce_token')
     self.assert_error_log('bot is not using X-Luci-Gce-Vm-Token')
 
   def test_gce_token_wrong_project(self):
@@ -238,7 +238,7 @@ class BotAuthTest(test_case.TestCase):
         gce_instance='bot_with_gce_token',
         gce_project='not_expected')
     with self.assertRaises(auth.AuthorizationError):
-      bot_auth.validate_bot_id_and_fetch_config('bot_with_gce_token', None)
+      bot_auth.validate_bot_id_and_fetch_config('bot_with_gce_token')
     self.assert_error_log('got GCE VM token from unexpected project')
 
   def test_gce_token_wrong_instance(self):
@@ -247,41 +247,41 @@ class BotAuthTest(test_case.TestCase):
         gce_instance='wrong_instance',
         gce_project='expected_proj')
     with self.assertRaises(auth.AuthorizationError):
-      bot_auth.validate_bot_id_and_fetch_config('bot_with_gce_token', None)
+      bot_auth.validate_bot_id_and_fetch_config('bot_with_gce_token')
     self.assert_error_log('bot ID and GCE instance name do not match')
 
   def test_composite_machine_token_ok(self):
     # Caller is using valid machine token.
     self.mock_caller('bot:bot_with_token.domain', '1.2.3.5')
     cfg = bot_auth.validate_bot_id_and_fetch_config(
-        'bot_with_token--vm123', None)
+        'bot_with_token--vm123')
     self.assertEquals({u'pool': [u'with_token']}, cfg.dimensions)
 
   def test_composite_machine_token_bad_id(self):
     # Caller is using machine token that doesn't match bot_id.
     self.mock_caller('bot:some-other-bot.domain', '1.2.3.5')
     with self.assertRaises(auth.AuthorizationError):
-      bot_auth.validate_bot_id_and_fetch_config('bot_with_token--vm123', None)
+      bot_auth.validate_bot_id_and_fetch_config('bot_with_token--vm123')
     self.assert_error_log('bot ID doesn\'t match the machine token used')
     self.assert_error_log('bot_id: "bot_with_token"')
 
   def test_first_method_is_used(self):
     self.mock_caller('bot:bot_with_fallback_to_ip_wl.domain', '2.2.2.2')
     cfg = bot_auth.validate_bot_id_and_fetch_config(
-        'bot_with_fallback_to_ip_wl', None)
+        'bot_with_fallback_to_ip_wl')
     self.assertEquals({u'pool': [u'with_fallback_to_ip_wl']}, cfg.dimensions)
 
   def test_fallback_to_another_method(self):
     self.mock_caller('anonymous:anonymous', '1.1.1.1')
     cfg = bot_auth.validate_bot_id_and_fetch_config(
-        'bot_with_fallback_to_ip_wl', None)
+        'bot_with_fallback_to_ip_wl')
     self.assertEquals({u'pool': [u'with_fallback_to_ip_wl']}, cfg.dimensions)
 
   def test_multiple_methods_fail(self):
     self.mock_caller('anonymous:anonymous', '2.2.2.2')
     with self.assertRaises(auth.AuthorizationError) as err:
       bot_auth.validate_bot_id_and_fetch_config(
-          'bot_with_fallback_to_ip_wl', None)
+          'bot_with_fallback_to_ip_wl')
     self.assertEqual(
         "All auth methods failed: Bot ID doesn't match the token used; "
         "Not IP whitelisted", err.exception.message)

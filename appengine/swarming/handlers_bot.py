@@ -162,17 +162,11 @@ class _BotAuthenticatingHandler(auth.AuthenticatingHandler):
       logging.debug('Using bootstrap token %r', payload)
       return existing_token
 
-    machine_type = None
-    if bot_id:
-      bot_info = bot_management.get_info_key(bot_id).get()
-      if bot_info:
-        machine_type = bot_info.machine_type
-
     # TODO(vadimsh): Remove is_ip_whitelisted_machine check once all bots are
     # using auth for bootstrap and updating.
     if (not acl.can_create_bot() and
         not acl.is_ip_whitelisted_machine() and
-        not (bot_id and bot_auth.is_authenticated_bot(bot_id, machine_type))):
+        not (bot_id and bot_auth.is_authenticated_bot(bot_id))):
       raise auth.AuthorizationError('Not allowed to access the bot code')
 
     return bot_code.generate_bootstrap_token() if generate_token else None
@@ -260,14 +254,6 @@ class _ProcessResult(object):
   quarantined_msg = None
   # Bot maintenance message (or None if the bot is not under maintenance).
   maintenance_msg = None
-  # DateTime indicating UTC time when bot will be reclaimed by Machine Provider.
-  # If lease_expiration_ts and leased_indefinitely are both None then this is
-  # not a Machine Provider bot.
-  lease_expiration_ts = None
-  # Indicates the bot is leased indefinitely from Machine Provider.
-  # If lease_expiration_ts and leased_indefinitely are both None then this is
-  # not a Machine Provider bot.
-  leased_indefinitely = None
 
   def __init__(self, **kwargs):
     for k, v in kwargs.iteritems():
@@ -314,23 +300,13 @@ class _BotBaseHandler(_BotApiHandler):
           and isinstance(dimension_id[0], unicode)):
         bot_id = dimensions['id'][0]
 
-    lease_expiration_ts = None
-    leased_indefinitely = None
-    machine_type = None
     if bot_id:
-      logging.debug('Fetching bot info and settings for bot id: %s', bot_id)
-      bot_info, bot_settings = ndb.get_multi([
-          bot_management.get_info_key(bot_id),
-          bot_management.get_settings_key(bot_id)])
-      if bot_info:
-        lease_expiration_ts = bot_info.lease_expiration_ts
-        leased_indefinitely = bot_info.leased_indefinitely
-        machine_type = bot_info.machine_type
+      logging.debug('Fetching bot settings for bot id: %s', bot_id)
+      bot_settings = bot_management.get_settings_key(bot_id).get()
 
     # Make sure bot self-reported ID matches the authentication token. Raises
     # auth.AuthorizationError if not.
-    bot_group_cfg = bot_auth.validate_bot_id_and_fetch_config(
-        bot_id, machine_type)
+    bot_group_cfg = bot_auth.validate_bot_id_and_fetch_config(bot_id)
 
     # The server side dimensions from bot_group_cfg override bot-provided ones.
     # If both server side config and bot report some dimension, server side
@@ -358,8 +334,6 @@ class _BotBaseHandler(_BotApiHandler):
         state=state,
         dimensions=dimensions,
         bot_group_cfg=bot_group_cfg,
-        lease_expiration_ts=lease_expiration_ts,
-        leased_indefinitely=leased_indefinitely,
         maintenance_msg=state.get('maintenance'))
 
     # The bot may decide to "self-quarantine" itself. Accept both via
@@ -571,7 +545,7 @@ class BotPollHandler(_BotBaseHandler):
     try:
       # This is a fairly complex function call, exceptions are expected.
       request, secret_bytes, run_result = task_scheduler.bot_reap_task(
-          res.dimensions, res.version, res.lease_expiration_ts)
+          res.dimensions, res.version)
       if not request:
         # No task found, tell it to sleep a bit.
         bot_event('request_sleep')
@@ -821,21 +795,17 @@ class BotOAuthTokenHandler(_BotApiHandler):
       self.abort_with_error(
           400, error='"task_id" is required when using "account_id" == "task"')
 
-    # Need machine type associated with the bot for bots.cfg query below.
-    # BotInfo also contains ID of a task the bot currently executes (to compare
+    # BotInfo contains ID of a task the bot currently executes (to compare
     # with 'task_id' request parameter).
-    machine_type = None
     current_task_id = None
     bot_info = bot_management.get_info_key(bot_id).get()
     if bot_info:
-      machine_type = bot_info.machine_type
       current_task_id = bot_info.task_id
 
     # Make sure bot self-reported ID matches the authentication token. Raises
     # auth.AuthorizationError if not. Also fetches corresponding BotGroupConfig
     # that contains system service account email for this bot.
-    bot_group_cfg = bot_auth.validate_bot_id_and_fetch_config(
-        bot_id, machine_type)
+    bot_group_cfg = bot_auth.validate_bot_id_and_fetch_config(bot_id)
 
     # At this point, the request is valid structurally, and the bot used proper
     # authentication when making it.
@@ -911,14 +881,9 @@ class BotTaskUpdateHandler(_BotApiHandler):
     bot_id = request['id']
     task_id = request['task_id']
 
-    machine_type = None
-    bot_info = bot_management.get_info_key(bot_id).get()
-    if bot_info:
-      machine_type = bot_info.machine_type
-
     # Make sure bot self-reported ID matches the authentication token. Raises
     # auth.AuthorizationError if not.
-    bot_auth.validate_bot_id_and_fetch_config(bot_id, machine_type)
+    bot_auth.validate_bot_id_and_fetch_config(bot_id)
 
     bot_overhead = request.get('bot_overhead')
     cipd_pins = request.get('cipd_pins')
@@ -1073,14 +1038,9 @@ class BotTaskErrorHandler(_BotApiHandler):
     task_id = request.get('task_id', '')
     message = request.get('message', 'unknown')
 
-    machine_type = None
-    bot_info = bot_management.get_info_key(bot_id).get()
-    if bot_info:
-      machine_type = bot_info.machine_type
-
     # Make sure bot self-reported ID matches the authentication token. Raises
     # auth.AuthorizationError if not.
-    bot_auth.validate_bot_id_and_fetch_config(bot_id, machine_type)
+    bot_auth.validate_bot_id_and_fetch_config(bot_id)
 
     bot_management.bot_event(
         event_type='task_error', bot_id=bot_id,

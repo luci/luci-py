@@ -748,9 +748,11 @@ class BotInfo(messages.Message):
   version = messages.StringField(11)
   # Encoded as json since it's an arbitrary dict.
   state = messages.StringField(12)
+  deleted = messages.BooleanField(15)
+
+  # Deprecated. TODO(crbug/897355): Remove.
   lease_id = messages.StringField(13)
   lease_expiration_ts = message_types.DateTimeField(14)
-  deleted = messages.BooleanField(15)
   machine_type = messages.StringField(16)
   machine_lease = messages.StringField(17)
   leased_indefinitely = messages.BooleanField(19)

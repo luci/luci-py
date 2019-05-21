@@ -73,7 +73,6 @@ def _gen_bot_info(**kwargs):
     'composite': [
       bot_management.BotInfo.NOT_IN_MAINTENANCE,
       bot_management.BotInfo.ALIVE,
-      bot_management.BotInfo.NOT_MACHINE_PROVIDER,
       bot_management.BotInfo.HEALTHY,
       bot_management.BotInfo.IDLE,
     ],
@@ -281,7 +280,6 @@ class BotManagementTest(test_case.TestCase):
         composite=[
           bot_management.BotInfo.NOT_IN_MAINTENANCE,
           bot_management.BotInfo.ALIVE,
-          bot_management.BotInfo.NOT_MACHINE_PROVIDER,
           bot_management.BotInfo.QUARANTINED,
           bot_management.BotInfo.IDLE,
         ],
@@ -299,7 +297,6 @@ class BotManagementTest(test_case.TestCase):
         composite=[
           bot_management.BotInfo.NOT_IN_MAINTENANCE,
           bot_management.BotInfo.ALIVE,
-          bot_management.BotInfo.NOT_MACHINE_PROVIDER,
           bot_management.BotInfo.HEALTHY,
           bot_management.BotInfo.BUSY,
         ],
@@ -381,11 +378,11 @@ class BotManagementTest(test_case.TestCase):
     def check(dead, alive):
       q = bot_management.filter_availability(
           bot_management.BotInfo.query(), quarantined=None, in_maintenance=None,
-          is_dead=True, is_busy=None, is_mp=None)
+          is_dead=True, is_busy=None)
       self.assertEqual(dead, [t.to_dict() for t in q])
       q = bot_management.filter_availability(
           bot_management.BotInfo.query(), quarantined=None, in_maintenance=None,
-          is_dead=False, is_busy=None, is_mp=None)
+          is_dead=False, is_busy=None)
       self.assertEqual(alive, [t.to_dict() for t in q])
 
     _bot_event(event_type='bot_connected')
@@ -404,7 +401,6 @@ class BotManagementTest(test_case.TestCase):
         composite=[
           bot_management.BotInfo.NOT_IN_MAINTENANCE,
           bot_management.BotInfo.DEAD,
-          bot_management.BotInfo.NOT_MACHINE_PROVIDER,
           bot_management.BotInfo.HEALTHY,
           bot_management.BotInfo.IDLE,
         ],

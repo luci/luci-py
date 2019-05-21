@@ -105,12 +105,6 @@ All *states* are optional!
     changes.
 *   `cost_usd_hour`: reports the base cost of this bot in $USD/hour. This is
     used to calculate task's cost.
-*   `lease_expiration_ts`: when set to an integer or floating point value,
-    informs the server of the time (in UTC seconds since epoch) that the bot
-    will disconnect from the server. The server will not allow the bot to
-    reap any tasks projected to end after the bot disconnects. This is leveraged
-    for bots managed by [Machine
-    Provider](https://chromium.googlesource.com/infra/luci/luci-py.git/+/master/appengine/machine_provider).
 *   `maintenance`: if present, regardless of its value, is similar to
     `quarantined` except that it means the bot is in temporary and expected
     self-maintenance state and doesn't need to be looked at. An example is that

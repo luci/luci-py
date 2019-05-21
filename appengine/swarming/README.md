@@ -81,10 +81,6 @@ release process.
 *   Configure [bot_config.py](swarming_bot/config/bot_config.py) and
     [bootstrap.py](swarming_bot/config/bootstrap.py) as desired. Both are
     optional.
-*   If using [machine_provider](../machine_provider),
-    *   Ensure the `mp` parameter is enabled in the swarming
-        [config](https://chromium.googlesource.com/infra/luci/luci-py/+/master/appengine/swarming/proto/config.proto).
-    *   Create a machine\_type entry in [bots.cfg](./proto/bots.proto) for each desired pool of bots.
 *   Visit "_https://\<appid\>.appspot.com_" and follow the instructions to start
     a bot.
 *   Visit "_https://\<appid\>.appspot.com/botlist_" to ensure the bot is
