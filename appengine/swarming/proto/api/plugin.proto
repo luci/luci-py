@@ -7,7 +7,7 @@
 syntax = "proto3";
 
 package swarming.v1;
-option go_package = "swarming";
+option go_package = "go.chromium.org/luci/swarming/proto/api;apipb";
 
 import "google/protobuf/timestamp.proto";
 import "swarming.proto";
