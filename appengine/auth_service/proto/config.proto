@@ -20,6 +20,22 @@ package auth_service;
 message SettingsCfg {
   // Enable ts_mon based monitoring.
   bool enable_ts_monitoring = 1;
+
+  // If set, store the latest AuthDB snapshot in Google Storage.
+  //
+  // Should have format "<bucket>/<prefix>".
+  //
+  // Auth service will take ownership of two objects there:
+  //   1. latest.json: JSON-serialized AuthDBRevision proto.
+  //   2. latest.db: binary-serialized SignedAuthDB with actual AuthDB data.
+  //
+  // When AuthDB changes, Auth service updates latest.db, then latest.json, and
+  // finally sends a PubSub notification.
+  //
+  // Consumers can either poll latest.json for changes, or they can setup
+  // a PubSub subscription via /auth_service/api/v1/authdb/subscription/ to get
+  // notified.
+  string auth_db_gs_path = 2;
 }
 
 

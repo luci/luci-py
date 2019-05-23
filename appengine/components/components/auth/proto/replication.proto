@@ -197,6 +197,50 @@ message AuthDBRevision {
 }
 
 
+// SignedAuthDB contains serialized and signed AuthDB proto.
+//
+// It is used to store AuthDB snapshots in Google Storage. Signing is used as
+// a defense against unauthorized writes to the storage bucket.
+message SignedAuthDB {
+  // Serialized AuthDBRevision message describing the version of AuthDB blob.
+  bytes auth_db_rev = 1;
+  // Serialized AuthDB message with actual data.
+  bytes auth_db_blob = 2;
+
+  // Service account name whose key was used to sign the AuthDB blob.
+  string signer_id = 3;
+  // ID of the signing key.
+  string signing_key_id = 4;
+
+  // The joint signature of auth_db_rev and auth_db_blob fields.
+  //
+  // It is calculated using the following algorithm:
+  //
+  //    signature = RS256(
+  //        "SignedAuthDB v1" +
+  //        SHA512(auth_db_rev) +
+  //        SHA512(auth_db_blob))
+  //
+  // Where:
+  //   * RS256 is RSASSA-PKCS1-v1_5 using SHA-256, see RS256 algo in RFC7518.
+  //   * SHA512 is a byte string (64 bytes) with SHA-512 digest of its input.
+  //   * '+' is concatenation.
+  //
+  // Such peculiar structure is due to performance reasons (to avoid
+  // reserializing AuthDB proto multiple times) and limitations of GAE signing
+  // infrastructure (RS256 function can accept at most 8KB of input).
+  //
+  // Consumers of SignedAuthDB are expected to do the following:
+  //   1. Check 'signer_id' is what they expect.
+  //   2. Use https://www.googleapis.com/service_accounts/v1/metadata/x509/...
+  //      endpoint to get the signer's public key with ID 'signing_key_id'.
+  //   3. Construct to-be-signed string as specified above.
+  //   4. Verify 'signature' matches to-be-signed string using the public key
+  //      from step 2.
+  bytes signature = 5;
+}
+
+
 // Published by Primary into 'auth-db-changed' PubSub topic. The body of the
 // message is base64 encoded serialized ChangeNotification. Additional
 // attributes are:
