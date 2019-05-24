@@ -150,10 +150,12 @@ def refetch_config(force=False):
 
 
 @validation.self_rule('settings.cfg', config_pb2.SettingsCfg)
-def validate_settings_cfg(conf, _ctx):
+def validate_settings_cfg(conf, ctx):
   assert isinstance(conf, config_pb2.SettingsCfg)
-  # Nothing to validate here actually. There's only one boolean field in
-  # SettingsCfg.
+  if conf.auth_db_gs_path:
+    chunks = conf.auth_db_gs_path.split('/')
+    if len(chunks) < 2 or any(not ch for ch in chunks):
+      ctx.error('auth_db_gs_path: must have form <bucket>/<path>')
 
 
 # TODO(vadimsh): Below use validation context for real (e.g. emit multiple

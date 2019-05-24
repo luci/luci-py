@@ -33,6 +33,21 @@ class ConfigTest(test_case.TestCase):
         auth_db_rev=0,
     ).put()
 
+  def test_validate_settings_cfg(self):
+    def is_valid(**fields):
+      ctx = validation.Context()
+      config.validate_settings_cfg(config_pb2.SettingsCfg(**fields), ctx)
+      return not ctx.messages
+
+    self.assertTrue(is_valid())
+    self.assertTrue(is_valid(auth_db_gs_path='a/b'))
+    self.assertTrue(is_valid(auth_db_gs_path='a/b/c'))
+
+    self.assertFalse(is_valid(auth_db_gs_path='a/'))
+    self.assertFalse(is_valid(auth_db_gs_path='a'))
+    self.assertFalse(is_valid(auth_db_gs_path='a//b'))
+    self.assertFalse(is_valid(auth_db_gs_path='a/b/'))
+
   def test_refetch_config(self):
     initial_revs = {
       'a.cfg': config.Revision('old_a_rev', 'urla'),
