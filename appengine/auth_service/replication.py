@@ -64,7 +64,7 @@ class AuthReplicaState(ndb.Model, datastore_utils.SerializableModelMixin):
     'push_error': datastore_utils.READABLE,
   }
 
-  # URL of a host to push AuthDB updates to, especially useful on dev_appserver.
+  # URL of a host to push updates to, especially useful on dev_appserver.
   replica_url = ndb.StringProperty(indexed=False)
   # Revision of auth DB replica is synced to.
   auth_db_rev = ndb.IntegerProperty(default=0, indexed=False)
@@ -84,11 +84,11 @@ class AuthReplicaState(ndb.Model, datastore_utils.SerializableModelMixin):
 
 
 class AuthDBSnapshot(ndb.Model):
-  """Contains deflated serialized AuthDB proto message for some revision.
+  """Contains deflated serialized ReplicationPushRequest for some revision.
 
   Root entity. ID is corresponding revision number (as integer). Immutable.
   """
-  # Deflated serialized AuthDB proto message.
+  # Deflated serialized ReplicationPushRequest proto message.
   auth_db_deflated = ndb.BlobProperty()
   # SHA256 hex digest of auth_db (before compression).
   auth_db_sha256 = ndb.StringProperty(indexed=False)
@@ -233,6 +233,7 @@ def update_replicas_task(auth_db_rev):
   replication_state, auth_db_blob = pack_auth_db()
 
   # Put the blob into datastore. Also updates pointer to the latest stored blob.
+  # This is used by /auth_service/api/v1/authdb/revisions/... endpoint.
   store_auth_db_snapshot(replication_state, auth_db_blob)
 
   # Notify PubSub subscribers that new snapshot is available.
@@ -328,7 +329,7 @@ def pack_auth_db():
   """Packs an entire AuthDB into a blob (serialized protobuf message).
 
   Returns:
-    Tuple (AuthReplicationState, blob).
+    Tuple (AuthReplicationState, blob with serialized ReplicationPushRequest).
   """
   # Grab the snapshot.
   state, snapshot = replication.new_auth_db_snapshot()
@@ -363,7 +364,7 @@ def store_auth_db_snapshot(replication_state, auth_db_blob):
 
   Args:
     replication_state: AuthReplicationState that correspond to auth_db_blob.
-    auth_db_blob: serialized AuthDB proto message.
+    auth_db_blob: serialized ReplicationPushRequest message (has AuthDB inside).
   """
   deflated = zlib.compress(auth_db_blob)
   sha256 = hashlib.sha256(auth_db_blob).hexdigest()
