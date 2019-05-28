@@ -693,7 +693,7 @@ def _Popen(botobj, cmd, **kwargs):
   """
   kwargs.setdefault('stdout', subprocess42.PIPE)
   if sys.platform == 'win32':
-    prev = kwargs.get('creationflags') or 0
+    prev = kwargs.get('creationflags', 0)
     kwargs['creationflags'] = prev | subprocess42.CREATE_NEW_CONSOLE
   else:
     kwargs['close_fds'] = True
