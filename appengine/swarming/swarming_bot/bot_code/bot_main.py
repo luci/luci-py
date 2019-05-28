@@ -684,6 +684,28 @@ def _run_isolated_flags(botobj):
   return args
 
 
+def _Popen(botobj, cmd, **kwargs):
+  """Wraps subprocess42.Popen.
+
+  Creates a 'detached' process as per subprocess42 description.
+
+  On Windows, also create a separate console.
+  """
+  kwargs.setdefault('stdout', subprocess42.PIPE)
+  if sys.platform == 'win32':
+    prev = kwargs.get('creationflags') or 0
+    kwargs['creationflags'] = prev | subprocess42.CREATE_NEW_CONSOLE
+  else:
+    kwargs['close_fds'] = True
+  return subprocess42.Popen(
+        cmd,
+        stdin=subprocess42.PIPE,
+        stderr=subprocess42.STDOUT,
+        cwd=botobj.base_dir,
+        detached=True,
+        **kwargs)
+
+
 def _clean_cache(botobj):
   """Asks run_isolated to clean its cache.
 
@@ -704,13 +726,7 @@ def _clean_cache(botobj):
   try:
     # Intentionally do not use a timeout, it can take a while to hash 50gb but
     # better be safe than sorry.
-    proc = subprocess42.Popen(
-        cmd,
-        stdin=subprocess42.PIPE,
-        stdout=subprocess42.PIPE, stderr=subprocess42.STDOUT,
-        cwd=botobj.base_dir,
-        detached=True,
-        close_fds=sys.platform != 'win32')
+    proc = _Popen(botobj, cmd)
     output, _ = proc.communicate(None)
     logging.info('Result:\n%s', output)
     if proc.returncode:
@@ -879,15 +895,7 @@ def _run_manifest(botobj, manifest, start):
     os_utilities.roll_log(log_path)
     os_utilities.trim_rolled_log(log_path)
     with fs.open(log_path, 'a+b') as f:
-      proc = subprocess42.Popen(
-          command,
-          detached=True,
-          cwd=botobj.base_dir,
-          env=env,
-          stdin=subprocess42.PIPE,
-          stdout=f,
-          stderr=subprocess42.STDOUT,
-          close_fds=sys.platform != 'win32')
+      proc = _Popen(botobj, command, stdout=f, env=env)
       try:
         proc.wait(last_ditch_timeout)
       except subprocess42.TimeoutExpired:
@@ -1248,9 +1256,7 @@ def _bot_restart(botobj, message, filepath=None):
   sys.stdout.flush()
   sys.stderr.flush()
 
-  proc = subprocess42.Popen(
-     [sys.executable, filepath, 'is_fine'],
-     stdout=subprocess42.PIPE, stderr=subprocess42.STDOUT)
+  proc = _Popen(botobj, [sys.executable, filepath, 'is_fine'])
   output, _ = proc.communicate()
   if proc.returncode:
     botobj.post_error(

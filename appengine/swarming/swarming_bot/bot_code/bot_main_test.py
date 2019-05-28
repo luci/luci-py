@@ -1036,12 +1036,16 @@ class TestBotNotMocked(TestBotBase):
     self.mock(bot_main.common, 'exec_python', exec_python)
     # pylint: disable=unused-argument
     class Popen(object):
-      def __init__(self2, cmd, stdout, stderr):
+      def __init__(self2, cmd, cwd, stdin, stdout, stderr, close_fds, detached):
         self2.returncode = None
         expected = [sys.executable, bot_main.THIS_FILE, 'is_fine']
         self.assertEqual(expected, cmd)
+        self.assertEqual(self.root_dir, cwd)
+        self.assertEqual(subprocess42.PIPE, stdin)
         self.assertEqual(subprocess42.PIPE, stdout)
         self.assertEqual(subprocess42.STDOUT, stderr)
+        self.assertEqual(True, detached)
+        self.assertEqual(True, close_fds)
 
       def communicate(self2):
         self2.returncode = 0
