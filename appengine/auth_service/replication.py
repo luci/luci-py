@@ -13,6 +13,8 @@ from google.appengine.api import app_identity
 from google.appengine.api import datastore_errors
 from google.appengine.ext import ndb
 
+from google.protobuf import json_format
+
 from components import datastore_utils
 from components import utils
 
@@ -22,6 +24,8 @@ from components.auth import signature
 from components.auth import version
 from components.auth.proto import replication_pb2
 
+import config
+import gcs
 import pubsub
 
 
@@ -228,13 +232,23 @@ def update_replicas_task(auth_db_rev):
         replication_state.auth_db_rev, auth_db_rev)
     return True
 
-  # Pack an entire AuthDB into a blob to be to stored in the datastore and
-  # pushed to Replicas.
+  # Pack the entire AuthDB into a blob to be stored in the datastore, Google
+  # Storage and directly pushed to Replicas.
   replication_state, auth_db_blob = pack_auth_db()
+
+  # Sign the blob, so even if it travels through unprotected channel, consumers
+  # can still verify that it was produced by us.
+  key_name, sig = signature.sign_blob(hashlib.sha512(auth_db_blob).digest())
+  sig_b64 = base64.b64encode(sig)
 
   # Put the blob into datastore. Also updates pointer to the latest stored blob.
   # This is used by /auth_service/api/v1/authdb/revisions/... endpoint.
   store_auth_db_snapshot(replication_state, auth_db_blob)
+
+  # Put the blob into Google Storage, if this feature is enabled.
+  gs_path = config.get_settings().auth_db_gs_path
+  if gs_path:
+    upload_to_gs(gs_path, replication_state, auth_db_blob, key_name, sig)
 
   # Notify PubSub subscribers that new snapshot is available.
   pubsub.publish_authdb_change(replication_state)
@@ -248,14 +262,11 @@ def update_replicas_task(auth_db_rev):
     logging.info('All replicas are up-to-date.')
     return True
 
-  # Sign the blob, replicas check the signature.
-  key_name, sig = sign_auth_db_blob(auth_db_blob)
-
   # Push the blob to all out-of-date replicas, in parallel.
   push_started_ts = utils.utcnow()
   futures = {
     push_to_replica(
-        replica.replica_url, auth_db_blob, key_name, sig): replica
+        replica.replica_url, auth_db_blob, key_name, sig_b64): replica
     for replica in stale_replicas
   }
 
@@ -347,18 +358,6 @@ def pack_auth_db():
   return state, auth_db_blob
 
 
-def sign_auth_db_blob(auth_db_blob):
-  """Signs AuthDB blob with app's private key.
-
-  Returns:
-    Tuple (name of a key used, base64 encoded signature).
-  """
-  # sign_blob is limited to 8KB only, so
-  # hash the body first and sign the digest.
-  key_name, sig = signature.sign_blob(hashlib.sha512(auth_db_blob).digest())
-  return key_name, base64.b64encode(sig)
-
-
 def store_auth_db_snapshot(replication_state, auth_db_blob):
   """Puts AuthDB blob (serialized proto) into datastore.
 
@@ -395,6 +394,50 @@ def store_auth_db_snapshot(replication_state, auth_db_blob):
       latest.auth_db_sha256 = sha256
       latest.put()
   update_latest_pointer()
+
+
+def upload_to_gs(gs_path, replication_state, auth_db_blob, key_name, sig):
+  """Updates Google Storage files to contain the latest AuthDB.
+
+  Will write two Google Storage objects (in that order):
+    * <gs_path>/latest.db: binary-serialized SignedAuthDB.
+    * <gs_path>/latest.json: JSON-serialized AuthDBRevision.
+
+  Each individual file write is atomic, but it is possible latest.db is updated
+  but latest.json is not (i.e. if the call crashes in between two writes). If
+  this happens, 'update_replicas_task' is retried. Eventually both files should
+  agree.
+
+  Args:
+    gs_path: where to put files, has form "<bucket>/<prefix>".
+    replication_state: AuthReplicationState that correspond to auth_db_blob.
+    auth_db_blob: serialized ReplicationPushRequest message (has AuthDB inside).
+    key_name: name of the signing key.
+    sig: a binary blob with RS256(SHA512(auth_db_blob)) signature.
+
+  Raises:
+    net.Error if Google Storage writes fail.
+  """
+  assert not gs_path.endswith('/'), gs_path
+
+  signed = replication_pb2.SignedAuthDB(
+      auth_db_blob=auth_db_blob,
+      signer_id=app_identity.get_service_account_name(),
+      signing_key_id=key_name,
+      signature=sig)
+  gcs.upload_file(
+      path=gs_path+'/latest.db',
+      data=signed.SerializeToString(),
+      content_type='application/protobuf')
+
+  rev = replication_pb2.AuthDBRevision(
+      primary_id=app_identity.get_application_id(),
+      auth_db_rev=replication_state.auth_db_rev,
+      modified_ts=utils.datetime_to_timestamp(replication_state.modified_ts))
+  gcs.upload_file(
+      path=gs_path+'/latest.json',
+      data=json_format.MessageToJson(rev),
+      content_type='application/json')
 
 
 @ndb.tasklet
