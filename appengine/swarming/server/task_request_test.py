@@ -1441,6 +1441,20 @@ class TaskRequestApiTest(TestCase):
     _gen_request(priority=task_request.MAXIMUM_PRIORITY).put()
 
   def test_request_bad_execution_timeout(self):
+    # When used locally, it is set to 1, which means it's impossible to test
+    # below _MIN_TIMEOUT_SECS but above 0.
+    self.mock(task_request, '_MIN_TIMEOUT_SECS', 30)
+    p = _gen_request(properties=_gen_properties(execution_timeout_secs=0))
+    with self.assertRaises(datastore_errors.BadValueError):
+      # Only termination task may have 0.
+      p.put()
+    with self.assertRaises(datastore_errors.BadValueError):
+      _gen_request(
+          properties=_gen_properties(
+            execution_timeout_secs=task_request._MIN_TIMEOUT_SECS-1))
+    _gen_request(
+        properties=_gen_properties(
+          execution_timeout_secs=task_request._MIN_TIMEOUT_SECS))
     with self.assertRaises(datastore_errors.BadValueError):
       _gen_request(
           properties=_gen_properties(

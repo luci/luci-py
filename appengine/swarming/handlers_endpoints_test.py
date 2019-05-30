@@ -947,7 +947,10 @@ class TasksApiTest(BaseTest):
 
   def test_new_denied_command(self):
     request = self.create_new_request(
-        properties={u'dimensions': [{u'key': u'pool', u'value': u'default'}]})
+        properties={
+          u'dimensions': [{u'key': u'pool', u'value': u'default'}],
+          u'execution_timeout_secs': 30,
+        })
     response = self.call_api('new', body=message_to_dict(request), status=400)
     expected = {
       u'error': {
@@ -964,10 +967,7 @@ class TasksApiTest(BaseTest):
         })
     response = self.call_api('new', body=message_to_dict(request), status=400)
     expected = {
-      u'error': {
-          u'message':
-              u'Entity has uninitialized properties: execution_timeout_secs',
-          },
+      u'error': {u'message': u"'execution_timeout_secs' must be specified"},
     }
     self.assertEqual(expected, response.json)
 
