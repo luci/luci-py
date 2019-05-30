@@ -256,6 +256,8 @@ def get_access_token_async(
         service_account_key=service_account_key,
         act_as=None,
         min_lifetime_sec=5*60))
+    # On cache miss or if the cached token expires too soon, mint a token that
+    # lives ~1h, so we can cache and reuse it.
     token = yield _get_or_mint_token_async(
         cache_key,
         min_lifetime_sec,
@@ -263,7 +265,7 @@ def get_access_token_async(
             iam_token_factory,
             act_as,
             scopes,
-            min_lifetime_sec)
+            lifetime_sec=3600)
     )
     raise ndb.Return(token)
 
@@ -317,8 +319,9 @@ def _memcache_key(method, email, scopes, key_id=None):
   return hashlib.sha256(blob).hexdigest()
 
 @ndb.tasklet
-def _get_or_mint_token_async(cache_key,
-    min_lifetime_secs,
+def _get_or_mint_token_async(
+    cache_key,
+    min_lifetime_sec,
     minter,
     namespace=_MEMCACHE_NS):
   """Gets an accress token from the cache or triggers mint flow."""
@@ -331,7 +334,7 @@ def _get_or_mint_token_async(cache_key,
 
   min_allowed_exp = (
     utils.time_time() +
-    _randint(min_lifetime_secs + 5, min_lifetime_secs + 305))
+    _randint(min_lifetime_sec + 5, min_lifetime_sec + 305))
 
   if not token_info or token_info['exp_ts'] < min_allowed_exp:
     token_info = yield minter()
@@ -388,8 +391,8 @@ def _mint_jwt_based_token_async(scopes, signer):
   })
 
 @ndb.tasklet
-def _mint_oauth_token_async(token_factory, email, scopes,
-    min_lifetime_secs=0, delegates=None):
+def _mint_oauth_token_async(
+    token_factory, email, scopes, lifetime_sec=0, delegates=None):
   """Creates a new access token using IAM credentials API."""
   # Query IAM credentials generateAccessToken API to obtain an OAuth token for
   # a given service account. Maximum lifetime is 1 hour. And can be obtained
@@ -402,9 +405,9 @@ def _mint_oauth_token_async(token_factory, email, scopes,
   request_body = {'scope': scopes}
   if delegates:
     request_body['delegates'] = delegates
-  if min_lifetime_secs > 0:
+  if lifetime_sec > 0:
     # Api accepts number of seconds with trailing 's'
-    request_body['lifetime'] = '%ds' % min_lifetime_secs
+    request_body['lifetime'] = '%ds' % lifetime_sec
 
   http_auth, _ = yield token_factory()
   response = yield _call_async(
