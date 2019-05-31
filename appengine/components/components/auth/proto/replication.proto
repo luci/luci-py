@@ -10,6 +10,8 @@ syntax = "proto3";
 
 package components.auth;
 
+import "components/auth/proto/buckets.proto";
+
 option go_package = "go.chromium.org/luci/server/auth/service/protocol;protocol";
 
 
@@ -153,6 +155,7 @@ message AuthIPWhitelistAssignment {
 
 // An entire database of auth configuration that is being replicated.
 message AuthDB {
+  // Next use: 11
   reserved 5; // used to be 'secrets', no longer used
 
   // OAuth2 client_id to use to mint new OAuth2 tokens.
@@ -168,6 +171,8 @@ message AuthDB {
   repeated AuthIPWhitelist ip_whitelists = 6;
   // Mapping 'account -> IP whitlist to use for that account'.
   repeated AuthIPWhitelistAssignment ip_whitelist_assignments = 7;
+  // All LUCI buckets across all projects.
+  repeated AuthBucket buckets = 10;
 
   // URL of a token server to use to generate delegation tokens.
   string token_server_url = 8;

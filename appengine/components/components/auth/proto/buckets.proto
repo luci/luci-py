@@ -1,0 +1,66 @@
+// Copyright 2019 The LUCI Authors. All rights reserved.
+// Use of this source code is governed under the Apache License, Version 2.0
+// that can be found in the LICENSE file.
+
+// AuthBucket schema for per-project ACLs fetched via a config service.
+
+syntax = "proto3";
+
+package components.auth;
+
+// AuthBucket is a container of LUCI project resources, e.g. builds, logs.
+message AuthBucket {
+
+  // Grants a role to a group or identity.
+  message AccessControl {
+    // Service identity, e.g. "chromium-swarm".
+    // It is needed because we have multiple deployments of the same service.
+    string service_id = 1;
+
+    // LUCI actions granted by this ACL.
+    repeated Action actions = 2;
+
+    // A group or identity. Supported formats include:
+    // - "group:<group name>"
+    // - "user:<email>"
+    // - "project:<name>"
+    repeated string grants = 3;
+  }
+
+  // Action is a concrete action that can be performed on a project resource.
+  // Each member is prefixed with the name of the service owning a resource.
+  enum Action {
+    BUILDBUCKET_READ_BUILD = 0;
+    BUILDBUCKET_SEARCH_BUILDS = 1;
+    BUILDBUCKET_SCHEDULE_BUILD = 2;
+
+    SCHEDULER_READ_JOB = 100;
+    SCHEDULER_TRIGGER_JOB = 101;
+
+    SWARMING_READ_TASK = 200;
+    SWARMING_SCHEDULE_TASK = 201;
+  }
+
+  // Full name of the bucket, as "<project>/<bucket>".
+  //
+  // Required. <bucket> must match regex '^[0-9a-z_\.\-]{1,100}$'.
+  // Examples: "try", "ci".
+  //
+  // When Bucket message is specified in a project config file,
+  // "<project>/" part can be omitted (it will be inferred from the location
+  // of the config file).
+  string name = 1;
+
+  // Optional: Description of what the bucket is used for to
+  // capture intent in the configuration.
+  string description = 2;
+
+  // The access control list.
+  repeated AccessControl acls = 3;
+}
+
+// Schema for buckets.cfg
+message BucketsCfg {
+  repeated AuthBucket buckets = 1;
+}
+
