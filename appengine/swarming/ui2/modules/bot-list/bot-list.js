@@ -655,7 +655,7 @@ window.customElements.define('bot-list', class extends SwarmingAppBoilerplate {
   _matchingTasksLink() {
     const cols = ['name', 'state', 'created_ts'];
     const dimensionFilters = this._filters.filter((f) => {
-      // Strip out non-dimensions like "is_mp_bot"
+      // Strip out non-dimensions like "status"
       return !specialFilters[f.split(':')[0]];
     });
     // Add any dimensions as columns, so they are shown by default

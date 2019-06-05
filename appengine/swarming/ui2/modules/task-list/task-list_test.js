@@ -999,6 +999,7 @@ describe('task-list', function() {
     });
 
     it('counts correctly when cancelling', function(done) {
+      jasmine.clock().uninstall(); // re-enable setTimeout
       fetchMock.post('/_ah/api/swarming/v1/tasks/cancel', {'matched': 10});
       loggedInTasklist((ele) => {
         ele._filters = ['pool-tag:Chrome'];
@@ -1009,26 +1010,32 @@ describe('task-list', function() {
         showBtn.click();
 
         fetchMock.flush(true).then(() => {
-          fetchMock.resetHistory();
-          const cancelBtn = $$('task-mass-cancel button.cancel');
-          expect(cancelBtn).toBeTruthy('cancel button should exist');
-          cancelBtn.click();
+          // The Promise.all for when the fetches complete isn't always
+          // done, so wait until next microtask or so to make sure that promise
+          // gets a chance to execute.
+          setTimeout(() => {
+            fetchMock.resetHistory();
+            const cancelBtn = $$('task-mass-cancel button.cancel');
+            expect(cancelBtn).toBeTruthy('cancel button should exist');
+            expect(cancelBtn).not.toHaveAttribute('disabled');
+            cancelBtn.click();
 
-          fetchMock.flush(true).then(() => {
-            expectNoUnmatchedCalls(fetchMock);
-            let calls = fetchMock.calls(MATCHED, 'GET');
-            expect(calls.length).toBe(0, 'Only posts');
-            calls = fetchMock.calls(MATCHED, 'POST');
-            expect(calls.length).toBe(1, '1 cancel request');
-            // calls is an array of 2-length arrays with the first element
-            // being the string of the url and the second element being
-            // the options that were passed in
-            const cancelPost = calls[0];
-            expect(cancelPost[0]).toEqual('/_ah/api/swarming/v1/tasks/cancel');
-            expect(cancelPost[1].body).toEqual('{"limit":100,"tags":["pool:Chrome"]}');
+            fetchMock.flush(true).then(() => {
+              expectNoUnmatchedCalls(fetchMock);
+              let calls = fetchMock.calls(MATCHED, 'GET');
+              expect(calls.length).toBe(0, 'Only posts');
+              calls = fetchMock.calls(MATCHED, 'POST');
+              expect(calls.length).toBe(1, '1 cancel request');
+              // calls is an array of 2-length arrays with the first element
+              // being the string of the url and the second element being
+              // the options that were passed in
+              const cancelPost = calls[0];
+              expect(cancelPost[0]).toEqual('/_ah/api/swarming/v1/tasks/cancel');
+              expect(cancelPost[1].body).toEqual('{"limit":100,"tags":["pool:Chrome"]}');
 
-            done();
-          });
+              done();
+            });
+          }, 50);
         });
       });
     });

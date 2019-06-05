@@ -818,8 +818,8 @@ describe('bot-list', function() {
 
     it('makes certain columns more readable', function(done) {
       loggedInBotlist((ele) => {
-        ele._cols = ['id', 'mp_lease_expires', 'mp_lease_id', 'uptime'];
-        ele._sort = 'mp_lease_expires';
+        ele._cols = ['id', 'uptime'];
+        ele._sort = 'uptime';
         ele._dir = 'desc';
         ele.render();
 
@@ -829,21 +829,16 @@ describe('bot-list', function() {
 
         const cols = $('.bot-table .bot-row td', ele);
         expect(cols).toBeTruthy();
-        expect(cols.length).toBe(4 * 10, '4 columns * 10 rows');
+        expect(cols.length).toBe(2 * 10, '2 columns * 10 rows');
         // little helper for readability
-        const cell = (r, c) => cols[4*r+c];
+        const cell = (r, c) => cols[2*r+c];
 
         // Check the content of the first few rows (after sorting)
-        expect(cell(0, 0)).toMatchTextContent('somebot18-a9');
-        expect(cell(0, 1)).toMatchTextContent('in 71w');
-        expect(cell(0, 2).innerHTML).toContain('<a ', 'has an mp link');
-        expect(cell(0, 2).innerHTML).toContain('href="https://example.com/leases/22596363b3de40b06f981fb85d82312e8c0ed511"', 'link is correct');
-        expect(cell(0, 3)).toMatchTextContent('7h  1m 48s');
+        expect(cell(0, 0)).toMatchTextContent('somebot13-a2');
+        expect(cell(0, 1)).toMatchTextContent('14h  8m 30s');
 
-        expect(cell(1, 0)).toMatchTextContent('somebot10-a9');
-        expect(cell(1, 1)).toMatchTextContent('--');
-        expect(cell(1, 2).innerHTML).not.toContain('<a ', 'no mp link');
-        expect(cell(1, 3)).toMatchTextContent('5h 53m 32s');
+        expect(cell(3, 0)).toMatchTextContent('somebot77-a3');
+        expect(cell(3, 1)).toMatchTextContent('10h 20m 48s');
         done();
       });
     });
@@ -898,7 +893,7 @@ describe('bot-list', function() {
 
     it('only tries to delete dimensions', function(done) {
       loggedInBotlist((ele) => {
-        ele._filters = ['pool:Skia', 'status:dead', 'is_mp_bot:true'];
+        ele._filters = ['pool:Skia', 'status:dead'];
         ele.render();
 
         const deleteAll = $$('button#delete_all', ele);
@@ -1061,12 +1056,11 @@ describe('bot-list', function() {
       const possibleCols = makePossibleColumns(deepCopy(fleetDimensions.bots_dimensions));
 
       expect(possibleCols).toBeTruthy();
-      expect(possibleCols.length).toBe(34);
+      expect(possibleCols.length).toBe(32);
       expect(possibleCols).toContain('id');
       expect(possibleCols).toContain('cores');
       expect(possibleCols).toContain('device_type');
       expect(possibleCols).toContain('xcode_version');
-      expect(possibleCols).toContain('mp_lease_id');
       expect(possibleCols).toContain('battery_health');
       expect(possibleCols).not.toContain('error');
     });
@@ -1092,7 +1086,7 @@ describe('bot-list', function() {
       // Note this list doesn't include the blacklisted keys.
       const expectedKeys = ['android_devices', 'cores', 'cpu', 'device', 'device_os',
           'device_type', 'gpu', 'hidpi', 'machine_type', 'os', 'pool',
-          'xcode_version', 'zone', 'id', 'task', 'status', 'is_mp_bot'];
+          'xcode_version', 'zone', 'id', 'task', 'status'];
       const actualKeys = Object.keys(pMap);
       actualKeys.sort();
       expectedKeys.sort();
@@ -1112,8 +1106,8 @@ describe('bot-list', function() {
       // Spot check custom options
       expect(pMap['status']).toBeTruthy();
       expect(pMap['status']).toContain('alive');
-      expect(pMap['is_mp_bot']).toBeTruthy();
-      expect(pMap['is_mp_bot']).toContain('false');
+      expect(pMap['task']).toBeTruthy();
+      expect(pMap['task']).toContain('busy');
       expect(pMap['id']).toEqual(null);
     });
 
@@ -1126,10 +1120,6 @@ describe('bot-list', function() {
       let filtered = filterBots(['status:quarantined'], bots);
       expect(filtered.length).toBe(1);
       expect(filtered[0].bot_id).toEqual('somebot11-a9');
-
-      filtered = filterBots(['is_mp_bot:true'], bots);
-      expect(filtered.length).toBe(1);
-      expect(filtered[0].bot_id).toEqual('somebot18-a9');
 
       filtered = filterBots(['task:busy'], bots);
       expect(filtered.length).toBe(4);
@@ -1178,11 +1168,6 @@ describe('bot-list', function() {
           'filters': ['status:maintenance', 'device_type:bullhead', 'device_type:marlin'],
           'output':  'dimensions=device_type%3Abullhead&dimensions=device_type%3Amarlin'+
                      '&in_maintenance=TRUE&limit=789',
-        },
-        { // is_mp_bot
-          'limit': 2,
-          'filters': ['status:quarantined', 'is_mp_bot:false'],
-          'output':  'is_mp=FALSE&limit=2&quarantined=TRUE',
         },
         { // is_busy
           'limit': 7,

@@ -112,14 +112,6 @@ export const specialFilters = {
   id: function(bot, id) {
     return bot.bot_id === id;
   },
-  is_mp_bot: function(bot, match) {
-    if (match === 'true') {
-      return !!bot.lease_id;
-    } else if (match === 'false') {
-      return !bot.lease_id;
-    }
-    return true;
-  },
   status: function(bot, status) {
     if (status === 'quarantined') {
       return bot.quarantined;
@@ -262,12 +254,6 @@ export function listQueryParams(filters, limit, cursor) {
         params['in_maintenance'] = ['TRUE'];
       } else if (rest === 'dead') {
         params['is_dead'] = ['TRUE'];
-      }
-    } else if (col === 'is_mp_bot') {
-      if (rest === 'true') {
-        params['is_mp'] = ['TRUE'];
-      } else if (rest === 'false') {
-        params['is_mp'] = ['FALSE'];
       }
     } else if (col === 'task') {
        if (rest === 'busy') {
@@ -455,7 +441,6 @@ export function processPrimaryMap(dimensions) {
   // Create custom filter/sorting options
   pMap['task'] = ['busy', 'idle'];
   pMap['status'] = ['alive', 'dead', 'quarantined', 'maintenance'];
-  pMap['is_mp_bot'] = ['true', 'false'];
 
   // No need to sort any of this, bot-filters sorts secondary items
   // automatically, especially when the user types a query.
@@ -540,15 +525,13 @@ const blacklistDimensions = ['quarantined', 'error', 'id'];
  *  that are not dimensions.
 .*/
 const extraKeys = ['disk_space', 'uptime', 'running_time', 'task',
-'status', 'version', 'external_ip', 'internal_ip', 'mp_lease_id',
-'mp_lease_expires', 'last_seen', 'first_seen', 'battery_level',
-'battery_voltage', 'battery_temperature', 'battery_status', 'battery_health',
-'bot_temperature', 'device_temperature', 'serial_number'];
+'status', 'version', 'external_ip', 'internal_ip', 'last_seen', 'first_seen',
+'battery_level', 'battery_voltage', 'battery_temperature', 'battery_status',
+'battery_health', 'bot_temperature', 'device_temperature', 'serial_number'];
 
 /** colHeaderMap maps keys to their human readable name.*/
 const colHeaderMap = {
   'id': 'Bot Id',
-  'mp_lease_id': 'Machine Provider Lease Id',
   'task': 'Current Task',
   'android_devices': 'Android Devices',
   'battery_health': 'Battery Health',
@@ -569,7 +552,6 @@ const colHeaderMap = {
   'gpu': 'GPU type',
   'internal_ip': 'Internal or Local IP',
   'last_seen': 'Last Seen',
-  'mp_lease_expires': 'Machine Provider Lease Expires',
   'os': 'OS',
   'pool': 'Pool',
   'running_time': 'Swarming Uptime',
@@ -724,36 +706,6 @@ const colMap = {
       return human.localeTime(bot.last_seen_ts);
     }
     return timeDiffApprox(bot.last_seen_ts) + ' ago';
-  },
-  mp_lease_id: (bot, ele) => {
-    if (!bot.lease_id) {
-      return EMPTY_VAL;
-    }
-    let id = bot.lease_id;
-    if (!ele._verbose) {
-      id = id.substring(0, 10);
-    }
-    if (ele.server_details && ele.server_details.machine_provider_template) {
-      // Might not be loaded yet.
-      const mp_url = ele.server_details.machine_provider_template
-                      .replace('%s', bot.lease_id);
-      return html`<a target=_blank
-                     rel=noopener
-                     href=${mp_url}>${id}</a>`;
-    }
-    return id;
-  },
-  mp_lease_expires: (bot, ele) => {
-    if (!bot.lease_expiration_ts) {
-      return EMPTY_VAL;
-    }
-    if (ele._verbose) {
-      return human.localeTime(bot.lease_expiration_ts);
-    }
-    if (bot.lease_expiration_ts < new Date()) {
-      return timeDiffApprox(bot.lease_expiration_ts) + ' ago';
-    }
-    return 'in ' + timeDiffApprox(bot.lease_expiration_ts);
   },
   running_time:  (bot, ele) => {
     const r = fromState(bot, 'running_time');
