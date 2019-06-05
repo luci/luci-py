@@ -976,6 +976,8 @@ def get_dimensions():
   ssd = get_ssd()
   if ssd:
     dimensions[u'ssd'] = [u'1']
+  else:
+    dimensions[u'ssd'] = [u'0']
 
   if sys.platform == 'linux2':
     inside_docker = platforms.linux.get_inside_docker()
