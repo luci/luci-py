@@ -24,6 +24,7 @@ from components.auth.ui import ui
 
 import acl
 import config
+import gcs
 import importer
 import pubsub
 import replication
@@ -139,17 +140,18 @@ class AuthDBRevisionsHandler(auth.ApiHandler):
 
 
 class AuthDBSubscriptionAuthHandler(auth.ApiHandler):
-  """Manages authorization to PubSub topic for AuthDB change notifications.
+  """Manages authorization to AuthDB PubSub topic and Google Storage object.
 
   Members of 'auth-trusted-services' group may use this endpoint to make sure
-  they can attach subscriptions to AuthDB change notification stream.
+  they:
+    1. Can subscribe to AuthDB change notification PubSub topic.
+    2. Read Google Storage object that contains AuthDB dump.
   """
 
-  def subscriber_email(self):
+  def caller_email(self):
     """Validates caller is using email for auth, returns it.
 
-    Raises HTTP 400 if some other kind of authentication is used. Only emails
-    are supported by PubSub.
+    Raises HTTP 400 if some other kind of authentication is used.
     """
     caller = auth.get_current_identity()
     if not caller.is_user:
@@ -158,58 +160,88 @@ class AuthDBSubscriptionAuthHandler(auth.ApiHandler):
 
   @auth.require(acl.is_trusted_service)
   def get(self):
-    """Queries whether the caller is authorized to attach subscriptions already.
+    """Queries whether the caller is authorized to access AuthDB already.
 
     Response body:
     {
       'topic': <full name of PubSub topic with AuthDB change notifications>,
-      'authorized': <boolean>
+      'authorized': <true if the caller is allowed to subscribe to it>,
+      'gs': {
+        'auth_db_gs_path': <same as auth_db_gs_path in SettingsCfg proto>,
+        'authorized': <true if the caller should be able to read GS files>
+      }
     }
     """
     try:
       return self.send_response({
         'topic': pubsub.topic_name(),
-        'authorized': pubsub.is_authorized_subscriber(self.subscriber_email()),
+        'authorized': pubsub.is_authorized_subscriber(self.caller_email()),
+        'gs': {
+          'auth_db_gs_path': config.get_settings().auth_db_gs_path,
+          'authorized': gcs.is_authorized_reader(self.caller_email()),
+        },
       })
-    except pubsub.Error as e:
+    except (gcs.Error, pubsub.Error) as e:
       self.abort_with_error(409, text=str(e))
 
   @auth.require(acl.is_trusted_service)
   def post(self):
-    """Grants caller "pubsub.subscriber" role on change notifications topic.
+    """Authorizes the caller to access AuthDB.
+
+    In particular grants the caller "pubsub.subscriber" role on the AuthDB
+    change notifications topic and adds the caller as Reader to the Google
+    Storage object that contains AuthDB.
 
     Response body:
     {
       'topic': <full name of PubSub topic with AuthDB change notifications>,
-      'authorized': true
+      'authorized': true,
+      'gs': {
+        'auth_db_gs_path': <same as auth_db_gs_path in SettingsCfg proto>,
+        'authorized': true
+      }
     }
     """
     try:
-      pubsub.authorize_subscriber(self.subscriber_email())
+      pubsub.authorize_subscriber(self.caller_email())
+      gcs.authorize_reader(self.caller_email())
       return self.send_response({
         'topic': pubsub.topic_name(),
         'authorized': True,
+        'gs': {
+          'auth_db_gs_path': config.get_settings().auth_db_gs_path,
+          'authorized': True,
+        },
       })
-    except pubsub.Error as e:
+    except (gcs.Error, pubsub.Error) as e:
       self.abort_with_error(409, text=str(e))
 
   @auth.require(acl.is_trusted_service)
   def delete(self):
-    """Revokes authorization if it exists.
+    """Revokes the authorization if it exists.
 
     Response body:
     {
       'topic': <full name of PubSub topic with AuthDB change notifications>,
-      'authorized': false
+      'authorized': false,
+      'gs': {
+        'auth_db_gs_path': <same as auth_db_gs_path in SettingsCfg proto>,
+        'authorized': false
+      }
     }
     """
     try:
-      pubsub.deauthorize_subscriber(self.subscriber_email())
+      pubsub.deauthorize_subscriber(self.caller_email())
+      gcs.deauthorize_reader(self.caller_email())
       return self.send_response({
         'topic': pubsub.topic_name(),
         'authorized': False,
+        'gs': {
+          'auth_db_gs_path': config.get_settings().auth_db_gs_path,
+          'authorized': False,
+        },
       })
-    except pubsub.Error as e:
+    except (gcs.Error, pubsub.Error) as e:
       self.abort_with_error(409, text=str(e))
 
 

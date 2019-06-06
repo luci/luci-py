@@ -10,6 +10,7 @@ from components import decorators
 from components.auth import change_log
 
 import config
+import gcs
 import importer
 import pubsub
 import replication
@@ -19,6 +20,7 @@ class InternalRevokePubSubAuthCronHandler(webapp2.RequestHandler):
   @decorators.require_cronjob
   def get(self):
     pubsub.revoke_stale_authorization()
+    gcs.revoke_stale_authorization()
 
 
 class InternalUpdateConfigCronHandler(webapp2.RequestHandler):
