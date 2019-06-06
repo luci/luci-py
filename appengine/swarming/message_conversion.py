@@ -13,6 +13,7 @@ ProtoRPC.
 
 import datetime
 import json
+import logging
 
 import swarming_rpcs
 
@@ -249,6 +250,7 @@ def new_task_request_from_rpc(msg, now):
     raise ValueError('Specify one of properties or task_slices, not both')
 
   if msg.properties:
+    logging.error('Properties is still used')
     if not msg.expiration_secs:
       raise ValueError('missing expiration_secs')
     props, secret_bytes = _taskproperties_from_rpc(msg.properties)

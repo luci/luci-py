@@ -414,8 +414,11 @@ class TaskSlice(messages.Message):
   # Swarming considers a bot dead if it hasn't pinged in the last N minutes
   # (currently 10 minutes).
   properties = messages.MessageField(TaskProperties, 1)
+  # Maximum of seconds the task slice may stay PENDING.
+  #
   # If this task request slice is not scheduled after waiting this long, the
-  # next one will be processed.
+  # next one will be processed. If this slice is the last one, the task state
+  # will be set to EXPIRED.
   expiration_secs = messages.IntegerField(2)
   # When a task is scheduled and there are currently no bots available to run
   # the task, the TaskSlice can either be PENDING, or be denied immediately.
@@ -430,8 +433,7 @@ class NewTaskRequest(messages.Message):
 
   This message is used to create a new task.
   """
-  # Maximum of seconds the task may stay PENDING. Must be specified with
-  # properties. Cannot be used at the same time as task_slices.
+  # DEPRECATED. Use task_slices[0].expiration_secs.
   expiration_secs = messages.IntegerField(1)
   # Task name for display purpose.
   name = messages.StringField(2)
@@ -442,7 +444,7 @@ class NewTaskRequest(messages.Message):
   parent_task_id = messages.StringField(3)
   # Task priority, the lower the more important.
   priority = messages.IntegerField(4)
-  # Task properties, which defines what to run.
+  # DEPRECATED. Use task_slices[0].properties.
   properties = messages.MessageField(TaskProperties, 5)
   # Slice of TaskSlice, along their scheduling parameters. Cannot be used at the
   # same time as properties and expiration_secs.
