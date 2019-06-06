@@ -136,6 +136,44 @@ class TestCPUInfo(unittest.TestCase):
   def test_get_num_processors(self):
     self.assertTrue(linux.get_num_processors() != 0)
 
+K8S_CGROUP = """
+8:freezer:/k8s.io/baa2c4c148cc83e36b7f14fe9145c58b742c82b244f77e32cda50cf8f26a27a5
+7:blkio:/k8s.io/baa2c4c148cc83e36b7f14fe9145c58b742c82b244f77e32cda50cf8f26a27a5
+6:net_cls:/k8s.io/baa2c4c148cc83e36b7f14fe9145c58b742c82b244f77e32cda50cf8f26a27a5
+5:memory:/k8s.io/baa2c4c148cc83e36b7f14fe9145c58b742c82b244f77e32cda50cf8f26a27a5
+4:cpu,cpuacct:/k8s.io/baa2c4c148cc83e36b7f14fe9145c58b742c82b244f77e32cda50cf8f26a27a5
+3:cpuset:/k8s.io/baa2c4c148cc83e36b7f14fe9145c58b742c82b244f77e32cda50cf8f26a27a5
+2:devices:/k8s.io/baa2c4c148cc83e36b7f14fe9145c58b742c82b244f77e32cda50cf8f26a27a5
+1:name=systemd:/k8s.io/baa2c4c148cc83e36b7f14fe9145c58b742c82b244f77e32cda50cf8f26a27a5
+"""
+
+NO_K8S_CGROUP = """
+11:blkio:/init.scope
+10:devices:/init.scope
+9:memory:/init.scope
+8:perf_event:/
+7:cpuset:/
+6:net_cls,net_prio:/
+5:freezer:/
+4:rdma:/
+3:cpu,cpuacct:/init.scope
+2:pids:/init.scope
+1:name=systemd:/init.scope
+0::/init.scope
+"""
+
+
+class TestDocker(unittest.TestCase):
+  def get_inside_docker(self, text):
+    tools.clear_cache(linux.get_inside_docker)
+    linux._read_cgroup = lambda: text
+    return linux.get_inside_docker()
+
+  def test_get_inside_docker_k8s(self):
+    self.assertEqual(u'stock', self.get_inside_docker(K8S_CGROUP))
+
+  def test_get_inside_docker_no_k8s(self):
+    self.assertEqual(None, self.get_inside_docker(NO_K8S_CGROUP))
 
 if __name__ == '__main__':
   if '-v' in sys.argv:

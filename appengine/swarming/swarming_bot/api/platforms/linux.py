@@ -116,6 +116,11 @@ def _read_cpuinfo():
     return f.read()
 
 
+def _read_cgroup():
+  with open('/proc/self/cgroup', 'rb') as f:
+    return f.read()
+
+
 def _read_dmi_file(filename):
   try:
     with open('/sys/devices/virtual/dmi/id/' + filename, 'rb') as f:
@@ -327,6 +332,8 @@ def get_inside_docker():
     - u'stock' if running in standard docker.
     - u'nvidia' if running in nvidia-docker.
   """
+  if u':/k8s.io' in _read_cgroup():
+      return u'stock'
   if not os.path.isfile('/.docker_env') and not os.path.isfile('/.dockerenv'):
     return None
   # TODO(maruel): Detect nvidia-docker.
