@@ -15,7 +15,7 @@ import subprocess
 import sys
 
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, os.path.join(ROOT_DIR, '..', 'third_party_local'))
+sys.path.insert(0, os.path.join(ROOT_DIR, '..', '..', 'client', 'third_party'))
 
 from depot_tools import git_number
 from depot_tools import git_common
