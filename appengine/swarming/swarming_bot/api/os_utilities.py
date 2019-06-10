@@ -612,6 +612,8 @@ def get_ssd():
     return platforms.osx.get_ssd()
   if sys.platform == 'linux2':
     return platforms.linux.get_ssd()
+  if sys.platform == 'win32':
+    return platforms.win.get_ssd()
   return ()
 
 
