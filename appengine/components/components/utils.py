@@ -123,14 +123,21 @@ def report_memory(app):
   old_dispatcher = app.router.dispatch
   def dispatch_and_report(*args, **kwargs):
     before = _get_memory_usage()
+    deadline = False
     try:
       return old_dispatcher(*args, **kwargs)
+    except runtime.DeadlineExceededError:
+      # Don't try to call any function after, it'll likely fail anyway. It is
+      # because _get_memory_usage() does an RPC under the hood.
+      deadline = True
+      raise
     finally:
-      after = _get_memory_usage()
-      if before and after and after >= before + min_delta:
-        logging.debug(
-            'Memory usage: %.1f -> %.1f MB; delta: %.1f MB',
-            before, after, after-before)
+      if not deadline:
+        after = _get_memory_usage()
+        if before and after and after >= before + min_delta:
+          logging.debug(
+              'Memory usage: %.1f -> %.1f MB; delta: %.1f MB',
+              before, after, after-before)
   app.router.dispatch = dispatch_and_report
 
 
