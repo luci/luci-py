@@ -532,7 +532,7 @@ def get_ssd():
       d.DeviceId for d in wbem.ExecQuery('SELECT * FROM MSFT_PhysicalDisk')
       if d.MediaType == 4
     )
-  except WindowsError:  # pylint: disable=undefined-variable
+  except AttributeError:
     return ()
 
 
