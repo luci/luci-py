@@ -27,6 +27,7 @@ def hack_windows():
   import sys
   # Disable AppEngine's sandbox.
   from google.appengine.tools.devappserver2.python import stubs
+
   stubs.FakeFile.is_file_accessible = staticmethod(lambda *_: True)
   sys.meta_path = []
   for i in os.listdir('.'):
