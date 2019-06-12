@@ -7,6 +7,7 @@
 from protorpc import message_types
 from protorpc import messages
 
+from proto.jsonrpc import taskstate_pb2
 
 ### Enums
 
@@ -79,41 +80,47 @@ class TaskState(messages.Enum):
   As you read the following constants, astute readers may wonder why these
   constants look like a bitmask. This is because of historical reasons and this
   is effectively an enum, not a bitmask.
+
+  This enum is also available as a proto definition, see
+  proto/jsonrpc/taskstate.proto.
+
+  If you make any modifications to comments here, please also update
+  proto/jsonrpc/taskstate.proto.
   """
   # Invalid state, do not use.
-  INVALID = 0x00
+  INVALID = taskstate_pb2.INVALID
   # The task is currently running. This is in fact 3 phases: the initial
   # overhead to fetch input files, the actual task running, and the tear down
   # overhead to archive output files to the server.
-  RUNNING = 0x10
+  RUNNING = taskstate_pb2.RUNNING
   # The task is currently pending. This means that no bot reaped the task. It
   # will stay in this state until either a task reaps it or the expiration
   # elapsed. The task pending expiration is specified as
   # TaskSlice.expiration_secs, one per task slice.
-  PENDING = 0x20
+  PENDING = taskstate_pb2.PENDING
   # The task is not pending anymore, and never ran due to lack of capacity. This
   # means that other higher priority tasks ran instead and that not enough bots
   # were available to run this task for TaskSlice.expiration_secs seconds.
-  EXPIRED = 0x30
+  EXPIRED = taskstate_pb2.EXPIRED
   # The task ran for longer than the allowed time in
   # TaskProperties.execution_timeout_secs or TaskProperties.io_timeout_secs.
   # This means the bot forcefully killed the task process as described in the
   # graceful termination dance in the documentation.
-  TIMED_OUT = 0x40
+  TIMED_OUT = taskstate_pb2.TIMED_OUT
   # The task ran but the bot had an internal failure, unrelated to the task
   # itself. It can be due to the server being unavailable to get task update,
   # the host on which the bot is running crashing or rebooting, etc.
-  BOT_DIED = 0x50
+  BOT_DIED = taskstate_pb2.BOT_DIED
   # The task never ran, and was manually cancelled via the 'cancel' API before
   # it was reaped.
-  CANCELED = 0x60
+  CANCELED = taskstate_pb2.CANCELED
   # The task ran and completed normally. The task process exit code may be 0 or
   # another value.
-  COMPLETED = 0x70
+  COMPLETED = taskstate_pb2.COMPLETED
   # The task ran but was manually killed via the 'cancel' API. This means the
   # bot forcefully killed the task process as described in the graceful
   # termination dance in the documentation.
-  KILLED = 0x80
+  KILLED = taskstate_pb2.KILLED
   # The task was never set to PENDING and was immediately refused, as the server
   # determined that there is no bot capacity to run this task. This happens
   # because no bot exposes a superset of the requested task dimensions.
@@ -123,7 +130,7 @@ class TaskState(messages.Enum):
   # eventually switch to EXPIRED, as there's no bot to run it. That said, there
   # are situations where it is known that in some not-too-distant future a wild
   # bot will appear that will be able to run this task.
-  NO_RESOURCE = 0x100
+  NO_RESOURCE = taskstate_pb2.NO_RESOURCE
 
 
 class TaskSort(messages.Enum):
