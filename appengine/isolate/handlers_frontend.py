@@ -301,6 +301,8 @@ class ContentHandler(auth.AuthenticatingHandler):
     """Checks if json_data is a valid .isolated format."""
     if not isinstance(json_data, dict):
       return False
+    if 'files' in json_data and not isinstance(json_data['files'], dict):
+      return False
     actual = set(json_data)
     return actual.issubset(_ISOLATED_ROOT_MEMBERS) and (
         'files' in actual or 'includes' in actual
