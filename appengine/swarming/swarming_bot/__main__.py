@@ -21,8 +21,6 @@ import zipfile
 # We have to reorder imports to make sure the third parties included in the zip
 # are preferred over the ones on the system.
 # pylint: disable=ungrouped-imports
-
-
 from utils import zip_package
 
 # This file can *only* be run as a zip.
@@ -33,6 +31,8 @@ sys.path.insert(0, os.path.join(THIS_FILE, 'python_libusb1'))
 
 # Copied from //client/utils/oauth.py.
 sys.path.insert(0, os.path.join(THIS_FILE, 'third_party'))
+sys.path.insert(0, os.path.join(
+    THIS_FILE, 'third_party', 'httplib2', 'python%d' % sys.version_info.major))
 sys.path.insert(0, os.path.join(THIS_FILE, 'third_party', 'pyasn1'))
 sys.path.insert(0, os.path.join(THIS_FILE, 'third_party', 'pyasn1-modules'))
 sys.path.insert(0, os.path.join(THIS_FILE, 'third_party', 'rsa'))

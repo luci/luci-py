@@ -33,6 +33,9 @@ import time
 import urllib
 import urllib2
 
+from utils import tools
+tools.force_local_third_party()
+
 # third_party/
 import httplib2
 from oauth2client import client
@@ -41,7 +44,6 @@ from api import parallel
 from api import platforms
 from utils import file_path
 from utils import fs
-from utils import tools
 
 
 # For compatibility with older bot_config.py files.

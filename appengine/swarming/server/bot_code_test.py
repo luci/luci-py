@@ -28,6 +28,8 @@ from components import config
 CLIENT_DIR = os.path.join(
     os.path.dirname(os.path.dirname(test_env.APP_DIR)), 'client')
 sys.path.insert(0, CLIENT_DIR)
+sys.path.insert(0, os.path.join(
+    CLIENT_DIR, 'third_party', 'httplib2', 'python%d' % sys.version_info.major))
 sys.path.insert(0, os.path.join(CLIENT_DIR, 'third_party'))
 from depot_tools import fix_encoding
 from utils import file_path
