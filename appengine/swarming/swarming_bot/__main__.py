@@ -34,7 +34,7 @@ sys.path.insert(0, os.path.join(THIS_FILE, 'third_party'))
 sys.path.insert(0, os.path.join(
     THIS_FILE, 'third_party', 'httplib2', 'python%d' % sys.version_info.major))
 sys.path.insert(0, os.path.join(THIS_FILE, 'third_party', 'pyasn1'))
-sys.path.insert(0, os.path.join(THIS_FILE, 'third_party', 'pyasn1-modules'))
+sys.path.insert(0, os.path.join(THIS_FILE, 'third_party', 'pyasn1_modules'))
 sys.path.insert(0, os.path.join(THIS_FILE, 'third_party', 'rsa'))
 
 
