@@ -26,11 +26,12 @@ class Enum(messages.Enum):
 
 class Message(messages.Message):
   """A message to test with."""
-  boolean = messages.BooleanField(1)
+  boolean = messages.BooleanField(1, default=True)
   integer = messages.IntegerField(2, default=2)
-  string = messages.StringField(3)
-  repeated = messages.BooleanField(4, repeated=True)
-  required = messages.BooleanField(5, required=True)
+  variant = messages.IntegerField(3, default=3, variant=messages.Variant.INT32)
+  string = messages.StringField(4)
+  repeated = messages.BooleanField(5, repeated=True)
+  required = messages.BooleanField(6, required=True)
 
 
 class Child(messages.Message):
@@ -272,6 +273,7 @@ class DiscoveryWebapp2TestCase(test_case.TestCase):
           'id': 'DiscoveryTestMessage',
           'properties': {
             'boolean': {
+              'default': True,
               'type': 'boolean',
             },
             'integer': {
@@ -292,6 +294,11 @@ class DiscoveryWebapp2TestCase(test_case.TestCase):
             'string': {
               'type': 'string',
             },
+            'variant': {
+              'default': 3,
+              'format': 'int32',
+              'type': 'integer',
+            },
           },
           'type': 'object',
         },
@@ -309,8 +316,9 @@ class DiscoveryWebapp2TestCase(test_case.TestCase):
       ],
       'parameters': {
         'boolean': {
+          'default': 'true',
           'location': 'path',
-          'type': 'boolean',
+          'type': 'string',
         },
         'integer': {
           'default': '2',
@@ -321,15 +329,21 @@ class DiscoveryWebapp2TestCase(test_case.TestCase):
         'repeated': {
           'location': 'query',
           'repeated': True,
-          'type': 'boolean',
+          'type': 'string',
         },
         'required': {
           'location': 'query',
           'required': True,
-          'type': 'boolean',
+          'type': 'string',
         },
         'string': {
           'location': 'path',
+          'type': 'string',
+        },
+        'variant': {
+          'default': '3',
+          'format': 'int32',
+          'location': 'query',
           'type': 'string',
         },
       },
@@ -600,6 +614,7 @@ class DiscoveryWebapp2TestCase(test_case.TestCase):
           'id': 'DiscoveryTestMessage',
           'properties': {
             'boolean': {
+              'default': True,
               'type': 'boolean',
             },
             'integer': {
@@ -619,6 +634,11 @@ class DiscoveryWebapp2TestCase(test_case.TestCase):
             },
             'string': {
               'type': 'string',
+            },
+            'variant': {
+              'default': 3,
+              'format': 'int32',
+              'type': 'integer',
             },
           },
           'type': 'object',
@@ -749,6 +769,7 @@ class DiscoveryWebapp2TestCase(test_case.TestCase):
           'id': 'DiscoveryTestMessage',
           'properties': {
             'boolean': {
+              'default': True,
               'type': 'boolean',
             },
             'integer': {
@@ -768,6 +789,11 @@ class DiscoveryWebapp2TestCase(test_case.TestCase):
             },
             'string': {
               'type': 'string',
+            },
+            'variant': {
+              'default': 3,
+              'format': 'int32',
+              'type': 'integer',
             },
           },
           'type': 'object',
