@@ -35,6 +35,12 @@ message SettingsCfg {
   // Consumers can either poll latest.json for changes, or they can setup
   // a PubSub subscription via /auth_service/api/v1/authdb/subscription/ to get
   // notified.
+  //
+  // Requires at least one AuthDB change (e.g. a group update) for the files
+  // to appear after setting or changing auth_db_gs_path.
+  //
+  // When changing or removing auth_db_gs_path, files at the old location are
+  // not automatically cleaned up.
   string auth_db_gs_path = 2;
 }
 
