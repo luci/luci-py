@@ -274,6 +274,37 @@ def get_audio():
 
 
 @tools.cached
+def get_visual_studio_versions():
+  """Retrieves all installed Visual Studio versions.
+
+  The returned version list is sorted such that the first element is the highest
+  version number.
+
+  Returns:
+    A list of Visual Studio version strings.
+  """
+  import _winreg
+
+  try:
+    k = _winreg.OpenKey(
+        _winreg.HKEY_LOCAL_MACHINE,
+        'SOFTWARE\\Wow6432Node\\Microsoft\\VSCommon')
+  # pylint: disable=undefined-variable
+  except WindowsError:
+    return None
+
+  try:
+    versions = []
+    for i in range(_winreg.QueryInfoKey(k)[0]):
+      sub_key = _winreg.EnumKey(k, i)
+      if re.match(r'\d+\.\d+', sub_key):
+        versions.append(sub_key)
+    return sorted(versions, key=float, reverse=True)
+  finally:
+    k.Close()
+
+
+@tools.cached
 def get_cpuinfo():
   # Ironically, the data returned by WMI is mostly worthless.
   # Another option is IsProcessorFeaturePresent().

@@ -133,6 +133,8 @@ class TestOsUtilities(auto_stub.TestCase):
     actual.discard(u'device_tree_compatible')
     # Only set on bare metal Linux machines.
     actual.discard(u'cpu_governor')
+    # Only set on Windows machines.
+    actual.discard(u'visual_studio_version')
 
     expected = {
         u'cores', u'cpu', u'gce', u'gpu', u'id', u'os', u'pool', u'python'}

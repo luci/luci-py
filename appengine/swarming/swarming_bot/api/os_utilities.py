@@ -1027,6 +1027,9 @@ def get_dimensions():
     integrity = platforms.win.get_integrity_level()
     if integrity is not None:
       dimensions[u'integrity'] = [integrity]
+    vs_versions = platforms.win.get_visual_studio_versions()
+    if vs_versions:
+      dimensions[u'visual_studio_version'] = vs_versions
 
   return dimensions
 
