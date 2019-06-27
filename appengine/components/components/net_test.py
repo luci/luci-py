@@ -49,7 +49,30 @@ class NetTest(test_case.TestCase):
         'validate_certificate': True,
       }
       defaults.update(expected)
-      self.assertEqual(defaults, kwargs)
+
+      # Treat the 'Authorization' key especially, since JWT support makes this
+      # complicated to do.
+      expected_authorization = None
+      if 'Authorization' in defaults['headers']:
+        expected_authorization = defaults['headers']['Authorization']
+        del defaults['headers']['Authorization']
+
+      provided_authorization = None
+      if 'Authorization' in kwargs.get('headers', {}):
+        provided_authorization = kwargs.get('headers', {}).get('Authorization')
+        del kwargs['headers']['Authorization']
+
+      # If we find a pattern in the expected_authorization (introduced with a
+      # '$' character) then we'll treat it as a regular expression.
+      if expected_authorization:
+        pattern_offset = expected_authorization.find('$')
+        if pattern_offset != -1:
+          self.assertRegexpMatches(provided_authorization,
+                                   expected_authorization[pattern_offset + 1:])
+        else:
+          self.assertEqual(provided_authorization, expected_authorization)
+      self.assertDictEqual(defaults, kwargs)
+
       if isinstance(response, Exception):
         raise response
       raise ndb.Return(response)
@@ -205,6 +228,100 @@ class NetTest(test_case.TestCase):
         deadline=123,
         max_attempts=5)
     self.assertEqual({'a': 'b'}, response)
+
+  def test_json_with_jwt_auth_works(self):
+    self.mock_urlfetch([
+      ({
+        'deadline': 123,
+        'headers': {
+          'Authorization':
+              r'$^Bearer\ [a-zA-Z0-9_=-]+\.[a-zA-Z0-9_=-]+\.[a-zA-Z0-9_=-]+$',
+          'Accept': 'application/json; charset=utf-8',
+          'Content-Type': 'application/json; charset=utf-8',
+          'Header': 'value',
+        },
+        'method': 'POST',
+        'payload': '{"key":"value"}',
+        'url': 'http://localhost/123?a=%3D&b=%26',
+      }, Response(200, ')]}\'\n{"a":"b"}', {})),
+    ])
+    response = net.json_request(
+        url='http://localhost/123',
+        method='POST',
+        payload={'key': 'value'},
+        params={'a': '=', 'b': '&'},
+        headers={'Header': 'value'},
+        deadline=123,
+        max_attempts=5,
+        use_jwt_auth=True,
+        audience='my-service.appspot.com')
+    self.assertEqual({'a': 'b'}, response)
+
+  def test_json_with_jwt_auth_and_scopes_fail(self):
+    with self.assertRaises(ValueError):
+      net.json_request(
+          url='http://localhost/123',
+          method='POST',
+          payload={'key': 'value'},
+          params={
+              'a': '=',
+              'b': '&'
+          },
+          headers={'Header': 'value'},
+          deadline=123,
+          max_attempts=5,
+          scopes=['scope'],
+          use_jwt_auth=True)
+
+  def test_json_with_jwt_auth_and_project_id_fail(self):
+    with self.assertRaises(ValueError):
+      net.json_request(
+          url='http://localhost/123',
+          method='POST',
+          payload={'key': 'value'},
+          params={
+              'a': '=',
+              'b': '&'
+          },
+          headers={'Header': 'value'},
+          deadline=123,
+          max_attempts=5,
+          project_id='some-id',
+          scopes=['scope'],
+          use_jwt_auth=True)
+
+  def test_json_with_jwt_auth_audience_and_scopes_fail(self):
+    with self.assertRaises(ValueError):
+      net.json_request(
+          url='http://localhost/123',
+          method='POST',
+          payload={'key': 'value'},
+          params={
+              'a': '=',
+              'b': '&'
+          },
+          headers={'Header': 'value'},
+          deadline=123,
+          max_attempts=5,
+          scopes=['scope'],
+          audience='my-service.appspot.com')
+
+  def test_json_with_jwt_auth_audience_and_project_id_fail(self):
+    with self.assertRaises(ValueError):
+      net.json_request(
+          url='http://localhost/123',
+          method='POST',
+          payload={'key': 'value'},
+          params={
+              'a': '=',
+              'b': '&'
+          },
+          headers={'Header': 'value'},
+          deadline=123,
+          max_attempts=5,
+          project_id='some-id',
+          scopes=['scope'],
+          audience='my-service.appspot.com')
 
   def test_json_bad_response(self):
     self.mock_urlfetch([

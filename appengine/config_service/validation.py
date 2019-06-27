@@ -337,7 +337,10 @@ def _validate_by_service_async(service, config_set, path, content, ctx):
       'content': base64.b64encode(content),
     }
     res = yield net.json_request_async(
-        url, method='POST', payload=req, scopes=net.EMAIL_SCOPE)
+        url, method='POST', payload=req,
+        scopes=None if service.HasField('jwt_auth') else net.EMAIL_SCOPE,
+        use_jwt_auth=service.HasField('jwt_auth') or None,
+        audience=service.jwt_auth.audience or None)
   except net.Error as ex:
     report_error('Net error: %s' % ex)
     return

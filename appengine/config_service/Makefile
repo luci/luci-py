@@ -24,7 +24,7 @@ compile-proto:
 	cd components/config/proto && make
 
 test: build
-	echo $(FILEBUG)
+	@echo -e "$$FILEBUG"
 	tools/run_coverage.py
 
 # deploy_dev-gae deploys to the dev environmant using gae.py.

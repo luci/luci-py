@@ -69,6 +69,11 @@ message ProjectsCfg {
 
 // Describes one luci service.
 message Service {
+  message JWTAuth {
+    // Value for the 'aud' field in the JSON Web Token claim.
+    string audience = 1;
+  }
+
   // Globally unique id of the service. Required.
   // Used in "services/<service_id>" config set name.
   string id = 1;
@@ -89,6 +94,10 @@ message Service {
   //
   // If not specified, only admins and trusted services have access.
   repeated string access = 5;
+
+  // If set, use JWT auth in requests to services. This is usually used for
+  // Cloud Endpoints v2 support.
+  JWTAuth jwt_auth = 6;
 }
 
 // Machine-generated service metadata, exposed by a service endpoint.
