@@ -41,6 +41,7 @@ GO_GAE_SDK = 'go_appengine'
 # TODO(vadimsh): Can be removed if using 'gcloud'.
 RUNTIME_TO_SDK = {
   'go': GO_GAE_SDK,
+  'go111': GO_GAE_SDK,
   'python27': PYTHON_GAE_SDK,
 }
 
