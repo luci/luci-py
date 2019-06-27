@@ -193,6 +193,8 @@ export function parseResult(result) {
   return result;
 }
 
+const TASK_ID_PLACEHOLDER = '${SWARMING_TASK_ID}';
+
 /** richLogsLink returns a URL to a rich logs representation (e.g. Milo)
  *  given information in the request/server_details of ele. If the data
  *  is not there (e.g. the task doesn't support it), undefined will be returned.
@@ -206,6 +208,12 @@ export function richLogsLink(ele) {
   let logs = tagMap['log_location'];
   if (logs && miloHost) {
     logs = logs.replace('logdog://', '');
+    if (logs.indexOf(TASK_ID_PLACEHOLDER) !== -1) {
+      if (!ele._result) {
+        return undefined;
+      }
+      logs = logs.replace(TASK_ID_PLACEHOLDER, ele._result.run_id);
+    }
     return miloHost.replace('%s', logs);
   }
   const displayTemplate = ele.server_details.display_server_url_template;

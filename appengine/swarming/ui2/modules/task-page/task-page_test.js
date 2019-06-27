@@ -23,6 +23,7 @@ describe('task-page', function() {
   const { customMatchers, expectNoUnmatchedCalls, mockAppGETs } = require('modules/test_util');
   const { fetchMock, MATCHED, UNMATCHED } = require('fetch-mock');
   const { taskOutput, taskResults, taskRequests } = require('modules/task-page/test_data');
+  const { richLogsLink } = require('modules/task-page/task-page-helpers')
 
   const TEST_TASK_ID = 'test0b3c0fac7810';
 
@@ -1167,4 +1168,25 @@ describe('task-page', function() {
     });
 
   }); // end describe('api calls')
+
+  describe('data', function() {
+    it('generates proper rich log links', function() {
+
+      const mockEle = {
+        _request: {
+          tagMap: {
+            'milo_host': 'https://example.com/%s',
+            'log_location': 'logdog://project/${SWARMING_TASK_ID}/+/annotations',
+          },
+        },
+        _result: {
+          'run_id': '45b22fd90cefdf12'
+        }
+      };
+
+      const url = richLogsLink(mockEle);
+      expect(url).toEqual('https://example.com/project/45b22fd90cefdf12/+/annotations');
+
+    });
+  }); // end describe('data')
 });
