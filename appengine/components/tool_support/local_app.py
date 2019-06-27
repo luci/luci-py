@@ -89,7 +89,7 @@ class LocalApplication(object):
 
   @property
   def port(self):
-    """Main HTTP port that serves requests to 'default' module.
+    """Main HTTP port that serves requests to the 'default' service.
 
     Valid only after app has started.
     """
@@ -119,9 +119,9 @@ class LocalApplication(object):
     self._log = None
     self._serving = False
 
-    # Find available ports, one per module + one for app admin.
+    # Find available ports, one per service and one for app admin.
     free_ports = find_free_ports(
-        'localhost', self._base_port, len(self._app.modules) + 1)
+        'localhost', self._base_port, len(self._app.services) + 1)
     self._port = free_ports[0]
 
     os.makedirs(os.path.join(self._root, 'storage'))

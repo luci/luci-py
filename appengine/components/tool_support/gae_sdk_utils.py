@@ -15,7 +15,7 @@ import sys
 import time
 
 
-# 'setup_gae_sdk' loads 'yaml' module and modifies this variable.
+# 'setup_gae_sdk' loads the 'yaml' module and modifies this variable.
 yaml = None
 
 
@@ -139,12 +139,13 @@ def find_app_yamls(app_dir):
   Recognizes Python and Go GAE apps.
 
   Returns:
-    List of abs path to module yamls.
+    List of absolute paths to service yamls.
 
   Raises:
     ValueError if not a valid GAE app.
   """
-  # Look in the root first. It's how python apps and one-module Go apps look.
+  # Look in the root first. It will be in the root dir if this is a Python app
+  # or single-service Go app.
   yamls = []
   app_yaml = os.path.join(app_dir, 'app.yaml')
   if os.path.isfile(app_yaml):
@@ -153,7 +154,7 @@ def find_app_yamls(app_dir):
   if yamls:
     return yamls
 
-  # Look in per-module subdirectories. Only Go apps are structured that way.
+  # Look in per-service subdirectories. Only Go apps are structured like this.
   # See https://cloud.google.com/appengine/docs/go/#Go_Organizing_Go_apps.
   for subdir in os.listdir(app_dir):
     subdir = os.path.join(app_dir, subdir)
@@ -165,7 +166,7 @@ def find_app_yamls(app_dir):
     yamls.extend(glob.glob(os.path.join(subdir, 'module-*.yaml')))
   if not yamls:
     raise ValueError(
-        'Not a GAE application directory, no module *.yamls found: %s' %
+        'Not a GAE application directory, no service *.yamls found: %s' %
         app_dir)
 
   # There should be one and only one app.yaml.
@@ -189,9 +190,11 @@ def is_app_dir(path):
     return False
 
 
-def get_module_runtime(yaml_path):
-  """Finds 'runtime: ...' property in module YAML (or None if missing)."""
-  # 'yaml' module is not available yet at this point (it is loaded from SDK).
+def get_service_runtime(yaml_path):
+  """Finds 'runtime: ...' property in per-service YAML (or None if missing)."""
+  # The 'yaml' Python module is not available yet at this point (it is loaded
+  # from SDK), so manually parse the runtime from the file with a regular
+  # expression instead.
   with open(yaml_path, 'rt') as f:
     m = re.search(r'^runtime\:\s+(.*)$', f.read(), re.MULTILINE)
   return m.group(1) if m else None
@@ -203,7 +206,7 @@ def get_app_runtime(yaml_paths):
   Raises:
     ValueError if multiple (or unknown) runtimes are specified.
   """
-  runtimes = sorted(set(get_module_runtime(p) for p in yaml_paths))
+  runtimes = sorted(set(get_service_runtime(p) for p in yaml_paths))
   if len(runtimes) != 1:
     raise ValueError('Expecting single runtime, got %s' % ', '.join(runtimes))
   if runtimes[0] not in RUNTIME_TO_SDK:
@@ -215,8 +218,8 @@ def setup_gae_sdk(sdk_path):
   """Modifies sys.path and to be able to use Python portion of GAE SDK.
 
   Once this is called, other functions from this module know where to find GAE
-  SDK and any AppEngine included module can be imported. The change is global
-  and permanent.
+  SDK and any AppEngine included Python module can be imported. The change is
+  global and permanent.
   """
   global _GAE_SDK_PATH
   if _GAE_SDK_PATH:
@@ -264,27 +267,30 @@ class Application(object):
     self._app_id = app_id
     self._verbose = verbose
 
-    # Module ID -> (path to YAML, deserialized content of module YAML).
-    self._modules = {}
+    # Module ID -> (path to YAML, deserialized content of service YAML).
+    self._services = {}
     for yaml_path in find_app_yamls(self._app_dir):
       with open(yaml_path) as f:
         data = yaml.load(f)
-        module_id = data.get('service', data.get('module', 'default'))
-        if module_id in self._modules:
+        # The service ID can be specified in the field "service", or
+        # "module" (deprecated name). If not specified at all, then
+        # it's the default service.
+        service_id = data.get('service', data.get('module', 'default'))
+        if service_id in self._services:
           raise ValueError(
-              'Multiple *.yaml files define same module %s: %s and %s' %
-              (module_id, yaml_path, self._modules[module_id].path))
-        self._modules[module_id] = ModuleFile(yaml_path, data)
+              'Multiple *.yaml files define same service %s: %s and %s' %
+              (service_id, yaml_path, self._services[service_id].path))
+        self._services[service_id] = ModuleFile(yaml_path, data)
 
     self.dispatch_yaml = os.path.join(app_dir, 'dispatch.yaml')
     if not os.path.isfile(self.dispatch_yaml):
       self.dispatch_yaml = None
 
-    if 'default' not in self._modules:
-      raise ValueError('Default module is missing')
+    if 'default' not in self._services:
+      raise ValueError('Default service is missing')
     if not self.app_id:
-      raise ValueError('application id is neither specified in default module, '
-                       'nor provided explicitly')
+      raise ValueError('application ID is neither specified in default '
+          'service nor provided explicitly')
 
   @property
   def app_dir(self):
@@ -294,28 +300,31 @@ class Application(object):
   @property
   def app_id(self):
     """Application ID as passed to constructor, or as read from app.yaml."""
-    return self._app_id or self._modules['default'].data.get('application')
+    return self._app_id or self._services['default'].data.get('application')
 
   @property
-  def modules(self):
-    """List of module IDs that this application contain."""
-    return self._modules.keys()
+  def services(self):
+    """List of service IDs that this application contains."""
+    return self._services.keys()
 
   @property
-  def module_yamls(self):
-    """List of paths to all module YAMLs (include app.yaml as a first item)."""
-    # app.yaml first (correspond to 'default' module), then everything else.
-    yamls = self._modules.copy()
+  def service_yamls(self):
+    """List of paths to all service YAMLs.
+
+    The first item is always the path the the default service.
+    """
+    # app.yaml first; this corresponds to the 'default' service.
+    yamls = self._services.copy()
     return [yamls.pop('default').path] + [m.path for m in yamls.itervalues()]
 
   @property
-  def default_module_dir(self):
-    """Absolute path to a directory with app.yaml of the default module.
+  def default_service_dir(self):
+    """Absolute path to a directory with app.yaml of the default service.
 
     It's different from app_dir for Go apps. dev_appserver.py searches for
-    cron.yaml, index.yaml etc in this directory.
+    cron.yaml, index.yaml etc. in this directory.
     """
-    return os.path.dirname(self._modules['default'].path)
+    return os.path.dirname(self._services['default'].path)
 
   def run_cmd(self, cmd, cwd=None):
     """Runs subprocess, capturing the output.
@@ -369,74 +378,74 @@ class Application(object):
     """List all uploaded versions.
 
     Returns:
-      Dict {module name -> [list of uploaded versions]}.
+      Dict {service name -> [list of uploaded versions]}.
     """
     if not USE_GCLOUD:
       return self.run_appcfg(['list_versions'])
     data = self.run_gcloud(['app', 'versions', 'list'])
-    per_module = collections.defaultdict(list)
+    per_service = collections.defaultdict(list)
     for deployment in data:
       service = deployment['service'].encode('utf-8')
       version_id = deployment['id'].encode('utf-8')
-      per_module[service].append(version_id)
-    return dict(per_module)
+      per_service[service].append(version_id)
+    return dict(per_service)
 
-  def set_default_version(self, version, modules=None):
-    """Switches default version of given |modules| to |version|."""
+  def set_default_version(self, version, services=None):
+    """Switches default version of given |services| to |version|."""
     if not USE_GCLOUD:
       self.run_appcfg([
         'set_default_version',
-        '--module', ','.join(sorted(modules or self.modules)),
+        '--module', ','.join(sorted(services or self.services)),
         '--version', version,
       ])
       return
 
-    # There's 'versions migrate' command. Unfortunately it requires to enable
-    # warmup requests for all modules if at least one module have them, which is
+    # There's 'versions migrate' command. Unfortunately it requires enabling
+    # warmup requests for all services if at least one service has it, which is
     # very inconvenient. Use 'services set-traffic' instead that is free of this
     # weird restriction. If a gradual traffic migration is desired, users can
     # click buttons in Cloud Console.
-    for m in sorted(modules or self.modules):
+    for m in sorted(services or self.services):
       self.run_gcloud([
         'app', 'services', 'set-traffic',
         m, '--splits', '%s=1' % version,
         '--quiet'
       ])
 
-  def delete_version(self, version, modules=None):
-    """Deletes the specified version of the given module names."""
+  def delete_version(self, version, services=None):
+    """Deletes the specified version of the given service names."""
     if not USE_GCLOUD:
-      # For some reason 'delete_version' call processes only one module at
+      # For some reason 'delete_version' call processes only one service at
       # a time, unlike all other related appcfg.py calls.
-      for module in sorted(modules or self.modules):
+      for service in sorted(services or self.services):
         self.run_appcfg([
           'delete_version',
-          '--module', module,
+          '--module', service,
           '--version', version,
         ])
       return
 
     # If --service is not specified, gcloud deletes the version from all
-    # modules. That's what we want if modules is None. --quiet is needed to
+    # services. That's what we want if services is None. --quiet is needed to
     # skip "Do you want to continue?". We've already asked in gae.py.
-    if modules is None:
+    if services is None:
       self.run_gcloud(['app', 'versions', 'delete', version, '--quiet'])
     else:
       # Otherwise delete service-by-service.
-      for m in sorted(modules):
+      for m in sorted(services):
         self.run_gcloud([
           'app', 'versions', 'delete', version, '--service', m, '--quiet'
         ])
 
-  def update(self, version, modules=None):
-    """Deploys new version of the given module names.
+  def update(self, version, services=None):
+    """Deploys a new version of the given services.
 
     Supports only GAE Standard currently.
     """
     mods = []
     try:
-      for m in sorted(modules or self.modules):
-        mod = self._modules[m]
+      for m in sorted(services or self.services):
+        mod = self._services[m]
         if mod.data.get('vm') and not USE_GCLOUD:
           raise UnsupportedModuleError(
               'MVM is only supported in gcloud mode: %s' % m)
@@ -447,9 +456,9 @@ class Application(object):
           raise BadEnvironmentError('GOROOT must be set when deploying Go app')
         mods.append(mod)
     except KeyError as e:
-      raise ValueError('Unknown module: %s' % e)
+      raise ValueError('Unknown service: %s' % e)
 
-    # Always make 'default' the first module to be uploaded. It is magical,
+    # Always make 'default' the first service to be uploaded. It is magical,
     # deploying it first "enables" the application, or so it seems.
     mods.sort(key=lambda x: '' if x == 'default' else x)
 
@@ -462,7 +471,8 @@ class Application(object):
       self._appcfg_update_dispatch()
       return
 
-    # Will contain paths to module YAMLs and to all extra YAMLs, like cron.yaml.
+    # Will contain paths to service YAMLs and to all extra YAMLs, like
+    # cron.yaml.
     yamls = []
 
     # 'gcloud' barfs at 'application' and 'version' fields in app.yaml. Hack
@@ -489,10 +499,10 @@ class Application(object):
 
     # Deploy all other stuff too. 'app deploy' is a polyglot.
     possible_extra = [
-      os.path.join(self.default_module_dir, 'index.yaml'),
-      os.path.join(self.default_module_dir, 'queue.yaml'),
-      os.path.join(self.default_module_dir, 'cron.yaml'),
-      os.path.join(self.default_module_dir, 'dispatch.yaml'),
+      os.path.join(self.default_service_dir, 'index.yaml'),
+      os.path.join(self.default_service_dir, 'queue.yaml'),
+      os.path.join(self.default_service_dir, 'cron.yaml'),
+      os.path.join(self.default_service_dir, 'dispatch.yaml'),
     ]
     for extra in possible_extra:
       if extra and os.path.isfile(extra):
@@ -512,20 +522,20 @@ class Application(object):
   def _appcfg_update_indexes(self):
     """Deploys new index.yaml."""
     assert not USE_GCLOUD
-    if os.path.isfile(os.path.join(self.default_module_dir, 'index.yaml')):
-      self.run_appcfg(['update_indexes', self.default_module_dir])
+    if os.path.isfile(os.path.join(self.default_service_dir, 'index.yaml')):
+      self.run_appcfg(['update_indexes', self.default_service_dir])
 
   def _appcfg_update_queues(self):
     """Deploys new queue.yaml."""
     assert not USE_GCLOUD
-    if os.path.isfile(os.path.join(self.default_module_dir, 'queue.yaml')):
-      self.run_appcfg(['update_queues', self.default_module_dir])
+    if os.path.isfile(os.path.join(self.default_service_dir, 'queue.yaml')):
+      self.run_appcfg(['update_queues', self.default_service_dir])
 
   def _appcfg_update_cron(self):
     """Deploys new cron.yaml."""
     assert not USE_GCLOUD
-    if os.path.isfile(os.path.join(self.default_module_dir, 'cron.yaml')):
-      self.run_appcfg(['update_cron', self.default_module_dir])
+    if os.path.isfile(os.path.join(self.default_service_dir, 'cron.yaml')):
+      self.run_appcfg(['update_cron', self.default_service_dir])
 
   def _appcfg_update_dispatch(self):
     """Deploys new dispatch.yaml."""
@@ -550,7 +560,7 @@ class Application(object):
       '--application', self.app_id,
       '--skip_sdk_update_check=yes',
       '--require_indexes=yes',
-    ] + self.module_yamls
+    ] + self.service_yamls
     if self.dispatch_yaml:
       cmd += [self.dispatch_yaml]
     cmd += args
@@ -572,23 +582,23 @@ class Application(object):
     """
     return self.spawn_dev_appserver(args, open_ports).wait()
 
-  def get_uploaded_versions(self, modules=None):
-    """Returns list of versions that are deployed to all given |modules|.
+  def get_uploaded_versions(self, services=None):
+    """Returns list of versions that are deployed to all given |services|.
 
-    If a version is deployed only to one module, it won't be listed. Versions
+    If a version is deployed only to one service, it won't be listed. Versions
     are sorted by a version number, oldest first.
     """
-    # Build a mapping: version -> list of modules that have it.
+    # Build a mapping: version -> list of services that have it.
     versions = collections.defaultdict(list)
-    for module, version_list in self.list_versions().iteritems():
+    for service, version_list in self.list_versions().iteritems():
       for version in version_list:
-        versions[version].append(module)
+        versions[version].append(service)
 
-    # Keep only versions that are deployed to all requested modules.
-    modules = modules or self.modules
+    # Keep only versions that are deployed to all requested services.
+    services = services or self.services
     actual_versions = [
-      version for version, modules_with_it in versions.iteritems()
-      if set(modules_with_it).issuperset(modules)
+      version for version, services_with_it in versions.iteritems()
+      if set(services_with_it).issuperset(services)
     ]
 
     # Sort by version number (best effort, nonconforming version names will
@@ -602,7 +612,7 @@ class Application(object):
       return tuple(parts)
     return sorted(actual_versions, key=extract_version_num)
 
-  def get_actives(self, modules=None):
+  def get_actives(self, services=None):
     """Returns active version(s)."""
     data = self.run_gcloud(['app', 'versions', 'list', '--hide-no-traffic'])
     # TODO(maruel): Handle when traffic_split != 1.0.
@@ -614,11 +624,11 @@ class Application(object):
         'deployer': service['version']['createdBy'],
         'id': service['id'],
         'service': service['service'],
-      } for service in data if not modules or service['service'] in modules
+      } for service in data if not services or service['service'] in services
     ]
 
 
-def setup_env(app_dir, app_id, version, module_id, remote_api=False):
+def setup_env(app_dir, app_id, version, service_id, remote_api=False):
   """Setups os.environ so GAE code works.
 
   Must be called only after SDK path has been initialized with setup_gae_sdk.
@@ -637,8 +647,8 @@ def setup_env(app_dir, app_id, version, module_id, remote_api=False):
   if version:
     os.environ['CURRENT_VERSION_ID'] = '%s.%d' % (
         version, int(time.time()) << 28)
-  if module_id:
-    os.environ['CURRENT_MODULE_ID'] = module_id
+  if service_id:
+    os.environ['CURRENT_MODULE_ID'] = service_id
 
 
 def add_sdk_options(parser, default_app_dir):
@@ -694,14 +704,14 @@ def process_sdk_options(parser, options):
     parser.error(str(e))
 
 
-def confirm(text, app, version, modules=None, default_yes=False):
+def confirm(text, app, version, services=None, default_yes=False):
   """Asks a user to confirm the action related to GAE app.
 
   Args:
     text: actual text of the prompt.
     app: instance of Application.
     version: version or a list of versions to operate upon.
-    modules: list of modules to operate upon (or None for all).
+    services: list of services to operate upon (or None for all).
 
   Returns:
     True on approval, False otherwise.
@@ -710,7 +720,7 @@ def confirm(text, app, version, modules=None, default_yes=False):
   print('  Directory: %s' % os.path.basename(app.app_dir))
   print('  App ID:    %s' % app.app_id)
   print('  Version:   %s' % version)
-  print('  Modules:   %s' % ', '.join(modules or app.modules))
+  print('  Services:  %s' % ', '.join(services or app.services))
   if default_yes:
     return raw_input('Continue? [Y/n] ') not in ('n', 'N')
   else:
@@ -766,3 +776,4 @@ def setup_gae_env():
   if not sdk_path:
     raise BadEnvironmentError('Couldn\'t find GAE SDK.')
   setup_gae_sdk(sdk_path)
+

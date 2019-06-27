@@ -3,7 +3,7 @@
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
 
-"""Wrapper around GAE SDK tools to simplify working with multi module apps."""
+"""Wrapper around GAE SDK tools to simplify working with multi-service apps."""
 
 __version__ = '1.2'
 
@@ -56,7 +56,7 @@ def _print_version_log(app, to_version):
   from_versions = set(service['id'] for service in app.get_actives())
   if len(from_versions) > 1:
     print >> sys.stderr, (
-        'Error: found multiple modules with different active versions. Use '
+        'Error: found multiple services with different active versions. Use '
         '"gae active" to get the curent list of active version. Please use the '
         'Web UI to fix. Aborting.')
     return 1
@@ -98,7 +98,7 @@ def CMDactive(parser, args):
   parser.add_option(
       '-b', '--bare', action='store_true',
       help='Only print the version(s), nothing else')
-  app, options, _modules = parser.parse_args(args)
+  app, options, _services = parser.parse_args(args)
   data = app.get_actives()
   if options.bare:
     print('\n'.join(sorted(set(i['id'] for i in data))))
@@ -128,9 +128,9 @@ def CMDapp_dir(parser, args):
 
 @subcommand.usage('[version_id version_id ...]')
 def CMDcleanup(parser, args):
-  """Removes old versions of GAE application modules.
+  """Removes old versions of GAE application services.
 
-  Removes the specified versions from all app modules. If no versions are
+  Removes the specified versions from all app services. If no versions are
   provided via command line, will ask interactively.
 
   When asking interactively, uses EDITOR environment variable to edit the list
@@ -207,12 +207,12 @@ def CMDdevserver(parser, args):
   return app.run_dev_appserver(args, options.open)
 
 
-@subcommand.usage('[module_id version_id]')
+@subcommand.usage('[service_id version_id]')
 def CMDshell(parser, args):
   """Opens interactive remote shell with app's GAE environment.
 
-  Connects to a specific version of a specific module (an active version of
-  'default' module by default). The app must have 'remote_api: on' builtin
+  Connects to a specific version of a specific service (an active version of
+  'default' service by default). The app must have 'remote_api: on' builtin
   enabled in app.yaml.
 
   Always uses password based authentication.
@@ -225,25 +225,25 @@ def CMDshell(parser, args):
       help='Operates locally on an empty dev instance')
   app, options, args = parser.parse_args(args)
 
-  module = 'default'
+  service = 'default'
   version = None
   if len(args) == 2:
-    module, version = args
+    service, version = args
   elif len(args) == 1:
-    module = args[0]
+    service = args[0]
   elif args:
     parser.error('Unknown args: %s' % args)
 
-  if module not in app.modules:
-    parser.error('No such module: %s' % module)
+  if service not in app.service:
+    parser.error('No such service: %s' % service)
 
   if not options.host and not options.local:
-    prefixes = filter(None, (version, module, app.app_id))
+    prefixes = filter(None, (version, service, app.app_id))
     options.host = '%s.appspot.com' % '-dot-'.join(prefixes)
 
   # Ensure remote_api is initialized and GAE sys.path is set.
   gae_sdk_utils.setup_env(
-      app.app_dir, app.app_id, version, module, remote_api=True)
+      app.app_dir, app.app_id, version, service, remote_api=True)
 
   if options.host:
     # Open the connection.
@@ -266,13 +266,13 @@ def CMDshell(parser, args):
     if os.path.isdir(abs_path) and not abs_path in sys.path:
       sys.path.insert(0, abs_path)
 
-  # Simplify imports of app modules (with dependencies). This code is optimized
+  # Simplify imports of app services (with dependencies). This code is optimized
   # for layout of apps that use 'components'.
   register_sys_path(app.app_dir)
   register_sys_path(app.app_dir, 'third_party')
   register_sys_path(app.app_dir, 'components', 'third_party')
 
-  # Import some common modules into interactive console namespace.
+  # Import some common services into interactive console namespace.
   def setup_context():
     # pylint: disable=unused-variable
     from google.appengine.api import app_identity
@@ -304,7 +304,7 @@ def CMDshell(parser, args):
 
 @subcommand.usage('[version_id]')
 def CMDswitch(parser, args):
-  """Switches default version of all app modules.
+  """Switches default version of all app services.
 
   The version must be uploaded already. If no version is provided via command
   line, will ask interactively.
@@ -344,11 +344,11 @@ def CMDswitch(parser, args):
   return 0
 
 
-@subcommand.usage('[module_id module_id ...]')
+@subcommand.usage('[service_id service_id ...]')
 def CMDupload(parser, args):
-  """Uploads a new version of specific (or all) modules of an app.
+  """Uploads a new version of specific (or all) services of an app.
 
-  Note that module yamls are expected to be named module-<module name>.yaml
+  Note that service yamls are expected to be named module-<service-name>.yaml
 
   Version name looks like <number>-<commit sha1>[-tainted-<who>], where:
     number      git commit number, monotonically increases with each commit
@@ -366,11 +366,11 @@ def CMDupload(parser, args):
   parser.add_switch_option()
   parser.add_force_option()
   parser.allow_positional_args = True
-  app, options, modules = parser.parse_args(args)
+  app, options, services = parser.parse_args(args)
 
-  for module in modules:
-    if module not in app.modules:
-      parser.error('No such module: %s' % module)
+  for service in services:
+    if service not in app.services:
+      parser.error('No such service: %s' % service)
 
   # Additional chars is for the app_id as well as 5 chars for '-dot-'.
   version = calculate_version.calculate_version(
@@ -380,12 +380,12 @@ def CMDupload(parser, args):
   if not options.force:
     approved = gae_sdk_utils.confirm(
         'Upload new version, update indexes, queues and cron jobs?',
-        app, version, modules, default_yes=True)
+        app, version, services, default_yes=True)
     if not approved:
       print('Aborted.')
       return 1
 
-  app.update(version, modules)
+  app.update(version, services)
 
   print('-' * 80)
   print('New version:')
@@ -473,15 +473,16 @@ def _find_app_dir(search_dir):
   app.yaml or some of its subdir have app.yaml), but its parent directory does
   NOT look like an app root.
 
-  It allows to detect multi-module Go apps. Their default module directory
-  usually contains app.yaml, and this directory by itself looks like one-module
-  GAE app. By looking at the parent we can detect that it's indeed just one
-  module of multi-module app.
+  It allows to detect multi-service Go apps. Their default service directory
+  usually contains app.yaml, and this directory by itself looks like a single
+  service GAE app. By looking at the parent we can detect that it's indeed just
+  one service of a multi-service app.
 
-  This logic gives false positives if multiple different one-module GAE apps are
-  located in sibling directories of some root directory (e.g. appengine/<app1>,
-  appengine/<app2). To prevent this directory to be incorrectly used as an app
-  root, we forbid root directories of this kind to directly contains apps.
+  This logic gives false positives if multiple different single-service GAE
+  apps are located in sibling directories of some root directory (e.g.
+  appengine/<app1>, appengine/<app2). To prevent this directory to be
+  incorrectly used as an app root, we forbid root directories of this kind to
+  directly contain apps.
 
   A root directory is denoted either by presence of '.git' subdir, or 'ROOT'
   file.
@@ -507,10 +508,10 @@ def _find_app_dir(search_dir):
 
 
 def main(args):
-  # gae.py may be symlinked into app's directory or its subdirectory (to avoid
-  # typing --app-dir all the time). If linked into subdirectory, discover root
-  # by locating app.yaml. It is used for Python GAE apps and one-module Go apps
-  # that have all YAMLs in app root dir.
+  # gae.py may be symlinked into an app's directory or subdirectory (to avoid
+  # typing --app-dir all the time). If linked into a subdirectory, discover root
+  # by locating app.yaml. It is used for Python GAE apps and single-service Go
+  # apps that have all YAMLs in app root dir.
   default_app_dir = None
   if IS_SYMLINKED:
     script_dir = os.path.dirname(os.path.abspath(__file__))
