@@ -147,7 +147,7 @@ class StatsFrameworkTest(test_case.TestCase):
     # Verify days.
     expected = [
       {
-        'key': midnight.date(),
+        'key': str(midnight.date()),
         'requests': limit,
         'b': float(limit),
         'd': [],
@@ -166,7 +166,9 @@ class StatsFrameworkTest(test_case.TestCase):
     # Verify hours.
     expected = [
       {
-        'key': (midnight + datetime.timedelta(seconds=i*60*60)),
+        'key':
+            (midnight + datetime.timedelta(seconds=i*60*60)).strftime(
+                '%Y-%m-%dT%H'),
         'requests': 60,
         'b': 60.,
         'd': [],
@@ -187,7 +189,9 @@ class StatsFrameworkTest(test_case.TestCase):
     # Verify minutes.
     expected = [
       {
-        'key': (midnight + datetime.timedelta(seconds=i*60)),
+        'key':
+            (midnight + datetime.timedelta(seconds=i*60)).strftime(
+              '%Y-%m-%dT%H:%M'),
         'requests': 1,
         'b': 1.,
         'd': [],
@@ -238,7 +242,7 @@ class StatsFrameworkTest(test_case.TestCase):
 
     expected = [
       {
-        'key': now.date(),
+        'key': '2010-01-02',
         'requests': 0,
         'b': 0.0,
         'd': [],
@@ -250,7 +254,7 @@ class StatsFrameworkTest(test_case.TestCase):
 
     expected = [
       {
-        'key': datetime.datetime(*now.timetuple()[:4]),
+        'key': '2010-01-02T03',
         'requests': 2,
         'b': 2.0,
         'd': [],
@@ -262,16 +266,14 @@ class StatsFrameworkTest(test_case.TestCase):
 
     expected = [
       {
-        'key': datetime.datetime(
-            *(now - datetime.timedelta(seconds=60)).timetuple()[:5]),
+        'key': '2010-01-02T03:03',
         'requests': 1,
         'b': 1.0,
         'd': [],
         'inner': {'c': u'2,'},
       },
       {
-        'key': datetime.datetime(
-            *(now - datetime.timedelta(seconds=120)).timetuple()[:5]),
+        'key': '2010-01-02T03:02',
         'requests': 1,
         'b': 1.0,
         'd': [],
@@ -396,14 +398,14 @@ class StatsFrameworkLogTest(test_case.TestCase):
     self.h.process_next_chunk(0)
     expected = [
       {
-        u'key': u'2010-01-02 03:00:00',
+        u'key': u'2010-01-02T03',
         u'b': 0.0,
         u'd': [],
         u'inner': {u'c': u''},
         u'requests': 0,
       },
       {
-        u'key': u'2010-01-02 02:00:00',
+        u'key': u'2010-01-02T02',
         u'b': 0.0,
         u'd': [],
         u'inner': {u'c': u''},
@@ -418,70 +420,70 @@ class StatsFrameworkLogTest(test_case.TestCase):
     self.h.process_next_chunk(0)
     expected = [
       {
-        u'key': u'2010-01-02 03:04:00',
+        u'key': u'2010-01-02T03:04',
         u'b': 0.0,
         u'd': [],
         u'inner': {u'c': u''},
         u'requests': 0,
       },
       {
-        u'key': u'2010-01-02 03:03:00',
+        u'key': u'2010-01-02T03:03',
         u'b': 0.0,
         u'd': [],
         u'inner': {u'c': u''},
         u'requests': 0,
       },
       {
-        u'key': u'2010-01-02 03:02:00',
+        u'key': u'2010-01-02T03:02',
         u'b': 0.0,
         u'd': [],
         u'inner': {u'c': u''},
         u'requests': 0,
       },
       {
-        u'key': u'2010-01-02 03:01:00',
+        u'key': u'2010-01-02T03:01',
         u'b': 0.0,
         u'd': [],
         u'inner': {u'c': u''},
         u'requests': 0,
       },
       {
-        u'key': u'2010-01-02 03:00:00',
+        u'key': u'2010-01-02T03:00',
         u'b': 0.0,
         u'd': [],
         u'inner': {u'c': u''},
         u'requests': 0,
       },
       {
-        u'key': u'2010-01-02 02:59:00',
+        u'key': u'2010-01-02T02:59',
         u'b': 0.0,
         u'd': [],
         u'inner': {u'c': u''},
         u'requests': 0,
       },
       {
-        u'key': u'2010-01-02 02:58:00',
+        u'key': u'2010-01-02T02:58',
         u'b': 0.0,
         u'd': [],
         u'inner': {u'c': u''},
         u'requests': 0,
       },
       {
-        u'key': u'2010-01-02 02:57:00',
+        u'key': u'2010-01-02T02:57',
         u'b': 0.0,
         u'd': [],
         u'inner': {u'c': u''},
         u'requests': 0,
       },
       {
-        u'key': u'2010-01-02 02:56:00',
+        u'key': u'2010-01-02T02:56',
         u'b': 0.0,
         u'd': [],
         u'inner': {u'c': u''},
         u'requests': 0,
       },
       {
-        u'key': u'2010-01-02 02:55:00',
+        u'key': u'2010-01-02T02:55',
         u'b': 0.0,
         u'd': [],
         u'inner': {u'c': u''},
@@ -496,21 +498,21 @@ class StatsFrameworkLogTest(test_case.TestCase):
     self.h.process_next_chunk(0)
     expected = [
       {
-        u'key': u'2010-01-02 03:04:00',
+        u'key': u'2010-01-02T03:04',
         u'b': 0.0,
         u'd': [],
         u'inner': {u'c': u''},
         u'requests': 0,
       },
       {
-        u'key': u'2010-01-02 03:03:00',
+        u'key': u'2010-01-02T03:03',
         u'b': 0.0,
         u'd': [],
         u'inner': {u'c': u''},
         u'requests': 0,
       },
       {
-        u'key': u'2010-01-02 03:02:00',
+        u'key': u'2010-01-02T03:02',
         u'b': 0.0,
         u'd': [],
         u'inner': {u'c': u''},
@@ -544,7 +546,7 @@ class StatsFrameworkLogTest(test_case.TestCase):
     self.h.process_next_chunk(0)
     expected = [
       {
-        u'key': u'2010-01-02 03:00:00',
+        u'key': u'2010-01-02T03',
         u'b': 0.0,
         u'd': [],
         u'inner': {u'c': u'HelloHello'},
@@ -561,7 +563,7 @@ class StatsFrameworkLogTest(test_case.TestCase):
     self.h.process_next_chunk(0)
     expected = [
       {
-        u'key': u'2010-01-02 03:04:00',
+        u'key': u'2010-01-02T03:04',
         u'b': 0.0,
         u'd': [],
         u'inner': {u'c': u'HelloHello'},

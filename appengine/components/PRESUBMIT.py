@@ -39,8 +39,7 @@ def CommonChecks(input_api, output_api):
     join('components', 'protoutil'),
     join('components', 'prpc'),
     join('components', 'prpc', 'discovery'),
-    # TODO(vadimsh): These tests are broken currently.
-    # join('components', 'stats_framework'),
+    join('components', 'stats_framework'),
     join('tests'),
   ]
   tests = []
