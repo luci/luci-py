@@ -93,7 +93,7 @@ def get_gitiles_config():
   try:
     cfg = storage.get_self_config_async(
         common.IMPORT_FILENAME, lambda: cfg).get_result()
-  except text_format.ParseError as ex:
+  except text_format.ParseError:
     # It is critical that get_gitiles_config() returns a valid config.
     # If import.cfg is broken, it should not break importing mechanism,
     # otherwise the system won't be able to heal itself by importing a fixed

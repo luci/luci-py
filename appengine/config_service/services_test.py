@@ -33,7 +33,7 @@ class ProjectsTestCase(test_case.TestCase):
         ))
 
   def mock_metadata_entity(self):
-    dict = {
+    dct = {
       'version': '1.0',
       'validation': {
         'url': 'https://a.com/validate',
@@ -43,7 +43,7 @@ class ProjectsTestCase(test_case.TestCase):
         ]
       }
     }
-    mck_meta = (services._dict_to_dynamic_metadata(dict).SerializeToString())
+    mck_meta = (services._dict_to_dynamic_metadata(dct).SerializeToString())
     storage.ServiceDynamicMetadata(
         id='deadbeef',
         metadata=mck_meta,
@@ -181,7 +181,7 @@ class ProjectsTestCase(test_case.TestCase):
   def test_update_service_metadata_async_same(self):
     self.mock_metadata_entity()
     self.mock(net, 'json_request_async', mock.Mock())
-    dict = {
+    dct = {
       'version': '1.0',
       'validation': {
         'url': 'https://a.com/validate',
@@ -192,7 +192,7 @@ class ProjectsTestCase(test_case.TestCase):
       }
     }
 
-    net.json_request_async.return_value = future(dict)
+    net.json_request_async.return_value = future(dct)
     self.mock(logging, 'info', mock.Mock())
     mock_service = mock.Mock()
     mock_service.id = 'deadbeef'
@@ -203,7 +203,7 @@ class ProjectsTestCase(test_case.TestCase):
   def test_update_service_metadata_async_different(self):
     self.mock_metadata_entity()
     self.mock(net, 'json_request_async', mock.Mock())
-    dict = {
+    dct = {
       'version': '1.0',
       'validation': {
         'url': 'https://a.com/different_validate',
@@ -214,7 +214,7 @@ class ProjectsTestCase(test_case.TestCase):
       }
     }
 
-    net.json_request_async.return_value = future(dict)
+    net.json_request_async.return_value = future(dct)
     self.mock(logging, 'info', mock.Mock())
     mock_service = mock.Mock()
     mock_service.id = 'deadbeef'

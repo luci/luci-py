@@ -58,7 +58,8 @@ class ApiTest(test_case.EndpointsTestCase):
   def mock_config(self, mock_content=True):
     self.mock(storage, 'get_config_hashes_async', mock.Mock())
     storage.get_config_hashes_async.return_value = future({
-      'services/luci-config': ('deadbeef', 'https://x.com/+/deadbeef', 'abc0123'),
+      'services/luci-config': (
+          'deadbeef', 'https://x.com/+/deadbeef', 'abc0123'),
     })
 
     if mock_content:
@@ -498,6 +499,7 @@ class ApiTest(test_case.EndpointsTestCase):
 
   def test_get_config_not_found(self):
     def get_config_hashes_async(revs, path):
+      _ = path
       return future({cs: (None, None, None) for cs in revs})
 
     self.mock(storage, 'get_config_hashes_async', get_config_hashes_async)

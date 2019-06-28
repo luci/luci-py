@@ -69,10 +69,10 @@ def get_projects():
   return cfg.projects or []
 
 
-def get_project(id):
+def get_project(project_id):
   """Returns a project by id."""
   for p in get_projects():
-    if p.id == id:
+    if p.id == project_id:
       return p
   return None
 
@@ -174,12 +174,12 @@ def _get_project_configs_async(project_ids, path, message_factory):
   @ndb.tasklet
   def get_async():
     prefix = 'projects/'
-    messages = yield storage.get_latest_messages_async(
+    msgs = yield storage.get_latest_messages_async(
         [prefix + pid for pid in _filter_existing(project_ids)],
         path, message_factory)
     raise ndb.Return({
-      # messages may not have a key because we filter project ids by existence
-      pid: messages.get(prefix + pid)
+      # msgs may not have a key because we filter project ids by existence
+      pid: msgs.get(prefix + pid)
       for pid in project_ids
     })
 

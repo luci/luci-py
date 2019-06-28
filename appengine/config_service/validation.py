@@ -76,17 +76,17 @@ def check_id_sorted(iterable, list_name, ctx):
     prev = item.id
 
 
-def validate_id(id, rgx, known_ids, ctx):
-  if not id:
+def validate_id(ident, rgx, known_ids, ctx):
+  if not ident:
     ctx.error('id is not specified')
     return
-  if not rgx.match(id):
-    ctx.error('id "%s" does not match %s regex', id, rgx.pattern)
+  if not rgx.match(ident):
+    ctx.error('id "%s" does not match %s regex', ident, rgx.pattern)
     return
-  if id in known_ids:
+  if ident in known_ids:
     ctx.error('id is not unique')
   else:
-    known_ids.add(id)
+    known_ids.add(ident)
 
 
 def validate_config_set_location(loc, ctx, allow_relative_url=False):
@@ -194,17 +194,17 @@ def validate_service_dynamic_metadata_blob(metadata, ctx):
     ctx.error(
         'Expected format version 1.0, but found "%s"', metadata.get('version'))
 
-  validation = metadata.get('validation')
-  if validation is None:
+  validation_meta = metadata.get('validation')
+  if validation_meta is None:
     return
 
   with ctx.prefix('validation: '):
-    if not isinstance(validation, dict):
+    if not isinstance(validation_meta, dict):
       ctx.error('must be an object')
       return
     with ctx.prefix('url: '):
-      validate_url(validation.get('url'), ctx)
-    patterns = validation.get('patterns', [])
+      validate_url(validation_meta.get('url'), ctx)
+    patterns = validation_meta.get('patterns', [])
     if not isinstance(patterns, list):
       ctx.error('patterns must be a list')
       return

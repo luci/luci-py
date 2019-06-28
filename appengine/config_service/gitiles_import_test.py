@@ -48,6 +48,7 @@ class GitilesImportTestCase(test_case.TestCase):
       committer=john,
       message=None,
       tree_diff=None)
+  test_project_id = 'test-project-id'
 
   def assert_attempt(self, success, msg, config_set=None, no_revision=False):
     config_set = config_set or 'config_set'
@@ -92,12 +93,14 @@ class GitilesImportTestCase(test_case.TestCase):
             path='/',
         ),
         self.test_commit,
-        False)
+        False,
+        self.test_project_id)
 
     expected_latest_revision_url = (
         'https://localhost/project/+/a1841f40264376d170269ee9473ce924b7c2c4e9')
     gitiles.get_archive.assert_called_once_with(
         'localhost', 'project', 'a1841f40264376d170269ee9473ce924b7c2c4e9', '/',
+        project_id=self.test_project_id,
         deadline=15)
     saved_config_set = storage.ConfigSet.get_by_id('config_set')
     self.assertIsNotNone(saved_config_set)
@@ -137,7 +140,8 @@ class GitilesImportTestCase(test_case.TestCase):
             treeish='master',
             path='/'),
         self.test_commit,
-        False)
+        False,
+        self.test_project_id)
     self.assertFalse(gitiles.get_archive.called)
     self.assert_attempt(True, 'Up-to-date')
 
@@ -166,7 +170,8 @@ class GitilesImportTestCase(test_case.TestCase):
         'config_set',
         loc,
         self.test_commit,
-        False)
+        False,
+        self.test_project_id)
 
     cs_fresh = cs.key.get()
     self.assertEqual(cs_fresh.latest_revision, self.test_commit.sha)
@@ -178,12 +183,13 @@ class GitilesImportTestCase(test_case.TestCase):
     gitiles_import._import_revision(
         'config_set',
         gitiles.Location(
-          hostname='localhost',
-          project='project',
-          treeish='master',
-          path='/'),
+            hostname='localhost',
+            project='project',
+            treeish='master',
+            path='/'),
         self.test_commit,
-        False)
+        False,
+        self.test_project_id)
     self.assert_attempt(True, 'Config directory not found. Imported as empty')
 
   def test_import_invalid_revision(self):
@@ -191,6 +197,7 @@ class GitilesImportTestCase(test_case.TestCase):
     self.mock(notifications, 'notify_gitiles_rejection', mock.Mock())
 
     def validate_config(config_set, filename, content, ctx):
+      _, _ = config_set, content
       if filename == 'test_archive/x':
         ctx.error('bad config!')
     self.mock(validation, 'validate_config', validate_config)
@@ -198,12 +205,13 @@ class GitilesImportTestCase(test_case.TestCase):
     gitiles_import._import_revision(
         'config_set',
         gitiles.Location(
-          hostname='localhost',
-          project='project',
-          treeish='master',
-          path='/'),
+            hostname='localhost',
+            project='project',
+            treeish='master',
+            path='/'),
         self.test_commit,
-        False)
+        False,
+        self.test_project_id)
     # Assert not saved.
     self.assertIsNone(storage.ConfigSet.get_by_id('config_set'))
 
@@ -231,10 +239,14 @@ class GitilesImportTestCase(test_case.TestCase):
       id='config_set',
     ).put()
     gitiles_import._import_config_set(
-        'config_set', gitiles.Location.parse('https://localhost/project'))
+        'config_set',
+        gitiles.Location.parse('https://localhost/project'),
+        self.test_project_id)
 
     gitiles.get_log.assert_called_once_with(
-        'localhost', 'project', 'HEAD', '/', limit=1,
+        'localhost', 'project', 'HEAD', '/',
+        project_id=self.test_project_id,
+        limit=1,
         deadline=15)
 
     saved_config_set = storage.ConfigSet.get_by_id('config_set')
@@ -250,7 +262,9 @@ class GitilesImportTestCase(test_case.TestCase):
     # Import second time, import_revision should not be called.
     self.mock(gitiles_import, '_import_revision', mock.Mock())
     gitiles_import._import_config_set(
-        'config_set', gitiles.Location.parse('https://localhost/project'))
+        'config_set',
+        gitiles.Location.parse('https://localhost/project'),
+        self.test_project_id)
     self.assertFalse(gitiles_import._import_revision.called)
     self.assert_attempt(True, 'Up-to-date')
 
@@ -260,7 +274,8 @@ class GitilesImportTestCase(test_case.TestCase):
     with self.assertRaises(gitiles_import.NotFoundError):
       gitiles_import._import_config_set(
           'config_set',
-          gitiles.Location.parse('https://localhost/project'))
+          gitiles.Location.parse('https://localhost/project'),
+          self.test_project_id)
 
     self.assert_attempt(False, 'Could not load commit log', no_revision=True)
 
@@ -281,7 +296,8 @@ class GitilesImportTestCase(test_case.TestCase):
     with self.assertRaises(gitiles_import.HistoryDisappeared):
       gitiles_import._import_config_set(
           'config_set',
-          gitiles.Location.parse('https://localhost/project'))
+          gitiles.Location.parse('https://localhost/project'),
+          self.test_project_id)
 
     self.assertIsNone(storage.last_import_attempt_key('config_set').get())
 
@@ -295,7 +311,8 @@ class GitilesImportTestCase(test_case.TestCase):
     with self.assertRaises(gitiles_import.Error):
       gitiles_import._import_config_set(
           'config_set',
-          gitiles.Location.parse('https://localhost/project'))
+          gitiles.Location.parse('https://localhost/project'),
+          self.test_project_id)
     self.assert_attempt(
         False, 'Could not import: permission denied', no_revision=True)
 
@@ -313,7 +330,8 @@ class GitilesImportTestCase(test_case.TestCase):
     self.mock(gitiles_import, '_import_revision', mock.Mock())
     gitiles_import._import_config_set(
         'config_set',
-        gitiles.Location.parse('https://localhost/project/+/master/x'))
+        gitiles.Location.parse('https://localhost/project/+/master/x'),
+        self.test_project_id)
     gitiles_import._import_revision.assert_called_once()
 
   def test_import_config_set_without_force_update(self):
@@ -330,7 +348,8 @@ class GitilesImportTestCase(test_case.TestCase):
     self.mock(gitiles_import, '_import_revision', mock.Mock())
     gitiles_import._import_config_set(
         'config_set',
-        gitiles.Location.parse('https://localhost/project/+/master/x'))
+        gitiles.Location.parse('https://localhost/project/+/master/x'),
+        self.test_project_id)
     self.assertFalse(gitiles_import._import_revision.called)
 
   def test_import_config_set_without_cs(self):
@@ -338,7 +357,8 @@ class GitilesImportTestCase(test_case.TestCase):
     self.mock(gitiles_import, '_import_revision', mock.Mock())
     gitiles_import._import_config_set(
         'config_set',
-        gitiles.Location.parse('https://localhost/project/+/master/x'))
+        gitiles.Location.parse('https://localhost/project/+/master/x'),
+        self.test_project_id)
     self.assertTrue(gitiles_import._import_revision.called)
 
   def test_deadline_exceeded(self):
@@ -354,7 +374,8 @@ class GitilesImportTestCase(test_case.TestCase):
     with self.assertRaises(gitiles_import.Error):
       gitiles_import._import_config_set(
           'config_set',
-          gitiles.Location.parse('https://localhost/project'))
+          gitiles.Location.parse('https://localhost/project'),
+          self.test_project_id)
     self.assert_attempt(False, 'Could not import: deadline exceeded')
 
   def test_import_services(self):
@@ -400,7 +421,13 @@ class GitilesImportTestCase(test_case.TestCase):
 
     gitiles_import._import_config_set.assert_called_once_with(
         'services/luci-config',
-        'https://localhost/config/+/HEAD/luci-config')
+        gitiles.Location(
+            hostname='localhost',
+            project='config',
+            treeish='HEAD',
+            path='/luci-config',
+        ),
+    )
 
   def test__project_and_ref_config_sets(self):
     self.mock(gitiles_import, '_import_config_set', mock.Mock())
@@ -444,7 +471,13 @@ class GitilesImportTestCase(test_case.TestCase):
 
     gitiles_import._import_config_set.assert_called_once_with(
         'projects/chromium',
-        'https://localhost/chromium/src/+/refs/heads/master')
+        gitiles.Location(
+            hostname='localhost',
+            project='chromium/src',
+            treeish='refs/heads/master',
+            path='/',
+        ),
+        'chromium')
 
   def test_import_project_not_found(self):
     self.mock(projects, 'get_project', mock.Mock(return_value=None))
@@ -498,7 +531,13 @@ class GitilesImportTestCase(test_case.TestCase):
 
     gitiles_import._import_config_set.assert_called_once_with(
         'projects/chromium/refs/heads/release42',
-        'https://localhost/chromium/src/+/refs/heads/release42/my-configs')
+        gitiles.Location(
+            hostname='localhost',
+            project='chromium/src',
+            treeish='refs/heads/release42',
+            path='/my-configs',
+        ),
+    )
 
   def test_import_ref_project_not_found(self):
     self.mock(projects, 'get_project', mock.Mock(return_value=None))

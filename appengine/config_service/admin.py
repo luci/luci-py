@@ -59,7 +59,7 @@ class AdminApi(remote.Service):
   @auth.endpoints_method(
       message_types.VoidMessage, GlobalConfigMessage, name='readGlobalConfig')
   @auth.require(acl.is_admin)
-  def read_global_config(self, request):
+  def read_global_config(self, _request):
     """Reads global configuration."""
     conf = GlobalConfig.fetch()
     if not conf:

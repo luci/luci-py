@@ -358,7 +358,7 @@ class ValidationTestCase(test_case.TestCase):
     services.get_metadata_async.side_effect = get_metadata_async
 
     @ndb.tasklet
-    def json_request_async(url, **kwargs):
+    def json_request_async(url, **_kwargs):
       raise ndb.Return({
         'messages': [{
           'text': 'OK from %s' % url,
