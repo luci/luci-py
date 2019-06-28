@@ -103,7 +103,17 @@ def find_gae_sdk_gcloud():
     return None
   # 'gcloud' is <sdk_root>/bin/gcloud.
   sdk_root = os.path.dirname(os.path.dirname(gcloud))
-  return os.path.join(sdk_root, 'platform', 'google_appengine')
+  gae_sdk = os.path.join(sdk_root, 'platform', 'google_appengine')
+  if not os.path.isdir(gae_sdk):
+    print >> sys.stderr, (
+        '-------------------------------------------------------------------\n'
+        'Found Cloud SDK in %s but it doesn\'t have App Engine components.\n'
+        'If you want to use this SDK, install necessary components:\n'
+        '  gcloud components install app-engine-python app-engine-go\n'
+        '-------------------------------------------------------------------'
+        % sdk_root)
+    return None
+  return gae_sdk
 
 
 def find_gae_sdk_appcfg(sdk_name, search_dir):
