@@ -5,7 +5,7 @@
 """Top-level presubmit script for LUCI.
 
 See http://dev.chromium.org/developers/how-tos/depottools/presubmit-scripts for
-details on the presubmit API built into gcl.
+details on the presubmit API built into gclient.
 """
 
 
