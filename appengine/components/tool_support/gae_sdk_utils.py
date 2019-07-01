@@ -66,16 +66,35 @@ class LoginRequiredError(Error):
 
 
 def find_gcloud():
-  """Searches for 'gcloud' binary in PATH and returns absolute path to it.
+  """Searches for 'gcloud' binary returning an absolute path to it.
 
-  Raises BadEnvironmentError error if it's not there.
+  Will first search for '<candidate>/gcloud/bin/gcloud' where <candidate> goes
+  over all parent directories of this script. Failing that will look for
+  'gcloud' binary in PATH.
+
+  Raises BadEnvironmentError error if neither method works.
   """
-  for path in os.environ['PATH'].split(os.pathsep):
-    exe_file = os.path.join(path, 'gcloud')  # <sdk_root>/bin/gcloud
+  binary = 'gcloud'
+  if sys.platform == 'win32':
+    binary += '.cmd'
+
+  search_dir = TOOLS_DIR
+  while True:
+    exe_file = os.path.join(search_dir, 'gcloud', 'bin', binary)
     if os.path.isfile(exe_file) and os.access(exe_file, os.X_OK):
       return os.path.realpath(exe_file)
+    prev_dir = search_dir
+    search_dir = os.path.dirname(search_dir)
+    if search_dir == prev_dir:
+      break
+
+  for path in os.environ['PATH'].split(os.pathsep):
+    exe_file = os.path.join(path, binary)  # <sdk_root>/bin/gcloud
+    if os.path.isfile(exe_file) and os.access(exe_file, os.X_OK):
+      return os.path.realpath(exe_file)
+
   raise BadEnvironmentError(
-      'Can\'t find "gcloud" in PATH. Install the Google Cloud SDK from '
+      'Can\'t find "gcloud". Install the Google Cloud SDK from '
       'https://cloud.google.com/sdk/')
 
 
