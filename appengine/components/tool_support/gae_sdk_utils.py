@@ -163,7 +163,7 @@ def find_gae_sdk_appcfg(sdk_name, search_dir):
 
 
 def find_app_yamls(app_dir):
-  """Searches for app.yaml and module-*.yaml in app_dir or its subdirs.
+  """Searches for app.yaml and (module|service)-*.yaml in app_dir.
 
   Recognizes Python and Go GAE apps.
 
@@ -180,8 +180,9 @@ def find_app_yamls(app_dir):
   if os.path.isfile(app_yaml):
     yamls.append(app_yaml)
   yamls.extend(glob.glob(os.path.join(app_dir, 'module-*.yaml')))
+  yamls.extend(glob.glob(os.path.join(app_dir, 'service-*.yaml')))
   if yamls:
-    return yamls
+    return sorted(yamls)
 
   # Look in per-service subdirectories. Only Go apps are structured like this.
   # See https://cloud.google.com/appengine/docs/go/#Go_Organizing_Go_apps.
@@ -193,9 +194,10 @@ def find_app_yamls(app_dir):
     if os.path.isfile(app_yaml):
       yamls.append(app_yaml)
     yamls.extend(glob.glob(os.path.join(subdir, 'module-*.yaml')))
+    yamls.extend(glob.glob(os.path.join(subdir, 'service-*.yaml')))
   if not yamls:
     raise ValueError(
-        'Not a GAE application directory, no service *.yamls found: %s' %
+        'Not a GAE application directory, no service *.yaml\'s found: %s' %
         app_dir)
 
   # There should be one and only one app.yaml.
@@ -207,7 +209,7 @@ def find_app_yamls(app_dir):
     raise ValueError(
         'Not a GAE application directory, multiple app.yaml found (%s): %s' %
         (app_yamls, app_dir))
-  return yamls
+  return sorted(yamls)
 
 
 def is_app_dir(path):
