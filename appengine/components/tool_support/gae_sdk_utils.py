@@ -24,7 +24,7 @@ yaml = None
 #
 # This flag is temporary. Once gcloud support is fully implemented and gcloud is
 # available on bots, this will become the default.
-USE_GCLOUD = os.getenv('LUCI_PY_USE_GCLOUD') == '1'
+USE_GCLOUD = os.getenv('LUCI_PY_USE_GCLOUD') != '0'
 
 
 # Directory with this file.

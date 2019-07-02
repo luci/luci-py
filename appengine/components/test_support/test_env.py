@@ -19,9 +19,6 @@ def setup_test_env(app_id='sample-app'):
     raise Exception('Do not call test_env.setup_test_env() twice.')
   _INITIALIZED = True
 
-  # TODO(vadimsh): Remove this once LUCI_PY_USE_GCLOUD is set by default.
-  os.environ['LUCI_PY_USE_GCLOUD'] = '1'
-
   # For depot_tools.
   sys.path.insert(
       0, os.path.join(ROOT_DIR, '..', '..', 'client', 'third_party'))
