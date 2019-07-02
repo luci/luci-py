@@ -13,11 +13,14 @@ _INITIALIZED = False
 
 
 def setup_test_env(app_id='sample-app'):
-  """Sets up App Engine/Django test environment."""
+  """Sets up App Engine test environment."""
   global _INITIALIZED
   if _INITIALIZED:
     raise Exception('Do not call test_env.setup_test_env() twice.')
   _INITIALIZED = True
+
+  # TODO(vadimsh): Remove this once LUCI_PY_USE_GCLOUD is set by default.
+  os.environ['LUCI_PY_USE_GCLOUD'] = '1'
 
   # For depot_tools.
   sys.path.insert(
