@@ -27,7 +27,7 @@ Mask = field_masks.Mask
 
 class ParsePathTests(unittest.TestCase):
   def parse(self, path, **kwargs):
-    return field_masks._parse_path(path, TEST_DESC, **kwargs)
+    return field_masks._parse_path(path, TEST_DESC, **kwargs)[0]
 
   def test_str(self):
     actual = self.parse('str')
@@ -545,6 +545,18 @@ class SubmaskTests(unittest.TestCase):
     actual = self.mask('msg.msg.str', 'str').submask('msg.msg')
     expected = self.mask('str')
     self.assertEqual(actual, expected)
+
+  def test_submask_repeated_star(self):
+    actual = self.mask('msgs.*.str').submask('msgs.*')
+    expected = self.mask('str')
+    self.assertEqual(actual, expected)
+
+  def test_submask_repeated_no_star(self):
+    actual = self.mask('msgs').submask('msgs.*')
+    self.assertIsNotNone(actual)
+    expected = Mask(desc=TEST_DESC, repeated=False)  # everything
+    self.assertEqual(actual, expected)
+    self.assertTrue(actual.includes('str'))
 
 
 if __name__ == '__main__':

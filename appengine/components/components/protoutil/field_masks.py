@@ -76,7 +76,7 @@ class Mask(object):
     repeated: True means that the segment represents a repeated field, and not
       one of the elements. Children of the node are the field elements.
     children: a dict that maps a segment to its node, e.g. children of the root
-      of the example above has keys 'a' and 'b', and values are Mask objects. A
+      in the example above has keys 'a' and 'b', and values are Mask objects. A
       segment can be of type str, int, bool or it can be the value of
       field_masks.STAR for '*' segments.
   """
@@ -156,7 +156,9 @@ class Mask(object):
         self.desc and self.repeated.
     """
     assert path
-    return self._includes(_parse_path(path, self.desc, repeated=self.repeated))
+    return self._includes(
+        _parse_path(path, self.desc, repeated=self.repeated)[0]
+    )
 
   def _includes(self, path, start_at=0):
     """Implements includes()."""
@@ -219,12 +221,15 @@ class Mask(object):
         # Scalar value.
         setattr(dest, f_name, src_value)
 
-
   def submask(self, path):
     """Returns a sub-mask given a path from self to it.
 
-    For example, for a mask ["a.b.c"], mask.get('a.b') will return a mask with
-    c.
+    For example, for a mask ["a.b.c"], mask.submask('a.b') will return a mask
+    ["c"].
+
+    If self includes the path entirely, returns a Mask that includes everything.
+    For example, for mask ["a"], mask.submask("a.b") returns a mask without
+    children.
 
     Args:
       path: a path string. Must use canonical field names, i.e. not json names.
@@ -237,7 +242,14 @@ class Mask(object):
         self.desc and self.repeated.
     """
     assert path
-    return self._submask(_parse_path(path, self.desc, repeated=self.repeated))
+    parsed_path, desc, repeated = _parse_path(
+        path, self.desc, repeated=self.repeated
+    )
+    if self._includes(parsed_path) == INCLUDE_ENTIRELY:
+      # Return a mask that includes everything.
+      return Mask(desc=desc, repeated=repeated)
+
+    return self._submask(parsed_path)
 
   def _submask(self, path, start_at=0):
     """Implements submask()."""
@@ -270,7 +282,7 @@ class Mask(object):
     parsed_paths = []
     for p in field_mask.paths:
       try:
-        parsed_paths.append(_parse_path(p, desc, json_names=json_names))
+        parsed_paths.append(_parse_path(p, desc, json_names=json_names)[0])
       except ValueError as ex:
         raise ValueError('invalid path "%s": %s' % (p, ex))
 
@@ -379,7 +391,8 @@ def _parse_path(path, desc, repeated=False, json_names=False):
       Field names will be parsed in the canonical form.
 
   Returns:
-    A tuple of segments. A star is returned as STAR object.
+    A tuple (segments, desc, repeated), where segments is a a tuple of segments.
+    A star is returned as STAR object.
 
   Raises:
     ValueError if path is invalid.
@@ -406,7 +419,7 @@ def _parse_path(path, desc, repeated=False, json_names=False):
         raise ValueError('unexpected token "%s"; expected end of string' % tok)
       if tok_type != _PERIOD:
         raise ValueError('unexpected token "%s"; expected a period' % tok)
-    return tuple(segs)
+    return tuple(segs), ctx.desc, ctx.repeated
 
   def read_segment():
     """Returns (segment, must_be_last) tuple."""
@@ -427,13 +440,13 @@ def _parse_path(path, desc, repeated=False, json_names=False):
 
     if ctx.desc is None:
       raise ValueError(
-          'scalar field "%s" cannot have subfields' % ctx.field_path)
+          'scalar field "%s" cannot have subfields' % ctx.field_path
+      )
 
     if is_map_key:
       key_type = ctx.desc.fields_by_name['key'].type
       if key_type not in _SUPPORTED_MAP_KEY_TYPES:
-        raise ValueError(
-            'unsupported key type of field "%s"' % ctx.field_path)
+        raise ValueError('unsupported key type of field "%s"' % ctx.field_path)
       if tok_type == _STAR:
         read()  # Swallow star.
         seg = STAR
@@ -451,27 +464,25 @@ def _parse_path(path, desc, repeated=False, json_names=False):
     if tok_type == _STAR:
       # Include all fields.
       read()  # Swallow star.
-       # A STAR field cannot be followed by subfields.
+      # A STAR field cannot be followed by subfields.
       return STAR, True
 
     if tok_type != _LITERAL:
-      raise ValueError(
-          'unexpected token "%s"; expected a field name' % tok)
+      raise ValueError('unexpected token "%s"; expected a field name' % tok)
     read()  # Swallow field name.
 
     field = _find_field(ctx.desc, tok, json_names)
     if field is None:
       raise ValueError(
-          'field "%s" does not exist in message %s' % (
-              tok, ctx.desc.full_name))
+          'field "%s" does not exist in message %s' % (tok, ctx.desc.full_name)
+      )
     ctx.advance_to_field(field)
     return field.name, False
 
   def read_bool():
     tok_type, tok = read()
     if tok_type != _LITERAL or tok not in ('true', 'false'):
-      raise ValueError(
-          'unexpected token "%s", expected true or false' % tok)
+      raise ValueError('unexpected token "%s", expected true or false' % tok)
     return tok == 'true'
 
   def read_integer():
