@@ -743,6 +743,80 @@ def _bot_update_tx(
   return result_summary, run_result, None
 
 
+def _cancel_task_tx(request, result_summary, kill_running, bot_id, now, es_cfg):
+  """Runs the transaction for cancel_task().
+
+  Arguments:
+    request: TaskRequest instance to cancel.
+    result_summary: result summary for request to cancel.
+    kill_running: if true, allow cancelling a task in RUNNING state.
+    bot_id: if specified, only cancel task if it is RUNNING on this bot. Cannot
+            be specified if kill_running is False.
+    now: timestamp used to update result_summary and run_result.
+    es_cfg: pools_config.ExternalSchedulerConfig for external scheduler.
+
+  Returns:
+    tuple(bool, bool)
+    - True if the cancellation succeeded. Either the task atomically changed
+      from PENDING to CANCELED or it was RUNNING and killing bit has been set.
+    - True if the task was running while it was canceled.
+
+  """
+  was_running = result_summary.state == task_result.State.RUNNING
+  if not result_summary.can_be_canceled:
+    return False, was_running
+
+  entities = [result_summary]
+  if not was_running:
+    if bot_id:
+      # Deny cancelling a non-running task if bot_id was specified.
+      return False, was_running
+    # PENDING.
+    result_summary.state = task_result.State.CANCELED
+    to_run_key = task_to_run.request_to_task_to_run_key(
+        request,
+        result_summary.try_number or 1,
+        result_summary.current_task_slice or 0)
+    to_run_future = to_run_key.get_async()
+
+    # Add it to the negative cache.
+    task_to_run.set_lookup_cache(to_run_key, False)
+
+    to_run = to_run_future.get_result()
+    entities.append(to_run)
+    to_run.queue_number = None
+  else:
+    if not kill_running:
+      # Deny canceling a task that started.
+      return False, was_running
+    if bot_id and bot_id != result_summary.bot_id:
+      # Deny cancelling a task if bot_id was specified, but task is not
+      # on this bot.
+      return False, was_running
+    # RUNNING.
+    run_result = result_summary.run_result_key.get()
+    entities.append(run_result)
+    # Do not change state to KILLED yet. Instead, use a 2 phase commit:
+    # - set killing to True
+    # - on next bot report, tell it to kill the task
+    # - once the bot reports the task as terminated, set state to KILLED
+    run_result.killing = True
+    run_result.abandoned_ts = now
+    run_result.completed_ts = now
+    run_result.modified_ts = now
+    entities.append(run_result)
+  result_summary.abandoned_ts = now
+  result_summary.completed_ts = now
+  result_summary.modified_ts = now
+
+  futures = ndb.put_multi_async(entities)
+  _maybe_taskupdate_notify_via_tq(
+      result_summary, request, es_cfg, transactional=True)
+  for f in futures:
+    f.check_success()
+  return True, was_running
+
+
 def _get_task_from_external_scheduler(es_cfg, bot_dimensions):
   """Gets a task to run from external scheduler.
 
@@ -1402,7 +1476,7 @@ def cancel_task(request, result_key, kill_running, bot_id):
 
   Returns:
     tuple(bool, bool)
-    - True if the cancelation succeeded. Either the task atomically changed
+    - True if the cancellation succeeded. Either the task atomically changed
       from PENDING to CANCELED or it was RUNNING and killing bit has been set.
     - True if the task was running while it was canceled.
 
@@ -1423,59 +1497,8 @@ def cancel_task(request, result_key, kill_running, bot_id):
     """1 DB GET, 1 memcache write, 2x DB PUTs, 1x task queue."""
     # Need to get the current try number to know which TaskToRun to fetch.
     result_summary = result_key.get()
-    was_running = result_summary.state == task_result.State.RUNNING
-    if not result_summary.can_be_canceled:
-      return False, was_running
-
-    entities = [result_summary]
-    if not was_running:
-      if bot_id:
-        # Deny cancelling a non-running task if bot_id was specified.
-        return False, was_running
-      # PENDING.
-      result_summary.state = task_result.State.CANCELED
-      to_run_key = task_to_run.request_to_task_to_run_key(
-          request,
-          result_summary.try_number or 1,
-          result_summary.current_task_slice or 0)
-      to_run_future = to_run_key.get_async()
-
-      # Add it to the negative cache.
-      task_to_run.set_lookup_cache(to_run_key, False)
-
-      to_run = to_run_future.get_result()
-      entities.append(to_run)
-      to_run.queue_number = None
-    else:
-      if not kill_running:
-        # Deny canceling a task that started.
-        return False, was_running
-      if bot_id and bot_id != result_summary.bot_id:
-        # Deny cancelling a task if bot_id was specified, but task is not
-        # on this bot.
-        return False, was_running
-      # RUNNING.
-      run_result = result_summary.run_result_key.get()
-      entities.append(run_result)
-      # Do not change state to KILLED yet. Instead, use a 2 phase commit:
-      # - set killing to True
-      # - on next bot report, tell it to kill the task
-      # - once the bot reports the task as terminated, set state to KILLED
-      run_result.killing = True
-      run_result.abandoned_ts = now
-      run_result.completed_ts = now
-      run_result.modified_ts = now
-      entities.append(run_result)
-    result_summary.abandoned_ts = now
-    result_summary.completed_ts = now
-    result_summary.modified_ts = now
-
-    futures = ndb.put_multi_async(entities)
-    _maybe_taskupdate_notify_via_tq(
-        result_summary, request, es_cfg, transactional=True)
-    for f in futures:
-      f.check_success()
-    return True, was_running
+    return _cancel_task_tx(
+        request, result_summary, kill_running, bot_id, now, es_cfg)
 
   return datastore_utils.transaction(run)
 
