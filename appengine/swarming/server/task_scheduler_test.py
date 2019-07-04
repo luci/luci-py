@@ -1450,6 +1450,72 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
   def test_bot_update_io_timeout(self):
     self._bot_update_timeouts(False, True)
 
+  def test_bot_update_child_with_cancelled_parent(self):
+    self._register_bot(0, self.bot_dimensions)
+
+    # Run parent task.
+    parent_request = _gen_request_slices()
+    parent_result_summary = task_scheduler.schedule_request(
+        parent_request, None)
+    self.assertEqual(1, self.execute_tasks())
+
+    _, _, parent_run_result = task_scheduler.bot_reap_task(
+        self.bot_dimensions, 'abc')
+
+    # Run a child task.
+    child_request = _gen_request_slices(
+        parent_task_id=parent_run_result.task_id)
+    child_result_summary = task_scheduler.schedule_request(child_request, None)
+    self.assertEqual(0, self.execute_tasks())
+
+    bot2_dimensions = self.bot_dimensions.copy()
+    bot2_dimensions['id'] = [bot2_dimensions['id'][0] + '2']
+    self._register_bot(1, bot2_dimensions)
+    _, _, child_run_result = task_scheduler.bot_reap_task(
+        bot2_dimensions, 'abc')
+    self.assertEqual(0, self.execute_tasks())
+
+    # Cancel parent task.
+    ok, was_running = task_scheduler.cancel_task(
+        parent_run_result.request_key.get(),
+        parent_run_result.result_summary_key, True, None)
+    self.assertEqual(True, ok)
+    self.assertEqual(True, was_running)
+    self.assertEqual(0, self.execute_tasks())
+
+    self.assertEqual(
+        State.KILLED,
+        task_scheduler.bot_update_task(
+            run_result_key=parent_run_result.key,
+            bot_id='localhost',
+            cipd_pins=None,
+            output='hi',
+            output_chunk_start=0,
+            exit_code=0,
+            duration=0.1,
+            hard_timeout=False,
+            io_timeout=False,
+            cost_usd=0.1,
+            outputs_ref=None,
+            performance_stats=None))
+
+    # Child task is not KILLED.
+    self.assertEqual(
+        State.COMPLETED,
+        task_scheduler.bot_update_task(
+            run_result_key=child_run_result.key,
+            bot_id='localhost2',
+            cipd_pins=None,
+            output='hi',
+            output_chunk_start=0,
+            exit_code=0,
+            duration=0.1,
+            hard_timeout=False,
+            io_timeout=False,
+            cost_usd=0.1,
+            outputs_ref=None,
+            performance_stats=None))
+
   def test_task_priority(self):
     # Create N tasks of various priority not in order.
     priorities = [200, 100, 20, 30, 50, 40, 199]
