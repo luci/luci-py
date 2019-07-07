@@ -1475,6 +1475,20 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         bot2_dimensions, 'abc')
     self.assertEqual(0, self.execute_tasks())
 
+    # Run a child task 2.
+    child_request2 = _gen_request_slices(
+        parent_task_id=parent_run_result.task_id)
+    child_result2_summary = task_scheduler.schedule_request(
+        child_request2, None)
+    self.assertEqual(0, self.execute_tasks())
+
+    bot3_dimensions = self.bot_dimensions.copy()
+    bot3_dimensions['id'] = [bot3_dimensions['id'][0] + '3']
+    self._register_bot(1, bot3_dimensions)
+    _, _, child_run_result2 = task_scheduler.bot_reap_task(
+        bot3_dimensions, 'abc')
+    self.assertEqual(0, self.execute_tasks())
+
     # Cancel parent task.
     ok, was_running = task_scheduler.cancel_task(
         parent_run_result.request_key.get(),
@@ -1499,7 +1513,8 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
             outputs_ref=None,
             performance_stats=None))
 
-    # Child task is not KILLED.
+    # Child task is not KILLED when parent task is cancelled and being
+    # completed.
     self.assertEqual(
         State.COMPLETED,
         task_scheduler.bot_update_task(
@@ -1515,6 +1530,28 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
             cost_usd=0.1,
             outputs_ref=None,
             performance_stats=None))
+
+    self.assertEqual('hi', child_run_result.key.get().get_output(0, 0))
+
+    # Child task is KILLED when parent task is cancelled and not being
+    # completed.
+    self.assertEqual(
+        State.KILLED,
+        task_scheduler.bot_update_task(
+            run_result_key=child_run_result2.key,
+            bot_id='localhost3',
+            cipd_pins=None,
+            output='hi',
+            output_chunk_start=0,
+            exit_code=None,
+            duration=None,
+            hard_timeout=False,
+            io_timeout=False,
+            cost_usd=0.1,
+            outputs_ref=None,
+            performance_stats=None))
+
+    self.assertEqual('hi', child_run_result2.key.get().get_output(0, 0))
 
   def test_task_priority(self):
     # Create N tasks of various priority not in order.
