@@ -198,7 +198,8 @@ There are two places where bots behavior can be tweaked:
     It is a python module that defines hook functions called during various
     stages of the bot life. It can contain essentially any code, and it is
     executed only on the bot. See Hooks section below.
-*   `bots.cfg` (with the schema defined by [bots.proto](../proto/bots.proto)).
+*   `bots.cfg` (with the schema defined by
+    [bots.proto](../proto/config/bots.proto)).
     This is purely server side configuration, fetched via luci-config. It
     describes how server authenticates the bots and what dimensions it
     forcefully applies to them (based on their id). For example, it allows to
