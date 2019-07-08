@@ -22,7 +22,7 @@ export function applyAlias(value, key) {
   return `${alias} (${value})`;
 }
 
-const ANDROID_ALIASES = {
+const DEVICE_TYPE_ALIASES = {
   'angler': 'Nexus 6p',
   'athene': 'Moto G4',
   'blueline': 'Pixel 3',
@@ -40,6 +40,11 @@ const ANDROID_ALIASES = {
   'hammerhead': 'Nexus 5',
   'herolte': 'Galaxy S7 [Global]',
   'heroqlteatt': 'Galaxy S7 [AT&T]',
+  'iPad4,1': 'iPad Air',
+  'iPad5,1': 'iPad mini 4',
+  'iPad6,3': 'iPad Pro [9.7 in]',
+  'iPhone7,2': 'iPhone 6',
+  'iPhone9,1': 'iPhone 7',
   'j5xnlte': 'Galaxy J5',
   'm0': 'Galaxy S3',
   'mako': 'Nexus 4',
@@ -119,7 +124,7 @@ const DEVICE_ALIASES = {
 
 const aliasMap = {
   'device': DEVICE_ALIASES,
-  'device_type': ANDROID_ALIASES,
+  'device_type': DEVICE_TYPE_ALIASES,
   'gpu': GPU_ALIASES,
 };
 
