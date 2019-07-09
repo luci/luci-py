@@ -15,6 +15,13 @@ export function applyAlias(value, key) {
     // so we trim that off if needed.
     const trimmed = value.split('-')[0];
     alias = aliasMap[key][trimmed];
+  } else if (key === 'os') {
+    // the Windows dimension ends with a build number, which may
+    // include a minor version number corresponding to bugfix
+    // releases. Only the major version of the build number
+    // corresponds to a marketing name.
+    const trimmed = value.split('.')[0];
+    alias = aliasMap[key][trimmed];
   }
   if (!alias) {
     return value;
@@ -122,10 +129,34 @@ const DEVICE_ALIASES = {
   'iPhone9,1': 'iPhone 7',
 }
 
+/** For Win10, the correspondence between build numbers and versions
+ *  is published at
+ *  https://docs.microsoft.com/en-us/windows/release-information/ for
+ *  clients and at
+ *  https://docs.microsoft.com/en-us/windows-server/get-started/windows-server-release-info
+ *  for servers. This mapping will need to be updated for each new
+ *  Win10 release.
+ */
+const OS_ALIASES = {
+  'Windows-10-10240': 'Windows 10 version 1507',
+  'Windows-10-10586': 'Windows 10 version 1511',
+  'Windows-10-14393': 'Windows 10 version 1607',
+  'Windows-10-15063': 'Windows 10 version 1703',
+  'Windows-10-16299': 'Windows 10 version 1709',
+  'Windows-10-17134': 'Windows 10 version 1803',
+  'Windows-10-17763': 'Windows 10 version 1809',
+  'Windows-10-18362': 'Windows 10 version 1903',
+  'Windows-Server-14393': 'Windows Server 2016',
+  'Windows-Server-17134': 'Windows Server version 1803',
+  'Windows-Server-17763': 'Windows Server 2019 or version 1809',
+  'Windows-Server-18362': 'Windows Server version 1903',
+}
+
 const aliasMap = {
   'device': DEVICE_ALIASES,
   'device_type': DEVICE_TYPE_ALIASES,
   'gpu': GPU_ALIASES,
+  'os': OS_ALIASES,
 };
 
 const oldStyle = /.+\((.+)\)/;

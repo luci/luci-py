@@ -242,7 +242,8 @@ describe('bot-list', function() {
                                       'link is pointing to the cannonical (0 ending) page');
             expect(cell(2, 1).innerHTML).toContain('title="Bot somebot12-a9 was last seen',
                                       'Mouseover with explanation');
-            expect(cell(2, 2)).toMatchTextContent('Windows-10-16299.431');
+            expect(cell(2, 2)).toMatchTextContent(
+                'Windows 10 version 1709 (Windows-10-16299.431)');
             expect(cell(2, 3).textContent).toContain('Dead');
             expect(cell(2, 3).textContent).toContain('Last seen 1w ago');
 
@@ -375,8 +376,11 @@ describe('bot-list', function() {
         const actualIDOrder = ele._bots.map((b) => b.bot_id);
 
         expect(actualOSOrder).toEqual(['Android', 'Ubuntu-17.04', 'Ubuntu-17.04', 'Ubuntu-17.04',
-          'Ubuntu-17.04', 'Ubuntu-17.04', 'Windows-10-16299.309', 'Windows-10-16299.309',
-          'Windows-10-16299.431', 'Windows-10-16299.431']);
+          'Ubuntu-17.04', 'Ubuntu-17.04',
+          'Windows 10 version 1709 (Windows-10-16299.309)',
+          'Windows 10 version 1709 (Windows-10-16299.309)',
+          'Windows 10 version 1709 (Windows-10-16299.431)',
+          'Windows 10 version 1709 (Windows-10-16299.431)']);
         expect(actualIDOrder).toEqual([
           'somebot11-a9', // Android
           'somebot77-a3', 'somebot15-a9', 'somebot13-a9', 'somebot13-a2', 'somebot10-a9', // Ubuntu in descending id
@@ -401,9 +405,13 @@ describe('bot-list', function() {
         const actualOSOrder = ele._bots.map((b) => column('os', b, ele));
         const actualIDOrder = ele._bots.map((b) => b.bot_id);
 
-        expect(actualOSOrder).toEqual(['Windows-10-16299.431', 'Windows-10-16299.431',
-          'Windows-10-16299.309', 'Windows-10-16299.309', 'Ubuntu-17.04', 'Ubuntu-17.04',
-          'Ubuntu-17.04', 'Ubuntu-17.04', 'Ubuntu-17.04', 'Android']);
+        expect(actualOSOrder).toEqual([
+          'Windows 10 version 1709 (Windows-10-16299.431)',
+          'Windows 10 version 1709 (Windows-10-16299.431)',
+          'Windows 10 version 1709 (Windows-10-16299.309)',
+          'Windows 10 version 1709 (Windows-10-16299.309)', 'Ubuntu-17.04',
+          'Ubuntu-17.04', 'Ubuntu-17.04', 'Ubuntu-17.04', 'Ubuntu-17.04',
+          'Android']);
         expect(actualIDOrder).toEqual([
           'somebot12-a9', 'somebot18-a9', // Win10.431
           'somebot16-a9', 'somebot17-a9', // Win10.309
