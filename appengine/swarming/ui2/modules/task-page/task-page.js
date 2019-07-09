@@ -1057,7 +1057,6 @@ window.customElements.define('task-page', class extends SwarmingAppBoilerplate {
     const newTask = {
       expiration_secs: this._request.expiration_secs,
       name: `leased to ${this.profile.email} for debugging`,
-      parent_task_id: this._request.parent_task_id,
       priority: 20,
       properties: this._currentSlice.properties,
       service_account: this._request.service_account,
