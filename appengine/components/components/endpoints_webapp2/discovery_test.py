@@ -318,7 +318,7 @@ class DiscoveryWebapp2TestCase(test_case.TestCase):
         'boolean': {
           'default': 'true',
           'location': 'path',
-          'type': 'string',
+          'type': 'boolean',
         },
         'integer': {
           'default': '2',
@@ -329,12 +329,12 @@ class DiscoveryWebapp2TestCase(test_case.TestCase):
         'repeated': {
           'location': 'query',
           'repeated': True,
-          'type': 'string',
+          'type': 'boolean',
         },
         'required': {
           'location': 'query',
           'required': True,
-          'type': 'string',
+          'type': 'boolean',
         },
         'string': {
           'location': 'path',
@@ -344,7 +344,7 @@ class DiscoveryWebapp2TestCase(test_case.TestCase):
           'default': '3',
           'format': 'int32',
           'location': 'query',
-          'type': 'string',
+          'type': 'integer',
         },
       },
     }

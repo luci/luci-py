@@ -215,13 +215,12 @@ def _get_parameters(message, path):
       schema['location'] = 'query'
       if schema.get('required'):
         order.append(parameter)
-    # Parameters must be strings because they're part of a URL string.
+    # Parameters have string defaults because they're part of a URL.
     if schema.get('default'):
       schema['default'] = str(schema['default'])
       # JSON bools are lowercase.
       if schema['type'] == 'boolean':
         schema['default'] = schema['default'].lower()
-    schema['type'] = 'string'
 
   document = {}
   if order:
