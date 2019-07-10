@@ -72,9 +72,11 @@ def get_settings(bot):
     #
     # The exact minimum free space can be calculated with:
     #   max(disk_size * 'min_percent', min('size', disk_size * 'max_percent'))
-    # where 'min_percent' and 'percent' are relative to the total partition
-    # size. Setting any value to 0 disables this setting. In practice, with the
-    # default values:
+    # where 'min_percent' and 'max_percent' are relative to the total partition
+    # size.
+    # Setting any value to 0 disables the check for that value.
+    # Setting all values to 0 disables the minimum free disk space check.
+    # In practice, with the default values:
     # - For disks <27GB this will be "disk_size * max_percent"
     # - For disks 27GB-80GB this will be 4GB
     # - For disks >80GB this will be "disk_size * min_percent"
