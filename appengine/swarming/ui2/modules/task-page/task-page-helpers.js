@@ -209,7 +209,7 @@ export function richLogsLink(ele) {
   if (logs && miloHost) {
     logs = logs.replace('logdog://', '');
     if (logs.indexOf(TASK_ID_PLACEHOLDER) !== -1) {
-      if (!ele._result) {
+      if (!ele._result || !ele._result.run_id) {
         return undefined;
       }
       logs = logs.replace(TASK_ID_PLACEHOLDER, ele._result.run_id);
@@ -217,7 +217,7 @@ export function richLogsLink(ele) {
     return miloHost.replace('%s', logs);
   }
   const displayTemplate = ele.server_details.display_server_url_template;
-  if (!displayTemplate) {
+  if (!displayTemplate || !ele._taskId) {
     return undefined;
   }
   return displayTemplate.replace('%s', ele._taskId);
