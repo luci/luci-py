@@ -231,18 +231,24 @@ def get_service_runtime(yaml_path):
   return m.group(1) if m else None
 
 
-def get_app_runtime(yaml_paths):
-  """Examines all app's yamls making sure they specify single runtime.
+def get_app_sdk(yaml_paths):
+  """Returns either PYTHON_GAE_SDK or GO_GAE_SDK depending on app runtime.
+
+  Examines all app's yamls making sure they can all be deployed with a single
+  SDK (since gae.py doesn't support using multiple SDKs).
 
   Raises:
-    ValueError if multiple (or unknown) runtimes are specified.
+    ValueError if multiple (or unknown) SDKs are required.
   """
-  runtimes = sorted(set(get_service_runtime(p) for p in yaml_paths))
-  if len(runtimes) != 1:
-    raise ValueError('Expecting single runtime, got %s' % ', '.join(runtimes))
-  if runtimes[0] not in RUNTIME_TO_SDK:
-    raise ValueError('Unknown runtime \'%s\' in %s' % (runtimes[0], yaml_paths))
-  return runtimes[0]
+  sdks = set()
+  for p in yaml_paths:
+    runtime = get_service_runtime(p)
+    if runtime not in RUNTIME_TO_SDK:
+      raise ValueError('Unknown runtime \'%s\' in %s' % (runtime, p))
+    sdks.add(RUNTIME_TO_SDK[runtime])
+  if len(sdks) != 1:
+    raise ValueError('Expecting single SDK, got %s' % ', '.join(sdks))
+  return list(sdks)[0]
 
 
 def setup_gae_sdk(sdk_path):
@@ -719,11 +725,11 @@ def process_sdk_options(parser, options):
   app_dir = os.path.abspath(options.app_dir)
 
   try:
-    runtime = get_app_runtime(find_app_yamls(app_dir))
+    app_sdk = get_app_sdk(find_app_yamls(app_dir))
   except (Error, ValueError) as exc:
     parser.error(str(exc))
 
-  sdk_path = options.sdk_path or find_gae_sdk(RUNTIME_TO_SDK[runtime], app_dir)
+  sdk_path = options.sdk_path or find_gae_sdk(app_sdk, app_dir)
   if not sdk_path:
     parser.error('Failed to find the AppEngine SDK. Pass --sdk-path argument.')
 
