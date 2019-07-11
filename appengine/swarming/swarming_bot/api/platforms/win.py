@@ -39,7 +39,7 @@ _WIN32_SERVER_NAMES = {
     u'6.1': u'2008ServerR2',
     u'6.2': u'2012Server',
     u'6.3': u'2012ServerR2',
-    u'10.0': u'2016Server',
+    u'10.0': u'Server',
 }
 
 
@@ -214,22 +214,49 @@ def get_os_version_number():
 
 @tools.cached
 def get_os_version_names():
-  """Returns the marketing name of the OS, without and with the service pack.
+  """Returns the marketing/user-friendly names of the OS.
 
-  On Windows 10, use the build number since there will be no service pack.
+  The return value contains the base marketing name, e.g. Vista, 10, or
+  2008Server. For Windows Server starting with 2016, this value is always
+  "Server".
+
+  For versions released before Windows 10, the return value also contains the
+  name with the service pack, e.g. 7-SP1 or 2012ServerR2-SP0.
+
+  For Windows 10 and Windows Server starting with 2016, the return value
+  includes "10-" or "Server-" followed by one or more parts of the build number.
+  E.g. for Windows 10 with build number 18362.207, the return value includes
+  10-18362, 10-18362.207. For Windows Server 2019 with build number 17763.557,
+  the return value includes Server-17763, Server-17763.557.
+
+  For backwards compatibility, for Windows Server starting with 2016, the return
+  value will also include "2016Server" and "2016Server-" followed by the full
+  build number. These values are deprecated and will be removed in the near
+  future. https://bugs.chromium.org/p/chromium/issues/detail?id=982893
   """
   # Python keeps a local map in platform.py and it is updated at newer python
   # release. Since our python release is a bit old, do not rely on it.
-  is_server = sys.getwindowsversion().product_type == 3
+  is_server = sys.getwindowsversion().product_type != 1
   lookup = _WIN32_SERVER_NAMES if is_server else _WIN32_CLIENT_NAMES
   version_number, build_number = _get_os_numbers()
   marketing_name = lookup.get(version_number, version_number)
   if version_number == u'10.0':
+    rv = [marketing_name]
     # Windows 10 doesn't have service packs, the build number now is the
-    # reference number.
-    return marketing_name, u'%s-%s' % (marketing_name, build_number)
+    # reference number. More discussion in
+    # https://docs.google.com/document/d/1iF1tbc1oedCQ9J6aL7sHeuaayY3bs52fuvKxvLLZ0ig
+    if '.' in build_number:
+      major_version = build_number.split(u'.')[0]
+      rv.append(u'%s-%s' % (marketing_name, major_version))
+    rv.append(u'%s-%s' % (marketing_name, build_number))
+    # Deprecated 2016Server dimension.
+    if is_server:
+      rv.append(u'2016Server')
+      rv.append(u'2016Server-%s' % build_number)
+    rv.sort()
+    return rv
   service_pack = platform.win32_ver()[2] or u'SP0'
-  return marketing_name, u'%s-%s' % (marketing_name, service_pack)
+  return [marketing_name, u'%s-%s' % (marketing_name, service_pack)]
 
 
 def get_startup_dir():
