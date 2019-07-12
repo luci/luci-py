@@ -300,6 +300,14 @@ class TaskESNotifyTasksHandler(webapp2.RequestHandler):
     external_scheduler.notify_request_now(es_host, request)
 
 
+class TaskESNotifyKickHandler(webapp2.RequestHandler):
+  """Kicks off the pull queue worker to batch the es-notifications."""
+
+  @decorators.require_taskqueue('es-notify-kick')
+  def post(self):
+    external_scheduler.task_batch_handle_notifications()
+
+
 class TaskNamedCachesPool(webapp2.RequestHandler):
   """Update named caches cache for a pool."""
 
@@ -422,6 +430,8 @@ def get_routes():
         TaskSendPubSubMessage),
     ('/internal/taskqueue/important/external_scheduler/notify-tasks',
         TaskESNotifyTasksHandler),
+    ('/internal/taskqueue/important/external_scheduler/notify-kick',
+         TaskESNotifyKickHandler),
     (r'/internal/taskqueue/important/named_cache/update-pool',
         TaskNamedCachesPool),
     (r'/internal/taskqueue/monitoring/bq/bots/events/'

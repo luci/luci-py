@@ -4,6 +4,8 @@
 
 """Helper functions for interacting with an external scheduler."""
 
+import collections
+import json
 import logging
 
 from components import utils
@@ -11,6 +13,7 @@ from components import datastore_utils
 
 from components.prpc import client
 
+from google.appengine.api import taskqueue
 from google.appengine.ext import ndb
 from google.protobuf import json_format
 
@@ -158,7 +161,8 @@ def assign_task(es_cfg, bot_dimensions):
   return resp.assignments[0].task_id, resp.assignments[0].slice_number
 
 
-def notify_requests(es_cfg, requests, use_tq, is_callback):
+# TODO(linxinan): Remove the default argument of batch_mode.
+def notify_requests(es_cfg, requests, use_tq, is_callback, batch_mode=False):
   """Calls external scheduler to notify it of a task state.
 
   Arguments:
@@ -173,6 +177,9 @@ def notify_requests(es_cfg, requests, use_tq, is_callback):
     - is_callback: If true, indicates that this notification was in response
                    to a external-scheduler-requested callback. This is for
                    diagnostic purposes.
+    - batch_mode: If true, the notifications will be sent in a batched mode
+                  along with others, to reduce traffic to external scheduler.
+                  Only valid when use_tq is true.
 
   Returns: Nothing.
   """
@@ -208,18 +215,36 @@ def notify_requests(es_cfg, requests, use_tq, is_callback):
 
   req.scheduler_id = es_cfg.id
 
-  if use_tq:
-    request_json = json_format.MessageToJson(req)
-    enqueued = utils.enqueue_task(
-        '/internal/taskqueue/important/external_scheduler/notify-tasks',
-        'es-notify-tasks',
-        params={'es_host': es_cfg.address, 'request_json': request_json},
-        transactional=ndb.in_transaction())
-    if not enqueued:
-      raise datastore_utils.CommitError('Failed to enqueue task')
-  else:
+  if not use_tq:
     # Ignore return value, the response proto is empty.
     notify_request_now(es_cfg.address, req)
+    return
+
+  request_json = json_format.MessageToJson(req)
+  if batch_mode:
+    payload = {'es_host': es_cfg.address, 'request_json': request_json}
+    req = taskqueue.Task(payload=json.dumps(payload), method='PULL')
+    if not req.add(queue_name='es-notify-tasks-batch',
+                   transactional=ndb.in_transaction()):
+      raise datastore_utils.CommitError('Failed to enqueue task')
+    stats = taskqueue.QueueStatistics.fetch('es-notify-kick')
+    # Add a kicker task if there are fewer than 10 minutes worth.
+    if stats.tasks < 600:
+      job_enqueued = utils.enqueue_task(
+          '/internal/taskqueue/important/external_scheduler/notify-kick',
+          'es-notify-kick',
+          transactional=ndb.in_transaction())
+      if not job_enqueued:
+        logging.info('Failed to add a notify-kick for request.')
+    return
+
+  enqueued = utils.enqueue_task(
+      '/internal/taskqueue/important/external_scheduler/notify-tasks',
+      'es-notify-tasks',
+      params={'es_host': es_cfg.address, 'request_json': request_json},
+      transactional=ndb.in_transaction())
+  if not enqueued:
+    raise datastore_utils.CommitError('Failed to enqueue task')
 
 
 def notify_request_now(es_host, proto):
@@ -231,6 +256,44 @@ def notify_request_now(es_host, proto):
   """
   c = _get_client(es_host)
   return c.NotifyTasks(proto, credentials=_creds())
+
+
+def task_batch_handle_notifications():
+  """Batches notifications from pull queue, and forwards to push queue."""
+
+  # Number of seconds to lease the tasks. Once it expires, the
+  # tasks will be available again for the next worker.
+  LEASE_SEC = 60
+  # The maximum number of tasks to lease from the pull queue.
+  MAX_TASKS = 1000
+  queue = taskqueue.Queue('es-notify-tasks-batch')
+  tasks = queue.lease_tasks(LEASE_SEC, MAX_TASKS)
+  if not tasks:
+    return
+  requests = {}
+  tasks_per_scheduler = collections.defaultdict(list)
+  for task in tasks:
+    proto = plugin_pb2.NotifyTasksRequest()
+    payload = json.loads(task.payload)
+    json_format.Parse(payload['request_json'], proto)
+    s_tuple = (proto.scheduler_id, payload['es_host'])
+    tasks_per_scheduler[s_tuple].append(task)
+    if s_tuple not in requests:
+      requests[s_tuple] = proto
+    else:
+      requests[s_tuple].notifications.extend(proto.notifications)
+
+  for s_id, address in requests:
+    request_json = json_format.MessageToJson(requests[s_id, address])
+    enqueued = utils.enqueue_task(
+        '/internal/taskqueue/important/external_scheduler/notify-tasks',
+        'es-notify-tasks',
+        params={'es_host': address, 'request_json': request_json},
+        transactional=ndb.in_transaction())
+    if not enqueued:
+      logging.warning('Failed to enqueue external scheduler task, skipping')
+      continue
+    queue.delete_tasks(tasks_per_scheduler[s_id, address])
 
 
 def get_cancellations(es_cfg):

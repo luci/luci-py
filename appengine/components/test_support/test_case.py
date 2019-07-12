@@ -144,6 +144,8 @@ class TestCase(auto_stub.TestCase):
       # Do multiple loops until no task was run.
       ran = 0
       for queue in self._taskqueue_stub.GetQueues():
+        if queue['mode'] == 'pull':
+          continue
         for task in self._taskqueue_stub.GetTasks(queue['name']):
           # Remove 2 seconds for jitter.
           eta = task['eta_usec'] / 1e6 - 2
