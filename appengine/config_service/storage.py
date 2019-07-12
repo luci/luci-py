@@ -36,7 +36,7 @@ class Blob(ndb.Model):
     Blob has no parent.
   """
   created_ts = ndb.DateTimeProperty(auto_now_add=True)
-  content = ndb.BlobProperty(required=True)
+  content = ndb.BlobProperty(required=True, compressed=True)
 
 
 class ConfigSet(ndb.Model):
