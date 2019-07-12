@@ -74,7 +74,7 @@ const statusAndTask = (ele, bot) => {
           ?hidden=${bot.is_dead}
           ?disabled=${!ele.permissions.terminate_bot}
           @click=${ele._promptShutdown}>
-      Shut down gracefully
+      Stop the bot gracefully
     </button>
     <button class='delete ${bot.is_dead && !bot.deleted ? '' : 'hidden'}'
           ?disabled=${!ele.permissions.delete_bot}
