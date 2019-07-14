@@ -748,8 +748,8 @@ window.customElements.define('bot-list', class extends SwarmingAppBoilerplate {
     // So, anytime we trigger a scroll, we increment a counter and have
     // the scroll listener ignore that many events - if it hears any more
     // then the human must have scrolled.
-    if (this._primaryKey && !this._humanScrolledKeys) {
-      const keySelector = $$('.keys.selector', this);
+    const keySelector = $$('.keys.selector', this);
+    if (this._primaryKey && !this._humanScrolledKeys && keySelector) {
       const selectedKey = $$('.item[selected]', keySelector);
 
       if (selectedKey) {
