@@ -4,14 +4,11 @@
 
 """Wrapper around urlfetch to call REST API with service account credentials."""
 
-import base64
 import json
 import logging
-import datetime
 import urllib
 import urlparse
 
-from google.appengine.api import app_identity
 from google.appengine.api import urlfetch
 from google.appengine.ext import ndb
 from google.appengine.runtime import apiproxy_errors
@@ -19,6 +16,7 @@ from google.appengine.runtime import apiproxy_errors
 from components import auth
 from components import utils
 from components.auth import delegation
+from components.auth import tokens
 
 
 EMAIL_SCOPE = 'https://www.googleapis.com/auth/userinfo.email'
@@ -73,35 +71,6 @@ def _error_class_for_status(status_code):
   if status_code in (401, 403):
     return AuthError
   return Error
-
-
-def _sign_jwt_headers(audience):
-  now = int((datetime.datetime.utcnow() -
-             datetime.datetime.utcfromtimestamp(0)).total_seconds())
-  encoded_header = base64.urlsafe_b64encode(
-      json.dumps({
-          # We hard-encode the algorithm here, since we're relying on the App
-          # Engine SDK's signing algorithm.
-          'alg': 'RS256',
-          'typ': 'JWT',
-      }))
-  sa_email = app_identity.get_service_account_name()
-  encoded_claim = base64.urlsafe_b64encode(
-      json.dumps({
-          'aud': audience,
-          'email': sa_email,
-          'exp': now + 3600,
-          'iat': now,
-          'iss': sa_email,
-          'sub': sa_email,
-      }))
-  payload = '.'.join((encoded_header, encoded_claim))
-  encoded_signature = base64.urlsafe_b64encode(
-      app_identity.sign_blob(payload)[1])
-  return {
-      'Authorization':
-          'Bearer {}'.format('.'.join((payload, encoded_signature)))
-  }
 
 
 @ndb.tasklet
@@ -190,7 +159,8 @@ def request_async(
     headers[delegation.HTTP_HEADER] = delegation_token
 
   if use_jwt_auth:
-    headers.update(_sign_jwt_headers(audience or ''))
+    # TODO(vadimsh): Cache the token for its validity duration.
+    headers['Authorization'] = 'Bearer %s' % tokens.sign_jwt(aud=audience or '')
 
   if payload is not None:
     assert isinstance(payload, str), type(payload)

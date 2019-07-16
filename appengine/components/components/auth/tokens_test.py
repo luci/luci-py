@@ -12,6 +12,8 @@ import unittest
 from test_support import test_env
 test_env.setup_test_env()
 
+from google.appengine.api import app_identity
+
 from components import utils
 from components.auth import api
 from components.auth import signature
@@ -383,6 +385,38 @@ class TestToken(test_case.TestCase):
 
 def to_json_b64(d):
   return tokens.base64_encode(json.dumps(d, sort_keys=True))
+
+
+class TestSignJWT(test_case.TestCase):
+  NOW = datetime.datetime(2018, 1, 1, 1, 1, 1)
+
+  def setUp(self):
+    super(TestSignJWT, self).setUp()
+    self.mock_now(self.NOW)
+    self.mock(utils, 'get_service_account_name', lambda: 'a@example.com')
+    self.signed = []
+    def sign_blob_mock(blob):
+      self.signed.append(blob)
+      return 'key_id', 'signature'
+    self.mock(app_identity, 'sign_blob', sign_blob_mock)
+
+  def test_works(self):
+    # Note: we can't use verify_jwt in this test because tokens produced by
+    # sign_jwt do not have 'kid' header field which is required by verify_jwt.
+    expected_hdr = tokens.base64_encode('{"alg":"RS256","typ":"JWT"}')
+    expected_claims = tokens.base64_encode(utils.encode_to_json({
+        'aud': 'some audience',
+        'email': 'a@example.com',
+        'exp': 1514772061,  # matches NOW+1h
+        'iat': 1514768461,  # matches NOW
+        'iss': 'a@example.com',
+        'sub': 'a@example.com',
+    }))
+    expected_sig = tokens.base64_encode('signature')
+    self.assertEqual(
+        tokens.sign_jwt(u'some audience'),
+        '.'.join((expected_hdr, expected_claims, expected_sig)))
+    self.assertEqual(self.signed[0], '.'.join((expected_hdr, expected_claims)))
 
 
 class TestVerifyJWT(test_case.TestCase):

@@ -10,6 +10,8 @@ import hmac
 import json
 import time
 
+from google.appengine.api import app_identity
+
 from components import utils
 
 from . import api
@@ -19,6 +21,7 @@ __all__ = [
   'InvalidTokenError',
   'InvalidSignatureError',
   'TokenKind',
+  'sign_jwt',
   'verify_jwt',
 ]
 
@@ -377,6 +380,31 @@ def decode_token(algo, token, possible_secrets, message):
   # At least one secret key should match.
   raise InvalidTokenError(
       'Bad token MAC; now=%d; data=%s' % (time.time(), public))
+
+
+# We can produce only RS256 JWTs, since we're relying on Cloud APIs to do the
+# signing they support only RS256.
+_jwt_header_b64 = base64_encode('{"alg":"RS256","typ":"JWT"}')
+
+
+def sign_jwt(aud):
+  """Produces a JWT signed with app's service account key."""
+  now = int(utils.time_time())
+  issuer = utils.get_service_account_name()
+  claims = {
+      'email': issuer,
+      'exp': now + 3600,
+      'iat': now,
+      'iss': issuer,
+      'sub': issuer,
+  }
+  if aud:
+    claims['aud'] = aud
+  claims_b64 = base64_encode(utils.encode_to_json(claims))
+  payload = '.'.join((_jwt_header_b64, claims_b64))
+  # TODO(vadimsh): Use sign_jwt RPC to get JWT header with 'kid' populated.
+  _, sig = app_identity.sign_blob(payload)
+  return '.'.join((payload, base64_encode(sig)))
 
 
 def verify_jwt(jwt, bundle):
