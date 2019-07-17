@@ -389,7 +389,7 @@ class ValidationTestCase(test_case.TestCase):
         'content': cfg_b64,
       },
       scopes=net.EMAIL_SCOPE,
-      use_jwt_auth=None,
+      use_jwt_auth=False,
       audience=None,
     )
     net.json_request_async.assert_any_call(
@@ -401,7 +401,7 @@ class ValidationTestCase(test_case.TestCase):
         'content': cfg_b64,
       },
       scopes=net.EMAIL_SCOPE,
-      use_jwt_auth=None,
+      use_jwt_auth=False,
       audience=None,
     )
 
@@ -425,7 +425,7 @@ class ValidationTestCase(test_case.TestCase):
         'content': cfg_b64,
       },
       scopes=net.EMAIL_SCOPE,
-      use_jwt_auth=None,
+      use_jwt_auth=False,
       audience=None,
     )
     net.json_request_async.assert_any_call(
@@ -437,7 +437,7 @@ class ValidationTestCase(test_case.TestCase):
         'content': cfg_b64,
       },
       scopes=net.EMAIL_SCOPE,
-      use_jwt_auth=None,
+      use_jwt_auth=False,
       audience=None,
     )
 

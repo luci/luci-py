@@ -22,10 +22,6 @@ class DynamicMetadataError(Exception):
   """Raised when a service metadata endpoint response is bad."""
 
 
-class ServiceNotFoundError(Exception):
-  """Raised when a service is not found."""
-
-
 @ndb.tasklet
 def get_services_async():
   """Returns a list of registered luci services.
@@ -59,40 +55,40 @@ def _dict_to_dynamic_metadata(data):
 
 @ndb.tasklet
 def get_metadata_async(service_id):
-  """Returns service dynamic metadata.
+  """Returns service_config_pb2.ServiceDynamicMetadata for a service.
 
   Raises:
-    ServiceNotFoundError if service |service_id| is not found.
-    DynamicMetadataError if metadata endpoint response is bad.
+    DynamicMetadataError if metadata is not available or no such service.
   """
   entity = yield storage.ServiceDynamicMetadata.get_by_id_async(service_id)
-  if entity:
-    msg = service_config_pb2.ServiceDynamicMetadata()
-    if entity.metadata:
-      msg.ParseFromString(entity.metadata)
-    raise ndb.Return(msg)
-
-  #TODO(myjang): delete the rest of the function once entities in production
-  services = yield get_services_async()
-  service = None
-  for s in services:
-    if s.id == service_id:
-      service = s
-  if service is None:
-    raise ServiceNotFoundError('Service "%s" not found', service_id)
-
-  if not service.metadata_url:
-    raise ndb.Return(service_config_pb2.ServiceDynamicMetadata())
-  try:
-    res = yield net.json_request_async(
-        service.metadata_url,
-        scopes=None if service.HasField('jwt_auth') else net.EMAIL_SCOPE,
-        use_jwt_auth=service.HasField('jwt_auth') or None,
-        audience=service.jwt_auth.audience or None)
-  except net.Error as ex:
-    raise DynamicMetadataError('Net error: %s' % ex.message)
-  msg = _dict_to_dynamic_metadata(res)
+  if not entity:
+    raise DynamicMetadataError('No dynamic metadata for "%s"' % service_id)
+  msg = service_config_pb2.ServiceDynamicMetadata()
+  if entity.metadata:
+    msg.ParseFromString(entity.metadata)
   raise ndb.Return(msg)
+
+
+def call_service_async(service, url, method='GET', payload=None):
+  """Sends JSON RPC request to a service, with authentication.
+
+  Args:
+    service: service_config_pb2.Service message.
+    url: full URL to send the request to.
+    method: HTTP method to use.
+    payload: JSON-serializable body to send in PUT/POST requests.
+
+  Returns:
+    Deserialized JSON response.
+
+  Raises:
+    net.Error on errors.
+  """
+  return net.json_request_async(
+      url, method=method, payload=payload,
+      scopes=None if service.HasField('jwt_auth') else net.EMAIL_SCOPE,
+      use_jwt_auth=service.HasField('jwt_auth'),
+      audience=service.jwt_auth.audience or None)
 
 
 @ndb.tasklet
@@ -100,8 +96,7 @@ def _update_service_metadata_async(service):
   entity = storage.ServiceDynamicMetadata(id=service.id)
   if service.metadata_url:
     try:
-      res = yield net.json_request_async(
-          service.metadata_url, scopes=net.EMAIL_SCOPE)
+      res = yield call_service_async(service, service.metadata_url)
     except net.Error as ex:
       raise DynamicMetadataError('Net error: %s' % ex.message)
     entity.metadata = _dict_to_dynamic_metadata(res).SerializeToString()
