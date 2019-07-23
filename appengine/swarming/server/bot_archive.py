@@ -335,6 +335,8 @@ FILES = (
     'third_party/rsa/rsa/transform.py',
     'third_party/rsa/rsa/util.py',
     'third_party/rsa/rsa/varblock.py',
+    'third_party/scandir/__init__.py',
+    'third_party/scandir/scandir.py',
     'third_party/six/__init__.py',
     'third_party/uritemplate/__init__.py',
     'third_party/urllib3/__init__.py',
