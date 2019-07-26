@@ -1373,7 +1373,6 @@ time.sleep(${leaseDuration})`];
     const newTask = {
       expiration_secs: this._request.expiration_secs,
       name: this._request.name + ' (retry)',
-      parent_task_id: this._request.parent_task_id,
       priority: this._request.priority,
       properties: this._currentSlice.properties,
       service_account: this._request.service_account,
