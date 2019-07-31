@@ -1030,6 +1030,9 @@ def get_dimensions():
     vs_versions = platforms.win.get_visual_studio_versions()
     if vs_versions:
       dimensions[u'visual_studio_version'] = vs_versions
+    windows_client_versions = platforms.win.get_client_versions()
+    if windows_client_versions:
+      dimensions[u'windows_client_version'] = windows_client_versions
 
   return dimensions
 

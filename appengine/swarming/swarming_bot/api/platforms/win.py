@@ -213,6 +213,20 @@ def get_os_version_number():
 
 
 @tools.cached
+def get_client_versions():
+  """Gets the client versions (or client equivalent for server).
+
+  Returns:
+    A list of client versions (or client equivalent for server).
+    E.g. '10' for Windows 10 and Windows Server 2016.
+  """
+  version_nubmer = get_os_version_number()
+  if version_nubmer in _WIN32_CLIENT_NAMES:
+    return [_WIN32_CLIENT_NAMES[version_nubmer]]
+  return []
+
+
+@tools.cached
 def get_os_version_names():
   """Returns the marketing/user-friendly names of the OS.
 

@@ -135,6 +135,8 @@ class TestOsUtilities(auto_stub.TestCase):
     actual.discard(u'cpu_governor')
     # Only set on Windows machines.
     actual.discard(u'visual_studio_version')
+    # Only set on Windows machines.
+    actual.discard(u'windows_client_version')
 
     expected = {
         u'cores', u'cpu', u'gce', u'gpu', u'id', u'os', u'pool', u'python'}

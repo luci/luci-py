@@ -70,6 +70,29 @@ class TestWin(auto_stub.TestCase):
     self.assertEqual(expected_version_names, names)
     self.assertTrue(isinstance(name, unicode) for name in names)
 
+  def test_get_client_versions(self):
+    if sys.platform != 'win32':
+      return
+    marketing_name_client_ver_map = {
+      u'Server': u'10',
+      u'2012ServerR2': u'8.1',
+      u'2012Server': u'8',
+      u'2008ServerR2': u'7',
+      u'2008Server': u'Vista',
+      u'2003Server': u'XP',
+      u'10': u'10',
+      u'8.1': u'8.1',
+      u'8': u'8',
+      u'7': u'7',
+      u'Vista': u'Vista',
+      u'XP': u'XP',
+      u'2000': u'2000',
+    }
+    marketing_name = win.get_os_version_names()[0]
+    client_ver = win.get_client_versions()
+    self.assertEqual(
+      [marketing_name_client_ver_map[marketing_name]], client_ver)
+
   def test_get_os_dims_mock_win10(self):
     self.assert_get_os_dims_mock(
         1,
