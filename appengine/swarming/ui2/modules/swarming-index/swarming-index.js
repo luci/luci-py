@@ -26,7 +26,7 @@ import '../swarming-app'
 
 // Don't use html for a straight string template, otherwise, it shows up
 // as [object Object] when used as the href attribute.
-const instancesURL = (ele) => `https://console.cloud.google.com/appengine/instances`+
+const instancesURL = (ele) => `https://console.cloud.google.com/appengine/instances?`+
     `project=${ele._project_id}&versionId=${ele.server_details.server_version}`;
 
 const errorsURL = (project_id) =>
