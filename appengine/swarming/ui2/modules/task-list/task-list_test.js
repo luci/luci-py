@@ -17,7 +17,6 @@ describe('task-list', function() {
   const { column, filterTasks, getColHeader, listQueryParams, processTasks } = require('modules/task-list/task-list-helpers');
   const { tasks_20 } = require('modules/task-list/test_data');
   const { fleetDimensions } = require('modules/bot-list/test_data');
-
   beforeEach(function() {
     jasmine.addMatchers(customMatchers);
     // Clear out any query params we might have to not mess with our current state.
@@ -52,12 +51,13 @@ describe('task-list', function() {
   afterEach(function() {
     container.innerHTML = '';
   });
-
+  const now = Date.UTC(2018, 11, 19, 16, 46, 22, 1234);
+  const yesterday = new Date(now-24*60*60*1000);
   beforeEach(function() {
     // Fix the time so all of our relative dates work.
     // Note, this turns off the default behavior of setTimeout and related.
     jasmine.clock().install();
-    jasmine.clock().mockDate(new Date(Date.UTC(2018, 11, 19, 16, 46, 22, 1234)));
+    jasmine.clock().mockDate(new Date(now));
   });
 
   afterEach(function() {
@@ -253,18 +253,28 @@ describe('task-list', function() {
             done();
           });
         });
-
+        // TruncateToMinute passes either a string or date
+        // date constructor, sets seconds/mills to 0, and
+        // returns an int that's seconds since the epoch.
+        const TruncateToMinute = function(date) {
+          const value = new Date(date);
+          value.setSeconds(0);
+          value.setMilliseconds(0);
+          return value.getTime()/1000;
+        }
         it('supplies past 24 hours for the time pickers', function(done) {
           loggedInTasklist((ele) => {
             const start = $$('#start_time', ele);
             expect(start).toBeTruthy();
             expect(start.disabled).toBeFalsy();
-            expect(start.value).toBe('2018-12-18 11:46', '(start time is 24 hours ago)');
+            expect(TruncateToMinute(start.value)).toBe(
+                TruncateToMinute(yesterday), '(start time is 24 hours ago)');
 
             const end = $$('#end_time', ele);
             expect(end).toBeTruthy();
             expect(end.disabled).toBeTruthy();
-            expect(end.value).toBe('2018-12-19 11:46', '(end time is now)');
+            expect(TruncateToMinute(end.value)).toBe(
+                TruncateToMinute(now), '(end time is now)');
 
             const checkbox = $$('.picker checkbox-sk', ele);
             expect(checkbox).toBeTruthy();
