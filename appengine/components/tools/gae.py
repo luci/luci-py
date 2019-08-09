@@ -237,7 +237,7 @@ def CMDshell(parser, args):
   elif args:
     parser.error('Unknown args: %s' % args)
 
-  if service not in app.service:
+  if service not in app.services:
     parser.error('No such service: %s' % service)
 
   if not options.host and not options.local:
