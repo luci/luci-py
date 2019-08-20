@@ -4,7 +4,10 @@
 
 """Helpers for managing AuthDB dump in Google Cloud Storage."""
 
+import binascii
 import logging
+import os
+import StringIO
 
 from google.appengine.ext import ndb
 
@@ -151,18 +154,19 @@ def _upload_file(path, data, content_type, readers):
   Raises:
     Error if Google Storage writes fail.
   """
-  del readers  # not used yet
-
-  # See https://cloud.google.com/storage/docs/json_api/v1/how-tos/simple-upload.
+  # We upload both metadata and body in a single request, see:
+  # https://cloud.google.com/storage/docs/json_api/v1/how-tos/multipart-upload.
   bucket, name = path.split('/', 1)
+  payload, boundary = _multipart_payload(
+      data, content_type,
+      {'name': name, 'acl': _gcs_acls(readers)})
   try:
-    # TODO(vadimsh): Set ACLs based on 'readers'.
     net.request(
         url='https://www.googleapis.com/upload/storage/v1/b/%s/o' % bucket,
         method='POST',
-        payload=data,
-        params={'uploadType': 'media', 'name': name},
-        headers={'Content-Type': content_type},
+        payload=payload,
+        params={'uploadType': 'multipart'},
+        headers={'Content-Type': 'multipart/related; boundary=%s' % boundary},
         scopes=['https://www.googleapis.com/auth/cloud-platform'],
         deadline=30)
   except net.Error as exc:
@@ -175,3 +179,51 @@ def _update_gcs_acls():
   Can be mocked in tests.
   """
   # TODO(vadimsh): Implement.
+
+
+def _gcs_acls(readers):
+  """Returns a list with objectAccessControls dicts.
+
+  Args:
+    readers: list of emails that should have read access.
+  """
+  return [{'entity': 'user-%s' % r, 'role': 'READER'} for r in readers]
+
+
+def _multipart_payload(body, content_type, metadata):
+  """Generates a body for multipart/related upload request to GCS.
+
+  Such request encodes both file body and its metadata.
+  See https://cloud.google.com/storage/docs/json_api/v1/how-tos/multipart-upload
+
+  Args:
+    body: raw object body to upload.
+    content_type: its content type.
+    metadata: dict with GCS metadata (e.g. ACLs) to put into the request.
+
+  Returns:
+    (Blob with the request, random boundary string).
+  """
+  parts = [
+      ('application/json; charset=UTF-8', utils.encode_to_json(metadata)),
+      (content_type, body),
+  ]
+
+  boundary = _multipart_payload_boundary()
+
+  buf = StringIO.StringIO()
+  for ct, payload in parts:
+    assert boundary not in payload
+    buf.write('--%s\r\n' % boundary)
+    buf.write('Content-Type: %s\r\n' % ct)
+    buf.write('\r\n')
+    buf.write(payload)
+    buf.write('\r\n')
+  buf.write('--%s--\r\n' % boundary)
+
+  return buf.getvalue(), boundary
+
+
+def _multipart_payload_boundary():
+  """Mocked in tests."""
+  return binascii.hexlify(os.urandom(20))
