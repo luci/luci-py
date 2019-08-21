@@ -20,6 +20,15 @@ import acl
 import config
 
 
+# Object ACLs can have at most 100 entries. We limit them to 80 to have some
+# breathing room before the hard limit is reached. When this happens, either
+# some old services should be deauthorized or GCS ACL management reimplemented
+# in some different way.
+#
+# See https://cloud.google.com/storage/quotas.
+_MAX_ACL_ENTRIES = 80
+
+
 class Error(Exception):
   """Raised on fatal errors when calling Google Storage."""
 
@@ -30,11 +39,24 @@ def is_authorized_reader(email):
 
 
 def authorize_reader(email):
-  """Allows the given user to fetch AuthDB Google Storage file."""
-  reader = AuthDBReader(
-      key=_auth_db_reader_key(email),
-      authorized_at=utils.utcnow())
-  reader.put()
+  """Allows the given user to fetch AuthDB Google Storage file.
+
+  Raises:
+    Error if reached GCS ACL entries limit or GCS call fails.
+  """
+  @ndb.transactional
+  def add_if_necessary():
+    readers = _list_authorized_readers()
+    if email in readers:
+      return
+    if len(readers) >= _MAX_ACL_ENTRIES:
+      raise Error('Reached the soft limit on GCS ACL entries')
+    reader = AuthDBReader(
+        key=_auth_db_reader_key(email),
+        authorized_at=utils.utcnow())
+    reader.put()
+
+  add_if_necessary()
   _update_gcs_acls()
 
 

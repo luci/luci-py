@@ -67,6 +67,22 @@ class GCSTest(test_case.TestCase):
     gcs.deauthorize_reader(email)
     self.assertFalse(gcs.is_authorized_reader(email))
 
+  def test_max_acl_entries_limit(self):
+    self.mock_update_gcs_acls()
+
+    # Fill up to the limit.
+    for i in range(gcs._MAX_ACL_ENTRIES):
+      self.expect_update_gcs_acls()
+      gcs.authorize_reader('%d@example.com' % i)
+
+    # Readding already existing entry is fine.
+    self.expect_update_gcs_acls()
+    gcs.authorize_reader('0@example.com')
+
+    # Adding a new one is not fine.
+    with self.assertRaises(gcs.Error):
+      gcs.authorize_reader('more@example.com')
+
   def test_revoke_stale_authorization(self):
     self.mock_update_gcs_acls()
 
