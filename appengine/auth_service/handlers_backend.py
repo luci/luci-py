@@ -16,6 +16,12 @@ import pubsub
 import replication
 
 
+class InternalRefreshReplicatedAuthDBCronHandler(webapp2.RequestHandler):
+  @decorators.require_cronjob
+  def get(self):
+    replication.refresh_replicated_authdb()
+
+
 class InternalRevokePubSubAuthCronHandler(webapp2.RequestHandler):
   @decorators.require_cronjob
   def get(self):
@@ -48,6 +54,9 @@ def get_routes():
   routes.extend(change_log.get_backend_routes())
   # Auth service's own routes.
   routes.extend([
+    webapp2.Route(
+        r'/internal/cron/refresh_replicated_authdb',
+        InternalRefreshReplicatedAuthDBCronHandler),
     webapp2.Route(
         r'/internal/cron/revoke_stale_pubsub_auth',
         InternalRevokePubSubAuthCronHandler),

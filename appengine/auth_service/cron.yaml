@@ -9,6 +9,11 @@ cron:
   url: /internal/cron/import_groups
   schedule: every 15 minutes
 
+- description: refresh replicated authdb if it is more than 1d old
+  target: backend
+  url: /internal/cron/refresh_replicated_authdb
+  schedule: every 1 hours
+
 - description: revoke stale pubsub authorization
   target: backend
   url: /internal/cron/revoke_stale_pubsub_auth

@@ -5,6 +5,7 @@
 """Primary side of Primary <-> Replica protocol."""
 
 import base64
+import datetime
 import hashlib
 import logging
 import zlib
@@ -183,6 +184,41 @@ def register_replica(app_id, replica_url):
       replica_url=replica_url)
   ent.put()
   trigger_replication()
+
+
+def refresh_replicated_authdb():
+  """Triggers AuthDB replication mechanism if it hasn't been done in last 24h.
+
+  Called periodically as a cron job. If it detects that the last AuthDB revision
+  was produced more than 24h ago, bumps AuthDB revision number and triggers
+  the replication mechanism (actual contents of AuthDB is not changed).
+
+  This is important for low traffic servers to make sure the AuthDB replication
+  configuration doesn't rot and that the exported AuthDB blob has a relatively
+  fresh signature.
+
+  Effectively noop for busy servers: AuthDB replication mechanism is triggered
+  naturally for them as part of normal AuthDB updates, so AuthDB is never stale.
+  """
+  AUTHDB_MAX_AGE = datetime.timedelta(hours=24)
+
+  state = model.get_replication_state()
+  if not state:
+    logging.warning('AuthDB is not initialized yet')
+    return
+
+  age = utils.utcnow() - state.modified_ts
+  if age < AUTHDB_MAX_AGE:
+    logging.info('Replicated AuthDB is fresh: %s < %s', age, AUTHDB_MAX_AGE)
+    return
+  logging.warning('Refreshing replicated AuthDB: %s > %s', age, AUTHDB_MAX_AGE)
+
+  @ndb.transactional
+  def trigger():
+    cur = model.get_replication_state()
+    if cur.auth_db_rev == state.auth_db_rev:
+      model.replicate_auth_db()
+  trigger()
 
 
 def trigger_replication(auth_db_rev=None, transactional=False):
