@@ -8,6 +8,7 @@ import binascii
 import logging
 import os
 import StringIO
+import urllib
 
 from google.appengine.ext import ndb
 
@@ -139,6 +140,23 @@ def _list_authorized_readers():
   return sorted(key.id() for key in q.fetch(keys_only=True))
 
 
+def _update_gcs_acls():
+  """Changes ACLs of existing GCS files to match what's in AuthDBReader list.
+
+  Very similar to upload_auth_db, except instead of creating new files, just
+  updates ACLs of existing ones.
+
+  Can be mocked in tests.
+  """
+  gs_path = config.get_settings().auth_db_gs_path
+  if not gs_path:
+    return
+  assert not gs_path.endswith('/'), gs_path
+  readers = _list_authorized_readers()
+  _set_gcs_acl(gs_path+'/latest.db', readers)
+  _set_gcs_acl(gs_path+'/latest.json', readers)
+
+
 def _upload_file(path, data, content_type, readers):
   """Overwrites a file in GCS, makes it readable to all authorized readers.
 
@@ -173,12 +191,28 @@ def _upload_file(path, data, content_type, readers):
     raise Error(str(exc))
 
 
-def _update_gcs_acls():
-  """Changes ACLs of existing GCS files to match what's in AuthDBReader list.
+def _set_gcs_acl(path, readers):
+  """Overwrites file ACLs in GCS.
 
-  Can be mocked in tests.
+  Args:
+    path: "<bucket>/<object>" string.
+    readers: list of emails that should have read access to the file.
+
+  Raises:
+    Error if Google Storage update fails.
   """
-  # TODO(vadimsh): Implement.
+  bucket, name = path.split('/', 1)
+  try:
+    net.request(
+        url='https://www.googleapis.com/storage/v1/b/%s/o/%s' % (
+            bucket, urllib.quote(name, safe='')),
+        method='PUT',
+        payload=utils.encode_to_json({'acl': _gcs_acls(readers)}),
+        headers={'Content-Type': 'application/json; charset=UTF-8'},
+        scopes=['https://www.googleapis.com/auth/cloud-platform'],
+        deadline=30)
+  except net.Error as exc:
+    raise Error(str(exc))
 
 
 def _gcs_acls(readers):

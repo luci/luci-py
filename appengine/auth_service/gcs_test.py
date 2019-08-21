@@ -25,10 +25,6 @@ class GCSTest(test_case.TestCase):
     super(GCSTest, self).setUp()
 
     self.expected_update_calls = 0
-    def _update_gcs_acls():
-      self.assertGreater(self.expected_update_calls, 0)
-      self.expected_update_calls -= 1
-    self.mock(gcs, '_update_gcs_acls', _update_gcs_acls)
 
     self.requests = []
     def _net_request(**kwargs):
@@ -43,6 +39,12 @@ class GCSTest(test_case.TestCase):
     finally:
       super(GCSTest, self).tearDown()
 
+  def mock_update_gcs_acls(self):
+    def _update_gcs_acls():
+      self.assertGreater(self.expected_update_calls, 0)
+      self.expected_update_calls -= 1
+    self.mock(gcs, '_update_gcs_acls', _update_gcs_acls)
+
   def expect_update_gcs_acls(self):
     self.expected_update_calls += 1
 
@@ -50,6 +52,8 @@ class GCSTest(test_case.TestCase):
     self.mock(config, 'get_settings', lambda: config_pb2.SettingsCfg(**kwargs))
 
   def test_authorize_and_deauthorize(self):
+    self.mock_update_gcs_acls()
+
     email = 'a@example.com'
 
     # Add.
@@ -64,6 +68,8 @@ class GCSTest(test_case.TestCase):
     self.assertFalse(gcs.is_authorized_reader(email))
 
   def test_revoke_stale_authorization(self):
+    self.mock_update_gcs_acls()
+
     emails = ['a@example.com', 'b@example.com', 'keep@example.com']
     for email in emails:
       self.expect_update_gcs_acls()
@@ -79,6 +85,7 @@ class GCSTest(test_case.TestCase):
     self.assertEqual(['keep@example.com'], gcs._list_authorized_readers())
 
   def test_upload_auth_db(self):
+    self.mock_update_gcs_acls()
     self.mock_config(auth_db_gs_path='bucket/dir')
     self.assertTrue(gcs.is_upload_enabled())
 
@@ -134,6 +141,32 @@ class GCSTest(test_case.TestCase):
         ]),
         'scopes': ['https://www.googleapis.com/auth/cloud-platform'],
         'url': u'https://www.googleapis.com/upload/storage/v1/b/bucket/o',
+    }, self.requests[1])
+
+  def test_update_gcs_acls(self):
+    self.mock_config(auth_db_gs_path='bucket/dir')
+    self.assertTrue(gcs.is_upload_enabled())
+
+    gcs.authorize_reader('a@example.com')
+
+    self.assertEqual(2, len(self.requests))
+    self.assertEqual({
+        'deadline': 30,
+        'headers': {'Content-Type': 'application/json; charset=UTF-8'},
+        'method': 'PUT',
+        'payload': '{"acl":[{"entity":"user-a@example.com","role":"READER"}]}',
+        'scopes': ['https://www.googleapis.com/auth/cloud-platform'],
+        'url': u'https://www.googleapis.com/storage/v1/b/bucket/'
+            + 'o/dir%2Flatest.db',
+    }, self.requests[0])
+    self.assertEqual({
+        'deadline': 30,
+        'headers': {'Content-Type': 'application/json; charset=UTF-8'},
+        'method': 'PUT',
+        'payload': '{"acl":[{"entity":"user-a@example.com","role":"READER"}]}',
+        'scopes': ['https://www.googleapis.com/auth/cloud-platform'],
+        'url': u'https://www.googleapis.com/storage/v1/b/bucket/'
+            + 'o/dir%2Flatest.json',
     }, self.requests[1])
 
 
