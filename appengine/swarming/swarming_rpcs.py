@@ -506,6 +506,10 @@ class NewTaskRequest(messages.Message):
   pool_task_template = messages.EnumField(
       PoolTaskTemplateField, 14, default='AUTO')
 
+  # Maximum delay between bot pings before the bot is considered dead
+  # while running a task.
+  bot_ping_tolerance_secs = messages.IntegerField(15)
+
 
 class TaskRequest(messages.Message):
   """Description of a task request as registered by the server.
@@ -533,6 +537,7 @@ class TaskRequest(messages.Message):
 
   pubsub_topic = messages.StringField(11)
   pubsub_userdata = messages.StringField(12)
+  bot_ping_tolerance_secs = messages.IntegerField(14)
 
 
 class TaskCancelRequest(messages.Message):

@@ -69,6 +69,7 @@ def _gen_request_slice(**kwargs):
       task_request.TaskSlice(expiration_secs=60, properties=_gen_properties()),
     ],
     'user': 'Jesus',
+    'bot_ping_tolerance_secs': 120,
   }
   args.update(kwargs)
   ret = task_request.TaskRequest(**args)
@@ -107,6 +108,8 @@ def _gen_run_result(**kwargs):
       request, to_run, 'localhost', 'abc', {})
   run_result.started_ts = result_summary.modified_ts
   run_result.modified_ts = utils.utcnow()
+  run_result.dead_after_ts = utils.utcnow() + datetime.timedelta(
+      seconds=request.bot_ping_tolerance_secs)
   ndb.transaction(
       lambda: result_summary.set_from_run_result(run_result, request))
   ndb.transaction(lambda: ndb.put_multi((result_summary, run_result)))
@@ -195,6 +198,7 @@ class TaskResultApiTest(TestCase):
       'completed_ts': None,
       'cost_usd': 0.,
       'current_task_slice': 0,
+      'dead_after_ts': None,
       'duration': None,
       'exit_code': None,
       'failure': False,
@@ -286,9 +290,13 @@ class TaskResultApiTest(TestCase):
         {u'id': [u'localhost'], u'foo': [u'bar', u'biz']})
     actual.modified_ts = self.now
     actual.started_ts = self.now
+    actual.dead_after_ts = self.now + datetime.timedelta(
+        seconds=request.bot_ping_tolerance_secs)
     # Trigger _pre_put_hook().
     actual.put()
-    expected = self._gen_result(modified_ts=self.now, started_ts=self.now)
+    expected = self._gen_result(modified_ts=self.now, started_ts=self.now,
+                                dead_after_ts=self.now + datetime.timedelta(
+                                    seconds=request.bot_ping_tolerance_secs))
     self.assertEqual(expected, actual.to_dict())
     self.assertEqual(50, actual.request.priority)
     self.assertEqual(True, actual.can_be_canceled)
@@ -344,6 +352,8 @@ class TaskResultApiTest(TestCase):
         request, to_run, u'localhost', u'abc', {})
     run_result.started_ts = utils.utcnow()
     run_result.modified_ts = run_result.started_ts
+    run_result.dead_after_ts = utils.utcnow() + datetime.timedelta(
+        seconds=request.bot_ping_tolerance_secs)
     ndb.transaction(
         lambda: result_summary.set_from_run_result(run_result, request))
     ndb.transaction(lambda: ndb.put_multi((result_summary, run_result)))
@@ -367,6 +377,7 @@ class TaskResultApiTest(TestCase):
     run_result.exit_code = 0
     run_result.state = task_result.State.COMPLETED
     run_result.modified_ts = utils.utcnow()
+    run_result.dead_after_ts = None
     task_result.PerformanceStats(
         key=task_pack.run_result_key_to_performance_stats_key(run_result.key),
         bot_overhead=0.1,
@@ -464,6 +475,8 @@ class TaskResultApiTest(TestCase):
     run_result.started_ts = utils.utcnow()
     run_result.completed_ts = run_result.started_ts
     run_result.modified_ts = run_result.started_ts
+    run_result.dead_after_ts = utils.utcnow() + datetime.timedelta(
+        seconds=request.bot_ping_tolerance_secs)
     ndb.transaction(
         lambda: result_summary.set_from_run_result(run_result, request))
     ndb.transaction(lambda: ndb.put_multi((run_result, result_summary)))
@@ -487,6 +500,8 @@ class TaskResultApiTest(TestCase):
     self.assertTrue(result_summary.need_update_from_run_result(run_result))
     result_summary.modified_ts = utils.utcnow()
     run_result.modified_ts = utils.utcnow()
+    run_result.dead_after_ts = utils.utcnow() + datetime.timedelta(
+        seconds=request.bot_ping_tolerance_secs)
     ndb.transaction(lambda: ndb.put_multi((result_summary, run_result)))
 
     self.assertTrue(result_summary.need_update_from_run_result(run_result))
@@ -506,6 +521,8 @@ class TaskResultApiTest(TestCase):
     self.assertTrue(result_summary.need_update_from_run_result(run_result))
     result_summary.modified_ts = utils.utcnow()
     run_result.modified_ts = utils.utcnow()
+    run_result.dead_after_ts = utils.utcnow() + datetime.timedelta(
+        seconds=request.bot_ping_tolerance_secs)
     ndb.transaction(lambda: ndb.put_multi((result_summary, run_result)))
 
     self.assertTrue(result_summary.need_update_from_run_result(run_result))
@@ -515,6 +532,8 @@ class TaskResultApiTest(TestCase):
 
     run_result.signal_server_version('new-version')
     run_result.modified_ts = utils.utcnow()
+    run_result.dead_after_ts = utils.utcnow() + datetime.timedelta(
+        seconds=request.bot_ping_tolerance_secs)
     ndb.transaction(
         lambda: result_summary.set_from_run_result(run_result, request))
     ndb.transaction(lambda: ndb.put_multi((result_summary, run_result)))
@@ -536,11 +555,15 @@ class TaskResultApiTest(TestCase):
     run_result_2.started_ts = utils.utcnow()
     self.assertTrue(result_summary.need_update_from_run_result(run_result_1))
     run_result_2.modified_ts = utils.utcnow()
+    run_result_2.dead_after_ts = utils.utcnow() + datetime.timedelta(
+        seconds=request.bot_ping_tolerance_secs)
     result_summary.modified_ts = utils.utcnow()
     ndb.transaction(lambda: ndb.put_multi((result_summary, run_result_2)))
 
     self.assertTrue(result_summary.need_update_from_run_result(run_result_1))
     run_result_1.modified_ts = utils.utcnow()
+    run_result_1.dead_after_ts = utils.utcnow() + datetime.timedelta(
+        seconds=request.bot_ping_tolerance_secs)
     ndb.transaction(
         lambda: result_summary.set_from_run_result(run_result_1, request))
     ndb.transaction(lambda: ndb.put_multi((result_summary, run_result_1)))
@@ -550,6 +573,8 @@ class TaskResultApiTest(TestCase):
 
     self.assertTrue(result_summary.need_update_from_run_result(run_result_2))
     run_result_2.modified_ts = utils.utcnow()
+    run_result_2.dead_after_ts = utils.utcnow() + datetime.timedelta(
+        seconds=request.bot_ping_tolerance_secs)
     ndb.transaction(
         lambda: result_summary.set_from_run_result(run_result_2, request))
     ndb.transaction(lambda: ndb.put_multi((result_summary, run_result_2)))
@@ -680,6 +705,7 @@ class TaskResultApiTest(TestCase):
     # Note: It cannot be both TIMED_OUT and have run_result.deduped_from set.
     run_result.state = task_result.State.TIMED_OUT
     run_result.bot_dimensions = {u'id': [u'bot1'], u'pool': [u'default']}
+    run_result.dead_after_ts = None
     run_result.put()
 
     props_h = '1cae9073cfc09142530e40b9e251b378cbd1b1309bb3cd2f51c36e1d488e1bfa'

@@ -79,6 +79,7 @@ def _gen_request_slices(**kwargs):
         wait_for_capacity=False),
     ],
     u'user': u'Jesus',
+    u'bot_ping_tolerance_secs': 120,
   }
   args.update(kwargs)
   ret = task_request.TaskRequest(**args)
@@ -220,6 +221,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
       'completed_ts': None,
       'cost_usd': 0.,
       'current_task_slice': 0,
+      'dead_after_ts': None,
       'duration': None,
       'exit_code': None,
       'failure': False,
@@ -1124,7 +1126,9 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(expected, result_summary.to_dict())
     expected = [
       self._gen_run_result(
-        id='1d69b9f088008911', modified_ts=reaped_ts, started_ts=reaped_ts),
+        id='1d69b9f088008911', modified_ts=reaped_ts, started_ts=reaped_ts,
+        dead_after_ts=reaped_ts + datetime.timedelta(
+            seconds=reaped_request.bot_ping_tolerance_secs)),
     ]
     self.assertEqual(expected, [i.to_dict() for i in run_results])
 

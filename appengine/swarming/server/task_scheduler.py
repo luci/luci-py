@@ -233,6 +233,11 @@ def _reap_task(bot_dimensions, bot_version, to_run_key, request,
     # the first ping.
     run_result.started_ts = now
     run_result.modified_ts = now
+    # Upon bot reap, set .dead_after_ts taking into consideration the
+    # user-provided keep-alive value. This is updated after each ping
+    # from the bot."
+    run_result.dead_after_ts = now + datetime.timedelta(
+        seconds=request.bot_ping_tolerance_secs)
     result_summary.set_from_run_result(run_result, request)
     ndb.put_multi([to_run, run_result, result_summary])
     if result_summary.state != orig_summary_state:
@@ -320,6 +325,7 @@ def _handle_dead_bot(run_result_key):
     if run_result.state != task_result.State.RUNNING:
       # It was updated already or not updating last. Likely DB index was stale.
       return None, run_result.bot_id
+    # TODO(adoneria): Modify this to use .dead_after_ts
     if run_result.modified_ts > now - task_result.BOT_PING_TOLERANCE:
       # The query index IS stale.
       return None, run_result.bot_id
@@ -328,6 +334,8 @@ def _handle_dead_bot(run_result_key):
     run_result.signal_server_version(server_version)
     old_modified = run_result.modified_ts
     run_result.modified_ts = now
+    # set .dead_after_ts to None since the task is terminated.
+    run_result.dead_after_ts = None
 
     result_summary = result_summary_key.get()
     orig_summary_state = result_summary.state
@@ -726,6 +734,11 @@ def _bot_update_tx(
 
   run_result.cost_usd = max(cost_usd, run_result.cost_usd or 0.)
   run_result.modified_ts = now
+  if run_result.state in task_result.State.STATES_RUNNING:
+    run_result.dead_after_ts = now + datetime.timedelta(
+        seconds=request.bot_ping_tolerance_secs)
+  else:
+    run_result.dead_after_ts = None
 
   result_summary = result_summary_future.get_result()
   if (result_summary.try_number and
@@ -814,6 +827,8 @@ def _cancel_task_tx(request, result_summary, kill_running, bot_id, now, es_cfg,
     run_result.abandoned_ts = now
     run_result.completed_ts = now
     run_result.modified_ts = now
+    run_result.dead_after_ts = now + datetime.timedelta(
+        seconds=request.bot_ping_tolerance_secs)
     entities.append(run_result)
   result_summary.abandoned_ts = now
   result_summary.completed_ts = now
@@ -1438,6 +1453,7 @@ def bot_kill_task(run_result_key, bot_id):
     run_result.abandoned_ts = now
     run_result.completed_ts = now
     run_result.modified_ts = now
+    run_result.dead_after_ts = None
     result_summary.set_from_run_result(run_result, request)
 
     futures = ndb.put_multi_async((run_result, result_summary))

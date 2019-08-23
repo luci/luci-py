@@ -890,6 +890,12 @@ class TaskRunResult(_TaskResultCommon):
   # presentation layer.
   deduped_from = None
 
+  # Specifies the time after which the bot is considered dead. That is,
+  # if a bot has not sent an update after this time while running the task,
+  # it is considered dead. It is set after every ping from the bot if the
+  # task is RUNNING and set to None once the task terminates.
+  dead_after_ts = ndb.DateTimeProperty()
+
   @property
   def created_ts(self):
     return self.request.created_ts
@@ -947,6 +953,14 @@ class TaskRunResult(_TaskResultCommon):
     super(TaskRunResult, self)._pre_put_hook()
     if not self.started_ts:
       raise datastore_errors.BadValueError('Must update .started_ts')
+    if self.dead_after_ts:
+      if self.dead_after_ts <= self.modified_ts:
+        raise datastore_errors.BadValueError('.dead_after_ts must be set'
+                                             ' after .modified_ts')
+      if self.state != State.RUNNING:
+        raise datastore_errors.BadValueError('.dead_after_ts should be None')
+    elif self.state == State.RUNNING:
+        raise datastore_errors.BadValueError('Must update .dead_after_ts')
 
 
 class TaskResultSummary(_TaskResultCommon):
@@ -1404,6 +1418,7 @@ def yield_run_result_keys_with_dead_bot():
   In practice it is returning a ndb.QueryIterator but this is equivalent.
   """
   # If a bot didn't ping recently, it is considered dead.
+  #TODO(adoneria): change this query to use .dead_after_ts
   deadline = utils.utcnow() - BOT_PING_TOLERANCE
   q = TaskRunResult.query(TaskRunResult.modified_ts < deadline)
   return q.filter(TaskRunResult.state == State.RUNNING).iter(keys_only=True)

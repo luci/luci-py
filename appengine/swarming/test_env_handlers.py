@@ -339,7 +339,7 @@ class AppTestBase(test_case.TestCase):
     return out
 
   def create_new_request(self, **kwargs):
-    """Returns an initialized swarming_rpcs.TaskNewRequest.
+    """Returns an initialized swarming_rpcs.NewTaskRequest.
 
     Useful to use a swarming_rpcs.TaskSlice.
     """
@@ -349,6 +349,7 @@ class AppTestBase(test_case.TestCase):
       'priority': 20,
       'tags': [u'a:tag'],
       'user': 'joe@localhost',
+      'bot_ping_tolerance_secs': 600,
     }
     out.update((unicode(k), v) for k, v in kwargs.iteritems())
     # Note that protorpc message constructor accepts dicts for submessages.
@@ -454,6 +455,7 @@ class AppTestBase(test_case.TestCase):
         u'user:joe@localhost',
       ],
       u'user': u'joe@localhost',
+      u'bot_ping_tolerance_secs': u'600',
     }
     out.update((unicode(k), v) for k, v in kwargs.iteritems())
     return out
