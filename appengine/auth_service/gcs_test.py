@@ -170,7 +170,8 @@ class GCSTest(test_case.TestCase):
         'deadline': 30,
         'headers': {'Content-Type': 'application/json; charset=UTF-8'},
         'method': 'PUT',
-        'payload': '{"acl":[{"entity":"user-a@example.com","role":"READER"}]}',
+        'payload': '{"acl":[{"entity":"user-a@example.com","role":"READER"}],'
+            + '"contentType":"application/protobuf"}',
         'scopes': ['https://www.googleapis.com/auth/cloud-platform'],
         'url': u'https://www.googleapis.com/storage/v1/b/bucket/'
             + 'o/dir%2Flatest.db',
@@ -179,7 +180,8 @@ class GCSTest(test_case.TestCase):
         'deadline': 30,
         'headers': {'Content-Type': 'application/json; charset=UTF-8'},
         'method': 'PUT',
-        'payload': '{"acl":[{"entity":"user-a@example.com","role":"READER"}]}',
+        'payload': '{"acl":[{"entity":"user-a@example.com","role":"READER"}],'
+            + '"contentType":"application/json"}',
         'scopes': ['https://www.googleapis.com/auth/cloud-platform'],
         'url': u'https://www.googleapis.com/storage/v1/b/bucket/'
             + 'o/dir%2Flatest.json',
