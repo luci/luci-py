@@ -1018,6 +1018,8 @@ class BotTaskUpdateHandler(_BotApiHandler):
     # - KILLED is when the client uses the kill API to forcibly stop a running
     #   task.
     must_stop = state in (task_result.State.BOT_DIED, task_result.State.KILLED)
+    if must_stop:
+      logging.info('asking bot to kill the task')
     self.send_response({'must_stop': must_stop, 'ok': True})
 
 
