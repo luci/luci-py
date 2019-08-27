@@ -21,6 +21,7 @@ from proto.api import plugin_pb2
 from proto.api import plugin_prpc_pb2
 from proto.api import swarming_pb2
 
+from server import config
 from server import pools_config
 from server import task_queues
 
@@ -176,18 +177,18 @@ def notify_requests(es_cfg, requests, use_tq, is_callback, batch_mode=False):
               datastore transaction).
     - is_callback: If true, indicates that this notification was in response
                    to a external-scheduler-requested callback. This is for
-                   diagnostic purposes.
     - batch_mode: If true, the notifications will be sent in a batched mode
                   along with others, to reduce traffic to external scheduler.
-                  Only valid when use_tq is true.
+                  Only valid when use_tq and global config's
+                  enable_batch_es_notifications are true.
 
   Returns: Nothing.
   """
   logging.debug(
       'notify_requests(es_cfg=(%s,%s), requests=%s, use_tq=%s, '
-      'is_callback=%s)',
+      'is_callback=%s, batch_mode=%s)',
       es_cfg.address, es_cfg.id, [r.task_id for r, _ in requests], use_tq,
-      is_callback)
+      is_callback, batch_mode)
 
   req = plugin_pb2.NotifyTasksRequest()
   req.is_callback = is_callback
@@ -221,7 +222,9 @@ def notify_requests(es_cfg, requests, use_tq, is_callback, batch_mode=False):
     return
 
   request_json = json_format.MessageToJson(req)
-  if batch_mode:
+  # If enable_batch_es_notifications is true, the notifications will be sent in
+  # a batched mode along with others, to reduce traffic to external scheduler.
+  if batch_mode and config.settings().enable_batch_es_notifications:
     payload = {'es_host': es_cfg.address, 'request_json': request_json}
     req = taskqueue.Task(payload=json.dumps(payload), method='PULL')
     if not req.add(queue_name='es-notify-tasks-batch',

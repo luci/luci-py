@@ -26,6 +26,7 @@ from test_support import test_case
 from components import utils
 from proto.api import plugin_pb2
 from proto.api import swarming_pb2
+from server import config
 from server import external_scheduler
 from server import pools_config
 from server import task_request
@@ -138,6 +139,10 @@ class ExternalSchedulerApiTest(test_env_handlers.AppTestBase):
           'SERVER_SOFTWARE': os.environ['SERVER_SOFTWARE'],
         })
     self._enqueue_orig = self.mock(utils, 'enqueue_task', self._enqueue)
+
+    cfg = config.settings()
+    cfg.enable_batch_es_notifications = False
+    self.mock(config, 'settings', lambda: cfg)
 
   def _enqueue(self, *args, **kwargs):
     return self._enqueue_orig(*args, use_dedicated_module=False, **kwargs)
@@ -261,6 +266,10 @@ class ExternalSchedulerApiTestBatchMode(test_env_handlers.AppTestBase):
           'SERVER_SOFTWARE': os.environ['SERVER_SOFTWARE'],
         })
 
+    self.cfg = config.settings()
+    self.cfg.enable_batch_es_notifications = True
+    self.mock(config, 'settings', lambda: self.cfg)
+
   def _enqueue(self, *args, **kwargs):
     return self._enqueue_orig(*args, use_dedicated_module=False, **kwargs)
 
@@ -313,15 +322,22 @@ class ExternalSchedulerApiTestBatchMode(test_env_handlers.AppTestBase):
   def test_notify_request_with_tq_batch_mode_false(self):
     request = _gen_request()
     result_summary = task_scheduler.schedule_request(request, None)
+    self.cfg.enable_batch_es_notifications = True
     self.assertEqual(1, self.execute_tasks())
 
     self._setup_client()
     # Since use_tq is false, the requests below should be sent out immediately.
     external_scheduler.notify_requests(
-        self.cfg_foo, [(request, result_summary)], False, False,
+        self.cfg_foo,
+        [(request, result_summary)],
+        False,
+        False,
         batch_mode=True)
     external_scheduler.notify_requests(
-        self.cfg_hoe, [(request, result_summary)], False, False,
+        self.cfg_hoe,
+        [(request, result_summary)],
+        False,
+        False,
         batch_mode=True)
 
     called_with = self._client.called_with_requests
