@@ -64,8 +64,7 @@ scheduler is needed.
     job will fail meanwhile.
 *   If you plan to use an [auth_service](../auth_service),
     *   Make sure it is setup already.
-    *   [Follow instructions
-        here](../auth_service#linking-other-services-to-auth_service).
+    *   [Follow instructions here](../auth_service#linking).
 *   _Else visit "_https://\<appid\>.appspot.com/auth/bootstrap_" and click
     `Proceed`.
 *   Visit "_https://\<appid\>.appspot.com/auth/groups_"

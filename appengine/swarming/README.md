@@ -72,8 +72,7 @@ release process.
         "<client_id>"`
 *   If you plan to use an [auth_service](../auth_service),
     *   Make sure it is setup already.
-    *   [Follow instructions
-        here](../auth_service#linking-other-services-to-auth_service).
+    *   [Follow instructions here](../auth_service#linking).
 *   Else, visit https://\<appid\>.appspot.com/auth/bootstrap and click
     `Proceed`.
 *   Visit "_https://\<appid\>.appspot.com/auth/groups_":

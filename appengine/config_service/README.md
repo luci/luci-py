@@ -27,6 +27,5 @@
          (e.g. GITILES).
 *   If you plan to use an [auth_service](../auth_service),
     *   Make sure it is setup already.
-    *   [Follow instructions
-        here](../auth_service#linking-other-services-to-auth_service).
+    *   [Follow instructions here](../auth_service#linking).
 

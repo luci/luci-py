@@ -54,9 +54,9 @@ guarantee.
 ### Server configuration
 
 The server has a few major configuration points;
-  - Authentication, usually delegated to the [auth_service](../../auth_service/)
-    instance.
-  - [config_service](../../config_service) manages
+  - Authorization configuration, usually distributed by
+    [auth_service](../../auth_service/) instance.
+  - [config_service](../../config_service) manages server side configuration.
   - [bootstrap.py](../swarming_bot/config/bootstrap.py) which permits automatic
     single-command bot bootstrapping.
   - [bot_config.py](../swarming_bot/config/bot_config.py)
@@ -350,15 +350,13 @@ bot.
    - The Web UI is implemented in Polymer and uses the same API as the client,
      both are authenticated via OAuth2.
    - Bots using the REST APIs can optionally be whitelisted by IPs.
-   - The ACLs can be federated through a third party AppEngine instance
-     [auth_service](../../auth_service/).
 
 
-### Access control and Federation
+### Access control
 
-The access control groups are optionally federated via
-[auth_service](../../auth_service/) via a master-replica model. This presents a
-coherent view on all the associated services.
+The access control groups are optionally configured via single
+[auth_service](../../auth_service/). This presents a coherent view on all
+the associated services.
 
 
 ## Testing Plan

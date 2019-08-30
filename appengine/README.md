@@ -20,7 +20,7 @@ your needs.
 
 ## Services
 
-*   [auth_service/](auth_service) Authentication Server. Provides centralized
+*   [auth_service/](auth_service) Authorization Server. Provides centralized
     group management and group database replication across services.
 *   [config_service/](config_service) is a project configuration distribution
     server that supports importing from repositories.
