@@ -1054,7 +1054,9 @@ def check_schedule_request_acl(request):
   if (has_service_account and
       not _is_allowed_service_account(request.service_account, pool_cfg)):
     raise auth.AuthorizationError(
-        'Service account "%s" is not allowed in the pool "%s", see pools.cfg' %
+        'Task service account "%s" as specified in the task request is not '
+        'allowed to be used in the pool "%s". Is allowed_service_account or '
+        'allowed_service_account_group specified in pools.cfg?' %
         (request.service_account, pool))
 
 
