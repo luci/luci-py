@@ -1200,6 +1200,16 @@ def schedule_request(request, secret_bytes):
       items = ndb.get_multi(parent_task_keys)
       k = result_summary.task_id
       for item in items:
+        # When a task is running, the TaskRunResult and TaskResultSummary
+        # entities are updated by a single server version, since the bot locks
+        # on the specific server version.
+        #
+        # WARNING: This code runs in the children task, updating the parent's
+        # task entities. This task was triggered later, so it could be running
+        # a different server version. There has been cases where saving entities
+        # across different versions caused issues, and they are next to
+        # impossible to test. This is especially problematic with new fields
+        # coupled with _pre_put_hook().
         item.children_task_ids.append(k)
         item.modified_ts = now
       ndb.put_multi(items)
