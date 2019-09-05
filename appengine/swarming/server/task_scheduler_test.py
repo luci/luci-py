@@ -644,9 +644,8 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         self.bot_dimensions, 'abc')
     self.assertEqual(1, run_result.current_task_slice)
 
-  def test_schedule_request_slice_fallback_to_second_after_expiration(self):
-    # First TaskSlice couldn't run so it was eventually expired, the second ran
-    # instead.
+  def test_schedule_request_slice_use_first_after_expiration(self):
+    # First TaskSlice runs so it is reaped before expiring cron job.
     self._register_bot(0, self.bot_dimensions)
     self._quick_schedule(
         2,
@@ -659,12 +658,13 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
               properties=_gen_properties()),
         ])
     self.mock_now(self.now, 181)
-    # The first was immediately expired, and the second immediately reaped.
+    # The first slice is returned from bot_reap_task if it is called earlier
+    # than cron_abort_expired_task_to_run.
     request, _, run_result = task_scheduler.bot_reap_task(
         self.bot_dimensions, 'abc')
-    self.assertEqual(1, run_result.current_task_slice)
+    self.assertEqual(0, run_result.current_task_slice)
 
-  def test_schedule_request_slice_fallback_to_second_after_expiration(self):
+  def test_schedule_request_slice_fallback_to_different_property(self):
     # The first TaskSlice couldn't run so it was eventually expired and the
     # second couldn't be run by the bot that was polling.
     self._register_bot(0, self.bot_dimensions)
@@ -688,7 +688,12 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertIsNone(run_result)
 
     self.mock_now(self.now, 181)
-    # The first was immediately expired, and the second TaskSlice cannot be
+
+    # Expire first task here.
+    self.assertEqual(([], ['1d69b9f088008910']),
+                     task_scheduler.cron_abort_expired_task_to_run())
+
+    # The first is explicitly expired, and the second TaskSlice cannot be
     # reaped by this bot.
     _, _, run_result = task_scheduler.bot_reap_task(
         self.bot_dimensions, 'abc')

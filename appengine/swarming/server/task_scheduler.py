@@ -1269,9 +1269,16 @@ def bot_reap_task(bot_dimensions, bot_version):
         logging.debug('Skipped es-owned request %s during es fallback',
                       request.task_id)
         continue
-      slice_index = task_to_run.task_to_run_key_slice_index(to_run.key)
-      t = request.task_slice(slice_index)
-      limit = to_run.created_ts + datetime.timedelta(seconds=t.expiration_secs)
+
+      limit = to_run.created_ts
+      # We use expiration_secs of following slices if there are. Because if we
+      # found bot that the task can run on before cron job cancels such slices,
+      # it is still preferred to run the task on there instead of cancelling
+      # current slice and trying to find bot for next slice.
+      for i in range(request.num_task_slices):
+        t = request.task_slice(i)
+        limit += datetime.timedelta(seconds=t.expiration_secs)
+
       if limit < utils.utcnow():
         if expired >= 5:
           # Do not try to expire too many tasks in one poll request, as this
