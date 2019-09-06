@@ -1588,39 +1588,31 @@ def cron_abort_expired_task_to_run():
     reconnect them.
   - Server has internal failures causing it to fail to either distribute the
     tasks or properly receive results from the bots.
-
-  Returns:
-    Packed tasks ids of aborted and reenqueued tasks.
   """
-  killed = []
-  reenqueued = []
-  skipped = 0
-  try:
-    for to_run in task_to_run.yield_expired_task_to_run():
-      request = to_run.request_key.get()
-      summary, new_to_run = _expire_task(to_run.key, request, inline=False)
-      if new_to_run:
-        # Expiring a TaskToRun for TaskSlice may reenqueue a new TaskToRun.
-        reenqueued.append(request)
-      elif summary:
-        killed.append(request)
-      else:
-        # It's not a big deal, the bot will continue running.
-        skipped += 1
-  finally:
-    if killed:
-      logging.info(
-          'EXPIRED!\n%d tasks:\n%s',
-          len(killed),
-          '\n'.join(
-            '  %s  %s' % (
-              i.task_id, i.task_slice(0).properties.dimensions)
-            for i in killed))
-    logging.info(
-        'Reenqueued %d tasks, killed %d, skipped %d',
-        len(reenqueued), len(killed), skipped)
-  # These are returned primarily for unit testing verification.
-  return [i.task_id for i in killed], [i.task_id for i in reenqueued]
+  def _enqueue_task(to_runs):
+    payload = {'task_to_runs': to_runs}
+    ok = utils.enqueue_task(
+        '/internal/taskqueue/important/tasks/expire',
+        'task-expire',
+        payload=utils.encode_to_json(payload))
+    if not ok:
+      logging.warning('Failed to enqueue task')
+
+  task_to_runs = []
+  for to_run in task_to_run.yield_expired_task_to_run():
+    summary_key = task_pack.request_key_to_result_summary_key(
+        to_run.request_key)
+    task_id = task_pack.pack_result_summary_key(summary_key)
+    task_to_runs.append((task_id, to_run.try_number, to_run.task_slice_index))
+
+    # enqueue every 50 task_to_runs
+    if len(task_to_runs) >= 50:
+      _enqueue_task(task_to_runs)
+      task_to_runs = []
+
+  # enqueue remaining task_to_runs
+  if task_to_runs:
+    _enqueue_task(task_to_runs)
 
 
 def cron_handle_bot_died():
@@ -1777,3 +1769,45 @@ def task_handle_pubsub_task(payload):
   _pubsub_notify(
       payload['task_id'], payload['topic'],
       payload['auth_token'], payload['userdata'])
+
+
+def task_expire_tasks(task_to_runs):
+  """Expire tasks enqueued by cron_abort_expired_task_to_run."""
+  killed = []
+  reenqueued = 0
+  skipped = 0
+
+  try:
+    for task_id, try_number, task_slice_index in task_to_runs:
+      # retrieve request
+      request_key, _ = task_pack.get_request_and_result_keys(task_id)
+      request = request_key.get()
+      if not request:
+        logging.error('Task for %s was not found.', task_id)
+        continue
+
+      to_run_key = task_to_run.request_to_task_to_run_key(
+          request, try_number, task_slice_index)
+
+      # execute task expiration
+      summary, new_to_run = _expire_task(to_run_key, request, inline=False)
+      if new_to_run:
+        # Expiring a TaskToRun for TaskSlice may reenqueue a new TaskToRun.
+        reenqueued += 1
+      elif summary:
+        killed.append(request)
+      else:
+        # It's not a big deal, the bot will continue running.
+        skipped += 1
+  finally:
+    if killed:
+      logging.info(
+          'EXPIRED!\n%d tasks:\n%s',
+          len(killed),
+          '\n'.join(
+            '  %s  %s' % (
+              i.task_id, i.task_slice(0).properties.dimensions)
+            for i in killed))
+    logging.info(
+        'Reenqueued %d tasks, killed %d, skipped %d',
+        reenqueued, len(killed), skipped)

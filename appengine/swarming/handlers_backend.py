@@ -214,7 +214,7 @@ class CronSendToBQ(_CronHandlerBase):
 ## Task queues.
 
 
-class CancelTasksHandler(webapp2.RequestHandler):
+class TaskCancelTasksHandler(webapp2.RequestHandler):
   """Cancels tasks given a list of their ids."""
 
   @decorators.require_taskqueue('cancel-tasks')
@@ -230,7 +230,7 @@ class CancelTasksHandler(webapp2.RequestHandler):
                    task_id, ok, was_running)
 
 
-class CancelTaskOnBotHandler(webapp2.RequestHandler):
+class TaskCancelTaskOnBotHandler(webapp2.RequestHandler):
   """Cancels a given task if it is running on the given bot.
 
   If bot is not specified, cancel task unconditionally.
@@ -256,7 +256,16 @@ class CancelTaskOnBotHandler(webapp2.RequestHandler):
           exc_info=True)
 
 
-class DeleteTasksHandler(webapp2.RequestHandler):
+class TaskExpireTasksHandler(webapp2.RequestHandler):
+  """Expires a list of tasks, given a list of their ids."""
+
+  @decorators.require_taskqueue('task-expire')
+  def post(self):
+    payload = json.loads(self.request.body)
+    task_scheduler.task_expire_tasks(payload.get('task_to_runs'))
+
+
+class TaskDeleteTasksHandler(webapp2.RequestHandler):
   """Deletes a list of tasks, given a list of their ids."""
 
   @decorators.require_taskqueue('delete-tasks')
@@ -420,10 +429,12 @@ def get_routes():
     ('/internal/cron/important/named_caches/update', CronNamedCachesUpdate),
 
     # Task queues.
-    ('/internal/taskqueue/important/tasks/cancel', CancelTasksHandler),
+    ('/internal/taskqueue/important/tasks/cancel', TaskCancelTasksHandler),
     ('/internal/taskqueue/important/tasks/cancel-task-on-bot',
-        CancelTaskOnBotHandler),
-    ('/internal/taskqueue/cleanup/tasks/delete', DeleteTasksHandler),
+        TaskCancelTaskOnBotHandler),
+    ('/internal/taskqueue/important/tasks/expire',
+        TaskExpireTasksHandler),
+    ('/internal/taskqueue/cleanup/tasks/delete', TaskDeleteTasksHandler),
     ('/internal/taskqueue/important/task_queues/rebuild-cache',
         TaskDimensionsHandler),
     (r'/internal/taskqueue/important/pubsub/notify-task/<task_id:[0-9a-f]+>',
