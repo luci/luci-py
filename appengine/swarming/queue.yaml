@@ -12,6 +12,11 @@ queue:
   bucket_size: 100
   rate: 500/s
 
+# /internal/taskqueue/important/tasks/cancel-children-tasks
+- name: cancel-children-tasks
+  bucket_size: 100
+  rate: 500/s
+
 # /internal/taskqueue/important/tasks/expire
 - name: task-expire
   bucket_size: 20

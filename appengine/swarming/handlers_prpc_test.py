@@ -71,7 +71,7 @@ class PRPCTest(test_env_handlers.AppTestBase):
       # Call directly into it.
       self.assertEqual(True, task_queues.rebuild_task_cache(kwargs['payload']))
       return True
-    if queue_name == 'pubsub':
+    if queue_name in ('cancel-children-tasks', 'pubsub'):
       return True
     self.fail(url)
     return False

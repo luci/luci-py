@@ -867,6 +867,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
             performance_stats=None))
     # An idempotent task has properties_hash set after it succeeded.
     self.assertTrue(run_result.result_summary_key.get().properties_hash)
+    self.assertEqual(1, self.execute_tasks())
     return unicode(run_result.task_id)
 
   def _task_deduped(self, num_task, new_ts, deduped_from, task_id, now=None):
@@ -1067,6 +1068,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
             cost_usd=0.1,
             outputs_ref=None,
             performance_stats=None))
+    self.assertEqual(1, self.execute_tasks())
 
     parent_id = run_result.task_id
     result_summary = self._quick_schedule(0, parent_task_id=parent_id)
@@ -1101,6 +1103,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
             cost_usd=0.1,
             outputs_ref=None,
             performance_stats=None))
+    self.assertEqual(1, self.execute_tasks())
     run_result = run_result.key.get()
     self.assertEqual(-1, run_result.exit_code)
     self.assertEqual(10.5, run_result.duration)
@@ -1227,6 +1230,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
           state=State.COMPLETED),
     ]
     self.assertEqual(expected, [t.to_dict() for t in run_results])
+    self.assertEqual(2, self.execute_tasks())
 
   def test_exit_code_failure(self):
     run_result = self._quick_reap(1, 0)
@@ -1271,6 +1275,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
           state=State.COMPLETED),
     ]
     self.assertEqual(expected, [t.to_dict() for t in run_results])
+    self.assertEqual(1, self.execute_tasks())
 
   def test_schedule_request_id_without_pool(self):
     auth_testing.mock_is_admin(self)
@@ -1319,6 +1324,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
             outputs_ref=None,
             performance_stats=None))
     self.assertEqual('hihey', run_result.key.get().get_output(0, 0))
+    self.assertEqual(1, self.execute_tasks())
 
   def test_bot_update_task_new_overwrite(self):
     self.mock(task_result.TaskOutput, 'CHUNK_SIZE', 2)
@@ -1417,6 +1423,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
             outputs_ref=None,
             performance_stats=None))
     self.assertEqual(2, len(pub_sub_calls)) # notification is sent
+    self.assertEqual(1, self.execute_tasks())
 
   def _bot_update_timeouts(self, hard, io):
     run_result = self._quick_reap(1, 0)
@@ -1458,6 +1465,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         state=State.TIMED_OUT,
         try_number=1)
     self.assertEqual(expected, run_result.key.get().to_dict())
+    self.assertEqual(1, self.execute_tasks())
 
   def test_bot_update_hard_timeout(self):
     self._bot_update_timeouts(True, False)
@@ -1503,6 +1511,12 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     _, _, child_run_result2 = task_scheduler.bot_reap_task(
         bot3_dimensions, 'abc')
     self.assertEqual(0, self.execute_tasks())
+
+    # Run a child task 3. This will be cancelled before running.
+    child_request3 = _gen_request_slices(
+        parent_task_id=parent_run_result.task_id)
+    child_result3_summary = task_scheduler.schedule_request(
+        child_request3, None)
 
     # Cancel parent task.
     ok, was_running = task_scheduler.cancel_task(
@@ -1567,6 +1581,25 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
             performance_stats=None))
 
     self.assertEqual('hi', child_run_result2.key.get().get_output(0, 0))
+
+    self.assertEqual(3, self.execute_tasks())
+
+    # parent_task should push task to cancel-children-tasks.
+    self.assertEqual(self._enqueue_calls[1], (
+      ('/internal/taskqueue/important/tasks/cancel-children-tasks',
+       'cancel-children-tasks'),
+      {'payload': utils.encode_to_json({
+        'task': parent_result_summary.task_id,
+      })}))
+    # Child request 3 should be cancelled via task queue.
+    self.assertEqual(self._enqueue_calls[3], (
+        ('/internal/taskqueue/important/tasks/cancel',
+         'cancel-tasks'),
+        {'payload': utils.encode_to_json({
+            'kill_running': True,
+            'tasks': [child_result2_summary.task_id,
+                      child_result3_summary.task_id]}),
+         'version': u'v1a'}))
 
   def test_task_priority(self):
     # Create N tasks of various priority not in order.
@@ -1756,6 +1789,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(False, run_result.killing)
     self.assertEqual(State.KILLED, run_result.state)
     self.assertEqual(4, len(pub_sub_calls)) # KILLED
+    self.assertEqual(1, self.execute_tasks())
 
   def test_cancel_task_bot_id(self):
     # Cancel a running task.
@@ -1816,6 +1850,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertIsNone(run_result.killing)
     self.assertEqual(State.COMPLETED, run_result.state)
     self.assertEqual(2, len(pub_sub_calls)) # No other message.
+    self.assertEqual(1, self.execute_tasks())
 
   def test_cron_abort_expired_task_to_run(self):
     pub_sub_calls = self.mock_pub_sub()
@@ -2041,6 +2076,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(0.1, run_result.key.get().cost_usd)
 
     self.assertEqual(4, len(pub_sub_calls)) # RUNNING -> COMPLETED
+    self.assertEqual(1, self.execute_tasks())
 
   def test_cron_handle_bot_died_no_update_not_idempotent(self):
     # A bot reaped a task but the handler returned HTTP 500, leaving the task in
@@ -2124,6 +2160,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(0.1, run_result.key.get().cost_usd)
 
     self.assertEqual(4, len(pub_sub_calls)) # RUNNING -> COMPLETED
+    self.assertEqual(1, self.execute_tasks())
 
   def test_cron_handle_bot_died_broken_task(self):
     # Not sure why, but this was observed on the fleet: the TaskRequest is
@@ -2620,6 +2657,10 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
 
   def test_task_expire_tasks(self):
     # Tested indirectly via test_cron_abort_expired_*
+    pass
+
+  def test_task_cancel_running_children_tasks(self):
+    # Tested indirectly via test_bot_update_child_with_cancelled_parent.
     pass
 
 

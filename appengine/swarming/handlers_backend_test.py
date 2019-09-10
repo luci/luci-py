@@ -174,6 +174,8 @@ class BackendTest(test_env_handlers.AppTestBase):
         ('cancel-task-on-bot',
           '/internal/taskqueue/important/tasks/cancel-task-on-bot', ''),
         ('cancel-tasks', '/internal/taskqueue/important/tasks/cancel', ''),
+        ('cancel-children-tasks',
+         '/internal/taskqueue/important/tasks/cancel-children-tasks', ''),
         ('task-expire', '/internal/taskqueue/important/tasks/expire', ''),
         ('delete-tasks', '/internal/taskqueue/cleanup/tasks/delete', ''),
         ('es-notify-tasks',

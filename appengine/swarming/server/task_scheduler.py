@@ -48,6 +48,10 @@ _PROBABILITY_OF_QUICK_COMEBACK = 0.05
 _ES_FALLBACK_SLACK = datetime.timedelta(minutes=6)
 
 
+class Error(Exception):
+  pass
+
+
 def _secs_to_ms(value):
   """Converts a seconds value in float to the number of ms as an integer."""
   return int(round(value * 1000.))
@@ -1450,6 +1454,15 @@ def bot_update_task(
     event_mon_metrics.send_task_event(smry)
     ts_mon_metrics.on_task_completed(smry)
 
+    ok = utils.enqueue_task(
+      '/internal/taskqueue/important/tasks/cancel-children-tasks',
+      'cancel-children-tasks',
+      payload=utils.encode_to_json({'task': smry.task_id})
+    )
+    if not ok:
+      raise Error(
+          'Failed to push cancel children task for %s' % smry.task_id)
+
   # Hack a bit to tell the bot what it needs to hear (see handler_bot.py). It's
   # kind of an ugly hack but the other option is to return the whole run_result.
   if run_result.killing:
@@ -1815,3 +1828,34 @@ def task_expire_tasks(task_to_runs):
     logging.info(
         'Reenqueued %d tasks, killed %d, skipped %d',
         reenqueued, len(killed), skipped)
+
+
+def task_cancel_running_children_tasks(parent_task_id):
+  """Enqueues task queue to cancel non-completed children tasks."""
+  parent_result_summary_key = task_pack.unpack_result_summary_key(
+      parent_task_id)
+  parent_run_result_summary = parent_result_summary_key.get()
+  children_task_keys = map(
+      task_pack.unpack_result_summary_key,
+      parent_run_result_summary.children_task_ids)
+  children_tasks_per_version = {}
+  for task in ndb.get_multi(children_task_keys):
+    if task.state not in task_result.State.STATES_RUNNING:
+      continue
+    version = task.server_versions[0]
+    children_tasks_per_version.setdefault(version, []).append(task.task_id)
+
+  for version in sorted(children_tasks_per_version):
+    payload = utils.encode_to_json({
+      'tasks': children_tasks_per_version[version],
+      'kill_running': True,
+    })
+    ok = utils.enqueue_task(
+        '/internal/taskqueue/important/tasks/cancel',
+        'cancel-tasks', payload=payload,
+        # cancel task on specific version of backend module.
+        version=version)
+    if not ok:
+      raise Error(
+          'Failed to enqueue task to cancel queue; version: %s, payload: %s' % (
+            version, payload))
