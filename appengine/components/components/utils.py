@@ -616,7 +616,9 @@ def enqueue_task_async(
 
   Logs an error and returns False if task queue is acting up.
   """
-  assert not use_dedicated_module or version is None
+  assert not use_dedicated_module or version is None, (
+    'use_dedicated_module(%s) and version(%s) are both specified' %
+    use_dedicated_module, version)
 
   try:
     headers = None
