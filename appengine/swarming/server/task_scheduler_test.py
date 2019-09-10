@@ -306,6 +306,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     to_run_key = task_to_run.request_to_task_to_run_key(
         run_result.request_key.get(), 1, 0)
     self.assertIsNone(to_run_key.get().queue_number)
+    self.assertIsNone(to_run_key.get().expiration_ts)
 
   def test_schedule_request(self):
     # It is tested indirectly in the other functions.
@@ -433,6 +434,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     to_run_key = task_to_run.request_to_task_to_run_key(
         result_summary.request_key.get(), 1, 0)
     self.assertIsNone(to_run_key.get().queue_number)
+    self.assertIsNone(to_run_key.get().expiration_ts)
     self.assertEqual(State.EXPIRED, result_summary.key.get().state)
 
   def test_bot_reap_task_6_expired_fifo(self):
@@ -846,6 +848,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual('localhost', run_result.bot_id)
     to_run_key = _run_result_to_to_run_key(run_result)
     self.assertIsNone(to_run_key.get().queue_number)
+    self.assertIsNone(to_run_key.get().expiration_ts)
     # It's important to complete the task with success.
     self.assertEqual(
         State.COMPLETED,
@@ -1047,6 +1050,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual('localhost', run_result.bot_id)
     to_run_key = _run_result_to_to_run_key(run_result)
     self.assertIsNone(to_run_key.get().queue_number)
+    self.assertIsNone(to_run_key.get().expiration_ts)
     # It's important to terminate the task with success.
     self.assertEqual(
         State.COMPLETED,
@@ -2162,6 +2166,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     to_run_key_1 = task_to_run.request_to_task_to_run_key(
         run_result.request_key.get(), 1, 0)
     self.assertIsNone(to_run_key_1.get().queue_number)
+    self.assertIsNone(to_run_key_1.get().expiration_ts)
 
     # See _handle_dead_bot() with special case about non-idempotent task that
     # were never updated.
@@ -2192,6 +2197,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(State.PENDING, result_summary.state)
     # The old TaskToRun is not reused.
     self.assertIsNone(to_run_key_1.get().queue_number)
+    self.assertIsNone(to_run_key_1.get().expiration_ts)
     to_run_key_2 = task_to_run.request_to_task_to_run_key(
         run_result.request_key.get(), 2, 0)
     self.assertTrue(to_run_key_2.get().queue_number)

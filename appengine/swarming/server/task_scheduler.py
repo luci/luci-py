@@ -70,6 +70,7 @@ def _expire_task_tx(now, request, to_run_key, result_summary_key, capacity,
 
   # In any case, dequeue the TaskToRun.
   to_run.queue_number = None
+  to_run.expiration_ts = None
   result_summary = result_summary_future.get_result()
   to_put = [to_run, result_summary]
   # Check if there's a TaskSlice fallback that could be reenqueued.
@@ -227,6 +228,7 @@ def _reap_task(bot_dimensions, bot_version, to_run_key, request,
           result_summary.task_id)
       return None, None
     to_run.queue_number = None
+    to_run.expiration_ts = None
     run_result = task_result.new_run_result(
         request, to_run, bot_id, bot_version, bot_dimensions)
     # Upon bot reap, both .started_ts and .modified_ts matches. They differ on
@@ -808,6 +810,7 @@ def _cancel_task_tx(request, result_summary, kill_running, bot_id, now, es_cfg,
     to_run = to_run_future.get_result()
     entities.append(to_run)
     to_run.queue_number = None
+    to_run.expiration_ts = None
   else:
     if not kill_running:
       # Deny canceling a task that started.
@@ -927,6 +930,7 @@ def _ensure_active_slice(request, try_number, task_slice_index):
 
       # Deactivate old TaskToRun, create new one.
       to_run.queue_number = None
+      to_run.expiration_ts = None
       new_to_run = task_to_run.new_task_to_run(request, try_number,
                                                task_slice_index)
       ndb.put_multi([to_run, new_to_run])

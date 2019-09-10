@@ -863,6 +863,7 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
 
     self.assertEqual(True, to_run.is_reapable)
     to_run.queue_number = None
+    to_run.expiration_ts = None
     to_run.put()
     self.assertEqual(False, to_run.is_reapable)
 
