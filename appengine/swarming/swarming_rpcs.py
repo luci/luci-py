@@ -520,6 +520,7 @@ class TaskRequest(messages.Message):
   """
   expiration_secs = messages.IntegerField(1)
   name = messages.StringField(2)
+  task_id = messages.StringField(15)
   parent_task_id = messages.StringField(3)
   priority = messages.IntegerField(4)
   # For some amount of time, the properties will be copied into the

@@ -438,9 +438,12 @@ class AppTestBase(test_case.TestCase):
 
     To be used for expectations.
     """
+    # This assumes:
+    # self.mock(random, 'getrandbits', lambda _: 0x88)
     out = {
       u'authenticated': u'user:user@example.com',
       u'expiration_secs': u'86400',
+      u'task_id': u'5cee488008810',
       u'name': u'job1',
       u'priority': u'20',
       u'service_account': u'none',
@@ -498,6 +501,8 @@ class AppTestBase(test_case.TestCase):
 
     To be used for expectations.
     """
+    # This assumes:
+    # self.mock(random, 'getrandbits', lambda _: 0x88)
     out = {
       u'bot_dimensions': [
         {u'key': u'id', u'value': [u'bot1']},

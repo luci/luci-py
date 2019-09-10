@@ -264,6 +264,8 @@ class TasksApiTest(BaseTest):
           },
         ]),
     }
+    # The task was not created for real, so there's no task id.
+    task_id = expected[u'request'].pop(u'task_id')
 
     # Do an evaluate_only call first
     request.evaluate_only = True
@@ -272,6 +274,7 @@ class TasksApiTest(BaseTest):
 
     request.evaluate_only = False
     expected[u'task_id'] = u'5cee488008810'
+    expected[u'request'][u'task_id'] = task_id
     expected[u'task_result'] = {
       u'abandoned_ts': u'2010-01-02T03:04:05',
       u'completed_ts': u'2010-01-02T03:04:05',
@@ -516,6 +519,7 @@ class TasksApiTest(BaseTest):
           u'swarming.pool.version:pools_cfg_rev',
           u'user:joe@localhost',
         ],
+        task_id=u'5cf59b8006610',
         task_slices=[
           {
             u'expiration_secs': u'30',
@@ -1718,6 +1722,7 @@ class TaskApiTest(BaseTest):
 
   def test_request_ok(self):
     """Asserts that request produces a task request."""
+    self.mock(random, 'getrandbits', lambda _: 0x88)
     self.mock_task_service_accounts()
     self.mock_default_pool_acl(['service-account@example.com'])
     _, task_id = self.client_create_task_raw(

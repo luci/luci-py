@@ -1162,8 +1162,11 @@ class TaskRequest(ndb.Model):
   @property
   def task_id(self):
     """Returns the TaskResultSummary packed id, not the task request key."""
-    return task_pack.pack_result_summary_key(
-        task_pack.request_key_to_result_summary_key(self.key))
+    # There's only one case where it's not set: when using evaluate_only in the
+    # task creation API.
+    if self.key:
+      return task_pack.pack_result_summary_key(
+          task_pack.request_key_to_result_summary_key(self.key))
 
   @property
   def expiration_secs(self):
