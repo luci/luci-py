@@ -81,7 +81,7 @@ class TaskToRun(ndb.Model):
   # Moment by which this TaskSlice has to be requested by a bot.
   # expiration_ts is based on TaskSlice.expiration_ts. This is used to figure
   # out TaskSlice fallback and enable a cron job query to clean up stale tasks.
-  expiration_ts = ndb.DateTimeProperty(required=True)
+  expiration_ts = ndb.DateTimeProperty()
 
   # Everything above is immutable, everything below is mutable.
 
