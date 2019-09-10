@@ -34,6 +34,7 @@ import datetime
 import logging
 import time
 
+from google.appengine.api import datastore_errors
 from google.appengine.runtime import apiproxy_errors
 from google.appengine.api import memcache
 from google.appengine.ext import ndb
@@ -124,6 +125,14 @@ class TaskToRun(ndb.Model):
     out['try_number'] = self.try_number
     out['task_slice_index'] = self.task_slice_index
     return out
+
+  def _pre_put_hook(self):
+    super(TaskToRun, self)._pre_put_hook()
+
+    if self.expiration_ts is None and self.queue_number:
+      raise datastore_errors.BadValueError(
+          ('%s.queue_number must be None when expiration_ts is None' %
+           self.__class__.__name__))
 
 
 ### Private functions.

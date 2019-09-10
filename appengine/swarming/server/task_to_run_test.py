@@ -17,6 +17,7 @@ import test_env_handlers
 
 import webtest
 
+from google.appengine.api import datastore_errors
 from google.appengine.ext import ndb
 
 import handlers_backend
@@ -892,6 +893,21 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
     task_to_run.set_lookup_cache(to_run_2.key, False)
     self.assertEqual(False, lookup(to_run_1.key))
     self.assertEqual(True, lookup(to_run_2.key))
+
+  def test_pre_put_hook(self):
+    _, to_run = self._gen_new_task_to_run(1)
+
+    # no error if expiration_ts and queue_number has values
+    to_run.put()
+
+    # raise an error if expiration_ts is None, but queue_number has some value
+    to_run.expiration_ts = None
+    with self.assertRaises(datastore_errors.BadValueError):
+      to_run.put()
+
+    # no error if both expiration_ts and queue_number is None
+    to_run.queue_number = None
+    to_run.put()
 
 
 if __name__ == '__main__':
