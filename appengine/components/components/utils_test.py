@@ -14,6 +14,9 @@ import unittest
 from test_support import test_env
 test_env.setup_test_env()
 
+import mock
+
+from google.appengine.api import app_identity
 from google.appengine.ext import ndb
 
 from components import utils
@@ -467,6 +470,36 @@ class AsyncApplyTest(test_case.TestCase):
         '0 finishing',
         '10 finishing',
     ])
+
+
+class TaskQueueTest(test_case.TestCase):
+
+  def setUp(self):
+    super(TaskQueueTest, self).setUp()
+
+    self.mock(utils, 'get_task_queue_host', lambda: 'appengine.host')
+    self.mock(app_identity, 'get_default_version_hostname',
+              lambda: 'default-appengine.host')
+
+  @mock.patch('google.appengine.api.taskqueue.Task')
+  def test_enqueue_task_async(self, mock_task):
+    # Task.add_async is not allowed to return plain value.
+    mock_task.return_value.add_async.return_value = []
+
+    self.assertTrue(utils.enqueue_task_async(
+      '/internal/test', 'test').get_result())
+    mock_task.assert_called_once_with(
+      name=None, url='/internal/test', countdown=None,
+      headers={'Host': 'appengine.host'}, params=None, payload=None)
+
+    mock_task.reset_mock()
+    self.assertTrue(utils.enqueue_task_async(
+      '/internal/test', 'test', use_dedicated_module=False,
+      version='4420-5e77b02').get_result())
+    mock_task.assert_called_once_with(
+      name=None, url='/internal/test', countdown=None,
+      headers={'Host': '4420-5e77b02-dot-backend-dot-default-appengine.host'},
+      params=None, payload=None)
 
 
 if __name__ == '__main__':

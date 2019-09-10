@@ -600,13 +600,15 @@ def enqueue_task_async(
     name=None,
     countdown=None,
     use_dedicated_module=True,
+    version=None,
     transactional=False):
   """Adds a task to a task queue.
 
   If |use_dedicated_module| is True (default) the task will be executed by
   a separate backend module instance that runs same version as currently
-  executing instance. Otherwise it will run on a current version of default
-  module.
+  executing instance. If |version| is specified, the task will be executed by a
+  separate backend module instance of specified version. Otherwise it will run
+  on a current version of default module.
 
   Returns True if the task was successfully added or a task with such name
   existed before (i.e. on TombstonedTaskError exception): deduplicated task is
@@ -614,10 +616,19 @@ def enqueue_task_async(
 
   Logs an error and returns False if task queue is acting up.
   """
+  assert not use_dedicated_module or version is None
+
   try:
     headers = None
     if use_dedicated_module:
       headers = {'Host': get_task_queue_host()}
+    elif version is not None:
+      headers = {
+        'Host': '%s-dot-%s-dot-%s' % (
+          version, _task_queue_module,
+          app_identity.get_default_version_hostname())
+      }
+
     # Note that just using 'target=module' here would redirect task request to
     # a default version of a module, not the curently executing one.
     task = taskqueue.Task(
