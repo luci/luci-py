@@ -643,6 +643,9 @@ def yield_expired_task_to_run():
         logging.info(
             '%s/%s: queue_number is None, but expiration_ts is %s.',
             task.task_id, task.task_slice_index, task.expiration_ts)
+        # Flush it, otherwise we'll keep on looping on it.
+        task.expiration_ts = None
+        task.put()
       else:
         yield task
         total += 1
