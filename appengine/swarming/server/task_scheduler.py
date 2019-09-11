@@ -1845,15 +1845,17 @@ def task_cancel_running_children_tasks(parent_task_id):
     version = task.server_versions[0]
     children_tasks_per_version.setdefault(version, []).append(task.task_id)
 
-  for version in sorted(children_tasks_per_version):
+  for version, tasks in sorted(children_tasks_per_version.items()):
+    logging.info('Sending %d tasks to version %s', len(tasks), version)
     payload = utils.encode_to_json({
-      'tasks': children_tasks_per_version[version],
+      'tasks': tasks,
       'kill_running': True,
     })
     ok = utils.enqueue_task(
         '/internal/taskqueue/important/tasks/cancel',
         'cancel-tasks', payload=payload,
         # cancel task on specific version of backend module.
+        use_dedicated_module=False,
         version=version)
     if not ok:
       raise Error(
