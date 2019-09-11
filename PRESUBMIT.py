@@ -39,10 +39,14 @@ def CommonChecks(input_api, output_api):
     r'appengine/isolate/bqh\.py$',
     r'appengine/swarming/bqh\.py$',
   ]
-  return input_api.canned_checks.PanProjectChecks(
-      input_api, output_api,
-      excluded_paths=excluded,
-      license_header=header(input_api))
+
+
+  return (input_api.canned_checks.CheckPatchFormatted(input_api, output_api) +
+          input_api.canned_checks.PanProjectChecks(
+              input_api,
+              output_api,
+              excluded_paths=excluded,
+              license_header=header(input_api)))
 
 
 def CheckChangeOnUpload(input_api, output_api):
