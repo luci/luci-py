@@ -116,6 +116,24 @@ class TaskToRun(ndb.Model):
     """Returns the TaskRequest ndb.Key that is parent to the task to run."""
     return task_to_run_key_to_request_key(self.key)
 
+  @property
+  def run_result_key(self):
+    """Returns the TaskRunResult ndb.Key that will be created for this TaskToRun
+    once reaped.
+    """
+    summary_key = task_pack.request_key_to_result_summary_key(
+        self.request_key)
+    return task_pack.result_summary_key_to_run_result_key(
+        summary_key, self.try_number)
+
+  @property
+  def task_id(self):
+    """Returns an encoded task id for this TaskToRun.
+
+    Note: this includes the try_number but not the task_slice_index.
+    """
+    return task_pack.pack_run_result_key(self.run_result_key)
+
   def to_dict(self):
     """Purely used for unit testing."""
     out = super(TaskToRun, self).to_dict()
@@ -623,8 +641,8 @@ def yield_expired_task_to_run():
       if not task.queue_number:
         skipped += 1
         logging.info(
-            'queue_number is None, but expiration_ts is %s.',
-            task.expiration_ts)
+            '%s/%s: queue_number is None, but expiration_ts is %s.',
+            task.task_id, task.task_slice_index, task.expiration_ts)
       else:
         yield task
         total += 1

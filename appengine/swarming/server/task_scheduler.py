@@ -1624,6 +1624,7 @@ def cron_abort_expired_task_to_run():
       summary_key = task_pack.request_key_to_result_summary_key(
           to_run.request_key)
       task_id = task_pack.pack_result_summary_key(summary_key)
+      # TODO(maruel): Use (to_run.task_id, to_run.task_slice_index).
       task_to_runs.append((task_id, to_run.try_number, to_run.task_slice_index))
 
       # Enqueue every 50 TaskToRun's.

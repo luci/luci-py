@@ -320,6 +320,7 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
       self.assertEqual(i, task_to_run.task_to_run_key_slice_index(to_run.key))
 
   def test_task_to_run_key_try_number(self):
+    self.mock(random, 'getrandbits', lambda _: 0x88)
     slices = [
       task_request.TaskSlice(
           expiration_secs=60,
@@ -332,6 +333,7 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
       to_run = task_to_run.new_task_to_run(request, i, 0)
       self.assertEqual(i, to_run.try_number)
       self.assertEqual(i, task_to_run.task_to_run_key_try_number(to_run.key))
+      self.assertEqual('1d69b9f08800881%d' % i, to_run.task_id)
 
   def test_new_task_to_run_list(self):
     self.mock(random, 'getrandbits', lambda _: 0x12)
