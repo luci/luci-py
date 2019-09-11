@@ -1606,6 +1606,7 @@ def cron_abort_expired_task_to_run():
   - Server has internal failures causing it to fail to either distribute the
     tasks or properly receive results from the bots.
   """
+  enqueued = []
   def _enqueue_task(to_runs):
     payload = {'task_to_runs': to_runs}
     ok = utils.enqueue_task(
@@ -1613,23 +1614,28 @@ def cron_abort_expired_task_to_run():
         'task-expire',
         payload=utils.encode_to_json(payload))
     if not ok:
-      logging.warning('Failed to enqueue task')
+      logging.warning('Failed to enqueue task for %d tasks', len(to_runs))
+    else:
+      enqueued.append(len(to_runs))
 
   task_to_runs = []
-  for to_run in task_to_run.yield_expired_task_to_run():
-    summary_key = task_pack.request_key_to_result_summary_key(
-        to_run.request_key)
-    task_id = task_pack.pack_result_summary_key(summary_key)
-    task_to_runs.append((task_id, to_run.try_number, to_run.task_slice_index))
+  try:
+    for to_run in task_to_run.yield_expired_task_to_run():
+      summary_key = task_pack.request_key_to_result_summary_key(
+          to_run.request_key)
+      task_id = task_pack.pack_result_summary_key(summary_key)
+      task_to_runs.append((task_id, to_run.try_number, to_run.task_slice_index))
 
-    # enqueue every 50 task_to_runs
-    if len(task_to_runs) >= 50:
+      # Enqueue every 50 TaskToRun's.
+      if len(task_to_runs) == 50:
+        _enqueue_task(task_to_runs)
+        task_to_runs = []
+
+    # Enqueue remaining TaskToRun's.
+    if task_to_runs:
       _enqueue_task(task_to_runs)
-      task_to_runs = []
-
-  # enqueue remaining task_to_runs
-  if task_to_runs:
-    _enqueue_task(task_to_runs)
+  finally:
+    logging.debug('Enqueued %d task for %d tasks', len(enqueued), sum(enqueued))
 
 
 def cron_handle_bot_died():

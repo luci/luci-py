@@ -607,15 +607,26 @@ def yield_expired_task_to_run():
   # since the entities are very small and to reduce RPC overhead.
   opts = ndb.QueryOptions(batch_size=256)
   now = utils.utcnow()
-  twodays_ago = now - datetime.timedelta(days=2)
+  # The backsearch here is just to ensure that we find entities that we forgot
+  # about before because the cron job couldn't keep up. In practice
+  # expiration_ts should not be more than 1 minute old (as the cron job runs
+  # every minutes) but keep it high in case there's an outage.
+  cut_off = now - datetime.timedelta(hours=24)
   q = TaskToRun.query(
-      ndb.AND(
-          TaskToRun.expiration_ts < now,
-          TaskToRun.expiration_ts > twodays_ago),
+      TaskToRun.expiration_ts < now,
+      TaskToRun.expiration_ts > cut_off,
       default_options=opts)
-  for task in q:
-    if not task.queue_number:
-      logging.warning(
-          'queue_number is None, but expiration_ts is %s.',
-          task.expiration_ts)
-    yield task
+  total = 0
+  skipped = 0
+  try:
+    for task in q:
+      if not task.queue_number:
+        skipped += 1
+        logging.info(
+            'queue_number is None, but expiration_ts is %s.',
+            task.expiration_ts)
+      else:
+        yield task
+        total += 1
+  finally:
+    logging.debug('Yielded %d tasks; skipped %d', total, skipped)
