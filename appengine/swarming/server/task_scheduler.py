@@ -1278,26 +1278,26 @@ def bot_reap_task(bot_dimensions, bot_version):
                       request.task_id)
         continue
 
+      now = utils.utcnow()
+
       # Hard limit to schedule this task.
-      limit = request.expiration_ts
-      # We use expiration_secs of following slices if there are. Because if we
-      # found bot that the task can run on before cron job cancels such slices,
-      # it is still preferred to run the task on there instead of cancelling
-      # current slice and trying to find bot for next slice.
+      expiration_ts = request.expiration_ts
+
+      # If we found bot that can run the task slice, even if it is slightly
+      # expired, we prefer to run it than fallback.
       slice_expiration = request.created_ts
       slice_index = task_to_run.task_to_run_key_slice_index(to_run.key)
       for i in range(slice_index + 1):
         t = request.task_slice(i)
         slice_expiration += datetime.timedelta(seconds=t.expiration_secs)
-
-      now = utils.utcnow()
-      if now <= slice_expiration and limit < now:
+      if now <= slice_expiration and expiration_ts < now:
         logging.info('Task slice is expired, but task is not expired; '
                      'slice index: %d, slice expiration: %s, '
                      'task expiration: %s',
-                     slice_index, slice_expiration, limit)
+                     slice_index, slice_expiration, expiration_ts)
 
-      if limit < now:
+      if expiration_ts < now:
+        # The whole task request has expired.
         if expired >= 5:
           # Do not try to expire too many tasks in one poll request, as this
           # kills the polling performance in case of degenerate queue: this
@@ -1307,6 +1307,7 @@ def bot_reap_task(bot_dimensions, bot_version):
           failures += 1
           continue
 
+        # Expiring a TaskToRun for TaskSlice may reenqueue a new TaskToRun.
         summary, new_to_run = _expire_task(to_run.key, request, inline=True)
         if not new_to_run:
           if summary:
@@ -1314,8 +1315,11 @@ def bot_reap_task(bot_dimensions, bot_version):
           else:
             stale_index += 1
           continue
-        # Expiring a TaskToRun for TaskSlice may reenqueue a new TaskToRun.
-        # Check it out right away, just in case.
+
+        # Under normal circumstances, this code path should not be executed,
+        # since we already looked for the whole task request expiration, instead
+        # of the current task slice expiration. But let's handle this, just in
+        # case.
         reenqueued += 1
         # We need to do an adhoc validation to check the new TaskToRun, so see
         # if we can harvest it too. This is slightly duplicating work in
