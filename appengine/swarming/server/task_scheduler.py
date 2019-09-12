@@ -1580,6 +1580,18 @@ def cancel_task(request, result_key, kill_running, bot_id):
   now = utils.utcnow()
   es_cfg = external_scheduler.config_for_task(request)
 
+  if kill_running:
+    task_id = task_pack.pack_result_summary_key(result_key)
+    ok = utils.enqueue_task(
+        '/internal/taskqueue/important/tasks/cancel-children-tasks',
+        'cancel-children-tasks',
+        payload=utils.encode_to_json({
+            'task': task_id,
+        }))
+    if not ok:
+      raise Error('Failed to enqueue task to cancel-children-tasks queue;'
+                  ' task_id: %s' % task_id)
+
   def run():
     """1 DB GET, 1 memcache write, 2x DB PUTs, 1x task queue."""
     # Need to get the current try number to know which TaskToRun to fetch.
