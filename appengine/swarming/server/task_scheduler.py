@@ -380,7 +380,17 @@ def _handle_dead_bot(run_result_key):
       # Kill it as BOT_DIED, there was more than one try, the task expired in
       # the meantime or it wasn't idempotent.
       to_put = (run_result, result_summary)
-      run_result.state = task_result.State.BOT_DIED
+      if run_result.killing:
+        run_result.killing = False
+        run_result.state = task_result.State.KILLED
+        # set fallback values to exit_code and duration
+        if not run_result.exit_code:
+          run_result.exit_code = -1
+        if not run_result.duration:
+          # Calculate an approximate time.
+          run_result.duration = (now - run_result.started_ts).total_seconds()
+      else:
+        run_result.state = task_result.State.BOT_DIED
       run_result.internal_failure = True
       run_result.abandoned_ts = now
       run_result.completed_ts = now

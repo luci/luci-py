@@ -2368,6 +2368,41 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(
         (['1d69b9f088008911'], 0, 0), task_scheduler.cron_handle_bot_died())
 
+  def test_cron_handle_bot_died_killing(self):
+    # Test first retry, then success.
+    run_result = self._quick_reap(
+        1,
+        0,
+        task_slices=[
+            task_request.TaskSlice(
+                expiration_secs=600,
+                properties=_gen_properties(idempotent=True),
+                wait_for_capacity=False),
+        ])
+    result_summary = run_result.result_summary_key.get()
+
+    # cancel task
+    canceled, was_running = task_scheduler.cancel_task(
+        run_result.request, run_result.key, True, result_summary.bot_id)
+    self.assertTrue(canceled)
+    self.assertTrue(was_running)
+    self.execute_tasks()
+
+    # now the RunResult should be at killing state
+    run_result = run_result.key.get()
+    self.assertTrue(run_result.killing)
+
+    # execute the cron
+    self.mock_now(self.now + task_result.BOT_PING_TOLERANCE, 601)
+    self.assertEqual(([run_result.task_id], 0, 0),
+                     task_scheduler.cron_handle_bot_died())
+
+    # state should be KILLED
+    run_result = run_result.key.get()
+    self.assertEqual(
+        task_result.State.to_string(task_result.State.KILLED),
+        task_result.State.to_string(run_result.state))
+
   def test_cron_handle_external_cancellations(self):
     es_address = 'externalscheduler_address'
     es_id = 'es_id'
