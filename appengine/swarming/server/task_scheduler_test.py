@@ -291,6 +291,16 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(int('pubsub_topic' in kwargs), self.execute_tasks())
     return run_result
 
+  def _cancel_running_task(self, run_result):
+    """Cancels running task"""
+    canceled, was_running = task_scheduler.cancel_task(
+        run_result.request, run_result.key, True, run_result.bot_id)
+    self.assertTrue(canceled)
+    self.assertTrue(was_running)
+    self.execute_tasks()
+    run_result = run_result.key.get()
+    self.assertTrue(run_result.killing)
+
   def test_all_apis_are_tested(self):
     # Ensures there's a test for each public API.
     # TODO(maruel): Remove this once coverage is asserted.
@@ -1636,13 +1646,13 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
           self.bot_dimensions, 'abc')
       self.assertEqual(request.priority, e)
 
-  def test_bot_kill_task(self):
+  def test_bot_terminate_task(self):
     pub_sub_calls = self.mock_pub_sub()
     run_result = self._quick_reap(1, 0, pubsub_topic='projects/abc/topics/def')
     self.assertEqual(1, len(pub_sub_calls)) # PENDING -> RUNNING
 
     self.assertEqual(
-        None, task_scheduler.bot_kill_task(run_result.key, 'localhost'))
+        None, task_scheduler.bot_terminate_task(run_result.key, 'localhost'))
     expected = self._gen_result_summary_reaped(
         abandoned_ts=self.now,
         completed_ts=self.now,
@@ -1662,13 +1672,58 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(1, self.execute_tasks())
     self.assertEqual(2, len(pub_sub_calls)) # RUNNING -> BOT_DIED
 
-  def test_bot_kill_task_wrong_bot(self):
+  def test_bot_terminate_canceled_task(self):
+    pub_sub_calls = self.mock_pub_sub()
+    run_result = self._quick_reap(1, 0, pubsub_topic='projects/abc/topics/def')
+    self.assertEqual(1, len(pub_sub_calls))  # PENDING -> RUNNING
+
+    # cancel task
+    self._cancel_running_task(run_result)
+    self.assertEqual(2, len(pub_sub_calls))  # RUNNING -> killing
+
+    # execute termination task
+    err = task_scheduler.bot_terminate_task(run_result.key, 'localhost')
+    self.assertEqual(None, err)
+
+    # check result summary
+    expected = self._gen_result_summary_reaped(
+        abandoned_ts=self.now,
+        completed_ts=self.now,
+        costs_usd=[0.],
+        id='1d69b9f088008910',
+        internal_failure=True,
+        started_ts=self.now,
+        state=State.KILLED,
+        duration=0.0,
+        exit_code=-1,
+        failure=True,
+    )
+    self.assertEqual(expected, run_result.result_summary_key.get().to_dict())
+
+    # check run result
+    expected = self._gen_run_result(
+        abandoned_ts=self.now,
+        completed_ts=self.now,
+        id='1d69b9f088008911',
+        internal_failure=True,
+        state=State.KILLED,
+        killing=False,
+        duration=0.0,
+        exit_code=-1,
+        failure=True,
+    )
+    self.assertEqual(expected, run_result.key.get().to_dict())
+
+    self.assertEqual(1, self.execute_tasks())
+    self.assertEqual(3, len(pub_sub_calls))  # killing -> KILLED
+
+  def test_bot_terminate_task_wrong_bot(self):
     run_result = self._quick_reap(1, 0)
     expected = (
       'Bot bot1 sent task kill for task 1d69b9f088008911 owned by bot '
       'localhost')
-    self.assertEqual(
-        expected, task_scheduler.bot_kill_task(run_result.key, 'bot1'))
+    err = task_scheduler.bot_terminate_task(run_result.key, 'bot1')
+    self.assertEqual(expected, err)
 
   def test_cancel_task(self):
     # Cancel a pending task.
@@ -2381,16 +2436,8 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         ])
     result_summary = run_result.result_summary_key.get()
 
-    # cancel task
-    canceled, was_running = task_scheduler.cancel_task(
-        run_result.request, run_result.key, True, result_summary.bot_id)
-    self.assertTrue(canceled)
-    self.assertTrue(was_running)
-    self.execute_tasks()
-
-    # now the RunResult should be at killing state
-    run_result = run_result.key.get()
-    self.assertTrue(run_result.killing)
+    # cancel running task
+    self._cancel_running_task(run_result)
 
     # execute the cron
     self.mock_now(self.now + task_result.BOT_PING_TOLERANCE, 601)

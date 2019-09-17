@@ -1027,8 +1027,8 @@ class BotTaskErrorHandler(_BotApiHandler):
   """It is a specialized version of ereporter2's /ereporter2/api/v1/on_error
   that also attaches a task id to it.
 
-  This formally kills the task, marking it as an internal failure. This can be
-  used by bot_main.py to kill the task when task_runner misbehaved.
+  This formally terminates the task, marking it as an internal failure.
+  This can be used by bot_main.py to kill the task when task_runner misbehaved.
   """
 
   EXPECTED_KEYS = {u'id', u'message', u'task_id'}
@@ -1065,7 +1065,7 @@ class BotTaskErrorHandler(_BotApiHandler):
     if msg:
       self.abort_with_error(400, error=msg)
 
-    msg = task_scheduler.bot_kill_task(
+    msg = task_scheduler.bot_terminate_task(
         task_pack.unpack_run_result_key(task_id), bot_id)
     if msg:
       logging.error(msg)

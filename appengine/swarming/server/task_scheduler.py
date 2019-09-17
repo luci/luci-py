@@ -381,14 +381,12 @@ def _handle_dead_bot(run_result_key):
       # the meantime or it wasn't idempotent.
       to_put = (run_result, result_summary)
       if run_result.killing:
+        logging.warning('Killing task %s/%s on the missing bot %s',
+                        run_result.task_id, run_result.current_task_slice,
+                        run_result.bot_id)
         run_result.killing = False
         run_result.state = task_result.State.KILLED
-        # set fallback values to exit_code and duration
-        if not run_result.exit_code:
-          run_result.exit_code = -1
-        if not run_result.duration:
-          # Calculate an approximate time.
-          run_result.duration = (now - run_result.started_ts).total_seconds()
+        run_result = _set_fallbacks_to_exit_code_and_duration(run_result, now)
       else:
         run_result.state = task_result.State.BOT_DIED
       run_result.internal_failure = True
@@ -727,13 +725,7 @@ def _bot_update_tx(
         # https://crbug.com/916560
         run_result.state = task_result.State.TIMED_OUT
         run_result.completed_ts = now
-        # It may happen that the bot reports no exit code or duration, make sure
-        # a value is set.
-        if run_result.exit_code is None:
-          run_result.exit_code = -1
-        if run_result.duration is None:
-          # Calculate an approximate time.
-          run_result.duration = (now - run_result.started_ts).total_seconds()
+        run_result = _set_fallbacks_to_exit_code_and_duration(run_result, now)
       elif run_result.exit_code is not None:
         run_result.state = task_result.State.COMPLETED
         run_result.completed_ts = now
@@ -1094,6 +1086,16 @@ def _gen_new_keys(result_summary, to_run, secret_bytes):
       result_summary.key.kind(), result_summary.key.id(), parent=key)
   logging.info('%s conflicted, using %s', old, result_summary.task_id)
   return key
+
+
+def _set_fallbacks_to_exit_code_and_duration(run_result, now):
+  """Sets fallback values to exit_code and duration"""
+  if run_result.exit_code is None:
+    run_result.exit_code = -1
+  if not run_result.duration:
+    # Calculate an approximate time.
+    run_result.duration = (now - run_result.started_ts).total_seconds()
+  return run_result
 
 
 def schedule_request(request, secret_bytes):
@@ -1481,8 +1483,12 @@ def bot_update_task(
   return run_result.state
 
 
-def bot_kill_task(run_result_key, bot_id):
+def bot_terminate_task(run_result_key, bot_id):
   """Terminates a task that is currently running as an internal failure.
+
+  Sets the TaskRunResult's state to
+  - KILLED if it's canceled
+  - BOT_DIED otherwise
 
   Returns:
     str if an error message.
@@ -1508,7 +1514,12 @@ def bot_kill_task(run_result_key, bot_id):
       return None
 
     run_result.signal_server_version(server_version)
-    run_result.state = task_result.State.BOT_DIED
+    if run_result.killing:
+      run_result.killing = False
+      run_result.state = task_result.State.KILLED
+      run_result = _set_fallbacks_to_exit_code_and_duration(run_result, now)
+    else:
+      run_result.state = task_result.State.BOT_DIED
     run_result.internal_failure = True
     run_result.abandoned_ts = now
     run_result.completed_ts = now
