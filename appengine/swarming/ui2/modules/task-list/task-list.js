@@ -54,9 +54,8 @@ import { botListLink, onSmallScreen } from '../util'
 import { filterPossibleColumns, filterPossibleKeys,
          filterPossibleValues, makeFilter } from '../queryfilter'
 import { moreOrLess } from '../templates'
-
 import SwarmingAppBoilerplate from '../SwarmingAppBoilerplate'
-
+import { COUNT_FILTERS } from '../task'
 
 const colHead = (col, ele) => html`
 <th>${getColHeader(col)}
@@ -379,19 +378,7 @@ window.customElements.define('task-list', class extends SwarmingAppBoilerplate {
     this._possibleColumns = {};
     this._primaryMap = {};
 
-    this._queryCounts = [
-      {label: 'Total',        value: '...'},
-      {label: 'Success',      value: '...', filter: 'COMPLETED_SUCCESS'},
-      {label: 'Failure',      value: '...', filter: 'COMPLETED_FAILURE'},
-      {label: 'Pending',      value: '...', filter: 'PENDING'},
-      {label: 'Running',      value: '...', filter: 'RUNNING'},
-      {label: 'Timed Out',    value: '...', filter: 'TIMED_OUT'},
-      {label: 'Bot Died',     value: '...', filter: 'BOT_DIED'},
-      {label: 'Deduplicated', value: '...', filter: 'DEDUPED'},
-      {label: 'Expired',      value: '...', filter: 'EXPIRED'},
-      {label: 'No Resource',  value: '...', filter: 'NO_RESOURCE'},
-      {label: 'Canceled',     value: '...', filter: 'CANCELED'},
-    ];
+    this._queryCounts = COUNT_FILTERS
 
     this._message = 'You must sign in to see anything useful.';
     this._showColSelector = false;
@@ -571,10 +558,7 @@ window.customElements.define('task-list', class extends SwarmingAppBoilerplate {
   }
 
   _fetchCounts(queryParams, extra) {
-    const states = ['COMPLETED_SUCCESS', 'COMPLETED_FAILURE', 'PENDING',
-                    'RUNNING', 'TIMED_OUT', 'BOT_DIED', 'DEDUPED', 'EXPIRED',
-                    'NO_RESOURCE', 'CANCELED'];
-
+    const states = COUNT_FILTERS.slice(1).map(c => c.filter);
     this.app.addBusyTasks(1 + states.length);
     const totalPromise = fetch(`/_ah/api/swarming/v1/tasks/count?${queryParams}`, extra)
       .then(jsonOrThrow)

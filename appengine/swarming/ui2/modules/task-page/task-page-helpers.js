@@ -5,6 +5,7 @@
 import * as human from 'common-sk/modules/human'
 
 import { humanDuration, sanitizeAndHumanizeTime, timeDiffExact } from '../util'
+import { EXCEPTIONAL_STATES, ONGOING_STATES } from '../task'
 
 
 /** canRetry returns if the given task can be retried.
@@ -240,14 +241,13 @@ export function stateClass(result) {
     return '';
   }
   const state = result.state;
-  if (state === 'CANCELED' || state === 'TIMED_OUT' || state === 'EXPIRED' ||
-      state === 'NO_RESOURCE') {
+  if (EXCEPTIONAL_STATES.has(state)) {
     return 'exception';
   }
   if (state === 'BOT_DIED') {
     return 'bot_died';
   }
-  if (state === 'RUNNING' || state === 'PENDING') {
+  if (ONGOING_STATES.has(state)) {
     return 'pending_task';
   }
   if (state === 'COMPLETED') {
