@@ -772,6 +772,16 @@ def _bot_update_tx(
   return result_summary, run_result, None
 
 
+def _set_fallbacks_to_exit_code_and_duration(run_result, now):
+  """Sets fallback values to exit_code and duration"""
+  if run_result.exit_code is None:
+    run_result.exit_code = -1
+  if not run_result.duration:
+    # Calculate an approximate time.
+    run_result.duration = (now - run_result.started_ts).total_seconds()
+  return run_result
+
+
 def _cancel_task_tx(request, result_summary, kill_running, bot_id, now, es_cfg,
                     run_result=None):
   """Runs the transaction for cancel_task().
@@ -1086,16 +1096,6 @@ def _gen_new_keys(result_summary, to_run, secret_bytes):
       result_summary.key.kind(), result_summary.key.id(), parent=key)
   logging.info('%s conflicted, using %s', old, result_summary.task_id)
   return key
-
-
-def _set_fallbacks_to_exit_code_and_duration(run_result, now):
-  """Sets fallback values to exit_code and duration"""
-  if run_result.exit_code is None:
-    run_result.exit_code = -1
-  if not run_result.duration:
-    # Calculate an approximate time.
-    run_result.duration = (now - run_result.started_ts).total_seconds()
-  return run_result
 
 
 def schedule_request(request, secret_bytes):
