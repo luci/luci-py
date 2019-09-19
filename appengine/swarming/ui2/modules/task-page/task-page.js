@@ -392,7 +392,7 @@ const executionBlock = (properties, env, env_prefixes) => html`
 ${arrayInTable(env, 'Environment Vars',
               (env) => env.key + '=' + env.value)}
 ${arrayInTable(env_prefixes, 'Environment Prefixes',
-               prefix => prefix.key + '=' + prefix.value.join(':'))}
+               (prefix) => prefix.key + '=' + prefix.value.join(':'))}
 <tr>
   <td>Idempotent</td>
   <td>${!!properties.idempotent}</td>
