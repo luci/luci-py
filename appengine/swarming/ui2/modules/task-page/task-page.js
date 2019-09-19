@@ -178,7 +178,8 @@ const taskInfoTable = (ele, request, result, currentSlice) => {
   </tr>
 </tbody>
 <tbody ?hidden=${!ele._showDetails}>
-  ${executionBlock(currentSlice.properties, currentSlice.properties.env || [])}
+  ${executionBlock(currentSlice.properties, currentSlice.properties.env || [],
+                   currentSlice.properties.env_prefixes || [])}
 
   ${arrayInTable(request.tags,
                  'Tags', (tag) => tag)}
@@ -379,7 +380,7 @@ const commitBlock = (tagMap) => {
 </tr>
 `};
 
-const executionBlock = (properties, env) => html`
+const executionBlock = (properties, env, env_prefixes) => html`
 <tr>
   <td>Extra Args</td>
   <td class="code break-all">${(properties.extra_args || []).join(' ') || '--'}</td>
@@ -390,6 +391,8 @@ const executionBlock = (properties, env) => html`
 </tr>
 ${arrayInTable(env, 'Environment Vars',
               (env) => env.key + '=' + env.value)}
+${arrayInTable(env_prefixes, 'Environment Prefixes',
+               prefix => prefix.key + '=' + prefix.value.join(':'))}
 <tr>
   <td>Idempotent</td>
   <td>${!!properties.idempotent}</td>
