@@ -512,7 +512,7 @@ describe('task-list', function() {
         expect(valueSelector).toBeTruthy();
         values = childrenAsArray(valueSelector).map((c) => c.textContent.trim());
         // spot check
-        expect(values.length).toBe(13);
+        expect(values.length).toBe(14);
         expect(values).toContain('RUNNING');
         expect(values).toContain('COMPLETED_FAILURE');
 
@@ -810,7 +810,7 @@ describe('task-list', function() {
             expect(ele._allStates).toBeTruthy();
             countRows = $('#query_counts tr', ele);
             expect(countRows).toBeTruthy();
-            expect(countRows.length).toBe(1+11, '(num counts, displayed + 11 states)');
+            expect(countRows.length).toBe(1+12, '(num counts, displayed + 12 states)');
 
             showMore  = $$('.summary expand-more-icon-sk');
             showMore2 = $$('.summary more-horiz-icon-sk');
@@ -922,10 +922,10 @@ describe('task-list', function() {
       expectNoUnmatchedCalls(fetchMock);
     }
 
-    it('makes auth\'d API calls when a logged in user views landing page', function(done) {
+    it('maker auth\'d API calls when a logged in user views landing page', function(done) {
       loggedInTasklist((ele) => {
         let calls = fetchMock.calls(MATCHED, 'GET');
-        expect(calls.length).toBe(2+2+11, '2 GETs from swarming-app, 2 from task-list (11 counts)');
+        expect(calls.length).toBe(2+2+12, '2 GETs from swarming-app, 2 from task-list (12 counts)');
         // calls is an array of 2-length arrays with the first element
         // being the string of the url and the second element being
         // the options that were passed in
@@ -946,7 +946,7 @@ describe('task-list', function() {
         ele._addFilter('state:PENDING_RUNNING');
         fetchMock.flush(true).then(() => {
           const calls = fetchMock.calls(MATCHED, 'GET');
-          expect(calls.length).toBe(1+11, '1 from task-list and 11 counts');
+          expect(calls.length).toBe(1+12, '1 from task-list and 12 counts');
 
           const gets = calls.map((c) => c[0]);
           for (const get of gets) {
@@ -968,7 +968,7 @@ describe('task-list', function() {
         ele._addFilter('state:PENDING_RUNNING');
         fetchMock.flush(true).then(() => {
           const calls = fetchMock.calls(MATCHED, 'GET');
-          expect(calls.length).toBe(1+11, '1 from task-list and 11 counts');
+          expect(calls.length).toBe(1+12, '1 from task-list and 12 counts');
 
           const gets = calls.map((c) => c[0]);
           for (const get of gets) {
