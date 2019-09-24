@@ -43,7 +43,7 @@
     "karma-spec-reporter": "0.0.32",
     "karma-webpack": "^3.0.5",
     "postcss-loader": "~2.1.5",
-    "pulito": "~4.2.0",
+    "pulito": "~4.4.0",
     "sass-loader": "~7.0.0",
     "style-loader": "~0.21.0",
     "uglify-es": "~3.3.9",
