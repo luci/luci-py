@@ -1019,6 +1019,24 @@ def _should_allow_es_fallback(es_cfg, request):
   return task_es_cfg == es_cfg
 
 
+def _gen_new_keys(result_summary, to_run, secret_bytes):
+  """Creates new keys for the entities.
+
+  Warning: this assumes knowledge about the hierarchy of each entity.
+  """
+  key = task_request.new_request_key()
+  if to_run:
+    to_run.key = ndb.Key(to_run.key.kind(), to_run.key.id(), parent=key)
+  if secret_bytes:
+    secret_bytes.key = ndb.Key(
+        secret_bytes.key.kind(), secret_bytes.key.id(), parent=key)
+  old = result_summary.task_id
+  result_summary.key = ndb.Key(
+      result_summary.key.kind(), result_summary.key.id(), parent=key)
+  logging.info('%s conflicted, using %s', old, result_summary.task_id)
+  return key
+
+
 ### Public API.
 
 
@@ -1078,24 +1096,6 @@ def check_schedule_request_acl(request):
         'allowed to be used in the pool "%s". Is allowed_service_account or '
         'allowed_service_account_group specified in pools.cfg?' %
         (request.service_account, pool))
-
-
-def _gen_new_keys(result_summary, to_run, secret_bytes):
-  """Creates new keys for the entities.
-
-  Warning: this assumes knowledge about the hierarchy of each entity.
-  """
-  key = task_request.new_request_key()
-  if to_run:
-    to_run.key = ndb.Key(to_run.key.kind(), to_run.key.id(), parent=key)
-  if secret_bytes:
-    secret_bytes.key = ndb.Key(
-        secret_bytes.key.kind(), secret_bytes.key.id(), parent=key)
-  old = result_summary.task_id
-  result_summary.key = ndb.Key(
-      result_summary.key.kind(), result_summary.key.id(), parent=key)
-  logging.info('%s conflicted, using %s', old, result_summary.task_id)
-  return key
 
 
 def schedule_request(request, secret_bytes):
