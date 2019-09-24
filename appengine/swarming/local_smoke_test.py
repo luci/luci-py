@@ -445,8 +445,11 @@ class Test(unittest.TestCase):
         exit_code=u'1',
         failure=True,
         output=re.compile(
-            u'^<The executable does not exist or a dependent library is '
-            u'missing>'))
+            r'^<The executable does not exist, a dependent library '
+            r'is missing or the command line is too long>\n'
+            r'<Check for missing .so/.dll in the .isolate or GN file or '
+            r'length of command line args>')
+    )
     self.assertOneTask(args, summary, {})
 
   def test_hard_timeout(self):
