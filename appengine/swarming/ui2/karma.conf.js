@@ -17,11 +17,6 @@ webpackConfig.resolve = {
     modules: ['./node_modules', './'],
 }
 
-// https://github.com/webpack-contrib/karma-webpack/issues/322#issuecomment-417862717
-webpackConfig.output = {
-    filename: '[name]'
-}
-
 module.exports = function(config) {
   config.set({
 
