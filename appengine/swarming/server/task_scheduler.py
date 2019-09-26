@@ -932,7 +932,8 @@ def _ensure_active_slice(request, try_number, task_slice_index):
     to_runs = [r for r in to_runs if r.queue_number]
     if to_runs:
       if len(to_runs) != 1:
-        logging.error('_ensure_active_slice: %s != 1 TaskToRuns', len(to_runs))
+        logging.warning('_ensure_active_slice: %s != 1 TaskToRuns',
+                        len(to_runs))
         return None
       assert len(to_runs) == 1, 'Too many pending TaskToRuns.'
 
@@ -956,7 +957,7 @@ def _ensure_active_slice(request, try_number, task_slice_index):
     result_summary = task_pack.request_key_to_result_summary_key(
         request.key).get()
     if not result_summary:
-      logging.error('_ensure_active_slice: no TaskToRun or TaskResultSummary')
+      logging.warning('_ensure_active_slice: no TaskToRun or TaskResultSummary')
       return None
 
     if not result_summary.is_pending:
