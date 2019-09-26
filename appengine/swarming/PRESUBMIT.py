@@ -15,9 +15,10 @@ def CommonChecks(input_api, output_api):
     return input_api.os_path.join(input_api.PresubmitLocalPath(), *args)
 
   black_list = list(input_api.DEFAULT_BLACK_LIST) + [
-    r'ui2/node_modules/.*',
-    r'.*_pb2\.py$',
-    r'.*_pb2_grpc\.py$',
+      r'ui2/node_modules/.*',
+      r'ui2/nodejs/.*',
+      r'.*_pb2\.py$',
+      r'.*_pb2_grpc\.py$',
   ]
   disabled_warnings = [
     'relative-import',

@@ -1,5 +1,7 @@
+use_relative_paths = True
+
 deps = {
-  'infra/luci/appengine/swarming/ui2/nodejs/': {
+  'appengine/swarming/ui2/nodejs/': {
     'packages': [
       {
         'package': 'infra/nodejs/nodejs/${{platform}}',
