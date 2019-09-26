@@ -137,6 +137,8 @@ class TestOsUtilities(auto_stub.TestCase):
     actual.discard(u'visual_studio_version')
     # Only set on Windows machines.
     actual.discard(u'windows_client_version')
+    # Only set on python3 installed env.
+    actual.discard(u'python3')
 
     expected = {
         u'cores', u'cpu', u'gce', u'gpu', u'id', u'os', u'pool', u'python'}
@@ -262,6 +264,11 @@ class TestOsUtilities(auto_stub.TestCase):
 
     self.assertFalse(os_utilities.host_reboot(timeout=60))
     self.assertEqual(time.time(), 60)
+
+  def test_get_python3_version(self):
+    self.mock(subprocess, 'check_output',
+              lambda _, **kwargs: 'Python 3.8.0b1+chromium.1\n')
+    self.assertEqual(os_utilities.get_python3_version(), '3.8.0b1+chromium.1')
 
 
 if __name__ == '__main__':
