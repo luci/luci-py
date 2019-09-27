@@ -6,27 +6,13 @@ future-proof than the current Polymer v1 UI, but functionally identical.
 
 ## Prerequisites
 
-You will need to install a recent version of node.js and npm (they usually
-come together). You can either install it through `bash` or manually download
-and extract it somewhere (e.g. `~/bin`) from the web site https://nodejs.org/en/download/.
-
-The version available via apt-get is likely way way way too old.
-
-### npm via bash
-
-To install in the local user (as `~/nodejs` in this example), use:
-
-    echo prefix = ~/nodejs >> ~/.npmrc
-    mkdir ~/nodejs
-    cd ~/nodejs
-    curl https://nodejs.org/dist/v8.11.2/node-v8.11.2-linux-x64.tar.xz | tar xJ --strip-components=1
-    export PATH="$PATH:$HOME/nodejs/bin"
+You will install a node.js, npm and npx via cipd (they usually come together). You should always use the same node/npm/npx used in bots. Please use `gclient sync` to fetch them.
 
 ## npm install
 
 After doing a git pull, before running any make commands, you must run:
 
-    npm install
+    make install_deps
 
 This should only be required once per pull (in case package.json was updated).
 

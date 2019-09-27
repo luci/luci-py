@@ -1,3 +1,5 @@
+export PATH := ./nodejs/bin:$(PATH)
+
 .ONESHELL:
 
 default: package-lock.json
@@ -40,3 +42,6 @@ package-lock.json: package.json
 	# This should tell Makefile that the "built" package-lock.json file is older than
 	# the "source" package.json and thus does not require to be "rebuilt".
 	touch package-lock.json
+
+install_deps:
+	npm install
