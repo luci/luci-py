@@ -953,19 +953,14 @@ class TaskRunResult(_TaskResultCommon):
     super(TaskRunResult, self)._pre_put_hook()
     if not self.started_ts:
       raise datastore_errors.BadValueError('Must update .started_ts')
-    # TODO(adoneria): Add exceptions back when the server code is stable
-    # and https://crbug.com/999288 is resolved.
     if self.dead_after_ts:
       if self.dead_after_ts <= self.modified_ts:
-        logging.warning('.dead_after_ts must be set after .modified_ts')
-        # raise datastore_errors.BadValueError('.dead_after_ts must be set'
-        #                                     ' after .modified_ts')
+        raise datastore_errors.BadValueError('.dead_after_ts must be set'
+                                             ' after .modified_ts')
       if self.state != State.RUNNING:
-        logging.warning('.dead_after_ts should be None')
-        # raise datastore_errors.BadValueError('.dead_after_ts should be None')
+        raise datastore_errors.BadValueError('.dead_after_ts should be None')
     elif self.state == State.RUNNING:
-        logging.warning('Must update .dead_after_ts')
-        # raise datastore_errors.BadValueError('Must update .dead_after_ts')
+      raise datastore_errors.BadValueError('Must update .dead_after_ts')
 
 
 class TaskResultSummary(_TaskResultCommon):
