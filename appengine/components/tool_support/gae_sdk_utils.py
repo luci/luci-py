@@ -4,15 +4,20 @@
 
 """Set of functions to work with GAE SDK tools."""
 
+from __future__ import print_function
+
 import collections
+import datetime
 import glob
 import json
 import logging
+import math
 import os
 import re
 import subprocess
 import sys
 import time
+import urllib
 
 
 # 'setup_gae_sdk' loads the 'yaml' module and modifies this variable.
@@ -48,6 +53,15 @@ RUNTIME_TO_SDK = {
 # Path to a current SDK, set in setup_gae_sdk.
 _GAE_SDK_PATH = None
 
+# Advanced log filter to help users
+_SWITCH_ADVANCED_FILTER = '''
+resource.type="gae_app"
+resource.labels.version_id="{version}"
+logName="projects/{app_id}/logs/appengine.googleapis.com%2Frequest_log"
+severity>=ERROR
+NOT "Request was aborted after waiting too long"
+'''.strip()
+
 
 class Error(Exception):
   """Base class for a fatal error."""
@@ -63,6 +77,59 @@ class UnsupportedModuleError(Error):
 
 class LoginRequiredError(Error):
   """Raised by Application methods if use has to go through login flow."""
+
+
+def _roll_splits(duration, starting_split=None):
+  """Generates (old_weight, new_weight) values for
+  `gcloud app services set-traffic`, sleeping in between each yield.
+
+  Yields in max(`duration` / 100, 5 minute) intervals.
+
+  Duration should be the number of seconds we want to do the rolling deployment
+  over.
+
+  If starting_split is provided, this will offset the start/end times for the
+  yielded splits to pick up from where an aborted (or manual) migration left
+  off. e.g. if starting_split is '.25', then this is 50% of the way through
+  the migration (due to the migration's quadratic split curve), and so
+  yield_splits will start yielding from halfway through the migration.
+  """
+  interval = max(duration / 100, 5 * 60)
+  start = time.time()
+  end = start + duration
+
+  if starting_split:
+    print('\n' + '=' * 60)
+    print('Resuming migration at %.1f%%' % (starting_split * 100))
+    offset_seconds = math.sqrt(starting_split) * duration
+    start -= offset_seconds
+    end -= offset_seconds
+    print('%.1fs left to go in this migration' % (end - time.time(),))
+    print(('=' * 60) + '\n')
+
+  while True:
+    now = time.time()
+    if now > end:
+      break
+
+    # The potential weight is the number of seconds elapsed divided by the total
+    # number of seconds. Because we want to follow a quadratic curve (instead of
+    # linear), we square this.
+    seconds_elapsed = now - start
+    potential_weight = (seconds_elapsed / duration)**2
+
+    # The actual new weight is at least 1%, but never more than 100%.
+    new_weight = min(1, max(potential_weight, .01))
+    if new_weight >= 1:
+      break
+
+    yield 1. - new_weight, new_weight
+
+    duration_left = end - now
+    to_sleep = min(interval, duration_left)
+    print('sleeping %ss for next split (%.1fs left in migration)\n' %
+          (to_sleep, duration_left))
+    time.sleep(to_sleep)
 
 
 def find_gcloud():
@@ -124,13 +191,14 @@ def find_gae_sdk_gcloud():
   sdk_root = os.path.dirname(os.path.dirname(gcloud))
   gae_sdk = os.path.join(sdk_root, 'platform', 'google_appengine')
   if not os.path.isdir(gae_sdk):
-    print >> sys.stderr, (
+    print(
         '-------------------------------------------------------------------\n'
         'Found Cloud SDK in %s but it doesn\'t have App Engine components.\n'
         'If you want to use this SDK, install necessary components:\n'
         '  gcloud components install app-engine-python app-engine-go\n'
-        '-------------------------------------------------------------------'
-        % sdk_root)
+        '-------------------------------------------------------------------' %
+        sdk_root,
+        file=sys.stderr)
     return None
   return gae_sdk
 
@@ -329,6 +397,8 @@ class Application(object):
       raise ValueError('application ID is neither specified in default '
           'service nor provided explicitly')
 
+    self._cached_get_actives = None
+
   @property
   def app_dir(self):
     """Absolute path to application directory."""
@@ -427,9 +497,39 @@ class Application(object):
       per_service[service].append(version_id)
     return dict(per_service)
 
-  def set_default_version(self, version, services=None):
+  def oldest_active_version(self, services=None):
+    """Returns the oldest active version of the app, or None if no version
+    is active.
+
+    Splits version numbers on '-', converts any decimal portions of the split
+    version to an int, then compares the resulting tuples to find the lowest
+    one.
+    """
+    actives = self.get_actives(services)
+    if actives:
+      return actives[0]['id']
+    return None
+
+  def set_default_version(self, version, services=None, roll_duration=None):
     """Switches default version of given |services| to |version|."""
+
+    advanced_filter = _SWITCH_ADVANCED_FILTER.format(
+        version=version, app_id=self.app_id)
+    url = ('https://pantheon.corp.google.com/logs/viewer?' + urllib.urlencode({
+        'project': self.app_id,
+        'minLogLevel': 0,
+        'customFacets': '',
+        'limitCustomFacetWidth': 'true',
+        'interval': 'NO_LIMIT',
+        'resource': 'gae_app/module_id/backend/version_id/' + version,
+        'advancedFilter': advanced_filter,
+    }))
+    print('Monitor error logs for new version here:', url, '\n')
+
     if not USE_GCLOUD:
+      if roll_duration:
+        # shouldn't be possible, but just to make sure
+        raise ValueError('rolling updates only available in gcloud mode')
       self.run_appcfg([
         'set_default_version',
         '--module', ','.join(sorted(services or self.services)),
@@ -437,17 +537,44 @@ class Application(object):
       ])
       return
 
+    services = sorted(services or self.services)
+    base_cmd = (['app', 'services', 'set-traffic'] + services +
+                ['--quiet', '--split-by', 'cookie', '--splits'])
+
+    from_version = self.oldest_active_version(services)
+    if roll_duration and from_version != version:
+      if len(set(info['id'] for info in self.get_actives(services))) > 2:
+        print('Too many active versions! See `gae active`.')
+        raise ValueError('too many active versions')
+
+      previous_split = None
+      for info in self.get_actives(services):
+        if info['id'] == version:
+          split = info['traffic_split']
+          if previous_split is None or split < previous_split:
+            previous_split = split
+
+      print('Beginning migration, press ctrl-C to cancel and reset to %r' %
+            (from_version,))
+
+      try:
+        for old, new in _roll_splits(roll_duration, previous_split):
+          self.run_gcloud(base_cmd + [
+              '%s=%s,%s=%s' % (from_version, old, version, new),
+          ])
+        self.run_gcloud(base_cmd + ['%s=1' % (version,)])
+        print('\nMigration complete!')
+        return
+      except KeyboardInterrupt:
+        logging.error('Got KeyboardInterrupt: rolling back')
+        version = from_version
+
     # There's 'versions migrate' command. Unfortunately it requires enabling
     # warmup requests for all services if at least one service has it, which is
     # very inconvenient. Use 'services set-traffic' instead that is free of this
     # weird restriction. If a gradual traffic migration is desired, users can
     # click buttons in Cloud Console.
-    for m in sorted(services or self.services):
-      self.run_gcloud([
-        'app', 'services', 'set-traffic',
-        m, '--splits', '%s=1' % version,
-        '--quiet'
-      ])
+    self.run_gcloud(base_cmd + ['%s=1' % version])
 
   def delete_version(self, version, services=None):
     """Deletes the specified version of the given service names."""
@@ -650,19 +777,43 @@ class Application(object):
     return sorted(actual_versions, key=extract_version_num)
 
   def get_actives(self, services=None):
-    """Returns active version(s)."""
-    data = self.run_gcloud(['app', 'versions', 'list', '--hide-no-traffic'])
-    # TODO(maruel): Handle when traffic_split != 1.0.
-    # TODO(maruel): There's a lot more data, decide what is generally useful in
-    # there.
-    return [
-      {
-        'creationTime': service['version']['createTime'],
-        'deployer': service['version']['createdBy'],
-        'id': service['id'],
-        'service': service['service'],
-      } for service in data if not services or service['service'] in services
-    ]
+    """Returns active version(s) sorted by smaller version number first.
+
+    Sorted by (service, ALNUM(id)), where `ALNUM` splits the id (once) by '-',
+    and turns any numeral sections to int.
+    """
+
+    def _sort_key(info):
+      toks = info['id'].split('-', 1)
+      if len(toks) == 1:
+        return (info['service'], info['id'])
+
+      maybe_vers, rest = toks
+      try:
+        maybe_vers = int(maybe_vers)
+      except ValueError:
+        pass
+
+      return (info['service'], (maybe_vers, rest))
+
+    if self._cached_get_actives is None:
+      data = self.run_gcloud(['app', 'versions', 'list', '--hide-no-traffic'])
+      # There's a lot more data, add what's useful in here as needed.
+      actives = [{
+          'creationTime': service['version']['createTime'],
+          'deployer': service['version']['createdBy'],
+          'id': service['id'],
+          'traffic_split': service['traffic_split'],
+          'service': service['service'],
+      } for service in data]
+      self._cached_get_actives = sorted(actives, key=_sort_key)
+
+    if services:
+      return [
+          service for service in self._cached_get_actives
+          if service['service'] in services
+      ]
+    return self._cached_get_actives
 
 
 def setup_env(app_dir, app_id, version, service_id, remote_api=False):
@@ -686,6 +837,42 @@ def setup_env(app_dir, app_id, version, service_id, remote_api=False):
         version, int(time.time()) << 28)
   if service_id:
     os.environ['CURRENT_MODULE_ID'] = service_id
+
+
+def add_roll_duration_option(parser):
+  parser.set_defaults(roll_duration=None)
+
+  if not USE_GCLOUD:
+    return
+
+  _TIME_RE = re.compile(r'(?:(?P<hour>\d+)h)?(?:(?P<min>\d+)m)?')
+
+  def _opt_callback(option, _opt, value, parser):
+    match = _TIME_RE.match(value or '2h')
+    if not match:
+      raise ValueError(
+          "RollDuration: cannot parse duration as NNhNNm: %r" % (value,))
+
+    setattr(
+        parser.values, option.dest,
+        datetime.timedelta(
+            hours=int(match.group('hour') or 0),
+            minutes=int(match.group('min') or 0)).total_seconds())
+
+  parser.add_option(
+      '--roll-update',
+      metavar='duration',
+      type='str',
+      nargs=1,
+      dest='roll_duration',
+      action='callback',
+      callback=_opt_callback,
+      help=('Do a rolling update over over a period of `duration`. The roll '
+            'follows a simple quadratic curve and use cookie traffic '
+            'distribution (which, for API users, should be the same as random).'
+            ' Duration may be specified as "[NNh][NNm]" where N are numbers. '
+            'Canceling gae with ctrl-C will immediately switch back to 0% '
+            'traffic for the new version.'))
 
 
 def add_sdk_options(parser, default_app_dir):
@@ -813,4 +1000,3 @@ def setup_gae_env():
   if not sdk_path:
     raise BadEnvironmentError('Couldn\'t find GAE SDK.')
   setup_gae_sdk(sdk_path)
-
