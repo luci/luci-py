@@ -259,7 +259,7 @@ class SnapshotToProtoConversionTest(test_case.TestCase):
   def assert_serialization_works(self, snapshot):
     """Ensures AuthDBSnapshot == AuthDBSnapshot -> proto -> AuthDBSnapshot."""
     roundtrip = replication.proto_to_auth_db_snapshot(
-        replication.auth_db_snapshot_to_proto(snapshot))
+        replication.auth_db_snapshot_to_proto(snapshot), False)
     self.assertEqual(snapshot_to_dict(snapshot), snapshot_to_dict(roundtrip))
 
   def test_empty(self):

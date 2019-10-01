@@ -145,26 +145,26 @@ class SignatureTest(test_case.TestCase):
 class ValidationTest(test_case.TestCase):
   def test_passes_validation(self):
     tok = fake_subtoken_proto('user:abc@example.com')
-    ident = delegation.check_subtoken(tok, FAKE_IDENT, api.AuthDB())
+    ident = delegation.check_subtoken(tok, FAKE_IDENT, api.AuthDB.empty())
     self.assertEqual('user:abc@example.com', ident.to_bytes())
 
   def test_negative_validatity_duration(self):
     tok = fake_subtoken_proto('user:abc@example.com', validity_duration=-3600)
     with self.assertRaises(exceptions.BadTokenError):
-      delegation.check_subtoken(tok, FAKE_IDENT, api.AuthDB())
+      delegation.check_subtoken(tok, FAKE_IDENT, api.AuthDB.empty())
 
   def test_expired(self):
     now = int(utils.time_time())
     tok = fake_subtoken_proto(
         'user:abc@example.com', creation_time=now-120, validity_duration=60)
     with self.assertRaises(exceptions.BadTokenError):
-      delegation.check_subtoken(tok, FAKE_IDENT, api.AuthDB())
+      delegation.check_subtoken(tok, FAKE_IDENT, api.AuthDB.empty())
 
   def test_not_active_yet(self):
     now = int(utils.time_time())
     tok = fake_subtoken_proto('user:abc@example.com', creation_time=now+120)
     with self.assertRaises(exceptions.BadTokenError):
-      delegation.check_subtoken(tok, FAKE_IDENT, api.AuthDB())
+      delegation.check_subtoken(tok, FAKE_IDENT, api.AuthDB.empty())
 
   def test_allowed_clock_drift(self):
     now = utils.utcnow()
@@ -172,11 +172,12 @@ class ValidationTest(test_case.TestCase):
     tok = fake_subtoken_proto('user:abc@example.com')
     # Works -29 sec before activation.
     self.mock_now(now, -29)
-    self.assertTrue(delegation.check_subtoken(tok, FAKE_IDENT, api.AuthDB()))
+    self.assertTrue(delegation.check_subtoken(
+        tok, FAKE_IDENT, api.AuthDB.empty()))
     # Doesn't work before that.
     self.mock_now(now, -31)
     with self.assertRaises(exceptions.BadTokenError):
-      delegation.check_subtoken(tok, FAKE_IDENT, api.AuthDB())
+      delegation.check_subtoken(tok, FAKE_IDENT, api.AuthDB.empty())
 
   def test_expiration_moment(self):
     now = utils.utcnow()
@@ -184,11 +185,12 @@ class ValidationTest(test_case.TestCase):
     tok = fake_subtoken_proto('user:abc@example.com', validity_duration=3600)
     # Active at now + 3599.
     self.mock_now(now, 3599)
-    self.assertTrue(delegation.check_subtoken(tok, FAKE_IDENT, api.AuthDB()))
+    self.assertTrue(delegation.check_subtoken(
+        tok, FAKE_IDENT, api.AuthDB.empty()))
     # Expired at now + 3601.
     self.mock_now(now, 3601)
     with self.assertRaises(exceptions.BadTokenError):
-      delegation.check_subtoken(tok, FAKE_IDENT, api.AuthDB())
+      delegation.check_subtoken(tok, FAKE_IDENT, api.AuthDB.empty())
 
   def test_subtoken_services(self):
     tok = fake_subtoken_proto(
@@ -197,16 +199,17 @@ class ValidationTest(test_case.TestCase):
     self.mock(
         model, 'get_service_self_identity',
         lambda: model.Identity.from_bytes('service:app-id'))
-    self.assertTrue(delegation.check_subtoken(tok, FAKE_IDENT, api.AuthDB()))
+    self.assertTrue(delegation.check_subtoken(
+        tok, FAKE_IDENT, api.AuthDB.empty()))
     # Fails.
     self.mock(
         model, 'get_service_self_identity',
         lambda: model.Identity.from_bytes('service:another-app-id'))
     with self.assertRaises(exceptions.BadTokenError):
-      delegation.check_subtoken(tok, FAKE_IDENT, api.AuthDB())
+      delegation.check_subtoken(tok, FAKE_IDENT, api.AuthDB.empty())
 
   def test_subtoken_audience(self):
-    auth_db = api.AuthDB(groups=[model.AuthGroup(
+    auth_db = api.AuthDB.from_entities(groups=[model.AuthGroup(
       id='abc', members=[model.Identity.from_bytes('user:b@b.com')],
     )])
     tok = fake_subtoken_proto(

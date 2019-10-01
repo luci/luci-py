@@ -208,8 +208,16 @@ def auth_db_snapshot_to_proto(snapshot, auth_db_proto=None):
   return auth_db_proto
 
 
-def proto_to_auth_db_snapshot(auth_db_proto):
-  """Given replication_pb2.AuthDB message returns AuthDBSnapshot."""
+def proto_to_auth_db_snapshot(auth_db_proto, skip_groups):
+  """Given replication_pb2.AuthDB message returns AuthDBSnapshot.
+
+  Args:
+    auth_db_proto: replication_pb2.AuthDB message.
+    skip_groups: if True, groups won't be extracted.
+
+  Returns:
+    AuthDBSnapshot.
+  """
   # Explicit conversion to 'list' is needed here since protobuf magic doesn't
   # stack with NDB magic.
   global_config = model.AuthGlobalConfig(
@@ -221,20 +229,22 @@ def proto_to_auth_db_snapshot(auth_db_proto):
       token_server_url=auth_db_proto.token_server_url,
       security_config=auth_db_proto.security_config)
 
-  groups = [
-    model.AuthGroup(
-        key=model.group_key(msg.name),
-        members=[model.Identity.from_bytes(x) for x in msg.members],
-        globs=[model.IdentityGlob.from_bytes(x) for x in msg.globs],
-        nested=list(msg.nested),
-        description=msg.description,
-        owners=msg.owners or model.ADMIN_GROUP,
-        created_ts=utils.timestamp_to_datetime(msg.created_ts),
-        created_by=model.Identity.from_bytes(msg.created_by),
-        modified_ts=utils.timestamp_to_datetime(msg.modified_ts),
-        modified_by=model.Identity.from_bytes(msg.modified_by))
-    for msg in auth_db_proto.groups
-  ]
+  groups = []
+  if not skip_groups:
+    groups = [
+      model.AuthGroup(
+          key=model.group_key(msg.name),
+          members=[model.Identity.from_bytes(x) for x in msg.members],
+          globs=[model.IdentityGlob.from_bytes(x) for x in msg.globs],
+          nested=list(msg.nested),
+          description=msg.description,
+          owners=msg.owners or model.ADMIN_GROUP,
+          created_ts=utils.timestamp_to_datetime(msg.created_ts),
+          created_by=model.Identity.from_bytes(msg.created_by),
+          modified_ts=utils.timestamp_to_datetime(msg.modified_ts),
+          modified_by=model.Identity.from_bytes(msg.modified_by))
+      for msg in auth_db_proto.groups
+    ]
 
   ip_whitelists = [
     model.AuthIPWhitelist(
@@ -403,7 +413,7 @@ def push_auth_db(revision, auth_db):
 
   # Try to apply it to Auth* datastore entities, retry until success (or until
   # some other task applies an even newer version of auth_db).
-  snapshot = proto_to_auth_db_snapshot(auth_db)
+  snapshot = proto_to_auth_db_snapshot(auth_db, False)
   while True:
     applied, current_state = replace_auth_db(
         revision.auth_db_rev,
@@ -458,6 +468,7 @@ def store_sharded_auth_db(auth_db, primary_url, auth_db_rev, shard_size):
   return ids
 
 
+@ndb.non_transactional
 def load_sharded_auth_db(primary_url, auth_db_rev, shard_ids):
   """Reconstructs replication_pb2.AuthDB proto from shards in datastore.
 

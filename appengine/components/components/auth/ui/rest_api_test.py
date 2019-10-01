@@ -2057,7 +2057,7 @@ class OAuthConfigHandlerTest(RestAPITestCase):
         oauth_additional_client_ids=['a', 'b', 'c'],
         token_server_url='https://token-server')
     self.mock(rest_api.api, 'get_request_auth_db',
-        lambda: api.AuthDB(global_config=fake_config))
+        lambda: api.AuthDB.from_entities(global_config=fake_config))
     # Call should return this data.
     expected = {
       'additional_client_ids': ['a', 'b', 'c'],
@@ -2087,7 +2087,7 @@ class OAuthConfigHandlerTest(RestAPITestCase):
         oauth_additional_client_ids=['c', 'd'],
         token_server_url='https://token-server-cache')
     self.mock(rest_api.api, 'get_request_auth_db',
-        lambda: api.AuthDB(global_config=config_in_cache))
+        lambda: api.AuthDB.from_entities(global_config=config_in_cache))
 
     # Without cache control header a cached version is used.
     expected = {

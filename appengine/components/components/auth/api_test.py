@@ -22,6 +22,7 @@ from components.auth import api
 from components.auth import config
 from components.auth import ipaddr
 from components.auth import model
+from components.auth import replication
 from components import utils
 from test_support import test_case
 
@@ -48,7 +49,7 @@ class AuthDBTest(test_case.TestCase):
       modified_by=model.Identity.from_bytes('user:y@example.com'),
       modified_ts=datetime.datetime(2015, 1, 2, 3, 4, 5))
 
-    db = api.AuthDB(groups=[g])
+    db = api.AuthDB.from_entities(groups=[g])
 
     # Unknown group.
     self.assertIsNone(db.get_group('blah'))
@@ -87,8 +88,8 @@ class AuthDBTest(test_case.TestCase):
     with_nesting.nested.append('WithListing')
 
     # Creates AuthDB with given list of groups and then runs the check.
-    is_member = (lambda groups, identity, group:
-        api.AuthDB(groups=groups).is_group_member(group, identity))
+    is_member = (lambda groups, ident, group:
+        api.AuthDB.from_entities(groups=groups).is_group_member(group, ident))
 
     # Wildcard group includes everyone (even anonymous).
     self.assertTrue(is_member([], joe, '*'))
@@ -113,7 +114,7 @@ class AuthDBTest(test_case.TestCase):
 
   def test_list_group(self):
     def list_group(groups, group, recursive):
-      l = api.AuthDB(groups=groups).list_group(group, recursive)
+      l = api.AuthDB.from_entities(groups=groups).list_group(group, recursive)
       return api.GroupListing(
           sorted(l.members), sorted(l.globs), sorted(l.nested))
 
@@ -185,7 +186,7 @@ class AuthDBTest(test_case.TestCase):
     self.mock(api.logging, 'warning', lambda msg, *_args: warnings.append(msg))
 
     # This should not hang, but produce error message.
-    auth_db = api.AuthDB(groups=[group1, group2])
+    auth_db = api.AuthDB.from_entities(groups=[group1, group2])
     self.assertFalse(
         auth_db.is_group_member('Group1', model.Anonymous))
     self.assertEqual(1, len(warnings))
@@ -202,7 +203,7 @@ class AuthDBTest(test_case.TestCase):
     group_B.nested = ['A']
     group_C.nested = ['A', 'B']
 
-    db = api.AuthDB(groups=[group_A, group_B, group_C])
+    db = api.AuthDB.from_entities(groups=[group_A, group_B, group_C])
 
     # 'is_group_member' must not report 'Cycle in a group graph' warning.
     warnings = []
@@ -214,7 +215,7 @@ class AuthDBTest(test_case.TestCase):
     global_config = model.AuthGlobalConfig(
         oauth_client_id='1',
         oauth_additional_client_ids=['2', '3'])
-    auth_db = api.AuthDB(
+    auth_db = api.AuthDB.from_entities(
         global_config=global_config,
         additional_client_ids=['local'])
     self.assertFalse(auth_db.is_allowed_oauth_client_id(None))
@@ -237,7 +238,10 @@ class AuthDBTest(test_case.TestCase):
     # Exist now.
     self.assertTrue(model.root_key().get())
 
-  def test_fetch_auth_db(self):
+  def run_auth_db_fetch_test(self, setup_cb):
+    now = utils.utcnow()
+    ident = model.Identity.from_bytes('user:a@example.com')
+
     # Client IDs callback. Disable config.ensure_configured() since it overrides
     # _additional_client_ids_cb after we mock it.
     self.mock(config, 'ensure_configured', lambda: None)
@@ -249,67 +253,116 @@ class AuthDBTest(test_case.TestCase):
     global_config.oauth_client_id = '1'
     global_config.oauth_client_secret = 'secret'
     global_config.oauth_additional_client_ids = ['2', '3']
+    global_config.security_config = 'security_config'
+    global_config.token_server_url = 'token_server_url'
     global_config.put()
 
     # Create a bunch of (empty) groups.
     groups = [
-      model.AuthGroup(key=model.group_key('Group A')),
-      model.AuthGroup(key=model.group_key('Group B')),
+      model.AuthGroup(
+          key=model.group_key('Group A'),
+          created_ts=now,
+          created_by=ident,
+          modified_ts=now,
+          modified_by=ident),
+      model.AuthGroup(
+          key=model.group_key('Group B'),
+          created_ts=now,
+          created_by=ident,
+          modified_ts=now,
+          modified_by=ident),
     ]
     for group in groups:
       group.put()
 
-    # And a bunch of secrets.
-    secrets = [model.AuthSecret.bootstrap('local%d' % i) for i in (0, 1, 2)]
-
-    # And IP whitelist.
+    # And a bunch IP whitelist.
     ip_whitelist_assignments = model.AuthIPWhitelistAssignments(
         key=model.ip_whitelist_assignments_key(),
         assignments=[
           model.AuthIPWhitelistAssignments.Assignment(
             identity=model.Anonymous,
             ip_whitelist='some ip whitelist',
+            created_ts=now,
+            created_by=ident,
+            comment='comment',
           ),
         ])
     ip_whitelist_assignments.put()
+
     some_ip_whitelist = model.AuthIPWhitelist(
         key=model.ip_whitelist_key('some ip whitelist'),
-        subnets=['127.0.0.1/32'])
+        subnets=['127.0.0.1/32'],
+        description='description',
+        created_ts=now,
+        created_by=ident,
+        modified_ts=now,
+        modified_by=ident)
     bots_ip_whitelist = model.AuthIPWhitelist(
         key=model.ip_whitelist_key('bots'),
-        subnets=['127.0.0.1/32'])
+        subnets=['127.0.0.1/32'],
+        description='description',
+        created_ts=now,
+        created_by=ident,
+        modified_ts=now,
+        modified_by=ident)
     some_ip_whitelist.put()
     bots_ip_whitelist.put()
 
+    if setup_cb:
+      setup_cb()
+
     # This all stuff should be fetched into AuthDB.
     auth_db = api.fetch_auth_db()
-    self.assertEqual(global_config, auth_db.global_config)
+    self.assertEqual(global_config, auth_db._global_config)
     self.assertEqual(
         set(g.key.id() for g in groups),
-        set(auth_db.groups))
-    self.assertEqual(
-        set(s.key.id() for s in secrets),
-        set(auth_db.secrets))
+        set(auth_db._groups))
     self.assertEqual(
         ip_whitelist_assignments,
-        auth_db.ip_whitelist_assignments)
+        auth_db._ip_whitelist_assignments)
     self.assertEqual(
         {'bots': bots_ip_whitelist, 'some ip whitelist': some_ip_whitelist},
-        auth_db.ip_whitelists)
+        auth_db._ip_whitelists)
     self.assertTrue(auth_db.is_allowed_oauth_client_id('1'))
     self.assertTrue(auth_db.is_allowed_oauth_client_id('cb_client_id'))
     self.assertTrue(auth_db.is_allowed_oauth_client_id('web_client_id'))
     self.assertFalse(auth_db.is_allowed_oauth_client_id(''))
 
-  def test_get_secret(self):
-    # Make AuthDB with two secrets.
-    secret = model.AuthSecret.bootstrap('some_secret')
-    auth_db = api.AuthDB(secrets=[secret])
+    return auth_db
 
-    # Ensure they are accessible via get_secret.
-    self.assertEqual(
-        secret.values,
-        auth_db.get_secret(api.SecretKey('some_secret')))
+  def test_fetch_auth_db_from_entities(self):
+    auth_db = self.run_auth_db_fetch_test(None)
+    self.assertEqual('from_entities', auth_db._from_what)
+
+  def test_fetch_auth_db_from_snapshot(self):
+    PRIMARY_ID = 'primary_id'
+    PRIMARY_URL = 'https://primary_url'
+    AUTH_DB_REV = 12345
+
+    def setup_snapshot():
+      # Create AuthDB snapshot entities from existing "detailed" entities in
+      # the datastore.
+      _, snap = replication.new_auth_db_snapshot()
+      # Switch into Replica mode, store the snapshot.
+      model.AuthReplicationState(
+          key=model.replication_state_key(),
+          primary_id=PRIMARY_ID,
+          primary_url=PRIMARY_URL,
+          auth_db_rev=AUTH_DB_REV,
+          shard_ids=replication.store_sharded_auth_db(
+              auth_db=replication.auth_db_snapshot_to_proto(snap),
+              primary_url=PRIMARY_URL,
+              auth_db_rev=AUTH_DB_REV,
+              shard_size=100,
+          ),
+      ).put()
+
+    auth_db = self.run_auth_db_fetch_test(setup_snapshot)
+
+    self.assertEqual('from_proto', auth_db._from_what)
+    self.assertEqual(PRIMARY_ID, auth_db.primary_id)
+    self.assertEqual(PRIMARY_URL, auth_db.primary_url)
+    self.assertEqual(AUTH_DB_REV, auth_db.auth_db_rev)
 
   def test_get_secret_bootstrap(self):
     # Mock AuthSecret.bootstrap to capture calls to it.
@@ -323,7 +376,7 @@ class AuthDBTest(test_case.TestCase):
       return result
     self.mock(api.model.AuthSecret, 'bootstrap', mocked_bootstrap)
 
-    auth_db = api.AuthDB()
+    auth_db = api.AuthDB.empty()
     got = auth_db.get_secret(api.SecretKey('some_secret'))
     self.assertEqual(['123'], got)
     self.assertEqual(['some_secret'], calls)
@@ -331,7 +384,7 @@ class AuthDBTest(test_case.TestCase):
   @staticmethod
   def make_auth_db_with_ip_whitelist():
     """AuthDB with a@example.com assigned IP whitelist '127.0.0.1/32'."""
-    return api.AuthDB(
+    return api.AuthDB.from_entities(
       ip_whitelists=[
         model.AuthIPWhitelist(
           key=model.ip_whitelist_key('some ip whitelist'),
@@ -370,7 +423,7 @@ class AuthDBTest(test_case.TestCase):
         ident, ipaddr.ip_from_string('192.168.0.100'))
 
   def test_verify_ip_whitelisted_missing_whitelist(self):
-    auth_db = api.AuthDB(
+    auth_db = api.AuthDB.from_entities(
       ip_whitelist_assignments=model.AuthIPWhitelistAssignments(
         assignments=[
           model.AuthIPWhitelistAssignments.Assignment(
@@ -453,8 +506,10 @@ class TestAuthDBCache(test_case.TestCase):
   def test_get_process_auth_db_expiration(self):
     """Ensure get_process_auth_db() respects expiration."""
     # Prepare several instances of AuthDB to be used in mocks.
-    auth_db_v0 = api.AuthDB(replication_state=mock_replication_state(0))
-    auth_db_v1 = api.AuthDB(replication_state=mock_replication_state(1))
+    auth_db_v0 = api.AuthDB.from_entities(
+        replication_state=mock_replication_state(0))
+    auth_db_v1 = api.AuthDB.from_entities(
+        replication_state=mock_replication_state(1))
 
     # Fetch initial copy of AuthDB.
     self.set_time(0)
@@ -474,8 +529,10 @@ class TestAuthDBCache(test_case.TestCase):
   def test_get_process_auth_db_known_version(self):
     """Ensure get_process_auth_db() respects entity group version."""
     # Prepare several instances of AuthDB to be used in mocks.
-    auth_db_v0 = api.AuthDB(replication_state=mock_replication_state(0))
-    auth_db_v0_again = api.AuthDB(replication_state=mock_replication_state(0))
+    auth_db_v0 = api.AuthDB.from_entities(
+        replication_state=mock_replication_state(0))
+    auth_db_v0_again = api.AuthDB.from_entities(
+        replication_state=mock_replication_state(0))
 
     # Fetch initial copy of AuthDB.
     self.set_time(0)
@@ -500,8 +557,10 @@ class TestAuthDBCache(test_case.TestCase):
       return result
 
     # Prepare several instances of AuthDB to be used in mocks.
-    auth_db_v0 = api.AuthDB(replication_state=mock_replication_state(0))
-    auth_db_v1 = api.AuthDB(replication_state=mock_replication_state(1))
+    auth_db_v0 = api.AuthDB.from_entities(
+        replication_state=mock_replication_state(0))
+    auth_db_v1 = api.AuthDB.from_entities(
+        replication_state=mock_replication_state(1))
 
     # Run initial fetch, should cache |auth_db_v0| in process cache.
     self.set_time(0)
@@ -541,8 +600,10 @@ class TestAuthDBCache(test_case.TestCase):
   def test_get_process_auth_db_exceptions(self):
     """Ensure get_process_auth_db() handles DB exceptions well."""
     # Prepare several instances of AuthDB to be used in mocks.
-    auth_db_v0 = api.AuthDB(replication_state=mock_replication_state(0))
-    auth_db_v1 = api.AuthDB(replication_state=mock_replication_state(1))
+    auth_db_v0 = api.AuthDB.from_entities(
+        replication_state=mock_replication_state(0))
+    auth_db_v1 = api.AuthDB.from_entities(
+        replication_state=mock_replication_state(1))
 
     # Fetch initial copy of AuthDB.
     self.set_time(0)
@@ -571,8 +632,10 @@ class TestAuthDBCache(test_case.TestCase):
 
   def test_get_latest_auth_db(self):
     """Ensure get_latest_auth_db "rushes" cached AuthDB update."""
-    auth_db_v0 = api.AuthDB(replication_state=mock_replication_state(0))
-    auth_db_v1 = api.AuthDB(replication_state=mock_replication_state(1))
+    auth_db_v0 = api.AuthDB.from_entities(
+        replication_state=mock_replication_state(0))
+    auth_db_v1 = api.AuthDB.from_entities(
+        replication_state=mock_replication_state(1))
 
     # Fetch initial copy of AuthDB.
     self.set_time(0)
@@ -863,7 +926,7 @@ class AuthDBBuilder(object):
     return self
 
   def build(self):
-    return api.AuthDB(groups=self.groups)
+    return api.AuthDB.from_entities(groups=self.groups)
 
 
 class RelevantSubgraphTest(test_case.TestCase):
@@ -879,7 +942,7 @@ class RelevantSubgraphTest(test_case.TestCase):
     for i, (node, edges) in enumerate(graph.describe()):
       if isinstance(node, (model.Identity, model.IdentityGlob)):
         node = node.to_bytes()
-      nodes[i]= (node, {l: sorted(s) for l, s in edges.iteritems() if s})
+      nodes[i] = (node, {l: sorted(s) for l, s in edges.items() if s})
     return nodes
 
   def test_empty(self):
