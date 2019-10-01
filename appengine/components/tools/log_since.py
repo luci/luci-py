@@ -91,6 +91,10 @@ def main():
         'Warning: --force was specified, continuing even if not pristine.\n')
 
   out, refspec = get_logs(root, pseudo_revision, mergebase, start, end)
+  remote = subprocess.check_output(['git', 'remote', 'get-url', 'origin'],
+                                   cwd=root).strip()
+  print(remote + '/+log/' + refspec)
+  print('')
   print(out)
 
   if options.files:
