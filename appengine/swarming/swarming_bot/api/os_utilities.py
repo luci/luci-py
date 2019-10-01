@@ -709,7 +709,7 @@ def get_python3_version():
                                       stderr=subprocess.STDOUT)
     return version.decode('utf-8').split()[1]
   except (subprocess.CalledProcessError, OSError):
-    return None
+    return u'none'
 
 
 class AuthenticatedHttpRequestFailure(Exception):
