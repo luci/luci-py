@@ -69,6 +69,7 @@ skip_files:
 - ^doc/
 - ^[A-Z]+$
 - ^[A-Z]+\.[a-z]+$
-- ui/node_modules/
-- ui/res/imp/bower_components/
 - ui2/node_modules/.+
+- ui2/modules/.+
+- ui2/nodejs/.+
+- ui2/pages/.+
