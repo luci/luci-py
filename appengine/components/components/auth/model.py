@@ -602,6 +602,48 @@ class AuthReplicationState(ndb.Model, datastore_utils.SerializableModelMixin):
   # auto_now is not used.
   modified_ts = ndb.DateTimeProperty(auto_now_add=True, indexed=False)
 
+  # For services in Replica mode, contains IDs of AuthDBSnapshotShard entities
+  # that together (when concatenated) hold a deflated AuthDB proto message with
+  # all groups, IP whitelists, etc. This property is used together with
+  # primary_url and auth_db_rev to reconstruct full keys of AuthDBSnapshotShard
+  # entities. See replication.py for code that deals with this property.
+  shard_ids = ndb.StringProperty(repeated=True, indexed=False)
+
+
+class AuthDBSnapshotShard(ndb.Model):
+  """Entity with a blob that contains a portion of deflated AuthDB message.
+
+  Services in Replica mode cache "fully assembled" AuthDB in such entities, so
+  that processes can fetch it all via a few memcache calls instead of doing a
+  bunch of expensive transactional datastore queries.
+
+  The parent key is AuthDBShapshotRoot(id="<primary_url>,<auth_db_rev>"), i.e.
+  all shards of some single auth_db_rev live in a single entity group. Note that
+  AuthDBShapshotRoot itself doesn't exist (nor even defined as an ndb.Model).
+
+  Entity ID is "<hex_sha256(blob)[:16]>".
+
+  See replication.py for code that deals with this entity.
+
+  Immutable.
+  """
+  # Disable useless in-process per-request cache.
+  _use_cache = False
+
+  # A shard of zlib-deflated serialized AuthDB proto.
+  #
+  # Note that 'blob' by itself is not a valid zlib-deflated data. We compress
+  # AuthDB first, and then split it into shards. Thus compressed=True is not
+  # used here.
+  blob = ndb.BlobProperty()
+
+
+def snapshot_shard_key(primary_url, auth_db_rev, shard_id):
+  """Returns ndb.Key of some AuthDBSnapshotShard entity."""
+  return ndb.Key(
+      'AuthDBShapshotRoot', '%s,%d' % (primary_url, auth_db_rev),
+      AuthDBSnapshotShard, shard_id)
+
 
 def replicate_auth_db():
   """Increments auth_db_rev, updates historical log, triggers replication.

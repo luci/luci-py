@@ -8,7 +8,10 @@ Also includes common code used by both Replica and Primary.
 """
 
 import collections
+import cStringIO
 import hashlib
+import logging
+import zlib
 
 from google.appengine.api import app_identity
 from google.appengine.api import urlfetch
@@ -283,7 +286,7 @@ def get_deleted_keys(new_entity_list, old_entity_list):
   return [old.key for old in old_entity_list if old.key not in new_by_key]
 
 
-def replace_auth_db(auth_db_rev, modified_ts, snapshot):
+def replace_auth_db(auth_db_rev, modified_ts, snapshot, shard_ids):
   """Replaces AuthDB in datastore if it's older than |auth_db_rev|.
 
   May return False in case of race conditions (i.e. if some other concurrent
@@ -293,6 +296,7 @@ def replace_auth_db(auth_db_rev, modified_ts, snapshot):
     auth_db_rev: revision number of |snapshot|.
     modified_ts: datetime timestamp of when |auth_db_rev| was created.
     snapshot: AuthDBSnapshot with entity to store.
+    shard_ids: ids of AuthDBSnapshotShard's, to put into AuthReplicationState.
 
   Returns:
     Tuple (True if update was applied, current AuthReplicationState value).
@@ -335,6 +339,7 @@ def replace_auth_db(auth_db_rev, modified_ts, snapshot):
     # Update auth_db_rev in AuthReplicationState.
     state.auth_db_rev = auth_db_rev
     state.modified_ts = modified_ts
+    state.shard_ids = shard_ids
 
     # Apply changes.
     futures = []
@@ -369,7 +374,11 @@ def is_signed_by_primary(blob, key_name, sig):
 
 
 def push_auth_db(revision, auth_db):
-  """Accepts AuthDB push from Primary and applies it to replica.
+  """Accepts AuthDB push from Primary and applies it to the replica.
+
+  TODO(vadimsh): Stop "exploding" the snapshot into independent datastore
+  entities once all replicas use AuthDBSnapshotShard mechanism to fetch
+  AuthDB into memory.
 
   Args:
     revision: replication_pb2.AuthDBRevision describing revision of pushed DB.
@@ -384,14 +393,23 @@ def push_auth_db(revision, auth_db):
       state.auth_db_rev >= revision.auth_db_rev):
     return False, state
 
-  # Try to apply it, retry until success (or until some other task applies
-  # an even newer version of auth_db).
+  # Store AuthDB message as is first by deflating it and splitting it up into
+  # multiple AuthDBSnapshotShard messages.
+  shard_ids = store_sharded_auth_db(
+      auth_db,
+      state.primary_url,
+      revision.auth_db_rev,
+      512*1024)
+
+  # Try to apply it to Auth* datastore entities, retry until success (or until
+  # some other task applies an even newer version of auth_db).
   snapshot = proto_to_auth_db_snapshot(auth_db)
   while True:
     applied, current_state = replace_auth_db(
         revision.auth_db_rev,
         utils.timestamp_to_datetime(revision.modified_ts),
-        snapshot)
+        snapshot,
+        shard_ids)
 
     # Update was successfully applied.
     if applied:
@@ -403,3 +421,82 @@ def push_auth_db(revision, auth_db):
 
     # Need to retry. Try until success or deadline.
     assert current_state.auth_db_rev < revision.auth_db_rev
+
+
+@ndb.transactional
+def store_sharded_auth_db(auth_db, primary_url, auth_db_rev, shard_size):
+  """Creates a bunch of AuthDBSnapshotShard entities with deflated AuthDB.
+
+  Runs transactionally to avoid updating the same entity group from multiple
+  RPCs at once (instead there'll be only one transaction that touches it).
+
+  Stores shards sequentially to avoid making a bunch of memory-hungry RPCs in
+  parallel in already memory-constrained (but not performance critical) code
+  path.
+
+  Uses relatively low compression level to make decompression in performance
+  critical 'load_sharded_auth_db' fast.
+
+  Args:
+    auth_db: replication_pb2.AuthDB with pushed DB.
+    primary_url: URL of the primary auth service that pushed the DB.
+    auth_db_rev: revision of AuthDB being pushed.
+    shard_size: size in bytes of each shard.
+
+  Returns:
+    List of IDs of created AuthDBSnapshotShard entities.
+  """
+  ids = []
+  blob = zlib.compress(auth_db.SerializeToString(), 3)
+  while blob:
+    shard, blob = blob[:shard_size], blob[shard_size:]
+    ids.append(hashlib.sha256(shard).hexdigest()[:16])
+    model.AuthDBSnapshotShard(
+        key=model.snapshot_shard_key(primary_url, auth_db_rev, ids[-1]),
+        blob=shard,
+    ).put()
+  return ids
+
+
+def load_sharded_auth_db(primary_url, auth_db_rev, shard_ids):
+  """Reconstructs replication_pb2.AuthDB proto from shards in datastore.
+
+  Runs in performance critical and memory-constrained code path.
+
+  Logs an error and returns None if some shard is missing. Any other unexpected
+  errors are raised as corresponding exceptions (there should be none).
+
+  Args:
+    primary_url: URL of the primary auth service that pushed the DB.
+    auth_db_rev: revision of AuthDB to fetch.
+    shard_ids: IDs of AuthDBSnapshotShard entities, must be non-empty.
+
+  Returns:
+    replication_pb2.AuthDB message.
+  """
+  shards = ndb.get_multi(
+      model.snapshot_shard_key(primary_url, auth_db_rev, shard_id)
+      for shard_id in shard_ids)
+
+  missing = [sid for sid, shard in zip(shard_ids, shards) if not shard]
+  if missing:
+    logging.error(
+        'Cannot reconstruct AuthDB from %s at rev %d due to missing '
+        'AuthDBSnapshotShard: %r', primary_url, auth_db_rev, missing)
+    return None
+
+  out = cStringIO.StringIO()
+  decompressor = zlib.decompressobj()
+  for idx, shard in enumerate(shards):
+    data = decompressor.decompress(shard.blob, 512*1024)
+    # Release the memory held by the shard ASAP
+    shards[idx] = None
+    shard.blob = None
+    out.write(data)
+  out.write(decompressor.flush())
+  del decompressor
+
+  buf = out.getvalue()
+  del out
+
+  return replication_pb2.AuthDB.FromString(buf)

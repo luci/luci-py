@@ -164,6 +164,7 @@ class NewAuthDBSnapshotTest(test_case.TestCase):
       'modified_ts': datetime.datetime(2014, 1, 1, 1, 1, 1),
       'primary_id': u'blah',
       'primary_url': u'https://blah',
+      'shard_ids': [],
     }
     self.assertEqual(expected_state, captured_state.to_dict())
 
@@ -423,13 +424,15 @@ class ReplaceAuthDbTest(test_case.TestCase):
     updated, state = replication.replace_auth_db(
         auth_db_rev=1234,
         modified_ts=datetime.datetime(2014, 1, 1, 1, 1, 1),
-        snapshot=snapshot)
+        snapshot=snapshot,
+        shard_ids=['abc', 'def'])
     self.assertTrue(updated)
     expected_state = {
       'auth_db_rev': 1234,
       'modified_ts': datetime.datetime(2014, 1, 1, 1, 1, 1),
       'primary_id': u'primary',
       'primary_url': u'https://primary',
+      'shard_ids': [u'abc', u'def'],
     }
     self.assertEqual(expected_state, state.to_dict())
 
@@ -576,7 +579,8 @@ class ReplaceAuthDbTest(test_case.TestCase):
     updated, state = replication.replace_auth_db(
         auth_db_rev=123,
         modified_ts=datetime.datetime(2014, 1, 1, 1, 1, 1),
-        snapshot=make_snapshot_obj())
+        snapshot=make_snapshot_obj(),
+        shard_ids=['abc', 'def'])
     self.assertFalse(updated)
     # Old modified_ts, update is not applied.
     expected_state = {
@@ -584,8 +588,42 @@ class ReplaceAuthDbTest(test_case.TestCase):
       'modified_ts': datetime.datetime(2000, 1, 1, 1, 1, 1),
       'primary_id': u'primary',
       'primary_url': u'https://primary',
+      'shard_ids': [],
     }
     self.assertEqual(expected_state, state.to_dict())
+
+
+class ShardedAuthDBTest(test_case.TestCase):
+  def test_works(self):
+    PRIMARY_URL = 'https://primary'
+    AUTH_DB_REV = 1234
+
+    # Make some non-empty snapshot, its contents is not important.
+    auth_db = replication.auth_db_snapshot_to_proto(
+        make_snapshot_obj(
+            global_config=model.AuthGlobalConfig(
+                key=model.root_key(),
+                oauth_client_id=u'some-client-id',
+                oauth_client_secret=u'some-client-secret',
+                oauth_additional_client_ids=[u'id1', u'id2'],
+                token_server_url=u'https://example.com',
+                security_config='security config blob')))
+
+    # Store in 50-byte shards.
+    shard_ids = replication.store_sharded_auth_db(
+        auth_db, PRIMARY_URL, AUTH_DB_REV, 50)
+    self.assertEqual(2, len(shard_ids))
+
+    # Verify keys look OK and the shard size is respected.
+    for shard_id in shard_ids:
+      self.assertEqual(len(shard_id), 16)
+      shard = model.snapshot_shard_key(PRIMARY_URL, AUTH_DB_REV, shard_id).get()
+      self.assertTrue(len(shard.blob) <= 50)
+
+    # Verify it can be reassembled back.
+    reassembled = replication.load_sharded_auth_db(
+        PRIMARY_URL, AUTH_DB_REV, shard_ids)
+    self.assertEqual(reassembled, auth_db)
 
 
 if __name__ == '__main__':
