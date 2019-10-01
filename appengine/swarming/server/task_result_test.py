@@ -481,11 +481,14 @@ class TaskResultApiTest(TestCase):
         lambda: result_summary.set_from_run_result(run_result, request))
     ndb.transaction(lambda: ndb.put_multi((run_result, result_summary)))
 
-    self.mock_now(self.now + task_result.BOT_PING_TOLERANCE)
+    self.mock_now(self.now +
+                  datetime.timedelta(seconds=request.bot_ping_tolerance_secs))
     self.assertEqual(
         [], list(task_result.yield_run_result_keys_with_dead_bot()))
 
-    self.mock_now(self.now + task_result.BOT_PING_TOLERANCE, 1)
+    self.mock_now(
+        self.now + datetime.timedelta(seconds=request.bot_ping_tolerance_secs),
+        1)
     self.assertEqual(
         [run_result.key],
         list(task_result.yield_run_result_keys_with_dead_bot()))

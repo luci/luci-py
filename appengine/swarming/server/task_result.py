@@ -83,19 +83,6 @@ from server import large
 from server import task_pack
 from server import task_request
 
-# Amount of time after which a bot is considered dead. In short, if a bot has
-# not sent an update in the last N minutes while running a task, it is
-# considered dead.
-#
-# task_runner.MAX_PACKET_INTERVAL is 30 seconds.
-#
-# https://crbug.com/863175 and https://crbug.com/948845 "Temporarily" increase
-# from 2 minutes to 10 minutes, as some task workload is so overwhelming on the
-# host that the bot process doesn't get CPU time for several minutes. This
-# should be decreased once the bot processes run at higher priority.
-BOT_PING_TOLERANCE = datetime.timedelta(seconds=10*60)
-
-
 # Time at which we can assume completed_ts is always set for task results.
 #
 # TODO(maruel): Remove this constant and all the code paths where it's
@@ -1418,10 +1405,11 @@ def yield_run_result_keys_with_dead_bot():
   In practice it is returning a ndb.QueryIterator but this is equivalent.
   """
   # If a bot didn't ping recently, it is considered dead.
-  #TODO(adoneria): change this query to use .dead_after_ts
-  deadline = utils.utcnow() - BOT_PING_TOLERANCE
-  q = TaskRunResult.query(TaskRunResult.modified_ts < deadline)
-  return q.filter(TaskRunResult.state == State.RUNNING).iter(keys_only=True)
+  now = utils.utcnow()
+  q = TaskRunResult.query(
+      TaskRunResult.dead_after_ts < now,
+      TaskRunResult.dead_after_ts > now - datetime.timedelta(days=366))
+  return q.iter(keys_only=True)
 
 
 def get_run_results_query(start, end, sort, state, bot_id):

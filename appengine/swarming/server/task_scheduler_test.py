@@ -1953,9 +1953,12 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
               properties=_gen_properties(idempotent=True),
               wait_for_capacity=False),
         ])
+    request = run_result.request_key.get()
     # Fake first try bot died.
     self.assertEqual(1, len(pub_sub_calls)) # PENDING -> RUNNING
-    now_1 = self.mock_now(self.now + task_result.BOT_PING_TOLERANCE, 1)
+    now_1 = self.mock_now(
+        self.now + datetime.timedelta(seconds=request.bot_ping_tolerance_secs),
+        1)
     self.assertEqual(([], 1, 0), task_scheduler.cron_handle_bot_died())
     self.assertEqual(State.BOT_DIED, run_result.key.get().state)
     self.assertEqual(State.PENDING, run_result.result_summary_key.get().state)
@@ -2077,7 +2080,9 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(True, is_in_negative_cache(1)) # Was just reaped.
     self.assertEqual(False, is_in_negative_cache(2))
 
-    now_1 = self.mock_now(self.now + task_result.BOT_PING_TOLERANCE, 1)
+    now_1 = self.mock_now(
+        self.now + datetime.timedelta(seconds=request.bot_ping_tolerance_secs),
+        1)
     self.assertEqual(([], 1, 0), task_scheduler.cron_handle_bot_died())
     self.assertEqual(1, self.execute_tasks())
     self.assertEqual(2, len(pub_sub_calls)) # RUNNING -> PENDING
@@ -2102,7 +2107,9 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(expected, run_result.key.get().to_dict())
 
     # Task was retried.
-    now_2 = self.mock_now(self.now + task_result.BOT_PING_TOLERANCE, 2)
+    now_2 = self.mock_now(
+        self.now + datetime.timedelta(seconds=request.bot_ping_tolerance_secs),
+        2)
     bot_dimensions_second = self.bot_dimensions.copy()
     bot_dimensions_second[u'id'] = [u'localhost-second']
     self._register_bot(1, bot_dimensions_second)
@@ -2162,10 +2169,13 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
               properties=_gen_properties(),
               wait_for_capacity=False),
         ])
+    request = run_result.request_key.get()
     self.assertEqual(1, len(pub_sub_calls)) # PENDING -> RUNNING
 
     # Bot becomes MIA.
-    now_1 = self.mock_now(self.now + task_result.BOT_PING_TOLERANCE, 1)
+    now_1 = self.mock_now(
+        self.now + datetime.timedelta(seconds=request.bot_ping_tolerance_secs),
+        1)
     self.assertEqual(([], 1, 0), task_scheduler.cron_handle_bot_died())
     self.assertEqual(1, self.execute_tasks())
     self.assertEqual(2, len(pub_sub_calls)) # RUNNING -> PENDING
@@ -2188,7 +2198,9 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(expected, run_result.key.get().to_dict())
 
     # Task was retried.
-    now_2 = self.mock_now(self.now + task_result.BOT_PING_TOLERANCE, 2)
+    now_2 = self.mock_now(
+        self.now + datetime.timedelta(seconds=request.bot_ping_tolerance_secs),
+        2)
     bot_dimensions_second = self.bot_dimensions.copy()
     bot_dimensions_second[u'id'] = [u'localhost-second']
     self._register_bot(1, bot_dimensions_second)
@@ -2243,9 +2255,12 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
               properties=_gen_properties(),
               wait_for_capacity=False),
         ])
+    request = run_result.request_key.get()
     to_run_key = task_to_run.request_to_task_to_run_key(
         run_result.request_key.get(), 1, 0)
-    now_1 = self.mock_now(self.now + task_result.BOT_PING_TOLERANCE, 1)
+    now_1 = self.mock_now(
+        self.now + datetime.timedelta(seconds=request.bot_ping_tolerance_secs),
+        1)
 
     # Very unusual, the TaskRequest disappeared:
     run_result.request_key.delete()
@@ -2262,12 +2277,12 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         1,
         0,
         task_slices=[
-          task_request.TaskSlice(
-              expiration_secs=
-                  3*int(task_result.BOT_PING_TOLERANCE.total_seconds()),
-              properties=_gen_properties(),
-              wait_for_capacity=False),
+            task_request.TaskSlice(
+                expiration_secs=6 * 60,
+                properties=_gen_properties(),
+                wait_for_capacity=False),
         ])
+    request = run_result.request_key.get()
     to_run_key_1 = task_to_run.request_to_task_to_run_key(
         run_result.request_key.get(), 1, 0)
     self.assertIsNone(to_run_key_1.get().queue_number)
@@ -2275,7 +2290,9 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
 
     # See _handle_dead_bot() with special case about non-idempotent task that
     # were never updated.
-    now_1 = self.mock_now(self.now + task_result.BOT_PING_TOLERANCE, 1)
+    now_1 = self.mock_now(
+        self.now + datetime.timedelta(seconds=request.bot_ping_tolerance_secs),
+        1)
     self.assertEqual(([], 1, 0), task_scheduler.cron_handle_bot_died())
 
     # Now the task is available. Bot magically wakes up (let's say a laptop that
@@ -2318,9 +2335,12 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
               properties=_gen_properties(idempotent=True),
               wait_for_capacity=False),
         ])
+    request = run_result.request_key.get()
     self.assertEqual(1, run_result.try_number)
     self.assertEqual(State.RUNNING, run_result.state)
-    now_1 = self.mock_now(self.now + task_result.BOT_PING_TOLERANCE, 1)
+    now_1 = self.mock_now(
+        self.now + datetime.timedelta(seconds=request.bot_ping_tolerance_secs),
+        1)
     self.assertEqual(([], 1, 0), task_scheduler.cron_handle_bot_died())
 
     # Refresh and compare:
@@ -2345,7 +2365,9 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(expected, run_result.result_summary_key.get().to_dict())
 
     # Task was retried but the same bot polls again, it's denied the task.
-    now_2 = self.mock_now(self.now + task_result.BOT_PING_TOLERANCE, 2)
+    now_2 = self.mock_now(
+        self.now + datetime.timedelta(seconds=request.bot_ping_tolerance_secs),
+        2)
     request, _, run_result = task_scheduler.bot_reap_task(
         self.bot_dimensions, 'abc')
     self.assertIsNone(request)
@@ -2371,13 +2393,17 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(True, is_in_negative_cache(1)) # Was just reaped.
     self.assertEqual(False, is_in_negative_cache(2))
     self.assertEqual(State.RUNNING, run_result.state)
-    self.mock_now(self.now + task_result.BOT_PING_TOLERANCE, 1)
+    self.mock_now(
+        self.now + datetime.timedelta(seconds=request.bot_ping_tolerance_secs),
+        1)
     self.assertEqual(([], 1, 0), task_scheduler.cron_handle_bot_died())
     self.assertEqual(False, is_in_negative_cache(1))
     self.assertEqual(False, is_in_negative_cache(2))
 
     # A second bot comes to reap the task.
-    now_1 = self.mock_now(self.now + task_result.BOT_PING_TOLERANCE, 2)
+    now_1 = self.mock_now(
+        self.now + datetime.timedelta(seconds=request.bot_ping_tolerance_secs),
+        2)
     bot_dimensions_second = self.bot_dimensions.copy()
     bot_dimensions_second[u'id'] = [u'localhost-second']
     self._register_bot(1, bot_dimensions_second)
@@ -2387,9 +2413,13 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(False, is_in_negative_cache(1))
     # Was just tried to be reaped.
     self.assertEqual(True, is_in_negative_cache(2))
-    now_2 = self.mock_now(self.now + 2 * task_result.BOT_PING_TOLERANCE, 3)
-    self.assertEqual(
-        (['1d69b9f088008912'], 0, 0), task_scheduler.cron_handle_bot_died())
+    self.assertEqual(([], 0, 0), task_scheduler.cron_handle_bot_died())
+
+    now_2 = self.mock_now(
+        self.now +
+        2 * datetime.timedelta(seconds=_request.bot_ping_tolerance_secs), 3)
+    self.assertEqual((['1d69b9f088008912'], 0, 0),
+                     task_scheduler.cron_handle_bot_died())
     self.assertEqual(([], 0, 0), task_scheduler.cron_handle_bot_died())
     self.assertEqual(False, is_in_negative_cache(1))
     self.assertEqual(False, is_in_negative_cache(2))
@@ -2417,9 +2447,12 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
               properties=_gen_properties(),
               wait_for_capacity=False),
         ])
+    request = run_result.request_key.get()
     self.assertEqual(1, run_result.try_number)
     self.assertEqual(State.RUNNING, run_result.state)
-    self.mock_now(self.now + task_result.BOT_PING_TOLERANCE, 601)
+    self.mock_now(
+        self.now + datetime.timedelta(seconds=request.bot_ping_tolerance_secs),
+        601)
     self.assertEqual(
         (['1d69b9f088008911'], 0, 0), task_scheduler.cron_handle_bot_died())
 
@@ -2435,12 +2468,15 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
                 wait_for_capacity=False),
         ])
     result_summary = run_result.result_summary_key.get()
+    request = run_result.request_key.get()
 
     # cancel running task
     self._cancel_running_task(run_result)
 
     # execute the cron
-    self.mock_now(self.now + task_result.BOT_PING_TOLERANCE, 601)
+    self.mock_now(
+        self.now + datetime.timedelta(seconds=request.bot_ping_tolerance_secs),
+        601)
     self.assertEqual(([run_result.task_id], 0, 0),
                      task_scheduler.cron_handle_bot_died())
 
