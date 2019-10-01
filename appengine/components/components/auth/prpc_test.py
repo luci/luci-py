@@ -16,12 +16,12 @@ from google.protobuf import empty_pb2
 from components import prpc as prpclib
 from components import utils
 from components.auth import api
+from components.auth import b64
 from components.auth import check
 from components.auth import ipaddr
 from components.auth import model
 from components.auth import prpc
 from components.auth import testing
-from components.auth import tokens
 from components.auth.proto import delegation_pb2
 from test_support import test_case
 
@@ -204,7 +204,7 @@ class PrpcAuthTest(testing.TestCase):
       signer_id='user:token-server@example.com',
       signing_key_id='signing-key',
       pkcs1_sha256_sig='fake-signature')
-    tok = tokens.base64_encode(tok_pb.SerializeToString())
+    tok = b64.encode(tok_pb.SerializeToString())
 
     # Valid delegation token.
     state, ctx = self.call(

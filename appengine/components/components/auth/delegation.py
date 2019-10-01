@@ -19,11 +19,11 @@ from google.protobuf import message
 from components import utils
 
 from . import api
-from . import model
+from . import b64
 from . import exceptions
+from . import model
 from . import service_account
 from . import signature
-from . import tokens
 from .proto import delegation_pb2
 
 
@@ -101,7 +101,7 @@ def deserialize_token(blob):
   if isinstance(blob, unicode):
     blob = blob.encode('ascii', 'ignore')
   try:
-    as_bytes = tokens.base64_decode(blob)
+    as_bytes = b64.decode(blob)
   except (TypeError, ValueError) as exc:
     raise exceptions.BadTokenError('Not base64: %s' % exc)
   if len(as_bytes) > MAX_TOKEN_SIZE:

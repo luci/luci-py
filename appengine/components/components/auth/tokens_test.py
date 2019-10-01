@@ -16,6 +16,7 @@ from google.appengine.api import app_identity
 
 from components import utils
 from components.auth import api
+from components.auth import b64
 from components.auth import signature
 from components.auth import tokens
 from test_support import test_case
@@ -88,37 +89,6 @@ class StringConvertersTest(test_case.TestCase):
       tokens.normalize_embedded({'a': None})
     with self.assertRaises(TypeError):
       tokens.normalize_embedded({'a': 123})
-
-
-class Base64Test(test_case.TestCase):
-  """Tests for base64_encode and base64_decode functions."""
-
-  def test_base64_encode_types(self):
-    with self.assertRaises(TypeError):
-      tokens.base64_encode(None)
-    with self.assertRaises(TypeError):
-      tokens.base64_encode(u'unicode')
-
-  def test_base64_decode_types(self):
-    with self.assertRaises(TypeError):
-      tokens.base64_decode(None)
-    with self.assertRaises(TypeError):
-      tokens.base64_decode(u'unicode')
-
-  def test_base64_encode_is_url_safe(self):
-    for a in xrange(255):
-      original = chr(a)
-      encoded = tokens.base64_encode(original)
-      self.assertEqual(original, tokens.base64_decode(encoded))
-      self.assertTrue(URL_SAFE_ALPHABET.issuperset(encoded), encoded)
-
-  def test_base64_encode_decode(self):
-    # Encode a bunch of strings of different lengths to test all
-    # possible paddings (to see how padding stripping works).
-    msg = 'somewhat long message with binary \x00\x01\x02\x03 inside'
-    for i in xrange(len(msg)):
-      self.assertEqual(
-          msg[:i], tokens.base64_decode(tokens.base64_encode(msg[:i])))
 
 
 class ComputeMacTest(test_case.TestCase):
@@ -384,7 +354,7 @@ class TestToken(test_case.TestCase):
 
 
 def to_json_b64(d):
-  return tokens.base64_encode(json.dumps(d, sort_keys=True))
+  return b64.encode(json.dumps(d, sort_keys=True))
 
 
 class TestSignJWT(test_case.TestCase):
@@ -403,8 +373,8 @@ class TestSignJWT(test_case.TestCase):
   def test_works(self):
     # Note: we can't use verify_jwt in this test because tokens produced by
     # sign_jwt do not have 'kid' header field which is required by verify_jwt.
-    expected_hdr = tokens.base64_encode('{"alg":"RS256","typ":"JWT"}')
-    expected_claims = tokens.base64_encode(utils.encode_to_json({
+    expected_hdr = b64.encode('{"alg":"RS256","typ":"JWT"}')
+    expected_claims = b64.encode(utils.encode_to_json({
         'aud': 'some audience',
         'email': 'a@example.com',
         'exp': 1514772061,  # matches NOW+1h
@@ -412,7 +382,7 @@ class TestSignJWT(test_case.TestCase):
         'iss': 'a@example.com',
         'sub': 'a@example.com',
     }))
-    expected_sig = tokens.base64_encode('signature')
+    expected_sig = b64.encode('signature')
     self.assertEqual(
         tokens.sign_jwt(u'some audience'),
         '.'.join((expected_hdr, expected_claims, expected_sig)))
@@ -441,7 +411,7 @@ class TestVerifyJWT(test_case.TestCase):
 
   def make_jwt(self, hdr, payload, sig=SIG):
     return '%s.%s.%s' % (
-        to_json_b64(hdr), to_json_b64(payload), tokens.base64_encode(sig))
+        to_json_b64(hdr), to_json_b64(payload), b64.encode(sig))
 
   def make_good_jwt(self, iat=None, exp=None, nbf=OMIT):
     hdr = {'alg': 'RS256', 'kid': self.KEY}

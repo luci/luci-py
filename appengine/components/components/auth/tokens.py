@@ -4,7 +4,6 @@
 
 """Functions to generate and validate tokens signed with MAC tags or RSA."""
 
-import base64
 import hashlib
 import hmac
 import json
@@ -15,6 +14,7 @@ from google.appengine.api import app_identity
 from components import utils
 
 from . import api
+from . import b64
 
 # Part of public API of 'auth' component, exposed by this module.
 __all__ = [
@@ -230,27 +230,6 @@ def normalize_embedded(embedded):
   }
 
 
-def base64_encode(data):
-  """Bytes str -> URL safe base64 with stripped '='."""
-  # Borrowed from ndb's key.py. This is 3-4x faster than urlsafe_b64encode().
-  if not isinstance(data, str):
-    raise TypeError('Expecting str with binary data')
-  urlsafe = base64.b64encode(data)
-  return urlsafe.rstrip('=').replace('+', '-').replace('/', '_')
-
-
-def base64_decode(data):
-  """URL safe base64 with stripped '=' -> bytes str."""
-  # Borrowed from ndb's key.py, _DecodeUrlSafe.
-  if not isinstance(data, str):
-    raise TypeError('Expecting str with base64 data')
-  mod = len(data) % 4
-  if mod:
-    data += '=' * (4 - mod)
-  # This is 3-4x faster than urlsafe_b64decode()
-  return base64.b64decode(data.replace('-', '+').replace('_', '/'))
-
-
 def compute_mac(algo, secret, chunks):
   """Secret + list of arbitrary strings -> MAC tag.
 
@@ -315,7 +294,7 @@ def encode_token(algo, version, secret, message, embedded):
   public = json.dumps(
       embedded, sort_keys=True, separators=(',', ':'), encoding='ascii')
   mac = compute_mac(algo, secret, [chr(version), public] + message)
-  return base64_encode(''.join([chr(version), public, mac]))
+  return b64.encode(''.join([chr(version), public, mac]))
 
 
 def decode_token(algo, token, possible_secrets, message):
@@ -342,7 +321,7 @@ def decode_token(algo, token, possible_secrets, message):
   try:
     # One byte for version, at least one byte for public embedded dict portion,
     # the rest is MAC digest.
-    binary = base64_decode(token)
+    binary = b64.decode(token)
     if len(binary) < digest_size + 2:
       raise ValueError()
     version = ord(binary[0])
@@ -384,7 +363,7 @@ def decode_token(algo, token, possible_secrets, message):
 
 # We can produce only RS256 JWTs, since we're relying on Cloud APIs to do the
 # signing they support only RS256.
-_jwt_header_b64 = base64_encode('{"alg":"RS256","typ":"JWT"}')
+_jwt_header_b64 = b64.encode('{"alg":"RS256","typ":"JWT"}')
 
 
 def sign_jwt(aud):
@@ -400,11 +379,11 @@ def sign_jwt(aud):
   }
   if aud:
     claims['aud'] = aud
-  claims_b64 = base64_encode(utils.encode_to_json(claims))
+  claims_b64 = b64.encode(utils.encode_to_json(claims))
   payload = '.'.join((_jwt_header_b64, claims_b64))
   # TODO(vadimsh): Use sign_jwt RPC to get JWT header with 'kid' populated.
   _, sig = app_identity.sign_blob(payload)
-  return '.'.join((payload, base64_encode(sig)))
+  return '.'.join((payload, b64.encode(sig)))
 
 
 def verify_jwt(jwt, bundle):
@@ -442,7 +421,7 @@ def verify_jwt(jwt, bundle):
   segments = jwt.split('.')
 
   try:
-    hdr, payload, sig = (base64_decode(b64) for b64 in segments)
+    hdr, payload, sig = (b64.decode(seg) for seg in segments)
   except (ValueError, TypeError) as exc:
     raise InvalidTokenError('Malformed JWT, not valid base64: %s' % exc)
 

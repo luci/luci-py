@@ -16,6 +16,7 @@ import webapp2
 from google.appengine.api import users
 
 from . import api
+from . import b64
 from . import check
 from . import config
 from . import delegation
@@ -305,7 +306,7 @@ class AuthenticatingHandler(webapp2.RequestHandler):
       </script>
     """
     if not self._csp_nonce:
-      self._csp_nonce = tokens.base64_encode(uuid.uuid4().bytes)
+      self._csp_nonce = b64.encode(uuid.uuid4().bytes)
     return self._csp_nonce
 
   def get_content_security_policy(self):

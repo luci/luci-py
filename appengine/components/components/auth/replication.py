@@ -16,9 +16,9 @@ from google.appengine.ext import ndb
 
 from components import utils
 
+from . import b64
 from . import model
 from . import signature
-from . import tokens
 from .proto import replication_pb2
 
 
@@ -45,8 +45,7 @@ class ProtocolError(Exception):
 
 def decode_link_ticket(encoded):
   """Returns replication_pb2.ServiceLinkTicket given base64 encoded blob."""
-  return replication_pb2.ServiceLinkTicket.FromString(
-      tokens.base64_decode(encoded))
+  return replication_pb2.ServiceLinkTicket.FromString(b64.decode(encoded))
 
 
 def become_replica(ticket, initiated_by):

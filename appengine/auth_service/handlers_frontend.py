@@ -15,6 +15,7 @@ from components import auth
 from components import template
 from components import utils
 
+from components.auth import b64
 from components.auth import model
 from components.auth import tokens
 from components.auth import version
@@ -362,8 +363,7 @@ class GenerateLinkingURL(auth.ApiHandler):
       host = 'https://%s.%s' % (naked_app_id, domain)
 
     # URL to a handler on Replica that initiates Replica <-> Primary handshake.
-    url = '%s/auth/link?t=%s' % (
-        host, tokens.base64_encode(link_msg.SerializeToString()))
+    url = '%s/auth/link?t=%s' % (host, b64.encode(link_msg.SerializeToString()))
     self.send_response({'url': url}, http_code=201)
 
 

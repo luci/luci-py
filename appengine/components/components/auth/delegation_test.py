@@ -16,12 +16,12 @@ from google.appengine.ext import ndb
 
 from components import utils
 from components.auth import api
+from components.auth import b64
 from components.auth import delegation
 from components.auth import exceptions
 from components.auth import model
-from components.auth import signature
 from components.auth import service_account
-from components.auth import tokens
+from components.auth import signature
 from components.auth.proto import delegation_pb2
 
 from test_support import test_case
@@ -50,7 +50,7 @@ def fake_subtoken_proto(delegated_identity='user:abc@example.com', **kwargs):
 
 
 def serialize_token(tok):
-  return tokens.base64_encode(tok.SerializeToString())
+  return b64.encode(tok.SerializeToString())
 
 
 def seal_token(subtoken):
@@ -72,7 +72,7 @@ class SerializationTest(test_case.TestCase):
   def test_deserialize_huge(self):
     msg = fake_token_proto()
     msg.serialized_subtoken = 'huge' * 10000
-    tok = tokens.base64_encode(msg.SerializeToString())
+    tok = b64.encode(msg.SerializeToString())
     with self.assertRaises(exceptions.BadTokenError):
       delegation.deserialize_token(tok)
 
@@ -84,7 +84,7 @@ class SerializationTest(test_case.TestCase):
       delegation.deserialize_token(tok)
 
   def test_deserialize_bad_proto(self):
-    tok = tokens.base64_encode('not a proto')
+    tok = b64.encode('not a proto')
     with self.assertRaises(exceptions.BadTokenError):
       delegation.deserialize_token(tok)
 
