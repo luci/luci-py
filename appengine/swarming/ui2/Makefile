@@ -2,13 +2,13 @@ export PATH := ./nodejs/bin:$(PATH)
 
 .ONESHELL:
 
-default: package-lock.json
+default:
 	npx webpack --mode=development
 
-release: package-lock.json
+release:
 	npx webpack --mode=production
 
-serve: package-lock.json
+serve:
 	npx webpack-dev-server --mode=development --watch-poll
 
 test: default
@@ -36,12 +36,6 @@ continuous_test:
 docs: package-lock.json
 	npx jsdoc -c jsdoc.config.js -d docs
 	xdg-open docs/index.html
-
-package-lock.json: package.json
-	npm install
-	# This should tell Makefile that the "built" package-lock.json file is older than
-	# the "source" package.json and thus does not require to be "rebuilt".
-	touch package-lock.json
 
 install_deps:
 	npm install
