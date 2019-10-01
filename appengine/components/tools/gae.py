@@ -9,7 +9,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-__version__ = '1.2'
+__version__ = '2.0'
 
 import atexit
 import code
@@ -74,20 +74,6 @@ def _print_version_log(app, to_version):
 
 
 ##
-
-
-def CMDappcfg_login(parser, args):
-  """Sets up authentication for appcfg.py usage [DEPRECATED]."""
-  app, _, _ = parser.parse_args(args)
-  print(
-      'Since appcfg.py doesn\'t support explicit login command, we\'ll run '
-      'innocent "list_version" instead. It will trigger appcfg\'s login flow. '
-      '\n'
-      'It\'s fine if "list_version" call itself fails - at this point we have '
-      'the necessary credentials cached and other subcommands should be able '
-      'to use them.\n')
-  gae_sdk_utils.appcfg_login(app)
-  return 0
 
 
 def CMDactive(parser, args):

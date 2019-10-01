@@ -24,31 +24,9 @@ import urllib
 yaml = None
 
 
-# If True, all code here will use gcloud SDK (not GAE SDK). It assumes 'gcloud'
-# tool is in PATH and the SDK has all necessary GAE components installed.
-#
-# This flag is temporary. Once gcloud support is fully implemented and gcloud is
-# available on bots, this will become the default.
-USE_GCLOUD = os.getenv('LUCI_PY_USE_GCLOUD') != '0'
-
-
 # Directory with this file.
 TOOLS_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# Name of a directory with Python GAE SDK.
-PYTHON_GAE_SDK = 'google_appengine'
-
-# Name of a directory with Go GAE SDK.
-GO_GAE_SDK = 'go_appengine'
-
-# Value of 'runtime: ...' in app.yaml -> SDK to use.
-#
-# TODO(vadimsh): Can be removed if using 'gcloud'.
-RUNTIME_TO_SDK = {
-  'go': GO_GAE_SDK,
-  'go111': GO_GAE_SDK,
-  'python27': PYTHON_GAE_SDK,
-}
 
 # Path to a current SDK, set in setup_gae_sdk.
 _GAE_SDK_PATH = None
@@ -69,10 +47,6 @@ class Error(Exception):
 
 class BadEnvironmentError(Error):
   """Raised when required tools or environment are missing."""
-
-
-class UnsupportedModuleError(Error):
-  """Raised when trying to deploy MVM or Flex module."""
 
 
 class LoginRequiredError(Error):
@@ -165,17 +139,7 @@ def find_gcloud():
       'https://cloud.google.com/sdk/')
 
 
-def find_gae_sdk(sdk_name=PYTHON_GAE_SDK, search_dir=TOOLS_DIR):
-  """Returns the path to GAE SDK if found, else None.
-
-  TODO(vadimsh): Replace with find_gae_sdk_gcloud, get rid of arguments.
-  """
-  if USE_GCLOUD:
-    return find_gae_sdk_gcloud()
-  return find_gae_sdk_appcfg(sdk_name, search_dir)
-
-
-def find_gae_sdk_gcloud():
+def find_gae_sdk():
   """Returns the path to GAE portion of Google Cloud SDK or None if not found.
 
   This is '<sdk_root>/platform/google_appengine'. It is documented here:
@@ -201,33 +165,6 @@ def find_gae_sdk_gcloud():
         file=sys.stderr)
     return None
   return gae_sdk
-
-
-def find_gae_sdk_appcfg(sdk_name, search_dir):
-  """Searches for appcfg.py to figure out where non-gcloud GAE SDK is.
-
-  TODO(vadimsh): To be removed once gcloud is fully supported.
-  """
-  # First search up the directories up to root.
-  while True:
-    attempt = os.path.join(search_dir, sdk_name)
-    if os.path.isfile(os.path.join(attempt, 'appcfg.py')):
-      return attempt
-    prev_dir = search_dir
-    search_dir = os.path.dirname(search_dir)
-    if search_dir == prev_dir:
-      break
-  # Next search PATH.
-  markers = ['appcfg.py']
-  if sdk_name == GO_GAE_SDK:
-    markers.append('goroot')
-  for item in os.environ['PATH'].split(os.pathsep):
-    if not item:
-      continue
-    item = os.path.normpath(os.path.abspath(item))
-    if all(os.path.exists(os.path.join(item, m)) for m in markers):
-      return item
-  return None
 
 
 def find_app_yamls(app_dir):
@@ -287,36 +224,6 @@ def is_app_dir(path):
     return True
   except ValueError:
     return False
-
-
-def get_service_runtime(yaml_path):
-  """Finds 'runtime: ...' property in per-service YAML (or None if missing)."""
-  # The 'yaml' Python module is not available yet at this point (it is loaded
-  # from SDK), so manually parse the runtime from the file with a regular
-  # expression instead.
-  with open(yaml_path, 'rt') as f:
-    m = re.search(r'^runtime\:\s+(.*)$', f.read(), re.MULTILINE)
-  return m.group(1) if m else None
-
-
-def get_app_sdk(yaml_paths):
-  """Returns either PYTHON_GAE_SDK or GO_GAE_SDK depending on app runtime.
-
-  Examines all app's yamls making sure they can all be deployed with a single
-  SDK (since gae.py doesn't support using multiple SDKs).
-
-  Raises:
-    ValueError if multiple (or unknown) SDKs are required.
-  """
-  sdks = set()
-  for p in yaml_paths:
-    runtime = get_service_runtime(p)
-    if runtime not in RUNTIME_TO_SDK:
-      raise ValueError('Unknown runtime \'%s\' in %s' % (runtime, p))
-    sdks.add(RUNTIME_TO_SDK[runtime])
-  if len(sdks) != 1:
-    raise ValueError('Expecting single SDK, got %s' % ', '.join(sdks))
-  return list(sdks)[0]
 
 
 def setup_gae_sdk(sdk_path):
@@ -451,23 +358,6 @@ class Application(object):
       raise subprocess.CalledProcessError(proc.returncode, cmd, output)
     return output
 
-  def run_appcfg(self, args):
-    """Runs appcfg.py <args>, deserializes its output and returns it."""
-    if USE_GCLOUD:
-      raise Error('Attempting to run appcfg.py %s' % ' '.join(args))
-    if not is_appcfg_oauth_token_cached():
-      raise LoginRequiredError('Login first using \'gae.py appcfg_login\'.')
-    cmd = [
-      sys.executable,
-      os.path.join(self._gae_sdk, 'appcfg.py'),
-      '--skip_sdk_update_check',
-      '--application', self.app_id,
-    ]
-    if self._verbose:
-      cmd.append('--verbose')
-    cmd.extend(args)
-    return yaml.safe_load(self.run_cmd(cmd))
-
   def run_gcloud(self, args):
     """Runs 'gcloud <args> --project ... --format ...' and parses the output."""
     gcloud = find_gcloud()
@@ -487,8 +377,6 @@ class Application(object):
     Returns:
       Dict {service name -> [list of uploaded versions]}.
     """
-    if not USE_GCLOUD:
-      return self.run_appcfg(['list_versions'])
     data = self.run_gcloud(['app', 'versions', 'list'])
     per_service = collections.defaultdict(list)
     for deployment in data:
@@ -512,10 +400,9 @@ class Application(object):
 
   def set_default_version(self, version, services=None, roll_duration=None):
     """Switches default version of given |services| to |version|."""
-
     advanced_filter = _SWITCH_ADVANCED_FILTER.format(
         version=version, app_id=self.app_id)
-    url = ('https://pantheon.corp.google.com/logs/viewer?' + urllib.urlencode({
+    url = ('https://console.cloud.google.com/logs/viewer?' + urllib.urlencode({
         'project': self.app_id,
         'minLogLevel': 0,
         'customFacets': '',
@@ -525,17 +412,6 @@ class Application(object):
         'advancedFilter': advanced_filter,
     }))
     print('Monitor error logs for new version here:', url, '\n')
-
-    if not USE_GCLOUD:
-      if roll_duration:
-        # shouldn't be possible, but just to make sure
-        raise ValueError('rolling updates only available in gcloud mode')
-      self.run_appcfg([
-        'set_default_version',
-        '--module', ','.join(sorted(services or self.services)),
-        '--version', version,
-      ])
-      return
 
     services = sorted(services or self.services)
     base_cmd = (['app', 'services', 'set-traffic'] + services +
@@ -578,17 +454,6 @@ class Application(object):
 
   def delete_version(self, version, services=None):
     """Deletes the specified version of the given service names."""
-    if not USE_GCLOUD:
-      # For some reason 'delete_version' call processes only one service at
-      # a time, unlike all other related appcfg.py calls.
-      for service in sorted(services or self.services):
-        self.run_appcfg([
-          'delete_version',
-          '--module', service,
-          '--version', version,
-        ])
-      return
-
     # If --service is not specified, gcloud deletes the version from all
     # services. That's what we want if services is None. --quiet is needed to
     # skip "Do you want to continue?". We've already asked in gae.py.
@@ -610,12 +475,6 @@ class Application(object):
     try:
       for m in sorted(services or self.services):
         mod = self._services[m]
-        if mod.data.get('vm') and not USE_GCLOUD:
-          raise UnsupportedModuleError(
-              'MVM is only supported in gcloud mode: %s' % m)
-        if mod.data.get('env') == 'flex' and not USE_GCLOUD:
-          raise UnsupportedModuleError(
-              'Flex is only supported in gcloud mode: %s' % m)
         if mod.data.get('runtime') == 'go' and not os.environ.get('GOROOT'):
           raise BadEnvironmentError('GOROOT must be set when deploying Go app')
         mods.append(mod)
@@ -625,15 +484,6 @@ class Application(object):
     # Always make 'default' the first service to be uploaded. It is magical,
     # deploying it first "enables" the application, or so it seems.
     mods.sort(key=lambda x: '' if x == 'default' else x)
-
-    if not USE_GCLOUD:
-      self.run_appcfg(
-          ['update'] + [m.path for m in mods] + ['--version', version])
-      self._appcfg_update_indexes()
-      self._appcfg_update_queues()
-      self._appcfg_update_cron()
-      self._appcfg_update_dispatch()
-      return
 
     # Will contain paths to service YAMLs and to all extra YAMLs, like
     # cron.yaml.
@@ -652,6 +502,8 @@ class Application(object):
       else:
         # Need to write a hacked version, in same directory, so all paths are
         # relative.
+        #
+        # TODO(vadimsh): Make this a hard error.
         logging.error(
             'Please remove "application" and "version" keys from %s', m.path)
         fname = os.path.basename(m.path)
@@ -682,30 +534,6 @@ class Application(object):
     finally:
       for h in hacked:
         os.remove(h)
-
-  def _appcfg_update_indexes(self):
-    """Deploys new index.yaml."""
-    assert not USE_GCLOUD
-    if os.path.isfile(os.path.join(self.default_service_dir, 'index.yaml')):
-      self.run_appcfg(['update_indexes', self.default_service_dir])
-
-  def _appcfg_update_queues(self):
-    """Deploys new queue.yaml."""
-    assert not USE_GCLOUD
-    if os.path.isfile(os.path.join(self.default_service_dir, 'queue.yaml')):
-      self.run_appcfg(['update_queues', self.default_service_dir])
-
-  def _appcfg_update_cron(self):
-    """Deploys new cron.yaml."""
-    assert not USE_GCLOUD
-    if os.path.isfile(os.path.join(self.default_service_dir, 'cron.yaml')):
-      self.run_appcfg(['update_cron', self.default_service_dir])
-
-  def _appcfg_update_dispatch(self):
-    """Deploys new dispatch.yaml."""
-    assert not USE_GCLOUD
-    if self.dispatch_yaml:
-      self.run_appcfg(['update_dispatch', self.app_dir])
 
   def spawn_dev_appserver(self, args, open_ports=False, **kwargs):
     """Launches subprocess with dev_appserver.py.
@@ -842,9 +670,6 @@ def setup_env(app_dir, app_id, version, service_id, remote_api=False):
 def add_roll_duration_option(parser):
   parser.set_defaults(roll_duration=None)
 
-  if not USE_GCLOUD:
-    return
-
   _TIME_RE = re.compile(r'(?:(?P<hour>\d+)h)?(?:(?P<min>\d+)m)?')
 
   def _opt_callback(option, _opt, value, parser):
@@ -884,7 +709,8 @@ def add_sdk_options(parser, default_app_dir):
   """
   parser.add_option(
       '-s', '--sdk-path',
-      help='Path to AppEngine SDK. Will try to find by itself.')
+      help='Path to GAE SDK (usually <gcloud_root>/platform/google_appengine). '
+           'If not set, will try to find by itself.')
   parser.add_option(
       '-p', '--app-dir',
       default=default_app_dir,
@@ -911,12 +737,7 @@ def process_sdk_options(parser, options):
     parser.error('--app-dir option is required')
   app_dir = os.path.abspath(options.app_dir)
 
-  try:
-    app_sdk = get_app_sdk(find_app_yamls(app_dir))
-  except (Error, ValueError) as exc:
-    parser.error(str(exc))
-
-  sdk_path = options.sdk_path or find_gae_sdk(app_sdk, app_dir)
+  sdk_path = options.sdk_path or find_gae_sdk()
   if not sdk_path:
     parser.error('Failed to find the AppEngine SDK. Pass --sdk-path argument.')
 
@@ -964,34 +785,6 @@ def is_gcloud_auth_set():
   except subprocess.CalledProcessError as exc:
     logging.error('Failed to check active gcloud account: %s', exc)
     return False
-
-
-# TODO(vadimsh): Can be removed if using 'gcloud'.
-def _appcfg_oauth2_tokens():
-  return os.path.join(os.path.expanduser('~'), '.appcfg_oauth2_tokens')
-
-
-# TODO(vadimsh): Can be removed if using 'gcloud'.
-def is_appcfg_oauth_token_cached():
-  """Returns true if ~/.appcfg_oauth2_tokens exists."""
-  return os.path.exists(_appcfg_oauth2_tokens())
-
-
-# TODO(vadimsh): Can be removed if using 'gcloud'.
-def appcfg_login(app):
-  """Starts appcfg.py's login flow."""
-  if not _GAE_SDK_PATH:
-    raise ValueError('Call setup_gae_sdk first')
-  if os.path.exists(_appcfg_oauth2_tokens()):
-    os.remove(_appcfg_oauth2_tokens())
-  # HACK: Call a command with no side effect to launch the flow.
-  subprocess.call([
-    sys.executable,
-    os.path.join(_GAE_SDK_PATH, 'appcfg.py'),
-    '--application', app.app_id,
-    '--noauth_local_webserver',
-    'list_versions',
-  ], cwd=app.app_dir)
 
 
 def setup_gae_env():
