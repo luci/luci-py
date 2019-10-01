@@ -623,6 +623,24 @@ def yield_expired_task_to_run():
   # The query fetches tasks that reached expiration time recently
   # to avoid fetching all past tasks. It uses a large batch size
   # since the entities are very small and to reduce RPC overhead.
+  def expire(q):
+    total = 0
+    skipped = 0
+    try:
+      for task in q:
+        if not task.queue_number:
+          skipped += 1
+          logging.info('%s/%s: queue_number is None, but expiration_ts is %s.',
+                       task.task_id, task.task_slice_index, task.expiration_ts)
+          # Flush it, otherwise we'll keep on looping on it.
+          task.expiration_ts = None
+          task.put()
+        else:
+          yield task
+          total += 1
+    finally:
+      logging.debug('Yielded %d tasks; skipped %d', total, skipped)
+
   opts = ndb.QueryOptions(batch_size=256)
   now = utils.utcnow()
   # The backsearch here is just to ensure that we find entities that we forgot
@@ -634,20 +652,14 @@ def yield_expired_task_to_run():
       TaskToRun.expiration_ts < now,
       TaskToRun.expiration_ts > cut_off,
       default_options=opts)
-  total = 0
-  skipped = 0
-  try:
-    for task in q:
-      if not task.queue_number:
-        skipped += 1
-        logging.info(
-            '%s/%s: queue_number is None, but expiration_ts is %s.',
-            task.task_id, task.task_slice_index, task.expiration_ts)
-        # Flush it, otherwise we'll keep on looping on it.
-        task.expiration_ts = None
-        task.put()
-      else:
-        yield task
-        total += 1
-  finally:
-    logging.debug('Yielded %d tasks; skipped %d', total, skipped)
+  # TODO(crbug.com/966660): remove this.
+  for task in expire(q):
+    yield task
+
+  # If we have more time, update older entries.
+  q = TaskToRun.query(
+      TaskToRun.expiration_ts <= cut_off,
+      TaskToRun.expiration_ts > None,
+      default_options=opts)
+  for task in expire(q):
+    yield task
