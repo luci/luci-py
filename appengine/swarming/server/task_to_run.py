@@ -631,11 +631,6 @@ def yield_expired_task_to_run():
         if not task.queue_number:
           skipped += 1
 
-          # TODO(crbug.com/1010315): remove this check.
-          if task.try_number > 2:
-            logging.warning("ignore task with try_number > 2")
-            continue
-
           logging.info('%s/%s: queue_number is None, but expiration_ts is %s.',
                        task.task_id, task.task_slice_index, task.expiration_ts)
           # Flush it, otherwise we'll keep on looping on it.
@@ -663,9 +658,12 @@ def yield_expired_task_to_run():
     yield task
 
   # If we have more time, update older entries.
+  # TaskToRun entities use to have different IDs (crrev.com/c/969760),
+  # and they are incompatible with the current codes.
+  fetch_since = datetime.datetime.strptime('2018-04-01', '%Y-%m-%d')
   q = TaskToRun.query(
       TaskToRun.expiration_ts <= cut_off,
-      TaskToRun.expiration_ts > None,
+      TaskToRun.expiration_ts > fetch_since,
       default_options=opts)
   for task in expire(q):
     yield task

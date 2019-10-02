@@ -125,7 +125,7 @@ def _yield_next_available_task_to_dispatch(bot_dimensions):
 class TaskToRunApiTest(test_env_handlers.AppTestBase):
   def setUp(self):
     super(TaskToRunApiTest, self).setUp()
-    self.now = datetime.datetime(2014, 01, 02, 03, 04, 05, 06)
+    self.now = datetime.datetime(2019, 01, 02, 03, 04, 05, 06)
     self.mock_now(self.now)
     auth_testing.mock_get_current_identity(self)
     # Setup the backend to handle task queues.
@@ -192,7 +192,7 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
     request = self.mkreq(1, _gen_request())
     # Ensures that the hash value is constant for the same input.
     self.assertEqual(
-        ndb.Key('TaskRequest', 0x7e296460f77ff77e, 'TaskToRun', 1),
+        ndb.Key('TaskRequest', 0x7bddaa9d777ff77e, 'TaskToRun', 1),
         task_to_run.request_to_task_to_run_key(request, 1, 0))
 
   def test_gen_queue_number(self):
@@ -333,7 +333,7 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
       to_run = task_to_run.new_task_to_run(request, i, 0)
       self.assertEqual(i, to_run.try_number)
       self.assertEqual(i, task_to_run.task_to_run_key_try_number(to_run.key))
-      self.assertEqual('1d69b9f08800881%d' % i, to_run.task_id)
+      self.assertEqual('422556288800881%d' % i, to_run.task_id)
 
   def test_new_task_to_run_list(self):
     self.mock(random, 'getrandbits', lambda _: 0x12)
@@ -370,23 +370,23 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
     task_to_run.new_task_to_run(self.mkreq(0, data), 1, 0).put()
 
     expected = [
-      {
-        'created_ts': self.now,
-        'expiration_ts': self.now + datetime.timedelta(seconds=31),
-        'request_key': '0x7e296460f77ffdce',
-        # Lower priority value means higher priority.
-        'queue_number': '0x1a3aa663153d248e',
-        'task_slice_index': 0,
-        'try_number': 1,
-      },
-      {
-        'created_ts': self.now,
-        'expiration_ts': self.now + datetime.timedelta(seconds=31),
-        'request_key': '0x7e296460f77ffede',
-        'queue_number': '0x1a3aa66317bd248e',
-        'task_slice_index': 0,
-        'try_number': 1,
-      },
+        {
+            'created_ts': self.now,
+            'expiration_ts': self.now + datetime.timedelta(seconds=31),
+            'request_key': '0x7bddaa9d777ffdce',
+            # Lower priority value means higher priority.
+            'queue_number': '0x1a3aa663153d248e',
+            'task_slice_index': 0,
+            'try_number': 1,
+        },
+        {
+            'created_ts': self.now,
+            'expiration_ts': self.now + datetime.timedelta(seconds=31),
+            'request_key': '0x7bddaa9d777ffede',
+            'queue_number': '0x1a3aa66317bd248e',
+            'task_slice_index': 0,
+            'try_number': 1,
+        },
     ]
 
     def flatten(i):
