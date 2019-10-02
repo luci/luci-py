@@ -11,8 +11,8 @@ command only.
 import code
 import json
 import logging
-import optparse
 import os
+import optparse
 import shutil
 import sys
 import zipfile
@@ -100,20 +100,12 @@ def CMDis_fine(_args):
   """Just reports that the code doesn't throw.
 
   That ensures that the bot has minimal viability before transfering control to
-  it. For now, it just imports bot_main and send ping request to server but
-  later it'll check the config, etc.
+  it. For now, it just imports bot_main but later it'll check the config, etc.
   """
   # pylint: disable=unused-variable
   from bot_code import bot_main
   from config import bot_config
-
-  from utils import net
-
-  resp = net.url_read(bot_main.get_config()['server'] +
-                      '/swarming/api/v1/bot/server_ping')
-  if resp is None:
-    logging.error('No response from server_ping')
-    return 1
+  # We're #goodenough.
   return 0
 
 
