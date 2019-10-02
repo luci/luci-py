@@ -1421,7 +1421,10 @@ def main():
     # kept. Only the last test case will leak these two directories.
     sys.argv.remove('--leak')
   if verbose:
-    logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(
+        format='%(asctime)s %(filename)s:%(lineno)d %(levelname)s %(message)s',
+        level=logging.INFO)
+
     Test.maxDiff = None
   else:
     logging.basicConfig(level=logging.ERROR)
