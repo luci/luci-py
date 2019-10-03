@@ -6,6 +6,8 @@
 
 from collections import namedtuple
 
+import six
+
 
 def _safe_parse(content, split=': '):
   """Safely parse a 'key: value' list of strings from a command."""
@@ -16,8 +18,9 @@ def _safe_parse(content, split=': '):
     parts = l.split(split, 2)
     if len(parts) != 2:
       continue
-    values.setdefault(
-        parts[0].strip().decode('utf-8'), parts[1].decode('utf-8'))
+    if six.PY2:
+      parts = map(unicode, parts)
+    values.setdefault(parts[0].strip(), parts[1])
   return values
 
 

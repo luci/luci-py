@@ -34,7 +34,7 @@ NCPUBITS = 8 * ctypes.sizeof(cpu_mask_t)
 pid_t = ctypes.c_uint64
 
 class cpu_set_t(ctypes.Structure):
-  _fields_ = [('__bits', cpu_mask_t * (CPU_SETSIZE / NCPUBITS))]
+  _fields_ = [('__bits', cpu_mask_t * (CPU_SETSIZE // NCPUBITS))]
 
   def get_cpus(self):
     """Convert bits in list len == CPU_SETSIZE
@@ -333,7 +333,7 @@ def get_inside_docker():
     - u'nvidia' if running in nvidia-docker.
   """
   if u':/k8s.io' in _read_cgroup():
-      return u'stock'
+    return u'stock'
   if not os.path.isfile('/.docker_env') and not os.path.isfile('/.dockerenv'):
     return None
   # TODO(maruel): Detect nvidia-docker.
