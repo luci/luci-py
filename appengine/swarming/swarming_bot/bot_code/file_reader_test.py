@@ -19,6 +19,7 @@ from depot_tools import fix_encoding
 from utils import file_path
 
 import file_reader
+import file_refresher
 
 
 class TestFileReaderThread(auto_stub.TestCase):
@@ -37,32 +38,59 @@ class TestFileReaderThread(auto_stub.TestCase):
 
     r = file_reader.FileReaderThread(self.path, 0.1)
     r.start()
-    self.assertEqual(r.last_value, {'A': 'a'})
+    try:
+      self.assertEqual(r.last_value, {'A': 'a'})
 
-    # Change the file. Expect possible conflict on Windows.
-    attempt = 0
-    while True:
-      try:
-        file_path.atomic_replace(self.path, json.dumps({'B': 'b'}))
-        break
-      except OSError:
-        attempt += 1
-        if attempt == 20:
-          self.fail('Cannot replace the file, giving up')
-        time.sleep(0.05)
+      # Change the file. Expect possible conflict on Windows.
+      attempt = 0
+      while True:
+        try:
+          file_path.atomic_replace(self.path, json.dumps({'B': 'b'}))
+          break
+        except OSError:
+          attempt += 1
+          if attempt == 20:
+            self.fail('Cannot replace the file, giving up')
+          time.sleep(0.05)
 
-    # Give some reasonable time for the reader thread to pick up the change.
-    # This test will flake if for whatever reason OS thread scheduler is lagging
-    # for more than 2 seconds.
-    time.sleep(2)
+      # Give some reasonable time for the reader thread to pick up the change.
+      # This test will flake if for whatever reason OS thread scheduler is
+      # lagging for more than 2 seconds.
+      time.sleep(2)
 
-    self.assertEqual(r.last_value, {'B': 'b'})
+      self.assertEqual(r.last_value, {'B': 'b'})
+    finally:
+      r.stop()
 
   def test_start_throws_on_error(self):
     r = file_reader.FileReaderThread(
         self.path + "_no_such_file", max_attempts=2)
     with self.assertRaises(file_reader.FatalReadError):
       r.start()
+
+  def test_works_with_file_refresher(self):
+    val = 0
+
+    w = file_refresher.FileRefresherThread(self.path, lambda: {'val': val}, 0.1)
+    r = file_reader.FileReaderThread(self.path, 0.1)
+
+    try:
+      w.start()
+      r.start()
+      self.assertEqual(r.last_value, {'val': 0})
+
+      val = 123
+
+      # Give some reasonable time for the reader thread to pick up the change.
+      # This test will flake if for whatever reason OS thread scheduler is
+      # lagging for more than 2 seconds.
+      time.sleep(2)
+
+      self.assertEqual(r.last_value, {'val': 123})
+
+    finally:
+      w.stop()
+      r.stop()
 
 
 if __name__ == '__main__':
