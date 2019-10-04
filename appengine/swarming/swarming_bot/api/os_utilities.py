@@ -702,25 +702,6 @@ def get_python_packages():
     return None
 
 
-def get_python3_version():
-  """
-  Returns a python3 version available from expected path.
-  This is used until swarming stops supporting python2.
-  """
-  try:
-    # python3 should be in the place written in go/swarming-bot-python3
-    if sys.platform == 'win32':
-      python3 = 'C:\\tools\\python3\\bin\\python3.exe'
-    else:
-      python3 = '/opt/python3/bin/python3'
-
-    version = subprocess.check_output([python3, '--version'],
-                                      stderr=subprocess.STDOUT)
-    return version.decode('utf-8').split()[1]
-  except (subprocess.CalledProcessError, OSError):
-    return u'none'
-
-
 class AuthenticatedHttpRequestFailure(Exception):
   pass
 
@@ -969,10 +950,6 @@ def get_dimensions():
   id_override = os.environ.get('SWARMING_BOT_ID')
   if id_override:
     dimensions[u'id'] = [id_override.decode('utf-8')]
-
-  python3 = get_python3_version()
-  if python3:
-    dimensions[u'python3'] = [python3]
 
   caches = get_named_caches_info()
   if caches:
