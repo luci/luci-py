@@ -68,7 +68,6 @@ class FileReaderThread(object):
     Returns:
       True to carry on, False to exit the thread.
     """
-    logging.info('crbug1010787: FileReaderThread - woke up')
     attempts = self._max_attempts
     while True:
       try:
@@ -76,10 +75,8 @@ class FileReaderThread(object):
           body = json.load(f)
         with self._lock:
           if self._last_value != body:
-            logging.info('crbug1010787: FileReaderThread - read %s', self._path)
+            logging.info('Read %s', self._path)
             self._last_value = body
-          else:
-            logging.info('crbug1010787: FileReaderThread - no changes')
         return True # success!
       except (IOError, OSError, ValueError) as e:
         last_error = 'Failed to read auth headers from %s: %s' % (self._path, e)
@@ -97,7 +94,6 @@ class FileReaderThread(object):
     """
     try:
       self._signal.get(timeout=timeout)
-      logging.info('crbug1010787: FileReaderThread - aborted')
       return False
     except Queue.Empty:
       return True

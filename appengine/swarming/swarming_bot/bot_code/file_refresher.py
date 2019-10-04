@@ -53,7 +53,6 @@ class FileRefresherThread(object):
     Returns:
       True to carry on, False to exit the thread.
     """
-    logging.info('crbug1010787: FileRefresherThread - woke up')
     try:
       blob = json.dumps(
           self._producer_callback(),
@@ -64,9 +63,7 @@ class FileRefresherThread(object):
       logging.exception('Unexpected exception in the callback')
       return True
     if blob == self._last_dumped_blob:
-      logging.info('crbug1010787: FileRefresherThread - no changes')
       return True # already have it on disk
-    logging.info('crbug1010787: FileRefresherThread - updating %s', self._path)
 
     # On Windows the file may be locked by reading process. Don't freak out,
     # just retry a bit later.
@@ -75,7 +72,7 @@ class FileRefresherThread(object):
       try:
         file_path.atomic_replace(self._path, blob)
         self._last_dumped_blob = blob
-        logging.info('crbug1010787: FileRefresherThread - updated')
+        logging.info('Updated %s', self._path)
         return True # success!
       except (IOError, OSError) as e:
         logging.error('Failed to update the file: %s', e)
@@ -96,7 +93,6 @@ class FileRefresherThread(object):
     """
     try:
       self._signal.get(timeout=timeout)
-      logging.info('crbug1010787: FileRefresherThread - aborted')
       return False
     except Queue.Empty:
       return True
