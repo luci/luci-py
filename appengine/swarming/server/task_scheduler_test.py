@@ -1046,6 +1046,14 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(expected, parent_run_result_key.get().children_task_ids)
     self.assertEqual(expected, parent_res_summary_key.get().children_task_ids)
 
+  def test_task_invalid_parent(self):
+    parent_id = self._task_ran_successfully(1, 0)
+    self.assertTrue(parent_id.endswith('1'))
+    # Try to create a children task with invalid parent_task_id.
+    with self.assertRaises(ValueError):
+      result_summary = self._quick_schedule(
+          0, parent_task_id=parent_id[:-1] + '2')
+
   def test_task_parent_isolated(self):
     run_result = self._quick_reap(
         1,

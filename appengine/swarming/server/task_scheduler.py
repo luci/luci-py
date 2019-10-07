@@ -1222,6 +1222,13 @@ def schedule_request(request, secret_bytes):
       items = ndb.get_multi(parent_task_keys)
       k = result_summary.task_id
       for item in items:
+        if not item:
+          # The client provided a parent task id that had a valid TaskRequest,
+          # it was verified in init_task_request(), but missing TaskRunResult.
+          # At this point the task was already scheduled, so the damage is done,
+          # but at least return an error to the client.
+          raise ValueError('failed to get entry for parent task')
+
         # When a task is running, the TaskRunResult and TaskResultSummary
         # entities are updated by a single server version, since the bot locks
         # on the specific server version.
@@ -1240,7 +1247,14 @@ def schedule_request(request, secret_bytes):
     # parent tasks, the task will be lost due to this transaction.
     # TODO(maruel): An option is to update the parent task as part of a cron
     # job, which would remove this code from the critical path.
-    datastore_utils.transaction(run_parent)
+    try:
+      datastore_utils.transaction(run_parent)
+    except ValueError:
+      if to_run:
+        to_run.queue_number = None
+        to_run.expiration_ts = None
+        to_run.put()
+      raise
 
   ts_mon_metrics.on_task_requested(result_summary, bool(dupe_summary))
 
