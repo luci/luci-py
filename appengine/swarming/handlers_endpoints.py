@@ -255,6 +255,7 @@ class SwarmingServerService(remote.Service):
         terminate_bot=acl.can_edit_bot(),
         get_configs=acl.can_view_config(),
         put_configs=acl.can_edit_config(),
+        # TODO(crbug/1010555): Remove is_ip_whitelisted_machine().
         cancel_task=acl._is_user() or acl.is_ip_whitelisted_machine(),
         cancel_tasks=acl.can_edit_all_tasks(),
         get_bootstrap_token=acl.can_create_bot())
