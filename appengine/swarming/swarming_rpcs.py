@@ -444,7 +444,7 @@ class NewTaskRequest(messages.Message):
   expiration_secs = messages.IntegerField(1)
   # Task name for display purpose.
   name = messages.StringField(2)
-  # Parent Swarming task ID of the process requesting this task. This is to tell
+  # Parent Swarming run ID of the process requesting this task. This is to tell
   # the server about reentrancy: when a task creates children Swarming tasks, so
   # that the tree of tasks can be presented in the UI; the parent task will list
   # all the children tasks that were triggered.
