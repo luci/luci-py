@@ -15,9 +15,7 @@ test_env_platforms.setup_test_env()
 
 from depot_tools import auto_stub
 
-# Disable caching before importing gce.
 from utils import tools
-tools.cached = lambda func: func
 
 import gce
 
@@ -27,6 +25,7 @@ class TestGCE(auto_stub.TestCase):
     self.mock(gce, 'get_zone', lambda: 'us-central2-a')
     self.assertEqual(
         ['us', 'us-central', 'us-central2', 'us-central2-a'], gce.get_zones())
+    tools.clear_cache(gce.get_zones)
     self.mock(gce, 'get_zone', lambda: 'europe-west1-b')
     self.assertEqual(
         ['europe', 'europe-west', 'europe-west1', 'europe-west1-b'],
