@@ -235,7 +235,7 @@ def setup_gae_sdk(sdk_path):
   """
   global _GAE_SDK_PATH
   if _GAE_SDK_PATH:
-    raise ValueError('setup_gae_sdk was already called.')
+    return
   _GAE_SDK_PATH = sdk_path
 
   sys.path.insert(0, sdk_path)
