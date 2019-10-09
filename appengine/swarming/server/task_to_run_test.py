@@ -825,12 +825,16 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(expected, actual)
 
   def test_yield_expired_task_to_run(self):
+    # There's a cut off at 2019-01-01, so the default self.now on Jan 2nd
+    # doesn't work when looking 4 weeks ago.
+    self.now = datetime.datetime(2019, 10, 02, 03, 04, 05, 06)
+    self.mock_now(self.now, 0)
     # task_to_run_1: still active
     self._gen_new_task_to_run_slices(
         1,
         created_ts=self.now,
         task_slices=[{'expiration_secs': 60, 'properties': _gen_properties()}])
-    # task_to_run_2: just reached to the expiraiton time
+    # task_to_run_2: just reached to the expiration time
     _, to_run_2 = self._gen_new_task_to_run_slices(
         0,
         created_ts=self.now-datetime.timedelta(seconds=61),
