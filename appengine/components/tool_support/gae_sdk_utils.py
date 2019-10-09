@@ -329,7 +329,7 @@ class Application(object):
     """
     # app.yaml first; this corresponds to the 'default' service.
     yamls = self._services.copy()
-    return [yamls.pop('default').path] + [m.path for m in yamls.itervalues()]
+    return [yamls.pop('default').path] + [m.path for m in yamls.values()]
 
   @property
   def default_service_dir(self):
@@ -582,14 +582,14 @@ class Application(object):
     """
     # Build a mapping: version -> list of services that have it.
     versions = collections.defaultdict(list)
-    for service, version_list in self.list_versions().iteritems():
+    for service, version_list in self.list_versions().items():
       for version in version_list:
         versions[version].append(service)
 
     # Keep only versions that are deployed to all requested services.
     services = services or self.services
     actual_versions = [
-      version for version, services_with_it in versions.iteritems()
+      version for version, services_with_it in versions.items()
       if set(services_with_it).issuperset(services)
     ]
 

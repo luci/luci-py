@@ -281,13 +281,13 @@ class TaskTemplate(_TaskTemplate):
 
     def finalize(self, ctx):
       doc = directory_occlusion.Checker()
-      for (path, pkg), version in self.cipd_package.iteritems():
+      for (path, pkg), version in self.cipd_package.items():
         # all cipd packages are considered compatible in terms of paths: it's
         # totally legit to install many packages in the same directory. Thus we
         # set the owner for all cipd packages to 'cipd'.
         doc.add(path, 'cipd', '%s:%s' % (pkg, version))
 
-      for name, path in self.cache.iteritems():
+      for name, path in self.cache.items():
         # caches are all unique; they can't overlap. Thus, we give each of them
         # a unique (via the cache name) owner.
         doc.add(path, 'cache %r' % name, '')

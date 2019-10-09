@@ -258,7 +258,7 @@ class TestMetrics(test_case.TestCase):
     self.assertEqual(600, ts_mon_metrics._jobs_max_pending_duration.get(
         fields=jobs_fields, target_fields=ts_mon_metrics._TARGET_FIELDS))
 
-    for bot_id, status in bots_expected.iteritems():
+    for bot_id, status in bots_expected.items():
       target_fields = dict(ts_mon_metrics._TARGET_FIELDS)
       target_fields['hostname'] = 'autogen:' + bot_id
       self.assertEqual(status, ts_mon_metrics._executors_status.get(

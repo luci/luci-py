@@ -32,7 +32,7 @@ def build_tar_gz(content):
   """Returns bytes of tar.gz archive build from {filename -> body} dict."""
   out = StringIO.StringIO()
   with tarfile.open(mode='w|gz', fileobj=out) as tar:
-    for name, value in content.iteritems():
+    for name, value in content.items():
       # tarfile module doesn't support in-memory files (it tries to os.stat
       # them), so dump to disk first to keep the code simple.
       path = None

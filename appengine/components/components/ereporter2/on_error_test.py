@@ -168,7 +168,7 @@ class Ereporter2OnErrorTest(test_case.TestCase):
     app.post('/?foo=bar', {'foo': 'baz'})
     # Strip None values for clarity.
     actual = [
-      {k: v for k, v in e.to_dict().iteritems() if v is not None}
+      {k: v for k, v in e.to_dict().items() if v is not None}
       for e in models.Error.query()
     ]
     # It happens this value is hardcoded on time.

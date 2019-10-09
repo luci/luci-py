@@ -335,7 +335,7 @@ class AppTestBase(test_case.TestCase):
       u'io_timeout_secs': 1200,
       u'outputs': [u'foo', u'path/to/foobar']
     }
-    out.update((unicode(k), v) for k, v in kwargs.iteritems())
+    out.update((unicode(k), v) for k, v in kwargs.items())
     return out
 
   def create_new_request(self, **kwargs):
@@ -351,7 +351,7 @@ class AppTestBase(test_case.TestCase):
       'user': 'joe@localhost',
       'bot_ping_tolerance_secs': 600,
     }
-    out.update((unicode(k), v) for k, v in kwargs.iteritems())
+    out.update((unicode(k), v) for k, v in kwargs.items())
     # Note that protorpc message constructor accepts dicts for submessages.
     return swarming_rpcs.NewTaskRequest(**out)
 
@@ -429,7 +429,7 @@ class AppTestBase(test_case.TestCase):
       u'io_timeout_secs': u'1200',
       u'outputs': [u'foo', u'path/to/foobar']
     }
-    out.update((unicode(k), v) for k, v in kwargs.iteritems())
+    out.update((unicode(k), v) for k, v in kwargs.items())
     return out
 
   @staticmethod
@@ -460,7 +460,7 @@ class AppTestBase(test_case.TestCase):
       u'user': u'joe@localhost',
       u'bot_ping_tolerance_secs': u'600',
     }
-    out.update((unicode(k), v) for k, v in kwargs.iteritems())
+    out.update((unicode(k), v) for k, v in kwargs.items())
     return out
 
   @staticmethod
@@ -492,7 +492,7 @@ class AppTestBase(test_case.TestCase):
         u'total_bytes_items_hot': u'56',
       },
     }
-    out.update((unicode(k), v) for k, v in kwargs.iteritems())
+    out.update((unicode(k), v) for k, v in kwargs.items())
     return out
 
   def gen_result_summary(self, **kwargs):
@@ -531,7 +531,7 @@ class AppTestBase(test_case.TestCase):
       u'try_number': u'0',
       u'user': u'joe@localhost',
     }
-    out.update((unicode(k), v) for k, v in kwargs.iteritems())
+    out.update((unicode(k), v) for k, v in kwargs.items())
     return out
 
   def gen_run_result(self, **kwargs):
@@ -559,5 +559,5 @@ class AppTestBase(test_case.TestCase):
       u'task_id': u'5cee488008811',
       u'try_number': u'1',
     }
-    out.update((unicode(k), v) for k, v in kwargs.iteritems())
+    out.update((unicode(k), v) for k, v in kwargs.items())
     return out

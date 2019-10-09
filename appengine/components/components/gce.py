@@ -560,7 +560,7 @@ class Project(object):
     filters = []
     if name:
       filters.append('(name = %s)' % name)
-    for key, value in sorted(labels.iteritems()):
+    for key, value in sorted(labels.items()):
       filters.append('(labels.%s = %s)' % (key, value))
     if filters:
       # e.g. (name = snapshot-name) AND (label.version = latest)

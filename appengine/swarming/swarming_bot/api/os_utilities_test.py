@@ -117,7 +117,7 @@ class TestOsUtilities(auto_stub.TestCase):
 
   def test_get_dimensions(self):
     dimensions = os_utilities.get_dimensions()
-    for key, values in dimensions.iteritems():
+    for key, values in dimensions.items():
       self.assertIsInstance(key, unicode)
       self.assertIsInstance(values, list)
       for value in values:

@@ -167,7 +167,7 @@ def get_config_hashes_async(revs, path):
     path (str): path to the file.
   """
   assert isinstance(revs, dict)
-  for cs, rev in revs.iteritems():
+  for cs, rev in revs.items():
     assert isinstance(cs, basestring)
     assert cs
     assert rev is None or isinstance(rev, basestring)
@@ -177,7 +177,7 @@ def get_config_hashes_async(revs, path):
 
   # Resolve latest revisions.
   revs = revs.copy()
-  config_sets_without_rev = [cs for cs, rev in revs.iteritems() if not rev]
+  config_sets_without_rev = [cs for cs, rev in revs.items() if not rev]
   if config_sets_without_rev:
     latest_revisions = yield get_latest_revisions_async(config_sets_without_rev)
     revs.update(latest_revisions)
@@ -188,7 +188,7 @@ def get_config_hashes_async(revs, path):
         ConfigSet, cs,
         Revision, rev,
         File, path)
-    for cs, rev in revs.iteritems()
+    for cs, rev in revs.items()
     if rev
   ])
   content_url_and_hashes = {
@@ -201,7 +201,7 @@ def get_config_hashes_async(revs, path):
     cs: (
         (rev, ) + content_url_and_hashes.get(cs)
         if content_url_and_hashes.get(cs) else (None, None, None))
-    for cs, rev in revs.iteritems()
+    for cs, rev in revs.items()
   })
 
 
@@ -234,12 +234,12 @@ def get_latest_configs_async(config_sets, path, hashes_only=False):
   if hashes_only:
     contents = {}
   else:
-    hashes = [h for _, _, h in revs_and_hashes.itervalues() if h]
+    hashes = [h for _, _, h in revs_and_hashes.values() if h]
     contents = yield get_configs_by_hashes_async(hashes)
 
   raise ndb.Return({
     cs: (rev, file_url, content_hash, contents.get(content_hash))
-    for cs, (rev, file_url, content_hash) in revs_and_hashes.iteritems()
+    for cs, (rev, file_url, content_hash) in revs_and_hashes.items()
   })
 
 
@@ -265,7 +265,7 @@ def get_latest_messages_async(config_sets, path, message_factory):
 
   raise ndb.Return({
     cs: to_msg(text)
-    for cs, (_, _, _, text) in configs.iteritems()
+    for cs, (_, _, _, text) in configs.items()
   })
 
 

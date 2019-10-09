@@ -77,7 +77,7 @@ class LocalBot(object):
   @property
   def log(self):
     """Returns the log output. Only set after calling stop()."""
-    return '\n'.join(self._logs.itervalues()) if self._logs else None
+    return '\n'.join(self._logs.values()) if self._logs else None
 
   def start(self):
     """Starts the local Swarming bot."""
@@ -135,7 +135,7 @@ class LocalBot(object):
     if not self._logs:
       print >> sys.stderr, '<N/A>'
     else:
-      for name, content in sorted(self._logs.iteritems()):
+      for name, content in sorted(self._logs.items()):
         sys.stderr.write(name + ':\n')
         for l in content.strip('\n').splitlines():
           sys.stderr.write('  %s\n' % l)

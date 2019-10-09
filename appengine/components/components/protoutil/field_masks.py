@@ -197,7 +197,7 @@ class Mask(object):
     assert isinstance(src, protobuf.message.Message)
     assert type(src) == type(dest)  # pylint: disable=unidiomatic-typecheck
 
-    for f_name, submask in self.children.iteritems():
+    for f_name, submask in self.children.items():
       include_partially = bool(submask.children)
 
       dest_value = getattr(dest, f_name)

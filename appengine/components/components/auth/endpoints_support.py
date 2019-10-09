@@ -122,7 +122,7 @@ def endpoints_api(
       raise TypeError(
           'Service %s must have at least one auth.endpoints_method method' %
           name)
-    for method, func in cls.all_remote_methods().iteritems():
+    for method, func in cls.all_remote_methods().items():
       if func and not api.is_decorated(func.remote._RemoteMethodInfo__method):
         raise TypeError(
             'Method \'%s\' of \'%s\' is not protected by @require or @public '

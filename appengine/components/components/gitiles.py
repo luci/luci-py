@@ -450,7 +450,7 @@ def get_refs_async(hostname, project, ref_prefix=None, **fetch_kwargs):
     raise ndb.Return(None)
 
   ret = {}
-  for k, v in res.iteritems():
+  for k, v in res.items():
     # if ref_prefix was specified and there is a ref matching exactly the
     # prefix, gitiles returns full ref, not ''.
     if prepend_prefix and k != ref_prefix[:-1]:  # -1 to exclude "/" suffix

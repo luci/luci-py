@@ -30,14 +30,14 @@ def _string_pairs_from_dict(dictionary):
   # For key: value items like env.
   return [
     swarming_rpcs.StringPair(key=k, value=v)
-    for k, v in sorted((dictionary or {}).iteritems())
+    for k, v in sorted((dictionary or {}).items())
   ]
 
 
 def _duplicate_string_pairs_from_dict(dictionary):
   # For compatibility due to legacy swarming_rpcs.TaskProperties.dimensions.
   out = []
-  for k, values in (dictionary or {}).iteritems():
+  for k, values in (dictionary or {}).items():
     assert isinstance(values, (list, tuple)), dictionary
     for v in values:
       out.append(swarming_rpcs.StringPair(key=k, value=v))
@@ -48,7 +48,7 @@ def _string_list_pairs_from_dict(dictionary):
   # For key: values items like bot dimensions.
   return [
     swarming_rpcs.StringListPair(key=k, value=v)
-    for k, v in sorted((dictionary or {}).iteritems())
+    for k, v in sorted((dictionary or {}).items())
   ]
 
 
@@ -56,7 +56,7 @@ def _ndb_to_rpc(cls, entity, **overrides):
   members = (f.name for f in cls.all_fields())
   kwargs = {m: getattr(entity, m) for m in members if not m in overrides}
   kwargs.update(overrides)
-  return cls(**{k: v for k, v in kwargs.iteritems() if v is not None})
+  return cls(**{k: v for k, v in kwargs.items() if v is not None})
 
 
 def _rpc_to_ndb(cls, entity, **overrides):
@@ -64,7 +64,7 @@ def _rpc_to_ndb(cls, entity, **overrides):
     m: getattr(entity, m) for m in cls._properties if not m in overrides
   }
   kwargs.update(overrides)
-  return cls(**{k: v for k, v in kwargs.iteritems() if v is not None})
+  return cls(**{k: v for k, v in kwargs.items() if v is not None})
 
 
 def _taskproperties_from_rpc(props):

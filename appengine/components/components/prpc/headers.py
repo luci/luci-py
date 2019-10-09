@@ -95,7 +95,7 @@ def parse_headers(headers):
       raise
 
   invocation_metadata = []
-  for header, value in headers.iteritems():
+  for header, value in headers.items():
     header = header.lower()
     if header.startswith('x-prpc-'):
       continue

@@ -101,7 +101,7 @@ def vendor_name_to_id(ven_name):
   # macOS 10.13 doesn't provide the vendor ID any more, so support reverse
   # lookups on vendor name.
   lower_name = ven_name.lower()
-  for k, v in _VENDOR_MAPPING.iteritems():
+  for k, v in _VENDOR_MAPPING.items():
     if lower_name == v[0].lower():
       return k
   return None

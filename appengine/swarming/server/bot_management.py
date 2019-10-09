@@ -190,7 +190,7 @@ class _BotCommon(ndb.Model):
 
     if self.task_id:
       out.current_task_id = self.task_id
-    for key, values in sorted(self.dimensions.iteritems()):
+    for key, values in sorted(self.dimensions.items()):
       d = out.dimensions.add()
       d.key = key
       for value in values:
@@ -816,7 +816,7 @@ def cron_aggregate_dimensions():
         seen.setdefault(k, set()).add(v)
   dims = [
     DimensionValues(dimension=k, values=sorted(values))
-    for k, values in sorted(seen.iteritems())
+    for k, values in sorted(seen.items())
   ]
 
   logging.info('Saw dimensions %s', dims)

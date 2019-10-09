@@ -73,7 +73,7 @@ class FrontendTest(test_env_handlers.AppTestBase):
     # Grab the set of all routes.
     app = self.app.app
     routes = set(app.router.match_routes)
-    routes.update(app.router.build_routes.itervalues())
+    routes.update(app.router.build_routes.values())
 
     # Get all routes that are not protected by GAE auth mechanism.
     routes_to_check = [

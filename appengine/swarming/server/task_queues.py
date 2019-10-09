@@ -262,7 +262,7 @@ class TaskDimensions(ndb.Model):
   def match_request(self, dimensions):
     """Confirms that this instance actually stores this set."""
     flat = []
-    for k, values in dimensions.iteritems():
+    for k, values in dimensions.items():
       for v in values:
         flat.append(u'%s:%s' % (k, v))
     return self._match_request_flat(flat)
@@ -707,7 +707,7 @@ def dimensions_to_flat(dimensions):
   """
   cutoff = config.DIMENSION_KEY_LENGTH + 1 + config.DIMENSION_VALUE_LENGTH
   out = []
-  for k, values in dimensions.iteritems():
+  for k, values in dimensions.items():
     for v in values:
       flat = u'%s:%s' % (k, v)
       if len(flat) > cutoff:
@@ -734,7 +734,7 @@ def hash_dimensions(dimensions):
   # TODO(maruel): This is incorrect, as it can confuse keys and values. But
   # changing the algo is non-trivial.
   data = ''
-  for k, values in sorted(dimensions.iteritems()):
+  for k, values in sorted(dimensions.items()):
     data += k.encode('utf8')
     data += '\000'
     assert isinstance(values, (list, tuple)), values
@@ -918,7 +918,7 @@ def rebuild_task_cache(payload):
   dimensions_hash = int(data[u'dimensions_hash'])
   valid_until_ts = utils.parse_datetime(data[u'valid_until_ts'])
   dimensions_flat = []
-  for k, values in dimensions.iteritems():
+  for k, values in dimensions.items():
     for v in values:
       dimensions_flat.append(u'%s:%s' % (k, v))
   dimensions_flat.sort()

@@ -256,7 +256,7 @@ class _ProcessResult(object):
   maintenance_msg = None
 
   def __init__(self, **kwargs):
-    for k, v in kwargs.iteritems():
+    for k, v in kwargs.items():
       # Typo catching assert, ensure _ProcessResult class has the attribute.
       assert hasattr(self, k), k
       setattr(self, k, v)
@@ -316,7 +316,7 @@ class _BotBaseHandler(_BotApiHandler):
     # doesn't know about new server-assigned dimensions yet in this case. Also
     # don't report ['default'], bot sends it in the handshake before it knows
     # anything at all.
-    for dim_key, from_cfg in bot_group_cfg.dimensions.iteritems():
+    for dim_key, from_cfg in bot_group_cfg.dimensions.items():
       from_bot = sorted(dimensions.get(dim_key) or [])
       from_cfg = sorted(from_cfg)
       if from_bot and from_bot != ['default'] and from_bot != from_cfg:

@@ -33,7 +33,7 @@ def _bot_event(bot_id, pool, caches, oses):
   # Format is named_caches: {name: [['shortname', size], timestamp]}.
   state = {
     'named_caches': {
-      name: [['a', size], 10] for name, size in caches.iteritems()
+      name: [['a', size], 10] for name, size in caches.items()
     }
   }
   bot_management.bot_event(

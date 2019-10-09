@@ -228,7 +228,7 @@ def main():
   tests = get_all_tests()
   results = Queue.Queue(maxsize=len(tests))
 
-  for name, fn in sorted(tests.iteritems()):
+  for name, fn in sorted(tests.items()):
     logging.info('%s', name)
     t = threading.Thread(
         target=run_test, name=name,

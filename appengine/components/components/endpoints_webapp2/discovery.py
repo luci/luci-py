@@ -204,7 +204,7 @@ def _get_parameters(message, path):
   order = re.findall(PARAMETER_REGEX, path)
   parameters = _get_schemas([message]).get(
       _normalize_name(message.definition_name()), {}).get('properties', {})
-  for parameter, schema in parameters.iteritems():
+  for parameter, schema in parameters.items():
     # As above, repeated fields for parameters do not have items.
     if schema['type'] == 'array':
       schema.update(schema.pop('items'))
@@ -246,7 +246,7 @@ def _get_methods(service):
   }
   types = set()
 
-  for _, method in service.all_remote_methods().iteritems():
+  for _, method in service.all_remote_methods().items():
     # Only describe methods decorated with @method.
     info = getattr(method, 'method_info', None)
     if info is None:

@@ -322,7 +322,7 @@ def delegate_async(
   # Request a new one.
   logging.info(
       'Minting a delegation token for %r',
-      {k: v for k, v in req.iteritems() if v},
+      {k: v for k, v in req.items() if v},
   )
   res = yield service_account.authenticated_request_async(
       '%s/prpc/tokenserver.minter.TokenMinter/MintDelegationToken' %

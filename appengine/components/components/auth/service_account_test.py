@@ -509,7 +509,7 @@ class GetAccessTokenTest(test_case.TestCase):
             "expireTime": expire_time,
         })
       }
-      for url_prefix, response in mock_dict.iteritems():
+      for url_prefix, response in mock_dict.items():
         if kwargs['url'].find(url_prefix) == 0:
           raise ndb.Return(response)
       raise Exception('url not found in mock: %s' % kwargs['url'])

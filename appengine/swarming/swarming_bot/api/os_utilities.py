@@ -425,7 +425,7 @@ def get_disk_size(path):
   # Find the disk for the path.
   path = os.path.realpath(path)
   paths = sorted(
-      ((p, k[u'size_mb']) for p, k in get_disks_info().iteritems()),
+      ((p, k[u'size_mb']) for p, k in get_disks_info().items()),
       key=lambda x: -len(x[0]))
   # It'd be nice if it were possible to know on a per-path basis, e.g. you can
   # have both case sensitive and insensitive partitions mounted on OSX.
@@ -517,7 +517,7 @@ def get_cost_hour():
   # TODO(maruel): Figure out the disk type. The metadata is not useful AFAIK.
   # Assume HDD for now, it's the cheapest. That's not true, we do have SSDs.
   disk_gb_cost = 0.
-  for disk in get_disks_info().itervalues():
+  for disk in get_disks_info().values():
     disk_gb_cost += disk[u'free_mb'] / 1024. * (
         GCE_HDD_GB_COST_MONTH / 30. / 24.)
 
@@ -542,7 +542,7 @@ def get_machine_type():
   ram_gb_per_core = ram_gb / cores
   logging.info('RAM GB/core = %.3f', ram_gb_per_core)
   best_fit = None
-  for ratio, prefix in GCE_RAM_GB_PER_CORE_RATIOS.iteritems():
+  for ratio, prefix in GCE_RAM_GB_PER_CORE_RATIOS.items():
     delta = (ram_gb_per_core-ratio)**2
     if best_fit is None or delta < best_fit[0]:
       best_fit = (delta, prefix)

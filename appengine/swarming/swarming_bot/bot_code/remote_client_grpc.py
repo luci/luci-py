@@ -445,7 +445,7 @@ def _dimensions_to_workers(dims, worker):
     worker.devices.add()
   del worker.properties[:]
   del worker.devices[0].properties[:]
-  for k, values in sorted(dims.iteritems()):
+  for k, values in sorted(dims.items()):
     if k == 'id':
       # Proxy treats ID as worker-level, not device-level. But use this for the
       # device name.

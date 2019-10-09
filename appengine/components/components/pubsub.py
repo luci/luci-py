@@ -178,7 +178,7 @@ def publish_multi(topic, messages):
   assert validate_full_name(topic, 'topics'), topic
   messages = [
       {'attributes': attributes or {}, 'data': base64.b64encode(message)}
-      for message, attributes in messages.iteritems()
+      for message, attributes in messages.items()
   ]
 
   def call_publish():

@@ -157,15 +157,15 @@ def _gen_task_template(cache=None, cipd_package=None, env=None):
   return pools_config.TaskTemplate(
     cache=sorted(
       pools_config.CacheEntry(unicode(name), unicode(path))
-      for name, path in (cache or {}).iteritems()
+      for name, path in (cache or {}).items()
     ),
     cipd_package=sorted(
       pools_config.CipdPackage(unicode(path), unicode(pkg), unicode(version))
-      for (path, pkg), version in (cipd_package or {}).iteritems()
+      for (path, pkg), version in (cipd_package or {}).items()
     ),
     env=sorted(
       env_value(unicode(var), value)
-      for var, value in (env or {}).iteritems()
+      for var, value in (env or {}).items()
     ),
     inclusions=(),
   )

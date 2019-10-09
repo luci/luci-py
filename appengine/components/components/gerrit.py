@@ -92,7 +92,7 @@ def get_change_async(
         commit=key,
         number=int(value['_number']),
         fetch_ref=value['fetch']['http']['ref'],
-    ) for key, value in data.get('revisions', {}).iteritems()]
+    ) for key, value in data.get('revisions', {}).items()]
   revisions.sort(key=lambda r: r.number)
 
   raise ndb.Return(Change(
@@ -137,7 +137,7 @@ def set_review_async(
     'message': message,
     'notify': notify,
   }
-  body = {k:v for k, v in body.iteritems() if v is not None}
+  body = {k:v for k, v in body.items() if v is not None}
 
   path = 'changes/%s/revisions/%s/review' % (change_id, revision)
   yield fetch_json_async(hostname, path, method='POST', payload=body)

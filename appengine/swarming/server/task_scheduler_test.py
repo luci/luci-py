@@ -2613,7 +2613,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
             scheduling_groups=frozenset(scheduling_groups or []),
             trusted_delegatees={
               peer: pools_config.TrustedDelegatee(peer, frozenset(tags))
-              for peer, tags in (trusted_delegatees or {}).iteritems()
+              for peer, tags in (trusted_delegatees or {}).items()
             },
             service_accounts=frozenset(service_accounts or []),
             service_accounts_groups=tuple(service_accounts_groups or []),

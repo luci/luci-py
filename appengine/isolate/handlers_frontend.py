@@ -326,7 +326,7 @@ class RootHandler(auth.AuthenticatingHandler):
     if auth.is_admin():
       params['mapreduce_jobs'] = [
         {'id': job_id, 'name': job_def['job_name']}
-        for job_id, job_def in mapreduce_jobs.MAPREDUCE_JOBS.iteritems()
+        for job_id, job_def in mapreduce_jobs.MAPREDUCE_JOBS.items()
       ]
       params['xsrf_token'] = self.generate_xsrf_token()
     self.response.write(template.render('isolate/root.html', params))

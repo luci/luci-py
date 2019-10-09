@@ -115,7 +115,7 @@ class AuthenticatingHandler(webapp2.RequestHandler):
     if policy:
       self.response.headers['Content-Security-Policy'] = '; '.join(
         str('%s %s' % (directive, ' '.join(sources)))
-        for directive, sources in sorted(policy.iteritems())
+        for directive, sources in sorted(policy.items())
       )
     # Enforce HTTPS by adding the HSTS header; 365*24*60*60s.
     # https://www.owasp.org/index.php/HTTP_Strict_Transport_Security
@@ -513,7 +513,7 @@ def get_authenticated_routes(app):
   # all routes for pretty-printing).
   routes = list(app.router.match_routes)
   routes.extend(
-      v for k, v in app.router.build_routes.iteritems()
+      v for k, v in app.router.build_routes.items()
       if v not in app.router.match_routes)
   return [r for r in routes if issubclass(r.handler, AuthenticatingHandler)]
 

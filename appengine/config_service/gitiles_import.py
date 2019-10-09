@@ -235,7 +235,7 @@ def _read_and_validate_archive(config_set, rev_key, archive, location):
     return [], ctx.result()
 
   entities = []
-  for name, content in files.iteritems():
+  for name, content in files.items():
     content_hash = storage.compute_hash(content)
     blob_futures.append(storage.import_blob_async(
       content=content, content_hash=content_hash))

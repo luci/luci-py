@@ -77,7 +77,7 @@ def get_additional_ui_data():
   if not config.is_remote_configured():
     return {'auth_service_config_locked': False}
   config_revisions = {}
-  for path, rev in config.get_revisions().iteritems():
+  for path, rev in config.get_revisions().items():
     config_revisions[path] = {
       'rev': rev.revision if rev else 'none',
       'url': rev.url if rev else 'about:blank',

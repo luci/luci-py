@@ -573,7 +573,7 @@ def _bot_group_proto_to_tuple(msg, trusted_dimensions):
         ip_whitelist=cfg.ip_whitelist)
       for cfg in msg.auth
     ),
-    dimensions={k: sorted(v) for k, v in dimensions.iteritems()},
+    dimensions={k: sorted(v) for k, v in dimensions.items()},
     bot_config_script=msg.bot_config_script or '',
     bot_config_script_content=msg.bot_config_script_content or '',
     system_service_account=msg.system_service_account or '')
@@ -830,7 +830,7 @@ def _validate_group_bot_id_prefixes(
           bot_id_prefix, known_bot_ids[bot_id_prefix])
       continue
 
-    for p, idx in known_bot_id_prefixes.iteritems():
+    for p, idx in known_bot_id_prefixes.items():
       # Inefficient, but robust code wrt variable char length.
       if p.startswith(bot_id_prefix):
         msg = 'bot_id_prefix "%s" is subprefix of "%s"'

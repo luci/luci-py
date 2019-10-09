@@ -96,7 +96,7 @@ IS_WINDOWS = os.name == 'nt'
 
 # Enable "yaml" to dump ordered dict.
 def dict_representer(dumper, data):
-  return dumper.represent_dict((k, v) for k, v in data.iteritems()
+  return dumper.represent_dict((k, v) for k, v in data.items()
                                if v is not None)
 yaml.Dumper.add_representer(collections.OrderedDict, dict_representer)
 
@@ -240,7 +240,7 @@ class Configuration(object):
     # Load the JSON into our namedtuple schema.
     cfg = cls.load_with_defaults(cls.Config, d)
     cfg = cfg._replace(clusters={k: cls.load_with_defaults(cls.Cluster, v)
-                                 for k, v in cfg.clusters.iteritems()})
+                                 for k, v in cfg.clusters.items()})
 
     return cls(cfg)
 

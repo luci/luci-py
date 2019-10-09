@@ -48,7 +48,7 @@ def can_read_config_sets(config_sets):
 
   project_ids = []
   service_ids = []
-  for cs in set(check_via.itervalues()):
+  for cs in set(check_via.values()):
     service_match = config.SERVICE_CONFIG_SET_RGX.match(cs)
     if service_match:
       service_ids.append(service_match.group(1))
@@ -60,9 +60,9 @@ def can_read_config_sets(config_sets):
         raise ValueError('invalid config_set %r' % cs)
 
   access_map = {}
-  for pid, access in has_projects_access(project_ids).iteritems():
+  for pid, access in has_projects_access(project_ids).items():
     access_map['projects/' + pid] = access
-  for sid, access in has_services_access(service_ids).iteritems():
+  for sid, access in has_services_access(service_ids).items():
     access_map['services/' + sid] = access
 
   return {

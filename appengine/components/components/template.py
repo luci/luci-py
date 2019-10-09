@@ -125,25 +125,25 @@ def bootstrap(paths, global_env=None, filters=None):
   """
   assert isinstance(paths, dict), paths
   assert all(
-      _TEMPLATE_PATHS.get(k, v) == v for k, v in paths.iteritems()), paths
-  assert all(os.path.isabs(p) for p in paths.itervalues()), paths
-  assert all(os.path.isdir(p) for p in paths.itervalues()), paths
+      _TEMPLATE_PATHS.get(k, v) == v for k, v in paths.items()), paths
+  assert all(os.path.isabs(p) for p in paths.values()), paths
+  assert all(os.path.isdir(p) for p in paths.values()), paths
 
   if global_env is not None:
     assert isinstance(global_env, dict), global_env
     assert all(isinstance(k, str) for k in global_env), global_env
     assert all(
         _GLOBAL_ENV.get(k, v) == v
-        for k, v in global_env.iteritems()), global_env
+        for k, v in global_env.items()), global_env
 
   if filters is not None:
     assert isinstance(filters, dict), filters
     assert all(
         isinstance(k, str) and callable(v)
-        for k, v in filters.iteritems()), filters
+        for k, v in filters.items()), filters
     assert all(
         _GLOBAL_FILTERS.get(k, v) == v
-        for k, v in filters.iteritems()), filters
+        for k, v in filters.items()), filters
 
   _TEMPLATE_PATHS.update(paths)
 
@@ -178,7 +178,7 @@ def get_jinja_env():
   env = jinja2.Environment(
       loader=jinja2.PrefixLoader({
         prefix: jinja2.FileSystemLoader(path)
-        for prefix, path in _TEMPLATE_PATHS.iteritems()
+        for prefix, path in _TEMPLATE_PATHS.items()
       }),
       autoescape=True,
       extensions=['jinja2.ext.autoescape'],

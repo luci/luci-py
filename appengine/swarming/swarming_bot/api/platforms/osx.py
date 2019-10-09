@@ -390,7 +390,7 @@ def get_xcode_state():
 def get_xcode_versions():
   """Returns a list of Xcode versions installed on this machine."""
   return sorted(
-      set(xcode['version'] for xcode in get_xcode_state().itervalues()))
+      set(xcode['version'] for xcode in get_xcode_state().values()))
 
 
 def get_current_xcode_version():
@@ -572,7 +572,7 @@ def get_temperatures():
     # Populate the cache of the sensors found on this system, so that the next
     # call can only get the actual sensors.
     # Note: It is relatively fast to brute force all the possible names.
-    for key, name in _sensor_names.iteritems():
+    for key, name in _sensor_names.items():
       value = _SMC_get_value(conn, key)
       if value is not None:
         _sensor_found_cache.add(key)
@@ -616,7 +616,7 @@ def get_monitor_hidpi():
 def get_xcode_versions():
   """Returns all Xcode versions installed."""
   return sorted(
-      unicode(xcode['version']) for xcode in get_xcode_state().itervalues())
+      unicode(xcode['version']) for xcode in get_xcode_state().values())
 
 
 @tools.cached

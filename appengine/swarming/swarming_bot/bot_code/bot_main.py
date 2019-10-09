@@ -150,7 +150,7 @@ def _pool_from_dimensions(dimensions):
   """Return a canonical string of flattened dimensions."""
   # Keep in sync with ../../ts_mon_metrics.py
   pairs = []
-  for key, values in dimensions.iteritems():
+  for key, values in dimensions.items():
     if key in _IGNORED_DIMENSIONS:
       continue
     # Strip all the prefixes of other values. values is already sorted.
@@ -419,7 +419,7 @@ def _get_disks_quarantine(botobj, disks):
   case_insensitive = sys.platform in ('darwin', 'win32')
   if case_insensitive:
     path = path.lower()
-  for mount, infos in sorted(disks.iteritems(), key=lambda x: -len(x[0])):
+  for mount, infos in sorted(disks.items(), key=lambda x: -len(x[0])):
     if path.startswith(mount.lower() if case_insensitive else mount):
       # Apply 'bot' check if bot is on its own partition, or it's on
       # root partition and there are no errors reported yet.

@@ -682,7 +682,7 @@ class _TaskResultCommon(ndb.Model):
     if self.bot_dimensions:
       # TODO(maruel): Keep a complete snapshot. This is a bit clunky at the
       # moment. https://crbug.com/850560
-      for key, values in sorted(self.bot_dimensions.iteritems()):
+      for key, values in sorted(self.bot_dimensions.items()):
         dst = out.bot.dimensions.add()
         dst.key = key
         dst.values.extend(values)
@@ -841,7 +841,7 @@ class _TaskResultCommon(ndb.Model):
     properties.
     """
     return [
-      prop._code_name for prop in cls._properties.itervalues()
+      prop._code_name for prop in cls._properties.values()
       if not isinstance(prop, ndb.ComputedProperty)
     ]
 
@@ -1491,7 +1491,7 @@ def cron_update_tags():
 
   tags = [
     TagValues(tag=k, values=sorted(values or []))
-    for k, values in sorted(seen.iteritems())
+    for k, values in sorted(seen.items())
   ]
   logging.info('From %d tasks, saw %d tags', count, len(tags))
   TagAggregation(key=TagAggregation.KEY, tags=tags, ts=now).put()

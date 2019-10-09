@@ -470,7 +470,7 @@ class AuthVersionedEntityMixin(object):
     if existing:
       return existing
     props = {}
-    for name, prop in cls._properties.iteritems():
+    for name, prop in cls._properties.items():
       # Whitelist supported property classes. Better to fail loudly when
       # encountering something new, rather than silently produce (possibly)
       # incorrect result. Note that all AuthDB classes are instantiated in

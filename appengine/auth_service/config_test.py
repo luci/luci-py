@@ -116,7 +116,7 @@ class ConfigTest(test_case.TestCase):
 
     # Updated revisions now.
     self.assertEqual(
-        {k: v[0] for k, v in configs_to_fetch.iteritems()},
+        {k: v[0] for k, v in configs_to_fetch.items()},
         config.get_revisions())
 
     # Refetch, nothing new.

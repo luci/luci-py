@@ -1003,7 +1003,7 @@ class PerIdentityBatchHandler(handler.ApiHandler):
 
     # Validate individual queries.
     queries = {}
-    for ident_str, params in per_identity.iteritems():
+    for ident_str, params in per_identity.items():
       try:
         ident = model.Identity.from_bytes(ident_str)
       except ValueError as e:
@@ -1026,7 +1026,7 @@ class PerIdentityBatchHandler(handler.ApiHandler):
     return {
       'per_identity': {
         ident.to_bytes(): res
-        for ident, res in self.execute_batch(queries).iteritems()
+        for ident, res in self.execute_batch(queries).items()
       },
     }
 
@@ -1240,7 +1240,7 @@ class MembershipsCheckHandler(PerIdentityBatchHandler):
     # in parallel will only hurt, since we have only one CPU and there's no IO.
     auth_db = api.get_request_cache().auth_db
     resp = {}
-    for iden, p in queries.iteritems():
+    for iden, p in queries.items():
       assert isinstance(p['groups'], list)
       resp[iden] = {
         'is_member': any(auth_db.is_group_member(g, iden) for g in p['groups']),
@@ -1293,7 +1293,7 @@ class SubgraphHandler(handler.ApiHandler):
         value = node
 
       sorted_edges = {}
-      for label, node_id_set in edges.iteritems():
+      for label, node_id_set in edges.items():
         if node_id_set:
           sorted_edges[label] = sorted(node_id_set)
 

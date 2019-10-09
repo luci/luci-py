@@ -129,7 +129,7 @@ class GlobalConfig(ndb.Model):
   def modify(self, updated_by, **kwargs):
     """Applies |kwargs| dict to the entity and stores the entity if changed."""
     dirty = False
-    for k, v in kwargs.iteritems():
+    for k, v in kwargs.items():
       assert k in self._properties, k
       if getattr(self, k) != v:
         setattr(self, k, v)

@@ -154,7 +154,7 @@ class AuthDBChange(polymodel.PolyModel):
         return utils.datetime_to_timestamp(v)
       return v
     as_dict = self.to_dict(exclude=['class_'])
-    for k, v in as_dict.iteritems():
+    for k, v in as_dict.items():
       if k.startswith('security_config_') and v:
         as_dict[k] = json_format.MessageToDict(
             security_config_pb2.SecurityConfig.FromString(v),
@@ -167,7 +167,7 @@ class AuthDBChange(polymodel.PolyModel):
 
 # Integer CHANGE_* => string for UI.
 _CHANGE_TYPE_TO_STRING = {
-  v: k[len('CHANGE_'):] for k, v in AuthDBChange.__dict__.iteritems()
+  v: k[len('CHANGE_'):] for k, v in AuthDBChange.__dict__.items()
   if k.startswith('CHANGE_')
 }
 
@@ -463,12 +463,12 @@ def diff_ip_whitelist_assignments(target, old, new):
   new_by_ident = {a.identity: a for a in new.assignments}
 
   # Delete old ones.
-  for ident, a in old_by_ident.iteritems():
+  for ident, a in old_by_ident.items():
     if ident not in new_by_ident:
       yield change('UNSET', a.identity, a.ip_whitelist)
 
   # Add new ones, update existing ones.
-  for ident, a in new_by_ident.iteritems():
+  for ident, a in new_by_ident.items():
     old_a = old_by_ident.get(ident)
     if not old_a or a.ip_whitelist != old_a.ip_whitelist:
       yield change('SET', a.identity, a.ip_whitelist)

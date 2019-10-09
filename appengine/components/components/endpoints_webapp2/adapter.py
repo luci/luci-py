@@ -187,7 +187,7 @@ def api_routes(api_classes, base_path='/_ah/api', regex='[^/]+'):
     templates = set()
 
     # Add routes for each method of each class.
-    for _, method in sorted(api_class.all_remote_methods().iteritems()):
+    for _, method in sorted(api_class.all_remote_methods().items()):
       info = method.method_info
       method_path = info.get_path(api_class.api_info)
       method_path = method_path.replace('{', '<').replace('}', ':%s>' % regex)

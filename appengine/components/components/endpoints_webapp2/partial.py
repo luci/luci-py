@@ -52,7 +52,7 @@ def _merge(source, destination):
     source: A dict whose values are source dicts.
     destination: A dict whose values are destination dicts.
   """
-  for key, value in source.iteritems():
+  for key, value in source.items():
     if destination.get(key):
       _merge(value, destination[key])
     else:

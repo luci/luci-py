@@ -184,7 +184,7 @@ def task_update_pool(pool):
     if not isinstance(c, dict):
       continue
     d = found.setdefault(os, {})
-    for key, value in sorted(c.iteritems()):
+    for key, value in sorted(c.items()):
       if not value or not isinstance(value, list) or len(value) != 2:
         logging.error('%s has bad cache (A)', bot.id)
         continue
@@ -195,11 +195,11 @@ def task_update_pool(pool):
       d.setdefault(key, []).append(s)
   logging.info(
       'Found %d bots, %d caches in %d distinct OSes in pool %r',
-      bots, sum(len(f) for f in found.itervalues()), len(found), pool)
+      bots, sum(len(f) for f in found.values()), len(found), pool)
 
   # TODO(maruel): Parallelise.
-  for os, d in sorted(found.iteritems()):
-    for name, sizes in sorted(d.iteritems()):
+  for os, d in sorted(found.items()):
+    for name, sizes in sorted(d.items()):
       # Adhoc calculation to take the ~95th percentile.
       sizes.sort()
       hint = sizes[int(float(len(sizes)) * 0.95)]

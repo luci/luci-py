@@ -138,7 +138,7 @@ def get_metadata_async(project_ids):
           cfg.SerializeToString() if cfg else PROJECT_DOES_NOT_EXIST_SENTINEL,
           namespace=cache_ns,
           time=60 * 10)
-      for pid, cfg in fetched.iteritems()
+      for pid, cfg in fetched.items()
     ]
 
   raise ndb.Return(result)
@@ -156,7 +156,7 @@ def get_refs(project_ids):
   ).get_result()
   return {
     pid: None if cfg is None else cfg.refs or DEFAULT_REF_CFG.refs
-    for pid, cfg in cfgs.iteritems()
+    for pid, cfg in cfgs.items()
   }
 
 

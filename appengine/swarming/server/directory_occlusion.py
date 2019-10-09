@@ -116,7 +116,7 @@ class Checker(object):
         parent_owned_node = self
 
     ret = False
-    for _, node in sorted(self._subdirs.iteritems()):
+    for _, node in sorted(self._subdirs.items()):
       # call _conflicts() first so that it's not short-circuited.
       ret = node._conflicts(ctx, parent_owned_node) or ret
     return ret
@@ -124,7 +124,7 @@ class Checker(object):
   def _descriptions(self):
     """Formats all the _owner_notes on this node into a list of strings."""
     ret = []
-    for owner, notes in sorted(self._owner_notes.iteritems()):
+    for owner, notes in sorted(self._owner_notes.items()):
       notes = filter(bool, notes)
       if notes:
         # 'owner[note, note, note]'

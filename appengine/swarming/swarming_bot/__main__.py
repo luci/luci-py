@@ -168,7 +168,7 @@ def CMDshell(args):
   }
   # Can't use: from api.platforms import *
   local_vars.update(
-      (k, v) for k, v in platforms.__dict__.iteritems()
+      (k, v) for k, v in platforms.__dict__.items()
       if not k.startswith('_'))
 
   if args:

@@ -152,13 +152,13 @@ def get_isolated_args(work_dir, task_details, isolated_result,
   if task_details.grace_period:
     cmd.extend(('--grace-period', str(task_details.grace_period)))
 
-  for key, value in (task_details.env or {}).iteritems():
+  for key, value in (task_details.env or {}).items():
     cmd.extend(('--env', '%s=%s' % (key, value)))
 
   cmd.extend(task_details.containment.flags())
   cmd.extend(run_isolated_flags)
 
-  for key, values in task_details.env_prefixes.iteritems():
+  for key, values in task_details.env_prefixes.items():
     for v in values:
       cmd.extend(('--env-prefix', '%s=%s' % (key, v)))
 
@@ -261,11 +261,11 @@ class TaskDetails(object):
     self.caches = data['caches']
 
     self.env = {
-      k.encode('utf-8'): v.encode('utf-8') for k, v in data['env'].iteritems()
+      k.encode('utf-8'): v.encode('utf-8') for k, v in data['env'].items()
     }
     self.env_prefixes = {
       k.encode('utf-8'): [path.encode('utf-8') for path in v]
-      for k, v in (data.get('env_prefixes') or {}).iteritems()
+      for k, v in (data.get('env_prefixes') or {}).items()
     }
     self.grace_period = data['grace_period']
     self.hard_timeout = data['hard_timeout']

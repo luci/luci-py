@@ -56,7 +56,7 @@ class SerializableModelTest(test_case.TestCase):
     # Ensure all simple properties (from _SIMPLE_PROPERTIES) are covered.
     self.assertEqual(
         set(serializable._SIMPLE_PROPERTIES),
-        set(prop.__class__ for prop in Entity._properties.itervalues()))
+        set(prop.__class__ for prop in Entity._properties.values()))
 
     # Check entity -> serializable dict conversion.
     self.assertEqual(

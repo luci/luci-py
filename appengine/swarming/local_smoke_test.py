@@ -344,7 +344,7 @@ def gen_expected(**kwargs):
     u'try_number': u'1',
     u'user': u'joe@localhost',
   }
-  expected.update({unicode(k): v for k, v in kwargs.iteritems()})
+  expected.update({unicode(k): v for k, v in kwargs.items()})
   return expected
 
 
@@ -402,7 +402,7 @@ class Test(unittest.TestCase):
 
   def gen_expected(self, **kwargs):
     dims = [
-      {u'key': k, u'value': v} for k, v in sorted(self.dimensions.iteritems())
+      {u'key': k, u'value': v} for k, v in sorted(self.dimensions.items())
     ]
     return gen_expected(bot_dimensions=dims, **kwargs)
 
@@ -541,7 +541,7 @@ class Test(unittest.TestCase):
     name = 'isolated_task'
     isolated_hash, isolated_size = self._archive(
         name, content, DEFAULT_ISOLATE_HELLO)
-    items_in = [sum(len(c) for c in content.itervalues()), isolated_size]
+    items_in = [sum(len(c) for c in content.values()), isolated_size]
     expected_summary = self.gen_expected(name=u'isolated_task', output=u'hi\n')
     expected_files = {
       os.path.join(u'0', u'💣.txt'.encode('utf-8')): 'test_isolated',
@@ -597,7 +597,7 @@ class Test(unittest.TestCase):
         u'base', HELLO_WORLD + u'.py').encode('utf-8')
     name = 'separate_cmd'
     isolated_hash, isolated_size = self._archive(name, content, isolate_content)
-    items_in = [sum(len(c) for c in content.itervalues()), isolated_size]
+    items_in = [sum(len(c) for c in content.values()), isolated_size]
     expected_summary = self.gen_expected(
         name=u'separate_cmd',
         output=u'hi💩\n%s\n' % os.sep.join(['$CWD', 'local', 'path']))
@@ -659,7 +659,7 @@ class Test(unittest.TestCase):
     name = 'isolated_hard_timeout'
     isolated_hash, isolated_size = self._archive(
         name, content, DEFAULT_ISOLATE_HELLO)
-    items_in = [sum(len(c) for c in content.itervalues()), isolated_size]
+    items_in = [sum(len(c) for c in content.values()), isolated_size]
     expected_summary = self.gen_expected(
         name=u'isolated_hard_timeout',
         exit_code=unicode(SIGNAL_TERM),
@@ -714,7 +714,7 @@ class Test(unittest.TestCase):
     name = 'isolated_hard_timeout_grace'
     isolated_hash, isolated_size = self._archive(
         name, content, DEFAULT_ISOLATE_HELLO)
-    items_in = [sum(len(c) for c in content.itervalues()), isolated_size]
+    items_in = [sum(len(c) for c in content.values()), isolated_size]
     expected_summary = self.gen_expected(
         name=u'isolated_hard_timeout_grace',
         output=u'hi\ngot signal 15\n',
@@ -753,7 +753,7 @@ class Test(unittest.TestCase):
     name = 'idempotent_reuse'
     isolated_hash, isolated_size = self._archive(
         name, content, DEFAULT_ISOLATE_HELLO)
-    items_in = [sum(len(c) for c in content.itervalues()), isolated_size]
+    items_in = [sum(len(c) for c in content.values()), isolated_size]
     expected_summary = self.gen_expected(name=u'idempotent_reuse')
     task_id, outputs_ref, performance_stats = self._run_isolated(
         isolated_hash, name, ['--idempotent'], expected_summary, {},
@@ -805,7 +805,7 @@ class Test(unittest.TestCase):
     name = 'secret_bytes'
     isolated_hash, isolated_size = self._archive(
         name, content, DEFAULT_ISOLATE_HELLO)
-    items_in = [sum(len(c) for c in content.itervalues()), isolated_size]
+    items_in = [sum(len(c) for c in content.values()), isolated_size]
     expected_summary = self.gen_expected(name=u'secret_bytes')
     tmp = os.path.join(self.tmpdir, 'test_secret_bytes')
     with fs.open(tmp, 'wb') as f:
@@ -857,7 +857,7 @@ class Test(unittest.TestCase):
     name = 'cache_first'
     isolated_hash, isolated_size = self._archive(
         name, content, DEFAULT_ISOLATE_HELLO)
-    items_in = [sum(len(c) for c in content.itervalues()), isolated_size]
+    items_in = [sum(len(c) for c in content.values()), isolated_size]
     expected_summary = self.gen_expected(name=u'cache_first')
     _, outputs_ref, performance_stats = self._run_isolated(
         isolated_hash, name,
@@ -1284,7 +1284,7 @@ class Test(unittest.TestCase):
     isolated_path = os.path.join(root, 'i.isolated')
     with fs.open(isolate_path, 'wb') as f:
       f.write(isolate_content)
-    for relpath, content in contents.iteritems():
+    for relpath, content in contents.items():
       p = os.path.join(root, relpath)
       d = os.path.dirname(p)
       if not os.path.isdir(d):

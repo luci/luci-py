@@ -169,7 +169,7 @@ def _task_summary_to_proto(summary, event):
       logging.error('Unexpected tag: %r', tag)
       continue
     name, value = tag.split(':', 1)
-    for event_tag, task_tags in TAGS.iteritems():
+    for event_tag, task_tags in TAGS.items():
       if name in task_tags:
         getattr(event.proto.swarming_task_event.tags, event_tag).append(value)
 

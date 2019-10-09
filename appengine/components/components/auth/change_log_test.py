@@ -124,7 +124,7 @@ class GenerateChangesTest(test_case.TestCase):
         as_str.append('%s:%s' % (k.kind(), k.id()))
         k = k.parent()
       entities['/'.join(as_str)] = {
-        prop: val for prop, val in key.get().to_dict().iteritems() if val
+        prop: val for prop, val in key.get().to_dict().items() if val
       }
     ndb.Query(ancestor=ancestor).map(cb, keys_only=True)
     return entities

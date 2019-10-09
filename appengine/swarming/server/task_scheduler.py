@@ -1797,12 +1797,12 @@ def cron_task_bot_distribution():
       t = req.task_slice(i)
       dimensions = tuple(sorted(
             (k, tuple(sorted(v)))
-            for k, v in t.properties.dimensions.iteritems()))
+            for k, v in t.properties.dimensions.items()))
       n_tasks_by_dimensions[dimensions] += 1
 
   # Second, count how many bots have those dimensions for each set.
   n_bots_by_dimensions = {}
-  for dimensions, n_tasks in n_tasks_by_dimensions.iteritems():
+  for dimensions, n_tasks in n_tasks_by_dimensions.items():
     filter_dimensions = []
     for k, values in dimensions:
       for v in values:
@@ -1821,7 +1821,7 @@ def cron_task_bot_distribution():
     n_bots_by_dimensions[dimensions] = q.count_async()
 
   # Third, multiply out, aggregating by fixed dimensions.
-  for dimensions, n_tasks in n_tasks_by_dimensions.iteritems():
+  for dimensions, n_tasks in n_tasks_by_dimensions.items():
     n_bots = 0
     if dimensions in n_bots_by_dimensions:
       n_bots = n_bots_by_dimensions[dimensions].get_result()

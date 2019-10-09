@@ -131,7 +131,7 @@ def process_auth_params_json(val):
   # The headers must be ASCII for sure, so don't bother with picking the
   # correct unicode encoding, default would work. If not, it'll raise
   # UnicodeEncodeError, which is subclass of ValueError.
-  headers = {str(k): str(v) for k, v in headers.iteritems()}
+  headers = {str(k): str(v) for k, v in headers.items()}
 
   def read_account(key):
     acc = val.get(key) or 'none'

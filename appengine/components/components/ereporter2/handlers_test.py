@@ -235,7 +235,7 @@ class Ereporter2FrontendTest(Base):
     self.mock(logscraper, '_log_request_id', gen_request)
     self.app.get('/restricted/ereporter2/request/123', status=200)
 
-    params = {k: (v or '') for k, v in actual_inputs.iteritems()}
+    params = {k: (v or '') for k, v in actual_inputs.items()}
     # Silence it.
     params['silenced'] = '1'
     resp = self.app.post(silence_url, params=params)

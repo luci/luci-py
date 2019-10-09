@@ -170,7 +170,7 @@ def get_project_configs_async(path, dest_type=None):
   provider = yield _get_config_provider_async()
   configs = yield provider.get_project_configs_async(path)
   result = {}
-  for config_set, (revision, content) in configs.iteritems():
+  for config_set, (revision, content) in configs.items():
     assert config_set and config_set.startswith('projects/'), config_set
     project_id = config_set[len('projects/'):]
     assert project_id
@@ -213,7 +213,7 @@ def get_ref_configs_async(path, dest_type=None):
   provider = yield _get_config_provider_async()
   configs = yield provider.get_ref_configs_async(path)
   result = {}
-  for config_set, (revision, content) in configs.iteritems():
+  for config_set, (revision, content) in configs.items():
     assert config_set and config_set.startswith('projects/'), config_set
     project_id, ref = config_set.split('/', 2)[1:]
     assert project_id

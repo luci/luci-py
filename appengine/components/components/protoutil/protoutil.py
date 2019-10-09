@@ -32,7 +32,7 @@ def merge_dict(data, msg):
   """
   if not isinstance(data, dict):
     raise TypeError('data is not a dict')
-  for name, value in data.iteritems():
+  for name, value in data.items():
     f = msg.DESCRIPTOR.fields_by_name.get(name)
     if not f:
       raise TypeError('unexpected property %r' % name)

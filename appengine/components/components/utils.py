@@ -689,7 +689,7 @@ def to_json_encodable(data):
   if isinstance(data, dict):
     assert all(isinstance(k, basestring) for k in data), data
     return {
-      to_json_encodable(k): to_json_encodable(v) for k, v in data.iteritems()
+      to_json_encodable(k): to_json_encodable(v) for k, v in data.items()
     }
 
   if isinstance(data, datetime.datetime):

@@ -182,7 +182,7 @@ def _validate_dimensions(_prop, value):
         u'dimensions can have up to %d keys' % maxkeys)
 
   normalized = {}
-  for k, values in value.iteritems():
+  for k, values in value.items():
     # Validate the key.
     if not config.validate_dimension_key(k):
       raise datastore_errors.BadValueError(
@@ -247,11 +247,11 @@ def _validate_env_key(prop, key):
 
 def _validate_env(prop, value):
   # pylint: disable=protected-access
-  if not all(isinstance(v, unicode) for v in value.itervalues()):
+  if not all(isinstance(v, unicode) for v in value.values()):
     raise TypeError(
         '%s must be a dict of strings, not %r' % (prop._name, value))
   maxlen = 1024
-  for k, v in value.iteritems():
+  for k, v in value.items():
     _validate_env_key(prop, k)
     if len(v) > maxlen:
       raise datastore_errors.BadValueError(
@@ -265,7 +265,7 @@ def _validate_env(prop, value):
 def _validate_env_prefixes(prop, value):
   # pylint: disable=protected-access
   maxlen = 1024
-  for k, values in value.iteritems():
+  for k, values in value.items():
     _validate_env_key(prop, k)
     if (not isinstance(values, list) or
         not all(isinstance(v, unicode) for v in values)):
@@ -786,12 +786,12 @@ class TaskProperties(ndb.Model):
     # Just look at the first one. The property is guaranteed to be internally
     # consistent.
     data = self.dimensions_data or {}
-    for v in data.itervalues():
+    for v in data.values():
       if isinstance(v, (list, tuple)):
         return self.dimensions_data
       break
     # Compatibility code for old entities.
-    return {k: [v] for k, v in data.iteritems()}
+    return {k: [v] for k, v in data.items()}
 
   @property
   def is_terminate(self):
@@ -841,15 +841,15 @@ class TaskProperties(ndb.Model):
     if self.extra_args:
       out.extra_args.extend(self.extra_args)
     out.has_secret_bytes = self.has_secret_bytes
-    for key, values in sorted(self.dimensions.iteritems()):
+    for key, values in sorted(self.dimensions.items()):
       v = out.dimensions.add()
       v.key = key
       v.values.extend(sorted(values))
-    for key, value in sorted((self.env or {}).iteritems()):
+    for key, value in sorted((self.env or {}).items()):
       v = out.env.add()
       v.key = key
       v.value = value
-    for key, values in sorted((self.env_prefixes or {}).iteritems()):
+    for key, values in sorted((self.env_prefixes or {}).items()):
       v = out.env_paths.add()
       v.key = key
       v.values.extend(sorted(values))
@@ -1321,7 +1321,7 @@ def _get_automatic_tags(request):
     u'user:%s' % (request.user or u'None'),
   ))
   for i in xrange(request.num_task_slices):
-    for key, values in request.task_slice(i).properties.dimensions.iteritems():
+    for key, values in request.task_slice(i).properties.dimensions.items():
       for value in values:
         tags.add(u'%s:%s' % (key, value))
   return tags
@@ -1340,7 +1340,7 @@ def get_automatic_tags(request, index):
     u'user:%s' % (request.user or u'None'),
   ))
   for key, values in request.task_slice(
-      index).properties.dimensions.iteritems():
+      index).properties.dimensions.items():
     for value in values:
       tags.add(u'%s:%s' % (key, value))
   return tags

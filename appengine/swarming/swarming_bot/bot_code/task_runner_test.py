@@ -238,7 +238,7 @@ class TestTaskRunnerBase(auto_stub.TestCase):
       u'output_chunk_start': 0,
       u'task_id': 23,
     }
-    for k, v in kwargs.iteritems():
+    for k, v in kwargs.items():
       if v is None:
         expected.pop(k)
       else:
@@ -253,7 +253,7 @@ class TestTaskRunnerBase(auto_stub.TestCase):
     if hasattr(expected[u'output'], 'pattern'):
       v = actual.pop(u'output')
       self.assertTrue(expected.pop(u'output').match(v), repr(v))
-    for key, value in expected.get(u'isolated_stats', {}).iteritems():
+    for key, value in expected.get(u'isolated_stats', {}).items():
       if 'isolated_stats' not in actual:
         # expected but not actual.
         break
@@ -469,7 +469,7 @@ class TestTaskRunner(TestTaskRunnerBase):
           'h': self.isolateserver.add_content_compressed(
               'default-gzip', content),
           's': len(content),
-        } for name, content in files.iteritems()
+        } for name, content in files.items()
       },
     })
     isolated_digest = self.isolateserver.add_content_compressed(
@@ -984,7 +984,7 @@ class TestTaskRunnerKilled(TestTaskRunnerBase):
           'h': self.isolateserver.add_content_compressed(
               'default-gzip', content),
           's': len(content),
-        } for name, content in files.iteritems()
+        } for name, content in files.items()
       },
     })
     isolated_digest = self.isolateserver.add_content_compressed(

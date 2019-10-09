@@ -195,7 +195,7 @@ def _yield_orphan_gcs_files(gs_bucket):
         ndb.Future.wait_any(futures)
         tmp = {}
         # pylint: disable=redefined-outer-name
-        for f, (filepath, filestats) in futures.iteritems():
+        for f, (filepath, filestats) in futures.items():
           if f.done():
             if not f.get_result():
               # Orphaned, delete.
@@ -212,7 +212,7 @@ def _yield_orphan_gcs_files(gs_bucket):
     while futures:
       ndb.Future.wait_any(futures)
       tmp = {}
-      for f, (filepath, filestats) in futures.iteritems():
+      for f, (filepath, filestats) in futures.items():
         if f.done():
           if not f.get_result():
             # Orphaned, delete.

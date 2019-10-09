@@ -391,7 +391,7 @@ def import_bundles(bundles, provided_by, change_log_comment):
     entities_to_put = []
     entities_to_delete = []
     revision, existing_groups = snapshot_groups()
-    for system, groups in bundles.iteritems():
+    for system, groups in bundles.items():
       to_put, to_delete = prepare_import(
           system, existing_groups, groups, ts, provided_by)
       entities_to_put.extend(to_put)

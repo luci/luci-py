@@ -149,7 +149,7 @@
       <td>Environment vars</td>
       <td>
         {% if error.env %}
-          {% for k, v in error.env.iteritems()|sort %}
+          {% for k, v in error.env.items()|sort %}
             <strong>{{k}}</strong>: {{v}}<br>
           {% endfor %}
         {% else %}

@@ -122,7 +122,7 @@ def refetch_config(force=False):
   dirty_in_authdb = {}
 
   cur_revs = dict(utils.async_apply(configs, _get_config_revision_async))
-  for path, (new_rev, conf) in sorted(configs.iteritems()):
+  for path, (new_rev, conf) in sorted(configs.items()):
     assert path in _CONFIG_SCHEMAS, path
     cur_rev = cur_revs[path]
     if cur_rev != new_rev or force:
@@ -134,7 +134,7 @@ def refetch_config(force=False):
       logging.info('Config %s is up-to-date at rev %s', path, cur_rev.revision)
 
   # First update configs that do not touch AuthDB, one by one.
-  for path, (rev, conf) in sorted(dirty.iteritems()):
+  for path, (rev, conf) in sorted(dirty.items()):
     dirty = _CONFIG_SCHEMAS[path]['updater'](None, rev, conf)
     logging.info(
         'Processed %s at rev %s: %s', path, rev.revision,
@@ -301,7 +301,7 @@ def _update_authdb_configs(configs):
         revisions={})
 
   ingested_revs = {}  # path -> Revision
-  for path, (rev, conf) in sorted(configs.iteritems()):
+  for path, (rev, conf) in sorted(configs.items()):
     dirty = _CONFIG_SCHEMAS[path]['updater'](root, rev, conf)
     revs.revisions[path] = {'rev': rev.revision, 'url': rev.url}
     logging.info(
@@ -398,7 +398,7 @@ def _update_ip_whitelist_config(root, rev, conf):
   to_delete = []
 
   # New or modified IP whitelists.
-  for name, subnets in imported_ip_whitelists.iteritems():
+  for name, subnets in imported_ip_whitelists.items():
     # An existing whitelist and it hasn't changed?
     wl = existing_ip_whitelists.get(name)
     if wl and wl.subnets == subnets:
@@ -414,7 +414,7 @@ def _update_ip_whitelist_config(root, rev, conf):
     to_put.append(wl)
 
   # Removed IP whitelists.
-  for wl in existing_ip_whitelists.itervalues():
+  for wl in existing_ip_whitelists.values():
     if wl.key.id() not in imported_ip_whitelists:
       to_delete.append(wl)
 

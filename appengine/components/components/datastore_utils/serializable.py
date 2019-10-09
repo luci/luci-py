@@ -126,7 +126,7 @@ class _ModelDictConverter(object):
           'Expecting a dict, got \'%s\' instead' % type(model_dict).__name__)
     allowed_properties = self.get_allowed_properties(model_cls)
     result = {}
-    for key, value in model_dict.iteritems():
+    for key, value in model_dict.items():
       if allowed_properties is None or key in allowed_properties:
         result[key] = self.convert_property(model_cls._properties[key], value)
     return result
@@ -175,7 +175,7 @@ class _ModelDictConverter(object):
     if model_cls.serializable_properties is None:
       return None
     return set(
-        field for field, mode in model_cls.serializable_properties.iteritems()
+        field for field, mode in model_cls.serializable_properties.items()
         if self.field_mode_predicate(mode))
 
   def get_property_converter(self, prop):

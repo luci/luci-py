@@ -346,7 +346,7 @@ def _fetch_certs_from_json(url, service_account_name=None):
           'key_name': key_name,
           'x509_certificate_pem': pem,
         }
-        for key_name, pem in sorted(response.iteritems())
+        for key_name, pem in sorted(response.items())
       ],
       'timestamp': utils.datetime_to_timestamp(utils.utcnow()),
     }

@@ -55,7 +55,7 @@ def get_recipients(commit):
   }
   return [
     '%s <%s>' % (name or email, email)
-    for email, name in names.iteritems()
+    for email, name in names.items()
   ]
 
 

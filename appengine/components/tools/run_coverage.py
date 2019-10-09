@@ -97,8 +97,8 @@ def main(root, blacklist, omit):
       return 1
 
     # Poll for the processes to complete.
-    while not all(v is not None for v in processes.itervalues()):
-      for proc, v in processes.iteritems():
+    while not all(v is not None for v in processes.values()):
+      for proc, v in processes.items():
         if v is None:
           # TODO(maruel): The test may hang if the stdout pipe becomes full. Fix
           # if it becomes an issue in practice (it hasn't here) and the speed
@@ -114,7 +114,7 @@ def main(root, blacklist, omit):
             sys.stdout.flush()
       time.sleep(0.1)
     end = time.time()
-    results = [not v for v in processes.itervalues()]
+    results = [not v for v in processes.values()]
     print(
         '\n%d out of %d tests succeeded in %.2fs.\n' %
         (sum(results), len(results), end-start))

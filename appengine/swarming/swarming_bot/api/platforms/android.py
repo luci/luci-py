@@ -158,7 +158,7 @@ def get_dimensions(devices):
   for device in devices:
     properties = device.cache.build_props
     if properties:
-      for dim, props in dimension_properties.iteritems():
+      for dim, props in dimension_properties.items():
         for prop in props:
           real_prop = u'ro.' + prop
           if real_prop in properties:

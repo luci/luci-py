@@ -198,7 +198,7 @@ class Endpoints(object):
     # Identify which arguments are path parameters and which are query strings.
     body = body or {}
     query_strings = []
-    for key, value in sorted(body.iteritems()):
+    for key, value in sorted(body.items()):
       if '{%s}' % key in path:
         path = path.replace('{%s}' % key, value)
       else:

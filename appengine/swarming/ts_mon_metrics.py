@@ -234,7 +234,7 @@ _bot_auth_successes = gae_ts_mon.CounterMetric(
 def _pool_from_dimensions(dimensions):
   """Return a canonical string of flattened dimensions."""
   pairs = []
-  for key, values in dimensions.iteritems():
+  for key, values in dimensions.items():
     if key in _IGNORED_DIMENSIONS:
       continue
     # Strip all the prefixes of other values. values is already sorted.
@@ -284,7 +284,7 @@ def _set_jobs_metrics(payload):
       _jobs_running.set(True, target_fields=target_fields, fields=fields)
     fields['status'] = status
 
-    key = tuple(sorted(fields.iteritems()))
+    key = tuple(sorted(fields.items()))
 
     jobs_counts[key] += 1
 
@@ -303,14 +303,14 @@ def _set_jobs_metrics(payload):
   target_fields = dict(_TARGET_FIELDS)
   target_fields['task_num'] = params.task_count
 
-  for key, count in jobs_counts.iteritems():
+  for key, count in jobs_counts.items():
     _jobs_active.set(count, target_fields=target_fields, fields=dict(key))
 
-  for key, distribution in jobs_pending_distributions.iteritems():
+  for key, distribution in jobs_pending_distributions.items():
     _jobs_pending_durations.set(
         distribution, target_fields=target_fields, fields=dict(key))
 
-  for key, val in jobs_max_pending_durations.iteritems():
+  for key, val in jobs_max_pending_durations.items():
     _jobs_max_pending_duration.set(
         val, target_fields=target_fields, fields=dict(key))
 
