@@ -89,13 +89,13 @@ def _is_project():
 ### Capabilities
 
 
-def is_ip_whitelisted_machine():
+def is_ip_whitelisted_machine(log=True):
   """Returns True if the call is made from IP whitelisted machine."""
   # TODO(crbug/1010555): Remove is_ip_whitelisted_machine(). /bot_code can be
   # fixed using temporary tokens retrieved with a service acccount.
   res = auth.is_in_ip_whitelist(
       auth.bots_ip_whitelist(), auth.get_peer_ip(), False)
-  if res:
+  if res and log:
     logging.debug('TODO(crbug/1010555): Remove IP whitelist super powers')
   return res
 
