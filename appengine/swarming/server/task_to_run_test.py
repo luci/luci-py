@@ -830,10 +830,13 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
     self.now = datetime.datetime(2019, 10, 10, 03, 04, 05, 06)
     self.mock_now(self.now, 0)
     # task_to_run_1: still active
-    self._gen_new_task_to_run_slices(
+    _, _to_run_1 = self._gen_new_task_to_run_slices(
         1,
         created_ts=self.now,
-        task_slices=[{'expiration_secs': 60, 'properties': _gen_properties()}])
+        task_slices=[{
+            'expiration_secs': 60,
+            'properties': _gen_properties()
+        }])
     # task_to_run_2: just reached to the expiration time
     _, to_run_2 = self._gen_new_task_to_run_slices(
         0,
@@ -845,7 +848,7 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
         created_ts=self.now-datetime.timedelta(days=1),
         task_slices=[{'expiration_secs': 60, 'properties': _gen_properties()}])
     # task_to_run_4: already passed the expiration time long time ago
-    _, to_run_4 = self._gen_new_task_to_run_slices(
+    _, _to_run_4 = self._gen_new_task_to_run_slices(
         0,
         created_ts=self.now - datetime.timedelta(weeks=4),
         task_slices=[{
@@ -860,8 +863,9 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
 
     expired_task_to_runs = list(task_to_run.yield_expired_task_to_run())
 
-    # only to_run_2, to_run_3 and to_run_4 should be yielded
-    expected = [to_run_2, to_run_3, to_run_4]
+    # Only to_run_2 and to_run_3 should be yielded. to_run_4 is too old and is
+    # ignored.
+    expected = [to_run_2, to_run_3]
     sort_key = lambda x: x.expiration_ts
     self.assertEqual(
         sorted(expected, key=sort_key),

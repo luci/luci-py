@@ -653,17 +653,5 @@ def yield_expired_task_to_run():
       TaskToRun.expiration_ts < now,
       TaskToRun.expiration_ts > cut_off,
       default_options=opts)
-  # TODO(crbug.com/966660): remove this.
-  for task in expire(q):
-    yield task
-
-  # If we have more time, update older entries.
-  # TaskToRun entities use to have different IDs (crrev.com/c/969760),
-  # and they are incompatible with the current codes.
-  fetch_since = datetime.datetime.strptime('2019-09-01', '%Y-%m-%d')
-  q = TaskToRun.query(
-      TaskToRun.expiration_ts <= cut_off,
-      TaskToRun.expiration_ts > fetch_since,
-      default_options=opts)
   for task in expire(q):
     yield task
