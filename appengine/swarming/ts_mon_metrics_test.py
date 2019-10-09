@@ -8,8 +8,8 @@ import json
 import sys
 import unittest
 
-import test_env
-test_env.setup_test_env()
+import swarming_test_env
+swarming_test_env.setup_test_env()
 
 from google.appengine.ext import ndb
 

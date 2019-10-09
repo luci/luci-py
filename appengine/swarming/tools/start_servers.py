@@ -20,8 +20,8 @@ sys.path.insert(0, os.path.join(CLIENT_DIR, 'third_party'))
 from depot_tools import fix_encoding
 sys.path.pop(0)
 
-import test_env
-test_env.setup_test_env()
+import swarming_test_env
+swarming_test_env.setup_test_env()
 
 from tool_support import local_app
 
