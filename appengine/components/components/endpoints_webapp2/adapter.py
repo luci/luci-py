@@ -9,19 +9,14 @@ import json
 import logging
 import os
 import posixpath
-import urlparse
 
 from endpoints import protojson
-from google.appengine.api import memcache
-from google.appengine.api import modules
 from protorpc import message_types
 from protorpc import messages
 from protorpc import remote
 import webapp2
 
-from components import net
 from components import template
-from components import utils
 
 import discovery
 import partial

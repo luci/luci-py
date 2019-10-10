@@ -9,8 +9,8 @@ import collections
 import datetime
 import posixpath
 import re
-import urllib
-import urlparse
+
+from six.moves import urllib
 
 from google.appengine.ext import ndb
 
@@ -115,7 +115,7 @@ class Location(LocationTuple):
       TreeishResolutionError: failed to find a valid treeish in the url
         present in treeishes.
     """
-    parsed = urlparse.urlparse(url)
+    parsed = urllib.parse.urlparse(url)
     path_match = RGX_URL_PATH.match(parsed.path)
     if not path_match:
       raise ValueError('Invalid Gitiles repo url: %s' % url)
@@ -198,9 +198,9 @@ class Location(LocationTuple):
     path = (self.path or '').strip('/')
 
     if self.treeish or path:
-      result += '/+/%s' % urllib.quote(self.treeish_safe)
+      result += '/+/%s' % urllib.parse.quote(self.treeish_safe)
     if path:
-      result += '/%s' % urllib.quote(path)
+      result += '/%s' % urllib.parse.quote(path)
     return result
 
   @property
@@ -439,7 +439,7 @@ def get_refs_async(hostname, project, ref_prefix=None, **fetch_kwargs):
   assert ref_prefix.endswith('/')
   _validate_args(hostname, project)
 
-  path = '%s/+refs' % urllib.quote(project)
+  path = '%s/+refs' % urllib.parse.quote(project)
 
   prepend_prefix = False
   if len(ref_prefix) > len('refs/'):
@@ -512,4 +512,4 @@ def _validate_args(
 
 
 def _quote_all(*args):
-  return tuple(map(urllib.quote, args))
+  return tuple(map(urllib.parse.quote, args))

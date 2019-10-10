@@ -4,12 +4,6 @@
 
 """Mixed bag of utilities."""
 
-# Disable 'Access to a protected member ...'. NDB uses '_' for other purposes.
-# pylint: disable=W0212
-
-# Disable: 'Method could be a function'. It can't: NDB expects a method.
-# pylint: disable=R0201
-
 import binascii
 import datetime
 import functools
@@ -21,7 +15,8 @@ import os
 import re
 import sys
 import threading
-import urlparse
+
+from six.moves import urllib
 
 from email import utils as email_utils
 
@@ -36,6 +31,7 @@ from google.appengine.runtime import apiproxy_errors
 
 from protorpc import messages
 from protorpc.remote import protojson
+
 
 THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -721,6 +717,7 @@ def to_json_encodable(data):
     return [to_json_encodable(i) for i in data]
 
   assert False, 'Don\'t know how to handle %r' % data
+  return None
 
 
 def encode_to_json(data):
@@ -752,12 +749,12 @@ def to_units(number):
 def validate_root_service_url(url):
   """Raises ValueError if the URL doesn't look like https://<host>."""
   schemes = ('https', 'http') if is_local_dev_server() else ('https',)
-  parsed = urlparse.urlparse(url)
+  parsed = urllib.parse.urlparse(url)
   if parsed.scheme not in schemes:
     raise ValueError('unsupported protocol %r' % str(parsed.scheme))
   if not parsed.netloc:
     raise ValueError('missing hostname')
-  stripped = urlparse.urlunparse((parsed[0], parsed[1], '', '', '', ''))
+  stripped = urllib.parse.urlunparse((parsed[0], parsed[1], '', '', '', ''))
   if stripped != url:
     raise ValueError('expecting root host URL, e.g. %r)' % str(stripped))
 

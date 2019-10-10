@@ -27,16 +27,13 @@ Example with custom validation:
 """
 
 import collections
-import fnmatch
-import functools
 import re
-import urlparse
 
-# Pylint doesn't like relative wildcard imports.
-# pylint: disable=W0401,W0403
+from six.moves import urllib
 
 from . import common
 from . import validation_context
+
 
 __all__ = [
   'Context',
@@ -103,7 +100,7 @@ def is_valid_ref_name(ref):
 
 def is_valid_secure_url(url):
   """Returns True if the URL is valid and secure, except for localhost."""
-  parsed = urlparse.urlparse(url)
+  parsed = urllib.parse.urlparse(url)
   if not parsed.netloc:
     return False
   if parsed.hostname in ('localhost', '127.0.0.1', '::1'):

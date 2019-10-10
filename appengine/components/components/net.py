@@ -6,8 +6,8 @@
 
 import json
 import logging
-import urllib
-import urlparse
+
+from six.moves import urllib
 
 from google.appengine.api import urlfetch
 from google.appengine.ext import ndb
@@ -59,9 +59,8 @@ def is_transient_error(response, url):
   # result is not JSON. This assumes that we only use JSON encoding.
   if response.status_code == 404:
     content_type = response.headers.get('Content-Type', '')
-    return (
-        urlparse.urlparse(url).path.startswith('/_ah/api/') and
-        not content_type.startswith('application/json'))
+    return (urllib.parse.urlparse(url).path.startswith('/_ah/api/') and
+            not content_type.startswith('application/json'))
   return False
 
 
@@ -126,7 +125,7 @@ def request_async(
     protocols = ('https://',)
   assert url.startswith(protocols) and '?' not in url, url
   if params:
-    url += '?' + urllib.urlencode(params)
+    url += '?' + urllib.parse.urlencode(params)
 
   headers = (headers or {}).copy()
 
