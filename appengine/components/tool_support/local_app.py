@@ -10,6 +10,8 @@ Useful for smoke and integration tests.
 
 # pylint: disable=no-init
 
+from __future__ import print_function
+
 import collections
 import cookielib
 import ctypes
@@ -234,12 +236,12 @@ class LocalApplication(object):
 
   def dump_log(self):
     """Prints dev_appserver log to stderr, works only if app is stopped."""
-    print >> sys.stderr, '-' * 60
-    print >> sys.stderr, 'dev_appserver.py log for %s' % self.app_id
-    print >> sys.stderr, '-' * 60
+    print('-' * 60, file=sys.stderr)
+    print('dev_appserver.py log for %s' % self.app_id, file=sys.stderr)
+    print('-' * 60, file=sys.stderr)
     for l in (self._log or '').strip('\n').splitlines():
       sys.stderr.write('  %s\n' % l)
-    print >> sys.stderr, '-' * 60
+    print('-' * 60, file=sys.stderr)
 
 
 class CustomHTTPErrorHandler(urllib.request.HTTPDefaultErrorHandler):

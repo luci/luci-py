@@ -11,6 +11,8 @@ It starts a Swarming server, Isolate server and a Swarming bot, then triggers
 tasks with the Swarming client to ensure the system works end to end.
 """
 
+from __future__ import print_function
+
 import base64
 import contextlib
 import json
@@ -194,7 +196,7 @@ class SwarmingClient(object):
     try:
       summary = json.loads(data)
     except ValueError:
-      print >> sys.stderr, 'Bad json:\n%s' % data
+      print('Bad json:\n%s' % data, file=sys.stderr)
       raise
     file_outputs = {}
     for root, _, files in fs.walk(tmpdir):
@@ -239,9 +241,9 @@ class SwarmingClient(object):
     return data['items'][0]
 
   def dump_log(self):
-    print >> sys.stderr, '-' * 60
-    print >> sys.stderr, 'Client calls'
-    print >> sys.stderr, '-' * 60
+    print('-' * 60, file=sys.stderr)
+    print('Client calls', file=sys.stderr)
+    print('-' * 60, file=sys.stderr)
     for i in range(self._index):
       with fs.open(os.path.join(self._tmpdir, 'client_%d.log' % i), 'rb') as f:
         log = f.read().strip('\n')
@@ -749,7 +751,7 @@ class Test(unittest.TestCase):
     self.assertPerformanceStats(expected_performance_stats, performance_stats)
 
   def test_idempotent_reuse(self):
-    content = {HELLO_WORLD + u'.py': 'print "hi"\n'}
+    content = {HELLO_WORLD + u'.py': 'print("hi")\n'}
     name = 'idempotent_reuse'
     isolated_hash, isolated_size = self._archive(
         name, content, DEFAULT_ISOLATE_HELLO)
@@ -788,18 +790,21 @@ class Test(unittest.TestCase):
 
   def test_secret_bytes(self):
     content = {
-      HELLO_WORLD + u'.py': _script(u"""
+        HELLO_WORLD + u'.py':
+            _script(u"""
+        from __future__ import print_function
+
         import sys
         import os
         import json
 
-        print "hi"
+        print("hi")
 
         with open(os.environ['LUCI_CONTEXT'], 'r') as f:
           data = json.load(f)
 
         with open(os.path.join(sys.argv[1], 'sekret'), 'w') as f:
-          print >> f, data['swarming']['secret_bytes'].decode('base64')
+          print(data['swarming']['secret_bytes'].decode('base64'), file=f)
       """),
     }
     name = 'secret_bytes'
@@ -843,7 +848,8 @@ class Test(unittest.TestCase):
     self.assertEqual(set(self.dimensions), set(dimensions))
     self.assertNotIn(u'cache', set(dimensions))
     content = {
-      HELLO_WORLD + u'.py': _script(u"""
+        HELLO_WORLD + u'.py':
+            _script(u"""
         import os, shutil, sys
         p = "p/b/a.txt"
         if not os.path.isfile(p):
@@ -851,7 +857,7 @@ class Test(unittest.TestCase):
             f.write("Yo!")
         else:
           shutil.copy(p, sys.argv[1])
-        print "hi"
+        print("hi")
         """),
     }
     name = 'cache_first'
@@ -1476,15 +1482,15 @@ def main():
     # seconds due to delay between sending the event that the process is
     # shutting down vs the process is shut down.
     if client.terminate(bot.bot_id) != 0:
-      print >> sys.stderr, 'swarming.py terminate failed'
+      print('swarming.py terminate failed', file=sys.stderr)
       failed = True
     try:
       bot.wait(10)
     except subprocess42.TimeoutExpired:
-      print >> sys.stderr, 'Bot is still alive after swarming.py terminate'
+      print('Bot is still alive after swarming.py terminate', file=sys.stderr)
       failed = True
   except KeyboardInterrupt:
-    print >> sys.stderr, '<Ctrl-C>'
+    print('<Ctrl-C>', file=sys.stderr)
     failed = True
     if bot is not None and bot.poll() is None:
       bot.kill()

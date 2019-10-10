@@ -113,8 +113,8 @@ class MainTest(TestCase):
     proc.terminate()
     out, _ = proc.communicate()
     if proc.returncode:
-      print 'ERROR LOG:'
-      print out
+      print('ERROR LOG:')
+      print(out)
     self.assertEqual(0, proc.returncode)
     events = self._server.get_bot_events()
     for event in events:

@@ -80,18 +80,16 @@ EXPECTED_GROUP_1 = bot_groups_config._make_bot_group_config(
 
 EXPECTED_GROUP_2 = bot_groups_config._make_bot_group_config(
     owners=(),
-    auth=(
-      bot_groups_config.BotAuth(
+    auth=(bot_groups_config.BotAuth(
         log_if_failed=False,
         require_luci_machine_token=False,
         require_service_account=(u'a@example.com',),
         require_gce_vm_token=None,
         ip_whitelist=u'',
-      ),
-    ),
+    ),),
     dimensions={u'pool': []},
     bot_config_script='foo.py',
-    bot_config_script_content='print "Hi"',
+    bot_config_script_content='print("Hi")',
     system_service_account='bot')
 
 EXPECTED_GROUP_3 = bot_groups_config._make_bot_group_config(
@@ -135,14 +133,14 @@ class BotGroupsConfigTest(test_case.TestCase):
         self.assertEqual(cls, bots_pb2.BotsCfg)
         return '123', cfg
       self.assertEqual('scripts/foo.py', path)
-      return '123', 'print "Hi"'
+      return '123', 'print("Hi")'
 
     self.mock(config, 'get_self_config', get_self_config_mock)
     bot_groups_config.clear_cache()
 
   def test_version(self):
     self.assertEqual('hash:d7d5710aeedb26', EXPECTED_GROUP_1.version)
-    self.assertEqual('hash:7fae1886301611', EXPECTED_GROUP_2.version)
+    self.assertEqual('hash:f9bdb002a4777d', EXPECTED_GROUP_2.version)
 
   def test_expand_bot_id_expr_success(self):
     def check(expected, expr):
@@ -626,7 +624,7 @@ class CacheTest(test_case.TestCase):
     self.assertEqual('rev1', cached.bots_cfg_rev)
 
   def test_expands_bot_config_scripts_ok(self):
-    good_script = "# coding=utf-8\nprint 'Hello'\n"
+    good_script = "# coding=utf-8\nprint('Hello')\n"
 
     calls = self.mock_config({
       'bots.cfg': ('rev1', bots_pb2.BotsCfg(

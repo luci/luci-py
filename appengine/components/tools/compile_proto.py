@@ -5,6 +5,8 @@
 
 """Compiles all *.proto files it finds into *_pb2.py."""
 
+from __future__ import print_function
+
 import logging
 import optparse
 import os
@@ -121,7 +123,7 @@ def compile_all_files(root_dir, proto_path):
     try:
       compile_proto(path, os.getcwd(), proto_path)
     except subprocess.CalledProcessError:
-      print >> sys.stderr, 'Failed to compile: %s' % path[len(root_dir)+1:]
+      print('Failed to compile: %s' % path[len(root_dir) + 1:], file=sys.stderr)
       success = False
   return success
 
@@ -132,8 +134,9 @@ def check_all_files(root_dir, proto_path):
   success = True
   for path in find_proto_files(root_dir):
     if not check_proto_compiled(path, proto_path):
-      print >> sys.stderr, (
-          'Need to recompile file: %s' % path[len(root_dir)+1:])
+      print(
+          'Need to recompile file: %s' % path[len(root_dir) + 1:],
+          file=sys.stderr)
       success = False
   return success
 
@@ -190,18 +193,20 @@ def main(args, app_dir=None):
     if protoc_version:
       existing = '.'.join(map(str, protoc_version))
       expected = '.'.join(map(str, MIN_SUPPORTED_PROTOC_VERSION))
-      print >> sys.stderr, (
+      print(
           'protoc version is too old (%s), expecting at least %s.\n' %
-          (existing, expected))
+          (existing, expected),
+          file=sys.stderr)
     sys.stderr.write(PROTOC_INSTALL_HELP)
     return 1
   # Make sure protoc produces code compatible with vendored libprotobuf.
   if protoc_version > MAX_SUPPORTED_PROTOC_VERSION:
     existing = '.'.join(map(str, protoc_version))
     expected = '.'.join(map(str, MAX_SUPPORTED_PROTOC_VERSION))
-    print >> sys.stderr, (
-        'protoc version is too new (%s), expecting at most %s.\n' %
-        (existing, expected))
+    print(
+        'protoc version is too new (%s), expecting at most %s.\n' % (existing,
+                                                                     expected),
+        file=sys.stderr)
     sys.stderr.write(PROTOC_INSTALL_HELP)
     return 1
 

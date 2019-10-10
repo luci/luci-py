@@ -91,7 +91,7 @@ class MachineAuthTest(test_case.TestCase):
       ident = self.call(body=self.good_body())[0]
       self.assertEqual('bot:some-machine.host', ident.to_bytes())
     except machine_auth.BadTokenError:
-      print self.logs
+      print(self.logs)
       raise
 
   def test_no_header(self):

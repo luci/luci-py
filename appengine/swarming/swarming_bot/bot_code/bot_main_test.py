@@ -126,7 +126,7 @@ class TestBotMain(TestBotBase):
     self.mock(bot_main, 'SINGLETON', None)
 
   def print_err_and_fail(self, _bot, msg, _task_id):
-    print msg
+    print(msg)
     self.fail('post_error_task was called')
 
   def test_hook_restart(self):

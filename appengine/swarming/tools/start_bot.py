@@ -5,6 +5,8 @@
 
 """Starts a local bot to connect to a local server."""
 
+from __future__ import print_function
+
 import argparse
 import glob
 import logging
@@ -130,17 +132,17 @@ class LocalBot(object):
 
   def dump_log(self):
     """Prints dev_appserver log to stderr, works only if app is stopped."""
-    print >> sys.stderr, '-' * 60
-    print >> sys.stderr, 'swarming_bot log'
-    print >> sys.stderr, '-' * 60
+    print('-' * 60, file=sys.stderr)
+    print('swarming_bot log', file=sys.stderr)
+    print('-' * 60, file=sys.stderr)
     if not self._logs:
-      print >> sys.stderr, '<N/A>'
+      print('<N/A>', file=sys.stderr)
     else:
       for name, content in sorted(self._logs.items()):
         sys.stderr.write(name + ':\n')
         for l in content.strip('\n').splitlines():
           sys.stderr.write('  %s\n' % l)
-    print >> sys.stderr, '-' * 60
+    print('-' * 60, file=sys.stderr)
 
   def _read_log(self, path):
     try:
@@ -163,7 +165,7 @@ def main():
       bot.wait()
       bot.dump_log()
     except KeyboardInterrupt:
-      print >> sys.stderr, '<Ctrl-C> received; stopping bot'
+      print('<Ctrl-C> received; stopping bot', file=sys.stderr)
     finally:
       exit_code = bot.stop()
   finally:

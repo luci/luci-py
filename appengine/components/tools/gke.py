@@ -402,9 +402,8 @@ class Kubectl(object):
     self.set_deployment_annotation(self._ANNOTATION_STABLE, image_tag)
 
   def describe_deployment(self):
-    print self.check_output([
-        'describe',
-        'deployments/%s' % (self.app.deployment_name,)])
+    print(self.check_output(
+        ['describe', 'deployments/%s' % (self.app.deployment_name,)]))
 
   def maybe_push_new_deployment(self, image_tag):
     # If we're not deployed, push a brand-new deployment YAML.
@@ -600,15 +599,15 @@ def subcommand_status(_args, kctl):
   kctl.describe_deployment()
 
   stable = kctl.get_stable_image()
-  print 'Stable image:', stable
+  print('Stable image:', stable)
 
   latest = kctl.get_latest_image()
-  print 'Latest image:', latest
+  print('Latest image:', latest)
 
   if stable != latest:
-    print 'NOTE: Stable and latest do not match. Run "promote" to commit.'
+    print('NOTE: Stable and latest do not match. Run "promote" to commit.')
   else:
-    print 'Stable and latest images match.'
+    print('Stable and latest images match.')
 
   return 0
 

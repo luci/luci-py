@@ -8,6 +8,8 @@
 The tests are run in parallel for maximum efficiency.
 """
 
+from __future__ import print_function
+
 import optparse
 import os
 import socket
@@ -57,9 +59,9 @@ def main(root, blacklist, omit):
   try:
     _run_coverage(root, ['erase'])
   except OSError:
-    print >> sys.stderr, (
-        'Please install coverage first.\n'
-        'See http://nedbatchelder.com/code/coverage for more details.')
+    print('Please install coverage first.\n'
+          'See http://nedbatchelder.com/code/coverage for more details.',
+          file=sys.stderr)
     return 2
 
   # http://nedbatchelder.com/code/coverage/config.html

@@ -91,14 +91,14 @@ def main():
   url = 'https://{server_version}-dot-{appid}.appspot.com'.format(
       appid=args.appid,
       server_version=args.server_version)
-  print 'Swarming server:', url
+  print('Swarming server:', url)
 
   pool = args.pool
   if not pool:
-    print 'Finding best pool to use'
+    print('Finding best pool to use')
     pool = pick_best_pool(url, args.server_version)
 
-  print 'Scheduling no-op task on pool %r' % pool
+  print('Scheduling no-op task on pool %r' % pool)
   rv = subprocess.call([
       SWARMING_TOOL, 'run',
       '-S', url,

@@ -5,6 +5,8 @@
 
 """Starts local Swarming and Isolate servers."""
 
+from __future__ import print_function
+
 import argparse
 import os
 import shutil
@@ -114,7 +116,7 @@ def main():
       print('Isolate : %s' % servers.isolate_server.url)
       servers.wait()
     except KeyboardInterrupt:
-      print >> sys.stderr, '<Ctrl-C> received; stopping servers'
+      print('<Ctrl-C> received; stopping servers', file=sys.stderr)
       dump_log = False
     finally:
       exit_code = servers.stop()

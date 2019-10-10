@@ -5,7 +5,9 @@
 
 """Prints a short log from HEAD (or [end]) to a pseudo revision number."""
 
-__version__ = '1.0'
+from __future__ import print_function
+
+__version__ = '1.0.1'
 
 import optparse
 import subprocess
@@ -25,8 +27,9 @@ def get_logs(root, pseudo_revision, mergebase, start, end):
   try:
     log = subprocess.check_output(cmd, cwd=root)
   except subprocess.CalledProcessError:
-    print >> sys.stderr, (
-        '\nFailed to retrieve the log of last %d commits.' % nb_commits)
+    print(
+        '\nFailed to retrieve the log of last %d commits.' % nb_commits,
+        file=sys.stderr)
     return 1
   maxlen = 0
   lines = []
@@ -58,8 +61,9 @@ def main():
       '-F', '--files', action='store_true', help='List all modified files')
   options, args = parser.parse_args()
 
-  print >> sys.stderr, (
-      'Current version: %s @ %s\n' % (pseudo_revision, mergebase))
+  print(
+      'Current version: %s @ %s\n' % (pseudo_revision, mergebase),
+      file=sys.stderr)
 
   if not args:
     parser.error('Specify the pseudo-revision number of the last push.')
@@ -87,8 +91,9 @@ def main():
     if not options.force:
       parser.error(
           'Make sure to sync to what was committed and uploaded first.')
-    print >> sys.stderr, (
-        'Warning: --force was specified, continuing even if not pristine.\n')
+    print(
+        'Warning: --force was specified, continuing even if not pristine.\n',
+        file=sys.stderr)
 
   out, refspec = get_logs(root, pseudo_revision, mergebase[:12], start, end)
   remote = subprocess.check_output(['git', 'remote', 'get-url', 'origin'],
@@ -103,8 +108,9 @@ def main():
     try:
       subprocess.check_call(cmd, cwd=root)
     except subprocess.CalledProcessError:
-      print >> sys.stderr, (
-          '\nFailed to list files of last %d commits.' % nb_commits)
+      print(
+          '\nFailed to list files of last %d commits.' % nb_commits,
+          file=sys.stderr)
       return 1
 
   return 0

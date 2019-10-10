@@ -591,22 +591,20 @@ class BotApiTest(test_env_handlers.AppTestBase):
     self.mock_bot_group_config(
         version='default',
         owners=None,
-        auth=(
-          bot_groups_config.BotAuth(
+        auth=(bot_groups_config.BotAuth(
             log_if_failed=False,
             require_luci_machine_token=False,
             require_service_account=None,
             require_gce_vm_token=None,
             ip_whitelist=None,
-          ),
-        ),
+        ),),
         dimensions={},
         bot_config_script='foo.py',
-        bot_config_script_content='print "Hi";import sys; sys.exit(1)',
+        bot_config_script_content='print("Hi");import sys; sys.exit(1)',
         system_service_account=None)
     params = self.do_handshake()
-    self.assertEqual(
-        u'print "Hi";import sys; sys.exit(1)', params['bot_config'])
+    self.assertEqual(u'print("Hi");import sys; sys.exit(1)',
+                     params['bot_config'])
 
   def test_complete_task_isolated(self):
     # Successfully poll a task.

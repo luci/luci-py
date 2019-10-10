@@ -19,6 +19,8 @@ Sections are:
   - Bot lifetime management
 """
 
+from __future__ import print_function
+
 import argparse
 import contextlib
 import fnmatch
@@ -1183,7 +1185,7 @@ def _poll_server(botobj, quit_bit, last_action):
       # if there's an error here before, so let's preserve that behaviour
       # (though anything that's not a remote_client.InternalError will make
       # it through, again preserving prior behaviour).
-      botobj.remote.post_task_update(value, botobj.id, {'duration':0}, None, 0)
+      botobj.remote.post_task_update(value, botobj.id, {'duration': 0}, None, 0)
     except remote_client_errors.InternalError:
       pass
     return False
@@ -1399,10 +1401,10 @@ def main(argv):
       msg = (
           'Found a previous bot, %d rebooting as a workaround for '
           'https://crbug.com/569610.') % os.getpid()
-      print >> sys.stderr, msg
+      print(msg, file=sys.stderr)
       os_utilities.host_reboot(msg)
     else:
-      print >> sys.stderr, 'Found a previous bot, %d exiting.' % os.getpid()
+      print('Found a previous bot, %d exiting.' % os.getpid(), file=sys.stderr)
     return 1
 
   base_dir = os.path.dirname(THIS_FILE)

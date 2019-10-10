@@ -4,6 +4,8 @@
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
 
+from __future__ import print_function
+
 import base64
 import datetime
 import fnmatch
@@ -180,7 +182,7 @@ class TestTaskRunnerBase(auto_stub.TestCase):
             logging.debug('%s:\n%s', i, ''.join('  ' + line for line in f))
         file_path.rmtree(self.root_dir)
     except OSError:
-      print >> sys.stderr, 'Failed to delete %s' % self.root_dir
+      print('Failed to delete %s' % self.root_dir, file=sys.stderr)
       raise
     finally:
       super(TestTaskRunnerBase, self).tearDown()
@@ -304,11 +306,10 @@ class TestTaskRunner(TestTaskRunnerBase):
 
   def test_run_command_env_prefix_one(self):
     task_details = get_task_details(
-      'import os\nprint os.getenv("PATH").split(os.pathsep)[0]',
+        'import os\nprint(os.getenv("PATH").split(os.pathsep)[0])',
         env_prefixes={
-          'PATH': ['./local/smurf', './other/thing'],
-        }
-    )
+            'PATH': ['./local/smurf', './other/thing'],
+        })
     expected = {
       u'exit_code': 0,
       u'hard_timeout': False,
@@ -324,14 +325,14 @@ class TestTaskRunner(TestTaskRunnerBase):
   def test_run_command_env_prefix_multiple(self):
     task_details = get_task_details(
         '\n'.join([
-          'import os',
-          'print os.path.realpath(os.getcwd())',
-          'path = os.getenv("PATH").split(os.pathsep)',
-          'print os.path.realpath(path[0])',
-          'print os.path.realpath(path[1])',
+            'import os',
+            'print(os.path.realpath(os.getcwd()))',
+            'path = os.getenv("PATH").split(os.pathsep)',
+            'print(os.path.realpath(path[0]))',
+            'print(os.path.realpath(path[1]))',
         ]),
         env_prefixes={
-          'PATH': ['./local/smurf', './other/thing'],
+            'PATH': ['./local/smurf', './other/thing'],
         })
     expected = {
       u'exit_code': 0,
@@ -452,14 +453,15 @@ class TestTaskRunner(TestTaskRunnerBase):
     this is the succeeding version.
     """
     files = {
-      'parent.py': (
-        'import subprocess, sys\n'
-        'sys.exit(subprocess.call([sys.executable,\'-u\',\'children.py\']))\n'),
-      'children.py': (
-        'import subprocess, sys\n'
-        'sys.exit(subprocess.call('
-            '[sys.executable, \'-u\', \'grand_children.py\']))\n'),
-      'grand_children.py': 'print \'hi\'',
+        'parent.py': (
+            'import subprocess, sys\n'
+            'res = subprocess.call([sys.executable,\'-u\',\'children.py\'])\n'
+            'sys.exit(res)\n'),
+        'children.py': ('import subprocess, sys\n'
+                        'sys.exit(subprocess.call('
+                        '[sys.executable, \'-u\', \'grand_children.py\']))\n'),
+        'grand_children.py':
+            'print(\'hi\')',
     }
 
     isolated = json.dumps({
@@ -491,18 +493,18 @@ class TestTaskRunner(TestTaskRunnerBase):
     self.assertEqual(expected, actual)
     self.expectTask(
         isolated_stats={
-          u'download': {
-            u'duration': 0.,
-            u'initial_number_items': 0,
-            u'initial_size': 0,
-            u'items_cold': u'eJzj8uHYxggAAuwBFg==',
-            u'items_hot': u'',
-          },
-          u'upload': {
-            u'duration': 0.,
-            u'items_cold': u'',
-            u'items_hot': u'',
-          },
+            u'download': {
+                u'duration': 0.,
+                u'initial_number_items': 0,
+                u'initial_size': 0,
+                u'items_cold': u'eJzjDmbawggAAvcBFg==',
+                u'items_hot': u'',
+            },
+            u'upload': {
+                u'duration': 0.,
+                u'items_cold': u'',
+                u'items_hot': u'',
+            },
         })
 
   def test_run_command_large(self):
@@ -593,15 +595,14 @@ class TestTaskRunner(TestTaskRunnerBase):
 
     # Maps the cache 'foo' as 'cache_foo'. This runs inside self.work_dir.
     # This runs the command for real.
-    script = (
-      'import os\n'
-      'print "hi"\n'
-      'with open("cache_foo/bar", "rb") as f:\n'
-      '  cached = f.read()\n'
-      'with open("../../result", "wb") as f:\n'
-      '  f.write(cached)\n'
-      'with open("cache_foo/bar", "wb") as f:\n'
-      '  f.write("updated_cache")\n')
+    script = ('import os\n'
+              'print("hi")\n'
+              'with open("cache_foo/bar", "rb") as f:\n'
+              '  cached = f.read()\n'
+              'with open("../../result", "wb") as f:\n'
+              '  f.write(cached)\n'
+              'with open("cache_foo/bar", "wb") as f:\n'
+              '  f.write("updated_cache")\n')
     task_details = get_task_details(
         script, caches=[{'name': 'foo', 'path': 'cache_foo', 'hint': '100'}])
     expected = {
@@ -1191,7 +1192,7 @@ class TaskRunnerNoServer(auto_stub.TestCase):
     try:
       file_path.rmtree(self.root_dir)
     except OSError:
-      print >> sys.stderr, 'Failed to delete %s' % self.root_dir
+      print('Failed to delete %s' % self.root_dir, file=sys.stderr)
       raise
     finally:
       super(TaskRunnerNoServer, self).tearDown()

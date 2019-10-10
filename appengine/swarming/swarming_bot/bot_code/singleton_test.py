@@ -17,8 +17,10 @@ THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
 CMD_ACQUIRE = [
-  sys.executable, '-u', '-c',
-  'import singleton; print singleton.Singleton(%r).acquire()' % THIS_DIR,
+    sys.executable,
+    '-u',
+    '-c',
+    'import singleton; print(singleton.Singleton(%r).acquire())' % THIS_DIR,
 ]
 
 

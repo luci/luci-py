@@ -228,7 +228,7 @@ def main():
   root = checkout_root(os.getcwd())
   logging.info('Checkout root is %s', root)
   try:
-    print calculate_version(root, options.tag)
+    print(calculate_version(root, options.tag))
   except VersionError as e:
     sys.stderr.write(str(e))
     return 1
