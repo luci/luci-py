@@ -40,7 +40,6 @@ FILES = (
     'api/bot.py',
     'api/oauth.py',
     'api/os_utilities.py',
-    'api/parallel.py',
     'api/platforms/__init__.py',
     'api/platforms/android.py',
     'api/platforms/common.py',

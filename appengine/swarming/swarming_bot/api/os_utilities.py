@@ -40,7 +40,6 @@ tools.force_local_third_party()
 import httplib2
 from oauth2client import client
 
-from api import parallel
 from api import platforms
 from utils import file_path
 from utils import fs

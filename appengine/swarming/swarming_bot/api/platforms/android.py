@@ -18,6 +18,7 @@ try:
   from adb import common
   from adb.contrib import adb_commands_safe
   from adb.contrib import high
+  from adb.contrib import parallel
 
   # Master switch that can easily be temporarily increased to INFO or even DEBUG
   # when needed by simply pushing a new tainted swarming server version. This
@@ -32,7 +33,6 @@ except OSError:
   # This can fail on macOS if libusb-1.0.dylib is not installed.
   pass
 
-from api import parallel
 from api.platforms import gce
 
 # This list of third party apps embedded in the base OS image varies from
