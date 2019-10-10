@@ -1,0 +1,10 @@
+# For more information, run:
+#   $ gcloud topic gcloudignore
+
+*.md
+*.sh
+*_test.py
+.gcloudignore
+.gitignore
+__pycache__/
+tools/

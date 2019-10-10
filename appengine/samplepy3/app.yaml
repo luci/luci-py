@@ -1,0 +1,27 @@
+# Copyright 2019 The LUCI Authors. All rights reserved.
+# Use of this source code is governed under the Apache License, Version 2.0
+# that can be found in the LICENSE file.
+#
+# References:
+# https://cloud.google.com/appengine/docs/standard/python3/config/appref
+# https://cloud.google.com/appengine/docs/standard/python3/runtime
+application: samplepy3
+runtime: python37
+service: default
+entrypoint: uwsgi --http-socket :8080 --wsgi-file main.py --callable app --master --processes 1 --threads 2
+instance_class: F2
+
+handlers:
+- url: /.*
+  script: auto
+  secure: always
+
+inbound_services:
+- warmup
+
+#includes:
+#- components/auth
+#- components/config
+#- components/ereporter2
+#- components/static_third_party.yaml
+#- gae_ts_mon

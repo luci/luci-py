@@ -779,6 +779,9 @@ def fix_protobuf_package():
   Prefer our own proto package on the server. Note that this functions is not
   used on the Swarming bot nor any other client.
   """
+  if sys.version_info.major != 2:
+    # Unnecessary on python3.
+    return
   # google.__path__[0] will be google_appengine/google.
   import google
   if len(google.__path__) > 1:
@@ -796,6 +799,9 @@ def fix_protobuf_package():
 
 def import_jinja2():
   """Remove any existing jinja2 package and add ours."""
+  if sys.version_info.major != 2:
+    # Unnecessary on python3.
+    return
   for i in sys.path[:]:
     if os.path.basename(i) == 'jinja2':
       sys.path.remove(i)
@@ -822,9 +828,7 @@ def async_apply(iterable, async_fn, unordered=False, concurrent_jobs=50):
 
 def _async_apply_ordered(iterable, async_fn, concurrent_jobs):
   results = _async_apply_unordered(
-      enumerate(iterable),
-      lambda (i, item): async_fn(item),
-      concurrent_jobs)
+      enumerate(iterable), lambda i: async_fn(i[1]), concurrent_jobs)
   for (_, item), result in sorted(results, key=lambda i: i[0][0]):
     yield item, result
 

@@ -10,7 +10,6 @@ import copy
 import logging
 import re
 
-from google.appengine.ext import ndb
 import webapp2
 
 from components import net
