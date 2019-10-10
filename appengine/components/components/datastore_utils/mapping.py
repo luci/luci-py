@@ -41,7 +41,7 @@ def _process_chunk_of_items(
 
 def pop_future_done(futures):
   """Removes the currently done futures."""
-  for i in xrange(len(futures) - 1, -1, -1):
+  for i in range(len(futures) - 1, -1, -1):
     if futures[i].done():
       futures.pop(i)
 
@@ -100,4 +100,3 @@ def incremental_map(
         map_fn, action_futures, items_to_process, max_inflight, map_page_size)
 
   ndb.Future.wait_all(action_futures)
-

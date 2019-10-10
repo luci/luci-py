@@ -588,7 +588,7 @@ def _lowest_missing_bit(bitmap):
   Do not check the sign bit. If all bits are set, return the sign bit. It's the
   caller to handle this case.
   """
-  for i in xrange(64):
+  for i in range(64):
     if not (bitmap & (1 << i)):
       return i
   return 64
@@ -609,7 +609,7 @@ def _get_snapshot_as_dict_future(keys):
     out.set_result(result.to_dict() if result else None)
 
   tmp = ndb.get_multi_async(keys, use_cache=False, use_memcache=False)
-  out = [ndb.Future() for _ in xrange(len(tmp))]
+  out = [ndb.Future() for _ in range(len(tmp))]
   for i, f in enumerate(tmp):
     f.add_immediate_callback(_fix_future, f, out[i])
   return out
@@ -619,8 +619,8 @@ def _get_days_keys(handler, now, num_days):
   """Returns a list of ndb.Key to Snapshot instances."""
   today = (now or utils.utcnow()).date()
   return [
-    handler.day_key(today - datetime.timedelta(days=i))
-    for i in xrange(num_days)
+      handler.day_key(today - datetime.timedelta(days=i))
+      for i in range(num_days)
   ]
 
 
@@ -628,8 +628,8 @@ def _get_hours_keys(handler, now, num_hours):
   """Returns a list of ndb.Key to Snapshot instances."""
   now = now or utils.utcnow()
   return [
-    handler.hour_key(now - datetime.timedelta(hours=i))
-    for i in xrange(num_hours)
+      handler.hour_key(now - datetime.timedelta(hours=i))
+      for i in range(num_hours)
   ]
 
 
@@ -637,8 +637,8 @@ def _get_minutes_keys(handler, now, num_minutes):
   """Returns a list of ndb.Key to Snapshot instances."""
   now = now or utils.utcnow()
   return [
-    handler.minute_key(now - datetime.timedelta(minutes=i))
-    for i in xrange(num_minutes)
+      handler.minute_key(now - datetime.timedelta(minutes=i))
+      for i in range(num_minutes)
   ]
 
 

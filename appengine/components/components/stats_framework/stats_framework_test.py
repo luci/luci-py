@@ -145,17 +145,15 @@ class StatsFrameworkTest(test_case.TestCase):
     self.assertEqual(expected, root[0].to_dict())
 
     # Verify days.
-    expected = [
-      {
+    expected = [{
         'key': str(midnight.date()),
         'requests': limit,
         'b': float(limit),
         'd': [],
         'inner': {
-          'c': u''.join('%d,' % i for i in xrange(1, limit + 1)),
+            'c': u''.join('%d,' % i for i in range(1, limit + 1)),
         },
-      }
-    ]
+    }]
     days = handler.stats_day_cls.query().fetch()
     self.assertEqual(expected, [d.to_dict() for d in days])
     # These are left out from .to_dict().
@@ -164,21 +162,22 @@ class StatsFrameworkTest(test_case.TestCase):
     self.assertEqual(3, days[0].hours_bitmap)
 
     # Verify hours.
-    expected = [
-      {
+    expected = [{
         'key':
-            (midnight + datetime.timedelta(seconds=i*60*60)).strftime(
-                '%Y-%m-%dT%H'),
-        'requests': 60,
-        'b': 60.,
+            (midnight +
+             datetime.timedelta(seconds=i * 60 * 60)).strftime('%Y-%m-%dT%H'),
+        'requests':
+            60,
+        'b':
+            60.,
         'd': [],
         'inner': {
-          'c': u''.join(
-              '%d,' % i for i in xrange(60 * i + 1, 60 * (i + 1) + 1)),
+            'c':
+                u''.join('%d,' % i
+                         for i in range(60 * i + 1, 60 * (i + 1) + 1)),
         },
-      }
-      for i in range(limit / 60)
-    ]
+    }
+                for i in range(limit / 60)]
     hours = handler.stats_hour_cls.query().fetch()
     self.assertEqual(expected, [d.to_dict() for d in hours])
     for h in hours:

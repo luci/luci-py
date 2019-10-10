@@ -287,8 +287,9 @@ def cron_send_to_bq():
           size, state.last, len(state.failed))
 
       keys = [
-        STATS_HANDLER.minute_key(state.last + datetime.timedelta(seconds=60*i))
-        for i in xrange(size)
+          STATS_HANDLER.minute_key(state.last +
+                                   datetime.timedelta(seconds=60 * i))
+          for i in range(size)
       ]
       # Do them last in case they fail again.
       keys.extend(STATS_HANDLER.minute_key(t) for t in state.failed)

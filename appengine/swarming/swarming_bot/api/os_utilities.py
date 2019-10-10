@@ -315,7 +315,7 @@ def get_ip():
   """Returns the IP that is the most likely to be used for TCP connections."""
   # Tries for ~0.5s then give up.
   max_tries = 10
-  for i in xrange(10):
+  for i in range(10):
     # It's guesswork and could return the wrong IP. In particular a host can
     # have multiple IPs.
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -1352,7 +1352,7 @@ def roll_log(name):
       return
     if os.path.isfile('%s.9' % name):
       os.remove('%s.9' % name)
-    for i in xrange(8, 0, -1):
+    for i in range(8, 0, -1):
       item = '%s.%d' % (name, i)
       if os.path.isfile(item):
         os.rename(item, '%s.%d' % (name, i+1))

@@ -804,7 +804,7 @@ def assert_task(request):
   assert not request.key, request.key
   # TODO(maruel): Parallelize the following.
   exp_ts = request.created_ts
-  for i in xrange(request.num_task_slices):
+  for i in range(request.num_task_slices):
     t = request.task_slice(i)
     exp_ts += datetime.timedelta(seconds=t.expiration_secs)
     _assert_task_props(t.properties, exp_ts)

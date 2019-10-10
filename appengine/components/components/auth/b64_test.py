@@ -34,7 +34,7 @@ class Base64Test(test_case.TestCase):
       b64.decode(u'unicode')
 
   def test_base64_encode_is_url_safe(self):
-    for a in xrange(255):
+    for a in range(255):
       original = chr(a)
       encoded = b64.encode(original)
       self.assertEqual(original, b64.decode(encoded))
@@ -44,7 +44,7 @@ class Base64Test(test_case.TestCase):
     # Encode a bunch of strings of different lengths to test all
     # possible paddings (to see how padding stripping works).
     msg = 'somewhat long message with binary \x00\x01\x02\x03 inside'
-    for i in xrange(len(msg)):
+    for i in range(len(msg)):
       self.assertEqual(msg[:i], b64.decode(b64.encode(msg[:i])))
 
 

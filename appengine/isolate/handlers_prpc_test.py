@@ -59,18 +59,18 @@ class PRPCTest(test_case.TestCase):
     # generate it.
     self.mock_now(self.now, 0)
     handler = stats.STATS_HANDLER
-    for i in xrange(10):
+    for i in range(10):
       s = stats._Snapshot(requests=100 + i)
       day = (self.now - datetime.timedelta(days=i)).date()
       handler.stats_day_cls(key=handler.day_key(day), values_compressed=s).put()
 
-    for i in xrange(10):
+    for i in range(10):
       s = stats._Snapshot(requests=10 + i)
       timestamp = (self.now - datetime.timedelta(hours=i))
       handler.stats_hour_cls(
           key=handler.hour_key(timestamp), values_compressed=s).put()
 
-    for i in xrange(10):
+    for i in range(10):
       s = stats._Snapshot(requests=1 + i)
       timestamp = (self.now - datetime.timedelta(minutes=i))
       handler.stats_minute_cls(

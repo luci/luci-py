@@ -753,8 +753,8 @@ class _TaskResultCommon(ndb.Model):
     # Retrieve the subset of TaskOutputChunk needed.
     output_key = _run_result_key_to_output_key(run_result_key)
     keys = [
-      _output_key_to_output_chunk_key(output_key, i)
-      for i in xrange(first_chunk, last_chunk)
+        _output_key_to_output_chunk_key(output_key, i)
+        for i in range(first_chunk, last_chunk)
     ]
     void = None
     parts = []
@@ -1208,14 +1208,13 @@ def _output_append(output_key, number_chunks, output, output_chunk_start):
   entities = ndb.get_multi(i[0] for i in chunks)
 
   # Update the entities.
-  for i in xrange(len(chunks)):
-    key, start, output = chunks[i]
+  for i, (key, start, output_chunk) in enumerate(chunks):
     if not entities[i]:
       # Fill up for missing entities.
       entities[i] = TaskOutputChunk(key=key)
     chunk = entities[i]
     # Magically combine everything.
-    end = start + len(output)
+    end = start + len(output_chunk)
     if len(chunk.chunk) < start:
       # Insert blank data automatically.
       chunk.gaps.extend((len(chunk.chunk), start))
@@ -1223,10 +1222,10 @@ def _output_append(output_key, number_chunks, output, output_chunk_start):
 
     # Strip gaps that are being written to.
     new_gaps = []
-    for i in xrange(0, len(chunk.gaps), 2):
+    for j in range(0, len(chunk.gaps), 2):
       # All values are relative to the starting offset of the chunk itself.
-      gap_start = chunk.gaps[i]
-      gap_end = chunk.gaps[i+1]
+      gap_start = chunk.gaps[j]
+      gap_end = chunk.gaps[j + 1]
       # If the gap overlaps the chunk being written, strip it. Cases:
       #   Gap:     |   |
       #   Chunk: |   |
@@ -1253,7 +1252,7 @@ def _output_append(output_key, number_chunks, output, output_chunk_start):
         new_gaps.extend((gap_start, gap_end))
 
     chunk.gaps = new_gaps
-    chunk.chunk = chunk.chunk[:start] + output + chunk.chunk[end:]
+    chunk.chunk = chunk.chunk[:start] + output_chunk + chunk.chunk[end:]
   return entities, number_chunks
 
 

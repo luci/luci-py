@@ -115,7 +115,7 @@ def delete_file_async(bucket, filename, ignore_missing):
   api = cloudstorage.storage_api._get_storage_api(
       retry_params=retry_params, account_id=None)
   p = cloudstorage.api_utils._quote_filename('/%s/%s' % (bucket, filename))
-  for i in xrange(max_tries+1):
+  for i in range(max_tries + 1):
     try:
       # The equivalent of cloudstorage.delete(p, retry_params=retry_params)
       status, resp_headers, content = yield api.delete_object_async(p)

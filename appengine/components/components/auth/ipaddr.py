@@ -96,7 +96,7 @@ def ip_to_string(ip):
     raise ValueError('Unknown type of IP with bits %d' % ip.bits)
   fields = []
   value = ip.value
-  for _ in xrange(count):
+  for _ in range(count):
     value, mod = divmod(value, factor)
     fields.append(conv(mod))
   if value:

@@ -690,7 +690,7 @@ def cron_update_bot_info():
         futures.append(f)
         if len(futures) >= 5:
           ndb.Future.wait_any(futures)
-          for i in xrange(len(futures) - 1, -1, -1):
+          for i in range(len(futures) - 1, -1, -1):
             if futures[i].done():
               try:
                 dead += futures.pop(i).get_result()

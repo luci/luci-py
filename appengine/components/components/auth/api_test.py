@@ -479,12 +479,12 @@ class TestAuthDBCache(test_case.TestCase):
     # whatever they return.
     results_queue = Queue.Queue()
     threads = [
-      threading.Thread(target=lambda: results_queue.put(thread_proc()))
-      for _ in xrange(2)
+        threading.Thread(target=lambda: results_queue.put(thread_proc()))
+        for _ in range(2)
     ]
     for t in threads:
       t.start()
-    results = [results_queue.get(timeout=1) for _ in xrange(len(threads))]
+    results = [results_queue.get(timeout=1) for _ in range(len(threads))]
 
     # Different threads use different RequestCache objects.
     self.assertTrue(results[0] is not results[1])

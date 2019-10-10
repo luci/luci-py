@@ -12,7 +12,7 @@ details on the presubmit API built into gclient.
 def header(input_api):
   """Returns the expected license header regexp for this project."""
   current_year = int(input_api.time.strftime('%Y'))
-  allowed_years = (str(s) for s in reversed(xrange(2011, current_year + 1)))
+  allowed_years = (str(s) for s in reversed(range(2011, current_year + 1)))
   years_re = '(' + '|'.join(allowed_years) + ')'
   license_header = (
     r'.*? Copyright %(year)s The LUCI Authors\. '

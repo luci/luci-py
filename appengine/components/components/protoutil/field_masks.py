@@ -339,10 +339,7 @@ def _normalize_paths(paths):
   e.g. removes ('a', 'b') from [('a', 'b'), ('a',)].
   """
   paths = _remove_trailing_stars(paths)
-  return {
-      p for p in paths
-      if not any(p[:i] in paths for i in xrange(len(p)))
-  }
+  return {p for p in paths if not any(p[:i] in paths for i in range(len(p)))}
 
 
 def _remove_trailing_stars(paths):
@@ -356,7 +353,7 @@ def _remove_trailing_stars(paths):
 
 
 # Token types.
-_STAR, _PERIOD, _LITERAL, _STRING, _INTEGER, _UNKNOWN, _EOF = xrange(7)
+_STAR, _PERIOD, _LITERAL, _STRING, _INTEGER, _UNKNOWN, _EOF = range(7)
 
 
 _INTEGER_FIELD_TYPES = {

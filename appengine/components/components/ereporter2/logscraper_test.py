@@ -202,7 +202,7 @@ class Ereporter2LogscraperTest(test_case.TestCase):
     l = logscraper._CappedList(5, 10)
 
     # Grow a bit, should go to head.
-    for i in xrange(5):
+    for i in range(5):
       l.append(i)
     self.assertFalse(l.has_gap)
     self.assertEqual(5, l.total_count)
@@ -210,7 +210,7 @@ class Ereporter2LogscraperTest(test_case.TestCase):
     self.assertEqual(0, len(l.tail))
 
     # Start growing a tail, still not long enough to start evicting items.
-    for i in xrange(5, 15):
+    for i in range(5, 15):
       l.append(i)
     self.assertFalse(l.has_gap)
     self.assertEqual(15, l.total_count)

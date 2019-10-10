@@ -129,9 +129,8 @@ def test_io_timeout(swarming, isolate, extra_flags):
 def test_hard_timeout(swarming, isolate, extra_flags):
   """Runs a task that triggers hard timeout."""
   h = gen_isolated(
-      isolate,
-      'import time\n'
-      'for i in xrange(6):'
+      isolate, 'import time\n'
+      'for i in range(6):'
       '  print(\'.\')\n'
       '  time.sleep(10)\n')
   start = time.time()
@@ -238,7 +237,7 @@ def main():
 
   print('%d tests started' % len(tests))
   maxlen = max(len(name) for name in tests)
-  for i in xrange(len(tests)):
+  for i in range(len(tests)):
     name, result, duration = results.get()
     print('[%d/%d] %-*s: %4.1fs: %s' %
         (i, len(tests), maxlen, name, duration, result))

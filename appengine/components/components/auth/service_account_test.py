@@ -78,10 +78,11 @@ class GetProjectAccessTokenTest(test_case.TestCase):
       mocked_urlfetch_async.called = True
       calls.append(('urlfetch', args))
       expiry = utils.utcnow() + datetime.timedelta(seconds=1800)
-      res = {'accessToken':'someaccesstoken',
-             'serviceAccountEmail': 'service@account.com',
-             'expiry': expiry.isoformat('T') + 'Z'
-             }
+      res = {
+          'accessToken': 'someaccesstoken',
+          'serviceAccountEmail': 'service@account.com',
+          'expiry': expiry.isoformat('T') + 'Z'
+      }
       raise ndb.Return(
           self.Response(200, json.dumps(res, sort_keys=True))
       )
@@ -139,7 +140,8 @@ class GetAccessTokenTest(test_case.TestCase):
     @ndb.tasklet
     def via_jwt(*args):
       calls.append(('jwt_based', args))
-      raise ndb.Return({'access_token':'token', 'exp_ts': 0})
+      raise ndb.Return({'access_token': 'token', 'exp_ts': 0})
+
     self.mock(service_account, '_mint_jwt_based_token_async', via_jwt)
 
     def via_gae_api(*args):
@@ -287,7 +289,7 @@ class GetAccessTokenTest(test_case.TestCase):
     signer = FakeSigner()
     token = service_account._mint_jwt_based_token_async(
         ['scope1', 'scope2'], signer).get_result()
-    self.assertEqual({'access_token':'token', 'exp_ts':1420171200.0}, token)
+    self.assertEqual({'access_token': 'token', 'exp_ts': 1420171200.0}, token)
 
     self.assertEqual([{
       'aud': 'https://www.googleapis.com/oauth2/v4/token',
@@ -391,15 +393,17 @@ class GetAccessTokenTest(test_case.TestCase):
     self.assertFalse(calls)
 
   def test_call_async_gives_up(self):
-    calls = self.mock_urlfetch([
-      {
+    calls = self.mock_urlfetch([{
         'url': 'http://example.com',
         'payload': 'blah',
         'method': 'POST',
-        'headers': {'A': 'a'},
-        'response': (500, {'error': 'zzz'}),
-      } for _ in xrange(0, 4)
-    ])
+        'headers': {
+            'A': 'a'
+        },
+        'response': (500, {
+            'error': 'zzz'
+        }),
+    } for _ in range(0, 4)])
     with self.assertRaises(service_account.AccessTokenError) as err:
       service_account._call_async(
         url='http://example.com',

@@ -414,7 +414,7 @@ def resolve_symlink(path):
     # Only does this dance on Windows.
     return path
   parts = os.path.normpath(path).split(os.path.sep)
-  for i in xrange(2, len(parts)):
+  for i in range(2, len(parts)):
     partial = os.path.sep.join(parts[:i])
     if os.path.isfile(partial):
       with open(partial) as f:

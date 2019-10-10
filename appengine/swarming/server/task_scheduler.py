@@ -81,7 +81,7 @@ def _expire_task_tx(now, request, to_run_key, result_summary_key, capacity,
   new_to_run = None
   offset = result_summary.current_task_slice+1
   rest = request.num_task_slices - offset
-  for index in xrange(rest):
+  for index in range(rest):
     # Use the lookup created just before the transaction. There's a small race
     # condition in here but we're willing to accept it.
     if capacity[index]:
@@ -155,7 +155,7 @@ def _expire_task(to_run_key, request, inline):
   # transaction runs.
   index = task_to_run.task_to_run_key_slice_index(to_run_key)
   slices = [
-    request.task_slice(i) for i in xrange(index+1, request.num_task_slices)
+      request.task_slice(i) for i in range(index + 1, request.num_task_slices)
   ]
   capacity = [
     t.wait_for_capacity or bot_management.has_capacity(t.properties.dimensions)
@@ -1135,7 +1135,7 @@ def schedule_request(request, secret_bytes):
     secret_bytes.key = request.secret_bytes_key
 
   dupe_summary = None
-  for i in xrange(request.num_task_slices):
+  for i in range(request.num_task_slices):
     t = request.task_slice(i)
     if t.properties.idempotent:
       dupe_summary = _find_dupe_task(now, t.properties_hash(request))
@@ -1793,7 +1793,7 @@ def cron_task_bot_distribution():
   for result in q:
     # Make dimensions immutable so they can be used to index a key.
     req = result.request
-    for i in xrange(req.num_task_slices):
+    for i in range(req.num_task_slices):
       t = req.task_slice(i)
       dimensions = tuple(sorted(
             (k, tuple(sorted(v)))

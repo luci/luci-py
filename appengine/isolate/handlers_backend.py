@@ -67,7 +67,7 @@ def _split_payload(request, chunk_size, max_chunks):
     logging.warning(msg)
     request.abort(400, detail=msg)
 
-  return [content[i * chunk_size: (i + 1) * chunk_size] for i in xrange(count)]
+  return [content[i * chunk_size:(i + 1) * chunk_size] for i in range(count)]
 
 
 def _payload_to_hashes(request, namespace):
@@ -276,7 +276,7 @@ class CronCleanupExpiredHandler(webapp2.RequestHandler):
       # 6 billions entities. This is because the query above is exact, not an
       # estimation.
       logging.warning('Query timed out; guessing instead')
-      for i in xrange(300, -1, -20):
+      for i in range(300, -1, -20):
         # It was observed that limiting the range on both sides helps with the
         # chances of the query succeeding, instead of raising a Timeout.
         q = model.ContentEntry.query(

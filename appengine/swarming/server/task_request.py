@@ -1180,7 +1180,7 @@ class TaskRequest(ndb.Model):
     """
     max_lifetime_secs = 0
     offset = 0
-    for i in xrange(self.num_task_slices):
+    for i in range(self.num_task_slices):
       t = self.task_slice(i)
       offset += t.expiration_secs
       props = t.properties
@@ -1283,7 +1283,7 @@ class TaskRequest(ndb.Model):
     # first TaskSlice, a second bot is targetted as a fallback on the second
     # TaskSlice.
     v = self.task_slice(0).properties.dimensions.get(u'pool')
-    for i in xrange(1, self.num_task_slices):
+    for i in range(1, self.num_task_slices):
       t = self.task_slice(i)
       w = t.properties.dimensions.get(u'pool')
       if v != w:
@@ -1320,7 +1320,7 @@ def _get_automatic_tags(request):
     u'service_account:%s' % (request.service_account or u'None'),
     u'user:%s' % (request.user or u'None'),
   ))
-  for i in xrange(request.num_task_slices):
+  for i in range(request.num_task_slices):
     for key, values in request.task_slice(i).properties.dimensions.items():
       for value in values:
         tags.add(u'%s:%s' % (key, value))

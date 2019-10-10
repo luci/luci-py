@@ -384,7 +384,7 @@ class TaskRequestApiTest(TestCase):
     self.assertTrue(request.task_slice(0).properties.is_terminate)
 
   def test_new_request_key(self):
-    for _ in xrange(3):
+    for _ in range(3):
       delta = utils.utcnow() - task_request._BEGINING_OF_THE_WORLD
       now = int(round(delta.total_seconds() * 1000.))
       key = task_request.new_request_key()
@@ -1051,13 +1051,17 @@ class TaskRequestApiTest(TestCase):
 
     # Limit on the maximum number of TaskSlice in a TaskRequest.
     slices = [
-      _gen_slice(dimensions={u'pool': [u'GPU'], u'v': [unicode(i)]})
-      for i in xrange(8)
+        _gen_slice(dimensions={
+            u'pool': [u'GPU'],
+            u'v': [unicode(i)]
+        }) for i in range(8)
     ]
     _gen_request_slices(task_slices=slices).put()
     slices = [
-      _gen_slice(dimensions={u'pool': [u'GPU'], u'v': [unicode(i)]})
-      for i in xrange(9)
+        _gen_slice(dimensions={
+            u'pool': [u'GPU'],
+            u'v': [unicode(i)]
+        }) for i in range(9)
     ]
     req = _gen_request_slices(task_slices=slices)
     with self.assertRaises(datastore_errors.BadValueError):
@@ -1258,14 +1262,14 @@ class TaskRequestApiTest(TestCase):
       mkcachereq(task_request.CacheEntry(name=u'g', path=u'p'*257))
     # Too many.
     c = [
-      task_request.CacheEntry(name=unicode(i), path=unicode(i))
-      for i in xrange(32)
+        task_request.CacheEntry(name=unicode(i), path=unicode(i))
+        for i in range(32)
     ]
     _gen_request(properties=_gen_properties(caches=c)).put()
     with self.assertRaises(datastore_errors.BadValueError):
       c = [
-        task_request.CacheEntry(name=unicode(i), path=unicode(i))
-        for i in xrange(33)
+          task_request.CacheEntry(name=unicode(i), path=unicode(i))
+          for i in range(33)
       ]
       _gen_request(properties=_gen_properties(caches=c)).put()
 
@@ -1329,11 +1333,11 @@ class TaskRequestApiTest(TestCase):
 
   def test_request_bad_dimensions_key(self):
     # Max # keys.
-    d = {u'a%s' % string.ascii_letters[i]: [unicode(i)] for i in xrange(31)}
+    d = {u'a%s' % string.ascii_letters[i]: [unicode(i)] for i in range(31)}
     d[u'pool'] = [u'a']
     _gen_request(properties=_gen_properties(dimensions=d)).put()
     with self.assertRaises(datastore_errors.BadValueError):
-      d = {u'a%s' % string.ascii_letters[i]: [unicode(i)] for i in xrange(32)}
+      d = {u'a%s' % string.ascii_letters[i]: [unicode(i)] for i in range(32)}
       d[u'pool'] = [u'a']
       _gen_request(properties=_gen_properties(dimensions=d)).put()
 
@@ -1356,10 +1360,10 @@ class TaskRequestApiTest(TestCase):
 
   def test_request_bad_dimensions_value(self):
     # Max # values.
-    d = {u'pool': [u'b'], u'a.': [unicode(i) for i in xrange(16)]}
+    d = {u'pool': [u'b'], u'a.': [unicode(i) for i in range(16)]}
     _gen_request(properties=_gen_properties(dimensions=d)).put()
     with self.assertRaises(datastore_errors.BadValueError):
-      d = {u'pool': [u'b'], u'a.': [unicode(i) for i in xrange(17)]}
+      d = {u'pool': [u'b'], u'a.': [unicode(i) for i in range(17)]}
       _gen_request(properties=_gen_properties(dimensions=d)).put()
     # Value length.
     d = {
@@ -1398,10 +1402,10 @@ class TaskRequestApiTest(TestCase):
       e = {u'k'*65: u'v'}
       _gen_request(properties=_gen_properties(env=e)).put()
     # # keys.
-    e = {u'k%s' % i: u'v' for i in xrange(64)}
+    e = {u'k%s' % i: u'v' for i in range(64)}
     _gen_request(properties=_gen_properties(env=e)).put()
     with self.assertRaises(datastore_errors.BadValueError):
-      e = {u'k%s' % i: u'v' for i in xrange(65)}
+      e = {u'k%s' % i: u'v' for i in range(65)}
       _gen_request(properties=_gen_properties(env=e)).put()
     # Value length.
     e = {u'k': u'v'*1024}
@@ -1426,10 +1430,10 @@ class TaskRequestApiTest(TestCase):
       e = {u'k'*65: [u'v']}
       _gen_request(properties=_gen_properties(env_prefixes=e)).put()
     # # keys.
-    e = {u'k%s' % i: [u'v'] for i in xrange(64)}
+    e = {u'k%s' % i: [u'v'] for i in range(64)}
     _gen_request(properties=_gen_properties(env_prefixes=e)).put()
     with self.assertRaises(datastore_errors.BadValueError):
-      e = {u'k%s' % i: [u'v'] for i in xrange(65)}
+      e = {u'k%s' % i: [u'v'] for i in range(65)}
       _gen_request(properties=_gen_properties(env_prefixes=e)).put()
     # Value length.
     e = {u'k': [u'v'*1024]}
@@ -1647,7 +1651,7 @@ class TaskRequestApiTest(TestCase):
 
     now = utils.utcnow()
     task_ids = []
-    for i in xrange(14):
+    for i in range(14):
       self.mock_now(now, i)
       request = _gen_request_slices()
       request.key = task_request.new_request_key()
@@ -1682,7 +1686,7 @@ class TaskRequestApiTest(TestCase):
     class Foo(ndb.Model):
       pass
     task_ids = []
-    for _ in xrange(5):
+    for _ in range(5):
       request = _gen_request_slices()
       request.key = task_request.new_request_key()
       request.put()

@@ -288,11 +288,12 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
   def test_new_task_to_run_limits(self):
     # Generate a TaskRequest with eight TaskSlice.
     slices = [
-      task_request.TaskSlice(
-          expiration_secs=60,
-          properties=_gen_properties(
-              dimensions={u'pool': [u'default'], u'v': [unicode(i)]}))
-      for i in xrange(8)
+        task_request.TaskSlice(
+            expiration_secs=60,
+            properties=_gen_properties(dimensions={
+                u'pool': [u'default'],
+                u'v': [unicode(i)]
+            })) for i in range(8)
     ]
     request = self.mkreq(8, _gen_request_slices(task_slices=slices))
     with self.assertRaises(AssertionError):
@@ -307,14 +308,15 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
 
   def test_task_to_run_key_slice_index(self):
     slices = [
-      task_request.TaskSlice(
-          expiration_secs=60,
-          properties=_gen_properties(
-              dimensions={u'pool': [u'default'], u'v': [unicode(i)]}))
-      for i in xrange(8)
+        task_request.TaskSlice(
+            expiration_secs=60,
+            properties=_gen_properties(dimensions={
+                u'pool': [u'default'],
+                u'v': [unicode(i)]
+            })) for i in range(8)
     ]
     request = self.mkreq(len(slices), _gen_request_slices(task_slices=slices))
-    for i in xrange(len(slices)):
+    for i in range(len(slices)):
       to_run = task_to_run.new_task_to_run(request, 1, i)
       self.assertEqual(i, to_run.task_slice_index)
       self.assertEqual(i, task_to_run.task_to_run_key_slice_index(to_run.key))
@@ -322,11 +324,12 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
   def test_task_to_run_key_try_number(self):
     self.mock(random, 'getrandbits', lambda _: 0x88)
     slices = [
-      task_request.TaskSlice(
-          expiration_secs=60,
-          properties=_gen_properties(
-              dimensions={u'pool': [u'default'], u'v': [unicode(i)]}))
-      for i in xrange(8)
+        task_request.TaskSlice(
+            expiration_secs=60,
+            properties=_gen_properties(dimensions={
+                u'pool': [u'default'],
+                u'v': [unicode(i)]
+            })) for i in range(8)
     ]
     request = self.mkreq(len(slices), _gen_request_slices(task_slices=slices))
     for i in (1, 2):

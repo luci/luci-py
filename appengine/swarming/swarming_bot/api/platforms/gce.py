@@ -57,7 +57,7 @@ def _raw_metadata_request(path):
     return None
   url = 'http://metadata.google.internal' + path
   headers = {'Metadata-Flavor': 'Google'}
-  for i in xrange(0, 10):
+  for i in range(0, 10):
     time.sleep(i*2)
     try:
       resp = urllib2.urlopen(urllib2.Request(url, headers=headers), timeout=10)

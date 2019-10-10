@@ -60,7 +60,8 @@ class UtilsTest(test_case.TestCase):
 
     self.assertEqual([0, 1], utils.to_json_encodable(range(2)))
     self.assertEqual([0, 1], utils.to_json_encodable(i for i in (0, 1)))
-    self.assertEqual([0, 1], utils.to_json_encodable(xrange(2)))
+    if sys.version_info.major == 2:
+      self.assertEqual([0, 1], utils.to_json_encodable(xrange(2)))
 
   def test_validate_root_service_url_dev_server(self):
     self.mock(utils, 'is_local_dev_server', lambda: True)
@@ -320,7 +321,7 @@ class MemcacheTest(test_case.TestCase):
         [('utils.memcache/v1a/f[1, 2, 3, 4]', ('value',), 54)])
 
   def test_call_packed_kwargs(self):
-    self.f(1, 2, **{'c':30, 'd': 40})
+    self.f(1, 2, **{'c': 30, 'd': 40})
     self.assertEqual(self.ctx.get_calls, ['utils.memcache/v1a/f[1, 2, 30, 40]'])
     self.assertEqual(self.f_calls, [(1, 2, 30, 40, 5)])
     self.assertEqual(
@@ -328,7 +329,7 @@ class MemcacheTest(test_case.TestCase):
         [('utils.memcache/v1a/f[1, 2, 30, 40]', ('value',), 54)])
 
   def test_call_packed_both(self):
-    self.f(*[1, 2], **{'c':30, 'd': 40})
+    self.f(*[1, 2], **{'c': 30, 'd': 40})
     self.assertEqual(self.ctx.get_calls, ['utils.memcache/v1a/f[1, 2, 30, 40]'])
     self.assertEqual(self.f_calls, [(1, 2, 30, 40, 5)])
     self.assertEqual(

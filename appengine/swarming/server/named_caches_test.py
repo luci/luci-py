@@ -79,7 +79,7 @@ class NamedCachesTest(test_case.TestCase):
 
   def test_p95(self):
     # Create 45 bots with cache 'foo' size between 1 and 45.
-    for i in xrange(45):
+    for i in range(45):
       _bot_event('second%d' % i, 'second', {'foo': i+1}, None)
     self.assertEqual(2, named_caches.cron_update_named_caches())
 

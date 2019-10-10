@@ -627,7 +627,7 @@ def _expand_bot_id_expr(expr):
     end = int(end)
   except ValueError:
     raise ValueError('Not a valid range end "%s"' % end)
-  for i in xrange(start, end+1):
+  for i in range(start, end + 1):
     yield prefix + str(i) + suffix
 
 

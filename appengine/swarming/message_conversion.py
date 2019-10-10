@@ -220,7 +220,7 @@ def task_request_to_rpc(entity):
   """"Returns a swarming_rpcs.TaskRequest from a task_request.TaskRequest."""
   assert entity.__class__ is task_request.TaskRequest
   slices = []
-  for i in xrange(entity.num_task_slices):
+  for i in range(entity.num_task_slices):
     t = entity.task_slice(i)
     slices.append(
         _ndb_to_rpc(
@@ -324,15 +324,17 @@ def task_result_to_rpc(entity, send_stats):
     )
   performance_stats = None
   if send_stats and entity.performance_stats.is_valid:
-      def op(entity):
-        if entity:
-          return _ndb_to_rpc(swarming_rpcs.OperationStats, entity)
 
-      performance_stats = _ndb_to_rpc(
-          swarming_rpcs.PerformanceStats,
-          entity.performance_stats,
-          isolated_download=op(entity.performance_stats.isolated_download),
-          isolated_upload=op(entity.performance_stats.isolated_upload))
+    def op(entity):
+      if entity:
+        return _ndb_to_rpc(swarming_rpcs.OperationStats, entity)
+      return None
+
+    performance_stats = _ndb_to_rpc(
+        swarming_rpcs.PerformanceStats,
+        entity.performance_stats,
+        isolated_download=op(entity.performance_stats.isolated_download),
+        isolated_upload=op(entity.performance_stats.isolated_upload))
   kwargs = {
     'bot_dimensions': _string_list_pairs_from_dict(entity.bot_dimensions or {}),
     'cipd_pins': cipd_pins,

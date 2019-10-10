@@ -513,7 +513,7 @@ class GroupsHandlerTest(RestAPITestCase):
     make_group(name='z-external/group')
 
     # Create a bunch of groups with all kinds of members.
-    for i in xrange(0, 5):
+    for i in range(0, 5):
       make_group(
           name='Test group %d' % i,
           created_by=model.Identity.from_bytes('user:creator@example.com'),
@@ -527,10 +527,8 @@ class GroupsHandlerTest(RestAPITestCase):
     self.mock_is_admin(True)
     status, body, _ = self.get('/auth/api/v1/groups')
     self.assertEqual(200, status)
-    self.assertEqual(
-      {
-        u'groups': [
-          {
+    self.assertEqual({
+        u'groups': [{
             u'caller_can_modify': True,
             u'created_by': u'user:creator@example.com',
             u'created_ts': 1300000000000000,
@@ -539,30 +537,29 @@ class GroupsHandlerTest(RestAPITestCase):
             u'modified_ts': 1300000000000000,
             u'name': u'Test group %d' % i,
             u'owners': u'administrators',
-          } for i in xrange(0, 5)
-        ] + [
-          {
-            u'caller_can_modify': True,
-            u'created_by': None,
-            u'created_ts': 1300000000000000,
-            u'description': u'',
-            u'modified_by': None,
-            u'modified_ts': 1300000000000000,
-            u'name': u'owners-check',
-            u'owners': u'owners-check',
-          },
-          {
-            u'caller_can_modify': False,
-            u'created_by': None,
-            u'created_ts': 1300000000000000,
-            u'description': u'',
-            u'modified_by': None,
-            u'modified_ts': 1300000000000000,
-            u'name': u'z-external/group',
-            u'owners': u'administrators',
-          },
+        } for i in range(0, 5)] + [
+            {
+                u'caller_can_modify': True,
+                u'created_by': None,
+                u'created_ts': 1300000000000000,
+                u'description': u'',
+                u'modified_by': None,
+                u'modified_ts': 1300000000000000,
+                u'name': u'owners-check',
+                u'owners': u'owners-check',
+            },
+            {
+                u'caller_can_modify': False,
+                u'created_by': None,
+                u'created_ts': 1300000000000000,
+                u'description': u'',
+                u'modified_by': None,
+                u'modified_ts': 1300000000000000,
+                u'name': u'z-external/group',
+                u'owners': u'administrators',
+            },
         ],
-      }, body)
+    }, body)
 
     # Check caller_can_modify for non-admin.
     self.mock_current_identity(owner)

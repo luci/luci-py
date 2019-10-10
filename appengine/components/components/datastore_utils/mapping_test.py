@@ -26,7 +26,7 @@ def int_ceil_div(value, divisor):
 
 class MappingTest(test_case.TestCase):
   def test_pop_future(self):
-    items = [ndb.Future() for _ in xrange(5)]
+    items = [ndb.Future() for _ in range(5)]
     items[1].set_result(None)
     items[3].set_result('foo')
     inputs = items[:]
@@ -46,10 +46,10 @@ class MappingTest(test_case.TestCase):
     # The order won't be deterministic. The only important this is that exactly
     # all the items are returned as chunks.
     expected = [
-      [EntityX(id=i, a=1) for i in xrange(1, 40, 4)],
-      [EntityX(id=i, a=2) for i in xrange(2, 42, 4)],
-      [EntityX(id=i, a=i%4) for i in xrange(1, 21)],
-      [EntityX(id=i, a=i%4) for i in xrange(21, 40)],
+        [EntityX(id=i, a=1) for i in range(1, 40, 4)],
+        [EntityX(id=i, a=2) for i in range(2, 42, 4)],
+        [EntityX(id=i, a=i % 4) for i in range(1, 21)],
+        [EntityX(id=i, a=i % 4) for i in range(21, 40)],
     ]
     self.assertEqual(len(expected), len(actual))
     for line in actual:
@@ -75,10 +75,10 @@ class MappingTest(test_case.TestCase):
     # The order won't be deterministic. The only important this is that exactly
     # all the items are returned as chunks and there is 3 chunks.
     expected = sorted(
-        [EntityX(id=i, a=1) for i in xrange(1, 40, 4)] +
-        [EntityX(id=i, a=2) for i in xrange(2, 42, 4)] +
-        [EntityX(id=i, a=i%4) for i in xrange(1, 21)] +
-        [EntityX(id=i, a=i%4) for i in xrange(21, 40)],
+        [EntityX(id=i, a=1) for i in range(1, 40, 4)] + [
+            EntityX(id=i, a=2) for i in range(2, 42, 4)
+        ] + [EntityX(id=i, a=i % 4) for i in range(1, 21)] +
+        [EntityX(id=i, a=i % 4) for i in range(21, 40)],
         key=lambda x: (x.key.id, x.to_dict()))
     map_page_size = 20
     self.assertEqual(int_ceil_div(len(expected), map_page_size), len(actual))
@@ -97,7 +97,7 @@ class MappingTest(test_case.TestCase):
     def map_fn(items):
       actual.extend(items)
       # Note that it is returning more Future than what is called. It's fine.
-      for _ in xrange(len(items) * 5):
+      for _ in range(len(items) * 5):
         n = ndb.Future('yo dawg')
         # TODO(maruel): It'd be nice to not set them completed right away to
         # have better code coverage but I'm not sure how to do this.
@@ -117,7 +117,7 @@ class MappingTest(test_case.TestCase):
 
     # The order won't be deterministic so sort it.
     expected = sorted(
-        [EntityX(id=i, a=2) for i in xrange(2, 42, 4)] * 2,
+        [EntityX(id=i, a=2) for i in range(2, 42, 4)] * 2,
         key=lambda x: (x.key.id, x.to_dict()))
     actual.sort(key=lambda x: (x.key.id, x.to_dict()))
     self.assertEqual(expected, actual)

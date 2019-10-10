@@ -489,7 +489,7 @@ def new_task_to_run(request, try_number, task_slice_index):
   # enqueued sooner or later. crbug.com/781021
   offset = 0
   if task_slice_index:
-    for i in xrange(task_slice_index):
+    for i in range(task_slice_index):
       offset += request.task_slice(i).expiration_secs
   exp = request.created_ts + datetime.timedelta(
       seconds=request.task_slice(task_slice_index).expiration_secs+offset)

@@ -177,7 +177,7 @@ class SwarmingClient(object):
     tmp = os.path.join(self._tmpdir, task_id + '.json')
     tmpdir = unicode(os.path.join(self._tmpdir, task_id))
     if os.path.isdir(tmpdir):
-      for i in xrange(100000):
+      for i in range(100000):
         t = '%s_%d' % (tmpdir, i)
         if not os.path.isdir(t):
           tmpdir = t
@@ -242,7 +242,7 @@ class SwarmingClient(object):
     print >> sys.stderr, '-' * 60
     print >> sys.stderr, 'Client calls'
     print >> sys.stderr, '-' * 60
-    for i in xrange(self._index):
+    for i in range(self._index):
       with fs.open(os.path.join(self._tmpdir, 'client_%d.log' % i), 'rb') as f:
         log = f.read().strip('\n')
       for l in log.splitlines():
@@ -1211,13 +1211,19 @@ class Test(unittest.TestCase):
     signal_file = os.path.join(self.tmpdir, name)
     fs.open(signal_file, 'wb').close()
     args = [
-      '-T', 'wait', '--priority', '20', '--',
-      'python', '-u', '-c',
-      # Cheezy wait.
-      ('import os,time;'
-        'print(\'hi\');'
-        '[time.sleep(0.1) for _ in xrange(100000) if os.path.exists(\'%s\')];'
-        'print(\'hi again\')') % signal_file,
+        '-T',
+        'wait',
+        '--priority',
+        '20',
+        '--',
+        'python',
+        '-u',
+        '-c',
+        # Cheezy wait.
+        ('import os,time;'
+         'print(\'hi\');'
+         '[time.sleep(0.1) for _ in range(100000) if os.path.exists(\'%s\')];'
+         'print(\'hi again\')') % signal_file,
     ]
     wait_task_id = self.client.task_trigger_raw(args)
     # Assert that the 'wait' task has started but not completed, otherwise

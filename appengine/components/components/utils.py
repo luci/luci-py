@@ -56,7 +56,7 @@ _task_queue_module = 'backend'
 
 
 def should_disable_ui_routes():
-    return os.environ.get('LUCI_DISABLE_UI_ROUTES', '0') == '1'
+  return os.environ.get('LUCI_DISABLE_UI_ROUTES', '0') == '1'
 
 
 def is_local_dev_server():
@@ -712,7 +712,10 @@ def to_json_encodable(data):
     # This takes care of ndb.Key.
     return to_json_encodable(data.urlsafe())
 
-  if inspect.isgenerator(data) or isinstance(data, xrange):
+  if inspect.isgenerator(data):
+    return [to_json_encodable(i) for i in data]
+
+  if sys.version_info.major == 2 and isinstance(data, xrange):
     # Handle it like a list. Sadly, xrange is not a proper generator so it has
     # to be checked manually.
     return [to_json_encodable(i) for i in data]

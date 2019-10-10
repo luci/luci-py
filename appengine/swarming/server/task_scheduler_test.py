@@ -458,7 +458,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     # A lot of tasks are expired, eventually stop expiring them.
     self._register_bot(0, self.bot_dimensions)
     result_summaries = []
-    for i in xrange(6):
+    for i in range(6):
       self.mock_now(self.now, i)
       result_summaries.append(self._quick_schedule(int(not bool(i))))
     # Forwards clock to get past expiration.
@@ -487,7 +487,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     # A lot of tasks are expired, eventually stop expiring them.
     self._register_bot(0, self.bot_dimensions)
     result_summaries = []
-    for i in xrange(6):
+    for i in range(6):
       self.mock_now(self.now, i)
       result_summaries.append(self._quick_schedule(int(not bool(i))))
     # Forwards clock to get past expiration.

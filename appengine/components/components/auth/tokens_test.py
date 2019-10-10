@@ -187,7 +187,7 @@ class TokenEncodeDecodeTest(test_case.TestCase):
     # Works if not modified.
     decode(tok)
     # Try simple modifications.
-    for i in xrange(len(tok)):
+    for i, t in enumerate(tok):
       # Truncation.
       with self.assertRaises(tokens.InvalidTokenError):
         decode(tok[:i])
@@ -196,7 +196,7 @@ class TokenEncodeDecodeTest(test_case.TestCase):
         decode(tok[:i] + 'A' + tok[i:])
       # Substitution.
       with self.assertRaises(tokens.InvalidTokenError):
-        decode(tok[:i] + chr((ord(tok[i]) + 1) % 255) + tok[i+1:])
+        decode(tok[:i] + chr((ord(t) + 1) % 255) + tok[i + 1:])
     # Expansion.
     with self.assertRaises(tokens.InvalidTokenError):
       decode('A' + tok)
