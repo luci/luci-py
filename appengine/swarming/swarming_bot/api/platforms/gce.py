@@ -11,11 +11,11 @@ import re
 import socket
 import threading
 import time
-import urllib
-import urllib2
 
 from api import oauth
 from utils import tools
+
+from six.moves import urllib
 
 
 ### Private stuff.
@@ -60,7 +60,8 @@ def _raw_metadata_request(path):
   for i in range(0, 10):
     time.sleep(i*2)
     try:
-      resp = urllib2.urlopen(urllib2.Request(url, headers=headers), timeout=10)
+      resp = urllib.request.urlopen(
+          urllib.request.Request(url, headers=headers), timeout=10)
       return resp.read()
     except IOError as e:
       logging.warning(
@@ -201,7 +202,7 @@ def signed_metadata_token(audience):
 
     jwt = _raw_metadata_request(
         '/computeMetadata/v1/instance/service-accounts/default/'
-        'identity?audience=%s&format=full' % urllib.quote_plus(audience))
+        'identity?audience=%s&format=full' % urllib.parse.quote_plus(audience))
     if not jwt:
       return None, None
 

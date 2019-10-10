@@ -9,7 +9,8 @@
 import json
 import logging
 import time
-import urllib2
+
+from six.moves import urllib
 
 
 def oauth2_access_token_from_url(url, headers):
@@ -24,7 +25,8 @@ def oauth2_access_token_from_url(url, headers):
   """
   try:
     resp = json.load(
-        urllib2.urlopen(urllib2.Request(url, headers=headers), timeout=20))
+        urllib.request.urlopen(
+            urllib.request.Request(url, headers=headers), timeout=20))
   except IOError as e:
     logging.error('Failed to grab OAuth2 access token: %s', e)
     raise

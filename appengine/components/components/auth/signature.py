@@ -13,7 +13,8 @@ import json
 import logging
 import random
 import threading
-import urllib
+
+from six.moves import urllib
 
 from google.appengine.api import app_identity
 from google.appengine.api import memcache
@@ -260,12 +261,11 @@ def get_service_account_certificates(service_account_name):
 
   Raises CertificateError on errors.
   """
+  url = _GOOGLE_ROBOT_CERTS_URL + urllib.parse.quote_plus(service_account_name)
+  refresh = lambda: _fetch_certs_from_json(
+      url=url, service_account_name=service_account_name)
   return _use_cached_or_fetch(
-      'v1:service_account_certs:%s' % service_account_name,
-      lambda: _fetch_certs_from_json(
-          url=_GOOGLE_ROBOT_CERTS_URL+urllib.quote_plus(service_account_name),
-          service_account_name=service_account_name,
-      ))
+      'v1:service_account_certs:%s' % service_account_name, refresh)
 
 
 def _fetch_service_certs(service_url):

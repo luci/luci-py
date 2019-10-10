@@ -17,7 +17,8 @@ import re
 import subprocess
 import sys
 import time
-import urllib
+
+from six.moves import urllib
 
 
 # 'setup_gae_sdk' loads the 'yaml' module and modifies this variable.
@@ -402,15 +403,16 @@ class Application(object):
     """Switches default version of given |services| to |version|."""
     advanced_filter = _SWITCH_ADVANCED_FILTER.format(
         version=version, app_id=self.app_id)
-    url = ('https://console.cloud.google.com/logs/viewer?' + urllib.urlencode({
-        'project': self.app_id,
-        'minLogLevel': 0,
-        'customFacets': '',
-        'limitCustomFacetWidth': 'true',
-        'interval': 'NO_LIMIT',
-        'resource': 'gae_app/module_id/backend/version_id/' + version,
-        'advancedFilter': advanced_filter,
-    }))
+    url = ('https://console.cloud.google.com/logs/viewer?' +
+           urllib.parse.urlencode({
+               'project': self.app_id,
+               'minLogLevel': 0,
+               'customFacets': '',
+               'limitCustomFacetWidth': 'true',
+               'interval': 'NO_LIMIT',
+               'resource': 'gae_app/module_id/backend/version_id/' + version,
+               'advancedFilter': advanced_filter,
+           }))
     print('Monitor error logs for new version here:', url, '\n')
 
     services = sorted(services or self.services)

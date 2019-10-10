@@ -30,8 +30,7 @@ import subprocess
 import sys
 import tempfile
 import time
-import urllib
-import urllib2
+
 
 from utils import tools
 tools.force_local_third_party()
@@ -39,6 +38,7 @@ tools.force_local_third_party()
 # third_party/
 import httplib2
 from oauth2client import client
+from six.moves import urllib
 
 from api import platforms
 from utils import file_path
@@ -727,7 +727,7 @@ def authenticated_http_request(service_account, *args, **kwargs):
     try:
       gce_bearer_token, _ = platforms.gce.oauth2_access_token_with_expiration(
           account=service_account)
-    except (IOError, urllib2.HTTPError) as e:
+    except (IOError, urllib.error.HTTPError) as e:
       raise AuthenticatedHttpRequestFailure(e)
     kwargs['headers']['Authorization'] = 'Bearer %s' % gce_bearer_token
   else:
@@ -792,8 +792,9 @@ def get_timeseries_data(name, project, service_account, **kwargs):
   if kwargs.get('page_token'):
     params['pageToken'] = kwargs['page_token']
 
-  metric = urllib.quote('custom.cloudmonitoring.googleapis.com/%s' % name, '')
-  params = urllib.urlencode(params, True)
+  metric = urllib.parse.quote('custom.cloudmonitoring.googleapis.com/%s' % name,
+                              '')
+  params = urllib.parse.urlencode(params, True)
   url = '%s/projects/%s/timeseries/%s?%s' % (
       MONITORING_ENDPOINT, project, metric, params)
   logging.info('Attempting to get timeseries data: %s', url)

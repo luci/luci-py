@@ -7,7 +7,8 @@
 import base64
 import datetime
 import logging
-import urllib
+
+from six.moves import urllib
 
 # Config component is using google.protobuf package, it requires some python
 # package magic hacking.
@@ -373,7 +374,7 @@ def _get_last_good_async(config_set, path, dest_type):
 
 
 def format_url(url_format, *args):
-  return url_format % tuple(urllib.quote(a, '') for a in args)
+  return url_format % tuple(urllib.parse.quote(a, '') for a in args)
 
 
 @ndb.non_transactional

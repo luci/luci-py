@@ -8,7 +8,9 @@ import base64
 import functools
 import logging
 import textwrap
-import urllib
+
+from six.moves import urllib
+
 import webapp2
 
 from google.appengine.api import app_identity
@@ -301,11 +303,12 @@ class EntityHandlerBase(handler.ApiHandler):
         response={'ok': True},
         http_code=201,
         headers={
-          'Last-Modified': utils.datetime_to_rfc2822(entity.modified_ts),
-          'Location':
-              '%s%s' % (self.entity_url_prefix, urllib.quote(entity.key.id())),
-        }
-    )
+            'Last-Modified':
+                utils.datetime_to_rfc2822(entity.modified_ts),
+            'Location':
+                '%s%s' % (self.entity_url_prefix,
+                          urllib.parse.quote(entity.key.id())),
+        })
 
   @forbid_api_on_replica
   @api.require(acl.has_access)

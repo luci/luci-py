@@ -13,7 +13,8 @@ import collections
 import hashlib
 import logging
 import os.path
-import urllib
+
+from six.moves import urllib
 
 from google.appengine.api import memcache
 from google.appengine.ext import ndb
@@ -55,7 +56,7 @@ def get_bootstrap(host_url, bootstrap_token=None):
   """
   # Calculate the header to inject at the top of the file.
   if bootstrap_token:
-    quoted = urllib.quote_plus(bootstrap_token)
+    quoted = urllib.parse.quote_plus(bootstrap_token)
     assert bootstrap_token == quoted, bootstrap_token
   header = (
       '#!/usr/bin/env python\n'

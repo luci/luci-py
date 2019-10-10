@@ -8,7 +8,6 @@ import datetime
 import json
 import logging
 import time
-import urllib
 
 import webtest
 

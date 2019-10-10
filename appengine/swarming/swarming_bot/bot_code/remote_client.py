@@ -11,7 +11,8 @@ import os
 import threading
 import time
 import traceback
-import urllib
+
+from six.moves import urllib
 
 from utils import net
 
@@ -337,7 +338,7 @@ class RemoteClientNative(object):
     Throws BotCodeError on error.
     """
     url_path = '/swarming/api/v1/bot/bot_code/%s?bot_id=%s' % (
-        bot_version, urllib.quote_plus(bot_id))
+        bot_version, urllib.parse.quote_plus(bot_id))
     if not self._url_retrieve(new_zip_path, url_path):
       raise BotCodeError(new_zip_path, self._server + url_path, bot_version)
 

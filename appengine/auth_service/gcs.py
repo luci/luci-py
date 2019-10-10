@@ -8,7 +8,8 @@ import binascii
 import logging
 import os
 import StringIO
-import urllib
+
+from six.moves import urllib
 
 from google.appengine.ext import ndb
 
@@ -230,8 +231,8 @@ def _set_gcs_metadata(path, metadata):
   bucket, name = path.split('/', 1)
   try:
     net.request(
-        url='https://www.googleapis.com/storage/v1/b/%s/o/%s' % (
-            bucket, urllib.quote(name, safe='')),
+        url='https://www.googleapis.com/storage/v1/b/%s/o/%s' %
+        (bucket, urllib.parse.quote(name, '')),
         method='PUT',
         payload=utils.encode_to_json(metadata),
         headers={'Content-Type': 'application/json; charset=UTF-8'},

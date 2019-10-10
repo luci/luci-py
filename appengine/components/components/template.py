@@ -6,7 +6,6 @@
 
 import datetime
 import os
-import urllib
 
 from components import utils
 utils.import_jinja2()

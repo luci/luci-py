@@ -8,6 +8,8 @@
 Useful for smoke and integration tests.
 """
 
+# pylint: disable=no-init
+
 import collections
 import cookielib
 import ctypes
@@ -19,7 +21,8 @@ import socket
 import subprocess
 import sys
 import time
-import urllib2
+
+from six.moves import urllib
 
 from . import gae_sdk_utils
 
@@ -178,11 +181,11 @@ class LocalApplication(object):
     alive = False
     while self._proc.poll() is None and time.time() < deadline:
       try:
-        urllib2.urlopen(self.url + '/_ah/warmup')
+        urllib.request.urlopen(self.url + '/_ah/warmup')
         alive = True
         break
-      except urllib2.URLError as exc:
-        if isinstance(exc, urllib2.HTTPError):
+      except urllib.error.URLError as exc:
+        if isinstance(exc, urllib.error.HTTPError):
           alive = True
           break
       time.sleep(0.05)
@@ -239,7 +242,7 @@ class LocalApplication(object):
     print >> sys.stderr, '-' * 60
 
 
-class CustomHTTPErrorHandler(urllib2.HTTPDefaultErrorHandler):
+class CustomHTTPErrorHandler(urllib.request.HTTPDefaultErrorHandler):
   """Swallows exceptions that would be thrown on >30x HTTP status."""
   def http_error_default(self, _request, response, _code, _msg, _hdrs):
     return response
@@ -254,9 +257,9 @@ class HttpClient(object):
 
   def __init__(self, url):
     self._url = url
-    self._opener = urllib2.build_opener(
+    self._opener = urllib.request.build_opener(
         CustomHTTPErrorHandler(),
-        urllib2.HTTPCookieProcessor(cookielib.CookieJar()))
+        urllib.request.HTTPCookieProcessor(cookielib.CookieJar()))
     self._xsrf_token = None
 
   def login_as_admin(self, user='test@example.com'):
@@ -269,7 +272,7 @@ class HttpClient(object):
     if not resource.startswith(self._url):
       assert resource.startswith('/')
       resource = self._url + resource
-    req = urllib2.Request(resource, body, headers=(headers or {}))
+    req = urllib.request.Request(resource, body, headers=(headers or {}))
     if method:
       req.get_method = lambda: method
     resp = self._opener.open(req)
@@ -290,7 +293,7 @@ class HttpClient(object):
 
   @property
   def url_opener(self):
-    """Instance of urllib2 opener used by this class."""
+    """Instance of urllib.request opener used by this class."""
     return self._opener
 
   @property

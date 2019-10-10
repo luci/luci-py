@@ -14,7 +14,8 @@ import collections
 import datetime
 import logging
 import time
-import urllib
+
+from six.moves import urllib
 
 # TODO(maruel): This needs to be fixed by adding proper vpython incantation when
 # running pylint.
@@ -333,7 +334,7 @@ class URLSigner(object):
         '/%s/%s' % (self.bucket, filename),
     ])
     # Construct final URL.
-    query_params = urllib.urlencode([
+    query_params = urllib.parse.urlencode([
         ('GoogleAccessId', self.client_id),
         ('Expires', expires),
         ('Signature', self.generate_signature(data_to_sign)),

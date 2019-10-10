@@ -14,14 +14,15 @@ import signal
 import socket
 import sys
 import tempfile
-import urllib
-
 
 THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 CLIENT_DIR = os.path.join(THIS_DIR, '..', '..', '..', 'client')
 sys.path.insert(0, CLIENT_DIR)
 sys.path.insert(0, os.path.join(CLIENT_DIR, 'third_party'))
+# third_party/
 from depot_tools import fix_encoding
+from six.moves import urllib
+
 from utils import file_path
 from utils import subprocess42
 sys.path.pop(0)
@@ -83,7 +84,7 @@ class LocalBot(object):
     """Starts the local Swarming bot."""
     assert not self._proc
     bot_zip = os.path.join(self._botdir, 'swarming_bot.zip')
-    urllib.urlretrieve(self._swarming_server_url + '/bot_code', bot_zip)
+    urllib.request.urlretrieve(self._swarming_server_url + '/bot_code', bot_zip)
     cmd = [sys.executable, bot_zip, 'start_slave']
     if self._redirect:
       logs = os.path.join(self._botdir, 'logs')

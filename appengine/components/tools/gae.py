@@ -9,7 +9,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-__version__ = '2.0'
+__version__ = '2.1'
 
 import atexit
 import code
@@ -18,7 +18,8 @@ import os
 import signal
 import sys
 import tempfile
-import urllib2
+
+from six.moves import urllib
 
 try:
   import readline
@@ -245,7 +246,7 @@ def CMDshell(parser, args):
           'https://www.googleapis.com/auth/userinfo.email\n')
       remote_api_stub.ConfigureRemoteApiForOAuth(
           options.host, '/_ah/remote_api')
-    except urllib2.URLError:
+    except urllib.error.URLError:
       print('Failed to access %s' % options.host, file=sys.stderr)
       return 1
     remote_api_stub.MaybeInvokeAuthentication()

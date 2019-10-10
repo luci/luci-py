@@ -18,7 +18,8 @@ import json
 import logging
 import os
 import random
-import urllib
+
+from six.moves import urllib
 
 from google.appengine.api import app_identity
 from google.appengine.api import urlfetch
@@ -92,7 +93,7 @@ def authenticated_request_async(url, method='GET', payload=None, params=None):
     protocols = ('https://',)
   assert url.startswith(protocols) and '?' not in url, url
   if params:
-    url += '?' + urllib.urlencode(params)
+    url += '?' + urllib.parse.urlencode(params)
 
   try:
     res = yield _urlfetch_async(
@@ -371,9 +372,9 @@ def _mint_jwt_based_token_async(scopes, signer):
   })
 
   # URL encoded body of a token request.
-  request_body = urllib.urlencode({
-    'grant_type': 'urn:ietf:params:oauth:grant-type:jwt-bearer',
-    'assertion': jwt,
+  request_body = urllib.parse.urlencode({
+      'grant_type': 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+      'assertion': jwt,
   })
 
   # Exchange signed claimset for an access token.
@@ -412,12 +413,12 @@ def _mint_oauth_token_async(
   http_auth, _ = yield token_factory()
   response = yield _call_async(
       url='https://iamcredentials.googleapis.com/v1/projects/-/'
-          'serviceAccounts/%s:generateAccessToken' % urllib.quote_plus(email),
+      'serviceAccounts/%s:generateAccessToken' % urllib.parse.quote_plus(email),
       method='POST',
       headers={
-        'Accept': 'application/json',
-        'Authorization': 'Bearer %s' % http_auth,
-        'Content-Type': 'application/json; charset=utf-8',
+          'Accept': 'application/json',
+          'Authorization': 'Bearer %s' % http_auth,
+          'Content-Type': 'application/json; charset=utf-8',
       },
       payload=utils.encode_to_json(request_body),
   )
@@ -605,4 +606,3 @@ class _LocalSigner(object):
 def _urlfetch_async(**kwargs):
   """To be mocked in tests."""
   return ndb.get_context().urlfetch(**kwargs)
-

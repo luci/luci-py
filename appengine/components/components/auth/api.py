@@ -21,7 +21,8 @@ import logging
 import os
 import threading
 import time
-import urllib
+
+from six.moves import urllib
 
 from google.appengine.api import oauth
 from google.appengine.api import urlfetch
@@ -887,9 +888,10 @@ def dev_oauth_authentication(header, token_info_endpoint, suffix=''):
   # Adapted from endpoints/users_id_tokens.py, _set_bearer_user_vars_local.
   logging.info('Using dev token info endpoint %s', token_info_endpoint)
   result = urlfetch.fetch(
-      url='%s?%s' % (
-          token_info_endpoint,
-          urllib.urlencode({'access_token': header[1]})),
+      url='%s?%s' % (token_info_endpoint,
+                     urllib.parse.urlencode({
+                         'access_token': header[1]
+                     })),
       follow_redirects=False,
       validate_certificate=True)
   if result.status_code != 200:
@@ -1698,8 +1700,8 @@ def autologin(func):
       # (bootstrap works only on standalone or on primary).
       if not is_superuser() or is_admin() or model.is_replica():
         raise
-      self.redirect(
-          '/auth/bootstrap?r=%s' % urllib.quote_plus(self.request.path_qs))
+      self.redirect('/auth/bootstrap?r=%s' % urllib.parse.quote_plus(
+          self.request.path_qs))
 
   # Propagate reference to original function, mark function as decorated.
   wrapper.__wrapped__ = original
