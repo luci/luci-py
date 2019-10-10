@@ -38,6 +38,8 @@ def CommonChecks(input_api, output_api):
   ]
 
   blacklist = [
+    # local_smoke_test runs on other tryjobs
+    r'^local_smoke_test\.py$',
     # Never run the remote_smoke_test automatically. Should instead be run after
     # uploading a server instance.
     r'^remote_smoke_test\.py$'
