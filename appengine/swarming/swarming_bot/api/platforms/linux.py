@@ -4,6 +4,8 @@
 
 """GNU/Linux specific utility functions."""
 
+from __future__ import absolute_import
+
 import ctypes
 import ctypes.util
 import logging
@@ -17,8 +19,8 @@ import subprocess
 
 from utils import tools
 
-import common
-import gpu
+from api.platforms import common
+from api.platforms import gpu
 
 
 ## Private stuff.
