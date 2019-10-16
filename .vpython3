@@ -3,7 +3,7 @@
 # Read more about `vpython` and how to modify this file here:
 #   https://chromium.googlesource.com/infra/infra/+/master/doc/users/vpython.md
 
-python_version: "2.7"
+python_version:"3.8"
 
 # required by nose2
 wheel: <

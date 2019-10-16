@@ -107,6 +107,7 @@ skip_files:
 - support/
 - ^tests/
 - ^tools/
+- test.py$
 - test_.+
 - .+_test\.py$
 # Junk files.

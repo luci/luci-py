@@ -357,6 +357,9 @@ class Test(unittest.TestCase):
   namespace = None
   bot = None
   leak = False
+  # This test can't pass when running via test runner
+  # so execute this file independently
+  no_run = 1
 
   def setUp(self):
     super(Test, self).setUp()
