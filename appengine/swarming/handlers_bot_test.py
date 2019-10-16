@@ -1225,6 +1225,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(
         response.location,
         'http://localhost/swarming/api/v1/bot/bot_code/' + '0' * 64)
+    self.assertEqual(type(response.location), str)
 
   def test_oauth_token_bad_scopes(self):
     self.set_as_bot()

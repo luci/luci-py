@@ -215,7 +215,7 @@ class BotCodeHandler(_BotAuthenticatingHandler):
 
       # Let default access to redirect to url with version so that we can use
       # cache for response safely.
-      self.redirect(redirect_url)
+      self.redirect(str(redirect_url))
       return
 
     self.response.headers['Cache-Control'] = 'public, max-age=3600'
