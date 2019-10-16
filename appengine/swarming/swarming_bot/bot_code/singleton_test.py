@@ -27,6 +27,10 @@ CMD_ACQUIRE = [sys.executable, '-u', '-c', PYCODE]
 
 
 class Test(unittest.TestCase):
+  # This test needs to be run independently
+  # run by test_seq.py
+  no_run = 1
+
   def test_singleton_with(self):
     with singleton.singleton(THIS_DIR) as s:
       self.assertEqual(True, s)

@@ -3,8 +3,6 @@
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
 
-# TODO(jwata) move test steps to luci_py recipe
-
 import os
 import subprocess
 import sys
@@ -12,23 +10,13 @@ import sys
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
-def run_unittests(python3):
+def run_test(test_file, python3=False):
   # vpython
   vpython = 'vpython'
   if python3:
     vpython += '3'
 
-  # test.py
-  testpy = os.path.join(ROOT_DIR, 'test.py')
-
-  # filtering attributes
-  attrs = '!no_run'
-
-  cmd = [vpython, testpy, '-v', '-A', attrs]
-
-  if python3:
-    # enable py3filter nose2 plugin
-    cmd.append('--python3')
+  cmd = [vpython, os.path.join(ROOT_DIR, test_file), '-v']
 
   print('Running test script: %r' % cmd)
   return subprocess.call(cmd)
@@ -37,8 +25,17 @@ def run_unittests(python3):
 def main():
   exit_code = 0
 
-  for py3 in [False, True]:
-    exit_code = run_unittests(py3) or exit_code
+  # These tests need to be run as executable
+  # because they don't pass when running in parallel
+  # or run via test runner
+  test_files = [
+      'server/bot_groups_config_test.py',
+      'swarming_bot/bot_code/singleton_test.py',
+      'local_smoke_test.py',
+  ]
+
+  for test_file in test_files:
+    exit_code = run_test(test_file) or exit_code
 
   return exit_code
 

@@ -440,6 +440,10 @@ class BotGroupsConfigTest(test_case.TestCase):
 
 
 class CacheTest(test_case.TestCase):
+  # This test needs be run independently
+  # run by test_seq.py
+  no_run = 1
+
   def setUp(self):
     super(CacheTest, self).setUp()
     bot_groups_config.clear_cache()

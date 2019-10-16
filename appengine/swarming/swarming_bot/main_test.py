@@ -75,10 +75,6 @@ class SimpleMainTest(TestCase):
         places=5)
     self.assertEqual(expected, actual)
 
-  # This test fails due to tools.cache decorator
-  # So need to run later
-  test_attributes.run_later = 1
-
   def test_version(self):
     version = subprocess42.check_output(
         [sys.executable, self._zip_file, 'version'], stderr=subprocess42.PIPE)

@@ -358,7 +358,7 @@ class Test(unittest.TestCase):
   bot = None
   leak = False
   # This test can't pass when running via test runner
-  # so execute this file independently
+  # run by test_seq.py
   no_run = 1
 
   def setUp(self):

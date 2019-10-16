@@ -43,10 +43,6 @@ def _encode(d):
 
 
 class PRPCTest(test_env_handlers.AppTestBase):
-  # This tests fails due to when runs after other tests
-  # Need to run later or fix cache or mock issue
-  run_later = 1
-
   """Tests the pRPC handlers."""
   def setUp(self):
     super(PRPCTest, self).setUp()
