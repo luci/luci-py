@@ -51,7 +51,7 @@ def KillADB():
   """
   _LOG.info('KillADB()')
   attempts = 10
-  for _ in xrange(attempts):
+  for _ in range(attempts):
     try:
       subprocess.check_output(['pgrep', 'adb'])
     except subprocess.CalledProcessError:
@@ -932,7 +932,7 @@ class AdbCommandsSafe(object):
     """Yields a loop until it's too late."""
     timeout = timeout or self._lost_timeout_ms
     start = time.time()
-    for i in xrange(self._tries):
+    for i in range(self._tries):
       if ((time.time() - start) * 1000) >= timeout:
         return
       yield i

@@ -67,7 +67,7 @@ def _pmap(pool, queue_in, queue_out, fn, items):
     queue_in.put((index, fn, item))
   out = [None] * len(items)
   e = None
-  for _ in xrange(len(items)):
+  for _ in range(len(items)):
     index, result = queue_out.get()
     if index < 0:
       # This is an exception.
