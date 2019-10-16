@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env vpython
 # coding: utf-8
 # Copyright 2019 The LUCI Authors. All rights reserved.
 # Use of this source code is governed under the Apache License, Version 2.0
@@ -149,11 +149,10 @@ class FrontendTest(test_env_handlers.AppTestBase):
     path = os.path.join(self.APP_DIR, 'swarming_bot', 'config', 'bootstrap.py')
     with open(path, 'rb') as f:
       expected = f.read()
-    header = (
-        u'#!/usr/bin/env python\n'
-        '# coding: utf-8\n'
-        'host_url = \'http://localhost\'\n'
-        'bootstrap_token = \'bootstrap-token\'\n')
+    header = (u'#!/usr/bin/env python\n'
+              '# coding: utf-8\n'
+              'host_url = \'http://localhost\'\n'
+              'bootstrap_token = \'bootstrap-token\'\n')
     self.assertEqual(header + expected, actual)
 
   def test_config(self):

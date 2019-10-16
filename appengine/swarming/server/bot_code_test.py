@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env vpython
 # Copyright 2014 The LUCI Authors. All rights reserved.
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
@@ -55,12 +55,11 @@ class BotManagementTest(test_case.TestCase):
       return None, 'foo bar'
     self.mock(config, 'get_self_config', get_self_config_mock)
     f = bot_code.get_bootstrap('localhost', 'token')
-    expected = (
-      '#!/usr/bin/env python\n'
-      '# coding: utf-8\n'
-      'host_url = \'localhost\'\n'
-      'bootstrap_token = \'token\'\n'
-      'foo bar')
+    expected = ('#!/usr/bin/env python\n'
+                '# coding: utf-8\n'
+                'host_url = \'localhost\'\n'
+                'bootstrap_token = \'token\'\n'
+                'foo bar')
     self.assertEqual(expected, f.content)
 
   def test_get_bot_config(self):

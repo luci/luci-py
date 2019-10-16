@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env vpython
 # coding=utf-8
 # Copyright 2015 The LUCI Authors. All rights reserved.
 # Use of this source code is governed under the Apache License, Version 2.0
@@ -200,8 +200,7 @@ class ServerApiTest(BaseTest):
 
   def test_bootstrap(self):
     self._test_file(
-        'bootstrap',
-        '#!/usr/bin/env python\n'
+        'bootstrap', '#!/usr/bin/env python\n'
         '# coding: utf-8\n'
         'host_url = \'\'\n'
         'bootstrap_token = \'\'\n')
@@ -2281,7 +2280,7 @@ class BotApiTest(BaseTest):
     bot_management.bot_event(
         event_type='bot_connected', bot_id='id1',
         external_ip='8.8.4.4', authenticated_as='bot:whitelisted-ip',
-        dimensions={u'id': [u'id1'], u'pool': [u'default']}, state={'foo':0},
+        dimensions={u'id': [u'id1'], u'pool': [u'default']}, state={'foo': 0},
         version='123456789', quarantined=False, maintenance_msg=None,
         task_id=None, task_name=None)
     # Delete the bot.

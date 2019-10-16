@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env vpython
 # Copyright 2018 The LUCI Authors. All rights reserved.
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
@@ -197,7 +197,7 @@ class PRPCTest(test_env_handlers.AppTestBase):
     common_info = swarming_pb2.BotInfo(
         supplemental=struct_pb2.Struct(
             fields={
-              'bot_group_cfg_version':struct_pb2.Value(string_value='default'),
+              'bot_group_cfg_version': struct_pb2.Value(string_value='default'),
               'running_time': struct_pb2.Value(number_value=1234.0),
               'sleep_streak': struct_pb2.Value(number_value=0),
               'started_ts': struct_pb2.Value(number_value=1410990411.11),
