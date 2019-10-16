@@ -1197,8 +1197,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(expected, response)
 
   def test_bot_code_as_bot(self):
-    self.mock(bot_code, 'get_bot_version', lambda _: ('0' * 64, None))
-    code = self.app.get('/swarming/api/v1/bot/bot_code/' + '0' * 64)
+    code = self.app.get('/bot_code')
     expected = {'config/bot_config.py', 'config/config.json'}.union(
         bot_archive.FILES)
     with zipfile.ZipFile(StringIO.StringIO(code.body), 'r') as z:
@@ -1209,23 +1208,9 @@ class BotApiTest(test_env_handlers.AppTestBase):
     self.app.get('/bot_code', status=403)
 
   def test_bot_code_with_token(self):
-    self.mock(bot_code, 'get_bot_version', lambda _: ('0' * 64, None))
     self.set_as_anonymous()
     tok = bot_code.generate_bootstrap_token()
-    response = self.app.get('/bot_code?tok=%s' % tok, status=302)
-    self.assertEqual(
-        response.location,
-        'http://localhost/swarming/api/v1/bot/bot_code/%s?tok=%s' % ('0' * 64,
-                                                                     tok))
-
-  def test_bot_code_redirect(self):
-    self.mock(bot_code, 'get_bot_version', lambda _: ('0' * 64, None))
-    response = self.app.get('/bot_code')
-    self.assertEqual(response.status_int, 302)  # Found
-    self.assertEqual(
-        response.location,
-        'http://localhost/swarming/api/v1/bot/bot_code/' + '0' * 64)
-    self.assertEqual(type(response.location), str)
+    self.app.get('/bot_code?tok=%s' % tok, status=200)
 
   def test_oauth_token_bad_scopes(self):
     self.set_as_bot()
