@@ -16,9 +16,7 @@ class Py3Filter(Plugin):
     log.debug('matchPath path=%s', event.path)
 
     event.handled = True
-    if not _has_py3_shebang(event.path):
-      return False
-    return True
+    return _has_py3_shebang(event.path)
 
 
 def _has_py3_shebang(path):

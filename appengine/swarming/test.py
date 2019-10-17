@@ -21,12 +21,12 @@ PLUGINS_DIR = os.path.join(APPENGINE_DIR, 'components', 'test_support',
 
 
 def main():
-  # TODO(jwata) delete this adhoc path insertion
+  # TODO(jwata): delete this adhoc path insertion
   # after fixing swarming_test_env.setup_test_env
   if six.PY2:
     import swarming_test_env
     swarming_test_env.setup_test_env()
-  elif six.PY3:
+  else:
     sys.path.insert(0, CLIENT_THIRDPARTY_DIR)
 
   sys.path.insert(0, SWARMING_BOT_DIR)
@@ -43,7 +43,7 @@ def main():
 
 
 def _has_arg(argv, arg):
-  return any([arg in a for a in argv])
+  return any(arg in a for a in argv)
 
 
 if __name__ == '__main__':
