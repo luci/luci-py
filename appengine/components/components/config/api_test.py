@@ -156,7 +156,9 @@ class ApiTestCase(test_case.TestCase):
 
     self.assertTrue(config.has_project_access('chromium'))
 
-    api.get_project_config_async.assert_called_once('chromium')
+    api.get_project_config_async.assert_called_once()
+    actual_first_arg = api.get_project_config_async.call_args[0][0]
+    self.assertEqual(actual_first_arg, 'chromium')
 
   def test_has_project_access_anon_identity(self):
     self.set_up_identity()
@@ -171,7 +173,9 @@ class ApiTestCase(test_case.TestCase):
 
     self.assertTrue(config.has_project_access('chromium'))
 
-    api.get_project_config_async.assert_called_once('chromium')
+    api.get_project_config_async.assert_called_once()
+    actual_first_arg = api.get_project_config_async.call_args[0][0]
+    self.assertEqual(actual_first_arg, 'chromium')
 
   def test_has_project_access_no_access(self):
     self.set_up_identity()
