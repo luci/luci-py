@@ -756,7 +756,7 @@ def _post_error_task(botobj, error, task_id):
         this function is invoked.
   """
   logging.error('Error: %s', error)
-  return botobj.remote.post_task_error(task_id, botobj.id, error)
+  return botobj.remote.post_task_error(task_id, error)
 
 
 def _run_manifest(botobj, manifest, start):
@@ -1073,6 +1073,9 @@ def _run_bot_inner(arg_error, quit_bit):
   # This environment variable is accessible to the tasks executed by this bot.
   os.environ['SWARMING_BOT_ID'] = botobj.id.encode('utf-8')
 
+  # bot_id is used in 'X-Luci-Swarming-Bot-ID' header.
+  botobj.remote.bot_id = botobj.id
+
   consecutive_sleeps = 0
   last_action = time.time()
   while not quit_bit.is_set():
@@ -1185,7 +1188,7 @@ def _poll_server(botobj, quit_bit, last_action):
       # if there's an error here before, so let's preserve that behaviour
       # (though anything that's not a remote_client.InternalError will make
       # it through, again preserving prior behaviour).
-      botobj.remote.post_task_update(value, botobj.id, {'duration': 0}, None, 0)
+      botobj.remote.post_task_update(value, {'duration': 0}, None, 0)
     except remote_client_errors.InternalError:
       pass
     return False
@@ -1240,7 +1243,7 @@ def _update_bot(botobj, version):
 
   # Download as a new file.
   try:
-    botobj.remote.get_bot_code(new_zip, version, botobj.id)
+    botobj.remote.get_bot_code(new_zip, version)
   except remote_client.BotCodeError as e:
     botobj.post_error(str(e))
   else:

@@ -258,7 +258,6 @@ class AuthSystemTest(auto_stub.TestCase):
     self.assertEqual({u'access_token': u'blah', u'expiry': expiry}, resp)
     self.assertEqual([{
         'account_id': 'system',
-        'bot_id': 'bot_1',
         'scopes': ('A', 'B', 'C'),
         'task_id': 'task_1',
     }], rpc_client.calls)

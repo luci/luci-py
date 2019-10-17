@@ -469,7 +469,6 @@ class AuthSystem(object):
         # to use a different lock here (not self._lock).
         resp = rpc_client.mint_oauth_token(
             task_id=auth_params.task_id,
-            bot_id=auth_params.bot_id,
             account_id=account_id,
             scopes=scopes)
       except remote_client.InternalError as exc:
