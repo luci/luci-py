@@ -26,6 +26,10 @@ from server import task_result
 
 
 class BackendTest(test_env_handlers.AppTestBase):
+  # These test fail with 'AppError: Bad response: 500 Internal Server Error'
+  # Need to run in test_seq.py
+  no_run = 1
+
   def _GetRoutes(self):
     """Returns the list of all routes handled."""
     return [

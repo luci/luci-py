@@ -53,6 +53,10 @@ def message_to_dict(rpc_message):
 
 
 class BaseTest(test_env_handlers.AppTestBase, test_case.EndpointsTestCase):
+  # These test fail with 'Unknown bot ID, not in config'
+  # Need to run in test_seq.py
+  no_run = 1
+
   def setUp(self):
     test_case.EndpointsTestCase.setUp(self)
     super(BaseTest, self).setUp()

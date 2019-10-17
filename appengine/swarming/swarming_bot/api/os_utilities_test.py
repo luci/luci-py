@@ -31,6 +31,10 @@ import os_utilities
 
 
 class TestOsUtilities(auto_stub.TestCase):
+  # These tests fail for cache related issue
+  # Need to run in test_seq.py
+  no_run = 1
+
   def test_get_os_name(self):
     expected = (u'Debian', u'Linux', u'Mac', u'Raspbian', u'Ubuntu', u'Windows')
     self.assertIn(os_utilities.get_os_name(), expected)

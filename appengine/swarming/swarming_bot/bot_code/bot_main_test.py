@@ -47,6 +47,10 @@ class FakeThreadingEvent(object):
 
 
 class TestBotBase(net_utils.TestCase):
+  # These tests fail for cache related issue
+  # Need to run in test_seq.py
+  no_run = 1
+
   def setUp(self):
     super(TestBotBase, self).setUp()
     # Throw away all swarming environ if running the test on Swarming. It may
