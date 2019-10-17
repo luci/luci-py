@@ -380,24 +380,29 @@ class TestBotMain(TestBotBase):
         bot_main, 'get_config',
         lambda: {'server': self.url, 'server_version': '1'})
     expected_attribs = bot_main.get_attributes(None)
-    self.expected_requests(
-        [
-          (
+    botobj = bot_main.get_bot(bot_main.get_config())
+    self.expected_requests([
+        (
             'https://localhost:1/swarming/api/v1/bot/task_error/23',
             {
-              'data': {
-                'id': expected_attribs['dimensions']['id'][0],
-                'message': 'error',
-                'task_id': 23,
-              },
-              'follow_redirects': False,
-              'headers': {'Cookie': 'GOOGAPPUID=42'},
-              'timeout': remote_client.NET_CONNECTION_TIMEOUT_SEC,
+                'data': {
+                    'id': expected_attribs['dimensions']['id'][0],
+                    'message': 'error',
+                    'task_id': 23,
+                },
+                'follow_redirects': False,
+                'headers': {
+                    'Cookie': 'GOOGAPPUID=42',
+                    'X-Luci-Swarming-Bot-ID': botobj.id,
+                },
+                'timeout': remote_client.NET_CONNECTION_TIMEOUT_SEC,
             },
-            {'resp': 1},
-          ),
-        ])
-    botobj = bot_main.get_bot(bot_main.get_config())
+            {
+                'resp': 1
+            },
+        ),
+    ])
+    botobj.remote.bot_id = botobj.id
     self.assertEqual(True, bot_main._post_error_task(botobj, 'error', 23))
 
   def test_do_handshake(self):
@@ -958,13 +963,17 @@ class TestBotMain(TestBotBase):
           'https://localhost:1/swarming/api/v1/bot/bot_code'
           '/123?bot_id=localhost', url)
       self.assertEqual(new_zip, f)
-      self.assertEqual({'Cookie': 'GOOGAPPUID=42'}, headers)
+      self.assertEqual({
+          'Cookie': 'GOOGAPPUID=42',
+          'X-Luci-Swarming-Bot-ID': 'localhost',
+      }, headers)
       self.assertEqual(remote_client.NET_CONNECTION_TIMEOUT_SEC, timeout)
       # Create a valid zip that runs properly.
       with zipfile.ZipFile(f, 'w') as z:
         z.writestr('__main__.py', 'print("hi")')
       return True
     self.mock(net, 'url_retrieve', url_retrieve)
+    self.bot.remote.bot_id = self.bot.id
     bot_main._update_bot(self.bot, '123')
     self.assertEqual([1], restarts)
 
