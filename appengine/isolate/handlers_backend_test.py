@@ -12,7 +12,7 @@ import time
 import unittest
 from Crypto.PublicKey import RSA
 
-import test_env
+import isolate_test_env as test_env
 test_env.setup_test_env()
 
 import cloudstorage

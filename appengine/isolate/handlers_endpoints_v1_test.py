@@ -12,7 +12,7 @@ import unittest
 import zlib
 from Crypto.PublicKey import RSA
 
-import test_env
+import isolate_test_env as test_env
 test_env.setup_test_env()
 
 from google.appengine.api import memcache

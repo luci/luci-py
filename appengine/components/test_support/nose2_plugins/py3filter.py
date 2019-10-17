@@ -10,6 +10,8 @@ log = logging.getLogger('nose2.plugins.py3filter')
 
 
 class Py3Filter(Plugin):
+  alwaysOn = True
+
   commandLineSwitch = (None, 'python3', 'filter python3 test files')
 
   def matchPath(self, event):
