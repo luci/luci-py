@@ -377,7 +377,6 @@ def load_and_run(
           swarming_server, headers_cb, os_utilities.get_hostname_short(),
           work_dir, grpc_proxy)
       remote.initialize()
-      remote.bot_id = task_details.bot_id
 
       # Let AuthSystem know it can now send RPCs to Swarming (to grab OAuth
       # tokens). There's a circular dependency here! AuthSystem will be
@@ -429,15 +428,15 @@ def kill_and_wait(proc, grace_period, reason):
   return exit_code
 
 
-def fail_without_command(remote, task_id, params, cost_usd_hour, task_start,
-                         exit_code, stdout):
+def fail_without_command(remote, bot_id, task_id, params, cost_usd_hour,
+                         task_start, exit_code, stdout):
   now = monotonic_time()
   params['cost_usd'] = cost_usd_hour * (now - task_start) / 60. / 60.
   params['duration'] = now - task_start
   params['io_timeout'] = False
   params['hard_timeout'] = False
   # Ignore server reply to stop.
-  remote.post_task_update(task_id, params, (stdout, 0), 1)
+  remote.post_task_update(task_id, bot_id, params, (stdout, 0), 1)
   return {
     u'exit_code': exit_code,
     u'hard_timeout': False,
@@ -630,7 +629,8 @@ def run_command(remote, task_details, work_dir, cost_usd_hour,
   params = {
     'cost_usd': cost_usd_hour * (start - task_start) / 60. / 60.,
   }
-  if not remote.post_task_update(task_details.task_id, params):
+  if not remote.post_task_update(
+      task_details.task_id, task_details.bot_id, params):
     # Don't even bother, the task was already canceled.
     return {
       u'exit_code': -1,
@@ -653,9 +653,9 @@ def run_command(remote, task_details, work_dir, cost_usd_hour,
   try:
     proc = _start_task_runner(args, work_dir, ctx_file)
   except _FailureOnStart as e:
-    return fail_without_command(remote, task_details.task_id, params,
-                                cost_usd_hour, task_start, e.exit_code,
-                                e.stdout)
+    return fail_without_command(
+        remote, task_details.bot_id, task_details.task_id, params,
+        cost_usd_hour, task_start, e.exit_code, e.stdout)
 
   buf = _OutputBuffer(task_details, start)
   try:
@@ -675,8 +675,8 @@ def run_command(remote, task_details, work_dir, cost_usd_hour,
         if buf.should_post_update():
           params['cost_usd'] = (
               cost_usd_hour * (monotonic_time() - task_start) / 60. / 60.)
-          if not remote.post_task_update(task_details.task_id, params,
-                                         buf.pop()):
+          if not remote.post_task_update(
+              task_details.task_id, task_details.bot_id, params, buf.pop()):
             # Server is telling us to stop. Normally task cancellation.
             if not kill_sent and not term_sent:
               logging.warning('Server induced stop; sending SIGTERM')
@@ -817,11 +817,12 @@ def run_command(remote, task_details, work_dir, cost_usd_hour,
         params.pop('isolated_stats', None)
         params.pop('cipd_stats', None)
         params.pop('cipd_pins', None)
-      remote.post_task_update(task_details.task_id, params, buf.pop(),
-                              exit_code)
+      remote.post_task_update(
+          task_details.task_id, task_details.bot_id, params, buf.pop(),
+          exit_code)
       if must_signal_internal_failure:
-        remote.post_task_error(task_details.task_id,
-                               must_signal_internal_failure)
+        remote.post_task_error(task_details.task_id, task_details.bot_id,
+            must_signal_internal_failure)
         # Clear out this error as we've posted it now (we already cleared out
         # exit_code above). Note: another error could arise after this point,
         # which is fine, since bot_main.py will post it).

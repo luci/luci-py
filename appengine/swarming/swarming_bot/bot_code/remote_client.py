@@ -116,7 +116,6 @@ class RemoteClientNative(object):
     self._disabled = not auth_headers_callback
     self._bot_hostname = hostname
     self._bot_work_dir = work_dir
-    self._bot_id = None
 
   @property
   def server(self):
@@ -125,14 +124,6 @@ class RemoteClientNative(object):
   @property
   def is_grpc(self):
     return False
-
-  @property
-  def bot_id(self):
-    return self._bot_id
-
-  @bot_id.setter
-  def bot_id(self, bid):
-    self._bot_id = bid
 
   def initialize(self, quit_bit=None):
     """Grabs initial auth headers, retrying on errors a bunch of times.
@@ -179,9 +170,6 @@ class RemoteClientNative(object):
     """
     googappuid = make_appengine_id(self._bot_hostname, self._bot_work_dir)
     headers = {'Cookie': 'GOOGAPPUID=%d' % googappuid}
-    if self.bot_id:
-      headers['X-Luci-Swarming-Bot-ID'] = self._bot_id
-
     if include_auth:
       headers.update(self.get_authentication_headers())
     return headers
@@ -258,11 +246,8 @@ class RemoteClientNative(object):
     data['message'] = message
     self._url_read_json('/swarming/api/v1/bot/event', data=data)
 
-  def post_task_update(self,
-                       task_id,
-                       params,
-                       stdout_and_chunk=None,
-                       exit_code=None):
+  def post_task_update(self, task_id, bot_id, params,
+                       stdout_and_chunk=None, exit_code=None):
     """Posts task update to task_update.
 
     Arguments:
@@ -281,7 +266,7 @@ class RemoteClientNative(object):
       server replies with an error.
     """
     data = {
-        'id': self.bot_id,
+        'id': bot_id,
         'task_id': task_id,
     }
     data.update(params)
@@ -300,10 +285,10 @@ class RemoteClientNative(object):
           resp.get('error') if resp else 'Failed to contact server')
     return not resp.get('must_stop', False)
 
-  def post_task_error(self, task_id, message):
+  def post_task_error(self, task_id, bot_id, message):
     """Logs task-specific info to the server"""
     data = {
-        'id': self.bot_id,
+        'id': bot_id,
         'message': message,
         'task_id': task_id,
     }
@@ -347,13 +332,13 @@ class RemoteClientNative(object):
       return (cmd, resp['message'])
     raise PollError('Unexpected command: %s\n%s' % (cmd, resp))
 
-  def get_bot_code(self, new_zip_path, bot_version):
+  def get_bot_code(self, new_zip_path, bot_version, bot_id):
     """Downloads code into the file specified by new_zip_fn (a string).
 
     Throws BotCodeError on error.
     """
     url_path = '/swarming/api/v1/bot/bot_code/%s?bot_id=%s' % (
-        bot_version, urllib.parse.quote_plus(self.bot_id))
+        bot_version, urllib.parse.quote_plus(bot_id))
     if not self._url_retrieve(new_zip_path, url_path):
       raise BotCodeError(new_zip_path, self._server + url_path, bot_version)
 
@@ -363,7 +348,7 @@ class RemoteClientNative(object):
     if resp is None:
       logging.error('No response from server_ping')
 
-  def mint_oauth_token(self, task_id, account_id, scopes):
+  def mint_oauth_token(self, task_id, bot_id, account_id, scopes):
     """Asks the server to generate an access token for a service account.
 
     Each task has two service accounts associated with it: 'system' and 'task'.
@@ -372,6 +357,7 @@ class RemoteClientNative(object):
 
     Args:
       task_id: identifier of currently executing task.
+      bot_id: name of the bot.
       account_id: logical identifier of the account (e.g 'system' or 'task').
       scopes: list of OAuth scopes the new token should have.
 
@@ -388,14 +374,12 @@ class RemoteClientNative(object):
 
       MintOAuthTokenError on fatal errors.
     """
-    resp = self._url_read_json(
-        '/swarming/api/v1/bot/oauth_token',
-        data={
-            'account_id': account_id,
-            'id': self.bot_id,
-            'scopes': scopes,
-            'task_id': task_id,
-        })
+    resp = self._url_read_json('/swarming/api/v1/bot/oauth_token', data={
+        'account_id': account_id,
+        'id': bot_id,
+        'scopes': scopes,
+        'task_id': task_id,
+    })
     if not resp:
       raise InternalError('Error when minting the token')
     if resp.get('error'):

@@ -97,7 +97,6 @@ def run_command(server_url, work_dir, task_details, headers_cb):
   """Runs a command with an initialized client."""
   remote = remote_client.createRemoteClient(
       server_url, headers_cb, 'localhost', work_dir, False)
-  remote.bot_id = task_details.bot_id
   with luci_context.stage(local_auth=None) as ctx_file:
     return task_runner.run_command(
         remote, task_details, work_dir, 3600.,

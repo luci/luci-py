@@ -63,7 +63,6 @@ class RemoteClientGrpc(object):
     self._session = None
     self._stdout_offset = 0
     self._stdout_resource = None
-    self._bot_id = None
 
   @property
   def server(self):
@@ -72,14 +71,6 @@ class RemoteClientGrpc(object):
   @property
   def is_grpc(self):
     return True
-
-  @property
-  def bot_id(self):
-    return self._bot_id
-
-  @bot_id.setter
-  def bot_id(self, bid):
-    self._bot_id = bid
 
   def initialize(self, quit_bit=None):
     pass
@@ -225,11 +216,8 @@ class RemoteClientGrpc(object):
     except grpc_proxy.grpc.RpcError as e:
       logging.error('gRPC error posting bot event: %s', e)
 
-  def post_task_update(self,
-                       task_id,
-                       params,
-                       stdout_and_chunk=None,
-                       exit_code=None):
+  def post_task_update(self, task_id, bot_id, params,
+                       stdout_and_chunk=None, exit_code=None):
     # In gRPC mode, task_id is a full resource name, as returned in
     # lease.assignment_name.
     #
@@ -239,32 +227,32 @@ class RemoteClientGrpc(object):
 
     # If there is stdout, send an update.
     if stdout_and_chunk or finished:
-      self._send_stdout_chunk(task_id, stdout_and_chunk, finished)
+      self._send_stdout_chunk(bot_id, task_id, stdout_and_chunk, finished)
 
     # If this is the last update, call UpdateTaskResult.
     if finished:
-      self._complete_task(task_id, params, exit_code)
+      self._complete_task(task_id, bot_id, params, exit_code)
 
     # TODO(aludwin): send normal BotSessionUpdate and verify that this lease is
     # not CANCELLED.
     should_continue = True
     return should_continue
 
-  def post_task_error(self, task_id, message):
+  def post_task_error(self, task_id, bot_id, message):
     # Send final stdout chunk before aborting the task. This is to satisfy the
     # Remote Worker API semantics.
-    self._send_stdout_chunk(task_id, None, True)
+    self._send_stdout_chunk(bot_id, task_id, None, True)
 
     req = tasks_pb2.UpdateTaskResultRequest()
     req.name = task_id + '/result'
-    req.source = self.bot_id
+    req.source = bot_id
     req.result.name = req.name
     req.result.complete = True
     req.result.status.code = code_pb2.ABORTED
     req.result.status.message = message
     self._proxy_tasks.call_unary('UpdateTaskResult', req)
 
-  def get_bot_code(self, new_zip_fn, bot_version):
+  def get_bot_code(self, new_zip_fn, bot_version, _bot_id):
     with open(new_zip_fn, 'wb') as zf:
       req = bytestream_pb2.ReadRequest()
       req.resource_name = bot_version
@@ -275,7 +263,7 @@ class RemoteClientGrpc(object):
         logging.error('gRPC error fetching %s: %s', req.resource_name, e)
         raise BotCodeError(new_zip_fn, req.resource_name, bot_version)
 
-  def mint_oauth_token(self, task_id, account_id, scopes):
+  def mint_oauth_token(self, task_id, bot_id, account_id, scopes):
     # pylint: disable=unused-argument
     raise MintOAuthTokenError(
         'mint_oauth_token is not supported in grpc protocol')
@@ -306,7 +294,8 @@ class RemoteClientGrpc(object):
     # Save the log handle
     self._stdout_offset = 0
     self._stdout_resource = task.logs['stdout']
-    expected_stdout = self._stdout_resource_name_from_ids(lease.assignment)
+    expected_stdout = self._stdout_resource_name_from_ids(
+        self._session.bot_id, lease.assignment)
     # We don't currently pass _stdout_resource to task_runner.py so verify now
     # that it's what we can reconstruct given the information that we *do* have.
     # TODO(aludwin): pass this information to task_runner.py.
@@ -324,30 +313,30 @@ class RemoteClientGrpc(object):
     outputs.extend(command.expected_outputs.directories)
 
     manifest = {
-        'bot_id': self.bot_id,
-        'dimensions': {
-            # TODO(aludwin): handle standard keys
-            prop.key: prop.value for prop in lease.requirements.properties
-        },
-        'env': {
-            env.name: env.value for env in command.inputs.environment_variables
-        },
-        # proto duration uses long integers; clients expect ints
-        'grace_period': int(command.timeouts.shutdown.seconds),
-        'hard_timeout': int(command.timeouts.execution.seconds),
-        'io_timeout': int(command.timeouts.idle.seconds),
-        'isolated': {
-            'namespace': inferred_namespace,
-            'input': command.inputs.files[0].hash,
-            'server': self._server,
-        },
-        'outputs': outputs,
-        'task_id': lease.assignment,
-        # These keys are only needed by raw commands. While this method
-        # only supports isolated commands, the keys need to exist to avoid
-        # missing key errors.
-        'command': None,
-        'extra_args': None,
+      'bot_id': self._session.bot_id,
+      'dimensions' : {
+        # TODO(aludwin): handle standard keys
+        prop.key: prop.value for prop in lease.requirements.properties
+      },
+      'env': {
+        env.name: env.value for env in command.inputs.environment_variables
+      },
+      # proto duration uses long integers; clients expect ints
+      'grace_period': int(command.timeouts.shutdown.seconds),
+      'hard_timeout': int(command.timeouts.execution.seconds),
+      'io_timeout': int(command.timeouts.idle.seconds),
+      'isolated': {
+        'namespace': inferred_namespace,
+        'input' : command.inputs.files[0].hash,
+        'server': self._server,
+      },
+      'outputs': outputs,
+      'task_id': lease.assignment,
+      # These keys are only needed by raw commands. While this method
+      # only supports isolated commands, the keys need to exist to avoid
+      # missing key errors.
+      'command': None,
+      'extra_args': None,
     }
     logging.info('returning manifest: %s', manifest)
     return ('run', manifest)
@@ -372,7 +361,7 @@ class RemoteClientGrpc(object):
     logging.info('Performing admin action: %s(%s)', cmd, action.arg)
     return (cmd, action.arg)
 
-  def _send_stdout_chunk(self, task_id, stdout_and_chunk, finished):
+  def _send_stdout_chunk(self, bot_id, task_id, stdout_and_chunk, finished):
     """Sends a stdout chunk to Bytestream.
 
     If stdout_and_chunk is not None, it must be a two element array, with the
@@ -384,7 +373,7 @@ class RemoteClientGrpc(object):
       raise InternalError('missing stdout, but finished is False')
 
     req = bytestream_pb2.WriteRequest()
-    req.resource_name = self._stdout_resource_name_from_ids(task_id)
+    req.resource_name = self._stdout_resource_name_from_ids(bot_id, task_id)
     req.write_offset = self._stdout_offset
     req.finish_write = finished
     if stdout_and_chunk:
@@ -410,15 +399,15 @@ class RemoteClientGrpc(object):
       self._stdout_offset = 0
       self._stdout_resource = None
 
-  def _stdout_resource_name_from_ids(self, task_id):
+  def _stdout_resource_name_from_ids(self, bot_id, task_id):
     # TODO(aludwin): use self._stdout_resource, but it's not set in
     # task_runner.py yet. Until then, take the task_id (currently in the form
     # projects/project/tasks/taskid) and extract the taskid from it.
     project_id = self._proxy_bs.prefix
     real_task_id = task_id[task_id.rfind('/')+1:]
-    return '%s/logs/%s/%s/stdout' % (project_id, self.bot_id, real_task_id)
+    return '%s/logs/%s/%s/stdout' % (project_id, bot_id, real_task_id)
 
-  def _complete_task(self, task_id, params, exit_code):
+  def _complete_task(self, task_id, bot_id, params, exit_code):
     # Create command result
     res = command_pb2.CommandOutputs()
     res.exit_code = exit_code
@@ -436,7 +425,7 @@ class RemoteClientGrpc(object):
     # Create task result and pack in command result/overhead
     req = tasks_pb2.UpdateTaskResultRequest()
     req.name = task_id + '/result'
-    req.source = self.bot_id
+    req.source = bot_id
     req.result.name = req.name
     req.result.complete = True
     if params.get('io_timeout'):
@@ -482,5 +471,6 @@ def _worker_to_bot_group_cfg(worker):
   return dims
 
 def _time_to_duration(time_f, duration):
-  duration.seconds = int(time_f)
-  duration.nanos = int(1e9 * (time_f - int(time_f)))
+    duration.seconds = int(time_f)
+    duration.nanos = int(1e9 * (
+        time_f - int(time_f)))
