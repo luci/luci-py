@@ -89,24 +89,16 @@ def _is_project():
 ### Capabilities
 
 
-def is_ip_whitelisted_machine(log=True):
+def is_ip_whitelisted_machine():
   """Returns True if the call is made from IP whitelisted machine."""
-  # TODO(crbug/1010555): Remove is_ip_whitelisted_machine(). /bot_code can be
-  # fixed using temporary tokens retrieved with a service acccount.
-  res = auth.is_in_ip_whitelist(
-      auth.bots_ip_whitelist(), auth.get_peer_ip(), False)
-  if res and log:
-    logging.debug('TODO(crbug/1010555): Remove IP whitelist super powers')
-  return res
+  return auth.is_in_ip_whitelist(auth.bots_ip_whitelist(), auth.get_peer_ip(),
+                                 False)
 
 
 def can_access():
   """Minimally authenticated user."""
-  if (
-      _is_user() or _is_project() or
-      _is_view_all_bots() or _is_view_all_tasks()):
-    return True
-  return is_ip_whitelisted_machine()
+  return (_is_user() or _is_project() or _is_view_all_bots() or
+          _is_view_all_tasks())
 
 
 #### Config
@@ -138,9 +130,7 @@ def can_edit_bot():
 
   Bots can terminate other bots. This may change in the future.
   """
-  if _is_privileged_user():
-    return True
-  return is_ip_whitelisted_machine()
+  return _is_privileged_user()
 
 
 def can_delete_bot():
@@ -148,9 +138,7 @@ def can_delete_bot():
 
   Bots can delete other bots. This may change in the future.
   """
-  if _is_admin():
-    return True
-  return is_ip_whitelisted_machine()
+  return _is_admin()
 
 
 def can_view_bot():
@@ -158,9 +146,7 @@ def can_view_bot():
 
   Bots can view other bots. This may change in the future.
   """
-  if _is_view_all_bots():
-    return True
-  return is_ip_whitelisted_machine()
+  return _is_view_all_bots()
 
 
 #### Task
@@ -172,9 +158,7 @@ def can_create_task():
   Swarming is reentrant, a bot can create a new task as part of a task. This may
   change in the future.
   """
-  if _is_user() or _is_project():
-    return True
-  return is_ip_whitelisted_machine()
+  return _is_user() or _is_project()
 
 
 def can_schedule_high_priority_tasks():
@@ -188,11 +172,8 @@ def can_edit_task(task):
   Since bots can create tasks, they can also cancel them. This may change in the
   future.
   """
-  if (
-      _is_privileged_user() or
-      auth.get_current_identity() == task.authenticated):
-    return True
-  return is_ip_whitelisted_machine()
+  return (_is_privileged_user() or
+          auth.get_current_identity() == task.authenticated)
 
 
 def can_edit_all_tasks():
@@ -202,9 +183,8 @@ def can_edit_all_tasks():
 
 def can_view_task(task):
   """Can view a single task."""
-  if _is_view_all_tasks() or auth.get_current_identity() == task.authenticated:
-    return True
-  return is_ip_whitelisted_machine()
+  return (_is_view_all_tasks() or
+          auth.get_current_identity() == task.authenticated)
 
 
 def can_view_all_tasks():

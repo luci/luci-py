@@ -349,6 +349,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
     self.mock(random, 'getrandbits', lambda _: 0x88)
     # A bot polls, gets a task, updates it, completes it.
     params = self.do_handshake()
+
     # Enqueue a task.
     self.set_as_user()
     _, task_id = self.client_create_task_raw(
@@ -356,6 +357,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
     self.assertEqual('0', task_id[-1])
     # Convert TaskResultSummary reference to TaskRunResult.
     task_id = task_id[:-1] + '1'
+
     self.set_as_bot()
     response = self.post_json('/swarming/api/v1/bot/poll', params)
     expected = {
@@ -411,6 +413,8 @@ class BotApiTest(test_env_handlers.AppTestBase):
       },
     }
     self.assertEqual(expected, response)
+
+    self.set_as_user()
     response = self.client_get_results(task_id)
     expected = self.gen_run_result(
         created_ts=fmtdate(self.now),
@@ -615,6 +619,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
     self.set_as_user()
     _, task_id = self.client_create_task_isolated()
     self.assertEqual('0', task_id[-1])
+
     # Convert TaskResultSummary reference to TaskRunResult.
     task_id = task_id[:-1] + '1'
     self.set_as_bot()
@@ -717,6 +722,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
     response = self.post_json('/swarming/api/v1/bot/task_update', params)
     self.assertEqual({u'must_stop': False, u'ok': True}, response)
 
+    self.set_as_user()
     response = self.client_get_results(task_id)
     expected = self.gen_run_result(
         cipd_pins={
@@ -950,8 +956,11 @@ class BotApiTest(test_env_handlers.AppTestBase):
       return out
 
     def _cycle(params, expected, must_stop):
+      """Cycles between bot update and user retrieving results."""
+      self.set_as_bot()
       response = self.post_json('/swarming/api/v1/bot/task_update', params)
       self.assertEqual({u'must_stop': must_stop, u'ok': True}, response)
+      self.set_as_user()
       self.assertEqual(expected, self.client_get_results(task_id))
 
     # 1. Initial task update with no data.
@@ -961,6 +970,8 @@ class BotApiTest(test_env_handlers.AppTestBase):
     params = _params()
     response = self.post_json('/swarming/api/v1/bot/task_update', params)
     self.assertEqual({u'must_stop': False, u'ok': True}, response)
+
+    self.set_as_user()
     response = self.client_get_results(task_id)
     expected = self.gen_run_result(
         costs_usd=[0.1],
@@ -1062,8 +1073,10 @@ class BotApiTest(test_env_handlers.AppTestBase):
   def test_task_failure(self):
     self.mock(random, 'getrandbits', lambda _: 0x88)
     params = self.do_handshake()
+
     self.set_as_user()
     self.client_create_task_raw()
+
     self.set_as_bot()
     response = self.post_json('/swarming/api/v1/bot/poll', params)
     task_id = response['manifest']['task_id']
@@ -1078,6 +1091,8 @@ class BotApiTest(test_env_handlers.AppTestBase):
       'task_id': task_id,
     }
     self.post_json('/swarming/api/v1/bot/task_update', params)
+
+    self.set_as_user()
     response = self.client_get_results(task_id)
     expected = self.gen_run_result(
         completed_ts=fmtdate(self.now),
@@ -1099,8 +1114,10 @@ class BotApiTest(test_env_handlers.AppTestBase):
         ereporter2, 'log_request',
         lambda *args, **kwargs: errors.append((args, kwargs)))
     params = self.do_handshake()
+
     self.set_as_user()
     self.client_create_task_raw()
+
     self.set_as_bot()
     response = self.post_json('/swarming/api/v1/bot/poll', params)
     task_id = response['manifest']['task_id']
@@ -1115,6 +1132,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
     }
     self.post_json('/swarming/api/v1/bot/task_error', params)
 
+    self.set_as_user()
     response = self.client_get_results(task_id)
     expected = self.gen_run_result(
         abandoned_ts=fmtdate(self.now),
@@ -1140,6 +1158,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
     # Task was canceled while running, resulting in KILLED.
     self.mock(random, 'getrandbits', lambda _: 0x88)
     params = self.do_handshake()
+
     self.set_as_user()
     self.client_create_task_raw()
 
@@ -1150,6 +1169,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
     task_id = response['manifest']['task_id']
 
     # Cancel the task while it's running.
+    self.set_as_user()
     response = self.client_cancel_task(task_id, True)
     self.assertEqual({u'ok': True, u'was_running': True}, response)
 
@@ -1163,9 +1183,11 @@ class BotApiTest(test_env_handlers.AppTestBase):
     response = self.client_get_results(task_id)
     self.assertEqual(expected, response)
 
+    self.set_as_bot()
     response = self.bot_complete_task(task_id=task_id)
     self.assertEqual({u'must_stop': True, u'ok': True}, response)
 
+    self.set_as_user()
     expected = self.gen_run_result(
         abandoned_ts=fmtdate(self.now),
         completed_ts=fmtdate(self.now),

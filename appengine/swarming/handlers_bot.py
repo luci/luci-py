@@ -169,7 +169,7 @@ class _BotAuthenticatingHandler(auth.AuthenticatingHandler):
     # are using auth for bootstrap and updating.
     if (not acl.can_create_bot() and
         not (bot_id and bot_auth.is_authenticated_bot(bot_id)) and
-        not acl.is_ip_whitelisted_machine(log=False)):
+        not acl.is_ip_whitelisted_machine()):
       raise auth.AuthorizationError('Not allowed to access the bot code')
 
     return bot_code.generate_bootstrap_token() if generate_token else None
