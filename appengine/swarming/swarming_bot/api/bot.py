@@ -209,7 +209,9 @@ class Bot(object):
     Returns:
       float between [-width, +width] rounded to 4 decimals.
     """
-    b = struct.unpack('h', hashlib.md5(self.id).digest()[:2])[0]
+    b = struct.unpack('h',
+                      hashlib.md5(bytes(
+                          self.id.encode('utf-8'))).digest()[:2])[0]
     return round(b / 32768. * width, 4)
 
   def post_event(self, event_type, message):

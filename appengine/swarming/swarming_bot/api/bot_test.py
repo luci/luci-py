@@ -1,4 +1,4 @@
-#!/usr/bin/env vpython
+#!/usr/bin/env vpython3
 # Copyright 2014 The LUCI Authors. All rights reserved.
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
@@ -29,8 +29,8 @@ class TestBot(unittest.TestCase):
   def test_get_pseudo_rand(self):
     # This test assumes little endian.
     # The following confirms the equivalent code in Bot.get_pseudo_rand():
-    self.assertEqual(-1., round(struct.unpack('h', '\x00\x80')[0] / 32768., 4))
-    self.assertEqual(1., round(struct.unpack('h', '\xff\x7f')[0] / 32768., 4))
+    self.assertEqual(-1., round(struct.unpack('h', b'\x00\x80')[0] / 32768., 4))
+    self.assertEqual(1., round(struct.unpack('h', b'\xff\x7f')[0] / 32768., 4))
     b = make_bot()
     self.assertEqual(-0.7782, b.get_pseudo_rand(1.))
     self.assertEqual(-0.0778, b.get_pseudo_rand(.1))
