@@ -1230,6 +1230,12 @@ class BotApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(response.status_int, 302)  # Found
     self.assertEqual(response.location, 'http://localhost/bot_code?bot_id=bot1')
 
+  def test_bot_code_wrong_version_without_bot_id(self):
+    self.mock(bot_code, 'get_bot_version', lambda _: ('0' * 64, None))
+    response = self.app.get('/swarming/api/v1/bot/bot_code/' + '1' * 64)
+    self.assertEqual(response.status_int, 302)  # Found
+    self.assertEqual(response.location, 'http://localhost/bot_code')
+
   def test_oauth_token_bad_scopes(self):
     self.set_as_bot()
     response = self.app.post_json(

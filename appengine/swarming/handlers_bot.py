@@ -224,7 +224,10 @@ class BotCodeHandler(_BotAuthenticatingHandler):
       # expected version.
       bot_id = self.request.get('bot_id') or self.request.headers.get(
           self._X_LUCI_SWARMING_BOT_ID)
-      self.redirect(str(server + '/bot_code?bot_id=' + bot_id))
+      redirect_url = server + '/bot_code'
+      if bot_id:
+        redirect_url += '?bot_id=' + bot_id
+      self.redirect(str(redirect_url))
       return
 
     # We don't need to do authentication in this path, because bot already
