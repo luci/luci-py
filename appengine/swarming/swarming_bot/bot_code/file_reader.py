@@ -4,8 +4,9 @@
 
 import json
 import logging
-import Queue
 import threading
+
+from six.moves import queue
 
 
 class FatalReadError(Exception):
@@ -27,7 +28,7 @@ class FileReaderThread(object):
     self._interval_sec = interval_sec
     self._max_attempts = max_attempts
     self._thread = None
-    self._signal = Queue.Queue()
+    self._signal = queue.Queue()
     self._lock = threading.Lock()
     self._last_value = None
 
@@ -95,7 +96,7 @@ class FileReaderThread(object):
     try:
       self._signal.get(timeout=timeout)
       return False
-    except Queue.Empty:
+    except queue.Empty:
       return True
 
   def _run(self):

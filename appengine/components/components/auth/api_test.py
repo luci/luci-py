@@ -8,10 +8,11 @@
 
 
 import datetime
-import Queue
 import sys
 import threading
 import unittest
+
+from six.moves import queue
 
 from test_support import test_env
 test_env.setup_test_env()
@@ -477,7 +478,7 @@ class TestAuthDBCache(test_case.TestCase):
 
     # Launch two threads running 'thread_proc', wait for them to stop, collect
     # whatever they return.
-    results_queue = Queue.Queue()
+    results_queue = queue.Queue()
     threads = [
         threading.Thread(target=lambda: results_queue.put(thread_proc()))
         for _ in range(2)
@@ -551,7 +552,7 @@ class TestAuthDBCache(test_case.TestCase):
 
     def run_in_thread(func):
       """Runs |func| in a parallel thread, returns future (as Queue)."""
-      result = Queue.Queue()
+      result = queue.Queue()
       thread = threading.Thread(target=lambda: result.put(func()))
       thread.start()
       return result
@@ -573,7 +574,8 @@ class TestAuthDBCache(test_case.TestCase):
     # Start fetching AuthDB from another thread, at some point it will call
     # 'fetch_auth_db', and we pause the thread then and resume main thread.
     fetching_now = threading.Event()
-    auth_db_queue = Queue.Queue()
+    auth_db_queue = queue.Queue()
+
     def mock_fetch_auth_db(**_kwargs):
       fetching_now.set()
       return auth_db_queue.get()

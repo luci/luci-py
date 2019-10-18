@@ -4,8 +4,9 @@
 
 import json
 import logging
-import Queue
 import threading
+
+from six.moves import queue
 
 from utils import file_path
 
@@ -26,7 +27,7 @@ class FileRefresherThread(object):
     self._producer_callback = producer_callback
     self._interval_sec = interval_sec
     self._thread = None
-    self._signal = Queue.Queue()
+    self._signal = queue.Queue()
     self._last_dumped_blob = None
 
   def start(self):
@@ -94,7 +95,7 @@ class FileRefresherThread(object):
     try:
       self._signal.get(timeout=timeout)
       return False
-    except Queue.Empty:
+    except queue.Empty:
       return True
 
   def _run(self):

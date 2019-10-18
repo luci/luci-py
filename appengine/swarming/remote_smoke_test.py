@@ -5,7 +5,6 @@
 
 """Integration test for the Swarming server."""
 
-import Queue
 import json
 import logging
 import optparse
@@ -15,6 +14,8 @@ import sys
 import tempfile
 import threading
 import time
+
+from six.moves import queue
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 CHECKOUT_DIR = os.path.dirname(os.path.dirname(APP_DIR))
@@ -225,7 +226,7 @@ def main():
 
   # Run all the tests in parallel.
   tests = get_all_tests()
-  results = Queue.Queue(maxsize=len(tests))
+  results = queue.Queue(maxsize=len(tests))
 
   for name, fn in sorted(tests.items()):
     logging.info('%s', name)
