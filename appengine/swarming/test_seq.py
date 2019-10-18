@@ -4,34 +4,13 @@
 # that can be found in the LICENSE file.
 
 import os
-import subprocess
 import sys
 
 import six
 
+from test_support import test_runner_seq
+
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
-
-
-def run_test(test_file, python3=False):
-  if python3 and not _has_py3_shebang(test_file):
-    print('Skipping test in python3: %s' % test_file)
-    return 0, True
-
-  # vpython
-  vpython = 'vpython'
-  if python3:
-    vpython += '3'
-
-  cmd = [vpython, os.path.join(ROOT_DIR, test_file), '-v']
-
-  print('Running test script: %r' % cmd)
-  return subprocess.call(cmd), False
-
-
-def _has_py3_shebang(path):
-  with open(path, 'r') as f:
-    maybe_shebang = f.readline()
-  return maybe_shebang.startswith('#!') and 'python3' in maybe_shebang
 
 
 def main():
@@ -48,39 +27,10 @@ def main():
       'swarming_bot/bot_code/bot_main_test.py',
       'local_smoke_test.py',
   ]
+  test_files = [os.path.join(ROOT_DIR, t) for t in test_files]
 
-  run_cnt = 0
-  skipped_tests = []
-  failed_tests = []
-  for test_file in test_files:
-    _exit_code, skipped = run_test(test_file, python3=six.PY3)
-    if skipped:
-      skipped_tests.append(test_file)
-      continue
-
-    if _exit_code:
-      failed_tests.append(test_file)
-
-    run_cnt += 1
-
-  print('\n-------------------------------------------------------------------')
-  print('Ran %d test files, Skipped %d test files' % (run_cnt,
-                                                      len(skipped_tests)))
-
-  if len(skipped_tests) > 0:
-    print('\nSkipped tests:')
-    for t in skipped_tests:
-      print(' - %s' % t)
-
-  if len(failed_tests) > 0:
-    print('\nFailed tests:')
-    for t in failed_tests:
-      print(' - %s' % t)
-    print('\nFAILED')
-    return 1
-
-  print('\nOK')
-  return 0
+  # execute test runner
+  return test_runner_seq.run_tests(test_files, python3=six.PY3)
 
 
 if __name__ == '__main__':
