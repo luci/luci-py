@@ -1,4 +1,4 @@
-#!/usr/bin/env vpython
+#!/usr/bin/env vpython3
 # Copyright 2018 The LUCI Authors. All rights reserved.
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
@@ -41,10 +41,13 @@ class TestSignedMetadataToken(auto_stub.TestCase):
 
   def test_works(self):
     # JWTs are '<header>.<payload>.<signature>'. We care only about payload.
-    jwt = 'unimportant.%s.unimportant' % base64.urlsafe_b64encode(json.dumps({
-      'iat': self.now - 600,
-      'exp': self.now + 3000,  # 1h after 'iat'
-    }))
+    bytes_json = bytes(
+        json.dumps({
+            'iat': self.now - 600,
+            'exp': self.now + 3000,  # 1h after 'iat'
+        }).encode('utf-8'))
+    jwt = b'unimportant.' + base64.urlsafe_b64encode(
+        bytes_json) + b'.unimportant'
 
     metadata_calls = []
     def mocked_raw_metadata_request(path):
