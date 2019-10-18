@@ -249,7 +249,7 @@ def get_zones():
   """Returns the list of zone values for the GCE VM."""
   # Ref: https://cloud.google.com/compute/docs/regions-zones/
   # 'continent-regionN-L' where N is a number and L a letter.
-  m = re.match(ur'([a-z]+)-([a-z]+)(\d)-([a-z])', get_zone())
+  m = re.match(r'([a-z]+)-([a-z]+)(\d)-([a-z])', get_zone())
   if not m:
     # Safety fallback in case a new form appears.
     return [get_zone()]

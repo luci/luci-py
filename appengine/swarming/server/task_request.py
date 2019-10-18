@@ -126,7 +126,7 @@ _TAG_LENGTH = config.DIMENSION_KEY_LENGTH + config.DIMENSION_VALUE_LENGTH + 1
 _HASH_CHARS = frozenset('0123456789abcdef')
 
 # Keep synced with named_cache.py
-_CACHE_NAME_RE = re.compile(ur'^[a-z0-9_]{1,4096}$')
+_CACHE_NAME_RE = re.compile(r'^[a-z0-9_]{1,4096}$')
 
 
 # Early verification of environment variable key name.

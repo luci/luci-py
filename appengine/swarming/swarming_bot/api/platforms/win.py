@@ -356,8 +356,8 @@ def get_cpuinfo():
       'HARDWARE\\DESCRIPTION\\System\\CentralProcessor\\0')
   try:
     identifier, _ = _winreg.QueryValueEx(k, 'Identifier')
-    match = re.match(
-        ur'^.+ Family (\d+) Model (\d+) Stepping (\d+)$', identifier)
+    match = re.match(r'^.+ Family (\d+) Model (\d+) Stepping (\d+)$',
+                     identifier)
     name, _ = _winreg.QueryValueEx(k, 'ProcessorNameString')
     vendor, _ = _winreg.QueryValueEx(k, 'VendorIdentifier')
     return {
