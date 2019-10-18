@@ -961,7 +961,7 @@ class TestBotMain(TestBotBase):
     def url_retrieve(f, url, headers=None, timeout=None):
       self.assertEqual(
           'https://localhost:1/swarming/api/v1/bot/bot_code'
-          '/123?bot_id=localhost', url)
+          '/123', url)
       self.assertEqual(new_zip, f)
       self.assertEqual({
           'Cookie': 'GOOGAPPUID=42',

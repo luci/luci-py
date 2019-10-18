@@ -1197,7 +1197,8 @@ class BotApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(expected, response)
 
   def test_bot_code_as_bot(self):
-    code = self.app.get('/bot_code')
+    self.mock(bot_code, 'get_bot_version', lambda _: ('0' * 64, None))
+    code = self.app.get('/swarming/api/v1/bot/bot_code/' + '0' * 64)
     expected = {'config/bot_config.py', 'config/config.json'}.union(
         bot_archive.FILES)
     with zipfile.ZipFile(StringIO.StringIO(code.body), 'r') as z:
@@ -1208,9 +1209,26 @@ class BotApiTest(test_env_handlers.AppTestBase):
     self.app.get('/bot_code', status=403)
 
   def test_bot_code_with_token(self):
+    self.mock(bot_code, 'get_bot_version', lambda _: ('0' * 64, None))
     self.set_as_anonymous()
     tok = bot_code.generate_bootstrap_token()
-    self.app.get('/bot_code?tok=%s' % tok, status=200)
+    self.app.get('/bot_code?tok=%s' % tok, status=302)
+
+  def test_bot_code_redirect(self):
+    self.mock(bot_code, 'get_bot_version', lambda _: ('0' * 64, None))
+    response = self.app.get('/bot_code')
+    self.assertEqual(response.status_int, 302)  # Found
+    self.assertEqual(
+        response.location,
+        'http://localhost/swarming/api/v1/bot/bot_code/' + '0' * 64)
+
+  def test_bot_code_wrong_version(self):
+    self.mock(bot_code, 'get_bot_version', lambda _: ('0' * 64, None))
+    response = self.app.get(
+        '/swarming/api/v1/bot/bot_code/' + '1' * 64,
+        headers={'X-Luci-Swarming-Bot-ID': 'bot1'})
+    self.assertEqual(response.status_int, 302)  # Found
+    self.assertEqual(response.location, 'http://localhost/bot_code?bot_id=bot1')
 
   def test_oauth_token_bad_scopes(self):
     self.set_as_bot()

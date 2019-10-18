@@ -138,6 +138,9 @@ class _BotAuthenticatingHandler(auth.AuthenticatingHandler):
   # for XSRF tokens.
   xsrf_token_enforce_on = ()
 
+  # This is header storing bot id.
+  _X_LUCI_SWARMING_BOT_ID = 'X-Luci-Swarming-Bot-ID'
+
   @classmethod
   def get_auth_methods(cls, conf):
     return _BOT_AUTH_METHODS
@@ -199,17 +202,35 @@ class BotCodeHandler(_BotAuthenticatingHandler):
   @auth.public  # auth inside check_bot_code_access()
   def get(self, version=None):
     server = self.request.host_url
-    self.check_bot_code_access(
-        bot_id=self.request.get('bot_id'), generate_token=False)
-    if version:
-      expected, _ = bot_code.get_bot_version(server)
-      if version != expected:
-        # This can happen when the server is rapidly updated.
-        logging.error('Requested Swarming bot %s, have %s', version, expected)
-        self.abort(404)
-      self.response.headers['Cache-Control'] = 'public, max-age=3600'
-    else:
-      self.response.headers['Cache-Control'] = 'no-cache, no-store'
+    expected, _ = bot_code.get_bot_version(server)
+    if not version:
+      # Historically, the bot_id query argument was used for the bot to pass its
+      # ID to the server. More recent bot code uses the X-Luci-Swarming-Bot-ID
+      # HTTP header instead so it doesn't bust the GAE transparent public cache.
+      # Support both mechanism until 2020-01-01.
+      bot_id = self.request.get('bot_id') or self.request.headers.get(
+          self._X_LUCI_SWARMING_BOT_ID)
+      self.check_bot_code_access(bot_id=bot_id, generate_token=False)
+
+      # Let default access to redirect to url with version so that we can use
+      # cache for response safely.
+      redirect_url = str(server + '/swarming/api/v1/bot/bot_code/' + expected)
+      self.redirect(redirect_url)
+      return
+
+    if version != expected:
+      # The client is requesting an unexpected hash. Redirects to /bot_code,
+      # which will ensure authentication, then will redirect to the currently
+      # expected version.
+      bot_id = self.request.get('bot_id') or self.request.headers.get(
+          self._X_LUCI_SWARMING_BOT_ID)
+      self.redirect(str(server + '/bot_code?bot_id=' + bot_id))
+      return
+
+    # We don't need to do authentication in this path, because bot already
+    # knows version of bot_code, and the content may be in edge cache.
+    self.response.headers['Cache-Control'] = 'public, max-age=3600'
+
     self.response.headers['Content-Type'] = 'application/octet-stream'
     self.response.headers['Content-Disposition'] = (
         'attachment; filename="swarming_bot.zip"')
@@ -774,6 +795,7 @@ class BotOAuthTokenHandler(_BotApiHandler):
       self.abort_with_error(400, error=msg)
 
     account_id = request['account_id']
+    # TODO(crbug.com/1015701): take from X-Luci-Swarming-Bot-ID header.
     bot_id = request['id']
     scopes = request['scopes']
     task_id = request.get('task_id')
@@ -878,6 +900,7 @@ class BotTaskUpdateHandler(_BotApiHandler):
     if msg:
       self.abort_with_error(400, error=msg)
 
+    # TODO(crbug.com/1015701): take from X-Luci-Swarming-Bot-ID header.
     bot_id = request['id']
     task_id = request['task_id']
 
@@ -1036,6 +1059,7 @@ class BotTaskErrorHandler(_BotApiHandler):
   @auth.public  # auth happens in bot_auth.validate_bot_id_and_fetch_config
   def post(self, task_id=None):
     request = self.parse_body()
+    # TODO(crbug.com/1015701): take from X-Luci-Swarming-Bot-ID header.
     bot_id = request.get('id')
     task_id = request.get('task_id', '')
     message = request.get('message', 'unknown')
