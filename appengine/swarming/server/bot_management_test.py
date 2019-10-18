@@ -284,11 +284,29 @@ class BotManagementTest(test_case.TestCase):
           bot_management.BotInfo.IDLE,
         ],
         quarantined=True)
+
     bot_info = bot_management.get_info_key('id1').get()
     self.assertEqual(expected, bot_info.to_dict())
 
-    # No BotEvent is registered for 'poll'.
+    # BotEvent is registered for poll when BotInfo creates
+    expected_event = _gen_bot_event(
+        event_type=u'request_sleep', quarantined=True)
+    bot_events = bot_management.get_events_query('id1', True)
+    self.assertEqual([expected_event], [e.to_dict() for e in bot_events])
+
+    # flush bot events
+    ndb.delete_multi(e.key for e in bot_events)
+
+    # BotEvent is not registered for poll when no dimensions change
+    _bot_event(event_type='request_sleep', quarantined=True)
     self.assertEqual([], bot_management.get_events_query('id1', True).fetch())
+
+    # BotEvent is registered for poll when dimensions change
+    dims = {u'foo': [u'bar']}
+    _bot_event(event_type='request_sleep', quarantined=True, dimensions=dims)
+    expected_event['dimensions'] = dims
+    bot_events = bot_management.get_events_query('id1', True).fetch()
+    self.assertEqual([expected_event], [e.to_dict() for e in bot_events])
 
   def test_bot_event_busy(self):
     _bot_event(event_type='bot_connected')
