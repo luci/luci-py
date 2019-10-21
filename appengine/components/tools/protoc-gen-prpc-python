@@ -104,6 +104,15 @@ def generate_code(file_descriptor, all_files):
   return ('\n'.join(fragments)).strip() + '\n'
 
 
+def safe_filename(filename):
+  # For compatibility with Python generator, converts a.b/c/d/ to a/b/c/d,
+  # since Python doesn't allow '.' in package names.
+  parts = filename.split('/')
+  for i, part in enumerate(parts[:-1]):
+    parts[i] = part.replace('.', '/')
+  return '/'.join(parts)
+
+
 def main():
   data = sys.stdin.read()
   req = plugin.CodeGeneratorRequest()
@@ -114,7 +123,7 @@ def main():
     file = files[file_name]
     if file.service:
       res.file.add(
-          name=file.name.replace('.proto', '_prpc_pb2.py'),
+          name=safe_filename(file.name).replace('.proto', '_prpc_pb2.py'),
           content=generate_code(file, files),
       )
   sys.stdout.write(res.SerializeToString())
