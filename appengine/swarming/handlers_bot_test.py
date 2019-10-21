@@ -1226,6 +1226,11 @@ class BotApiTest(test_env_handlers.AppTestBase):
     with zipfile.ZipFile(StringIO.StringIO(code.body), 'r') as z:
       self.assertEqual(expected, set(z.namelist()))
 
+  def test_bot_code_as_bot_query_string(self):
+    self.mock(bot_code, 'get_bot_version', lambda _: ('0' * 64, None))
+    self.app.get(
+        '/swarming/api/v1/bot/bot_code/' + '0' * 64 + '?bot_id=1', status=302)
+
   def test_bot_code_without_token(self):
     self.set_as_anonymous()
     self.app.get('/bot_code', status=403)

@@ -230,6 +230,15 @@ class BotCodeHandler(_BotAuthenticatingHandler):
       self.redirect(str(redirect_url))
       return
 
+    if self.request.query_string:
+      logging.info('ignoring query string: %s', self.request.query_string)
+
+      # If bot has query string, let the request redirect to url not having
+      # query string to share the content from cache.
+      redirect_url = str(server + '/swarming/api/v1/bot/bot_code/' + expected)
+      self.redirect(redirect_url)
+      return
+
     # We don't need to do authentication in this path, because bot already
     # knows version of bot_code, and the content may be in edge cache.
     self.response.headers['Cache-Control'] = 'public, max-age=3600'
