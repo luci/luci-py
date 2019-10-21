@@ -25,7 +25,7 @@ def main():
 
   # execute test runner
   sys.path.insert(0, SWARMING_DIR)
-  from test_support import parallel_test_runner
+  from test_support import sequential_test_runner
   return sequential_test_runner.run_tests(abs_test_files, python3=six.PY3)
 
 
