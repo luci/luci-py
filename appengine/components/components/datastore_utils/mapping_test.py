@@ -25,6 +25,10 @@ def int_ceil_div(value, divisor):
 
 
 class MappingTest(test_case.TestCase):
+  # This test fails when running with other tests
+  # Need to run in test_seq.py
+  no_run = 1
+
   def test_pop_future(self):
     items = [ndb.Future() for _ in range(5)]
     items[1].set_result(None)

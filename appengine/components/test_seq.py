@@ -20,6 +20,9 @@ def main():
   test_files = [
       'components/auth/delegation_test.py',
       'components/auth/project_tokens_test.py',
+      'components/auth/service_account_test.py',
+      'components/datastore_utils/mapping_test.py',
+      'components/utils_test.py',
       'components/endpoints_webapp2/discovery_test.py',
   ]
   abs_test_files = [os.path.join(ROOT_DIR, t) for t in test_files]

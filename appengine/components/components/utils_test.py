@@ -394,6 +394,10 @@ class FingerprintTest(test_case.TestCase):
 
 
 class AsyncApplyTest(test_case.TestCase):
+  # This test fails when running with other tests
+  # Need to run in test_seq.py
+  no_run = 1
+
   def test_ordered(self):
     items = range(3)
 
