@@ -63,7 +63,14 @@ def seal_token(subtoken):
       pkcs1_sha256_sig=pkcs1_sha256_sig)
 
 
-class SerializationTest(test_case.TestCase):
+class DelegationTestBase(test_case.TestCase):
+  # These tests fail with
+  # 'TokenCreationError: Token server URL is not configured'
+  # Needs to run in test_seq.py as an executable
+  no_run = 1
+
+
+class SerializationTest(DelegationTestBase):
   def test_serialization_works(self):
     msg = fake_token_proto()
     tok = serialize_token(msg)
@@ -89,7 +96,7 @@ class SerializationTest(test_case.TestCase):
       delegation.deserialize_token(tok)
 
 
-class SignatureTest(test_case.TestCase):
+class SignatureTest(DelegationTestBase):
   def setUp(self):
     super(SignatureTest, self).setUp()
     api.reset_local_state()  # to clear request-cached AuthDB
@@ -142,7 +149,7 @@ class SignatureTest(test_case.TestCase):
       delegation.unseal_token(msg)
 
 
-class ValidationTest(test_case.TestCase):
+class ValidationTest(DelegationTestBase):
   def test_passes_validation(self):
     tok = fake_subtoken_proto('user:abc@example.com')
     ident = delegation.check_subtoken(tok, FAKE_IDENT, api.AuthDB.empty())
@@ -225,7 +232,7 @@ class ValidationTest(test_case.TestCase):
       delegation.check_subtoken(tok, make_id('user:c@c.com'), auth_db)
 
 
-class CreateTokenTest(test_case.TestCase):
+class CreateTokenTest(DelegationTestBase):
 
   Response = collections.namedtuple('Response', ['status_code', 'content'])
 

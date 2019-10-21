@@ -18,6 +18,7 @@ CLIENT_THIRD_PARTY_DIR = os.path.join(LUCI_DIR, 'client', 'third_party')
 
 def run_tests(python3=False):
   """Discover unittests and run them using nose2"""
+  # override default log level
   if not _has_arg(sys.argv, '--log-level'):
     logging.basicConfig(level=logging.CRITICAL)
 

@@ -18,14 +18,9 @@ def main():
   # because they don't pass when running in parallel
   # or run via test runner
   test_files = [
-      'handlers_backend_test.py',
-      'handlers_endpoints_test.py',
-      'handlers_prpc_test.py',
-      'server/bot_groups_config_test.py',
-      'swarming_bot/api/os_utilities_test.py',
-      'swarming_bot/bot_code/singleton_test.py',
-      'swarming_bot/bot_code/bot_main_test.py',
-      'local_smoke_test.py',
+      'tests/swarming_test.py',
+      'tests/run_isolated_test.py',
+      'tests/logging_utils_test.py',
   ]
   abs_test_files = [os.path.join(ROOT_DIR, t) for t in test_files]
 

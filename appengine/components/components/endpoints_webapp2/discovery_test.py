@@ -120,6 +120,9 @@ class ServiceB(remote.Service):
 
 class DiscoveryWebapp2TestCase(test_case.TestCase):
   """Tests for discovery.py"""
+  # These tests fail when running via unitest runner
+  # Needs to run in test_seq.py as executable
+  no_run = 1
 
   def test_normalize_name(self):
     """Tests discovery._normalize_name."""
