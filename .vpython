@@ -46,6 +46,12 @@ wheel: <
   >
 >
 
+# required by presubmit_support
+wheel: <
+  name: "infra/python/wheels/httplib2-py2_py3"
+  version: "version:0.10.3"
+>
+
 # Note that six is used by other than tests
 # Make sure that python can find six in production
 # required by nose2
