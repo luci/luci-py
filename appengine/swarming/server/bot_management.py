@@ -540,11 +540,11 @@ def bot_event(
   bot_info.external_ip = external_ip
   bot_info.authenticated_as = authenticated_as
   bot_info.maintenance_msg = maintenance_msg
-  dimenssions_updated = False
+  dimensions_updated = False
   if dimensions:
     dimensions_flat = task_queues.dimensions_to_flat(dimensions)
     if bot_info.dimensions_flat != dimensions_flat:
-      dimenssions_updated = True
+      dimensions_updated = True
       bot_info.dimensions_flat = dimensions_flat
   if state:
     bot_info.state = state
@@ -562,8 +562,8 @@ def bot_event(
     task_queues.cleanup_after_bot(info_key.parent())
 
   try:
-    if event_type in ('request_sleep', 'task_update') and \
-        not dimenssions_updated:
+    if event_type in ('request_sleep',
+                      'task_update') and not dimensions_updated:
       # Handle this specifically. It's not much of an even worth saving a
       # BotEvent for but it's worth updating BotInfo. The only reason BotInfo is
       # GET is to keep first_seen_ts. It's not necessary to use a transaction
