@@ -418,6 +418,9 @@ def _yield_potential_tasks(bot_id):
     # It is possible that all futures are done if every queue has less than 10
     # task pending.
     while any(futures) or items:
+      logging.debug(
+          '_yield_potential_tasks(%s): yielding %s items and %s futures',
+          bot_id, len(items), len(futures))
       if items:
         yield items[0]
         items = items[1:]
