@@ -61,8 +61,7 @@ class GetProjectAccessTokenTest(test_case.TestCase):
     return utils.datetime_to_timestamp(datetimeobj) / 10**6
 
   def test_success(self):
-    now_for_mock = utils.utcnow()
-    self.mock(utils, 'utcnow', lambda: now_for_mock)
+    self.mock_now(datetime.datetime(2015, 1, 2, 3))
 
     model.AuthReplicationState(
       key=model.replication_state_key(),
