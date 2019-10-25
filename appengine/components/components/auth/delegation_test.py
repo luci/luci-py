@@ -144,7 +144,10 @@ class SignatureTest(DelegationTestBase):
 
   def test_bad_signature(self):
     msg = seal_token(fake_subtoken_proto())
-    msg.pkcs1_sha256_sig = msg.pkcs1_sha256_sig[:-1] + 'A'
+
+    # make sure that pkcs1_sha256_sig is changed.
+    msg.pkcs1_sha256_sig = msg.pkcs1_sha256_sig[:-1] + chr(
+        ord(msg.pkcs1_sha256_sig[-1]) ^ 1)
     with self.assertRaises(exceptions.BadTokenError):
       delegation.unseal_token(msg)
 
