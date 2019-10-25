@@ -358,7 +358,7 @@ def _flush_futures(futures):
 @ndb.tasklet
 def _delete_stale_BotTaskDimensions(bot_dimensions, bot_root_key, cleaned):
   """Deletes any BotTaskDimensions that do not match the current dimensions."""
-  qit = BotTaskDimensions.query(ancestor=bot_root_key).iter(batch_size=64)
+  qit = BotTaskDimensions.query(ancestor=bot_root_key).iter(batch_size=256)
   iter_cnt = 0
   try:
     while (yield qit.has_next_async()):
@@ -389,7 +389,7 @@ def _update_BotTaskDimensions_slice(
   run that are ACTIVE queues, e.g. TaskDimensions.valid_until_ts is in the
   future.
   """
-  qit = q.iter(batch_size=100, deadline=15)
+  qit = q.iter(batch_size=256, deadline=15)
   iter_cnt = 0
   try:
     while (yield qit.has_next_async()):
