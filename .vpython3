@@ -28,6 +28,11 @@ wheel: <
  version: "version:0.9.1"
 >
 
+wheel: <
+ name: "infra/python/wheels/parameterized-py2_py3"
+ version: "version:0.7.0"
+>
+
 # required by nose2
 wheel: <
  name: "infra/python/wheels/pbr-py2_py3"
