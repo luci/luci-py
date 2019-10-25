@@ -84,7 +84,7 @@ def make_appengine_id(hostname, work_dir):
     An integer in the range [0, 999].
   """
   s = '%s-%s:%s' % (utcnow().strftime('%Y-%m-%d'), hostname, work_dir)
-  googappuid = int(hashlib.sha1(s).hexdigest(), 16) % 1000
+  googappuid = int(hashlib.sha1(s.encode('utf-8')).hexdigest(), 16) % 1000
   logging.debug('GOOGAPPUID = sha1(%s) %% 1000 = %d', s, googappuid)
   return googappuid
 
