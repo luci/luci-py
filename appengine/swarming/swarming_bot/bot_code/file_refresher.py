@@ -59,7 +59,7 @@ class FileRefresherThread(object):
           self._producer_callback(),
           sort_keys=True,
           indent=2,
-          separators=(',', ': '))
+          separators=(',', ': ')).encode('utf-8')
     except Exception:
       logging.exception('Unexpected exception in the callback')
       return True
