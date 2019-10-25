@@ -67,7 +67,7 @@ class Singleton(object):
         return False
       self.handle.seek(0, os.SEEK_SET)
       self.handle.truncate(0)
-      self.handle.write(str(os.getpid()))
+      self.handle.write(str(os.getpid()).encode('utf-8'))
       return True
 
   def release(self):
@@ -91,7 +91,7 @@ def singleton(rootdir):
   s = Singleton(rootdir)
   acquired = s.acquire()
   try:
-      yield acquired
+    yield acquired
   finally:
     if acquired:
       s.release()
