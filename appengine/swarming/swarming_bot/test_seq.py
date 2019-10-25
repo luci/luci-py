@@ -9,7 +9,8 @@ import sys
 import six
 
 THIS_DIR = os.path.dirname(os.path.abspath(__file__))
-SWARMING_DIR = os.path.dirname(THIS_DIR)
+APPENGINE_DIR = os.path.dirname(os.path.dirname(THIS_DIR))
+COMPONENTS_DIR = os.path.join(APPENGINE_DIR, 'components')
 
 
 def main():
@@ -24,7 +25,7 @@ def main():
   abs_test_files = [os.path.join(THIS_DIR, t) for t in test_files]
 
   # execute test runner
-  sys.path.insert(0, SWARMING_DIR)
+  sys.path.insert(0, COMPONENTS_DIR)
   from test_support import sequential_test_runner
   return sequential_test_runner.run_tests(abs_test_files, python3=six.PY3)
 

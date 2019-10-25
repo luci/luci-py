@@ -9,17 +9,18 @@ import sys
 import six
 
 
-SWARMING_BOT_DIR = os.path.dirname(os.path.abspath(__file__))
-SWARMING_DIR = os.path.dirname(SWARMING_BOT_DIR)
+THIS_DIR = os.path.dirname(os.path.abspath(__file__))
+APPENGINE_DIR = os.path.dirname(os.path.dirname(THIS_DIR))
+COMPONENTS_DIR = os.path.join(APPENGINE_DIR, 'components')
 
 
 def main():
-  sys.path.insert(0, SWARMING_BOT_DIR)
+  sys.path.insert(0, THIS_DIR)
   import test_env_bot
   test_env_bot.setup_test_env()
 
   # execute test runner
-  sys.path.insert(0, SWARMING_DIR)
+  sys.path.insert(0, COMPONENTS_DIR)
   from test_support import parallel_test_runner
   return parallel_test_runner.run_tests(python3=six.PY3)
 
