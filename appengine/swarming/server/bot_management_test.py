@@ -9,6 +9,8 @@ import logging
 import sys
 import unittest
 
+from parameterized import parameterized
+
 import test_env
 test_env.setup_test_env()
 
@@ -265,6 +267,62 @@ class BotManagementTest(test_case.TestCase):
         ['bot_connected', 5],
         memcache.get('id1:2010-01-02T03:04', namespace='BotEvents'))
 
+  @parameterized.expand([
+      (u'task_completed', True),
+      (u'task_error', True),
+      (u'task_killed', True),
+      (u'request_sleep', True),
+      (u'task_update', False),
+  ])
+  def test_bot_event_reset_task(self, event, reset_task):
+    bot_id = 'id1'
+    d = {
+        u'id': [u'id1'],
+        u'os': [u'Ubuntu', u'Ubuntu-16.04'],
+        u'pool': [u'default'],
+    }
+    bot_management.bot_event(
+        event_type=event,
+        bot_id=bot_id,
+        external_ip='8.8.4.4',
+        authenticated_as='bot:id1.domain',
+        dimensions=d,
+        state={'ram': 65},
+        version=_VERSION,
+        quarantined=False,
+        maintenance_msg=None,
+        task_id='12311',
+        task_name='yo')
+
+    # check bot_info
+    composite = [
+        bot_management.BotInfo.NOT_IN_MAINTENANCE,
+        bot_management.BotInfo.ALIVE,
+        bot_management.BotInfo.HEALTHY,
+    ]
+    if reset_task:
+      # bot_info.task_id and bot_info.task_name should be reset
+      expected = _gen_bot_info(
+          composite=composite+[bot_management.BotInfo.IDLE],
+          id=bot_id,
+          task_id='',
+          task_name=None)
+    else:
+      # bot_info.task_id and bot_info.task_name should be kept
+      expected = _gen_bot_info(
+          composite=composite+[bot_management.BotInfo.BUSY],
+          id=bot_id,
+          task_id=u'12311',
+          task_name=u'yo')
+    self.assertEqual(expected,
+                     bot_management.get_info_key(bot_id).get().to_dict())
+
+    # bot_event should have task_id
+    expected_events = [_gen_bot_event(event_type=event, task_id=u'12311')]
+    self.assertEqual(
+        expected_events,
+        [i.to_dict() for i in bot_management.get_events_query(bot_id, True)])
+
   def test_get_events_query(self):
     _bot_event(event_type='bot_connected')
     expected = [_gen_bot_event(event_type=u'bot_connected')]
@@ -283,6 +341,7 @@ class BotManagementTest(test_case.TestCase):
           bot_management.BotInfo.QUARANTINED,
           bot_management.BotInfo.IDLE,
         ],
+        task_id='',
         quarantined=True)
 
     bot_info = bot_management.get_info_key('id1').get()
@@ -290,7 +349,7 @@ class BotManagementTest(test_case.TestCase):
 
     # BotEvent is registered for poll when BotInfo creates
     expected_event = _gen_bot_event(
-        event_type=u'request_sleep', quarantined=True)
+        event_type=u'request_sleep', quarantined=True, task_id='')
     bot_events = bot_management.get_events_query('id1', True)
     self.assertEqual([expected_event], [e.to_dict() for e in bot_events])
 
