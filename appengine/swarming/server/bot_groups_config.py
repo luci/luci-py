@@ -744,7 +744,7 @@ def _do_fetch_bot_groups(known_cfg=None):
           if bot_id in known_prefixes:
             # TODO(tandrii): change to error and skip this prefix
             # https://crbug.com/781087.
-            logging.warn(
+            logging.warning(
                 'bot_id "%s" is equal to existing bot_id_prefix of other group',
                 bot_id)
           direct_matches[bot_id] = group_cfg
@@ -758,10 +758,10 @@ def _do_fetch_bot_groups(known_cfg=None):
       if bot_id_prefix in direct_matches:
         # TODO(tandrii): change to error and skip this prefix
         # https://crbug.com/781087.
-        logging.warn(
+        logging.warning(
             'bot_id_prefix "%s" is equal to existing bot of %s', bot_id_prefix,
-            'the same group ' if group_cfg == direct_matches[bot_id_prefix] else
-            'another group')
+            'the same group '
+            if group_cfg == direct_matches[bot_id_prefix] else 'another group')
       prefix_matches.append((bot_id_prefix, group_cfg))
       known_prefixes.add(bot_id_prefix)
 
