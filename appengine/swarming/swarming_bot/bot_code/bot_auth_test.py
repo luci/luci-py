@@ -6,6 +6,7 @@
 import json
 import logging
 import os
+import platform
 import sys
 import tempfile
 import time
@@ -198,6 +199,8 @@ class AuthSystemTest(auto_stub.TestCase):
       self.assertEqual(u'bot-own-token', resp['access_token'])
       self.assertEqual(exp, resp['expiry'])
 
+  @unittest.skipIf(platform.system() == 'Darwin',
+                   'TODO(crbug.com/1017545): fails with time out ocationally')
   def test_using_bot_without_known_email(self):
     # An auth system configured to use both system and task accounts, both set
     # to bot's own credentials, with email not known.

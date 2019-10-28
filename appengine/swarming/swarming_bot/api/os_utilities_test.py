@@ -119,6 +119,10 @@ class TestOsUtilities(auto_stub.TestCase):
     actual = os_utilities.get_gpu()
     self.assertTrue(actual is None or actual)
 
+  @unittest.skipIf(platform.system() == 'Darwin',
+                   'TODO(crbug.com/1017545): '
+                   'AssertionError: Items in the first set but not the second:'
+                   'u\'xcode_version\'')
   def test_get_dimensions(self):
     dimensions = os_utilities.get_dimensions()
     for key, values in dimensions.items():
