@@ -168,7 +168,9 @@ class _BotCommon(ndb.Model):
       if l.startswith(u'pool:'):
         out.pools.append(l[len(u'pool:'):])
 
-    # https://crbug.com/916578: MISSSING
+    if self.is_dead:
+      out.status = swarming_pb2.MISSING
+      out.status_msg = ''
     # https://crbug.com/757931: QUARANTINED_BY_SERVER
     # https://crbug.com/870723: OVERHEAD_BOT_INTERNAL
     # https://crbug.com/870723: HOST_REBOOTING
@@ -273,9 +275,6 @@ class BotInfo(_BotCommon):
     """Converts self to a swarming_pb2.Bot."""
     # This populates most of the data.
     super(BotInfo, self).to_proto(out)
-    if self.is_dead:
-      out.state = swarming_pb2.MISSING
-      out.state_msg = ''
     # https://crbug.com/757931: QUARANTINED_BY_SERVER
     # https://crbug.com/870723: OVERHEAD_BOT_INTERNAL
     # https://crbug.com/870723: HOST_REBOOTING
@@ -329,33 +328,34 @@ class BotEvent(_BotCommon):
   }
 
   ALLOWED_EVENTS = {
-    # Bot specific events that are outside the scope of a task:
-    'bot_connected',
-    # Deprecated. Use bot_hook_error or bot_internal_failure.
-    # TODO(maruel): Remove 2020-01-01.
-    'bot_error',
-    'bot_internal_failure',
-    'bot_hook_error',
-    'bot_hook_log',
-    'bot_leased',
-    # Deprecated. Use bot_hook_log.
-    # TODO(maruel): Remove 2020-01-01.
-    'bot_log',
-    'bot_rebooting',
-    'bot_shutdown',
-    'bot_terminate',
+      # Bot specific events that are outside the scope of a task:
+      'bot_connected',
+      # Deprecated. Use bot_hook_error or bot_internal_failure.
+      # TODO(maruel): Remove 2020-01-01.
+      'bot_error',
+      'bot_internal_failure',
+      'bot_hook_error',
+      'bot_hook_log',
+      'bot_leased',
+      # Deprecated. Use bot_hook_log.
+      # TODO(maruel): Remove 2020-01-01.
+      'bot_log',
+      'bot_rebooting',
+      'bot_shutdown',
+      'bot_terminate',
+      # TODO(crbug/916578): Add 'bot_missing'.
 
-    # Bot polling result:
-    'request_restart',
-    'request_sleep',
-    'request_task',
-    'request_update',
+      # Bot polling result:
+      'request_restart',
+      'request_sleep',
+      'request_task',
+      'request_update',
 
-    # Task lifetime as processed by the bot:
-    'task_completed',
-    'task_error',
-    'task_killed',
-    'task_update',
+      # Task lifetime as processed by the bot:
+      'task_completed',
+      'task_error',
+      'task_killed',
+      'task_update',
   }
 
   # Common properties for all events (which includes everything in _BotCommon).
@@ -364,6 +364,11 @@ class BotEvent(_BotCommon):
 
   # event_type == 'bot_error', 'request_restart', 'bot_rebooting', etc.
   message = ndb.TextProperty()
+
+  @property
+  def is_dead(self):
+    # TODO(crbug/916578): Return True on 'bot_missing' event.
+    return False
 
   @property
   def previous_key(self):
@@ -669,6 +674,8 @@ def has_capacity(dimensions):
 
 def cron_update_bot_info():
   """Refreshes BotInfo.composite for dead bots."""
+  # TODO(crbug/916578): Ensure a BotEvent is registered so it can be queried in
+  # the Big Query swarming.bot_events table.
   dt = datetime.timedelta(seconds=config.settings().bot_death_timeout_secs)
   cutoff = utils.utcnow() - dt
 
