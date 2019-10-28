@@ -41,20 +41,7 @@ class ContentEntry(ndb.Model):
 
   Parent is a ContentShard.
 
-  Key is '<namespace>-<hash>'.
-
-  Eventually, the table name could have a prefix to determine the hashing
-  algorithm, like 'sha1-'.
-
-  There's usually only one table name:
-    - default:    The default CAD.
-    - temporary*: This family of namespace is a discardable namespace for
-                  testing purpose only.
-
-  The table name can have suffix:
-    - -deflate: The namespace contains the content in deflated format. The
-                content key is the hash of the uncompressed data, not the
-                compressed one. That is why it is in a separate namespace.
+  Key is '<namespace>/<hash>'.
   """
   # Cache the file size for statistics purposes.
   compressed_size = ndb.IntegerProperty(indexed=False)
@@ -89,7 +76,7 @@ class ContentEntry(ndb.Model):
     """Is it the raw data or was it modified in any form, e.g. compressed, so
     that the SHA-1 doesn't match.
     """
-    return self.key.parent().id().endswith(('-bzip2', '-deflate', '-gzip'))
+    return self.key.parent().id().endswith(('-deflate', '-gzip'))
 
 
 ### Private stuff.
@@ -138,8 +125,17 @@ def get_entry_key(namespace, hash_key):
 
 def entry_key_from_id(key_id):
   """Returns the ndb.Key for the key_id."""
-  hash_key = key_id.rsplit('/', 1)[1]
+  namespace, hash_key = key_id.rsplit('/', 1)
+  # https://crbug.com/944896
   N = config.settings().sharding_letters
+  assert N in (1, 4), N
+  if namespace != 'default-gzip':
+    # This is to work around https://crbug.com/943571, where prod instances have
+    # sharding_letters: 1. Oops.
+    #
+    # This is a temporary hack until we migrate off default-gzip and
+    # deprecate sharding_letters.
+    N = 4
   return ndb.Key(
       ContentEntry, key_id,
       parent=datastore_utils.shard_key(hash_key, N, 'ContentShard'))

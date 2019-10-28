@@ -20,12 +20,11 @@ message SettingsCfg {
   // second per bucket.
   //
   // Each letter represent 4 bits of information, so the number of ContentShard
-  // will be 16**N. Nominal values are:
+  // will be 16**N. Allowed values are:
   //   1: 16 buckets
-  //   2: 256 buckets
-  //   3: 4096 buckets
   //   4: 65536 buckets
-  // Default: 4.
+  //
+  // Deprecated: https://crbug.com/944896
   optional int32 sharding_letters = 3;
 
   // The Google Cloud Storage bucket where to save the data. By
