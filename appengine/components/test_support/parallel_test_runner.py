@@ -3,9 +3,11 @@
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
 
+import argparse
 import logging
 import os
 import sys
+import unittest
 
 import six
 from nose2 import discover
@@ -18,9 +20,7 @@ CLIENT_THIRD_PARTY_DIR = os.path.join(LUCI_DIR, 'client', 'third_party')
 
 def run_tests(python3=False):
   """Discover unittests and run them using nose2"""
-  # override default log level
-  if not _has_arg(sys.argv, '--log-level'):
-    logging.basicConfig(level=logging.CRITICAL)
+  hook_args(sys.argv)
 
   plugins = []
   if python3:
@@ -36,8 +36,18 @@ def run_tests(python3=False):
   discover(plugins=plugins)
 
 
-def _has_arg(argv, arg):
-  return any(arg in a for a in argv)
+def hook_args(argv):
+  parser = argparse.ArgumentParser(add_help=False)
+  parser.add_argument('-v', '--verbose', action='store_true')
+  parser.add_argument('--log-level')
+  args, _ = parser.parse_known_args(argv)
+
+  if args.verbose:
+    unittest.TestCase.maxDiff = None
+
+  if not args.log_level:
+    # override default log level
+    logging.basicConfig(level=logging.CRITICAL)
 
 
 if __name__ == '__main__':
