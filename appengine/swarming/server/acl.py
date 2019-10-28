@@ -79,9 +79,14 @@ def _is_project():
 
   This happens when the request is coming from a trusted LUCI service which
   acts in a context of some LUCI project. We trust such services to authorize
-  access to Swarming however they like. Swarming may impose some additional
-  checks in pool ACLs though (e.g. make sure a pool is used only by some
-  specific projects).
+  access to Swarming however they like. A proper Swarming configuration should
+  impose additional checks in pool ACLs (e.g. make sure a pool is used only by
+  some specific projects).
+
+  Historically 'project:...' identities could not be used in auth_service. This
+  will be resolved with https://crbug.com/1014669. Then in theory this function
+  could be removed and each instance would have the corresponding 'project:...'
+  identity in the user group.
   """
   return auth.get_current_identity().is_project
 
@@ -97,8 +102,8 @@ def is_ip_whitelisted_machine():
 
 def can_access():
   """Minimally authenticated user."""
-  return (_is_user() or _is_project() or _is_view_all_bots() or
-          _is_view_all_tasks())
+  return (_is_user() or _is_view_all_bots() or _is_view_all_tasks() or
+          _is_project())
 
 
 #### Config
@@ -153,11 +158,8 @@ def can_view_bot():
 
 
 def can_create_task():
-  """Can create a task.
-
-  Swarming is reentrant, a bot can create a new task as part of a task. This may
-  change in the future.
-  """
+  """Can create a task."""
+  # TODO(crbug/1018872): Remove _is_project().
   return _is_user() or _is_project()
 
 
@@ -169,8 +171,7 @@ def can_schedule_high_priority_tasks():
 def can_edit_task(task):
   """Can 'edit' tasks, like cancelling.
 
-  Since bots can create tasks, they can also cancel them. This may change in the
-  future.
+  The account that created a task can cancel it.
   """
   return (_is_privileged_user() or
           auth.get_current_identity() == task.authenticated)
