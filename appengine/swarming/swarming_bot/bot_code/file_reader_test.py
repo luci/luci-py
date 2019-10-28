@@ -43,12 +43,10 @@ class TestFileReaderThread(auto_stub.TestCase):
 
       # Change the file. Expect possible conflict on Windows.
       attempt = 0
+      bytes_json = json.dumps({'B': 'b'}).encode('utf-8')
       while True:
         try:
-          file_path.atomic_replace(self.path,
-                                   json.dumps({
-                                       'B': 'b'
-                                   }).encode('utf-8'))
+          file_path.atomic_replace(self.path, bytes_json)
           break
         except OSError:
           attempt += 1
