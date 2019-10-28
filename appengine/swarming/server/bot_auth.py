@@ -209,20 +209,20 @@ def _is_valid_ident_for_bot(ident, bot_id):
 
 
 def _extract_primary_hostname(bot_id):
-   """If the bot_id is a composed name, return just the primary hostname.
+  """If the bot_id is a composed name, return just the primary hostname.
 
    Multiple bots running on the same host may use the host's token to
    authenticate. When this is the case, the hostname is needed to
    validate the token. It can be extracted from their bot_ids, which will take
    the form $(hostname)--$(random_identifier).
    """
-   # TODO(bpastene): Change the '--' seperator to something more unique if/when
-   # this is used in production.
-   if not bot_id:
-     return bot_id
-   parts = bot_id.split('--')
-   if len(parts) == 2:
-     return parts[0]
-   elif len(parts) > 2:
-     logging.error('Unable to parse composed bot_id: %s', bot_id)
-   return bot_id
+  # TODO(bpastene): Change the '--' seperator to something more unique if/when
+  # this is used in production.
+  if not bot_id:
+    return bot_id
+  parts = bot_id.split('--')
+  if len(parts) == 2:
+    return parts[0]
+  elif len(parts) > 2:
+    logging.error('Unable to parse composed bot_id: %s', bot_id)
+  return bot_id

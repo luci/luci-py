@@ -104,4 +104,3 @@ class Error(ndb.Model):
   os = ndb.StringProperty()
   # The local user, orthogonal to authentication in self.identity.
   user = ndb.StringProperty()
-

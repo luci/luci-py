@@ -334,8 +334,7 @@ def setup_bot(bot):
   os_utilities.set_auto_startup_win() or os_utilities.set_auto_startup_osx().
   """
   with open(os.path.join(bot.base_dir, 'README'), 'wb') as f:
-    f.write(
-"""This directory contains a Swarming bot.
+    f.write("""This directory contains a Swarming bot.
 
 Swarming source code is hosted at
 https://chromium.googlesource.com/infra/luci/luci-py.git.

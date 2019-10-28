@@ -89,7 +89,7 @@ def insert_async(entity, new_key_callback=None, extra=None):
     if new_key_callback:
       key = new_key_callback()
     if isinstance(key, ndb.Future):
-       return key
+      return key
     future = ndb.Future()
     future.set_result(key)
     return future

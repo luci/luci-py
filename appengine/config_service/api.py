@@ -231,8 +231,8 @@ class ConfigApi(remote.Service):
     if request.config_set and not can_read_config_set(request.config_set):
       raise endpoints.ForbiddenException()
     if request.include_files and not request.config_set:
-        raise endpoints.BadRequestException(
-            'Must specify config_set to use include_files')
+      raise endpoints.BadRequestException(
+          'Must specify config_set to use include_files')
 
     config_sets = storage.get_config_sets_async(
         config_set=request.config_set).get_result()

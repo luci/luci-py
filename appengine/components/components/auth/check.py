@@ -83,7 +83,7 @@ def check_request(
   # from Chrome Buildbot machines.
   if (use_bots_ip_whitelist and peer_identity.is_anonymous and
       auth_db.is_in_ip_whitelist(model.bots_ip_whitelist(), peer_ip, False)):
-      peer_identity = model.IP_WHITELISTED_BOT_ID
+    peer_identity = model.IP_WHITELISTED_BOT_ID
 
   # Note: populating fields early is useful, since exception handlers may use
   # them for logging.
