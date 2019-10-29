@@ -5,7 +5,6 @@
 
 # Wildcard import mapping - pylint:disable=W0401
 
-from .mapping import *
 from .monotonic import *
 from .properties import *
 from .serializable import *
