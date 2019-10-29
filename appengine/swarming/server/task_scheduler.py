@@ -1248,7 +1248,7 @@ def schedule_request(request, secret_bytes):
     # TODO(maruel): An option is to update the parent task as part of a cron
     # job, which would remove this code from the critical path.
     try:
-      datastore_utils.transaction(run_parent)
+      datastore_utils.transaction(run_parent, retries=3)
     except ValueError:
       if to_run:
         to_run.queue_number = None
