@@ -195,7 +195,7 @@ def get_os_name():
   if value:
     return value
 
-  if sys.platform == 'linux2':
+  if sys.platform.startswith('linux'):
     # Try to figure out the distro. Supported distros are Debian, Ubuntu,
     # Raspbian.
     # Add support for other OSes as relevant.
@@ -300,7 +300,7 @@ def get_cpuinfo():
     info = platforms.osx.get_cpuinfo()
   elif sys.platform == 'win32':
     info = platforms.win.get_cpuinfo()
-  elif sys.platform == 'linux2':
+  elif sys.platform.startswith('linux'):
     info = platforms.linux.get_cpuinfo()
   else:
     info = {}
@@ -371,7 +371,7 @@ def get_num_processors():
   Python on OSX 10.6 raises a NotImplementedError exception.
   """
   try:
-    if sys.platform == 'linux2':
+    if sys.platform.startswith('linux'):
       return platforms.linux.get_num_processors()
     # Multiprocessing
     return multiprocessing.cpu_count()
@@ -445,7 +445,7 @@ def get_audio():
   # on OSX when an audio cable is plugged in.
   if sys.platform == 'darwin':
     return platforms.osx.get_audio()
-  elif sys.platform == 'linux2':
+  elif sys.platform.startswith('linux'):
     return platforms.linux.get_audio()
   elif sys.platform == 'win32':
     return platforms.win.get_audio()
@@ -463,7 +463,7 @@ def get_gpu():
   """
   if sys.platform == 'darwin':
     dimensions, state = platforms.osx.get_gpu()
-  elif sys.platform == 'linux2':
+  elif sys.platform.startswith('linux'):
     dimensions, state = platforms.linux.get_gpu()
   elif sys.platform == 'win32':
     dimensions, state = platforms.win.get_gpu()
@@ -611,7 +611,7 @@ def get_ssd():
   """Returns a list of SSD disks."""
   if sys.platform == 'darwin':
     return platforms.osx.get_ssd()
-  if sys.platform == 'linux2':
+  if sys.platform.startswith('linux'):
     return platforms.linux.get_ssd()
   if sys.platform == 'win32':
     return platforms.win.get_ssd()
@@ -983,7 +983,7 @@ def get_dimensions():
   else:
     dimensions[u'ssd'] = [u'0']
 
-  if sys.platform == 'linux2':
+  if sys.platform.startswith('linux'):
     inside_docker = platforms.linux.get_inside_docker()
     if not inside_docker:
       dimensions[u'inside_docker'] = [u'0']
@@ -1091,7 +1091,7 @@ def get_state():
     temp = platforms.osx.get_temperatures()
     if temp is not None:
       state[u'temp'] = temp
-  if sys.platform == 'linux2':
+  if sys.platform.startswith('linux'):
     temp = platforms.linux.get_temperatures()
     if temp:
       state[u'temp'] = temp
@@ -1317,7 +1317,7 @@ def host_reboot_and_return(message=None):
       ['shutdown', '-r', '-f', '-t', '1'],
       ['shutdown', '-r', '-f', '1'],
     ]
-  elif sys.platform == 'linux2':
+  elif sys.platform.startswith('linux'):
     # systemd removed support for -f. So Ubuntu 14.04 supports -f but 16.04
     # won't. This is also the case of Raspbian Jessie, which is on systemd. For
     # now, just try both. Once pre-systemd system are not supported anymore,

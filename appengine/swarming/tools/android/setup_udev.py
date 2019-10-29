@@ -98,7 +98,7 @@ def test_device_rule(device):
 
 
 def main():
-  if sys.platform != 'linux2':
+  if not sys.platform.startswith('linux'):
     print('Only tested on linux')
     return 1
 

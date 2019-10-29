@@ -16,6 +16,8 @@ import tempfile
 import time
 import unittest
 
+import six
+
 import test_env_api
 test_env_api.setup_test_env()
 
@@ -58,7 +60,10 @@ class TestOsUtilities(auto_stub.TestCase):
     self.assertGreater(len(values), 1)
 
   def test_get_cpu_dimensions_mips(self):
-    self.mock(sys, 'platform', 'linux2')
+    if six.PY2:
+      self.mock(sys, 'platform', 'linux2')
+    else:
+      self.mock(sys, 'platform', 'linux')
     self.mock(platform, 'machine', lambda: 'mips64')
     self.mock(
         os_utilities, 'get_cpuinfo',
@@ -155,7 +160,7 @@ class TestOsUtilities(auto_stub.TestCase):
       expected.add(u'hidpi')
       expected.add(u'mac_model')
       expected.add(u'xcode_version')
-    if sys.platform == 'linux2':
+    if sys.platform.startswith('linux'):
       expected.add(u'inside_docker')
       expected.add(u'kvm')
     if sys.platform == 'win32':

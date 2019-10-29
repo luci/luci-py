@@ -24,7 +24,7 @@ def main():
 
   # Pass an empty tag, so pop it up since it has no significance.
   devices = None
-  if sys.platform == 'linux2':
+  if sys.platform.startswith('linux'):
     devices = platforms.android.get_devices(None)
     if devices:
       try:
