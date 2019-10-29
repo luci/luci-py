@@ -43,6 +43,12 @@ message SettingsCfg {
   // oauth client id for the ui. This is created in the developer's console
   // under Credentials.
   optional string ui_client_id = 8;
+
+  // A list of configurations for clients to monitor. When a request is
+  // received, the list is traversed in order and the first match is the
+  // monitoring config to use. If none of the configs match the request is
+  // unmonitored.
+  repeated ClientMonitoringConfig client_monitoring_config = 9;
 }
 
 // Access control groups for the isolate service. Custom group names
@@ -55,4 +61,14 @@ message AuthSettings {
   optional string full_access_group = 1;
   // Group with read-only access.
   optional string readonly_access_group = 2;
+}
+
+// Defines a client whose requests should be monitored.
+message ClientMonitoringConfig {
+  // Name of an IP whitelist in the auth service. If a request is received from
+  // an IP matching this whitelist, it will be reported.
+  optional string ip_whitelist = 1;
+
+  // Monitoring label to apply when reporting metrics for this client.
+  optional string label = 2;
 }
