@@ -186,7 +186,7 @@ def validate_oauth_config(conf, ctx):
     ctx.error(str(exc))
 
 
-# Simple auth_serivce own configs stored in the datastore as plain text.
+# Simple auth_service own configs stored in the datastore as plain text.
 # They are different from imports.cfg (no GUI to update them other), and from
 # ip_whitelist.cfg and oauth.cfg (not tied to AuthDB changes).
 
