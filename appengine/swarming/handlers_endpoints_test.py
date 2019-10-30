@@ -73,17 +73,21 @@ class BaseTest(test_env_handlers.AppTestBase, test_case.EndpointsTestCase):
     # Client API test cases run by default as user.
     self.set_as_user()
     self.mock(utils, 'enqueue_task', self._enqueue_task)
+    self.mock(utils, 'enqueue_task_async', self._enqueue_task_async)
     self.now = datetime.datetime(2010, 1, 2, 3, 4, 5)
     self.mock_now(self.now)
 
   @ndb.non_transactional
   def _enqueue_task(self, url, queue_name, **kwargs):
-    if queue_name == 'rebuild-task-cache':
-      # Call directly into it.
-      self.assertEqual(True, task_queues.rebuild_task_cache(kwargs['payload']))
-      return True
+    del kwargs
     if queue_name in ('cancel-children-tasks', 'pubsub'):
       return True
+    self.fail(url)
+
+  @ndb.non_transactional
+  def _enqueue_task_async(self, url, queue_name, payload):
+    if queue_name == 'rebuild-task-cache':
+      return task_queues.rebuild_task_cache_async(payload)
     self.fail(url)
 
 
@@ -1023,13 +1027,11 @@ class TasksApiTest(BaseTest):
   def test_mass_cancel_pending(self):
     _, pending_id, now_120 = self._prepare_mass_cancel()
 
-    def enqueue_task(*args, **kwargs):
+    def enqueue_task(url, name, payload):
+      self.assertEqual('/internal/taskqueue/important/tasks/cancel', url)
+      self.assertEqual('cancel-tasks', name)
       e = {'tasks': [pending_id], 'kill_running': False}
-      self.assertEqual(e, json.loads(kwargs.get('payload')))
-      # check URL
-      self.assertEqual('/internal/taskqueue/important/tasks/cancel', args[0])
-      # check task queue
-      self.assertEqual('cancel-tasks', args[1])
+      self.assertEqual(e, json.loads(payload))
       return True
     self.mock(utils, 'enqueue_task', enqueue_task)
 
@@ -1044,13 +1046,11 @@ class TasksApiTest(BaseTest):
   def test_mass_cancel_running(self):
     running_id, pending_id, now_120 = self._prepare_mass_cancel()
 
-    def enqueue_task(*args, **kwargs):
+    def enqueue_task(url, name, payload):
+      self.assertEqual('/internal/taskqueue/important/tasks/cancel', url)
+      self.assertEqual('cancel-tasks', name)
       e = {'tasks': [pending_id, running_id], 'kill_running': True}
-      self.assertEqual(e, json.loads(kwargs.get('payload')))
-      # check URL
-      self.assertEqual('/internal/taskqueue/important/tasks/cancel', args[0])
-      # check task queue
-      self.assertEqual('cancel-tasks', args[1])
+      self.assertEqual(e, json.loads(payload))
       return True
     self.mock(utils, 'enqueue_task', enqueue_task)
 

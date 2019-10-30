@@ -292,7 +292,8 @@ class TaskDimensionsHandler(webapp2.RequestHandler):
   @decorators.silence(datastore_errors.Timeout)
   @decorators.require_taskqueue('rebuild-task-cache')
   def post(self):
-    if not task_queues.rebuild_task_cache(self.request.body):
+    f = task_queues.rebuild_task_cache_async(self.request.body)
+    if not f.get_result():
       # The task likely failed due to DB transaction contention,
       # so we can reply that the service has had too many requests (429).
       # Using a 400-level response also prevents failures here from causing

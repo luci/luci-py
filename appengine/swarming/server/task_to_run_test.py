@@ -135,7 +135,7 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
           'REMOTE_ADDR': self.source_ip,
           'SERVER_SOFTWARE': os.environ['SERVER_SOFTWARE'],
         })
-    self._enqueue_orig = self.mock(utils, 'enqueue_task', self._enqueue)
+    self._enqueue_orig = self.mock(utils, 'enqueue_task_async', self._enqueue)
     cfg = config.settings()
     cfg.use_lifo = True
     self.mock(config, 'settings', lambda: cfg)
@@ -152,7 +152,7 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
     task queue was enqueued to process it, 0 otherwise.
     """
     # It is important that the task queue to be asserted.
-    task_queues.assert_task(req)
+    task_queues.assert_task_async(req).get_result()
     self.assertEqual(nb_task, self.execute_tasks())
     req.key = task_request.new_request_key()
     req.put()

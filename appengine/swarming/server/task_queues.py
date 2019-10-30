@@ -73,8 +73,8 @@ from server import config
 # TaskDimensions vs keeping them alive for longer than necessary, causing
 # unnecessary queries in get_queues() users.
 #
-# The 10 minutes delta is from assert_task() which advance the timer by a random
-# value to up 10 minutes early.
+# The 10 minutes delta is from assert_task_async() which advance the timer by a
+# random value to up 10 minutes early.
 #
 # For 8000 task queues, that gives a rate of (8000/(4*60*60)) 0.5QPS.
 _EXTEND_VALIDITY = datetime.timedelta(hours=4, minutes=10)
@@ -170,12 +170,12 @@ class TaskDimensionsSet(ndb.Model):
   """
   # Validity time, at which this entity should be considered irrelevant.
   # Entities with valid_until_ts in the past are considered inactive and are not
-  # used. valid_until_ts is set in assert_task() to "TaskRequest.expiration_ts +
-  # _EXTEND_VALIDITY".
+  # used. valid_until_ts is set in assert_task_async() to
+  # "TaskRequest.expiration_ts + _EXTEND_VALIDITY".
   #
-  # It is updated when an assert_task() call sees that valid_until_ts becomes
-  # lower than TaskRequest.expiration_ts for a later task. This enables not
-  # updating the entity too frequently, at the cost of keeping a dead queue
+  # It is updated when an assert_task_async() call sees that valid_until_ts
+  # becomes lower than TaskRequest.expiration_ts for a later task. This enables
+  # not updating the entity too frequently, at the cost of keeping a dead queue
   # "alive" for a bit longer than strictly necessary.
   #
   # In practice, do not remove this set until _KEEP_DEAD has expired, to
@@ -302,7 +302,7 @@ class TaskDimensions(ndb.Model):
 ### Private APIs.
 
 
-# Limit in _cap_futures. Meant to be overridden in unit test.
+# Limit in rebuild_task_cache_async. Meant to be overridden in unit test.
 _CAP_FUTURES_LIMIT = 50
 
 
@@ -331,24 +331,6 @@ def _get_task_queries_for_bot(bot_dimensions):
   # are removed by cron job /internal/cron/task_queues_tidy triggered every N
   # minutes (see cron.yaml).
   return [TaskDimensions.query(ancestor=a) for a in ancestors]
-
-
-def _cap_futures(futures):
-  """Limits the number of on-going ndb.Future (RPCs) to _CAP_FUTURES_LIMIT.
-
-  Having too many on-going RPCs may lead to memory exhaustion.
-  """
-  out = []
-  while len(futures) > _CAP_FUTURES_LIMIT:
-    ndb.Future.wait_any(futures)
-    tmp = []
-    for f in futures:
-      if f.done():
-        out.append(f.get_result())
-      else:
-        tmp.append(f)
-    futures = tmp
-  return out, futures
 
 
 def _flush_futures(futures):
@@ -551,16 +533,16 @@ def _get_query_BotTaskDimensions_keys(dimensions_flat):
 
 
 @ndb.tasklet
-def _refresh_BotTaskDimensions_async(bot_task_key, dimensions_flat, now,
-                                     valid_until_ts):
+def _refresh_BotTaskDimensions_async(now, valid_until_ts, dimensions_flat,
+                                     bot_task_key):
   """Creates or refreshes a BotTaskDimensions.
 
   Arguments:
-  - bot_task_key: ndb.Key to a BotTaskDimensions
-  - dimensions_flat: list of '<key>:<value>' for the task request dimensions
   - now: datetime.datetime of 'now'
   - valid_until_ts: datetime.datetime determines until when this
     dimensions_flat should remain valid.
+  - dimensions_flat: list of '<key>:<value>' for the task request dimensions
+  - bot_task_key: ndb.Key to a BotTaskDimensions
 
   Returns:
     True if the entity was updated, False if no-op.
@@ -630,15 +612,16 @@ def _tidy_stale_BotTaskDimensions(now):
   raise ndb.Return(btd)
 
 
-def _assert_task_props(properties, expiration_ts):
+@ndb.tasklet
+def _assert_task_props_async(properties, expiration_ts):
   """Asserts a TaskDimensions for a specific TaskProperties.
 
-  Implementation of assert_task().
+  Implementation of assert_task_async().
   """
   # TODO(maruel): Make it a tasklet.
   dimensions_hash = hash_dimensions(properties.dimensions)
   task_dims_key = _get_task_dims_key(dimensions_hash, properties.dimensions)
-  obj = task_dims_key.get()
+  obj = yield task_dims_key.get_async()
   if obj:
     # Reduce the check to be 5~10 minutes earlier to help reduce an attack of
     # task queues when there's a strong on-going load of tasks happening. This
@@ -650,22 +633,20 @@ def _assert_task_props(properties, expiration_ts):
       if s.valid_until_ts >= valid_until_ts:
         # Cache hit. It is important to reconfirm the dimensions because a hash
         # can be conflicting.
-        logging.debug('assert_task(%d): hit', dimensions_hash)
-        return
-      else:
-        logging.info(
-            'assert_task(%d): set.valid_until_ts(%s) < expected(%s); '
-            'triggering rebuild-task-cache',
-            dimensions_hash, s.valid_until_ts, valid_until_ts)
+        logging.debug('assert_task_async(%d): hit', dimensions_hash)
+        raise ndb.Return(None)
+      logging.info(
+          'assert_task_async(%d): set.valid_until_ts(%s) < expected(%s); '
+          'triggering rebuild-task-cache', dimensions_hash, s.valid_until_ts,
+          valid_until_ts)
     else:
       logging.info(
-          'assert_task(%d): failed to match the dimensions; triggering '
-          'rebuild-task-cache',
-          dimensions_hash)
+          'assert_task_async(%d): failed to match the dimensions; triggering '
+          'rebuild-task-cache', dimensions_hash)
   else:
     logging.info(
-        'assert_task(%d): new request kind; triggering rebuild-task-cache',
-        dimensions_hash)
+        'assert_task_async(%d): new request kind; triggering '
+        'rebuild-task-cache', dimensions_hash)
 
   data = {
     u'dimensions': properties.dimensions,
@@ -680,19 +661,129 @@ def _assert_task_props(properties, expiration_ts):
   # there's only one bot that can run it, so it won't take long. This permits
   # tasks like 'terminate' tasks to execute faster.
   if properties.dimensions.get(u'id'):
-    rebuild_task_cache(payload)
-    return
+    # TODO(maruel): Handle when it needs to be retried.
+    yield rebuild_task_cache_async(payload)
+    raise ndb.Return(None)
 
   # We can't use the request ID since the request was not stored yet, so embed
   # all the necessary information.
-  if not utils.enqueue_task(
+  res = yield utils.enqueue_task_async(
       '/internal/taskqueue/important/task_queues/rebuild-cache',
       'rebuild-task-cache',
-      payload=payload):
+      payload=payload)
+  if not res:
     logging.error('Failed to enqueue TaskDimensions update %x', dimensions_hash)
     # Technically we'd want to raise a endpoints.InternalServerErrorException.
     # Raising anything that is not TypeError or ValueError is fine.
     raise Error('Failed to trigger task queue; please try again')
+  raise ndb.Return(None)
+
+
+@ndb.tasklet
+def _refresh_all_BotTaskDimensions_async(now, valid_until_ts, dimensions_flat,
+                                         dimensions_hash):
+  """Updates BotTaskDimensions for dimensions_flat.
+
+  Used by rebuild_task_cache_async.
+  """
+  # Number of BotTaskDimensions entities that were created/updated in the DB.
+  updated = 0
+  # Number of BotTaskDimensions entities that matched this task queue.
+  viable = 0
+  try:
+    pending = []
+    qit = _get_query_BotTaskDimensions_keys(dimensions_flat)
+    while (yield qit.has_next_async()):
+      bot_info_key = qit.next()
+      bot_task_key = ndb.Key(
+          BotTaskDimensions, dimensions_hash, parent=bot_info_key.parent())
+      viable += 1
+      future = _refresh_BotTaskDimensions_async(now, valid_until_ts,
+                                                dimensions_flat, bot_task_key)
+      pending.append(future)
+
+      while len(pending) > _CAP_FUTURES_LIMIT:
+        ndb.Future.wait_any(pending)
+        tmp = []
+        for f in pending:
+          if f.done():
+            if (yield f):
+              updated += 1
+          else:
+            tmp.append(f)
+        pending = tmp
+
+    for f in pending:
+      if (yield f):
+        updated += 1
+    raise ndb.Return(None)
+  finally:
+    # The main reason for this log entry is to confirm the timing of the first
+    # part (updating BotTaskDimensions) versus the second part (updating
+    # TaskDimensions in rebuild_task_cache_async).
+    # Only log at info level when something was done. This helps scanning
+    # quickly the logs.
+    fn = logging.info if updated else logging.debug
+    fn(
+        '_refresh_all_BotTaskDimensions_async: viable bots: %d; bots updated: '
+        '%d', viable, updated)
+
+
+@ndb.tasklet
+def _refresh_TaskDimensions_async(now, valid_until_ts, dimensions_flat,
+                                  task_dims_key):
+  """Updates TaskDimensions for dimensions_flat.
+
+  Used by rebuild_task_cache_async.
+  """
+  # First do a dry run. If the dry run passes, skip the transaction.
+  #
+  # The rationale is that there can be concurrent trigger of this taskqueue
+  # (rebuild-cache) when there are conccurent task creation. The dry run cost
+  # not much overhead and if it passes, it saves transaction contention.
+  #
+  # The transaction contention can be problematic on pool with a high
+  # cardinality of the dimension sets.
+  obj = yield task_dims_key.get_async()
+  if obj and not obj.assert_request(now, valid_until_ts, dimensions_flat):
+    logging.debug('Skipped transaction!')
+    raise ndb.Return(None)
+  # Do an adhoc transaction instead of using datastore_utils.transaction().
+  # This is because for some pools, the transaction rate may be so high that
+  # it's impossible to get a good performance on the entity group.
+  #
+  # In practice the odds of conflict is ~nil, because it can only conflict
+  # if a TaskDimensions.set has more than one item and this happens when
+  # there's a hash conflict (odds 2^31) plus two concurrent task running
+  # simultaneously (over _EXTEND_VALIDITY period) so we can do it in a more
+  # adhoc way.
+  key = '%s:%s' % (task_dims_key.parent().string_id(),
+                   task_dims_key.string_id())
+  res = yield ndb.get_context().memcache_add(
+      key, True, time=60, namespace='task_queues_tx')
+  if not res:
+    # add() returns True if the entry was added, False otherwise. That's
+    # perfect.
+    logging.warning('Failed taking pseudo-lock for %s; reenqueuing', key)
+    raise ndb.Return(False)
+  try:
+    action = yield _ensure_TaskDimensions_async(task_dims_key, now,
+                                                valid_until_ts, dimensions_flat)
+  finally:
+    yield ndb.get_context().memcache_delete(key, namespace='task_queues_tx')
+
+  # Keeping this dead code for now, in case we find a solution for the
+  # transaction rate issue.
+  #try:
+  #  action = yield datastore_utils.transaction_async(_run, retries=4)
+  #except datastore_utils.CommitError as e:
+  #  # Still log an error but no need for a stack trace in the logs. It is
+  #  # important to surface that the call failed so the task queue is
+  #  # retried later.
+  #  logging.warning('Failed updating TaskDimensions: %s; reenqueuing', e)
+  #  raise ndb.Return(False)
+  if action:
+    logging.info('_refresh_TaskDimensions_async: Did %s', action)
 
 
 ### Public APIs.
@@ -773,8 +864,8 @@ def hash_dimensions(dimensions):
 def assert_bot_async(bot_root_key, bot_dimensions):
   """Prepares BotTaskDimensions entities as needed.
 
-  Coupled with assert_task(), enables get_queues() to work by by knowing which
-  TaskDimensions applies to this bot.
+  Coupled with assert_task_async(), enables get_queues() to work by by knowing
+  which TaskDimensions applies to this bot.
 
   Arguments:
     bot_root_key: ndb.Key to bot_management.BotRoot
@@ -813,7 +904,8 @@ def cleanup_after_bot(bot_root_key):
   _flush_futures(futures)
 
 
-def assert_task(request):
+@ndb.tasklet
+def assert_task_async(request):
   """Makes sure the TaskRequest dimensions, for each TaskProperties, are listed
   as a known queue.
 
@@ -826,13 +918,16 @@ def assert_task(request):
   worst. This only occurs on new kind of requests, which is not that often in
   practice.
   """
-  assert not request.key, request.key
-  # TODO(maruel): Parallelize the following.
+  # It's important that the TaskRequest to not be stored in the DB yet, still
+  # its key could be set.
   exp_ts = request.created_ts
+  futures = []
   for i in range(request.num_task_slices):
     t = request.task_slice(i)
     exp_ts += datetime.timedelta(seconds=t.expiration_secs)
-    _assert_task_props(t.properties, exp_ts)
+    futures.append(_assert_task_props_async(t.properties, exp_ts))
+  for f in futures:
+    yield f
 
 
 def get_queues(bot_root_key):
@@ -907,7 +1002,8 @@ def set_has_capacity(dimensions, seconds):
       dimensions_hash, True, time=seconds, namespace='task_queues_tasks')
 
 
-def rebuild_task_cache(payload):
+@ndb.tasklet
+def rebuild_task_cache_async(payload):
   """Rebuilds the TaskDimensions cache.
 
   This function is called in two cases:
@@ -928,7 +1024,7 @@ def rebuild_task_cache(payload):
   entities on a new kind of request. As such, it must be called in the backend.
 
   Arguments:
-  - payload: dict as created in assert_task() with:
+  - payload: dict as created in assert_task_async() with:
     - 'dimensions': dict of task dimensions to refresh
     - 'dimensions_hash': precalculated hash for dimensions
     - 'valid_until_ts': expiration_ts + _EXTEND_VALIDITY for how long this cache
@@ -947,100 +1043,22 @@ def rebuild_task_cache(payload):
     for v in values:
       dimensions_flat.append(u'%s:%s' % (k, v))
   dimensions_flat.sort()
-
+  dims = '\n'.join('  ' + d for d in dimensions_flat)
   now = utils.utcnow()
-  # Number of BotTaskDimensions entities that were created/updated in the DB.
-  updated = 0
-  # Number of BotTaskDimensions entities that matched this task queue.
-  viable = 0
   try:
-    pending = []
-    qit = _get_query_BotTaskDimensions_keys(dimensions_flat)
-    while qit.has_next():
-      bot_info_key = qit.next()
-      bot_task_key = ndb.Key(
-          BotTaskDimensions, dimensions_hash, parent=bot_info_key.parent())
-      viable += 1
-      future = _refresh_BotTaskDimensions_async(bot_task_key, dimensions_flat,
-                                                now, valid_until_ts)
-      pending.append(future)
-      done, pending = _cap_futures(pending)
-      updated += sum(1 for i in done if i)
-    updated += sum(1 for i in _flush_futures(pending) if i)
-    # The main reason for this log entry is to confirm the timing of the first
-    # part (updating BotTaskDimensions) versus the second part (updating
-    # TaskDimensions).
-    logging.debug('Updated %d BotTaskDimensions', updated)
-
+    yield _refresh_all_BotTaskDimensions_async(now, valid_until_ts,
+                                               dimensions_flat, dimensions_hash)
     # Done updating, now store the entity. Must use a transaction as there could
     # be other dimensions set in the entity.
     task_dims_key = _get_task_dims_key(dimensions_hash, dimensions)
-
-    # First do a dry run. If the dry run passes, skip the transaction.
-    #
-    # The rationale is that there can be concurrent trigger of this taskqueue
-    # (rebuild-cache) when there are conccurent task creation. The dry run cost
-    # not much overhead and if it passes, it saves transaction contention.
-    #
-    # The transaction contention can be problematic on pool with a high
-    # cardinality of the dimension sets.
-    obj = task_dims_key.get()
-    if not obj or obj.assert_request(now, valid_until_ts, dimensions_flat):
-      # Do an adhoc transaction instead of using datastore_utils.transaction().
-      # This is because for some pools, the transaction rate may be so high that
-      # it's impossible to get a good performance on the entity group.
-      #
-      # In practice the odds of conflict is ~nil, because it can only conflict
-      # if a TaskDimensions.set has more than one item and this happens when
-      # there's a hash conflict (odds 2^31) plus two concurrent task running
-      # simultaneously (over _EXTEND_VALIDITY period) so we can do it in a more
-      # adhoc way.
-      key = '%s:%s' % (
-          task_dims_key.parent().string_id(), task_dims_key.string_id())
-      if not memcache.add(key, True, time=60, namespace='task_queues_tx'):
-        # add() returns True if the entry was added, False otherwise. That's
-        # perfect.
-        logging.warning('Failed taking pseudo-lock for %s; reenqueuing', key)
-        return False
-      try:
-        action = _ensure_TaskDimensions_async(
-            task_dims_key, now, valid_until_ts, dimensions_flat).get_result()
-      finally:
-        memcache.delete(key, namespace='task_queues_tx')
-
-      # Keeping this dead code for now, in case we find a solution for the
-      # transaction rate issue.
-      #try:
-      #  action = datastore_utils.transaction(_run, retries=4)
-      #except datastore_utils.CommitError as e:
-      #  # Still log an error but no need for a stack trace in the logs. It is
-      #  # important to surface that the call failed so the task queue is
-      #  # retried later.
-      #  logging.warning('Failed updating TaskDimensions: %s; reenqueuing', e)
-      #  return False
-
-      if action:
-        # Only log at info level when something was done. This helps scanning
-        # quickly the logs.
-        logging.info('Did %s', action)
-      else:
-        logging.debug('Did nothing')
-    else:
-      logging.debug('Skipped transaction!')
+    yield _refresh_TaskDimensions_async(now, valid_until_ts, dimensions_flat,
+                                        task_dims_key)
   finally:
-    # Any of the _refresh_BotTaskDimensions_async() calls above could throw.
-    # Still log how far we went.
-    msg = (
-      'rebuild_task_cache(%d) in %.3fs. viable bots: %d; bots updated: %d\n%s')
-    dims = '\n'.join('  ' + d for d in dimensions_flat)
+    # Any of the calls above could throw. Log how far long we processed.
     duration = (utils.utcnow()-now).total_seconds()
-    # Only log at info level when something was done. This helps scanning
-    # quickly the logs.
-    if updated:
-      logging.info(msg, dimensions_hash, duration, viable, updated, dims)
-    else:
-      logging.debug(msg, dimensions_hash, duration, viable, updated, dims)
-  return True
+    logging.debug('rebuild_task_cache(%d) in %.3fs\n%s', dimensions_hash,
+                  duration, dims)
+  raise ndb.Return(True)
 
 
 def cron_tidy_stale():

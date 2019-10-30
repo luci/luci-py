@@ -60,18 +60,24 @@ class BotApiTest(test_env_handlers.AppTestBase):
     self.set_as_bot()
     self._enqueue_task_orig = self.mock(
         utils, 'enqueue_task', self._enqueue_task)
+    self._enqueue_task_async_orig = self.mock(utils, 'enqueue_task_async',
+                                              self._enqueue_task_async)
     self.now = datetime.datetime(2010, 1, 2, 3, 4, 5)
     self.mock_now(self.now)
     self.mock_default_pool_acl([])
 
   @ndb.non_transactional
   def _enqueue_task(self, url, queue_name, **kwargs):
-    if queue_name == 'rebuild-task-cache':
-      # Call directly into it.
-      self.assertEqual(True, task_queues.rebuild_task_cache(kwargs['payload']))
-      return True
+    del kwargs
     if queue_name in ('cancel-children-tasks', 'pubsub'):
       return True
+    self.fail(url)
+
+  @ndb.non_transactional
+  def _enqueue_task_async(self, url, queue_name, **kwargs):
+    if queue_name == 'rebuild-task-cache':
+      # Call directly into it.
+      return task_queues.rebuild_task_cache_async(kwargs['payload'])
     self.fail(url)
 
   def mock_bot_group_config(self, **kwargs):

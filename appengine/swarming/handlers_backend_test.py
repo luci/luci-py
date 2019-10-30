@@ -14,6 +14,7 @@ import unittest
 import test_env_handlers
 
 from google.appengine.api import datastore_errors
+from google.appengine.ext import ndb
 
 import webtest
 
@@ -47,9 +48,15 @@ class BackendTest(test_env_handlers.AppTestBase):
         })
     self._enqueue_task_orig = self.mock(
         utils, 'enqueue_task', self._enqueue_task)
+    self._enqueue_task_async_orig = self.mock(utils, 'enqueue_task_async',
+                                              self._enqueue_task_async)
 
   def _enqueue_task(self, *args, **kwargs):
     return self._enqueue_task_orig(*args, use_dedicated_module=False, **kwargs)
+
+  def _enqueue_task_async(self, *args, **kwargs):
+    kwargs['use_dedicated_module'] = False
+    return self._enqueue_task_async_orig(*args, **kwargs)
 
   def test_crons(self):
     # Tests all the cron tasks are securely handled.
@@ -223,9 +230,12 @@ class BackendTest(test_env_handlers.AppTestBase):
 
   def test_taskqueue_important_task_queues_rebuild_cache_fail(self):
     self.set_as_admin()
-    def rebuild_task_cache(_body):
-      return False
-    self.mock(task_queues, 'rebuild_task_cache', rebuild_task_cache)
+
+    @ndb.tasklet
+    def rebuild_task_cache_async(_body):
+      raise ndb.Return(False)
+
+    self.mock(task_queues, 'rebuild_task_cache_async', rebuild_task_cache_async)
     self.app.post(
         '/internal/taskqueue/important/task_queues/rebuild-cache',
         headers={'X-AppEngine-QueueName': 'rebuild-task-cache'}, status=429)

@@ -19,6 +19,7 @@ import webtest
 
 from google.appengine.api import datastore_errors
 from google.appengine.api import memcache
+from google.appengine.ext import ndb
 
 import handlers_backend
 
@@ -91,15 +92,16 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
           'REMOTE_ADDR': self.source_ip,
           'SERVER_SOFTWARE': os.environ['SERVER_SOFTWARE'],
         })
-    self._enqueue_orig = self.mock(utils, 'enqueue_task', self._enqueue)
+    self._enqueue_async_orig = self.mock(utils, 'enqueue_task_async',
+                                         self._enqueue_async)
 
-  def _enqueue(self, *args, **kwargs):
-    return self._enqueue_orig(*args, use_dedicated_module=False, **kwargs)
+  def _enqueue_async(self, *args, **kwargs):
+    return self._enqueue_async_orig(*args, use_dedicated_module=False, **kwargs)
 
   def _assert_task(self, tasks=1):
     """Creates one pending TaskRequest and asserts it in task_queues."""
     request = _gen_request()
-    task_queues.assert_task(request)
+    task_queues.assert_task_async(request).get_result()
     self.assertEqual(tasks, self.execute_tasks())
     return request
 
@@ -198,7 +200,7 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
         valid_until_ts,
         task_queues.BotTaskDimensions.query().get().valid_until_ts)
 
-  def test_assert_task(self):
+  def test_assert_task_async(self):
     self.assert_count(0, task_queues.BotTaskDimensions)
     self.assert_count(0, task_queues.TaskDimensions)
     self._assert_task()
@@ -207,7 +209,7 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
     self.assert_count(0, task_queues.BotTaskDimensions)
     self.assert_count(1, task_queues.TaskDimensions)
 
-  def test_assert_task_no_update(self):
+  def test_assert_task_async_no_update(self):
     # Ensure the entity was not updated when not needed.
     now = datetime.datetime(2010, 1, 2, 3, 4, 5)
     self.mock_now(now)
@@ -225,7 +227,7 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
     # See more complex test below.
     pass
 
-  def test_rebuild_task_cache(self):
+  def test_rebuild_task_cache_async(self):
     # Assert that expiration works.
     now = datetime.datetime(2010, 1, 2, 3, 4, 5)
     self.mock_now(now)
@@ -246,13 +248,16 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
     self.mock(task_queues, '_CAP_FUTURES_LIMIT', 1)
 
     payloads = []
-    def _enqueue_task(url, name, payload):
+
+    @ndb.tasklet
+    def _enqueue_task_async(url, name, payload):
       self.assertEqual(
           '/internal/taskqueue/important/task_queues/rebuild-cache', url)
       self.assertEqual('rebuild-task-cache', name)
       payloads.append(payload)
-      return True
-    self.mock(utils, 'enqueue_task', _enqueue_task)
+      raise ndb.Return(True)
+
+    self.mock(utils, 'enqueue_task_async', _enqueue_task_async)
 
     # The equivalent of self._assert_task(tasks=1) except that we snapshot the
     # payload.
@@ -263,9 +268,10 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
               u'cpu': [u'x86-64'],
               u'pool': [u'default'],
             }))
-    task_queues.assert_task(request_1)
+    task_queues.assert_task_async(request_1).get_result()
     self.assertEqual(1, len(payloads))
-    self.assertEqual(True, task_queues.rebuild_task_cache(payloads[-1]))
+    f = task_queues.rebuild_task_cache_async(payloads[-1])
+    self.assertEqual(True, f.get_result())
     self.assertEqual(3, task_queues.BotTaskDimensions.query().count())
     self.assertEqual(1, task_queues.TaskDimensions.query().count())
     self.assertEqual(60, request_1.expiration_secs)
@@ -280,9 +286,10 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
               u'os': [u'Ubuntu-16.04'],
               u'pool': [u'default'],
             }))
-    task_queues.assert_task(request_2)
+    task_queues.assert_task_async(request_2).get_result()
     self.assertEqual(2, len(payloads))
-    self.assertEqual(True, task_queues.rebuild_task_cache(payloads[-1]))
+    f = task_queues.rebuild_task_cache_async(payloads[-1])
+    self.assertEqual(True, f.get_result())
     self.assertEqual(6, task_queues.BotTaskDimensions.query().count())
     self.assertEqual(2, task_queues.TaskDimensions.query().count())
     self.assertEqual(
@@ -296,7 +303,8 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
     offset = (task_queues._EXTEND_VALIDITY + datetime.timedelta(
       seconds=request_1.expiration_secs)).total_seconds() + 1
     self.mock_now(now, offset)
-    self.assertEqual(True, task_queues.rebuild_task_cache(payloads[0]))
+    f = task_queues.rebuild_task_cache_async(payloads[0])
+    self.assertEqual(True, f.get_result())
     self.assertEqual(6, task_queues.BotTaskDimensions.query().count())
     self.assertEqual(2, task_queues.TaskDimensions.query().count())
     self.assertEqual(
@@ -307,7 +315,8 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
 
     # Re-running still do not delete TaskDimensions because they are kept until
     # _KEEP_DEAD.
-    self.assertEqual(True, task_queues.rebuild_task_cache(payloads[1]))
+    f = task_queues.rebuild_task_cache_async(payloads[1])
+    self.assertEqual(True, f.get_result())
     self.assertEqual(6, task_queues.BotTaskDimensions.query().count())
     self.assertEqual(2, task_queues.TaskDimensions.query().count())
     self.assertEqual([], task_queues.get_queues(bot_root_key))
@@ -320,21 +329,24 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
       ).total_seconds() + 1
     self.mock_now(now, offset)
     self.assertEqual([], task_queues.get_queues(bot_root_key))
-    self.assertEqual(True, task_queues.rebuild_task_cache(payloads[0]))
+    f = task_queues.rebuild_task_cache_async(payloads[0])
+    self.assertEqual(True, f.get_result())
     self.assertEqual(6, task_queues.BotTaskDimensions.query().count())
     self.assertEqual(1, task_queues.TaskDimensions.query().count())
     self.assertEqual([], task_queues.get_queues(bot_root_key))
 
-  def test_rebuild_task_cache_fail(self):
+  def test_rebuild_task_cache_async_fail(self):
     # pylint: disable=unused-argument
-    def _enqueue_task(url, name, payload):
+    @ndb.tasklet
+    def _enqueue_task_async(url, name, payload):
       # Enqueueing the task failed.
-      return False
-    self.mock(utils, 'enqueue_task', _enqueue_task)
+      raise ndb.Return(False)
+
+    self.mock(utils, 'enqueue_task_async', _enqueue_task_async)
 
     request = _gen_request()
     with self.assertRaises(task_queues.Error):
-      task_queues.assert_task(request)
+      task_queues.assert_task_async(request).get_result()
 
   def test_dimensions_to_flat(self):
     actual = task_queues.dimensions_to_flat(
@@ -431,7 +443,7 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
     # get_queues() is called.
     _assert_bot()
     request = _gen_request(properties=_gen_properties(dimensions=d))
-    task_queues.assert_task(request)
+    task_queues.assert_task_async(request).get_result()
     self.assertEqual(1, self.execute_tasks())
     self.assertEqual(None, task_queues.probably_has_capacity(d))
 
@@ -466,7 +478,7 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
     bot_root_key = bot_management.get_root_key(u'bot1')
     self.assertEqual([2980491642], task_queues.get_queues(bot_root_key))
 
-  def test_assert_task_then_bot(self):
+  def test_assert_task_async_then_bot(self):
     self._assert_task()
     self.assertEqual(1, _assert_bot())
     self.assert_count(1, task_queues.BotDimensions)
@@ -477,11 +489,11 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
 
   def test_assert_bot_then_task_with_id(self):
     # Assert a task that includes an 'id' dimension. No task queue is triggered
-    # in this case, rebuild_task_cache() is called inlined.
+    # in this case, rebuild_task_cache_async() is called inlined.
     self.assertEqual(0, _assert_bot())
     request = _gen_request(
         properties=_gen_properties(dimensions={u'id': [u'bot1']}))
-    task_queues.assert_task(request)
+    task_queues.assert_task_async(request).get_result()
     self.assertEqual(0, self.execute_tasks())
     self.assert_count(1, bot_management.BotInfo)
     self.assert_count(1, task_queues.BotDimensions)

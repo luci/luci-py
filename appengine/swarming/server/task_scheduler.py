@@ -1122,10 +1122,7 @@ def schedule_request(request, secret_bytes):
   assert isinstance(request, task_request.TaskRequest), request
   assert not request.key, request.key
 
-  # This does a DB GET, occasionally triggers a task queue. May throw, which is
-  # surfaced to the user but it is safe as the task request wasn't stored yet.
-  task_queues.assert_task(request)
-
+  task_asserted_future = task_queues.assert_task_async(request)
   now = utils.utcnow()
   request.key = task_request.new_request_key()
   result_summary = task_result.new_result_summary(request)
@@ -1181,6 +1178,10 @@ def schedule_request(request, secret_bytes):
   # Determine external scheduler (if relevant) prior to making task live, to
   # make HTTP handler return as fast as possible after making task live.
   es_cfg = external_scheduler.config_for_task(request)
+
+  # This occasionally triggers a task queue. May throw, which is surfaced to the
+  # user but it is safe as the task request wasn't stored yet.
+  task_asserted_future.get_result()
 
   # Storing these entities makes this task live. It is important at this point
   # that the HTTP handler returns as fast as possible, otherwise the task will

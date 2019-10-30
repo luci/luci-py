@@ -139,6 +139,8 @@ class ExternalSchedulerApiTest(test_env_handlers.AppTestBase):
           'SERVER_SOFTWARE': os.environ['SERVER_SOFTWARE'],
         })
     self._enqueue_orig = self.mock(utils, 'enqueue_task', self._enqueue)
+    self._enqueue_async_orig = self.mock(utils, 'enqueue_task_async',
+                                         self._enqueue_async)
 
     cfg = config.settings()
     cfg.enable_batch_es_notifications = False
@@ -146,6 +148,10 @@ class ExternalSchedulerApiTest(test_env_handlers.AppTestBase):
 
   def _enqueue(self, *args, **kwargs):
     return self._enqueue_orig(*args, use_dedicated_module=False, **kwargs)
+
+  def _enqueue_async(self, *args, **kwargs):
+    kwargs['use_dedicated_module'] = False
+    return self._enqueue_async_orig(*args, **kwargs)
 
   def _get_client(self, addr):
     self.assertEqual(u'http://localhost:1', addr)
@@ -255,6 +261,8 @@ class ExternalSchedulerApiTestBatchMode(test_env_handlers.AppTestBase):
 
     self.mock(external_scheduler, '_get_client', self._get_client)
     self._enqueue_orig = self.mock(utils, 'enqueue_task', self._enqueue)
+    self._enqueue_async_orig = self.mock(utils, 'enqueue_task_async',
+                                         self._enqueue_async)
 
     self._client = None
 
@@ -272,6 +280,10 @@ class ExternalSchedulerApiTestBatchMode(test_env_handlers.AppTestBase):
 
   def _enqueue(self, *args, **kwargs):
     return self._enqueue_orig(*args, use_dedicated_module=False, **kwargs)
+
+  def _enqueue_async(self, *args, **kwargs):
+    kwargs['use_dedicated_module'] = False
+    return self._enqueue_async_orig(*args, **kwargs)
 
   def _get_client(self, addr):
     self.assertEqual(u'http://localhost:1', addr)

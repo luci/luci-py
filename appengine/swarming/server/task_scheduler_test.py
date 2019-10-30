@@ -128,6 +128,8 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         })
     self._enqueue_calls = []
     self._enqueue_orig = self.mock(utils, 'enqueue_task', self._enqueue)
+    self._enqueue_async_orig = self.mock(utils, 'enqueue_task_async',
+                                         self._enqueue_async)
     # See mock_pub_sub()
     self._pub_sub_mocked = False
     self.publish_successful = True
@@ -147,6 +149,13 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     kwargs = kwargs.copy()
     kwargs.setdefault('use_dedicated_module', False)
     return self._enqueue_orig(*args, **kwargs)
+
+  def _enqueue_async(self, *args, **kwargs):
+    self._enqueue_calls.append((args, kwargs))
+    # Only then add use_dedicated_module as default False.
+    kwargs = kwargs.copy()
+    kwargs.setdefault('use_dedicated_module', False)
+    return self._enqueue_async_orig(*args, **kwargs)
 
   def _getrandbits(self, bits):
     self.assertEqual(16, bits)
@@ -1614,7 +1623,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
       })}))
     # Child tasks should be cancelled via task queue.
     self.assertEqual(
-        self._enqueue_calls[2],
+        self._enqueue_calls[3],
         (('/internal/taskqueue/important/tasks/cancel', 'cancel-tasks'), {
             'payload':
                 utils.encode_to_json({
@@ -2516,8 +2525,8 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
       # the exception handling in the handler.
       # Also, in the wild we would not be making duplicate calls with the same
       # task and bot; this is simply convenient for testing.
-      c.task_id = "task1"
-      c.bot_id = "bot1"
+      c.task_id = 'task1'
+      c.bot_id = 'bot1'
       return [c]
 
     self.mock(external_scheduler, 'get_cancellations', mock_get_cancellations)
@@ -2527,7 +2536,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.execute_tasks()
 
     self.assertEqual(len(calls), 2)
-    self.assertEqual(len(self._enqueue_calls), 2)
+    self.assertEqual(len(self._enqueue_calls), 4)
 
   def test_cron_handle_external_cancellations_none(self):
     es_address = 'externalscheduler_address'
