@@ -510,6 +510,12 @@ class NewTaskRequest(messages.Message):
   # while running a task.
   bot_ping_tolerance_secs = messages.IntegerField(15)
 
+  # This is used to make new task request idempotent in best effort.
+  # If new request has request_uuid field, it checks memcache before scheduling
+  # actual task to check there is already the task triggered by same request
+  # previously.
+  request_uuid = messages.StringField(16)
+
 
 class TaskRequest(messages.Message):
   """Description of a task request as registered by the server.

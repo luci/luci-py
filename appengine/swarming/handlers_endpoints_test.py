@@ -13,6 +13,8 @@ import random
 import sys
 import unittest
 
+import mock
+
 import test_env_handlers
 from test_support import test_case
 
@@ -38,6 +40,7 @@ from server import task_pack
 from server import task_queues
 from server import task_request
 from server import task_result
+from server import task_scheduler
 
 
 DATETIME_NO_MICRO = '%Y-%m-%dT%H:%M:%S'
@@ -944,6 +947,122 @@ class TasksApiTest(BaseTest):
       },
     }
     self.assertEqual(expected, resp.json)
+
+  def test_new_idempotent(self):
+    """Asserts that new generates appropriate metadata."""
+    self.mock_task_service_accounts()
+    self.mock(random, 'getrandbits', lambda _: 0x88)
+
+    request = self.create_new_request(
+        expiration_secs=30,
+        properties=self.create_props(
+            command=['rm', '-rf', '/'],
+            execution_timeout_secs=30,
+            grace_period_secs=15),
+        pubsub_topic='projects/abc/topics/def',
+        pubsub_auth_token='secret that must not be shown',
+        pubsub_userdata='userdata',
+        service_account='service-account@example.com',
+        request_uuid=u'cf60878f-8f2a-4f1e-b1f5-8b5ec88813a9')
+    expected_props = self.gen_props(
+        command=[u'rm', u'-rf', u'/'],
+        execution_timeout_secs=u'30',
+        grace_period_secs=u'15')
+    expected = {
+        u'request':
+            self.gen_request(
+                created_ts=fmtdate(self.now),
+                expiration_secs=u'30',
+                priority=u'20',
+                properties=expected_props,
+                pubsub_topic=u'projects/abc/topics/def',
+                pubsub_userdata=u'userdata',
+                tags=[
+                    u'a:tag',
+                    u'os:Amiga',
+                    u'pool:default',
+                    u'priority:20',
+                    u'service_account:service-account@example.com',
+                    u'swarming.pool.template:none',
+                    u'swarming.pool.version:pools_cfg_rev',
+                    u'user:joe@localhost',
+                ],
+                service_account=u'service-account@example.com',
+                task_slices=[
+                    {
+                        u'expiration_secs': u'30',
+                        u'properties': expected_props,
+                        u'wait_for_capacity': False,
+                    },
+                ]),
+    }
+    # The task was not created for real, so there's no task id.
+    task_id = expected[u'request'].pop(u'task_id')
+
+    # Do an evaluate_only call first
+    request.evaluate_only = True
+    response = self.call_api('new', body=message_to_dict(request))
+    self.assertEqual(expected, response.json)
+
+    request.evaluate_only = False
+    expected[u'task_id'] = u'5cee488008810'
+    expected[u'request'][u'task_id'] = task_id
+    expected[u'task_result'] = {
+        u'abandoned_ts':
+            u'2010-01-02T03:04:05',
+        u'completed_ts':
+            u'2010-01-02T03:04:05',
+        u'created_ts':
+            u'2010-01-02T03:04:05',
+        u'current_task_slice':
+            u'0',
+        u'failure':
+            False,
+        u'internal_failure':
+            False,
+        u'modified_ts':
+            u'2010-01-02T03:04:05',
+        u'name':
+            u'job1',
+        u'server_versions': [u'v1a'],
+        u'state':
+            u'NO_RESOURCE',
+        u'tags': [
+            u'a:tag',
+            u'os:Amiga',
+            u'pool:default',
+            u'priority:20',
+            u'service_account:service-account@example.com',
+            u'swarming.pool.template:none',
+            u'swarming.pool.version:pools_cfg_rev',
+            u'user:joe@localhost',
+        ],
+        u'task_id':
+            u'5cee488008810',
+        u'user':
+            u'joe@localhost',
+    }
+
+    with mock.patch(
+        'server.task_scheduler.schedule_request',
+        wraps=task_scheduler.schedule_request) as mock_schedule_request:
+
+      response = self.call_api('new', body=message_to_dict(request))
+      # Time advanced since the evaluate_only call.
+      expected['request']['created_ts'] = fmtdate(self.now)
+      self.assertEqual(expected, response.json)
+      mock_schedule_request.assert_called_once()
+
+    with mock.patch(
+        'server.task_scheduler.schedule_request',
+        wraps=task_scheduler.schedule_request) as mock_schedule_request:
+      # Send the same request twice.
+      response = self.call_api('new', body=message_to_dict(request))
+      # Time advanced since the evaluate_only call.
+      expected['request']['created_ts'] = fmtdate(self.now)
+      self.assertEqual(expected, response.json)
+      # schedule_request should not be called this time.
+      self.assertFalse(mock_schedule_request.called)
 
   def test_new_denied_pool(self):
     # Ensures that quality check is done early enough that a 400 and not an 500
