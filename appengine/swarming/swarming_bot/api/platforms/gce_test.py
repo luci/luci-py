@@ -9,7 +9,6 @@ import logging
 import sys
 import time
 import unittest
-import platform
 
 import test_env_platforms
 test_env_platforms.setup_test_env()
@@ -22,7 +21,7 @@ import gce
 
 
 class TestGCE(auto_stub.TestCase):
-  @unittest.skipIf(platform.system() == 'Darwin',
+  @unittest.skipIf(sys.platform == 'darwin',
                    'TODO(crbug.com/1017545): '
                    "'function' object has no attribute '__cache__'")
   def test_get_zones(self):

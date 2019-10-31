@@ -124,10 +124,6 @@ class TestOsUtilities(auto_stub.TestCase):
     actual = os_utilities.get_gpu()
     self.assertTrue(actual is None or actual)
 
-  @unittest.skipIf(platform.system() == 'Darwin',
-                   'TODO(crbug.com/1017545): '
-                   'AssertionError: Items in the first set but not the second:'
-                   'u\'xcode_version\'')
   def test_get_dimensions(self):
     dimensions = os_utilities.get_dimensions()
     for key, values in dimensions.items():
@@ -157,9 +153,10 @@ class TestOsUtilities(auto_stub.TestCase):
       expected.add(u'image')
       expected.add(u'zone')
     if sys.platform == 'darwin':
-      expected.add(u'hidpi')
       expected.add(u'mac_model')
-      expected.add(u'xcode_version')
+      # Bot may not have HiDPI and Xcode preinstalled
+      actual.discard(u'hidpi')
+      actual.discard(u'xcode_version')
     if sys.platform.startswith('linux'):
       expected.add(u'inside_docker')
       expected.add(u'kvm')
