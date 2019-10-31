@@ -31,6 +31,7 @@ from components import utils
 import acl
 import config
 import gcs
+import metrics
 import model
 import stats
 
@@ -313,6 +314,7 @@ class IsolateService(remote.Service):
       raise endpoints.BadRequestException(
           'Invalid offset %d. Offset must be between 0 and content length.' %
           offset)
+    metrics.file_size(stored.compressed_size - offset)
     stats.add_entry(
         stats.RETURN,
         stored.compressed_size - offset,
