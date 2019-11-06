@@ -69,6 +69,15 @@ Run the following to setup the code review tool and create your first review:
 Use `git cl help` and `git cl help <cmd>` for more details.
 
 
+## Style
+
+The preferred style is PEP8 with two-space indent; that is, the [Chromium
+Python
+style](https://chromium.googlesource.com/chromium/src/+/master/styleguide/python/python.md),
+except functions use `lowercase_with_underscores`. Use yapf (`git cl format`)
+to autoformat new code.
+
+
 ## License
 
 This project is licensed under Apache v2.0 license. See LICENSE for details.
