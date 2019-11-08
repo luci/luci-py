@@ -45,6 +45,32 @@ import SwarmingAppBoilerplate from '../SwarmingAppBoilerplate'
  * @attr testing_offline - If true, the real OAuth flow won't be used.
  *    Instead, dummy data will be used. Ideal for local testing.
  */
+const serverLogsURL = (ele, request, result) => {
+  let url, filter;
+  url = `https://console.cloud.google.com/logs/viewer`
+  url += `?project=${ele._project_id}`
+  url += `&resource=gae_app`
+  if (request.created_ts) {
+    // task creation request happens before record creation in DB
+    const timeStart = new Date(request.created_ts - 60*1000);
+    const timeEnd = result.completed_ts || result.abandoned_ts || new Date();
+    url += `&interval=CUSTOM`
+    url += `&dateRangeStart=${timeStart.toISOString()}`
+    url += `&dateRangeEnd=${timeEnd.toISOString()}`;
+  }
+  filter = `resource.type="gae_app"\n`
+  // limit logs that we care
+  filter += [
+    `protoPayload.resource>="/internal/"`, // cron, task queue
+    `protoPayload.resource>="/swarming/api/v1/bot/"`, // requests from bots
+    `protoPayload.method!="GET"`, // POST, PUT, DELETE etc
+  ].join(" OR ")
+  filter += '\n'
+  // cut the last character that represents try number
+  filter += `${ele._taskId.slice(0, -1)}`
+  url += `&advancedFilter=${filter}`
+  return encodeURI(url);
+}
 
 const idAndButtons = (ele) => {
   if (!ele._taskId || ele._notFound) {
@@ -527,6 +553,12 @@ const taskTimingSection = (ele, request, result) => {
           ${result.human_duration}
         </td>
       </tr>
+      <tr>
+        <td>Server Logs</td>
+        <td>
+          <a href=${serverLogsURL(ele, request, result)} target="_blank">View logs on Cloud Console</a>
+        </td>
+      </tr>
     </tbody>
   </table>
   <div class=right>
@@ -909,6 +941,8 @@ window.customElements.define('task-page', class extends SwarmingAppBoilerplate {
     this._showRawOutput = false;
     this._wideLogs = false;
     this._urlParamsLoaded = false;
+    const idx = location.hostname.indexOf('.appspot.com');
+    this._project_id = location.hostname.substring(0, idx);
 
     this._stateChanged = stateReflector(
       /*getState*/() => {

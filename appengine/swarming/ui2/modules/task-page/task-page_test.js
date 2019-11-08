@@ -289,7 +289,7 @@ describe('task-page', function() {
           const taskTiming = $$('table.task-timing', ele);
           expect(taskTiming).toBeTruthy();
           const rows = $('tr', taskTiming);
-          expect(rows.length).toEqual(9);
+          expect(rows.length).toEqual(10);
 
           // little helper for readability
           const cell = (r, c) => rows[r].children[c];
@@ -594,7 +594,7 @@ describe('task-page', function() {
           const taskTiming = $$('table.task-timing', ele);
           expect(taskTiming).toBeTruthy();
           const rows = $('tr', taskTiming);
-          expect(rows.length).toEqual(9);
+          expect(rows.length).toEqual(10);
 
           // little helper for readability
           const cell = (r, c) => rows[r].children[c];
@@ -719,7 +719,7 @@ describe('task-page', function() {
           const taskTiming = $$('table.task-timing', ele);
           expect(taskTiming).toBeTruthy();
           const rows = $('tr', taskTiming);
-          expect(rows.length).toEqual(9);
+          expect(rows.length).toEqual(10);
 
           // little helper for readability
           const cell = (r, c) => rows[r].children[c];
