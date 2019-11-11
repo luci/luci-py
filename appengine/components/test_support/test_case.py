@@ -153,21 +153,46 @@ class TestCase(auto_stub.TestCase):
           self.assertEqual('POST', task['method'])
           logging.info('Task: %s', task['url'])
 
-          # Not 100% sure why the Content-Length hack is needed, nor why the
-          # stub returns unicode values that break webtest's assertions.
-          body = base64.b64decode(task['body'])
-          headers = {k: str(v) for k, v in task['headers']}
-          headers['Content-Length'] = str(len(body))
-          try:
-            self.app.post(task['url'], body, headers=headers, **kwargs)
-          except:
-            logging.error(task)
-            raise
+          self._post_task(task, **kwargs)
           self._taskqueue_stub.DeleteTask(queue['name'], task['name'])
           ran += 1
       if not ran:
         return ran_total
       ran_total += ran
+
+  def execute_task(self, url, queue_name, payload):
+    """Executes a specified task.
+    Raise error if the task isn't in the queue.
+    """
+    task = self._find_task(url, queue_name, payload)
+    expected = {'url': url, 'queue_name': queue_name, 'payload': payload}
+    if not task:
+      raise AssertionError("Task is not enqueued. expected: %r" % expected)
+    self._post_task(task)
+
+  def _post_task(self, task, **kwargs):
+    # Not 100% sure why the Content-Length hack is needed, nor why the
+    # stub returns unicode values that break webtest's assertions.
+    body = base64.b64decode(task['body'])
+    headers = {k: str(v) for k, v in task['headers']}
+    headers['Content-Length'] = str(len(body))
+    try:
+      self.app.post(task['url'], body, headers=headers, **kwargs)
+    except:
+      logging.error(task)
+      raise
+
+
+  def _find_task(self, url, queue_name, payload):
+    for t in self._taskqueue_stub.GetTasks(queue_name):
+      if t['url'] != url:
+        continue
+      if t['queue_name'] != queue_name:
+        continue
+      if base64.b64decode(t['body']) != payload:
+        continue
+      return t
+    return None
 
 
 class Endpoints(object):

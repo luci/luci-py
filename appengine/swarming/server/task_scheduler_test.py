@@ -126,7 +126,6 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
           'REMOTE_ADDR': self.source_ip,
           'SERVER_SOFTWARE': os.environ['SERVER_SOFTWARE'],
         })
-    self._enqueue_calls = []
     self._enqueue_orig = self.mock(utils, 'enqueue_task', self._enqueue)
     self._enqueue_async_orig = self.mock(utils, 'enqueue_task_async',
                                          self._enqueue_async)
@@ -144,14 +143,12 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self._known_pools = None
 
   def _enqueue(self, *args, **kwargs):
-    self._enqueue_calls.append((args, kwargs))
     # Only then add use_dedicated_module as default False.
     kwargs = kwargs.copy()
     kwargs.setdefault('use_dedicated_module', False)
     return self._enqueue_orig(*args, **kwargs)
 
   def _enqueue_async(self, *args, **kwargs):
-    self._enqueue_calls.append((args, kwargs))
     # Only then add use_dedicated_module as default False.
     kwargs = kwargs.copy()
     kwargs.setdefault('use_dedicated_module', False)
@@ -1554,7 +1551,28 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         parent_run_result.result_summary_key, True, None)
     self.assertEqual(True, ok)
     self.assertEqual(True, was_running)
-    self.assertEqual(5, self.execute_tasks())
+
+    # parent_task should push task to cancel-children-tasks.
+    self.execute_task(
+        '/internal/taskqueue/important/tasks/cancel-children-tasks',
+        'cancel-children-tasks',
+        utils.encode_to_json({
+          'task': parent_result_summary.task_id,
+        })
+    )
+    # and child tasks should be cancelled via task queue.
+    self.execute_task(
+        '/internal/taskqueue/important/tasks/cancel',
+        'cancel-tasks',
+        utils.encode_to_json({
+          'kill_running': True,
+          'tasks': [
+            child_result_summary.task_id,
+            child_result2_summary.task_id,
+            child_result3_summary.task_id
+          ],
+        })
+    )
 
     self.assertEqual(
         State.KILLED,
@@ -1608,38 +1626,10 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
             cost_usd=0.1,
             outputs_ref=None,
             performance_stats=None))
-
     self.assertEqual('hi', child_run_result2.key.get().get_output(0, 0))
 
-    self.assertEqual(4, self.execute_tasks())
-
-    # TODO(tikuta): use mock library.
-    # parent_task should push task to cancel-children-tasks.
-    self.assertEqual(self._enqueue_calls[1], (
-      ('/internal/taskqueue/important/tasks/cancel-children-tasks',
-       'cancel-children-tasks'),
-      {'payload': utils.encode_to_json({
-        'task': parent_result_summary.task_id,
-      })}))
-    # Child tasks should be cancelled via task queue.
-    self.assertEqual(
-        self._enqueue_calls[3],
-        (('/internal/taskqueue/important/tasks/cancel', 'cancel-tasks'), {
-            'payload':
-                utils.encode_to_json({
-                    'kill_running':
-                        True,
-                    'tasks': [
-                        child_result_summary.task_id,
-                        child_result2_summary.task_id,
-                        child_result3_summary.task_id
-                    ],
-                }),
-            'use_dedicated_module':
-                False,
-            'version':
-                u'v1a',
-        }))
+    # flush tasks
+    self.execute_tasks()
 
   def test_task_priority(self):
     # Create N tasks of various priority not in order.
@@ -2533,10 +2523,8 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
 
     task_scheduler.cron_handle_external_cancellations()
 
-    self.execute_tasks()
-
     self.assertEqual(len(calls), 2)
-    self.assertEqual(len(self._enqueue_calls), 4)
+    self.assertEqual(2, self.execute_tasks())
 
   def test_cron_handle_external_cancellations_none(self):
     es_address = 'externalscheduler_address'
@@ -2562,7 +2550,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     task_scheduler.cron_handle_external_cancellations()
 
     self.assertEqual(len(calls), 2)
-    self.assertEqual(len(self._enqueue_calls), 0)
+    self.assertEqual(0, self.execute_tasks())
 
   def test_cron_handle_get_callbacks(self):
     """Test that cron_handle_get_callbacks behaves as expected."""
