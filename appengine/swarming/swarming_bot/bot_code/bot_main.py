@@ -22,6 +22,7 @@ Sections are:
 from __future__ import print_function
 
 import argparse
+import collections
 import contextlib
 import fnmatch
 import json
@@ -263,7 +264,12 @@ def _call_hook(chained, botobj, name, *args, **kwargs):
       # Injected version has higher priority.
       hook = getattr(_EXTRA_BOT_CONFIG, name, None)
       if hook:
-        return hook(botobj, *args, **kwargs)
+        try:
+          return hook(botobj, *args, **kwargs)
+
+        except OSError:
+          _log_process_info()
+
       hook = getattr(_get_bot_config(), name, None)
       if hook:
         return hook(botobj, *args, **kwargs)
@@ -288,6 +294,18 @@ def _call_hook(chained, botobj, name, *args, **kwargs):
       if msg:
         # The hook requested a bot restart. Do it right after the hook call.
         _bot_restart(botobj, msg)
+
+
+def _log_process_info():
+  try:
+    import psutil
+    process_count = collections.Counter(
+      proc.name() for proc in psutil.process_iter()
+    )
+    logging.info('Processes running: %s', process_count)
+
+  except ImportError:
+    logging.info('Fail to get process info. Missing psutil')
 
 
 def _call_hook_safe(chained, botobj, name, *args):
