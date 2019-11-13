@@ -182,7 +182,6 @@ class TestCase(auto_stub.TestCase):
       logging.error(task)
       raise
 
-
   def _find_task(self, url, queue_name, payload):
     for t in self._taskqueue_stub.GetTasks(queue_name):
       if t['url'] != url:

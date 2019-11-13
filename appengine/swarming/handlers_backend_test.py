@@ -174,9 +174,11 @@ class BackendTest(test_env_handlers.AppTestBase):
   def test_taskqueues(self):
     # Tests all the task queue tasks are securely handled.
     # TODO(maruel): Test mapreduce.
+    # TODO(jwata): test append-child.
     task_queue_urls = sorted(
       r for r in self._GetRoutes() if r.startswith('/internal/taskqueue/')
-      if not r.startswith('/internal/taskqueue/mapreduce/launch/')
+      if not r.startswith('/internal/taskqueue/mapreduce/launch/') and
+        not r.endswith('/append-child')
     )
     # This help to keep queue.yaml and handlers_backend.py up to date.
     # Format: (<queue-name>, <base-url>, <argument>).
