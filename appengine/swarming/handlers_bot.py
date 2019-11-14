@@ -12,6 +12,7 @@ import webob
 import webapp2
 
 from google.appengine.api import app_identity
+from google.appengine.api import datastore_errors
 from google.appengine.ext import ndb
 from google.appengine import runtime
 
@@ -578,9 +579,13 @@ class BotPollHandler(_BotBaseHandler):
 
     # The bot is in good shape. Try to grab a task.
     try:
-      # This is a fairly complex function call, exceptions are expected.
-      request, secret_bytes, run_result = task_scheduler.bot_reap_task(
-          res.dimensions, res.version)
+      try:
+        # This is a fairly complex function call, exceptions are expected.
+        request, secret_bytes, run_result = task_scheduler.bot_reap_task(
+            res.dimensions, res.version)
+      except datastore_errors.Timeout:
+        self.abort(429, 'Deadline exceeded while accessing datastore')
+
       if not request:
         # No task found, tell it to sleep a bit.
         bot_event('request_sleep')
