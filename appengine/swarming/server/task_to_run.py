@@ -346,7 +346,7 @@ def _get_task_to_run_query(dimensions_hash):
   # dimensions_hash should be 32 bits but on AppEngine, which is using 32 bits
   # python, it is silently upgraded to long.
   assert isinstance(dimensions_hash, (int, long)), repr(dimensions_hash)
-  opts = ndb.QueryOptions(deadline=15)
+  opts = ndb.QueryOptions(deadline=60)
   # See _gen_queue_number() as of why << 31. This query cannot use the key
   # because it is not a root entity.
   return TaskToRun.query(default_options=opts).order(
