@@ -265,8 +265,9 @@ class CronCleanupExpiredHandler(webapp2.RequestHandler):
     # (to be verified) that the datastore will accept more inconsistency, which
     # increases the likelihood of not timing out.
     q = model.ContentEntry.query(
-        default_options=ndb.QueryOptions(keys_only=True)).order(
-            model.ContentEntry.expiration_ts)
+        default_options=ndb.QueryOptions(
+            keys_only=True, read_policy=ndb.EVENTUAL_CONSISTENCY)).order(
+                model.ContentEntry.expiration_ts)
     entity = None
     try:
       key = q.get()
