@@ -105,8 +105,11 @@ def generate_code(file_descriptor, all_files):
 
 
 def safe_filename(filename):
-  # For compatibility with Python generator, converts a.b/c/d/ to a/b/c/d,
-  # since Python doesn't allow '.' in package names.
+  """Converts a/b.c/d/ to a/b/c/d for proper Python package name.
+
+  Python doesn't allow '.' in package names and this is compatible with Python
+  generator.
+  """
   parts = filename.split('/')
   for i, part in enumerate(parts[:-1]):
     parts[i] = part.replace('.', '/')
