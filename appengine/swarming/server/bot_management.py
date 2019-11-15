@@ -250,19 +250,28 @@ class BotInfo(_BotCommon):
 
   def _calc_composite(self):
     """Returns the value for BotInfo.composite, which permits quick searches."""
-    timeout = config.settings().bot_death_timeout_secs
-    is_dead = (utils.utcnow() - self.last_seen_ts).total_seconds() >= timeout
     return [
-      self.IN_MAINTENANCE if self.maintenance_msg else self.NOT_IN_MAINTENANCE,
-      self.DEAD if is_dead else self.ALIVE,
-      self.QUARANTINED if self.quarantined else self.HEALTHY,
-      self.BUSY if self.task_id else self.IDLE
+        self.IN_MAINTENANCE
+        if self.maintenance_msg else self.NOT_IN_MAINTENANCE,
+        self.DEAD if self.should_be_dead else self.ALIVE,
+        self.QUARANTINED if self.quarantined else self.HEALTHY,
+        self.BUSY if self.task_id else self.IDLE
     ]
+
+  @property
+  def should_be_dead(self):
+    # check if the last seen is over deadline
+    return self.last_seen_ts <= self._deadline()
 
   @property
   def is_dead(self):
     # Only valid after it's stored.
     return self.DEAD in self.composite
+
+  @property
+  def is_alive(self):
+    # Only valid after it's stored.
+    return self.ALIVE in self.composite
 
   def to_dict(self, exclude=None):
     out = super(BotInfo, self).to_dict(exclude=exclude)
@@ -287,6 +296,16 @@ class BotInfo(_BotCommon):
     if not self.task_id:
       self.task_name = None
     self.composite = self._calc_composite()
+
+  @staticmethod
+  def yield_dead_bots():
+    """Yields bots who should be dead."""
+    return BotInfo.query(BotInfo.last_seen_ts <= BotInfo._deadline())
+
+  @staticmethod
+  def _deadline():
+    dt = datetime.timedelta(seconds=config.settings().bot_death_timeout_secs)
+    return utils.utcnow() - dt
 
 
 class BotEvent(_BotCommon):
@@ -676,32 +695,37 @@ def cron_update_bot_info():
   """Refreshes BotInfo.composite for dead bots."""
   # TODO(crbug/916578): Ensure a BotEvent is registered so it can be queried in
   # the Big Query swarming.bot_events table.
-  dt = datetime.timedelta(seconds=config.settings().bot_death_timeout_secs)
-  cutoff = utils.utcnow() - dt
 
   @ndb.tasklet
   def run(bot_key):
     bot = yield bot_key.get_async()
-    if (bot and bot.last_seen_ts <= cutoff and
-        (BotInfo.ALIVE in bot.composite or BotInfo.DEAD not in bot.composite)):
-      # Updating it recomputes composite.
-      # TODO(maruel): BotEvent.
+    if bot and bot.should_be_dead and (bot.is_alive or not bot.is_dead):
+      # bot composite get updated in _pre_put_hook
       yield bot.put_async()
       logging.info('DEAD: %s', bot.id)
       raise ndb.Return(1)
     raise ndb.Return(0)
 
+  def tx_result(future, stats):
+    try:
+      stats['dead'] += future.get_result()
+    except datastore_utils.CommitError:
+      logging.warning('Failed to commit a Tx')
+      stats['failed'] += 1
+
   # The assumption here is that a cron job can churn through all the entities
   # fast enough. The number of dead bot is expected to be <10k. In practice the
   # average runtime is around 8 seconds.
-  dead = 0
-  seen = 0
-  failed = 0
+  cron_stats = {
+      'dead': 0,
+      'seen': 0,
+      'failed': 0,
+  }
   try:
     futures = []
-    for b in BotInfo.query(BotInfo.last_seen_ts <= cutoff):
-      seen += 1
-      if BotInfo.ALIVE in b.composite or BotInfo.DEAD not in b.composite:
+    for b in BotInfo.yield_dead_bots():
+      cron_stats['seen'] += 1
+      if b.is_alive or not b.is_dead:
         # Make sure the variable is not aliased.
         k = b.key
         # Unregister the bot from task queues since it can't reap anything.
@@ -714,21 +738,14 @@ def cron_update_bot_info():
           ndb.Future.wait_any(futures)
           for i in range(len(futures) - 1, -1, -1):
             if futures[i].done():
-              try:
-                dead += futures.pop(i).get_result()
-              except datastore_utils.CommitError:
-                logging.warning('Failed to commit a Tx')
-                failed += 1
+              f = futures.pop(i)
+              tx_result(f, cron_stats)
     for f in futures:
-      try:
-        dead += f.get_result()
-      except datastore_utils.CommitError:
-        logging.warning('Failed to commit a Tx')
-        failed += 1
+      tx_result(f, cron_stats)
   finally:
-    logging.debug(
-        'Seen %d bots, updated %d bots, failed %d tx', seen, dead, failed)
-  return dead
+    logging.debug('Seen %d bots, updated %d dead bots, failed %d tx',
+                  cron_stats['seen'], cron_stats['dead'], cron_stats['failed'])
+  return cron_stats['dead']
 
 
 def cron_delete_old_bot_events():
