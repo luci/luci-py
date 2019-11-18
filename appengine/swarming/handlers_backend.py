@@ -219,13 +219,23 @@ class TaskAppendChildTaskHandler(webapp2.RequestHandler):
 
   @decorators.require_taskqueue('append-child-task')
   def post(self, task_id):
-    payload = json.loads(self.request.body)
-    child_task_id = payload['child_task_id']
+    try:
+      payload = json.loads(self.request.body)
+      child_task_id = payload['child_task_id']
+    except ValueError:
+      self.response.set_status(422)
+      return
+
     logging.info(('Appending child task.'
                   'parent_task_id:%s, child_task_id:%s'),
                  task_id, child_task_id)
     try:
       task_scheduler.task_append_child(task_id, child_task_id)
+    except datastore_utils.CommitError:
+      # It can fail when multiple childrent access to the same parents
+      logging.warning(
+          'The parents may be updated by another process.', exc_info=True)
+      self.response.set_status(409)
     except ValueError:
       # Ignore errors that happen due to invalid task ids.
       logging.warning('Ignoring appending child task due to exception.',

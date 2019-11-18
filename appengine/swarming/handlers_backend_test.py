@@ -5,6 +5,7 @@
 # that can be found in the LICENSE file.
 
 import datetime
+import json
 import logging
 import os
 import sys
@@ -21,6 +22,7 @@ import webtest
 
 import handlers_backend
 from components import utils
+from components import datastore_utils
 from server import bot_management
 from server import task_queues
 from server import task_request
@@ -229,6 +231,21 @@ class BackendTest(test_env_handlers.AppTestBase):
             url, headers={'X-AppEngine-QueueName': 'bogus name'}, status=403)
       except Exception as e:
         self.fail('%s: %s' % (url, e))
+
+  def test_taskqueue_important_tasks_append_child_commit_error(self):
+
+    def raise_commit_error(_task_id, _child_task_id):
+      raise datastore_utils.CommitError()
+
+    self.mock(handlers_backend.task_scheduler, 'task_append_child',
+              raise_commit_error)
+    self.app.post(
+        '/internal/taskqueue/important/tasks/123123/append-child',
+        json.dumps({
+            'child_task_id': '321321'
+        }),
+        headers={'X-AppEngine-QueueName': 'append-child-task'},
+        status=409)
 
   def test_taskqueue_important_task_queues_rebuild_cache_fail(self):
     self.set_as_admin()
