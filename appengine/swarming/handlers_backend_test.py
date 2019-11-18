@@ -13,6 +13,7 @@ import unittest
 # Sets up environment.
 import test_env_handlers
 
+import webapp2
 from google.appengine.api import datastore_errors
 from google.appengine.ext import ndb
 
@@ -31,10 +32,11 @@ class BackendTest(test_env_handlers.AppTestBase):
   # Need to run in test_seq.py
   no_run = 1
 
-  def _GetRoutes(self):
+  def _GetRoutes(self, prefix):
     """Returns the list of all routes handled."""
     return [
-        r.template for r in self.app.app.router.match_routes
+        r for r in self.app.app.router.match_routes
+        if r.template.startswith(prefix)
     ]
 
   def setUp(self):
@@ -61,7 +63,7 @@ class BackendTest(test_env_handlers.AppTestBase):
   def test_crons(self):
     # Tests all the cron tasks are securely handled.
     prefix = '/internal/cron/'
-    cron_job_urls = [r for r in self._GetRoutes() if r.startswith(prefix)]
+    cron_job_urls = [r.template for r in self._GetRoutes(prefix)]
     self.assertTrue(cron_job_urls)
 
     for cron_job_url in cron_job_urls:
@@ -173,60 +175,58 @@ class BackendTest(test_env_handlers.AppTestBase):
 
   def test_taskqueues(self):
     # Tests all the task queue tasks are securely handled.
-    # TODO(maruel): Test mapreduce.
-    # TODO(jwata): test append-child.
-    task_queue_urls = sorted(
-      r for r in self._GetRoutes() if r.startswith('/internal/taskqueue/')
-      if not r.startswith('/internal/taskqueue/mapreduce/launch/') and
-        not r.endswith('/append-child')
-    )
+    task_queue_routes = sorted(
+        self._GetRoutes('/internal/taskqueue/'), key=lambda x: x.template)
     # This help to keep queue.yaml and handlers_backend.py up to date.
     # Format: (<queue-name>, <base-url>, <argument>).
     expected_task_queues = sorted(
       [
         ('cancel-task-on-bot',
-          '/internal/taskqueue/important/tasks/cancel-task-on-bot', ''),
-        ('cancel-tasks', '/internal/taskqueue/important/tasks/cancel', ''),
+         '/internal/taskqueue/important/tasks/cancel-task-on-bot'),
+        ('cancel-tasks', '/internal/taskqueue/important/tasks/cancel'),
         ('cancel-children-tasks',
-         '/internal/taskqueue/important/tasks/cancel-children-tasks', ''),
-        ('task-expire', '/internal/taskqueue/important/tasks/expire', ''),
-        ('delete-tasks', '/internal/taskqueue/cleanup/tasks/delete', ''),
+         '/internal/taskqueue/important/tasks/cancel-children-tasks'),
+        ('append-child-task',
+         '/internal/taskqueue/important/tasks/4895ff792a944310/append-child'),
+        ('task-expire', '/internal/taskqueue/important/tasks/expire'),
+        ('delete-tasks', '/internal/taskqueue/cleanup/tasks/delete'),
         ('es-notify-tasks',
-          '/internal/taskqueue/important/external_scheduler/notify-tasks', ''),
+         '/internal/taskqueue/important/external_scheduler/notify-tasks'),
         ('es-notify-kick',
-          '/internal/taskqueue/important/external_scheduler/notify-kick',
-          ''),
-        ('pubsub', '/internal/taskqueue/important/pubsub/notify-task/',
-          'abcabcabc'),
+         '/internal/taskqueue/important/external_scheduler/notify-kick'),
+        ('pubsub',
+         '/internal/taskqueue/important/pubsub/notify-task/abcabcabc'),
         ('rebuild-task-cache',
-          '/internal/taskqueue/important/task_queues/rebuild-cache', ''),
-        ('tsmon', '/internal/taskqueue/monitoring/tsmon/', 'executors'),
+         '/internal/taskqueue/important/task_queues/rebuild-cache'),
+        ('tsmon', '/internal/taskqueue/monitoring/tsmon/executors'),
         ('named-cache-task',
-          '/internal/taskqueue/important/named_cache/update-pool', ''),
+         '/internal/taskqueue/important/named_cache/update-pool'),
         ('monitoring-bq-bots-events',
-          '/internal/taskqueue/monitoring/bq/bots/events/', '2020-01-01T01:01'),
+         '/internal/taskqueue/monitoring/bq/bots/events/2020-01-01T01:01'),
         ('monitoring-bq-tasks-requests',
-          '/internal/taskqueue/monitoring/bq/tasks/requests/',
-          '2020-01-01T01:01'),
+         '/internal/taskqueue/monitoring/bq/tasks/requests/2020-01-01T01:01'),
         ('monitoring-bq-tasks-results-run',
-          '/internal/taskqueue/monitoring/bq/tasks/results/run/',
-          '2020-01-01T01:01'),
+         '/internal/taskqueue/monitoring/bq/tasks/results/run/'
+         '2020-01-01T01:01'),
         ('monitoring-bq-tasks-results-summary',
-          '/internal/taskqueue/monitoring/bq/tasks/results/summary/',
-          '2020-01-01T01:01'),
+         '/internal/taskqueue/monitoring/bq/tasks/results/summary/'
+         '2020-01-01T01:01'),
+        ('mapreduce-jobs', '/internal/taskqueue/mapreduce/launch/jobid'),
       ],
       key=lambda x: x[1])
-    self.assertEqual(len(expected_task_queues), len(task_queue_urls))
-    for i, url in enumerate(task_queue_urls):
-      self.assertTrue(
-          url.startswith(expected_task_queues[i][1]),
-          '%s does not start with %s' % (url, expected_task_queues[i][1]))
+    self.assertEqual(len(expected_task_queues), len(task_queue_routes))
 
-    for _, url, arg in expected_task_queues:
+    for i, route in enumerate(task_queue_routes):
+      expected_url = expected_task_queues[i][1]
+      request = webapp2.Request.blank(expected_url)
+      if not route.match(request):
+        self.fail('Failed to route url %s with %r.' % (expected_url, route))
+
+    # A request with wrong queue name should fail with 403
+    for _, url in expected_task_queues:
       try:
         self.app.post(
-            url+arg, headers={'X-AppEngine-QueueName': 'bogus name'},
-            status=403)
+            url, headers={'X-AppEngine-QueueName': 'bogus name'}, status=403)
       except Exception as e:
         self.fail('%s: %s' % (url, e))
 
