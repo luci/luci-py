@@ -265,12 +265,12 @@ class BotInfo(_BotCommon):
 
   @property
   def is_dead(self):
-    # Only valid after it's stored.
+    assert self.composite, 'Please store first'
     return self.DEAD in self.composite
 
   @property
   def is_alive(self):
-    # Only valid after it's stored.
+    assert self.composite, 'Please store first'
     return self.ALIVE in self.composite
 
   def to_dict(self, exclude=None):
@@ -297,10 +297,10 @@ class BotInfo(_BotCommon):
       self.task_name = None
     self.composite = self._calc_composite()
 
-  @staticmethod
-  def yield_dead_bots():
+  @classmethod
+  def yield_dead_bots(cls):
     """Yields bots who should be dead."""
-    return BotInfo.query(BotInfo.last_seen_ts <= BotInfo._deadline())
+    return cls.query(cls.last_seen_ts <= cls._deadline())
 
   @staticmethod
   def _deadline():
