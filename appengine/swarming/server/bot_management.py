@@ -317,33 +317,34 @@ class BotEvent(_BotCommon):
   This entity is created on each bot state transition.
   """
   _MAPPING = {
-    'bot_connected': swarming_pb2.BOT_NEW_SESSION,
-    'bot_internal_failure': swarming_pb2.BOT_INTERNAL_FAILURE,
-    'bot_hook_error': swarming_pb2.BOT_HOOK_ERROR,
-    'bot_hook_log': swarming_pb2.BOT_HOOK_LOG,
-    # Historically ambiguous. It used to be both bot_internal_failure and
-    # bot_hook_error.
-    'bot_error': swarming_pb2.BOT_HOOK_ERROR,
-    # Historical misnaming. This is equivalent to bot_hook_log.
-    'bot_log': swarming_pb2.BOT_HOOK_LOG,
-    # TODO(maruel): Add definition if desired.
-    'bot_leased': None,
-    # Historical misnaming.
-    'bot_rebooting': swarming_pb2.BOT_REBOOTING_HOST,
-    'bot_shutdown': swarming_pb2.BOT_SHUTDOWN,
-    # Historical misnaming.
-    'bot_terminate': swarming_pb2.INSTRUCT_TERMINATE_BOT,
-    'request_restart': swarming_pb2.INSTRUCT_RESTART_BOT,
-    # Shall only be sorted when there is a significant difference in the bot
-    # state versus the previous event.
-    'request_sleep': swarming_pb2.INSTRUCT_IDLE,
-    'request_task': swarming_pb2.INSTRUCT_START_TASK,
-    'request_update': swarming_pb2.INSTRUCT_UPDATE_BOT_CODE,
-    'task_completed': swarming_pb2.TASK_COMPLETED,
-    'task_error': swarming_pb2.TASK_INTERNAL_FAILURE,
-    'task_killed': swarming_pb2.TASK_KILLED,
-    # This value is not registered in the API.
-    'task_update': None
+      'bot_connected': swarming_pb2.BOT_NEW_SESSION,
+      'bot_internal_failure': swarming_pb2.BOT_INTERNAL_FAILURE,
+      'bot_hook_error': swarming_pb2.BOT_HOOK_ERROR,
+      'bot_hook_log': swarming_pb2.BOT_HOOK_LOG,
+      # Historically ambiguous. It used to be both bot_internal_failure and
+      # bot_hook_error.
+      'bot_error': swarming_pb2.BOT_HOOK_ERROR,
+      # Historical misnaming. This is equivalent to bot_hook_log.
+      'bot_log': swarming_pb2.BOT_HOOK_LOG,
+      # TODO(maruel): Add definition if desired.
+      'bot_leased': None,
+      # Historical misnaming.
+      'bot_rebooting': swarming_pb2.BOT_REBOOTING_HOST,
+      'bot_shutdown': swarming_pb2.BOT_SHUTDOWN,
+      # Historical misnaming.
+      'bot_terminate': swarming_pb2.INSTRUCT_TERMINATE_BOT,
+      'bot_missing': swarming_pb2.MISSING,
+      'request_restart': swarming_pb2.INSTRUCT_RESTART_BOT,
+      # Shall only be sorted when there is a significant difference in the bot
+      # state versus the previous event.
+      'request_sleep': swarming_pb2.INSTRUCT_IDLE,
+      'request_task': swarming_pb2.INSTRUCT_START_TASK,
+      'request_update': swarming_pb2.INSTRUCT_UPDATE_BOT_CODE,
+      'task_completed': swarming_pb2.TASK_COMPLETED,
+      'task_error': swarming_pb2.TASK_INTERNAL_FAILURE,
+      'task_killed': swarming_pb2.TASK_KILLED,
+      # This value is not registered in the API.
+      'task_update': None
   }
 
   ALLOWED_EVENTS = {
@@ -359,10 +360,10 @@ class BotEvent(_BotCommon):
       # Deprecated. Use bot_hook_log.
       # TODO(maruel): Remove 2020-01-01.
       'bot_log',
+      'bot_missing',
       'bot_rebooting',
       'bot_shutdown',
       'bot_terminate',
-      # TODO(crbug/916578): Add 'bot_missing'.
 
       # Bot polling result:
       'request_restart',
