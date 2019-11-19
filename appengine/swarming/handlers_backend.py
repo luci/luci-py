@@ -223,7 +223,7 @@ class TaskAppendChildTaskHandler(webapp2.RequestHandler):
       payload = json.loads(self.request.body)
       child_task_id = payload['child_task_id']
     except ValueError:
-      self.response.set_status(422)
+      self.response.set_status(400)
       return
 
     logging.info(('Appending child task.'
