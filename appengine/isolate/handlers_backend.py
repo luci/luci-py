@@ -277,14 +277,14 @@ class CronCleanupExpiredHandler(webapp2.RequestHandler):
       # 6 billions entities. This is because the query above is exact, not an
       # estimation.
       logging.warning('Query timed out; guessing instead')
-      for i in range(300, -1, -20):
+      days_interval = 20
+      for i in range(300, -1, -days_interval):
         # It was observed that limiting the range on both sides helps with the
         # chances of the query succeeding, instead of raising a Timeout.
         q = model.ContentEntry.query(
-            model.ContentEntry.expiration_ts <
-                now - datetime.timedelta(days=i),
+            model.ContentEntry.expiration_ts < now - datetime.timedelta(days=i),
             model.ContentEntry.expiration_ts >=
-                now - datetime.timedelta(days=i+1))
+            now - datetime.timedelta(days=i + days_interval))
         try:
           # Don't order() here otherwise the query will likely time out. Don't
           # bother with keys_only=True since the lack of order() should suffice.
