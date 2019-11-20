@@ -116,6 +116,8 @@ class BotApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(64, len(response['bot_version']))
     self.assertEqual(u'v1a', response['server_version'])
     self.assertEqual([], errors)
+    bot_info = bot_management.get_info_key('id1').get()
+    self.assertIsNone(bot_info)
 
   def test_handshake_minimum(self):
     errors = []
@@ -904,7 +906,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
           u'sleep_streak': 0,
           u'started_ts': 1410990411.111,
         },
-        'task_id': u'',
+        'task_id': None,
         'ts': self.now,
         'version': self.bot_version,
       } for e in reversed(handlers_bot.BotEventHandler.ALLOWED_EVENTS)
