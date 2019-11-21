@@ -313,7 +313,7 @@ class _BotBaseHandler(_BotApiHandler):
   EXPECTED_KEYS = {u'dimensions', u'state', u'version'}
   REQUIRED_STATE_KEYS = {u'running_time', u'sleep_streak'}
 
-  def _process(self, skip_assert_bot):
+  def _process(self, assert_bot):
     """Fetches bot info and settings, does authorization and quarantine checks.
 
     Returns:
@@ -429,7 +429,7 @@ class _BotBaseHandler(_BotApiHandler):
       result.quarantined_msg = 'Quarantined by admin'
       return result
 
-    if not skip_assert_bot:
+    if assert_bot:
       # TODO(jwata): Parallelise assert_bot by removing get_result(),
       # Use @ndb.toplevel on the handler not to forget calling ndb.Future
       bot_root_key = bot_management.get_root_key(bot_id)
@@ -461,7 +461,7 @@ class BotHandshakeHandler(_BotBaseHandler):
   """
   @auth.public  # auth happens in self._process()
   def post(self):
-    res = self._process(skip_assert_bot=True)
+    res = self._process(assert_bot=False)
 
     # crbug.com/801679: BotInfo shouldn't be registered at /handshake
     bot_management.bot_event(
@@ -520,7 +520,7 @@ class BotPollHandler(_BotBaseHandler):
       self._cmd_sleep(1000, True)
       return
 
-    res = self._process(skip_assert_bot=False)
+    res = self._process(assert_bot=True)
     sleep_streak = res.state.get('sleep_streak', 0)
     quarantined = bool(res.quarantined_msg)
 
@@ -728,7 +728,7 @@ class BotEventHandler(_BotBaseHandler):
 
   @auth.public  # auth happens in self._process()
   def post(self):
-    res = self._process(skip_assert_bot=False)
+    res = self._process(assert_bot=False)
     event = res.request.get('event')
     if event not in self.ALLOWED_EVENTS:
       logging.error('Unexpected event type')
