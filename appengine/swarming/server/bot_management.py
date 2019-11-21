@@ -521,8 +521,7 @@ def filter_availability(q, quarantined, in_maintenance, is_dead, is_busy):
 
 def bot_event(
     event_type, bot_id, external_ip, authenticated_as, dimensions, state,
-    version, quarantined, maintenance_msg, task_id, task_name,
-    store_bot_info=True, **kwargs):
+    version, quarantined, maintenance_msg, task_id, task_name, **kwargs):
   """Records when a bot has queried for work.
 
   The sheer fact this event is happening means the bot is alive (not dead), so
@@ -548,7 +547,6 @@ def bot_event(
   - maintenance_msg: string describing why the bot is in maintenance.
   - task_id: packed task id if relevant. Set to '' to zap the stored value.
   - task_name: task name if relevant. Zapped when task_id is zapped.
-  - store_bot_info: store BotInfo if True.
   - kwargs: optional values to add to BotEvent relevant to event_type.
 
   Returns:
@@ -601,8 +599,8 @@ def bot_event(
     task_queues.cleanup_after_bot(info_key.parent())
 
   try:
-    if (event_type in ('request_sleep', 'task_update')
-        and not dimensions_updated and store_bot_info):
+    if event_type in ('request_sleep',
+                      'task_update') and not dimensions_updated:
       # Handle this specifically. It's not much of an even worth saving a
       # BotEvent for but it's worth updating BotInfo. The only reason BotInfo is
       # GET is to keep first_seen_ts. It's not necessary to use a transaction
@@ -626,10 +624,7 @@ def bot_event(
         version=bot_info.version,
         **kwargs)
 
-    extra = []
-    if store_bot_info:
-      extra.append(bot_info)
-    datastore_utils.store_new_version(event, BotRoot, extra)
+    datastore_utils.store_new_version(event, BotRoot, [bot_info])
     return event.key
   finally:
     # Store the event in memcache to accelerate monitoring.

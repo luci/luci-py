@@ -462,8 +462,6 @@ class BotHandshakeHandler(_BotBaseHandler):
   @auth.public  # auth happens in self._process()
   def post(self):
     res = self._process(assert_bot=False)
-
-    # crbug.com/801679: BotInfo shouldn't be registered at /handshake
     bot_management.bot_event(
         event_type='bot_connected', bot_id=res.bot_id,
         external_ip=self.request.remote_addr,
@@ -471,8 +469,7 @@ class BotHandshakeHandler(_BotBaseHandler):
         dimensions=res.dimensions, state=res.state,
         version=res.version, quarantined=bool(res.quarantined_msg),
         maintenance_msg=res.maintenance_msg,
-        task_id='', task_name=None, message=res.quarantined_msg,
-        store_bot_info=False)
+        task_id='', task_name=None, message=res.quarantined_msg)
 
     data = {
       'bot_version': bot_code.get_bot_version(self.request.host_url)[0],
