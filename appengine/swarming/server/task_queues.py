@@ -548,6 +548,8 @@ def _refresh_BotTaskDimensions_async(now, valid_until_ts, dimensions_flat,
     True if the entity was updated, False if no-op.
   """
   bot_task = yield bot_task_key.get_async()
+  bot_id = bot_task_key.parent().string_id()
+  logging.debug('refreshing BotTaskDimensions. bot_id: %s', bot_id)
   # Play safe. If the BotTaskDimensions was close to be ignored, refresh the
   # memcache entry.
   cutoff = now - datetime.timedelta(minutes=1)
@@ -559,12 +561,22 @@ def _refresh_BotTaskDimensions_async(now, valid_until_ts, dimensions_flat,
     need_db_store = bot_task.valid_until_ts < valid_until_ts
 
   if need_db_store:
+    logging.debug(
+        'Storing new BotTaskDimensions to DB.'
+        'bot_id:%s, valid_until_ts:%s', bot_id, valid_until_ts)
     yield BotTaskDimensions(
         key=bot_task_key, valid_until_ts=valid_until_ts,
         dimensions_flat=dimensions_flat).put_async()
+  else:
+    logging.debug(
+        'Keeping stored BotTaskDimensions.'
+        'bot_id: %s, valid_until_ts: %s', bot_id, bot_task.valid_until_ts)
   if need_memcache_clear:
-    bot_id = bot_task_key.parent().string_id()
+    logging.debug('Deleting cached task queues. bot_id: %s', bot_id)
     yield ndb.get_context().memcache_delete(bot_id, namespace='task_queues')
+  else:
+    logging.debug('Keeping cached task queues. bot_id: %s, valid_until_ts: %s',
+                  bot_id, bot_task.valid_until_ts)
   raise ndb.Return(need_db_store)
 
 
@@ -686,6 +698,9 @@ def _refresh_all_BotTaskDimensions_async(now, valid_until_ts, dimensions_flat,
 
   Used by rebuild_task_cache_async.
   """
+  logging.debug(
+      '_refresh_all_BotTaskDimensions_async: refreshing bots with '
+      'dimension_hash: %s, dimensions: %s', dimensions_hash, dimensions_flat)
   # Number of BotTaskDimensions entities that were created/updated in the DB.
   updated = 0
   # Number of BotTaskDimensions entities that matched this task queue.
