@@ -23,7 +23,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   package='swarming.v1',
   syntax='proto3',
   serialized_options=_b('Z-go.chromium.org/luci/swarming/proto/api;apipb'),
-  serialized_pb=_b('\n\x0eswarming.proto\x12\x0bswarming.v1\x1a\x1egoogle/protobuf/duration.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xa7\x01\n\x10\x42otEventsRequest\x12\x0e\n\x06\x62ot_id\x18\x01 \x01(\t\x12\x11\n\tpage_size\x18\x02 \x01(\x05\x12\x12\n\npage_token\x18\x03 \x01(\t\x12.\n\nstart_time\x18\x04 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12,\n\x08\x65nd_time\x18\x05 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\"S\n\x11\x42otEventsResponse\x12%\n\x06\x65vents\x18\x01 \x03(\x0b\x32\x15.swarming.v1.BotEvent\x12\x17\n\x0fnext_page_token\x18\x02 \x01(\t\"(\n\nStringPair\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t\"-\n\x0eStringListPair\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\x0e\n\x06values\x18\x02 \x03(\t\"\xe6\x01\n\x03\x42ot\x12\x0e\n\x06\x62ot_id\x18\x01 \x01(\t\x12\x12\n\nsession_id\x18\x02 \x01(\t\x12\r\n\x05pools\x18\x03 \x03(\t\x12*\n\x06status\x18\x04 \x01(\x0e\x32\x1a.swarming.v1.BotStatusType\x12\x12\n\nstatus_msg\x18\x05 \x01(\t\x12\x17\n\x0f\x63urrent_task_id\x18\x06 \x01(\t\x12/\n\ndimensions\x18\x07 \x03(\x0b\x32\x1b.swarming.v1.StringListPair\x12\"\n\x04info\x18\x08 \x01(\x0b\x32\x14.swarming.v1.BotInfo\"\xfc\x02\n\x07\x42otInfo\x12-\n\x0csupplemental\x18\x01 \x01(\x0b\x32\x17.google.protobuf.Struct\x12\x0f\n\x07version\x18\x02 \x01(\t\x12\x13\n\x0b\x65xternal_ip\x18\x03 \x01(\t\x12\x18\n\x10\x61uthenticated_as\x18\x04 \x01(\t\x12(\n\tcas_stats\x18\x05 \x01(\x0b\x32\x15.swarming.v1.CASStats\x12\x38\n\x12named_caches_stats\x18\x06 \x03(\x0b\x32\x1c.swarming.v1.NamedCacheStats\x12\x45\n\x19\x63ipd_packages_cache_stats\x18\x07 \x03(\x0b\x32\".swarming.v1.CIPDPackageCacheStats\x12)\n\x04host\x18\x08 \x01(\x0b\x32\x1b.swarming.v1.PhysicalEntity\x12,\n\x07\x64\x65vices\x18\t \x03(\x0b\x32\x1b.swarming.v1.PhysicalEntity\"Y\n\x0ePhysicalEntity\x12\x0c\n\x04name\x18\x01 \x01(\t\x12-\n\x0csupplemental\x18\x02 \x01(\x0b\x32\x17.google.protobuf.Struct\x12\n\n\x02ip\x18\x03 \x01(\t\"_\n\x08\x43\x41SStats\x12\x14\n\x0cnumber_items\x18\x01 \x01(\x03\x12\x0c\n\x04size\x18\x02 \x01(\x03\x12/\n\x0boldest_time\x18\x03 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\"`\n\x0fNamedCacheStats\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x0c\n\x04size\x18\x02 \x01(\x03\x12\x31\n\rlast_use_time\x18\x03 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\"w\n\x15\x43IPDPackageCacheStats\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x0f\n\x07version\x18\x02 \x01(\t\x12\x0c\n\x04size\x18\x03 \x01(\x03\x12\x31\n\rlast_use_time\x18\x04 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\"\x96\x01\n\x08\x42otEvent\x12.\n\nevent_time\x18\x01 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x1d\n\x03\x62ot\x18\x02 \x01(\x0b\x32\x10.swarming.v1.Bot\x12(\n\x05\x65vent\x18\x03 \x01(\x0e\x32\x19.swarming.v1.BotEventType\x12\x11\n\tevent_msg\x18\x04 \x01(\t\"<\n\x07\x43\x41STree\x12\x0e\n\x06server\x18\x01 \x01(\t\x12\x0e\n\x06\x64igest\x18\x02 \x01(\t\x12\x11\n\tnamespace\x18\x03 \x01(\t\"G\n\x0b\x43IPDPackage\x12\x14\n\x0cpackage_name\x18\x01 \x01(\t\x12\x0f\n\x07version\x18\x02 \x01(\t\x12\x11\n\tdest_path\x18\x03 \x01(\t\"2\n\x0fNamedCacheEntry\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x11\n\tdest_path\x18\x02 \x01(\t\"\xf2\x01\n\x0b\x43ontainment\x12\x16\n\x0elower_priority\x18\x01 \x01(\x08\x12\x42\n\x10\x63ontainment_type\x18\x02 \x01(\x0e\x32(.swarming.v1.Containment.ContainmentType\x12\x17\n\x0flimit_processes\x18\x03 \x01(\x03\x12$\n\x1climit_total_committed_memory\x18\x04 \x01(\x03\"H\n\x0f\x43ontainmentType\x12\x11\n\rNOT_SPECIFIED\x10\x00\x12\x08\n\x04NONE\x10\x01\x12\x08\n\x04\x41UTO\x10\x02\x12\x0e\n\nJOB_OBJECT\x10\x03\"\xf9\x04\n\x0eTaskProperties\x12(\n\ncas_inputs\x18\x01 \x01(\x0b\x32\x14.swarming.v1.CASTree\x12-\n\x0b\x63ipd_inputs\x18\x02 \x03(\x0b\x32\x18.swarming.v1.CIPDPackage\x12\x32\n\x0cnamed_caches\x18\x03 \x03(\x0b\x32\x1c.swarming.v1.NamedCacheEntry\x12\x0f\n\x07\x63ommand\x18\x04 \x03(\t\x12\x14\n\x0crelative_cwd\x18\x05 \x01(\t\x12\x12\n\nextra_args\x18\x06 \x03(\t\x12\x14\n\x0csecret_bytes\x18\x07 \x01(\x0c\x12\x18\n\x10has_secret_bytes\x18\x08 \x01(\x08\x12/\n\ndimensions\x18\t \x03(\x0b\x32\x1b.swarming.v1.StringListPair\x12$\n\x03\x65nv\x18\n \x03(\x0b\x32\x17.swarming.v1.StringPair\x12.\n\tenv_paths\x18\x0b \x03(\x0b\x32\x1b.swarming.v1.StringListPair\x12-\n\x0b\x63ontainment\x18\x0c \x01(\x0b\x32\x18.swarming.v1.Containment\x12\x34\n\x11\x65xecution_timeout\x18\r \x01(\x0b\x32\x19.google.protobuf.Duration\x12-\n\nio_timeout\x18\x0e \x01(\x0b\x32\x19.google.protobuf.Duration\x12/\n\x0cgrace_period\x18\x0f \x01(\x0b\x32\x19.google.protobuf.Duration\x12\x12\n\nidempotent\x18\x10 \x01(\x08\x12\x0f\n\x07outputs\x18\x11 \x03(\t\"\x9f\x01\n\tTaskSlice\x12/\n\nproperties\x18\x01 \x01(\x0b\x32\x1b.swarming.v1.TaskProperties\x12-\n\nexpiration\x18\x02 \x01(\x0b\x32\x19.google.protobuf.Duration\x12\x19\n\x11wait_for_capacity\x18\x03 \x01(\x08\x12\x17\n\x0fproperties_hash\x18\x04 \x01(\t\"\xe9\x02\n\x0bTaskRequest\x12+\n\x0btask_slices\x18\x01 \x03(\x0b\x32\x16.swarming.v1.TaskSlice\x12\x10\n\x08priority\x18\x02 \x01(\x05\x12\x17\n\x0fservice_account\x18\x03 \x01(\t\x12/\n\x0b\x63reate_time\x18\x04 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x0c\n\x04name\x18\x05 \x01(\t\x12\x0c\n\x04tags\x18\x06 \x03(\t\x12\x0c\n\x04user\x18\x07 \x01(\t\x12\x0f\n\x07task_id\x18\x08 \x01(\t\x12\x16\n\x0eparent_task_id\x18\t \x01(\t\x12\x15\n\rparent_run_id\x18\x0b \x01(\t\x12\x30\n\x13pubsub_notification\x18\n \x01(\x0b\x32\x13.swarming.v1.PubSub\x12\x35\n\x12\x62ot_ping_tolerance\x18\x0c \x01(\x0b\x32\x19.google.protobuf.Duration\"=\n\x06PubSub\x12\r\n\x05topic\x18\x01 \x01(\t\x12\x12\n\nauth_token\x18\x02 \x01(\t\x12\x10\n\x08userdata\x18\x03 \x01(\t\"\xd5\x05\n\nTaskResult\x12)\n\x07request\x18\x01 \x01(\x0b\x32\x18.swarming.v1.TaskRequest\x12/\n\x0b\x63reate_time\x18\x02 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12.\n\nstart_time\x18\x03 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x30\n\x0c\x61\x62\x61ndon_time\x18\x04 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12,\n\x08\x65nd_time\x18\x05 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12+\n\x08\x64uration\x18\x06 \x01(\x0b\x32\x19.google.protobuf.Duration\x12%\n\x05state\x18\x07 \x01(\x0e\x32\x16.swarming.v1.TaskState\x12\x36\n\x0estate_category\x18\x08 \x01(\x0e\x32\x1e.swarming.v1.TaskStateCategory\x12\x12\n\ntry_number\x18\t \x01(\x05\x12\x1a\n\x12\x63urrent_task_slice\x18\n \x01(\x05\x12\x1d\n\x03\x62ot\x18\x0b \x01(\x0b\x32\x10.swarming.v1.Bot\x12\x17\n\x0fserver_versions\x18\x0c \x03(\t\x12\x19\n\x11\x63hildren_task_ids\x18\r \x03(\t\x12\x14\n\x0c\x64\x65\x64uped_from\x18\x0e \x01(\t\x12\x0f\n\x07task_id\x18\x0f \x01(\t\x12\x0e\n\x06run_id\x18\x10 \x01(\t\x12(\n\tcipd_pins\x18\x11 \x01(\x0b\x32\x15.swarming.v1.CIPDPins\x12\x31\n\x0bperformance\x18\x12 \x01(\x0b\x32\x1c.swarming.v1.TaskPerformance\x12\x11\n\texit_code\x18\x13 \x01(\x11\x12%\n\x07outputs\x18\x14 \x01(\x0b\x32\x14.swarming.v1.CASTree\"x\n\x08\x43IPDPins\x12\x0e\n\x06server\x18\x01 \x01(\t\x12\x30\n\x0e\x63lient_package\x18\x02 \x01(\x0b\x32\x18.swarming.v1.CIPDPackage\x12*\n\x08packages\x18\x03 \x03(\x0b\x32\x18.swarming.v1.CIPDPackage\"\xb7\x01\n\x0fTaskPerformance\x12\x10\n\x08\x63ost_usd\x18\x01 \x01(\x02\x12\x31\n\x0eother_overhead\x18\x02 \x01(\x0b\x32\x19.google.protobuf.Duration\x12-\n\x05setup\x18\x03 \x01(\x0b\x32\x1e.swarming.v1.TaskOverheadStats\x12\x30\n\x08teardown\x18\x04 \x01(\x0b\x32\x1e.swarming.v1.TaskOverheadStats\"\x97\x01\n\x11TaskOverheadStats\x12+\n\x08\x64uration\x18\x01 \x01(\x0b\x32\x19.google.protobuf.Duration\x12*\n\x04\x63old\x18\x02 \x01(\x0b\x32\x1c.swarming.v1.CASEntriesStats\x12)\n\x03hot\x18\x03 \x01(\x0b\x32\x1c.swarming.v1.CASEntriesStats\"N\n\x0f\x43\x41SEntriesStats\x12\x11\n\tnum_items\x18\x01 \x01(\x03\x12\x19\n\x11total_bytes_items\x18\x02 \x01(\x03\x12\r\n\x05items\x18\x06 \x01(\x0c*\xdf\x01\n\rBotStatusType\x12\x1a\n\x16\x42OT_STATUS_UNSPECIFIED\x10\x00\x12\x0b\n\x07MISSING\x10\x01\x12\x19\n\x15QUARANTINED_BY_SERVER\x10\x02\x12\x16\n\x12QUARANTINED_BY_BOT\x10\x03\x12!\n\x1dOVERHEAD_MAINTENANCE_EXTERNAL\x10\x04\x12\x19\n\x15OVERHEAD_BOT_INTERNAL\x10\x05\x12\x12\n\x0eHOST_REBOOTING\x10\x06\x12\x08\n\x04\x42USY\x10\x07\x12\x0c\n\x08RESERVED\x10\x08\x12\x08\n\x04IDLE\x10\t*\xfe\x02\n\x0c\x42otEventType\x12\x1e\n\x1a\x42OT_EVENT_TYPE_UNSPECIFIED\x10\x00\x12\x13\n\x0f\x42OT_NEW_SESSION\x10\x01\x12\x18\n\x14\x42OT_INTERNAL_FAILURE\x10\x02\x12\x12\n\x0e\x42OT_HOOK_ERROR\x10\x03\x12\x10\n\x0c\x42OT_HOOK_LOG\x10\x04\x12\x16\n\x12\x42OT_REBOOTING_HOST\x10\x05\x12\x10\n\x0c\x42OT_SHUTDOWN\x10\x06\x12\x0f\n\x0b\x42OT_DELETED\x10\x07\x12\x11\n\rINSTRUCT_IDLE\x10\n\x12\x17\n\x13INSTRUCT_START_TASK\x10\x0b\x12\x18\n\x14INSTRUCT_RESTART_BOT\x10\x0c\x12\x1c\n\x18INSTRUCT_UPDATE_BOT_CODE\x10\r\x12\x1a\n\x16INSTRUCT_TERMINATE_BOT\x10\x0e\x12\x12\n\x0eTASK_COMPLETED\x10\x14\x12\x19\n\x15TASK_INTERNAL_FAILURE\x10\x15\x12\x0f\n\x0bTASK_KILLED\x10\x16*\xd0\x01\n\x11TaskStateCategory\x12#\n\x1fTASK_STATE_CATEGORY_UNSPECIFIED\x10\x00\x12\x13\n\x0fTASK_STATE_MASK\x10\x0f\x12\x14\n\x10\x43\x41TEGORY_PENDING\x10\x10\x12\x14\n\x10\x43\x41TEGORY_RUNNING\x10 \x12\x1b\n\x17\x43\x41TEGORY_TRANSIENT_DONE\x10\x30\x12\x1b\n\x17\x43\x41TEGORY_EXECUTION_DONE\x10@\x12\x1b\n\x17\x43\x41TEGORY_NEVER_RAN_DONE\x10P*\xd1\x03\n\tTaskState\x12\x16\n\x12TASK_STATE_INVALID\x10\x00\x12\x0b\n\x07PENDING\x10\x10\x12\x14\n\x10PENDING_DEDUPING\x10\x11\x12\x0b\n\x07RUNNING\x10 \x12\x1a\n\x16RUNNING_OVERHEAD_SETUP\x10!\x12\x1d\n\x19RUNNING_OVERHEAD_TEARDOWN\x10\"\x12\x0f\n\x0bTERMINATING\x10#\x12\x0e\n\nCOMPLETING\x10/\x12\x18\n\x14RAN_INTERNAL_FAILURE\x10\x30\x12\x0f\n\x0b\x44UT_FAILURE\x10\x31\x12\x13\n\x0f\x42OT_DISAPPEARED\x10\x32\x12\r\n\tPREEMPTED\x10\x33\x12\r\n\tCOMPLETED\x10@\x12\r\n\tTIMED_OUT\x10\x41\x12\x15\n\x11TIMED_OUT_SILENCE\x10\x42\x12\n\n\x06KILLED\x10\x43\x12\x12\n\x0eMISSING_INPUTS\x10\x44\x12\x0b\n\x07\x44\x45\x44UPED\x10P\x12\x0b\n\x07\x45XPIRED\x10Q\x12\x0c\n\x08\x43\x41NCELED\x10R\x12\x0f\n\x0bNO_RESOURCE\x10S\x12\r\n\tLOAD_SHED\x10T\x12\x16\n\x12RESOURCE_EXHAUSTED\x10U\x12\x1c\n\x18SKIPPED_INTERNAL_FAILURE\x10V2S\n\x06\x42otAPI\x12I\n\x06\x45vents\x12\x1d.swarming.v1.BotEventsRequest\x1a\x1e.swarming.v1.BotEventsResponse\"\x00\x42/Z-go.chromium.org/luci/swarming/proto/api;apipbb\x06proto3')
+  serialized_pb=_b('\n\x0eswarming.proto\x12\x0bswarming.v1\x1a\x1egoogle/protobuf/duration.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xa7\x01\n\x10\x42otEventsRequest\x12\x0e\n\x06\x62ot_id\x18\x01 \x01(\t\x12\x11\n\tpage_size\x18\x02 \x01(\x05\x12\x12\n\npage_token\x18\x03 \x01(\t\x12.\n\nstart_time\x18\x04 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12,\n\x08\x65nd_time\x18\x05 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\"S\n\x11\x42otEventsResponse\x12%\n\x06\x65vents\x18\x01 \x03(\x0b\x32\x15.swarming.v1.BotEvent\x12\x17\n\x0fnext_page_token\x18\x02 \x01(\t\"(\n\nStringPair\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t\"-\n\x0eStringListPair\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\x0e\n\x06values\x18\x02 \x03(\t\"\xe6\x01\n\x03\x42ot\x12\x0e\n\x06\x62ot_id\x18\x01 \x01(\t\x12\x12\n\nsession_id\x18\x02 \x01(\t\x12\r\n\x05pools\x18\x03 \x03(\t\x12*\n\x06status\x18\x04 \x01(\x0e\x32\x1a.swarming.v1.BotStatusType\x12\x12\n\nstatus_msg\x18\x05 \x01(\t\x12\x17\n\x0f\x63urrent_task_id\x18\x06 \x01(\t\x12/\n\ndimensions\x18\x07 \x03(\x0b\x32\x1b.swarming.v1.StringListPair\x12\"\n\x04info\x18\x08 \x01(\x0b\x32\x14.swarming.v1.BotInfo\"\xae\x03\n\x07\x42otInfo\x12-\n\x0csupplemental\x18\x01 \x01(\x0b\x32\x17.google.protobuf.Struct\x12\x0f\n\x07version\x18\x02 \x01(\t\x12\x13\n\x0b\x65xternal_ip\x18\x03 \x01(\t\x12\x18\n\x10\x61uthenticated_as\x18\x04 \x01(\t\x12(\n\tcas_stats\x18\x05 \x01(\x0b\x32\x15.swarming.v1.CASStats\x12\x38\n\x12named_caches_stats\x18\x06 \x03(\x0b\x32\x1c.swarming.v1.NamedCacheStats\x12\x45\n\x19\x63ipd_packages_cache_stats\x18\x07 \x03(\x0b\x32\".swarming.v1.CIPDPackageCacheStats\x12)\n\x04host\x18\x08 \x01(\x0b\x32\x1b.swarming.v1.PhysicalEntity\x12,\n\x07\x64\x65vices\x18\t \x03(\x0b\x32\x1b.swarming.v1.PhysicalEntity\x12\x30\n\x0clast_seen_ts\x18\n \x01(\x0b\x32\x1a.google.protobuf.Timestamp\"Y\n\x0ePhysicalEntity\x12\x0c\n\x04name\x18\x01 \x01(\t\x12-\n\x0csupplemental\x18\x02 \x01(\x0b\x32\x17.google.protobuf.Struct\x12\n\n\x02ip\x18\x03 \x01(\t\"_\n\x08\x43\x41SStats\x12\x14\n\x0cnumber_items\x18\x01 \x01(\x03\x12\x0c\n\x04size\x18\x02 \x01(\x03\x12/\n\x0boldest_time\x18\x03 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\"`\n\x0fNamedCacheStats\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x0c\n\x04size\x18\x02 \x01(\x03\x12\x31\n\rlast_use_time\x18\x03 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\"w\n\x15\x43IPDPackageCacheStats\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x0f\n\x07version\x18\x02 \x01(\t\x12\x0c\n\x04size\x18\x03 \x01(\x03\x12\x31\n\rlast_use_time\x18\x04 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\"\x96\x01\n\x08\x42otEvent\x12.\n\nevent_time\x18\x01 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x1d\n\x03\x62ot\x18\x02 \x01(\x0b\x32\x10.swarming.v1.Bot\x12(\n\x05\x65vent\x18\x03 \x01(\x0e\x32\x19.swarming.v1.BotEventType\x12\x11\n\tevent_msg\x18\x04 \x01(\t\"<\n\x07\x43\x41STree\x12\x0e\n\x06server\x18\x01 \x01(\t\x12\x0e\n\x06\x64igest\x18\x02 \x01(\t\x12\x11\n\tnamespace\x18\x03 \x01(\t\"G\n\x0b\x43IPDPackage\x12\x14\n\x0cpackage_name\x18\x01 \x01(\t\x12\x0f\n\x07version\x18\x02 \x01(\t\x12\x11\n\tdest_path\x18\x03 \x01(\t\"2\n\x0fNamedCacheEntry\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x11\n\tdest_path\x18\x02 \x01(\t\"\xf2\x01\n\x0b\x43ontainment\x12\x16\n\x0elower_priority\x18\x01 \x01(\x08\x12\x42\n\x10\x63ontainment_type\x18\x02 \x01(\x0e\x32(.swarming.v1.Containment.ContainmentType\x12\x17\n\x0flimit_processes\x18\x03 \x01(\x03\x12$\n\x1climit_total_committed_memory\x18\x04 \x01(\x03\"H\n\x0f\x43ontainmentType\x12\x11\n\rNOT_SPECIFIED\x10\x00\x12\x08\n\x04NONE\x10\x01\x12\x08\n\x04\x41UTO\x10\x02\x12\x0e\n\nJOB_OBJECT\x10\x03\"\xf9\x04\n\x0eTaskProperties\x12(\n\ncas_inputs\x18\x01 \x01(\x0b\x32\x14.swarming.v1.CASTree\x12-\n\x0b\x63ipd_inputs\x18\x02 \x03(\x0b\x32\x18.swarming.v1.CIPDPackage\x12\x32\n\x0cnamed_caches\x18\x03 \x03(\x0b\x32\x1c.swarming.v1.NamedCacheEntry\x12\x0f\n\x07\x63ommand\x18\x04 \x03(\t\x12\x14\n\x0crelative_cwd\x18\x05 \x01(\t\x12\x12\n\nextra_args\x18\x06 \x03(\t\x12\x14\n\x0csecret_bytes\x18\x07 \x01(\x0c\x12\x18\n\x10has_secret_bytes\x18\x08 \x01(\x08\x12/\n\ndimensions\x18\t \x03(\x0b\x32\x1b.swarming.v1.StringListPair\x12$\n\x03\x65nv\x18\n \x03(\x0b\x32\x17.swarming.v1.StringPair\x12.\n\tenv_paths\x18\x0b \x03(\x0b\x32\x1b.swarming.v1.StringListPair\x12-\n\x0b\x63ontainment\x18\x0c \x01(\x0b\x32\x18.swarming.v1.Containment\x12\x34\n\x11\x65xecution_timeout\x18\r \x01(\x0b\x32\x19.google.protobuf.Duration\x12-\n\nio_timeout\x18\x0e \x01(\x0b\x32\x19.google.protobuf.Duration\x12/\n\x0cgrace_period\x18\x0f \x01(\x0b\x32\x19.google.protobuf.Duration\x12\x12\n\nidempotent\x18\x10 \x01(\x08\x12\x0f\n\x07outputs\x18\x11 \x03(\t\"\x9f\x01\n\tTaskSlice\x12/\n\nproperties\x18\x01 \x01(\x0b\x32\x1b.swarming.v1.TaskProperties\x12-\n\nexpiration\x18\x02 \x01(\x0b\x32\x19.google.protobuf.Duration\x12\x19\n\x11wait_for_capacity\x18\x03 \x01(\x08\x12\x17\n\x0fproperties_hash\x18\x04 \x01(\t\"\xe9\x02\n\x0bTaskRequest\x12+\n\x0btask_slices\x18\x01 \x03(\x0b\x32\x16.swarming.v1.TaskSlice\x12\x10\n\x08priority\x18\x02 \x01(\x05\x12\x17\n\x0fservice_account\x18\x03 \x01(\t\x12/\n\x0b\x63reate_time\x18\x04 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x0c\n\x04name\x18\x05 \x01(\t\x12\x0c\n\x04tags\x18\x06 \x03(\t\x12\x0c\n\x04user\x18\x07 \x01(\t\x12\x0f\n\x07task_id\x18\x08 \x01(\t\x12\x16\n\x0eparent_task_id\x18\t \x01(\t\x12\x15\n\rparent_run_id\x18\x0b \x01(\t\x12\x30\n\x13pubsub_notification\x18\n \x01(\x0b\x32\x13.swarming.v1.PubSub\x12\x35\n\x12\x62ot_ping_tolerance\x18\x0c \x01(\x0b\x32\x19.google.protobuf.Duration\"=\n\x06PubSub\x12\r\n\x05topic\x18\x01 \x01(\t\x12\x12\n\nauth_token\x18\x02 \x01(\t\x12\x10\n\x08userdata\x18\x03 \x01(\t\"\xd5\x05\n\nTaskResult\x12)\n\x07request\x18\x01 \x01(\x0b\x32\x18.swarming.v1.TaskRequest\x12/\n\x0b\x63reate_time\x18\x02 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12.\n\nstart_time\x18\x03 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x30\n\x0c\x61\x62\x61ndon_time\x18\x04 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12,\n\x08\x65nd_time\x18\x05 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12+\n\x08\x64uration\x18\x06 \x01(\x0b\x32\x19.google.protobuf.Duration\x12%\n\x05state\x18\x07 \x01(\x0e\x32\x16.swarming.v1.TaskState\x12\x36\n\x0estate_category\x18\x08 \x01(\x0e\x32\x1e.swarming.v1.TaskStateCategory\x12\x12\n\ntry_number\x18\t \x01(\x05\x12\x1a\n\x12\x63urrent_task_slice\x18\n \x01(\x05\x12\x1d\n\x03\x62ot\x18\x0b \x01(\x0b\x32\x10.swarming.v1.Bot\x12\x17\n\x0fserver_versions\x18\x0c \x03(\t\x12\x19\n\x11\x63hildren_task_ids\x18\r \x03(\t\x12\x14\n\x0c\x64\x65\x64uped_from\x18\x0e \x01(\t\x12\x0f\n\x07task_id\x18\x0f \x01(\t\x12\x0e\n\x06run_id\x18\x10 \x01(\t\x12(\n\tcipd_pins\x18\x11 \x01(\x0b\x32\x15.swarming.v1.CIPDPins\x12\x31\n\x0bperformance\x18\x12 \x01(\x0b\x32\x1c.swarming.v1.TaskPerformance\x12\x11\n\texit_code\x18\x13 \x01(\x11\x12%\n\x07outputs\x18\x14 \x01(\x0b\x32\x14.swarming.v1.CASTree\"x\n\x08\x43IPDPins\x12\x0e\n\x06server\x18\x01 \x01(\t\x12\x30\n\x0e\x63lient_package\x18\x02 \x01(\x0b\x32\x18.swarming.v1.CIPDPackage\x12*\n\x08packages\x18\x03 \x03(\x0b\x32\x18.swarming.v1.CIPDPackage\"\xb7\x01\n\x0fTaskPerformance\x12\x10\n\x08\x63ost_usd\x18\x01 \x01(\x02\x12\x31\n\x0eother_overhead\x18\x02 \x01(\x0b\x32\x19.google.protobuf.Duration\x12-\n\x05setup\x18\x03 \x01(\x0b\x32\x1e.swarming.v1.TaskOverheadStats\x12\x30\n\x08teardown\x18\x04 \x01(\x0b\x32\x1e.swarming.v1.TaskOverheadStats\"\x97\x01\n\x11TaskOverheadStats\x12+\n\x08\x64uration\x18\x01 \x01(\x0b\x32\x19.google.protobuf.Duration\x12*\n\x04\x63old\x18\x02 \x01(\x0b\x32\x1c.swarming.v1.CASEntriesStats\x12)\n\x03hot\x18\x03 \x01(\x0b\x32\x1c.swarming.v1.CASEntriesStats\"N\n\x0f\x43\x41SEntriesStats\x12\x11\n\tnum_items\x18\x01 \x01(\x03\x12\x19\n\x11total_bytes_items\x18\x02 \x01(\x03\x12\r\n\x05items\x18\x06 \x01(\x0c*\xdf\x01\n\rBotStatusType\x12\x1a\n\x16\x42OT_STATUS_UNSPECIFIED\x10\x00\x12\x0b\n\x07MISSING\x10\x01\x12\x19\n\x15QUARANTINED_BY_SERVER\x10\x02\x12\x16\n\x12QUARANTINED_BY_BOT\x10\x03\x12!\n\x1dOVERHEAD_MAINTENANCE_EXTERNAL\x10\x04\x12\x19\n\x15OVERHEAD_BOT_INTERNAL\x10\x05\x12\x12\n\x0eHOST_REBOOTING\x10\x06\x12\x08\n\x04\x42USY\x10\x07\x12\x0c\n\x08RESERVED\x10\x08\x12\x08\n\x04IDLE\x10\t*\x8f\x03\n\x0c\x42otEventType\x12\x1e\n\x1a\x42OT_EVENT_TYPE_UNSPECIFIED\x10\x00\x12\x13\n\x0f\x42OT_NEW_SESSION\x10\x01\x12\x18\n\x14\x42OT_INTERNAL_FAILURE\x10\x02\x12\x12\n\x0e\x42OT_HOOK_ERROR\x10\x03\x12\x10\n\x0c\x42OT_HOOK_LOG\x10\x04\x12\x16\n\x12\x42OT_REBOOTING_HOST\x10\x05\x12\x10\n\x0c\x42OT_SHUTDOWN\x10\x06\x12\x0f\n\x0b\x42OT_DELETED\x10\x07\x12\x0f\n\x0b\x42OT_MISSING\x10\x08\x12\x11\n\rINSTRUCT_IDLE\x10\n\x12\x17\n\x13INSTRUCT_START_TASK\x10\x0b\x12\x18\n\x14INSTRUCT_RESTART_BOT\x10\x0c\x12\x1c\n\x18INSTRUCT_UPDATE_BOT_CODE\x10\r\x12\x1a\n\x16INSTRUCT_TERMINATE_BOT\x10\x0e\x12\x12\n\x0eTASK_COMPLETED\x10\x14\x12\x19\n\x15TASK_INTERNAL_FAILURE\x10\x15\x12\x0f\n\x0bTASK_KILLED\x10\x16*\xd0\x01\n\x11TaskStateCategory\x12#\n\x1fTASK_STATE_CATEGORY_UNSPECIFIED\x10\x00\x12\x13\n\x0fTASK_STATE_MASK\x10\x0f\x12\x14\n\x10\x43\x41TEGORY_PENDING\x10\x10\x12\x14\n\x10\x43\x41TEGORY_RUNNING\x10 \x12\x1b\n\x17\x43\x41TEGORY_TRANSIENT_DONE\x10\x30\x12\x1b\n\x17\x43\x41TEGORY_EXECUTION_DONE\x10@\x12\x1b\n\x17\x43\x41TEGORY_NEVER_RAN_DONE\x10P*\xd1\x03\n\tTaskState\x12\x16\n\x12TASK_STATE_INVALID\x10\x00\x12\x0b\n\x07PENDING\x10\x10\x12\x14\n\x10PENDING_DEDUPING\x10\x11\x12\x0b\n\x07RUNNING\x10 \x12\x1a\n\x16RUNNING_OVERHEAD_SETUP\x10!\x12\x1d\n\x19RUNNING_OVERHEAD_TEARDOWN\x10\"\x12\x0f\n\x0bTERMINATING\x10#\x12\x0e\n\nCOMPLETING\x10/\x12\x18\n\x14RAN_INTERNAL_FAILURE\x10\x30\x12\x0f\n\x0b\x44UT_FAILURE\x10\x31\x12\x13\n\x0f\x42OT_DISAPPEARED\x10\x32\x12\r\n\tPREEMPTED\x10\x33\x12\r\n\tCOMPLETED\x10@\x12\r\n\tTIMED_OUT\x10\x41\x12\x15\n\x11TIMED_OUT_SILENCE\x10\x42\x12\n\n\x06KILLED\x10\x43\x12\x12\n\x0eMISSING_INPUTS\x10\x44\x12\x0b\n\x07\x44\x45\x44UPED\x10P\x12\x0b\n\x07\x45XPIRED\x10Q\x12\x0c\n\x08\x43\x41NCELED\x10R\x12\x0f\n\x0bNO_RESOURCE\x10S\x12\r\n\tLOAD_SHED\x10T\x12\x16\n\x12RESOURCE_EXHAUSTED\x10U\x12\x1c\n\x18SKIPPED_INTERNAL_FAILURE\x10V2S\n\x06\x42otAPI\x12I\n\x06\x45vents\x12\x1d.swarming.v1.BotEventsRequest\x1a\x1e.swarming.v1.BotEventsResponse\"\x00\x42/Z-go.chromium.org/luci/swarming/proto/api;apipbb\x06proto3')
   ,
   dependencies=[google_dot_protobuf_dot_duration__pb2.DESCRIPTOR,google_dot_protobuf_dot_struct__pb2.DESCRIPTOR,google_dot_protobuf_dot_timestamp__pb2.DESCRIPTOR,])
 
@@ -76,8 +76,8 @@ _BOTSTATUSTYPE = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   serialized_options=None,
-  serialized_start=4574,
-  serialized_end=4797,
+  serialized_start=4624,
+  serialized_end=4847,
 )
 _sym_db.RegisterEnumDescriptor(_BOTSTATUSTYPE)
 
@@ -121,42 +121,46 @@ _BOTEVENTTYPE = _descriptor.EnumDescriptor(
       serialized_options=None,
       type=None),
     _descriptor.EnumValueDescriptor(
-      name='INSTRUCT_IDLE', index=8, number=10,
+      name='BOT_MISSING', index=8, number=8,
       serialized_options=None,
       type=None),
     _descriptor.EnumValueDescriptor(
-      name='INSTRUCT_START_TASK', index=9, number=11,
+      name='INSTRUCT_IDLE', index=9, number=10,
       serialized_options=None,
       type=None),
     _descriptor.EnumValueDescriptor(
-      name='INSTRUCT_RESTART_BOT', index=10, number=12,
+      name='INSTRUCT_START_TASK', index=10, number=11,
       serialized_options=None,
       type=None),
     _descriptor.EnumValueDescriptor(
-      name='INSTRUCT_UPDATE_BOT_CODE', index=11, number=13,
+      name='INSTRUCT_RESTART_BOT', index=11, number=12,
       serialized_options=None,
       type=None),
     _descriptor.EnumValueDescriptor(
-      name='INSTRUCT_TERMINATE_BOT', index=12, number=14,
+      name='INSTRUCT_UPDATE_BOT_CODE', index=12, number=13,
       serialized_options=None,
       type=None),
     _descriptor.EnumValueDescriptor(
-      name='TASK_COMPLETED', index=13, number=20,
+      name='INSTRUCT_TERMINATE_BOT', index=13, number=14,
       serialized_options=None,
       type=None),
     _descriptor.EnumValueDescriptor(
-      name='TASK_INTERNAL_FAILURE', index=14, number=21,
+      name='TASK_COMPLETED', index=14, number=20,
       serialized_options=None,
       type=None),
     _descriptor.EnumValueDescriptor(
-      name='TASK_KILLED', index=15, number=22,
+      name='TASK_INTERNAL_FAILURE', index=15, number=21,
+      serialized_options=None,
+      type=None),
+    _descriptor.EnumValueDescriptor(
+      name='TASK_KILLED', index=16, number=22,
       serialized_options=None,
       type=None),
   ],
   containing_type=None,
   serialized_options=None,
-  serialized_start=4800,
-  serialized_end=5182,
+  serialized_start=4850,
+  serialized_end=5249,
 )
 _sym_db.RegisterEnumDescriptor(_BOTEVENTTYPE)
 
@@ -198,8 +202,8 @@ _TASKSTATECATEGORY = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   serialized_options=None,
-  serialized_start=5185,
-  serialized_end=5393,
+  serialized_start=5252,
+  serialized_end=5460,
 )
 _sym_db.RegisterEnumDescriptor(_TASKSTATECATEGORY)
 
@@ -309,8 +313,8 @@ _TASKSTATE = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   serialized_options=None,
-  serialized_start=5396,
-  serialized_end=5861,
+  serialized_start=5463,
+  serialized_end=5928,
 )
 _sym_db.RegisterEnumDescriptor(_TASKSTATE)
 
@@ -333,6 +337,7 @@ BOT_HOOK_LOG = 4
 BOT_REBOOTING_HOST = 5
 BOT_SHUTDOWN = 6
 BOT_DELETED = 7
+BOT_MISSING = 8
 INSTRUCT_IDLE = 10
 INSTRUCT_START_TASK = 11
 INSTRUCT_RESTART_BOT = 12
@@ -399,8 +404,8 @@ _CONTAINMENT_CONTAINMENTTYPE = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   serialized_options=None,
-  serialized_start=2004,
-  serialized_end=2076,
+  serialized_start=2054,
+  serialized_end=2126,
 )
 _sym_db.RegisterEnumDescriptor(_CONTAINMENT_CONTAINMENTTYPE)
 
@@ -728,6 +733,13 @@ _BOTINFO = _descriptor.Descriptor(
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR),
+    _descriptor.FieldDescriptor(
+      name='last_seen_ts', full_name='swarming.v1.BotInfo.last_seen_ts', index=9,
+      number=10, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR),
   ],
   extensions=[
   ],
@@ -741,7 +753,7 @@ _BOTINFO = _descriptor.Descriptor(
   oneofs=[
   ],
   serialized_start=704,
-  serialized_end=1084,
+  serialized_end=1134,
 )
 
 
@@ -785,8 +797,8 @@ _PHYSICALENTITY = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1086,
-  serialized_end=1175,
+  serialized_start=1136,
+  serialized_end=1225,
 )
 
 
@@ -830,8 +842,8 @@ _CASSTATS = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1177,
-  serialized_end=1272,
+  serialized_start=1227,
+  serialized_end=1322,
 )
 
 
@@ -875,8 +887,8 @@ _NAMEDCACHESTATS = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1274,
-  serialized_end=1370,
+  serialized_start=1324,
+  serialized_end=1420,
 )
 
 
@@ -927,8 +939,8 @@ _CIPDPACKAGECACHESTATS = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1372,
-  serialized_end=1491,
+  serialized_start=1422,
+  serialized_end=1541,
 )
 
 
@@ -979,8 +991,8 @@ _BOTEVENT = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1494,
-  serialized_end=1644,
+  serialized_start=1544,
+  serialized_end=1694,
 )
 
 
@@ -1024,8 +1036,8 @@ _CASTREE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1646,
-  serialized_end=1706,
+  serialized_start=1696,
+  serialized_end=1756,
 )
 
 
@@ -1069,8 +1081,8 @@ _CIPDPACKAGE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1708,
-  serialized_end=1779,
+  serialized_start=1758,
+  serialized_end=1829,
 )
 
 
@@ -1107,8 +1119,8 @@ _NAMEDCACHEENTRY = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1781,
-  serialized_end=1831,
+  serialized_start=1831,
+  serialized_end=1881,
 )
 
 
@@ -1160,8 +1172,8 @@ _CONTAINMENT = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1834,
-  serialized_end=2076,
+  serialized_start=1884,
+  serialized_end=2126,
 )
 
 
@@ -1303,8 +1315,8 @@ _TASKPROPERTIES = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=2079,
-  serialized_end=2712,
+  serialized_start=2129,
+  serialized_end=2762,
 )
 
 
@@ -1355,8 +1367,8 @@ _TASKSLICE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=2715,
-  serialized_end=2874,
+  serialized_start=2765,
+  serialized_end=2924,
 )
 
 
@@ -1463,8 +1475,8 @@ _TASKREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=2877,
-  serialized_end=3238,
+  serialized_start=2927,
+  serialized_end=3288,
 )
 
 
@@ -1508,8 +1520,8 @@ _PUBSUB = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=3240,
-  serialized_end=3301,
+  serialized_start=3290,
+  serialized_end=3351,
 )
 
 
@@ -1672,8 +1684,8 @@ _TASKRESULT = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=3304,
-  serialized_end=4029,
+  serialized_start=3354,
+  serialized_end=4079,
 )
 
 
@@ -1717,8 +1729,8 @@ _CIPDPINS = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=4031,
-  serialized_end=4151,
+  serialized_start=4081,
+  serialized_end=4201,
 )
 
 
@@ -1769,8 +1781,8 @@ _TASKPERFORMANCE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=4154,
-  serialized_end=4337,
+  serialized_start=4204,
+  serialized_end=4387,
 )
 
 
@@ -1814,8 +1826,8 @@ _TASKOVERHEADSTATS = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=4340,
-  serialized_end=4491,
+  serialized_start=4390,
+  serialized_end=4541,
 )
 
 
@@ -1859,8 +1871,8 @@ _CASENTRIESSTATS = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=4493,
-  serialized_end=4571,
+  serialized_start=4543,
+  serialized_end=4621,
 )
 
 _BOTEVENTSREQUEST.fields_by_name['start_time'].message_type = google_dot_protobuf_dot_timestamp__pb2._TIMESTAMP
@@ -1875,6 +1887,7 @@ _BOTINFO.fields_by_name['named_caches_stats'].message_type = _NAMEDCACHESTATS
 _BOTINFO.fields_by_name['cipd_packages_cache_stats'].message_type = _CIPDPACKAGECACHESTATS
 _BOTINFO.fields_by_name['host'].message_type = _PHYSICALENTITY
 _BOTINFO.fields_by_name['devices'].message_type = _PHYSICALENTITY
+_BOTINFO.fields_by_name['last_seen_ts'].message_type = google_dot_protobuf_dot_timestamp__pb2._TIMESTAMP
 _PHYSICALENTITY.fields_by_name['supplemental'].message_type = google_dot_protobuf_dot_struct__pb2._STRUCT
 _CASSTATS.fields_by_name['oldest_time'].message_type = google_dot_protobuf_dot_timestamp__pb2._TIMESTAMP
 _NAMEDCACHESTATS.fields_by_name['last_use_time'].message_type = google_dot_protobuf_dot_timestamp__pb2._TIMESTAMP
@@ -2127,8 +2140,8 @@ _BOTAPI = _descriptor.ServiceDescriptor(
   file=DESCRIPTOR,
   index=0,
   serialized_options=None,
-  serialized_start=5863,
-  serialized_end=5946,
+  serialized_start=5930,
+  serialized_end=6013,
   methods=[
   _descriptor.MethodDescriptor(
     name='Events',

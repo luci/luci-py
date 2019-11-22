@@ -133,6 +133,9 @@ class _BotCommon(ndb.Model):
   # list must be sorted. It is indexed to enable searching for bots.
   dimensions_flat = ndb.StringProperty(repeated=True)
 
+  # Last time the bot pinged and this entity was updated
+  last_seen_ts = ndb.DateTimeProperty()
+
   @property
   def dimensions(self):
     """Returns a dict representation of self.dimensions_flat."""
@@ -239,9 +242,6 @@ class BotInfo(_BotCommon):
   # First time this bot was seen.
   first_seen_ts = ndb.DateTimeProperty(auto_now_add=True, indexed=False)
 
-  # Last time the bot pinged and this entity was updated
-  last_seen_ts = ndb.DateTimeProperty()
-
   # Must only be set when self.task_id is set.
   task_name = ndb.StringProperty(indexed=False)
 
@@ -333,7 +333,7 @@ class BotEvent(_BotCommon):
       'bot_shutdown': swarming_pb2.BOT_SHUTDOWN,
       # Historical misnaming.
       'bot_terminate': swarming_pb2.INSTRUCT_TERMINATE_BOT,
-      'bot_missing': swarming_pb2.MISSING,
+      'bot_missing': swarming_pb2.BOT_MISSING,
       'request_restart': swarming_pb2.INSTRUCT_RESTART_BOT,
       # Shall only be sorted when there is a significant difference in the bot
       # state versus the previous event.

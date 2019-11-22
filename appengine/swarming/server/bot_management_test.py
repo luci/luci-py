@@ -113,6 +113,7 @@ def _gen_bot_event(**kwargs):
       u'pool': [u'default'],
     },
     'external_ip': u'8.8.4.4',
+    'last_seen_ts': None,
     'lease_id': None,
     'lease_expiration_ts': None,
     'leased_indefinitely': None,
