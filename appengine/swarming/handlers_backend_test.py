@@ -245,7 +245,7 @@ class BackendTest(test_env_handlers.AppTestBase):
             'child_task_id': '321321'
         }),
         headers={'X-AppEngine-QueueName': 'append-child-task'},
-        status=409)
+        status=429)
 
   def test_taskqueue_important_task_queues_rebuild_cache_fail(self):
     self.set_as_admin()
