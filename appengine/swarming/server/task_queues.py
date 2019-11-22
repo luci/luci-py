@@ -372,7 +372,7 @@ def _update_BotTaskDimensions_slice_async(bot_dimensions, bot_root_key, now,
   run that are ACTIVE queues, e.g. TaskDimensions.valid_until_ts is in the
   future.
   """
-  qit = q.iter(batch_size=256, deadline=120)
+  qit = q.iter(batch_size=256, deadline=60)
   iter_cnt = 0
   try:
     while (yield qit.has_next_async()):
