@@ -332,25 +332,23 @@ class BotManagementTest(test_case.TestCase):
         [i.to_dict() for i in bot_management.get_events_query('id1', True)])
 
   def test_bot_event_poll_sleep(self):
-    _bot_event(event_type='request_sleep', quarantined=True)
+    _bot_event(event_type='request_sleep')
 
     # Assert that BotInfo was updated too.
     expected = _gen_bot_info(
         composite=[
-          bot_management.BotInfo.NOT_IN_MAINTENANCE,
-          bot_management.BotInfo.ALIVE,
-          bot_management.BotInfo.QUARANTINED,
-          bot_management.BotInfo.IDLE,
+            bot_management.BotInfo.NOT_IN_MAINTENANCE,
+            bot_management.BotInfo.ALIVE,
+            bot_management.BotInfo.HEALTHY,
+            bot_management.BotInfo.IDLE,
         ],
-        task_id='',
-        quarantined=True)
+        task_id='')
 
     bot_info = bot_management.get_info_key('id1').get()
     self.assertEqual(expected, bot_info.to_dict())
 
     # BotEvent is registered for poll when BotInfo creates
-    expected_event = _gen_bot_event(
-        event_type=u'request_sleep', quarantined=True, task_id='')
+    expected_event = _gen_bot_event(event_type=u'request_sleep', task_id='')
     bot_events = bot_management.get_events_query('id1', True)
     self.assertEqual([expected_event], [e.to_dict() for e in bot_events])
 
@@ -358,12 +356,12 @@ class BotManagementTest(test_case.TestCase):
     ndb.delete_multi(e.key for e in bot_events)
 
     # BotEvent is not registered for poll when no dimensions change
-    _bot_event(event_type='request_sleep', quarantined=True)
+    _bot_event(event_type='request_sleep')
     self.assertEqual([], bot_management.get_events_query('id1', True).fetch())
 
     # BotEvent is registered for poll when dimensions change
     dims = {u'foo': [u'bar']}
-    _bot_event(event_type='request_sleep', quarantined=True, dimensions=dims)
+    _bot_event(event_type='request_sleep', dimensions=dims)
     expected_event['dimensions'] = dims
     bot_events = bot_management.get_events_query('id1', True).fetch()
     self.assertEqual([expected_event], [e.to_dict() for e in bot_events])
@@ -555,19 +553,23 @@ class BotManagementTest(test_case.TestCase):
     start = self.mock_now(self.now, 10)
     _bot_event(bot_id=u'id1', event_type='bot_connected')
     self.mock_now(self.now, 20)
-    _bot_event(event_type='request_sleep', quarantined=True)
+    _bot_event(event_type='request_sleep')
     self.mock_now(self.now, 30)
+    _bot_event(event_type='request_sleep', quarantined=True)
+    self.mock_now(self.now, 40)
     _bot_event(event_type='request_task', task_id='12311', task_name='yo')
-    end = self.mock_now(self.now, 40)
+    end = self.mock_now(self.now, 50)
 
-    # request_sleep is not streamed.
-    self.assertEqual((2, 0), bot_management.task_bq_events(start, end))
+    # normal request_sleep is not streamed.
+    self.assertEqual((3, 0), bot_management.task_bq_events(start, end))
     self.assertEqual(1, len(payloads))
     actual_rows = payloads[0]
-    self.assertEqual(2, len(actual_rows))
     expected = [
-      'id1:2010-01-02T03:04:15.000006Z', 'id1:2010-01-02T03:04:35.000006Z',
+        'id1:2010-01-02T03:04:15.000006Z',  # bot_connected
+        'id1:2010-01-02T03:04:35.000006Z',  # request_sleep + quarantined
+        'id1:2010-01-02T03:04:45.000006Z',  # request_task
     ]
+    self.assertEqual(len(expected), len(actual_rows))
     self.assertEqual(expected, [r[0] for r in actual_rows])
 
 

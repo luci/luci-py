@@ -599,15 +599,16 @@ def bot_event(
     task_queues.cleanup_after_bot(info_key.parent())
 
   try:
-    if event_type in ('request_sleep',
-                      'task_update') and not dimensions_updated:
-      # Handle this specifically. It's not much of an even worth saving a
-      # BotEvent for but it's worth updating BotInfo. The only reason BotInfo is
-      # GET is to keep first_seen_ts. It's not necessary to use a transaction
-      # here since no BotEvent is being added, only last_seen_ts is really
-      # updated.
-      # crbug.com/1015365: It's useful to send BotEvent only when dimensions
-      # updates.
+    # Decide whether saving the event.
+    # It's not much of an even worth saving a BotEvent for but it's worth
+    # updating BotInfo. The only reason BotInfo is GET is to keep first_seen_ts.
+    # It's not necessary to use a transaction here since no BotEvent is being
+    # added, only last_seen_ts is really updated.
+    # crbug.com/1015365: It's useful saving BotEvent when dimensions updates.
+    # crbug.com/952984: It needs to save BotEvent when quarantined.
+    skip_save_event = (not dimensions_updated and not quarantined and
+                       event_type in ('request_sleep', 'task_update'))
+    if skip_save_event:
       bot_info.put()
       return
 
