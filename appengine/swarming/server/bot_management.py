@@ -210,6 +210,8 @@ class _BotCommon(ndb.Model):
       out.info.authenticated_as = self.authenticated_as
     if self.external_ip:
       out.info.external_ip = self.external_ip
+    if self.is_dead and self.last_seen_ts:
+      out.info.last_seen_ts.FromDatetime(self.last_seen_ts)
     # TODO(maruel): Populate bot.info.host and bot.info.devices.
     # https://crbug.com/916570
 
@@ -387,8 +389,7 @@ class BotEvent(_BotCommon):
 
   @property
   def is_dead(self):
-    # TODO(crbug/916578): Return True on 'bot_missing' event.
-    return False
+    return self.event_type == 'bot_missing'
 
   @property
   def previous_key(self):
@@ -524,9 +525,9 @@ def bot_event(
     version, quarantined, maintenance_msg, task_id, task_name, **kwargs):
   """Records when a bot has queried for work.
 
-  The sheer fact this event is happening means the bot is alive (not dead), so
-  this is good. It may be quarantined though, and in this case, it will be
-  evicted from the task queues.
+  This event happening usually means the bot is alive (not dead), except for
+  'bot_missing' event which is created by server. It may be quarantined, and
+  in this case, it will be evicted from the task queues.
 
   If it's declaring maintenance, it will not be evicted from the task queues, as
   maintenance is supposed to be temporary and expected to complete within a
@@ -561,10 +562,17 @@ def bot_event(
   if not bot_info:
     bot_info = BotInfo(key=info_key)
   now = utils.utcnow()
-  bot_info.last_seen_ts = now
-  bot_info.external_ip = external_ip
-  bot_info.authenticated_as = authenticated_as
-  bot_info.maintenance_msg = maintenance_msg
+  # bot_missing event is created by a server, not a bot.
+  # If the last_seen_ts gets updated, it would change the bot composite
+  # to alive.
+  if event_type != 'bot_missing':
+    bot_info.last_seen_ts = now
+  if external_ip:
+    bot_info.external_ip = external_ip
+  if authenticated_as:
+    bot_info.authenticated_as = authenticated_as
+  if maintenance_msg:
+    bot_info.maintenance_msg = maintenance_msg
   dimensions_updated = False
   if dimensions:
     dimensions_flat = task_queues.dimensions_to_flat(dimensions)
@@ -585,9 +593,11 @@ def bot_event(
   #    The bot has already finished the previous task.
   #    But it could have forgotten to remove the task from the BotInfo.
   #    So ensure the task is removed.
+  # 3) When the bot is missing
+  #    We assume it can't process assigned task anymore.
   if event_type in ('task_completed', 'task_error', 'task_killed',
-                    'request_sleep'):
-    bot_info.task_id = ''
+                    'request_sleep', 'bot_missing'):
+    bot_info.task_id = None
     bot_info.task_name = None
   if task_name:
     bot_info.task_name = task_name
@@ -695,25 +705,43 @@ def has_capacity(dimensions):
 
 def cron_update_bot_info():
   """Refreshes BotInfo.composite for dead bots."""
-  # TODO(crbug/916578): Ensure a BotEvent is registered so it can be queried in
-  # the Big Query swarming.bot_events table.
-
   @ndb.tasklet
   def run(bot_key):
     bot = yield bot_key.get_async()
     if bot and bot.should_be_dead and (bot.is_alive or not bot.is_dead):
       # bot composite get updated in _pre_put_hook
       yield bot.put_async()
-      logging.info('DEAD: %s', bot.id)
-      raise ndb.Return(1)
-    raise ndb.Return(0)
+      logging.info('Changing Bot status to DEAD: %s', bot.id)
+      raise ndb.Return(bot_key)
+    raise ndb.Return(None)
 
   def tx_result(future, stats):
     try:
-      stats['dead'] += future.get_result()
+      bot_key = future.get_result()
+      if bot_key:
+        stats['dead'] += 1
+        send_bot_event(bot_key)
     except datastore_utils.CommitError:
       logging.warning('Failed to commit a Tx')
       stats['failed'] += 1
+
+  def send_bot_event(bot_key):
+    bot = bot_key.get()
+    logging.info('Sending bot_missing event: %s', bot.id)
+    return bot_event(
+        event_type='bot_missing',
+        bot_id=bot.id,
+        message=None,
+        external_ip=None,
+        authenticated_as=None,
+        dimensions=None,
+        state=None,
+        version=None,
+        quarantined=None,
+        maintenance_msg=None,
+        task_id=None,
+        task_name=None,
+        last_seen_ts=bot.last_seen_ts)
 
   # The assumption here is that a cron job can churn through all the entities
   # fast enough. The number of dead bot is expected to be <10k. In practice the
