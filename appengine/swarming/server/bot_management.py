@@ -720,28 +720,25 @@ def cron_update_bot_info():
       bot_key = future.get_result()
       if bot_key:
         stats['dead'] += 1
-        send_bot_event(bot_key)
+        bot = bot_key.get()
+        logging.info('Sending bot_missing event: %s', bot.id)
+        bot_event(
+            event_type='bot_missing',
+            bot_id=bot.id,
+            message=None,
+            external_ip=None,
+            authenticated_as=None,
+            dimensions=None,
+            state=None,
+            version=None,
+            quarantined=None,
+            maintenance_msg=None,
+            task_id=None,
+            task_name=None,
+            last_seen_ts=bot.last_seen_ts)
     except datastore_utils.CommitError:
       logging.warning('Failed to commit a Tx')
       stats['failed'] += 1
-
-  def send_bot_event(bot_key):
-    bot = bot_key.get()
-    logging.info('Sending bot_missing event: %s', bot.id)
-    return bot_event(
-        event_type='bot_missing',
-        bot_id=bot.id,
-        message=None,
-        external_ip=None,
-        authenticated_as=None,
-        dimensions=None,
-        state=None,
-        version=None,
-        quarantined=None,
-        maintenance_msg=None,
-        task_id=None,
-        task_name=None,
-        last_seen_ts=bot.last_seen_ts)
 
   # The assumption here is that a cron job can churn through all the entities
   # fast enough. The number of dead bot is expected to be <10k. In practice the
