@@ -293,9 +293,15 @@ class OperationStats(ndb.Model):
     """Converts self to a swarming_pb2.CASEntriesStats."""
     if self.duration:
       out.duration.FromTimedelta(datetime.timedelta(seconds=self.duration))
-    # TODO(maruel): Process items_cold and items_hot.
-    # out.cold
-    # out.hot
+
+    if self.items_cold:
+      out.cold.num_items = self.num_items_cold
+      out.cold.total_bytes_items = self.total_bytes_items_cold
+
+    if self.items_hot:
+      out.hot.num_items = self.num_items_hot
+      out.hot.total_bytes_items = self.total_bytes_items_hot
+
     # TODO(maruel): Put initial_number_items and initial_size in the bot
     # snapshot for now, until this is better restructured later.
     # https://crbug.com/850560
@@ -361,6 +367,9 @@ class PerformanceStats(ndb.Model):
         (self.isolated_download.duration or 0.))
     if dur:
       out.setup.duration.FromTimedelta(datetime.timedelta(seconds=dur))
+
+    if self.isolated_download.duration:
+      self.isolated_download.to_proto(out.setup)
 
     if self.isolated_upload.duration:
       self.isolated_upload.to_proto(out.teardown)

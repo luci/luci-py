@@ -715,38 +715,39 @@ class TaskResultApiTest(TestCase):
     expected = swarming_pb2.TaskResult(
         request=swarming_pb2.TaskRequest(
             task_slices=[
-              swarming_pb2.TaskSlice(
-                  properties=swarming_pb2.TaskProperties(
-                    cipd_inputs=[
-                      swarming_pb2.CIPDPackage(
-                          package_name=u'rm',
-                          version=u'latest',
-                          dest_path=u'bin',
-                      ),
-                    ],
-                    containment=swarming_pb2.Containment(lower_priority=True),
-                    command=[u'command1'],
-                    dimensions=[
-                      swarming_pb2.StringListPair(
-                          key=u'pool', values=[u'default']),
-                    ],
-                    execution_timeout=duration_pb2.Duration(seconds=86400),
-                    grace_period=duration_pb2.Duration(seconds=30),
-                  ),
-                  expiration=duration_pb2.Duration(seconds=60),
-                  properties_hash=props_h,
-              ),
+                swarming_pb2.TaskSlice(
+                    properties=swarming_pb2.TaskProperties(
+                        cipd_inputs=[
+                            swarming_pb2.CIPDPackage(
+                                package_name=u'rm',
+                                version=u'latest',
+                                dest_path=u'bin',
+                            ),
+                        ],
+                        containment=swarming_pb2.Containment(
+                            lower_priority=True),
+                        command=[u'command1'],
+                        dimensions=[
+                            swarming_pb2.StringListPair(
+                                key=u'pool', values=[u'default']),
+                        ],
+                        execution_timeout=duration_pb2.Duration(seconds=86400),
+                        grace_period=duration_pb2.Duration(seconds=30),
+                    ),
+                    expiration=duration_pb2.Duration(seconds=60),
+                    properties_hash=props_h,
+                ),
             ],
             priority=50,
             service_account=u'none',
             name=u'Request name',
             tags=[
-              u'pool:default',
-              u'priority:50',
-              u'service_account:none',
-              u'swarming.pool.template:no_config',
-              u'tag:1',
-              u'user:Jesus',
+                u'pool:default',
+                u'priority:50',
+                u'service_account:none',
+                u'swarming.pool.template:no_config',
+                u'tag:1',
+                u'user:Jesus',
             ],
             user=u'Jesus',
             task_id=u'1d69b9f088008810',
@@ -760,8 +761,8 @@ class TaskResultApiTest(TestCase):
             bot_id=u'bot1',
             pools=[u'default'],
             dimensions=[
-              swarming_pb2.StringListPair(key=u'id', values=[u'bot1']),
-              swarming_pb2.StringListPair(key=u'pool', values=[u'default']),
+                swarming_pb2.StringListPair(key=u'id', values=[u'bot1']),
+                swarming_pb2.StringListPair(key=u'pool', values=[u'default']),
             ],
         ),
         server_versions=[u'v1a'],
@@ -776,28 +777,39 @@ class TaskResultApiTest(TestCase):
                 version=u'git_revision:deadbeef',
             ),
             packages=[
-              swarming_pb2.CIPDPackage(
-                  package_name=u'rm',
-                  version=u'stable',
-                  dest_path=u'bin',
-              ),
+                swarming_pb2.CIPDPackage(
+                    package_name=u'rm',
+                    version=u'stable',
+                    dest_path=u'bin',
+                ),
             ],
         ),
         performance=swarming_pb2.TaskPerformance(
             other_overhead=duration_pb2.Duration(nanos=100000000),
             setup=swarming_pb2.TaskOverheadStats(
-              duration=duration_pb2.Duration(nanos=50000000),
+                duration=duration_pb2.Duration(nanos=50000000),
+                cold=swarming_pb2.CASEntriesStats(
+                    num_items=2,
+                    total_bytes_items=3,
+                ),
+                hot=swarming_pb2.CASEntriesStats(
+                    num_items=3,
+                    total_bytes_items=12,
+                ),
             ),
             teardown=swarming_pb2.TaskOverheadStats(
-              duration=duration_pb2.Duration(nanos=10000000),
+                duration=duration_pb2.Duration(nanos=10000000),
+                cold=swarming_pb2.CASEntriesStats(
+                    num_items=1,
+                    total_bytes_items=10,
+                ),
             ),
         ),
         exit_code=1,
         outputs=swarming_pb2.CASTree(
             digest=u'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef',
             server=u'http://localhost:1',
-            namespace=u'default-gzip')
-    )
+            namespace=u'default-gzip'))
     expected.request.create_time.FromDatetime(self.now)
     expected.create_time.FromDatetime(self.now)
     expected.start_time.FromDatetime(
