@@ -54,19 +54,16 @@ class TestOsx(unittest.TestCase):
     return '\n'.join(content)
 
   def clear_get_physical_disks_info_cache(self):
-    if hasattr(osx._get_physical_disks_info, '__cache__'):
-      tools.clear_cache(osx._get_physical_disks_info)
+    tools.clear_cache(osx._get_physical_disks_info)
 
   def get_ssd(self):
     self.clear_get_physical_disks_info_cache()
-    if hasattr(osx.get_ssd, '__cache__'):
-      tools.clear_cache(osx.get_ssd)
+    tools.clear_cache(osx.get_ssd)
     return osx.get_ssd()
 
   def get_disks_model(self):
     self.clear_get_physical_disks_info_cache()
-    if hasattr(osx.get_disks_model, '__cache__'):
-      tools.clear_cache(osx.get_disks_model)
+    tools.clear_cache(osx.get_disks_model)
     return osx.get_disks_model()
 
   @mock.patch('subprocess.check_output')

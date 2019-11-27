@@ -99,8 +99,7 @@ VCEI exceptions         : not available
 
 class TestCPUInfo(unittest.TestCase):
   def get_cpuinfo(self, text):
-    if hasattr(linux.get_cpuinfo, '__cache__'):
-      tools.clear_cache(linux.get_cpuinfo)
+    tools.clear_cache(linux.get_cpuinfo)
     linux._read_cpuinfo = lambda: text
     return linux.get_cpuinfo()
 
@@ -166,8 +165,7 @@ NO_K8S_CGROUP = """
 
 class TestDocker(unittest.TestCase):
   def get_inside_docker(self, text):
-    if hasattr(linux.get_inside_docker, '__cache__'):
-      tools.clear_cache(linux.get_inside_docker)
+    tools.clear_cache(linux.get_inside_docker)
     linux._read_cgroup = lambda: text
     return linux.get_inside_docker()
 
