@@ -277,7 +277,7 @@ class CronCleanupExpiredHandler(webapp2.RequestHandler):
       # 6 billions entities. This is because the query above is exact, not an
       # estimation.
       logging.warning('Query timed out; guessing instead')
-      days_interval = 20
+      days_interval = 1
       for i in range(300, -1, -days_interval):
         # It was observed that limiting the range on both sides helps with the
         # chances of the query succeeding, instead of raising a Timeout.
