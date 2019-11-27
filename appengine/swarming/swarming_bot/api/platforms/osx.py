@@ -362,6 +362,22 @@ def _get_xcode_version(xcode_app):
     return out[0].split()[-1], out[1].split()[-1]
 
 
+@tools.cached
+def _get_physical_disks_info():
+  """Return the disk info for all the physical disks"""
+  try:
+    out = subprocess.check_output(['diskutil', 'list', '-plist', 'physical'])
+    pl = plistlib.readPlistFromString(out)
+    disk_info = {}
+    for disk in pl['WholeDisks']:
+      out = subprocess.check_output(['diskutil', 'info', '-plist', disk])
+      disk_info[disk.decode('utf-8')] = plistlib.readPlistFromString(out)
+    return disk_info
+  except (OSError, subprocess.CalledProcessError) as e:
+    logging.error('Failed to read disk info: %s', e)
+    return {}
+
+
 ## Public API.
 
 
@@ -688,19 +704,21 @@ def is_beta():
 @tools.cached
 def get_ssd():
   """Returns a list of SSD disks."""
-  try:
-    out = subprocess.check_output(['diskutil', 'list', '-plist', 'physical'])
-    pl = plistlib.readPlistFromString(out)
-    ssd = []
-    for disk in pl['WholeDisks']:
-      out = subprocess.check_output(['diskutil', 'info', '-plist', disk])
-      pl = plistlib.readPlistFromString(out)
-      if pl['SolidState']:
-        ssd.append(disk.decode('utf-8'))
-    return tuple(sorted(ssd))
-  except (OSError, subprocess.CalledProcessError) as e:
-    logging.error('Failed to read disk info: %s', e)
-    return ()
+  ssd = []
+  for disk, disk_info in _get_physical_disks_info().items():
+    if disk_info['SolidState']:
+      ssd.append(disk)
+  return tuple(sorted(ssd))
+
+
+@tools.cached
+def get_disks_model():
+  """Returns a list of disk models"""
+  models = []
+  for _, disk_info in _get_physical_disks_info().items():
+    if disk_info['MediaName']:
+      models.append(disk_info['MediaName'].decode('utf-8'))
+  return tuple(sorted(models))
 
 
 ## Mutating code.
