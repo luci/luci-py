@@ -14,6 +14,9 @@ import unittest
 THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
+@unittest.skipIf(
+    sys.platform == 'win32',
+    'TODO(crbug.com/1017545): signal object has no attribute SIGUSR1')
 class Test(unittest.TestCase):
   def _run(self, cmd, sig, stdin):
     p = subprocess.Popen(

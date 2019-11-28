@@ -46,6 +46,9 @@ def call_rpc(ctx, account_id, scopes):
   return r.status_code, r.content
 
 
+@unittest.skipIf(
+    sys.platform == 'win32',
+    'TODO(crbug.com/1017545): tearDown fails')
 class AuthSystemTest(auto_stub.TestCase):
   def setUp(self):
     super(AuthSystemTest, self).setUp()

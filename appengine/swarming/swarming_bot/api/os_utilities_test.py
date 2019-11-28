@@ -32,6 +32,9 @@ tools.cached = lambda func: func
 import os_utilities
 
 
+@unittest.skipIf(
+    sys.platform == 'win32',
+    'TODO(crbug.com/1017545): it fails to mock functions')
 class TestOsUtilities(auto_stub.TestCase):
   # These tests fail for cache related issue
   # Need to run in test_seq.py

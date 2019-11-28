@@ -463,6 +463,10 @@ class TestBotMain(TestBotBase):
     self.assertTrue(first.is_set())
     self.assertTrue(second.is_set())
 
+  @unittest.skipIf(
+      sys.platform == 'win32',
+      'TODO(crbug.com/1017545): '
+      '__init__() got an unexpected keyword argument \\\'creationflags\\\'')
   def test_run_bot(self):
     self.mock(threading, 'Event', FakeThreadingEvent)
 
@@ -801,6 +805,9 @@ class TestBotMain(TestBotBase):
     self.mock(subprocess42, 'Popen', Popen)
     return result
 
+  @unittest.skipIf(
+      sys.platform == 'win32',
+      'TODO(crbug.com/1017545): post_error_task was called')
   def test_run_manifest(self):
     self.mock(bot_main, '_post_error_task', self.print_err_and_fail)
     def call_hook(botobj, name, *args):
@@ -826,6 +833,9 @@ class TestBotMain(TestBotBase):
     self.assertEqual(self.root_dir, self.bot.base_dir)
     bot_main._run_manifest(self.bot, manifest, time.time())
 
+  @unittest.skipIf(
+      sys.platform == 'win32',
+      'TODO(crbug.com/1017545): post_error_task was called')
   def test_run_manifest_with_auth_headers(self):
     self.bot = self.make_bot(
         auth_headers_cb=lambda: ({'A': 'a'}, time.time() + 3600))
@@ -868,6 +878,9 @@ class TestBotMain(TestBotBase):
     self.assertEqual(self.root_dir, self.bot.base_dir)
     bot_main._run_manifest(self.bot, manifest, time.time())
 
+  @unittest.skipIf(
+      sys.platform == 'win32',
+      'TODO(crbug.com/1017545): post_error_task was called')
   def test_run_manifest_task_failure(self):
     self.mock(bot_main, '_post_error_task', self.print_err_and_fail)
     def call_hook(_botobj, name, *args):
@@ -890,6 +903,10 @@ class TestBotMain(TestBotBase):
     }
     bot_main._run_manifest(self.bot, manifest, time.time())
 
+  @unittest.skipIf(
+      sys.platform == 'win32',
+      'TODO(crbug.com/1017545): '
+      '__init__() got an unexpected keyword argument \\\'creationflags\\\'')
   def test_run_manifest_internal_failure(self):
     posted = []
     self.mock(bot_main, '_post_error_task', lambda *args: posted.append(args))
@@ -1041,6 +1058,10 @@ class TestBotMain(TestBotBase):
 
 
 class TestBotNotMocked(TestBotBase):
+  @unittest.skipIf(
+      sys.platform == 'win32',
+      'TODO(crbug.com/1017545): '
+      '__init__() got an unexpected keyword argument \\\'creationflags\\\'')
   def test_bot_restart(self):
     calls = []
     def exec_python(args):

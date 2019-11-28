@@ -49,6 +49,9 @@ class SimpleMainTest(TestCase):
   def url(self):
     return 'http://localhost:1'
 
+  @unittest.skipIf(
+      sys.platform == 'win32',
+      'TODO(crbug.com/1017545): fix assertions')
   def test_attributes(self):
     actual = json.loads(subprocess42.check_output(
         [sys.executable, self._zip_file, 'attributes'],
@@ -98,6 +101,9 @@ class MainTest(TestCase):
   def url(self):
     return self._server.url
 
+  @unittest.skipIf(
+      sys.platform == 'win32',
+      'TODO(crbug.com/1017545): It gets stuck at proc.communicate()')
   def test_run_bot_signal(self):
     # Test SIGTERM signal handling. Run it as an external process to not mess
     # things up.
