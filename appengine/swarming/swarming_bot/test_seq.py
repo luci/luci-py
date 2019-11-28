@@ -22,7 +22,8 @@ def main():
       'bot_code/singleton_test.py',
       'bot_code/bot_main_test.py',
   ]
-  abs_test_files = [os.path.join(THIS_DIR, t) for t in test_files]
+  abs_test_path = lambda p: os.path.join(THIS_DIR, *p.split('/'))
+  abs_test_files = [abs_test_path(t) for t in test_files]
 
   # execute test runner
   sys.path.insert(0, COMPONENTS_DIR)

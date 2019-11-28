@@ -4,6 +4,7 @@
 # that can be found in the LICENSE file.
 
 import subprocess
+import sys
 
 
 def run_tests(test_files, python3=False):
@@ -53,9 +54,12 @@ def _run_test(test_file, python3=False):
     vpython += '3'
 
   cmd = [vpython, test_file, '-v']
+  shell = False
+  if sys.platform == 'win32':
+    shell = True
 
   print('Running test script: %r' % cmd)
-  return subprocess.call(cmd), False
+  return subprocess.call(cmd, shell=shell), False
 
 
 def _has_py3_shebang(path):
