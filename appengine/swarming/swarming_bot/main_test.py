@@ -62,9 +62,8 @@ class SimpleMainTest(TestCase):
     self.assertEqual([u'N/A'], expected[u'dimensions'][u'server_version'])
     expected[u'dimensions'][u'server_version'] = [u'1']
 
-    NON_DETERMINISTIC = (
-      u'cwd', u'disks', u'nb_files_in_temp', u'pid', u'running_time',
-      u'started_ts', u'uptime')
+    NON_DETERMINISTIC = (u'cwd', u'disks', u'nb_files_in_temp', u'pid',
+                         u'running_time', u'ssd', u'started_ts', u'uptime')
     for key in NON_DETERMINISTIC:
       del actual[u'state'][key]
       del expected[u'state'][key]
