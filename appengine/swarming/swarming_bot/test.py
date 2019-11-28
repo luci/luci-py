@@ -22,7 +22,14 @@ def main():
   # execute test runner
   sys.path.insert(0, COMPONENTS_DIR)
   from test_support import parallel_test_runner
-  return parallel_test_runner.run_tests(python3=six.PY3)
+
+  # enable plugins only on linux
+  plugins = []
+  if sys.platform.startswith('linux'):
+    plugins.append('nose2.plugins.mp')
+
+  # execute test runner
+  return parallel_test_runner.run_tests(python3=six.PY3, plugins=plugins)
 
 
 if __name__ == '__main__':
