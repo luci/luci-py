@@ -21,6 +21,14 @@ if sys.platform == 'darwin':
                      'Tests only run under darwin platform')
 class TestOsx(unittest.TestCase):
 
+  def setUp(self):
+    self.clear_get_physical_disks_info_cache()
+    tools.clear_cache(osx.get_ssd)
+
+  def tearDown(self):
+    self.clear_get_physical_disks_info_cache()
+    tools.clear_cache(osx.get_ssd)
+
   def mock_physical_disks_list(self, disks_data):
     content = []
     content.append("""
