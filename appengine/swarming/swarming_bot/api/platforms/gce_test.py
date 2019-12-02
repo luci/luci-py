@@ -23,14 +23,9 @@ import gce
 
 
 class TestGCE(auto_stub.TestCase):
-
-  def setUp(self):
-    super(TestGCE, self).setUp()
-    tools.clear_cache(gce.get_zones)
-
   def tearDown(self):
     super(TestGCE, self).tearDown()
-    tools.clear_cache(gce.get_zones)
+    tools.clear_cache_all()
 
   @params(
       ('us-central2-a', ['us', 'us-central', 'us-central2', 'us-central2-a']),

@@ -20,14 +20,9 @@ if sys.platform == 'darwin':
 @unittest.skipUnless(sys.platform == 'darwin',
                      'Tests only run under darwin platform')
 class TestOsx(unittest.TestCase):
-
-  def setUp(self):
-    self.clear_get_physical_disks_info_cache()
-    tools.clear_cache(osx.get_ssd)
-
   def tearDown(self):
-    self.clear_get_physical_disks_info_cache()
-    tools.clear_cache(osx.get_ssd)
+    super(TestOsx, self).tearDown()
+    tools.clear_cache_all()
 
   def mock_physical_disks_list(self, disks_data):
     content = []
@@ -61,19 +56,6 @@ class TestOsx(unittest.TestCase):
     """)
     return '\n'.join(content)
 
-  def clear_get_physical_disks_info_cache(self):
-    tools.clear_cache(osx._get_physical_disks_info)
-
-  def get_ssd(self):
-    self.clear_get_physical_disks_info_cache()
-    tools.clear_cache(osx.get_ssd)
-    return osx.get_ssd()
-
-  def get_disks_model(self):
-    self.clear_get_physical_disks_info_cache()
-    tools.clear_cache(osx.get_disks_model)
-    return osx.get_disks_model()
-
   @mock.patch('subprocess.check_output')
   def test_get_ssd(self, mock_subprocess):
     disks_data = {
@@ -92,7 +74,7 @@ class TestOsx(unittest.TestCase):
       side_effect.append(self.mock_disk_info(disk_data))
     mock_subprocess.side_effect = side_effect
 
-    ssd = self.get_ssd()
+    ssd = osx.get_ssd()
     self.assertEqual((u'disk0', u'disk2'), ssd)
 
   @mock.patch('subprocess.check_output')
@@ -110,7 +92,7 @@ class TestOsx(unittest.TestCase):
       side_effect.append(self.mock_disk_info(disk_data))
     mock_subprocess.side_effect = side_effect
 
-    disks_model = self.get_disks_model()
+    disks_model = osx.get_disks_model()
     self.assertEqual((u'APPLE SSD AP0256M', u'APPLE SSD AP0257M'), disks_model)
 
 
