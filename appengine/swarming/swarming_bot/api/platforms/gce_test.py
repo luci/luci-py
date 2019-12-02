@@ -10,6 +10,8 @@ import sys
 import time
 import unittest
 
+from nose2.tools import params
+
 import test_env_platforms
 test_env_platforms.setup_test_env()
 
@@ -21,18 +23,26 @@ import gce
 
 
 class TestGCE(auto_stub.TestCase):
+
+  def setUp(self):
+    super(TestGCE, self).setUp()
+    tools.clear_cache(gce.get_zones)
+
+  def tearDown(self):
+    super(TestGCE, self).tearDown()
+    tools.clear_cache(gce.get_zones)
+
+  @params(
+      ('us-central2-a', ['us', 'us-central', 'us-central2', 'us-central2-a']),
+      ('europe-west1-b',
+       ['europe', 'europe-west', 'europe-west1', 'europe-west1-b']),
+  )
   @unittest.skipIf(sys.platform == 'darwin',
                    'TODO(crbug.com/1017545): '
                    "'function' object has no attribute '__cache__'")
-  def test_get_zones(self):
-    self.mock(gce, 'get_zone', lambda: 'us-central2-a')
-    self.assertEqual(
-        ['us', 'us-central', 'us-central2', 'us-central2-a'], gce.get_zones())
-    tools.clear_cache(gce.get_zones)
-    self.mock(gce, 'get_zone', lambda: 'europe-west1-b')
-    self.assertEqual(
-        ['europe', 'europe-west', 'europe-west1', 'europe-west1-b'],
-        gce.get_zones())
+  def test_get_zones(self, zone, expected):
+    self.mock(gce, 'get_zone', lambda: zone)
+    self.assertEqual(expected, gce.get_zones())
 
 
 class TestSignedMetadataToken(auto_stub.TestCase):

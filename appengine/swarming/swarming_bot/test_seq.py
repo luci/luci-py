@@ -18,7 +18,6 @@ def main():
   # because they don't pass when running in parallel
   # or run via test runner
   test_files = [
-      'api/os_utilities_test.py',
       'bot_code/singleton_test.py',
       'bot_code/bot_main_test.py',
   ]

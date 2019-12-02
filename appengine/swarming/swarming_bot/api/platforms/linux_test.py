@@ -10,6 +10,7 @@ import unittest
 import test_env_platforms
 test_env_platforms.setup_test_env()
 
+from depot_tools import auto_stub
 from utils import tools
 
 import linux
@@ -97,10 +98,15 @@ VCEI exceptions         : not available
 """
 
 
-class TestCPUInfo(unittest.TestCase):
+class TestCPUInfo(auto_stub.TestCase):
+
+  def tearDown(self):
+    super(TestCPUInfo, self).tearDown()
+    tools.clear_cache(linux.get_cpuinfo)
+
   def get_cpuinfo(self, text):
     tools.clear_cache(linux.get_cpuinfo)
-    linux._read_cpuinfo = lambda: text
+    self.mock(linux, '_read_cpuinfo', lambda: text)
     return linux.get_cpuinfo()
 
   def test_get_cpuinfo_exynos(self):
