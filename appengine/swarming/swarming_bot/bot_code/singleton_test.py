@@ -27,8 +27,8 @@ CMD_ACQUIRE = [sys.executable, '-u', '-c', PYCODE]
 
 
 class Test(unittest.TestCase):
-  # This test needs to be run independently
-  # run by test_seq.py
+  # This test fails when running by nose2 in python3.
+  # It passes when running this script as an executable.
   no_run = 1
 
   def test_singleton_with(self):

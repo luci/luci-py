@@ -2,6 +2,7 @@
 # Copyright 2019 The LUCI Authors. All rights reserved.
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
+# TODO(jwata): remove this file
 
 import os
 import sys
@@ -18,8 +19,6 @@ def main():
   # because they don't pass when running in parallel
   # or run via test runner
   test_files = [
-      'bot_code/singleton_test.py',
-      'bot_code/bot_main_test.py',
   ]
   abs_test_path = lambda p: os.path.join(THIS_DIR, *p.split('/'))
   abs_test_files = [abs_test_path(t) for t in test_files]

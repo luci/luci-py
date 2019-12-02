@@ -129,10 +129,6 @@ class GetProjectAccessTokenTest(test_case.TestCase):
 
 
 class GetAccessTokenTest(test_case.TestCase):
-  # This tests fail when runnin with other tests
-  # Need to run in test_seq.py
-  no_run = 1
-
   def setUp(self):
     super(GetAccessTokenTest, self).setUp()
     self.log_lines = []
