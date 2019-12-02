@@ -53,7 +53,7 @@ def _run_test(test_file, python3=False):
   if python3:
     vpython += '3'
 
-  cmd = [vpython, test_file, '-v']
+  cmd = [vpython, test_file]
   shell = False
   if sys.platform == 'win32':
     shell = True
