@@ -563,15 +563,15 @@ def bot_event(
     bot_info = BotInfo(key=info_key)
   now = utils.utcnow()
   # bot_missing event is created by a server, not a bot.
+  # So it shouldn't update last_seen_ts, external_ip, authenticated_as,
+  # maintenance_msg.
   # If the last_seen_ts gets updated, it would change the bot composite
-  # to alive.
+  # to alive. And if it clears maintenance_msg, it would change the composite
+  # to NOT_IN_MAINTENANCE and lose the message.
   if event_type != 'bot_missing':
     bot_info.last_seen_ts = now
-  if external_ip:
     bot_info.external_ip = external_ip
-  if authenticated_as:
     bot_info.authenticated_as = authenticated_as
-  if maintenance_msg:
     bot_info.maintenance_msg = maintenance_msg
   dimensions_updated = False
   if dimensions:
