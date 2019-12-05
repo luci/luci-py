@@ -130,7 +130,6 @@ def get_isolated_args(work_dir, task_details, isolated_result,
           task_details.cipd_input['client_package']['version'],
           '--cipd-server', task_details.cipd_input.get('server'),
         ])
-    cmd.append('--use-go-isolated')
 
   cmd.extend(
       [
