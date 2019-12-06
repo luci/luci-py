@@ -1116,7 +1116,7 @@ class TasksApiTest(BaseTest):
     # Create 3 tasks: one pending, one running, one complete.
     self.mock(random, 'getrandbits', lambda _: 0x88)
     self.set_as_bot()
-    self.do_handshake()
+    self.do_handshake(do_first_poll=True)
 
     # Completed.
     self.set_as_user()
@@ -2524,7 +2524,7 @@ class BotApiTest(BaseTest):
     self.mock(random, 'getrandbits', lambda _: 0x88)
 
     self.set_as_bot()
-    params = self.do_handshake()
+    params = self.do_handshake(do_first_poll=True)
     self.set_as_user()
     self.client_create_task_raw()
     self.set_as_bot()
@@ -2599,6 +2599,19 @@ class BotApiTest(BaseTest):
         {
           u'authenticated_as': u'bot:whitelisted-ip',
           u'dimensions': dimensions,
+          u'event_type': u'request_sleep',
+          u'external_ip': unicode(self.source_ip),
+          u'quarantined': False,
+          u'state': state,
+          u'ts': fmtdate(self.now),
+          u'version': unicode(self.bot_version),
+        },
+        {
+          u'authenticated_as': u'bot:whitelisted-ip',
+          u'dimensions': [
+            {u'key': u'id', u'value': [u'bot1']},
+            {u'key': u'pool', u'value': [u'default']},
+          ],
           u'event_type': u'bot_connected',
           u'external_ip': unicode(self.source_ip),
           u'quarantined': False,
@@ -2616,7 +2629,7 @@ class BotApiTest(BaseTest):
         handlers_endpoints.BotEventsRequest.combined_message_class(
             bot_id='bot1', start=end, end=end+1))
     response = self.call_api('events', body=body)
-    expected['items'] = expected['items'][:-2]
+    expected['items'] = expected['items'][:2]
     self.assertEqual(expected, response.json)
 
   def test_terminate_admin(self):

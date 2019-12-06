@@ -221,7 +221,7 @@ class AppTestBase(test_case.TestCase):
 
   # Bot
 
-  def do_handshake(self, bot='bot1'):
+  def do_handshake(self, bot='bot1', do_first_poll=False):
     """Performs bot handshake, returns data to be sent to bot handlers.
 
     Also populates self.bot_version.
@@ -248,6 +248,8 @@ class AppTestBase(test_case.TestCase):
     # A bit hackish but fine for unit testing purpose.
     if response.get('bot_config'):
       params['bot_config'] = response['bot_config']
+    if do_first_poll:
+      self.bot_poll(bot=bot, params=params)
     return params
 
   def bot_poll(self, bot='bot1', params=None):

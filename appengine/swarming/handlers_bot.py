@@ -456,6 +456,16 @@ class BotHandshakeHandler(_BotBaseHandler):
   @auth.public  # auth happens in self._process()
   def post(self):
     res = self._process()
+
+    # Do not register dimensions because they may change at first polling,
+    # as the initial handshake is done without the injected bot_config.py.
+    # Keep id and pool since some codes refer them.
+    # crbug.com/801679
+    res.dimensions = {
+        k: v for k, v in res.dimensions.items()
+        if k in ('id', 'pool')
+    }
+
     bot_management.bot_event(
         event_type='bot_connected', bot_id=res.bot_id,
         external_ip=self.request.remote_addr,
@@ -742,11 +752,12 @@ class BotEventHandler(_BotBaseHandler):
     message = res.request.get('message')
     # Record the event in a BotEvent entity so it can be listed on the bot's
     # page.
+    # Do not pass dimensions they are likely not valid at handshake.
     bot_management.bot_event(
         event_type=event, bot_id=res.bot_id,
         external_ip=self.request.remote_addr,
         authenticated_as=auth.get_peer_identity().to_bytes(),
-        dimensions=res.dimensions, state=res.state,
+        dimensions=None, state=res.state,
         version=res.version, quarantined=bool(res.quarantined_msg),
         maintenance_msg=res.maintenance_msg, task_id=None,
         task_name=None, message=message)

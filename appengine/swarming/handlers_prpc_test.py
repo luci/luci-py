@@ -111,7 +111,6 @@ class PRPCTest(test_env_handlers.AppTestBase):
               ),
             dimensions=[
               swarming_pb2.StringListPair(key='id', values=['bot1']),
-              swarming_pb2.StringListPair(key='os', values=['Amiga']),
               swarming_pb2.StringListPair(key='pool', values=['default']),
             ]),
           event=swarming_pb2.BOT_NEW_SESSION,
@@ -174,6 +173,8 @@ class PRPCTest(test_env_handlers.AppTestBase):
     self.set_as_bot()
     self.mock_now(self.now, 0)
     params = self.do_handshake()
+    self.mock_now(self.now, 30)
+    self.bot_poll(params=params)
     self.set_as_user()
     now_60 = self.mock_now(self.now, 60)
     self.client_create_task_raw()
@@ -250,6 +251,15 @@ class PRPCTest(test_env_handlers.AppTestBase):
           event=swarming_pb2.INSTRUCT_START_TASK,
       ),
       swarming_pb2.BotEvent(
+          event_time=timestamp_pb2.Timestamp(seconds=1262401475),
+          bot=swarming_pb2.Bot(
+              bot_id='bot1',
+              pools=[u'default'],
+              info=common_info,
+              dimensions=dimensions),
+          event=swarming_pb2.INSTRUCT_IDLE,
+      ),
+      swarming_pb2.BotEvent(
           event_time=timestamp_pb2.Timestamp(seconds=1262401445),
           bot=swarming_pb2.Bot(
               bot_id='bot1',
@@ -267,12 +277,16 @@ class PRPCTest(test_env_handlers.AppTestBase):
                   authenticated_as='bot:whitelisted-ip',
                   version='123',
               ),
-              dimensions=dimensions),
+              dimensions=[
+                swarming_pb2.StringListPair(key='id', values=['bot1']),
+                swarming_pb2.StringListPair(key='pool', values=['default']),
+              ]),
           event=swarming_pb2.BOT_NEW_SESSION,
       ),
     ]
-    self.assertEqual(
-        unicode(swarming_pb2.BotEventsResponse(events=events)), unicode(resp))
+    self.assertEqual(len(events), len(resp.events))
+    for i, event in enumerate(events):
+      self.assertEqual(unicode(event), unicode(resp.events[i]))
 
     # Now test with a subset. It will retrieve events 1 and 2.
     msg = swarming_pb2.BotEventsRequest(bot_id=u'bot1')
