@@ -136,8 +136,6 @@ def get_isolated_args(work_dir, task_details, isolated_result,
       [
         # Switch to 'task' logical account, if it is set.
         '--switch-to-account', 'task',
-        # https://github.com/luci/luci-py/issues/270
-        #'--use-symlinks',
         '--json', isolated_result,
         '--log-file', os.path.join(bot_dir, 'logs', 'run_isolated.log'),
         '--root-dir', work_dir,
