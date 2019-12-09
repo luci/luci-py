@@ -1576,6 +1576,15 @@ def _apply_task_template(task_template, props):
           'request.cache[%r] conflicts with pool\'s template' % cache.name)
     occlude_checker.add(cache.path, 'task cache %r' % cache.name, '')
   for cp in (props.cipd_input.packages or () if props.cipd_input else ()):
+    if not cp.package_name:
+      raise ValueError('package name of cipd package is not set for %s' % cp)
+    if not cp.path:
+      raise ValueError(
+          'path for cipd package is not set for %s' % cp.package_name)
+    if not cp.version:
+      raise ValueError(
+          'verson for cipd package is not set for %s' % cp.package_name)
+
     occlude_checker.add(
         cp.path, 'task cipd', '%s:%s' % (cp.package_name, cp.version))
 
