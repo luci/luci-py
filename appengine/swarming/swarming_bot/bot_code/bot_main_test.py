@@ -32,6 +32,7 @@ from utils import file_path
 from utils import logging_utils
 from utils import net
 from utils import subprocess42
+from utils import tools
 from utils import zip_package
 
 
@@ -72,6 +73,7 @@ class TestBotBase(net_utils.TestCase):
       'version': '123',
     }
     self.bot = self.make_bot()
+    tools.clear_cache_all()
 
   def tearDown(self):
     os.chdir(self.old_cwd)
