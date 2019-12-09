@@ -81,23 +81,25 @@ def _expire_task_tx(now, request, to_run_key, result_summary_key, capacity,
   new_to_run = None
   offset = result_summary.current_task_slice+1
   rest = request.num_task_slices - offset
-  if len(capacity) != rest:
-    # TODO(crbug.com/1030504): current_task_slice might be inconsistent with
-    # the index calculated before the tx section.
-    logging.debug('crbug.com/1030504:'
-                  'current_task_slice=%s, num_task_slices=%s, capacity=%s',
-                  result_summary.current_task_slice,
-                  request.num_task_slices,
-                  capacity)
   for index in range(rest):
     # Use the lookup created just before the transaction. There's a small race
     # condition in here but we're willing to accept it.
-    if capacity[index]:
-      # Enqueue a new TasktoRun for this next TaskSlice, it has capacity!
-      new_to_run = task_to_run.new_task_to_run(request, 1, index+offset)
-      result_summary.current_task_slice = index+offset
-      to_put.append(new_to_run)
-      break
+    try:
+      if capacity[index]:
+        # Enqueue a new TasktoRun for this next TaskSlice, it has capacity!
+        new_to_run = task_to_run.new_task_to_run(request, 1, index+offset)
+        result_summary.current_task_slice = index+offset
+        to_put.append(new_to_run)
+        break
+    except IndexError:
+      logging.debug('crbug.com/1030504:'
+                    'current_task_slice=%d, num_task_slices=%d, '
+                    'index=%d, capacity=%s',
+                    result_summary.current_task_slice,
+                    request.num_task_slices,
+                    index,
+                    capacity)
+      raise
 
   if not new_to_run:
     # There's no fallback, giving up.
