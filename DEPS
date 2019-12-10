@@ -4,8 +4,8 @@ deps = {
   'appengine/swarming/ui2/nodejs/': {
     'packages': [
       {
-        'package': 'infra/nodejs/nodejs/${{platform}}',
-        'version': 'node_version:10.15.3',
+        'package': 'infra/3pp/tools/nodejs/${{platform}}',
+        'version': 'version:13.3.0',
       }
     ],
     'dep_type': 'cipd',
