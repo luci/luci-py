@@ -584,17 +584,24 @@ class BotPollHandler(_BotBaseHandler):
 
     # The bot is in good shape.
 
-    # Prepare BotTaskDimensions
-    # TODO(crbug.com/1027407): get_result() takes longer than 60 sec which ends
-    # up with "DeadlineExceededError".
-    # Approaches would be to
-    # - Move the assert_bot task to background rather than waiting at polling.
-    # - Execute assert_bot_async here (before bot_reap_task), and get_result()
-    # after reaping task.
-    # See discussion:
-    # https://crrev.com/c/1948022/2#message-15c7ac534cdc49794fcb66cd209e5d2272ea22a5
-    bot_root_key = bot_management.get_root_key(res.bot_id)
-    task_queues.assert_bot_async(bot_root_key, res.dimensions).get_result()
+    try:
+      # Prepare BotTaskDimensions
+      bot_root_key = bot_management.get_root_key(res.bot_id)
+      task_queues.assert_bot_async(bot_root_key, res.dimensions).get_result()
+    except runtime.DeadlineExceededError as e:
+      # TODO(crbug.com/1027431): assert_bot_async().get_result()
+      # takes longer than 60 sec which ends up with "DeadlineExceededError".
+      # Returning 429 for the bot to retry.
+      # Approaches to avoid ignoring the errors would be to
+      # - Move the assert_bot task to background rather than waiting at polling.
+      # - Execute assert_bot_async here (before bot_reap_task), and get_result()
+      # after reaping task.
+      # See discussion:
+      # https://crrev.com/c/1948022/2#message-15c7ac534cdc49794fcb66cd209e5d2272ea22a5
+      logging.warning('crbug.com/1027431: '
+                      'Ignoring Deadline exceeded error: %s', e)
+      self.abort(429, 'Deadline exceeded while asserting bot')
+      return
 
     # Try to grab a task.
     try:
