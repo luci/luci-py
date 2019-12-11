@@ -437,7 +437,8 @@ class DimensionAggregation(ndb.Model):
   This entity is updated via cron job /internal/cron/aggregate_bots_dimensions
   updated every hour.
   """
-  dimensions = ndb.LocalStructuredProperty(DimensionValues, repeated=True)
+  dimensions = ndb.LocalStructuredProperty(
+      DimensionValues, repeated=True, compressed=True)
 
   ts = ndb.DateTimeProperty()
 
