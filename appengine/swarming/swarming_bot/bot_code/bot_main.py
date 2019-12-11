@@ -90,18 +90,17 @@ SINGLETON = singleton.Singleton(THIS_DIR)
 # https://chromium.googlesource.com/infra/luci/luci-py.git/+/master/appengine/swarming/doc/Bot.md
 # for more details.
 PASSLIST = (
-    '*-cacert.pem',
-    'README',
-    'README.md',
-    'c',
-    'cipd_cache',
-    'isolated_cache',
-    'isolated_cache_go',
-    'logs',
-    'swarming.lck',
-    'swarming_bot.1.zip',
-    'swarming_bot.2.zip',
-    'swarming_bot.zip',
+  '*-cacert.pem',
+  'c',
+  'cipd_cache',
+  'isolated_cache',
+  'logs',
+  'README',
+  'README.md',
+  'swarming.lck',
+  'swarming_bot.1.zip',
+  'swarming_bot.2.zip',
+  'swarming_bot.zip',
 )
 
 
@@ -688,18 +687,11 @@ def _run_isolated_flags(botobj):
       _min_free_disk({'size_mb': size}, partition) +
       partition['wiggle'])
   args = [
-      '--cache',
-      os.path.join(botobj.base_dir, 'isolated_cache'),
-      '--go-cache-dir',
-      os.path.join(botobj.base_dir, 'isolated_cache_go'),
-      '--min-free-space',
-      str(min_free),
-      '--named-cache-root',
-      os.path.join(botobj.base_dir, 'c'),
-      '--max-cache-size',
-      str(settings['caches']['isolated']['size']),
-      '--max-items',
-      str(settings['caches']['isolated']['items']),
+    '--cache', os.path.join(botobj.base_dir, 'isolated_cache'),
+    '--min-free-space', str(min_free),
+    '--named-cache-root', os.path.join(botobj.base_dir, 'c'),
+    '--max-cache-size', str(settings['caches']['isolated']['size']),
+    '--max-items', str(settings['caches']['isolated']['items']),
   ]
 
   # Get the gRPC proxy from the config, but allow an environment variable to
