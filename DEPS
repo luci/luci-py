@@ -9,6 +9,5 @@ deps = {
       }
     ],
     'dep_type': 'cipd',
-    'condition': 'checkout_linux or checkout_mac',
   },
 }
