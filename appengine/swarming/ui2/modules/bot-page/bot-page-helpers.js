@@ -176,6 +176,6 @@ const TASK_TIMES = ['started_ts', 'completed_ts', 'abandoned_ts', 'modified_ts']
 
 // These field filters trim down the data we get per task, which
 // may speed up the server time and should speed up the network time.
-export const TASKS_QUERY_PARAMS = 'include_performance_stats=true&limit=30&fields=cursor%2Citems(state%2Cbot_version%2Ccompleted_ts%2Ccreated_ts%2Cduration%2Cexit_code%2Cfailure%2Cinternal_failure%2Cmodified_ts%2Cname%2Cperformance_stats(bot_overhead%2Cisolated_download(duration%2Cinitial_number_items%2Cinitial_size%2Cnum_items_cold%2Cnum_items_hot%2Ctotal_bytes_items_cold%2Ctotal_bytes_items_hot)%2Cisolated_upload(duration%2Cinitial_number_items%2Cinitial_size%2Cnum_items_cold%2Cnum_items_hot%2Ctotal_bytes_items_cold%2Ctotal_bytes_items_hot))%2Cserver_versions%2Cstarted_ts%2Ctask_id)&sort=started_ts';
+export const TASKS_QUERY_PARAMS = 'include_performance_stats=true&limit=30&fields=cursor%2Citems(state%2Cbot_version%2Ccompleted_ts%2Ccreated_ts%2Cduration%2Cexit_code%2Cfailure%2Cinternal_failure%2Cmodified_ts%2Cname%2Cperformance_stats(bot_overhead%2Cisolated_download(duration%2Cinitial_number_items%2Cinitial_size%2Cnum_items_cold%2Cnum_items_hot%2Ctotal_bytes_items_cold%2Ctotal_bytes_items_hot)%2Cisolated_upload(duration%2Cinitial_number_items%2Cinitial_size%2Cnum_items_cold%2Cnum_items_hot%2Ctotal_bytes_items_cold%2Ctotal_bytes_items_hot))%2Cserver_versions%2Cstarted_ts%2Ctask_id)';
 
 export const EVENTS_QUERY_PARAMS = 'limit=50&fields=cursor%2Citems(event_type%2Cmaintenance_msg%2Cmessage%2Cquarantined%2Ctask_id%2Cts%2Cversion)';
