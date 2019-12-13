@@ -688,7 +688,7 @@ def _run_isolated_flags(botobj):
       partition['wiggle'])
   args = [
       '--cache',
-      os.path.join(botobj.base_dir, 'isolated_cache_python'),
+      os.path.join(botobj.base_dir, 'isolated_cache'),
       '--min-free-space',
       str(min_free),
       '--named-cache-root',

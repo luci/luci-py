@@ -1432,8 +1432,8 @@ def main():
   Test.leak = bool('--leak' in sys.argv)
   Test.tmpdir = unicode(tempfile.mkdtemp(prefix='local_smoke_test'))
   if Test.leak:
-    # Note that --leak will not guarantee that 'c' and 'isolated_cache_python'
-    # are kept. Only the last test case will leak these two directories.
+    # Note that --leak will not guarantee that 'c' and 'isolated_cache' are
+    # kept. Only the last test case will leak these two directories.
     sys.argv.remove('--leak')
   if verbose:
     logging.basicConfig(
