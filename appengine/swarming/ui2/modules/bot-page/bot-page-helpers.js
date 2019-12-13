@@ -179,6 +179,7 @@ const TASK_TIMES = ['started_ts', 'completed_ts', 'abandoned_ts', 'modified_ts']
 export const TASKS_QUERY_PARAMS = [
     'include_performance_stats=true',
     'limit=30',
+    'sort=STARTED_TS',
     encodeURIComponent(
         'fields=cursor,'+
             'items(state,bot_version,completed_ts,created_ts,duration,'+

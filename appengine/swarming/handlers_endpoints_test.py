@@ -1300,45 +1300,59 @@ class TasksApiTest(BaseTest):
         (None, TaskStateQuery.BOT_DIED, TaskSort.ABANDONED_TS),
         (None, TaskStateQuery.BOT_DIED, TaskSort.COMPLETED_TS),
         (None, TaskStateQuery.BOT_DIED, TaskSort.MODIFIED_TS),
+        (None, TaskStateQuery.BOT_DIED, TaskSort.STARTED_TS),
         (None, TaskStateQuery.CANCELED, TaskSort.ABANDONED_TS),
         (None, TaskStateQuery.CANCELED, TaskSort.COMPLETED_TS),
         (None, TaskStateQuery.CANCELED, TaskSort.MODIFIED_TS),
+        (None, TaskStateQuery.CANCELED, TaskSort.STARTED_TS),
         (None, TaskStateQuery.COMPLETED, TaskSort.ABANDONED_TS),
         (None, TaskStateQuery.COMPLETED, TaskSort.COMPLETED_TS),
         (None, TaskStateQuery.COMPLETED, TaskSort.MODIFIED_TS),
+        (None, TaskStateQuery.COMPLETED, TaskSort.STARTED_TS),
         (None, TaskStateQuery.COMPLETED_FAILURE, TaskSort.ABANDONED_TS),
         (None, TaskStateQuery.COMPLETED_FAILURE, TaskSort.COMPLETED_TS),
         (None, TaskStateQuery.COMPLETED_FAILURE, TaskSort.MODIFIED_TS),
+        (None, TaskStateQuery.COMPLETED_FAILURE, TaskSort.STARTED_TS),
         (None, TaskStateQuery.COMPLETED_SUCCESS, TaskSort.ABANDONED_TS),
         (None, TaskStateQuery.COMPLETED_SUCCESS, TaskSort.COMPLETED_TS),
         (None, TaskStateQuery.COMPLETED_SUCCESS, TaskSort.MODIFIED_TS),
+        (None, TaskStateQuery.COMPLETED_SUCCESS, TaskSort.STARTED_TS),
         (None, TaskStateQuery.DEDUPED, TaskSort.ABANDONED_TS),
         (None, TaskStateQuery.DEDUPED, TaskSort.COMPLETED_TS),
         (None, TaskStateQuery.DEDUPED, TaskSort.MODIFIED_TS),
+        (None, TaskStateQuery.DEDUPED, TaskSort.STARTED_TS),
         (None, TaskStateQuery.EXPIRED, TaskSort.ABANDONED_TS),
         (None, TaskStateQuery.EXPIRED, TaskSort.COMPLETED_TS),
         (None, TaskStateQuery.EXPIRED, TaskSort.MODIFIED_TS),
+        (None, TaskStateQuery.EXPIRED, TaskSort.STARTED_TS),
         (None, TaskStateQuery.KILLED, TaskSort.ABANDONED_TS),
         (None, TaskStateQuery.KILLED, TaskSort.COMPLETED_TS),
         (None, TaskStateQuery.KILLED, TaskSort.MODIFIED_TS),
+        (None, TaskStateQuery.KILLED, TaskSort.STARTED_TS),
         (None, TaskStateQuery.NO_RESOURCE, TaskSort.ABANDONED_TS),
         (None, TaskStateQuery.NO_RESOURCE, TaskSort.COMPLETED_TS),
         (None, TaskStateQuery.NO_RESOURCE, TaskSort.MODIFIED_TS),
+        (None, TaskStateQuery.NO_RESOURCE, TaskSort.STARTED_TS),
         (None, TaskStateQuery.PENDING, TaskSort.ABANDONED_TS),
         (None, TaskStateQuery.PENDING, TaskSort.COMPLETED_TS),
         (None, TaskStateQuery.PENDING, TaskSort.MODIFIED_TS),
+        (None, TaskStateQuery.PENDING, TaskSort.STARTED_TS),
         (None, TaskStateQuery.PENDING_RUNNING, TaskSort.ABANDONED_TS),
         (None, TaskStateQuery.PENDING_RUNNING, TaskSort.COMPLETED_TS),
         (None, TaskStateQuery.PENDING_RUNNING, TaskSort.MODIFIED_TS),
+        (None, TaskStateQuery.PENDING_RUNNING, TaskSort.STARTED_TS),
         (None, TaskStateQuery.RUNNING, TaskSort.ABANDONED_TS),
         (None, TaskStateQuery.RUNNING, TaskSort.COMPLETED_TS),
         (None, TaskStateQuery.RUNNING, TaskSort.MODIFIED_TS),
+        (None, TaskStateQuery.RUNNING, TaskSort.STARTED_TS),
         (None, TaskStateQuery.TIMED_OUT, TaskSort.ABANDONED_TS),
         (None, TaskStateQuery.TIMED_OUT, TaskSort.COMPLETED_TS),
         (None, TaskStateQuery.TIMED_OUT, TaskSort.MODIFIED_TS),
+        (None, TaskStateQuery.TIMED_OUT, TaskSort.STARTED_TS),
         (True, TaskStateQuery.ALL, TaskSort.ABANDONED_TS),
         (True, TaskStateQuery.ALL, TaskSort.COMPLETED_TS),
         (True, TaskStateQuery.ALL, TaskSort.MODIFIED_TS),
+        (True, TaskStateQuery.ALL, TaskSort.STARTED_TS),
     ]
     _, _, now_120, start, end = self._gen_two_tasks()
     for state in TaskStateQuery:
@@ -2513,11 +2527,13 @@ class BotApiTest(BaseTest):
             base64.b64decode(actual['items'][0]['performance_stats'][k][j]))
     self.assertEqual(expected, actual)
 
-    request = handlers_endpoints.BotTasksRequest.combined_message_class(
-        bot_id='bot1', include_performance_stats=True,
-        sort=swarming_rpcs.TaskSort.COMPLETED_TS)
-    body = message_to_dict(request)
-    response = self.call_api('tasks', body=body)
+    for sort in (swarming_rpcs.TaskSort.COMPLETED_TS,
+                 swarming_rpcs.TaskSort.STARTED_TS):
+      request = handlers_endpoints.BotTasksRequest.combined_message_class(
+          bot_id='bot1', include_performance_stats=True, sort=sort)
+      body = message_to_dict(request)
+      response = self.call_api('tasks', body=body)
+
 
   def test_events(self):
     # Run one task, push an event manually.

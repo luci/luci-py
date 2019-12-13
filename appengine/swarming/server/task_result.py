@@ -1273,7 +1273,8 @@ def _outputchunk_key_to_request(output_chunk_key):
 
 def _sort_property(sort):
   """Returns a datastore_query.PropertyOrder based on 'sort'."""
-  if sort not in ('created_ts', 'modified_ts', 'completed_ts', 'abandoned_ts'):
+  if sort not in ('created_ts', 'modified_ts', 'completed_ts', 'abandoned_ts',
+                  'started_ts'):
     raise ValueError('Unexpected sort %r' % sort)
   if sort == 'created_ts':
     return datastore_query.PropertyOrder(
