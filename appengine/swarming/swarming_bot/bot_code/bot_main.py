@@ -96,7 +96,6 @@ PASSLIST = (
     'c',
     'cipd_cache',
     'isolated_cache_python',
-    'isolated_cache_go',
     'logs',
     'swarming.lck',
     'swarming_bot.1.zip',
@@ -690,8 +689,6 @@ def _run_isolated_flags(botobj):
   args = [
       '--cache',
       os.path.join(botobj.base_dir, 'isolated_cache_python'),
-      '--go-cache-dir',
-      os.path.join(botobj.base_dir, 'isolated_cache_go'),
       '--min-free-space',
       str(min_free),
       '--named-cache-root',

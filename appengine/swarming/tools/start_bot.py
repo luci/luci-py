@@ -65,16 +65,12 @@ class LocalBot(object):
       # effect.
       # These values are from ./swarming_bot/bot_code/bot_main.py.
       _safe_rm(os.path.join(self._botdir, 'c'))
-      # TODO(crbug.com/932396): remove this line.
       _safe_rm(os.path.join(self._botdir, 'isolated_cache_python'))
-      _safe_rm(os.path.join(self._botdir, 'isolated_cache_go'))
       self.start()
     else:
       logging.info('wipe_cache(): wiping cache without telling the bot')
       _safe_rm(os.path.join(self._botdir, 'c'))
-      # TODO(crbug.com/932396): remove this line.
       _safe_rm(os.path.join(self._botdir, 'isolated_cache_python'))
-      _safe_rm(os.path.join(self._botdir, 'isolated_cache_go'))
 
   @property
   def bot_id(self):
