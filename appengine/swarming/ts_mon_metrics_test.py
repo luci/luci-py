@@ -113,19 +113,25 @@ class TestMetrics(test_case.TestCase):
     summary.internal_failure = False
     summary.duration = 42
 
+    summary.state = task_result.State.COMPLETED
     fields['result'] = 'success'
+    fields['end_status'] = task_result.State.to_string(summary.state)
     self.assertIsNone(ts_mon_metrics._jobs_completed.get(fields=fields))
     ts_mon_metrics.on_task_completed(summary)
     self.assertEqual(1, ts_mon_metrics._jobs_completed.get(fields=fields))
 
     summary.exit_code = 1 # sets failure = True.
+    summary.state = task_result.State.COMPLETED
     fields['result'] = 'failure'
+    fields['end_status'] = task_result.State.to_string(summary.state)
     self.assertIsNone(ts_mon_metrics._jobs_completed.get(fields=fields))
     ts_mon_metrics.on_task_completed(summary)
     self.assertEqual(1, ts_mon_metrics._jobs_completed.get(fields=fields))
 
     summary.internal_failure = True
+    summary.state = task_result.State.BOT_DIED
     fields['result'] = 'infra-failure'
+    fields['end_status'] = task_result.State.to_string(summary.state)
     self.assertIsNone(ts_mon_metrics._jobs_completed.get(fields=fields))
     ts_mon_metrics.on_task_completed(summary)
     self.assertEqual(1, ts_mon_metrics._jobs_completed.get(fields=fields))
