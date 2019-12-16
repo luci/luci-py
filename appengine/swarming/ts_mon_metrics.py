@@ -66,7 +66,7 @@ _jobs_completed = gae_ts_mon.CounterMetric(
         gae_ts_mon.StringField('subproject_id'),
         gae_ts_mon.StringField('pool'),
         gae_ts_mon.StringField('result'),
-        gae_ts_mon.StringField('end_status'),
+        gae_ts_mon.StringField('status'),
     ])
 
 
@@ -455,7 +455,7 @@ def on_task_completed(summary):
     fields['result'] = 'success'
 
   completed_fields = fields.copy()
-  completed_fields['end_status'] = task_result.State.to_string(summary.state)
+  completed_fields['status'] = task_result.State.to_string(summary.state)
   _jobs_completed.increment(fields=completed_fields)
   if summary.duration is not None:
     _jobs_durations.add(summary.duration, fields=fields)
