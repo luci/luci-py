@@ -248,7 +248,10 @@ def get_gpu():
   re_id = re.compile(r'^(.+?) \[([0-9a-f]{4})\]$')
   for line in pci_devices:
     # Look for display class as noted at http://wiki.osdev.org/PCI
-    dev_type = re_id.match(line[1]).group(2)
+    m = re_id.match(line[1])
+    if not m:
+      continue
+    dev_type = m.group(2)
     if not dev_type or not dev_type.startswith('03'):
       continue
     vendor = re_id.match(line[2])
