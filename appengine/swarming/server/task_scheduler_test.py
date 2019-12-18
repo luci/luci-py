@@ -1546,6 +1546,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     child_result3_summary = task_scheduler.schedule_request(
         child_request3, None)
 
+    # TODO(crbug.com/1034166): remove children_task_ids
     # Parent task should have child task ids, but the id of task 3
     # doesn't belong to the parent since it's appended when running
     appended_child_task_ids = [
@@ -1573,6 +1574,11 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         })
     )
     # and child tasks should be cancelled via task queue.
+    appended_child_task_ids = [
+        child_result3_summary.task_id,
+        child_result2_summary.task_id,
+        child_result_summary.task_id,
+    ]
     self.execute_task(
         '/internal/taskqueue/important/tasks/cancel',
         'cancel-tasks',

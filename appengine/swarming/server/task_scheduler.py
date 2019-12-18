@@ -1865,16 +1865,15 @@ def task_expire_tasks(task_to_runs):
         reenqueued, len(killed), skipped)
 
 
-def task_cancel_running_children_tasks(parent_task_id):
+def task_cancel_running_children_tasks(parent_result_summary_id):
   """Enqueues task queue to cancel non-completed children tasks."""
-  parent_result_summary_key = task_pack.unpack_result_summary_key(
-      parent_task_id)
-  parent_run_result_summary = parent_result_summary_key.get()
-  children_task_keys = map(
-      task_pack.unpack_result_summary_key,
-      parent_run_result_summary.children_task_ids)
+  # TODO(crbug.com/1034166): it may not be able to handle
+  # 1000+ child tasks. need to save cursor and continue iteration
+  # in a follow up task.
+  it = task_result.yield_result_summary_by_parent_task_id(
+      parent_result_summary_id)
   children_tasks_per_version = {}
-  for task in ndb.get_multi(children_task_keys):
+  for task in it:
     if task.state not in task_result.State.STATES_RUNNING:
       continue
     version = task.server_versions[0]

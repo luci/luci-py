@@ -150,8 +150,9 @@ def _task_summary_to_proto(summary, event):
     event.proto.swarming_task_event.abandoned_ts = _to_timestamp(
         summary.abandoned_ts)
 
-  for task_id in summary.children_task_ids:
-    event.proto.swarming_task_event.children_task_ids.append(task_id)
+  # TODO(crbug.com/1034166): collects child task ids efficiently
+  # for task_id in summary.children_task_ids:
+  #   event.proto.swarming_task_event.children_task_ids.append(task_id)
 
   if summary.outputs_ref:
     _files_ref_to_proto(

@@ -1738,6 +1738,24 @@ class TaskRequestApiTest(TestCase):
     ]
     self.assertEqual(expected, [r[0] for r in actual_rows])
 
+  def test_yield_request_keys_by_parent_task_id(self):
+    parent_request = _gen_request()
+    parent_request.key = task_request.new_request_key()
+    parent_request.put()
+    parent_summary_key = task_pack.request_key_to_result_summary_key(
+        parent_request.key)
+    parent_summary_id = task_pack.pack_result_summary_key(parent_summary_key)
+    parent_run_key = task_pack.result_summary_key_to_run_result_key(
+        parent_summary_key, 1)
+    parent_run_id = task_pack.pack_run_result_key(parent_run_key)
+
+    child_request_1_key = _gen_request(parent_task_id=parent_run_id).put()
+    child_request_2_key = _gen_request(parent_task_id=parent_run_id).put()
+
+    it = task_request.yield_request_keys_by_parent_task_id(parent_summary_id)
+    expected = [child_request_1_key, child_request_2_key]
+    self.assertEqual(sorted(expected), sorted([k for k in it]))
+
 
 if __name__ == '__main__':
   if '-v' in sys.argv:
