@@ -1220,20 +1220,6 @@ def schedule_request(request, secret_bytes):
   else:
     logging.debug('New request %s', result_summary.task_id)
 
-  if request.parent_task_id:
-    # Append task_id to parent tasks in async
-    # TODO(jwata): make this enqueuing transactional
-    payload = {
-       'child_task_id': result_summary.task_id,
-    }
-    ok = utils.enqueue_task(
-        ('/internal/taskqueue/important/tasks/%s/append-child' %
-         request.parent_task_id),
-        'append-child-task',
-        payload=utils.encode_to_json(payload))
-    if not ok:
-      raise datastore_utils.CommitError('Failed to enqueue task')
-
   ts_mon_metrics.on_task_requested(result_summary, bool(dupe_summary))
 
   # Either the task was deduped, or forcibly refused. Notify through PubSub.
@@ -1898,36 +1884,7 @@ def task_cancel_running_children_tasks(parent_result_summary_id):
 
 
 def task_append_child(parent_task_id, child_task_id):
-  parent_run_key = task_pack.unpack_run_result_key(parent_task_id)
-  parent_task_keys = [
-    parent_run_key,
-    task_pack.run_result_key_to_result_summary_key(parent_run_key),
-  ]
-  now = utils.utcnow()
-
-  def update_parents():
-    # This one is slower.
-    items = ndb.get_multi(parent_task_keys)
-    for item in items:
-      if not item:
-        # The client provided a parent task id that had a valid TaskRequest,
-        # it was verified in init_task_request(), but missing TaskRunResult.
-        # At this point the task was already scheduled, so the damage is done,
-        # but at least return an error to the client.
-        raise ValueError('failed to get entry for parent task')
-
-      # When a task is running, the TaskRunResult and TaskResultSummary
-      # entities are updated by a single server version, since the bot locks
-      # on the specific server version.
-      #
-      # WARNING: This code runs in the children task, updating the parent's
-      # task entities. This task was triggered later, so it could be running
-      # a different server version. There has been cases where saving entities
-      # across different versions caused issues, and they are next to
-      # impossible to test. This is especially problematic with new fields
-      # coupled with _pre_put_hook().
-      item.children_task_ids.append(child_task_id)
-      item.modified_ts = now
-    ndb.put_multi(items)
-
-  datastore_utils.transaction(update_parents, retries=3)
+  # TODO(crbug.com/1034166): remove later
+  logging.error(
+      "crbug.com/1034166: task_append_child should not be called."
+      "parent_task_id=%s, child_task_id=%s", parent_task_id, child_task_id)

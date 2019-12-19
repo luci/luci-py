@@ -1038,28 +1038,13 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(1, result_summary.current_task_slice)
     self.assertEqual(0, result_summary.try_number)
 
-  def test_task_parent_children(self):
-    # Parent task creates a child task.
-    parent_id = self._task_ran_successfully(1, 0)
-    result_summary = self._quick_schedule(1, parent_task_id=parent_id)
-    self.assertEqual([], result_summary.children_task_ids)
-    self.assertEqual(parent_id, result_summary.request_key.get().parent_task_id)
-
-    parent_run_result_key = task_pack.unpack_run_result_key(parent_id)
-    parent_res_summary_key = task_pack.run_result_key_to_result_summary_key(
-        parent_run_result_key)
-    expected = [result_summary.task_id]
-    self.assertEqual(expected, parent_run_result_key.get().children_task_ids)
-    self.assertEqual(expected, parent_res_summary_key.get().children_task_ids)
-
   def test_task_invalid_parent(self):
     parent_id = self._task_ran_successfully(1, 0)
     self.assertTrue(parent_id.endswith('1'))
     invalid_parent_id = parent_id[:-1] + '2'
     # Try to create a children task with invalid parent_task_id.
     # task should be scheduled without error
-    result_summary = self._quick_schedule(
-        1, parent_task_id=invalid_parent_id)
+    result_summary = self._quick_schedule(0, parent_task_id=invalid_parent_id)
 
   def test_task_parent_isolated(self):
     run_result = self._quick_reap(
@@ -1099,16 +1084,9 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(1, self.execute_tasks())
 
     parent_id = run_result.task_id
-    result_summary = self._quick_schedule(1, parent_task_id=parent_id)
+    result_summary = self._quick_schedule(0, parent_task_id=parent_id)
     self.assertEqual([], result_summary.children_task_ids)
     self.assertEqual(parent_id, result_summary.request_key.get().parent_task_id)
-
-    parent_run_result_key = task_pack.unpack_run_result_key(parent_id)
-    parent_res_summary_key = task_pack.run_result_key_to_result_summary_key(
-        parent_run_result_key)
-    expected = [result_summary.task_id]
-    self.assertEqual(expected, parent_run_result_key.get().children_task_ids)
-    self.assertEqual(expected, parent_res_summary_key.get().children_task_ids)
 
   def test_task_timeout(self):
     # Create a task, but the bot tries to timeout but fails to report exit code
@@ -1517,7 +1495,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     child_request = _gen_request_slices(
         parent_task_id=parent_run_result.task_id)
     child_result_summary = task_scheduler.schedule_request(child_request, None)
-    self.assertEqual(1, self.execute_tasks())
+    self.assertEqual(0, self.execute_tasks())
 
     bot2_dimensions = self.bot_dimensions.copy()
     bot2_dimensions['id'] = [bot2_dimensions['id'][0] + '2']
@@ -1531,7 +1509,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         parent_task_id=parent_run_result.task_id)
     child_result2_summary = task_scheduler.schedule_request(
         child_request2, None)
-    self.assertEqual(1, self.execute_tasks())
+    self.assertEqual(0, self.execute_tasks())
 
     bot3_dimensions = self.bot_dimensions.copy()
     bot3_dimensions['id'] = [bot3_dimensions['id'][0] + '3']
@@ -1545,18 +1523,6 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         parent_task_id=parent_run_result.task_id)
     child_result3_summary = task_scheduler.schedule_request(
         child_request3, None)
-
-    # TODO(crbug.com/1034166): remove children_task_ids
-    # Parent task should have child task ids, but the id of task 3
-    # doesn't belong to the parent since it's appended when running
-    appended_child_task_ids = [
-        child_result_summary.task_id,
-        child_result2_summary.task_id,
-    ]
-    parents = [parent_run_result, parent_result_summary]
-    for p in parents:
-      p = p.key.get()
-      self.assertEqual(p.children_task_ids, appended_child_task_ids)
 
     # Cancel parent task.
     ok, was_running = task_scheduler.cancel_task(
