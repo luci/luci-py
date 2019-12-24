@@ -214,36 +214,6 @@ class CronSendToBQ(_CronHandlerBase):
 ## Task queues.
 
 
-class TaskAppendChildTaskHandler(webapp2.RequestHandler):
-  """Append child task id to entities."""
-
-  @decorators.require_taskqueue('append-child-task')
-  def post(self, task_id):
-    try:
-      payload = json.loads(self.request.body)
-      child_task_id = payload['child_task_id']
-    except ValueError:
-      self.response.set_status(400)
-      return
-
-    logging.info(('Appending child task.'
-                  'parent_task_id:%s, child_task_id:%s'),
-                 task_id, child_task_id)
-    try:
-      task_scheduler.task_append_child(task_id, child_task_id)
-    except datastore_utils.CommitError:
-      # It can fail when multiple childrent access to the same parents
-      # at the same time. So we can retry the same request by returning 429
-      # Too many requests. Using 4xx also prevents alerts due to 5xx responses.
-      logging.warning(
-          'The parents may be updated by another process.', exc_info=True)
-      self.response.set_status(429, 'Need to retry')
-    except ValueError:
-      # Ignore errors that happen due to invalid task ids.
-      logging.warning('Ignoring appending child task due to exception.',
-          exc_info=True)
-
-
 class TaskCancelTasksHandler(webapp2.RequestHandler):
   """Cancels tasks given a list of their ids."""
 
@@ -472,8 +442,6 @@ def get_routes():
     ('/internal/cron/important/named_caches/update', CronNamedCachesUpdate),
 
     # Task queues.
-    ('/internal/taskqueue/important/tasks/<task_id:[0-9a-f]+>/append-child',
-        TaskAppendChildTaskHandler),
     ('/internal/taskqueue/important/tasks/cancel', TaskCancelTasksHandler),
     ('/internal/taskqueue/important/tasks/cancel-task-on-bot',
         TaskCancelTaskOnBotHandler),

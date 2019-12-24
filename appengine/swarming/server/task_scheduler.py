@@ -1853,13 +1853,10 @@ def task_expire_tasks(task_to_runs):
 
 def task_cancel_running_children_tasks(parent_result_summary_id):
   """Enqueues task queue to cancel non-completed children tasks."""
-  # TODO(crbug.com/1034166): it may not be able to handle
-  # 1000+ child tasks. need to save cursor and continue iteration
-  # in a follow up task.
-  it = task_result.yield_result_summary_by_parent_task_id(
+  q = task_result.yield_result_summary_by_parent_task_id(
       parent_result_summary_id)
   children_tasks_per_version = {}
-  for task in it:
+  for task in q:
     if task.state not in task_result.State.STATES_RUNNING:
       continue
     version = task.server_versions[0]
@@ -1881,10 +1878,3 @@ def task_cancel_running_children_tasks(parent_result_summary_id):
       raise Error(
           'Failed to enqueue task to cancel queue; version: %s, payload: %s' % (
             version, payload))
-
-
-def task_append_child(parent_task_id, child_task_id):
-  # TODO(crbug.com/1034166): remove later
-  logging.error(
-      "crbug.com/1034166: task_append_child should not be called."
-      "parent_task_id=%s, child_task_id=%s", parent_task_id, child_task_id)

@@ -188,8 +188,6 @@ class BackendTest(test_env_handlers.AppTestBase):
         ('cancel-tasks', '/internal/taskqueue/important/tasks/cancel'),
         ('cancel-children-tasks',
          '/internal/taskqueue/important/tasks/cancel-children-tasks'),
-        ('append-child-task',
-         '/internal/taskqueue/important/tasks/4895ff792a944310/append-child'),
         ('task-expire', '/internal/taskqueue/important/tasks/expire'),
         ('delete-tasks', '/internal/taskqueue/cleanup/tasks/delete'),
         ('es-notify-tasks',
@@ -231,21 +229,6 @@ class BackendTest(test_env_handlers.AppTestBase):
             url, headers={'X-AppEngine-QueueName': 'bogus name'}, status=403)
       except Exception as e:
         self.fail('%s: %s' % (url, e))
-
-  def test_taskqueue_important_tasks_append_child_commit_error(self):
-
-    def raise_commit_error(_task_id, _child_task_id):
-      raise datastore_utils.CommitError()
-
-    self.mock(handlers_backend.task_scheduler, 'task_append_child',
-              raise_commit_error)
-    self.app.post(
-        '/internal/taskqueue/important/tasks/123123/append-child',
-        json.dumps({
-            'child_task_id': '321321'
-        }),
-        headers={'X-AppEngine-QueueName': 'append-child-task'},
-        status=429)
 
   def test_taskqueue_important_task_queues_rebuild_cache_fail(self):
     self.set_as_admin()

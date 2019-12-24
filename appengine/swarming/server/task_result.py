@@ -1410,9 +1410,8 @@ def new_run_result(request, to_run, bot_id, bot_version, bot_dimensions):
 
 def yield_result_summary_by_parent_task_id(parent_task_id):
   """Yields child TaskResultSummary entities by parent task id."""
-  request_key_iter = (
-      task_request.yield_request_keys_by_parent_task_id(parent_task_id))
-  for request_key in request_key_iter:
+  q = task_request.yield_request_keys_by_parent_task_id(parent_task_id)
+  for request_key in q:
     result_summary_key = (
         task_pack.request_key_to_result_summary_key(request_key))
     yield result_summary_key.get()
