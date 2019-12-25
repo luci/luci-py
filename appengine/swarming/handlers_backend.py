@@ -11,6 +11,7 @@ import logging
 import webapp2
 from google.appengine.api import datastore_errors
 from google.appengine.ext import ndb
+from google.appengine import runtime
 
 from google.protobuf import json_format
 
@@ -260,6 +261,7 @@ class TaskCancelTaskOnBotHandler(webapp2.RequestHandler):
 class TaskCancelChildrenTasksHandler(webapp2.RequestHandler):
   """Cancels children tasks with pending state of the given task."""
 
+  @decorators.silence(runtime.DeadlineExceededError)
   @decorators.require_taskqueue('cancel-children-tasks')
   def post(self):
     payload = json.loads(self.request.body)
