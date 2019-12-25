@@ -94,10 +94,8 @@ def _get_memory_usage():
   """Returns the amount of memory available as an float in MiB."""
   try:
     return apiruntime.runtime.memory_usage().current()
-  except (AssertionError,
-          apiproxy_errors.CancelledError,
-          runtime.DeadlineExceededError) as e:
-    logging.warning('Failed to get memory usage: %s', e)
+  except (AssertionError, apiproxy_errors.CancelledError,
+          runtime.DeadlineExceededError, runtime.RPCFailedError):
     return None
 
 
