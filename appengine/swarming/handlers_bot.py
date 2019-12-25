@@ -15,6 +15,7 @@ from google.appengine.api import app_identity
 from google.appengine.api import datastore_errors
 from google.appengine.ext import ndb
 from google.appengine import runtime
+from google.appengine.runtime import apiproxy_errors
 
 from components import auth
 from components import ereporter2
@@ -609,7 +610,7 @@ class BotPollHandler(_BotBaseHandler):
         # This is a fairly complex function call, exceptions are expected.
         request, secret_bytes, run_result = task_scheduler.bot_reap_task(
             res.dimensions, res.version)
-      except datastore_errors.Timeout:
+      except (datastore_errors.Timeout, apiproxy_errors.CancelledError):
         self.abort(429, 'Deadline exceeded while accessing datastore')
 
       if not request:
