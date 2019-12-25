@@ -19,6 +19,7 @@ from proto.api import plugin_pb2
 import mapreduce_jobs
 from components import decorators
 from components import datastore_utils
+from components import net
 from server import bq_state
 from server import bot_groups_config
 from server import bot_management
@@ -344,6 +345,7 @@ class TaskNamedCachesPool(webapp2.RequestHandler):
 class TaskMonitoringBotsEventsBQ(webapp2.RequestHandler):
   """Sends rows to BigQuery swarming.bot_events table."""
 
+  @decorators.silence(net.Error)
   @decorators.require_taskqueue('monitoring-bq-bots-events')
   def post(self, timestamp):
     ndb.get_context().set_cache_policy(lambda _: False)
@@ -355,6 +357,7 @@ class TaskMonitoringBotsEventsBQ(webapp2.RequestHandler):
 class TaskMonitoringTasksRequestsBQ(webapp2.RequestHandler):
   """Sends rows to BigQuery swarming.task_requests table."""
 
+  @decorators.silence(net.Error)
   @decorators.require_taskqueue('monitoring-bq-tasks-requests')
   def post(self, timestamp):
     ndb.get_context().set_cache_policy(lambda _: False)
@@ -366,6 +369,7 @@ class TaskMonitoringTasksRequestsBQ(webapp2.RequestHandler):
 class TaskMonitoringTasksResultsRunBQ(webapp2.RequestHandler):
   """Sends rows to BigQuery swarming.task_results_run table."""
 
+  @decorators.silence(net.Error)
   @decorators.require_taskqueue('monitoring-bq-tasks-results-run')
   def post(self, timestamp):
     start = datetime.datetime.strptime(timestamp, u'%Y-%m-%dT%H:%M')
@@ -376,6 +380,7 @@ class TaskMonitoringTasksResultsRunBQ(webapp2.RequestHandler):
 class TaskMonitoringTasksResultsSummaryBQ(webapp2.RequestHandler):
   """Sends rows to BigQuery swarming.task_results_summary table."""
 
+  @decorators.silence(net.Error)
   @decorators.require_taskqueue('monitoring-bq-tasks-results-summary')
   def post(self, timestamp):
     start = datetime.datetime.strptime(timestamp, u'%Y-%m-%dT%H:%M')
