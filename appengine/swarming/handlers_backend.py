@@ -333,6 +333,7 @@ class TaskESNotifyKickHandler(webapp2.RequestHandler):
 class TaskNamedCachesPool(webapp2.RequestHandler):
   """Update named caches cache for a pool."""
 
+  @decorators.silence(datastore_errors.Timeout)
   @decorators.require_taskqueue('named-cache-task')
   def post(self):
     params = json.loads(self.request.body)
