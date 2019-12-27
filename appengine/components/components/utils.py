@@ -91,11 +91,14 @@ def is_unit_test():
 
 
 def _get_memory_usage():
-  """Returns the amount of memory available as an float in MiB."""
+  """Returns the amount of memory used as an float in MiB."""
   try:
     return apiruntime.runtime.memory_usage().current()
-  except (AssertionError, apiproxy_errors.CancelledError,
-          runtime.DeadlineExceededError, runtime.RPCFailedError):
+  except (AssertionError,
+          apiproxy_errors.CancelledError,
+          apiproxy_errors.DeadlineExceededError,
+          runtime.DeadlineExceededError,
+          runtime.RPCFailedError):
     return None
 
 
