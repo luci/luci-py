@@ -98,7 +98,8 @@ def _get_memory_usage():
           apiproxy_errors.CancelledError,
           apiproxy_errors.DeadlineExceededError,
           runtime.DeadlineExceededError,
-          runtime.RPCFailedError):
+          runtime.RPCFailedError) as e:
+    logging.warning('Failed to get memory usage: %s', e)
     return None
 
 
