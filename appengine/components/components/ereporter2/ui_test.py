@@ -76,7 +76,8 @@ class Ereporter2Test(test_case.TestCase):
   def assertContent(self, message):
     self.assertEqual(
         u'no_reply@sample-app.appspotmail.com', message.sender)
-    self.assertEqual(u'Exceptions on "sample-app"', message.subject)
+    self.assertEqual(u'Exceptions on "sample-app" at "2014-06-24"',
+                     message.subject)
     expected_html = (
         '<html><body><h3><a href="http://foo/report?start=0&end=1383000000">1 '
         'occurrences of 1 errors across 1 versions.</a></h3>\n'
@@ -146,9 +147,10 @@ class Ereporter2Test(test_case.TestCase):
   def test_get_template_env(self):
     env = ui._get_template_env(10, 20, [('foo', 'bar')])
     expected = {
-      'end': 20,
-      'module_versions': [('foo', 'bar')],
-      'start': 10,
+        'end': 20,
+        'module_versions': [('foo', 'bar')],
+        'start': 10,
+        'day': '2014-06-24',
     }
     self.assertEqual(expected, env)
 

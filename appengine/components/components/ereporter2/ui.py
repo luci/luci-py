@@ -4,6 +4,7 @@
 
 """UI code to generate email and HTML reports."""
 
+import datetime
 import itertools
 import logging
 import os
@@ -91,10 +92,12 @@ def _email_html(to, subject, body):
 
 def _get_template_env(start_time, end_time, module_versions):
   """Generates commonly used jinja2 template variables."""
+  now = utils.utcnow()
   return {
-    'end': end_time,
-    'module_versions': module_versions or [],
-    'start': start_time or 0,
+      'end': end_time,
+      'module_versions': module_versions or [],
+      'start': start_time or 0,
+      'day': str(datetime.date(now.year, now.month, now.day)),
   }
 
 
