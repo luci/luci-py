@@ -531,14 +531,25 @@ class BotPollHandler(_BotBaseHandler):
     # the other for the list of known bots.
 
     def bot_event(event_type, task_id=None, task_name=None):
-      bot_management.bot_event(
-          event_type=event_type, bot_id=res.bot_id,
-          external_ip=self.request.remote_addr,
-          authenticated_as=auth.get_peer_identity().to_bytes(),
-          dimensions=res.dimensions, state=res.state,
-          version=res.version, quarantined=quarantined,
-          maintenance_msg=res.maintenance_msg, task_id=task_id,
-          task_name=task_name, message=res.quarantined_msg)
+      try:
+        bot_management.bot_event(
+            event_type=event_type, bot_id=res.bot_id,
+            external_ip=self.request.remote_addr,
+            authenticated_as=auth.get_peer_identity().to_bytes(),
+            dimensions=res.dimensions, state=res.state,
+            version=res.version, quarantined=quarantined,
+            maintenance_msg=res.maintenance_msg, task_id=task_id,
+            task_name=task_name, message=res.quarantined_msg)
+      except runtime.DeadlineExceededError as e:
+        # Ignore runtime.DeadlineExceededError at the following events
+        # and return 429 for the bot to retry later
+        # if the event_type is 'request_task' or 'bot_terminate', the exception
+        # will be handled at the end of BotPollHandler.post
+        if event_type in ('request_sleep', 'request_update', 'request_restart'):
+          logging.debug('Ignoring deadline exceeded error. %s', e)
+          self.abort(429, 'Deadline exceeded')
+          return
+        raise
 
     # Bot version is host-specific because the host URL is embedded in
     # swarming_bot.zip
