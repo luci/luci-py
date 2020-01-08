@@ -1559,25 +1559,6 @@ def task_bq_run(start, end):
       total += len(rows)
       failed += bq_state.send_to_bq('task_results_run', rows)
 
-  # The ones below will be in the __NULL__ partition since end_time is NULL.
-
-  # Running
-  now = utils.utcnow()
-  # A task may be running for a predefined amount of time. Add 1 hour of
-  # safety. This is only material when backfilling.
-  delta = datetime.timedelta(seconds=task_request.MAX_TIMEOUT_SECS + 60*60)
-  if start >= now - delta:
-    q = TaskRunResult.query(
-        TaskRunResult.started_ts >= start,
-        TaskRunResult.started_ts <= end)
-    cursor = None
-    more = True
-    while more:
-      entities, cursor, more = q.fetch_page(500, start_cursor=cursor)
-      rows = [_convert(e) for e in entities if e.task_id not in seen]
-      total += len(rows)
-      failed += bq_state.send_to_bq('task_results_run', rows)
-
   return total, failed
 
 
@@ -1621,42 +1602,6 @@ def task_bq_summary(start, end):
       entities, cursor, more = q.fetch_page(500, start_cursor=cursor)
       rows = [_convert(e) for e in entities if e.task_id not in seen]
       seen.update(e.task_id for e in entities)
-      total += len(rows)
-      failed += bq_state.send_to_bq('task_results_summary', rows)
-
-  # The ones below will be in the __NULL__ partition since end_time is NULL.
-
-  # Pending
-  now = utils.utcnow()
-  # A task may be pending for a predefined amount of time. Add 1 hour of
-  # safety. This is only material when backfilling.
-  delta = datetime.timedelta(seconds=task_request.MAX_EXPIRATION_SECS + 60*60)
-  if start >= now - delta:
-    q = TaskResultSummary.query(
-        TaskResultSummary.created_ts >= start,
-        TaskResultSummary.created_ts <= end)
-    cursor = None
-    more = True
-    while more:
-      entities, cursor, more = q.fetch_page(500, start_cursor=cursor)
-      rows = [_convert(e) for e in entities if e.task_id not in seen]
-      seen.update(e.task_id for e in entities)
-      total += len(rows)
-      failed += bq_state.send_to_bq('task_results_summary', rows)
-
-  # Running
-  # A task may be running for a predefined amount of time. Add 1 hour of
-  # safety. This is only material when backfilling.
-  delta = datetime.timedelta(seconds=task_request.MAX_TIMEOUT_SECS + 60*60)
-  if start >= now - delta:
-    q = TaskResultSummary.query(
-        TaskResultSummary.started_ts >= start,
-        TaskResultSummary.started_ts <= end)
-    cursor = None
-    more = True
-    while more:
-      entities, cursor, more = q.fetch_page(500, start_cursor=cursor)
-      rows = [_convert(e) for e in entities if e.task_id not in seen]
       total += len(rows)
       failed += bq_state.send_to_bq('task_results_summary', rows)
 

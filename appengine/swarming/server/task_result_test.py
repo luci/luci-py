@@ -947,11 +947,8 @@ class TaskResultApiTest(TestCase):
     run_result.put()
     end = self.mock_now(self.now, 60)
 
-    self.assertEqual((1, 0), task_result.task_bq_run(start, end))
-    self.assertEqual(1, len(payloads), payloads)
-    actual_rows = payloads[0]
-    self.assertEqual(1, len(actual_rows))
-    self.assertEqual([run_result.task_id], [r[0] for r in actual_rows])
+    self.assertEqual((0, 0), task_result.task_bq_run(start, end))
+    self.assertEqual(0, len(payloads), payloads)
 
   def test_task_bq_run_old_abandoned_ts(self):
     # Confirm that an old entity without completed_ts set is still found.
@@ -1040,11 +1037,8 @@ class TaskResultApiTest(TestCase):
     result.put()
     end = self.mock_now(self.now, 60)
 
-    self.assertEqual((1, 0), task_result.task_bq_summary(start, end))
-    self.assertEqual(1, len(payloads), payloads)
-    actual_rows = payloads[0]
-    self.assertEqual(1, len(actual_rows))
-    self.assertEqual([result.task_id], [r[0] for r in actual_rows])
+    self.assertEqual((0, 0), task_result.task_bq_summary(start, end))
+    self.assertEqual(0, len(payloads), payloads)
 
   def test_task_bq_summary_running(self):
     payloads = self._mock_send_to_bq('task_results_summary')
@@ -1056,11 +1050,8 @@ class TaskResultApiTest(TestCase):
     result.put()
     end = self.mock_now(self.now, 60)
 
-    self.assertEqual((1, 0), task_result.task_bq_summary(start, end))
-    self.assertEqual(1, len(payloads), payloads)
-    actual_rows = payloads[0]
-    self.assertEqual(1, len(actual_rows))
-    self.assertEqual([result.task_id], [r[0] for r in actual_rows])
+    self.assertEqual((0, 0), task_result.task_bq_summary(start, end))
+    self.assertEqual(0, len(payloads), payloads)
 
   def test_task_bq_summary_old_abandoned_ts(self):
     # Confirm that an old entity without completed_ts set is still found.
