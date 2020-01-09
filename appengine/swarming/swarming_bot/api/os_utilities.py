@@ -970,6 +970,7 @@ def get_dimensions():
     if image:
       dimensions[u'image'] = [image]
     dimensions[u'zone'] = platforms.gce.get_zones()
+    dimensions[u'gcp'] = platforms.gce.get_gcp()
   else:
     dimensions[u'gce'] = [u'0']
 

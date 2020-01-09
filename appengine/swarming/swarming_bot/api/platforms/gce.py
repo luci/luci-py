@@ -262,6 +262,13 @@ def get_zones():
 
 
 @tools.cached
+def get_gcp():
+  """Returns the string identifier of the GCE VM's Cloud Project."""
+  metadata = get_metadata()
+  return [unicode(metadata['project']['projectId'])]
+
+
+@tools.cached
 def get_machine_type():
   """Returns the GCE machine type."""
   # Format is projects/<id>/machineTypes/<machine_type>
