@@ -972,7 +972,8 @@ def _ensure_active_slice(request, try_number, task_slice_index):
       return None
 
     if not result_summary.is_pending:
-      logging.debug('_ensure_active_slice: request is not PENDING')
+      logging.debug('_ensure_active_slice: request is not PENDING. state: "%s"',
+                    task_result.state_to_string(result_summary))
       return None
 
     new_to_run = task_to_run.new_task_to_run(request, try_number,
