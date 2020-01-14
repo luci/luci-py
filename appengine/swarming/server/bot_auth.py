@@ -44,12 +44,7 @@ def validate_bot_id_and_fetch_config(bot_id):
   On success returns the configuration for this bot (BotGroupConfig tuple), as
   defined in bots.cfg.
   """
-  bot_id = _extract_primary_hostname(bot_id)
-  cfg = bot_groups_config.get_bot_group_config(bot_id)
-  if not cfg:
-    logging.error(
-        'bot_auth: unknown bot_id, not in the config\nbot_id: "%s"', bot_id)
-    raise auth.AuthorizationError('Unknown bot ID, not in config')
+  auth_bot_id, cfg = _get_bot_group_config(bot_id)
 
   # This should not really happen for validated configs.
   if not cfg.auth:
@@ -69,7 +64,7 @@ def validate_bot_id_and_fetch_config(bot_id):
   # skipped. Logs from such methods are always emitted at 'error' level. Other
   # logs are buffered and emitted only if all methods fail.
   for bot_auth in cfg.auth:
-    err, details = _check_bot_auth(bot_auth, bot_id, peer_ident, ip)
+    err, details = _check_bot_auth(bot_auth, auth_bot_id, peer_ident, ip)
     if not err:
       logging.debug('Using auth method: %s', bot_auth)
       return cfg
@@ -94,6 +89,62 @@ def validate_bot_id_and_fetch_config(bot_id):
     raise auth.AuthorizationError(auth_errs[0])
   raise auth.AuthorizationError(
       'All auth methods failed: %s' % '; '.join(auth_errs))
+
+
+def _get_bot_group_config(bot_id):
+  """Finds a bot group config for given bot_id
+
+  A dockerized bot may contain the magic word '--' in the bot_id.
+  At the first attempt, the full bot_id is used to get bot group config.
+  If it didn't find one, the hostname is used.
+
+  Args:
+    bot_id: ID of the bot.
+
+  Returns:
+    auth_bot_id: ID which will be used for authentication.
+    bot_group_config: matched bot group config.
+
+  Raises:
+    auth.AuthorizationError: if the bot_id doesn't match any groups in
+                             the bots.cfg.
+  """
+  # In many cases, hostname == bot_id. But dockeriezed bots contain
+  # magic word '--' to represent host name. e.g. bot_id=foo--bar > hostname=foo
+  # Those bots should be authenticated using the hostname.
+  hostname = _extract_primary_hostname(bot_id)
+
+  # At first, try to get bot group config with given bot_id
+  # return the config if it's not default config
+  cfg = bot_groups_config.get_bot_group_config(bot_id)
+  if cfg and not cfg.is_default:
+    logging.debug(
+        'bot_auth: found a bot group cfg for bot_id: "%s"\n'
+        'hostname: "%s" will be used for authentication', bot_id, hostname)
+    return hostname, cfg
+
+  # if hostname == bot_id, the same config would be returned at next attempt.
+  if cfg and hostname == bot_id:
+    logging.debug(
+        'bot_auth: found a bot group cfg for bot_id: "%s"\n'
+        'bot_id will be used for authentication', bot_id)
+    return hostname, cfg
+
+  # For a dockerized bot which has magic word '--' in the bot_id,
+  # try to get bot group config with the host name
+  cfg = bot_groups_config.get_bot_group_config(hostname)
+  if cfg:
+    logging.debug(
+        'bot_auth: found a bot group cfg for bot_id: "%s"'
+        ' using hostname: "%s"\nhostname will be used for authentication',
+        bot_id, hostname)
+    return hostname, cfg
+
+  # This path isn't reachable when bots.cfg has a default group.
+  logging.error(
+      'bot_auth: unknown bot_id, not in the config\n'
+      'bot_id: "%s" hostname: "%s"', bot_id, hostname)
+  raise auth.AuthorizationError('Unknown bot ID, not in config')
 
 
 def _check_bot_auth(bot_auth, bot_id, peer_ident, ip):

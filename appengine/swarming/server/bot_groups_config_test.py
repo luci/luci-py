@@ -76,7 +76,8 @@ EXPECTED_GROUP_1 = bot_groups_config._make_bot_group_config(
     dimensions={u'pool': [u'A', u'B'], u'other': [u'D']},
     bot_config_script='',
     bot_config_script_content='',
-    system_service_account='')
+    system_service_account='',
+    is_default=False)
 
 EXPECTED_GROUP_2 = bot_groups_config._make_bot_group_config(
     owners=(),
@@ -90,7 +91,8 @@ EXPECTED_GROUP_2 = bot_groups_config._make_bot_group_config(
     dimensions={u'pool': []},
     bot_config_script='foo.py',
     bot_config_script_content='print("Hi")',
-    system_service_account='bot')
+    system_service_account='bot',
+    is_default=False)
 
 EXPECTED_GROUP_3 = bot_groups_config._make_bot_group_config(
     owners=(),
@@ -106,7 +108,8 @@ EXPECTED_GROUP_3 = bot_groups_config._make_bot_group_config(
     dimensions={u'pool': [u'default']},
     bot_config_script='',
     bot_config_script_content='',
-    system_service_account='')
+    system_service_account='',
+    is_default=True)
 
 
 DEFAULT_AUTH_CFG = [bots_pb2.BotAuth(ip_whitelist='bots')]
@@ -139,8 +142,8 @@ class BotGroupsConfigTest(test_case.TestCase):
     bot_groups_config.clear_cache()
 
   def test_version(self):
-    self.assertEqual('hash:d7d5710aeedb26', EXPECTED_GROUP_1.version)
-    self.assertEqual('hash:f9bdb002a4777d', EXPECTED_GROUP_2.version)
+    self.assertEqual('hash:4fd27b3abc6eb1', EXPECTED_GROUP_1.version)
+    self.assertEqual('hash:f32dde47be8560', EXPECTED_GROUP_2.version)
 
   def test_expand_bot_id_expr_success(self):
     def check(expected, expr):
