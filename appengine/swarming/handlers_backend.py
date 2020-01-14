@@ -218,6 +218,7 @@ class CronSendToBQ(_CronHandlerBase):
 class TaskCancelTasksHandler(webapp2.RequestHandler):
   """Cancels tasks given a list of their ids."""
 
+  @decorators.silence(datastore_utils.CommitError)
   @decorators.require_taskqueue('cancel-tasks')
   def post(self):
     payload = json.loads(self.request.body)
