@@ -95,7 +95,7 @@ PASSLIST = (
     'README.md',
     'c',
     'cipd_cache',
-    'isolated_cache_python',
+    'isolated_cache',
     'logs',
     'swarming.lck',
     'swarming_bot.1.zip',
