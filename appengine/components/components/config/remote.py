@@ -7,6 +7,7 @@
 import base64
 import datetime
 import logging
+import zlib
 
 from six.moves import urllib
 
@@ -25,7 +26,7 @@ from . import common
 from . import validation
 
 
-MEMCACHE_PREFIX = 'components.config/v1/'
+MEMCACHE_PREFIX = 'components.config/v2/'
 # Delete LastGoodConfig if it was not accessed for more than a week.
 CONFIG_MAX_TIME_SINCE_LAST_ACCESS = datetime.timedelta(days=7)
 # Update LastGoodConfig.last_access_ts if it will be deleted next day.
@@ -77,18 +78,18 @@ class Provider(object):
 
   @ndb.tasklet
   def get_config_by_hash_async(self, content_hash):
-    """Returns a config blob by its hash. Optionally memcaches results."""
+    """Returns a config blob by its hash. Memcaches results."""
     assert content_hash
     cache_key = '%sconfig_by_hash/%s' % (MEMCACHE_PREFIX, content_hash)
     ctx = ndb.get_context()
     content = yield ctx.memcache_get(cache_key)
     if content is not None:
-      raise ndb.Return(content)
+      raise ndb.Return(zlib.decompress(content))
 
     res = yield self._api_call_async('config/%s' % content_hash)
     content = base64.b64decode(res.get('content')) if res else None
     if content is not None:
-      yield ctx.memcache_set(cache_key, content)
+      yield ctx.memcache_set(cache_key, zlib.compress(content))
     raise ndb.Return(content)
 
   @ndb.tasklet
