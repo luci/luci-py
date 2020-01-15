@@ -18,6 +18,7 @@ from google.appengine import runtime
 from google.appengine.runtime import apiproxy_errors
 
 from components import auth
+from components import decorators
 from components import ereporter2
 from components import utils
 from server import acl
@@ -949,6 +950,7 @@ class BotTaskUpdateHandler(_BotApiHandler):
   }
   REQUIRED_KEYS = {u'id', u'task_id'}
 
+  @decorators.silence(apiproxy_errors.RPCFailedError)
   @auth.public  # auth happens in bot_auth.validate_bot_id_and_fetch_config()
   def post(self, task_id=None):
     # Unlike handshake and poll, we do not accept invalid keys here. This code
