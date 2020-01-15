@@ -188,7 +188,6 @@ def _expire_task(to_run_key, request, inline):
   if summary:
     logging.info(
         'Expired %s', task_pack.pack_result_summary_key(result_summary_key))
-    ts_mon_metrics.on_task_completed(summary)
   return summary, new_to_run
 
 
@@ -1447,8 +1446,8 @@ def bot_update_task(
   if not _maybe_pubsub_notify_now(smry, request):
     return None
   if smry.state not in task_result.State.STATES_RUNNING:
+    # TODO(jwata): can event_mon_metrics be removed?
     event_mon_metrics.send_task_event(smry)
-    ts_mon_metrics.on_task_completed(smry)
 
     ok = utils.enqueue_task(
       '/internal/taskqueue/important/tasks/cancel-children-tasks',

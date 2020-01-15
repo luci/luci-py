@@ -1013,6 +1013,11 @@ class TaskResultSummary(_TaskResultCommon):
   # run.
   deduped_from = ndb.StringProperty(indexed=False)
 
+  # Previous state, will be set in _pre_put_hook and compared in _post_pre_hook
+  # with post state. It can be used for state transition actions. e.g. logging,
+  # sending metrics
+  _prev_state = None
+
   @property
   def cost_usd(self):
     """Returns the sum of the cost of each try."""
@@ -1047,6 +1052,40 @@ class TaskResultSummary(_TaskResultCommon):
   @property
   def task_id(self):
     return task_pack.pack_result_summary_key(self.key)
+
+  def _pre_put_hook(self):
+    super(TaskResultSummary, self)._pre_put_hook()
+    self._cache_prev_state()
+
+  def _cache_prev_state(self):
+    """Stores previous state."""
+    # Note: Skip when the current state is running or pending
+    # since it's used only by _send_job_completed_metric at the time
+    # of implementing.
+    if self.state in State.STATES_RUNNING:
+      return
+    # Don't use process cache to retrieve the original object
+    orig = self.key.get(use_cache=False)
+    if not orig:
+      return
+    self._prev_state = orig.state
+
+  def _post_put_hook(self, future):
+    super(TaskResultSummary, self)._post_put_hook(future)
+    self._send_job_completed_metric(future)
+
+  def _send_job_completed_metric(self, future):
+    """Sends metric 'job/completed'"""
+    # Skip when the current state is running or pending
+    if self.state in State.STATES_RUNNING:
+      return
+    # Skip when the previous state was alerady done
+    if self._prev_state not in State.STATES_RUNNING:
+      return
+    # Ensure that the write succeeded (= no errors from future.check_success())
+    if not future.check_success():
+      import ts_mon_metrics
+      ts_mon_metrics.on_task_completed(self)
 
   def reset_to_pending(self):
     """Resets this entity to pending state."""

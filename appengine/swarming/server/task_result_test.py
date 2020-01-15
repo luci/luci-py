@@ -32,6 +32,7 @@ from server import task_pack
 from server import task_request
 from server import task_result
 from server import task_to_run
+import ts_mon_metrics
 
 
 # pylint: disable=W0212
@@ -301,6 +302,34 @@ class TaskResultApiTest(TestCase):
     self.assertEqual(50, actual.request.priority)
     self.assertEqual(True, actual.can_be_canceled)
     self.assertEqual(0, actual.current_task_slice)
+
+  def test_result_summary_post_hook_sends_job_completed_metric(self):
+    request = _gen_request()
+    summary = task_result.new_result_summary(request)
+    summary.modified_ts = self.now
+
+    # on_task_completed should not be called when state is pending.
+    self.mock(ts_mon_metrics, 'on_task_completed', self.fail)
+    summary.put()
+
+    # change state to completed
+    summary.completed_ts = self.now
+    summary.modified_ts = self.now
+    summary.started_ts = self.now
+    summary.duration = 1.
+    summary.exit_code = 0
+    summary.state = task_result.State.COMPLETED
+
+    # on_task_completed should be called when state got updated to
+    # completed.
+    calls = []
+
+    def on_task_completed(smry):
+      calls.append(smry)
+
+    self.mock(ts_mon_metrics, 'on_task_completed', on_task_completed)
+    summary.put()
+    self.assertEqual(len(calls), 1)
 
   def test_new_run_result_duration_no_exit_code(self):
     request = _gen_request()
