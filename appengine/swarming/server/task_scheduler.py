@@ -22,7 +22,6 @@ from components import datastore_utils
 from components import pubsub
 from components import utils
 
-import event_mon_metrics
 import ts_mon_metrics
 
 from server import bot_management
@@ -1446,9 +1445,6 @@ def bot_update_task(
   if not _maybe_pubsub_notify_now(smry, request):
     return None
   if smry.state not in task_result.State.STATES_RUNNING:
-    # TODO(jwata): can event_mon_metrics be removed?
-    event_mon_metrics.send_task_event(smry)
-
     ok = utils.enqueue_task(
       '/internal/taskqueue/important/tasks/cancel-children-tasks',
       'cancel-children-tasks',

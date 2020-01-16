@@ -20,7 +20,6 @@ from google.appengine.ext import ndb
 
 import webtest
 
-import event_mon_metrics
 import handlers_backend
 
 from components import auth
@@ -118,7 +117,6 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.now = datetime.datetime(2014, 1, 2, 3, 4, 5, 6)
     self.mock_now(self.now)
     auth_testing.mock_get_current_identity(self)
-    event_mon_metrics.initialize()
     # Setup the backend to handle task queues.
     self.app = webtest.TestApp(
         handlers_backend.create_application(True),

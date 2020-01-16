@@ -25,7 +25,6 @@ from components import utils
 
 import gae_ts_mon
 
-import event_mon_metrics
 import handlers_endpoints
 import handlers_frontend
 import handlers_prpc
@@ -83,7 +82,6 @@ def create_application():
   from mapreduce import main
   gae_ts_mon.initialize(main.APP, is_enabled_fn=is_enabled_callback)
 
-  event_mon_metrics.initialize()
   ts_mon_metrics.initialize()
   utils.report_memory(frontend_app)
   utils.report_memory(endpoints_api)

@@ -22,7 +22,6 @@ from components import utils
 
 import gae_ts_mon
 
-import event_mon_metrics
 import handlers_backend
 import ts_mon_metrics
 from server import acl
@@ -59,7 +58,6 @@ def create_application():
   from mapreduce import main
   gae_ts_mon.initialize(main.APP, is_enabled_fn=is_enabled_callback)
 
-  event_mon_metrics.initialize()
   ts_mon_metrics.initialize()
   utils.report_memory(backend_app)
   return backend_app, main.APP
