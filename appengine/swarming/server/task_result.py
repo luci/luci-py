@@ -1072,9 +1072,13 @@ class TaskResultSummary(_TaskResultCommon):
 
   def _post_put_hook(self, future):
     super(TaskResultSummary, self)._post_put_hook(future)
-    self._send_job_completed_metric(future)
+    # Ensure that no errors are raised from future.check_success()
+    # See the document for check_success()
+    # https://cloud.google.com/appengine/docs/standard/python/ndb/futureclass
+    future.check_success()
+    self._send_job_completed_metric()
 
-  def _send_job_completed_metric(self, future):
+  def _send_job_completed_metric(self):
     """Sends metric 'job/completed'"""
     # Skip when the current state is running or pending
     if self.state in State.STATES_RUNNING:
@@ -1082,10 +1086,13 @@ class TaskResultSummary(_TaskResultCommon):
     # Skip when the previous state was alerady done
     if self._prev_state not in State.STATES_RUNNING:
       return
-    # Ensure that the write succeeded (= no errors from future.check_success())
-    if not future.check_success():
-      import ts_mon_metrics
-      ts_mon_metrics.on_task_completed(self)
+    logging.debug(
+        '_send_job_completed_metric: '
+        'Task completed. prev_state:"%s", current_state:"%s".\n'
+        'Sending metric...', State.to_string(self._prev_state),
+        State.to_string(self.state))
+    import ts_mon_metrics
+    ts_mon_metrics.on_task_completed(self)
 
   def reset_to_pending(self):
     """Resets this entity to pending state."""
