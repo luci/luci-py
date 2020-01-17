@@ -303,7 +303,7 @@ class TaskResultApiTest(TestCase):
     self.assertEqual(True, actual.can_be_canceled)
     self.assertEqual(0, actual.current_task_slice)
 
-  def test_result_summary_post_hook_sends_job_completed_metric(self):
+  def test_result_summary_post_hook_sends_metric_at_completion(self):
     request = _gen_request()
     summary = task_result.new_result_summary(request)
     summary.modified_ts = self.now
@@ -329,6 +329,23 @@ class TaskResultApiTest(TestCase):
 
     self.mock(ts_mon_metrics, 'on_task_completed', on_task_completed)
     summary.put()
+    self.assertEqual(len(calls), 1)
+
+  def test_result_summary_post_hook_sends_metric_at_no_resource_failure(self):
+    request = _gen_request()
+    summary = task_result.new_result_summary(request)
+    summary.completed_ts = self.now
+    summary.modified_ts = self.now
+    summary.state = task_result.State.NO_RESOURCE
+
+    # on_task_completed should be called even at the initial write if it's the
+    # end with no resource error.
+    calls = []
+    def on_task_completed(smry):
+      calls.append(smry)
+    self.mock(ts_mon_metrics, 'on_task_completed', on_task_completed)
+    summary.put()
+
     self.assertEqual(len(calls), 1)
 
   def test_new_run_result_duration_no_exit_code(self):

@@ -1084,13 +1084,15 @@ class TaskResultSummary(_TaskResultCommon):
     if self.state in State.STATES_RUNNING:
       return
     # Skip when the previous state was alerady done
-    if self._prev_state not in State.STATES_RUNNING:
+    if self._prev_state and self._prev_state not in State.STATES_RUNNING:
       return
+    prev_state = None
+    if self._prev_state:
+      prev_state = State.to_string(self._prev_state)
     logging.debug(
         '_send_job_completed_metric: '
         'Task completed. prev_state:"%s", current_state:"%s".\n'
-        'Sending metric...', State.to_string(self._prev_state),
-        State.to_string(self.state))
+        'Sending metric...', prev_state, State.to_string(self.state))
     import ts_mon_metrics
     ts_mon_metrics.on_task_completed(self)
 
