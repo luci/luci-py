@@ -83,6 +83,13 @@ from server import large
 from server import task_pack
 from server import task_request
 
+# Time at which we can assume completed_ts is always set for task results.
+#
+# TODO(maruel): Remove this constant and all the code paths where it's
+# referenced in 2020-07-01 once there's no task result entities (TaskRunResult
+# and TaskResultSummary) left without completed_ts set.
+_COMPLETED_TS_CUTOFF = datetime.datetime(2019, 3, 1)
+
 
 class State(object):
   """Represents the current task state.
@@ -450,7 +457,6 @@ class _TaskResultCommon(ndb.Model):
   # Children tasks that were triggered by this task. This is set when the task
   # reentrantly creates other Swarming tasks. Note that the task_id is to a
   # TaskResultSummary.
-  # Not filed anymore; see https://crbug.com/1036564
   children_task_ids = ndb.StringProperty(
       validator=_validate_task_summary_id, repeated=True)
 
@@ -1402,14 +1408,6 @@ def _filter_query(cls, q, start, end, sort, state):
   raise ValueError('Invalid state')
 
 
-@ndb.tasklet
-def _to_task_result_proto_async(e):
-  """Given a TaskResultSummary or TaskRunResult, yields a tuple(bq_key, row)."""
-  out = swarming_pb2.TaskResult()
-  e.to_proto(out)
-  raise ndb.Return((e.task_id, out))
-
-
 ### Public API.
 
 
@@ -1567,7 +1565,16 @@ def cron_update_tags():
 
 
 def task_bq_run(start, end):
-  """Sends TaskRunResult to BigQuery swarming.task_results_run table."""
+  """Sends TaskRunResult to BigQuery swarming.task_results_run table.
+
+  Multiple queries are run one after the other. This is because ndb.OR() cannot
+  be used when the subqueries are inequalities on different fields.
+  """
+  def _convert(e):
+    """Returns a tuple(bq_key, row)."""
+    out = swarming_pb2.TaskResult()
+    e.to_proto(out)
+    return (e.task_id, out)
 
   failed = 0
   total = 0
@@ -1581,17 +1588,40 @@ def task_bq_run(start, end):
   more = True
   while more:
     entities, cursor, more = q.fetch_page(500, start_cursor=cursor)
-    futures = [_to_task_result_proto_async(e) for e in entities]
-    rows = [f.get_result() for f in futures]
+    rows = [_convert(e) for e in entities]
     seen.update(e.task_id for e in entities)
     total += len(rows)
     failed += bq_state.send_to_bq('task_results_run', rows)
+
+  # Compatibility code for old tasks that didn't set completed_ts.
+  if start < _COMPLETED_TS_CUTOFF:
+    q = TaskRunResult.query(
+        TaskRunResult.abandoned_ts >= start,
+        TaskRunResult.abandoned_ts <= end)
+    cursor = None
+    more = True
+    while more:
+      entities, cursor, more = q.fetch_page(500, start_cursor=cursor)
+      rows = [_convert(e) for e in entities if e.task_id not in seen]
+      seen.update(e.task_id for e in entities)
+      total += len(rows)
+      failed += bq_state.send_to_bq('task_results_run', rows)
 
   return total, failed
 
 
 def task_bq_summary(start, end):
-  """Sends TaskResultSummary to BigQuery swarming.task_results_summary table."""
+  """Sends TaskResultSummary to BigQuery swarming.task_results_summary table.
+
+  Multiple queries are run one after the other. This is because ndb.OR() cannot
+  be used when the subqueries are inequalities on different fields.
+  """
+  def _convert(e):
+    """Returns a tuple(bq_key, row)."""
+    out = swarming_pb2.TaskResult()
+    e.to_proto(out)
+    return (e.task_id, out)
+
   failed = 0
   total = 0
   seen = set()
@@ -1604,10 +1634,23 @@ def task_bq_summary(start, end):
   more = True
   while more:
     entities, cursor, more = q.fetch_page(500, start_cursor=cursor)
-    futures = [_to_task_result_proto_async(e) for e in entities]
-    rows = [f.get_result() for f in futures]
+    rows = [_convert(e) for e in entities]
     seen.update(e.task_id for e in entities)
     total += len(rows)
     failed += bq_state.send_to_bq('task_results_summary', rows)
+
+  # Compatibility code for old tasks that didn't set completed_ts.
+  if start < _COMPLETED_TS_CUTOFF:
+    q = TaskResultSummary.query(
+        TaskResultSummary.abandoned_ts >= start,
+        TaskResultSummary.abandoned_ts <= end)
+    cursor = None
+    more = True
+    while more:
+      entities, cursor, more = q.fetch_page(500, start_cursor=cursor)
+      rows = [_convert(e) for e in entities if e.task_id not in seen]
+      seen.update(e.task_id for e in entities)
+      total += len(rows)
+      failed += bq_state.send_to_bq('task_results_summary', rows)
 
   return total, failed

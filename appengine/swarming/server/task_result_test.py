@@ -973,13 +973,6 @@ class TaskResultApiTest(TestCase):
     run_result_4.modified_ts = utils.utcnow()
     run_result_4.put()
 
-    # Go back in time to generate one children task to test children_task_ids.
-    self.mock_now(self.now, 20)
-    run_result_2_child = _gen_run_result(parent_task_id=run_result_2.task_id)
-    run_result_2_child.completed_ts = utils.utcnow()
-    run_result_2_child.modified_ts = utils.utcnow()
-    run_result_2_child.put()
-
     self.assertEqual((2, 0), task_result.task_bq_run(start, end))
     self.assertEqual(1, len(payloads), payloads)
     actual_rows = payloads[0]
@@ -989,12 +982,6 @@ class TaskResultApiTest(TestCase):
       run_result_3.task_id,
     ]
     self.assertEqual(expected, [r[0] for r in actual_rows])
-    # Specifically look at children_task_ids.
-    expected = [
-        [],
-        [],
-    ]
-    self.assertEqual(expected, [r[1].children_task_ids for r in actual_rows])
 
   def test_task_bq_run_running(self):
     payloads = self._mock_send_to_bq('task_results_run')
@@ -1009,10 +996,29 @@ class TaskResultApiTest(TestCase):
     self.assertEqual((0, 0), task_result.task_bq_run(start, end))
     self.assertEqual(0, len(payloads), payloads)
 
+  def test_task_bq_run_old_abandoned_ts(self):
+    # Confirm that an old entity without completed_ts set is still found.
+    payloads = self._mock_send_to_bq('task_results_run')
+    self.now = task_result._COMPLETED_TS_CUTOFF - datetime.timedelta(days=1)
+    start = self.mock_now(self.now, 0)
+    run_result = _gen_run_result()
+    run_result.abandoned_ts = utils.utcnow()
+    run_result.modified_ts = utils.utcnow()
+    run_result.put()
+    self.assertIsNone(run_result.key.get().completed_ts)
+    end = self.mock_now(self.now, 60)
+
+    self.assertEqual((1, 0), task_result.task_bq_run(start, end))
+    self.assertEqual(1, len(payloads), payloads)
+    actual_rows = payloads[0]
+    self.assertEqual(1, len(actual_rows))
+    self.assertEqual([run_result.task_id], [r[0] for r in actual_rows])
+
   def test_task_bq_run_recent_abandoned_ts(self):
     # Confirm that a recent entity without completed_ts set is not found.
     payloads = self._mock_send_to_bq('task_results_run')
-    start = self.now
+    self.now = task_result._COMPLETED_TS_CUTOFF + datetime.timedelta(days=1)
+    start = self.mock_now(self.now, 0)
     run_result = _gen_run_result()
     # Make sure started_ts is not caught.
     run_result.started_ts = datetime.datetime(2010, 1, 1)
@@ -1043,35 +1049,19 @@ class TaskResultApiTest(TestCase):
     result_1.put()
     start = self.mock_now(self.now, 20)
     result_2 = _gen_summary_result()
-    result_2.try_number = 1
-    result_2.started_ts = utils.utcnow()
     result_2.completed_ts = utils.utcnow()
     result_2.modified_ts = utils.utcnow()
     result_2.put()
     end = self.mock_now(self.now, 30)
     result_3 = _gen_summary_result()
-    result_3.try_number = 1
-    result_3.started_ts = utils.utcnow()
     result_3.completed_ts = utils.utcnow()
     result_3.modified_ts = utils.utcnow()
     result_3.put()
     self.mock_now(self.now, 40)
     result_4 = _gen_summary_result()
-    result_4.started_ts = utils.utcnow()
     result_4.completed_ts = utils.utcnow()
     result_4.modified_ts = utils.utcnow()
     result_4.put()
-
-    # Go back in time to generate one children task to test children_task_ids.
-    self.mock_now(self.now, 20)
-    # Store the run_id of result_2, not the summary task id.
-    result_2_child = _gen_summary_result(
-        parent_task_id=task_pack.pack_run_result_key(result_2.run_result_key))
-    result_2_child.try_number = 1
-    result_2_child.started_ts = utils.utcnow()
-    result_2_child.completed_ts = utils.utcnow()
-    result_2_child.modified_ts = utils.utcnow()
-    result_2_child.put()
 
     self.assertEqual((2, 0), task_result.task_bq_summary(start, end))
     self.assertEqual(1, len(payloads), payloads)
@@ -1082,12 +1072,6 @@ class TaskResultApiTest(TestCase):
       result_3.task_id,
     ]
     self.assertEqual(expected, [r[0] for r in actual_rows])
-    # Specifically look at children_task_ids.
-    expected = [
-        [],
-        [],
-    ]
-    self.assertEqual(expected, [r[1].children_task_ids for r in actual_rows])
 
   def test_task_bq_summary_pending(self):
     payloads = self._mock_send_to_bq('task_results_summary')
@@ -1115,10 +1099,29 @@ class TaskResultApiTest(TestCase):
     self.assertEqual((0, 0), task_result.task_bq_summary(start, end))
     self.assertEqual(0, len(payloads), payloads)
 
+  def test_task_bq_summary_old_abandoned_ts(self):
+    # Confirm that an old entity without completed_ts set is still found.
+    payloads = self._mock_send_to_bq('task_results_summary')
+    self.now = task_result._COMPLETED_TS_CUTOFF - datetime.timedelta(days=1)
+    start = self.mock_now(self.now, 0)
+    result = _gen_summary_result()
+    result.abandoned_ts = utils.utcnow()
+    result.modified_ts = utils.utcnow()
+    result.put()
+    self.assertIsNone(result.key.get().completed_ts)
+    end = self.mock_now(self.now, 60)
+
+    self.assertEqual((1, 0), task_result.task_bq_summary(start, end))
+    self.assertEqual(1, len(payloads), payloads)
+    actual_rows = payloads[0]
+    self.assertEqual(1, len(actual_rows))
+    self.assertEqual([result.task_id], [r[0] for r in actual_rows])
+
   def test_task_bq_summary_recent_abandoned_ts(self):
     # Confirm that a recent entity without completed_ts set is not found.
     payloads = self._mock_send_to_bq('task_results_summary')
-    start = self.now
+    self.now = task_result._COMPLETED_TS_CUTOFF + datetime.timedelta(days=1)
+    start = self.mock_now(self.now, 0)
     result = _gen_summary_result()
     # Make sure neither created_ts and started_ts is caught.
     result.created_ts = datetime.datetime(2010, 1, 1)
