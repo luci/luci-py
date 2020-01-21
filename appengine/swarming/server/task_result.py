@@ -1407,6 +1407,22 @@ def _to_task_result_proto_async(e):
   """Given a TaskResultSummary or TaskRunResult, yields a tuple(bq_key, row)."""
   out = swarming_pb2.TaskResult()
   e.to_proto(out)
+  key = e.run_result_key
+  if key:
+    # Use the run id, since that's what parent_task_id is set to.
+    run_id = task_pack.pack_run_result_key(key)
+    q = task_request.TaskRequest.query(
+        task_request.TaskRequest.parent_task_id == run_id,
+        default_options=ndb.QueryOptions(keys_only=True))
+
+    cursor = None
+    more = True
+    while more:
+      keys, cursor, more = yield q.fetch_page_async(100, start_cursor=cursor)
+      # children_task_ids is always task ids, not run ids.
+      out.children_task_ids.extend(
+          task_pack.pack_result_summary_key(
+              task_pack.request_key_to_result_summary_key(k)) for k in keys)
   raise ndb.Return((e.task_id, out))
 
 

@@ -991,7 +991,10 @@ class TaskResultApiTest(TestCase):
     self.assertEqual(expected, [r[0] for r in actual_rows])
     # Specifically look at children_task_ids.
     expected = [
-        [],
+        [
+            task_pack.pack_result_summary_key(
+                run_result_2_child.result_summary_key)
+        ],
         [],
     ]
     self.assertEqual(expected, [r[1].children_task_ids for r in actual_rows])
@@ -1084,7 +1087,7 @@ class TaskResultApiTest(TestCase):
     self.assertEqual(expected, [r[0] for r in actual_rows])
     # Specifically look at children_task_ids.
     expected = [
-        [],
+        [result_2_child.task_id],
         [],
     ]
     self.assertEqual(expected, [r[1].children_task_ids for r in actual_rows])
