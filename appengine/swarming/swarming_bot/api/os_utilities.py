@@ -45,10 +45,6 @@ from utils import file_path
 from utils import fs
 
 
-# For compatibility with older bot_config.py files.
-cached = tools.cached
-
-
 # https://cloud.google.com/compute/pricing#machinetype
 GCE_MACHINE_COST_HOUR_US = {
   u'n1-standard-1': 0.050,
