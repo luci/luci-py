@@ -611,14 +611,18 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
 
   def test_bot_reap_task_es_with_nonpending_task(self):
     self._setup_es(False)
-    self._mock_es_notify()
+    notify_calls = self._mock_es_notify()
     result_summary = self._quick_schedule(1)
     self._mock_es_assign(result_summary.task_id, 0)
 
-    # Exception is raised, because external scheduler attempts to reap a
-    # non-PENDING task.
-    with self.assertRaises(external_scheduler.ExternalSchedulerException):
-      task_scheduler.bot_reap_task(self.bot_dimensions, 'abc')
+    # Ignore es notifications that were side-effects of the setup code, they
+    # are incidental to this test.
+    del notify_calls[:]
+
+    # It should notify to external scheduler. But an exception won't be raised
+    # because the task is already running or has finished including failures.
+    task_scheduler.bot_reap_task(self.bot_dimensions, 'abc')
+    self.assertEqual(len(notify_calls), 1)
 
   def test_bot_reap_task_es_with_pending_task(self):
     self._setup_es(False)
@@ -2737,7 +2741,8 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
   def test_ensure_active_slice_nonpending(self):
     # Non-PENDING task cannot have active slice set.
     r = self._quick_schedule(1)
-    self.assertEqual(task_scheduler._ensure_active_slice(r.request, 1, 1), None)
+    self.assertEqual(
+        task_scheduler._ensure_active_slice(r.request, 1, 1), (None, False))
 
   def test_ensure_active_slice_pending(self):
     # Pending task can be forced between different active slices via
@@ -2758,15 +2763,15 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         ],
     )
 
-    to_run = task_scheduler._ensure_active_slice(r.request, 1, 0)
+    to_run, _ = task_scheduler._ensure_active_slice(r.request, 1, 0)
     self.assertEqual(to_run.task_slice_index, 0)
-    to_run = task_scheduler._ensure_active_slice(r.request, 1, 1)
+    to_run, _ = task_scheduler._ensure_active_slice(r.request, 1, 1)
     self.assertEqual(to_run.task_slice_index, 1)
-    to_run = task_scheduler._ensure_active_slice(r.request, 1, 0)
+    to_run, _ = task_scheduler._ensure_active_slice(r.request, 1, 0)
     self.assertEqual(to_run.task_slice_index, 0)
     # This works even if there is no to_run entity.
     to_run.key.delete()
-    to_run = task_scheduler._ensure_active_slice(r.request, 1, 1)
+    to_run, _ = task_scheduler._ensure_active_slice(r.request, 1, 1)
     self.assertEqual(to_run.task_slice_index, 1)
 
   def test_task_expire_tasks(self):

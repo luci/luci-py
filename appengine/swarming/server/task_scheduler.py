@@ -901,15 +901,17 @@ def _get_task_from_external_scheduler(es_cfg, bot_dimensions):
   logging.info('Determined try_number, slice_number %s %s', try_number,
                slice_number)
 
-  to_run = _ensure_active_slice(request, try_number, slice_number)
+  to_run, raise_exception = _ensure_active_slice(request, try_number,
+                                                 slice_number)
   if not to_run:
     # We were unable to ensure the given request was at the desired slice. This
     # means the external scheduler must have stale state about this request, so
     # notify it of the newest state.
     external_scheduler.notify_requests(
         es_cfg, [(request, result_summary)], True, False)
-    raise external_scheduler.ExternalSchedulerException(
-        'unable to ensure active slice for task %s' % task_id)
+    if raise_exception:
+      raise external_scheduler.ExternalSchedulerException(
+          'unable to ensure active slice for task %s' % task_id)
 
   return request, to_run
 
@@ -931,8 +933,9 @@ def _ensure_active_slice(request, try_number, task_slice_index):
     task_slice_index: slice index to ensure is active.
 
   Returns:
-    A saved TaskToRun instance corresponding to the given request, try_number,
-    and slice, if exists, or None otherwise.
+    TaskToRun: A saved TaskToRun instance corresponding to the given request,
+               try_number, and slice, if exists, or None otherwise.
+    Boolean: Whether or not it should raise exception
   """
   def run():
     logging.debug('_ensure_active_slice(%s, %d, %d)',
@@ -943,7 +946,7 @@ def _ensure_active_slice(request, try_number, task_slice_index):
       if len(to_runs) != 1:
         logging.warning('_ensure_active_slice: %s != 1 TaskToRuns',
                         len(to_runs))
-        return None
+        return None, True
       assert len(to_runs) == 1, 'Too many pending TaskToRuns.'
 
     to_run = to_runs[0] if to_runs else None
@@ -952,7 +955,7 @@ def _ensure_active_slice(request, try_number, task_slice_index):
       if (to_run.try_number == try_number and
           to_run.task_slice_index == task_slice_index):
         logging.debug('_ensure_active_slice: already active')
-        return to_run
+        return to_run, False
 
       # Deactivate old TaskToRun, create new one.
       to_run.queue_number = None
@@ -961,26 +964,27 @@ def _ensure_active_slice(request, try_number, task_slice_index):
                                                task_slice_index)
       ndb.put_multi([to_run, new_to_run])
       logging.debug('_ensure_active_slice: added new TaskToRun')
-      return new_to_run
+      return new_to_run, False
 
     result_summary = task_pack.request_key_to_result_summary_key(
         request.key).get()
     if not result_summary:
       logging.warning('_ensure_active_slice: no TaskToRun or TaskResultSummary')
-      return None
+      return None, True
 
     if not result_summary.is_pending:
       logging.debug(
           '_ensure_active_slice: request is not PENDING.'
           ' state: "%s", task_id: "%s"',
           result_summary.to_string(), result_summary.task_id)
-      return None
+      # just notify to external scheudler without exception
+      return None, False
 
     new_to_run = task_to_run.new_task_to_run(request, try_number,
         task_slice_index)
     new_to_run.put()
     logging.debug('ensure_active_slice: added new TaskToRun (no previous one)')
-    return new_to_run
+    return new_to_run, False
 
   return datastore_utils.transaction(run)
 
@@ -998,7 +1002,7 @@ def _bot_reap_task_external_scheduler(bot_dimensions, bot_version, es_cfg):
     - es_cfg: ExternalSchedulerConfig for this bot.
   """
   request, to_run = _get_task_from_external_scheduler(es_cfg, bot_dimensions)
-  if not request:
+  if not request or not to_run:
     return None, None, None
 
   run_result, secret_bytes = _reap_task(
