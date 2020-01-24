@@ -686,6 +686,7 @@ def _run_isolated_flags(botobj):
   min_free = (
       _min_free_disk({'size_mb': size}, partition) +
       partition['wiggle'])
+  logging.info('size %d, partition %s, min_free %s', size, partition, min_free)
   args = [
       '--cache',
       os.path.join(botobj.base_dir, 'isolated_cache'),
