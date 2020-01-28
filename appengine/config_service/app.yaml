@@ -14,21 +14,14 @@ handlers:
   upload: static/favicon.ico
   secure: always
 
-- url: /elements.html
-  static_files: ui/static/elements.html
-  upload: ui/static/elements.html
-
-- url: /static/images
-  static_dir: ui/static/images
-
-- url: /bower_components
-  static_dir: ui/bower_components
-
-- url: /common
-  static_dir: ui/common
+- url: /node_modules
+  static_dir: ui/node_modules
 
 - url: /src
-  static_dir: ui/src
+  static_dir: ui/build/default/src
+
+- url: /static/images
+  static_dir: ui/build/default/static/images
 
 - url: /_ah/api/.*
   script: apps.endpoints

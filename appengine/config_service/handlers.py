@@ -54,7 +54,7 @@ class MainPageHandler(webapp2.RequestHandler):
           ('247108661754-svmo17vmk1j5hlt388gb45qblgvg2h98.apps.'
            'googleusercontent.com'),
     }
-    path = os.path.join(os.path.dirname(__file__), 'ui/static/index.html')
+    path = os.path.join(os.path.dirname(__file__), 'ui/index.html')
     self.response.out.write(template.render(path, template_values))
 
 

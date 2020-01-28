@@ -5,11 +5,11 @@ This is a UI for the configuration service.
 
 ## Setting up
 
-*	First, make sure you have the [Polymer CLI](https://www.polymer-project.org/2.0/docs/tools/polymer-cli) installed.
+*	First, make sure you have the [Polymer CLI](https://polymer-library.polymer-project.org/3.0/docs/tools/polymer-cli) installed.
 
-*   Install [Google App Engine SDK](https://cloud.google.com/appengine/downloads).
+* Install [Google App Engine SDK](https://cloud.google.com/appengine/downloads).
 
-*	Run `bower install` in the ui directory to make sure you have all the dependencies installed.
+*	Run `polymer install` in the ui directory to make sure you have all the dependencies installed.
 
 
 ## Running locally
@@ -18,6 +18,8 @@ This is a UI for the configuration service.
 	*	One in src/config-ui/front-page.html
 	*	Two in src/config-ui/config-set.html
 	*	One in src/config-ui/config-ui.html
+
+*	Run `polymer build` in the ui directory to build the ui app
 
 *	In the config-service folder run `dev_appserver.py app.yaml`
 

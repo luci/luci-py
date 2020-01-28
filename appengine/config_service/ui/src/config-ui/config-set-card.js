@@ -1,20 +1,22 @@
-<!--
-  Copyright 2017 The LUCI Authors. All rights reserved.
-  Use of this source code is governed under the Apache License, Version 2.0
-  that can be found in the LICENSE file.
--->
+/**
+ * @license
+ * Copyright 2020 The LUCI Authors. All rights reserved.
+ * Use of this source code is governed under the Apache License, Version 2.0
+ * that can be found in the LICENSE file.
+ */
 
-<link rel="import" href="../../bower_components/iron-icons/iron-icons.html">
-<link rel="import" href="../../bower_components/paper-button/paper-button.html">
-<link rel="import" href="../../bower_components/paper-card/paper-card.html">
-<link rel="import" href="../../bower_components/polymer/polymer.html">
-<link rel="import" href="../../bower_components/iron-icons/maps-icons.html">
-<link rel="import" href="../../bower_components/iron-flex-layout/iron-flex-layout.html">
-<link rel="import" href="../../bower_components/paper-tooltip/paper-tooltip.html">
-<link rel="import" href="../../common/common-behaviors.html">
+import { CommonBehavior } from "../common/common-behaviors.js"
 
-<dom-module id="config-set-card">
-  <template>
+import '@polymer/paper-card/paper-card.js';
+import '@polymer/paper-tooltip/paper-tooltip.js';
+import '@polymer/polymer/lib/elements/dom-if.js';
+
+import { PolymerElement, html } from '@polymer/polymer/polymer-element.js';
+import { mixinBehaviors } from '@polymer/polymer/lib/legacy/class.js';
+
+class ConfigSetCard extends mixinBehaviors([CommonBehavior], PolymerElement) {
+  static get template() {
+    return html`
     <style>
       paper-card {
         width: 100%;
@@ -53,37 +55,40 @@
           [[name]]
           <div class="validation">
             <iron-icon id="launch"
-                       icon="icons:launch"
-                       class="paper-grey"
-                       on-tap="_openConfigGitiles">
+                      icon="icons:launch"
+                      class="paper-grey"
+                      on-tap="_openConfigGitiles">
             </iron-icon>
             <paper-tooltip for="launch" offset="0">
               [[link]]
             </paper-tooltip>
             <template is="dom-if" if="[[lastImportAttempt]]" restamp="true">
-              <template is="dom-if" if="[[lastImportAttempt.success]]" restamp="true">
+              <template is="dom-if"
+                if="[[lastImportAttempt.success]]" restamp="true">
                 <iron-icon id="successful-import"
-                           icon="icons:check-circle"
-                           class="paper-green">
+                          icon="icons:check-circle"
+                          class="paper-green">
                 </iron-icon>
                 <paper-tooltip for="successful-import" offset="0">
                   Last import succeeded.
                 </paper-tooltip>
               </template>
-              <template is="dom-if" if="[[_not(lastImportAttempt.success)]]" restamp="true">
+              <template is="dom-if"
+                if="[[_not(lastImportAttempt.success)]]" restamp="true">
                 <iron-icon id="failed-import"
-                           icon="icons:warning"
-                           class="paper-red">
+                          icon="icons:warning"
+                          class="paper-red">
                 </iron-icon>
                 <paper-tooltip for="failed-import" offset="0">
                   Last import failed. Click for more info.
                 </paper-tooltip>
               </template>
             </template>
-            <template is="dom-if" if="[[_not(lastImportAttempt)]]" restamp="true">
+            <template is="dom-if"
+              if="[[_not(lastImportAttempt)]]" restamp="true">
               <iron-icon id="no-import"
-                         icon="icons:help"
-                         class="paper-grey">
+                        icon="icons:help"
+                        class="paper-grey">
               </iron-icon>
               <paper-tooltip for="no-import" offset="0">
                 Last import attempt info not available.
@@ -103,23 +108,19 @@
         </div>
       </div>
     </paper-card>
+    `;
+  }
 
-  </template>
-  <script>
-    Polymer({
-      is: "config-set-card",
+  static get is() { return 'config-set-card'; }
 
-      behaviors: [ConfigUIBehaviors.CommonBehavior],
+  _openConfigGitiles(event) {
+    event.stopPropagation();
+    window.open(this.link);
+  }
 
-      _openConfigGitiles: function(event) {
-        event.stopPropagation();
-        window.open(this.link);
-      },
+  _openConfigPage() {
+    window.location.href = "/#/" + this.name;
+  }
+}
 
-      _openConfigPage: function() {
-        window.location.href = "/#/" + this.name;
-      },
-    });
-  </script>
-</dom-module>
-
+window.customElements.define(ConfigSetCard.is, ConfigSetCard);

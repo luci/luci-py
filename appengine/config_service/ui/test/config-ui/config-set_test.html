@@ -12,10 +12,9 @@
 
     <title>config-set test</title>
 
-    <script src="../../bower_components/webcomponentsjs/webcomponents-lite.js"></script>
-    <script src="../../bower_components/web-component-tester/browser.js"></script>
-
-    <link rel="import" href="../../src/config-ui/config-set.html">
+    <script src="../../node_modules/@webcomponents/webcomponentsjs/webcomponents-bundle.js"></script>
+    <script src="../../node_modules/wct-browser-legacy/browser.js"></script>
+    <script type="module" src="../../src/config-ui/config-set.js"></script>
   </head>
   <body>
 
@@ -35,7 +34,6 @@
 
     <script>
       suite('Valid project with config files', function() {
-          
         var ajax;
         var request;
         var server;
@@ -47,7 +45,7 @@
         setup(function() {
           server = sinon.fakeServer.create();
           config_set = fixture('valid-project-with-config-files');
-          ajax = Polymer.dom(config_set.root).querySelector('#requestConfigs');
+          ajax = config_set.shadowRoot.querySelector('#requestConfigs');
         });
 
         teardown(function() {
@@ -175,7 +173,7 @@
             ]
           );
           config_set = fixture('invalid-project-without-config-files');
-          ajax = Polymer.dom(config_set.root).querySelector('#requestConfigs');
+          ajax = config_set.shadowRoot.querySelector('#requestConfigs');
         });
 
         teardown(function() {
@@ -223,7 +221,7 @@
           server = sinon.fakeServer.create();
           server.respondWith(
             'POST',
-            /\/_ah\/api\/config\/v1\/reimport\?config_set=([a-z\-]+)\/([a-z\-]+)/, 
+            /\/_ah\/api\/config\/v1\/reimport\?config_set=([a-z\-]+)\/([a-z\-]+)/,
             [
               204,
               responseHeaders.json,
@@ -232,7 +230,7 @@
             ]
           );
           config_set = fixture('valid-project-with-config-files');
-          ajax = Polymer.dom(config_set.root).querySelector('#refreshConfigs');
+          ajax = config_set.shadowRoot.querySelector('#refreshConfigs');
         });
 
         teardown(function() {
@@ -275,7 +273,7 @@
           }
           server.respondWith(
             'POST',
-            /\/_ah\/api\/config\/v1\/reimport\?config_set=([a-z\-]+)\/([a-z\-]+)/, 
+            /\/_ah\/api\/config\/v1\/reimport\?config_set=([a-z\-]+)\/([a-z\-]+)/,
             [
               404,
               responseHeaders.json,
@@ -283,7 +281,7 @@
             ]
           );
           config_set = fixture('valid-project-with-config-files');
-          ajax = Polymer.dom(config_set.root).querySelector('#refreshConfigs');
+          ajax = config_set.shadowRoot.querySelector('#refreshConfigs');
         });
 
         teardown(function() {
@@ -315,7 +313,7 @@
         setup(function() {
           server = sinon.fakeServer.create();
           config_set = fixture('valid-project-with-config-files');
-          ajax = Polymer.dom(config_set.root).querySelector('#requestConfigs');
+          ajax = config_set.shadowRoot.querySelector('#requestConfigs');
         });
 
         teardown(function() {
@@ -347,7 +345,7 @@
           assert.equal(request.status, 403);
           config_set.addEventListener('fetchError', function() {
             assert.equal(config_set.isLoading, false);
-            assert.equal(config_set.errorMessage, 
+            assert.equal(config_set.errorMessage,
                 "Access denied, please sign in.");
             done();
           }.bind(config_set));
@@ -364,9 +362,9 @@
           assert.equal(request.status, 403);
           config_set.addEventListener('fetchError', function() {
             assert.equal(config_set.isLoading, false);
-            assert.equal(config_set.errorMessage, 
-                "Access denied, some_email@google.com" + 
-                " is not authorized to access this config set." + 
+            assert.equal(config_set.errorMessage,
+                "Access denied, some_email@google.com" +
+                " is not authorized to access this config set." +
                 " Request access or sign in as a different user.");
             done();
           }.bind(config_set));

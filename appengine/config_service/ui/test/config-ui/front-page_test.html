@@ -12,10 +12,9 @@
 
     <title>front-page test</title>
 
-    <script src="../../bower_components/webcomponentsjs/webcomponents-lite.js"></script>
-    <script src="../../bower_components/web-component-tester/browser.js"></script>
-
-    <link rel="import" href="../../src/config-ui/front-page.html">
+    <script src="../../node_modules/@webcomponents/webcomponentsjs/webcomponents-bundle.js"></script>
+    <script src="../../node_modules/wct-browser-legacy/browser.js"></script>
+    <script type="module" src="../../src/config-ui/front-page.js"></script>
   </head>
   <body>
 
@@ -28,7 +27,6 @@
     <script>
 
       suite('Front page with config sets', function() {
-          
         var ajax;
         var request;
         var server;
@@ -52,7 +50,7 @@
           };
           server.respondWith(
             'GET',
-            /\/_ah\/api\/config\/v1\/config-sets\?include_last_import_attempt=true/, 
+            /\/_ah\/api\/config\/v1\/config-sets\?include_last_import_attempt=true/,
             [
               200,
               responseHeaders.json,
@@ -60,22 +58,23 @@
             ]
           );
           front_page = fixture('front-pageTestFixture');
-          ajax = Polymer.dom(front_page.root).querySelector('iron-ajax');
+          console.log(front_page)
+          ajax = front_page.shadowRoot.querySelector('iron-ajax');
         });
 
         teardown(function() {
           server.restore();
         });
 
-        test('checks the config set list is empty before iron ajax call', 
+        test('checks the config set list is empty before iron ajax call',
           function() {
           assert.equal(front_page.configSetList.length, 0);
         });
 
-        test('checks the search results list is empty before iron ajax call', 
+        test('checks the search results list is empty before iron ajax call',
           function() {
           assert.equal(front_page.searchResults.length, 0);
-        });        
+        });
 
         test('checks that isLoading property is true by default', function() {
           assert.equal(front_page.isLoading, true);
@@ -108,7 +107,7 @@
           server.respond();
           front_page.addEventListener('processedConfigSets', function() {
             front_page.query = "service";
-            assert.notEqual(front_page.configSetList, 
+            assert.notEqual(front_page.configSetList,
               front_page.searchResults);
             assert.equal(front_page.searchResults.length, 0);
             done();
@@ -136,10 +135,10 @@
           server.respond();
           front_page.addEventListener('processedConfigSets', function() {
             front_page.query = "invalid-project";
-            assert.notEqual(front_page.configSetList, 
+            assert.notEqual(front_page.configSetList,
               front_page.searchResults);
-            assert.equal(front_page.searchResults[0].config_set, "invalid-project");     
-            done();       
+            assert.equal(front_page.searchResults[0].config_set, "invalid-project");
+            done();
           }.bind(front_page));
         });
       });
@@ -164,7 +163,7 @@
           }
           server500.respondWith(
             'GET',
-            /\/_ah\/api\/config\/v1\/config-sets\?include_last_import_attempt=true/, 
+            /\/_ah\/api\/config\/v1\/config-sets\?include_last_import_attempt=true/,
             [
               500,
               responseHeaders.json,
@@ -181,7 +180,7 @@
           }
           server403.respondWith(
             'GET',
-            /\/_ah\/api\/config\/v1\/config-sets\?include_last_import_attempt=true/, 
+            /\/_ah\/api\/config\/v1\/config-sets\?include_last_import_attempt=true/,
             [
               403,
               responseHeaders.json,
@@ -198,7 +197,7 @@
           }
           server400.respondWith(
             'GET',
-            /\/_ah\/api\/config\/v1\/config-sets\?include_last_import_attempt=true/, 
+            /\/_ah\/api\/config\/v1\/config-sets\?include_last_import_attempt=true/,
             [
               400,
               responseHeaders.json,
@@ -206,7 +205,7 @@
             ]
           );
           front_page = fixture('front-pageTestFixture');
-          ajax = Polymer.dom(front_page.root).querySelector('iron-ajax');
+          ajax = front_page.shadowRoot.querySelector('iron-ajax');
         });
 
         teardown(function() {

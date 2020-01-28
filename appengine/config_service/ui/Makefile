@@ -3,7 +3,7 @@
 # found in the LICENSE file.
 
 default:
-	bower install
+	polymer install
 
 .PHONY: run
 run: default
@@ -11,4 +11,4 @@ run: default
 
 .PHONY: clean
 clean:
-	rm -rf bower_components
+	rm -rf node_modules

@@ -1,0 +1,30 @@
+{
+  "name": "luci-config-ui",
+  "description": "UI for LUCI configuration service",
+  "main": "index.html",
+  "private": true,
+  "license": "Apache-2.0",
+  "dependencies": {
+    "@cwmr/paper-search": "^3.0.0",
+    "@google-web-components/google-signin": "^3.0.0",
+    "@polymer/app-layout": "^3.0.0",
+    "@polymer/app-route": "^3.0.0",
+    "@polymer/iron-ajax": "^3.0.0",
+    "@polymer/iron-flex-layout": "^3.0.0",
+    "@polymer/iron-icon": "^3.0.0",
+    "@polymer/iron-icons": "^3.0.0",
+    "@polymer/iron-iconset-svg": "^3.0.0",
+    "@polymer/paper-button": "^3.0.0",
+    "@polymer/paper-card": "^3.0.0",
+    "@polymer/paper-item": "^3.0.0",
+    "@polymer/paper-spinner": "^3.0.0",
+    "@polymer/paper-styles": "^3.0.0",
+    "@polymer/paper-tooltip": "^3.0.0",
+    "@polymer/polymer": "^3.0.0",
+    "@webcomponents/webcomponentsjs": "^2.0.0",
+    "web-animations-js": "^2.3.0"
+  },
+  "devDependencies": {
+    "wct-browser-legacy": "^1.0.1"
+  }
+}

@@ -12,10 +12,9 @@
 
     <title>auth-signin test</title>
 
-    <script src="../../bower_components/webcomponentsjs/webcomponents-lite.js"></script>
-    <script src="../../bower_components/web-component-tester/browser.js"></script>
-
-    <link rel="import" href="../../src/config-ui/front-page.html">
+    <script src="../../node_modules/@webcomponents/webcomponentsjs/webcomponents-bundle.js"></script>
+    <script src="../../node_modules/wct-browser-legacy/browser.js"></script>
+    <script type="module" src="../../src/config-ui/front-page.js"></script>
   </head>
   <body>
 
@@ -81,7 +80,7 @@
             "success": true,
             "revision": {
               "timestamp": "09061997"
-            } 
+            }
           }
           expect(common._getTimestamp(lastImportAttempt, null)).to.be.equal('09061997');
         });

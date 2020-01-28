@@ -1,25 +1,30 @@
-<!--
-  Copyright 2017 The LUCI Authors. All rights reserved.
-  Use of this source code is governed under the Apache License, Version 2.0
-  that can be found in the LICENSE file.
--->
+/**
+ * @license
+ * Copyright 2020 The LUCI Authors. All rights reserved.
+ * Use of this source code is governed under the Apache License, Version 2.0
+ * that can be found in the LICENSE file.
+ */
 
-<link rel="import" href="../../bower_components/polymer/polymer.html">
-<link rel="import" href="../../bower_components/paper-search/paper-search-bar.html">
-<link rel="import" href="../../bower_components/app-route/app-location.html">
-<link rel="import" href="../../bower_components/app-route/app-route.html">
-<link rel="import" href="../../bower_components/app-layout/app-drawer-layout/app-drawer-layout.html">
-<link rel="import" href="../../bower_components/app-layout/app-header/app-header.html">
-<link rel="import" href="../../bower_components/app-layout/app-header-layout/app-header-layout.html">
-<link rel="import" href="../../bower_components/app-layout/app-toolbar/app-toolbar.html">
+import "../common/auth-signin.js"
+import "./config-set.js"
+import "./front-page.js"
 
-<link rel="import" href="../../common/auth-signin.html">
-<link rel="import" href="../../common/common-behaviors.html">
-<link rel="import" href="config-set.html">
-<link rel="import" href="front-page.html">
+import { CommonBehavior } from "../common/common-behaviors.js"
 
-<dom-module id="config-ui">
-  <template>
+import '@polymer/app-layout/app-drawer-layout/app-drawer-layout.js';
+import '@polymer/app-layout/app-header/app-header.js';
+import '@polymer/app-layout/app-header-layout/app-header-layout.js';
+import '@polymer/app-layout/app-toolbar/app-toolbar.js';
+import '@polymer/app-route/app-location.js';
+import '@polymer/app-route/app-route.js';
+import '@polymer/polymer/lib/elements/dom-if.js';
+
+import { mixinBehaviors } from '@polymer/polymer/lib/legacy/class.js';
+import { PolymerElement, html } from '@polymer/polymer/polymer-element.js';
+
+class ConfigUI extends mixinBehaviors([CommonBehavior], PolymerElement) {
+  static get template() {
+    return html`
     <style>
       @media only screen and (min-width: 768px) {
         app-toolbar {
@@ -71,8 +76,8 @@
             </div>
 
             <a href="/_ah/api/explorer"
-               class="link"
-               target="_blank">APIs explorer
+              class="link"
+              target="_blank">APIs explorer
             </a>
 
             <template is="dom-if" if="[[client_id]]">
@@ -137,36 +142,35 @@
         </template>
       </app-header-layout>
     </app-drawer-layout>
-  </template>
+    `;
+  }
 
-  <script>
-    Polymer({
-      is: 'config-ui',
+  static get is() { return 'config-ui'; }
 
-      behaviors: [ConfigUIBehaviors.CommonBehavior],
-
-      properties: {
-        client_id: {
-          type: String,
-          value: null
-        },
-        route: {
-          type: Object,
-          observer: '_routeChanged',
-        }
+  static get properties() {
+    return {
+      client_id: {
+        type: String,
+        value: null
       },
+      route: {
+        type: Object,
+        observer: '_routeChanged',
+      }
+    }
+  }
 
-      _routeChanged: function(route) {
-        // If the path is blank, redirect to /q/
-        if (!route.path || route.path == "/") {
-          this.set('route.path', '/q/');
-        }
-      },
+  _routeChanged(route) {
+    // If the path is blank, redirect to /q/
+    if (!route.path || route.path == "/") {
+      this.set('route.path', '/q/');
+    }
+  }
 
-      ready: function() {
-        this._routeChanged(this.route);
-      },
+  ready() {
+    super.ready();
+    this._routeChanged(this.route);
+  }
+}
 
-    });
-  </script>
-</dom-module>
+window.customElements.define(ConfigUI.is, ConfigUI);
