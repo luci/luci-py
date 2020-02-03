@@ -91,13 +91,12 @@ def _expire_task_tx(now, request, to_run_key, result_summary_key, capacity,
         to_put.append(new_to_run)
         break
     except IndexError:
-      logging.debug('crbug.com/1030504:'
-                    'current_task_slice=%d, num_task_slices=%d, '
-                    'index=%d, capacity=%s',
-                    result_summary.current_task_slice,
-                    request.num_task_slices,
-                    index,
-                    capacity)
+      logging.debug(
+          'crbug.com/1030504: task_id=%s, '
+          'current_task_slice=%d, num_task_slices=%d, '
+          'index=%d, capacity=%s', result_summary.task_id,
+          result_summary.current_task_slice, request.num_task_slices, index,
+          capacity)
       raise
 
   if not new_to_run:
