@@ -2778,6 +2778,37 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     # Tested indirectly via test_cron_abort_expired_*
     pass
 
+  def test_task_expire_with_invalid_slice_index(self):
+    self._register_bot(0, self.bot_dimensions)
+    result_summary = self._quick_schedule(
+        2,
+        task_slices=[
+          task_request.TaskSlice(
+              expiration_secs=600,
+              properties=_gen_properties(
+                  dimensions={u'pool': [u'default']}
+              )),
+          task_request.TaskSlice(
+              expiration_secs=600,
+              properties=_gen_properties(
+                  dimensions={u'pool': [u'default'], u'foo': [u'bar']}
+              )),
+        ])
+    # activate a non-current slice forcebly.
+    try_number = 1
+    invalid_slice_index = 1
+    task_scheduler._ensure_active_slice(
+        result_summary.request, try_number, invalid_slice_index)
+    self.assertEqual(State.PENDING, result_summary.state)
+    self.assertEqual(0, result_summary.current_task_slice)
+
+    # task_expire_tasks should expire the task.
+    to_runs = [
+        (result_summary.task_id, try_number, invalid_slice_index)
+    ]
+    task_scheduler.task_expire_tasks(to_runs)
+    self.assertEqual(State.EXPIRED, result_summary.key.get().state)
+
   def test_task_cancel_running_children_tasks(self):
     # Tested indirectly via test_bot_update_child_with_cancelled_parent.
     pass

@@ -83,21 +83,28 @@ def _expire_task_tx(now, request, to_run_key, result_summary_key, capacity,
   for index in range(rest):
     # Use the lookup created just before the transaction. There's a small race
     # condition in here but we're willing to accept it.
-    try:
-      if capacity[index]:
-        # Enqueue a new TasktoRun for this next TaskSlice, it has capacity!
-        new_to_run = task_to_run.new_task_to_run(request, 1, index+offset)
-        result_summary.current_task_slice = index+offset
-        to_put.append(new_to_run)
-        break
-    except IndexError:
-      logging.debug(
-          'crbug.com/1030504: task_id=%s, '
-          'current_task_slice=%d, num_task_slices=%d, '
-          'index=%d, capacity=%s', result_summary.task_id,
-          result_summary.current_task_slice, request.num_task_slices, index,
-          capacity)
-      raise
+    if len(capacity) > index and capacity[index]:
+      # Enqueue a new TasktoRun for this next TaskSlice, it has capacity!
+      new_to_run = task_to_run.new_task_to_run(request, 1, index+offset)
+      result_summary.current_task_slice = index+offset
+      to_put.append(new_to_run)
+      break
+    if len(capacity) <= index:
+      # crbug.com/1030504
+      # This invalid situation probably come from the invalid task-expire task
+      # parameters (task_id, try_number, task_slice_index), and the task-expire
+      # task will be enqueued with a valid parameters in a cron job later.
+      # So ignoring here should not be a problem.
+      logging.warning(
+          'crbug.com/1030504: invalid capacity length or slice index. '
+          'index=%d, capacity=%s\n'
+          'TaskResultSummary: task_id=%s, current_task_slice=%d, '
+          'num_task_slices=%d\n'
+          'TaskToRun: task_id=%s, task_slice_index=%d, try_number=%d',
+          index, capacity,
+          result_summary.task_id, result_summary.current_task_slice,
+          request.num_task_slices,
+          to_run.task_id, to_run.task_slice_index, to_run.try_number)
 
   if not new_to_run:
     # There's no fallback, giving up.
