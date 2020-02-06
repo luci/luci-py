@@ -192,15 +192,7 @@ export function sanitizeAndHumanizeTime(obj, key) {
     const str = obj[key].toString();
     const timezone = str.substring(str.indexOf('('));
 
-    // If timestamp is today, skip the date.
-    const now = new Date();
-    if (obj[key].getDate() == now.getDate() &&
-        obj[key].getMonth() == now.getMonth() &&
-        obj[key].getYear() == now.getYear()) {
-      obj['human_'+key] = obj[key].toLocaleTimeString() + ' ' + timezone;
-    } else {
-      obj['human_'+key] = obj[key].toLocaleString() + ' ' + timezone;
-    }
+    obj['human_'+key] = obj[key].toLocaleString() + ' ' + timezone;
   }
 }
 
