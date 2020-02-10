@@ -20,6 +20,7 @@ import ts_mon_metrics
 from server import bot_management
 from server import task_queues
 from server import task_result
+from server import task_to_run
 
 
 def _gen_task_result_summary(now, key_id, properties=None, **kwargs):
@@ -42,6 +43,20 @@ def _gen_task_result_summary(now, key_id, properties=None, **kwargs):
   }
   args.update(kwargs)
   return task_result.TaskResultSummary(**args)
+
+
+def _get_task_to_run(now, request_key_id, try_number, slice_index, **kwargs):
+  """Creates a TaskToRun."""
+  request_key = ndb.Key('TaskRequest', request_key_id)
+  to_run_key = ndb.Key(
+      'TaskToRun', try_number | (slice_index << 4), parent=request_key)
+  args = {
+      'key': to_run_key,
+      'created_ts': now,
+      'queue_number': None,
+  }
+  args.update(kwargs)
+  return task_to_run.TaskToRun(**args)
 
 
 def _gen_bot_info(key_id, last_seen_ts, **kwargs):
@@ -273,6 +288,23 @@ class TestMetrics(test_case.TestCase):
       self.assertEqual('bot_id:%s|os:Linux|os:Ubuntu' % bot_id,
                        ts_mon_metrics._executors_pool.get(
                            target_fields=target_fields))
+
+  def test_on_task_expired(self):
+    tags = [
+        'project:test_project',
+        'slice_index:0',
+    ]
+    fields = {'project_id': 'test_project'}
+    summary = _gen_task_result_summary(
+        self.now, 1, tags=tags, expiration_delay=1,
+        state=task_result.State.EXPIRED)
+    to_run = _get_task_to_run(self.now, 1, 1, 0, expiration_delay=1)
+
+    ts_mon_metrics.on_task_expired(summary, to_run)
+    self.assertEqual(1, ts_mon_metrics._tasks_expiration_delay.get(
+        fields=fields).sum)
+    self.assertEqual(1, ts_mon_metrics._tasks_slice_expiration_delay.get(
+        fields=dict(fields, slice_index=0)).sum)
 
 
 if __name__ == '__main__':

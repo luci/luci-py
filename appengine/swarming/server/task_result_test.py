@@ -162,6 +162,7 @@ class TaskResultApiTest(TestCase):
       'deduped_from': None,
       'duration': None,
       'exit_code': None,
+      'expiration_delay': None,
       'failure': False,
       # Constant due to the mock of both utils.utcnow() and
       # random.getrandbits().

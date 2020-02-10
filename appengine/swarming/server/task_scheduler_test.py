@@ -185,6 +185,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
       'deduped_from': None,
       'duration': None,
       'exit_code': None,
+      'expiration_delay': None,
       'failure': False,
       'internal_failure': False,
       'modified_ts': self.now,
@@ -1912,10 +1913,11 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
   def test_cron_abort_expired_task_to_run(self):
     pub_sub_calls = self.mock_pub_sub()
     self._register_bot(0, self.bot_dimensions)
+    expiration_ts = self.now + datetime.timedelta(1)
     result_summary = self._quick_schedule(
         1, pubsub_topic='projects/abc/topics/def')
-    abandoned_ts = self.mock_now(
-        self.now, result_summary.request_key.get().expiration_secs+1)
+    expiration_ts = result_summary.request_key.get().expiration_ts
+    abandoned_ts = self.mock_now(expiration_ts, 1)
     task_scheduler.cron_abort_expired_task_to_run()
     tasks = self._taskqueue_stub.GetTasks('task-expire')
     self.assertEqual(1, len(tasks))
@@ -1924,6 +1926,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     expected = self._gen_result_summary_pending(
         abandoned_ts=abandoned_ts,
         completed_ts=abandoned_ts,
+        expiration_delay=1,
         id='1d69b9f088008910',
         modified_ts=abandoned_ts,
         state=State.EXPIRED)
@@ -1966,6 +1969,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         abandoned_ts=abandoned_ts,
         completed_ts=abandoned_ts,
         costs_usd=[0.],
+        expiration_delay=1,
         id='1d69b9f088008910',
         internal_failure=True,
         modified_ts=abandoned_ts,
@@ -2014,6 +2018,11 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(State.PENDING, result_summary.state)
     # Skipped the second and third TaskSlice.
     self.assertEqual(3, result_summary.current_task_slice)
+
+    # The first task slice should be expired.
+    request = result_summary.request_key.get()
+    to_run_1 = task_to_run.request_to_task_to_run_key(request, 1, 0).get()
+    self.assertEqual(to_run_1.expiration_delay, 601 - 600)
 
   def test_cron_abort_expired_fallback_wait_for_capacity(self):
     # 1 has capacity.

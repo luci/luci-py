@@ -266,6 +266,7 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
     expected = {
       'created_ts': self.now,
       'expiration_ts': self.now + datetime.timedelta(seconds=31),
+      'expiration_delay': None,
       'queue_number': '0x1a3aa66317bd248e',
       'task_slice_index': 0,
       'try_number': 1,
@@ -376,6 +377,7 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
         {
             'created_ts': self.now,
             'expiration_ts': self.now + datetime.timedelta(seconds=31),
+            'expiration_delay': None,
             'request_key': '0x7bddaa9d777ffdce',
             # Lower priority value means higher priority.
             'queue_number': '0x1a3aa663153d248e',
@@ -385,6 +387,7 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
         {
             'created_ts': self.now,
             'expiration_ts': self.now + datetime.timedelta(seconds=31),
+            'expiration_delay': None,
             'request_key': '0x7bddaa9d777ffede',
             'queue_number': '0x1a3aa66317bd248e',
             'task_slice_index': 0,
@@ -466,6 +469,7 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
       {
         'created_ts': self.now,
         'expiration_ts': self.now + datetime.timedelta(minutes=1),
+        'expiration_delay': None,
         'queue_number': '0x613fbb331f3d248e',
         'task_slice_index': 0,
         'try_number': 1,
@@ -488,6 +492,7 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
       {
         'created_ts': self.now,
         'expiration_ts': self.now + datetime.timedelta(minutes=1),
+        'expiration_delay': None,
         'queue_number': '0x1a3aa6631f3d248e',
         'task_slice_index': 0,
         'try_number': 1,
@@ -506,6 +511,7 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
       {
         'created_ts': self.now,
         'expiration_ts': self.now + datetime.timedelta(minutes=1),
+        'expiration_delay': None,
         'queue_number': '0x1a3aa6631f3d248e',
         'task_slice_index': 0,
         'try_number': 1,
@@ -528,6 +534,7 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
       {
         'created_ts': self.now,
         'expiration_ts': self.now + datetime.timedelta(minutes=1),
+        'expiration_delay': None,
         'queue_number': '0x1a3aa6631f3d248e',
         'task_slice_index': 0,
         'try_number': 1,
@@ -562,6 +569,7 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
       {
         'created_ts': self.now,
         'expiration_ts': self.now + datetime.timedelta(minutes=1),
+        'expiration_delay': None,
         'queue_number': '0x613fbb331f3d248e',
         'task_slice_index': 0,
         'try_number': 1,
@@ -569,6 +577,7 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
       {
         'created_ts': self.now + datetime.timedelta(seconds=1),
         'expiration_ts': self.now + datetime.timedelta(minutes=1, seconds=1),
+        'expiration_delay': None,
         'queue_number': '0x5385bf749f3d2484',
         'task_slice_index': 0,
         'try_number': 1,
@@ -609,6 +618,7 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
         'created_ts': self.now + datetime.timedelta(seconds=-1),
         # Due to time being late on the second requester frontend.
         'expiration_ts': self.now + datetime.timedelta(minutes=1, seconds=-1),
+        'expiration_delay': None,
         'queue_number': '0x5385bf749f3d2498',
         'task_slice_index': 0,
         'try_number': 1,
@@ -616,6 +626,7 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
       {
         'created_ts': self.now,
         'expiration_ts': self.now + datetime.timedelta(minutes=1),
+        'expiration_delay': None,
         'queue_number': '0x613fbb331f3d248e',
         'task_slice_index': 0,
         'try_number': 1,
@@ -647,6 +658,7 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
       {
         'created_ts': self.now,
         'expiration_ts': self.now + datetime.timedelta(minutes=1),
+        'expiration_delay': None,
         'queue_number': '0x1a3aa663153d248e',
         'task_slice_index': 0,
         'try_number': 1,
@@ -654,6 +666,7 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
       {
         'created_ts': self.now + datetime.timedelta(minutes=1),
         'expiration_ts': self.now + datetime.timedelta(minutes=2),
+        'expiration_delay': None,
         'queue_number': '0x1a3aa6631f3d2236',
         'task_slice_index': 0,
         'try_number': 1,
@@ -691,6 +704,7 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
       {
         'created_ts': self.now,
         'expiration_ts': self.now + datetime.timedelta(minutes=1),
+        'expiration_delay': None,
         'queue_number': '0x1a3aa6630c8ede72',
         'task_slice_index': 0,
         'try_number': 1,
@@ -698,6 +712,7 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
       {
         'created_ts': self.now + datetime.timedelta(minutes=1),
         'expiration_ts': self.now + datetime.timedelta(minutes=2),
+        'expiration_delay': None,
         'queue_number': '0x1a3aa6630c8ee0ca',
         'task_slice_index': 0,
         'try_number': 1,
@@ -731,6 +746,7 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
       {
         'created_ts': self.now + datetime.timedelta(minutes=1),
         'expiration_ts': self.now + datetime.timedelta(minutes=2),
+        'expiration_delay': None,
         'queue_number': '0x1a3aa6631f3d2236',
         'task_slice_index': 0,
         'try_number': 1,
@@ -738,6 +754,7 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
       {
         'created_ts': self.now,
         'expiration_ts': self.now + datetime.timedelta(minutes=1),
+        'expiration_delay': None,
         'queue_number': '0x1a3aa6631f3d248e',
         'task_slice_index': 0,
         'try_number': 1,
@@ -776,6 +793,7 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
       {
         'created_ts': self.now,
         'expiration_ts': self.now + datetime.timedelta(minutes=1),
+        'expiration_delay': None,
         'queue_number': '0x1a3aa663153d248e',
         'task_slice_index': 0,
         'try_number': 1,
@@ -783,6 +801,7 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
       {
         'created_ts': self.now + datetime.timedelta(minutes=1),
         'expiration_ts': self.now + datetime.timedelta(minutes=2),
+        'expiration_delay': None,
         'queue_number': '0x5385bf749f3d2236',
         'task_slice_index': 0,
         'try_number': 1,
@@ -820,6 +839,7 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
       {
         'created_ts': self.now,
         'expiration_ts': self.now + datetime.timedelta(minutes=1),
+        'expiration_delay': None,
         'queue_number': '0x54795e3c92bd248e',
         'task_slice_index': 0,
         'try_number': 1,

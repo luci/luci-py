@@ -1013,6 +1013,9 @@ class TaskResultSummary(_TaskResultCommon):
   # run.
   deduped_from = ndb.StringProperty(indexed=False)
 
+  # Delay from TaskRequest.expiratoin_ts to the actual expired time.
+  expiration_delay = ndb.FloatProperty(indexed=False)
+
   # Previous state, will be set in _pre_put_hook and compared in _post_pre_hook
   # with post state. It can be used for state transition actions. e.g. logging,
   # sending metrics

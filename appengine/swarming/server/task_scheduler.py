@@ -71,6 +71,9 @@ def _expire_task_tx(now, request, to_run_key, result_summary_key, capacity,
     result_summary_future.get_result()
     return None, None
 
+  # record expiration delay
+  to_run.expiration_delay = max(0, (now - to_run.expiration_ts).total_seconds())
+
   # In any case, dequeue the TaskToRun.
   to_run.queue_number = None
   to_run.expiration_ts = None
@@ -118,6 +121,8 @@ def _expire_task_tx(now, request, to_run_key, result_summary_key, capacity,
       result_summary.state = task_result.State.EXPIRED
     result_summary.abandoned_ts = now
     result_summary.completed_ts = now
+    result_summary.expiration_delay = max(
+        0, (now - request.expiration_ts).total_seconds())
   result_summary.modified_ts = now
 
   futures = ndb.put_multi_async(to_put)
@@ -193,6 +198,7 @@ def _expire_task(to_run_key, request, inline):
   if summary:
     logging.info(
         'Expired %s', task_pack.pack_result_summary_key(result_summary_key))
+    ts_mon_metrics.on_task_expired(summary, to_run_key.get())
   return summary, new_to_run
 
 

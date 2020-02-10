@@ -79,12 +79,17 @@ class TaskToRun(ndb.Model):
   # task is reenqueued.
   created_ts = ndb.DateTimeProperty(indexed=False)
 
+  # Everything above is immutable, everything below is mutable.
+
   # Moment by which this TaskSlice has to be requested by a bot.
   # expiration_ts is based on TaskSlice.expiration_ts. This is used to figure
   # out TaskSlice fallback and enable a cron job query to clean up stale tasks.
+  # This is reset to None at expiration not to be queried in the cron job.
   expiration_ts = ndb.DateTimeProperty()
 
-  # Everything above is immutable, everything below is mutable.
+  # Delay from the expiration_ts to the actual expired time in seconds.
+  # This is set at expiration process.
+  expiration_delay = ndb.FloatProperty(indexed=False)
 
   # priority and request creation timestamp are mixed together to allow queries
   # to order the results by this field to allow sorting by priority first, and

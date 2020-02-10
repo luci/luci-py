@@ -116,6 +116,25 @@ _tasks_expired = gae_ts_mon.CounterMetric(
     ])
 
 
+# Swarming-specific metric. Metric fields:
+# - project_id: e.g. 'chromium-swarm'
+_tasks_expiration_delay = gae_ts_mon.NonCumulativeDistributionMetric(
+    'swarming/tasks/expiration_delay',
+    'Delay of task expiration, in seconds.', [
+        gae_ts_mon.StringField('project_id'),
+    ])
+
+
+# Swarming-specific metric. Metric fields:
+# - project_id: e.g. 'chromium-swarm'
+_tasks_slice_expiration_delay = gae_ts_mon.NonCumulativeDistributionMetric(
+    'swarming/tasks/slice_expiration_delay',
+    'Delay of task slice expiration, in seconds.', [
+        gae_ts_mon.StringField('project_id'),
+        gae_ts_mon.IntegerField('slice_index'),
+    ])
+
+
 _task_bots_runnable = gae_ts_mon.CumulativeDistributionMetric(
     'swarming/tasks/bots_runnable',
     'Number of bots available to run tasks.', [
@@ -277,7 +296,7 @@ def _set_jobs_metrics(payload):
     jobs_total += 1
     summary = query_iter.next()
     status = state_map.get(summary.state, '')
-    fields = _extract_job_fields(summary.tags)
+    fields = _extract_job_fields(_tags_to_dict(summary.tags))
     target_fields = dict(_TARGET_FIELDS)
     if summary.bot_id:
       target_fields['hostname'] = 'autogen:' + summary.bot_id
@@ -399,8 +418,8 @@ class _ShardParams(object):
     })
 
 
-def _extract_job_fields(tags):
-  """Extracts common job's metric fields from TaskResultSummary.
+def _tags_to_dict(tags):
+  """Converts list of string tags to dict.
 
   Args:
     tags (list of str): list of 'key:value' strings.
@@ -412,7 +431,15 @@ def _extract_job_fields(tags):
       tags_dict[key] = value
     except ValueError:
       pass
+  return tags_dict
 
+
+def _extract_job_fields(tags_dict):
+  """Extracts common job's metric fields from TaskResultSummary.
+
+  Args:
+    tags_dict: tags dictionary.
+  """
   spec_name = tags_dict.get('spec_name')
   if not spec_name:
     spec_name = '%s:%s' % (
@@ -435,14 +462,14 @@ def _extract_job_fields(tags):
 
 def on_task_requested(summary, deduped):
   """When a task is created."""
-  fields = _extract_job_fields(summary.tags)
+  fields = _extract_job_fields(_tags_to_dict(summary.tags))
   fields['deduped'] = deduped
   _jobs_requested.increment(fields=fields)
 
 
 def on_task_completed(summary):
   """When a task is stopped from being processed."""
-  fields = _extract_job_fields(summary.tags)
+  fields = _extract_job_fields(_tags_to_dict(summary.tags))
   if summary.state == task_result.State.EXPIRED:
     _tasks_expired.increment(fields=fields)
     return
@@ -459,6 +486,21 @@ def on_task_completed(summary):
   _jobs_completed.increment(fields=completed_fields)
   if summary.duration is not None:
     _jobs_durations.add(summary.duration, fields=fields)
+
+
+def on_task_expired(summary, task_to_run):
+  """When a task slice is expired."""
+  tags_dict = _tags_to_dict(summary.tags)
+  fields = {'project_id': tags_dict.get('project', '')}
+
+  # slice expiration delay
+  _tasks_slice_expiration_delay.add(
+      task_to_run.expiration_delay,
+      fields=dict(fields, slice_index=task_to_run.task_slice_index))
+
+  # task expiration delay
+  if summary.expiration_delay:
+    _tasks_expiration_delay.add(summary.expiration_delay, fields=fields)
 
 
 def on_bot_auth_success(auth_method, condition):
