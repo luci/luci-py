@@ -381,28 +381,30 @@ class ValidationTestCase(test_case.TestCase):
               text='OK from https://ultimate.verifier', severity=logging.INFO)
         ])
     net.json_request_async.assert_any_call(
-      'https://bar.verifier',
-      method='POST',
-      payload={
-        'config_set': 'services/foo',
-        'path': 'bar.cfg',
-        'content': cfg_b64,
-      },
-      scopes=net.EMAIL_SCOPE,
-      use_jwt_auth=False,
-      audience=None,
+        'https://bar.verifier',
+        method='POST',
+        payload={
+            'config_set': 'services/foo',
+            'path': 'bar.cfg',
+            'content': cfg_b64,
+        },
+        deadline=50,
+        scopes=net.EMAIL_SCOPE,
+        use_jwt_auth=False,
+        audience=None,
     )
     net.json_request_async.assert_any_call(
-      'https://ultimate.verifier',
-      method='POST',
-      payload={
-        'config_set': 'services/foo',
-        'path': 'bar.cfg',
-        'content': cfg_b64,
-      },
-      scopes=net.EMAIL_SCOPE,
-      use_jwt_auth=False,
-      audience=None,
+        'https://ultimate.verifier',
+        method='POST',
+        payload={
+            'config_set': 'services/foo',
+            'path': 'bar.cfg',
+            'content': cfg_b64,
+        },
+        deadline=50,
+        scopes=net.EMAIL_SCOPE,
+        use_jwt_auth=False,
+        audience=None,
     )
 
     ############################################################################
@@ -417,28 +419,30 @@ class ValidationTestCase(test_case.TestCase):
               text='OK from https://ultimate.verifier', severity=logging.INFO)
         ])
     net.json_request_async.assert_any_call(
-      'https://bar2.verifier',
-      method='POST',
-      payload={
-        'config_set': 'projects/foo',
-        'path': 'bar.cfg',
-        'content': cfg_b64,
-      },
-      scopes=net.EMAIL_SCOPE,
-      use_jwt_auth=False,
-      audience=None,
+        'https://bar2.verifier',
+        method='POST',
+        payload={
+            'config_set': 'projects/foo',
+            'path': 'bar.cfg',
+            'content': cfg_b64,
+        },
+        deadline=50,
+        scopes=net.EMAIL_SCOPE,
+        use_jwt_auth=False,
+        audience=None,
     )
     net.json_request_async.assert_any_call(
-      'https://ultimate.verifier',
-      method='POST',
-      payload={
-        'config_set': 'projects/foo',
-        'path': 'bar.cfg',
-        'content': cfg_b64,
-      },
-      scopes=net.EMAIL_SCOPE,
-      use_jwt_auth=False,
-      audience=None,
+        'https://ultimate.verifier',
+        method='POST',
+        payload={
+            'config_set': 'projects/foo',
+            'path': 'bar.cfg',
+            'content': cfg_b64,
+        },
+        deadline=50,
+        scopes=net.EMAIL_SCOPE,
+        use_jwt_auth=False,
+        audience=None,
     )
 
     ############################################################################

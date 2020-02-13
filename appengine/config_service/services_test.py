@@ -120,6 +120,7 @@ class ProjectsTestCase(test_case.TestCase):
         'https://a.com/metadata',
         method='GET',
         payload=None,
+        deadline=50,
         scopes=net.EMAIL_SCOPE,
         use_jwt_auth=False,
         audience=None)
@@ -150,6 +151,7 @@ class ProjectsTestCase(test_case.TestCase):
         'https://a.com/metadata',
         method='GET',
         payload=None,
+        deadline=50,
         scopes=None,
         use_jwt_auth=True,
         audience='https://service.example.com')

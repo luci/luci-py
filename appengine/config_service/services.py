@@ -85,7 +85,10 @@ def call_service_async(service, url, method='GET', payload=None):
     net.Error on errors.
   """
   return net.json_request_async(
-      url, method=method, payload=payload,
+      url,
+      method=method,
+      payload=payload,
+      deadline=50,
       scopes=None if service.HasField('jwt_auth') else net.EMAIL_SCOPE,
       use_jwt_auth=service.HasField('jwt_auth'),
       audience=service.jwt_auth.audience or None)
