@@ -22,6 +22,7 @@ _VENDOR_MAPPING = {
             u'6646': u'Radeon R9 M280X',
             u'6779': u'Radeon HD 6450/7450/8450',
             u'679e': u'Radeon HD 7800',
+            u'67ef': u'Radeon RX 560',
             u'6821':
                 u'Radeon R8 M370X',  # 'HD 8800M' or 'R7 M380' based on rev_id
             u'683d': u'Radeon HD 7700',

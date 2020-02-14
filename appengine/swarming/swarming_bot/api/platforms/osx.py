@@ -539,6 +539,11 @@ def get_gpu():
     # string. Infer it from the vendor name instead.
     if not ven_id:
       ven_id = gpu.vendor_name_to_id(ven_name)
+    if not ven_id and 'spdisplays_vendor' in card:
+      match = re.search(r'sppci_vendor_([a-z]+)$', card['spdisplays_vendor'])
+      if match:
+        ven_name = match.group(1)
+        ven_id = gpu.vendor_name_to_id(ven_name)
     if not ven_id:
       ven_id = u'UNKNOWN'
     ven_name, dev_name = gpu.ids_to_names(ven_id, ven_name, dev_id, dev_name)

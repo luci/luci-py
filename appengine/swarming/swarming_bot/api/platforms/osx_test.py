@@ -95,6 +95,50 @@ class TestOsx(unittest.TestCase):
     disks_model = osx.get_disks_model()
     self.assertEqual((u'APPLE SSD AP0256M', u'APPLE SSD AP0257M'), disks_model)
 
+  @mock.patch('subprocess.check_output')
+  def test_get_gpu_radeon_rx560_egpu(self, mock_subprocess):
+    # Copied from actual output of 'system_profiler SPDisplaysDataType -xml' on
+    # a Macmini8,1 with a Sonnet eGFX Breakaway Puck Radeon RX 560 attached to
+    # Thunderbolt. Trimmed out irrelevant elements.
+    mock_subprocess.side_effect = [
+        """
+      <plist>
+      <array>
+        <dict>
+          <key>_items</key>
+          <array>
+            <dict>
+              <key>spdisplays_device-id</key>
+              <string>0x3e9b</string>
+              <key>spdisplays_vendor</key>
+              <string>Intel</string>
+              <key>sppci_device_type</key>
+              <string>spdisplays_gpu</string>
+              <key>sppci_model</key>
+              <string>Intel UHD Graphics 630</string>
+            </dict>
+            <dict>
+              <key>spdisplays_device-id</key>
+              <string>0x67ef</string>
+              <key>spdisplays_gpu_removable</key>
+              <string>spdisplays_yes</string>
+              <key>spdisplays_vendor</key>
+              <string>sppci_vendor_amd</string>
+              <key>sppci_device_type</key>
+              <string>spdisplays_egpu</string>
+              <key>sppci_model</key>
+              <string>Radeon RX 560</string>
+            </dict>
+          </array>
+        </dict>
+      </array>
+      </plist>"""
+    ]
+
+    gpus = osx.get_gpu()
+    self.assertEqual(([u'1002', u'1002:67ef', u'8086', u'8086:3e9b'],
+                      [u'AMD Radeon RX 560', u'Intel UHD Graphics 630']), gpus)
+
 
 if __name__ == '__main__':
   if '-v' in sys.argv:
