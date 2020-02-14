@@ -1,0 +1,156 @@
+// Copyright 2020 The LUCI Authors. All rights reserved.
+// Use of this source code is governed under the Apache License, Version 2.0
+// that can be found in the LICENSE file.
+
+// Messages that describe internal representation of LUCI Realms.
+//
+// They are produced and distributed by the LUCI Auth service based on a high
+// level representation fetched via LUCI Config from realms.cfg project config
+// files. See realms_config.proto in the auth service source code for schema.
+//
+// Comments in this file is the authoritative documentation of how LUCI services
+// should interpret realms when making authorization decisions.
+
+syntax = "proto3";
+
+package components.auth.realms;
+
+
+// Realms is complete definition of all known permissions and realms in a LUCI
+// deployment.
+//
+// It is generated and distributed across all LUCI services (as part of the
+// AuthDB) by the LUCI Auth service.
+message Realms {
+  // API version is incremented whenever the semantic meaning of Realms message
+  // changes in some backward incompatible way (e.g. some message grows a new
+  // field that *must* be checked by services). LUCI services must reject Realms
+  // messages that have API versions they don't recognize. It is a precaution
+  // against misinterpreting the realms configuration.
+  //
+  // The current version is 1.
+  int64 api_version = 1;
+
+  // List of all possible permissions in alphabetical order.
+  //
+  // Services may use this field to check that permissions they are about to use
+  // are actually known to the LUCI auth system. This is useful for debugging
+  // when adding or removing permissions.
+  //
+  // See Permission message for more details.
+  repeated Permission permissions = 2;
+
+  // List of all registered realms in alphabetical order.
+  //
+  // See Realm message for more details.
+  repeated Realm realms = 3;
+}
+
+
+// Permission is a symbol that has form "<service>.<subject>.<verb>", which
+// describes some elementary action ("<verb>") that can be done to some category
+// of resources ("<subject>"), managed by some particular kind of LUCI service
+// ("<service>").
+//
+// Within each individual realm (see Realm message), a principal (such as an end
+// user or a service account) can have zero or more permissions that describe
+// what this user can actually do to resources belonging to the realm. See Realm
+// message for the definition of what "belonging to the realm" means.
+//
+// Examples of permissions:
+//   * buildbucket.build.create
+//   * swarming.pool.listBots
+//   * swarming.task.cancel
+//
+// Note that permission names are composed of generic terms, not some specific
+// IDs of service deployments or resources. Generally, using a concrete
+// permission name in the service's source code as a constant should look
+// natural.
+//
+// Each individual LUCI service should document what permissions it checks and
+// when. It becomes a part of service's public API. Usually services should
+// check only permissions of resources they own (e.g. "<service>.<subject>.*"),
+// but in exceptional cases they may also check permissions intended for other
+// services. This is primarily useful for services that somehow "proxy" access
+// to resources.
+//
+// Field `permissions` in Realms message describes all permissions known to the
+// LUCI Auth service. The LUCI Auth service guarantees that all permissions
+// mentioned in all realms (in `realms` field) are among `permissions` set.
+//
+// If a LUCI service checks a permission that is no longer (or not yet) listed
+// in the `permissions` set, the check should succeed with "no permission"
+// result, and produce a warning in service's logs.
+//
+// Note that Permission is a proto message (and not just a string) to allow
+// attaching metadata to permissions in the future (for example "deprecated"
+// flag).
+message Permission {
+  string name = 1;  // "<service>.<subject>.<verb>"
+}
+
+
+// Realm is a named collection of (<principal>, <permission>) pairs.
+//
+// A LUCI resource can point to exactly one realm by referring to its name.
+// Such reference can either be calculated on the fly from other resource's
+// properties, or be stored alongside the resource's data. We say that such
+// resource "belongs to the realm" or "lives in the realm" or is just "in the
+// realm". The corresponding Realm message then describes who can do what to
+// the resource.
+//
+// The logic of how resources get assigned to realms is a part of the public API
+// of the service that owns resources. Some services may use a static realm
+// assignment via project configuration files, others may do it dynamically by
+// accepting a realm when a resource is created via an RPC.
+//
+// A realm name has form "<project>/<realm>", where "<project>" is a name of
+// the LUCI project that defined the realm, and "<realm>" is a user-provided
+// name of the realm from realms.cfg project config file.
+//
+// Each project can also have a special realm called "@default". The default
+// realm is used to handle a situation when resources refer to realms that no
+// longer exist (e.g. they were deleted from realms.cfg). LUCI services must
+// fallback to checking permissions in the default realm in this case. If the
+// default realm is not defined either, all permission check should succeed with
+// "no permission" result. Note that it is discouraged to explicitly put
+// resources in the default realm, it is often used only for owner-level access.
+//
+// The actual list of (<principal>, <permission>) pairs is defined via a list of
+// bindings, where each binding basically says "all these principals have all
+// these permissions". In other words, each binding defines some subset of
+// permissions and the overall realm permissions is a union of all such subsets.
+// Subsets defined by bindings may potentially intersect or be empty.
+//
+// The LUCI Auth service constructs bindings by interpreting realms.cfg project
+// configuration file using some set of rules. Individual LUCI services must
+// not care about what these rules really are. They should use only the end
+// result (in form of bindings). This allows to decouple the high-level
+// user-facing language for defining permissions from the implementation of each
+// individual LUCI service that checks permissions.
+message Realm {
+  // Name of the realm as "<project>/<realm>" string, where:
+  //   "<project>" is a LUCI project name, matches `^[a-z0-9\-_]{1,100}$`.
+  //   "<realm>" is a literal "@default" or matches `^[0-9a-z_\.\-\\]{1,400}$`.
+  string name = 1;
+
+  // A list of bindings in undefined order.
+  repeated Binding bindings = 2;
+}
+
+
+// Binding assigns all specified permissions to all specified principals.
+message Binding {
+  // Permissions in alphabetical order.
+  //
+  // This set is a subset of `permissions` in Realms message.
+  repeated string permissions = 1;
+
+  // A set of principals to grant all above permissions to.
+  //
+  // Each entry can either be an identity string (like "user:<email>") or a
+  // LUCI group reference "group:<name>".
+  //
+  // Ordered alphabetically.
+  repeated string principals = 2;
+}

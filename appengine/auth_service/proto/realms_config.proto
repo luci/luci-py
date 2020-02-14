@@ -1,0 +1,141 @@
+// Copyright 2020 The LUCI Authors. All rights reserved.
+// Use of this source code is governed under the Apache License, Version 2.0
+// that can be found in the LICENSE file.
+
+// Schema for realms.cfg project configuration file.
+//
+// RealmsCfg describes configuration of all realms of some single LUCI project.
+
+
+syntax = "proto3";
+
+package auth_service;
+
+
+// RealmsCfg defines a schema for realms.cfg project configuration file.
+message RealmsCfg {
+  // List of all realms in the project in arbitrary order.
+  repeated Realm realms = 1;
+
+  // Optional list of custom roles that can be referenced from Bindings in this
+  // project.
+  repeated CustomRole custom_roles = 2;
+}
+
+
+// Realm is a named collection of (<principal>, <permission>) pairs.
+//
+// A LUCI resource can point to exactly one realm by referring to its full
+// name ("<project>/<realm>"). We say that such resource "belongs to the realm"
+// or "lives in the realm" or is just "in the realm". The corresponding Realm
+// message then describes who can do what to the resource.
+//
+// The logic of how resources get assigned to realms is a part of the public API
+// of the service that owns resources. Some services may use a static realm
+// assignment via project configuration files, others may do it dynamically by
+// accepting a realm when a resource is created via an RPC.
+//
+// A realm can "extend" one or more other realms. If a realm `A` extends `B`,
+// then all permissions defined in `B` are also in `A`. Remembering that a realm
+// is just a set of (<principal>, <permission>) pairs, the "extend" relation is
+// just a set inclusion.
+//
+// The project can have a special realm called "@default". The default realm is
+// used to handle a situation when resources refer to realms that no longer
+// exist (e.g. they were deleted from realms.cfg). LUCI services fallback to
+// checking permissions in the default realm in this case. The default realm
+// also acts as the root of the realm tree (all realms "extend" the default
+// realm). In other words, permissions defined in the default realm are
+// propagated to all other realms in the project. The default realm usually
+// should be very small and contain only owner-level permissions.
+//
+// If the default realm is not defined, it is assumed to be empty.
+//
+// Finally, the primary way of populating the permission set of a realm is via
+// bindings. Each binding assigns a role to a set of principals. Since each role
+// is essentially just a set of permissions, each binding adds to the realm
+// a Cartesian product of a set of permissions (defined via the role) and a set
+// of principals (defined via a direct listing or via groups).
+message Realm {
+  // Name of the realm.
+  //
+  // Should match `^[0-9a-z_\.\-\\]{1,400}$` or be a literal "@default" (to
+  // define the permissions of the default realm of the project).
+  //
+  // Realm names must be unique within a project.
+  string name = 1;
+
+  // Optional list of realms whose permissions will be included in this realm.
+  //
+  // All realms implicitly extend "@default" realm, i.e. all permissions
+  // specified in the "@default" realm are propagated to all realms in
+  // the project.
+  //
+  // To keep the mental model simple, cycles aren't allowed (i.e. a realm is not
+  // allowed to directly or indirectly extend itself). The LUCI Config service
+  // will reject realms.cfg that contains cycles during the config validation
+  // phase.
+  repeated string extends = 2;
+
+  // List of bindings that define who can do what to resources in this realm.
+  repeated Binding bindings = 3;
+}
+
+
+// Binding assigns a role to all specified principals.
+message Binding {
+  // Name of the role to assign.
+  //
+  // Can either be a predefined role (if starts with "role/") or a custom role
+  // (if starts with "customRole/"). See TODO for a list of predefined roles
+  // and their meanings.
+  //
+  // A custom role must be defined somewhere in this realms.cfg file.
+  string role = 1;
+
+  // A set of principals to assign the role to.
+  //
+  // Each entry can either be an identity string (like "user:<email>") or a
+  // LUCI group reference "group:<name>".
+  repeated string principals = 2;
+}
+
+
+// Custom role defines a custom named set of permissions.
+//
+// Can be used in bindings if predefined roles are too broad or do not map well
+// to the desired set of permissions.
+//
+// Custom roles are scoped to the project (i.e. different projects may have
+// identically named, but semantically different custom roles).
+message CustomRole {
+  // Name of this custom role, must start with "customRole/".
+  string name = 1;
+
+  // Optional list of roles whose permissions will be included in this role.
+  //
+  // Each entry can either be a predefined role (if starts with "role/") or
+  // another custom role defined in this realms.cfg (if starts with
+  // "customRole/").
+  //
+  // To keep the mental model simple, cycles aren't allowed (i.e. a custom role
+  // is not allowed to directly or indirectly extend itself). The LUCI Config
+  // service will reject realms.cfg that contains cycles during the config
+  // validation phase.
+  repeated string extends = 2;
+
+  // Optional list of permissions to include in the role.
+  //
+  // Each permission is a symbol that has form "<service>.<subject>.<verb>",
+  // which describes some elementary action ("<verb>") that can be done to some
+  // category of resources ("<subject>"), managed by some particular kind of
+  // LUCI service ("<service>").
+  //
+  // Examples of permissions:
+  //   * buildbucket.build.create
+  //   * swarming.pool.listBots
+  //   * swarming.task.cancel
+  //
+  // See TODO for a list of all possible permissions.
+  repeated string permissions = 3;
+}
