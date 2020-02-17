@@ -394,6 +394,7 @@ def load_and_run(
     # This normally means run_command() didn't get the chance to run, as it
     # itself traps exceptions and will report accordingly. In this case, we want
     # the parent process to send the message instead.
+    logging.exception('Exception caught in run_command().')
     if not task_result:
       task_result = {
         u'exit_code': -1,
@@ -402,7 +403,6 @@ def load_and_run(
         u'must_signal_internal_failure': str(e.message or 'unknown error'),
         u'version': OUT_VERSION,
       }
-
   finally:
     # We've found tests to delete the working directory work_dir when quitting,
     # causing an exception here. Try to recreate the directory if necessary.
@@ -630,6 +630,8 @@ def run_command(remote, task_details, work_dir, cost_usd_hour,
   }
   if not remote.post_task_update(task_details.task_id, params):
     # Don't even bother, the task was already canceled.
+    logging.debug('Task has been already canceled. Won\'t start it. '
+                  'task_id: %s', task_details.task_id)
     return {
       u'exit_code': -1,
       u'hard_timeout': False,
@@ -675,6 +677,8 @@ def run_command(remote, task_details, work_dir, cost_usd_hour,
               cost_usd_hour * (monotonic_time() - task_start) / 60. / 60.)
           if not remote.post_task_update(task_details.task_id, params,
                                          buf.pop()):
+            logging.debug('Server induced stop; kill_sent: %s, term_sent: %s',
+                          kill_sent, term_sent)
             # Server is telling us to stop. Normally task cancellation.
             if not kill_sent and not term_sent:
               logging.warning('Server induced stop; sending SIGTERM')
@@ -809,6 +813,8 @@ def run_command(remote, task_details, work_dir, cost_usd_hour,
         # stats as the server prints errors if either are set in this case.
         # TODO(sethkoehler): Come up with some way to still send the exit_code
         # (and thus also duration/stats) without marking the task COMPLETED.
+        logging.debug('must_signal_internal_failure: True. '
+                      'Resetting exit_code and params.')
         exit_code = None
         params.pop('duration', None)
         params.pop('bot_overhead', None)
@@ -817,6 +823,8 @@ def run_command(remote, task_details, work_dir, cost_usd_hour,
         params.pop('cipd_pins', None)
       remote.post_task_update(task_details.task_id, params, buf.pop(),
                               exit_code)
+      logging.debug('Last task update finished. task_id: %s, exit_code: %s, '
+                    'params: %s.', task_details.task_id, exit_code, params)
       if must_signal_internal_failure:
         remote.post_task_error(task_details.task_id,
                                must_signal_internal_failure)
