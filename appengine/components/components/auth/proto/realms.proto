@@ -42,9 +42,11 @@ message Realms {
 
   // List of all possible permissions in alphabetical order.
   //
-  // Services may use this field to check that permissions they are about to use
-  // are actually known to the LUCI auth system. This is useful for debugging
-  // when adding or removing permissions.
+  // Acts as a universal set of permissions in Binding messages.
+  //
+  // Services may also use this field to check that permissions they are about
+  // to use are actually known to the LUCI auth system. This is useful for
+  // debugging when adding or removing permissions.
   //
   // See Permission message for more details.
   repeated Permission permissions = 2;
@@ -156,10 +158,16 @@ message Realm {
 
 // Binding assigns all specified permissions to all specified principals.
 message Binding {
-  // Permissions in alphabetical order.
+  // Permissions in increasing order of their indexes.
   //
-  // This set is a subset of `permissions` in Realms message.
-  repeated string permissions = 1;
+  // This set is a subset of `permissions` in the Realms message. Each element
+  // is an index of a permission in the `permissions` list in the Realms
+  // message.
+  //
+  // These indexes are not stable across different copies of Realms message.
+  // They must not be stored or processed in isolation from the containing
+  // Realms message.
+  repeated uint32 permissions = 1;
 
   // A set of principals to grant all above permissions to.
   //
