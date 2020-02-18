@@ -46,19 +46,19 @@ import SwarmingAppBoilerplate from '../SwarmingAppBoilerplate'
  *    Instead, dummy data will be used. Ideal for local testing.
  */
 const serverLogsURL = (ele, request, result) => {
-  let url, filter;
-  url = `https://console.cloud.google.com/logs/viewer`
+  let url = `https://console.cloud.google.com/logs/viewer`
   url += `?project=${ele._project_id}`
   url += `&resource=gae_app`
   if (request.created_ts) {
     // task creation request happens before record creation in DB
-    const timeStart = new Date(request.created_ts - 60*1000);
-    const timeEnd = result.completed_ts || result.abandoned_ts || new Date();
+    const timeStart = new Date(request.created_ts.getTime() - 60*1000)
+    const tsEnd = result.completed_ts || result.abandoned_ts
+    const timeEnd = tsEnd ? new Date(tsEnd.getTime() + 60*1000) : new Date()
     url += `&interval=CUSTOM`
     url += `&dateRangeStart=${timeStart.toISOString()}`
     url += `&dateRangeEnd=${timeEnd.toISOString()}`;
   }
-  filter = `resource.type="gae_app"\n`
+  let filter = `resource.type="gae_app"\n`
   // limit logs that we care
   filter += [
     `protoPayload.resource>="/internal/"`, // cron, task queue
@@ -68,6 +68,28 @@ const serverLogsURL = (ele, request, result) => {
   filter += '\n'
   // cut the last character that represents try number
   filter += `${ele._taskId.slice(0, -1)}`
+  url += `&advancedFilter=${filter}`
+  return encodeURI(url);
+}
+
+const botLogsURL = (ele, request, result, botProjectID) => {
+  let url = `https://console.cloud.google.com/logs/viewer`
+  url += `?project=${botProjectID}`
+  if (result.started_ts) {
+    const timeStart = new Date(result.started_ts.getTime() - 60*1000)
+    const tsEnd = result.completed_ts || result.abandoned_ts
+    const timeEnd = tsEnd ? new Date(tsEnd.getTime() + 60*1000) : new Date()
+    url += `&interval=CUSTOM`
+    url += `&dateRangeStart=${timeStart.toISOString()}`
+    url += `&dateRangeEnd=${timeEnd.toISOString()}`;
+  }
+  // limit logs that we care
+  // TODO(jwata): Non GCE bots will need a different label.
+  let filter = `labels."compute.googleapis.com/resource_name"="${result.bot_id}"\n`
+  filter += [
+    `logName:"projects/${botProjectID}/logs/swarming"`,
+    `logName:"projects/${botProjectID}/logs/chromebuild"`
+  ].join(" OR ")
   url += `&advancedFilter=${filter}`
   return encodeURI(url);
 }
@@ -553,12 +575,6 @@ const taskTimingSection = (ele, request, result) => {
           ${result.human_duration}
         </td>
       </tr>
-      <tr>
-        <td>Server Logs</td>
-        <td>
-          <a href=${serverLogsURL(ele, request, result)} target="_blank">View logs on Cloud Console</a>
-        </td>
-      </tr>
     </tbody>
   </table>
   <div class=right>
@@ -568,6 +584,45 @@ const taskTimingSection = (ele, request, result) => {
       .values=${durationChart(result)}>
     </stacked-time-chart>
   </div>
+</div>
+`;
+}
+
+const logsSection = (ele, request, result) => {
+  if (!ele._taskId || ele._notFound) {
+    return '';
+  }
+  let botProjectID = null
+  if (result && result.bot_dimensions) {
+    for (const dim of result.bot_dimensions) {
+      if (dim.key != 'gcp') continue
+      botProjectID = dim.value[0]
+    }
+  }
+  return html`
+<div class=title>Logs Information</div>
+<div class="horizontal layout wrap">
+  <table class="task-info left">
+    <tbody>
+      <tr>
+        <td>Server Logs</td>
+        <td>
+          <a href=${serverLogsURL(ele, request, result)} target="_blank">
+            View on Cloud Console
+          </a>
+        </td>
+      </tr>
+      <tr>
+        <td>Bot Logs</td>
+        <td>
+          <a href=${botLogsURL(ele, request, result, botProjectID)} target="_blank" ?hidden=${!botProjectID}>
+            View on Cloud Console
+          </a>
+          <p ?hidden=${botProjectID}>--</p>
+        </td>
+      </tr>
+    </tbody>
+  </table>
 </div>
 `;
 }
@@ -892,6 +947,8 @@ const template = (ele) => html`
     ${taskInfoTable(ele, ele._request, ele._result, ele._currentSlice)}
 
     ${taskTimingSection(ele, ele._request, ele._result)}
+
+    ${logsSection(ele, ele._request, ele._result)}
 
     ${taskExecutionSection(ele, ele._request, ele._result, ele._currentSlice)}
 

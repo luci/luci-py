@@ -50,6 +50,12 @@ export const taskResults = [
       },
       {
         "value": [
+          "google.com:chromecompute"
+        ],
+        "key": "gcp"
+      },
+      {
+        "value": [
           "none"
         ],
         "key": "gpu"
@@ -118,7 +124,7 @@ export const taskResults = [
           "us-east1-b"
         ],
         "key": "zone"
-      }
+      },
     ],
     "bot_version": "31e15677c83a483c3fc713eb537f60555797bef859c50bbe39c1de2a413adf38",
     "task_id": "testid000",
@@ -322,6 +328,18 @@ export const taskResults = [
           "x86-64-avx2"
         ],
         "key": "cpu"
+      },
+      {
+        "value": [
+          "1"
+        ],
+        "key": "gce"
+      },
+      {
+        "value": [
+          "google.com:chromecompute"
+        ],
+        "key": "gcp"
       },
       {
         "value": [
