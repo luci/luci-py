@@ -25,6 +25,7 @@
     "web-animations-js": "^2.3.0"
   },
   "devDependencies": {
+    "polymer-cli": "^1.0.0",
     "wct-browser-legacy": "^1.0.1"
   }
 }
