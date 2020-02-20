@@ -218,6 +218,51 @@ def find_app_yamls(app_dir):
   return sorted(yamls)
 
 
+def expand_luci_gae_vars(body, app_id):
+  """Returns a copy of `body` with expanded luci_gae_vars."""
+  varz = body.get('luci_gae_vars', None)
+  if not varz:
+    return body
+
+  # Grab the mapping "variable name => its value" for the given app_id.
+  if not isinstance(varz, dict):
+    raise ValueError('luci_gae_vars section must be a dict')
+  if app_id not in varz:
+    raise ValueError(
+        'no configuration for %s, it is not not in luci_gae_vars' % app_id)
+  mapping = varz[app_id]
+  if not isinstance(mapping, dict):
+    raise ValueError('bad value for %s in luci_gae_vars, not a dict' % app_id)
+
+  # Convert KEY into ${KEY} to simplify direct lookups.
+  mapping = {('${%s}' % k): v for k, v in mapping.items()}
+
+  # The callback used by re.sub.
+  def pick_value(match):
+    v = match.group(0)
+    if v in mapping:
+      return str(mapping[v])
+    raise ValueError('%s is not defined in luci_gae_vars for %s' % (v, app_id))
+
+  # Recursively visit all sections and replace ${NAME} with the corresponding
+  # value. Note that we handle only types that can appear as a result of YAML
+  # deserialization (e.g. tuples can't).
+  def sub(x):
+    if isinstance(x, basestring):
+      if x in mapping:
+        return mapping[x]  # preserve the type! useful for int-valued vars
+      return re.sub(r'\$\{[\w]+\}', pick_value, x)
+    if isinstance(x, dict):
+      return {k: sub(v) for k, v in x.items()}
+    if isinstance(x, list):
+      return [sub(v) for v in x]
+    return x
+
+  body = body.copy()
+  body.pop('luci_gae_vars')
+  return sub(body)
+
+
 def is_app_dir(path):
   """Returns True if |path| is structure like GAE app directory."""
   try:
@@ -487,52 +532,62 @@ class Application(object):
     # deploying it first "enables" the application, or so it seems.
     mods.sort(key=lambda x: '' if x == 'default' else x)
 
-    # Will contain paths to service YAMLs and to all extra YAMLs, like
-    # cron.yaml.
-    yamls = []
-
-    # 'gcloud' barfs at 'application' and 'version' fields in app.yaml. Hack
-    # them away. Eventually all app.yaml must be updated to not specify
-    # 'application' or 'version'.
+    # List of temp YAMLs we wrote and need to delete before exiting.
     hacked = []
-    for m in mods:
-      stripped = m.data.copy()
-      stripped.pop('application', None)
-      stripped.pop('version', None)
-      if stripped == m.data:
-        yamls.append(m.path)  # the original YAML is good enough
-      else:
-        # Need to write a hacked version, in same directory, so all paths are
-        # relative.
-        #
-        # TODO(vadimsh): Make this a hard error.
-        logging.error(
-            'Please remove "application" and "version" keys from %s', m.path)
-        fname = os.path.basename(m.path)
-        hacked_path = os.path.join(os.path.dirname(m.path), '._gae_py_' + fname)
-        with open(hacked_path, 'w') as f:
-          json.dump(stripped, f)  # JSON is YAML, so whatever
-        yamls.append(hacked_path)
-        hacked.append(hacked_path)  # to know what to delete later
-
-    # Deploy all other stuff too. 'app deploy' is a polyglot.
-    possible_extra = [
-      os.path.join(self.default_service_dir, 'index.yaml'),
-      os.path.join(self.default_service_dir, 'queue.yaml'),
-      os.path.join(self.default_service_dir, 'cron.yaml'),
-      os.path.join(self.default_service_dir, 'dispatch.yaml'),
-    ]
-    for extra in possible_extra:
-      if extra and os.path.isfile(extra):
-        yamls.append(extra)
 
     try:
+      # Will contain paths to service YAMLs and to all extra YAMLs, like
+      # cron.yaml.
+      yamls = []
+
+      # 'gcloud' barfs at 'application' and 'version' fields in app.yaml. Hack
+      # them away. Eventually all app.yaml must be updated to not specify
+      # 'application' or 'version'. Additionally, handle hacky luci_gae_vars
+      # sections by reading vars from them and substituting their values into
+      # the rest of the YAML, see expand_luci_gae_vars.
+      for m in mods:
+        modified = m.data.copy()
+        modified.pop('application', None)
+        modified.pop('version', None)
+        try:
+          modified = expand_luci_gae_vars(modified, self.app_id)
+        except ValueError as exc:
+          raise ValueError('Bad %s: %s' % (os.path.basename(m.path), exc))
+        if modified == m.data:
+          yamls.append(m.path)  # the original YAML is good enough
+        else:
+          if 'application' in m.data or 'version' in m.data:
+            logging.error('Remove "application" and "version" from %s', m.path)
+          # Need to write a hacked version in same directory, so all paths are
+          # relative.
+          fnm = os.path.basename(m.path)
+          hacked_path = os.path.join(os.path.dirname(m.path), '._gae_py_' + fnm)
+          hacked_body = json.dumps(
+              modified, sort_keys=True, indent=2, separators=(',', ': '))
+          logging.debug('Replacing "%s" with\n%s', fnm, hacked_body)
+          with open(hacked_path, 'w') as f:
+            f.write(hacked_body)  # JSON is YAML, so whatever
+          yamls.append(hacked_path)
+          hacked.append(hacked_path)  # to know what to delete later
+
+      # Deploy all other stuff too. 'app deploy' is a polyglot.
+      possible_extra = [
+        os.path.join(self.default_service_dir, 'index.yaml'),
+        os.path.join(self.default_service_dir, 'queue.yaml'),
+        os.path.join(self.default_service_dir, 'cron.yaml'),
+        os.path.join(self.default_service_dir, 'dispatch.yaml'),
+      ]
+      for extra in possible_extra:
+        if extra and os.path.isfile(extra):
+          yamls.append(extra)
+
       self.run_gcloud(
           ['app', 'deploy'] + yamls +
           [
             '--version', version, '--quiet',
             '--no-promote', '--no-stop-previous-version',
           ])
+
     finally:
       for h in hacked:
         os.remove(h)
