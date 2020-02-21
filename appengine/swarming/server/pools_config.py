@@ -532,7 +532,8 @@ def _validate_external_services_cipd(ctx, cfg):
       _validate_url(ctx, cfg.server)
 
     with ctx.prefix('client_package '):
-      if not cipd.is_valid_package_name(cfg.client_package.package_name):
+      if not cipd.is_valid_package_name_template(
+          cfg.client_package.package_name):
         ctx.error('is invalid "%s"', cfg.client_package.package_name)
 
     with ctx.prefix('client_version '):
