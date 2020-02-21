@@ -356,7 +356,7 @@ class TasksApiTest(BaseTest):
         },
     )
     expected_props[u'cipd_input'][u'client_package'] = {
-      u'package_name': u'infra/tools/cipd/${platform}',
+      u'package_name': u'cipd-client-pkg',
       u'version': u'from_pool_config',
     }
     expected_props[u'cipd_input'][u'server'] = (
@@ -725,7 +725,7 @@ class TasksApiTest(BaseTest):
     expected_props = self.gen_props(
         cipd_input={
           u'client_package': {
-            u'package_name': u'infra/tools/cipd/${platform}',
+            u'package_name': u'cipd-client-pkg',
             u'version': u'from_pool_config',
           },
           u'packages': [

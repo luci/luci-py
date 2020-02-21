@@ -17,6 +17,7 @@ from components import utils
 from components.config import validation
 from test_support import test_case
 
+from proto.config import config_pb2
 from proto.config import pools_pb2
 from server import pools_config
 from server import task_request
@@ -65,7 +66,10 @@ TEST_CONFIG = pools_pb2.PoolsCfg(
       ),
       cipd=pools_pb2.ExternalServices.CIPD(
         server='https://cipd.server.example.com',
-        client_version='latest',
+        client_package=config_pb2.CipdPackage(
+          package_name='some-cipd-client',
+          version='latest',
+        ),
       )
     ),
     bot_monitoring=[
@@ -121,6 +125,7 @@ class PoolsConfigTest(test_case.TestCase):
         ),
         default_cipd=pools_config.CipdServer(
           server='https://cipd.server.example.com',
+          package_name='some-cipd-client',
           client_version='latest',
         ),
         external_schedulers=(
@@ -149,7 +154,10 @@ class PoolsConfigTest(test_case.TestCase):
           isolate=pools_pb2.ExternalServices.Isolate(**kwargs),
           cipd=pools_pb2.ExternalServices.CIPD(
             server="https://example.com",
-            client_version="test",
+            client_package=config_pb2.CipdPackage(
+              package_name='some-cipd-client',
+              version='test',
+            ),
           ),
         ))
 
@@ -190,27 +198,35 @@ class PoolsConfigTest(test_case.TestCase):
         ])
 
   def test_validate_external_services_cipd(self):
-    def msg(**kwargs):
+    def msg(server=None, package_name=None, version=None):
       return pools_pb2.PoolsCfg(
         default_external_services=pools_pb2.ExternalServices(
           isolate=pools_pb2.ExternalServices.Isolate(
             server="https://example.com",
             namespace="test",
           ),
-          cipd=pools_pb2.ExternalServices.CIPD(**kwargs),
+          cipd=pools_pb2.ExternalServices.CIPD(
+            server=server,
+            client_package=config_pb2.CipdPackage(
+              package_name=package_name,
+              version=version,
+            ),
+          )
         ))
 
     self.validator_test(
         msg(),
         [
           'cipd server is not set',
+          'cipd client_package is invalid ""',
           'cipd client_version is invalid ""',
         ])
 
     self.validator_test(
         msg(
             server='chrome-infra-packages.appspot.com',
-            client_version='git_revision:deadbeef',
+            package_name='some-cipd-package',
+            version='git_revision:deadbeef',
         ),
         [
           'cipd server must start with "https://" or "http://localhost"',
@@ -219,7 +235,8 @@ class PoolsConfigTest(test_case.TestCase):
     self.validator_test(
         msg(
             server='https://chrome-infra-packages.appspot.com',
-            client_version='git_revision:deadbeef',
+            package_name='some-cipd-package',
+            version='git_revision:deadbeef',
         ),
         [])
 

@@ -154,6 +154,7 @@ class AppTestBase(test_case.TestCase):
       )
       default_cipd = pools_config.CipdServer(
         server='https://pool.config.cipd.example.com',
+        package_name='cipd-client-pkg',
         client_version='from_pool_config',
       )
       return pools_config._PoolsCfg(

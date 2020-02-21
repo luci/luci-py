@@ -144,7 +144,13 @@ def get_or_raise(key):
 
 
 def apply_server_property_defaults(properties):
-  """Fills ndb task properties with default values read from server settings."""
+  """Fills ndb task properties with default values read from server settings.
+
+  Essentially:
+   - If a property is set by the task explicitly, use that. Else:
+   - If a property is set by the task's template, use that. Else:
+   - If a property is set by the server's settings.cfg, use that.
+  """
   settings = config.settings()
   # TODO(iannucci): This was an artifact of the existing test harnesses;
   # get_pool_config raises on None, but the way it's mocked in
@@ -172,9 +178,11 @@ def apply_server_property_defaults(properties):
         properties.inputs_ref.namespace or iso_ns)
 
   cipd_server = settings.cipd.default_server
+  cipd_client = settings.cipd.default_client_package.package_name
   cipd_vers = settings.cipd.default_client_package.version
   if pool_cfg and pool_cfg.default_cipd:
     cipd_server = pool_cfg.default_cipd.server
+    cipd_client = pool_cfg.default_cipd.package_name
     cipd_vers = pool_cfg.default_cipd.client_version
 
   if cipd_server and properties.cipd_input:
@@ -185,7 +193,7 @@ def apply_server_property_defaults(properties):
     # TODO(iannucci) - finish removing 'client_package' as a task-configurable
     # setting.
     properties.cipd_input.client_package.package_name = (
-      'infra/tools/cipd/${platform}')
+        properties.cipd_input.client_package.package_name or cipd_client)
     properties.cipd_input.client_package.version = (
         properties.cipd_input.client_package.version or cipd_vers)
 

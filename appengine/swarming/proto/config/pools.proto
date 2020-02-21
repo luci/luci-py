@@ -8,6 +8,8 @@ package swarming.config;
 
 option go_package = "go.chromium.org/luci/swarming/proto/config;configpb";
 
+import "config.proto";
+
 // Schema for pools.cfg service config file in luci-config.
 //
 // It defined a set of Pool objects, each one corresponding to a single Swarming
@@ -423,6 +425,9 @@ message ExternalServices {
   Isolate isolate = 1;
 
   message CIPD {
+    reserved 2; // Used to be "client_version", no longer used.
+    reserved "client_version";
+
     // (required) URL of the default CIPD server to use, if it is not specified
     // in the task.
     //
@@ -431,10 +436,10 @@ message ExternalServices {
     // e.g. "https://chrome-infra-packages.appspot.com"
     string server = 1;
 
-    // (required) The version of the cipd client to use. This is the
+    // (required) The version of the cipd client to use. This is likely the
     // 'infra/tools/cipd/${platform}' package, but because it's part of the
     // bootstrap needs special logic to handle its installation.
-    string client_version = 2;
+    CipdPackage client_package = 3;
   }
   CIPD cipd = 2;
 }

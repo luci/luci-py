@@ -67,6 +67,7 @@ IsolateServer = collections.namedtuple('IsolateServer', [
 
 CipdServer = collections.namedtuple('CipdServer', [
   'server',
+  'package_name',
   'client_version',
 ])
 
@@ -530,9 +531,13 @@ def _validate_external_services_cipd(ctx, cfg):
     with ctx.prefix('server '):
       _validate_url(ctx, cfg.server)
 
+    with ctx.prefix('client_package '):
+      if not cipd.is_valid_package_name(cfg.client_package.package_name):
+        ctx.error('is invalid "%s"', cfg.client_package.package_name)
+
     with ctx.prefix('client_version '):
-      if not cipd.is_valid_version(cfg.client_version):
-        ctx.error('is invalid "%s"', cfg.client_version)
+      if not cipd.is_valid_version(cfg.client_package.version):
+        ctx.error('is invalid "%s"', cfg.client_package.version)
 
 
 def _validate_external_services(ctx, cfg):
@@ -568,7 +573,10 @@ def _fetch_pools_config():
   if cfg.HasField('default_external_services'):
     ext = cfg.default_external_services
     default_isolate = IsolateServer(ext.isolate.server, ext.isolate.namespace)
-    default_cipd = CipdServer(ext.cipd.server, ext.cipd.client_version)
+    default_cipd = CipdServer(
+        ext.cipd.server,
+        ext.cipd.client_package.package_name,
+        ext.cipd.client_package.version)
 
   pools = {}
   for msg in cfg.pool:
