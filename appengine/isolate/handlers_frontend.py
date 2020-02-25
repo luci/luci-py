@@ -16,6 +16,7 @@ from google.appengine.api import modules
 
 import acl
 import config
+import gae_ts_mon
 import gcs
 import handlers_endpoints_v1
 import mapreduce_jobs
@@ -191,6 +192,8 @@ class RestrictedLaunchMapReduceJob(auth.AuthenticatingHandler):
 
 
 class BrowseHandler(auth.AuthenticatingHandler):
+
+  @gae_ts_mon.instrument_endpoint()
   @auth.autologin
   @auth.require(acl.isolate_readable)
   def get(self):
@@ -220,6 +223,8 @@ class BrowseHandler(auth.AuthenticatingHandler):
 
 
 class ContentHandler(auth.AuthenticatingHandler):
+
+  @gae_ts_mon.instrument_endpoint()
   @auth.autologin
   @auth.require(acl.isolate_readable)
   def get(self):
