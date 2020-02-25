@@ -81,25 +81,35 @@ class NetTest(test_case.TestCase):
 
   def test_request_works(self):
     self.mock_urlfetch([
-      ({
-        'deadline': 123,
-        'headers': {'Accept': 'text/plain', 'Authorization': 'Bearer token'},
-        'method': 'POST',
-        'payload': 'post body',
-        'url': 'http://localhost/123?a=%3D&b=%26',
-      }, Response(200, 'response body', {})),
+        ({
+            'deadline': 123,
+            'headers': {
+                'Accept': 'text/plain',
+                'Authorization': 'Bearer token'
+            },
+            'method': 'POST',
+            'payload': 'post body',
+            'url': 'http://localhost/123?a=%3D&b=%26',
+        }, Response(200, 'response body', {'example-header': 'example-value'})),
     ])
+    response_headers = {}
     response = net.request(
         url='http://localhost/123',
         method='POST',
         payload='post body',
-        params={'a': '=', 'b': '&'},
+        params={
+            'a': '=',
+            'b': '&'
+        },
         headers={'Accept': 'text/plain'},
         scopes=['scope'],
         service_account_key=auth.ServiceAccountKey('a', 'b', 'c'),
         deadline=123,
-        max_attempts=5)
+        max_attempts=5,
+        response_headers=response_headers,
+    )
     self.assertEqual('response body', response)
+    self.assertEqual('example-value', response_headers['example-header'])
 
   def test_request_project_token_fallback_works(self):
     @ndb.tasklet

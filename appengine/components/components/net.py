@@ -86,7 +86,9 @@ def request_async(
     use_jwt_auth=None,
     audience=None,
     deadline=None,
-    max_attempts=None):
+    max_attempts=None,
+    response_headers=None,
+):
   """Sends a REST API request, returns raw unparsed response.
 
   Retries the request on transient errors for up to |max_attempts| times.
@@ -107,6 +109,7 @@ def request_async(
               must only be set when use_jwt_auth is True.
     deadline: deadline for a single attempt (10 sec by default).
     max_attempts: how many times to retry on errors (4 times by default).
+    response_headers: a dict to populate with the response headers.
 
   Returns:
     Buffer with raw response.
@@ -206,6 +209,8 @@ def request_async(
           response.status_code, response.content, headers=response.headers)
 
     # Success. Beware of large responses.
+    if response_headers is not None:
+      response_headers.update(response.headers)
     if len(response.content) > 1024 * 1024:
       logging.warning('Response size: %.1f KiB', len(response.content) / 1024.0)
     raise ndb.Return(response.content)

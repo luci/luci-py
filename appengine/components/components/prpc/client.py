@@ -97,15 +97,17 @@ class ProtocolError(Error):
 
 
 @ndb.tasklet
-def rpc_async(req):
+def rpc_async(req, response_metadata=None):
   """Sends an asynchronous pRPC request.
 
   This API is low level. Most users should use Client class instead.
 
   Args:
     req (Request): a pRPC request.
+    response_metadata (dict): a dict to populate with the response's metadata.
 
-  Returns the response message if the RPC status code is OK.
+  Returns the response message if the RPC status code is OK, if given,
+  populates response_metadata with the response's headers.
   Otherwise raises an Error.
   """
 
@@ -138,6 +140,7 @@ def rpc_async(req):
         delegation_token=req.delegation_token,
         deadline=timeout,
         max_attempts=req.max_attempts or 4,
+        response_headers=response_metadata,
     )
     # Unfortunately, net module does not expose headers of HTTP 200
     # responses.
@@ -241,9 +244,15 @@ class Client(object):
         self._full_service_name, method_desc.name)
 
     def method_async(  # pylint: disable=redefined-outer-name
-        request, timeout=None, metadata=None, credentials=None):
-      # The signature of this function must match
+        request,
+        timeout=None,
+        metadata=None,
+        credentials=None,
+        response_metadata=None):
+      # The signature of this function was originally supposed to match
       # https://grpc.io/grpc/python/grpc.html#grpc.UnaryUnaryMultiCallable.__call__
+      # But a new optional argument has been added to return the response's
+      # metadata.
 
       prpc_req = new_request(
           hostname=self._hostname,
@@ -262,7 +271,7 @@ class Client(object):
           'components.prpc.client module')
         prpc_req = credentials(prpc_req)
 
-      return rpc_async(prpc_req)
+      return rpc_async(prpc_req, response_metadata=response_metadata)
 
     def method(*args, **kwargs):
       return method_async(*args, **kwargs).get_result()

@@ -66,15 +66,16 @@ class PRPCClientTestCase(test_case.TestCase):
           method='POST',
           payload=req.SerializeToString(),
           headers={
-            'Content-Type': 'application/prpc; encoding=binary',
-            'Accept': 'application/prpc; encoding=binary',
-            'X-Prpc-Timeout': '10S',
+              'Content-Type': 'application/prpc; encoding=binary',
+              'Accept': 'application/prpc; encoding=binary',
+              'X-Prpc-Timeout': '10S',
           },
           scopes=None,
           service_account_key=None,
           delegation_token=None,
           deadline=10,
           max_attempts=4,
+          response_headers=None,
       )
 
   def give_creds(self, creds):
