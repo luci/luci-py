@@ -395,6 +395,34 @@ class BotManagementTest(test_case.TestCase):
         ['bot_connected', 5, 'request_task', 5],
         memcache.get('id1:2010-01-02T03:04', namespace='BotEvents'))
 
+  def test_bot_event_update_dimensions(self):
+    # 'bot_connected' event registers only id and pool at first handshake.
+    _bot_event(event_type='bot_connected')
+    bot_info = bot_management.get_info_key('id1').get()
+    self.assertEqual(bot_info.dimensions_flat, [u'id:id1', u'pool:default'])
+
+    # 'request_sleep' stores given dimensions at first polling.
+    _bot_event(event_type='request_sleep')
+    self.assertEqual(
+        bot_info.dimensions_flat,
+        [u'id:id1', u'os:Ubuntu', u'os:Ubuntu-16.04', u'pool:default'])
+
+    # 'bot_connected' keeps dimensions if the given dimensions are the same with
+    # the stored ones.
+    _bot_event(event_type='bot_connected')
+    self.assertEqual(
+        bot_info.dimensions_flat,
+        [u'id:id1', u'os:Ubuntu', u'os:Ubuntu-16.04', u'pool:default'])
+
+    # 'bot_connected' resets dimensions only with id and pool
+    # if they have changed. e.g. OS update
+    _bot_event(event_type='bot_connected', dimensions={
+        u'id': [u'id1'],
+        u'pool': [u'default'],
+        u'os': ['Ubuntu', 'Ubuntu-16.05']
+    })
+    self.assertEqual(bot_info.dimensions_flat, [u'id:id1', u'pool:default'])
+
   def test_get_info_key(self):
     self.assertEqual(
         ndb.Key(bot_management.BotRoot, 'foo', bot_management.BotInfo, 'info'),
