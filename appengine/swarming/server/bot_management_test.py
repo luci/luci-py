@@ -106,13 +106,16 @@ def _gen_bot_info(**kwargs):
 
 
 def _gen_bot_event(**kwargs):
+  dimensions = {
+    u'id': [u'id1'],
+    u'os': [u'Ubuntu', u'Ubuntu-16.04'],
+    u'pool': [u'default'],
+  }
+  if kwargs['event_type'] == 'bot_connected':
+    del dimensions[u'os']
   out = {
     'authenticated_as': u'bot:id1.domain',
-    'dimensions': {
-      u'id': [u'id1'],
-      u'os': [u'Ubuntu', u'Ubuntu-16.04'],
-      u'pool': [u'default'],
-    },
+    'dimensions': dimensions,
     'external_ip': u'8.8.4.4',
     'last_seen_ts': None,
     'lease_id': None,
@@ -255,8 +258,9 @@ class BotManagementTest(test_case.TestCase):
       u'os': [u'Ubuntu', u'Ubuntu-16.04'],
       u'pool': [u'default'],
     }
+    event = 'request_sleep'
     bot_management.bot_event(
-        event_type='bot_connected', bot_id='id1',
+        event_type=event, bot_id='id1',
         external_ip='8.8.4.4', authenticated_as='bot:id1.domain',
         dimensions=d, state={'ram': 65}, version=_VERSION, quarantined=False,
         maintenance_msg=None, task_id=None, task_name=None)
@@ -266,7 +270,7 @@ class BotManagementTest(test_case.TestCase):
         expected, bot_management.get_info_key('id1').get().to_dict())
 
     self.assertEqual(
-        ['bot_connected', 5],
+        [event, 5],
         memcache.get('id1:2010-01-02T03:04', namespace='BotEvents'))
 
   @parameterized.expand([
@@ -414,7 +418,7 @@ class BotManagementTest(test_case.TestCase):
 
     # A bot comes online. There's some capacity now.
     _bot_event(
-        event_type='bot_connected',
+        event_type='request_sleep',
         dimensions={'id': ['id1'], 'pool': ['default'], 'os': ['Ubuntu',
           'Ubuntu-16.04']})
     self.assertEqual(1, bot_management.BotInfo.query().count())
@@ -432,7 +436,7 @@ class BotManagementTest(test_case.TestCase):
     d = {u'pool': [u'default'], u'os': [u'Ubuntu-16.04']}
     botid = 'id1'
     _bot_event(
-        event_type='bot_connected',
+        event_type='request_sleep',
         dimensions={'id': [botid], 'pool': ['default'], 'os': ['Ubuntu',
           'Ubuntu-16.04']})
     self.assertEqual(True, bot_management.has_capacity(d))
@@ -459,16 +463,17 @@ class BotManagementTest(test_case.TestCase):
           is_dead=False, is_busy=None)
       self.assertEqual(alive, [t.to_dict() for t in q])
 
-    _bot_event(event_type='bot_connected')
+    _bot_event(event_type='request_sleep')
     # One second before the timeout value.
     then = self.mock_now(self.now, timeout-1)
     _bot_event(
-        event_type='bot_connected',
+        event_type='request_sleep',
         bot_id='id2',
         external_ip='8.8.4.4', authenticated_as='bot:id2.domain',
         dimensions={'id': ['id2'], 'foo': ['bar']})
 
-    bot1_alive = _gen_bot_info(first_seen_ts=self.now, last_seen_ts=self.now)
+    bot1_alive = _gen_bot_info(
+        first_seen_ts=self.now, last_seen_ts=self.now)
     bot1_dead = _gen_bot_info(
         first_seen_ts=self.now,
         last_seen_ts=self.now,
@@ -567,19 +572,22 @@ class BotManagementTest(test_case.TestCase):
     self.mock_now(self.now, 20)
     _bot_event(event_type='request_sleep')
     self.mock_now(self.now, 30)
-    _bot_event(event_type='request_sleep', quarantined=True)
+    _bot_event(event_type='request_sleep')
     self.mock_now(self.now, 40)
+    _bot_event(event_type='request_sleep', quarantined=True)
+    self.mock_now(self.now, 50)
     _bot_event(event_type='request_task', task_id='12311', task_name='yo')
-    end = self.mock_now(self.now, 50)
+    end = self.mock_now(self.now, 60)
 
     # normal request_sleep is not streamed.
-    self.assertEqual((3, 0), bot_management.task_bq_events(start, end))
+    self.assertEqual((4, 0), bot_management.task_bq_events(start, end))
     self.assertEqual(1, len(payloads))
     actual_rows = payloads[0]
     expected = [
         'id1:2010-01-02T03:04:15.000006Z',  # bot_connected
-        'id1:2010-01-02T03:04:35.000006Z',  # request_sleep + quarantined
-        'id1:2010-01-02T03:04:45.000006Z',  # request_task
+        'id1:2010-01-02T03:04:25.000006Z',  # request_sleep (dimensions update)
+        'id1:2010-01-02T03:04:45.000006Z',  # request_sleep + quarantined
+        'id1:2010-01-02T03:04:55.000006Z',  # request_task
     ]
     self.assertEqual(len(expected), len(actual_rows))
     self.assertEqual(expected, [r[0] for r in actual_rows])

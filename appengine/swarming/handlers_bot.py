@@ -459,15 +459,6 @@ class BotHandshakeHandler(_BotBaseHandler):
   def post(self):
     res = self._process()
 
-    # Do not register dimensions because they may change at first polling,
-    # as the initial handshake is done without the injected bot_config.py.
-    # Keep id and pool since some codes refer them.
-    # crbug.com/801679
-    res.dimensions = {
-        k: v for k, v in res.dimensions.items()
-        if k in ('id', 'pool')
-    }
-
     bot_management.bot_event(
         event_type='bot_connected', bot_id=res.bot_id,
         external_ip=self.request.remote_addr,

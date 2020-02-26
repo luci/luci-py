@@ -37,7 +37,7 @@ def _bot_event(bot_id, pool, caches, oses):
     }
   }
   bot_management.bot_event(
-      event_type='bot_connected',
+      event_type='request_sleep',
       bot_id=bot_id,
       external_ip='8.8.4.4',
       authenticated_as=u'bot:%s.domain' % bot_id,
