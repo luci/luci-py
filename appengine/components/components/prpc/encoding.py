@@ -2,7 +2,17 @@
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
 
+import base64
+import logging
+import six
+
 from google.protobuf import json_format, text_format
+
+
+_BASE64_ENCODING_ERROR = TypeError
+if six.PY3:
+  import binascii
+  _BASE64_ENCODING_ERROR = binascii.Error
 
 
 class Encoding(object):
@@ -54,3 +64,30 @@ def get_encoder(encoding):
     return lambda proto: text_format.MessageToString(proto, as_utf8=True)
   else:
     assert False, 'Argument |encoding| was not a value of the Encoding enum.'
+
+
+def encode_bin_metadata(mutable_metadata_dict):
+  """Encodes values to base64 if their key ends with the `-bin` suffix.
+
+  This works regardless of the casing of the key, and performs any changes
+  in-place.
+  """
+  for k, v in mutable_metadata_dict.iteritems():
+    if k.lower().endswith('-bin'):
+      mutable_metadata_dict[k] = base64.b64encode(v)
+
+
+def decode_bin_metadata(mutable_metadata_dict):
+  """Decodes values from base64 if their key ends with the `-bin` suffix.
+
+  This works regardless of the casing of the key, and performs any changes
+  in-place.
+  """
+  for k in (mutable_metadata_dict or {}):
+    if not k.lower().endswith('-bin'):
+      continue
+    try:
+      mutable_metadata_dict[k] = base64.b64decode(mutable_metadata_dict[k])
+    except _BASE64_ENCODING_ERROR:
+      raise ValueError('Metadata key %s not base64 encoded, val: %s' %
+                       (k, mutable_metadata_dict[k]))

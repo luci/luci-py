@@ -50,16 +50,27 @@ class PRPCClientTestCase(test_case.TestCase):
   @contextlib.contextmanager
   def mocked_request_async(self, res=None):
     res = res or empty_pb2.Empty()
+
+    def inner(*args, **kwargs):
+      ret = ndb.Future()
+      ret.set_result(res.SerializeToString())
+      if kwargs.get('response_headers') is not None:
+        kwargs['response_headers']['Some-Bytes-Bin'] = 'MTIzNA=='  # '1234'
+      return ret
+
     with mock.patch('components.net.request_async', autospec=True) as m:
-      m.return_value = ndb.Future()
-      m.return_value.set_result(res.SerializeToString())
+      m.side_effect = inner
       yield
 
 
   def test_request(self):
+    client_metadata = {'Jennys-Number-Bin': '867-5309'}
+    server_metadata = {}  # To be written to.
     with self.mocked_request_async():
       req = test_pb2.GiveRequest(m=1)
-      self.make_test_client().GiveAsync(req).get_result()
+      self.make_test_client().GiveAsync(
+          req, metadata=client_metadata,
+          response_metadata=server_metadata).get_result()
 
       net.request_async.assert_called_with(
           url='https://example.com/prpc/test.Test/Give',
@@ -69,14 +80,16 @@ class PRPCClientTestCase(test_case.TestCase):
               'Content-Type': 'application/prpc; encoding=binary',
               'Accept': 'application/prpc; encoding=binary',
               'X-Prpc-Timeout': '10S',
+              'Jennys-Number-Bin': 'ODY3LTUzMDk=',  # '867-5309'
           },
           scopes=None,
           service_account_key=None,
           delegation_token=None,
           deadline=10,
           max_attempts=4,
-          response_headers=None,
+          response_headers=server_metadata,
       )
+      self.assertEqual(server_metadata['Some-Bytes-Bin'], '1234')
 
   def give_creds(self, creds):
     self.make_test_client().Give(test_pb2.GiveRequest(), credentials=creds)

@@ -120,6 +120,7 @@ def rpc_async(req, response_metadata=None):
   timeout = req.timeout or 10
 
   headers = (req.metadata or {}).copy()
+  encoding.encode_bin_metadata(headers)
   headers['Content-Type'] = _BINARY_MEDIA_TYPE
   headers['Accept'] = _BINARY_MEDIA_TYPE
   headers['X-Prpc-Timeout'] = '%dS' % timeout
@@ -159,6 +160,10 @@ def rpc_async(req, response_metadata=None):
   # Parse the response and return it.
   res = req.response_message
   res.ParseFromString(res_bytes)
+  try:
+    encoding.decode_bin_metadata(response_metadata)
+  except ValueError as ve:
+    raise ProtocolError(ve.message)
   raise ndb.Return(res)
 
 
