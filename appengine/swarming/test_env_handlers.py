@@ -159,62 +159,72 @@ class AppTestBase(test_case.TestCase):
       )
       return pools_config._PoolsCfg(
           {
-            "template": pools_config.PoolConfig(
-              name='template',
-              rev='pools_cfg_rev',
-              scheduling_users=frozenset([
-                # See setUp above. We just duplicate the first ACL layer here
-                auth.Identity(auth.IDENTITY_USER, 'super-admin@example.com'),
-                auth.Identity(auth.IDENTITY_USER, 'admin@example.com'),
-                auth.Identity(auth.IDENTITY_USER, 'priv@example.com'),
-                auth.Identity(auth.IDENTITY_USER, 'user@example.com'),
-              ]),
-              scheduling_groups=frozenset(),
-              trusted_delegatees={},
-              service_accounts=frozenset(service_accounts),
-              service_accounts_groups=(),
-              task_template_deployment=pools_config.TaskTemplateDeployment(
-                  prod=pools_config.TaskTemplate(
-                    cache=(),
-                    cipd_package=(),
-                    env=(pools_config.Env('VAR', 'prod', (), False),),
-                    inclusions=()),
-                  canary=pools_config.TaskTemplate(
-                    cache=(),
-                    cipd_package=(),
-                    env=(pools_config.Env('VAR', 'canary', (), False),),
-                    inclusions=()),
-                  canary_chance=0.5,
-              ),
-              default_isolate=default_isolate,
-              default_cipd=default_cipd,
-              bot_monitoring=None,
-              external_schedulers=None,
-            ),
-
-            "default": pools_config.PoolConfig(
-              name='default',
-              rev='pools_cfg_rev',
-              scheduling_users=frozenset([
-                # See setUp above. We just duplicate the first ACL layer here
-                auth.Identity(auth.IDENTITY_USER, 'super-admin@example.com'),
-                auth.Identity(auth.IDENTITY_USER, 'admin@example.com'),
-                auth.Identity(auth.IDENTITY_USER, 'priv@example.com'),
-                auth.Identity(auth.IDENTITY_USER, 'user@example.com'),
-              ]),
-              scheduling_groups=frozenset(),
-              trusted_delegatees={},
-              service_accounts=frozenset(service_accounts),
-              service_accounts_groups=(),
-              task_template_deployment=None,
-              bot_monitoring=None,
-              default_isolate=default_isolate,
-              default_cipd=default_cipd,
-              external_schedulers=None,
-            ),
+              "template":
+                  pools_config.PoolConfig(
+                      name='template',
+                      rev='pools_cfg_rev',
+                      scheduling_users=frozenset([
+                          # See setUp above. We just duplicate the first ACL
+                          # layer here
+                          auth.Identity(auth.IDENTITY_USER,
+                                        'super-admin@example.com'),
+                          auth.Identity(auth.IDENTITY_USER,
+                                        'admin@example.com'),
+                          auth.Identity(auth.IDENTITY_USER, 'priv@example.com'),
+                          auth.Identity(auth.IDENTITY_USER, 'user@example.com'),
+                      ]),
+                      scheduling_groups=frozenset(),
+                      trusted_delegatees={},
+                      service_accounts=frozenset(service_accounts),
+                      service_accounts_groups=(),
+                      task_template_deployment=pools_config
+                      .TaskTemplateDeployment(
+                          prod=pools_config.TaskTemplate(
+                              cache=(),
+                              cipd_package=(pools_config.CipdPackage(
+                                  '.', 'some-pkg', 'prod-version'),),
+                              env=(pools_config.Env('VAR', 'prod', (), False),),
+                              inclusions=()),
+                          canary=pools_config.TaskTemplate(
+                              cache=(),
+                              cipd_package=(pools_config.CipdPackage(
+                                  '.', 'some-pkg', 'canary-version'),),
+                              env=(pools_config.Env('VAR', 'canary',
+                                                    (), False),),
+                              inclusions=()),
+                          canary_chance=0.5,
+                      ),
+                      default_isolate=default_isolate,
+                      default_cipd=default_cipd,
+                      bot_monitoring=None,
+                      external_schedulers=None,
+                  ),
+              "default":
+                  pools_config.PoolConfig(
+                      name='default',
+                      rev='pools_cfg_rev',
+                      scheduling_users=frozenset([
+                          # See setUp above. We just duplicate the first ACL
+                          # layer here
+                          auth.Identity(auth.IDENTITY_USER,
+                                        'super-admin@example.com'),
+                          auth.Identity(auth.IDENTITY_USER,
+                                        'admin@example.com'),
+                          auth.Identity(auth.IDENTITY_USER, 'priv@example.com'),
+                          auth.Identity(auth.IDENTITY_USER, 'user@example.com'),
+                      ]),
+                      scheduling_groups=frozenset(),
+                      trusted_delegatees={},
+                      service_accounts=frozenset(service_accounts),
+                      service_accounts_groups=(),
+                      task_template_deployment=None,
+                      bot_monitoring=None,
+                      default_isolate=default_isolate,
+                      default_cipd=default_cipd,
+                      external_schedulers=None,
+                  ),
           },
-        (default_isolate, default_cipd)
-      )
+          (default_isolate, default_cipd))
 
     self.mock(pools_config, '_fetch_pools_config', mocked_fetch_pools_config)
 

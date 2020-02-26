@@ -361,6 +361,12 @@ class TasksApiTest(BaseTest):
     }
     expected_props[u'cipd_input'][u'server'] = (
       u'https://pool.config.cipd.example.com')
+    # Need to add the additional package that the template applies.
+    expected_props[u'cipd_input'][u'packages'].insert(0, {
+        u'package_name': u'some-pkg',
+        u'path': u'.',
+        u'version': u'prod-version'
+    })
 
     expected = {
       u'request': self.gen_request(
@@ -413,6 +419,52 @@ class TasksApiTest(BaseTest):
 
     response = self.call_api('new', body=message_to_dict(request))
     self.assertEqual(expected, response.json)
+
+  def test_new_ok_template_no_additional_packages(self):
+    """Asserts that new generates appropriate metadata for a templated task."""
+    self.mock(random, 'getrandbits', lambda _: 0x88)
+    self.mock(random, 'randint', lambda *_: 10000)  # always pick prod
+
+    props = self.create_props(
+        command=['echo', 'hello', 'world'],
+        execution_timeout_secs=30,
+        grace_period_secs=15,
+        dimensions=[
+            {
+                u'key': u'os',
+                u'value': u'Amiga'
+            },
+            {
+                u'key': u'pool',
+                u'value': u'template'
+            },
+        ])
+
+    # We want to observe the pool defaults when no CIPD props were set at all
+    # in the task request.
+    props[u'cipd_input'] = None
+    request = self.create_new_request(properties=props, tags=[u'a:tag'])
+
+    expected_cipd_props = {
+        u'client_package': {
+            u'version': u'from_pool_config',
+            u'package_name': u'cipd-client-pkg'
+        },
+        u'server':
+            u'https://pool.config.cipd.example.com',
+        u'packages': [{
+            u'path': u'.',
+            u'version': u'prod-version',
+            u'package_name': u'some-pkg'
+        }],
+    }
+
+    response = self.call_api('new', body=message_to_dict(request))
+
+    # Much of the response was verified in the previous template test, so just
+    # verify the CIPD related props here.
+    self.assertEqual(expected_cipd_props,
+                     response.json[u'request'][u'properties'][u'cipd_input'])
 
   def test_new_bad_service_account(self):
     oauth_grant_calls = self.mock_task_service_accounts()
