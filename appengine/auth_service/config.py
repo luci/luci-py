@@ -106,10 +106,6 @@ def refetch_config(force=False):
 
   Called as a cron job.
   """
-  if not is_remote_configured():
-    logging.info('Config remote is not configured')
-    return
-
   # Grab and validate all new configs in parallel.
   try:
     configs = _fetch_configs(_CONFIG_SCHEMAS)

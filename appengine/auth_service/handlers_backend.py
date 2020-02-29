@@ -13,6 +13,7 @@ import config
 import gcs
 import importer
 import pubsub
+import realms
 import replication
 
 
@@ -32,7 +33,15 @@ class InternalRevokePubSubAuthCronHandler(webapp2.RequestHandler):
 class InternalUpdateConfigCronHandler(webapp2.RequestHandler):
   @decorators.require_cronjob
   def get(self):
-    config.refetch_config()
+    if config.is_remote_configured():
+      config.refetch_config()
+
+
+class InternalUpdateRealmsCronHandler(webapp2.RequestHandler):
+  @decorators.require_cronjob
+  def get(self):
+    if config.is_remote_configured():
+      realms.refetch_config()
 
 
 class InternalImportGroupsCronHandler(webapp2.RequestHandler):
@@ -63,6 +72,9 @@ def get_routes():
     webapp2.Route(
         r'/internal/cron/update_config',
         InternalUpdateConfigCronHandler),
+    webapp2.Route(
+        r'/internal/cron/update_realms',
+        InternalUpdateRealmsCronHandler),
     webapp2.Route(
         r'/internal/cron/import_groups',
         InternalImportGroupsCronHandler),

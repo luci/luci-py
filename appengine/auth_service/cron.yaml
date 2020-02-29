@@ -1,8 +1,13 @@
 cron:
-- description: fetch config from luci-config
+- description: fetch service config from luci-config
   target: backend
   url: /internal/cron/update_config
   schedule: every 1 minutes
+
+- description: fetch realm configs from luci-config
+  target: backend
+  url: /internal/cron/update_realms
+  schedule: every 2 minutes
 
 - description: group import from external sources
   target: backend
