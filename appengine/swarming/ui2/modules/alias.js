@@ -6,7 +6,7 @@
 // This aliasing should be used for human-displayable only,
 // not, for example, on the filters that are sent to the backend.
 export function applyAlias(value, key) {
-  if (!aliasMap[key] || value === 'none') {
+  if (!aliasMap[key] || value === 'none' || !value ) {
     return value;
   }
   let alias = aliasMap[key][value];

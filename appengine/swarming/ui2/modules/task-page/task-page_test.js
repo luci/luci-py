@@ -583,8 +583,8 @@ describe('task-page', function() {
           // little helper for readability
           const cell = (r, c) => rows[r].children[c];
 
-          expect(cell(19, 0)).toMatchTextContent('Try Number');
-          expect(cell(19, 1)).toMatchTextContent('3');
+          expect(cell(20, 0)).toMatchTextContent('Try Number');
+          expect(cell(20, 1)).toMatchTextContent('3');
           done();
         });
       });

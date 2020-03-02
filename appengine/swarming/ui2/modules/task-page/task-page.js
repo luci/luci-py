@@ -667,7 +667,8 @@ const taskExecutionSection = (ele, request, result, currentSlice) => {
         dim.highlight = true;
       }
     }
-    const values = [];
+    dim.values = [];
+    if (!dim.value) continue;
     // despite the name, dim.value is an array of values
     for (const v of dim.value) {
       const newValue = {name: applyAlias(v, dim.key)};
@@ -676,9 +677,8 @@ const taskExecutionSection = (ele, request, result, currentSlice) => {
           newValue.bold = true;
         }
       }
-      values.push(newValue);
+      dim.values.push(newValue);
     }
-    dim.values = values;
   }
 
   return html`

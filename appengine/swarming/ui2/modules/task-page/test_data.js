@@ -125,6 +125,9 @@ export const taskResults = [
         ],
         "key": "zone"
       },
+      {
+        "key": "novalue"
+      }
     ],
     "bot_version": "31e15677c83a483c3fc713eb537f60555797bef859c50bbe39c1de2a413adf38",
     "task_id": "testid000",
@@ -736,7 +739,7 @@ export const taskRequests = [
             {
               "value": "Chrome",
               "key": "pool"
-            }
+            },
           ],
           "idempotent": true,
           "cipd_input": {
