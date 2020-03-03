@@ -591,8 +591,8 @@ def bot_event(
         dimensions_flat = [
             d for d in dimensions_flat
             if d.startswith('id:') or d.startswith('pool:')]
-        logging.debug('bot_event: Updating dimensions. from: %s, to: %s',
-                      bot_info.dimensions_flat, dimensions_flat)
+      logging.debug('bot_event: Updating dimensions. from: %s, to: %s',
+                    bot_info.dimensions_flat, dimensions_flat)
       bot_info.dimensions_flat = dimensions_flat
       dimensions_updated = True
   if state:
