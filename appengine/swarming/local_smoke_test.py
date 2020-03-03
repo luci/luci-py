@@ -38,8 +38,8 @@ from utils import fs
 from utils import file_path
 from utils import large
 from utils import subprocess42
-from tool import start_bot
-from tool import start_servers
+from tools import start_bot
+from tools import start_servers
 
 # client/third_party/
 from depot_tools import fix_encoding
