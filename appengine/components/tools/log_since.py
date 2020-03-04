@@ -9,6 +9,7 @@ from __future__ import print_function
 
 __version__ = '1.0.1'
 
+import json
 import optparse
 import subprocess
 import sys
@@ -44,6 +45,15 @@ def get_logs(root, pseudo_revision, mergebase, start, end):
   return out, refspec
 
 
+def get_revision_from_project(project):
+  out = subprocess.check_output([
+      'gcloud', '--project', project, 'app', 'versions', 'list',
+      '--service=default', '--format=json', '--filter', 'TRAFFIC_SPLIT=1'
+  ])
+  service_info = json.loads(out)
+  return int(service_info[0]["id"].split('-')[0])
+
+
 def main():
   root = calculate_version.checkout_root('.')
   pseudo_revision, mergebase = calculate_version.get_head_pseudo_revision(
@@ -59,15 +69,21 @@ def main():
       help='Run even if not pristine checkout, e.g. HEAD != origin/master')
   parser.add_option(
       '-F', '--files', action='store_true', help='List all modified files')
+  parser.add_option('--project', help='Project ID used to take active revision')
   options, args = parser.parse_args()
 
   print(
       'Current version: %s @ %s\n' % (pseudo_revision, mergebase),
       file=sys.stderr)
 
-  if not args:
-    parser.error('Specify the pseudo-revision number of the last push.')
-  start = int(args[0])
+  if not args and not options.project:
+    parser.error(
+        'Specify --project or the pseudo-revision number of the last push.')
+
+  if options.project:
+    start = get_revision_from_project(options.project)
+  else:
+    start = int(args[0])
   end = None
   if len(args) == 2:
     end = int(args[1])
