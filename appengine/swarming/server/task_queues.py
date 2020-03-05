@@ -233,15 +233,15 @@ class TaskDimensions(ndb.Model):
   # One or multiple sets of request dimensions this dimensions_hash represents.
   sets = ndb.LocalStructuredProperty(TaskDimensionsSet, repeated=True)
 
-  def assert_request(self, now, valid_until_ts, dimensions_flat):
-    """Updates this entity to assert this dimensions_flat is supported.
+  def assert_request(self, now, valid_until_ts, task_dimensions_flat):
+    """Updates this entity to assert this task_dimensions_flat is supported.
 
     Returns:
       True if the entity was updated; it can be that a TaskDimensionsSet was
       added, updated or a stale one was removed.
     """
     cutoff = now - _KEEP_DEAD
-    s = self._match_request_flat(dimensions_flat)
+    s = self._match_request_flat(task_dimensions_flat)
     if s:
       if s.valid_until_ts > valid_until_ts:
         # It was updated already, skip storing again.
@@ -254,7 +254,8 @@ class TaskDimensions(ndb.Model):
     else:
       self.sets.append(
           TaskDimensionsSet(
-              valid_until_ts=valid_until_ts, dimensions_flat=dimensions_flat))
+              valid_until_ts=valid_until_ts,
+              dimensions_flat=task_dimensions_flat))
     # Trim.
     self.sets = [s for s in self.sets if s.valid_until_ts >= cutoff]
     return True
@@ -275,8 +276,8 @@ class TaskDimensions(ndb.Model):
         return s
     return None
 
-  def _match_request_flat(self, dimensions_flat):
-    d = frozenset(dimensions_flat)
+  def _match_request_flat(self, task_dimensions_flat):
+    d = frozenset(task_dimensions_flat)
     for s in self.sets:
       if not d.difference(s.dimensions_flat):
         return s
@@ -472,14 +473,14 @@ def _get_task_dims_key(dimensions_hash, dimensions):
 
 @ndb.tasklet
 def _ensure_TaskDimensions_async(task_dims_key, now, valid_until_ts,
-                                 dimensions_flat):
+                                 task_dimensions_flat):
   """Adds, updates or deletes the TaskDimensions."""
   action = None
   obj = yield task_dims_key.get_async()
   if not obj:
     obj = TaskDimensions(key=task_dims_key)
     action = 'created'
-  if obj.assert_request(now, valid_until_ts, dimensions_flat):
+  if obj.assert_request(now, valid_until_ts, task_dimensions_flat):
     if action:
       action = 'updated'
     if not obj.sets:
@@ -521,27 +522,28 @@ def _remove_old_entity_async(key, now):
   raise ndb.Return(res)
 
 
-def _get_query_BotTaskDimensions_keys(dimensions_flat):
+def _get_query_BotTaskDimensions_keys(task_dimensions_flat):
   """Returns a BotTaskDimensions ndb.Key ndb.QueryIterator for the bots that
   corresponds to these task request dimensions.
   """
   assert not ndb.in_transaction()
   q = BotDimensions.query()
-  for d in dimensions_flat:
+  for d in task_dimensions_flat:
     q = q.filter(BotDimensions.dimensions_flat == d)
   return q.iter(batch_size=100, keys_only=True, deadline=15)
 
 
 @ndb.tasklet
-def _refresh_BotTaskDimensions_async(now, valid_until_ts, dimensions_flat,
+def _refresh_BotTaskDimensions_async(now, valid_until_ts, task_dimensions_flat,
                                      bot_task_key):
   """Creates or refreshes a BotTaskDimensions.
 
   Arguments:
   - now: datetime.datetime of 'now'
   - valid_until_ts: datetime.datetime determines until when this
-    dimensions_flat should remain valid.
-  - dimensions_flat: list of '<key>:<value>' for the task request dimensions
+    task_dimensions_flat should remain valid.
+  - task_dimensions_flat: list of '<key>:<value>' for the task request
+    dimensions.
   - bot_task_key: ndb.Key to a BotTaskDimensions
 
   Returns:
@@ -555,7 +557,7 @@ def _refresh_BotTaskDimensions_async(now, valid_until_ts, dimensions_flat,
   cutoff = now - datetime.timedelta(minutes=1)
   need_memcache_clear = True
   need_db_store = True
-  if bot_task and set(bot_task.dimensions_flat) == set(dimensions_flat):
+  if bot_task and set(bot_task.dimensions_flat) == set(task_dimensions_flat):
     need_memcache_clear = bot_task.valid_until_ts < cutoff
     # Skip storing if the validity period was already updated.
     need_db_store = bot_task.valid_until_ts < valid_until_ts
@@ -565,8 +567,9 @@ def _refresh_BotTaskDimensions_async(now, valid_until_ts, dimensions_flat,
         'Storing new BotTaskDimensions to DB.'
         'bot_id:%s, valid_until_ts:%s', bot_id, valid_until_ts)
     yield BotTaskDimensions(
-        key=bot_task_key, valid_until_ts=valid_until_ts,
-        dimensions_flat=dimensions_flat).put_async()
+        key=bot_task_key,
+        valid_until_ts=valid_until_ts,
+        dimensions_flat=task_dimensions_flat).put_async()
   else:
     logging.debug(
         'Keeping stored BotTaskDimensions.'
@@ -692,29 +695,30 @@ def _assert_task_props_async(properties, expiration_ts):
 
 
 @ndb.tasklet
-def _refresh_all_BotTaskDimensions_async(now, valid_until_ts, dimensions_flat,
-                                         dimensions_hash):
-  """Updates BotTaskDimensions for dimensions_flat.
+def _refresh_all_BotTaskDimensions_async(
+    now, valid_until_ts, task_dimensions_flat, task_dimensions_hash):
+  """Updates BotTaskDimensions for task_dimensions_flat.
 
   Used by rebuild_task_cache_async.
   """
   logging.debug(
       '_refresh_all_BotTaskDimensions_async: refreshing bots with '
-      'dimension_hash: %s, dimensions: %s', dimensions_hash, dimensions_flat)
+      'task_dimension_hash: %s, task_dimensions: %s', task_dimensions_hash,
+      task_dimensions_flat)
   # Number of BotTaskDimensions entities that were created/updated in the DB.
   updated = 0
   # Number of BotTaskDimensions entities that matched this task queue.
   viable = 0
   try:
     pending = []
-    qit = _get_query_BotTaskDimensions_keys(dimensions_flat)
+    qit = _get_query_BotTaskDimensions_keys(task_dimensions_flat)
     while (yield qit.has_next_async()):
       bot_info_key = qit.next()
       bot_task_key = ndb.Key(
-          BotTaskDimensions, dimensions_hash, parent=bot_info_key.parent())
+          BotTaskDimensions, task_dimensions_hash, parent=bot_info_key.parent())
       viable += 1
-      future = _refresh_BotTaskDimensions_async(now, valid_until_ts,
-                                                dimensions_flat, bot_task_key)
+      future = _refresh_BotTaskDimensions_async(
+          now, valid_until_ts, task_dimensions_flat, bot_task_key)
       pending.append(future)
 
       while len(pending) > _CAP_FUTURES_LIMIT:
@@ -745,9 +749,9 @@ def _refresh_all_BotTaskDimensions_async(now, valid_until_ts, dimensions_flat,
 
 
 @ndb.tasklet
-def _refresh_TaskDimensions_async(now, valid_until_ts, dimensions_flat,
+def _refresh_TaskDimensions_async(now, valid_until_ts, task_dimensions_flat,
                                   task_dims_key):
-  """Updates TaskDimensions for dimensions_flat.
+  """Updates TaskDimensions for task_dimensions_flat.
 
   Used by rebuild_task_cache_async.
   """
@@ -760,7 +764,7 @@ def _refresh_TaskDimensions_async(now, valid_until_ts, dimensions_flat,
   # The transaction contention can be problematic on pool with a high
   # cardinality of the dimension sets.
   obj = yield task_dims_key.get_async()
-  if obj and not obj.assert_request(now, valid_until_ts, dimensions_flat):
+  if obj and not obj.assert_request(now, valid_until_ts, task_dimensions_flat):
     logging.debug('Skipped transaction!')
     raise ndb.Return(None)
   # Do an adhoc transaction instead of using datastore_utils.transaction().
@@ -782,8 +786,8 @@ def _refresh_TaskDimensions_async(now, valid_until_ts, dimensions_flat,
     logging.warning('Failed taking pseudo-lock for %s; reenqueuing', key)
     raise ndb.Return(False)
   try:
-    action = yield _ensure_TaskDimensions_async(task_dims_key, now,
-                                                valid_until_ts, dimensions_flat)
+    action = yield _ensure_TaskDimensions_async(
+        task_dims_key, now, valid_until_ts, task_dimensions_flat)
   finally:
     yield ndb.get_context().memcache_delete(key, namespace='task_queues_tx')
 
@@ -1050,28 +1054,28 @@ def rebuild_task_cache_async(payload):
   """
   data = json.loads(payload)
   logging.debug('rebuild_task_cache(%s)', data)
-  dimensions = data[u'dimensions']
-  dimensions_hash = int(data[u'dimensions_hash'])
+  task_dimensions = data[u'dimensions']
+  task_dimensions_hash = int(data[u'dimensions_hash'])
   valid_until_ts = utils.parse_datetime(data[u'valid_until_ts'])
-  dimensions_flat = []
-  for k, values in dimensions.items():
+  task_dimensions_flat = []
+  for k, values in task_dimensions.items():
     for v in values:
-      dimensions_flat.append(u'%s:%s' % (k, v))
-  dimensions_flat.sort()
-  dims = '\n'.join('  ' + d for d in dimensions_flat)
+      task_dimensions_flat.append(u'%s:%s' % (k, v))
+  task_dimensions_flat.sort()
+  dims = '\n'.join('  ' + d for d in task_dimensions_flat)
   now = utils.utcnow()
   try:
-    yield _refresh_all_BotTaskDimensions_async(now, valid_until_ts,
-                                               dimensions_flat, dimensions_hash)
+    yield _refresh_all_BotTaskDimensions_async(
+        now, valid_until_ts, task_dimensions_flat, task_dimensions_hash)
     # Done updating, now store the entity. Must use a transaction as there could
     # be other dimensions set in the entity.
-    task_dims_key = _get_task_dims_key(dimensions_hash, dimensions)
-    yield _refresh_TaskDimensions_async(now, valid_until_ts, dimensions_flat,
-                                        task_dims_key)
+    task_dims_key = _get_task_dims_key(task_dimensions_hash, task_dimensions)
+    yield _refresh_TaskDimensions_async(now, valid_until_ts,
+                                        task_dimensions_flat, task_dims_key)
   finally:
     # Any of the calls above could throw. Log how far long we processed.
     duration = (utils.utcnow()-now).total_seconds()
-    logging.debug('rebuild_task_cache(%d) in %.3fs\n%s', dimensions_hash,
+    logging.debug('rebuild_task_cache(%d) in %.3fs\n%s', task_dimensions_hash,
                   duration, dims)
   raise ndb.Return(True)
 
