@@ -458,7 +458,7 @@ def _rebuild_bot_cache_async(bot_dimensions, bot_root_key):
         bot_id, (utils.utcnow()-now).total_seconds(), len(matches), cleaned[0])
 
 
-def _get_task_dims_key(dimensions_hash, dimensions):
+def _get_task_dimensions_key(dimensions_hash, dimensions):
   """Returns the ndb.Key for the task dimensions."""
   # Both 'id' and 'pool' are guaranteed to have at most 1 item for a single
   # TaskProperty.
@@ -472,13 +472,13 @@ def _get_task_dims_key(dimensions_hash, dimensions):
 
 
 @ndb.tasklet
-def _ensure_TaskDimensions_async(task_dims_key, now, valid_until_ts,
+def _ensure_TaskDimensions_async(task_dimensions_key, now, valid_until_ts,
                                  task_dimensions_flat):
   """Adds, updates or deletes the TaskDimensions."""
   action = None
-  obj = yield task_dims_key.get_async()
+  obj = yield task_dimensions_key.get_async()
   if not obj:
-    obj = TaskDimensions(key=task_dims_key)
+    obj = TaskDimensions(key=task_dimensions_key)
     action = 'created'
   if obj.assert_request(now, valid_until_ts, task_dimensions_flat):
     if action:
@@ -635,8 +635,9 @@ def _assert_task_props_async(properties, expiration_ts):
   """
   # TODO(maruel): Make it a tasklet.
   dimensions_hash = hash_dimensions(properties.dimensions)
-  task_dims_key = _get_task_dims_key(dimensions_hash, properties.dimensions)
-  obj = yield task_dims_key.get_async()
+  task_dimensions_key = _get_task_dimensions_key(dimensions_hash,
+                                                 properties.dimensions)
+  obj = yield task_dimensions_key.get_async()
   if obj:
     # Reduce the check to be 5~10 minutes earlier to help reduce an attack of
     # task queues when there's a strong on-going load of tasks happening. This
@@ -750,7 +751,7 @@ def _refresh_all_BotTaskDimensions_async(
 
 @ndb.tasklet
 def _refresh_TaskDimensions_async(now, valid_until_ts, task_dimensions_flat,
-                                  task_dims_key):
+                                  task_dimensions_key):
   """Updates TaskDimensions for task_dimensions_flat.
 
   Used by rebuild_task_cache_async.
@@ -763,7 +764,7 @@ def _refresh_TaskDimensions_async(now, valid_until_ts, task_dimensions_flat,
   #
   # The transaction contention can be problematic on pool with a high
   # cardinality of the dimension sets.
-  obj = yield task_dims_key.get_async()
+  obj = yield task_dimensions_key.get_async()
   if obj and not obj.assert_request(now, valid_until_ts, task_dimensions_flat):
     logging.debug('Skipped transaction!')
     raise ndb.Return(None)
@@ -776,8 +777,8 @@ def _refresh_TaskDimensions_async(now, valid_until_ts, task_dimensions_flat,
   # there's a hash conflict (odds 2^31) plus two concurrent task running
   # simultaneously (over _EXTEND_VALIDITY period) so we can do it in a more
   # adhoc way.
-  key = '%s:%s' % (task_dims_key.parent().string_id(),
-                   task_dims_key.string_id())
+  key = '%s:%s' % (task_dimensions_key.parent().string_id(),
+                   task_dimensions_key.string_id())
   res = yield ndb.get_context().memcache_add(
       key, True, time=60, namespace='task_queues_tx')
   if not res:
@@ -787,7 +788,7 @@ def _refresh_TaskDimensions_async(now, valid_until_ts, task_dimensions_flat,
     raise ndb.Return(False)
   try:
     action = yield _ensure_TaskDimensions_async(
-        task_dims_key, now, valid_until_ts, task_dimensions_flat)
+        task_dimensions_key, now, valid_until_ts, task_dimensions_flat)
   finally:
     yield ndb.get_context().memcache_delete(key, namespace='task_queues_tx')
 
@@ -1069,9 +1070,10 @@ def rebuild_task_cache_async(payload):
         now, valid_until_ts, task_dimensions_flat, task_dimensions_hash)
     # Done updating, now store the entity. Must use a transaction as there could
     # be other dimensions set in the entity.
-    task_dims_key = _get_task_dims_key(task_dimensions_hash, task_dimensions)
-    yield _refresh_TaskDimensions_async(now, valid_until_ts,
-                                        task_dimensions_flat, task_dims_key)
+    task_dimensions_key = _get_task_dimensions_key(task_dimensions_hash,
+                                                   task_dimensions)
+    yield _refresh_TaskDimensions_async(
+        now, valid_until_ts, task_dimensions_flat, task_dimensions_key)
   finally:
     # Any of the calls above could throw. Log how far long we processed.
     duration = (utils.utcnow()-now).total_seconds()
