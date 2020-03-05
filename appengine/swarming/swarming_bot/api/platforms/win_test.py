@@ -108,21 +108,18 @@ class TestWin(auto_stub.TestCase):
       'TODO(crbug.com/1017545): fix assertions')
   def test_get_os_dims_mock_win2016(self):
     self.assert_get_os_dims_mock(
-        3,
-        '\nMicrosoft Windows [Version 10.0.14393]\n',
+        3, '\nMicrosoft Windows [Version 10.0.14393]\n',
         ('10', '10.0.14393', '', u'Multiprocessor Free'),
-        [u'2016Server', u'2016Server-14393', u'Server', u'Server-14393'])
+        [u'Server', u'Server-14393'])
 
   @unittest.skipIf(
       sys.platform == 'win32',
       'TODO(crbug.com/1017545): fix assertions')
   def test_get_os_dims_mock_win2019(self):
     self.assert_get_os_dims_mock(
-        3,
-        '\nMicrosoft Windows [Version 10.0.17763.557]\n',
+        3, '\nMicrosoft Windows [Version 10.0.17763.557]\n',
         ('10', '10.0.17763', '', u'Multiprocessor Free'),
-        [u'2016Server', u'2016Server-17763.557', u'Server', u'Server-17763',
-         u'Server-17763.557'])
+        [u'Server', u'Server-17763', u'Server-17763.557'])
 
   @unittest.skipIf(
       sys.platform == 'win32',

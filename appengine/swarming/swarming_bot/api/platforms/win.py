@@ -242,11 +242,6 @@ def get_os_version_names():
   E.g. for Windows 10 with build number 18362.207, the return value includes
   10-18362, 10-18362.207. For Windows Server 2019 with build number 17763.557,
   the return value includes Server-17763, Server-17763.557.
-
-  For backwards compatibility, for Windows Server starting with 2016, the return
-  value will also include "2016Server" and "2016Server-" followed by the full
-  build number. These values are deprecated and will be removed in the near
-  future. https://bugs.chromium.org/p/chromium/issues/detail?id=982893
   """
   # Python keeps a local map in platform.py and it is updated at newer python
   # release. Since our python release is a bit old, do not rely on it.
@@ -263,10 +258,6 @@ def get_os_version_names():
       major_version = build_number.split(u'.')[0]
       rv.append(u'%s-%s' % (marketing_name, major_version))
     rv.append(u'%s-%s' % (marketing_name, build_number))
-    # Deprecated 2016Server dimension.
-    if is_server:
-      rv.append(u'2016Server')
-      rv.append(u'2016Server-%s' % build_number)
     rv.sort()
     return rv
   service_pack = platform.win32_ver()[2] or u'SP0'
