@@ -21,8 +21,9 @@ from depot_tools import auto_stub
 from depot_tools import fix_encoding
 
 # client/
-from utils import subprocess42
 from utils import file_path
+from utils import subprocess42
+from utils import tools
 
 import swarmingserver_bot_fake
 from bot_code import bot_main
@@ -31,6 +32,7 @@ from bot_code import bot_main
 class TestCase(auto_stub.TestCase):
   def setUp(self):
     super(TestCase, self).setUp()
+    tools.clear_cache_all()
     self._tmpdir = tempfile.mkdtemp(prefix='swarming_main')
     self._zip_file = os.path.join(self._tmpdir, 'swarming_bot.zip')
     code, _ = swarmingserver_bot_fake.gen_zip(self.url)
