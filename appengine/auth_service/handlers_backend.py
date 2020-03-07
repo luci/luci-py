@@ -41,7 +41,8 @@ class InternalUpdateRealmsCronHandler(webapp2.RequestHandler):
   @decorators.require_cronjob
   def get(self):
     if config.is_remote_configured():
-      realms.refetch_config()
+      success = realms.refetch_config()
+      self.response.set_status(200 if success else 500)
 
 
 class InternalImportGroupsCronHandler(webapp2.RequestHandler):
