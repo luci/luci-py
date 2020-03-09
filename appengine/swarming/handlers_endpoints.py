@@ -538,7 +538,7 @@ class SwarmingTasksService(remote.Service):
         request_metadata.request.task_id = None
         if request_metadata.request != message_conversion.task_request_to_rpc(
             request_obj):
-          raise endpoints.BadRequestException(
+          logging.warning(
               'the same request_uuid value was reused for different task '
               'requests')
 
