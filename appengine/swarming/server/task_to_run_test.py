@@ -32,7 +32,6 @@ from server import task_queues
 from server import task_request
 from server import task_to_run
 
-
 # pylint: disable=W0212
 # Method could be a function - pylint: disable=R0201
 
@@ -40,16 +39,17 @@ from server import task_to_run
 def _gen_cipd(**kwargs):
   """Creates a CipdInputs."""
   args = {
-    u'client_package': task_request.CipdPackage(
-        package_name=u'infra/tools/cipd/${platform}',
-        version=u'git_revision:deadbeef'),
-    u'packages': [
-      task_request.CipdPackage(
-          package_name=u'rm',
-          path=u'bin',
-          version=u'git_revision:deadbeef'),
-    ],
-    u'server': u'https://chrome-infra-packages.appspot.com',
+      u'client_package':
+          task_request.CipdPackage(
+              package_name=u'infra/tools/cipd/${platform}',
+              version=u'git_revision:deadbeef'),
+      u'packages': [
+          task_request.CipdPackage(
+              package_name=u'rm', path=u'bin',
+              version=u'git_revision:deadbeef'),
+      ],
+      u'server':
+          u'https://chrome-infra-packages.appspot.com',
   }
   args.update(kwargs)
   return task_request.CipdInput(**args)
@@ -58,23 +58,35 @@ def _gen_cipd(**kwargs):
 def _gen_properties(**kwargs):
   """Creates a TaskProperties."""
   args = {
-    u'cipd_input': _gen_cipd(),
-    u'command': [u'command1', u'arg1'],
-    u'dimensions': {
-      u'OS': [u'Windows-3.1.1'],
-      u'hostname': [u'localhost'],
-      u'pool': [u'default'],
-    },
-    u'env': {u'foo': u'bar', u'joe': u'2'},
-    u'env_prefixes': {u'PATH': [u'local/path']},
-    u'execution_timeout_secs': 24*60*60,
-    u'grace_period_secs': 30,
-    u'idempotent': False,
-    u'inputs_ref': task_request.FilesRef(
-        isolatedserver=u'https://isolateserver.appspot.com',
-        namespace=u'default-gzip'),
-    u'io_timeout_secs': None,
-    u'has_secret_bytes': u'secret_bytes' in kwargs,
+      u'cipd_input':
+          _gen_cipd(),
+      u'command': [u'command1', u'arg1'],
+      u'dimensions': {
+          u'OS': [u'Windows-3.1.1'],
+          u'hostname': [u'localhost'],
+          u'pool': [u'default'],
+      },
+      u'env': {
+          u'foo': u'bar',
+          u'joe': u'2'
+      },
+      u'env_prefixes': {
+          u'PATH': [u'local/path']
+      },
+      u'execution_timeout_secs':
+          24 * 60 * 60,
+      u'grace_period_secs':
+          30,
+      u'idempotent':
+          False,
+      u'inputs_ref':
+          task_request.FilesRef(
+              isolatedserver=u'https://isolateserver.appspot.com',
+              namespace=u'default-gzip'),
+      u'io_timeout_secs':
+          None,
+      u'has_secret_bytes':
+          u'secret_bytes' in kwargs,
   }
   args.update(kwargs)
   args[u'dimensions_data'] = args.pop(u'dimensions')
@@ -85,11 +97,11 @@ def _gen_request_slices(**kwargs):
   """Creates a TaskRequest."""
   now = utils.utcnow()
   args = {
-    u'created_ts': now,
-    u'manual_tags': [u'tag:1'],
-    u'name': u'Request name',
-    u'priority': 50,
-    u'user': u'Jesus',
+      u'created_ts': now,
+      u'manual_tags': [u'tag:1'],
+      u'name': u'Request name',
+      u'priority': 50,
+      u'user': u'Jesus',
   }
   args.update(kwargs)
   req = task_request.TaskRequest(**args)
@@ -100,29 +112,28 @@ def _gen_request_slices(**kwargs):
 def _gen_request(properties=None, **kwargs):
   """Creates a TaskRequest with one task slice."""
   return _gen_request_slices(
-    task_slices=[
-      task_request.TaskSlice(
-          expiration_secs=60,
-          properties=properties or _gen_properties()),
-    ],
-    **kwargs)
+      task_slices=[
+          task_request.TaskSlice(
+              expiration_secs=60, properties=properties or _gen_properties()),
+      ],
+      **kwargs)
 
 
 def _yield_next_available_task_to_dispatch(bot_dimensions):
   bot_id = bot_dimensions[u'id'][0]
-  bot_management.bot_event(
-      'bot_connected', bot_id, '1.2.3.4', 'joe@localhost',
-      bot_dimensions, {'state': 'real'}, '1234', False, None, None, None)
+  bot_management.bot_event('bot_connected', bot_id, '1.2.3.4', 'joe@localhost',
+                           bot_dimensions, {'state': 'real'}, '1234', False,
+                           None, None, None)
   bot_root_key = bot_management.get_root_key(bot_id)
   task_queues.assert_bot_async(bot_root_key, bot_dimensions).get_result()
   return [
-    to_run.to_dict()
-    for _request, to_run in
-    task_to_run.yield_next_available_task_to_dispatch(bot_dimensions)
+      to_run.to_dict() for _request, to_run in task_to_run
+      .yield_next_available_task_to_dispatch(bot_dimensions)
   ]
 
 
 class TaskToRunApiTest(test_env_handlers.AppTestBase):
+
   def setUp(self):
     super(TaskToRunApiTest, self).setUp()
     self.now = datetime.datetime(2019, 01, 02, 03, 04, 05, 06)
@@ -132,8 +143,8 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
     self.app = webtest.TestApp(
         handlers_backend.create_application(True),
         extra_environ={
-          'REMOTE_ADDR': self.source_ip,
-          'SERVER_SOFTWARE': os.environ['SERVER_SOFTWARE'],
+            'REMOTE_ADDR': self.source_ip,
+            'SERVER_SOFTWARE': os.environ['SERVER_SOFTWARE'],
         })
     self._enqueue_orig = self.mock(utils, 'enqueue_task_async', self._enqueue)
     cfg = config.settings()
@@ -200,63 +211,62 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
     # 0x3fc00000 is the priority mask.
     # pylint: disable=bad-whitespace
     data = [
-      # Priorities.
-      ((1, '1970-01-01 00:00:00.000',   0), (0x92cc0300,  75)),
-      ((1, '1970-01-01 00:00:00.000',   1), (0x930c0300,  76)),
-      ((1, '1970-01-01 00:00:00.000',   2), (0x934c0300,  77)),
-      ((1, '1970-01-01 00:00:00.000',   3), (0x938c0300,  78)),
-      ((1, '1970-01-01 00:00:00.000', 255), (0xd28c0300, 330)),
-      # Largest hash.
-      ((0xffffffff, '1970-01-01 00:00:00.000', 255), (0x7fffffffd28c0300, 330)),
-      # Time resolution.
-      ((1, '1970-01-01 00:00:00.040',   0), (0x92cc0300,  75)),
-      ((1, '1970-01-01 00:00:00.050',   0), (0x92cc0300,  75)),
-      ((1, '1970-01-01 00:00:00.100',   0), (0x92cc02ff,  75)),
-      ((1, '1970-01-01 00:00:00.900',   0), (0x92cc02f7,  75)),
-      ((1, '1970-01-01 00:00:01.000',   0), (0x92cc02f6,  75)),  # 10
-      ((1, '2010-01-02 03:04:05.060',   0), (0x92bd248d,  74)),
-      ((1, '2010-01-02 03:04:05.060',   1), (0x92fd248d,  75)),
-      ((1, '2010-12-31 23:59:59.999',   0), (0x80000000,   0)),
-      ((1, '2010-12-31 23:59:59.999',   1), (0x80400000,   1)),
-      ((1, '2010-12-31 23:59:59.999',   2), (0x80800000,   2)),
-      ((1, '2010-12-31 23:59:59.999', 255), (0xbfc00000, 255)),
-      # It's the end of the world as we know it...
-      ((1, '9998-12-31 23:59:59.999',   0), (0x80000000,   0)),
-      ((1, '9998-12-31 23:59:59.999',   1), (0x80400000,   1)),
-      ((1, '9998-12-31 23:59:59.999', 255), (0xbfc00000, 255)),
+        # Priorities.
+        ((1, '1970-01-01 00:00:00.000', 0), (0x92cc0300, 75)),
+        ((1, '1970-01-01 00:00:00.000', 1), (0x930c0300, 76)),
+        ((1, '1970-01-01 00:00:00.000', 2), (0x934c0300, 77)),
+        ((1, '1970-01-01 00:00:00.000', 3), (0x938c0300, 78)),
+        ((1, '1970-01-01 00:00:00.000', 255), (0xd28c0300, 330)),
+        # Largest hash.
+        ((0xffffffff, '1970-01-01 00:00:00.000', 255), (0x7fffffffd28c0300,
+                                                        330)),
+        # Time resolution.
+        ((1, '1970-01-01 00:00:00.040', 0), (0x92cc0300, 75)),
+        ((1, '1970-01-01 00:00:00.050', 0), (0x92cc0300, 75)),
+        ((1, '1970-01-01 00:00:00.100', 0), (0x92cc02ff, 75)),
+        ((1, '1970-01-01 00:00:00.900', 0), (0x92cc02f7, 75)),
+        ((1, '1970-01-01 00:00:01.000', 0), (0x92cc02f6, 75)),  # 10
+        ((1, '2010-01-02 03:04:05.060', 0), (0x92bd248d, 74)),
+        ((1, '2010-01-02 03:04:05.060', 1), (0x92fd248d, 75)),
+        ((1, '2010-12-31 23:59:59.999', 0), (0x80000000, 0)),
+        ((1, '2010-12-31 23:59:59.999', 1), (0x80400000, 1)),
+        ((1, '2010-12-31 23:59:59.999', 2), (0x80800000, 2)),
+        ((1, '2010-12-31 23:59:59.999', 255), (0xbfc00000, 255)),
+        # It's the end of the world as we know it...
+        ((1, '9998-12-31 23:59:59.999', 0), (0x80000000, 0)),
+        ((1, '9998-12-31 23:59:59.999', 1), (0x80400000, 1)),
+        ((1, '9998-12-31 23:59:59.999', 255), (0xbfc00000, 255)),
     ]
     # pylint: enable=bad-whitespace
-    for i, (
-      (dimensions_hash, timestamp, priority),
-      (expected_v, expected_p)) in enumerate(data):
+    for i, ((dimensions_hash, timestamp, priority),
+            (expected_v, expected_p)) in enumerate(data):
       d = datetime.datetime.strptime(timestamp, '%Y-%m-%d %H:%M:%S.%f')
-      actual = task_to_run._gen_queue_number(
-          dimensions_hash, d, priority)
+      actual = task_to_run._gen_queue_number(dimensions_hash, d, priority)
       self.assertEqual((i, '0x%016x' % expected_v), (i, '0x%016x' % actual))
       # Ensure we can extract the priority back. That said, it is corrupted by
       # time.
       v = task_to_run.TaskToRun(queue_number=actual)
-      self.assertEqual(
-          (i, expected_p), (i, task_to_run._queue_number_priority(v)))
+      self.assertEqual((i, expected_p),
+                       (i, task_to_run._queue_number_priority(v)))
 
   def test_new_task_to_run(self):
     self.mock(random, 'getrandbits', lambda _: 0x12)
     request_dimensions = {u'os': [u'Windows-3.1.1'], u'pool': [u'default']}
     data = _gen_request_slices(
         task_slices=[
-          task_request.TaskSlice(
-              expiration_secs=31,
-              properties=_gen_properties(
-                  command=[u'command1', u'arg1'],
-                  dimensions=request_dimensions,
-                  env={u'foo': u'bar'},
-                  execution_timeout_secs=30)),
-          task_request.TaskSlice(
-              expiration_secs=30,
-              properties=_gen_properties(
-                  command=[u'command2'],
-                  dimensions=request_dimensions,
-                  execution_timeout_secs=30)),
+            task_request.TaskSlice(
+                expiration_secs=31,
+                properties=_gen_properties(
+                    command=[u'command1', u'arg1'],
+                    dimensions=request_dimensions,
+                    env={u'foo': u'bar'},
+                    execution_timeout_secs=30)),
+            task_request.TaskSlice(
+                expiration_secs=30,
+                properties=_gen_properties(
+                    command=[u'command2'],
+                    dimensions=request_dimensions,
+                    execution_timeout_secs=30)),
         ],
         priority=20,
         created_ts=self.now)
@@ -264,12 +274,12 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
     # request.created_ts is used.
     self.mock_now(self.now, 1)
     expected = {
-      'created_ts': self.now,
-      'expiration_ts': self.now + datetime.timedelta(seconds=31),
-      'expiration_delay': None,
-      'queue_number': '0x1a3aa66317bd248e',
-      'task_slice_index': 0,
-      'try_number': 1,
+        'created_ts': self.now,
+        'expiration_ts': self.now + datetime.timedelta(seconds=31),
+        'expiration_delay': None,
+        'queue_number': '0x1a3aa66317bd248e',
+        'task_slice_index': 0,
+        'try_number': 1,
     }
     actual = task_to_run.new_task_to_run(request, 1, 0).to_dict()
     self.assertEqual(expected, actual)
@@ -346,13 +356,13 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
         priority=20,
         created_ts=self.now,
         task_slices=[
-          task_request.TaskSlice(
-              expiration_secs=31,
-              properties=_gen_properties(
-                  command=[u'command1', u'arg1'],
-                  dimensions=request_dimensions,
-                  env={u'foo': u'bar'},
-                  execution_timeout_secs=30)),
+            task_request.TaskSlice(
+                expiration_secs=31,
+                properties=_gen_properties(
+                    command=[u'command1', u'arg1'],
+                    dimensions=request_dimensions,
+                    env={u'foo': u'bar'},
+                    execution_timeout_secs=30)),
         ])
     request = self.mkreq(1, data)
     task_to_run.new_task_to_run(request, 1, 0).put()
@@ -363,13 +373,13 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
         priority=10,
         created_ts=self.now,
         task_slices=[
-          task_request.TaskSlice(
-            expiration_secs=31,
-            properties=_gen_properties(
-                command=[u'command1', u'arg1'],
-                dimensions=request_dimensions,
-                env={u'foo': u'bar'},
-                execution_timeout_secs=30)),
+            task_request.TaskSlice(
+                expiration_secs=31,
+                properties=_gen_properties(
+                    command=[u'command1', u'arg1'],
+                    dimensions=request_dimensions,
+                    env={u'foo': u'bar'},
+                    execution_timeout_secs=30)),
         ])
     task_to_run.new_task_to_run(self.mkreq(0, data), 1, 0).put()
 
@@ -408,28 +418,48 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
 
   def test_match_dimensions(self):
     data_true = (
-      ({}, {}),
-      ({}, {'a': 'b'}),
-      ({'a': ['b']}, {'a': ['b']}),
-      ({'os': ['amiga']}, {'os': ['amiga', 'amiga-3.1']}),
-      ( {'os': ['amiga'], 'foo': ['bar']},
-        {'os': ['amiga', 'amiga-3.1'], 'a': 'b', 'foo': 'bar'}),
-      ( {'os': ['amiga', 'amiga-3.1'], 'foo': ['bar']},
-        {'os': ['amiga', 'amiga-3.1'], 'a': 'b', 'foo': 'bar'}),
+        ({}, {}),
+        ({}, {
+            'a': 'b'
+        }),
+        ({
+            'a': ['b']
+        }, {
+            'a': ['b']
+        }),
+        ({
+            'os': ['amiga']
+        }, {
+            'os': ['amiga', 'amiga-3.1']
+        }),
+        ({
+            'os': ['amiga'],
+            'foo': ['bar']
+        }, {
+            'os': ['amiga', 'amiga-3.1'],
+            'a': 'b',
+            'foo': 'bar'
+        }),
+        ({
+            'os': ['amiga', 'amiga-3.1'],
+            'foo': ['bar']
+        }, {
+            'os': ['amiga', 'amiga-3.1'],
+            'a': 'b',
+            'foo': 'bar'
+        }),
     )
 
     for request_dimensions, bot_dimensions in data_true:
       self.assertEqual(
-          True,
-          task_to_run.match_dimensions(request_dimensions, bot_dimensions))
+          True, task_to_run.match_dimensions(request_dimensions,
+                                             bot_dimensions))
 
-    data_false = (
-      ({'os': ['amiga']}, {'os': ['Win', 'Win-3.1']}),
-    )
+    data_false = (({'os': ['amiga']}, {'os': ['Win', 'Win-3.1']}),)
     for request_dimensions, bot_dimensions in data_false:
       self.assertEqual(
-          False,
-          task_to_run.match_dimensions(request_dimensions, bot_dimensions))
+          False, task_to_run.match_dimensions(request_dimensions,
+                                              bot_dimensions))
 
   def test_yield_next_available_task_to_dispatch_none(self):
     request_dimensions = {u'os': [u'Windows-3.1.1'], u'pool': [u'default']}
@@ -446,18 +476,18 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
         1, properties=_gen_properties(dimensions=request_dimensions))
     # Bot declares other dimensions, so it will fail to match.
     bot_dimensions = {
-      u'id': [u'bot1'],
-      u'os': [u'Windows-3.0'],
-      u'pool': [u'default'],
+        u'id': [u'bot1'],
+        u'os': [u'Windows-3.0'],
+        u'pool': [u'default'],
     }
     actual = _yield_next_available_task_to_dispatch(bot_dimensions)
     self.assertEqual([], actual)
 
   def test_yield_next_available_task_to_dispatch(self):
     request_dimensions = {
-      u'foo': [u'bar'],
-      u'os': [u'Windows-3.1.1'],
-      u'pool': [u'default'],
+        u'foo': [u'bar'],
+        u'os': [u'Windows-3.1.1'],
+        u'pool': [u'default'],
     }
     _request, _ = self._gen_new_task_to_run(
         1, properties=_gen_properties(dimensions=request_dimensions))
@@ -466,14 +496,14 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
     bot_dimensions[u'id'] = [u'bot1']
     actual = _yield_next_available_task_to_dispatch(bot_dimensions)
     expected = [
-      {
-        'created_ts': self.now,
-        'expiration_ts': self.now + datetime.timedelta(minutes=1),
-        'expiration_delay': None,
-        'queue_number': '0x613fbb331f3d248e',
-        'task_slice_index': 0,
-        'try_number': 1,
-      },
+        {
+            'created_ts': self.now,
+            'expiration_ts': self.now + datetime.timedelta(minutes=1),
+            'expiration_delay': None,
+            'queue_number': '0x613fbb331f3d248e',
+            'task_slice_index': 0,
+            'try_number': 1,
+        },
     ]
     self.assertEqual(expected, actual)
 
@@ -483,20 +513,20 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
         1, properties=_gen_properties(dimensions=request_dimensions))
     # Bot declares more dimensions than needed, this is fine and it matches.
     bot_dimensions = {
-      u'id': [u'localhost'],
-      u'os': [u'Windows-3.1.1'],
-      u'pool': [u'default'],
+        u'id': [u'localhost'],
+        u'os': [u'Windows-3.1.1'],
+        u'pool': [u'default'],
     }
     actual = _yield_next_available_task_to_dispatch(bot_dimensions)
     expected = [
-      {
-        'created_ts': self.now,
-        'expiration_ts': self.now + datetime.timedelta(minutes=1),
-        'expiration_delay': None,
-        'queue_number': '0x1a3aa6631f3d248e',
-        'task_slice_index': 0,
-        'try_number': 1,
-      },
+        {
+            'created_ts': self.now,
+            'expiration_ts': self.now + datetime.timedelta(minutes=1),
+            'expiration_delay': None,
+            'queue_number': '0x1a3aa6631f3d248e',
+            'task_slice_index': 0,
+            'try_number': 1,
+        },
     ]
     self.assertEqual(expected, actual)
 
@@ -508,14 +538,14 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
     bot_dimensions[u'id'] = [u'bot1']
     actual = _yield_next_available_task_to_dispatch(bot_dimensions)
     expected = [
-      {
-        'created_ts': self.now,
-        'expiration_ts': self.now + datetime.timedelta(minutes=1),
-        'expiration_delay': None,
-        'queue_number': '0x1a3aa6631f3d248e',
-        'task_slice_index': 0,
-        'try_number': 1,
-      },
+        {
+            'created_ts': self.now,
+            'expiration_ts': self.now + datetime.timedelta(minutes=1),
+            'expiration_delay': None,
+            'queue_number': '0x1a3aa6631f3d248e',
+            'task_slice_index': 0,
+            'try_number': 1,
+        },
     ]
     self.assertEqual(expected, actual)
 
@@ -525,29 +555,29 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
         1, properties=_gen_properties(dimensions=request_dimensions))
     # Bot declares more dimensions than needed.
     bot_dimensions = {
-      u'id': [u'localhost'],
-      u'os': [u'Windows', u'Windows-3.1.1'],
-      u'pool': [u'default'],
+        u'id': [u'localhost'],
+        u'os': [u'Windows', u'Windows-3.1.1'],
+        u'pool': [u'default'],
     }
     actual = _yield_next_available_task_to_dispatch(bot_dimensions)
     expected = [
-      {
-        'created_ts': self.now,
-        'expiration_ts': self.now + datetime.timedelta(minutes=1),
-        'expiration_delay': None,
-        'queue_number': '0x1a3aa6631f3d248e',
-        'task_slice_index': 0,
-        'try_number': 1,
-      },
+        {
+            'created_ts': self.now,
+            'expiration_ts': self.now + datetime.timedelta(minutes=1),
+            'expiration_delay': None,
+            'queue_number': '0x1a3aa6631f3d248e',
+            'task_slice_index': 0,
+            'try_number': 1,
+        },
     ]
     self.assertEqual(expected, actual)
 
   def test_yield_next_available_task_to_dispatch_multi_normal(self):
     # Task added one after the other, normal case.
     request_dimensions_1 = {
-      u'foo': [u'bar'],
-      u'os': [u'Windows-3.1.1'],
-      u'pool': [u'default'],
+        u'foo': [u'bar'],
+        u'os': [u'Windows-3.1.1'],
+        u'pool': [u'default'],
     }
     _request1, _ = self._gen_new_task_to_run(
         1, properties=_gen_properties(dimensions=request_dimensions_1))
@@ -559,29 +589,35 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
         0, properties=_gen_properties(dimensions=request_dimensions_2))
 
     bot_dimensions = {
-      u'foo': [u'bar'],
-      u'id': [u'localhost'],
-      u'os': [u'Windows-3.1.1'],
-      u'pool': [u'default'],
+        u'foo': [u'bar'],
+        u'id': [u'localhost'],
+        u'os': [u'Windows-3.1.1'],
+        u'pool': [u'default'],
     }
     actual = _yield_next_available_task_to_dispatch(bot_dimensions)
     expected = [
-      {
-        'created_ts': self.now,
-        'expiration_ts': self.now + datetime.timedelta(minutes=1),
-        'expiration_delay': None,
-        'queue_number': '0x613fbb331f3d248e',
-        'task_slice_index': 0,
-        'try_number': 1,
-      },
-      {
-        'created_ts': self.now + datetime.timedelta(seconds=1),
-        'expiration_ts': self.now + datetime.timedelta(minutes=1, seconds=1),
-        'expiration_delay': None,
-        'queue_number': '0x5385bf749f3d2484',
-        'task_slice_index': 0,
-        'try_number': 1,
-      },
+        {
+            'created_ts': self.now,
+            'expiration_ts': self.now + datetime.timedelta(minutes=1),
+            'expiration_delay': None,
+            'queue_number': '0x613fbb331f3d248e',
+            'task_slice_index': 0,
+            'try_number': 1,
+        },
+        {
+            'created_ts':
+                self.now + datetime.timedelta(seconds=1),
+            'expiration_ts':
+                self.now + datetime.timedelta(minutes=1, seconds=1),
+            'expiration_delay':
+                None,
+            'queue_number':
+                '0x5385bf749f3d2484',
+            'task_slice_index':
+                0,
+            'try_number':
+                1,
+        },
     ]
     # There is a significant risk of non-determinism.
     self.assertEqual(sorted(expected), sorted(actual))
@@ -592,9 +628,9 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
     # between machines) is still returned in the timestamp order, e.g. priority
     # is done based on timestamps and priority only.
     request_dimensions_1 = {
-      u'foo': [u'bar'],
-      u'os': [u'Windows-3.1.1'],
-      u'pool': [u'default'],
+        u'foo': [u'bar'],
+        u'os': [u'Windows-3.1.1'],
+        u'pool': [u'default'],
     }
     _request1, _ = self._gen_new_task_to_run(
         1, properties=_gen_properties(dimensions=request_dimensions_1))
@@ -607,30 +643,36 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
         0, properties=_gen_properties(dimensions=request_dimensions_2))
 
     bot_dimensions = {
-      u'foo': [u'bar'],
-      u'id': [u'localhost'],
-      u'os': [u'Windows-3.1.1'],
-      u'pool': [u'default'],
+        u'foo': [u'bar'],
+        u'id': [u'localhost'],
+        u'os': [u'Windows-3.1.1'],
+        u'pool': [u'default'],
     }
     actual = _yield_next_available_task_to_dispatch(bot_dimensions)
     expected = [
-      {
-        'created_ts': self.now + datetime.timedelta(seconds=-1),
-        # Due to time being late on the second requester frontend.
-        'expiration_ts': self.now + datetime.timedelta(minutes=1, seconds=-1),
-        'expiration_delay': None,
-        'queue_number': '0x5385bf749f3d2498',
-        'task_slice_index': 0,
-        'try_number': 1,
-      },
-      {
-        'created_ts': self.now,
-        'expiration_ts': self.now + datetime.timedelta(minutes=1),
-        'expiration_delay': None,
-        'queue_number': '0x613fbb331f3d248e',
-        'task_slice_index': 0,
-        'try_number': 1,
-      },
+        {
+            'created_ts':
+                self.now + datetime.timedelta(seconds=-1),
+            # Due to time being late on the second requester frontend.
+            'expiration_ts':
+                self.now + datetime.timedelta(minutes=1, seconds=-1),
+            'expiration_delay':
+                None,
+            'queue_number':
+                '0x5385bf749f3d2498',
+            'task_slice_index':
+                0,
+            'try_number':
+                1,
+        },
+        {
+            'created_ts': self.now,
+            'expiration_ts': self.now + datetime.timedelta(minutes=1),
+            'expiration_delay': None,
+            'queue_number': '0x613fbb331f3d248e',
+            'task_slice_index': 0,
+            'try_number': 1,
+        },
     ]
     # There is a significant risk of non-determinism.
     self.assertEqual(expected, sorted(actual, key=lambda x: x['queue_number']))
@@ -655,27 +697,27 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
     # It should return them all, in the expected order: highest priority
     # (lowest priority value) first.
     expected = [
-      {
-        'created_ts': self.now,
-        'expiration_ts': self.now + datetime.timedelta(minutes=1),
-        'expiration_delay': None,
-        'queue_number': '0x1a3aa663153d248e',
-        'task_slice_index': 0,
-        'try_number': 1,
-      },
-      {
-        'created_ts': self.now + datetime.timedelta(minutes=1),
-        'expiration_ts': self.now + datetime.timedelta(minutes=2),
-        'expiration_delay': None,
-        'queue_number': '0x1a3aa6631f3d2236',
-        'task_slice_index': 0,
-        'try_number': 1,
-      },
+        {
+            'created_ts': self.now,
+            'expiration_ts': self.now + datetime.timedelta(minutes=1),
+            'expiration_delay': None,
+            'queue_number': '0x1a3aa663153d248e',
+            'task_slice_index': 0,
+            'try_number': 1,
+        },
+        {
+            'created_ts': self.now + datetime.timedelta(minutes=1),
+            'expiration_ts': self.now + datetime.timedelta(minutes=2),
+            'expiration_delay': None,
+            'queue_number': '0x1a3aa6631f3d2236',
+            'task_slice_index': 0,
+            'try_number': 1,
+        },
     ]
     bot_dimensions = {
-      u'id': [u'localhost'],
-      u'os': [u'Windows-3.1.1'],
-      u'pool': [u'default'],
+        u'id': [u'localhost'],
+        u'os': [u'Windows-3.1.1'],
+        u'pool': [u'default'],
     }
     actual = _yield_next_available_task_to_dispatch(bot_dimensions)
     self.assertEqual(expected, actual)
@@ -701,27 +743,27 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
 
     # It should return them all, in the expected order: first in, first out.
     expected = [
-      {
-        'created_ts': self.now,
-        'expiration_ts': self.now + datetime.timedelta(minutes=1),
-        'expiration_delay': None,
-        'queue_number': '0x1a3aa6630c8ede72',
-        'task_slice_index': 0,
-        'try_number': 1,
-      },
-      {
-        'created_ts': self.now + datetime.timedelta(minutes=1),
-        'expiration_ts': self.now + datetime.timedelta(minutes=2),
-        'expiration_delay': None,
-        'queue_number': '0x1a3aa6630c8ee0ca',
-        'task_slice_index': 0,
-        'try_number': 1,
-      },
+        {
+            'created_ts': self.now,
+            'expiration_ts': self.now + datetime.timedelta(minutes=1),
+            'expiration_delay': None,
+            'queue_number': '0x1a3aa6630c8ede72',
+            'task_slice_index': 0,
+            'try_number': 1,
+        },
+        {
+            'created_ts': self.now + datetime.timedelta(minutes=1),
+            'expiration_ts': self.now + datetime.timedelta(minutes=2),
+            'expiration_delay': None,
+            'queue_number': '0x1a3aa6630c8ee0ca',
+            'task_slice_index': 0,
+            'try_number': 1,
+        },
     ]
     bot_dimensions = {
-      u'id': [u'localhost'],
-      u'os': [u'Windows-3.1.1'],
-      u'pool': [u'default'],
+        u'id': [u'localhost'],
+        u'os': [u'Windows-3.1.1'],
+        u'pool': [u'default'],
     }
     actual = _yield_next_available_task_to_dispatch(bot_dimensions)
     self.assertEqual(expected, actual)
@@ -743,27 +785,27 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
 
     # It should return them all, in the expected order: last in, first out.
     expected = [
-      {
-        'created_ts': self.now + datetime.timedelta(minutes=1),
-        'expiration_ts': self.now + datetime.timedelta(minutes=2),
-        'expiration_delay': None,
-        'queue_number': '0x1a3aa6631f3d2236',
-        'task_slice_index': 0,
-        'try_number': 1,
-      },
-      {
-        'created_ts': self.now,
-        'expiration_ts': self.now + datetime.timedelta(minutes=1),
-        'expiration_delay': None,
-        'queue_number': '0x1a3aa6631f3d248e',
-        'task_slice_index': 0,
-        'try_number': 1,
-      },
+        {
+            'created_ts': self.now + datetime.timedelta(minutes=1),
+            'expiration_ts': self.now + datetime.timedelta(minutes=2),
+            'expiration_delay': None,
+            'queue_number': '0x1a3aa6631f3d2236',
+            'task_slice_index': 0,
+            'try_number': 1,
+        },
+        {
+            'created_ts': self.now,
+            'expiration_ts': self.now + datetime.timedelta(minutes=1),
+            'expiration_delay': None,
+            'queue_number': '0x1a3aa6631f3d248e',
+            'task_slice_index': 0,
+            'try_number': 1,
+        },
     ]
     bot_dimensions = {
-      u'id': [u'localhost'],
-      u'os': [u'Windows-3.1.1'],
-      u'pool': [u'default'],
+        u'id': [u'localhost'],
+        u'os': [u'Windows-3.1.1'],
+        u'pool': [u'default'],
     }
     actual = _yield_next_available_task_to_dispatch(bot_dimensions)
     self.assertEqual(expected, actual)
@@ -790,27 +832,27 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
     # It should return them all, in the expected order: highest priority
     # (lowest priority value) first.
     expected = [
-      {
-        'created_ts': self.now,
-        'expiration_ts': self.now + datetime.timedelta(minutes=1),
-        'expiration_delay': None,
-        'queue_number': '0x1a3aa663153d248e',
-        'task_slice_index': 0,
-        'try_number': 1,
-      },
-      {
-        'created_ts': self.now + datetime.timedelta(minutes=1),
-        'expiration_ts': self.now + datetime.timedelta(minutes=2),
-        'expiration_delay': None,
-        'queue_number': '0x5385bf749f3d2236',
-        'task_slice_index': 0,
-        'try_number': 1,
-      },
+        {
+            'created_ts': self.now,
+            'expiration_ts': self.now + datetime.timedelta(minutes=1),
+            'expiration_delay': None,
+            'queue_number': '0x1a3aa663153d248e',
+            'task_slice_index': 0,
+            'try_number': 1,
+        },
+        {
+            'created_ts': self.now + datetime.timedelta(minutes=1),
+            'expiration_ts': self.now + datetime.timedelta(minutes=2),
+            'expiration_delay': None,
+            'queue_number': '0x5385bf749f3d2236',
+            'task_slice_index': 0,
+            'try_number': 1,
+        },
     ]
     bot_dimensions = {
-      u'id': [u'localhost'],
-      u'os': [u'Windows-3.1.1'],
-      u'pool': [u'default'],
+        u'id': [u'localhost'],
+        u'os': [u'Windows-3.1.1'],
+        u'pool': [u'default'],
     }
     actual = _yield_next_available_task_to_dispatch(bot_dimensions)
     self.assertEqual(expected, actual)
@@ -836,14 +878,14 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
     bot_dimensions[u'pool'] = [u'default']
     actual = _yield_next_available_task_to_dispatch(bot_dimensions)
     expected = [
-      {
-        'created_ts': self.now,
-        'expiration_ts': self.now + datetime.timedelta(minutes=1),
-        'expiration_delay': None,
-        'queue_number': '0x54795e3c92bd248e',
-        'task_slice_index': 0,
-        'try_number': 1,
-      },
+        {
+            'created_ts': self.now,
+            'expiration_ts': self.now + datetime.timedelta(minutes=1),
+            'expiration_delay': None,
+            'queue_number': '0x54795e3c92bd248e',
+            'task_slice_index': 0,
+            'try_number': 1,
+        },
     ]
     self.assertEqual(expected, actual)
 
@@ -863,13 +905,19 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
     # task_to_run_2: just reached to the expiration time
     _, to_run_2 = self._gen_new_task_to_run_slices(
         0,
-        created_ts=self.now-datetime.timedelta(seconds=61),
-        task_slices=[{'expiration_secs': 60, 'properties': _gen_properties()}])
+        created_ts=self.now - datetime.timedelta(seconds=61),
+        task_slices=[{
+            'expiration_secs': 60,
+            'properties': _gen_properties()
+        }])
     # task_to_run_3: already passed the expiration time 1 day ago
     _, to_run_3 = self._gen_new_task_to_run_slices(
         0,
-        created_ts=self.now-datetime.timedelta(days=1),
-        task_slices=[{'expiration_secs': 60, 'properties': _gen_properties()}])
+        created_ts=self.now - datetime.timedelta(days=1),
+        task_slices=[{
+            'expiration_secs': 60,
+            'properties': _gen_properties()
+        }])
     # task_to_run_4: already passed the expiration time long time ago
     _, _to_run_4 = self._gen_new_task_to_run_slices(
         0,
@@ -899,9 +947,9 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
     _, to_run = self._gen_new_task_to_run(
         1, properties=_gen_properties(dimensions=request_dimensions))
     bot_dimensions = {
-      u'id': [u'localhost'],
-      u'os': [u'Windows-3.1.1'],
-      u'pool': [u'default'],
+        u'id': [u'localhost'],
+        u'os': [u'Windows-3.1.1'],
+        u'pool': [u'default'],
     }
     self.assertEqual(
         1, len(_yield_next_available_task_to_dispatch(bot_dimensions)))
