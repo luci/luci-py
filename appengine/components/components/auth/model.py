@@ -78,6 +78,7 @@ from components import utils
 
 from . import globmatch
 from . import ipaddr
+from .proto import realms_pb2
 
 # Part of public API of 'auth' component, exposed by this module.
 __all__ = [
@@ -114,6 +115,9 @@ __all__ = [
   'replicate_auth_db',
 ]
 
+
+# Currently acceptable version of Realms API. See api_version in realms.proto.
+REALMS_API_VERSION = 1
 
 # Name of a group whose members have access to Group management UI. It's the
 # only group needed to bootstrap everything else.
@@ -476,6 +480,7 @@ class AuthVersionedEntityMixin(object):
       # incorrect result. Note that all AuthDB classes are instantiated in
       # unit tests, so there should be no unexpected asserts in production.
       assert prop.__class__ in (
+        datastore_utils.ProtobufProperty,
         IdentityGlobProperty,
         IdentityProperty,
         ndb.BlobProperty,
@@ -492,7 +497,9 @@ class AuthVersionedEntityMixin(object):
         'required': False,
         'repeated': prop._repeated,
       }
-      if prop.__class__ == ndb.LocalStructuredProperty:
+      if prop.__class__ == datastore_utils.ProtobufProperty:
+        kwargs['message_class'] = prop._message_class
+      elif prop.__class__ == ndb.LocalStructuredProperty:
         kwargs['modelclass'] = prop._modelclass
       props[name] = prop.__class__(**kwargs)
     new_cls = type(
@@ -1289,6 +1296,31 @@ def fetch_ip_whitelists():
 
   whitelists = sorted(whitelists_fut.get_result(), key=lambda x: x.key.id())
   return assignments, whitelists
+
+
+################################################################################
+## Realms entities.
+
+
+class AuthRealmsGlobals(ndb.Model, AuthVersionedEntityMixin):
+  """A singleton entity with global portions of realms configuration.
+
+  Data here does not relate to any individual realm or project. Currently
+  contains a list of all defined permissions (with their metadata).
+
+  Entity key is realms_globals_key(). Parent entity is root_key().
+  """
+  # Disable useless in-process per-request cache.
+  _use_cache = False
+
+  # All globally defined permissions, in alphabetical order.
+  permissions = datastore_utils.ProtobufProperty(
+      realms_pb2.Permission, repeated=True)
+
+
+def realms_globals_key():
+  """The key of AuthRealmsGlobals singleton entity."""
+  return ndb.Key(AuthRealmsGlobals, 'globals', parent=root_key())
 
 
 ################################################################################

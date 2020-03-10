@@ -15,6 +15,7 @@ from google.appengine.ext import ndb
 from components import utils
 from components.auth import ipaddr
 from components.auth import model
+from components.auth.proto import realms_pb2
 from test_support import test_case
 
 
@@ -974,6 +975,59 @@ class AuditLogTest(test_case.TestCase):
         'modified_ts': datetime.datetime(2015, 1, 1, 1, 1),
       },
     }, self.grab_log(model.AuthIPWhitelistAssignments))
+
+  def test_realms_globals_log(self):
+    @ndb.transactional
+    def modify(permissions):
+      key = model.realms_globals_key()
+      e = key.get() or model.AuthRealmsGlobals(key=key)
+      e.record_revision(
+          modified_by=model.Identity.from_bytes('user:a@example.com'),
+          modified_ts=datetime.datetime(2015, 1, 1, 1, 1),
+          comment='Comment')
+      e.permissions = permissions
+      e.put()
+      model.replicate_auth_db()
+
+    modify([])
+    modify([realms_pb2.Permission(name='luci.dev.p1')])
+    modify([])
+
+    cpy = lambda rev: ndb.Key(
+        'Rev', rev, 'AuthRealmsGlobalsHistory', 'globals',
+        parent=model.root_key())
+    self.assertEqual({
+      cpy(1): {
+        'permissions': [],
+        'auth_db_rev': 1,
+        'auth_db_prev_rev': None,
+        'auth_db_app_version': u'v1a',
+        'auth_db_deleted': False,
+        'auth_db_change_comment': u'Comment',
+        'modified_by': model.Identity.from_bytes('user:a@example.com'),
+        'modified_ts': datetime.datetime(2015, 1, 1, 1, 1),
+      },
+      cpy(2): {
+        'permissions': [realms_pb2.Permission(name='luci.dev.p1')],
+        'auth_db_rev': 2,
+        'auth_db_prev_rev': 1,
+        'auth_db_app_version': u'v1a',
+        'auth_db_deleted': False,
+        'auth_db_change_comment': u'Comment',
+        'modified_by': model.Identity.from_bytes('user:a@example.com'),
+        'modified_ts': datetime.datetime(2015, 1, 1, 1, 1),
+      },
+      cpy(3): {
+        'permissions': [],
+        'auth_db_rev': 3,
+        'auth_db_prev_rev': 2,
+        'auth_db_app_version': u'v1a',
+        'auth_db_deleted': False,
+        'auth_db_change_comment': u'Comment',
+        'modified_by': model.Identity.from_bytes('user:a@example.com'),
+        'modified_ts': datetime.datetime(2015, 1, 1, 1, 1),
+      },
+    }, self.grab_log(model.AuthRealmsGlobals))
 
 
 if __name__ == '__main__':

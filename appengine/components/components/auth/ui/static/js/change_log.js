@@ -44,6 +44,9 @@ var parseTarget = function(t) {
       title = 'Global config';
       targetURL = '/auth/oauth_config';
       break;
+    case 'AuthRealmsGlobals':
+      title = 'Realms config';
+      break;
   }
 
   return {

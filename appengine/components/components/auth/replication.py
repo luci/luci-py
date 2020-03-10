@@ -36,7 +36,13 @@ LINKING_ERRORS = {
 # Returned by new_auth_db_snapshot.
 AuthDBSnapshot = collections.namedtuple(
     'AuthDBSnapshot',
-    'global_config, groups, ip_whitelists, ip_whitelist_assignments')
+    [
+      'global_config',
+      'groups',
+      'ip_whitelists',
+      'ip_whitelist_assignments',
+      'realms_globals',
+    ])
 
 
 class ProtocolError(Exception):
@@ -129,16 +135,22 @@ def new_auth_db_snapshot():
   state_future = model.replication_state_key().get_async()
   config_future = model.root_key().get_async()
   groups_future = model.AuthGroup.query(ancestor=model.root_key()).fetch_async()
+  realms_globals_future = model.realms_globals_key().get_async()
 
   # It's fine to block here as long as it's the last fetch.
   ip_whitelist_assignments, ip_whitelists = model.fetch_ip_whitelists()
 
   snapshot = AuthDBSnapshot(
       config_future.get_result() or model.AuthGlobalConfig(
-          key=model.root_key()),
+          key=model.root_key()
+      ),
       groups_future.get_result(),
       ip_whitelists,
-      ip_whitelist_assignments)
+      ip_whitelist_assignments,
+      realms_globals_future.get_result() or model.AuthRealmsGlobals(
+          key=model.realms_globals_key()
+      ),
+  )
   return state_future.get_result(), snapshot
 
 
@@ -204,6 +216,9 @@ def auth_db_snapshot_to_proto(snapshot, auth_db_proto=None):
     msg.comment = ent.comment or 'empty'
     msg.created_ts = utils.datetime_to_timestamp(ent.created_ts)
     msg.created_by = ent.created_by.to_bytes()
+
+  auth_db_proto.realms.api_version = model.REALMS_API_VERSION
+  auth_db_proto.realms.permissions.extend(snapshot.realms_globals.permissions)
 
   return auth_db_proto
 
@@ -271,8 +286,18 @@ def proto_to_auth_db_snapshot(auth_db_proto, skip_groups):
       ],
   )
 
+  realms_globals = model.AuthRealmsGlobals(
+      key=model.realms_globals_key(),
+      permissions=list(auth_db_proto.realms.permissions),
+  )
+
   return AuthDBSnapshot(
-      global_config, groups, ip_whitelists, ip_whitelist_assignments)
+      global_config,
+      groups,
+      ip_whitelists,
+      ip_whitelist_assignments,
+      realms_globals,
+  )
 
 
 def get_changed_entities(new_entity_list, old_entity_list):
@@ -332,6 +357,8 @@ def replace_auth_db(auth_db_rev, modified_ts, snapshot, shard_ids):
   old_ips = current.ip_whitelist_assignments
   if new_ips.to_dict() != old_ips.to_dict():
     entites_to_put.append(new_ips)
+  if snapshot.realms_globals.to_dict() != current.realms_globals.to_dict():
+    entites_to_put.append(snapshot.realms_globals)
 
   # Keys of entities that needs to be removed.
   keys_to_delete = []

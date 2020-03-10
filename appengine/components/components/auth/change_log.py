@@ -126,6 +126,9 @@ class AuthDBChange(polymodel.PolyModel):
   CHANGE_CONF_TOKEN_SERVER_URL_CHANGED = 7300
   CHANGE_CONF_SECURITY_CONFIG_CHANGED  = 7400
 
+  # AuthRealmsGlobalsChange change types.
+  CHANGE_REALMS_GLOBALS_CHANGED = 9000
+
   # What kind of a change this is (see CHANGE_*). Defines what subclass to use.
   change_type = ndb.IntegerProperty()
   # Entity (or subentity) that was changed: kind$id[$subid] (subid is optional).
@@ -536,6 +539,45 @@ def diff_global_config(target, old, new):
         security_config_new=new.security_config)
 
 
+## AuthRealmsGlobals changes.
+
+
+class AuthRealmsGlobalsChange(AuthDBChange):
+  # Valid for CHANGE_REALMS_GLOBALS_CHANGED.
+  permissions_added = ndb.StringProperty(repeated=True)
+  permissions_changed = ndb.StringProperty(repeated=True)
+  permissions_removed = ndb.StringProperty(repeated=True)
+
+
+def diff_realms_globals(target, old, new):
+  to_map = lambda ent: {} if not ent else {p.name: p for p in ent.permissions}
+
+  old_perms = to_map(old)
+  new_perms = to_map(new)
+
+  added, changed = [], []
+  for name in sorted(new_perms):
+    if name not in old_perms:
+      added.append(name)
+    elif old_perms[name] != new_perms[name]:
+      changed.append(name)
+
+  removed = []
+  for name in sorted(old_perms):
+    if name not in new_perms:
+      removed.append(name)
+
+  # Emit it as a single change log entry, it's not useful to have a finer
+  # granularity for this sort of changes.
+  if added or change or removed:
+    yield AuthRealmsGlobalsChange(
+        change_type=AuthDBChange.CHANGE_REALMS_GLOBALS_CHANGED,
+        target=target,
+        permissions_added=added,
+        permissions_changed=changed,
+        permissions_removed=removed)
+
+
 ###
 
 
@@ -553,6 +595,7 @@ KNOWN_HISTORICAL_ENTITIES = {
   'AuthIPWhitelistAssignmentsHistory': (
       model.AuthIPWhitelistAssignments, diff_ip_whitelist_assignments),
   'AuthGlobalConfigHistory': (model.AuthGlobalConfig, diff_global_config),
+  'AuthRealmsGlobalsHistory': (model.AuthRealmsGlobals, diff_realms_globals),
 }
 
 

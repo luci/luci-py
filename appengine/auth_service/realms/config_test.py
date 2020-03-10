@@ -16,12 +16,17 @@ import mock
 
 from test_support import test_case
 
+from components.auth import model
+
 from realms import config
 from realms import permissions
 
 
-def fake_db(rev):
-  return permissions.Builder(rev).finish()
+def fake_db(rev, perms=None):
+  b = permissions.Builder(rev)
+  for p in (perms or []):
+    b.permission(p)
+  return b.finish()
 
 
 def fake_realms_rev(project_id, config_digest, db_rev):
@@ -119,6 +124,36 @@ class CheckConfigChangesTest(test_case.TestCase):
     self.assertEqual(updated, {p.project_id for p in revs})  # all of them
     self.assertEqual(deleted, set())
     self.assertEqual(len(batches), config.DB_REEVAL_REVISIONS)
+
+
+class CheckPermissionChangesTest(test_case.TestCase):
+  def call(self, db):
+    jobs = config.check_permission_changes(db)
+    self.assertTrue(config.execute_jobs(jobs, 0.0))
+
+  def test_works(self):
+    def perms_from_authdb():
+      e = model.realms_globals_key().get()
+      return [p.name for p in e.permissions] if e else []
+
+    # The initial state.
+    self.assertEqual(model.get_auth_db_revision(), 0)
+    self.assertEqual(perms_from_authdb(), [])
+
+    # Create the initial copy of AuthRealmsGlobals.
+    self.call(fake_db('rev1', ['luci.dev.p1', 'luci.dev.p2']))
+    self.assertEqual(model.get_auth_db_revision(), 1)
+    self.assertEqual(perms_from_authdb(), ['luci.dev.p1', 'luci.dev.p2'])
+
+    # Noop change.
+    self.call(fake_db('rev1', ['luci.dev.p1', 'luci.dev.p2']))
+    self.assertEqual(model.get_auth_db_revision(), 1)
+    self.assertEqual(perms_from_authdb(), ['luci.dev.p1', 'luci.dev.p2'])
+
+    # Real change.
+    self.call(fake_db('rev2', ['luci.dev.p3']))
+    self.assertEqual(model.get_auth_db_revision(), 2)
+    self.assertEqual(perms_from_authdb(), ['luci.dev.p3'])
 
 
 if __name__ == '__main__':

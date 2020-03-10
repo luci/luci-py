@@ -15,12 +15,15 @@ necessary. Each commit produces a new AuthDB revision.
 
 import collections
 import functools
+import logging
 import random
 import time
 
 from google.appengine.api import datastore_errors
 from google.appengine.ext import ndb
 from google.appengine.runtime import apiproxy_errors
+
+from components.auth import model
 
 from realms import permissions
 from realms import validation
@@ -129,14 +132,30 @@ def check_permission_changes(db):
   Returns:
     A list of parameterless callbacks.
   """
-  # TODO(vadimsh): Implement:
-  #   1. Fetch the currently stored list of permissions.
-  #   2. If same as db.permissions, exit.
-  #   3. Transactionally:
-  #      a. Fetch it again, compare to db.permissions.
-  #      b. If different, update and trigger AuthDB replication.
-  _ = db
-  return []
+  perms_to_map = lambda perms: {p.name: p for p in perms}
+
+  stored = model.realms_globals_key().get()
+  if stored and perms_to_map(stored.permissions) == db.permissions:
+    return []  # permissions in the AuthDB are up to date
+
+  logging.info('Updating permissions in AuthDB to rev "%s"', db.revision)
+
+  @ndb.transactional
+  def update_stored():
+    stored = model.realms_globals_key().get()
+    if not stored:
+      stored = model.AuthRealmsGlobals(key=model.realms_globals_key())
+    if perms_to_map(stored.permissions) == db.permissions:
+      logging.info('Skipping, already up-to-date')
+      return
+    stored.permissions = sorted(db.permissions.values(), key=lambda p: p.name)
+    stored.record_revision(
+        modified_by=model.get_service_self_identity(),
+        comment='Updating permissions to rev "%s"' % db.revision)
+    stored.put()
+    model.replicate_auth_db()
+
+  return [update_stored]
 
 
 def check_config_changes(db, latest, stored):

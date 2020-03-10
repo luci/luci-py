@@ -15,6 +15,7 @@ from google.appengine.ext import ndb
 from components import utils
 from components.auth import model
 from components.auth import replication
+from components.auth.proto import realms_pb2
 from test_support import test_case
 
 
@@ -34,6 +35,7 @@ def snapshot_to_dict(snapshot):
     'ip_whitelists': [entity_to_dict(l) for l in snapshot.ip_whitelists],
     'ip_whitelist_assignments':
         entity_to_dict(snapshot.ip_whitelist_assignments),
+    'realms_globals': entity_to_dict(snapshot.realms_globals),
   }
   # Ensure no new keys are forgotten.
   assert len(snapshot) == len(result)
@@ -42,7 +44,8 @@ def snapshot_to_dict(snapshot):
 
 def make_snapshot_obj(
     global_config=None, groups=None,
-    ip_whitelists=None, ip_whitelist_assignments=None):
+    ip_whitelists=None, ip_whitelist_assignments=None,
+    realms_globals=None):
   """Returns AuthDBSnapshot with empty list of groups and whitelists."""
   return replication.AuthDBSnapshot(
       global_config=global_config or model.AuthGlobalConfig(
@@ -57,6 +60,8 @@ def make_snapshot_obj(
           ip_whitelist_assignments or
           model.AuthIPWhitelistAssignments(
               key=model.ip_whitelist_assignments_key())),
+      realms_globals=realms_globals or model.AuthRealmsGlobals(
+          key=model.realms_globals_key()),
   )
 
 
@@ -90,6 +95,15 @@ class NewAuthDBSnapshotTest(test_case.TestCase):
         'auth_db_prev_rev': None,
         'modified_by': None,
         'modified_ts': None,
+      },
+      'realms_globals': {
+        '__id__': 'globals',
+        '__parent__': ndb.Key('AuthGlobalConfig', 'root'),
+        'auth_db_prev_rev': None,
+        'auth_db_rev': None,
+        'modified_by': None,
+        'modified_ts': None,
+        'permissions': [],
       },
     }
     self.assertEqual(expected_snapshot, snapshot_to_dict(snapshot))
@@ -156,6 +170,14 @@ class NewAuthDBSnapshotTest(test_case.TestCase):
             created_by=model.Identity.from_bytes('user:creator@example.com')),
         ])
     ip_whitelist_assignments.put()
+
+    realms_globals = model.AuthRealmsGlobals(
+        key=model.realms_globals_key(),
+        permissions=[
+            realms_pb2.Permission(name='luci.dev.p1'),
+            realms_pb2.Permission(name='luci.dev.p2'),
+        ])
+    realms_globals.put()
 
     captured_state, snapshot = replication.new_auth_db_snapshot()
 
@@ -249,6 +271,18 @@ class NewAuthDBSnapshotTest(test_case.TestCase):
         'modified_by': model.Identity(kind='user', name='modifier@example.com'),
         'modified_ts': datetime.datetime(2014, 1, 1, 1, 1, 1),
       },
+      'realms_globals': {
+        '__id__': 'globals',
+        '__parent__': ndb.Key('AuthGlobalConfig', 'root'),
+        'auth_db_prev_rev': None,
+        'auth_db_rev': None,
+        'modified_by': None,
+        'modified_ts': None,
+        'permissions': [
+          realms_pb2.Permission(name='luci.dev.p1'),
+          realms_pb2.Permission(name='luci.dev.p2'),
+        ],
+      },
     }
     self.assertEqual(expected_snapshot, snapshot_to_dict(snapshot))
 
@@ -329,6 +363,18 @@ class SnapshotToProtoConversionTest(test_case.TestCase):
     snapshot = make_snapshot_obj(ip_whitelist_assignments=entity)
     self.assert_serialization_works(snapshot)
 
+  def test_realms_globals_serialization(self):
+    """Serializing snapshot with non-trivial AuthRealmsGlobals."""
+    entity = model.AuthRealmsGlobals(
+        key=model.realms_globals_key(),
+        permissions=[
+          realms_pb2.Permission(name='luci.dev.p1'),
+          realms_pb2.Permission(name='luci.dev.p2'),
+        ],
+    )
+    snapshot = make_snapshot_obj(realms_globals=entity)
+    self.assert_serialization_works(snapshot)
+
 
 class ReplaceAuthDbTest(test_case.TestCase):
   """Tests for replace_auth_db function."""
@@ -390,6 +436,12 @@ class ReplaceAuthDbTest(test_case.TestCase):
           assignment('user:3@example.com', 'keep'),
         ]).put()
 
+    model.AuthRealmsGlobals(
+        key=model.realms_globals_key(),
+        permissions=[
+          realms_pb2.Permission(name='luci.dev.p1'),
+        ]).put()
+
     # Prepare snapshot.
     snapshot = replication.AuthDBSnapshot(
         global_config=model.AuthGlobalConfig(
@@ -416,6 +468,12 @@ class ReplaceAuthDbTest(test_case.TestCase):
               assignment('user:a@example.com', 'new'),
               assignment('user:b@example.com', 'modify'),
               assignment('user:c@example.com', 'keep'),
+            ],
+        ),
+        realms_globals=model.AuthRealmsGlobals(
+            key=model.realms_globals_key(),
+            permissions=[
+              realms_pb2.Permission(name='luci.dev.p2'),
             ],
         ),
     )
@@ -568,7 +626,18 @@ class ReplaceAuthDbTest(test_case.TestCase):
         'auth_db_rev': None,
         'auth_db_prev_rev': None,
         'modified_by': None,
-        'modified_ts': None, # not transfered currently in proto
+        'modified_ts': None, # not transferred currently in proto
+      },
+      'realms_globals': {
+        '__id__': 'globals',
+        '__parent__': ndb.Key('AuthGlobalConfig', 'root'),
+        'auth_db_prev_rev': None,
+        'auth_db_rev': None,
+        'modified_by': None,
+        'modified_ts': None,
+        'permissions': [
+          realms_pb2.Permission(name='luci.dev.p2'),
+        ],
       },
     }
     self.assertEqual(expected_auth_db, snapshot_to_dict(current_snapshot))

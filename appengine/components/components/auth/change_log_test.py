@@ -15,6 +15,7 @@ from google.appengine.ext import ndb
 from components import utils
 from components.auth import change_log
 from components.auth import model
+from components.auth.proto import realms_pb2
 from components.auth.proto import security_config_pb2
 
 from test_support import test_case
@@ -47,7 +48,7 @@ class MakeInitialSnapshotTest(test_case.TestCase):
     # Generated new AuthDB rev with updated entities.
     self.assertEqual(3, model.get_auth_db_revision())
 
-    # Check all *History entitites exist now.
+    # Check all *History entities exist now.
     p = model.historical_revision_key(3)
     self.assertIsNotNone(
         ndb.Key('AuthGlobalConfigHistory', 'root', parent=p).get())
@@ -165,6 +166,14 @@ class GenerateChangesTest(test_case.TestCase):
           modified_ts=utils.utcnow(),
           comment='Config change')
       c.put()
+      r = model.AuthRealmsGlobals(
+          key=model.realms_globals_key(),
+          permissions=[realms_pb2.Permission(name='luci.dev.p1')])
+      r.record_revision(
+          modified_by=ident('me@example.com'),
+          modified_ts=utils.utcnow(),
+          comment='New permission')
+      r.put()
 
     changes = self.grab_all(self.auth_db_transaction(touch_all))
     self.assertEqual({
@@ -249,6 +258,17 @@ class GenerateChangesTest(test_case.TestCase):
         'identity': model.Identity(kind='user', name='a@example.com'),
         'ip_whitelist': u'An IP whitelist',
         'target': u'AuthIPWhitelistAssignments$default$user:a@example.com',
+        'when': datetime.datetime(2015, 1, 2, 3, 4, 5),
+        'who': model.Identity(kind='user', name='me@example.com')
+      },
+      'AuthDBChange:AuthRealmsGlobals$globals!9000': {
+        'app_version': u'v1a',
+        'auth_db_rev': 1,
+        'change_type': 9000,
+        'class_': [u'AuthDBChange', u'AuthRealmsGlobalsChange'],
+        'comment': u'New permission',
+        'permissions_added': [u'luci.dev.p1'],
+        'target': u'AuthRealmsGlobals$globals',
         'when': datetime.datetime(2015, 1, 2, 3, 4, 5),
         'who': model.Identity(kind='user', name='me@example.com')
       },
@@ -803,9 +823,55 @@ class GenerateChangesTest(test_case.TestCase):
       },
     }, changes)
 
+  def test_realms_globals_diff(self):
+    def create():
+      c = model.AuthRealmsGlobals(
+          key=model.realms_globals_key(),
+          permissions=[
+            realms_pb2.Permission(name='luci.dev.p1'),
+            realms_pb2.Permission(name='luci.dev.p2'),
+            realms_pb2.Permission(name='luci.dev.p3'),
+          ])
+      c.record_revision(
+          modified_by=ident('me@example.com'),
+          modified_ts=utils.utcnow(),
+          comment='New realms config')
+      c.put()
+    self.auth_db_transaction(create)
+
+    def modify():
+      ent = model.realms_globals_key().get()
+      ent.permissions = [
+        realms_pb2.Permission(name='luci.dev.p1'),
+        realms_pb2.Permission(name='luci.dev.p3'),
+        realms_pb2.Permission(name='luci.dev.p4'),
+      ]
+      ent.record_revision(
+          modified_by=ident('me@example.com'),
+          modified_ts=utils.utcnow(),
+          comment='Realms config change')
+      ent.put()
+    changes = self.grab_all(self.auth_db_transaction(modify))
+
+    self.assertEqual({
+      'AuthDBChange:AuthRealmsGlobals$globals!9000': {
+        'app_version': u'v1a',
+        'auth_db_rev': 2,
+        'change_type':
+            change_log.AuthDBChange.CHANGE_REALMS_GLOBALS_CHANGED,
+        'class_': [u'AuthDBChange', u'AuthRealmsGlobalsChange'],
+        'comment': u'Realms config change',
+        'permissions_added': [u'luci.dev.p4'],
+        'permissions_removed': [u'luci.dev.p2'],
+        'target': u'AuthRealmsGlobals$globals',
+        'when': datetime.datetime(2015, 1, 2, 3, 4, 5),
+        'who': model.Identity(kind='user', name='me@example.com'),
+      },
+    }, changes)
+
 
 class AuthDBChangeTest(test_case.TestCase):
-  # Test to_jsonins for AuthDBGroupChange and AuthDBIPWhitelistAssignmentChange,
+  # Test to_jsonish for AuthDBGroupChange and AuthDBIPWhitelistAssignmentChange,
   # the rest are trivial.
 
   def test_group_change_to_jsonish(self):
