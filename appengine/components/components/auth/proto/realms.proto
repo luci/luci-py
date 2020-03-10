@@ -151,7 +151,7 @@ message Realm {
   //   "<realm>" matches `^[0-9a-z_\.\-\\]{1,400}|@root|@legacy$`.
   string name = 1;
 
-  // A list of bindings in undefined order.
+  // A list of bindings in lexicographical order of their `permissions` fields.
   repeated Binding bindings = 2;
 }
 
