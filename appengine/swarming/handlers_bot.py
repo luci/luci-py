@@ -463,7 +463,7 @@ class BotHandshakeHandler(_BotBaseHandler):
         event_type='bot_connected', bot_id=res.bot_id,
         external_ip=self.request.remote_addr,
         authenticated_as=auth.get_peer_identity().to_bytes(),
-        dimensions=res.dimensions, state=res.state,
+        dimensions=None, state=res.state,
         version=res.version, quarantined=bool(res.quarantined_msg),
         maintenance_msg=res.maintenance_msg,
         task_id='', task_name=None, message=res.quarantined_msg)

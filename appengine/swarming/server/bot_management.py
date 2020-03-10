@@ -560,6 +560,9 @@ def bot_event(
   # Retrieve the previous BotInfo and update it.
   info_key = get_info_key(bot_id)
   bot_info = info_key.get()
+  # Create BotInfo only at the first poll. But update if it already
+  # exists.
+  store_bot_info = bot_info or event_type.startswith('request_')
   if not bot_info:
     bot_info = BotInfo(key=info_key)
   now = utils.utcnow()
@@ -578,19 +581,6 @@ def bot_event(
   if dimensions:
     dimensions_flat = task_queues.dimensions_to_flat(dimensions)
     if bot_info.dimensions_flat != dimensions_flat:
-      # The dimensions given at handshake may change at first polling since
-      # the initial handshake is done without the injected bot_config.py.
-      # When the given dimensions are the same with the stored ones,
-      # just keep them instead of deleting them unnecessarily. This fixes
-      # crbug.com/1054154 caused by temporarily disappearing bot dimensions.
-      # Otherwise, initializing a BotInfo only with 'id' and 'pool' which are
-      # referred as specifal dimensions. This avoids flapping dimensions
-      # reported in crbug.com/801679.
-      if event_type == 'bot_connected':
-        logging.debug('bot_event: Trimming dimensions: %s', dimensions)
-        dimensions_flat = [
-            d for d in dimensions_flat
-            if d.startswith('id:') or d.startswith('pool:')]
       logging.debug('bot_event: Updating dimensions. from: %s, to: %s',
                     bot_info.dimensions_flat, dimensions_flat)
       bot_info.dimensions_flat = dimensions_flat
@@ -651,7 +641,11 @@ def bot_event(
         version=bot_info.version,
         **kwargs)
 
-    datastore_utils.store_new_version(event, BotRoot, [bot_info])
+    extra = []
+    if store_bot_info:
+      extra.append(bot_info)
+
+    datastore_utils.store_new_version(event, BotRoot, extra)
     return event.key
   finally:
     # Store the event in memcache to accelerate monitoring.

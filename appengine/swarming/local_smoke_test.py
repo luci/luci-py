@@ -375,7 +375,7 @@ class Test(unittest.TestCase):
     start = time.time()
     while True:
       old = self.client.query_bot()
-      if old:
+      if old and 'dimensions' in old:
         break
       if time.time() - start > TIMEOUT_SECS:
         self.fail('Bot took too long to start')
