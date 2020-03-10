@@ -524,13 +524,18 @@ class SwarmingTasksService(remote.Service):
 
     # TODO(crbug.com/997221): move this to task_scheduler.py after
     # crbug.com/1018982.
+    request_idempotency_key = None
     if request.request_uuid:
+      request_idempotency_key = 'request_id/%s/%s' % (
+          request.request_uuid, auth.get_current_identity().to_bytes())
+
+    if request_idempotency_key:
       # This check is for idempotency when creating new tasks.
       # TODO(crbug.com/997221): Make idempotency robust.
       # There is still possibility of duplicate task creation if requests with
       # the same uuid are sent in a short period of time.
       request_metadata = memcache.get(
-          request.request_uuid, namespace='task_new')
+          request_idempotency_key, namespace='task_new')
       if request_metadata is not None:
         # request_obj does not have task_id, so need to delete before
         # validation.
@@ -566,9 +571,9 @@ class SwarmingTasksService(remote.Service):
 
     # TODO(crbug.com/997221): move this to task_scheduler.py after
     # crbug.com/1018982.
-    if request.request_uuid:
+    if request_idempotency_key:
       memcache.add(
-          request.request_uuid,
+          request_idempotency_key,
           request_metadata,
           time=60 * 60,
           namespace='task_new')
