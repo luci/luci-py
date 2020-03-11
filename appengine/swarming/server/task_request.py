@@ -182,6 +182,8 @@ def _validate_dimensions(_prop, value):
         u'dimensions can have up to %d keys' % maxkeys)
 
   normalized = {}
+  or_dimensions_num = 1
+  max_or_dimensions_num = 8
   for k, values in value.items():
     # Validate the key.
     if not config.validate_dimension_key(k):
@@ -199,6 +201,14 @@ def _validate_dimensions(_prop, value):
       raise datastore_errors.BadValueError(
           u'dimensions must be a dict of strings or list of string, not %r' %
           value)
+
+    for value in values:
+      or_dimensions_num *= len(value.split('|'))
+      if or_dimensions_num > max_or_dimensions_num:
+        raise datastore_errors.BadValueError(
+            'possible dimension subset for \'or\' dimensions '
+            'should not be more than %d, but %d' % (max_or_dimensions_num,
+                                                    or_dimensions_num))
 
     if len(values) > maxvalues:
       raise datastore_errors.BadValueError(

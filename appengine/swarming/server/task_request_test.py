@@ -1385,6 +1385,25 @@ class TaskRequestApiTest(TestCase):
       # Duplicate value.
       d = {u'pool': [u'default'], u'v': [u'v', u'v']}
       _gen_request(properties=_gen_properties(dimensions=d)).put()
+    with self.assertRaisesRegexp(
+        datastore_errors.BadValueError,
+        'possible dimension subset for \'or\' dimensions '
+        'should not be more than 8, but 9'):
+      # Too many combinations for 'or'
+      d = {
+          u'pool': [u'default'],
+          u'x': [u'1|2|3'],
+          u'y': [u'1|2|3'],
+      }
+      _gen_request(properties=_gen_properties(dimensions=d)).put()
+
+    d = {
+        u'pool': [u'default'],
+        u'x': [u'1|2'],
+        u'y': [u'1|2'],
+        u'z': [u'1|2'],
+    }
+    _gen_request(properties=_gen_properties(dimensions=d)).put()
 
   def test_request_bad_env(self):
     # Type error.
