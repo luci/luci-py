@@ -232,7 +232,7 @@ def _validate_dimensions(_prop, value):
       raise datastore_errors.BadValueError(
           u'\'pool\' cannot be specified more than once in dimensions')
 
-    # Always store the values sorted, that simplies the code.
+    # Always store the values sorted, that simplifies the code.
     normalized[k] = sorted(values)
 
   return normalized
