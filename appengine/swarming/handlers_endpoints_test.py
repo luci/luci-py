@@ -55,6 +55,22 @@ def message_to_dict(rpc_message):
   return json.loads(protojson.encode_message(rpc_message))
 
 
+def _bot_event(event_type, bot_id, **kwargs):
+  args = {
+      'authenticated_as': 'bot:whitelisted-ip',
+      'dimensions': {u'id': [bot_id], u'pool': [u'default']},
+      'external_ip': '8.8.4.4',
+      'state': {'ram': 65},
+      'version': '123456789',
+      'quarantined': False,
+      'maintenance_msg': None,
+      'task_id': None,
+      'task_name': None
+  }
+  args.update(kwargs)
+  return bot_management.bot_event(event_type, bot_id, **args)
+
+
 class BaseTest(test_env_handlers.AppTestBase, test_case.EndpointsTestCase):
   # These test fail with 'Unknown bot ID, not in config'
   # Need to run in test_seq.py
@@ -2040,31 +2056,11 @@ class BotsApiTest(BaseTest):
 
     # Add four bot events, corresponding to one dead bot, one quarantined bot,
     # one bot in maintenance, and one good bot
-    bot_management.bot_event(
-        event_type='request_sleep', bot_id='id3',
-        external_ip='8.8.4.4', authenticated_as='bot:whitelisted-ip',
-        dimensions={u'id': [u'id3'], u'pool': [u'default']}, state={'ram': 65},
-        version='123456789', quarantined=False, maintenance_msg=None,
-        task_id=None, task_name=None)
+    _bot_event('request_sleep', bot_id='id3')
     self.mock_now(self.now)
-    bot_management.bot_event(
-        event_type='request_sleep', bot_id='id1',
-        external_ip='8.8.4.4', authenticated_as='bot:whitelisted-ip',
-        dimensions={u'id': [u'id1'], u'pool': [u'default']}, state={'ram': 65},
-        version='123456789', quarantined=False, maintenance_msg=None,
-        task_id=None, task_name=None)
-    bot_management.bot_event(
-        event_type='request_sleep', bot_id='id2',
-        external_ip='8.8.4.4', authenticated_as='bot:whitelisted-ip',
-        dimensions={u'id': [u'id2'], u'pool': [u'default']}, state={'ram': 65},
-        version='123456789', quarantined=True, maintenance_msg=None,
-        task_id=None, task_name=None)
-    bot_management.bot_event(
-        event_type='request_sleep', bot_id='id4',
-        external_ip='8.8.4.4', authenticated_as='bot:whitelisted-ip',
-        dimensions={u'id': [u'id4'], u'pool': [u'default']}, state={'ram': 65},
-        version='123456789', quarantined=False, maintenance_msg='very busy',
-        task_id=None, task_name=None)
+    _bot_event('request_sleep', bot_id='id1')
+    _bot_event('request_sleep', bot_id='id2', quarantined=True)
+    _bot_event('request_sleep', bot_id='id4', maintenance_msg='very busy')
     bot1 = {
       u'authenticated_as': u'bot:whitelisted-ip',
       u'bot_id': u'id1',
@@ -2270,31 +2266,11 @@ class BotsApiTest(BaseTest):
     self.set_as_privileged_user()
     then = datetime.datetime(2009, 1, 2, 3, 4, 5)
     self.mock_now(then)
-    bot_management.bot_event(
-        event_type='request_sleep', bot_id='id3',
-        external_ip='8.8.4.4', authenticated_as='bot:whitelisted-ip',
-        dimensions={u'id': [u'id3'], u'pool': [u'default']}, state={'ram': 65},
-        version='123456789', quarantined=True, maintenance_msg=None,
-        task_id=None, task_name=None)
+    _bot_event('request_sleep', bot_id='id3', quarantined=True)
     self.mock_now(self.now)
-    bot_management.bot_event(
-        event_type='request_task', bot_id='id1',
-        external_ip='8.8.4.4', authenticated_as='bot:whitelisted-ip',
-        dimensions={u'id': [u'id1'], u'pool': [u'default']}, state={'ram': 65},
-        version='123456789', quarantined=False, maintenance_msg=None,
-        task_id='987', task_name=None)
-    bot_management.bot_event(
-        event_type='request_sleep', bot_id='id2',
-        external_ip='8.8.4.4', authenticated_as='bot:whitelisted-ip',
-        dimensions={u'id': [u'id2'], u'pool': [u'default']}, state={'ram': 65},
-        version='123456789', quarantined=True, maintenance_msg=None,
-        task_id=None, task_name=None)
-    bot_management.bot_event(
-        event_type='request_sleep', bot_id='id4',
-        external_ip='8.8.4.4', authenticated_as='bot:whitelisted-ip',
-        dimensions={u'id': [u'id4'], u'pool': [u'default']}, state={'ram': 65},
-        version='123456789', quarantined=False, maintenance_msg='very busy',
-        task_id=None, task_name=None)
+    _bot_event('request_task', bot_id='id1', task_id='987')
+    _bot_event('request_sleep', bot_id='id2', quarantined=True)
+    _bot_event('request_sleep', bot_id='id4', maintenance_msg='very busy')
     expected = {
       u'count': u'4',
       u'quarantined': u'2',
@@ -2403,12 +2379,7 @@ class BotApiTest(BaseTest):
   def test_get_ok(self):
     """Asserts that get shows the tasks a specific bot has executed."""
     self.set_as_privileged_user()
-    bot_management.bot_event(
-        event_type='request_sleep', bot_id='id1',
-        external_ip='8.8.4.4', authenticated_as='bot:whitelisted-ip',
-        dimensions={u'id': [u'id1'], u'pool': [u'default']}, state={'ram': 65},
-        version='123456789', quarantined=False, maintenance_msg='very busy',
-        task_id=None, task_name=None)
+    _bot_event('request_sleep', bot_id='id1', maintenance_msg='very busy')
 
     expected = {
       u'authenticated_as': u'bot:whitelisted-ip',
@@ -2433,12 +2404,7 @@ class BotApiTest(BaseTest):
   def test_get_maintenance(self):
     """Asserts that get shows a bot that is in maintenance."""
     self.set_as_privileged_user()
-    bot_management.bot_event(
-        event_type='request_sleep', bot_id='id1',
-        external_ip='8.8.4.4', authenticated_as='bot:whitelisted-ip',
-        dimensions={u'id': [u'id1'], u'pool': [u'default']}, state={'ram': 65},
-        version='123456789', quarantined=False, maintenance_msg='very busy',
-        task_id=None, task_name=None)
+    _bot_event('request_sleep', bot_id='id1', maintenance_msg='very busy')
 
     expected = {
       u'authenticated_as': u'bot:whitelisted-ip',
@@ -2466,12 +2432,7 @@ class BotApiTest(BaseTest):
     self.call_api('get', body={'bot_id': 'not_a_bot'}, status=404)
 
   def test_get_deleted_bot(self):
-    bot_management.bot_event(
-        event_type='request_sleep', bot_id='id1',
-        external_ip='8.8.4.4', authenticated_as='bot:whitelisted-ip',
-        dimensions={u'id': [u'id1'], u'pool': [u'default']}, state={'foo': 0},
-        version='123456789', quarantined=False, maintenance_msg=None,
-        task_id=None, task_name=None)
+    _bot_event('request_sleep', bot_id='id1', state={'foo': 0})
     # Delete the bot.
     self.set_as_admin()
     response = self.call_api('delete', body={'bot_id': 'id1'})
@@ -2506,12 +2467,7 @@ class BotApiTest(BaseTest):
       'list': ['of', 'things'],
       'str': u'uni',
     }
-    bot_management.bot_event(
-        event_type='request_sleep', bot_id='id1',
-        external_ip='8.8.4.4', authenticated_as='bot:whitelisted-ip',
-        dimensions={u'id': [u'id1'], u'pool': [u'default']}, state=state,
-        version='123456789', quarantined=False, maintenance_msg=None,
-        task_id=None, task_name=None)
+    _bot_event('request_sleep', bot_id='id1', state=state)
 
     # delete the bot
     response = self.call_api('delete', body={'bot_id': 'id1'})

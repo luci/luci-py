@@ -168,11 +168,8 @@ class BotManagementTest(test_case.TestCase):
       u'pool': [u'default'],
     }
     for name in bot_management.BotEvent.ALLOWED_EVENTS:
-      event_key = bot_management.bot_event(
-          event_type=name, bot_id=u'id1',
-          external_ip=u'8.8.4.4', authenticated_as=u'bot:id1.domain',
-          dimensions=dimensions, state={u'ram': 65}, version=_VERSION,
-          quarantined=False, maintenance_msg=None, task_id=None, task_name=None)
+      event_key = _bot_event(
+          event_type=name, bot_id=u'id1', dimensions=dimensions)
       if name in (u'request_sleep', u'task_update'):
         # TODO(maruel): Store request_sleep IFF the state changed.
         self.assertIsNone(event_key, name)
@@ -183,12 +180,9 @@ class BotManagementTest(test_case.TestCase):
 
   def test_BotEvent_proto_maintenance(self):
     # Also test a misconfigured bot not in a pool.
-    event_key = bot_management.bot_event(
+    event_key = _bot_event(
         event_type=u'bot_connected', bot_id=u'id1',
-        external_ip=u'8.8.4.4', authenticated_as=u'bot:id1.domain',
-        dimensions={u'id': [u'id1']}, state={u'ram': 65.0}, version=_VERSION,
-        quarantined=False, maintenance_msg=u'Too hot', task_id=None,
-        task_name=None)
+        dimensions={u'id': [u'id1']}, maintenance_msg=u'Too hot')
     actual = swarming_pb2.BotEvent()
     event_key.get().to_proto(actual)
     expected = swarming_pb2.BotEvent(
@@ -203,7 +197,7 @@ class BotManagementTest(test_case.TestCase):
             info=swarming_pb2.BotInfo(
                 supplemental=struct_pb2.Struct(
                     fields={
-                      u'ram': struct_pb2.Value(number_value=65.0),
+                      u'ram': struct_pb2.Value(number_value=65),
                     }),
                 version=_VERSION,
                 external_ip=u'8.8.4.4',
@@ -216,14 +210,11 @@ class BotManagementTest(test_case.TestCase):
 
   def test_BotEvent_proto_quarantine(self):
     # Also test that a bot can belong to two pools.
-    event_key = bot_management.bot_event(
+    event_key = _bot_event(
         event_type=u'bot_connected', bot_id=u'id1',
-        external_ip=u'8.8.4.4', authenticated_as=u'bot:id1.domain',
         dimensions={u'id': [u'id1'], u'pool': [u'next', u'previous']},
-        state={u'ram': 65.0, u'quarantined': u'sad bot'},
-        version=_VERSION,
-        quarantined=True, maintenance_msg=None, task_id=None,
-        task_name=None)
+        state={u'ram': 65, u'quarantined': u'sad bot'},
+        quarantined=True)
     actual = swarming_pb2.BotEvent()
     event_key.get().to_proto(actual)
     expected = swarming_pb2.BotEvent(
@@ -242,7 +233,7 @@ class BotManagementTest(test_case.TestCase):
                 supplemental=struct_pb2.Struct(
                     fields={
                       u'quarantined': struct_pb2.Value(string_value=u'sad bot'),
-                      u'ram': struct_pb2.Value(number_value=65.0),
+                      u'ram': struct_pb2.Value(number_value=65),
                     }),
                 version=_VERSION,
                 external_ip=u'8.8.4.4',
@@ -261,11 +252,7 @@ class BotManagementTest(test_case.TestCase):
       u'pool': [u'default'],
     }
     event = 'request_sleep'
-    bot_management.bot_event(
-        event_type=event, bot_id='id1',
-        external_ip='8.8.4.4', authenticated_as='bot:id1.domain',
-        dimensions=d, state={'ram': 65}, version=_VERSION, quarantined=False,
-        maintenance_msg=None, task_id=None, task_name=None)
+    _bot_event(event_type=event, bot_id='id1', dimensions=d)
 
     expected = _gen_bot_info()
     self.assertEqual(
@@ -293,16 +280,10 @@ class BotManagementTest(test_case.TestCase):
     }
     bot_info = _ensure_bot_info(
         bot_id=bot_id, dimensions=d, task_id=task_id, task_name=task_name)
-    bot_management.bot_event(
+    _bot_event(
         event_type=event,
         bot_id=bot_id,
-        external_ip='8.8.4.4',
-        authenticated_as='bot:id1.domain',
         dimensions=d,
-        state={'ram': 65},
-        version=_VERSION,
-        quarantined=False,
-        maintenance_msg=None,
         task_id=task_id,
         task_name=task_name)
 
