@@ -771,10 +771,15 @@ class TestTaskRunnerKilled(TestTaskRunnerBase):
     }
     self.assertEqual(expected, self._run_command(task_details))
     # Now look at the updates sent by the bot as seen by the server.
+    expected = {
+        u'id': u'localhost',
+        u'task_id': 23,
+        u'canceled': True,
+        u'exit_code': -1
+    }
     actual = self.getTaskResults()
     self.assertLessEqual(0, actual.pop(u'cost_usd'))
-    self.assertEqual({u'id': u'localhost', u'task_id': 23, u'exit_code': -1},
-                     actual)
+    self.assertEqual(expected, actual)
 
   def test_killed_later(self):
     # Case where a task started and a client asks the server to kill the task.

@@ -634,6 +634,9 @@ def run_command(remote, task_details, work_dir, cost_usd_hour,
                   'task_id: %s. Sending update...', task_details.task_id)
     # crbug.com/1052208:
     # Send task update again for the server to know that the task has stopped.
+    # Sending 'canceled' signal to the server for the task to be 'CANCELED'
+    # instead of 'KILLED'.
+    params['canceled'] = True
     remote.post_task_update(task_details.task_id, params, exit_code=-1)
     return {
       u'exit_code': -1,

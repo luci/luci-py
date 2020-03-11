@@ -973,6 +973,7 @@ class BotTaskUpdateHandler(_BotApiHandler):
     output = request.get('output')
     output_chunk_start = request.get('output_chunk_start')
     outputs_ref = request.get('outputs_ref')
+    canceled = request.get('canceled')
 
     if (isolated_stats or cipd_stats) and bot_overhead is None:
       ereporter2.log_request(
@@ -1052,7 +1053,8 @@ class BotTaskUpdateHandler(_BotApiHandler):
           cost_usd=cost_usd,
           outputs_ref=outputs_ref,
           cipd_pins=cipd_pins,
-          performance_stats=performance_stats)
+          performance_stats=performance_stats,
+          canceled=canceled)
       if not state:
         logging.info('Failed to update, please retry')
         self.abort_with_error(500, error='Failed to update, please retry')

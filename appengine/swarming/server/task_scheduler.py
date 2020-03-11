@@ -673,7 +673,7 @@ def _bot_update_tx(
     run_result_key, bot_id, output, output_chunk_start, exit_code, duration,
     hard_timeout, io_timeout, cost_usd, outputs_ref, cipd_pins, need_cancel,
     performance_stats, now, result_summary_key, server_version, request,
-    es_cfg):
+    es_cfg, canceled):
   """Runs the transaction for bot_update_task().
 
   es_cfg is only required when need_cancel is True.
@@ -735,7 +735,16 @@ def _bot_update_tx(
   if run_result.state in task_result.State.STATES_RUNNING:
     # Task was still registered as running. Look if it should be terminated now.
     if run_result.killing:
-      if duration is not None:
+      if canceled:
+        # A user requested to cancel the task while setting up the task.
+        # Since the task hasn't started running yet, we can mark the state as
+        # CANCELED.
+        run_result.killing = False
+        run_result.state = task_result.State.CANCELED
+        # reset duration, exit_code since not allowed
+        run_result.duration = None
+        run_result.exit_code = None
+      elif duration is not None:
         # A user requested to cancel the task while it was running. Since the
         # task is now stopped, we can tag the task result as KILLED.
         run_result.killing = False
@@ -1370,7 +1379,7 @@ def bot_reap_task(bot_dimensions, bot_version):
 def bot_update_task(
     run_result_key, bot_id, output, output_chunk_start, exit_code, duration,
     hard_timeout, io_timeout, cost_usd, outputs_ref, cipd_pins,
-    performance_stats):
+    performance_stats, canceled):
   """Updates a TaskRunResult and TaskResultSummary, along TaskOutputChunk.
 
   Arguments:
@@ -1387,6 +1396,7 @@ def bot_update_task(
   - cipd_pins: None or task_result.CipdPins
   - performance_stats: task_result.PerformanceStats instance or None. Can only
         be set when the task is completing.
+  - canceled: Bool set if the task was canceled before running.
 
   Invalid states, these are flat out refused:
   - A command is updated after it had an exit code assigned to.
@@ -1439,7 +1449,7 @@ def bot_update_task(
       run_result_key, bot_id, output, output_chunk_start, exit_code, duration,
       hard_timeout, io_timeout, cost_usd, outputs_ref, cipd_pins, need_cancel,
       performance_stats, now, result_summary_key, server_version, request,
-      es_cfg)
+      es_cfg, canceled)
   try:
     smry, run_result, error = datastore_utils.transaction(run)
   except datastore_utils.CommitError as e:
