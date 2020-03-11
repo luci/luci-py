@@ -454,7 +454,7 @@ class BotManagementTest(test_case.TestCase):
           'Ubuntu-16.04']})
     self.assertEqual(True, bot_management.has_capacity(d))
 
-    # Delete the BotInfo, so the bot disapeared.
+    # Delete the BotInfo, so the bot will disappear.
     bot_management.get_info_key(botid).delete()
     # The capacity is still found due to a recent BotEvent with this dimension.
     self.assertEqual(True, bot_management.has_capacity(d))
