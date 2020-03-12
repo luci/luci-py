@@ -396,7 +396,8 @@ class RemoteClientNative(object):
             'task_id': task_id,
         })
     if not resp:
-      raise InternalError('Error when minting the token')
+      raise InternalError(
+          'Error when minting the token for account_id: %s' % account_id)
     if resp.get('error'):
       raise MintOAuthTokenError(resp['error'])
     return resp
