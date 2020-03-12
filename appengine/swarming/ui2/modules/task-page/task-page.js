@@ -1151,6 +1151,7 @@ window.customElements.define('task-page', class extends SwarmingAppBoilerplate {
     const newTask = {
       expiration_secs: this._request.expiration_secs,
       name: `leased to ${this.profile.email} for debugging`,
+      pool_task_template: 3,  // SKIP
       priority: 20,
       properties: this._currentSlice.properties,
       service_account: this._request.service_account,
@@ -1467,6 +1468,7 @@ time.sleep(${leaseDuration})`];
     const newTask = {
       expiration_secs: this._request.expiration_secs,
       name: this._request.name + ' (retry)',
+      pool_task_template: 3,  // SKIP
       priority: this._request.priority,
       properties: this._currentSlice.properties,
       service_account: this._request.service_account,
