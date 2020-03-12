@@ -10,6 +10,8 @@ import random
 import sys
 import unittest
 
+from parameterized import parameterized
+
 # Setups environment.
 APP_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, APP_DIR)
@@ -339,6 +341,38 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
   def test_bot_reap_task(self):
     # Essentially check _quick_reap() works.
     run_result = self._quick_reap(1, 0)
+    self.assertEqual('localhost', run_result.bot_id)
+    self.assertEqual(1, run_result.try_number)
+    to_run_key = task_to_run.request_to_task_to_run_key(
+        run_result.request_key.get(), 1, 0)
+    self.assertIsNone(to_run_key.get().queue_number)
+    self.assertIsNone(to_run_key.get().expiration_ts)
+
+  @parameterized.expand([
+      ({
+          u'pool': [u'default'],
+          u'os': [u'Windows-3.1.1|Windows-3.2.1'],
+      },),
+      ({
+          u'pool': [u'default'],
+          u'os': [u'Windows-3.1.1|Windows-3.2.1'],
+          u'foo': [u'bar|A|B|C'],
+      },),
+  ])
+  @unittest.expectedFailure
+  def test_bot_reap_task_or_dimensions(self, or_dimensions):
+    run_result = self._quick_reap(
+        1,
+        0,
+        task_slices=[
+            task_request.TaskSlice(
+                expiration_secs=60,
+                properties=_gen_properties(dimensions=or_dimensions),
+                wait_for_capacity=False,
+            )
+        ])
+
+    # TODO(crbug.com/1057886): support 'or' dimension.
     self.assertEqual('localhost', run_result.bot_id)
     self.assertEqual(1, run_result.try_number)
     to_run_key = task_to_run.request_to_task_to_run_key(
