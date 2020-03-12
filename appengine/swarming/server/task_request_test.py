@@ -1387,6 +1387,19 @@ class TaskRequestApiTest(TestCase):
       _gen_request(properties=_gen_properties(dimensions=d)).put()
     with self.assertRaisesRegexp(
         datastore_errors.BadValueError,
+        "^dimension key u'v' has invalid value u'v||c'$"):
+      # Empty 'or' dimension value.
+      d = {u'pool': [u'default'], u'v': [u'v||c']}
+      _gen_request(properties=_gen_properties(dimensions=d)).put()
+    with self.assertRaisesRegexp(
+        datastore_errors.BadValueError,
+        "^'pool' cannot be specified more than once in dimensions "
+        "\[u'default|non-default'\]$"):
+      # Use 'or' dimension in pool.
+      d = {u'pool': [u'default|non-default'], u'v': [u'v']}
+      _gen_request(properties=_gen_properties(dimensions=d)).put()
+    with self.assertRaisesRegexp(
+        datastore_errors.BadValueError,
         'possible dimension subset for \'or\' dimensions '
         'should not be more than 8, but 9'):
       # Too many combinations for 'or'

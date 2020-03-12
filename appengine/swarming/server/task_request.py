@@ -217,10 +217,11 @@ def _validate_dimensions(_prop, value):
     if len(values) != len(set(values)):
       raise datastore_errors.BadValueError(
           u'dimension key %r has repeated values' % k)
-    for v in values:
-      if not config.validate_dimension_value(v):
-        raise datastore_errors.BadValueError(
-            u'dimension key %r has invalid value %r' % (k, v))
+    for value in values:
+      for v in value.split('|'):
+        if not config.validate_dimension_value(v):
+          raise datastore_errors.BadValueError(
+              u'dimension key %r has invalid value %r' % (k, value))
 
     # Key specific checks.
     if k == u'id' and len(values) != 1:
@@ -228,9 +229,10 @@ def _validate_dimensions(_prop, value):
           u'\'id\' cannot be specified more than once in dimensions')
     # Do not allow a task to be triggered in multiple pools, as this could
     # cross a security boundary.
-    if k == u'pool' and len(values) != 1:
+    if k == u'pool' and (len(values) != 1 or '|' in values[0]):
       raise datastore_errors.BadValueError(
-          u'\'pool\' cannot be specified more than once in dimensions')
+          u'\'pool\' cannot be specified more than once in dimensions %s' %
+          values)
 
     # Always store the values sorted, that simplifies the code.
     normalized[k] = sorted(values)
