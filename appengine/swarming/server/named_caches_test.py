@@ -47,7 +47,8 @@ def _bot_event(bot_id, pool, caches, oses):
       quarantined=False,
       maintenance_msg=None,
       task_id=None,
-      task_name=None)
+      task_name=None,
+      register_dimensions=True)
 
 
 class NamedCachesTest(test_case.TestCase):

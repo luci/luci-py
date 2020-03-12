@@ -97,6 +97,7 @@ class PRPCTest(test_env_handlers.AppTestBase):
           event_time=timestamp_pb2.Timestamp(seconds=1262401445),
           bot=swarming_pb2.Bot(
             bot_id='bot1',
+            pools=['default'],
             info=swarming_pb2.BotInfo(
               supplemental=struct_pb2.Struct(
                 fields={
@@ -108,7 +109,11 @@ class PRPCTest(test_env_handlers.AppTestBase):
               authenticated_as='bot:whitelisted-ip',
               version='123',
               ),
-            ),
+            dimensions=[
+              swarming_pb2.StringListPair(key='id', values=['bot1']),
+              swarming_pb2.StringListPair(key='os', values=['Amiga']),
+              swarming_pb2.StringListPair(key='pool', values=['default']),
+            ]),
           event=swarming_pb2.BOT_NEW_SESSION,
         ),
       ])
@@ -259,6 +264,7 @@ class PRPCTest(test_env_handlers.AppTestBase):
           event_time=timestamp_pb2.Timestamp(seconds=1262401445),
           bot=swarming_pb2.Bot(
               bot_id='bot1',
+              pools=[u'default'],
               status=swarming_pb2.BOT_STATUS_UNSPECIFIED,
               info=swarming_pb2.BotInfo(
                   supplemental=struct_pb2.Struct(
@@ -272,7 +278,7 @@ class PRPCTest(test_env_handlers.AppTestBase):
                   authenticated_as='bot:whitelisted-ip',
                   version='123',
               ),
-              dimensions=[]),
+              dimensions=dimensions),
           event=swarming_pb2.BOT_NEW_SESSION,
       ),
     ]

@@ -523,7 +523,8 @@ def filter_availability(q, quarantined, in_maintenance, is_dead, is_busy):
 
 def bot_event(
     event_type, bot_id, external_ip, authenticated_as, dimensions, state,
-    version, quarantined, maintenance_msg, task_id, task_name, **kwargs):
+    version, quarantined, maintenance_msg, task_id, task_name,
+    register_dimensions, **kwargs):
   """Records when a bot has queried for work.
 
   This event happening usually means the bot is alive (not dead), except for
@@ -549,6 +550,8 @@ def bot_event(
   - maintenance_msg: string describing why the bot is in maintenance.
   - task_id: packed task id if relevant. Set to '' to zap the stored value.
   - task_name: task name if relevant. Zapped when task_id is zapped.
+  - register_dimensions: bool to specify whether to register dimensions to
+    BotInfo.
   - kwargs: optional values to add to BotEvent relevant to event_type.
 
   Returns:
@@ -578,9 +581,10 @@ def bot_event(
     bot_info.authenticated_as = authenticated_as
     bot_info.maintenance_msg = maintenance_msg
   dimensions_updated = False
+  dimensions_flat = []
   if dimensions:
     dimensions_flat = task_queues.dimensions_to_flat(dimensions)
-    if bot_info.dimensions_flat != dimensions_flat:
+    if register_dimensions and bot_info.dimensions_flat != dimensions_flat:
       logging.debug('bot_event: Updating dimensions. from: %s, to: %s',
                     bot_info.dimensions_flat, dimensions_flat)
       bot_info.dimensions_flat = dimensions_flat
@@ -628,12 +632,18 @@ def bot_event(
       bot_info.put()
       return
 
+    # When it's a 'bot_*' or 'request_*' event, use the dimensions provided
+    # by the bot.
+    # When it's a 'task_*' event, use BotInfo.dimensios_flat since dimensions
+    # aren't provided by the bot.
+    event_dimensions_flat = dimensions_flat or bot_info.dimensions_flat
+
     event = BotEvent(
         parent=get_root_key(bot_id),
         event_type=event_type,
         external_ip=external_ip,
         authenticated_as=authenticated_as,
-        dimensions_flat=bot_info.dimensions_flat,
+        dimensions_flat=event_dimensions_flat,
         quarantined=bot_info.quarantined,
         maintenance_msg=bot_info.maintenance_msg,
         state=bot_info.state,
@@ -745,6 +755,7 @@ def cron_update_bot_info():
             maintenance_msg=None,
             task_id=None,
             task_name=None,
+            register_dimensions=False,
             last_seen_ts=bot.last_seen_ts)
     except datastore_utils.CommitError:
       logging.warning('Failed to commit a Tx')

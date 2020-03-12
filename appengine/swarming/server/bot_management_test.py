@@ -56,6 +56,7 @@ def _bot_event(
     }
   if not authenticated_as:
     authenticated_as = u'bot:%s.domain' % bot_id
+  register_dimensions = kwargs.get('event_type').startswith('request_')
   return bot_management.bot_event(
       bot_id=bot_id,
       external_ip=external_ip,
@@ -67,6 +68,7 @@ def _bot_event(
       maintenance_msg=maintenance_msg,
       task_id=task_id,
       task_name=task_name,
+      register_dimensions=register_dimensions,
       **kwargs)
 
 

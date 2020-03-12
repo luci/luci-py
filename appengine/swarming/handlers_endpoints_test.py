@@ -65,7 +65,8 @@ def _bot_event(event_type, bot_id, **kwargs):
       'quarantined': False,
       'maintenance_msg': None,
       'task_id': None,
-      'task_name': None
+      'task_name': None,
+      'register_dimensions': event_type.startswith('request_')
   }
   args.update(kwargs)
   return bot_management.bot_event(event_type, bot_id, **args)
@@ -2632,6 +2633,7 @@ class BotApiTest(BaseTest):
         },
         {
           u'authenticated_as': u'bot:whitelisted-ip',
+          u'dimensions': dimensions,
           u'event_type': u'bot_connected',
           u'external_ip': unicode(self.source_ip),
           u'quarantined': False,

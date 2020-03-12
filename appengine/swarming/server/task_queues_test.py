@@ -39,7 +39,7 @@ def _assert_bot(bot_id=u'bot1', dimensions=None):
   bot_dimensions.update(dimensions or {})
   bot_management.bot_event(
       'request_sleep', bot_id, '1.2.3.4', bot_id, bot_dimensions, {},
-      '1234', False, None, None, None)
+      '1234', False, None, None, None, register_dimensions=True)
   bot_root_key = bot_management.get_root_key(bot_id)
   return task_queues.assert_bot_async(bot_root_key, bot_dimensions).get_result()
 

@@ -873,6 +873,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
   def test_bot_event(self):
     self.mock(random, 'getrandbits', lambda _: 0x88)
     params = self.do_handshake()
+    dimensions = params['dimensions']
     for e in handlers_bot.BotEventHandler.ALLOWED_EVENTS:
       if e == 'bot_error':
         # This one is tested specifically since it also logs an error message.
@@ -888,7 +889,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
     expected = [
       {
         'authenticated_as': u'bot:whitelisted-ip',
-        'dimensions': {},
+        'dimensions': dimensions,
         'event_type': unicode(e),
         'external_ip': u'192.168.2.2',
         'last_seen_ts': None,
@@ -915,7 +916,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
     expected.append(
       {
         'authenticated_as': u'bot:whitelisted-ip',
-        'dimensions': {},
+        'dimensions': dimensions,
         'event_type': u'bot_connected',
         'external_ip': u'192.168.2.2',
         'last_seen_ts': None,
