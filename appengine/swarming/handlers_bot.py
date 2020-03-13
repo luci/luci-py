@@ -461,7 +461,7 @@ class BotHandshakeHandler(_BotBaseHandler):
 
     # The dimensions provided by Bot won't be applied to BotInfo since they
     # provide them without injected bot_config. The bot will report valid
-    # dimensiosn at poll.
+    # dimensions at poll.
     bot_management.bot_event(
         event_type='bot_connected', bot_id=res.bot_id,
         external_ip=self.request.remote_addr,
