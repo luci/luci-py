@@ -161,14 +161,15 @@ class Provider(object):
     # Each config has keys 'config_set', 'revision' and 'content_hash'.
     res = yield self._api_call_async(
         url_path, params={'hashes_only': True}, allow_not_found=False)
+    configs = res.get('configs', [])
 
     # Load config contents. Most of them will come from memcache.
-    for cfg in res['configs']:
+    for cfg in configs:
       cfg['project_id'] = cfg['config_set'].split('/', 1)[1]
       cfg['get_content_future'] = self.get_config_by_hash_async(
           cfg['content_hash'])
 
-    for cfg in res['configs']:
+    for cfg in configs:
       cfg['content'] = yield cfg['get_content_future']
       if not cfg['content']:
         logging.error(
@@ -177,7 +178,7 @@ class Provider(object):
 
     raise ndb.Return({
       cfg['config_set']: (cfg['revision'], cfg['content'])
-      for cfg in res['configs']
+      for cfg in configs
       if cfg['content']
     })
 
