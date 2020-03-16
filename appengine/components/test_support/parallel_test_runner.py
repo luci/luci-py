@@ -56,4 +56,4 @@ def hook_args(argv):
 
 
 if __name__ == '__main__':
-  run_tests(python3=six.PY3)
+  sys.exit(run_tests(python3=six.PY3))
