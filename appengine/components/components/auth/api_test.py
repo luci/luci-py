@@ -257,6 +257,12 @@ class AuthDBTest(test_case.TestCase):
     # Exist now.
     self.assertTrue(model.root_key().get())
 
+    # Simulate datastore wipe which can happen in tests, verify fetch_auth_db
+    # still works. It hits slightly different code path since wiping datastore
+    # doesn't reset _lazy_bootstrap_ran global var.
+    model.root_key().delete()
+    api.fetch_auth_db()
+
   def run_auth_db_fetch_test(self, setup_cb):
     now = utils.utcnow()
     ident = model.Identity.from_bytes('user:a@example.com')

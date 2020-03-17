@@ -1176,7 +1176,7 @@ def fetch_auth_db(known_auth_db=None):
       ),
       'global_config': (
           global_config_future.get_result() or
-          model.AuthGlobalConfig(key=model.root_key)
+          model.AuthGlobalConfig(key=root_key)
       ),
       'groups': groups_future.get_result(),
       'ip_whitelist_assignments': ip_whitelist_assignments,
