@@ -21,6 +21,7 @@ from components import utils
 
 from . import b64
 from . import model
+from . import realms
 from . import signature
 from .proto import replication_pb2
 
@@ -42,6 +43,7 @@ AuthDBSnapshot = collections.namedtuple(
         'ip_whitelists',
         'ip_whitelist_assignments',
         'realms_globals',
+        'project_realms',
     ])
 
 
@@ -136,6 +138,8 @@ def new_auth_db_snapshot():
   config_future = model.root_key().get_async()
   groups_future = model.AuthGroup.query(ancestor=model.root_key()).fetch_async()
   realms_globals_future = model.realms_globals_key().get_async()
+  project_realms_future = model.AuthProjectRealms.query(
+      ancestor=model.root_key()).fetch_async()
 
   # It's fine to block here as long as it's the last fetch.
   ip_whitelist_assignments, ip_whitelists = model.fetch_ip_whitelists()
@@ -150,6 +154,7 @@ def new_auth_db_snapshot():
       realms_globals_future.get_result() or model.AuthRealmsGlobals(
           key=model.realms_globals_key()
       ),
+      project_realms_future.get_result(),
   )
   return state_future.get_result(), snapshot
 
@@ -217,8 +222,12 @@ def auth_db_snapshot_to_proto(snapshot, auth_db_proto=None):
     msg.created_ts = utils.datetime_to_timestamp(ent.created_ts)
     msg.created_by = ent.created_by.to_bytes()
 
-  auth_db_proto.realms.api_version = model.REALMS_API_VERSION
-  auth_db_proto.realms.permissions.extend(snapshot.realms_globals.permissions)
+  # Merge all per-project realms into a single realms_pb2.Realms. There are some
+  # space savings there due to dedupping permissions lists.
+  realms.merge(
+      snapshot.realms_globals.permissions,
+      {r.key.id(): r.realms for r in snapshot.project_realms},
+      auth_db_proto.realms)
 
   return auth_db_proto
 

@@ -174,6 +174,16 @@ class GenerateChangesTest(test_case.TestCase):
           modified_ts=utils.utcnow(),
           comment='New permission')
       r.put()
+      p = model.AuthProjectRealms(
+          key=model.project_realms_key('proj1'),
+          realms=realms_pb2.Realms(api_version=1234),
+          config_rev='config_rev',
+          perms_rev='prems_rev')
+      p.record_revision(
+          modified_by=ident('me@example.com'),
+          modified_ts=utils.utcnow(),
+          comment='New project')
+      p.put()
 
     changes = self.grab_all(self.auth_db_transaction(touch_all))
     self.assertEqual({
@@ -261,10 +271,22 @@ class GenerateChangesTest(test_case.TestCase):
         'when': datetime.datetime(2015, 1, 2, 3, 4, 5),
         'who': model.Identity(kind='user', name='me@example.com')
       },
+      'AuthDBChange:AuthProjectRealms$proj1!10000': {
+        'app_version': u'v1a',
+        'auth_db_rev': 1,
+        'change_type': change_log.AuthDBChange.CHANGE_PROJECT_REALMS_CREATED,
+        'class_': [u'AuthDBChange', u'AuthProjectRealmsChange'],
+        'comment': u'New project',
+        'config_rev_new': u'config_rev',
+        'perms_rev_new': u'prems_rev',
+        'target': u'AuthProjectRealms$proj1',
+        'when': datetime.datetime(2015, 1, 2, 3, 4, 5),
+        'who': model.Identity(kind='user', name='me@example.com')
+      },
       'AuthDBChange:AuthRealmsGlobals$globals!9000': {
         'app_version': u'v1a',
         'auth_db_rev': 1,
-        'change_type': 9000,
+        'change_type': change_log.AuthDBChange.CHANGE_REALMS_GLOBALS_CHANGED,
         'class_': [u'AuthDBChange', u'AuthRealmsGlobalsChange'],
         'comment': u'New permission',
         'permissions_added': [u'luci.dev.p1'],
@@ -864,6 +886,127 @@ class GenerateChangesTest(test_case.TestCase):
         'permissions_added': [u'luci.dev.p4'],
         'permissions_removed': [u'luci.dev.p2'],
         'target': u'AuthRealmsGlobals$globals',
+        'when': datetime.datetime(2015, 1, 2, 3, 4, 5),
+        'who': model.Identity(kind='user', name='me@example.com'),
+      },
+    }, changes)
+
+  def test_project_realms_diff(self):
+    # Note: in reality Realms.api_version is fixed. We change it in this test
+    # since it is the simplest field to change.
+
+    def create():
+      p = model.AuthProjectRealms(
+          key=model.project_realms_key('proj1'),
+          realms=realms_pb2.Realms(api_version=123),
+          config_rev='config_rev1',
+          perms_rev='perms_rev1')
+      p.record_revision(
+          modified_by=ident('me@example.com'),
+          modified_ts=utils.utcnow(),
+          comment='Created')
+      p.put()
+
+    changes = self.grab_all(self.auth_db_transaction(create))
+    self.assertEqual({
+      'AuthDBChange:AuthProjectRealms$proj1!10000': {
+        'app_version': u'v1a',
+        'auth_db_rev': 1,
+        'change_type': change_log.AuthDBChange.CHANGE_PROJECT_REALMS_CREATED,
+        'class_': [u'AuthDBChange', u'AuthProjectRealmsChange'],
+        'comment': u'Created',
+        'config_rev_new': u'config_rev1',
+        'perms_rev_new': u'perms_rev1',
+        'target': u'AuthProjectRealms$proj1',
+        'when': datetime.datetime(2015, 1, 2, 3, 4, 5),
+        'who': model.Identity(kind='user', name='me@example.com'),
+      },
+    }, changes)
+
+    def update(api_version, config_rev, perms_rev):
+      p = model.project_realms_key('proj1').get()
+      p.realms = realms_pb2.Realms(api_version=api_version)
+      p.config_rev = config_rev
+      p.perms_rev = perms_rev
+      p.record_revision(
+          modified_by=ident('me@example.com'),
+          modified_ts=utils.utcnow(),
+          comment='Updated')
+      p.put()
+
+    # Update everything.
+    changes = self.grab_all(self.auth_db_transaction(
+        lambda: update(1234, 'config_rev2', 'perms_rev2')))
+    self.assertEqual({
+      'AuthDBChange:AuthProjectRealms$proj1!10100': {
+        'app_version': u'v1a',
+        'auth_db_rev': 2,
+        'change_type': change_log.AuthDBChange.CHANGE_PROJECT_REALMS_CHANGED,
+        'class_': [u'AuthDBChange', u'AuthProjectRealmsChange'],
+        'comment': u'Updated',
+        'config_rev_new': u'config_rev2',
+        'config_rev_old': u'config_rev1',
+        'target': u'AuthProjectRealms$proj1',
+        'when': datetime.datetime(2015, 1, 2, 3, 4, 5),
+        'who': model.Identity(kind='user', name='me@example.com'),
+      },
+      'AuthDBChange:AuthProjectRealms$proj1!10200': {
+        'app_version': u'v1a',
+        'auth_db_rev': 2,
+        'change_type':
+            change_log.AuthDBChange.CHANGE_PROJECT_REALMS_REEVALUATED,
+        'class_': [u'AuthDBChange', u'AuthProjectRealmsChange'],
+        'comment': u'Updated',
+        'perms_rev_new': u'perms_rev2',
+        'perms_rev_old': u'perms_rev1',
+        'target': u'AuthProjectRealms$proj1',
+        'when': datetime.datetime(2015, 1, 2, 3, 4, 5),
+        'who': model.Identity(kind='user', name='me@example.com'),
+      },
+    }, changes)
+
+    # Update realms_pb2.Realms, but do not change revisions.
+    changes = self.grab_all(self.auth_db_transaction(
+        lambda: update(12345, 'config_rev2', 'perms_rev2')))
+    self.assertEqual({
+      'AuthDBChange:AuthProjectRealms$proj1!10100': {
+        'app_version': u'v1a',
+        'auth_db_rev': 3,
+        'change_type': change_log.AuthDBChange.CHANGE_PROJECT_REALMS_CHANGED,
+        'class_': [u'AuthDBChange', u'AuthProjectRealmsChange'],
+        'comment': u'Updated',
+        'config_rev_new': u'config_rev2',
+        'config_rev_old': u'config_rev2',
+        'target': u'AuthProjectRealms$proj1',
+        'when': datetime.datetime(2015, 1, 2, 3, 4, 5),
+        'who': model.Identity(kind='user', name='me@example.com'),
+      },
+    }, changes)
+
+    # Update revisions, but don't actually touch realms.
+    changes = self.grab_all(self.auth_db_transaction(
+        lambda: update(12345, 'config_rev3', 'perms_rev3')))
+    self.assertEqual({}, changes)
+
+    def delete():
+      p = model.project_realms_key('proj1').get()
+      p.record_deletion(
+          modified_by=ident('me@example.com'),
+          modified_ts=utils.utcnow(),
+          comment='Deleted')
+      p.key.delete()
+
+    changes = self.grab_all(self.auth_db_transaction(delete))
+    self.assertEqual({
+      'AuthDBChange:AuthProjectRealms$proj1!10300': {
+        'app_version': u'v1a',
+        'auth_db_rev': 5,
+        'change_type': change_log.AuthDBChange.CHANGE_PROJECT_REALMS_REMOVED,
+        'class_': [u'AuthDBChange', u'AuthProjectRealmsChange'],
+        'comment': u'Deleted',
+        'config_rev_old': u'config_rev3',
+        'perms_rev_old': u'perms_rev3',
+        'target': u'AuthProjectRealms$proj1',
         'when': datetime.datetime(2015, 1, 2, 3, 4, 5),
         'who': model.Identity(kind='user', name='me@example.com'),
       },

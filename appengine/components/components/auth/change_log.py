@@ -129,6 +129,12 @@ class AuthDBChange(polymodel.PolyModel):
   # AuthRealmsGlobalsChange change types.
   CHANGE_REALMS_GLOBALS_CHANGED = 9000
 
+  # AuthProjectRealmsChange change types.
+  CHANGE_PROJECT_REALMS_CREATED     = 10000
+  CHANGE_PROJECT_REALMS_CHANGED     = 10100
+  CHANGE_PROJECT_REALMS_REEVALUATED = 10200
+  CHANGE_PROJECT_REALMS_REMOVED     = 10300
+
   # What kind of a change this is (see CHANGE_*). Defines what subclass to use.
   change_type = ndb.IntegerProperty()
   # Entity (or subentity) that was changed: kind$id[$subid] (subid is optional).
@@ -578,6 +584,58 @@ def diff_realms_globals(target, old, new):
         permissions_removed=removed)
 
 
+## AuthProjectRealms changes (very simplistic for now).
+
+
+class AuthProjectRealmsChange(AuthDBChange):
+  config_rev_old = ndb.StringProperty(indexed=False)
+  config_rev_new = ndb.StringProperty(indexed=False)
+  perms_rev_old = ndb.StringProperty(indexed=False)
+  perms_rev_new = ndb.StringProperty(indexed=False)
+
+
+def diff_project_realms(target, old, new):
+  # Helper to reduce amount of typing.
+  change = lambda tp, **kwargs: AuthProjectRealmsChange(
+      change_type=getattr(AuthDBChange, 'CHANGE_PROJECT_REALMS_%s' % tp),
+      target=target,
+      **kwargs)
+
+  if new.auth_db_deleted:
+    yield change(
+        'REMOVED',
+        config_rev_old=new.config_rev,
+        perms_rev_old=new.perms_rev)
+    return
+
+  if old is None:
+    yield change(
+        'CREATED',
+        config_rev_new=new.config_rev,
+        perms_rev_new=new.perms_rev)
+    return
+
+  if old.realms == new.realms:
+    return  # nothing log-worthy has changed
+
+  # One of them should be True, but cautiously emit CHANGED entry even if both
+  # are False. We end up here only if realms do change somehow.
+  config_changed = old.config_rev != new.config_rev
+  reevaluated = old.perms_rev != new.perms_rev
+
+  if config_changed or (not config_changed and not reevaluated):
+    yield change(
+        'CHANGED',
+        config_rev_old=old.config_rev,
+        config_rev_new=new.config_rev)
+
+  if reevaluated:
+    yield change(
+        'REEVALUATED',
+        perms_rev_old=old.perms_rev,
+        perms_rev_new=new.perms_rev)
+
+
 ###
 
 
@@ -596,6 +654,7 @@ KNOWN_HISTORICAL_ENTITIES = {
       model.AuthIPWhitelistAssignments, diff_ip_whitelist_assignments),
   'AuthGlobalConfigHistory': (model.AuthGlobalConfig, diff_global_config),
   'AuthRealmsGlobalsHistory': (model.AuthRealmsGlobals, diff_realms_globals),
+  'AuthProjectRealmsHistory': (model.AuthProjectRealms, diff_project_realms),
 }
 
 

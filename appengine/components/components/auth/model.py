@@ -116,9 +116,6 @@ __all__ = [
 ]
 
 
-# Currently acceptable version of Realms API. See api_version in realms.proto.
-REALMS_API_VERSION = 1
-
 # Name of a group whose members have access to Group management UI. It's the
 # only group needed to bootstrap everything else.
 ADMIN_GROUP = 'administrators'
@@ -498,7 +495,10 @@ class AuthVersionedEntityMixin(object):
         'repeated': prop._repeated,
       }
       if prop.__class__ == datastore_utils.ProtobufProperty:
-        kwargs['message_class'] = prop._message_class
+        kwargs.update({
+          'message_class': prop._message_class,
+          'compressed': prop._compressed,
+        })
       elif prop.__class__ == ndb.LocalStructuredProperty:
         kwargs['modelclass'] = prop._modelclass
       props[name] = prop.__class__(**kwargs)
@@ -1307,9 +1307,36 @@ class AuthRealmsGlobals(ndb.Model, AuthVersionedEntityMixin):
       realms_pb2.Permission, repeated=True)
 
 
+class AuthProjectRealms(ndb.Model, AuthVersionedEntityMixin):
+  """All realms of some single LUCI project.
+
+  They are defined as realms_pb2.Realms proto message reduced to a single
+  project:
+    * Only project's realms are listed in `realms` field.
+    * Only permissions used by the project are listed in `permissions` field.
+    * Permissions have their metadata stripped, they have only names.
+
+  Entity key is project_realms_key(...). Parent entity is root_key().
+  """
+  # Disable useless in-process per-request cache.
+  _use_cache = False
+
+  # All realms of a project, see the AuthProjectRealms doc string above.
+  realms = datastore_utils.ProtobufProperty(realms_pb2.Realms, compressed=True)
+  # The git revision the config was picked up from.
+  config_rev = ndb.StringProperty(indexed=False)
+  # Revision of permissions DB used to expand roles.
+  perms_rev = ndb.StringProperty(indexed=False)
+
+
 def realms_globals_key():
   """The key of AuthRealmsGlobals singleton entity."""
   return ndb.Key(AuthRealmsGlobals, 'globals', parent=root_key())
+
+
+def project_realms_key(project_id):
+  """An ndb.Key for an AuthProjectRealms entity."""
+  return ndb.Key(AuthProjectRealms, project_id, parent=root_key())
 
 
 ################################################################################

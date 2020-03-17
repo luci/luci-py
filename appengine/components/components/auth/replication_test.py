@@ -14,6 +14,7 @@ from google.appengine.ext import ndb
 
 from components import utils
 from components.auth import model
+from components.auth import realms
 from components.auth import replication
 from components.auth.proto import realms_pb2
 from components.auth.proto import replication_pb2
@@ -37,6 +38,7 @@ def snapshot_to_dict(snapshot):
     'ip_whitelist_assignments':
         entity_to_dict(snapshot.ip_whitelist_assignments),
     'realms_globals': entity_to_dict(snapshot.realms_globals),
+    'project_realms': [entity_to_dict(e) for e in snapshot.project_realms],
   }
   # Ensure no new keys are forgotten.
   assert len(snapshot) == len(result)
@@ -46,7 +48,7 @@ def snapshot_to_dict(snapshot):
 def make_snapshot_obj(
     global_config=None, groups=None,
     ip_whitelists=None, ip_whitelist_assignments=None,
-    realms_globals=None):
+    realms_globals=None, project_realms=None):
   """Returns AuthDBSnapshot with empty list of groups and whitelists."""
   return replication.AuthDBSnapshot(
       global_config=global_config or model.AuthGlobalConfig(
@@ -63,6 +65,7 @@ def make_snapshot_obj(
               key=model.ip_whitelist_assignments_key())),
       realms_globals=realms_globals or model.AuthRealmsGlobals(
           key=model.realms_globals_key()),
+      project_realms=project_realms or [],
   )
 
 
@@ -110,6 +113,7 @@ class NewAuthDBSnapshotTest(test_case.TestCase):
         'modified_ts': None,
         'permissions': [],
       },
+      'project_realms': [],
     }
     self.assertEqual(expected_snapshot, snapshot_to_dict(snapshot))
 
@@ -183,6 +187,17 @@ class NewAuthDBSnapshotTest(test_case.TestCase):
             realms_pb2.Permission(name='luci.dev.p2'),
         ])
     realms_globals.put()
+
+    model.AuthProjectRealms(
+        key=model.project_realms_key('proj_id1'),
+        realms=realms_pb2.Realms(api_version=1234),
+        config_rev='rev1',
+        perms_rev='rev1').put()
+    model.AuthProjectRealms(
+        key=model.project_realms_key('proj_id2'),
+        realms=realms_pb2.Realms(api_version=1234),
+        config_rev='rev2',
+        perms_rev='rev2').put()
 
     captured_state, snapshot = replication.new_auth_db_snapshot()
 
@@ -288,6 +303,30 @@ class NewAuthDBSnapshotTest(test_case.TestCase):
           realms_pb2.Permission(name='luci.dev.p2'),
         ],
       },
+      'project_realms': [
+        {
+          '__id__': 'proj_id1',
+          '__parent__': ndb.Key('AuthGlobalConfig', 'root'),
+          'auth_db_prev_rev': None,
+          'auth_db_rev': None,
+          'config_rev': u'rev1',
+          'perms_rev': u'rev1',
+          'modified_by': None,
+          'modified_ts': None,
+          'realms': realms_pb2.Realms(api_version=1234),
+        },
+        {
+          '__id__': 'proj_id2',
+          '__parent__': ndb.Key('AuthGlobalConfig', 'root'),
+          'auth_db_prev_rev': None,
+          'auth_db_rev': None,
+          'config_rev': u'rev2',
+          'perms_rev': u'rev2',
+          'modified_by': None,
+          'modified_ts': None,
+          'realms': realms_pb2.Realms(api_version=1234),
+        }
+      ],
     }
     self.assertEqual(expected_snapshot, snapshot_to_dict(snapshot))
 
@@ -311,7 +350,7 @@ class SnapshotToProtoConversionTest(test_case.TestCase):
         oauth_additional_client_ids=[u'id1', u'id2'],
         token_server_url=u'https://example.com',
         security_config='security config blob',
-        realms={'api_version': model.REALMS_API_VERSION},
+        realms={'api_version': realms.API_VERSION},
     ))
 
   def test_group_serialization(self):
@@ -393,21 +432,70 @@ class SnapshotToProtoConversionTest(test_case.TestCase):
             created_by='user:creator@example.com',
         )])
 
-  def test_realms_globals_serialization(self):
-    """Serializing snapshot with non-trivial AuthRealmsGlobals."""
-    entity = model.AuthRealmsGlobals(
+  def test_realms_serialization(self):
+    """Serializing snapshot with non-trivial realms configs."""
+    realms_globals = model.AuthRealmsGlobals(
         key=model.realms_globals_key(),
         permissions=[
             realms_pb2.Permission(name='luci.dev.p1'),
             realms_pb2.Permission(name='luci.dev.p2'),
         ],
     )
-    auth_db = make_auth_db_proto(realms_globals=entity)
+    p1 = model.AuthProjectRealms(
+        key=model.project_realms_key('proj1'),
+        realms=realms_pb2.Realms(
+            permissions=[{'name': 'luci.dev.p2'}],
+            realms=[{
+                'name': 'proj1/@root',
+                'bindings': [
+                    {
+                        'permissions': [0],
+                        'principals': ['group:gr1'],
+                    },
+                ],
+            }],
+        ),
+    )
+    p2 = model.AuthProjectRealms(
+        key=model.project_realms_key('proj2'),
+        realms=realms_pb2.Realms(
+            permissions=[{'name': 'luci.dev.p1'}],
+            realms=[{
+                'name': 'proj2/@root',
+                'bindings': [
+                    {
+                        'permissions': [0],
+                        'principals': ['group:gr2'],
+                    },
+                ],
+            }],
+        ),
+    )
+    auth_db = make_auth_db_proto(
+        realms_globals=realms_globals,
+        project_realms=[p1, p2])
     self.assertEqual(auth_db.realms, realms_pb2.Realms(
-        api_version=model.REALMS_API_VERSION,
-        permissions=[
-            realms_pb2.Permission(name='luci.dev.p1'),
-            realms_pb2.Permission(name='luci.dev.p2'),
+        api_version=realms.API_VERSION,
+        permissions=[{'name': 'luci.dev.p1'}, {'name': 'luci.dev.p2'}],
+        realms=[
+            {
+                'name': 'proj1/@root',
+                'bindings': [
+                    {
+                        'permissions': [1],
+                        'principals': ['group:gr1'],
+                    },
+                ],
+            },
+            {
+                'name': 'proj2/@root',
+                'bindings': [
+                    {
+                        'permissions': [0],
+                        'principals': ['group:gr2'],
+                    },
+                ],
+            },
         ],
     ))
 

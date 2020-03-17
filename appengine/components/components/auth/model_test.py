@@ -1019,6 +1019,79 @@ class AuditLogTest(test_case.TestCase):
       },
     }, self.grab_log(model.AuthRealmsGlobals))
 
+  def test_project_realms_log(self):
+    PROJECT_ID = 'pid'
+
+    @ndb.transactional
+    def modify(realms, config_rev, perms_rev):
+      key = model.project_realms_key(PROJECT_ID)
+      e = key.get() or model.AuthProjectRealms(key=key)
+      if realms:
+        e.realms = realms
+        e.config_rev = config_rev
+        e.perms_rev = perms_rev
+        e.record_revision(
+            modified_by=model.Identity.from_bytes('user:a@example.com'),
+            modified_ts=datetime.datetime(2015, 1, 1, 1, 1),
+            comment='Comment')
+        e.put()
+      else:
+        e.record_deletion(
+            modified_by=model.Identity.from_bytes('user:a@example.com'),
+            modified_ts=datetime.datetime(2015, 1, 1, 1, 1),
+            comment='Comment')
+        e.key.delete()
+      model.replicate_auth_db()
+
+    realms_v1 = realms_pb2.Realms(permissions=[{'name': 'p1'}])
+    realms_v2 = realms_pb2.Realms(permissions=[{'name': 'p2'}])
+
+    modify(realms_v1, 'rev1', 'rev1')
+    modify(realms_v2, 'rev2', 'rev2')
+    modify(None, None, None)  # delete
+
+    cpy = lambda rev: ndb.Key(
+        'Rev', rev, 'AuthProjectRealmsHistory', PROJECT_ID,
+        parent=model.root_key())
+    self.assertEqual({
+      cpy(1): {
+        'realms': realms_v1,
+        'config_rev': u'rev1',
+        'perms_rev': u'rev1',
+        'auth_db_rev': 1,
+        'auth_db_prev_rev': None,
+        'auth_db_app_version': u'v1a',
+        'auth_db_deleted': False,
+        'auth_db_change_comment': u'Comment',
+        'modified_by': model.Identity.from_bytes('user:a@example.com'),
+        'modified_ts': datetime.datetime(2015, 1, 1, 1, 1),
+      },
+      cpy(2): {
+        'realms': realms_v2,
+        'config_rev': u'rev2',
+        'perms_rev': u'rev2',
+        'auth_db_rev': 2,
+        'auth_db_prev_rev': 1,
+        'auth_db_app_version': u'v1a',
+        'auth_db_deleted': False,
+        'auth_db_change_comment': u'Comment',
+        'modified_by': model.Identity.from_bytes('user:a@example.com'),
+        'modified_ts': datetime.datetime(2015, 1, 1, 1, 1),
+      },
+      cpy(3): {
+        'realms': realms_v2,
+        'config_rev': u'rev2',
+        'perms_rev': u'rev2',
+        'auth_db_rev': 3,
+        'auth_db_prev_rev': 2,
+        'auth_db_app_version': u'v1a',
+        'auth_db_deleted': True,
+        'auth_db_change_comment': u'Comment',
+        'modified_by': model.Identity.from_bytes('user:a@example.com'),
+        'modified_ts': datetime.datetime(2015, 1, 1, 1, 1),
+      },
+    }, self.grab_log(model.AuthProjectRealms))
+
 
 if __name__ == '__main__':
   if '-v' in sys.argv:
