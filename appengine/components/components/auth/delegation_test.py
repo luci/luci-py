@@ -219,9 +219,11 @@ class ValidationTest(DelegationTestBase):
       delegation.check_subtoken(tok, FAKE_IDENT, api.AuthDB.empty())
 
   def test_subtoken_audience(self):
-    auth_db = api.AuthDB.from_entities(groups=[model.AuthGroup(
-      id='abc', members=[model.Identity.from_bytes('user:b@b.com')],
-    )])
+    auth_db = api.AuthDB.empty()
+    self.mock(
+        auth_db, 'is_group_member',
+        lambda gr, ident: gr == 'abc' and ident.to_bytes() == 'user:b@b.com'
+    )
     tok = fake_subtoken_proto(
           'user:abc@example.com', audience=['user:a@a.com', 'group:abc'])
     # Works.

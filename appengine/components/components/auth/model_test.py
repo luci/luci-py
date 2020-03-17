@@ -460,16 +460,6 @@ class IpWhitelistTest(test_case.TestCase):
         'modified_ts': datetime.datetime(2014, 1, 1),
       }, model.ip_whitelist_assignments_key().get().to_dict())
 
-  def test_is_ip_whitelisted(self):
-    ent = model.AuthIPWhitelist(subnets=['127.0.0.1', '192.168.0.0/24'])
-    test = lambda ip: ent.is_ip_whitelisted(ipaddr.ip_from_string(ip))
-    self.assertTrue(test('127.0.0.1'))
-    self.assertTrue(test('192.168.0.0'))
-    self.assertTrue(test('192.168.0.9'))
-    self.assertTrue(test('192.168.0.255'))
-    self.assertFalse(test('192.168.1.0'))
-    self.assertFalse(test('192.1.0.0'))
-
   def test_fetch_ip_whitelists_empty(self):
     assignments, whitelists = model.fetch_ip_whitelists()
     self.assertEqual(model.ip_whitelist_assignments_key(), assignments.key)

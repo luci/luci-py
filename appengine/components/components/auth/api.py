@@ -138,7 +138,7 @@ SecretKey = collections.namedtuple('SecretKey', ['name'])
 # membership checks. We keep it in AuthDB in place of AuthGroup to reduce RAM
 # usage.
 CachedGroup = collections.namedtuple('CachedGroup', [
-  'members',  # == set(m.to_bytes() for m in auth_group.members)
+  'members',  # == frozenset(m.to_bytes() for m in auth_group.members)
   'globs',
   'nested',
   'description',
@@ -158,33 +158,46 @@ GroupListing = collections.namedtuple('GroupListing', [
 ])
 
 
+# OAuthConfig is extracted from the AuthDB proto or from AuthGlobalConfig.
+OAuthConfig = collections.namedtuple('OAuthConfig', [
+  'oauth_client_id',              # str
+  'oauth_client_secret',          # str
+  'oauth_additional_client_ids',  # list of str
+])
+
+
 class AuthDB(object):
   """A read only in-memory database of auth configuration of a service.
 
-  Holds user groups, all secret keys and OAuth2 configuration.
+  Holds user groups, IP whitelists, OAuth2 configuration, etc.
 
-  Each instance process holds AuthDB object in memory and shares it between all
-  requests, occasionally refetching it from Datastore.
+  Each process instance holds an AuthDB object in memory and shares it between
+  all requests, occasionally refetching it from Datastore.
   """
 
   @staticmethod
   def empty():
     """Returns empty AuthDB suitable for tests."""
-    return AuthDB.from_entities()
+    return AuthDB(
+        from_what='empty',
+        replication_state=model.AuthReplicationState(),
+        oauth_config=OAuthConfig('', '', []),
+        token_server_url='',
+        groups={},
+        ip_whitelist_assignments={},
+        ip_whitelists={},
+        additional_client_ids=[])
 
   @staticmethod
   def from_entities(
-      replication_state=None,
-      global_config=None,
-      groups=None,
-      ip_whitelist_assignments=None,
-      ip_whitelists=None,
-      additional_client_ids=None):
+        replication_state,
+        global_config,
+        groups,
+        ip_whitelist_assignments,
+        ip_whitelists,
+        additional_client_ids
+    ):
     """Constructs AuthDB from various (already loaded) datastore entities.
-
-    Mostly just populates fields of AuthDB object by storing given entities
-    there. None default values are used in unit tests only to skip populating
-    unimportant fields.
 
     Args:
       replication_state: AuthReplicationState entity.
@@ -197,29 +210,34 @@ class AuthDB(object):
     Returns:
       New AuthDB instance.
     """
-    # Preprocess groups for faster membership checks. Throw away original
-    # entities to reduce memory usage.
     cached_groups = {}
     for entity in (groups or []):
       cached_groups[entity.key.string_id()] = CachedGroup(
           members=frozenset(m.to_bytes() for m in entity.members),
-          globs=entity.globs or (),
-          nested=entity.nested or (),
+          globs=tuple(entity.globs or ()),
+          nested=tuple(entity.nested or ()),
           description=entity.description,
           owners=entity.owners,
           created_ts=entity.created_ts,
           created_by=entity.created_by,
           modified_ts=entity.modified_ts,
           modified_by=entity.modified_by)
+
     return AuthDB(
         from_what='from_entities',
-        replication_state=replication_state or model.AuthReplicationState(),
-        global_config=global_config or model.AuthGlobalConfig(),
+        replication_state=replication_state,
+        oauth_config=OAuthConfig(
+            global_config.oauth_client_id,
+            global_config.oauth_client_secret,
+            global_config.oauth_additional_client_ids),
+        token_server_url=global_config.token_server_url,
         groups=cached_groups,
-        ip_whitelist_assignments=(
-            ip_whitelist_assignments or model.AuthIPWhitelistAssignments()),
-        ip_whitelists=ip_whitelists or [],
-        additional_client_ids=additional_client_ids or [])
+        ip_whitelist_assignments={
+            e.identity: e.ip_whitelist
+            for e in ip_whitelist_assignments.assignments
+        },
+        ip_whitelists={e.key.id(): list(e.subnets) for e in ip_whitelists},
+        additional_client_ids=additional_client_ids)
 
   @staticmethod
   def from_proto(replication_state, auth_db, additional_client_ids):
@@ -233,11 +251,6 @@ class AuthDB(object):
     Returns:
       New AuthDB instance.
     """
-    # "Lite" AuthDBSnapshot without any groups. We don't want to copy them one
-    # more time and will convert them from AuthGroup proto directly into
-    # CachedGroup tuple, bypassing the NDB entity representation.
-    snap = replication.proto_to_auth_db_snapshot(auth_db, True)
-
     cached_groups = {}
     for gr in auth_db.groups:
       cached_groups[gr.name] = CachedGroup(
@@ -254,22 +267,41 @@ class AuthDB(object):
     return AuthDB(
         from_what='from_proto',
         replication_state=replication_state,
-        global_config=snap.global_config,
+        oauth_config=OAuthConfig(
+            oauth_client_id=auth_db.oauth_client_id,
+            oauth_client_secret=auth_db.oauth_client_secret,
+            oauth_additional_client_ids=list(
+                auth_db.oauth_additional_client_ids)),
+        token_server_url=auth_db.token_server_url,
         groups=cached_groups,
-        ip_whitelist_assignments=snap.ip_whitelist_assignments,
-        ip_whitelists=snap.ip_whitelists,
+        ip_whitelist_assignments={
+            model.Identity.from_bytes(e.identity): e.ip_whitelist
+            for e in auth_db.ip_whitelist_assignments
+        },
+        ip_whitelists={
+            e.name: list(e.subnets) for e in auth_db.ip_whitelists
+        },
         additional_client_ids=additional_client_ids)
 
   # Note: do not use __init__ directly, use one of AuthDB.empty(),
-  # AuthDB.from_entities() or AuthDB.from_proto instead.
+  # AuthDB.from_entities() or AuthDB.from_proto() instead.
   def __init__(
-      self, from_what, replication_state, global_config, groups,
-      ip_whitelist_assignments, ip_whitelists, additional_client_ids):
+        self,
+        from_what,                 # str
+        replication_state,         # AuthReplicationState
+        oauth_config,              # OAuthConfig
+        token_server_url,          # str
+        groups,                    # {str -> CachedGroup}
+        ip_whitelist_assignments,  # {Identity -> str}
+        ip_whitelists,             # {str -> [str]}
+        additional_client_ids      # [str]
+    ):
     self._from_what = from_what  # for tests only
     self._replication_state = replication_state
-    self._global_config = global_config
+    self._oauth_config = oauth_config
+    self._token_server_url = token_server_url
     self._groups = groups
-    self._ip_whitelists = {e.key.string_id(): e for e in ip_whitelists}
+    self._ip_whitelists = ip_whitelists
     self._ip_whitelist_assignments = ip_whitelist_assignments
 
     # Secrets are loaded lazily in get_secret.
@@ -278,10 +310,10 @@ class AuthDB(object):
 
     # A set of all allowed client IDs (as provided via config and the callback).
     client_ids = []
-    if self._global_config.oauth_client_id:
-      client_ids.append(self._global_config.oauth_client_id)
-    if self._global_config.oauth_additional_client_ids:
-      client_ids.extend(self._global_config.oauth_additional_client_ids)
+    if self._oauth_config.oauth_client_id:
+      client_ids.append(self._oauth_config.oauth_client_id)
+    if self._oauth_config.oauth_additional_client_ids:
+      client_ids.extend(self._oauth_config.oauth_additional_client_ids)
     client_ids.append(API_EXPLORER_CLIENT_ID)
     if additional_client_ids:
       client_ids.extend(additional_client_ids)
@@ -369,7 +401,7 @@ class AuthDB(object):
   @property
   def token_server_url(self):
     """URL of a token server to use to generate tokens, provided by Primary."""
-    return self._global_config.token_server_url
+    return self._token_server_url
 
   def is_group_member(self, group_name, identity):
     """Returns True if |identity| belongs to group |group_name|.
@@ -609,12 +641,16 @@ class AuthDB(object):
       ip: instance of ipaddr.IP.
       warn_if_missing: if True and IP whitelist is missing, logs a warning.
     """
-    whitelist = self._ip_whitelists.get(whitelist_name)
-    if not whitelist:
+    subnets = self._ip_whitelists.get(whitelist_name)
+    if not subnets:
       if warn_if_missing:
         logging.error('Unknown IP whitelist: %s', whitelist_name)
       return False
-    return whitelist.is_ip_whitelisted(ip)
+    # TODO(vadimsh): If number of subnets to check grows it makes sense to add
+    # an internal cache to 'subnet_from_string' (sort of like in re.compile).
+    return any(
+        ipaddr.is_in_subnet(ip, ipaddr.subnet_from_string(net))
+        for net in subnets)
 
   def verify_ip_whitelisted(self, identity, ip):
     """Verifies IP is in a whitelist assigned to the Identity.
@@ -631,15 +667,8 @@ class AuthDB(object):
       address doesn't belong to it.
     """
     assert isinstance(identity, model.Identity), identity
-
-    for assignment in self._ip_whitelist_assignments.assignments:
-      if assignment.identity == identity:
-        whitelist_name = assignment.ip_whitelist
-        break
-    else:
-      return
-
-    if not self.is_in_ip_whitelist(whitelist_name, ip):
+    whitelist_name = self._ip_whitelist_assignments.get(identity)
+    if whitelist_name and not self.is_in_ip_whitelist(whitelist_name, ip):
       ip_as_str = ipaddr.ip_to_string(ip)
       logging.error(
           'IP is not whitelisted.\nIdentity: %s\nIP: %s\nWhitelist: %s',
@@ -651,14 +680,11 @@ class AuthDB(object):
     return client_id in self._allowed_client_ids
 
   def get_oauth_config(self):
-    """Returns a tuple with OAuth2 config.
+    """Returns an OAuthConfig tuple with OAuth2 config.
 
     Format of the tuple: (client_id, client_secret, additional client ids list).
     """
-    return (
-        self._global_config.oauth_client_id,
-        self._global_config.oauth_client_secret,
-        self._global_config.oauth_additional_client_ids)
+    return self._oauth_config
 
 
 ################################################################################
@@ -1123,7 +1149,7 @@ def fetch_auth_db(known_auth_db=None):
       return (
           not state or
           state.primary_id != known_auth_db.primary_id or
-          state.auth_db_rev != known_auth_db.auth_db_rev), None
+          state.auth_db_rev != known_auth_db.auth_db_rev), state
     return True, state
 
   @ndb.transactional(propagation=ndb.TransactionOptions.INDEPENDENT)
@@ -1140,8 +1166,14 @@ def fetch_auth_db(known_auth_db=None):
     # since it does some heavy computations. Instead just return all kwargs for
     # it, so AuthDB can be built outside.
     return {
-      'replication_state': replication_state_future.get_result(),
-      'global_config': global_config_future.get_result(),
+      'replication_state': (
+          replication_state_future.get_result() or
+          model.AuthReplicationState(key=model.replication_state_key())
+      ),
+      'global_config': (
+          global_config_future.get_result() or
+          model.AuthGlobalConfig(key=model.root_key)
+      ),
       'groups': groups_future.get_result(),
       'ip_whitelist_assignments': ip_whitelist_assignments,
       'ip_whitelists': ip_whitelists,
@@ -1152,23 +1184,30 @@ def fetch_auth_db(known_auth_db=None):
   if not need_refetch:
     return known_auth_db
 
-  # If we have an AuthDB snapshot stored in the datastore, load and use it.
-  msg = None
-  if replication_state and replication_state.shard_ids:
-    # Note: auth_db_msg may end up None if the snapshot in the datastore is
-    # corrupted.
-    msg = replication.load_sharded_auth_db(
-        replication_state.primary_url,
-        replication_state.auth_db_rev,
-        replication_state.shard_ids)
-
-  # Fallback to relying on individual AuthGroup etc. entities if there's no
-  # stored AuthDB snapshot. In particular this is always the case on Primary.
-  if not msg:
+  # In Primary and Standalone modes assemble the AuthDB from individual entities
+  # in the datastore. Do it also on replicas if we haven't yet received the
+  # first AuthDB push from the primary.
+  is_standalone = not replication_state or not replication_state.primary_id
+  is_fresh_replica = replication_state and replication_state.auth_db_rev == 0
+  if model.is_primary() or is_standalone or is_fresh_replica:
     return AuthDB.from_entities(**fetch_entities())
 
-  # Otherwise construct queryable AuthDB representation from AuthDB proto.
-  return AuthDB.from_proto(replication_state, msg, additional_client_ids)
+  # In Replica mode load AuthDB snapshot proto stored in the datastore as is.
+  # It is put there by replication.push_auth_db(...) when the replica receives
+  # AuthDB pushes from the primary.
+  auth_db = replication.load_sharded_auth_db(
+      replication_state.primary_url,
+      replication_state.auth_db_rev,
+      replication_state.shard_ids)
+  if not auth_db:
+    raise Error(
+        'Could not load sharded AuthDB of %s rev %d, shard_ids: %s' %
+        (
+            replication_state.primary_url,
+            replication_state.auth_db_rev,
+            ', '.join(replication_state.shard_ids),
+        ))
+  return AuthDB.from_proto(replication_state, auth_db, additional_client_ids)
 
 
 def reset_local_state():

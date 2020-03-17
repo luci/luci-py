@@ -2046,6 +2046,15 @@ class OAuthConfigHandlerTest(RestAPITestCase):
     self.assertEqual(200, status)
     self.assertEqual(expected, body)
 
+  def mock_request_auth_db_config(self, config):
+    auth_db = api.AuthDB.empty()
+    auth_db._token_server_url = config.token_server_url
+    auth_db._oauth_config = api.OAuthConfig(
+        config.oauth_client_id,
+        config.oauth_client_secret,
+        config.oauth_additional_client_ids)
+    self.mock(rest_api.api, 'get_request_auth_db', lambda: auth_db)
+
   def test_configured_works(self):
     # Mock auth_db.get_oauth_config().
     fake_config = model.AuthGlobalConfig(
@@ -2053,8 +2062,7 @@ class OAuthConfigHandlerTest(RestAPITestCase):
         oauth_client_secret='some-secret',
         oauth_additional_client_ids=['a', 'b', 'c'],
         token_server_url='https://token-server')
-    self.mock(rest_api.api, 'get_request_auth_db',
-        lambda: api.AuthDB.from_entities(global_config=fake_config))
+    self.mock_request_auth_db_config(fake_config)
     # Call should return this data.
     expected = {
       'additional_client_ids': ['a', 'b', 'c'],
@@ -2083,8 +2091,7 @@ class OAuthConfigHandlerTest(RestAPITestCase):
         oauth_client_secret='some-secret-cache',
         oauth_additional_client_ids=['c', 'd'],
         token_server_url='https://token-server-cache')
-    self.mock(rest_api.api, 'get_request_auth_db',
-        lambda: api.AuthDB.from_entities(global_config=config_in_cache))
+    self.mock_request_auth_db_config(config_in_cache)
 
     # Without cache control header a cached version is used.
     expected = {

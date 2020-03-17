@@ -1145,14 +1145,6 @@ class AuthIPWhitelist(
   # Who created the list.
   created_by = IdentityProperty()
 
-  def is_ip_whitelisted(self, ip):
-    """Returns True if ipaddr.IP is in the whitelist."""
-    # TODO(vadimsh): If number of subnets to check grows it makes sense to add
-    # an internal cache to 'subnet_from_string' (sort of like in re.compile).
-    return any(
-        ipaddr.is_in_subnet(ip, ipaddr.subnet_from_string(net))
-        for net in self.subnets)
-
 
 def ip_whitelist_key(name):
   """Returns ndb.Key for AuthIPWhitelist entity given its name."""
