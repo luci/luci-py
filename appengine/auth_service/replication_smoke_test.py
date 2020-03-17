@@ -65,7 +65,6 @@ class ReplicationTest(unittest.TestCase):
     self.link_replica_to_primary()
     self.check_oauth_config_replication()
     self.check_group_replication()
-    self.check_ip_whitelist_replication()
     self.check_snapshot_endpoint()
 
   def link_replica_to_primary(self):
@@ -150,7 +149,8 @@ class ReplicationTest(unittest.TestCase):
     # Ensure replica got the update.
     self.wait_for_sync()
     response = self.replica.client.json_request(
-        '/auth/api/v1/server/oauth_config')
+        '/auth/api/v1/server/oauth_config',
+        headers={'Cache-Control': 'no-cache'})
     self.assertEqual(200, response.http_code)
     self.assertEqual(oauth_config, response.body)
 
@@ -159,7 +159,7 @@ class ReplicationTest(unittest.TestCase):
     logging.info('Creating group')
     group = {
       'name': 'some-group',
-      'members': ['user:jekyll@example.com', 'user:hyde@example.com'],
+      'members': ['user:hyde@example.com', 'user:jekyll@example.com'],
       'globs': ['user:*@google.com'],
       'nested': [],
       'description': 'Blah',
@@ -177,13 +177,27 @@ class ReplicationTest(unittest.TestCase):
     self.assertEqual(200, response.http_code)
     group = response.body
 
+    # Group listing also works.
+    response = self.auth_service.client.json_request(
+        '/auth/api/v1/groups',
+        headers={'Cache-Control': 'no-cache'})
+    self.assertEqual(200, response.http_code)
+    groups = response.body
+
     # Ensure replica got the update.
     self.wait_for_sync()
+
     response = self.replica.client.json_request(
         '/auth/api/v1/groups/some-group',
         headers={'Cache-Control': 'no-cache'})
     self.assertEqual(200, response.http_code)
     self.assertEqual(group, response.body)
+
+    response = self.replica.client.json_request(
+        '/auth/api/v1/groups',
+        headers={'Cache-Control': 'no-cache'})
+    self.assertEqual(200, response.http_code)
+    self.assertEqual(groups, response.body)
 
     logging.info('Modifying group')
     group = {
@@ -228,10 +242,6 @@ class ReplicationTest(unittest.TestCase):
         '/auth/api/v1/groups/some-group',
         headers={'Cache-Control': 'no-cache'})
     self.assertEqual(404, response.http_code)
-
-  def check_ip_whitelist_replication(self):
-    """Verifies changes to IP whitelist propagate to replica."""
-    # TODO(vadimsh): Implement once IP whitelist is accessible via API.
 
   def check_snapshot_endpoint(self):
     """Verifies /auth_service/api/v1/authdb/revisions/ works."""

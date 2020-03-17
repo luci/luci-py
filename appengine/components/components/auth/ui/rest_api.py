@@ -182,6 +182,8 @@ class EntityHandlerBase(handler.ApiHandler):
   def do_get(cls, name, request):  # pylint: disable=unused-argument
     """Returns an entity given its name or None if no such entity.
 
+    Can be called in any mode (including on replicas).
+
     Args:
       name: name of the entity to fetch (use get_entity_key to convert to key).
       request: webapp2.Request object.
@@ -190,12 +192,14 @@ class EntityHandlerBase(handler.ApiHandler):
 
   @classmethod
   def can_create(cls):
-    """True if caller is allowed to create a new entity."""
+    """True if the caller is allowed to create a new entity."""
     return acl.is_admin()
 
   @classmethod
   def do_create(cls, entity):
-    """Called in transaction to validate and put a new entity.
+    """Called in a transaction to validate and put a new entity.
+
+    Called only in Primary and Standalone modes.
 
     Raises:
       EntityOperationError in case of a conflict.
@@ -204,12 +208,14 @@ class EntityHandlerBase(handler.ApiHandler):
 
   @classmethod
   def can_update(cls, entity):  # pylint: disable=unused-argument
-    """True if caller is allowed to update a given entity."""
+    """True if the caller is allowed to update a given entity."""
     return acl.is_admin()
 
   @classmethod
   def do_update(cls, entity, params):
-    """Called in transaction to update existing entity.
+    """Called in a transaction to update existing entity.
+
+    Called only in Primary and Standalone modes.
 
     Raises:
       EntityOperationError in case of a conflict.
@@ -218,12 +224,14 @@ class EntityHandlerBase(handler.ApiHandler):
 
   @classmethod
   def can_delete(cls, entity):  # pylint: disable=unused-argument
-    """True if caller is allowed to delete a given entity."""
+    """True if the caller is allowed to delete a given entity."""
     return acl.is_admin()
 
   @classmethod
   def do_delete(cls, entity):
-    """Called in transaction to delete existing entity.
+    """Called in a transaction to delete existing entity.
+
+    Called only in Primary and Standalone modes.
 
     Raises:
       EntityOperationError in case of a conflict.
@@ -616,10 +624,15 @@ class GroupsHandler(handler.ApiHandler):
       return
 
     # Grab a list of groups and corresponding revision for cache key.
-    def run():
-      fut = model.AuthGroup.query(ancestor=model.root_key()).fetch_async()
-      return model.get_auth_db_revision(), fut.get_result()
-    auth_db_rev, group_list = ndb.transaction(run)
+    if not model.is_replica():
+      def run():
+        fut = model.AuthGroup.query(ancestor=model.root_key()).fetch_async()
+        return model.get_auth_db_revision(), fut.get_result()
+      auth_db_rev, group_list = ndb.transaction(run)
+    else:
+      auth_db = api.get_latest_auth_db()
+      auth_db_rev = auth_db.auth_db_rev
+      group_list = [auth_db.get_group(g) for g in auth_db.get_group_names()]
 
     # Currently AuthGroup entity contains a list of group members in the entity
     # body. It's an implementation detail that should not be relied upon.
@@ -697,12 +710,13 @@ class GroupHandler(EntityHandlerBase):
 
   @classmethod
   def do_get(cls, name, request):
-    # Use in-memory cache by default. It can be slightly stale, but serving from
-    # it is extra fast (0 RPCs). Use datastore if explicitly asked to bypass
-    # the cache. Direct datastore reads are used mostly by admin UI.
-    if _is_no_cache(request):
+    # On the primary/standalone, hit the datastore directly if the caching is
+    # forbidden.
+    if _is_no_cache(request) and not model.is_replica():
       return super(GroupHandler, cls).do_get(name, request)
-    return api.get_request_auth_db().get_group(name)
+    # Otherwise use AuthDB (either latest or cached). The cached one can be
+    # slightly stale, but serving from it is extra fast (0 RPCs).
+    return _get_maybe_cached_auth_db(request).get_group(name)
 
   # Same as in the base class, repeated here just for clarity.
   @classmethod
@@ -890,6 +904,8 @@ class IPWhitelistsHandler(handler.ApiHandler):
 
   @api.require(acl.has_access)
   def get(self):
+    if model.is_replica():
+      raise NotImplementedError()
     entities = model.AuthIPWhitelist.query(ancestor=model.root_key())
     self.send_response({
       'ip_whitelists': [
@@ -918,6 +934,12 @@ class IPWhitelistHandler(EntityHandlerBase):
   def get_entity_key(cls, name):
     assert model.is_valid_ip_whitelist_name(name), name
     return model.ip_whitelist_key(name)
+
+  @classmethod
+  def do_get(cls, name, request):
+    if model.is_replica():
+      raise NotImplementedError()
+    return super(IPWhitelistHandler, cls).do_get(name, request)
 
   @classmethod
   def do_create(cls, entity):
@@ -1387,17 +1409,18 @@ class OAuthConfigHandler(handler.ApiHandler):
     additional_ids = None
     token_server_url = None
 
-    # Use most up-to-date data in datastore if requested. Used by management UI.
-    if _is_no_cache(self.request):
+    # Use most up-to-date data in datastore if requested and available.
+    if _is_no_cache(self.request) and not model.is_replica():
       global_config = model.root_key().get()
       client_id = global_config.oauth_client_id
       client_secret = global_config.oauth_client_secret
       additional_ids = global_config.oauth_additional_client_ids
       token_server_url = global_config.token_server_url
     else:
-      # Faster call that uses cached config (that may be several minutes stale).
-      # Used by all client side scripts that just want to authenticate.
-      auth_db = api.get_request_auth_db()
+      # Potentially faster call that uses cached config (that may be several
+      # minutes stale). Used by all client side scripts that just want to
+      # authenticate.
+      auth_db = _get_maybe_cached_auth_db(self.request)
       client_id, client_secret, additional_ids = auth_db.get_oauth_config()
       token_server_url = auth_db.token_server_url
 

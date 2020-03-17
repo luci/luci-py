@@ -27,9 +27,9 @@ from .proto import replication_pb2
 
 # Messages for error codes in ServiceLinkResponse.
 LINKING_ERRORS = {
-  replication_pb2.ServiceLinkResponse.TRANSPORT_ERROR: 'Transport error,',
-  replication_pb2.ServiceLinkResponse.BAD_TICKET: 'The link has expired.',
-  replication_pb2.ServiceLinkResponse.AUTH_ERROR: 'Authentication error.',
+    replication_pb2.ServiceLinkResponse.TRANSPORT_ERROR: 'Transport error,',
+    replication_pb2.ServiceLinkResponse.BAD_TICKET: 'The link has expired.',
+    replication_pb2.ServiceLinkResponse.AUTH_ERROR: 'Authentication error.',
 }
 
 
@@ -37,11 +37,11 @@ LINKING_ERRORS = {
 AuthDBSnapshot = collections.namedtuple(
     'AuthDBSnapshot',
     [
-      'global_config',
-      'groups',
-      'ip_whitelists',
-      'ip_whitelist_assignments',
-      'realms_globals',
+        'global_config',
+        'groups',
+        'ip_whitelists',
+        'ip_whitelist_assignments',
+        'realms_globals',
     ])
 
 
@@ -223,181 +223,6 @@ def auth_db_snapshot_to_proto(snapshot, auth_db_proto=None):
   return auth_db_proto
 
 
-def proto_to_auth_db_snapshot(auth_db_proto, skip_groups):
-  """Given replication_pb2.AuthDB message returns AuthDBSnapshot.
-
-  Args:
-    auth_db_proto: replication_pb2.AuthDB message.
-    skip_groups: if True, groups won't be extracted.
-
-  Returns:
-    AuthDBSnapshot.
-  """
-  # Explicit conversion to 'list' is needed here since protobuf magic doesn't
-  # stack with NDB magic.
-  global_config = model.AuthGlobalConfig(
-      key=model.root_key(),
-      oauth_client_id=auth_db_proto.oauth_client_id,
-      oauth_client_secret=auth_db_proto.oauth_client_secret,
-      oauth_additional_client_ids=list(
-          auth_db_proto.oauth_additional_client_ids),
-      token_server_url=auth_db_proto.token_server_url,
-      security_config=auth_db_proto.security_config)
-
-  groups = []
-  if not skip_groups:
-    groups = [
-      model.AuthGroup(
-          key=model.group_key(msg.name),
-          members=[model.Identity.from_bytes(x) for x in msg.members],
-          globs=[model.IdentityGlob.from_bytes(x) for x in msg.globs],
-          nested=list(msg.nested),
-          description=msg.description,
-          owners=msg.owners or model.ADMIN_GROUP,
-          created_ts=utils.timestamp_to_datetime(msg.created_ts),
-          created_by=model.Identity.from_bytes(msg.created_by),
-          modified_ts=utils.timestamp_to_datetime(msg.modified_ts),
-          modified_by=model.Identity.from_bytes(msg.modified_by))
-      for msg in auth_db_proto.groups
-    ]
-
-  ip_whitelists = [
-    model.AuthIPWhitelist(
-        key=model.ip_whitelist_key(msg.name),
-        subnets=list(msg.subnets),
-        description=msg.description,
-        created_ts=utils.timestamp_to_datetime(msg.created_ts),
-        created_by=model.Identity.from_bytes(msg.created_by),
-        modified_ts=utils.timestamp_to_datetime(msg.modified_ts),
-        modified_by=model.Identity.from_bytes(msg.modified_by))
-    for msg in auth_db_proto.ip_whitelists
-  ]
-
-  ip_whitelist_assignments = model.AuthIPWhitelistAssignments(
-      key=model.ip_whitelist_assignments_key(),
-      assignments=[
-        model.AuthIPWhitelistAssignments.Assignment(
-            identity=model.Identity.from_bytes(msg.identity),
-            ip_whitelist=msg.ip_whitelist,
-            comment=msg.comment,
-            created_ts=utils.timestamp_to_datetime(msg.created_ts),
-            created_by=model.Identity.from_bytes(msg.created_by))
-        for msg in auth_db_proto.ip_whitelist_assignments
-      ],
-  )
-
-  realms_globals = model.AuthRealmsGlobals(
-      key=model.realms_globals_key(),
-      permissions=list(auth_db_proto.realms.permissions),
-  )
-
-  return AuthDBSnapshot(
-      global_config,
-      groups,
-      ip_whitelists,
-      ip_whitelist_assignments,
-      realms_globals,
-  )
-
-
-def get_changed_entities(new_entity_list, old_entity_list):
-  """Returns subset of changed entites.
-
-  Compares entites from |new_entity_list| with entities from |old_entity_list|
-  with same key, returns all changed or added entities.
-  """
-  old_by_key = {x.key: x for x in old_entity_list}
-  new_or_changed = []
-  for new_entity in new_entity_list:
-    old_entity = old_by_key.get(new_entity.key)
-    if not old_entity or old_entity.to_dict() != new_entity.to_dict():
-      new_or_changed.append(new_entity)
-  return new_or_changed
-
-
-def get_deleted_keys(new_entity_list, old_entity_list):
-  """Returns list of keys of entities that were removed."""
-  new_by_key = frozenset(x.key for x in new_entity_list)
-  return [old.key for old in old_entity_list if old.key not in new_by_key]
-
-
-def replace_auth_db(auth_db_rev, modified_ts, snapshot, shard_ids):
-  """Replaces AuthDB in datastore if it's older than |auth_db_rev|.
-
-  May return False in case of race conditions (i.e. if some other concurrent
-  process happened to update AuthDB earlier). May be retried in that case.
-
-  Args:
-    auth_db_rev: revision number of |snapshot|.
-    modified_ts: datetime timestamp of when |auth_db_rev| was created.
-    snapshot: AuthDBSnapshot with entity to store.
-    shard_ids: ids of AuthDBSnapshotShard's, to put into AuthReplicationState.
-
-  Returns:
-    Tuple (True if update was applied, current AuthReplicationState value).
-  """
-  assert model.is_replica()
-
-  # Quickly check current auth_db rev before doing heavy calls.
-  current_state = model.get_replication_state()
-  if current_state.auth_db_rev >= auth_db_rev:
-    return False, current_state
-
-  # Make a snapshot of existing state of AuthDB to figure out what to change.
-  current_state, current = new_auth_db_snapshot()
-
-  # Entities that needs to be updated or created.
-  entites_to_put = []
-  if snapshot.global_config.to_dict() != current.global_config.to_dict():
-    entites_to_put.append(snapshot.global_config)
-  entites_to_put.extend(get_changed_entities(snapshot.groups, current.groups))
-  entites_to_put.extend(
-      get_changed_entities(snapshot.ip_whitelists, current.ip_whitelists))
-  new_ips = snapshot.ip_whitelist_assignments
-  old_ips = current.ip_whitelist_assignments
-  if new_ips.to_dict() != old_ips.to_dict():
-    entites_to_put.append(new_ips)
-  if snapshot.realms_globals.to_dict() != current.realms_globals.to_dict():
-    entites_to_put.append(snapshot.realms_globals)
-
-  # Keys of entities that needs to be removed.
-  keys_to_delete = []
-  keys_to_delete.extend(get_deleted_keys(snapshot.groups, current.groups))
-  keys_to_delete.extend(
-      get_deleted_keys(snapshot.ip_whitelists, current.ip_whitelists))
-
-  @ndb.transactional
-  def update_auth_db():
-    # AuthDB changed since 'new_auth_db_snapshot' transaction? Back off.
-    state = model.get_replication_state()
-    if state.auth_db_rev != current_state.auth_db_rev:
-      return False, state
-
-    # Update auth_db_rev in AuthReplicationState.
-    state.auth_db_rev = auth_db_rev
-    state.modified_ts = modified_ts
-    state.shard_ids = shard_ids
-
-    # Apply changes.
-    futures = []
-    futures.extend(ndb.put_multi_async([state] + entites_to_put))
-    futures.extend(ndb.delete_multi_async(keys_to_delete))
-
-    # Wait for all pending futures to complete. Aborting the transaction with
-    # outstanding futures is a bad idea (ndb complains in log about that).
-    ndb.Future.wait_all(futures)
-
-    # Raise an exception, if any.
-    for future in futures:
-      future.check_success()
-
-    # Success.
-    return True, state
-
-  # Do the transactional update.
-  return update_auth_db()
-
-
 def is_signed_by_primary(blob, key_name, sig):
   """Verifies that |blob| was signed by Primary."""
   # Assert that running on Replica.
@@ -413,9 +238,7 @@ def is_signed_by_primary(blob, key_name, sig):
 def push_auth_db(revision, auth_db):
   """Accepts AuthDB push from Primary and applies it to the replica.
 
-  TODO(vadimsh): Stop "exploding" the snapshot into independent datastore
-  entities once all replicas use AuthDBSnapshotShard mechanism to fetch
-  AuthDB into memory.
+  TODO(vadimsh): Delete all AuthGroup etc. entities on replicas.
 
   Args:
     revision: replication_pb2.AuthDBRevision describing revision of pushed DB.
@@ -426,38 +249,37 @@ def push_auth_db(revision, auth_db):
   """
   # Already up-to-date? Check it first before doing heavy calls.
   state = model.get_replication_state()
-  if (state.primary_id == revision.primary_id and
+  if (state.primary_id != revision.primary_id or
       state.auth_db_rev >= revision.auth_db_rev):
     return False, state
 
+  # Zero revision in AuthReplicationState is special, it means "waiting for the
+  # first AuthDB push". The Primary must never try to send it.
+  assert revision.auth_db_rev > 0
+
   # Store AuthDB message as is first by deflating it and splitting it up into
-  # multiple AuthDBSnapshotShard messages.
+  # multiple AuthDBSnapshotShard messages. If it fails midway, no big deal. It
+  # will just hang in the datastore as unreferenced garbage.
   shard_ids = store_sharded_auth_db(
       auth_db,
       state.primary_url,
       revision.auth_db_rev,
       512*1024)
 
-  # Try to apply it to Auth* datastore entities, retry until success (or until
-  # some other task applies an even newer version of auth_db).
-  snapshot = proto_to_auth_db_snapshot(auth_db, False)
-  while True:
-    applied, current_state = replace_auth_db(
-        revision.auth_db_rev,
-        utils.timestamp_to_datetime(revision.modified_ts),
-        snapshot,
-        shard_ids)
+  # Put shard IDs into AuthReplicationState, they are used in api.fetch_auth_db.
+  @ndb.transactional
+  def update_replication_state():
+    state = model.get_replication_state()
+    if (state.primary_id != revision.primary_id or
+        state.auth_db_rev >= revision.auth_db_rev):
+      return False, state  # already up-to-date or newer
+    state.auth_db_rev = revision.auth_db_rev
+    state.modified_ts = utils.timestamp_to_datetime(revision.modified_ts)
+    state.shard_ids = shard_ids
+    state.put()
+    return True, state
 
-    # Update was successfully applied.
-    if applied:
-      return True, current_state
-
-    # Some other task managed to apply the update already.
-    if current_state.auth_db_rev >= revision.auth_db_rev:
-      return False, current_state
-
-    # Need to retry. Try until success or deadline.
-    assert current_state.auth_db_rev < revision.auth_db_rev
+  return update_replication_state()
 
 
 @ndb.transactional

@@ -580,9 +580,6 @@ class AuthReplicationState(ndb.Model, datastore_utils.SerializableModelMixin):
   changes to AuthDB are made, Replica updates it whenever it receives a push
   from Primary.
   """
-  # Disable useless in-process per-request cache.
-  _use_cache = False
-
   # How to convert this entity to or from serializable dict.
   serializable_properties = {
     'primary_id': datastore_utils.READABLE,

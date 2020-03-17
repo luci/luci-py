@@ -544,6 +544,10 @@ class AuthDB(object):
     # TODO(vadimsh): This is currently very dumb and can probably be optimized.
     return {g for g in self._groups if self.is_group_member(g, ident)}
 
+  def get_group_names(self):
+    """Returns a sorted list of all group names."""
+    return sorted(self._groups)
+
   def get_group_names_with_prefix(self, prefix):
     """Returns a sorted list of group names that start with the given prefix."""
     return sorted(g for g in self._groups if g.startswith(prefix))
