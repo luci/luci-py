@@ -7,7 +7,7 @@ cron:
 - description: fetch realm configs from luci-config
   target: backend
   url: /internal/cron/update_realms
-  schedule: every 2 minutes
+  schedule: every 1 minutes
 
 - description: group import from external sources
   target: backend

@@ -575,7 +575,7 @@ def diff_realms_globals(target, old, new):
 
   # Emit it as a single change log entry, it's not useful to have a finer
   # granularity for this sort of changes.
-  if added or change or removed:
+  if added or changed or removed:
     yield AuthRealmsGlobalsChange(
         change_type=AuthDBChange.CHANGE_REALMS_GLOBALS_CHANGED,
         target=target,

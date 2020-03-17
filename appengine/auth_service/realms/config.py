@@ -15,17 +15,26 @@ necessary. Each commit produces a new AuthDB revision.
 
 import collections
 import functools
+import hashlib
 import logging
 import random
 import time
+
+from google.protobuf import text_format
 
 from google.appengine.api import datastore_errors
 from google.appengine.ext import ndb
 from google.appengine.runtime import apiproxy_errors
 
+from components import config
+from components import utils
 from components.auth import model
 
+from proto import realms_config_pb2
+
+from realms import common
 from realms import permissions
+from realms import rules
 from realms import validation
 
 import replication
@@ -37,9 +46,9 @@ validation.register()
 
 # Information about fetched or previously processed realms.cfg.
 #
-# Comes either from LUCI Config (then `config_body` is set, but `db_rev` isn't)
-# or from the datastore (then `db_rev` is set, but `config_body` isn't). All
-# other fields are always set.
+# Comes either from LUCI Config (then `config_body` is set, but `perms_rev`
+# isn't) or from the datastore (then `perms_rev` is set, but `config_body`
+# isn't). All other fields are always set.
 RealmsCfgRev = collections.namedtuple(
     'RealmsCfgRev',
     [
@@ -48,8 +57,8 @@ RealmsCfgRev = collections.namedtuple(
         'config_digest',  # digest of the raw config body
 
         # These two are mutually exclusive, and one MUST be non-None.
-        'config_body', # byte blob with the fetched config
-        'db_rev',      # revision of the permissions DB used
+        'config_body',  # byte blob with the fetched config
+        'perms_rev',    # revision of the permissions DB used
     ])
 
 
@@ -189,8 +198,10 @@ def check_config_changes(db, latest, stored):
   for rev in latest:
     cur = stored_map.get(rev.project_id)
     if not cur or cur.config_digest != rev.config_digest:
-      yield functools.partial(update_realms, db, [rev])  # the body has changed
-    elif cur.db_rev != db.revision:
+      yield functools.partial(
+          update_realms, db, [rev],
+          'Realms config rev "%s"' % rev.config_rev)
+    elif cur.perms_rev != db.revision:
       reeval.append(rev)  # was evaluated with potentially stale roles
 
   # Detect realms.cfg that were removed completely.
@@ -205,56 +216,190 @@ def check_config_changes(db, latest, stored):
   # split it into DB_REEVAL_REVISIONS revisions, hoping for the best.
   batch_size = max(1, len(reeval) // DB_REEVAL_REVISIONS)
   for i in range(0, len(reeval), batch_size):
-    yield functools.partial(update_realms, db, reeval[i:i+batch_size])
+    yield functools.partial(
+        update_realms, db, reeval[i:i+batch_size],
+        'Permissions rev "%s"' % db.revision)
 
 
 @ndb.tasklet
 def get_latest_revs_async():
   """Returns a list of all current RealmsCfgRev by querying LUCI Config."""
-  # TODO(vadimsh): Implement via components.config API.
-  raise ndb.Return([])
+  out = []
+  configs = yield config.get_project_configs_async(common.cfg_path())
+  for project_id, (rev, body, exc) in configs.items():
+    # Errors are impossible when when not specifying 2nd parameter of
+    # get_project_configs_async.
+    assert body is not None
+    assert exc is None
+    out.append(RealmsCfgRev(
+        project_id=project_id,
+        config_rev=rev or 'unknown',
+        config_digest=hashlib.sha256(body).hexdigest(),
+        config_body=body,
+        perms_rev=None,
+    ))
+  raise ndb.Return(out)
 
 
 @ndb.tasklet
 def get_stored_revs_async():
   """Returns a list of all stored RealmsCfgRev based on data in the AuthDB."""
-  # TODO(vadimsh): Implement via a strongly consistent AuthDB datastore query.
-  raise ndb.Return([])
+  out = []
+  metas = yield AuthProjectRealmsMeta.query(
+      ancestor=model.root_key()).fetch_async()
+  for meta in metas:
+    out.append(RealmsCfgRev(
+        project_id=meta.project_id,
+        config_rev=meta.config_rev,
+        config_digest=meta.config_digest,
+        config_body=None,
+        perms_rev=meta.perms_rev,
+    ))
+  raise ndb.Return(out)
 
 
-def update_realms(db, revs):
+def update_realms(db, revs, comment):
   """Performs an AuthDB transaction that updates realms of some projects.
 
   It interprets realms.cfg, expanding them into an internal flat representation
   (using rules in `db`), and puts them into the AuthDB (if not already there).
 
+  Has verbose logging inside, since this function operates with potentially huge
+  proto messages which GAE Python runtime is known to have issues with.
+
   Args:
     db: a permissions.DB instance with current permissions and roles.
     revs: a list of RealmsCfgRev with fetched configs to reevaluate.
+    comment: a comment for the AuthDB log.
   """
-  # TODO(vadimsh): Implement:
-  #   1. Parse all text protos.
-  #   2. Expand them into realms_pb2.Realms based on rules in `db`.
-  #   3. In an AuthDB transaction visit all related ExpandedRealms entities and:
-  #     a. If realms_pb2.Realms there is already up-to-date, just update
-  #        associated config_rev, config_digest, db_rev (to avoid revisiting
-  #        this config again).
-  #     b. If realms_pb2.Realms is stale, update it (and all associated
-  #        metadata). Remember this.
-  #     c. If some realms_pb2.Realms were indeed updated, trigger AuthDB
-  #        replication. Do NOT trigger it if we updated only bookkeeping
-  #        metadata.
-  _ = db
-  _ = revs
+  expanded = []  # list of (RealmsCfgRev, realms_pb2.Realms)
+
+  for r in revs:
+    logging.info('Expanding realms of project "%s"...', r.project_id)
+    start = time.time()
+
+    try:
+      parsed = realms_config_pb2.RealmsCfg()
+      text_format.Merge(r.config_body, parsed)
+      expanded.append((r, rules.expand_realms(db, r.project_id, parsed)))
+    except (text_format.ParseError, ValueError) as exc:
+      # We end up here if realms.cfg could not be parsed or it fails validation.
+      # This logging line should surface in ereporter2.
+      logging.error('Failed to process realms of "%s": %s', r.project_id, exc)
+
+    # Cheesy, but effective. These errors should surface in ereporter2 alerts.
+    # We can't really setup effective time series metrics since this code path
+    # is hit very infrequently (only when configs change, so only a few times
+    # per day).
+    dt = time.time() - start
+    if dt > 5.0:
+      logging.error('Realms expansion of "%s" is slow: %1.fs', r.project_id, dt)
+
+  if not expanded:
+    return
+
+  @ndb.transactional
+  def update():
+    existing = ndb.get_multi(
+        model.project_realms_key(rev.project_id)
+        for rev, _ in expanded
+    )
+
+    updated = []
+    metas = []
+
+    for (rev, realms), ent in zip(expanded, existing):
+      logging.info('Visiting project "%s"...', rev.project_id)
+      if not ent:
+        logging.info('New realms config in project "%s"', rev.project_id)
+        ent = model.AuthProjectRealms(
+            key=model.project_realms_key(rev.project_id),
+            realms=realms,
+            config_rev=rev.config_rev,
+            perms_rev=db.revision)
+        ent.record_revision(
+            modified_by=model.get_service_self_identity(),
+            comment='New realms config')
+        updated.append(ent)
+      elif ent.realms != realms:
+        logging.info('Updated realms config in project "%s"', rev.project_id)
+        ent.realms = realms
+        ent.config_rev = rev.config_rev
+        ent.perms_rev = db.revision
+        ent.record_revision(
+            modified_by=model.get_service_self_identity(),
+            comment=comment)
+        updated.append(ent)
+      else:
+        logging.info('Realms config in project "%s" are fresh', rev.project_id)
+
+      # Always update AuthProjectRealmsMeta to match the state we just checked.
+      metas.append(AuthProjectRealmsMeta(
+          key=project_realms_meta_key(rev.project_id),
+          config_rev=rev.config_rev,
+          perms_rev=db.revision,
+          config_digest=rev.config_digest,
+          modified_ts=utils.utcnow(),
+      ))
+
+    logging.info('Persisting changes...')
+    ndb.put_multi(updated + metas)
+    if updated:
+      model.replicate_auth_db()
+
+  logging.info('Entering the transaction...')
+  update()
+  logging.info('Transaction landed')
 
 
+@ndb.transactional
 def delete_realms(project_id):
   """Performs an AuthDB transaction that deletes all realms of some project.
 
   Args:
     project_id: ID of the project being deleted.
   """
-  # TODO(vadimsh): Implement. Transactionally:
-  #   1. Check ExpandedRealms(project_id) entity still exists.
-  #   2. Delete it and trigger the replication if it does, noop if doesn't.
-  _ = project_id
+  realms = model.project_realms_key(project_id).get()
+  if not realms:
+    return  # already gone
+  realms.record_deletion(
+      modified_by=model.get_service_self_identity(),
+      comment='No longer in the configs')
+  realms.key.delete()
+  project_realms_meta_key(project_id).delete()
+  model.replicate_auth_db()
+
+
+class AuthProjectRealmsMeta(ndb.Model):
+  """Metadata of some AuthProjectRealms entity.
+
+  Always created/deleted/updated transactionally with the corresponding
+  AuthProjectRealms entity, but it is not a part of AuthDB itself (i.e.
+  components.auth doesn't know about this entity and never fetches it).
+
+  Used to hold bookkeeping state related to realms.cfg processing. Can be
+  fetched very efficiently (compared to fetching AuthProjectRealms with their
+  fat realm_pb2.Realms bodies).
+
+  ID is always 'meta', the parent entity is corresponding AuthProjectRealms.
+  """
+  # The git revision the config was picked up from.
+  config_rev = ndb.StringProperty(indexed=False)
+  # Revision of permissions DB used to expand roles.
+  perms_rev = ndb.StringProperty(indexed=False)
+  # SHA256 digest of the raw config body.
+  config_digest = ndb.StringProperty(indexed=False)
+  # When it was updated the last time (mostly FYI).
+  modified_ts = ndb.DateTimeProperty(indexed=False)
+
+  @property
+  def project_id(self):
+    assert self.key.parent().kind() == 'AuthProjectRealms'
+    return self.key.parent().id()
+
+
+def project_realms_meta_key(project_id):
+  """An ndb.Key for an AuthProjectRealmsMeta entity."""
+  return ndb.Key(
+      AuthProjectRealmsMeta, 'meta',
+      parent=model.project_realms_key(project_id))

@@ -6,6 +6,7 @@
 # pylint: disable=no-value-for-parameter
 
 import logging
+import os
 import sys
 import unittest
 
@@ -17,6 +18,7 @@ import mock
 from test_support import test_case
 
 from components.auth import model
+from components.config import fs
 
 from realms import config
 from realms import permissions
@@ -29,9 +31,9 @@ def fake_db(rev, perms=None):
   return b.finish()
 
 
-def fake_realms_rev(project_id, config_digest, db_rev):
+def fake_realms_rev(project_id, config_digest, perms_rev):
   return config.RealmsCfgRev(
-      project_id, 'config-rev', config_digest, 'config-body', db_rev)
+      project_id, 'config-rev', config_digest, 'config-body', perms_rev)
 
 
 class CheckConfigChangesTest(test_case.TestCase):
@@ -42,7 +44,7 @@ class CheckConfigChangesTest(test_case.TestCase):
     deleted = set()
     batches = []
 
-    def do_update(_db, revs):
+    def do_update(_db, revs, _comment):
       batches.append(len(revs))
       for r in revs:
         self.assertNotIn(r.project_id, updated)
@@ -115,7 +117,7 @@ class CheckConfigChangesTest(test_case.TestCase):
     self.assertEqual(updated, set())
     self.assertEqual(deleted, {'proj2'})
 
-  def test_db_revision_change(self):
+  def test_perms_revision_change(self):
     revs = [
         fake_realms_rev('proj%d' % i, 'digest1', 'db-rev1')
         for i in range(20)
@@ -154,6 +156,184 @@ class CheckPermissionChangesTest(test_case.TestCase):
     self.call(fake_db('rev2', ['luci.dev.p3']))
     self.assertEqual(model.get_auth_db_revision(), 2)
     self.assertEqual(perms_from_authdb(), ['luci.dev.p3'])
+
+
+class ProjectConfigFetchTest(test_case.TestCase):
+  @mock.patch('components.config.fs.get_provider', autospec=True)
+  def test_works(self, get_provider_mock):
+    TESTS_DIR = os.path.dirname(os.path.abspath(__file__))
+    get_provider_mock.return_value = fs.Provider(
+        os.path.join(TESTS_DIR, 'test_data'))
+
+    revs = config.get_latest_revs_async().get_result()
+    self.assertEqual(sorted(revs, key=lambda r: r.project_id), [
+        config.RealmsCfgRev(
+            project_id='proj1',
+            config_rev='unknown',
+            config_digest='05105846cbabf80e1ab2979b7787' +
+                'f1df1aca9751661fe4b4d28494e0b442459b',
+            config_body='realms {\n  name: "realm1"\n}\n',
+            perms_rev=None,
+        ),
+        config.RealmsCfgRev(
+            project_id='proj2',
+            config_rev='unknown',
+            config_digest='fe0857c4fe4282083c0295ee835e7' +
+                '96403027d13c652f4959a0c6a41957dbc18',
+            config_body='realms {\n  name: "realm2"\n}\n',
+            perms_rev=None,
+        ),
+    ])
+
+
+class RealmsUpdateTest(test_case.TestCase):
+  def test_realms_config_lifecycle(self):
+    self.assertEqual(model.get_auth_db_revision(), 0)
+
+    # A new config appears.
+    rev = config.RealmsCfgRev(
+        project_id='proj1',
+        config_rev='cfg_rev1',
+        config_digest='digest1',
+        config_body='realms{ name: "realm1" }',
+        perms_rev=None)
+    config.update_realms(fake_db('db-rev1'), [rev], 'New config')
+
+    # Generated new AuthDB revisions.
+    self.assertEqual(model.get_auth_db_revision(), 1)
+
+    # Stored now in the expanded form.
+    ent = model.project_realms_key('proj1').get()
+    self.assertEqual(
+        [r.name for r in ent.realms.realms], ['proj1/@root', 'proj1/realm1'])
+    self.assertEqual(ent.config_rev, 'cfg_rev1')
+    self.assertEqual(ent.perms_rev, 'db-rev1')
+
+    # Permissions DB changes in a way that doesn't affect the expanded form.
+    config.update_realms(fake_db('db-rev2'), [rev], 'Reeval')
+
+    # Seeing the same AuthDB version.
+    self.assertEqual(model.get_auth_db_revision(), 1)
+
+    # The config body changes in a way that doesn't affect the expanded form.
+    rev = config.RealmsCfgRev(
+        project_id='proj1',
+        config_rev='cfg_rev2',
+        config_digest='digest2',
+        config_body='realms{ name: "realm1" }  # blah blah',
+        perms_rev=None)
+    config.update_realms(fake_db('db-rev2'), [rev], 'Updated config')
+
+    # Still the same AuthDB version.
+    self.assertEqual(model.get_auth_db_revision(), 1)
+
+    # The config change significantly now.
+    rev = config.RealmsCfgRev(
+        project_id='proj1',
+        config_rev='cfg_rev3',
+        config_digest='digest3',
+        config_body='realms{ name: "realm2" }',
+        perms_rev=None)
+    config.update_realms(fake_db('db-rev2'), [rev], 'Updated config')
+
+    # New revision.
+    self.assertEqual(model.get_auth_db_revision(), 2)
+
+    # And new body.
+    ent = model.project_realms_key('proj1').get()
+    self.assertEqual(
+        [r.name for r in ent.realms.realms], ['proj1/@root', 'proj1/realm2'])
+    self.assertEqual(ent.config_rev, 'cfg_rev3')
+    self.assertEqual(ent.perms_rev, 'db-rev2')
+
+    # The config is gone.
+    config.delete_realms('proj1')
+
+    # This generated a new revision.
+    self.assertEqual(model.get_auth_db_revision(), 3)
+
+    # And it is indeed gone.
+    ent = model.project_realms_key('proj1').get()
+    self.assertIsNone(ent)
+
+    # The second deletion is noop.
+    config.delete_realms('proj1')
+    self.assertEqual(model.get_auth_db_revision(), 3)
+
+
+  def test_update_many_projects(self):
+    self.assertEqual(model.get_auth_db_revision(), 0)
+
+    cfg_rev = lambda proj, realm, rev_sfx: config.RealmsCfgRev(
+        project_id=proj,
+        config_rev='cfg-rev-'+rev_sfx,
+        config_digest='digest-'+rev_sfx,
+        config_body='realms{ name: "%s" }' % realm,
+        perms_rev=None)
+
+    # Create a bunch of project configs at once.
+    config.update_realms(
+        fake_db('db-rev1'),
+        [
+            cfg_rev('proj1', 'realm1', 'p1s1'),
+            cfg_rev('proj2', 'realm1', 'p2s1'),
+        ],
+        'New config')
+
+    # Produced a single revision.
+    self.assertEqual(model.get_auth_db_revision(), 1)
+
+    # Present now.
+    revs = config.get_stored_revs_async().get_result()
+    self.assertEqual(revs, [
+        config.RealmsCfgRev(
+            project_id='proj1',
+            config_rev=u'cfg-rev-p1s1',
+            config_digest=u'digest-p1s1',
+            config_body=None,
+            perms_rev=u'db-rev1',
+        ),
+        config.RealmsCfgRev(
+            project_id='proj2',
+            config_rev=u'cfg-rev-p2s1',
+            config_digest=u'digest-p2s1',
+            config_body=None,
+            perms_rev=u'db-rev1',
+        ),
+    ])
+    self.assertEqual(
+        model.project_realms_key('proj1').get().config_rev, 'cfg-rev-p1s1')
+    self.assertEqual(
+        model.project_realms_key('proj2').get().config_rev, 'cfg-rev-p2s1')
+
+    # One is modified significantly, another not.
+    config.update_realms(
+        fake_db('db-rev1'),
+        [
+            cfg_rev('proj1', 'realm1', 'p1s2'),  # noop change
+            cfg_rev('proj2', 'realm2', 'p2s2'),  # significant change
+        ],
+        'New config')
+
+    revs = config.get_stored_revs_async().get_result()
+    self.assertEqual(
+        model.project_realms_key('proj1').get().config_rev, 'cfg-rev-p1s1')
+    self.assertEqual(
+        model.project_realms_key('proj2').get().config_rev, 'cfg-rev-p2s2')
+
+    # One config is broken.
+    config.update_realms(
+        fake_db('db-rev1'),
+        [
+            cfg_rev('proj1', 'realm3', 'p1s3'),
+            cfg_rev('proj2', '@@@@@@', 'p2s3'),
+        ],
+        'New config')
+    revs = config.get_stored_revs_async().get_result()
+    self.assertEqual(
+        model.project_realms_key('proj1').get().config_rev, 'cfg-rev-p1s3')
+    self.assertEqual(
+        model.project_realms_key('proj2').get().config_rev, 'cfg-rev-p2s2')
 
 
 if __name__ == '__main__':

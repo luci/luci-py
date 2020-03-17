@@ -30,6 +30,9 @@ import importer
 import pubsub
 import replication
 
+# Importing for the side effect of registering the config validation hook.
+import realms
+
 
 # Path to search for jinja templates.
 TEMPLATES_DIR = os.path.join(
