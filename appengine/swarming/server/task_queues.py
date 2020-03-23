@@ -635,6 +635,24 @@ def _assert_task_props_async(properties, expiration_ts):
   """
   # TODO(maruel): Make it a tasklet.
   dimensions_hash = hash_dimensions(properties.dimensions)
+  data = {
+    u'dimensions': properties.dimensions,
+    u'dimensions_hash': str(dimensions_hash),
+    # _EXTEND_VALIDITY here is a way to lower the QPS of the taskqueue
+    # 'rebuild-cache'.
+    u'valid_until_ts': expiration_ts + _EXTEND_VALIDITY,
+  }
+  payload = utils.encode_to_json(data)
+
+  # If this task specifies an 'id' value, updates the cache inline since we know
+  # there's only one bot that can run it, so it won't take long. This permits
+  # tasks for specific bots like 'terminate' tasks to execute faster.
+  # Related bug: crbug.com/1062746
+  if properties.dimensions.get(u'id'):
+    # TODO(maruel): Handle when it needs to be retried.
+    yield rebuild_task_cache_async(payload)
+    raise ndb.Return(None)
+
   task_dimensions_key = _get_task_dimensions_key(dimensions_hash,
                                                  properties.dimensions)
   obj = yield task_dimensions_key.get_async()
@@ -663,23 +681,6 @@ def _assert_task_props_async(properties, expiration_ts):
     logging.info(
         'assert_task_async(%d): new request kind; triggering '
         'rebuild-task-cache', dimensions_hash)
-
-  data = {
-    u'dimensions': properties.dimensions,
-    u'dimensions_hash': str(dimensions_hash),
-    # _EXTEND_VALIDITY here is a way to lower the QPS of the taskqueue
-    # 'rebuild-cache'.
-    u'valid_until_ts': expiration_ts + _EXTEND_VALIDITY,
-  }
-  payload = utils.encode_to_json(data)
-
-  # If this task specifies an 'id' value, updates the cache inline since we know
-  # there's only one bot that can run it, so it won't take long. This permits
-  # tasks like 'terminate' tasks to execute faster.
-  if properties.dimensions.get(u'id'):
-    # TODO(maruel): Handle when it needs to be retried.
-    yield rebuild_task_cache_async(payload)
-    raise ndb.Return(None)
 
   # We can't use the request ID since the request was not stored yet, so embed
   # all the necessary information.

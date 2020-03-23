@@ -500,14 +500,10 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
     self.assert_count(1, task_queues.BotTaskDimensions)
     self.assert_count(1, task_queues.TaskDimensions)
 
-  # TODO(crbug.com/1062746): fix this testcase
-  @unittest.expectedFailure
-  def test_assert_bot_then_task_twice_with_id(self):
+  def test_assert_task_async_call_rebuld_task_cache_async(self):
     self.assertEqual(0, _assert_bot())
     dimensions={
         u'id': [u'bot1'],
-        u'cpu': [u'x86-64'],
-        u'pool': [u'default'],
     }
     self.mock_now(datetime.datetime(2020, 1, 2, 3, 4, 5))
     request1 = _gen_request(properties=_gen_properties(dimensions=dimensions))
@@ -515,14 +511,25 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
     self.assert_count(1, task_queues.BotDimensions)
     self.assert_count(1, task_queues.BotTaskDimensions)
     self.assert_count(1, task_queues.TaskDimensions)
+    bot_root_key = bot_management.get_root_key('bot1')
+    self.assertEqual(1, len(task_queues.get_queues(bot_root_key)))
 
-    self.mock_now(self.now + datetime.timedelta(seconds=1))
+    # expire BotTaskDimensions by changing time.
+    memcache.flush_all()
+    bot_task_dimensions = task_queues.BotTaskDimensions.query(
+        ancestor=bot_root_key).fetch()[0]
+    self.mock_now(bot_task_dimensions.valid_until_ts +
+                  datetime.timedelta(seconds=1))
+    self.assertEqual(0, len(task_queues.get_queues(bot_root_key)))
+
+    # request a task with the same dimensions.
+    memcache.flush_all()
     request2 = _gen_request(properties=_gen_properties(dimensions=dimensions))
     task_queues.assert_task_async(request2).get_result()
     self.assert_count(1, task_queues.BotDimensions)
-    # There should be two BotTaskDimensions entities
-    self.assert_count(2, task_queues.BotTaskDimensions)
+    self.assert_count(1, task_queues.BotTaskDimensions)
     self.assert_count(1, task_queues.TaskDimensions)
+    self.assertEqual(1, len(task_queues.get_queues(bot_root_key)))
 
   def test_cleanup_after_bot(self):
     self.assertEqual(0, _assert_bot())
