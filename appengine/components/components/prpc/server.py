@@ -70,11 +70,12 @@ class Server(object):
   provides a simpler interface via add_service and get_routes.
   """
 
-  def __init__(self):
+  def __init__(self, allow_cors=True):
     self._services = {}
     self._interceptors = ()
     self._discovery_service = discovery.Discovery()
     self.add_service(self._discovery_service)
+    self.allow_cors = allow_cors
 
   def add_interceptor(self, interceptor):
     """Adds an interceptor to the interceptor chain.
@@ -280,9 +281,10 @@ class Server(object):
 
       # pylint: disable=unused-argument
       def options(self, service, method):
-        """Sends an empty response with headers for CORS for all requests."""
+        """Sends an empty response with CORS headers for origins, if allowed."""
         origin = self.request.headers.get('Origin')
-        if origin:
+
+        if origin and server.allow_cors:
           self.response.headers['Access-Control-Allow-Origin'] = origin
           self.response.headers['Vary'] = 'Origin'
           self.response.headers['Access-Control-Allow-Credentials'] = 'true'
