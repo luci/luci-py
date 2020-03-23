@@ -387,6 +387,7 @@ FILES = (
     'utils/auth_server.py',
     'utils/authenticators.py',
     'utils/cacert.pem',
+    'utils/configs.py',
     'utils/file_path.py',
     'utils/fs.py',
     'utils/grpc_proxy.py',
