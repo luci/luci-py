@@ -667,7 +667,8 @@ def _assert_task_props_async(properties, expiration_ts):
       if s.valid_until_ts >= valid_until_ts:
         # Cache hit. It is important to reconfirm the dimensions because a hash
         # can be conflicting.
-        logging.debug('assert_task_async(%d): hit', dimensions_hash)
+        logging.debug('assert_task_async(%d): hit. valid_until_ts(%s)',
+                      dimensions_hash, s.valid_until_ts)
         raise ndb.Return(None)
       logging.info(
           'assert_task_async(%d): set.valid_until_ts(%s) < expected(%s); '
@@ -900,6 +901,8 @@ def assert_bot_async(bot_root_key, bot_dimensions):
   obj = yield ndb.Key(BotDimensions, 1, parent=bot_root_key).get_async()
   if obj and obj.dimensions_flat == dimensions_to_flat(bot_dimensions):
     # Cache hit, no need to look further.
+    logging.debug('assert_bot_async: cache hit. bot_id: %s, bot_dimensions: %s',
+                  bot_dimensions.get('id'), bot_dimensions)
     raise ndb.Return(None)
 
   matches = yield _rebuild_bot_cache_async(bot_dimensions, bot_root_key)
