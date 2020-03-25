@@ -10,6 +10,7 @@ import logging
 import sys
 import unittest
 import zlib
+import mock
 from Crypto.PublicKey import RSA
 
 import isolate_test_env as test_env
@@ -112,21 +113,27 @@ def get_file_info_factory(content=None):
 ### Isolate Service Test
 
 
-class IsolateServiceTest(test_case.EndpointsTestCase):
-  """Test the IsolateService's API methods."""
-
-  api_service_cls = handlers_endpoints_v1.IsolateService
+class IsolateServiceTestBase(test_case.EndpointsTestCase):
+  """Base class for testing IsolateService."""
   store_prefix = 'https://storage.googleapis.com/sample-app/'
 
   APP_DIR = test_env.APP_DIR
 
   def setUp(self):
-    super(IsolateServiceTest, self).setUp()
+    super(IsolateServiceTestBase, self).setUp()
     self.testbed.init_blobstore_stub()
     self.testbed.init_urlfetch_stub()
-    admin = auth.Identity(auth.IDENTITY_USER, 'admin@example.com')
+    # It seems like there is a singleton state preserved across the tests,
+    # making it hard to re-run the complete setUp procedure. Therefore we pre-
+    # register all the possible identities being used in the tests.
+    all_authed_ids = [
+        auth.Identity(auth.IDENTITY_USER, 'admin@example.com'),
+        auth.Identity(auth.IDENTITY_USER, 'admin@appspot.gserviceaccount.com'),
+        auth.Identity(auth.IDENTITY_SERVICE, 'adminapp'),
+    ]
+    admin = all_authed_ids[0]
     full_access_group = config.settings().auth.full_access_group
-    auth.bootstrap_group(full_access_group, [admin])
+    auth.bootstrap_group(full_access_group, all_authed_ids)
     auth_testing.mock_get_current_identity(self, admin)
     version = utils.get_app_version()
     self.mock(utils, 'get_task_queue_host', lambda: version)
@@ -141,6 +148,12 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
     make_private_key()
     # Remove the check for dev server in should_push_to_gs().
     self.mock(utils, 'is_local_dev_server', lambda: False)
+
+
+class IsolateServiceTest(IsolateServiceTestBase):
+  """Test the IsolateService's API methods."""
+
+  api_service_cls = handlers_endpoints_v1.IsolateService
 
   def store_request(self, namespace, content):
     """Generate a Storage/FinalizeRequest via preupload status."""
@@ -597,6 +610,50 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
         'https://storage.googleapis.com/sample-app/%s/%s?GoogleAccessId=&'
         'Expires=') % (namespace, digest)
     self.assertTrue(resp.json['url'].startswith(prefix))
+
+
+
+class IsolateServiceLogIfPythonClientTest(IsolateServiceTestBase):
+  """Test the IsolateService's handlers can log for python clients."""
+
+  @staticmethod
+  def mocked_cls():
+    cls = handlers_endpoints_v1.IsolateService
+    cls.get_user_agent = mock.MagicMock(return_value='python-requests/1.0')
+    return cls
+
+  api_service_cls = mocked_cls.__func__()
+
+  @mock.patch('logging.warn')
+  def test_log_serviceaccount(self, logwarn):
+    """Assert that service account identity is being logged."""
+    admin = auth.Identity(auth.IDENTITY_USER,
+                          'admin@appspot.gserviceaccount.com')
+    auth_testing.mock_get_current_identity(self, admin)
+    self._send_request()
+    logwarn.assert_called_once_with(mock.ANY,
+                                    'user:admin@appspot.gserviceaccount.com')
+
+  @mock.patch('logging.warn')
+  def test_log_non_user_id(self, logwarn):
+    """Assert that non-user identity is being logged."""
+    admin = auth.Identity(auth.IDENTITY_SERVICE, 'adminapp')
+    auth_testing.mock_get_current_identity(self, admin)
+    self._send_request()
+    logwarn.assert_called_once_with(mock.ANY, 'service:adminapp')
+
+  @mock.patch('logging.warn')
+  def test_log_hide_normal_users(self, logwarn):
+    """Assert that the usage is still logged without the user identity."""
+    admin = auth.Identity(auth.IDENTITY_USER, 'admin@example.com')
+    auth_testing.mock_get_current_identity(self, admin)
+    self._send_request()
+    logwarn.assert_called_once_with('Python isolate client from user')
+
+  def _send_request(self):
+    namespace = 'default'
+    collection = generate_collection(namespace, ['foobar'])
+    self.call_api('preupload', message_to_dict(collection), 200)
 
 
 if __name__ == '__main__':
