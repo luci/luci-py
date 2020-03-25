@@ -147,13 +147,23 @@ def rpc_async(req, response_metadata=None):
     # responses.
     # Assume (HTTP OK => pRPC OK).
   except net.Error as ex:
-    # net.Error means HTTP status code was not 200.
+    msg = (ex.response or '<empty>').decode('utf-8', 'ignore')
+
+    # Sometime requests fail before reaching the pRPC server. We recognize few
+    # such cases.
+    if 'X-Prpc-Grpc-Code' not in ex.headers:
+      if ex.status_code == 500:
+        raise RpcError(msg, codes.StatusCode.INTERNAL, ex.headers)
+      if ex.status_code == 503:
+        raise RpcError(msg, codes.StatusCode.UNAVAILABLE, ex.headers)
+
+    # Otherwise it must be a reply from the server with a valid code header.
     try:
       code = codes.INT_TO_CODE[int(ex.headers['X-Prpc-Grpc-Code'])]
     except (ValueError, KeyError, TypeError):
       raise ProtocolError(
-          'response does not contain a valid X-Prpc-Grpc-Code header')
-    msg = ex.response.decode('utf-8', 'ignore')
+          'response does not contain a valid X-Prpc-Grpc-Code header, '
+          'its body: %r' % msg)
     raise RpcError(msg, code, ex.headers)
 
   # Status code is OK.

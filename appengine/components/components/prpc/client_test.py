@@ -163,6 +163,34 @@ class PRPCClientTestCase(test_case.TestCase):
       self.make_test_client().Take(empty_pb2.Empty())
     self.assertEqual(cm.exception.status_code, codes.StatusCode.NOT_FOUND)
 
+  @mock.patch('components.net.request_async', autospec=True)
+  def test_response_transport_error_internal(self, request_async):
+    request_async.side_effect = net.Error(
+        msg='boom',
+        status_code=500,
+        response='boom',
+        headers={
+            # No X-Prpc-Grpc-Code  header.
+        },
+    )
+    with self.assertRaises(prpc_client.RpcError) as cm:
+      self.make_test_client().Take(empty_pb2.Empty())
+    self.assertEqual(cm.exception.status_code, codes.StatusCode.INTERNAL)
+
+  @mock.patch('components.net.request_async', autospec=True)
+  def test_response_transport_error_unavailable(self, request_async):
+    request_async.side_effect = net.Error(
+        msg='boom',
+        status_code=503,
+        response='boom',
+        headers={
+            # No X-Prpc-Grpc-Code  header.
+        },
+    )
+    with self.assertRaises(prpc_client.RpcError) as cm:
+      self.make_test_client().Take(empty_pb2.Empty())
+    self.assertEqual(cm.exception.status_code, codes.StatusCode.UNAVAILABLE)
+
 
 if __name__ == '__main__':
   if '-v' in sys.argv:
