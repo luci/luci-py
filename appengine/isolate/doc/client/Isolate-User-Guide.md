@@ -1,26 +1,27 @@
-# isolate.py user guide
+# `isolate` user guide
 
 Isolate your test.
 
 
 ## Introduction
 
-  - `isolate.py` wraps the vast majority of the client side code relating to
+-   The Go binary `isolate` (compiled from
+    https://chromium.googlesource.com/infra/luci/luci-go/+/refs/heads/master/client/cmd/isolate/main.go)
+    is meant to replace `isolate.py`.
+-   `isolate` wraps the vast majority of the client side code relating to
     executable isolation.
-  - "`isolate.py help`" gives you all the help you need so only a quick overview
-    is given here.
+-   "`isolate help`" gives you all the help you need so only a quick overview is
+    given here.
 
 
-## isolate.py
+## isolate
 
-  - "`isolate.py`" wraps usage for tracing, compiling, archiving and even
-    running a test isolated locally.
-  - Look at the `isolate.py --help` page for more information.
-  - `--isolate` is not necessary when `--isolated` is specified and the
-    `.isolated` file exists. This is because the `.isolated.state` file saved
-    beside the `.isolated` file contains a pointer back to the original
-    `.isolate` file *and* persists the variables.
-
+-   "`isolate`" wraps usage for tracing, compiling, archiving and even running a
+    test isolated locally.
+-   Look at the `isolate help` page for more information.
+-   `-isolate` is the preferred input format in the Go
+    implementation. `-isolated` is supported in only a few subcommands (e.g.
+    `isolate archive`).
 
 ### Minimal .isolate file
 
@@ -72,13 +73,14 @@ check out http://dev.chromium.org/developers/testing/isolated-testing/for-swes
 
 ### Useful subcommands
 
-  - "`isolate.py check`" compiles a `.isolate` into a `.isolated`.
-  - "`isolate.py archive`" does the equivalent of `check`, then uses
-    `isolateserver.py` to archive the isolated tree.
-  - "`isolate.py run`" runs the test locally isolated, so you can verify for any
+-   "`isolate check`" verifies a `.isolate` file (It no longer produces a
+    `.isolated`).
+-   "`isolate archive`" does the equivalent of `check`, then archives the
+    isolated tree.
+-   "`isolate run`" runs the test locally isolated, so you can verify for any
     failure specific to isolated testing.
 
-Did I tell you about "`isolate.py help`" yet?
+Did I tell you about "`isolate help`" yet?
 
 
 ## FAQ
