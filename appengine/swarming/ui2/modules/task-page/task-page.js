@@ -45,7 +45,16 @@ import SwarmingAppBoilerplate from '../SwarmingAppBoilerplate'
  * @attr testing_offline - If true, the real OAuth flow won't be used.
  *    Instead, dummy data will be used. Ideal for local testing.
  */
-const serverLogsURL = (ele, request, result) => {
+
+const serverLogFilter = `resource.type="gae_app"\n` +
+  // limit logs that we care
+  [
+    `protoPayload.resource>="/internal/"`, // cron, task queue
+    `protoPayload.resource>="/swarming/api/v1/bot/"`, // requests from bots
+    `protoPayload.method!="GET"`, // POST, PUT, DELETE etc
+  ].join(" OR ") + '\n';
+
+const serverLogsBaseURL = (ele, request, result) => {
   let url = `https://console.cloud.google.com/logs/viewer`
   url += `?project=${ele._project_id}`
   url += `&resource=gae_app`
@@ -58,16 +67,24 @@ const serverLogsURL = (ele, request, result) => {
     url += `&dateRangeStart=${timeStart.toISOString()}`
     url += `&dateRangeEnd=${timeEnd.toISOString()}`;
   }
-  let filter = `resource.type="gae_app"\n`
-  // limit logs that we care
-  filter += [
-    `protoPayload.resource>="/internal/"`, // cron, task queue
-    `protoPayload.resource>="/swarming/api/v1/bot/"`, // requests from bots
-    `protoPayload.method!="GET"`, // POST, PUT, DELETE etc
-  ].join(" OR ")
-  filter += '\n'
+  return url;
+}
+
+const serverTaskLogsURL = (ele, request, result) => {
+  let url = serverLogsBaseURL(ele, request, result)
+  let filter = serverLogFilter
+
   // cut the last character that represents try number
   filter += `${ele._taskId.slice(0, -1)}`
+  url += `&advancedFilter=${filter}`
+  return encodeURI(url);
+}
+
+const serverBotLogsURL = (ele, request, result) => {
+  let url = serverLogsBaseURL(ele, request, result)
+  let filter = serverLogFilter
+
+  filter += `${result.bot_id}`
   url += `&advancedFilter=${filter}`
   return encodeURI(url);
 }
@@ -605,9 +622,17 @@ const logsSection = (ele, request, result) => {
   <table class="task-info left">
     <tbody>
       <tr>
-        <td>Server Logs</td>
+        <td>Task related server Logs</td>
         <td>
-          <a href=${serverLogsURL(ele, request, result)} target="_blank">
+          <a href=${serverTaskLogsURL(ele, request, result)} target="_blank">
+            View on Cloud Console
+          </a>
+        </td>
+      </tr>
+      <tr>
+        <td>Bot related server Logs</td>
+        <td>
+          <a href=${serverBotLogsURL(ele, request, result)} target="_blank">
             View on Cloud Console
           </a>
         </td>
