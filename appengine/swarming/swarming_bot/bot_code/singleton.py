@@ -60,8 +60,9 @@ class Singleton(object):
       try:
         fcntl.flock(self.handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
       except IOError:
-        # There's a small race conditon where it could report a previous pid.
-        logging.error('Singleton held by %s', self.handle.read())
+        # There's a small race condition where it could report a previous pid.
+        logging.exception('Singleton "%s" is held by "%s"', self.key,
+                          self.handle.read())
         self.handle.close()
         self.handle = None
         return False
