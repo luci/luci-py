@@ -32,7 +32,7 @@ handlers:
 
 libraries:
 - name: endpoints
-  version: 1.0
+  version: "1.0"
 - name: pycrypto
   version: "2.6"
 - name: six
