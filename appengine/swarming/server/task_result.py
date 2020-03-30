@@ -1622,6 +1622,9 @@ def task_bq_summary(start, end):
   def _convert(e):
     """Returns a tuple(bq_key, row)."""
     out = swarming_pb2.TaskResult()
+    if not out.end_time:
+      logging.warning('crbug.com/1064833: task %s does not have end_time %s',
+                      e.task_id, out)
     e.to_proto(out)
     return (e.task_id, out)
 
