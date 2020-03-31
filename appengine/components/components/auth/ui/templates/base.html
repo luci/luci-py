@@ -116,13 +116,7 @@ style="font-family:monospace;">{{rev['rev']}}</a>.
     <footer>
       <hr>
       <p class="text-right" id="app-rev-block">
-        <small>Version:
-          {% if app_revision_url %}
-            <a href="{{app_revision_url}}">{{app_version}}</a>
-          {% else %}
-            <span>{{app_version}}</span>
-          {% endif %}
-        </small>
+        <small>Version: {{app_version}}</small>
       </p>
     </footer>
 

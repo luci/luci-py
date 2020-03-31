@@ -354,7 +354,6 @@ class UIHandler(handler.AuthenticatingHandler):
     # Jinja2 environment to use to render a template.
     full_env = {
       'app_name': _ui_app_name,
-      'app_revision_url': utils.get_app_revision_url(),
       'app_version': utils.get_app_version(),
       'config': json.dumps(js_config),
       'csp_nonce': self.csp_nonce,
