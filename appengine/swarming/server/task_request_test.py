@@ -1789,6 +1789,18 @@ class TaskRequestApiTest(TestCase):
     self.assertEqual(sorted(expected), sorted([k for k in it]))
 
 
+  def test_normalize_or_dimensions(self):
+    dim1 = _gen_request(
+        properties=_gen_properties(dimensions={u'foo':
+            [u'a|c|b', u'xyz']})).task_slice(0).properties.dimensions
+    dim2 = _gen_request(
+        properties=_gen_properties(dimensions={u'foo':
+            [u'xyz', u'c|b|a']})).task_slice(0).properties.dimensions
+    expected = {u'foo': [u'a|b|c', u'xyz']}
+    self.assertEqual(dim1, expected)
+    self.assertEqual(dim1, dim2)
+
+
 if __name__ == '__main__':
   if '-v' in sys.argv:
     unittest.TestCase.maxDiff = None

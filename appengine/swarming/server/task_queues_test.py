@@ -579,6 +579,16 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
     # Assert it doesn't return 0.
     self.assertEqual(3649838548, task_queues.hash_dimensions({}))
 
+  def test_hash_or_dimensions(self):
+    dim1 = _gen_request(
+        properties=_gen_properties(dimensions={u'foo':
+            [u'a|c|b', u'xyz']})).task_slice(0).properties.dimensions
+    dim2 = _gen_request(
+        properties=_gen_properties(dimensions={u'foo':
+            [u'xyz', u'b|c|a']})).task_slice(0).properties.dimensions
+    self.assertEqual(
+        task_queues.hash_dimensions(dim1), task_queues.hash_dimensions(dim2))
+
   def test_cron_tidy_stale(self):
     now = datetime.datetime(2010, 1, 2, 3, 4, 5)
     self.mock_now(now)
