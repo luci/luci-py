@@ -1433,10 +1433,11 @@ def main(argv):
       msg = (
           'Found a previous bot, %d rebooting as a workaround for '
           'https://crbug.com/569610.') % os.getpid()
-      print(msg, file=sys.stderr)
-      os_utilities.host_reboot(msg)
     else:
-      print('Found a previous bot, %d exiting.' % os.getpid(), file=sys.stderr)
+      msg = ('Found a previous bot, %d rebooting as a workaround for '
+             'https://crbug.com/1061531' % os.getpid())
+    print(msg, file=sys.stderr)
+    os_utilities.host_reboot(msg)
     return 1
 
   base_dir = os.path.dirname(THIS_FILE)
