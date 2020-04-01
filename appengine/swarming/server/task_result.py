@@ -1586,7 +1586,9 @@ def task_bq_run(start, end):
   # Completed
   q = TaskRunResult.query(
       TaskRunResult.completed_ts >= start,
-      TaskRunResult.completed_ts <= end)
+      TaskRunResult.completed_ts <= end,
+      # Disable cache for consistency.
+      default_options=ndb.QueryOptions(use_cache=False, use_memcache=False))
   cursor = None
   more = True
   while more:
@@ -1635,7 +1637,9 @@ def task_bq_summary(start, end):
   # Completed
   q = TaskResultSummary.query(
       TaskResultSummary.completed_ts >= start,
-      TaskResultSummary.completed_ts <= end)
+      TaskResultSummary.completed_ts <= end,
+      # Disable cache for consistency.
+      default_options=ndb.QueryOptions(use_cache=False, use_memcache=False))
   cursor = None
   more = True
   while more:
