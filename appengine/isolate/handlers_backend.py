@@ -551,26 +551,35 @@ class TaskVerifyWorkerHandler(webapp2.RequestHandler):
     data = None
 
     try:
-      # Start a loop where it reads the data in block.
-      stream = gcs.read_file(gs_bucket, entry.key.id())
-      if save_to_memcache:
-        # Wraps stream with a generator that accumulates the data.
-        stream = Accumulator(stream)
+      # crbug.com/916644: Verify 2 times to cope with possible data flakiness.
+      verified = False
+      for i in range(2):
+        # Start a loop where it reads the data in block.
+        stream = gcs.read_file(gs_bucket, entry.key.id())
+        if save_to_memcache:
+          # Wraps stream with a generator that accumulates the data.
+          stream = Accumulator(stream)
 
-      for data in model.expand_content(namespace, stream):
-        expanded_size += len(data)
-        digest.update(data)
-        # Make sure the data is GC'ed.
-        del data
+        for data in model.expand_content(namespace, stream):
+          expanded_size += len(data)
+          digest.update(data)
+          # Make sure the data is GC'ed.
+          del data
 
-      # Hashes should match.
-      if digest.hexdigest() != hash_key:
-        self.purge_entry(entry,
-            'SHA-1 do not match data\n'
+        # Hashes should match.
+        if digest.hexdigest() == hash_key:
+          verified = True
+          break
+        logging.warning(
+            'SHA-1 do not match data in %d-th iteration: got %s, want %s',
+            i + 1, digest.hexdigest(), hash_key)
+
+      if not verified:
+        self.purge_entry(
+            entry, 'SHA-1 do not match data\n'
             '%d bytes, %d bytes expanded, expected %d bytes\n%s',
-            entry.compressed_size, expanded_size,
-            entry.expanded_size, original_request)
-        return
+            entry.compressed_size, expanded_size, entry.expanded_size,
+            original_request)
 
     except gcs.NotFoundError as e:
       # Somebody deleted a file between get_file_info and read_file calls.
