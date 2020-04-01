@@ -74,6 +74,7 @@ from server import directory_occlusion
 from server import pools_config
 from server import service_accounts
 from server import task_pack
+from server.constants import OR_DIM_SEP
 
 
 # Maximum acceptable priority value, which is effectively the lowest priority.
@@ -150,9 +151,6 @@ _MAX_BOT_PING_TOLERANCE_SECS = 1200
 # Min time to keep the bot alive before it is declared dead.
 _MIN_BOT_PING_TOLERANCE_SECS = 60
 
-# Or dimension separtor
-_OR_DIM_SEP = '|'
-
 ### Properties validators must come before the models.
 
 
@@ -205,7 +203,7 @@ def _validate_dimensions(_prop, value):
           value)
 
     for value in values:
-      or_dimensions_num *= len(value.split(_OR_DIM_SEP))
+      or_dimensions_num *= len(value.split(OR_DIM_SEP))
       if or_dimensions_num > max_or_dimensions_num:
         raise datastore_errors.BadValueError(
             'possible dimension subset for \'or\' dimensions '
@@ -222,14 +220,14 @@ def _validate_dimensions(_prop, value):
 
     normalized_values = []
     for value in values:
-      or_values = value.split(_OR_DIM_SEP)
+      or_values = value.split(OR_DIM_SEP)
       for v in or_values:
         if not config.validate_dimension_value(v):
           raise datastore_errors.BadValueError(
               u'dimension key %r has invalid value %r' % (k, value))
       # sorts OR's operands, so that dimension_hash for semantically equivalent
       # dimension values will be the same.
-      normalized_values.append(_OR_DIM_SEP.join(sorted(or_values)))
+      normalized_values.append(OR_DIM_SEP.join(sorted(or_values)))
     values = normalized_values
 
     # Key specific checks.
@@ -238,7 +236,7 @@ def _validate_dimensions(_prop, value):
           u'\'id\' cannot be specified more than once in dimensions')
     # Do not allow a task to be triggered in multiple pools, as this could
     # cross a security boundary.
-    if k == u'pool' and (len(values) != 1 or _OR_DIM_SEP in values[0]):
+    if k == u'pool' and (len(values) != 1 or OR_DIM_SEP in values[0]):
       raise datastore_errors.BadValueError(
           u'\'pool\' cannot be specified more than once in dimensions %s' %
           values)

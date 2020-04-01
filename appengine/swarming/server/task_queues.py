@@ -63,6 +63,7 @@ from google.appengine.ext import ndb
 from components import datastore_utils
 from components import utils
 from server import config
+from server.constants import OR_DIM_SEP
 
 
 # Extends the validity of TaskDimensionsSet and BotTaskDimensions, added to the
@@ -1033,6 +1034,34 @@ def set_has_capacity(dimensions, seconds):
   dimensions_hash = str(hash_dimensions(dimensions))
   memcache.set(
       dimensions_hash, True, time=seconds, namespace='task_queues_tasks')
+
+
+def _expand_dimensions_to_dimensions_flat(dimensions):
+  """Expands |dimensions| to a series of dimensions_flat.
+
+  If OR is not used, then this should yield exactly one element. Otherwise, it
+  expands the OR expression into a series of basic dimension values.
+  """
+  dimensions_kv = list(dimensions.items())
+
+  def gen(ki, vi, cur_dimensions_flat):
+    if ki == len(dimensions_kv):
+      yield sorted(cur_dimensions_flat)
+      return
+
+    key, values = dimensions_kv[ki]
+    if vi == len(values):
+      for f in gen(ki + 1, 0, cur_dimensions_flat):
+        yield f
+      return
+
+    for or_operand in values[vi].split(OR_DIM_SEP):
+      cur_dimensions_flat.append(u'%s:%s' % (key, or_operand))
+      for f in gen(ki, vi + 1, cur_dimensions_flat):
+        yield f
+      cur_dimensions_flat.pop()
+
+  return gen(0, 0, [])
 
 
 @ndb.tasklet

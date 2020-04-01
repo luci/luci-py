@@ -589,6 +589,51 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(
         task_queues.hash_dimensions(dim1), task_queues.hash_dimensions(dim2))
 
+  def test_expand_dimensions_to_dimensions_flat(self):
+    expand = task_queues._expand_dimensions_to_dimensions_flat
+    # Without OR
+    actual = set(
+        tuple(f) for f in expand({
+            u'foo': [u'c', u'a', u'b'],
+            u'bar': [u'x', u'z', u'y']
+        }))
+    expected = {
+        (u'bar:x', u'bar:y', u'bar:z', u'foo:a', u'foo:b', u'foo:c'),
+    }
+    self.assertEqual(actual, expected)
+    # With OR
+    actual = set(
+        tuple(f) for f in expand({
+            u'foo': [u'a|b|c', u'def'],
+            u'bar': [u'x|y', u'z|w']
+        }))
+    expected = {
+        (u'bar:w', u'bar:x', u'foo:a', u'foo:def'),
+        (u'bar:w', u'bar:x', u'foo:b', u'foo:def'),
+        (u'bar:w', u'bar:x', u'foo:c', u'foo:def'),
+        (u'bar:w', u'bar:y', u'foo:a', u'foo:def'),
+        (u'bar:w', u'bar:y', u'foo:b', u'foo:def'),
+        (u'bar:w', u'bar:y', u'foo:c', u'foo:def'),
+        (u'bar:x', u'bar:z', u'foo:a', u'foo:def'),
+        (u'bar:x', u'bar:z', u'foo:b', u'foo:def'),
+        (u'bar:x', u'bar:z', u'foo:c', u'foo:def'),
+        (u'bar:y', u'bar:z', u'foo:a', u'foo:def'),
+        (u'bar:y', u'bar:z', u'foo:b', u'foo:def'),
+        (u'bar:y', u'bar:z', u'foo:c', u'foo:def'),
+    }
+    # flats are sorted
+    actual = set(tuple(f) for f in expand({
+        u'foo': [u'a|y|b|z', u'c'],
+    }))
+    expected = {
+        (u'foo:a', u'foo:c'),
+        (u'foo:b', u'foo:c'),
+        (u'foo:c', u'foo:y'),
+        (u'foo:c', u'foo:z'),
+    }
+    self.assertEqual(actual, expected)
+
+
   def test_cron_tidy_stale(self):
     now = datetime.datetime(2010, 1, 2, 3, 4, 5)
     self.mock_now(now)
