@@ -357,9 +357,7 @@ def _handle_dead_bot(run_result_key):
       # This shouldn't have been filtered in the query. DB index may be stale.
       return None, run_result.bot_id
 
-    current_task_slice = run_result.current_task_slice
     run_result.signal_server_version(server_version)
-    old_modified = run_result.modified_ts
     run_result.modified_ts = now
     # set .dead_after_ts to None since the task is terminated.
     run_result.dead_after_ts = None
@@ -375,28 +373,6 @@ def _handle_dead_bot(run_result_key):
       run_result.abandoned_ts = now
       run_result.completed_ts = now
       task_is_retried = None
-    elif (result_summary.try_number == 1 and now < request.expiration_ts and
-          (request.task_slice(current_task_slice).properties.idempotent or
-            run_result.started_ts == old_modified)):
-      # Retry it. It fits:
-      # - first try
-      # - not yet expired
-      # - One of:
-      #   - idempotent
-      #   - task hadn't got any ping at all from task_runner.run_command()
-      # TODO(maruel): Allow increasing the current_task_slice value.
-      # Create a second TaskToRun with the same TaskSlice.
-      to_run = task_to_run.new_task_to_run(request, 2, current_task_slice)
-      to_put = (run_result, result_summary, to_run)
-      run_result.state = task_result.State.BOT_DIED
-      run_result.internal_failure = True
-      run_result.abandoned_ts = now
-      run_result.completed_ts = now
-      # Do not sync data from run_result to result_summary, since the task is
-      # being retried.
-      result_summary.reset_to_pending()
-      result_summary.modified_ts = now
-      task_is_retried = True
     else:
       # Kill it as BOT_DIED, there was more than one try, the task expired in
       # the meantime or it wasn't idempotent.
