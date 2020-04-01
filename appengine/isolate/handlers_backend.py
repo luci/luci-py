@@ -546,14 +546,14 @@ class TaskVerifyWorkerHandler(webapp2.RequestHandler):
     save_to_memcache = (
         entry.compressed_size <= model.MAX_MEMCACHE_ISOLATED and
         entry.is_isolated)
-    expanded_size = 0
-    digest = model.get_hash(namespace)
-    data = None
 
     try:
       # crbug.com/916644: Verify 2 times to cope with possible data flakiness.
       verified = False
       for i in range(2):
+        digest = model.get_hash(namespace)
+        expanded_size = 0
+
         # Start a loop where it reads the data in block.
         stream = gcs.read_file(gs_bucket, entry.key.id())
         if save_to_memcache:
