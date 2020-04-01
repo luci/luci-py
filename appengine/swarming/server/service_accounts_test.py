@@ -149,8 +149,8 @@ class OAuthTokenGrantTest(TestBase):
 
 
 class TaskAccountTokenTest(TestBase):
-  def make_task_request(
-      self, service_account, service_account_token, try_number=1):
+
+  def make_task_request(self, service_account, service_account_token):
     now = utils.utcnow()
     args = {
       'created_ts': now,
@@ -176,48 +176,47 @@ class TaskAccountTokenTest(TestBase):
 
     summary_key = task_pack.request_key_to_result_summary_key(req.key)
     run_result_key = task_pack.result_summary_key_to_run_result_key(
-        summary_key, try_number)
+        summary_key, 1)
     return task_pack.pack_run_result_key(run_result_key)
 
   def test_happy_path(self):
     now = datetime.datetime(2010, 1, 2, 3, 4, 5)
     self.mock_now(now)
 
-    # Initial attempt and a retry.
-    for try_number in (1, 2):
-      task_id = self.make_task_request(
-          service_account='service-account@example.com',
-          service_account_token='mocked-oauth-token-grant',
-          try_number=try_number)
+    # Initial attempt.
+    task_id = self.make_task_request(
+        service_account='service-account@example.com',
+        service_account_token='mocked-oauth-token-grant')
 
-      expiry = now + datetime.timedelta(seconds=3600)
-      self.mock_json_request(
-          expected_url='https://tokens.example.com/prpc/'
-              'tokenserver.minter.TokenMinter/MintOAuthTokenViaGrant',
-          expected_payload={
-            'grantToken': 'mocked-oauth-token-grant',
+    expiry = now + datetime.timedelta(seconds=3600)
+    self.mock_json_request(
+        expected_url='https://tokens.example.com/prpc/'
+        'tokenserver.minter.TokenMinter/MintOAuthTokenViaGrant',
+        expected_payload={
+            'grantToken':
+                'mocked-oauth-token-grant',
             'oauthScope': ['scope1', 'scope2'],
-            'minValidityDuration': 300,
+            'minValidityDuration':
+                300,
             'auditTags': [
-              'swarming:gae_request_id:7357B3D7091D',
-              'swarming:service_version:sample-app/v1a',
-              'swarming:bot_id:bot-id',
-              'swarming:task_id:' + task_id,
-              'swarming:task_name:Request with service-account@example.com',
+                'swarming:gae_request_id:7357B3D7091D',
+                'swarming:service_version:sample-app/v1a',
+                'swarming:bot_id:bot-id',
+                'swarming:task_id:' + task_id,
+                'swarming:task_name:Request with service-account@example.com',
             ],
-          },
-          response={
+        },
+        response={
             'accessToken': 'totally_real_token',
             'serviceVersion': 'token-server-id/ver',
             'expiry': expiry.isoformat() + 'Z',
-          })
+        })
 
-      tok = service_accounts.AccessToken(
-          'totally_real_token', int(utils.time_time() + 3600))
-      self.assertEqual(
-          ('service-account@example.com', tok),
-          service_accounts.get_task_account_token(
-              task_id, 'bot-id', ['scope1', 'scope2']))
+    tok = service_accounts.AccessToken('totally_real_token',
+                                       int(utils.time_time() + 3600))
+    self.assertEqual(('service-account@example.com', tok),
+                     service_accounts.get_task_account_token(
+                         task_id, 'bot-id', ['scope1', 'scope2']))
 
   def test_malformed_task_id(self):
     with self.assertRaises(service_accounts.MisconfigurationError):
