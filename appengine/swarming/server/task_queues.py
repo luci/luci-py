@@ -482,7 +482,7 @@ def _ensure_TaskDimensions_async(task_dimensions_key, now, valid_until_ts,
     obj = TaskDimensions(key=task_dimensions_key)
     action = 'created'
   if obj.assert_request(now, valid_until_ts, task_dimensions_flat):
-    if action:
+    if not action:
       action = 'updated'
     if not obj.sets:
       yield obj.key.delete_async()
