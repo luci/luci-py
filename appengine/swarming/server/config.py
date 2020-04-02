@@ -87,7 +87,7 @@ def validate_dimension_key(key):
 
 
 def validate_dimension_value(value):
-  """Returns True if the dimension key is valid."""
+  """Returns True if the dimension value is valid."""
   return (
       bool(isinstance(value, unicode) and
       value and
