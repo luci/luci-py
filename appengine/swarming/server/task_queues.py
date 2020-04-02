@@ -474,14 +474,19 @@ def _get_task_dimensions_key(dimensions_hash, dimensions):
 
 @ndb.tasklet
 def _ensure_TaskDimensions_async(task_dimensions_key, now, valid_until_ts,
-                                 task_dimensions_flat):
+                                 task_dimensions_flats):
   """Adds, updates or deletes the TaskDimensions."""
   action = None
   obj = yield task_dimensions_key.get_async()
   if not obj:
     obj = TaskDimensions(key=task_dimensions_key)
     action = 'created'
-  if obj.assert_request(now, valid_until_ts, task_dimensions_flat):
+  # Force all elements in |task_dimensions_flats| to be evaluated
+  updated = [
+      obj.assert_request(now, valid_until_ts, df)
+      for df in task_dimensions_flats
+  ]
+  if any(updated):
     if not action:
       action = 'updated'
     if not obj.sets:
@@ -566,7 +571,8 @@ def _refresh_BotTaskDimensions_async(now, valid_until_ts, task_dimensions_flat,
   if need_db_store:
     logging.debug(
         'Storing new BotTaskDimensions to DB.'
-        'bot_id:%s, valid_until_ts:%s', bot_id, valid_until_ts)
+        'bot_id:%s, valid_until_ts:%s, task_dimensions_flat:%s', bot_id,
+        valid_until_ts, task_dimensions_flat)
     yield BotTaskDimensions(
         key=bot_task_key,
         valid_until_ts=valid_until_ts,
@@ -753,11 +759,14 @@ def _refresh_all_BotTaskDimensions_async(
 
 
 @ndb.tasklet
-def _refresh_TaskDimensions_async(now, valid_until_ts, task_dimensions_flat,
+def _refresh_TaskDimensions_async(now, valid_until_ts, task_dimensions_flats,
                                   task_dimensions_key):
   """Updates TaskDimensions for task_dimensions_flat.
 
   Used by rebuild_task_cache_async.
+
+  task_dimensions_flats is a list of task_dimensions_flat that is expanded from
+  a task's dimensions.
   """
   # First do a dry run. If the dry run passes, skip the transaction.
   #
@@ -768,7 +777,9 @@ def _refresh_TaskDimensions_async(now, valid_until_ts, task_dimensions_flat,
   # The transaction contention can be problematic on pool with a high
   # cardinality of the dimension sets.
   obj = yield task_dimensions_key.get_async()
-  if obj and not obj.assert_request(now, valid_until_ts, task_dimensions_flat):
+  if obj and not any(
+      obj.assert_request(now, valid_until_ts, df)
+      for df in task_dimensions_flats):
     logging.debug('Skipped transaction!')
     raise ndb.Return(None)
   # Do an adhoc transaction instead of using datastore_utils.transaction().
@@ -791,7 +802,7 @@ def _refresh_TaskDimensions_async(now, valid_until_ts, task_dimensions_flat,
     raise ndb.Return(False)
   try:
     action = yield _ensure_TaskDimensions_async(
-        task_dimensions_key, now, valid_until_ts, task_dimensions_flat)
+        task_dimensions_key, now, valid_until_ts, task_dimensions_flats)
   finally:
     yield ndb.get_context().memcache_delete(key, namespace='task_queues_tx')
 
@@ -1043,25 +1054,26 @@ def _expand_dimensions_to_dimensions_flat(dimensions):
   expands the OR expression into a series of basic dimension values.
   """
   dimensions_kv = list(dimensions.items())
+  cur_dimensions_flat = []
+  result = []
 
-  def gen(ki, vi, cur_dimensions_flat):
+  def gen(ki, vi):
     if ki == len(dimensions_kv):
-      yield sorted(cur_dimensions_flat)
+      result.append(sorted(cur_dimensions_flat))
       return
 
     key, values = dimensions_kv[ki]
     if vi == len(values):
-      for f in gen(ki + 1, 0, cur_dimensions_flat):
-        yield f
+      gen(ki + 1, 0)
       return
 
     for or_operand in values[vi].split(OR_DIM_SEP):
       cur_dimensions_flat.append(u'%s:%s' % (key, or_operand))
-      for f in gen(ki, vi + 1, cur_dimensions_flat):
-        yield f
+      gen(ki, vi + 1)
       cur_dimensions_flat.pop()
 
-  return gen(0, 0, [])
+  gen(0, 0)
+  return result
 
 
 @ndb.tasklet
@@ -1100,27 +1112,30 @@ def rebuild_task_cache_async(payload):
   task_dimensions = data[u'dimensions']
   task_dimensions_hash = int(data[u'dimensions_hash'])
   valid_until_ts = utils.parse_datetime(data[u'valid_until_ts'])
-  task_dimensions_flat = []
-  for k, values in task_dimensions.items():
-    for v in values:
-      task_dimensions_flat.append(u'%s:%s' % (k, v))
-  task_dimensions_flat.sort()
-  dims = '\n'.join('  ' + d for d in task_dimensions_flat)
+  task_dimensions_key = _get_task_dimensions_key(task_dimensions_hash,
+                                                 task_dimensions)
   now = utils.utcnow()
+
+  expanded_task_dimensions_flats = _expand_dimensions_to_dimensions_flat(
+      task_dimensions)
   try:
-    yield _refresh_all_BotTaskDimensions_async(
-        now, valid_until_ts, task_dimensions_flat, task_dimensions_hash)
-    # Done updating, now store the entity. Must use a transaction as there could
-    # be other dimensions set in the entity.
-    task_dimensions_key = _get_task_dimensions_key(task_dimensions_hash,
-                                                   task_dimensions)
-    yield _refresh_TaskDimensions_async(
-        now, valid_until_ts, task_dimensions_flat, task_dimensions_key)
+    yield [
+        _refresh_all_BotTaskDimensions_async(now, valid_until_ts, df,
+                                             task_dimensions_hash)
+        for df in expanded_task_dimensions_flats
+    ]
+    # Done updating, now store the entity. Must use a transaction as there
+    # could be other dimensions set in the entity.
+    yield _refresh_TaskDimensions_async(now, valid_until_ts,
+                                        expanded_task_dimensions_flats,
+                                        task_dimensions_key)
   finally:
     # Any of the calls above could throw. Log how far long we processed.
     duration = (utils.utcnow()-now).total_seconds()
-    logging.debug('rebuild_task_cache(%d) in %.3fs\n%s', task_dimensions_hash,
-                  duration, dims)
+    logging.debug(
+        'rebuild_task_cache(%d) in %.3fs\n%s\ndimensions_flat size=%d',
+        task_dimensions_hash, duration, task_dimensions,
+        len(expanded_task_dimensions_flats))
   raise ndb.Return(True)
 
 

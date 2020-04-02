@@ -98,6 +98,20 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
   def _enqueue_async(self, *args, **kwargs):
     return self._enqueue_async_orig(*args, use_dedicated_module=False, **kwargs)
 
+  def _mock_enqueue_task_async_for_rebuild_task_cache(self):
+    payloads = []
+
+    @ndb.tasklet
+    def _enqueue_task_async(url, name, payload):
+      self.assertEqual(
+          '/internal/taskqueue/important/task_queues/rebuild-cache', url)
+      self.assertEqual('rebuild-task-cache', name)
+      payloads.append(payload)
+      raise ndb.Return(True)
+
+    self.mock(utils, 'enqueue_task_async', _enqueue_task_async)
+    return payloads
+
   def _assert_task(self, tasks=1):
     """Creates one pending TaskRequest and asserts it in task_queues."""
     request = _gen_request()
@@ -247,17 +261,7 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
     # testing with 50 bots, would make the unit test slow.
     self.mock(task_queues, '_CAP_FUTURES_LIMIT', 1)
 
-    payloads = []
-
-    @ndb.tasklet
-    def _enqueue_task_async(url, name, payload):
-      self.assertEqual(
-          '/internal/taskqueue/important/task_queues/rebuild-cache', url)
-      self.assertEqual('rebuild-task-cache', name)
-      payloads.append(payload)
-      raise ndb.Return(True)
-
-    self.mock(utils, 'enqueue_task_async', _enqueue_task_async)
+    payloads = self._mock_enqueue_task_async_for_rebuild_task_cache()
 
     # The equivalent of self._assert_task(tasks=1) except that we snapshot the
     # payload.
@@ -347,6 +351,152 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
     request = _gen_request()
     with self.assertRaises(task_queues.Error):
       task_queues.assert_task_async(request).get_result()
+
+  def test_or_dimensions_new_tasks(self):
+    # Bots are already registered, then new tasks show up
+    self.mock_now(datetime.datetime(2020, 1, 2, 3, 4, 5))
+    self.assertEqual(
+        0,
+        _assert_bot(
+            bot_id=u'bot1',
+            dimensions={
+                u'os': [u'v1', u'v2'],
+                u'gpu': [u'nv'],
+            }))
+    self.assertEqual(
+        0,
+        _assert_bot(
+            bot_id=u'bot2', dimensions={
+                u'os': [u'v2'],
+                u'gpu': [u'amd'],
+            }))
+
+    payloads = self._mock_enqueue_task_async_for_rebuild_task_cache()
+
+    request1 = _gen_request(
+        properties=_gen_properties(dimensions={
+            u'pool': [u'default'],
+            u'os': [u'v1|v2'],
+            u'gpu': [u'nv|amd'],
+        }))
+    task_queues.assert_task_async(request1).get_result()
+    self.assertEqual(1, len(payloads))
+    f = task_queues.rebuild_task_cache_async(payloads[-1])
+    self.assertEqual(True, f.get_result())
+    payloads.pop()
+
+    # Both bots should be able to handle |request1|
+    self.assert_count(2, task_queues.BotDimensions)
+    self.assert_count(2, task_queues.BotTaskDimensions)
+    self.assert_count(1, task_queues.TaskDimensions)
+    self.assertEqual(4, len(task_queues.TaskDimensions.query().get().sets))
+    bot1_root_key = bot_management.get_root_key(u'bot1')
+    bot2_root_key = bot_management.get_root_key(u'bot2')
+    self.assertEqual(1, len(task_queues.get_queues(bot1_root_key)))
+    self.assertEqual(1, len(task_queues.get_queues(bot2_root_key)))
+
+    request2 = _gen_request(
+        properties=_gen_properties(dimensions={
+            u'pool': [u'default'],
+            u'os': [u'v1'],
+            u'gpu': [u'nv|amd'],
+        }))
+    task_queues.assert_task_async(request2).get_result()
+    self.assertEqual(1, len(payloads))
+    f = task_queues.rebuild_task_cache_async(payloads[-1])
+    self.assertEqual(True, f.get_result())
+    payloads.pop()
+
+    # Only bot1 can handle |request2|
+    self.assert_count(3, task_queues.BotTaskDimensions)
+    self.assert_count(2, task_queues.TaskDimensions)
+    self.assertEqual(2, len(task_queues.get_queues(bot1_root_key)))
+    self.assertEqual(1, len(task_queues.get_queues(bot2_root_key)))
+
+  def test_or_dimensions_new_bots(self):
+    # Tasks are already registered, then new bots show up
+    self.mock_now(datetime.datetime(2020, 1, 2, 3, 4, 5))
+
+    payloads = self._mock_enqueue_task_async_for_rebuild_task_cache()
+
+    request1 = _gen_request(
+        properties=_gen_properties(dimensions={
+            u'pool': [u'default'],
+            u'os': [u'v1|v2'],
+            u'gpu': [u'nv|amd'],
+        }))
+    task_queues.assert_task_async(request1).get_result()
+    self.assertEqual(1, len(payloads))
+    f = task_queues.rebuild_task_cache_async(payloads[-1])
+    self.assertEqual(True, f.get_result())
+    payloads.pop()
+
+    self.assert_count(0, task_queues.BotDimensions)
+    self.assert_count(0, task_queues.BotTaskDimensions)
+    self.assert_count(1, task_queues.TaskDimensions)
+    self.assertEqual(4, len(task_queues.TaskDimensions.query().get().sets))
+
+    self.assertEqual(
+        1,
+        _assert_bot(
+            bot_id=u'bot1', dimensions={
+                u'os': [u'v1'],
+                u'gpu': [u'nv'],
+            }))
+    self.assertEqual(
+        1,
+        _assert_bot(
+            bot_id=u'bot2', dimensions={
+                u'os': [u'v2'],
+                u'gpu': [u'amd'],
+            }))
+    # Both bots should be able to handle |request1|
+    self.assert_count(2, task_queues.BotDimensions)
+    self.assert_count(2, task_queues.BotTaskDimensions)
+    bot1_root_key = bot_management.get_root_key(u'bot1')
+    bot2_root_key = bot_management.get_root_key(u'bot2')
+    self.assertEqual(1, len(task_queues.get_queues(bot1_root_key)))
+    self.assertEqual(1, len(task_queues.get_queues(bot2_root_key)))
+
+  def test_or_dimensions_same_hash(self):
+    self.mock_now(datetime.datetime(2020, 1, 2, 3, 4, 5))
+    self.assertEqual(0, _assert_bot(
+        bot_id=u'bot1', dimensions={u'os': [u'v1']}))
+    self.assertEqual(0, _assert_bot(
+        bot_id=u'bot2', dimensions={u'os': [u'v2']}))
+    self.assertEqual(0, _assert_bot(
+        bot_id=u'bot3', dimensions={u'os': [u'v3']}))
+
+    payloads = self._mock_enqueue_task_async_for_rebuild_task_cache()
+    # Both requests should have the same dimension_hash
+    request1 = _gen_request(
+        properties=_gen_properties(dimensions={
+            u'pool': [u'default'],
+            u'os': [u'v1|v2|v3'],
+        }))
+    request2 = _gen_request(
+        properties=_gen_properties(dimensions={
+            u'pool': [u'default'],
+            u'os': [u'v3|v2|v1'],
+        }))
+    task_queues.assert_task_async(request1).get_result()
+    task_queues.assert_task_async(request2).get_result()
+    self.assertEqual(2, len(payloads))
+    while payloads:
+      f = task_queues.rebuild_task_cache_async(payloads[-1])
+      self.assertEqual(True, f.get_result())
+      payloads.pop()
+
+    self.assert_count(3, task_queues.BotDimensions)
+    self.assert_count(3, task_queues.BotTaskDimensions)
+    self.assert_count(1, task_queues.TaskDimensions)
+    self.assertEqual(3, len(task_queues.TaskDimensions.query().get().sets))
+    bot1_root_key = bot_management.get_root_key(u'bot1')
+    bot2_root_key = bot_management.get_root_key(u'bot2')
+    bot3_root_key = bot_management.get_root_key(u'bot3')
+    self.assertEqual(1, len(task_queues.get_queues(bot1_root_key)))
+    self.assertEqual(1, len(task_queues.get_queues(bot2_root_key)))
+    self.assertEqual(1, len(task_queues.get_queues(bot3_root_key)))
 
   def test_dimensions_to_flat(self):
     actual = task_queues.dimensions_to_flat(
