@@ -2,9 +2,7 @@
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
 
-import json
 import logging
-import zlib
 
 from google.appengine.api import memcache
 from google.appengine.ext import ndb
@@ -556,8 +554,8 @@ def get_config_multi(scope, path, hashes_only):
   """
   assert scope in ('projects', 'refs'), scope
   cache_key = (
-      'v3/%s%s:%s' % (scope, ',hashes_only' if hashes_only else '', path))
-  configs = _memcache_get_compressed_json(cache_key)
+    'v2/%s%s:%s' % (scope, ',hashes_only' if hashes_only else '', path))
+  configs = memcache.get(cache_key)
   if configs is None:
     config_sets = list(get_config_sets_from_scope(scope))
     cfg_map = storage.get_latest_configs_async(
@@ -579,7 +577,7 @@ def get_config_multi(scope, path, hashes_only):
             'Blob %s referenced from %s:%s:%s was not found',
             content_hash, cs, rev, path)
     try:
-      _memcache_set_compressed_json(cache_key, configs, time=60)
+      memcache.add(cache_key, configs, time=60)
     except ValueError:
       logging.exception('%s:%s configs are too big for memcache', scope, path)
 
@@ -613,14 +611,3 @@ def can_read_config_sets(config_sets):
 
 def can_read_config_set(config_set):
   return can_read_config_sets([config_set]).get(config_set)
-
-
-def _memcache_get_compressed_json(key):
-  buf = memcache.get(key)
-  if buf is None:
-    return buf
-  return json.loads(zlib.decompress(buf))
-
-
-def _memcache_set_compressed_json(key, value, time, level=5):
-  memcache.set(key, zlib.compress(json.dumps(value), level), time=time)
