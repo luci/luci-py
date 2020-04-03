@@ -1047,7 +1047,7 @@ def set_has_capacity(dimensions, seconds):
       dimensions_hash, True, time=seconds, namespace='task_queues_tasks')
 
 
-def _expand_dimensions_to_dimensions_flat(dimensions):
+def expand_dimensions_to_dimensions_flat(dimensions):
   """Expands |dimensions| to a series of dimensions_flat.
 
   If OR is not used, then this should yield exactly one element. Otherwise, it
@@ -1116,7 +1116,7 @@ def rebuild_task_cache_async(payload):
                                                  task_dimensions)
   now = utils.utcnow()
 
-  expanded_task_dimensions_flats = _expand_dimensions_to_dimensions_flat(
+  expanded_task_dimensions_flats = expand_dimensions_to_dimensions_flat(
       task_dimensions)
   try:
     yield [
