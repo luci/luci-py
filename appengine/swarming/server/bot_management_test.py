@@ -447,15 +447,13 @@ class BotManagementTest(test_case.TestCase):
     self.assertEqual(1, bot_management.BotInfo.query().count())
     self.assertEqual(True, bot_management.has_capacity(d))
 
-    # TODO(crbug.com/1057886): This should be True after 'or' dimension support.
-    self.assertEqual(False, bot_management.has_capacity(or_dimensions))
+    self.assertEqual(True, bot_management.has_capacity(or_dimensions))
 
     # Disable the memcache code path to confirm the DB based behavior.
     self.mock(task_queues, 'probably_has_capacity', lambda *_: None)
     self.assertEqual(True, bot_management.has_capacity(d))
 
-    # TODO(crbug.com/1057886): This should be True after 'or' dimension support.
-    self.assertEqual(False, bot_management.has_capacity(or_dimensions))
+    self.assertEqual(True, bot_management.has_capacity(or_dimensions))
 
   def test_has_capacity_BotEvent(self):
     # Disable the memcache code path to confirm the DB based behavior.
@@ -478,13 +476,11 @@ class BotManagementTest(test_case.TestCase):
     bot_management.get_info_key(botid).delete()
     # The capacity is still found due to a recent BotEvent with this dimension.
     self.assertEqual(True, bot_management.has_capacity(d))
-    # TODO(crbug.com/1057886): This should be True after 'or' dimension support.
-    self.assertEqual(False, bot_management.has_capacity(or_dimensions))
+    self.assertEqual(True, bot_management.has_capacity(or_dimensions))
 
     self.mock_now(self.now, config.settings().bot_death_timeout_secs-1)
     self.assertEqual(True, bot_management.has_capacity(d))
-    # TODO(crbug.com/1057886): This should be True after 'or' dimension support.
-    self.assertEqual(False, bot_management.has_capacity(or_dimensions))
+    self.assertEqual(True, bot_management.has_capacity(or_dimensions))
 
     self.mock_now(self.now, config.settings().bot_death_timeout_secs)
     self.assertEqual(False, bot_management.has_capacity(d))

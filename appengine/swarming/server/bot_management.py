@@ -689,12 +689,6 @@ def has_capacity(dimensions):
   if cap is not None:
     return cap
 
-  # Do a query. That's slower and it's eventually consistent.
-  q = BotInfo.query()
-  flat = task_queues.dimensions_to_flat(dimensions)
-  for f in flat:
-    q = q.filter(BotInfo.dimensions_flat == f)
-
   # Add it to the 'quick cache' to improve performance. This cache is kept for
   # the same duration as how long bots are considered still alive without a
   # ping. Useful if there's a single bot in the fleet for these dimensions and
@@ -702,24 +696,41 @@ def has_capacity(dimensions):
   # initialization and some baremetal bots (thanks SCSI firmware!).
   seconds = config.settings().bot_death_timeout_secs
 
-  if q.count(limit=1):
-    logging.info('Found capacity via BotInfo: %s', flat)
+  @ndb.tasklet
+  def run_query(flat):
+    # Do a query. That's slower and it's eventually consistent.
+    q = BotInfo.query()
+    for f in flat:
+      q = q.filter(BotInfo.dimensions_flat == f)
+
+    num = yield q.count_async(limit=1)
+    if num:
+      logging.info('Found capacity via BotInfo: %s', flat)
+      raise ndb.Return(True)
+
+    # Search a bit harder. In this case, we're looking for BotEvent which would
+    # be a bot that used to exist recently.
+    cutoff = utils.utcnow() - datetime.timedelta(seconds=seconds)
+    q = BotEvent.query(BotEvent.ts > cutoff)
+    for f in flat:
+      q = q.filter(BotEvent.dimensions_flat == f)
+    num = yield q.count_async(limit=1)
+    if num:
+      logging.info('Found capacity via BotEvent: %s', flat)
+      raise ndb.Return(True)
+    raise ndb.Return(False)
+
+  futures = [
+      run_query(f)
+      for f in task_queues.expand_dimensions_to_dimensions_flat(dimensions)
+  ]
+
+  ndb.tasklets.Future.wait_all(futures)
+  if any(f.get_result() for f in futures):
     task_queues.set_has_capacity(dimensions, seconds)
     return True
 
-  # Search a bit harder. In this case, we're looking for BotEvent which would be
-  # a bot that used to exist recently.
-  cutoff = utils.utcnow() - datetime.timedelta(seconds=seconds)
-  q = BotEvent.query(BotEvent.ts > cutoff)
-  flat = task_queues.dimensions_to_flat(dimensions)
-  for f in flat:
-    q = q.filter(BotEvent.dimensions_flat == f)
-  if q.count(limit=1):
-    logging.info('Found capacity via BotEvent: %s', flat)
-    task_queues.set_has_capacity(dimensions, seconds)
-    return True
-
-  logging.warning('HAS NO CAPACITY: %s', flat)
+  logging.warning('HAS NO CAPACITY: %s', dimensions)
   return False
 
 
