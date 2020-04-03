@@ -515,12 +515,13 @@ def match_dimensions(request_dimensions, bot_dimensions):
   """Returns True if the bot dimensions satisfies the request dimensions."""
   assert isinstance(request_dimensions, dict), request_dimensions
   assert isinstance(bot_dimensions, dict), bot_dimensions
-  if frozenset(request_dimensions).difference(bot_dimensions):
+  if not frozenset(request_dimensions).issubset(bot_dimensions):
     return False
-  for key, values in request_dimensions.items():
-    if not all(v in bot_dimensions.get(key, []) for v in values):
-      return False
-  return True
+
+  bot_flat = frozenset(task_queues.bot_dimensions_to_flat(bot_dimensions))
+  return any(
+      frozenset(f).issubset(bot_flat) for f in task_queues
+      .expand_dimensions_to_dimensions_flat(request_dimensions))
 
 
 def set_lookup_cache(to_run_key, is_available_to_schedule):

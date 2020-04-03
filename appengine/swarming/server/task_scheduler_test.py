@@ -359,7 +359,6 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
           u'foo': [u'bar|A|B|C'],
       },),
   ])
-  @unittest.expectedFailure
   def test_bot_reap_task_or_dimensions(self, or_dimensions):
     run_result = self._quick_reap(
         1,
@@ -372,13 +371,63 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
             )
         ])
 
-    # TODO(crbug.com/1057886): support 'or' dimension.
     self.assertEqual('localhost', run_result.bot_id)
     self.assertEqual(1, run_result.try_number)
     to_run_key = task_to_run.request_to_task_to_run_key(
         run_result.request_key.get(), 1, 0)
     self.assertIsNone(to_run_key.get().queue_number)
     self.assertIsNone(to_run_key.get().expiration_ts)
+
+  def test_bot_reap_tasks_using_or_dimensions(self):
+    # The fist part of this case checks for bot -> task
+    # Register a bot first
+    bot1_dimensions = self.bot_dimensions.copy()
+    bot1_dimensions[u'id'] = [u'bot1']
+    bot1_dimensions[u'os'] = [u'v1', u'v2']
+    bot1_dimensions[u'gpu'] = [u'nv', u'sega']
+    self._register_bot(0, bot1_dimensions)
+    # Then send a request
+    task_slices = [
+        task_request.TaskSlice(
+            expiration_secs=60,
+            properties=_gen_properties(
+                dimensions={
+                    u'pool': [u'default'],
+                    u'os': [u'v1|v2'],
+                    u'gpu': [u'sega', u'amd|nv'],
+                }),
+            wait_for_capacity=False),
+    ]
+    self._quick_schedule(1, task_slices=task_slices)
+    _, _, run_result = task_scheduler.bot_reap_task(bot1_dimensions, 'abc')
+    self.assertEqual(u'bot1', run_result.bot_id)
+    to_run_key = _run_result_to_to_run_key(run_result)
+    self.assertIsNone(to_run_key.get().queue_number)
+    self.assertEqual(
+        State.COMPLETED,
+        _bot_update_task(
+            run_result.key, bot_id=u'bot1', exit_code=0, duration=0.1))
+    self.assertEqual(1, self.execute_tasks())
+
+    # The second part checks for task -> bot
+    # Send an identical request
+    self._quick_schedule(1, task_slices=task_slices)
+    # Then register another bot
+    bot2_dimensions = self.bot_dimensions.copy()
+    bot2_dimensions[u'id'] = [u'bot2']
+    bot2_dimensions[u'os'] = [u'v2']
+    bot2_dimensions[u'gpu'] = [u'amd', u'sega']
+    self._register_bot(1, bot2_dimensions)
+
+    _, _, run_result = task_scheduler.bot_reap_task(bot2_dimensions, 'def')
+    self.assertEqual(u'bot2', run_result.bot_id)
+    to_run_key = _run_result_to_to_run_key(run_result)
+    self.assertIsNone(to_run_key.get().queue_number)
+    self.assertEqual(
+        State.COMPLETED,
+        _bot_update_task(
+            run_result.key, bot_id=u'bot2', exit_code=0, duration=0.1))
+    self.assertEqual(1, self.execute_tasks())
 
   def test_schedule_request(self):
     # It is tested indirectly in the other functions.
@@ -2525,7 +2574,6 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
   def test_task_append_child(self):
     # Tested indirectly via test_task_parent_*, test_task_invalid_parent
     pass
-
 
 if __name__ == '__main__':
   if '-v' in sys.argv:

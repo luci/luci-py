@@ -448,6 +448,14 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
             'a': 'b',
             'foo': 'bar'
         }),
+        ({
+            'os': ['amiga|amiga-3.1'],
+            'foo': ['a|b', 'c']
+        }, {
+            'os': 'amiga',
+            'foo': ['b', 'c'],
+            'more': ['gsu'],
+        }),
     )
 
     for request_dimensions, bot_dimensions in data_true:
@@ -455,7 +463,23 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
           True, task_to_run.match_dimensions(request_dimensions,
                                              bot_dimensions))
 
-    data_false = (({'os': ['amiga']}, {'os': ['Win', 'Win-3.1']}),)
+    data_false = (
+        ({
+            'os': ['amiga']
+        }, {
+            'os': ['Win', 'Win-3.1']
+        }),
+        ({
+            'os': ['amiga']
+        }, {
+            'foo': 'bar'
+        }),
+        ({
+            'foo': ['a|b', 'c'],
+        }, {
+            'foo': 'b'
+        }),
+    )
     for request_dimensions, bot_dimensions in data_false:
       self.assertEqual(
           False, task_to_run.match_dimensions(request_dimensions,
