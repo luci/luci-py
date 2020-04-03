@@ -498,22 +498,23 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(1, len(task_queues.get_queues(bot2_root_key)))
     self.assertEqual(1, len(task_queues.get_queues(bot3_root_key)))
 
-  def test_dimensions_to_flat(self):
-    actual = task_queues.dimensions_to_flat(
-        {u'a': [u'c', u'bee'], u'cee': [u'zee']})
+  def test_bot_dimensions_to_flat(self):
+    actual = task_queues.bot_dimensions_to_flat({
+        u'a': [u'c', u'bee'],
+        u'cee': [u'zee']
+    })
     self.assertEqual([u'a:bee', u'a:c', u'cee:zee'], actual)
 
   def test_dimensions_to_flat_long_ascii(self):
     key = u'a' * 64
-    actual = task_queues.dimensions_to_flat(
-        {
-          key: [
+    actual = task_queues.bot_dimensions_to_flat({
+        key: [
             # Too long.
             u'b' * 257,
             # Ok.
             u'c' * 256,
-          ],
-        })
+        ],
+    })
     expected = [
         key + u':' + u'b' * 256 + u'…',
         key + u':' + u'c' * 256,
@@ -522,15 +523,14 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
 
   def test_dimensions_to_flat_long_unicode(self):
     key = u'a' * 64
-    actual = task_queues.dimensions_to_flat(
-        {
-          key: [
+    actual = task_queues.bot_dimensions_to_flat({
+        key: [
             # Ok.
             u'⌛' * 256,
             # Too long.
             u'⛔' * 257,
-          ],
-        })
+        ],
+    })
     expected = [
         key + u':' + u'⌛' * 256,
         key + u':' + u'⛔' * 256 + u'…',
@@ -543,15 +543,14 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
     # Python considers emoji in the supplemental plane to have length 2 on UCS2
     # builds, and length 1 on UCS4 builds.
     l = 128 if sys.maxunicode < 65536 else 256
-    actual = task_queues.dimensions_to_flat(
-        {
-          key: [
+    actual = task_queues.bot_dimensions_to_flat({
+        key: [
             # Too long.
-            u'💥' * (l+1),
+            u'💥' * (l + 1),
             # Ok.
             u'😬' * l,
-          ],
-        })
+        ],
+    })
     expected = [
         key + u':' + u'💥' * l + u'…',
         key + u':' + u'😬' * l,
@@ -559,7 +558,7 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(expected, actual)
 
   def test_dimensions_to_flat_duplicate_value(self):
-    actual = task_queues.dimensions_to_flat({u'a': [u'c', u'c']})
+    actual = task_queues.bot_dimensions_to_flat({u'a': [u'c', u'c']})
     self.assertEqual([u'a:c'], actual)
 
   def test_python_len_non_BMP(self):

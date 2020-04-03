@@ -91,7 +91,7 @@ def config_for_bot(bot_dimensions):
     this bot, if it exists, or None otherwise.
   """
   pool_cfg = _bot_pool_cfg(bot_dimensions)
-  bot_dimensions_flat = set(task_queues.dimensions_to_flat(bot_dimensions))
+  bot_dimensions_flat = set(task_queues.bot_dimensions_to_flat(bot_dimensions))
   return _config_for_dimensions(pool_cfg, bot_dimensions_flat)
 
 
@@ -115,11 +115,11 @@ def config_for_task(request):
 
   # Determine the dimension intersection across all task slices.
   common_dimensions = set(
-      task_queues.dimensions_to_flat(s0.properties.dimensions))
+      task_queues.bot_dimensions_to_flat(s0.properties.dimensions))
   for i in range(1, request.num_task_slices):
     s = request.task_slice(i)
     common_dimensions.intersection_update(
-        task_queues.dimensions_to_flat(s.properties.dimensions))
+        task_queues.bot_dimensions_to_flat(s.properties.dimensions))
 
   return _config_for_dimensions(pool_cfg, common_dimensions)
 
@@ -143,7 +143,7 @@ def assign_task(es_cfg, bot_dimensions):
 
   idle_bot = req.idle_bots.add()
   idle_bot.bot_id = bot_id
-  idle_bot.dimensions.extend(task_queues.dimensions_to_flat(bot_dimensions))
+  idle_bot.dimensions.extend(task_queues.bot_dimensions_to_flat(bot_dimensions))
 
   req.scheduler_id = es_cfg.id
   req.time.GetCurrentTime()
@@ -203,7 +203,8 @@ def notify_requests(es_cfg, requests, use_tq, is_callback, batch_mode=False):
     item.task.enqueued_time.FromDatetime(request.created_ts)
     for i in range(request.num_task_slices):
       s = request.task_slice(i)
-      flat_dimensions = task_queues.dimensions_to_flat(s.properties.dimensions)
+      flat_dimensions = task_queues.bot_dimensions_to_flat(
+          s.properties.dimensions)
       s_pb = item.task.slices.add()
       s_pb.dimensions.extend(flat_dimensions)
 

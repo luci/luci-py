@@ -583,7 +583,7 @@ def bot_event(
   dimensions_updated = False
   dimensions_flat = []
   if dimensions:
-    dimensions_flat = task_queues.dimensions_to_flat(dimensions)
+    dimensions_flat = task_queues.bot_dimensions_to_flat(dimensions)
     if register_dimensions and bot_info.dimensions_flat != dimensions_flat:
       logging.debug('bot_event: Updating dimensions. from: %s, to: %s',
                     bot_info.dimensions_flat, dimensions_flat)

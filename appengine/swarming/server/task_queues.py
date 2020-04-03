@@ -445,7 +445,7 @@ def _rebuild_bot_cache_async(bot_dimensions, bot_root_key):
     yield [future_bots, future_tasks]
 
     # Seal the fact that it has been updated.
-    df = dimensions_to_flat(bot_dimensions)
+    df = bot_dimensions_to_flat(bot_dimensions)
     obj = BotDimensions(id=1, parent=bot_root_key, dimensions_flat=df)
     # Do these steps in order.
     yield obj.put_async()
@@ -823,8 +823,18 @@ def _refresh_TaskDimensions_async(now, valid_until_ts, task_dimensions_flats,
 ### Public APIs.
 
 
-def dimensions_to_flat(dimensions):
-  """Returns a flat '<key>:<value>' sorted list of dimensions.
+def expand_dimensions_to_dimensions_flat(dimensions, allow_cutoff=False):
+  """Expands |dimensions| to a series of dimensions_flat.
+
+  If OR is not used, the result contains exactly one element. Otherwise, it
+  expands the OR dimension into a series of basic dimensions, then flattens each
+  one of them.
+
+  Returns: a list of dimensions_flat expanded from |dimensions|. A
+  dimensions_flat is a sorted list of '<key>:<value>' of the basic dimensions.
+
+  When allow_cutoff is true, the flat key-value pair will be trimmed if it gets
+  too long. Only enable allow_cutoff for bot dimensions!
 
   This function can be called with invalid dimensions that are reported by the
   bot. Tolerate them, but trim dimensions longer than 321 characters (the limit
@@ -855,20 +865,45 @@ def dimensions_to_flat(dimensions):
 
   Silently remove duplicate dimensions, for the same reason as for long ones.
   """
+  dimensions_kv = list(dimensions.items())
+  cur_dimensions_flat = []
+  result = []
   cutoff = config.DIMENSION_KEY_LENGTH + 1 + config.DIMENSION_VALUE_LENGTH
-  out = []
-  for k, values in dimensions.items():
-    for v in values:
-      flat = u'%s:%s' % (k, v)
+
+  def gen(ki, vi):
+    if ki == len(dimensions_kv):
+      # Remove duplicate dimensions. While invalid, we want to make sure they
+      # can be stored without throwing an exception.
+      result.append(sorted(set(cur_dimensions_flat)))
+      return
+
+    key, values = dimensions_kv[ki]
+    if vi == len(values):
+      gen(ki + 1, 0)
+      return
+
+    for v in values[vi].split(OR_DIM_SEP):
+      flat = u'%s:%s' % (key, v)
       if len(flat) > cutoff:
+        assert allow_cutoff, flat
         # An ellipsis is codepoint U+2026 which is encoded with 3 bytes in
         # UTF-8. We're still well below the 1500 bytes limit. Datastore uses
         # UTF-8.
         flat = flat[:cutoff] + u'…'
-      out.append(flat)
-  # Remove duplicate dimensions. While invalid, we want to make sure they can be
-  # stored without throwing an exception.
-  return sorted(set(out))
+
+      cur_dimensions_flat.append(flat)
+      gen(ki, vi + 1)
+      cur_dimensions_flat.pop()
+
+  gen(0, 0)
+  return result
+
+
+def bot_dimensions_to_flat(dimensions):
+  """Returns a flat '<key>:<value>' sorted list of dimensions."""
+  expanded = expand_dimensions_to_dimensions_flat(dimensions, allow_cutoff=True)
+  assert len(expanded) == 1, dimensions
+  return expanded[0]
 
 
 def hash_dimensions(dimensions):
@@ -911,7 +946,7 @@ def assert_bot_async(bot_root_key, bot_dimensions):
   # Check if the bot dimensions changed since last _rebuild_bot_cache_async()
   # call.
   obj = yield ndb.Key(BotDimensions, 1, parent=bot_root_key).get_async()
-  if obj and obj.dimensions_flat == dimensions_to_flat(bot_dimensions):
+  if obj and obj.dimensions_flat == bot_dimensions_to_flat(bot_dimensions):
     # Cache hit, no need to look further.
     logging.debug('assert_bot_async: cache hit. bot_id: %s, bot_dimensions: %s',
                   bot_dimensions.get('id'), bot_dimensions)
@@ -1045,35 +1080,6 @@ def set_has_capacity(dimensions, seconds):
   dimensions_hash = str(hash_dimensions(dimensions))
   memcache.set(
       dimensions_hash, True, time=seconds, namespace='task_queues_tasks')
-
-
-def expand_dimensions_to_dimensions_flat(dimensions):
-  """Expands |dimensions| to a series of dimensions_flat.
-
-  If OR is not used, then this should yield exactly one element. Otherwise, it
-  expands the OR expression into a series of basic dimension values.
-  """
-  dimensions_kv = list(dimensions.items())
-  cur_dimensions_flat = []
-  result = []
-
-  def gen(ki, vi):
-    if ki == len(dimensions_kv):
-      result.append(sorted(cur_dimensions_flat))
-      return
-
-    key, values = dimensions_kv[ki]
-    if vi == len(values):
-      gen(ki + 1, 0)
-      return
-
-    for or_operand in values[vi].split(OR_DIM_SEP):
-      cur_dimensions_flat.append(u'%s:%s' % (key, or_operand))
-      gen(ki, vi + 1)
-      cur_dimensions_flat.pop()
-
-  gen(0, 0)
-  return result
 
 
 @ndb.tasklet

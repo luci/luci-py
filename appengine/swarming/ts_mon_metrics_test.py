@@ -70,7 +70,7 @@ def _gen_bot_info(key_id, last_seen_ts, **kwargs):
     'state': {},
   }
   args.update(**kwargs)
-  args['dimensions_flat'] = task_queues.dimensions_to_flat(
+  args['dimensions_flat'] = task_queues.bot_dimensions_to_flat(
       args.pop('dimensions'))
   return bot_management.BotInfo(**args)
 
