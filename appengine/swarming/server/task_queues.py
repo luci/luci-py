@@ -823,7 +823,7 @@ def _refresh_TaskDimensions_async(now, valid_until_ts, task_dimensions_flats,
 ### Public APIs.
 
 
-def expand_dimensions_to_dimensions_flat(dimensions, allow_cutoff=False):
+def expand_dimensions_to_dimensions_flat(dimensions, is_bot_dim=False):
   """Expands |dimensions| to a series of dimensions_flat.
 
   If OR is not used, the result contains exactly one element. Otherwise, it
@@ -832,9 +832,6 @@ def expand_dimensions_to_dimensions_flat(dimensions, allow_cutoff=False):
 
   Returns: a list of dimensions_flat expanded from |dimensions|. A
   dimensions_flat is a sorted list of '<key>:<value>' of the basic dimensions.
-
-  When allow_cutoff is true, the flat key-value pair will be trimmed if it gets
-  too long. Only enable allow_cutoff for bot dimensions!
 
   This function can be called with invalid dimensions that are reported by the
   bot. Tolerate them, but trim dimensions longer than 321 characters (the limit
@@ -866,6 +863,12 @@ def expand_dimensions_to_dimensions_flat(dimensions, allow_cutoff=False):
   Silently remove duplicate dimensions, for the same reason as for long ones.
   """
   dimensions_kv = list(dimensions.items())
+  for i, (k, v) in enumerate(dimensions_kv):
+    if isinstance(v, (str, unicode)):
+      assert is_bot_dim, (k, v)
+      dimensions_kv[i] = (k, [
+          v,
+      ])
   cur_dimensions_flat = []
   result = []
   cutoff = config.DIMENSION_KEY_LENGTH + 1 + config.DIMENSION_VALUE_LENGTH
@@ -885,7 +888,7 @@ def expand_dimensions_to_dimensions_flat(dimensions, allow_cutoff=False):
     for v in values[vi].split(OR_DIM_SEP):
       flat = u'%s:%s' % (key, v)
       if len(flat) > cutoff:
-        assert allow_cutoff, flat
+        assert is_bot_dim, flat
         # An ellipsis is codepoint U+2026 which is encoded with 3 bytes in
         # UTF-8. We're still well below the 1500 bytes limit. Datastore uses
         # UTF-8.
@@ -901,7 +904,7 @@ def expand_dimensions_to_dimensions_flat(dimensions, allow_cutoff=False):
 
 def bot_dimensions_to_flat(dimensions):
   """Returns a flat '<key>:<value>' sorted list of dimensions."""
-  expanded = expand_dimensions_to_dimensions_flat(dimensions, allow_cutoff=True)
+  expanded = expand_dimensions_to_dimensions_flat(dimensions, is_bot_dim=True)
   assert len(expanded) == 1, dimensions
   return expanded[0]
 
