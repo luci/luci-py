@@ -83,13 +83,6 @@ from server import large
 from server import task_pack
 from server import task_request
 
-# Time at which we can assume completed_ts is always set for task results.
-#
-# TODO(maruel): Remove this constant and all the code paths where it's
-# referenced in 2020-07-01 once there's no task result entities (TaskRunResult
-# and TaskResultSummary) left without completed_ts set.
-_COMPLETED_TS_CUTOFF = datetime.datetime(2019, 3, 1)
-
 
 class State(object):
   """Represents the current task state.
@@ -1598,20 +1591,6 @@ def task_bq_run(start, end):
     total += len(rows)
     failed += bq_state.send_to_bq('task_results_run', rows)
 
-  # Compatibility code for old tasks that didn't set completed_ts.
-  if start < _COMPLETED_TS_CUTOFF:
-    q = TaskRunResult.query(
-        TaskRunResult.abandoned_ts >= start,
-        TaskRunResult.abandoned_ts <= end)
-    cursor = None
-    more = True
-    while more:
-      entities, cursor, more = q.fetch_page(500, start_cursor=cursor)
-      rows = [_convert(e) for e in entities if e.task_id not in seen]
-      seen.update(e.task_id for e in entities)
-      total += len(rows)
-      failed += bq_state.send_to_bq('task_results_run', rows)
-
   return total, failed
 
 
@@ -1648,19 +1627,5 @@ def task_bq_summary(start, end):
     seen.update(e.task_id for e in entities)
     total += len(rows)
     failed += bq_state.send_to_bq('task_results_summary', rows)
-
-  # Compatibility code for old tasks that didn't set completed_ts.
-  if start < _COMPLETED_TS_CUTOFF:
-    q = TaskResultSummary.query(
-        TaskResultSummary.abandoned_ts >= start,
-        TaskResultSummary.abandoned_ts <= end)
-    cursor = None
-    more = True
-    while more:
-      entities, cursor, more = q.fetch_page(500, start_cursor=cursor)
-      rows = [_convert(e) for e in entities if e.task_id not in seen]
-      seen.update(e.task_id for e in entities)
-      total += len(rows)
-      failed += bq_state.send_to_bq('task_results_summary', rows)
 
   return total, failed

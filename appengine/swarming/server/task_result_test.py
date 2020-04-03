@@ -997,29 +997,10 @@ class TaskResultApiTest(TestCase):
     self.assertEqual((0, 0), task_result.task_bq_run(start, end))
     self.assertEqual(0, len(payloads), payloads)
 
-  def test_task_bq_run_old_abandoned_ts(self):
-    # Confirm that an old entity without completed_ts set is still found.
-    payloads = self._mock_send_to_bq('task_results_run')
-    self.now = task_result._COMPLETED_TS_CUTOFF - datetime.timedelta(days=1)
-    start = self.mock_now(self.now, 0)
-    run_result = _gen_run_result()
-    run_result.abandoned_ts = utils.utcnow()
-    run_result.modified_ts = utils.utcnow()
-    run_result.put()
-    self.assertIsNone(run_result.key.get().completed_ts)
-    end = self.mock_now(self.now, 60)
-
-    self.assertEqual((1, 0), task_result.task_bq_run(start, end))
-    self.assertEqual(1, len(payloads), payloads)
-    actual_rows = payloads[0]
-    self.assertEqual(1, len(actual_rows))
-    self.assertEqual([run_result.task_id], [r[0] for r in actual_rows])
-
   def test_task_bq_run_recent_abandoned_ts(self):
     # Confirm that a recent entity without completed_ts set is not found.
     payloads = self._mock_send_to_bq('task_results_run')
-    self.now = task_result._COMPLETED_TS_CUTOFF + datetime.timedelta(days=1)
-    start = self.mock_now(self.now, 0)
+    start = self.now
     run_result = _gen_run_result()
     # Make sure started_ts is not caught.
     run_result.started_ts = datetime.datetime(2010, 1, 1)
@@ -1100,29 +1081,10 @@ class TaskResultApiTest(TestCase):
     self.assertEqual((0, 0), task_result.task_bq_summary(start, end))
     self.assertEqual(0, len(payloads), payloads)
 
-  def test_task_bq_summary_old_abandoned_ts(self):
-    # Confirm that an old entity without completed_ts set is still found.
-    payloads = self._mock_send_to_bq('task_results_summary')
-    self.now = task_result._COMPLETED_TS_CUTOFF - datetime.timedelta(days=1)
-    start = self.mock_now(self.now, 0)
-    result = _gen_summary_result()
-    result.abandoned_ts = utils.utcnow()
-    result.modified_ts = utils.utcnow()
-    result.put()
-    self.assertIsNone(result.key.get().completed_ts)
-    end = self.mock_now(self.now, 60)
-
-    self.assertEqual((1, 0), task_result.task_bq_summary(start, end))
-    self.assertEqual(1, len(payloads), payloads)
-    actual_rows = payloads[0]
-    self.assertEqual(1, len(actual_rows))
-    self.assertEqual([result.task_id], [r[0] for r in actual_rows])
-
   def test_task_bq_summary_recent_abandoned_ts(self):
     # Confirm that a recent entity without completed_ts set is not found.
     payloads = self._mock_send_to_bq('task_results_summary')
-    self.now = task_result._COMPLETED_TS_CUTOFF + datetime.timedelta(days=1)
-    start = self.mock_now(self.now, 0)
+    start = self.now
     result = _gen_summary_result()
     # Make sure neither created_ts and started_ts is caught.
     result.created_ts = datetime.datetime(2010, 1, 1)
