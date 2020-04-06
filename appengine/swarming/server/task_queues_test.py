@@ -738,8 +738,8 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(
         task_queues.hash_dimensions(dim1), task_queues.hash_dimensions(dim2))
 
-  def test_expand_dimensions_to_dimensions_flat(self):
-    expand = task_queues.expand_dimensions_to_dimensions_flat
+  def test_expand_dimensions_to_flat(self):
+    expand = task_queues.expand_dimensions_to_flat
     # Without OR
     actual = set(
         tuple(f) for f in expand({

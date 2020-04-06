@@ -520,8 +520,8 @@ def match_dimensions(request_dimensions, bot_dimensions):
 
   bot_flat = frozenset(task_queues.bot_dimensions_to_flat(bot_dimensions))
   return any(
-      frozenset(f).issubset(bot_flat) for f in task_queues
-      .expand_dimensions_to_dimensions_flat(request_dimensions))
+      frozenset(f).issubset(bot_flat)
+      for f in task_queues.expand_dimensions_to_flat(request_dimensions))
 
 
 def set_lookup_cache(to_run_key, is_available_to_schedule):

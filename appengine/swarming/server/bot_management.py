@@ -721,8 +721,7 @@ def has_capacity(dimensions):
     raise ndb.Return(False)
 
   futures = [
-      run_query(f)
-      for f in task_queues.expand_dimensions_to_dimensions_flat(dimensions)
+      run_query(f) for f in task_queues.expand_dimensions_to_flat(dimensions)
   ]
 
   ndb.tasklets.Future.wait_all(futures)
