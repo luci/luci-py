@@ -429,6 +429,46 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
             run_result.key, bot_id=u'bot2', exit_code=0, duration=0.1))
     self.assertEqual(1, self.execute_tasks())
 
+  @parameterized.expand([(0,), (1,)])
+  def test_either_bot_reap_tasks_using_or_dimensions(self, bi):
+    bots_ids = [u'bot1', u'bot2']
+    bot1_dimensions = self.bot_dimensions.copy()
+    bot1_dimensions[u'id'] = [bots_ids[0]]
+    bot1_dimensions[u'os'] = [u'v1', u'v2']
+    bot1_dimensions[u'gpu'] = [u'nv', u'sega']
+    self._register_bot(0, bot1_dimensions)
+
+    bot2_dimensions = self.bot_dimensions.copy()
+    bot2_dimensions[u'id'] = [bots_ids[1]]
+    bot2_dimensions[u'os'] = [u'v2']
+    bot2_dimensions[u'gpu'] = [u'amd', u'sega']
+    self._register_bot(0, bot2_dimensions)
+    bots_dimensions = [bot1_dimensions, bot2_dimensions]
+
+    task_slices = [
+        task_request.TaskSlice(
+            expiration_secs=60,
+            properties=_gen_properties(
+                dimensions={
+                    u'pool': [u'default'],
+                    u'os': [u'v1|v2'],
+                    u'gpu': [u'sega', u'amd|nv'],
+                }),
+            wait_for_capacity=False),
+    ]
+    self._quick_schedule(1, task_slices=task_slices)
+
+    test_bot_id = bots_ids[bi]
+    _, _, run_result = task_scheduler.bot_reap_task(bots_dimensions[bi], 'abc')
+    self.assertEqual(test_bot_id, run_result.bot_id)
+    to_run_key = _run_result_to_to_run_key(run_result)
+    self.assertIsNone(to_run_key.get().queue_number)
+    self.assertEqual(
+        State.COMPLETED,
+        _bot_update_task(
+            run_result.key, bot_id=test_bot_id, exit_code=0, duration=0.1))
+    self.assertEqual(1, self.execute_tasks())
+
   def test_schedule_request(self):
     # It is tested indirectly in the other functions.
     # Essentially check _quick_schedule() and _register_bot() works.
