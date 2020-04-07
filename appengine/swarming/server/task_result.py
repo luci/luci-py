@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014 The LUCI Authors. All rights reserved.
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
@@ -1561,31 +1560,17 @@ def cron_update_tags():
   return len(tags)
 
 
-@ndb.tasklet
-def _convert_to_proto_async(e):
-  """Returns a tuple(bq_key, row)."""
-  if not e.completed_ts:
-    logging.warning(
-        'crbug.com/1064833: task %s does not have completed_ts %s '
-        '¯\_(ツ)_/¯', e.task_id, e)
-    e = yield e.key.get_async(use_memcache=False, use_cache=False)
-
-    if not e.completed_ts:
-      logging.warning(
-          'crbug.com/1064833: task %s still does not have completed_ts '
-          '¯\_(ツ)_/¯', e.task_id)
-
-  out = swarming_pb2.TaskResult()
-  e.to_proto(out)
-  raise ndb.Return((e.task_id, out))
-
-
 def task_bq_run(start, end):
   """Sends TaskRunResult to BigQuery swarming.task_results_run table.
 
   Multiple queries are run one after the other. This is because ndb.OR() cannot
   be used when the subqueries are inequalities on different fields.
   """
+  def _convert(e):
+    """Returns a tuple(bq_key, row)."""
+    out = swarming_pb2.TaskResult()
+    e.to_proto(out)
+    return (e.task_id, out)
 
   failed = 0
   total = 0
@@ -1601,9 +1586,7 @@ def task_bq_run(start, end):
   more = True
   while more:
     entities, cursor, more = q.fetch_page(500, start_cursor=cursor)
-    futures = [_convert_to_proto_async(e) for e in entities]
-    ndb.Future.wait_all(futures)
-    rows = [f.get_result() for f in futures]
+    rows = [_convert(e) for e in entities]
     seen.update(e.task_id for e in entities)
     total += len(rows)
     failed += bq_state.send_to_bq('task_results_run', rows)
@@ -1617,6 +1600,15 @@ def task_bq_summary(start, end):
   Multiple queries are run one after the other. This is because ndb.OR() cannot
   be used when the subqueries are inequalities on different fields.
   """
+  def _convert(e):
+    """Returns a tuple(bq_key, row)."""
+    out = swarming_pb2.TaskResult()
+    e.to_proto(out)
+    if not out.HasField('end_time'):
+      logging.warning('crbug.com/1064833: task %s does not have end_time %s',
+                      e.task_id, out)
+    return (e.task_id, out)
+
   failed = 0
   total = 0
   seen = set()
@@ -1631,9 +1623,7 @@ def task_bq_summary(start, end):
   more = True
   while more:
     entities, cursor, more = q.fetch_page(500, start_cursor=cursor)
-    futures = [_convert_to_proto_async(e) for e in entities]
-    ndb.Future.wait_all(futures)
-    rows = [f.get_result() for f in futures]
+    rows = [_convert(e) for e in entities]
     seen.update(e.task_id for e in entities)
     total += len(rows)
     failed += bq_state.send_to_bq('task_results_summary', rows)
