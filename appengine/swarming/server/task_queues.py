@@ -823,7 +823,7 @@ def _refresh_TaskDimensions_async(now, valid_until_ts, task_dimensions_flats,
 ### Public APIs.
 
 
-def expand_dimensions_to_flat(dimensions, is_bot_dim=False):
+def expand_dimensions_to_flats(dimensions, is_bot_dim=False):
   """Expands |dimensions| to a series of dimensions_flat.
 
   If OR is not used, the result contains exactly one element. Otherwise, it
@@ -904,7 +904,7 @@ def expand_dimensions_to_flat(dimensions, is_bot_dim=False):
 
 def bot_dimensions_to_flat(dimensions):
   """Returns a flat '<key>:<value>' sorted list of dimensions."""
-  expanded = expand_dimensions_to_flat(dimensions, is_bot_dim=True)
+  expanded = expand_dimensions_to_flats(dimensions, is_bot_dim=True)
   assert len(expanded) == 1, dimensions
   return expanded[0]
 
@@ -1125,7 +1125,7 @@ def rebuild_task_cache_async(payload):
                                                  task_dimensions)
   now = utils.utcnow()
 
-  expanded_task_dimensions_flats = expand_dimensions_to_flat(task_dimensions)
+  expanded_task_dimensions_flats = expand_dimensions_to_flats(task_dimensions)
   try:
     yield [
         _refresh_all_BotTaskDimensions_async(now, valid_until_ts, df,
