@@ -741,6 +741,28 @@ class ApiTest(test_case.EndpointsTestCase):
       }],
     })
 
+  def test_get_config_multi_caching_works(self):
+    self.mock(storage, 'get_latest_configs_async', mock.Mock())
+    storage.get_latest_configs_async.return_value = future({
+        'projects/chromium': ('deadbeef', 'https://x.com/+/deadbeef', 'fedcba',
+                              'some content'),
+        'projects/v8': (
+            'beefdead',
+            'https://x.com/+/deadbeef',
+            'abcdef',
+            None  # no content
+        ),
+    })
+    # Cache miss.
+    res1 = api.get_config_multi(
+        scope='projects', path='commit-queue.cfg', hashes_only=False)
+    self.assertEqual(storage.get_latest_configs_async.call_count, 1)
+    # Cache hit.
+    res2 = api.get_config_multi(
+        scope='projects', path='commit-queue.cfg', hashes_only=False)
+    self.assertEqual(storage.get_latest_configs_async.call_count, 1)
+    self.assertEqual(res1, res2)
+
   ##############################################################################
   # get_ref_configs
 

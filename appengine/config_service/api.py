@@ -2,7 +2,9 @@
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
 
+import cPickle
 import logging
+import zlib
 
 from google.appengine.api import memcache
 from google.appengine.ext import ndb
@@ -554,8 +556,9 @@ def get_config_multi(scope, path, hashes_only):
   """
   assert scope in ('projects', 'refs'), scope
   cache_key = (
-    'v2/%s%s:%s' % (scope, ',hashes_only' if hashes_only else '', path))
-  configs = memcache.get(cache_key)
+      'v4/%s%s:%s' % (scope, ',hashes_only' if hashes_only else '', path))
+  configs = _memcache_get_compressed(cache_key)
+
   if configs is None:
     config_sets = list(get_config_sets_from_scope(scope))
     cfg_map = storage.get_latest_configs_async(
@@ -577,7 +580,7 @@ def get_config_multi(scope, path, hashes_only):
             'Blob %s referenced from %s:%s:%s was not found',
             content_hash, cs, rev, path)
     try:
-      memcache.add(cache_key, configs, time=60)
+      _memcache_add_compressed(cache_key, configs, time=60)
     except ValueError:
       logging.exception('%s:%s configs are too big for memcache', scope, path)
 
@@ -588,13 +591,14 @@ def get_config_multi(scope, path, hashes_only):
       continue
     if not hashes_only and config.get('content') is None:
       continue
-    res.configs.append(res.ConfigEntry(
-        config_set=config['config_set'],
-        revision=config['revision'],
-        content_hash=config['content_hash'],
-        content=config.get('content'),
-        url=config.get('url'),
-    ))
+    res.configs.append(
+        res.ConfigEntry(
+            config_set=config['config_set'],
+            revision=config['revision'],
+            content_hash=config['content_hash'],
+            content=config.get('content'),
+            url=config.get('url'),
+        ))
   return res
 
 
@@ -611,3 +615,17 @@ def can_read_config_sets(config_sets):
 
 def can_read_config_set(config_set):
   return can_read_config_sets([config_set]).get(config_set)
+
+
+def _memcache_get_compressed(key):
+  buf = memcache.get(key)
+  if buf is None:
+    return buf
+  return cPickle.loads(zlib.decompress(buf))
+
+
+def _memcache_add_compressed(key, value, time, level=5):
+  memcache.add(
+      key,
+      zlib.compress(cPickle.dumps(value, cPickle.HIGHEST_PROTOCOL), level),
+      time=time)
