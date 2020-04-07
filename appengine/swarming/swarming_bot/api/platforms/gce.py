@@ -295,10 +295,18 @@ def get_cpuinfo():
   # TODO: Update once we get other platforms. We don't know in advance what
   # 'creative' names will be used so better to fail explicitly and fix it right
   # away.
-  assert cpu_platform.startswith(u'Intel '), cpu_platform
+  cpu_name = None
+  vendor = None
+  if cpu_platform.startswith(u'Intel '):
+    cpu_name = u'Intel(R) Xeon(R) CPU %s GCE' % cpu_platform[len(u'Intel '):]
+    vendor = u'GenuineIntel'
+  elif cpu_platform.startswith(u'AMD '):
+    cpu_name = u'%s GCE' % cpu_platform
+    vendor = u'AuthenticAMD'
+  assert cpu_name is not None, cpu_platform
   return {
-    u'name': u'Intel(R) Xeon(R) CPU %s GCE' % cpu_platform[len(u'Intel '):],
-    u'vendor': u'GenuineIntel',
+      u'name': cpu_name,
+      u'vendor': vendor,
   }
 
 
