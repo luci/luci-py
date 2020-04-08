@@ -1,5 +1,5 @@
-export PATH := $(PWD)/nodejs/bin:$(PATH)
-export npm_config_cache := $(PWD)/.npm
+export PATH := $(CURDIR)/nodejs/bin:$(PATH)
+export npm_config_cache := $(CURDIR)/.npm
 
 .ONESHELL:
 
