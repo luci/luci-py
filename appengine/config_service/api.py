@@ -173,23 +173,20 @@ class ConfigApi(remote.Service):
         auth.get_current_identity().to_bytes(),
         request.config_set,
         [f.path for f in request.files])
-    if not request.config_set:
-      raise endpoints.BadRequestException('Must specify a config_set')
-    if not request.files:
-      raise endpoints.BadRequestException('Must specify files to validate')
-    for f in request.files:
-      if not f.path:
-        raise endpoints.BadRequestException('Must specify the path of a file')
-    if not acl.has_validation_access():
+
+    try:
+      validation.validate_config_set(request.config_set)
+      if not request.files:
+        raise ValueError('Must specify files to validate')
+      for f in request.files:
+        validation.validate_path(f.path)
+    except ValueError as ex:
+      raise endpoints.BadRequestException(ex.message)
+
+    if not acl.can_validate(request.config_set):
       logging.warning(
           '%s does not have validation access',
           auth.get_current_identity().to_bytes())
-      raise endpoints.ForbiddenException()
-    if not can_read_config_set(request.config_set):
-      logging.warning(
-          '%s does not have access to %s',
-          auth.get_current_identity().to_bytes(),
-          request.config_set)
       raise endpoints.ForbiddenException()
 
     futs = []
@@ -198,9 +195,8 @@ class ConfigApi(remote.Service):
       with ctx.prefix(f.path + ': '):
         futs.append(validation.validate_config_async(
             request.config_set, f.path, f.content, ctx=ctx))
-
     ndb.Future.wait_all(futs)
-    # return the severities and the texts
+
     msgs = []
     for f, fut in zip(request.files, futs):
       for msg in fut.get_result().messages:

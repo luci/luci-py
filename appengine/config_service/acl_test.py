@@ -24,10 +24,6 @@ def can_read_config_set(config_set):
   return acl.can_read_config_sets([config_set])[config_set]
 
 
-def has_project_access(project_id):
-  return acl.has_projects_access([project_id])[project_id]
-
-
 class AclTestCase(test_case.TestCase):
   def setUp(self):
     super(AclTestCase, self).setUp()
@@ -48,7 +44,7 @@ class AclTestCase(test_case.TestCase):
     self.mock(acl, 'is_admin', mock.Mock(return_value=True))
     self.assertTrue(can_read_config_set('services/swarming'))
     self.assertTrue(can_read_config_set('projects/chromium'))
-    self.assertTrue(has_project_access('chromium'))
+    self.assertTrue(acl.has_project_access('chromium'))
 
   def test_has_service_access(self):
     self.assertFalse(can_read_config_set('services/swarming'))
@@ -96,7 +92,7 @@ class AclTestCase(test_case.TestCase):
     self.assertTrue(can_read_config_set('projects/secret'))
 
   def test_can_read_project_config_no_access(self):
-    self.assertFalse(has_project_access('projects/swarming'))
+    self.assertFalse(acl.has_project_access('swarming'))
     self.assertFalse(can_read_config_set('projects/swarming/refs/heads/x'))
 
   def test_malformed_config_set(self):

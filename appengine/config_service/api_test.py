@@ -821,7 +821,7 @@ class ApiTest(test_case.EndpointsTestCase):
     self.mock(acl, 'can_read_config_sets', mock.Mock(return_value={
       'services/luci-config': True,
     }))
-    self.mock(acl, 'has_validation_access', mock.Mock(return_value=True))
+    self.mock(acl, 'can_validate', mock.Mock(return_value=True))
 
     req = {
       'config_set': 'services/luci-config',
@@ -847,7 +847,7 @@ class ApiTest(test_case.EndpointsTestCase):
     self.mock(acl, 'can_read_config_sets', mock.Mock(return_value={
       'services/luci-config': True,
     }))
-    self.mock(acl, 'has_validation_access', mock.Mock(return_value=True))
+    self.mock(acl, 'can_validate', mock.Mock(return_value=True))
     with self.call_should_fail(400):
       self.call_api('validate_config', req)
 
@@ -859,7 +859,7 @@ class ApiTest(test_case.EndpointsTestCase):
     self.mock(acl, 'can_read_config_sets', mock.Mock(return_value={
       'services/luci-config': True,
     }))
-    self.mock(acl, 'has_validation_access', mock.Mock(return_value=True))
+    self.mock(acl, 'can_validate', mock.Mock(return_value=True))
     with self.call_should_fail(400):
       self.call_api('validate_config', req)
 

@@ -13,19 +13,42 @@ import services
 import storage
 
 
-# Cache acl.cfg for 10min. It never changes.
-@utils.cache_with_expiration(10 * 60)
-def get_acl_cfg():
-  return storage.get_self_config_async(
-      common.ACL_FILENAME, service_config_pb2.AclCfg).get_result()
-
-
 def can_reimport(config_set):
-  if not can_read_config_sets([config_set])[config_set]:
-    return False
-  acl_cfg = get_acl_cfg()
-  return acl_cfg and acl_cfg.reimport_group and auth.is_group_member(
-    acl_cfg.reimport_group) or is_admin()
+  project_id = _extract_project_id(config_set)
+  if project_id:
+    return _can_reimport_project_cs(project_id)
+  service_id = _extract_service_id(config_set)
+  if service_id:
+    return _can_reimport_service_cs(service_id)
+  raise ValueError('invalid config_set %r' % config_set)
+
+
+def _can_reimport_project_cs(project_id):
+  # TODO(vadimsh): Switch to using Realms.
+  return has_project_access(project_id) and _check_acl_cfg('reimport_group')
+
+
+def _can_reimport_service_cs(service_id):
+  return has_service_access(service_id) and _check_acl_cfg('reimport_group')
+
+
+def can_validate(config_set):
+  project_id = _extract_project_id(config_set)
+  if project_id:
+    return _can_validate_project_cs(project_id)
+  service_id = _extract_service_id(config_set)
+  if service_id:
+    return _can_validate_service_cs(service_id)
+  raise ValueError('invalid config_set %r' % config_set)
+
+
+def _can_validate_project_cs(project_id):
+  # TODO(vadimsh): Switch to using Realms.
+  return has_project_access(project_id) and _check_acl_cfg('validation_group')
+
+
+def _can_validate_service_cs(service_id):
+  return has_service_access(service_id) and _check_acl_cfg('validation_group')
 
 
 def can_read_config_sets(config_sets):
@@ -37,44 +60,41 @@ def can_read_config_sets(config_sets):
     ValueError if any config_set is malformed.
   """
   assert isinstance(config_sets, list)
-  check_via = {}
-  for cs in config_sets:
-    ref_match = config.REF_CONFIG_SET_RGX.match(cs)
-    if ref_match:
-      project_id = ref_match.group(1)
-      check_via[cs] = 'projects/' + project_id
-    else:
-      check_via[cs] = cs
 
-  project_ids = []
-  service_ids = []
-  for cs in set(check_via.values()):
-    service_match = config.SERVICE_CONFIG_SET_RGX.match(cs)
-    if service_match:
-      service_ids.append(service_match.group(1))
-    else:
-      project_match = config.PROJECT_CONFIG_SET_RGX.match(cs)
-      if project_match:
-        project_ids.append(project_match.group(1))
-      else:
-        raise ValueError('invalid config_set %r' % cs)
+  PROJECT = 1
+  SERVICE = 2
+
+  project_ids = set()
+  service_ids = set()
+
+  check_via = {}  # config set -> (PROJECT|SERVICE, id)
+
+  for cs in config_sets:
+    project_id = _extract_project_id(cs)
+    if project_id:
+      check_via[cs] = (PROJECT, project_id)
+      project_ids.add(project_id)
+      continue
+    service_id = _extract_service_id(cs)
+    if service_id:
+      check_via[cs] = (SERVICE, service_id)
+      service_ids.add(service_id)
+      continue
+    raise ValueError('invalid config_set %r' % cs)
 
   access_map = {}
-  for pid, access in has_projects_access(project_ids).items():
-    access_map['projects/' + pid] = access
-  for sid, access in has_services_access(service_ids).items():
-    access_map['services/' + sid] = access
+  for project_id, access in has_projects_access(list(project_ids)).items():
+    access_map[(PROJECT, project_id)] = access
+  for service_id, access in has_services_access(list(service_ids)).items():
+    access_map[(SERVICE, service_id)] = access
 
-  return {
-    cs: access_map[check_via[cs]]
-    for cs in config_sets
-  }
+  return {cs: access_map[check_via[cs]] for cs in config_sets}
 
 
 def is_admin():
   if auth.is_superuser():
     return True
-  acl_cfg = get_acl_cfg()
+  acl_cfg = _get_acl_cfg()
   return auth.is_group_member(
       acl_cfg and acl_cfg.admin_group or auth.ADMIN_GROUP)
 
@@ -87,12 +107,8 @@ def has_services_access(service_ids):
   assert isinstance(service_ids, list)
   if not service_ids:
     return {}
-  for sid in service_ids:
-    assert isinstance(sid, basestring)
-    assert sid
 
-  super_group = get_acl_cfg().service_access_group
-  if is_admin() or super_group and auth.is_group_member(super_group):
+  if _check_acl_cfg('service_access_group'):
     return {sid: True for sid in service_ids}
 
   service_id_set = set(service_ids)
@@ -105,21 +121,58 @@ def has_services_access(service_ids):
   return dict(zip(service_ids, has_access))
 
 
+def has_service_access(service_id):
+  return has_services_access([service_id])[service_id]
+
+
 def has_projects_access(project_ids):
+  # TODO(vadimsh): Switch to using Realms.
+  assert isinstance(project_ids, list)
   if not project_ids:
     return {}
-  super_group = get_acl_cfg().project_access_group
-  if is_admin() or super_group and auth.is_group_member(super_group):
+
+  if _check_acl_cfg('project_access_group'):
     return {pid: True for pid in project_ids}
+
   metadata = projects.get_metadata_async(project_ids).get_result()
   has_access = _has_access([metadata.get(pid) for pid in project_ids])
   return dict(zip(project_ids, has_access))
 
 
-def has_validation_access():
-  validation_group = get_acl_cfg().validation_group
-  return is_admin() or (validation_group and
-                        auth.is_group_member(validation_group))
+def has_project_access(project_id):
+  return has_projects_access([project_id])[project_id]
+
+
+def can_get_by_hash():
+  # TODO(vadimsh): Delete this, it is effectively always True in our deployment.
+  acl_cfg = _get_acl_cfg()
+  if not acl_cfg.config_get_by_hash_group:
+    return True
+  return auth.is_group_member(acl_cfg.config_get_by_hash_group)
+
+
+# Cache acl.cfg for 10min. It never changes.
+@utils.cache_with_expiration(10 * 60)
+def _get_acl_cfg():
+  return storage.get_self_config_async(
+      common.ACL_FILENAME, service_config_pb2.AclCfg).get_result()
+
+
+def _check_acl_cfg(group_id):
+  """Checks the caller is an admin or a member of a group from acl.cfg."""
+  assert group_id in (
+      'reimport_group',
+      'validation_group',
+      'service_access_group',
+      'project_access_group',
+  )
+  if is_admin():
+    return True
+  acl_cfg = _get_acl_cfg()
+  return (
+      acl_cfg and
+      getattr(acl_cfg, group_id) and
+      auth.is_group_member(getattr(acl_cfg, group_id)))
 
 
 def _has_access(resources):
@@ -138,10 +191,20 @@ def _has_access(resources):
   ]
 
 
-def can_get_by_hash():
-  acl_cfg = get_acl_cfg()
-  # TODO(kamrik): Remove this once acl.cfg is updated b/64201867
-  if not acl_cfg.config_get_by_hash_group:
-    return True
+def _extract_project_id(config_set):
+  """Returns a project ID for projects/... config sets or None for the rest."""
+  ref_match = config.REF_CONFIG_SET_RGX.match(config_set)
+  if ref_match:
+    return ref_match.group(1)
+  project_match = config.PROJECT_CONFIG_SET_RGX.match(config_set)
+  if project_match:
+    return project_match.group(1)
+  return None
 
-  return auth.is_group_member(acl_cfg.config_get_by_hash_group)
+
+def _extract_service_id(config_set):
+  """Returns a service ID for services/... config sets or None for the rest."""
+  service_match = config.SERVICE_CONFIG_SET_RGX.match(config_set)
+  if service_match:
+    return service_match.group(1)
+  return None
