@@ -490,7 +490,8 @@ class FilesRef(ndb.Model):
   """
   # The hash of an isolated archive.
   isolated = ndb.StringProperty(indexed=False)
-  # The hostname of the isolated server to use or the Google Cloud Project name.
+  # The hostname of the isolated server with scheme to use or the Google Cloud
+  # Project name.
   isolatedserver = ndb.StringProperty(indexed=False)
   # Namespace on the isolate server or "sha256-GCP" for a RBE CAS.
   namespace = ndb.StringProperty(indexed=False)

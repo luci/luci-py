@@ -241,7 +241,8 @@ class FilesRef(messages.Message):
   """
   # The hash of an isolated archive.
   isolated = messages.StringField(1)
-  # The hostname of the isolated server to use or the Google Cloud Project name.
+  # The hostname of the isolated server with scheme to use or the Google Cloud
+  # Project name.
   isolatedserver = messages.StringField(2)
   # Namespace on the isolate server or "sha256-GCP" for a GCP hosted RBE CAS.
   namespace = messages.StringField(3)
