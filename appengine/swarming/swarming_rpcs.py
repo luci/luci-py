@@ -470,20 +470,18 @@ class NewTaskRequest(messages.Message):
   # Defines what OAuth2 credentials the task uses when calling other services.
   #
   # Possible values are:
-  #   - 'none': do not use task service accounts at all, this is default.
+  #   - 'none': do not use a task service account at all, this is the default.
   #   - 'bot': use bot's own account, works only if bots authenticate with
   #       OAuth2.
-  #   - 'email': use this account (if token server's service_accounts.cfg rules
-  #       allow it). Not implemented yet.
+  #   - <some email>: use this specific service account if it is allowed in the
+  #       pool (via 'allowed_service_account' pools.cfg setting) and configured
+  #       in the token server's service_accounts.cfg.
   #
   # Note that the service account name is specified outside of task properties,
   # and thus it is possible to have two tasks with different service accounts,
   # but identical properties hash (so one can be deduped). If this is unsuitable
   # use 'idempotent=False' or include a service account name in properties
   # separately.
-  #
-  # TODO(vadimsh): Link to a doc that describes Swarming Service Accounts, when
-  # it exists.
   service_account = messages.StringField(8)
 
   # Full topic name to post task state updates to, e.g.
