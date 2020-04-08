@@ -632,7 +632,8 @@ const logsSection = (ele, request, result) => {
       <tr>
         <td>Bot related server Logs</td>
         <td>
-          <a href=${serverBotLogsURL(ele, request, result)} target="_blank">
+          <a href=${serverBotLogsURL(ele, request, result)} target="_blank"
+             ?hidden=${!result.bot_id}>
             View on Cloud Console
           </a>
         </td>
