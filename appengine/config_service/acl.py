@@ -143,14 +143,6 @@ def has_project_access(project_id):
   return has_projects_access([project_id])[project_id]
 
 
-def can_get_by_hash():
-  # TODO(vadimsh): Delete this, it is effectively always True in our deployment.
-  acl_cfg = _get_acl_cfg()
-  if not acl_cfg.config_get_by_hash_group:
-    return True
-  return auth.is_group_member(acl_cfg.config_get_by_hash_group)
-
-
 # Cache acl.cfg for 10min. It never changes.
 @utils.cache_with_expiration(10 * 60)
 def _get_acl_cfg():

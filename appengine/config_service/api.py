@@ -356,7 +356,7 @@ class ConfigApi(remote.Service):
       GetConfigByHashResponseMessage,
       http_method='GET',
       path='config/{content_hash}')
-  @auth.require(acl.can_get_by_hash)
+  @auth.public # assumes the hash itself is a guarded secret
   def get_config_by_hash(self, request):
     """Gets a config file by its hash."""
     res = self.GetConfigByHashResponseMessage(
