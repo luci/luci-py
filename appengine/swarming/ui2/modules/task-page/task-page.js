@@ -636,6 +636,7 @@ const logsSection = (ele, request, result) => {
              ?hidden=${!result.bot_id}>
             View on Cloud Console
           </a>
+          <p ?hidden=${result.bot_id}>--</p>
         </td>
       </tr>
       <tr>
