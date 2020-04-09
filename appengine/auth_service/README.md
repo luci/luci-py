@@ -96,7 +96,7 @@ Auth Service's own web frontend (i.e. it is mostly used by humans). It is
 documented [right there](https://chrome-infra-auth.appspot.com/auth/api).
 Alternatively, read the
 [source code](../components/components/auth/ui/rest_api.py). This API is
-appropriate for modifying groups and for adhoc checks when debugging
+appropriate for modifying groups and for ad-hoc checks when debugging
 access errors (and both these tasks can be done through the web UI, so there's
 rarely a need to use this API directly).
 

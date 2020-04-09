@@ -7,7 +7,7 @@ internet with high level of duplication. The cache is content addressed and uses
 Isolate enables sending _temporary_ files around. It is a pure cache, _files_
 will be deleted.
 
-Isolate can be used standalone when only files need to be transfered but no task
+Isolate can be used standalone when only files need to be transferred but no task
 scheduler is needed.
 
 [Documentation](doc)

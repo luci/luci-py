@@ -21,7 +21,7 @@ As a result, Auth services has the following for free
 ### Project config example
 
 Project chromium is a tenant of Swarming service. Swarming is
-chromum-independent therefore it does not contain configuration for chromium,
+chromium-independent therefore it does not contain configuration for chromium,
 but chromium needs to supply its config to swarming. Chromium configs can be
 stored in chromium repository and be imported into `projects/chromium` config
 set. `projects.cfg` in `services/luci-config` config set contains a list of
@@ -48,7 +48,7 @@ component to read `swarming.cfg` from `projects/<project id>` config set.
 There are three types of configs:
 
 1.  Service configs. A service may have a global project-independent config.
-    Example: auth service has a whiltelist of oauth2 client ids. These configs
+    Example: auth service has a whitelist of oauth2 client ids. These configs
     are generally not interesting to project maintainers.
 
     Service configs live in `services/<service_id>` config sets. For GAE apps,

@@ -7,7 +7,7 @@ for [config_service](../../../config_service).
 The library can work in two modes: remote and fs. In remote mode the library
 fetches configs from a configuration service. In fs mode it uses file system
 as a source of configs. The library defaults to fs mode if URL of the config
-service is uknown.
+service is unknown.
 
 ## Remote mode
 
