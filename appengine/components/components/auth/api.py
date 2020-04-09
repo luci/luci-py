@@ -44,6 +44,8 @@ __all__ = [
   'AuthenticationError',
   'AuthorizationError',
   'autologin',
+  'check_permission',
+  'check_permission_dryrun',
   'disable_process_cache',
   'Error',
   'get_auth_details',
@@ -60,10 +62,13 @@ __all__ = [
   'is_group_member',
   'is_in_ip_whitelist',
   'is_superuser',
+  'legacy_realm',
   'list_group',
   'new_auth_details',
+  'Permission',
   'public',
   'require',
+  'root_realm',
   'SecretKey',
   'verify_ip_whitelisted',
   'warmup',
@@ -1756,3 +1761,166 @@ def autologin(func):
 def is_decorated(func):
   """Return True if |func| is decorated by @public or @require decorators."""
   return hasattr(func, '__auth_public') or hasattr(func, '__auth_require')
+
+
+################################################################################
+## Realms permission checks.
+
+
+class Permission(collections.namedtuple('Permission', 'name')):
+  """Represents a single permission.
+
+  Permission is a symbol that has form "<service>.<subject>.<verb>", which
+  describes some elementary action ("<verb>") that can be done to some category
+  of resources ("<subject>"), managed by some particular kind of LUCI service
+  ("<service>").
+
+  Each individual LUCI service should document what permissions it checks and
+  when. It becomes a part of service's public API. Usually services should
+  check only permissions of resources they own (e.g. "<service>.<subject>.*"),
+  but in exceptional cases they may also check permissions intended for other
+  services. This is primarily useful for services that somehow "proxy" access
+  to resources.
+
+  Normally permissions are instantiated as global variables during the module
+  loading time and later passed as constants to check_permission().
+  """
+
+  def __new__(cls, name):
+    if not isinstance(name, str):
+      raise TypeError('Permission name should be str, not %s' % (type(name),))
+    # TODO(vadimsh): Check the syntax.
+    # TODO(vadimsh): Register in the in-process registry of known permissions.
+    return super(Permission, cls).__new__(cls, name)
+
+
+def root_realm(project):
+  """Validates the project name and returns `<project>/@root` string.
+
+  The root realm is implicitly included into all other realms (including
+  "@legacy"), and it is also used as a fallback when a resource points to
+  a realm that no longer exists. Without the root realm, such resources become
+  effectively inaccessible and this may be undesirable. Permissions in the root
+  realm apply to all realms in the project (current, past and future), and thus
+  the root realm should contain only administrative-level bindings.
+
+  check_permission() automatically falls back to root realms if any of the
+  realms it receives do not exist. You still can pass a root realm to
+  check_permission() explicitly if you specifically want to check the root
+  realm permissions.
+
+  Args:
+    project: a string with LUCI project name.
+
+  Returns:
+    String `<project>/@root`.
+
+  Raises:
+    TypeError if `project` is not a string.
+    ValueError if `project` doesn't pass the regexp check.
+  """
+  if not isinstance(project, basestring):
+    raise TypeError('Expecting a string, got %s' % (type(project),))
+  # TODO(vadimsh): Check against the regexp.
+  return str(project) + '/@root'
+
+
+def legacy_realm(project):
+  """Validates the project name and returns `<project>/@legacy` string.
+
+  The legacy realm should be used for legacy resources created before the
+  realms mechanism was introduced in case the service can't figure out a more
+  appropriate realm based on resource's properties. The service must clearly
+  document when and how it uses the legacy realm (if it uses it at all).
+
+  Unlike the situation with root realms, check_permission() has no special
+  handling of legacy realms. You should always pass them to check_permission()
+  explicitly when checking permissions of legacy resources.
+
+  Args:
+    project: a string with LUCI project name.
+
+  Returns:
+    String `<project>/@legacy`.
+
+  Raises:
+    TypeError if `project` is not a string.
+    ValueError if `project` doesn't pass the regexp check.
+  """
+  if not isinstance(project, basestring):
+    raise TypeError('Expecting a string, got %s' % (type(project),))
+  # TODO(vadimsh): Check against the regexp.
+  return str(project) + '/@legacy'
+
+
+def check_permission(permission, realms, identity=None):
+  """Returns True if the identity has the given permission in any of the realms.
+
+  Uses an in-memory cache and can be considered "fast". Makes no RPCs.
+
+  During the check any non-existing realm is replaced with the corresponding
+  root realm (e.g. if "projectA/some/realm" doesn't exist, "projectA/@root"
+  will be used in its place). If the project doesn't exist or is not using
+  realms yet, all its realms (including the root realm) are considered empty.
+  check_permission() returns False in this case.
+
+  Args:
+    permission: an instance of Permission specifying the permission to check.
+    realms: an iterable with one or more realm names (strings) to check the
+        permission in.
+    identity: an instance of Identity to check permission for or None to use
+        get_current_identity().
+
+  Returns:
+    True: if the identity has the given permission in any of the given realms.
+
+  Raises:
+    TypeError if some argument type is not correct.
+    ValueError if some realm name doesn't pass the regexp check.
+  """
+  # TODO(vadimsh): Implement.
+  _ = permission
+  _ = realms
+  _ = identity
+  return False
+
+
+def check_permission_dryrun(
+      permission,
+      realms,
+      expected_result,
+      identity=None,
+      tracking_bug=None
+  ):
+  """Compares result of check_permission(...) to `expected_result`.
+
+  Intended to be used during the realms migration to report discrepancies
+  between the old and new ACL models. Intentionally returns nothing.
+
+  The exact mechanism of how results are reported is an implementation detail,
+  but callers can assume it is "fast". It's OK to call check_permission_dryrun()
+  often or even in loops.
+
+  Args:
+    permission: an instance of Permission specifying the permission to check.
+    realms: an iterable with one or more realm names (strings) to check the
+        permission in.
+    expected_result: boolean with the expected outcome based on legacy ACLs.
+    identity: an instance of Identity to check permission for or None to use
+        get_current_identity().
+    tracking_bug: a string like 'crbug.com/<number>' identifying a particular
+        migration, for logs.
+
+  Returns:
+    None.
+
+  Raises:
+    TypeError if some argument type is not correct.
+    ValueError if some realm name doesn't pass the regexp check.
+  """
+  # TODO(vadimsh): Implement.
+  _ = permission
+  _ = realms
+  _ = expected_result
+  _ = identity
+  _ = tracking_bug

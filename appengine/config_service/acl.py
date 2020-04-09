@@ -13,6 +13,11 @@ import services
 import storage
 
 
+_PERMISSION_READ = auth.Permission('configs.configSet.read')
+_PERMISSION_VALIDATE = auth.Permission('configs.configSet.validate')
+_PERMISSION_REIMPORT = auth.Permission('configs.configSet.reimport')
+
+
 def can_reimport(config_set):
   project_id = _extract_project_id(config_set)
   if project_id:
@@ -24,8 +29,10 @@ def can_reimport(config_set):
 
 
 def _can_reimport_project_cs(project_id):
-  # TODO(vadimsh): Switch to using Realms.
-  return has_project_access(project_id) and _check_acl_cfg('reimport_group')
+  return _check_project_acl(
+      project_id=project_id,
+      permission=_PERMISSION_REIMPORT,
+      legacy_acl_group='reimport_group')
 
 
 def _can_reimport_service_cs(service_id):
@@ -43,8 +50,10 @@ def can_validate(config_set):
 
 
 def _can_validate_project_cs(project_id):
-  # TODO(vadimsh): Switch to using Realms.
-  return has_project_access(project_id) and _check_acl_cfg('validation_group')
+  return _check_project_acl(
+      project_id=project_id,
+      permission=_PERMISSION_VALIDATE,
+      legacy_acl_group='validation_group')
 
 
 def _can_validate_service_cs(service_id):
@@ -126,7 +135,24 @@ def has_service_access(service_id):
 
 
 def has_projects_access(project_ids):
-  # TODO(vadimsh): Switch to using Realms.
+  # TODO(crbug.com/1068817): During the migration we'll use the legacy response
+  # as the final result, but will compare it to realms checks and log
+  # discrepancies (this is what check_permission_dryrun does).
+  legacy = _has_projects_access_legacy(project_ids)
+  for pid in project_ids:
+    auth.check_permission_dryrun(
+        permission=_PERMISSION_READ,
+        realms=[auth.root_realm(pid)],
+        tracking_bug='crbug.com/1068817',
+        expected_result=legacy[pid])
+  return legacy
+
+
+def has_project_access(project_id):
+  return has_projects_access([project_id])[project_id]
+
+
+def _has_projects_access_legacy(project_ids):
   assert isinstance(project_ids, list)
   if not project_ids:
     return {}
@@ -139,8 +165,21 @@ def has_projects_access(project_ids):
   return dict(zip(project_ids, has_access))
 
 
-def has_project_access(project_id):
-  return has_projects_access([project_id])[project_id]
+def _check_project_acl(project_id, permission, legacy_acl_group):
+  """Checks legacy and realms ACLs, comparing them.
+
+  Returns the result of the legacy ACL check for now.
+  """
+  # TODO(crbug.com/1068817): Switch to using Realms for real.
+  legacy_result = (
+      _has_projects_access_legacy([project_id])[project_id] and
+      _check_acl_cfg(legacy_acl_group))
+  auth.check_permission_dryrun(
+      permission=permission,
+      realms=[auth.root_realm(project_id)],
+      tracking_bug='crbug.com/1068817',
+      expected_result=legacy_result)
+  return legacy_result
 
 
 # Cache acl.cfg for 10min. It never changes.
