@@ -1767,6 +1767,12 @@ def is_decorated(func):
 ## Realms permission checks.
 
 
+# All permissions created via Permission (name -> Permission object)
+_all_perms = {}
+# Protects access to _all_perms.
+_all_perms_lock = threading.Lock()
+
+
 class Permission(collections.namedtuple('Permission', 'name')):
   """Represents a single permission.
 
@@ -1789,9 +1795,20 @@ class Permission(collections.namedtuple('Permission', 'name')):
   def __new__(cls, name):
     if not isinstance(name, str):
       raise TypeError('Permission name should be str, not %s' % (type(name),))
-    # TODO(vadimsh): Check the syntax.
-    # TODO(vadimsh): Register in the in-process registry of known permissions.
-    return super(Permission, cls).__new__(cls, name)
+    parts = name.split('.')
+    if len(parts) != 3 or any(p == '' for p in parts):
+      raise ValueError(
+          'Permissions should have form <service>.<subject>.<verb>, got %r'
+          % name)
+    with _all_perms_lock:
+      perm = super(Permission, cls).__new__(cls, name)
+      return _all_perms.setdefault(name, perm)
+
+  def __str__(self):
+    return self.name
+
+  def __repr__(self):
+    return repr(self.name)
 
 
 def root_realm(project):

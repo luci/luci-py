@@ -1122,6 +1122,30 @@ class RelevantSubgraphTest(test_case.TestCase):
     }, self.call(b.build(), 'user:a@example.com'))
 
 
+class PermissionsTest(test_case.TestCase):
+  def test_happy_path(self):
+    p1 = api.Permission('service.subject.verb')
+    p2 = api.Permission('service.subject.verb')
+    p3 = api.Permission('service.subject.another')
+    self.assertEqual(p1, p2)
+    self.assertTrue(p1 is p2)
+    self.assertNotEqual(p1, p3)
+    self.assertEqual('service.subject.verb', str(p1))
+    self.assertEqual("'service.subject.verb'", '%r' % (p1,))
+
+  def test_validation_errors(self):
+    with self.assertRaises(TypeError):
+      api.Permission(123)
+    with self.assertRaises(TypeError):
+      api.Permission(u'no.unicode.here')
+    with self.assertRaises(ValueError):
+      api.Permission('too.few')
+    with self.assertRaises(ValueError):
+      api.Permission('too.too.too.much')
+    with self.assertRaises(ValueError):
+      api.Permission('has..empty')
+
+
 if __name__ == '__main__':
   if '-v' in sys.argv:
     unittest.TestCase.maxDiff = None
