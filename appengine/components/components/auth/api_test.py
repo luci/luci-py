@@ -1146,6 +1146,24 @@ class PermissionsTest(test_case.TestCase):
       api.Permission('has..empty')
 
 
+class RealmStringsTest(test_case.TestCase):
+  def test_happy_path(self):
+    self.assertEqual(api.root_realm('proj'), 'proj/@root')
+    self.assertEqual(api.root_realm(u'proj'), 'proj/@root')
+    self.assertEqual(api.legacy_realm('proj'), 'proj/@legacy')
+    self.assertEqual(api.legacy_realm(u'proj'), 'proj/@legacy')
+
+  def test_validation_errors(self):
+    with self.assertRaises(TypeError):
+      api.root_realm(None)
+    with self.assertRaises(TypeError):
+      api.legacy_realm(None)
+    with self.assertRaises(ValueError):
+      api.root_realm('')
+    with self.assertRaises(ValueError):
+      api.legacy_realm('')
+
+
 if __name__ == '__main__':
   if '-v' in sys.argv:
     unittest.TestCase.maxDiff = None

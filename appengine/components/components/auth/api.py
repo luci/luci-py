@@ -19,6 +19,7 @@ import functools
 import json
 import logging
 import os
+import re
 import threading
 import time
 
@@ -1767,6 +1768,16 @@ def is_decorated(func):
 ## Realms permission checks.
 
 
+# Allowed LUCI project names, see realms.proto and LUCI Config service.
+_PROJECT_NAME_RE = re.compile(r'^[a-z0-9\-_]{1,100}$')
+# Allowed non-special (not "@...") realm names in realms.cfg.
+_REALM_NAME_RE = re.compile(r'^[a-z0-9_\.\-/]{1,400}$')
+
+# Root realm is included in all other realms, see root_realm().
+_ROOT_REALM = '@root'
+# Legacy realm is used for older realm-less resources, see legacy_realm().
+_LEGACY_REALM = '@legacy'
+
 # All permissions created via Permission (name -> Permission object)
 _all_perms = {}
 # Protects access to _all_perms.
@@ -1836,10 +1847,7 @@ def root_realm(project):
     TypeError if `project` is not a string.
     ValueError if `project` doesn't pass the regexp check.
   """
-  if not isinstance(project, basestring):
-    raise TypeError('Expecting a string, got %s' % (type(project),))
-  # TODO(vadimsh): Check against the regexp.
-  return str(project) + '/@root'
+  return '%s/%s' % (_validated_project_id(project), _ROOT_REALM)
 
 
 def legacy_realm(project):
@@ -1864,10 +1872,7 @@ def legacy_realm(project):
     TypeError if `project` is not a string.
     ValueError if `project` doesn't pass the regexp check.
   """
-  if not isinstance(project, basestring):
-    raise TypeError('Expecting a string, got %s' % (type(project),))
-  # TODO(vadimsh): Check against the regexp.
-  return str(project) + '/@legacy'
+  return '%s/%s' % (_validated_project_id(project), _LEGACY_REALM)
 
 
 def check_permission(permission, realms, identity=None):
@@ -1941,3 +1946,14 @@ def check_permission_dryrun(
   _ = expected_result
   _ = identity
   _ = tracking_bug
+
+
+def _validated_project_id(project):
+  """Checks type and value of `project` and returns it as str."""
+  if not isinstance(project, basestring):
+    raise TypeError('Expecting a string, got %s' % (type(project),))
+  if not _PROJECT_NAME_RE.match(project):
+    raise ValueError(
+        'Invalid project name %r: should match %r' %
+        (project, _PROJECT_NAME_RE.pattern))
+  return str(project)  # get rid of 'unicode'
