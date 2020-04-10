@@ -15,6 +15,8 @@ syntax = "proto3";
 
 package components.auth.realms;
 
+option go_package = "go.chromium.org/luci/server/auth/service/protocol;protocol";
+
 
 // Realms is a complete definition of all known permissions and realms in a LUCI
 // deployment.

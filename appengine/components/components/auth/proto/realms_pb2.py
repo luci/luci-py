@@ -18,8 +18,8 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   name='components/auth/proto/realms.proto',
   package='components.auth.realms',
   syntax='proto3',
-  serialized_options=None,
-  serialized_pb=_b('\n\"components/auth/proto/realms.proto\x12\x16\x63omponents.auth.realms\"\x85\x01\n\x06Realms\x12\x13\n\x0b\x61pi_version\x18\x01 \x01(\x03\x12\x37\n\x0bpermissions\x18\x02 \x03(\x0b\x32\".components.auth.realms.Permission\x12-\n\x06realms\x18\x03 \x03(\x0b\x32\x1d.components.auth.realms.Realm\"\x1a\n\nPermission\x12\x0c\n\x04name\x18\x01 \x01(\t\"H\n\x05Realm\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x31\n\x08\x62indings\x18\x02 \x03(\x0b\x32\x1f.components.auth.realms.Binding\"2\n\x07\x42inding\x12\x13\n\x0bpermissions\x18\x01 \x03(\r\x12\x12\n\nprincipals\x18\x02 \x03(\tb\x06proto3')
+  serialized_options=_b('Z:go.chromium.org/luci/server/auth/service/protocol;protocol'),
+  serialized_pb=_b('\n\"components/auth/proto/realms.proto\x12\x16\x63omponents.auth.realms\"\x85\x01\n\x06Realms\x12\x13\n\x0b\x61pi_version\x18\x01 \x01(\x03\x12\x37\n\x0bpermissions\x18\x02 \x03(\x0b\x32\".components.auth.realms.Permission\x12-\n\x06realms\x18\x03 \x03(\x0b\x32\x1d.components.auth.realms.Realm\"\x1a\n\nPermission\x12\x0c\n\x04name\x18\x01 \x01(\t\"H\n\x05Realm\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x31\n\x08\x62indings\x18\x02 \x03(\x0b\x32\x1f.components.auth.realms.Binding\"2\n\x07\x42inding\x12\x13\n\x0bpermissions\x18\x01 \x03(\r\x12\x12\n\nprincipals\x18\x02 \x03(\tB<Z:go.chromium.org/luci/server/auth/service/protocol;protocolb\x06proto3')
 )
 
 
@@ -214,4 +214,5 @@ Binding = _reflection.GeneratedProtocolMessageType('Binding', (_message.Message,
 _sym_db.RegisterMessage(Binding)
 
 
+DESCRIPTOR._options = None
 # @@protoc_insertion_point(module_scope)
