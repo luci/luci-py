@@ -99,13 +99,13 @@ class ValidationTest(test_case.TestCase):
                 'name': '@legacy',
                 'extends': [
                     '@root',  # explicitly extending root is OK
-                    'some-realm-a',
-                    'some-realm-b',
+                    'some-realm/a',
+                    'some-realm/b',
                 ],
             },
             {
-                'name': 'some-realm-a',
-                'extends': ['some-realm-b'],
+                'name': 'some-realm/a',
+                'extends': ['some-realm/b'],
                 'bindings': [
                     {
                         'role': 'role/dev.a',
@@ -114,7 +114,7 @@ class ValidationTest(test_case.TestCase):
                 ],
             },
             {
-                'name': 'some-realm-b',
+                'name': 'some-realm/b',
                 'bindings': [
                     {
                         'role': 'role/dev.b',

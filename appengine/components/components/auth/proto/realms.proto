@@ -148,7 +148,7 @@ message Permission {
 message Realm {
   // Name of the realm as "<project>/<realm>" string, where:
   //   "<project>" is a LUCI project name, matches `^[a-z0-9\-_]{1,100}$`.
-  //   "<realm>" matches `^[0-9a-z_\.\-\\]{1,400}|@root|@legacy$`.
+  //   "<realm>" matches `^[a-z0-9_\.\-/]{1,400}|@root|@legacy$`.
   string name = 1;
 
   // A list of bindings in lexicographical order of their `permissions` fields.

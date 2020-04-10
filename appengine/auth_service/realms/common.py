@@ -15,7 +15,7 @@ ROOT_REALM = '@root'
 LEGACY_REALM = '@legacy'
 
 # Allowed non-special (not "@...") realm names in realms.cfg.
-REALM_NAME_RE = re.compile(r'^[0-9a-z_\.\-\\]{1,400}$')
+REALM_NAME_RE = re.compile(r'^[a-z0-9_\.\-/]{1,400}$')
 
 
 @utils.cache

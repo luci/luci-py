@@ -72,7 +72,7 @@ message RealmsCfg {
 message Realm {
   // Name of the realm.
   //
-  // Must match `^[0-9a-z_\.\-\\]{1,400}$` or be literals "@root" or "@legacy".
+  // Must match `^[a-z0-9_\.\-/]{1,400}$` or be literals "@root" or "@legacy".
   //
   // Realm names must be unique within a project.
   string name = 1;
