@@ -31,7 +31,8 @@ def expand_realms(db, project_id, realms_cfg):
 
   All such realms_pb2.Realms messages across all projects (plus a list of all
   defined permissions with all their metadata) are later merged together into
-  a final universal realms_pb2.Realms by TODO.
+  a final universal realms_pb2.Realms by realms.merge(...) in
+  components/auth/replication.py.
 
   Args:
     db: a permissions.DB instance with current permissions and roles.
