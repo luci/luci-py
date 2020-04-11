@@ -13,6 +13,7 @@ generally should not be used outside of Auth components implementation.
 
 # Pylint doesn't like ndb.transactional(...).
 # pylint: disable=E1120
+# pylint: disable=redefined-outer-name
 
 import collections
 import functools
@@ -36,8 +37,10 @@ from components import utils
 from . import config
 from . import ipaddr
 from . import model
+from . import realms
 from . import replication
 from .proto import delegation_pb2
+from .proto import realms_pb2
 
 # Part of public API of 'auth' component, exposed by this module.
 __all__ = [
@@ -132,6 +135,10 @@ class AuthorizationError(Error):
   """Access is denied."""
 
 
+class RealmsError(Error):
+  """An error related to realms configuration, this is an internal error."""
+
+
 ################################################################################
 ## AuthDB.
 
@@ -172,6 +179,20 @@ OAuthConfig = collections.namedtuple('OAuthConfig', [
 ])
 
 
+# The representation of realms_pb2.Realm used by AuthDB, preprocessed for faster
+# checks.
+CachedRealm = collections.namedtuple('CachedRealm', [
+  'per_permission_sets',  # permission index -> [PrincipalsSet].
+])
+
+
+# Represents a set of groups and identities, used by CachedRealm.
+PrincipalsSet = collections.namedtuple('PrincipalsSet', [
+  'groups',  # tuple(['group1', 'group2', ...])
+  'idents',  # frozenset(['user:abc@example.com', ...])
+])
+
+
 class AuthDB(object):
   """A read only in-memory database of auth configuration of a service.
 
@@ -192,6 +213,7 @@ class AuthDB(object):
         groups={},
         ip_whitelist_assignments={},
         ip_whitelists={},
+        realms_pb=realms_pb2.Realms(api_version=realms.API_VERSION),
         additional_client_ids=[])
 
   @staticmethod
@@ -243,6 +265,7 @@ class AuthDB(object):
             for e in ip_whitelist_assignments.assignments
         },
         ip_whitelists={e.key.id(): list(e.subnets) for e in ip_whitelists},
+        realms_pb=None,  # not available when not using replication_pb2.AuthDB
         additional_client_ids=additional_client_ids)
 
   @staticmethod
@@ -287,6 +310,7 @@ class AuthDB(object):
         ip_whitelists={
             e.name: list(e.subnets) for e in auth_db.ip_whitelists
         },
+        realms_pb=auth_db.realms if auth_db.HasField('realms') else None,
         additional_client_ids=additional_client_ids)
 
   # Note: do not use __init__ directly, use one of AuthDB.empty(),
@@ -300,6 +324,7 @@ class AuthDB(object):
         groups,                    # {str -> CachedGroup}
         ip_whitelist_assignments,  # {Identity -> str}
         ip_whitelists,             # {str -> [str]}
+        realms_pb,                 # realms_pb2.Realms or None
         additional_client_ids      # [str]
     ):
     self._from_what = from_what  # for tests only
@@ -325,12 +350,89 @@ class AuthDB(object):
       client_ids.extend(additional_client_ids)
     self._allowed_client_ids = set(c for c in client_ids if c)
 
+    # These are populated from realms_pb2.Realms.
+    self._use_realms = realms_pb is not None
+    self._permissions = {}  # {str name -> int index}
+    self._realms = {}       # {str name -> CachedRealm}
+    if realms_pb:
+      with _all_perms_lock:
+        registered_perms = list(_all_perms)
+      self._init_realms(realms_pb, registered_perms)
+
     # Lazy-initialized indexes structures. See _indexes().
     self._lock = threading.Lock()
     self._members_idx = None
     self._globs_idx = None
     self._nested_idx = None
     self._owned_idx = None
+
+  def _init_realms(self, realms_pb, registered_perms):
+    """Preprocesses realms_pb2.Realms into a slightly more efficient form.
+
+    Populates `_permissions` and `_realms`.
+
+    Args:
+      realms_pb: a realms_pb2.Realms message.
+      registered_perms: a list with names of permissions used by the process.
+
+    Raises:
+      RealmsError on api_version mismatch.
+    """
+    assert isinstance(realms_pb, realms_pb2.Realms), realms_pb
+    assert not self._permissions
+    assert not self._realms
+
+    logging.info('Loading realms...')
+
+    # Do not use realm_pb2.Realms we don't understand. Better to go offline
+    # completely than mistakenly allow access to something private by
+    # misinterpreting realm rules (e.g. if a new hypothetical DENY rule is
+    # misinterpreted as ALLOW).
+    #
+    # Bumping `api_version` (if it ever happens) should be done extremely
+    # carefully in multiple stages:
+    #   1. Update components.auth to understand both new and old api_version.
+    #   2. Redeploy *everything*.
+    #   3. Update Auth Service to generate realms_pb2.Realms using the new API.
+    if realms_pb.api_version != realms.API_VERSION:
+      raise RealmsError(
+          'Realms proto has api_version %d not compatible with this service '
+          '(it expects %d)' % (realms_pb.api_version, realms.API_VERSION))
+
+    # Build map: permission name -> its index (since Binding messages operate
+    # with indexes). Using ints as keys is also slightly faster than strings.
+    for idx, perm in enumerate(realms_pb.permissions):
+      self._permissions[perm.name] = idx
+
+    # Warn if the process declared some permission which doesn't actually exist.
+    # This may happen if the service introduced a new permission before it is
+    # added to the Auth Service. This is relatively safe, checks against this
+    # permission will just always return DENY.
+    for p in registered_perms:
+      if p not in self._permissions:
+        logging.warning(
+            'Permission %r is not in the AuthDB rev %d', p, self.auth_db_rev)
+
+    # Conceptually, for each realm we are building a map "permission -> set of
+    # principals". But to save memory we represent "set of principals" as a list
+    # of PrincipalsSet objects (one per an original Binding message). That way
+    # multiple per_permission_sets entries may share the same PrincipalsSet
+    # object. The expense is more computations during check_permission(...).
+    for realm in realms_pb.realms:
+      per_permission_sets = {}  # permission index => list of PrincipalsSet
+      for b in realm.bindings:
+        groups, idents = [], []
+        for p in b.principals:
+          if p.startswith('group:'):
+            groups.append(p[6:])  # 6 == len('group:')
+          else:
+            idents.append(p)
+        principals_set = PrincipalsSet(tuple(groups), frozenset(idents))
+        for perm_idx in b.permissions:
+          per_permission_sets.setdefault(perm_idx, []).append(principals_set)
+      self._realms[realm.name] = CachedRealm(per_permission_sets)
+
+    logging.info('Loaded %d realms', len(self._realms))
 
   def _indexes(self):
     """Lazily builds and returns various indexes used by get_relevant_subgraph.
@@ -695,6 +797,140 @@ class AuthDB(object):
     Format of the tuple: (client_id, client_secret, additional client ids list).
     """
     return self._oauth_config
+
+  def check_permission(self, permission, realms, identity):
+    """Returns True if the identity has the given permission in any of `realms`.
+
+    See check_permission() function below for more info.
+    """
+    self._check_realms_available()
+
+    if not isinstance(permission, Permission):
+      raise TypeError(
+          'Bad permission type: got %s, want auth.Permission' %
+          (type(permission),))
+
+    perm_idx = self._permissions.get(permission.name)
+    if perm_idx is None:
+      logging.warning(
+          'Checking permission %r not present in the AuthDB' % (permission,))
+      return False
+
+    # Memoization of negative is_group_member() checks to avoid doing them
+    # multiple times.
+    checked_groups = set()
+
+    for name in realms:
+      # Grab the CachedRealm if it exists, or the corresponding @root otherwise.
+      # This also raises TypeError or ValueError if the realm name is invalid.
+      realm = self._get_realm_or_its_root(name, permission)
+      if not realm:
+        continue
+
+      # Check if `identity` is in any of PrincipalsSet's that are granted the
+      # permission. This does group checks inside. Note that this implementation
+      # is pretty dumb and can be optimized more if necessary.
+      for ps in realm.per_permission_sets.get(perm_idx, []):
+        if self._is_identity_in_principals_set(identity, ps, checked_groups):
+          return True
+
+    return False
+
+  def _check_realms_available(self):
+    """Raises RealmsError if Realms API is not available.
+
+    Currently Realms API is implemented only in services running in Replica
+    mode (i.e. connected to some Auth Service). It is not available in the
+    Auth Service itself (not needed there yet) and in services running in
+    Standalone mode (no general way to provide realms.cfg for them). The only
+    exception are integration tests for e.g. Swarming (which run services in
+    Standalone mode). Tests can populate realms programmatically as part of the
+    test setup without connecting them to an Auth Service.
+    """
+    if not self._use_realms:
+      raise RealmsError('Realms API is not available')
+
+  def _get_realm_or_its_root(self, name, perm):
+    """Returns either the realm `name` or its @root if `name` doesn't exist.
+
+    If the root doesn't exist either, returns None. This may happen if the
+    project doesn't exist or it's not using realms yet.
+
+    Args:
+      name: a name of the realm to grab.
+      perm: a Permission being checked (used for log messages only).
+
+    Returns:
+      CachedRealm or None.
+
+    Raises:
+      TypeError if `name` is not a string.
+      ValueError if `name` doesn't look valid.
+    """
+    if not isinstance(name, basestring):
+      raise TypeError('Bad realm: got %s, want a string' % (type(name),))
+    realm = self._realms.get(name)
+    if realm:
+      return realm
+
+    # Given "<project>/..." need to construct "<project>/@root". Validate
+    # the realm name along the way. We do it here (instead of at the start of
+    # the function) to avoid unnecessary regexp checks on the hot path (when
+    # hitting existing realms).
+    spl = name.split('/', 1)
+    if len(spl) != 2 or not spl[0] or not spl[1]:
+      raise ValueError('Bad realm %r, want "<project>/<name>"' % (name,))
+    if (not _PROJECT_NAME_RE.match(spl[0]) or
+        not (
+            _REALM_NAME_RE.match(spl[1]) or
+            spl[1] == _ROOT_REALM or
+            spl[1] == _LEGACY_REALM
+        )):
+      raise ValueError(
+          'Bad realm %r: should be "<project>/<name>" where '
+          '<project> matches %r and <name> matches %r or is %s or %s' % (
+          name, _PROJECT_NAME_RE.pattern, _REALM_NAME_RE.pattern,
+          _ROOT_REALM, _LEGACY_REALM))
+
+    # Same as root_realm(...) except skipping the validation, we already did it.
+    root_name = str('%s/%s' % (spl[0], _ROOT_REALM))
+
+    # Can't fallback to the root if already checking it.
+    if name == root_name:
+      logging.warning(
+          'Checking %r in a non-existing root realm %r: denying', perm, name)
+      return None
+
+    # Fallback to the root and log the outcome.
+    root = self._realms.get(root_name)
+    if root:
+      logging.warning(
+          'Checking %r in a non-existing realm %r: falling back to the root '
+          'realm %r', perm, name, root_name)
+      return root
+
+    logging.warning(
+        'Checking %r in a non-existing realm %r that doesn\'t have a root '
+        'realm (no such project?): denying', perm, name)
+    return None
+
+  def _is_identity_in_principals_set(self, ident, principals, checked_groups):
+    """Returns True if `ident` is in a PrincipalsSet.
+
+    Args:
+      ident: an Identity to check.
+      principals: a PrincipalsSet object.
+      checked_groups: a set of already checked groups that do not have the
+          identity. Mutated inside with each new negative is_group_member check.
+    """
+    if ident.to_bytes() in principals.idents:
+      return True
+    for gr in principals.groups:
+      if gr not in checked_groups:
+        if self.is_group_member(gr, ident):
+          return True
+        checked_groups.add(gr)
+    return False
 
 
 ################################################################################
@@ -1899,12 +2135,10 @@ def check_permission(permission, realms, identity=None):
   Raises:
     TypeError if some argument type is not correct.
     ValueError if some realm name doesn't pass the regexp check.
+    RealmsError if Realms API is unavailable or misconfigured.
   """
-  # TODO(vadimsh): Implement.
-  _ = permission
-  _ = realms
-  _ = identity
-  return False
+  return get_request_cache().auth_db.check_permission(
+      permission, realms, identity or get_current_identity())
 
 
 def check_permission_dryrun(
@@ -1915,6 +2149,8 @@ def check_permission_dryrun(
       tracking_bug=None
   ):
   """Compares result of check_permission(...) to `expected_result`.
+
+  Also catches ValueError and RealmsError and logs them.
 
   Intended to be used during the realms migration to report discrepancies
   between the old and new ACL models. Intentionally returns nothing.
@@ -1938,14 +2174,32 @@ def check_permission_dryrun(
 
   Raises:
     TypeError if some argument type is not correct.
-    ValueError if some realm name doesn't pass the regexp check.
   """
-  # TODO(vadimsh): Implement.
-  _ = permission
-  _ = realms
-  _ = expected_result
-  _ = identity
-  _ = tracking_bug
+  auth_db = get_request_cache().auth_db
+  realms = list(realms)
+  identity = identity or get_current_identity()
+
+  log_pfx = 'check_permission_dryrun(%r, %r, %r), authdb=%d' % (
+      permission, realms, identity.to_bytes(), auth_db.auth_db_rev)
+  if tracking_bug:
+    log_pfx = '%s: %s' % (tracking_bug, log_pfx)
+
+  try:
+    result = auth_db.check_permission(permission, realms, identity)
+  except (ValueError, RealmsError) as exc:
+    logging.exception(
+        '%s: exception %s, want %s',
+        log_pfx, type(exc).__name__, 'ALLOW' if expected_result else 'DENY')
+    return
+
+  if result == bool(expected_result):
+    logging.info('%s: match - %s', log_pfx, 'ALLOW' if result else 'DENY')
+  else:
+    logging.warning(
+        '%s: mismatch - got %s, want %s',
+        log_pfx,
+        'ALLOW' if result else 'DENY',
+        'ALLOW' if expected_result else 'DENY')
 
 
 def _validated_project_id(project):
