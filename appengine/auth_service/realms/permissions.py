@@ -68,6 +68,16 @@ def db():
       include('role/dev.testing2'),
   ])
 
+  # LUCI Config permissions and roles (crbug.com/1068817).
+  role('role/configs.reader', [
+      permission('configs.configSet.read'),
+  ])
+  role('role/configs.developer', [
+      include('role/configs.reader'),
+      permission('configs.configSet.validate'),
+      permission('configs.configSet.reimport'),
+  ])
+
   return builder.finish()
 
 
