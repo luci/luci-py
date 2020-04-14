@@ -48,8 +48,6 @@ __all__ = [
   'AuthenticationError',
   'AuthorizationError',
   'autologin',
-  'check_permission',
-  'check_permission_dryrun',
   'disable_process_cache',
   'Error',
   'get_auth_details',
@@ -62,6 +60,8 @@ __all__ = [
   'get_secret',
   'get_web_client_id',
   'GroupListing',
+  'has_permission',
+  'has_permission_dryrun',
   'is_admin',
   'is_group_member',
   'is_in_ip_whitelist',
@@ -417,7 +417,7 @@ class AuthDB(object):
     # principals". But to save memory we represent "set of principals" as a list
     # of PrincipalsSet objects (one per an original Binding message). That way
     # multiple per_permission_sets entries may share the same PrincipalsSet
-    # object. The expense is more computations during check_permission(...).
+    # object. The expense is more computations during has_permission(...).
     for realm in realms_pb.realms:
       per_permission_sets = {}  # permission index => list of PrincipalsSet
       for b in realm.bindings:
@@ -798,10 +798,10 @@ class AuthDB(object):
     """
     return self._oauth_config
 
-  def check_permission(self, permission, realms, identity):
+  def has_permission(self, permission, realms, identity):
     """Returns True if the identity has the given permission in any of `realms`.
 
-    See check_permission() function below for more info.
+    See has_permission() function below for more info.
     """
     self._check_realms_available()
 
@@ -2036,7 +2036,7 @@ class Permission(collections.namedtuple('Permission', 'name')):
   to resources.
 
   Normally permissions are instantiated as global variables during the module
-  loading time and later passed as constants to check_permission().
+  loading time and later passed as constants to has_permission().
   """
 
   def __new__(cls, name):
@@ -2068,10 +2068,9 @@ def root_realm(project):
   realm apply to all realms in the project (current, past and future), and thus
   the root realm should contain only administrative-level bindings.
 
-  check_permission() automatically falls back to root realms if any of the
-  realms it receives do not exist. You still can pass a root realm to
-  check_permission() explicitly if you specifically want to check the root
-  realm permissions.
+  has_permission() automatically falls back to root realms if any of the realms
+  it receives do not exist. You still can pass a root realm to has_permission()
+  explicitly if you specifically want to check the root realm permissions.
 
   Args:
     project: a string with LUCI project name.
@@ -2094,8 +2093,8 @@ def legacy_realm(project):
   appropriate realm based on resource's properties. The service must clearly
   document when and how it uses the legacy realm (if it uses it at all).
 
-  Unlike the situation with root realms, check_permission() has no special
-  handling of legacy realms. You should always pass them to check_permission()
+  Unlike the situation with root realms, has_permission() has no special
+  handling of legacy realms. You should always pass them to has_permission()
   explicitly when checking permissions of legacy resources.
 
   Args:
@@ -2111,7 +2110,7 @@ def legacy_realm(project):
   return '%s:%s' % (_validated_project_id(project), _LEGACY_REALM)
 
 
-def check_permission(permission, realms, identity=None):
+def has_permission(permission, realms, identity=None):
   """Returns True if the identity has the given permission in any of the realms.
 
   Uses an in-memory cache and can be considered "fast". Makes no RPCs.
@@ -2120,7 +2119,7 @@ def check_permission(permission, realms, identity=None):
   root realm (e.g. if "projectA:some/realm" doesn't exist, "projectA:@root"
   will be used in its place). If the project doesn't exist or is not using
   realms yet, all its realms (including the root realm) are considered empty.
-  check_permission() returns False in this case.
+  has_permission() returns False in this case.
 
   Args:
     permission: an instance of Permission specifying the permission to check.
@@ -2137,18 +2136,18 @@ def check_permission(permission, realms, identity=None):
     ValueError if some realm name doesn't pass the regexp check.
     RealmsError if Realms API is unavailable or misconfigured.
   """
-  return get_request_cache().auth_db.check_permission(
+  return get_request_cache().auth_db.has_permission(
       permission, realms, identity or get_current_identity())
 
 
-def check_permission_dryrun(
+def has_permission_dryrun(
       permission,
       realms,
       expected_result,
       identity=None,
       tracking_bug=None
   ):
-  """Compares result of check_permission(...) to `expected_result`.
+  """Compares result of has_permission(...) to `expected_result`.
 
   Also catches ValueError and RealmsError and logs them.
 
@@ -2156,7 +2155,7 @@ def check_permission_dryrun(
   between the old and new ACL models. Intentionally returns nothing.
 
   The exact mechanism of how results are reported is an implementation detail,
-  but callers can assume it is "fast". It's OK to call check_permission_dryrun()
+  but callers can assume it is "fast". It's OK to call has_permission_dryrun()
   often or even in loops.
 
   Args:
@@ -2179,13 +2178,13 @@ def check_permission_dryrun(
   realms = list(realms)
   identity = identity or get_current_identity()
 
-  log_pfx = 'check_permission_dryrun(%r, %r, %r), authdb=%d' % (
+  log_pfx = 'has_permission_dryrun(%r, %r, %r), authdb=%d' % (
       permission, realms, identity.to_bytes(), auth_db.auth_db_rev)
   if tracking_bug:
     log_pfx = '%s: %s' % (tracking_bug, log_pfx)
 
   try:
-    result = auth_db.check_permission(permission, realms, identity)
+    result = auth_db.has_permission(permission, realms, identity)
   except (ValueError, RealmsError) as exc:
     logging.exception(
         '%s: exception %s, want %s',

@@ -137,10 +137,10 @@ def has_service_access(service_id):
 def has_projects_access(project_ids):
   # TODO(crbug.com/1068817): During the migration we'll use the legacy response
   # as the final result, but will compare it to realms checks and log
-  # discrepancies (this is what check_permission_dryrun does).
+  # discrepancies (this is what has_permission_dryrun does).
   legacy = _has_projects_access_legacy(project_ids)
   for pid in project_ids:
-    auth.check_permission_dryrun(
+    auth.has_permission_dryrun(
         permission=_PERMISSION_READ,
         realms=[auth.root_realm(pid)],
         tracking_bug='crbug.com/1068817',
@@ -174,7 +174,7 @@ def _check_project_acl(project_id, permission, legacy_acl_group):
   legacy_result = (
       _has_projects_access_legacy([project_id])[project_id] and
       _check_acl_cfg(legacy_acl_group))
-  auth.check_permission_dryrun(
+  auth.has_permission_dryrun(
       permission=permission,
       realms=[auth.root_realm(project_id)],
       tracking_bug='crbug.com/1068817',

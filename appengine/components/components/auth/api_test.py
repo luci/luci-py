@@ -1237,8 +1237,8 @@ class PermissionCheckTest(test_case.TestCase):
 
   def assert_check(self, db, perm, realms, ident, outcome):
     self.assertEqual(
-        outcome, db.check_permission(perm, realms, ident),
-        'check_permission(%r, %r, %r) is %s, but should be %s' %
+        outcome, db.has_permission(perm, realms, ident),
+        'has_permission(%r, %r, %r) is %s, but should be %s' %
         (perm, realms, ident.to_bytes(), not outcome, outcome))
 
   def test_direct_inclusion_in_binding(self):
@@ -1318,7 +1318,7 @@ class PermissionCheckTest(test_case.TestCase):
   def test_realms_unavailable(self):
     empty = new_auth_db()
     with self.assertRaises(api.RealmsError):
-      empty.check_permission('luci.dev.p1', ['proj:realm'], ID1)
+      empty.has_permission('luci.dev.p1', ['proj:realm'], ID1)
 
   def test_bad_api_version(self):
     with self.assertRaises(api.RealmsError):
@@ -1327,48 +1327,48 @@ class PermissionCheckTest(test_case.TestCase):
   def test_bad_permission_type(self):
     db = self.auth_db({})
     with self.assertRaises(TypeError):
-      db.check_permission('luci.dev.p1', ['proj:realm'], ID1)
+      db.has_permission('luci.dev.p1', ['proj:realm'], ID1)
 
   def test_bad_realm_names(self):
     db = self.auth_db({})
     for r in ['z', ':z', 'p:', 'blah blah:z', 'p:BLAH', 'p:@z', 'p:p:z']:
       with self.assertRaises(ValueError):
-        db.check_permission(PERM0, [r], ID1)
+        db.has_permission(PERM0, [r], ID1)
 
-  def test_check_permission_dryrun(self):
+  def test_has_permission_dryrun(self):
     rc = api.RequestCache()
     rc._auth_db = self.auth_db({'proj:@root': {(PERM0,): [ID1]}})
     self.mock(api, 'get_request_cache', lambda: rc)
 
     # Match.
     self.logs['info'] = []
-    api.check_permission_dryrun(PERM0, ['proj:@root'], True, ID1, 'bug')
+    api.has_permission_dryrun(PERM0, ['proj:@root'], True, ID1, 'bug')
     self.assert_logs('info',
-        "bug: check_permission_dryrun('luci.dev.testing0', ['proj:@root'], "
+        "bug: has_permission_dryrun('luci.dev.testing0', ['proj:@root'], "
         "'user:1@example.com'), authdb=0: match - ALLOW")
     self.logs['info'] = []
-    api.check_permission_dryrun(PERM1, ['proj:@root'], False, ID1, 'bug')
+    api.has_permission_dryrun(PERM1, ['proj:@root'], False, ID1, 'bug')
     self.assert_logs('info',
-        "bug: check_permission_dryrun('luci.dev.testing1', ['proj:@root'], "
+        "bug: has_permission_dryrun('luci.dev.testing1', ['proj:@root'], "
         "'user:1@example.com'), authdb=0: match - DENY")
 
     # Mismatch.
     self.logs['warning'] = []
-    api.check_permission_dryrun(PERM0, ['proj:@root'], False, ID1, 'bug')
+    api.has_permission_dryrun(PERM0, ['proj:@root'], False, ID1, 'bug')
     self.assert_logs('warning',
-        "bug: check_permission_dryrun('luci.dev.testing0', ['proj:@root'], "
+        "bug: has_permission_dryrun('luci.dev.testing0', ['proj:@root'], "
         "'user:1@example.com'), authdb=0: mismatch - got ALLOW, want DENY")
     self.logs['warning'] = []
-    api.check_permission_dryrun(PERM1, ['proj:@root'], True, ID1, 'bug')
+    api.has_permission_dryrun(PERM1, ['proj:@root'], True, ID1, 'bug')
     self.assert_logs('warning',
-        "bug: check_permission_dryrun('luci.dev.testing1', ['proj:@root'], "
+        "bug: has_permission_dryrun('luci.dev.testing1', ['proj:@root'], "
         "'user:1@example.com'), authdb=0: mismatch - got DENY, want ALLOW")
 
     # Blow up.
     self.logs['exception'] = []
-    api.check_permission_dryrun(PERM1, ['@root'], True, ID1, 'bug')
+    api.has_permission_dryrun(PERM1, ['@root'], True, ID1, 'bug')
     self.assert_logs('exception',
-        "bug: check_permission_dryrun('luci.dev.testing1', ['@root'], "
+        "bug: has_permission_dryrun('luci.dev.testing1', ['@root'], "
         "'user:1@example.com'), authdb=0: exception ValueError, want ALLOW")
 
 
