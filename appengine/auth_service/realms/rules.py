@@ -86,7 +86,7 @@ def expand_realms(db, project_id, realms_cfg):
       permissions=[realms_pb2.Permission(name=p) for p in perms],
       realms=[
           realms_pb2.Realm(
-              name='%s/%s' % (project_id, name),
+              name='%s:%s' % (project_id, name),
               bindings=to_normalized_bindings(perms_to_principals, index_map),
           )
           for name, perms_to_principals in realms

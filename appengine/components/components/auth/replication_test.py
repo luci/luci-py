@@ -446,7 +446,7 @@ class SnapshotToProtoConversionTest(test_case.TestCase):
         realms=realms_pb2.Realms(
             permissions=[{'name': 'luci.dev.p2'}],
             realms=[{
-                'name': 'proj1/@root',
+                'name': 'proj1:@root',
                 'bindings': [
                     {
                         'permissions': [0],
@@ -461,7 +461,7 @@ class SnapshotToProtoConversionTest(test_case.TestCase):
         realms=realms_pb2.Realms(
             permissions=[{'name': 'luci.dev.p1'}],
             realms=[{
-                'name': 'proj2/@root',
+                'name': 'proj2:@root',
                 'bindings': [
                     {
                         'permissions': [0],
@@ -479,7 +479,7 @@ class SnapshotToProtoConversionTest(test_case.TestCase):
         permissions=[{'name': 'luci.dev.p1'}, {'name': 'luci.dev.p2'}],
         realms=[
             {
-                'name': 'proj1/@root',
+                'name': 'proj1:@root',
                 'bindings': [
                     {
                         'permissions': [1],
@@ -488,7 +488,7 @@ class SnapshotToProtoConversionTest(test_case.TestCase):
                 ],
             },
             {
-                'name': 'proj2/@root',
+                'name': 'proj2:@root',
                 'bindings': [
                     {
                         'permissions': [0],

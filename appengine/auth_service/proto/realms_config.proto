@@ -26,7 +26,7 @@ message RealmsCfg {
 // Realm is a named collection of (<principal>, <permission>) pairs.
 //
 // A LUCI resource can point to exactly one realm by referring to its full
-// name ("<project>/<realm>"). We say that such resource "belongs to the realm"
+// name ("<project>:<realm>"). We say that such resource "belongs to the realm"
 // or "lives in the realm" or is just "in the realm". We also say that such
 // resource belongs to the project "<project>". The corresponding Realm message
 // then describes who can do what to the resource.

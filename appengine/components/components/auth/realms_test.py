@@ -32,7 +32,7 @@ class MergeTest(test_case.TestCase):
                 permissions=perms('luci.dev.p2', 'luci.dev.z', 'luci.dev.p1'),
                 realms=[
                     {
-                        'name': 'proj1/@root',
+                        'name': 'proj1:@root',
                         'bindings': [
                             {
                                 'permissions': [0, 1, 2],  # p2, z, p1
@@ -57,7 +57,7 @@ class MergeTest(test_case.TestCase):
         permissions=perms('luci.dev.p1', 'luci.dev.p2'),
         realms=[
             {
-                'name': 'proj1/@root',
+                'name': 'proj1:@root',
                 'bindings': [
                     {
                         'permissions': [0],  # p1
@@ -80,7 +80,7 @@ class MergeTest(test_case.TestCase):
                 permissions=perms('luci.dev.p1', 'luci.dev.p2'),
                 realms=[
                     {
-                        'name': 'proj1/@root',
+                        'name': 'proj1:@root',
                         'bindings': [
                             {
                                 'permissions': [0, 1],  # p1, p2
@@ -94,7 +94,7 @@ class MergeTest(test_case.TestCase):
                 permissions=perms('luci.dev.p2', 'luci.dev.p3'),
                 realms=[
                     {
-                        'name': 'proj2/@root',
+                        'name': 'proj2:@root',
                         'bindings': [
                             {
                                 'permissions': [0, 1],  # p2, p3
@@ -111,7 +111,7 @@ class MergeTest(test_case.TestCase):
         permissions=perms('luci.dev.p1', 'luci.dev.p2', 'luci.dev.p3'),
         realms=[
             {
-                'name': 'proj1/@root',
+                'name': 'proj1:@root',
                 'bindings': [
                     {
                         'permissions': [0, 1],  # p1, p2
@@ -120,7 +120,7 @@ class MergeTest(test_case.TestCase):
                 ],
             },
             {
-                'name': 'proj2/@root',
+                'name': 'proj2:@root',
                 'bindings': [
                     {
                         'permissions': [1, 2],  # p2, p3

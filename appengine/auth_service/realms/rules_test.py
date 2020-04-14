@@ -127,7 +127,7 @@ class ExpandRealmsTest(test_case.TestCase):
       })
 
   def test_completely_empty(self):
-    self.assertEqual(self.expand({}), {'realms': [{'name': 'p/@root'}]})
+    self.assertEqual(self.expand({}), {'realms': [{'name': 'p:@root'}]})
 
   def test_empty_realm(self):
     cfg = {
@@ -137,9 +137,9 @@ class ExpandRealmsTest(test_case.TestCase):
         ],
     }
     self.assertEqual(self.expand(cfg), {'realms': [
-        {'name': u'p/@root'},
-        {'name': u'p/r1'},
-        {'name': u'p/r2'},
+        {'name': u'p:@root'},
+        {'name': u'p:r1'},
+        {'name': u'p:r2'},
     ]})
 
   def test_simple_bindings(self):
@@ -161,10 +161,10 @@ class ExpandRealmsTest(test_case.TestCase):
         ],
         'realms': [
             {
-                'name': u'p/@root',
+                'name': u'p:@root',
             },
             {
-                'name': u'p/r',
+                'name': u'p:r',
                 'bindings': [
                     {
                         'permissions': [0, 1],
@@ -207,7 +207,7 @@ class ExpandRealmsTest(test_case.TestCase):
         ],
         'realms': [
             {
-                'name': u'p/@root',
+                'name': u'p:@root',
                 'bindings': [
                     {
                         'permissions': [0, 1, 2],
@@ -216,7 +216,7 @@ class ExpandRealmsTest(test_case.TestCase):
                 ],
             },
             {
-                'name': u'p/r',
+                'name': u'p:r',
                 'bindings': [
                     {
                         'permissions': [0, 1],
@@ -261,7 +261,7 @@ class ExpandRealmsTest(test_case.TestCase):
         ],
         'realms': [
             {
-                'name': u'p/@root',
+                'name': u'p:@root',
                 'bindings': [
                     {
                         'permissions': [0, 1, 2],
@@ -270,7 +270,7 @@ class ExpandRealmsTest(test_case.TestCase):
                 ],
             },
             {
-                'name': u'p/r1',
+                'name': u'p:r1',
                 'bindings': [
                     {
                         'permissions': [0, 1],
@@ -283,7 +283,7 @@ class ExpandRealmsTest(test_case.TestCase):
                 ],
             },
             {
-                'name': u'p/r2',
+                'name': u'p:r2',
                 'bindings': [
                     {
                         'permissions': [0, 1],
@@ -340,10 +340,10 @@ class ExpandRealmsTest(test_case.TestCase):
         ],
         'realms': [
             {
-                'name': u'p/@root',
+                'name': u'p:@root',
             },
             {
-                'name': u'p/r',
+                'name': u'p:r',
                 'bindings': [
                     {
                         'permissions': [0, 1, 2, 3],

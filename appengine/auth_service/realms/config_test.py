@@ -205,7 +205,7 @@ class RealmsUpdateTest(test_case.TestCase):
     # Stored now in the expanded form.
     ent = model.project_realms_key('proj1').get()
     self.assertEqual(
-        [r.name for r in ent.realms.realms], ['proj1/@root', 'proj1/realm1'])
+        [r.name for r in ent.realms.realms], ['proj1:@root', 'proj1:realm1'])
     self.assertEqual(ent.config_rev, 'cfg_rev1')
     self.assertEqual(ent.perms_rev, 'db-rev1')
 
@@ -242,7 +242,7 @@ class RealmsUpdateTest(test_case.TestCase):
     # And new body.
     ent = model.project_realms_key('proj1').get()
     self.assertEqual(
-        [r.name for r in ent.realms.realms], ['proj1/@root', 'proj1/realm2'])
+        [r.name for r in ent.realms.realms], ['proj1:@root', 'proj1:realm2'])
     self.assertEqual(ent.config_rev, 'cfg_rev3')
     self.assertEqual(ent.perms_rev, 'db-rev2')
 

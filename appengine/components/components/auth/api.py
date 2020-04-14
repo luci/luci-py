@@ -873,13 +873,13 @@ class AuthDB(object):
     if realm:
       return realm
 
-    # Given "<project>/..." need to construct "<project>/@root". Validate
+    # Given "<project>:..." need to construct "<project>:@root". Validate
     # the realm name along the way. We do it here (instead of at the start of
     # the function) to avoid unnecessary regexp checks on the hot path (when
     # hitting existing realms).
-    spl = name.split('/', 1)
+    spl = name.split(':', 1)
     if len(spl) != 2 or not spl[0] or not spl[1]:
-      raise ValueError('Bad realm %r, want "<project>/<name>"' % (name,))
+      raise ValueError('Bad realm %r, want "<project>:<name>"' % (name,))
     if (not _PROJECT_NAME_RE.match(spl[0]) or
         not (
             _REALM_NAME_RE.match(spl[1]) or
@@ -887,13 +887,13 @@ class AuthDB(object):
             spl[1] == _LEGACY_REALM
         )):
       raise ValueError(
-          'Bad realm %r: should be "<project>/<name>" where '
+          'Bad realm %r: should be "<project>:<name>" where '
           '<project> matches %r and <name> matches %r or is %s or %s' % (
           name, _PROJECT_NAME_RE.pattern, _REALM_NAME_RE.pattern,
           _ROOT_REALM, _LEGACY_REALM))
 
     # Same as root_realm(...) except skipping the validation, we already did it.
-    root_name = str('%s/%s' % (spl[0], _ROOT_REALM))
+    root_name = str('%s:%s' % (spl[0], _ROOT_REALM))
 
     # Can't fallback to the root if already checking it.
     if name == root_name:
@@ -2059,7 +2059,7 @@ class Permission(collections.namedtuple('Permission', 'name')):
 
 
 def root_realm(project):
-  """Validates the project name and returns `<project>/@root` string.
+  """Validates the project name and returns `<project>:@root` string.
 
   The root realm is implicitly included into all other realms (including
   "@legacy"), and it is also used as a fallback when a resource points to
@@ -2077,17 +2077,17 @@ def root_realm(project):
     project: a string with LUCI project name.
 
   Returns:
-    String `<project>/@root`.
+    String `<project>:@root`.
 
   Raises:
     TypeError if `project` is not a string.
     ValueError if `project` doesn't pass the regexp check.
   """
-  return '%s/%s' % (_validated_project_id(project), _ROOT_REALM)
+  return '%s:%s' % (_validated_project_id(project), _ROOT_REALM)
 
 
 def legacy_realm(project):
-  """Validates the project name and returns `<project>/@legacy` string.
+  """Validates the project name and returns `<project>:@legacy` string.
 
   The legacy realm should be used for legacy resources created before the
   realms mechanism was introduced in case the service can't figure out a more
@@ -2102,13 +2102,13 @@ def legacy_realm(project):
     project: a string with LUCI project name.
 
   Returns:
-    String `<project>/@legacy`.
+    String `<project>:@legacy`.
 
   Raises:
     TypeError if `project` is not a string.
     ValueError if `project` doesn't pass the regexp check.
   """
-  return '%s/%s' % (_validated_project_id(project), _LEGACY_REALM)
+  return '%s:%s' % (_validated_project_id(project), _LEGACY_REALM)
 
 
 def check_permission(permission, realms, identity=None):
@@ -2117,7 +2117,7 @@ def check_permission(permission, realms, identity=None):
   Uses an in-memory cache and can be considered "fast". Makes no RPCs.
 
   During the check any non-existing realm is replaced with the corresponding
-  root realm (e.g. if "projectA/some/realm" doesn't exist, "projectA/@root"
+  root realm (e.g. if "projectA:some/realm" doesn't exist, "projectA:@root"
   will be used in its place). If the project doesn't exist or is not using
   realms yet, all its realms (including the root realm) are considered empty.
   check_permission() returns False in this case.

@@ -56,7 +56,7 @@ def merge(permissions, realms, out=None):
           bindings.append((perms, b.principals))
 
       # Add the relabeled realm to the output.
-      assert old_realm.name.startswith(proj_id+'/'), old_realm.name
+      assert old_realm.name.startswith(proj_id+':'), old_realm.name
       new_realm = out.realms.add()
       new_realm.name = old_realm.name
       new_realm.bindings.extend(
