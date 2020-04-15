@@ -172,8 +172,7 @@ def main(args, app_dir=None):
   parser.add_option(
       '--proto_path',
       help=('Passed through to protoc. If not set, will be set to the directory'
-            'containing the proto file being compiled.')
-  )
+            ' containing the proto file being compiled.'))
 
   options, args = parser.parse_args(args)
   logging.basicConfig(level=logging.DEBUG if options.verbose else logging.ERROR)
