@@ -108,6 +108,9 @@ class BotDimensions(ndb.Model):
   # when the bot changes its dimensions.
   dimensions_flat = ndb.StringProperty(repeated=True)
 
+  # Validity time, at which this entity should be considered irrelevant.
+  valid_until_ts = ndb.DateTimeProperty()
+
   def _pre_put_hook(self):
     super(BotDimensions, self)._pre_put_hook()
     if self.key.integer_id() != 1:
@@ -445,8 +448,14 @@ def _rebuild_bot_cache_async(bot_dimensions, bot_root_key):
     yield [future_bots, future_tasks]
 
     # Seal the fact that it has been updated.
-    df = bot_dimensions_to_flat(bot_dimensions)
-    obj = BotDimensions(id=1, parent=bot_root_key, dimensions_flat=df)
+    # The expirations are distributed to avoid accessing Datastore
+    # at the same time.
+    valid_until_ts = now + datetime.timedelta(minutes=random.randint(20, 40))
+    obj = BotDimensions(
+        id=1,
+        parent=bot_root_key,
+        dimensions_flat=bot_dimensions_to_flat(bot_dimensions),
+        valid_until_ts=valid_until_ts)
     # Do these steps in order.
     yield obj.put_async()
     yield ndb.get_context().memcache_set(
@@ -947,9 +956,14 @@ def assert_bot_async(bot_root_key, bot_dimensions):
     Number of matches or None if hit the cache, thus nothing was updated.
   """
   # Check if the bot dimensions changed since last _rebuild_bot_cache_async()
-  # call.
+  # call and still valids. It rebuilds cache every 20-40 minutes to avoid
+  # missing tasks that can be assigined to the bot. Tasks can be missed because
+  # _rebuild_bot_cache_async isn't an atomic operation, and also it takes time
+  # for secondary indices to be ready since they are *eventually* consistent.
+  now = utils.utcnow()
   obj = yield ndb.Key(BotDimensions, 1, parent=bot_root_key).get_async()
-  if obj and obj.dimensions_flat == bot_dimensions_to_flat(bot_dimensions):
+  if (obj and obj.dimensions_flat == bot_dimensions_to_flat(bot_dimensions) and
+      obj.valid_until_ts > now):
     # Cache hit, no need to look further.
     logging.debug('assert_bot_async: cache hit. bot_id: %s, bot_dimensions: %s',
                   bot_dimensions.get('id'), bot_dimensions)
