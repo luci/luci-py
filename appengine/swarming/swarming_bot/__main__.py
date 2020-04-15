@@ -7,6 +7,7 @@
 The imports are done late so if an ImportError occurs, it is localized to this
 command only.
 """
+__version__ = '1.0.0'
 
 import code
 import json
@@ -72,6 +73,7 @@ import signal_trace
 from depot_tools import fix_encoding
 
 from utils import logging_utils
+from utils import net
 
 from bot_code import common
 
@@ -106,8 +108,6 @@ def CMDis_fine(_args):
   # pylint: disable=unused-variable
   from bot_code import bot_main
   from config import bot_config
-
-  from utils import net
 
   resp = net.url_read(bot_main.get_config()['server'] +
                       '/swarming/api/v1/bot/server_ping')
@@ -241,6 +241,8 @@ def main():
   # Always create the logs dir first thing, before printing anything out.
   if not os.path.isdir('logs'):
     os.mkdir('logs')
+
+  net.set_user_agent('swarming_bot/' + __version__)
 
   # This is necessary so os.path.join() works with unicode path. No kidding.
   # This must be done here as each of the command take wildly different code
