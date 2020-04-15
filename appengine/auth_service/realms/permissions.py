@@ -78,6 +78,22 @@ def db():
       permission('configs.configSet.reimport'),
   ])
 
+  # LUCI Scheduler permissions and roles (crbug.com/1070761).
+  role('role/scheduler.reader', [
+      permission('scheduler.job.get'),
+  ])
+  role('role/scheduler.triggerer', [
+      include('role/scheduler.reader'),
+      permission('scheduler.job.trigger'),
+  ])
+  role('role/scheduler.owner', [
+      include('role/scheduler.reader'),
+      include('role/scheduler.triggerer'),
+      permission('scheduler.job.pause'),
+      permission('scheduler.job.resume'),
+      permission('scheduler.job.abort'),
+  ])
+
   return builder.finish()
 
 
