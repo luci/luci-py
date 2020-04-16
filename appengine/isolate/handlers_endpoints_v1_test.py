@@ -113,14 +113,16 @@ def get_file_info_factory(content=None):
 ### Isolate Service Test
 
 
-class IsolateServiceTestBase(test_case.EndpointsTestCase):
-  """Base class for testing IsolateService."""
-  store_prefix = 'https://storage.googleapis.com/sample-app/'
+class IsolateServiceTest(test_case.EndpointsTestCase):
+  """Test the IsolateService's API methods."""
 
+  store_prefix = 'https://storage.googleapis.com/sample-app/'
   APP_DIR = test_env.APP_DIR
 
+  api_service_cls = handlers_endpoints_v1.IsolateService
+
   def setUp(self):
-    super(IsolateServiceTestBase, self).setUp()
+    super(IsolateServiceTest, self).setUp()
     self.testbed.init_blobstore_stub()
     self.testbed.init_urlfetch_stub()
     # It seems like there is a singleton state preserved across the tests,
@@ -148,12 +150,6 @@ class IsolateServiceTestBase(test_case.EndpointsTestCase):
     make_private_key()
     # Remove the check for dev server in should_push_to_gs().
     self.mock(utils, 'is_local_dev_server', lambda: False)
-
-
-class IsolateServiceTest(IsolateServiceTestBase):
-  """Test the IsolateService's API methods."""
-
-  api_service_cls = handlers_endpoints_v1.IsolateService
 
   def store_request(self, namespace, content):
     """Generate a Storage/FinalizeRequest via preupload status."""
@@ -611,19 +607,14 @@ class IsolateServiceTest(IsolateServiceTestBase):
         'Expires=') % (namespace, digest)
     self.assertTrue(resp.json['url'].startswith(prefix))
 
-
-class IsolateServiceLogIdentityTest(IsolateServiceTestBase):
-  """Test the IsolateService's handlers can log clients' info."""
-
-  api_service_cls = handlers_endpoints_v1.IsolateService
-
   @mock.patch('logging.info')
   def test_log_serviceaccount(self, logfunc):
     """Assert that service account identity is being logged."""
     admin = auth.Identity(auth.IDENTITY_USER,
                           'admin@appspot.gserviceaccount.com')
     auth_testing.mock_get_current_identity(self, admin)
-    self._send_request()
+    collection = generate_collection('default', ['foobar'])
+    self.call_api('preupload', message_to_dict(collection), 200)
     logfunc.assert_any_call('Accessed from identity=%s',
                             'user:admin@appspot.gserviceaccount.com')
 
@@ -632,7 +623,8 @@ class IsolateServiceLogIdentityTest(IsolateServiceTestBase):
     """Assert that non-user identity is being logged."""
     admin = auth.Identity(auth.IDENTITY_SERVICE, 'adminapp')
     auth_testing.mock_get_current_identity(self, admin)
-    self._send_request()
+    collection = generate_collection('default', ['foobar'])
+    self.call_api('preupload', message_to_dict(collection), 200)
     logfunc.assert_any_call('Accessed from identity=%s', 'service:adminapp')
 
   @mock.patch('logging.info')
@@ -640,13 +632,9 @@ class IsolateServiceLogIdentityTest(IsolateServiceTestBase):
     """Assert that the usage is still logged without the user identity."""
     admin = auth.Identity(auth.IDENTITY_USER, 'admin@example.com')
     auth_testing.mock_get_current_identity(self, admin)
-    self._send_request()
-    logfunc.assert_any_call('Accessed from user')
-
-  def _send_request(self):
-    namespace = 'default'
-    collection = generate_collection(namespace, ['foobar'])
+    collection = generate_collection('default', ['foobar'])
     self.call_api('preupload', message_to_dict(collection), 200)
+    logfunc.assert_any_call('Accessed from user')
 
 
 if __name__ == '__main__':
