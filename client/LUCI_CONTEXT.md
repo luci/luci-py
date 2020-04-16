@@ -27,7 +27,8 @@ a subprocess intends to outlive its parent, it MUST make its own copy of the
 `LUCI_CONTEXT` file.
 
 Example contents:
-```
+
+```json
 {
   "local_auth": {
     "rpc_port": 10000,
@@ -68,7 +69,7 @@ calling other services. It is a reference to a local RPC port, along with
 some configuration of what this RPC service (called "local auth service") can
 provide.
 
-```
+```proto
 message LocalAuth {
   message Account {
     string id = 1;
@@ -104,7 +105,7 @@ TODO(vadimsh): Finish this.
 This section describes data passed down from the
 [swarming service](../appengine/swarming) to scripts running within swarming.
 
-```
+```proto
 message Swarming {
   // The user-supplied secret bytes specified for the task, if any. This can be
   // used to pass application or task-specific secret keys, JSON, etc. from the
@@ -130,17 +131,37 @@ message LUCIExe {
 
 ## `resultdb`
 
-This section describes data passed from resultdb-related services.
+This section describes data passed from ResultDB integrations.
 
-```
+```proto
 message ResultDB {
-  message TestResults {
-    // The port that the test results server will listen on.
-    int64 port = 1;
-    // The secret token to send to the server for the handshake.
-    string auth_token = 2;
+  string hostname = 1; // e.g. results.api.cr.dev
+
+  message Invocation {
+    string name = 1;         // e.g. "invocations/build:1234567890"
+    string update_token = 2; // required in all mutation requests
   }
 
-  TestResults test_results = 1;
+  // The invocation in the current context.
+  // For example, in a Buildbucket build context, it is the build's invocation.
+  //
+  // This is the recommended way to propagate invocation name and update token
+  // to subprocesses.
+  Invocation current_invocation = 1;
+}
+```
+
+## `result_sink`
+
+This section describes the ResultSink available in the environment.
+
+```proto
+message ResultSink {
+  // TCP address (e.g. "localhost:62115") where a ResultSink pRPC server is hosted.
+  string address = 1;
+
+  // secret string required in all ResultSink requests in HTTP header
+  // `Authorization: ResultSink <auth-token>`
+  string auth_token = 2;
 }
 ```
