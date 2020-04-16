@@ -2554,7 +2554,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     # Non-PENDING task cannot have active slice set.
     r = self._quick_schedule(1)
     self.assertEqual(
-        task_scheduler._ensure_active_slice(r.request, 1, 1), (None, False))
+        task_scheduler._ensure_active_slice(r.request, 1), (None, False))
 
   def test_ensure_active_slice_pending(self):
     # Pending task can be forced between different active slices via
@@ -2575,15 +2575,15 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         ],
     )
 
-    to_run, _ = task_scheduler._ensure_active_slice(r.request, 1, 0)
+    to_run, _ = task_scheduler._ensure_active_slice(r.request, 0)
     self.assertEqual(to_run.task_slice_index, 0)
-    to_run, _ = task_scheduler._ensure_active_slice(r.request, 1, 1)
+    to_run, _ = task_scheduler._ensure_active_slice(r.request, 1)
     self.assertEqual(to_run.task_slice_index, 1)
-    to_run, _ = task_scheduler._ensure_active_slice(r.request, 1, 0)
+    to_run, _ = task_scheduler._ensure_active_slice(r.request, 0)
     self.assertEqual(to_run.task_slice_index, 0)
     # This works even if there is no to_run entity.
     to_run.key.delete()
-    to_run, _ = task_scheduler._ensure_active_slice(r.request, 1, 1)
+    to_run, _ = task_scheduler._ensure_active_slice(r.request, 1)
     self.assertEqual(to_run.task_slice_index, 1)
 
   def test_task_expire_tasks(self):
@@ -2607,14 +2607,14 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
               )),
         ])
     # activate a non-current slice forcebly.
-    try_number = 1
     invalid_slice_index = 1
-    task_scheduler._ensure_active_slice(
-        result_summary.request, try_number, invalid_slice_index)
+    task_scheduler._ensure_active_slice(result_summary.request,
+                                        invalid_slice_index)
     self.assertEqual(State.PENDING, result_summary.state)
     self.assertEqual(0, result_summary.current_task_slice)
 
     # task_expire_tasks should expire the task.
+    try_number = 1
     to_runs = [
         (result_summary.task_id, try_number, invalid_slice_index)
     ]

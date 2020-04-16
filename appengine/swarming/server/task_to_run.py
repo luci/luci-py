@@ -481,17 +481,15 @@ def task_to_run_key_try_number(to_run_key):
   return to_run_key.integer_id() & 15
 
 
-def new_task_to_run(request, try_number, task_slice_index):
+def new_task_to_run(request, task_slice_index):
   """Returns a fresh new TaskToRun for the task ready to be scheduled.
 
   Returns:
     Unsaved TaskToRun entity.
   """
-  assert 1 <= try_number <= 2, try_number
   assert 0 <= task_slice_index < 64, task_slice_index
   created = request.created_ts
-  if try_number != 1 or task_slice_index:
-    # When retrying, use the current time.
+  if task_slice_index:
     created = utils.utcnow()
   # TODO(maruel): expiration_ts is based on request.created_ts but it could be
   # enqueued sooner or later. crbug.com/781021
@@ -505,7 +503,7 @@ def new_task_to_run(request, try_number, task_slice_index):
   qn = _gen_queue_number(
       task_queues.hash_dimensions(h), request.created_ts, request.priority)
   return TaskToRun(
-      key=request_to_task_to_run_key(request, try_number, task_slice_index),
+      key=request_to_task_to_run_key(request, 1, task_slice_index),
       created_ts=created,
       queue_number=qn,
       expiration_ts=exp)

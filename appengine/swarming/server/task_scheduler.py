@@ -88,7 +88,7 @@ def _expire_task_tx(now, request, to_run_key, result_summary_key, capacity,
     # condition in here but we're willing to accept it.
     if len(capacity) > index and capacity[index]:
       # Enqueue a new TasktoRun for this next TaskSlice, it has capacity!
-      new_to_run = task_to_run.new_task_to_run(request, 1, index+offset)
+      new_to_run = task_to_run.new_task_to_run(request, index + offset)
       result_summary.current_task_slice = index+offset
       to_put.append(new_to_run)
       break
@@ -888,18 +888,9 @@ def _get_task_from_external_scheduler(es_cfg, bot_dimensions):
   request = request_key.get()
   result_summary = result_key.get()
 
-  # result_summary.try_number is:
-  # 0 or None when the first try is pending.
-  # 1 once the first try started.
-  # 1 when the second try is pending.
-  # 2 once the second try started.
-  try_number = (result_summary.try_number or 0) + 1
+  logging.info('Determined slice_number %s', slice_number)
 
-  logging.info('Determined try_number, slice_number %s %s', try_number,
-               slice_number)
-
-  to_run, raise_exception = _ensure_active_slice(request, try_number,
-                                                 slice_number)
+  to_run, raise_exception = _ensure_active_slice(request, slice_number)
   if not to_run:
     # We were unable to ensure the given request was at the desired slice. This
     # means the external scheduler must have stale state about this request, so
@@ -913,7 +904,7 @@ def _get_task_from_external_scheduler(es_cfg, bot_dimensions):
   return request, to_run
 
 
-def _ensure_active_slice(request, try_number, task_slice_index):
+def _ensure_active_slice(request, task_slice_index):
   """Ensures the existence of a TaskToRun for the given request, try, slice.
 
   Ensure that the given request is currently active at a given try_number and
@@ -926,7 +917,6 @@ def _ensure_active_slice(request, try_number, task_slice_index):
 
   Arguments:
     request: TaskRequest instance
-    try_number: try_number to ensure exists.
     task_slice_index: slice index to ensure is active.
 
   Returns:
@@ -935,8 +925,8 @@ def _ensure_active_slice(request, try_number, task_slice_index):
     Boolean: Whether or not it should raise exception
   """
   def run():
-    logging.debug('_ensure_active_slice(%s, %d, %d)',
-                  request.task_id, try_number, task_slice_index)
+    logging.debug('_ensure_active_slice(%s, %d)', request.task_id,
+                  task_slice_index)
     to_runs = task_to_run.TaskToRun.query(ancestor=request.key).fetch()
     to_runs = [r for r in to_runs if r.queue_number]
     if to_runs:
@@ -949,16 +939,14 @@ def _ensure_active_slice(request, try_number, task_slice_index):
     to_run = to_runs[0] if to_runs else None
 
     if to_run:
-      if (to_run.try_number == try_number and
-          to_run.task_slice_index == task_slice_index):
+      if to_run.task_slice_index == task_slice_index:
         logging.debug('_ensure_active_slice: already active')
         return to_run, False
 
       # Deactivate old TaskToRun, create new one.
       to_run.queue_number = None
       to_run.expiration_ts = None
-      new_to_run = task_to_run.new_task_to_run(request, try_number,
-                                               task_slice_index)
+      new_to_run = task_to_run.new_task_to_run(request, task_slice_index)
       ndb.put_multi([to_run, new_to_run])
       logging.debug('_ensure_active_slice: added new TaskToRun')
       return new_to_run, False
@@ -977,8 +965,7 @@ def _ensure_active_slice(request, try_number, task_slice_index):
       # just notify to external scheudler without exception
       return None, False
 
-    new_to_run = task_to_run.new_task_to_run(request, try_number,
-        task_slice_index)
+    new_to_run = task_to_run.new_task_to_run(request, task_slice_index)
     new_to_run.put()
     logging.debug('ensure_active_slice: added new TaskToRun (no previous one)')
     return new_to_run, False
@@ -1167,7 +1154,7 @@ def schedule_request(request, secret_bytes):
     index = 0
     while index < request.num_task_slices:
       # This needs to be extremely fast.
-      to_run = task_to_run.new_task_to_run(request, 1, index)
+      to_run = task_to_run.new_task_to_run(request, index)
       #  Make sure there's capacity if desired.
       t = request.task_slice(index)
       if (t.wait_for_capacity or

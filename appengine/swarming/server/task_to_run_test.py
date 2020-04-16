@@ -172,14 +172,14 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
   def _gen_new_task_to_run(self, nb_task, **kwargs):
     """Returns TaskRequest, TaskToRun saved in the DB."""
     request = self.mkreq(nb_task, _gen_request(**kwargs))
-    to_run = task_to_run.new_task_to_run(request, 1, 0)
+    to_run = task_to_run.new_task_to_run(request, 0)
     to_run.put()
     return request, to_run
 
   def _gen_new_task_to_run_slices(self, nb_task, **kwargs):
     """Returns TaskRequest, TaskToRun saved in the DB."""
     request = self.mkreq(nb_task, _gen_request_slices(**kwargs))
-    to_run = task_to_run.new_task_to_run(request, 1, 0)
+    to_run = task_to_run.new_task_to_run(request, 0)
     to_run.put()
     return request, to_run
 
@@ -281,19 +281,15 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
         'task_slice_index': 0,
         'try_number': 1,
     }
-    actual = task_to_run.new_task_to_run(request, 1, 0).to_dict()
-    self.assertEqual(expected, actual)
-    # now is used when try_number != 1.
-    expected['created_ts'] = self.now + datetime.timedelta(seconds=1)
-    expected['try_number'] = 2
-    actual = task_to_run.new_task_to_run(request, 2, 0).to_dict()
+    actual = task_to_run.new_task_to_run(request, 0).to_dict()
     self.assertEqual(expected, actual)
     # now is used when task_slice_index != 0.
+    expected['created_ts'] = self.now + datetime.timedelta(seconds=1)
     expected['task_slice_index'] = 1
     expected['try_number'] = 1
     expected['expiration_ts'] = self.now + datetime.timedelta(
         minutes=1, seconds=1)
-    actual = task_to_run.new_task_to_run(request, 1, 1).to_dict()
+    actual = task_to_run.new_task_to_run(request, 1).to_dict()
     self.assertEqual(expected, actual)
 
   def test_new_task_to_run_limits(self):
@@ -307,15 +303,10 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
             })) for i in range(8)
     ]
     request = self.mkreq(8, _gen_request_slices(task_slices=slices))
-    with self.assertRaises(AssertionError):
-      task_to_run.new_task_to_run(request, 0, 0)
-    task_to_run.new_task_to_run(request, 1, 0)
-    task_to_run.new_task_to_run(request, 2, 0)
-    with self.assertRaises(AssertionError):
-      task_to_run.new_task_to_run(request, 3, 0)
-    task_to_run.new_task_to_run(request, 1, 7)
+    task_to_run.new_task_to_run(request, 0)
+    task_to_run.new_task_to_run(request, 7)
     with self.assertRaises(IndexError):
-      task_to_run.new_task_to_run(request, 1, 8)
+      task_to_run.new_task_to_run(request, 8)
 
   def test_task_to_run_key_slice_index(self):
     slices = [
@@ -328,7 +319,7 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
     ]
     request = self.mkreq(len(slices), _gen_request_slices(task_slices=slices))
     for i in range(len(slices)):
-      to_run = task_to_run.new_task_to_run(request, 1, i)
+      to_run = task_to_run.new_task_to_run(request, i)
       self.assertEqual(i, to_run.task_slice_index)
       self.assertEqual(i, task_to_run.task_to_run_key_slice_index(to_run.key))
 
@@ -343,11 +334,10 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
             })) for i in range(8)
     ]
     request = self.mkreq(len(slices), _gen_request_slices(task_slices=slices))
-    for i in (1, 2):
-      to_run = task_to_run.new_task_to_run(request, i, 0)
-      self.assertEqual(i, to_run.try_number)
-      self.assertEqual(i, task_to_run.task_to_run_key_try_number(to_run.key))
-      self.assertEqual('422556288800881%d' % i, to_run.task_id)
+    to_run = task_to_run.new_task_to_run(request, 0)
+    self.assertEqual(1, to_run.try_number)
+    self.assertEqual(1, task_to_run.task_to_run_key_try_number(to_run.key))
+    self.assertEqual('4225562888008811', to_run.task_id)
 
   def test_new_task_to_run_list(self):
     self.mock(random, 'getrandbits', lambda _: 0x12)
@@ -365,7 +355,7 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
                     execution_timeout_secs=30)),
         ])
     request = self.mkreq(1, data)
-    task_to_run.new_task_to_run(request, 1, 0).put()
+    task_to_run.new_task_to_run(request, 0).put()
 
     # Create a second with higher priority.
     self.mock(random, 'getrandbits', lambda _: 0x23)
@@ -381,7 +371,7 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
                     env={u'foo': u'bar'},
                     execution_timeout_secs=30)),
         ])
-    task_to_run.new_task_to_run(self.mkreq(0, data), 1, 0).put()
+    task_to_run.new_task_to_run(self.mkreq(0, data), 0).put()
 
     expected = [
         {
@@ -716,7 +706,7 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
         _gen_request(
             properties=_gen_properties(dimensions=request_dimensions),
             priority=50))
-    task_to_run.new_task_to_run(request, 1, 0).put()
+    task_to_run.new_task_to_run(request, 0).put()
 
     # It should return them all, in the expected order: highest priority
     # (lowest priority value) first.
@@ -763,7 +753,7 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
         _gen_request(
             properties=_gen_properties(dimensions=request_dimensions),
             priority=50))
-    task_to_run.new_task_to_run(request, 1, 0).put()
+    task_to_run.new_task_to_run(request, 0).put()
 
     # It should return them all, in the expected order: first in, first out.
     expected = [
@@ -805,7 +795,7 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
         _gen_request(
             properties=_gen_properties(dimensions=request_dimensions),
             priority=50))
-    task_to_run.new_task_to_run(request, 1, 0).put()
+    task_to_run.new_task_to_run(request, 0).put()
 
     # It should return them all, in the expected order: last in, first out.
     expected = [
@@ -851,7 +841,7 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
         _gen_request(
             properties=_gen_properties(dimensions=request_dimensions_2),
             priority=50))
-    task_to_run.new_task_to_run(request2, 1, 0).put()
+    task_to_run.new_task_to_run(request2, 0).put()
 
     # It should return them all, in the expected order: highest priority
     # (lowest priority value) first.
@@ -988,29 +978,19 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
     # Create two TaskToRun on the same TaskRequest and assert that affecting one
     # negative cache entry doesn't affect the other.
     request = self.mkreq(1, _gen_request())
-    to_run_1 = task_to_run.new_task_to_run(request, 1, 0)
+    to_run_1 = task_to_run.new_task_to_run(request, 0)
     to_run_1.put()
-    to_run_2 = task_to_run.new_task_to_run(request, 2, 0)
-    to_run_2.put()
     lookup = lambda k: task_to_run._lookup_cache_is_taken_async(k).get_result()
     # By default, the negative cache is false, i.e. it is safe to reap the task.
     self.assertEqual(False, lookup(to_run_1.key))
-    self.assertEqual(False, lookup(to_run_2.key))
     # Mark to_run_1 as safe to reap.
     task_to_run.set_lookup_cache(to_run_1.key, True)
     self.assertEqual(False, lookup(to_run_1.key))
-    self.assertEqual(False, lookup(to_run_2.key))
     # Mark to_run_1 as unreapable, i.e. a bot is about to reap it.
     task_to_run.set_lookup_cache(to_run_1.key, False)
     self.assertEqual(True, lookup(to_run_1.key))
-    self.assertEqual(False, lookup(to_run_2.key))
     task_to_run.set_lookup_cache(to_run_1.key, True)
     self.assertEqual(False, lookup(to_run_1.key))
-    self.assertEqual(False, lookup(to_run_2.key))
-    # Mark to_run_2 as unreapable, i.e. a bot is about to reap it.
-    task_to_run.set_lookup_cache(to_run_2.key, False)
-    self.assertEqual(False, lookup(to_run_1.key))
-    self.assertEqual(True, lookup(to_run_2.key))
 
   def test_pre_put_hook(self):
     _, to_run = self._gen_new_task_to_run(1)

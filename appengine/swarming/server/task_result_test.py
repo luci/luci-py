@@ -104,7 +104,7 @@ def _gen_run_result(**kwargs):
   """Creates a TaskRunResult."""
   result_summary = _gen_summary_result(**kwargs)
   request = result_summary.request_key.get()
-  to_run = task_to_run.new_task_to_run(request, 1, 0)
+  to_run = task_to_run.new_task_to_run(request, 0)
   run_result = task_result.new_run_result(
       request, to_run, 'localhost', 'abc', {})
   run_result.started_ts = result_summary.modified_ts
@@ -286,7 +286,7 @@ class TaskResultApiTest(TestCase):
 
   def test_new_run_result(self):
     request = _gen_request()
-    to_run = task_to_run.new_task_to_run(request, 1, 0)
+    to_run = task_to_run.new_task_to_run(request, 0)
     actual = task_result.new_run_result(
         request, to_run, u'localhost', u'abc',
         {u'id': [u'localhost'], u'foo': [u'bar', u'biz']})
@@ -351,7 +351,7 @@ class TaskResultApiTest(TestCase):
 
   def test_new_run_result_duration_no_exit_code(self):
     request = _gen_request()
-    to_run = task_to_run.new_task_to_run(request, 1, 0)
+    to_run = task_to_run.new_task_to_run(request, 0)
     actual = task_result.new_run_result(
         request, to_run, u'localhost', u'abc',
         {u'id': [u'localhost'], u'foo': [u'bar', u'biz']})
@@ -380,7 +380,7 @@ class TaskResultApiTest(TestCase):
 
     request = _gen_request()
     result_summary = task_result.new_result_summary(request)
-    to_run = task_to_run.new_task_to_run(request, 1, 0)
+    to_run = task_to_run.new_task_to_run(request, 0)
     result_summary.modified_ts = utils.utcnow()
     ndb.transaction(lambda: ndb.put_multi([result_summary, to_run]))
     expected = self._gen_summary(modified_ts=self.now)
@@ -534,7 +534,7 @@ class TaskResultApiTest(TestCase):
     result_summary = task_result.new_result_summary(request)
     result_summary.modified_ts = utils.utcnow()
     ndb.transaction(result_summary.put)
-    to_run = task_to_run.new_task_to_run(request, 1, 0)
+    to_run = task_to_run.new_task_to_run(request, 0)
     run_result = task_result.new_run_result(
         request, to_run, 'localhost', 'abc', {})
     run_result.started_ts = utils.utcnow()
@@ -561,7 +561,7 @@ class TaskResultApiTest(TestCase):
   def test_set_from_run_result(self):
     request = _gen_request()
     result_summary = task_result.new_result_summary(request)
-    to_run = task_to_run.new_task_to_run(request, 1, 0)
+    to_run = task_to_run.new_task_to_run(request, 0)
     run_result = task_result.new_run_result(
         request, to_run, 'localhost', 'abc', {})
     run_result.started_ts = utils.utcnow()
@@ -582,7 +582,7 @@ class TaskResultApiTest(TestCase):
   def test_set_from_run_result_two_server_versions(self):
     request = _gen_request()
     result_summary = task_result.new_result_summary(request)
-    to_run = task_to_run.new_task_to_run(request, 1, 0)
+    to_run = task_to_run.new_task_to_run(request, 0)
     run_result = task_result.new_run_result(
         request, to_run, 'localhost', 'abc', {})
     run_result.started_ts = utils.utcnow()
@@ -610,47 +610,6 @@ class TaskResultApiTest(TestCase):
     self.assertEqual(
         ['v1a', 'new-version'], result_summary.key.get().server_versions)
 
-  def test_set_from_run_result_two_tries(self):
-    request = _gen_request()
-    result_summary = task_result.new_result_summary(request)
-    to_run_1 = task_to_run.new_task_to_run(request, 1, 0)
-    run_result_1 = task_result.new_run_result(
-        request, to_run_1, 'localhost', 'abc', {})
-    run_result_1.started_ts = utils.utcnow()
-    to_run_2 = task_to_run.new_task_to_run(request, 2, 0)
-    run_result_2 = task_result.new_run_result(
-        request, to_run_2, 'localhost', 'abc', {})
-    run_result_2.started_ts = utils.utcnow()
-    self.assertTrue(result_summary.need_update_from_run_result(run_result_1))
-    run_result_2.modified_ts = utils.utcnow()
-    run_result_2.dead_after_ts = utils.utcnow() + datetime.timedelta(
-        seconds=request.bot_ping_tolerance_secs)
-    result_summary.modified_ts = utils.utcnow()
-    ndb.transaction(lambda: ndb.put_multi((result_summary, run_result_2)))
-
-    self.assertTrue(result_summary.need_update_from_run_result(run_result_1))
-    run_result_1.modified_ts = utils.utcnow()
-    run_result_1.dead_after_ts = utils.utcnow() + datetime.timedelta(
-        seconds=request.bot_ping_tolerance_secs)
-    ndb.transaction(
-        lambda: result_summary.set_from_run_result(run_result_1, request))
-    ndb.transaction(lambda: ndb.put_multi((result_summary, run_result_1)))
-
-    result_summary = result_summary.key.get()
-    self.assertFalse(result_summary.need_update_from_run_result(run_result_1))
-
-    self.assertTrue(result_summary.need_update_from_run_result(run_result_2))
-    run_result_2.modified_ts = utils.utcnow()
-    run_result_2.dead_after_ts = utils.utcnow() + datetime.timedelta(
-        seconds=request.bot_ping_tolerance_secs)
-    ndb.transaction(
-        lambda: result_summary.set_from_run_result(run_result_2, request))
-    ndb.transaction(lambda: ndb.put_multi((result_summary, run_result_2)))
-    result_summary = result_summary.key.get()
-
-    self.assertEqual(2, result_summary.try_number)
-    self.assertFalse(result_summary.need_update_from_run_result(run_result_1))
-
   def test_run_result_duration(self):
     run_result = task_result.TaskRunResult(
         started_ts=datetime.datetime(2010, 1, 1, 0, 0, 0),
@@ -672,7 +631,7 @@ class TaskResultApiTest(TestCase):
     result_summary = task_result.new_result_summary(request)
     result_summary.modified_ts = utils.utcnow()
     ndb.transaction(result_summary.put)
-    to_run = task_to_run.new_task_to_run(request, 1, 0)
+    to_run = task_to_run.new_task_to_run(request, 0)
     run_result = task_result.new_run_result(
         request, to_run, 'localhost', 'abc', {})
     run_result.state = task_result.State.TIMED_OUT
