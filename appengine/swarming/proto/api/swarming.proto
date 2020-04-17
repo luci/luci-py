@@ -792,6 +792,8 @@ message TaskRequest {
   repeated string tags = 6;
   // User for this task is run, if relevant. Not validated.
   string user = 7;
+  // Authenticated client that triggered this task.
+  string authenticated = 13;
 
   // Task hierarchy and notifications
 

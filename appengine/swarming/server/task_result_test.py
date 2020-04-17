@@ -765,6 +765,7 @@ class TaskResultApiTest(TestCase):
             priority=50,
             service_account=u'none',
             name=u'Request name',
+            authenticated=u"user:mocked@example.com",
             tags=[
                 u'pool:default',
                 u'priority:50',

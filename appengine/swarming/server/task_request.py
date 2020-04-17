@@ -1241,6 +1241,8 @@ class TaskRequest(ndb.Model):
     out.tags.extend(self.tags)
     if self.user:
       out.user = self.user
+    if self.authenticated:
+      out.authenticated = self.authenticated.to_bytes()
 
     # Hierarchy and notifications.
     if self.key:

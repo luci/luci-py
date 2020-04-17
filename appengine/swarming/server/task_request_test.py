@@ -979,6 +979,7 @@ class TaskRequestApiTest(TestCase):
         # Information.
         create_time=timestamp_pb2.Timestamp(seconds=1262304000),
         name=u'Request name',
+        authenticated='user:mocked@example.com',
         tags=[
           u'OS:Windows-3.1.1',
           u'hostname:localhost',
