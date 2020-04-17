@@ -1146,6 +1146,12 @@ class TaskRequest(ndb.Model):
   bot_ping_tolerance_secs = ndb.IntegerProperty(
       indexed=False, validator=_validate_ping_tolerance, default=1200)
 
+  # The ResultDB invocation's update token for the task run that was created for
+  # this request.
+  # This is None if the task was deduplicated, or if ResultDB integration
+  # was not enabled for this task.
+  resultdb_update_token = ndb.StringProperty(indexed=False)
+
   @property
   def num_task_slices(self):
     """Returns the number of TaskSlice, supports old entities."""
@@ -1213,9 +1219,10 @@ class TaskRequest(ndb.Model):
     """Supports both old and new format."""
     # to_dict() doesn't recurse correctly into ndb.LocalStructuredProperty! It
     # will call the default method and not the overridden one. :(
-    out = super(TaskRequest, self).to_dict(
-        exclude=['manual_tags', 'properties_old', 'pubsub_auth_token',
-                 'service_account_token', 'task_slice'])
+    out = super(TaskRequest, self).to_dict(exclude=[
+        'manual_tags', 'properties_old', 'pubsub_auth_token',
+        'resultdb_update_token', 'service_account_token', 'task_slice'
+    ])
     if self.properties_old:
       out['properties'] = self.properties_old.to_dict()
     if self.task_slices:

@@ -515,6 +515,10 @@ class NewTaskRequest(messages.Message):
   # previously.
   request_uuid = messages.StringField(16)
 
+  # Disabled by default.
+  # Note: booleans in protorpc are tri-states.
+  enable_resultdb = messages.BooleanField(17)
+
 
 class TaskRequest(messages.Message):
   """Description of a task request as registered by the server.
@@ -685,6 +689,13 @@ class TaskResult(messages.Message):
   #
   # The TaskSlice contains a TaskProperties, which defines what is run.
   current_task_slice = messages.IntegerField(29)
+
+  # e.g. "invocations/task:chromium-swarm.appspot.com:deadbeef0"
+  # None if the integration was not enabled for this task.
+  #
+  # If the task was deduplicated, this equals invocation name of the original
+  # task.
+  resultdb_invocation = messages.StringField(30)
 
 
 class TaskStates(messages.Message):

@@ -464,6 +464,13 @@ class _TaskResultCommon(ndb.Model):
   # running or ran.
   current_task_slice = ndb.IntegerProperty(indexed=False, default=0)
 
+  # e.g. "invocations/task:chromium-swarm.appspot.com:deadbeef0"
+  # None if the integration was not enabled for this task.
+  #
+  # If the task was deduplicated, this equals invocation name of the original
+  # task.
+  resultdb_invocation = ndb.StringProperty()
+
   @property
   def can_be_canceled(self):
     """Returns True if the task is in a state that can be canceled."""
