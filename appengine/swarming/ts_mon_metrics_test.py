@@ -45,9 +45,10 @@ def _gen_task_result_summary(now, key_id, properties=None, **kwargs):
   return task_result.TaskResultSummary(**args)
 
 
-def _get_task_to_run(now, request_key_id, try_number, slice_index, **kwargs):
+def _get_task_to_run(now, request_key_id, slice_index, **kwargs):
   """Creates a TaskToRun."""
   request_key = ndb.Key('TaskRequest', request_key_id)
+  try_number = 1
   to_run_key = ndb.Key(
       'TaskToRun', try_number | (slice_index << 4), parent=request_key)
   args = {
@@ -298,7 +299,7 @@ class TestMetrics(test_case.TestCase):
     summary = _gen_task_result_summary(
         self.now, 1, tags=tags, expiration_delay=1,
         state=task_result.State.EXPIRED)
-    to_run = _get_task_to_run(self.now, 1, 1, 0, expiration_delay=1)
+    to_run = _get_task_to_run(self.now, 1, 0, expiration_delay=1)
 
     ts_mon_metrics.on_task_expired(summary, to_run)
     self.assertEqual(1, ts_mon_metrics._tasks_expiration_delay.get(
