@@ -515,8 +515,14 @@ class NewTaskRequest(messages.Message):
   # previously.
   request_uuid = messages.StringField(16)
 
-  # Disabled by default.
-  # Note: booleans in protorpc are tri-states.
+  # If True and this task is not deduplicated, create
+  # "task:{swarming_hostname}:{run_id}" invocation for this task,
+  # provide its update token to the task subprocess via LUCI_CONTEXT
+  # and finalize the invocation when the task is done.
+  # If the task is deduplicated, then TaskResult.invocation_name will be the
+  # invocation name of the original task.
+  # Swarming:ResultDB integration is off by default, but it may change in the
+  # future.
   enable_resultdb = messages.BooleanField(17)
 
 
@@ -690,7 +696,7 @@ class TaskResult(messages.Message):
   # The TaskSlice contains a TaskProperties, which defines what is run.
   current_task_slice = messages.IntegerField(29)
 
-  # e.g. "invocations/task:chromium-swarm.appspot.com:deadbeef0"
+  # e.g. "invocations/task:chromium-swarm.appspot.com:deadbeef1"
   # None if the integration was not enabled for this task.
   #
   # If the task was deduplicated, this equals invocation name of the original
