@@ -944,6 +944,7 @@ def map_and_run(data, constant_run_path):
       if out_dir:
         logging.exception('Leaking out_dir %s: %s', out_dir, e)
       result['internal_failure'] = str(e)
+      on_error.report(None)
   return result
 
 
