@@ -135,6 +135,7 @@ class FrontendTest(test_env_handlers.AppTestBase):
     self.set_as_anonymous()
     self.app.get('/user/tasks', status=302)
     self.app.get('/user/task/123', status=302)
+    self.app.get('/tasks/123', status=302)
 
   def test_bot_redirect(self):
     self.set_as_anonymous()

@@ -198,23 +198,26 @@ def get_routes():
 
   if not utils.should_disable_ui_routes():
     routes.extend([
-      # Frontend pages. They return HTML.
-      # Public pages.
-      ('/<page:(botlist|tasklist|task|bot|)>', UIHandler),
+        # Frontend pages. They return HTML.
+        # Public pages.
+        ('/<page:(botlist|tasklist|task|bot|)>', UIHandler),
 
-      # These were the very old (pre-2016) links, so this redirects
-      # them to the modern url style.
-      ('/user/tasks', TasksHandler),
-      ('/user/task/<task_id:[0-9a-fA-F]+>', TaskHandler),
-      ('/restricted/bots', BotsListHandler),
-      ('/restricted/bot/<bot_id:[^/]+>', BotHandler),
+        # This is for https://aip.dev/122#resource-uris
+        ('/tasks/<task_id:[0-9a-fA-F]+>', TaskHandler),
 
-      # Admin pages.
-      # TODO(maruel): Get rid of them.
-      ('/restricted/config', RestrictedConfigHandler),
+        # These were the very old (pre-2016) links, so this redirects
+        # them to the modern url style.
+        ('/user/tasks', TasksHandler),
+        ('/user/task/<task_id:[0-9a-fA-F]+>', TaskHandler),
+        ('/restricted/bots', BotsListHandler),
+        ('/restricted/bot/<bot_id:[^/]+>', BotHandler),
 
-      # Mapreduce related urls.
-      (r'/restricted/launch_mapreduce', RestrictedLaunchMapReduceJob),
+        # Admin pages.
+        # TODO(maruel): Get rid of them.
+        ('/restricted/config', RestrictedConfigHandler),
+
+        # Mapreduce related urls.
+        (r'/restricted/launch_mapreduce', RestrictedLaunchMapReduceJob),
     ])
 
   return [webapp2.Route(*i) for i in routes]
