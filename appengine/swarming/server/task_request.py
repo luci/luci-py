@@ -1212,7 +1212,7 @@ class TaskRequest(ndb.Model):
   def to_dict(self):
     """Supports both old and new format."""
     # to_dict() doesn't recurse correctly into ndb.LocalStructuredProperty! It
-    # will call the default method and not the overiden one. :(
+    # will call the default method and not the overridden one. :(
     out = super(TaskRequest, self).to_dict(
         exclude=['manual_tags', 'properties_old', 'pubsub_auth_token',
                  'service_account_token', 'task_slice'])
