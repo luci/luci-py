@@ -887,8 +887,8 @@ class Storage(object):
                                      size)
       # Verified stream goes to |sink|.
       sink(verifier.run())
-    except Exception as err:
-      logging.error('Failed to fetch %s: %s', digest, err)
+    except Exception:
+      logging.exception('Failed to fetch %s', digest)
       raise
 
   def async_fetch(self, channel, priority, digest, size, sink):
