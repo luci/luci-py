@@ -68,12 +68,12 @@ class FakeIsolateServerHandler(httpserver.Handler):
     # handlers_endpoints_v1.IsolateService.generate_ticket.
     namespace = embedded['n']
     d = embedded['d']
-    if self.server.store_hash_instead:
-      if not finalize_gs:
-        self.server.contents.setdefault(namespace, {})[d] = hash_content(
-            content)
-    else:
-      self.server.contents.setdefault(namespace, {})[d] = content
+    if not finalize_gs:
+      if self.server.store_hash_instead:
+        self.server.contents.setdefault(namespace,
+                                        {})[d] = hash_content(content)
+      else:
+        self.server.contents.setdefault(namespace, {})[d] = content
     self.send_json({'ok': True})
 
   ### Faked HTTP Methods
