@@ -1561,7 +1561,6 @@ def main(args):
       containment=containment)
   try:
     if options.isolate_server:
-      on_error.report_on_exception_exit(options.isolate_server)
       server_ref = isolate_storage.ServerRef(
           options.isolate_server, options.namespace)
       storage = isolateserver.get_storage(server_ref)
