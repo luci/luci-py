@@ -905,9 +905,7 @@ class IsolateServerStorageSmokeTest(unittest.TestCase):
       raise IOError('exception from mock')
 
     with mock.patch.object(storage, '_fetch', mocked_fetch):
-      with self.assertRaisesRegexp(AssertionError,
-                                   'push_state is not finalized'):
-        storage.upload_items(items, verify_push=True)
+      storage.upload_items(items, verify_push=True)
 
   def test_upload_items_gzip(self):
     self.run_upload_items_test('default-gzip')

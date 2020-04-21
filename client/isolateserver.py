@@ -820,11 +820,18 @@ class Storage(object):
         raise Aborted()
       self._storage_api.push(item, push_state, content)
       if verify_push:
-        self._fetch(
-            item.digest,
-            item.size,
-            # this consumes all elements from given generator.
-            lambda gen: collections.deque(gen, maxlen=0))
+        try:
+          self._fetch(
+              item.digest,
+              item.size,
+              # this consumes all elements from given generator.
+              lambda gen: collections.deque(gen, maxlen=0))
+        except Exception:
+          # reset push_state if failed to verify.
+          push_state.finalized = False
+          push_state.uploaded = False
+          raise
+
       return item
 
     # If zipping is not required, just start a push task. Don't pass 'content'
