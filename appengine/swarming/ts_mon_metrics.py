@@ -118,7 +118,7 @@ _tasks_expired = gae_ts_mon.CounterMetric(
 
 # Swarming-specific metric. Metric fields:
 # - project_id: e.g. 'chromium-swarm'
-_tasks_expiration_delay = gae_ts_mon.NonCumulativeDistributionMetric(
+_tasks_expiration_delay = gae_ts_mon.CumulativeDistributionMetric(
     'swarming/tasks/expiration_delay',
     'Delay of task expiration, in seconds.', [
         gae_ts_mon.StringField('project_id'),
@@ -127,7 +127,7 @@ _tasks_expiration_delay = gae_ts_mon.NonCumulativeDistributionMetric(
 
 # Swarming-specific metric. Metric fields:
 # - project_id: e.g. 'chromium-swarm'
-_tasks_slice_expiration_delay = gae_ts_mon.NonCumulativeDistributionMetric(
+_tasks_slice_expiration_delay = gae_ts_mon.CumulativeDistributionMetric(
     'swarming/tasks/slice_expiration_delay',
     'Delay of task slice expiration, in seconds.', [
         gae_ts_mon.StringField('project_id'),
