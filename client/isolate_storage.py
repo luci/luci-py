@@ -405,7 +405,7 @@ class IsolateServer(StorageApi):
     assert item.digest is not None
     assert item.size is not None
     assert isinstance(push_state, _IsolateServerPushState)
-    assert not push_state.finalized
+    assert not push_state.finalized, "push_state is not finalized"
 
     # Default to item.content().
     content = item.content() if content is None else content

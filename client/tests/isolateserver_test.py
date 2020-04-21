@@ -16,6 +16,7 @@ import tempfile
 import unittest
 import zlib
 
+import mock
 import parameterized
 import six
 
@@ -881,6 +882,32 @@ class IsolateServerStorageSmokeTest(unittest.TestCase):
 
   def test_upload_items(self):
     self.run_upload_items_test('default')
+
+  def test_upload_items_verify_failed(self):
+    storage = isolateserver.get_storage(
+        isolate_storage.ServerRef(self.server.url, 'default'))
+
+    # Items to upload.
+    items = [
+        isolateserver.BufferItem('item ' * 200, storage.server_ref.hash_algo)
+    ]
+
+    called = []
+
+    orig_fetch = storage._fetch
+
+    def mocked_fetch(digest, size, sink):
+      called.append(True)
+      if len(called) != 1:
+        orig_fetch(digest, size, sink)
+        return
+      # raise error in first call to cause retry.
+      raise IOError('exception from mock')
+
+    with mock.patch.object(storage, '_fetch', mocked_fetch):
+      with self.assertRaisesRegexp(AssertionError,
+                                   'push_state is not finalized'):
+        storage.upload_items(items, verify_push=True)
 
   def test_upload_items_gzip(self):
     self.run_upload_items_test('default-gzip')
