@@ -47,13 +47,13 @@ class TestBase(test_case.TestCase):
 
   def mock_json_request(self, expected_url, expected_payload, response):
     calls = []
-    def mocked(url, method, payload, headers, scopes):
+
+    def mocked(url, method, payload, scopes):
       calls.append(url)
       self.assertEqual(expected_url, url)
       self.assertEqual('POST', method)
       if expected_payload:
         self.assertEqual(expected_payload, payload)
-      self.assertEqual({'Accept': 'application/json; charset=utf-8'},  headers)
       self.assertEqual([net.EMAIL_SCOPE], scopes)
       if isinstance(response, Exception):
         raise response

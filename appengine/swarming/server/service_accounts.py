@@ -413,7 +413,6 @@ def _call_token_server(method, request):
         url='%s/prpc/tokenserver.minter.TokenMinter/%s' % (ts_url, method),
         method='POST',
         payload=request,
-        headers={'Accept': 'application/json; charset=utf-8'},
         scopes=[net.EMAIL_SCOPE])
   except net.Error as exc:
     logging.error(
