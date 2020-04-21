@@ -138,6 +138,13 @@ def _validate_cipd_settings(cfg, ctx=None):
     _validate_cipd_package(cfg.default_client_package, ctx)
 
 
+def _validate_resultdb_settings(cfg, ctx=None):
+  """Validates CipdSettings message stored in settings.cfg."""
+  ctx = ctx or validation.Context.raise_on_error()
+  with ctx.prefix('server '):
+    _validate_url(cfg.server, ctx)
+
+
 @validation.self_rule(_SETTINGS_CFG_FILENAME, config_pb2.SettingsCfg)
 def _validate_settings(cfg, ctx):
   """Validates settings.cfg file against proto message schema."""
@@ -159,6 +166,10 @@ def _validate_settings(cfg, ctx):
   if cfg.HasField('cipd'):
     with ctx.prefix('cipd: '):
       _validate_cipd_settings(cfg.cipd, ctx)
+
+  if cfg.HasField('resultdb'):
+    with ctx.prefix('resultdb: '):
+      _validate_resultdb_settings(cfg.resultdb, ctx)
 
   with ctx.prefix('display_server_url_template '):
     url = cfg.display_server_url_template

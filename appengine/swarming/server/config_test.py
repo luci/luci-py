@@ -141,6 +141,22 @@ class ConfigTest(test_case.TestCase):
             ),
         [])
 
+  def test_validate_resultdb_settings(self):
+    self.validator_test(config._validate_resultdb_settings,
+                        config_pb2.ResultDBSettings(), [
+                            'server is not set',
+                        ])
+
+    self.validator_test(
+        config._validate_resultdb_settings,
+        config_pb2.ResultDBSettings(server='results.api.cr.dev',), [
+            'server must start with "https://" or "http://localhost"',
+        ])
+
+    self.validator_test(
+        config._validate_resultdb_settings,
+        config_pb2.ResultDBSettings(server='https://results.api.cr.dev',), [])
+
   def test_validate_settings(self):
     self.validator_test(
         config._validate_settings,
