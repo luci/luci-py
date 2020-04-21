@@ -99,6 +99,11 @@ VCEI exceptions         : not available
 
 
 class TestCPUInfo(auto_stub.TestCase):
+
+  def setUp(self):
+    super(TestCPUInfo, self).setUp()
+    tools.clear_cache_all()
+
   def tearDown(self):
     super(TestCPUInfo, self).tearDown()
     tools.clear_cache_all()
