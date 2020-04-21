@@ -62,17 +62,12 @@ class FakeIsolateServerHandler(httpserver.Handler):
     """Processes handlers_endpoints_v1.StorageRequest."""
     request = json.loads(body)
     message = 'gs' if finalize_gs else 'datastore'
-    content = request['content'] if not finalize_gs else None
+    content = base64.b64decode(request['content']) if not finalize_gs else None
     embedded = FakeSigner.validate(request['upload_ticket'], message)
     # Embedded is an internal format used by
     # handlers_endpoints_v1.IsolateService.generate_ticket.
     namespace = embedded['n']
     d = embedded['d']
-    size = embedded['s']
-
-    if content and len(content) != size:
-      # decode content if base64 seems applied.
-      content = base64.b64decode(content)
 
     if not finalize_gs:
       if self.server.store_hash_instead:
