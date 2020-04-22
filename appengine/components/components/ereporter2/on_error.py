@@ -65,11 +65,9 @@ def log(**kwargs):
     # The format of the message is important here. The first line is used to
     # generate a signature, so it must be unique for each category of errors.
     logging.error(
-        '%s\n\nSource: %s\nhttps://%s/restricted/ereporter2/errors/%s',
-        error.message,
-        error.source,
-        app_identity.get_default_version_hostname(),
-        key_id)
+        '%s\n%s\n\nSource: %s\nhttps://%s/restricted/ereporter2/errors/%s',
+        error.message, error.stack, error.source,
+        app_identity.get_default_version_hostname(), key_id)
     return key_id
   except (datastore_errors.BadValueError, TypeError) as e:
     stack = formatter._reformat_stack(traceback.format_exc())
