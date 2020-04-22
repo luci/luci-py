@@ -18,35 +18,37 @@ from components import auth
 from components import net
 from test_support import test_case
 
-
 Response = collections.namedtuple('Response', 'status_code content headers')
 
 
 class NetTest(test_case.TestCase):
+
   def setUp(self):
     super(NetTest, self).setUp()
 
     @ndb.tasklet
     def get_access_token(*_args):
       raise ndb.Return(('token', 0))
+
     self.mock(auth, 'get_access_token_async', get_access_token)
 
     self.mock(logging, 'warning', lambda *_args: None)
     self.mock(logging, 'error', lambda *_args: None)
 
   def mock_urlfetch(self, calls):
+
     @ndb.tasklet
     def mocked(**kwargs):
       if not calls:
         self.fail('Unexpected urlfetch call: %s' % kwargs)
       expected, response = calls.pop(0)
       defaults = {
-        'deadline': 10,
-        'follow_redirects': False,
-        'headers': {},
-        'method': 'GET',
-        'payload': None,
-        'validate_certificate': True,
+          'deadline': 10,
+          'follow_redirects': False,
+          'headers': {},
+          'method': 'GET',
+          'payload': None,
+          'validate_certificate': True,
       }
       defaults.update(expected)
 
@@ -76,6 +78,7 @@ class NetTest(test_case.TestCase):
       if isinstance(response, Exception):
         raise response
       raise ndb.Return(response)
+
     self.mock(net, 'urlfetch_async', mocked)
     return calls
 
@@ -112,11 +115,13 @@ class NetTest(test_case.TestCase):
     self.assertEqual('example-value', response_headers['example-header'])
 
   def test_request_project_token_fallback_works(self):
+
     @ndb.tasklet
     def mocked_get_project_access_token_async(*args, **kwargs):
       mocked_get_project_access_token_async.params = (args, kwargs)
       mocked_get_project_access_token_async.called = True
       raise auth.NotFoundError('testing fallback 1')
+
     mocked_get_project_access_token_async.called = False
 
     @ndb.tasklet
@@ -124,142 +129,170 @@ class NetTest(test_case.TestCase):
       mocked_get_access_token_async.params = (args, kwargs)
       mocked_get_access_token_async.called = True
       raise Exception('testing fallback 2')
+
     mocked_get_access_token_async.called = False
 
-    self.mock(auth,
-              'get_project_access_token_async',
+    self.mock(auth, 'get_project_access_token_async',
               mocked_get_project_access_token_async)
-    self.mock(auth,
-              'get_access_token_async',
-              mocked_get_access_token_async)
+    self.mock(auth, 'get_access_token_async', mocked_get_access_token_async)
 
     with self.assertRaises(Exception):
       _ = net.request(
-        url='http://localhost/123',
-        method='POST',
-        payload='post body',
-        params={'a': '=', 'b': '&'},
-        headers={'Accept': 'text/plain'},
-        scopes=['scope'],
-        service_account_key=auth.ServiceAccountKey('a', 'b', 'c'),
-        deadline=123,
-        max_attempts=5,
-        project_id='project1')
+          url='http://localhost/123',
+          method='POST',
+          payload='post body',
+          params={
+              'a': '=',
+              'b': '&'
+          },
+          headers={'Accept': 'text/plain'},
+          scopes=['scope'],
+          service_account_key=auth.ServiceAccountKey('a', 'b', 'c'),
+          deadline=123,
+          max_attempts=5,
+          project_id='project1')
     self.assertTrue(mocked_get_project_access_token_async.called)
     self.assertTrue(mocked_get_access_token_async.called)
 
   def test_retries_transient_errors(self):
     self.mock_urlfetch([
-      ({'url': 'http://localhost/123'}, urlfetch.Error()),
-      ({'url': 'http://localhost/123'}, Response(408, 'clien timeout', {})),
-      ({'url': 'http://localhost/123'}, Response(500, 'server error', {})),
-      ({'url': 'http://localhost/123'}, Response(200, 'response body', {})),
+        ({
+            'url': 'http://localhost/123'
+        }, urlfetch.Error()),
+        ({
+            'url': 'http://localhost/123'
+        }, Response(408, 'clien timeout', {})),
+        ({
+            'url': 'http://localhost/123'
+        }, Response(500, 'server error', {})),
+        ({
+            'url': 'http://localhost/123'
+        }, Response(200, 'response body', {})),
     ])
     response = net.request('http://localhost/123', max_attempts=4)
     self.assertEqual('response body', response)
 
   def test_gives_up_retrying(self):
     self.mock_urlfetch([
-      ({'url': 'http://localhost/123'}, Response(500, 'server error', {})),
-      ({'url': 'http://localhost/123'}, Response(500, 'server error', {})),
-      ({'url': 'http://localhost/123'}, Response(200, 'response body', {})),
+        ({
+            'url': 'http://localhost/123'
+        }, Response(500, 'server error', {})),
+        ({
+            'url': 'http://localhost/123'
+        }, Response(500, 'server error', {})),
+        ({
+            'url': 'http://localhost/123'
+        }, Response(200, 'response body', {})),
     ])
     with self.assertRaises(net.Error):
       net.request('http://localhost/123', max_attempts=2)
 
   def test_404(self):
     self.mock_urlfetch([
-      ({'url': 'http://localhost/123'}, Response(404, 'Not found', {})),
+        ({
+            'url': 'http://localhost/123'
+        }, Response(404, 'Not found', {})),
     ])
     with self.assertRaises(net.NotFoundError):
       net.request('http://localhost/123')
 
   def test_crappy_cloud_endpoints_404_is_retried(self):
     self.mock_urlfetch([
-      (
-        {'url': 'http://localhost/_ah/api/blah'},
-        Response(404, 'Not found', {})
-      ),
-      (
-        {'url': 'http://localhost/_ah/api/blah'},
-        Response(200, 'response body', {})
-      ),
+        ({
+            'url': 'http://localhost/_ah/api/blah'
+        }, Response(404, 'Not found', {})),
+        ({
+            'url': 'http://localhost/_ah/api/blah'
+        }, Response(200, 'response body', {})),
     ])
     response = net.request('http://localhost/_ah/api/blah')
     self.assertEqual('response body', response)
 
   def test_legitimate_cloud_endpoints_404_is_not_retried(self):
     self.mock_urlfetch([
-      (
-        {'url': 'http://localhost/_ah/api/blah'},
-        Response(404, '{}', {'Content-Type': 'application/json'})
-      ),
+        ({
+            'url': 'http://localhost/_ah/api/blah'
+        }, Response(404, '{}', {'Content-Type': 'application/json'})),
     ])
     with self.assertRaises(net.NotFoundError):
       net.request('http://localhost/_ah/api/blah')
 
   def test_401(self):
     self.mock_urlfetch([
-      ({'url': 'http://localhost/123'}, Response(401, 'Auth error', {})),
+        ({
+            'url': 'http://localhost/123'
+        }, Response(401, 'Auth error', {})),
     ])
     with self.assertRaises(net.AuthError):
       net.request('http://localhost/123')
 
   def test_403(self):
     self.mock_urlfetch([
-      ({'url': 'http://localhost/123'}, Response(403, 'Auth error', {})),
+        ({
+            'url': 'http://localhost/123'
+        }, Response(403, 'Auth error', {})),
     ])
     with self.assertRaises(net.AuthError):
       net.request('http://localhost/123')
 
   def test_json_request_works(self):
     self.mock_urlfetch([
-      ({
-        'deadline': 123,
-        'headers': {
-          'Authorization': 'Bearer token',
-          'Accept': 'application/json; charset=utf-8',
-          'Content-Type': 'application/json; charset=utf-8',
-          'Header': 'value',
-        },
-        'method': 'POST',
-        'payload': '{"key":"value"}',
-        'url': 'http://localhost/123?a=%3D&b=%26',
-      }, Response(200, ')]}\'\n{"a":"b"}', {})),
+        ({
+            'deadline': 123,
+            'headers': {
+                'Authorization': 'Bearer token',
+                'Accept': 'application/json; charset=utf-8',
+                'Content-Type': 'application/json; charset=utf-8',
+                'Header': 'value',
+            },
+            'method': 'POST',
+            'payload': '{"key":"value"}',
+            'url': 'http://localhost/123?a=%3D&b=%26',
+        }, Response(200, ')]}\'\n{"a":"b"}',
+                    {'example-header': 'example-value'})),
     ])
+    response_headers = {}
     response = net.json_request(
         url='http://localhost/123',
         method='POST',
         payload={'key': 'value'},
-        params={'a': '=', 'b': '&'},
+        params={
+            'a': '=',
+            'b': '&'
+        },
         headers={'Header': 'value'},
         scopes=['scope'],
         service_account_key=auth.ServiceAccountKey('a', 'b', 'c'),
         deadline=123,
-        max_attempts=5)
+        max_attempts=5,
+        response_headers=response_headers)
     self.assertEqual({'a': 'b'}, response)
+    self.assertEqual(response_headers, {'example-header': 'example-value'})
 
   def test_json_with_jwt_auth_works(self):
     self.mock_urlfetch([
-      ({
-        'deadline': 123,
-        'headers': {
-          'Authorization':
-              r'$^Bearer\ [a-zA-Z0-9_=-]+\.[a-zA-Z0-9_=-]+\.[a-zA-Z0-9_=-]+$',
-          'Accept': 'application/json; charset=utf-8',
-          'Content-Type': 'application/json; charset=utf-8',
-          'Header': 'value',
-        },
-        'method': 'POST',
-        'payload': '{"key":"value"}',
-        'url': 'http://localhost/123?a=%3D&b=%26',
-      }, Response(200, ')]}\'\n{"a":"b"}', {})),
+        ({
+            'deadline': 123,
+            'headers': {
+                'Authorization': r'$^Bearer\ [a-zA-Z0-9_=-]+\.[a-zA-Z0-9_=-]+\.'
+                                 '[a-zA-Z0-9_=-]+$',
+                'Accept': 'application/json; charset=utf-8',
+                'Content-Type': 'application/json; charset=utf-8',
+                'Header': 'value',
+            },
+            'method': 'POST',
+            'payload': '{"key":"value"}',
+            'url': 'http://localhost/123?a=%3D&b=%26',
+        }, Response(200, ')]}\'\n{"a":"b"}', {})),
     ])
     response = net.json_request(
         url='http://localhost/123',
         method='POST',
         payload={'key': 'value'},
-        params={'a': '=', 'b': '&'},
+        params={
+            'a': '=',
+            'b': '&'
+        },
         headers={'Header': 'value'},
         deadline=123,
         max_attempts=5,
@@ -335,7 +368,9 @@ class NetTest(test_case.TestCase):
 
   def test_json_bad_response(self):
     self.mock_urlfetch([
-      ({'url': 'http://localhost/123'}, Response(200, 'not a json', {})),
+        ({
+            'url': 'http://localhost/123'
+        }, Response(200, 'not a json', {})),
     ])
     with self.assertRaises(net.Error):
       net.json_request('http://localhost/123')

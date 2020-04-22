@@ -1,7 +1,6 @@
 # Copyright 2015 The LUCI Authors. All rights reserved.
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
-
 """Wrapper around urlfetch to call REST API with service account credentials."""
 
 import json
@@ -18,7 +17,6 @@ from components import utils
 from components.auth import delegation
 from components.auth import tokens
 
-
 EMAIL_SCOPE = 'https://www.googleapis.com/auth/userinfo.email'
 
 
@@ -27,6 +25,7 @@ class Error(Exception):
 
   Attribute response is response body.
   """
+
   def __init__(self, msg, status_code, response, headers=None):
     super(Error, self).__init__(msg)
     self.status_code = status_code
@@ -194,19 +193,21 @@ def request_async(
 
     # Transient error on the other side.
     if is_transient_error(response, url):
-      logging.warning(
-          '%s %s failed with HTTP %d\nHeaders: %r\nBody: %r',
-          method, url, response.status_code, response.headers, response.content)
+      logging.warning('%s %s failed with HTTP %d\nHeaders: %r\nBody: %r',
+                      method, url, response.status_code, response.headers,
+                      response.content)
       continue
 
     # Non-transient error.
     if 300 <= response.status_code < 500:
-      logging.warning(
-          '%s %s failed with HTTP %d\nHeaders: %r\nBody: %r',
-          method, url, response.status_code, response.headers, response.content)
+      logging.warning('%s %s failed with HTTP %d\nHeaders: %r\nBody: %r',
+                      method, url, response.status_code, response.headers,
+                      response.content)
       raise _error_class_for_status(response.status_code)(
           'Failed to call %s: HTTP %d' % (url, response.status_code),
-          response.status_code, response.content, headers=response.headers)
+          response.status_code,
+          response.content,
+          headers=response.headers)
 
     # Success. Beware of large responses.
     if response_headers is not None:
@@ -228,20 +229,20 @@ def request(*args, **kwargs):
 
 
 @ndb.tasklet
-def json_request_async(
-    url,
-    method='GET',
-    payload=None,
-    params=None,
-    headers=None,
-    scopes=None,
-    service_account_key=None,
-    delegation_token=None,
-    project_id=None,
-    use_jwt_auth=None,
-    audience=None,
-    deadline=None,
-    max_attempts=None):
+def json_request_async(url,
+                       method='GET',
+                       payload=None,
+                       params=None,
+                       headers=None,
+                       scopes=None,
+                       service_account_key=None,
+                       delegation_token=None,
+                       project_id=None,
+                       use_jwt_auth=None,
+                       audience=None,
+                       deadline=None,
+                       max_attempts=None,
+                       response_headers=None):
   """Sends a JSON REST API request, returns deserialized response.
 
   Automatically strips prefixes formed from characters in the set ")]}'\n"
@@ -266,6 +267,7 @@ def json_request_async(
               must only be set when use_jwt_auth is True.
     deadline: deadline for a single attempt.
     max_attempts: how many times to retry on errors.
+    response_headers: a dict to populate with the response headers.
 
   Returns:
     Deserialized JSON response.
@@ -293,7 +295,8 @@ def json_request_async(
       deadline=deadline,
       max_attempts=max_attempts,
       use_jwt_auth=use_jwt_auth,
-      audience=audience)
+      audience=audience,
+      response_headers=response_headers)
   try:
     response = json.loads(response.lstrip(")]}'\n"))
   except ValueError as e:
