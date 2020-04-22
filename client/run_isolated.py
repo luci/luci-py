@@ -76,6 +76,7 @@ from utils import file_path
 from utils import fs
 from utils import large
 from utils import logging_utils
+from utils import net
 from utils import on_error
 from utils import subprocess42
 
@@ -1582,4 +1583,5 @@ if __name__ == '__main__':
   subprocess42.inhibit_os_error_reporting()
   # Ensure that we are always running with the correct encoding.
   fix_encoding.fix_encoding()
+  net.set_user_agent('run_isolated.py/' + __version__)
   sys.exit(main(sys.argv[1:]))
