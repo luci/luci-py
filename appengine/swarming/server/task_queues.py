@@ -1051,8 +1051,8 @@ def get_queues(bot_root_key):
   # should be fast.
   now = utils.utcnow()
   dimensions_hashes = sorted(
-      obj.key.integer_id() for obj in
-      BotTaskDimensions.query(ancestor=bot_root_key)
+      obj.key.integer_id()
+      for obj in BotTaskDimensions.query(ancestor=bot_root_key)
       if obj.valid_until_ts >= now)
   # crbug.com/1065306:
   # Cache expires in 5 minutes.

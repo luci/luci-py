@@ -29,16 +29,17 @@ def main():
     if devices:
       try:
         data = {
-          u'dimensions': os_utilities.get_dimensions_all_devices_android(
-              devices),
-          u'state': os_utilities.get_state_all_devices_android(devices),
+            u'dimensions':
+                os_utilities.get_dimensions_all_devices_android(devices),
+            u'state':
+                os_utilities.get_state_all_devices_android(devices),
         }
       finally:
         platforms.android.close_devices(devices)
   if not devices:
     data = {
-      u'dimensions': os_utilities.get_dimensions(),
-      u'state': os_utilities.get_state(),
+        u'dimensions': os_utilities.get_dimensions(),
+        u'state': os_utilities.get_state(),
     }
 
   json.dump(data, sys.stdout, indent=2, sort_keys=True, separators=(',', ': '))

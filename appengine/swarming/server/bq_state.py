@@ -88,18 +88,24 @@ def _send_to_bq_raw(dataset, table_name, rows):
       'https://www.googleapis.com/bigquery/v2/projects/%s/datasets/%s/tables/'
       '%s/insertAll') % (app_identity.get_application_id(), dataset, table_name)
   payload = {
-    'kind': 'bigquery#tableDataInsertAllRequest',
-    # Do not fail entire request because of one bad row.
-    # We handle invalid rows below.
-    'skipInvalidRows': True,
-    'ignoreUnknownValues': False,
-    'rows': [
-      {'insertId': row_id, 'json': bqh.message_to_dict(row)}
-      for row_id, row in rows
-    ],
+      'kind':
+          'bigquery#tableDataInsertAllRequest',
+      # Do not fail entire request because of one bad row.
+      # We handle invalid rows below.
+      'skipInvalidRows':
+          True,
+      'ignoreUnknownValues':
+          False,
+      'rows': [{
+          'insertId': row_id,
+          'json': bqh.message_to_dict(row)
+      } for row_id, row in rows],
   }
   res = net.json_request(
-      url=url, method='POST', payload=payload, scopes=bqh.INSERT_ROWS_SCOPE,
+      url=url,
+      method='POST',
+      payload=payload,
+      scopes=bqh.INSERT_ROWS_SCOPE,
       deadline=600)
 
   dropped = 0

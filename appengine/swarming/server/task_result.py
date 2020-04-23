@@ -93,19 +93,18 @@ class State(object):
 
   It's in fact an enum.
   """
-  RUNNING = 0x10      # 16
-  PENDING = 0x20      # 32
-  EXPIRED = 0x30      # 48
-  TIMED_OUT = 0x40    # 64
-  BOT_DIED = 0x50     # 80
-  CANCELED = 0x60     # 96
-  COMPLETED = 0x70    # 112
-  KILLED = 0x80       # 128
-  NO_RESOURCE = 0x100 # 256
+  RUNNING = 0x10  # 16
+  PENDING = 0x20  # 32
+  EXPIRED = 0x30  # 48
+  TIMED_OUT = 0x40  # 64
+  BOT_DIED = 0x50  # 80
+  CANCELED = 0x60  # 96
+  COMPLETED = 0x70  # 112
+  KILLED = 0x80  # 128
+  NO_RESOURCE = 0x100  # 256
 
-  STATES = (
-      RUNNING, PENDING, EXPIRED, TIMED_OUT, BOT_DIED, CANCELED, COMPLETED,
-      KILLED, NO_RESOURCE)
+  STATES = (RUNNING, PENDING, EXPIRED, TIMED_OUT, BOT_DIED, CANCELED, COMPLETED,
+            KILLED, NO_RESOURCE)
   # State will mutate again. Anything else means not queued, not running.
   STATES_RUNNING = (RUNNING, PENDING)
   # Abnormal termination.
@@ -117,15 +116,15 @@ class State(object):
   STATES_ABANDONED = (EXPIRED, BOT_DIED, CANCELED, NO_RESOURCE)
 
   _NAMES = {
-    RUNNING: 'Running',
-    PENDING: 'Pending',
-    EXPIRED: 'Expired',
-    TIMED_OUT: 'Execution timed out',
-    BOT_DIED: 'Bot died',
-    CANCELED: 'User canceled',
-    COMPLETED: 'Completed',
-    KILLED: 'Killed',
-    NO_RESOURCE: 'No resource available',
+      RUNNING: 'Running',
+      PENDING: 'Pending',
+      EXPIRED: 'Expired',
+      TIMED_OUT: 'Execution timed out',
+      BOT_DIED: 'Bot died',
+      CANCELED: 'User canceled',
+      COMPLETED: 'Completed',
+      KILLED: 'Killed',
+      NO_RESOURCE: 'No resource available',
   }
 
   @classmethod
@@ -159,6 +158,7 @@ def _validate_task_summary_id(_prop, value):
 
 class LargeIntegerArray(ndb.BlobProperty):
   """Contains a large integer array as compressed by large."""
+
   def __init__(self, **kwargs):
     # pylint: disable=E1002
     super(LargeIntegerArray, self).__init__(
@@ -171,9 +171,8 @@ class LargeIntegerArray(ndb.BlobProperty):
 def _calculate_failure(result_common):
   # When the task command times out, there may not be any exit code, it is still
   # a user process failure mode, not an infrastructure failure mode.
-  return (
-      bool(result_common.exit_code) or
-      result_common.state == State.TIMED_OUT)
+  return (bool(result_common.exit_code) or
+          result_common.state == State.TIMED_OUT)
 
 
 class TaskOutput(ndb.Model):
@@ -340,9 +339,9 @@ class PerformanceStats(ndb.Model):
   def to_dict(self):
     # to_dict() doesn't correctly call overriden to_dict() on
     # LocalStructuredProperty.
-    out = super(PerformanceStats, self).to_dict(
-        exclude=[
-          'package_installation', 'isolated_download', 'isolated_upload'])
+    out = super(PerformanceStats, self).to_dict(exclude=[
+        'package_installation', 'isolated_download', 'isolated_upload'
+    ])
     out['package_installation'] = self.package_installation.to_dict()
     out['isolated_download'] = self.isolated_download.to_dict()
     out['isolated_upload'] = self.isolated_upload.to_dict()
@@ -355,9 +354,8 @@ class PerformanceStats(ndb.Model):
       out.other_overhead.FromTimedelta(
           datetime.timedelta(seconds=self.bot_overhead))
 
-    dur = (
-        (self.package_installation.duration or 0.) +
-        (self.isolated_download.duration or 0.))
+    dur = ((self.package_installation.duration or 0.) +
+           (self.isolated_download.duration or 0.))
     if dur:
       out.setup.duration.FromTimedelta(datetime.timedelta(seconds=dur))
 
@@ -810,8 +808,8 @@ class _TaskResultCommon(ndb.Model):
       # but they should be not present for any running/pending states.
       if self.duration is not None:
         raise datastore_errors.BadValueError(
-            'duration must not be set with state %s' %
-            State.to_string(self.state))
+            'duration must not be set with state %s' % State.to_string(
+                self.state))
       if self.exit_code is not None:
         raise datastore_errors.BadValueError(
             'exit_code must not be set with state %s' %

@@ -86,6 +86,8 @@ MAXIMUM_PRIORITY = 255
 # swarming_rpcs.PoolTaskTemplateField
 class TemplateApplyEnum(str):
   pass
+
+
 TEMPLATE_AUTO = TemplateApplyEnum('TEMPLATE_AUTO')
 TEMPLATE_CANARY_PREFER = TemplateApplyEnum('TEMPLATE_CANARY_PREFER')
 TEMPLATE_CANARY_NEVER = TemplateApplyEnum('TEMPLATE_CANARY_NEVER')
@@ -353,8 +355,8 @@ def _validate_hard_timeout(prop, value):
     # 0 is tolerated for termination task, but we don't advertize that, that's
     # an internal detail.
     raise datastore_errors.BadValueError(
-        '%s (%ds) must be between %ds and three days' %
-            (prop._name, value, _MIN_TIMEOUT_SECS))
+        '%s (%ds) must be between %ds and three days' % (prop._name, value,
+                                                         _MIN_TIMEOUT_SECS))
 
 
 def _validate_io_timeout(prop, value):
@@ -460,8 +462,8 @@ def _validate_service_account(prop, value):
   if value in ('bot', 'none') or service_accounts.is_service_account(value):
     return value
   raise datastore_errors.BadValueError(
-      '%r must be an email, "bot" or "none" string, got %r' %
-      (prop._name, value))
+      '%r must be an email, "bot" or "none" string, got %r' % (prop._name,
+                                                               value))
 
 
 def _validate_ping_tolerance(prop, value):
@@ -526,8 +528,7 @@ class FilesRef(ndb.Model):
 
     if self.isolated:
       if not _HASH_CHARS.issuperset(self.isolated):
-        raise datastore_errors.BadValueError(
-            'isolated must be lowercase hex')
+        raise datastore_errors.BadValueError('isolated must be lowercase hex')
       length = len(self.isolated)
       expected = 40
       if self.namespace.startswith('sha256-'):
@@ -817,21 +818,14 @@ class TaskProperties(ndb.Model):
   def is_terminate(self):
     """If True, it is a terminate request."""
     # Check dimensions last because it's a bit slower.
-    return (
-        not self.caches and
-        not self.command and
-        not (self.inputs_ref and self.inputs_ref.isolated) and
-        not self.cipd_input and
-        not self.env and
-        not self.env_prefixes and
-        not self.execution_timeout_secs and
-        not self.extra_args and
-        not self.grace_period_secs and
-        not self.io_timeout_secs and
-        not self.idempotent and
-        not self.outputs and
-        not self.has_secret_bytes and
-        self.dimensions_data.keys() == [u'id'])
+    return (not self.caches and not self.command and
+            not (self.inputs_ref and self.inputs_ref.isolated) and
+            not self.cipd_input and not self.env and not self.env_prefixes and
+            not self.execution_timeout_secs and not self.extra_args and
+            not self.grace_period_secs and not self.io_timeout_secs and
+            not self.idempotent and not self.outputs and
+            not self.has_secret_bytes and
+            self.dimensions_data.keys() == [u'id'])
 
   def to_dict(self):
     out = super(TaskProperties, self).to_dict(
@@ -1575,8 +1569,8 @@ def _apply_task_template(task_template, props):
             'request.env[%r] conflicts with pool\'s template' % var_name)
       if var_name in (props.env_prefixes or {}):
         raise ValueError(
-            'request.env_prefixes[%r] conflicts with pool\'s template'
-            % var_name)
+            'request.env_prefixes[%r] conflicts with pool\'s template' %
+            var_name)
 
     if envvar.value:
       props.env = props.env or {}
@@ -1828,6 +1822,7 @@ def task_delete_tasks(task_ids):
 
 def task_bq(start, end):
   """Sends TaskRequest to BigQuery swarming.task_requests table."""
+
   # TODO(maruel): What about shutdown requests.
   def _convert(e):
     """Returns a tuple(bq_key, row)."""

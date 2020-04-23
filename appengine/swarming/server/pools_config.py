@@ -31,103 +31,110 @@ NAMESPACE_RE = re.compile(r'^[a-z0-9A-Z\-._]+$')
 
 
 # Validated read-only representation of one pool.
-PoolConfig = collections.namedtuple('PoolConfig', [
-  # Name of the pool.
-  'name',
-  # Revision of pools.cfg file this config came from.
-  'rev',
-  # Set of auth.Identity that can schedule jobs in the pool.
-  'scheduling_users',
-  # Set of group names with users that can schedule jobs in the pool.
-  'scheduling_groups',
-  # Map {auth.Identity of a delegatee => TrustedDelegatee tuple}.
-  'trusted_delegatees',
-  # Set of service account emails allowed in this pool, specified explicitly.
-  'service_accounts',
-  # Additional list of groups with allowed service accounts.
-  'service_accounts_groups',
-  # resolved TaskTemplateDeployment (optional).
-  'task_template_deployment',
-  # resolved BotMonitoring.
-  'bot_monitoring',
-  # Tuple of ExternalSchedulerConfigs for this pool, if defined (or None).
-  'external_schedulers',
-  # resolved default IsolateServer
-  'default_isolate',
-  # resolved default CipdServer
-  'default_cipd',
-])
-
+PoolConfig = collections.namedtuple(
+    'PoolConfig',
+    [
+        # Name of the pool.
+        'name',
+        # Revision of pools.cfg file this config came from.
+        'rev',
+        # Set of auth.Identity that can schedule jobs in the pool.
+        'scheduling_users',
+        # Set of group names with users that can schedule jobs in the pool.
+        'scheduling_groups',
+        # Map {auth.Identity of a delegatee => TrustedDelegatee tuple}.
+        'trusted_delegatees',
+        # Set of service account emails allowed in this pool, specified
+        # explicitly.
+        'service_accounts',
+        # Additional list of groups with allowed service accounts.
+        'service_accounts_groups',
+        # resolved TaskTemplateDeployment (optional).
+        'task_template_deployment',
+        # resolved BotMonitoring.
+        'bot_monitoring',
+        # Tuple of ExternalSchedulerConfigs for this pool, if defined (or None).
+        'external_schedulers',
+        # resolved default IsolateServer
+        'default_isolate',
+        # resolved default CipdServer
+        'default_cipd',
+    ])
 
 IsolateServer = collections.namedtuple('IsolateServer', [
-  'server',
-  'namespace',
+    'server',
+    'namespace',
 ])
-
 
 CipdServer = collections.namedtuple('CipdServer', [
-  'server',
-  'package_name',
-  'client_version',
+    'server',
+    'package_name',
+    'client_version',
 ])
-
 
 # Validated read-only fields of one trusted delegation scenario.
-TrustedDelegatee = collections.namedtuple('TrustedDelegatee', [
-  # auth.Identity of the delegatee (the one who's minting the delegation token).
-  'peer_id',
-  # A set of tags to look for in the delegation token to allow the delegation.
-  'required_delegation_tags',
-])
-
+TrustedDelegatee = collections.namedtuple(
+    'TrustedDelegatee',
+    [
+        # auth.Identity of the delegatee
+        # (the one who's minting the delegation token).
+        'peer_id',
+        # A set of tags to look for in the delegation token to allow
+        # the delegation.
+        'required_delegation_tags',
+    ])
 
 # Read-only hashable representation of a single ExternalSchedulerConfig
-ExternalSchedulerConfig = collections.namedtuple('ExternalScheduler', [
-  # Service address.
-  'address',
-  # Scheduler ID (opaque to swarming).
-  'id',
-  # Dimension set in ['key1:value1', 'key2:value2'] format.
-  #
-  # To-be-deprecated.
-  #
-  # Only 1 of this and 'all_dimensions' should be specified.
-  'dimensions',
-  # Bot or task should have all of these dimensions in order to be eligible
-  # for scheduler.
-  #
-  # Dimensions should be in 'key1:value1' format.
-  #
-  # Only 1 of this and 'dimensions' should be specified.
-  'all_dimensions',
-  # If non-empty, bot or task should have any of these dimensions in order to be
-  # eligible for scheduler.
-  'any_dimensions',
-  # Whether this config is enabled.
-  'enabled',
-  # Whether to allow fall back to other es-owned tasks if external scheduler has
-  # no tasks for a bot.
-  'allow_es_fallback',
-])
-
+ExternalSchedulerConfig = collections.namedtuple(
+    'ExternalScheduler',
+    [
+        # Service address.
+        'address',
+        # Scheduler ID (opaque to swarming).
+        'id',
+        # Dimension set in ['key1:value1', 'key2:value2'] format.
+        #
+        # To-be-deprecated.
+        #
+        # Only 1 of this and 'all_dimensions' should be specified.
+        'dimensions',
+        # Bot or task should have all of these dimensions in order to be
+        # eligible for scheduler.
+        #
+        # Dimensions should be in 'key1:value1' format.
+        #
+        # Only 1 of this and 'dimensions' should be specified.
+        'all_dimensions',
+        # If non-empty, bot or task should have any of these dimensions
+        # in order to be eligible for scheduler.
+        'any_dimensions',
+        # Whether this config is enabled.
+        'enabled',
+        # Whether to allow fall back to other es-owned tasks if external
+        # scheduler has no tasks for a bot.
+        'allow_es_fallback',
+    ])
 
 # Describes how task templates apply to a pool.
-_TaskTemplateDeployment = collections.namedtuple('_TaskTemplateDeployment', [
-  # The TaskTemplate for prod builds (optional).
-  'prod',
-  # The TaskTemplate for canary builds (optional).
-  'canary',
-  # The chance (int [0, 9999]) of the time that the canary template should
-  # be selected. Must be 0 if no canary is specified.
-  #
-  # NOTE: some tests set this to >9999 in order to force canary selection
-  # without mocking randomint; in the live server TaskTemplateDeployment.from_pb
-  # prevents this from occurring.
-  'canary_chance',
-])
+_TaskTemplateDeployment = collections.namedtuple(
+    '_TaskTemplateDeployment',
+    [
+        # The TaskTemplate for prod builds (optional).
+        'prod',
+        # The TaskTemplate for canary builds (optional).
+        'canary',
+        # The chance (int [0, 9999]) of the time that the canary template should
+        # be selected. Must be 0 if no canary is specified.
+        #
+        # NOTE: some tests set this to >9999 in order to force canary selection
+        # without mocking randomint; in the live server
+        # TaskTemplateDeployment.from_pb prevents this from occurring.
+        'canary_chance',
+    ])
 
 
 class TaskTemplateDeployment(_TaskTemplateDeployment):
+
   @classmethod
   def from_pb(cls, ctx, d, template_map):
     """This returns a TaskTemplateDeployment from `d` and `template_map`.
@@ -155,9 +162,8 @@ class TaskTemplateDeployment(_TaskTemplateDeployment):
       canary = TaskTemplate.from_pb(ctx, d.canary, template_map)
 
     if not (0 <= d.canary_chance <= 9999):
-      ctx.error(
-          'canary_chance out of range `[0,9999]`: %d -> %%%.2f',
-          d.canary_chance, d.canary_chance/100.)
+      ctx.error('canary_chance out of range `[0,9999]`: %d -> %%%.2f',
+                d.canary_chance, d.canary_chance / 100.)
     elif d.canary_chance and not canary:
       ctx.error('canary_chance specified without a canary')
 
@@ -169,19 +175,21 @@ class TaskTemplateDeployment(_TaskTemplateDeployment):
 
 
 # A set of default task parameters to apply to tasks issued within a pool.
-_TaskTemplate = collections.namedtuple('_TaskTemplate', [
-  # sequence of CacheEntry.
-  'cache',
-  # sequence of CipdPackage.
-  'cipd_package',
-  # sequence of Env.
-  'env',
+_TaskTemplate = collections.namedtuple(
+    '_TaskTemplate',
+    [
+        # sequence of CacheEntry.
+        'cache',
+        # sequence of CipdPackage.
+        'cipd_package',
+        # sequence of Env.
+        'env',
 
-  # An internal frozenset<str> of the transitive inclusions that went into
-  # the creation of this _TaskTemplate. Users outside of this file should ignore
-  # this field.
-  'inclusions',
-])
+        # An internal frozenset<str> of the transitive inclusions that went into
+        # the creation of this _TaskTemplate. Users outside of this file should
+        # ignore this field.
+        'inclusions',
+    ])
 
 
 def _singleton(name):
@@ -260,9 +268,8 @@ class TaskTemplate(_TaskTemplate):
 
       for transitive_include in other.inclusions:
         if transitive_include in self.inclusions:
-          ctx.error(
-              'template %r included (transitively) multiple times',
-              transitive_include)
+          ctx.error('template %r included (transitively) multiple times',
+                    transitive_include)
         self.inclusions.add(transitive_include)
 
       for entry in other.cache:
@@ -275,10 +282,8 @@ class TaskTemplate(_TaskTemplate):
         val, pfx = '', ()
         if entry.var in self.env:
           val, pfx, _ = self.env[entry.var]
-        self.env[entry.var] = (
-            entry.value or val,
-            (pfx + entry.prefix),
-            entry.soft)
+        self.env[entry.var] = (entry.value or val, (pfx + entry.prefix),
+                               entry.soft)
 
     def finalize(self, ctx):
       doc = directory_occlusion.Checker()
@@ -297,16 +302,16 @@ class TaskTemplate(_TaskTemplate):
         return
 
       return TaskTemplate(
-        cache=tuple(
-            CacheEntry(name, path)
-            for name, path in sorted(self.cache.items())),
-        cipd_package=tuple(
-            CipdPackage(path, pkg, version)
-            for (path, pkg), version in sorted(self.cipd_package.items())),
-        env=tuple(
-            Env(var, value, prefix, soft)
-            for var, (value, prefix, soft) in sorted(self.env.items())),
-        inclusions=frozenset(self.inclusions),
+          cache=tuple(
+              CacheEntry(name, path)
+              for name, path in sorted(self.cache.items())),
+          cipd_package=tuple(
+              CipdPackage(path, pkg, version)
+              for (path, pkg), version in sorted(self.cipd_package.items())),
+          env=tuple(
+              Env(var, value, prefix, soft)
+              for var, (value, prefix, soft) in sorted(self.env.items())),
+          inclusions=frozenset(self.inclusions),
       )
 
   @classmethod
@@ -343,8 +348,7 @@ class TaskTemplate(_TaskTemplate):
           ctx.error('depends on %r, which has errors', include)
         elif resolved is cls.CYCLE:
           found_cycle = True
-          ctx.error(
-              'depends on %r, which causes an import cycle', include)
+          ctx.error('depends on %r, which causes an import cycle', include)
         else:
           assert False, (
               'resolve_func returned a bad type: %s: %r' % (
@@ -390,7 +394,6 @@ def known():
 # Used only on dev server as an ultimate fallback to enable local_smoke_test to
 # work.
 _LOCAL_FAKE_CONFIG = None
-
 
 # Parsed representation of pools.cfg ready for queries.
 _PoolsCfg = collections.namedtuple('_PoolsCfg', [
@@ -588,15 +591,15 @@ def _fetch_pools_config():
           scheduling_users=frozenset(_to_ident(u) for u in msg.schedulers.user),
           scheduling_groups=frozenset(msg.schedulers.group),
           trusted_delegatees={
-            _to_ident(d.peer_id): TrustedDelegatee(
-                peer_id=_to_ident(d.peer_id),
-                required_delegation_tags=frozenset(d.require_any_of.tag))
-            for d in msg.schedulers.trusted_delegation
+              _to_ident(d.peer_id): TrustedDelegatee(
+                  peer_id=_to_ident(d.peer_id),
+                  required_delegation_tags=frozenset(d.require_any_of.tag))
+              for d in msg.schedulers.trusted_delegation
           },
           service_accounts=frozenset(msg.allowed_service_account),
           service_accounts_groups=tuple(msg.allowed_service_account_group),
-          task_template_deployment=_resolve_deployment(
-              ctx, msg, template_map, deployment_map),
+          task_template_deployment=_resolve_deployment(ctx, msg, template_map,
+                                                       deployment_map),
           bot_monitoring=bot_monitorings.get(name),
           external_schedulers=_resolve_external_schedulers(
               msg.external_schedulers),
@@ -693,23 +696,25 @@ def bootstrap_dev_server_acls():
   global _LOCAL_FAKE_CONFIG
   _LOCAL_FAKE_CONFIG = _PoolsCfg(
       {
-        'default': PoolConfig(
-            name='default',
-            rev='pools_cfg_rev',
-            scheduling_users=frozenset([
-              auth.Identity(auth.IDENTITY_USER, 'smoke-test@example.com'),
-              auth.Identity(auth.IDENTITY_BOT, 'whitelisted-ip'),
-            ]),
-            scheduling_groups=frozenset(),
-            trusted_delegatees={},
-            service_accounts=frozenset(),
-            service_accounts_groups=tuple(),
-            task_template_deployment=None,
-            bot_monitoring=None,
-            default_isolate=None,
-            default_cipd=None,
-            external_schedulers=None,
-        ),
+          'default':
+              PoolConfig(
+                  name='default',
+                  rev='pools_cfg_rev',
+                  scheduling_users=frozenset([
+                      auth.Identity(auth.IDENTITY_USER,
+                                    'smoke-test@example.com'),
+                      auth.Identity(auth.IDENTITY_BOT, 'whitelisted-ip'),
+                  ]),
+                  scheduling_groups=frozenset(),
+                  trusted_delegatees={},
+                  service_accounts=frozenset(),
+                  service_accounts_groups=tuple(),
+                  task_template_deployment=None,
+                  bot_monitoring=None,
+                  default_isolate=None,
+                  default_cipd=None,
+                  external_schedulers=None,
+              ),
       },
       (None, None),
   )

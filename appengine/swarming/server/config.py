@@ -48,12 +48,14 @@ def settings_info():
   rev_url = _gitiles_url(_get_configs_url(), rev, _SETTINGS_CFG_FILENAME)
   cfg_service_hostname = config.config_service_hostname()
   return {
-    'cfg': cfg,
-    'rev': rev,
-    'rev_url': rev_url,
-    'config_service_url': (
-        'https://%s' % cfg_service_hostname if cfg_service_hostname else ''
-    ),
+      'cfg':
+          cfg,
+      'rev':
+          rev,
+      'rev_url':
+          rev_url,
+      'config_service_url': (
+          'https://%s' % cfg_service_hostname if cfg_service_hostname else ''),
   }
 
 
@@ -79,11 +81,9 @@ def validate_flat_dimension(d):
 
 def validate_dimension_key(key):
   """Returns True if the dimension key is valid."""
-  return (
-      isinstance(key, unicode) and
-      key and
-      len(key) <= DIMENSION_KEY_LENGTH and
-      bool(re.match(DIMENSION_KEY_RE, key)))
+  return (isinstance(key, unicode) and key and
+          len(key) <= DIMENSION_KEY_LENGTH and
+          bool(re.match(DIMENSION_KEY_RE, key)))
 
 
 def validate_dimension_value(value):

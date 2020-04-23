@@ -16,6 +16,7 @@ from server import directory_occlusion
 
 
 class TestDirectoryOcclusionChecker(unittest.TestCase):
+
   def setUp(self):
     self.ctx = validation.Context()
     self.doc = directory_occlusion.Checker()
@@ -34,12 +35,9 @@ class TestDirectoryOcclusionChecker(unittest.TestCase):
     self.doc.add('some/path', 'charlie', 'for peace')
 
     self.assertTrue(self.doc.conflicts(self.ctx))
-    self.assertEqual(
-        [x.text for x in self.ctx.result().messages],
-        [
-          ('\'some/path\': directory has conflicting owners: '
-           'bobbie[\'for justice\'] and charlie[\'for peace\']')
-        ])
+    self.assertEqual([x.text for x in self.ctx.result().messages],
+                     [('\'some/path\': directory has conflicting owners: '
+                       'bobbie[\'for justice\'] and charlie[\'for peace\']')])
 
   def test_conflicting_subdir(self):
     self.doc.add('some/path', 'bobbie', 'for justice')
@@ -48,10 +46,8 @@ class TestDirectoryOcclusionChecker(unittest.TestCase):
     self.assertTrue(self.doc.conflicts(self.ctx))
     self.assertEqual(
         [x.text for x in self.ctx.result().messages],
-        [
-          ('charlie[\'for peace\'] uses \'some/path/other\', which conflicts '
-           'with bobbie[\'for justice\'] using \'some/path\'')
-        ])
+        [('charlie[\'for peace\'] uses \'some/path/other\', which conflicts '
+          'with bobbie[\'for justice\'] using \'some/path\'')])
 
   def test_conflicting_deep_subdir(self):
     self.doc.add('some/path', 'bobbie', 'for justice')

@@ -229,14 +229,14 @@ class BotInfo(_BotCommon):
   poll, which does not create a BotEvent.
   """
   # One of:
-  NOT_IN_MAINTENANCE = 1<<9 # 512
-  IN_MAINTENANCE = 1<<8     # 256
+  NOT_IN_MAINTENANCE = 1 << 9  # 512
+  IN_MAINTENANCE = 1 << 8  # 256
   # One of:
-  ALIVE = 1<<7 # 128
-  DEAD = 1<<6  # 64
+  ALIVE = 1 << 7  # 128
+  DEAD = 1 << 6  # 64
   # One of:
-  HEALTHY = 1<<3     # 8
-  QUARANTINED = 1<<2 # 4
+  HEALTHY = 1 << 3  # 8
+  QUARANTINED = 1 << 2  # 4
   # One of:
   IDLE = 1<<1 # 2
   BUSY = 1<<0 # 1
@@ -859,9 +859,8 @@ def cron_delete_old_bot_events():
 
     logging.info(
         'Deleted %d BotEvent entities; from %s\n'
-        'Cut off was %s; trailing by %s',
-        count, _format_ts(first_ts), _format_ts(end_ts),
-        _format_delta(end_ts, first_ts))
+        'Cut off was %s; trailing by %s', count, _format_ts(first_ts),
+        _format_ts(end_ts), _format_delta(end_ts, first_ts))
 
 
 def cron_delete_old_bot():

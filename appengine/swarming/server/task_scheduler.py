@@ -110,11 +110,10 @@ def _expire_task_tx(now, request, to_run_key, result_summary_key, capacity,
           'index=%d, capacity=%s\n'
           'TaskResultSummary: task_id=%s, current_task_slice=%d, '
           'num_task_slices=%d\n'
-          'TaskToRun: task_id=%s, task_slice_index=%d, try_number=%d',
-          index, capacity,
-          result_summary.task_id, result_summary.current_task_slice,
-          request.num_task_slices,
-          to_run.task_id, to_run.task_slice_index, to_run.try_number)
+          'TaskToRun: task_id=%s, task_slice_index=%d, try_number=%d', index,
+          capacity, result_summary.task_id, result_summary.current_task_slice,
+          request.num_task_slices, to_run.task_id, to_run.task_slice_index,
+          to_run.try_number)
 
   if not new_to_run:
     # There's no fallback, giving up.
@@ -260,9 +259,8 @@ def _reap_task(bot_dimensions, bot_version, to_run_key, request,
       # try failed and the retry is being reaped by the same bot. Deny that, as
       # the bot may be deeply broken and could be in a killing spree.
       # TODO(maruel): Allow retry for bot locked task using 'id' dimension.
-      logging.warning(
-          '%s can\'t retry its own internal failure task',
-          result_summary.task_id)
+      logging.warning('%s can\'t retry its own internal failure task',
+                      result_summary.task_id)
       return None, None
     to_run.queue_number = None
     to_run.expiration_ts = None
@@ -450,16 +448,15 @@ def _maybe_pubsub_notify_now(result_summary, request):
   not needed (e.g. messages was sent successfully or fatal error happened).
   """
   assert not ndb.in_transaction()
-  assert isinstance(
-      result_summary, task_result.TaskResultSummary), result_summary
+  assert isinstance(result_summary,
+                    task_result.TaskResultSummary), result_summary
   assert isinstance(request, task_request.TaskRequest), request
   if (result_summary.state not in task_result.State.STATES_RUNNING and
       request.pubsub_topic):
     task_id = task_pack.pack_result_summary_key(result_summary.key)
     try:
-      _pubsub_notify(
-          task_id, request.pubsub_topic,
-          request.pubsub_auth_token, request.pubsub_userdata)
+      _pubsub_notify(task_id, request.pubsub_topic, request.pubsub_auth_token,
+                     request.pubsub_userdata)
     except pubsub.TransientError:
       logging.exception('Transient error when sending PubSub notification')
       return False
@@ -483,8 +480,8 @@ def _maybe_taskupdate_notify_via_tq(
   Raises CommitError on errors (to abort the transaction).
   """
   assert transactional == ndb.in_transaction()
-  assert isinstance(
-      result_summary, task_result.TaskResultSummary), result_summary
+  assert isinstance(result_summary,
+                    task_result.TaskResultSummary), result_summary
   assert isinstance(request, task_request.TaskRequest), request
   if request.pubsub_topic:
     task_id = task_pack.pack_result_summary_key(result_summary.key)
@@ -1208,8 +1205,8 @@ def schedule_request(request, secret_bytes):
   # that use an external scheduler, and which are not effectively live unless
   # the external scheduler is aware of them.
   if es_cfg:
-    external_scheduler.notify_requests(
-        es_cfg, [(request, result_summary)], False, False)
+    external_scheduler.notify_requests(es_cfg, [(request, result_summary)],
+                                       False, False)
 
   if dupe_summary:
     logging.debug(
@@ -1347,8 +1344,8 @@ def bot_reap_task(bot_dimensions, bot_version):
   finally:
     logging.debug(
         'bot_reap_task(%s) in %.3fs: %d iterated, %d reenqueued, %d expired, '
-        '%d stale_index, %d failured',
-        bot_id, time.time()-start, iterated, reenqueued, expired, stale_index,
+        '%d stale_index, %d failured', bot_id,
+        time.time() - start, iterated, reenqueued, expired, stale_index,
         failures)
 
 
@@ -1393,8 +1390,7 @@ def bot_update_task(
   if performance_stats and duration is None:
     raise ValueError(
         'duration must be set when performance_stats is set\n'
-        'duration: %s; performance_stats: %s' %
-        (duration, performance_stats))
+        'duration: %s; performance_stats: %s' % (duration, performance_stats))
 
   packed = task_pack.pack_run_result_key(run_result_key)
   logging.debug(
@@ -1422,10 +1418,25 @@ def bot_update_task(
 
   now = utils.utcnow()
   run = lambda: _bot_update_tx(
-      run_result_key, bot_id, output, output_chunk_start, exit_code, duration,
-      hard_timeout, io_timeout, cost_usd, outputs_ref, cipd_pins, need_cancel,
-      performance_stats, now, result_summary_key, server_version, request,
-      es_cfg, canceled)
+      run_result_key,
+      bot_id,
+      output,
+      output_chunk_start,
+      exit_code,
+      duration,
+      hard_timeout,
+      io_timeout,
+      cost_usd,
+      outputs_ref,
+      cipd_pins,
+      need_cancel,
+      performance_stats,
+      now,
+      result_summary_key,
+      server_version,
+      request,
+      es_cfg,
+      canceled)
   try:
     smry, run_result, error = datastore_utils.transaction(run)
   except datastore_utils.CommitError as e:
@@ -1437,8 +1448,8 @@ def bot_update_task(
     # Take no chance and explicitly clear the ndb memcache entry. A very rare
     # race condition is observed where a stale version of the entities it kept
     # in memcache.
-    ndb.get_context()._clear_memcache(
-        [result_summary_key, run_result_key]).check_success()
+    ndb.get_context()._clear_memcache([result_summary_key,
+                                       run_result_key]).check_success()
   assert bool(error) != bool(run_result), (error, run_result)
   if error:
     logging.error('Task %s %s', packed, error)
@@ -1846,9 +1857,8 @@ def task_expire_tasks(task_to_runs):
             '  %s  %s' % (
               i.task_id, i.task_slice(0).properties.dimensions)
             for i in killed))
-    logging.info(
-        'Reenqueued %d tasks, killed %d, skipped %d',
-        reenqueued, len(killed), skipped)
+    logging.info('Reenqueued %d tasks, killed %d, skipped %d', reenqueued,
+                 len(killed), skipped)
 
 
 def task_cancel_running_children_tasks(parent_result_summary_id):

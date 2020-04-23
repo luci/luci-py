@@ -20,60 +20,61 @@ from server import bot_groups_config
 
 
 TEST_CONFIG = bots_pb2.BotsCfg(
-  trusted_dimensions=['pool'],
-  bot_group=[
-    bots_pb2.BotGroup(
-      bot_id=['bot1', 'bot{2..3}'],
-      auth=[
-        bots_pb2.BotAuth(require_luci_machine_token=True),
-        bots_pb2.BotAuth(require_service_account=['z@example.com']),
-        bots_pb2.BotAuth(
-          require_gce_vm_token=bots_pb2.BotAuth.GCE(project='proj'),
+    trusted_dimensions=['pool'],
+    bot_group=[
+        bots_pb2.BotGroup(
+            bot_id=['bot1', 'bot{2..3}'],
+            auth=[
+                bots_pb2.BotAuth(require_luci_machine_token=True),
+                bots_pb2.BotAuth(require_service_account=['z@example.com']),
+                bots_pb2.BotAuth(
+                    require_gce_vm_token=bots_pb2.BotAuth.GCE(project='proj'),),
+            ],
+            owners=['owner@example.com'],
+            dimensions=['pool:A', 'pool:B', 'other:D'],
         ),
-      ],
-      owners=['owner@example.com'],
-      dimensions=['pool:A', 'pool:B', 'other:D'],
-    ),
-    # This group includes an injected bot_config and system_service_account.
-    bots_pb2.BotGroup(
-      bot_id=['other_bot'],
-      bot_id_prefix=['bot'],
-      auth=[bots_pb2.BotAuth(require_service_account=['a@example.com'])],
-      bot_config_script='foo.py',
-      system_service_account='bot'),
-    bots_pb2.BotGroup(
-      auth=[bots_pb2.BotAuth(ip_whitelist='bots')],
-      dimensions=['pool:default']),
-  ],
+        # This group includes an injected bot_config and system_service_account.
+        bots_pb2.BotGroup(
+            bot_id=['other_bot'],
+            bot_id_prefix=['bot'],
+            auth=[bots_pb2.BotAuth(require_service_account=['a@example.com'])],
+            bot_config_script='foo.py',
+            system_service_account='bot'),
+        bots_pb2.BotGroup(
+            auth=[bots_pb2.BotAuth(ip_whitelist='bots')],
+            dimensions=['pool:default']),
+    ],
 )
-
 
 EXPECTED_GROUP_1 = bot_groups_config._make_bot_group_config(
     owners=(u'owner@example.com',),
     auth=(
-      bot_groups_config.BotAuth(
-        log_if_failed=False,
-        require_luci_machine_token=True,
-        require_service_account=(),
-        require_gce_vm_token=None,
-        ip_whitelist=u'',
-      ),
-      bot_groups_config.BotAuth(
-        log_if_failed=False,
-        require_luci_machine_token=False,
-        require_service_account=('z@example.com',),
-        require_gce_vm_token=None,
-        ip_whitelist=u'',
-      ),
-      bot_groups_config.BotAuth(
-        log_if_failed=False,
-        require_luci_machine_token=False,
-        require_service_account=(),
-        require_gce_vm_token=bot_groups_config.BotAuthGCE('proj'),
-        ip_whitelist=u'',
-      ),
+        bot_groups_config.BotAuth(
+            log_if_failed=False,
+            require_luci_machine_token=True,
+            require_service_account=(),
+            require_gce_vm_token=None,
+            ip_whitelist=u'',
+        ),
+        bot_groups_config.BotAuth(
+            log_if_failed=False,
+            require_luci_machine_token=False,
+            require_service_account=('z@example.com',),
+            require_gce_vm_token=None,
+            ip_whitelist=u'',
+        ),
+        bot_groups_config.BotAuth(
+            log_if_failed=False,
+            require_luci_machine_token=False,
+            require_service_account=(),
+            require_gce_vm_token=bot_groups_config.BotAuthGCE('proj'),
+            ip_whitelist=u'',
+        ),
     ),
-    dimensions={u'pool': [u'A', u'B'], u'other': [u'D']},
+    dimensions={
+        u'pool': [u'A', u'B'],
+        u'other': [u'D']
+    },
     bot_config_script='',
     bot_config_script_content='',
     system_service_account='',
@@ -96,15 +97,13 @@ EXPECTED_GROUP_2 = bot_groups_config._make_bot_group_config(
 
 EXPECTED_GROUP_3 = bot_groups_config._make_bot_group_config(
     owners=(),
-    auth=(
-      bot_groups_config.BotAuth(
+    auth=(bot_groups_config.BotAuth(
         log_if_failed=False,
         require_luci_machine_token=False,
         require_service_account=(),
         require_gce_vm_token=None,
         ip_whitelist=u'bots',
-      ),
-    ),
+    ),),
     dimensions={u'pool': [u'default']},
     bot_config_script='',
     bot_config_script_content='',
@@ -116,11 +115,11 @@ DEFAULT_AUTH_CFG = [bots_pb2.BotAuth(ip_whitelist='bots')]
 
 
 class ValidationCtx(validation.Context):
+
   def assert_errors(self, test, messages):
-    test.assertEquals(self.result().messages, [
-      validation.Message(severity=logging.ERROR, text=m)
-      for m in messages
-    ])
+    test.assertEquals(
+        self.result().messages,
+        [validation.Message(severity=logging.ERROR, text=m) for m in messages])
 
 
 class BotGroupsConfigTest(test_case.TestCase):
@@ -146,9 +145,11 @@ class BotGroupsConfigTest(test_case.TestCase):
     self.assertEqual('hash:f32dde47be8560', EXPECTED_GROUP_2.version)
 
   def test_expand_bot_id_expr_success(self):
+
     def check(expected, expr):
-      self.assertEquals(
-        expected, list(bot_groups_config._expand_bot_id_expr(expr)))
+      self.assertEquals(expected,
+                        list(bot_groups_config._expand_bot_id_expr(expr)))
+
     check(['abc'], 'abc')
     check(['abc1def', 'abc2def'], 'abc{1,2}def')
     check(['abc1def', 'abc2def', 'abc3def'], 'abc{1..3}def')
@@ -174,10 +175,10 @@ class BotGroupsConfigTest(test_case.TestCase):
     cfg = bot_groups_config._fetch_bot_groups()
 
     self.assertEquals({
-      u'bot1': EXPECTED_GROUP_1,
-      u'bot2': EXPECTED_GROUP_1,
-      u'bot3': EXPECTED_GROUP_1,
-      u'other_bot': EXPECTED_GROUP_2,
+        u'bot1': EXPECTED_GROUP_1,
+        u'bot2': EXPECTED_GROUP_1,
+        u'bot3': EXPECTED_GROUP_1,
+        u'other_bot': EXPECTED_GROUP_2,
     }, cfg.direct_matches)
     self.assertEquals([('bot', EXPECTED_GROUP_2)], cfg.prefix_matches)
     self.assertEquals(EXPECTED_GROUP_3, cfg.default_group)
@@ -186,8 +187,8 @@ class BotGroupsConfigTest(test_case.TestCase):
     self.mock_config(TEST_CONFIG)
     self.assertEquals(
         EXPECTED_GROUP_1, bot_groups_config.get_bot_group_config('bot1'))
-    self.assertEquals(
-        EXPECTED_GROUP_3, bot_groups_config.get_bot_group_config('?'))
+    self.assertEquals(EXPECTED_GROUP_3,
+                      bot_groups_config.get_bot_group_config('?'))
 
   def test_empty_config_is_valid(self):
     self.validator_test(bots_pb2.BotsCfg(), [])
@@ -206,65 +207,64 @@ class BotGroupsConfigTest(test_case.TestCase):
     ])
 
   def test_bad_bot_id(self):
-    cfg = bots_pb2.BotsCfg(
-      bot_group=[
+    cfg = bots_pb2.BotsCfg(bot_group=[
         bots_pb2.BotGroup(bot_id=['blah{}'], auth=DEFAULT_AUTH_CFG),
-      ])
+    ])
     self.validator_test(cfg, [
-      'bot_group #0: bad bot_id expression "blah{}" - Invalid set "", '
-      'not a list and not a range'
+        'bot_group #0: bad bot_id expression "blah{}" - Invalid set "", '
+        'not a list and not a range'
     ])
 
   def test_bot_id_duplication(self):
-    cfg = bots_pb2.BotsCfg(
-      bot_group=[
+    cfg = bots_pb2.BotsCfg(bot_group=[
         bots_pb2.BotGroup(bot_id=['b{0..5}'], auth=DEFAULT_AUTH_CFG),
         bots_pb2.BotGroup(bot_id=['b5'], auth=DEFAULT_AUTH_CFG),
-      ])
-    self.validator_test(cfg, [
-      'bot_group #1: bot_id "b5" was already mentioned in group #0'
     ])
+    self.validator_test(
+        cfg, ['bot_group #1: bot_id "b5" was already mentioned in group #0'])
 
   def test_empty_prefix(self):
-    cfg = bots_pb2.BotsCfg(
-      bot_group=[
+    cfg = bots_pb2.BotsCfg(bot_group=[
         bots_pb2.BotGroup(bot_id_prefix=[''], auth=DEFAULT_AUTH_CFG)
-      ])
-    self.validator_test(cfg, [
-      'bot_group #0: empty bot_id_prefix is not allowed'
     ])
+    self.validator_test(cfg,
+                        ['bot_group #0: empty bot_id_prefix is not allowed'])
 
   def test_duplicate_prefixes(self):
-    cfg = bots_pb2.BotsCfg(
-      bot_group=[
+    cfg = bots_pb2.BotsCfg(bot_group=[
         bots_pb2.BotGroup(bot_id_prefix=['abc-'], auth=DEFAULT_AUTH_CFG),
         bots_pb2.BotGroup(bot_id_prefix=['abc-'], auth=DEFAULT_AUTH_CFG),
-      ])
-    self.validator_test(cfg, [
-      'bot_group #1: bot_id_prefix "abc-" is already specified in group #0'
     ])
+    self.validator_test(
+        cfg,
+        ['bot_group #1: bot_id_prefix "abc-" is already specified in group #0'])
 
   def test_duplicate_bot_and_prefix_ids(self):
-    cfg = bots_pb2.BotsCfg(
-      bot_group=[
+    cfg = bots_pb2.BotsCfg(bot_group=[
         bots_pb2.BotGroup(
-          bot_id=['abc', 'ok'], bot_id_prefix=['xyz'], auth=DEFAULT_AUTH_CFG,
-          dimensions=['g:first']),
+            bot_id=['abc', 'ok'],
+            bot_id_prefix=['xyz'],
+            auth=DEFAULT_AUTH_CFG,
+            dimensions=['g:first']),
         bots_pb2.BotGroup(
-          bot_id=['xyz'], bot_id_prefix=['abc', 'ok-'], auth=DEFAULT_AUTH_CFG,
-          dimensions=['g:second']),
+            bot_id=['xyz'],
+            bot_id_prefix=['abc', 'ok-'],
+            auth=DEFAULT_AUTH_CFG,
+            dimensions=['g:second']),
         bots_pb2.BotGroup(
-          bot_id=['foo'], bot_id_prefix=['foo'], auth=DEFAULT_AUTH_CFG,
-          dimensions=['g:third']),
+            bot_id=['foo'],
+            bot_id_prefix=['foo'],
+            auth=DEFAULT_AUTH_CFG,
+            dimensions=['g:third']),
         bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, dimensions=['g:default']),
-      ])
+    ])
     self.validator_test(cfg, [
-      (u'bot_group #1: bot_id "xyz" was already mentioned as bot_id_prefix '
-        'in group #0'),
-      (u'bot_group #1: bot_id_prefix "abc" is already specified as bot_id '
-        'in group #0'),
-      (u'bot_group #2: bot_id_prefix "foo" is already specified as bot_id '
-        'in group #2'),
+        (u'bot_group #1: bot_id "xyz" was already mentioned as bot_id_prefix '
+         'in group #0'),
+        (u'bot_group #1: bot_id_prefix "abc" is already specified as bot_id '
+         'in group #0'),
+        (u'bot_group #2: bot_id_prefix "foo" is already specified as bot_id '
+         'in group #2'),
     ])
 
   def test_bad_auth_completely_missing(self):
@@ -272,148 +272,123 @@ class BotGroupsConfigTest(test_case.TestCase):
     self.validator_test(cfg, ['bot_group #0: an "auth" entry is required'])
 
   def test_bad_auth_cfg_two_methods(self):
-    cfg = bots_pb2.BotsCfg(
-      bot_group=[
+    cfg = bots_pb2.BotsCfg(bot_group=[
         bots_pb2.BotGroup(auth=[
-          bots_pb2.BotAuth(
-            require_luci_machine_token=True,
-            require_service_account=['abc@example.com']),
+            bots_pb2.BotAuth(
+                require_luci_machine_token=True,
+                require_service_account=['abc@example.com']),
         ])
-      ])
+    ])
     self.validator_test(cfg, [
-      'bot_group #0: require_luci_machine_token and require_service_account '
-      'can\'t be used at the same time'
+        'bot_group #0: require_luci_machine_token and require_service_account '
+        'can\'t be used at the same time'
     ])
 
   def test_bad_auth_cfg_three_methods(self):
-    cfg = bots_pb2.BotsCfg(
-      bot_group=[
+    cfg = bots_pb2.BotsCfg(bot_group=[
         bots_pb2.BotGroup(auth=[
-          bots_pb2.BotAuth(
-            require_luci_machine_token=True,
-            require_service_account=['abc@example.com'],
-            require_gce_vm_token=bots_pb2.BotAuth.GCE(project='zzz')),
+            bots_pb2.BotAuth(
+                require_luci_machine_token=True,
+                require_service_account=['abc@example.com'],
+                require_gce_vm_token=bots_pb2.BotAuth.GCE(project='zzz')),
         ])
-      ])
+    ])
     self.validator_test(cfg, [
-      'bot_group #0: require_luci_machine_token and require_service_account '
-      'and require_gce_vm_token can\'t be used at the same time'
+        'bot_group #0: require_luci_machine_token and require_service_account '
+        'and require_gce_vm_token can\'t be used at the same time'
     ])
 
   def test_bad_auth_cfg_no_ip_whitelist(self):
     cfg = bots_pb2.BotsCfg(
-      bot_group=[
-        bots_pb2.BotGroup(auth=[bots_pb2.BotAuth()])
-      ])
+        bot_group=[bots_pb2.BotGroup(auth=[bots_pb2.BotAuth()])])
     self.validator_test(cfg, [
-      'bot_group #0: if all auth requirements are unset, '
-      'ip_whitelist must be set'
+        'bot_group #0: if all auth requirements are unset, '
+        'ip_whitelist must be set'
     ])
 
   def test_bad_required_service_account(self):
-    cfg = bots_pb2.BotsCfg(
-      bot_group=[
+    cfg = bots_pb2.BotsCfg(bot_group=[
         bots_pb2.BotGroup(auth=[
-          bots_pb2.BotAuth(require_service_account=['not-an-email']),
+            bots_pb2.BotAuth(require_service_account=['not-an-email']),
         ])
-      ])
-    self.validator_test(cfg, [
-      'bot_group #0: invalid service account email "not-an-email"'
     ])
+    self.validator_test(
+        cfg, ['bot_group #0: invalid service account email "not-an-email"'])
 
   def test_bad_require_gce_vm_token_no_proj(self):
-    cfg = bots_pb2.BotsCfg(
-      bot_group=[
+    cfg = bots_pb2.BotsCfg(bot_group=[
         bots_pb2.BotGroup(auth=[
-          bots_pb2.BotAuth(require_gce_vm_token=bots_pb2.BotAuth.GCE()),
+            bots_pb2.BotAuth(require_gce_vm_token=bots_pb2.BotAuth.GCE()),
         ])
-      ])
-    self.validator_test(cfg, [
-      'bot_group #0: missing project in require_gce_vm_token'
     ])
+    self.validator_test(
+        cfg, ['bot_group #0: missing project in require_gce_vm_token'])
 
   def test_bad_ip_whitelist_name(self):
-    cfg = bots_pb2.BotsCfg(
-      bot_group=[
+    cfg = bots_pb2.BotsCfg(bot_group=[
         bots_pb2.BotGroup(auth=[
-          bots_pb2.BotAuth(ip_whitelist='bad ## name'),
+            bots_pb2.BotAuth(ip_whitelist='bad ## name'),
         ])
-      ])
-    self.validator_test(cfg, [
-      'bot_group #0: invalid ip_whitelist name "bad ## name"'
     ])
+    self.validator_test(
+        cfg, ['bot_group #0: invalid ip_whitelist name "bad ## name"'])
 
   def test_bad_owners(self):
-    cfg = bots_pb2.BotsCfg(
-      bot_group=[
+    cfg = bots_pb2.BotsCfg(bot_group=[
         bots_pb2.BotGroup(
-          bot_id=['blah'],
-          auth=DEFAULT_AUTH_CFG,
-          owners=['bad email']),
-      ])
-    self.validator_test(cfg, [
-      'bot_group #0: invalid owner email "bad email"'
+            bot_id=['blah'], auth=DEFAULT_AUTH_CFG, owners=['bad email']),
     ])
+    self.validator_test(cfg, ['bot_group #0: invalid owner email "bad email"'])
 
   def test_bad_dimension_not_kv(self):
-    cfg = bots_pb2.BotsCfg(
-      bot_group=[
+    cfg = bots_pb2.BotsCfg(bot_group=[
         bots_pb2.BotGroup(
-          bot_id=['blah'],
-          auth=DEFAULT_AUTH_CFG,
-          dimensions=['not_kv_pair']),
-      ])
-    self.validator_test(cfg, [
-      u'bot_group #0: bad dimension u\'not_kv_pair\''
+            bot_id=['blah'], auth=DEFAULT_AUTH_CFG, dimensions=['not_kv_pair']),
     ])
+    self.validator_test(cfg, [u'bot_group #0: bad dimension u\'not_kv_pair\''])
 
   def test_bad_dimension_bad_dim_key(self):
-    cfg = bots_pb2.BotsCfg(
-      bot_group=[
+    cfg = bots_pb2.BotsCfg(bot_group=[
         bots_pb2.BotGroup(
-          bot_id=['blah'],
-          auth=DEFAULT_AUTH_CFG,
-          dimensions=['blah####key:value:value']),
-      ])
+            bot_id=['blah'],
+            auth=DEFAULT_AUTH_CFG,
+            dimensions=['blah####key:value:value']),
+    ])
     self.validator_test(cfg, [
-      u'bot_group #0: bad dimension u\'blah####key:value:value\'',
+        u'bot_group #0: bad dimension u\'blah####key:value:value\'',
     ])
 
   def test_intersecting_prefixes(self):
-    cfg = bots_pb2.BotsCfg(
-      bot_group=[
+    cfg = bots_pb2.BotsCfg(bot_group=[
         bots_pb2.BotGroup(bot_id_prefix=['abc-'], auth=DEFAULT_AUTH_CFG),
         bots_pb2.BotGroup(bot_id_prefix=['abc-def-'], auth=DEFAULT_AUTH_CFG),
         bots_pb2.BotGroup(bot_id_prefix=['xyz-def-'], auth=DEFAULT_AUTH_CFG),
         bots_pb2.BotGroup(bot_id_prefix=['xyz-'], auth=DEFAULT_AUTH_CFG),
-      ])
+    ])
     self.validator_test(cfg, [
-      (u'bot_group #1: bot_id_prefix "abc-def-" contains prefix "abc-", '
-        'defined in group #0, making group assigned for bots with prefix '
-        '"abc-" ambigious'),
-      (u'bot_group #3: bot_id_prefix "xyz-" is subprefix of "xyz-def-", '
-        'defined in group #2, making group assigned for bots with prefix '
-        '"xyz-" ambigious'),
+        (u'bot_group #1: bot_id_prefix "abc-def-" contains prefix "abc-", '
+         'defined in group #0, making group assigned for bots with prefix '
+         '"abc-" ambigious'),
+        (u'bot_group #3: bot_id_prefix "xyz-" is subprefix of "xyz-def-", '
+         'defined in group #2, making group assigned for bots with prefix '
+         '"xyz-" ambigious'),
     ])
 
   def test_two_default_groups(self):
-    cfg = bots_pb2.BotsCfg(
-      bot_group=[
+    cfg = bots_pb2.BotsCfg(bot_group=[
         bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG),
         bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG),
-      ])
-    self.validator_test(cfg, [
-      u'bot_group #1: group #0 is already set as default'
     ])
+    self.validator_test(cfg,
+                        [u'bot_group #1: group #0 is already set as default'])
 
   def test_system_service_account_bad_email(self):
-    cfg = bots_pb2.BotsCfg(
-      bot_group=[
+    cfg = bots_pb2.BotsCfg(bot_group=[
         bots_pb2.BotGroup(
-          bot_id=['blah'],
-          auth=DEFAULT_AUTH_CFG,
-          system_service_account='bad email'),
-      ])
+            bot_id=['blah'],
+            auth=DEFAULT_AUTH_CFG,
+            system_service_account='bad email'),
+    ])
     self.validator_test(cfg, [
       'bot_group #0: invalid system service account email "bad email"'
     ])
@@ -634,56 +609,64 @@ class CacheTest(test_case.TestCase):
     good_script = "# coding=utf-8\nprint('Hello')\n"
 
     calls = self.mock_config({
-      'bots.cfg': ('rev1', bots_pb2.BotsCfg(
-        bot_group=[
-          bots_pb2.BotGroup(
-            bot_id=['bot1'],
-            auth=[bots_pb2.BotAuth(require_luci_machine_token=True)],
-            bot_config_script='script.py',
-          ),
-          bots_pb2.BotGroup(
-            bot_id=['bot2'],
-            auth=[bots_pb2.BotAuth(require_luci_machine_token=True)],
-            bot_config_script='script.py',
-          ),
-        ],
-      )),
-      'scripts/script.py': ('rev2', good_script),
+        'bots.cfg': (
+            'rev1',
+            bots_pb2.BotsCfg(
+                bot_group=[
+                    bots_pb2.BotGroup(
+                        bot_id=['bot1'],
+                        auth=[
+                            bots_pb2.BotAuth(require_luci_machine_token=True)
+                        ],
+                        bot_config_script='script.py',
+                    ),
+                    bots_pb2.BotGroup(
+                        bot_id=['bot2'],
+                        auth=[
+                            bots_pb2.BotAuth(require_luci_machine_token=True)
+                        ],
+                        bot_config_script='script.py',
+                    ),
+                ],)),
+        'scripts/script.py': ('rev2', good_script),
     })
 
     # Has 'bot_config_script_content' populated.
     cfg = bot_groups_config.refetch_from_config_service()
-    self.assertEqual(bots_pb2.BotsCfg(
-      bot_group=[
-        bots_pb2.BotGroup(
-          bot_id=['bot1'],
-          auth=[bots_pb2.BotAuth(require_luci_machine_token=True)],
-          bot_config_script='script.py',
-          bot_config_script_content=good_script,
-        ),
-        bots_pb2.BotGroup(
-          bot_id=['bot2'],
-          auth=[bots_pb2.BotAuth(require_luci_machine_token=True)],
-          bot_config_script='script.py',
-          bot_config_script_content=good_script,
-        ),
-      ],
-    ), cfg.bots)
+    self.assertEqual(
+        bots_pb2.BotsCfg(
+            bot_group=[
+                bots_pb2.BotGroup(
+                    bot_id=['bot1'],
+                    auth=[bots_pb2.BotAuth(require_luci_machine_token=True)],
+                    bot_config_script='script.py',
+                    bot_config_script_content=good_script,
+                ),
+                bots_pb2.BotGroup(
+                    bot_id=['bot2'],
+                    auth=[bots_pb2.BotAuth(require_luci_machine_token=True)],
+                    bot_config_script='script.py',
+                    bot_config_script_content=good_script,
+                ),
+            ],), cfg.bots)
 
     # The script was fetched only once.
     self.assertEqual({'bots.cfg': 1, u'scripts/script.py': 1}, calls)
 
   def test_expands_bot_config_scripts_fail(self):
     self.mock_config({
-      'bots.cfg': ('rev1', bots_pb2.BotsCfg(
-        bot_group=[
-          bots_pb2.BotGroup(
-            auth=[bots_pb2.BotAuth(require_luci_machine_token=True)],
-            bot_config_script='script.py',
-          ),
-        ],
-      )),
-      'scripts/script.py': ('rev2', '!!not python!!'),
+        'bots.cfg': (
+            'rev1',
+            bots_pb2.BotsCfg(
+                bot_group=[
+                    bots_pb2.BotGroup(
+                        auth=[
+                            bots_pb2.BotAuth(require_luci_machine_token=True)
+                        ],
+                        bot_config_script='script.py',
+                    ),
+                ],)),
+        'scripts/script.py': ('rev2', '!!not python!!'),
     })
 
     ctx = ValidationCtx()

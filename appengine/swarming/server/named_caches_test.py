@@ -26,15 +26,15 @@ from test_support import test_case
 def _bot_event(bot_id, pool, caches, oses):
   """Calls bot_management.bot_event with default arguments."""
   dimensions = {
-    u'id': [bot_id],
-    u'os': oses or [u'Linux', u'Ubuntu', u'Ubuntu-16.04'],
-    u'pool': [pool],
+      u'id': [bot_id],
+      u'os': oses or [u'Linux', u'Ubuntu', u'Ubuntu-16.04'],
+      u'pool': [pool],
   }
   # Format is named_caches: {name: [['shortname', size], timestamp]}.
   state = {
-    'named_caches': {
-      name: [['a', size], 10] for name, size in caches.items()
-    }
+      'named_caches': {
+          name: [['a', size], 10] for name, size in caches.items()
+      }
   }
   bot_management.bot_event(
       event_type='request_sleep',
@@ -81,7 +81,7 @@ class NamedCachesTest(test_case.TestCase):
   def test_p95(self):
     # Create 45 bots with cache 'foo' size between 1 and 45.
     for i in range(45):
-      _bot_event('second%d' % i, 'second', {'foo': i+1}, None)
+      _bot_event('second%d' % i, 'second', {'foo': i + 1}, None)
     self.assertEqual(2, named_caches.cron_update_named_caches())
 
     self.assertEqual(1, named_caches.NamedCache.query().count())
@@ -108,12 +108,12 @@ class NamedCachesTest(test_case.TestCase):
     self.assertEqual(2, named_caches.cron_update_named_caches())
     self.assertEqual([now], [e.ts for e in named_caches.NamedCache.query()])
 
-    self.mock_now(now, 8*24*60*60)
+    self.mock_now(now, 8 * 24 * 60 * 60)
     self.assertEqual(2, named_caches.cron_update_named_caches())
     self.assertEqual(1, named_caches.NamedCache.query().count())
     self.assertEqual([now], [e.ts for e in named_caches.NamedCache.query()])
 
-    self.mock_now(now, 8*24*60*60+1)
+    self.mock_now(now, 8 * 24 * 60 * 60 + 1)
     self.assertEqual(2, named_caches.cron_update_named_caches())
     self.assertEqual(0, named_caches.NamedCache.query().count())
 

@@ -41,17 +41,19 @@ import ts_mon_metrics
 def _gen_properties(**kwargs):
   """Creates a TaskProperties."""
   args = {
-    'command': [u'command1'],
-    'containment': {
-      u'lower_priority': True,
-      u'containment_type': None,
-      u'limit_processes': None,
-      u'limit_total_committed_memory': None,
-    },
-    'dimensions': {u'pool': [u'default']},
-    'env': {},
-    'execution_timeout_secs': 24*60*60,
-    'io_timeout_secs': None,
+      'command': [u'command1'],
+      'containment': {
+          u'lower_priority': True,
+          u'containment_type': None,
+          u'limit_processes': None,
+          u'limit_total_committed_memory': None,
+      },
+      'dimensions': {
+          u'pool': [u'default']
+      },
+      'env': {},
+      'execution_timeout_secs': 24 * 60 * 60,
+      'io_timeout_secs': None,
   }
   args.update(kwargs or {})
   args['dimensions_data'] = args.pop('dimensions')
@@ -62,15 +64,21 @@ def _gen_request_slice(**kwargs):
   """Creates a TaskRequest."""
   now = utils.utcnow()
   args = {
-    'created_ts': now,
-    'manual_tags': [u'tag:1'],
-    'name': 'Request name',
-    'priority': 50,
-    'task_slices': [
-      task_request.TaskSlice(expiration_secs=60, properties=_gen_properties()),
-    ],
-    'user': 'Jesus',
-    'bot_ping_tolerance_secs': 120,
+      'created_ts':
+          now,
+      'manual_tags': [u'tag:1'],
+      'name':
+          'Request name',
+      'priority':
+          50,
+      'task_slices': [
+          task_request.TaskSlice(
+              expiration_secs=60, properties=_gen_properties()),
+      ],
+      'user':
+          'Jesus',
+      'bot_ping_tolerance_secs':
+          120,
   }
   args.update(kwargs)
   ret = task_request.TaskRequest(**args)
@@ -325,9 +333,11 @@ class TaskResultApiTest(TestCase):
         seconds=request.bot_ping_tolerance_secs)
     # Trigger _pre_put_hook().
     actual.put()
-    expected = self._gen_result(modified_ts=self.now, started_ts=self.now,
-                                dead_after_ts=self.now + datetime.timedelta(
-                                    seconds=request.bot_ping_tolerance_secs))
+    expected = self._gen_result(
+        modified_ts=self.now,
+        started_ts=self.now,
+        dead_after_ts=self.now +
+        datetime.timedelta(seconds=request.bot_ping_tolerance_secs))
     self.assertEqual(expected, actual.to_dict())
     self.assertEqual(50, actual.request.priority)
     self.assertEqual(True, actual.can_be_canceled)
@@ -381,9 +391,10 @@ class TaskResultApiTest(TestCase):
   def test_new_run_result_duration_no_exit_code(self):
     request = _gen_request()
     to_run = task_to_run.new_task_to_run(request, 0)
-    actual = task_result.new_run_result(
-        request, to_run, u'localhost', u'abc',
-        {u'id': [u'localhost'], u'foo': [u'bar', u'biz']})
+    actual = task_result.new_run_result(request, to_run, u'localhost', u'abc', {
+        u'id': [u'localhost'],
+        u'foo': [u'bar', u'biz']
+    })
     actual.completed_ts = self.now
     actual.modified_ts = self.now
     actual.started_ts = self.now
@@ -395,8 +406,12 @@ class TaskResultApiTest(TestCase):
     actual.state = task_result.State.TIMED_OUT
     actual.put()
     expected = self._gen_result(
-        completed_ts=self.now, duration=1., modified_ts=self.now, failure=True,
-        started_ts=self.now, state=task_result.State.TIMED_OUT)
+        completed_ts=self.now,
+        duration=1.,
+        modified_ts=self.now,
+        failure=True,
+        started_ts=self.now,
+        state=task_result.State.TIMED_OUT)
     self.assertEqual(expected, actual.to_dict())
 
   def test_integration(self):
@@ -482,40 +497,40 @@ class TaskResultApiTest(TestCase):
         try_number=1)
     self.assertEqual(expected, result_summary.key.get().to_dict())
     expected = {
-      'bot_overhead': 0.1,
-      'isolated_download': {
-        'duration': 0.05,
-        'initial_number_items': 10,
-        'initial_size': 10000,
-        'items_cold': large.pack([1, 2]),
-        'items_hot': large.pack([3, 4, 5]),
-        'num_items_cold': 2,
-        'total_bytes_items_cold': 3,
-        'num_items_hot': 3,
-        'total_bytes_items_hot': 12,
-      },
-      'isolated_upload': {
-        'duration': 0.01,
-        'initial_number_items': None,
-        'initial_size': None,
-        'items_cold': large.pack([10]),
-        'items_hot': None,
-        'num_items_cold': 1,
-        'total_bytes_items_cold': 10,
-        'num_items_hot': None,
-        'total_bytes_items_hot': None,
-      },
-      'package_installation': {
-        'duration': None,
-        'initial_number_items': None,
-        'initial_size': None,
-        'items_cold': None,
-        'items_hot': None,
-        'num_items_cold': None,
-        'total_bytes_items_cold': None,
-        'num_items_hot': None,
-        'total_bytes_items_hot': None,
-      },
+        'bot_overhead': 0.1,
+        'isolated_download': {
+            'duration': 0.05,
+            'initial_number_items': 10,
+            'initial_size': 10000,
+            'items_cold': large.pack([1, 2]),
+            'items_hot': large.pack([3, 4, 5]),
+            'num_items_cold': 2,
+            'total_bytes_items_cold': 3,
+            'num_items_hot': 3,
+            'total_bytes_items_hot': 12,
+        },
+        'isolated_upload': {
+            'duration': 0.01,
+            'initial_number_items': None,
+            'initial_size': None,
+            'items_cold': large.pack([10]),
+            'items_hot': None,
+            'num_items_cold': 1,
+            'total_bytes_items_cold': 10,
+            'num_items_hot': None,
+            'total_bytes_items_hot': None,
+        },
+        'package_installation': {
+            'duration': None,
+            'initial_number_items': None,
+            'initial_size': None,
+            'items_cold': None,
+            'items_hot': None,
+            'num_items_cold': None,
+            'total_bytes_items_cold': None,
+            'num_items_hot': None,
+            'total_bytes_items_hot': None,
+        },
     }
     self.assertEqual(expected, result_summary.performance_stats.to_dict())
     self.assertEqual('foo', result_summary.get_output(0, 0))
@@ -525,8 +540,7 @@ class TaskResultApiTest(TestCase):
     self.assertEqual(
         datetime.timedelta(seconds=0.1),
         result_summary.duration_now(utils.utcnow()))
-    self.assertEqual(
-        datetime.timedelta(seconds=4), result_summary.pending)
+    self.assertEqual(datetime.timedelta(seconds=4), result_summary.pending)
     self.assertEqual(
         datetime.timedelta(seconds=4),
         result_summary.pending_now(utils.utcnow()))
@@ -536,8 +550,7 @@ class TaskResultApiTest(TestCase):
         result_summary.task_id)
     self.assertEqual(complete_ts, result_summary.ended_ts)
     self.assertEqual(
-        task_pack.pack_run_result_key(run_result.key),
-        run_result.task_id)
+        task_pack.pack_run_result_key(run_result.key), run_result.task_id)
     self.assertEqual(complete_ts, run_result.ended_ts)
 
   def test_yield_result_summary_by_parent_task_id(self):
@@ -583,9 +596,8 @@ class TaskResultApiTest(TestCase):
     self.mock_now(
         self.now + datetime.timedelta(seconds=request.bot_ping_tolerance_secs),
         1)
-    self.assertEqual(
-        [run_result.key],
-        list(task_result.yield_run_result_keys_with_dead_bot()))
+    self.assertEqual([run_result.key],
+                     list(task_result.yield_run_result_keys_with_dead_bot()))
 
   def test_set_from_run_result(self):
     request = _gen_request()
@@ -678,9 +690,10 @@ class TaskResultApiTest(TestCase):
     self.assertEqual(True, result_summary.failure)
 
   def test_result_task_state(self):
+
     def check(expected, **kwargs):
-      self.assertEqual(
-          expected, task_result.TaskResultSummary(**kwargs).task_state)
+      self.assertEqual(expected,
+                       task_result.TaskResultSummary(**kwargs).task_state)
 
     # That's an incorrect state:
     check(swarming_pb2.TASK_STATE_INVALID, state=task_result.State.BOT_DIED)
@@ -717,18 +730,17 @@ class TaskResultApiTest(TestCase):
     run_result = _gen_run_result(
         properties=_gen_properties(
             cipd_input={
-              u'client_package': cipd_client_pkg,
-              u'packages': [
-                task_request.CipdPackage(
-                    package_name=u'rm',
-                    path=u'bin',
-                    version=u'latest'),
-              ],
-              u'server': u'http://localhost:2'
+                u'client_package':
+                    cipd_client_pkg,
+                u'packages': [
+                    task_request.CipdPackage(
+                        package_name=u'rm', path=u'bin', version=u'latest'),
+                ],
+                u'server':
+                    u'http://localhost:2'
             },
             containment=task_request.Containment(lower_priority=True),
-        ),
-    )
+        ),)
     run_result.started_ts = self.now + datetime.timedelta(seconds=20)
     run_result.abandoned_ts = self.now + datetime.timedelta(seconds=30)
     run_result.completed_ts = self.now + datetime.timedelta(seconds=40)
@@ -744,19 +756,20 @@ class TaskResultApiTest(TestCase):
     run_result.cipd_pins = task_result.CipdPins(
         client_package=cipd_client_pkg,
         packages=[
-          task_request.CipdPackage(
-              package_name=u'rm', path=u'bin', version=u'stable'),
+            task_request.CipdPackage(
+                package_name=u'rm', path=u'bin', version=u'stable'),
         ])
     task_result.PerformanceStats(
         key=task_pack.run_result_key_to_performance_stats_key(run_result.key),
         bot_overhead=0.1,
         isolated_download=task_result.OperationStats(
-            duration=0.05, initial_number_items=10, initial_size=10000,
+            duration=0.05,
+            initial_number_items=10,
+            initial_size=10000,
             items_cold=large.pack([1, 2]),
             items_hot=large.pack([3, 4, 5])),
         isolated_upload=task_result.OperationStats(
-            duration=0.01,
-            items_cold=large.pack([10]))).put()
+            duration=0.01, items_cold=large.pack([10]))).put()
 
     # Note: It cannot be both TIMED_OUT and have run_result.deduped_from set.
     run_result.state = task_result.State.TIMED_OUT
@@ -1175,11 +1188,14 @@ class TestOutput(TestCase):
         '\x00' * (task_result.TaskOutput.CHUNK_SIZE * 2 - 3) + 'FooBar')
     self.assertEqual(expected_output, run_result.get_output(0, 0))
     expected = [
-      {
-        'chunk': '\x00' * (task_result.TaskOutput.CHUNK_SIZE - 3) + 'Foo',
-        'gaps': [0, 13],
-      },
-      {'chunk': 'Bar', 'gaps': []},
+        {
+            'chunk': '\x00' * (task_result.TaskOutput.CHUNK_SIZE - 3) + 'Foo',
+            'gaps': [0, 13],
+        },
+        {
+            'chunk': 'Bar',
+            'gaps': []
+        },
     ]
     self.assertTaskOutputChunk(expected)
 
@@ -1191,12 +1207,20 @@ class TestOutput(TestCase):
     ndb.put_multi(run_result.append_output('FooBar', 0))
     ndb.put_multi(run_result.append_output('X', 3))
     self.assertEqual('FooXar', run_result.get_output(0, 0))
-    self.assertTaskOutputChunk(
-        [
-          {'chunk': 'Fo', 'gaps': []},
-          {'chunk': 'oX', 'gaps': []},
-          {'chunk': 'ar', 'gaps': []},
-        ])
+    self.assertTaskOutputChunk([
+        {
+            'chunk': 'Fo',
+            'gaps': []
+        },
+        {
+            'chunk': 'oX',
+            'gaps': []
+        },
+        {
+            'chunk': 'ar',
+            'gaps': []
+        },
+    ])
 
   def test_append_output_reverse_order(self):
     # Write the data in reverse order in multiple calls.
@@ -1209,8 +1233,10 @@ class TestOutput(TestCase):
     ndb.put_multi(run_result.append_output('Bar', 4))
     expected_output = 'Baz\x00Bar\x00FooWow'
     self.assertEqual(expected_output, run_result.get_output(0, 0))
-    self.assertTaskOutputChunk(
-        [{'chunk': expected_output, 'gaps': [3, 4, 7, 8]}])
+    self.assertTaskOutputChunk([{
+        'chunk': expected_output,
+        'gaps': [3, 4, 7, 8]
+    }])
 
   def test_append_output_reverse_order_second_chunk(self):
     # Write the data in reverse order in multiple calls.
@@ -1222,13 +1248,15 @@ class TestOutput(TestCase):
         'Foo', task_result.TaskOutput.CHUNK_SIZE + 8))
     ndb.put_multi(run_result.append_output(
         'Baz', task_result.TaskOutput.CHUNK_SIZE + 0))
-    ndb.put_multi(run_result.append_output(
-        'Bar', task_result.TaskOutput.CHUNK_SIZE + 4))
+    ndb.put_multi(
+        run_result.append_output('Bar', task_result.TaskOutput.CHUNK_SIZE + 4))
     expected_output = (
         task_result.TaskOutput.CHUNK_SIZE * '\x00' + 'Baz\x00Bar\x00FooWow')
     self.assertEqual(expected_output, run_result.get_output(0, 0))
-    self.assertTaskOutputChunk(
-        [{'chunk': 'Baz\x00Bar\x00FooWow', 'gaps': [3, 4, 7, 8]}])
+    self.assertTaskOutputChunk([{
+        'chunk': 'Baz\x00Bar\x00FooWow',
+        'gaps': [3, 4, 7, 8]
+    }])
 
   def test_get_output_subset(self):
     self.mock(task_result.TaskOutput, 'CHUNK_SIZE', 16)

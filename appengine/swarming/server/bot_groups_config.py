@@ -27,13 +27,15 @@ BOTS_CFG_FILENAME = 'bots.cfg'
 
 # Validated and "frozen" bots_pb2.BotAuth proto, see its doc for meaning of
 # fields.
-BotAuth = collections.namedtuple('BotAuth', [
-  'log_if_failed',
-  'require_luci_machine_token',
-  'require_service_account',
-  'require_gce_vm_token',  # this is BotAuthGCE
-  'ip_whitelist',
-])
+BotAuth = collections.namedtuple(
+    'BotAuth',
+    [
+        'log_if_failed',
+        'require_luci_machine_token',
+        'require_service_account',
+        'require_gce_vm_token',  # this is BotAuthGCE
+        'ip_whitelist',
+    ])
 
 # Validated and "frozen" bots_pb2.BotAuth.GCE proto.
 BotAuthGCE = collections.namedtuple('BotAuthGCE', ['project'])
@@ -41,42 +43,44 @@ BotAuthGCE = collections.namedtuple('BotAuthGCE', ['project'])
 # Configuration that applies to some group of bots. Derived from BotsCfg and
 # BotGroup in bots.proto. See comments there. This tuple contains already
 # validated values.
-BotGroupConfig = collections.namedtuple('BotGroupConfig', [
-  # The hash of the rest of the data in this tuple, see _gen_version.
-  #
-  # TODO(vadimsh): Should we rename it to bot_config_script_ver and hash only
-  # bot_config_script_content? There's little value in restarting bots when e.g.
-  # only 'owners' changes.
-  'version',
+BotGroupConfig = collections.namedtuple(
+    'BotGroupConfig',
+    [
+        # The hash of the rest of the data in this tuple, see _gen_version.
+        #
+        # TODO(vadimsh): Should we rename it to bot_config_script_ver and
+        # hash only bot_config_script_content? There's little value in
+        # restarting bots when e.g. only 'owners' changes.
+        'version',
 
-  # Tuple with emails of bot owners.
-  'owners',
+        # Tuple with emails of bot owners.
+        'owners',
 
-  # A list of BotAuth tuples with all applicable authentication methods.
-  #
-  # The bot is considered authenticated if at least one method applies.
-  'auth',
+        # A list of BotAuth tuples with all applicable authentication methods.
+        #
+        # The bot is considered authenticated if at least one method applies.
+        'auth',
 
-  # Dict {key => list of values}. Always contains all the keys specified by
-  # 'trusted_dimensions' set in BotsCfg. If BotGroup doesn't define some
-  # dimension from that set, the list of value for it will be empty. Key and
-  # values are unicode strings.
-  'dimensions',
+        # Dict {key => list of values}. Always contains all the keys specified
+        # by 'trusted_dimensions' set in BotsCfg. If BotGroup doesn't define
+        # some dimension from that set, the list of value for it will be empty.
+        # Key and values are unicode strings.
+        'dimensions',
 
-  # Name of the supplemental bot_config.py to inject to the bot during
-  # handshake.
-  'bot_config_script',
+        # Name of the supplemental bot_config.py to inject to the bot during
+        # handshake.
+        'bot_config_script',
 
-  # Content of the supplemental bot_config.py to inject to the bot during
-  # handshake.
-  'bot_config_script_content',
+        # Content of the supplemental bot_config.py to inject to the bot during
+        # handshake.
+        'bot_config_script_content',
 
-  # An email, "bot" or "". See 'system_service_account' in bots.proto.
-  'system_service_account',
+        # An email, "bot" or "". See 'system_service_account' in bots.proto.
+        'system_service_account',
 
-  # True if it's default group config.
-  'is_default',
-])
+        # True if it's default group config.
+        'is_default',
+    ])
 
 
 # Represents bots_pb2.BotsCfg after all includes are expanded, along with its
@@ -88,11 +92,13 @@ BotGroupConfig = collections.namedtuple('BotGroupConfig', [
 #
 # The revision alone must not be used to detect changes to the expanded config,
 # since it doesn't capture changes to the included files.
-ExpandedBotsCfg = collections.namedtuple('ExpandedBotsCfg', [
-  'bots',    # instance of bots_pb2.BotsCfg with expanded config
-  'rev',     # revision of bots.cfg file this config was built from, FYI
-  'digest',  # str with digest string, derived from 'bots' contents
-])
+ExpandedBotsCfg = collections.namedtuple(
+    'ExpandedBotsCfg',
+    [
+        'bots',  # instance of bots_pb2.BotsCfg with expanded config
+        'rev',  # revision of bots.cfg file this config was built from, FYI
+        'digest',  # str with digest string, derived from 'bots' contents
+    ])
 
 
 class BadConfigError(Exception):
@@ -164,9 +170,8 @@ def refetch_from_config_service(ctx=None):
     if (cur.empty and not cfg) or cur.digest == cfg.digest:
       logging.info(
           'Config is up-to-date at rev "%s" (digest "%s"), updated %s ago',
-          cfg.rev if cfg else 'none',
-          cfg.digest if cfg else 'none',
-          utils.utcnow()-cur.last_update_ts)
+          cfg.rev if cfg else 'none', cfg.digest if cfg else 'none',
+          utils.utcnow() - cur.last_update_ts)
       return cfg
 
   bots_cfg_pb = cfg.bots.SerializeToString() if cfg else ''
@@ -183,14 +188,10 @@ def refetch_from_config_service(ctx=None):
     if not cfg:
       if not cur or not cur.empty:
         ndb.put_multi([
-          BotsCfgHead(
-              key=_bots_cfg_head_key(),
-              empty=True,
-              last_update_ts=now),
-          BotsCfgBody(
-              key=_bots_cfg_body_key(),
-              empty=True,
-              last_update_ts=now),
+            BotsCfgHead(
+                key=_bots_cfg_head_key(), empty=True, last_update_ts=now),
+            BotsCfgBody(
+                key=_bots_cfg_body_key(), empty=True, last_update_ts=now),
         ])
       return
 
@@ -206,17 +207,17 @@ def refetch_from_config_service(ctx=None):
         'Storing expanded bots.cfg, its size before compression is %d bytes',
         len(bots_cfg_pb))
     ndb.put_multi([
-      BotsCfgHead(
-          key=_bots_cfg_head_key(),
-          bots_cfg_rev=cfg.rev,
-          digest=cfg.digest,
-          last_update_ts=now),
-      BotsCfgBody(
-          key=_bots_cfg_body_key(),
-          bots_cfg=bots_cfg_pb,
-          bots_cfg_rev=cfg.rev,
-          digest=cfg.digest,
-          last_update_ts=now),
+        BotsCfgHead(
+            key=_bots_cfg_head_key(),
+            bots_cfg_rev=cfg.rev,
+            digest=cfg.digest,
+            last_update_ts=now),
+        BotsCfgBody(
+            key=_bots_cfg_body_key(),
+            bots_cfg=bots_cfg_pb,
+            bots_cfg_rev=cfg.rev,
+            digest=cfg.digest,
+            last_update_ts=now),
     ])
 
   update()
@@ -451,13 +452,15 @@ def _get_expanded_bots_cfg(known_digest=None):
 # Post-processed and validated read-only immutable form of expanded bots.cfg
 # config. Its structure is optimized for fast lookup of BotGroupConfig by
 # bot_id.
-_BotGroups = collections.namedtuple('_BotGroups', [
-  'digest',             # a digest of corresponding ExpandedBotsCfg
-  'rev',                # a revision of root bots.cfg config file
-  'direct_matches',     # dict bot_id => BotGroupConfig
-  'prefix_matches',     # list of pairs (bot_id_prefix, BotGroupConfig)
-  'default_group',      # fallback BotGroupConfig or None if not defined
-])
+_BotGroups = collections.namedtuple(
+    '_BotGroups',
+    [
+        'digest',  # a digest of corresponding ExpandedBotsCfg
+        'rev',  # a revision of root bots.cfg config file
+        'direct_matches',  # dict bot_id => BotGroupConfig
+        'prefix_matches',  # list of pairs (bot_id_prefix, BotGroupConfig)
+        'default_group',  # fallback BotGroupConfig or None if not defined
+    ])
 
 
 class _BotGroupsCache(object):
@@ -497,26 +500,24 @@ _cache = _BotGroupsCache()
 # Default config to use on unconfigured server.
 def _default_bot_groups():
   return _BotGroups(
-    digest='none',
-    rev='none',
-    direct_matches={},
-    prefix_matches=[],
-    default_group=BotGroupConfig(
-        version='default',
-        owners=(),
-        auth=(
-          BotAuth(
+      digest='none',
+      rev='none',
+      direct_matches={},
+      prefix_matches=[],
+      default_group=BotGroupConfig(
+          version='default',
+          owners=(),
+          auth=(BotAuth(
               log_if_failed=False,
               require_luci_machine_token=False,
               require_service_account=None,
               require_gce_vm_token=None,
-              ip_whitelist=auth.bots_ip_whitelist()),
-        ),
-        dimensions={},
-        bot_config_script='',
-        bot_config_script_content='',
-        system_service_account='',
-        is_default=True))
+              ip_whitelist=auth.bots_ip_whitelist()),),
+          dimensions={},
+          bot_config_script='',
+          bot_config_script_content='',
+          system_service_account='',
+          is_default=True))
 
 
 def _gen_version(fields):
@@ -564,24 +565,21 @@ def _bot_group_proto_to_tuple(msg, trusted_dimensions):
     dimensions.setdefault(k, set()).add(v)
 
   return _make_bot_group_config(
-    owners=tuple(msg.owners),
-    auth=tuple(
-      BotAuth(
-        log_if_failed=cfg.log_if_failed,
-        require_luci_machine_token=cfg.require_luci_machine_token,
-        require_service_account=tuple(cfg.require_service_account),
-        require_gce_vm_token=(
-            BotAuthGCE(cfg.require_gce_vm_token.project)
-            if cfg.HasField('require_gce_vm_token') else None
-        ),
-        ip_whitelist=cfg.ip_whitelist)
-      for cfg in msg.auth
-    ),
-    dimensions={k: sorted(v) for k, v in dimensions.items()},
-    bot_config_script=msg.bot_config_script or '',
-    bot_config_script_content=msg.bot_config_script_content or '',
-    system_service_account=msg.system_service_account or '',
-    is_default=not msg.bot_id and not msg.bot_id_prefix)
+      owners=tuple(msg.owners),
+      auth=tuple(
+          BotAuth(
+              log_if_failed=cfg.log_if_failed,
+              require_luci_machine_token=cfg.require_luci_machine_token,
+              require_service_account=tuple(cfg.require_service_account),
+              require_gce_vm_token=(
+                  BotAuthGCE(cfg.require_gce_vm_token.project) if cfg
+                  .HasField('require_gce_vm_token') else None),
+              ip_whitelist=cfg.ip_whitelist) for cfg in msg.auth),
+      dimensions={k: sorted(v) for k, v in dimensions.items()},
+      bot_config_script=msg.bot_config_script or '',
+      bot_config_script_content=msg.bot_config_script_content or '',
+      system_service_account=msg.system_service_account or '',
+      is_default=not msg.bot_id and not msg.bot_id_prefix)
 
 
 def _expand_bot_id_expr(expr):
@@ -777,12 +775,8 @@ def _do_fetch_bot_groups(known_cfg=None):
       else:
         default_group = group_cfg
 
-  return _BotGroups(
-      expanded_cfg.digest,
-      expanded_cfg.rev,
-      direct_matches,
-      prefix_matches,
-      default_group)
+  return _BotGroups(expanded_cfg.digest, expanded_cfg.rev, direct_matches,
+                    prefix_matches, default_group)
 
 
 ### Config validation.
@@ -802,9 +796,8 @@ def _validate_group_bot_ids(
     try:
       for bot_id in _expand_bot_id_expr(bot_id_expr):
         if bot_id in known_bot_ids:
-          ctx.error(
-              'bot_id "%s" was already mentioned in group #%d',
-              bot_id, known_bot_ids[bot_id])
+          ctx.error('bot_id "%s" was already mentioned in group #%d', bot_id,
+                    known_bot_ids[bot_id])
           continue
         if bot_id in known_bot_id_prefixes:
           ctx.error(

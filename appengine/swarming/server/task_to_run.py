@@ -268,14 +268,8 @@ class _QueryStats(object):
     return (
         '%d total, %d exp %d no_queue, %d hash mismatch, %d cache negative, '
         '%d dimensions mismatch, %d ignored, %d broken') % (
-        self.total,
-        self.expired,
-        self.no_queue,
-        self.hash_mismatch,
-        self.cache_lookup,
-        self.real_mismatch,
-        self.ignored,
-        self.broken)
+            self.total, self.expired, self.no_queue, self.hash_mismatch,
+            self.cache_lookup, self.real_mismatch, self.ignored, self.broken)
 
 
 @ndb.tasklet

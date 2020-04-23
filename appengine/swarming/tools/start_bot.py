@@ -45,6 +45,7 @@ class LocalBot(object):
   It creates its own temporary directory to download the zip and run tasks
   locally.
   """
+
   def __init__(self, swarming_server_url, redirect, botdir):
     self._botdir = botdir
     self._swarming_server_url = swarming_server_url

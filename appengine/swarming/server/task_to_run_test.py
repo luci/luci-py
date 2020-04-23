@@ -121,9 +121,18 @@ def _gen_request(properties=None, **kwargs):
 
 def _yield_next_available_task_to_dispatch(bot_dimensions):
   bot_id = bot_dimensions[u'id'][0]
-  bot_management.bot_event('bot_connected', bot_id, '1.2.3.4', 'joe@localhost',
-                           bot_dimensions, {'state': 'real'}, '1234', False,
-                           None, None, None, register_dimensions=False)
+  bot_management.bot_event(
+      'bot_connected',
+      bot_id,
+      '1.2.3.4',
+      'joe@localhost',
+      bot_dimensions, {'state': 'real'},
+      '1234',
+      False,
+      None,
+      None,
+      None,
+      register_dimensions=False)
   bot_root_key = bot_management.get_root_key(bot_id)
   task_queues.assert_bot_async(bot_root_key, bot_dimensions).get_result()
   return [

@@ -26,20 +26,22 @@ from server import task_to_run
 def _gen_task_result_summary(now, key_id, properties=None, **kwargs):
   """Creates a TaskRequest."""
   props = {
-    'command': [u'command1'],
-    'dimensions': {u'pool': u'default'},
-    'env': {},
-    'execution_timeout_secs': 24*60*60,
-    'io_timeout_secs': None,
+      'command': [u'command1'],
+      'dimensions': {
+          u'pool': u'default'
+      },
+      'env': {},
+      'execution_timeout_secs': 24 * 60 * 60,
+      'io_timeout_secs': None,
   }
   props.update(properties or {})
   args = {
-    'created_ts': now,
-    'modified_ts': now,
-    'name': 'Request name',
-    'tags': [u'tag:1'],
-    'user': 'Jesus',
-    'key': ndb.Key('TaskResultSummary', key_id),
+      'created_ts': now,
+      'modified_ts': now,
+      'name': 'Request name',
+      'tags': [u'tag:1'],
+      'user': 'Jesus',
+      'key': ndb.Key('TaskResultSummary', key_id),
   }
   args.update(kwargs)
   return task_result.TaskResultSummary(**args)
@@ -62,13 +64,13 @@ def _get_task_to_run(now, request_key_id, slice_index, **kwargs):
 
 def _gen_bot_info(key_id, last_seen_ts, **kwargs):
   args = {
-    'key': ndb.Key('BotRoot', key_id, 'BotInfo', 'info'),
-    'last_seen_ts': last_seen_ts,
-    'dimensions': {
-        'os': ['Linux', 'Ubuntu'],
-        'bot_id': [key_id],
-    },
-    'state': {},
+      'key': ndb.Key('BotRoot', key_id, 'BotInfo', 'info'),
+      'last_seen_ts': last_seen_ts,
+      'dimensions': {
+          'os': ['Linux', 'Ubuntu'],
+          'bot_id': [key_id],
+      },
+      'state': {},
   }
   args.update(**kwargs)
   args['dimensions_flat'] = task_queues.bot_dimensions_to_flat(
@@ -266,29 +268,40 @@ class TestMetrics(test_case.TestCase):
     self.assertTrue(ts_mon_metrics._jobs_running.get(
         fields=jobs_fields, target_fields=jobs_target_fields))
     jobs_target_fields['hostname'] = 'autogen:test_bot2'
-    self.assertFalse(ts_mon_metrics._jobs_running.get(
-        fields=jobs_fields, target_fields=jobs_target_fields))
+    self.assertFalse(
+        ts_mon_metrics._jobs_running.get(
+            fields=jobs_fields, target_fields=jobs_target_fields))
     jobs_fields['status'] = 'running'
-    self.assertEqual(1, ts_mon_metrics._jobs_active.get(
-        fields=jobs_fields, target_fields=ts_mon_metrics._TARGET_FIELDS))
+    self.assertEqual(
+        1,
+        ts_mon_metrics._jobs_active.get(
+            fields=jobs_fields, target_fields=ts_mon_metrics._TARGET_FIELDS))
     jobs_fields['status'] = 'pending'
-    self.assertEqual(2, ts_mon_metrics._jobs_active.get(
-        fields=jobs_fields, target_fields=ts_mon_metrics._TARGET_FIELDS))
+    self.assertEqual(
+        2,
+        ts_mon_metrics._jobs_active.get(
+            fields=jobs_fields, target_fields=ts_mon_metrics._TARGET_FIELDS))
 
-    self.assertEqual(900, ts_mon_metrics._jobs_pending_durations.get(
-        fields=jobs_fields, target_fields=ts_mon_metrics._TARGET_FIELDS).sum)
-    self.assertEqual(600, ts_mon_metrics._jobs_max_pending_duration.get(
-        fields=jobs_fields, target_fields=ts_mon_metrics._TARGET_FIELDS))
+    self.assertEqual(
+        900,
+        ts_mon_metrics._jobs_pending_durations.get(
+            fields=jobs_fields,
+            target_fields=ts_mon_metrics._TARGET_FIELDS).sum)
+    self.assertEqual(
+        600,
+        ts_mon_metrics._jobs_max_pending_duration.get(
+            fields=jobs_fields, target_fields=ts_mon_metrics._TARGET_FIELDS))
 
     for bot_id, status in bots_expected.items():
       target_fields = dict(ts_mon_metrics._TARGET_FIELDS)
       target_fields['hostname'] = 'autogen:' + bot_id
-      self.assertEqual(status, ts_mon_metrics._executors_status.get(
-          target_fields=target_fields))
+      self.assertEqual(
+          status,
+          ts_mon_metrics._executors_status.get(target_fields=target_fields))
 
-      self.assertEqual('bot_id:%s|os:Linux|os:Ubuntu' % bot_id,
-                       ts_mon_metrics._executors_pool.get(
-                           target_fields=target_fields))
+      self.assertEqual(
+          'bot_id:%s|os:Linux|os:Ubuntu' % bot_id,
+          ts_mon_metrics._executors_pool.get(target_fields=target_fields))
 
   def test_on_task_expired(self):
     tags = [
@@ -297,15 +310,21 @@ class TestMetrics(test_case.TestCase):
     ]
     fields = {'project_id': 'test_project'}
     summary = _gen_task_result_summary(
-        self.now, 1, tags=tags, expiration_delay=1,
+        self.now,
+        1,
+        tags=tags,
+        expiration_delay=1,
         state=task_result.State.EXPIRED)
     to_run = _get_task_to_run(self.now, 1, 0, expiration_delay=1)
 
     ts_mon_metrics.on_task_expired(summary, to_run)
-    self.assertEqual(1, ts_mon_metrics._tasks_expiration_delay.get(
-        fields=fields).sum)
-    self.assertEqual(1, ts_mon_metrics._tasks_slice_expiration_delay.get(
-        fields=dict(fields, slice_index=0)).sum)
+    self.assertEqual(
+        1,
+        ts_mon_metrics._tasks_expiration_delay.get(fields=fields).sum)
+    self.assertEqual(
+        1,
+        ts_mon_metrics._tasks_slice_expiration_delay.get(
+            fields=dict(fields, slice_index=0)).sum)
 
 
 if __name__ == '__main__':

@@ -22,6 +22,7 @@ from server import task_pack
 
 
 class TaskPackApiTest(test_case.TestCase):
+
   def test_all_apis_are_tested(self):
     # Ensures there's a test for each public API.
     module = task_pack
@@ -35,7 +36,7 @@ class TaskPackApiTest(test_case.TestCase):
   def test_pack_request_key(self):
     self.assertEqual(
         '11',
-       task_pack.pack_request_key(ndb.Key('TaskRequest', 0x7fffffffffffffee)))
+        task_pack.pack_request_key(ndb.Key('TaskRequest', 0x7fffffffffffffee)))
 
   def test_unpack_request_key(self):
     self.assertEqual(
@@ -47,15 +48,14 @@ class TaskPackApiTest(test_case.TestCase):
   def test_request_key_to_result_summary_key(self):
     request_key = task_pack.unpack_request_key('11')
     result_key = task_pack.request_key_to_result_summary_key(request_key)
-    expected = ndb.Key(
-        'TaskRequest', 0x7fffffffffffffee, 'TaskResultSummary', 1)
+    expected = ndb.Key('TaskRequest', 0x7fffffffffffffee, 'TaskResultSummary',
+                       1)
     self.assertEqual(expected, result_key)
 
   def test_request_key_to_secret_bytes_key(self):
     request_key = task_pack.unpack_request_key('11')
     result_key = task_pack.request_key_to_secret_bytes_key(request_key)
-    expected = ndb.Key(
-        'TaskRequest', 0x7fffffffffffffee, 'SecretBytes', 1)
+    expected = ndb.Key('TaskRequest', 0x7fffffffffffffee, 'SecretBytes', 1)
     self.assertEqual(expected, result_key)
 
   def test_result_summary_key_to_request_key(self):
@@ -71,9 +71,8 @@ class TaskPackApiTest(test_case.TestCase):
         request_key)
     run_result_key = task_pack.result_summary_key_to_run_result_key(
         result_summary_key, 1)
-    expected = ndb.Key(
-        'TaskRequest', 0x7fffffffffffffee, 'TaskResultSummary', 1,
-        'TaskRunResult', 1)
+    expected = ndb.Key('TaskRequest', 0x7fffffffffffffee, 'TaskResultSummary',
+                       1, 'TaskRunResult', 1)
     self.assertEqual(expected, run_result_key)
     run_result_key = task_pack.result_summary_key_to_run_result_key(
         result_summary_key, 2)

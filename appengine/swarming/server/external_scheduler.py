@@ -33,7 +33,8 @@ class ExternalSchedulerException(Exception):
 def _get_client(address):
   """Get a prpc client instance for given address."""
   return client.Client(
-      address, plugin_prpc_pb2.ExternalSchedulerServiceDescription,
+      address,
+      plugin_prpc_pb2.ExternalSchedulerServiceDescription,
       insecure=utils.is_local_dev_server())
 
 
@@ -59,9 +60,9 @@ def _bot_pool_cfg(bot_dimensions):
   if len(pools) == 1:
     return pools_config.get_pool_config(pools[0])
   else:
-    logging.warning('Bot with dimensions %s was found to be in multiple '
-                    'pools. Unable to determine pool config.',
-                    bot_dimensions)
+    logging.warning(
+        'Bot with dimensions %s was found to be in multiple '
+        'pools. Unable to determine pool config.', bot_dimensions)
 
   return None
 
@@ -186,9 +187,8 @@ def notify_requests(es_cfg, requests, use_tq, is_callback, batch_mode=False):
   """
   logging.debug(
       'notify_requests(es_cfg=(%s,%s), requests=%s, use_tq=%s, '
-      'is_callback=%s, batch_mode=%s)',
-      es_cfg.address, es_cfg.id, [r.task_id for r, _ in requests], use_tq,
-      is_callback, batch_mode)
+      'is_callback=%s, batch_mode=%s)', es_cfg.address, es_cfg.id,
+      [r.task_id for r, _ in requests], use_tq, is_callback, batch_mode)
 
   req = plugin_pb2.NotifyTasksRequest()
   req.is_callback = is_callback
@@ -228,8 +228,8 @@ def notify_requests(es_cfg, requests, use_tq, is_callback, batch_mode=False):
   if batch_mode and config.settings().enable_batch_es_notifications:
     payload = {'es_host': es_cfg.address, 'request_json': request_json}
     req = taskqueue.Task(payload=json.dumps(payload), method='PULL')
-    if not req.add(queue_name='es-notify-tasks-batch',
-                   transactional=ndb.in_transaction()):
+    if not req.add(
+        queue_name='es-notify-tasks-batch', transactional=ndb.in_transaction()):
       raise datastore_utils.CommitError('Failed to enqueue task')
     stats = taskqueue.QueueStatistics.fetch('es-notify-kick')
     # Add a kicker task if there are fewer than 10 minutes worth.
@@ -245,7 +245,10 @@ def notify_requests(es_cfg, requests, use_tq, is_callback, batch_mode=False):
   enqueued = utils.enqueue_task(
       '/internal/taskqueue/important/external_scheduler/notify-tasks',
       'es-notify-tasks',
-      params={'es_host': es_cfg.address, 'request_json': request_json},
+      params={
+          'es_host': es_cfg.address,
+          'request_json': request_json
+      },
       transactional=ndb.in_transaction())
   if not enqueued:
     raise datastore_utils.CommitError('Failed to enqueue task')

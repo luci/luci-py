@@ -13,6 +13,7 @@ from test_support import parallel_test_runner, sequential_test_runner
 SWARMING_DIR = os.path.dirname(os.path.abspath(__file__))
 SWARMING_BOT_DIR = os.path.join(SWARMING_DIR, 'swarming_bot')
 
+
 def main():
   return run_tests_parralel() or run_tests_sequential()
 

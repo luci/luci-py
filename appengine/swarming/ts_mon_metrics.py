@@ -25,8 +25,8 @@ from server import task_result
 # - id is unique for each bot.
 # - temp_band is android specific.
 # Keep in sync with ../swarming_bot/bot_code/bot_main.py
-_IGNORED_DIMENSIONS = (
-    'android_devices', 'caches', 'id', 'server_version', 'temp_band')
+_IGNORED_DIMENSIONS = ('android_devices', 'caches', 'id', 'server_version',
+                       'temp_band')
 # Real timeout is 60s, keep it slightly under to bail out early.
 _REQUEST_TIMEOUT_SEC = 50
 # Cap the max number of items per taskqueue task, to keep the total
@@ -36,9 +36,9 @@ _JOBS_PER_SHARD = 500
 
 # Override default target fields for app-global metrics.
 _TARGET_FIELDS = {
-    'job_name':  '',  # module name
+    'job_name': '',  # module name
     'hostname': '',  # version
-    'task_num':  0,  # instance ID
+    'task_num': 0,  # instance ID
 }
 
 
@@ -107,8 +107,7 @@ _jobs_requested = gae_ts_mon.CounterMetric(
 # - spec_name: name of a job specification, e.g. '<master>:<builder>'
 #     for buildbot jobs.
 _tasks_expired = gae_ts_mon.CounterMetric(
-    'swarming/tasks/expired',
-    'Number of expired tasks', [
+    'swarming/tasks/expired', 'Number of expired tasks', [
         gae_ts_mon.StringField('spec_name'),
         gae_ts_mon.StringField('project_id'),
         gae_ts_mon.StringField('subproject_id'),
@@ -155,8 +154,7 @@ _task_bots_runnable = gae_ts_mon.CumulativeDistributionMetric(
 # Value should be 'pending' or 'running'. Completed / canceled jobs should not
 # send this metric.
 _jobs_running = gae_ts_mon.BooleanMetric(
-    'jobs/running',
-    'Presence metric for a running job.', [
+    'jobs/running', 'Presence metric for a running job.', [
         gae_ts_mon.StringField('spec_name'),
         gae_ts_mon.StringField('project_id'),
         gae_ts_mon.StringField('subproject_id'),
@@ -171,8 +169,7 @@ _jobs_running = gae_ts_mon.BooleanMetric(
 #     for buildbot jobs.
 # - status: 'pending' or 'running'.
 _jobs_active = gae_ts_mon.GaugeMetric(
-    'jobs/active',
-    'Number of running, pending or otherwise active jobs.', [
+    'jobs/active', 'Number of running, pending or otherwise active jobs.', [
         gae_ts_mon.StringField('spec_name'),
         gae_ts_mon.StringField('project_id'),
         gae_ts_mon.StringField('subproject_id'),
@@ -226,8 +223,7 @@ _jobs_pending_durations = gae_ts_mon.NonCumulativeDistributionMetric(
 # Note that 'running' will report data as long as the job is running,
 # so it is best to restrict data to status == 'pending.'
 _jobs_max_pending_duration = gae_ts_mon.FloatMetric(
-    'jobs/max_pending_duration',
-    'Maximum pending seconds of pending jobs.', [
+    'jobs/max_pending_duration', 'Maximum pending seconds of pending jobs.', [
         gae_ts_mon.StringField('spec_name'),
         gae_ts_mon.StringField('project_id'),
         gae_ts_mon.StringField('subproject_id'),
@@ -241,8 +237,7 @@ _jobs_max_pending_duration = gae_ts_mon.FloatMetric(
 # - condition = depends on the auth method (e.g. email for 'service_account').
 _bot_auth_successes = gae_ts_mon.CounterMetric(
     'swarming/bot_auth/success',
-    'Number of successful bot authentication events',
-    [
+    'Number of successful bot authentication events', [
         gae_ts_mon.StringField('auth_method'),
         gae_ts_mon.StringField('condition'),
     ])
@@ -372,8 +367,7 @@ def _set_executors_metrics(payload):
 
     _executors_status.set(status, target_fields=target_fields)
     _executors_pool.set(
-        _pool_from_dimensions(bot_info.dimensions),
-        target_fields=target_fields)
+        _pool_from_dimensions(bot_info.dimensions), target_fields=target_fields)
 
   logging.debug(
       '%s: task %d started at %s, processed %d bots (%d total)',

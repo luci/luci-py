@@ -30,7 +30,9 @@ def retry_exception(exc_type, max_attempts, delay):
   Returns:
     A decorator to be applied to the function.
   """
+
   def deco(fn):
+
     @functools.wraps(fn)
     def wrapper(*args, **kwargs):
       for _ in range(max_attempts - 1):
@@ -40,6 +42,7 @@ def retry_exception(exc_type, max_attempts, delay):
           time.sleep(delay)
       return fn(*args, **kwargs)
     return wrapper
+
   return deco
 
 
@@ -59,9 +62,12 @@ def pick_best_pool(url, server_version):
     A string indicating the best pool to run the health check task on.
   """
   output = subprocess.check_output([
-      SWARMING_TOOL, 'query',
-      '-S', url,
-      '--limit', '0',
+      SWARMING_TOOL,
+      'query',
+      '-S',
+      url,
+      '--limit',
+      '0',
       'bots/list?dimensions=server_version:%s' % server_version,
   ])
   data = json.loads(output)
@@ -100,15 +106,12 @@ def main():
 
   print('Scheduling no-op task on pool %r' % pool)
   rv = subprocess.call([
-      SWARMING_TOOL, 'run',
-      '-S', url,
-      '--expiration', '120',
-      '--hard-timeout', '120',
-      '-d', 'pool', pool,
-      '-d', 'server_version', args.server_version,
-      '--raw-cmd', '--', 'python', '-c', 'pass'])
+      SWARMING_TOOL, 'run', '-S', url, '--expiration', '120', '--hard-timeout',
+      '120', '-d', 'pool', pool, '-d', 'server_version', args.server_version,
+      '--raw-cmd', '--', 'python', '-c', 'pass'
+  ])
   if rv != 0:
-    print>>sys.stderr, 'Failed to run no-op task'
+    print >> sys.stderr, 'Failed to run no-op task'
     return 2
   return 0
 

@@ -24,13 +24,13 @@ from server import task_request
 
 
 class ServiceAccountRegexpTest(test_case.TestCase):
+
   def test_is_service_account(self):
     self.assertTrue(
         service_accounts.is_service_account('a@proj.iam.gserviceaccount.com'))
+    self.assertFalse(service_accounts.is_service_account('bot:something'))
     self.assertFalse(
-      service_accounts.is_service_account('bot:something'))
-    self.assertFalse(
-      service_accounts.is_service_account('user:something@something'))
+        service_accounts.is_service_account('user:something@something'))
     self.assertFalse(service_accounts.is_service_account(''))
 
 
@@ -39,6 +39,7 @@ class MockedAuthDB(object):
 
 
 class TestBase(test_case.TestCase):
+
   def setUp(self):
     super(TestBase, self).setUp()
     self.mock(random, 'randint', lambda _a, _b: 333)
@@ -65,9 +66,8 @@ class TestBase(test_case.TestCase):
 class OAuthTokenGrantTest(TestBase):
   def setUp(self):
     super(OAuthTokenGrantTest, self).setUp()
-    self.mock(
-        auth, 'get_current_identity',
-        lambda: auth.Identity.from_bytes('user:end-user@example.com'))
+    self.mock(auth, 'get_current_identity',
+              lambda: auth.Identity.from_bytes('user:end-user@example.com'))
 
   def test_happy_path(self):
     now = datetime.datetime(2010, 1, 2, 3, 4, 5)
@@ -76,20 +76,23 @@ class OAuthTokenGrantTest(TestBase):
     expiry = now + datetime.timedelta(seconds=7200)
     calls = self.mock_json_request(
         expected_url='https://tokens.example.com/prpc/'
-            'tokenserver.minter.TokenMinter/MintOAuthTokenGrant',
+        'tokenserver.minter.TokenMinter/MintOAuthTokenGrant',
         expected_payload={
-          'auditTags': [
-            'swarming:gae_request_id:7357B3D7091D',
-            'swarming:service_version:sample-app/v1a',
-          ],
-          'endUser': 'user:end-user@example.com',
-          'serviceAccount': 'service-account@example.com',
-          'validityDuration': 7200,
+            'auditTags': [
+                'swarming:gae_request_id:7357B3D7091D',
+                'swarming:service_version:sample-app/v1a',
+            ],
+            'endUser':
+                'user:end-user@example.com',
+            'serviceAccount':
+                'service-account@example.com',
+            'validityDuration':
+                7200,
         },
         response={
-          'grantToken': 'totally_real_token',
-          'serviceVersion': 'token-server-id/ver',
-          'expiry': expiry.isoformat() + 'Z',
+            'grantToken': 'totally_real_token',
+            'serviceVersion': 'token-server-id/ver',
+            'expiry': expiry.isoformat() + 'Z',
         })
 
     # Minting new one.
@@ -111,20 +114,23 @@ class OAuthTokenGrantTest(TestBase):
     expiry = now + datetime.timedelta(seconds=7200)
     calls = self.mock_json_request(
         expected_url='https://tokens.example.com/prpc/'
-            'tokenserver.minter.TokenMinter/MintOAuthTokenGrant',
+        'tokenserver.minter.TokenMinter/MintOAuthTokenGrant',
         expected_payload={
-          'auditTags': [
-            'swarming:gae_request_id:7357B3D7091D',
-            'swarming:service_version:sample-app/v1a',
-          ],
-          'endUser': 'user:end-user@example.com',
-          'serviceAccount': 'service-account@example.com',
-          'validityDuration': 7200,
+            'auditTags': [
+                'swarming:gae_request_id:7357B3D7091D',
+                'swarming:service_version:sample-app/v1a',
+            ],
+            'endUser':
+                'user:end-user@example.com',
+            'serviceAccount':
+                'service-account@example.com',
+            'validityDuration':
+                7200,
         },
         response={
-          'grantToken': 'another_totally_real_token',
-          'serviceVersion': 'token-server-id/ver',
-          'expiry': expiry.isoformat() + 'Z',
+            'grantToken': 'another_totally_real_token',
+            'serviceVersion': 'token-server-id/ver',
+            'expiry': expiry.isoformat() + 'Z',
         })
 
     tok = service_accounts.get_oauth_token_grant(
@@ -153,19 +159,23 @@ class TaskAccountTokenTest(TestBase):
   def make_task_request(self, service_account, service_account_token):
     now = utils.utcnow()
     args = {
-      'created_ts': now,
-      'manual_tags': [u'tag:1'],
-      'name': 'Request with %s' % service_account,
-      'priority': 50,
-      'task_slices': [
-        task_request.TaskSlice(
-            expiration_secs=60,
-            properties=task_request.TaskProperties(
-                command=[u'command1'],
-                dimensions_data={u'pool': [u'default']},
-                execution_timeout_secs=24*60*60)),
-      ],
-      'user': 'Someone',
+        'created_ts':
+            now,
+        'manual_tags': [u'tag:1'],
+        'name':
+            'Request with %s' % service_account,
+        'priority':
+            50,
+        'task_slices': [
+            task_request.TaskSlice(
+                expiration_secs=60,
+                properties=task_request.TaskProperties(
+                    command=[u'command1'],
+                    dimensions_data={u'pool': [u'default']},
+                    execution_timeout_secs=24 * 60 * 60)),
+        ],
+        'user':
+            'Someone',
     }
     req = task_request.TaskRequest(**args)
     task_request.init_new_request(req, True, task_request.TEMPLATE_AUTO)
@@ -239,8 +249,7 @@ class TaskAccountTokenTest(TestBase):
 
   def test_task_account_is_none(self):
     task_id = self.make_task_request(
-        service_account='none',
-        service_account_token=None)
+        service_account='none', service_account_token=None)
     account, tok = service_accounts.get_task_account_token(
         task_id, 'bot-id', ['scope1', 'scope2'])
     self.assertEqual('none', account)
@@ -258,21 +267,22 @@ class SystemAccountTokenTest(test_case.TestCase):
         service_accounts.get_system_account_token(None, ['scope']))
 
   def test_bot(self):
-    self.assertEqual(
-        ('bot', None),
-        service_accounts.get_system_account_token('bot', ['scope']))
+    self.assertEqual(('bot', None),
+                     service_accounts.get_system_account_token(
+                         'bot', ['scope']))
 
   def test_token(self):
     calls = []
+
     def mocked(**kwargs):
       calls.append(kwargs)
       return 'fake-token', utils.time_time() + 3600
     self.mock(auth, 'get_access_token', mocked)
 
     tok = service_accounts.AccessToken('fake-token', utils.time_time() + 3600)
-    self.assertEqual(
-        ('bot@example.com', tok),
-        service_accounts.get_system_account_token('bot@example.com', ['scope']))
+    self.assertEqual(('bot@example.com', tok),
+                     service_accounts.get_system_account_token(
+                         'bot@example.com', ['scope']))
 
     self.assertEqual([{
         'act_as': 'bot@example.com',

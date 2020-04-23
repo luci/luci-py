@@ -36,11 +36,14 @@ from server import task_scheduler
 def _gen_properties(**kwargs):
   """Creates a TaskProperties."""
   args = {
-    'command': [u'command1'],
-    'dimensions': {u'os': [u'Windows-3.1.1'], u'pool': [u'default']},
-    'env': {},
-    'execution_timeout_secs': 24*60*60,
-    'io_timeout_secs': None,
+      'command': [u'command1'],
+      'dimensions': {
+          u'os': [u'Windows-3.1.1'],
+          u'pool': [u'default']
+      },
+      'env': {},
+      'execution_timeout_secs': 24 * 60 * 60,
+      'io_timeout_secs': None,
   }
   args.update(kwargs)
   args['dimensions_data'] = args.pop('dimensions')
@@ -51,19 +54,23 @@ def _gen_request(**kwargs):
   """Returns an initialized task_request.TaskRequest."""
   now = utils.utcnow()
   args = {
-    # Don't be confused, this is not part of the API. This code is constructing
-    # a DB entity, not a swarming_rpcs.NewTaskRequest.
-    u'created_ts': now,
-    u'manual_tags': [u'tag:1'],
-    u'name': u'yay',
-    u'priority': 50,
-    u'task_slices': [
-      task_request.TaskSlice(
-        expiration_secs=60,
-        properties=_gen_properties(),
-        wait_for_capacity=False),
-    ],
-    u'user': u'Jesus',
+      # Don't be confused, this is not part of the API. This code is
+      # constructing a DB entity, not a swarming_rpcs.NewTaskRequest.
+      u'created_ts':
+          now,
+      u'manual_tags': [u'tag:1'],
+      u'name':
+          u'yay',
+      u'priority':
+          50,
+      u'task_slices': [
+          task_request.TaskSlice(
+              expiration_secs=60,
+              properties=_gen_properties(),
+              wait_for_capacity=False),
+      ],
+      u'user':
+          u'Jesus',
   }
   args.update(kwargs)
   ret = task_request.TaskRequest(**args)
@@ -346,8 +353,7 @@ class ExternalSchedulerApiTestBatchMode(test_env_handlers.AppTestBase):
         False,
         batch_mode=True)
     external_scheduler.notify_requests(
-        self.cfg_hoe,
-        [(request, result_summary)],
+        self.cfg_hoe, [(request, result_summary)],
         False,
         False,
         batch_mode=True)

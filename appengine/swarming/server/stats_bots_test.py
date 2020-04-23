@@ -16,6 +16,7 @@ from server import stats_bots
 
 
 class StatsBotsApiTest(test_case.TestCase):
+
   def test_all_apis_are_tested(self):
     # Ensures there's a test for each public API.
     module = stats_bots
