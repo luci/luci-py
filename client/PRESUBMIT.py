@@ -10,6 +10,7 @@ details on the presubmit API built into gcl.
 
 def CommonChecks(input_api, output_api):
   import sys
+
   def join(*args):
     return input_api.os_path.join(input_api.PresubmitLocalPath(), *args)
 
@@ -17,17 +18,17 @@ def CommonChecks(input_api, output_api):
   sys_path_backup = sys.path
   try:
     sys.path = [
-      input_api.PresubmitLocalPath(),
-      join('tests'),
-      join('third_party'),
+        input_api.PresubmitLocalPath(),
+        join('tests'),
+        join('third_party'),
     ] + sys.path
     black_list = list(input_api.DEFAULT_BLACK_LIST) + [
         r'.*_pb2\.py$',
         r'.*_pb2_grpc\.py$',
     ]
-    output.extend(input_api.canned_checks.RunPylint(
-        input_api, output_api,
-    black_list=black_list))
+    output.extend(
+        input_api.canned_checks.RunPylint(
+            input_api, output_api, black_list=black_list))
   finally:
     sys.path = sys_path_backup
 
@@ -35,11 +36,12 @@ def CommonChecks(input_api, output_api):
   # is not whitelisted so do not run them for now. They should use a local fake
   # web service instead.
   blacklist = [
-    r'.*isolateserver_smoke_test\.py$',
-    r'.*isolateserver_load_test\.py$',
+      r'.*isolateserver_smoke_test\.py$',
+      r'.*isolateserver_load_test\.py$',
   ]
   unit_tests = input_api.canned_checks.GetUnitTestsRecursively(
-      input_api, output_api,
+      input_api,
+      output_api,
       input_api.os_path.join(input_api.PresubmitLocalPath()),
       whitelist=[r'.+_test\.py$'],
       blacklist=blacklist)

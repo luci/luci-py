@@ -57,9 +57,8 @@ class Failure(Exception):
 def default_task_name(options):
   """Returns a default task name if not specified."""
   if not options.task_name:
-    task_name = u'%s/%s' % (
-        options.user,
-        '_'.join('%s=%s' % (k, v) for k, v in options.dimensions))
+    task_name = u'%s/%s' % (options.user, '_'.join(
+        '%s=%s' % (k, v) for k, v in options.dimensions))
     if options.isolated:
       task_name += u'/' + options.isolated
     return task_name
@@ -70,73 +69,60 @@ def default_task_name(options):
 
 
 # See ../appengine/swarming/swarming_rpcs.py.
-CipdPackage = collections.namedtuple(
-    'CipdPackage',
-    [
-      'package_name',
-      'path',
-      'version',
-    ])
+CipdPackage = collections.namedtuple('CipdPackage', [
+    'package_name',
+    'path',
+    'version',
+])
 
 
 # See ../appengine/swarming/swarming_rpcs.py.
-CipdInput = collections.namedtuple(
-    'CipdInput',
-    [
-      'client_package',
-      'packages',
-      'server',
-    ])
-
+CipdInput = collections.namedtuple('CipdInput', [
+    'client_package',
+    'packages',
+    'server',
+])
 
 # See ../appengine/swarming/swarming_rpcs.py.
-FilesRef = collections.namedtuple(
-    'FilesRef',
-    [
-      'isolated',
-      'isolatedserver',
-      'namespace',
-    ])
-
+FilesRef = collections.namedtuple('FilesRef', [
+    'isolated',
+    'isolatedserver',
+    'namespace',
+])
 
 # See ../appengine/swarming/swarming_rpcs.py.
 StringListPair = collections.namedtuple(
-  'StringListPair', [
-    'key',
-    'value', # repeated string
-  ]
-)
-
-# See ../appengine/swarming/swarming_rpcs.py.
-Containment = collections.namedtuple(
-    'Containment',
+    'StringListPair',
     [
-      'lower_priority',
-      'containment_type',
+        'key',
+        'value',  # repeated string
     ])
 
+# See ../appengine/swarming/swarming_rpcs.py.
+Containment = collections.namedtuple('Containment', [
+    'lower_priority',
+    'containment_type',
+])
 
 # See ../appengine/swarming/swarming_rpcs.py.
-TaskProperties = collections.namedtuple(
-    'TaskProperties',
-    [
-      'caches',
-      'cipd_input',
-      'command',
-      'containment',
-      'relative_cwd',
-      'dimensions',
-      'env',
-      'env_prefixes',
-      'execution_timeout_secs',
-      'extra_args',
-      'grace_period_secs',
-      'idempotent',
-      'inputs_ref',
-      'io_timeout_secs',
-      'outputs',
-      'secret_bytes',
-    ])
+TaskProperties = collections.namedtuple('TaskProperties', [
+    'caches',
+    'cipd_input',
+    'command',
+    'containment',
+    'relative_cwd',
+    'dimensions',
+    'env',
+    'env_prefixes',
+    'execution_timeout_secs',
+    'extra_args',
+    'grace_period_secs',
+    'idempotent',
+    'inputs_ref',
+    'io_timeout_secs',
+    'outputs',
+    'secret_bytes',
+])
 
 
 # See ../appengine/swarming/swarming_rpcs.py.
@@ -415,9 +401,8 @@ class TaskOutputCollector(object):
     # Sanity check index is in expected range.
     assert isinstance(shard_index, int)
     if shard_index < 0 or shard_index >= self.shard_count:
-      logging.warning(
-          'Shard index %d is outside of expected range: [0; %d]',
-          shard_index, self.shard_count - 1)
+      logging.warning('Shard index %d is outside of expected range: [0; %d]',
+                      shard_index, self.shard_count - 1)
       return
 
     if result.get('outputs_ref'):
@@ -474,9 +459,7 @@ class TaskOutputCollector(object):
       # Write summary.json to task_output_dir as well.
       if self.task_output_dir:
         tools.write_json(
-            os.path.join(self.task_output_dir, u'summary.json'),
-            summary,
-            False)
+            os.path.join(self.task_output_dir, u'summary.json'), summary, False)
       if self._storage:
         self._storage.close()
         self._storage = None
@@ -496,9 +479,9 @@ class TaskOutputCollector(object):
               self._storage.server_ref.url, server_ref.url)
           return None
         if self._storage.server_ref.namespace != server_ref.namespace:
-          logging.error(
-              'Task shards are using multiple namespaces: %s and %s',
-              self._storage.server_ref.namespace, server_ref.namespace)
+          logging.error('Task shards are using multiple namespaces: %s and %s',
+                        self._storage.server_ref.namespace,
+                        server_ref.namespace)
           return None
       return self._storage
 
@@ -520,9 +503,8 @@ def parse_time(value):
   raise ValueError('Failed to parse %s' % value)
 
 
-def retrieve_results(
-    base_url, shard_index, task_id, timeout, should_stop, output_collector,
-    include_perf, fetch_stdout):
+def retrieve_results(base_url, shard_index, task_id, timeout, should_stop,
+                     output_collector, include_perf, fetch_stdout):
   """Retrieves results for a single task ID.
 
   Returns:
@@ -576,9 +558,8 @@ def retrieve_results(
       # An error occurred.
       if result['error'].get('errors'):
         for err in result['error']['errors']:
-          logging.warning(
-              'Error while reading task: %s; %s',
-              err.get('message'), err.get('debugInfo'))
+          logging.warning('Error while reading task: %s; %s',
+                          err.get('message'), err.get('debugInfo'))
       elif result['error'].get('message'):
         logging.warning(
             'Error while reading task: %s', result['error']['message'])
@@ -657,11 +638,9 @@ def yield_results(
           if print_status_updates:
             time_now = str(datetime.datetime.now())
             _, time_now = time_now.split(' ')
-            print(
-                '%s '
-                'Waiting for results from the following shards: %s' %
-                (time_now, ', '.join(map(str, shards_remaining)))
-            )
+            print('%s '
+                  'Waiting for results from the following shards: %s' %
+                  (time_now, ', '.join(map(str, shards_remaining))))
             sys.stdout.flush()
           continue
         except Exception:
@@ -741,13 +720,13 @@ def decorate_shard_output(swarming, shard_index, metadata, include_stdout):
         tag_footer1,
         tag_footer2,
         dash_pad,
-        ])
+    ])
   return '\n'.join([
       dash_pad,
       tag_header,
       tag_footer2,
       dash_pad,
-      ])
+  ])
 
 
 def collect(
@@ -773,10 +752,15 @@ def collect(
   total_duration = 0
   try:
     for index, metadata in yield_results(
-        swarming, task_ids, timeout, None, print_status_updates,
-        output_collector, include_perf,
+        swarming,
+        task_ids,
+        timeout,
+        None,
+        print_status_updates,
+        output_collector,
+        include_perf,
         (len(task_output_stdout) > 0),
-        ):
+    ):
       seen_shards.add(index)
 
       # Default to failure if there was no process that even started.
@@ -953,7 +937,10 @@ def process_filter_options(parser, options):
 def add_sharding_options(parser):
   parser.sharding_group = optparse.OptionGroup(parser, 'Sharding options')
   parser.sharding_group.add_option(
-      '--shards', type='int', default=1, metavar='NUMBER',
+      '--shards',
+      type='int',
+      default=1,
+      metavar='NUMBER',
       help='Number of shards to trigger and collect.')
   parser.add_option_group(parser.sharding_group)
 
@@ -965,105 +952,151 @@ def add_trigger_options(parser):
 
   group = optparse.OptionGroup(parser, 'TaskSlice properties')
   group.add_option(
-      '-s', '--isolated', metavar='HASH',
+      '-s',
+      '--isolated',
+      metavar='HASH',
       help='Hash of the .isolated to grab from the isolate server')
   group.add_option(
-      '-e', '--env', default=[], action='append', nargs=2, metavar='FOO bar',
+      '-e',
+      '--env',
+      default=[],
+      action='append',
+      nargs=2,
+      metavar='FOO bar',
       help='Environment variables to set')
   group.add_option(
-      '--env-prefix', default=[], action='append', nargs=2,
+      '--env-prefix',
+      default=[],
+      action='append',
+      nargs=2,
       metavar='VAR local/path',
       help='Prepend task-relative `local/path` to the task\'s VAR environment '
-           'variable using os-appropriate pathsep character. Can be specified '
-           'multiple times for the same VAR to add multiple paths.')
+      'variable using os-appropriate pathsep character. Can be specified '
+      'multiple times for the same VAR to add multiple paths.')
   group.add_option(
-      '--idempotent', action='store_true', default=False,
+      '--idempotent',
+      action='store_true',
+      default=False,
       help='When set, the server will actively try to find a previous task '
-           'with the same parameter and return this result instead if possible')
+      'with the same parameter and return this result instead if possible')
   group.add_option(
-      '--secret-bytes-path', metavar='FILE',
+      '--secret-bytes-path',
+      metavar='FILE',
       help='The optional path to a file containing the secret_bytes to use '
-           'with this task.')
+      'with this task.')
   group.add_option(
-      '--hard-timeout', type='int', default=60*60, metavar='SECS',
+      '--hard-timeout',
+      type='int',
+      default=60 * 60,
+      metavar='SECS',
       help='Seconds to allow the task to complete.')
   group.add_option(
-      '--io-timeout', type='int', default=20*60, metavar='SECS',
+      '--io-timeout',
+      type='int',
+      default=20 * 60,
+      metavar='SECS',
       help='Seconds to allow the task to be silent.')
   parser.add_option(
-      '--lower-priority', action='store_true',
+      '--lower-priority',
+      action='store_true',
       help='Lowers the child process priority')
   containment_choices = ('NONE', 'AUTO', 'JOB_OBJECT')
   parser.add_option(
-      '--containment-type', default='NONE', metavar='NONE',
+      '--containment-type',
+      default='NONE',
+      metavar='NONE',
       choices=containment_choices,
       help='Containment to use; one of: %s' % ', '.join(containment_choices))
   group.add_option(
-      '--raw-cmd', action='store_true', default=False,
+      '--raw-cmd',
+      action='store_true',
+      default=False,
       help='When set, the command after -- is used as-is without run_isolated. '
-           'In this case, the .isolated file is expected to not have a command')
+      'In this case, the .isolated file is expected to not have a command')
   group.add_option(
       '--relative-cwd',
       help='Ignore the isolated \'relative_cwd\' and use this one instead; '
-           'requires --raw-cmd')
+      'requires --raw-cmd')
   group.add_option(
-      '--cipd-package', action='append', default=[], metavar='PKG',
+      '--cipd-package',
+      action='append',
+      default=[],
+      metavar='PKG',
       help='CIPD packages to install on the Swarming bot. Uses the format: '
-           'path:package_name:version')
+      'path:package_name:version')
   group.add_option(
-      '--named-cache', action='append', nargs=2, default=[],
+      '--named-cache',
+      action='append',
+      nargs=2,
+      default=[],
       metavar='NAME RELPATH',
       help='"<name> <relpath>" items to keep a persistent bot managed cache')
   group.add_option(
       '--service-account',
       help='Email of a service account to run the task as, or literal "bot" '
-           'string to indicate that the task should use the same account the '
-           'bot itself is using to authenticate to Swarming. Don\'t use task '
-           'service accounts if not given (default).')
+      'string to indicate that the task should use the same account the '
+      'bot itself is using to authenticate to Swarming. Don\'t use task '
+      'service accounts if not given (default).')
   group.add_option(
       '--pool-task-template',
       choices=('AUTO', 'CANARY_PREFER', 'CANARY_NEVER', 'SKIP'),
       default='AUTO',
       help='Set how you want swarming to apply the pool\'s TaskTemplate. '
-           'By default, the pool\'s TaskTemplate is automatically selected, '
-           'according the pool configuration on the server. Choices are: '
-           'AUTO, CANARY_PREFER, CANARY_NEVER, and SKIP (default: AUTO).')
+      'By default, the pool\'s TaskTemplate is automatically selected, '
+      'according the pool configuration on the server. Choices are: '
+      'AUTO, CANARY_PREFER, CANARY_NEVER, and SKIP (default: AUTO).')
   group.add_option(
-      '-o', '--output', action='append', default=[], metavar='PATH',
+      '-o',
+      '--output',
+      action='append',
+      default=[],
+      metavar='PATH',
       help='A list of files to return in addition to those written to '
-           '${ISOLATED_OUTDIR}. An error will occur if a file specified by'
-           'this option is also written directly to ${ISOLATED_OUTDIR}.')
+      '${ISOLATED_OUTDIR}. An error will occur if a file specified by'
+      'this option is also written directly to ${ISOLATED_OUTDIR}.')
   group.add_option(
-      '--wait-for-capacity', action='store_true', default=False,
+      '--wait-for-capacity',
+      action='store_true',
+      default=False,
       help='Instructs to leave the task PENDING even if there\'s no known bot '
-           'that could run this task, otherwise the task will be denied with '
-           'NO_RESOURCE')
+      'that could run this task, otherwise the task will be denied with '
+      'NO_RESOURCE')
   parser.add_option_group(group)
 
   group = optparse.OptionGroup(parser, 'TaskRequest details')
   group.add_option(
-      '--priority', type='int', default=200,
+      '--priority',
+      type='int',
+      default=200,
       help='The lower value, the more important the task is')
   group.add_option(
-      '-T', '--task-name', metavar='NAME',
+      '-T',
+      '--task-name',
+      metavar='NAME',
       help='Display name of the task. Defaults to '
-           '<base_name>/<dimensions>/<isolated hash>/<timestamp> if an '
-           'isolated file is provided, if a hash is provided, it defaults to '
-           '<user>/<dimensions>/<isolated hash>/<timestamp>')
+      '<base_name>/<dimensions>/<isolated hash>/<timestamp> if an '
+      'isolated file is provided, if a hash is provided, it defaults to '
+      '<user>/<dimensions>/<isolated hash>/<timestamp>')
   group.add_option(
-      '--tags', action='append', default=[], metavar='FOO:BAR',
+      '--tags',
+      action='append',
+      default=[],
+      metavar='FOO:BAR',
       help='Tags to assign to the task.')
   group.add_option(
-      '--user', default='',
+      '--user',
+      default='',
       help='User associated with the task. Defaults to authenticated user on '
-           'the server.')
+      'the server.')
   group.add_option(
-      '--expiration', type='int', default=6*60*60, metavar='SECS',
+      '--expiration',
+      type='int',
+      default=6 * 60 * 60,
+      metavar='SECS',
       help='Seconds to allow the task to be pending for a bot to run before '
-           'this task request expires.')
+      'this task request expires.')
   group.add_option(
-      '--deadline', type='int', dest='expiration',
-      help=optparse.SUPPRESS_HELP)
+      '--deadline', type='int', dest='expiration', help=optparse.SUPPRESS_HELP)
   parser.add_option_group(group)
 
 
@@ -1128,10 +1161,8 @@ def process_trigger_options(parser, options, args):
     split = p.split(':', 2)
     if len(split) != 3:
       parser.error('CIPD packages must take the form: path:package:version')
-    cipd_packages.append(CipdPackage(
-        package_name=split[1],
-        path=split[0],
-        version=split[2]))
+    cipd_packages.append(
+        CipdPackage(package_name=split[1], path=split[0], version=split[2]))
   cipd_input = None
   if cipd_packages:
     cipd_input = CipdInput(
@@ -1167,8 +1198,8 @@ def process_trigger_options(parser, options, args):
       cipd_input=cipd_input,
       command=command,
       containment=Containment(
-        lower_priority=bool(options.lower_priority),
-        containment_type=options.containment_type,
+          lower_priority=bool(options.lower_priority),
+          containment_type=options.containment_type,
       ),
       relative_cwd=options.relative_cwd,
       dimensions=orig_dims,
@@ -1302,8 +1333,8 @@ def add_collect_options(parser):
       '--task-output-dir',
       metavar='DIR',
       help='Directory to put task results into. When the task finishes, this '
-           'directory contains per-shard directory with output files produced '
-           'by shards: <task-output-dir>/<zero-based-shard-index>/.')
+      'directory contains per-shard directory with output files produced '
+      'by shards: <task-output-dir>/<zero-based-shard-index>/.')
   parser.task_output_group.add_option(TaskOutputStdoutOption(
       '--task-output-stdout'))
   parser.task_output_group.add_option(
@@ -1364,7 +1395,8 @@ def CMDbots(parser, args):
   parser.filter_group.add_option(
       '--idle', action='store_true', help='Keep only idle bots')
   parser.filter_group.add_option(
-      '--mp', action='store_true',
+      '--mp',
+      action='store_true',
       help='Keep only Machine Provider managed bots')
   parser.filter_group.add_option(
       '--non-mp', action='store_true',
@@ -1473,8 +1505,7 @@ def CMDcollect(parser, args):
     except (IOError, ValueError):
       parser.error('Failed to open %s' % options.json)
     try:
-      tasks = sorted(
-          data['tasks'].values(), key=lambda x: x['shard_index'])
+      tasks = sorted(data['tasks'].values(), key=lambda x: x['shard_index'])
       args = [t['task_id'] for t in tasks]
     except (KeyError, TypeError):
       parser.error('Failed to process %s' % options.json)
@@ -1494,17 +1525,10 @@ def CMDcollect(parser, args):
       parser.error('Task ids are 0-9a-f.')
 
   try:
-    return collect(
-        options.swarming,
-        args,
-        options.timeout,
-        options.decorate,
-        options.print_status_updates,
-        options.task_summary_json,
-        options.task_output_dir,
-        options.task_output_stdout,
-        options.perf,
-        options.filepath_filter)
+    return collect(options.swarming, args, options.timeout, options.decorate,
+                   options.print_status_updates, options.task_summary_json,
+                   options.task_output_dir, options.task_output_stdout,
+                   options.perf, options.filepath_filter)
   except Failure:
     on_error.report(None)
     return 1
@@ -1680,8 +1704,8 @@ def CMDrun(parser, args):
     return 1
   print('Triggered task: %s' % task_request.name)
   task_ids = [
-    t['task_id']
-    for t in sorted(tasks.values(), key=lambda x: x['shard_index'])
+      t['task_id']
+      for t in sorted(tasks.values(), key=lambda x: x['shard_index'])
   ]
   for task_id in task_ids:
     print('Task: {server}/task?id={task}'.format(
@@ -1730,7 +1754,9 @@ def CMDreproduce(parser, args):
       '--work', metavar='DIR', default='work',
       help='Directory to map the task input files into')
   parser.add_option(
-      '--cache', metavar='DIR', default='cache',
+      '--cache',
+      metavar='DIR',
+      default='cache',
       help='Directory that contains the input cache')
   parser.add_option(
       '--leak', action='store_true',
@@ -1909,9 +1935,9 @@ def CMDtrigger(parser, args):
           tasks.values(), key=lambda x: x['shard_index'])
       if options.dump_json:
         data = {
-          'base_task_name': task_request.name,
-          'tasks': tasks,
-          'request': task_request_to_raw_request(task_request),
+            'base_task_name': task_request.name,
+            'tasks': tasks,
+            'request': task_request_to_raw_request(task_request),
         }
         tools.write_json(unicode(options.dump_json), data, True)
         print('To collect results, use:')
@@ -1931,13 +1957,16 @@ def CMDtrigger(parser, args):
 
 
 class OptionParserSwarming(logging_utils.OptionParserWithLogging):
+
   def __init__(self, **kwargs):
     logging_utils.OptionParserWithLogging.__init__(
         self, prog='swarming.py', **kwargs)
     self.server_group = optparse.OptionGroup(self, 'Server')
     self.server_group.add_option(
-        '-S', '--swarming',
-        metavar='URL', default=os.environ.get('SWARMING_SERVER', ''),
+        '-S',
+        '--swarming',
+        metavar='URL',
+        default=os.environ.get('SWARMING_SERVER', ''),
         help='Swarming server to use')
     self.add_option_group(self.server_group)
     auth.add_auth_options(self)

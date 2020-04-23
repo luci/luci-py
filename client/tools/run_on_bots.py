@@ -22,8 +22,9 @@ import sys
 import tempfile
 import threading
 
-CLIENT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(
-    __file__.decode(sys.getfilesystemencoding()))))
+CLIENT_DIR = os.path.dirname(
+    os.path.dirname(
+        os.path.abspath(__file__.decode(sys.getfilesystemencoding()))))
 sys.path.insert(0, CLIENT_DIR)
 
 from utils import tools
@@ -45,10 +46,14 @@ def get_bot_list(swarming_server, dimensions):
   q = '&'.join(
       'dimensions=%s:%s' % (k, v) for k, v in sorted(dimensions.items()))
   cmd = [
-    sys.executable, 'swarming.py', 'query',
-    '--swarming', swarming_server,
-    '--limit', '0',
-    'bots/list?' + q,
+      sys.executable,
+      'swarming.py',
+      'query',
+      '--swarming',
+      swarming_server,
+      '--limit',
+      '0',
+      'bots/list?' + q,
   ]
   healthy = []
   quarantined = []
@@ -70,10 +75,10 @@ def archive(isolate_server, script):
   """Archives the tool and return the sha-1."""
   base_script = os.path.basename(script)
   isolate = {
-    'variables': {
-      'command': ['python', base_script],
-      'files': [base_script],
-    },
+      'variables': {
+          'command': ['python', base_script],
+          'files': [base_script],
+      },
   }
   tempdir = tempfile.mkdtemp(prefix=u'run_on_bots')
   try:
@@ -83,10 +88,15 @@ def archive(isolate_server, script):
       f.write(str(isolate))
     shutil.copyfile(script, os.path.join(tempdir, base_script))
     cmd = [
-      sys.executable, 'isolate.py', 'archive',
-      '--isolate-server', isolate_server,
-      '-i', isolate_file,
-      '-s', isolated_file,
+        sys.executable,
+        'isolate.py',
+        'archive',
+        '--isolate-server',
+        isolate_server,
+        '-i',
+        isolate_file,
+        '-s',
+        isolated_file,
     ]
     return subprocess.check_output(cmd, cwd=CLIENT_DIR).split()[0]
   finally:
@@ -121,14 +131,24 @@ def run_batches(
       task_name = parallel_execution.task_to_name(
             name, {'id': bot}, isolated_hash) + suffix
       cmd = [
-        sys.executable, 'swarming.py', 'run',
-        '--swarming', swarming_server,
-        '--isolate-server', isolate_server,
-        '--priority', priority,
-        '--deadline', deadline,
-        '--dimension', 'id', bot,
-        '--task-name', task_name,
-        '-s', isolated_hash,
+          sys.executable,
+          'swarming.py',
+          'run',
+          '--swarming',
+          swarming_server,
+          '--isolate-server',
+          isolate_server,
+          '--priority',
+          priority,
+          '--deadline',
+          deadline,
+          '--dimension',
+          'id',
+          bot,
+          '--task-name',
+          task_name,
+          '-s',
+          isolated_hash,
       ]
       for k, v in sorted(dimensions.items()):
         cmd.extend(('-d', k, v))
@@ -144,9 +164,8 @@ def run_batches(
     t.join()
 
 
-def run_serial(
-    swarming_server, isolate_server, dimensions, tags, env, priority, deadline,
-    repeat, isolated_hash, name, bots, args):
+def run_serial(swarming_server, isolate_server, dimensions, tags, env, priority,
+               deadline, repeat, isolated_hash, name, bots, args):
   """Runs the task one at a time.
 
   This will be mainly bound by task scheduling latency, especially if the bots
@@ -159,14 +178,24 @@ def run_serial(
       task_name = parallel_execution.task_to_name(
           name, {'id': bot}, isolated_hash) + suffix
       cmd = [
-        sys.executable, 'swarming.py', 'run',
-        '--swarming', swarming_server,
-        '--isolate-server', isolate_server,
-        '--priority', priority,
-        '--deadline', deadline,
-        '--dimension', 'id', bot,
-        '--task-name', task_name,
-        '-s', isolated_hash,
+          sys.executable,
+          'swarming.py',
+          'run',
+          '--swarming',
+          swarming_server,
+          '--isolate-server',
+          isolate_server,
+          '--priority',
+          priority,
+          '--deadline',
+          deadline,
+          '--dimension',
+          'id',
+          bot,
+          '--task-name',
+          task_name,
+          '-s',
+          isolated_hash,
       ]
       for k, v in sorted(dimensions.items()):
         cmd.extend(('-d', k, v))
@@ -182,9 +211,8 @@ def run_serial(
   return result
 
 
-def run_parallel(
-    swarming_server, isolate_server, dimensions, env, priority, deadline,
-    repeat, isolated_hash, name, bots, args):
+def run_parallel(swarming_server, isolate_server, dimensions, env, priority,
+                 deadline, repeat, isolated_hash, name, bots, args):
   tasks = []
   for i in range(repeat):
     suffix = '/%d' % i if repeat > 1 else ''
@@ -209,9 +237,10 @@ def main():
             '-- [script.py arguments]',
       version=__version__)
   parser.add_option(
-      '--serial', action='store_true',
+      '--serial',
+      action='store_true',
       help='Runs the task serially, to be used when debugging problems since '
-           'it\'s slow')
+      'it\'s slow')
   parser.add_option(
       '--batches', type='int', default=0,
       help='Runs a task in parallel |batches| at a time.')
@@ -240,18 +269,13 @@ def main():
   # 1. Archive the script to run.
   if not os.path.exists(args[0]):
     if not options.name:
-      parser.error(
-          'Please provide --name when using an isolated hash.')
+      parser.error('Please provide --name when using an isolated hash.')
     if len(args[0]) not in (40, 64):
-      parser.error(
-          'Hash wrong length %d (%r)' % (len(args.hash), args[0]))
+      parser.error('Hash wrong length %d (%r)' % (len(args.hash), args[0]))
     for i, c in enumerate(args[0]):
       if c not in string.hexdigits:
-        parser.error(
-            'Hash character invalid\n'
-            ' %s\n' % args[0] +
-            ' '+'-'*i+'^\n'
-            )
+        parser.error('Hash character invalid\n'
+                     ' %s\n' % args[0] + ' ' + '-' * i + '^\n')
 
     isolated_hash = args[0]
     name = options.name
@@ -274,48 +298,22 @@ def main():
 
   # 3. Trigger the tasks.
   if options.batches > 0:
-    return run_batches(
-        options.swarming,
-        options.isolate_server,
-        options.dimensions,
-        options.tags,
-        options.env,
-        str(options.priority),
-        str(options.deadline),
-        options.batches,
-        options.repeat,
-        isolated_hash,
-        name,
-        bots,
-        args[1:])
+    return run_batches(options.swarming, options.isolate_server,
+                       options.dimensions, options.tags, options.env,
+                       str(options.priority), str(
+                           options.deadline), options.batches, options.repeat,
+                       isolated_hash, name, bots, args[1:])
 
   if options.serial:
-    return run_serial(
-        options.swarming,
-        options.isolate_server,
-        options.dimensions,
-        options.tags,
-        options.env,
-        str(options.priority),
-        str(options.deadline),
-        options.repeat,
-        isolated_hash,
-        name,
-        bots,
-        args[1:])
+    return run_serial(options.swarming, options.isolate_server,
+                      options.dimensions, options.tags, options.env,
+                      str(options.priority), str(options.deadline),
+                      options.repeat, isolated_hash, name, bots, args[1:])
 
-  return run_parallel(
-      options.swarming,
-      options.isolate_server,
-      options.dimensions,
-      options.env,
-      str(options.priority),
-      str(options.deadline),
-      options.repeat,
-      isolated_hash,
-      name,
-      bots,
-      args[1:])
+  return run_parallel(options.swarming, options.isolate_server,
+                      options.dimensions, options.env, str(options.priority),
+                      str(options.deadline), options.repeat, isolated_hash,
+                      name, bots, args[1:])
 
 
 if __name__ == '__main__':

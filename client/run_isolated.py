@@ -995,14 +995,13 @@ def run_tha_test(data, result_json):
   if result['outputs_ref']:
     # pylint: disable=unsubscriptable-object
     data = {
-      'hash': result['outputs_ref']['isolated'],
-      'namespace': result['outputs_ref']['namespace'],
-      'storage': result['outputs_ref']['isolatedserver'],
+        'hash': result['outputs_ref']['isolated'],
+        'namespace': result['outputs_ref']['namespace'],
+        'storage': result['outputs_ref']['isolatedserver'],
     }
     sys.stdout.flush()
-    print(
-        '[run_isolated_out_hack]%s[/run_isolated_out_hack]' %
-        tools.format_json(data, dense=True))
+    print('[run_isolated_out_hack]%s[/run_isolated_out_hack]' %
+          tools.format_json(data, dense=True))
     sys.stdout.flush()
   return result['exit_code'] or int(bool(result['internal_failure']))
 
@@ -1140,23 +1139,23 @@ def install_client_and_packages(run_dir, packages, service_url,
     file_path.make_tree_files_read_only(run_dir)
 
     total_duration = time.time() - start
-    logging.info(
-        'Installing CIPD client and packages took %d seconds', total_duration)
+    logging.info('Installing CIPD client and packages took %d seconds',
+                 total_duration)
 
     yield CipdInfo(
-      client=client,
-      cache_dir=cipd_cache_dir,
-      stats={
-        'duration': total_duration,
-        'get_client_duration': get_client_duration,
-      },
-      pins={
-        'client_package': {
-          'package_name': client.package_name,
-          'version': client.instance_id,
+        client=client,
+        cache_dir=cipd_cache_dir,
+        stats={
+            'duration': total_duration,
+            'get_client_duration': get_client_duration,
         },
-        'packages': package_pins,
-      })
+        pins={
+            'client_package': {
+                'package_name': client.package_name,
+                'version': client.instance_id,
+            },
+            'packages': package_pins,
+        })
 
 
 def create_option_parser():
@@ -1165,61 +1164,70 @@ def create_option_parser():
       version=__version__,
       log_file=RUN_ISOLATED_LOG_FILE)
   parser.add_option(
-      '--clean', action='store_true',
+      '--clean',
+      action='store_true',
       help='Cleans the cache, trimming it necessary and remove corrupted items '
-           'and returns without executing anything; use with -v to know what '
-           'was done')
+      'and returns without executing anything; use with -v to know what '
+      'was done')
   parser.add_option(
       '--json',
       help='dump output metadata to json file. When used, run_isolated returns '
-           'non-zero only on internal failure')
+      'non-zero only on internal failure')
   parser.add_option(
       '--hard-timeout', type='float', help='Enforce hard timeout in execution')
   parser.add_option(
-      '--grace-period', type='float',
+      '--grace-period',
+      type='float',
       help='Grace period between SIGTERM and SIGKILL')
   parser.add_option(
-      '--raw-cmd', action='store_true',
+      '--raw-cmd',
+      action='store_true',
       help='Ignore the isolated command, use the one supplied at the command '
-           'line')
+      'line')
   parser.add_option(
       '--relative-cwd',
       help='Ignore the isolated \'relative_cwd\' and use this one instead; '
-           'requires --raw-cmd')
+      'requires --raw-cmd')
   parser.add_option(
-      '--env', default=[], action='append',
+      '--env',
+      default=[],
+      action='append',
       help='Environment variables to set for the child process')
   parser.add_option(
-      '--env-prefix', default=[], action='append',
+      '--env-prefix',
+      default=[],
+      action='append',
       help='Specify a VAR=./path/fragment to put in the environment variable '
-           'before executing the command. The path fragment must be relative '
-           'to the isolated run directory, and must not contain a `..` token. '
-           'The path will be made absolute and prepended to the indicated '
-           '$VAR using the OS\'s path separator. Multiple items for the same '
-           '$VAR will be prepended in order.')
+      'before executing the command. The path fragment must be relative '
+      'to the isolated run directory, and must not contain a `..` token. '
+      'The path will be made absolute and prepended to the indicated '
+      '$VAR using the OS\'s path separator. Multiple items for the same '
+      '$VAR will be prepended in order.')
   parser.add_option(
       '--bot-file',
       help='Path to a file describing the state of the host. The content is '
-           'defined by on_before_task() in bot_config.')
+      'defined by on_before_task() in bot_config.')
   parser.add_option(
       '--switch-to-account',
       help='If given, switches LUCI_CONTEXT to given logical service account '
-           '(e.g. "task" or "system") before launching the isolated process.')
+      '(e.g. "task" or "system") before launching the isolated process.')
   parser.add_option(
-      '--output', action='append',
+      '--output',
+      action='append',
       help='Specifies an output to return. If no outputs are specified, all '
-           'files located in $(ISOLATED_OUTDIR) will be returned; '
-           'otherwise, outputs in both $(ISOLATED_OUTDIR) and those '
-           'specified by --output option (there can be multiple) will be '
-           'returned. Note that if a file in OUT_DIR has the same path '
-           'as an --output option, the --output version will be returned.')
+      'files located in $(ISOLATED_OUTDIR) will be returned; '
+      'otherwise, outputs in both $(ISOLATED_OUTDIR) and those '
+      'specified by --output option (there can be multiple) will be '
+      'returned. Note that if a file in OUT_DIR has the same path '
+      'as an --output option, the --output version will be returned.')
   parser.add_option(
-      '-a', '--argsfile',
+      '-a',
+      '--argsfile',
       # This is actually handled in parse_args; it's included here purely so it
       # can make it into the help text.
       help='Specify a file containing a JSON array of arguments to this '
-           'script. If --argsfile is provided, no other argument may be '
-           'provided on the command line.')
+      'script. If --argsfile is provided, no other argument may be '
+      'provided on the command line.')
 
   group = optparse.OptionGroup(parser, 'Data source')
   group.add_option(
@@ -1240,12 +1248,13 @@ def create_option_parser():
       nargs=3,
       default=[],
       help='A named cache to request. Accepts 3 arguments: name, path, hint. '
-           'name identifies the cache, must match regex [a-z0-9_]{1,4096}. '
-           'path is a path relative to the run dir where the cache directory '
-           'must be put to. '
-           'This option can be specified more than once.')
+      'name identifies the cache, must match regex [a-z0-9_]{1,4096}. '
+      'path is a path relative to the run dir where the cache directory '
+      'must be put to. '
+      'This option can be specified more than once.')
   group.add_option(
-      '--named-cache-root', default='named_caches',
+      '--named-cache-root',
+      default='named_caches',
       help='Cache root directory. Default=%default')
   parser.add_option_group(group)
 
@@ -1254,14 +1263,19 @@ def create_option_parser():
       '--lower-priority', action='store_true',
       help='Lowers the child process priority')
   parser.add_option(
-      '--containment-type', choices=('NONE', 'AUTO', 'JOB_OBJECT'),
+      '--containment-type',
+      choices=('NONE', 'AUTO', 'JOB_OBJECT'),
       default='NONE',
       help='Type of container to use')
   parser.add_option(
-      '--limit-processes', type='int', default=0,
+      '--limit-processes',
+      type='int',
+      default=0,
       help='Maximum number of active processes in the containment')
   parser.add_option(
-      '--limit-total-committed-memory', type='int', default=0,
+      '--limit-total-committed-memory',
+      type='int',
+      default=0,
       help='Maximum sum of committed memory in the containment')
   parser.add_option_group(group)
 
@@ -1270,9 +1284,8 @@ def create_option_parser():
       '--leak-temp-dir',
       action='store_true',
       help='Deliberately leak isolate\'s temp dir for later examination. '
-           'Default: %default')
-  group.add_option(
-      '--root-dir', help='Use a directory instead of a random one')
+      'Default: %default')
+  group.add_option('--root-dir', help='Use a directory instead of a random one')
   parser.add_option_group(group)
 
   auth.add_auth_options(parser)
@@ -1464,8 +1477,8 @@ def main(args):
     opath = os.path.normpath(opath)
     if not os.path.realpath(os.path.join(cwd, opath)).startswith(cwd):
       parser.error(
-        '--env-prefix %r path is bad, must be relative and not contain `..`.'
-        % opath)
+          '--env-prefix %r path is bad, must be relative and not contain `..`.'
+          % opath)
     prefixes.setdefault(key, []).append(opath)
   options.env_prefix = prefixes
 
@@ -1571,10 +1584,8 @@ def main(args):
         assert storage.server_ref.hash_algo == server_ref.hash_algo
         return run_tha_test(data, options.json)
     return run_tha_test(data, options.json)
-  except (
-      cipd.Error,
-      local_caching.NamedCacheError,
-      local_caching.NoMoreSpace) as ex:
+  except (cipd.Error, local_caching.NamedCacheError,
+          local_caching.NoMoreSpace) as ex:
     print(ex.message, file=sys.stderr)
     return 1
 

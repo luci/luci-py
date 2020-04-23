@@ -232,9 +232,9 @@ def match_configs(expr, config_variables, all_configs):
 def verify_variables(variables):
   """Verifies the |variables| dictionary is in the expected format."""
   VALID_VARIABLES = [
-    'command',
-    'files',
-    'read_only',
+      'command',
+      'files',
+      'read_only',
   ]
   assert isinstance(variables, dict), variables
   assert set(VALID_VARIABLES).issuperset(set(variables)), variables.keys()
@@ -391,9 +391,12 @@ class ConfigSettings(object):
       return sorted(l + list(map(rebase_item, r)))
 
     var = {
-      'command': self.command or rhs.command,
-      'files': map_both(self.files, rhs.files),
-      'read_only': rhs.read_only if self.read_only is None else self.read_only,
+        'command':
+            self.command or rhs.command,
+        'files':
+            map_both(self.files, rhs.files),
+        'read_only':
+            rhs.read_only if self.read_only is None else self.read_only,
     }
     return ConfigSettings(var, l_rel_cwd)
 
@@ -455,6 +458,7 @@ class Configs(object):
   configuration selected. It is implicitly dependent on which .isolate defines
   the 'command' that will take effect.
   """
+
   def __init__(self, file_comment, config_variables):
     self.file_comment = file_comment
     # Contains the names of the config variables seen while processing
@@ -534,9 +538,8 @@ class Configs(object):
     return dict((k, v.flatten()) for k, v in self._by_config.items())
 
   def __str__(self):
-    return 'Configs(%s,%s)' % (
-      self._config_variables,
-      ''.join('\n  %s' % str(f) for f in self._by_config))
+    return 'Configs(%s,%s)' % (self._config_variables, ''.join(
+        '\n  %s' % str(f) for f in self._by_config))
 
 
 def load_included_isolate(isolate_dir, isolate_path):

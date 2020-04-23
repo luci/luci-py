@@ -13,6 +13,7 @@ TESTS_DIR = os.path.join(THIS_DIR, 'tests')
 LUCI_DIR = os.path.dirname(THIS_DIR)
 COMPONENTS_DIR = os.path.join(LUCI_DIR, 'appengine', 'components')
 
+
 def main():
   sys.path.insert(0, COMPONENTS_DIR)
 

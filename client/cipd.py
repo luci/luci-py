@@ -34,13 +34,12 @@ EXECUTABLE_SUFFIX = '.exe' if sys.platform == 'win32' else ''
 
 
 if sys.platform == 'win32':
+
   def _ensure_batfile(client_path):
     base, _ = os.path.splitext(client_path)
-    with open(base+".bat", 'w') as f:
+    with open(base + ".bat", 'w') as f:
       f.write('\n'.join([  # python turns \n into CRLF
-        '@set CIPD="%~dp0cipd.exe"',
-        '@shift',
-        '@%CIPD% %*'
+          '@set CIPD="%~dp0cipd.exe"', '@shift', '@%CIPD% %*'
       ]))
 else:
   def _ensure_batfile(_client_path):
@@ -61,37 +60,37 @@ def add_cipd_options(parser):
   group.add_option(
       '--cipd-server',
       help='URL of the CIPD server. '
-           'Only relevant with --cipd-enabled or --cipd-package.')
+      'Only relevant with --cipd-enabled or --cipd-package.')
   group.add_option(
       '--cipd-client-package',
       help='Package name of CIPD client with optional parameters described in '
-           '--cipd-package help. '
-           'Only relevant with --cipd-enabled or --cipd-package. '
-           'Default: "%default"',
+      '--cipd-package help. '
+      'Only relevant with --cipd-enabled or --cipd-package. '
+      'Default: "%default"',
       default='infra/tools/cipd/${platform}')
   group.add_option(
       '--cipd-client-version',
       help='Version of CIPD client. '
-           'Only relevant with --cipd-enabled or --cipd-package. '
-           'Default: "%default"',
+      'Only relevant with --cipd-enabled or --cipd-package. '
+      'Default: "%default"',
       default='latest')
   group.add_option(
       '--cipd-package',
       dest='cipd_packages',
       help='A CIPD package to install. '
-           'Format is "<path>:<package_name>:<version>". '
-           '"path" is installation directory relative to run_dir, '
-           'defaults to ".". '
-           '"package_name" may have ${platform} parameter: it will be '
-           'expanded to "<os>-<architecture>". '
-           'The option can be specified multiple times.',
+      'Format is "<path>:<package_name>:<version>". '
+      '"path" is installation directory relative to run_dir, '
+      'defaults to ".". '
+      '"package_name" may have ${platform} parameter: it will be '
+      'expanded to "<os>-<architecture>". '
+      'The option can be specified multiple times.',
       action='append',
       default=[])
   group.add_option(
       '--cipd-cache',
       help='CIPD cache directory, separate from isolate cache. '
-           'Only relevant with --cipd-enabled or --cipd-package. '
-           'Default: "%default".',
+      'Only relevant with --cipd-enabled or --cipd-package. '
+      'Default: "%default".',
       default='')
   parser.add_option_group(group)
 
@@ -143,8 +142,12 @@ class CipdClient(object):
     self.instance_id = instance_id
     self.service_url = service_url
 
-  def ensure(
-      self, site_root, packages, cache_dir=None, tmp_dir=None, timeout=None):
+  def ensure(self,
+             site_root,
+             packages,
+             cache_dir=None,
+             tmp_dir=None,
+             timeout=None):
     """Ensures that packages installed in |site_root| equals |packages| set.
 
     Blocking call.
@@ -170,15 +173,15 @@ class CipdClient(object):
     ensure_file_handle, ensure_file_path = tempfile.mkstemp(
         dir=tmp_dir, prefix=u'cipd-ensure-file-', suffix='.txt')
     json_out_file_handle, json_file_path = tempfile.mkstemp(
-      dir=tmp_dir, prefix=u'cipd-ensure-result-', suffix='.json')
+        dir=tmp_dir, prefix=u'cipd-ensure-result-', suffix='.json')
     os.close(json_out_file_handle)
 
     try:
       try:
         for subdir, pkgs in sorted(packages.items()):
           if '\n' in subdir:
-            raise Error(
-              'Could not install packages; subdir %r contains newline' % subdir)
+            raise Error('Could not install packages; subdir %r contains newline'
+                        % subdir)
           os.write(ensure_file_handle, '@Subdir %s\n' % (subdir,))
           for pkg, version in pkgs:
             os.write(ensure_file_handle, '%s %s\n' % (pkg, version))
@@ -186,11 +189,15 @@ class CipdClient(object):
         os.close(ensure_file_handle)
 
       cmd = [
-        self.binary_path, 'ensure',
-        '-root', site_root,
-        '-ensure-file', ensure_file_path,
-        '-verbose',  # this is safe because cipd-ensure does not print a lot
-        '-json-output', json_file_path,
+          self.binary_path,
+          'ensure',
+          '-root',
+          site_root,
+          '-ensure-file',
+          ensure_file_path,
+          '-verbose',  # this is safe because cipd-ensure does not print a lot
+          '-json-output',
+          json_file_path,
       ]
       if cache_dir:
         cmd += ['-cache-dir', cache_dir]
@@ -224,8 +231,8 @@ class CipdClient(object):
       with open(json_file_path) as jfile:
         result_json = json.load(jfile)
       return {
-        subdir: [(x['package'], x['instance_id']) for x in pins]
-        for subdir, pins in result_json['result'].items()
+          subdir: [(x['package'], x['instance_id']) for x in pins
+                  ] for subdir, pins in result_json['result'].items()
       }
     finally:
       fs.remove(ensure_file_path)
@@ -276,9 +283,8 @@ def _check_response(res, fmt, *args):
     raise Error('%s: no response' % (fmt % args))
 
   if res.get('status') != 'SUCCESS':
-    raise Error('%s: %s' % (
-        fmt % args,
-        res.get('error_message') or 'status is %s' % res.get('status')))
+    raise Error('%s: %s' % (fmt % args, res.get('error_message') or
+                            'status is %s' % res.get('status')))
 
 
 def resolve_version(cipd_server, package_name, version, timeout=None):
@@ -310,8 +316,8 @@ def get_client_fetch_url(service_url, package_name, instance_id, timeout=None):
                                               'instance_id': instance_id,
                                           }))
   res = net.url_read_json(url, timeout=timeout)
-  _check_response(
-      res, 'Could not fetch CIPD client %s:%s',package_name, instance_id)
+  _check_response(res, 'Could not fetch CIPD client %s:%s', package_name,
+                  instance_id)
   fetch_url = res.get('client_binary', {}).get('fetch_url')
   if not fetch_url:
     raise Error('Invalid fetchClientBinary response: no fetch_url')
@@ -343,8 +349,8 @@ def _fetch_cipd_client(disk_cache, instance_id, fetch_url, timeoutfn):
     except net.TimeoutError as ex:
       raise Error('Could not fetch CIPD client: %s', ex)
     except net.NetError as ex:
-      logging.warning(
-          'Could not fetch CIPD client on attempt #%d: %s', attempt + 1, ex)
+      logging.warning('Could not fetch CIPD client on attempt #%d: %s',
+                      attempt + 1, ex)
 
   raise Error('Could not fetch CIPD client after 5 retries')
 

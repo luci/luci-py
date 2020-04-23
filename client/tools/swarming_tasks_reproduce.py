@@ -18,14 +18,18 @@ import tempfile
 
 from six.moves import urllib
 
-CLIENT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(
-    __file__.decode(sys.getfilesystemencoding()))))
+CLIENT_DIR = os.path.dirname(
+    os.path.dirname(
+        os.path.abspath(__file__.decode(sys.getfilesystemencoding()))))
 
 
 def capture_swarming(server, cmd, *args):
   cmd = [
-    sys.executable,
-    os.path.join(CLIENT_DIR, 'swarming.py'), cmd, '-S', server,
+      sys.executable,
+      os.path.join(CLIENT_DIR, 'swarming.py'),
+      cmd,
+      '-S',
+      server,
   ]
   cmd.extend(args)
   logging.info('%s', ' '.join(args))
@@ -57,15 +61,25 @@ def reproduce(server_old, server_new, task_id):
     print('Can\'t reproduce task %s with secrets' % task_id, file=sys.stderr)
     sys.exit(1)
   cmd = [
-    'trigger', '--tag', 'testing:1',
-    '-I', inputs['isolatedserver'],
-    '--namespace', inputs['namespace'],
-    '-s', inputs['isolated'],
-    '--task-name', name,
-    '--priority', '10',
-    '--expiration', request['expiration_secs'],
-    '--hard-timeout', prop['execution_timeout_secs'],
-    '--io-timeout', prop['io_timeout_secs'],
+      'trigger',
+      '--tag',
+      'testing:1',
+      '-I',
+      inputs['isolatedserver'],
+      '--namespace',
+      inputs['namespace'],
+      '-s',
+      inputs['isolated'],
+      '--task-name',
+      name,
+      '--priority',
+      '10',
+      '--expiration',
+      request['expiration_secs'],
+      '--hard-timeout',
+      prop['execution_timeout_secs'],
+      '--io-timeout',
+      prop['io_timeout_secs'],
   ]
   if request.get('service_account'):
     cmd.extend(('--service-account', request['service_account']))

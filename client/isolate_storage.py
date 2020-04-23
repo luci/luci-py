@@ -116,9 +116,11 @@ class Item(object):
   the main thread. It is never used concurrently from multiple threads.
   """
 
-  def __init__(
-      self, digest=None, size=None, high_priority=False,
-      compression_level=6):
+  def __init__(self,
+               digest=None,
+               size=None,
+               high_priority=False,
+               compression_level=6):
     self._digest = digest
     self._size = size
     self._high_priority = high_priority
@@ -418,8 +420,8 @@ class IsolateServer(StorageApi):
         # PUT file to |upload_url|.
         success = self._do_push(push_state, content)
         if not success:
-          raise IOError('Failed to upload file with hash %s to URL %s' % (
-              item.digest, push_state.upload_url))
+          raise IOError('Failed to upload file with hash %s to URL %s' %
+                        (item.digest, push_state.upload_url))
         push_state.uploaded = True
       else:
         logging.info(
@@ -454,14 +456,13 @@ class IsolateServer(StorageApi):
 
     # Request body is a json encoded list of dicts.
     body = {
-        'items': [
-          {
+        'items': [{
             'digest': item.digest,
             'is_isolated': bool(item.high_priority),
             'size': item.size,
-          } for item in items
-        ],
-        'namespace': self._namespace_dict,
+        } for item in items],
+        'namespace':
+            self._namespace_dict,
     }
 
     query_url = '%s/_ah/api/isolateservice/v1/preupload' % self.server_ref.url
@@ -632,6 +633,7 @@ class IsolateServerGrpc(StorageApi):
     self._num_pushes += 1
 
     try:
+
       def chunker():
         # Returns one bit of content at a time
         if (isinstance(content, str)

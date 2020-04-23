@@ -29,9 +29,9 @@ DISK_FILE_CHUNK = 1024 * 1024
 # Sadly, hashlib uses 'shaX' instead of the standard 'sha-X' so explicitly
 # specify the names here.
 SUPPORTED_ALGOS = {
-  'sha-1': hashlib.sha1,
-  'sha-256': hashlib.sha256,
-  'sha-512': hashlib.sha512,
+    'sha-1': hashlib.sha1,
+    'sha-256': hashlib.sha256,
+    'sha-512': hashlib.sha512,
 }
 
 
@@ -471,8 +471,8 @@ def load_isolated(content, algo):
               raise IsolatedError('Expected int, got %r' % subsubvalue)
           elif subsubkey == 'h':
             if not is_valid_hash(subsubvalue, algo):
-              raise IsolatedError('Expected %s, got %r' %
-                                  (algo_name, subsubvalue))
+              raise IsolatedError(
+                  'Expected %s, got %r' % (algo_name, subsubvalue))
           elif subsubkey == 's':
             if not isinstance(subsubvalue, six.integer_types):
               raise IsolatedError('Expected int or long, got %r' % subsubvalue)

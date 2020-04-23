@@ -74,10 +74,20 @@ ITEMS_PER_CONTAINS_QUERIES = (20, 20, 50, 50, 50, 100)
 # A list of already compressed extension types that should not receive any
 # compression before being uploaded.
 ALREADY_COMPRESSED_TYPES = [
-    '7z', 'avi', 'cur', 'gif', 'h264', 'jar', 'jpeg', 'jpg', 'mp4', 'pdf',
-    'png', 'wav', 'zip',
+    '7z',
+    'avi',
+    'cur',
+    'gif',
+    'h264',
+    'jar',
+    'jpeg',
+    'jpg',
+    'mp4',
+    'pdf',
+    'png',
+    'wav',
+    'zip',
 ]
-
 
 # The delay (in seconds) to wait between logging statements when retrieving
 # the required files. This is intended to let the user (or buildbot) know that
@@ -86,10 +96,10 @@ DELAY_BETWEEN_UPDATES_IN_SECS = 30
 
 
 DEFAULT_BLACKLIST = (
-  # Temporary vim or python files.
-  r'^.+\.(?:pyc|swp)$',
-  # .git or .svn directory.
-  r'^(?:.+' + re.escape(os.path.sep) + r'|)\.(?:git|svn)$',
+    # Temporary vim or python files.
+    r'^.+\.(?:pyc|swp)$',
+    # .git or .svn directory.
+    r'^(?:.+' + re.escape(os.path.sep) + r'|)\.(?:git|svn)$',
 )
 
 
@@ -1348,9 +1358,10 @@ def fetch_isolated(isolated_hash, storage, cache, outdir, use_symlinks,
   with tools.Profiler('GetIsolateds'):
     # Optionally support local files by manually adding them to cache.
     if not isolated_format.is_valid_hash(isolated_hash, algo):
-      logging.debug('%s is not a valid hash, assuming a file '
-                    '(algo was %s, hash size was %d)',
-                    isolated_hash, algo(), algo().digest_size)
+      logging.debug(
+          '%s is not a valid hash, assuming a file '
+          '(algo was %s, hash size was %d)', isolated_hash, algo(),
+          algo().digest_size)
       path = six.text_type(os.path.abspath(isolated_hash))
       try:
         isolated_hash = fetch_queue.inject_local_file(path, algo)
@@ -1484,12 +1495,10 @@ def _print_upload_stats(items, missing):
       cache_hit_size * 100. / total_size if total_size else 0)
   cache_miss = missing
   cache_miss_size = sum(f.size for f in cache_miss)
-  logging.info(
-      'cache miss: %6d, %9.1fkiB, %6.2f%% files, %6.2f%% size',
-      len(cache_miss),
-      cache_miss_size / 1024.,
-      len(cache_miss) * 100. / total,
-      cache_miss_size * 100. / total_size if total_size else 0)
+  logging.info('cache miss: %6d, %9.1fkiB, %6.2f%% files, %6.2f%% size',
+               len(cache_miss), cache_miss_size / 1024.,
+               len(cache_miss) * 100. / total,
+               cache_miss_size * 100. / total_size if total_size else 0)
 
 
 def _enqueue_dir(dirpath, blacklist, hash_algo, hash_algo_name):
@@ -1669,13 +1678,22 @@ def CMDdownload(parser, args):
       help='hash of an isolated file, .isolated file content is discarded, use '
            '--file if you need it')
   parser.add_option(
-      '-f', '--file', metavar='HASH DEST', default=[], action='append', nargs=2,
+      '-f',
+      '--file',
+      metavar='HASH DEST',
+      default=[],
+      action='append',
+      nargs=2,
       help='hash and destination of a file, can be used multiple times')
   parser.add_option(
-      '-t', '--target', metavar='DIR', default='download',
+      '-t',
+      '--target',
+      metavar='DIR',
+      default='download',
       help='destination directory')
   parser.add_option(
-      '--use-symlinks', action='store_true',
+      '--use-symlinks',
+      action='store_true',
       help='Use symlinks instead of hardlinks')
   add_cache_options(parser)
   options, args = parser.parse_args(args)
@@ -1710,12 +1728,10 @@ def CMDdownload(parser, args):
         dest = six.text_type(dest)
         pending[digest] = dest
         storage.async_fetch(
-            channel,
-            threading_utils.PRIORITY_MED,
-            digest,
+            channel, threading_utils.PRIORITY_MED, digest,
             local_caching.UNKNOWN_FILE_SIZE,
-            functools.partial(
-                local_caching.file_write, os.path.join(options.target, dest)))
+            functools.partial(local_caching.file_write,
+                              os.path.join(options.target, dest)))
       while pending:
         fetched = channel.next()
         dest = pending.pop(fetched)
@@ -1758,7 +1774,8 @@ def add_isolate_server_options(parser):
   parser.add_option(
       '--grpc-proxy', help='gRPC proxy by which to communicate to Isolate')
   parser.add_option(
-      '--namespace', default='default-gzip',
+      '--namespace',
+      default='default-gzip',
       help='The namespace to use on the Isolate Server, default: %default')
 
 
@@ -1814,7 +1831,7 @@ def add_cache_options(parser):
       metavar='NNN',
       default=100000,
       help='Trim if more than this number of items are in the cache '
-           'default=%default')
+      'default=%default')
   parser.add_option_group(cache_group)
 
 
@@ -1825,7 +1842,7 @@ def process_cache_options(options, trim, **kwargs):
         options.min_free_space,
         options.max_items,
         # 3 weeks.
-        max_age_secs=21*24*60*60)
+        max_age_secs=21 * 24 * 60 * 60)
 
     # |options.cache| path may not exist until DiskContentAddressedCache()
     # instance is created.
@@ -1835,6 +1852,7 @@ def process_cache_options(options, trim, **kwargs):
 
 
 class OptionParserIsolateServer(logging_utils.OptionParserWithLogging):
+
   def __init__(self, **kwargs):
     logging_utils.OptionParserWithLogging.__init__(
         self,

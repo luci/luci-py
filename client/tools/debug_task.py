@@ -12,8 +12,9 @@ import subprocess
 import sys
 import tempfile
 
-CLIENT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(
-    __file__.decode(sys.getfilesystemencoding()))))
+CLIENT_DIR = os.path.dirname(
+    os.path.dirname(
+        os.path.abspath(__file__.decode(sys.getfilesystemencoding()))))
 
 
 # URL to point people to. *Chromium specific*
@@ -41,7 +42,11 @@ class Failed(Exception):
 def retrieve_task_props(swarming, taskid):
   """Retrieves the task request metadata."""
   cmd = [
-      sys.executable, 'swarming.py', 'query', '-S', swarming,
+      sys.executable,
+      'swarming.py',
+      'query',
+      '-S',
+      swarming,
       'task/%s/request' % taskid,
   ]
   try:
@@ -53,7 +58,11 @@ def retrieve_task_props(swarming, taskid):
 def retrieve_task_results(swarming, taskid):
   """Retrieves the task request metadata."""
   cmd = [
-      sys.executable, 'swarming.py', 'query', '-S', swarming,
+      sys.executable,
+      'swarming.py',
+      'query',
+      '-S',
+      swarming,
       'task/%s/result' % taskid,
   ]
   try:
@@ -66,13 +75,14 @@ def generate_command(swarming, taskid, task, duration):
   """Generats a command that sleep and prints the original command."""
   original = get_swarming_args_from_task(task)
   return [
-    'python', '-c',
-    COMMAND.replace('\n', ';') % {
-      'duration': duration,
-      'original_cmd': ' '.join(original),
-      'task_url': 'https://%s/task?id=%s' % (swarming, taskid),
-      'help_url': URL,
-    },
+      'python',
+      '-c',
+      COMMAND.replace('\n', ';') % {
+          'duration': duration,
+          'original_cmd': ' '.join(original),
+          'task_url': 'https://%s/task?id=%s' % (swarming, taskid),
+          'help_url': URL,
+      },
   ]
 
 
@@ -130,12 +140,14 @@ def trigger(swarming, taskid, task, duration, reuse_bot):
       cmd.extend(('-d', i['key'], i['value']))
 
   if task['properties'].get('inputs_ref'):
-    cmd.extend(
-        [
-          '-s', task['properties']['inputs_ref']['isolated'],
-          '-I', task['properties']['inputs_ref']['isolatedserver'],
-          '--namespace', task['properties']['inputs_ref']['namespace'],
-        ])
+    cmd.extend([
+        '-s',
+        task['properties']['inputs_ref']['isolated'],
+        '-I',
+        task['properties']['inputs_ref']['isolatedserver'],
+        '--namespace',
+        task['properties']['inputs_ref']['namespace'],
+    ])
 
   for i in task['properties'].get('env', []):
     cmd.extend(('--env', i['key'], i['value']))
@@ -160,8 +172,10 @@ def main():
   parser = argparse.ArgumentParser(description=__doc__)
   parser.add_argument('taskid', help='Task\'s input files to map onto the bot')
   parser.add_argument(
-      '-S', '--swarming',
-      metavar='URL', default=os.environ.get('SWARMING_SERVER', ''),
+      '-S',
+      '--swarming',
+      metavar='URL',
+      default=os.environ.get('SWARMING_SERVER', ''),
       help='Swarming server to use')
   parser.add_argument(
       '-r', '--reuse-bot', action='store_true',
