@@ -23,7 +23,9 @@ def get_logs(root, pseudo_revision, mergebase, start, end):
   if end is not None:
     end_ref += '~%d' % (pseudo_revision - end)
   refspec = '%s..%s' % (start_ref, end_ref)
-  cmd = ['git', 'log', refspec, '--date=short', '--format=%ad %ae %s']
+  cmd = [
+      'git', '--no-pager', 'log', refspec, '--date=short', '--format=%ad %ae %s'
+  ]
   nb_commits = (end or pseudo_revision) - start
   try:
     log = subprocess.check_output(cmd, cwd=root)
