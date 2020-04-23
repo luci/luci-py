@@ -1592,8 +1592,22 @@ def archive_files_to_storage(storage, files, blacklist, verify_push=False):
     channel.send_done()
   t.join()
   exc_channel.send_done()
-  for _ in exc_channel:
-    pass
+
+  try:
+    for _ in exc_channel:
+      pass
+  except Exception:
+    # log items when failed to upload files.
+    for item in items_found:
+      if isinstance(item, FileItem):
+        logging.error('FileItem path: %s, digest:%s, re-calculated digest:%s',
+                      item.path, item.digest,
+                      isolated_format.hash_file(item.path, item.algo))
+        continue
+
+      logging.error('Item digest:%s', item.digest)
+
+    raise
 
   cold = []
   hot = []
