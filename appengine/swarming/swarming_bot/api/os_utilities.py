@@ -47,47 +47,46 @@ from utils import fs
 
 # https://cloud.google.com/compute/pricing#machinetype
 GCE_MACHINE_COST_HOUR_US = {
-  u'n1-standard-1': 0.050,
-  u'n1-standard-2': 0.100,
-  u'n1-standard-4': 0.200,
-  u'n1-standard-8': 0.400,
-  u'n1-standard-16': 0.800,
-  u'n1-standard-32': 1.600,
-  u'f1-micro': 0.008,
-  u'g1-small': 0.027,
-  u'n1-highmem-2': 0.126,
-  u'n1-highmem-4': 0.252,
-  u'n1-highmem-8': 0.504,
-  u'n1-highmem-16': 1.008,
-  u'n1-highmem-32': 2.016,
-  u'n1-highcpu-2': 0.076,
-  u'n1-highcpu-4': 0.152,
-  u'n1-highcpu-8': 0.304,
-  u'n1-highcpu-16': 0.608,
-  u'n1-highcpu-32': 1.216,
+    u'n1-standard-1': 0.050,
+    u'n1-standard-2': 0.100,
+    u'n1-standard-4': 0.200,
+    u'n1-standard-8': 0.400,
+    u'n1-standard-16': 0.800,
+    u'n1-standard-32': 1.600,
+    u'f1-micro': 0.008,
+    u'g1-small': 0.027,
+    u'n1-highmem-2': 0.126,
+    u'n1-highmem-4': 0.252,
+    u'n1-highmem-8': 0.504,
+    u'n1-highmem-16': 1.008,
+    u'n1-highmem-32': 2.016,
+    u'n1-highcpu-2': 0.076,
+    u'n1-highcpu-4': 0.152,
+    u'n1-highcpu-8': 0.304,
+    u'n1-highcpu-16': 0.608,
+    u'n1-highcpu-32': 1.216,
 }
-
 
 # https://cloud.google.com/compute/pricing#machinetype
 GCE_MACHINE_COST_HOUR_EUROPE_ASIA = {
-  u'n1-standard-1': 0.055,
-  u'n1-standard-2': 0.110,
-  u'n1-standard-4': 0.220,
-  u'n1-standard-8': 0.440,
-  u'n1-standard-16': 0.880,
-  u'n1-standard-32': 1.760,
-  u'f1-micro': 0.009,
-  u'g1-small': 0.030,
-  u'n1-highmem-2': 0.139,
-  u'n1-highmem-4': 0.278,
-  u'n1-highmem-8': 0.556,
-  u'n1-highmem-16': 1.112,
-  u'n1-highmem-32': 2.224,
-  u'n1-highcpu-2': 0.084,
-  u'n1-highcpu-4': 0.168,
-  u'n1-highcpu-8': 0.336,
-  u'n1-highcpu-16': 0.672,
-  u'n1-highcpu-32': 1.344,
+    u'n1-standard-1': 0.055,
+    u'n1-standard-2': 0.110,
+    u'n1-standard-4': 0.220,
+    u'n1-standard-8': 0.440,
+    u'n1-standard-16': 0.880,
+    u'n1-standard-32': 1.760,
+    u'f1-micro': 0.009,
+    u'g1-small': 0.030,
+    u'n1-highmem-2': 0.139,
+    u'n1-highmem-4': 0.278,
+    u'n1-highmem-8': 0.556,
+    u'n1-highmem-16': 1.112,
+    u'n1-highmem-32': 2.224,
+    u'n1-highcpu-2': 0.084,
+    u'n1-highcpu-4': 0.168,
+    u'n1-highcpu-8': 0.336,
+    u'n1-highcpu-16': 0.672,
+    u'n1-highcpu-32': 1.344,
 }
 
 
@@ -776,8 +775,9 @@ def get_timeseries_data(name, project, service_account, **kwargs):
     GetTimeseriesDataFailure
   """
   params = {
-      'youngest': kwargs.get('youngest') or time.strftime(
-          '%Y-%m-%dT%H:%M:%SZ', time.gmtime())
+      'youngest':
+          kwargs.get('youngest')
+          or time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
   }
   if kwargs.get('count'):
     params['count'] = kwargs['count']
@@ -1049,32 +1049,32 @@ def get_state():
   except OSError:
     nb_files_in_temp = 'N/A'
   state = {
-    u'audio': get_audio(),
-    u'cpu_name': get_cpuinfo().get(u'name'),
-    u'cost_usd_hour': get_cost_hour(),
-    u'cwd': file_path.get_native_path_case(os.getcwd().decode('utf-8')),
-    u'disks': get_disks_info(),
-    # Only including a subset of the environment variable, as state is not
-    # designed to sustain large load at the moment.
-    u'env': {
-      u'PATH': os.environ[u'PATH'].decode('utf-8'),
-    },
-    u'gpu': get_gpu()[1],
-    u'hostname': get_hostname(),
-    u'ip': get_ip(),
-    u'nb_files_in_temp': nb_files_in_temp,
-    u'pid': os.getpid(),
-    u'python': {
-      u'executable': sys.executable.decode('utf-8'),
-      u'packages': get_python_packages(),
-      u'version': sys.version.decode('utf-8'),
-    },
-    u'ram': get_physical_ram(),
-    u'running_time': int(round(time.time() - _STARTED_TS)),
-    u'ssd': list(get_ssd()),
-    u'started_ts': int(round(_STARTED_TS)),
-    u'uptime': int(round(get_uptime())),
-    u'user': getpass.getuser().decode('utf-8'),
+      u'audio': get_audio(),
+      u'cpu_name': get_cpuinfo().get(u'name'),
+      u'cost_usd_hour': get_cost_hour(),
+      u'cwd': file_path.get_native_path_case(os.getcwd().decode('utf-8')),
+      u'disks': get_disks_info(),
+      # Only including a subset of the environment variable, as state is not
+      # designed to sustain large load at the moment.
+      u'env': {
+          u'PATH': os.environ[u'PATH'].decode('utf-8'),
+      },
+      u'gpu': get_gpu()[1],
+      u'hostname': get_hostname(),
+      u'ip': get_ip(),
+      u'nb_files_in_temp': nb_files_in_temp,
+      u'pid': os.getpid(),
+      u'python': {
+          u'executable': sys.executable.decode('utf-8'),
+          u'packages': get_python_packages(),
+          u'version': sys.version.decode('utf-8'),
+      },
+      u'ram': get_physical_ram(),
+      u'running_time': int(round(time.time() - _STARTED_TS)),
+      u'ssd': list(get_ssd()),
+      u'started_ts': int(round(_STARTED_TS)),
+      u'uptime': int(round(get_uptime())),
+      u'user': getpass.getuser().decode('utf-8'),
   }
   if get_reboot_required():
     state[u'reboot_required'] = True
@@ -1182,8 +1182,8 @@ def setup_auto_startup_win(command, cwd, batch_name):
       '\r\n'
       'echo Running: %(command)s\r\n'
       '%(command)s 1>> logs\\bot_stdout.log 2>&1\r\n') % {
-        'root': cwd,
-        'command': ' '.join(command)
+          'root': cwd,
+          'command': ' '.join(command)
       }
   success = _write(batch_path, content)
   if success and sys.platform == 'cygwin':

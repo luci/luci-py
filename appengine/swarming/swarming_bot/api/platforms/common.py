@@ -24,5 +24,5 @@ def _safe_parse(content, split=': '):
   return values
 
 
-ComputerSystemInfo = namedtuple('ComputerSystemInfo', [
-    'name', 'vendor', 'version', 'serial'])
+ComputerSystemInfo = namedtuple('ComputerSystemInfo',
+                                ['name', 'vendor', 'version', 'serial'])

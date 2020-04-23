@@ -38,14 +38,21 @@ iokit = ctypes.CDLL(
     '/System/Library/Frameworks/IOKit.framework/Versions/A/IOKit')
 # https://developer.apple.com/documentation/iokit/1514274-ioconnectcallstructmethod
 iokit.IOConnectCallStructMethod.argtypes = [
-    ctypes.c_uint, ctypes.c_uint, ctypes.c_void_p, ctypes.c_ulonglong,
-    ctypes.c_void_p, ctypes.POINTER(ctypes.c_ulonglong),
+    ctypes.c_uint,
+    ctypes.c_uint,
+    ctypes.c_void_p,
+    ctypes.c_ulonglong,
+    ctypes.c_void_p,
+    ctypes.POINTER(ctypes.c_ulonglong),
 ]
 iokit.IOConnectCallStructMethod.restype = ctypes.c_int
 
 # https://developer.apple.com/documentation/iokit/1514515-ioserviceopen
 iokit.IOServiceOpen.argtypes = [
-    ctypes.c_uint, ctypes.c_uint, ctypes.c_uint, ctypes.POINTER(ctypes.c_uint),
+    ctypes.c_uint,
+    ctypes.c_uint,
+    ctypes.c_uint,
+    ctypes.POINTER(ctypes.c_uint),
 ]
 iokit.IOServiceOpen.restype = ctypes.c_int
 
@@ -128,94 +135,94 @@ class _SMC_Value(ctypes.Structure):
 # their signification is unknown:
 #   TC0E, TC0F, TH0A, TH0B, TH0V, TP0P, TS0D, TS0P
 _sensor_names = {
-  'TA0P': u'ambient', # u'hdd bay 1',
-  #'TA0S': u'pci slot 1 pos 1',
-  #'TA1S': u'pci slot 1 pos 2',
-  #'TA3S': u'pci slot 2 pos 2',
-  'TB0T': u'enclosure bottom',
-  #'TB2T': u'enclosure bottom 3',
-  #'TC0D': u'cpu0 die core',
-  'TC0P': u'cpu', # u'cpu0 proximity'
-  #'TC1D': u'cpu1',
-  #'TCAH': u'cpu0',
-  #'TCDH': u'cpu3',
-  'TG0D': u'gpu', # u'gpu0 diode',
-  #'TG0P': u'gpu0 proximity',
-  #'TG1H': u'gpu heatsink 2',
-  #'TH0P': u'hdd bay 1',
-  #'TH2P': u'hdd bay 3',
-  #'TL0P': u'lcd proximity',
-  #'TM0P': u'mem bank a1',
-  #'TM1P': u'mem bank a2',
-  #'TM2P': u'mem bank a3',
-  #'TM3P': u'mem bank a4',
-  #'TM4P': u'mem bank a5',
-  #'TM5P': u'mem bank a6',
-  #'TM6P': u'mem bank a7',
-  #'TM7P': u'mem bank a8',
-  #'TM8P': u'mem bank b1',
-  #'TM9P': u'mem bank b2',
-  #'TMA1': u'ram a1',
-  #'TMA3': u'ram a3',
-  #'TMAP': u'mem bank b3',
-  #'TMB1': u'ram b1',
-  #'TMB3': u'ram b3',
-  #'TMBP': u'mem bank b4',
-  #'TMCP': u'mem bank b5',
-  #'TMDP': u'mem bank b6',
-  #'TMEP': u'mem bank b7',
-  #'TMFP': u'mem bank b8',
-  #'TN0D': u'northbridge die core',
-  #'TN0P': u'northbridge proximity',
-  #'TO0P': u'optical drive',
-  #'TW0P': u'wireless airport card',
-  #'Th0H': u'main heatsink a',
-  #'Th2H': u'main heatsink c',
-  #'Tm0P': u'memory controller',
-  'Tp0C': u'power supply',
-  #'Tp1C': u'power supply 2',
-  #'Tp2P': u'power supply 3',
-  #'Tp4P': u'power supply 5',
-  #'TA1P': u'ambient 2',
-  #'TA2S': u'pci slot 2 pos 1',
-  #'TB1T': u'enclosure bottom 2',
-  #'TB3T': u'enclosure bottom 4',
-  #'TC0H': u'cpu0 heatsink',
-  #'TC2D': u'cpu2',
-  #'TC3D': u'cpu3',
-  #'TCBH': u'cpu1',
-  #'TCCH': u'cpu2',
-  #'TG0H': u'gpu0 heatsink',
-  #'TH1P': u'hdd bay 2',
-  #'TH3P': u'hdd bay 4',
-  #'TM0S': u'mem module a1',
-  #'TM1S': u'mem module a2',
-  #'TM2S': u'mem module a3',
-  #'TM3S': u'mem module a4',
-  #'TM4S': u'mem module a5',
-  #'TM5S': u'mem module a6',
-  #'TM6S': u'mem module a7',
-  #'TM7S': u'mem module a8',
-  #'TM8S': u'mem module b1',
-  #'TM9S': u'mem module b2',
-  #'TMA2': u'ram a2',
-  #'TMA4': u'ram a4',
-  #'TMAS': u'mem module b3',
-  #'TMB2': u'ram b2',
-  #'TMB4': u'ram b4',
-  #'TMBS': u'mem module b4',
-  #'TMCS': u'mem module b5',
-  #'TMDS': u'mem module b6',
-  #'TMES': u'mem module b7',
-  #'TMFS': u'mem module b8',
-  #'TN0H': u'northbridge',
-  #'TN1P': u'northbridge 2',
-  #'TS0C': u'expansion slots',
-  #'Th1H': u'main heatsink b',
-  #'Tp0P': u'power supply 1',
-  #'Tp1P': u'power supply 2',
-  #'Tp3P': u'power supply 4',
-  #'Tp5P': u'power supply 6',
+    'TA0P': u'ambient',  # u'hdd bay 1',
+    #'TA0S': u'pci slot 1 pos 1',
+    #'TA1S': u'pci slot 1 pos 2',
+    #'TA3S': u'pci slot 2 pos 2',
+    'TB0T': u'enclosure bottom',
+    #'TB2T': u'enclosure bottom 3',
+    #'TC0D': u'cpu0 die core',
+    'TC0P': u'cpu',  # u'cpu0 proximity'
+    #'TC1D': u'cpu1',
+    #'TCAH': u'cpu0',
+    #'TCDH': u'cpu3',
+    'TG0D': u'gpu',  # u'gpu0 diode',
+    #'TG0P': u'gpu0 proximity',
+    #'TG1H': u'gpu heatsink 2',
+    #'TH0P': u'hdd bay 1',
+    #'TH2P': u'hdd bay 3',
+    #'TL0P': u'lcd proximity',
+    #'TM0P': u'mem bank a1',
+    #'TM1P': u'mem bank a2',
+    #'TM2P': u'mem bank a3',
+    #'TM3P': u'mem bank a4',
+    #'TM4P': u'mem bank a5',
+    #'TM5P': u'mem bank a6',
+    #'TM6P': u'mem bank a7',
+    #'TM7P': u'mem bank a8',
+    #'TM8P': u'mem bank b1',
+    #'TM9P': u'mem bank b2',
+    #'TMA1': u'ram a1',
+    #'TMA3': u'ram a3',
+    #'TMAP': u'mem bank b3',
+    #'TMB1': u'ram b1',
+    #'TMB3': u'ram b3',
+    #'TMBP': u'mem bank b4',
+    #'TMCP': u'mem bank b5',
+    #'TMDP': u'mem bank b6',
+    #'TMEP': u'mem bank b7',
+    #'TMFP': u'mem bank b8',
+    #'TN0D': u'northbridge die core',
+    #'TN0P': u'northbridge proximity',
+    #'TO0P': u'optical drive',
+    #'TW0P': u'wireless airport card',
+    #'Th0H': u'main heatsink a',
+    #'Th2H': u'main heatsink c',
+    #'Tm0P': u'memory controller',
+    'Tp0C': u'power supply',
+    #'Tp1C': u'power supply 2',
+    #'Tp2P': u'power supply 3',
+    #'Tp4P': u'power supply 5',
+    #'TA1P': u'ambient 2',
+    #'TA2S': u'pci slot 2 pos 1',
+    #'TB1T': u'enclosure bottom 2',
+    #'TB3T': u'enclosure bottom 4',
+    #'TC0H': u'cpu0 heatsink',
+    #'TC2D': u'cpu2',
+    #'TC3D': u'cpu3',
+    #'TCBH': u'cpu1',
+    #'TCCH': u'cpu2',
+    #'TG0H': u'gpu0 heatsink',
+    #'TH1P': u'hdd bay 2',
+    #'TH3P': u'hdd bay 4',
+    #'TM0S': u'mem module a1',
+    #'TM1S': u'mem module a2',
+    #'TM2S': u'mem module a3',
+    #'TM3S': u'mem module a4',
+    #'TM4S': u'mem module a5',
+    #'TM5S': u'mem module a6',
+    #'TM6S': u'mem module a7',
+    #'TM7S': u'mem module a8',
+    #'TM8S': u'mem module b1',
+    #'TM9S': u'mem module b2',
+    #'TMA2': u'ram a2',
+    #'TMA4': u'ram a4',
+    #'TMAS': u'mem module b3',
+    #'TMB2': u'ram b2',
+    #'TMB4': u'ram b4',
+    #'TMBS': u'mem module b4',
+    #'TMCS': u'mem module b5',
+    #'TMDS': u'mem module b6',
+    #'TMES': u'mem module b7',
+    #'TMFS': u'mem module b8',
+    #'TN0H': u'northbridge',
+    #'TN1P': u'northbridge 2',
+    #'TS0C': u'expansion slots',
+    #'Th1H': u'main heatsink b',
+    #'Tp0P': u'power supply 1',
+    #'Tp1P': u'power supply 2',
+    #'Tp3P': u'power supply 4',
+    #'Tp5P': u'power supply 6',
 }
 
 # _sensor_found_cache is set on the first call to _SMC_get_values.
@@ -250,8 +257,7 @@ def _SMC_open():
 def _SMC_call(conn, index, indata, outdata):
   """Executes a call to the SMC subsystem."""
   return iokit.IOConnectCallStructMethod(
-      conn,
-      ctypes.c_uint(index),
+      conn, ctypes.c_uint(index),
       ctypes.cast(ctypes.pointer(indata), ctypes.c_void_p),
       ctypes.c_ulonglong(ctypes.sizeof(_SMC_KeyData)),
       ctypes.cast(ctypes.pointer(outdata), ctypes.c_void_p),
@@ -300,21 +306,18 @@ def _SMC_get_value(conn, key):
         2)
   if t == 'fpe2\0' and val.size == 2:
     # Format is unsigned 14 bits big endian, 2 bits fractional.
-    return round(
-        (float((val.bytes[0] << 6) + (val.bytes[1] >> 2)) +
-        (val.bytes[1] & 3) / 4.),
-        2)
+    return round((float((val.bytes[0] << 6) + (val.bytes[1] >> 2)) +
+                  (val.bytes[1] & 3) / 4.), 2)
   # TODO(maruel): Handler other formats like 64 bits long. This is used for fan
   # speed.
-  logging.error(
-      '_SMC_get_value(%s) got unknown format: %s of %d bytes', key, t, val.size)
+  logging.error('_SMC_get_value(%s) got unknown format: %s of %d bytes', key, t,
+                val.size)
   return None
 
 
 def _get_system_profiler(data_type):
   """Returns an XML about the system display properties."""
-  sp = subprocess.check_output(
-      ['system_profiler', data_type, '-xml'])
+  sp = subprocess.check_output(['system_profiler', data_type, '-xml'])
   return plistlib.readPlistFromString(sp)[0].get('_items', [])
 
 
@@ -330,9 +333,8 @@ def _sysctl(ctl, item, result):
   # http://opensource.apple.com/source/xnu/xnu-1699.24.8/bsd/sys/sysctl.h
   arr = (ctypes.c_int * 2)(ctl, item)
   size = ctypes.c_size_t(ctypes.sizeof(result))
-  _get_libc().sysctl(
-      arr, len(arr), ctypes.byref(result), ctypes.byref(size),
-      ctypes.c_void_p(), ctypes.c_size_t(0))
+  _get_libc().sysctl(arr, len(arr), ctypes.byref(result), ctypes.byref(size),
+                     ctypes.c_void_p(), ctypes.c_size_t(0))
 
 
 class _timeval(ctypes.Structure):
@@ -351,8 +353,8 @@ def _get_xcode_version(xcode_app):
     A tuple of (Xcode version, Xcode build version), or None if
     this is not an Xcode installation.
   """
-  xcodebuild = os.path.join(
-      xcode_app, 'Contents', 'Developer', 'usr', 'bin', 'xcodebuild')
+  xcodebuild = os.path.join(xcode_app, 'Contents', 'Developer', 'usr', 'bin',
+                            'xcodebuild')
   if os.path.exists(xcodebuild):
     try:
       out = subprocess.check_output([xcodebuild, '-version'])
@@ -392,12 +394,12 @@ def get_xcode_state():
       version = _get_xcode_version(xcode_app)
       if version:
         state[xcode_app] = {
-          u'version': version[0],
-          u'build version': version[1],
+            u'version': version[0],
+            u'build version': version[1],
         }
-        device_support_dir = os.path.join(
-            xcode_app, 'Contents', 'Developer', 'Platforms',
-            'iPhoneOS.platform', 'DeviceSupport')
+        device_support_dir = os.path.join(xcode_app, 'Contents', 'Developer',
+                                          'Platforms', 'iPhoneOS.platform',
+                                          'DeviceSupport')
         if os.path.exists(device_support_dir):
           state[xcode_app][u'device support'] = os.listdir(device_support_dir)
   return state
@@ -497,8 +499,9 @@ def get_os_version_number():
 def get_audio():
   """Returns the audio cards that are "connected"."""
   return [
-    card['_name'] for card in _get_system_profiler('SPAudioDataType')
-    if card.get('coreaudio_default_audio_output_device') == 'spaudio_yes'
+      card['_name']
+      for card in _get_system_profiler('SPAudioDataType')
+      if card.get('coreaudio_default_audio_output_device') == 'spaudio_yes'
   ]
 
 
@@ -553,8 +556,8 @@ def get_gpu():
     if version:
       match = re.search(r'([0-9.]+) \[([0-9.]+)\]', version)
       if match:
-        dimensions.add(u'%s:%s-%s-%s' % (
-            ven_id, dev_id, match.group(1), match.group(2)))
+        dimensions.add(
+            u'%s:%s-%s-%s' % (ven_id, dev_id, match.group(1), match.group(2)))
       state.add(u'%s %s %s' % (ven_name, dev_name, version))
     else:
       state.add(u'%s %s' % (ven_name, dev_name))
@@ -568,15 +571,18 @@ def get_cpuinfo():
       subprocess.check_output(['sysctl', 'machdep.cpu']))
   # http://unix.stackexchange.com/questions/43539/what-do-the-flags-in-proc-cpuinfo-mean
   return {
-    u'flags': sorted(
-        i.lower() for i in values[u'machdep.cpu.features'].split()),
-    u'model': [
-      int(values['machdep.cpu.family']), int(values['machdep.cpu.model']),
-      int(values['machdep.cpu.stepping']),
-      int(values['machdep.cpu.microcode_version']),
-    ],
-    u'name': values[u'machdep.cpu.brand_string'],
-    u'vendor': values[u'machdep.cpu.vendor'],
+      u'flags':
+          sorted(i.lower() for i in values[u'machdep.cpu.features'].split()),
+      u'model': [
+          int(values['machdep.cpu.family']),
+          int(values['machdep.cpu.model']),
+          int(values['machdep.cpu.stepping']),
+          int(values['machdep.cpu.microcode_version']),
+      ],
+      u'name':
+          values[u'machdep.cpu.brand_string'],
+      u'vendor':
+          values[u'machdep.cpu.vendor'],
   }
 
 
@@ -736,38 +742,36 @@ def generate_launchd_plist(command, cwd, plistname):
   #    ManPages/man5/launchd.plist.5.html
   escaped_plist = cgi.escape(plistname)
   entries = [
-    '<key>Label</key><string>%s</string>' % escaped_plist,
-    '<key>StandardOutPath</key><string>logs/bot_stdout.log</string>',
-    '<key>StandardErrorPath</key><string>logs/bot_stderr.log</string>',
-    '<key>LimitLoadToSessionType</key><array><string>Aqua</string></array>',
-    '<key>RunAtLoad</key><true/>',
-    '<key>Umask</key><integer>18</integer>',
+      '<key>Label</key><string>%s</string>' % escaped_plist,
+      '<key>StandardOutPath</key><string>logs/bot_stdout.log</string>',
+      '<key>StandardErrorPath</key><string>logs/bot_stderr.log</string>',
+      '<key>LimitLoadToSessionType</key><array><string>Aqua</string></array>',
+      '<key>RunAtLoad</key><true/>',
+      '<key>Umask</key><integer>18</integer>',
 
-    # https://developer.apple.com/library/mac/documentation/Darwin/Reference/ManPages/man5/launchd.plist.5.html
-    # launchd expects the process to call vproc_transaction_begin(), which we
-    # don't. Otherwise it sends SIGKILL instead of SIGTERM, which isn't nice.
-    '<key>EnableTransactions</key>',
-    '<false/>',
-
-    '<key>EnvironmentVariables</key>',
-    '<dict>',
-    '  <key>PATH</key>',
-    # TODO(maruel): Makes it configurable if necessary.
-    '  <string>/opt/local/bin:/opt/local/sbin:/usr/local/sbin'
-    ':/usr/local/git/bin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin</string>',
-    '</dict>',
-
-    '<key>SoftResourceLimits</key>',
-    '<dict>',
-    '  <key>NumberOfFiles</key>',
-    '  <integer>8000</integer>',
-    '</dict>',
-
-    '<key>KeepAlive</key>',
-    '<dict>',
-    '  <key>SuccessfulExit</key>',
-    '  <false/>',
-    '</dict>',
+      # https://developer.apple.com/library/mac/documentation/Darwin/Reference/ManPages/man5/launchd.plist.5.html
+      # launchd expects the process to call vproc_transaction_begin(), which we
+      # don't. Otherwise it sends SIGKILL instead of SIGTERM, which isn't nice.
+      '<key>EnableTransactions</key>',
+      '<false/>',
+      '<key>EnvironmentVariables</key>',
+      '<dict>',
+      '  <key>PATH</key>',
+      # TODO(maruel): Makes it configurable if necessary.
+      '  <string>/opt/local/bin:/opt/local/sbin:/usr/local/sbin'
+      ':/usr/local/git/bin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:'
+      '/bin</string>',
+      '</dict>',
+      '<key>SoftResourceLimits</key>',
+      '<dict>',
+      '  <key>NumberOfFiles</key>',
+      '  <integer>8000</integer>',
+      '</dict>',
+      '<key>KeepAlive</key>',
+      '<dict>',
+      '  <key>SuccessfulExit</key>',
+      '  <false/>',
+      '</dict>',
   ]
   entries.append(
       '<key>Program</key><string>%s</string>' % cgi.escape(command[0]))
@@ -779,12 +783,10 @@ def generate_launchd_plist(command, cwd, plistname):
   entries.append(
       '<key>WorkingDirectory</key><string>%s</string>' % cgi.escape(cwd))
   header = (
-    '<?xml version="1.0" encoding="UTF-8"?>\n'
-    '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" '
-    '"http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n'
-    '<plist version="1.0">\n'
-    '  <dict>\n'
-    + ''.join('    %s\n' % l for l in entries) +
-    '  </dict>\n'
-    '</plist>\n')
+      '<?xml version="1.0" encoding="UTF-8"?>\n'
+      '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" '
+      '"http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n'
+      '<plist version="1.0">\n'
+      '  <dict>\n' + ''.join('    %s\n' % l for l in entries) + '  </dict>\n'
+      '</plist>\n')
   return header

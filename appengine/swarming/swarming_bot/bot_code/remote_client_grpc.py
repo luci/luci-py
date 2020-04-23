@@ -311,8 +311,8 @@ class RemoteClientGrpc(object):
     # that it's what we can reconstruct given the information that we *do* have.
     # TODO(aludwin): pass this information to task_runner.py.
     if self._stdout_resource != expected_stdout:
-      raise PollError('expected stdout resouce %s but got %s' % (
-          expected_stdout, self._stdout_resource))
+      raise PollError('expected stdout resouce %s but got %s' %
+                      (expected_stdout, self._stdout_resource))
 
     # TODO(aludwin): Pass the namespace through the proxy. Using
     # proxy hardcoded values for now.
@@ -394,6 +394,7 @@ class RemoteClientGrpc(object):
 
     res = None
     try:
+
       def stream():
         logging.info('Writing to ByteStream:\n%s', req)
         yield req

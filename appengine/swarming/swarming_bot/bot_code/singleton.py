@@ -44,8 +44,7 @@ class Singleton(object):
       # doesn't get to keep it alive.
       # pylint: disable=undefined-variable
       self.handle = wintypes.windll.kernel32.CreateMutexW(
-          wintypes.c_int(0),
-          wintypes.c_int(-1),
+          wintypes.c_int(0), wintypes.c_int(-1),
           wintypes.create_unicode_buffer(self.key))
       last_error = wintypes.GetLastError()
       logging.info('%s = %s ; %s', self.key, self.handle, last_error)

@@ -187,8 +187,10 @@ def get_cpuinfo():
     # Intel.
     cpu_info[u'flags'] = values[u'flags']
     cpu_info[u'model'] = [
-      int(values[u'cpu family']), int(values[u'model']),
-      int(values[u'stepping']), int(values[u'microcode'], 0),
+        int(values[u'cpu family']),
+        int(values[u'model']),
+        int(values[u'stepping']),
+        int(values[u'microcode'], 0),
     ]
     cpu_info[u'name'] = values[u'model name']
     cpu_info[u'vendor'] = values[u'vendor_id']
@@ -200,8 +202,9 @@ def get_cpuinfo():
     # CPU implementer == 0x41 means ARM.
     cpu_info[u'flags'] = values[u'Features']
     cpu_info[u'model'] = (
-      int(values[u'CPU variant'], 0), int(values[u'CPU part'], 0),
-      int(values[u'CPU revision']),
+        int(values[u'CPU variant'], 0),
+        int(values[u'CPU part'], 0),
+        int(values[u'CPU revision']),
     )
     # ARM CPUs have a serial number embedded. Intel did try on the Pentium III
     # but gave up after backlash;
@@ -306,8 +309,8 @@ def get_reboot_required():
 def get_ssd():
   """Returns a list of SSD disks."""
   try:
-    out = subprocess.check_output(
-        ['lsblk', '-d', '-o', 'name,rota']).splitlines()
+    out = subprocess.check_output(['lsblk', '-d', '-o',
+                                   'name,rota']).splitlines()
     ssd = []
     for line in out:
       match = re.match(r'(\w+)\s+(0|1)', line)
@@ -497,7 +500,7 @@ exit 0
       'cmd': ' '.join(pipes.quote(c) for c in command),
       'cwd': pipes.quote(cwd),
       'user': pipes.quote(user),
-    }
+  }
 
 
 def generate_autostart_desktop(command, name):
@@ -505,18 +508,17 @@ def generate_autostart_desktop(command, name):
 
   http://standards.freedesktop.org/desktop-entry-spec/desktop-entry-spec-latest.html
   """
-  return (
-    '[Desktop Entry]\n'
-    'Type=Application\n'
-    'Name=%(name)s\n'
-    'Exec=%(cmd)s\n'
-    'Hidden=false\n'
-    'NoDisplay=false\n'
-    'Comment=Created by os_utilities.py in swarming_bot.zip\n'
-    'X-GNOME-Autostart-enabled=true\n') % {
-      'cmd': ' '.join(pipes.quote(c) for c in command),
-      'name': name,
-    }
+  return ('[Desktop Entry]\n'
+          'Type=Application\n'
+          'Name=%(name)s\n'
+          'Exec=%(cmd)s\n'
+          'Hidden=false\n'
+          'NoDisplay=false\n'
+          'Comment=Created by os_utilities.py in swarming_bot.zip\n'
+          'X-GNOME-Autostart-enabled=true\n') % {
+              'cmd': ' '.join(pipes.quote(c) for c in command),
+              'name': name,
+          }
 
 
 @tools.cached

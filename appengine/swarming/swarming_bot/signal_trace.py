@@ -44,8 +44,8 @@ def _debug(_sig, frame):
     import readline
   except ImportError:
     pass
-  msg = 'Signal received : entering python shell.\nTraceback:\n%s' % (
-      ''.join(traceback.format_stack(frame)))
+  msg = 'Signal received : entering python shell.\nTraceback:\n%s' % (''.join(
+      traceback.format_stack(frame)))
   symbols = set(frame.f_locals.keys() + frame.f_globals.keys())
   msg += 'Symbols:\n%s' % '\n'.join('  ' + x for x in sorted(symbols))
   code.InteractiveConsole(d).interact(msg)

@@ -103,29 +103,28 @@ PASSLIST = (
     'swarming_bot.zip',
 )
 
-
 # These settings are documented in ../config/bot_config.py.
 # Keep in sync with ../config/bot_config.py. This is enforced by a unit test.
 DEFAULT_SETTINGS = {
-  'free_partition': {
-    'root': {
-      'size': 1 * 1024*1024*1024,
-      'max_percent': 10.,
-      'min_percent': 6.,
+    'free_partition': {
+        'root': {
+            'size': 1 * 1024 * 1024 * 1024,
+            'max_percent': 10.,
+            'min_percent': 6.,
+        },
+        'bot': {
+            'size': 4 * 1024 * 1024 * 1024,
+            'max_percent': 15.,
+            'min_percent': 7.,
+            'wiggle': 250 * 1024 * 1024,
+        },
     },
-    'bot': {
-      'size': 4 * 1024*1024*1024,
-      'max_percent': 15.,
-      'min_percent': 7.,
-      'wiggle': 250 * 1024*1024,
+    'caches': {
+        'isolated': {
+            'size': 50 * 1024 * 1024 * 1024,
+            'items': 50 * 1024,
+        },
     },
-  },
-  'caches': {
-    'isolated': {
-      'size': 50 * 1024*1024*1024,
-      'items': 50*1024,
-    },
-  },
 }
 
 # Keep in sync with ../../ts_mon_metrics.py
@@ -420,6 +419,7 @@ def _get_disks_quarantine(botobj, disks):
   root = 'c:\\' if sys.platform == 'win32' else '/'
 
   errors = []
+
   def _check_for_quarantine(r, i, key):
     min_free = _min_free_disk(i, settings[key])
     if int(i[u'free_mb']*1024*1024) < min_free:
@@ -596,17 +596,11 @@ def get_bot(config):
   # Use temporary Bot object to call get_attributes. Attributes are needed to
   # construct the "real" bot.Bot.
   attributes = get_attributes(
-    bot.Bot(
-      remote_client.createRemoteClient(config['server'],
-                                       None,
-                                       hostname,
-                                       base_dir,
-                                       config.get('swarming_grpc_proxy')),
-      attributes,
-      config['server'],
-      config['server_version'],
-      base_dir,
-      _on_shutdown_hook))
+      bot.Bot(
+          remote_client.createRemoteClient(
+              config['server'], None, hostname, base_dir,
+              config.get('swarming_grpc_proxy')), attributes, config['server'],
+          config['server_version'], base_dir, _on_shutdown_hook))
 
   # Make remote client callback use the returned bot object. We assume here
   # RemoteClient doesn't call its callback in the constructor (since 'botobj' is
@@ -614,15 +608,9 @@ def get_bot(config):
   botobj = bot.Bot(
       remote_client.createRemoteClient(
           config['server'],
-          lambda: _get_authentication_headers(botobj),
-          hostname,
-          base_dir,
-          config.get('swarming_grpc_proxy')),
-      attributes,
-      config['server'],
-      config['server_version'],
-      base_dir,
-      _on_shutdown_hook)
+          lambda: _get_authentication_headers(botobj), hostname, base_dir,
+          config.get('swarming_grpc_proxy')), attributes, config['server'],
+      config['server_version'], base_dir, _on_shutdown_hook)
   return botobj
 
 
@@ -724,12 +712,12 @@ def _Popen(botobj, cmd, **kwargs):
   else:
     kwargs['close_fds'] = True
   return subprocess42.Popen(
-        cmd,
-        stdin=subprocess42.PIPE,
-        stderr=subprocess42.STDOUT,
-        cwd=botobj.base_dir,
-        detached=True,
-        **kwargs)
+      cmd,
+      stdin=subprocess42.PIPE,
+      stderr=subprocess42.STDOUT,
+      cwd=botobj.base_dir,
+      detached=True,
+      **kwargs)
 
 
 def _clean_cache(botobj):
@@ -893,15 +881,24 @@ def _run_manifest(botobj, manifest, start):
     auth_params_dumper.start()
 
     command = [
-      sys.executable, THIS_FILE, 'task_runner',
-      '--swarming-server', url,
-      '--in-file', task_in_file,
-      '--out-file', task_result_file,
-      '--cost-usd-hour', str(botobj.state.get('cost_usd_hour') or 0.),
-      # Include the time taken to poll the task in the cost.
-      '--start', str(start),
-      '--bot-file', bot_file,
-      '--auth-params-file', auth_params_file,
+        sys.executable,
+        THIS_FILE,
+        'task_runner',
+        '--swarming-server',
+        url,
+        '--in-file',
+        task_in_file,
+        '--out-file',
+        task_result_file,
+        '--cost-usd-hour',
+        str(botobj.state.get('cost_usd_hour') or 0.),
+        # Include the time taken to poll the task in the cost.
+        '--start',
+        str(start),
+        '--bot-file',
+        bot_file,
+        '--auth-params-file',
+        auth_params_file,
     ]
     if botobj.remote.is_grpc:
       command.append('--is-grpc')

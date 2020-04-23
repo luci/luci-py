@@ -97,15 +97,16 @@ class TestRemoteClientGrpc(auto_stub.TestCase):
     expected_call = ('CreateBotSession', msg_req, msg_rsp)
     self._expected.append(expected_call)
     response = self._client.do_handshake(attrs)
-    self.assertEqual(response, {
-        'bot_version': u'123',
-        'bot_group_cfg': {
-            'dimensions': {
-                u'pool': [u'dead'],
+    self.assertEqual(
+        response, {
+            'bot_version': u'123',
+            'bot_group_cfg': {
+                'dimensions': {
+                    u'pool': [u'dead'],
+                },
             },
-        },
-        'bot_group_cfg_version': 1,
-    })
+            'bot_group_cfg_version': 1,
+        })
 
   def test_post_bot_event(self):
     """Tests post_bot_event function."""

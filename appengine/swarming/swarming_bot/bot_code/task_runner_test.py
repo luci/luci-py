@@ -58,32 +58,43 @@ def get_manifest(script=None, isolated=None, **kwargs):
   """
   isolated_input = isolated and isolated.get('input')
   out = {
-    'bot_authenticated_as': 'foo',
-    'bot_id': 'localhost',
-    'caches': [],
-    'cipd_input': {},
-    'command':
-        [sys.executable, '-u', '-c', script] if not isolated_input else None,
-    'containment': {
-      'lower_priority': True,
-      'containment_type': 'NONE',
-      'limit_processes': 0,
-      'limit_total_committed_memory': 0,
-    },
-    'dimensions': {},
-    'env': {},
-    'env_prefixes': {},
-    'extra_args': [],
-    'grace_period': 30.,
-    'hard_timeout': 10.,
-    'host': 'bar',
-    'io_timeout': 10.,
-    'isolated': isolated,
-    'outputs': [],
-    'relative_cwd': None,
-    'secret_bytes': None,
-    'service_accounts': None,
-    'task_id': 23,
+      'bot_authenticated_as':
+          'foo',
+      'bot_id':
+          'localhost',
+      'caches': [],
+      'cipd_input': {},
+      'command': [sys.executable, '-u', '-c', script]
+                 if not isolated_input else None,
+      'containment': {
+          'lower_priority': True,
+          'containment_type': 'NONE',
+          'limit_processes': 0,
+          'limit_total_committed_memory': 0,
+      },
+      'dimensions': {},
+      'env': {},
+      'env_prefixes': {},
+      'extra_args': [],
+      'grace_period':
+          30.,
+      'hard_timeout':
+          10.,
+      'host':
+          'bar',
+      'io_timeout':
+          10.,
+      'isolated':
+          isolated,
+      'outputs': [],
+      'relative_cwd':
+          None,
+      'secret_bytes':
+          None,
+      'service_accounts':
+          None,
+      'task_id':
+          23,
   }
   out.update(kwargs)
   return out
@@ -110,9 +121,9 @@ def load_and_run(server_url, work_dir, manifest, auth_params_file):
   with open(in_file, 'wb') as f:
     json.dump(manifest, f)
   out_file = os.path.join(work_dir, 'task_runner_out.json')
-  task_runner.load_and_run(
-      in_file, server_url, False, 3600., time.time(), out_file,
-      ['--min-free-space', '1'], None, auth_params_file)
+  task_runner.load_and_run(in_file, server_url, False, 3600., time.time(),
+                           out_file, ['--min-free-space', '1'], None,
+                           auth_params_file)
   with open(out_file, 'rb') as f:
     return json.load(f)
 
@@ -224,22 +235,22 @@ class TestTaskRunnerBase(auto_stub.TestCase):
     actual = self.getTaskResults()
     out = actual.copy()
     expected = {
-      u'bot_overhead': 0.,
-      u'cost_usd': 0.,
-      u'duration': 0.,
-      u'exit_code': 0,
-      u'hard_timeout': False,
-      u'id': u'localhost',
-      u'io_timeout': False,
-      u'isolated_stats': {
-        u'download': {
-          u'initial_number_items': 0,
-          u'initial_size': 0,
+        u'bot_overhead': 0.,
+        u'cost_usd': 0.,
+        u'duration': 0.,
+        u'exit_code': 0,
+        u'hard_timeout': False,
+        u'id': u'localhost',
+        u'io_timeout': False,
+        u'isolated_stats': {
+            u'download': {
+                u'initial_number_items': 0,
+                u'initial_size': 0,
+            },
         },
-      },
-      u'output': 'hi\n',
-      u'output_chunk_start': 0,
-      u'task_id': 23,
+        u'output': 'hi\n',
+        u'output_chunk_start': 0,
+        u'task_id': 23,
     }
     for k, v in kwargs.items():
       if v is None:
@@ -312,11 +323,11 @@ class TestTaskRunner(TestTaskRunnerBase):
             'PATH': ['./local/smurf', './other/thing'],
         })
     expected = {
-      u'exit_code': 0,
-      u'hard_timeout': False,
-      u'io_timeout': False,
-      u'must_signal_internal_failure': None,
-      u'version': task_runner.OUT_VERSION,
+        u'exit_code': 0,
+        u'hard_timeout': False,
+        u'io_timeout': False,
+        u'must_signal_internal_failure': None,
+        u'version': task_runner.OUT_VERSION,
     }
     self.assertEqual(expected, self._run_command(task_details))
     # Now look at the updates sent by the bot as seen by the server.
@@ -345,86 +356,81 @@ class TestTaskRunner(TestTaskRunnerBase):
     self.assertEqual(expected, self._run_command(task_details))
     # Now look at the updates sent by the bot as seen by the server.
     sep = re.escape(os.sep)
-    output = re.compile((
-       r'^'
-       r'(?P<cwd>[^\n]*)\n'
-       r'(?P=cwd)%slocal%ssmurf\n'
-       r'(?P=cwd)%sother%sthing\n'
-       r'$'
-     ) % (sep, sep, sep, sep))
+    output = re.compile((r'^'
+                         r'(?P<cwd>[^\n]*)\n'
+                         r'(?P=cwd)%slocal%ssmurf\n'
+                         r'(?P=cwd)%sother%sthing\n'
+                         r'$') % (sep, sep, sep, sep))
     self.expectTask(output=output)
 
   def test_run_command_isolated(self):
     # Hook run_isolated out to see that everything still work.
     task_details = get_task_details(
         isolated={
-          'input': '123',
-          'server': 'localhost:1',
-          'namespace': 'default-gzip',
+            'input': '123',
+            'server': 'localhost:1',
+            'namespace': 'default-gzip',
         },
         extra_args=['foo', 'bar'])
     # Mock running run_isolated with a script.
-    SCRIPT_ISOLATED = (
-      'import json, sys;\n'
-      'args = []\n'
-      'if len(sys.argv) != 3 or sys.argv[1] != \'-a\':\n'
-      '  raise Exception(sys.argv)\n'
-      'with open(sys.argv[2], \'r\') as argsfile:\n'
-      '  args = json.loads(argsfile.read())\n'
-      'if len(args) != 1:\n'
-      '  raise Exception(args);\n'
-      'with open(args[0], \'wb\') as f:\n'
-      '  json.dump({\n'
-      '    \'exit_code\': 0,\n'
-      '    \'had_hard_timeout\': False,\n'
-      '    \'internal_failure\': None,\n'
-      '    \'outputs_ref\': {\n'
-      '      \'isolated\': \'123\',\n'
-      '      \'isolatedserver\': \'http://localhost:1\',\n'
-      '       \'namespace\': \'default-gzip\',\n'
-      '    },\n'
-      '  }, f)\n'
-      'sys.stdout.write(\'hi\\n\')')
-    self.mock(
-        task_runner, 'get_run_isolated',
-        lambda: [sys.executable, '-u', '-c', SCRIPT_ISOLATED])
+    SCRIPT_ISOLATED = ('import json, sys;\n'
+                       'args = []\n'
+                       'if len(sys.argv) != 3 or sys.argv[1] != \'-a\':\n'
+                       '  raise Exception(sys.argv)\n'
+                       'with open(sys.argv[2], \'r\') as argsfile:\n'
+                       '  args = json.loads(argsfile.read())\n'
+                       'if len(args) != 1:\n'
+                       '  raise Exception(args);\n'
+                       'with open(args[0], \'wb\') as f:\n'
+                       '  json.dump({\n'
+                       '    \'exit_code\': 0,\n'
+                       '    \'had_hard_timeout\': False,\n'
+                       '    \'internal_failure\': None,\n'
+                       '    \'outputs_ref\': {\n'
+                       '      \'isolated\': \'123\',\n'
+                       '      \'isolatedserver\': \'http://localhost:1\',\n'
+                       '       \'namespace\': \'default-gzip\',\n'
+                       '    },\n'
+                       '  }, f)\n'
+                       'sys.stdout.write(\'hi\\n\')')
+    self.mock(task_runner, 'get_run_isolated',
+              lambda: [sys.executable, '-u', '-c', SCRIPT_ISOLATED])
     self.mock(
         task_runner, 'get_isolated_args',
         lambda work_dir, details, isolated_result, bot_file, run_isolated_flags:
             [isolated_result])
     expected = {
-      u'exit_code': 0,
-      u'hard_timeout': False,
-      u'io_timeout': False,
-      u'must_signal_internal_failure': None,
-      u'version': task_runner.OUT_VERSION,
+        u'exit_code': 0,
+        u'hard_timeout': False,
+        u'io_timeout': False,
+        u'must_signal_internal_failure': None,
+        u'version': task_runner.OUT_VERSION,
     }
     self.assertEqual(expected, self._run_command(task_details))
     # Now look at the updates sent by the bot as seen by the server.
     self.expectTask(
         isolated_stats=None,
         outputs_ref={
-          u'isolated': u'123',
-          u'isolatedserver': u'http://localhost:1',
-          u'namespace': u'default-gzip',
+            u'isolated': u'123',
+            u'isolatedserver': u'http://localhost:1',
+            u'namespace': u'default-gzip',
         })
 
   def test_run_command_fail(self):
     task_details = get_task_details('import sys; print(\'hi\'); sys.exit(1)')
     expected = {
-      u'exit_code': 1,
-      u'hard_timeout': False,
-      u'io_timeout': False,
-      u'must_signal_internal_failure': None,
-      u'version': task_runner.OUT_VERSION,
+        u'exit_code': 1,
+        u'hard_timeout': False,
+        u'io_timeout': False,
+        u'must_signal_internal_failure': None,
+        u'version': task_runner.OUT_VERSION,
     }
     self.assertEqual(expected, self._run_command(task_details))
     # Now look at the updates sent by the bot as seen by the server.
     self.expectTask(exit_code=1)
 
-  @unittest.skipIf(
-      sys.platform == 'win32',
-      'TODO(crbug.com/1017545): fix assertions')
+  @unittest.skipIf(sys.platform == 'win32',
+                   'TODO(crbug.com/1017545): fix assertions')
   def test_run_command_os_error(self):
     task_details = get_task_details(
         command=[
@@ -432,11 +438,11 @@ class TestTaskRunner(TestTaskRunnerBase):
           'thus_raising_OSError',
         ])
     expected = {
-      u'exit_code': 1,
-      u'hard_timeout': False,
-      u'io_timeout': False,
-      u'must_signal_internal_failure': None,
-      u'version': task_runner.OUT_VERSION,
+        u'exit_code': 1,
+        u'hard_timeout': False,
+        u'io_timeout': False,
+        u'must_signal_internal_failure': None,
+        u'version': task_runner.OUT_VERSION,
     }
     self.assertEqual(expected, self._run_command(task_details))
     # Now look at the updates sent by the bot as seen by the server.
@@ -469,30 +475,32 @@ class TestTaskRunner(TestTaskRunnerBase):
     }
 
     isolated = json.dumps({
-      'command': ['python', 'parent.py'],
-      'files': {
-        name: {
-          'h': self.isolateserver.add_content_compressed(
-              'default-gzip', content),
-          's': len(content),
-        } for name, content in files.items()
-      },
+        'command': ['python', 'parent.py'],
+        'files': {
+            name: {
+                'h':
+                    self.isolateserver.add_content_compressed(
+                        'default-gzip', content),
+                's':
+                    len(content),
+            } for name, content in files.items()
+        },
     })
     isolated_digest = self.isolateserver.add_content_compressed(
         'default-gzip', isolated)
     manifest = get_manifest(
         isolated={
-          'input': isolated_digest,
-          'namespace': 'default-gzip',
-          'server': self.isolateserver.url,
+            'input': isolated_digest,
+            'namespace': 'default-gzip',
+            'server': self.isolateserver.url,
         })
     actual = load_and_run(self.server.url, self.work_dir, manifest, None)
     expected = {
-      u'exit_code': 0,
-      u'hard_timeout': False,
-      u'io_timeout': False,
-      u'must_signal_internal_failure': None,
-      u'version': task_runner.OUT_VERSION,
+        u'exit_code': 0,
+        u'hard_timeout': False,
+        u'io_timeout': False,
+        u'must_signal_internal_failure': None,
+        u'version': task_runner.OUT_VERSION,
     }
     self.assertEqual(expected, actual)
     self.expectTask(
@@ -560,9 +568,7 @@ class TestTaskRunner(TestTaskRunnerBase):
     self.assertEqual(expected, self._run_command(task_details))
     # Now look at the updates sent by the bot as seen by the server.
     self.expectTask(
-        bot_overhead=None,
-        isolated_stats=None,
-        output='hi!\n' * 100003)
+        bot_overhead=None, isolated_stats=None, output='hi!\n' * 100003)
     # Here, we want to carefully check the packets sent to ensure the internal
     # timer works as expected. There's 3 updates:
     # - initial task startup with no output
@@ -613,17 +619,19 @@ class TestTaskRunner(TestTaskRunnerBase):
     task_details = get_task_details(
         script, caches=[{'name': 'foo', 'path': 'cache_foo', 'hint': '100'}])
     expected = {
-      u'exit_code': 0,
-      u'hard_timeout': False,
-      u'io_timeout': False,
-      u'must_signal_internal_failure': None,
-      u'version': task_runner.OUT_VERSION,
+        u'exit_code': 0,
+        u'hard_timeout': False,
+        u'io_timeout': False,
+        u'must_signal_internal_failure': None,
+        u'version': task_runner.OUT_VERSION,
     }
     self.assertEqual(expected, self._run_command(task_details))
-    self._expect_files(
-        [
-          u'c/*/bar', u'c/state.json', u'result', u'w/run_isolated_args.json',
-        ])
+    self._expect_files([
+        u'c/*/bar',
+        u'c/state.json',
+        u'result',
+        u'w/run_isolated_args.json',
+    ])
 
     # Ensure the 'result' file written my the task contained foo/bar.
     with open(os.path.join(self.root_dir, 'result'), 'rb') as f:
@@ -668,15 +676,23 @@ class TestTaskRunner(TestTaskRunnerBase):
 
     self.mock(task_runner, 'load_and_run', _load_and_run)
     cmd = [
-      '--swarming-server', self.server.url,
-      '--in-file', 'foo',
-      '--out-file', 'task_summary.json',
-      '--cost-usd-hour', '3600',
-      '--start', str(time.time()),
-      '--bot-file', '/path/to/bot-file',
-      '--auth-params-file', '/path/to/auth-params-file',
-      '--',
-      '--min-free-space', '1',
+        '--swarming-server',
+        self.server.url,
+        '--in-file',
+        'foo',
+        '--out-file',
+        'task_summary.json',
+        '--cost-usd-hour',
+        '3600',
+        '--start',
+        str(time.time()),
+        '--bot-file',
+        '/path/to/bot-file',
+        '--auth-params-file',
+        '/path/to/auth-params-file',
+        '--',
+        '--min-free-space',
+        '1',
     ]
     self.assertEqual(0, task_runner.main(cmd))
 
@@ -696,16 +712,24 @@ class TestTaskRunner(TestTaskRunnerBase):
 
     self.mock(task_runner, 'load_and_run', _load_and_run)
     cmd = [
-      '--swarming-server', self.server.url,
-      '--in-file', 'foo',
-      '--out-file', 'task_summary.json',
-      '--cost-usd-hour', '3600',
-      '--start', str(time.time()),
-      '--bot-file', '/path/to/bot-file',
-      '--auth-params-file', '/path/to/auth-params-file',
-      '--is-grpc',
-      '--',
-      '--min-free-space', '1',
+        '--swarming-server',
+        self.server.url,
+        '--in-file',
+        'foo',
+        '--out-file',
+        'task_summary.json',
+        '--cost-usd-hour',
+        '3600',
+        '--start',
+        str(time.time()),
+        '--bot-file',
+        '/path/to/bot-file',
+        '--auth-params-file',
+        '/path/to/auth-params-file',
+        '--is-grpc',
+        '--',
+        '--min-free-space',
+        '1',
     ]
     self.assertEqual(0, task_runner.main(cmd))
 
@@ -719,40 +743,40 @@ class TestTaskRunnerKilled(TestTaskRunnerBase):
 
   # Here's a simple script that handles signals properly. Sadly SIGBREAK is not
   # defined on posix.
-  SCRIPT_SIGNAL = (
-    'import signal, sys, time;\n'
-    'l = [];\n'
-    'def handler(signum, _):\n'
-    '  l.append(signum);\n'
-    '  print(\'got signal %%d\' %% signum);\n'
-    '  sys.stdout.flush();\n'
-    'signal.signal(signal.%s, handler);\n'
-    'print(\'hi\');\n'
-    'sys.stdout.flush();\n'
-    'while not l:\n'
-    '  try:\n'
-    '    time.sleep(0.01);\n'
-    '  except IOError:\n'
-    '    pass;\n'
-    'print(\'bye\')') % ('SIGBREAK' if sys.platform == 'win32' else 'SIGTERM')
+  SCRIPT_SIGNAL = ('import signal, sys, time;\n'
+                   'l = [];\n'
+                   'def handler(signum, _):\n'
+                   '  l.append(signum);\n'
+                   '  print(\'got signal %%d\' %% signum);\n'
+                   '  sys.stdout.flush();\n'
+                   'signal.signal(signal.%s, handler);\n'
+                   'print(\'hi\');\n'
+                   'sys.stdout.flush();\n'
+                   'while not l:\n'
+                   '  try:\n'
+                   '    time.sleep(0.01);\n'
+                   '  except IOError:\n'
+                   '    pass;\n'
+                   'print(\'bye\')') % ('SIGBREAK' if sys.platform == 'win32'
+                                        else 'SIGTERM')
 
-  SCRIPT_SIGNAL_HANG = (
-    'import signal, sys, time;\n'
-    'l = [];\n'
-    'def handler(signum, _):\n'
-    '  l.append(signum);\n'
-    '  print(\'got signal %%d\' %% signum);\n'
-    '  sys.stdout.flush();\n'
-    'signal.signal(signal.%s, handler);\n'
-    'print(\'hi\');\n'
-    'sys.stdout.flush();\n'
-    'while not l:\n'
-    '  try:\n'
-    '    time.sleep(0.01);\n'
-    '  except IOError:\n'
-    '    pass;\n'
-    'print(\'bye\');\n'
-    'time.sleep(100)') % ('SIGBREAK' if sys.platform == 'win32' else 'SIGTERM')
+  SCRIPT_SIGNAL_HANG = ('import signal, sys, time;\n'
+                        'l = [];\n'
+                        'def handler(signum, _):\n'
+                        '  l.append(signum);\n'
+                        '  print(\'got signal %%d\' %% signum);\n'
+                        '  sys.stdout.flush();\n'
+                        'signal.signal(signal.%s, handler);\n'
+                        'print(\'hi\');\n'
+                        'sys.stdout.flush();\n'
+                        'while not l:\n'
+                        '  try:\n'
+                        '    time.sleep(0.01);\n'
+                        '  except IOError:\n'
+                        '    pass;\n'
+                        'print(\'bye\');\n'
+                        'time.sleep(100)') % ('SIGBREAK' if sys.platform ==
+                                              'win32' else 'SIGTERM')
 
   SCRIPT_HANG = 'import time; print(\'hi\'); time.sleep(100)'
 
@@ -763,11 +787,11 @@ class TestTaskRunnerKilled(TestTaskRunnerBase):
     # task_runner is told to kill the task right on the first task update.
     self.server.must_stop = True
     expected = {
-      u'exit_code': -1,
-      u'hard_timeout': False,
-      u'io_timeout': False,
-      u'must_signal_internal_failure': None,
-      u'version': 3,
+        u'exit_code': -1,
+        u'hard_timeout': False,
+        u'io_timeout': False,
+        u'must_signal_internal_failure': None,
+        u'version': 3,
     }
     self.assertEqual(expected, self._run_command(task_details))
     # Now look at the updates sent by the bot as seen by the server.
@@ -801,6 +825,7 @@ class TestTaskRunnerKilled(TestTaskRunnerBase):
         if 'output' in self.getTaskResults():
           self.server.must_stop = True
           break
+
     t = threading.Thread(target=run)
     t.daemon = True
     t.start()
@@ -847,11 +872,11 @@ class TestTaskRunnerKilled(TestTaskRunnerBase):
     # Actually 0xc000013a
     exit_code = -1073741510 if sys.platform == 'win32' else -signal.SIGTERM
     expected = {
-      u'exit_code': exit_code,
-      u'hard_timeout': False,
-      u'io_timeout': True,
-      u'must_signal_internal_failure': None,
-      u'version': task_runner.OUT_VERSION,
+        u'exit_code': exit_code,
+        u'hard_timeout': False,
+        u'io_timeout': True,
+        u'must_signal_internal_failure': None,
+        u'version': task_runner.OUT_VERSION,
     }
     self.assertEqual(expected, self._run_command(task_details))
     # Now look at the updates sent by the bot as seen by the server.
@@ -862,11 +887,11 @@ class TestTaskRunnerKilled(TestTaskRunnerBase):
         self.SCRIPT_SIGNAL, hard_timeout=self.SHORT_TIME_OUT)
     # Returns 0 because the process cleaned up itself.
     expected = {
-      u'exit_code': 0,
-      u'hard_timeout': True,
-      u'io_timeout': False,
-      u'must_signal_internal_failure': None,
-      u'version': task_runner.OUT_VERSION,
+        u'exit_code': 0,
+        u'hard_timeout': True,
+        u'io_timeout': False,
+        u'must_signal_internal_failure': None,
+        u'version': task_runner.OUT_VERSION,
     }
     self.assertEqual(expected, self._run_command(task_details))
     # Now look at the updates sent by the bot as seen by the server.
@@ -881,11 +906,11 @@ class TestTaskRunnerKilled(TestTaskRunnerBase):
         self.SCRIPT_SIGNAL, io_timeout=self.SHORT_TIME_OUT)
     # Returns 0 because the process cleaned up itself.
     expected = {
-      u'exit_code': 0,
-      u'hard_timeout': False,
-      u'io_timeout': True,
-      u'must_signal_internal_failure': None,
-      u'version': task_runner.OUT_VERSION,
+        u'exit_code': 0,
+        u'hard_timeout': False,
+        u'io_timeout': True,
+        u'must_signal_internal_failure': None,
+        u'version': task_runner.OUT_VERSION,
     }
     self.assertEqual(expected, self._run_command(task_details))
     # Now look at the updates sent by the bot as seen by the server.
@@ -896,7 +921,8 @@ class TestTaskRunnerKilled(TestTaskRunnerBase):
 
   def test_hard_no_grace(self):
     task_details = get_task_details(
-        self.SCRIPT_HANG, hard_timeout=self.SHORT_TIME_OUT,
+        self.SCRIPT_HANG,
+        hard_timeout=self.SHORT_TIME_OUT,
         grace_period=self.SHORT_TIME_OUT)
     # Actually 0xc000013a
     exit_code = -1073741510 if sys.platform == 'win32' else -signal.SIGTERM
@@ -916,7 +942,8 @@ class TestTaskRunnerKilled(TestTaskRunnerBase):
       'As run_isolated is killed, the children process leaks')
   def test_io_no_grace(self):
     task_details = get_task_details(
-        self.SCRIPT_HANG, io_timeout=self.SHORT_TIME_OUT,
+        self.SCRIPT_HANG,
+        io_timeout=self.SHORT_TIME_OUT,
         grace_period=self.SHORT_TIME_OUT)
     exit_code = -1 if sys.platform == 'win32' else -signal.SIGTERM
     expected = {
@@ -936,11 +963,11 @@ class TestTaskRunnerKilled(TestTaskRunnerBase):
         grace_period=self.SHORT_TIME_OUT)
     exit_code = 1 if sys.platform == 'win32' else -signal.SIGKILL
     expected = {
-      u'exit_code': exit_code,
-      u'hard_timeout': True,
-      u'io_timeout': False,
-      u'must_signal_internal_failure': None,
-      u'version': task_runner.OUT_VERSION,
+        u'exit_code': exit_code,
+        u'hard_timeout': True,
+        u'io_timeout': False,
+        u'must_signal_internal_failure': None,
+        u'version': task_runner.OUT_VERSION,
     }
     self.assertEqual(expected, self._run_command(task_details))
     # Now look at the updates sent by the bot as seen by the server.
@@ -950,20 +977,20 @@ class TestTaskRunnerKilled(TestTaskRunnerBase):
         exit_code=exit_code,
         output='hi\ngot signal %s\nbye\n' % task_runner.SIG_BREAK_OR_TERM)
 
-  @unittest.skipIf(
-      sys.platform == 'win32',
-      'As run_isolated is killed, the children process leaks')
+  @unittest.skipIf(sys.platform == 'win32',
+                   'As run_isolated is killed, the children process leaks')
   def test_io_signal_no_grace(self):
     task_details = get_task_details(
-        self.SCRIPT_SIGNAL_HANG, io_timeout=self.SHORT_TIME_OUT,
+        self.SCRIPT_SIGNAL_HANG,
+        io_timeout=self.SHORT_TIME_OUT,
         grace_period=self.SHORT_TIME_OUT)
     exit_code = -1 if sys.platform == 'win32' else -signal.SIGKILL
     expected = {
-      u'exit_code': exit_code,
-      u'hard_timeout': False,
-      u'io_timeout': True,
-      u'must_signal_internal_failure': None,
-      u'version': task_runner.OUT_VERSION,
+        u'exit_code': exit_code,
+        u'hard_timeout': False,
+        u'io_timeout': True,
+        u'must_signal_internal_failure': None,
+        u'version': task_runner.OUT_VERSION,
     }
     self.assertEqual(expected, self._run_command(task_details))
     # Now look at the updates sent by the bot as seen by the server.
@@ -973,9 +1000,8 @@ class TestTaskRunnerKilled(TestTaskRunnerBase):
         exit_code=exit_code,
         output='hi\ngot signal %s\nbye\n' % task_runner.SIG_BREAK_OR_TERM)
 
-  @unittest.skipIf(
-      sys.platform == 'win32',
-      'TODO(crbug.com/1017545): KeyError output')
+  @unittest.skipIf(sys.platform == 'win32',
+                   'TODO(crbug.com/1017545): KeyError output')
   def test_isolated_io_signal_grand_children(self):
     """Handles grand-children process hanging and signal management.
 
@@ -983,39 +1009,43 @@ class TestTaskRunnerKilled(TestTaskRunnerBase):
     timeout is implemented by run_isolated.
     """
     files = {
-      'parent.py': (
-        'import subprocess, sys\n'
-        'print(\'parent\')\n'
-        'p = subprocess.Popen([sys.executable, \'-u\', \'children.py\'])\n'
-        'print(p.pid)\n'
-        'p.wait()\n'
-        'sys.exit(p.returncode)\n'),
-      'children.py': (
-        'import subprocess, sys\n'
-        'print(\'children\')\n'
-        'p = subprocess.Popen([sys.executable,\'-u\',\'grand_children.py\'])\n'
-        'print(p.pid)\n'
-        'p.wait()\n'
-        'sys.exit(p.returncode)\n'),
-      'grand_children.py': self.SCRIPT_SIGNAL_HANG,
+        'parent.py': (
+            'import subprocess, sys\n'
+            'print(\'parent\')\n'
+            'p = subprocess.Popen([sys.executable, \'-u\', \'children.py\'])\n'
+            'print(p.pid)\n'
+            'p.wait()\n'
+            'sys.exit(p.returncode)\n'),
+        'children.py': (
+            'import subprocess, sys\n'
+            'print(\'children\')\n'
+            'p = subprocess.Popen('
+            '[sys.executable,\'-u\',\'grand_children.py\'])\n'
+            'print(p.pid)\n'
+            'p.wait()\n'
+            'sys.exit(p.returncode)\n'),
+        'grand_children.py':
+            self.SCRIPT_SIGNAL_HANG,
     }
     isolated = json.dumps({
-      'command': ['python', '-u', 'parent.py'],
-      'files': {
-        name: {
-          'h': self.isolateserver.add_content_compressed(
-              'default-gzip', content),
-          's': len(content),
-        } for name, content in files.items()
-      },
+        'command': ['python', '-u', 'parent.py'],
+        'files': {
+            name: {
+                'h':
+                    self.isolateserver.add_content_compressed(
+                        'default-gzip', content),
+                's':
+                    len(content),
+            } for name, content in files.items()
+        },
     })
     isolated_digest = self.isolateserver.add_content_compressed(
         'default-gzip', isolated)
     manifest = get_manifest(
         isolated={
-          'input': isolated_digest,
-          'namespace': 'default-gzip',
-          'server': self.isolateserver.url,
+            'input': isolated_digest,
+            'namespace': 'default-gzip',
+            'server': self.isolateserver.url,
         },
         # TODO(maruel): A bit cheezy, we'd want the I/O timeout to be just
         # enough to have the time for the PID to be printed but not more.
@@ -1027,11 +1057,11 @@ class TestTaskRunnerKilled(TestTaskRunnerBase):
     # Actually 0xc000013a
     exit_code = -1073741510 if sys.platform == 'win32' else -signal.SIGTERM
     expected = {
-      u'exit_code': exit_code,
-      u'hard_timeout': False,
-      u'io_timeout': True,
-      u'must_signal_internal_failure': None,
-      u'version': task_runner.OUT_VERSION,
+        u'exit_code': exit_code,
+        u'hard_timeout': False,
+        u'io_timeout': True,
+        u'must_signal_internal_failure': None,
+        u'version': task_runner.OUT_VERSION,
     }
     try:
       actual = load_and_run(self.server.url, self.work_dir, manifest, None)
@@ -1063,18 +1093,18 @@ class TestTaskRunnerKilled(TestTaskRunnerBase):
         exit_code=exit_code,
         output=re.compile('parent\n\\d+\nchildren\n\\d+\nhi\n'),
         isolated_stats={
-          u'download': {
-            u'duration': 0.,
-            u'initial_number_items': 0,
-            u'initial_size': 0,
-            u'items_cold': items_cold,
-            u'items_hot': u'',
-          },
-          u'upload': {
-            u'duration': 0.,
-            u'items_cold': u'',
-            u'items_hot': u'',
-          },
+            u'download': {
+                u'duration': 0.,
+                u'initial_number_items': 0,
+                u'initial_size': 0,
+                u'items_cold': items_cold,
+                u'items_hot': u'',
+            },
+            u'upload': {
+                u'duration': 0.,
+                u'items_cold': u'',
+                u'items_hot': u'',
+            },
         })
 
   def test_kill_and_wait(self):
@@ -1111,9 +1141,8 @@ class TestTaskRunnerKilled(TestTaskRunnerBase):
     self.assertEqual(expected, exit_code)
     self.assertEqual('got it\n', p.stdout.readline())
 
-  @unittest.skipIf(
-      sys.platform == 'win32',
-      'TODO(crbug.com/1017545): it gets stuck at proc.wait()')
+  @unittest.skipIf(sys.platform == 'win32',
+                   'TODO(crbug.com/1017545): it gets stuck at proc.wait()')
   def test_signal(self):
     # Tests when task_runner gets a SIGTERM.
     signal_file = os.path.join(self.work_dir, 'signal')
@@ -1122,7 +1151,8 @@ class TestTaskRunnerKilled(TestTaskRunnerBase):
     # As done by bot_main.py.
     manifest = get_manifest(
         script='import os,time;os.remove(%r);time.sleep(60)' % signal_file,
-        hard_timeout=60., io_timeout=60.)
+        hard_timeout=60.,
+        io_timeout=60.)
     task_in_file = os.path.join(self.work_dir, 'task_runner_in.json')
     task_result_file = os.path.join(self.work_dir, 'task_runner_out.json')
     with open(task_in_file, 'wb') as f:
@@ -1159,21 +1189,22 @@ class TestTaskRunnerKilled(TestTaskRunnerBase):
       logging.info('task_runner.log:\n---\n%s---', f.read())
     self.assertEqual([], self.server.get_bot_events())
     expected = {
-      'swarming_bot.1.zip',
-      'e2bfe61c8f0dc89e72a854f4afb14f4b662ea6301fc5652ebe03f80fa2b06263-cacert.'
-          'pem',
-      'w',
-      'isolated_cache_party',
-      'logs',
-      'c',
+        'swarming_bot.1.zip',
+        'e2bfe61c8f0dc89e72a854f4afb14f4b662ea6301fc5652ebe03f80fa2b06263'
+        '-cacert.'
+        'pem',
+        'w',
+        'isolated_cache_party',
+        'logs',
+        'c',
     }
     self.assertEqual(expected, set(os.listdir(self.root_dir)))
 
     expected = {
-      u'hard_timeout': False,
-      u'id': u'localhost',
-      u'io_timeout': False,
-      u'task_id': 23,
+        u'hard_timeout': False,
+        u'id': u'localhost',
+        u'io_timeout': False,
+        u'task_id': 23,
     }
     actual = self.getTaskResults()
     self.assertLessEqual(0, actual.pop(u'cost_usd'))
@@ -1182,11 +1213,11 @@ class TestTaskRunnerKilled(TestTaskRunnerBase):
     # TODO(sethkoehler): Set exit_code to 'exit_code' variable rather than None
     # when we correctly pass exit_code on failure (see TODO in task_runner.py).
     expected = {
-      u'exit_code': None,
-      u'hard_timeout': False,
-      u'io_timeout': False,
-      u'must_signal_internal_failure': u'',
-      u'version': 3,
+        u'exit_code': None,
+        u'hard_timeout': False,
+        u'io_timeout': False,
+        u'must_signal_internal_failure': u'',
+        u'version': 3,
     }
     with open(task_result_file, 'rb') as f:
       self.assertEqual(expected, json.load(f))
@@ -1228,9 +1259,8 @@ class TaskRunnerNoServer(auto_stub.TestCase):
   def test_load_and_run_isolated(self):
     self.mock(bot_auth, 'AuthSystem', FakeAuthSystem)
 
-    def _run_command(
-        remote, task_details, work_dir,
-        cost_usd_hour, start, run_isolated_flags, bot_file, ctx_file):
+    def _run_command(remote, task_details, work_dir, cost_usd_hour, start,
+                     run_isolated_flags, bot_file, ctx_file):
       self.assertTrue(remote.uses_auth) # mainly to avoid unused arg warning
       self.assertTrue(isinstance(task_details, task_runner.TaskDetails))
       # Necessary for OSX.
@@ -1243,11 +1273,11 @@ class TaskRunnerNoServer(auto_stub.TestCase):
       with open(ctx_file, 'r') as f:
         self.assertIsNone(json.load(f).get('local_auth'))
       return {
-        u'exit_code': 0,
-        u'hard_timeout': False,
-        u'io_timeout': False,
-        u'must_signal_internal_failure': None,
-        u'version': task_runner.OUT_VERSION,
+          u'exit_code': 0,
+          u'hard_timeout': False,
+          u'io_timeout': False,
+          u'must_signal_internal_failure': None,
+          u'version': task_runner.OUT_VERSION,
       }
     self.mock(task_runner, 'run_command', _run_command)
 
@@ -1264,20 +1294,24 @@ class TaskRunnerNoServer(auto_stub.TestCase):
         'http://localhost:1', self.root_dir, manifest,
         '/path/to/auth-params-file')
     expected = {
-      u'exit_code': 0,
-      u'hard_timeout': False,
-      u'io_timeout': False,
-      u'must_signal_internal_failure': None,
-      u'version': task_runner.OUT_VERSION,
+        u'exit_code': 0,
+        u'hard_timeout': False,
+        u'io_timeout': False,
+        u'must_signal_internal_failure': None,
+        u'version': task_runner.OUT_VERSION,
     }
     self.assertEqual(expected, actual)
 
   def test_load_and_run_raw(self):
     local_auth_ctx = {
-      'accounts': [{'id': 'a'}, {'id': 'b'}],
-      'default_account_id': 'a',
-      'rpc_port': 123,
-      'secret': 'abcdef',
+        'accounts': [{
+            'id': 'a'
+        }, {
+            'id': 'b'
+        }],
+        'default_account_id': 'a',
+        'rpc_port': 123,
+        'secret': 'abcdef',
     }
 
     def _run_command(
@@ -1295,28 +1329,27 @@ class TaskRunnerNoServer(auto_stub.TestCase):
       with open(ctx_file, 'r') as f:
         self.assertDictEqual(local_auth_ctx, json.load(f)['local_auth'])
       return {
-        u'exit_code': 1,
-        u'hard_timeout': False,
-        u'io_timeout': False,
-        u'must_signal_internal_failure': None,
-        u'version': task_runner.OUT_VERSION,
+          u'exit_code': 1,
+          u'hard_timeout': False,
+          u'io_timeout': False,
+          u'must_signal_internal_failure': None,
+          u'version': task_runner.OUT_VERSION,
       }
     self.mock(task_runner, 'run_command', _run_command)
     manifest = get_manifest(command=['a'])
     FakeAuthSystem.local_auth_context = local_auth_ctx
     try:
       self.mock(bot_auth, 'AuthSystem', FakeAuthSystem)
-      actual = load_and_run(
-          'http://localhost:1', self.root_dir, manifest,
-          '/path/to/auth-params-file')
+      actual = load_and_run('http://localhost:1', self.root_dir, manifest,
+                            '/path/to/auth-params-file')
     finally:
       FakeAuthSystem.local_auth_context = None
     expected = {
-      u'exit_code': 1,
-      u'hard_timeout': False,
-      u'io_timeout': False,
-      u'must_signal_internal_failure': None,
-      u'version': task_runner.OUT_VERSION,
+        u'exit_code': 1,
+        u'hard_timeout': False,
+        u'io_timeout': False,
+        u'must_signal_internal_failure': None,
+        u'version': task_runner.OUT_VERSION,
     }
     self.assertEqual(expected, actual)
 
@@ -1326,8 +1359,8 @@ if __name__ == '__main__':
   if '-v' in sys.argv:
     unittest.TestCase.maxDiff = None
   logging_utils.prepare_logging(None)
-  logging_utils.set_console_level(
-      logging.DEBUG if '-v' in sys.argv else logging.CRITICAL+1)
+  logging_utils.set_console_level(logging.DEBUG if '-v' in sys
+                                  .argv else logging.CRITICAL + 1)
   # Fix literal text expectation.
   os.environ['LANG'] = 'en_US.UTF-8'
   os.environ['LANGUAGE'] = 'en_US.UTF-8'

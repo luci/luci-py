@@ -223,10 +223,8 @@ class RemoteClientNative(object):
           if self._headers:
             logging.info(
                 'Fetched auth headers (%s), they expire in %d sec. '
-                'Next check in %d sec.',
-                self._headers.keys(),
-                self._exp_ts - time.time(),
-                next_check)
+                'Next check in %d sec.', self._headers.keys(),
+                self._exp_ts - time.time(), next_check)
           else:
             logging.info(
                 'No headers available yet, next check in %d sec.', next_check)

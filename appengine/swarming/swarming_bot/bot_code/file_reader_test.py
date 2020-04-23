@@ -23,6 +23,7 @@ import file_refresher
 
 
 class TestFileReaderThread(auto_stub.TestCase):
+
   def setUp(self):
     super(TestFileReaderThread, self).setUp()
     self.root_dir = tempfile.mkdtemp(prefix='file_reader')

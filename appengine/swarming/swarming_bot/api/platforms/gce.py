@@ -152,9 +152,8 @@ def oauth2_access_token_with_expiration(account):
     if cached_tok and cached_tok['expiresAt'] >= time.time() + 600:
       return cached_tok['accessToken'], cached_tok['expiresAt']
     # Grab the token.
-    url = (
-        'http://metadata.google.internal/computeMetadata/v1/instance'
-        '/service-accounts/%s/token' % account)
+    url = ('http://metadata.google.internal/computeMetadata/v1/instance'
+           '/service-accounts/%s/token' % account)
     headers = {'Metadata-Flavor': 'Google'}
     access_token, expires_at = oauth.oauth2_access_token_from_url(url, headers)
     tok = {

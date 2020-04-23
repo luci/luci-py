@@ -34,11 +34,11 @@ def global_test_setup():
 def call_rpc(ctx, account_id, scopes):
   r = requests.post(
       url='http://127.0.0.1:%d/rpc/LuciLocalAuthService.GetOAuthToken' %
-          ctx['rpc_port'],
+      ctx['rpc_port'],
       data=json.dumps({
-        'account_id': account_id,
-        'scopes': scopes,
-        'secret': ctx['secret'],
+          'account_id': account_id,
+          'scopes': scopes,
+          'secret': ctx['secret'],
       }),
       headers={'Content-Type': 'application/json'})
   if r.status_code == 200:
@@ -46,10 +46,10 @@ def call_rpc(ctx, account_id, scopes):
   return r.status_code, r.content
 
 
-@unittest.skipIf(
-    sys.platform == 'win32',
-    'TODO(crbug.com/1017545): tearDown fails')
+@unittest.skipIf(sys.platform == 'win32',
+                 'TODO(crbug.com/1017545): tearDown fails')
 class AuthSystemTest(auto_stub.TestCase):
+
   def setUp(self):
     super(AuthSystemTest, self).setUp()
     self.tmp_dir = tempfile.mkdtemp(prefix='bot_main')
@@ -74,28 +74,30 @@ class AuthSystemTest(auto_stub.TestCase):
   def test_get_bot_headers(self):
     # 'get_bot_headers' returns swarming_http_headers.
     exp = int(time.time() + 3600)
-    self.init_auth_system(bot_auth.AuthParams(
-        bot_id='bot_1',
-        task_id='task_1',
-        swarming_http_headers={'Authorization': 'Bearer bot-own-token'},
-        swarming_http_headers_exp=exp,
-        bot_service_account='none',
-        system_service_account='none',
-        task_service_account='none'))
-    self.assertEqual(
-        ({'Authorization': 'Bearer bot-own-token'}, exp),
-        self.auth_sys.get_bot_headers())
+    self.init_auth_system(
+        bot_auth.AuthParams(
+            bot_id='bot_1',
+            task_id='task_1',
+            swarming_http_headers={'Authorization': 'Bearer bot-own-token'},
+            swarming_http_headers_exp=exp,
+            bot_service_account='none',
+            system_service_account='none',
+            task_service_account='none'))
+    self.assertEqual(({
+        'Authorization': 'Bearer bot-own-token'
+    }, exp), self.auth_sys.get_bot_headers())
 
   def test_no_auth(self):
     # Not using service accounts at all -> no LUCI_CONTEXT['local_auth'].
-    local_auth_ctx = self.init_auth_system(bot_auth.AuthParams(
-        bot_id='bot_1',
-        task_id='task_1',
-        swarming_http_headers={'Authorization': 'Bearer bot-own-token'},
-        swarming_http_headers_exp=0,
-        bot_service_account='none',
-        system_service_account='none',
-        task_service_account='none'))
+    local_auth_ctx = self.init_auth_system(
+        bot_auth.AuthParams(
+            bot_id='bot_1',
+            task_id='task_1',
+            swarming_http_headers={'Authorization': 'Bearer bot-own-token'},
+            swarming_http_headers_exp=0,
+            bot_service_account='none',
+            system_service_account='none',
+            task_service_account='none'))
     self.assertIsNone(local_auth_ctx)
 
   def test_task_as_bot(self):
@@ -103,14 +105,15 @@ class AuthSystemTest(auto_stub.TestCase):
 
     # An auth system is configured to use only task account, set to bot's own
     # credentials.
-    local_auth_ctx = self.init_auth_system(bot_auth.AuthParams(
-        bot_id='bot_1',
-        task_id='task_1',
-        swarming_http_headers={'Authorization': 'Bearer bot-own-token'},
-        swarming_http_headers_exp=exp,
-        bot_service_account='bot-account@example.com',
-        system_service_account='none',
-        task_service_account='bot'))
+    local_auth_ctx = self.init_auth_system(
+        bot_auth.AuthParams(
+            bot_id='bot_1',
+            task_id='task_1',
+            swarming_http_headers={'Authorization': 'Bearer bot-own-token'},
+            swarming_http_headers_exp=exp,
+            bot_service_account='bot-account@example.com',
+            system_service_account='none',
+            task_service_account='bot'))
     # Note: default_account_id is omitted when it is None.
     self.assertEqual(['accounts', 'rpc_port', 'secret'], sorted(local_auth_ctx))
 
@@ -137,22 +140,23 @@ class AuthSystemTest(auto_stub.TestCase):
 
     # An auth system is configured to use only system account, set to bot's own
     # credentials.
-    local_auth_ctx = self.init_auth_system(bot_auth.AuthParams(
-        bot_id='bot_1',
-        task_id='task_1',
-        swarming_http_headers={'Authorization': 'Bearer bot-own-token'},
-        swarming_http_headers_exp=exp,
-        bot_service_account='bot-account@example.com',
-        system_service_account='bot',
-        task_service_account='none'))
-    self.assertEqual(
-        ['accounts', 'default_account_id', 'rpc_port', 'secret'],
-        sorted(local_auth_ctx))
+    local_auth_ctx = self.init_auth_system(
+        bot_auth.AuthParams(
+            bot_id='bot_1',
+            task_id='task_1',
+            swarming_http_headers={'Authorization': 'Bearer bot-own-token'},
+            swarming_http_headers_exp=exp,
+            bot_service_account='bot-account@example.com',
+            system_service_account='bot',
+            task_service_account='none'))
+    self.assertEqual(['accounts', 'default_account_id', 'rpc_port', 'secret'],
+                     sorted(local_auth_ctx))
 
     # Only 'system' account is defined (no 'task'), and it is default.
-    self.assertEqual(
-        [{'id': 'system', 'email': 'bot-account@example.com'}],
-        local_auth_ctx['accounts'])
+    self.assertEqual([{
+        'id': 'system',
+        'email': 'bot-account@example.com'
+    }], local_auth_ctx['accounts'])
     self.assertEqual('system', local_auth_ctx['default_account_id'])
 
     # Try to use the local RPC service to grab a 'system' token. Should return
@@ -172,25 +176,29 @@ class AuthSystemTest(auto_stub.TestCase):
 
     # An auth system configured to use both system and task accounts, both set
     # to bot's own credentials.
-    local_auth_ctx = self.init_auth_system(bot_auth.AuthParams(
-        bot_id='bot_1',
-        task_id='task_1',
-        swarming_http_headers={'Authorization': 'Bearer bot-own-token'},
-        swarming_http_headers_exp=exp,
-        bot_service_account='bot-account@example.com',
-        system_service_account='bot',
-        task_service_account='bot'))
-    self.assertEqual(
-        ['accounts', 'default_account_id', 'rpc_port', 'secret'],
-        sorted(local_auth_ctx))
+    local_auth_ctx = self.init_auth_system(
+        bot_auth.AuthParams(
+            bot_id='bot_1',
+            task_id='task_1',
+            swarming_http_headers={'Authorization': 'Bearer bot-own-token'},
+            swarming_http_headers_exp=exp,
+            bot_service_account='bot-account@example.com',
+            system_service_account='bot',
+            task_service_account='bot'))
+    self.assertEqual(['accounts', 'default_account_id', 'rpc_port', 'secret'],
+                     sorted(local_auth_ctx))
 
     # Both are defined, 'system' is default.
-    self.assertEqual(
-        [
-            {'id': 'system', 'email': 'bot-account@example.com'},
-            {'id': 'task', 'email': 'bot-account@example.com'},
-        ],
-        local_auth_ctx['accounts'])
+    self.assertEqual([
+        {
+            'id': 'system',
+            'email': 'bot-account@example.com'
+        },
+        {
+            'id': 'task',
+            'email': 'bot-account@example.com'
+        },
+    ], local_auth_ctx['accounts'])
     self.assertEqual('system', local_auth_ctx.get('default_account_id'))
 
     # Both 'system' and 'task' tokens work.
@@ -214,34 +222,42 @@ class AuthSystemTest(auto_stub.TestCase):
         task_service_account='bot'))
 
     # Email is not available, as indicated by '-'.
-    self.assertEqual(
-        [
-            {'id': 'system', 'email': '-'},
-            {'id': 'task', 'email': '-'},
-        ],
-        local_auth_ctx['accounts'])
+    self.assertEqual([
+        {
+            'id': 'system',
+            'email': '-'
+        },
+        {
+            'id': 'task',
+            'email': '-'
+        },
+    ], local_auth_ctx['accounts'])
 
   @staticmethod
   def mocked_rpc_client(reply):
     class MockedClient(object):
+
       def __init__(self):
         self.calls = []
+
       def mint_oauth_token(self, **kwargs):
         self.calls.append(kwargs)
         if isinstance(reply, Exception):
           raise reply
         return reply
+
     return MockedClient()
 
   def test_minting_via_rpc_ok(self):
-    local_auth_ctx = self.init_auth_system(bot_auth.AuthParams(
-        bot_id='bot_1',
-        task_id='task_1',
-        swarming_http_headers={'Authorization': 'Bearer bot-own-token'},
-        swarming_http_headers_exp=int(time.time() + 3600),
-        bot_service_account='none',
-        system_service_account='abc@example.com',
-        task_service_account='none'))
+    local_auth_ctx = self.init_auth_system(
+        bot_auth.AuthParams(
+            bot_id='bot_1',
+            task_id='task_1',
+            swarming_http_headers={'Authorization': 'Bearer bot-own-token'},
+            swarming_http_headers_exp=int(time.time() + 3600),
+            bot_service_account='none',
+            system_service_account='abc@example.com',
+            task_service_account='none'))
 
     # Email is set.
     self.assertEqual(
@@ -296,14 +312,15 @@ class AuthSystemTest(auto_stub.TestCase):
     self.assertTrue(rpc_client.calls)
 
   def test_minting_via_rpc_fatal_error(self):
-    local_auth_ctx = self.init_auth_system(bot_auth.AuthParams(
-        bot_id='bot_1',
-        task_id='task_1',
-        swarming_http_headers={'Authorization': 'Bearer bot-own-token'},
-        swarming_http_headers_exp=int(time.time() + 3600),
-        bot_service_account='none',
-        system_service_account='abc@example.com',
-        task_service_account='none'))
+    local_auth_ctx = self.init_auth_system(
+        bot_auth.AuthParams(
+            bot_id='bot_1',
+            task_id='task_1',
+            swarming_http_headers={'Authorization': 'Bearer bot-own-token'},
+            swarming_http_headers_exp=int(time.time() + 3600),
+            bot_service_account='none',
+            system_service_account='abc@example.com',
+            task_service_account='none'))
     rpc_client = self.mocked_rpc_client(
         remote_client.MintOAuthTokenError('msg'))
     self.auth_sys.set_remote_client(rpc_client)
@@ -321,14 +338,15 @@ class AuthSystemTest(auto_stub.TestCase):
     self.assertFalse(rpc_client.calls)
 
   def test_minting_via_rpc_switching_to_none(self):
-    local_auth_ctx = self.init_auth_system(bot_auth.AuthParams(
-        bot_id='bot_1',
-        task_id='task_1',
-        swarming_http_headers={'Authorization': 'Bearer bot-own-token'},
-        swarming_http_headers_exp=int(time.time() + 3600),
-        bot_service_account='none',
-        system_service_account='abc@example.com',
-        task_service_account='none'))
+    local_auth_ctx = self.init_auth_system(
+        bot_auth.AuthParams(
+            bot_id='bot_1',
+            task_id='task_1',
+            swarming_http_headers={'Authorization': 'Bearer bot-own-token'},
+            swarming_http_headers_exp=int(time.time() + 3600),
+            bot_service_account='none',
+            system_service_account='abc@example.com',
+            task_service_account='none'))
     rpc_client = self.mocked_rpc_client({'service_account': 'none'})
     self.auth_sys.set_remote_client(rpc_client)
 
@@ -342,14 +360,15 @@ class AuthSystemTest(auto_stub.TestCase):
 
   def test_minting_via_rpc_switching_to_bot(self):
     expiry = int(time.time() + 3600)
-    local_auth_ctx = self.init_auth_system(bot_auth.AuthParams(
-        bot_id='bot_1',
-        task_id='task_1',
-        swarming_http_headers={'Authorization': 'Bearer bot-own-token'},
-        swarming_http_headers_exp=expiry,
-        bot_service_account='none',
-        system_service_account='abc@example.com',
-        task_service_account='none'))
+    local_auth_ctx = self.init_auth_system(
+        bot_auth.AuthParams(
+            bot_id='bot_1',
+            task_id='task_1',
+            swarming_http_headers={'Authorization': 'Bearer bot-own-token'},
+            swarming_http_headers_exp=expiry,
+            bot_service_account='none',
+            system_service_account='abc@example.com',
+            task_service_account='none'))
     rpc_client = self.mocked_rpc_client({'service_account': 'bot'})
     self.auth_sys.set_remote_client(rpc_client)
 

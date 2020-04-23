@@ -20,6 +20,7 @@ if sys.platform == 'darwin':
 @unittest.skipUnless(sys.platform == 'darwin',
                      'Tests only run under darwin platform')
 class TestOsx(unittest.TestCase):
+
   def tearDown(self):
     super(TestOsx, self).tearDown()
     tools.clear_cache_all()

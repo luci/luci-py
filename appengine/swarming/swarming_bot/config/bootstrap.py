@@ -8,6 +8,6 @@
 # executed directly at the CLI.
 # pylint: disable=E0602
 import os, urllib, sys
-urllib.urlretrieve(
-    '%s/bot_code?tok=%s' % (host_url, bootstrap_token), 'swarming_bot.zip')
+urllib.urlretrieve('%s/bot_code?tok=%s' % (host_url, bootstrap_token),
+                   'swarming_bot.zip')
 os.execv(sys.executable, [sys.executable, 'swarming_bot.zip'])

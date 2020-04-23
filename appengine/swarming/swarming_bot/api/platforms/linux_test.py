@@ -114,36 +114,60 @@ class TestCPUInfo(auto_stub.TestCase):
 
   def test_get_cpuinfo_exynos(self):
     self.assertEqual({
-      u'flags': [
-        u'edsp', u'fastmult', u'half', u'idiva', u'idivt', u'neon', u'swp',
-        u'thumb', u'thumbee', u'tls', u'vfp', u'vfpv3', u'vfpv4',
-      ],
-      u'model': (0, 3087, 4),
-      u'name': u'SAMSUNG EXYNOS5',
-      u'revision': u'0000',
-      u'serial': u'',
-      u'vendor': u'ARMv7 Processor rev 4 (v7l)',
+        u'flags': [
+            u'edsp',
+            u'fastmult',
+            u'half',
+            u'idiva',
+            u'idivt',
+            u'neon',
+            u'swp',
+            u'thumb',
+            u'thumbee',
+            u'tls',
+            u'vfp',
+            u'vfpv3',
+            u'vfpv4',
+        ],
+        u'model': (0, 3087, 4),
+        u'name':
+            u'SAMSUNG EXYNOS5',
+        u'revision':
+            u'0000',
+        u'serial':
+            u'',
+        u'vendor':
+            u'ARMv7 Processor rev 4 (v7l)',
     }, self.get_cpuinfo(EXYNOS_CPU_INFO))
 
   def test_get_cpuinfo_cavium(self):
     self.assertEqual({
-      u'flags': [
-        u'aes', u'asimd', u'atomics', u'crc32', u'evtstrm',  u'fp',  u'pmull',
-        u'sha1', u'sha2',
-      ],
-      u'model': (1, 161, 1),
-      u'vendor': u'N/A',
+        u'flags': [
+            u'aes',
+            u'asimd',
+            u'atomics',
+            u'crc32',
+            u'evtstrm',
+            u'fp',
+            u'pmull',
+            u'sha1',
+            u'sha2',
+        ],
+        u'model': (1, 161, 1),
+        u'vendor':
+            u'N/A',
     }, self.get_cpuinfo(CAVIUM_CPU_INFO))
 
   def test_get_cpuinfo_mips(self):
     self.assertEqual({
-      u'flags': [u'mips2', u'mips3', u'mips4', u'mips5', u'mips64r2'],
-      u'name': 'Cavium Octeon II V0.1',
+        u'flags': [u'mips2', u'mips3', u'mips4', u'mips5', u'mips64r2'],
+        u'name': 'Cavium Octeon II V0.1',
     }, self.get_cpuinfo(MIPS64_CPU_INFO))
 
   @unittest.skipIf(not sys.platform.startswith('linux'), 'linux only test')
   def test_get_num_processors(self):
     self.assertTrue(linux.get_num_processors() != 0)
+
 
 K8S_CGROUP = """
 8:freezer:/k8s.io/baa2c4c148cc83e36b7f14fe9145c58b742c82b244f77e32cda50cf8f26a27a5

@@ -23,6 +23,7 @@ import gce
 
 
 class TestGCE(auto_stub.TestCase):
+
   def tearDown(self):
     super(TestGCE, self).tearDown()
     tools.clear_cache_all()
@@ -58,6 +59,7 @@ class TestSignedMetadataToken(auto_stub.TestCase):
     def mocked_raw_metadata_request(path):
       metadata_calls.append(path)
       return jwt
+
     self.mock(gce, '_raw_metadata_request', mocked_raw_metadata_request)
 
     tok, exp = gce.signed_metadata_token('https://example.com')

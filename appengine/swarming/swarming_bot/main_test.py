@@ -30,6 +30,7 @@ from bot_code import bot_main
 
 
 class TestCase(auto_stub.TestCase):
+
   def setUp(self):
     super(TestCase, self).setUp()
     tools.clear_cache_all()
@@ -51,13 +52,13 @@ class SimpleMainTest(TestCase):
   def url(self):
     return 'http://localhost:1'
 
-  @unittest.skipIf(
-      sys.platform == 'win32',
-      'TODO(crbug.com/1017545): fix assertions')
+  @unittest.skipIf(sys.platform == 'win32',
+                   'TODO(crbug.com/1017545): fix assertions')
   def test_attributes(self):
-    actual = json.loads(subprocess42.check_output(
-        [sys.executable, self._zip_file, 'attributes'],
-        stderr=subprocess42.PIPE))
+    actual = json.loads(
+        subprocess42.check_output(
+            [sys.executable, self._zip_file, 'attributes'],
+            stderr=subprocess42.PIPE))
     # get_config() doesn't work when called outside of a zip, so patch the
     # server_version manually with the default value in config/config.json.
     expected = bot_main.get_attributes(None)
@@ -108,11 +109,10 @@ class MainTest(TestCase):
   def test_run_bot_signal(self):
     # Test SIGTERM signal handling. Run it as an external process to not mess
     # things up.
-    proc = subprocess42.Popen(
-        [sys.executable, self._zip_file, 'start_slave'],
-        stdout=subprocess42.PIPE,
-        stderr=subprocess42.STDOUT,
-        detached=True)
+    proc = subprocess42.Popen([sys.executable, self._zip_file, 'start_slave'],
+                              stdout=subprocess42.PIPE,
+                              stderr=subprocess42.STDOUT,
+                              detached=True)
 
     # Wait for the grand-child process to poll the server.
     self._server.has_polled.wait(60)
@@ -129,10 +129,10 @@ class MainTest(TestCase):
       event.pop('state')
       event.pop('version')
     expected = [
-      {
-        u'event': u'bot_shutdown',
-        u'message': u'Signal was received',
-      },
+        {
+            u'event': u'bot_shutdown',
+            u'message': u'Signal was received',
+        },
     ]
     if sys.platform == 'win32':
       # Sadly, the signal handler generate an error.

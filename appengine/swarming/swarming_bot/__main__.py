@@ -32,8 +32,10 @@ sys.path.insert(0, os.path.join(THIS_FILE, 'python_libusb1'))
 
 # Copied from //client/utils/oauth.py.
 sys.path.insert(0, os.path.join(THIS_FILE, 'third_party'))
-sys.path.insert(0, os.path.join(
-    THIS_FILE, 'third_party', 'httplib2', 'python%d' % sys.version_info.major))
+sys.path.insert(
+    0,
+    os.path.join(THIS_FILE, 'third_party', 'httplib2',
+                 'python%d' % sys.version_info.major))
 sys.path.insert(0, os.path.join(THIS_FILE, 'third_party', 'pyasn1'))
 sys.path.insert(0, os.path.join(THIS_FILE, 'third_party', 'pyasn1_modules'))
 sys.path.insert(0, os.path.join(THIS_FILE, 'third_party', 'rsa'))
@@ -83,8 +85,11 @@ def CMDattributes(_args):
   from bot_code import bot_main
   botobj = bot_main.get_bot(bot_main.get_config())
   json.dump(
-      bot_main.get_attributes(botobj), sys.stdout, indent=2,
-      sort_keys=True, separators=(',', ': '))
+      bot_main.get_attributes(botobj),
+      sys.stdout,
+      indent=2,
+      sort_keys=True,
+      separators=(',', ': '))
   print('')
   return 0
 
@@ -161,10 +166,10 @@ def CMDshell(args):
   from api import os_utilities
   from api import platforms
   local_vars = {
-    'bot_main': bot_main,
-    'json': json,
-    'os_utilities': os_utilities,
-    'platforms': platforms,
+      'bot_main': bot_main,
+      'json': json,
+      'os_utilities': os_utilities,
+      'platforms': platforms,
   }
   # Can't use: from api.platforms import *
   local_vars.update(
@@ -175,8 +180,8 @@ def CMDshell(args):
     for arg in args:
       exec code.compile_command(arg) in local_vars
   else:
-    code.interact(
-        'Locals:\n  ' + '\n  '.join( sorted(local_vars)), None, local_vars)
+    code.interact('Locals:\n  ' + '\n  '.join(sorted(local_vars)), None,
+                  local_vars)
   return 0
 
 
@@ -184,11 +189,10 @@ def CMDstart_bot(args):
   """Starts the swarming bot."""
   logging_utils.prepare_logging(os.path.join('logs', 'swarming_bot.log'))
   from bot_code import bot_main
-  logging.info(
-      'importing bot_main: %s, %s', THIS_FILE, bot_main.generate_version())
+  logging.info('importing bot_main: %s, %s', THIS_FILE,
+               bot_main.generate_version())
   adb_logger = logging.getLogger('adb')
-  logging_utils.prepare_logging(os.path.join('logs', 'adb.log'),
-                                adb_logger)
+  logging_utils.prepare_logging(os.path.join('logs', 'adb.log'), adb_logger)
   adb_logger.setLevel(logging.DEBUG)
   for child in ('high', 'low', 'usb', 'cmd'):
     adb_logger.getChild(child).setLevel(logging.DEBUG)
@@ -205,7 +209,8 @@ def CMDstart_slave(args):
 
   parser = optparse.OptionParser()
   parser.add_option(
-      '--survive', action='store_true',
+      '--survive',
+      action='store_true',
       help='Do not reboot the host even if bot_config.setup_bot() asked to')
   options, args = parser.parse_args(args)
 

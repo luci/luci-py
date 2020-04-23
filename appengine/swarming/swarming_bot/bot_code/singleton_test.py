@@ -50,9 +50,8 @@ class Test(unittest.TestCase):
     finally:
       f.release()
 
-  @unittest.skipIf(
-      sys.platform == 'win32',
-      'TODO(crbug.com/1017545): fail subprocess')
+  @unittest.skipIf(sys.platform == 'win32',
+                   'TODO(crbug.com/1017545): fail subprocess')
   def test_singleton_child(self):
     logging.info('using command:\n%s', ' '.join(CMD_ACQUIRE))
     with singleton.singleton(THIS_DIR):

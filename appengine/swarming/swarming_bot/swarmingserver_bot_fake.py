@@ -47,6 +47,7 @@ def flatten_task_updates(updates):
 
 class Handler(httpserver.Handler):
   """Minimal Swarming bot server fake implementation."""
+
   def do_GET(self):
     if self.path == '/swarming/api/v1/bot/server_ping':
       self.send_response(200)

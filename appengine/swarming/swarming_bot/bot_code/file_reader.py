@@ -42,7 +42,7 @@ class FileReaderThread(object):
       FatalReadError is the file cannot be read even after many retries.
     """
     assert self._thread is None
-    self._read() # initial read
+    self._read()  # initial read
     self._thread = threading.Thread(
         target=self._run, name='FileReaderThread %s' % self._path)
     self._thread.daemon = True
@@ -53,7 +53,7 @@ class FileReaderThread(object):
     if not self._thread:
       return
     self._signal.put(None)
-    self._thread.join(60) # don't wait forever
+    self._thread.join(60)  # don't wait forever
     if self._thread.is_alive():
       logging.error('FileReaderThread failed to terminate in time')
 
@@ -78,7 +78,7 @@ class FileReaderThread(object):
           if self._last_value != body:
             logging.info('Read %s', self._path)
             self._last_value = body
-        return True # success!
+        return True  # success!
       except (IOError, OSError, ValueError) as e:
         last_error = 'Failed to read auth headers from %s: %s' % (self._path, e)
       attempts -= 1

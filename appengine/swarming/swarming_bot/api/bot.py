@@ -32,10 +32,11 @@ def _get_stripper(paths):
 
   stdlib = os.path.dirname(os.__file__)
   # Find the common root for paths not in stdlib and not relative.
-  split_paths = [
-    [c for c in p.split(os.path.sep) if c] for p in paths
-    if os.path.isabs(p) and not p.startswith(stdlib)
-  ]
+  split_paths = [[c
+                  for c in p.split(os.path.sep)
+                  if c]
+                 for p in paths
+                 if os.path.isabs(p) and not p.startswith(stdlib)]
   common = None
   if split_paths:
     common = []
@@ -51,12 +52,13 @@ def _get_stripper(paths):
 
   def stripper(f):
     if f.startswith(stdlib):
-      return f[len(stdlib)+1:]
+      return f[len(stdlib) + 1:]
     if os.path.isabs(f) and common:
-      return f[len(common)+1:]
+      return f[len(common) + 1:]
     if f.startswith('./'):
       return f[2:]
     return f
+
   return stripper
 
 
@@ -68,16 +70,15 @@ def _make_stack():
     frames.append(frame)
     frame = frame.f_back
   strip = _get_stripper(f.f_code.co_filename for f in frames)
-  return '\n'.join(
-      '  %-2d %s:%s:%s()' % (
-        i, strip(f.f_code.co_filename), f.f_lineno, f.f_code.co_name)
-      for i, f in enumerate(frames))
+  return '\n'.join('  %-2d %s:%s:%s()' % (i, strip(f.f_code.co_filename),
+                                          f.f_lineno, f.f_code.co_name)
+                   for i, f in enumerate(frames))
 
 
 class Bot(object):
-  def __init__(
-      self, remote, attributes, server, server_version, base_dir,
-      shutdown_hook):
+
+  def __init__(self, remote, attributes, server, server_version, base_dir,
+               shutdown_hook):
     # Do not expose attributes for now, as attributes may be refactored.
     assert server is None or not server.endswith('/'), server
     # Immutable.
@@ -255,7 +256,7 @@ class Bot(object):
     # is taking longer than N minutes, it probably not going to finish at all.
     # Report this to the server.
     try:
-      os_utilities.host_reboot(message, timeout=15*60)
+      os_utilities.host_reboot(message, timeout=15 * 60)
     except LookupError:
       # This is a special case where OSX is deeply hosed. In that case the disk
       # is likely in read-only mode and there isn't much that can be done. This

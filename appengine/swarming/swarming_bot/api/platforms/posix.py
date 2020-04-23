@@ -20,9 +20,10 @@ def _run_df():
     4. used in percent
     5. mount point
   """
-  proc = subprocess.Popen(
-      ['/bin/df', '-k', '-P', '-l'], env={'LANG': 'C'},
-      stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+  proc = subprocess.Popen(['/bin/df', '-k', '-P', '-l'],
+                          env={'LANG': 'C'},
+                          stdout=subprocess.PIPE,
+                          stderr=subprocess.PIPE)
   for l in proc.communicate()[0].splitlines():
     l = l.decode('utf-8')
     if l.startswith(u'/dev/'):
@@ -54,13 +55,13 @@ def get_disks_info():
       # Sometimes df lists paths that cannot be stat'ed, ignore them.
       continue
     out[path] = {
-      # Do not use the value reported by 'df' since it includes all the free
-      # space, including the free space reserved by root. Since the Swarming bot
-      # is likely not running as root, it present an inflated value of what is
-      # usable.
-      #u'free_mb': round(float(items[3]) / 1024., 1),
-      u'free_mb': round(float(f.f_bfree * f.f_frsize) / 1024. / 1024., 1),
-      u'size_mb': round(float(block_size) / 1024., 1),
+        # Do not use the value reported by 'df' since it includes all the free
+        # space, including the free space reserved by root. Since the Swarming
+        # bot is likely not running as root, it present an inflated value of
+        # what is usable.
+        #u'free_mb': round(float(items[3]) / 1024., 1),
+        u'free_mb': round(float(f.f_bfree * f.f_frsize) / 1024. / 1024., 1),
+        u'size_mb': round(float(block_size) / 1024., 1),
     }
 
   return out

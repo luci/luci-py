@@ -33,7 +33,7 @@ class FileRefresherThread(object):
   def start(self):
     """Starts a thread that dumps value to the file."""
     assert self._thread is None
-    self._dump() # initial dump
+    self._dump()  # initial dump
     self._thread = threading.Thread(
         target=self._run, name='FileRefresherThread %s' % self._path)
     self._thread.daemon = True
@@ -44,7 +44,7 @@ class FileRefresherThread(object):
     if not self._thread:
       return
     self._signal.put(None)
-    self._thread.join(60) # don't wait forever
+    self._thread.join(60)  # don't wait forever
     if self._thread.is_alive():
       logging.error('FileRefresherThread failed to terminate in time')
 
@@ -64,7 +64,7 @@ class FileRefresherThread(object):
       logging.exception('Unexpected exception in the callback')
       return True
     if blob == self._last_dumped_blob:
-      return True # already have it on disk
+      return True  # already have it on disk
 
     # On Windows the file may be locked by reading process. Don't freak out,
     # just retry a bit later.
@@ -74,7 +74,7 @@ class FileRefresherThread(object):
         file_path.atomic_replace(self._path, blob)
         self._last_dumped_blob = blob
         logging.info('Updated %s', self._path)
-        return True # success!
+        return True  # success!
       except (IOError, OSError) as e:
         logging.error('Failed to update the file: %s', e)
       if not attempts:

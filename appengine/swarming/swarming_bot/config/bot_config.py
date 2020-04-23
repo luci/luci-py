@@ -68,62 +68,63 @@ def get_settings(bot):
   # Here is the default values. Keep in sync with the default values in
   # ../bot_code/bot_main.py.
   return {
-    # Free partition (disk) space to keep and to self-quarantine on.
-    #
-    # The exact minimum free space can be calculated with:
-    #   max(disk_size * 'min_percent', min('size', disk_size * 'max_percent'))
-    # where 'min_percent' and 'max_percent' are relative to the total partition
-    # size.
-    # Setting any value to 0 disables the check for that value.
-    # Setting all values to 0 disables the minimum free disk space check.
-    # In practice, with the default values:
-    # - For disks <27GB this will be "disk_size * max_percent"
-    # - For disks 27GB-80GB this will be 4GB
-    # - For disks >80GB this will be "disk_size * min_percent"
-    #
-    # When trimming the cache, 'wiggle' is added to the value selected above.
-    #
-    'free_partition': {
-      # Settings specifically for the OS root partition: / on Linux
-      # distributions and OSX, generally (but not necessarily) C:\ on Windows).
-      # If the bot runs on the root partition, these values are ignored.
-      'root': {
-        # Minimum free space in bytes to use, if lower than 'max_percent'.
-        'size': 1 * 1024*1024*1024,
-        # Maximum free space in percent to ensure to keep free, if lower than
-        # 'size'.
-        'max_percent': 10.,
-        # Minimum of of free space percentage, even if higher than 'size'.
-        'min_percent': 6.,
+      # Free partition (disk) space to keep and to self-quarantine on.
+      #
+      # The exact minimum free space can be calculated with:
+      #   max(disk_size * 'min_percent', min('size', disk_size * 'max_percent'))
+      # where 'min_percent' and 'max_percent' are relative to the total
+      # partition size.
+      # Setting any value to 0 disables the check for that value.
+      # Setting all values to 0 disables the minimum free disk space check.
+      # In practice, with the default values:
+      # - For disks <27GB this will be "disk_size * max_percent"
+      # - For disks 27GB-80GB this will be 4GB
+      # - For disks >80GB this will be "disk_size * min_percent"
+      #
+      # When trimming the cache, 'wiggle' is added to the value selected above.
+      #
+      'free_partition': {
+          # Settings specifically for the OS root partition: / on Linux
+          # distributions and OSX, generally (but not necessarily)
+          # C:\ on Windows).
+          # If the bot runs on the root partition, these values are ignored.
+          'root': {
+              # Minimum free space in bytes to use, if lower than 'max_percent'.
+              'size': 1 * 1024 * 1024 * 1024,
+              # Maximum free space in percent to ensure to keep free, if lower
+              # than 'size'.
+              'max_percent': 10.,
+              # Minimum of of free space percentage, even if higher than 'size'.
+              'min_percent': 6.,
+          },
+          # Settings specifically for the partition in which the bot runs on.
+          # These values are expected to be higher than 'root' values.
+          'bot': {
+              'size': 4 * 1024 * 1024 * 1024,
+              'max_percent': 15.,
+              'min_percent': 7.,
+              # Number of bytes to add to the minimum value selected above when
+              # calculating the isolated cache trimming. This is to ensure that
+              # system level processes writing logs and such do not cause to
+              # criss the self-quarantine line while the bot is idle.
+              'wiggle': 250 * 1024 * 1024,
+          },
       },
-      # Settings specifically for the partition in which the bot runs on. These
-      # values are expected to be higher than 'root' values.
-      'bot': {
-        'size': 4 * 1024*1024*1024,
-        'max_percent': 15.,
-        'min_percent': 7.,
-        # Number of bytes to add to the minimum value selected above when
-        # calculating the isolated cache trimming. This is to ensure that system
-        # level processes writing logs and such do not cause to criss the
-        # self-quarantine line while the bot is idle.
-        'wiggle': 250 * 1024*1024,
+      # Local caches settings.
+      'caches': {
+          # Local isolated cache settings, used for isolated tasks. The cache
+          # actual size is bounded by the lesser of all 3:
+          # - The cache total size in bytes
+          # - The number of items in the cache
+          # - The cache is further trimmed until 'free_partition' value is
+          #   respected.
+          'isolated': {
+              # Maximum local isolated cache size in bytes.
+              'size': 50 * 1024 * 1024 * 1024,
+              # Maximum number of items in the local isolated cache.
+              'items': 50 * 1024,
+          },
       },
-    },
-    # Local caches settings.
-    'caches': {
-      # Local isolated cache settings, used for isolated tasks. The cache actual
-      # size is bounded by the lesser of all 3:
-      # - The cache total size in bytes
-      # - The number of items in the cache
-      # - The cache is further trimmed until 'free_partition' value is
-      #   respected.
-      'isolated': {
-        # Maximum local isolated cache size in bytes.
-        'size': 50 * 1024*1024*1024,
-        # Maximum number of items in the local isolated cache.
-        'items': 50*1024,
-      },
-    },
   }
 
 
@@ -176,8 +177,8 @@ def get_authentication_headers(bot):
     # By default, VMs do not have "User info" API enabled, as commented above.
     # When this is the case, the oauth token is unusable. So do not use the
     # oauth token in this case and fall back to IP based whitelisting.
-    if ('https://www.googleapis.com/auth/userinfo.email' in
-        platforms.gce.oauth2_available_scopes('default')):
+    if ('https://www.googleapis.com/auth/userinfo.email' in platforms.gce
+        .oauth2_available_scopes('default')):
       tok, exp = platforms.gce.oauth2_access_token_with_expiration('default')
       return {'Authorization': 'Bearer %s' % tok}, exp
   return (None, None)

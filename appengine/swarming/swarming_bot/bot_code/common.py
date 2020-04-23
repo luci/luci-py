@@ -30,6 +30,7 @@ def exec_python(args):
     # TODO(maruel): If stdin closes, it tells the child process that the parent
     # process died.
     proc = subprocess42.Popen(cmd, detached=True, stdin=subprocess42.PIPE)
+
     def handler(sig, _):
       logging.info('Got signal %s', sig)
       # Always send SIGTERM, which is properly translated.

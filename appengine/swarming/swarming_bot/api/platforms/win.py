@@ -51,9 +51,9 @@ def _get_mount_points():
   DRIVE_FIXED = 3
   # https://msdn.microsoft.com/library/windows/desktop/aa364939.aspx
   return [
-    u'%s:\\' % letter
-    for letter in string.lowercase
-    if ctypes.windll.kernel32.GetDriveTypeW(letter + ':\\') == DRIVE_FIXED
+      u'%s:\\' % letter
+      for letter in string.lowercase
+      if ctypes.windll.kernel32.GetDriveTypeW(letter + ':\\') == DRIVE_FIXED
   ]
 
 
@@ -299,9 +299,9 @@ def get_audio():
     return None
   # https://msdn.microsoft.com/library/aa394463.aspx
   return [
-    device.Name
-    for device in wbem.ExecQuery('SELECT * FROM Win32_SoundDevice')
-    if device.Status == 'OK'
+      device.Name
+      for device in wbem.ExecQuery('SELECT * FROM Win32_SoundDevice')
+      if device.Status == 'OK'
   ]
 
 
@@ -352,11 +352,15 @@ def get_cpuinfo():
     name, _ = _winreg.QueryValueEx(k, 'ProcessorNameString')
     vendor, _ = _winreg.QueryValueEx(k, 'VendorIdentifier')
     return {
-      u'model': [
-        int(match.group(1)), int(match.group(2)), int(match.group(3))
-      ],
-      u'name': name,
-      u'vendor': vendor,
+        u'model': [
+            int(match.group(1)),
+            int(match.group(2)),
+            int(match.group(3))
+        ],
+        u'name':
+            name,
+        u'vendor':
+            vendor,
     }
   finally:
     k.Close()
@@ -419,13 +423,13 @@ def get_integrity_level():
     return None
 
   mapping = {
-    0x0000: u'untrusted',
-    0x1000: u'low',
-    0x2000: u'medium',
-    0x2100: u'medium high',
-    0x3000: u'high',
-    0x4000: u'system',
-    0x5000: u'protected process',
+      0x0000: u'untrusted',
+      0x1000: u'low',
+      0x2000: u'medium',
+      0x2100: u'medium high',
+      0x3000: u'high',
+      0x4000: u'system',
+      0x5000: u'protected process',
   }
 
   # This was specifically written this way to work on cygwin except for the
@@ -434,15 +438,16 @@ def get_integrity_level():
   BOOL = ctypes.c_long
   DWORD = ctypes.c_ulong
   HANDLE = ctypes.c_void_p
+
   class SID_AND_ATTRIBUTES(ctypes.Structure):
     _fields_ = [
-      ('Sid', ctypes.c_void_p),
-      ('Attributes', DWORD),
+        ('Sid', ctypes.c_void_p),
+        ('Attributes', DWORD),
     ]
 
   class TOKEN_MANDATORY_LABEL(ctypes.Structure):
     _fields_ = [
-      ('Label', SID_AND_ATTRIBUTES),
+        ('Label', SID_AND_ATTRIBUTES),
     ]
 
   TOKEN_READ = DWORD(0x20008)
@@ -457,11 +462,12 @@ def get_integrity_level():
   ctypes.windll.kernel32.GetLastError.restype = DWORD
   ctypes.windll.kernel32.GetCurrentProcess.argtypes = ()
   ctypes.windll.kernel32.GetCurrentProcess.restype = ctypes.c_void_p
-  ctypes.windll.advapi32.OpenProcessToken.argtypes = (
-      HANDLE, DWORD, ctypes.POINTER(HANDLE))
+  ctypes.windll.advapi32.OpenProcessToken.argtypes = (HANDLE, DWORD,
+                                                      ctypes.POINTER(HANDLE))
   ctypes.windll.advapi32.OpenProcessToken.restype = BOOL
-  ctypes.windll.advapi32.GetTokenInformation.argtypes = (
-      HANDLE, ctypes.c_long, ctypes.c_void_p, DWORD, ctypes.POINTER(DWORD))
+  ctypes.windll.advapi32.GetTokenInformation.argtypes = (HANDLE, ctypes.c_long,
+                                                         ctypes.c_void_p, DWORD,
+                                                         ctypes.POINTER(DWORD))
   ctypes.windll.advapi32.GetTokenInformation.restype = BOOL
   ctypes.windll.advapi32.GetSidSubAuthorityCount.argtypes = [ctypes.c_void_p]
   ctypes.windll.advapi32.GetSidSubAuthorityCount.restype = ctypes.POINTER(
@@ -472,10 +478,8 @@ def get_integrity_level():
   # First open the current process token, query it, then close everything.
   token = ctypes.c_void_p()
   proc_handle = ctypes.windll.kernel32.GetCurrentProcess()
-  if not ctypes.windll.advapi32.OpenProcessToken(
-      proc_handle,
-      TOKEN_READ,
-      ctypes.byref(token)):
+  if not ctypes.windll.advapi32.OpenProcessToken(proc_handle, TOKEN_READ,
+                                                 ctypes.byref(token)):
     logging.error('Failed to get process\' token')
     return None
   if token.value == 0:
@@ -486,29 +490,22 @@ def get_integrity_level():
     # used will have the SID appened right after the TOKEN_MANDATORY_LABEL in
     # the heap allocated memory block, with .Label.Sid pointing to it.
     info_size = DWORD()
-    if ctypes.windll.advapi32.GetTokenInformation(
-        token,
-        TokenIntegrityLevel,
-        ctypes.c_void_p(),
-        info_size,
-        ctypes.byref(info_size)):
+    if ctypes.windll.advapi32.GetTokenInformation(token, TokenIntegrityLevel,
+                                                  ctypes.c_void_p(), info_size,
+                                                  ctypes.byref(info_size)):
       logging.error('GetTokenInformation() failed expectation')
       return None
     if info_size.value == 0:
       logging.error('GetTokenInformation() returned size 0')
       return None
     if ctypes.windll.kernel32.GetLastError() != ERROR_INSUFFICIENT_BUFFER:
-      logging.error(
-          'GetTokenInformation(): Unknown error: %d',
-          ctypes.windll.kernel32.GetLastError())
+      logging.error('GetTokenInformation(): Unknown error: %d',
+                    ctypes.windll.kernel32.GetLastError())
       return None
     token_info = TOKEN_MANDATORY_LABEL()
     ctypes.resize(token_info, info_size.value)
     if not ctypes.windll.advapi32.GetTokenInformation(
-        token,
-        TokenIntegrityLevel,
-        ctypes.byref(token_info),
-        info_size,
+        token, TokenIntegrityLevel, ctypes.byref(token_info), info_size,
         ctypes.byref(info_size)):
       logging.error(
           'GetTokenInformation(): Unknown error with buffer size %d: %d',
@@ -529,18 +526,19 @@ def get_integrity_level():
 def get_physical_ram():
   """Returns the amount of installed RAM in Mb, rounded to the nearest number.
   """
+
   # https://msdn.microsoft.com/library/windows/desktop/aa366589.aspx
   class MemoryStatusEx(ctypes.Structure):
     _fields_ = [
-      ('dwLength', ctypes.c_ulong),
-      ('dwMemoryLoad', ctypes.c_ulong),
-      ('dwTotalPhys', ctypes.c_ulonglong),
-      ('dwAvailPhys', ctypes.c_ulonglong),
-      ('dwTotalPageFile', ctypes.c_ulonglong),
-      ('dwAvailPageFile', ctypes.c_ulonglong),
-      ('dwTotalVirtual', ctypes.c_ulonglong),
-      ('dwAvailVirtual', ctypes.c_ulonglong),
-      ('dwAvailExtendedVirtual', ctypes.c_ulonglong),
+        ('dwLength', ctypes.c_ulong),
+        ('dwMemoryLoad', ctypes.c_ulong),
+        ('dwTotalPhys', ctypes.c_ulonglong),
+        ('dwAvailPhys', ctypes.c_ulonglong),
+        ('dwTotalPageFile', ctypes.c_ulonglong),
+        ('dwAvailPageFile', ctypes.c_ulonglong),
+        ('dwTotalVirtual', ctypes.c_ulonglong),
+        ('dwAvailVirtual', ctypes.c_ulonglong),
+        ('dwAvailExtendedVirtual', ctypes.c_ulonglong),
     ]
   stat = MemoryStatusEx()
   stat.dwLength = ctypes.sizeof(MemoryStatusEx)  # pylint: disable=W0201

@@ -85,11 +85,12 @@ def get_isolated_args(work_dir, task_details, isolated_result,
 
   # Isolated options.
   if task_details.isolated:
-    cmd.extend(
-        [
-          '-I', task_details.isolated['server'].encode('utf-8'),
-          '--namespace', task_details.isolated['namespace'].encode('utf-8'),
-        ])
+    cmd.extend([
+        '-I',
+        task_details.isolated['server'].encode('utf-8'),
+        '--namespace',
+        task_details.isolated['namespace'].encode('utf-8'),
+    ])
     isolated_input = task_details.isolated.get('input')
     if isolated_input:
       cmd.extend(
@@ -103,11 +104,12 @@ def get_isolated_args(work_dir, task_details, isolated_result,
   cmd.extend(['--named-cache-root', os.path.join(bot_dir, 'c')])
   if task_details.caches:
     for c in task_details.caches:
-      cmd.extend(
-          [
-            '--named-cache', c['name'], c['path'].replace('/', os.sep),
-            c['hint'],
-          ])
+      cmd.extend([
+          '--named-cache',
+          c['name'],
+          c['path'].replace('/', os.sep),
+          c['hint'],
+      ])
 
   # Expected output files:
   for output in task_details.outputs:
@@ -119,26 +121,31 @@ def get_isolated_args(work_dir, task_details, isolated_result,
     cmd.append('--cipd-enabled')
     for pkg in task_details.cipd_input.get('packages', []):
       cmd.extend([
-        '--cipd-package',
-        '%s:%s:%s' % (pkg['path'], pkg['package_name'], pkg['version'])])
-    cmd.extend(
-        [
-          '--cipd-cache', os.path.join(bot_dir, 'cipd_cache'),
-          '--cipd-client-package',
-          task_details.cipd_input['client_package']['package_name'],
-          '--cipd-client-version',
-          task_details.cipd_input['client_package']['version'],
-          '--cipd-server', task_details.cipd_input.get('server'),
-        ])
-
-  cmd.extend(
-      [
-        # Switch to 'task' logical account, if it is set.
-        '--switch-to-account', 'task',
-        '--json', isolated_result,
-        '--log-file', os.path.join(bot_dir, 'logs', 'run_isolated.log'),
-        '--root-dir', work_dir,
+          '--cipd-package',
+          '%s:%s:%s' % (pkg['path'], pkg['package_name'], pkg['version'])
       ])
+    cmd.extend([
+        '--cipd-cache',
+        os.path.join(bot_dir, 'cipd_cache'),
+        '--cipd-client-package',
+        task_details.cipd_input['client_package']['package_name'],
+        '--cipd-client-version',
+        task_details.cipd_input['client_package']['version'],
+        '--cipd-server',
+        task_details.cipd_input.get('server'),
+    ])
+
+  cmd.extend([
+      # Switch to 'task' logical account, if it is set.
+      '--switch-to-account',
+      'task',
+      '--json',
+      isolated_result,
+      '--log-file',
+      os.path.join(bot_dir, 'logs', 'run_isolated.log'),
+      '--root-dir',
+      work_dir,
+  ])
   if bot_file:
     cmd.extend(('--bot-file', bot_file))
 
@@ -173,13 +180,12 @@ def get_isolated_args(work_dir, task_details, isolated_result,
 
 class Containment(object):
   """Containment details."""
-  _EXPECTED = frozenset(
-      (
-        'containment_type',
-        'limit_processes',
-        'limit_total_committed_memory',
-        'lower_priority',
-      ))
+  _EXPECTED = frozenset((
+      'containment_type',
+      'limit_processes',
+      'limit_total_committed_memory',
+      'lower_priority',
+  ))
 
   def __init__(self, data):
     if set(data) != self._EXPECTED:
@@ -200,9 +206,8 @@ class Containment(object):
     if self.limit_processes:
       out.extend(('--limit-processes', str(self.limit_processes)))
     if self.limit_total_committed_memory:
-      out.extend(
-          ('--limit-total-committed-memory',
-            str(self.limit_total_committed_memory)))
+      out.extend(('--limit-total-committed-memory',
+                  str(self.limit_total_committed_memory)))
     return out
 
 
@@ -211,29 +216,28 @@ class TaskDetails(object):
 
   It only contains what the bot needs to know.
   """
-  _EXPECTED = frozenset(
-      (
-        'bot_authenticated_as',
-        'bot_id',
-        'caches',
-        'cipd_input',
-        'command',
-        'containment',
-        'dimensions',
-        'env',
-        'env_prefixes',
-        'extra_args',
-        'grace_period',
-        'hard_timeout',
-        'host',
-        'io_timeout',
-        'isolated',
-        'outputs',
-        'relative_cwd',
-        'secret_bytes',
-        'service_accounts',
-        'task_id',
-      ))
+  _EXPECTED = frozenset((
+      'bot_authenticated_as',
+      'bot_id',
+      'caches',
+      'cipd_input',
+      'command',
+      'containment',
+      'dimensions',
+      'env',
+      'env_prefixes',
+      'extra_args',
+      'grace_period',
+      'hard_timeout',
+      'host',
+      'io_timeout',
+      'isolated',
+      'outputs',
+      'relative_cwd',
+      'secret_bytes',
+      'service_accounts',
+      'task_id',
+  ))
 
   def __init__(self, data):
     logging.info('TaskDetails(%s)', data)
@@ -259,11 +263,11 @@ class TaskDetails(object):
     self.caches = data['caches']
 
     self.env = {
-      k.encode('utf-8'): v.encode('utf-8') for k, v in data['env'].items()
+        k.encode('utf-8'): v.encode('utf-8') for k, v in data['env'].items()
     }
     self.env_prefixes = {
-      k.encode('utf-8'): [path.encode('utf-8') for path in v]
-      for k, v in (data.get('env_prefixes') or {}).items()
+        k.encode('utf-8'): [path.encode('utf-8') for path in v]
+        for k, v in (data.get('env_prefixes') or {}).items()
     }
     self.grace_period = data['grace_period']
     self.hard_timeout = data['hard_timeout']
@@ -288,6 +292,7 @@ class TaskDetails(object):
 
 class ExitSignal(Exception):
   """Raised on a signal that the process must exit immediately."""
+
   def __init__(self, sig):
     super(ExitSignal, self).__init__(u'task_runner received signal %s' % sig)
     self.signal = sig
@@ -297,9 +302,8 @@ class InternalError(Exception):
   """Raised on unrecoverable errors that abort task with 'internal error'."""
 
 
-def load_and_run(
-    in_file, swarming_server, is_grpc, cost_usd_hour, start, out_file,
-    run_isolated_flags, bot_file, auth_params_file):
+def load_and_run(in_file, swarming_server, is_grpc, cost_usd_hour, start,
+                 out_file, run_isolated_flags, bot_file, auth_params_file):
   """Loads the task's metadata, prepares auth environment and executes the task.
 
   This may throw all sorts of exceptions in case of failure. It's up to the
@@ -397,11 +401,11 @@ def load_and_run(
     logging.exception('Exception caught in run_command().')
     if not task_result:
       task_result = {
-        u'exit_code': -1,
-        u'hard_timeout': False,
-        u'io_timeout': False,
-        u'must_signal_internal_failure': str(e.message or 'unknown error'),
-        u'version': OUT_VERSION,
+          u'exit_code': -1,
+          u'hard_timeout': False,
+          u'io_timeout': False,
+          u'must_signal_internal_failure': str(e.message or 'unknown error'),
+          u'version': OUT_VERSION,
       }
   finally:
     # We've found tests to delete the working directory work_dir when quitting,
@@ -437,11 +441,11 @@ def fail_without_command(remote, task_id, params, cost_usd_hour, task_start,
   # Ignore server reply to stop.
   remote.post_task_update(task_id, params, (stdout, 0), 1)
   return {
-    u'exit_code': exit_code,
-    u'hard_timeout': False,
-    u'io_timeout': False,
-    u'must_signal_internal_failure': None,
-    u'version': OUT_VERSION,
+      u'exit_code': exit_code,
+      u'hard_timeout': False,
+      u'io_timeout': False,
+      u'must_signal_internal_failure': None,
+      u'version': OUT_VERSION,
   }
 
 
@@ -572,8 +576,8 @@ class _OutputBuffer(object):
     - self._last_pop was more than "self._max_packet_interval seconds ago".
     """
     packet_interval = (
-        self._min_packet_interval if self._stdout
-        else self._max_packet_interval)
+        self._min_packet_interval
+        if self._stdout else self._max_packet_interval)
     return (
         len(self._stdout) >= self._max_chunk_size or
         (self._last_loop - self._last_pop) > packet_interval)
@@ -626,7 +630,7 @@ def run_command(remote, task_details, work_dir, cost_usd_hour,
   # _reap_task() in task_scheduler.py for more information.
   start = monotonic_time()
   params = {
-    'cost_usd': cost_usd_hour * (start - task_start) / 60. / 60.,
+      'cost_usd': cost_usd_hour * (start - task_start) / 60. / 60.,
   }
   if not remote.post_task_update(task_details.task_id, params):
     # Don't even bother, the task was already canceled.
@@ -639,11 +643,11 @@ def run_command(remote, task_details, work_dir, cost_usd_hour,
     params['canceled'] = True
     remote.post_task_update(task_details.task_id, params, exit_code=-1)
     return {
-      u'exit_code': -1,
-      u'hard_timeout': False,
-      u'io_timeout': False,
-      u'must_signal_internal_failure': None,
-      u'version': OUT_VERSION,
+        u'exit_code': -1,
+        u'hard_timeout': False,
+        u'io_timeout': False,
+        u'must_signal_internal_failure': None,
+        u'version': OUT_VERSION,
     }
 
   isolated_result = os.path.join(work_dir, 'isolated_result.json')
@@ -778,8 +782,8 @@ def run_command(remote, task_details, work_dir, cost_usd_hour,
           params['bot_overhead'] = params['duration']
           params['duration'] = run_isolated_result['duration']
           params['bot_overhead'] -= params['duration']
-          params['bot_overhead'] -= run_isolated_result.get(
-              'download', {}).get('duration', 0)
+          params['bot_overhead'] -= run_isolated_result.get('download', {}).get(
+              'duration', 0)
           params['bot_overhead'] -= run_isolated_result.get(
               'upload', {}).get('duration', 0)
           params['bot_overhead'] -= run_isolated_result.get(
@@ -844,11 +848,11 @@ def run_command(remote, task_details, work_dir, cost_usd_hour,
         must_signal_internal_failure = str(e.message or 'unknown error')
 
     return {
-      u'exit_code': exit_code,
-      u'hard_timeout': had_hard_timeout,
-      u'io_timeout': had_io_timeout,
-      u'must_signal_internal_failure': must_signal_internal_failure,
-      u'version': OUT_VERSION,
+        u'exit_code': exit_code,
+        u'hard_timeout': had_hard_timeout,
+        u'io_timeout': had_io_timeout,
+        u'must_signal_internal_failure': must_signal_internal_failure,
+        u'version': OUT_VERSION,
     }
   finally:
     file_path.try_remove(unicode(isolated_result))
