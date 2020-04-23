@@ -81,7 +81,7 @@ TrustedDelegatee = collections.namedtuple('TrustedDelegatee', [
 ])
 
 
-# Read-only hashable representation of a single ExtenalSchedulerConfig
+# Read-only hashable representation of a single ExternalSchedulerConfig
 ExternalSchedulerConfig = collections.namedtuple('ExternalScheduler', [
   # Service address.
   'address',
@@ -122,7 +122,7 @@ _TaskTemplateDeployment = collections.namedtuple('_TaskTemplateDeployment', [
   #
   # NOTE: some tests set this to >9999 in order to force canary selection
   # without mocking randomint; in the live server TaskTemplateDeployment.from_pb
-  # prevents this from occuring.
+  # prevents this from occurring.
   'canary_chance',
 ])
 

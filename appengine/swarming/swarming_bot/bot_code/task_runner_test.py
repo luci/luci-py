@@ -1328,7 +1328,7 @@ if __name__ == '__main__':
   logging_utils.prepare_logging(None)
   logging_utils.set_console_level(
       logging.DEBUG if '-v' in sys.argv else logging.CRITICAL+1)
-  # Fix litteral text expectation.
+  # Fix literal text expectation.
   os.environ['LANG'] = 'en_US.UTF-8'
   os.environ['LANGUAGE'] = 'en_US.UTF-8'
   unittest.main()
