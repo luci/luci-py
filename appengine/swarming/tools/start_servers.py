@@ -58,8 +58,11 @@ class LocalServers(object):
     # We wait for the Swarming server to be started up so the isolate server
     # ports do not clash.
     self._isolate_server = local_app.LocalApplication(
-        os.path.join(APP_DIR, '..', 'isolate'), 10050, self._listen_all,
-        self._root)
+        os.path.join(APP_DIR, '..', 'isolate'),
+        10050,
+        self._listen_all,
+        self._root,
+        app_id='local-isolate')
     self._isolate_server.start()
     self._swarming_server.ensure_serving()
     self._isolate_server.ensure_serving()
