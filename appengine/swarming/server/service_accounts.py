@@ -427,7 +427,7 @@ def _call_token_server(method, request):
     # Don't put the response body into the error message, it may contain
     # internal details (that are public to Swarming server, but may not be
     # public to whoever is calling the Swarming server now).
-    raise InternalError('Failed to call MintOAuthTokenGrant, see server logs')
+    raise InternalError('Failed to call %s, see server logs' % method)
 
 
 def _common_audit_tags():
