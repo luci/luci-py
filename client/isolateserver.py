@@ -371,6 +371,10 @@ class FileItem(isolate_storage.Item):
     return self._path
 
   @property
+  def algo(self):
+    return self._algo
+
+  @property
   def digest(self):
     if not self._digest:
       self._digest = isolated_format.hash_file(self._path, self._algo)
