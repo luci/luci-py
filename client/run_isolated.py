@@ -582,7 +582,7 @@ def _fetch_and_map_with_go(isolated_hash, storage, outdir, go_cache_dir,
         proc.kill()
         proc.wait()
       # Raise unconditionally, because |proc| was forcefully terminated.
-      raise ValueError("timedout after %d seconds (cmd=%s)",
+      raise ValueError("timedout after %d seconds (cmd=%s)" %
                        (check_period_sec * max_checks, cmd_str))
 
     with open(result_json_path) as json_file:
