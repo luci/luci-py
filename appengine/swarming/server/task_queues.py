@@ -88,6 +88,13 @@ _EXTEND_VALIDITY = datetime.timedelta(hours=4, minutes=10)
 _KEEP_DEAD = datetime.timedelta(days=1, minutes=10)
 
 
+# crbug.com/1064848
+# Expiration time for task queues in memcache
+# It expires in 5 minutes for now, But it should be shortened further or
+# removed according to load on Datastore.
+_EXPIRATION_TIME_TASK_QUEUES = 60 * 5
+
+
 class Error(Exception):
   pass
 
@@ -459,7 +466,10 @@ def _rebuild_bot_cache_async(bot_dimensions, bot_root_key):
     # Do these steps in order.
     yield obj.put_async()
     yield ndb.get_context().memcache_set(
-        bot_id, sorted(matches), namespace='task_queues')
+        bot_id,
+        sorted(matches),
+        namespace='task_queues',
+        time=_EXPIRATION_TIME_TASK_QUEUES)
     raise ndb.Return(len(matches))
   finally:
     logging.debug(
@@ -1054,10 +1064,11 @@ def get_queues(bot_root_key):
       obj.key.integer_id()
       for obj in BotTaskDimensions.query(ancestor=bot_root_key)
       if obj.valid_until_ts >= now)
-  # crbug.com/1065306:
-  # Cache expires in 5 minutes.
-  # It should be shortened further or removed according to load on Datastore.
-  memcache.set(bot_id,dimensions_hashes, time=60*5, namespace='task_queues')
+  memcache.set(
+      bot_id,
+      dimensions_hashes,
+      namespace='task_queues',
+      time=_EXPIRATION_TIME_TASK_QUEUES)
   logging.info(
       'get_queues(%s): Query in %.3fs: can run from %d queues\n%s',
       bot_id, (utils.utcnow()-now).total_seconds(),
