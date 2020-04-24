@@ -261,8 +261,7 @@ def report(error):
   """
   exc_info = sys.exc_info()
   if _SERVER:
-    _report_exception(
-        error, exc_info[1], ''.join(traceback.format_tb(exc_info[2])))
+    _report_exception(error, exc_info[1], traceback.format_exc())
     return
 
   if error:

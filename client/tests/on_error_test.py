@@ -220,6 +220,7 @@ class OnErrorServerTest(OnErrorBase):
         u'os': six.text_type(sys.platform),
         u'python_version': six.text_type(platform.python_version()),
         u'source': u'main.py',
+        u'stack': u'None',
         u'user': six.text_type(getpass.getuser()),
         # The version was added dynamically for testing purpose.
         u'version': u'123',
@@ -253,8 +254,10 @@ class OnErrorServerTest(OnErrorBase):
         u'os': six.text_type(sys.platform),
         u'python_version': six.text_type(platform.python_version()),
         u'source': u'main.py',
-        u'stack': u'File "main.py", line 0, in run_shell_out\n'
-                  u'  raise TypeError(\'You are not my type\')',
+        u'stack': u'Traceback (most recent call last):\n'
+                  u'  File "main.py", line 0, in run_shell_out\n'
+                  u'    raise TypeError(\'You are not my type\')\n'
+                  u'TypeError: You are not my type',
         u'user': six.text_type(getpass.getuser()),
     }
     self.assertEqual(expected, actual)
@@ -286,8 +289,10 @@ class OnErrorServerTest(OnErrorBase):
         u'os': six.text_type(sys.platform),
         u'python_version': six.text_type(platform.python_version()),
         u'source': u'main.py',
-        u'stack': u'File "main.py", line 0, in run_shell_out\n'
-                  u'  raise TypeError(\'You are not my type #2\')',
+        u'stack': u'Traceback (most recent call last):\n'
+                  u'  File "main.py", line 0, in run_shell_out\n'
+                  u'    raise TypeError(\'You are not my type #2\')\n'
+                  u'TypeError: You are not my type #2',
         u'user': six.text_type(getpass.getuser()),
     }
     self.assertEqual(expected, actual)
