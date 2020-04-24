@@ -463,9 +463,9 @@ def _rebuild_bot_cache_async(bot_dimensions, bot_root_key):
     raise ndb.Return(len(matches))
   finally:
     logging.debug(
-        '_rebuild_bot_cache_async(%s) in %.3fs. Registered for %d queues; '
-        'cleaned %d',
-        bot_id, (utils.utcnow()-now).total_seconds(), len(matches), cleaned[0])
+        '_rebuild_bot_cache_async(%s) in %.3fs. Registered for queues %s; '
+        'cleaned %d', bot_id, (utils.utcnow() - now).total_seconds(), matches,
+        cleaned[0])
 
 
 def _get_task_dimensions_key(dimensions_hash, dimensions):
