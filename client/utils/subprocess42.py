@@ -458,7 +458,7 @@ class Popen(subprocess.Popen):
   - start: timestamp when this process started.
   - end: timestamp when this process exited, as seen by this process.
   - detached: If True, the child process was started as a detached process.
-  - gid: process group id, if any.
+  - pgid: process group id, if any.
   - duration: time in seconds the process lasted.
 
   Additional methods:
@@ -538,7 +538,7 @@ class Popen(subprocess.Popen):
         kwargs['creationflags'] = prev | CREATE_SUSPENDED
 
     self.end = None
-    self.gid = None
+    self.pgid = None
     self.start = time.time()
     try:
       with self.popen_lock:
@@ -568,7 +568,7 @@ class Popen(subprocess.Popen):
     self.args = args
     if self.detached and sys.platform != 'win32':
       try:
-        self.gid = os.getpgid(self.pid)
+        self.pgid = os.getpgid(self.pid)
       except OSError:
         # sometimes the process can run+finish before we collect its pgid. fun.
         pass
@@ -875,9 +875,9 @@ class Popen(subprocess.Popen):
       # was no containment.
       return True
 
-    if self.gid:
+    if self.pgid:
       try:
-        os.killpg(self.gid, signal.SIGKILL)
+        os.killpg(self.pgid, signal.SIGKILL)
       except OSError:
         return False
     else:
