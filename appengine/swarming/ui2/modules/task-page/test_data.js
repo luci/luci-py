@@ -778,6 +778,7 @@ export const taskRequests = [
             "--test-launcher-print-test-stdio=always",
             "--test-launcher-summary-output=${ISOLATED_OUTDIR}/output.json"
           ],
+          "relative_cwd": ".",
           "io_timeout_secs": "1200",
           "env_prefixes": [
             {

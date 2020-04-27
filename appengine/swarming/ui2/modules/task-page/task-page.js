@@ -454,6 +454,10 @@ const executionBlock = (properties, env, env_prefixes) => html`
   <td>Command</td>
   <td class="code break-all">${(properties.command || []).join(' ') || '--'}</td>
 </tr>
+<tr>
+  <td>Relative Cwd</td>
+  <td class="code break-all">${properties.relative_cwd || '--'}</td>
+</tr>
 ${arrayInTable(env, 'Environment Vars',
               (env) => env.key + '=' + env.value)}
 ${arrayInTable(env_prefixes, 'Environment Prefixes',
