@@ -13,9 +13,9 @@ import services
 import storage
 
 
-_PERMISSION_READ = auth.Permission('configs.configSet.read')
-_PERMISSION_VALIDATE = auth.Permission('configs.configSet.validate')
-_PERMISSION_REIMPORT = auth.Permission('configs.configSet.reimport')
+_PERMISSION_READ = auth.Permission('configs.configSets.read')
+_PERMISSION_VALIDATE = auth.Permission('configs.configSets.validate')
+_PERMISSION_REIMPORT = auth.Permission('configs.configSets.reimport')
 
 
 def can_reimport(config_set):

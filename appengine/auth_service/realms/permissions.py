@@ -70,28 +70,28 @@ def db():
 
   # LUCI Config permissions and roles (crbug.com/1068817).
   role('role/configs.reader', [
-      permission('configs.configSet.read'),
+      permission('configs.configSets.read'),
   ])
   role('role/configs.developer', [
       include('role/configs.reader'),
-      permission('configs.configSet.validate'),
-      permission('configs.configSet.reimport'),
+      permission('configs.configSets.validate'),
+      permission('configs.configSets.reimport'),
   ])
 
   # LUCI Scheduler permissions and roles (crbug.com/1070761).
   role('role/scheduler.reader', [
-      permission('scheduler.job.get'),
+      permission('scheduler.jobs.get'),
   ])
   role('role/scheduler.triggerer', [
       include('role/scheduler.reader'),
-      permission('scheduler.job.trigger'),
+      permission('scheduler.jobs.trigger'),
   ])
   role('role/scheduler.owner', [
       include('role/scheduler.reader'),
       include('role/scheduler.triggerer'),
-      permission('scheduler.job.pause'),
-      permission('scheduler.job.resume'),
-      permission('scheduler.job.abort'),
+      permission('scheduler.jobs.pause'),
+      permission('scheduler.jobs.resume'),
+      permission('scheduler.jobs.abort'),
   ])
 
   return builder.finish()
