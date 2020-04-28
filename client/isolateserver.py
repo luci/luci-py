@@ -1529,7 +1529,10 @@ def _enqueue_dir(dirpath, blacklist, hash_algo, hash_algo_name):
       tools.format_json(data, True), algo=hash_algo, high_priority=True)
 
 
-def archive_files_to_storage(storage, files, blacklist, verify_push=False):
+def _archive_files_to_storage_internal(storage,
+                                       files,
+                                       blacklist,
+                                       verify_push=False):
   """Stores every entry into remote storage and returns stats.
 
   Arguments:
@@ -1631,6 +1634,41 @@ def archive_files_to_storage(storage, files, blacklist, verify_push=False):
     else:
       hot.append(i)
   return results, cold, hot
+
+
+# TODO(crbug.com/1073832):
+# remove this if process leak in coverage build was fixed.
+def archive_files_to_storage(storage, files, blacklist, verify_push=False):
+  """Calls _archive_files_to_storage_internal with retry.
+
+  Arguments:
+    See Arguments section in _archive_files_to_storage_internal
+
+  Returns:
+    See Returns section in _archive_files_to_storage_internal
+
+  Raises:
+    Re-raises the exception in _archive_files_to_storage_internal if all retry
+    failed.
+  """
+
+  # Will do exponential backoff.
+  # e.g. 10, 20, 40, 80
+  backoff = 10
+
+  while True:
+    try:
+      return _archive_files_to_storage_internal(storage, files, blacklist,
+                                                verify_push)
+    except Exception:
+      if backoff > 100:
+        raise
+
+      logging.exception(
+          'failed to run _archive_files_to_storage_internal,'
+          ' will retry after %d seconds', backoff)
+      time.sleep(backoff)
+      backoff *= 2
 
 
 @subcommand.usage('<file1..fileN> or - to read from stdin')
