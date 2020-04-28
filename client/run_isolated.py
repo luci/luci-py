@@ -579,6 +579,9 @@ def _fetch_and_map_with_go(isolated_hash, storage, outdir, go_cache_dir,
       try:
         proc.wait(check_period_sec)
       except subprocess42.TimeoutExpired:
+        logging.exception(
+            "failed to terminate? timeout happened after %d seconds",
+            check_period_sec)
         proc.kill()
         proc.wait()
       # Raise unconditionally, because |proc| was forcefully terminated.
