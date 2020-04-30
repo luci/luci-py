@@ -7,6 +7,8 @@ License: MIT
 
 Description:
 
-Local Modifications:
-curl -sL https://github.com/urllib3/urllib3/archive/1.24.1.tar.gz | \
-    tar xvz --strip-components 3 --include urllib3-1.24.1/src/urllib3
+Local Modifications: See update.sh.
+
+How to update:
+Run update script and update this file.
+$ ./update.sh <version>
