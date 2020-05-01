@@ -238,7 +238,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
             u'yay',
         'outputs_ref':
             None,
-        'resultdb_invocation':
+        'resultdb_info':
             None,
         'server_versions': [u'v1a'],
         'started_ts':
@@ -290,7 +290,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         'killing': None,
         'modified_ts': self.now,
         'outputs_ref': None,
-        'resultdb_invocation': None,
+        'resultdb_info': None,
         'server_versions': [u'v1a'],
         'started_ts': self.now,
         'state': State.RUNNING,

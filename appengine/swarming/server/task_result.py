@@ -371,6 +371,25 @@ class PerformanceStats(ndb.Model):
           'PerformanceStats.bot_overhead is required')
 
 
+class ResultDBInfo(ndb.Model):
+  """ResultDB related properties."""
+  # ResultDB hostname, e.g. "results.api.cr.dev"
+  hostname = ndb.StringProperty()
+
+  # e.g. "invocations/task:chromium-swarm.appspot.com:deadbeef1"
+  # None if the integration was not enabled for this task.
+  #
+  # If the task was deduplicated, this equals invocation name of the original
+  # task.
+  invocation = ndb.StringProperty()
+
+  def to_proto(self, out):
+    if self.hostname:
+      out.hostname = self.hostname
+    if self.invocation:
+      out.invocation = self.invocation
+
+
 class CipdPins(ndb.Model):
   """Specifies which CIPD client and packages were actually installed.
 
@@ -462,12 +481,8 @@ class _TaskResultCommon(ndb.Model):
   # running or ran.
   current_task_slice = ndb.IntegerProperty(indexed=False, default=0)
 
-  # e.g. "invocations/task:chromium-swarm.appspot.com:deadbeef0"
-  # None if the integration was not enabled for this task.
-  #
-  # If the task was deduplicated, this equals invocation name of the original
-  # task.
-  resultdb_invocation = ndb.StringProperty()
+  # ResultDB related information.
+  resultdb_info = ndb.LocalStructuredProperty(ResultDBInfo)
 
   @property
   def can_be_canceled(self):
@@ -724,6 +739,8 @@ class _TaskResultCommon(ndb.Model):
       out.performance.cost_usd = self.cost_usd
     if self.performance_stats:
       self.performance_stats.to_proto(out.performance)
+    if self.resultdb_info:
+      self.resultdb_info.to_proto(out.resultdb_info)
     if self.exit_code is not None:
       out.exit_code = self.exit_code
     if self.outputs_ref:

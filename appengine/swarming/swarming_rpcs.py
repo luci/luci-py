@@ -616,6 +616,19 @@ class TaskOutput(messages.Message):
   state = messages.EnumField(TaskState, 2)
 
 
+class ResultDBInfo(messages.Message):
+  """ResultDB related properties."""
+  # ResultDB hostname, e.g. "results.api.cr.dev"
+  hostname = messages.StringField(1)
+
+  # e.g. "invocations/task:chromium-swarm.appspot.com:deadbeef1"
+  # None if the integration was not enabled for this task.
+  #
+  # If the task was deduplicated, this equals invocation name of the original
+  # task.
+  invocation = messages.StringField(2)
+
+
 class TaskResult(messages.Message):
   """Representation of the TaskResultSummary or TaskRunResult ndb model."""
   # Time when the task was abandoned instead of normal completion (e.g.
@@ -696,12 +709,8 @@ class TaskResult(messages.Message):
   # The TaskSlice contains a TaskProperties, which defines what is run.
   current_task_slice = messages.IntegerField(29)
 
-  # e.g. "invocations/task:chromium-swarm.appspot.com:deadbeef1"
-  # None if the integration was not enabled for this task.
-  #
-  # If the task was deduplicated, this equals invocation name of the original
-  # task.
-  resultdb_invocation = messages.StringField(30)
+  # ResultDB related information.
+  resultdb_info = messages.MessageField(ResultDBInfo, 30)
 
 
 class TaskStates(messages.Message):

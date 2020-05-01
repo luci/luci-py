@@ -198,7 +198,7 @@ class TaskResultApiTest(TestCase):
             u'Request name',
         'outputs_ref':
             None,
-        'resultdb_invocation':
+        'resultdb_info':
             None,
         'server_versions': [u'v1a'],
         'started_ts':
@@ -247,7 +247,7 @@ class TaskResultApiTest(TestCase):
         'killing': None,
         'modified_ts': None,
         'outputs_ref': None,
-        'resultdb_invocation': None,
+        'resultdb_info': None,
         'server_versions': [u'v1a'],
         'started_ts': None,
         'state': task_result.State.RUNNING,
