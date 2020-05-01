@@ -49,6 +49,7 @@ def run_tests_sequential():
       'handlers_endpoints_test.py',
       'handlers_prpc_test.py',
       'server/bot_groups_config_test.py',
+      'server/resultdb_test.py',
       'local_smoke_test.py',
   ]
   abs_test_files = [os.path.join(SWARMING_DIR, t) for t in test_files]
