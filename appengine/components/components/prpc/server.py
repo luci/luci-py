@@ -137,11 +137,14 @@ class Server(object):
 
     self._discovery_service.add_service(servicer.DESCRIPTION)
 
-  def get_routes(self):
+  def get_routes(self, prefix=''):
     """Returns a list of webapp2.Route for all the routes the API handles."""
-    return [webapp2.Route('/prpc/<service>/<method>',
-                          handler=self._handler(),
-                          methods=['POST', 'OPTIONS'])]
+    return [
+        webapp2.Route(
+            '%s/prpc/<service>/<method>' % prefix,
+            handler=self._handler(),
+            methods=['POST', 'OPTIONS'])
+    ]
 
   def _handler(self):
     """Returns a RequestHandler class with access to this server's data."""
