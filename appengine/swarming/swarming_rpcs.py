@@ -436,6 +436,23 @@ class TaskSlice(messages.Message):
   wait_for_capacity = messages.BooleanField(3)
 
 
+class ResultDBCfg(messages.Message):
+  """Swarming:ResultDB integration configuration for a task.
+
+  See NewTaskRequest.resultdb for more details.
+  """
+
+  # If True and this task is not deduplicated, create
+  # "task:{swarming_hostname}:{run_id}" invocation for this task,
+  # provide its update token to the task subprocess via LUCI_CONTEXT
+  # and finalize the invocation when the task is done.
+  # If the task is deduplicated, then TaskResult.invocation_name will be the
+  # invocation name of the original task.
+  # Swarming:ResultDB integration is off by default, but it may change in the
+  # future.
+  enable = messages.BooleanField(1)
+
+
 class NewTaskRequest(messages.Message):
   """Description of a new task request as described by the client.
 
@@ -515,23 +532,15 @@ class NewTaskRequest(messages.Message):
   # previously.
   request_uuid = messages.StringField(16)
 
-  # If True and this task is not deduplicated, create
-  # "task:{swarming_hostname}:{run_id}" invocation for this task,
-  # provide its update token to the task subprocess via LUCI_CONTEXT
-  # and finalize the invocation when the task is done.
-  # If the task is deduplicated, then TaskResult.invocation_name will be the
-  # invocation name of the original task.
-  # Swarming:ResultDB integration is off by default, but it may change in the
-  # future.
-  enable_resultdb = messages.BooleanField(17)
-
+  # Configuration of Swarming:ResultDB integration.
+  resultdb = messages.MessageField(ResultDBCfg, 17)
 
 class TaskRequest(messages.Message):
   """Description of a task request as registered by the server.
 
   This message is used when retrieving information about an existing task.
 
-  See NewtaskRequest for more details.
+  See NewTaskRequest for more details.
   """
   expiration_secs = messages.IntegerField(1)
   name = messages.StringField(2)
