@@ -75,10 +75,9 @@ class ResultDBTest(test_case.TestCase):
     with mock.patch(
         'server.resultdb._call_resultdb_recorder_api_async') as mock_call:
       mock_call.side_effect = self.nop_async
-      resultdb.finalize_invocation_async('task001', True).get_result()
+      resultdb.finalize_invocation_async('task001').get_result()
       mock_call.assert_called_once_with('FinalizeInvocation', {
           'name': 'task:test-swarming.appspot.com:task001',
-          'interrupted': True
       })
 
   def test_finalize_invocation_async_failed_precondition(self):
@@ -89,10 +88,9 @@ class ResultDBTest(test_case.TestCase):
           status_code=400,
           response='error',
           headers={'X-Prpc-Grpc-Code': '9'})
-      resultdb.finalize_invocation_async('task001', True).get_result()
+      resultdb.finalize_invocation_async('task001').get_result()
       mock_call.assert_called_once_with('FinalizeInvocation', {
           'name': 'task:test-swarming.appspot.com:task001',
-          'interrupted': True
       })
 
   def test_finalize_invocation_async_failed(self):
@@ -100,10 +98,9 @@ class ResultDBTest(test_case.TestCase):
         'server.resultdb._call_resultdb_recorder_api_async') as mock_call:
       mock_call.side_effect = Exception('failed')
       with self.assertRaises(Exception):
-        resultdb.finalize_invocation_async('task001', True).get_result()
+        resultdb.finalize_invocation_async('task001').get_result()
       mock_call.assert_called_once_with('FinalizeInvocation', {
           'name': 'task:test-swarming.appspot.com:task001',
-          'interrupted': True
       })
 
   def test_call_resultdb_recorder_api(self):

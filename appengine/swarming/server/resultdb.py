@@ -39,14 +39,13 @@ def create_invocation_async(task_run_id):
 
 
 @ndb.tasklet
-def finalize_invocation_async(task_run_id, interrupted):
+def finalize_invocation_async(task_run_id):
   """This is wrapper for FinalizeInvocation API."""
 
   try:
     invocation_id = _get_invocation_id(task_run_id)
     yield _call_resultdb_recorder_api_async('FinalizeInvocation', {
         'name': invocation_id,
-        'interrupted': interrupted,
     })
   except net.Error as ex:
     if ex.headers.get('X-Prpc-Grpc-Code') == str(
