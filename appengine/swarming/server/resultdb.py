@@ -45,18 +45,10 @@ def finalize_invocation_async(task_run_id):
   try:
     invocation_id = _get_invocation_id(task_run_id)
     yield _call_resultdb_recorder_api_async('FinalizeInvocation', {
-        'name': invocation_id,
+        'name': 'invocations/%s' % invocation_id,
     })
-  except net.Error as ex:
-    if ex.headers.get('X-Prpc-Grpc-Code') == str(
-        prpc.StatusCode.FAILED_PRECONDITION.value):
-      logging.info(
-          'Got FAILED_PRECONDITION in response headers when '
-          'finalize invocation %s', invocation_id)
-    else:
-      logging.exception(
-          'X-Prpc-Grpc-Code is not FAILED_PRECONDITION when '
-          'finalize invocation %s: %s', invocation_id, ex.headers)
+  except net.Error:
+    logging.exception('Failed to finalize invocation %s', invocation_id)
 
 
 ### Private code

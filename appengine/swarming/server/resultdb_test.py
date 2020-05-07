@@ -77,7 +77,7 @@ class ResultDBTest(test_case.TestCase):
       mock_call.side_effect = self.nop_async
       resultdb.finalize_invocation_async('task001').get_result()
       mock_call.assert_called_once_with('FinalizeInvocation', {
-          'name': 'task:test-swarming.appspot.com:task001',
+          'name': 'invocations/task:test-swarming.appspot.com:task001',
       })
 
   def test_finalize_invocation_async_failed_precondition(self):
@@ -90,7 +90,7 @@ class ResultDBTest(test_case.TestCase):
           headers={'X-Prpc-Grpc-Code': '9'})
       resultdb.finalize_invocation_async('task001').get_result()
       mock_call.assert_called_once_with('FinalizeInvocation', {
-          'name': 'task:test-swarming.appspot.com:task001',
+          'name': 'invocations/task:test-swarming.appspot.com:task001',
       })
 
   def test_finalize_invocation_async_failed(self):
@@ -100,7 +100,7 @@ class ResultDBTest(test_case.TestCase):
       with self.assertRaises(Exception):
         resultdb.finalize_invocation_async('task001').get_result()
       mock_call.assert_called_once_with('FinalizeInvocation', {
-          'name': 'task:test-swarming.appspot.com:task001',
+          'name': 'invocations/task:test-swarming.appspot.com:task001',
       })
 
   def test_call_resultdb_recorder_api(self):
