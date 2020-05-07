@@ -24,8 +24,9 @@ import * as query from 'common-sk/modules/query'
 import { applyAlias } from '../alias'
 import { canRetry, cipdLink, durationChart, hasRichOutput, humanState,
          firstDimension, isolateLink, isSummaryTask, parseRequest, parseResult,
-         richLogsLink, sliceExpires, stateClass, taskCost, taskExpires,
-         taskInfoClass, wasDeduped, wasPickedUp} from './task-page-helpers'
+         richLogsLink, sliceSchedulingDeadline, stateClass, taskCost,
+         taskSchedulingDeadline, taskInfoClass, wasDeduped,
+         wasPickedUp} from './task-page-helpers'
 import { botListLink, botPageLink, humanDuration, parseDuration,
          taskListLink, taskPageLink } from '../util'
 
@@ -344,8 +345,8 @@ const requestBlock = (request, result, currentSlice) => html`
   <td>${!!currentSlice.wait_for_capacity}</td>
 </tr>
 <tr>
-  <td>Slice Expires</td>
-  <td>${sliceExpires(currentSlice, request)}</td>
+  <td>Slice Scheduling Deadline</td>
+  <td>${sliceSchedulingDeadline(currentSlice, request)}</td>
 </tr>
 <tr>
   <td>User</td>
@@ -567,8 +568,8 @@ const taskTimingSection = (ele, request, result) => {
         <td title=${result.started_ts}>${result.human_started_ts}</td>
       </tr>
       <tr>
-        <td>Expires</td>
-        <td>${taskExpires(request)}</td>
+        <td>Scheduling Deadline</td>
+        <td>${taskSchedulingDeadline(request)}</td>
       </tr>
       <tr ?hidden=${!result.completed_ts}>
         <td>Completed</td>

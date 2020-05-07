@@ -224,9 +224,10 @@ export function richLogsLink(ele) {
   return displayTemplate.replace('%s', ele._taskId);
 }
 
-/** sliceExpires returns a human readable time stamp of when a task slice expires.
+/** sliceSchedulingDeadline returns a human readable time stamp of when a task
+ *  slice expires.
  */
-export function sliceExpires(slice, request) {
+export function sliceSchedulingDeadline(slice, request) {
   if (!request.created_ts) {
     return '';
   }
@@ -267,10 +268,10 @@ export function taskCost(result) {
   return result.costs_usd[0].toFixed(4);
 }
 
-/** sliceExpires returns a human readable time stamp of when a task expires,
- *  which is after any and all slices expire.
+/** taskSchedulingDeadline returns a human readable time stamp of when a task
+ *  expires, which is after any and all slices expire.
  */
-export function taskExpires(request) {
+export function taskSchedulingDeadline(request) {
   if (!request.created_ts) {
     return '';
   }
