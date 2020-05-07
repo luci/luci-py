@@ -47,7 +47,8 @@ class Singleton(object):
           wintypes.c_int(0), wintypes.c_int(-1),
           wintypes.create_unicode_buffer(self.key))
       last_error = wintypes.GetLastError()
-      logging.info('%s = %s ; %s', self.key, self.handle, last_error)
+      logging.info('[singleton] acquire: %s = %s ; %s', self.key, self.handle,
+                   last_error)
       if not self.handle:
         return False
       # ERROR_ALREADY_EXISTS
@@ -65,6 +66,7 @@ class Singleton(object):
         self.handle.close()
         self.handle = None
         return False
+      logging.info('[singleton] acquire: %s = %s', self.key, self.handle)
       self.handle.seek(0, os.SEEK_SET)
       self.handle.truncate(0)
       self.handle.write(str(os.getpid()).encode('utf-8'))
