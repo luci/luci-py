@@ -591,6 +591,13 @@ class BotPollHandler(_BotBaseHandler):
       self._cmd_sleep(sleep_streak, True)
       return
 
+    bot_info = bot_management.get_info_key(res.bot_id).get()
+    # TODO(crbug.com/1077188):
+    #   avoid assigning to bots with another task assigned.
+    if bot_info and bot_info.task_id:
+      logging.error('Task %s is already assigned to the bot %s',
+                    bot_info.task_id, bot_id)
+
     # The bot is in good shape.
 
     try:
