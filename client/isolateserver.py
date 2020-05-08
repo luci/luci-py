@@ -1664,6 +1664,8 @@ def archive_files_to_storage(storage, files, blacklist, verify_push=False):
       if backoff > 100:
         raise
 
+      on_error.report('error before %d second backoff' % backoff)
+
       logging.exception(
           'failed to run _archive_files_to_storage_internal,'
           ' will retry after %d seconds', backoff)
