@@ -626,22 +626,12 @@ def yield_expired_task_to_run():
   # since the entities are very small and to reduce RPC overhead.
   def expire(q):
     total = 0
-    skipped = 0
     try:
       for task in q:
-        if not task.queue_number:
-          skipped += 1
-
-          logging.info('%s/%s: queue_number is None, but expiration_ts is %s.',
-                       task.task_id, task.task_slice_index, task.expiration_ts)
-          # Flush it, otherwise we'll keep on looping on it.
-          task.expiration_ts = None
-          task.put()
-        else:
-          yield task
-          total += 1
+        yield task
+        total += 1
     finally:
-      logging.debug('Yielded %d tasks; skipped %d', total, skipped)
+      logging.debug('Yielded %d tasks', total)
 
   opts = ndb.QueryOptions(batch_size=256)
   now = utils.utcnow()
