@@ -168,7 +168,6 @@ class OptionParserAuth(logging_utils.OptionParserWithLogging):
       options.service = normalize_host_url(options.service)
     except ValueError as exc:
       self.error(str(exc))
-    on_error.report_on_exception_exit(options.service)
     return options, args
 
 

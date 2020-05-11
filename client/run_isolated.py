@@ -1447,8 +1447,7 @@ def main(args):
 
   auth.process_auth_options(parser, options)
 
-  isolateserver.process_isolate_server_options(
-      parser, options, True, False)
+  isolateserver.process_isolate_server_options(parser, options, False)
   if not options.isolate_server:
     if options.isolated:
       parser.error('--isolated requires --isolate-server')

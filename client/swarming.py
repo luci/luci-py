@@ -1131,8 +1131,8 @@ def process_trigger_options(parser, options, args):
   # --isolated is required only if --raw-cmd wasn't provided.
   # TODO(maruel): --isolate-server may be optional as Swarming may have its own
   # preferred server.
-  isolateserver.process_isolate_server_options(
-      parser, options, False, not options.raw_cmd)
+  isolateserver.process_isolate_server_options(parser, options,
+                                               not options.raw_cmd)
   inputs_ref = None
   if options.isolate_server:
     inputs_ref = FilesRef(
@@ -1991,7 +1991,7 @@ class OptionParserSwarming(logging_utils.OptionParserWithLogging):
       options.swarming = net.fix_url(options.swarming)
     except ValueError as e:
       self.error('--swarming %s' % e)
-    on_error.report_on_exception_exit(options.swarming)
+
     try:
       user = auth.ensure_logged_in(options.swarming)
     except ValueError as e:

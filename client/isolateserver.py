@@ -1688,7 +1688,7 @@ def CMDarchive(parser, args):
   add_isolate_server_options(parser)
   add_archive_options(parser)
   options, files = parser.parse_args(args)
-  process_isolate_server_options(parser, options, True, True)
+  process_isolate_server_options(parser, options, True)
   server_ref = isolate_storage.ServerRef(
       options.isolate_server, options.namespace)
   if files == ['-']:
@@ -1742,7 +1742,7 @@ def CMDdownload(parser, args):
   if not file_path.enable_symlink():
     logging.warning('Symlink support is not enabled')
 
-  process_isolate_server_options(parser, options, True, True)
+  process_isolate_server_options(parser, options, True)
   if bool(options.isolated) == bool(options.file):
     parser.error('Use one of --isolated or --file, and only one.')
   if not options.cache and options.use_symlinks:
@@ -1819,8 +1819,7 @@ def add_isolate_server_options(parser):
       help='The namespace to use on the Isolate Server, default: %default')
 
 
-def process_isolate_server_options(
-    parser, options, set_exception_handler, required):
+def process_isolate_server_options(parser, options, required):
   """Processes the --isolate-server option.
 
   Returns the identity as determined by the server.
@@ -1837,8 +1836,7 @@ def process_isolate_server_options(
       options.isolate_server = net.fix_url(options.isolate_server)
     except ValueError as e:
       parser.error('--isolate-server %s' % e)
-  if set_exception_handler:
-    on_error.report_on_exception_exit(options.isolate_server)
+
   try:
     return auth.ensure_logged_in(options.isolate_server)
   except ValueError as e:

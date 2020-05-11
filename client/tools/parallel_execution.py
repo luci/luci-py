@@ -208,7 +208,7 @@ class OptionParser(logging_utils.OptionParserWithLogging):
     if not options.swarming:
       self.error('--swarming is required.')
     auth.process_auth_options(self, options)
-    isolateserver.process_isolate_server_options(self, options, False, True)
+    isolateserver.process_isolate_server_options(self, options, True)
     options.dimensions = dict(options.dimensions)
     return options, args
 
