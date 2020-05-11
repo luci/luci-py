@@ -25,14 +25,6 @@ from . import tools
 from . import zip_package
 
 
-# It is very important to not get reports from non Chromium infrastructure. We
-# *really* do not want to know anything about you, dear non Google employee.
-_ENABLED_DOMAINS = (
-  '.chromium.org',
-  '.google.com',
-  '.google.com.internal',
-)
-
 # If this envar is '1' then disable reports. Useful when developing the client.
 _DISABLE_ENVVAR = 'SWARMING_DISABLE_ON_ERROR'
 
@@ -236,13 +228,6 @@ def report_on_exception_exit(server):
     return False
 
   _HOSTNAME = socket.getfqdn()
-  if not _HOSTNAME.endswith(_ENABLED_DOMAINS):
-    # Silently skip non-google infrastructure. Technically, it reports to the
-    # server the client code is talking to so in practice, it would be safe for
-    # non googler to manually enable this assuming their client code talks to a
-    # server they also own. Please send a CL if you desire this functionality.
-    return False
-
   _SERVER = net.get_http_service(server, allow_cached=False)
   atexit.register(_check_for_exception_on_exit)
   return True

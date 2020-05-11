@@ -146,7 +146,6 @@ class OnErrorBase(auto_stub.TestCase):
     os.chdir(test_env.TESTS_DIR)
     self._atexit = []
     self.mock(atexit, 'register', self._atexit.append)
-    self.mock(on_error, '_ENABLED_DOMAINS', (self.HOSTNAME,))
     self.mock(on_error, '_HOSTNAME', None)
     self.mock(on_error, '_SERVER', None)
     self.mock(on_error, '_is_in_test', lambda: False)
