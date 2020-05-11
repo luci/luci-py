@@ -367,7 +367,7 @@ def _delete_stale_BotTaskDimensions_async(bot_dimensions, bot_root_key,
         cleaned[0] += 1
   finally:
     logging.info(
-        'crbug.com/1016778: call from _delete_stale_BotTaskDimensions_async: '
+        'crbug.com/1064848: call from _delete_stale_BotTaskDimensions_async: '
         '%d', iter_cnt)
 
 
@@ -386,6 +386,7 @@ def _update_BotTaskDimensions_slice_async(bot_dimensions, bot_root_key, now,
   """
   qit = q.iter(batch_size=256, deadline=60)
   iter_cnt = 0
+  match_cnt = 0
   try:
     while (yield qit.has_next_async()):
       iter_cnt += 1
@@ -393,9 +394,10 @@ def _update_BotTaskDimensions_slice_async(bot_dimensions, bot_root_key, now,
       # match_bot() returns a TaskDimensionsSet if there's a match. It may still
       # be expired.
       s = task_dimensions.match_bot(bot_dimensions)
+      dimensions_hash = task_dimensions.key.integer_id()
       if s and s.valid_until_ts >= now:
+        match_cnt += 1
         # Valid TaskDimensionsSet.
-        dimensions_hash = task_dimensions.key.integer_id()
         # Reuse TaskDimensionsSet.valid_until_ts.
         obj = BotTaskDimensions(
             id=dimensions_hash,
@@ -404,10 +406,14 @@ def _update_BotTaskDimensions_slice_async(bot_dimensions, bot_root_key, now,
             dimensions_flat=s.dimensions_flat)
         yield obj.put_async()
         matches.append(dimensions_hash)
+      elif s:
+        logging.debug(
+            'crbug.com/1064848: found a matching TaskDimensionsSet(%s), '
+            'but was stale.', dimensions_hash)
   finally:
-    logging.info(
-        'crbug.com/1016778: call from _update_BotTaskDimensions_slice_async: '
-        '%d', iter_cnt)
+    logging.debug(
+        'crbug.com/1064848: call from _update_BotTaskDimensions_slice_async: '
+        'checked %d TaskDimensions, found %d matches.', iter_cnt, match_cnt)
 
 
 @ndb.tasklet
@@ -975,8 +981,10 @@ def assert_bot_async(bot_root_key, bot_dimensions):
   if (obj and obj.dimensions_flat == bot_dimensions_to_flat(bot_dimensions) and
       obj.valid_until_ts > now):
     # Cache hit, no need to look further.
-    logging.debug('assert_bot_async: cache hit. bot_id: %s, bot_dimensions: %s',
-                  bot_dimensions.get('id'), bot_dimensions)
+    logging.debug(
+        'assert_bot_async: cache hit. bot_id: %s, valid_until: %s, '
+        'bot_dimensions: %s', bot_root_key.string_id(), obj.valid_until_ts,
+        bot_dimensions)
     raise ndb.Return(None)
 
   matches = yield _rebuild_bot_cache_async(bot_dimensions, bot_root_key)
