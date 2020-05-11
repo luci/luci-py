@@ -418,6 +418,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
                 u'server': u'https://pool.config.isolate.example.com',
             },
             u'secret_bytes': None,
+            u'resultdb': {},
             u'io_timeout': 1200,
             u'outputs': [u'foo', u'path/to/foobar'],
             u'service_accounts': {
@@ -494,6 +495,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
                 u'server': u'https://pool.config.isolate.example.com',
             },
             u'secret_bytes': None,
+            u'resultdb': {},
             u'io_timeout': 1200,
             u'outputs': [u'foo', u'path/to/foobar'],
             u'service_accounts': {
@@ -573,6 +575,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
             u'io_timeout': 1200,
             u'outputs': [u'foo', u'path/to/foobar'],
             u'secret_bytes': None,
+            u'resultdb': {},
             u'service_accounts': {
                 u'system': {
                     u'service_account': u'none'
@@ -692,6 +695,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
                 u'namespace': u'default-gzip',
             },
             u'secret_bytes': None,
+            u'resultdb': {},
             u'io_timeout': 1200,
             u'outputs': [u'foo', u'path/to/foobar'],
             u'service_accounts': {

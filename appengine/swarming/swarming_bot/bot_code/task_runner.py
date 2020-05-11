@@ -234,6 +234,7 @@ class TaskDetails(object):
       'isolated',
       'outputs',
       'relative_cwd',
+      'resultdb',
       'secret_bytes',
       'service_accounts',
       'task_id',
@@ -275,6 +276,7 @@ class TaskDetails(object):
     self.task_id = data['task_id']
     self.outputs = data['outputs']
     self.secret_bytes = data['secret_bytes']
+    self.resultdb = data['resultdb']
     self.containment = Containment(data['containment'])
 
   @staticmethod
@@ -358,6 +360,12 @@ def load_and_run(in_file, swarming_server, is_grpc, cost_usd_hour, start,
         swarming = luci_context.read('swarming') or {}
         swarming['secret_bytes'] = task_details.secret_bytes
         context_edits['swarming'] = swarming
+
+      # Extend existing LUCI_CONTEXT['resultdb'], if any.
+      if task_details.resultdb is not None:
+        resultdb = luci_context.read('resultdb') or {}
+        resultdb.update(task_details.resultdb)
+        context_edits['resultdb'] = resultdb
 
       # Returns bot authentication headers dict or raises InternalError.
       def headers_cb():

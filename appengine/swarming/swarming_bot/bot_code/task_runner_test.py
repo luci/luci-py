@@ -89,6 +89,8 @@ def get_manifest(script=None, isolated=None, **kwargs):
       'outputs': [],
       'relative_cwd':
           None,
+      'resultdb':
+          None,
       'secret_bytes':
           None,
       'service_accounts':

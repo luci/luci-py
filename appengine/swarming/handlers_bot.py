@@ -725,6 +725,8 @@ class BotPollHandler(_BotBaseHandler):
                 props.outputs,
             'relative_cwd':
                 props.relative_cwd,
+            # TODO(crbug.com/1065139): fill appropriately.
+            'resultdb': {},
             'service_accounts': {
                 'system': {
                     # 'none', 'bot' or email. Bot interprets 'none' and 'bot'
