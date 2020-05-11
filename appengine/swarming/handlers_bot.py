@@ -1,7 +1,6 @@
 # Copyright 2015 The LUCI Authors. All rights reserved.
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
-
 """Internal bot API handlers."""
 
 import base64
@@ -34,7 +33,6 @@ from server import task_request
 from server import task_result
 from server import task_scheduler
 
-
 # Methods used to authenticate requests from bots, see get_auth_methods().
 #
 # Order matters if a single request have multiple credentials of different
@@ -59,30 +57,30 @@ def has_unexpected_subset_keys(expected_keys, minimum_keys, actual_keys, name):
   missing = minimum_keys - actual_keys
   if superfluous or missing:
     msg_missing = (' missing: %s' % sorted(missing)) if missing else ''
-    msg_superfluous = (
-        (' superfluous: %s' % sorted(superfluous)) if superfluous else '')
-    return 'Unexpected %s%s%s; did you make a typo?' % (
-        name, msg_missing, msg_superfluous)
+    msg_superfluous = ((' superfluous: %s' %
+                        sorted(superfluous)) if superfluous else '')
+    return 'Unexpected %s%s%s; did you make a typo?' % (name, msg_missing,
+                                                        msg_superfluous)
 
 
 def has_unexpected_keys(expected_keys, actual_keys, name):
   """Return an error if unexpected keys are present or expected keys are
   missing.
   """
-  return has_unexpected_subset_keys(
-      expected_keys, expected_keys, actual_keys, name)
+  return has_unexpected_subset_keys(expected_keys, expected_keys, actual_keys,
+                                    name)
 
 
-def log_unexpected_subset_keys(
-    expected_keys, minimum_keys, actual_keys, request, source, name):
+def log_unexpected_subset_keys(expected_keys, minimum_keys, actual_keys,
+                               request, source, name):
   """Logs an error if unexpected keys are present or expected keys are missing.
 
   Accepts optional keys.
 
   This is important to catch typos.
   """
-  message = has_unexpected_subset_keys(
-    expected_keys, minimum_keys, actual_keys, name)
+  message = has_unexpected_subset_keys(expected_keys, minimum_keys, actual_keys,
+                                       name)
   if message:
     ereporter2.log_request(request, source=source, message=message)
   return message
@@ -91,8 +89,8 @@ def log_unexpected_subset_keys(
 def log_unexpected_keys(expected_keys, actual_keys, request, source, name):
   """Logs an error if unexpected keys are present or expected keys are missing.
   """
-  return log_unexpected_subset_keys(
-      expected_keys, expected_keys, actual_keys, request, source, name)
+  return log_unexpected_subset_keys(expected_keys, expected_keys, actual_keys,
+                                    request, source, name)
 
 
 def has_missing_keys(minimum_keys, actual_keys, name):
@@ -249,8 +247,7 @@ class BotCodeHandler(_BotAuthenticatingHandler):
     self.response.headers['Content-Type'] = 'application/octet-stream'
     self.response.headers['Content-Disposition'] = (
         'attachment; filename="swarming_bot.zip"')
-    self.response.out.write(
-        bot_code.get_swarming_bot_zip(server))
+    self.response.out.write(bot_code.get_swarming_bot_zip(server))
 
 
 ## Bot API RPCs
@@ -332,8 +329,8 @@ class _BotBaseHandler(_BotApiHandler):
     bot_id = None
     if dimensions.get('id'):
       dimension_id = dimensions['id']
-      if (isinstance(dimension_id, list) and len(dimension_id) == 1
-          and isinstance(dimension_id[0], unicode)):
+      if (isinstance(dimension_id, list) and len(dimension_id) == 1 and
+          isinstance(dimension_id[0], unicode)):
         bot_id = dimensions['id'][0]
 
     if bot_id:
@@ -358,8 +355,8 @@ class _BotBaseHandler(_BotApiHandler):
       if from_bot and from_bot != ['default'] and from_bot != from_cfg:
         logging.warning(
             'Dimensions in bots.cfg don\'t match ones provided by the bot\n'
-            'bot_id: "%s", key: "%s", from_bot: %s, from_cfg: %s',
-            bot_id, dim_key, from_bot, from_cfg)
+            'bot_id: "%s", key: "%s", from_bot: %s, from_cfg: %s', bot_id,
+            dim_key, from_bot, from_cfg)
       dimensions[dim_key] = from_cfg
 
     # Fill in all result fields except 'quarantined_msg'.
@@ -375,8 +372,7 @@ class _BotBaseHandler(_BotApiHandler):
     # The bot may decide to "self-quarantine" itself. Accept both via
     # dimensions or via state. See bot_management._BotCommon.quarantined for
     # more details.
-    if (bool(dimensions.get('quarantined')) or
-        bool(state.get('quarantined'))):
+    if (bool(dimensions.get('quarantined')) or bool(state.get('quarantined'))):
       result.quarantined_msg = 'Bot self-quarantined'
       return result
 
@@ -384,13 +380,12 @@ class _BotBaseHandler(_BotApiHandler):
     # Use a dummy 'for' to be able to break early from the block.
     for _ in [0]:
 
-      quarantined_msg = has_unexpected_keys(
-          self.EXPECTED_KEYS, request, 'keys')
+      quarantined_msg = has_unexpected_keys(self.EXPECTED_KEYS, request, 'keys')
       if quarantined_msg:
         break
 
-      quarantined_msg = has_missing_keys(
-          self.REQUIRED_STATE_KEYS, state, 'state')
+      quarantined_msg = has_missing_keys(self.REQUIRED_STATE_KEYS, state,
+                                         'state')
       if quarantined_msg:
         break
 
@@ -420,8 +415,7 @@ class _BotBaseHandler(_BotApiHandler):
 
     if quarantined_msg:
       line = 'Quarantined Bot\nhttps://%s/restricted/bot/%s\n%s' % (
-          app_identity.get_default_version_hostname(), bot_id,
-          quarantined_msg)
+          app_identity.get_default_version_hostname(), bot_id, quarantined_msg)
       ereporter2.log_request(self.request, source='bot', message=line)
       result.quarantined_msg = quarantined_msg
       return result
@@ -455,6 +449,7 @@ class BotHandshakeHandler(_BotBaseHandler):
       }
     }
   """
+
   @auth.public  # auth happens in self._process()
   def post(self):
     res = self._process()
@@ -463,29 +458,33 @@ class BotHandshakeHandler(_BotBaseHandler):
     # provide them without injected bot_config. The bot will report valid
     # dimensions at poll.
     bot_management.bot_event(
-        event_type='bot_connected', bot_id=res.bot_id,
+        event_type='bot_connected',
+        bot_id=res.bot_id,
         external_ip=self.request.remote_addr,
         authenticated_as=auth.get_peer_identity().to_bytes(),
-        dimensions=res.dimensions, state=res.state,
-        version=res.version, quarantined=bool(res.quarantined_msg),
+        dimensions=res.dimensions,
+        state=res.state,
+        version=res.version,
+        quarantined=bool(res.quarantined_msg),
         maintenance_msg=res.maintenance_msg,
-        task_id='', task_name=None, message=res.quarantined_msg,
+        task_id='',
+        task_name=None,
+        message=res.quarantined_msg,
         register_dimensions=False)
 
     data = {
-      'bot_version': bot_code.get_bot_version(self.request.host_url)[0],
-      'server_version': utils.get_app_version(),
-      'bot_group_cfg_version': res.bot_group_cfg.version,
-      'bot_group_cfg': {
-        # Let the bot know its server-side dimensions (from bots.cfg file).
-        'dimensions': res.bot_group_cfg.dimensions,
-      },
+        'bot_version': bot_code.get_bot_version(self.request.host_url)[0],
+        'server_version': utils.get_app_version(),
+        'bot_group_cfg_version': res.bot_group_cfg.version,
+        'bot_group_cfg': {
+            # Let the bot know its server-side dimensions (from bots.cfg file).
+            'dimensions': res.bot_group_cfg.dimensions,
+        },
     }
     if res.bot_group_cfg.bot_config_script_content:
-      logging.info(
-          'Injecting %s: %d bytes',
-          res.bot_group_cfg.bot_config_script,
-          len(res.bot_group_cfg.bot_config_script_content))
+      logging.info('Injecting %s: %d bytes',
+                   res.bot_group_cfg.bot_config_script,
+                   len(res.bot_group_cfg.bot_config_script_content))
       data['bot_config'] = res.bot_group_cfg.bot_config_script_content
     self.send_response(data)
 
@@ -529,13 +528,18 @@ class BotPollHandler(_BotBaseHandler):
     def bot_event(event_type, task_id=None, task_name=None):
       try:
         bot_management.bot_event(
-            event_type=event_type, bot_id=res.bot_id,
+            event_type=event_type,
+            bot_id=res.bot_id,
             external_ip=self.request.remote_addr,
             authenticated_as=auth.get_peer_identity().to_bytes(),
-            dimensions=res.dimensions, state=res.state,
-            version=res.version, quarantined=quarantined,
-            maintenance_msg=res.maintenance_msg, task_id=task_id,
-            task_name=task_name, message=res.quarantined_msg,
+            dimensions=res.dimensions,
+            state=res.state,
+            version=res.version,
+            quarantined=quarantined,
+            maintenance_msg=res.maintenance_msg,
+            task_id=task_id,
+            task_name=task_name,
+            message=res.quarantined_msg,
             register_dimensions=True)
       except runtime.DeadlineExceededError as e:
         # Ignore runtime.DeadlineExceededError at the following events
@@ -551,8 +555,7 @@ class BotPollHandler(_BotBaseHandler):
     # Bot version is host-specific because the host URL is embedded in
     # swarming_bot.zip
     logging.debug('Fetching bot code version')
-    expected_version, _ = bot_code.get_bot_version(
-        self.request.host_url)
+    expected_version, _ = bot_code.get_bot_version(self.request.host_url)
     if res.version != expected_version:
       bot_event('request_update')
       self._cmd_update(expected_version)
@@ -614,8 +617,9 @@ class BotPollHandler(_BotBaseHandler):
       # after reaping task.
       # See discussion:
       # https://crrev.com/c/1948022/2#message-15c7ac534cdc49794fcb66cd209e5d2272ea22a5
-      logging.warning('crbug.com/1027431: '
-                      'Ignoring Deadline exceeded error: %s', e)
+      logging.warning(
+          'crbug.com/1027431: '
+          'Ignoring Deadline exceeded error: %s', e)
       self.abort(429, 'Deadline exceeded while asserting bot')
     except datastore_errors.InternalError as e:
       self.abort(429, 'Datastore internal error. %s' % e)
@@ -645,11 +649,11 @@ class BotPollHandler(_BotBaseHandler):
           self._cmd_terminate(run_result.task_id)
         else:
           bot_event(
-              'request_task', task_id=run_result.task_id,
+              'request_task',
+              task_id=run_result.task_id,
               task_name=request.name)
-          self._cmd_run(
-              request, secret_bytes, run_result, res.bot_id, res.os,
-              res.bot_group_cfg)
+          self._cmd_run(request, secret_bytes, run_result, res.bot_id, res.os,
+                        res.bot_group_cfg)
       except:
         logging.exception('Dang, exception after reaping')
         raise
@@ -663,8 +667,8 @@ class BotPollHandler(_BotBaseHandler):
       # https://code.google.com/p/swarming/issues/detail?id=130
       self.abort(500, 'Deadline')
 
-  def _cmd_run(
-      self, request, secret_bytes, run_result, bot_id, oses, bot_group_cfg):
+  def _cmd_run(self, request, secret_bytes, run_result, bot_id, oses,
+               bot_group_cfg):
     logging.info('Run: %s', request.task_id)
     props = request.task_slice(run_result.current_task_slice).properties
 
@@ -677,85 +681,101 @@ class BotPollHandler(_BotBaseHandler):
       caches[i]['hint'] = str(hint)
 
     out = {
-      'cmd': 'run',
-      'manifest': {
-        'bot_id': bot_id,
-        'bot_authenticated_as': auth.get_peer_identity().to_bytes(),
-        'caches': caches,
-        'cipd_input': {
-          'client_package': props.cipd_input.client_package.to_dict(),
-          'packages': [p.to_dict() for p in props.cipd_input.packages],
-          'server': props.cipd_input.server,
-        } if props.cipd_input else None,
-        'command': props.command,
-        'containment': props.containment.to_dict() if props.containment else {},
-        'dimensions': props.dimensions,
-        'env': props.env,
-        'env_prefixes': props.env_prefixes,
-        'extra_args': props.extra_args,
-        'grace_period': props.grace_period_secs,
-        'hard_timeout': props.execution_timeout_secs,
-        'host': utils.get_versioned_hosturl(),
-        'io_timeout': props.io_timeout_secs,
-        'secret_bytes': (secret_bytes.secret_bytes.encode('base64')
-                         if secret_bytes else None),
-        'isolated': {
-          'input': props.inputs_ref.isolated,
-          'namespace': props.inputs_ref.namespace,
-          'server': props.inputs_ref.isolatedserver,
-        } if props.inputs_ref else None,
-        'outputs': props.outputs,
-        'relative_cwd': props.relative_cwd,
-        'service_accounts': {
-          'system': {
-            # 'none', 'bot' or email. Bot interprets 'none' and 'bot' locally.
-            # When it sees something else, it uses /oauth_token API endpoint to
-            # grab tokens through server.
-            'service_account': bot_group_cfg.system_service_account or 'none',
-          },
-          'task': {
-            # Same here.
-            'service_account': request.service_account,
-          },
+        'cmd': 'run',
+        'manifest': {
+            'bot_id':
+                bot_id,
+            'bot_authenticated_as':
+                auth.get_peer_identity().to_bytes(),
+            'caches':
+                caches,
+            'cipd_input': {
+                'client_package': props.cipd_input.client_package.to_dict(),
+                'packages': [p.to_dict() for p in props.cipd_input.packages],
+                'server': props.cipd_input.server,
+            } if props.cipd_input else None,
+            'command':
+                props.command,
+            'containment':
+                props.containment.to_dict() if props.containment else {},
+            'dimensions':
+                props.dimensions,
+            'env':
+                props.env,
+            'env_prefixes':
+                props.env_prefixes,
+            'extra_args':
+                props.extra_args,
+            'grace_period':
+                props.grace_period_secs,
+            'hard_timeout':
+                props.execution_timeout_secs,
+            'host':
+                utils.get_versioned_hosturl(),
+            'io_timeout':
+                props.io_timeout_secs,
+            'secret_bytes': (secret_bytes.secret_bytes.encode('base64')
+                             if secret_bytes else None),
+            'isolated': {
+                'input': props.inputs_ref.isolated,
+                'namespace': props.inputs_ref.namespace,
+                'server': props.inputs_ref.isolatedserver,
+            } if props.inputs_ref else None,
+            'outputs':
+                props.outputs,
+            'relative_cwd':
+                props.relative_cwd,
+            'service_accounts': {
+                'system': {
+                    # 'none', 'bot' or email. Bot interprets 'none' and 'bot'
+                    # locally. When it sees something else, it uses /oauth_token
+                    # API endpoint to grab tokens through server.
+                    'service_account':
+                        bot_group_cfg.system_service_account or 'none',
+                },
+                'task': {
+                    # Same here.
+                    'service_account': request.service_account,
+                },
+            },
+            'task_id':
+                task_pack.pack_run_result_key(run_result.key),
         },
-        'task_id': task_pack.pack_run_result_key(run_result.key),
-      },
     }
     self.send_response(utils.to_json_encodable(out))
 
   def _cmd_sleep(self, sleep_streak, quarantined):
     duration = task_scheduler.exponential_backoff(sleep_streak)
-    logging.debug(
-        'Sleep: streak: %d; duration: %ds; quarantined: %s',
-        sleep_streak, duration, quarantined)
+    logging.debug('Sleep: streak: %d; duration: %ds; quarantined: %s',
+                  sleep_streak, duration, quarantined)
     out = {
-      'cmd': 'sleep',
-      'duration': duration,
-      'quarantined': quarantined,
+        'cmd': 'sleep',
+        'duration': duration,
+        'quarantined': quarantined,
     }
     self.send_response(out)
 
   def _cmd_terminate(self, task_id):
     logging.info('Terminate: %s', task_id)
     out = {
-      'cmd': 'terminate',
-      'task_id': task_id,
+        'cmd': 'terminate',
+        'task_id': task_id,
     }
     self.send_response(out)
 
   def _cmd_update(self, expected_version):
     logging.info('Update: %s', expected_version)
     out = {
-      'cmd': 'update',
-      'version': expected_version,
+        'cmd': 'update',
+        'version': expected_version,
     }
     self.send_response(out)
 
   def _cmd_bot_restart(self, message):
     logging.info('Restarting bot: %s', message)
     out = {
-      'cmd': 'bot_restart',
-      'message': message,
+        'cmd': 'bot_restart',
+        'message': message,
     }
     self.send_response(out)
 
@@ -779,13 +799,19 @@ class BotEventHandler(_BotBaseHandler):
     # page. The dimensions won't be applied to BotInfo since they may not be
     # valid, but will be applied to BotEvent for analysis purpose.
     bot_management.bot_event(
-        event_type=event, bot_id=res.bot_id,
+        event_type=event,
+        bot_id=res.bot_id,
         external_ip=self.request.remote_addr,
         authenticated_as=auth.get_peer_identity().to_bytes(),
-        dimensions=res.dimensions, state=res.state,
-        version=res.version, quarantined=bool(res.quarantined_msg),
-        maintenance_msg=res.maintenance_msg, task_id=None,
-        task_name=None, message=message, register_dimensions=False)
+        dimensions=res.dimensions,
+        state=res.state,
+        version=res.version,
+        quarantined=bool(res.quarantined_msg),
+        maintenance_msg=res.maintenance_msg,
+        task_id=None,
+        task_name=None,
+        message=message,
+        register_dimensions=False)
 
     if event == 'bot_error':
       # Also logs this to ereporter2, so it will be listed in the server's
@@ -793,10 +819,10 @@ class BotEventHandler(_BotBaseHandler):
       # issues requiring action. In this case, include again the bot's URL since
       # there's no context in the report. Redundantly include the bot id so
       # messages are bucketted by bot.
-      line = (
-          '%s\n'
-          '\nhttps://%s/restricted/bot/%s') % (
-          message, app_identity.get_default_version_hostname(), res.bot_id)
+      line = ('%s\n'
+              '\nhttps://%s/restricted/bot/%s') % (
+                  message, app_identity.get_default_version_hostname(),
+                  res.bot_id)
       ereporter2.log_request(self.request, source='bot', message=line)
     self.send_response({})
 
@@ -841,10 +867,10 @@ class BotOAuthTokenHandler(_BotApiHandler):
     HTTP 500 - on retriable transient errors.
   """
   ACCEPTED_KEYS = {
-    u'account_id',  # 'system' or 'task'
-    u'id',          # bot ID
-    u'scopes',      # list of requested OAuth scopes
-    u'task_id',     # optional task ID, required if using 'task' account
+      u'account_id',  # 'system' or 'task'
+      u'id',  # bot ID
+      u'scopes',  # list of requested OAuth scopes
+      u'task_id',  # optional task ID, required if using 'task' account
   }
   REQUIRED_KEYS = {u'account_id', u'id', u'scopes'}
 
@@ -852,9 +878,8 @@ class BotOAuthTokenHandler(_BotApiHandler):
   def post(self):
     request = self.parse_body()
     logging.debug('Request body: %s', request)
-    msg = log_unexpected_subset_keys(
-        self.ACCEPTED_KEYS, self.REQUIRED_KEYS, request, self.request, 'bot',
-        'keys')
+    msg = log_unexpected_subset_keys(self.ACCEPTED_KEYS, self.REQUIRED_KEYS,
+                                     request, self.request, 'bot', 'keys')
     if msg:
       self.abort_with_error(400, error=msg)
 
@@ -908,7 +933,7 @@ class BotOAuthTokenHandler(_BotApiHandler):
           400, error='Wrong task_id: the bot is not executing this task')
 
     account = None  # an email or 'bot' or 'none'
-    token = None    # service_accounts.AccessToken
+    token = None  # service_accounts.AccessToken
     try:
       if account_id == 'task':
         account, token = service_accounts.get_task_account_token(
@@ -928,9 +953,9 @@ class BotOAuthTokenHandler(_BotApiHandler):
     # Note: the token info is already logged by service_accounts.get_*_token.
     if token:
       self.send_response({
-        'service_account': account,
-        'access_token': token.access_token,
-        'expiry': token.expiry,
+          'service_account': account,
+          'access_token': token.access_token,
+          'expiry': token.expiry,
       })
     else:
       assert account in ('bot', 'none'), account
@@ -947,9 +972,20 @@ class BotTaskUpdateHandler(_BotApiHandler):
   out-of-order packets.
   """
   ACCEPTED_KEYS = {
-    u'bot_overhead', u'cipd_pins', u'cipd_stats', u'cost_usd', u'duration',
-    u'exit_code', u'hard_timeout', u'id', u'io_timeout', u'isolated_stats',
-    u'output', u'output_chunk_start', u'outputs_ref', u'task_id',
+      u'bot_overhead',
+      u'cipd_pins',
+      u'cipd_stats',
+      u'cost_usd',
+      u'duration',
+      u'exit_code',
+      u'hard_timeout',
+      u'id',
+      u'io_timeout',
+      u'isolated_stats',
+      u'output',
+      u'output_chunk_start',
+      u'outputs_ref',
+      u'task_id',
   }
   REQUIRED_KEYS = {u'id', u'task_id'}
 
@@ -959,9 +995,8 @@ class BotTaskUpdateHandler(_BotApiHandler):
     # Unlike handshake and poll, we do not accept invalid keys here. This code
     # path is much more strict.
     request = self.parse_body()
-    msg = log_unexpected_subset_keys(
-        self.ACCEPTED_KEYS, self.REQUIRED_KEYS, request, self.request, 'bot',
-        'keys')
+    msg = log_unexpected_subset_keys(self.ACCEPTED_KEYS, self.REQUIRED_KEYS,
+                                     request, self.request, 'bot', 'keys')
     if msg:
       self.abort_with_error(400, error=msg)
 
@@ -996,8 +1031,8 @@ class BotTaskUpdateHandler(_BotApiHandler):
       self.abort_with_error(
           400,
           error='isolated_stats and cipd_stats require bot_overhead to be set'
-                '\nbot_overhead: %s\nisolate_stats: %s' %
-                (bot_overhead, isolated_stats))
+          '\nbot_overhead: %s\nisolate_stats: %s' %
+          (bot_overhead, isolated_stats))
 
     run_result_key = task_pack.unpack_run_result_key(task_id)
     performance_stats = None
@@ -1007,10 +1042,12 @@ class BotTaskUpdateHandler(_BotApiHandler):
       if isolated_stats:
         download = isolated_stats.get('download') or {}
         upload = isolated_stats.get('upload') or {}
+
         def unpack_base64(d, k):
           x = d.get(k)
           if x:
             return base64.b64decode(x)
+
         performance_stats.isolated_download = task_result.OperationStats(
             duration=download.get('duration'),
             initial_number_items=download.get('initial_number_items'),
@@ -1041,11 +1078,11 @@ class BotTaskUpdateHandler(_BotApiHandler):
 
     if cipd_pins:
       cipd_pins = task_result.CipdPins(
-        client_package=task_request.CipdPackage(
-            **cipd_pins['client_package']),
-        packages=[
-            task_request.CipdPackage(**args) for args in cipd_pins['packages']]
-      )
+          client_package=task_request.CipdPackage(
+              **cipd_pins['client_package']),
+          packages=[
+              task_request.CipdPackage(**args) for args in cipd_pins['packages']
+          ])
 
     # Tell the task queues management engine that the bot is still alive, and
     # it shall refresh the task queues.
@@ -1076,16 +1113,22 @@ class BotTaskUpdateHandler(_BotApiHandler):
       elif state == task_result.State.KILLED:
         action = 'task_killed'
       else:
-        assert state in (
-            task_result.State.BOT_DIED, task_result.State.RUNNING), state
+        assert state in (task_result.State.BOT_DIED,
+                         task_result.State.RUNNING), state
         action = 'task_update'
       bot_management.bot_event(
-          event_type=action, bot_id=bot_id,
+          event_type=action,
+          bot_id=bot_id,
           external_ip=self.request.remote_addr,
           authenticated_as=auth.get_peer_identity().to_bytes(),
-          dimensions=None, state=None,
-          version=None, quarantined=None, maintenance_msg=None, task_id=task_id,
-          task_name=None, register_dimensions=False)
+          dimensions=None,
+          state=None,
+          version=None,
+          quarantined=None,
+          maintenance_msg=None,
+          task_id=task_id,
+          task_name=None,
+          register_dimensions=False)
     except ValueError as e:
       ereporter2.log_request(
           request=self.request,
@@ -1136,23 +1179,28 @@ class BotTaskErrorHandler(_BotApiHandler):
     bot_auth.validate_bot_id_and_fetch_config(bot_id)
 
     bot_management.bot_event(
-        event_type='task_error', bot_id=bot_id,
+        event_type='task_error',
+        bot_id=bot_id,
         external_ip=self.request.remote_addr,
         authenticated_as=auth.get_peer_identity().to_bytes(),
-        dimensions=None, state=None,
-        version=None, quarantined=None, maintenance_msg=None, task_id=task_id,
-        task_name=None, message=message, register_dimensions=False)
-    line = (
-        'Bot: https://%s/restricted/bot/%s\n'
-        'Task failed: https://%s/user/task/%s\n'
-        '%s') % (
-        app_identity.get_default_version_hostname(), bot_id,
-        app_identity.get_default_version_hostname(), task_id,
-        message)
+        dimensions=None,
+        state=None,
+        version=None,
+        quarantined=None,
+        maintenance_msg=None,
+        task_id=task_id,
+        task_name=None,
+        message=message,
+        register_dimensions=False)
+    line = ('Bot: https://%s/restricted/bot/%s\n'
+            'Task failed: https://%s/user/task/%s\n'
+            '%s') % (app_identity.get_default_version_hostname(), bot_id,
+                     app_identity.get_default_version_hostname(), task_id,
+                     message)
     ereporter2.log_request(self.request, source='bot', message=line)
 
-    msg = log_unexpected_keys(
-        self.EXPECTED_KEYS, request, self.request, 'bot', 'keys')
+    msg = log_unexpected_keys(self.EXPECTED_KEYS, request, self.request, 'bot',
+                              'keys')
     if msg:
       self.abort_with_error(400, error=msg)
 
@@ -1174,8 +1222,8 @@ def get_routes():
       ('/bot_code', BotCodeHandler),
       # 40 for old sha1 digest so old bot can still update, 64 for current
       # sha256 digest.
-      ('/swarming/api/v1/bot/bot_code/<version:[0-9a-f]{40,64}>',
-          BotCodeHandler),
+      ('/swarming/api/v1/bot/bot_code/<version:[0-9a-f]{40,64}>', BotCodeHandler
+      ),
 
       # Bot API RPCs
 
@@ -1190,10 +1238,10 @@ def get_routes():
       # Bot Task API RPC handlers
       ('/swarming/api/v1/bot/task_update', BotTaskUpdateHandler),
       ('/swarming/api/v1/bot/task_update/<task_id:[a-f0-9]+>',
-          BotTaskUpdateHandler),
+       BotTaskUpdateHandler),
       ('/swarming/api/v1/bot/task_error', BotTaskErrorHandler),
       ('/swarming/api/v1/bot/task_error/<task_id:[a-f0-9]+>',
-          BotTaskErrorHandler),
+       BotTaskErrorHandler),
 
       # Bot Security API RPC handler
   ]
