@@ -85,7 +85,8 @@ instance. The allowed items are:
   - `includes`: list of `.isolate` files to include, i.e. that will be processed
     before processing this file.
   - `variables`: dict of variables. Only 3 variables are allowed:
-    - `command`: list that describes the command to run, i.e. each argument.
+    - `command`: DEPRECATED. list that describes the command to run, i.e. each
+      argument.
     - `files`: list of dependencies to track, i.e. files and directories.
     - `read_only`: an integer of value 0, 1 or 2. 1 is the default.
       - 0 means that the tree is created writeable. Any file can be opened for

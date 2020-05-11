@@ -109,7 +109,7 @@ used to run the executable and the relative directory to start the command in.
 
 The root is a dictionary with the following keys:
   - `algo`: Hashing algorithm used to hash the content. Normally `'sha-1'`.
-  - `command`: exact command to run as a list.
+  - `command`: DPERECATED. exact command to run as a list.
   - `files`: list of dictionary, each key being the relative file path, and the
     entry being a dict determining the properties of the file. Exactly one of
     `h` or `l` must be present. `m` must be present only on POSIX systems.
@@ -118,14 +118,14 @@ The root is a dictionary with the following keys:
     - `m`: POSIX file mode (required on POSIX, ignored on non-POSIX).
     - `s`: file size iff not a symlink
     - `t`: type of the file iff not the default of `basic`
-  - `includes`: references another `.isolated` file for additional files or to
-    provide the command. In practice, this is used to reduce `.isolated` file
-    size by moving rarely changed test data files in a separate `.isolated`
-    file.
+  - `includes`: DEPRECATED. references another `.isolated` file for additional
+    files or to provide the command. In practice, this is used to reduce
+    `.isolated` file size by moving rarely changed test data files in a separate
+    `.isolated` file.
   - `read_only`: boolean to specify if all the files should be read-only. This
     will be eventually enforced.
-  - `relative_cwd`: relative directory inside the temporary directory tree when
-    the command should be executed from.
+  - `relative_cwd`: DEPRECATED. relative directory inside the temporary
+    directory tree when the command should be executed from.
   - `version`: version of the file format. Increment the minor version for non
     breaking changes and the major version if code written for a previous
     version shouldn't be able to parse it.
