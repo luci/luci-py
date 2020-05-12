@@ -122,7 +122,7 @@ def main():
 
   if options.files:
     print('')
-    cmd = ['git', 'diff', refspec, '--stat', '-C', '-C']
+    cmd = ['git', '--no-pager', 'diff', refspec, '--stat', '-C', '-C']
     try:
       subprocess.check_call(cmd, cwd=root)
     except subprocess.CalledProcessError:
