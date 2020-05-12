@@ -85,9 +85,6 @@ const template = (ele) => html`
         <a href=/stats>Usage statistics</a>
       </li>
       <li>
-        <a href=/restricted/mapreduce/status>Map Reduce Jobs</a>
-      </li>
-      <li>
         <a href=${instancesURL(ele)}>View version's instances on Cloud Console</a>
       </li>
       <li>
