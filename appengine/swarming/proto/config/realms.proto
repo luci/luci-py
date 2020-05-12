@@ -13,5 +13,9 @@ option go_package = "go.chromium.org/luci/swarming/proto/config;configpb";
 // in server/realms.py
 enum RealmPermission {
   REALM_PERMISSION_UNSPECIFIED = 0;
-  REALM_PERMISSION_POOLS_CREATE_TASK = 1; // 'swarming.pools.createTask'
+
+  // Permission 'swarming.pools.createTask'
+  // This is required to create a task in the pool.
+  // It will be checked at the new task API.
+  REALM_PERMISSION_POOLS_CREATE_TASK = 1;
 }

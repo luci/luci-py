@@ -94,6 +94,12 @@ def db():
       permission('scheduler.jobs.abort'),
   ])
 
+  # Swarming permissions and roles (crbug.com/1066839).
+  # See swarming/proto/config/realms.proto for more details.
+  role('role/swarming.poolUser', [
+      permission('swarming.pools.createTask'),
+  ])
+
   return builder.finish()
 
 
