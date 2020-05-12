@@ -1,5 +1,15 @@
 # This file must be in repo root for it to be used by `git cl format`. Unlike
 # .gitignore, patterns in this file are only simple Unix shell-style wildcard
 # patterns (e.g. *.ext" matches all paths that end in .ext).
+# auto generated files
 *_pb2.py
 *_pb2_grpc.py
+
+# third party files
+*/third_party/*
+*/third_party_local/*
+*/node_modules/*
+appengine/swarming/ui2/nodejs/*
+
+# crbug.com/1081197: yapf fails to format this file.
+client/example/payload/hello_🌐.py
