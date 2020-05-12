@@ -6,9 +6,10 @@ syntax = "proto3";
 
 package swarming.config;
 
-option go_package = "go.chromium.org/luci/swarming/proto/config;configpb";
-
 import "config.proto";
+import "realms.proto";
+
+option go_package = "go.chromium.org/luci/swarming/proto/config;configpb";
 
 // Schema for pools.cfg service config file in luci-config.
 //
@@ -109,6 +110,21 @@ message Pool {
   // For a given task or bot, the first entry in this list that matches based on
   // dimension eligibility will be used.
   repeated ExternalSchedulerConfig external_schedulers = 9;
+
+  // Realm name that the pool is associated with.
+  //
+  // e.g.
+  // 'infra:pool/flext/try' for 'luci.flex.try' pool
+  //
+  // See also
+  // https://chromium.googlesource.com/infra/luci/luci-go/+/HEAD/server/auth/service/protocol/components/auth/proto/realms.proto
+  string realm = 10;
+
+  // Enforcements of permissions can be controlled by pool during migration
+  // from legacy ACLs configs to Realms configs.
+  // Listed permissions will be enforced to the specific pool.
+  // This field will be deprecated after migration.
+  repeated RealmPermission enforced_realm_permissions = 11;
 }
 
 
