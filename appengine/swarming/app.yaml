@@ -76,7 +76,7 @@ builtins:
 - remote_api: on
 
 inbound_services:
-- mail
+- mail # This is for 'reply all' to the mail from ereporter2.
 - warmup
 
 includes:
