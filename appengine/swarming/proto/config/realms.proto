@@ -1,0 +1,17 @@
+// Copyright 2020 The LUCI Authors. All rights reserved.
+// Use of this source code is governed under the Apache License, Version 2.0
+// that can be found in the LICENSE file.
+
+syntax = "proto3";
+
+package swarming.config;
+
+option go_package = "go.chromium.org/luci/swarming/proto/config;configpb";
+
+// Realm permissions used in Swarming.
+// The enums are converted to string names using get_permission_name
+// in server/realms.py
+enum RealmPermission {
+  REALM_PERMISSION_UNSPECIFIED = 0;
+  REALM_PERMISSION_POOLS_CREATE_TASK = 1; // 'swarming.pools.createTask'
+}

@@ -12,6 +12,7 @@ from google.protobuf import symbol_database as _symbol_database
 _sym_db = _symbol_database.Default()
 
 
+import realms_pb2 as realms__pb2
 
 
 DESCRIPTOR = _descriptor.FileDescriptor(
@@ -19,8 +20,9 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   package='swarming.config',
   syntax='proto3',
   serialized_options=_b('Z3go.chromium.org/luci/swarming/proto/config;configpb'),
-  serialized_pb=_b('\n\x0c\x63onfig.proto\x12\x0fswarming.config\"\xf3\x04\n\x0bSettingsCfg\x12\x18\n\x10google_analytics\x18\x01 \x01(\t\x12\x1e\n\x16reusable_task_age_secs\x18\x02 \x01(\x05\x12\x1e\n\x16\x62ot_death_timeout_secs\x18\x03 \x01(\x05\x12\x1c\n\x14\x65nable_ts_monitoring\x18\x04 \x01(\x08\x12\x31\n\x07isolate\x18\x05 \x01(\x0b\x32 .swarming.config.IsolateSettings\x12+\n\x04\x63ipd\x18\x06 \x01(\x0b\x32\x1d.swarming.config.CipdSettings\x12,\n$force_bots_to_sleep_and_not_run_task\x18\x08 \x01(\x08\x12\x14\n\x0cui_client_id\x18\t \x01(\t\x12#\n\x1b\x64isplay_server_url_template\x18\x0b \x01(\t\x12\x1a\n\x12max_bot_sleep_time\x18\x0c \x01(\x05\x12+\n\x04\x61uth\x18\r \x01(\x0b\x32\x1d.swarming.config.AuthSettings\x12\x1e\n\x16\x62ot_isolate_grpc_proxy\x18\x0e \x01(\t\x12\x1f\n\x17\x62ot_swarming_grpc_proxy\x18\x0f \x01(\t\x12\x1f\n\x17\x65xtra_child_src_csp_url\x18\x10 \x03(\t\x12\x10\n\x08use_lifo\x18\x11 \x01(\x08\x12%\n\x1d\x65nable_batch_es_notifications\x18\x12 \x01(\x08\x12\x33\n\x08resultdb\x18\x13 \x01(\x0b\x32!.swarming.config.ResultDBSettingsJ\x04\x08\x07\x10\x08J\x04\x08\n\x10\x0b\"D\n\x0fIsolateSettings\x12\x16\n\x0e\x64\x65\x66\x61ult_server\x18\x01 \x01(\t\x12\x19\n\x11\x64\x65\x66\x61ult_namespace\x18\x02 \x01(\t\"4\n\x0b\x43ipdPackage\x12\x14\n\x0cpackage_name\x18\x01 \x01(\t\x12\x0f\n\x07version\x18\x02 \x01(\t\"d\n\x0c\x43ipdSettings\x12\x16\n\x0e\x64\x65\x66\x61ult_server\x18\x01 \x01(\t\x12<\n\x16\x64\x65\x66\x61ult_client_package\x18\x02 \x01(\x0b\x32\x1c.swarming.config.CipdPackage\"\xb1\x01\n\x0c\x41uthSettings\x12\x14\n\x0c\x61\x64mins_group\x18\x01 \x01(\t\x12\x1b\n\x13\x62ot_bootstrap_group\x18\x02 \x01(\t\x12\x1e\n\x16privileged_users_group\x18\x03 \x01(\t\x12\x13\n\x0busers_group\x18\x04 \x01(\t\x12\x1b\n\x13view_all_bots_group\x18\x05 \x01(\t\x12\x1c\n\x14view_all_tasks_group\x18\x06 \x01(\t\"\"\n\x10ResultDBSettings\x12\x0e\n\x06server\x18\x01 \x01(\tB5Z3go.chromium.org/luci/swarming/proto/config;configpbb\x06proto3')
-)
+  serialized_pb=_b('\n\x0c\x63onfig.proto\x12\x0fswarming.config\x1a\x0crealms.proto\"\xf3\x04\n\x0bSettingsCfg\x12\x18\n\x10google_analytics\x18\x01 \x01(\t\x12\x1e\n\x16reusable_task_age_secs\x18\x02 \x01(\x05\x12\x1e\n\x16\x62ot_death_timeout_secs\x18\x03 \x01(\x05\x12\x1c\n\x14\x65nable_ts_monitoring\x18\x04 \x01(\x08\x12\x31\n\x07isolate\x18\x05 \x01(\x0b\x32 .swarming.config.IsolateSettings\x12+\n\x04\x63ipd\x18\x06 \x01(\x0b\x32\x1d.swarming.config.CipdSettings\x12,\n$force_bots_to_sleep_and_not_run_task\x18\x08 \x01(\x08\x12\x14\n\x0cui_client_id\x18\t \x01(\t\x12#\n\x1b\x64isplay_server_url_template\x18\x0b \x01(\t\x12\x1a\n\x12max_bot_sleep_time\x18\x0c \x01(\x05\x12+\n\x04\x61uth\x18\r \x01(\x0b\x32\x1d.swarming.config.AuthSettings\x12\x1e\n\x16\x62ot_isolate_grpc_proxy\x18\x0e \x01(\t\x12\x1f\n\x17\x62ot_swarming_grpc_proxy\x18\x0f \x01(\t\x12\x1f\n\x17\x65xtra_child_src_csp_url\x18\x10 \x03(\t\x12\x10\n\x08use_lifo\x18\x11 \x01(\x08\x12%\n\x1d\x65nable_batch_es_notifications\x18\x12 \x01(\x08\x12\x33\n\x08resultdb\x18\x13 \x01(\x0b\x32!.swarming.config.ResultDBSettingsJ\x04\x08\x07\x10\x08J\x04\x08\n\x10\x0b\"D\n\x0fIsolateSettings\x12\x16\n\x0e\x64\x65\x66\x61ult_server\x18\x01 \x01(\t\x12\x19\n\x11\x64\x65\x66\x61ult_namespace\x18\x02 \x01(\t\"4\n\x0b\x43ipdPackage\x12\x14\n\x0cpackage_name\x18\x01 \x01(\t\x12\x0f\n\x07version\x18\x02 \x01(\t\"d\n\x0c\x43ipdSettings\x12\x16\n\x0e\x64\x65\x66\x61ult_server\x18\x01 \x01(\t\x12<\n\x16\x64\x65\x66\x61ult_client_package\x18\x02 \x01(\x0b\x32\x1c.swarming.config.CipdPackage\"\xf7\x01\n\x0c\x41uthSettings\x12\x14\n\x0c\x61\x64mins_group\x18\x01 \x01(\t\x12\x1b\n\x13\x62ot_bootstrap_group\x18\x02 \x01(\t\x12\x1e\n\x16privileged_users_group\x18\x03 \x01(\t\x12\x13\n\x0busers_group\x18\x04 \x01(\t\x12\x1b\n\x13view_all_bots_group\x18\x05 \x01(\t\x12\x1c\n\x14view_all_tasks_group\x18\x06 \x01(\t\x12\x44\n\x1a\x65nforced_realm_permissions\x18\x07 \x03(\x0e\x32 .swarming.config.RealmPermission\"\"\n\x10ResultDBSettings\x12\x0e\n\x06server\x18\x01 \x01(\tB5Z3go.chromium.org/luci/swarming/proto/config;configpbb\x06proto3')
+  ,
+  dependencies=[realms__pb2.DESCRIPTOR,])
 
 
 
@@ -163,8 +165,8 @@ _SETTINGSCFG = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=34,
-  serialized_end=661,
+  serialized_start=48,
+  serialized_end=675,
 )
 
 
@@ -201,8 +203,8 @@ _ISOLATESETTINGS = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=663,
-  serialized_end=731,
+  serialized_start=677,
+  serialized_end=745,
 )
 
 
@@ -239,8 +241,8 @@ _CIPDPACKAGE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=733,
-  serialized_end=785,
+  serialized_start=747,
+  serialized_end=799,
 )
 
 
@@ -277,8 +279,8 @@ _CIPDSETTINGS = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=787,
-  serialized_end=887,
+  serialized_start=801,
+  serialized_end=901,
 )
 
 
@@ -331,6 +333,13 @@ _AUTHSETTINGS = _descriptor.Descriptor(
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR),
+    _descriptor.FieldDescriptor(
+      name='enforced_realm_permissions', full_name='swarming.config.AuthSettings.enforced_realm_permissions', index=6,
+      number=7, type=14, cpp_type=8, label=3,
+      has_default_value=False, default_value=[],
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR),
   ],
   extensions=[
   ],
@@ -343,8 +352,8 @@ _AUTHSETTINGS = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=890,
-  serialized_end=1067,
+  serialized_start=904,
+  serialized_end=1151,
 )
 
 
@@ -374,8 +383,8 @@ _RESULTDBSETTINGS = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1069,
-  serialized_end=1103,
+  serialized_start=1153,
+  serialized_end=1187,
 )
 
 _SETTINGSCFG.fields_by_name['isolate'].message_type = _ISOLATESETTINGS
@@ -383,6 +392,7 @@ _SETTINGSCFG.fields_by_name['cipd'].message_type = _CIPDSETTINGS
 _SETTINGSCFG.fields_by_name['auth'].message_type = _AUTHSETTINGS
 _SETTINGSCFG.fields_by_name['resultdb'].message_type = _RESULTDBSETTINGS
 _CIPDSETTINGS.fields_by_name['default_client_package'].message_type = _CIPDPACKAGE
+_AUTHSETTINGS.fields_by_name['enforced_realm_permissions'].enum_type = realms__pb2._REALMPERMISSION
 DESCRIPTOR.message_types_by_name['SettingsCfg'] = _SETTINGSCFG
 DESCRIPTOR.message_types_by_name['IsolateSettings'] = _ISOLATESETTINGS
 DESCRIPTOR.message_types_by_name['CipdPackage'] = _CIPDPACKAGE

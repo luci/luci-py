@@ -6,6 +6,8 @@ syntax = "proto3";
 
 package swarming.config;
 
+import "realms.proto";
+
 option go_package = "go.chromium.org/luci/swarming/proto/config;configpb";
 
 // Schema for settings.cfg service config file in luci-config.
@@ -167,6 +169,10 @@ message AuthSettings {
   // Grants:
   // - view all tasks
   string view_all_tasks_group = 6;
+
+  // List of Realm permissions enforced by default.
+  // This field will be deprecated after migration.
+  repeated RealmPermission enforced_realm_permissions = 7;
 }
 
 // Settings for Swarming-ResultDB integration.
