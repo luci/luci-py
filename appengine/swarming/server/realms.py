@@ -3,6 +3,7 @@
 # that can be found in the LICENSE file.
 
 from proto.config import realms_pb2
+from server import config
 
 
 def get_permission_name(enum_permission):
@@ -24,3 +25,21 @@ def get_permission_name(enum_permission):
   # convert following words to verb e.g. createTask, listBots
   verb = words[1].lower() + ''.join(map(lambda x: x.capitalize(), words[2:]))
   return 'swarming.%s.%s' % (subject, verb)
+
+
+def is_enforced_permission(perm, pool_cfg=None):
+  """ Checks if the Realm permission is enforced.
+
+  Checks if the permission is specified in `enforced_realm_permissions`
+  in settings.cfg or pools.cfg for the pool.
+
+  Args:
+    perm: realms_pb2.RealmPermission enum value.
+    pool_cfg: PoolConfig of the pool
+
+  Returns:
+    bool: True if it's enforced, False if it's legacy-compatible.
+  """
+  if pool_cfg and perm in pool_cfg.enforced_realm_permissions:
+    return True
+  return perm in config.settings().auth.enforced_realm_permissions
