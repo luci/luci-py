@@ -90,6 +90,7 @@ def get_isolated_args(work_dir, task_details, isolated_result,
         task_details.isolated['server'].encode('utf-8'),
         '--namespace',
         task_details.isolated['namespace'].encode('utf-8'),
+        '--report-on-exception',
     ])
     isolated_input = task_details.isolated.get('input')
     if isolated_input:

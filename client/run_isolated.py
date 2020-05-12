@@ -1231,6 +1231,11 @@ def create_option_parser():
       help='Specify a file containing a JSON array of arguments to this '
       'script. If --argsfile is provided, no other argument may be '
       'provided on the command line.')
+  parser.add_option(
+      '--report-on-exception',
+      action='store_true',
+      help='Whether report exception during execution to isolate server. '
+      'This flag should only be used in swarming bot.')
 
   group = optparse.OptionGroup(parser, 'Data source')
   group.add_option(
@@ -1376,6 +1381,9 @@ def main(args):
   # Warning: when --argsfile is used, the strings are unicode instances, when
   # parsed normally, the strings are str instances.
   (parser, options, args) = parse_args(args)
+
+  if options.report_on_exception and options.isolate_server:
+    on_error.report_on_exception_exit(options.isolate_server)
 
   if not file_path.enable_symlink():
     logging.warning('Symlink support is not enabled')
