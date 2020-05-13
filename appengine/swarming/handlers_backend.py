@@ -17,7 +17,6 @@ from google.protobuf import json_format
 
 from proto.api import plugin_pb2
 
-import mapreduce_jobs
 from components import decorators
 from components import datastore_utils
 from server import bq_state
@@ -394,17 +393,6 @@ class TaskMonitoringTSMon(webapp2.RequestHandler):
     ts_mon_metrics.set_global_metrics(kind, payload=self.request.body)
 
 
-### Mapreduce related handlers
-
-
-class InternalLaunchMapReduceJobWorkerHandler(webapp2.RequestHandler):
-  """Called via task queue or cron to start a map reduce job."""
-
-  @decorators.require_taskqueue(mapreduce_jobs.MAPREDUCE_TASK_QUEUE)
-  def post(self, job_id):  # pylint: disable=R0201
-    mapreduce_jobs.launch_job(job_id)
-
-
 ###
 
 
@@ -478,10 +466,6 @@ def get_routes():
         TaskMonitoringTasksResultsSummaryBQ),
     (r'/internal/taskqueue/monitoring/tsmon/<kind:[0-9A-Za-z_]+>',
         TaskMonitoringTSMon),
-
-    # Mapreduce related urls.
-    (r'/internal/taskqueue/mapreduce/launch/<job_id:[^\/]+>',
-      InternalLaunchMapReduceJobWorkerHandler),
   ]
   return [webapp2.Route(*a) for a in routes]
 

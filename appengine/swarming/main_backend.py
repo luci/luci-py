@@ -53,14 +53,9 @@ def create_application():
   backend_app = handlers_backend.create_application(False)
   gae_ts_mon.initialize(backend_app, is_enabled_fn=is_enabled_callback)
 
-  # Local import, because it instantiates the mapreduce app.
-  # This is for the task queue handlers.
-  from mapreduce import main
-  gae_ts_mon.instrument_wsgi_application(main.APP)
-
   ts_mon_metrics.initialize()
   utils.report_memory(backend_app)
-  return backend_app, main.APP
+  return backend_app
 
 
-app, mapreduce_app = create_application()
+app = create_application()

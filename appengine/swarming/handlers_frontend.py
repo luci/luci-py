@@ -15,7 +15,6 @@ import webapp2
 
 import handlers_bot
 import handlers_endpoints
-import mapreduce_jobs
 import template
 
 from components import auth
@@ -43,33 +42,6 @@ class RestrictedConfigHandler(auth.AuthenticatingHandler):
     # Template parameters schema matches settings_info() return value.
     self.response.write(template.render(
         'swarming/restricted_config.html', config.settings_info()))
-
-
-### Mapreduce related handlers
-
-
-class RestrictedLaunchMapReduceJob(auth.AuthenticatingHandler):
-  """Enqueues a task to start a map reduce job on the backend module.
-
-  A tree of map reduce jobs inherits module and version of a handler that
-  launched it. All UI handlers are executes by 'default' module. So to run a
-  map reduce on a backend module one needs to pass a request to a task running
-  on backend module.
-  """
-
-  @auth.require(acl.can_edit_config)
-  def post(self):
-    job_id = self.request.get('job_id')
-    assert job_id in mapreduce_jobs.MAPREDUCE_JOBS
-    success = utils.enqueue_task(
-        url='/internal/taskqueue/mapreduce/launch/%s' % job_id,
-        queue_name=mapreduce_jobs.MAPREDUCE_TASK_QUEUE,
-        use_dedicated_module=False)
-    # New tasks should show up on the status page.
-    if success:
-      self.redirect('/restricted/mapreduce/status')
-    else:
-      self.abort(500, 'Failed to launch the job')
 
 
 ### Redirectors.
@@ -215,9 +187,6 @@ def get_routes():
         # Admin pages.
         # TODO(maruel): Get rid of them.
         ('/restricted/config', RestrictedConfigHandler),
-
-        # Mapreduce related urls.
-        (r'/restricted/launch_mapreduce', RestrictedLaunchMapReduceJob),
     ])
 
   return [webapp2.Route(*i) for i in routes]

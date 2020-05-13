@@ -211,7 +211,6 @@ class BackendTest(test_env_handlers.AppTestBase):
         ('monitoring-bq-tasks-results-summary',
          '/internal/taskqueue/monitoring/bq/tasks/results/summary/'
          '2020-01-01T01:01'),
-        ('mapreduce-jobs', '/internal/taskqueue/mapreduce/launch/jobid'),
       ],
       key=lambda x: x[1])
     self.assertEqual(len(expected_task_queues), len(task_queue_routes))

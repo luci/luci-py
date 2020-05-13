@@ -107,17 +107,6 @@ queue:
 
 ## General
 
-# /internal/taskqueue/mapreduce/launch/<job_id:[^\/]+>
-- name: mapreduce-jobs
-  bucket_size: 500
-  rate: 500/s
-  # This limits the burn rate:
-  max_concurrent_requests: 128
-  retry_parameters:
-    task_age_limit: 2h
-    min_backoff_seconds: 1
-    max_backoff_seconds: 600
-
 # /internal/taskqueue/monitoring/tsmon/<kind:[0-9A-Za-z_]+>
 - name: tsmon
   bucket_size: 10

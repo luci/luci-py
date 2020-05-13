@@ -79,16 +79,11 @@ def create_application():
   prpc_api = webapp2.WSGIApplication(handlers_prpc.get_routes())
   gae_ts_mon.instrument_wsgi_application(prpc_api)
 
-  # Local import, because it instantiates the mapreduce app.
-  # This is for the Web UI.
-  from mapreduce import main
-  gae_ts_mon.instrument_wsgi_application(main.APP)
-
   ts_mon_metrics.initialize()
   utils.report_memory(frontend_app)
   utils.report_memory(endpoints_api)
   utils.report_memory(prpc_api)
-  return frontend_app, endpoints_api, prpc_api, main.APP
+  return frontend_app, endpoints_api, prpc_api
 
 
-app, endpoints_app, prpc_app, mapreduce_app = create_application()
+app, endpoints_app, prpc_app = create_application()
