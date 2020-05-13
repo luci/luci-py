@@ -19,7 +19,6 @@ from google.appengine.ext import ndb
 
 import config
 import gcs
-import mapreduce_jobs
 import model
 import stats
 import template
@@ -615,16 +614,6 @@ class TaskVerifyWorkerHandler(webapp2.RequestHandler):
     return
 
 
-### Mapreduce related handlers
-
-
-class TaskLaunchMapReduceJobWorkerHandler(webapp2.RequestHandler):
-  """Called via task queue or cron to start a map reduce job."""
-  @decorators.require_taskqueue(mapreduce_jobs.MAPREDUCE_TASK_QUEUE)
-  def post(self, job_id):  # pylint: disable=no-self-use
-    mapreduce_jobs.launch_job(job_id)
-
-
 ###
 
 
@@ -671,11 +660,6 @@ def get_routes():
         r'/internal/cron/stats/update', CronStatsUpdateHandler),
     webapp2.Route(
         r'/internal/cron/stats/send_to_bq', CronStatsSendToBQHandler),
-
-    # Mapreduce related urls.
-    webapp2.Route(
-        r'/internal/taskqueue/mapreduce/launch/<job_id:[^\/]+>',
-        TaskLaunchMapReduceJobWorkerHandler),
   ]
 
 

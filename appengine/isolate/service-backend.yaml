@@ -13,11 +13,6 @@ automatic_scaling:
   max_pending_latency: 10000ms
 
 handlers:
-- url: /mapreduce(/.*)?
-  script: mapreduce.main.APP
-  secure: always
-  login: admin
-
 - url: /internal.*
   script: main_backend.app
   secure: always

@@ -21,23 +21,10 @@ handlers:
   script: main_frontend.prpc_app
   secure: always
 
-- url: /mapreduce(/.*)?
-  script: mapreduce.main.APP
-  secure: always
-  login: admin
-
 - url: /restricted.*
   script: main_frontend.frontend_app
   secure: always
   login: required
-
-- url: /mapreduce/pipeline/images
-  static_dir: third_party/mapreduce/lib/pipeline/ui/images
-  secure: always
-  http_headers:
-    Content-Security-Policy: "default-src https: 'self'"
-    Strict-Transport-Security: "max-age=31536000; includeSubDomains; preload"
-    X-Frame-Options: deny
 
 - url: /res/(.+)
   static_files: ui/build/\1

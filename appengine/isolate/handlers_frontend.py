@@ -18,7 +18,6 @@ import acl
 import config
 import gcs
 import handlers_endpoints_v1
-import mapreduce_jobs
 import model
 import stats
 import template
@@ -157,36 +156,6 @@ class RestrictedPurgeHandler(auth.AuthenticatingHandler):
         template.render('isolate/restricted_purge.html', params))
 
 
-### Mapreduce related handlers
-
-
-class RestrictedLaunchMapReduceJob(auth.AuthenticatingHandler):
-  """Enqueues a task to start a map reduce job on the backend module.
-
-  A tree of map reduce jobs inherits module and version of a handler that
-  launched it. All UI handlers are executes by 'default' module. So to run a
-  map reduce on a backend module one needs to pass a request to a task running
-  on backend module.
-  """
-
-  @auth.require(auth.is_admin)
-  def post(self):
-    job_id = self.request.get('job_id')
-    assert job_id in mapreduce_jobs.MAPREDUCE_JOBS
-    # Do not use 'backend' module when running from dev appserver. Mapreduce
-    # generates URLs that are incompatible with dev appserver URL routing when
-    # using custom modules.
-    success = utils.enqueue_task(
-        url='/internal/taskqueue/mapreduce/launch/%s' % job_id,
-        queue_name=mapreduce_jobs.MAPREDUCE_TASK_QUEUE,
-        use_dedicated_module=not utils.is_local_dev_server())
-    # New tasks should show up on the status page.
-    if success:
-      self.redirect('/mapreduce/status')
-    else:
-      self.abort(500, 'Failed to launch the job')
-
-
 ### Non-restricted handlers
 
 
@@ -320,14 +289,9 @@ class RootHandler(auth.AuthenticatingHandler):
     params = {
       'is_admin': auth.is_admin(),
       'is_user': acl.isolate_readable(),
-      'mapreduce_jobs': [],
       'user_type': acl.get_user_type(),
     }
     if auth.is_admin():
-      params['mapreduce_jobs'] = [
-        {'id': job_id, 'name': job_def['job_name']}
-        for job_id, job_def in mapreduce_jobs.MAPREDUCE_JOBS.items()
-      ]
       params['xsrf_token'] = self.generate_xsrf_token()
     self.response.write(template.render('isolate/root.html', params))
 
@@ -380,11 +344,6 @@ def get_routes():
       # Administrative urls.
       webapp2.Route(r'/restricted/config', RestrictedConfigHandler),
       webapp2.Route(r'/restricted/purge', RestrictedPurgeHandler),
-
-      # Mapreduce related urls.
-      webapp2.Route(
-          r'/restricted/launch_mapreduce',
-          RestrictedLaunchMapReduceJob),
 
       # User web pages.
       webapp2.Route(r'/browse', BrowseHandler),

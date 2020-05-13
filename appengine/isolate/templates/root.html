@@ -47,7 +47,6 @@ Please <a href="{{signin_link|safe}}">sign in</a> for more access.
   <li class="user"><a href="/browse">Browse files online</a></li>
   <li class="admin"><a href="/restricted/ereporter2/report">Exceptions in server log</a></li>
   <li class="admin"><a href="/restricted/ereporter2/errors">Ereporter2 errors</a></li>
-  <li class="admin"><a href="/mapreduce/status">Map reduce jobs</a></li>
   <li class="admin">
     <a href="https://console.cloud.google.com/appengine?project={{app_id|utf8}}&versionId={{app_version|utf8}}&duration=P2D&graph=AE_INSTANCES">View instances on AppEngine</a>
   </li>
@@ -61,19 +60,6 @@ Please <a href="{{signin_link|safe}}">sign in</a> for more access.
   <li><a href="/restricted/purge">Purge an object</a></li>
   <li><a href="/restricted/config">Server config</a></li>
   <li><a href="/auth/groups">User groups</a></li>
-</ul>
-
-<h3>Map reduce jobs</h3>
-<ul class="admin">
-  {% for job in mapreduce_jobs %}
-    <li>
-      <form action="/restricted/launch_mapreduce" method="post">
-        <input type="hidden" name="xsrf_token" value="{{xsrf_token}}" />
-        <input type="hidden" name="job_id" value="{{job.id}}" />
-        <button type="submit">Launch '{{job.name}}'</button>
-      </form>
-    </li>
-  {% endfor %}
 </ul>
 
 {% endblock %}
