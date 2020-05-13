@@ -1,4 +1,4 @@
-#!/usr/bin/env vpython
+#!/usr/bin/env vpython3
 # Copyright 2014 The LUCI Authors. All rights reserved.
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
@@ -58,7 +58,8 @@ def raiseError(code):
       'cannot turn this into a real code yet: %s' % code)
 
 
-class HashAlgoNameTest(net_utils.TestCase):
+class HashAlgoNameTest(unittest.TestCase):
+
   def test_get_hash_algo(self):
     pairs = [
       ('default', hashlib.sha1),
@@ -299,8 +300,7 @@ class IsolateStorageGPRCTest(auto_stub.TestCase):
 
     s = self.get_server()
     i = isolate_storage.Item(digest='abc123', size=4)
-    self.mock(isolate_storage.Item, 'content',
-              lambda _: [(yield x) for x in ['12', '34']])
+    self.mock(isolate_storage.Item, 'content', lambda _: ['12', '34'])
     with self.assertRaises(IOError):
       s.push(i, isolate_storage._IsolateServerGrpcPushState())
 

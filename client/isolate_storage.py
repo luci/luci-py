@@ -566,7 +566,8 @@ class IsolateServer(StorageApi):
     # https://cloud.google.com/storage/docs/xml-api/reference-headers#xgooghash
     goog_hash = response.headers.get('x-goog-hash')
     assert goog_hash, response.headers
-    md5_x_goog_hash = 'md5=' + base64.b64encode(hashlib.md5(content).digest())
+    md5_x_goog_hash = 'md5=' + six.ensure_str(
+        base64.b64encode(hashlib.md5(content).digest()))
     return md5_x_goog_hash in goog_hash
 
 
