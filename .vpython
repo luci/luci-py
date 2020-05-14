@@ -99,3 +99,9 @@ wheel: <
   name: "infra/python/wheels/backports_functools_lru_cache-py2_py3"
   version: "version:1.5"
 >
+
+# required by gae.py
+wheel: <
+  name: "infra/python/wheels/colorama-py2_py3"
+  version: "version:0.4.1"
+>
