@@ -2605,6 +2605,16 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         'Is allowed_service_account or allowed_service_account_group specified '
         'in pools.cfg?', str(ctx.exception))
 
+  def test_check_schedule_request_acl_caller(self):
+    # the functionality is already  tested by
+    # test_check_schedule_request_acl_*.
+    pass
+
+  def test_check_schedule_request_acl_service_account(self):
+    # the functionality is already  tested by
+    # test_check_schedule_request_acl_*.
+    pass
+
   def test_cron_task_bot_distribution(self):
     # TODO(maruel): https://crbug.com/912154
     self.assertEqual(0, task_scheduler.cron_task_bot_distribution())

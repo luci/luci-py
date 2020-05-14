@@ -1086,11 +1086,6 @@ def check_schedule_request_acl(request):
   pool = request.pool
   pool_cfg = pools_config.get_pool_config(pool)
 
-  # request.service_account can be 'bot' or 'none'. We don't care about these,
-  # they are always allowed. We care when the service account is a real email.
-  has_service_account = service_accounts.is_service_account(
-      request.service_account)
-
   if not pool_cfg:
     logging.warning('Pool "%s" is not in pools.cfg', pool)
     # Unknown pools are forbidden.
@@ -1101,19 +1096,31 @@ def check_schedule_request_acl(request):
       'Looking at the pool "%s" in pools.cfg, rev "%s"', pool, pool_cfg.rev)
 
   # Verify the caller can use the pool at all.
+  check_schedule_request_acl_caller(pool, pool_cfg)
+
+  # Verify the requested task service account is allowed in this pool.
+  check_schedule_request_acl_service_account(request, pool_cfg)
+
+
+def check_schedule_request_acl_caller(pool, pool_cfg):
   if not _is_allowed_to_schedule(pool_cfg):
     raise auth.AuthorizationError(
         'User "%s" is not allowed to schedule tasks in the pool "%s", '
         'see pools.cfg' % (auth.get_current_identity().to_bytes(), pool))
 
-  # Verify the requested task service account is allowed in this pool.
+
+def check_schedule_request_acl_service_account(request, pool_cfg):
+  # request.service_account can be 'bot' or 'none'. We don't care about these,
+  # they are always allowed. We care when the service account is a real email.
+  has_service_account = service_accounts.is_service_account(
+      request.service_account)
   if (has_service_account and
       not _is_allowed_service_account(request.service_account, pool_cfg)):
     raise auth.AuthorizationError(
         'Task service account "%s" as specified in the task request is not '
         'allowed to be used in the pool "%s". Is allowed_service_account or '
         'allowed_service_account_group specified in pools.cfg?' %
-        (request.service_account, pool))
+        (request.service_account, request.pool))
 
 
 def schedule_request(request, secret_bytes):
