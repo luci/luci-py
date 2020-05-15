@@ -14,6 +14,7 @@ import math
 import random
 import time
 
+from google.appengine.api import app_identity
 from google.appengine.api import datastore_errors
 from google.appengine.ext import ndb
 
@@ -28,6 +29,7 @@ from server import bot_management
 from server import config
 from server import external_scheduler
 from server import pools_config
+from server import resultdb
 from server import service_accounts
 from server import task_pack
 from server import task_queues
@@ -1123,7 +1125,7 @@ def check_schedule_request_acl_service_account(request, pool_cfg):
         (request.service_account, request.pool))
 
 
-def schedule_request(request, secret_bytes):
+def schedule_request(request, secret_bytes, enable_resultdb):
   """Creates and stores all the entities to schedule a new task request.
 
   Assumes ACL check has already happened (see 'check_schedule_request_acl').
@@ -1138,6 +1140,7 @@ def schedule_request(request, secret_bytes):
   - secret_bytes: SecretBytes entity to be saved in the DB. It's key will be set
              and the entity will be stored by this function. None is allowed if
              there are no SecretBytes for this task.
+  - enable_resultdb: Whether we use resultdb or not for this task.
 
   Returns:
     TaskResultSummary. TaskToRun is not returned.
@@ -1153,6 +1156,7 @@ def schedule_request(request, secret_bytes):
   to_run = None
   if secret_bytes:
     secret_bytes.key = request.secret_bytes_key
+  resultdb_update_token_future = None
 
   dupe_summary = None
   for i in range(request.num_task_slices):
@@ -1198,6 +1202,10 @@ def schedule_request(request, secret_bytes):
       result_summary.completed_ts = result_summary.created_ts
       result_summary.state = task_result.State.NO_RESOURCE
 
+    elif enable_resultdb:
+      resultdb_update_token_future = resultdb.create_invocation_async(
+          task_pack.pack_run_result_key(to_run.run_result_key))
+
   # Determine external scheduler (if relevant) prior to making task live, to
   # make HTTP handler return as fast as possible after making task live.
   es_cfg = external_scheduler.config_for_task(request)
@@ -1205,6 +1213,14 @@ def schedule_request(request, secret_bytes):
   # This occasionally triggers a task queue. May throw, which is surfaced to the
   # user but it is safe as the task request wasn't stored yet.
   task_asserted_future.get_result()
+
+  if resultdb_update_token_future:
+    request.resultdb_update_token = resultdb_update_token_future.get_result()
+    result_summary.resultdb_info = task_result.ResultDBInfo(
+        hostname=config.settings().resultdb.server,
+        invocation=resultdb.get_invocation_name(
+            task_pack.pack_run_result_key(to_run.run_result_key)),
+    )
 
   # Storing these entities makes this task live. It is important at this point
   # that the HTTP handler returns as fast as possible, otherwise the task will
