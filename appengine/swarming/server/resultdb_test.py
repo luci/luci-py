@@ -118,6 +118,11 @@ class ResultDBTest(test_case.TestCase):
       mock_settings.assert_called_once()
       mock_json_request_async.assert_called_once()
 
+  def test_get_invocation_name(self):
+    self.assertEqual(
+        resultdb.get_invocation_name('run_result_id_01'),
+        'invocations/task:test-swarming.appspot.com:run_result_id_01')
+
 
 if __name__ == '__main__':
   if '-v' in sys.argv:

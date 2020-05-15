@@ -43,12 +43,16 @@ def finalize_invocation_async(task_run_id):
   """This is wrapper for FinalizeInvocation API."""
 
   try:
-    invocation_id = _get_invocation_id(task_run_id)
+    invocation_name = get_invocation_name(task_run_id)
     yield _call_resultdb_recorder_api_async('FinalizeInvocation', {
-        'name': 'invocations/%s' % invocation_id,
+        'name': invocation_name,
     })
   except net.Error:
-    logging.exception('Failed to finalize invocation %s', invocation_id)
+    logging.exception('Failed to finalize invocation %s', invocation_name)
+
+
+def get_invocation_name(task_run_id):
+  return 'invocations/%s' % _get_invocation_id(task_run_id)
 
 
 ### Private code
