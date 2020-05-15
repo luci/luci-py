@@ -680,6 +680,8 @@ class BotPollHandler(_BotBaseHandler):
     for i, hint in enumerate(named_caches.get_hints(pool, oses, names)):
       caches[i]['hint'] = str(hint)
 
+    logging.debug('named cache: %s', caches)
+
     out = {
         'cmd': 'run',
         'manifest': {
