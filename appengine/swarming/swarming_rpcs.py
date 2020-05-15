@@ -631,7 +631,6 @@ class ResultDBInfo(messages.Message):
   hostname = messages.StringField(1)
 
   # e.g. "invocations/task:chromium-swarm.appspot.com:deadbeef1"
-  # None if the integration was not enabled for this task.
   #
   # If the task was deduplicated, this equals invocation name of the original
   # task.
@@ -719,6 +718,7 @@ class TaskResult(messages.Message):
   current_task_slice = messages.IntegerField(29)
 
   # ResultDB related information.
+  # None if the integration was not enabled for this task.
   resultdb_info = messages.MessageField(ResultDBInfo, 30)
 
 
