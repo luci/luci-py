@@ -141,7 +141,8 @@ class BotApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(64, len(response['bot_version']))
     self.assertEqual(u'v1a', response['server_version'])
     expected = [
-        'Quarantined Bot\nhttps://None/restricted/bot/None\n'
+        'Quarantined Bot\n'
+        'https://test-swarming.appspot.com/restricted/bot/None\n'
         'Unexpected keys missing: [u\'dimensions\', u\'state\', u\'version\']; '
         'did you make a typo?',
     ]
@@ -183,7 +184,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(64, len(response['bot_version']))
     self.assertEqual(u'v1a', response['server_version'])
     msg = (u'Quarantined Bot\n'
-           'https://None/restricted/bot/id1\n'
+           'https://test-swarming.appspot.com/restricted/bot/id1\n'
            'Key pool has duplicate values: [u\'default\', u\'default\']')
     self.assertEqual([msg], errors)
 
@@ -224,7 +225,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(64, len(response['bot_version']))
     self.assertEqual(u'v1a', response['server_version'])
     msg = (u'Quarantined Bot\n'
-           'https://None/restricted/bot/id1\n'
+           'https://test-swarming.appspot.com/restricted/bot/id1\n'
            'Key a has invalid value: u\'%s\'' % ('b' * 1499))
     self.assertEqual([msg], errors)
 
@@ -262,7 +263,8 @@ class BotApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(64, len(response['bot_version']))
     self.assertEqual(u'v1a', response['server_version'])
     expected = [
-        u'Quarantined Bot\nhttps://None/restricted/bot/bot1\n'
+        u'Quarantined Bot\n'
+        u'https://test-swarming.appspot.com/restricted/bot/bot1\n'
         u'Unexpected keys superfluous: [u\'foo\']; did you make a typo?',
     ]
     self.assertEqual(expected, errors)
@@ -300,7 +302,8 @@ class BotApiTest(test_env_handlers.AppTestBase):
     self.assertTrue(response.pop(u'duration'))
     self.assertEqual(expected, response)
     expected = [
-        'Quarantined Bot\nhttps://None/restricted/bot/None\n'
+        'Quarantined Bot\n'
+        'https://test-swarming.appspot.com/restricted/bot/None\n'
         'Unexpected keys missing: [u\'dimensions\', u\'state\']; '
         'did you make a typo?',
     ]
@@ -889,7 +892,8 @@ class BotApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(expected, response)
     expected = [
         {
-            'message': u'for the worst\n\nhttps://None/restricted/bot/bot1',
+            'message': u'for the worst\n\n'
+                       'https://test-swarming.appspot.com/restricted/bot/bot1',
             'source': 'bot',
         },
     ]
@@ -1178,8 +1182,10 @@ class BotApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(1, len(errors))
     expected = [
         {
-            'message': u'Bot: https://None/restricted/bot/bot1\n'
-                       'Task failed: https://None/user/task/5cee488008811\nOh',
+            'message':
+                u'Bot: https://test-swarming.appspot.com/restricted/bot/bot1\n'
+                'Task failed: '
+                'https://test-swarming.appspot.com/user/task/5cee488008811\nOh',
             'source': 'bot',
         },
     ]

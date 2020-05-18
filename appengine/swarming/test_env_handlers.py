@@ -12,6 +12,8 @@ import os
 import swarming_test_env
 swarming_test_env.setup_test_env()
 
+from google.appengine.api import app_identity
+
 from protorpc.remote import protojson
 import webtest
 
@@ -61,6 +63,9 @@ class AppTestBase(test_case.TestCase):
             users_group=users_group,
         ))
     self.mock(config, '_get_settings', lambda: ('test_rev', cfg))
+    self.mock(
+        app_identity,
+        'get_default_version_hostname', lambda: 'test-swarming.appspot.com')
     utils.clear_cache(config.settings)
 
     # Note that auth.ADMIN_GROUP != admins_group.
