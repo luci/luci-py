@@ -48,7 +48,7 @@ def finalize_invocation_async(task_run_id):
         'name': invocation_name,
     })
   except net.Error:
-    logging.exception('Failed to finalize invocation %s', invocation_name)
+    logging.exception('Failed to finalize %s', invocation_name)
 
 
 def get_invocation_name(task_run_id):
