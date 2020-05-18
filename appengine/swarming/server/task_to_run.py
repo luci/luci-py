@@ -633,13 +633,7 @@ def yield_expired_task_to_run():
     finally:
       logging.debug('Yielded %d tasks', total)
 
-  opts = ndb.QueryOptions(
-      batch_size=256,
-      # crbug.com/1081206: query execution sometimes becomes very slow. In that
-      # case, instead of waiting long time, raise early and let cron job run
-      # again to prevent expiration delay.
-      deadline=60  # seconds
-  )
+  opts = ndb.QueryOptions(batch_size=256)
   now = utils.utcnow()
   # The backsearch here is just to ensure that we find entities that we forgot
   # about before because the cron job couldn't keep up. In practice
