@@ -70,6 +70,14 @@ class ResultDBTest(test_case.TestCase):
           },
           response_headers=mock.ANY)
 
+  def test_create_invocation_async_no_update_token(self):
+    with mock.patch('server.resultdb._call_resultdb_recorder_api_async',
+                    mock.Mock(side_effect=self.nop_async)):
+      with self.assertRaisesRegexp(
+          AssertionError,
+          "^response_headers should have valid update-token: {}$"):
+        resultdb.create_invocation_async('task001').get_result()
+
   def test_finalize_invocation_async_success(self):
 
     with mock.patch(
