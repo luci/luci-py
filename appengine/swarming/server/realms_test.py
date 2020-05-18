@@ -78,7 +78,6 @@ class RealmsTest(test_case.TestCase):
                                         is_enforced=None,
                                         is_allowed_legacy=None,
                                         is_allowed_realms=None):
-    task_request_mock = mock.Mock(pool='test_pool')
     self.mock(pools_config,
               'get_pool_config', lambda _: pools_pb2.Pool(realm=pool_realm))
     self.mock(realms, 'is_enforced_permission', lambda *_: is_enforced)
@@ -90,13 +89,13 @@ class RealmsTest(test_case.TestCase):
     else:
       has_permission_mock = mock.Mock()
       self.mock(auth, 'has_permission_dryrun', has_permission_mock)
-    return task_request_mock, has_permission_mock
+    return has_permission_mock
 
   def test_check_pools_create_task_legacy_allowed(self):
-    request_mock, has_permission_mock = self._mock_for_check_pools_create_task(
+    has_permission_mock = self._mock_for_check_pools_create_task(
         is_enforced=False, is_allowed_legacy=True)
 
-    self.assertIsNone(realms.check_pools_create_task(request_mock))
+    self.assertIsNone(realms.check_pools_create_task('test_pool'))
 
     has_permission_mock.assert_called_once_with(
         'swarming.pools.createTask', [u'test:pool'],
@@ -104,19 +103,19 @@ class RealmsTest(test_case.TestCase):
         tracking_bug='crbug.com/1066839')
 
   def test_check_pools_create_task_legacy_allowed_no_pool_realm(self):
-    request_mock, has_permission_mock = self._mock_for_check_pools_create_task(
+    has_permission_mock = self._mock_for_check_pools_create_task(
         pool_realm=None, is_enforced=False, is_allowed_legacy=True)
 
-    self.assertIsNone(realms.check_pools_create_task(request_mock))
+    self.assertIsNone(realms.check_pools_create_task('test_pool'))
 
     has_permission_mock.assert_not_called()
 
   def test_check_pools_create_task_legacy_not_allowed(self):
-    request_mock, has_permission_mock = self._mock_for_check_pools_create_task(
+    has_permission_mock = self._mock_for_check_pools_create_task(
         is_enforced=False, is_allowed_legacy=False)
 
     with self.assertRaises(auth.AuthorizationError):
-      realms.check_pools_create_task(request_mock)
+      realms.check_pools_create_task('test_pool')
 
     has_permission_mock.assert_called_once_with(
         'swarming.pools.createTask', [u'test:pool'],
@@ -124,29 +123,29 @@ class RealmsTest(test_case.TestCase):
         tracking_bug='crbug.com/1066839')
 
   def test_check_pools_create_task_legacy_not_allowed_no_pool_realm(self):
-    request_mock, has_permission_mock = self._mock_for_check_pools_create_task(
+    has_permission_mock = self._mock_for_check_pools_create_task(
         pool_realm=None, is_enforced=False, is_allowed_legacy=False)
 
     with self.assertRaises(auth.AuthorizationError):
-      realms.check_pools_create_task(request_mock)
+      realms.check_pools_create_task('test_pool')
 
     has_permission_mock.assert_not_called()
 
   def test_check_pools_create_task_enforced_allowed(self):
-    request_mock, has_permission_mock = self._mock_for_check_pools_create_task(
+    has_permission_mock = self._mock_for_check_pools_create_task(
         is_enforced=True, is_allowed_realms=True)
 
-    self.assertIsNone(realms.check_pools_create_task(request_mock))
+    self.assertIsNone(realms.check_pools_create_task('test_pool'))
 
     has_permission_mock.assert_called_once_with('swarming.pools.createTask',
                                                 [u'test:pool'])
 
   def test_check_pools_create_task_enforced_not_allowed(self):
-    request_mock, has_permission_mock = self._mock_for_check_pools_create_task(
+    has_permission_mock = self._mock_for_check_pools_create_task(
         is_enforced=True, is_allowed_realms=False)
 
     with self.assertRaises(auth.AuthorizationError):
-      realms.check_pools_create_task(request_mock)
+      realms.check_pools_create_task('test_pool')
     has_permission_mock.assert_called_once_with('swarming.pools.createTask',
                                                 [u'test:pool'])
 
