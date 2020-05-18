@@ -142,10 +142,9 @@ ALLOWED_IDENTITY_KINDS = {
   IDENTITY_USER: re.compile(r'^[0-9a-zA-Z_\-\.\+\%]+@[0-9a-zA-Z_\-\.]+$'),
 }
 
-# Regular expression that matches group names. ASCII only, no leading or
-# trailing spaces allowed (spaces inside are fine).
-GROUP_NAME_RE = re.compile(
-    r'^([a-z\-]+/)?[0-9a-zA-Z_][0-9a-zA-Z_\-\.\ @]{1,80}[0-9a-zA-Z_\-\.]$')
+# Regular expression that matches group names. Lowercase ASCII only plus some
+# special symbols to allow imported google groups.
+GROUP_NAME_RE = re.compile(r'^([a-z\-]+/)?[0-9a-z_\-\.@]{1,100}$')
 # Special group name that means 'All possible users' (including anonymous!).
 GROUP_ALL = '*'
 

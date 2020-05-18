@@ -178,6 +178,20 @@ class IdentityGlobTest(test_case.TestCase):
         glob.match(model.Identity(model.IDENTITY_USER, 'a@test.com')))
 
 
+class GroupNameTest(test_case.TestCase):
+  def test_valid(self):
+    self.assertTrue(model.is_valid_group_name('zdb/q9'))
+    self.assertTrue(model.is_valid_group_name('blah-blah-zzz'))
+    self.assertTrue(model.is_valid_group_name('buuble/blarh-zz@buuble.com'))
+    self.assertTrue(model.is_valid_group_name('09az_-.@'))
+
+  def test_invalid(self):
+    self.assertFalse(model.is_valid_group_name(''))
+    self.assertFalse(model.is_valid_group_name('aBC'))
+    self.assertFalse(model.is_valid_group_name('//'))
+    self.assertFalse(model.is_valid_group_name('what//now'))
+
+
 class AuthSecretTest(test_case.TestCase):
   """Tests for AuthSecret class."""
 
