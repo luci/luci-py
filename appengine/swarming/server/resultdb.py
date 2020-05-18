@@ -34,8 +34,10 @@ def create_invocation_async(task_run_id):
           }
       },
       response_headers=response_headers)
-
-  raise ndb.Return(response_headers.get('update-token'))
+  update_token = response_headers.get('update-token')
+  assert update_token, ("response_headers should have valid update-token: %s" %
+                        response_headers)
+  raise ndb.Return(update_token)
 
 
 @ndb.tasklet
