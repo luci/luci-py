@@ -13,6 +13,7 @@ import logging
 import math
 import random
 import time
+import urlparse
 
 from google.appengine.api import app_identity
 from google.appengine.api import datastore_errors
@@ -1217,7 +1218,7 @@ def schedule_request(request, secret_bytes, enable_resultdb):
   if resultdb_update_token_future:
     request.resultdb_update_token = resultdb_update_token_future.get_result()
     result_summary.resultdb_info = task_result.ResultDBInfo(
-        hostname=config.settings().resultdb.server,
+        hostname=urlparse.urlparse(config.settings().resultdb.server).hostname,
         invocation=resultdb.get_invocation_name(
             task_pack.pack_run_result_key(to_run.run_result_key)),
     )
