@@ -323,6 +323,14 @@ def task_result_to_rpc(entity, send_stats):
         for pkg in entity.cipd_pins.packages
       ] if entity.cipd_pins.packages else None
     )
+
+  resultdb_info = None
+  if entity.resultdb_info:
+    resultdb_info = swarming_rpcs.ResultDBInfo(
+        hostname=entity.resultdb_info.hostname,
+        invocation=entity.resultdb_info.invocation,
+    )
+
   performance_stats = None
   if send_stats and entity.performance_stats.is_valid:
 
@@ -337,11 +345,18 @@ def task_result_to_rpc(entity, send_stats):
         isolated_download=op(entity.performance_stats.isolated_download),
         isolated_upload=op(entity.performance_stats.isolated_upload))
   kwargs = {
-    'bot_dimensions': _string_list_pairs_from_dict(entity.bot_dimensions or {}),
-    'cipd_pins': cipd_pins,
-    'outputs_ref': outputs_ref,
-    'performance_stats': performance_stats,
-    'state': swarming_rpcs.TaskState(entity.state),
+      'bot_dimensions':
+          _string_list_pairs_from_dict(entity.bot_dimensions or {}),
+      'cipd_pins':
+          cipd_pins,
+      'outputs_ref':
+          outputs_ref,
+      'performance_stats':
+          performance_stats,
+      'state':
+          swarming_rpcs.TaskState(entity.state),
+      'resultdb_info':
+          resultdb_info,
   }
   if entity.__class__ is task_result.TaskRunResult:
     kwargs['costs_usd'] = []

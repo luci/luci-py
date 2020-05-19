@@ -6,6 +6,7 @@
 import base64
 import json
 import logging
+import urlparse
 
 import webob
 import webapp2
@@ -26,6 +27,7 @@ from server import bot_code
 from server import bot_management
 from server import config
 from server import named_caches
+from server import resultdb
 from server import service_accounts
 from server import task_pack
 from server import task_queues
@@ -682,6 +684,20 @@ class BotPollHandler(_BotBaseHandler):
 
     logging.debug('named cache: %s', caches)
 
+    resultdb_context = {}
+    if request.resultdb_update_token:
+      resultdb_context = {
+          'hostname':
+              urlparse.urlparse(config.settings().resultdb.server).hostname,
+          'current_invocation': {
+              'invocation':
+                  resultdb.get_invocation_name(
+                      task_pack.pack_run_result_key(run_result.run_result_key)),
+              'update_token':
+                  request.resultdb_update_token,
+          }
+      }
+
     out = {
         'cmd': 'run',
         'manifest': {
@@ -727,8 +743,8 @@ class BotPollHandler(_BotBaseHandler):
                 props.outputs,
             'relative_cwd':
                 props.relative_cwd,
-            # TODO(crbug.com/1065139): fill appropriately.
-            'resultdb': {},
+            'resultdb':
+                resultdb_context,
             'service_accounts': {
                 'system': {
                     # 'none', 'bot' or email. Bot interprets 'none' and 'bot'

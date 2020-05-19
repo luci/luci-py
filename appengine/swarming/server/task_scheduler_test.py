@@ -631,7 +631,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(
         result_summary.resultdb_info,
         task_result.ResultDBInfo(
-            hostname='',
+            hostname='https://test-resultdb-server.com',
             invocation=(
                 'invocations/task:test-swarming.appspot.com:1d69b9f088008911')))
     self.assertEqual(result_summary.request_key.get().resultdb_update_token,
