@@ -11,11 +11,26 @@ option go_package = "go.chromium.org/luci/swarming/proto/config;configpb";
 // Realm permissions used in Swarming.
 // The enums are converted to string names using get_permission_name
 // in server/realms.py
+// NEXT_ID: 4
 enum RealmPermission {
   REALM_PERMISSION_UNSPECIFIED = 0;
+
+  // Pools permissions
 
   // Permission 'swarming.pools.createTask'
   // This is required to create a task in the pool.
   // It will be checked at the new task API.
   REALM_PERMISSION_POOLS_CREATE_TASK = 1;
+
+  // Tasks permissions
+
+  // Permission 'swarming.tasks.createInRealm'
+  // This is required to create a task in the realm.
+  // It will be checked at the new task API.
+  REALM_PERMISSION_TASKS_CREATE_IN_REALM = 2;
+
+  // Permission 'swarming.tasks.runAs'
+  // This is required to use a task service account in the realm.
+  // It will be checked at the new task API.
+  REALM_PERMISSION_TASKS_RUN_AS = 3;
 }

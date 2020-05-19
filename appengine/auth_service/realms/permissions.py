@@ -96,6 +96,12 @@ def db():
 
   # Swarming permissions and roles (crbug.com/1066839).
   # See swarming/proto/config/realms.proto for more details.
+  role('role/swarming.taskAccount', [
+      permission('swarming.tasks.runAs'),
+  ])
+  role('role/swarming.realmUser', [
+      permission('swarming.tasks.createInRealm'),
+  ])
   role('role/swarming.poolUser', [
       permission('swarming.pools.createTask'),
   ])
