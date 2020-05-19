@@ -135,6 +135,36 @@ class RealmsTest(test_case.TestCase):
     self._has_permission_mock.assert_called_once_with(
         'swarming.pools.createTask', [u'test:pool'])
 
+  def test_check_tasks_create_in_realm_legacy(self):
+    realms.check_tasks_create_in_realm('test:realm')
+    self._has_permission_dryrun_mock.assert_called_once_with(
+        'swarming.tasks.createInRealm', [u'test:realm'],
+        expected_result=True, tracking_bug=realms._TRACKING_BUG)
+
+  def test_check_tasks_create_in_realm_legacy_no_realm(self):
+    realms.check_tasks_create_in_realm(None)
+    self._has_permission_dryrun_mock.assert_not_called()
+
+  def test_check_tasks_create_in_realm_enforced_allowed(self):
+    self.mock(realms, 'is_enforced_permission', lambda *_: True)
+    self._has_permission_mock.return_value = True
+    realms.check_tasks_create_in_realm('test:realm')
+    self._has_permission_mock.assert_called_once_with(
+        'swarming.tasks.createInRealm', [u'test:realm'])
+
+  def test_check_tasks_create_in_realm_enforced_not_allowed(self):
+    self.mock(realms, 'is_enforced_permission', lambda *_: True)
+    self._has_permission_mock.return_value = False
+    with self.assertRaises(auth.AuthorizationError):
+      realms.check_tasks_create_in_realm('test:realm')
+    self._has_permission_mock.assert_called_once_with(
+        'swarming.tasks.createInRealm', [u'test:realm'])
+
+  def test_check_tasks_create_in_realm_enforced_no_realm(self):
+    self.mock(realms, 'is_enforced_permission', lambda *_: True)
+    with self.assertRaises(auth.AuthorizationError):
+      realms.check_tasks_create_in_realm(None)
+
 
 if __name__ == '__main__':
   if '-v' in sys.argv:

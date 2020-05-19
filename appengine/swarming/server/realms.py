@@ -11,6 +11,8 @@ from server import config
 from server import pools_config
 from server import task_scheduler
 
+_TRACKING_BUG = 'crbug.com/1066839'
+
 
 def get_permission_name(enum_permission):
   """ Generates Realm permission name from enum value.
@@ -103,7 +105,7 @@ def check_pools_create_task(pool):
 
   # pool.realm is optional.
   if not pool_cfg.realm:
-    logging.warning('crbug.com/1066839: realm is missing in Pool "%s"', pool)
+    logging.warning('%s: realm is missing in Pool "%s"', _TRACKING_BUG, pool)
 
   legacy_allowed = True
   try:
@@ -116,9 +118,44 @@ def check_pools_create_task(pool):
     # is specified.
     if pool_cfg.realm:
       auth.has_permission_dryrun(
-          perm, [pool_cfg.realm],
-          legacy_allowed,
-          tracking_bug='crbug.com/1066839')
+          perm, [pool_cfg.realm], legacy_allowed, tracking_bug=_TRACKING_BUG)
+
+
+def check_tasks_create_in_realm(realm):
+  """Checks if the caller is allowed to create a task in the realm.
+
+  Args:
+    realm: Realm that a task will be created in.
+
+  Returns:
+    None
+
+  Raises:
+    auth.AuthorizationError: if the caller is not allowed.
+  """
+  # 'swarming.tasks.createInRealm'
+  perm_enum = realms_pb2.REALM_PERMISSION_TASKS_CREATE_IN_REALM
+  perm = get_permission_name(perm_enum)
+
+  if is_enforced_permission(perm_enum):
+    # realm is required in this path.
+    if not realm:
+      raise auth.AuthorizationError('task realm is missing')
+
+    if not auth.has_permission(perm, [realm]):
+      raise auth.AuthorizationError(
+          'User "%s" is not allowed to create a task in the realm "%s"' %
+          (auth.get_current_identity().to_bytes(), realm))
+    return
+
+  # legacy-compatible path
+  if realm:
+    # There is no existing permission that corresponds to the realm
+    # permission. So always pass expected_result=True to the dryrun.
+    auth.has_permission_dryrun(
+        perm, [realm], expected_result=True, tracking_bug=_TRACKING_BUG)
+  else:
+    logging.warning('%s: task realm is missing', _TRACKING_BUG)
 
 
 # TODO(crbug.com/1066839): implement and replace the legacy check function

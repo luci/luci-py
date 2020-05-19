@@ -481,6 +481,11 @@ class SwarmingTasksService(remote.Service):
       logging.warning('Incorrect new task request', exc_info=True)
       raise endpoints.BadRequestException(e.message)
 
+    # TODO(crbug.com/1066839):
+    # uncomment to call realms.check_tasks_create_in_realm.
+    # task_realm = request.realm if request.realm else pool_cfg.realm.
+    # realms.check_tasks_create_in_realm(task_realm)
+
     # TODO(crbug.com/1066839): replace check_schedule_request_acl with
     # realms.check_pools_create_task and realms.check_tasks_run_as which
     # internally calls legacy checks.
