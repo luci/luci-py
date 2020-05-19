@@ -443,7 +443,7 @@ class ResultDBCfg(messages.Message):
   """
 
   # If True and this task is not deduplicated, create
-  # "task:{swarming_hostname}:{run_id}" invocation for this task,
+  # "task-{swarming_hostname}-{run_id}" invocation for this task,
   # provide its update token to the task subprocess via LUCI_CONTEXT
   # and finalize the invocation when the task is done.
   # If the task is deduplicated, then TaskResult.invocation_name will be the
@@ -634,7 +634,7 @@ class ResultDBInfo(messages.Message):
   # ResultDB hostname, e.g. "results.api.cr.dev"
   hostname = messages.StringField(1)
 
-  # e.g. "invocations/task:chromium-swarm.appspot.com:deadbeef1"
+  # e.g. "invocations/task-chromium-swarm.appspot.com-deadbeef1"
   #
   # If the task was deduplicated, this equals invocation name of the original
   # task.

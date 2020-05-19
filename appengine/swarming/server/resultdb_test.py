@@ -66,7 +66,7 @@ class ResultDBTest(test_case.TestCase):
                       '//test-swarming.appspot.com/tasks/task001'
               },
               'requestId': '00000000-0000-0000-0000-000000000000',
-              'invocationId': 'task:test-swarming.appspot.com:task001'
+              'invocationId': 'task-test-swarming.appspot.com-task001'
           },
           response_headers=mock.ANY)
 
@@ -85,7 +85,7 @@ class ResultDBTest(test_case.TestCase):
       mock_call.side_effect = self.nop_async
       resultdb.finalize_invocation_async('task001').get_result()
       mock_call.assert_called_once_with('FinalizeInvocation', {
-          'name': 'invocations/task:test-swarming.appspot.com:task001',
+          'name': 'invocations/task-test-swarming.appspot.com-task001',
       })
 
   def test_finalize_invocation_async_failed_precondition(self):
@@ -98,7 +98,7 @@ class ResultDBTest(test_case.TestCase):
           headers={'X-Prpc-Grpc-Code': '9'})
       resultdb.finalize_invocation_async('task001').get_result()
       mock_call.assert_called_once_with('FinalizeInvocation', {
-          'name': 'invocations/task:test-swarming.appspot.com:task001',
+          'name': 'invocations/task-test-swarming.appspot.com-task001',
       })
 
   def test_finalize_invocation_async_failed(self):
@@ -108,7 +108,7 @@ class ResultDBTest(test_case.TestCase):
       with self.assertRaises(Exception):
         resultdb.finalize_invocation_async('task001').get_result()
       mock_call.assert_called_once_with('FinalizeInvocation', {
-          'name': 'invocations/task:test-swarming.appspot.com:task001',
+          'name': 'invocations/task-test-swarming.appspot.com-task001',
       })
 
   def test_call_resultdb_recorder_api(self):
@@ -129,7 +129,7 @@ class ResultDBTest(test_case.TestCase):
   def test_get_invocation_name(self):
     self.assertEqual(
         resultdb.get_invocation_name('run_result_id_01'),
-        'invocations/task:test-swarming.appspot.com:run_result_id_01')
+        'invocations/task-test-swarming.appspot.com-run_result_id_01')
 
 
 if __name__ == '__main__':

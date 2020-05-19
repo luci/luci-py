@@ -62,7 +62,7 @@ def get_invocation_name(task_run_id):
 
 def _get_invocation_id(task_run_id):
   hostname = app_identity.get_default_version_hostname()
-  return 'task:%s:%s' % (hostname, task_run_id)
+  return 'task-%s-%s' % (hostname, task_run_id)
 
 
 @ndb.tasklet

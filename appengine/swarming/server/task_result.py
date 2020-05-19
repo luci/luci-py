@@ -376,7 +376,7 @@ class ResultDBInfo(ndb.Model):
   # ResultDB hostname, e.g. "results.api.cr.dev"
   hostname = ndb.StringProperty()
 
-  # e.g. "invocations/task:chromium-swarm.appspot.com:deadbeef1"
+  # e.g. "invocations/task-chromium-swarm.appspot.com-deadbeef1"
   # None if the integration was not enabled for this task.
   #
   # If the task was deduplicated, this equals invocation name of the original
