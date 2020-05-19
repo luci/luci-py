@@ -563,11 +563,8 @@ class SwarmingTasksService(remote.Service):
     except (datastore_errors.BadValueError, TypeError, ValueError) as e:
       raise endpoints.BadRequestException(e.message)
 
-    returned_result = None
-    if result_summary.state != task_result.State.PENDING:
-      # It likely is COMPLETED (because of deduping) or NO_RESOURCE.
-      returned_result = message_conversion.task_result_to_rpc(
-          result_summary, False)
+    returned_result = message_conversion.task_result_to_rpc(
+      result_summary, False)
 
     request_metadata = swarming_rpcs.TaskRequestMetadata(
         request=message_conversion.task_request_to_rpc(request_obj),
