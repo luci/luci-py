@@ -1146,6 +1146,10 @@ class TaskRequest(ndb.Model):
   # was not enabled for this task.
   resultdb_update_token = ndb.StringProperty(indexed=False)
 
+  # Task realm.
+  # See api/swarming.proto for more details.
+  realm = ndb.StringProperty()
+
   @property
   def num_task_slices(self):
     """Returns the number of TaskSlice, supports old entities."""
@@ -1244,6 +1248,8 @@ class TaskRequest(ndb.Model):
       out.user = self.user
     if self.authenticated:
       out.authenticated = self.authenticated.to_bytes()
+    if self.realm:
+      out.realm = self.realm
 
     # Hierarchy and notifications.
     if self.key:

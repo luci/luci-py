@@ -794,6 +794,9 @@ message TaskRequest {
   string user = 7;
   // Authenticated client that triggered this task.
   string authenticated = 13;
+  // Task realm is used to control who can interact with the task e.g. get,
+  // cancel etc, and which task service accounts can be used in the realm.
+  string realm = 14;
 
   // Task hierarchy and notifications
 

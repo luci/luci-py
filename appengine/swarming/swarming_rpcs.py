@@ -535,6 +535,10 @@ class NewTaskRequest(messages.Message):
   # Configuration of Swarming:ResultDB integration.
   resultdb = messages.MessageField(ResultDBCfg, 17)
 
+  # Task realm.
+  # See api/swarming.proto for more details.
+  realm = messages.StringField(18)
+
 class TaskRequest(messages.Message):
   """Description of a task request as registered by the server.
 

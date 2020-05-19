@@ -571,6 +571,8 @@ class TaskRequestApiTest(TestCase):
         },],
         'user':
             u'Jesus',
+        'realm':
+            None,
         'bot_ping_tolerance_secs':
             120,
     }
@@ -690,6 +692,8 @@ class TaskRequestApiTest(TestCase):
         },],
         'user':
             u'Jesus',
+        'realm':
+            None,
         'bot_ping_tolerance_secs':
             120,
     }

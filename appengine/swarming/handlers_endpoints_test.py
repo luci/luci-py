@@ -259,7 +259,9 @@ class TasksApiTest(BaseTest):
         pubsub_topic='projects/abc/topics/def',
         pubsub_auth_token='secret that must not be shown',
         pubsub_userdata='userdata',
-        service_account='service-account@example.com')
+        service_account='service-account@example.com',
+        realm='test:example',
+    )
     expected_props = self.gen_props(
         command=[u'rm', u'-rf', u'/'],
         execution_timeout_secs=u'30',
