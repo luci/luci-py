@@ -724,6 +724,12 @@ class TaskRequestApiTest(TestCase):
     with self.assertRaises(ValueError):
       _gen_request(parent_task_id='1d69b9f088008810')
 
+  def test_init_new_request_missing_name(self):
+    req = _gen_request(name=None)
+    with self.assertRaisesRegexp(datastore_errors.BadValueError,
+                                 '^name is missing$'):
+      req.put()
+
   def test_init_new_request_idempotent(self):
     request = _gen_request(properties=_gen_properties(idempotent=True))
     as_dict = request.to_dict()

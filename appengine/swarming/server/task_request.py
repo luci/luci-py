@@ -1271,6 +1271,8 @@ class TaskRequest(ndb.Model):
           'old style TaskRequest.properties is not supported anymore')
     if not self.task_slices:
       raise datastore_errors.BadValueError('task_slices is missing')
+    if not self.name:
+      raise datastore_errors.BadValueError('name is missing')
     if len(self.task_slices) > 8:
       # The objects are large so use a low limit to start, and increase if
       # there's user request.
