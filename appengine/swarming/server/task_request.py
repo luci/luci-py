@@ -781,7 +781,7 @@ class TaskProperties(ndb.Model):
   idempotent = ndb.BooleanProperty(default=False, indexed=False)
 
   # A list of outputs expected. If empty, all files written to
-  # $(ISOLATED_OUTDIR) will be returned; otherwise, the files in this list
+  # ${ISOLATED_OUTDIR} will be returned; otherwise, the files in this list
   # will be added to those in that directory.
   outputs = ndb.StringProperty(repeated=True, indexed=False,
       validator=_validate_output_path)
