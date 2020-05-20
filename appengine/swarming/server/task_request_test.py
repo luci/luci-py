@@ -1687,6 +1687,8 @@ class TaskRequestApiTest(TestCase):
 
   def test_validate_priority(self):
     with self.assertRaises(TypeError):
+      task_request.validate_priority(None)
+    with self.assertRaises(TypeError):
       task_request.validate_priority('1')
     with self.assertRaises(datastore_errors.BadValueError):
       task_request.validate_priority(-1)

@@ -1706,6 +1706,9 @@ def init_new_request(request, allow_high_priority, template_apply):
 
 def validate_priority(priority):
   """Throws ValueError if priority is not a valid value."""
+  if not isinstance(priority, int):
+    raise TypeError('priority (%s) must be int type, got %s' %
+                    (priority, type(priority)))
   if 0 > priority or MAXIMUM_PRIORITY < priority:
     raise datastore_errors.BadValueError(
         'priority (%d) must be between 0 and %d (inclusive)' %
