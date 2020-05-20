@@ -68,6 +68,14 @@ def db():
       include('role/dev.testing2'),
   ])
 
+  # LUCI Token Server permissions and roles (crbug.com/1082960).
+  role('role/luci.realmServiceAccount', [
+      permission('luci.serviceAccounts.existInRealm'),
+  ])
+  role('role/luci.serviceAccountTokenCreator', [
+      permission('luci.serviceAccounts.mintToken'),
+  ])
+
   # LUCI Config permissions and roles (crbug.com/1068817).
   role('role/configs.reader', [
       permission('configs.configSets.read'),
@@ -97,6 +105,7 @@ def db():
   # Swarming permissions and roles (crbug.com/1066839).
   # See swarming/proto/config/realms.proto for more details.
   role('role/swarming.taskAccount', [
+      include('role/luci.realmServiceAccount'),
       permission('swarming.tasks.runAs'),
   ])
   role('role/swarming.realmUser', [
