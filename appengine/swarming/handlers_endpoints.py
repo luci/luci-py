@@ -566,6 +566,7 @@ class SwarmingTasksService(remote.Service):
                                                        secret_bytes,
                                                        enable_resultdb)
     except (datastore_errors.BadValueError, TypeError, ValueError) as e:
+      logging.exception("got exception around task_scheduler.schedule_request")
       raise endpoints.BadRequestException(e.message)
 
     returned_result = message_conversion.task_result_to_rpc(
