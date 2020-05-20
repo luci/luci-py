@@ -395,7 +395,7 @@ class HttpServiceTest(RetryLoopMockedTest):
 
     net.set_user_agent(None)
     request_headers = service.request('/', data={}).headers
-    self.assertFalse('User-Agent' in request_headers)
+    self.assertNotIn('User-Agent', request_headers)
 
 
 class TestNetFunctions(auto_stub.TestCase):
