@@ -614,13 +614,17 @@ const logsSection = (ele, request, result) => {
   if (!ele._taskId || ele._notFound) {
     return '';
   }
-  let botProjectID = null
+  let botProjectID = null;
+  let botOS = null;
   if (result && result.bot_dimensions) {
     for (const dim of result.bot_dimensions) {
-      if (dim.key != 'gcp') continue
-      botProjectID = dim.value[0]
+      if (dim.key == 'gcp') botProjectID = dim.value[0]
+      if (dim.key == 'os') botOS = dim.value[0]
     }
   }
+  // TODO(crbug.com/1053751):
+  // Currently only Linux VMs sends bot logs.
+  const showBotLogsLink = botProjectID && botOS == 'Linux';
   return html`
 <div class=title>Logs Information</div>
 <div class="horizontal layout wrap">
@@ -647,10 +651,10 @@ const logsSection = (ele, request, result) => {
       <tr>
         <td>Bot Logs</td>
         <td>
-          <a href=${botLogsURL(ele, request, result, botProjectID)} target="_blank" ?hidden=${!botProjectID}>
+          <a href=${botLogsURL(ele, request, result, botProjectID)} target="_blank" ?hidden=${!showBotLogsLink}>
             View on Cloud Console
           </a>
-          <p ?hidden=${botProjectID}>--</p>
+          <p ?hidden=${showBotLogsLink}>--</p>
         </td>
       </tr>
     </tbody>
