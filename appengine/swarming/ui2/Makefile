@@ -1,3 +1,4 @@
+export SHELL = /bin/bash
 export PATH := $(CURDIR)/nodejs/bin:$(PATH)
 export npm_config_cache := $(CURDIR)/.npm
 
