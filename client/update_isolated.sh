@@ -14,7 +14,7 @@ current_revision=$(
 # get newer revision and log.
 pushd ../..
 git fetch
-filter="Roll infra/go/src/go.chromium.org/luci "
+filter="Roll luci-go from "
 target_revision=$(git log --grep "${filter}" --oneline -n 1 \
                       --pretty=format:"%H" origin/master DEPS)
 logs=$(git --no-pager log --grep "${filter}" --no-decorate \
