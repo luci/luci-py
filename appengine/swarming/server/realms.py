@@ -2,13 +2,17 @@
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
 
+import datetime
 import logging
+
+import endpoints
 
 from components import auth
 
 from proto.config import realms_pb2
 from server import config
 from server import pools_config
+from server import service_accounts
 from server import task_scheduler
 
 _TRACKING_BUG = 'crbug.com/1066839'
@@ -154,7 +158,7 @@ def check_tasks_create_in_realm(realm):
 
 # TODO(crbug.com/1066839): replace the legacy check function with
 # check_tasks_run_as and check_pools_create_task.
-def check_tasks_run_as(_task_request):
+def check_tasks_run_as(task_request):
   """Checks if the task service account is allowed to run in the pool.
 
   Realm permission `swarming.tasks.runAs` will be checked,
@@ -166,7 +170,8 @@ def check_tasks_run_as(_task_request):
   If it's legacy-compatible,
     It calls task_scheduler.check_schedule_request_acl_service_account()
     and compare the legacy result with the realm permission check using
-    the dryrun.
+    the dryrun. It also appends service account token to task_request
+    by calling token server.
 
   Args:
     task_request: TaskRequest entity to be scheduled.
@@ -178,4 +183,67 @@ def check_tasks_run_as(_task_request):
     auth.AuthorizationError: if the service account is not allowed to run
                              in the pool.
   """
-  pass
+  if not service_accounts.is_service_account(task_request.service_account):
+    return
+
+  if not service_accounts.has_token_server():
+    raise endpoints.BadRequestException(
+        'This Swarming server doesn\'t support task service accounts '
+        'because Token Server URL is not configured')
+
+  perm_enum = realms_pb2.REALM_PERMISSION_TASKS_RUN_AS
+  perm = get_permission_name(perm_enum)
+
+  if is_enforced_permission(perm_enum):
+    if not task_request.realm:
+      raise auth.AuthorizationError('Task realm is missing')
+
+    if not auth.has_permission(
+        perm, [task_request.realm], identity=auth.get_peer_identity()):
+      raise auth.AuthorizationError(
+          'Task service account "%s" is not allowed to run in the realm "%s"' %
+          (task_request.service_account, task_request.realm))
+    return
+
+  # legacy-compatible path
+
+  # skip has_permission_dryrun when the legacy permission check didn't complete.
+  skip_dryrun = False
+
+  legacy_allowed = True
+  try:
+    # ACL check
+    pool_cfg = pools_config.get_pool_config(task_request.pool)
+    task_scheduler.check_schedule_request_acl_service_account(
+        task_request, pool_cfg)
+    # Get service account token from token server
+    validity_duration = datetime.timedelta(
+        seconds=task_request.max_lifetime_secs)
+    task_request.service_account_token = (
+        service_accounts.get_oauth_token_grant(
+            service_account=task_request.service_account,
+            validity_duration=validity_duration))
+  except auth.AuthorizationError:
+    legacy_allowed = False
+    raise  # re-raise the exception
+  except service_accounts.PermissionError as exc:
+    legacy_allowed = False
+    raise auth.AuthorizationError(exc.message)
+  except service_accounts.MisconfigurationError as exc:
+    # token server check didn't complete.
+    skip_dryrun = True
+    raise endpoints.BadRequestException(exc.message)
+  except service_accounts.InternalError as exc:
+    # token server check didn't complete.
+    skip_dryrun = True
+    raise endpoints.InternalServerErrorException(exc.message)
+  finally:
+    if not skip_dryrun and task_request.realm:
+      auth.has_permission_dryrun(
+          perm, [task_request.realm],
+          legacy_allowed,
+          identity=auth.get_peer_identity(),
+          tracking_bug='crbug.com/1066839')
+    elif skip_dryrun:
+      # task realm is optional.
+      logging.warning('crbug.com/1066839: realm is missing in TaskRequest')
