@@ -973,6 +973,9 @@ def _run_manifest(botobj, manifest, start):
       auth_params_dumper.stop()
     if internal_failure:
       _post_error_task(botobj, msg, task_id)
+    logging.info('calling on_after_task: failure=%s, internal_failure=%s, '
+                 'task_dimensions=%s, task_result=%s',
+                 failure, internal_failure, task_dimensions, task_result)
     _call_hook_safe(
         True, botobj, 'on_after_task', failure, internal_failure,
         task_dimensions, task_result)
