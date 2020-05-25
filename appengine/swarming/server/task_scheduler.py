@@ -1091,9 +1091,10 @@ def check_schedule_request_acl(request):
 
   if not pool_cfg:
     logging.warning('Pool "%s" is not in pools.cfg', pool)
-    # Unknown pools are forbidden.
+    # TODO(crbug.com/1086058): It currently returns 403 Forbidden, but should
+    # return 400 BadRequest or 422 Unprocessable Entity, instead.
     raise auth.AuthorizationError(
-        'Can\'t submit tasks to pool "%s" not defined in pools.cfg' % pool)
+        'Can\'t submit tasks to pool "%s", not defined in pools.cfg' % pool)
 
   logging.info(
       'Looking at the pool "%s" in pools.cfg, rev "%s"', pool, pool_cfg.rev)

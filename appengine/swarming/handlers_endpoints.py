@@ -481,6 +481,17 @@ class SwarmingTasksService(remote.Service):
       logging.warning('Incorrect new task request', exc_info=True)
       raise endpoints.BadRequestException(e.message)
 
+
+    # Retrieve pool_cfg, and check the existence.
+    pool = request_obj.pool
+    pool_cfg = pools_config.get_pool_config(pool)
+    if not pool_cfg:
+      logging.warning('Pool "%s" is not in pools.cfg', pool)
+      # TODO(crbug.com/1086058): It currently returns 403 Forbidden, but should
+      # return 400 BadRequest or 422 Unprocessable Entity, instead.
+      raise auth.AuthorizationError(
+          'Can\'t submit tasks to pool "%s", not defined in pools.cfg' % pool)
+
     # TODO(crbug.com/1066839):
     # uncomment to call realms.check_tasks_create_in_realm.
     # task_realm = request.realm if request.realm else pool_cfg.realm.

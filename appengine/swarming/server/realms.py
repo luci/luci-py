@@ -53,7 +53,7 @@ def is_enforced_permission(perm, pool_cfg=None):
   return perm in config.settings().auth.enforced_realm_permissions
 
 
-def check_pools_create_task(pool):
+def check_pools_create_task(pool, pool_cfg):
   """Checks if the caller can create the task in the pool.
 
   Realm permission `swarming.pools.createTask` will be checked,
@@ -68,6 +68,7 @@ def check_pools_create_task(pool):
 
   Args:
     pool: Pool in which the caller is scheduling a new task.
+    pool_cfg: PoolCfg of the pool.
 
   Returns:
     None
@@ -76,13 +77,6 @@ def check_pools_create_task(pool):
     auth.AuthorizationError: if the caller is not allowed to schedule the task
                              in the pool.
   """
-  pool_cfg = pools_config.get_pool_config(pool)
-
-  if not pool_cfg:
-    logging.warning('Pool "%s" is not in pools.cfg', pool)
-    # Unknown pools are forbidden.
-    raise auth.AuthorizationError('Pool "%s" not defined in pools.cfg' % pool)
-
   # 'swarming.pools.createTask'
   perm = get_permission_name(realms_pb2.REALM_PERMISSION_POOLS_CREATE_TASK)
 
@@ -158,8 +152,8 @@ def check_tasks_create_in_realm(realm):
     logging.warning('%s: task realm is missing', _TRACKING_BUG)
 
 
-# TODO(crbug.com/1066839): implement and replace the legacy check function
-# with check_tasks_run_as and check_pools_create_task.
+# TODO(crbug.com/1066839): replace the legacy check function with
+# check_tasks_run_as and check_pools_create_task.
 def check_tasks_run_as(_task_request):
   """Checks if the task service account is allowed to run in the pool.
 

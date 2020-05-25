@@ -2531,7 +2531,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
       self.check_schedule_request_acl(
           properties=_gen_properties(dimensions={u'pool': [u'some-pool']}))
     self.assertIn(
-        'Can\'t submit tasks to pool "some-pool" not defined in pools.cfg',
+        'Can\'t submit tasks to pool "some-pool", not defined in pools.cfg',
         str(ctx.exception))
 
     # Service accounts are not allowed if not configured.
@@ -2540,7 +2540,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
           properties=_gen_properties(dimensions={u'pool': [u'some-pool']}),
           service_account='robot@example.com')
     self.assertIn(
-        'Can\'t submit tasks to pool "some-pool" not defined in pools.cfg',
+        'Can\'t submit tasks to pool "some-pool", not defined in pools.cfg',
         str(ctx.exception))
 
   def test_check_schedule_request_acl_unknown_forbidden(self):
