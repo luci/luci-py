@@ -52,7 +52,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
     super(BotApiTest, self).setUp()
     # By default requests in tests are coming from bot with fake IP.
     routes = handlers_bot.get_routes()
-    app = webapp2.WSGIApplication(routes, debug=True)
+    app = ndb.toplevel(webapp2.WSGIApplication(routes, debug=True))
     self.app = webtest.TestApp(
         app,
         extra_environ={
@@ -866,7 +866,9 @@ class BotApiTest(test_env_handlers.AppTestBase):
         },
     }
     ereporter2_app = webtest.TestApp(
-        webapp2.WSGIApplication(ereporter2.get_frontend_routes(), debug=True),
+        ndb.toplevel(
+            webapp2.WSGIApplication(
+                ereporter2.get_frontend_routes(), debug=True)),
         extra_environ={
             'REMOTE_ADDR': self.source_ip,
             'SERVER_SOFTWARE': os.environ['SERVER_SOFTWARE'],

@@ -50,12 +50,12 @@ def create_application():
   def is_enabled_callback():
     return config.settings().enable_ts_monitoring
 
-  backend_app = handlers_backend.create_application(False)
+  backend_app = handlers_backend.create_application(False, ndb_toplevel=False)
   gae_ts_mon.initialize(backend_app, is_enabled_fn=is_enabled_callback)
 
   ts_mon_metrics.initialize()
   utils.report_memory(backend_app)
-  return backend_app
+  return ndb.toplevel(backend_app)
 
 
 app = create_application()

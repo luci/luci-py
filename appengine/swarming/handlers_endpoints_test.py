@@ -82,10 +82,11 @@ class BaseTest(test_env_handlers.AppTestBase, test_case.EndpointsTestCase):
     super(BaseTest, self).setUp()
     # handlers_bot is necessary to create fake tasks.
     self.app = webtest.TestApp(
-        webapp2.WSGIApplication(handlers_bot.get_routes(), debug=True),
+        ndb.toplevel(
+            webapp2.WSGIApplication(handlers_bot.get_routes(), debug=True)),
         extra_environ={
-          'REMOTE_ADDR': self.source_ip,
-          'SERVER_SOFTWARE': os.environ['SERVER_SOFTWARE'],
+            'REMOTE_ADDR': self.source_ip,
+            'SERVER_SOFTWARE': os.environ['SERVER_SOFTWARE'],
         })
     self.mock(
         ereporter2, 'log_request',
