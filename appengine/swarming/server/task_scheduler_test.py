@@ -2114,7 +2114,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     now_1 = self.mock_now(
         self.now + datetime.timedelta(seconds=request.bot_ping_tolerance_secs),
         1)
-    self.assertEqual(([run_result.task_id], 0, 0),
+    self.assertEqual(([run_result.task_id], 0),
                      task_scheduler.cron_handle_bot_died())
     self.assertEqual(1, self.execute_tasks())
     self.assertEqual(2, len(pub_sub_calls))  # RUNNING -> COMPLETED
@@ -2169,7 +2169,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     now_1 = self.mock_now(
         self.now + datetime.timedelta(seconds=request.bot_ping_tolerance_secs),
         1)
-    self.assertEqual(([run_result.task_id], 0, 0),
+    self.assertEqual(([run_result.task_id], 0),
                      task_scheduler.cron_handle_bot_died())
     self.assertEqual(1, self.execute_tasks())
     self.assertEqual(2, len(pub_sub_calls))  # RUNNING -> COMPLETED
@@ -2220,8 +2220,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     # Very unusual, the TaskRequest disappeared:
     run_result.request_key.delete()
 
-    self.assertEqual(
-        (['1d69b9f088008911'], 0, 0), task_scheduler.cron_handle_bot_died())
+    self.assertEqual(([], 1), task_scheduler.cron_handle_bot_died())
 
   def test_bot_poll_http_500_but_bot_reapears_after_BOT_PING_TOLERANCE(self):
     # A bot reaped a task, sleeps for over BOT_PING_TOLERANCE (2 minutes), then
@@ -2248,7 +2247,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.mock_now(
         self.now + datetime.timedelta(seconds=request.bot_ping_tolerance_secs),
         1)
-    self.assertEqual(([to_run_key_1.get().task_id], 0, 0),
+    self.assertEqual(([to_run_key_1.get().task_id], 0),
                      task_scheduler.cron_handle_bot_died())
 
     # Now the task is available. Bot magically wakes up (let's say a laptop that
@@ -2287,7 +2286,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     now_1 = self.mock_now(
         self.now + datetime.timedelta(seconds=request.bot_ping_tolerance_secs),
         1)
-    self.assertEqual(([run_result.task_id], 0, 0),
+    self.assertEqual(([run_result.task_id], 0),
                      task_scheduler.cron_handle_bot_died())
 
     # Refresh and compare:
@@ -2341,8 +2340,8 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.mock_now(
         self.now + datetime.timedelta(seconds=request.bot_ping_tolerance_secs),
         601)
-    self.assertEqual(
-        (['1d69b9f088008911'], 0, 0), task_scheduler.cron_handle_bot_died())
+    self.assertEqual((['1d69b9f088008911'], 0),
+                     task_scheduler.cron_handle_bot_died())
 
   def test_cron_handle_bot_died_killing(self):
     # Test first retry, then success.
@@ -2365,7 +2364,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.mock_now(
         self.now + datetime.timedelta(seconds=request.bot_ping_tolerance_secs),
         601)
-    self.assertEqual(([run_result.task_id], 0, 0),
+    self.assertEqual(([run_result.task_id], 0),
                      task_scheduler.cron_handle_bot_died())
 
     # state should be KILLED

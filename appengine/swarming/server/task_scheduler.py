@@ -336,8 +336,7 @@ def _handle_dead_bot(run_result_key):
   task may be retried automatically, canceled or left alone.
 
   Returns:
-    True if the task was retried, False if the task was killed, None if no
-    action was done.
+    True if the task was killed, False if no action was done.
   """
   result_summary_key = task_pack.run_result_key_to_result_summary_key(
       run_result_key)
@@ -345,7 +344,6 @@ def _handle_dead_bot(run_result_key):
   request_future = request_key.get_async()
   now = utils.utcnow()
   server_version = utils.get_app_version()
-  packed = task_pack.pack_run_result_key(run_result_key)
   request = request_future.get_result()
   if not request:
     # That's a particularly broken task, there's no TaskRequest in the DB!
@@ -364,7 +362,7 @@ def _handle_dead_bot(run_result_key):
   es_cfg = external_scheduler.config_for_task(request)
 
   def run():
-    """Returns tuple(task_is_retried or None, bot_id).
+    """Returns True if the task becomes killed or bot died.
 
     1x GET, 1x GETs 2~3x PUT.
     """
@@ -372,11 +370,11 @@ def _handle_dead_bot(run_result_key):
 
     if run_result.state != task_result.State.RUNNING:
       # It was updated already or not updating last. Likely DB index was stale.
-      return None, run_result.bot_id
+      return False
 
     if not run_result.dead_after_ts or run_result.dead_after_ts > now:
       # This shouldn't have been filtered in the query. DB index may be stale.
-      return None, run_result.bot_id
+      return False
 
     run_result.signal_server_version(server_version)
     run_result.modified_ts = now
@@ -393,7 +391,6 @@ def _handle_dead_bot(run_result_key):
       run_result.internal_failure = True
       run_result.abandoned_ts = now
       run_result.completed_ts = now
-      task_is_retried = None
     else:
       # Kill it as BOT_DIED, there was more than one try, the task expired in
       # the meantime or it wasn't idempotent.
@@ -411,7 +408,6 @@ def _handle_dead_bot(run_result_key):
       run_result.abandoned_ts = now
       run_result.completed_ts = now
       result_summary.set_from_run_result(run_result, request)
-      task_is_retried = False
 
     futures = ndb.put_multi_async(to_put)
     # if result_summary.state != orig_summary_state:
@@ -420,18 +416,12 @@ def _handle_dead_bot(run_result_key):
           result_summary, request, es_cfg, transactional=True)
     for f in futures:
       f.check_success()
-
-    return task_is_retried
+    return True
 
   try:
-    task_is_retried = datastore_utils.transaction(run)
+    return datastore_utils.transaction(run)
   except datastore_utils.CommitError:
-    task_is_retried = None
-  if task_is_retried:
-    logging.info('Retried %s', packed)
-  elif task_is_retried == False:
-    logging.debug('Ignored %s', packed)
-  return task_is_retried
+    return False
 
 
 def _copy_summary(src, dst, skip_list):
@@ -1697,26 +1687,21 @@ def cron_abort_expired_task_to_run():
 
 
 def cron_handle_bot_died():
-  """Aborts or retry stale TaskRunResult where the bot stopped sending updates.
+  """Aborts TaskRunResult where the bot stopped sending updates.
 
-  If the task was at its first try, it'll be retried. Otherwise the task will be
-  canceled.
+  The task will be canceled.
 
   Returns:
   - task IDs killed
-  - number of task retried
   - number of task ignored
   """
   try:
     ignored = 0
     killed = []
-    retried = 0
     try:
       for run_result_key in task_result.yield_run_result_keys_with_dead_bot():
         result = _handle_dead_bot(run_result_key)
-        if result is True:
-          retried += 1
-        elif result is False:
+        if result:
           killed.append(task_pack.pack_run_result_key(run_result_key))
         else:
           ignored += 1
@@ -1726,10 +1711,9 @@ def cron_handle_bot_died():
             'BOT_DIED!\n%d tasks:\n%s',
             len(killed),
             '\n'.join('  %s' % i for i in killed))
-      logging.info(
-          'Killed %d; retried %d; ignored: %d', len(killed), retried, ignored)
+      logging.info('Killed %d; ignored: %d', len(killed), ignored)
     # These are returned primarily for unit testing verification.
-    return killed, retried, ignored
+    return killed, ignored
   except datastore_errors.NeedIndexError as e:
     # When a fresh new instance is deployed, it takes a few minutes for the
     # composite indexes to be created even if they are empty. Ignore the case
