@@ -18,8 +18,8 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   name='realms_config.proto',
   package='auth_service',
   syntax='proto3',
-  serialized_options=None,
-  serialized_pb=_b('\n\x13realms_config.proto\x12\x0c\x61uth_service\"`\n\tRealmsCfg\x12#\n\x06realms\x18\x01 \x03(\x0b\x32\x13.auth_service.Realm\x12.\n\x0c\x63ustom_roles\x18\x02 \x03(\x0b\x32\x18.auth_service.CustomRole\"O\n\x05Realm\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x0f\n\x07\x65xtends\x18\x02 \x03(\t\x12\'\n\x08\x62indings\x18\x03 \x03(\x0b\x32\x15.auth_service.Binding\"+\n\x07\x42inding\x12\x0c\n\x04role\x18\x01 \x01(\t\x12\x12\n\nprincipals\x18\x02 \x03(\t\"@\n\nCustomRole\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x0f\n\x07\x65xtends\x18\x02 \x03(\t\x12\x13\n\x0bpermissions\x18\x03 \x03(\tb\x06proto3')
+  serialized_options=_b('Z/go.chromium.org/luci/common/proto/realms;realms'),
+  serialized_pb=_b('\n\x13realms_config.proto\x12\x0c\x61uth_service\"`\n\tRealmsCfg\x12#\n\x06realms\x18\x01 \x03(\x0b\x32\x13.auth_service.Realm\x12.\n\x0c\x63ustom_roles\x18\x02 \x03(\x0b\x32\x18.auth_service.CustomRole\"O\n\x05Realm\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x0f\n\x07\x65xtends\x18\x02 \x03(\t\x12\'\n\x08\x62indings\x18\x03 \x03(\x0b\x32\x15.auth_service.Binding\"+\n\x07\x42inding\x12\x0c\n\x04role\x18\x01 \x01(\t\x12\x12\n\nprincipals\x18\x02 \x03(\t\"@\n\nCustomRole\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x0f\n\x07\x65xtends\x18\x02 \x03(\t\x12\x13\n\x0bpermissions\x18\x03 \x03(\tB1Z/go.chromium.org/luci/common/proto/realms;realmsb\x06proto3')
 )
 
 
@@ -228,4 +228,5 @@ CustomRole = _reflection.GeneratedProtocolMessageType('CustomRole', (_message.Me
 _sym_db.RegisterMessage(CustomRole)
 
 
+DESCRIPTOR._options = None
 # @@protoc_insertion_point(module_scope)

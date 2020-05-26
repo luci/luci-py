@@ -11,6 +11,8 @@ syntax = "proto3";
 
 package auth_service;
 
+option go_package = "go.chromium.org/luci/common/proto/realms;realms";
+
 
 // RealmsCfg defines a schema for realms.cfg project configuration file.
 message RealmsCfg {
