@@ -63,6 +63,10 @@ def _print_version_log(app, to_version):
   except ValueError:
     return
 
+  if not from_version:
+    print("Can't find any active versions.")
+    return
+
   start = int(from_version.split('-', 1)[0])
   end = int(to_version.split('-', 1)[0])
   if start < end:
