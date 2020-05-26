@@ -48,6 +48,7 @@ TEST_CONFIG = pools_pb2.PoolsCfg(
                 'accounts_group1',
                 'accounts_group2',
             ],
+            realm='test:pool/realm',
             bot_monitoring='bots',
             external_schedulers=[
                 pools_pb2.ExternalSchedulerConfig(
@@ -119,6 +120,7 @@ class PoolsConfigTest(test_case.TestCase):
         },
         service_accounts=frozenset([u'a2@example.com', u'a1@example.com']),
         service_accounts_groups=(u'accounts_group1', u'accounts_group2'),
+        realm='test:pool/realm',
         task_template_deployment=None,
         bot_monitoring=None,
         default_isolate=pools_config.IsolateServer(
@@ -385,6 +387,11 @@ class PoolsConfigTest(test_case.TestCase):
     self.validator_test(cfg, [
       'bot_monitoring not referred to: mon',
     ])
+
+  def test_bootstrap_dev_server_acls(self):
+    # Just ensure there are no errors.
+    self.assertIsNone(pools_config.bootstrap_dev_server_acls())
+    pools_config._LOCAL_FAKE_CONFIG = None
 
 
 class TaskTemplateBaseTest(unittest.TestCase):

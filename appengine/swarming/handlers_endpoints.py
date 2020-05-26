@@ -33,6 +33,7 @@ from server import bot_code
 from server import bot_management
 from server import config
 from server import pools_config
+from server import realms
 from server import service_accounts
 from server import task_pack
 from server import task_queues
@@ -492,10 +493,10 @@ class SwarmingTasksService(remote.Service):
       raise auth.AuthorizationError(
           'Can\'t submit tasks to pool "%s", not defined in pools.cfg' % pool)
 
-    # TODO(crbug.com/1066839):
-    # uncomment to call realms.check_tasks_create_in_realm.
-    # task_realm = request.realm if request.realm else pool_cfg.realm.
-    # realms.check_tasks_create_in_realm(task_realm)
+    # Realm permission 'swarming.pools.createInRealm' checks if the
+    # caller is allowed to create a task in the realm.
+    task_realm = request.realm if request.realm else pool_cfg.realm
+    realms.check_tasks_create_in_realm(task_realm)
 
     # TODO(crbug.com/1066839): replace check_schedule_request_acl with
     # realms.check_pools_create_task and realms.check_tasks_run_as which

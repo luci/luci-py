@@ -49,6 +49,8 @@ PoolConfig = collections.namedtuple(
         'service_accounts',
         # Additional list of groups with allowed service accounts.
         'service_accounts_groups',
+        # Pool realm,
+        'realm',
         # resolved TaskTemplateDeployment (optional).
         'task_template_deployment',
         # resolved BotMonitoring.
@@ -598,6 +600,7 @@ def _fetch_pools_config():
           },
           service_accounts=frozenset(msg.allowed_service_account),
           service_accounts_groups=tuple(msg.allowed_service_account_group),
+          realm=msg.realm if msg.realm else None,
           task_template_deployment=_resolve_deployment(ctx, msg, template_map,
                                                        deployment_map),
           bot_monitoring=bot_monitorings.get(name),
@@ -709,6 +712,7 @@ def bootstrap_dev_server_acls():
                   trusted_delegatees={},
                   service_accounts=frozenset(),
                   service_accounts_groups=tuple(),
+                  realm=None,
                   task_template_deployment=None,
                   bot_monitoring=None,
                   default_isolate=None,
