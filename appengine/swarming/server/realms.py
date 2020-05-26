@@ -22,7 +22,7 @@ def get_permission(enum_permission):
   """ Generates Realm permission instance from enum value.
 
   e.g. realms_pb2.REALM_PERMISSION_POOLS_CREATE_TASK
-       -> 'swarming.pools.createTask'
+       -> auth.Permission('swarming.pools.createTask')
 
   Args:
     enum_permission: realms_pb2.RealmPermission enum value.
