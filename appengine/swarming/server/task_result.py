@@ -80,6 +80,7 @@ from components import utils
 from proto.api import swarming_pb2  # pylint: disable=no-name-in-module
 from server import bq_state
 from server import large
+from server import resultdb
 from server import task_pack
 from server import task_request
 
@@ -1095,6 +1096,21 @@ class TaskResultSummary(_TaskResultCommon):
     # https://cloud.google.com/appengine/docs/standard/python/ndb/futureclass
     future.check_success()
     self._send_job_completed_metric()
+    self._call_finalize_invocation()
+
+  def _call_finalize_invocation(self):
+    """Call FinalizeInvocation to ResultDB."""
+    if self.state in State.STATES_RUNNING:
+      return
+
+    if not self._prev_state or self._prev_state not in State.STATES_RUNNING:
+      # self._prev_state becomes None when NO RESOURCE case.
+      return
+
+    if self.request.resultdb_update_token:
+      run_id = task_pack.pack_run_result_key(self.run_result_key)
+      # TODO(crbug.com/1065139): remove get_result() if ndb.toplevel works fine.
+      resultdb.finalize_invocation_async(run_id).get_result()
 
   def _send_job_completed_metric(self):
     """Sends metric 'job/completed'"""

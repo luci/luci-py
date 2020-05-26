@@ -11,6 +11,8 @@ import string
 import sys
 import unittest
 
+import mock
+
 import test_env
 test_env.setup_test_env()
 
@@ -370,6 +372,37 @@ class TaskResultApiTest(TestCase):
     self.mock(ts_mon_metrics, 'on_task_completed', on_task_completed)
     summary.put()
     self.assertEqual(len(calls), 1)
+
+  def test_result_summary_post_hook_call_finalize_invocation(self):
+    request = _gen_request(resultdb_update_token='secret')
+    summary = task_result.new_result_summary(request)
+    summary.modified_ts = self.now
+
+    # Store current state for summary._prev_state
+    summary.put()
+
+    # change state to completed
+    summary.completed_ts = self.now
+    summary.modified_ts = self.now
+    summary.started_ts = self.now
+    summary.duration = 1.
+    summary.exit_code = 0
+    summary.state = task_result.State.COMPLETED
+    summary.try_number = 1
+
+    def on_task_completed(_):
+      pass
+
+    self.mock(ts_mon_metrics, 'on_task_completed', on_task_completed)
+
+    @ndb.tasklet
+    def nop_async(_):
+      pass
+
+    with mock.patch('server.resultdb.finalize_invocation_async',
+                    mock.Mock(side_effect=nop_async)) as mocked:
+      summary.put()
+      mocked.assert_called_once_with('1d69b9f088008811')
 
   def test_result_summary_post_hook_sends_metric_at_no_resource_failure(self):
     request = _gen_request()
