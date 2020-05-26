@@ -18,8 +18,8 @@ from server import task_scheduler
 _TRACKING_BUG = 'crbug.com/1066839'
 
 
-def get_permission_name(enum_permission):
-  """ Generates Realm permission name from enum value.
+def get_permission(enum_permission):
+  """ Generates Realm permission instance from enum value.
 
   e.g. realms_pb2.REALM_PERMISSION_POOLS_CREATE_TASK
        -> 'swarming.pools.createTask'
@@ -28,7 +28,7 @@ def get_permission_name(enum_permission):
     enum_permission: realms_pb2.RealmPermission enum value.
 
   Returns:
-    realm_permission: Realm permission name 'swarming.<subject>.<verb>'
+    realm_permission: an instance of auth.Permission.
   """
   enum_name = realms_pb2.RealmPermission.Name(enum_permission)
   words = enum_name.replace('REALM_PERMISSION_', '').split('_')
@@ -36,7 +36,7 @@ def get_permission_name(enum_permission):
   subject = words[0].lower()
   # convert following words to verb e.g. createTask, listBots
   verb = words[1].lower() + ''.join(map(lambda x: x.capitalize(), words[2:]))
-  return 'swarming.%s.%s' % (subject, verb)
+  return auth.Permission('swarming.%s.%s' % (subject, verb))
 
 
 def is_enforced_permission(perm, pool_cfg=None):
@@ -82,7 +82,7 @@ def check_pools_create_task(pool, pool_cfg):
                              in the pool.
   """
   # 'swarming.pools.createTask'
-  perm = get_permission_name(realms_pb2.REALM_PERMISSION_POOLS_CREATE_TASK)
+  perm = get_permission(realms_pb2.REALM_PERMISSION_POOLS_CREATE_TASK)
 
   if is_enforced_permission(realms_pb2.REALM_PERMISSION_POOLS_CREATE_TASK,
                             pool_cfg):
@@ -133,7 +133,7 @@ def check_tasks_create_in_realm(realm):
   """
   # 'swarming.tasks.createInRealm'
   perm_enum = realms_pb2.REALM_PERMISSION_TASKS_CREATE_IN_REALM
-  perm = get_permission_name(perm_enum)
+  perm = get_permission(perm_enum)
 
   if is_enforced_permission(perm_enum):
     # realm is required in this path.
@@ -192,7 +192,7 @@ def check_tasks_run_as(task_request):
         'because Token Server URL is not configured')
 
   perm_enum = realms_pb2.REALM_PERMISSION_TASKS_RUN_AS
-  perm = get_permission_name(perm_enum)
+  perm = get_permission(perm_enum)
 
   if is_enforced_permission(perm_enum):
     if not task_request.realm:
