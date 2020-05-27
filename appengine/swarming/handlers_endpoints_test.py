@@ -42,7 +42,6 @@ from server import task_request
 from server import task_result
 from server import task_scheduler
 
-
 DATETIME_NO_MICRO = '%Y-%m-%dT%H:%M:%S'
 
 
@@ -58,9 +57,14 @@ def message_to_dict(rpc_message):
 def _bot_event(event_type, bot_id, **kwargs):
   args = {
       'authenticated_as': 'bot:whitelisted-ip',
-      'dimensions': {u'id': [bot_id], u'pool': [u'default']},
+      'dimensions': {
+          u'id': [bot_id],
+          u'pool': [u'default']
+      },
       'external_ip': '8.8.4.4',
-      'state': {'ram': 65},
+      'state': {
+          'ram': 65
+      },
       'version': '123456789',
       'quarantined': False,
       'maintenance_msg': None,
@@ -88,9 +92,8 @@ class BaseTest(test_env_handlers.AppTestBase, test_case.EndpointsTestCase):
             'REMOTE_ADDR': self.source_ip,
             'SERVER_SOFTWARE': os.environ['SERVER_SOFTWARE'],
         })
-    self.mock(
-        ereporter2, 'log_request',
-        lambda *args, **kwargs: self.fail('%s, %s' % (args, kwargs)))
+    self.mock(ereporter2, 'log_request', lambda *args, **kwargs: self.fail(
+        '%s, %s' % (args, kwargs)))
     # Client API test cases run by default as user.
     self.set_as_user()
     self.mock(utils, 'enqueue_task', self._enqueue_task)
@@ -122,13 +125,18 @@ class ServerApiTest(BaseTest):
 
     response = self.call_api('details')
     expected = {
-      u'bot_version': unicode(
-          bot_code.get_bot_version('https://testbed.example.com')[0]),
-      u'display_server_url_template': u'',
-      u'luci_config': u'a.server',
-      u'default_isolate_server': u'https://pool.config.isolate.example.com',
-      u'default_isolate_namespace': u'default-gzip',
-      u'server_version': unicode(utils.get_app_version()),
+        u'bot_version':
+            unicode(bot_code.get_bot_version('https://testbed.example.com')[0]),
+        u'display_server_url_template':
+            u'',
+        u'luci_config':
+            u'a.server',
+        u'default_isolate_server':
+            u'https://pool.config.isolate.example.com',
+        u'default_isolate_namespace':
+            u'default-gzip',
+        u'server_version':
+            unicode(utils.get_app_version()),
     }
     self.assertEqual(expected, response.json)
 
@@ -200,7 +208,7 @@ class ServerApiTest(BaseTest):
       content = f.read().decode('utf-8')
 
     expected = {
-      u'content': header + content,
+        u'content': header + content,
     }
     self.assertEqual(expected, self.call_api('get_' + name).json)
 
@@ -213,17 +221,18 @@ class ServerApiTest(BaseTest):
       self.assertEqual(None, revision)
       self.assertEqual(True, store_last_good)
       return 'abc', 'foo bar'
+
     def config_service_hostname_mock():
       return 'localhost:1'
+
     self.mock(bot_code.config, 'get_self_config', get_self_config_mock)
-    self.mock(
-        bot_code.config, 'config_service_hostname',
-        config_service_hostname_mock)
+    self.mock(bot_code.config, 'config_service_hostname',
+              config_service_hostname_mock)
 
     expected = {
-      u'content': header + u'foo bar',
-      u'version': u'abc',
-      u'who': u'localhost:1',
+        u'content': header + u'foo bar',
+        u'version': u'abc',
+        u'who': u'localhost:1',
     }
     self.assertEqual(expected, self.call_api('get_' + name).json)
 
@@ -268,31 +277,29 @@ class TasksApiTest(BaseTest):
         execution_timeout_secs=u'30',
         grace_period_secs=u'15')
     expected = {
-      u'request': self.gen_request(
-        created_ts=fmtdate(self.now),
-        expiration_secs=u'30',
-        priority=u'20',
-        properties=expected_props,
-        pubsub_topic=u'projects/abc/topics/def',
-        pubsub_userdata=u'userdata',
-        tags=[
-          u'a:tag',
-          u'os:Amiga',
-          u'pool:default',
-          u'priority:20',
-          u'service_account:service-account@example.com',
-          u'swarming.pool.template:none',
-          u'swarming.pool.version:pools_cfg_rev',
-          u'user:joe@localhost'
-        ],
-        service_account=u'service-account@example.com',
-        task_slices=[
-          {
-            u'expiration_secs': u'30',
-            u'properties': expected_props,
-            u'wait_for_capacity': False,
-          },
-        ]),
+        u'request':
+            self.gen_request(
+                created_ts=fmtdate(self.now),
+                expiration_secs=u'30',
+                priority=u'20',
+                properties=expected_props,
+                pubsub_topic=u'projects/abc/topics/def',
+                pubsub_userdata=u'userdata',
+                tags=[
+                    u'a:tag', u'os:Amiga', u'pool:default', u'priority:20',
+                    u'service_account:service-account@example.com',
+                    u'swarming.pool.template:none',
+                    u'swarming.pool.version:pools_cfg_rev',
+                    u'user:joe@localhost'
+                ],
+                service_account=u'service-account@example.com',
+                task_slices=[
+                    {
+                        u'expiration_secs': u'30',
+                        u'properties': expected_props,
+                        u'wait_for_capacity': False,
+                    },
+                ]),
     }
     # The task was not created for real, so there's no task id.
     task_id = expected[u'request'].pop(u'task_id')
@@ -306,112 +313,6 @@ class TasksApiTest(BaseTest):
     expected[u'task_id'] = u'5cee488008810'
     expected[u'request'][u'task_id'] = task_id
     expected[u'task_result'] = {
-      u'abandoned_ts': u'2010-01-02T03:04:05',
-      u'completed_ts': u'2010-01-02T03:04:05',
-      u'created_ts': u'2010-01-02T03:04:05',
-      u'current_task_slice': u'0',
-      u'failure': False,
-      u'internal_failure': False,
-      u'modified_ts': u'2010-01-02T03:04:05',
-      u'name': u'job1',
-      u'server_versions': [u'v1a'],
-      u'state': u'NO_RESOURCE',
-      u'tags': [
-        u'a:tag',
-        u'os:Amiga',
-        u'pool:default',
-        u'priority:20',
-        u'service_account:service-account@example.com',
-        u'swarming.pool.template:none',
-        u'swarming.pool.version:pools_cfg_rev',
-        u'user:joe@localhost',
-      ],
-      u'task_id': u'5cee488008810',
-      u'user': u'joe@localhost',
-    }
-    response = self.call_api('new', body=message_to_dict(request))
-    # Time advanced since the evaluate_only call.
-    expected['request']['created_ts'] = fmtdate(self.now)
-    self.assertEqual(expected, response.json)
-
-    # Asked for a correct grant(s), since both evaluate and non-evaluate modes
-    # do auth check.
-    self.assertEqual(
-        [(u'service-account@example.com', datetime.timedelta(0, 30+30+15))] * 2,
-        oauth_grant_calls)
-
-  def test_new_ok_template(self):
-    """Asserts that new generates appropriate metadata for a templated task."""
-    self.mock(random, 'getrandbits', lambda _: 0x88)
-    self.mock(random, 'randint', lambda *_: 10000) # always pick prod
-
-    props = self.create_props(
-      command=['rm', '-rf', '/'],
-      execution_timeout_secs=30,
-      grace_period_secs=15,
-      dimensions=[
-        {u'key': u'os', u'value': u'Amiga'},
-        {u'key': u'pool', u'value': u'template'},
-      ])
-
-    # We want to observe the pool default
-    props[u'cipd_input'][u'client_package'] = None
-    props[u'cipd_input'][u'server'] = None
-
-    request = self.create_new_request(
-        properties=props,
-        tags=[u'a:tag'])
-    expected_props = self.gen_props(
-        command=[u'rm', u'-rf', u'/'],
-        execution_timeout_secs=u'30',
-        grace_period_secs=u'15',
-        env=[{u'key': u'VAR', u'value': u'prod'}],
-        dimensions=[
-          {u'key': u'os', u'value': u'Amiga'},
-          {u'key': u'pool', u'value': u'template'},
-        ],
-        inputs_ref={
-          u'isolatedserver': u'https://pool.config.isolate.example.com',
-          u'namespace': u'default-gzip',
-        },
-    )
-    expected_props[u'cipd_input'][u'client_package'] = {
-      u'package_name': u'cipd-client-pkg',
-      u'version': u'from_pool_config',
-    }
-    expected_props[u'cipd_input'][u'server'] = (
-      u'https://pool.config.cipd.example.com')
-    # Need to add the additional package that the template applies.
-    expected_props[u'cipd_input'][u'packages'].insert(0, {
-        u'package_name': u'some-pkg',
-        u'path': u'.',
-        u'version': u'prod-version'
-    })
-
-    expected = {
-      u'request': self.gen_request(
-        created_ts=fmtdate(self.now),
-        priority=u'20',
-        properties=expected_props,
-        tags=[
-          u'a:tag',
-          u'os:Amiga',
-          u'pool:template',
-          u'priority:20',
-          u'service_account:none',
-          u'swarming.pool.template:prod',
-          u'swarming.pool.version:pools_cfg_rev',
-          u'user:joe@localhost',
-        ],
-        task_slices=[
-          {
-            u'expiration_secs': u'86400',
-            u'properties': expected_props,
-            u'wait_for_capacity': False,
-          },
-        ]),
-      u'task_id': u'5cee488008810',
-      u'task_result': {
         u'abandoned_ts': u'2010-01-02T03:04:05',
         u'completed_ts': u'2010-01-02T03:04:05',
         u'created_ts': u'2010-01-02T03:04:05',
@@ -423,18 +324,139 @@ class TasksApiTest(BaseTest):
         u'server_versions': [u'v1a'],
         u'state': u'NO_RESOURCE',
         u'tags': [
-          u'a:tag',
-          u'os:Amiga',
-          u'pool:template',
-          u'priority:20',
-          u'service_account:none',
-          u'swarming.pool.template:prod',
-          u'swarming.pool.version:pools_cfg_rev',
-          u'user:joe@localhost',
+            u'a:tag',
+            u'os:Amiga',
+            u'pool:default',
+            u'priority:20',
+            u'service_account:service-account@example.com',
+            u'swarming.pool.template:none',
+            u'swarming.pool.version:pools_cfg_rev',
+            u'user:joe@localhost',
         ],
         u'task_id': u'5cee488008810',
         u'user': u'joe@localhost',
-      },
+    }
+    response = self.call_api('new', body=message_to_dict(request))
+    # Time advanced since the evaluate_only call.
+    expected['request']['created_ts'] = fmtdate(self.now)
+    self.assertEqual(expected, response.json)
+
+    # Asked for a correct grant(s), since both evaluate and non-evaluate modes
+    # do auth check.
+    self.assertEqual([
+        (u'service-account@example.com', datetime.timedelta(0, 30 + 30 + 15))
+    ] * 2, oauth_grant_calls)
+
+  def test_new_ok_template(self):
+    """Asserts that new generates appropriate metadata for a templated task."""
+    self.mock(random, 'getrandbits', lambda _: 0x88)
+    self.mock(random, 'randint', lambda *_: 10000)  # always pick prod
+
+    props = self.create_props(
+        command=['rm', '-rf', '/'],
+        execution_timeout_secs=30,
+        grace_period_secs=15,
+        dimensions=[
+            {
+                u'key': u'os',
+                u'value': u'Amiga'
+            },
+            {
+                u'key': u'pool',
+                u'value': u'template'
+            },
+        ])
+
+    # We want to observe the pool default
+    props[u'cipd_input'][u'client_package'] = None
+    props[u'cipd_input'][u'server'] = None
+
+    request = self.create_new_request(properties=props, tags=[u'a:tag'])
+    expected_props = self.gen_props(
+        command=[u'rm', u'-rf', u'/'],
+        execution_timeout_secs=u'30',
+        grace_period_secs=u'15',
+        env=[{
+            u'key': u'VAR',
+            u'value': u'prod'
+        }],
+        dimensions=[
+            {
+                u'key': u'os',
+                u'value': u'Amiga'
+            },
+            {
+                u'key': u'pool',
+                u'value': u'template'
+            },
+        ],
+        inputs_ref={
+            u'isolatedserver': u'https://pool.config.isolate.example.com',
+            u'namespace': u'default-gzip',
+        },
+    )
+    expected_props[u'cipd_input'][u'client_package'] = {
+        u'package_name': u'cipd-client-pkg',
+        u'version': u'from_pool_config',
+    }
+    expected_props[u'cipd_input'][u'server'] = (
+        u'https://pool.config.cipd.example.com')
+    # Need to add the additional package that the template applies.
+    expected_props[u'cipd_input'][u'packages'].insert(0, {
+        u'package_name': u'some-pkg',
+        u'path': u'.',
+        u'version': u'prod-version'
+    })
+
+    expected = {
+        u'request':
+            self.gen_request(
+                created_ts=fmtdate(self.now),
+                priority=u'20',
+                properties=expected_props,
+                tags=[
+                    u'a:tag',
+                    u'os:Amiga',
+                    u'pool:template',
+                    u'priority:20',
+                    u'service_account:none',
+                    u'swarming.pool.template:prod',
+                    u'swarming.pool.version:pools_cfg_rev',
+                    u'user:joe@localhost',
+                ],
+                task_slices=[
+                    {
+                        u'expiration_secs': u'86400',
+                        u'properties': expected_props,
+                        u'wait_for_capacity': False,
+                    },
+                ]),
+        u'task_id':
+            u'5cee488008810',
+        u'task_result': {
+            u'abandoned_ts': u'2010-01-02T03:04:05',
+            u'completed_ts': u'2010-01-02T03:04:05',
+            u'created_ts': u'2010-01-02T03:04:05',
+            u'current_task_slice': u'0',
+            u'failure': False,
+            u'internal_failure': False,
+            u'modified_ts': u'2010-01-02T03:04:05',
+            u'name': u'job1',
+            u'server_versions': [u'v1a'],
+            u'state': u'NO_RESOURCE',
+            u'tags': [
+                u'a:tag',
+                u'os:Amiga',
+                u'pool:template',
+                u'priority:20',
+                u'service_account:none',
+                u'swarming.pool.template:prod',
+                u'swarming.pool.version:pools_cfg_rev',
+                u'user:joe@localhost',
+            ],
+            u'task_id': u'5cee488008810',
+            u'user': u'joe@localhost',
+        },
     }
 
     response = self.call_api('new', body=message_to_dict(request))
@@ -492,11 +514,13 @@ class TasksApiTest(BaseTest):
         properties=self.create_props(command=['rm', '-rf', '/']),
         service_account='bad email')
     response = self.call_api('new', body=message_to_dict(request), status=400)
-    self.assertEqual({
-        u'error': {
-            u'message': u'\'service_account\' must be an email, "bot" or '
-                '"none" string, got u\'bad email\''},
-    }, response.json)
+    self.assertEqual(
+        {
+            u'error': {
+                u'message': u'\'service_account\' must be an email, "bot" or '
+                            '"none" string, got u\'bad email\''
+            },
+        }, response.json)
     self.assertFalse(oauth_grant_calls)
 
   def test_new_forbidden_service_account(self):
@@ -507,7 +531,9 @@ class TasksApiTest(BaseTest):
         service_account='service-account@example.com')
     response = self.call_api('new', body=message_to_dict(request), status=403)
     self.assertEqual({
-        u'error': {u'message': u'forbidden account'},
+        u'error': {
+            u'message': u'forbidden account'
+        },
     }, response.json)
 
   def test_new_ok_deduped(self):
@@ -518,8 +544,7 @@ class TasksApiTest(BaseTest):
     self.bot_poll()
     self.set_as_user()
     self.client_create_task_raw(
-        tags=['project:yay', 'commit:post'],
-        properties=dict(idempotent=True))
+        tags=['project:yay', 'commit:post'], properties=dict(idempotent=True))
     self.set_as_bot()
     self.bot_run_task()
 
@@ -536,15 +561,15 @@ class TasksApiTest(BaseTest):
         modified_ts=fmtdate(self.now),
         started_ts=fmtdate(self.now),
         tags=[
-          u'commit:post',
-          u'os:Amiga',
-          u'pool:default',
-          u'priority:20',
-          u'project:yay',
-          u'service_account:none',
-          u'swarming.pool.template:none',
-          u'swarming.pool.version:pools_cfg_rev',
-          u'user:joe@localhost',
+            u'commit:post',
+            u'os:Amiga',
+            u'pool:default',
+            u'priority:20',
+            u'project:yay',
+            u'service_account:none',
+            u'swarming.pool.template:none',
+            u'swarming.pool.version:pools_cfg_rev',
+            u'user:joe@localhost',
         ],
         try_number=u'1')
     t_request = self.gen_request(
@@ -553,23 +578,26 @@ class TasksApiTest(BaseTest):
             command=[u'python', u'run_test.py'], idempotent=True),
         priority=u'20',
         tags=[
-          u'commit:post',
-          u'os:Amiga',
-          u'pool:default',
-          u'priority:20',
-          u'project:yay',
-          u'service_account:none',
-          u'swarming.pool.template:none',
-          u'swarming.pool.version:pools_cfg_rev',
-          u'user:joe@localhost',
+            u'commit:post',
+            u'os:Amiga',
+            u'pool:default',
+            u'priority:20',
+            u'project:yay',
+            u'service_account:none',
+            u'swarming.pool.template:none',
+            u'swarming.pool.version:pools_cfg_rev',
+            u'user:joe@localhost',
         ],
         task_slices=[
-          {
-            u'expiration_secs': u'86400',
-            u'properties': self.gen_props(
-                command=[u'python', u'run_test.py'], idempotent=True),
-            u'wait_for_capacity': False,
-          },
+            {
+                u'expiration_secs':
+                    u'86400',
+                u'properties':
+                    self.gen_props(
+                        command=[u'python', u'run_test.py'], idempotent=True),
+                u'wait_for_capacity':
+                    False,
+            },
         ])
 
     # Make sure it completed.
@@ -592,23 +620,26 @@ class TasksApiTest(BaseTest):
         properties=self.gen_props(
             command=[u'python', u'run_test.py'], idempotent=True),
         tags=[
-          u'commit:pre',
-          u'os:Amiga',
-          u'pool:default',
-          u'priority:200',
-          u'service_account:none',
-          u'swarming.pool.template:none',
-          u'swarming.pool.version:pools_cfg_rev',
-          u'user:joe@localhost',
+            u'commit:pre',
+            u'os:Amiga',
+            u'pool:default',
+            u'priority:200',
+            u'service_account:none',
+            u'swarming.pool.template:none',
+            u'swarming.pool.version:pools_cfg_rev',
+            u'user:joe@localhost',
         ],
         task_id=u'5cf59b8006610',
         task_slices=[
-          {
-            u'expiration_secs': u'30',
-            u'properties': self.gen_props(
-                command=[u'python', u'run_test.py'], idempotent=True),
-            u'wait_for_capacity': False,
-          },
+            {
+                u'expiration_secs':
+                    u'30',
+                u'properties':
+                    self.gen_props(
+                        command=[u'python', u'run_test.py'], idempotent=True),
+                u'wait_for_capacity':
+                    False,
+            },
         ])
     deduped_result = self.gen_result_summary(
         completed_ts=fmtdate(self.now),
@@ -622,20 +653,20 @@ class TasksApiTest(BaseTest):
         task_id=u'5cf59b8006610',
         started_ts=fmtdate(self.now),
         tags=[
-          u'commit:pre',
-          u'os:Amiga',
-          u'pool:default',
-          u'priority:200',
-          u'service_account:none',
-          u'swarming.pool.template:none',
-          u'swarming.pool.version:pools_cfg_rev',
-          u'user:joe@localhost',
+            u'commit:pre',
+            u'os:Amiga',
+            u'pool:default',
+            u'priority:200',
+            u'service_account:none',
+            u'swarming.pool.template:none',
+            u'swarming.pool.version:pools_cfg_rev',
+            u'user:joe@localhost',
         ])
 
     expected = {
-      u'request': deduped_request,
-      u'task_id': u'5cf59b8006610',
-      u'task_result': deduped_result,
+        u'request': deduped_request,
+        u'task_id': u'5cf59b8006610',
+        u'task_result': deduped_result,
     }
     self.set_as_user()
     new_req = self.create_new_request(
@@ -650,8 +681,8 @@ class TasksApiTest(BaseTest):
 
     self.set_as_privileged_user()
     expected = {
-      u'items': [deduped_result],
-      u'now': fmtdate(now_30),
+        u'items': [deduped_result],
+        u'now': fmtdate(now_30),
     }
     request = handlers_endpoints.TasksRequest.combined_message_class(
         state=swarming_rpcs.TaskStateQuery.DEDUPED)
@@ -690,51 +721,53 @@ class TasksApiTest(BaseTest):
     request = self.create_new_request(
         properties=self.create_props(
             inputs_ref=swarming_rpcs.FilesRef(
-                isolated='1'*40,
+                isolated='1' * 40,
                 isolatedserver='http://localhost:1',
                 namespace='default-gzip')))
     expected_props = self.gen_props(
         inputs_ref={
-          u'isolated': u'1'*40,
-          u'isolatedserver': u'http://localhost:1',
-          u'namespace': u'default-gzip',
+            u'isolated': u'1' * 40,
+            u'isolatedserver': u'http://localhost:1',
+            u'namespace': u'default-gzip',
         })
     expected = {
-      u'request': self.gen_request(
-          created_ts=fmtdate(self.now),
-          properties=expected_props,
-          task_slices=[
-            {
-              u'expiration_secs': u'86400',
-              u'properties': expected_props,
-              u'wait_for_capacity': False,
-            },
-          ]),
-      u'task_id': u'5cee488008810',
-      u'task_result': {
-        u'abandoned_ts': u'2010-01-02T03:04:05',
-        u'completed_ts': u'2010-01-02T03:04:05',
-        u'created_ts': u'2010-01-02T03:04:05',
-        u'current_task_slice': u'0',
-        u'failure': False,
-        u'internal_failure': False,
-        u'modified_ts': u'2010-01-02T03:04:05',
-        u'name': u'job1',
-        u'server_versions': [u'v1a'],
-        u'state': u'NO_RESOURCE',
-        u'tags': [
-          u'a:tag',
-          u'os:Amiga',
-          u'pool:default',
-          u'priority:20',
-          u'service_account:none',
-          u'swarming.pool.template:none',
-          u'swarming.pool.version:pools_cfg_rev',
-          u'user:joe@localhost',
-        ],
-        u'task_id': u'5cee488008810',
-        u'user': u'joe@localhost',
-      },
+        u'request':
+            self.gen_request(
+                created_ts=fmtdate(self.now),
+                properties=expected_props,
+                task_slices=[
+                    {
+                        u'expiration_secs': u'86400',
+                        u'properties': expected_props,
+                        u'wait_for_capacity': False,
+                    },
+                ]),
+        u'task_id':
+            u'5cee488008810',
+        u'task_result': {
+            u'abandoned_ts': u'2010-01-02T03:04:05',
+            u'completed_ts': u'2010-01-02T03:04:05',
+            u'created_ts': u'2010-01-02T03:04:05',
+            u'current_task_slice': u'0',
+            u'failure': False,
+            u'internal_failure': False,
+            u'modified_ts': u'2010-01-02T03:04:05',
+            u'name': u'job1',
+            u'server_versions': [u'v1a'],
+            u'state': u'NO_RESOURCE',
+            u'tags': [
+                u'a:tag',
+                u'os:Amiga',
+                u'pool:default',
+                u'priority:20',
+                u'service_account:none',
+                u'swarming.pool.template:none',
+                u'swarming.pool.version:pools_cfg_rev',
+                u'user:joe@localhost',
+            ],
+            u'task_id': u'5cee488008810',
+            u'user': u'joe@localhost',
+        },
     }
     response = self.call_api('new', body=message_to_dict(request))
     self.assertEqual(expected, response.json)
@@ -744,49 +777,51 @@ class TasksApiTest(BaseTest):
 
     request = self.create_new_request(
         properties=self.create_props(
-            inputs_ref=swarming_rpcs.FilesRef(isolated='1'*40)))
+            inputs_ref=swarming_rpcs.FilesRef(isolated='1' * 40)))
     expected_props = self.gen_props(
         inputs_ref={
-          u'isolated': u'1'*40,
-          u'isolatedserver': u'https://pool.config.isolate.example.com',
-          u'namespace': u'default-gzip',
+            u'isolated': u'1' * 40,
+            u'isolatedserver': u'https://pool.config.isolate.example.com',
+            u'namespace': u'default-gzip',
         })
     expected = {
-      u'request': self.gen_request(
-          created_ts=fmtdate(self.now),
-          properties=expected_props,
-          task_slices=[
-            {
-              u'expiration_secs': u'86400',
-              u'properties': expected_props,
-              u'wait_for_capacity': False,
-            },
-          ]),
-      u'task_id': u'5cee488008810',
-      u'task_result': {
-        u'abandoned_ts': u'2010-01-02T03:04:05',
-        u'completed_ts': u'2010-01-02T03:04:05',
-        u'created_ts': u'2010-01-02T03:04:05',
-        u'current_task_slice': u'0',
-        u'failure': False,
-        u'internal_failure': False,
-        u'modified_ts': u'2010-01-02T03:04:05',
-        u'name': u'job1',
-        u'server_versions': [u'v1a'],
-        u'state': u'NO_RESOURCE',
-        u'tags': [
-          u'a:tag',
-          u'os:Amiga',
-          u'pool:default',
-          u'priority:20',
-          u'service_account:none',
-          u'swarming.pool.template:none',
-          u'swarming.pool.version:pools_cfg_rev',
-          u'user:joe@localhost',
-        ],
-        u'task_id': u'5cee488008810',
-        u'user': u'joe@localhost',
-      },
+        u'request':
+            self.gen_request(
+                created_ts=fmtdate(self.now),
+                properties=expected_props,
+                task_slices=[
+                    {
+                        u'expiration_secs': u'86400',
+                        u'properties': expected_props,
+                        u'wait_for_capacity': False,
+                    },
+                ]),
+        u'task_id':
+            u'5cee488008810',
+        u'task_result': {
+            u'abandoned_ts': u'2010-01-02T03:04:05',
+            u'completed_ts': u'2010-01-02T03:04:05',
+            u'created_ts': u'2010-01-02T03:04:05',
+            u'current_task_slice': u'0',
+            u'failure': False,
+            u'internal_failure': False,
+            u'modified_ts': u'2010-01-02T03:04:05',
+            u'name': u'job1',
+            u'server_versions': [u'v1a'],
+            u'state': u'NO_RESOURCE',
+            u'tags': [
+                u'a:tag',
+                u'os:Amiga',
+                u'pool:default',
+                u'priority:20',
+                u'service_account:none',
+                u'swarming.pool.template:none',
+                u'swarming.pool.version:pools_cfg_rev',
+                u'user:joe@localhost',
+            ],
+            u'task_id': u'5cee488008810',
+            u'user': u'joe@localhost',
+        },
     }
     response = self.call_api('new', body=message_to_dict(request))
     self.assertEqual(expected, response.json)
@@ -796,68 +831,70 @@ class TasksApiTest(BaseTest):
 
     expected_props = self.gen_props(
         cipd_input={
-          u'client_package': {
-            u'package_name': u'cipd-client-pkg',
-            u'version': u'from_pool_config',
-          },
-          u'packages': [
-            {
-              u'package_name': u'rm',
-              u'path': u'.',
-              u'version': u'latest',
+            u'client_package': {
+                u'package_name': u'cipd-client-pkg',
+                u'version': u'from_pool_config',
             },
-          ],
-          u'server': u'https://pool.config.cipd.example.com',
+            u'packages': [{
+                u'package_name': u'rm',
+                u'path': u'.',
+                u'version': u'latest',
+            },],
+            u'server': u'https://pool.config.cipd.example.com',
         },
         command=[u'rm', u'-rf', u'/'],
-        env=[{u'key': u'PATH', u'value': u'/'}])
+        env=[{
+            u'key': u'PATH',
+            u'value': u'/'
+        }])
     expected = {
-      u'request': self.gen_request(
-          created_ts=fmtdate(self.now),
-          properties=expected_props,
-          task_slices=[
-            {
-              u'expiration_secs': u'86400',
-              u'properties': expected_props,
-              u'wait_for_capacity': False,
-            },
-          ]),
-      u'task_id': u'5cee488008810',
-      u'task_result': {
-        u'abandoned_ts': u'2010-01-02T03:04:05',
-        u'completed_ts': u'2010-01-02T03:04:05',
-        u'created_ts': u'2010-01-02T03:04:05',
-        u'current_task_slice': u'0',
-        u'failure': False,
-        u'internal_failure': False,
-        u'modified_ts': u'2010-01-02T03:04:05',
-        u'name': u'job1',
-        u'server_versions': [u'v1a'],
-        u'state': u'NO_RESOURCE',
-        u'tags': [
-          u'a:tag',
-          u'os:Amiga',
-          u'pool:default',
-          u'priority:20',
-          u'service_account:none',
-          u'swarming.pool.template:none',
-          u'swarming.pool.version:pools_cfg_rev',
-          u'user:joe@localhost',
-        ],
-        u'task_id': u'5cee488008810',
-        u'user': u'joe@localhost',
-      },
+        u'request':
+            self.gen_request(
+                created_ts=fmtdate(self.now),
+                properties=expected_props,
+                task_slices=[
+                    {
+                        u'expiration_secs': u'86400',
+                        u'properties': expected_props,
+                        u'wait_for_capacity': False,
+                    },
+                ]),
+        u'task_id':
+            u'5cee488008810',
+        u'task_result': {
+            u'abandoned_ts': u'2010-01-02T03:04:05',
+            u'completed_ts': u'2010-01-02T03:04:05',
+            u'created_ts': u'2010-01-02T03:04:05',
+            u'current_task_slice': u'0',
+            u'failure': False,
+            u'internal_failure': False,
+            u'modified_ts': u'2010-01-02T03:04:05',
+            u'name': u'job1',
+            u'server_versions': [u'v1a'],
+            u'state': u'NO_RESOURCE',
+            u'tags': [
+                u'a:tag',
+                u'os:Amiga',
+                u'pool:default',
+                u'priority:20',
+                u'service_account:none',
+                u'swarming.pool.template:none',
+                u'swarming.pool.version:pools_cfg_rev',
+                u'user:joe@localhost',
+            ],
+            u'task_id': u'5cee488008810',
+            u'user': u'joe@localhost',
+        },
     }
     request = self.create_new_request(
         properties=self.create_props(
-            cipd_input=swarming_rpcs.CipdInput(
-                packages=[
-                  swarming_rpcs.CipdPackage(
-                      package_name='rm', path='.', version='latest'),
-                ]),
+            cipd_input=swarming_rpcs.CipdInput(packages=[
+                swarming_rpcs.CipdPackage(
+                    package_name='rm', path='.', version='latest'),
+            ]),
             command=['rm', '-rf', '/'],
             env=[
-              swarming_rpcs.StringPair(key='PATH', value='/'),
+                swarming_rpcs.StringPair(key='PATH', value='/'),
             ]))
     response = self.call_api('new', body=message_to_dict(request))
     self.assertEqual(expected, response.json)
@@ -868,52 +905,54 @@ class TasksApiTest(BaseTest):
     self.mock_now(now)
 
     task_slices = [
-      {
-        u'expiration_secs': 180,
-        u'properties': self.create_props(command=['python', 'run_test.py']),
-        u'wait_for_capacity': False,
-      },
+        {
+            u'expiration_secs': 180,
+            u'properties': self.create_props(command=['python', 'run_test.py']),
+            u'wait_for_capacity': False,
+        },
     ]
     response, _ = self.client_create_task(
         expiration_secs=None, task_slices=task_slices)
     expected_props = self.gen_props(command=[u'python', u'run_test.py'])
     expected = {
-      u'request': self.gen_request(
-          created_ts=fmtdate(self.now),
-          expiration_secs=u'180',
-          properties=expected_props,
-          task_slices=[
-            {
-              u'expiration_secs': u'180',
-              u'properties': expected_props,
-              u'wait_for_capacity': False,
-            },
-          ]),
-      u'task_id': u'5cee488008810',
-      u'task_result': {
-        u'abandoned_ts': u'2010-01-02T03:04:05',
-        u'completed_ts': u'2010-01-02T03:04:05',
-        u'created_ts': u'2010-01-02T03:04:05',
-        u'current_task_slice': u'0',
-        u'failure': False,
-        u'internal_failure': False,
-        u'modified_ts': u'2010-01-02T03:04:05',
-        u'name': u'job1',
-        u'server_versions': [u'v1a'],
-        u'state': u'NO_RESOURCE',
-        u'tags': [
-          u'a:tag',
-          u'os:Amiga',
-          u'pool:default',
-          u'priority:20',
-          u'service_account:none',
-          u'swarming.pool.template:none',
-          u'swarming.pool.version:pools_cfg_rev',
-          u'user:joe@localhost',
-        ],
-        u'task_id': u'5cee488008810',
-        u'user': u'joe@localhost',
-      },
+        u'request':
+            self.gen_request(
+                created_ts=fmtdate(self.now),
+                expiration_secs=u'180',
+                properties=expected_props,
+                task_slices=[
+                    {
+                        u'expiration_secs': u'180',
+                        u'properties': expected_props,
+                        u'wait_for_capacity': False,
+                    },
+                ]),
+        u'task_id':
+            u'5cee488008810',
+        u'task_result': {
+            u'abandoned_ts': u'2010-01-02T03:04:05',
+            u'completed_ts': u'2010-01-02T03:04:05',
+            u'created_ts': u'2010-01-02T03:04:05',
+            u'current_task_slice': u'0',
+            u'failure': False,
+            u'internal_failure': False,
+            u'modified_ts': u'2010-01-02T03:04:05',
+            u'name': u'job1',
+            u'server_versions': [u'v1a'],
+            u'state': u'NO_RESOURCE',
+            u'tags': [
+                u'a:tag',
+                u'os:Amiga',
+                u'pool:default',
+                u'priority:20',
+                u'service_account:none',
+                u'swarming.pool.template:none',
+                u'swarming.pool.version:pools_cfg_rev',
+                u'user:joe@localhost',
+            ],
+            u'task_id': u'5cee488008810',
+            u'user': u'joe@localhost',
+        },
     }
     self.assertEqual(expected, response)
 
@@ -923,67 +962,78 @@ class TasksApiTest(BaseTest):
     self.mock_now(now)
 
     task_slices = [
-      {
-        u'expiration_secs': 180,
-        u'properties': self.create_props(command=['python', 'run_test.py']),
-        u'wait_for_capacity': False,
-      },
-      {
-        u'expiration_secs': 180,
-        u'properties': self.create_props(
-            command=['python', 'run_test.py'],
-            dimensions=[{u'key': u'pool', u'value': u'default'}]),
-        u'wait_for_capacity': False,
-      },
+        {
+            u'expiration_secs': 180,
+            u'properties': self.create_props(command=['python', 'run_test.py']),
+            u'wait_for_capacity': False,
+        },
+        {
+            u'expiration_secs':
+                180,
+            u'properties':
+                self.create_props(
+                    command=['python', 'run_test.py'],
+                    dimensions=[{
+                        u'key': u'pool',
+                        u'value': u'default'
+                    }]),
+            u'wait_for_capacity':
+                False,
+        },
     ]
     response, _ = self.client_create_task(
         expiration_secs=None, task_slices=task_slices)
     expected_props_1 = self.gen_props(command=[u'python', u'run_test.py'])
     expected_props_2 = self.gen_props(
         command=[u'python', u'run_test.py'],
-        dimensions=[{u'key': u'pool', u'value': u'default'}])
+        dimensions=[{
+            u'key': u'pool',
+            u'value': u'default'
+        }])
     expected = {
-      u'request': self.gen_request(
-          created_ts=fmtdate(self.now),
-          expiration_secs=u'360',
-          properties=expected_props_1,
-          task_slices=[
-            {
-              u'expiration_secs': u'180',
-              u'properties': expected_props_1,
-              u'wait_for_capacity': False,
-            },
-            {
-              u'expiration_secs': u'180',
-              u'properties': expected_props_2,
-              u'wait_for_capacity': False,
-            },
-          ]),
-      u'task_id': u'5cee488008810',
-      u'task_result': {
-        u'abandoned_ts': u'2010-01-02T03:04:05',
-        u'completed_ts': u'2010-01-02T03:04:05',
-        u'created_ts': u'2010-01-02T03:04:05',
-        u'current_task_slice': u'0',
-        u'failure': False,
-        u'internal_failure': False,
-        u'modified_ts': u'2010-01-02T03:04:05',
-        u'name': u'job1',
-        u'server_versions': [u'v1a'],
-        u'state': u'NO_RESOURCE',
-        u'tags': [
-          u'a:tag',
-          u'os:Amiga',
-          u'pool:default',
-          u'priority:20',
-          u'service_account:none',
-          u'swarming.pool.template:none',
-          u'swarming.pool.version:pools_cfg_rev',
-          u'user:joe@localhost',
-        ],
-        u'task_id': u'5cee488008810',
-        u'user': u'joe@localhost',
-      },
+        u'request':
+            self.gen_request(
+                created_ts=fmtdate(self.now),
+                expiration_secs=u'360',
+                properties=expected_props_1,
+                task_slices=[
+                    {
+                        u'expiration_secs': u'180',
+                        u'properties': expected_props_1,
+                        u'wait_for_capacity': False,
+                    },
+                    {
+                        u'expiration_secs': u'180',
+                        u'properties': expected_props_2,
+                        u'wait_for_capacity': False,
+                    },
+                ]),
+        u'task_id':
+            u'5cee488008810',
+        u'task_result': {
+            u'abandoned_ts': u'2010-01-02T03:04:05',
+            u'completed_ts': u'2010-01-02T03:04:05',
+            u'created_ts': u'2010-01-02T03:04:05',
+            u'current_task_slice': u'0',
+            u'failure': False,
+            u'internal_failure': False,
+            u'modified_ts': u'2010-01-02T03:04:05',
+            u'name': u'job1',
+            u'server_versions': [u'v1a'],
+            u'state': u'NO_RESOURCE',
+            u'tags': [
+                u'a:tag',
+                u'os:Amiga',
+                u'pool:default',
+                u'priority:20',
+                u'service_account:none',
+                u'swarming.pool.template:none',
+                u'swarming.pool.version:pools_cfg_rev',
+                u'user:joe@localhost',
+            ],
+            u'task_id': u'5cee488008810',
+            u'user': u'joe@localhost',
+        },
     }
     self.assertEqual(expected, response)
 
@@ -993,17 +1043,17 @@ class TasksApiTest(BaseTest):
     self.mock_now(now)
 
     task_slices = [
-      {
-        u'expiration_secs': 180,
-        u'properties': self.create_props(command=['python', 'run_test.py']),
-        u'wait_for_capacity': False,
-      },
-      {
-        # That's incorrect:
-        u'expiration_secs': 0,
-        u'properties': self.create_props(command=['python', 'run_test.py']),
-        u'wait_for_capacity': False,
-      },
+        {
+            u'expiration_secs': 180,
+            u'properties': self.create_props(command=['python', 'run_test.py']),
+            u'wait_for_capacity': False,
+        },
+        {
+            # That's incorrect:
+            u'expiration_secs': 0,
+            u'properties': self.create_props(command=['python', 'run_test.py']),
+            u'wait_for_capacity': False,
+        },
     ]
     request = swarming_rpcs.NewTaskRequest(
         expiration_secs=None,
@@ -1014,9 +1064,9 @@ class TasksApiTest(BaseTest):
         user='joe@localhost')
     resp = self.call_api('new', body=message_to_dict(request), status=400)
     expected = {
-      u'error': {
-        u'message': u'expiration_secs (0) must be between 1s and 7 days',
-      },
+        u'error': {
+            u'message': u'expiration_secs (0) must be between 1s and 7 days',
+        },
     }
     self.assertEqual(expected, resp.json)
 
@@ -1080,25 +1130,16 @@ class TasksApiTest(BaseTest):
     expected[u'task_id'] = u'5cee488008810'
     expected[u'request'][u'task_id'] = task_id
     expected[u'task_result'] = {
-        u'abandoned_ts':
-            u'2010-01-02T03:04:05',
-        u'completed_ts':
-            u'2010-01-02T03:04:05',
-        u'created_ts':
-            u'2010-01-02T03:04:05',
-        u'current_task_slice':
-            u'0',
-        u'failure':
-            False,
-        u'internal_failure':
-            False,
-        u'modified_ts':
-            u'2010-01-02T03:04:05',
-        u'name':
-            u'job1',
+        u'abandoned_ts': u'2010-01-02T03:04:05',
+        u'completed_ts': u'2010-01-02T03:04:05',
+        u'created_ts': u'2010-01-02T03:04:05',
+        u'current_task_slice': u'0',
+        u'failure': False,
+        u'internal_failure': False,
+        u'modified_ts': u'2010-01-02T03:04:05',
+        u'name': u'job1',
         u'server_versions': [u'v1a'],
-        u'state':
-            u'NO_RESOURCE',
+        u'state': u'NO_RESOURCE',
         u'tags': [
             u'a:tag',
             u'os:Amiga',
@@ -1109,10 +1150,8 @@ class TasksApiTest(BaseTest):
             u'swarming.pool.version:pools_cfg_rev',
             u'user:joe@localhost',
         ],
-        u'task_id':
-            u'5cee488008810',
-        u'user':
-            u'joe@localhost',
+        u'task_id': u'5cee488008810',
+        u'user': u'joe@localhost',
     }
 
     with mock.patch(
@@ -1140,36 +1179,49 @@ class TasksApiTest(BaseTest):
     # Ensures that quality check is done early enough that a 400 and not an 500
     # is returned.
     request = self.create_new_request(
-        properties={u'dimensions': [{u'key': u'id', u'value': u'bot123'}]})
+        properties={u'dimensions': [{
+            u'key': u'id',
+            u'value': u'bot123'
+        }]})
     response = self.call_api('new', body=message_to_dict(request), status=400)
     expected = {
-      u'error': {u'message': u"'pool' must be used as dimensions"},
+        u'error': {
+            u'message': u"'pool' must be used as dimensions"
+        },
     }
     self.assertEqual(expected, response.json)
 
   def test_new_denied_command(self):
     request = self.create_new_request(
         properties={
-          u'dimensions': [{u'key': u'pool', u'value': u'default'}],
-          u'execution_timeout_secs': 30,
+            u'dimensions': [{
+                u'key': u'pool',
+                u'value': u'default'
+            }],
+            u'execution_timeout_secs': 30,
         })
     response = self.call_api('new', body=message_to_dict(request), status=400)
     expected = {
-      u'error': {
-          u'message': u'use at least one of command or inputs_ref.isolated',
-      },
+        u'error': {
+            u'message': u'use at least one of command or inputs_ref.isolated',
+        },
     }
     self.assertEqual(expected, response.json)
 
   def test_new_denied_execution_timeout_secs(self):
     request = self.create_new_request(
         properties={
-          u'command': [u'echo', u'hi'],
-          u'dimensions': [{u'key': u'pool', u'value': u'default'}],
+            u'command': [u'echo', u'hi'],
+            u'dimensions': [{
+                u'key': u'pool',
+                u'value': u'default'
+            }],
         })
     response = self.call_api('new', body=message_to_dict(request), status=400)
     expected = {
-      u'error': {u'message': u"'execution_timeout_secs' must be specified"},
+        u'error': {
+            u'message': u"'execution_timeout_secs' must be specified"
+        },
     }
     self.assertEqual(expected, response.json)
 
@@ -1177,9 +1229,12 @@ class TasksApiTest(BaseTest):
     self.mock(random, 'getrandbits', lambda _: 0x88)
     request = self.create_new_request(
         properties={
-          u'command': [u'echo', u'hi'],
-          u'dimensions': [{u'key': u'pool', u'value': u'default'}],
-          u'execution_timeout_secs': 30,
+            u'command': [u'echo', u'hi'],
+            u'dimensions': [{
+                u'key': u'pool',
+                u'value': u'default'
+            }],
+            u'execution_timeout_secs': 30,
         })
     response = self.call_api('new', body=message_to_dict(request), status=200)
     self.assertEqual(u'5cee488008810', response.json[u'task_id'])
@@ -1201,7 +1256,8 @@ class TasksApiTest(BaseTest):
     self.set_as_user()
     self.mock_now(self.now, 60)
     _, running_id = self.client_create_task_raw(
-        name='second', user='jack@localhost',
+        name='second',
+        user='jack@localhost',
         tags=['project:yay', 'commit:efgh', 'os:Win'])
     self.set_as_bot()
     self.bot_poll()
@@ -1210,7 +1266,8 @@ class TasksApiTest(BaseTest):
     self.set_as_user()
     now_120 = self.mock_now(self.now, 120)
     _, pending_id = self.client_create_task_raw(
-        name='third', user='jack@localhost',
+        name='third',
+        user='jack@localhost',
         tags=['project:yay', 'commit:ijkhl', 'os:Linux'])
 
     return running_id, pending_id, now_120
@@ -1224,13 +1281,14 @@ class TasksApiTest(BaseTest):
       e = {'tasks': [pending_id], 'kill_running': False}
       self.assertEqual(e, json.loads(payload))
       return True
+
     self.mock(utils, 'enqueue_task', enqueue_task)
 
     self.set_as_admin()
     response = self.call_api('cancel', body={u'tags': [u'project:yay']})
     expected = {
-      u'matched': u'1',
-      u'now': fmtdate(now_120),
+        u'matched': u'1',
+        u'now': fmtdate(now_120),
     }
     self.assertEqual(expected, response.json)
 
@@ -1243,14 +1301,18 @@ class TasksApiTest(BaseTest):
       e = {'tasks': [pending_id, running_id], 'kill_running': True}
       self.assertEqual(e, json.loads(payload))
       return True
+
     self.mock(utils, 'enqueue_task', enqueue_task)
 
     self.set_as_admin()
     response = self.call_api(
-        'cancel', body={u'tags': [u'project:yay'], 'kill_running': True})
+        'cancel', body={
+            u'tags': [u'project:yay'],
+            'kill_running': True
+        })
     expected = {
-      u'matched': u'2',
-      u'now': fmtdate(now_120),
+        u'matched': u'2',
+        u'now': fmtdate(now_120),
     }
     self.assertEqual(expected, response.json)
 
@@ -1276,40 +1338,53 @@ class TasksApiTest(BaseTest):
         sort=swarming_rpcs.TaskSort.CREATED_TS)
     actual = self.call_api('list', body=message_to_dict(request)).json
     self.assertEqual(
-        {u'now': fmtdate(now_120), u'items': [second, first_no_perf]}, actual)
+        {
+            u'now': fmtdate(now_120),
+            u'items': [second, first_no_perf]
+        }, actual)
 
     # Sort by MODIFIED_TS.
     request = handlers_endpoints.TasksRequest.combined_message_class(
         sort=swarming_rpcs.TaskSort.MODIFIED_TS)
     actual = self.call_api('list', body=message_to_dict(request)).json
     self.assertEqual(
-        {u'now': fmtdate(now_120), u'items': [first_no_perf, second]}, actual)
+        {
+            u'now': fmtdate(now_120),
+            u'items': [first_no_perf, second]
+        }, actual)
 
     # With two tags.
     request = handlers_endpoints.TasksRequest.combined_message_class(
         end=end, start=start, tags=['project:yay', 'commit:pre'])
-    self.assertEqual(
-        {u'now': fmtdate(now_120), u'items': [second]},
-        self.call_api('list', body=message_to_dict(request)).json)
+    self.assertEqual({
+        u'now': fmtdate(now_120),
+        u'items': [second]
+    },
+                     self.call_api('list', body=message_to_dict(request)).json)
 
     # A spurious tag.
     request = handlers_endpoints.TasksRequest.combined_message_class(
         end=end, start=start, tags=['foo:bar'])
-    self.assertEqual(
-        {u'now': fmtdate(now_120)},
-        self.call_api('list', body=message_to_dict(request)).json)
+    self.assertEqual({u'now': fmtdate(now_120)},
+                     self.call_api('list', body=message_to_dict(request)).json)
 
     # Both state and tag.
     request = handlers_endpoints.TasksRequest.combined_message_class(
-        end=end, start=start, tags=['commit:pre'],
+        end=end,
+        start=start,
+        tags=['commit:pre'],
         state=swarming_rpcs.TaskStateQuery.COMPLETED_SUCCESS)
-    self.assertEqual(
-        {u'now': fmtdate(now_120), u'items': [second]},
-        self.call_api('list', body=message_to_dict(request)).json)
+    self.assertEqual({
+        u'now': fmtdate(now_120),
+        u'items': [second]
+    },
+                     self.call_api('list', body=message_to_dict(request)).json)
 
     # Both sort and tag.
     request = handlers_endpoints.TasksRequest.combined_message_class(
-        end=end, start=start, tags=['commit:pre'],
+        end=end,
+        start=start,
+        tags=['commit:pre'],
         sort=swarming_rpcs.TaskSort.MODIFIED_TS,
         state=swarming_rpcs.TaskStateQuery.COMPLETED_SUCCESS)
     self.call_api('list', body=message_to_dict(request), status=400)
@@ -1441,17 +1516,15 @@ class TasksApiTest(BaseTest):
                   self.call_api(
                       'list', body=message_to_dict(request), status=400)
                 except:  # pylint: disable=bare-except
-                  self.fail(
-                      'Is actually supported: (%s, %s, %s)' %
-                      (using_filter, state, sort))
+                  self.fail('Is actually supported: (%s, %s, %s)' %
+                            (using_filter, state, sort))
               else:
                 try:
                   result = self.call_api(
                       'list', body=message_to_dict(request)).json
                 except:  # pylint: disable=bare-except
-                  self.fail(
-                      'Is unsupported: (%s, %s, %s)' %
-                      (using_filter, state, sort))
+                  self.fail('Is unsupported: (%s, %s, %s)' %
+                            (using_filter, state, sort))
                 # Don't check for correctness here, just assert that it doesn't
                 # throw due to missing index or invalid query.
                 result.pop(u'items', None)
@@ -1464,24 +1537,23 @@ class TasksApiTest(BaseTest):
     task_result.TagAggregation(
         key=task_result.TagAggregation.KEY,
         tags=[
-            task_result.TagValues(
-                tag='foo', values=['alpha', 'beta']),
+            task_result.TagValues(tag='foo', values=['alpha', 'beta']),
             task_result.TagValues(
                 tag='bar', values=['gamma', 'delta', 'epsilon']),
         ],
         ts=self.now).put()
     expected = {
-      u'tasks_tags': [
-        {
-          u'key': u'foo',
-          u'value': [u'alpha', u'beta'],
-        },
-        {
-          u'key': u'bar',
-          u'value': [u'gamma', u'delta', u'epsilon'],
-        },
-      ],
-      u'ts': fmtdate(self.now, DATETIME_NO_MICRO),
+        u'tasks_tags': [
+            {
+                u'key': u'foo',
+                u'value': [u'alpha', u'beta'],
+            },
+            {
+                u'key': u'bar',
+                u'value': [u'gamma', u'delta', u'epsilon'],
+            },
+        ],
+        u'ts': fmtdate(self.now, DATETIME_NO_MICRO),
     }
     self.assertEqual(expected, self.call_api('tags', body={}).json)
 
@@ -1526,10 +1598,15 @@ class TasksApiTest(BaseTest):
         performance_stats=self.gen_perf_stats(),
         started_ts=fmtdate(self.now),
         tags=[
-          u'commit:post', u'os:Amiga', u'pool:default', u'priority:20',
-          u'project:yay', u'service_account:none',
-          u'swarming.pool.template:none',
-          u'swarming.pool.version:pools_cfg_rev', u'user:joe@localhost',
+            u'commit:post',
+            u'os:Amiga',
+            u'pool:default',
+            u'priority:20',
+            u'project:yay',
+            u'service_account:none',
+            u'swarming.pool.template:none',
+            u'swarming.pool.version:pools_cfg_rev',
+            u'user:joe@localhost',
         ],
         try_number=u'1')
     deduped = self.gen_result_summary(
@@ -1544,10 +1621,15 @@ class TasksApiTest(BaseTest):
         run_id=u'5cee488008811',
         started_ts=fmtdate(self.now),
         tags=[
-          u'commit:pre', u'os:Amiga', u'pool:default', u'priority:20',
-          u'project:yay', u'service_account:none',
-          u'swarming.pool.template:none',
-          u'swarming.pool.version:pools_cfg_rev', u'user:jack@localhost',
+            u'commit:pre',
+            u'os:Amiga',
+            u'pool:default',
+            u'priority:20',
+            u'project:yay',
+            u'service_account:none',
+            u'swarming.pool.template:none',
+            u'swarming.pool.version:pools_cfg_rev',
+            u'user:jack@localhost',
         ],
         task_id=u'5cfcee8006610',
         user=u'jack@localhost')
@@ -1580,50 +1662,52 @@ class TaskApiTest(BaseTest):
     self.bot_poll()
     self.set_as_user()
     _, task_id = self.client_create_task_raw(
-        pubsub_topic='projects/abc/topics/def',
-        pubsub_userdata='blah')
+        pubsub_topic='projects/abc/topics/def', pubsub_userdata='blah')
     expected = {u'ok': True, u'was_running': False}
     response = self.call_api(
-        'cancel', body={'task_id': task_id, 'kill_running': False})
+        'cancel', body={
+            'task_id': task_id,
+            'kill_running': False
+        })
     self.assertEqual(expected, response.json)
 
     # determine that the task's state updates correctly
     expected = {
-      u'abandoned_ts': fmtdate(self.now),
-      u'completed_ts': fmtdate(self.now),
-      u'created_ts': fmtdate(self.now),
-      u'current_task_slice': u'0',
-      u'failure': False,
-      u'internal_failure': False,
-      u'modified_ts': fmtdate(self.now),
-      u'name': u'job1',
-      u'server_versions': [u'v1a'],
-      u'state': u'CANCELED',
-      u'tags': [
-        u'a:tag',
-        u'os:Amiga',
-        u'pool:default',
-        u'priority:20',
-        u'service_account:none',
-        u'swarming.pool.template:none',
-        u'swarming.pool.version:pools_cfg_rev',
-        u'user:joe@localhost',
-      ],
-      u'task_id': task_id,
-      u'user': u'joe@localhost',
+        u'abandoned_ts': fmtdate(self.now),
+        u'completed_ts': fmtdate(self.now),
+        u'created_ts': fmtdate(self.now),
+        u'current_task_slice': u'0',
+        u'failure': False,
+        u'internal_failure': False,
+        u'modified_ts': fmtdate(self.now),
+        u'name': u'job1',
+        u'server_versions': [u'v1a'],
+        u'state': u'CANCELED',
+        u'tags': [
+            u'a:tag',
+            u'os:Amiga',
+            u'pool:default',
+            u'priority:20',
+            u'service_account:none',
+            u'swarming.pool.template:none',
+            u'swarming.pool.version:pools_cfg_rev',
+            u'user:joe@localhost',
+        ],
+        u'task_id': task_id,
+        u'user': u'joe@localhost',
     }
     response = self.call_api('result', body={'task_id': task_id})
     self.assertEqual(expected, response.json)
 
     # notification has been sent.
     expected = [
-      {
-        'payload': '{"auth_token":null,"task_id":"5cee488008810",'
-                   '"topic":"projects/abc/topics/def","userdata":"blah"}',
-        'queue_name': 'pubsub',
-        'transactional': True,
-        'url': '/internal/taskqueue/pubsub/5cee488008810',
-      },
+        {
+            'payload': '{"auth_token":null,"task_id":"5cee488008810",'
+                       '"topic":"projects/abc/topics/def","userdata":"blah"}',
+            'queue_name': 'pubsub',
+            'transactional': True,
+            'url': '/internal/taskqueue/pubsub/5cee488008810',
+        },
     ]
 
   def test_cancel_forbidden(self):
@@ -1632,13 +1716,15 @@ class TaskApiTest(BaseTest):
     self.mock(random, 'getrandbits', lambda _: 0x88)
     self.set_as_admin()
     _, task_id = self.client_create_task_raw(
-        pubsub_topic='projects/abc/topics/def',
-        pubsub_userdata='blah')
+        pubsub_topic='projects/abc/topics/def', pubsub_userdata='blah')
 
     # Attempt to cancel as non-privileged user -> HTTP 403.
     self.set_as_user()
     self.call_api(
-        'cancel', body={'task_id': task_id, 'kill_running': False}, status=403)
+        'cancel', body={
+            'task_id': task_id,
+            'kill_running': False
+        }, status=403)
 
   def test_cancel_running(self):
     self.mock(random, 'getrandbits', lambda _: 0x88)
@@ -1652,15 +1738,16 @@ class TaskApiTest(BaseTest):
     params = self.do_handshake()
     data = self.post_json('/swarming/api/v1/bot/poll', params)
     run_id = data['manifest']['task_id']
+
     def _params(**kwargs):
       out = {
-        'cost_usd': 0.1,
-        'duration': None,
-        'exit_code': None,
-        'id': 'bot1',
-        'output': None,
-        'output_chunk_start': 0,
-        'task_id': run_id,
+          'cost_usd': 0.1,
+          'duration': None,
+          'exit_code': None,
+          'id': 'bot1',
+          'output': None,
+          'output_chunk_start': 0,
+          'task_id': run_id,
       }
       out.update(**kwargs)
       return out
@@ -1677,26 +1764,32 @@ class TaskApiTest(BaseTest):
         started_ts=fmtdate(self.now),
         state=u'RUNNING',
         tags=[
-          u'a:tag',
-          u'os:Amiga',
-          u'pool:default',
-          u'priority:20',
-          u'service_account:none',
-          u'swarming.pool.template:none',
-          u'swarming.pool.version:pools_cfg_rev',
-          u'user:joe@localhost',
+            u'a:tag',
+            u'os:Amiga',
+            u'pool:default',
+            u'priority:20',
+            u'service_account:none',
+            u'swarming.pool.template:none',
+            u'swarming.pool.version:pools_cfg_rev',
+            u'user:joe@localhost',
         ],
         try_number=u'1')
     self.assertEqual(expected, self.client_get_results(task_id))
 
     # Denied if kill_running == False.
     response = self.call_api(
-        'cancel', body={'task_id': task_id, 'kill_running': False})
+        'cancel', body={
+            'task_id': task_id,
+            'kill_running': False
+        })
     self.assertEqual({u'ok': False, u'was_running': True}, response.json)
 
     # Works if kill_running == True.
     response = self.call_api(
-        'cancel', body={'task_id': task_id, 'kill_running': True})
+        'cancel', body={
+            'task_id': task_id,
+            'kill_running': True
+        })
     self.assertEqual({u'ok': True, u'was_running': True}, response.json)
 
     self.set_as_bot()
@@ -1715,14 +1808,14 @@ class TaskApiTest(BaseTest):
         started_ts=fmtdate(self.now),
         state=u'RUNNING',
         tags=[
-          u'a:tag',
-          u'os:Amiga',
-          u'pool:default',
-          u'priority:20',
-          u'service_account:none',
-          u'swarming.pool.template:none',
-          u'swarming.pool.version:pools_cfg_rev',
-          u'user:joe@localhost',
+            u'a:tag',
+            u'os:Amiga',
+            u'pool:default',
+            u'priority:20',
+            u'service_account:none',
+            u'swarming.pool.template:none',
+            u'swarming.pool.version:pools_cfg_rev',
+            u'user:joe@localhost',
         ],
         try_number=u'1')
     self.assertEqual(expected, self.client_get_results(task_id))
@@ -1730,8 +1823,10 @@ class TaskApiTest(BaseTest):
     # Bot terminates the task.
     self.set_as_bot()
     params = _params(
-        output=base64.b64encode(' again'), output_chunk_start=6,
-        duration=0.1, exit_code=0)
+        output=base64.b64encode(' again'),
+        output_chunk_start=6,
+        duration=0.1,
+        exit_code=0)
     response = self.post_json('/swarming/api/v1/bot/task_update', params)
     self.assertEqual({u'must_stop': True, u'ok': True}, response)
 
@@ -1747,14 +1842,14 @@ class TaskApiTest(BaseTest):
         started_ts=fmtdate(self.now),
         state=u'KILLED',
         tags=[
-          u'a:tag',
-          u'os:Amiga',
-          u'pool:default',
-          u'priority:20',
-          u'service_account:none',
-          u'swarming.pool.template:none',
-          u'swarming.pool.version:pools_cfg_rev',
-          u'user:joe@localhost',
+            u'a:tag',
+            u'os:Amiga',
+            u'pool:default',
+            u'priority:20',
+            u'service_account:none',
+            u'swarming.pool.template:none',
+            u'swarming.pool.version:pools_cfg_rev',
+            u'user:joe@localhost',
         ],
         try_number=u'1')
     self.assertEqual(expected, self.client_get_results(task_id))
@@ -1765,7 +1860,7 @@ class TaskApiTest(BaseTest):
 
   def test_result_long(self):
     """Asserts that result raises 400 for wildly invalid task IDs."""
-    self.call_api('result', body={'task_id': '12310'*10}, status=400)
+    self.call_api('result', body={'task_id': '12310' * 10}, status=400)
 
   def test_result_ok(self):
     """Asserts that result produces a result entity."""
@@ -1778,26 +1873,26 @@ class TaskApiTest(BaseTest):
     _, task_id = self.client_create_task_raw()
     response = self.call_api('result', body={'task_id': task_id})
     expected = {
-      u'created_ts': fmtdate(self.now),
-      u'current_task_slice': u'0',
-      u'failure': False,
-      u'internal_failure': False,
-      u'modified_ts': fmtdate(self.now),
-      u'name': u'job1',
-      u'server_versions': [u'v1a'],
-      u'state': u'PENDING',
-      u'tags': [
-        u'a:tag',
-        u'os:Amiga',
-        u'pool:default',
-        u'priority:20',
-        u'service_account:none',
-        u'swarming.pool.template:none',
-        u'swarming.pool.version:pools_cfg_rev',
-        u'user:joe@localhost',
-      ],
-      u'task_id': u'5cee488008810',
-      u'user': u'joe@localhost',
+        u'created_ts': fmtdate(self.now),
+        u'current_task_slice': u'0',
+        u'failure': False,
+        u'internal_failure': False,
+        u'modified_ts': fmtdate(self.now),
+        u'name': u'job1',
+        u'server_versions': [u'v1a'],
+        u'state': u'PENDING',
+        u'tags': [
+            u'a:tag',
+            u'os:Amiga',
+            u'pool:default',
+            u'priority:20',
+            u'service_account:none',
+            u'swarming.pool.template:none',
+            u'swarming.pool.version:pools_cfg_rev',
+            u'user:joe@localhost',
+        ],
+        u'task_id': u'5cee488008810',
+        u'user': u'joe@localhost',
     }
     self.assertEqual(expected, response.json)
 
@@ -1843,8 +1938,10 @@ class TaskApiTest(BaseTest):
 
     expected[u'performance_stats'] = self.gen_perf_stats()
     response = self.call_api(
-        'result',
-        body={'task_id': task_id, 'include_performance_stats': True})
+        'result', body={
+            'task_id': task_id,
+            'include_performance_stats': True
+        })
     actual = response.json
     for k in ('isolated_download', 'isolated_upload'):
       for j in ('items_cold', 'items_hot'):
@@ -1939,27 +2036,27 @@ class TaskApiTest(BaseTest):
 
     expected_props = self.gen_props(
         command=[u'python', u'run_test.py'],
-        secret_bytes=u'PFJFREFDVEVEPg==') # <REDACTED> in base64
+        secret_bytes=u'PFJFREFDVEVEPg==')  # <REDACTED> in base64
     expected = self.gen_request(
         created_ts=fmtdate(self.now),
         properties=expected_props,
         service_account=u'service-account@example.com',
         tags=[
-          u'a:tag',
-          u'os:Amiga',
-          u'pool:default',
-          u'priority:20',
-          u'service_account:service-account@example.com',
-          u'swarming.pool.template:none',
-          u'swarming.pool.version:pools_cfg_rev',
-          u'user:joe@localhost',
+            u'a:tag',
+            u'os:Amiga',
+            u'pool:default',
+            u'priority:20',
+            u'service_account:service-account@example.com',
+            u'swarming.pool.template:none',
+            u'swarming.pool.version:pools_cfg_rev',
+            u'user:joe@localhost',
         ],
         task_slices=[
-          {
-            u'expiration_secs': u'86400',
-            u'properties': expected_props,
-            u'wait_for_capacity': False,
-          },
+            {
+                u'expiration_secs': u'86400',
+                u'properties': expected_props,
+                u'wait_for_capacity': False,
+            },
         ])
     response = self.call_api('request', body={'task_id': task_id})
     self.assertEqual(expected, response.json)
@@ -1978,25 +2075,43 @@ class QueuesApiTest(BaseTest):
     self.client_create_task_raw(
         properties={
             u'dimensions': [
-            {u'key': u'os', u'value': u'Amiga'},
-            {u'key': u'pool', u'value': u'default'},
-          ],
+                {
+                    u'key': u'os',
+                    u'value': u'Amiga'
+                },
+                {
+                    u'key': u'pool',
+                    u'value': u'default'
+                },
+            ],
         })
     self.mock_now(self.now, 1)
     self.client_create_task_raw(
         properties={
             u'dimensions': [
-            {u'key': u'os', u'value': u'Atari'},
-            {u'key': u'pool', u'value': u'template'},
-          ],
+                {
+                    u'key': u'os',
+                    u'value': u'Atari'
+                },
+                {
+                    u'key': u'pool',
+                    u'value': u'template'
+                },
+            ],
         })
     self.mock_now(self.now, 2)
     self.client_create_task_raw(
         properties={
             u'dimensions': [
-            {u'key': u'id', u'value': u'bot123'},
-            {u'key': u'pool', u'value': u'default'},
-          ],
+                {
+                    u'key': u'id',
+                    u'value': u'bot123'
+                },
+                {
+                    u'key': u'pool',
+                    u'value': u'default'
+                },
+            ],
         })
     # A termination task.
     self.mock_now(self.now, 3)
@@ -2004,8 +2119,8 @@ class QueuesApiTest(BaseTest):
     self.bot_poll()
     self.mock_now(self.now, 4)
     self.set_as_privileged_user()
-    self.endpoint_call(
-        handlers_endpoints.SwarmingBotService, 'terminate', {'bot_id': 'bot1'})
+    self.endpoint_call(handlers_endpoints.SwarmingBotService, 'terminate',
+                       {'bot_id': 'bot1'})
 
     # There's four task queues.
     self.assertEqual(4, task_queues.TaskDimensions.query().count())
@@ -2013,19 +2128,19 @@ class QueuesApiTest(BaseTest):
     # Only three are returned, in two pages due to limit=2.
     self.mock_now(self.now, 5)
     expected = {
-      u'items': [
-        {
-          u'dimensions': [u'id:bot123', u'pool:default'],
-          # This is a function of expiration_secs and
-          # task_queues._EXTEND_VALIDITY.
-          u'valid_until_ts': u'2010-01-03T07:14:07',
-        },
-        {
-          u'dimensions': [u'os:Amiga', u'pool:default'],
-          u'valid_until_ts': u'2010-01-03T07:14:05',
-        },
-      ],
-      u'now': u'2010-01-02T03:04:10',
+        u'items': [
+            {
+                u'dimensions': [u'id:bot123', u'pool:default'],
+                # This is a function of expiration_secs and
+                # task_queues._EXTEND_VALIDITY.
+                u'valid_until_ts': u'2010-01-03T07:14:07',
+            },
+            {
+                u'dimensions': [u'os:Amiga', u'pool:default'],
+                u'valid_until_ts': u'2010-01-03T07:14:05',
+            },
+        ],
+        u'now': u'2010-01-02T03:04:10',
     }
     request = handlers_endpoints.TaskQueuesRequest.combined_message_class(
         limit=2)
@@ -2035,13 +2150,11 @@ class QueuesApiTest(BaseTest):
     self.assertEqual(expected, actual)
 
     expected = {
-      u'items': [
-        {
-          u'dimensions': [u'os:Atari', u'pool:template'],
-          u'valid_until_ts': u'2010-01-03T07:14:06',
-        },
-      ],
-      u'now': u'2010-01-02T03:04:10',
+        u'items': [{
+            u'dimensions': [u'os:Atari', u'pool:template'],
+            u'valid_until_ts': u'2010-01-03T07:14:06',
+        },],
+        u'now': u'2010-01-02T03:04:10',
     }
     request = handlers_endpoints.TaskQueuesRequest.combined_message_class(
         cursor=cursor, limit=2)
@@ -2066,74 +2179,98 @@ class BotsApiTest(BaseTest):
     _bot_event('request_sleep', bot_id='id2', quarantined=True)
     _bot_event('request_sleep', bot_id='id4', maintenance_msg='very busy')
     bot1 = {
-      u'authenticated_as': u'bot:whitelisted-ip',
-      u'bot_id': u'id1',
-      u'deleted': False,
-      u'dimensions': [
-        {u'key': u'id', u'value': [u'id1']},
-        {u'key': u'pool', u'value': [u'default']},
-      ],
-      u'external_ip': u'8.8.4.4',
-      u'first_seen_ts': fmtdate(self.now),
-      u'is_dead': False,
-      u'last_seen_ts': fmtdate(self.now),
-      u'quarantined': False,
-      u'state': u'{"ram":65}',
-      u'version': u'123456789',
+        u'authenticated_as': u'bot:whitelisted-ip',
+        u'bot_id': u'id1',
+        u'deleted': False,
+        u'dimensions': [
+            {
+                u'key': u'id',
+                u'value': [u'id1']
+            },
+            {
+                u'key': u'pool',
+                u'value': [u'default']
+            },
+        ],
+        u'external_ip': u'8.8.4.4',
+        u'first_seen_ts': fmtdate(self.now),
+        u'is_dead': False,
+        u'last_seen_ts': fmtdate(self.now),
+        u'quarantined': False,
+        u'state': u'{"ram":65}',
+        u'version': u'123456789',
     }
     bot2 = {
-      u'authenticated_as': u'bot:whitelisted-ip',
-      u'bot_id': u'id2',
-      u'deleted': False,
-      u'dimensions': [
-        {u'key': u'id', u'value': [u'id2']},
-        {u'key': u'pool', u'value': [u'default']},
-      ],
-      u'external_ip': u'8.8.4.4',
-      u'first_seen_ts': fmtdate(self.now),
-      u'is_dead': False,
-      u'last_seen_ts': fmtdate(self.now),
-      u'quarantined': True,
-      u'state': u'{"ram":65}',
-      u'version': u'123456789',
+        u'authenticated_as': u'bot:whitelisted-ip',
+        u'bot_id': u'id2',
+        u'deleted': False,
+        u'dimensions': [
+            {
+                u'key': u'id',
+                u'value': [u'id2']
+            },
+            {
+                u'key': u'pool',
+                u'value': [u'default']
+            },
+        ],
+        u'external_ip': u'8.8.4.4',
+        u'first_seen_ts': fmtdate(self.now),
+        u'is_dead': False,
+        u'last_seen_ts': fmtdate(self.now),
+        u'quarantined': True,
+        u'state': u'{"ram":65}',
+        u'version': u'123456789',
     }
     bot3 = {
-      u'authenticated_as': u'bot:whitelisted-ip',
-      u'bot_id': u'id3',
-      u'deleted': False,
-      u'dimensions': [
-        {u'key': u'id', u'value': [u'id3']},
-        {u'key': u'pool', u'value': [u'default']},
-      ],
-      u'external_ip': u'8.8.4.4',
-      u'first_seen_ts': fmtdate(then, DATETIME_NO_MICRO),
-      u'is_dead': False,
-      u'last_seen_ts': fmtdate(then, DATETIME_NO_MICRO),
-      u'quarantined': False,
-      u'state': u'{"ram":65}',
-      u'version': u'123456789',
+        u'authenticated_as': u'bot:whitelisted-ip',
+        u'bot_id': u'id3',
+        u'deleted': False,
+        u'dimensions': [
+            {
+                u'key': u'id',
+                u'value': [u'id3']
+            },
+            {
+                u'key': u'pool',
+                u'value': [u'default']
+            },
+        ],
+        u'external_ip': u'8.8.4.4',
+        u'first_seen_ts': fmtdate(then, DATETIME_NO_MICRO),
+        u'is_dead': False,
+        u'last_seen_ts': fmtdate(then, DATETIME_NO_MICRO),
+        u'quarantined': False,
+        u'state': u'{"ram":65}',
+        u'version': u'123456789',
     }
     bot4 = {
-      u'authenticated_as': u'bot:whitelisted-ip',
-      u'bot_id': u'id4',
-      u'deleted': False,
-      u'dimensions': [
-        {u'key': u'id', u'value': [u'id4']},
-        {u'key': u'pool', u'value': [u'default']},
-      ],
-      u'external_ip': u'8.8.4.4',
-      u'first_seen_ts': fmtdate(self.now),
-      u'is_dead': False,
-      u'last_seen_ts': fmtdate(self.now),
-      u'quarantined': False,
-      u'maintenance_msg': 'very busy',
-      u'state': u'{"ram":65}',
-      u'version': u'123456789',
+        u'authenticated_as': u'bot:whitelisted-ip',
+        u'bot_id': u'id4',
+        u'deleted': False,
+        u'dimensions': [
+            {
+                u'key': u'id',
+                u'value': [u'id4']
+            },
+            {
+                u'key': u'pool',
+                u'value': [u'default']
+            },
+        ],
+        u'external_ip': u'8.8.4.4',
+        u'first_seen_ts': fmtdate(self.now),
+        u'is_dead': False,
+        u'last_seen_ts': fmtdate(self.now),
+        u'quarantined': False,
+        u'maintenance_msg': 'very busy',
+        u'state': u'{"ram":65}',
+        u'version': u'123456789',
     }
     expected = {
-      u'items': [bot1, bot2, bot3, bot4],
-      u'death_timeout': unicode(config.settings().bot_death_timeout_secs),
-      u'now': fmtdate(self.now),
+        u'items': [bot1, bot2, bot3, bot4],
+        u'death_timeout': unicode(config.settings().bot_death_timeout_secs),
+        u'now': fmtdate(self.now),
     }
     # All bots should be returned with no params
     request = handlers_endpoints.BotsRequest.combined_message_class()
@@ -2215,8 +2352,7 @@ class BotsApiTest(BaseTest):
     self.assertEqual(expected, response.json)
     # is_dead:true can be paired with other dimensions and still work
     request = handlers_endpoints.BotsRequest.combined_message_class(
-        is_dead=swarming_rpcs.ThreeStateBool.TRUE,
-        dimensions=['pool:default'])
+        is_dead=swarming_rpcs.ThreeStateBool.TRUE, dimensions=['pool:default'])
     response = self.call_api('list', body=message_to_dict(request))
     self.assertEqual(expected, response.json)
     # only 1 bot is "ready for work"
@@ -2250,8 +2386,7 @@ class BotsApiTest(BaseTest):
     # is_dead:true can be paired with other non-existing dimensions and
     # still work
     request = handlers_endpoints.BotsRequest.combined_message_class(
-        is_dead=swarming_rpcs.ThreeStateBool.TRUE,
-        dimensions=['not:existing'])
+        is_dead=swarming_rpcs.ThreeStateBool.TRUE, dimensions=['not:existing'])
     response = self.call_api('list', body=message_to_dict(request))
     self.assertEqual(expected, response.json)
     # No bot is both dead and quarantined
@@ -2276,12 +2411,12 @@ class BotsApiTest(BaseTest):
     _bot_event('request_sleep', bot_id='id2', quarantined=True)
     _bot_event('request_sleep', bot_id='id4', maintenance_msg='very busy')
     expected = {
-      u'count': u'4',
-      u'quarantined': u'2',
-      u'maintenance': u'1',
-      u'dead': u'0',
-      u'busy': u'1',
-      u'now': unicode(self.now.strftime(DATETIME_NO_MICRO)),
+        u'count': u'4',
+        u'quarantined': u'2',
+        u'maintenance': u'1',
+        u'dead': u'0',
+        u'busy': u'1',
+        u'now': unicode(self.now.strftime(DATETIME_NO_MICRO)),
     }
     request = handlers_endpoints.BotsRequest.combined_message_class()
     response = self.call_api('count', body=message_to_dict(request))
@@ -2292,12 +2427,12 @@ class BotsApiTest(BaseTest):
     self.assertEqual(expected, response.json)
 
     expected = {
-      u'count': u'1',
-      u'quarantined': u'0',
-      u'maintenance': u'0',
-      u'dead': u'0',
-      u'busy': u'1',
-      u'now': unicode(self.now.strftime(DATETIME_NO_MICRO)),
+        u'count': u'1',
+        u'quarantined': u'0',
+        u'maintenance': u'0',
+        u'dead': u'0',
+        u'busy': u'1',
+        u'now': unicode(self.now.strftime(DATETIME_NO_MICRO)),
     }
     request = handlers_endpoints.BotsRequest.combined_message_class(
         dimensions=['pool:default', 'id:id1'])
@@ -2329,12 +2464,12 @@ class BotsApiTest(BaseTest):
         dimensions=['not:existing'])
     response = self.call_api('count', body=message_to_dict(request))
     expected = {
-      u'count': u'0',
-      u'quarantined': u'0',
-      u'maintenance': u'0',
-      u'dead': u'0',
-      u'busy': u'0',
-      u'now': unicode(self.now.strftime(DATETIME_NO_MICRO)),
+        u'count': u'0',
+        u'quarantined': u'0',
+        u'maintenance': u'0',
+        u'dead': u'0',
+        u'busy': u'0',
+        u'now': unicode(self.now.strftime(DATETIME_NO_MICRO)),
     }
     self.assertEqual(expected, response.json)
 
@@ -2350,24 +2485,24 @@ class BotsApiTest(BaseTest):
         key=bot_management.DimensionAggregation.KEY,
         dimensions=[
             bot_management.DimensionValues(
-              dimension='foo', values=['alpha', 'beta']),
+                dimension='foo', values=['alpha', 'beta']),
             bot_management.DimensionValues(
-              dimension='bar', values=['gamma', 'delta', 'epsilon']),
+                dimension='bar', values=['gamma', 'delta', 'epsilon']),
         ],
         ts=self.now).put()
 
     expected = {
-      u'bots_dimensions': [
-        {
-          u'key': u'foo',
-          u'value': [u'alpha', u'beta'],
-        },
-        {
-          u'key': u'bar',
-          u'value': [u'gamma', u'delta', u'epsilon'],
-        },
-      ],
-      u'ts': unicode(self.now.strftime(DATETIME_NO_MICRO)),
+        u'bots_dimensions': [
+            {
+                u'key': u'foo',
+                u'value': [u'alpha', u'beta'],
+            },
+            {
+                u'key': u'bar',
+                u'value': [u'gamma', u'delta', u'epsilon'],
+            },
+        ],
+        u'ts': unicode(self.now.strftime(DATETIME_NO_MICRO)),
     }
 
     self.assertEqual(expected, self.call_api('dimensions', body={}).json)
@@ -2386,21 +2521,27 @@ class BotApiTest(BaseTest):
     _bot_event('request_sleep', bot_id='id1', maintenance_msg='very busy')
 
     expected = {
-      u'authenticated_as': u'bot:whitelisted-ip',
-      u'bot_id': u'id1',
-      u'deleted': False,
-      u'dimensions': [
-        {u'key': u'id', u'value': [u'id1']},
-        {u'key': u'pool', u'value': [u'default']},
-      ],
-      u'external_ip': u'8.8.4.4',
-      u'first_seen_ts': fmtdate(self.now),
-      u'is_dead': False,
-      u'last_seen_ts': fmtdate(self.now),
-      u'maintenance_msg': u'very busy',
-      u'quarantined': False,
-      u'state': u'{"ram":65}',
-      u'version': u'123456789',
+        u'authenticated_as': u'bot:whitelisted-ip',
+        u'bot_id': u'id1',
+        u'deleted': False,
+        u'dimensions': [
+            {
+                u'key': u'id',
+                u'value': [u'id1']
+            },
+            {
+                u'key': u'pool',
+                u'value': [u'default']
+            },
+        ],
+        u'external_ip': u'8.8.4.4',
+        u'first_seen_ts': fmtdate(self.now),
+        u'is_dead': False,
+        u'last_seen_ts': fmtdate(self.now),
+        u'maintenance_msg': u'very busy',
+        u'quarantined': False,
+        u'state': u'{"ram":65}',
+        u'version': u'123456789',
     }
     response = self.call_api('get', body={'bot_id': 'id1'})
     self.assertEqual(expected, response.json)
@@ -2411,21 +2552,27 @@ class BotApiTest(BaseTest):
     _bot_event('request_sleep', bot_id='id1', maintenance_msg='very busy')
 
     expected = {
-      u'authenticated_as': u'bot:whitelisted-ip',
-      u'bot_id': u'id1',
-      u'deleted': False,
-      u'dimensions': [
-        {u'key': u'id', u'value': [u'id1']},
-        {u'key': u'pool', u'value': [u'default']},
-      ],
-      u'external_ip': u'8.8.4.4',
-      u'first_seen_ts': fmtdate(self.now),
-      u'is_dead': False,
-      u'last_seen_ts': fmtdate(self.now),
-      u'quarantined': False,
-      u'maintenance_msg': u'very busy',
-      u'state': u'{"ram":65}',
-      u'version': u'123456789',
+        u'authenticated_as': u'bot:whitelisted-ip',
+        u'bot_id': u'id1',
+        u'deleted': False,
+        u'dimensions': [
+            {
+                u'key': u'id',
+                u'value': [u'id1']
+            },
+            {
+                u'key': u'pool',
+                u'value': [u'default']
+            },
+        ],
+        u'external_ip': u'8.8.4.4',
+        u'first_seen_ts': fmtdate(self.now),
+        u'is_dead': False,
+        u'last_seen_ts': fmtdate(self.now),
+        u'quarantined': False,
+        u'maintenance_msg': u'very busy',
+        u'state': u'{"ram":65}',
+        u'version': u'123456789',
     }
     response = self.call_api('get', body={'bot_id': 'id1'})
     self.assertEqual(expected, response.json)
@@ -2444,19 +2591,25 @@ class BotApiTest(BaseTest):
 
     # Get it. Should still return a ghost version.
     expected = {
-      u'authenticated_as': u'bot:whitelisted-ip',
-      u'bot_id': u'id1',
-      u'deleted': True,
-      u'dimensions': [
-        {u'key': u'id', u'value': [u'id1']},
-        {u'key': u'pool', u'value': [u'default']},
-      ],
-      u'external_ip': u'8.8.4.4',
-      u'is_dead': False,
-      u'last_seen_ts': u'2010-01-02T03:04:05',
-      u'quarantined': False,
-      u'state': u'{"foo":0}',
-      u'version': u'123456789',
+        u'authenticated_as': u'bot:whitelisted-ip',
+        u'bot_id': u'id1',
+        u'deleted': True,
+        u'dimensions': [
+            {
+                u'key': u'id',
+                u'value': [u'id1']
+            },
+            {
+                u'key': u'pool',
+                u'value': [u'default']
+            },
+        ],
+        u'external_ip': u'8.8.4.4',
+        u'is_dead': False,
+        u'last_seen_ts': u'2010-01-02T03:04:05',
+        u'quarantined': False,
+        u'state': u'{"foo":0}',
+        u'version': u'123456789',
     }
     resp = self.call_api('get', body={'bot_id': 'id1'})
     self.assertEqual(expected, resp.json)
@@ -2466,10 +2619,12 @@ class BotApiTest(BaseTest):
     self.set_as_admin()
     self.mock(acl, '_is_admin', lambda *_args, **_kwargs: True)
     state = {
-      'dict': {'random': 'values'},
-      'float': 0.,
-      'list': ['of', 'things'],
-      'str': u'uni',
+        'dict': {
+            'random': 'values'
+        },
+        'float': 0.,
+        'list': ['of', 'things'],
+        'str': u'uni',
     }
     _bot_event('request_sleep', bot_id='id1', state=state)
 
@@ -2503,10 +2658,10 @@ class BotApiTest(BaseTest):
         exit_code=1, task_id=res['manifest']['task_id'])
     self.assertEqual({u'must_stop': False, u'ok': True}, response)
 
-    start = utils.datetime_to_timestamp(
-        self.now + datetime.timedelta(seconds=0.5)) / 1000000.
-    end = utils.datetime_to_timestamp(
-        now_1 + datetime.timedelta(seconds=0.5)) / 1000000.
+    start = utils.datetime_to_timestamp(self.now + datetime.timedelta(
+        seconds=0.5)) / 1000000.
+    end = utils.datetime_to_timestamp(now_1 + datetime.timedelta(
+        seconds=0.5)) / 1000000.
 
     self.set_as_privileged_user()
     request = handlers_endpoints.BotTasksRequest.combined_message_class(
@@ -2514,23 +2669,23 @@ class BotApiTest(BaseTest):
     body = message_to_dict(request)
     response = self.call_api('tasks', body=body)
     expected = {
-      u'items': [
-        self.gen_run_result(
-            completed_ts=fmtdate(now_1),
-            costs_usd=[0.1],
-            created_ts=fmtdate(now_1),
-            duration=0.1,
-            exit_code=u'1',
-            failure=True,
-            modified_ts=fmtdate(now_1),
-            name=u'philbert',
-            performance_stats=self.gen_perf_stats(),
-            run_id=u'5cee870005511',
-            started_ts=fmtdate(now_1),
-            state=u'COMPLETED',
-            task_id=u'5cee870005511'),
-      ],
-      u'now': fmtdate(now_1),
+        u'items': [
+            self.gen_run_result(
+                completed_ts=fmtdate(now_1),
+                costs_usd=[0.1],
+                created_ts=fmtdate(now_1),
+                duration=0.1,
+                exit_code=u'1',
+                failure=True,
+                modified_ts=fmtdate(now_1),
+                name=u'philbert',
+                performance_stats=self.gen_perf_stats(),
+                run_id=u'5cee870005511',
+                started_ts=fmtdate(now_1),
+                state=u'COMPLETED',
+                task_id=u'5cee870005511'),
+        ],
+        u'now': fmtdate(now_1),
     }
     actual = response.json
     for k in ('isolated_download', 'isolated_upload'):
@@ -2545,7 +2700,6 @@ class BotApiTest(BaseTest):
           bot_id='bot1', include_performance_stats=True, sort=sort)
       body = message_to_dict(request)
       response = self.call_api('tasks', body=body)
-
 
   def test_events(self):
     # Run one task, push an event manually.
@@ -2571,18 +2725,27 @@ class BotApiTest(BaseTest):
     self.set_as_privileged_user()
     body = message_to_dict(
         handlers_endpoints.BotEventsRequest.combined_message_class(
-            bot_id='bot1', start=start, end=end+1))
+            bot_id='bot1', start=start, end=end + 1))
     response = self.call_api('events', body=body)
     dimensions = [
-      {u'key': u'id', u'value': [u'bot1']},
-      {u'key': u'os', u'value': [u'Amiga']},
-      {u'key': u'pool', u'value': [u'default']},
+        {
+            u'key': u'id',
+            u'value': [u'bot1']
+        },
+        {
+            u'key': u'os',
+            u'value': [u'Amiga']
+        },
+        {
+            u'key': u'pool',
+            u'value': [u'default']
+        },
     ]
     state_dict = {
-      'bot_group_cfg_version': 'default',
-      'running_time': 1234.,
-      'sleep_streak': 0,
-      'started_ts': 1410990411.111,
+        'bot_group_cfg_version': 'default',
+        'running_time': 1234.,
+        'sleep_streak': 0,
+        'started_ts': 1410990411.111,
     }
     state = unicode(
         json.dumps(state_dict, sort_keys=True, separators=(',', ':')))
@@ -2590,61 +2753,61 @@ class BotApiTest(BaseTest):
     state_no_cfg_ver = unicode(
         json.dumps(state_dict, sort_keys=True, separators=(',', ':')))
     expected = {
-      u'items': [
-        {
-          u'authenticated_as': u'bot:whitelisted-ip',
-          u'dimensions': dimensions,
-          u'event_type': u'bot_rebooting',
-          u'external_ip': unicode(self.source_ip),
-          u'message': u'for the best',
-          u'quarantined': False,
-          u'state': state,
-          u'ts': fmtdate(now_60),
-          u'version': unicode(self.bot_version),
-        },
-        {
-          u'authenticated_as': u'bot:whitelisted-ip',
-          u'dimensions': dimensions,
-          u'event_type': u'task_completed',
-          u'external_ip': unicode(self.source_ip),
-          u'quarantined': False,
-          u'state': state,
-          u'task_id': u'5cee488008811',
-          u'ts': fmtdate(now_60),
-          u'version': unicode(self.bot_version),
-        },
-        {
-          u'authenticated_as': u'bot:whitelisted-ip',
-          u'dimensions': dimensions,
-          u'event_type': u'request_task',
-          u'external_ip': unicode(self.source_ip),
-          u'quarantined': False,
-          u'state': state,
-          u'task_id': u'5cee488008811',
-          u'ts': fmtdate(self.now),
-          u'version': unicode(self.bot_version),
-        },
-        {
-          u'authenticated_as': u'bot:whitelisted-ip',
-          u'dimensions': dimensions,
-          u'event_type': u'request_sleep',
-          u'external_ip': unicode(self.source_ip),
-          u'quarantined': False,
-          u'state': state,
-          u'ts': fmtdate(self.now),
-          u'version': unicode(self.bot_version),
-        },
-        {
-          u'authenticated_as': u'bot:whitelisted-ip',
-          u'dimensions': dimensions,
-          u'event_type': u'bot_connected',
-          u'external_ip': unicode(self.source_ip),
-          u'quarantined': False,
-          u'state': state_no_cfg_ver,
-          u'ts': fmtdate(self.now),
-          u'version': u'123',
-        },
-      ],
+        u'items': [
+            {
+                u'authenticated_as': u'bot:whitelisted-ip',
+                u'dimensions': dimensions,
+                u'event_type': u'bot_rebooting',
+                u'external_ip': unicode(self.source_ip),
+                u'message': u'for the best',
+                u'quarantined': False,
+                u'state': state,
+                u'ts': fmtdate(now_60),
+                u'version': unicode(self.bot_version),
+            },
+            {
+                u'authenticated_as': u'bot:whitelisted-ip',
+                u'dimensions': dimensions,
+                u'event_type': u'task_completed',
+                u'external_ip': unicode(self.source_ip),
+                u'quarantined': False,
+                u'state': state,
+                u'task_id': u'5cee488008811',
+                u'ts': fmtdate(now_60),
+                u'version': unicode(self.bot_version),
+            },
+            {
+                u'authenticated_as': u'bot:whitelisted-ip',
+                u'dimensions': dimensions,
+                u'event_type': u'request_task',
+                u'external_ip': unicode(self.source_ip),
+                u'quarantined': False,
+                u'state': state,
+                u'task_id': u'5cee488008811',
+                u'ts': fmtdate(self.now),
+                u'version': unicode(self.bot_version),
+            },
+            {
+                u'authenticated_as': u'bot:whitelisted-ip',
+                u'dimensions': dimensions,
+                u'event_type': u'request_sleep',
+                u'external_ip': unicode(self.source_ip),
+                u'quarantined': False,
+                u'state': state,
+                u'ts': fmtdate(self.now),
+                u'version': unicode(self.bot_version),
+            },
+            {
+                u'authenticated_as': u'bot:whitelisted-ip',
+                u'dimensions': dimensions,
+                u'event_type': u'bot_connected',
+                u'external_ip': unicode(self.source_ip),
+                u'quarantined': False,
+                u'state': state_no_cfg_ver,
+                u'ts': fmtdate(self.now),
+                u'version': u'123',
+            },
+        ],
         u'now': fmtdate(now_60),
     }
     self.assertEqual(expected, response.json)
@@ -2652,7 +2815,7 @@ class BotApiTest(BaseTest):
     # Now test with a subset.
     body = message_to_dict(
         handlers_endpoints.BotEventsRequest.combined_message_class(
-            bot_id='bot1', start=end, end=end+1))
+            bot_id='bot1', start=end, end=end + 1))
     response = self.call_api('events', body=body)
     expected['items'] = expected['items'][:2]
     self.assertEqual(expected, response.json)
