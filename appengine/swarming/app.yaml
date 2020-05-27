@@ -86,15 +86,17 @@ libraries:
 - name: webob
   version: "1.2.3"
 
-# Keep this list in sync with module-backend.yaml
+# Keep this list in sync with service-backend.yaml
 skip_files:
 # Test and tools.
-- support/
-- ^tests/
+- (.*/|^)test_support/.*
+- .*/test/.*
+- .+_test\.py$
+- ^tool_support/
 - ^tools/
+- support/
 - test.py$
 - test_.+
-- .+_test\.py$
 # Junk files.
 - ^(.*/)?\..*
 - .+\.orig$

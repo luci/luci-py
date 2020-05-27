@@ -44,11 +44,14 @@ libraries:
 # Keep this list in sync with app.yaml
 skip_files:
 # Test and tools.
-- support/
-- ^tests/
-- ^tools/
-- test_.+
+- (.*/|^)test_support/.*
+- .*/test/.*
 - .+_test\.py$
+- ^tool_support/
+- ^tools/
+- support/
+- test.py$
+- test_.+
 # Junk files.
 - ^(.*/)?\..*
 - .+\.orig$
