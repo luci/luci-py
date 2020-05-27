@@ -396,13 +396,13 @@ class TaskResultApiTest(TestCase):
     self.mock(ts_mon_metrics, 'on_task_completed', on_task_completed)
 
     @ndb.tasklet
-    def nop_async(_):
+    def nop_async(_run_id, _update_token):
       pass
 
     with mock.patch('server.resultdb.finalize_invocation_async',
                     mock.Mock(side_effect=nop_async)) as mocked:
       summary.put()
-      mocked.assert_called_once_with('1d69b9f088008811')
+      mocked.assert_called_once_with('1d69b9f088008811', 'secret')
 
   def test_result_summary_post_hook_sends_metric_at_no_resource_failure(self):
     request = _gen_request()

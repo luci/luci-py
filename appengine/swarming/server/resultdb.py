@@ -41,14 +41,16 @@ def create_invocation_async(task_run_id):
 
 
 @ndb.tasklet
-def finalize_invocation_async(task_run_id):
+def finalize_invocation_async(task_run_id, update_token):
   """This is wrapper for FinalizeInvocation API."""
 
   try:
     invocation_name = get_invocation_name(task_run_id)
-    yield _call_resultdb_recorder_api_async('FinalizeInvocation', {
-        'name': invocation_name,
-    })
+    yield _call_resultdb_recorder_api_async(
+        'FinalizeInvocation', {
+            'name': invocation_name,
+        },
+        headers={'update-token': update_token})
   except net.Error:
     logging.exception('Failed to finalize %s', invocation_name)
 
@@ -66,7 +68,10 @@ def _get_invocation_id(task_run_id):
 
 
 @ndb.tasklet
-def _call_resultdb_recorder_api_async(method, request, response_headers=None):
+def _call_resultdb_recorder_api_async(method,
+                                      request,
+                                      headers=None,
+                                      response_headers=None):
   cfg = config.settings()
   rdb_url = cfg.resultdb.server
   assert rdb_url, 'ResultDB integration is not configured'
@@ -80,4 +85,5 @@ def _call_resultdb_recorder_api_async(method, request, response_headers=None):
       method='POST',
       payload=request,
       scopes=[net.EMAIL_SCOPE],
+      headers=headers,
       response_headers=response_headers)

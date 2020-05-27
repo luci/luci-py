@@ -1110,7 +1110,8 @@ class TaskResultSummary(_TaskResultCommon):
     if self.request.resultdb_update_token:
       run_id = task_pack.pack_run_result_key(self.run_result_key)
       # TODO(crbug.com/1065139): remove get_result() if ndb.toplevel works fine.
-      resultdb.finalize_invocation_async(run_id).get_result()
+      resultdb.finalize_invocation_async(
+          run_id, self.request.resultdb_update_token).get_result()
 
   def _send_job_completed_metric(self):
     """Sends metric 'job/completed'"""
