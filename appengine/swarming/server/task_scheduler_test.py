@@ -2495,6 +2495,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
             service_accounts=frozenset(service_accounts or []),
             service_accounts_groups=tuple(service_accounts_groups or []),
             realm=None,
+            enforced_realm_permissions=frozenset(),
             task_template_deployment=None,
             bot_monitoring=None,
             default_isolate=None,

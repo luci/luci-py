@@ -51,6 +51,8 @@ PoolConfig = collections.namedtuple(
         'service_accounts_groups',
         # Pool realm,
         'realm',
+        # Set of enforced realm permission enums.
+        'enforced_realm_permissions',
         # resolved TaskTemplateDeployment (optional).
         'task_template_deployment',
         # resolved BotMonitoring.
@@ -601,6 +603,7 @@ def _fetch_pools_config():
           service_accounts=frozenset(msg.allowed_service_account),
           service_accounts_groups=tuple(msg.allowed_service_account_group),
           realm=msg.realm if msg.realm else None,
+          enforced_realm_permissions=frozenset(msg.enforced_realm_permissions),
           task_template_deployment=_resolve_deployment(ctx, msg, template_map,
                                                        deployment_map),
           bot_monitoring=bot_monitorings.get(name),
@@ -713,6 +716,7 @@ def bootstrap_dev_server_acls():
                   service_accounts=frozenset(),
                   service_accounts_groups=tuple(),
                   realm=None,
+                  enforced_realm_permissions=frozenset(),
                   task_template_deployment=None,
                   bot_monitoring=None,
                   default_isolate=None,

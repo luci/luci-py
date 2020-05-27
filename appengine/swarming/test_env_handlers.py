@@ -188,6 +188,7 @@ class AppTestBase(test_case.TestCase):
                       service_accounts=frozenset(service_accounts),
                       service_accounts_groups=(),
                       realm=None,
+                      enforced_realm_permissions=frozenset(),
                       task_template_deployment=pools_config
                       .TaskTemplateDeployment(
                           prod=pools_config.TaskTemplate(
@@ -229,6 +230,7 @@ class AppTestBase(test_case.TestCase):
                       service_accounts=frozenset(service_accounts),
                       service_accounts_groups=(),
                       realm=None,
+                      enforced_realm_permissions=frozenset(),
                       task_template_deployment=None,
                       bot_monitoring=None,
                       default_isolate=default_isolate,

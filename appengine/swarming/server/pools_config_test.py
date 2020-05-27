@@ -19,6 +19,7 @@ from test_support import test_case
 
 from proto.config import config_pb2
 from proto.config import pools_pb2
+from proto.config import realms_pb2
 from server import pools_config
 from server import task_request
 
@@ -49,6 +50,9 @@ TEST_CONFIG = pools_pb2.PoolsCfg(
                 'accounts_group2',
             ],
             realm='test:pool/realm',
+            enforced_realm_permissions=[
+                realms_pb2.REALM_PERMISSION_POOLS_CREATE_TASK,
+            ],
             bot_monitoring='bots',
             external_schedulers=[
                 pools_pb2.ExternalSchedulerConfig(
@@ -121,6 +125,8 @@ class PoolsConfigTest(test_case.TestCase):
         service_accounts=frozenset([u'a2@example.com', u'a1@example.com']),
         service_accounts_groups=(u'accounts_group1', u'accounts_group2'),
         realm='test:pool/realm',
+        enforced_realm_permissions=frozenset(
+            [realms_pb2.REALM_PERMISSION_POOLS_CREATE_TASK]),
         task_template_deployment=None,
         bot_monitoring=None,
         default_isolate=pools_config.IsolateServer(

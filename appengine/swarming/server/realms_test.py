@@ -36,11 +36,30 @@ _PERM_TASKS_RUN_AS = auth.Permission('swarming.tasks.runAs')
 
 
 def _gen_task_request_mock(realm='test:realm'):
-  mocked = mock.create_autospec(task_request.TaskRequest, spec_set=True)()
+  mocked = mock.create_autospec(
+      task_request.TaskRequest, spec_set=True, instance=True)
   mocked.max_lifetime_secs = 1
   mocked.service_account = 'test@test-service-accounts.iam.gserviceaccount.com'
   mocked.realm = realm
   return mocked
+
+
+def _gen_pool_config(realm='test:pool/realm', enforced_realm_permissions=()):
+  return pools_config.PoolConfig(
+      name='default',
+      rev='pools_cfg_rev',
+      scheduling_users=frozenset([]),
+      scheduling_groups=frozenset(),
+      trusted_delegatees={},
+      service_accounts=frozenset([]),
+      service_accounts_groups=(),
+      realm=realm,
+      enforced_realm_permissions=frozenset(enforced_realm_permissions),
+      task_template_deployment=None,
+      bot_monitoring=None,
+      default_isolate=None,
+      default_cipd=None,
+      external_schedulers=None)
 
 
 class RealmsTest(test_case.TestCase):
@@ -69,25 +88,19 @@ class RealmsTest(test_case.TestCase):
       (
           False,
           config_pb2.SettingsCfg(),
-          pools_pb2.Pool(),
+          _gen_pool_config(),
       ),
       # should return True if the permission is enforced in the pool.
-      (
-          True,
-          config_pb2.SettingsCfg(),
-          pools_pb2.Pool(enforced_realm_permissions=[
-              realms_pb2.REALM_PERMISSION_POOLS_CREATE_TASK
-          ])
-      ),
+      (True, config_pb2.SettingsCfg(),
+       _gen_pool_config(enforced_realm_permissions=[
+           realms_pb2.REALM_PERMISSION_POOLS_CREATE_TASK
+       ])),
       # return True if the permission is enforced globally.
-      (
-          True,
-          config_pb2.SettingsCfg(
-              auth=config_pb2.AuthSettings(enforced_realm_permissions=[
-                  realms_pb2.REALM_PERMISSION_POOLS_CREATE_TASK
-          ])),
-          pools_pb2.Pool()
-      ),
+      (True,
+       config_pb2.SettingsCfg(
+           auth=config_pb2.AuthSettings(enforced_realm_permissions=[
+               realms_pb2.REALM_PERMISSION_POOLS_CREATE_TASK
+           ])), _gen_pool_config()),
   ])
   def test_is_enforced_permission(self, expected, settings_cfg, pool_cfg):
     self.mock(config, '_get_settings', lambda: (None, settings_cfg))
@@ -102,12 +115,12 @@ class RealmsTest(test_case.TestCase):
   def _mock_for_check_pools_create_task(self, pool_realm='test:pool'):
     self.mock(realms, 'is_enforced_permission', lambda *_: True)
     self.mock(pools_config,
-              'get_pool_config', lambda _: pools_pb2.Pool(realm=pool_realm))
+              'get_pool_config', lambda _: _gen_pool_config(realm=pool_realm))
 
   def test_check_pools_create_task_legacy_allowed(self):
     self._mock_for_check_pools_create_task_legacy(is_allowed_legacy=True)
     realms.check_pools_create_task('test_pool',
-                                   pools_pb2.Pool(realm='test:pool'))
+                                   _gen_pool_config(realm='test:pool'))
     self._has_permission_dryrun_mock.assert_called_once_with(
         _PERM_POOLS_CREATE_TASK, [u'test:pool'],
         True,
@@ -115,14 +128,14 @@ class RealmsTest(test_case.TestCase):
 
   def test_check_pools_create_task_legacy_allowed_no_pool_realm(self):
     self._mock_for_check_pools_create_task_legacy(is_allowed_legacy=True)
-    realms.check_pools_create_task('test_pool', pools_pb2.Pool())
+    realms.check_pools_create_task('test_pool', _gen_pool_config(realm=None))
     self._has_permission_dryrun_mock.assert_not_called()
 
   def test_check_pools_create_task_legacy_not_allowed(self):
     self._mock_for_check_pools_create_task_legacy(is_allowed_legacy=False)
     with self.assertRaises(auth.AuthorizationError):
       realms.check_pools_create_task('test_pool',
-                                     pools_pb2.Pool(realm='test:pool'))
+                                     _gen_pool_config(realm='test:pool'))
     self._has_permission_dryrun_mock.assert_called_once_with(
         _PERM_POOLS_CREATE_TASK, [u'test:pool'],
         False,
@@ -131,14 +144,14 @@ class RealmsTest(test_case.TestCase):
   def test_check_pools_create_task_legacy_not_allowed_no_pool_realm(self):
     self._mock_for_check_pools_create_task_legacy(is_allowed_legacy=False)
     with self.assertRaises(auth.AuthorizationError):
-      realms.check_pools_create_task('test_pool', pools_pb2.Pool())
+      realms.check_pools_create_task('test_pool', _gen_pool_config(realm=None))
     self._has_permission_dryrun_mock.assert_not_called()
 
   def test_check_pools_create_task_enforced_allowed(self):
     self._mock_for_check_pools_create_task()
     self._has_permission_mock.return_value = True
     realms.check_pools_create_task('test_pool',
-                                   pools_pb2.Pool(realm='test:pool'))
+                                   _gen_pool_config(realm='test:pool'))
     self._has_permission_mock.assert_called_once_with(_PERM_POOLS_CREATE_TASK,
                                                       [u'test:pool'])
 
@@ -147,7 +160,7 @@ class RealmsTest(test_case.TestCase):
     self._has_permission_mock.return_value = False
     with self.assertRaises(auth.AuthorizationError):
       realms.check_pools_create_task('test_pool',
-                                     pools_pb2.Pool(realm='test:pool'))
+                                     _gen_pool_config(realm='test:pool'))
     self._has_permission_mock.assert_called_once_with(_PERM_POOLS_CREATE_TASK,
                                                       [u'test:pool'])
 
