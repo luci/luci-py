@@ -493,41 +493,21 @@ class SwarmingTasksService(remote.Service):
       raise auth.AuthorizationError(
           'Can\'t submit tasks to pool "%s", not defined in pools.cfg' % pool)
 
+    # Set pool realm to task as a fallback.
+    if not request_obj.realm and pool_cfg.realm:
+      request_obj.realm = pools_cfg.realm
+
     # Realm permission 'swarming.pools.createInRealm' checks if the
-    # caller is allowed to create a task in the realm.
-    task_realm = request.realm if request.realm else pool_cfg.realm
-    realms.check_tasks_create_in_realm(task_realm)
+    # caller is allowed to create a task in the task realm.
+    realms.check_tasks_create_in_realm(request_obj.realm)
 
-    # TODO(crbug.com/1066839): replace check_schedule_request_acl with
-    # realms.check_pools_create_task and realms.check_tasks_run_as which
-    # internally calls legacy checks.
-    # Make sure the caller is actually allowed to schedule the task before
-    # asking the token server for a service account token.
-    task_scheduler.check_schedule_request_acl(request_obj)
+    # Realm permission 'swarming.pools.create' checks if the caller is allowed
+    # to create a task in the pool.
+    realms.check_pools_create_task(pool, pool_cfg)
 
-    # If request_obj.service_account is an email, contact the token server to
-    # generate "OAuth token grant" (or grab a cached one). By doing this we
-    # check that the given service account usage is allowed by the token server
-    # rules at the time the task is posted. This check is also performed later
-    # (when running the task), when we get the actual OAuth access token.
-    if service_accounts.is_service_account(request_obj.service_account):
-      if not service_accounts.has_token_server():
-        raise endpoints.BadRequestException(
-            'This Swarming server doesn\'t support task service accounts '
-            'because Token Server URL is not configured')
-      max_lifetime_secs = request_obj.max_lifetime_secs
-      try:
-        duration = datetime.timedelta(seconds=max_lifetime_secs)
-        request_obj.service_account_token = (
-            service_accounts.get_oauth_token_grant(
-                service_account=request_obj.service_account,
-                validity_duration=duration))
-      except service_accounts.PermissionError as exc:
-        raise auth.AuthorizationError(exc.message)
-      except service_accounts.MisconfigurationError as exc:
-        raise endpoints.BadRequestException(exc.message)
-      except service_accounts.InternalError as exc:
-        raise endpoints.InternalServerErrorException(exc.message)
+    # Realm permission 'swarming.tasks.runAs' checks if the service account is
+    # allowed to run in the task realm.
+    realms.check_tasks_run_as(request_obj)
 
     # If the user only wanted to evaluate scheduling the task, but not actually
     # schedule it, return early without a task_id.
