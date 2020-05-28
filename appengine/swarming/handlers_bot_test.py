@@ -995,7 +995,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
             u'sleep_streak': 0,
             u'started_ts': 1410990411.111,
         },
-        'task_id': u'',
+        'task_id': None,
         'ts': self.now,
         'version': u'123',
     })

@@ -2518,7 +2518,7 @@ class BotApiTest(BaseTest):
   def test_get_ok(self):
     """Asserts that get shows the tasks a specific bot has executed."""
     self.set_as_privileged_user()
-    _bot_event('request_sleep', bot_id='id1', maintenance_msg='very busy')
+    _bot_event('bot_connected', bot_id='id1', maintenance_msg='very busy')
 
     expected = {
         u'authenticated_as': u'bot:whitelisted-ip',
@@ -2583,7 +2583,7 @@ class BotApiTest(BaseTest):
     self.call_api('get', body={'bot_id': 'not_a_bot'}, status=404)
 
   def test_get_deleted_bot(self):
-    _bot_event('request_sleep', bot_id='id1', state={'foo': 0})
+    _bot_event('bot_connected', bot_id='id1', state={'foo': 0})
     # Delete the bot.
     self.set_as_admin()
     response = self.call_api('delete', body={'bot_id': 'id1'})

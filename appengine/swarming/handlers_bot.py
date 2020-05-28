@@ -469,7 +469,7 @@ class BotHandshakeHandler(_BotBaseHandler):
         version=res.version,
         quarantined=bool(res.quarantined_msg),
         maintenance_msg=res.maintenance_msg,
-        task_id='',
+        task_id=None,
         task_name=None,
         message=res.quarantined_msg,
         register_dimensions=False)

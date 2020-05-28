@@ -47,7 +47,7 @@ def _bot_event(bot_id=None,
   """Calls bot_management.bot_event with default arguments."""
   if not bot_id:
     bot_id = u'id1'
-  if not dimensions and kwargs.get('event_type') != 'bot_connected':
+  if not dimensions:
     dimensions = {
         u'id': [bot_id],
         u'os': [u'Ubuntu', u'Ubuntu-16.04'],
@@ -348,7 +348,7 @@ class BotManagementTest(test_case.TestCase):
 
   def test_get_events_query(self):
     _bot_event(event_type='bot_connected')
-    expected = [_gen_bot_event(event_type=u'bot_connected', dimensions={})]
+    expected = [_gen_bot_event(event_type=u'bot_connected')]
     self.assertEqual(
         expected,
         [i.to_dict() for i in bot_management.get_events_query('id1', True)])
@@ -402,8 +402,8 @@ class BotManagementTest(test_case.TestCase):
     self.assertEqual(expected, bot_info.to_dict())
 
     expected = [
-      _gen_bot_event(event_type=u'request_task', task_id=u'12311'),
-      _gen_bot_event(event_type=u'bot_connected', dimensions={}),
+        _gen_bot_event(event_type=u'request_task', task_id=u'12311'),
+        _gen_bot_event(event_type=u'bot_connected'),
     ]
     self.assertEqual(
         expected,
@@ -417,23 +417,40 @@ class BotManagementTest(test_case.TestCase):
     bot_id = 'id1'
     bot_info_key = bot_management.get_info_key(bot_id)
 
-    # 'bot_connected' event does not create BotInfo.
-    _bot_event(bot_id=bot_id, event_type='bot_connected')
-    self.assertIsNone(bot_info_key.get())
+    # bot dimensions generated without injected bot_config.py.
+    dimensions_invalid = {'id': ['id1'], 'os': ['Ubuntu'], 'pool': ['default']}
 
-    # 'bot_hook_log' event also does not create BotInfo.
-    _bot_event(bot_id=bot_id, event_type='bot_hook_log')
-    self.assertIsNone(bot_info_key.get())
-
-    # 'request_sleep' initializes BotInfo with given dimensions at first poll.
+    # 'bot_connected' event creates BotInfo only with id and pool dimensions.
     _bot_event(
+        bot_id=bot_id,
+        event_type='bot_connected',
+        dimensions=dimensions_invalid)
+    self.assertEqual(bot_info_key.get().dimensions_flat,
+                     [u'id:id1', u'pool:default'])
+
+    # 'bot_hook_log' event does not register dimensions other than id and pool.
+    _bot_event(
+        bot_id=bot_id, event_type='bot_hook_log', dimensions=dimensions_invalid)
+    self.assertEqual(bot_info_key.get().dimensions_flat,
+                     [u'id:id1', u'pool:default'])
+
+    # 'request_sleep' registers given dimensions to BotInfo.
+    _bot_event(
+        bot_id=bot_id,
         event_type='request_sleep',
-        dimensions={'id': ['id1'], 'os': ['Android'], 'pool': ['default']})
+        dimensions={
+            'id': ['id1'],
+            'os': ['Android'],
+            'pool': ['default']
+        })
     self.assertEqual(bot_info_key.get().dimensions_flat,
                      [u'id:id1', u'os:Android', u'pool:default'])
 
     # 'bot_connected' doesn't update dimensions since bot_config isn't injected.
-    _bot_event(event_type='bot_connected')
+    _bot_event(
+        bot_id=bot_id,
+        event_type='bot_connected',
+        dimensions=dimensions_invalid)
     self.assertEqual(bot_info_key.get().dimensions_flat,
                      [u'id:id1', u'os:Android', u'pool:default'])
 

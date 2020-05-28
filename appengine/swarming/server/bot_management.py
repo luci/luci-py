@@ -563,11 +563,15 @@ def bot_event(
   # Retrieve the previous BotInfo and update it.
   info_key = get_info_key(bot_id)
   bot_info = info_key.get()
-  # Create BotInfo only at the first poll. But update if it already
-  # exists.
-  store_bot_info = bot_info or event_type.startswith('request_')
   if not bot_info:
     bot_info = BotInfo(key=info_key)
+    # Register only id and pool dimensions at the first handshake.
+    dimensions_flat = task_queues.bot_dimensions_to_flat(dimensions)
+    bot_info.dimensions_flat = [
+        d for d in dimensions_flat
+        if d.startswith('id:') or d.startswith('pool:')
+    ]
+
   now = utils.utcnow()
   # bot_missing event is created by a server, not a bot.
   # So it shouldn't update last_seen_ts, external_ip, authenticated_as,
@@ -651,11 +655,7 @@ def bot_event(
         version=bot_info.version,
         **kwargs)
 
-    extra = []
-    if store_bot_info:
-      extra.append(bot_info)
-
-    datastore_utils.store_new_version(event, BotRoot, extra)
+    datastore_utils.store_new_version(event, BotRoot, [bot_info])
     return event.key
   finally:
     # Store the event in memcache to accelerate monitoring.
