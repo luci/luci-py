@@ -399,6 +399,29 @@ class TaskRequestApiTest(TestCase):
     with self.assertRaises(IndexError):
       task_request.get_automatic_tags(req, 2)
 
+  def test_get_automatic_tags_or_dim(self):
+    slices = [
+        task_request.TaskSlice(
+            expiration_secs=60,
+            properties=_gen_properties(dimensions={
+                u'gpu': [u'nv|amd'],
+                u'pool': [u'foo']
+            })),
+        task_request.TaskSlice(
+            expiration_secs=60,
+            properties=_gen_properties(dimensions={
+                u'os': [u'linux|mac|win'],
+                u'pool': [u'bar']
+            })),
+    ]
+    req = _gen_request_slices(task_slices=slices)
+    expected = set((u'gpu:nv', u'gpu:amd', u'pool:foo', u'priority:50',
+                    u'service_account:none', u'user:Jesus'))
+    self.assertEqual(expected, task_request.get_automatic_tags(req, 0))
+    expected = set((u'os:linux', u'os:mac', u'os:win', u'pool:bar',
+                    u'priority:50', u'service_account:none', u'user:Jesus'))
+    self.assertEqual(expected, task_request.get_automatic_tags(req, 1))
+
   def test_create_termination_task(self):
     request = task_request.create_termination_task(
         u'some-bot', wait_for_capacity=True)

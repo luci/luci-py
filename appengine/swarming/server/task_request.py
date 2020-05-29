@@ -1341,6 +1341,17 @@ class TaskRequest(ndb.Model):
 ### Private stuff.
 
 
+def _get_automatic_tags_from_slice(task_slice):
+  """Returns tags from the information of a given task slice.
+  """
+  tags = set()
+  for key, values in task_slice.properties.dimensions.items():
+    for value in values:
+      for v in value.split(OR_DIM_SEP):
+        tags.add(u'%s:%s' % (key, v))
+  return tags
+
+
 def _get_automatic_tags(request):
   """Returns tags that should automatically be added to the TaskRequest.
 
@@ -1352,9 +1363,7 @@ def _get_automatic_tags(request):
     u'user:%s' % (request.user or u'None'),
   ))
   for i in range(request.num_task_slices):
-    for key, values in request.task_slice(i).properties.dimensions.items():
-      for value in values:
-        tags.add(u'%s:%s' % (key, value))
+    tags.update(_get_automatic_tags_from_slice(request.task_slice(i)))
   return tags
 
 
@@ -1370,10 +1379,7 @@ def get_automatic_tags(request, index):
     u'service_account:%s' % (request.service_account or u'None'),
     u'user:%s' % (request.user or u'None'),
   ))
-  for key, values in request.task_slice(
-      index).properties.dimensions.items():
-    for value in values:
-      tags.add(u'%s:%s' % (key, value))
+  tags.update(_get_automatic_tags_from_slice(request.task_slice(index)))
   return tags
 
 
