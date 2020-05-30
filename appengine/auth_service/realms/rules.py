@@ -16,11 +16,6 @@ from realms import permissions
 from realms import validation
 
 
-def default_root():
-  """A @root realm to use if not explicitly defined in the config."""
-  return realms_config_pb2.Realm(name=common.ROOT_REALM)
-
-
 def expand_realms(db, project_id, realms_cfg):
   """Expands realms_config_pb2.RealmsCfg into a flat realms_pb2.Realms.
 
@@ -55,6 +50,9 @@ def expand_realms(db, project_id, realms_cfg):
   roles_expander = RolesExpander(db.roles, realms_cfg.custom_roles)
   # A helper to traverse the realms graph.
   realms_expander = RealmsExpander(roles_expander, realms_cfg.realms)
+
+  # This extends @root realm with additional implicit bindings.
+  realms_expander.extend_root(db.implicit_root_bindings(project_id))
 
   # Visit all realms and build preliminary bindings as pairs of
   # (a tuple with permission indexes, a list of principals who have them). The
@@ -164,8 +162,14 @@ class RealmsExpander(object):
   def __init__(self, roles, realms):
     self._roles = roles
     self._realms = {r.name: r for r in realms}
-    if common.ROOT_REALM not in self._realms:
-      self._realms[common.ROOT_REALM] = default_root()
+
+  def extend_root(self, bindings):
+    """Adds the given list of realms_config_pb2.Binding to the root realm."""
+    root = realms_config_pb2.Realm(name=common.ROOT_REALM)
+    if common.ROOT_REALM in self._realms:
+      root.CopyFrom(self._realms[common.ROOT_REALM])
+    root.bindings.extend(bindings)
+    self._realms[common.ROOT_REALM] = root
 
   @property
   def realm_names(self):

@@ -100,6 +100,11 @@ def validate_permission(db, perm, ctx):
 def validate_role_ref(db, name, custom_roles, ctx):
   """Emits errors and returns False if the role name is unrecognized."""
   if name.startswith(permissions.BUILTIN_ROLE_PREFIX):
+    if name.startswith(permissions.INTERNAL_ROLE_PREFIX):
+      ctx.error(
+          'the role "%s" is an internal role, it can\'t be used in the config',
+          name)
+      return False
     if name in db.roles:
       return True
     ctx.error(

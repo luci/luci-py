@@ -279,6 +279,18 @@ class ValidationTest(test_case.TestCase):
         ],
     })
 
+  def test_bindings_internal_role(self):
+    self.assert_has_error('is an internal role', {
+        'realms': [
+            {
+                'name': 'a',
+                'bindings': [
+                    {'role': 'role/luci.internal.system'},
+                ],
+            },
+        ],
+    })
+
   def test_bindings_bad_group_name(self):
     self.assert_has_error('invalid group name', {
         'realms': [

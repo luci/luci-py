@@ -9,13 +9,17 @@ import collections
 from components import utils
 from components.auth.proto import realms_pb2
 
+from proto import realms_config_pb2
+
 # Prefix for role names defined in the Auth service code.
 BUILTIN_ROLE_PREFIX = 'role/'
 # Prefix for role names that can be defined in user-supplied realms.cfg.
 CUSTOM_ROLE_PREFIX = 'customRole/'
+# Prefix for internally used roles that are forbidden in realms.cfg.
+INTERNAL_ROLE_PREFIX = 'role/luci.internal.'
 
 
-# Representation of all defined roles and permissions.
+# Representation of all defined roles, permissions and implicit bindings.
 #
 # Must be treated as immutable once constructed. Do not mess with it.
 #
@@ -26,9 +30,10 @@ CUSTOM_ROLE_PREFIX = 'customRole/'
 DB = collections.namedtuple(
     'DB',
     [
-        'revision',     # an arbitrary string identifying a particular version
-        'permissions',  # a dict {permission str => realms_pb2.Permission}
-        'roles',        # a dict {full role name str => Role}
+        'revision',       # an arbitrary string identifying a particular version
+        'permissions',    # a dict {permission str => realms_pb2.Permission}
+        'roles',          # a dict {full role name str => Role}
+        'implicit_root_bindings',  # f(proj_id) -> [realms_config_pb2.Binding]
     ])
 
 # Represents a single role.
@@ -115,6 +120,27 @@ def db():
       permission('swarming.pools.createTask'),
   ])
 
+  # This role is implicitly granted to identity "project:X" in all realms of
+  # the project X (and only it!). See below. Identity "project:X" is used by
+  # RPCs when one LUCI micro-service calls another in a context of some project.
+  # Thus this role authorizes various internal RPCs between LUCI micro-services
+  # when they are scoped to a single project.
+  role('role/luci.internal.system', [
+      # Allow Swarming to use realm accounts.
+      include('role/luci.serviceAccountTokenCreator'),
+      # Allow Buildbucket to trigger Swarming tasks and use project's pools.
+      include('role/swarming.realmUser'),
+      include('role/swarming.poolUser'),
+  ])
+
+  # Bindings implicitly added into the root realm of every project.
+  builder.implicit_root_bindings = lambda project_id: [
+      realms_config_pb2.Binding(
+          role='role/luci.internal.system',
+          principals=['project:'+project_id],
+      ),
+  ]
+
   return builder.finish()
 
 
@@ -128,6 +154,7 @@ class Builder(object):
     self.revision = revision
     self.permissions = set()  # set of str with all permissions
     self.roles = {}  # role name => set of str with permissions
+    self.implicit_root_bindings = lambda _: []  # see DB.implicit_root_bindings
 
   def permission(self, name):
     """Defines a permission if it hasn't been defined before.
@@ -188,4 +215,5 @@ class Builder(object):
         roles={
             name: Role(name=name, permissions=tuple(sorted(perms)))
             for name, perms in self.roles.items()
-        })
+        },
+        implicit_root_bindings=self.implicit_root_bindings)

@@ -20,7 +20,7 @@ from realms import permissions
 from realms import rules
 
 
-def test_db():
+def test_db(implicit_root_bindings=False):
   b = permissions.Builder('auth-code-rev')
   b.role('role/dev.a', [
       b.permission('luci.dev.p1'),
@@ -41,6 +41,16 @@ def test_db():
       b.permission('luci.dev.p5'),
       b.permission('luci.dev.unused'),
   ])
+  b.role('role/implicitRoot', [
+      b.permission('luci.dev.implicitRoot'),
+  ])
+  if implicit_root_bindings:
+    b.implicit_root_bindings = lambda project_id: [
+        realms_config_pb2.Binding(
+            role='role/implicitRoot',
+            principals=['project:'+project_id],
+        ),
+    ]
   return b.finish()
 
 
@@ -112,9 +122,11 @@ def binding(role, *principals):
 
 
 class ExpandRealmsTest(test_case.TestCase):
-  def expand(self, cfg):
+  def expand(self, cfg, implicit_root_bindings=False):
     out = rules.expand_realms(
-        test_db(), 'p', realms_config_pb2.RealmsCfg(**cfg))
+        test_db(implicit_root_bindings),
+        'p',
+        realms_config_pb2.RealmsCfg(**cfg))
     return json_format.MessageToDict(out)
 
   def test_fails_validation(self):
@@ -356,6 +368,102 @@ class ExpandRealmsTest(test_case.TestCase):
                     {
                         'permissions': [4],
                         'principals': [u'group:gr5'],
+                    },
+                ],
+            },
+        ],
+    })
+
+  def test_implicit_root_bindings_no_root(self):
+    cfg = {
+        'realms': [
+            {
+                'name': 'r',
+                'bindings': [
+                    binding('role/dev.a', 'group:gr'),
+                ],
+            },
+        ],
+    }
+    self.assertEqual(self.expand(cfg, implicit_root_bindings=True), {
+        'permissions': [
+            {'name': u'luci.dev.implicitRoot'},
+            {'name': u'luci.dev.p1'},
+            {'name': u'luci.dev.p2'},
+        ],
+        'realms': [
+            {
+                'name': u'p:@root',
+                'bindings': [
+                    {
+                        'permissions': [0],
+                        'principals': [u'project:p'],
+                    },
+                ],
+            },
+            {
+                'name': u'p:r',
+                'bindings': [
+                    {
+                        'permissions': [0],
+                        'principals': [u'project:p'],
+                    },
+                    {
+                        'permissions': [1, 2],
+                        'principals': [u'group:gr'],
+                    },
+                ],
+            },
+        ],
+    })
+
+  def test_implicit_root_bindings_with_root(self):
+    cfg = {
+        'realms': [
+            {
+                'name': '@root',
+                'bindings': [
+                    binding('role/dev.a', 'group:gr1'),
+                ],
+            },
+            {
+                'name': 'r',
+                'bindings': [
+                    binding('role/dev.a', 'group:gr2'),
+                ],
+            },
+        ],
+    }
+    self.assertEqual(self.expand(cfg, implicit_root_bindings=True), {
+        'permissions': [
+            {'name': u'luci.dev.implicitRoot'},
+            {'name': u'luci.dev.p1'},
+            {'name': u'luci.dev.p2'},
+        ],
+        'realms': [
+            {
+                'name': u'p:@root',
+                'bindings': [
+                    {
+                        'permissions': [0],
+                        'principals': [u'project:p'],
+                    },
+                    {
+                        'permissions': [1, 2],
+                        'principals': [u'group:gr1'],
+                    },
+                ],
+            },
+            {
+                'name': u'p:r',
+                'bindings': [
+                    {
+                        'permissions': [0],
+                        'principals': [u'project:p'],
+                    },
+                    {
+                        'permissions': [1, 2],
+                        'principals': [u'group:gr1', u'group:gr2'],
                     },
                 ],
             },

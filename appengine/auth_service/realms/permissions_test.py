@@ -10,8 +10,9 @@ import unittest
 import test_env
 test_env.setup_test_env()
 
-from test_support import test_case
+from proto import realms_config_pb2
 from realms import permissions
+from test_support import test_case
 
 
 class BuilderTest(test_case.TestCase):
@@ -91,7 +92,9 @@ class BuilderTest(test_case.TestCase):
 class HardcodedDBTest(test_case.TestCase):
 
   def test_can_be_built(self):
-    permissions.db()
+    db = permissions.db()
+    for b in db.implicit_root_bindings('proj'):
+      self.assertIsInstance(b, realms_config_pb2.Binding)
 
 
 if __name__ == '__main__':
