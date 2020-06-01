@@ -330,7 +330,7 @@ describe('bot-list', function() {
             expect(tds.length).toBe(2);
             expect(tds[0]).toMatchTextContent('Alive:');
             expect(tds[0].innerHTML).toContain(encodeURIComponent('status:alive'));
-            expect(tds[1]).toMatchTextContent('426');
+            expect(tds[1]).toMatchTextContent('429');
             const link = $$('a', tds[0]);
             expect(link.href).toContain('f=status%3Aalive');
             // the following happens if links are constructed poorly.
