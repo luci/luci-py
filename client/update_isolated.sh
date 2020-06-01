@@ -18,7 +18,8 @@ filter="Roll luci-go from "
 target_revision=$(git log --grep "${filter}" --oneline -n 1 \
                       --pretty=format:"%H" origin/master DEPS)
 logs=$(git --no-pager log --grep "${filter}" --no-decorate \
-       --oneline "${current_revision}..${target_revision}" DEPS)
+           "${current_revision}..${target_revision}" DEPS | \
+           grep -E '^    202[0-9]-[0-9]{2,2}-[0-9]{2,2} ')
 popd
 
 # check existence of package.
