@@ -1422,7 +1422,11 @@ def main(args):
     named_cache = process_named_cache_options(parser, options)
 
   # TODO(crbug.com/932396): Remove this.
-  use_go_isolated = options.cipd_enabled
+  use_go_isolated = (
+      options.cipd_enabled and
+      # TODO(crbug.com/1045281): windows other than win10 has flaky connection
+      # issue.
+      (sys.platform != 'win32' or platform.release() == '10'))
 
   # TODO(maruel): CIPD caches should be defined at an higher level here too, so
   # they can be cleaned the same way.
