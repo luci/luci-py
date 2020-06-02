@@ -1159,7 +1159,7 @@ describe('bot-list', function() {
           'limit': 256,
           'filters': ['pool:Skia','os:Android', 'status:alive'],
           'output':  'dimensions=pool%3ASkia&dimensions=os%3AAndroid'+
-                     '&in_maintenance=FALSE&is_dead=FALSE&limit=256&quarantined=FALSE',
+                     '&is_dead=FALSE&limit=256',
         },
         { // no filters
           'limit': 123,

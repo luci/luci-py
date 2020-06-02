@@ -121,7 +121,7 @@ export const specialFilters = {
       return bot.is_dead;
     } else {
       // Status must be 'alive'.
-      return !bot.quarantined && !bot.is_dead;
+      return !bot.is_dead;
     }
   },
   task: function(bot, task) {
@@ -246,8 +246,6 @@ export function listQueryParams(filters, limit, cursor) {
     if (col === 'status') {
       if (rest === 'alive') {
         params['is_dead'] = ['FALSE'];
-        params['quarantined'] = ['FALSE'];
-        params['in_maintenance'] = ['FALSE'];
       } else if (rest === 'quarantined') {
         params['quarantined'] = ['TRUE'];
       } else if (rest === 'maintenance') {
