@@ -126,18 +126,42 @@ def db():
   role('role/cq.committer', [])
   role('role/cq.dryRunner', [])
 
+  # ResultDB permissions and roles. (crbug.com/1013316)
+  role('role/resultdb.invocationCreator', [
+      permission('resultdb.invocations.create'),
+      permission('resultdb.invocations.update'),
+  ])
+  role('role/resultdb.trustedInvocationCreator', [
+      include('role/resultdb.invocationCreator'),
+      permission('resultdb.invocations.setProducerResource'),
+  ])
+  role('role/resultdb.resultsUploader', [
+      permission('resultdb.testResults.create'),
+      permission('resultdb.artifacts.create'),
+      permission('resultdb.testExonerations.create'),
+  ])
+  role('role/resultdb.reader', [
+      permission('resultdb.invocations.read'),
+      permission('resultdb.testResults.read'),
+      permission('resultdb.artifacts.read'),
+      permission('resultdb.testExonerations.read'),
+  ])
+
   # This role is implicitly granted to identity "project:X" in all realms of
   # the project X (and only it!). See below. Identity "project:X" is used by
   # RPCs when one LUCI micro-service calls another in a context of some project.
   # Thus this role authorizes various internal RPCs between LUCI micro-services
   # when they are scoped to a single project.
-  role('role/luci.internal.system', [
-      # Allow Swarming to use realm accounts.
-      include('role/luci.serviceAccountTokenCreator'),
-      # Allow Buildbucket to trigger Swarming tasks and use project's pools.
-      include('role/swarming.realmUser'),
-      include('role/swarming.poolUser'),
-  ])
+  role(
+      'role/luci.internal.system',
+      [
+          # Allow Swarming to use realm accounts.
+          include('role/luci.serviceAccountTokenCreator'),
+          # Allow Buildbucket to trigger Swarming tasks and use project's pools.
+          include('role/swarming.realmUser'),
+          include('role/swarming.poolUser'),
+          include('role/resultdb.trustedInvocationCreator'),
+      ])
 
   # Bindings implicitly added into the root realm of every project.
   builder.implicit_root_bindings = lambda project_id: [
