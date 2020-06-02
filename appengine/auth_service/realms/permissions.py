@@ -58,21 +58,6 @@ def db():
   include = builder.include
   role = builder.role
 
-  # Used for adhoc testing only. Will likely be deleted once we have some real
-  # permissions and roles.
-  role('role/dev.testing1', [
-      permission('luci.dev.testing1'),
-      permission('luci.dev.testing2'),
-  ])
-  role('role/dev.testing2', [
-      permission('luci.dev.testing2'),
-      permission('luci.dev.testing3'),
-  ])
-  role('role/dev.testing3', [
-      include('role/dev.testing1'),
-      include('role/dev.testing2'),
-  ])
-
   # LUCI Token Server permissions and roles (crbug.com/1082960).
   role('role/luci.realmServiceAccount', [
       permission('luci.serviceAccounts.existInRealm'),
@@ -109,7 +94,7 @@ def db():
 
   # Swarming permissions and roles (crbug.com/1066839).
   # See swarming/proto/config/realms.proto for more details.
-  role('role/swarming.taskAccount', [
+  role('role/swarming.taskServiceAccount', [
       include('role/luci.realmServiceAccount'),
       permission('swarming.tasks.runAs'),
   ])
@@ -119,6 +104,27 @@ def db():
   role('role/swarming.poolUser', [
       permission('swarming.pools.createTask'),
   ])
+
+  # LogDog permissions and roles. Placeholders for now.
+  role('role/logdog.reader', [])
+  role('role/logdog.writer', [])
+
+  # Buildbucket permissions and roles. Mostly placeholders for now.
+  role('role/buildbucket.reader', [])
+  role('role/buildbucket.triggerer', [
+      include('role/buildbucket.reader'),
+  ])
+  role('role/buildbucket.owner', [
+      include('role/buildbucket.reader'),
+      include('role/buildbucket.triggerer'),
+  ])
+  role('role/buildbucket.builderServiceAccount', [
+      include('role/swarming.taskServiceAccount'),
+  ])
+
+  # CQ permissions and roles. Placeholders for now.
+  role('role/cq.committer', [])
+  role('role/cq.dryRunner', [])
 
   # This role is implicitly granted to identity "project:X" in all realms of
   # the project X (and only it!). See below. Identity "project:X" is used by
