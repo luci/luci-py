@@ -114,7 +114,7 @@ message Pool {
   // Realm name that the pool is associated with.
   //
   // e.g.
-  // 'infra:pool/flext/try' for 'luci.flex.try' pool
+  // 'infra:pool/flex/try' for 'luci.flex.try' pool
   //
   // See also
   // https://chromium.googlesource.com/infra/luci/luci-go/+/HEAD/server/auth/service/protocol/components/auth/proto/realms.proto
