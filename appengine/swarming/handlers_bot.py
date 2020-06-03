@@ -562,19 +562,22 @@ class BotPollHandler(_BotBaseHandler):
       bot_event('request_update')
       self._cmd_update(expected_version)
       return
-    if quarantined:
-      bot_event('request_sleep')
-      self._cmd_sleep(sleep_streak, quarantined)
-      return
 
     # If the server-side per-bot config for the bot has changed, we need
     # to restart this particular bot, so it picks up new config in /handshake.
     # Do this check only for bots that know about server-side per-bot configs
     # already (such bots send 'bot_group_cfg_version' state attribute).
     cur_bot_cfg_ver = res.state.get('bot_group_cfg_version')
+    logging.debug('bot_config version: %s, latest: %s', cur_bot_cfg_ver,
+                  res.bot_group_cfg.version)
     if cur_bot_cfg_ver and cur_bot_cfg_ver != res.bot_group_cfg.version:
       bot_event('request_restart')
       self._cmd_bot_restart('Restarting to pick up new bots.cfg config')
+      return
+
+    if quarantined:
+      bot_event('request_sleep')
+      self._cmd_sleep(sleep_streak, quarantined)
       return
 
     #

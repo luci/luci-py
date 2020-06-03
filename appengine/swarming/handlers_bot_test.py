@@ -314,12 +314,12 @@ class BotApiTest(test_env_handlers.AppTestBase):
 
   def test_poll_bad_version(self):
     params = self.do_handshake()
-    old_version = params['version']
+    latest_version = params['version']
     params['version'] = 'badversion'
     response = self.post_json('/swarming/api/v1/bot/poll', params)
     expected = {
         u'cmd': u'update',
-        u'version': old_version,
+        u'version': latest_version,
     }
     self.assertEqual(expected, response)
 
@@ -358,6 +358,18 @@ class BotApiTest(test_env_handlers.AppTestBase):
   def test_poll_bot_group_config_change(self):
     params = self.do_handshake()
     params['state']['bot_group_cfg_version'] = 'badversion'
+    response = self.post_json('/swarming/api/v1/bot/poll', params)
+    expected = {
+        u'cmd': u'bot_restart',
+        u'message': u'Restarting to pick up new bots.cfg config',
+    }
+    self.assertEqual(expected, response)
+
+  def test_poll_bot_group_config_change_with_quarantined_flag(self):
+    params = self.do_handshake()
+    params['state']['bot_group_cfg_version'] = 'badversion'
+    params['state']['quarantined'] = True
+
     response = self.post_json('/swarming/api/v1/bot/poll', params)
     expected = {
         u'cmd': u'bot_restart',
