@@ -495,7 +495,7 @@ class SwarmingTasksService(remote.Service):
 
     # Set pool realm to task as a fallback.
     if not request_obj.realm and pool_cfg.realm:
-      request_obj.realm = pools_cfg.realm
+      request_obj.realm = pool_cfg.realm
 
     # Realm permission 'swarming.pools.createInRealm' checks if the
     # caller is allowed to create a task in the task realm.
