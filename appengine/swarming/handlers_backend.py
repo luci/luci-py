@@ -470,8 +470,5 @@ def get_routes():
   return [webapp2.Route(*a) for a in routes]
 
 
-def create_application(debug, ndb_toplevel=True):
-  app = webapp2.WSGIApplication(get_routes(), debug=debug)
-  if ndb_toplevel:
-    return ndb.toplevel(app)
-  return app
+def create_application(debug):
+  return webapp2.WSGIApplication(get_routes(), debug=debug)

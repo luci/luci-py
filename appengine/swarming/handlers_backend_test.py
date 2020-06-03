@@ -11,9 +11,6 @@ import os
 import sys
 import unittest
 
-import mock
-import six
-
 # Sets up environment.
 import test_env_handlers
 
@@ -40,22 +37,19 @@ class BackendTest(test_env_handlers.AppTestBase):
   def _GetRoutes(self, prefix):
     """Returns the list of all routes handled."""
     return [
-        r for r in self.app.app.__wrapped__.router.match_routes
+        r for r in self.app.app.router.match_routes
         if r.template.startswith(prefix)
     ]
 
   def setUp(self):
     super(BackendTest, self).setUp()
-    with mock.patch('functools.wraps', six.wraps):
-      # This is to use __wrapped__ in python2.
-
-      # By default requests in tests are coming from bot with fake IP.
-      self.app = webtest.TestApp(
-          handlers_backend.create_application(True),
-          extra_environ={
-              'REMOTE_ADDR': self.source_ip,
-              'SERVER_SOFTWARE': os.environ['SERVER_SOFTWARE'],
-          })
+    # By default requests in tests are coming from bot with fake IP.
+    self.app = webtest.TestApp(
+        handlers_backend.create_application(True),
+        extra_environ={
+          'REMOTE_ADDR': self.source_ip,
+          'SERVER_SOFTWARE': os.environ['SERVER_SOFTWARE'],
+        })
     self._enqueue_task_orig = self.mock(
         utils, 'enqueue_task', self._enqueue_task)
     self._enqueue_task_async_orig = self.mock(utils, 'enqueue_task_async',

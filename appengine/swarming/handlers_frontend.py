@@ -13,8 +13,6 @@ import os
 
 import webapp2
 
-from google.appengine.ext import ndb
-
 import handlers_bot
 import handlers_endpoints
 import template
@@ -194,12 +192,9 @@ def get_routes():
   return [webapp2.Route(*i) for i in routes]
 
 
-def create_application(debug, ndb_toplevel=True):
+def create_application(debug):
   routes = []
   routes.extend(get_routes())
   routes.extend(handlers_bot.get_routes())
   routes.extend(handlers_endpoints.get_routes())
-  app = webapp2.WSGIApplication(routes, debug=debug)
-  if ndb_toplevel:
-    return ndb.toplevel(app)
-  return app
+  return webapp2.WSGIApplication(routes, debug=debug)

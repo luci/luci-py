@@ -53,10 +53,10 @@ class PRPCTest(test_env_handlers.AppTestBase):
     # handlers_bot is necessary to run fake tasks.
     routes = handlers_prpc.get_routes() + handlers_bot.get_routes()
     self.app = webtest.TestApp(
-        ndb.toplevel(webapp2.WSGIApplication(routes, debug=True)),
+        webapp2.WSGIApplication(routes, debug=True),
         extra_environ={
-            'REMOTE_ADDR': self.source_ip,
-            'SERVER_SOFTWARE': os.environ['SERVER_SOFTWARE'],
+          'REMOTE_ADDR': self.source_ip,
+          'SERVER_SOFTWARE': os.environ['SERVER_SOFTWARE'],
         },
     )
     self._headers = {

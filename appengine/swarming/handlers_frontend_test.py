@@ -10,9 +10,6 @@ import os
 import sys
 import unittest
 
-import mock
-import six
-
 # Sets up environment.
 import test_env_handlers
 
@@ -27,17 +24,13 @@ class FrontendTest(test_env_handlers.AppTestBase):
   def setUp(self):
     super(FrontendTest, self).setUp()
     template.bootstrap()
-
-    with mock.patch('functools.wraps', six.wraps):
-      # This is to use __wrapped__ in python2.
-
-      # By default requests in tests are coming from bot with fake IP.
-      self.app = webtest.TestApp(
-          handlers_frontend.create_application(True),
-          extra_environ={
-              'REMOTE_ADDR': self.source_ip,
-              'SERVER_SOFTWARE': os.environ['SERVER_SOFTWARE'],
-          })
+    # By default requests in tests are coming from bot with fake IP.
+    self.app = webtest.TestApp(
+        handlers_frontend.create_application(True),
+        extra_environ={
+          'REMOTE_ADDR': self.source_ip,
+          'SERVER_SOFTWARE': os.environ['SERVER_SOFTWARE'],
+        })
 
   def tearDown(self):
     try:
@@ -78,7 +71,7 @@ class FrontendTest(test_env_handlers.AppTestBase):
     ])
 
     # Grab the set of all routes.
-    app = self.app.app.__wrapped__
+    app = self.app.app
     routes = set(app.router.match_routes)
     routes.update(app.router.build_routes.values())
 
