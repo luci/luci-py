@@ -26,9 +26,9 @@ import six
 
 _LOGGER = logging.getLogger(__name__)
 
-# _ENV_KEY is the environment variable that we look for to find out where the
+# ENV_KEY is the environment variable that we look for to find out where the
 # LUCI context file is.
-_ENV_KEY = 'LUCI_CONTEXT'
+ENV_KEY = 'LUCI_CONTEXT'
 
 # _CUR_CONTEXT contains the cached LUCI Context that is currently available to
 # read. A value of None indicates that the value has not yet been populated.
@@ -111,7 +111,7 @@ def _initial_load():
   global _CUR_CONTEXT
   to_assign = {}
 
-  ctx_path = os.environ.get(_ENV_KEY)
+  ctx_path = os.environ.get(ENV_KEY)
   if ctx_path:
     if six.PY2:
       ctx_path = ctx_path.decode(sys.getfilesystemencoding())
@@ -249,19 +249,19 @@ def write(_leak=False, _tmpdir=None, **section_values):
     with _tf(new_val, leak=_leak, workdir=_tmpdir) as name:
       try:
         old_value = _CUR_CONTEXT
-        old_envvar = os.environ.get(_ENV_KEY, None)
+        old_envvar = os.environ.get(ENV_KEY, None)
         if six.PY2:
-          os.environ[_ENV_KEY] = name.encode(sys.getfilesystemencoding())
+          os.environ[ENV_KEY] = name.encode(sys.getfilesystemencoding())
         else:
-          os.environ[_ENV_KEY] = name
+          os.environ[ENV_KEY] = name
         _CUR_CONTEXT = new_val
         yield
       finally:
         _CUR_CONTEXT = old_value
         if old_envvar is None:
-          del os.environ[_ENV_KEY]
+          del os.environ[ENV_KEY]
         else:
-          os.environ[_ENV_KEY] = old_envvar
+          os.environ[ENV_KEY] = old_envvar
   finally:
     _WRITE_LOCK.release()
 

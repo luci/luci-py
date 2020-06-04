@@ -19,7 +19,7 @@ from libs.luci_context import luci_context
 
 class TestLuciContext(unittest.TestCase):
   def setUp(self):
-    self.ek = luci_context._ENV_KEY
+    self.ek = luci_context.ENV_KEY
     # Makes all logged messages go into unittest's buffer to be revealed on test
     # failure.
     logging.root.handlers[0].stream = sys.stdout
@@ -150,5 +150,5 @@ class TestLuciContext(unittest.TestCase):
 if __name__ == '__main__':
   # Pop it out of the environment to make sure we start clean.
   logging.basicConfig()
-  os.environ.pop(luci_context._ENV_KEY, None)
+  os.environ.pop(luci_context.ENV_KEY, None)
   unittest.main(buffer=True)
