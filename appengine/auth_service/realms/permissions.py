@@ -135,11 +135,6 @@ def db():
       include('role/resultdb.invocationCreator'),
       permission('resultdb.invocations.setProducerResource'),
   ])
-  role('role/resultdb.resultsUploader', [
-      permission('resultdb.testResults.create'),
-      permission('resultdb.artifacts.create'),
-      permission('resultdb.testExonerations.create'),
-  ])
   role('role/resultdb.reader', [
       permission('resultdb.invocations.read'),
       permission('resultdb.testResults.read'),
