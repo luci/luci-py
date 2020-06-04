@@ -555,9 +555,6 @@ class _UnixDomainSocketStreamClient(StreamClient):
     def fileno(self):
       return self._sock
 
-    def fileno(self):
-      return self._fd
-
     def write(self, data):
       self._sock.sendall(data)
 
