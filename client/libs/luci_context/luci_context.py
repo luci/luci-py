@@ -41,7 +41,7 @@ _WRITE_LOCK = threading.RLock()
 
 
 @contextlib.contextmanager
-def _tf(data, data_raw=False, workdir=None):
+def _tf(data, data_raw=False, leak=False, workdir=None):
   tf = tempfile.NamedTemporaryFile(
       mode='w', prefix='luci_ctx.', suffix='.json', delete=False, dir=workdir)
   _LOGGER.debug('Writing LUCI_CONTEXT file %r', tf.name)
@@ -54,11 +54,12 @@ def _tf(data, data_raw=False, workdir=None):
     tf.close()  # close it so that winders subprocesses can read it.
     yield tf.name
   finally:
-    try:
-      os.unlink(tf.name)
-    except OSError as ex:
-      _LOGGER.error(
-        'Failed to delete written LUCI_CONTEXT file %r: %s', tf.name, ex)
+    if not leak:
+      try:
+        os.unlink(tf.name)
+      except OSError as ex:
+        _LOGGER.error('Failed to delete written LUCI_CONTEXT file %r: %s',
+                      tf.name, ex)
 
 
 def _to_utf8(obj):
@@ -190,7 +191,7 @@ def read(section_key):
 
 
 @contextlib.contextmanager
-def write(_tmpdir=None, **section_values):
+def write(_leak=False, _tmpdir=None, **section_values):
   """Write is a contextmanager which will write all of the provided section
   details to a new context, copying over the values from any unmentioned
   sections. The new context file will be set in os.environ. When the
@@ -207,6 +208,8 @@ def write(_tmpdir=None, **section_values):
   done, this function raises an exception.
 
   Args:
+    _leak (bool) - If true, the new LUCI_CONTEXT file won't be deleted after
+      contextmanager exits.
     _tmpdir (str) - an optional directory to use for the newly written
       LUCI_CONTEXT file.
     section_values (str -> value) - A mapping of section_key to the new value
@@ -215,7 +218,7 @@ def write(_tmpdir=None, **section_values):
 
   Raises:
     MultipleLUCIContextException if called from multiple threads
-    simulataneously.
+    simultaneously.
 
   Example:
     Given a LUCI_CONTEXT of:
@@ -243,7 +246,7 @@ def write(_tmpdir=None, **section_values):
   if not got_lock:
     raise MultipleLUCIContextException()
   try:
-    with _tf(new_val, workdir=_tmpdir) as name:
+    with _tf(new_val, leak=_leak, workdir=_tmpdir) as name:
       try:
         old_value = _CUR_CONTEXT
         old_envvar = os.environ.get(_ENV_KEY, None)
@@ -264,7 +267,7 @@ def write(_tmpdir=None, **section_values):
 
 
 @contextlib.contextmanager
-def stage(_tmpdir=None, **section_values):
+def stage(_leak=False, _tmpdir=None, **section_values):
   """Prepares and writes new LUCI_CONTEXT file, but doesn't replace the env var.
 
   This is useful when launching new process asynchronously in new LUCI_CONTEXT
@@ -277,5 +280,5 @@ def stage(_tmpdir=None, **section_values):
   if not section_values:
     yield None
     return
-  with _tf(_mutate(section_values), workdir=_tmpdir) as name:
+  with _tf(_mutate(section_values), leak=_leak, workdir=_tmpdir) as name:
     yield name

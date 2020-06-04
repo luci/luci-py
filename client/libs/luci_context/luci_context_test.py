@@ -138,6 +138,14 @@ class TestLuciContext(unittest.TestCase):
     output_dict = luci_context._to_utf8(input_dict)
     self.assertDictEqual({'key1': 'value1', 'key2': 'value2'}, output_dict)
 
+  def test_leak(self):
+    path = None
+    with luci_context._tf({'something': {'data': True}}, leak=True) as path:
+      self.assertTrue(os.path.exists(path))
+    # The file is not deleted after contextmanager exits
+    self.assertTrue(os.path.exists(path))
+    os.unlink(path)
+
 
 if __name__ == '__main__':
   # Pop it out of the environment to make sure we start clean.
