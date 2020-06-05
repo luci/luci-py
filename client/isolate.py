@@ -752,7 +752,6 @@ def create_isolate_tree(outdir, root_dir, files, relative_cwd, read_only):
   # directory.
   file_path.ensure_tree(cwd)
 
-  run_isolated.change_tree_read_only(outdir, read_only)
   return cwd
 
 

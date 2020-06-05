@@ -249,34 +249,6 @@ def make_temp_dir(prefix, root_dir):
   return six.text_type(tempfile.mkdtemp(prefix=prefix, dir=root_dir))
 
 
-def change_tree_read_only(rootdir, read_only):
-  """Changes the tree read-only bits according to the read_only specification.
-
-  The flag can be 0, 1 or 2, which will affect the possibility to modify files
-  and create or delete files.
-  """
-  if read_only == 2:
-    # Files and directories (except on Windows) are marked read only. This
-    # inhibits modifying, creating or deleting files in the test directory,
-    # except on Windows where creating and deleting files is still possible.
-    file_path.make_tree_read_only(rootdir)
-  elif read_only == 1:
-    # Files are marked read only but not the directories. This inhibits
-    # modifying files but creating or deleting files is still possible.
-    file_path.make_tree_files_read_only(rootdir)
-  elif read_only in (0, None):
-    # Anything can be modified.
-    # TODO(maruel): This is currently dangerous as long as
-    # DiskContentAddressedCache.touch() is not yet changed to verify the hash of
-    # the content of the files it is looking at, so that if a test modifies an
-    # input file, the file must be deleted.
-    file_path.make_tree_writeable(rootdir)
-  else:
-    raise ValueError(
-        'change_tree_read_only(%s, %s): Unknown flag %s' %
-        (rootdir, read_only, read_only))
-
-
 @contextlib.contextmanager
 def set_luci_context_account(account, tmp_dir):
   """Sets LUCI_CONTEXT account to be used by the task.
@@ -841,7 +813,7 @@ def map_and_run(data, constant_run_path):
               cache=data.isolate_cache,
               outdir=run_dir)
         isolated_stats['download'].update(stats)
-        change_tree_read_only(run_dir, bundle.read_only)
+
         # Inject the command
         if not command and bundle.command:
           command = bundle.command + data.extra_args
