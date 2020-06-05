@@ -369,10 +369,10 @@ class DiskContentAddressedCacheTest(TestCase, ContentAddressedCacheTestMixin):
     mtime_a = self._now
     mtime_b = self._now
     def _get_mtime(h):
-        if h == h_a:
-            return mtime_a
-        if h == h_b:
-            return mtime_b
+      if h == h_a:
+        return mtime_a
+      if h == h_b:
+        return mtime_b
 
     self.mock(cache, '_get_mtime', _get_mtime)
 
@@ -544,13 +544,15 @@ class NamedCacheTest(TestCase, CacheTestMixin):
 
     a_path = os.path.join(dest_dir, u'a')
     b_path = os.path.join(dest_dir, u'b')
+    c_path = os.path.join(dest_dir, u'c')
 
     self.assertEqual(0, cache.install(a_path, u'1'))
     self.assertEqual(0, cache.install(b_path, u'2'))
+    self.assertEqual(0, cache.install(c_path, u'3'))
     self.assertEqual(
         False, fs.exists(os.path.join(cache.cache_dir, cache.NAMED_DIR)))
 
-    self.assertEqual({u'a', u'b'}, set(fs.listdir(dest_dir)))
+    self.assertEqual({u'a', u'b', u'c'}, set(fs.listdir(dest_dir)))
     self.assertFalse(cache.available)
     self.assertEqual([cache.STATE_FILE], fs.listdir(cache.cache_dir))
 
@@ -559,8 +561,9 @@ class NamedCacheTest(TestCase, CacheTestMixin):
 
     self.assertEqual(1, cache.uninstall(a_path, u'1'))
     self.assertEqual(1, cache.uninstall(b_path, u'2'))
+    self.assertEqual(0, cache.uninstall(c_path, u'3'))
 
-    self.assertEqual(4, len(fs.listdir(cache.cache_dir)))
+    self.assertEqual(5, len(fs.listdir(cache.cache_dir)))
     path1 = os.path.join(cache.cache_dir, cache._lru['1'][0])
     self.assertEqual('x', read_file(os.path.join(path1, u'x')))
     path2 = os.path.join(cache.cache_dir, cache._lru['2'][0])
@@ -571,8 +574,9 @@ class NamedCacheTest(TestCase, CacheTestMixin):
     self.assertEqual(
         os.path.join(u'..', cache._lru['2'][0]),
         fs.readlink(cache._get_named_path('2')))
+    # empty cache should be kept for better bot affinity.
     self.assertEqual(
-        [u'1', u'2'],
+        [u'1', u'2', u'3'],
         sorted(fs.listdir(os.path.join(cache.cache_dir, cache.NAMED_DIR))))
 
   def test_existing_cache(self):
