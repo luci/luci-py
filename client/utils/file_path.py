@@ -934,7 +934,7 @@ def try_remove(filepath):
   """Removes a file without crashing even if it doesn't exist.
 
   Returns:
-    True if the removal successed.
+    True if the removal succeeded.
   """
   try:
     remove(filepath)
