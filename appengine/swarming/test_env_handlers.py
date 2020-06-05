@@ -170,7 +170,7 @@ class AppTestBase(test_case.TestCase):
       return pools_config._PoolsCfg(
           {
               "template":
-                  pools_config.PoolConfig(
+                  pools_config.init_pool_config(
                       name='template',
                       rev='pools_cfg_rev',
                       scheduling_users=frozenset([
@@ -183,12 +183,7 @@ class AppTestBase(test_case.TestCase):
                           auth.Identity(auth.IDENTITY_USER, 'priv@example.com'),
                           auth.Identity(auth.IDENTITY_USER, 'user@example.com'),
                       ]),
-                      scheduling_groups=frozenset(),
-                      trusted_delegatees={},
                       service_accounts=frozenset(service_accounts),
-                      service_accounts_groups=(),
-                      realm=None,
-                      enforced_realm_permissions=frozenset(),
                       task_template_deployment=pools_config
                       .TaskTemplateDeployment(
                           prod=pools_config.TaskTemplate(
@@ -208,11 +203,9 @@ class AppTestBase(test_case.TestCase):
                       ),
                       default_isolate=default_isolate,
                       default_cipd=default_cipd,
-                      bot_monitoring=None,
-                      external_schedulers=None,
                   ),
               "default":
-                  pools_config.PoolConfig(
+                  pools_config.init_pool_config(
                       name='default',
                       rev='pools_cfg_rev',
                       scheduling_users=frozenset([
@@ -225,17 +218,9 @@ class AppTestBase(test_case.TestCase):
                           auth.Identity(auth.IDENTITY_USER, 'priv@example.com'),
                           auth.Identity(auth.IDENTITY_USER, 'user@example.com'),
                       ]),
-                      scheduling_groups=frozenset(),
-                      trusted_delegatees={},
                       service_accounts=frozenset(service_accounts),
-                      service_accounts_groups=(),
-                      realm=None,
-                      enforced_realm_permissions=frozenset(),
-                      task_template_deployment=None,
-                      bot_monitoring=None,
                       default_isolate=default_isolate,
                       default_cipd=default_cipd,
-                      external_schedulers=None,
                   ),
           },
           (default_isolate, default_cipd))

@@ -805,21 +805,10 @@ class TaskRequestApiTest(TestCase):
       deployment = pools_config.TaskTemplateDeployment(
             prod=prod, canary=canary, canary_chance=canary_chance)
 
-    self._pool_configs[pool_name] = pools_config.PoolConfig(
+    self._pool_configs[pool_name] = pools_config.init_pool_config(
         name=pool_name,
         rev=u'testVersion1',
-        scheduling_users=frozenset(),
-        scheduling_groups=frozenset(),
-        trusted_delegatees={},
-        service_accounts=frozenset(),
-        service_accounts_groups=frozenset(),
-        realm=None,
-        enforced_realm_permissions=frozenset(),
         task_template_deployment=deployment,
-        bot_monitoring=None,
-        default_isolate=None,
-        default_cipd=None,
-        external_schedulers=None,
     )
 
   def test_init_new_request_skip_template(self):

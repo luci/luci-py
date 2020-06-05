@@ -2483,7 +2483,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self._known_pools.add(name)
     def mocked_get_pool_config(pool):
       if pool == name:
-        return pools_config.PoolConfig(
+        return pools_config.init_pool_config(
             name=name,
             rev='rev',
             scheduling_users=frozenset(scheduling_users or []),
@@ -2494,12 +2494,6 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
             },
             service_accounts=frozenset(service_accounts or []),
             service_accounts_groups=tuple(service_accounts_groups or []),
-            realm=None,
-            enforced_realm_permissions=frozenset(),
-            task_template_deployment=None,
-            bot_monitoring=None,
-            default_isolate=None,
-            default_cipd=None,
             external_schedulers=external_schedulers,
         )
       return None

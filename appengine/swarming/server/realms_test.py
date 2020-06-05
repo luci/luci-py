@@ -47,21 +47,11 @@ def _gen_task_request_mock(realm='test:realm'):
 
 
 def _gen_pool_config(realm='test:pool/realm', enforced_realm_permissions=()):
-  return pools_config.PoolConfig(
+  return pools_config.init_pool_config(
       name='default',
       rev='pools_cfg_rev',
-      scheduling_users=frozenset([]),
-      scheduling_groups=frozenset(),
-      trusted_delegatees={},
-      service_accounts=frozenset([]),
-      service_accounts_groups=(),
       realm=realm,
-      enforced_realm_permissions=frozenset(enforced_realm_permissions),
-      task_template_deployment=None,
-      bot_monitoring=None,
-      default_isolate=None,
-      default_cipd=None,
-      external_schedulers=None)
+      enforced_realm_permissions=frozenset(enforced_realm_permissions))
 
 
 class RealmsTest(test_case.TestCase):

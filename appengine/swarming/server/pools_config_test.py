@@ -107,7 +107,7 @@ class PoolsConfigTest(test_case.TestCase):
     self.mock_config(TEST_CONFIG)
     self.assertEqual(None, pools_config.get_pool_config('unknown'))
 
-    expected1 = pools_config.PoolConfig(
+    expected1 = pools_config.init_pool_config(
         name=u'pool_name',
         rev='rev',
         scheduling_users=frozenset([
@@ -127,8 +127,6 @@ class PoolsConfigTest(test_case.TestCase):
         realm='test:pool/realm',
         enforced_realm_permissions=frozenset(
             [realms_pb2.REALM_PERMISSION_POOLS_CREATE_TASK]),
-        task_template_deployment=None,
-        bot_monitoring=None,
         default_isolate=pools_config.IsolateServer(
             server='https://isolate.server.example.com',
             namespace='default-gzip',
