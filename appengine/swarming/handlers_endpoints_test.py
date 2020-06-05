@@ -254,7 +254,7 @@ class TasksApiTest(BaseTest):
     utils.clear_cache(config.settings)
     self.mock_default_pool_acl(['service-account@example.com'])
 
-  def test_new_ok_raw(self):
+  def test_new_ok_raw_legacy(self):
     """Asserts that new generates appropriate metadata."""
     oauth_grant_calls = self.mock_task_service_accounts()
     self.mock(random, 'getrandbits', lambda _: 0x88)
@@ -269,7 +269,6 @@ class TasksApiTest(BaseTest):
         pubsub_auth_token='secret that must not be shown',
         pubsub_userdata='userdata',
         service_account='service-account@example.com',
-        realm='test:example',
     )
     expected_props = self.gen_props(
         command=[u'rm', u'-rf', u'/'],
@@ -345,6 +344,8 @@ class TasksApiTest(BaseTest):
     self.assertEqual([
         (u'service-account@example.com', datetime.timedelta(0, 30 + 30 + 15))
     ] * 2, oauth_grant_calls)
+
+  # TODO(crbug.com/1066839): add test_new_ok_raw_realm
 
   def test_new_ok_template(self):
     """Asserts that new generates appropriate metadata for a templated task."""

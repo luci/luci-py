@@ -185,14 +185,8 @@ class RealmsTest(test_case.TestCase):
     with self.assertRaises(auth.AuthorizationError):
       realms.check_tasks_create_in_realm(None)
 
-  def _mock_for_check_tasks_run_as_legacy(self,
-                                          is_allowed_legacy,
-                                          token_server_err=None):
+  def _mock_for_check_tasks_run_as_legacy(self, is_allowed_legacy):
     self.mock(realms, 'is_enforced_permission', lambda *_: False)
-    get_oauth_token_grant_mock = mock.Mock(return_value='service_account_token')
-    get_oauth_token_grant_mock.side_effect = token_server_err
-    self.mock(service_accounts, 'get_oauth_token_grant',
-              get_oauth_token_grant_mock)
     self.mock(task_scheduler,
               '_is_allowed_service_account', lambda *_: is_allowed_legacy)
 
@@ -205,8 +199,6 @@ class RealmsTest(test_case.TestCase):
         True,
         identity=_TASK_SERVICE_ACCOUNT_IDENTITY,
         tracking_bug=realms._TRACKING_BUG)
-    self.assertEqual(task_request_mock.service_account_token,
-                     'service_account_token')
 
   def test_check_tasks_run_as_legacy_allowed_no_realm(self):
     self._mock_for_check_tasks_run_as_legacy(is_allowed_legacy=True)
@@ -224,31 +216,6 @@ class RealmsTest(test_case.TestCase):
         False,
         identity=_TASK_SERVICE_ACCOUNT_IDENTITY,
         tracking_bug=realms._TRACKING_BUG)
-
-  def test_check_tasks_run_as_legacy_token_server_permission_error(self):
-    self._mock_for_check_tasks_run_as_legacy(
-        is_allowed_legacy=True,
-        token_server_err=service_accounts.PermissionError('not permitted'))
-    task_request_mock = _gen_task_request_mock()
-    with self.assertRaises(auth.AuthorizationError):
-      realms.check_tasks_run_as(task_request_mock)
-    self._has_permission_dryrun_mock.assert_called_once_with(
-        _PERM_TASKS_RUN_AS, [u'test:realm'],
-        False,
-        identity=_TASK_SERVICE_ACCOUNT_IDENTITY,
-        tracking_bug=realms._TRACKING_BUG)
-
-  @parameterized.expand([
-      (service_accounts.MisconfigurationError('config is wrong'),),
-      (service_accounts.InternalError('something is wrong'),),
-  ])
-  def test_check_tasks_run_as_legacy_token_server_config_error(self, err):
-    self._mock_for_check_tasks_run_as_legacy(
-        is_allowed_legacy=True, token_server_err=err)
-    task_request_mock = _gen_task_request_mock()
-    with self.assertRaises(endpoints.ServiceException):
-      realms.check_tasks_run_as(task_request_mock)
-    self._has_permission_dryrun_mock.assert_not_called()
 
   def test_check_tasks_run_as_enforced_allowed(self):
     self.mock(realms, 'is_enforced_permission', lambda *_: True)
