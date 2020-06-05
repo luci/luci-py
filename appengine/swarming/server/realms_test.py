@@ -33,13 +33,15 @@ from server import task_scheduler
 _PERM_POOLS_CREATE_TASK = auth.Permission('swarming.pools.createTask')
 _PERM_TASKS_CREATE_IN_REALM = auth.Permission('swarming.tasks.createInRealm')
 _PERM_TASKS_RUN_AS = auth.Permission('swarming.tasks.runAs')
+_TASK_SERVICE_ACCOUNT_IDENTITY = auth.Identity(
+    auth.IDENTITY_USER, 'test@test-service-accounts.iam.gserviceaccount.com')
 
 
 def _gen_task_request_mock(realm='test:realm'):
   mocked = mock.create_autospec(
       task_request.TaskRequest, spec_set=True, instance=True)
   mocked.max_lifetime_secs = 1
-  mocked.service_account = 'test@test-service-accounts.iam.gserviceaccount.com'
+  mocked.service_account = _TASK_SERVICE_ACCOUNT_IDENTITY.name
   mocked.realm = realm
   return mocked
 
@@ -70,8 +72,6 @@ class RealmsTest(test_case.TestCase):
     self._has_permission_dryrun_mock = mock.Mock()
     self.mock(auth, 'has_permission', self._has_permission_mock)
     self.mock(auth, 'has_permission_dryrun', self._has_permission_dryrun_mock)
-    delegatee = auth.Identity.from_bytes('user:delegatee@example.com')
-    self.mock(auth, 'get_peer_identity', lambda: delegatee)
     self.mock(service_accounts, 'has_token_server', lambda: True)
 
   def tearDown(self):
@@ -213,7 +213,7 @@ class RealmsTest(test_case.TestCase):
     self._has_permission_dryrun_mock.assert_called_once_with(
         _PERM_TASKS_RUN_AS, [u'test:realm'],
         True,
-        identity=auth.Identity.from_bytes('user:delegatee@example.com'),
+        identity=_TASK_SERVICE_ACCOUNT_IDENTITY,
         tracking_bug=realms._TRACKING_BUG)
     self.assertEqual(task_request_mock.service_account_token,
                      'service_account_token')
@@ -232,7 +232,7 @@ class RealmsTest(test_case.TestCase):
     self._has_permission_dryrun_mock.assert_called_once_with(
         _PERM_TASKS_RUN_AS, [u'test:realm'],
         False,
-        identity=auth.Identity.from_bytes('user:delegatee@example.com'),
+        identity=_TASK_SERVICE_ACCOUNT_IDENTITY,
         tracking_bug=realms._TRACKING_BUG)
 
   def test_check_tasks_run_as_legacy_token_server_permission_error(self):
@@ -245,7 +245,7 @@ class RealmsTest(test_case.TestCase):
     self._has_permission_dryrun_mock.assert_called_once_with(
         _PERM_TASKS_RUN_AS, [u'test:realm'],
         False,
-        identity=auth.Identity.from_bytes('user:delegatee@example.com'),
+        identity=_TASK_SERVICE_ACCOUNT_IDENTITY,
         tracking_bug=realms._TRACKING_BUG)
 
   @parameterized.expand([
@@ -267,7 +267,7 @@ class RealmsTest(test_case.TestCase):
     realms.check_tasks_run_as(task_request_mock)
     self._has_permission_mock.assert_called_once_with(
         _PERM_TASKS_RUN_AS, [u'test:realm'],
-        identity=auth.Identity.from_bytes('user:delegatee@example.com'))
+        identity=_TASK_SERVICE_ACCOUNT_IDENTITY)
 
   def test_check_tasks_run_as_enforced_no_realm(self):
     self.mock(realms, 'is_enforced_permission', lambda *_: True)
@@ -285,7 +285,7 @@ class RealmsTest(test_case.TestCase):
       realms.check_tasks_run_as(task_request_mock)
     self._has_permission_mock.assert_called_once_with(
         _PERM_TASKS_RUN_AS, [u'test:realm'],
-        identity=auth.Identity.from_bytes('user:delegatee@example.com'))
+        identity=_TASK_SERVICE_ACCOUNT_IDENTITY)
 
 
 if __name__ == '__main__':

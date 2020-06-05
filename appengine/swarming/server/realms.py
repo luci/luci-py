@@ -191,13 +191,13 @@ def check_tasks_run_as(task_request):
 
   perm_enum = realms_pb2.REALM_PERMISSION_TASKS_RUN_AS
   perm = get_permission(perm_enum)
+  identity = auth.Identity(auth.IDENTITY_USER, task_request.service_account)
 
   if is_enforced_permission(perm_enum):
     if not task_request.realm:
       raise auth.AuthorizationError('Task realm is missing')
 
-    if not auth.has_permission(
-        perm, [task_request.realm], identity=auth.get_peer_identity()):
+    if not auth.has_permission(perm, [task_request.realm], identity=identity):
       raise auth.AuthorizationError(
           'Task service account "%s" is not allowed to run in the realm "%s"' %
           (task_request.service_account, task_request.realm))
@@ -240,7 +240,7 @@ def check_tasks_run_as(task_request):
       auth.has_permission_dryrun(
           perm, [task_request.realm],
           legacy_allowed,
-          identity=auth.get_peer_identity(),
+          identity=identity,
           tracking_bug='crbug.com/1066839')
     elif skip_dryrun:
       # task realm is optional.
