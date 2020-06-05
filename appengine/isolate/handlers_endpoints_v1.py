@@ -54,11 +54,7 @@ def _log_identity(func):
 
   @functools.wraps(func)
   def wrapped(service, *args, **kwargs):
-    identity = auth.get_current_identity()
-    if not identity.is_user or identity.name.endswith('.gserviceaccount.com'):
-      logging.info('Accessed from identity=%s', identity.to_bytes())
-    else:
-      logging.info('Accessed from user')
+    logging.info('Accessed from %s' % auth.get_current_identity().to_bytes())
     return func(service, *args, **kwargs)
 
   return wrapped

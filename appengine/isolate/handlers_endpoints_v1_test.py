@@ -615,8 +615,8 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
     auth_testing.mock_get_current_identity(self, admin)
     collection = generate_collection('default', ['foobar'])
     self.call_api('preupload', message_to_dict(collection), 200)
-    logfunc.assert_any_call('Accessed from identity=%s',
-                            'user:admin@appspot.gserviceaccount.com')
+    logfunc.assert_any_call(
+        'Accessed from user:admin@appspot.gserviceaccount.com')
 
   @mock.patch('logging.info')
   def test_log_non_user_id(self, logfunc):
@@ -625,16 +625,16 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
     auth_testing.mock_get_current_identity(self, admin)
     collection = generate_collection('default', ['foobar'])
     self.call_api('preupload', message_to_dict(collection), 200)
-    logfunc.assert_any_call('Accessed from identity=%s', 'service:adminapp')
+    logfunc.assert_any_call('Accessed from service:adminapp')
 
   @mock.patch('logging.info')
-  def test_log_hide_normal_users(self, logfunc):
-    """Assert that the usage is still logged without the user identity."""
+  def test_log_normal_users(self, logfunc):
+    """Assert that user identity is being logged."""
     admin = auth.Identity(auth.IDENTITY_USER, 'admin@example.com')
     auth_testing.mock_get_current_identity(self, admin)
     collection = generate_collection('default', ['foobar'])
     self.call_api('preupload', message_to_dict(collection), 200)
-    logfunc.assert_any_call('Accessed from user')
+    logfunc.assert_any_call('Accessed from user:admin@example.com')
 
 
 if __name__ == '__main__':
