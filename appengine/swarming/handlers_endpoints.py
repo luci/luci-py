@@ -730,7 +730,7 @@ class SwarmingTasksService(remote.Service):
     Cancellation happens asynchronously, so when this call returns,
     cancellations will not have completed yet.
     """
-    logging.debug('%s', request)
+    logging.debug('%s sent %s', auth.get_current_identity(), request)
     if not request.tags:
       # Prevent accidental cancellation of everything.
       raise endpoints.BadRequestException(
