@@ -14,7 +14,6 @@ import os
 import sys
 import tempfile
 
-import mock
 import six
 
 # Mutates sys.path.
@@ -1045,61 +1044,6 @@ class RunIsolatedTest(RunIsolatedTestBase):
     bundle, stats = run_isolated._fetch_and_map_with_go(
         'fake_isolated_hash', storage, 'fake_outdir', 'fake_cache_dir',
         local_caching.CachePolicies(0, 0, 0, 0), 'fake/path/to/isolated')
-    self.assertTrue(bundle)
-    self.assertTrue(stats)
-
-  @mock.patch('platform.release', lambda: '7')
-  @mock.patch('sys.platform', 'win32')
-  def test_fetch_and_map_with_go_heap(self):
-    # Sanity test for run_isolated._fetch_and_map_with_go(...).
-    _, options, _ = run_isolated.parse_args([])
-    cipd_server = 'https://chrome-infra-packages.appspot.com/'
-    storage = isolate_storage.IsolateServer(
-        isolate_storage.ServerRef(cipd_server, options.namespace))
-
-    def fake_wait(args, **kwargs):  # pylint: disable=unused-argument
-      for arg in args:
-        self.assertTrue(
-            isinstance(arg, str) or isinstance(arg.encode('utf-8'), str), arg)
-
-      json_path = args[args.index('-fetch-and-map-result-json') + 1]
-      with open(json_path, 'w') as json_file:
-        json.dump({
-            'isolated': {},
-            'items_cold': '',
-            'items_hot': '',
-        }, json_file)
-      return 0
-
-    self.popen_fakes.append(fake_wait)
-
-    with mock.patch('isolateserver.archive_files_to_storage',
-                    mock.Mock()) as mocked, mock.patch(
-                        'tempfile.mkdtemp',
-                        lambda prefix='tmp': os.path.join(self.tempdir, prefix)
-                    ), mock.patch('tempfile.mkstemp',
-                                  mock.Mock()) as mocked_mkstemp:
-      json_path = os.path.join(self.tempdir, "json.json")
-      mocked_mkstemp.return_value = (os.open(json_path,
-                                             os.O_CREAT | os.O_WRONLY),
-                                     json_path)
-
-      mocked.return_value = (None, None, None)
-      bundle, stats = run_isolated._fetch_and_map_with_go(
-          'fake_isolated_hash', storage, 'fake_outdir', 'fake_cache_dir',
-          local_caching.CachePolicies(0, 0, 0, 0), 'fake/path/to/isolated')
-      mocked.assert_called_once_with(storage, [mock.ANY], None)
-      self.assertEqual(self.popen_calls, [([
-          'fake/path/to/isolated', 'download', '-isolate-server',
-          'https://chrome-infra-packages.appspot.com', '-namespace',
-          'default-gzip', '-isolated', 'fake_isolated_hash', '-cache-dir',
-          'fake_cache_dir', '-cache-max-items', '0', '-cache-max-size', '0',
-          '-cache-min-free-space', '0', '-output-dir', 'fake_outdir',
-          '-fetch-and-map-result-json', json_path, '-profile-output-dir',
-          os.path.join(self.tempdir,
-                       'tmp'), '-profile-heap', '-profile-heap-frequency', '30s'
-      ], {})])
-
     self.assertTrue(bundle)
     self.assertTrue(stats)
 

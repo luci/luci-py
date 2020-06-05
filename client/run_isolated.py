@@ -528,8 +528,6 @@ def _fetch_and_map_with_go(isolated_hash, storage, outdir, go_cache_dir,
   result_json_handle, result_json_path = tempfile.mkstemp(
       prefix=u'fetch-and-map-result-', suffix=u'.json')
   os.close(result_json_handle)
-  heap_profile_dir = None
-
   try:
     cmd = [
         isolated_client,
@@ -557,19 +555,6 @@ def _fetch_and_map_with_go(isolated_hash, storage, outdir, go_cache_dir,
         '-fetch-and-map-result-json',
         result_json_path,
     ]
-
-    # TODO(crbug.com/1045281): windows other than win10 has flaky connection
-    # issue.
-    if sys.platform == 'win32' and platform.release() != '10':
-      heap_profile_dir = six.ensure_text(tempfile.mkdtemp())
-      cmd.extend([
-          '-profile-output-dir',
-          heap_profile_dir,
-          '-profile-heap',
-          '-profile-heap-frequency',
-          '30s',
-      ])
-
     proc = subprocess42.Popen(cmd)
     cmd_str = ' '.join(cmd)
 
@@ -620,15 +605,6 @@ def _fetch_and_map_with_go(isolated_hash, storage, outdir, go_cache_dir,
     }
   finally:
     fs.remove(result_json_path)
-    if heap_profile_dir:
-      try:
-        results, _, _ = isolateserver.archive_files_to_storage(
-            storage, [heap_profile_dir], None)
-      except Exception:
-        logging.exception('exception from archive_files_to_storage is ignored')
-
-      print('heap profile results are uploaded: %s' % results)
-      file_path.rmtree(heap_profile_dir)
 
 
 # TODO(crbug.com/932396): remove this function.
