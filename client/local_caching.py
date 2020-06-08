@@ -154,8 +154,8 @@ def _get_recursive_size(path):
           continue
         total += st.st_size
     return total
-  except (IOError, OSError, UnicodeEncodeError) as exc:
-    logging.warning('Exception while getting the size of %s:\n%s', path, exc)
+  except (IOError, OSError, UnicodeEncodeError):
+    logging.exception('Exception while getting the size of %s', path)
     return None
 
 
