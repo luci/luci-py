@@ -337,8 +337,8 @@ class RunIsolatedTest(RunIsolatedTestBase):
     make_tree_call = []
     def add(i, _):
       make_tree_call.append(i)
-    for i in ('make_tree_read_only', 'make_tree_files_read_only',
-              'make_tree_deleteable', 'make_tree_writeable'):
+
+    for i in ('make_tree_files_read_only', 'make_tree_deleteable'):
       self.mock(file_path, i, functools.partial(add, i))
 
     server_ref = isolate_storage.ServerRef('http://localhost:1', 'default-gzip')

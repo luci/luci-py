@@ -1045,35 +1045,6 @@ def ensure_tree(path, perm=0o777):
         raise
 
 
-def make_tree_read_only(root):
-  """Makes all the files in the directories read only.
-
-  Also makes the directories read only, only if it makes sense on the platform.
-
-  This means no file can be created or deleted.
-  """
-  err = None
-  logging.debug('make_tree_read_only(%s)', root)
-  for dirpath, dirnames, filenames in fs.walk(root, topdown=True):
-    for filename in filenames:
-      e = set_read_only_swallow(os.path.join(dirpath, filename), True)
-      if not err:
-        err = e
-    if sys.platform != 'win32':
-      # It must not be done on Windows.
-      for dirname in dirnames:
-        e = set_read_only_swallow(os.path.join(dirpath, dirname), True)
-        if not err:
-          err = e
-  if sys.platform != 'win32':
-    e = set_read_only_swallow(root, True)
-    if not err:
-      err = e
-  if err:
-    # pylint: disable=raising-bad-type
-    raise err
-
-
 def make_tree_files_read_only(root):
   """Makes all the files in the directories read only but not the directories
   themselves.
@@ -1086,26 +1057,6 @@ def make_tree_files_read_only(root):
   for dirpath, dirnames, filenames in fs.walk(root, topdown=True):
     for filename in filenames:
       set_read_only(os.path.join(dirpath, filename), True)
-    if sys.platform != 'win32':
-      # It must not be done on Windows.
-      for dirname in dirnames:
-        set_read_only(os.path.join(dirpath, dirname), False)
-
-
-def make_tree_writeable(root):
-  """Makes all the files in the directories writeable.
-
-  Also makes the directories writeable, only if it makes sense on the platform.
-
-  It is different from make_tree_deleteable() because it unconditionally affects
-  the files.
-  """
-  logging.debug('make_tree_writeable(%s)', root)
-  if sys.platform != 'win32':
-    set_read_only(root, False)
-  for dirpath, dirnames, filenames in fs.walk(root, topdown=True):
-    for filename in filenames:
-      set_read_only(os.path.join(dirpath, filename), False)
     if sys.platform != 'win32':
       # It must not be done on Windows.
       for dirname in dirnames:
