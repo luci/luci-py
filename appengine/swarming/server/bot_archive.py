@@ -156,6 +156,7 @@ FILES = (
     'third_party/google/protobuf/internal/decoder.py',
     'third_party/google/protobuf/internal/encoder.py',
     'third_party/google/protobuf/internal/enum_type_wrapper.py',
+    'third_party/google/protobuf/internal/extension_dict.py',
     'third_party/google/protobuf/internal/message_listener.py',
     'third_party/google/protobuf/internal/python_message.py',
     'third_party/google/protobuf/internal/type_checkers.py',
