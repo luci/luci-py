@@ -128,10 +128,13 @@ _tasks_expiration_delay = gae_ts_mon.CumulativeDistributionMetric(
 # - project_id: e.g. 'chromium-swarm'
 _tasks_slice_expiration_delay = gae_ts_mon.CumulativeDistributionMetric(
     'swarming/tasks/slice_expiration_delay',
-    'Delay of task slice expiration, in seconds.', [
+    'Delay of task slice expiration, in seconds.',
+    [
         gae_ts_mon.StringField('project_id'),
         gae_ts_mon.IntegerField('slice_index'),
-    ])
+    ],
+    bucketer=gae_ts_mon.FixedWidthBucketer(width=30),
+)
 
 
 _task_bots_runnable = gae_ts_mon.CumulativeDistributionMetric(
