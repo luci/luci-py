@@ -63,6 +63,7 @@ class RealmsTest(test_case.TestCase):
     self.mock(auth, 'has_permission', self._has_permission_mock)
     self.mock(auth, 'has_permission_dryrun', self._has_permission_dryrun_mock)
     self.mock(service_accounts, 'has_token_server', lambda: True)
+    utils.clear_cache(config.settings)
 
   def tearDown(self):
     super(RealmsTest, self).tearDown()
