@@ -186,10 +186,13 @@ def task_update_pool(pool):
     d = found.setdefault(os, {})
     for key, value in sorted(c.items()):
       if not value or not isinstance(value, list) or len(value) != 2:
-        logging.error('%s has bad cache (A)', bot.id)
+        logging.error('%s has bad cache (A): %s', bot.id, value)
         continue
       if not value[0] or not isinstance(value[0], list) or len(value[0]) != 2:
-        logging.error('%s has bad cache (B)', bot.id)
+        logging.error('%s has bad cache (B): %s', bot.id, value)
+        continue
+      if not value[0][1] or not isinstance(value[0][1], (int, long)):
+        logging.error('%s has bad cache (C): %s', bot.id, value)
         continue
       s = value[0][1]
       d.setdefault(key, []).append(s)
