@@ -380,7 +380,7 @@ class SwarmingTaskService(remote.Service):
 
     If a bot was running the task, the bot will forcibly cancel the task.
     """
-    logging.debug('%s', request)
+    logging.debug('%s sent %s', auth.get_current_identity(), request)
     request_key, result_key = _to_keys(request.task_id)
     request_obj = _get_task_request_async(
         request.task_id, request_key, _EDIT).get_result()
