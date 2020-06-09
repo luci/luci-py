@@ -9,6 +9,8 @@ import base64
 import json
 import os
 
+import mock
+
 import swarming_test_env
 swarming_test_env.setup_test_env()
 
@@ -22,14 +24,35 @@ import swarming_rpcs
 from components import auth
 from components import auth_testing
 from components import utils
+from components.auth import api as auth_api
+from components.auth import model as auth_model
+from components.auth import realms as auth_realms
+from components.auth.proto import replication_pb2
 import gae_ts_mon
 from test_support import test_case
 
 from proto.config import config_pb2
+from proto.config import realms_pb2
 from server import config
 from server import large
 from server import pools_config
+from server import realms
 from server import service_accounts
+
+
+# Realm permissions used in the tests.
+PERM_POOLS_CREATE_TASK = realms.get_permission(
+    realms_pb2.REALM_PERMISSION_POOLS_CREATE_TASK)
+PERM_TASKS_CREATE_IN_REALM = realms.get_permission(
+    realms_pb2.REALM_PERMISSION_TASKS_CREATE_IN_REALM)
+PREM_TASKS_RUN_AS = realms.get_permission(
+    realms_pb2.REALM_PERMISSION_TASKS_RUN_AS)
+
+_ALL_PERMS = [
+    PERM_POOLS_CREATE_TASK,
+    PERM_TASKS_CREATE_IN_REALM,
+    PREM_TASKS_RUN_AS,
+]
 
 
 class AppTestBase(test_case.TestCase):
@@ -184,6 +207,7 @@ class AppTestBase(test_case.TestCase):
                           auth.Identity(auth.IDENTITY_USER, 'user@example.com'),
                       ]),
                       service_accounts=frozenset(service_accounts),
+                      realm='test:pool/default',
                       task_template_deployment=pools_config
                       .TaskTemplateDeployment(
                           prod=pools_config.TaskTemplate(
@@ -218,6 +242,7 @@ class AppTestBase(test_case.TestCase):
                           auth.Identity(auth.IDENTITY_USER, 'priv@example.com'),
                           auth.Identity(auth.IDENTITY_USER, 'user@example.com'),
                       ]),
+                      realm='test:pool/default',
                       service_accounts=frozenset(service_accounts),
                       default_isolate=default_isolate,
                       default_cipd=default_cipd,
@@ -226,6 +251,66 @@ class AppTestBase(test_case.TestCase):
           (default_isolate, default_cipd))
 
     self.mock(pools_config, '_fetch_pools_config', mocked_fetch_pools_config)
+
+  def mock_auth_db(self):
+    self.mock(auth_api,
+              'get_request_cache', lambda: mock.Mock(auth_db=self.auth_db()))
+
+  @staticmethod
+  def auth_db():
+    return auth_api.AuthDB.from_proto(
+        replication_state=auth_model.AuthReplicationState(),
+        auth_db=replication_pb2.AuthDB(
+            groups=[{
+                'name': 'test_users_group',
+                'members': [
+                    'user:super-admin@example.com',
+                    'user:admin@example.com',
+                    'user:priv@example.com',
+                    'user:user@example.com',
+                ],
+                'created_by': 'user:zzz@example.com',
+                'modified_by': 'user:zzz@example.com',
+            }],
+            realms={
+                'api_version':
+                    auth_realms.API_VERSION,
+                'permissions': [{
+                    'name': p.name
+                } for p in _ALL_PERMS],
+                'realms': [
+                    {
+                        'name': 'test:@root',
+                    },
+                    {
+                        'name':
+                            'test:pool/default',
+                        'bindings': [{
+                            'permissions': [
+                                _ALL_PERMS.index(PERM_POOLS_CREATE_TASK),
+                            ],
+                            'principals': ['user:user@example.com'],
+                        }],
+                    },
+                    {
+                        'name':
+                            'test:task_realm',
+                        'bindings': [{
+                            'permissions': [
+                                _ALL_PERMS.index(PERM_TASKS_CREATE_IN_REALM),
+                            ],
+                            'principals': ['user:user@example.com'],
+                        }, {
+                            'permissions': [
+                                _ALL_PERMS.index(PREM_TASKS_RUN_AS),
+                            ],
+                            'principals': ['user:service-account@example.com'],
+                        }],
+                    },
+                ],
+            },
+        ),
+        additional_client_ids=[])
 
   # Bot
 

@@ -36,6 +36,7 @@ from server import bot_code
 from server import bot_management
 from server import config
 from server import large
+from server import service_accounts
 from server import task_pack
 from server import task_queues
 from server import task_request
@@ -254,7 +255,7 @@ class TasksApiTest(BaseTest):
     utils.clear_cache(config.settings)
     self.mock_default_pool_acl(['service-account@example.com'])
 
-  def test_new_ok_raw_legacy(self):
+  def test_new_ok_raw(self):
     """Asserts that new generates appropriate metadata."""
     oauth_grant_calls = self.mock_task_service_accounts()
     self.mock(random, 'getrandbits', lambda _: 0x88)
@@ -344,8 +345,6 @@ class TasksApiTest(BaseTest):
     self.assertEqual([
         (u'service-account@example.com', datetime.timedelta(0, 30 + 30 + 15))
     ] * 2, oauth_grant_calls)
-
-  # TODO(crbug.com/1066839): add test_new_ok_raw_realm
 
   def test_new_ok_template(self):
     """Asserts that new generates appropriate metadata for a templated task."""
@@ -1236,6 +1235,25 @@ class TasksApiTest(BaseTest):
             }],
             u'execution_timeout_secs': 30,
         })
+    response = self.call_api('new', body=message_to_dict(request), status=200)
+    self.assertEqual(u'5cee488008810', response.json[u'task_id'])
+
+  def test_new_ok_with_realm(self):
+    self.mock(random, 'getrandbits', lambda _: 0x88)
+    self.mock(service_accounts, 'has_token_server', lambda: True)
+    self.mock_auth_db()
+
+    request = self.create_new_request(
+        properties={
+            u'command': [u'echo', u'hi'],
+            u'dimensions': [{
+                u'key': u'pool',
+                u'value': u'default'
+            }],
+            u'execution_timeout_secs': 30,
+        },
+        service_account='service-account@example.com',
+        realm='test:task_realm')
     response = self.call_api('new', body=message_to_dict(request), status=200)
     self.assertEqual(u'5cee488008810', response.json[u'task_id'])
 
