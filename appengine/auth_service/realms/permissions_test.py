@@ -88,6 +88,12 @@ class BuilderTest(test_case.TestCase):
     with self.assertRaises(ValueError):
       self.include('role/zzz')
 
+  def test_non_idempotent_perm(self):
+    self.permission('luci.dev.p1')
+    self.permission('luci.dev.p1')
+    with self.assertRaises(ValueError):
+      self.permission('luci.dev.p1', internal=True)
+
 
 class HardcodedDBTest(test_case.TestCase):
 

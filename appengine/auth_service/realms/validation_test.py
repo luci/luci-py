@@ -30,6 +30,7 @@ def test_db():
       b.permission('luci.dev.p2'),
       b.permission('luci.dev.p3'),
   ])
+  b.permission('luci.dev.int', internal=True)
   return b.finish()
 
 
@@ -140,7 +141,7 @@ class ValidationTest(test_case.TestCase):
         ],
     })
 
-  def test_unknown_permission(self):
+  def test_custom_role_unknown_permission(self):
     self.assert_has_error('not defined in permissions DB', {
         'custom_roles': [
             {
@@ -148,6 +149,19 @@ class ValidationTest(test_case.TestCase):
                 'permissions': [
                     'luci.dev.p1',  # known
                     'luci.dev.unknown',
+                ],
+            },
+        ],
+    })
+
+  def test_custom_role_internal_permission(self):
+    self.assert_has_error('it can\'t be used in the config', {
+        'custom_roles': [
+            {
+                'name': 'customRole/some',
+                'permissions': [
+                    'luci.dev.p1',  # public
+                    'luci.dev.int',
                 ],
             },
         ],

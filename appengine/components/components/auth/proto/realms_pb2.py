@@ -19,7 +19,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   syntax='proto3',
   serialized_options=b'Z:go.chromium.org/luci/server/auth/service/protocol;protocol',
   create_key=_descriptor._internal_create_key,
-  serialized_pb=b'\n\"components/auth/proto/realms.proto\x12\x16\x63omponents.auth.realms\"\x85\x01\n\x06Realms\x12\x13\n\x0b\x61pi_version\x18\x01 \x01(\x03\x12\x37\n\x0bpermissions\x18\x02 \x03(\x0b\x32\".components.auth.realms.Permission\x12-\n\x06realms\x18\x03 \x03(\x0b\x32\x1d.components.auth.realms.Realm\"\x1a\n\nPermission\x12\x0c\n\x04name\x18\x01 \x01(\t\"H\n\x05Realm\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x31\n\x08\x62indings\x18\x02 \x03(\x0b\x32\x1f.components.auth.realms.Binding\"2\n\x07\x42inding\x12\x13\n\x0bpermissions\x18\x01 \x03(\r\x12\x12\n\nprincipals\x18\x02 \x03(\tB<Z:go.chromium.org/luci/server/auth/service/protocol;protocolb\x06proto3'
+  serialized_pb=b'\n\"components/auth/proto/realms.proto\x12\x16\x63omponents.auth.realms\"\x85\x01\n\x06Realms\x12\x13\n\x0b\x61pi_version\x18\x01 \x01(\x03\x12\x37\n\x0bpermissions\x18\x02 \x03(\x0b\x32\".components.auth.realms.Permission\x12-\n\x06realms\x18\x03 \x03(\x0b\x32\x1d.components.auth.realms.Realm\",\n\nPermission\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x10\n\x08internal\x18\x02 \x01(\x08\"H\n\x05Realm\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x31\n\x08\x62indings\x18\x02 \x03(\x0b\x32\x1f.components.auth.realms.Binding\"2\n\x07\x42inding\x12\x13\n\x0bpermissions\x18\x01 \x03(\r\x12\x12\n\nprincipals\x18\x02 \x03(\tB<Z:go.chromium.org/luci/server/auth/service/protocol;protocolb\x06proto3'
 )
 
 
@@ -86,6 +86,13 @@ _PERMISSION = _descriptor.Descriptor(
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='internal', full_name='components.auth.realms.Permission.internal', index=1,
+      number=2, type=8, cpp_type=7, label=1,
+      has_default_value=False, default_value=False,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
   ],
   extensions=[
   ],
@@ -99,7 +106,7 @@ _PERMISSION = _descriptor.Descriptor(
   oneofs=[
   ],
   serialized_start=198,
-  serialized_end=224,
+  serialized_end=242,
 )
 
 
@@ -137,8 +144,8 @@ _REALM = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=226,
-  serialized_end=298,
+  serialized_start=244,
+  serialized_end=316,
 )
 
 
@@ -176,8 +183,8 @@ _BINDING = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=300,
-  serialized_end=350,
+  serialized_start=318,
+  serialized_end=368,
 )
 
 _REALMS.fields_by_name['permissions'].message_type = _PERMISSION

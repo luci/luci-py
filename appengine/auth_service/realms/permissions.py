@@ -177,21 +177,33 @@ class Builder(object):
 
   def __init__(self, revision):
     self.revision = revision
-    self.permissions = set()  # set of str with all permissions
+    self.permissions = {}  # permission name -> realms_pb2.Permission
     self.roles = {}  # role name => set of str with permissions
     self.implicit_root_bindings = lambda _: []  # see DB.implicit_root_bindings
 
-  def permission(self, name):
+  def permission(self, name, internal=False):
     """Defines a permission if it hasn't been defined before.
 
-    Idempotent. Returns a reference to permission that can be passed to `role`
-    as an element of `includes`.
+    Idempotent. Raises ValueError when attempting to redeclare the permission
+    with the same name but different attributes.
+
+    Returns a reference to the permission that can be passed to `role` as
+    an element of `includes`.
     """
     if name.count('.') != 2:
       raise ValueError(
           'Permissions must have form <service>.<subject>.<verb> for now, '
           'got %s' % (name,))
-    self.permissions.add(name)
+
+    perm = realms_pb2.Permission(name=name, internal=internal)
+
+    existing = self.permissions.get(name)
+    if existing:
+      if existing != perm:
+        raise ValueError('Redeclaring permission %s' % name)
+    else:
+      self.permissions[name] = perm
+
     return self.PermRef(name)
 
   def include(self, role):
@@ -234,9 +246,7 @@ class Builder(object):
   def finish(self):
     return DB(
         revision=self.revision,
-        permissions={
-            name: realms_pb2.Permission(name=name) for name in self.permissions
-        },
+        permissions=self.permissions,
         roles={
             name: Role(name=name, permissions=tuple(sorted(perms)))
             for name, perms in self.roles.items()

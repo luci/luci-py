@@ -53,7 +53,7 @@ def validate_custom_roles_list(db, roles, ctx):
         ctx.error('a custom role with this name was already defined')
         continue
 
-      # All referenced permissions must be known.
+      # All referenced permissions must be known and be non-internal.
       for perm in role.permissions:
         validate_permission(db, perm, ctx)
 
@@ -90,11 +90,15 @@ def validate_custom_roles_list(db, roles, ctx):
 
 
 def validate_permission(db, perm, ctx):
-  """Emits errors if the permission is not defined."""
-  if perm not in db.permissions:
+  """Emits errors if the permission is not defined or it is internal."""
+  perm_pb = db.permissions.get(perm)
+  if not perm_pb:
     ctx.error(
         'permission "%s" is not defined in permissions DB ver "%s"',
         perm, db.revision)
+  elif perm_pb.internal:
+    ctx.error(
+        'permission "%s" is internal, it can\'t be used in the config', perm)
 
 
 def validate_role_ref(db, name, custom_roles, ctx):
