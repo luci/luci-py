@@ -830,14 +830,14 @@ class NamedCacheTest(TestCase, CacheTestMixin):
     # v1
     old = {
         'version': lru.CURRENT_VERSION,
-        'items': [['cache1', ['f1', now]],],
+        'items': [['cache1', [['f1', len('world')], now]],],
     }
     c = local_caching.NamedCache
     with fs.open(os.path.join(self.cache_dir, c.STATE_FILE), 'w') as f:
       json.dump(old, f)
     # It automatically upgrades to v2.
     cache = self.get_cache(_get_policies())
-    expected = {u'cache1': ((u'f1', len('world')), now)}
+    expected = {u'cache1': [[u'f1', len('world')], now]}
     self.assertEqual(expected, dict(cache._lru._items.items()))
     self.assertEqual(
         [u'f1', cache.STATE_FILE], sorted(fs.listdir(cache.cache_dir)))

@@ -848,6 +848,10 @@ class NamedCache(Cache):
     elif fs.isfile(self.state_file):
       try:
         self._lru = lru.LRUDict.load(self.state_file)
+        for _, size in self._lru.values():
+          if not isinstance(size, (int, long)):
+            raise ValueError("size is not integer: %v", size)
+
       except ValueError:
         logging.exception(
             'NamedCache: failed to load named cache state file; obliterating')
