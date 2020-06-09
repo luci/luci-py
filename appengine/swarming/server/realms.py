@@ -9,7 +9,6 @@ from components import auth
 
 from proto.config import realms_pb2
 from server import config
-from server import pools_config
 from server import task_scheduler
 
 _TRACKING_BUG = 'crbug.com/1066839'
