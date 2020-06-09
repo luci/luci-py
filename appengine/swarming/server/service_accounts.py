@@ -9,7 +9,6 @@ import datetime
 import logging
 import os
 import random
-import re
 
 from google.appengine.api import app_identity
 from google.appengine.api import memcache
@@ -18,6 +17,7 @@ from components import auth
 from components import net
 from components import utils
 
+from server import service_accounts_utils
 from server import task_pack
 
 
@@ -65,11 +65,6 @@ def has_token_server():
   return bool(auth.get_request_auth_db().token_server_url)
 
 
-def is_service_account(value):
-  """Returns True if given value looks like a service account email."""
-  return bool(_SERVICE_ACCOUNT_RE.match(value))
-
-
 def get_oauth_token_grant(service_account, validity_duration):
   """Returns "OAuth token grant" that allows usage of the service account.
 
@@ -102,7 +97,8 @@ def get_oauth_token_grant(service_account, validity_duration):
     InternalError if the RPC fails unexpectedly.
   """
   assert has_token_server()
-  assert is_service_account(service_account), service_account
+  assert service_accounts_utils.is_service_account(
+      service_account), service_account
 
   end_user = auth.get_current_identity()
 
@@ -223,7 +219,8 @@ def get_task_account_token(task_id, bot_id, scopes):
     return task_request.service_account, None
 
   # The only possible case is a service account email. Double check this.
-  if not is_service_account(task_request.service_account):
+  if not service_accounts_utils.is_service_account(
+      task_request.service_account):
     raise MisconfigurationError(
         'Not a service account email: %s' % task_request.service_account)
 
@@ -302,9 +299,6 @@ def get_system_account_token(system_service_account, scopes):
 
 ### Private code
 
-
-# Matches service account email (or rather close enough superset of it).
-_SERVICE_ACCOUNT_RE = re.compile(r'^[0-9a-zA-Z_\-\.\+\%]+@[0-9a-zA-Z_\-\.]+$')
 
 # Memcache namespace for OAuth token grants.
 _OAUTH_TOKEN_GRANT_CACHE_NS = 'oauth_token_grants_v1'

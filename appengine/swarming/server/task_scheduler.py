@@ -31,7 +31,7 @@ from server import config
 from server import external_scheduler
 from server import pools_config
 from server import resultdb
-from server import service_accounts
+from server import service_accounts_utils
 from server import task_pack
 from server import task_queues
 from server import task_request
@@ -1106,7 +1106,7 @@ def check_schedule_request_acl_caller(pool, pool_cfg):
 def check_schedule_request_acl_service_account(request, pool_cfg):
   # request.service_account can be 'bot' or 'none'. We don't care about these,
   # they are always allowed. We care when the service account is a real email.
-  has_service_account = service_accounts.is_service_account(
+  has_service_account = service_accounts_utils.is_service_account(
       request.service_account)
   if (has_service_account and
       not _is_allowed_service_account(request.service_account, pool_cfg)):

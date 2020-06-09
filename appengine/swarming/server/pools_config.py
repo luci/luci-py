@@ -22,7 +22,7 @@ from components.config import validation
 from proto.config import pools_pb2
 from server import config as local_config
 from server import directory_occlusion
-from server import service_accounts
+from server import service_accounts_utils
 
 
 POOLS_CFG_FILENAME = 'pools.cfg'
@@ -698,7 +698,7 @@ def _validate_pools_cfg(cfg, ctx):
 
       # Validate service accounts.
       for i, account in enumerate(msg.allowed_service_account):
-        if not service_accounts.is_service_account(account):
+        if not service_accounts_utils.is_service_account(account):
           ctx.error('bad allowed_service_account #%d "%s"', i, account)
 
       # Validate service account groups.

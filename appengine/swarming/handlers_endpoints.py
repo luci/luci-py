@@ -35,6 +35,7 @@ from server import config
 from server import pools_config
 from server import realms
 from server import service_accounts
+from server import service_accounts_utils
 from server import task_pack
 from server import task_queues
 from server import task_request
@@ -503,7 +504,7 @@ class SwarmingTasksService(remote.Service):
 
     # If the request has a service account email, check if the service account
     # is allowed to run.
-    if service_accounts.is_service_account(request_obj.service_account):
+    if service_accounts_utils.is_service_account(request_obj.service_account):
       if not service_accounts.has_token_server():
         raise endpoints.BadRequestException(
             'This Swarming server doesn\'t support task service accounts '

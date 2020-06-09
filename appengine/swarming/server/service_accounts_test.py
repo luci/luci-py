@@ -23,17 +23,6 @@ from server import task_pack
 from server import task_request
 
 
-class ServiceAccountRegexpTest(test_case.TestCase):
-
-  def test_is_service_account(self):
-    self.assertTrue(
-        service_accounts.is_service_account('a@proj.iam.gserviceaccount.com'))
-    self.assertFalse(service_accounts.is_service_account('bot:something'))
-    self.assertFalse(
-        service_accounts.is_service_account('user:something@something'))
-    self.assertFalse(service_accounts.is_service_account(''))
-
-
 class MockedAuthDB(object):
   token_server_url = 'https://tokens.example.com'
 

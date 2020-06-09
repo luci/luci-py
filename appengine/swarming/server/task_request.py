@@ -72,7 +72,7 @@ from server import bq_state
 from server import config
 from server import directory_occlusion
 from server import pools_config
-from server import service_accounts
+from server import service_accounts_utils
 from server import task_pack
 from server.constants import OR_DIM_SEP
 
@@ -459,7 +459,8 @@ def _validate_service_account(prop, value):
   _validate_length(prop, value, 128)
   if not value:
     return None
-  if value in ('bot', 'none') or service_accounts.is_service_account(value):
+  if value in ('bot',
+               'none') or service_accounts_utils.is_service_account(value):
     return value
   raise datastore_errors.BadValueError(
       '%r must be an email, "bot" or "none" string, got %r' % (prop._name,
