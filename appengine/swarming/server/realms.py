@@ -93,6 +93,9 @@ def check_pools_create_task(pool, pool_cfg):
       raise auth.AuthorizationError(
           'User "%s" is not allowed to schedule tasks in the pool "%s", '
           'see pools.cfg' % (auth.get_current_identity().to_bytes(), pool))
+    logging.info(
+        '[realms] User "%s" is allowed to schedule tasks in the pool "%s".',
+        auth.get_current_identity().to_bytes(), pool)
     return
 
   # legacy-compatible path
@@ -141,6 +144,9 @@ def check_tasks_create_in_realm(realm, pool_cfg):
       raise auth.AuthorizationError(
           'User "%s" is not allowed to create a task in the realm "%s"' %
           (auth.get_current_identity().to_bytes(), realm))
+    logging.info(
+        '[realms] User "%s" is allowed to create a task in the realm "%s"',
+        auth.get_current_identity().to_bytes(), realm)
     return
 
   if pool_cfg.dry_run_task_realm:
@@ -191,6 +197,9 @@ def check_tasks_run_as(task_request, pool_cfg):
       raise auth.AuthorizationError(
           'Task service account "%s" is not allowed to run in the realm "%s"' %
           (task_request.service_account, task_request.realm))
+    logging.info(
+        '[realms] Task service account %s is allowed to run in the realm "%s"',
+        task_request.service_account, task_request.realm)
     return
 
   # legacy-compatible path
