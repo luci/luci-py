@@ -17,6 +17,8 @@ from components import auth
 from components import net
 from components import utils
 
+from server import pools_config
+from server import realms
 from server import service_accounts_utils
 from server import task_pack
 
@@ -187,6 +189,10 @@ def get_task_account_token(task_id, bot_id, scopes):
 
   Otherwise returns (<email>, AccessToken with valid token for <email>).
 
+  If the task has realm, it calls MintServiceAccountToken rpc using the realm.
+  Otherwise, it calls MintOAuthTokenViaGrant with grant token. The legacy path
+  will be deprecated after migrating to Realm-based configurations.
+
   Args:
     task_id: ID of the task.
     bot_id: ID of the bot that executes the task, for logs.
@@ -224,11 +230,6 @@ def get_task_account_token(task_id, bot_id, scopes):
     raise MisconfigurationError(
         'Not a service account email: %s' % task_request.service_account)
 
-  # Should have a token prepared by 'get_oauth_token_grant' already.
-  if not task_request.service_account_token:
-    raise MisconfigurationError(
-        'The task request %s has no associated service account token' % task_id)
-
   # Additional information for Token Server's logs.
   audit_tags = [
       'swarming:bot_id:%s' % bot_id,
@@ -236,10 +237,25 @@ def get_task_account_token(task_id, bot_id, scopes):
       'swarming:task_name:%s' % task_request.name,
   ]
 
-  # Use this token to grab the real OAuth token. Note that the bot caches the
-  # resulting OAuth token internally, so we don't bother to cache it here.
-  access_token, expiry = _mint_oauth_token_via_grant(
-      task_request.service_account_token, scopes, audit_tags)
+  if task_request.realm:
+    # If TaskRequest.realm is set, it calls MintServiceAccountToken to grab
+    # a OAuth token. It also re-checks if the service account is still allowed
+    # to run in the realm. because it may have changed since the last check.
+    pool_cfg = pools_config.get_pool_config(task_request.pool)
+    realms.check_tasks_run_as(task_request, pool_cfg)
+    access_token, expiry = _mint_service_account_token(
+        task_request.service_account, task_request.realm, scopes, audit_tags)
+  else:
+    # Should have a token prepared by 'get_oauth_token_grant' already.
+    if not task_request.service_account_token:
+      raise MisconfigurationError(
+          'The task request %s has no associated service account token' %
+          task_id)
+
+    # Use this token to grab the real OAuth token. Note that the bot caches the
+    # resulting OAuth token internally, so we don't bother to cache it here.
+    access_token, expiry = _mint_oauth_token_via_grant(
+        task_request.service_account_token, scopes, audit_tags)
 
   # Log and return the token.
   token = AccessToken(access_token,
@@ -378,12 +394,55 @@ def _mint_oauth_token_via_grant(grant_token, oauth_scopes, audit_tags):
   return access_token, expiry
 
 
-def _call_token_server(method, request):
+def _mint_service_account_token(service_account, realm, oauth_scopes,
+                                audit_tags):
+  """Does the RPC to the token server to get an access token using realm.
+
+  Args:
+    service_account: a service account email to use.
+    realm: a realm name to use.
+    oauth_scopes: list of strings with requested OAuth scopes.
+    audit_tags: list with information tags to send with the RPC, for logging.
+
+  Raises:
+    PermissionError if the token server forbids the usage.
+    MisconfigurationError if the service account is misconfigured.
+    InternalError if the RPC fails unexpectedly.
+  """
+  # extract LUCI project from realm '<project>:<realm>'.
+  luci_project = realm.split(':')[0]
+  resp = _call_token_server(
+      'MintServiceAccountToken',
+      {
+          # tokenserver.minter.SERVICE_ACCOUNT_TOKEN_ACCESS_TOKEN
+          'tokenKind': 1,
+          'serviceAccount': service_account,
+          'realm': realm,
+          'oauthScope': oauth_scopes,
+          'minValidityDuration': MIN_TOKEN_LIFETIME_SEC,
+          'auditTags': _common_audit_tags() + audit_tags,
+      },
+      {
+          'X-Luci-Project': luci_project,
+      })
+  try:
+    access_token = str(resp['token'])
+    service_version = str(resp['serviceVersion'])
+    expiry = utils.parse_rfc3339_datetime(resp['expiry'])
+  except (KeyError, ValueError) as exc:
+    logging.error('Bad response from the token server (%s):\n%r', exc, resp)
+    raise InternalError('Bad response from the token server, see server logs')
+  logging.info('The token server replied, its version: %s', service_version)
+  return access_token, expiry
+
+
+def _call_token_server(method, request, headers=None):
   """Sends an RPC to tokenserver.minter.TokenMinter service.
 
   Args:
     method: name of the method to call.
     request: dict with request fields.
+    headers: dict with additional request headers.
 
   Returns:
     Dict with response fields.
@@ -410,6 +469,7 @@ def _call_token_server(method, request):
         url='%s/prpc/tokenserver.minter.TokenMinter/%s' % (ts_url, method),
         method='POST',
         payload=request,
+        headers=headers,
         scopes=[net.EMAIL_SCOPE])
   except net.Error as exc:
     logging.error('Error calling %s (HTTP %s: %s):\n%s', method,

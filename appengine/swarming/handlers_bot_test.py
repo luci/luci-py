@@ -1396,13 +1396,16 @@ class BotApiTest(test_env_handlers.AppTestBase):
       return 'blah@example.com', service_accounts.AccessToken('blah', 126240504)
 
     self.mock(service_accounts, 'get_task_account_token', mocked)
+    self.mock_task_service_accounts()
+    self.mock_default_pool_acl(['blah@example.com'])
 
     self.set_as_bot()
     resp = self.bot_poll()
 
     # Create a task.
     self.set_as_user()
-    _, task_summary_id = self.client_create_task_raw()
+    _, task_summary_id = self.client_create_task_raw(
+        service_account='blah@example.com')
     self.assertEqual('0', task_summary_id[-1])
     # Convert TaskResultSummary reference to TaskRunResult.
     task_id = task_summary_id[:-1] + '1'
