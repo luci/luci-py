@@ -567,7 +567,6 @@ def _fetch_and_map_with_go(isolated_hash, storage, outdir, go_cache_dir,
     bundle = isolateserver.IsolatedBundle(filter_cb=None)
     # Only following properties are used in caller.
     bundle.command = isolated.get('command')
-    bundle.read_only = isolated.get('read_only')
     bundle.relative_cwd = isolated.get('relative_cwd')
 
     return bundle, {

@@ -68,7 +68,7 @@ class SymlinkTest(unittest.TestCase):
       fs.mkdir(subdir)
       linkdir = os.path.join(self.cwd, u'linkdir')
       fs.symlink('subDir', linkdir)
-      actual = isolated_format.file_to_metadata(linkdir.upper(), True, False)
+      actual = isolated_format.file_to_metadata(linkdir.upper(), False)
       self.assertEqual({'l': u'subdir'}, actual)
 
     def test_file_to_metadata_path_case_complex(self):
@@ -86,12 +86,10 @@ class SymlinkTest(unittest.TestCase):
       subsymlinkdir = os.path.join(basedir, u'symlinkdir')
       fs.symlink('linkedDir1', subsymlinkdir)
 
-      actual = isolated_format.file_to_metadata(
-          subsymlinkdir.upper(), True, False)
+      actual = isolated_format.file_to_metadata(subsymlinkdir.upper(), False)
       self.assertEqual({'l': u'linkeddir1'}, actual)
 
-      actual = isolated_format.file_to_metadata(
-          linkeddir1.upper(), True, False)
+      actual = isolated_format.file_to_metadata(linkeddir1.upper(), False)
       self.assertEqual({'l': u'../linkeddir2'}, actual)
 
   if sys.platform != 'win32':
@@ -131,13 +129,13 @@ class SymlinkTest(unittest.TestCase):
       sym_file = os.path.join(basedir, u'linkdir', u'Sym.txt')
       fs.symlink('../subdir/Foo.txt', sym_file)
 
-      actual = isolated_format.file_to_metadata(sym_file, True, True)
+      actual = isolated_format.file_to_metadata(sym_file, True)
       actual['h'] = isolated_format.hash_file(sym_file, ALGO)
       expected = {
-        # SHA-1 of empty string
-        'h': 'da39a3ee5e6b4b0d3255bfef95601890afd80709',
-        'm': 256,
-        's': 0,
+          # SHA-1 of empty string
+          'h': 'da39a3ee5e6b4b0d3255bfef95601890afd80709',
+          'm': 0o600,
+          's': 0,
       }
       self.assertEqual(expected, actual)
 

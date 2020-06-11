@@ -297,7 +297,7 @@ def expand_directory_and_symlink(indir, relfile, blacklist, follow_symlinks):
 
 
 @tools.profile
-def file_to_metadata(filepath, read_only, collapse_symlinks):
+def file_to_metadata(filepath, collapse_symlinks):
   """Processes an input file, a dependency, and return meta data about it.
 
   Behaviors:
@@ -307,10 +307,6 @@ def file_to_metadata(filepath, read_only, collapse_symlinks):
 
   Arguments:
     filepath: File to act on.
-    read_only: If 1 or 2, the file mode is manipulated. In practice, only save
-               one of 4 modes: 0755 (rwx), 0644 (rw), 0555 (rx), 0444 (r). On
-               windows, mode is not set since all files are 'executable' by
-               default.
     collapse_symlinks: True if symlinked files should be treated like they were
                        the normal underlying file.
 
@@ -318,8 +314,6 @@ def file_to_metadata(filepath, read_only, collapse_symlinks):
     The necessary dict to create a entry in the 'files' section of an .isolated
     file *except* 'h' for files.
   """
-  # TODO(maruel): None is not a valid value.
-  assert read_only in (None, 0, 1, 2), read_only
   out = {}
   # Always check the file stat and check if it is a link.
   try:
@@ -339,8 +333,6 @@ def file_to_metadata(filepath, read_only, collapse_symlinks):
     filemode = stat.S_IMODE(filestats.st_mode)
     # Remove write access for group and all access to 'others'.
     filemode &= ~(stat.S_IWGRP | stat.S_IRWXO)
-    if read_only:
-      filemode &= ~stat.S_IWUSR
     if filemode & (stat.S_IXUSR|stat.S_IRGRP) == (stat.S_IXUSR|stat.S_IRGRP):
       # Only keep x group bit if both x user bit and group read bit are set.
       filemode |= stat.S_IXGRP

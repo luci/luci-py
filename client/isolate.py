@@ -604,7 +604,6 @@ class CompleteState(object):
         # code is going away soon and shouldn't be used in new code.
         meta = isolated_format.file_to_metadata(
             filepath,
-            self.saved_state.read_only,
             collapse_symlinks)
         if 'l' not in meta:
           meta['h'] = isolated_format.hash_file(filepath, self.saved_state.algo)

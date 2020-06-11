@@ -1155,8 +1155,8 @@ class IsolateServerDownloadTest(TestCase):
     self.expected_requests(requests)
     self.assertEqual(0, isolateserver.main(cmd))
     expected = {
-        os.path.join(self.tempdir, 'target', 'a', 'foo'): ('Content', 0o500),
-        os.path.join(self.tempdir, 'target', 'b'): ('More content', 0o400),
+        os.path.join(self.tempdir, 'target', 'a', 'foo'): ('Content', 0o700),
+        os.path.join(self.tempdir, 'target', 'b'): ('More content', 0o600),
         os.path.join(self.tempdir, 'target', 'c'): (u'a/foo', 0),
     }
     actual = self._get_actual()
@@ -1172,7 +1172,7 @@ class IsolateServerDownloadTest(TestCase):
 
     files = {
         os.path.join('a', 'foo'): ('Content', 0o500),
-        'b': ('More content', 0o400),
+        'b': ('More content', 0o600),
         'c': ('Even more content!', 0o500),
     }
 
