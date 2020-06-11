@@ -850,7 +850,7 @@ class NamedCache(Cache):
         self._lru = lru.LRUDict.load(self.state_file)
         for _, size in self._lru.values():
           if not isinstance(size, (int, long)):
-            raise ValueError("size is not integer: %s", size)
+            raise ValueError("size is not integer: %s" % size)
 
       except ValueError:
         logging.exception(
