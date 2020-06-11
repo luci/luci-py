@@ -55,6 +55,9 @@ import logging
 import posixpath
 import random
 import re
+import sys
+
+import six
 
 from google.appengine import runtime
 from google.appengine.api import datastore_errors
@@ -475,6 +478,16 @@ def _validate_ping_tolerance(prop, value):
         '%s (%d) must range between %d and %d' %
         (prop._name, value, _MIN_BOT_PING_TOLERANCE_SECS,
          _MAX_BOT_PING_TOLERANCE_SECS))
+
+
+def _validate_realm(_prop, value):
+  if not value:
+    return
+  try:
+    auth.validate_realm_name(value)
+  except ValueError:
+    _, e, tb = sys.exc_info()
+    six.reraise(datastore_errors.BadValueError, e.message, tb)
 
 
 ### Models.
@@ -1149,7 +1162,7 @@ class TaskRequest(ndb.Model):
 
   # Task realm.
   # See api/swarming.proto for more details.
-  realm = ndb.StringProperty()
+  realm = ndb.StringProperty(validator=_validate_realm)
 
   @property
   def num_task_slices(self):

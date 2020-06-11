@@ -1257,6 +1257,27 @@ class TasksApiTest(BaseTest):
     response = self.call_api('new', body=message_to_dict(request), status=200)
     self.assertEqual(u'5cee488008810', response.json[u'task_id'])
 
+  def test_new_invalid_realm(self):
+    request = self.create_new_request(
+        properties={
+            u'command': [u'echo', u'hi'],
+            u'dimensions': [{
+                u'key': u'pool',
+                u'value': u'default'
+            }],
+            u'execution_timeout_secs': 30,
+        },
+        service_account='service-account@example.com',
+        realm='test/invalid')  # should be <project>:<realm>
+    response = self.call_api('new', body=message_to_dict(request), status=400)
+    self.assertEqual(
+        {
+            u'error': {
+                u'message': u'Bad realm u\'test/invalid\', want '
+                            '"<project>:<name>"',
+            },
+        }, response.json)
+
   def _prepare_mass_cancel(self):
     # Create 3 tasks: one pending, one running, one complete.
     self.mock(random, 'getrandbits', lambda _: 0x88)

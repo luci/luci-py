@@ -1706,6 +1706,12 @@ class TaskRequestApiTest(TestCase):
     with self.assertRaises(datastore_errors.BadValueError):
       _gen_request(manual_tags=['a:' + 'a' * (l + 1)]).put()
 
+  def test_request_bad_realm(self):
+    _gen_request(realm=None).put()
+    _gen_request(realm='test:realm').put()
+    with self.assertRaises(datastore_errors.BadValueError):
+      _gen_request(realm='invalid_realm').put()
+
   def test_validate_priority(self):
     with self.assertRaises(TypeError):
       task_request.validate_priority(None)
