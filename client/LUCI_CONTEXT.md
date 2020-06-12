@@ -129,6 +129,18 @@ message LUCIExe {
 }
 ```
 
+## `realm`
+
+This section describes data passed from LUCI Realms integration.
+
+```proto
+message Realm {
+  // Realm name of the task.
+  // e.g. infra:ci
+  string name = 1;
+}
+```
+
 ## `resultdb`
 
 This section describes data passed from ResultDB integrations.
