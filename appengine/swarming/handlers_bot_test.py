@@ -630,7 +630,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
     expected = {
         u'hostname': u'test-resultdb-server.com',
         u'current_invocation': {
-            u'invocation': invocation_name,
+            u'name': invocation_name,
             u'update_token': u'resultdb-update-token',
         }
     }

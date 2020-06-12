@@ -693,7 +693,7 @@ class BotPollHandler(_BotBaseHandler):
           'hostname':
               urlparse.urlparse(config.settings().resultdb.server).hostname,
           'current_invocation': {
-              'invocation':
+              'name':
                   resultdb.get_invocation_name(
                       task_pack.pack_run_result_key(run_result.run_result_key)),
               'update_token':
