@@ -700,6 +700,9 @@ class BotPollHandler(_BotBaseHandler):
                   request.resultdb_update_token,
           }
       }
+    realm_context = {}
+    if request.realm:
+      realm_context['name'] = request.realm
 
     out = {
         'cmd': 'run',
@@ -744,6 +747,8 @@ class BotPollHandler(_BotBaseHandler):
             } if props.inputs_ref else None,
             'outputs':
                 props.outputs,
+            'realm':
+                realm_context,
             'relative_cwd':
                 props.relative_cwd,
             'resultdb':

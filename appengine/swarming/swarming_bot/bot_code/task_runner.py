@@ -234,6 +234,7 @@ class TaskDetails(object):
       'io_timeout',
       'isolated',
       'outputs',
+      'realm',
       'relative_cwd',
       'resultdb',
       'secret_bytes',
@@ -278,6 +279,7 @@ class TaskDetails(object):
     self.outputs = data['outputs']
     self.secret_bytes = data['secret_bytes']
     self.resultdb = data['resultdb']
+    self.realm = data['realm']
     self.containment = Containment(data['containment'])
 
   @staticmethod
@@ -361,6 +363,12 @@ def load_and_run(in_file, swarming_server, is_grpc, cost_usd_hour, start,
         swarming = luci_context.read('swarming') or {}
         swarming['secret_bytes'] = task_details.secret_bytes
         context_edits['swarming'] = swarming
+
+      # Extend existing LUCI_CONTEXT['realm'], if any.
+      if task_details.realm is not None:
+        realm = luci_context.read('realm') or {}
+        realm.update(task_details.realm)
+        context_edits['realm'] = realm
 
       # Extend existing LUCI_CONTEXT['resultdb'], if any.
       if task_details.resultdb is not None:

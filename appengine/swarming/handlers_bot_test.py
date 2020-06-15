@@ -436,6 +436,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
                 u'server': u'https://pool.config.isolate.example.com',
             },
             u'secret_bytes': None,
+            u'realm': {},
             u'resultdb': {},
             u'io_timeout': 1200,
             u'outputs': [u'foo', u'path/to/foobar'],
@@ -513,6 +514,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
                 u'server': u'https://pool.config.isolate.example.com',
             },
             u'secret_bytes': None,
+            u'realm': {},
             u'resultdb': {},
             u'io_timeout': 1200,
             u'outputs': [u'foo', u'path/to/foobar'],
@@ -593,6 +595,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
             u'io_timeout': 1200,
             u'outputs': [u'foo', u'path/to/foobar'],
             u'secret_bytes': None,
+            u'realm': {},
             u'resultdb': {},
             u'service_accounts': {
                 u'system': {
@@ -635,6 +638,22 @@ class BotApiTest(test_env_handlers.AppTestBase):
         }
     }
     self.assertEqual(expected, response['manifest']['resultdb'])
+
+  def test_poll_with_realm(self):
+    params = self.do_handshake(do_first_poll=True)
+
+    self.mock(auth, 'has_permission', lambda *_args, **_kwargs: True)
+    self.mock(service_accounts, 'has_token_server', lambda: True)
+
+    self.set_as_user()
+    response, _ = self.client_create_task_raw(realm='test:task_realm')
+
+    self.set_as_bot()
+    response = self.post_json('/swarming/api/v1/bot/poll', params)
+    expected = {
+        u'name': u'test:task_realm',
+    }
+    self.assertEqual(expected, response['manifest']['realm'])
 
   def test_poll_conflicting_dimensions(self):
     params = self.do_handshake()
@@ -742,6 +761,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
                 u'namespace': u'default-gzip',
             },
             u'secret_bytes': None,
+            u'realm': {},
             u'resultdb': {},
             u'io_timeout': 1200,
             u'outputs': [u'foo', u'path/to/foobar'],

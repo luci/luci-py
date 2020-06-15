@@ -20,6 +20,8 @@ import threading
 import time
 import unittest
 
+import mock
+
 import test_env_bot_code
 test_env_bot_code.setup_test_env()
 
@@ -87,6 +89,8 @@ def get_manifest(script=None, isolated=None, **kwargs):
       'isolated':
           isolated,
       'outputs': [],
+      'realm':
+          None,
       'relative_cwd':
           None,
       'resultdb':
@@ -1315,6 +1319,7 @@ class TaskRunnerNoServer(auto_stub.TestCase):
         'rpc_port': 123,
         'secret': 'abcdef',
     }
+    realm_ctx = {'name': 'test:realm'}
 
     def _run_command(
         remote, task_details, work_dir,
@@ -1329,7 +1334,9 @@ class TaskRunnerNoServer(auto_stub.TestCase):
       self.assertEqual(['--min-free-space', '1'], run_isolated_flags)
       self.assertEqual(None, bot_file)
       with open(ctx_file, 'r') as f:
-        self.assertDictEqual(local_auth_ctx, json.load(f)['local_auth'])
+        ctx = json.load(f)
+        self.assertDictEqual(local_auth_ctx, ctx['local_auth'])
+        self.assertDictEqual(realm_ctx, ctx['realm'])
       return {
           u'exit_code': 1,
           u'hard_timeout': False,
@@ -1340,10 +1347,13 @@ class TaskRunnerNoServer(auto_stub.TestCase):
     self.mock(task_runner, 'run_command', _run_command)
     manifest = get_manifest(command=['a'])
     FakeAuthSystem.local_auth_context = local_auth_ctx
+    task_details = get_task_details(realm={'name': 'test:realm'})
     try:
       self.mock(bot_auth, 'AuthSystem', FakeAuthSystem)
-      actual = load_and_run('http://localhost:1', self.root_dir, manifest,
-                            '/path/to/auth-params-file')
+      with mock.patch('%s.TaskDetails.load' % task_runner.__name__,
+                      mock.Mock(return_value=task_details)):
+        actual = load_and_run('http://localhost:1', self.root_dir, manifest,
+                              '/path/to/auth-params-file')
     finally:
       FakeAuthSystem.local_auth_context = None
     expected = {
