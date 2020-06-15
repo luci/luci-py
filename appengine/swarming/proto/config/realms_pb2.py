@@ -20,7 +20,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   syntax='proto3',
   serialized_options=b'Z3go.chromium.org/luci/swarming/proto/config;configpb',
   create_key=_descriptor._internal_create_key,
-  serialized_pb=b'\n\x0crealms.proto\x12\x0fswarming.config*\xaa\x01\n\x0fRealmPermission\x12 \n\x1cREALM_PERMISSION_UNSPECIFIED\x10\x00\x12&\n\"REALM_PERMISSION_POOLS_CREATE_TASK\x10\x01\x12*\n&REALM_PERMISSION_TASKS_CREATE_IN_REALM\x10\x02\x12!\n\x1dREALM_PERMISSION_TASKS_RUN_AS\x10\x03\x42\x35Z3go.chromium.org/luci/swarming/proto/config;configpbb\x06proto3'
+  serialized_pb=b'\n\x0crealms.proto\x12\x0fswarming.config*\xda\x03\n\x0fRealmPermission\x12 \n\x1cREALM_PERMISSION_UNSPECIFIED\x10\x00\x12&\n\"REALM_PERMISSION_POOLS_CREATE_TASK\x10\x01\x12%\n!REALM_PERMISSION_POOLS_LIST_TASKS\x10\x04\x12&\n\"REALM_PERMISSION_POOLS_CANCEL_TASK\x10\x05\x12%\n!REALM_PERMISSION_POOLS_CREATE_BOT\x10\x06\x12$\n REALM_PERMISSION_POOLS_LIST_BOTS\x10\x07\x12(\n$REALM_PERMISSION_POOLS_TERMINATE_BOT\x10\x08\x12%\n!REALM_PERMISSION_POOLS_DELETE_BOT\x10\t\x12*\n&REALM_PERMISSION_TASKS_CREATE_IN_REALM\x10\x02\x12!\n\x1dREALM_PERMISSION_TASKS_RUN_AS\x10\x03\x12\x1e\n\x1aREALM_PERMISSION_TASKS_GET\x10\n\x12!\n\x1dREALM_PERMISSION_TASKS_CANCEL\x10\x0b\x42\x35Z3go.chromium.org/luci/swarming/proto/config;configpbb\x06proto3'
 )
 
 _REALMPERMISSION = _descriptor.EnumDescriptor(
@@ -41,12 +41,52 @@ _REALMPERMISSION = _descriptor.EnumDescriptor(
       type=None,
       create_key=_descriptor._internal_create_key),
     _descriptor.EnumValueDescriptor(
-      name='REALM_PERMISSION_TASKS_CREATE_IN_REALM', index=2, number=2,
+      name='REALM_PERMISSION_POOLS_LIST_TASKS', index=2, number=4,
       serialized_options=None,
       type=None,
       create_key=_descriptor._internal_create_key),
     _descriptor.EnumValueDescriptor(
-      name='REALM_PERMISSION_TASKS_RUN_AS', index=3, number=3,
+      name='REALM_PERMISSION_POOLS_CANCEL_TASK', index=3, number=5,
+      serialized_options=None,
+      type=None,
+      create_key=_descriptor._internal_create_key),
+    _descriptor.EnumValueDescriptor(
+      name='REALM_PERMISSION_POOLS_CREATE_BOT', index=4, number=6,
+      serialized_options=None,
+      type=None,
+      create_key=_descriptor._internal_create_key),
+    _descriptor.EnumValueDescriptor(
+      name='REALM_PERMISSION_POOLS_LIST_BOTS', index=5, number=7,
+      serialized_options=None,
+      type=None,
+      create_key=_descriptor._internal_create_key),
+    _descriptor.EnumValueDescriptor(
+      name='REALM_PERMISSION_POOLS_TERMINATE_BOT', index=6, number=8,
+      serialized_options=None,
+      type=None,
+      create_key=_descriptor._internal_create_key),
+    _descriptor.EnumValueDescriptor(
+      name='REALM_PERMISSION_POOLS_DELETE_BOT', index=7, number=9,
+      serialized_options=None,
+      type=None,
+      create_key=_descriptor._internal_create_key),
+    _descriptor.EnumValueDescriptor(
+      name='REALM_PERMISSION_TASKS_CREATE_IN_REALM', index=8, number=2,
+      serialized_options=None,
+      type=None,
+      create_key=_descriptor._internal_create_key),
+    _descriptor.EnumValueDescriptor(
+      name='REALM_PERMISSION_TASKS_RUN_AS', index=9, number=3,
+      serialized_options=None,
+      type=None,
+      create_key=_descriptor._internal_create_key),
+    _descriptor.EnumValueDescriptor(
+      name='REALM_PERMISSION_TASKS_GET', index=10, number=10,
+      serialized_options=None,
+      type=None,
+      create_key=_descriptor._internal_create_key),
+    _descriptor.EnumValueDescriptor(
+      name='REALM_PERMISSION_TASKS_CANCEL', index=11, number=11,
       serialized_options=None,
       type=None,
       create_key=_descriptor._internal_create_key),
@@ -54,15 +94,23 @@ _REALMPERMISSION = _descriptor.EnumDescriptor(
   containing_type=None,
   serialized_options=None,
   serialized_start=34,
-  serialized_end=204,
+  serialized_end=508,
 )
 _sym_db.RegisterEnumDescriptor(_REALMPERMISSION)
 
 RealmPermission = enum_type_wrapper.EnumTypeWrapper(_REALMPERMISSION)
 REALM_PERMISSION_UNSPECIFIED = 0
 REALM_PERMISSION_POOLS_CREATE_TASK = 1
+REALM_PERMISSION_POOLS_LIST_TASKS = 4
+REALM_PERMISSION_POOLS_CANCEL_TASK = 5
+REALM_PERMISSION_POOLS_CREATE_BOT = 6
+REALM_PERMISSION_POOLS_LIST_BOTS = 7
+REALM_PERMISSION_POOLS_TERMINATE_BOT = 8
+REALM_PERMISSION_POOLS_DELETE_BOT = 9
 REALM_PERMISSION_TASKS_CREATE_IN_REALM = 2
 REALM_PERMISSION_TASKS_RUN_AS = 3
+REALM_PERMISSION_TASKS_GET = 10
+REALM_PERMISSION_TASKS_CANCEL = 11
 
 
 DESCRIPTOR.enum_types_by_name['RealmPermission'] = _REALMPERMISSION
