@@ -81,7 +81,7 @@ def _call_resultdb_recorder_api_async(method,
   # https://chromium.googlesource.com/infra/luci/luci-go/+/HEAD/resultdb/proto/rpc/v1/recorder.proto
   # But beware that proto JSON serialization uses camelCase, not snake_case.
   yield net.json_request_async(
-      url='%s/prpc/luci.resultdb.rpc.v1.Recorder/%s' % (rdb_url, method),
+      url='%s/prpc/luci.resultdb.v1.Recorder/%s' % (rdb_url, method),
       method='POST',
       payload=request,
       scopes=[net.EMAIL_SCOPE],
