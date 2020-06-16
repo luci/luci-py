@@ -82,20 +82,7 @@ def check_pools_create_task(pool, pool_cfg):
 
   if is_enforced_permission(realms_pb2.REALM_PERMISSION_POOLS_CREATE_TASK,
                             pool_cfg):
-    # enforced path.
-
-    # pool.realm is required.
-    if not pool_cfg.realm:
-      raise auth.AuthorizationError('realm is missing in Pool "%s"' % pool)
-
-    # check only Realm ACLs.
-    if not auth.has_permission(perm, [pool_cfg.realm]):
-      raise auth.AuthorizationError(
-          'User "%s" is not allowed to schedule tasks in the pool "%s", '
-          'see pools.cfg' % (auth.get_current_identity().to_bytes(), pool))
-    logging.info(
-        '[realms] User "%s" is allowed to schedule tasks in the pool "%s".',
-        auth.get_current_identity().to_bytes(), pool)
+    _check_permission(perm, [pool_cfg.realm])
     return
 
   # legacy-compatible path
@@ -136,17 +123,7 @@ def check_tasks_create_in_realm(realm, pool_cfg):
   perm = get_permission(perm_enum)
 
   if realm or is_enforced_permission(perm_enum, pool_cfg):
-    # realm is required in this path.
-    if not realm:
-      raise auth.AuthorizationError('task realm is missing')
-
-    if not auth.has_permission(perm, [realm]):
-      raise auth.AuthorizationError(
-          'User "%s" is not allowed to create a task in the realm "%s"' %
-          (auth.get_current_identity().to_bytes(), realm))
-    logging.info(
-        '[realms] User "%s" is allowed to create a task in the realm "%s"',
-        auth.get_current_identity().to_bytes(), realm)
+    _check_permission(perm, [realm])
     return
 
   if pool_cfg.dry_run_task_realm:
@@ -190,16 +167,7 @@ def check_tasks_run_as(task_request, pool_cfg):
   # Enforce if the requested task has realm or it's configured in pools.cfg or
   # in settings.cfg globally.
   if task_request.realm or is_enforced_permission(perm_enum, pool_cfg):
-    if not task_request.realm:
-      raise auth.AuthorizationError('Task realm is missing')
-
-    if not auth.has_permission(perm, [task_request.realm], identity=identity):
-      raise auth.AuthorizationError(
-          'Task service account "%s" is not allowed to run in the realm "%s"' %
-          (task_request.service_account, task_request.realm))
-    logging.info(
-        '[realms] Task service account %s is allowed to run in the realm "%s"',
-        task_request.service_account, task_request.realm)
+    _check_permission(perm, [task_request.realm], identity)
     return
 
   # legacy-compatible path
@@ -220,3 +188,41 @@ def check_tasks_run_as(task_request, pool_cfg):
           legacy_allowed,
           identity=identity,
           tracking_bug='crbug.com/1066839')
+
+
+# Private section
+
+
+def _check_permission(perm, realms, identity=None):
+  """Checks if the caller has the realm permission.
+
+  Args:
+    perm: An instance of auth.Permission.
+    realms: List of realms.
+    identity: An instance of auth.Identity to check permission.
+              default is auth.get_current_identity().
+
+  Returns:
+    None
+
+  Raises:
+    auth.AuthorizationError: if the caller is not allowed or realm is missing.
+  """
+
+  # Remove None from list
+  realms = [r for r in realms if r]
+
+  if not identity:
+    identity = auth.get_current_identity()
+
+  if not realms:
+    raise auth.AuthorizationError('Realm is missing')
+
+  if not auth.has_permission(perm, realms, identity=identity):
+    logging.warning(
+        '[realms] %s "%s" does not have permission "%s" in any realms %s',
+        identity.kind, identity.name, perm.name, realms)
+    raise auth.AuthorizationError('%s "%s" does not have permission "%s"' %
+                                  (identity.kind, identity.name, perm.name))
+  logging.info('[realms] %s "%s" has permission "%s" in any realms %s',
+               identity.kind, identity.name, perm.name, realms)
