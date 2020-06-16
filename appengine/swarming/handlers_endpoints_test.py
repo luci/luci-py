@@ -1241,7 +1241,7 @@ class TasksApiTest(BaseTest):
   def test_new_ok_with_realm(self):
     self.mock(random, 'getrandbits', lambda _: 0x88)
     self.mock(service_accounts, 'has_token_server', lambda: True)
-    self.mock_auth_db()
+    self.mock_auth_db([auth.Permission('swarming.pools.createTask')])
 
     request = self.create_new_request(
         properties={
