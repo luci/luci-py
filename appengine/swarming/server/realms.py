@@ -63,8 +63,8 @@ def check_pools_create_task(pool, pool_cfg):
     It just calls auth.has_permission()
 
   If it's legacy-compatible,
-    It calls the legacy task_scheduler._is_allowed_to_schedule() and compare
-    the legacy result with the realm permission check using the dryrun.
+    It calls the legacy task_scheduler.check_schedule_request_acl_caller() and
+    compare the legacy result with the realm permission check using the dryrun.
 
   Args:
     pool: Pool in which the caller is scheduling a new task.
@@ -77,22 +77,45 @@ def check_pools_create_task(pool, pool_cfg):
     auth.AuthorizationError: if the caller is not allowed to schedule the task
                              in the pool.
   """
-  perm = realms_pb2.REALM_PERMISSION_POOLS_CREATE_TASK
+  # 'swarming.pools.createTask'
+  perm = get_permission(realms_pb2.REALM_PERMISSION_POOLS_CREATE_TASK)
 
-  legacy_err_msg = (
-      'User "%s" is not allowed to schedule tasks in the pool "%s", '
-      'see pools.cfg' % (auth.get_current_identity().to_bytes(), pool))
+  if is_enforced_permission(realms_pb2.REALM_PERMISSION_POOLS_CREATE_TASK,
+                            pool_cfg):
+    # enforced path.
 
-  def check_auth_legacy():
-    return task_scheduler._is_allowed_to_schedule(pool_cfg)
+    # pool.realm is required.
+    if not pool_cfg.realm:
+      raise auth.AuthorizationError('realm is missing in Pool "%s"' % pool)
 
-  _check_permission(
-      perm,
-      pool_cfg.realm,
-      is_enforced=is_enforced_permission(perm, pool_cfg),
-      legacy_check_func=check_auth_legacy,
-      legacy_auth_err_msg=legacy_err_msg,
-      dryrun_realm=pool_cfg.realm)
+    # check only Realm ACLs.
+    if not auth.has_permission(perm, [pool_cfg.realm]):
+      raise auth.AuthorizationError(
+          'User "%s" is not allowed to schedule tasks in the pool "%s", '
+          'see pools.cfg' % (auth.get_current_identity().to_bytes(), pool))
+    logging.info(
+        '[realms] User "%s" is allowed to schedule tasks in the pool "%s".',
+        auth.get_current_identity().to_bytes(), pool)
+    return
+
+  # legacy-compatible path
+
+  # pool.realm is optional.
+  if not pool_cfg.realm:
+    logging.warning('%s: realm is missing in Pool "%s"', _TRACKING_BUG, pool)
+
+  legacy_allowed = True
+  try:
+    task_scheduler.check_schedule_request_acl_caller(pool, pool_cfg)
+  except auth.AuthorizationError:
+    legacy_allowed = False
+    raise  # re-raise the exception
+  finally:
+    # compare the legacy check result with realm check result if the pool realm
+    # is specified.
+    if pool_cfg.realm:
+      auth.has_permission_dryrun(
+          perm, [pool_cfg.realm], legacy_allowed, tracking_bug=_TRACKING_BUG)
 
 
 def check_tasks_create_in_realm(realm, pool_cfg):
@@ -108,12 +131,31 @@ def check_tasks_create_in_realm(realm, pool_cfg):
   Raises:
     auth.AuthorizationError: if the caller is not allowed.
   """
-  perm = realms_pb2.REALM_PERMISSION_TASKS_CREATE_IN_REALM
-  _check_permission(
-      perm,
-      realm,
-      is_enforced=bool(realm) or is_enforced_permission(perm, pool_cfg),
-      dryrun_realm=realm or pool_cfg.dry_run_task_realm)
+  # 'swarming.tasks.createInRealm'
+  perm_enum = realms_pb2.REALM_PERMISSION_TASKS_CREATE_IN_REALM
+  perm = get_permission(perm_enum)
+
+  if realm or is_enforced_permission(perm_enum, pool_cfg):
+    # realm is required in this path.
+    if not realm:
+      raise auth.AuthorizationError('task realm is missing')
+
+    if not auth.has_permission(perm, [realm]):
+      raise auth.AuthorizationError(
+          'User "%s" is not allowed to create a task in the realm "%s"' %
+          (auth.get_current_identity().to_bytes(), realm))
+    logging.info(
+        '[realms] User "%s" is allowed to create a task in the realm "%s"',
+        auth.get_current_identity().to_bytes(), realm)
+    return
+
+  if pool_cfg.dry_run_task_realm:
+    # There is no existing permission that corresponds to the realm
+    # permission. So always pass expected_result=True to the dryrun.
+    auth.has_permission_dryrun(
+        perm, [pool_cfg.dry_run_task_realm],
+        expected_result=True,
+        tracking_bug=_TRACKING_BUG)
 
 
 def check_tasks_run_as(task_request, pool_cfg):
@@ -126,8 +168,9 @@ def check_tasks_run_as(task_request, pool_cfg):
     It just calls auth.has_permission()
 
   If it's legacy-compatible,
-    It calls task_scheduler._is_allowed_service_account() and compare the
-    legacy result with the realm permission check using the dryrun.
+    It calls task_scheduler.check_schedule_request_acl_service_account()
+    and compare the legacy result with the realm permission check using
+    the dryrun.
 
   Args:
     task_request: TaskRequest entity to be scheduled.
@@ -140,91 +183,40 @@ def check_tasks_run_as(task_request, pool_cfg):
     auth.AuthorizationError: if the service account is not allowed to run
                              in the task realm.
   """
-  perm = realms_pb2.REALM_PERMISSION_TASKS_RUN_AS
+  perm_enum = realms_pb2.REALM_PERMISSION_TASKS_RUN_AS
+  perm = get_permission(perm_enum)
+  identity = auth.Identity(auth.IDENTITY_USER, task_request.service_account)
 
   # Enforce if the requested task has realm or it's configured in pools.cfg or
   # in settings.cfg globally.
-  is_enforced = (
-      bool(task_request.realm) or is_enforced_permission(perm, pool_cfg))
+  if task_request.realm or is_enforced_permission(perm_enum, pool_cfg):
+    if not task_request.realm:
+      raise auth.AuthorizationError('Task realm is missing')
 
-  def check_auth_legacy():
-    return task_scheduler._is_allowed_service_account(
-        task_request.service_account, pool_cfg)
-
-  err_msg = (
-      'Task service account "%s" as specified in the task request is not '
-      'allowed to be used in the pool "%s". Is allowed_service_account or '
-      'allowed_service_account_group specified in pools.cfg?' %
-      (task_request.service_account, task_request.pool))
-
-  dryrun_realm = task_request.realm or pool_cfg.dry_run_task_realm
-
-  _check_permission(
-      perm,
-      task_request.realm,
-      identity=auth.Identity(auth.IDENTITY_USER, task_request.service_account),
-      is_enforced=is_enforced,
-      legacy_check_func=check_auth_legacy,
-      legacy_auth_err_msg=err_msg,
-      dryrun_realm=dryrun_realm)
-
-
-def _check_permission(enum_permission,
-                      realm,
-                      identity=None,
-                      is_enforced=False,
-                      legacy_check_func=lambda: True,
-                      legacy_auth_err_msg=None,
-                      dryrun_realm=None):
-  """Checks if the caller has the permission.
-
-  If the realm permission check is enforced,
-   It just calls auth.has_permission()
-
-  If it's legacy-compatible,
-   It calls the legacy permission check function, and compare the legacy result
-   with the realm check result using auth.has_permission_dryrun().
-
-  Args:
-    enum_permission: realms_pb2.RealmPermission enum value.
-    realm: name of the Realm.
-    identity: an instance of auth.Identity to check permission.
-              default is auth.get_current_identity().
-    is_enforced: boolean with the enforcement of Realm permission check.
-    legacy_check_func: a function to check permission. required if not enforced.
-    legach_auth_err_msg: auth.AuthorizationError message for legacy path.
-
-  Returns:
-    None
-
-  Raises:
-    auth.AuthorizationError: if the caller is not allowed.
-  """
-  if not identity:
-    identity = auth.get_current_identity()
-  perm = get_permission(enum_permission)
-
-  if is_enforced:
-    if not realm:
-      raise auth.AuthorizationError('Realm is missing')
-
-    if not auth.has_permission(perm, [realm], identity=identity):
+    if not auth.has_permission(perm, [task_request.realm], identity=identity):
       raise auth.AuthorizationError(
-          '[realms] Identity "%s" does not have permission "%s" in realm "%s"' %
-          (identity, perm.name, realm))
-    logging.info('[realms] Identity "%s" has permission "%s" in realm "%s"',
-                 identity, perm.name, realm)
+          'Task service account "%s" is not allowed to run in the realm "%s"' %
+          (task_request.service_account, task_request.realm))
+    logging.info(
+        '[realms] Task service account %s is allowed to run in the realm "%s"',
+        task_request.service_account, task_request.realm)
     return
 
-  # legacy path
-  legacy_allowed = legacy_check_func()
+  # legacy-compatible path
 
-  if dryrun_realm:
-    auth.has_permission_dryrun(
-        perm, [dryrun_realm],
-        legacy_allowed,
-        identity=identity,
-        tracking_bug=_TRACKING_BUG)
+  legacy_allowed = True
 
-  if not legacy_allowed:
-    raise auth.AuthorizationError(legacy_auth_err_msg)
+  try:
+    # ACL check
+    task_scheduler.check_schedule_request_acl_service_account(
+        task_request, pool_cfg)
+  except auth.AuthorizationError:
+    legacy_allowed = False
+    raise  # re-raise the exception
+  finally:
+    if pool_cfg.dry_run_task_realm:
+      auth.has_permission_dryrun(
+          perm, [pool_cfg.dry_run_task_realm],
+          legacy_allowed,
+          identity=identity,
+          tracking_bug='crbug.com/1066839')
