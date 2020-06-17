@@ -909,7 +909,7 @@ class SwarmingBotService(remote.Service):
       name='get',
       path='{bot_id}/get',
       http_method='GET')
-  @auth.require(acl.can_view_bot)
+  @auth.require(acl.can_access)
   def get(self, request):
     """Returns information about a known bot.
 
@@ -918,6 +918,12 @@ class SwarmingBotService(remote.Service):
     """
     logging.debug('%s', request)
     bot_id = request.bot_id
+
+    # Check permission.
+    # The caller needs to have global permission, or any permissions of the
+    # pools that the bot belongs to.
+    realms.check_bot_get_acl(bot_id)
+
     bot = bot_management.get_info_key(bot_id).get()
     deleted = False
     if not bot:
@@ -981,16 +987,23 @@ class SwarmingBotService(remote.Service):
       name='events',
       path='{bot_id}/events',
       http_method='GET')
-  @auth.require(acl.can_view_bot)
+  @auth.require(acl.can_access)
   def events(self, request):
     """Returns events that happened on a bot."""
     logging.debug('%s', request)
+    bot_id = request.bot_id
+
+    # Check permission.
+    # The caller needs to have global permission, or any permissions of the
+    # pools that the bot belongs to.
+    realms.check_bot_get_acl(bot_id)
+
     try:
       now = utils.utcnow()
       start = message_conversion.epoch_to_datetime(request.start)
       end = message_conversion.epoch_to_datetime(request.end)
       order = not (start or end)
-      q = bot_management.get_events_query(request.bot_id, order)
+      q = bot_management.get_events_query(bot_id, order)
       if not order:
         q = q.order(-bot_management.BotEvent.ts, bot_management.BotEvent.key)
       if start:
@@ -1114,13 +1127,19 @@ class SwarmingBotsService(remote.Service):
   @auth.endpoints_method(
       BotsRequest, swarming_rpcs.BotList,
       http_method='GET')
-  @auth.require(acl.can_view_bot)
+  @auth.require(acl.can_access)
   def list(self, request):
     """Provides list of known bots.
 
     Deleted bots will not be listed.
     """
     logging.debug('%s', request)
+
+    # Check permission.
+    # If the caller has global permission, it can access all bots.
+    # Otherwise, it requires pool dimension to check ACL.
+    realms.check_bots_list_acl(request.dimensions)
+
     now = utils.utcnow()
     # Disable the in-process local cache. This is important, as there can be up
     # to a thousand entities loaded in memory, and this is a pure memory leak,
@@ -1149,10 +1168,16 @@ class SwarmingBotsService(remote.Service):
   @auth.endpoints_method(
       BotsCountRequest, swarming_rpcs.BotsCount,
       http_method='GET')
-  @auth.require(acl.can_view_bot)
+  @auth.require(acl.can_access)
   def count(self, request):
     """Counts number of bots with given dimensions."""
     logging.debug('%s', request)
+
+    # Check permission.
+    # If the caller has global permission, it can access all bots.
+    # Otherwise, it requires pool dimension to check ACL.
+    realms.check_bots_list_acl(request.dimensions)
+
     now = utils.utcnow()
     q = bot_management.BotInfo.query()
     try:

@@ -14,6 +14,7 @@ import sys
 import unittest
 
 import mock
+from parameterized import parameterized
 
 import test_env_handlers
 from test_support import test_case
@@ -2204,6 +2205,10 @@ class QueuesApiTest(BaseTest):
 class BotsApiTest(BaseTest):
   api_service_cls = handlers_endpoints.SwarmingBotsService
 
+  def setUp(self):
+    super(BotsApiTest, self).setUp()
+    self.mock_default_pool_acl([])
+
   def test_list_ok(self):
     """Asserts that BotInfo is returned for the appropriate set of bots."""
     self.set_as_privileged_user()
@@ -2546,6 +2551,43 @@ class BotsApiTest(BaseTest):
 
     self.assertEqual(expected, self.call_api('dimensions', body={}).json)
 
+  @parameterized.expand([
+      'list',
+      'count',
+  ])
+  def test_list_ok_realm(self, api):
+    # non-privileged user, with realm permission.
+    self.mock_auth_db([auth.Permission('swarming.pools.listBots')])
+    self.set_as_user()
+
+    # the user can query bots in the default pool.
+    self.call_api(api, body={'dimensions': ['pool:default']}, status=200)
+
+  @parameterized.expand([
+      'list',
+      'count',
+  ])
+  def test_list_forbidden(self, api):
+    # non-privileged user, with no permissions.
+    self.mock_auth_db([])
+    self.set_as_user()
+
+    # the user needs to specify a pool dimension.
+    response = self.call_api(api, status=403)
+    self.assertErrorResponseMessage(u'Pool dimension is missing', response)
+
+    # the user needs to have permissions of the requested pools.
+    response = self.call_api(
+        api, body={'dimensions': ['pool:default']}, status=403)
+    self.assertErrorResponseMessage(
+        'user "user@example.com" does not have permission '
+        '"swarming.pools.listBots"', response)
+
+    # the user needs to specify known pools.
+    response = self.call_api(
+        api, body={'dimensions': ['pool:unknown']}, status=400)
+    self.assertErrorResponseMessage('Pool "unknown" not found', response)
+
 
 class BotApiTest(BaseTest):
   api_service_cls = handlers_endpoints.SwarmingBotService
@@ -2652,6 +2694,37 @@ class BotApiTest(BaseTest):
     }
     resp = self.call_api('get', body={'bot_id': 'id1'})
     self.assertEqual(expected, resp.json)
+
+  @parameterized.expand([
+      'get',
+      'events',
+  ])
+  def test_get_ok_realm(self, api):
+    # non-privileged user with realm permission.
+    self.mock_auth_db([auth.Permission('swarming.pools.listBots')])
+    self.set_as_user()
+
+    _bot_event('bot_connected', bot_id='id1')
+    self.call_api(api, body={'bot_id': 'id1'}, status=200)
+
+  @parameterized.expand([
+      'get',
+      'events',
+  ])
+  def test_get_forbidden(self, api):
+    self.mock_auth_db([])
+
+    # non-privileged user with no realm permission.
+    self.set_as_user()
+
+    # alive bot
+    _bot_event('bot_connected', bot_id='id1')
+    self.call_api(api, body={'bot_id': 'id1'}, status=403)
+
+    # deleted bot
+    with mock.patch('server.acl._is_admin', return_value=True):
+      self.call_api('delete', body={'bot_id': 'id1'})
+    self.call_api(api, body={'bot_id': 'id1'}, status=403)
 
   def test_delete_ok(self):
     """Assert that delete finds and deletes a bot."""
