@@ -1242,7 +1242,10 @@ class TasksApiTest(BaseTest):
   def test_new_ok_with_realm(self):
     self.mock(random, 'getrandbits', lambda _: 0x88)
     self.mock(service_accounts, 'has_token_server', lambda: True)
-    self.mock_auth_db([auth.Permission('swarming.pools.createTask')])
+    self.mock_auth_db([
+        auth.Permission('swarming.pools.createTask'),
+        auth.Permission('swarming.tasks.createInRealm'),
+    ])
 
     request = self.create_new_request(
         properties={
@@ -2131,6 +2134,39 @@ class TaskApiTest(BaseTest):
         ])
     response = self.call_api('request', body={'task_id': task_id})
     self.assertEqual(expected, response.json)
+
+  @parameterized.expand(['request', 'result', 'stdout'])
+  def test_get_with_realm_permission(self, api):
+    # someone creates tasks with/without realm.
+    self.set_as_privileged_user()
+    self.mock_auth_db([
+        auth.Permission('swarming.pools.createTask'),
+        auth.Permission('swarming.tasks.createInRealm'),
+    ])
+    _, task_id_with_realm = self.client_create_task_raw(realm='test:task_realm')
+    _, task_id_without_realm = self.client_create_task_raw(realm=None)
+
+    def assertTaskIsNotAccessible(task_id):
+      response = self.call_api(api, body={'task_id': task_id}, status=403)
+      self.assertErrorResponseMessage(u'Task "%s" is not accessible' % task_id,
+                                      response)
+
+    # non-privileged user can't access to the both tasks without permission.
+    self.set_as_user()
+    assertTaskIsNotAccessible(task_id_with_realm)
+    assertTaskIsNotAccessible(task_id_without_realm)
+
+    # the user can access to the both tasks with swarming.pools.listTasks
+    # permission.
+    self.mock_auth_db([auth.Permission('swarming.pools.listTasks')])
+    self.call_api(api, body={'task_id': task_id_with_realm}, status=200)
+    self.call_api(api, body={'task_id': task_id_without_realm}, status=200)
+
+    # the user can access with swarming.tasks.get permission.
+    self.mock_auth_db([auth.Permission('swarming.tasks.get')])
+    self.call_api(api, body={'task_id': task_id_with_realm}, status=200)
+    # but, not accessible to the task with no realm.
+    assertTaskIsNotAccessible(task_id_without_realm)
 
 
 class QueuesApiTest(BaseTest):

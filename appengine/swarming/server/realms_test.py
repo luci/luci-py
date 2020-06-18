@@ -32,21 +32,23 @@ from server import task_request
 from server import task_scheduler
 
 _PERM_POOLS_CREATE_TASK = auth.Permission('swarming.pools.createTask')
-_PERM_POOLS_LIST_TASKS = auth.Permission('swarming.pools.listTasks')
 _PERM_POOLS_LIST_BOTS = auth.Permission('swarming.pools.listBots')
+_PERM_POOLS_LIST_TASKS = auth.Permission('swarming.pools.listTasks')
 _PERM_TASKS_CREATE_IN_REALM = auth.Permission('swarming.tasks.createInRealm')
 _PERM_TASKS_ACT_AS = auth.Permission('swarming.tasks.actAs')
+_PERM_TASKS_GET = auth.Permission('swarming.tasks.get')
 _TASK_SERVICE_ACCOUNT_IDENTITY = auth.Identity(
     auth.IDENTITY_USER, 'test@test-service-accounts.iam.gserviceaccount.com')
 
 
 def _gen_task_request_mock(realm='test:realm'):
-  mocked = mock.create_autospec(
-      task_request.TaskRequest, spec_set=True, instance=True)
-  mocked.max_lifetime_secs = 1
-  mocked.service_account = _TASK_SERVICE_ACCOUNT_IDENTITY.name
-  mocked.realm = realm
-  return mocked
+  return mock.create_autospec(
+      task_request.TaskRequest,
+      spec_set=True,
+      instance=True,
+      max_lifetime_secs=1,
+      service_account=_TASK_SERVICE_ACCOUNT_IDENTITY.name,
+      realm=realm)
 
 
 def _gen_bot_event_mock(dimensions_flat=None):
@@ -403,6 +405,50 @@ class RealmsTest(test_case.TestCase):
     with self.assertRaises(endpoints.BadRequestException):
       realms.check_bots_list_acl(['pool:unknown'])
     self._has_permission_mock.assert_not_called()
+
+  def test_check_task_get_acl_with_global_permission(self):
+    self.mock(acl, 'can_view_task', lambda _: True)
+
+    realms.check_task_get_acl(None)
+    self._has_permission_mock.assert_not_called()
+
+  def test_check_task_get_acl_allowed_by_pool_permission(self):
+    # mock
+    self.mock(acl, 'can_view_task', lambda _: False)
+    get_pool_config = lambda _: _gen_pool_config(realm='test:pool')
+    self.mock(pools_config, 'get_pool_config', get_pool_config)
+    self._has_permission_mock.return_value = True
+
+    # call
+    realms.check_task_get_acl(_gen_task_request_mock())
+    self._has_permission_mock.assert_called_once_with(_PERM_POOLS_LIST_TASKS,
+                                                      ['test:pool'])
+
+  def test_check_task_get_acl_allowed_by_task_permission(self):
+    # mock
+    self.mock(acl, 'can_view_task', lambda _: False)
+    get_pool_config = lambda _: _gen_pool_config(realm=None)
+    self.mock(pools_config, 'get_pool_config', get_pool_config)
+    self._has_permission_mock.return_value = True
+
+    # call
+    realms.check_task_get_acl(_gen_task_request_mock(realm='test:realm'))
+    self._has_permission_mock.assert_called_once_with(_PERM_TASKS_GET,
+                                                      ['test:realm'])
+
+  def test_check_task_get_acl_not_allowed(self):
+    # mock
+    self.mock(acl, 'can_view_task', lambda _: False)
+    get_pool_config = lambda _: _gen_pool_config(realm='test:pool')
+    self.mock(pools_config, 'get_pool_config', get_pool_config)
+    self._has_permission_mock.return_value = False
+
+    # call
+    with self.assertRaises(auth.AuthorizationError):
+      realms.check_task_get_acl(_gen_task_request_mock(realm='test:realm'))
+    self._has_permission_mock.assert_any_call(_PERM_POOLS_LIST_TASKS,
+                                              ['test:pool'])
+    self._has_permission_mock.assert_any_call(_PERM_TASKS_GET, ['test:realm'])
 
   def test_check_tasks_list_acl_with_global_permission(self):
     self.mock(acl, 'can_view_all_tasks', lambda: True)

@@ -51,6 +51,7 @@ PERM_TASKS_CREATE_IN_REALM = realms.get_permission(
     realms_pb2.REALM_PERMISSION_TASKS_CREATE_IN_REALM)
 PREM_TASKS_ACT_AS = realms.get_permission(
     realms_pb2.REALM_PERMISSION_TASKS_ACT_AS)
+PREM_TASKS_GET = realms.get_permission(realms_pb2.REALM_PERMISSION_TASKS_GET)
 
 _ALL_PERMS = [
     PERM_POOLS_CREATE_TASK,
@@ -58,6 +59,7 @@ _ALL_PERMS = [
     PERM_POOLS_LIST_TASKS,
     PERM_TASKS_CREATE_IN_REALM,
     PREM_TASKS_ACT_AS,
+    PREM_TASKS_GET,
 ]
 
 
@@ -295,7 +297,9 @@ class AppTestBase(test_case.TestCase):
                             'permissions': [
                                 _ALL_PERMS.index(p) for p in permissions
                             ],
-                            'principals': ['user:user@example.com'],
+                            'principals': [
+                                auth.get_current_identity().to_bytes()
+                            ],
                         }],
                     },
                     {
@@ -303,9 +307,11 @@ class AppTestBase(test_case.TestCase):
                             'test:task_realm',
                         'bindings': [{
                             'permissions': [
-                                _ALL_PERMS.index(PERM_TASKS_CREATE_IN_REALM),
+                                _ALL_PERMS.index(p) for p in permissions
                             ],
-                            'principals': ['user:user@example.com'],
+                            'principals': [
+                                auth.get_current_identity().to_bytes()
+                            ],
                         }, {
                             'permissions': [
                                 _ALL_PERMS.index(PREM_TASKS_ACT_AS),

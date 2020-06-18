@@ -46,7 +46,7 @@ from server import task_scheduler
 ### Helper Methods
 
 
-# Used by _get_request_and_result(), clearer than using True/False and important
+# Used by _get_task_request_async(), clearer than using True/False and important
 # as this is part of the security boundary.
 _EDIT = object()
 _VIEW = object()
@@ -79,15 +79,11 @@ def _get_task_request_async(task_id, request_key, viewing):
   Returns:
     TaskRequest instance.
   """
-  # TODO(crbug.com/1066839): integrate with swarming.pools.listTasks and,
-  # swarming.tasks.get permissions.
-
   request = yield request_key.get_async()
   if not request:
     raise endpoints.NotFoundException('%s not found.' % task_id)
   if viewing == _VIEW:
-    if not acl.can_view_task(request):
-      raise endpoints.ForbiddenException('%s is not accessible.' % task_id)
+    realms.check_task_get_acl(request)
   elif viewing == _EDIT:
     if not acl.can_edit_task(request):
       raise endpoints.ForbiddenException('%s is not accessible.' % task_id)
