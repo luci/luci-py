@@ -59,10 +59,10 @@ enum RealmPermission {
   // It will be checked at the new task API.
   REALM_PERMISSION_TASKS_CREATE_IN_REALM = 2;
 
-  // Permission 'swarming.tasks.runAs'
+  // Permission 'swarming.tasks.actAs'
   // This is required to use a task service account in the realm.
   // It will be checked at the new task API.
-  REALM_PERMISSION_TASKS_RUN_AS = 3;
+  REALM_PERMISSION_TASKS_ACT_AS = 3;
 
   // Permission 'swarming.tasks.get'
   // This is required to get task request, result, outputs.

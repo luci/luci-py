@@ -96,7 +96,7 @@ def db():
   # See swarming/proto/config/realms.proto for more details.
   role('role/swarming.taskServiceAccount', [
       include('role/luci.realmServiceAccount'),
-      permission('swarming.tasks.runAs'),
+      permission('swarming.tasks.actAs'),
   ])
   role('role/swarming.realmUser', [
       permission('swarming.tasks.createInRealm'),

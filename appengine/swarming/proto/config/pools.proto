@@ -127,7 +127,7 @@ message Pool {
   repeated RealmPermission enforced_realm_permissions = 11;
 
   // Realm name that will be used to call
-  // auth.has_permission_dryrun('swarming.tasks.runAs') and
+  // auth.has_permission_dryrun('swarming.tasks.actAs') and
   // auth.has_permission_dryrun('swarming.tasks.createInRealm')
   // for task requests without realm field.
   string dry_run_task_realm = 12;

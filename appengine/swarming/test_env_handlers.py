@@ -47,14 +47,14 @@ PERM_POOLS_LIST_BOTS = realms.get_permission(
     realms_pb2.REALM_PERMISSION_POOLS_LIST_BOTS)
 PERM_TASKS_CREATE_IN_REALM = realms.get_permission(
     realms_pb2.REALM_PERMISSION_TASKS_CREATE_IN_REALM)
-PREM_TASKS_RUN_AS = realms.get_permission(
-    realms_pb2.REALM_PERMISSION_TASKS_RUN_AS)
+PREM_TASKS_ACT_AS = realms.get_permission(
+    realms_pb2.REALM_PERMISSION_TASKS_ACT_AS)
 
 _ALL_PERMS = [
     PERM_POOLS_CREATE_TASK,
     PERM_POOLS_LIST_BOTS,
     PERM_TASKS_CREATE_IN_REALM,
-    PREM_TASKS_RUN_AS,
+    PREM_TASKS_ACT_AS,
 ]
 
 
@@ -305,7 +305,7 @@ class AppTestBase(test_case.TestCase):
                             'principals': ['user:user@example.com'],
                         }, {
                             'permissions': [
-                                _ALL_PERMS.index(PREM_TASKS_RUN_AS),
+                                _ALL_PERMS.index(PREM_TASKS_ACT_AS),
                             ],
                             'principals': ['user:service-account@example.com'],
                         }],

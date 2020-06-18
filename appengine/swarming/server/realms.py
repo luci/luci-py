@@ -144,10 +144,10 @@ def check_tasks_create_in_realm(realm, pool_cfg):
         tracking_bug=_TRACKING_BUG)
 
 
-def check_tasks_run_as(task_request, pool_cfg):
+def check_tasks_act_as(task_request, pool_cfg):
   """Checks if the task service account is allowed to run in the task realm.
 
-  Realm permission `swarming.tasks.runAs` will be checked,
+  Realm permission `swarming.tasks.actAs` will be checked,
   using auth.has_permission() or auth.has_permission_dryrun().
 
   If the realm permission check is enforced,
@@ -169,7 +169,7 @@ def check_tasks_run_as(task_request, pool_cfg):
     auth.AuthorizationError: if the service account is not allowed to run
                              in the task realm.
   """
-  perm_enum = realms_pb2.REALM_PERMISSION_TASKS_RUN_AS
+  perm_enum = realms_pb2.REALM_PERMISSION_TASKS_ACT_AS
   perm = get_permission(perm_enum)
   identity = auth.Identity(auth.IDENTITY_USER, task_request.service_account)
 

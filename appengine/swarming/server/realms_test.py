@@ -34,7 +34,7 @@ from server import task_scheduler
 _PERM_POOLS_CREATE_TASK = auth.Permission('swarming.pools.createTask')
 _PERM_POOLS_LIST_BOTS = auth.Permission('swarming.pools.listBots')
 _PERM_TASKS_CREATE_IN_REALM = auth.Permission('swarming.tasks.createInRealm')
-_PERM_TASKS_RUN_AS = auth.Permission('swarming.tasks.runAs')
+_PERM_TASKS_ACT_AS = auth.Permission('swarming.tasks.actAs')
 _TASK_SERVICE_ACCOUNT_IDENTITY = auth.Identity(
     auth.IDENTITY_USER, 'test@test-service-accounts.iam.gserviceaccount.com')
 
@@ -208,56 +208,56 @@ class RealmsTest(test_case.TestCase):
     with self.assertRaises(auth.AuthorizationError):
       realms.check_tasks_create_in_realm(None, pool_cfg_mock)
 
-  def test_check_tasks_run_as_legacy_allowed(self):
+  def test_check_tasks_act_as_legacy_allowed(self):
     self.mock(task_scheduler, '_is_allowed_service_account', lambda *_: True)
     task_request_mock = _gen_task_request_mock(realm=None)
     pool_cfg_mock = _gen_pool_config()
-    realms.check_tasks_run_as(task_request_mock, pool_cfg_mock)
+    realms.check_tasks_act_as(task_request_mock, pool_cfg_mock)
     self._has_permission_dryrun_mock.assert_called_once_with(
-        _PERM_TASKS_RUN_AS, [u'test:realm_dryrun'],
+        _PERM_TASKS_ACT_AS, [u'test:realm_dryrun'],
         True,
         identity=_TASK_SERVICE_ACCOUNT_IDENTITY,
         tracking_bug=realms._TRACKING_BUG)
 
-  def test_check_tasks_run_as_legacy_not_allowed(self):
+  def test_check_tasks_act_as_legacy_not_allowed(self):
     self.mock(task_scheduler, '_is_allowed_service_account', lambda *_: False)
     task_request_mock = _gen_task_request_mock(realm=None)
     pool_cfg_mock = _gen_pool_config()
     with self.assertRaises(auth.AuthorizationError):
-      realms.check_tasks_run_as(task_request_mock, pool_cfg_mock)
+      realms.check_tasks_act_as(task_request_mock, pool_cfg_mock)
     self._has_permission_dryrun_mock.assert_called_once_with(
-        _PERM_TASKS_RUN_AS, [u'test:realm_dryrun'],
+        _PERM_TASKS_ACT_AS, [u'test:realm_dryrun'],
         False,
         identity=_TASK_SERVICE_ACCOUNT_IDENTITY,
         tracking_bug=realms._TRACKING_BUG)
 
-  def test_check_tasks_run_as_enforced_allowed(self):
+  def test_check_tasks_act_as_enforced_allowed(self):
     self._has_permission_mock.return_value = True
     task_request_mock = _gen_task_request_mock()
     pool_cfg_mock = _gen_pool_config()
-    realms.check_tasks_run_as(task_request_mock, pool_cfg_mock)
+    realms.check_tasks_act_as(task_request_mock, pool_cfg_mock)
     self._has_permission_mock.assert_called_once_with(
-        _PERM_TASKS_RUN_AS, [u'test:realm'],
+        _PERM_TASKS_ACT_AS, [u'test:realm'],
         identity=_TASK_SERVICE_ACCOUNT_IDENTITY)
 
-  def test_check_tasks_run_as_enforced_no_realm(self):
+  def test_check_tasks_act_as_enforced_no_realm(self):
     self._has_permission_mock.return_value = False
     task_request_mock = _gen_task_request_mock(realm=None)
     pool_cfg_mock = _gen_pool_config(
-        enforced_realm_permissions=[realms_pb2.REALM_PERMISSION_TASKS_RUN_AS])
+        enforced_realm_permissions=[realms_pb2.REALM_PERMISSION_TASKS_ACT_AS])
     with self.assertRaises(auth.AuthorizationError):
-      realms.check_tasks_run_as(task_request_mock, pool_cfg_mock)
+      realms.check_tasks_act_as(task_request_mock, pool_cfg_mock)
     self._has_permission_mock.assert_not_called()
 
-  def test_check_tasks_run_as_enforced_not_allowed(self):
+  def test_check_tasks_act_as_enforced_not_allowed(self):
     self.mock(realms, 'is_enforced_permission', lambda *_: True)
     self._has_permission_mock.return_value = False
     task_request_mock = _gen_task_request_mock()
     pool_cfg_mock = _gen_pool_config()
     with self.assertRaises(auth.AuthorizationError):
-      realms.check_tasks_run_as(task_request_mock, pool_cfg_mock)
+      realms.check_tasks_act_as(task_request_mock, pool_cfg_mock)
     self._has_permission_mock.assert_called_once_with(
-        _PERM_TASKS_RUN_AS, [u'test:realm'],
+        _PERM_TASKS_ACT_AS, [u'test:realm'],
         identity=_TASK_SERVICE_ACCOUNT_IDENTITY)
 
   def test_check_bot_get_acl_with_global_permission(self):

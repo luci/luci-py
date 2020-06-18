@@ -242,7 +242,7 @@ def get_task_account_token(task_id, bot_id, scopes):
     # a OAuth token. It also re-checks if the service account is still allowed
     # to run in the realm. because it may have changed since the last check.
     pool_cfg = pools_config.get_pool_config(task_request.pool)
-    realms.check_tasks_run_as(task_request, pool_cfg)
+    realms.check_tasks_act_as(task_request, pool_cfg)
     access_token, expiry = _mint_service_account_token(
         task_request.service_account, task_request.realm, scopes, audit_tags)
   else:
