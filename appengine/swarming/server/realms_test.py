@@ -32,6 +32,7 @@ from server import task_request
 from server import task_scheduler
 
 _PERM_POOLS_CREATE_TASK = auth.Permission('swarming.pools.createTask')
+_PERM_POOLS_LIST_TASKS = auth.Permission('swarming.pools.listTasks')
 _PERM_POOLS_LIST_BOTS = auth.Permission('swarming.pools.listBots')
 _PERM_TASKS_CREATE_IN_REALM = auth.Permission('swarming.tasks.createInRealm')
 _PERM_TASKS_ACT_AS = auth.Permission('swarming.tasks.actAs')
@@ -48,10 +49,10 @@ def _gen_task_request_mock(realm='test:realm'):
   return mocked
 
 
-def _gen_bot_event_mock(dimensions=None):
+def _gen_bot_event_mock(dimensions_flat=None):
   mocked = mock.create_autospec(
       bot_management.BotEvent, spec_set=True, instance=True)
-  mocked.dimensions = dimensions or {}
+  mocked.dimensions_flat = dimensions_flat or []
   return mocked
 
 
@@ -269,7 +270,9 @@ class RealmsTest(test_case.TestCase):
   def test_check_bot_get_acl_allowed(self):
     # mock
     self.mock(acl, 'can_view_bot', lambda: False)
-    bot_events = [_gen_bot_event_mock(dimensions={'pool': ['pool1', 'pool2']})]
+    bot_events = [
+        _gen_bot_event_mock(dimensions_flat=['pool:pool1', 'pool:pool2'])
+    ]
     query = lambda *_: mock.Mock(fetch=lambda _: bot_events)
     self.mock(bot_management, 'get_events_query', query)
     get_pool_config = lambda p: _gen_pool_config(realm='test:' + p)
@@ -284,7 +287,9 @@ class RealmsTest(test_case.TestCase):
   def test_check_bot_get_acl_not_allowed(self):
     # mock
     self.mock(acl, 'can_view_bot', lambda: False)
-    bot_events = [_gen_bot_event_mock(dimensions={'pool': ['pool1', 'pool2']})]
+    bot_events = [
+        _gen_bot_event_mock(dimensions_flat=['pool:pool1', 'pool:pool2'])
+    ]
     query = lambda *_: mock.Mock(fetch=lambda _: bot_events)
     self.mock(bot_management, 'get_events_query', query)
     get_pool_config = lambda p: _gen_pool_config(realm='test:' + p)
@@ -307,7 +312,9 @@ class RealmsTest(test_case.TestCase):
   def test_check_bot_get_acl_no_realms(self):
     # mock
     self.mock(acl, 'can_view_bot', lambda: False)
-    bot_events = [_gen_bot_event_mock(dimensions={'pool': ['pool1', 'pool2']})]
+    bot_events = [
+        _gen_bot_event_mock(dimensions_flat=['pool:pool1', 'pool:pool2'])
+    ]
     query = lambda *_: mock.Mock(fetch=lambda _: bot_events)
     self.mock(bot_management, 'get_events_query', query)
     get_pool_config = lambda p: _gen_pool_config(realm=None)
@@ -395,6 +402,149 @@ class RealmsTest(test_case.TestCase):
     # call
     with self.assertRaises(endpoints.BadRequestException):
       realms.check_bots_list_acl(['pool:unknown'])
+    self._has_permission_mock.assert_not_called()
+
+  def test_check_tasks_list_acl_with_global_permission(self):
+    self.mock(acl, 'can_view_all_tasks', lambda: True)
+
+    realms.check_tasks_list_acl(None)
+    self._has_permission_mock.assert_not_called()
+
+  def test_check_tasks_list_acl_realm_allowed(self):
+    # mock
+    self.mock(acl, 'can_view_all_tasks', lambda: False)
+    get_pool_config = lambda p: _gen_pool_config(realm='test:' + p)
+    self.mock(pools_config, 'get_pool_config', get_pool_config)
+
+    # call
+    realms.check_tasks_list_acl(['pool:pool1', 'pool:pool2'])
+    for pool_realm in ['test:pool1', 'test:pool2']:
+      self._has_permission_mock.assert_any_call(
+          _PERM_POOLS_LIST_TASKS, [pool_realm],
+          identity=auth.get_current_identity())
+
+  def test_check_tasks_list_acl_realm_not_allowed(self):
+    # mock
+    self.mock(acl, 'can_view_all_tasks', lambda: False)
+    get_pool_config = lambda p: _gen_pool_config(realm='test:' + p)
+    self.mock(pools_config, 'get_pool_config', get_pool_config)
+    self._has_permission_mock.return_value = False
+
+    # call
+    with self.assertRaises(auth.AuthorizationError):
+      realms.check_tasks_list_acl(['pool:pool1', 'pool:pool2'])
+    # it checks only the first realm and fails.
+    self._has_permission_mock.assert_any_call(
+        _PERM_POOLS_LIST_TASKS, ['test:pool1'],
+        identity=auth.get_current_identity())
+
+  def test_check_tasks_list_acl_realm_missing_any_permission(self):
+    # mock
+    self.mock(acl, 'can_view_all_tasks', lambda: False)
+    get_pool_config = lambda p: _gen_pool_config(realm='test:' + p)
+    self.mock(pools_config, 'get_pool_config', get_pool_config)
+    self._has_permission_mock.side_effect = [True, False]
+
+    # call
+    with self.assertRaises(auth.AuthorizationError):
+      realms.check_tasks_list_acl(['pool:pool1', 'pool:pool2'])
+    for pool_realm in ['test:pool1', 'test:pool2']:
+      self._has_permission_mock.assert_any_call(
+          _PERM_POOLS_LIST_TASKS, [pool_realm],
+          identity=auth.get_current_identity())
+
+  def test_check_tasks_list_acl_realm_no_pool_dimension(self):
+    # mock
+    self.mock(acl, 'can_view_all_tasks', lambda: False)
+
+    # call
+    with self.assertRaises(auth.AuthorizationError):
+      realms.check_tasks_list_acl(['id:bot1'])  # no pool dimensions
+    self._has_permission_mock.assert_not_called()
+
+  def test_check_tasks_list_acl_realm_no_pool_realms(self):
+    # mock
+    self.mock(acl, 'can_view_all_tasks', lambda: False)
+    get_pool_config = lambda p: _gen_pool_config(realm=None)
+    self.mock(pools_config, 'get_pool_config', get_pool_config)
+
+    # call
+    with self.assertRaises(auth.AuthorizationError):
+      realms.check_tasks_list_acl(['pool:pool1', 'pool:pool2'])
+    self._has_permission_mock.assert_not_called()
+
+  def test_check_tasks_list_acl_realm_unknown_pool(self):
+    # mock
+    self.mock(acl, 'can_view_all_tasks', lambda: False)
+    self.mock(pools_config, 'get_pool_config', lambda _: None)
+
+    # call
+    with self.assertRaises(endpoints.BadRequestException):
+      realms.check_tasks_list_acl(['pool:unknown'])
+    self._has_permission_mock.assert_not_called()
+
+  def test_check_bot_tasks_acl_with_global_permission(self):
+    self.mock(acl, 'can_view_all_tasks', lambda: True)
+
+    realms.check_bot_tasks_acl('bot1')
+    self._has_permission_mock.assert_not_called()
+
+  def test_check_bot_tasks_acl_allowed(self):
+    # mock
+    self.mock(acl, 'can_view_all_tasks', lambda: False)
+    bot_events = [
+        _gen_bot_event_mock(dimensions_flat=['pool:pool1', 'pool:pool2'])
+    ]
+    query = lambda *_: mock.Mock(fetch=lambda _: bot_events)
+    self.mock(bot_management, 'get_events_query', query)
+    get_pool_config = lambda p: _gen_pool_config(realm='test:' + p)
+    self.mock(pools_config, 'get_pool_config', get_pool_config)
+
+    # call
+    realms.check_bot_tasks_acl('bot1')
+    self._has_permission_mock.assert_called_once_with(
+        _PERM_POOLS_LIST_TASKS, ['test:pool1', 'test:pool2'],
+        identity=auth.get_current_identity())
+
+  def test_check_bot_tasks_acl_not_allowed(self):
+    # mock
+    self.mock(acl, 'can_view_all_tasks', lambda: False)
+    bot_events = [
+        _gen_bot_event_mock(dimensions_flat=['pool:pool1', 'pool:pool2'])
+    ]
+    query = lambda *_: mock.Mock(fetch=lambda _: bot_events)
+    self.mock(bot_management, 'get_events_query', query)
+    get_pool_config = lambda p: _gen_pool_config(realm='test:' + p)
+    self.mock(pools_config, 'get_pool_config', get_pool_config)
+    self._has_permission_mock.return_value = False
+
+    # call
+    with self.assertRaises(auth.AuthorizationError):
+      realms.check_bot_tasks_acl('bot1')
+    self._has_permission_mock.assert_called_once_with(
+        _PERM_POOLS_LIST_TASKS, ['test:pool1', 'test:pool2'],
+        identity=auth.get_current_identity())
+
+  def test_check_bot_tasks_acl_no_bot(self):
+    self.mock(acl, 'can_view_all_tasks', lambda: False)
+    with self.assertRaises(endpoints.NotFoundException):
+      realms.check_bot_tasks_acl('bot1')
+    self._has_permission_mock.assert_not_called()
+
+  def test_check_bot_tasks_acl_no_realms(self):
+    # mock
+    self.mock(acl, 'can_view_all_tasks', lambda: False)
+    bot_events = [
+        _gen_bot_event_mock(dimensions_flat=['pool:pool1', 'pool:pool2'])
+    ]
+    query = lambda *_: mock.Mock(fetch=lambda _: bot_events)
+    self.mock(bot_management, 'get_events_query', query)
+    get_pool_config = lambda p: _gen_pool_config(realm=None)
+    self.mock(pools_config, 'get_pool_config', get_pool_config)
+
+    # call
+    with self.assertRaises(auth.AuthorizationError):
+      realms.check_bot_tasks_acl('bot1')
     self._has_permission_mock.assert_not_called()
 
 

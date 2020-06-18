@@ -1429,6 +1429,37 @@ class TasksApiTest(BaseTest):
         state=swarming_rpcs.TaskStateQuery.COMPLETED_SUCCESS)
     self.call_api('list', body=message_to_dict(request), status=400)
 
+  @parameterized.expand(['list', 'count'])
+  def test_list_realm_permission(self, api):
+    # non-privileged user without realm permission.
+    self.set_as_user()
+    self.mock_auth_db([])
+    start = (
+        utils.datetime_to_timestamp(self.now - datetime.timedelta(days=1)) /
+        1000000.)
+
+    # the user needs to specify a pool filter.
+    response = self.call_api(api, body={'start': start}, status=403)
+    self.assertErrorResponseMessage(u'No pool is specified', response)
+
+    # the user can't access the tasks without permission.
+    request = {'start': start, 'tags': ['pool:default']}
+    response = self.call_api(api, body=request, status=403)
+    self.assertErrorResponseMessage(
+        u'user "user@example.com" does not have permission '
+        '"swarming.pools.listTasks"', response)
+
+    # give permission to the user.
+    self.mock_auth_db([auth.Permission('swarming.pools.listTasks')])
+
+    # the user still needs to specify a pool filter.
+    response = self.call_api(api, body={'start': start}, status=403)
+    self.assertErrorResponseMessage(u'No pool is specified', response)
+
+    # ok if the user has a permission of the specified pool.
+    request = {'start': start, 'tags': ['pool:default']}
+    self.call_api(api, body=request, status=200)
+
   def test_get_state_ok(self):
     """Asserts that get_states requests return correct state."""
     # Create two tasks, one COMPLETED, one PENDING
@@ -2574,7 +2605,7 @@ class BotsApiTest(BaseTest):
 
     # the user needs to specify a pool dimension.
     response = self.call_api(api, status=403)
-    self.assertErrorResponseMessage(u'Pool dimension is missing', response)
+    self.assertErrorResponseMessage(u'No pool is specified', response)
 
     # the user needs to have permissions of the requested pools.
     response = self.call_api(
@@ -2812,6 +2843,29 @@ class BotApiTest(BaseTest):
           bot_id='bot1', include_performance_stats=True, sort=sort)
       body = message_to_dict(request)
       response = self.call_api('tasks', body=body)
+
+  def test_tasks_realm_permission(self):
+    # create bot
+    self.set_as_bot()
+    self.bot_poll()
+    self.mock_auth_db([])
+
+    # non-privileged user without realm permission.
+    self.set_as_user()
+
+    # unknown bot
+    self.call_api('tasks', body={'bot_id': 'unknown_bot'}, status=404)
+
+    # the user can't access to tasks of the bot.
+    self.set_as_user()
+    response = self.call_api('tasks', body={'bot_id': 'bot1'}, status=403)
+    self.assertErrorResponseMessage(
+        u'user "user@example.com" does not have permission '
+        '"swarming.pools.listTasks"', response)
+
+    # give permission.
+    self.mock_auth_db([auth.Permission('swarming.pools.listTasks')])
+    self.call_api('tasks', body={'bot_id': 'bot1'}, status=200)
 
   def test_events(self):
     # Run one task, push an event manually.

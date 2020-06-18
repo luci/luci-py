@@ -79,6 +79,9 @@ def _get_task_request_async(task_id, request_key, viewing):
   Returns:
     TaskRequest instance.
   """
+  # TODO(crbug.com/1066839): integrate with swarming.pools.listTasks and,
+  # swarming.tasks.get permissions.
+
   request = yield request_key.get_async()
   if not request:
     raise endpoints.NotFoundException('%s not found.' % task_id)
@@ -612,7 +615,7 @@ class SwarmingTasksService(remote.Service):
   @auth.endpoints_method(
       TasksRequest, swarming_rpcs.TaskList,
       http_method='GET')
-  @auth.require(acl.can_view_all_tasks)
+  @auth.require(acl.can_access)
   def list(self, request):
     """Returns full task results based on the filters.
 
@@ -622,6 +625,12 @@ class SwarmingTasksService(remote.Service):
     # TODO(maruel): Rename 'list' to 'results'.
     # TODO(maruel): Rename 'TaskList' to 'TaskResults'.
     logging.debug('%s', request)
+
+    # Check permission.
+    # If the caller has global permission, it can access all tasks.
+    # Otherwise, it requires pool dimension to check ACL.
+    realms.check_tasks_list_acl(request.tags)
+
     now = utils.utcnow()
     try:
       items, cursor = datastore_utils.fetch_page(
@@ -774,10 +783,16 @@ class SwarmingTasksService(remote.Service):
   @auth.endpoints_method(
       TasksCountRequest, swarming_rpcs.TasksCount,
       http_method='GET')
-  @auth.require(acl.can_view_all_tasks)
+  @auth.require(acl.can_access)
   def count(self, request):
     """Counts number of tasks in a given state."""
     logging.debug('%s', request)
+
+    # Check permission.
+    # If the caller has global permission, it can access all tasks.
+    # Otherwise, it requires pool dimension to check ACL.
+    realms.check_tasks_list_acl(request.tags)
+
     if not request.start:
       raise endpoints.BadRequestException('start (as epoch) is required')
     now = utils.utcnow()
@@ -1063,7 +1078,7 @@ class SwarmingBotService(remote.Service):
       name='tasks',
       path='{bot_id}/tasks',
       http_method='GET')
-  @auth.require(acl.can_view_all_tasks)
+  @auth.require(acl.can_access)
   def tasks(self, request):
     """Lists a given bot's tasks within the specified date range.
 
@@ -1074,6 +1089,12 @@ class SwarmingBotService(remote.Service):
     TaskRunResult.tags will be added (via a copy from TaskRequest.tags).
     """
     logging.debug('%s', request)
+
+    # Check permission.
+    # The caller needs to have global permission, or any permissions of the
+    # pools that the bot belongs to.
+    realms.check_bot_tasks_acl(request.bot_id)
+
     try:
       start = message_conversion.epoch_to_datetime(request.start)
       end = message_conversion.epoch_to_datetime(request.end)
