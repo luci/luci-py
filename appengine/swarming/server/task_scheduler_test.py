@@ -723,7 +723,15 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         pools_config.ExternalSchedulerConfig(
             address=es_address,
             id=es_id,
-            dimensions=set(),
+            dimensions=set([u'foo:bar', u'label-pool:CTS']),
+            all_dimensions=None,
+            any_dimensions=None,
+            enabled=False,
+            allow_es_fallback=allow_es_fallback),
+        pools_config.ExternalSchedulerConfig(
+            address=es_address,
+            id=es_id,
+            dimensions=set([u'foo:bar']),
             all_dimensions=None,
             any_dimensions=None,
             enabled=True,
@@ -846,6 +854,30 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     request, _, _ = task_scheduler.bot_reap_task(
         self.bot_dimensions, 'abc')
     self.assertEqual(request.task_id, result_summary.task_id)
+
+  def test_bot_reap_task_for_nonexternal_pool(self):
+    self._setup_es(False)
+    notify_calls = self._mock_es_notify()
+    dimensions = {u'os': [u'Windows-3.1.1'], u'pool': [u'label-pool:CTS']}
+    slices = [
+        task_request.TaskSlice(
+            expiration_secs=60,
+            properties=_gen_properties(dimensions=dimensions),
+            wait_for_capacity=False),
+    ]
+    result_summary = self._quick_schedule(1, task_slices=slices)
+    self._mock_es_assign(result_summary.task_id, 0)
+
+    del notify_calls[:]
+    bot_dimensions = {
+        u'foo': [u'bar'],
+        u'id': [u'localhost'],
+        u'label-pool': [u'CTS'],
+    }
+    # CTS pool has disabled external scheduler, so notify_calls should have
+    # nothing recorded.
+    task_scheduler.bot_reap_task(bot_dimensions, 'abc')
+    self.assertEqual(len(notify_calls), 0)
 
   def test_schedule_request_slice_fallback_to_second_immediate(self):
     # First TaskSlice couldn't run so it was immediately skipped, the second ran

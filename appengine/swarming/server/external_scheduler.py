@@ -68,12 +68,16 @@ def _bot_pool_cfg(bot_dimensions):
 
 
 def _config_for_dimensions(pool_cfg, dimensions_flat):
-  """Determines the external scheduler for pool config and dimension set."""
+  """Determines the external scheduler for pool config and dimension set.
+
+  Pool's dimensions are matched with each config from top to down. The
+  last config in the file should be the default one.
+  """
   if not pool_cfg or not pool_cfg.external_schedulers:
     return None
   for e in pool_cfg.external_schedulers:
-    if e.enabled and e.dimensions.issubset(dimensions_flat):
-      return e
+    if e.dimensions.issubset(dimensions_flat):
+      return e if e.enabled else None
   return None
 
 
