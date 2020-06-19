@@ -34,8 +34,8 @@ from server import task_scheduler
 _PERM_POOLS_CREATE_TASK = auth.Permission('swarming.pools.createTask')
 _PERM_POOLS_LIST_BOTS = auth.Permission('swarming.pools.listBots')
 _PERM_POOLS_LIST_TASKS = auth.Permission('swarming.pools.listTasks')
-_PERM_TASKS_CREATE_IN_REALM = auth.Permission('swarming.tasks.createInRealm')
 _PERM_TASKS_ACT_AS = auth.Permission('swarming.tasks.actAs')
+_PERM_TASKS_CREATE_IN_REALM = auth.Permission('swarming.tasks.createInRealm')
 _PERM_TASKS_GET = auth.Permission('swarming.tasks.get')
 _TASK_SERVICE_ACCOUNT_IDENTITY = auth.Identity(
     auth.IDENTITY_USER, 'test@test-service-accounts.iam.gserviceaccount.com')
