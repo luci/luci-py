@@ -23,35 +23,39 @@ _BINARY_MEDIA_TYPE = encoding.Encoding.media_type(encoding.Encoding.BINARY)
 # A low-level pRPC request to be sent using components.net module.
 # Most clients should use Client class instead.
 # Use new_request to create a new request.
-Request = collections.namedtuple('Request', [
-    # hostname of the pRPC server, e.g. "app.example.com".
-    # Must not contain a scheme.
-    'hostname',
-    # True if the client must use HTTP, as opposed to HTTPS.
-    # Useful for local servers.
-    'insecure',
-    # Full name of the service, including the package name,
-    # e.g. "mypackage.MyService".
-    'service_name',
-    # Name of the RPC method.
-    'method_name',
-    # The request message.
-    'request_message',
-    # Target response message.
-    'response_message',
-    # A dict of call metadata. Will be available to the server.
-    'metadata',
-    # RPC timeout in seconds.
-    'timeout',
-    # OAuth2 scopes for the access token (ok skip auth if None).
-    'scopes',
-    # components.auth.ServiceAccountKey with credentials.
-    'service_account_key',
-    # delegation token returned by components.auth.delegate.
-    'delegation_token',
-    # how many times to retry on errors (4 times by default).
-    'max_attempts',
-])
+Request = collections.namedtuple(
+    'Request',
+    [
+        # hostname of the pRPC server, e.g. "app.example.com".
+        # Must not contain a scheme.
+        'hostname',
+        # True if the client must use HTTP, as opposed to HTTPS.
+        # Useful for local servers.
+        'insecure',
+        # Full name of the service, including the package name,
+        # e.g. "mypackage.MyService".
+        'service_name',
+        # Name of the RPC method.
+        'method_name',
+        # The request message.
+        'request_message',
+        # Target response message.
+        'response_message',
+        # A dict of call metadata. Will be available to the server.
+        'metadata',
+        # RPC timeout in seconds.
+        'timeout',
+        # OAuth2 scopes for the access token (ok skip auth if None).
+        'scopes',
+        # components.auth.ServiceAccountKey with credentials.
+        'service_account_key',
+        # delegation token returned by components.auth.delegate.
+        'delegation_token',
+        # how many times to retry on errors (4 times by default).
+        'max_attempts',
+        # the luci project under whose authority to perform the request.
+        'project_id',
+    ])
 
 
 def new_request(
@@ -71,6 +75,7 @@ def new_request(
       service_account_key=None,
       delegation_token=None,
       max_attempts=None,
+      project_id=None,
   )
   return ret._replace(**kwargs)
 
@@ -142,6 +147,7 @@ def rpc_async(req, response_metadata=None):
         deadline=timeout,
         max_attempts=req.max_attempts or 4,
         response_headers=response_metadata,
+        project_id=req.project_id,
     )
     # Unfortunately, net module does not expose headers of HTTP 200
     # responses.
@@ -196,6 +202,14 @@ def delegation_credentials(delegation_token):
   return lambda req: req._replace(delegation_token=delegation_token)
 
 
+def project_credentials(project_id):
+  """Return credentials that use project-based authorization.
+
+  The returned value can be used as "credentials" argument in RPC method calls.
+  """
+  return lambda req: req._replace(project_id=project_id)
+
+
 def composite_call_credentials(*call_credentials):
   """Combines multiple credentials.
 
@@ -228,8 +242,7 @@ class Client(object):
   Otherwise, they raise an Error.
   """
 
-  def __init__(
-      self, hostname, service_description, insecure=False):
+  def __init__(self, hostname, service_description, insecure=False):
     """Initializes a new pRPC Client.
 
     Args:

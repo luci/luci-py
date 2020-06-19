@@ -88,6 +88,7 @@ class PRPCClientTestCase(test_case.TestCase):
           deadline=10,
           max_attempts=4,
           response_headers=server_metadata,
+          project_id=None,
       )
       self.assertEqual(server_metadata['Some-Bytes-Bin'], '1234')
 
@@ -112,6 +113,12 @@ class PRPCClientTestCase(test_case.TestCase):
       self.give_creds(prpc_client.delegation_credentials('token'))
       _, kwargs = net.request_async.call_args
       self.assertEqual(kwargs['delegation_token'], 'token')
+
+  def test_request_credentials_project(self):
+    with self.mocked_request_async():
+      self.give_creds(prpc_client.project_credentials('project'))
+      _, kwargs = net.request_async.call_args
+      self.assertEqual(kwargs['project_id'], 'project')
 
   def test_request_credentials_composite(self):
     with self.mocked_request_async():
