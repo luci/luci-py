@@ -40,26 +40,9 @@ from server import realms
 from server import service_accounts
 
 
-# Realm permissions used in the tests.
-PERM_POOLS_CREATE_TASK = realms.get_permission(
-    realms_pb2.REALM_PERMISSION_POOLS_CREATE_TASK)
-PERM_POOLS_LIST_BOTS = realms.get_permission(
-    realms_pb2.REALM_PERMISSION_POOLS_LIST_BOTS)
-PERM_POOLS_LIST_TASKS = realms.get_permission(
-    realms_pb2.REALM_PERMISSION_POOLS_LIST_TASKS)
-PERM_TASKS_CREATE_IN_REALM = realms.get_permission(
-    realms_pb2.REALM_PERMISSION_TASKS_CREATE_IN_REALM)
-PREM_TASKS_ACT_AS = realms.get_permission(
-    realms_pb2.REALM_PERMISSION_TASKS_ACT_AS)
-PREM_TASKS_GET = realms.get_permission(realms_pb2.REALM_PERMISSION_TASKS_GET)
-
+# Realm permissions used in Swarming.
 _ALL_PERMS = [
-    PERM_POOLS_CREATE_TASK,
-    PERM_POOLS_LIST_BOTS,
-    PERM_POOLS_LIST_TASKS,
-    PERM_TASKS_CREATE_IN_REALM,
-    PREM_TASKS_ACT_AS,
-    PREM_TASKS_GET,
+    realms.get_permission(p) for p in realms_pb2.RealmPermission.values()[1:]
 ]
 
 
@@ -314,7 +297,10 @@ class AppTestBase(test_case.TestCase):
                             ],
                         }, {
                             'permissions': [
-                                _ALL_PERMS.index(PREM_TASKS_ACT_AS),
+                                _ALL_PERMS.index(
+                                    realms.get_permission(
+                                        realms_pb2.REALM_PERMISSION_TASKS_ACT_AS
+                                    )),
                             ],
                             'principals': ['user:service-account@example.com'],
                         }],
