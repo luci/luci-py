@@ -109,8 +109,23 @@ def db():
   role('role/logdog.reader', [])
   role('role/logdog.writer', [])
 
+  # ResultDB permissions and roles. (crbug.com/1013316)
+  role('role/resultdb.invocationCreator', [
+      permission('resultdb.invocations.create'),
+      permission('resultdb.invocations.update'),
+  ])
+  role('role/resultdb.reader', [
+      permission('resultdb.invocations.read'),
+      permission('resultdb.testResults.read'),
+      permission('resultdb.artifacts.read'),
+      permission('resultdb.testExonerations.read'),
+  ])
+
   # Buildbucket permissions and roles. Mostly placeholders for now.
-  role('role/buildbucket.reader', [])
+  role('role/buildbucket.reader', [
+      # Readers of builds should also have read permissions to test results.
+      include('role/resultdb.reader'),
+  ])
   role('role/buildbucket.triggerer', [
       include('role/buildbucket.reader'),
   ])
@@ -125,18 +140,6 @@ def db():
   # CQ permissions and roles. Placeholders for now.
   role('role/cq.committer', [])
   role('role/cq.dryRunner', [])
-
-  # ResultDB permissions and roles. (crbug.com/1013316)
-  role('role/resultdb.invocationCreator', [
-      permission('resultdb.invocations.create'),
-      permission('resultdb.invocations.update'),
-  ])
-  role('role/resultdb.reader', [
-      permission('resultdb.invocations.read'),
-      permission('resultdb.testResults.read'),
-      permission('resultdb.artifacts.read'),
-      permission('resultdb.testExonerations.read'),
-  ])
 
   # This role is implicitly granted to identity "project:X" in all realms of
   # the project X (and only it!). See below. Identity "project:X" is used by
