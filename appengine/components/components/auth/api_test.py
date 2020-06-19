@@ -13,6 +13,7 @@ import threading
 import unittest
 
 from six.moves import queue
+import mock
 
 from test_support import test_env
 test_env.setup_test_env()
@@ -933,6 +934,18 @@ class ApiTest(test_case.TestCase):
     self.assertTrue(api.is_decorated(api.public(lambda: None)))
     self.assertTrue(
         api.is_decorated(api.require(lambda: True)(lambda: None)))
+
+  @mock.patch('logging.info')
+  def test_require_log_identity(self, logfunc):
+    ident = model.Identity.from_bytes('user:abc@example.com')
+    api.get_request_cache().current_identity = ident
+
+    @api.require(lambda: True, log_identity=True)
+    def func():
+      pass
+
+    func()
+    logfunc.assert_called_once_with('Accessed from user:abc@example.com')
 
 
 class OAuthAccountsTest(test_case.TestCase):

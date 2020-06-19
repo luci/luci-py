@@ -1883,7 +1883,7 @@ def public(func):
   return func
 
 
-def require(callback, error_msg=None):
+def require(callback, error_msg=None, log_identity=False):
   """Decorator that checks current identity's permissions.
 
   Args:
@@ -1893,6 +1893,8 @@ def require(callback, error_msg=None):
         use get_current_identity() (and other request state) to figure this out.
     error_msg: string that is included as the message in the AuthorizationError
         raised if callback returns False.
+    log_identity: boolean that is used to decide whether the user identity
+        should be logged in the backend.
 
   Multiple @require decorators can be safely nested on top of each other to
   check multiple permissions. In that case a current identity needs to have all
@@ -1922,6 +1924,8 @@ def require(callback, error_msg=None):
     def wrapper(*args, **kwargs):
       if not callback():
         raise AuthorizationError(error_msg)
+      if log_identity:
+        logging.info('Accessed from %s' % get_current_identity().to_bytes())
       return func(*args, **kwargs)
 
     # Propagate reference to original function, mark function as decorated.

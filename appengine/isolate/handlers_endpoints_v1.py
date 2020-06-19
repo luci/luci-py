@@ -42,24 +42,6 @@ import stats
 MIN_SIZE_FOR_GS = 501
 
 
-### Utility
-
-
-def _log_identity(func):
-  """Logs the identity from the client's request.
-
-  This decorator must come after the auth ones, so that when it is invoked, the
-  identity is updated.
-  """
-
-  @functools.wraps(func)
-  def wrapped(service, *args, **kwargs):
-    logging.info('Accessed from %s' % auth.get_current_identity().to_bytes())
-    return func(service, *args, **kwargs)
-
-  return wrapped
-
-
 ### Request Types
 
 
@@ -207,8 +189,7 @@ class IsolateService(remote.Service):
   ### Endpoints Methods
 
   @auth.endpoints_method(DigestCollection, UrlCollection, http_method='POST')
-  @auth.require(acl.isolate_writable)
-  @_log_identity
+  @auth.require(acl.isolate_writable, log_identity=True)
   def preupload(self, request):
     """Checks for entry's existence and generates upload URLs.
 
@@ -280,22 +261,19 @@ class IsolateService(remote.Service):
     return response
 
   @auth.endpoints_method(StorageRequest, PushPing)
-  @auth.require(acl.isolate_writable)
-  @_log_identity
+  @auth.require(acl.isolate_writable, log_identity=True)
   def store_inline(self, request):
     """Stores relatively small entities in the datastore."""
     return self.storage_helper(request, False)
 
   @auth.endpoints_method(FinalizeRequest, PushPing)
-  @auth.require(acl.isolate_writable)
-  @_log_identity
+  @auth.require(acl.isolate_writable, log_identity=True)
   def finalize_gs_upload(self, request):
     """Informs client that large entities have been uploaded to GCS."""
     return self.storage_helper(request, True)
 
   @auth.endpoints_method(RetrieveRequest, RetrievedContent)
-  @auth.require(acl.isolate_readable)
-  @_log_identity
+  @auth.require(acl.isolate_readable, log_identity=True)
   def retrieve(self, request):
     """Retrieves content from a storage location."""
     content = None
