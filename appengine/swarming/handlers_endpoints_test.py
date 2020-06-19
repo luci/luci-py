@@ -1794,11 +1794,44 @@ class TaskApiTest(BaseTest):
 
     # Attempt to cancel as non-privileged user -> HTTP 403.
     self.set_as_user()
+    self.mock_auth_db([])
     self.call_api(
         'cancel', body={
             'task_id': task_id,
             'kill_running': False
         }, status=403)
+
+  def test_cancel_with_realm_permission(self):
+    # someone creates tasks with/without realm.
+    self.set_as_privileged_user()
+    self.mock_auth_db([
+        auth.Permission('swarming.pools.createTask'),
+        auth.Permission('swarming.tasks.createInRealm'),
+    ])
+    _, task_id_with_realm = self.client_create_task_raw(realm='test:task_realm')
+    _, task_id_without_realm = self.client_create_task_raw(realm=None)
+
+    def assertTaskIsNotAccessible(task_id):
+      response = self.call_api('cancel', body={'task_id': task_id}, status=403)
+      self.assertErrorResponseMessage(u'Task "%s" is not accessible' % task_id,
+                                      response)
+
+    # non-privileged user can't cancel the both tasks without permission.
+    self.set_as_user()
+    assertTaskIsNotAccessible(task_id_with_realm)
+    assertTaskIsNotAccessible(task_id_without_realm)
+
+    # the user can cancel to the both tasks with swarming.pools.cancelTask
+    # permission.
+    self.mock_auth_db([auth.Permission('swarming.pools.cancelTask')])
+    self.call_api('cancel', body={'task_id': task_id_with_realm}, status=200)
+    self.call_api('cancel', body={'task_id': task_id_without_realm}, status=200)
+
+    # the user can cancel with swarming.tasks.cancel permission.
+    self.mock_auth_db([auth.Permission('swarming.tasks.cancel')])
+    self.call_api('cancel', body={'task_id': task_id_with_realm}, status=200)
+    # but, not accessible to the task without realm.
+    assertTaskIsNotAccessible(task_id_without_realm)
 
   def test_cancel_running(self):
     self.mock(random, 'getrandbits', lambda _: 0x88)

@@ -48,7 +48,7 @@ from server import task_scheduler
 
 # Used by _get_task_request_async(), clearer than using True/False and important
 # as this is part of the security boundary.
-_EDIT = object()
+_CANCEL = object()
 _VIEW = object()
 
 
@@ -84,9 +84,8 @@ def _get_task_request_async(task_id, request_key, viewing):
     raise endpoints.NotFoundException('%s not found.' % task_id)
   if viewing == _VIEW:
     realms.check_task_get_acl(request)
-  elif viewing == _EDIT:
-    if not acl.can_edit_task(request):
-      raise endpoints.ForbiddenException('%s is not accessible.' % task_id)
+  elif viewing == _CANCEL:
+    realms.check_task_cancel_acl(request)
   else:
     raise endpoints.InternalServerErrorException('_get_task_request_async()')
   raise ndb.Return(request)
@@ -100,7 +99,7 @@ def _get_request_and_result(task_id, viewing, trust_memcache):
 
   Arguments:
     task_id: task ID as provided by the user.
-    viewing: one of _EDIT or _VIEW
+    viewing: one of _CANCEL or _VIEW
     trust_memcache: bool to state if memcache should be trusted for running
         task. If False, when a task is still pending/running, do a DB fetch.
 
@@ -382,8 +381,8 @@ class SwarmingTaskService(remote.Service):
     """
     logging.debug('request %s', request)
     request_key, result_key = _to_keys(request.task_id)
-    request_obj = _get_task_request_async(
-        request.task_id, request_key, _EDIT).get_result()
+    request_obj = _get_task_request_async(request.task_id, request_key,
+                                          _CANCEL).get_result()
     ok, was_running = task_scheduler.cancel_task(
         request_obj, result_key, request.kill_running or False, None)
     return swarming_rpcs.CancelResponse(ok=ok, was_running=was_running)
