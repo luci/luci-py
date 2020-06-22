@@ -388,6 +388,32 @@ def check_tasks_list_acl(tags):
   _check_pools_filters_acl(realms_pb2.REALM_PERMISSION_POOLS_LIST_TASKS, tags)
 
 
+def check_tasks_cancel_acl(tags):
+  """Checks if the caller is allowed to cancel tasks.
+
+  Checks if the caller has global permission using acl.can_edit_all_tasks().
+
+  If the caller doesn't have any global permissions,
+    It checks realm permission 'swarming.pools.cancelTask'.
+    The caller is required to specify a pool dimension, and have
+    *all* permissions of the specified pools.
+
+  Args:
+    tags: List of tags for filtering.
+
+  Returns:
+    None
+
+  Raises:
+    auth.AuthorizationError: if the caller is not allowed.
+  """
+
+  # check global permission.
+  if acl.can_edit_all_tasks():
+    return
+  _check_pools_filters_acl(realms_pb2.REALM_PERMISSION_POOLS_CANCEL_TASK, tags)
+
+
 # Private section
 
 

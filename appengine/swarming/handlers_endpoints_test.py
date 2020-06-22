@@ -1359,6 +1359,33 @@ class TasksApiTest(BaseTest):
     }
     self.assertEqual(expected, response.json)
 
+  def test_mass_cancel_realm_permission(self):
+    # non-privileged user without realm permission.
+    self.set_as_user()
+    self.mock_auth_db([])
+
+    # the user needs to specify a pool filter.
+    response = self.call_api('cancel', body={'tags': ['foo:bar']}, status=403)
+    self.assertErrorResponseMessage(u'No pool is specified', response)
+
+    # the user can't access the tasks without permission.
+    request = {'tags': ['pool:default']}
+    response = self.call_api('cancel', body=request, status=403)
+    self.assertErrorResponseMessage(
+        u'user "user@example.com" does not have permission '
+        '"swarming.pools.cancelTask"', response)
+
+    # give permission to the user.
+    self.mock_auth_db([auth.Permission('swarming.pools.cancelTask')])
+
+    # the user still needs to specify a pool filter.
+    response = self.call_api('cancel', body={'tags': ['foo:bar']}, status=403)
+    self.assertErrorResponseMessage(u'No pool is specified', response)
+
+    # ok if the user has a permission of the specified pool.
+    request = {'tags': ['pool:default']}
+    self.call_api('cancel', body=request, status=200)
+
   def test_list_ok(self):
     """Asserts that list requests all TaskResultSummaries."""
     first, second, now_120, start, end = self._gen_two_tasks()

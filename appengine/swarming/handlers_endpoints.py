@@ -729,7 +729,7 @@ class SwarmingTasksService(remote.Service):
   @auth.endpoints_method(
       swarming_rpcs.TasksCancelRequest, swarming_rpcs.TasksCancelResponse,
       http_method='POST')
-  @auth.require(acl.can_edit_all_tasks, log_identity=True)
+  @auth.require(acl.can_access, log_identity=True)
   def cancel(self, request):
     """Cancel a subset of pending tasks based on the tags.
 
@@ -741,6 +741,11 @@ class SwarmingTasksService(remote.Service):
       # Prevent accidental cancellation of everything.
       raise endpoints.BadRequestException(
           'You must specify tags when cancelling multiple tasks.')
+
+    # Check permission.
+    # If the caller has global permission, it can access all tasks.
+    # Otherwise, it requires a pool tag to check ACL.
+    realms.check_tasks_cancel_acl(request.tags)
 
     now = utils.utcnow()
     cond = task_result.TaskResultSummary.state == task_result.State.PENDING
