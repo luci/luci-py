@@ -209,7 +209,7 @@ def check_bot_get_acl(bot_id):
 
   If the caller doesn't have any global permissions,
     It checks realm permission 'swarming.pools.listBots'.
-    The caller is required to have *any* permissions of the pools.
+    The caller is required to have the permission in *any* pools.
 
   Args:
     bot_id: ID of the bot.
@@ -236,7 +236,7 @@ def check_bot_tasks_acl(bot_id):
 
   If the caller doesn't have any global permissions,
     It checks realm permission 'swarming.pools.listTasks'.
-    The caller is required to have *any* permissions of the pools.
+    The caller is required to have the permission in *any* pools.
 
   Args:
     bot_id: ID of the bot.
@@ -263,8 +263,8 @@ def check_bots_list_acl(dimensions_flat):
 
   If the caller doesn't have any global permissions,
     It checks realm permission 'swarming.pools.listBots'.
-    The caller is required to specify a pool dimension, and have
-    *all* permissions of the specified pools.
+    The caller is required to specify a pool dimension, and have the permission
+    in *all* pools.
 
   Args:
     dimensions_flat: List of dimensions for filtering.
@@ -279,8 +279,8 @@ def check_bots_list_acl(dimensions_flat):
   # check global permission.
   if acl.can_view_bot():
     return
-  _check_pools_list_acl(realms_pb2.REALM_PERMISSION_POOLS_LIST_BOTS,
-                        dimensions_flat)
+  _check_pools_filters_acl(realms_pb2.REALM_PERMISSION_POOLS_LIST_BOTS,
+                           dimensions_flat)
 
 
 def check_task_get_acl(task_request):
@@ -369,8 +369,8 @@ def check_tasks_list_acl(tags):
 
   If the caller doesn't have any global permissions,
     It checks realm permission 'swarming.pools.listTasks'.
-    The caller is required to specify a pool dimension, and have
-    *all* permissions of the specified pools.
+    The caller is required to specify a pool dimension, and have the permission
+    in *all* pools.
 
   Args:
     tags: List of tags for filtering.
@@ -385,7 +385,7 @@ def check_tasks_list_acl(tags):
   # check global permission.
   if acl.can_view_all_tasks():
     return
-  _check_pools_list_acl(realms_pb2.REALM_PERMISSION_POOLS_LIST_TASKS, tags)
+  _check_pools_filters_acl(realms_pb2.REALM_PERMISSION_POOLS_LIST_TASKS, tags)
 
 
 # Private section
@@ -440,10 +440,10 @@ def _retrieve_bot_dimensions(bot_id):
   return events[0].dimensions_flat
 
 
-def _check_pools_list_acl(perm_enum, dimensions):
-  """Checks if the caller is allowed to list or count resources in the pools.
+def _check_pools_filters_acl(perm_enum, dimensions):
+  """Checks if the caller has the permission in the specified pools.
 
-  The caller needs to have *all* permissions of the specified pools.
+  The caller needs to have the permission in *all* pools.
 
   Raises:
     auth.AuthorizationError: if the caller is not allowed.
@@ -454,7 +454,6 @@ def _check_pools_list_acl(perm_enum, dimensions):
   if not pools:
     raise auth.AuthorizationError('No pool is specified')
 
-  # check Realm permission 'swarming.pools.listTasks'
   perm = get_permission(perm_enum)
 
   # the caller needs to have all permissions of the pools.
@@ -463,7 +462,6 @@ def _check_pools_list_acl(perm_enum, dimensions):
     if not pool_cfg:
       raise endpoints.BadRequestException('Pool "%s" not found' % p)
 
-    # check Realm permission 'swarming.pools.listBots'
     _check_permission(perm, [pool_cfg.realm])
 
 
@@ -471,7 +469,7 @@ def _check_bot_acl(perm_enum, bot_id):
   """Checks if the caller is allowed to access the resource associated with
   the bot.
 
-  The caller needs to have *any* permissions of the pools the bot belong to.
+  The caller needs to have the permission in *any* pools the bot belong to.
 
   Raises:
     auth.AuthorizationError: if the caller is not allowed.
