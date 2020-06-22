@@ -3104,8 +3104,17 @@ class BotApiTest(BaseTest):
     self.set_as_bot()
     self.bot_poll()
 
+    # without realm permission.
     self.set_as_user()
-    self.call_api('terminate', body={'bot_id': 'bot1'}, status=403)
+    self.mock_auth_db([])
+    response = self.call_api('terminate', body={'bot_id': 'bot1'}, status=403)
+    self.assertErrorResponseMessage(
+        u'user "user@example.com" does not have permission '
+        '"swarming.pools.terminateBot"', response)
+
+    # give permission.
+    self.mock_auth_db([auth.Permission('swarming.pools.terminateBot')])
+    self.call_api('terminate', body={'bot_id': 'bot1'}, status=200)
 
 
 if __name__ == '__main__':

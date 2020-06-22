@@ -1041,7 +1041,7 @@ class SwarmingBotService(remote.Service):
       BotId, swarming_rpcs.TerminateResponse,
       name='terminate',
       path='{bot_id}/terminate')
-  @auth.require(acl.can_edit_bot)
+  @auth.require(acl.can_access)
   def terminate(self, request):
     """Asks a bot to terminate itself gracefully.
 
@@ -1059,6 +1059,12 @@ class SwarmingBotService(remote.Service):
     # minutes.
     logging.debug('%s', request)
     bot_id = unicode(request.bot_id)
+
+    # Check permission.
+    # The caller needs to have global permission, or a permission in any pools
+    # that the bot belongs to.
+    realms.check_bot_terminate_acl(bot_id)
+
     bot_key = bot_management.get_info_key(bot_id)
     get_or_raise(bot_key)  # raises 404 if there is no such bot
     try:

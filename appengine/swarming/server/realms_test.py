@@ -35,6 +35,7 @@ _PERM_POOLS_CANCEL_TASK = auth.Permission('swarming.pools.cancelTask')
 _PERM_POOLS_CREATE_TASK = auth.Permission('swarming.pools.createTask')
 _PERM_POOLS_LIST_BOTS = auth.Permission('swarming.pools.listBots')
 _PERM_POOLS_LIST_TASKS = auth.Permission('swarming.pools.listTasks')
+_PERM_POOLS_TERMINATE_BOT = auth.Permission('swarming.pools.terminateBot')
 _PERM_TASKS_ACT_AS = auth.Permission('swarming.tasks.actAs')
 _PERM_TASKS_CANCEL = auth.Permission('swarming.tasks.cancel')
 _PERM_TASKS_CREATE_IN_REALM = auth.Permission('swarming.tasks.createInRealm')
@@ -119,13 +120,13 @@ class RealmsTest(test_case.TestCase):
 
   def _mock_for_check_pools_create_task_legacy(self, is_allowed_legacy):
     self.mock(realms, 'is_enforced_permission', lambda *_: False)
-    self.mock(task_scheduler,
-              '_is_allowed_to_schedule', lambda _: is_allowed_legacy)
+    self.mock(task_scheduler, '_is_allowed_to_schedule',
+              lambda _: is_allowed_legacy)
 
   def _mock_for_check_pools_create_task(self, pool_realm='test:pool'):
     self.mock(realms, 'is_enforced_permission', lambda *_: True)
-    self.mock(pools_config,
-              'get_pool_config', lambda _: _gen_pool_config(realm=pool_realm))
+    self.mock(pools_config, 'get_pool_config',
+              lambda _: _gen_pool_config(realm=pool_realm))
 
   def test_check_pools_create_task_legacy_allowed(self):
     self._mock_for_check_pools_create_task_legacy(is_allowed_legacy=True)
@@ -717,6 +718,70 @@ class RealmsTest(test_case.TestCase):
     # call
     with self.assertRaises(endpoints.BadRequestException):
       realms.check_tasks_cancel_acl(['pool:unknown'])
+    self._has_permission_mock.assert_not_called()
+
+  def test_check_bot_terminate_acl_with_global_permission(self):
+    self.mock(acl, 'can_edit_bot', lambda: True)
+
+    realms.check_bot_terminate_acl('bot1')
+    self._has_permission_mock.assert_not_called()
+
+  def test_check_bot_terminate_acl_allowed(self):
+    # mock
+    self.mock(acl, 'can_edit_bot', lambda: False)
+    bot_events = [
+        _gen_bot_event_mock(dimensions_flat=['pool:pool1', 'pool:pool2'])
+    ]
+    query = lambda *_: mock.Mock(fetch=lambda _: bot_events)
+    self.mock(bot_management, 'get_events_query', query)
+    get_pool_config = lambda p: _gen_pool_config(realm='test:' + p)
+    self.mock(pools_config, 'get_pool_config', get_pool_config)
+
+    # call
+    realms.check_bot_terminate_acl('bot1')
+    self._has_permission_mock.assert_called_once_with(
+        _PERM_POOLS_TERMINATE_BOT, ['test:pool1', 'test:pool2'],
+        identity=auth.get_current_identity())
+
+  def test_check_bot_terminate_acl_not_allowed(self):
+    # mock
+    self.mock(acl, 'can_edit_bot', lambda: False)
+    bot_events = [
+        _gen_bot_event_mock(dimensions_flat=['pool:pool1', 'pool:pool2'])
+    ]
+    query = lambda *_: mock.Mock(fetch=lambda _: bot_events)
+    self.mock(bot_management, 'get_events_query', query)
+    get_pool_config = lambda p: _gen_pool_config(realm='test:' + p)
+    self.mock(pools_config, 'get_pool_config', get_pool_config)
+    self._has_permission_mock.return_value = False
+
+    # call
+    with self.assertRaises(auth.AuthorizationError):
+      realms.check_bot_terminate_acl('bot1')
+    self._has_permission_mock.assert_called_once_with(
+        _PERM_POOLS_TERMINATE_BOT, ['test:pool1', 'test:pool2'],
+        identity=auth.get_current_identity())
+
+  def test_check_bot_terminate_acl_no_bot(self):
+    self.mock(acl, 'can_edit_bot', lambda: False)
+    with self.assertRaises(endpoints.NotFoundException):
+      realms.check_bot_terminate_acl('bot1')
+    self._has_permission_mock.assert_not_called()
+
+  def test_check_bot_terminate_acl_no_realms(self):
+    # mock
+    self.mock(acl, 'can_edit_bot', lambda: False)
+    bot_events = [
+        _gen_bot_event_mock(dimensions_flat=['pool:pool1', 'pool:pool2'])
+    ]
+    query = lambda *_: mock.Mock(fetch=lambda _: bot_events)
+    self.mock(bot_management, 'get_events_query', query)
+    get_pool_config = lambda p: _gen_pool_config(realm=None)
+    self.mock(pools_config, 'get_pool_config', get_pool_config)
+
+    # call
+    with self.assertRaises(auth.AuthorizationError):
+      realms.check_bot_terminate_acl('bot1')
     self._has_permission_mock.assert_not_called()
 
 
