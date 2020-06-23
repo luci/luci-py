@@ -832,10 +832,9 @@ const reproduceSection = (ele, currentSlice) => {
 <div class=reproduce>
   <div ?hidden=${!hasIsolated}>Download inputs files into directory <i>foo</i>:</div>
   <div class="code bottom_space" ?hidden=${!hasIsolated}>
-    # (if needed) git clone https://chromium.googlesource.com/infra/luci/client-py<br>
-    python ./client-py/isolateserver.py download -I ${ref.isolatedserver}
-    --namespace ${ref.namespace}
-    -s ${ref.isolated} --target foo
+    # (if needed) cipd install 'infra/tools/luci/isolated/\${platform}' -root bar<br>
+    ./bar/isolated download -I ${ref.isolatedserver} --namespace ${ref.namespace}
+    -isolated ${ref.isolated} -output-dir foo
   </div>
 
   <div>Run this task locally:</div>
