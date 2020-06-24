@@ -13,9 +13,8 @@ release: _packages-lock.json.done
 serve: _packages-lock.json.done
 	npx webpack-dev-server --mode=development --watch-poll
 
-test: default
-	# Run the generated tests just once under Xvfb.
-	xvfb-run --auto-servernum --server-args "-screen 0 1280x1024x24" npx karma start
+test: _packages-lock.json.done
+	npx karma start
 
 browser_test:
 	# Good for debugging/developing tests.
@@ -23,7 +22,7 @@ browser_test:
 	# tests there, seeing the results. Unfortunately, due to how karma needs to
 	# concatenate the _test.js files and run them through webpack, it doesn't
 	# autodetect changes and needs to be re-run manually :(
-	xvfb-run --auto-servernum --server-args "-screen 0 1280x1024x24" npx karma start --no-single-run
+	npx karma start --no-single-run
 
 continuous_test:
 	# Good for debugging/developing tests.
