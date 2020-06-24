@@ -955,6 +955,14 @@ class NamedCache(Cache):
         abs_cache = os.path.join(self.cache_dir, rel_cache)
         logging.info('- Moving to %r', rel_cache)
         file_path.ensure_tree(os.path.dirname(abs_cache))
+
+        if sys.platform != 'win32':
+          uid = os.getuid()
+          if os.stat(src).st_uid != uid:
+            # Maybe owner of |src| is different from runner of this script. This
+            # is to make fs.rename work in that case.
+            # https://crbug.com/986676
+            subprocess.check_call(['sudo', '-n', 'chown', str(uid), src])
         fs.rename(src, abs_cache)
 
         self._lru.add(name, (rel_cache, size))
