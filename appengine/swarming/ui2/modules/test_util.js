@@ -66,8 +66,13 @@ export const customMatchers = {
         if (!isElement(actual)) {
           throw `${actual} is not a DOM element`;
         }
-        text = text.trim();
-        let actualText = actual.textContent.trim();
+        function normalize(s) {
+          return s.trim()
+            .replace('\t', ' ')
+            .replace(/ {2,}/g, ' ');
+        }
+        text = normalize(text);
+        let actualText = normalize(actual.innerText);
         if (actualText === text) {
           return {
             // craft the message for the negated version
