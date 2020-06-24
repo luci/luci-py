@@ -283,6 +283,25 @@ def check_bot_terminate_acl(bot_id):
   _check_bot_acl(realms_pb2.REALM_PERMISSION_POOLS_TERMINATE_BOT, bot_id)
 
 
+def can_terminate_bot(bot_id):
+  """Checks if the caller is allowed to terminate the bot.
+
+  Args:
+    bot_id: ID of the bot.
+
+  Returns:
+    allowed: True if allowed, False otherwise.
+  """
+  if not bot_id:
+    return acl.can_edit_bot()
+
+  try:
+    check_bot_terminate_acl(bot_id)
+    return True
+  except auth.AuthorizationError:
+    return False
+
+
 def check_bots_list_acl(dimensions_flat):
   """Checks if the caller is allowed to list or count bots.
 
@@ -389,6 +408,22 @@ def check_task_cancel_acl(task_request):
                                 task_request.task_id)
 
 
+def can_cancel_task(task_request):
+  """Checks if the caller is allowed to cancel the task.
+
+  Args:
+    task_request: An instance of TaskRequest.
+
+  Returns:
+    allowed: True if allowed, False otherwise.
+  """
+  try:
+    check_task_cancel_acl(task_request)
+    return True
+  except auth.AuthorizationError:
+    return False
+
+
 def check_tasks_list_acl(tags):
   """Checks if the caller is allowed to list or count tasks.
 
@@ -439,6 +474,22 @@ def check_tasks_cancel_acl(tags):
   if acl.can_edit_all_tasks():
     return
   _check_pools_filters_acl(realms_pb2.REALM_PERMISSION_POOLS_CANCEL_TASK, tags)
+
+
+def can_cancel_tasks(tags):
+  """Checks if the caller is allowed to cancel tasks.
+
+  Args:
+    tags: List of tags for filtering.
+
+  Returns:
+    allowed: True if allowed, False otherwise.
+  """
+  try:
+    check_tasks_cancel_acl(tags)
+    return True
+  except auth.AuthorizationError:
+    return False
 
 
 # Private section

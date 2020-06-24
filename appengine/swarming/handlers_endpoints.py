@@ -209,6 +209,14 @@ swarming_api = auth.endpoints_api(
         'view and cancel tasks, query tasks and bots')
 
 
+PermissionsRequest = endpoints.ResourceContainer(
+    message_types.VoidMessage,
+    bot_id=messages.StringField(1),
+    task_id=messages.StringField(2),
+    tags=messages.StringField(3, repeated=True),
+)
+
+
 @swarming_api.api_class(resource_name='server', path='server')
 class SwarmingServerService(remote.Service):
   @gae_ts_mon.instrument_endpoint()
@@ -254,20 +262,30 @@ class SwarmingServerService(remote.Service):
 
   @gae_ts_mon.instrument_endpoint()
   @auth.endpoints_method(
-      message_types.VoidMessage, swarming_rpcs.ClientPermissions,
-      http_method='GET')
+      PermissionsRequest, swarming_rpcs.ClientPermissions, http_method='GET')
   @auth.public
-  def permissions(self, _request):
+  def permissions(self, request):
     """Returns the caller's permissions."""
     return swarming_rpcs.ClientPermissions(
         delete_bot=acl.can_delete_bot(),
-        terminate_bot=acl.can_edit_bot(),
+        terminate_bot=realms.can_terminate_bot(request.bot_id),
         get_configs=acl.can_view_config(),
         put_configs=acl.can_edit_config(),
-        # TODO(crbug/1010555): Remove is_ip_whitelisted_machine().
-        cancel_task=acl._is_user() or acl.is_ip_whitelisted_machine(),
-        cancel_tasks=acl.can_edit_all_tasks(),
+        cancel_task=self._can_cancel_task(request.task_id),
+        cancel_tasks=realms.can_cancel_tasks(request.tags),
         get_bootstrap_token=acl.can_create_bot())
+
+  def _can_cancel_task(self, task_id):
+    if not task_id:
+      # TODO(crbug.com/1066839):
+      # This is for the compatibility until Web clients send task_id.
+      # return False if task_id is not given.
+      return acl._is_privileged_user()
+    task_key, _ = _to_keys(task_id)
+    task = task_key.get()
+    if not task:
+      raise endpoints.NotFoundException('%s not found.' % task_id)
+    return realms.can_cancel_task(task)
 
   @gae_ts_mon.instrument_endpoint()
   @auth.endpoints_method(

@@ -498,6 +498,19 @@ class RealmsTest(test_case.TestCase):
     self._has_permission_mock.assert_any_call(_PERM_TASKS_CANCEL,
                                               ['test:realm'])
 
+  def test_can_cancel_task(self):
+    # True case
+    self.mock(acl, 'can_edit_task', lambda _: True)
+    self.assertTrue(realms.can_cancel_task(None))
+
+    # False case
+    self.mock(acl, 'can_edit_task', lambda _: False)
+    get_pool_config = lambda _: _gen_pool_config(realm='test:pool')
+    self.mock(pools_config, 'get_pool_config', get_pool_config)
+    self._has_permission_mock.return_value = False
+    self.assertFalse(
+        realms.can_cancel_task(_gen_task_request_mock(realm='test:realm')))
+
   def test_check_tasks_list_acl_with_global_permission(self):
     self.mock(acl, 'can_view_all_tasks', lambda: True)
 
@@ -720,6 +733,17 @@ class RealmsTest(test_case.TestCase):
       realms.check_tasks_cancel_acl(['pool:unknown'])
     self._has_permission_mock.assert_not_called()
 
+  def test_can_cancel_tasks(self):
+    # True case
+    self.mock(acl, 'can_edit_all_tasks', lambda: True)
+    self.assertTrue(realms.can_cancel_tasks(['pool:pool1', 'pool:pool2']))
+
+    # False case
+    get_pool_config = lambda p: _gen_pool_config(realm=None)
+    self.mock(pools_config, 'get_pool_config', get_pool_config)
+    self.mock(acl, 'can_edit_all_tasks', lambda: False)
+    self.assertFalse(realms.can_cancel_tasks(['pool:pool1', 'pool:pool2']))
+
   def test_check_bot_terminate_acl_with_global_permission(self):
     self.mock(acl, 'can_edit_bot', lambda: True)
 
@@ -783,6 +807,22 @@ class RealmsTest(test_case.TestCase):
     with self.assertRaises(auth.AuthorizationError):
       realms.check_bot_terminate_acl('bot1')
     self._has_permission_mock.assert_not_called()
+
+  def test_can_terminate_bot(self):
+    # True case
+    self.mock(acl, 'can_edit_bot', lambda: True)
+    self.assertTrue(realms.can_terminate_bot('bot1'))
+
+    # False case
+    self.mock(acl, 'can_edit_bot', lambda: False)
+    bot_events = [
+        _gen_bot_event_mock(dimensions_flat=['pool:pool1', 'pool:pool2'])
+    ]
+    query = lambda *_: mock.Mock(fetch=lambda _: bot_events)
+    self.mock(bot_management, 'get_events_query', query)
+    get_pool_config = lambda p: _gen_pool_config(realm=None)
+    self.mock(pools_config, 'get_pool_config', get_pool_config)
+    self.assertFalse(realms.can_terminate_bot('bot1'))
 
 
 if __name__ == '__main__':
