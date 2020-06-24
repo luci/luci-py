@@ -300,13 +300,20 @@ class Subprocess42Test(unittest.TestCase):
                    "TODO(crbug.com/1017545): AssertionError: '12345' != ''")
   def test_communicate_input_stdout_timeout(self):
     cmd = [
-      sys.executable, '-u', '-c',
-      'import sys, time; sys.stdout.write(sys.stdin.read(5)); time.sleep(60)',
+        sys.executable,
+        '-u',
+        '-c',
+        """
+import sys, time
+sys.stdout.write(sys.stdin.read(5))
+sys.stdout.flush()
+time.sleep(60)
+        """,
     ]
     proc = subprocess42.Popen(
         cmd, stdin=subprocess42.PIPE, stdout=subprocess42.PIPE)
     try:
-      proc.communicate(input='12345', timeout=0.5)
+      proc.communicate(input='12345', timeout=1)
       self.fail()
     except subprocess42.TimeoutExpired as e:
       self.assertEqual('12345', e.output)
