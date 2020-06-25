@@ -197,6 +197,11 @@ NO_K8S_CGROUP = """
 
 
 class TestDocker(auto_stub.TestCase):
+
+  def setUp(self):
+    super(TestDocker, self).setUp()
+    tools.clear_cache_all()
+
   def tearDown(self):
     super(TestDocker, self).tearDown()
     tools.clear_cache_all()
