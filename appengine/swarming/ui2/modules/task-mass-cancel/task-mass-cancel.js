@@ -178,7 +178,7 @@ window.customElements.define('task-mass-cancel', class extends HTMLElement {
   _fetchCount() {
     if (!this.auth_header) {
       // This should never happen
-      console.warn('no auth_header recieved, try refreshing the page?');
+      console.warn('no auth_header received, try refreshing the page?');
       return;
     }
     let extra = {
