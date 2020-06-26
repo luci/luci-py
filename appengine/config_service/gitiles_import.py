@@ -359,14 +359,13 @@ def import_project(project_id):
   try:
     loc = _resolved_location(project.config_location.url)
   except gitiles.TreeishResolutionError:
+    logging.warn('could not resolve URL %r', project.config_location.url)
 
     @ndb.transactional
     def txn():
       key = ndb.Key(storage.ConfigSet, config_set)
       if key.get():
-        logging.warning(
-            'treeish was not resolved in URL "%s" => delete project',
-            project.config_location.url)
+        logging.warning('deleting project %s with unresolved URL', project_id)
         key.delete()
 
     txn()

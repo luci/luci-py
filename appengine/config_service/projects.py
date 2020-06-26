@@ -55,6 +55,9 @@ def update_import_info(project_id, repo_type, repo_url):
           for attr, old_value, new_value in values
           if old_value != new_value
         ]))
+  else:
+    logging.info('Creating project %s repo info: %s %s',
+        project_id, repo_type, repo_url)
   ProjectImportInfo(id=project_id, repo_type=repo_type, repo_url=repo_url).put()
 
 
