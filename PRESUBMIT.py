@@ -33,7 +33,6 @@ def CommonChecks(input_api, output_api):
     r'.+/dist/.+(js|html|css)$',
     r'/test',
     r'.+_pb2\.py$',
-    r'.+_pb2_grpc\.py$',
     r'.*third_party.*',
     # These are a symlink to third_party, so it shouldn't be checked.
     r'appengine/isolate/bqh\.py$',

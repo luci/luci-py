@@ -3,7 +3,6 @@
 # patterns (e.g. *.ext" matches all paths that end in .ext).
 # auto generated files
 *_pb2.py
-*_pb2_grpc.py
 
 # third party files
 */third_party/*
