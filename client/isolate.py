@@ -192,7 +192,7 @@ def chromium_save_isolated(isolated, data, path_variables, algo):
       'files': {},
       'version': data['version'],
     }
-    for f in data['files'].keys():
+    for f in list(data['files'].keys()):
       if f.startswith(prefix):
         new_slave['files'][f] = data['files'].pop(f)
     if new_slave['files']:
@@ -549,7 +549,8 @@ class CompleteState(object):
     # form '../../foo/bar'. Note that path variables must be taken in account
     # too, add them as if they were input files.
     self.saved_state.root_dir = isolate_format.determine_root_dir(
-        isolate_cmd_dir, infiles + self.saved_state.path_variables.values())
+        isolate_cmd_dir,
+        infiles + list(self.saved_state.path_variables.values()))
     # The relative directory is automatically determined by the relative path
     # between root_dir and the directory containing the .isolate file,
     # isolate_base_dir.
@@ -660,7 +661,7 @@ def load_complete_state(options, cwd, subdir, skip_update):
   """
   assert not options.isolate or os.path.isabs(options.isolate)
   assert not options.isolated or os.path.isabs(options.isolated)
-  cwd = file_path.get_native_path_case(unicode(cwd))
+  cwd = file_path.get_native_path_case(six.ensure_text(cwd))
   # maruel: This is incorrect but it's not worth fixing.
   namespace = getattr(options, 'namespace', 'default')
   algo_name = isolate_storage.ServerRef('', namespace).hash_algo_name
@@ -949,7 +950,7 @@ def CMDarchive(parser, args):
   if result is None:
     return EXIT_CODE_UPLOAD_ERROR
   assert len(result) == 1, result
-  if result.values()[0] is None:
+  if list(result.values())[0] is None:
     return EXIT_CODE_ISOLATE_ERROR
   return 0
 
@@ -1140,7 +1141,7 @@ def _process_variable_arg(option, opt, _value, parser):
     raise optparse.OptionValueError(
         'Variable \'%s\' doesn\'t respect format \'%s\'' %
         (k, isolate_format.VALID_VARIABLE))
-  variables.append((k, v.decode('utf-8')))
+  variables.append((k, six.ensure_text(v)))
 
 
 def add_variable_option(parser):
@@ -1255,7 +1256,7 @@ def process_isolate_options(parser, options, cwd=None, require_isolated=True):
   Mutates |options| in place, by normalizing path to isolate file, values of
   variables, etc.
   """
-  cwd = file_path.get_native_path_case(unicode(cwd or os.getcwd()))
+  cwd = file_path.get_native_path_case(six.ensure_text(cwd or os.getcwd()))
 
   # Parse --isolated option.
   if options.isolated:
@@ -1273,7 +1274,8 @@ def process_isolate_options(parser, options, cwd=None, require_isolated=True):
     try:
       return int(s)
     except ValueError:
-      return s.decode('utf-8')
+      return six.ensure_text(s)
+
   options.config_variables = dict(
       (k, try_make_int(v)) for k, v in options.config_variables)
   options.path_variables = dict(options.path_variables)
