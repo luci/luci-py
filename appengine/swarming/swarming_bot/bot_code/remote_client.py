@@ -48,11 +48,7 @@ AUTH_HEADERS_EXPIRATION_SEC = 9*60+30
 NET_CONNECTION_TIMEOUT_SEC = 3*60
 
 
-def createRemoteClient(server, auth, hostname, work_dir, grpc_proxy):
-  grpc_proxy = os.environ.get('SWARMING_GRPC_PROXY', grpc_proxy)
-  if grpc_proxy:
-    import remote_client_grpc
-    return remote_client_grpc.RemoteClientGrpc(grpc_proxy)
+def createRemoteClient(server, auth, hostname, work_dir):
   return RemoteClientNative(server, auth, hostname, work_dir)
 
 

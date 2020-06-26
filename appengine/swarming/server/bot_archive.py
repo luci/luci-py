@@ -57,7 +57,6 @@ FILES = (
     'bot_code/file_refresher.py',
     'bot_code/remote_client.py',
     'bot_code/remote_client_errors.py',
-    'bot_code/remote_client_grpc.py',
     'bot_code/singleton.py',
     'bot_code/task_runner.py',
     'client/auth.py',

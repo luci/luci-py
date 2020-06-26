@@ -85,7 +85,7 @@ class TestBotBase(net_utils.TestCase):
   def make_bot(self, auth_headers_cb=None):
     return bot.Bot(
         remote_client.createRemoteClient('https://localhost:1', auth_headers_cb,
-                                         'localhost', self.root_dir, False),
+                                         'localhost', self.root_dir),
         copy.deepcopy(self.attributes), 'https://localhost:1', 'version1',
         unicode(self.root_dir), self.fail)
 

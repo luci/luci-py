@@ -307,8 +307,8 @@ class InternalError(Exception):
   """Raised on unrecoverable errors that abort task with 'internal error'."""
 
 
-def load_and_run(in_file, swarming_server, is_grpc, cost_usd_hour, start,
-                 out_file, run_isolated_flags, bot_file, auth_params_file):
+def load_and_run(in_file, swarming_server, cost_usd_hour, start, out_file,
+                 run_isolated_flags, bot_file, auth_params_file):
   """Loads the task's metadata, prepares auth environment and executes the task.
 
   This may throw all sorts of exceptions in case of failure. It's up to the
@@ -385,16 +385,11 @@ def load_and_run(in_file, swarming_server, is_grpc, cost_usd_hour, start,
         except bot_auth.AuthSystemError as e:
           raise InternalError('Failed to grab bot auth headers: %s' % e)
 
-      # Make a client that can send request to Swarming using bot auth headers.
-      grpc_proxy = ''
-      if is_grpc:
-        grpc_proxy = swarming_server
-        swarming_server = ''
       # The hostname and work dir provided here don't really matter, since the
       # task runner is always called with a specific versioned URL.
       remote = remote_client.createRemoteClient(
           swarming_server, headers_cb, os_utilities.get_hostname_short(),
-          work_dir, grpc_proxy)
+          work_dir)
       remote.initialize()
       remote.bot_id = task_details.bot_id
 
@@ -912,10 +907,9 @@ def main(args):
     options.start = now
 
   try:
-    load_and_run(
-        options.in_file, options.swarming_server, options.is_grpc,
-        options.cost_usd_hour, options.start, options.out_file,
-        args, options.bot_file, options.auth_params_file)
+    load_and_run(options.in_file, options.swarming_server,
+                 options.cost_usd_hour, options.start, options.out_file, args,
+                 options.bot_file, options.auth_params_file)
     return 0
   finally:
     logging.info('quitting')

@@ -112,8 +112,8 @@ def get_task_details(*args, **kwargs):
 
 def run_command(server_url, work_dir, task_details, headers_cb):
   """Runs a command with an initialized client."""
-  remote = remote_client.createRemoteClient(
-      server_url, headers_cb, 'localhost', work_dir, False)
+  remote = remote_client.createRemoteClient(server_url, headers_cb, 'localhost',
+                                            work_dir)
   remote.bot_id = task_details.bot_id
   with luci_context.stage(local_auth=None) as ctx_file:
     return task_runner.run_command(
@@ -127,9 +127,8 @@ def load_and_run(server_url, work_dir, manifest, auth_params_file):
   with open(in_file, 'wb') as f:
     json.dump(manifest, f)
   out_file = os.path.join(work_dir, 'task_runner_out.json')
-  task_runner.load_and_run(in_file, server_url, False, 3600., time.time(),
-                           out_file, ['--min-free-space', '1'], None,
-                           auth_params_file)
+  task_runner.load_and_run(in_file, server_url, 3600., time.time(), out_file,
+                           ['--min-free-space', '1'], None, auth_params_file)
   with open(out_file, 'rb') as f:
     return json.load(f)
 
@@ -667,12 +666,12 @@ class TestTaskRunner(TestTaskRunnerBase):
     self.assertEqual(2, e.exception.exit_code)
 
   def test_main(self):
-    def _load_and_run(
-        manifest, swarming_server, is_grpc, cost_usd_hour, start,
-        json_file, run_isolated_flags, bot_file, auth_params_file):
+
+    def _load_and_run(manifest, swarming_server, cost_usd_hour, start,
+                      json_file, run_isolated_flags, bot_file,
+                      auth_params_file):
       self.assertEqual('foo', manifest)
       self.assertEqual(self.server.url, swarming_server)
-      self.assertFalse(is_grpc)
       self.assertEqual(3600., cost_usd_hour)
       self.assertGreaterEqual(time.time(), start)
       self.assertEqual('task_summary.json', json_file)
@@ -703,12 +702,12 @@ class TestTaskRunner(TestTaskRunnerBase):
     self.assertEqual(0, task_runner.main(cmd))
 
   def test_main_grpc(self):
-    def _load_and_run(
-        manifest, swarming_server, is_grpc, cost_usd_hour, start,
-        json_file, run_isolated_flags, bot_file, auth_params_file):
+
+    def _load_and_run(manifest, swarming_server, cost_usd_hour, start,
+                      json_file, run_isolated_flags, bot_file,
+                      auth_params_file):
       self.assertEqual('foo', manifest)
       self.assertEqual(self.server.url, swarming_server)
-      self.assertTrue(is_grpc)
       self.assertEqual(3600., cost_usd_hour)
       self.assertGreaterEqual(time.time(), start)
       self.assertEqual('task_summary.json', json_file)

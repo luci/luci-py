@@ -597,19 +597,18 @@ def get_bot(config):
   # construct the "real" bot.Bot.
   attributes = get_attributes(
       bot.Bot(
-          remote_client.createRemoteClient(
-              config['server'], None, hostname, base_dir,
-              config.get('swarming_grpc_proxy')), attributes, config['server'],
-          config['server_version'], base_dir, _on_shutdown_hook))
+          remote_client.createRemoteClient(config['server'], None, hostname,
+                                           base_dir), attributes,
+          config['server'], config['server_version'], base_dir,
+          _on_shutdown_hook))
 
   # Make remote client callback use the returned bot object. We assume here
   # RemoteClient doesn't call its callback in the constructor (since 'botobj' is
   # undefined during the construction).
   botobj = bot.Bot(
       remote_client.createRemoteClient(
-          config['server'],
-          lambda: _get_authentication_headers(botobj), hostname, base_dir,
-          config.get('swarming_grpc_proxy')), attributes, config['server'],
+          config['server'], lambda: _get_authentication_headers(botobj),
+          hostname, base_dir), attributes, config['server'],
       config['server_version'], base_dir, _on_shutdown_hook)
   return botobj
 
@@ -1030,9 +1029,8 @@ def _run_bot_inner(arg_error, quit_bit):
     # fail and we'll handle it there.
     hostname = _get_botid_safe()
     base_dir = os.path.dirname(THIS_FILE)
-    remote = remote_client.createRemoteClient(config['server'], None,
-                                              hostname, base_dir,
-                                              config.get('swarming_grpc_proxy'))
+    remote = remote_client.createRemoteClient(config['server'], None, hostname,
+                                              base_dir)
     remote.ping()
   except Exception:
     # url_read() already traps pretty much every exceptions. This except
