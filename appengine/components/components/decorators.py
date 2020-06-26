@@ -40,15 +40,19 @@ def require_cronjob(f):
   return hook
 
 
-def require_taskqueue(task_name):
-  """Enforces the task is run with a specific task queue."""
+def require_taskqueue(*queue_names):
+  """Enforces the task is run by specific task queue(s)."""
+  assert all(isinstance(q, basestring) for q in queue_names), (
+      map(type, queue_names), queue_names)
+  queue_names = frozenset(queue_names)
+
   def decorator(f):
     @functools.wraps(f)
     def hook(self, *args, **kwargs):
       actual_name = self.request.headers.get('X-AppEngine-QueueName')
-      if actual_name != task_name:
+      if actual_name not in queue_names:
         self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
-        msg = 'Only internal task %s can do this' % task_name
+        msg = 'Only internal queue(s) %s can do this' % (queue_names,)
         if actual_name:
           msg += '; got %s' % actual_name
         logging.error(msg)
