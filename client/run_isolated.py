@@ -1269,7 +1269,7 @@ def create_option_parser():
 
   auth.add_auth_options(parser)
 
-  parser.set_defaults(cache='cache', cipd_cache='cipd_cache')
+  parser.set_defaults(cache='cache')
   return parser
 
 
@@ -1462,13 +1462,21 @@ def main(args):
   cipd.validate_cipd_options(parser, options)
 
   install_packages_fn = noop_install_packages
+  tmp_cipd_cache_dir = None
   if options.cipd_enabled:
+    cache_dir = options.cipd_cache
+    if not cache_dir:
+      tmp_cipd_cache_dir = six.text_type(tempfile.mkdtemp())
+      cache_dir = tmp_cipd_cache_dir
     install_packages_fn = (
-      lambda run_dir, isolated_dir: install_client_and_packages(
-        run_dir, cipd.parse_package_args(options.cipd_packages),
-        options.cipd_server, options.cipd_client_package,
-        options.cipd_client_version, cache_dir=options.cipd_cache,
-        isolated_dir=isolated_dir))
+        lambda run_dir, isolated_dir: install_client_and_packages(
+            run_dir,
+            cipd.parse_package_args(options.cipd_packages),
+            options.cipd_server,
+            options.cipd_client_package,
+            options.cipd_client_version,
+            cache_dir=cache_dir,
+            isolated_dir=isolated_dir))
 
   @contextlib.contextmanager
   def install_named_caches(run_dir):
@@ -1565,6 +1573,14 @@ def main(args):
           local_caching.NoMoreSpace) as ex:
     print(ex.message, file=sys.stderr)
     return 1
+  finally:
+    if tmp_cipd_cache_dir is not None:
+      try:
+        file_path.rmtree(tmp_cipd_cache_dir)
+      except OSError:
+        logging.exception('Remove tmp_cipd_cache_dir=%s failed',
+                          tmp_cipd_cache_dir)
+        # Best effort clean up. Failed to do so doesn't affect the outcome.
 
 
 if __name__ == '__main__':
