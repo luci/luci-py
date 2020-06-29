@@ -738,7 +738,7 @@ def _get_luci_context_access_token(local_auth):
 
   if error_code or not access_token:
     logging.error(
-        'local_auth: Error %d in retrieving access token: %s',
+        'local_auth: Error %s in retrieving access token: %s',
         error_code, error_message)
     return None
 
