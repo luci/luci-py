@@ -11,6 +11,8 @@ import logging
 import sys
 import unittest
 
+import mock
+
 from test_support import test_env
 test_env.setup_test_env()
 
@@ -2006,8 +2008,9 @@ class GroupsSuggestHandlerTest(RestAPITestCase):
 class CertificatesHandlerTest(RestAPITestCase):
   def test_works(self):
     # Test mostly for code coverage.
-    self.mock_now(utils.timestamp_to_datetime(1300000000000000))
-    status, body, _ = self.get('/auth/api/v1/server/certificates')
+    with mock.patch('components.utils.utcnow') as mock_utcnow:
+      mock_utcnow.return_value = utils.timestamp_to_datetime(1300000000000000)
+      status, body, _ = self.get('/auth/api/v1/server/certificates')
     self.assertEqual(200, status)
     self.assertEqual(1300000000000000, body['timestamp'])
     self.assertTrue(body['certificates'])
