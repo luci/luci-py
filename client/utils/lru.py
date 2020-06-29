@@ -28,7 +28,7 @@ class LRUDict(object):
 
     Can be substituted in individual LRUDict instances, especially for tests.
     """
-    return round(time.time())
+    return int(round(time.time()))
 
   def __init__(self):
     # Ordered key -> (value, timestamp) mapping,
