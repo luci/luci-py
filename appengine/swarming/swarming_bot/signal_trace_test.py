@@ -38,7 +38,7 @@ class Test(unittest.TestCase):
     cmd = ('import signal_trace,sys,time; signal_trace.register(); '
            'sys.stdout.write("1"); sys.stdout.flush(); time.sleep(60)')
     out, err = self._run(cmd, signal.SIGUSR1, None)
-    self.assertEqual('', out)
+    self.assertEqual(b'', out)
     self.assertEqual(
         'ERROR:root:\n'
         '** SIGUSR1 received **\n'
@@ -53,9 +53,9 @@ class Test(unittest.TestCase):
            't.daemon=True; t.start(); '
            'sys.stdout.write("1"); sys.stdout.flush(); time.sleep(60)')
     out, err = self._run(cmd, signal.SIGUSR1, None)
-    self.assertEqual('', out)
+    self.assertEqual(b'', out)
     self.assertTrue(
-        err.startswith('ERROR:root:\n** SIGUSR1 received **\nAwesome:\n  '),
+        err.startswith(b'ERROR:root:\n** SIGUSR1 received **\nAwesome:\n  '),
         repr(err))
     self.assertTrue(err.endswith('\n** SIGUSR1 end **\n'), repr(err))
     self.assertIn('MainThread:', err.splitlines())

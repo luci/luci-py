@@ -4,7 +4,7 @@
 
 """Prints stack trace on SIGUSR1 and starts interactive console on SIGUSR2."""
 
-import StringIO
+import io
 import logging
 import code
 import traceback
@@ -13,10 +13,19 @@ import sys
 import threading
 import traceback
 
+import six
+
 
 def _dump(_sig, frame):
   """Dumps the stack trace of all threads."""
-  buf = StringIO.StringIO()
+
+  # traceback.print_stack uses bytes-like object in python2, but not in
+  # python3
+  if six.PY2:
+    buf = io.BytesIO()
+  else:
+    buf = io.StringIO()
+
   buf.write('** SIGUSR1 received **\n')
   for t in sorted(threading.enumerate(), key=lambda x: x.name):
     buf.write('%s:\n' % t.name)
