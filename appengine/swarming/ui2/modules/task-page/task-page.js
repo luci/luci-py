@@ -1235,7 +1235,8 @@ time.sleep(${leaseDuration})`];
       headers: {'authorization': this.auth_header},
       signal: this._fetchController.signal,
     };
-
+    // re-fetch permissions with the task ID.
+    this.app._fetchPermissions(extra, {task_id: this._taskId})
     this._fetchTaskInfo(extra);
     this._fetchStdOut(extra);
   }

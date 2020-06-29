@@ -12,11 +12,15 @@ import { $$ } from 'common-sk/modules/dom'
 // correctly for it, and we get strange errors about 'this' not being defined.
 const fetchMock = require('fetch-mock');
 
-mockAuthdAppGETs(fetchMock, {
-  delete_bot: true,
-  terminate_bot: true,
-  cancel_task: true,
-});
+mockAuthdAppGETs(fetchMock, {})
+
+fetchMock.get('glob:/_ah/api/swarming/v1/server/permissions?bot_id=*',
+  requireLogin({
+    delete_bot: true,
+    terminate_bot: true,
+    cancel_task: true,
+  })
+);
 
 fetchMock.get('glob:/_ah/api/swarming/v1/bot/*/get',
               requireLogin(botData, 100));

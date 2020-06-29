@@ -490,6 +490,8 @@ window.customElements.define('bot-page', class extends SwarmingAppBoilerplate {
       headers: {'authorization': this.auth_header},
       signal: this._fetchController.signal,
     };
+    // re-fetch permissions with the bot ID.
+    this.app._fetchPermissions(extra, {bot_id: this._botId})
     this.app.addBusyTasks(1);
     fetch(`/_ah/api/swarming/v1/bot/${this._botId}/get`, extra)
       .then(jsonOrThrow)

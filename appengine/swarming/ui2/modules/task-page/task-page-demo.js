@@ -14,9 +14,13 @@ const fetchMock = require('fetch-mock');
 
 const PERF_TEST_LOGS = true;
 
-mockAuthdAppGETs(fetchMock, {
-  cancel_task: true,
-});
+mockAuthdAppGETs(fetchMock, {});
+
+fetchMock.get('glob:/_ah/api/swarming/v1/server/permissions?task_id=*',
+  requireLogin({
+    cancel_task: true,
+  })
+);
 
 fetchMock.get('glob:/_ah/api/swarming/v1/task/*/request',
               requireLogin(taskRequest, 100));

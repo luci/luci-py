@@ -36,7 +36,8 @@ describe('task-page', function() {
   beforeEach(function() {
     // These are the default responses to the expected API calls (aka 'matched').
     // They can be overridden for specific tests, if needed.
-    mockAppGETs(fetchMock, {
+    mockAppGETs(fetchMock, {});
+    fetchMock.get(new RegExp('/_ah/api/swarming/v1/server/permissions\??.*'), {
       cancel_task: false,
     });
 
@@ -877,7 +878,7 @@ describe('task-page', function() {
       serveTask(0, 'running task on try number 3');
       loggedInTaskPage((ele) => {
         let calls = fetchMock.calls(MATCHED, 'GET');
-        expect(calls.length).toBe(2+3+3+2, '2 GETs from swarming-app, 3 from task-page,' +
+        expect(calls.length).toBe(2+4+3+2, '2 GETs from swarming-app, 4 from task-page,' +
                                            '3 counts * 1 slice, 2 from extra tries');
         // calls is an array of 2-length arrays with the first element
         // being the string of the url and the second element being
@@ -900,7 +901,7 @@ describe('task-page', function() {
       serveTask(1, 'Completed task with 2 slices');
       loggedInTaskPage((ele) => {
         let calls = fetchMock.calls(MATCHED, 'GET');
-        expect(calls.length).toBe(2+3+6, '2 GETs from swarming-app, 3 from task-page, ' +
+        expect(calls.length).toBe(2+4+6, '2 GETs from swarming-app, 4 from task-page, ' +
                                          '3 counts * 2 slices');
         // calls is an array of 2-length arrays with the first element
         // being the string of the url and the second element being
@@ -928,7 +929,7 @@ describe('task-page', function() {
       serveTask(2, 'Pending task - 1 slice - no rich logs');
       loggedInTaskPage((ele) => {
         let calls = fetchMock.calls(MATCHED, 'GET');
-        expect(calls.length).toBe(2+3+3, '2 GETs from swarming-app, 3 from task-page, '+
+        expect(calls.length).toBe(2+4+3, '2 GETs from swarming-app, 4 from task-page, '+
                                          '3 counts * 1 slice');
         // calls is an array of 2-length arrays with the first element
         // being the string of the url and the second element being

@@ -106,6 +106,7 @@ describe('bot-page', function() {
     const tasks = {items: tasksMap['SkiaGPU']};
     const events = {items: eventsMap['SkiaGPU']};
 
+    fetchMock.get(new RegExp('/_ah/api/swarming/v1/server/permissions\??.*'), {})
     fetchMock.get(`/_ah/api/swarming/v1/bot/${TEST_BOT_ID}/get`, data);
     fetchMock.get(`glob:/_ah/api/swarming/v1/bot/${TEST_BOT_ID}/tasks*`, tasks);
     fetchMock.get(`glob:/_ah/api/swarming/v1/bot/${TEST_BOT_ID}/events*`, events);
@@ -607,7 +608,7 @@ describe('bot-page', function() {
       serveBot('running');
       loggedInBotPage((ele) => {
         let calls = fetchMock.calls(MATCHED, 'GET');
-        expect(calls.length).toBe(2+3, '2 GETs from swarming-app, 3 from bot-page');
+        expect(calls.length).toBe(2+4, '2 GETs from swarming-app, 4 from bot-page');
         // calls is an array of 2-length arrays with the first element
         // being the string of the url and the second element being
         // the options that were passed in
@@ -831,7 +832,7 @@ describe('bot-page', function() {
           // beforeEach at the top of this file.
           expectNoUnmatchedCalls(fetchMock);
           let calls = fetchMock.calls(MATCHED, 'GET');
-          expect(calls.length).toBe(3);
+          expect(calls.length).toBe(4);
 
           done();
         });

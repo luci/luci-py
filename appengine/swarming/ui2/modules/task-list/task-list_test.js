@@ -26,7 +26,8 @@ describe('task-list', function() {
   beforeEach(function() {
     // These are the default responses to the expected API calls (aka 'matched').
     // They can be overridden for specific tests, if needed.
-    mockAppGETs(fetchMock, {
+    mockAppGETs(fetchMock, {})
+    fetchMock.get(new RegExp('/_ah/api/swarming/v1/server/permissions\??.*'), {
       cancel_task: false,
     });
 
@@ -925,7 +926,7 @@ describe('task-list', function() {
     it('maker auth\'d API calls when a logged in user views landing page', function(done) {
       loggedInTasklist((ele) => {
         let calls = fetchMock.calls(MATCHED, 'GET');
-        expect(calls.length).toBe(2+2+12, '2 GETs from swarming-app, 2 from task-list (12 counts)');
+        expect(calls.length).toBe(2+3+12, '2 GETs from swarming-app, 3 from task-list (12 counts)');
         // calls is an array of 2-length arrays with the first element
         // being the string of the url and the second element being
         // the options that were passed in
@@ -946,7 +947,7 @@ describe('task-list', function() {
         ele._addFilter('state:PENDING_RUNNING');
         fetchMock.flush(true).then(() => {
           const calls = fetchMock.calls(MATCHED, 'GET');
-          expect(calls.length).toBe(1+12, '1 from task-list and 12 counts');
+          expect(calls.length).toBe(2+12, '2 from task-list and 12 counts');
 
           const gets = calls.map((c) => c[0]);
           for (const get of gets) {
@@ -968,9 +969,9 @@ describe('task-list', function() {
         ele._addFilter('state:PENDING_RUNNING');
         fetchMock.flush(true).then(() => {
           const calls = fetchMock.calls(MATCHED, 'GET');
-          expect(calls.length).toBe(1+12, '1 from task-list and 12 counts');
+          expect(calls.length).toBe(2+12, '2 from task-list and 12 counts');
 
-          const gets = calls.map((c) => c[0]);
+          const gets = calls.slice(1).map((c) => c[0]);
           for (const get of gets) {
             // make sure there aren't two states when we do the count (which
             // appends a state)
