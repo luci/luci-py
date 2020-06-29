@@ -2,8 +2,8 @@
 // Use of this source code is governed under the Apache License, Version 2.0
 // that can be found in the LICENSE file.
 
-import { applyAlias } from '../alias'
-import { botListLink, humanDuration, sanitizeAndHumanizeTime, timeDiffExact } from '../util'
+import {applyAlias} from '../alias';
+import {botListLink, humanDuration, sanitizeAndHumanizeTime, timeDiffExact} from '../util';
 
 
 /** mpLink produces a machine provider link for this bot
@@ -11,7 +11,7 @@ import { botListLink, humanDuration, sanitizeAndHumanizeTime, timeDiffExact } fr
  *  @param {Object} serverDetails - The server details returned via the API.
  */
 export function mpLink(bot, serverDetails) {
-  const template = serverDetails.machine_provider_template
+  const template = serverDetails.machine_provider_template;
   if (!bot.lease_id || !template) {
     return undefined;
   }
@@ -154,7 +154,7 @@ const dimensionsToStrip = ['id', 'caches', 'server_version'];
  */
 export function siblingBotsLink(dimensions) {
   const cols = ['id', 'os', 'task', 'status'];
-   if (!dimensions) {
+  if (!dimensions) {
     return botListLink([], cols);
   }
 
@@ -177,11 +177,11 @@ const TASK_TIMES = ['started_ts', 'completed_ts', 'abandoned_ts', 'modified_ts']
 // These field filters trim down the data we get per task, which
 // may speed up the server time and should speed up the network time.
 export const TASKS_QUERY_PARAMS = [
-    'include_performance_stats=true',
-    'limit=30',
-    'sort=STARTED_TS',
-    encodeURIComponent(
-        'fields=cursor,'+
+  'include_performance_stats=true',
+  'limit=30',
+  'sort=STARTED_TS',
+  encodeURIComponent(
+      'fields=cursor,'+
             'items(state,bot_version,completed_ts,created_ts,duration,'+
             'exit_code,failure,internal_failure,modified_ts,name,'+
             'server_versions,started_ts,task_id)'),

@@ -2,16 +2,16 @@
 // Use of this source code is governed under the Apache License, Version 2.0
 // that can be found in the LICENSE file.
 
-import 'modules/bot-mass-delete'
+import 'modules/bot-mass-delete';
 
 describe('bot-mass-delete', function() {
   // Instead of using import, we use require. Otherwise,
   // the concatenation trick we do doesn't play well with webpack, which would
   // leak dependencies (e.g. bot-list's 'column' function to task-list) and
   // try to import things multiple times.
-  const { $, $$ } = require('common-sk/modules/dom');
-  const { customMatchers, expectNoUnmatchedCalls, mockAppGETs } = require('modules/test_util');
-  const { fetchMock, MATCHED, UNMATCHED } = require('fetch-mock');
+  const {$, $$} = require('common-sk/modules/dom');
+  const {customMatchers, expectNoUnmatchedCalls, mockAppGETs} = require('modules/test_util');
+  const {fetchMock, MATCHED, UNMATCHED} = require('fetch-mock');
 
   // A reusable HTML element in which we create our element under test.
   const container = document.createElement('div');
@@ -33,7 +33,7 @@ describe('bot-mass-delete', function() {
     fetchMock.reset();
   });
 
-//===============TESTS START====================================
+  // ===============TESTS START====================================
 
   // calls the test callback with one element 'ele', a created <bot-mass-delete>.
   function createElement(test) {
@@ -89,13 +89,12 @@ describe('bot-mass-delete', function() {
 
   it('makes an API call to list after clicking, then deletes', function(done) {
     createElement((ele) => {
-
       // create a shortened version of the returned data
       fetchMock.getOnce('/_ah/api/swarming/v1/bots/list?dimensions=os%3AAndroid' +
                         '&dimensions=pool%3AChrome&fields=cursor%2Citems%2Fbot_id&is_dead=TRUE&limit=200',
-        {
-          items: [{bot_id: 'bot-1'}, {bot_id: 'bot-2'}, {bot_id: 'bot-3'}],
-        }
+      {
+        items: [{bot_id: 'bot-1'}, {bot_id: 'bot-2'}, {bot_id: 'bot-3'}],
+      },
       );
 
       fetchMock.post('/_ah/api/swarming/v1/bot/bot-1/delete', 200);
@@ -127,22 +126,21 @@ describe('bot-mass-delete', function() {
 
   it('pages the bot list calls before deleting', function(done) {
     createElement((ele) => {
-
       // create a shortened version of the returned data
       fetchMock.getOnce('/_ah/api/swarming/v1/bots/list?dimensions=os%3AAndroid' +
                         '&dimensions=pool%3AChrome&fields=cursor%2Citems%2Fbot_id&' +
                         'is_dead=TRUE&limit=200',
-        {
-          items: [{bot_id: 'bot-1'}],
-          cursor: 'alpha',
-        }
+      {
+        items: [{bot_id: 'bot-1'}],
+        cursor: 'alpha',
+      },
       );
       fetchMock.getOnce('/_ah/api/swarming/v1/bots/list?cursor=alpha&dimensions=os%3AAndroid' +
                         '&dimensions=pool%3AChrome&fields=cursor%2Citems%2Fbot_id'+
                         '&is_dead=TRUE&limit=200',
-        {
-          items: [{bot_id: 'bot-2'}, {bot_id: 'bot-3'}],
-        }
+      {
+        items: [{bot_id: 'bot-2'}, {bot_id: 'bot-3'}],
+      },
       );
 
       fetchMock.post('/_ah/api/swarming/v1/bot/bot-1/delete', 200);

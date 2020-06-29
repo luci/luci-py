@@ -33,6 +33,9 @@ continuous_test:
 		make test
 	done
 
+format: _packages-lock.json.done
+	git ls-files "[^dist]*.js" | xargs npx eslint --fix --quiet
+
 _packages-lock.json.done: package-lock.json
 	npm ci
 	touch _packages-lock.json.done

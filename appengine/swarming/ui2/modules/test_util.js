@@ -11,7 +11,7 @@
  * </p>
  */
 
- import { UNMATCHED } from 'fetch-mock';
+import {UNMATCHED} from 'fetch-mock';
 
 export const customMatchers = {
   // see https://jasmine.github.io/tutorials/custom_matcher
@@ -22,7 +22,7 @@ export const customMatchers = {
         if (!(regex instanceof RegExp)) {
           throw `toContainRegex expects a regex, got ${JSON.stringify(regex)}`;
         }
-        let result = {};
+        const result = {};
 
         if (!actual || !actual.length) {
           result.pass = false;
@@ -30,7 +30,7 @@ export const customMatchers = {
                            `containing something matching ${regex}`;
           return result;
         }
-        for (let s of actual) {
+        for (const s of actual) {
           if (s.match && s.match(regex)) {
             result.pass = true;
             // craft the message for the negated version (i.e. using .not)
@@ -68,11 +68,11 @@ export const customMatchers = {
         }
         function normalize(s) {
           return s.trim()
-            .replace('\t', ' ')
-            .replace(/ {2,}/g, ' ');
+              .replace('\t', ' ')
+              .replace(/ {2,}/g, ' ');
         }
         text = normalize(text);
-        let actualText = normalize(actual.innerText);
+        const actualText = normalize(actual.innerText);
         if (actualText === text) {
           return {
             // craft the message for the negated version
@@ -92,7 +92,7 @@ export const customMatchers = {
 };
 
 function isElement(ele) {
-  //https://stackoverflow.com/a/36894871
+  // https://stackoverflow.com/a/36894871
   return ele instanceof Element || ele instanceof HTMLDocument;
 }
 
@@ -118,7 +118,7 @@ export function mockAuthdAppGETs(fetchMock, permissions) {
 
 
   fetchMock.get('/_ah/api/swarming/v1/server/permissions',
-                requireLogin(permissions));
+      requireLogin(permissions));
 }
 
 export function requireLogin(logged_in, delay=100) {
@@ -146,19 +146,19 @@ export function requireLogin(logged_in, delay=100) {
             return {
               status: 404,
               body: JSON.stringify({'error': {'message': 'bot not found.'}}),
-              headers: {'content-type':'application/json'},
+              headers: {'content-type': 'application/json'},
             };
           }
           return {
             status: 200,
             body: JSON.stringify(val),
-            headers: {'content-type':'application/json'},
+            headers: {'content-type': 'application/json'},
           };
         }
         return {
           status: 200,
           body: JSON.stringify(logged_in),
-          headers: {'content-type':'application/json'},
+          headers: {'content-type': 'application/json'},
         };
       });
     } else {
@@ -168,7 +168,7 @@ export function requireLogin(logged_in, delay=100) {
         return {
           status: 403,
           body: 'Try logging in',
-          headers: {'content-type':'text/plain'},
+          headers: {'content-type': 'text/plain'},
         };
       });
     }
@@ -186,16 +186,16 @@ export function childrenAsArray(ele) {
  *  unexpected (unmatched) calls to fetchMock.
  */
 export function expectNoUnmatchedCalls(fetchMock) {
-    let calls = fetchMock.calls(UNMATCHED, 'GET');
-    expect(calls.length).toBe(0, 'no unmatched (unexpected) GETs');
-    if (calls.length) {
-      console.warn('unmatched GETS', calls);
-    }
-    calls = fetchMock.calls(UNMATCHED, 'POST');
-    expect(calls.length).toBe(0, 'no unmatched (unexpected) POSTs');
-    if (calls.length) {
-      console.warn('unmatched POSTS', calls);
-    }
+  let calls = fetchMock.calls(UNMATCHED, 'GET');
+  expect(calls.length).toBe(0, 'no unmatched (unexpected) GETs');
+  if (calls.length) {
+    console.warn('unmatched GETS', calls);
+  }
+  calls = fetchMock.calls(UNMATCHED, 'POST');
+  expect(calls.length).toBe(0, 'no unmatched (unexpected) POSTs');
+  if (calls.length) {
+    console.warn('unmatched POSTS', calls);
+  }
 }
 
 /** getChildItemWithText looks at the children of the given element

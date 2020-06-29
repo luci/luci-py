@@ -4,9 +4,9 @@
 
 /** @module swarming-ui/SwarmingAppBoilerplate */
 
-import { errorMessage } from 'elements-sk/errorMessage'
-import { html, render } from 'lit-html'
-import { upgradeProperty } from 'elements-sk/upgradeProperty'
+import {errorMessage} from 'elements-sk/errorMessage';
+import {html, render} from 'lit-html';
+import {upgradeProperty} from 'elements-sk/upgradeProperty';
 
 /** @classdesc
  * The SwarmingAppBoilerplate class deduplicates much of the boilerplate
@@ -39,7 +39,6 @@ import { upgradeProperty } from 'elements-sk/upgradeProperty'
  *
  */
 export default class SwarmingAppBoilerplate extends HTMLElement {
-
   constructor(template) {
     super();
     this._template = template;
@@ -71,12 +70,16 @@ export default class SwarmingAppBoilerplate extends HTMLElement {
   /** @prop {HTMLElement} app - A reference to the embedded &lt;swarming-app&gt
                         which is available after the first render() call.
                         Read only.*/
-  get app() { return this._app; }
+  get app() {
+    return this._app;
+  }
 
   /** @prop {string} auth_header - reflects the auth_header passed up from the
                         &lt;oauth-login&gt;.
                         Read only.*/
-  get auth_header() { return this._auth_header; }
+  get auth_header() {
+    return this._auth_header;
+  }
 
   /** @prop {boolean} loggedIn Indicates if a user is logged in and authorized
                         to see this page.
@@ -88,23 +91,35 @@ export default class SwarmingAppBoilerplate extends HTMLElement {
   /** @prop {Object} permissions - reflects the permissions from the
                         included &lt;swarming-app&gt;
                         Read only.*/
-  get permissions() { return (this._app && this._app.permissions) || {}; }
+  get permissions() {
+    return (this._app && this._app.permissions) || {};
+  }
 
   /** @prop {Object} profile An object with keys email and imageURL of the
                              logged in user. Read Only. */
-  get profile() { return (this._app && this._app.profile) || {}  }
+  get profile() {
+    return (this._app && this._app.profile) || {};
+  }
 
   /** @prop {Object} server_details - reflects the server_details from the
                         included &lt;swarming-app&gt;
                         Read only.*/
-  get server_details() { return (this._app && this._app.server_details) || {}; }
+  get server_details() {
+    return (this._app && this._app.server_details) || {};
+  }
 
   /** @prop {string} client_id Mirrors the attribute 'client_id'. */
-  get client_id() { return this.getAttribute('client_id'); }
-  set client_id(val) {return this.setAttribute('client_id', val); }
+  get client_id() {
+    return this.getAttribute('client_id');
+  }
+  set client_id(val) {
+    return this.setAttribute('client_id', val);
+  }
 
   /** @prop {bool} testing_offline Mirrors the attribute 'testing_offline'. */
-  get testing_offline() { return this.hasAttribute('testing_offline'); }
+  get testing_offline() {
+    return this.hasAttribute('testing_offline');
+  }
   set testing_offline(val) {
     if (val) {
       this.setAttribute('testing_offline', true);
@@ -132,7 +147,7 @@ export default class SwarmingAppBoilerplate extends HTMLElement {
       // https://developer.mozilla.org/en-US/docs/Web/API/DOMException
       console.error(e);
       errorMessage(`Unexpected error loading ${loadingWhat}: ${e.message}`,
-                   5000);
+          5000);
     }
     this._app.finishedTask();
   }

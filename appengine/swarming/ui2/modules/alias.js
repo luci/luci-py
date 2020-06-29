@@ -71,7 +71,7 @@ const DEVICE_TYPE_ALIASES = {
 };
 
 const GPU_ALIASES = {
-  '1002':      'AMD',
+  '1002': 'AMD',
   '1002:6613': 'AMD Radeon R7 240',
   '1002:6646': 'AMD Radeon R9 M280X',
   '1002:6779': 'AMD Radeon HD 6450/7450/8450',
@@ -80,13 +80,13 @@ const GPU_ALIASES = {
   '1002:683d': 'AMD Radeon HD 7770/8760',
   '1002:9830': 'AMD Radeon HD 8400',
   '1002:9874': 'AMD Carrizo',
-  '1a03':      'ASPEED',
+  '1a03': 'ASPEED',
   '1a03:2000': 'ASPEED Graphics Family',
-  '102b':      'Matrox',
+  '102b': 'Matrox',
   '102b:0522': 'Matrox MGA G200e',
   '102b:0532': 'Matrox MGA G200eW',
   '102b:0534': 'Matrox G200eR2',
-  '10de':      'NVIDIA',
+  '10de': 'NVIDIA',
   '10de:08a4': 'NVIDIA GeForce 320M',
   '10de:08aa': 'NVIDIA GeForce 320M',
   '10de:0a65': 'NVIDIA GeForce 210',
@@ -99,7 +99,7 @@ const GPU_ALIASES = {
   '10de:1ba1': 'NVIDIA GeForce GTX 1070',
   '10de:1cb3': 'NVIDIA Quadro P400',
   '10de:2184': 'NVIDIA GeForce GTX 1660',
-  '8086':      'Intel',
+  '8086': 'Intel',
   '8086:0046': 'Intel Ironlake HD Graphics',
   '8086:0102': 'Intel Sandy Bridge HD Graphics 2000',
   '8086:0116': 'Intel Sandy Bridge HD Graphics 3000',
@@ -128,12 +128,12 @@ const GPU_ALIASES = {
 };
 
 const DEVICE_ALIASES = {
-  'iPad4,1':   'iPad Air',
-  'iPad5,1':   'iPad mini 4',
-  'iPad6,3':   'iPad Pro [9.7 in]',
+  'iPad4,1': 'iPad Air',
+  'iPad5,1': 'iPad mini 4',
+  'iPad6,3': 'iPad Pro [9.7 in]',
   'iPhone7,2': 'iPhone 6',
   'iPhone9,1': 'iPhone 7',
-}
+};
 
 /** For Win10, the correspondence between build numbers and versions
  *  is published at
@@ -158,7 +158,7 @@ const OS_ALIASES = {
   'Windows-Server-17763': 'Windows Server 2019 or version 1809',
   'Windows-Server-18362': 'Windows Server version 1903',
   'Windows-Server-18363': 'Windows Server version 1909',
-}
+};
 
 const aliasMap = {
   'device': DEVICE_ALIASES,

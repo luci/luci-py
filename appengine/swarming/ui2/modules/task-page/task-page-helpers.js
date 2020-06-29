@@ -2,10 +2,10 @@
 // Use of this source code is governed under the Apache License, Version 2.0
 // that can be found in the LICENSE file.
 
-import * as human from 'common-sk/modules/human'
+import * as human from 'common-sk/modules/human';
 
-import { humanDuration, sanitizeAndHumanizeTime, timeDiffExact } from '../util'
-import { EXCEPTIONAL_STATES, ONGOING_STATES } from '../task'
+import {humanDuration, sanitizeAndHumanizeTime, timeDiffExact} from '../util';
+import {EXCEPTIONAL_STATES, ONGOING_STATES} from '../task';
 
 
 /** canRetry returns if the given task can be retried.
@@ -19,7 +19,7 @@ export function canRetry(request) {
  *  and a CIPD server URL.
  */
 export function cipdLink(actualVersion, server) {
-   // actualVersion looks like infra/python/cpython/windows-amd64:1ba7...
+  // actualVersion looks like infra/python/cpython/windows-amd64:1ba7...
   if (!actualVersion || !server) {
     return undefined;
   }
@@ -42,7 +42,7 @@ export function durationChart(result) {
       return 0.0;
     }
     return Math.round(a * 10)/10;
-  }
+  };
   let preOverhead = 0;
   let postOverhead = 0;
   // These are only put in upon task completion.
@@ -55,7 +55,7 @@ export function durationChart(result) {
     preOverhead = result.performance_stats.bot_overhead - postOverhead;
   }
   return [result.pending, preOverhead,
-         result.duration, postOverhead].map(oneDecimalPlace);
+    result.duration, postOverhead].map(oneDecimalPlace);
 }
 
 /** firstDimension returns the first entry in an array of dimensions for
@@ -304,4 +304,4 @@ export function wasPickedUp(result) {
 }
 
 const TASK_TIMES = ['abandoned_ts', 'completed_ts', 'created_ts', 'modified_ts',
-                    'started_ts'];
+  'started_ts'];

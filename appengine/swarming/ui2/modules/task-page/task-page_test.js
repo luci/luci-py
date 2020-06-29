@@ -2,7 +2,7 @@
 // Use of this source code is governed under the Apache License, Version 2.0
 // that can be found in the LICENSE file.
 
-import 'modules/task-page'
+import 'modules/task-page';
 
 // Tip from https://stackoverflow.com/a/37348710
 // for catching "full page reload" errors.
@@ -11,7 +11,7 @@ beforeAll(() => {
     expect(false).toBeTruthy();
     console.error('We should not have modified window.location.href directly.');
     throw 'We should not have modified window.location.href directly.';
-  }
+  };
 });
 
 describe('task-page', function() {
@@ -19,11 +19,11 @@ describe('task-page', function() {
   // the concatenation trick we do doesn't play well with webpack, which would
   // leak dependencies (e.g. bot-list's 'column' function to task-list) and
   // try to import things multiple times.
-  const { $, $$ } = require('common-sk/modules/dom');
-  const { customMatchers, expectNoUnmatchedCalls, mockAppGETs } = require('modules/test_util');
-  const { fetchMock, MATCHED, UNMATCHED } = require('fetch-mock');
-  const { taskOutput, taskResults, taskRequests } = require('modules/task-page/test_data');
-  const { richLogsLink } = require('modules/task-page/task-page-helpers')
+  const {$, $$} = require('common-sk/modules/dom');
+  const {customMatchers, expectNoUnmatchedCalls, mockAppGETs} = require('modules/test_util');
+  const {fetchMock, MATCHED, UNMATCHED} = require('fetch-mock');
+  const {taskOutput, taskResults, taskRequests} = require('modules/task-page/test_data');
+  const {richLogsLink} = require('modules/task-page/task-page-helpers');
 
   const TEST_TASK_ID = 'test0b3c0fac7810';
 
@@ -89,7 +89,7 @@ describe('task-page', function() {
     ele.addEventListener('busy-end', (e) => {
       if (!ran) {
         ran = true; // prevent multiple runs if the test makes the
-                    // app go busy (e.g. if it calls fetch).
+        // app go busy (e.g. if it calls fetch).
         callback();
       }
     });
@@ -152,7 +152,7 @@ describe('task-page', function() {
     });
   }
 
-//===============TESTS START====================================
+  // ===============TESTS START====================================
 
   describe('html structure', function() {
     it('contains swarming-app as its only child', function(done) {
@@ -184,18 +184,17 @@ describe('task-page', function() {
           done();
         });
       });
-    }); //end describe('when not logged in')
+    }); // end describe('when not logged in')
 
     describe('when logged in as unauthorized user', function() {
-
       function notAuthorized() {
         // overwrite the default fetchMock behaviors to have everything return 403.
         fetchMock.get('/_ah/api/swarming/v1/server/details', 403,
-                      { overwriteRoutes: true });
+            {overwriteRoutes: true});
         fetchMock.get('/_ah/api/swarming/v1/server/permissions', {},
-                      { overwriteRoutes: true });
+            {overwriteRoutes: true});
         fetchMock.get('glob:/_ah/api/swarming/v1/task/*', 403,
-                      { overwriteRoutes: true });
+            {overwriteRoutes: true});
       }
 
       beforeEach(notAuthorized);
@@ -223,7 +222,6 @@ describe('task-page', function() {
     }); // end describe('when logged in as unauthorized user')
 
     describe('authorized user, but no taskid', function() {
-
       it('tells the user they should enter a task id', function(done) {
         loggedInTaskPage((ele) => {
           const loginMessage = $$('.id_buttons .message', ele);
@@ -427,7 +425,7 @@ describe('task-page', function() {
         });
       });
 
-       it('shows neither a cancel button nor a kill button', function(done) {
+      it('shows neither a cancel button nor a kill button', function(done) {
         loggedInTaskPage((ele) => {
           const cancelBtn = $$('.id_buttons button.cancel', ele);
           expect(cancelBtn).toBeTruthy();
@@ -544,7 +542,6 @@ describe('task-page', function() {
           done();
         });
       });
-
     }); // end describe('Pending task - 1 slice - no rich logs')
 
     describe('running task on try number 3', function() {
@@ -682,7 +679,7 @@ describe('task-page', function() {
 
           expect(cell(14, 0).rowSpan).toEqual(4); // 3 dimensions + 1 for header
           expect(cell(16, 0)).toMatchTextContent(
-                  'gpu:Intel Sandy Bridge HD Graphics 2000 (8086:0102)');
+              'gpu:Intel Sandy Bridge HD Graphics 2000 (8086:0102)');
 
           done();
         });
@@ -746,7 +743,6 @@ describe('task-page', function() {
         });
       });
     }); // end describe('Expired Task')
-
   }); // end describe('html structure')
 
   describe('dynamic behavior', function() {
@@ -842,7 +838,7 @@ describe('task-page', function() {
         });
       });
     });
-  });  // end describe('dynamic behavior')
+  }); // end describe('dynamic behavior')
 
   describe('api calls', function() {
     it('makes no API calls when not logged in', function(done) {
@@ -877,7 +873,7 @@ describe('task-page', function() {
     it('fetches some extra requests with try number > 1', function(done) {
       serveTask(0, 'running task on try number 3');
       loggedInTaskPage((ele) => {
-        let calls = fetchMock.calls(MATCHED, 'GET');
+        const calls = fetchMock.calls(MATCHED, 'GET');
         expect(calls.length).toBe(2+4+3+2, '2 GETs from swarming-app, 4 from task-page,' +
                                            '3 counts * 1 slice, 2 from extra tries');
         // calls is an array of 2-length arrays with the first element
@@ -900,7 +896,7 @@ describe('task-page', function() {
     it('makes auth\'d API calls when a logged in user views landing page', function(done) {
       serveTask(1, 'Completed task with 2 slices');
       loggedInTaskPage((ele) => {
-        let calls = fetchMock.calls(MATCHED, 'GET');
+        const calls = fetchMock.calls(MATCHED, 'GET');
         expect(calls.length).toBe(2+4+6, '2 GETs from swarming-app, 4 from task-page, ' +
                                          '3 counts * 2 slices');
         // calls is an array of 2-length arrays with the first element
@@ -928,7 +924,7 @@ describe('task-page', function() {
     it('makes counts correctly with 1 slice', function(done) {
       serveTask(2, 'Pending task - 1 slice - no rich logs');
       loggedInTaskPage((ele) => {
-        let calls = fetchMock.calls(MATCHED, 'GET');
+        const calls = fetchMock.calls(MATCHED, 'GET');
         expect(calls.length).toBe(2+4+3, '2 GETs from swarming-app, 4 from task-page, '+
                                          '3 counts * 1 slice');
         // calls is an array of 2-length arrays with the first element
@@ -1028,12 +1024,12 @@ describe('task-page', function() {
 
           const dims = body.properties.dimensions;
           expect(dims).toBeTruthy();
-          dims.sort((a,b) => {
+          dims.sort((a, b) => {
             return a.key.localeCompare(b.key);
           });
           expect(dims).toEqual([{
             key: 'id',
-            value: 'swarm1931-c4'
+            value: 'swarm1931-c4',
           }, {
             key: 'pool',
             value: 'luci.chromium.try',
@@ -1132,17 +1128,17 @@ describe('task-page', function() {
       fetchMock.get(`/_ah/api/swarming/v1/task/${TEST_TASK_ID}/stdout?offset=0&length=102400`, {
         state: 'RUNNING',
         output: FIRST_LINE,
-      }, { overwriteRoutes: true });
+      }, {overwriteRoutes: true});
       fetchMock.get(`/_ah/api/swarming/v1/task/${TEST_TASK_ID}/stdout?offset=${FIRST_LINE.length}`+
           '&length=102400', {
         state: 'RUNNING',
         output: SECOND_LINE,
-      }, { overwriteRoutes: true });
+      }, {overwriteRoutes: true});
       fetchMock.get(`/_ah/api/swarming/v1/task/${TEST_TASK_ID}/stdout?`+
           `offset=${FIRST_LINE.length + SECOND_LINE.length}&length=102400`, {
         state: 'COMPLETED',
         output: THIRD_LINE,
-      }, { overwriteRoutes: true });
+      }, {overwriteRoutes: true});
 
       loggedInTaskPage((ele) => {
         expectNoUnmatchedCalls(fetchMock);
@@ -1152,12 +1148,12 @@ describe('task-page', function() {
           'first log line\n',
           'this is cutoff on the second log line\n',
           'third log line\n',
-          ]);
+        ]);
         const calls = fetchMock.calls(MATCHED, 'GET').map((arr) => arr[0]);
         const callsToResult = calls.filter(
-          (url) => url.indexOf(`/_ah/api/swarming/v1/task/${TEST_TASK_ID}/result`) >= 0);
+            (url) => url.indexOf(`/_ah/api/swarming/v1/task/${TEST_TASK_ID}/result`) >= 0);
         const callsToRequest = calls.filter(
-          (url) => url === `/_ah/api/swarming/v1/task/${TEST_TASK_ID}/request`);
+            (url) => url === `/_ah/api/swarming/v1/task/${TEST_TASK_ID}/request`);
 
         // We expect the requests and results to be fetched after
         // the logs notice the state has changed from RUNNING to COMPLETED.
@@ -1167,12 +1163,10 @@ describe('task-page', function() {
         done();
       });
     });
-
   }); // end describe('api calls')
 
   describe('data', function() {
     it('generates proper rich log links', function() {
-
       const mockEle = {
         _request: {
           tagMap: {
@@ -1181,13 +1175,12 @@ describe('task-page', function() {
           },
         },
         _result: {
-          'run_id': '45b22fd90cefdf12'
-        }
+          'run_id': '45b22fd90cefdf12',
+        },
       };
 
       const url = richLogsLink(mockEle);
       expect(url).toEqual('https://example.com/project/45b22fd90cefdf12/+/annotations');
-
     });
   }); // end describe('data')
 });

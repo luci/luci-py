@@ -16,46 +16,46 @@
  *    Instead, dummy data will be used. Ideal for local testing.
  */
 
-import { $, $$ } from 'common-sk/modules/dom'
-import { errorMessage } from 'elements-sk/errorMessage'
-import { html, render } from 'lit-html'
-import { ifDefined } from 'lit-html/directives/if-defined';
-import { until } from 'lit-html/directives/until';
-import { jsonOrThrow } from 'common-sk/modules/jsonOrThrow'
-import naturalSort from 'javascript-natural-sort/naturalSort'
-import { stateReflector } from 'common-sk/modules/stateReflector'
+import {$, $$} from 'common-sk/modules/dom';
+import {errorMessage} from 'elements-sk/errorMessage';
+import {html, render} from 'lit-html';
+import {ifDefined} from 'lit-html/directives/if-defined';
+import {until} from 'lit-html/directives/until';
+import {jsonOrThrow} from 'common-sk/modules/jsonOrThrow';
+import naturalSort from 'javascript-natural-sort/naturalSort';
+import {stateReflector} from 'common-sk/modules/stateReflector';
 
-import 'elements-sk/checkbox-sk'
-import 'elements-sk/icon/add-circle-icon-sk'
-import 'elements-sk/icon/cancel-icon-sk'
-import 'elements-sk/icon/more-horiz-icon-sk'
-import 'elements-sk/icon/more-vert-icon-sk'
-import 'elements-sk/icon/search-icon-sk'
-import 'elements-sk/select-sk'
-import 'elements-sk/styles/buttons'
-import '../dialog-pop-over'
-import '../sort-toggle'
-import '../swarming-app'
-import '../task-mass-cancel'
+import 'elements-sk/checkbox-sk';
+import 'elements-sk/icon/add-circle-icon-sk';
+import 'elements-sk/icon/cancel-icon-sk';
+import 'elements-sk/icon/more-horiz-icon-sk';
+import 'elements-sk/icon/more-vert-icon-sk';
+import 'elements-sk/icon/search-icon-sk';
+import 'elements-sk/select-sk';
+import 'elements-sk/styles/buttons';
+import '../dialog-pop-over';
+import '../sort-toggle';
+import '../swarming-app';
+import '../task-mass-cancel';
 
-import flatpickr from 'flatpickr'
-import 'flatpickr/dist/flatpickr.css'
+import flatpickr from 'flatpickr';
+import 'flatpickr/dist/flatpickr.css';
 
 // query.fromObject is more readable than just 'fromObject'
-import * as query from 'common-sk/modules/query'
+import * as query from 'common-sk/modules/query';
 
-import { applyAlias, handleLegacyFilters, maybeApplyAlias } from '../alias'
-import { appendPossibleColumns, appendPrimaryMap, column, filterTasks,
-         floorSecond, getColHeader, humanizePrimaryKey, legacyTags, listQueryParams,
-         processTasks, sortColumns, sortPossibleColumns, specialSortMap,
-         stripTag, stripTagFromFilter,  tagsOnly, taskClass,
-         useNaturalSort } from './task-list-helpers'
-import { botListLink, onSmallScreen } from '../util'
-import { filterPossibleColumns, filterPossibleKeys,
-         filterPossibleValues, makeFilter } from '../queryfilter'
-import { moreOrLess } from '../templates'
-import SwarmingAppBoilerplate from '../SwarmingAppBoilerplate'
-import { COUNT_FILTERS } from '../task'
+import {applyAlias, handleLegacyFilters, maybeApplyAlias} from '../alias';
+import {appendPossibleColumns, appendPrimaryMap, column, filterTasks,
+  floorSecond, getColHeader, humanizePrimaryKey, legacyTags, listQueryParams,
+  processTasks, sortColumns, sortPossibleColumns, specialSortMap,
+  stripTag, stripTagFromFilter, tagsOnly, taskClass,
+  useNaturalSort} from './task-list-helpers';
+import {botListLink, onSmallScreen} from '../util';
+import {filterPossibleColumns, filterPossibleKeys,
+  filterPossibleValues, makeFilter} from '../queryfilter';
+import {moreOrLess} from '../templates';
+import SwarmingAppBoilerplate from '../SwarmingAppBoilerplate';
+import {COUNT_FILTERS} from '../task';
 
 const colHead = (col, ele) => html`
 <th>${getColHeader(col)}
@@ -88,7 +88,7 @@ const col_selector = (ele) => {
   }
   return html`
 <!-- Stop clicks from traveling outside the popup.-->
-<div class=col_selector @click=${e => e.stopPropagation()}>
+<div class=col_selector @click=${(e) => e.stopPropagation()}>
   <input id=column_search class=search type=text
          placeholder='Search columns to show'
          @input=${ele._refilterPossibleColumns}
@@ -99,7 +99,7 @@ const col_selector = (ele) => {
   </input>
   ${ele._filteredPossibleColumns.map((key) => columnOption(key, ele))}
 </div>`;
-}
+};
 
 const col_options = (ele, firstCol) => html`
 <!-- Put the click action here to make it bigger, especially for mobile.-->
@@ -108,7 +108,7 @@ const col_options = (ele, firstCol) => html`
     <more-vert-icon-sk tabindex=0 @keypress=${ele._toggleColSelector}></more-vert-icon-sk>
   </span>
   <span>${getColHeader(firstCol)}</span>
-  <sort-toggle @click=${e => (e.stopPropagation() && e.preventDefault())}
+  <sort-toggle @click=${(e) => (e.stopPropagation() && e.preventDefault())}
                key=name .currentKey=${ele._sort} .direction=${ele._dir}>
   </sort-toggle>
   ${col_selector(ele)}
@@ -146,7 +146,7 @@ const secondaryOptions = (ele) => {
                       @click=${() => ele._addFilter(makeFilter(ele._primaryKey, value))}>
   </add-circle-icon-sk>
 </div>`);
-}
+};
 
 const filterChip = (filter, ele) => html`
 <span class=chip>
@@ -213,7 +213,7 @@ const summary = (ele) => html`
   <table id=query_counts>
     ${summaryQueryRow(ele, {label: 'Displayed', value: ele._tasks.length})}
     ${ele._queryCounts.filter(ele._filterCounts.bind(ele))
-                      .map((count) => summaryQueryRow(ele, count))}
+      .map((count) => summaryQueryRow(ele, count))}
   </table>
   <more-horiz-icon-sk @click=${ele._toggleAllStates}
                       ?hidden=${ele._allStates}>
@@ -259,7 +259,7 @@ const template = (ele) => html`
       </aside>
   </header>
   <!-- Allow clicking anywhere to dismiss the column selector-->
-  <main @click=${e => ele._showColSelector && ele._toggleColSelector(e)}>
+  <main @click=${(e) => ele._showColSelector && ele._toggleColSelector(e)}>
     <h2 class=message ?hidden=${ele.loggedInAndAuthorized}>${ele._message}</h2>
 
     ${header(ele)}
@@ -289,7 +289,7 @@ const template = (ele) => html`
       <button class=goback tabindex=0
               @click=${ele._closePopup}
               ?disabled=${ele._startedCanceling && !ele._finishedCanceling}>
-        ${ele._startedCanceling ? 'DISMISS': "GO BACK - DON'T CANCEL ANYTHING"}
+        ${ele._startedCanceling ? 'DISMISS': 'GO BACK - DON\'T CANCEL ANYTHING'}
       </button>
     </div>
   </dialog-pop-over>
@@ -307,7 +307,6 @@ const INITIAL_LOAD = 100;
 const BATCH_LOAD = 200;
 
 window.customElements.define('task-list', class extends SwarmingAppBoilerplate {
-
   constructor() {
     super(template);
     this._tasks = [];
@@ -317,10 +316,10 @@ window.customElements.define('task-list', class extends SwarmingAppBoilerplate {
     this._endTime = 0;
     this._filters = [];
     this._limit = 0; // _limit being 0 is a sentinel value for _fetch()
-                     // We won't actually make a request if _limit is 0.
-                     // So, we keep limit 0 until our params have been read in
-                     // from the URL to avoid making a request until we are
-                     // ready.
+    // We won't actually make a request if _limit is 0.
+    // So, we keep limit 0 until our params have been read in
+    // from the URL to avoid making a request until we are
+    // ready.
     this._now = true;
     this._primaryKey = '';
     this._sort = '';
@@ -330,55 +329,55 @@ window.customElements.define('task-list', class extends SwarmingAppBoilerplate {
     this._allStates = onSmallScreen();
 
     this._stateChanged = stateReflector(
-      /*getState*/() => {
-        return {
+        /* getState*/() => {
+          return {
           // provide empty values
-          'c' : this._cols,
-          'd' : this._dir,
-          'et': this._endTime,
-          'f' : this._filters,
-          'k' : this._primaryKey,
-          'n' : this._now,
-          's' : this._sort,
-          'st': this._startTime,
-          'at': this._allStates,
-          'v': this._verbose,
-        }
-    }, /*setState*/(newState) => {
-      // default values if not specified.
-      this._allStates = newState.at; // default to false
-      this._cols = newState.c;
-      if (!newState.c.length) {
-        this._cols = ['name', 'state', 'bot', 'created_ts', 'pending_time',
-                      'duration', 'pool-tag'];
-      }
-      this._dir = newState.d || 'desc';
-      this._filters = handleLegacyFilters(newState.f); // default to []
-      this._filters = legacyTags(this._filters);
-      this._limit = INITIAL_LOAD;
-      this._now = newState.n; // default to true
-      this._primaryKey = newState.k; // default to ''
-      // default to 24 hours ago, or if now is checked, update it to now
-      if (this._now || !newState.et) {
-        this._endTime = Date.now();
-      } else {
-        this._endTime = newState.et;
-      }
-      // default to 24 hours ago
-      this._startTime = newState.st || floorSecond(Date.now() - 24*60*60*1000);
-      this._sort = newState.s || 'created_ts';
-      this._verbose = newState.v;         // default to false
-      this._fetch();
-      this.render();
-      this._initDatePickers();
-    });
+            'c': this._cols,
+            'd': this._dir,
+            'et': this._endTime,
+            'f': this._filters,
+            'k': this._primaryKey,
+            'n': this._now,
+            's': this._sort,
+            'st': this._startTime,
+            'at': this._allStates,
+            'v': this._verbose,
+          };
+        }, /* setState*/(newState) => {
+          // default values if not specified.
+          this._allStates = newState.at; // default to false
+          this._cols = newState.c;
+          if (!newState.c.length) {
+            this._cols = ['name', 'state', 'bot', 'created_ts', 'pending_time',
+              'duration', 'pool-tag'];
+          }
+          this._dir = newState.d || 'desc';
+          this._filters = handleLegacyFilters(newState.f); // default to []
+          this._filters = legacyTags(this._filters);
+          this._limit = INITIAL_LOAD;
+          this._now = newState.n; // default to true
+          this._primaryKey = newState.k; // default to ''
+          // default to 24 hours ago, or if now is checked, update it to now
+          if (this._now || !newState.et) {
+            this._endTime = Date.now();
+          } else {
+            this._endTime = newState.et;
+          }
+          // default to 24 hours ago
+          this._startTime = newState.st || floorSecond(Date.now() - 24*60*60*1000);
+          this._sort = newState.s || 'created_ts';
+          this._verbose = newState.v; // default to false
+          this._fetch();
+          this.render();
+          this._initDatePickers();
+        });
 
     this._filteredPrimaryArr = [];
 
     this._possibleColumns = {};
     this._primaryMap = {};
 
-    this._queryCounts = COUNT_FILTERS
+    this._queryCounts = COUNT_FILTERS;
 
     this._message = 'You must sign in to see anything useful.';
     this._showColSelector = false;
@@ -410,13 +409,13 @@ window.customElements.define('task-list', class extends SwarmingAppBoilerplate {
       this._startedCanceling = true;
       this._finishedCanceling = false;
       this.render();
-    }
+    };
     this.addEventListener('tasks-canceling-started', this._startedMassCancelingEvent);
     this._finishedMassCancelingEvent = (e) => {
       this._startedCanceling = true;
       this._finishedCanceling = true;
       this.render();
-    }
+    };
     this.addEventListener('tasks-canceling-finished', this._finishedMassCancelingEvent);
   }
 
@@ -490,8 +489,8 @@ window.customElements.define('task-list', class extends SwarmingAppBoilerplate {
     };
     // Re-checks permissions with tags.
     const tags = this._filters
-      .filter((f) => f.split(':')[0] != 'state')
-      .map((f) => f.replace('-tag', ''))
+        .filter((f) => f.split(':')[0] != 'state')
+        .map((f) => f.replace('-tag', ''));
     this.app._fetchPermissions(extra, {tags: tags});
 
     // Fetch the tasks
@@ -502,38 +501,38 @@ window.customElements.define('task-list', class extends SwarmingAppBoilerplate {
       end: floorSecond(this._now ? Date.now() : this._endTime),
     });
     fetch(`/_ah/api/swarming/v1/tasks/list?${queryParams}`, extra)
-      .then(jsonOrThrow)
-      .then((json) => {
-        this._tasks = [];
-        const maybeLoadMore = (json) => {
-          const tags = {};
-          this._tasks = this._tasks.concat(processTasks(json.items, tags));
-          appendPossibleColumns(this._possibleColumns, tags);
-          appendPrimaryMap(this._primaryMap, tags);
-          this._rebuildFilterables();
+        .then(jsonOrThrow)
+        .then((json) => {
+          this._tasks = [];
+          const maybeLoadMore = (json) => {
+            const tags = {};
+            this._tasks = this._tasks.concat(processTasks(json.items, tags));
+            appendPossibleColumns(this._possibleColumns, tags);
+            appendPrimaryMap(this._primaryMap, tags);
+            this._rebuildFilterables();
 
-          this.render();
-          // Special case: Don't load all the tasks when filters is empty to avoid
-          // loading many many tasks unintentionally.
-          if (this._filters.length && json.cursor) {
-            this._limit = BATCH_LOAD;
-            queryParams = listQueryParams(this._filters, {
-              cursor: json.cursor,
-              limit: this._limit,
-              start: floorSecond(this._startTime),
-              end: floorSecond(this._now ? Date.now() : this._endTime),
-            });
-            fetch(`/_ah/api/swarming/v1/tasks/list?${queryParams}`, extra)
-              .then(jsonOrThrow)
-              .then(maybeLoadMore)
-              .catch((e) => this.fetchError(e, 'tasks/list (paging)'));
-          } else {
-            this.app.finishedTask();
-          }
-        }
-        maybeLoadMore(json);
-      })
-      .catch((e) => this.fetchError(e, 'tasks/list'));
+            this.render();
+            // Special case: Don't load all the tasks when filters is empty to avoid
+            // loading many many tasks unintentionally.
+            if (this._filters.length && json.cursor) {
+              this._limit = BATCH_LOAD;
+              queryParams = listQueryParams(this._filters, {
+                cursor: json.cursor,
+                limit: this._limit,
+                start: floorSecond(this._startTime),
+                end: floorSecond(this._now ? Date.now() : this._endTime),
+              });
+              fetch(`/_ah/api/swarming/v1/tasks/list?${queryParams}`, extra)
+                  .then(jsonOrThrow)
+                  .then(maybeLoadMore)
+                  .catch((e) => this.fetchError(e, 'tasks/list (paging)'));
+            } else {
+              this.app.finishedTask();
+            }
+          };
+          maybeLoadMore(json);
+        })
+        .catch((e) => this.fetchError(e, 'tasks/list'));
 
     this._fetchCounts(queryParams, extra);
 
@@ -549,41 +548,41 @@ window.customElements.define('task-list', class extends SwarmingAppBoilerplate {
         // This request does not depend on the filters.
       };
       fetch('/_ah/api/swarming/v1/bots/dimensions', extra)
-      .then(jsonOrThrow)
-      .then((json) => {
-        appendPossibleColumns(this._possibleColumns, json.bots_dimensions);
-        appendPrimaryMap(this._primaryMap, json.bots_dimensions);
-        this._knownDimensions = json.bots_dimensions.map((d) => d.key);
-        this._rebuildFilterables();
+          .then(jsonOrThrow)
+          .then((json) => {
+            appendPossibleColumns(this._possibleColumns, json.bots_dimensions);
+            appendPrimaryMap(this._primaryMap, json.bots_dimensions);
+            this._knownDimensions = json.bots_dimensions.map((d) => d.key);
+            this._rebuildFilterables();
 
-        this.render();
-        this.app.finishedTask();
-      })
-      .catch((e) => this.fetchError(e, 'bots/dimensions'));
+            this.render();
+            this.app.finishedTask();
+          })
+          .catch((e) => this.fetchError(e, 'bots/dimensions'));
     }
   }
 
   _fetchCounts(queryParams, extra) {
-    const states = COUNT_FILTERS.slice(1).map(c => c.filter);
+    const states = COUNT_FILTERS.slice(1).map((c) => c.filter);
     this.app.addBusyTasks(1 + states.length);
     const totalPromise = fetch(`/_ah/api/swarming/v1/tasks/count?${queryParams}`, extra)
-      .then(jsonOrThrow)
-      .then((json) => {
-        this.app.finishedTask();
-        return json.count;
-      })
-      .catch((e) => this.fetchError(e, 'count/total'))
-    this._queryCounts[0].value = html`${until(totalPromise, '...')}`;
-
-    const stateRemoved = queryParams.replace(/state=.+?(&|$)/g, '');
-    for (let i = 0; i < states.length; i++) {
-      const promise = fetch(`/_ah/api/swarming/v1/tasks/count?${stateRemoved}&state=${states[i]}`, extra)
         .then(jsonOrThrow)
         .then((json) => {
           this.app.finishedTask();
           return json.count;
         })
-        .catch((e) => this.fetchError(e, `count/${states[i]}`))
+        .catch((e) => this.fetchError(e, 'count/total'));
+    this._queryCounts[0].value = html`${until(totalPromise, '...')}`;
+
+    const stateRemoved = queryParams.replace(/state=.+?(&|$)/g, '');
+    for (let i = 0; i < states.length; i++) {
+      const promise = fetch(`/_ah/api/swarming/v1/tasks/count?${stateRemoved}&state=${states[i]}`, extra)
+          .then(jsonOrThrow)
+          .then((json) => {
+            this.app.finishedTask();
+            return json.count;
+          })
+          .catch((e) => this.fetchError(e, `count/${states[i]}`));
       this._queryCounts[1 + i].value = html`${until(promise, '...')}`;
     }
   }
@@ -642,7 +641,7 @@ window.customElements.define('task-list', class extends SwarmingAppBoilerplate {
         if (this._endEle._flatpickr.isOpen) {
           this._endEle._flatpickr.close();
         }
-      }
+      },
     });
     flatpickr(this._endEle, {
       appendTo: $$('.picker', this), // otherwise, it leaks the calendar to <body>
@@ -653,7 +652,7 @@ window.customElements.define('task-list', class extends SwarmingAppBoilerplate {
         this._stateChanged();
         this._fetch();
         this.render();
-      }
+      },
     });
   }
 
@@ -677,18 +676,18 @@ window.customElements.define('task-list', class extends SwarmingAppBoilerplate {
     });
     withNewState.push(`state:${state}`);
     const queryParams = query.fromObject({
-          // provide empty values
-          'c' : this._cols,
-          'd' : this._dir,
-          'et': this._endTime,
-          'f' : withNewState,
-          'k' : this._primaryKey,
-          'n' : this._now,
-          's' : this._sort,
-          'st': this._startTime,
-          'at': this._allStates,
-          'v': this._verbose,
-        });
+      // provide empty values
+      'c': this._cols,
+      'd': this._dir,
+      'et': this._endTime,
+      'f': withNewState,
+      'k': this._primaryKey,
+      'n': this._now,
+      's': this._sort,
+      'st': this._startTime,
+      'at': this._allStates,
+      'v': this._verbose,
+    });
     return `/tasklist?${queryParams}`;
   }
 
@@ -726,7 +725,7 @@ window.customElements.define('task-list', class extends SwarmingAppBoilerplate {
 
   _rebuildFilterables() {
     this._filteredPossibleColumns = filterPossibleColumns(Object.keys(this._possibleColumns),
-                                                          this._columnQuery);
+        this._columnQuery);
 
     this._primaryArr = Object.keys(this._primaryMap);
     this._primaryArr.sort();
@@ -754,7 +753,7 @@ window.customElements.define('task-list', class extends SwarmingAppBoilerplate {
     // If the column selector box is hidden, input will be null
     this._columnQuery = (input && input.value) || '';
     this._filteredPossibleColumns = filterPossibleColumns(Object.keys(this._possibleColumns),
-                                                          this._columnQuery);
+        this._columnQuery);
     sortPossibleColumns(this._filteredPossibleColumns, this._cols);
     this.render();
   }
@@ -898,5 +897,4 @@ window.customElements.define('task-list', class extends SwarmingAppBoilerplate {
     this._stateChanged();
     this.render();
   }
-
 });

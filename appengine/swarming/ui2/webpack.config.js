@@ -7,7 +7,7 @@ const path = require('path');
 const CopyWebpackPlugin = require('copy-webpack-plugin');
 
 module.exports = (env, argv) => {
-  let config = commonBuilder(env, argv, __dirname);
+  const config = commonBuilder(env, argv, __dirname);
   // Make all CSS/JS files appear at the /newres location.
   config.output.publicPath='/newres/';
   config.module.rules.push({
@@ -15,10 +15,10 @@ module.exports = (env, argv) => {
     use: 'html-template-minifier-webpack',
   });
   config.plugins.push(
-    new CopyWebpackPlugin([
-        { from: 'node_modules/@webcomponents/custom-elements/custom-elements.min.js' },
-    ])
+      new CopyWebpackPlugin([
+        {from: 'node_modules/@webcomponents/custom-elements/custom-elements.min.js'},
+      ]),
   );
 
   return config;
-}
+};

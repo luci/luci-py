@@ -2,21 +2,21 @@
 // Use of this source code is governed under the Apache License, Version 2.0
 // that can be found in the LICENSE file.
 
-import 'modules/swarming-index'
+import 'modules/swarming-index';
 
 describe('swarming-index', function() {
   // Instead of using import, we use require. Otherwise,
   // the concatenation trick we do doesn't play well with webpack, which would
   // leak dependencies (e.g. bot-list's 'column' function to task-list) and
   // try to import things multiple times.
-  const { fetchMock, MATCHED, UNMATCHED } = require('fetch-mock');
-  const { expectNoUnmatchedCalls, mockAppGETs } = require('modules/test_util');
+  const {fetchMock, MATCHED, UNMATCHED} = require('fetch-mock');
+  const {expectNoUnmatchedCalls, mockAppGETs} = require('modules/test_util');
 
-  beforeEach(function(){
+  beforeEach(function() {
     // These are the default responses to the expected API calls (aka 'matched')
     // They can be overridden for specific tests, if needed.
     mockAppGETs(fetchMock, {
-      get_bootstrap_token: false
+      get_bootstrap_token: false,
     });
 
     fetchMock.post('/_ah/api/swarming/v1/server/token', 403);
@@ -61,7 +61,7 @@ describe('swarming-index', function() {
         callback();
       }
       ran = true; // prevent multiple runs if the test makes the
-                  // app go busy (e.g. if it calls fetch).
+      // app go busy (e.g. if it calls fetch).
     });
     const login = ele.querySelector('oauth-login');
     login._logIn();
@@ -72,14 +72,14 @@ describe('swarming-index', function() {
     // overwrite the default fetchMock behaviors for this run to return
     // what an admin would see.
     fetchMock.get('/_ah/api/swarming/v1/server/permissions', {
-      get_bootstrap_token: true
-    }, { overwriteRoutes: true });
+      get_bootstrap_token: true,
+    }, {overwriteRoutes: true});
     fetchMock.post('/_ah/api/swarming/v1/server/token', {
-      bootstrap_token: '8675309JennyDontChangeYourNumber8675309'
-    }, { overwriteRoutes: true });
+      bootstrap_token: '8675309JennyDontChangeYourNumber8675309',
+    }, {overwriteRoutes: true});
   }
 
-//===============TESTS START====================================
+  // ===============TESTS START====================================
 
   describe('html structure', function() {
     it('contains swarming-app as its only child', function(done) {
@@ -97,31 +97,30 @@ describe('swarming-index', function() {
           expect(serverVersion).toBeTruthy();
           expect(serverVersion.innerText).toContain('must log in');
           done();
-        })
-      })
+        });
+      });
       it('does not display the bootstrapping section', function(done) {
         createElement((ele) => {
           const sectionHeaders = ele.querySelectorAll('swarming-app>main h2');
           expect(sectionHeaders).toBeTruthy();
           expect(sectionHeaders.length).toBe(2);
           done();
-        })
+        });
       });
     });
 
     describe('when logged in as unauthorized user', function() {
-
       function notAuthorized() {
         // overwrite the default fetchMock behaviors to have everything return 403.
         fetchMock.get('/_ah/api/swarming/v1/server/details', 403,
-                      { overwriteRoutes: true });
+            {overwriteRoutes: true});
         fetchMock.get('/_ah/api/swarming/v1/server/permissions', {},
-                      { overwriteRoutes: true });
+            {overwriteRoutes: true});
       }
 
       beforeEach(notAuthorized);
 
-      it('tells the user to try a different account', function(done){
+      it('tells the user to try a different account', function(done) {
         createElement((ele) => {
           userLogsIn(ele, () => {
             const serverVersion = ele.querySelector('swarming-app>main .server_version');
@@ -131,7 +130,7 @@ describe('swarming-index', function() {
           });
         });
       });
-      it('does not displays the bootstrapping section', function(done){
+      it('does not displays the bootstrapping section', function(done) {
         createElement((ele) => {
           userLogsIn(ele, () => {
             const sectionHeaders = ele.querySelectorAll('swarming-app>main h2');
@@ -141,7 +140,7 @@ describe('swarming-index', function() {
           });
         });
       });
-      it('does not display the bootstrap token', function(done){
+      it('does not display the bootstrap token', function(done) {
         createElement((ele) => {
           userLogsIn(ele, () => {
             const commandBox = ele.querySelector('swarming-app>main .command');
@@ -255,7 +254,7 @@ describe('swarming-index', function() {
       becomeAdmin();
       createElement((ele) => {
         userLogsIn(ele, () => {
-           // swarming-app makes the GETs and swarming-app_test.js tests that.
+          // swarming-app makes the GETs and swarming-app_test.js tests that.
 
           const calls = fetchMock.calls(MATCHED, 'POST');
           const posts = calls.map((c) => c[0]);
@@ -266,7 +265,7 @@ describe('swarming-index', function() {
           calls.forEach((c) => {
             expect(c[1].headers).toBeDefined();
             expect(c[1].headers.authorization).toContain('Bearer ');
-          })
+          });
 
           expectNoUnmatchedCalls(fetchMock);
           done();

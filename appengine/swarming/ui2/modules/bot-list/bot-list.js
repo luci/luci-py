@@ -16,41 +16,41 @@
  *    Instead, dummy data will be used. Ideal for local testing.
  */
 
-import { $, $$ } from 'common-sk/modules/dom'
-import { errorMessage } from 'elements-sk/errorMessage'
-import { html, render } from 'lit-html'
-import { ifDefined } from 'lit-html/directives/if-defined'
-import { jsonOrThrow } from 'common-sk/modules/jsonOrThrow'
-import naturalSort from 'javascript-natural-sort/naturalSort'
-import * as query from 'common-sk/modules/query'
-import { stateReflector } from 'common-sk/modules/stateReflector'
+import {$, $$} from 'common-sk/modules/dom';
+import {errorMessage} from 'elements-sk/errorMessage';
+import {html, render} from 'lit-html';
+import {ifDefined} from 'lit-html/directives/if-defined';
+import {jsonOrThrow} from 'common-sk/modules/jsonOrThrow';
+import naturalSort from 'javascript-natural-sort/naturalSort';
+import * as query from 'common-sk/modules/query';
+import {stateReflector} from 'common-sk/modules/stateReflector';
 
-import 'elements-sk/checkbox-sk'
-import 'elements-sk/icon/add-circle-icon-sk'
-import 'elements-sk/icon/cancel-icon-sk'
-import 'elements-sk/icon/more-vert-icon-sk'
-import 'elements-sk/icon/search-icon-sk'
-import 'elements-sk/select-sk'
-import 'elements-sk/styles/buttons'
-import '../bot-mass-delete'
-import '../dialog-pop-over'
-import '../sort-toggle'
-import '../swarming-app'
+import 'elements-sk/checkbox-sk';
+import 'elements-sk/icon/add-circle-icon-sk';
+import 'elements-sk/icon/cancel-icon-sk';
+import 'elements-sk/icon/more-vert-icon-sk';
+import 'elements-sk/icon/search-icon-sk';
+import 'elements-sk/select-sk';
+import 'elements-sk/styles/buttons';
+import '../bot-mass-delete';
+import '../dialog-pop-over';
+import '../sort-toggle';
+import '../swarming-app';
 
 
-import { applyAlias, handleLegacyFilters, maybeApplyAlias } from '../alias'
-import { aggregateTemps, attribute, botLink, column, devices, dimensionsOnly,
-         filterBots, forcedColumns, fromDimension, fromState, getColHeader,
-         initCounts, listQueryParams, longestOrAll, processBots, processCounts,
-         makePossibleColumns, processPrimaryMap, sortColumns,
-         sortPossibleColumns, specialFilters, specialSortMap,
-         useNaturalSort } from './bot-list-helpers'
-import { filterPossibleColumns, filterPossibleKeys,
-         filterPossibleValues, makeFilter } from '../queryfilter'
-import { moreOrLess } from '../templates'
-import { taskListLink } from '../util'
+import {applyAlias, handleLegacyFilters, maybeApplyAlias} from '../alias';
+import {aggregateTemps, attribute, botLink, column, devices, dimensionsOnly,
+  filterBots, forcedColumns, fromDimension, fromState, getColHeader,
+  initCounts, listQueryParams, longestOrAll, processBots, processCounts,
+  makePossibleColumns, processPrimaryMap, sortColumns,
+  sortPossibleColumns, specialFilters, specialSortMap,
+  useNaturalSort} from './bot-list-helpers';
+import {filterPossibleColumns, filterPossibleKeys,
+  filterPossibleValues, makeFilter} from '../queryfilter';
+import {moreOrLess} from '../templates';
+import {taskListLink} from '../util';
 
-import SwarmingAppBoilerplate from '../SwarmingAppBoilerplate'
+import SwarmingAppBoilerplate from '../SwarmingAppBoilerplate';
 
 const colHead = (col, ele) => html`
 <th>${getColHeader(col)}
@@ -98,7 +98,7 @@ const secondaryOptions = (ele) => {
                       @click=${() => ele._addFilter(makeFilter(ele._primaryKey, value))}>
   </add-circle-icon-sk>
 </div>`);
-}
+};
 
 
 const filterChip = (filter, ele) => html`
@@ -215,7 +215,7 @@ const col_selector = (ele) => {
   }
   return html`
 <!-- Stop clicks from traveling outside the popup.-->
-<div class=col_selector @click=${e => e.stopPropagation()}>
+<div class=col_selector @click=${(e) => e.stopPropagation()}>
   <input id=column_search class=search type=text
          placeholder='Search columns to show'
          @input=${ele._refilterPossibleColumns}
@@ -226,7 +226,7 @@ const col_selector = (ele) => {
   </input>
   ${ele._filteredPossibleColumns.map((key) => columnOption(key, ele))}
 </div>`;
-}
+};
 
 const col_options = (ele) => html`
 <!-- Put the click action here to make it bigger, especially for mobile.-->
@@ -235,7 +235,7 @@ const col_options = (ele) => html`
     <more-vert-icon-sk tabindex=0 @keypress=${ele._toggleColSelector}></more-vert-icon-sk>
   </span>
   <span>Bot Id</span>
-  <sort-toggle @click=${e => (e.stopPropagation() && e.preventDefault())}
+  <sort-toggle @click=${(e) => (e.stopPropagation() && e.preventDefault())}
                key=id .currentKey=${ele._sort} .direction=${ele._dir}>
   </sort-toggle>
   ${col_selector(ele)}
@@ -255,7 +255,7 @@ const template = (ele) => html`
       </aside>
   </header>
   <!-- Allow clicking anywhere to dismiss the column selector-->
-  <main @click=${e => ele._showColSelector && ele._toggleColSelector(e)}>
+  <main @click=${(e) => ele._showColSelector && ele._toggleColSelector(e)}>
     <h2 class=message ?hidden=${ele.loggedInAndAuthorized}>${ele._message}</h2>
 
     ${ele.loggedInAndAuthorized ? header(ele): ''}
@@ -270,7 +270,7 @@ const template = (ele) => html`
           ${ele._cols.slice(1).map((col) => colHead(col, ele))}
         </tr>
       </thead>
-      <tbody>${ele._sortBots().map((bot) => botRow(bot,ele))}</tbody>
+      <tbody>${ele._sortBots().map((bot) => botRow(bot, ele))}</tbody>
     </table>
     <button ?hidden=${!ele.loggedInAndAuthorized || !!ele._filters.length || ele._showAll}
             @click=${ele._forceShowAll}>
@@ -286,7 +286,7 @@ const template = (ele) => html`
       <button class=goback tabindex=0
               @click=${ele._closePopup}
               ?disabled=${ele._startedDeleting && !ele._finishedDeleting}>
-        ${ele._startedDeleting ? 'DISMISS': "GO BACK - DON'T DELETE ANYTHING"}
+        ${ele._startedDeleting ? 'DISMISS': 'GO BACK - DON\'T DELETE ANYTHING'}
       </button>
     </div>
   </dialog-pop-over>
@@ -304,7 +304,6 @@ const INITIAL_LOAD = 100;
 const BATCH_LOAD = 200;
 
 window.customElements.define('bot-list', class extends SwarmingAppBoilerplate {
-
   constructor() {
     super(template);
     this._bots = [];
@@ -315,10 +314,10 @@ window.customElements.define('bot-list', class extends SwarmingAppBoilerplate {
     this._dir = '';
     this._filters = [];
     this._limit = 0; // _limit being 0 is a sentinel value for _fetch()
-                     // We won't actually make a request if _limit is 0.
-                     // So, we keep limit 0 until our params have been read in
-                     // from the URL to avoid making a request until we are
-                     // ready.
+    // We won't actually make a request if _limit is 0.
+    // So, we keep limit 0 until our params have been read in
+    // from the URL to avoid making a request until we are
+    // ready.
     this._primaryKey = '';
     this._showAll = false;
     this._showFleetCounts = false;
@@ -329,35 +328,35 @@ window.customElements.define('bot-list', class extends SwarmingAppBoilerplate {
     this._queryCounts = initCounts();
 
     this._stateChanged = stateReflector(
-      /*getState*/() => {
-        return {
+        /* getState*/() => {
+          return {
           // provide empty values
-          'c': this._cols,
-          'd': this._dir,
-          'e': this._showFleetCounts, // 'e' because 'f', 'l', are taken
-          'f': this._filters,
-          'k': this._primaryKey,
-          's': this._sort,
-          'show_all': this._showAll,
-          'v': this._verbose,
-        }
-    }, /*setState*/(newState) => {
-      // default values if not specified.
-      this._cols = newState.c;
-      if (!newState.c.length) {
-        this._cols = ['id', 'task', 'os', 'status'];
-      }
-      this._dir = newState.d || 'asc';
-      this._filters = handleLegacyFilters(newState.f); // default to []
-      this._primaryKey = newState.k; // default to ''
-      this._sort = newState.s || 'id';
-      this._verbose = newState.v;         // default to false
-      this._showFleetCounts = newState.e; // default to false
-      this._limit = INITIAL_LOAD;
-      this._showAll = newState.show_all; // default to false
-      this._fetch();
-      this.render();
-    });
+            'c': this._cols,
+            'd': this._dir,
+            'e': this._showFleetCounts, // 'e' because 'f', 'l', are taken
+            'f': this._filters,
+            'k': this._primaryKey,
+            's': this._sort,
+            'show_all': this._showAll,
+            'v': this._verbose,
+          };
+        }, /* setState*/(newState) => {
+          // default values if not specified.
+          this._cols = newState.c;
+          if (!newState.c.length) {
+            this._cols = ['id', 'task', 'os', 'status'];
+          }
+          this._dir = newState.d || 'asc';
+          this._filters = handleLegacyFilters(newState.f); // default to []
+          this._primaryKey = newState.k; // default to ''
+          this._sort = newState.s || 'id';
+          this._verbose = newState.v; // default to false
+          this._showFleetCounts = newState.e; // default to false
+          this._limit = INITIAL_LOAD;
+          this._showAll = newState.show_all; // default to false
+          this._fetch();
+          this.render();
+        });
 
     /** _primaryArr: Array<String>, the display order of the primaryKeys, that is,
         anything that can be searched/filtered by. This should not be changed
@@ -415,13 +414,13 @@ window.customElements.define('bot-list', class extends SwarmingAppBoilerplate {
       this._startedDeleting = true;
       this._finishedDeleting = false;
       this.render();
-    }
+    };
     this.addEventListener('bots-deleting-started', this._startedMassDeletingEvent);
     this._finishedMassDeletingEvent = (e) => {
       this._startedDeleting = true;
       this._finishedDeleting = true;
       this.render();
-    }
+    };
     this.addEventListener('bots-deleting-finished', this._finishedMassDeletingEvent);
   }
 
@@ -514,42 +513,42 @@ window.customElements.define('bot-list', class extends SwarmingAppBoilerplate {
     this.app.addBusyTasks(1);
     let queryParams = listQueryParams(this._filters, this._limit);
     fetch(`/_ah/api/swarming/v1/bots/list?${queryParams}`, extra)
-      .then(jsonOrThrow)
-      .then((json) => {
-        this._bots = [];
-        const maybeLoadMore = (json) => {
-          this._bots = this._bots.concat(processBots(json.items));
-          this.render();
-          // Special case: Don't load all the bots when filters is empty to avoid
-          // loading many many bots unintentionally. A user can over-ride this
-          // with the showAll button.
-          if ((this._filters.length || this._showAll) && json.cursor) {
-            this._limit = BATCH_LOAD;
-            queryParams = listQueryParams(this._filters, this._limit, json.cursor);
-            fetch(`/_ah/api/swarming/v1/bots/list?${queryParams}`, extra)
-              .then(jsonOrThrow)
-              .then(maybeLoadMore)
-              .catch((e) => this.fetchError(e, 'bots/list (paging)'));
-          } else {
-            this.app.finishedTask();
-          }
-        }
-        maybeLoadMore(json);
-      })
-      .catch((e) => this.fetchError(e, 'bots/list'));
+        .then(jsonOrThrow)
+        .then((json) => {
+          this._bots = [];
+          const maybeLoadMore = (json) => {
+            this._bots = this._bots.concat(processBots(json.items));
+            this.render();
+            // Special case: Don't load all the bots when filters is empty to avoid
+            // loading many many bots unintentionally. A user can over-ride this
+            // with the showAll button.
+            if ((this._filters.length || this._showAll) && json.cursor) {
+              this._limit = BATCH_LOAD;
+              queryParams = listQueryParams(this._filters, this._limit, json.cursor);
+              fetch(`/_ah/api/swarming/v1/bots/list?${queryParams}`, extra)
+                  .then(jsonOrThrow)
+                  .then(maybeLoadMore)
+                  .catch((e) => this.fetchError(e, 'bots/list (paging)'));
+            } else {
+              this.app.finishedTask();
+            }
+          };
+          maybeLoadMore(json);
+        })
+        .catch((e) => this.fetchError(e, 'bots/list'));
 
     this.app.addBusyTasks(1);
     // We can re-use the query params from listQueryParams because
     // the backend will ignore those it doesn't understand (e.g limit
     // and is_dead, etc).
     fetch('/_ah/api/swarming/v1/bots/count?' + queryParams, extra)
-      .then(jsonOrThrow)
-      .then((json) => {
-        this._queryCounts = processCounts(this._queryCounts, json);
-        this.render();
-        this.app.finishedTask();
-      })
-      .catch((e) => this.fetchError(e, 'bots/count (query)'));
+        .then(jsonOrThrow)
+        .then((json) => {
+          this._queryCounts = processCounts(this._queryCounts, json);
+          this.render();
+          this.app.finishedTask();
+        })
+        .catch((e) => this.fetchError(e, 'bots/count (query)'));
 
     // We only need to do this once, because we don't expect it to
     // change (much) after the page has been loaded.
@@ -557,13 +556,13 @@ window.customElements.define('bot-list', class extends SwarmingAppBoilerplate {
       this._fleetCounts._queried = true;
       this.app.addBusyTasks(1);
       fetch('/_ah/api/swarming/v1/bots/count', extra)
-        .then(jsonOrThrow)
-        .then((json) => {
-          this._fleetCounts = processCounts(this._fleetCounts, json);
-          this.render();
-          this.app.finishedTask();
-        })
-        .catch((e) => this.fetchError(e, 'bots/count (fleet)'));
+          .then(jsonOrThrow)
+          .then((json) => {
+            this._fleetCounts = processCounts(this._fleetCounts, json);
+            this.render();
+            this.app.finishedTask();
+          })
+          .catch((e) => this.fetchError(e, 'bots/count (fleet)'));
     }
 
     // fetch dimensions so we can fill out the filters.
@@ -578,18 +577,18 @@ window.customElements.define('bot-list', class extends SwarmingAppBoilerplate {
         // This request does not depend on the filters.
       };
       fetch('/_ah/api/swarming/v1/bots/dimensions', extra)
-      .then(jsonOrThrow)
-      .then((json) => {
-        this._primaryMap = processPrimaryMap(json.bots_dimensions);
-        this._possibleColumns = makePossibleColumns(json.bots_dimensions);
-        this._filteredPossibleColumns = this._possibleColumns.slice();
-        this._primaryArr = Object.keys(this._primaryMap);
-        this._primaryArr.sort();
-        this._filteredPrimaryArr = this._primaryArr.slice();
-        this._refilterPossibleColumns(); // calls render
-        this.app.finishedTask();
-      })
-      .catch((e) => this.fetchError(e, 'bots/dimensions'));
+          .then(jsonOrThrow)
+          .then((json) => {
+            this._primaryMap = processPrimaryMap(json.bots_dimensions);
+            this._possibleColumns = makePossibleColumns(json.bots_dimensions);
+            this._filteredPossibleColumns = this._possibleColumns.slice();
+            this._primaryArr = Object.keys(this._primaryMap);
+            this._primaryArr.sort();
+            this._filteredPrimaryArr = this._primaryArr.slice();
+            this._refilterPossibleColumns(); // calls render
+            this.app.finishedTask();
+          })
+          .catch((e) => this.fetchError(e, 'bots/dimensions'));
     }
   }
 
@@ -841,5 +840,4 @@ window.customElements.define('bot-list', class extends SwarmingAppBoilerplate {
     this._stateChanged();
     this.render();
   }
-
 });

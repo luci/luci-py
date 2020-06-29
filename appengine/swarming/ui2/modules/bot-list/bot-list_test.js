@@ -2,22 +2,22 @@
 // Use of this source code is governed under the Apache License, Version 2.0
 // that can be found in the LICENSE file.
 
-import 'modules/bot-list'
+import 'modules/bot-list';
 
 describe('bot-list', function() {
   // Instead of using import, we use require. Otherwise,
   // the concatenation trick we do doesn't play well with webpack, which would
   // leak dependencies (e.g. bot-list's 'column' function to task-list) and
   // try to import things multiple times.
-  const { deepCopy } = require('common-sk/modules/object');
-  const { $, $$ } = require('common-sk/modules/dom');
-  const { childrenAsArray, customMatchers, expectNoUnmatchedCalls, getChildItemWithText, mockAppGETs } = require('modules/test_util');
-  const { fetchMock, MATCHED, UNMATCHED } = require('fetch-mock');
+  const {deepCopy} = require('common-sk/modules/object');
+  const {$, $$} = require('common-sk/modules/dom');
+  const {childrenAsArray, customMatchers, expectNoUnmatchedCalls, getChildItemWithText, mockAppGETs} = require('modules/test_util');
+  const {fetchMock, MATCHED, UNMATCHED} = require('fetch-mock');
 
-  const { handleLegacyFilters } = require('modules/alias');
-  const { column, filterBots, getColHeader, listQueryParams, processBots, makePossibleColumns,
-         processPrimaryMap } = require('modules/bot-list/bot-list-helpers');
-  const { bots_10, fleetCount, fleetDimensions, queryCount } = require('modules/bot-list/test_data');
+  const {handleLegacyFilters} = require('modules/alias');
+  const {column, filterBots, getColHeader, listQueryParams, processBots, makePossibleColumns,
+    processPrimaryMap} = require('modules/bot-list/bot-list-helpers');
+  const {bots_10, fleetCount, fleetDimensions, queryCount} = require('modules/bot-list/test_data');
 
   beforeEach(function() {
     jasmine.addMatchers(customMatchers);
@@ -29,7 +29,7 @@ describe('bot-list', function() {
     // These are the default responses to the expected API calls (aka 'matched').
     // They can be overridden for specific tests, if needed.
     mockAppGETs(fetchMock, {
-      delete_bot: true
+      delete_bot: true,
     });
 
     fetchMock.get('glob:/_ah/api/swarming/v1/bots/list?*', bots_10);
@@ -84,7 +84,7 @@ describe('bot-list', function() {
     ele.addEventListener('busy-end', (e) => {
       if (!ran) {
         ran = true; // prevent multiple runs if the test makes the
-                    // app go busy (e.g. if it calls fetch).
+        // app go busy (e.g. if it calls fetch).
         callback();
       }
     });
@@ -104,7 +104,7 @@ describe('bot-list', function() {
     });
   }
 
-//===============TESTS START====================================
+  // ===============TESTS START====================================
 
   describe('html structure', function() {
     it('contains swarming-app as its only child', function(done) {
@@ -135,20 +135,19 @@ describe('bot-list', function() {
           done();
         });
       });
-    }); //end describe('when not logged in')
+    }); // end describe('when not logged in')
 
     describe('when logged in as unauthorized user', function() {
-
       function notAuthorized() {
         // overwrite the default fetchMock behaviors to have everything return 403.
         fetchMock.get('/_ah/api/swarming/v1/server/details', 403,
-                      { overwriteRoutes: true });
+            {overwriteRoutes: true});
         fetchMock.get('/_ah/api/swarming/v1/server/permissions', {},
-                      { overwriteRoutes: true });
+            {overwriteRoutes: true});
         fetchMock.get('glob:/_ah/api/swarming/v1/bots/list?*', 403,
-                      { overwriteRoutes: true });
+            {overwriteRoutes: true});
         fetchMock.get('/_ah/api/swarming/v1/bots/dimensions', 403,
-                      { overwriteRoutes: true });
+            {overwriteRoutes: true});
       }
 
       beforeEach(notAuthorized);
@@ -176,7 +175,6 @@ describe('bot-list', function() {
     }); // end describe('when logged in as unauthorized user')
 
     describe('when logged in as user (not admin)', function() {
-
       describe('default landing page', function() {
         it('displays whatever bots show up', function(done) {
           loggedInBotlist((ele) => {
@@ -239,9 +237,9 @@ describe('bot-list', function() {
             expect(cell(2, 1)).toMatchTextContent('[died on task]');
             expect(cell(2, 1).innerHTML).toContain('<a ', 'has a link');
             expect(cell(2, 1).innerHTML).toContain('href="/task?id=3e17182091d7ae10"',
-                                      'link is pointing to the cannonical (0 ending) page');
+                'link is pointing to the cannonical (0 ending) page');
             expect(cell(2, 1).innerHTML).toContain('title="Bot somebot12-a9 was last seen',
-                                      'Mouseover with explanation');
+                'Mouseover with explanation');
             expect(cell(2, 2)).toMatchTextContent(
                 'Windows 10 version 1709 (Windows-10-16299.431)');
             expect(cell(2, 3).textContent).toContain('Dead');
@@ -257,9 +255,9 @@ describe('bot-list', function() {
             expect(cell(6, 1)).toMatchTextContent('3e1723e23fd70811');
             expect(cell(6, 1).innerHTML).toContain('<a ', 'has a link');
             expect(cell(6, 1).innerHTML).toContain('href="/task?id=3e1723e23fd70810"',
-                                      'link is pointing to the cannonical (0 ending) page');
+                'link is pointing to the cannonical (0 ending) page');
             expect(cell(6, 1).innerHTML).toContain('title="Perf-Win10-Clang-Golo',
-                                      'Mouseover with task name');
+                'Mouseover with task name');
             done();
           });
         });
@@ -350,11 +348,8 @@ describe('bot-list', function() {
             done();
           });
         });
-
       }); // end describe('default landing page')
-
     });// end describe('when logged in as user')
-
   }); // end describe('html structure')
 
   describe('dynamic behavior', function() {
@@ -384,7 +379,7 @@ describe('bot-list', function() {
         expect(actualIDOrder).toEqual([
           'somebot11-a9', // Android
           'somebot77-a3', 'somebot15-a9', 'somebot13-a9', 'somebot13-a2', 'somebot10-a9', // Ubuntu in descending id
-          'somebot17-a9', 'somebot16-a9',   // Win10.309
+          'somebot17-a9', 'somebot16-a9', // Win10.309
           'somebot18-a9', 'somebot12-a9']); // Win10.431
         done();
       });
@@ -415,7 +410,7 @@ describe('bot-list', function() {
         expect(actualIDOrder).toEqual([
           'somebot12-a9', 'somebot18-a9', // Win10.431
           'somebot16-a9', 'somebot17-a9', // Win10.309
-          'somebot10-a9', 'somebot13-a2', 'somebot13-a9', 'somebot15-a9', 'somebot77-a3',  // Ubuntu in ascending id
+          'somebot10-a9', 'somebot13-a2', 'somebot13-a9', 'somebot15-a9', 'somebot77-a3', // Ubuntu in ascending id
           'somebot11-a9']); // Android
         done();
       });
@@ -460,7 +455,7 @@ describe('bot-list', function() {
           }
         }
         checkbox.click(); // click is synchronous, it returns after
-                          // the clickHandler is run.
+        // the clickHandler is run.
         // Check underlying data
         expect(ele._cols).toContain(keyToClick);
         // check the rendering changed
@@ -533,7 +528,7 @@ describe('bot-list', function() {
         expect(ele._cols).toEqual(expectedOrder);
 
         const expectedHeaders = ['Bot Id', 'Current Task', 'Android Devices', 'OS',
-                               'Status', 'XCode Version'];
+          'Status', 'XCode Version'];
         const colHeaders = $('.bot-table thead th');
         expect(colHeaders.map((c) => c.textContent.trim())).toEqual(expectedHeaders);
         done();
@@ -550,7 +545,7 @@ describe('bot-list', function() {
         const checkbox = $$('checkbox-sk', row);
         expect(checkbox.checked).toBeTruthy();
         checkbox.click(); // click is synchronous, it returns after
-                          // the clickHandler is run.
+        // the clickHandler is run.
         // Check underlying data
         expect(ele._cols).toContain('id');
         // check there are still headers.
@@ -579,7 +574,7 @@ describe('bot-list', function() {
         expect(values).toContain('arm-32');
         expect(values).toContain('x86-64');
 
-        let oldRow = row;
+        const oldRow = row;
         row = getChildItemWithText($$('.selector.keys'), 'device_os', ele);
         expect(row).toBeTruthy();
         row.click();
@@ -611,7 +606,7 @@ describe('bot-list', function() {
 
         // Skip the first child, which is the input box
         expect(keys.slice(1, 7)).toEqual(['id', 'task', 'os', 'status',
-                                          'android_devices', 'battery_health']);
+          'android_devices', 'battery_health']);
 
         done();
       });
@@ -620,8 +615,8 @@ describe('bot-list', function() {
     it('adds a filter when the addIcon is clicked', function(done) {
       loggedInBotlist((ele) => {
         ele._cols = ['id', 'task', 'os', 'status'];
-        ele._primaryKey = 'os';  // set 'os' selected
-        ele._filters = [];  // no filters
+        ele._primaryKey = 'os'; // set 'os' selected
+        ele._filters = []; // no filters
         ele.render();
 
         const valueRow = getChildItemWithText($$('.selector.values'), 'Android', ele);
@@ -636,7 +631,7 @@ describe('bot-list', function() {
         expect(chipContainer).toBeTruthy('there should be a filter chip container');
         expect(chipContainer.children.length).toBe(1);
         expect(addIcon.hasAttribute('hidden'))
-              .toBeTruthy('addIcon should go away after being clicked');
+            .toBeTruthy('addIcon should go away after being clicked');
         done();
       });
     });
@@ -703,7 +698,7 @@ describe('bot-list', function() {
           expect(ele._bots.length).toBe(5, '5 Linux bots there now.');
           wasCalled = true;
           return '[]'; // pretend no bots match
-        }, { overwriteRoutes: true });
+        }, {overwriteRoutes: true});
 
         ele._addFilter('os:Linux');
         // The true on flush waits for res.json() to resolve too, which
@@ -917,7 +912,6 @@ describe('bot-list', function() {
         done();
       });
     });
-
   }); // end describe('dynamic behavior')
 
   describe('api calls', function() {
@@ -951,18 +945,18 @@ describe('bot-list', function() {
 
     it('makes auth\'d API calls when a logged in user views landing page', function(done) {
       loggedInBotlist((ele) => {
-        let calls = fetchMock.calls(MATCHED, 'GET');
+        const calls = fetchMock.calls(MATCHED, 'GET');
         expect(calls.length).toBe(2+4, '2 GETs from swarming-app, 4 from bot-list');
         // calls is an array of 2-length arrays with the first element
         // being the string of the url and the second element being
         // the options that were passed in
-        let gets = calls.map((c) => c[0]);
+        const gets = calls.map((c) => c[0]);
 
         // limit=100 comes from the default limit value.
         expect(gets).toContainRegex(/\/_ah\/api\/swarming\/v1\/bots\/list.+limit=100.*/);
         expect(gets).toContain('/_ah/api/swarming/v1/bots/count');
 
-        checkAuthorizationAndNoPosts(calls)
+        checkAuthorizationAndNoPosts(calls);
         done();
       });
     });
@@ -1031,7 +1025,7 @@ describe('bot-list', function() {
     it('turns the dates into DateObjects', function() {
       // Make a copy of the object because _processBots will modify it in place.
       const bots = processBots([deepCopy(LINUX_BOT)]);
-      const ts = bots[0].first_seen_ts
+      const ts = bots[0].first_seen_ts;
       expect(ts).toBeTruthy();
       expect(ts instanceof Date).toBeTruthy('Should be a date object');
     });
@@ -1093,8 +1087,8 @@ describe('bot-list', function() {
       expect(pMap).toBeTruthy();
       // Note this list doesn't include the blacklisted keys.
       const expectedKeys = ['android_devices', 'cores', 'cpu', 'device', 'device_os',
-          'device_type', 'gpu', 'hidpi', 'machine_type', 'os', 'pool',
-          'xcode_version', 'zone', 'id', 'task', 'status'];
+        'device_type', 'gpu', 'hidpi', 'machine_type', 'os', 'pool',
+        'xcode_version', 'zone', 'id', 'task', 'status'];
       const actualKeys = Object.keys(pMap);
       actualKeys.sort();
       expectedKeys.sort();
@@ -1157,31 +1151,31 @@ describe('bot-list', function() {
       const expectations = [
         { // basic 'alive'
           'limit': 256,
-          'filters': ['pool:Skia','os:Android', 'status:alive'],
-          'output':  'dimensions=pool%3ASkia&dimensions=os%3AAndroid'+
+          'filters': ['pool:Skia', 'os:Android', 'status:alive'],
+          'output': 'dimensions=pool%3ASkia&dimensions=os%3AAndroid'+
                      '&is_dead=FALSE&limit=256',
         },
         { // no filters
           'limit': 123,
           'filters': [],
-          'output':  'limit=123',
+          'output': 'limit=123',
         },
         { // dead
           'limit': 456,
           'filters': ['status:dead', 'device_type:bullhead'],
-          'output':  'dimensions=device_type%3Abullhead&is_dead=TRUE&limit=456',
+          'output': 'dimensions=device_type%3Abullhead&is_dead=TRUE&limit=456',
         },
         { // multiple of a filter
           'limit': 789,
           'filters': ['status:maintenance', 'device_type:bullhead', 'device_type:marlin'],
-          'output':  'dimensions=device_type%3Abullhead&dimensions=device_type%3Amarlin'+
+          'output': 'dimensions=device_type%3Abullhead&dimensions=device_type%3Amarlin'+
                      '&in_maintenance=TRUE&limit=789',
         },
         { // is_busy
           'limit': 7,
           'filters': ['task:busy'],
-          'output':  'is_busy=TRUE&limit=7',
-        }
+          'output': 'is_busy=TRUE&limit=7',
+        },
       ];
 
       for (const testcase of expectations) {
@@ -1192,7 +1186,6 @@ describe('bot-list', function() {
       const testcase = expectations[0];
       const qp = listQueryParams(testcase.filters, testcase.limit, 'mock_cursor12345');
       expect(qp).toEqual('cursor=mock_cursor12345&'+testcase.output);
-
     });
 
     it('remove aliases from legacy filters', function() {
@@ -1201,5 +1194,4 @@ describe('bot-list', function() {
       expect(output).toEqual(['cpu:12354', 'gpu:10de:1cb3-415.27']);
     });
   }); // end describe('data parsing')
-
 });

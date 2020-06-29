@@ -4,7 +4,7 @@
 
 process.env.CHROME_BIN = require('puppeteer').executablePath();
 
-let webpackConfig = require('./webpack.config.js')
+let webpackConfig = require('./webpack.config.js');
 // Webpack 3+ configs can be either objects or functions that produce the
 // config object. Karma currently doesn't handle the latter, so do it
 // ourselves here.
@@ -16,8 +16,8 @@ webpackConfig.mode = 'development';
 
 // Allows tests to import modules locally
 webpackConfig.resolve = {
-    modules: ['./node_modules', './'],
-}
+  modules: ['./node_modules', './'],
+};
 
 module.exports = function(config) {
   config.set({
@@ -33,8 +33,8 @@ module.exports = function(config) {
 
     // list of files / patterns to load in the browser
     files: [
-        'node_modules/@webcomponents/custom-elements/custom-elements.min.js',
-        '_all_tests.js',
+      'node_modules/@webcomponents/custom-elements/custom-elements.min.js',
+      '_all_tests.js',
     ],
 
 
@@ -43,34 +43,34 @@ module.exports = function(config) {
     ],
 
     plugins: [
-        'karma-concat-preprocessor',
-        'karma-webpack',
-        'karma-jasmine',
-        'karma-firefox-launcher',
-        'karma-chrome-launcher',
-        'karma-spec-reporter'
+      'karma-concat-preprocessor',
+      'karma-webpack',
+      'karma-jasmine',
+      'karma-firefox-launcher',
+      'karma-chrome-launcher',
+      'karma-spec-reporter',
     ],
 
     // preprocess matching files before serving them to the browser
     // available preprocessors: https://npmjs.org/browse/keyword/karma-preprocessor
     preprocessors: {
-        'modules/**/*.js': ['concat'],
-        '_all_tests.js': [ 'webpack' ]
+      'modules/**/*.js': ['concat'],
+      '_all_tests.js': ['webpack'],
     },
 
     concat: {
-        // By default, concat puts everything in a function(){}, but
-        // that doesn't work with imports.
-        header: '',
-        footer: '',
-        outputs: [
-            {
-                file: '_all_tests.js',
-                inputs: [
-                    'modules/**/*_test.js',
-                ],
-            },
-        ],
+      // By default, concat puts everything in a function(){}, but
+      // that doesn't work with imports.
+      header: '',
+      footer: '',
+      outputs: [
+        {
+          file: '_all_tests.js',
+          inputs: [
+            'modules/**/*_test.js',
+          ],
+        },
+      ],
     },
 
     // test results reporter to use
@@ -110,5 +110,5 @@ module.exports = function(config) {
     concurrency: Infinity,
 
     webpack: webpackConfig,
-  })
-}
+  });
+};

@@ -2,7 +2,7 @@
 // Use of this source code is governed under the Apache License, Version 2.0
 // that can be found in the LICENSE file.
 
-import 'modules/sort-toggle'
+import 'modules/sort-toggle';
 
 describe('sort-toggle', function() {
   // A reusable HTML element in which we create our element under test.
@@ -13,7 +13,7 @@ describe('sort-toggle', function() {
     container.innerHTML = '';
   });
 
-//===============TESTS START====================================
+  // ===============TESTS START====================================
 
   // calls the test callback with one element 'ele', a created <sort-toggle>.
   function createElement(test) {

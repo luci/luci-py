@@ -2,35 +2,35 @@
 // Use of this source code is governed under the Apache License, Version 2.0
 // that can be found in the LICENSE file.
 
-import { $, $$ } from 'common-sk/modules/dom'
-import { errorMessage } from 'elements-sk/errorMessage'
-import { guard } from 'lit-html/directives/guard'
-import { html, render } from 'lit-html'
-import { ifDefined } from 'lit-html/directives/if-defined'
-import { jsonOrThrow } from 'common-sk/modules/jsonOrThrow'
-import { stateReflector } from 'common-sk/modules/stateReflector'
+import {$, $$} from 'common-sk/modules/dom';
+import {errorMessage} from 'elements-sk/errorMessage';
+import {guard} from 'lit-html/directives/guard';
+import {html, render} from 'lit-html';
+import {ifDefined} from 'lit-html/directives/if-defined';
+import {jsonOrThrow} from 'common-sk/modules/jsonOrThrow';
+import {stateReflector} from 'common-sk/modules/stateReflector';
 
-import 'elements-sk/checkbox-sk'
-import 'elements-sk/icon/add-circle-outline-icon-sk'
-import 'elements-sk/icon/remove-circle-outline-icon-sk'
-import 'elements-sk/styles/buttons'
-import '../dialog-pop-over'
-import '../stacked-time-chart'
-import '../swarming-app'
+import 'elements-sk/checkbox-sk';
+import 'elements-sk/icon/add-circle-outline-icon-sk';
+import 'elements-sk/icon/remove-circle-outline-icon-sk';
+import 'elements-sk/styles/buttons';
+import '../dialog-pop-over';
+import '../stacked-time-chart';
+import '../swarming-app';
 
-import * as human from 'common-sk/modules/human'
-import * as query from 'common-sk/modules/query'
+import * as human from 'common-sk/modules/human';
+import * as query from 'common-sk/modules/query';
 
-import { applyAlias } from '../alias'
-import { canRetry, cipdLink, durationChart, hasRichOutput, humanState,
-         firstDimension, isolateLink, isSummaryTask, parseRequest, parseResult,
-         richLogsLink, sliceSchedulingDeadline, stateClass, taskCost,
-         taskSchedulingDeadline, taskInfoClass, wasDeduped,
-         wasPickedUp} from './task-page-helpers'
-import { botListLink, botPageLink, humanDuration, parseDuration,
-         taskListLink, taskPageLink } from '../util'
+import {applyAlias} from '../alias';
+import {canRetry, cipdLink, durationChart, hasRichOutput, humanState,
+  firstDimension, isolateLink, isSummaryTask, parseRequest, parseResult,
+  richLogsLink, sliceSchedulingDeadline, stateClass, taskCost,
+  taskSchedulingDeadline, taskInfoClass, wasDeduped,
+  wasPickedUp} from './task-page-helpers';
+import {botListLink, botPageLink, humanDuration, parseDuration,
+  taskListLink, taskPageLink} from '../util';
 
-import SwarmingAppBoilerplate from '../SwarmingAppBoilerplate'
+import SwarmingAppBoilerplate from '../SwarmingAppBoilerplate';
 
 /**
  * @module swarming-ui/modules/task-page
@@ -53,64 +53,64 @@ const serverLogFilter = `resource.type="gae_app"\n` +
     `protoPayload.resource>="/internal/"`, // cron, task queue
     `protoPayload.resource>="/swarming/api/v1/bot/"`, // requests from bots
     `protoPayload.method!="GET"`, // POST, PUT, DELETE etc
-  ].join(" OR ") + '\n';
+  ].join(' OR ') + '\n';
 
 const serverLogsBaseURL = (ele, request, result) => {
-  let url = `https://console.cloud.google.com/logs/viewer`
-  url += `?project=${ele._project_id}`
-  url += `&resource=gae_app`
+  let url = `https://console.cloud.google.com/logs/viewer`;
+  url += `?project=${ele._project_id}`;
+  url += `&resource=gae_app`;
   if (request.created_ts) {
     // task creation request happens before record creation in DB
-    const timeStart = new Date(request.created_ts.getTime() - 60*1000)
-    const tsEnd = result.completed_ts || result.abandoned_ts
-    const timeEnd = tsEnd ? new Date(tsEnd.getTime() + 60*1000) : new Date()
-    url += `&interval=CUSTOM`
-    url += `&dateRangeStart=${timeStart.toISOString()}`
+    const timeStart = new Date(request.created_ts.getTime() - 60*1000);
+    const tsEnd = result.completed_ts || result.abandoned_ts;
+    const timeEnd = tsEnd ? new Date(tsEnd.getTime() + 60*1000) : new Date();
+    url += `&interval=CUSTOM`;
+    url += `&dateRangeStart=${timeStart.toISOString()}`;
     url += `&dateRangeEnd=${timeEnd.toISOString()}`;
   }
   return url;
-}
+};
 
 const serverTaskLogsURL = (ele, request, result) => {
-  let url = serverLogsBaseURL(ele, request, result)
-  let filter = serverLogFilter
+  let url = serverLogsBaseURL(ele, request, result);
+  let filter = serverLogFilter;
 
   // cut the last character that represents try number
-  filter += `${ele._taskId.slice(0, -1)}`
-  url += `&advancedFilter=${filter}`
+  filter += `${ele._taskId.slice(0, -1)}`;
+  url += `&advancedFilter=${filter}`;
   return encodeURI(url);
-}
+};
 
 const serverBotLogsURL = (ele, request, result) => {
-  let url = serverLogsBaseURL(ele, request, result)
-  let filter = serverLogFilter
+  let url = serverLogsBaseURL(ele, request, result);
+  let filter = serverLogFilter;
 
-  filter += `${result.bot_id}`
-  url += `&advancedFilter=${filter}`
+  filter += `${result.bot_id}`;
+  url += `&advancedFilter=${filter}`;
   return encodeURI(url);
-}
+};
 
 const botLogsURL = (ele, request, result, botProjectID) => {
-  let url = `https://console.cloud.google.com/logs/viewer`
-  url += `?project=${botProjectID}`
+  let url = `https://console.cloud.google.com/logs/viewer`;
+  url += `?project=${botProjectID}`;
   if (result.started_ts) {
-    const timeStart = new Date(result.started_ts.getTime() - 60*1000)
-    const tsEnd = result.completed_ts || result.abandoned_ts
-    const timeEnd = tsEnd ? new Date(tsEnd.getTime() + 60*1000) : new Date()
-    url += `&interval=CUSTOM`
-    url += `&dateRangeStart=${timeStart.toISOString()}`
+    const timeStart = new Date(result.started_ts.getTime() - 60*1000);
+    const tsEnd = result.completed_ts || result.abandoned_ts;
+    const timeEnd = tsEnd ? new Date(tsEnd.getTime() + 60*1000) : new Date();
+    url += `&interval=CUSTOM`;
+    url += `&dateRangeStart=${timeStart.toISOString()}`;
     url += `&dateRangeEnd=${timeEnd.toISOString()}`;
   }
   // limit logs that we care
   // TODO(jwata): Non GCE bots will need a different label.
-  let filter = `labels."compute.googleapis.com/resource_name"="${result.bot_id}"\n`
+  let filter = `labels."compute.googleapis.com/resource_name"="${result.bot_id}"\n`;
   filter += [
     `logName:"projects/${botProjectID}/logs/swarming"`,
-    `logName:"projects/${botProjectID}/logs/chromebuild"`
-  ].join(" OR ")
-  url += `&advancedFilter=${filter}`
+    `logName:"projects/${botProjectID}/logs/chromebuild"`,
+  ].join(' OR ');
+  url += `&advancedFilter=${filter}`;
   return encodeURI(url);
-}
+};
 
 const idAndButtons = (ele) => {
   if (!ele._taskId || ele._notFound) {
@@ -137,7 +137,7 @@ const idAndButtons = (ele) => {
           ?disabled=${!ele.permissions.cancel_task}
           @click=${ele._promptCancel} class=kill>kill</button>
 </div>`;
-}
+};
 
 const taskDisambiguation = (ele, result) => {
   // Only tasks with id ending in 0 can be summaries
@@ -163,7 +163,7 @@ const taskDisambiguation = (ele, result) => {
     ${ele._extraTries.map(taskRow)}
   </tbody>
 </table>`;
-}
+};
 
 const taskRow = (result, idx) => {
   if (!result.task_id) {
@@ -187,7 +187,7 @@ const taskRow = (result, idx) => {
   <td class=${stateClass(result)}>${humanState(result)}</td>
 </tr>
 `;
-}
+};
 
 
 const slicePicker = (ele) => {
@@ -202,7 +202,7 @@ const slicePicker = (ele) => {
 <div class=slice-picker>
   ${ele._request.task_slices.map((_, idx) => sliceTab(ele, idx))}
 </div>`;
-}
+};
 
 const sliceTab = (ele, idx) => html`
   <div class=tab ?selected=${ele._currentSliceIdx === idx}
@@ -228,7 +228,7 @@ const taskInfoTable = (ele, request, result, currentSlice) => {
   ${dimensionBlock(currentSlice.properties.dimensions || [])}
   ${isolateBlock('Isolated Inputs', currentSlice.properties.inputs_ref || {})}
   ${arrayInTable(currentSlice.properties.outputs,
-                 'Expected outputs', (output) => output)}
+      'Expected outputs', (output) => output)}
   ${commitBlock(request.tagMap)}
 
   <tr class=details>
@@ -245,10 +245,10 @@ const taskInfoTable = (ele, request, result, currentSlice) => {
 </tbody>
 <tbody ?hidden=${!ele._showDetails}>
   ${executionBlock(currentSlice.properties, currentSlice.properties.env || [],
-                   currentSlice.properties.env_prefixes || [])}
+      currentSlice.properties.env_prefixes || [])}
 
   ${arrayInTable(request.tags,
-                 'Tags', (tag) => tag)}
+      'Tags', (tag) => tag)}
   <tr>
     <td>Execution timeout</td>
     <td>${humanDuration(currentSlice.properties.execution_timeout_secs)}</td>
@@ -264,12 +264,12 @@ const taskInfoTable = (ele, request, result, currentSlice) => {
 
   ${cipdBlock(currentSlice.properties.cipd_input, result)}
   ${arrayInTable(currentSlice.properties.caches,
-                 'Named Caches',
-                 (cache) => cache.name + ':' + cache.path)}
+      'Named Caches',
+      (cache) => cache.name + ':' + cache.path)}
 </tbody>
 </table>
 `;
-}
+};
 
 const stateLoadBlock = (ele, request, result) => html`
 <tr>
@@ -277,9 +277,9 @@ const stateLoadBlock = (ele, request, result) => html`
   <td class=${stateClass(result)}>${humanState(result, ele._currentSliceIdx)}</td>
 </tr>
 ${countBlocks(result, ele._capacityCounts[ele._currentSliceIdx],
-                      ele._pendingCounts[ele._currentSliceIdx],
-                      ele._runningCounts[ele._currentSliceIdx],
-                      ele._currentSlice.properties || {})}
+      ele._pendingCounts[ele._currentSliceIdx],
+      ele._runningCounts[ele._currentSliceIdx],
+      ele._currentSlice.properties || {})}
 <tr ?hidden=${!result.deduped_from} class=highlighted>
   <td><b>Deduped From</b></td>
   <td>
@@ -297,7 +297,7 @@ ${countBlocks(result, ele._capacityCounts[ele._currentSliceIdx],
 `;
 
 const countBlocks = (result, capacityCount, pendingCount,
-                     runningCount, properties) => html`
+    runningCount, properties) => html`
 <tr>
   <td class=${result.state === 'PENDING'? 'bold': ''}>
     ${result.state === 'PENDING' ? 'Why Pending?' : 'Fleet Capacity'}
@@ -327,13 +327,13 @@ const countBlocks = (result, capacityCount, pendingCount,
 
 const count = (obj, value) => {
   if (!obj || (value && obj[value] === undefined)) {
-    return html`<span class=italic>&lt;counting&gt</span>`
+    return html`<span class=italic>&lt;counting&gt</span>`;
   }
   if (value) {
     return obj[value];
   }
   return obj;
-}
+};
 
 const requestBlock = (request, result, currentSlice) => html`
 <tr>
@@ -421,7 +421,7 @@ const arrayInTable = (array, label, keyFn) => {
   <td rowspan=${array.length+1}>${label}</td>
 </tr>
 ${array.map(arrayRow(keyFn))}`;
-}
+};
 
 const arrayRow = (keyFn) => {
   return (key) => html`
@@ -429,13 +429,13 @@ const arrayRow = (keyFn) => {
   <td class=break-all>${keyFn(key)}</td>
 </tr>
 `;
-}
+};
 
 const commitBlock = (tagMap) => {
   if (!tagMap || !tagMap.source_revision) {
     return '';
   }
-    return html`
+  return html`
 <tr>
   <td>Associated Commit</td>
   <td>
@@ -444,7 +444,8 @@ const commitBlock = (tagMap) => {
     </a>
   </td>
 </tr>
-`};
+`;
+};
 
 const executionBlock = (properties, env, env_prefixes) => html`
 <tr>
@@ -460,9 +461,9 @@ const executionBlock = (properties, env, env_prefixes) => html`
   <td class="code break-all">${properties.relative_cwd || '--'}</td>
 </tr>
 ${arrayInTable(env, 'Environment Vars',
-              (env) => env.key + '=' + env.value)}
+      (env) => env.key + '=' + env.value)}
 ${arrayInTable(env_prefixes, 'Environment Prefixes',
-               (prefix) => prefix.key + '=' + prefix.value.join(':'))}
+      (prefix) => prefix.key + '=' + prefix.value.join(':'))}
 <tr>
   <td>Idempotent</td>
   <td>${!!properties.idempotent}</td>
@@ -524,7 +525,7 @@ const cipdBlock = (cipdInput, result) => {
 </tr>
 ${requestedPackages.map((pkg) => cipdRowSet(pkg, cipdInput, !!actualPackages.length))}
 `;
-}
+};
 
 const cipdRowSet = (pkg, cipdInput, actualAvailable) => html`
 <tr>
@@ -608,7 +609,7 @@ const taskTimingSection = (ele, request, result) => {
   </div>
 </div>
 `;
-}
+};
 
 const logsSection = (ele, request, result) => {
   if (!ele._taskId || ele._notFound) {
@@ -618,8 +619,8 @@ const logsSection = (ele, request, result) => {
   let botOS = null;
   if (result && result.bot_dimensions) {
     for (const dim of result.bot_dimensions) {
-      if (dim.key == 'gcp') botProjectID = dim.value[0]
-      if (dim.key == 'os') botOS = dim.value[0]
+      if (dim.key == 'gcp') botProjectID = dim.value[0];
+      if (dim.key == 'os') botOS = dim.value[0];
     }
   }
   // TODO(crbug.com/1053751):
@@ -661,7 +662,7 @@ const logsSection = (ele, request, result) => {
   </table>
 </div>
 `;
-}
+};
 
 const taskExecutionSection = (ele, request, result, currentSlice) => {
   if (!ele._taskId || ele._notFound) {
@@ -771,7 +772,7 @@ const botDimensionRow = (dim, usedDimensions) => html`
 `;
 
 const botDimensionValue = (value) =>
-html`<span class="break-all dim ${value.bold ? 'bold': ''}">${value.name}</span>`;
+  html`<span class="break-all dim ${value.bold ? 'bold': ''}">${value.name}</span>`;
 
 const performanceStatsSection = (ele, performanceStats) => {
   if (!ele._taskId || ele._notFound || !performanceStats ) {
@@ -818,13 +819,13 @@ const performanceStatsSection = (ele, performanceStats) => {
      ${human.bytes(performanceStats.isolated_upload.total_bytes_items_hot || 0)}</td>
   </tr>
 </table>`;
-}
+};
 
 const reproduceSection = (ele, currentSlice) => {
   if (!ele._taskId || ele._notFound) {
     return '';
   }
-  const ref =  currentSlice.properties && currentSlice.properties.inputs_ref || {};
+  const ref = currentSlice.properties && currentSlice.properties.inputs_ref || {};
   const hasIsolated = !!ref.isolated;
   const hostUrl = window.location.hostname;
   return html`
@@ -850,7 +851,7 @@ const reproduceSection = (ele, currentSlice) => {
   </div>
 </div>
 `;
-}
+};
 
 const taskLogs = (ele) => {
   if (!ele._taskId || ele._notFound) {
@@ -876,7 +877,7 @@ const taskLogs = (ele) => {
 </div>
 ${richOrRawLogs(ele)}
 `;
-}
+};
 
 // See comment on this._stdout for explanation on how breaking the logs up
 // increases page performance.
@@ -886,7 +887,7 @@ const richOrRawLogs = (ele) => {
   // guard should prevent the iframe from reloading on any render,
   // and only when something relevant changes.
   return guard([ele._request, ele._showRawOutput, ele._stdout.length,
-                ele._stdoutOffset, ele._wideLogs], () => {
+    ele._stdoutOffset, ele._wideLogs], () => {
     if (ele._showRawOutput || !hasRichOutput(ele)) {
       return html`
 <div class="code stdout tabbed ${ele._wideLogs ? 'wide' : 'break-all'}"
@@ -904,7 +905,7 @@ const richOrRawLogs = (ele) => {
     return html`
 <iframe id=richLogsFrame class=tabbed src=${ifDefined(richLogsLink(ele))}></iframe>`;
   });
-}
+};
 
 const retryOrDebugPrompt = (ele, sliceProps) => {
   const dimensions = sliceProps.dimensions || [];
@@ -943,7 +944,7 @@ const retryOrDebugPrompt = (ele, sliceProps) => {
     </tbody>
   </table>
 </div>`;
-}
+};
 
 const promptRow = (dim) => html`
 <tr>
@@ -1022,7 +1023,6 @@ const template = (ele) => html`
 const STDOUT_REQUEST_SIZE = 100 * 1024;
 
 window.customElements.define('task-page', class extends SwarmingAppBoilerplate {
-
   constructor() {
     super(template);
     // Set empty values to allow empty rendering while we wait for
@@ -1037,24 +1037,24 @@ window.customElements.define('task-page', class extends SwarmingAppBoilerplate {
     this._project_id = location.hostname.substring(0, idx);
 
     this._stateChanged = stateReflector(
-      /*getState*/() => {
-        return {
+        /* getState*/() => {
+          return {
           // provide empty values
-          'id': this._taskId,
-          'd': this._showDetails,
-          'o': this._showRawOutput,
-          'w': this._wideLogs,
-        }
-    }, /*setState*/(newState) => {
-      // default values if not specified.
-      this._taskId = newState.id || this._taskId;
-      this._showDetails = newState.d; // default to false
-      this._showRawOutput = newState.o; // default to false
-      this._wideLogs = newState.w; // default to false
-      this._urlParamsLoaded = true;
-      this._fetch();
-      this.render();
-    });
+            'id': this._taskId,
+            'd': this._showDetails,
+            'o': this._showRawOutput,
+            'w': this._wideLogs,
+          };
+        }, /* setState*/(newState) => {
+          // default values if not specified.
+          this._taskId = newState.id || this._taskId;
+          this._showDetails = newState.d; // default to false
+          this._showRawOutput = newState.o; // default to false
+          this._wideLogs = newState.w; // default to false
+          this._urlParamsLoaded = true;
+          this._fetch();
+          this.render();
+        });
 
     this._request = {};
     this._result = {};
@@ -1129,13 +1129,13 @@ window.customElements.define('task-page', class extends SwarmingAppBoilerplate {
       },
       body: JSON.stringify(body),
     }).then(jsonOrThrow)
-      .then((response) => {
-        this._closePopups();
-        errorMessage('Request sent', 4000);
-        this.render();
-        this.app.finishedTask();
-      })
-      .catch((e) => this.fetchError(e, 'task/cancel'));
+        .then((response) => {
+          this._closePopups();
+          errorMessage('Request sent', 4000);
+          this.render();
+          this.app.finishedTask();
+        })
+        .catch((e) => this.fetchError(e, 'task/cancel'));
   }
 
   _closePopups() {
@@ -1156,7 +1156,7 @@ window.customElements.define('task-page', class extends SwarmingAppBoilerplate {
         // pool is always a required dimension
         key: 'pool',
         value: firstDimension(this._result.bot_dimensions, 'pool'),
-      }
+      },
       );
     } else {
       const inputRows = $('#retry_inputs tr', this);
@@ -1186,13 +1186,13 @@ window.customElements.define('task-page', class extends SwarmingAppBoilerplate {
     const newTask = {
       expiration_secs: this._request.expiration_secs,
       name: `leased to ${this.profile.email} for debugging`,
-      pool_task_template: 3,  // SKIP
+      pool_task_template: 3, // SKIP
       priority: 20,
       properties: this._currentSlice.properties,
       service_account: this._request.service_account,
       tags: ['debug_task:1'],
       user: this.profile.email,
-    }
+    };
 
     const leaseDurationEle = $$('#lease_duration').value;
     const leaseDuration = parseDuration(leaseDurationEle);
@@ -1236,7 +1236,7 @@ time.sleep(${leaseDuration})`];
       signal: this._fetchController.signal,
     };
     // re-fetch permissions with the task ID.
-    this.app._fetchPermissions(extra, {task_id: this._taskId})
+    this.app._fetchPermissions(extra, {task_id: this._taskId});
     this._fetchTaskInfo(extra);
     this._fetchStdOut(extra);
   }
@@ -1245,46 +1245,46 @@ time.sleep(${leaseDuration})`];
     this.app.addBusyTasks(2);
     let currIdx = -1;
     fetch(`/_ah/api/swarming/v1/task/${this._taskId}/request`, extra)
-      .then(jsonOrThrow)
-      .then((json) => {
-        this._notFound = false;
-        this._request = parseRequest(json);
-        // Note, this triggers more fetch requests, which also adds to
-        // app's busy task counts.
-        this._fetchCounts(this._request, extra);
-        // We need to set the slice if result has been loaded, otherwise
-        // when the slice loads, it will take care of it for us.
-        if (currIdx >= 0) {
-          this._setSlice(currIdx); // calls render
-        } else {
-          this.render();
-        }
-        this.app.finishedTask();
-      })
-      .catch((e) => {
-        if (e.status === 404) {
-          this._request = {};
-          this._notFound = true;
-          this.render();
-        }
-        this.fetchError(e, 'task/request')
-      });
+        .then(jsonOrThrow)
+        .then((json) => {
+          this._notFound = false;
+          this._request = parseRequest(json);
+          // Note, this triggers more fetch requests, which also adds to
+          // app's busy task counts.
+          this._fetchCounts(this._request, extra);
+          // We need to set the slice if result has been loaded, otherwise
+          // when the slice loads, it will take care of it for us.
+          if (currIdx >= 0) {
+            this._setSlice(currIdx); // calls render
+          } else {
+            this.render();
+          }
+          this.app.finishedTask();
+        })
+        .catch((e) => {
+          if (e.status === 404) {
+            this._request = {};
+            this._notFound = true;
+            this.render();
+          }
+          this.fetchError(e, 'task/request');
+        });
     this._extraTries = [];
     fetch(`/_ah/api/swarming/v1/task/${this._taskId}/result?include_performance_stats=true`, extra)
-      .then(jsonOrThrow)
-      .then((json) => {
-        this._result = parseResult(json);
-        if (this._result.try_number > 1) {
-          this._extraTries[this._result.try_number - 1] = this._result;
-          // put placeholder objects in the rest
-          this._extraTries.fill({}, 0, this._result.try_number - 1);
-          this._fetchExtraTries(this._taskId, this._result.try_number - 1, extra);
-        }
-        currIdx = +this._result.current_task_slice;
-        this._setSlice(currIdx); // calls render
-        this.app.finishedTask();
-      })
-      .catch((e) => this.fetchError(e, 'task/result'));
+        .then(jsonOrThrow)
+        .then((json) => {
+          this._result = parseResult(json);
+          if (this._result.try_number > 1) {
+            this._extraTries[this._result.try_number - 1] = this._result;
+            // put placeholder objects in the rest
+            this._extraTries.fill({}, 0, this._result.try_number - 1);
+            this._fetchExtraTries(this._taskId, this._result.try_number - 1, extra);
+          }
+          currIdx = +this._result.current_task_slice;
+          this._setSlice(currIdx); // calls render
+          this.app.finishedTask();
+        })
+        .catch((e) => this.fetchError(e, 'task/result'));
   }
 
   _fetchStdOut(extra) {
@@ -1295,70 +1295,69 @@ time.sleep(${leaseDuration})`];
     // unicode characters apart.
     let previousState = '';
     const fetchNextStdout = () => {
-    fetch(`/_ah/api/swarming/v1/task/${this._taskId}/stdout?offset=${this._stdoutOffset}&`+
+      fetch(`/_ah/api/swarming/v1/task/${this._taskId}/stdout?offset=${this._stdoutOffset}&`+
           `length=${STDOUT_REQUEST_SIZE}`, extra)
-      .then(jsonOrThrow)
-      .then((json) => {
-        if (!previousState) {
-          previousState = json.state;
-        }
-        const s = json.output || '';
-        this._stdoutOffset += s.length;
-        // Remove carriage returns for easier copy-paste and presentation.
-        // https://crbug.com/944974
-        const newLogs = s.replace(/\r\n/g, '\n');
-        // split this log batch on the last newline
-        const lastNewline = newLogs.lastIndexOf('\n');
-        let block = newLogs;
-        let remainder = '';
-        if (lastNewline !== -1) {
-          block = newLogs.substring(0, lastNewline+1);
-          remainder = newLogs.substring(lastNewline+1);
-        }
-        // If the previous block doesn't end in newline, we assume this block
-        // should be appended to that one.
-        if (this._stdout.length && !this._stdout[this._stdout.length-1].endsWith('\n')) {
-          this._stdout[this._stdout.length-1] += block;
-          if (remainder) {
-            this._stdout.push(remainder);
-          }
-        } else {
-          // otherwise, just push what we have as a new block (usually this
-          // is the first logs loaded).
-          this._stdout.push(block);
-          if (remainder) {
-            this._stdout.push(remainder);
-          }
-        }
+          .then(jsonOrThrow)
+          .then((json) => {
+            if (!previousState) {
+              previousState = json.state;
+            }
+            const s = json.output || '';
+            this._stdoutOffset += s.length;
+            // Remove carriage returns for easier copy-paste and presentation.
+            // https://crbug.com/944974
+            const newLogs = s.replace(/\r\n/g, '\n');
+            // split this log batch on the last newline
+            const lastNewline = newLogs.lastIndexOf('\n');
+            let block = newLogs;
+            let remainder = '';
+            if (lastNewline !== -1) {
+              block = newLogs.substring(0, lastNewline+1);
+              remainder = newLogs.substring(lastNewline+1);
+            }
+            // If the previous block doesn't end in newline, we assume this block
+            // should be appended to that one.
+            if (this._stdout.length && !this._stdout[this._stdout.length-1].endsWith('\n')) {
+              this._stdout[this._stdout.length-1] += block;
+              if (remainder) {
+                this._stdout.push(remainder);
+              }
+            } else {
+              // otherwise, just push what we have as a new block (usually this
+              // is the first logs loaded).
+              this._stdout.push(block);
+              if (remainder) {
+                this._stdout.push(remainder);
+              }
+            }
 
-        this.render();
+            this.render();
 
-        if (json.state !== previousState) {
-          this._fetchTaskInfo(extra);
-        }
+            if (json.state !== previousState) {
+              this._fetchTaskInfo(extra);
+            }
 
-        if (json.state === 'RUNNING' || json.state === 'PENDING') {
-          if (s.length < STDOUT_REQUEST_SIZE) {
-            // wait for more input because no new input from last fetch
-            setTimeout(fetchNextStdout, this._logFetchPeriod);
-          } else {
-            //fetch right away because we are not at the end of input
-            fetchNextStdout();
-          }
-
-        } else {
-          // no more
-          if (s.length < STDOUT_REQUEST_SIZE) {
-            this.app.finishedTask();
-          } else {
-            //fetch right away because we are not at the end of input
-            fetchNextStdout();
-          }
-        }
-        previousState = json.state;
-      })
-      .catch((e) => this.fetchError(e, 'task/request'));
-    }
+            if (json.state === 'RUNNING' || json.state === 'PENDING') {
+              if (s.length < STDOUT_REQUEST_SIZE) {
+                // wait for more input because no new input from last fetch
+                setTimeout(fetchNextStdout, this._logFetchPeriod);
+              } else {
+                // fetch right away because we are not at the end of input
+                fetchNextStdout();
+              }
+            } else {
+              // no more
+              if (s.length < STDOUT_REQUEST_SIZE) {
+                this.app.finishedTask();
+              } else {
+                // fetch right away because we are not at the end of input
+                fetchNextStdout();
+              }
+            }
+            previousState = json.state;
+          })
+          .catch((e) => this.fetchError(e, 'task/request'));
+    };
     fetchNextStdout();
   }
 
@@ -1372,18 +1371,18 @@ time.sleep(${leaseDuration})`];
     for (let i = 0; i < numSlices; i++) {
       const bParams = {
         dimensions: [],
-      }
+      };
       for (const dim of request.task_slices[i].properties.dimensions) {
         bParams.dimensions.push(`${dim.key}:${dim.value}`);
       }
       fetch(`/_ah/api/swarming/v1/bots/count?${query.fromObject(bParams)}`, extra)
-        .then(jsonOrThrow)
-        .then((json) => {
-          this._capacityCounts[i] = json;
-          this.render();
-          this.app.finishedTask();
-        })
-        .catch((e) => this.fetchError(e, 'bots/count slice ' + i));
+          .then(jsonOrThrow)
+          .then((json) => {
+            this._capacityCounts[i] = json;
+            this.render();
+            this.app.finishedTask();
+          })
+          .catch((e) => this.fetchError(e, 'bots/count slice ' + i));
 
       let start = new Date();
       start.setSeconds(0);
@@ -1395,25 +1394,25 @@ time.sleep(${leaseDuration})`];
         start: [start],
         state: ['RUNNING'],
         tags: bParams.dimensions,
-      }
+      };
       fetch(`/_ah/api/swarming/v1/tasks/count?${query.fromObject(tParams)}`, extra)
-        .then(jsonOrThrow)
-        .then((json) => {
-          this._runningCounts[i] = json.count;
-          this.render();
-          this.app.finishedTask();
-        })
-        .catch((e) => this.fetchError(e, 'tasks/running slice ' + i));
+          .then(jsonOrThrow)
+          .then((json) => {
+            this._runningCounts[i] = json.count;
+            this.render();
+            this.app.finishedTask();
+          })
+          .catch((e) => this.fetchError(e, 'tasks/running slice ' + i));
 
       tParams.state = ['PENDING'];
       fetch(`/_ah/api/swarming/v1/tasks/count?${query.fromObject(tParams)}`, extra)
-        .then(jsonOrThrow)
-        .then((json) => {
-          this._pendingCounts[i] = json.count;
-          this.render();
-          this.app.finishedTask();
-        })
-        .catch((e) => this.fetchError(e, 'tasks/pending slice ' + i));
+          .then(jsonOrThrow)
+          .then((json) => {
+            this._pendingCounts[i] = json.count;
+            this.render();
+            this.app.finishedTask();
+          })
+          .catch((e) => this.fetchError(e, 'tasks/pending slice ' + i));
     }
   }
 
@@ -1422,14 +1421,14 @@ time.sleep(${leaseDuration})`];
     const baseTaskId = taskId.substring(0, taskId.length - 1);
     for (let i = 0; i < tries; i++) {
       fetch(`/_ah/api/swarming/v1/task/${taskId + (i+1)}/result`, extra)
-      .then(jsonOrThrow)
-      .then((json) => {
-        const result = parseResult(json);
-        this._extraTries[i] = result;
-        this.render();
-        this.app.finishedTask();
-      })
-      .catch((e) => this.fetchError(e, 'task/result'));
+          .then(jsonOrThrow)
+          .then((json) => {
+            const result = parseResult(json);
+            this._extraTries[i] = result;
+            this.render();
+            this.app.finishedTask();
+          })
+          .catch((e) => this.fetchError(e, 'task/result'));
     }
   }
 
@@ -1445,16 +1444,16 @@ time.sleep(${leaseDuration})`];
       },
       body: JSON.stringify(newTask),
     })
-      .then(jsonOrThrow)
-      .then((response) => {
-      if (response && response.task_id) {
-        this._taskId = response.task_id;
-        this._stateChanged();
-        this._fetch();
-        this.render();
-        this.app.finishedTask();
-      }
-    }).catch((e) => this.fetchError(e, 'newtask'));
+        .then(jsonOrThrow)
+        .then((response) => {
+          if (response && response.task_id) {
+            this._taskId = response.task_id;
+            this._stateChanged();
+            this._fetch();
+            this.render();
+            this.app.finishedTask();
+          }
+        }).catch((e) => this.fetchError(e, 'newtask'));
   }
 
   _promptCancel() {
@@ -1504,13 +1503,13 @@ time.sleep(${leaseDuration})`];
     const newTask = {
       expiration_secs: this._request.expiration_secs,
       name: this._request.name + ' (retry)',
-      pool_task_template: 3,  // SKIP
+      pool_task_template: 3, // SKIP
       priority: this._request.priority,
       properties: this._currentSlice.properties,
       service_account: this._request.service_account,
       tags: this._request.tags,
       user: this.profile.email,
-    }
+    };
     newTask.tags.push('retry:1');
 
     const dims = this._collectDimensions();

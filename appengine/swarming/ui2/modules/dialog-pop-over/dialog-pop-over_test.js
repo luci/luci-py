@@ -2,14 +2,14 @@
 // Use of this source code is governed under the Apache License, Version 2.0
 // that can be found in the LICENSE file.
 
-import 'modules/dialog-pop-over'
+import 'modules/dialog-pop-over';
 
 describe('dialog-pop-over', function() {
   // Instead of using import, we use require. Otherwise,
   // the concatenation trick we do doesn't play well with webpack, which would
   // leak dependencies (e.g. bot-list's 'column' function to task-list) and
   // try to import things multiple times.
-  const { $$ } = require('common-sk/modules/dom');
+  const {$$} = require('common-sk/modules/dom');
 
   // A reusable HTML element in which we create our element under test.
   const container = document.createElement('div');
@@ -19,7 +19,7 @@ describe('dialog-pop-over', function() {
     container.innerHTML = '';
   });
 
-//===============TESTS START====================================
+  // ===============TESTS START====================================
 
   // calls the test callback with one element 'ele', a created <dialog-pop-over>.
   function createElement(test) {

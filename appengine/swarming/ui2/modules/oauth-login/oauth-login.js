@@ -40,9 +40,9 @@
  *
  */
 
-import { html, render } from 'lit-html'
-import { upgradeProperty } from 'elements-sk/upgradeProperty'
-import { errorMessage } from 'elements-sk/errorMessage'
+import {html, render} from 'lit-html';
+import {upgradeProperty} from 'elements-sk/upgradeProperty';
+import {errorMessage} from 'elements-sk/errorMessage';
 
 // gapiLoaded is a promise that resolves when the 'gapi' JS library is
 // finished loading.
@@ -51,10 +51,10 @@ const gapiLoaded = new Promise((resolve, reject) => {
     if (window.gapi !== undefined) {
       resolve();
     } else {
-      setTimeout(check, 10)
+      setTimeout(check, 10);
     }
-  }
-  setTimeout(check, 10)
+  };
+  setTimeout(check, 10);
 });
 
 const template = (ele) => {
@@ -75,7 +75,6 @@ const template = (ele) => {
 };
 
 window.customElements.define('oauth-login', class extends HTMLElement {
-
   connectedCallback() {
     upgradeProperty(this, 'client_id');
     upgradeProperty(this, 'testing_offline');
@@ -102,7 +101,6 @@ window.customElements.define('oauth-login', class extends HTMLElement {
           });
         });
       });
-
     }
     this.render();
   }
@@ -113,19 +111,29 @@ window.customElements.define('oauth-login', class extends HTMLElement {
 
   /** @prop {string} auth_header the "Authorization" header that should be used
   *                  for authenticated requests. Read-only. */
-  get auth_header() { return this._auth_header;}
+  get auth_header() {
+    return this._auth_header;
+  }
 
   /** @prop {string} client_id To be used in the OAuth 2.0 flow. This is generally
                                supplied by the server. */
-  get client_id() { return this.getAttribute('client_id');}
-  set client_id(val) { return this.setAttribute('client_id', val);}
+  get client_id() {
+    return this.getAttribute('client_id');
+  }
+  set client_id(val) {
+    return this.setAttribute('client_id', val);
+  }
 
   /** @prop {Object} profile An object with keys email and imageURL of the
                              logged in user. Read Only. */
-  get profile() { return this._profile; }
+  get profile() {
+    return this._profile;
+  }
 
   /** @prop {bool} testing_offline Mirrors the attribute 'testing_offline'. */
-  get testing_offline() { return this.hasAttribute('testing_offline');}
+  get testing_offline() {
+    return this.hasAttribute('testing_offline');
+  }
   set testing_offline(val) {
     if (val) {
       this.setAttribute('testing_offline', true);
@@ -140,12 +148,12 @@ window.customElements.define('oauth-login', class extends HTMLElement {
       const profile = user.getBasicProfile();
       this._profile = {
         email: profile.getEmail(),
-        imageURL: profile.getImageUrl()
+        imageURL: profile.getImageUrl(),
       };
       // Need the true here to get an access_token on the response.
       const auth = user.getAuthResponse(true);
 
-      const header = `${auth.token_type} ${auth.access_token}`
+      const header = `${auth.token_type} ${auth.access_token}`;
       this.dispatchEvent(new CustomEvent('log-in', {
         detail: {
           'auth_header': header,
@@ -164,29 +172,29 @@ window.customElements.define('oauth-login', class extends HTMLElement {
 
   _logIn() {
     if (this.testing_offline) {
-        this._auth_header = 'Bearer 12345678910-boomshakalaka';
-        this.dispatchEvent(new CustomEvent('log-in', {
-          detail: {
-            'auth_header': this._auth_header,
-            'profile': this._profile,
-          },
-          bubbles: true,
-        }));
-        this.render();
-      } else {
-        const auth = gapi.auth2.getAuthInstance();
-        if (auth) {
-          auth.signIn({
-            scope: 'email',
-            prompt: 'select_account',
-          }).then(() => {
-            if (!this._maybeFireLoginEvent()) {
-              console.warn('login was not successful; maybe user canceled');
-            }
-            this.render();
-          });
-        }
+      this._auth_header = 'Bearer 12345678910-boomshakalaka';
+      this.dispatchEvent(new CustomEvent('log-in', {
+        detail: {
+          'auth_header': this._auth_header,
+          'profile': this._profile,
+        },
+        bubbles: true,
+      }));
+      this.render();
+    } else {
+      const auth = gapi.auth2.getAuthInstance();
+      if (auth) {
+        auth.signIn({
+          scope: 'email',
+          prompt: 'select_account',
+        }).then(() => {
+          if (!this._maybeFireLoginEvent()) {
+            console.warn('login was not successful; maybe user canceled');
+          }
+          this.render();
+        });
       }
+    }
   }
 
   _logOut() {
@@ -215,5 +223,4 @@ window.customElements.define('oauth-login', class extends HTMLElement {
   attributeChangedCallback(attrName, oldVal, newVal) {
     this.render();
   }
-
 });

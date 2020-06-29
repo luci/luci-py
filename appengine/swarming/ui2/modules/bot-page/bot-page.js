@@ -2,26 +2,26 @@
 // Use of this source code is governed under the Apache License, Version 2.0
 // that can be found in the LICENSE file.
 
-import { $, $$ } from 'common-sk/modules/dom'
-import { errorMessage } from 'elements-sk/errorMessage'
-import { html, render } from 'lit-html'
-import { ifDefined } from 'lit-html/directives/if-defined'
-import { jsonOrThrow } from 'common-sk/modules/jsonOrThrow'
-import { stateReflector } from 'common-sk/modules/stateReflector'
+import {$, $$} from 'common-sk/modules/dom';
+import {errorMessage} from 'elements-sk/errorMessage';
+import {html, render} from 'lit-html';
+import {ifDefined} from 'lit-html/directives/if-defined';
+import {jsonOrThrow} from 'common-sk/modules/jsonOrThrow';
+import {stateReflector} from 'common-sk/modules/stateReflector';
 
-import 'elements-sk/checkbox-sk'
-import 'elements-sk/icon/add-circle-outline-icon-sk'
-import 'elements-sk/icon/remove-circle-outline-icon-sk'
-import 'elements-sk/styles/buttons'
-import '../bot-page-summary'
-import '../dialog-pop-over'
-import '../swarming-app'
+import 'elements-sk/checkbox-sk';
+import 'elements-sk/icon/add-circle-outline-icon-sk';
+import 'elements-sk/icon/remove-circle-outline-icon-sk';
+import 'elements-sk/styles/buttons';
+import '../bot-page-summary';
+import '../dialog-pop-over';
+import '../swarming-app';
 
-import { EVENTS_QUERY_PARAMS, mpLink, parseBotData, parseEvents,
-         parseTasks, quarantineMessage, siblingBotsLink, TASKS_QUERY_PARAMS } from './bot-page-helpers'
-import { stateClass as taskClass } from '../task-page/task-page-helpers'
-import { timeDiffApprox, timeDiffExact, taskPageLink } from '../util'
-import SwarmingAppBoilerplate from '../SwarmingAppBoilerplate'
+import {EVENTS_QUERY_PARAMS, mpLink, parseBotData, parseEvents,
+  parseTasks, quarantineMessage, siblingBotsLink, TASKS_QUERY_PARAMS} from './bot-page-helpers';
+import {stateClass as taskClass} from '../task-page/task-page-helpers';
+import {timeDiffApprox, timeDiffExact, taskPageLink} from '../util';
+import SwarmingAppBoilerplate from '../SwarmingAppBoilerplate';
 
 /**
  * @module swarming-ui/modules/bot-page
@@ -52,7 +52,7 @@ const idAndButtons = (ele) => {
   <button title="Refresh data" class=refresh
           @click=${ele._refresh}>refresh</button>
 </div>`;
-}
+};
 
 const statusAndTask = (ele, bot) => {
   if (!ele._botId) {
@@ -114,7 +114,7 @@ const statusAndTask = (ele, bot) => {
       </button>
   </td>
 </tr>`;
-}
+};
 
 const dimensionBlock = (dimensions) => html`
 <tr>
@@ -172,7 +172,7 @@ const dataAndMPBlock = (ele, bot) => html`
   <td>Machine Provider Lease Expires</td>
   <td colspan=2>${bot.human_lease_expiration_ts}</td>
 </tr>
-`
+`;
 
 const deviceSection = (ele, bot) => {
   if (!bot.device_list || !bot.device_list.length) {
@@ -197,7 +197,7 @@ const deviceSection = (ele, bot) => {
     ${bot.device_list.map(deviceRow)}
   </tbody>
 </table>`;
-}
+};
 
 const deviceRow = (device) => html`
 <tr>
@@ -245,7 +245,7 @@ const tasksTable = (ele, tasks) => {
   Show More
 </button>
 `;
-}
+};
 
 const taskRow = (task) => html`
 <tr class=${taskClass(task)}>
@@ -293,7 +293,7 @@ const eventsTable = (ele, events) => {
   Show More
 </button>
 `;
-}
+};
 
 const eventRow = (event, showAll, serverVersion) => {
   if (!showAll && !event.message) {
@@ -314,7 +314,7 @@ const eventRow = (event, showAll, serverVersion) => {
       ${event.version && event.version.substring(0, 10)}
   </td>
 </tr>`;
-}
+};
 
 const template = (ele) => html`
 <swarming-app id=swapp
@@ -387,7 +387,6 @@ const template = (ele) => html`
 `;
 
 window.customElements.define('bot-page', class extends SwarmingAppBoilerplate {
-
   constructor() {
     super(template);
 
@@ -401,24 +400,24 @@ window.customElements.define('bot-page', class extends SwarmingAppBoilerplate {
 
     this._urlParamsLoaded = false;
     this._stateChanged = stateReflector(
-      /*getState*/() => {
-        return {
+        /* getState*/() => {
+          return {
           // provide empty values
-          'id': this._botId,
-          's': this._showState,
-          'e': this._showEvents,
-          'a': this._showAll,
-        }
-    }, /*setState*/(newState) => {
-      // default values if not specified.
-      this._botId = newState.id || this._botId;
-      this._showState = newState.s; // default to false
-      this._showEvents = newState.e; // default to false
-      this._showAll = newState.a; // default to false
-      this._urlParamsLoaded = true;
-      this._fetch();
-      this.render();
-    });
+            'id': this._botId,
+            's': this._showState,
+            'e': this._showEvents,
+            'a': this._showAll,
+          };
+        }, /* setState*/(newState) => {
+          // default values if not specified.
+          this._botId = newState.id || this._botId;
+          this._showState = newState.s; // default to false
+          this._showEvents = newState.e; // default to false
+          this._showAll = newState.a; // default to false
+          this._urlParamsLoaded = true;
+          this._fetch();
+          this.render();
+        });
 
     this._bot = {};
     this._notFound = false;
@@ -462,17 +461,17 @@ window.customElements.define('bot-page', class extends SwarmingAppBoilerplate {
         'content-type': 'application/json; charset=UTF-8',
       },
     }).then(jsonOrThrow)
-      .then((response) => {
-        this._closePopup();
-        errorMessage('Request to delete bot sent', 4000);
-        this.render();
-        this.app.finishedTask();
-      })
-      .catch((e) => {
-        this._closePopup();
-        this.fetchError(e, 'bot/delete'); // calls app.finishedTask()
-        this.render();
-      });
+        .then((response) => {
+          this._closePopup();
+          errorMessage('Request to delete bot sent', 4000);
+          this.render();
+          this.app.finishedTask();
+        })
+        .catch((e) => {
+          this._closePopup();
+          this.fetchError(e, 'bot/delete'); // calls app.finishedTask()
+          this.render();
+        });
   }
 
   _fetch() {
@@ -491,48 +490,48 @@ window.customElements.define('bot-page', class extends SwarmingAppBoilerplate {
       signal: this._fetchController.signal,
     };
     // re-fetch permissions with the bot ID.
-    this.app._fetchPermissions(extra, {bot_id: this._botId})
+    this.app._fetchPermissions(extra, {bot_id: this._botId});
     this.app.addBusyTasks(1);
     fetch(`/_ah/api/swarming/v1/bot/${this._botId}/get`, extra)
-      .then(jsonOrThrow)
-      .then((json) => {
-        this._notFound = false;
-        this._bot = parseBotData(json);
-        this.render();
-        this.app.finishedTask();
-      })
-      .catch((e) => {
-        if (e.status === 404) {
-          this._bot = {};
-          this._notFound = true;
-          this.render();
-        }
-        this.fetchError(e, 'bot/data');
-      });
-    if (!this._taskCursor) {
-      this.app.addBusyTasks(1);
-      fetch(`/_ah/api/swarming/v1/bot/${this._botId}/tasks?${TASKS_QUERY_PARAMS}`, extra)
         .then(jsonOrThrow)
         .then((json) => {
-          this._taskCursor = json.cursor;
-          this._tasks = parseTasks(json.items);
+          this._notFound = false;
+          this._bot = parseBotData(json);
           this.render();
           this.app.finishedTask();
         })
-        .catch((e) => this.fetchError(e, 'bot/tasks'));
+        .catch((e) => {
+          if (e.status === 404) {
+            this._bot = {};
+            this._notFound = true;
+            this.render();
+          }
+          this.fetchError(e, 'bot/data');
+        });
+    if (!this._taskCursor) {
+      this.app.addBusyTasks(1);
+      fetch(`/_ah/api/swarming/v1/bot/${this._botId}/tasks?${TASKS_QUERY_PARAMS}`, extra)
+          .then(jsonOrThrow)
+          .then((json) => {
+            this._taskCursor = json.cursor;
+            this._tasks = parseTasks(json.items);
+            this.render();
+            this.app.finishedTask();
+          })
+          .catch((e) => this.fetchError(e, 'bot/tasks'));
     }
 
     if (!this._eventsCursor) {
       this.app.addBusyTasks(1);
       fetch(`/_ah/api/swarming/v1/bot/${this._botId}/events?${EVENTS_QUERY_PARAMS}`, extra)
-        .then(jsonOrThrow)
-        .then((json) => {
-          this._eventsCursor = json.cursor;
-          this._events = parseEvents(json.items);
-          this.render();
-          this.app.finishedTask();
-        })
-        .catch((e) => this.fetchError(e, 'bot/events'));
+          .then(jsonOrThrow)
+          .then((json) => {
+            this._eventsCursor = json.cursor;
+            this._events = parseEvents(json.items);
+            this.render();
+            this.app.finishedTask();
+          })
+          .catch((e) => this.fetchError(e, 'bot/events'));
     }
   }
 
@@ -549,17 +548,17 @@ window.customElements.define('bot-page', class extends SwarmingAppBoilerplate {
       },
       body: JSON.stringify(body),
     }).then(jsonOrThrow)
-      .then((response) => {
-        this._closePopup();
-        errorMessage('Request to kill task sent', 4000);
-        this.render();
-        this.app.finishedTask();
-      })
-      .catch((e) => {
-        this._closePopup();
-        this.fetchError(e, 'task/kill'); // calls app.finishedTask()
-        this.render();
-      });
+        .then((response) => {
+          this._closePopup();
+          errorMessage('Request to kill task sent', 4000);
+          this.render();
+          this.app.finishedTask();
+        })
+        .catch((e) => {
+          this._closePopup();
+          this.fetchError(e, 'task/kill'); // calls app.finishedTask()
+          this.render();
+        });
   }
 
   _moreEvents() {
@@ -573,14 +572,14 @@ window.customElements.define('bot-page', class extends SwarmingAppBoilerplate {
     this.app.addBusyTasks(1);
     fetch(`/_ah/api/swarming/v1/bot/${this._botId}/events?cursor=${this._eventsCursor}&` +
           EVENTS_QUERY_PARAMS, extra)
-      .then(jsonOrThrow)
-      .then((json) => {
-        this._eventsCursor = json.cursor;
-        this._events.push(...parseEvents(json.items));
-        this.render();
-        this.app.finishedTask();
-      })
-      .catch((e) => this.fetchError(e, 'bot/more_events'));
+        .then(jsonOrThrow)
+        .then((json) => {
+          this._eventsCursor = json.cursor;
+          this._events.push(...parseEvents(json.items));
+          this.render();
+          this.app.finishedTask();
+        })
+        .catch((e) => this.fetchError(e, 'bot/more_events'));
   }
 
   _moreTasks() {
@@ -594,14 +593,14 @@ window.customElements.define('bot-page', class extends SwarmingAppBoilerplate {
     this.app.addBusyTasks(1);
     fetch(`/_ah/api/swarming/v1/bot/${this._botId}/tasks?cursor=${this._taskCursor}&` +
           TASKS_QUERY_PARAMS, extra)
-      .then(jsonOrThrow)
-      .then((json) => {
-        this._taskCursor = json.cursor;
-        this._tasks.push(...parseTasks(json.items));
-        this.render();
-        this.app.finishedTask();
-      })
-      .catch((e) => this.fetchError(e, 'bot/more_tasks'));
+        .then(jsonOrThrow)
+        .then((json) => {
+          this._taskCursor = json.cursor;
+          this._tasks.push(...parseTasks(json.items));
+          this.render();
+          this.app.finishedTask();
+        })
+        .catch((e) => this.fetchError(e, 'bot/more_tasks'));
   }
 
   _promptDelete() {
@@ -665,17 +664,17 @@ window.customElements.define('bot-page', class extends SwarmingAppBoilerplate {
         'content-type': 'application/json',
       },
     }).then(jsonOrThrow)
-      .then((response) => {
-        this._closePopup();
-        errorMessage('Request to shutdown bot sent', 4000);
-        this.render();
-        this.app.finishedTask();
-      })
-      .catch((e) => {
-        this._closePopup();
-        this.fetchError(e, 'bot/terminate'); // calls app.finishedTask()
-        this.render();
-      });
+        .then((response) => {
+          this._closePopup();
+          errorMessage('Request to shutdown bot sent', 4000);
+          this.render();
+          this.app.finishedTask();
+        })
+        .catch((e) => {
+          this._closePopup();
+          this.fetchError(e, 'bot/terminate'); // calls app.finishedTask()
+          this.render();
+        });
   }
 
   _toggleBotState(e) {

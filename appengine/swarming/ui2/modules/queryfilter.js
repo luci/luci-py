@@ -11,7 +11,7 @@
  *  some of them. This is primarily used by task-list and bot-list.
  * </p>
  */
-import { applyAlias } from './alias'
+import {applyAlias} from './alias';
 
 /** filterPossibleColumns shows only those columns that match the given query.
  *  This means, if there is a part of the query in the column (ignoring case).
@@ -39,7 +39,7 @@ export function filterPossibleKeys(allKeys, keyMap, query) {
       if (matchPartCaseInsensitive(k, query)) {
         return true;
       }
-      let values = keyMap[k] || [];
+      const values = keyMap[k] || [];
       for (let value of values) {
         value = applyAlias(value, k);
         if (matchPartCaseInsensitive(value, query)) {
@@ -98,7 +98,7 @@ function matchPartCaseInsensitive(str, queries) {
     return true;
   }
   if (!str) {
-    return false
+    return false;
   }
   queries = queries.trim().toLocaleLowerCase();
   str = str.toLocaleLowerCase();

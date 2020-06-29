@@ -2,19 +2,19 @@
 // Use of this source code is governed under the Apache License, Version 2.0
 // that can be found in the LICENSE file.
 
-import { $$ } from 'common-sk/modules/dom'
-import { errorMessage } from 'elements-sk/errorMessage'
-import { html, render } from 'lit-html'
-import { jsonOrThrow } from 'common-sk/modules/jsonOrThrow'
-import { until } from 'lit-html/directives/until';
+import {$$} from 'common-sk/modules/dom';
+import {errorMessage} from 'elements-sk/errorMessage';
+import {html, render} from 'lit-html';
+import {jsonOrThrow} from 'common-sk/modules/jsonOrThrow';
+import {until} from 'lit-html/directives/until';
 
-import { initPropertyFromAttrOrProperty } from '../util'
+import {initPropertyFromAttrOrProperty} from '../util';
 
 // query.fromObject is more readable than just 'fromObject'
-import * as query from 'common-sk/modules/query'
+import * as query from 'common-sk/modules/query';
 
-import 'elements-sk/checkbox-sk'
-import 'elements-sk/styles/buttons'
+import 'elements-sk/checkbox-sk';
+import 'elements-sk/styles/buttons';
 
 /**
  * @module swarming-ui/modules/task-mass-cancel
@@ -82,7 +82,6 @@ function nowInSeconds() {
 const CANCEL_BATCH_SIZE = 100;
 
 window.customElements.define('task-mass-cancel', class extends HTMLElement {
-
   constructor() {
     super();
     this._readyToCancel = false;
@@ -109,7 +108,7 @@ window.customElements.define('task-mass-cancel', class extends HTMLElement {
     this.dispatchEvent(new CustomEvent('tasks-canceling-started', {bubbles: true}));
     this.render();
 
-    let payload = {
+    const payload = {
       limit: CANCEL_BATCH_SIZE,
       tags: this.tags,
     };
@@ -118,7 +117,7 @@ window.customElements.define('task-mass-cancel', class extends HTMLElement {
       payload.kill_running = true;
     }
 
-    let options = {
+    const options = {
       headers: {
         'authorization': this.auth_header,
         'content-type': 'application/json',
@@ -131,7 +130,7 @@ window.customElements.define('task-mass-cancel', class extends HTMLElement {
       this._progress += parseInt(json.matched);
       this.render();
       if (json.cursor) {
-        let payload = {
+        const payload = {
           limit: CANCEL_BATCH_SIZE,
           tags: this.tags,
           cursor: json.cursor,
@@ -139,7 +138,7 @@ window.customElements.define('task-mass-cancel', class extends HTMLElement {
         if (this._both) {
           payload.kill_running = true;
         }
-        let options = {
+        const options = {
           headers: {
             'authorization': this.auth_header,
             'content-type': 'application/json',
@@ -148,9 +147,9 @@ window.customElements.define('task-mass-cancel', class extends HTMLElement {
           body: JSON.stringify(payload),
         };
         fetch('/_ah/api/swarming/v1/tasks/cancel', options)
-          .then(jsonOrThrow)
-          .then(maybeCancelMore)
-          .catch((e) => fetchError(e, 'task-mass-cancel/cancel (paging)'));
+            .then(jsonOrThrow)
+            .then(maybeCancelMore)
+            .catch((e) => fetchError(e, 'task-mass-cancel/cancel (paging)'));
       } else {
         this._finished = true;
         this.render();
@@ -162,7 +161,6 @@ window.customElements.define('task-mass-cancel', class extends HTMLElement {
         .then(jsonOrThrow)
         .then(maybeCancelMore)
         .catch((e) => fetchError(e, 'task-mass-cancel/cancel'));
-
   }
 
   _count() {
@@ -181,11 +179,11 @@ window.customElements.define('task-mass-cancel', class extends HTMLElement {
       console.warn('no auth_header received, try refreshing the page?');
       return;
     }
-    let extra = {
+    const extra = {
       headers: {'authorization': this.auth_header},
     };
 
-    let pendingParams = query.fromObject({
+    const pendingParams = query.fromObject({
       state: 'PENDING',
       tags: this.tags,
       // Search in the last week to get the count.  PENDING tasks should expire
@@ -194,13 +192,13 @@ window.customElements.define('task-mass-cancel', class extends HTMLElement {
       end: nowInSeconds(),
     });
 
-    let pendingPromise = fetch(`/_ah/api/swarming/v1/tasks/count?${pendingParams}`, extra)
-      .then(jsonOrThrow)
-      .then((json) => {
-        this._pendingCount = parseInt(json.count);
-      }).catch((e) => fetchError(e, 'task-mass-cancel/pending'));
+    const pendingPromise = fetch(`/_ah/api/swarming/v1/tasks/count?${pendingParams}`, extra)
+        .then(jsonOrThrow)
+        .then((json) => {
+          this._pendingCount = parseInt(json.count);
+        }).catch((e) => fetchError(e, 'task-mass-cancel/pending'));
 
-    let runningParams = query.fromObject({
+    const runningParams = query.fromObject({
       state: 'RUNNING',
       tags: this.tags,
       // Search in the last week to get the count.  RUNNING tasks should finish
@@ -209,11 +207,11 @@ window.customElements.define('task-mass-cancel', class extends HTMLElement {
       end: nowInSeconds(),
     });
 
-    let runningPromise = fetch(`/_ah/api/swarming/v1/tasks/count?${runningParams}`, extra)
-      .then(jsonOrThrow)
-      .then((json) => {
-        this._runningCount = parseInt(json.count);
-      }).catch((e) => fetchError(e, 'task-mass-cancel/running'));
+    const runningPromise = fetch(`/_ah/api/swarming/v1/tasks/count?${runningParams}`, extra)
+        .then(jsonOrThrow)
+        .then((json) => {
+          this._runningCount = parseInt(json.count);
+        }).catch((e) => fetchError(e, 'task-mass-cancel/running'));
 
     // re-render when both have returned
     Promise.all([pendingPromise, runningPromise]).then(() => {

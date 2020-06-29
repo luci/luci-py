@@ -2,7 +2,7 @@
 // Use of this source code is governed under the Apache License, Version 2.0
 // that can be found in the LICENSE file.
 
-import 'modules/oauth-login'
+import 'modules/oauth-login';
 
 describe('oauth-login', function() {
   // A reusable HTML element in which we create our element under test.
@@ -13,10 +13,9 @@ describe('oauth-login', function() {
     container.innerHTML = '';
   });
 
-//===============TESTS START====================================
+  // ===============TESTS START====================================
 
   describe('testing-offline true', function() {
-
     // calls the test callback with one element 'ele', a created <oauth-login>.
     function createElement(test) {
       return window.customElements.whenDefined('oauth-login').then(() => {
@@ -54,11 +53,9 @@ describe('oauth-login', function() {
         done();
       });
     });
-
   }); // end describe('testing-offline true')
 
   describe('testing-offline false', function() {
-
     // calls the test callback with one element 'ele', a created <oauth-login>.
     function createElement(test) {
       return window.customElements.whenDefined('oauth-login').then(() => {
@@ -69,7 +66,7 @@ describe('oauth-login', function() {
       });
     }
 
-    beforeEach(function(){
+    beforeEach(function() {
       // Stub this out to return a blank promise, which allows any inits
       // called to gracefully do nothing.
       window.gapi = {
@@ -131,5 +128,4 @@ describe('oauth-login', function() {
       });
     });
   }); // end describe('testing-offline false')
-
 });

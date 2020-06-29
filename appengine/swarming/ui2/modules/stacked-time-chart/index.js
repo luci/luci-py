@@ -2,4 +2,4 @@
 // Use of this source code is governed under the Apache License, Version 2.0
 // that can be found in the LICENSE file.
 
-import './stacked-time-chart.js'
+import './stacked-time-chart.js';

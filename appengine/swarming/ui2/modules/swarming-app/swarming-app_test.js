@@ -2,22 +2,22 @@
 // Use of this source code is governed under the Apache License, Version 2.0
 // that can be found in the LICENSE file.
 
-import 'modules/swarming-app'
+import 'modules/swarming-app';
 
 describe('swarming-app', function() {
   // Instead of using import, we use require. Otherwise,
   // the concatenation trick we do doesn't play well with webpack, which would
   // leak dependencies (e.g. bot-list's 'column' function to task-list) and
   // try to import things multiple times.
-  const { expectNoUnmatchedCalls, mockAppGETs } = require('modules/test_util');
-  const { fetchMock, MATCHED, UNMATCHED } = require('fetch-mock');
+  const {expectNoUnmatchedCalls, mockAppGETs} = require('modules/test_util');
+  const {fetchMock, MATCHED, UNMATCHED} = require('fetch-mock');
 
-  beforeEach(function(){
+  beforeEach(function() {
     // These are the default responses to the expected API calls (aka 'matched')
     // They can be overridden for specific tests, if needed.
     mockAppGETs(fetchMock, {
       can_like_dogs: true,
-      can_like_cats: true
+      can_like_cats: true,
     });
 
     // Everything else
@@ -65,17 +65,16 @@ describe('swarming-app', function() {
         callback();
       }
       ran = true; // prevent multiple runs if the test makes the
-                  // app go busy (e.g. if it calls fetch).
+      // app go busy (e.g. if it calls fetch).
     });
     const login = ele.querySelector('oauth-login');
     login._logIn();
     fetchMock.flush();
   }
 
-//===============TESTS START====================================
+  // ===============TESTS START====================================
 
   describe('html injection to provided content', function() {
-
     it('injects login element and sidebar buttons', function(done) {
       createElement((ele) => {
         const button = ele.querySelector('header button');
@@ -113,7 +112,7 @@ describe('swarming-app', function() {
         done();
       });
     });
-  });  // end describe('html injection to provided content')
+  }); // end describe('html injection to provided content')
 
   describe('sidebar', function() {
     it('should toggle', function(done) {
@@ -194,9 +193,8 @@ describe('swarming-app', function() {
   }); // end describe('spinner and busy property')
 
   describe('behavior with logged-in user', function() {
-
     describe('html content', function() {
-      it('adds a server version indicator to the header', function(done){
+      it('adds a server version indicator to the header', function(done) {
         createElement((ele) => {
           ele.addEventListener('server-details-loaded', (e) => {
             e.stopPropagation();
@@ -213,7 +211,7 @@ describe('swarming-app', function() {
       });
     });
 
-    describe('api calls', function(){
+    describe('api calls', function() {
       it('makes no API calls when not logged in', function(done) {
         createElement((ele) => {
           fetchMock.flush(true).then(() => {
@@ -244,7 +242,7 @@ describe('swarming-app', function() {
             calls.forEach((c) => {
               expect(c[1].headers).toBeDefined();
               expect(c[1].headers.authorization).toContain('Bearer ');
-            })
+            });
 
             expectNoUnmatchedCalls(fetchMock);
             done();
@@ -253,7 +251,7 @@ describe('swarming-app', function() {
       });
     });
 
-    describe('events', function(){
+    describe('events', function() {
       it('emits a permissions-loaded event', function(done) {
         createElement((ele) => {
           ele.addEventListener('permissions-loaded', (e) => {
@@ -280,6 +278,5 @@ describe('swarming-app', function() {
         });
       });
     });
-
   }); // end describe('spinner and busy property')
 });

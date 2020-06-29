@@ -2,11 +2,11 @@
 // Use of this source code is governed under the Apache License, Version 2.0
 // that can be found in the LICENSE file.
 
-import { html, render } from 'lit-html'
-import { humanDuration, initPropertyFromAttrOrProperty } from '../util'
+import {html, render} from 'lit-html';
+import {humanDuration, initPropertyFromAttrOrProperty} from '../util';
 
-import 'elements-sk/checkbox-sk'
-import '../sort-toggle'
+import 'elements-sk/checkbox-sk';
+import '../sort-toggle';
 
 /**
  * @module swarming-ui/modules/bot-page-summary
@@ -175,7 +175,6 @@ export function prettifyName(name) {
 }
 
 window.customElements.define('bot-page-summary', class extends HTMLElement {
-
   constructor() {
     super();
 
@@ -204,8 +203,12 @@ window.customElements.define('bot-page-summary', class extends HTMLElement {
 
   /** @prop {Array<Object>} tasks - The tasks to summarize.
    */
-  get tasks() { return this._tasks || []; }
-  set tasks(val) { this._tasks = val; this.render();}
+  get tasks() {
+    return this._tasks || [];
+  }
+  set tasks(val) {
+    this._tasks = val; this.render();
+  }
 
   _aggregate() {
     const totalStats = {
@@ -216,7 +219,7 @@ window.customElements.define('bot-page-summary', class extends HTMLElement {
       avg_duration: 0,
       avg_overhead: 0,
       total_overhead: 0,
-      total_time: 0
+      total_time: 0,
     };
     if (!this.tasks || !this.tasks.length) {
       this._totalStats = totalStats;
@@ -252,7 +255,7 @@ window.customElements.define('bot-page-summary', class extends HTMLElement {
           avg_duration: 0,
           total_time: 0,
           total_overhead: 0,
-        }
+        };
       }
       totalStats.total++;
       taskAgg[name].total++;
@@ -335,5 +338,4 @@ window.customElements.define('bot-page-summary', class extends HTMLElement {
     this._showAllTasks = !this._showAllTasks;
     this.render();
   }
-
 });

@@ -29,17 +29,17 @@
  *
  */
 
-import 'elements-sk/error-toast-sk'
-import 'elements-sk/icon/bug-report-icon-sk'
-import 'elements-sk/icon/menu-icon-sk'
-import 'elements-sk/spinner-sk'
-import '../oauth-login'
+import 'elements-sk/error-toast-sk';
+import 'elements-sk/icon/bug-report-icon-sk';
+import 'elements-sk/icon/menu-icon-sk';
+import 'elements-sk/spinner-sk';
+import '../oauth-login';
 
-import {jsonOrThrow} from 'common-sk/modules/jsonOrThrow'
-import * as query from 'common-sk/modules/query'
-import {errorMessage} from 'elements-sk/errorMessage'
-import {upgradeProperty} from 'elements-sk/upgradeProperty'
-import {html, render} from 'lit-html'
+import {jsonOrThrow} from 'common-sk/modules/jsonOrThrow';
+import * as query from 'common-sk/modules/query';
+import {errorMessage} from 'elements-sk/errorMessage';
+import {upgradeProperty} from 'elements-sk/upgradeProperty';
+import {html, render} from 'lit-html';
 import {ifDefined} from 'lit-html/directives/if-defined';
 
 const button_template = document.createElement('template');
@@ -61,7 +61,7 @@ function versionLink(details) {
   if (!details || !details.server_version) {
     return undefined;
   }
-  var split = details.server_version.split('-');
+  const split = details.server_version.split('-');
   if (split.length !== 2) {
     return undefined;
   }
@@ -87,7 +87,6 @@ fab_template.innerHTML = `
 </a>`;
 
 window.customElements.define('swarming-app', class extends HTMLElement {
-
   constructor() {
     super();
     this._busyTaskCount = 0;
@@ -124,29 +123,43 @@ window.customElements.define('swarming-app', class extends HTMLElement {
   /** @prop {boolean} busy Indicates if there any on-going tasks (e.g. RPCs).
    *                  This also mirrors the status of the embedded spinner-sk.
    *                  Read-only. */
-  get busy() { return !!this._busyTaskCount;}
+  get busy() {
+    return !!this._busyTaskCount;
+  }
 
   /** @prop {Object} permissions The permissions the server says the logged-in
                      user has. This is empty object if user is not logged in.
    *                 Read-only. */
-  get permissions() { return this._permissions; }
+  get permissions() {
+    return this._permissions;
+  }
 
   /** @prop {Object} profile An object with keys email and imageURL of the
                              logged in user. Read Only. */
-  get profile() { return this._profile; }
+  get profile() {
+    return this._profile;
+  }
 
   /** @prop {Object} server_details The details about the server or a
                      placeholder object if the user is not logged in or
    *                 not authorized. Read-only. */
-  get server_details() { return this._server_details; }
+  get server_details() {
+    return this._server_details;
+  }
 
 
   /** @prop {string} client_id Mirrors the attribute 'client_id'. */
-  get client_id() { return this.getAttribute('client_id');}
-  set client_id(val) { return this.setAttribute('client_id', val);}
+  get client_id() {
+    return this.getAttribute('client_id');
+  }
+  set client_id(val) {
+    return this.setAttribute('client_id', val);
+  }
 
   /** @prop {bool} testing_offline Mirrors the attribute 'testing_offline'. */
-  get testing_offline() { return this.hasAttribute('testing_offline');}
+  get testing_offline() {
+    return this.hasAttribute('testing_offline');
+  }
   set testing_offline(val) {
     if (val) {
       this.setAttribute('testing_offline', true);
@@ -259,32 +272,32 @@ window.customElements.define('swarming-app', class extends HTMLElement {
       bot_version: '<loading>',
     };
     const auth = {
-      headers: {'authorization': this._auth_header}
+      headers: {'authorization': this._auth_header},
     };
     this.addBusyTasks(1);
     fetch('/_ah/api/swarming/v1/server/details', auth)
-      .then(jsonOrThrow)
-      .then((json) => {
-        this._server_details = json;
-        this.render();
-        this.dispatchEvent(new CustomEvent('server-details-loaded',
-                                           {bubbles: true}));
-        this.finishedTask();
-      })
-      .catch((e) => {
-        if (e.status === 403) {
-          this._server_details = {
-            server_version: 'User unauthorized - try logging in ' +
-                            'with a different account',
-            bot_version: '',
-          };
+        .then(jsonOrThrow)
+        .then((json) => {
+          this._server_details = json;
           this.render();
-        } else {
-          console.error(e);
-          errorMessage(`Unexpected error loading details: ${e.message}`, 5000);
-        }
-        this.finishedTask();
-      });
+          this.dispatchEvent(new CustomEvent('server-details-loaded',
+              {bubbles: true}));
+          this.finishedTask();
+        })
+        .catch((e) => {
+          if (e.status === 403) {
+            this._server_details = {
+              server_version: 'User unauthorized - try logging in ' +
+                            'with a different account',
+              bot_version: '',
+            };
+            this.render();
+          } else {
+            console.error(e);
+            errorMessage(`Unexpected error loading details: ${e.message}`, 5000);
+          }
+          this.finishedTask();
+        });
     this._fetchPermissions(auth);
   }
 
@@ -293,33 +306,31 @@ window.customElements.define('swarming-app', class extends HTMLElement {
     let url = '/_ah/api/swarming/v1/server/permissions';
     if (params) url += `?${query.fromObject(params)}`;
     fetch(url, auth)
-      .then(jsonOrThrow)
-      .then((json) => {
-        this._permissions = json;
-        this.render();
-        this.dispatchEvent(new CustomEvent('permissions-loaded',
-                                           {bubbles: true}));
-        this.finishedTask();
-      })
-      .catch((e) => {
-        if (e.status !== 403) {
-          console.error(e);
-          errorMessage(`Unexpected error loading permissions: ${e.message}`,
-                       5000);
-        }
-        this.finishedTask();
-      });
+        .then(jsonOrThrow)
+        .then((json) => {
+          this._permissions = json;
+          this.render();
+          this.dispatchEvent(new CustomEvent('permissions-loaded',
+              {bubbles: true}));
+          this.finishedTask();
+        })
+        .catch((e) => {
+          if (e.status !== 403) {
+            console.error(e);
+            errorMessage(`Unexpected error loading permissions: ${e.message}`,
+                5000);
+          }
+          this.finishedTask();
+        });
   }
 
   render() {
     if (this._dynamicEle) {
       render(dynamic_content_template(this), this._dynamicEle);
     }
-
   }
 
   attributeChangedCallback(attrName, oldVal, newVal) {
     this.render();
   }
-
 });

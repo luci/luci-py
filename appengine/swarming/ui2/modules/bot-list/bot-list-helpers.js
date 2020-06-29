@@ -9,13 +9,13 @@
 // If a function doesn't refer to 'this', it should go here, otherwise
 // it should go inside the element declaration.
 
-import * as human from 'common-sk/modules/human'
+import * as human from 'common-sk/modules/human';
 // query.fromObject is more readable than just 'fromObject'
-import * as query from 'common-sk/modules/query'
-import { html } from 'lit-html'
-import naturalSort from 'javascript-natural-sort/naturalSort'
-import { compareWithFixedOrder, sanitizeAndHumanizeTime, taskPageLink } from '../util'
-import { applyAlias } from '../alias'
+import * as query from 'common-sk/modules/query';
+import {html} from 'lit-html';
+import naturalSort from 'javascript-natural-sort/naturalSort';
+import {compareWithFixedOrder, sanitizeAndHumanizeTime, taskPageLink} from '../util';
+import {applyAlias} from '../alias';
 
 const EMPTY_VAL = '--';
 
@@ -33,7 +33,7 @@ export function aggregateTemps(temps) {
     zones.push(k +': '+temps[k]);
     avg += (+temps[k]);
   }
-  avg = avg / zones.length
+  avg = avg / zones.length;
   if (avg) {
     avg = avg.toFixed(1);
   } else {
@@ -42,7 +42,7 @@ export function aggregateTemps(temps) {
   return {
     average: avg,
     zones: zones.join(' | ') || 'unknown',
-  }
+  };
 }
 
 /** attribute looks first in dimension and then in state for the
@@ -93,7 +93,7 @@ export function column(col, bot, ele) {
     emptyVal = 'none';
   }
   const values = attribute(bot, col, emptyVal)
-                    .map((v) => applyAlias(v, col));
+      .map((v) => applyAlias(v, col));
   return longestOrAll(values, ele._verbose);
 }
 
@@ -130,7 +130,7 @@ export const specialFilters = {
     }
     // Task must be 'busy'.
     return !!bot.task_id;
-  }
+  },
 };
 
 /** dimensionsOnly takes a list of filters in the form foo:bar
@@ -222,12 +222,14 @@ export function getColHeader(col) {
 
 // The list of things we do count data for, in the order they are presented.
 const countTypes = ['All', 'Alive', 'Busy', 'Idle', 'Dead',
-                    'Quarantined', 'Maintenance'];
+  'Quarantined', 'Maintenance'];
 
 /** initCounts creates the default list of objects for displaying counts.
  */
 export function initCounts() {
-  return countTypes.map((label) => {return {'label': label, 'key': ''}});
+  return countTypes.map((label) => {
+    return {'label': label, 'key': ''};
+  });
 }
 
 /** listQueryParams returns a query string for the /list API based on the
@@ -240,7 +242,7 @@ export function listQueryParams(filters, limit, cursor) {
   const params = {};
   const dims = [];
   for (const f of filters) {
-    const split = f.split(':', 1)
+    const split = f.split(':', 1);
     const col = split[0];
     const rest = f.substring(col.length + 1);
     if (col === 'status') {
@@ -254,7 +256,7 @@ export function listQueryParams(filters, limit, cursor) {
         params['is_dead'] = ['TRUE'];
       }
     } else if (col === 'task') {
-       if (rest === 'busy') {
+      if (rest === 'busy') {
         params['is_busy'] = ['TRUE'];
       } else if (rest === 'idle') {
         params['is_busy'] = ['FALSE'];
@@ -336,7 +338,7 @@ export function processBots(arr) {
     } else {
       bot.disks = [];
       for (let i = 0; i < keys.length; i++) {
-        bot.disks.push({'id':keys[i], 'mb':disks[keys[i]].free_mb});
+        bot.disks.push({'id': keys[i], 'mb': disks[keys[i]].free_mb});
       }
       // Sort these so the biggest disk comes first.
       bot.disks.sort(function(a, b) {
@@ -367,7 +369,7 @@ export function processBots(arr) {
       devices.push(o);
     }
     // For determinism, sort by device id
-    devices.sort((a,b) => {
+    devices.sort((a, b) => {
       // Don't use natural sort because that can confusingly put
       // 89ABCDEF012 before 3456789ABC
       if (a.serial < b.serial) {
@@ -392,13 +394,13 @@ export function processBots(arr) {
  */
 export function processCounts(output, countJSON) {
   // output is expected to be in the order described by countTypes.
-  output[0].value = parseInt(countJSON.count);                            // All
+  output[0].value = parseInt(countJSON.count); // All
   output[1].value = parseInt(countJSON.count) - parseInt(countJSON.dead); // Alive
-  output[2].value = parseInt(countJSON.busy);                             // Busy
+  output[2].value = parseInt(countJSON.busy); // Busy
   output[3].value = parseInt(countJSON.count) - parseInt(countJSON.busy); // Idle
-  output[4].value = parseInt(countJSON.dead);                             // Dead
-  output[5].value = parseInt(countJSON.quarantined);                      // Quarantined
-  output[6].value = parseInt(countJSON.maintenance);                      // Maintenance
+  output[4].value = parseInt(countJSON.dead); // Dead
+  output[5].value = parseInt(countJSON.quarantined); // Quarantined
+  output[6].value = parseInt(countJSON.maintenance); // Maintenance
   return output;
 }
 
@@ -414,7 +416,7 @@ export function processPrimaryMap(dimensions) {
   // includes state like disk_space, quarantined, busy, etc.
   dimensions = dimensions || [];
 
-  var pMap = {};
+  const pMap = {};
   dimensions.forEach(function(d) {
     if (blacklistDimensions.indexOf(d.key) >= 0) {
       return;
@@ -470,21 +472,21 @@ export function sortPossibleColumns(columns, selectedCols) {
   }
 
   columns.sort((a, b) => {
-      // Show selected columns above non selected columns
-      const selA = selected[a];
-      const selB = selected[b];
-      if (selA && !selB) {
-        return -1;
-      }
-      if (selB && !selA) {
-        return 1;
-      }
-      if (selA && selB) {
-        // Both keys are selected, thus we put them in display order.
-        return compareColumns(a, b);
-      }
-      // neither column was selected, fallback to alphabetical sorting.
-      return a.localeCompare(b);
+    // Show selected columns above non selected columns
+    const selA = selected[a];
+    const selB = selected[b];
+    if (selA && !selB) {
+      return -1;
+    }
+    if (selB && !selA) {
+      return 1;
+    }
+    if (selA && selB) {
+      // Both keys are selected, thus we put them in display order.
+      return compareColumns(a, b);
+    }
+    // neither column was selected, fallback to alphabetical sorting.
+    return a.localeCompare(b);
   });
 }
 
@@ -521,9 +523,9 @@ const blacklistDimensions = ['quarantined', 'error', 'id'];
  *  that are not dimensions.
 .*/
 const extraKeys = ['disk_space', 'uptime', 'running_time', 'task',
-'status', 'version', 'external_ip', 'internal_ip', 'last_seen', 'first_seen',
-'battery_level', 'battery_voltage', 'battery_temperature', 'battery_status',
-'battery_health', 'bot_temperature', 'device_temperature', 'serial_number'];
+  'status', 'version', 'external_ip', 'internal_ip', 'last_seen', 'first_seen',
+  'battery_level', 'battery_voltage', 'battery_temperature', 'battery_status',
+  'battery_health', 'bot_temperature', 'device_temperature', 'serial_number'];
 
 /** colHeaderMap maps keys to their human readable name.*/
 const colHeaderMap = {
@@ -567,7 +569,7 @@ const BATTERY_HEALTH_ALIASES = {
   5: 'Over Voltage',
   6: 'Unspecified Failure',
   7: 'Too Cold',
-}
+};
 
 const BATTERY_STATUS_ALIASES = {
   1: 'Unknown',
@@ -575,7 +577,7 @@ const BATTERY_STATUS_ALIASES = {
   3: 'Discharging',
   4: 'Not Charging',
   5: 'Full',
-}
+};
 
 function getStatusSortIndex(bot) {
   if (bot.is_dead) return 4;
@@ -703,7 +705,7 @@ const colMap = {
     }
     return timeDiffApprox(bot.last_seen_ts) + ' ago';
   },
-  running_time:  (bot, ele) => {
+  running_time: (bot, ele) => {
     const r = fromState(bot, 'running_time');
     if (!r) {
       return 'UNKNOWN';
@@ -737,7 +739,7 @@ const colMap = {
       // clear if this is a transient error (e.g. device is too hot)
       // or if it is requires human interaction (e.g. device is unauthorized)
       devices(bot).forEach(function(d) {
-          deviceStates.push(d.state);
+        deviceStates.push(d.state);
       });
       if (deviceStates.length) {
         msg += ` devices: [${deviceStates.join(', ')}]`;
@@ -779,5 +781,5 @@ const colMap = {
       return v;
     }
     return v.substring(0, 10);
-  }
+  },
 };

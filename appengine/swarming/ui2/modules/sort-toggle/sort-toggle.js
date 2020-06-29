@@ -2,11 +2,11 @@
 // Use of this source code is governed under the Apache License, Version 2.0
 // that can be found in the LICENSE file.
 
-import { html, render } from 'lit-html'
-import { initPropertyFromAttrOrProperty } from '../util'
+import {html, render} from 'lit-html';
+import {initPropertyFromAttrOrProperty} from '../util';
 
-import 'elements-sk/icon/arrow-drop-down-icon-sk'
-import 'elements-sk/icon/arrow-drop-up-icon-sk'
+import 'elements-sk/icon/arrow-drop-down-icon-sk';
+import 'elements-sk/icon/arrow-drop-up-icon-sk';
 
 /**
  * @module swarming-ui/modules/sort-toggle
@@ -25,15 +25,13 @@ import 'elements-sk/icon/arrow-drop-up-icon-sk'
  */
 
 
-
 const template = (ele) => html`
 <arrow-drop-down-icon-sk ?hidden=${ele.key === ele.currentKey && ele.direction === 'asc'}>
 </arrow-drop-down-icon-sk>
 <arrow-drop-up-icon-sk ?hidden=${ele.key === ele.currentKey && ele.direction === 'desc'}>
-</arrow-drop-up-icon-sk>`
+</arrow-drop-up-icon-sk>`;
 
 window.customElements.define('sort-toggle', class extends HTMLElement {
-
   constructor() {
     super();
     // _currentKey, _key, _direction are private members
@@ -55,21 +53,33 @@ window.customElements.define('sort-toggle', class extends HTMLElement {
    *                  sort-changed event from another sort-toggle was
    *                  observed.
    */
-  get currentKey() { return this._currentKey; }
-  set currentKey(val) { this._currentKey = val; this.render();}
+  get currentKey() {
+    return this._currentKey;
+  }
+  set currentKey(val) {
+    this._currentKey = val; this.render();
+  }
 
   /** @prop {string} key - An arbitrary, unique string that this sort-toggle
    *                  represents.
    */
-  get key() { return this._key; }
-  set key(val) { this._key = val; this.render();}
+  get key() {
+    return this._key;
+  }
+  set key(val) {
+    this._key = val; this.render();
+  }
 
   /** @prop {string} direction - Either 'asc' or 'desc' indicating which
    *                  direction the user indicated. Is ignored if currentKey
    *                  does not equal this.key.
    */
-  get direction() { return this._direction; }
-  set direction(val) { this._direction = val; this.render();}
+  get direction() {
+    return this._direction;
+  }
+  set direction(val) {
+    this._direction = val; this.render();
+  }
 
   toggle() {
     if (this.currentKey === this.key) {
@@ -105,5 +115,4 @@ window.customElements.define('sort-toggle', class extends HTMLElement {
   render() {
     render(template(this), this, {eventContext: this});
   }
-
 });

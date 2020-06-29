@@ -4,7 +4,7 @@
 
 export const ONGOING_STATES = new Set([
   'PENDING',
-  'RUNNING'
+  'RUNNING',
 ]);
 
 export const EXCEPTIONAL_STATES = new Set([
@@ -16,18 +16,18 @@ export const EXCEPTIONAL_STATES = new Set([
 ]);
 
 export const COUNT_FILTERS = [
-  {label: 'Total',        value: '...'},
-  {label: 'Success',      value: '...', filter: 'COMPLETED_SUCCESS'},
-  {label: 'Failure',      value: '...', filter: 'COMPLETED_FAILURE'},
-  {label: 'Pending',      value: '...', filter: 'PENDING'},
-  {label: 'Running',      value: '...', filter: 'RUNNING'},
-  {label: 'Timed Out',    value: '...', filter: 'TIMED_OUT'},
-  {label: 'Bot Died',     value: '...', filter: 'BOT_DIED'},
+  {label: 'Total', value: '...'},
+  {label: 'Success', value: '...', filter: 'COMPLETED_SUCCESS'},
+  {label: 'Failure', value: '...', filter: 'COMPLETED_FAILURE'},
+  {label: 'Pending', value: '...', filter: 'PENDING'},
+  {label: 'Running', value: '...', filter: 'RUNNING'},
+  {label: 'Timed Out', value: '...', filter: 'TIMED_OUT'},
+  {label: 'Bot Died', value: '...', filter: 'BOT_DIED'},
   {label: 'Deduplicated', value: '...', filter: 'DEDUPED'},
-  {label: 'Expired',      value: '...', filter: 'EXPIRED'},
-  {label: 'No Resource',  value: '...', filter: 'NO_RESOURCE'},
-  {label: 'Canceled',     value: '...', filter: 'CANCELED'},
-  {label: 'Killed',       value: '...', filter: 'KILLED'},
+  {label: 'Expired', value: '...', filter: 'EXPIRED'},
+  {label: 'No Resource', value: '...', filter: 'NO_RESOURCE'},
+  {label: 'Canceled', value: '...', filter: 'CANCELED'},
+  {label: 'Killed', value: '...', filter: 'KILLED'},
 ];
 
 export const FILTER_STATES = [

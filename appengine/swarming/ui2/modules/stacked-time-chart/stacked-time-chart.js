@@ -2,9 +2,9 @@
 // Use of this source code is governed under the Apache License, Version 2.0
 // that can be found in the LICENSE file.
 
-import { GoogleCharts } from 'google-charts';
-import { html, render } from 'lit-html'
-import { initPropertyFromAttrOrProperty } from '../util'
+import {GoogleCharts} from 'google-charts';
+import {html, render} from 'lit-html';
+import {initPropertyFromAttrOrProperty} from '../util';
 
 
 /**
@@ -40,8 +40,7 @@ import { initPropertyFromAttrOrProperty } from '../util'
 const loaded = new Promise((resolve, reject) => {
   try {
     GoogleCharts.load(resolve);
-  }
-  catch (e) {
+  } catch (e) {
     reject(e);
   }
 });
@@ -56,7 +55,6 @@ function makeArray(maybeString) {
 const template = (ele) => html`<div id=chart>${ele._error}</div>`;
 
 window.customElements.define('stacked-time-chart', class extends HTMLElement {
-
   constructor() {
     super();
     this._loaded = false;
@@ -85,27 +83,39 @@ window.customElements.define('stacked-time-chart', class extends HTMLElement {
     this.render();
   }
 
-  get colors() { return this._colors; }
-  set colors(val) { this._colors = val; this.render();}
+  get colors() {
+    return this._colors;
+  }
+  set colors(val) {
+    this._colors = val; this.render();
+  }
 
-  get labels() { return this._labels; }
-  set labels(val) { this._labels = val; this.render();}
+  get labels() {
+    return this._labels;
+  }
+  set labels(val) {
+    this._labels = val; this.render();
+  }
 
-  get values() { return this._values; }
-  set values(val) { this._values = val; this.render();}
+  get values() {
+    return this._values;
+  }
+  set values(val) {
+    this._values = val; this.render();
+  }
 
   drawChart() {
     // Create the data table. The first row is the headers. The second row
     // (and any another rows) are the data that fill it in. This element
     // is tuned for only one stacked chart, so there will only be one data row.
     const data = GoogleCharts.api.visualization.arrayToDataTable([
-        // 'Type' is just a human-friendly value to remind us what the rest
-        // of the headers are. It could be empty, as it doesn't show up on the
-        // chart.
-        ['Type'].concat(this._labels),
-        // The empty string below would be a left-hand label, but since there
-        // is only one entry, the label is superfluous.
-        [''].concat(this._values),
+      // 'Type' is just a human-friendly value to remind us what the rest
+      // of the headers are. It could be empty, as it doesn't show up on the
+      // chart.
+      ['Type'].concat(this._labels),
+      // The empty string below would be a left-hand label, but since there
+      // is only one entry, the label is superfluous.
+      [''].concat(this._values),
     ]);
 
     // Do some computation to make axis lines show up nicely for different
@@ -116,7 +126,7 @@ window.customElements.define('stacked-time-chart', class extends HTMLElement {
     for (const v of this._values) {
       total += +v;
     }
-    const ticks = [{v: 0, f:''}];
+    const ticks = [{v: 0, f: ''}];
     let gridCount = 0;
     if (total < 120) { // 2 min
       for (let t = 10; t < total; t+=10) {
@@ -158,20 +168,20 @@ window.customElements.define('stacked-time-chart', class extends HTMLElement {
       // We want it to be as wide as possible, leaving a little bit of space
       // on the top and bottom for the legend and labels.  These values
       // were found via experimentation.
-      chartArea: {width: '100%', height:'65%'},
+      chartArea: {width: '100%', height: '65%'},
       legend: {
         position: 'top',
         // Force the legend onto one line - can be tweaked if necessary
         maxLines: 1,
         alignment: 'center',
-        textStyle: {fontSize: 12}
+        textStyle: {fontSize: 12},
       },
       colors: this._colors,
       hAxis: {
         title: 'Time',
         ticks: ticks,
         minorGridlines: {count: gridCount},
-      }
+      },
     };
 
     const chart = new GoogleCharts.api.visualization.BarChart(this.firstElementChild);
@@ -184,5 +194,4 @@ window.customElements.define('stacked-time-chart', class extends HTMLElement {
       this.drawChart();
     }
   }
-
 });

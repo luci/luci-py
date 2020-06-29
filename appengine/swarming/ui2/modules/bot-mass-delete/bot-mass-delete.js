@@ -2,17 +2,17 @@
 // Use of this source code is governed under the Apache License, Version 2.0
 // that can be found in the LICENSE file.
 
-import { errorMessage } from 'elements-sk/errorMessage'
-import { html, render } from 'lit-html'
-import { jsonOrThrow } from 'common-sk/modules/jsonOrThrow'
-import { until } from 'lit-html/directives/until';
+import {errorMessage} from 'elements-sk/errorMessage';
+import {html, render} from 'lit-html';
+import {jsonOrThrow} from 'common-sk/modules/jsonOrThrow';
+import {until} from 'lit-html/directives/until';
 
-import { initPropertyFromAttrOrProperty } from '../util'
+import {initPropertyFromAttrOrProperty} from '../util';
 
 // query.fromObject is more readable than just 'fromObject'
-import * as query from 'common-sk/modules/query'
+import * as query from 'common-sk/modules/query';
 
-import 'elements-sk/styles/buttons'
+import 'elements-sk/styles/buttons';
 
 /**
  * @module swarming-ui/modules/bot-mass-delete
@@ -68,7 +68,6 @@ function fetchError(e, loadingWhat) {
 }
 
 window.customElements.define('bot-mass-delete', class extends HTMLElement {
-
   constructor() {
     super();
     this._count = '...';
@@ -107,51 +106,51 @@ window.customElements.define('bot-mass-delete', class extends HTMLElement {
 
     let bots = [];
     fetch(`/_ah/api/swarming/v1/bots/list?${queryParams}`, extra)
-      .then(jsonOrThrow)
-      .then((json) => {
-        const maybeLoadMore = (json) => {
-          bots = bots.concat(json.items);
-          this.render();
-          if (json.cursor) {
-            const queryParams = query.fromObject({
-              cursor: json.cursor,
-              dimensions: this.dimensions,
-              limit: 200, // see https://crbug.com/908423
-              fields: 'cursor,items/bot_id',
-              is_dead: 'TRUE',
-            });
-            fetch(`/_ah/api/swarming/v1/bots/list?${queryParams}`, extra)
-              .then(jsonOrThrow)
-              .then(maybeLoadMore)
-              .catch((e) => fetchError(e, 'bot-mass-delete/list (paging)'));
-          } else {
+        .then(jsonOrThrow)
+        .then((json) => {
+          const maybeLoadMore = (json) => {
+            bots = bots.concat(json.items);
+            this.render();
+            if (json.cursor) {
+              const queryParams = query.fromObject({
+                cursor: json.cursor,
+                dimensions: this.dimensions,
+                limit: 200, // see https://crbug.com/908423
+                fields: 'cursor,items/bot_id',
+                is_dead: 'TRUE',
+              });
+              fetch(`/_ah/api/swarming/v1/bots/list?${queryParams}`, extra)
+                  .then(jsonOrThrow)
+                  .then(maybeLoadMore)
+                  .catch((e) => fetchError(e, 'bot-mass-delete/list (paging)'));
+            } else {
             // Now that we have the complete list of bots (e.g. no paging left)
             // delete the bots one at a time, updating this._progress to be the
             // number completed.
-            const post = {
-              headers: {'authorization': this.auth_header},
-              method: 'POST',
-            };
-            const deleteNext = (bots) => {
-              if (!bots.length) {
-                this._finished = true;
-                this.render();
-                this.dispatchEvent(new CustomEvent('bots-deleting-finished', {bubbles: true}));
-                return;
-              }
-              const toDelete = bots.pop();
-              fetch(`/_ah/api/swarming/v1/bot/${toDelete.bot_id}/delete`, post)
-                .then(() => {
-                  this._progress++;
+              const post = {
+                headers: {'authorization': this.auth_header},
+                method: 'POST',
+              };
+              const deleteNext = (bots) => {
+                if (!bots.length) {
+                  this._finished = true;
                   this.render();
-                  deleteNext(bots);
-                }).catch((e) => fetchError(e, 'bot-mass-delete/delete'));
+                  this.dispatchEvent(new CustomEvent('bots-deleting-finished', {bubbles: true}));
+                  return;
+                }
+                const toDelete = bots.pop();
+                fetch(`/_ah/api/swarming/v1/bot/${toDelete.bot_id}/delete`, post)
+                    .then(() => {
+                      this._progress++;
+                      this.render();
+                      deleteNext(bots);
+                    }).catch((e) => fetchError(e, 'bot-mass-delete/delete'));
+              };
+              deleteNext(bots);
             }
-            deleteNext(bots);
-          }
-        }
-        maybeLoadMore(json);
-      }).catch((e) => fetchError(e, 'bot-mass-delete/list'));
+          };
+          maybeLoadMore(json);
+        }).catch((e) => fetchError(e, 'bot-mass-delete/list'));
 
     this.render();
   }
@@ -168,12 +167,12 @@ window.customElements.define('bot-mass-delete', class extends HTMLElement {
     const queryParams = query.fromObject({dimensions: this.dimensions});
 
     const countPromise = fetch(`/_ah/api/swarming/v1/bots/count?${queryParams}`, extra)
-      .then(jsonOrThrow)
-      .then((json) => {
-        this._readyToDelete = true;
-        this.render();
-        return parseInt(json.dead);
-      }).catch((e) => fetchError(e, 'bot-mass-delete/count'));
+        .then(jsonOrThrow)
+        .then((json) => {
+          this._readyToDelete = true;
+          this.render();
+          return parseInt(json.dead);
+        }).catch((e) => fetchError(e, 'bot-mass-delete/count'));
     this._count = html`${until(countPromise, '...')}`;
   }
 
@@ -190,5 +189,4 @@ window.customElements.define('bot-mass-delete', class extends HTMLElement {
     this._fetchCount();
     this.render();
   }
-
 });

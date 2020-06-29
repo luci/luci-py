@@ -2,7 +2,7 @@
 // Use of this source code is governed under the Apache License, Version 2.0
 // that can be found in the LICENSE file.
 
-import { $, $$ } from 'common-sk/modules/dom'
+import {$, $$} from 'common-sk/modules/dom';
 
 
 /**
@@ -21,7 +21,6 @@ const backdrop_template = document.createElement('template');
 backdrop_template.innerHTML =`<div class=backdrop></div>`;
 
 window.customElements.define('dialog-pop-over', class extends HTMLElement {
-
   constructor() {
     super();
     this._backdrop = null;

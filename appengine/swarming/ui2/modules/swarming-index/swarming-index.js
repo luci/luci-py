@@ -15,14 +15,14 @@
  * @extends module:swarming-ui/SwarmingAppBoilerplate
  */
 
-import { html, render } from 'lit-html'
-import { upgradeProperty } from 'elements-sk/upgradeProperty'
-import { jsonOrThrow } from 'common-sk/modules/jsonOrThrow'
-import { errorMessage } from 'elements-sk/errorMessage'
+import {html, render} from 'lit-html';
+import {upgradeProperty} from 'elements-sk/upgradeProperty';
+import {jsonOrThrow} from 'common-sk/modules/jsonOrThrow';
+import {errorMessage} from 'elements-sk/errorMessage';
 
-import SwarmingAppBoilerplate from '../SwarmingAppBoilerplate'
+import SwarmingAppBoilerplate from '../SwarmingAppBoilerplate';
 
-import '../swarming-app'
+import '../swarming-app';
 
 // Don't use html for a straight string template, otherwise, it shows up
 // as [object Object] when used as the href attribute.
@@ -30,10 +30,10 @@ const instancesURL = (ele) => `https://console.cloud.google.com/appengine/instan
     `project=${ele._project_id}&versionId=${ele.server_details.server_version}`;
 
 const errorsURL = (project_id) =>
-    `https://console.cloud.google.com/errors?project=${project_id}`;
+  `https://console.cloud.google.com/errors?project=${project_id}`;
 
 const logsURL = (project_id) =>
-    `https://console.cloud.google.com/logs/viewer?filters=status:500..599&project=${project_id}`;
+  `https://console.cloud.google.com/logs/viewer?filters=status:500..599&project=${project_id}`;
 
 const bootstrapTemplate = (ele) => html`
 <div>
@@ -120,7 +120,6 @@ const template = (ele) => html`
 </swarming-app>`;
 
 window.customElements.define('swarming-index', class extends SwarmingAppBoilerplate {
-
   constructor() {
     super(template);
     this._bootstrap_token = '...';
@@ -153,13 +152,12 @@ window.customElements.define('swarming-index', class extends SwarmingAppBoilerpl
     };
     this.app.addBusyTasks(1);
     fetch('/_ah/api/swarming/v1/server/token', post_extra)
-      .then(jsonOrThrow)
-      .then((json) => {
-        this._bootstrap_token = json.bootstrap_token;
-        this.render();
-        this.app.finishedTask();
-      })
-      .catch((e) => this.fetchError(e, 'token'));
+        .then(jsonOrThrow)
+        .then((json) => {
+          this._bootstrap_token = json.bootstrap_token;
+          this.render();
+          this.app.finishedTask();
+        })
+        .catch((e) => this.fetchError(e, 'token'));
   }
-
 });

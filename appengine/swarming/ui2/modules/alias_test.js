@@ -3,7 +3,7 @@
 // that can be found in the LICENSE file.
 
 describe('alias', function() {
-  const { applyAlias } = require('modules/alias');
+  const {applyAlias} = require('modules/alias');
 
   describe('applyAlias', function() {
     it('maps device_type', function(done) {
@@ -48,7 +48,7 @@ describe('alias', function() {
     });
 
     it('does not affect other os values', function(done) {
-      const check = v => expect(applyAlias(v, 'os')).toBe(v);
+      const check = (v) => expect(applyAlias(v, 'os')).toBe(v);
       check('Android');
       check('Debian-9.8');
       check('Mac-10.11.6');

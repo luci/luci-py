@@ -10,9 +10,9 @@
  * </p>
  */
 
-import { html } from 'lit-html'
-import 'elements-sk/icon/expand-less-icon-sk'
-import 'elements-sk/icon/expand-more-icon-sk'
+import {html} from 'lit-html';
+import 'elements-sk/icon/expand-less-icon-sk';
+import 'elements-sk/icon/expand-more-icon-sk';
 
 /** moreOrLess shows an expand-more or expand-less icon
  *  depdending on the passedin param.

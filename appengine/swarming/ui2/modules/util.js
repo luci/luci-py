@@ -10,9 +10,9 @@
  * </p>
  */
 
-import * as human from 'common-sk/modules/human'
-import * as query from 'common-sk/modules/query'
-import { upgradeProperty } from 'elements-sk/upgradeProperty'
+import * as human from 'common-sk/modules/human';
+import * as query from 'common-sk/modules/query';
+import {upgradeProperty} from 'elements-sk/upgradeProperty';
 
 /** botPageLink creates a URL to a given bot */
 export function botPageLink(bot_id) {
@@ -48,7 +48,7 @@ export function botListLink(filters=[], columns=[]) {
   const obj = {
     f: fArr,
     c: columns,
-  }
+  };
   return '/botlist?' + query.fromParamSet(obj);
 }
 
@@ -78,7 +78,7 @@ export function compareWithFixedOrder(fixedOrder) {
     }
     // Lower rank in fixedOrder prevails.
     return aSpecial - bSpecial;
-  }
+  };
 }
 
 /** humanDuration formats a duration to be more human readable.
@@ -144,7 +144,7 @@ export function onSmallScreen() {
  *  parseDuration("1h") == 3600
  *  parseDuration("foo") == null
  */
- export function parseDuration(duration) {
+export function parseDuration(duration) {
   let number = duration.slice(0, -1);
   if (!/[1-9][0-9]*/.test(number)) {
     return null;
@@ -229,7 +229,7 @@ export function taskListLink(filters=[], columns=[]) {
   const obj = {
     f: fArr,
     c: columns,
-  }
+  };
   return '/tasklist?' + query.fromParamSet(obj);
 }
 
@@ -256,7 +256,7 @@ export function taskPageLink(taskId, disableCanonicalID) {
 /** timeDiffApprox returns the approximate difference between now and
  *  the specified date.
  */
-export function timeDiffApprox(date){
+export function timeDiffApprox(date) {
   if (!date) {
     return 'eons';
   }

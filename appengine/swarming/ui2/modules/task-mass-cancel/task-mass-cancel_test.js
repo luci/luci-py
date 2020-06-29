@@ -2,16 +2,16 @@
 // Use of this source code is governed under the Apache License, Version 2.0
 // that can be found in the LICENSE file.
 
-import 'modules/task-mass-cancel'
+import 'modules/task-mass-cancel';
 
 describe('task-mass-cancel', function() {
   // Instead of using import, we use require. Otherwise,
   // the concatenation trick we do doesn't play well with webpack, which would
   // leak dependencies (e.g. bot-list's 'column' function to task-list) and
   // try to import things multiple times.
-  const { $, $$ } = require('common-sk/modules/dom');
-  const { customMatchers, expectNoUnmatchedCalls, mockAppGETs } = require('modules/test_util');
-  const { fetchMock, MATCHED, UNMATCHED } = require('fetch-mock');
+  const {$, $$} = require('common-sk/modules/dom');
+  const {customMatchers, expectNoUnmatchedCalls, mockAppGETs} = require('modules/test_util');
+  const {fetchMock, MATCHED, UNMATCHED} = require('fetch-mock');
   // A reusable HTML element in which we create our element under test.
   const container = document.createElement('div');
   document.body.appendChild(container);
@@ -43,7 +43,7 @@ describe('task-mass-cancel', function() {
     });
   }
 
-//===============TESTS START====================================
+  // ===============TESTS START====================================
 
   it('can read in attributes', function(done) {
     createElement((ele) => {
@@ -80,7 +80,6 @@ describe('task-mass-cancel', function() {
 
   it('makes an API call to delete after clicking', function(done) {
     createElement((ele) => {
-
       fetchMock.post('/_ah/api/swarming/v1/tasks/cancel', {matched: 22});
 
       let sawStartEvent = false;
@@ -103,5 +102,4 @@ describe('task-mass-cancel', function() {
       button.click();
     });
   });
-
 });

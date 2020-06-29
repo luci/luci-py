@@ -10,14 +10,14 @@
 // it should go inside the element declaration.
 
 // query.fromObject is more readable than just 'fromObject'
-import * as query from 'common-sk/modules/query'
+import * as query from 'common-sk/modules/query';
 
-import { applyAlias } from '../alias'
-import { html } from 'lit-html'
-import naturalSort from 'javascript-natural-sort/naturalSort'
-import { botPageLink, compareWithFixedOrder, humanDuration, sanitizeAndHumanizeTime,
-         taskPageLink } from '../util'
-import { EXCEPTIONAL_STATES, FILTER_STATES, ONGOING_STATES } from '../task'
+import {applyAlias} from '../alias';
+import {html} from 'lit-html';
+import naturalSort from 'javascript-natural-sort/naturalSort';
+import {botPageLink, compareWithFixedOrder, humanDuration, sanitizeAndHumanizeTime,
+  taskPageLink} from '../util';
+import {EXCEPTIONAL_STATES, FILTER_STATES, ONGOING_STATES} from '../task';
 
 const BLACKLIST_DIMENSIONS = ['quarantined', 'error'];
 const EMPTY_VAL = '--';
@@ -69,7 +69,7 @@ export function appendPossibleColumns(possibleColumns, data) {
  */
 export function appendPrimaryMap(primaryMap, data) {
   if (!primaryMap['state']) {
-    primaryMap['state'] = FILTER_STATES
+    primaryMap['state'] = FILTER_STATES;
   }
   if (Array.isArray(data)) {
     // we have a list of dimensions, which are {key: String, value: Array}
@@ -86,10 +86,10 @@ export function appendPrimaryMap(primaryMap, data) {
     // data is a map of tag -> values
     for (const tag in data) {
       let existing = primaryMap[tag + '-tag'];
-        for (const value of data[tag]) {
-          existing = _insertUnique(existing, value);
-        }
-        primaryMap[tag + '-tag'] = existing;
+      for (const value of data[tag]) {
+        existing = _insertUnique(existing, value);
+      }
+      primaryMap[tag + '-tag'] = existing;
     }
   }
 }
@@ -155,7 +155,7 @@ export const specialFilters = {
     if (s === 'DEDUPED') {
       return state === 'COMPLETED' && tryNum === '0';
     }
-  }
+  },
 };
 
 /** Filters the tasks like they would be filtered from the server
@@ -216,7 +216,7 @@ export function humanizePrimaryKey(key) {
   if (key === 'state') {
     return 'state (of task)';
   }
-  return key
+  return key;
 }
 
 function _insertUnique(arr, value) {
@@ -254,7 +254,7 @@ export function legacyTags(filters) {
     if (idx < 0) {
       return filter;
     }
-    let key = filter.substring(0, idx);
+    const key = filter.substring(0, idx);
     if (key.endsWith('-tag') || key === 'state') {
       // this is fine
       return filter;
@@ -273,7 +273,7 @@ export function listQueryParams(filters, extra) {
   const params = {};
   const tags = [];
   for (const f of filters) {
-    const split = f.split(':', 1)
+    const split = f.split(':', 1);
     let key = split[0];
     const rest = f.substring(key.length + 1);
     // we use the -tag as a UI thing to differentiate tags
@@ -319,7 +319,7 @@ export function processTasks(arr, existingTags) {
     const tagMap = {};
     task.tags = task.tags || [];
     for (const tag of task.tags) {
-      const split = tag.split(':', 1)
+      const split = tag.split(':', 1);
       const key = split[0];
       const rest = tag.substring(key.length + 1);
       // tags are free-form, and could be duplicated
@@ -381,7 +381,7 @@ export function processTasks(arr, existingTags) {
 // This puts the times in a aesthetically pleasing order, roughly in
 // the order everything happened.
 const specialColOrder = ['name', 'created_ts', 'pending_time',
-    'started_ts', 'duration', 'completed_ts', 'abandoned_ts', 'modified_ts'];
+  'started_ts', 'duration', 'completed_ts', 'abandoned_ts', 'modified_ts'];
 const compareColumns = compareWithFixedOrder(specialColOrder);
 
 /** sortColumns sorts the bot-list columns in mostly alphabetical order. Some
@@ -408,21 +408,21 @@ export function sortPossibleColumns(columns, selectedCols) {
   }
 
   columns.sort((a, b) => {
-      // Show selected columns above non selected columns
-      const selA = selected[a];
-      const selB = selected[b];
-      if (selA && !selB) {
-        return -1;
-      }
-      if (selB && !selA) {
-        return 1;
-      }
-      if (selA && selB) {
-        // Both keys are selected, thus we put them in display order.
-        return compareColumns(a, b);
-      }
-      // neither column was selected, fallback to alphabetical sorting.
-      return a.localeCompare(b);
+    // Show selected columns above non selected columns
+    const selA = selected[a];
+    const selB = selected[b];
+    if (selA && !selB) {
+      return -1;
+    }
+    if (selB && !selA) {
+      return 1;
+    }
+    if (selA && selB) {
+      // Both keys are selected, thus we put them in display order.
+      return compareColumns(a, b);
+    }
+    // neither column was selected, fallback to alphabetical sorting.
+    return a.localeCompare(b);
   });
 }
 
@@ -463,19 +463,19 @@ export function tagsOnly(filters) {
  */
 export function taskClass(task) {
   const state = column('state', task);
-    if (EXCEPTIONAL_STATES.has(state)) {
-      return 'exception';
-    }
-    if (state === 'BOT_DIED') {
-      return 'bot_died';
-    }
-    if (state === 'COMPLETED (FAILURE)') {
-      return 'failed_task';
-    }
-    if (ONGOING_STATES.has(state)) {
-      return 'pending_task';
-    }
-    return '';
+  if (EXCEPTIONAL_STATES.has(state)) {
+    return 'exception';
+  }
+  if (state === 'BOT_DIED') {
+    return 'bot_died';
+  }
+  if (state === 'COMPLETED (FAILURE)') {
+    return 'failed_task';
+  }
+  if (ONGOING_STATES.has(state)) {
+    return 'pending_task';
+  }
+  return '';
 }
 
 const naturalSortDims = {
@@ -512,10 +512,10 @@ const colHeaderMap = {
   'state': 'state (of task)',
   'user': 'Requesting User',
   'pending_time': 'Time Spent Pending',
-}
+};
 
 const TASK_TIMES = ['abandoned_ts', 'completed_ts', 'created_ts', 'modified_ts',
-                    'started_ts'];
+  'started_ts'];
 
 const extraKeys = ['name', 'state', 'costs_usd', 'deduped_from', 'duration', 'pending_time',
   'server_versions', 'bot', 'exit_code', ...TASK_TIMES];
@@ -584,7 +584,7 @@ const colMap = {
     }
     return state;
   },
-}
+};
 
 /** specialSortMap maps keys to their special sort rules, encapsulated in a
  *  function. The function takes in the current sort direction (1 for ascending)
@@ -616,7 +616,7 @@ function sortableTime(attr) {
     const bCol = b[attr] || '9999';
 
     return dir * (aCol - bCol);
-  }
+  };
 }
 
 /** Given a duration attribute like 'pending_time', sortableDuration
@@ -631,5 +631,5 @@ function sortableDuration(attr) {
     const bCol = b[attr] !== undefined ? b[attr] : 1e12;
 
     return dir * (aCol - bCol);
-  }
+  };
 }
