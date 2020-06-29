@@ -7,7 +7,9 @@ python_version:"3.8"
 
 # required by nose2
 wheel: <
- name: "infra/python/wheels/coverage/${vpython_platform}"
+ # TODO(crbug.com/1100211): currently we don't have mac-amd64_cp32_abi3, so
+ # enforce cp36_abi3 here.
+ name: "infra/python/wheels/coverage/${platform}_cp36_abi3"
  version: "version:4.3.4"
 >
 
