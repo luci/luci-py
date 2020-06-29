@@ -223,6 +223,13 @@ class Cache(object):
     """
     return True
 
+  def __bool__(self):
+    """A cache is always True.
+
+    Otherwise it falls back to __len__, which is surprising.
+    """
+    return True
+
   def __len__(self):
     """Returns the number of entries in the cache."""
     raise NotImplementedError()
@@ -553,7 +560,7 @@ class DiskContentAddressedCache(ContentAddressedCache):
     # Verify hash of every single item to detect corruption. the corrupted
     # files will be evicted.
     with self._lock:
-      for digest, (_, timestamp) in self._lru._items.items():
+      for digest, (_, timestamp) in list(self._lru._items.items()):
         # verify only if the mtime is grather than the timestamp in state.json
         # to avoid take too long time.
         if self._get_mtime(digest) <= timestamp:
@@ -849,7 +856,7 @@ class NamedCache(Cache):
       try:
         self._lru = lru.LRUDict.load(self.state_file)
         for _, size in self._lru.values():
-          if not isinstance(size, (int, long)):
+          if not isinstance(size, six.integer_types):
             raise ValueError("size is not integer: %s" % size)
 
       except ValueError:
@@ -914,7 +921,7 @@ class NamedCache(Cache):
         # Raise using the original traceback.
         exc = NamedCacheError(
             'cannot install cache named %r at %r: %s' % (name, dst, ex))
-        six.reraise(exc, None, sys.exc_info()[2])
+        six.reraise(type(exc), exc, sys.exc_info()[2])
       finally:
         self._save()
 
@@ -990,7 +997,7 @@ class NamedCache(Cache):
         # Raise using the original traceback.
         exc = NamedCacheError(
             'cannot uninstall cache named %r at %r: %s' % (name, src, ex))
-        six.reraise(exc, None, sys.exc_info()[2])
+        six.reraise(type(exc), exc, sys.exc_info()[2])
       finally:
         # Call save() at every uninstall. The assumptions are:
         # - The total the number of named caches is low, so the state.json file
@@ -1209,8 +1216,7 @@ class NamedCache(Cache):
     while len(tried) < 1000:
       i = random.randint(0, abc_len * abc_len - 1)
       rel_path = (
-        self._DIR_ALPHABET[i / abc_len] +
-        self._DIR_ALPHABET[i % abc_len])
+          self._DIR_ALPHABET[i // abc_len] + self._DIR_ALPHABET[i % abc_len])
       if rel_path in tried:
         continue
       abs_path = os.path.join(self.cache_dir, rel_path)
