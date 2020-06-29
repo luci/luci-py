@@ -1797,8 +1797,6 @@ def add_isolate_server_options(parser):
            'variable ISOLATE_SERVER if set. No need to specify https://, this '
            'is assumed.')
   parser.add_option(
-      '--grpc-proxy', help='gRPC proxy by which to communicate to Isolate')
-  parser.add_option(
       '--namespace',
       default='default-gzip',
       help='The namespace to use on the Isolate Server, default: %default')
@@ -1814,13 +1812,10 @@ def process_isolate_server_options(parser, options, required):
       parser.error('--isolate-server is required.')
     return
 
-  if options.grpc_proxy:
-    isolate_storage.set_grpc_proxy(options.grpc_proxy)
-  else:
-    try:
-      options.isolate_server = net.fix_url(options.isolate_server)
-    except ValueError as e:
-      parser.error('--isolate-server %s' % e)
+  try:
+    options.isolate_server = net.fix_url(options.isolate_server)
+  except ValueError as e:
+    parser.error('--isolate-server %s' % e)
 
   try:
     return auth.ensure_logged_in(options.isolate_server)
