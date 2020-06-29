@@ -701,43 +701,6 @@ class TestTaskRunner(TestTaskRunnerBase):
     ]
     self.assertEqual(0, task_runner.main(cmd))
 
-  def test_main_grpc(self):
-
-    def _load_and_run(manifest, swarming_server, cost_usd_hour, start,
-                      json_file, run_isolated_flags, bot_file,
-                      auth_params_file):
-      self.assertEqual('foo', manifest)
-      self.assertEqual(self.server.url, swarming_server)
-      self.assertEqual(3600., cost_usd_hour)
-      self.assertGreaterEqual(time.time(), start)
-      self.assertEqual('task_summary.json', json_file)
-      self.assertEqual(['--min-free-space', '1'], run_isolated_flags)
-      self.assertEqual('/path/to/bot-file', bot_file)
-      self.assertEqual('/path/to/auth-params-file', auth_params_file)
-
-    self.mock(task_runner, 'load_and_run', _load_and_run)
-    cmd = [
-        '--swarming-server',
-        self.server.url,
-        '--in-file',
-        'foo',
-        '--out-file',
-        'task_summary.json',
-        '--cost-usd-hour',
-        '3600',
-        '--start',
-        str(time.time()),
-        '--bot-file',
-        '/path/to/bot-file',
-        '--auth-params-file',
-        '/path/to/auth-params-file',
-        '--is-grpc',
-        '--',
-        '--min-free-space',
-        '1',
-    ]
-    self.assertEqual(0, task_runner.main(cmd))
-
 
 class TestTaskRunnerKilled(TestTaskRunnerBase):
   # These test cases run the command for real where the process is killed.

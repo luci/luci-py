@@ -119,10 +119,6 @@ class RemoteClientNative(object):
     return self._server
 
   @property
-  def is_grpc(self):
-    return False
-
-  @property
   def bot_id(self):
     return self._bot_id
 

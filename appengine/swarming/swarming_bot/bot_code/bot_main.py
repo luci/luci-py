@@ -789,7 +789,7 @@ def _run_manifest(botobj, manifest, start):
 
   # Get the server info to pass to the task runner so it can provide updates.
   url = botobj.remote.server
-  if not botobj.remote.is_grpc and 'host' in manifest:
+  if 'host' in manifest:
     # The URL in the manifest includes the version - eg not https://chromium-
     # swarm-dev.appspot.com, but https://<some-version>-dot-chromiium-swarm-
     # dev.appspot.com. That way, if a new server version becomes the default,
@@ -892,8 +892,6 @@ def _run_manifest(botobj, manifest, start):
         '--auth-params-file',
         auth_params_file,
     ]
-    if botobj.remote.is_grpc:
-      command.append('--is-grpc')
     # Flags for run_isolated.py are passed through by task_runner.py as-is
     # without interpretation.
     command.append('--')
@@ -1300,8 +1298,7 @@ def _bot_restart(botobj, message, filepath=None):
   # the fresh bot group config cache (it gets refreshed each second). This makes
   # sure the bot doesn't accidentally pick up the old config after restarting
   # and connecting to an instance with a stale cache.
-  if not botobj.remote.is_grpc:
-    time.sleep(2)
+  time.sleep(2)
 
   # Don't forget to release the singleton before restarting itself.
   SINGLETON.release()

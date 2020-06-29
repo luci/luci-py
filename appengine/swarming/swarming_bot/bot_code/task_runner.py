@@ -884,9 +884,6 @@ def main(args):
   parser.add_option(
       '--swarming-server', help='Swarming server to send data back')
   parser.add_option(
-      '--is-grpc', action='store_true',
-      help='If true, --swarming-server is a gRPC proxy')
-  parser.add_option(
       '--cost-usd-hour', type='float', help='Cost of this VM in $/h')
   parser.add_option('--start', type='float', help='Time this task was started')
   parser.add_option(

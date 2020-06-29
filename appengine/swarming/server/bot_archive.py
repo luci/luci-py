@@ -520,13 +520,9 @@ def _make_config_json(host, host_version, settings):
   # The keys must match ../swarming_bot/config/config.json.
   config = {
     'enable_ts_monitoring': False,
-    'isolate_grpc_proxy': "",
     'server': host.rstrip('/'),
     'server_version': host_version,
-    'swarming_grpc_proxy': "",
   }
   if settings:
     config['enable_ts_monitoring'] = settings.enable_ts_monitoring
-    config['isolate_grpc_proxy'] = settings.bot_isolate_grpc_proxy
-    config['swarming_grpc_proxy'] = settings.bot_swarming_grpc_proxy
   return json.dumps(config)

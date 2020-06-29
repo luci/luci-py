@@ -20,8 +20,9 @@ ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 _EXPECTED_CONFIG_KEYS = {
-  'enable_ts_monitoring', 'isolate_grpc_proxy', 'server', 'server_version',
-  'swarming_grpc_proxy',
+    'enable_ts_monitoring',
+    'server',
+    'server_version',
 }
 
 
