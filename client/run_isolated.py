@@ -1373,7 +1373,7 @@ def main(args):
 
   # TODO(maruel): CIPD caches should be defined at an higher level here too, so
   # they can be cleaned the same way.
-  if use_go_isolated:
+  if use_go_isolated and not options.clean:
     isolate_cache = None
   else:
     isolate_cache = isolateserver.process_cache_options(options, trim=False)
