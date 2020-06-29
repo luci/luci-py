@@ -16,7 +16,6 @@ def CommonChecks(input_api, output_api):
       r'ui2/node_modules/.*',
       r'ui2/nodejs/.*',
       r'.*_pb2\.py$',
-      r'.*_pb2_grpc\.py$',
   ]
   disabled_warnings = [
     'relative-import',
