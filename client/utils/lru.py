@@ -120,7 +120,7 @@ class LRUDict(object):
           'version': CURRENT_VERSION,
           'items': list(self._items.items()),
       }
-      json.dump(contents, f, separators=(',', ':'))
+      json.dump(contents, f, sort_keys=True, separators=(',', ':'))
 
     self._dirty = False
     return True
