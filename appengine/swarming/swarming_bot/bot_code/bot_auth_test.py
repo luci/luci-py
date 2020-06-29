@@ -1,4 +1,4 @@
-#!/usr/bin/env vpython
+#!/usr/bin/env vpython3
 # Copyright 2016 The LUCI Authors. All rights reserved.
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
@@ -302,7 +302,7 @@ class AuthSystemTest(auto_stub.TestCase):
 
     code, resp = call_rpc(local_auth_ctx, 'system', ['A', 'B', 'C'])
     self.assertEqual(500, code)
-    self.assertEqual('msg\n', resp)
+    self.assertEqual(b'msg\n', resp)
     self.assertTrue(rpc_client.calls)
     del rpc_client.calls[:]
 
