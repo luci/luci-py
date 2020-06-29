@@ -36,21 +36,6 @@ rm -rf protobuf-3.12.1 protobuf-python-3.12.1.zip
 
 ---
 
-Name: Google RPC protocol buffers
-Revision: 943102cfb5fa8811a15a4c21bd12421aadb423b5
-Source: https://github.com/googleapis/googleapis/tree/943102cfb5fa8811a15a4c21bd12421aadb423b5/google/rpc
-Home-page: https://grpc.io/
-License: Apache License 2.0
-
-Local modifications in ./rpc
-```
-touch __init__.py
-cd ../..
-protoc --python_out=. google/rpc/*.proto
-```
-
----
-
 Name: Google API services protocol buffers
 Revision: 4543762b23a57fc3c53d409efc3a9affd47b6ab3
 Home-page: https://github.com/googleapis/googleapis/tree/master/google/api
