@@ -35,18 +35,18 @@ class TestBase(test_case.TestCase):
     self.mock(random, 'getrandbits', lambda _: 0x88)
     self.mock(auth, 'get_request_auth_db', MockedAuthDB)
 
-  def mock_json_request(self, expected_url, expected_payload, expected_headers,
-                        response):
+  def mock_json_request(self, expected_url, expected_payload,
+                        expected_project_id, response):
     calls = []
 
-    def mocked(url=None, method=None, payload=None, headers=None, scopes=None):
+    def mocked(url=None, method=None, payload=None,
+               project_id=None, scopes=None):
       calls.append(url)
       self.assertEqual(expected_url, url)
       self.assertEqual('POST', method)
       if expected_payload:
         self.assertEqual(expected_payload, payload)
-      if expected_headers:
-        self.assertEqual(expected_headers, headers)
+      self.assertEqual(expected_project_id, project_id)
       self.assertEqual([net.EMAIL_SCOPE], scopes)
       if isinstance(response, Exception):
         raise response
@@ -78,7 +78,7 @@ class OAuthTokenGrantTest(TestBase):
             'serviceAccount': 'service-account@example.com',
             'validityDuration': 7200,
         },
-        expected_headers=None,
+        expected_project_id=None,
         response={
             'grantToken': 'totally_real_token',
             'serviceVersion': 'token-server-id/ver',
@@ -114,7 +114,7 @@ class OAuthTokenGrantTest(TestBase):
             'serviceAccount': 'service-account@example.com',
             'validityDuration': 7200,
         },
-        expected_headers=None,
+        expected_project_id=None,
         response={
             'grantToken': 'another_totally_real_token',
             'serviceVersion': 'token-server-id/ver',
@@ -134,7 +134,7 @@ class OAuthTokenGrantTest(TestBase):
         expected_url='https://tokens.example.com/prpc/'
         'tokenserver.minter.TokenMinter/MintOAuthTokenGrant',
         expected_payload=None,
-        expected_headers=None,
+        expected_project_id=None,
         response=net.Error('bad', 403, 'Token server error message'))
 
     with self.assertRaises(service_accounts.PermissionError) as err:
@@ -209,7 +209,7 @@ class TaskAccountTokenTest(TestBase):
                 'swarming:task_name:Request with service-account@example.com',
             ],
         },
-        expected_headers=None,
+        expected_project_id=None,
         response={
             'accessToken': 'totally_real_token',
             'serviceVersion': 'token-server-id/ver',
@@ -253,9 +253,7 @@ class TaskAccountTokenTest(TestBase):
                 'swarming:task_name:Request with service-account@example.com',
             ],
         },
-        expected_headers={
-            'X-Luci-Project': 'test',
-        },
+        expected_project_id='test',
         response={
             'token': 'totally_real_token',
             'serviceVersion': 'token-server-id/ver',

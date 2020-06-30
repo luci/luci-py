@@ -411,6 +411,7 @@ def _mint_service_account_token(service_account, realm, oauth_scopes,
   """
   # extract LUCI project from realm '<project>:<realm>'.
   luci_project = realm.split(':')[0]
+  assert luci_project
   resp = _call_token_server(
       'MintServiceAccountToken',
       {
@@ -422,9 +423,7 @@ def _mint_service_account_token(service_account, realm, oauth_scopes,
           'minValidityDuration': MIN_TOKEN_LIFETIME_SEC,
           'auditTags': _common_audit_tags() + audit_tags,
       },
-      {
-          'X-Luci-Project': luci_project,
-      })
+      luci_project)
   try:
     access_token = str(resp['token'])
     service_version = str(resp['serviceVersion'])
@@ -436,13 +435,13 @@ def _mint_service_account_token(service_account, realm, oauth_scopes,
   return access_token, expiry
 
 
-def _call_token_server(method, request, headers=None):
+def _call_token_server(method, request, project_id=None):
   """Sends an RPC to tokenserver.minter.TokenMinter service.
 
   Args:
     method: name of the method to call.
     request: dict with request fields.
-    headers: dict with additional request headers.
+    project_id: if set, act with the authority of this LUCI project.
 
   Returns:
     Dict with response fields.
@@ -469,7 +468,7 @@ def _call_token_server(method, request, headers=None):
         url='%s/prpc/tokenserver.minter.TokenMinter/%s' % (ts_url, method),
         method='POST',
         payload=request,
-        headers=headers,
+        project_id=project_id,
         scopes=[net.EMAIL_SCOPE])
   except net.Error as exc:
     logging.error('Error calling %s (HTTP %s: %s):\n%s', method,
