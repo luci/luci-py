@@ -50,7 +50,8 @@ def finalize_invocation_async(task_run_id, update_token):
         'FinalizeInvocation', {
             'name': invocation_name,
         },
-        headers={'update-token': update_token})
+        headers={'update-token': update_token},
+        scopes=None)
   except net.Error:
     logging.exception('Failed to finalize %s', invocation_name)
 
@@ -71,7 +72,8 @@ def _get_invocation_id(task_run_id):
 def _call_resultdb_recorder_api_async(method,
                                       request,
                                       headers=None,
-                                      response_headers=None):
+                                      response_headers=None,
+                                      scopes=(net.EMAIL_SCOPE,)):
   cfg = config.settings()
   rdb_url = cfg.resultdb.server
   assert rdb_url, 'ResultDB integration is not configured'
@@ -84,6 +86,6 @@ def _call_resultdb_recorder_api_async(method,
       url='%s/prpc/luci.resultdb.v1.Recorder/%s' % (rdb_url, method),
       method='POST',
       payload=request,
-      scopes=[net.EMAIL_SCOPE],
+      scopes=scopes,
       headers=headers,
       response_headers=response_headers)

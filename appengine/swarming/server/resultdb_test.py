@@ -88,7 +88,8 @@ class ResultDBTest(test_case.TestCase):
           'FinalizeInvocation', {
               'name': 'invocations/task-test-swarming.appspot.com-task001',
           },
-          headers={'update-token': 'secret'})
+          headers={'update-token': 'secret'},
+          scopes=None)
 
   def test_finalize_invocation_async_failed_precondition(self):
     with mock.patch(
@@ -103,7 +104,8 @@ class ResultDBTest(test_case.TestCase):
           'FinalizeInvocation', {
               'name': 'invocations/task-test-swarming.appspot.com-task001',
           },
-          headers={'update-token': 'secret'})
+          headers={'update-token': 'secret'},
+          scopes=None)
 
   def test_finalize_invocation_async_failed(self):
     with mock.patch(
@@ -115,7 +117,8 @@ class ResultDBTest(test_case.TestCase):
           'FinalizeInvocation', {
               'name': 'invocations/task-test-swarming.appspot.com-task001',
           },
-          headers={'update-token': 'secret'})
+          headers={'update-token': 'secret'},
+          scopes=None)
 
   def test_call_resultdb_recorder_api(self):
 
