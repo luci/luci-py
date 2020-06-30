@@ -324,6 +324,19 @@ class PoolsConfigTest(test_case.TestCase):
         '"a@example.com" was specified twice',
     ])
 
+  def test_wildcard_delegation_tag_ok(self):
+    cfg = pools_pb2.PoolsCfg(pool=[
+      pools_pb2.Pool(name=['abc'], schedulers=pools_pb2.Schedulers(
+        trusted_delegation=[pools_pb2.TrustedDelegation(
+          peer_id='a@example.com',
+          require_any_of=pools_pb2.TrustedDelegation.TagList(
+            tag=['k:tag1/*'],
+          ),
+        )],
+      )),
+    ])
+    self.validator_test(cfg, [])
+
   def test_bad_delegation_tag(self):
     cfg = pools_pb2.PoolsCfg(pool=[
         pools_pb2.Pool(

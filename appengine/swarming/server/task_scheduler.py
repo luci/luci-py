@@ -621,6 +621,13 @@ def _is_allowed_to_schedule(pool_cfg):
 
   # Are any of the required delegation tags present in the token?
   cross = token_tags & trusted_delegatee.required_delegation_tags
+  if not cross:
+    cross = set()
+    wildcard_delegation_tags = filter(
+        lambda t: t.endswith('/*'), trusted_delegatee.required_delegation_tags)
+    for t in wildcard_delegation_tags:
+      t = t[:-1]
+      cross |= set(filter(lambda tt: tt.startswith(t), token_tags))
   if cross:
     logging.info(
         'Caller "%s" is allowed to schedule tasks in the pool "%s" by acting '

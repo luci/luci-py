@@ -2670,6 +2670,23 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     # test_check_schedule_request_acl_*.
     pass
 
+  def test_check_schedule_request_wildcard_acl_delegation_ok(self):
+    delegatee = auth.Identity.from_bytes('user:d1@example.com')
+    self.mock_pool_config(
+        'some-pool', trusted_delegatees={delegatee: ['t1/*', 'other']})
+    self.mock_delegation(delegatee, ['t1/foo', 'extra'])
+    self.check_schedule_request_acl(
+        properties=_gen_properties(dimensions={u'pool': [u'some-pool']}))
+
+  def test_check_schedule_request_wildcard_acl_delegation_missing_tag(self):
+    delegatee = auth.Identity.from_bytes('user:d1@example.com')
+    self.mock_pool_config(
+        'some-pool', trusted_delegatees={delegatee: ['t1', 'other/*']})
+    self.mock_delegation(delegatee, ['t1/foo', 'extra'])
+    with self.assertRaises(auth.AuthorizationError):
+      self.check_schedule_request_acl(
+          properties=_gen_properties(dimensions={u'pool': [u'some-pool']}))
+
   def test_cron_task_bot_distribution(self):
     # TODO(maruel): https://crbug.com/912154
     self.assertEqual(0, task_scheduler.cron_task_bot_distribution())
