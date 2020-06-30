@@ -15,6 +15,8 @@ import struct
 import subprocess
 import time
 
+import six
+
 from utils import tools
 
 import common
@@ -317,8 +319,8 @@ def _SMC_get_value(conn, key):
 
 def _get_system_profiler(data_type):
   """Returns an XML about the system display properties."""
-  sp = subprocess.check_output(['system_profiler', data_type, '-xml'])
-  return plistlib.readPlistFromString(sp)[0].get('_items', [])
+  plist = _get_system_info_in_plist(['system_profiler', data_type, '-xml'])
+  return plist[0].get('_items', [])
 
 
 @tools.cached
@@ -368,16 +370,23 @@ def _get_xcode_version(xcode_app):
 def _get_physical_disks_info():
   """Return the disk info for all the physical disks"""
   try:
-    out = subprocess.check_output(['diskutil', 'list', '-plist', 'physical'])
-    pl = plistlib.readPlistFromString(out)
+    pl = _get_system_info_in_plist(['diskutil', 'list', '-plist', 'physical'])
     disk_info = {}
     for disk in pl['WholeDisks']:
-      out = subprocess.check_output(['diskutil', 'info', '-plist', disk])
-      disk_info[disk.decode('utf-8')] = plistlib.readPlistFromString(out)
+      disk_info[six.ensure_text(disk)] = _get_system_info_in_plist(
+          ['diskutil', 'info', '-plist', disk])
     return disk_info
   except (OSError, subprocess.CalledProcessError) as e:
     logging.error('Failed to read disk info: %s', e)
     return {}
+
+
+def _get_system_info_in_plist(cmds):
+  out = subprocess.check_output(cmds)
+  if six.PY2:
+    return plistlib.readPlistFromString(out)
+  else:
+    return plistlib.loads(out)
 
 
 ## Public API.
@@ -478,7 +487,7 @@ def get_hardware_model_string():
     A string like Macmini5,3 or MacPro6,1.
   """
   try:
-    return unicode(
+    return six.text_type(
         subprocess.check_output(['sysctl', '-n', 'hw.model']).rstrip())
   except (OSError, subprocess.CalledProcessError):
     return None
@@ -492,7 +501,7 @@ def get_os_version_number():
     Version as a string like '10.12.4'
   """
   # We expect at least 2 parts. Do not fail if it is not the case.
-  return unicode(platform.mac_ver()[0])
+  return six.text_type(platform.mac_ver()[0])
 
 
 @tools.cached
@@ -527,10 +536,10 @@ def get_gpu():
     dev_id = card['spdisplays_device-id'][2:]
 
     # Looks like: u'4.0.20 [3.2.8]'
-    version = unicode(card.get('spdisplays_gmux-version', u''))
+    version = six.text_type(card.get('spdisplays_gmux-version', u''))
 
     # VMWare doesn't set it.
-    dev_name = unicode(card.get('sppci_model', u''))
+    dev_name = six.text_type(card.get('sppci_model', u''))
     ven_name = ''
     if dev_name:
       # The first word is pretty much always the company name on OSX.
@@ -551,7 +560,7 @@ def get_gpu():
       ven_id = u'UNKNOWN'
     ven_name, dev_name = gpu.ids_to_names(ven_id, ven_name, dev_id, dev_name)
 
-    dimensions.add(unicode(ven_id))
+    dimensions.add(six.text_type(ven_id))
     dimensions.add(u'%s:%s' % (ven_id, dev_id))
     if version:
       match = re.search(r'([0-9.]+) \[([0-9.]+)\]', version)
@@ -637,13 +646,13 @@ def get_monitor_hidpi():
     is_hidpi(card['spdisplays_ndrvs'])
     for card in _get_system_profiler('SPDisplaysDataType')
     if 'spdisplays_ndrvs' in card)
-  return unicode(int(hidpi))
+  return six.text_type(int(hidpi))
 
 
 def get_xcode_versions():
   """Returns all Xcode versions installed."""
   return sorted(
-      unicode(xcode['version']) for xcode in get_xcode_state().values())
+      six.text_type(xcode['version']) for xcode in get_xcode_state().values())
 
 
 @tools.cached
@@ -728,7 +737,7 @@ def get_disks_model():
   models = []
   for _, disk_info in _get_physical_disks_info().items():
     if disk_info['MediaName']:
-      models.append(disk_info['MediaName'].decode('utf-8'))
+      models.append(six.ensure_text(disk_info['MediaName']))
   return tuple(sorted(models))
 
 
