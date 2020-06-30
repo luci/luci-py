@@ -57,29 +57,6 @@ class ResultDBTest(test_case.TestCase):
         mock.MagicMock(side_effect=self._mock_call_resultdb_recorder_api_async)
     ) as mock_call:
 
-      update_token = resultdb.create_invocation_async('task001').get_result()
-      self.assertEqual(update_token, 'token')
-      mock_call.assert_called_once_with(
-          'CreateInvocation', {
-              'invocation': {
-                  'producerResource':
-                      '//test-swarming.appspot.com/tasks/task001',
-                  'realm':
-                      None,
-              },
-              'requestId': '00000000-0000-0000-0000-000000000000',
-              'invocationId': 'task-test-swarming.appspot.com-task001'
-          },
-          project_id=None,
-          response_headers=mock.ANY)
-
-  def test_create_invocation_async_with_realm(self):
-
-    with mock.patch(
-        'server.resultdb._call_resultdb_recorder_api_async',
-        mock.MagicMock(side_effect=self._mock_call_resultdb_recorder_api_async)
-    ) as mock_call:
-
       update_token = resultdb.create_invocation_async('task001',
                                                       'infra:try').get_result()
       self.assertEqual(update_token, 'token')

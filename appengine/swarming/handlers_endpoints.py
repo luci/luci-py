@@ -599,6 +599,10 @@ class SwarmingTasksService(remote.Service):
 
     try:
       enable_resultdb = request.resultdb and request.resultdb.enable
+      if enable_resultdb and not request.realm:
+        raise endpoints.BadRequestException(
+            'ResultDB is enabled, but realm is not set')
+
       result_summary = task_scheduler.schedule_request(request_obj,
                                                        secret_bytes,
                                                        enable_resultdb)

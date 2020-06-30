@@ -17,7 +17,7 @@ from server import config
 
 
 @ndb.tasklet
-def create_invocation_async(task_run_id, realm=None):
+def create_invocation_async(task_run_id, realm):
   """This is wrapper for CreateInvocation API.
 
   Returns:
@@ -25,10 +25,7 @@ def create_invocation_async(task_run_id, realm=None):
   """
   hostname = app_identity.get_default_version_hostname()
   response_headers = {}
-  if realm:
-    project_id = realm.split(':')[0]
-  else:
-    project_id = None
+
   yield _call_resultdb_recorder_api_async(
       'CreateInvocation', {
           'requestId': str(uuid.uuid4()),
@@ -38,7 +35,7 @@ def create_invocation_async(task_run_id, realm=None):
               'realm': realm,
           }
       },
-      project_id=project_id,
+      project_id=realm.split(':')[0],
       response_headers=response_headers)
   update_token = response_headers.get('update-token')
   assert update_token, ("response_headers should have valid update-token: %s" %
