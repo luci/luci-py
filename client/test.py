@@ -27,7 +27,7 @@ def run_tests_parralel():
 
   # Need to specify config path explicitly
   # because test_env.setup() changes directory
-  cfg = os.path.join(COMPONENTS_DIR, 'test_support', 'unittest.cfg')
+  cfg = os.path.join(THIS_DIR, 'unittest.cfg')
   sys.argv.extend(['-c', cfg])
 
   # enable plugins only on linux
