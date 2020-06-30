@@ -47,7 +47,7 @@ class ResultDBTest(test_case.TestCase):
 
   @ndb.tasklet
   def _mock_call_resultdb_recorder_api_async(self, _method, _request,
-                                             _project_id, response_headers):
+                                             response_headers, **_kwargs):
     response_headers['update-token'] = 'token'
 
   def test_create_invocation_async(self):
@@ -70,7 +70,7 @@ class ResultDBTest(test_case.TestCase):
               'requestId': '00000000-0000-0000-0000-000000000000',
               'invocationId': 'task-test-swarming.appspot.com-task001'
           },
-          None,
+          project_id=None,
           response_headers=mock.ANY)
 
   def test_create_invocation_async_with_realm(self):
@@ -94,7 +94,7 @@ class ResultDBTest(test_case.TestCase):
               'requestId': '00000000-0000-0000-0000-000000000000',
               'invocationId': 'task-test-swarming.appspot.com-task001'
           },
-          'infra',
+          project_id='infra',
           response_headers=mock.ANY)
 
   def test_create_invocation_async_no_update_token(self):
