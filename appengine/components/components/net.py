@@ -121,6 +121,15 @@ def request_async(
   deadline = 10 if deadline is None else deadline
   max_attempts = 4 if max_attempts is None else max_attempts
 
+  # Reject incompatible combinations of options.
+  if (project_id or scopes) and use_jwt_auth:
+    raise ValueError('Cannot use either `scopes` or `project_id` '
+                     'and `use_jwt_auth` together.')
+  if audience and not use_jwt_auth:
+    raise ValueError('Cannot use `audience` when `use_jwt_auth` is not set.')
+  if service_account_key and project_id:
+    raise ValueError('Cannot use `service_account_key` and `project_id`.')
+
   if utils.is_local_dev_server():
     protocols = ('http://', 'https://')
   else:
@@ -131,37 +140,38 @@ def request_async(
 
   headers = (headers or {}).copy()
 
-  # Check that we use either JWT or OAuth, not both.
-  if project_id or scopes:
-    if use_jwt_auth:
-      raise ValueError('Cannot use either `scopes` or `project_id` '
-                       'and `use_jwt_auth` together.')
-
-  if audience and not use_jwt_auth:
-    raise ValueError('Cannot use `audience` when `use_jwt_auth` is not set.')
-
+  tok = None
   if project_id:
-    try:
-      tok, _ = yield auth.get_project_access_token_async(project_id, scopes)
-    # Fall back if project token acquisition failed
-    except auth.NotFoundError as e:
-      # TODO(fmatenaar): Remove this after migration.
-      logging.error('unable to obtain project token: %s', e)
-      tok, _ = yield auth.get_access_token_async(scopes, service_account_key)
+    if auth.is_internal_domain(urllib.parse.urlparse(url).netloc):
+      # When hitting other LUCI services, use X-Luci-Project header.
+      headers['X-Luci-Project'] = project_id
+      tok, _ = yield auth.get_access_token_async([EMAIL_SCOPE])
+    else:
+      # When hitting external services, use a project-scoped account. Fall back
+      # to own service tokens if the project has no associated service account.
+      #
+      # TODO(vadimsh): Remove the fallback after all projects have associated
+      # service accounts.
+      scopes = scopes or [EMAIL_SCOPE]
+      try:
+        tok, _ = yield auth.get_project_access_token_async(project_id, scopes)
+      except auth.NotFoundError:
+        logging.warning('No project-scoped account for %s', project_id)
+        tok, _ = yield auth.get_access_token_async(scopes)
   elif scopes:
     tok, _ = yield auth.get_access_token_async(scopes, service_account_key)
-  if scopes or project_id:
-    headers['Authorization'] = 'Bearer %s' % tok
+  elif use_jwt_auth:
+    # TODO(vadimsh): Cache the token for its validity duration.
+    tok = tokens.sign_jwt(aud=audience or '')
+
+  if tok:
+    headers['Authorization'] = 'Bearer ' + tok
 
   if delegation_token:
     if isinstance(delegation_token, auth.DelegationToken):
       delegation_token = delegation_token.token
     assert isinstance(delegation_token, basestring)
     headers[delegation.HTTP_HEADER] = delegation_token
-
-  if use_jwt_auth:
-    # TODO(vadimsh): Cache the token for its validity duration.
-    headers['Authorization'] = 'Bearer %s' % tokens.sign_jwt(aud=audience or '')
 
   if payload is not None:
     assert isinstance(payload, str), type(payload)

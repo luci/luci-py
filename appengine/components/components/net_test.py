@@ -28,9 +28,17 @@ class NetTest(test_case.TestCase):
 
     @ndb.tasklet
     def get_access_token(*_args):
-      raise ndb.Return(('token', 0))
-
+      raise ndb.Return(('own-token', 0))
     self.mock(auth, 'get_access_token_async', get_access_token)
+
+    @ndb.tasklet
+    def get_project_access_token(project_id, _scopes):
+      raise ndb.Return(('%s-token' % project_id, 0))
+    self.mock(auth, 'get_project_access_token_async', get_project_access_token)
+
+    self.mock(
+        auth, 'is_internal_domain',
+        lambda domain: domain == 'internal.example.com')
 
     self.mock(logging, 'warning', lambda *_args: None)
     self.mock(logging, 'error', lambda *_args: None)
@@ -88,7 +96,7 @@ class NetTest(test_case.TestCase):
             'deadline': 123,
             'headers': {
                 'Accept': 'text/plain',
-                'Authorization': 'Bearer token'
+                'Authorization': 'Bearer own-token'
             },
             'method': 'POST',
             'payload': 'post body',
@@ -114,45 +122,51 @@ class NetTest(test_case.TestCase):
     self.assertEqual('response body', response)
     self.assertEqual('example-value', response_headers['example-header'])
 
-  def test_request_project_token_fallback_works(self):
+  def test_project_tokens_external_service(self):
+    self.mock_urlfetch([
+        ({
+            'deadline': 10,
+            'headers': {
+                'Authorization': 'Bearer project-id-token'
+            },
+            'method': 'GET',
+            'url': 'https://external.example.com/123',
+        }, Response(200, '', {})),
+    ])
+    net.request(url='https://external.example.com/123', project_id='project-id')
 
+  def test_project_tokens_fallback(self):
     @ndb.tasklet
-    def mocked_get_project_access_token_async(*args, **kwargs):
-      mocked_get_project_access_token_async.params = (args, kwargs)
-      mocked_get_project_access_token_async.called = True
-      raise auth.NotFoundError('testing fallback 1')
+    def get_project_access_token(_project_id, _scopes):
+      raise auth.NotFoundError('not found')
+    self.mock(auth, 'get_project_access_token_async', get_project_access_token)
 
-    mocked_get_project_access_token_async.called = False
+    self.mock_urlfetch([
+        ({
+            'deadline': 10,
+            'headers': {
+                # Switches to own token.
+                'Authorization': 'Bearer own-token',
+            },
+            'method': 'GET',
+            'url': 'https://external.example.com/123',
+        }, Response(200, '', {})),
+    ])
+    net.request(url='https://external.example.com/123', project_id='project-id')
 
-    @ndb.tasklet
-    def mocked_get_access_token_async(*args, **kwargs):
-      mocked_get_access_token_async.params = (args, kwargs)
-      mocked_get_access_token_async.called = True
-      raise Exception('testing fallback 2')
-
-    mocked_get_access_token_async.called = False
-
-    self.mock(auth, 'get_project_access_token_async',
-              mocked_get_project_access_token_async)
-    self.mock(auth, 'get_access_token_async', mocked_get_access_token_async)
-
-    with self.assertRaises(Exception):
-      _ = net.request(
-          url='http://localhost/123',
-          method='POST',
-          payload='post body',
-          params={
-              'a': '=',
-              'b': '&'
-          },
-          headers={'Accept': 'text/plain'},
-          scopes=['scope'],
-          service_account_key=auth.ServiceAccountKey('a', 'b', 'c'),
-          deadline=123,
-          max_attempts=5,
-          project_id='project1')
-    self.assertTrue(mocked_get_project_access_token_async.called)
-    self.assertTrue(mocked_get_access_token_async.called)
+  def test_project_tokens_internal_service(self):
+    self.mock_urlfetch([
+        ({
+            'deadline': 10,
+            'headers': {
+                'Authorization': 'Bearer own-token',
+                'X-Luci-Project': 'project-id',
+            },
+            'method': 'GET',
+            'url': 'https://internal.example.com/123',
+        }, Response(200, '', {})),
+    ])
+    net.request(url='https://internal.example.com/123', project_id='project-id')
 
   def test_retries_transient_errors(self):
     self.mock_urlfetch([
@@ -240,7 +254,7 @@ class NetTest(test_case.TestCase):
         ({
             'deadline': 123,
             'headers': {
-                'Authorization': 'Bearer token',
+                'Authorization': 'Bearer own-token',
                 'Accept': 'application/json; charset=utf-8',
                 'Content-Type': 'application/json; charset=utf-8',
                 'Header': 'value',
