@@ -25,6 +25,7 @@ from components import utils
 from components.auth import api
 from components.auth import handler
 from components.auth import model
+from components.auth import signature
 from components.auth import version
 from components.auth.ui import acl
 from components.auth.ui import rest_api
@@ -2006,6 +2007,15 @@ class GroupsSuggestHandlerTest(RestAPITestCase):
 
 
 class CertificatesHandlerTest(RestAPITestCase):
+
+  def setUp(self):
+    super(CertificatesHandlerTest, self).setUp()
+    utils.clear_cache(signature.get_own_public_certificates)
+
+  def tearDown(self):
+    super(CertificatesHandlerTest, self).tearDown()
+    utils.clear_cache(signature.get_own_public_certificates)
+
   def test_works(self):
     # Test mostly for code coverage.
     with mock.patch('components.utils.utcnow') as mock_utcnow:
