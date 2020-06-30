@@ -1196,7 +1196,7 @@ def schedule_request(request, secret_bytes, enable_resultdb):
 
     elif enable_resultdb:
       resultdb_update_token_future = resultdb.create_invocation_async(
-          task_pack.pack_run_result_key(to_run.run_result_key))
+          task_pack.pack_run_result_key(to_run.run_result_key), request.realm)
 
   # Determine external scheduler (if relevant) prior to making task live, to
   # make HTTP handler return as fast as possible after making task live.

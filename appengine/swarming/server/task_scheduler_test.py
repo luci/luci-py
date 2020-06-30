@@ -615,7 +615,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(1, self.execute_tasks())
 
   @ndb.tasklet
-  def _mock_create_invocation_async(self, _):
+  def _mock_create_invocation_async(self, _task_run_id, _realm):
     raise ndb.Return('resultdb-update-token')
 
   def test_schedule_request_resultdb(self):
@@ -624,9 +624,9 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     with mock.patch(
         'server.resultdb.create_invocation_async',
         mock.Mock(side_effect=self._mock_create_invocation_async)) as mock_call:
-      request = _gen_request_slices()
+      request = _gen_request_slices(realm='infra:try')
       result_summary = task_scheduler.schedule_request(request, None, True)
-      mock_call.assert_called_once_with('1d69b9f088008911')
+      mock_call.assert_called_once_with('1d69b9f088008911', 'infra:try')
 
     self.assertEqual(
         result_summary.resultdb_info,
