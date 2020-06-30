@@ -27,6 +27,7 @@ from components.auth import model
 from components.auth import realms
 from components.auth import replication
 from components.auth.proto import replication_pb2
+from components.auth.proto import security_config_pb2
 from components import utils
 from test_support import test_case
 
@@ -37,16 +38,25 @@ def new_auth_db(
       groups=None,
       ip_whitelist_assignments=None,
       ip_whitelists=None,
+      internal_service_regexp=None,
       additional_client_ids=None
   ):
+  global_config = global_config or model.AuthGlobalConfig()
+  global_config.security_config = security_config_blob(internal_service_regexp)
   return api.AuthDB.from_entities(
       replication_state=replication_state or model.AuthReplicationState(),
-      global_config=global_config or model.AuthGlobalConfig(),
+      global_config=global_config,
       groups=groups or [],
       ip_whitelist_assignments=(
           ip_whitelist_assignments or model.AuthIPWhitelistAssignments()),
       ip_whitelists=ip_whitelists or [],
       additional_client_ids=additional_client_ids or [])
+
+
+def security_config_blob(regexps=None):
+  regexps = regexps or ['(.*-dot-)?internal\\.example\\.com']
+  msg = security_config_pb2.SecurityConfig(internal_service_regexp=regexps)
+  return msg.SerializeToString()
 
 
 class AuthDBTest(test_case.TestCase):
@@ -281,7 +291,7 @@ class AuthDBTest(test_case.TestCase):
     global_config.oauth_client_id = '1'
     global_config.oauth_client_secret = 'secret'
     global_config.oauth_additional_client_ids = ['2', '3']
-    global_config.security_config = 'security_config'
+    global_config.security_config = security_config_blob()
     global_config.token_server_url = 'token_server_url'
     global_config.put()
 
@@ -512,6 +522,19 @@ class AuthDBTest(test_case.TestCase):
       auth_db.verify_ip_whitelisted(
           model.Identity(model.IDENTITY_USER, 'a@example.com'),
           ipaddr.ip_from_string('127.0.0.1'))
+
+  def test_is_internal_domain(self):
+    auth_db = new_auth_db(internal_service_regexp=[
+        '(.*-dot-)?a-int\\.example\\.com',
+        '(.*-dot-)?b-int\\.example\\.com',
+    ])
+    self.assertTrue(auth_db.is_internal_domain('a-int.example.com'))
+    self.assertTrue(auth_db.is_internal_domain('b-int.example.com'))
+    self.assertTrue(auth_db.is_internal_domain('z-dot-a-int.example.com'))
+    self.assertTrue(auth_db.is_internal_domain('z-dot-b-int.example.com'))
+    self.assertFalse(auth_db.is_internal_domain('int.example.com'))
+    self.assertFalse(auth_db.is_internal_domain('a-int.example'))
+    self.assertFalse(auth_db.is_internal_domain('dot-a-int.example.com'))
 
 
 def mock_replication_state(auth_db_rev):

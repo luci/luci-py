@@ -41,6 +41,7 @@ from . import realms
 from . import replication
 from .proto import delegation_pb2
 from .proto import realms_pb2
+from .proto import security_config_pb2
 
 # Part of public API of 'auth' component, exposed by this module.
 __all__ = [
@@ -67,6 +68,7 @@ __all__ = [
     'is_admin',
     'is_group_member',
     'is_in_ip_whitelist',
+    'is_internal_domain',
     'is_superuser',
     'legacy_realm',
     'list_group',
@@ -215,6 +217,7 @@ class AuthDB(object):
         ip_whitelist_assignments={},
         ip_whitelists={},
         realms_pb=realms_pb2.Realms(api_version=realms.API_VERSION),
+        security_config_blob=None,
         additional_client_ids=[])
 
   @staticmethod
@@ -267,6 +270,7 @@ class AuthDB(object):
         },
         ip_whitelists={e.key.id(): list(e.subnets) for e in ip_whitelists},
         realms_pb=None,  # not available when not using replication_pb2.AuthDB
+        security_config_blob=global_config.security_config,
         additional_client_ids=additional_client_ids)
 
   @staticmethod
@@ -312,6 +316,7 @@ class AuthDB(object):
             e.name: list(e.subnets) for e in auth_db.ip_whitelists
         },
         realms_pb=auth_db.realms if auth_db.HasField('realms') else None,
+        security_config_blob=auth_db.security_config,
         additional_client_ids=additional_client_ids)
 
   # Note: do not use __init__ directly, use one of AuthDB.empty(),
@@ -326,6 +331,7 @@ class AuthDB(object):
         ip_whitelist_assignments,  # {Identity -> str}
         ip_whitelists,             # {str -> [str]}
         realms_pb,                 # realms_pb2.Realms or None
+        security_config_blob,      # str
         additional_client_ids      # [str]
     ):
     self._from_what = from_what  # for tests only
@@ -359,6 +365,12 @@ class AuthDB(object):
       with _all_perms_lock:
         registered_perms = list(_all_perms)
       self._init_realms(realms_pb, registered_perms)
+
+    # Interpret the SecurityConfig proto if given, used by is_internal_domain.
+    # See replication.py for explanation of 'empty' string.
+    self._internal_domains_re = None
+    if security_config_blob and security_config_blob != 'empty':
+      self._init_security_config(security_config_blob)
 
     # Lazy-initialized indexes structures. See _indexes().
     self._lock = threading.Lock()
@@ -434,6 +446,13 @@ class AuthDB(object):
       self._realms[realm.name] = CachedRealm(per_permission_sets)
 
     logging.info('Loaded %d realms', len(self._realms))
+
+  def _init_security_config(self, blob):
+    """Parses and interprets security_config_pb2.SecurityConfig."""
+    msg = security_config_pb2.SecurityConfig.FromString(blob)
+    if msg.internal_service_regexp:
+      merged = '|'.join('(%s)' % r for r in msg.internal_service_regexp)
+      self._internal_domains_re = re.compile('^(%s)$' % merged)
 
   def _indexes(self):
     """Lazily builds and returns various indexes used by get_relevant_subgraph.
@@ -798,6 +817,12 @@ class AuthDB(object):
     Format of the tuple: (client_id, client_secret, additional client ids list).
     """
     return self._oauth_config
+
+  def is_internal_domain(self, domain):
+    """True for domain names of services within the current LUCI deployment."""
+    return bool(
+        self._internal_domains_re and
+        self._internal_domains_re.match(domain))
 
   def has_permission(self, permission, realms, identity):
     """Returns True if the identity has the given permission in any of `realms`.
@@ -1862,6 +1887,21 @@ def verify_ip_whitelisted(identity, ip):
     address doesn't belong to it.
   """
   get_request_cache().auth_db.verify_ip_whitelisted(identity, ip)
+
+
+def is_internal_domain(domain):
+  """True for domain names of services within the current LUCI deployment.
+
+  This check is based on a deployment-wide 'security.cfg' configuration file.
+  See proto/security_config.proto for more details.
+
+  Args:
+    domain: a domain name to check.
+
+  Returns:
+    True or False.
+  """
+  return get_request_cache().auth_db.is_internal_domain(domain)
 
 
 def public(func):
