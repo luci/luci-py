@@ -42,7 +42,8 @@ if sys.platform == 'win32':
   import locale
   from ctypes import wintypes  # pylint: disable=ungrouped-imports
   from ctypes.wintypes import windll  # pylint: disable=ungrouped-imports
-elif sys.platform == 'darwin':
+elif sys.platform == 'darwin' and six.PY2:
+  # These modules don't exist in Python3.
   import Carbon.File
   import MacOS
 
