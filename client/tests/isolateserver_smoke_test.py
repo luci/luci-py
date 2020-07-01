@@ -41,8 +41,8 @@ class IsolateServerArchiveSmokeTest(unittest.TestCase):
     # before being uploaded.
     # TODO(maruel): This should not be leaked to the client. It's a
     # transport/storage detail.
-    self.namespace = ('temporary' + str(long(time.time())).split('.', 1)[0]
-                      + '-gzip')
+    self.namespace = ('temporary' + str(int(time.time())).split('.', 1)[0] +
+                      '-gzip')
     self.tempdir = tempfile.mkdtemp(prefix=u'isolateserver')
     self.rootdir = os.path.join(self.tempdir, 'rootdir')
     self.test_data = os.path.join(self.tempdir, 'test_data')

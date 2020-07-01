@@ -1682,7 +1682,7 @@ def CMDarchive(parser, args):
     files = (l.rstrip('\n\r') for l in sys.stdin)
   if not files:
     parser.error('Nothing to upload')
-  files = (f.decode('utf-8') for f in files)
+  files = (six.ensure_text(f) for f in files)
   blacklist = tools.gen_blacklist(options.blacklist)
   try:
     with get_storage(server_ref) as storage:
