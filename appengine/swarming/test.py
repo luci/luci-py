@@ -11,7 +11,6 @@ import six
 from test_support import parallel_test_runner, sequential_test_runner
 
 SWARMING_DIR = os.path.dirname(os.path.abspath(__file__))
-SWARMING_BOT_DIR = os.path.join(SWARMING_DIR, 'swarming_bot')
 
 
 def main():
@@ -24,10 +23,6 @@ def run_tests_parralel():
   if six.PY2:
     import swarming_test_env
     swarming_test_env.setup_test_env()
-
-  sys.path.insert(0, SWARMING_BOT_DIR)
-  import test_env_bot
-  test_env_bot.setup_test_env()
 
   # append attribute filter option "--attribute '!no_run'"
   # https://nose2.readthedocs.io/en/latest/plugins/attrib.html
