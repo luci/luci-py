@@ -359,7 +359,7 @@ def import_project(project_id):
   try:
     loc = _resolved_location(project.config_location.url)
   except gitiles.TreeishResolutionError:
-    logging.warn('could not resolve URL %r', project.config_location.url)
+    logging.warning('could not resolve URL %r', project.config_location.url)
 
     @ndb.transactional
     def txn():
