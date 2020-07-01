@@ -86,7 +86,7 @@ def _reformat_stack(stack):
     return l
 
   # Trim paths.
-  out = map(replace, stack.splitlines(True))
+  out = list(map(replace, stack.splitlines(True)))
 
   # Trim indentation.
   while all(l.startswith(' ') for l in out):
@@ -124,7 +124,7 @@ def _serialize_env():
   ANSI escape code.
   """
   return dict(
-      (k, v.encode('ascii', 'replace')) for k, v in os.environ.items())
+      (k, v.encode('ascii', 'replace').decode()) for k, v in os.environ.items())
 
 
 def _report_exception(message, e, stack):
