@@ -3,6 +3,8 @@
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
 
+from __future__ import print_function
+
 import base64
 import hashlib
 import json
@@ -55,17 +57,17 @@ class TestCase(net_utils.TestCase):
   def setUp(self):
     super(TestCase, self).setUp()
     self.mock(auth, 'ensure_logged_in', lambda _: None)
-    self.mock(sys, 'stdout', StringIO.StringIO())
-    self.mock(sys, 'stderr', StringIO.StringIO())
     self.old_cwd = os.getcwd()
+    self.mock_print = mock.patch('__builtin__.print').start()
 
   def tearDown(self):
+    mock.patch.stopall()
     try:
       os.chdir(self.old_cwd)
       if self._tempdir:
         file_path.rmtree(self._tempdir)
       if not self.has_failed():
-        self.checkOutput('', '')
+        self.checkOutput([])
     finally:
       super(TestCase, self).tearDown()
 
@@ -78,15 +80,9 @@ class TestCase(net_utils.TestCase):
   def make_tree(self, contents):
     test_env.make_tree(self.tempdir, contents)
 
-  def checkOutput(self, expected_out, expected_err):
-    try:
-      # pylint: disable=no-member
-      self.assertEqual(expected_err, sys.stderr.getvalue())
-      self.assertEqual(expected_out, sys.stdout.getvalue())
-    finally:
-      # Prevent double-fail.
-      self.mock(sys, 'stdout', StringIO.StringIO())
-      self.mock(sys, 'stderr', StringIO.StringIO())
+  def checkOutput(self, expected_out):
+    self.assertEqual(self.mock_print.call_args_list, expected_out)
+    self.mock_print.reset_mock()
 
 
 class TestZipCompression(TestCase):
@@ -1161,10 +1157,13 @@ class IsolateServerDownloadTest(TestCase):
     }
     actual = self._get_actual()
     self.assertEqual(expected, actual)
-    expected_stdout = (
-        'To run this test please run from the directory %s:\n  Absurb command\n'
-        % os.path.join(self.tempdir, 'target', 'a'))
-    self.checkOutput(expected_stdout, '')
+    expected_stdout = [
+        mock.call(
+            'To run this test please run from the directory %s:' %
+            os.path.join(self.tempdir, 'target', 'a'),),
+        mock.call('  Absurb command',),
+    ]
+    self.checkOutput(expected_stdout)
 
   def test_download_isolated_tar_archive(self):
     # Test downloading an isolated tree.
@@ -1251,10 +1250,13 @@ class IsolateServerDownloadTest(TestCase):
     }
     actual = self._get_actual()
     self.assertEqual(expected, actual)
-    expected_stdout = (
-        'To run this test please run from the directory %s:\n  Absurb command\n'
-        % os.path.join(self.tempdir, 'target', 'a'))
-    self.checkOutput(expected_stdout, '')
+
+    expected_stdout = [
+        mock.call(u'To run this test please run from the directory %s:' %
+                  os.path.join(self.tempdir, 'target', 'a')),
+        mock.call(u'  Absurb command'),
+    ]
+    self.checkOutput(expected_stdout)
 
 
 def get_storage(server_ref):
@@ -1282,16 +1284,6 @@ class TestArchive(TestCase):
     self.mock(logging_utils, 'prepare_logging', lambda *_: None)
     self.mock(logging_utils, 'set_console_level', lambda *_: None)
 
-  def test_archive_no_server(self):
-    with self.assertRaises(SystemExit):
-      isolateserver.main(['archive', '.'])
-    prog = os.path.basename(sys.modules[isolateserver.__name__].__file__)
-    self.checkOutput(
-        '',
-        'Usage: %(prog)s archive [options] <file1..fileN> or - to read '
-        'from stdin\n\n'
-        '%(prog)s: error: --isolate-server is required.\n' % {'prog': prog})
-
   def test_archive_files(self):
     self.mock(isolateserver, 'get_storage', get_storage)
     self.make_tree(CONTENTS)
@@ -1299,10 +1291,10 @@ class TestArchive(TestCase):
     os.chdir(self.tempdir)
     isolateserver.main(
         ['archive', '--isolate-server', 'https://localhost:1'] + f)
-    self.checkOutput(
-        'da39a3ee5e6b4b0d3255bfef95601890afd80709 empty_file.txt\n'
-        '0491bd1da8087ad10fcdd7c9634e308804b72158 small_file.txt\n',
-        '')
+    self.checkOutput([
+        mock.call(u'da39a3ee5e6b4b0d3255bfef95601890afd80709 empty_file.txt\n'
+                  '0491bd1da8087ad10fcdd7c9634e308804b72158 small_file.txt'),
+    ])
 
   def help_test_archive(self, cmd_line_prefix):
     self.mock(isolateserver, 'get_storage', get_storage)
@@ -1322,9 +1314,7 @@ class TestArchive(TestCase):
         isolated['files'][k]['m'] = 0o600
     isolated_data = json.dumps(isolated, sort_keys=True, separators=(',', ':'))
     isolated_hash = isolateserver_fake.hash_content(isolated_data)
-    self.checkOutput(
-        '%s %s\n' % (isolated_hash, self.tempdir),
-        '')
+    self.checkOutput([mock.call('%s %s' % (isolated_hash, self.tempdir))])
 
   def test_archive_directory(self):
     self.help_test_archive(['archive', '-I', 'https://localhost:1'])

@@ -5,7 +5,7 @@
 
 """Archives a set of files or directories to an Isolate Server."""
 
-__version__ = '0.9.0'
+from __future__ import print_function
 
 import collections
 import errno
@@ -46,6 +46,8 @@ from utils import on_error
 from utils import subprocess42
 from utils import threading_utils
 
+
+__version__ = '0.9.0'
 
 # Version of isolate protocol passed to the server in /handshake request.
 ISOLATE_PROTOCOL_VERSION = '1.0'
