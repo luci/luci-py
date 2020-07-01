@@ -53,6 +53,9 @@ import remote_client
 import task_runner
 
 
+DISABLE_CIPD_FOR_TESTS = ['--cipd-enabled', 'false']
+
+
 def get_manifest(script=None, isolated=None, **kwargs):
   """Returns a task manifest similar to what the server sends back to the bot.
 
@@ -116,9 +119,10 @@ def run_command(server_url, work_dir, task_details, headers_cb):
                                             work_dir)
   remote.bot_id = task_details.bot_id
   with luci_context.stage(local_auth=None) as ctx_file:
-    return task_runner.run_command(
-        remote, task_details, work_dir, 3600.,
-        time.time(), ['--min-free-space', '1'], '/path/to/file', ctx_file)
+    return task_runner.run_command(remote, task_details, work_dir, 3600.,
+                                   time.time(), ['--min-free-space', '1'] +
+                                   DISABLE_CIPD_FOR_TESTS, '/path/to/file',
+                                   ctx_file)
 
 
 def load_and_run(server_url, work_dir, manifest, auth_params_file):
@@ -128,7 +132,8 @@ def load_and_run(server_url, work_dir, manifest, auth_params_file):
     json.dump(manifest, f)
   out_file = os.path.join(work_dir, 'task_runner_out.json')
   task_runner.load_and_run(in_file, server_url, 3600., time.time(), out_file,
-                           ['--min-free-space', '1'], None, auth_params_file)
+                           ['--min-free-space', '1'] + DISABLE_CIPD_FOR_TESTS,
+                           None, auth_params_file)
   with open(out_file, 'rb') as f:
     return json.load(f)
 
@@ -1141,16 +1146,24 @@ class TestTaskRunnerKilled(TestTaskRunnerBase):
     with open(bot, 'wb') as f:
       f.write(code)
     cmd = [
-      sys.executable, bot, 'task_runner',
-      '--swarming-server', self.server.url,
-      '--in-file', task_in_file,
-      '--out-file', task_result_file,
-      '--cost-usd-hour', '1',
-      # Include the time taken to poll the task in the cost.
-      '--start', str(time.time()),
-      '--',
-      '--cache', 'isolated_cache_party',
-    ]
+        sys.executable,
+        bot,
+        'task_runner',
+        '--swarming-server',
+        self.server.url,
+        '--in-file',
+        task_in_file,
+        '--out-file',
+        task_result_file,
+        '--cost-usd-hour',
+        '1',
+        # Include the time taken to poll the task in the cost.
+        '--start',
+        str(time.time()),
+        '--',
+        '--cache',
+        'isolated_cache_party',
+    ] + DISABLE_CIPD_FOR_TESTS
     logging.info('%s', cmd)
     proc = subprocess42.Popen(cmd, cwd=self.root_dir, detached=True)
     logging.info('Waiting for child process to be alive')
@@ -1246,7 +1259,8 @@ class TaskRunnerNoServer(auto_stub.TestCase):
           os.path.realpath(self.root_dir), os.path.realpath(work_dir))
       self.assertEqual(3600., cost_usd_hour)
       self.assertGreaterEqual(time.time(), start)
-      self.assertEqual(['--min-free-space', '1'], run_isolated_flags)
+      self.assertEqual(['--min-free-space', '1'] + DISABLE_CIPD_FOR_TESTS,
+                       run_isolated_flags)
       self.assertEqual(None, bot_file)
       with open(ctx_file, 'r') as f:
         self.assertIsNone(json.load(f).get('local_auth'))
@@ -1303,7 +1317,8 @@ class TaskRunnerNoServer(auto_stub.TestCase):
           os.path.realpath(self.root_dir), os.path.realpath(work_dir))
       self.assertEqual(3600., cost_usd_hour)
       self.assertGreaterEqual(time.time(), start)
-      self.assertEqual(['--min-free-space', '1'], run_isolated_flags)
+      self.assertEqual(['--min-free-space', '1'] + DISABLE_CIPD_FOR_TESTS,
+                       run_isolated_flags)
       self.assertEqual(None, bot_file)
       with open(ctx_file, 'r') as f:
         ctx = json.load(f)

@@ -693,6 +693,9 @@ def _run_isolated_flags(botobj):
       str(settings['caches']['isolated']['items']),
   ]
 
+  if _IN_TEST_MODE:
+    args += ['--cipd-enabled', 'false']
+
   return args
 
 
@@ -1314,7 +1317,11 @@ def _bot_restart(botobj, message, filepath=None):
   # to outlive the new code child process. Launchd really wants the main process
   # to survive, and it'll restart it if it disappears. os.exec*() replaces the
   # process so this is fine.
-  ret = common.exec_python([filepath, 'start_slave', '--survive'])
+  cmd = [filepath, 'start_slave', '--survive']
+  if _IN_TEST_MODE:
+    cmd.append('--test-mode')
+  logging.debug('Restarting bot, cmd: %s', cmd)
+  ret = common.exec_python(cmd)
   if ret in (1073807364, -1073741510):
     # 1073807364 is returned when the process is killed due to shutdown. No need
     # to alert anyone in that case.

@@ -119,7 +119,6 @@ def get_isolated_args(work_dir, task_details, isolated_result,
   # CIPD options. Empty 'packages' list is fine. It means the task needs
   # a bootstrapped CIPD client only.
   if task_details.cipd_input:
-    cmd.append('--cipd-enabled')
     for pkg in task_details.cipd_input.get('packages', []):
       cmd.extend([
           '--cipd-package',
