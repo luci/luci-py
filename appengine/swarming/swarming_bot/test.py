@@ -15,6 +15,10 @@ COMPONENTS_DIR = os.path.join(APPENGINE_DIR, 'components')
 
 
 def main():
+  return run_tests_parralel() or run_tests_sequential()
+
+
+def run_tests_parralel():
   # TODO(jwata): add only root level directory to
   # avoid adhoc sys.path insertions
   # add path for test_support
@@ -36,6 +40,20 @@ def main():
   sys.path.insert(0, COMPONENTS_DIR)
   from test_support import parallel_test_runner
   return parallel_test_runner.run_tests(python3=six.PY3, plugins=plugins)
+
+
+def run_tests_sequential():
+  # These tests need to be run as executable.
+  # because they don't pass when running in parallel
+  # or run via test runner.
+  test_files = [
+      'bot_code/singleton_test.py',
+  ]
+  abs_test_files = [os.path.join(THIS_DIR, t) for t in test_files]
+
+  # execute test runner
+  from test_support import sequential_test_runner
+  return sequential_test_runner.run_tests(abs_test_files, python3=six.PY3)
 
 
 if __name__ == '__main__':
