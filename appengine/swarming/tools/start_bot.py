@@ -88,7 +88,7 @@ class LocalBot(object):
     assert not self._proc
     bot_zip = os.path.join(self._botdir, 'swarming_bot.zip')
     urllib.request.urlretrieve(self._swarming_server_url + '/bot_code', bot_zip)
-    cmd = [sys.executable, bot_zip, 'start_slave']
+    cmd = [sys.executable, bot_zip, 'start_slave', '--test-mode']
     if self._redirect:
       logs = os.path.join(self._botdir, 'logs')
       if not os.path.isdir(logs):

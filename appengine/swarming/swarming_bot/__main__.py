@@ -9,10 +9,10 @@ command only.
 """
 __version__ = '1.0.0'
 
+import argparse
 import code
 import json
 import logging
-import optparse
 import os
 import shutil
 import sys
@@ -206,13 +206,12 @@ def CMDstart_slave(args):
   """Ill named command that actually sets up the bot then start it."""
   # TODO(maruel): Rename function.
   logging_utils.prepare_logging(os.path.join('logs', 'bot_config.log'))
-
-  parser = optparse.OptionParser()
-  parser.add_option(
+  parser = argparse.ArgumentParser()
+  parser.add_argument(
       '--survive',
       action='store_true',
       help='Do not reboot the host even if bot_config.setup_bot() asked to')
-  options, args = parser.parse_args(args)
+  options, args = parser.parse_known_args(args)
 
   try:
     from bot_code import bot_main
@@ -220,8 +219,9 @@ def CMDstart_slave(args):
   except Exception:
     logging.exception('bot_main.py failed.')
 
-  logging.info('Starting the bot: %s', THIS_FILE)
-  return common.exec_python([THIS_FILE, 'start_bot'])
+  cmd = [THIS_FILE, 'start_bot'] + args
+  logging.info('Starting the bot: %s', cmd)
+  return common.exec_python(cmd)
 
 
 def CMDtask_runner(args):
