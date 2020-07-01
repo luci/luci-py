@@ -113,7 +113,6 @@ class RunIsolatedTestBase(auto_stub.TestCase):
   # 'AssertionError: Items in the first set but not the second'
   # Need to run in test_seq.py as an executable
   no_run = 1
-  DISABLE_CIPD_FOR_TESTS = ['--cipd-enabled', False]
 
   @classmethod
   def setUpClass(cls):
@@ -260,7 +259,7 @@ class RunIsolatedTest(RunIsolatedTestBase):
       return StorageFake({isolated_hash: isolated}, server_ref)
     self.mock(isolateserver, 'get_storage', get_storage)
 
-    cmd = self.DISABLE_CIPD_FOR_TESTS + [
+    cmd = [
         '--no-log',
         '--isolated',
         isolated_hash,
@@ -298,7 +297,7 @@ class RunIsolatedTest(RunIsolatedTestBase):
       return StorageFake({isolated_hash: isolated}, server_ref)
     self.mock(isolateserver, 'get_storage', get_storage)
 
-    cmd = self.DISABLE_CIPD_FOR_TESTS + [
+    cmd = [
         '--no-log',
         '--isolated',
         isolated_hash,
@@ -413,7 +412,7 @@ class RunIsolatedTest(RunIsolatedTestBase):
       return StorageFake({isolated_hash: isolated}, server_ref)
     self.mock(isolateserver, 'get_storage', get_storage)
 
-    cmd = self.DISABLE_CIPD_FOR_TESTS + [
+    cmd = [
         '--no-log',
         '--isolated',
         isolated_hash,
@@ -446,7 +445,7 @@ class RunIsolatedTest(RunIsolatedTestBase):
 
   def test_main_naked_without_isolated(self):
     self.mock_popen_with_oserr()
-    cmd = self.DISABLE_CIPD_FOR_TESTS + [
+    cmd = [
         '--no-log',
         '--cache',
         os.path.join(self.tempdir, 'isolated_cache'),
@@ -478,7 +477,7 @@ class RunIsolatedTest(RunIsolatedTestBase):
   def test_main_naked_with_account_switch(self):
     self.capture_luci_ctx = True
     self.mock_popen_with_oserr()
-    cmd = self.DISABLE_CIPD_FOR_TESTS + [
+    cmd = [
         '--no-log',
         '--cache',
         os.path.join(self.tempdir, 'isolated_cache'),
@@ -508,7 +507,7 @@ class RunIsolatedTest(RunIsolatedTestBase):
   def test_main_naked_with_account_pop(self):
     self.capture_luci_ctx = True
     self.mock_popen_with_oserr()
-    cmd = self.DISABLE_CIPD_FOR_TESTS + [
+    cmd = [
         '--no-log',
         '--cache',
         os.path.join(self.tempdir, 'isolated_cache'),
@@ -538,7 +537,7 @@ class RunIsolatedTest(RunIsolatedTestBase):
   def test_main_naked_leaking(self):
     workdir = tempfile.mkdtemp()
     try:
-      cmd = self.DISABLE_CIPD_FOR_TESTS + [
+      cmd = [
           '--no-log',
           '--cache',
           os.path.join(self.tempdir, 'isolated_cache'),
@@ -669,6 +668,7 @@ class RunIsolatedTest(RunIsolatedTestBase):
         '--no-log',
         '--cache',
         os.path.join(self.tempdir, 'isolated_cache'),
+        '--cipd-enabled',
         '--cipd-client-version',
         'git:wowza',
         '--cipd-server',
@@ -756,22 +756,20 @@ class RunIsolatedTest(RunIsolatedTestBase):
     self.assertEqual(os.path.join(cipd_cache, 'cache'), env['CIPD_CACHE_DIR'])
 
   def test_main_relative_cwd_no_cmd(self):
-    cmd = self.DISABLE_CIPD_FOR_TESTS + [
-        '--relative-cwd',
-        'a',
+    cmd = [
+      '--relative-cwd', 'a',
     ]
     with self.assertRaises(SystemExit):
       run_isolated.main(cmd)
 
   def test_main_bad_relative_cwd(self):
-    cmd = self.DISABLE_CIPD_FOR_TESTS + [
-        '--raw-cmd',
-        '--relative-cwd',
-        'a/../../b',
-        '--',
-        'bin/echo${EXECUTABLE_SUFFIX}',
-        'hello',
-        'world',
+    cmd = [
+      '--raw-cmd',
+      '--relative-cwd', 'a/../../b',
+      '--',
+      'bin/echo${EXECUTABLE_SUFFIX}',
+      'hello',
+      'world',
     ]
     with self.assertRaises(SystemExit):
       run_isolated.main(cmd)
@@ -788,7 +786,7 @@ class RunIsolatedTest(RunIsolatedTestBase):
       self.assertEqual(1814400, max_age_secs)
     self.mock(local_caching, 'trim_caches', trim_caches)
     nc = os.path.join(self.tempdir, 'named_cache')
-    cmd = self.DISABLE_CIPD_FOR_TESTS + [
+    cmd = [
         '--no-log',
         '--leak-temp-dir',
         '--cache',
@@ -887,20 +885,17 @@ class RunIsolatedTest(RunIsolatedTestBase):
       # Success.
       return 0
     self.popen_fakes.append(fake_wait)
-    cmd = self.DISABLE_CIPD_FOR_TESTS + [
-        '--no-log',
-        '--raw-cmd',
-        '--lower-priority',
-        '--containment-type',
-        'JOB_OBJECT',
-        '--limit-processes',
-        '42',
-        '--limit-total-committed-memory',
-        '1024',
-        '--',
-        '/bin/echo',
-        'hello',
-        'world',
+    cmd = [
+      '--no-log',
+      '--raw-cmd',
+      '--lower-priority',
+      '--containment-type', 'JOB_OBJECT',
+      '--limit-processes', '42',
+      '--limit-total-committed-memory', '1024',
+      '--',
+      '/bin/echo',
+      'hello',
+      'world',
     ]
     ret = run_isolated.main(cmd)
     self.assertEqual(0, ret)
@@ -1483,10 +1478,6 @@ class RunIsolatedJsonTest(RunIsolatedTestBase):
         self2._path = args[-1]
         self2.returncode = None
 
-      def yield_any_line(self2, timeout=None):
-        self.assertEqual(None, timeout)
-        return ()
-
       def wait(self2, timeout=None):
         self.assertEqual(None, timeout)
         self2.returncode = 0
@@ -1514,7 +1505,7 @@ class RunIsolatedJsonTest(RunIsolatedTestBase):
     self.mock(isolateserver, 'get_storage', get_storage)
 
     out = os.path.join(self.tempdir, 'res.json')
-    cmd = self.DISABLE_CIPD_FOR_TESTS + [
+    cmd = [
         '--no-log',
         '--isolated',
         isolated_in_hash,
