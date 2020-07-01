@@ -14,7 +14,7 @@ import sys
 import threading
 import time
 
-import os_utilities
+from api import os_utilities
 
 # Method could be a function - pylint: disable=R0201
 

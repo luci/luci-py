@@ -50,7 +50,7 @@ class Handler(BaseHTTPServer.BaseHTTPRequestHandler):
   def do_OPTIONS(self):
     if self.path == _STOP_EVENT:
       self.server.parent._stopped = True
-    self.send_octet_stream('')
+    self.send_octet_stream(b'')
 
   def log_message(self, fmt, *args):
     logging.info(

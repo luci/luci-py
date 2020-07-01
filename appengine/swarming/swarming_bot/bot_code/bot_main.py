@@ -37,6 +37,8 @@ import traceback
 import types
 import zipfile
 
+import six
+
 # Import _strptime before threaded code. datetime.datetime.strptime is
 # threadsafe except for the initial import of the _strptime module.
 # See https://bugs.python.org/issue7980.
@@ -75,7 +77,7 @@ _ERROR_HANDLER_WAS_REGISTERED = False
 #
 # Note: this more or less requires the bot to be in a path without non-ASCII
 # characters.
-THIS_FILE = unicode(os.path.abspath(zip_package.get_main_script_path()))
+THIS_FILE = six.ensure_text(os.path.abspath(zip_package.get_main_script_path()))
 THIS_DIR = os.path.dirname(THIS_FILE)
 
 
