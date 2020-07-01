@@ -45,6 +45,9 @@ class SymlinkTest(unittest.TestCase):
       super(SymlinkTest, self).tearDown()
 
   if sys.platform == 'darwin':
+
+    @unittest.skipIf(six.PY3, 'TODO(crbug.com/1017545): '
+                     'MacOS and Carbon are not defined')
     def test_expand_symlinks_path_case(self):
       # Ensures that the resulting path case is fixed on case insensitive file
       # system.
@@ -62,6 +65,8 @@ class SymlinkTest(unittest.TestCase):
           self.cwd, u'link/File.txt')
       self.assertEqual((u'Dest/file.txt', [u'link']), (relfile, symlinks))
 
+    @unittest.skipIf(six.PY3, 'TODO(crbug.com/1017545): '
+                     'MacOS and Carbon are not defined')
     def test_file_to_metadata_path_case_simple(self):
       # Ensure the symlink dest is saved in the right path case.
       subdir = os.path.join(self.cwd, u'subdir')
@@ -71,6 +76,8 @@ class SymlinkTest(unittest.TestCase):
       actual = isolated_format.file_to_metadata(linkdir.upper(), False)
       self.assertEqual({'l': u'subdir'}, actual)
 
+    @unittest.skipIf(six.PY3, 'TODO(crbug.com/1017545): '
+                     'MacOS and Carbon are not defined')
     def test_file_to_metadata_path_case_complex(self):
       # Ensure the symlink dest is saved in the right path case. This includes 2
       # layers of symlinks.
@@ -93,6 +100,10 @@ class SymlinkTest(unittest.TestCase):
       self.assertEqual({'l': u'../linkeddir2'}, actual)
 
   if sys.platform != 'win32':
+
+    @unittest.skipIf(sys.platform == 'darwin' and six.PY3,
+                     'TODO(crbug.com/1017545): '
+                     'MacOS and Carbon are not defined')
     def test_symlink_input_absolute_path(self):
       # A symlink is outside of the checkout, it should be treated as a normal
       # directory.

@@ -13,6 +13,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import unittest
 
 import six
 
@@ -115,6 +116,8 @@ class MockStorage(object):
     self.items = list(items)
 
 
+@unittest.skipIf(sys.platform == 'darwin' and six.PY3,
+                 'TODO(crbug.com/1017545): MacOS and Carbon are not defined')
 class IsolateBase(auto_stub.TestCase):
   def setUp(self):
     super(IsolateBase, self).setUp()

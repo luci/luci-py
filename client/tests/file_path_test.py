@@ -11,6 +11,9 @@ import subprocess
 import sys
 import tempfile
 import time
+import unittest
+
+import six
 
 # Mutates sys.path.
 import test_env
@@ -80,17 +83,26 @@ class FilePathTest(auto_stub.TestCase):
     """It's usually when the file was first marked read only."""
     self.assertFileMode(filepath, mode, 0 if sys.platform == 'win32' else 0o77)
 
+  @unittest.skipIf(sys.platform == 'darwin' and six.PY3,
+                   'TODO(crbug.com/1017545): '
+                   'MacOS and Carbon are not defined')
   def test_native_case_end_with_os_path_sep(self):
     # Make sure the trailing os.path.sep is kept.
     path = file_path.get_native_path_case(test_env.CLIENT_DIR) + os.path.sep
     self.assertEqual(file_path.get_native_path_case(path), path)
 
+  @unittest.skipIf(sys.platform == 'darwin' and six.PY3,
+                   'TODO(crbug.com/1017545): '
+                   'MacOS and Carbon are not defined')
   def test_native_case_end_with_dot_os_path_sep(self):
     path = file_path.get_native_path_case(test_env.CLIENT_DIR + os.path.sep)
     self.assertEqual(
         file_path.get_native_path_case(path + '.' + os.path.sep),
         path)
 
+  @unittest.skipIf(sys.platform == 'darwin' and six.PY3,
+                   'TODO(crbug.com/1017545): '
+                   'MacOS and Carbon are not defined')
   def test_native_case_non_existing(self):
     # Make sure it doesn't throw on non-existing files.
     non_existing = 'trace_input_test_this_file_should_not_exist'
@@ -193,6 +205,9 @@ class FilePathTest(auto_stub.TestCase):
     file_path.rmtree(str(subdir))
 
   if sys.platform == 'darwin':
+
+    @unittest.skipIf(six.PY3, 'TODO(crbug.com/1017545): '
+                     'MacOS and Carbon are not defined')
     def test_native_case_symlink_wrong_case(self):
       base_dir = file_path.get_native_path_case(test_env.TESTS_DIR)
       trace_inputs_dir = os.path.join(base_dir, 'trace_inputs')
@@ -217,6 +232,10 @@ class FilePathTest(auto_stub.TestCase):
           os.path.join(trace_inputs_dir, 'files2', 'Child1.py'), actual)
 
   if sys.platform in ('darwin', 'win32'):
+
+    @unittest.skipIf(sys.platform == 'darwin' and six.PY3,
+                     'TODO(crbug.com/1017545): '
+                     'MacOS and Carbon are not defined')
     def test_native_case_not_sensitive(self):
       # The home directory is almost guaranteed to have mixed upper/lower case
       # letters on both Windows and OSX.
@@ -235,6 +254,9 @@ class FilePathTest(auto_stub.TestCase):
           file_path.get_native_path_case(path.lower()),
           file_path.get_native_path_case(path.upper()))
 
+    @unittest.skipIf(sys.platform == 'darwin' and six.PY3,
+                     'TODO(crbug.com/1017545): '
+                     'MacOS and Carbon are not defined')
     def test_native_case_not_sensitive_non_existent(self):
       # This test also ensures that the output is independent on the input
       # string case.
@@ -366,6 +388,9 @@ class FilePathTest(auto_stub.TestCase):
       expected = (os.path.join('tests', 'trace_inputs'), 'files2', '/bar')
       self.assertEqual(expected, actual)
 
+    @unittest.skipIf(sys.platform == 'darwin' and six.PY3,
+                     'TODO(crbug.com/1017545): '
+                     'MacOS and Carbon are not defined')
     def test_native_case_symlink_right_case(self):
       actual = file_path.get_native_path_case(
           os.path.join(test_env.TESTS_DIR, 'trace_inputs'))
