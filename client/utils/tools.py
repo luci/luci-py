@@ -14,13 +14,10 @@ import sys
 import threading
 import time
 
+import six
+
 import utils
 from . import zip_package
-
-if sys.version_info.major == 2:
-  import cStringIO
-else:
-  import io as cStringIO
 
 # Path to (possibly extracted from zip) cacert.pem bundle file.
 # See get_cacerts_bundle().
@@ -374,7 +371,7 @@ def format_json(data, dense):
 
   If dense is True, the json is packed. Otherwise, it is human readable.
   """
-  buf = cStringIO.StringIO()
+  buf = six.StringIO()
   write_json(buf, data, dense)
   return buf.getvalue()
 
