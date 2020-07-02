@@ -879,6 +879,17 @@ class NamedCache(Cache):
     with self._lock:
       return set(self._lru)
 
+  def _sudo_chown(self, path):
+    if sys.platform == 'win32':
+      return
+    uid = os.getuid()
+    if os.stat(path).st_uid == uid:
+      return
+    # Maybe owner of |path| is different from runner of this script. This is to
+    # make fs.rename work in that case.
+    # https://crbug.com/986676
+    subprocess.check_call(['sudo', '-n', 'chown', str(uid), path])
+
   def install(self, dst, name):
     """Creates the directory |dst| and moves a previous named cache |name| if it
     was in the local named caches cache.
@@ -908,6 +919,7 @@ class NamedCache(Cache):
           if fs.isdir(abs_cache):
             logging.info('- reusing %r; size was %d', rel_cache, size)
             file_path.ensure_tree(os.path.dirname(dst))
+            self._sudo_chown(abs_cache)
             fs.rename(abs_cache, dst)
             self._remove(name)
             return size
@@ -966,14 +978,7 @@ class NamedCache(Cache):
         abs_cache = os.path.join(self.cache_dir, rel_cache)
         logging.info('- Moving to %r', rel_cache)
         file_path.ensure_tree(os.path.dirname(abs_cache))
-
-        if sys.platform != 'win32':
-          uid = os.getuid()
-          if os.stat(src).st_uid != uid:
-            # Maybe owner of |src| is different from runner of this script. This
-            # is to make fs.rename work in that case.
-            # https://crbug.com/986676
-            subprocess.check_call(['sudo', '-n', 'chown', str(uid), src])
+        self._sudo_chown(src)
         fs.rename(src, abs_cache)
 
         self._lru.add(name, (rel_cache, size))
