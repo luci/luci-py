@@ -487,7 +487,7 @@ def get_hardware_model_string():
     A string like Macmini5,3 or MacPro6,1.
   """
   try:
-    return six.text_type(
+    return six.ensure_text(
         subprocess.check_output(['sysctl', '-n', 'hw.model']).rstrip())
   except (OSError, subprocess.CalledProcessError):
     return None
@@ -509,7 +509,7 @@ def get_audio():
   """Returns the audio cards that are "connected"."""
   return [
       card['_name']
-      for card in _get_system_profiler('SPAudioDataType')
+      for card in _get_system_profiler('SPAudioDataType')[0].get('_items', [])
       if card.get('coreaudio_default_audio_output_device') == 'spaudio_yes'
   ]
 
@@ -577,7 +577,7 @@ def get_gpu():
 def get_cpuinfo():
   """Returns CPU information."""
   values = common._safe_parse(
-      subprocess.check_output(['sysctl', 'machdep.cpu']))
+      subprocess.check_output(['sysctl', 'machdep.cpu']).decode())
   # http://unix.stackexchange.com/questions/43539/what-do-the-flags-in-proc-cpuinfo-mean
   return {
       u'flags':
@@ -647,12 +647,6 @@ def get_monitor_hidpi():
     for card in _get_system_profiler('SPDisplaysDataType')
     if 'spdisplays_ndrvs' in card)
   return six.text_type(int(hidpi))
-
-
-def get_xcode_versions():
-  """Returns all Xcode versions installed."""
-  return sorted(
-      six.text_type(xcode['version']) for xcode in get_xcode_state().values())
 
 
 @tools.cached
