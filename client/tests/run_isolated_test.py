@@ -1077,7 +1077,8 @@ class RunIsolatedTestOutputs(RunIsolatedTestBase):
       full_path = os.path.join(run_dir, path)
       (t, content) = src_dir[path]
       if t == FILE:
-        open(full_path, 'w').write(content)
+        with open(full_path, 'w') as f:
+          f.write(content)
       elif t == RELATIVE_LINK:
         fs.symlink(content, full_path)
       elif t == LINK:
