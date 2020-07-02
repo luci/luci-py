@@ -1,4 +1,4 @@
-#!/usr/bin/env vpython
+#!/usr/bin/env vpython3
 # Copyright 2012 The LUCI Authors. All rights reserved.
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
@@ -30,7 +30,7 @@ CONTENTS = {
       from __future__ import print_function
       import os, sys
       ROOT_DIR = os.path.dirname(os.path.abspath(
-          __file__.decode(sys.getfilesystemencoding())))
+          __file__))
       expected = [
         'check_files.py', 'file1.txt', 'file1_copy.txt', 'file2.txt',
         'repeated_files.py',
@@ -44,51 +44,50 @@ CONTENTS = {
         sys.exit(1)
       # Check that file2.txt is in reality file3.txt.
       with open(os.path.join(ROOT_DIR, 'file2.txt'), 'rb') as f:
-        if f.read() != 'File3\\n':
+        if f.read() != b'File3\\n':
           print('file2.txt should be file3.txt in reality', file=sys.stderr)
           sys.exit(2)
-      print('Success')"""),
+      print('Success')""").encode(),
     'file1.txt':
-        'File1\n',
+        b'File1\n',
     'file2.txt':
-        'File2.txt\n',
+        b'File2.txt\n',
     'file3.txt':
-        'File3\n',
+        b'File3\n',
     'repeated_files.py':
         textwrap.dedent("""
       from __future__ import print_function
       import os, sys
       expected = ['file1.txt', 'file1_copy.txt', 'repeated_files.py']
       actual = sorted(os.listdir(os.path.dirname(os.path.abspath(
-          __file__.decode(sys.getfilesystemencoding())))))
+          __file__))))
       if expected != actual:
         print('Expected list doesn\\'t match:', file=sys.stderr)
         print(
             '%s\\n%s' % (','.join(expected), ','.join(actual)),
             file=sys.stderr)
         sys.exit(1)
-      print('Success')"""),
+      print('Success')""").encode(),
     'max_path.py':
         textwrap.dedent("""
       from __future__ import print_function
       import os, sys
       prefix = u'\\\\\\\\?\\\\' if sys.platform == 'win32' else u''
-      path = os.path.join(os.getcwd().decode(
-          sys.getfilesystemencoding()), 'a' * 200, 'b' * 200)
+      path = os.path.join(os.getcwd(), 'a' * 200, 'b' * 200)
       with open(prefix + path, 'rb') as f:
         actual = f.read()
-        if actual != 'File1\\n':
+        if actual != b'File1\\n':
           print('Unexpected content: %s' % actual, file=sys.stderr)
           sys.exit(1)
-      print('Success')"""),
+      print('Success')""").encode(),
     'tar_archive':
-        open(os.path.join(test_env.TESTS_DIR, 'archive.tar')).read(),
+        open(os.path.join(test_env.TESTS_DIR, 'archive.tar'), 'rb').read(),
     'archive_files.py':
         textwrap.dedent("""
       from __future__ import print_function
       import os, sys
       ROOT_DIR = os.path.dirname(os.path.abspath(
-          __file__.decode(sys.getfilesystemencoding())))
+          __file__))
       expected = ['a', 'archive_files.py', 'b']
       actual = sorted(os.listdir(ROOT_DIR))
       if expected != actual:
@@ -106,16 +105,16 @@ CONTENTS = {
       # Check that a/foo has right contents.
       with open(os.path.join(ROOT_DIR, 'a/foo'), 'rb') as f:
         d = f.read()
-        if d != 'Content':
+        if d != b'Content':
           print('a/foo contained %r' % d, file=sys.stderr)
           sys.exit(3)
       # Check that b has right contents.
       with open(os.path.join(ROOT_DIR, 'b'), 'rb') as f:
         d = f.read()
-        if d != 'More content':
+        if d != b'More content':
           print('b contained %r' % d, file=sys.stderr)
           sys.exit(4)
-      print('Success')"""),
+      print('Success')""").encode(),
 }
 
 
@@ -126,87 +125,82 @@ def file_meta(filename):
   }
 
 
-CONTENTS['download.isolated'] = json.dumps(
-    {
-      'command': ['python', 'repeated_files.py'],
-      'files': {
+CONTENTS['download.isolated'] = json.dumps({
+    'command': ['python', 'repeated_files.py'],
+    'files': {
         'file1.txt': file_meta('file1.txt'),
-        'file1_symlink.txt': {'l': 'files1.txt'},
+        'file1_symlink.txt': {
+            'l': 'files1.txt'
+        },
         'new_folder/file1.txt': file_meta('file1.txt'),
         'repeated_files.py': file_meta('repeated_files.py'),
-      },
-    })
+    },
+}).encode()
 
+CONTENTS['file_with_size.isolated'] = json.dumps({
+    'command': ['python', '-V'],
+    'files': {
+        'file1.txt': file_meta('file1.txt')
+    },
+    'read_only': 1,
+}).encode()
 
-CONTENTS['file_with_size.isolated'] = json.dumps(
-    {
-      'command': ['python', '-V'],
-      'files': {'file1.txt': file_meta('file1.txt')},
-      'read_only': 1,
-    })
+CONTENTS['manifest1.isolated'] = json.dumps({
+    'files': {
+        'file1.txt': file_meta('file1.txt')
+    }
+}).encode()
 
-
-CONTENTS['manifest1.isolated'] = json.dumps(
-    {'files': {'file1.txt': file_meta('file1.txt')}})
-
-
-CONTENTS['manifest2.isolated'] = json.dumps(
-    {
-      'files': {'file2.txt': file_meta('file2.txt')},
-      'includes': [
+CONTENTS['manifest2.isolated'] = json.dumps({
+    'files': {
+        'file2.txt': file_meta('file2.txt')
+    },
+    'includes': [
         isolateserver_fake.hash_content(CONTENTS['manifest1.isolated']),
-      ],
-    })
+    ],
+}).encode()
 
-
-CONTENTS['tar_archive.isolated'] = json.dumps(
-    {
-      'command': ['python', 'archive_files.py'],
-      'files': {
+CONTENTS['tar_archive.isolated'] = json.dumps({
+    'command': ['python', 'archive_files.py'],
+    'files': {
         'archive': {
-          'h': isolateserver_fake.hash_content(CONTENTS['tar_archive']),
-          's': len(CONTENTS['tar_archive']),
-          't': 'tar',
+            'h': isolateserver_fake.hash_content(CONTENTS['tar_archive']),
+            's': len(CONTENTS['tar_archive']),
+            't': 'tar',
         },
         'archive_files.py': file_meta('archive_files.py'),
-      },
-    })
+    },
+}).encode()
 
-
-CONTENTS['max_path.isolated'] = json.dumps(
-    {
-      'command': ['python', 'max_path.py'],
-      'files': {
+CONTENTS['max_path.isolated'] = json.dumps({
+    'command': ['python', 'max_path.py'],
+    'files': {
         'a' * 200 + '/' + 'b' * 200: file_meta('file1.txt'),
         'max_path.py': file_meta('max_path.py'),
-      },
-    })
+    },
+}).encode()
 
-
-CONTENTS['repeated_files.isolated'] = json.dumps(
-    {
-      'command': ['python', 'repeated_files.py'],
-      'files': {
+CONTENTS['repeated_files.isolated'] = json.dumps({
+    'command': ['python', 'repeated_files.py'],
+    'files': {
         'file1.txt': file_meta('file1.txt'),
         'file1_copy.txt': file_meta('file1.txt'),
         'repeated_files.py': file_meta('repeated_files.py'),
-      },
-    })
+    },
+}).encode()
 
-
-CONTENTS['check_files.isolated'] = json.dumps(
-    {
-      'command': ['python', 'check_files.py'],
-      'files': {
+CONTENTS['check_files.isolated'] = json.dumps({
+    'command': ['python', 'check_files.py'],
+    'files': {
         'check_files.py': file_meta('check_files.py'),
         # Mapping another file.
         'file2.txt': file_meta('file3.txt'),
-      },
-      'includes': [
+    },
+    'includes': [
         isolateserver_fake.hash_content(CONTENTS[i])
         for i in ('manifest2.isolated', 'repeated_files.isolated')
-      ]
-    })
+    ]
+}).encode()
 
 
 def list_files_tree(directory):
@@ -280,7 +274,8 @@ class RunIsolatedTest(unittest.TestCase):
   def _store_isolated(self, data):
     """Stores an isolated file and returns its hash."""
     return self._isolated_server.add_content(
-        'default', json.dumps(data, sort_keys=True))
+        'default',
+        json.dumps(data, sort_keys=True).encode())
 
   def _store(self, filename):
     """Stores a test data file in the table and returns its hash."""
@@ -453,15 +448,15 @@ class RunIsolatedTest(unittest.TestCase):
   def test_isolated_corrupted_cache_entry_different_size(self):
     # Test that an entry with an invalid file size properly gets removed and
     # fetched again. This test case also check for file modes.
-    cached_file_path = self._test_corruption_common(
-        CONTENTS['file1.txt'] + ' now invalid size')
+    cached_file_path = self._test_corruption_common(CONTENTS['file1.txt'] +
+                                                    b' now invalid size')
     self.assertEqual(CONTENTS['file1.txt'], read_content(cached_file_path))
 
   def test_isolated_corrupted_cache_entry_same_size(self):
     # Test that an entry with an invalid file content but same size is NOT
     # detected property.
-    cached_file_path = self._test_corruption_common(
-        CONTENTS['file1.txt'][:-1] + ' ')
+    cached_file_path = self._test_corruption_common(CONTENTS['file1.txt'][:-1] +
+                                                    b' ')
     # TODO(maruel): This corruption is NOT detected.
     # This needs to be fixed.
     self.assertNotEqual(CONTENTS['file1.txt'], read_content(cached_file_path))
@@ -517,13 +512,9 @@ class RunIsolatedTest(unittest.TestCase):
     # means that it could get rounded *down* and match the value of now.
     now = time.time() - 2
     cmd = [
-        '--named-cache-root', self._named_cache_dir,
-        '--named-cache', 'cache1', 'a', '100',
-        '--raw-cmd',
-        '--',
-        sys.executable,
-        '-c',
-        'open("a/hello","wb").write("world");print("Success")'
+        '--named-cache-root', self._named_cache_dir, '--named-cache', 'cache1',
+        'a', '100', '--raw-cmd', '--', sys.executable, '-c',
+        'open("a/hello","wb").write(b"world");print("Success")'
     ]
     out, err, returncode = self._run(cmd)
     self.assertEqual('', err)

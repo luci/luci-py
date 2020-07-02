@@ -591,9 +591,9 @@ def fetch_and_map(isolated_hash, storage, cache, outdir):
   hot = (collections.Counter(cache.used) -
          collections.Counter(cache.added)).elements()
   return bundle, {
-    'duration': time.time() - start,
-    'items_cold': base64.b64encode(large.pack(sorted(cache.added))),
-    'items_hot': base64.b64encode(large.pack(sorted(hot))),
+      'duration': time.time() - start,
+      'items_cold': base64.b64encode(large.pack(sorted(cache.added))).decode(),
+      'items_hot': base64.b64encode(large.pack(sorted(hot))).decode(),
   }
 
 
@@ -673,9 +673,9 @@ def upload_then_delete(storage, out_dir, leak_temp_dir):
         results, f_cold, f_hot = isolateserver.archive_files_to_storage(
             storage, [out_dir], None, verify_push=True)
         outputs_ref = {
-          'isolated': results.values()[0],
-          'isolatedserver': storage.server_ref.url,
-          'namespace': storage.server_ref.namespace,
+            'isolated': list(results.values())[0],
+            'isolatedserver': storage.server_ref.url,
+            'namespace': storage.server_ref.namespace,
         }
         cold = sorted(i.size for i in f_cold)
         hot = sorted(i.size for i in f_hot)
@@ -701,9 +701,9 @@ def upload_then_delete(storage, out_dir, leak_temp_dir):
     # When this happens, it means there's a process error.
     logging.exception('Had difficulties removing out_dir %s: %s', out_dir, e)
   stats = {
-    'duration': time.time() - start,
-    'items_cold': base64.b64encode(large.pack(cold)),
-    'items_hot': base64.b64encode(large.pack(hot)),
+      'duration': time.time() - start,
+      'items_cold': base64.b64encode(large.pack(cold)).decode(),
+      'items_hot': base64.b64encode(large.pack(hot)).decode(),
   }
   return outputs_ref, success, stats
 
@@ -1284,7 +1284,7 @@ def process_named_cache_options(parser, options, time_fn=None):
     if not path:
       parser.error('cache path cannot be empty')
     try:
-      long(hint)
+      int(hint)
     except ValueError:
       parser.error('cache hint must be a number')
   if options.named_cache_root:
@@ -1342,7 +1342,7 @@ def _calc_named_cache_hint(named_cache, named_caches):
   size = 0
   for name, _, hint in named_caches:
     if name not in present:
-      hint = long(hint)
+      hint = int(hint)
       if hint > 0:
         size += hint
   return size

@@ -1513,7 +1513,9 @@ def _enqueue_dir(dirpath, blacklist, hash_algo, hash_algo_name):
   # Keep the file in memory. This is fine because .isolated files are relatively
   # small.
   yield BufferItem(
-      tools.format_json(data, True), algo=hash_algo, high_priority=True)
+      tools.format_json(data, True).encode(),
+      algo=hash_algo,
+      high_priority=True)
 
 
 def _archive_files_to_storage_internal(storage,

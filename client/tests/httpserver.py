@@ -22,7 +22,7 @@ class Handler(BaseHTTPServer.BaseHTTPRequestHandler):
     self.send_response(200)
     self.send_header('Content-type', 'application/json')
     self.end_headers()
-    json.dump(data, self.wfile)
+    self.wfile.write(json.dumps(data).encode())
 
   def send_octet_stream(self, data, headers=None):
     """Sends a binary response."""
