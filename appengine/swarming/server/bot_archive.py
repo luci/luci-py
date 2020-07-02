@@ -381,6 +381,7 @@ FILES = (
     'utils/large.py',
     'utils/logging_utils.py',
     'utils/lru.py',
+    'utils/macos.py',
     'utils/net.py',
     'utils/oauth.py',
     'utils/on_error.py',
