@@ -313,16 +313,13 @@ def task_result_to_rpc(entity, send_stats):
   cipd_pins = None
   if entity.cipd_pins:
     cipd_pins = swarming_rpcs.CipdPins(
-      client_package=(
-        _ndb_to_rpc(swarming_rpcs.CipdPackage,
-                    entity.cipd_pins.client_package)
-        if entity.cipd_pins.client_package else None
-      ),
-      packages=[
-        _ndb_to_rpc(swarming_rpcs.CipdPackage, pkg)
-        for pkg in entity.cipd_pins.packages
-      ] if entity.cipd_pins.packages else None
-    )
+        client_package=(_ndb_to_rpc(swarming_rpcs.CipdPackage,
+                                    entity.cipd_pins.client_package)
+                        if entity.cipd_pins.client_package else None),
+        packages=[
+            _ndb_to_rpc(swarming_rpcs.CipdPackage, pkg)
+            for pkg in entity.cipd_pins.packages
+        ] if entity.cipd_pins.packages else [])
 
   resultdb_info = None
   if entity.resultdb_info:
