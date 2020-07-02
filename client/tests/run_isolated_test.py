@@ -3,7 +3,8 @@
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
 
-import StringIO
+from __future__ import print_function
+
 import base64
 import contextlib
 import functools
@@ -14,6 +15,7 @@ import os
 import sys
 import tempfile
 
+import mock
 import six
 
 # Mutates sys.path.
@@ -952,6 +954,15 @@ class RunIsolatedTest(RunIsolatedTestBase):
 
 
 class RunIsolatedTestRun(RunIsolatedTestBase):
+
+  def setUp(self):
+    super(RunIsolatedTestRun, self).setUp()
+    self.mocked_print = mock.patch('__builtin__.print').start()
+
+  def tearDown(self):
+    super(RunIsolatedTestRun, self).tearDown()
+    mock.patch.stopall()
+
   # Runs the actual command requested.
   def test_output(self):
     # Starts a full isolate server mock and have run_tha_test() uploads results
@@ -983,7 +994,6 @@ class RunIsolatedTestRun(RunIsolatedTestBase):
       store = isolateserver.get_storage(
           isolate_storage.ServerRef(server.url, 'default-store'))
 
-      self.mock(sys, 'stdout', StringIO.StringIO())
       data = run_isolated.TaskData(
           command=[],
           relative_cwd=None,
@@ -1033,13 +1043,11 @@ class RunIsolatedTestRun(RunIsolatedTestBase):
       self.assertEqual(hashes, set(server.contents['default-store']))
 
       expected = ''.join([
-        '[run_isolated_out_hack]',
-        '{"hash":"%s","namespace":"default-store","storage":%s}' % (
-            uploaded_hash, json.dumps(server.url)),
-        '[/run_isolated_out_hack]'
-      ]) + '\n'
-      # pylint: disable=no-member
-      self.assertEqual(expected, sys.stdout.getvalue())
+          '[run_isolated_out_hack]',
+          '{"hash":"%s","namespace":"default-store","storage":%s}' %
+          (uploaded_hash, json.dumps(server.url)), '[/run_isolated_out_hack]'
+      ])
+      self.mocked_print.assert_called_once_with(expected)
     finally:
       server.close()
 
@@ -1312,6 +1320,15 @@ class RunIsolatedTestOutputs(RunIsolatedTestBase):
 
 
 class RunIsolatedTestOutputFiles(RunIsolatedTestBase):
+
+  def setUp(self):
+    super(RunIsolatedTestOutputFiles, self).setUp()
+    self.mocked_print = mock.patch('__builtin__.print').start()
+
+  def tearDown(self):
+    super(RunIsolatedTestOutputFiles, self).tearDown()
+    mock.patch.stopall()
+
   # Like RunIsolatedTestRun, but ensures that specific output files
   # (as opposed to anything in $(ISOLATED_OUTDIR)) are returned.
   def _run_test(self, isolated, command, extra_args):
@@ -1353,7 +1370,6 @@ class RunIsolatedTestOutputFiles(RunIsolatedTestBase):
       store = isolateserver.get_storage(
           isolate_storage.ServerRef(server.url, 'default-store'))
 
-      self.mock(sys, 'stdout', StringIO.StringIO())
       data = run_isolated.TaskData(
           command=command,
           relative_cwd=None,
@@ -1424,13 +1440,11 @@ class RunIsolatedTestOutputFiles(RunIsolatedTestBase):
       self.assertEqual(hashes, set(server.contents['default-store']))
 
       expected = ''.join([
-        '[run_isolated_out_hack]',
-        '{"hash":"%s","namespace":"default-store","storage":%s}' % (
-            uploaded_hash, json.dumps(server.url)),
-        '[/run_isolated_out_hack]'
-      ]) + '\n'
-      # pylint: disable=no-member
-      self.assertEqual(expected, sys.stdout.getvalue())
+          '[run_isolated_out_hack]',
+          '{"hash":"%s","namespace":"default-store","storage":%s}' %
+          (uploaded_hash, json.dumps(server.url)), '[/run_isolated_out_hack]'
+      ])
+      self.mocked_print.assert_called_once_with(expected)
     finally:
       server.close()
 
