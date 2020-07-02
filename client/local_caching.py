@@ -858,6 +858,9 @@ class NamedCache(Cache):
         self._lru = lru.LRUDict.load(self.state_file)
         for _, size in self._lru.values():
           if not isinstance(size, six.integer_types):
+            with open(self.state_file, 'r') as f:
+              logging.info('named cache state file: %s\n%s', self.state_file,
+                           f.read())
             raise ValueError("size is not integer: %s" % size)
 
       except ValueError:
