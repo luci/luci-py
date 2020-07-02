@@ -117,6 +117,7 @@ class TestOsUtilities(auto_stub.TestCase):
   def test_get_physical_ram(self):
     self.assertGreater(os_utilities.get_physical_ram(), 0)
 
+  @unittest.skipIf(sys.platform == 'darwin' and six.PY3, 'crbug.com/1010816')
   def test_get_disks_info(self):
     info = os_utilities.get_disks_info()
     self.assertGreater(len(info), 0)
