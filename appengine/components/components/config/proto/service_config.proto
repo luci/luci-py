@@ -124,6 +124,9 @@ message ProjectsCfg {
 
 // Describes one luci service.
 message Service {
+  reserved 3;
+  reserved 'config_location';
+
   message JWTAuth {
     // Value for the 'aud' field in the JSON Web Token claim.
     string audience = 1;
@@ -134,13 +137,6 @@ message Service {
   string id = 1;
   // Email addresses of responsible and point-of-contacts for the service.
   repeated string owners = 2;
-  // DEPRECATED.
-  // TODO(tandrii): remove after https://crrev.com/i/3138183 lands.
-  // Where to import "services/<id>" config set from. If config_location.url is
-  // relative, it is relative to the current configuration file.
-  // If not specified, defaults to "../<id>/".
-  // Not yet implemented.
-  ConfigSetLocation config_location = 3;
   // An HTTPS endpoint that returns JSON-encoded ServiceDynamicMetadata in body.
   string metadata_url = 4;
   // A list of identities that have access to this service's configs.

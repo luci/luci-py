@@ -110,10 +110,6 @@ class ValidationTestCase(test_case.TestCase):
       }
       services {
         owners: "not an email"
-        config_location {
-          storage_type: GITILES
-          url: "../some"
-        }
         metadata_url: "not an url"
         access: "**&"
         access: "group:**&"
@@ -121,10 +117,6 @@ class ValidationTestCase(test_case.TestCase):
       }
       services {
         id: "b"
-        config_location {
-          storage_type: GITILES
-          url: "https://gitiles.host.com/project/+/refs/heads/master"
-        }
       }
       services {
         id: "a-unsorted"
@@ -137,8 +129,6 @@ class ValidationTestCase(test_case.TestCase):
         [m.text for m in result.messages],
         [
           'Service #2: id is not specified',
-          ('Service #2: config_location: '
-           'storage_type must not be set if relative url is used'),
           'Service #2: invalid email: "not an email"',
           'Service #2: metadata_url: hostname not specified',
           'Service #2: metadata_url: scheme must be "https"',

@@ -171,10 +171,6 @@ def validate_services_cfg(cfg, ctx):
   for i, service in enumerate(cfg.services):
     with ctx.prefix('Service %s: ', service.id or ('#%d' % (i + 1))):
       validate_id(service.id, config.common.SERVICE_ID_RGX, service_ids, ctx)
-      if service.config_location and service.config_location.url:
-        with ctx.prefix('config_location: '):
-          validate_config_set_location(
-              service.config_location, ctx, allow_relative_url=True)
       for owner in service.owners:
         validate_email(owner, ctx)
       if service.metadata_url:
