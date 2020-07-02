@@ -27,7 +27,10 @@ def CommonChecks(input_api, output_api):
     ]
     output.extend(
         input_api.canned_checks.RunPylint(
-            input_api, output_api, block_list=block_list))
+            input_api,
+            output_api,
+            block_list=block_list,
+            pylintrc=join('../', 'pylintrc')),)
   finally:
     sys.path = sys_path_backup
 
