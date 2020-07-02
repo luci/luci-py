@@ -14,6 +14,7 @@ import logging
 import os
 import sys
 import tempfile
+import unittest
 
 import mock
 import six
@@ -250,6 +251,7 @@ class RunIsolatedTest(RunIsolatedTestBase):
     finally:
       os.environ = old_env
 
+  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_main(self):
     self.mock(tools, 'disable_buffering', lambda: None)
     isolated = json_dumps(
@@ -291,6 +293,7 @@ class RunIsolatedTest(RunIsolatedTestBase):
         ],
         self.popen_calls)
 
+  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_main_args(self):
     self.mock(tools, 'disable_buffering', lambda: None)
     isolated = json_dumps({'command': ['foo.exe', 'cmd w/ space']})
@@ -371,6 +374,7 @@ class RunIsolatedTest(RunIsolatedTestBase):
     self.assertEqual(0, ret)
     return make_tree_call
 
+  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_run_tha_test_naked(self):
     isolated = json_dumps({'command': ['invalid', 'command']})
     isolated_hash = isolateserver_fake.hash_content(isolated)
@@ -403,6 +407,7 @@ class RunIsolatedTest(RunIsolatedTestBase):
       raise OSError('Unknown')
     old_init = self.mock(subprocess42.Popen, '__init__', r)
 
+  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_main_naked(self):
     self.mock_popen_with_oserr()
     self.mock(on_error, 'report', lambda _: None)
@@ -536,6 +541,7 @@ class RunIsolatedTest(RunIsolatedTestBase):
     task_ctx.pop('default_account_id')
     self.assertEqual(task_ctx, self.popen_calls[0][1]['luci_ctx']['local_auth'])
 
+  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_main_naked_leaking(self):
     workdir = tempfile.mkdtemp()
     try:
@@ -559,6 +565,7 @@ class RunIsolatedTest(RunIsolatedTestBase):
     finally:
       fs.rmtree(unicode(workdir))
 
+  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_main_naked_with_packages(self):
     self.mock(cipd, 'get_platform', lambda: 'linux-amd64')
 
@@ -662,6 +669,7 @@ class RunIsolatedTest(RunIsolatedTestBase):
         echo_cmd[0])
     self.assertEqual(echo_cmd[1:], [u'hello', u'world'])
 
+  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_main_naked_with_cipd_client_no_packages(self):
     self.mock(cipd, 'get_platform', lambda: 'linux-amd64')
 
@@ -776,6 +784,7 @@ class RunIsolatedTest(RunIsolatedTestBase):
     with self.assertRaises(SystemExit):
       run_isolated.main(cmd)
 
+  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_main_naked_with_caches(self):
     # An empty named cache better to be kept!
     trimmed = []
@@ -818,6 +827,7 @@ class RunIsolatedTest(RunIsolatedTestBase):
       self.assertTrue(fs.exists(named_path))
     self.assertTrue(trimmed)
 
+  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_modified_cwd(self):
     isolated = json_dumps({
         'command': ['../out/some.exe', 'arg'],
@@ -841,6 +851,7 @@ class RunIsolatedTest(RunIsolatedTestBase):
         ],
         self.popen_calls)
 
+  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_python_cmd_lower_priority(self):
     isolated = json_dumps({
         'command': ['../out/cmd.py', 'arg'],
@@ -865,6 +876,7 @@ class RunIsolatedTest(RunIsolatedTestBase):
     self.assertIn('python', cmd[0])
     self.assertEqual([os.path.join(u'..', 'out', 'cmd.py'), u'arg'], cmd[1:])
 
+  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_run_tha_test_non_isolated(self):
     _ = self._run_tha_test(command=[u'/bin/echo', u'hello', u'world'])
     self.assertEqual(
@@ -953,6 +965,7 @@ class RunIsolatedTest(RunIsolatedTestBase):
     self.assertTrue(stats)
 
 
+@unittest.skipIf(six.PY3, 'crbug.com/1010816')
 class RunIsolatedTestRun(RunIsolatedTestBase):
 
   def setUp(self):
@@ -1319,6 +1332,7 @@ class RunIsolatedTestOutputs(RunIsolatedTestBase):
     self.assertExpectedTree(expected)
 
 
+@unittest.skipIf(six.PY3, 'crbug.com/1010816')
 class RunIsolatedTestOutputFiles(RunIsolatedTestBase):
 
   def setUp(self):
@@ -1504,6 +1518,7 @@ class RunIsolatedJsonTest(RunIsolatedTestBase):
 
     self.mock(subprocess42, 'Popen', Popen)
 
+  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_main_json(self):
     # Instruct the Popen mock to write a file in ISOLATED_OUTDIR so it will be
     # archived back on termination.
