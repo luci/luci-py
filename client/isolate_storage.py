@@ -539,7 +539,7 @@ class IsolateServer(StorageApi):
       return False
     try:
       response.read()
-    except TimeoutError:
+    except net.TimeoutError:
       return False
 
     # Integrity check of uploaded file.
