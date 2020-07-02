@@ -14,8 +14,6 @@ import sys
 import threading
 import time
 
-import six
-
 import utils
 from . import zip_package
 
@@ -371,6 +369,8 @@ def format_json(data, dense):
 
   If dense is True, the json is packed. Otherwise, it is human readable.
   """
+  import six
+
   buf = six.StringIO()
   write_json(buf, data, dense)
   return buf.getvalue()
