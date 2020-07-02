@@ -8,6 +8,7 @@
 
 import sys
 
+import six
 
 if sys.platform == 'cygwin':
   import gce
@@ -27,12 +28,13 @@ if sys.platform == 'win32':
   is_gce = lambda: gce.is_gce() # to reuse gce.is_gce mock, if any
 
 
-if sys.platform == 'linux2':
+if sys.platform.startswith('linux'):
   try:
-    import android
+    if six.PY2:
+      import android
   except OSError:
     android = None
-  import gce
-  import linux
-  import posix
+  from api.platforms import gce
+  from api.platforms import linux
+  from api.platforms import posix
   is_gce = lambda: gce.is_gce() # to reuse gce.is_gce mock, if any

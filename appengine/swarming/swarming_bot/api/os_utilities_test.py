@@ -1,4 +1,4 @@
-#!/usr/bin/env vpython
+#!/usr/bin/env vpython3
 # Copyright 2014 The LUCI Authors. All rights reserved.
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
@@ -44,6 +44,7 @@ class TestOsUtilities(auto_stub.TestCase):
     super(TestOsUtilities, self).tearDown()
     tools.clear_cache_all()
 
+  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_get_os_name(self):
     expected = (u'Debian', u'Linux', u'Mac', u'Raspbian', u'Ubuntu', u'Windows')
     self.assertIn(os_utilities.get_os_name(), expected)
@@ -62,6 +63,7 @@ class TestOsUtilities(auto_stub.TestCase):
     expected = (u'32', u'64')
     self.assertIn(os_utilities.get_cpu_bitness(), expected)
 
+  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_get_cpu_dimensions(self):
     values = os_utilities.get_cpu_dimensions()
     self.assertGreater(len(values), 1)
@@ -100,6 +102,7 @@ class TestOsUtilities(auto_stub.TestCase):
       actual = os_utilities._parse_intel_model(i)
       self.assertEqual(expected, actual)
 
+  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_get_ip(self):
     ip = os_utilities.get_ip()
     self.assertNotEqual('127.0.0.1', ip)
@@ -110,6 +113,7 @@ class TestOsUtilities(auto_stub.TestCase):
   def test_get_num_processors(self):
     self.assertGreater(os_utilities.get_num_processors(), 0)
 
+  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_get_physical_ram(self):
     self.assertGreater(os_utilities.get_physical_ram(), 0)
 
@@ -126,10 +130,12 @@ class TestOsUtilities(auto_stub.TestCase):
     # disk I/O during the two calls.
     self.assertLess(delta, 2., (delta, free_disk, root['free_mb']))
 
+  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_get_gpu(self):
     actual = os_utilities.get_gpu()
     self.assertTrue(actual is None or actual)
 
+  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_get_dimensions(self):
     dimensions = os_utilities.get_dimensions()
     for key, values in dimensions.items():
@@ -171,6 +177,7 @@ class TestOsUtilities(auto_stub.TestCase):
       expected.add(u'integrity')
     self.assertEqual(expected, actual)
 
+  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_override_id_via_env(self):
     mock_env = os.environ.copy()
     mock_env['SWARMING_BOT_ID'] = 'customid'
@@ -181,6 +188,7 @@ class TestOsUtilities(auto_stub.TestCase):
     self.assertIsInstance(dimensions[u'id'][0], unicode)
     self.assertEqual(dimensions[u'id'][0], u'customid')
 
+  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_get_state(self):
     actual = os_utilities.get_state()
     actual.pop('reboot_required', None)
@@ -215,12 +223,14 @@ class TestOsUtilities(auto_stub.TestCase):
       self.fail(actual[u'quarantined'])
     self.assertEqual(expected, set(actual))
 
+  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_get_hostname_gce_docker(self):
     self.mock(platforms, 'is_gce', lambda: True)
     self.mock(os.path, 'isfile', lambda _: True)
     self.mock(socket, 'getfqdn', lambda: 'dockerhost')
     self.assertEqual(os_utilities.get_hostname(), 'dockerhost')
 
+  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_get_hostname_gce_nodocker(self):
     self.mock(platforms, 'is_gce', lambda: True)
     self.mock(os.path, 'isfile', lambda _: False)
@@ -239,12 +249,14 @@ class TestOsUtilities(auto_stub.TestCase):
       if manual_mock:
         del platforms.gce
 
+  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_get_hostname_nogce(self):
     self.mock(platforms, 'is_gce', lambda: False)
     self.mock(os.path, 'isfile', lambda _: False)
     self.mock(socket, 'getfqdn', lambda: 'somehost')
     self.assertEqual(os_utilities.get_hostname(), 'somehost')
 
+  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_get_hostname_macos(self):
     self.mock(platforms, 'is_gce', lambda: False)
     self.mock(os.path, 'isfile', lambda _: False)

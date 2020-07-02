@@ -31,6 +31,7 @@ import sys
 import tempfile
 import time
 
+import six
 
 from utils import tools
 tools.force_local_third_party()
@@ -932,7 +933,7 @@ def get_state_all_devices_android(devices):
 def get_dimensions():
   """Returns the default dimensions."""
   dimensions = {
-      u'cores': [unicode(get_num_processors())],
+      u'cores': [six.ensure_text(str(get_num_processors()))],
       u'cpu': get_cpu_dimensions(),
       u'gpu': get_gpu()[0],
       u'id': [get_hostname_short()],
