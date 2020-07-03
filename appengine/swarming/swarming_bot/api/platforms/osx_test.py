@@ -283,9 +283,18 @@ class TestOsx(unittest.TestCase):
     }
     self.assertEqual(osx.get_cpuinfo(), expected)
 
-  @unittest.skip('TODO(crbug.com/1100226): add test')
   def test_get_temperatures(self):
-    pass
+    temp1 = osx.get_temperatures()
+
+    def assertOpenBetween(val, lower, upper):
+      self.assertGreater(val, lower)
+      self.assertLess(val, upper)
+
+    assertOpenBetween(temp1['cpu'], 0, 100)
+
+    # use sensor cache.
+    temp2 = osx.get_temperatures()
+    assertOpenBetween(temp2['cpu'], 0, 100)
 
   @unittest.skip('TODO(crbug.com/1100226): add test')
   def test_get_monitor_hidpi(self):

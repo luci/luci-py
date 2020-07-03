@@ -240,7 +240,7 @@ def _SMC_open():
   # There should be only one.
   itr = ctypes.c_uint()
   result = iokit.IOServiceGetMatchingServices(
-      0, iokit.IOServiceMatching('AppleSMC'), ctypes.byref(itr))
+      0, iokit.IOServiceMatching(b'AppleSMC'), ctypes.byref(itr))
   if result:
     logging.error('failed to get AppleSMC (%d)', result)
     return None
@@ -280,8 +280,11 @@ def _SMC_read_key(conn, key):
 
   # Call with SMC_CMD_READ_BYTES.
   val = _SMC_Value(size=outdata.keyInfo.size)
-  for i, x in enumerate(struct.pack('>i', outdata.keyInfo.type)):
-    val.type[i] = ord(x)
+  packed = struct.pack('>i', outdata.keyInfo.type)
+  if six.PY2:
+    packed = map(ord, packed)
+  for i, x in enumerate(packed):
+    val.type[i] = x
   # pylint: disable=attribute-defined-outside-init
   indata.data8 = 5
   indata.keyInfo.size = val.size
@@ -609,14 +612,14 @@ def get_temperatures():
     # call can only get the actual sensors.
     # Note: It is relatively fast to brute force all the possible names.
     for key, name in _sensor_names.items():
-      value = _SMC_get_value(conn, key)
+      value = _SMC_get_value(conn, key.encode())
       if value is not None:
         _sensor_found_cache.add(key)
         out[name] = value
     return out
 
   for key in _sensor_found_cache:
-    value = _SMC_get_value(conn, key)
+    value = _SMC_get_value(conn, key.encode())
     if value is not None:
       out[_sensor_names[key]] = value
   return out
