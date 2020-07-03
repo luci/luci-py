@@ -9,6 +9,9 @@ import sys
 import textwrap
 import unittest
 
+# TODO(github.com/wolever/parameterized/issues/91)
+# use parameterized after the bug is resolved.
+from nose2.tools import params
 import mock
 import six
 
@@ -296,9 +299,85 @@ class TestOsx(unittest.TestCase):
     temp2 = osx.get_temperatures()
     assertOpenBetween(temp2['cpu'], 0, 100)
 
-  @unittest.skip('TODO(crbug.com/1100226): add test')
-  def test_get_monitor_hidpi(self):
-    pass
+  @params(
+      # Retina 10.12.4 or later
+      (
+          """\
+          <plist>
+            <array>
+              <dict>
+                <key>_items</key>
+                <array>
+                  <dict>
+                    <key>spdisplays_ndrvs</key>
+                    <array>
+                      <dict>
+                        <key>_name</key>
+                        <string>Display 10.12.4 and later</string>
+                        <key>spdisplays_display_type</key>
+                        <string>spdisplays_built-in_retinaLCD</string>
+                        <key>spdisplays_pixelresolution</key>
+                        <string>spdisplays_2880x1800Retina</string>
+                      </dict>
+                    </array>
+                  </dict>
+                </array>
+              </dict>
+            </array>
+          </plist>""",
+          '1',
+      ),
+      # Retina 10.12.3 and earlier
+      (
+          """\
+          <plist>
+            <array>
+              <dict>
+                <key>_items</key>
+                <array>
+                  <dict>
+                    <key>spdisplays_ndrvs</key>
+                    <array>
+                      <dict>
+                        <key>_name</key>
+                        <string>Display 10.12.4 and later</string>
+                        <key>spdisplays_retina</key>
+                        <string>spdisplays_yes</string>
+                      </dict>
+                    </array>
+                  </dict>
+                </array>
+              </dict>
+            </array>
+          </plist>""",
+          '1',
+      ),
+      # None retina
+      (
+          """\
+          <plist>
+            <array>
+              <dict>
+                <key>_items</key>
+                <array>
+                  <dict>
+                    <key>spdisplays_ndrvs</key>
+                    <array>
+                      <dict>
+                        <key>_name</key>
+                        <string>Non redina display</string>
+                      </dict>
+                    </array>
+                  </dict>
+                </array>
+              </dict>
+            </array>
+          </plist>""",
+          '0',
+      ))
+  def test_get_monitor_hidpi(self, plist, expected):
+    self.mock_check_output.return_value = textwrap.dedent(plist).encode()
+    self.assertEqual(osx.get_monitor_hidpi(), expected)
 
   @unittest.skip('TODO(crbug.com/1100226): add test')
   def test_get_physical_ram(self):

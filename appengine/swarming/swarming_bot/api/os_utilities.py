@@ -476,7 +476,7 @@ def get_gpu():
 
 @tools.cached
 def get_monitor_hidpi():
-  """Returns True if there is an hidpi monitor detected."""
+  """Returns '1' if there is an hidpi monitor detected."""
   if sys.platform == 'darwin':
     return [platforms.osx.get_monitor_hidpi()]
   return None
