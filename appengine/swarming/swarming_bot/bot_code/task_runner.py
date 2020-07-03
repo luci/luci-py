@@ -23,6 +23,8 @@ import sys
 import time
 import traceback
 
+import six
+
 from api import os_utilities
 
 from utils import file_path
@@ -87,9 +89,9 @@ def get_isolated_args(work_dir, task_details, isolated_result,
   if task_details.isolated:
     cmd.extend([
         '-I',
-        task_details.isolated['server'].encode('utf-8'),
+        task_details.isolated['server'],
         '--namespace',
-        task_details.isolated['namespace'].encode('utf-8'),
+        task_details.isolated['namespace'],
         '--report-on-exception',
     ])
     isolated_input = task_details.isolated.get('input')
@@ -426,7 +428,7 @@ def load_and_run(in_file, swarming_server, cost_usd_hour, start, out_file,
       os.mkdir(work_dir)
     if auth_system:
       auth_system.stop()
-    with open(out_file, 'wb') as f:
+    with open(out_file, 'w') as f:
       json.dump(task_result, f)
 
 
@@ -489,7 +491,7 @@ def _start_task_runner(args, work_dir, ctx_file):
   # can handle. Since it is inside work_dir, it'll be automatically be deleted
   # upon task termination.
   try:
-    with open(args_path, 'wb') as f:
+    with open(args_path, 'w') as f:
       json.dump(args, f)
   except (IOError, OSError) as e:
     raise _FailureOnStart(
@@ -535,7 +537,7 @@ class _OutputBuffer(object):
 
     # Mutable:
     # Buffered data to send to the server.
-    self._stdout = ''
+    self._stdout = b''
     # Offset at which the buffered data shall be sent to the server.
     self._output_chunk_start = 0
     # Last time proc.yield_any() yielded.
@@ -867,7 +869,7 @@ def run_command(remote, task_details, work_dir, cost_usd_hour,
         u'version': OUT_VERSION,
     }
   finally:
-    file_path.try_remove(unicode(isolated_result))
+    file_path.try_remove(six.ensure_text(isolated_result))
 
 
 def main(args):

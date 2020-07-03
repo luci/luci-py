@@ -277,7 +277,7 @@ class RemoteClientNative(object):
     data.update(params)
     # Preserving prior behaviour: empty stdout is not transmitted
     if stdout_and_chunk and stdout_and_chunk[0]:
-      data['output'] = base64.b64encode(stdout_and_chunk[0])
+      data['output'] = base64.b64encode(stdout_and_chunk[0]).decode()
       data['output_chunk_start'] = stdout_and_chunk[1]
     if exit_code != None:
       data['exit_code'] = exit_code

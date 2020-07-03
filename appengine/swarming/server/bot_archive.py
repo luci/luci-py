@@ -471,9 +471,9 @@ def get_swarming_bot_zip(
         zinfo.external_attr = 0o600 << 16     # ?rw-------
       zip_file.writestr(zinfo, content)
 
-      h.update(str(len(name)))
-      h.update(name)
-      h.update(str(len(content)))
+      h.update(str(len(name)).encode())
+      h.update(name.encode())
+      h.update(str(len(content)).encode())
       h.update(content)
 
   data = zip_memory_file.getvalue()

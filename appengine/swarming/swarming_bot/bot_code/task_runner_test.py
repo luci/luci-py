@@ -1,4 +1,4 @@
-#!/usr/bin/env vpython
+#!/usr/bin/env vpython3
 # coding=utf-8
 # Copyright 2013 The LUCI Authors. All rights reserved.
 # Use of this source code is governed under the Apache License, Version 2.0
@@ -21,6 +21,7 @@ import time
 import unittest
 
 import mock
+import six
 
 import test_env_bot_code
 test_env_bot_code.setup_test_env()
@@ -124,7 +125,7 @@ def run_command(server_url, work_dir, task_details, headers_cb):
 def load_and_run(server_url, work_dir, manifest, auth_params_file):
   """Wraps task_runner.load_and_run() which runs a Swarming task."""
   in_file = os.path.join(work_dir, 'task_runner_in.json')
-  with open(in_file, 'wb') as f:
+  with open(in_file, 'w') as f:
     json.dump(manifest, f)
   out_file = os.path.join(work_dir, 'task_runner_out.json')
   task_runner.load_and_run(in_file, server_url, 3600., time.time(), out_file,
@@ -159,7 +160,7 @@ class FakeAuthSystem(object):
 class TestTaskRunnerBase(auto_stub.TestCase):
   def setUp(self):
     super(TestTaskRunnerBase, self).setUp()
-    self.root_dir = unicode(tempfile.mkdtemp(prefix=u'task_runner'))
+    self.root_dir = six.ensure_text(tempfile.mkdtemp(prefix=u'task_runner'))
     self.work_dir = os.path.join(self.root_dir, u'w')
     # Create the logs directory so run_isolated.py can put its log there.
     self.logs_dir = os.path.join(self.root_dir, u'logs')
@@ -195,7 +196,7 @@ class TestTaskRunnerBase(auto_stub.TestCase):
       finally:
         logging.debug(self.logs_dir)
         for i in os.listdir(self.logs_dir):
-          with open(os.path.join(self.logs_dir, i), 'rb') as f:
+          with open(os.path.join(self.logs_dir, i), 'r') as f:
             logging.debug('%s:\n%s', i, ''.join('  ' + line for line in f))
         file_path.rmtree(self.root_dir)
     except OSError:
@@ -261,7 +262,7 @@ class TestTaskRunnerBase(auto_stub.TestCase):
       if v is None:
         expected.pop(k)
       else:
-        expected[unicode(k)] = v
+        expected[six.ensure_text(k)] = v
 
     # Use explicit <= verification for these.
     for k in (u'bot_overhead', u'cost_usd', u'duration'):
@@ -308,6 +309,7 @@ class TestTaskRunner(TestTaskRunnerBase):
     if expected:
       self.fail(expected)
 
+  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_run_command_raw(self):
     task_details = get_task_details('print(\'hi\')')
     expected = {
@@ -321,6 +323,7 @@ class TestTaskRunner(TestTaskRunnerBase):
     # Now look at the updates sent by the bot as seen by the server.
     self.expectTask()
 
+  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_run_command_env_prefix_one(self):
     task_details = get_task_details(
         'import os\nprint(os.getenv("PATH").split(os.pathsep)[0])',
@@ -339,6 +342,7 @@ class TestTaskRunner(TestTaskRunnerBase):
     sep = re.escape(os.sep)
     self.expectTask(output=re.compile('.+%slocal%ssmurf\n$' % (sep, sep)))
 
+  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_run_command_env_prefix_multiple(self):
     task_details = get_task_details(
         '\n'.join([
@@ -368,6 +372,7 @@ class TestTaskRunner(TestTaskRunnerBase):
                          r'$') % (sep, sep, sep, sep))
     self.expectTask(output=output)
 
+  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_run_command_isolated(self):
     # Hook run_isolated out to see that everything still work.
     task_details = get_task_details(
@@ -421,6 +426,7 @@ class TestTaskRunner(TestTaskRunnerBase):
             u'namespace': u'default-gzip',
         })
 
+  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_run_command_fail(self):
     task_details = get_task_details('import sys; print(\'hi\'); sys.exit(1)')
     expected = {
@@ -434,6 +440,7 @@ class TestTaskRunner(TestTaskRunnerBase):
     # Now look at the updates sent by the bot as seen by the server.
     self.expectTask(exit_code=1)
 
+  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   @unittest.skipIf(sys.platform == 'win32',
                    'TODO(crbug.com/1017545): fix assertions')
   def test_run_command_os_error(self):
@@ -461,6 +468,7 @@ class TestTaskRunner(TestTaskRunnerBase):
     out = self.expectTask(exit_code=1, output=output)
     self.assertGreater(10., out[u'cost_usd'])
 
+  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_isolated_grand_children(self):
     """Runs a normal test involving 3 level deep subprocesses.
 
@@ -468,15 +476,14 @@ class TestTaskRunner(TestTaskRunnerBase):
     this is the succeeding version.
     """
     files = {
-        'parent.py': (
-            'import subprocess, sys\n'
-            'res = subprocess.call([sys.executable,\'-u\',\'children.py\'])\n'
-            'sys.exit(res)\n'),
-        'children.py': ('import subprocess, sys\n'
-                        'sys.exit(subprocess.call('
-                        '[sys.executable, \'-u\', \'grand_children.py\']))\n'),
-        'grand_children.py':
-            'print(\'hi\')',
+        'parent.py':
+            (b'import subprocess, sys\n'
+             b'res = subprocess.call([sys.executable,\'-u\',\'children.py\'])\n'
+             b'sys.exit(res)\n'),
+        'children.py': (b'import subprocess, sys\n'
+                        b'sys.exit(subprocess.call('
+                        b'[sys.executable, \'-u\', \'grand_children.py\']))\n'),
+        'grand_children.py': b'print(\'hi\')',
     }
 
     isolated = json.dumps({
@@ -490,7 +497,7 @@ class TestTaskRunner(TestTaskRunnerBase):
                     len(content),
             } for name, content in files.items()
         },
-    })
+    }).encode()
     isolated_digest = self.isolateserver.add_content_compressed(
         'default-gzip', isolated)
     manifest = get_manifest(
@@ -524,6 +531,7 @@ class TestTaskRunner(TestTaskRunnerBase):
             },
         })
 
+  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_run_command_large(self):
     # Method should have "self" as first argument - pylint: disable=E0213
     class Popen(object):
@@ -585,6 +593,7 @@ class TestTaskRunner(TestTaskRunnerBase):
     self.assertEqual(base64.b64encode('hi!\n' * 100002), updates[1][u'output'])
     self.assertEqual(base64.b64encode('hi!\n'), updates[2][u'output'])
 
+  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   @unittest.skipIf(
       sys.platform == 'win32',
       'TODO(crbug.com/1017545): fix assertions')
@@ -605,7 +614,7 @@ class TestTaskRunner(TestTaskRunnerBase):
     cache = local_caching.NamedCache(cache_dir, policies)
     cache.install(dest_dir, 'foo')
     with open(os.path.join(dest_dir, 'bar'), 'wb') as f:
-      f.write('thecache')
+      f.write(b'thecache')
     cache.uninstall(dest_dir, 'foo')
     self.assertFalse(os.path.exists(dest_dir))
 
@@ -773,6 +782,7 @@ class TestTaskRunnerKilled(TestTaskRunnerBase):
     self.assertLessEqual(0, actual.pop(u'cost_usd'))
     self.assertEqual(expected, actual)
 
+  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_killed_later(self):
     # Case where a task started and a client asks the server to kill the task.
     # In this case the task results in state KILLED.
@@ -815,6 +825,7 @@ class TestTaskRunnerKilled(TestTaskRunnerBase):
     self.expectTask(exit_code=exit_code)
     t.join()
 
+  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_hard(self):
     task_details = get_task_details(
         self.SCRIPT_HANG, hard_timeout=self.SHORT_TIME_OUT)
@@ -832,6 +843,7 @@ class TestTaskRunnerKilled(TestTaskRunnerBase):
     self.expectTask(hard_timeout=True, exit_code=exit_code)
 
 
+  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   @unittest.skipIf(sys.platform == 'darwin',
                    'TODO(crbug.com/1017545): Fails on Mac CQ')
   @unittest.skipIf(
@@ -852,6 +864,7 @@ class TestTaskRunnerKilled(TestTaskRunnerBase):
     # Now look at the updates sent by the bot as seen by the server.
     self.expectTask(io_timeout=True, exit_code=exit_code)
 
+  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_hard_signal(self):
     task_details = get_task_details(
         self.SCRIPT_SIGNAL, hard_timeout=self.SHORT_TIME_OUT)
@@ -869,6 +882,7 @@ class TestTaskRunnerKilled(TestTaskRunnerBase):
         hard_timeout=True,
         output='hi\ngot signal %s\nbye\n' % task_runner.SIG_BREAK_OR_TERM)
 
+  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   @unittest.skipIf(sys.platform == 'darwin',
                    'TODO(crbug.com/1017545): Fails on Mac CQ')
   @unittest.skipIf(
@@ -891,6 +905,7 @@ class TestTaskRunnerKilled(TestTaskRunnerBase):
         io_timeout=True,
         output='hi\ngot signal %s\nbye\n' % task_runner.SIG_BREAK_OR_TERM)
 
+  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_hard_no_grace(self):
     task_details = get_task_details(
         self.SCRIPT_HANG,
@@ -909,6 +924,7 @@ class TestTaskRunnerKilled(TestTaskRunnerBase):
     # Now look at the updates sent by the bot as seen by the server.
     self.expectTask(hard_timeout=True, exit_code=exit_code)
 
+  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   @unittest.skipIf(sys.platform == 'darwin',
                    'TODO(crbug.com/1017545): Fails on Mac CQ')
   @unittest.skipIf(
@@ -931,6 +947,7 @@ class TestTaskRunnerKilled(TestTaskRunnerBase):
     # Now look at the updates sent by the bot as seen by the server.
     self.expectTask(io_timeout=True, exit_code=exit_code)
 
+  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_hard_signal_no_grace(self):
     task_details = get_task_details(
         self.SCRIPT_SIGNAL_HANG, hard_timeout=self.SHORT_TIME_OUT,
@@ -951,6 +968,7 @@ class TestTaskRunnerKilled(TestTaskRunnerBase):
         exit_code=exit_code,
         output='hi\ngot signal %s\nbye\n' % task_runner.SIG_BREAK_OR_TERM)
 
+  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   @unittest.skipIf(sys.platform == 'darwin',
                    'TODO(crbug.com/1017545): Fails on Mac CQ')
   @unittest.skipIf(sys.platform == 'win32',
@@ -976,6 +994,7 @@ class TestTaskRunnerKilled(TestTaskRunnerBase):
         exit_code=exit_code,
         output='hi\ngot signal %s\nbye\n' % task_runner.SIG_BREAK_OR_TERM)
 
+  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   @unittest.skipIf(sys.platform == 'darwin',
                    'TODO(crbug.com/1017545): Fails on Mac CQ')
   @unittest.skipIf(sys.platform == 'win32',
@@ -988,22 +1007,20 @@ class TestTaskRunnerKilled(TestTaskRunnerBase):
     """
     files = {
         'parent.py': (
-            'import subprocess, sys\n'
-            'print(\'parent\')\n'
-            'p = subprocess.Popen([sys.executable, \'-u\', \'children.py\'])\n'
-            'print(p.pid)\n'
-            'p.wait()\n'
-            'sys.exit(p.returncode)\n'),
-        'children.py': (
-            'import subprocess, sys\n'
-            'print(\'children\')\n'
-            'p = subprocess.Popen('
-            '[sys.executable,\'-u\',\'grand_children.py\'])\n'
-            'print(p.pid)\n'
-            'p.wait()\n'
-            'sys.exit(p.returncode)\n'),
-        'grand_children.py':
-            self.SCRIPT_SIGNAL_HANG,
+            b'import subprocess, sys\n'
+            b'print(\'parent\')\n'
+            b'p = subprocess.Popen([sys.executable, \'-u\', \'children.py\'])\n'
+            b'print(p.pid)\n'
+            b'p.wait()\n'
+            b'sys.exit(p.returncode)\n'),
+        'children.py': (b'import subprocess, sys\n'
+                        b'print(\'children\')\n'
+                        b'p = subprocess.Popen('
+                        b'[sys.executable,\'-u\',\'grand_children.py\'])\n'
+                        b'print(p.pid)\n'
+                        b'p.wait()\n'
+                        b'sys.exit(p.returncode)\n'),
+        'grand_children.py': self.SCRIPT_SIGNAL_HANG,
     }
     isolated = json.dumps({
         'command': ['python', '-u', 'parent.py'],
@@ -1085,6 +1102,7 @@ class TestTaskRunnerKilled(TestTaskRunnerBase):
             },
         })
 
+  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_kill_and_wait(self):
     # Test the case where the script swallows the SIGTERM/SIGBREAK signal and
     # hangs.
@@ -1119,6 +1137,7 @@ class TestTaskRunnerKilled(TestTaskRunnerBase):
     self.assertEqual(expected, exit_code)
     self.assertEqual('got it\n', p.stdout.readline())
 
+  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   @unittest.skipIf(sys.platform == 'win32',
                    'TODO(crbug.com/1017545): it gets stuck at proc.wait()')
   def test_signal(self):
@@ -1133,7 +1152,7 @@ class TestTaskRunnerKilled(TestTaskRunnerBase):
         io_timeout=60.)
     task_in_file = os.path.join(self.work_dir, 'task_runner_in.json')
     task_result_file = os.path.join(self.work_dir, 'task_runner_out.json')
-    with open(task_in_file, 'wb') as f:
+    with open(task_in_file, 'w') as f:
       json.dump(manifest, f)
 
     bot = os.path.join(self.root_dir, 'swarming_bot.1.zip')
@@ -1219,7 +1238,7 @@ class TaskRunnerNoServer(auto_stub.TestCase):
 
   def setUp(self):
     super(TaskRunnerNoServer, self).setUp()
-    self.root_dir = unicode(tempfile.mkdtemp(prefix=u'task_runner'))
+    self.root_dir = six.ensure_text(tempfile.mkdtemp(prefix=u'task_runner'))
 
   def tearDown(self):
     try:
@@ -1234,6 +1253,7 @@ class TaskRunnerNoServer(auto_stub.TestCase):
     return run_command(
         'http://localhost:1', self.root_dir, task_details, headers_cb)
 
+  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_load_and_run_isolated(self):
     self.mock(bot_auth, 'AuthSystem', FakeAuthSystem)
 
@@ -1280,6 +1300,7 @@ class TaskRunnerNoServer(auto_stub.TestCase):
     }
     self.assertEqual(expected, actual)
 
+  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_load_and_run_raw(self):
     local_auth_ctx = {
         'accounts': [{

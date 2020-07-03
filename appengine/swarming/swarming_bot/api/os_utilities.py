@@ -351,7 +351,7 @@ def get_hostname():
     # address reversed, which is not useful. Get the base hostname as defined by
     # the host itself instead of the FQDN since the returned FQDN is useless.
     hostname = socket.gethostname()
-  return hostname.decode('utf-8')
+  return six.ensure_text(hostname)
 
 
 @tools.cached
