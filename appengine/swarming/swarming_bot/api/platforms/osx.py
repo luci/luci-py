@@ -322,7 +322,8 @@ def _SMC_get_value(conn, key):
 
 def _get_system_profiler(data_type):
   """Returns an XML about the system display properties."""
-  plist = _get_system_info_in_plist(['system_profiler', data_type, '-xml'])
+  out = subprocess.check_output(['system_profiler', data_type, '-xml'])
+  plist = _read_plist(out)
   return plist[0].get('_items', [])
 
 
@@ -373,23 +374,23 @@ def _get_xcode_version(xcode_app):
 def _get_physical_disks_info():
   """Return the disk info for all the physical disks"""
   try:
-    pl = _get_system_info_in_plist(['diskutil', 'list', '-plist', 'physical'])
+    out = subprocess.check_output(['diskutil', 'list', '-plist', 'physical'])
+    pl = _read_plist(out)
     disk_info = {}
     for disk in pl['WholeDisks']:
-      disk_info[six.ensure_text(disk)] = _get_system_info_in_plist(
-          ['diskutil', 'info', '-plist', disk])
+      out = subprocess.check_output(['diskutil', 'info', '-plist', disk])
+      disk_info[six.ensure_text(disk)] = _read_plist(out)
     return disk_info
   except (OSError, subprocess.CalledProcessError) as e:
     logging.error('Failed to read disk info: %s', e)
     return {}
 
 
-def _get_system_info_in_plist(cmds):
-  out = subprocess.check_output(cmds)
+def _read_plist(data):
   if six.PY2:
-    return plistlib.readPlistFromString(out)
+    return plistlib.readPlistFromString(data)
   else:
-    return plistlib.loads(out)
+    return plistlib.loads(data)
 
 
 ## Public API.
