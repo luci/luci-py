@@ -144,7 +144,7 @@ class FakeIsolateServerHandler(httpserver.Handler):
         })
         return
 
-      if not self.server.store_hash_instead:
+      if data and not self.server.store_hash_instead:
         data = base64.b64encode(data).decode()
 
       self.send_json({
