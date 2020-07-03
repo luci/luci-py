@@ -47,7 +47,6 @@ import argparse
 import base64
 import collections
 import contextlib
-import distutils
 import errno
 import json
 import logging
@@ -1334,8 +1333,6 @@ def parse_args(args):
   # will print the correct help message.
   parser = create_option_parser()
   options, args = parser.parse_args(args)
-  if not isinstance(options.cipd_enabled, (bool, int)):
-    options.cipd_enabled = distutils.util.strtobool(options.cipd_enabled)
   return (parser, options, args)
 
 
