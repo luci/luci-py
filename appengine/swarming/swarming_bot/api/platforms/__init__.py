@@ -11,27 +11,27 @@ import sys
 import six
 
 if sys.platform == 'cygwin':
-  import gce
-  import posix
-  import win
+  from api.platforms import gce
+  from api.platforms import posix
+  from api.platforms import win
   is_gce = lambda: gce.is_gce() # to reuse gce.is_gce mock, if any
 
 if sys.platform == 'darwin':
-  import osx
-  import posix
+  from api.platforms import osx
+  from api.platforms import posix
   is_gce = lambda: False
 
 
 if sys.platform == 'win32':
-  import gce
-  import win
+  from api.platforms import gce
+  from api.platforms import win
   is_gce = lambda: gce.is_gce() # to reuse gce.is_gce mock, if any
 
 
 if sys.platform.startswith('linux'):
   try:
     if six.PY2:
-      import android
+      from api.platforms import android
   except OSError:
     android = None
   from api.platforms import gce
