@@ -379,21 +379,19 @@ class TestOsx(unittest.TestCase):
     self.mock_check_output.return_value = textwrap.dedent(plist).encode()
     self.assertEqual(osx.get_monitor_hidpi(), expected)
 
-  @unittest.skip('TODO(crbug.com/1100226): add test')
   def test_get_physical_ram(self):
-    pass
+    self.assertGreater(osx.get_physical_ram(), 0)
 
-  @unittest.skip('TODO(crbug.com/1100226): add test')
   def test_get_uptime(self):
-    pass
+    self.assertGreater(osx.get_uptime(), 0)
 
-  @unittest.skip('TODO(crbug.com/1100226): add test')
+  @unittest.skip('TODO(crbug.com/1100226): install pyobjc')
   def test_is_locked(self):
-    pass
+    self.assertIsNotNone(osx.is_locked())
 
-  @unittest.skip('TODO(crbug.com/1100226): add test')
+  @unittest.skip('TODO(crbug.com/1100226): install pyobjc')
   def test_is_beta(self):
-    pass
+    self.assertIsNotNone(osx.is_beta())
 
   def mock_physical_disks_list(self, disks_data):
     content = []
