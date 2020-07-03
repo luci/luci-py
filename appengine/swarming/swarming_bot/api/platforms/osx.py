@@ -4,7 +4,7 @@
 
 """OSX specific utility functions."""
 
-import cgi
+from xml.sax import saxutils
 import ctypes
 import logging
 import os
@@ -747,7 +747,7 @@ def generate_launchd_plist(command, cwd, plistname):
   # The documentation is available at:
   # https://developer.apple.com/library/mac/documentation/Darwin/Reference/ \
   #    ManPages/man5/launchd.plist.5.html
-  escaped_plist = cgi.escape(plistname)
+  escaped_plist = saxutils.escape(plistname)
   entries = [
       '<key>Label</key><string>%s</string>' % escaped_plist,
       '<key>StandardOutPath</key><string>logs/bot_stdout.log</string>',
@@ -780,15 +780,15 @@ def generate_launchd_plist(command, cwd, plistname):
       '  <false/>',
       '</dict>',
   ]
-  entries.append(
-      '<key>Program</key><string>%s</string>' % cgi.escape(command[0]))
+  entries.append('<key>Program</key><string>%s</string>' %
+                 saxutils.escape(command[0]))
   entries.append('<key>ProgramArguments</key>')
   entries.append('<array>')
   # Command[0] must be passed as an argument.
-  entries.extend('  <string>%s</string>' % cgi.escape(i) for i in command)
+  entries.extend('  <string>%s</string>' % saxutils.escape(i) for i in command)
   entries.append('</array>')
-  entries.append(
-      '<key>WorkingDirectory</key><string>%s</string>' % cgi.escape(cwd))
+  entries.append('<key>WorkingDirectory</key><string>%s</string>' %
+                 saxutils.escape(cwd))
   header = (
       '<?xml version="1.0" encoding="UTF-8"?>\n'
       '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" '

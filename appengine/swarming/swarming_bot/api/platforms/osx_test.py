@@ -395,10 +395,6 @@ class TestOsx(unittest.TestCase):
   def test_is_beta(self):
     pass
 
-  @unittest.skip('TODO(crbug.com/1100226): add test')
-  def test_generate_launchd_plist(self):
-    pass
-
   def mock_physical_disks_list(self, disks_data):
     content = []
     content.append(
@@ -469,6 +465,15 @@ class TestOsx(unittest.TestCase):
 
     disks_model = osx.get_disks_model()
     self.assertEqual((u'APPLE SSD AP0256M', u'APPLE SSD AP0257M'), disks_model)
+
+  def test_generate_launchd_plist(self):
+    plist_data = osx.generate_launchd_plist(['echo', 'hi'], os.getcwd(),
+                                            'org.swarm.bot.plist')
+    plist = osx._read_plist(plist_data.encode())
+    self.assertEqual(plist['Label'], 'org.swarm.bot.plist')
+    self.assertEqual(plist['Program'], 'echo')
+    self.assertEqual(plist['ProgramArguments'], ['echo', 'hi'])
+
 
 if __name__ == '__main__':
   if '-v' in sys.argv:
