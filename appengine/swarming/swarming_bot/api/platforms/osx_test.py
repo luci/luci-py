@@ -89,17 +89,17 @@ class TestOsx(unittest.TestCase):
     version = osx.get_current_xcode_version()
     self.assertEqual(version, ('11.5', '11E608c'))
 
-  @unittest.skip('TODO(crbug.com/1100226): add test')
   def test_get_ios_device_ids(self):
-    pass
+    self.mock_check_output.return_value = b'1234abcd\n'
+    self.assertEqual(osx.get_ios_device_ids(), ['1234abcd'])
 
-  @unittest.skip('TODO(crbug.com/1100226): add test')
   def test_get_ios_version(self):
-    pass
+    self.mock_check_output.return_value = b'13.5\n'
+    self.assertEqual(osx.get_ios_version('1234abcd'), '13.5')
 
-  @unittest.skip('TODO(crbug.com/1100226): add test')
   def test_get_ios_device_type(self):
-    pass
+    self.mock_check_output.return_value = b'iPhone12,1\n'
+    self.assertEqual(osx.get_ios_device_type('1234abcd'), 'iPhone12,1')
 
   def test_get_hardware_model_string(self):
     self.mock_check_output.return_value = b'MacBookPro15,1\n'

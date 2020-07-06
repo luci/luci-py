@@ -441,7 +441,8 @@ def get_ios_device_ids():
   See http://libimobiledevice.org.
   """
   try:
-    return subprocess.check_output(['idevice_id', '--list']).splitlines()
+    out = subprocess.check_output(['idevice_id', '--list']).splitlines()
+    return list(map(six.ensure_text, out))
   except (OSError, subprocess.CalledProcessError):
     return []
 
@@ -459,7 +460,7 @@ def get_ios_version(udid):
     out = subprocess.check_output(
         ['ideviceinfo', '-k', 'ProductVersion', '-u', udid]).splitlines()
     if len(out) == 1:
-      return out[0]
+      return six.ensure_text(out[0])
   except (OSError, subprocess.CalledProcessError):
     pass
 
@@ -478,7 +479,7 @@ def get_ios_device_type(udid):
     out = subprocess.check_output(
         ['ideviceinfo', '-k', 'ProductType', '-u', udid]).splitlines()
     if len(out) == 1:
-      return out[0]
+      return six.ensure_text(out[0])
   except (OSError, subprocess.CalledProcessError):
     pass
 
