@@ -7,9 +7,8 @@
 If services_config_location is set in admin.GlobalConfig root entity,
 each directory in the location is imported as services/<directory_name>.
 
-For each project defined in the project registry with
-config_storage_type == Gitiles, projects/<project_id> config set is imported
-from project.config_location.
+For each project defined in the project registry,
+the projects/<project_id> config set is imported from the project.location.
 """
 
 import contextlib
@@ -119,6 +118,16 @@ def _resolved_location(url):
   loc = gitiles.Location.parse_resolve(url)
   memcache.set(cache_key, loc.to_dict(), time=random.randint(1800, 5400))
   return loc
+
+
+def _make_gitiles_location(cfg):
+  """Returns gitiles.Location from service_config_pb2.GitilesLocation."""
+  loc = gitiles.Location.parse(url=cfg.repo)
+  return gitiles.Location(
+      hostname=loc.hostname,
+      project=loc.project,
+      treeish=cfg.ref,
+      path='/' + cfg.path)
 
 
 def _import_revision(
@@ -330,7 +339,6 @@ def _import_config_set(config_set, location, project_id=None):
 def import_service(service_id, conf=None):
   if not config.validation.is_valid_service_id(service_id):
     raise ValueError('Invalid service id: %s' % service_id)
-  # TODO(nodir): import services from location specified in services.cfg
   conf = conf or admin.GlobalConfig.fetch()
   if not conf:
     raise Exception('not configured')
@@ -353,23 +361,29 @@ def import_project(project_id):
   project = projects.get_project(project_id)
   if project is None:
     raise NotFoundError('project %s not found' % project_id)
-  if project.config_location.storage_type != GITILES_LOCATION_TYPE:
-    raise Error('project %s is not a Gitiles project' % project_id)
 
-  try:
-    loc = _resolved_location(project.config_location.url)
-  except gitiles.TreeishResolutionError:
-    logging.warning('could not resolve URL %r', project.config_location.url)
+  if project.HasField('config_location'):
+    # TODO(crbug/1099956): delete legacy config_location support.
+    if project.config_location.storage_type != GITILES_LOCATION_TYPE:
+      raise Error('project %s is not a Gitiles project' % project_id)
+    try:
+      loc = _resolved_location(project.config_location.url)
+    except gitiles.TreeishResolutionError:
+      logging.warning('could not resolve URL %r', project.config_location.url)
 
-    @ndb.transactional
-    def txn():
-      key = ndb.Key(storage.ConfigSet, config_set)
-      if key.get():
-        logging.warning('deleting project %s with unresolved URL', project_id)
-        key.delete()
+      @ndb.transactional
+      def txn():
+        key = ndb.Key(storage.ConfigSet, config_set)
+        if key.get():
+          logging.warning('deleting project %s with unresolved URL', project_id)
+          key.delete()
 
-    txn()
-    return
+      txn()
+      return
+  elif project.HasField('gitiles_location'):
+    loc = _make_gitiles_location(project.gitiles_location)
+  else:
+    raise Error('project %s does not have a gitiles location' % project_id)
 
   # Update project repo info.
   repo_url = str(loc._replace(treeish=None, path=None))
@@ -388,12 +402,17 @@ def import_ref(project_id, ref_name):
   project = projects.get_project(project_id)
   if project is None:
     raise NotFoundError('project %s not found' % project_id)
-  if project.config_location.storage_type != GITILES_LOCATION_TYPE:
-    raise Error('project %s is not a Gitiles project' % project_id)
-
-  # We don't call _resolved_location here because we are replacing treeish and
-  # path below anyway.
-  loc = gitiles.Location.parse(project.config_location.url)
+  if project.HasField('config_location'):
+    # TODO(crbug/1099956): delete legacy config_location support.
+    if project.config_location.storage_type != GITILES_LOCATION_TYPE:
+      raise Error('project %s is not a Gitiles project' % project_id)
+    # We don't call _resolved_location here because we are replacing treeish and
+    # path below anyway.
+    loc = gitiles.Location.parse(project.config_location.url)
+  elif project.HasField('gitiles_location'):
+    loc = _make_gitiles_location(project.gitiles_location)
+  else:
+    raise Error('project %s does not have a gitiles location' % project_id)
 
   ref = None
   for r in projects.get_refs([project_id])[project_id] or ():
@@ -440,7 +459,6 @@ def import_config_set(config_set):
 
 def _service_config_sets(location_root):
   """Returns a list of all service config sets stored in Gitiles."""
-  # TODO(nodir): import services from location specified in services.cfg
   assert location_root
   tree = location_root.get_tree()
 

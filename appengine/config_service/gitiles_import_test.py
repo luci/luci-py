@@ -429,7 +429,8 @@ class GitilesImportTestCase(test_case.TestCase):
         ),
     )
 
-  def test__project_and_ref_config_sets(self):
+  def test__project_and_ref_config_sets_legacy(self):
+    # TODO(crbug/1099956): delete legacy config_location support.
     self.mock(gitiles_import, '_import_config_set', mock.Mock())
     self.mock(projects, 'get_projects', mock.Mock())
     self.mock(projects, 'get_refs', mock.Mock())
@@ -456,7 +457,36 @@ class GitilesImportTestCase(test_case.TestCase):
       'projects/chromium/refs/heads/release42',
     ])
 
-  def test_import_project(self):
+  def test__project_and_ref_config_sets(self):
+    self.mock(gitiles_import, '_import_config_set', mock.Mock())
+    self.mock(projects, 'get_projects', mock.Mock())
+    self.mock(projects, 'get_refs', mock.Mock())
+    projects.get_projects.return_value = [
+      service_config_pb2.Project(
+          id='chromium',
+          gitiles_location=service_config_pb2.GitilesLocation(
+            repo='https://localhost/chromium/src',
+            ref='refs/heads/infra/config',
+            path='generated',
+          )
+      ),
+    ]
+    RefType = project_config_pb2.RefsCfg.Ref
+    projects.get_refs.return_value = {
+      'chromium': [
+        RefType(name='refs/heads/master'),
+        RefType(name='refs/heads/release42', config_path='/my-configs'),
+      ],
+    }
+
+    self.assertEqual(gitiles_import._project_and_ref_config_sets(), [
+      'projects/chromium',
+      'projects/chromium/refs/heads/master',
+      'projects/chromium/refs/heads/release42',
+    ])
+
+  def test_import_project_legacy(self):
+    # TODO(crbug/1099956): delete legacy config_location support.
     self.mock(gitiles_import, '_import_config_set', mock.Mock())
     self.mock(projects, 'get_project', mock.Mock())
     projects.get_project.return_value = service_config_pb2.Project(
@@ -479,6 +509,30 @@ class GitilesImportTestCase(test_case.TestCase):
         ),
         'chromium')
 
+  def test_import_project(self):
+    self.mock(gitiles_import, '_import_config_set', mock.Mock())
+    self.mock(projects, 'get_project', mock.Mock())
+    projects.get_project.return_value = service_config_pb2.Project(
+        id='chromium',
+        gitiles_location=service_config_pb2.GitilesLocation(
+            repo='https://localhost/chromium/src',
+            ref='refs/any/thing',
+            path='infra/config/generated',
+        ),
+    )
+
+    gitiles_import.import_project('chromium')
+
+    gitiles_import._import_config_set.assert_called_once_with(
+        'projects/chromium',
+        gitiles.Location(
+            hostname='localhost',
+            project='chromium/src',
+            treeish='refs/any/thing',
+            path='/infra/config/generated',
+        ),
+        'chromium')
+
   def test_import_project_not_found(self):
     self.mock(projects, 'get_project', mock.Mock(return_value=None))
     with self.assertRaises(gitiles_import.NotFoundError):
@@ -489,6 +543,7 @@ class GitilesImportTestCase(test_case.TestCase):
       gitiles_import.import_project(')))')
 
   def test_import_project_ref_not_resolved(self):
+    # TODO(crbug/1099956): delete legacy config_location support.
     self.mock(projects, 'get_project', mock.Mock())
     projects.get_project.return_value = service_config_pb2.Project(
         id='chromium',
@@ -514,9 +569,9 @@ class GitilesImportTestCase(test_case.TestCase):
     self.mock(projects, 'get_refs', mock.Mock())
     projects.get_project.return_value = service_config_pb2.Project(
         id='chromium',
-        config_location=service_config_pb2.ConfigSetLocation(
-            url='https://localhost/chromium/src/',
-            storage_type=service_config_pb2.ConfigSetLocation.GITILES,
+        gitiles_location=service_config_pb2.GitilesLocation(
+            repo='https://localhost/chromium/src',
+            ref='refs/heads/infra/config',
         ),
     )
     projects.get_refs.return_value = {
@@ -548,9 +603,9 @@ class GitilesImportTestCase(test_case.TestCase):
     self.mock(projects, 'get_project', mock.Mock())
     projects.get_project.return_value = service_config_pb2.Project(
         id='chromium',
-        config_location=service_config_pb2.ConfigSetLocation(
-            url='https://localhost/chromium/src/',
-            storage_type=service_config_pb2.ConfigSetLocation.GITILES,
+        gitiles_location=service_config_pb2.GitilesLocation(
+            repo='https://localhost/chromium/src',
+            ref='refs/heads/infra/config',
         ),
     )
     self.mock(projects, 'get_refs', mock.Mock(return_value={

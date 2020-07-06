@@ -32,7 +32,7 @@ class ValidationTestCase(test_case.TestCase):
     self.services = []
     self.mock(services, 'get_services_async', lambda: future(self.services))
 
-  def test_validate_project_registry(self):
+  def test_validate_project_registry_legacy(self):
     cfg = '''
       projects {
         id: "a"
@@ -80,6 +80,59 @@ class ValidationTestCase(test_case.TestCase):
            'https://example.googlesource.com/bad_plus/+'),
           'Project c: config_location: ref/commit is not specified',
           'Projects are not sorted by id. First offending id: a',
+        ]
+    )
+
+  def test_validate_project_registry(self):
+    cfg = '''
+      projects {
+        id: "a"
+        gitiles_location {
+          repo: "https://a.googlesource.com/ok"
+          ref: "refs/heads/main"
+          path: "infra/config/generated"
+        }
+      }
+      projects {
+        id: "b"
+      }
+      projects {
+        id: "a"
+        gitiles_location {
+          repo: "https://a.googlesource.com/project/"
+          ref: "refs/heads/infra/config"
+          path: "/generated"
+        }
+      }
+      projects {
+        gitiles_location {
+          repo: "https://a.googlesource.com/project.git"
+          ref: "branch"
+        }
+      }
+      projects {
+        id: "c"
+        gitiles_location {
+          repo: "https://a.googlesource.com/missed/ref"
+        }
+      }
+    '''
+    result = validation.validate_config(
+        config.self_config_set(), 'projects.cfg', cfg)
+
+    self.assertEqual(
+        [m.text for m in result.messages],
+        [
+           # TODO(crbug/1099956): change to require gitiles_location.
+           'Project b: config_location: storage_type is not set',
+           'Project a: id is not unique',
+           'Project a: gitiles_location: repo: must not end with "/"',
+           'Project a: gitiles_location: path must not start with "/"',
+           'Project #4: id is not specified',
+           'Project #4: gitiles_location: repo: must not end with ".git"',
+           'Project #4: gitiles_location: ref must start with "refs/"',
+           'Project c: gitiles_location: ref is not set',
+           'Projects are not sorted by id. First offending id: a',
         ]
     )
 

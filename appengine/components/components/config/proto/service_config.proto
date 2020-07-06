@@ -37,7 +37,7 @@ message GitilesLocation {
   // URL of the Git repository.
   // Must not end with "/".
   // Must not end with ".git".
-  // Must not have "/a" prefix of a path component.
+  // Must not have "/a/" prefix of a path component.
   //
   // Example:
   //   OK:

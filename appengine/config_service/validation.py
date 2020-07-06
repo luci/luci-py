@@ -112,6 +112,51 @@ def validate_config_set_location(loc, ctx, allow_relative_url=False):
         ctx.error('ref/commit is not specified')
 
 
+def validate_gitiles_location_repo(repo, ctx):
+  if not repo:
+    ctx.error('not specified')
+    return
+
+  try:
+    parsed = urllib.parse.urlparse(repo)
+  except ValueError as e:
+    ctx.error('failed to parse the URL: %s' % e.message)
+    return
+
+  if not parsed.netloc:
+    ctx.error('hostname not specified')
+  if parsed.scheme != 'https':
+    ctx.error('scheme must be "https"')
+  if parsed.query:
+    ctx.error('query not allowed')
+  if parsed.fragment:
+    ctx.error('fragment not allowed')
+  if not parsed.path:
+    ctx.error('missing repo name')
+    return
+
+  if parsed.path.endswith('/'):
+    ctx.error('must not end with "/"')
+  if parsed.path.endswith('.git'):
+    ctx.error('must not end with ".git"')
+  if parsed.path.startswith('/a/'):
+    ctx.error('must not have "/a/" prefix of a path component')
+
+
+def validate_gitiles_location(loc, ctx):
+  if not loc:
+    ctx.error('not specified')
+    return
+  with ctx.prefix('repo: '):
+    validate_gitiles_location_repo(loc.repo, ctx)
+  if not loc.ref:
+    ctx.error('ref is not set')
+  elif not loc.ref.startswith('refs/'):
+    ctx.error('ref must start with "refs/"')
+  if loc.path and loc.path.startswith('/'):
+    ctx.error('path must not start with "/"')
+
+
 @validation.self_rule(
     common.PROJECT_REGISTRY_FILENAME, service_config_pb2.ProjectsCfg)
 def validate_project_registry(cfg, ctx):
@@ -119,8 +164,13 @@ def validate_project_registry(cfg, ctx):
   for i, project in enumerate(cfg.projects):
     with ctx.prefix('Project %s: ', project.id or ('#%d' % (i + 1))):
       validate_id(project.id, config.common.PROJECT_ID_RGX, project_ids, ctx)
-      with ctx.prefix('config_location: '):
-        validate_config_set_location(project.config_location, ctx)
+      if project.HasField('gitiles_location'):
+        with ctx.prefix('gitiles_location: '):
+          validate_gitiles_location(project.gitiles_location, ctx)
+      else:
+        # TODO(crbug/1099956): delete legacy config_location support.
+        with ctx.prefix('config_location: '):
+          validate_config_set_location(project.config_location, ctx)
   check_id_sorted(cfg.projects, 'Projects', ctx)
 
 
