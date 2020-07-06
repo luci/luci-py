@@ -35,7 +35,8 @@ PEM = os.path.join(test_env.TESTS_DIR, 'self_signed.pem')
 
 
 def _serialize_env():
-  return dict((unicode(k), six.text_type(v.encode('ascii', 'replace')))
+  return dict((six.ensure_text(k),
+               six.ensure_text(v.encode('ascii', 'replace')))
               for k, v in os.environ.items())
 
 
@@ -121,7 +122,7 @@ class Handler(BaseHTTPServer.BaseHTTPRequestHandler):
       'id': '1234',
       'url': 'https://localhost/error/1234',
     }
-    self.wfile.write(json.dumps(data))
+    self.wfile.write(json.dumps(data).encode())
 
 
 def start_server():
@@ -186,7 +187,7 @@ class OnErrorServerTest(OnErrorBase):
     self.assertEqual(1, len(httpd.requests))
     resource, params = httpd.requests[0]
     self.assertEqual('/ereporter2/api/v1/on_error', resource)
-    self.assertEqual(['r', 'v'], params.keys())
+    self.assertEqual(['r', 'v'], list(params.keys()))
     self.assertEqual('1', params['v'])
     return params['r']
 
@@ -198,7 +199,6 @@ class OnErrorServerTest(OnErrorBase):
     self.assertEqual('', out)
     httpd.stop()
 
-  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_shell_out_report(self):
     # Rerun itself, report an error manually, ensure the error was reported.
     httpd = start_server()
@@ -221,7 +221,7 @@ class OnErrorServerTest(OnErrorBase):
         u'os': six.text_type(sys.platform),
         u'python_version': six.text_type(platform.python_version()),
         u'source': u'main.py',
-        u'stack': u'None',
+        u'stack': u'None' if six.PY2 else 'NoneType: None',
         u'user': six.text_type(getpass.getuser()),
         # The version was added dynamically for testing purpose.
         u'version': u'123',
@@ -229,7 +229,6 @@ class OnErrorServerTest(OnErrorBase):
     self.assertEqual(expected, actual)
     httpd.stop()
 
-  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_shell_out_exception(self):
     # Rerun itself, report an exception manually, ensure the error was reported.
     httpd = start_server()
@@ -265,7 +264,6 @@ class OnErrorServerTest(OnErrorBase):
     self.assertEqual(expected, actual)
     httpd.stop()
 
-  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_shell_out_exception_no_msg(self):
     # Rerun itself, report an exception manually, ensure the error was reported.
     httpd = start_server()
@@ -301,7 +299,6 @@ class OnErrorServerTest(OnErrorBase):
     self.assertEqual(expected, actual)
     httpd.stop()
 
-  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_shell_out_crash(self):
     # Rerun itself, report an error with a crash, ensure the error was reported.
     httpd = start_server()
