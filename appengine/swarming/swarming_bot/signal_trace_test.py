@@ -1,4 +1,4 @@
-#!/usr/bin/env vpython
+#!/usr/bin/env vpython3
 # Copyright 2017 The LUCI Authors. All rights reserved.
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
@@ -10,6 +10,7 @@ import subprocess
 import sys
 import unittest
 
+import six
 
 THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -29,7 +30,10 @@ class Test(unittest.TestCase):
     os.kill(p.pid, sig)
     # Wait for some output before calling communicate(), otherwise there's a
     # race condition with SIGUSR2.
-    e = p.stderr.read(1)
+    if stdin:
+      e = p.stderr.read(1)
+    else:
+      e = b''
     out, err = p.communicate(input=stdin)
     return out, e + err
 
@@ -40,11 +44,11 @@ class Test(unittest.TestCase):
     out, err = self._run(cmd, signal.SIGUSR1, None)
     self.assertEqual(b'', out)
     self.assertEqual(
-        'ERROR:root:\n'
-        '** SIGUSR1 received **\n'
-        'MainThread:\n'
-        '  File "<string>", line 1, in <module>\n'
-        '** SIGUSR1 end **\n', err)
+        b'ERROR:root:\n'
+        b'** SIGUSR1 received **\n'
+        b'MainThread:\n'
+        b'  File "<string>", line 1, in <module>\n'
+        b'** SIGUSR1 end **\n', err)
 
   def test_SIGUSR1_threads(self):
     # The multithreaded case.
@@ -57,17 +61,18 @@ class Test(unittest.TestCase):
     self.assertTrue(
         err.startswith(b'ERROR:root:\n** SIGUSR1 received **\nAwesome:\n  '),
         repr(err))
-    self.assertTrue(err.endswith('\n** SIGUSR1 end **\n'), repr(err))
-    self.assertIn('MainThread:', err.splitlines())
+    self.assertTrue(err.endswith(b'\n** SIGUSR1 end **\n'), repr(err))
+    self.assertIn(b'MainThread:', err.splitlines())
 
+  @unittest.skipIf(six.PY3, "crbug.com/1010816")
   def test_SIGUSR2(self):
     cmd = ('import signal_trace,sys,time; signal_trace.register(); '
            'sys.stdout.write("1"); sys.stdout.flush(); time.sleep(60)')
-    out, err = self._run(cmd, signal.SIGUSR2, 'exit()\n')
-    self.assertEqual('>>> ', out)
+    out, err = self._run(cmd, signal.SIGUSR2, b'exit()\n')
+    self.assertEqual(b'>>> ', out)
     self.assertTrue(
-        err
-        .startswith('Signal received : entering python shell.\nTraceback:\n'),
+        err.startswith(
+            b'Signal received : entering python shell.\nTraceback:\n'),
         repr(err))
 
 
