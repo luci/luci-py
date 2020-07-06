@@ -65,7 +65,7 @@ SCRIPT_ERR = ('import signal, sys, time;\n'
               'sys.stderr.flush();\n') % ('signal.SIGBREAK' if sys.platform ==
                                           'win32' else 'signal.SIGTERM')
 
-OUTPUT_SCRIPT = r"""
+OUTPUT_SCRIPT = br"""
 import re
 import sys
 import time
@@ -179,7 +179,6 @@ class Subprocess42Test(unittest.TestCase):
       os.close(handle)
     return self._output_script
 
-  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_communicate_timeout(self):
     timedout = 1 if sys.platform == 'win32' else -9
     # Format is:
@@ -189,21 +188,21 @@ class Subprocess42Test(unittest.TestCase):
         # 0 means no timeout, like None.
         (
             (['out_sleeping', '0.001', 'out_slept', 'err_print'], None, 0),
-            ('Sleeping.\nSlept.\n', None, 0),
+            (b'Sleeping.\nSlept.\n', None, 0),
         ),
         (
             (['err_print'], subprocess42.STDOUT, 0),
-            ('printing', None, 0),
+            (b'printing', None, 0),
         ),
         (
             (['err_print'], subprocess42.PIPE, 0),
-            ('', 'printing', 0),
+            (b'', b'printing', 0),
         ),
 
         # On a loaded system, this can be tight.
         (
             (['out_sleeping', 'out_flush', '60', 'out_slept'], None, 0.5),
-            ('Sleeping.\n', None, timedout),
+            (b'Sleeping.\n', None, timedout),
         ),
         (
             (
@@ -221,11 +220,11 @@ class Subprocess42Test(unittest.TestCase):
                 ],
                 subprocess42.PIPE,
                 0.5),
-            ('Sleeping.\n', 'printing', timedout),
+            (b'Sleeping.\n', b'printing', timedout),
         ),
         (
             (['out_sleeping', '0.001', 'out_slept'], None, 60),
-            ('Sleeping.\nSlept.\n', None, 0),
+            (b'Sleeping.\nSlept.\n', None, 0),
         ),
     ]
     for i, ((args, errpipe, timeout), expected) in enumerate(test_data):
@@ -260,16 +259,19 @@ class Subprocess42Test(unittest.TestCase):
         stdout, stderr = proc.communicate(timeout=timeout)
         code = proc.returncode
       except subprocess42.TimeoutExpired as e:
-        stdout = e.output
-        stderr = e.stderr
+        # output/stderr becomes bytes even if universal_newlines = True in
+        # Python3
+        stdout = e.output.decode() if e.output else None
+        stderr = e.stderr.decode() if e.stderr else None
         self.assertTrue(proc.kill())
         code = proc.wait()
       finally:
         duration = proc.duration()
       self.assertTrue(duration >= expected_duration, (i, expected_duration))
-      self.assertEqual((i, stdout, stderr, code), (i,) + expected)
+      self.assertEqual((i, None if stdout is None else stdout.encode(),
+                        None if stderr is None else stderr.encode(), code),
+                       (i,) + expected)
 
-  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_communicate_input(self):
     cmd = [
         sys.executable,
@@ -279,16 +281,15 @@ class Subprocess42Test(unittest.TestCase):
     ]
     proc = subprocess42.Popen(
         cmd, stdin=subprocess42.PIPE, stdout=subprocess42.PIPE)
-    out, err = proc.communicate(input='12345')
-    self.assertEqual('12345', out)
+    out, err = proc.communicate(input=b'12345')
+    self.assertEqual(b'12345', out)
     self.assertEqual(None, err)
 
-  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_communicate_input_timeout(self):
     cmd = [sys.executable, '-u', '-c', 'import time; time.sleep(60)']
     proc = subprocess42.Popen(cmd, stdin=subprocess42.PIPE)
     try:
-      proc.communicate(input='12345', timeout=0.5)
+      proc.communicate(input=b'12345', timeout=0.5)
       self.fail()
     except subprocess42.TimeoutExpired as e:
       self.assertEqual(None, e.output)
@@ -297,9 +298,6 @@ class Subprocess42Test(unittest.TestCase):
       proc.wait()
       self.assertLessEqual(0.5, proc.duration())
 
-  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
-  @unittest.skipIf(platform.system() == 'Darwin',
-                   "TODO(crbug.com/1017545): AssertionError: '12345' != ''")
   def test_communicate_input_stdout_timeout(self):
     cmd = [
         sys.executable,
@@ -315,16 +313,15 @@ time.sleep(60)
     proc = subprocess42.Popen(
         cmd, stdin=subprocess42.PIPE, stdout=subprocess42.PIPE)
     try:
-      proc.communicate(input='12345', timeout=1)
+      proc.communicate(input=b'12345', timeout=1)
       self.fail()
     except subprocess42.TimeoutExpired as e:
-      self.assertEqual('12345', e.output)
+      self.assertEqual(b'12345', e.output)
       self.assertEqual(None, e.stderr)
       self.assertTrue(proc.kill())
       proc.wait()
       self.assertLessEqual(0.5, proc.duration())
 
-  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_communicate_timeout_no_pipe(self):
     # In this case, it's effectively a wait() call.
     cmd = [sys.executable, '-u', '-c', 'import time; time.sleep(60)']
@@ -359,7 +356,6 @@ time.sleep(60)
     self.assertEqual(None, err)
     return out
 
-  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_lower_priority(self):
     out = self._test_lower_priority(True)
     if sys.platform == 'win32':
@@ -368,9 +364,8 @@ time.sleep(60)
       BELOW_NORMAL_PRIORITY_CLASS = 0x4000
       self.assertEqual(hex(BELOW_NORMAL_PRIORITY_CLASS), out)
     else:
-      self.assertEqual(str(os.nice(0) + 1), out)
+      self.assertEqual(str(os.nice(0) + 1).encode(), out)
 
-  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_lower_priority_False(self):
     out = self._test_lower_priority(False)
     if sys.platform == 'win32':
@@ -378,7 +373,7 @@ time.sleep(60)
       p = ctypes.windll.kernel32.GetPriorityClass(-1)
       self.assertEqual(hex(p), out)
     else:
-      self.assertEqual(str(os.nice(0)), out)
+      self.assertEqual(str(os.nice(0)).encode(), out)
 
   @staticmethod
   def _cmd_print_good():
@@ -433,7 +428,6 @@ time.sleep(60)
       with self.assertRaises(NotImplementedError):
         start()
 
-  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_containment_auto_kill(self):
     # Test process killing.
     cmd = [
@@ -449,7 +443,7 @@ time.sleep(60)
     p = subprocess42.Popen(
         cmd, stdout=subprocess42.PIPE, containment=containment)
     itr = p.yield_any_line()
-    self.assertEqual(('stdout', 'hi'), next(itr))
+    self.assertEqual(('stdout', b'hi'), next(itr))
     p.kill()
     p.wait()
     if sys.platform != 'win32':
@@ -467,11 +461,10 @@ time.sleep(60)
         'range(50*1024*1024); print("hi")',
     ]
 
-  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_large_memory(self):
     # Just assert the process works normally.
     cmd = self._cmd_large_memory()
-    self.assertEqual('hi', subprocess42.check_output(cmd).strip())
+    self.assertEqual(b'hi', subprocess42.check_output(cmd).strip())
 
   def test_containment_auto_limit_memory(self):
     # Process allocates a lot of memory. It should fail due to quota.
@@ -527,7 +520,6 @@ time.sleep(60)
     except subprocess42.CalledProcessError as e:
       self.assertEqual('.\n', e.output)
 
-  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_recv_any(self):
     # Test all pipe direction and output scenarios.
     combinations = [
@@ -548,7 +540,7 @@ time.sleep(60)
             'stdout': subprocess42.PIPE,
             'stderr': subprocess42.PIPE,
             'expected': {
-                'stdout': 'printing'
+                'stdout': b'printing'
             },
         },
         {
@@ -556,7 +548,7 @@ time.sleep(60)
             'stdout': subprocess42.PIPE,
             'stderr': None,
             'expected': {
-                'stdout': 'printing'
+                'stdout': b'printing'
             },
         },
         {
@@ -564,7 +556,7 @@ time.sleep(60)
             'stdout': subprocess42.PIPE,
             'stderr': subprocess42.STDOUT,
             'expected': {
-                'stdout': 'printing'
+                'stdout': b'printing'
             },
         },
         {
@@ -572,7 +564,7 @@ time.sleep(60)
             'stdout': subprocess42.PIPE,
             'stderr': subprocess42.PIPE,
             'expected': {
-                'stderr': 'printing'
+                'stderr': b'printing'
             },
         },
         {
@@ -580,7 +572,7 @@ time.sleep(60)
             'stdout': None,
             'stderr': subprocess42.PIPE,
             'expected': {
-                'stderr': 'printing'
+                'stderr': b'printing'
             },
         },
         {
@@ -588,7 +580,7 @@ time.sleep(60)
             'stdout': subprocess42.PIPE,
             'stderr': subprocess42.STDOUT,
             'expected': {
-                'stdout': 'printing'
+                'stdout': b'printing'
             },
         },
         {
@@ -596,8 +588,8 @@ time.sleep(60)
             'stdout': subprocess42.PIPE,
             'stderr': subprocess42.PIPE,
             'expected': {
-                'stderr': 'printing',
-                'stdout': 'printing'
+                'stderr': b'printing',
+                'stdout': b'printing'
             },
         },
         {
@@ -605,7 +597,7 @@ time.sleep(60)
             'stdout': subprocess42.PIPE,
             'stderr': subprocess42.STDOUT,
             'expected': {
-                'stdout': 'printingprinting'
+                'stdout': b'printingprinting'
             },
         },
     ]
@@ -617,7 +609,7 @@ time.sleep(60)
       while p.poll() is None:
         pipe, data = p.recv_any()
         if data:
-          actual.setdefault(pipe, '')
+          actual.setdefault(pipe, b'')
           actual[pipe] += data
 
       # The process exited, read any remaining data in the pipes.
@@ -625,14 +617,13 @@ time.sleep(60)
         pipe, data = p.recv_any()
         if pipe is None:
           break
-        actual.setdefault(pipe, '')
+        actual.setdefault(pipe, b'')
         actual[pipe] += data
       self.assertEqual(testcase['expected'], actual,
                        (i, testcase['cmd'], testcase['expected'], actual))
       self.assertEqual((None, None), p.recv_any())
       self.assertEqual(0, p.returncode)
 
-  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_recv_any_different_buffering(self):
     # Specifically test all buffering scenarios.
     for flush, unbuffered in itertools.product([True, False], [True, False]):
@@ -651,7 +642,6 @@ time.sleep(60)
       proc.wait()
       self.assertEqual(0, proc.returncode)
 
-  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_recv_any_timeout_0(self):
     self._test_recv_any_timeout(False, False)
     self._test_recv_any_timeout(False, True)
@@ -692,7 +682,6 @@ time.sleep(60)
           continue
         raise
 
-  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_yield_any_no_timeout(self):
     for duration in (0.05, 0.1, 0.5, 2):
       try:
@@ -717,7 +706,6 @@ time.sleep(60)
           continue
         raise
 
-  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_yield_any_timeout_0(self):
     # rec_any() is expected to timeout and return None with no data pending at
     # least once, due to the sleep of 'duration' and the use of timeout=0.
@@ -749,7 +737,6 @@ time.sleep(60)
           continue
         raise
 
-  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_yield_any_timeout_0_called(self):
     # rec_any() is expected to timeout and return None with no data pending at
     # least once, due to the sleep of 'duration' and the use of timeout=0.
@@ -786,14 +773,13 @@ time.sleep(60)
           continue
         raise
 
-  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_yield_any_returncode(self):
     proc = subprocess42.Popen(
         [sys.executable, '-c', 'import sys;sys.stdout.write("yo");sys.exit(1)'],
         stdout=subprocess42.PIPE)
     for p, d in proc.yield_any():
       self.assertEqual('stdout', p)
-      self.assertEqual('yo', d)
+      self.assertEqual(b'yo', d)
     # There was a bug where the second call to wait() would overwrite
     # proc.returncode with 0 when timeout is not None.
     self.assertEqual(1, proc.wait())
@@ -805,7 +791,7 @@ time.sleep(60)
     self.assertLessEqual(0, proc.duration())
 
   def _wait_for_hi(self, proc, err):
-    actual = ''
+    actual = b''
     while True:
       if err:
         data = proc.recv_err(timeout=5)
@@ -815,7 +801,7 @@ time.sleep(60)
         self.fail('%r' % actual)
       self.assertTrue(data)
       actual += data
-      if actual in ('hi\n', 'hi\r\n'):
+      if actual in (b'hi\n', b'hi\r\n'):
         break
 
   def _proc(self, err, **kwargs):
@@ -831,7 +817,6 @@ time.sleep(60)
       kwargs['stdout'] = subprocess42.PIPE
     return subprocess42.Popen(cmd, **kwargs)
 
-  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_detached(self):
     self._test_detached(False)
     self._test_detached(True)
@@ -856,13 +841,12 @@ time.sleep(60)
         ))
       else:
         self.assertEqual(0, proc.wait())
-        self.assertEqual((key, 'got signal 15\nbye\n'), proc.recv_any())
+        self.assertEqual((key, b'got signal 15\nbye\n'), proc.recv_any())
     finally:
       # In case the test fails.
       proc.kill()
       proc.wait()
 
-  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_attached(self):
     self._test_attached(False)
     self._test_attached(True)
@@ -880,7 +864,7 @@ time.sleep(60)
         self.assertEqual((None, None), proc.recv_any())
       else:
         self.assertEqual(0, proc.wait())
-        self.assertEqual((key, 'got signal 15\nbye\n'), proc.recv_any())
+        self.assertEqual((key, b'got signal 15\nbye\n'), proc.recv_any())
     finally:
       # In case the test fails.
       proc.kill()
@@ -888,34 +872,34 @@ time.sleep(60)
 
   def test_split(self):
     data = [
-        ('stdout', 'o1\no2\no3\n'),
-        ('stderr', 'e1\ne2\ne3\n'),
-        ('stdout', '\n\n'),
-        ('stdout', '\n'),
-        ('stdout', 'o4\no5'),
-        ('stdout', '_sameline\npart1 of one line '),
-        ('stderr', 'err inserted between two parts of stdout\n'),
-        ('stdout', 'part2 of one line\n'),
-        ('stdout', 'incomplete last stdout'),
-        ('stderr', 'incomplete last stderr'),
+        ('stdout', b'o1\no2\no3\n'),
+        ('stderr', b'e1\ne2\ne3\n'),
+        ('stdout', b'\n\n'),
+        ('stdout', b'\n'),
+        ('stdout', b'o4\no5'),
+        ('stdout', b'_sameline\npart1 of one line '),
+        ('stderr', b'err inserted between two parts of stdout\n'),
+        ('stdout', b'part2 of one line\n'),
+        ('stdout', b'incomplete last stdout'),
+        ('stderr', b'incomplete last stderr'),
     ]
     self.assertEqual(
         list(subprocess42.split(data)), [
-            ('stdout', 'o1'),
-            ('stdout', 'o2'),
-            ('stdout', 'o3'),
-            ('stderr', 'e1'),
-            ('stderr', 'e2'),
-            ('stderr', 'e3'),
-            ('stdout', ''),
-            ('stdout', ''),
-            ('stdout', ''),
-            ('stdout', 'o4'),
-            ('stdout', 'o5_sameline'),
-            ('stderr', 'err inserted between two parts of stdout'),
-            ('stdout', 'part1 of one line part2 of one line'),
-            ('stderr', 'incomplete last stderr'),
-            ('stdout', 'incomplete last stdout'),
+            ('stdout', b'o1'),
+            ('stdout', b'o2'),
+            ('stdout', b'o3'),
+            ('stderr', b'e1'),
+            ('stderr', b'e2'),
+            ('stderr', b'e3'),
+            ('stdout', b''),
+            ('stdout', b''),
+            ('stdout', b''),
+            ('stdout', b'o4'),
+            ('stdout', b'o5_sameline'),
+            ('stderr', b'err inserted between two parts of stdout'),
+            ('stdout', b'part1 of one line part2 of one line'),
+            ('stderr', b'incomplete last stderr'),
+            ('stdout', b'incomplete last stdout'),
         ])
 
 

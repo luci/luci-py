@@ -40,6 +40,9 @@ import subprocess
 from subprocess import CalledProcessError, PIPE, STDOUT  # pylint: disable=W0611
 from subprocess import list2cmdline
 
+import six
+
+
 # Default maxsize argument.
 MAX_SIZE = 16384
 
@@ -353,19 +356,24 @@ else:
         fcntl.fcntl(conn, fcntl.F_SETFL, flags)
 
 
-class TimeoutExpired(Exception):
-  """Compatible with python3 subprocess."""
+if six.PY3:
+  TimeoutExpired = subprocess.TimeoutExpired
+else:
 
-  def __init__(self, cmd, timeout, output=None, stderr=None):
-    self.cmd = cmd
-    self.timeout = timeout
-    self.output = output
-    # Non-standard:
-    self.stderr = stderr
-    super(TimeoutExpired, self).__init__(str(self))
+  class TimeoutExpired(Exception):
+    """Compatible with python3 subprocess."""
 
-  def __str__(self):
-    return "Command '%s' timed out after %s seconds" % (self.cmd, self.timeout)
+    def __init__(self, cmd, timeout, output=None, stderr=None):
+      self.cmd = cmd
+      self.timeout = timeout
+      self.output = output
+      # Non-standard:
+      self.stderr = stderr
+      super(TimeoutExpired, self).__init__(str(self))
+
+    def __str__(self):
+      return "Command '%s' timed out after %s seconds" % (self.cmd,
+                                                          self.timeout)
 
 
 class Containment(object):
@@ -595,11 +603,16 @@ class Popen(subprocess.Popen):
     if not timeout:
       return super(Popen, self).communicate(input=input)
 
-    assert isinstance(timeout, (int, float)), timeout
+    if six.PY3:
+      return super(Popen, self).communicate(  # pylint: disable=unexpected-keyword-arg
+          input=input,
+          timeout=timeout,
+      )
 
+    assert isinstance(timeout, (int, float)), timeout
     if self.stdin or self.stdout or self.stderr:
-      stdout = '' if self.stdout else None
-      stderr = '' if self.stderr else None
+      stdout = b'' if self.stdout else None
+      stderr = b'' if self.stderr else None
       t = None
       if input is not None:
         assert self.stdin, ('Can\'t use communicate(input) if not using '
@@ -664,6 +677,8 @@ class Popen(subprocess.Popen):
     assert timeout is None or isinstance(timeout, (int, float)), timeout
     if timeout is None:
       super(Popen, self).wait()
+    elif six.PY3:
+      super(Popen, self).wait(timeout)
     elif self.returncode is None:
       if sys.platform == 'win32':
         WAIT_TIMEOUT = 258
@@ -817,7 +832,11 @@ class Popen(subprocess.Popen):
           continue
 
       if self.universal_newlines and data:
-        data = self._translate_newlines(data)
+        if six.PY3:
+          data = self._translate_newlines(
+              six.ensure_binary(data), encoding='utf-8', errors='strict')
+        else:
+          data = self._translate_newlines(data)
       return names[index], data
 
   def recv_out(self, maxsize=None, timeout=None):
@@ -997,11 +1016,11 @@ def inhibit_os_error_reporting():
   # - Ubuntu, disable apport if needed.
 
 
-def split(data, sep='\n'):
+def split(data, sep=b'\n'):
   """Splits pipe data by |sep|. Does some buffering.
 
-  For example, [('stdout', 'a\nb'), ('stdout', '\n'), ('stderr', 'c\n')] ->
-  [('stdout', 'a'), ('stdout', 'b'), ('stderr', 'c')].
+  For example, [('stdout', b'a\nb'), ('stdout', b'\n'), ('stderr', b'c\n')] ->
+  [('stdout', b'a'), ('stdout', b'b'), ('stderr', b'c')].
 
   Args:
     data: iterable of tuples (pipe_name, bytes).
@@ -1029,7 +1048,7 @@ def split(data, sep='\n'):
       start = j + 1
       if pending:
         # prepend and forget
-        to_emit = ''.join(pending) + to_emit
+        to_emit = b''.join(pending) + to_emit
         pending = []
         pending_chunks[pipe_name] = pending
       yield pipe_name, to_emit
@@ -1037,4 +1056,4 @@ def split(data, sep='\n'):
   # Emit remaining chunks that don't end with separators as is.
   for pipe_name, chunks in sorted(pending_chunks.items()):
     if chunks:
-      yield pipe_name, ''.join(chunks)
+      yield pipe_name, b''.join(chunks)
