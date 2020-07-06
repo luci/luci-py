@@ -385,11 +385,11 @@ class TestOsx(unittest.TestCase):
   def test_get_uptime(self):
     self.assertGreater(osx.get_uptime(), 0)
 
-  @unittest.skip('TODO(crbug.com/1100226): install pyobjc')
+  @unittest.skip('TODO(crbug.com/1101705): install pyobjc')
   def test_is_locked(self):
     self.assertIsNotNone(osx.is_locked())
 
-  @unittest.skip('TODO(crbug.com/1100226): install pyobjc')
+  @unittest.skip('TODO(crbug.com/1101705): install pyobjc')
   def test_is_beta(self):
     self.assertIsNotNone(osx.is_beta())
 
