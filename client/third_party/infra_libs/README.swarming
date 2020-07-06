@@ -1,7 +1,7 @@
 Name: infra_libs
 Short Name: infra_libs
 URL: https://chromium.googlesource.com/infra/infra/+/master/packages/infra_libs/infra_libs/
-Revision:  2bb89a9f2164a65a66c6f1e3edf07b1377f9a73b
+Revision: 8a7b755ecfb83110accd8f4bda62394a7c85f89d
 License: Chromium License
 
 Description:
