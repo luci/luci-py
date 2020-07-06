@@ -17,6 +17,8 @@ import re
 import shlex
 import subprocess
 
+import six
+
 from utils import tools
 
 from api.platforms import common
@@ -83,7 +85,7 @@ def _lspci():
     # It normally happens on Google Compute Engine as lspci is not installed by
     # default and on ARM since they do not have a PCI bus.
     return None
-  return [shlex.split(l) for l in lines]
+  return [shlex.split(l.decode()) for l in lines]
 
 
 @tools.cached
@@ -114,18 +116,18 @@ def _get_intel_version():
 
 
 def _read_cpuinfo():
-  with open('/proc/cpuinfo', 'rb') as f:
+  with open('/proc/cpuinfo', 'r') as f:
     return f.read()
 
 
 def _read_cgroup():
-  with open('/proc/self/cgroup', 'rb') as f:
+  with open('/proc/self/cgroup', 'r') as f:
     return f.read()
 
 
 def _read_dmi_file(filename):
   try:
-    with open('/sys/devices/virtual/dmi/id/' + filename, 'rb') as f:
+    with open('/sys/devices/virtual/dmi/id/' + filename, 'r') as f:
       return f.read().strip()
   except (IOError, OSError):
     return None
@@ -143,7 +145,7 @@ def get_os_version_number():
   """
   # On Ubuntu it will return a string like '12.04'. On Raspbian, it will look
   # like '7.6'.
-  return unicode(platform.linux_distribution()[1])
+  return six.text_type(platform.linux_distribution()[1])
 
 
 def get_temperatures():
@@ -274,7 +276,7 @@ def get_gpu():
       version = _get_intel_version()
     ven_name, dev_name = gpu.ids_to_names(ven_id, ven_name, dev_id, dev_name)
 
-    dimensions.add(unicode(ven_id))
+    dimensions.add(six.text_type(ven_id))
     dimensions.add(u'%s:%s' % (ven_id, dev_id))
     if version:
       dimensions.add(u'%s:%s-%s' % (ven_id, dev_id, version))
@@ -313,7 +315,7 @@ def get_ssd():
                                    'name,rota']).splitlines()
     ssd = []
     for line in out:
-      match = re.match(r'(\w+)\s+(0|1)', line)
+      match = re.match(br'(\w+)\s+(0|1)', line)
       if match and match.group(2) == '0':
         ssd.append(match.group(1).decode('utf-8'))
     return tuple(sorted(ssd))

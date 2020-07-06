@@ -44,7 +44,6 @@ class TestOsUtilities(auto_stub.TestCase):
     super(TestOsUtilities, self).tearDown()
     tools.clear_cache_all()
 
-  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_get_os_name(self):
     expected = (u'Debian', u'Linux', u'Mac', u'Raspbian', u'Ubuntu', u'Windows')
     self.assertIn(os_utilities.get_os_name(), expected)
@@ -63,7 +62,6 @@ class TestOsUtilities(auto_stub.TestCase):
     expected = (u'32', u'64')
     self.assertIn(os_utilities.get_cpu_bitness(), expected)
 
-  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_get_cpu_dimensions(self):
     values = os_utilities.get_cpu_dimensions()
     self.assertGreater(len(values), 1)
@@ -102,7 +100,6 @@ class TestOsUtilities(auto_stub.TestCase):
       actual = os_utilities._parse_intel_model(i)
       self.assertEqual(expected, actual)
 
-  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_get_ip(self):
     ip = os_utilities.get_ip()
     self.assertNotEqual('127.0.0.1', ip)
@@ -113,11 +110,9 @@ class TestOsUtilities(auto_stub.TestCase):
   def test_get_num_processors(self):
     self.assertGreater(os_utilities.get_num_processors(), 0)
 
-  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_get_physical_ram(self):
     self.assertGreater(os_utilities.get_physical_ram(), 0)
 
-  @unittest.skipIf(sys.platform == 'darwin' and six.PY3, 'crbug.com/1010816')
   def test_get_disks_info(self):
     info = os_utilities.get_disks_info()
     self.assertGreater(len(info), 0)
@@ -131,7 +126,6 @@ class TestOsUtilities(auto_stub.TestCase):
     # disk I/O during the two calls.
     self.assertLess(delta, 2., (delta, free_disk, root['free_mb']))
 
-  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_get_gpu(self):
     actual = os_utilities.get_gpu()
     self.assertTrue(actual is None or actual)
@@ -224,14 +218,12 @@ class TestOsUtilities(auto_stub.TestCase):
       self.fail(actual[u'quarantined'])
     self.assertEqual(expected, set(actual))
 
-  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_get_hostname_gce_docker(self):
     self.mock(platforms, 'is_gce', lambda: True)
     self.mock(os.path, 'isfile', lambda _: True)
     self.mock(socket, 'getfqdn', lambda: 'dockerhost')
     self.assertEqual(os_utilities.get_hostname(), 'dockerhost')
 
-  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_get_hostname_gce_nodocker(self):
     self.mock(platforms, 'is_gce', lambda: True)
     self.mock(os.path, 'isfile', lambda _: False)
@@ -250,14 +242,12 @@ class TestOsUtilities(auto_stub.TestCase):
       if manual_mock:
         del platforms.gce
 
-  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_get_hostname_nogce(self):
     self.mock(platforms, 'is_gce', lambda: False)
     self.mock(os.path, 'isfile', lambda _: False)
     self.mock(socket, 'getfqdn', lambda: 'somehost')
     self.assertEqual(os_utilities.get_hostname(), 'somehost')
 
-  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_get_hostname_macos(self):
     self.mock(platforms, 'is_gce', lambda: False)
     self.mock(os.path, 'isfile', lambda _: False)

@@ -63,7 +63,7 @@ def _raw_metadata_request(path):
     try:
       resp = urllib.request.urlopen(
           urllib.request.Request(url, headers=headers), timeout=10)
-      return bytes(resp.read().encode('utf-8'))
+      return resp.read()
     except IOError as e:
       logging.warning(
           'Failed to grab GCE metadata from %s on attempt #%d: %s',

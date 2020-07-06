@@ -197,10 +197,10 @@ def get_os_name():
     # Add support for other OSes as relevant.
     content = _safe_read('/etc/os-release')
     if content:
-      os_release = dict(l.split('=', 1) for l in content.splitlines() if l)
-      os_id = os_release.get('ID').strip('"')
+      os_release = dict(l.split(b'=', 1) for l in content.splitlines() if l)
+      os_id = os_release.get(b'ID').strip(b'"').decode('utf-8')
       # Uppercase the first letter for consistency with the other platforms.
-      return (os_id[0].upper() + os_id[1:]).decode('utf-8')
+      return os_id[0].upper() + os_id[1:]
 
   return sys.platform.decode('utf-8')
 
@@ -319,7 +319,7 @@ def get_ip():
     # network system to figure out an IP interface to use.
     try:
       s.connect(('8.8.8.8', 80))
-      return s.getsockname()[0].decode('utf-8')
+      return six.ensure_text(s.getsockname()[0])
     except socket.error:
       # Can raise "error: [Errno 10051] A socket operation was attempted to an
       # unreachable network" if the network is still booting up. We don't want
@@ -342,7 +342,7 @@ def get_hostname():
     meta = platforms.gce.get_metadata() or {}
     hostname = meta.get('instance', {}).get('hostname')
     if hostname:
-      return hostname.decode('utf-8')
+      return six.ensure_text(hostname)
 
   # Windows enjoys putting random case in there. Enforces lower case for sanity.
   hostname = socket.getfqdn().lower()
@@ -395,7 +395,7 @@ def get_physical_ram():
   if os.path.isfile('/proc/meminfo'):
     # linux.
     meminfo = _safe_read('/proc/meminfo') or ''
-    matched = re.search(r'MemTotal:\s+(\d+) kB', meminfo)
+    matched = re.search(br'MemTotal:\s+(\d+) kB', meminfo)
     if matched:
       mb = int(matched.groups()[0]) / 1024.
       if 0. < mb < 1.:
@@ -542,13 +542,13 @@ def get_machine_type():
     if best_fit is None or delta < best_fit[0]:
       best_fit = (delta, prefix)
   prefix = best_fit[1]
-  machine_type = prefix + unicode(cores)
+  machine_type = prefix + six.text_type(cores)
   if machine_type not in GCE_MACHINE_COST_HOUR_US:
     # Try a best fit.
     logging.info('Failed to find a good machine_type match: %s', machine_type)
     for i in (16, 8, 4, 2):
       if cores > i:
-        machine_type = prefix + unicode(i)
+        machine_type = prefix + six.text_type(i)
         break
     else:
       if cores == 1:
@@ -1053,12 +1053,12 @@ def get_state():
       u'audio': get_audio(),
       u'cpu_name': get_cpuinfo().get(u'name'),
       u'cost_usd_hour': get_cost_hour(),
-      u'cwd': file_path.get_native_path_case(os.getcwd().decode('utf-8')),
+      u'cwd': file_path.get_native_path_case(six.ensure_text(os.getcwd())),
       u'disks': get_disks_info(),
       # Only including a subset of the environment variable, as state is not
       # designed to sustain large load at the moment.
       u'env': {
-          u'PATH': os.environ[u'PATH'].decode('utf-8'),
+          u'PATH': six.ensure_text(os.environ[u'PATH']),
       },
       u'gpu': get_gpu()[1],
       u'hostname': get_hostname(),
@@ -1066,16 +1066,16 @@ def get_state():
       u'nb_files_in_temp': nb_files_in_temp,
       u'pid': os.getpid(),
       u'python': {
-          u'executable': sys.executable.decode('utf-8'),
+          u'executable': six.ensure_text(sys.executable),
           u'packages': get_python_packages(),
-          u'version': sys.version.decode('utf-8'),
+          u'version': six.ensure_text(sys.version),
       },
       u'ram': get_physical_ram(),
       u'running_time': int(round(time.time() - _STARTED_TS)),
       u'ssd': list(get_ssd()),
       u'started_ts': int(round(_STARTED_TS)),
       u'uptime': int(round(get_uptime())),
-      u'user': getpass.getuser().decode('utf-8'),
+      u'user': six.ensure_text(getpass.getuser()),
   }
   if get_reboot_required():
     state[u'reboot_required'] = True
