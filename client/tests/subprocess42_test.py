@@ -21,55 +21,49 @@ import test_env
 
 from utils import subprocess42
 
-
 # Disable pre-set unbuffered output to not interfere with the testing being done
 # here. Otherwise everything would test with unbuffered; which is fine but
 # that's not what we specifically want to test here.
 ENV = os.environ.copy()
 ENV.pop('PYTHONUNBUFFERED', None)
 
+SCRIPT_OUT = ('import signal, sys, time;\n'
+              'l = [];\n'
+              'def handler(signum, _):\n'
+              '  l.append(signum);\n'
+              '  sys.stdout.write(\'got signal %%d\\n\' %% signum);\n'
+              '  sys.stdout.flush();\n'
+              'signal.signal(%s, handler);\n'
+              'sys.stdout.write(\'hi\\n\');\n'
+              'sys.stdout.flush();\n'
+              'while not l:\n'
+              '  try:\n'
+              '    time.sleep(0.01);\n'
+              '  except IOError:\n'
+              '    sys.stdout.write(\'ioerror\\n\');\n'
+              '    sys.stdout.flush();\n'
+              'sys.stdout.write(\'bye\\n\');\n'
+              'sys.stdout.flush();\n') % ('signal.SIGBREAK' if sys.platform ==
+                                          'win32' else 'signal.SIGTERM')
 
-SCRIPT_OUT = (
-  'import signal, sys, time;\n'
-  'l = [];\n'
-  'def handler(signum, _):\n'
-  '  l.append(signum);\n'
-  '  sys.stdout.write(\'got signal %%d\\n\' %% signum);\n'
-  '  sys.stdout.flush();\n'
-  'signal.signal(%s, handler);\n'
-  'sys.stdout.write(\'hi\\n\');\n'
-  'sys.stdout.flush();\n'
-  'while not l:\n'
-  '  try:\n'
-  '    time.sleep(0.01);\n'
-  '  except IOError:\n'
-  '    sys.stdout.write(\'ioerror\\n\');\n'
-  '    sys.stdout.flush();\n'
-  'sys.stdout.write(\'bye\\n\');\n'
-  'sys.stdout.flush();\n') % (
-    'signal.SIGBREAK' if sys.platform == 'win32' else 'signal.SIGTERM')
-
-
-SCRIPT_ERR = (
-  'import signal, sys, time;\n'
-  'l = [];\n'
-  'def handler(signum, _):\n'
-  '  l.append(signum);\n'
-  '  sys.stderr.write(\'got signal %%d\\n\' %% signum);\n'
-  '  sys.stderr.flush();\n'
-  'signal.signal(%s, handler);\n'
-  'sys.stderr.write(\'hi\\n\');\n'
-  'sys.stderr.flush();\n'
-  'while not l:\n'
-  '  try:\n'
-  '    time.sleep(0.01);\n'
-  '  except IOError:\n'
-  '    sys.stderr.write(\'ioerror\\n\');\n'
-  '    sys.stderr.flush();\n'
-  'sys.stderr.write(\'bye\\n\');\n'
-  'sys.stderr.flush();\n') % (
-    'signal.SIGBREAK' if sys.platform == 'win32' else 'signal.SIGTERM')
-
+SCRIPT_ERR = ('import signal, sys, time;\n'
+              'l = [];\n'
+              'def handler(signum, _):\n'
+              '  l.append(signum);\n'
+              '  sys.stderr.write(\'got signal %%d\\n\' %% signum);\n'
+              '  sys.stderr.flush();\n'
+              'signal.signal(%s, handler);\n'
+              'sys.stderr.write(\'hi\\n\');\n'
+              'sys.stderr.flush();\n'
+              'while not l:\n'
+              '  try:\n'
+              '    time.sleep(0.01);\n'
+              '  except IOError:\n'
+              '    sys.stderr.write(\'ioerror\\n\');\n'
+              '    sys.stderr.flush();\n'
+              'sys.stderr.write(\'bye\\n\');\n'
+              'sys.stderr.flush();\n') % ('signal.SIGBREAK' if sys.platform ==
+                                          'win32' else 'signal.SIGTERM')
 
 OUTPUT_SCRIPT = r"""
 import re
@@ -129,15 +123,15 @@ def get_output_sleep_proc(flush, unbuffered, sleep_duration):
   unbuffered output in python.
   """
   command = [
-    'import sys,time',
-    'print(\'A\')',
+      'import sys,time',
+      'print(\'A\')',
   ]
   if flush:
     # Sadly, this doesn't work otherwise in some combination.
     command.append('sys.stdout.flush()')
   command.extend((
-    'time.sleep(%s)' % sleep_duration,
-    'print(\'B\')',
+      'time.sleep(%s)' % sleep_duration,
+      'print(\'B\')',
   ))
   cmd = [sys.executable, '-c', ';'.join(command)]
   if unbuffered:
@@ -151,12 +145,12 @@ def get_output_sleep_proc_err(sleep_duration):
   and after a sleep.
   """
   command = [
-    'import sys,time',
-    'sys.stderr.write(\'A\\n\')',
+      'import sys,time',
+      'sys.stderr.write(\'A\\n\')',
   ]
   command.extend((
-    'time.sleep(%s)' % sleep_duration,
-    'sys.stderr.write(\'B\\n\')',
+      'time.sleep(%s)' % sleep_duration,
+      'sys.stderr.write(\'B\\n\')',
   ))
   cmd = [sys.executable, '-c', ';'.join(command)]
   return subprocess42.Popen(
@@ -164,6 +158,7 @@ def get_output_sleep_proc_err(sleep_duration):
 
 
 class Subprocess42Test(unittest.TestCase):
+
   def setUp(self):
     self._output_script = None
     super(Subprocess42Test, self).setUp()
@@ -191,43 +186,47 @@ class Subprocess42Test(unittest.TestCase):
     # ( (cmd, stderr_pipe, timeout), (stdout, stderr, returncode) ), ...
     # See OUTPUT script for the meaning of the commands.
     test_data = [
-      # 0 means no timeout, like None.
-      (
-        (['out_sleeping', '0.001', 'out_slept', 'err_print'], None, 0),
-        ('Sleeping.\nSlept.\n', None, 0),
-      ),
-      (
-        (['err_print'], subprocess42.STDOUT, 0),
-        ('printing', None, 0),
-      ),
-      (
-        (['err_print'], subprocess42.PIPE, 0),
-        ('', 'printing', 0),
-      ),
-
-      # On a loaded system, this can be tight.
-      (
-        (['out_sleeping', 'out_flush', '60', 'out_slept'], None, 0.5),
-        ('Sleeping.\n', None, timedout),
-      ),
-      (
+        # 0 means no timeout, like None.
         (
-          # Note that err_flush is necessary on Windows but not on the other
-          # OSes. This means the likelihood of missing stderr output from a
-          # killed child process on Windows is much higher than on other OSes.
-          [
-            'out_sleeping', 'out_flush', 'err_print', 'err_flush', '60',
-            'out_slept',
-          ],
-          subprocess42.PIPE,
-          0.5),
-        ('Sleeping.\n', 'printing', timedout),
-      ),
+            (['out_sleeping', '0.001', 'out_slept', 'err_print'], None, 0),
+            ('Sleeping.\nSlept.\n', None, 0),
+        ),
+        (
+            (['err_print'], subprocess42.STDOUT, 0),
+            ('printing', None, 0),
+        ),
+        (
+            (['err_print'], subprocess42.PIPE, 0),
+            ('', 'printing', 0),
+        ),
 
-      (
-        (['out_sleeping', '0.001', 'out_slept'], None, 60),
-        ('Sleeping.\nSlept.\n', None, 0),
-      ),
+        # On a loaded system, this can be tight.
+        (
+            (['out_sleeping', 'out_flush', '60', 'out_slept'], None, 0.5),
+            ('Sleeping.\n', None, timedout),
+        ),
+        (
+            (
+                # Note that err_flush is necessary on Windows but not on the
+                # other OSes. This means the likelihood of missing stderr output
+                # from a killed child process on Windows is much higher than on
+                # other OSes.
+                [
+                    'out_sleeping',
+                    'out_flush',
+                    'err_print',
+                    'err_flush',
+                    '60',
+                    'out_slept',
+                ],
+                subprocess42.PIPE,
+                0.5),
+            ('Sleeping.\n', 'printing', timedout),
+        ),
+        (
+            (['out_sleeping', '0.001', 'out_slept'], None, 60),
+            ('Sleeping.\nSlept.\n', None, 0),
+        ),
     ]
     for i, ((args, errpipe, timeout), expected) in enumerate(test_data):
       proc = subprocess42.Popen(
@@ -247,12 +246,8 @@ class Subprocess42Test(unittest.TestCase):
         duration = proc.duration()
       expected_duration = 0.0001 if not timeout or timeout == 60 else timeout
       self.assertTrue(duration >= expected_duration, (i, expected_duration))
-      self.assertEqual(
-          (i, stdout, stderr, code),
-          (i,
-            to_native_eol(expected[0]),
-            to_native_eol(expected[1]),
-            expected[2]))
+      self.assertEqual((i, stdout, stderr, code), (i, to_native_eol(
+          expected[0]), to_native_eol(expected[1]), expected[2]))
 
       # Try again with universal_newlines=True.
       proc = subprocess42.Popen(
@@ -272,15 +267,15 @@ class Subprocess42Test(unittest.TestCase):
       finally:
         duration = proc.duration()
       self.assertTrue(duration >= expected_duration, (i, expected_duration))
-      self.assertEqual(
-          (i, stdout, stderr, code),
-          (i,) + expected)
+      self.assertEqual((i, stdout, stderr, code), (i,) + expected)
 
   @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_communicate_input(self):
     cmd = [
-      sys.executable, '-u', '-c',
-      'import sys; sys.stdout.write(sys.stdin.read(5))',
+        sys.executable,
+        '-u',
+        '-c',
+        'import sys; sys.stdout.write(sys.stdin.read(5))',
     ]
     proc = subprocess42.Popen(
         cmd, stdin=subprocess42.PIPE, stdout=subprocess42.PIPE)
@@ -347,14 +342,16 @@ time.sleep(60)
   def _test_lower_priority(self, lower_priority):
     if sys.platform == 'win32':
       cmd = [
-        sys.executable, '-u', '-c',
-        'import ctypes,sys; v=ctypes.windll.kernel32.GetPriorityClass(-1);'
-        'sys.stdout.write(hex(v))'
+          sys.executable, '-u', '-c',
+          'import ctypes,sys; v=ctypes.windll.kernel32.GetPriorityClass(-1);'
+          'sys.stdout.write(hex(v))'
       ]
     else:
       cmd = [
-        sys.executable, '-u', '-c',
-        'import os,sys;sys.stdout.write(str(os.nice(0)))',
+          sys.executable,
+          '-u',
+          '-c',
+          'import os,sys;sys.stdout.write(str(os.nice(0)))',
       ]
     proc = subprocess42.Popen(
         cmd, stdout=subprocess42.PIPE, lower_priority=lower_priority)
@@ -371,7 +368,7 @@ time.sleep(60)
       BELOW_NORMAL_PRIORITY_CLASS = 0x4000
       self.assertEqual(hex(BELOW_NORMAL_PRIORITY_CLASS), out)
     else:
-      self.assertEqual(str(os.nice(0)+1), out)
+      self.assertEqual(str(os.nice(0) + 1), out)
 
   @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_lower_priority_False(self):
@@ -387,7 +384,9 @@ time.sleep(60)
   def _cmd_print_good():
     # Used in test_containment_auto and test_containment_auto_limit_process.
     return [
-        sys.executable, '-u', '-c',
+        sys.executable,
+        '-u',
+        '-c',
         'import subprocess,sys; '
         'subprocess.call([sys.executable, "-c", "print(\\"good\\")"])',
     ]
@@ -405,7 +404,7 @@ time.sleep(60)
     containment = subprocess42.Containment(
         containment_type=subprocess42.Containment.AUTO,
         limit_processes=2,
-        limit_total_committed_memory=1024*1024*1024)
+        limit_total_committed_memory=1024 * 1024 * 1024)
     self.assertEqual(0, subprocess42.check_call(cmd, containment=containment))
 
   def test_containment_auto_limit_process(self):
@@ -413,10 +412,11 @@ time.sleep(60)
     # quota.
     cmd = self._cmd_print_good()
     containment = subprocess42.Containment(
-        containment_type=subprocess42.Containment.JOB_OBJECT,
-        limit_processes=1)
+        containment_type=subprocess42.Containment.JOB_OBJECT, limit_processes=1)
     start = lambda: subprocess42.Popen(
-        cmd, stdout=subprocess42.PIPE, stderr=subprocess42.PIPE,
+        cmd,
+        stdout=subprocess42.PIPE,
+        stderr=subprocess42.PIPE,
         containment=containment)
 
     if sys.platform == 'win32':
@@ -437,13 +437,15 @@ time.sleep(60)
   def test_containment_auto_kill(self):
     # Test process killing.
     cmd = [
-      sys.executable, '-u', '-c',
-      'import sys,time; print("hi");time.sleep(60)',
+        sys.executable,
+        '-u',
+        '-c',
+        'import sys,time; print("hi");time.sleep(60)',
     ]
     containment = subprocess42.Containment(
         containment_type=subprocess42.Containment.AUTO,
         limit_processes=1,
-        limit_total_committed_memory=1024*1024*1024)
+        limit_total_committed_memory=1024 * 1024 * 1024)
     p = subprocess42.Popen(
         cmd, stdout=subprocess42.PIPE, containment=containment)
     itr = p.yield_any_line()
@@ -459,7 +461,10 @@ time.sleep(60)
   def _cmd_large_memory():
     # Used in test_large_memory and test_containment_auto_limit_memory.
     return [
-      sys.executable, '-u', '-c', 'range(50*1024*1024); print("hi")',
+        sys.executable,
+        '-u',
+        '-c',
+        'range(50*1024*1024); print("hi")',
     ]
 
   @unittest.skipIf(six.PY3, 'crbug.com/1010816')
@@ -474,9 +479,11 @@ time.sleep(60)
     containment = subprocess42.Containment(
         containment_type=subprocess42.Containment.JOB_OBJECT,
         # 20 MiB.
-        limit_total_committed_memory=20*1024*1024)
+        limit_total_committed_memory=20 * 1024 * 1024)
     start = lambda: subprocess42.Popen(
-        cmd, stdout=subprocess42.PIPE, stderr=subprocess42.PIPE,
+        cmd,
+        stdout=subprocess42.PIPE,
+        stderr=subprocess42.PIPE,
         containment=containment)
 
     if sys.platform == 'win32':
@@ -510,9 +517,8 @@ time.sleep(60)
 
   def test_check_output(self):
     cmd = [sys.executable, '-u', '-c', 'print(\'.\')']
-    self.assertEqual(
-        '.\n',
-        subprocess42.check_output(cmd, universal_newlines=True))
+    self.assertEqual('.\n',
+                     subprocess42.check_output(cmd, universal_newlines=True))
 
     cmd = [sys.executable, '-u', '-c', 'import sys; print(\'.\'); sys.exit(1)']
     try:
@@ -525,69 +531,83 @@ time.sleep(60)
   def test_recv_any(self):
     # Test all pipe direction and output scenarios.
     combinations = [
-      {
-        'cmd': ['out_print', 'err_print'],
-        'stdout': None,
-        'stderr': None,
-        'expected': {},
-      },
-      {
-        'cmd': ['out_print', 'err_print'],
-        'stdout': None,
-        'stderr': subprocess42.STDOUT,
-        'expected': {},
-      },
-
-      {
-        'cmd': ['out_print'],
-        'stdout': subprocess42.PIPE,
-        'stderr': subprocess42.PIPE,
-        'expected': {'stdout': 'printing'},
-      },
-      {
-        'cmd': ['out_print'],
-        'stdout': subprocess42.PIPE,
-        'stderr': None,
-        'expected': {'stdout': 'printing'},
-      },
-      {
-        'cmd': ['out_print'],
-        'stdout': subprocess42.PIPE,
-        'stderr': subprocess42.STDOUT,
-        'expected': {'stdout': 'printing'},
-      },
-
-      {
-        'cmd': ['err_print'],
-        'stdout': subprocess42.PIPE,
-        'stderr': subprocess42.PIPE,
-        'expected': {'stderr': 'printing'},
-      },
-      {
-        'cmd': ['err_print'],
-        'stdout': None,
-        'stderr': subprocess42.PIPE,
-        'expected': {'stderr': 'printing'},
-      },
-      {
-        'cmd': ['err_print'],
-        'stdout': subprocess42.PIPE,
-        'stderr': subprocess42.STDOUT,
-        'expected': {'stdout': 'printing'},
-      },
-
-      {
-        'cmd': ['out_print', 'err_print'],
-        'stdout': subprocess42.PIPE,
-        'stderr': subprocess42.PIPE,
-        'expected': {'stderr': 'printing', 'stdout': 'printing'},
-      },
-      {
-        'cmd': ['out_print', 'err_print'],
-        'stdout': subprocess42.PIPE,
-        'stderr': subprocess42.STDOUT,
-        'expected': {'stdout': 'printingprinting'},
-      },
+        {
+            'cmd': ['out_print', 'err_print'],
+            'stdout': None,
+            'stderr': None,
+            'expected': {},
+        },
+        {
+            'cmd': ['out_print', 'err_print'],
+            'stdout': None,
+            'stderr': subprocess42.STDOUT,
+            'expected': {},
+        },
+        {
+            'cmd': ['out_print'],
+            'stdout': subprocess42.PIPE,
+            'stderr': subprocess42.PIPE,
+            'expected': {
+                'stdout': 'printing'
+            },
+        },
+        {
+            'cmd': ['out_print'],
+            'stdout': subprocess42.PIPE,
+            'stderr': None,
+            'expected': {
+                'stdout': 'printing'
+            },
+        },
+        {
+            'cmd': ['out_print'],
+            'stdout': subprocess42.PIPE,
+            'stderr': subprocess42.STDOUT,
+            'expected': {
+                'stdout': 'printing'
+            },
+        },
+        {
+            'cmd': ['err_print'],
+            'stdout': subprocess42.PIPE,
+            'stderr': subprocess42.PIPE,
+            'expected': {
+                'stderr': 'printing'
+            },
+        },
+        {
+            'cmd': ['err_print'],
+            'stdout': None,
+            'stderr': subprocess42.PIPE,
+            'expected': {
+                'stderr': 'printing'
+            },
+        },
+        {
+            'cmd': ['err_print'],
+            'stdout': subprocess42.PIPE,
+            'stderr': subprocess42.STDOUT,
+            'expected': {
+                'stdout': 'printing'
+            },
+        },
+        {
+            'cmd': ['out_print', 'err_print'],
+            'stdout': subprocess42.PIPE,
+            'stderr': subprocess42.PIPE,
+            'expected': {
+                'stderr': 'printing',
+                'stdout': 'printing'
+            },
+        },
+        {
+            'cmd': ['out_print', 'err_print'],
+            'stdout': subprocess42.PIPE,
+            'stderr': subprocess42.STDOUT,
+            'expected': {
+                'stdout': 'printingprinting'
+            },
+        },
     ]
     for i, testcase in enumerate(combinations):
       cmd = [sys.executable, self.output_script] + testcase['cmd']
@@ -607,10 +627,8 @@ time.sleep(60)
           break
         actual.setdefault(pipe, '')
         actual[pipe] += data
-      self.assertEqual(
-          testcase['expected'],
-          actual,
-          (i, testcase['cmd'], testcase['expected'], actual))
+      self.assertEqual(testcase['expected'], actual,
+                       (i, testcase['cmd'], testcase['expected'], actual))
       self.assertEqual((None, None), p.recv_any())
       self.assertEqual(0, p.returncode)
 
@@ -681,8 +699,8 @@ time.sleep(60)
         proc = get_output_sleep_proc(True, True, duration)
         try:
           expected = [
-            'A\n',
-            'B\n',
+              'A\n',
+              'B\n',
           ]
           for p, data in proc.yield_any():
             self.assertEqual('stdout', p)
@@ -708,8 +726,8 @@ time.sleep(60)
         proc = get_output_sleep_proc(True, True, duration)
         try:
           expected = [
-            'A\n',
-            'B\n',
+              'A\n',
+              'B\n',
           ]
           got_none = False
           for p, data in proc.yield_any(timeout=0):
@@ -739,10 +757,12 @@ time.sleep(60)
       got_none = False
       expected = ['A\n', 'B\n']
       called = []
+
       def timeout():
         # pylint: disable=cell-var-from-loop
         called.append(0)
         return 0
+
       try:
         proc = get_output_sleep_proc(True, True, duration)
         try:
@@ -828,14 +848,12 @@ time.sleep(60)
         # after handling SIGBREAK.
         self.assertEqual(0, proc.wait())
         # Windows...
-        self.assertIn(
-            proc.recv_any(),
-            (
-              (key, 'got signal 21\r\nioerror\r\nbye\r\n'),
-              (key, 'got signal 21\nioerror\nbye\n'),
-              (key, 'got signal 21\r\nbye\r\n'),
-              (key, 'got signal 21\nbye\n'),
-            ))
+        self.assertIn(proc.recv_any(), (
+            (key, 'got signal 21\r\nioerror\r\nbye\r\n'),
+            (key, 'got signal 21\nioerror\nbye\n'),
+            (key, 'got signal 21\r\nbye\r\n'),
+            (key, 'got signal 21\nbye\n'),
+        ))
       else:
         self.assertEqual(0, proc.wait())
         self.assertEqual((key, 'got signal 15\nbye\n'), proc.recv_any())
@@ -870,34 +888,35 @@ time.sleep(60)
 
   def test_split(self):
     data = [
-      ('stdout', 'o1\no2\no3\n'),
-      ('stderr', 'e1\ne2\ne3\n'),
-      ('stdout', '\n\n'),
-      ('stdout', '\n'),
-      ('stdout', 'o4\no5'),
-      ('stdout', '_sameline\npart1 of one line '),
-      ('stderr', 'err inserted between two parts of stdout\n'),
-      ('stdout', 'part2 of one line\n'),
-      ('stdout', 'incomplete last stdout'),
-      ('stderr', 'incomplete last stderr'),
+        ('stdout', 'o1\no2\no3\n'),
+        ('stderr', 'e1\ne2\ne3\n'),
+        ('stdout', '\n\n'),
+        ('stdout', '\n'),
+        ('stdout', 'o4\no5'),
+        ('stdout', '_sameline\npart1 of one line '),
+        ('stderr', 'err inserted between two parts of stdout\n'),
+        ('stdout', 'part2 of one line\n'),
+        ('stdout', 'incomplete last stdout'),
+        ('stderr', 'incomplete last stderr'),
     ]
-    self.assertEqual(list(subprocess42.split(data)), [
-      ('stdout', 'o1'),
-      ('stdout', 'o2'),
-      ('stdout', 'o3'),
-      ('stderr', 'e1'),
-      ('stderr', 'e2'),
-      ('stderr', 'e3'),
-      ('stdout', ''),
-      ('stdout', ''),
-      ('stdout', ''),
-      ('stdout', 'o4'),
-      ('stdout', 'o5_sameline'),
-      ('stderr', 'err inserted between two parts of stdout'),
-      ('stdout', 'part1 of one line part2 of one line'),
-      ('stderr', 'incomplete last stderr'),
-      ('stdout', 'incomplete last stdout'),
-    ])
+    self.assertEqual(
+        list(subprocess42.split(data)), [
+            ('stdout', 'o1'),
+            ('stdout', 'o2'),
+            ('stdout', 'o3'),
+            ('stderr', 'e1'),
+            ('stderr', 'e2'),
+            ('stderr', 'e3'),
+            ('stdout', ''),
+            ('stdout', ''),
+            ('stdout', ''),
+            ('stdout', 'o4'),
+            ('stdout', 'o5_sameline'),
+            ('stderr', 'err inserted between two parts of stdout'),
+            ('stdout', 'part1 of one line part2 of one line'),
+            ('stderr', 'incomplete last stderr'),
+            ('stdout', 'incomplete last stdout'),
+        ])
 
 
 if __name__ == '__main__':
