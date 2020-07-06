@@ -2036,15 +2036,21 @@ def is_decorated(func):
 ## Realms permission checks.
 
 
-# Allowed LUCI project names, see realms.proto and LUCI Config service.
+# Allowed non-special (not "@...") project names, see realms.proto.
 _PROJECT_NAME_RE = re.compile(r'^[a-z0-9\-_]{1,100}$')
 # Allowed non-special (not "@...") realm names in realms.cfg.
 _REALM_NAME_RE = re.compile(r'^[a-z0-9_\.\-/]{1,400}$')
+
+# Used in place of a project in full names of internal realms.
+_INTERNAL_PROJECT = '@internal'
 
 # Root realm is included in all other realms, see root_realm().
 _ROOT_REALM = '@root'
 # Legacy realm is used for older realm-less resources, see legacy_realm().
 _LEGACY_REALM = '@legacy'
+
+# Set of special realms accepted when validating realm names.
+_SPECIAL_REALMS = (_ROOT_REALM, _LEGACY_REALM)
 
 # All permissions created via Permission (name -> Permission object)
 _all_perms = {}
@@ -2114,7 +2120,7 @@ def root_realm(project):
     TypeError if `project` is not a string.
     ValueError if `project` doesn't pass the regexp check.
   """
-  return '%s:%s' % (_validated_project_id(project), _ROOT_REALM)
+  return '%s:%s' % (_validated_realm_project(project), _ROOT_REALM)
 
 
 def legacy_realm(project):
@@ -2139,7 +2145,7 @@ def legacy_realm(project):
     TypeError if `project` is not a string.
     ValueError if `project` doesn't pass the regexp check.
   """
-  return '%s:%s' % (_validated_project_id(project), _LEGACY_REALM)
+  return '%s:%s' % (_validated_realm_project(project), _LEGACY_REALM)
 
 
 def validate_realm_name(name):
@@ -2155,14 +2161,20 @@ def validate_realm_name(name):
   spl = name.split(':', 1)
   if len(spl) != 2 or not spl[0] or not spl[1]:
     raise ValueError('Bad realm %r, want "<project>:<name>"' % (name,))
-  if (not _PROJECT_NAME_RE.match(spl[0]) or
-      not (_REALM_NAME_RE.match(spl[1]) or spl[1] == _ROOT_REALM or
-           spl[1] == _LEGACY_REALM)):
+
+  # Note: we don't mention _INTERNAL_PROJECT in the error message intentionally.
+  # Internal realms are uncommon and mentioning them in a generic error message
+  # will just confuse users.
+  if not _PROJECT_NAME_RE.match(spl[0]) and spl[0] != _INTERNAL_PROJECT:
     raise ValueError(
-        'Bad realm %r: should be "<project>:<name>" where '
-        '<project> matches %r and <name> matches %r or is %s or %s' %
-        (name, _PROJECT_NAME_RE.pattern, _REALM_NAME_RE.pattern, _ROOT_REALM,
-         _LEGACY_REALM))
+        'Bad realm %r: should be "<project>:<name>" where <project> '
+        'matches %r' % (name, _PROJECT_NAME_RE.pattern))
+
+  if not _REALM_NAME_RE.match(spl[1]) and spl[1] not in _SPECIAL_REALMS:
+    raise ValueError(
+        'Bad realm %r: should be "<project>:<name>" where <name> '
+        'matches %r or is %s' %
+        (name, _REALM_NAME_RE.pattern, ' or '.join(_SPECIAL_REALMS)))
 
 
 def has_permission(permission, realms, identity=None):
@@ -2256,11 +2268,11 @@ def has_permission_dryrun(
         'ALLOW' if expected_result else 'DENY')
 
 
-def _validated_project_id(project):
+def _validated_realm_project(project):
   """Checks type and value of `project` and returns it as str."""
   if not isinstance(project, basestring):
     raise TypeError('Expecting a string, got %s' % (type(project),))
-  if not _PROJECT_NAME_RE.match(project):
+  if not _PROJECT_NAME_RE.match(project) and project != _INTERNAL_PROJECT:
     raise ValueError(
         'Invalid project name %r: should match %r' %
         (project, _PROJECT_NAME_RE.pattern))

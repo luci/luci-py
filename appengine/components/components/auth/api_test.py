@@ -1205,6 +1205,9 @@ class RealmStringsTest(test_case.TestCase):
     self.assertIsNone(api.validate_realm_name('proj:realm'))
     self.assertIsNone(api.validate_realm_name('proj:@root'))
     self.assertIsNone(api.validate_realm_name('proj:@legacy'))
+    self.assertIsNone(api.validate_realm_name('@internal:realm'))
+    self.assertIsNone(api.validate_realm_name('@internal:@root'))
+    self.assertIsNone(api.validate_realm_name('@internal:@legacy'))
 
   def test_validate_realm_name_errors(self):
     with self.assertRaises(ValueError):
@@ -1213,6 +1216,8 @@ class RealmStringsTest(test_case.TestCase):
       self.assertFalse(api.validate_realm_name('proj:@invalid'))
     with self.assertRaises(ValueError):
       self.assertFalse(api.validate_realm_name('proj:re:alm'))
+    with self.assertRaises(ValueError):
+      self.assertFalse(api.validate_realm_name('@proj:realm'))
 
 
 PERM0 = api.Permission('luci.dev.testing0')

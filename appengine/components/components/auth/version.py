@@ -7,4 +7,4 @@
 Should be increased on any API or protocol changes.
 """
 
-__version__ = '1.4.2'
+__version__ = '1.4.3'
