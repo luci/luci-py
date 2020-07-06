@@ -16,6 +16,7 @@ from api import oauth
 from utils import tools
 
 from six.moves import urllib
+import six
 
 
 ### Private stuff.
@@ -183,6 +184,14 @@ def oauth2_available_scopes(account='default'):
   return accounts.get(account, {}).get('scopes') or []
 
 
+@tools.cached
+def can_send_metric(service_account):
+  """True if 'send_metric' really does something."""
+  # Scope to use Cloud Monitoring.
+  scope = 'https://www.googleapis.com/auth/monitoring'
+  return scope in oauth2_available_scopes(account=service_account)
+
+
 def signed_metadata_token(audience):
   """Returns tuple (signed GCE metadata JWT, expiration timestamp).
 
@@ -232,7 +241,7 @@ def get_image():
   """Returns the image used by the GCE VM."""
   # Format is projects/<id>/global/images/<image>
   metadata = get_metadata()
-  return unicode(metadata['instance']['image'].rsplit('/', 1)[-1])
+  return six.text_type(metadata['instance']['image'].rsplit('/', 1)[-1])
 
 
 @tools.cached
@@ -240,7 +249,7 @@ def get_zone():
   """Returns the zone containing the GCE VM."""
   # Format is projects/<id>/zones/<zone>
   metadata = get_metadata()
-  return unicode(metadata['instance']['zone'].rsplit('/', 1)[-1])
+  return six.text_type(metadata['instance']['zone'].rsplit('/', 1)[-1])
 
 
 @tools.cached
@@ -264,7 +273,7 @@ def get_zones():
 def get_gcp():
   """Returns the string identifier of the GCE VM's Cloud Project."""
   metadata = get_metadata()
-  return [unicode(metadata['project']['projectId'])]
+  return [six.text_type(metadata['project']['projectId'])]
 
 
 @tools.cached
@@ -272,7 +281,7 @@ def get_machine_type():
   """Returns the GCE machine type."""
   # Format is projects/<id>/machineTypes/<machine_type>
   metadata = get_metadata()
-  return unicode(metadata['instance']['machineType'].rsplit('/', 1)[-1])
+  return six.text_type(metadata['instance']['machineType'].rsplit('/', 1)[-1])
 
 
 @tools.cached
@@ -281,7 +290,7 @@ def get_cpuinfo():
   metadata = get_metadata()
   if not metadata:
     return None
-  cpu_platform = unicode(metadata['instance']['cpuPlatform'])
+  cpu_platform = six.text_type(metadata['instance']['cpuPlatform'])
   if not cpu_platform:
     return None
   # Normalize according to the expected name as reported by the CPUID
@@ -313,11 +322,3 @@ def get_cpuinfo():
 def get_tags():
   """Returns a list of instance tags or empty list if not GCE VM."""
   return get_metadata()['instance']['tags']
-
-
-@tools.cached
-def can_send_metric(service_account):
-  """True if 'send_metric' really does something."""
-  # Scope to use Cloud Monitoring.
-  scope = 'https://www.googleapis.com/auth/monitoring'
-  return scope in oauth2_available_scopes(account=service_account)
