@@ -241,7 +241,7 @@ def _register_extra_bot_config(content):
   This file is called implicitly by _call_hook() and _call_hook_safe().
   """
   global _EXTRA_BOT_CONFIG
-  if isinstance(content, unicode):
+  if isinstance(content, six.text_type):
     # compile will throw if there's a '# coding: utf-8' line and the string is
     # in unicode. <3 python.
     content = content.encode('utf-8')
@@ -857,7 +857,7 @@ def _run_manifest(botobj, manifest, start):
     env['SWARMING_SERVER'] = botobj.server.encode('ascii')
 
     task_in_file = os.path.join(work_dir, 'task_runner_in.json')
-    with fs.open(task_in_file, 'wb') as f:
+    with fs.open(task_in_file, 'w') as f:
       f.write(json.dumps(manifest))
     handle, bot_file = tempfile.mkstemp(
         prefix='bot_file', suffix='.json', dir=work_dir)
@@ -1095,7 +1095,7 @@ def _run_bot_inner(arg_error, quit_bit):
     return 0
 
   # This environment variable is accessible to the tasks executed by this bot.
-  os.environ['SWARMING_BOT_ID'] = botobj.id.encode('utf-8')
+  os.environ['SWARMING_BOT_ID'] = six.ensure_str(botobj.id)
 
   # bot_id is used in 'X-Luci-Swarming-Bot-ID' header.
   botobj.remote.bot_id = botobj.id

@@ -1,4 +1,4 @@
-#!/usr/bin/env vpython
+#!/usr/bin/env vpython3
 # Copyright 2013 The LUCI Authors. All rights reserved.
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
@@ -15,6 +15,8 @@ import threading
 import time
 import unittest
 import zipfile
+
+import six
 
 import test_env_bot_code
 test_env_bot_code.setup_test_env()
@@ -87,7 +89,7 @@ class TestBotBase(net_utils.TestCase):
         remote_client.createRemoteClient('https://localhost:1', auth_headers_cb,
                                          'localhost', self.root_dir),
         copy.deepcopy(self.attributes), 'https://localhost:1', 'version1',
-        unicode(self.root_dir), self.fail)
+        six.ensure_text(self.root_dir), self.fail)
 
 
 class TestBotMain(TestBotBase):
@@ -111,7 +113,8 @@ class TestBotMain(TestBotBase):
     self.mock(bot_main, '_bot_restart', self.fail)
     self.mock(
         bot_main, 'THIS_FILE',
-        unicode(os.path.join(test_env_bot_code.BOT_DIR, 'swarming_bot.zip')))
+        six.ensure_text(
+            os.path.join(test_env_bot_code.BOT_DIR, 'swarming_bot.zip')))
     # Need to disable this otherwise it'd kill the current checkout.
     self.mock(bot_main, '_cleanup_bot_directory', lambda _: None)
     # Test results shouldn't depend on where they run. And they should not use
@@ -130,6 +133,7 @@ class TestBotMain(TestBotBase):
     print(msg)
     self.fail('post_error_task was called')
 
+  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_hook_restart(self):
     from config import bot_config
     obj = self.make_bot()
@@ -190,6 +194,7 @@ class TestBotMain(TestBotBase):
     expected = {'sleep_streak': 0.1, 'yo': 'dawh'}
     self.assertEqual(expected, bot_main._get_state(obj, 0.1))
 
+  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_get_state_quarantine(self):
     botobj = bot_main.get_bot(bot_main.get_config())
     root = u'c:\\' if sys.platform == 'win32' else u'/'
@@ -348,6 +353,7 @@ class TestBotMain(TestBotBase):
     self.assertEqual(a, bot_main._dict_deep_merge(a, None))
     self.assertEqual(a, bot_main._dict_deep_merge(None, a))
 
+  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_setup_bot(self):
     setup_bots = []
 
@@ -815,7 +821,7 @@ class TestBotMain(TestBotBase):
           self.assertEqual(cmd[:2], ['--auth-params-file', auth_params_file])
         self.assertEqual(True, detached)
         self.assertEqual(self.bot.base_dir, cwd)
-        self.assertEqual('24', env['SWARMING_TASK_ID'])
+        self.assertEqual(b'24', env['SWARMING_TASK_ID'])
         self.assertTrue(stdout)
         self.assertEqual(subprocess42.STDOUT, stderr)
         self.assertEqual(subprocess42.PIPE, stdin)
@@ -823,7 +829,7 @@ class TestBotMain(TestBotBase):
 
       def wait(self2, timeout=None): # pylint: disable=unused-argument
         self2.returncode = returncode
-        with open(self2._out_file, 'wb') as f:
+        with open(self2._out_file, 'w') as f:
           json.dump(result, f)
         return 0
 
@@ -1021,8 +1027,9 @@ class TestBotMain(TestBotBase):
       restarts.append(1)
     self.mock(bot_main, '_bot_restart', bot_restart)
     # Mock the file to download in the temporary directory.
-    self.mock(bot_main, 'THIS_FILE',
-              unicode(os.path.join(self.root_dir, 'swarming_bot.1.zip')))
+    self.mock(
+        bot_main, 'THIS_FILE',
+        six.ensure_text(os.path.join(self.root_dir, 'swarming_bot.1.zip')))
     new_zip = os.path.join(self.root_dir, 'swarming_bot.2.zip')
     # This is necessary otherwise zipfile will crash.
     self.mock(time, 'time', lambda: 1400000000)
@@ -1072,46 +1079,48 @@ class TestBotMain(TestBotBase):
     # Create LKGBC with a timestamp from 1h ago.
     lkgbc = os.path.join(self.bot.base_dir, 'swarming_bot.zip')
     with open(lkgbc, 'wb') as f:
-      f.write('a')
+      f.write(b'a')
     past = time.time() - 60 * 60
     os.utime(lkgbc, (past, past))
 
     cur = os.path.join(self.bot.base_dir, 'swarming_bot.1.zip')
     with open(cur, 'wb') as f:
-      f.write('ab')
+      f.write(b'ab')
     self.mock(bot_main, 'THIS_FILE', cur)
 
     self.assertEqual(True, bot_main._update_lkgbc(self.bot))
     with open(lkgbc, 'rb') as f:
-      self.assertEqual('ab', f.read())
+      self.assertEqual(b'ab', f.read())
 
   def test_maybe_update_lkgbc(self):
     # Create LKGBC with a timestamp from 1h ago.
     lkgbc = os.path.join(self.bot.base_dir, 'swarming_bot.zip')
     with open(lkgbc, 'wb') as f:
-      f.write('a')
+      f.write(b'a')
     past = time.time() - 60 * 60
     os.utime(lkgbc, (past, past))
 
     cur = os.path.join(self.bot.base_dir, 'swarming_bot.1.zip')
     with open(cur, 'wb') as f:
-      f.write('ab')
+      f.write(b'ab')
     self.mock(bot_main, 'THIS_FILE', cur)
 
     # No update even if they mismatch, LKGBC is not old enough.
     self.assertEqual(False, bot_main._maybe_update_lkgbc(self.bot))
     with open(lkgbc, 'rb') as f:
-      self.assertEqual('a', f.read())
+      self.assertEqual(b'a', f.read())
 
     # Fast forward a little more than 7 days.
     now = time.time()
     self.mock(time, 'time', lambda: now + 7 * 24 * 60 * 60 + 10)
     self.assertEqual(True, bot_main._maybe_update_lkgbc(self.bot))
     with open(lkgbc, 'rb') as f:
-      self.assertEqual('ab', f.read())
+      self.assertEqual(b'ab', f.read())
 
 
 class TestBotNotMocked(TestBotBase):
+
+  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   @unittest.skipIf(
       sys.platform == 'win32', 'TODO(crbug.com/1017545): '
       '__init__() got an unexpected keyword argument \\\'creationflags\\\'')
