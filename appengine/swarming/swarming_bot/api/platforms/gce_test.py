@@ -7,6 +7,7 @@ import base64
 import json
 import logging
 import sys
+import threading
 import time
 import unittest
 
@@ -161,17 +162,38 @@ class TestGCE(auto_stub.TestCase):
     self.assertEqual(gce.get_tags(), ['tag1', 'tag2'])
 
 
-@unittest.skip('TODO(crbug.com/1100226): add test')
+@unittest.skipUnless(gce.is_gce(), 'TestMetadata runs only on GCE machines')
 class TestMetadata(auto_stub.TestCase):
 
   def test_get_metadata_uncached(self):
-    pass
+    meta = gce.get_metadata_uncached()
+    # assert if all metadata used in gce.py exist.
+    self.assertIsNotNone(meta['instance']['cpuPlatform'])
+    self.assertIsNotNone(meta['instance']['image'])
+    self.assertIsNotNone(meta['instance']['machineType'])
+    self.assertIsNotNone(meta['instance']['serviceAccounts'])
+    self.assertIsNotNone(meta['instance']['tags'])
+    self.assertIsNotNone(meta['instance']['zone'])
+    self.assertIsNotNone(meta['project']['projectId'])
 
   def test_wait_for_metadata(self):
-    pass
+    quit_bit = threading.Event()
+
+    # It should cache the result.
+    gce.wait_for_metadata(quit_bit)
+    self.assertIsNotNone(gce._CACHED_METADATA[0])
 
   def test_get_metadata(self):
-    pass
+    # First call should cache the result.
+    meta = gce.get_metadata()
+
+    # Second call should not call get_metadata_uncached().
+    with mock.patch('api.platforms.gce.get_metadata_uncached'
+                   ) as mock_get_metadata_uncached:
+      meta_cached = gce.get_metadata()
+      mock_get_metadata_uncached.assert_not_called()
+
+    self.assertEqual(meta, meta_cached)
 
 
 @unittest.skip('TODO(crbug.com/1100226): add test')
