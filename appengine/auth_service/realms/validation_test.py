@@ -30,19 +30,21 @@ def test_db():
       b.permission('luci.dev.p2'),
       b.permission('luci.dev.p3'),
   ])
-  b.permission('luci.dev.int', internal=True)
+  b.role('role/luci.internal.int', [
+      b.permission('luci.dev.int', internal=True),
+  ])
   return b.finish()
 
 
 class ValidationTest(test_case.TestCase):
-  def call(self, fields):
+  def call(self, fields, allow_internal=False):
     ctx = cfgvalidation.Context()
-    val = validation.Validator(ctx, test_db(), False)
+    val = validation.Validator(ctx, test_db(), allow_internal)
     val.validate(realms_config_pb2.RealmsCfg(**fields))
     return ctx
 
-  def assert_valid(self, fields):
-    ctx = self.call(fields)
+  def assert_valid(self, fields, allow_internal=False):
+    ctx = self.call(fields, allow_internal)
     self.assertEqual(ctx.messages, [])
 
   def assert_has_error(self, err, fields):
@@ -55,7 +57,7 @@ class ValidationTest(test_case.TestCase):
   def test_empty(self):
     self.assert_valid({})
 
-  def test_happy_path(self):
+  def test_happy_path_project_config(self):
     self.assert_valid({
         'custom_roles': [
             {
@@ -126,6 +128,38 @@ class ValidationTest(test_case.TestCase):
         ],
     })
 
+  def test_happy_path_internal_config(self):
+    self.assert_valid({
+        'custom_roles': [
+            {
+                'name': 'customRole/with-int-perm',
+                'permissions': [
+                    'luci.dev.p1',  # public
+                    'luci.dev.int'  # internal
+                ],
+            },
+        ],
+        'realms': [
+            {
+                'name': 'realm',
+                'bindings': [
+                    {
+                        'role': 'role/dev.a',
+                        'principals': ['group:aaa'],
+                    },
+                    {
+                        'role': 'role/luci.internal.int',
+                        'principals': ['group:aaa'],
+                    },
+                    {
+                        'role': 'customRole/with-int-perm',
+                        'principals': ['group:aaa'],
+                    },
+                ],
+            },
+        ],
+    }, allow_internal=True)
+
   def test_custom_role_bad_name(self):
     self.assert_has_error('name should start with "customRole/"', {
         'custom_roles': [
@@ -155,7 +189,7 @@ class ValidationTest(test_case.TestCase):
     })
 
   def test_custom_role_internal_permission(self):
-    self.assert_has_error('it can\'t be used in the config', {
+    self.assert_has_error('is internal', {
         'custom_roles': [
             {
                 'name': 'customRole/some',
@@ -294,7 +328,7 @@ class ValidationTest(test_case.TestCase):
     })
 
   def test_bindings_internal_role(self):
-    self.assert_has_error('is an internal role', {
+    self.assert_has_error('is internal', {
         'realms': [
             {
                 'name': 'a',

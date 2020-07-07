@@ -24,10 +24,13 @@ from realms import permissions
 def register():
   """Register the config validation hook."""
   # pylint: disable=unused-variable
-  @validation.project_config_rule(
-      common.cfg_path(), realms_config_pb2.RealmsCfg)
-  def validate_realms_cfg(cfg, ctx):
+  cfg_path = common.cfg_path()
+  @validation.project_config_rule(cfg_path, realms_config_pb2.RealmsCfg)
+  def validate_project_realms_cfg(cfg, ctx):
     Validator(ctx, permissions.db(), allow_internal=False).validate(cfg)
+  @validation.self_rule(cfg_path, realms_config_pb2.RealmsCfg)
+  def validate_internal_realms_cfg(cfg, ctx):
+    Validator(ctx, permissions.db(), allow_internal=True).validate(cfg)
 
 
 class Validator(object):
@@ -36,7 +39,7 @@ class Validator(object):
   def __init__(self, ctx, db, allow_internal):
     self.ctx = ctx
     self.db = db
-    self.allow_internal = allow_internal  # TODO(vadimsh): Unused currently.
+    self.allow_internal = allow_internal
 
     # Shortcuts to reduce typing.
     self.prefix = self.ctx.prefix
@@ -62,7 +65,8 @@ class Validator(object):
           self.error('a custom role with this name was already defined')
           continue
 
-        # All referenced permissions must be known and be non-internal.
+        # All referenced permissions must be known and have appropriate
+        # visibility.
         for perm in role.permissions:
           self.validate_permission(perm)
 
@@ -99,22 +103,24 @@ class Validator(object):
     return valid
 
   def validate_permission(self, perm):
-    """Emits errors if the permission is not defined or it is internal."""
+    """Emits errors if the permission is not defined or has wrong visibility."""
     perm_pb = self.db.permissions.get(perm)
     if not perm_pb:
       self.error(
           'permission "%s" is not defined in permissions DB ver "%s"',
           perm, self.db.revision)
-    elif perm_pb.internal:
+    elif perm_pb.internal and not self.allow_internal:
       self.error(
-          'permission "%s" is internal, it can\'t be used in the config', perm)
+          'permission "%s" is internal, it can\'t be used in '
+          'a project config', perm)
 
   def validate_role_ref(self, name, custom_roles):
     """Emits errors and returns False if the role name is unrecognized."""
     if name.startswith(permissions.BUILTIN_ROLE_PREFIX):
-      if name.startswith(permissions.INTERNAL_ROLE_PREFIX):
+      is_internal = name.startswith(permissions.INTERNAL_ROLE_PREFIX)
+      if is_internal and not self.allow_internal:
         self.error(
-            'the role "%s" is an internal role, it can\'t be used in '
+            'the role "%s" is internal, it can\'t be used in '
             'a project config', name)
         return False
       if name in self.db.roles:
