@@ -428,7 +428,8 @@ def yield_swarming_bot_files(
   """
   items = {i: None for i in FILES}
   items.update(additionals)
-  items['config/config.json'] = _make_config_json(host, host_version, settings)
+  items['config/config.json'] = _make_config_json(host, host_version,
+                                                  settings).encode()
   logging.debug('Bot config.json: %s', items['config/config.json'])
   for item, content in sorted(items.items()):
     if content is not None:

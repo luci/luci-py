@@ -335,7 +335,7 @@ def setup_bot(bot):
   Example: making this script starts automatically on user login via
   os_utilities.set_auto_startup_win() or os_utilities.set_auto_startup_osx().
   """
-  with open(os.path.join(bot.base_dir, 'README'), 'wb') as f:
+  with open(os.path.join(bot.base_dir, 'README'), 'w') as f:
     f.write("""This directory contains a Swarming bot.
 
 Swarming source code is hosted at

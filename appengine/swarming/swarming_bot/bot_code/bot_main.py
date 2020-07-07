@@ -44,15 +44,15 @@ import six
 # See https://bugs.python.org/issue7980.
 import _strptime  # pylint: disable=unused-import
 
-import bot_auth
-import common
-import file_refresher
-import remote_client
-import remote_client_errors
-import singleton
 from api import bot
 from api import os_utilities
 from api import platforms
+from bot_code import bot_auth
+from bot_code import common
+from bot_code import file_refresher
+from bot_code import remote_client
+from bot_code import remote_client_errors
+from bot_code import singleton
 from infra_libs import ts_mon
 from utils import file_path
 from utils import fs

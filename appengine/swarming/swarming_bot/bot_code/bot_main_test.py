@@ -24,11 +24,11 @@ test_env_bot_code.setup_test_env()
 # Creates a server mock for functions in net.py.
 import net_utils
 
-import bot_main
-import remote_client
 from api import bot
 from api import os_utilities
 from api.platforms import gce
+from bot_code import bot_main
+from bot_code import remote_client
 from depot_tools import fix_encoding
 from utils import file_path
 from utils import logging_utils

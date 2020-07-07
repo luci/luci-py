@@ -16,11 +16,11 @@ from six.moves import urllib
 
 from utils import net
 
-from remote_client_errors import BotCodeError
-from remote_client_errors import InitializationError
-from remote_client_errors import InternalError
-from remote_client_errors import MintOAuthTokenError
-from remote_client_errors import PollError
+from bot_code.remote_client_errors import BotCodeError
+from bot_code.remote_client_errors import InitializationError
+from bot_code.remote_client_errors import InternalError
+from bot_code.remote_client_errors import MintOAuthTokenError
+from bot_code.remote_client_errors import PollError
 
 
 # RemoteClient will attempt to refresh the authentication headers once they are

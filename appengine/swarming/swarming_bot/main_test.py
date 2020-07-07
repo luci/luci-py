@@ -1,4 +1,4 @@
-#!/usr/bin/env vpython
+#!/usr/bin/env vpython3
 # Copyright 2014 The LUCI Authors. All rights reserved.
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
@@ -10,6 +10,8 @@ import re
 import sys
 import tempfile
 import unittest
+
+import six
 
 BOT_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -52,6 +54,7 @@ class SimpleMainTest(TestCase):
   def url(self):
     return 'http://localhost:1'
 
+  @unittest.skipIf(six.PY3 and sys.platform == 'darwin', 'crbug.com/1101705')
   @unittest.skipIf(sys.platform == 'win32',
                    'TODO(crbug.com/1017545): fix assertions')
   def test_attributes(self):
@@ -85,7 +88,7 @@ class SimpleMainTest(TestCase):
         [sys.executable, self._zip_file, 'version'], stderr=subprocess42.PIPE)
     lines = version.strip().split()
     self.assertEqual(1, len(lines), lines)
-    self.assertTrue(re.match(r'^[0-9a-f]{64}$', lines[0]), lines[0])
+    self.assertTrue(re.match(br'^[0-9a-f]{64}$', lines[0]), lines[0])
 
 
 class MainTest(TestCase):
@@ -103,6 +106,7 @@ class MainTest(TestCase):
   def url(self):
     return self._server.url
 
+  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   @unittest.skipIf(
       sys.platform == 'win32',
       'TODO(crbug.com/1017545): It gets stuck at proc.communicate()')

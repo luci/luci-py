@@ -12,8 +12,8 @@ import six
 
 from utils import auth_server
 
-import file_reader
-import remote_client
+from bot_code import file_reader
+from bot_code import remote_client
 
 
 class AuthSystemError(Exception):
