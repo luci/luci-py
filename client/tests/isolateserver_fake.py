@@ -172,11 +172,12 @@ class FakeIsolateServerHandler(httpserver.Handler):
         self.server.contents.setdefault(namespace, {})[h] = body
 
       self.send_octet_stream(
-          '',
+          b'',
           headers={
               # This is to simulate
               # https://cloud.google.com/storage/docs/xml-api/reference-headers#xgooghash
-              'x-goog-hash': 'md5=' + base64.b64encode(md5_hash.digest()),
+              'x-goog-hash':
+                  'md5=' + base64.b64encode(md5_hash.digest()).decode(),
           })
     else:
       raise NotImplementedError(self.path)

@@ -514,7 +514,7 @@ class IsolateServer(StorageApi):
     if isinstance(content, list) and len(content) == 1:
       content = content[0]
     else:
-      content = ''.join(content)
+      content = b''.join(content)
 
     # DB upload
     if not push_state.finalize_url:
