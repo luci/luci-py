@@ -130,14 +130,13 @@ class TestOsUtilities(auto_stub.TestCase):
     actual = os_utilities.get_gpu()
     self.assertTrue(actual is None or actual)
 
-  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_get_dimensions(self):
     dimensions = os_utilities.get_dimensions()
     for key, values in dimensions.items():
-      self.assertIsInstance(key, unicode)
+      self.assertIsInstance(key, six.text_type)
       self.assertIsInstance(values, list)
       for value in values:
-        self.assertIsInstance(value, unicode)
+        self.assertIsInstance(value, six.text_type)
     actual = set(dimensions)
     # Only set when the process is running in a properly configured GUI context.
     actual.discard(u'locale')
