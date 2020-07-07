@@ -116,57 +116,77 @@ class TestOsx(unittest.TestCase):
     plist = textwrap.dedent("""\
       <plist> <array>
         <dict>
-           <key>_items</key>
-           <array>
-             <dict>
-               <key>_items</key>
-               <array>
-                 <dict>
-                   <key>_name</key>
-                   <string>MacBook Pro Microphone</string>
-                   <key>coreaudio_default_audio_input_device</key>
-                   <string>spaudio_yes</string>
-                   <key>coreaudio_device_input</key>
-                   <integer>1</integer>
-                   <key>coreaudio_device_manufacturer</key>
-                   <string>Apple Inc.</string>
-                   <key>coreaudio_device_srate</key>
-                   <real>48000</real>
-                   <key>coreaudio_device_transport</key>
-                   <string>coreaudio_device_type_builtin</string>
-                   <key>coreaudio_input_source</key>
-                   <string>MacBook Pro Microphone</string>
-                 </dict>
-                 <dict>
-                   <key>_name</key>
-                   <string>MacBook Pro Speakers</string>
-                   <key>_properties</key>
-                   <string>coreaudio_default_audio_system_device</string>
-                   <key>coreaudio_default_audio_output_device</key>
-                   <string>spaudio_yes</string>
-                   <key>coreaudio_default_audio_system_device</key>
-                   <string>spaudio_yes</string>
-                   <key>coreaudio_device_manufacturer</key>
-                   <string>Apple Inc.</string>
-                   <key>coreaudio_device_output</key>
-                   <integer>2</integer>
-                   <key>coreaudio_device_srate</key>
-                   <real>48000</real>
-                   <key>coreaudio_device_transport</key>
-                   <string>coreaudio_device_type_builtin</string>
-                   <key>coreaudio_output_source</key>
-                   <string>MacBook Pro Speakers</string>
-                 </dict>
-               </array>
-               <key>_name</key>
-               <string>coreaudio_device</string>
-             </dict>
-           </array>
+          <key>_items</key>
+          <array>
+            <dict>
+              <key>_items</key>
+              <array>
+                <dict>
+                  <key>_name</key>
+                  <string>MacBook Pro Microphone</string>
+                  <key>coreaudio_default_audio_input_device</key>
+                  <string>spaudio_yes</string>
+                  <key>coreaudio_device_input</key>
+                  <integer>1</integer>
+                  <key>coreaudio_device_manufacturer</key>
+                  <string>Apple Inc.</string>
+                  <key>coreaudio_device_srate</key>
+                  <real>48000</real>
+                  <key>coreaudio_device_transport</key>
+                  <string>coreaudio_device_type_builtin</string>
+                  <key>coreaudio_input_source</key>
+                  <string>MacBook Pro Microphone</string>
+                </dict>
+                <dict>
+                  <key>_name</key>
+                  <string>MacBook Pro Speakers</string>
+                  <key>_properties</key>
+                  <string>coreaudio_default_audio_system_device</string>
+                  <key>coreaudio_default_audio_output_device</key>
+                  <string>spaudio_yes</string>
+                  <key>coreaudio_default_audio_system_device</key>
+                  <string>spaudio_yes</string>
+                  <key>coreaudio_device_manufacturer</key>
+                  <string>Apple Inc.</string>
+                  <key>coreaudio_device_output</key>
+                  <integer>2</integer>
+                  <key>coreaudio_device_srate</key>
+                  <real>48000</real>
+                  <key>coreaudio_device_transport</key>
+                  <string>coreaudio_device_type_builtin</string>
+                  <key>coreaudio_output_source</key>
+                  <string>MacBook Pro Speakers</string>
+                </dict>
+              </array>
+              <key>_name</key>
+              <string>coreaudio_device</string>
+            </dict>
+          </array>
         </dict>
       </array>
       </plist>""").encode()
     self.mock_check_output.return_value = plist
     self.assertEqual(osx.get_audio(), ['MacBook Pro Speakers'])
+
+  def test_get_audio_no_devices(self):
+    plist = textwrap.dedent("""\
+      <plist> <array>
+        <dict>
+          <key>_items</key>
+          <array>
+            <dict>
+              <key>_items</key>
+              <array>
+              </array>
+              <key>_name</key>
+              <string>coreaudio_device</string>
+            </dict>
+          </array>
+        </dict>
+      </array>
+      </plist>""").encode()
+    self.mock_check_output.return_value = plist
+    self.assertEqual(osx.get_audio(), [])
 
   def test_get_gpu_radeon_rx560_egpu(self):
     # Copied from actual output of 'system_profiler SPDisplaysDataType -xml' on

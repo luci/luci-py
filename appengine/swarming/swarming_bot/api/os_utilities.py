@@ -434,7 +434,6 @@ def get_disk_size(path):
   return 0.
 
 
-@tools.cached
 def get_audio():
   """Returns the active audio card(s)."""
   # There's a risk that an audio card may "appear", which may be especially true
