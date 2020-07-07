@@ -7,6 +7,7 @@
 The imports are done late so if an ImportError occurs, it is localized to this
 command only.
 """
+from __future__ import print_function
 __version__ = '1.0.0'
 
 import argparse
@@ -178,7 +179,7 @@ def CMDshell(args):
 
   if args:
     for arg in args:
-      exec code.compile_command(arg) in local_vars
+      exec (code.compile_command(arg), local_vars)
   else:
     code.interact('Locals:\n  ' + '\n  '.join(sorted(local_vars)), None,
                   local_vars)
@@ -234,7 +235,7 @@ def CMDtask_runner(args):
 def CMDversion(_args):
   """Prints the version of this file and the hash of the code."""
   logging_utils.prepare_logging(None)
-  print zip_package.generate_version()
+  print(zip_package.generate_version())
   return 0
 
 
@@ -261,13 +262,13 @@ def main():
   if os.path.basename(THIS_FILE) == 'swarming_bot.zip':
     # Self-replicate itself right away as swarming_bot.1.zip and restart the bot
     # process as this copy. This enables LKGBC logic.
-    print >> sys.stderr, 'Self replicating pid:%d.' % os.getpid()
+    print('Self replicating pid:%d.' % os.getpid(), file=sys.stderr)
     new_zip = os.path.join(base_dir, 'swarming_bot.1.zip')
     if os.path.isfile(new_zip):
       os.remove(new_zip)
     shutil.copyfile(THIS_FILE, new_zip)
     cmd = [new_zip] + sys.argv[1:]
-    print >> sys.stderr, 'cmd: %s' % cmd
+    print('cmd: %s' % cmd, file=sys.stderr)
     return common.exec_python(cmd)
 
   # sys.argv[0] is the zip file itself.
@@ -287,7 +288,7 @@ def main():
         logging.error('Files in %s:\n%s', THIS_FILE, f.namelist())
       return 1
 
-  print >> sys.stderr, 'Unknown command %s' % cmd
+  print('Unknown command %s' % cmd, file=sys.stderr)
   return 1
 
 
