@@ -172,7 +172,6 @@ class TestOsUtilities(auto_stub.TestCase):
       expected.add(u'integrity')
     self.assertEqual(expected, actual)
 
-  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_override_id_via_env(self):
     mock_env = os.environ.copy()
     mock_env['SWARMING_BOT_ID'] = 'customid'
@@ -180,10 +179,10 @@ class TestOsUtilities(auto_stub.TestCase):
     dimensions = os_utilities.get_dimensions()
     self.assertIsInstance(dimensions[u'id'], list)
     self.assertEqual(len(dimensions[u'id']), 1)
-    self.assertIsInstance(dimensions[u'id'][0], unicode)
+    self.assertIsInstance(dimensions[u'id'][0], six.text_type)
     self.assertEqual(dimensions[u'id'][0], u'customid')
 
-  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
+  @unittest.skipIf(six.PY3 and sys.platform == 'darwin', 'crbug.com/1101705')
   def test_get_state(self):
     actual = os_utilities.get_state()
     actual.pop('reboot_required', None)

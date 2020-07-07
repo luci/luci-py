@@ -12,11 +12,11 @@ import logging
 import multiprocessing
 import os
 import pipes
-import platform
 import re
 import shlex
 import subprocess
 
+import distro
 import six
 
 from utils import tools
@@ -145,7 +145,7 @@ def get_os_version_number():
   """
   # On Ubuntu it will return a string like '12.04'. On Raspbian, it will look
   # like '7.6'.
-  return six.text_type(platform.linux_distribution()[1])
+  return six.text_type(distro.linux_distribution()[1])
 
 
 def get_temperatures():
@@ -383,7 +383,7 @@ def get_cpu_scaling_governor(cpu_num):
   for p in files:
     try:
       with open(p, 'rb') as f:
-        return [unicode(f.read().strip())]
+        return [six.ensure_text(f.read().strip())]
     except IOError:
       continue
   return None

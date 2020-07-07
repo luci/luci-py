@@ -939,13 +939,13 @@ def get_dimensions():
       u'os': get_os_values(),
       # This value is frequently overridden by bots.cfg via luci-config.
       u'pool': [u'default'],
-      u'python': [sys.version.decode('utf-8').split()[0]],
+      u'python': [six.ensure_text(sys.version).split()[0]],
   }
 
   # Conditional dimensions:
   id_override = os.environ.get('SWARMING_BOT_ID')
   if id_override:
-    dimensions[u'id'] = [id_override.decode('utf-8')]
+    dimensions[u'id'] = [six.ensure_text(id_override)]
 
   caches = get_named_caches_info()
   if caches:
@@ -987,7 +987,7 @@ def get_dimensions():
     else:
       dimensions[u'inside_docker'] = [u'1', inside_docker]
 
-    dimensions[u'kvm'] = [unicode(int(platforms.linux.get_kvm()))]
+    dimensions[u'kvm'] = [six.text_type(int(platforms.linux.get_kvm()))]
 
     comp = platforms.linux.get_device_tree_compatible()
     if comp:
