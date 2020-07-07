@@ -43,8 +43,10 @@ def expand_realms(db, project_id, realms_cfg):
   # The server code could have changed since the config passed the validation
   # and realms_cfg may not be valid anymore. Verify it still is. The code below
   # depends crucially on the validity of realms_cfg.
-  validation.validate_realms_cfg_with_db(
-      db, realms_cfg, cfg_validation.Context.raise_on_error())
+  validation.Validator(
+      cfg_validation.Context.raise_on_error(), db,
+      project_id == common.INTERNAL_PROJECT,
+  ).validate(realms_cfg)
 
   # A lazily populated {role -> tuple of permissions} mapping.
   roles_expander = RolesExpander(db.roles, realms_cfg.custom_roles)

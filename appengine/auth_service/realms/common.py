@@ -9,6 +9,9 @@ import re
 from components import utils
 
 
+# Used in place of a project in full names of internal realms.
+INTERNAL_PROJECT = '@internal'
+
 # Root realm is included in all other realms, see realms_config.proto.
 ROOT_REALM = '@root'
 # Legacy realm is used for older realm-less resources, see realms_config.proto.

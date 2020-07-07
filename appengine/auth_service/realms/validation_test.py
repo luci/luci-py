@@ -37,8 +37,8 @@ def test_db():
 class ValidationTest(test_case.TestCase):
   def call(self, fields):
     ctx = cfgvalidation.Context()
-    validation.validate_realms_cfg_with_db(
-        test_db(), realms_config_pb2.RealmsCfg(**fields), ctx)
+    val = validation.Validator(ctx, test_db(), False)
+    val.validate(realms_config_pb2.RealmsCfg(**fields))
     return ctx
 
   def assert_valid(self, fields):
