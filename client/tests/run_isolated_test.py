@@ -251,13 +251,11 @@ class RunIsolatedTest(RunIsolatedTestBase):
     finally:
       os.environ = old_env
 
-  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_main(self):
     self.mock(tools, 'disable_buffering', lambda: None)
-    isolated = json_dumps(
-        {
-          'command': ['foo.exe', 'cmd with space'],
-        })
+    isolated = json_dumps({
+        'command': ['foo.exe', 'cmd with space'],
+    }).encode()
     isolated_hash = isolateserver_fake.hash_content(isolated)
     def get_storage(server_ref):
       return StorageFake({isolated_hash: isolated}, server_ref)
@@ -293,10 +291,9 @@ class RunIsolatedTest(RunIsolatedTestBase):
         ],
         self.popen_calls)
 
-  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_main_args(self):
     self.mock(tools, 'disable_buffering', lambda: None)
-    isolated = json_dumps({'command': ['foo.exe', 'cmd w/ space']})
+    isolated = json_dumps({'command': ['foo.exe', 'cmd w/ space']}).encode()
     isolated_hash = isolateserver_fake.hash_content(isolated)
     def get_storage(server_ref):
       return StorageFake({isolated_hash: isolated}, server_ref)
@@ -374,9 +371,8 @@ class RunIsolatedTest(RunIsolatedTestBase):
     self.assertEqual(0, ret)
     return make_tree_call
 
-  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_run_tha_test_naked(self):
-    isolated = json_dumps({'command': ['invalid', 'command']})
+    isolated = json_dumps({'command': ['invalid', 'command']}).encode()
     isolated_hash = isolateserver_fake.hash_content(isolated)
     files = {isolated_hash: isolated}
     make_tree_call = self._run_tha_test(isolated_hash, files)
@@ -407,13 +403,12 @@ class RunIsolatedTest(RunIsolatedTestBase):
       raise OSError('Unknown')
     old_init = self.mock(subprocess42.Popen, '__init__', r)
 
-  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_main_naked(self):
     self.mock_popen_with_oserr()
     self.mock(on_error, 'report', lambda _: None)
     # The most naked .isolated file that can exist.
     self.mock(tools, 'disable_buffering', lambda: None)
-    isolated = json_dumps({'command': ['invalid', 'command']})
+    isolated = json_dumps({'command': ['invalid', 'command']}).encode()
     isolated_hash = isolateserver_fake.hash_content(isolated)
     def get_storage(server_ref):
       return StorageFake({isolated_hash: isolated}, server_ref)
@@ -541,7 +536,6 @@ class RunIsolatedTest(RunIsolatedTestBase):
     task_ctx.pop('default_account_id')
     self.assertEqual(task_ctx, self.popen_calls[0][1]['luci_ctx']['local_auth'])
 
-  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_main_naked_leaking(self):
     workdir = tempfile.mkdtemp()
     try:
@@ -563,9 +557,8 @@ class RunIsolatedTest(RunIsolatedTestBase):
       ret = run_isolated.main(cmd)
       self.assertEqual(0, ret)
     finally:
-      fs.rmtree(unicode(workdir))
+      fs.rmtree(six.ensure_text(workdir))
 
-  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_main_naked_with_packages(self):
     self.mock(cipd, 'get_platform', lambda: 'linux-amd64')
 
@@ -591,15 +584,16 @@ class RunIsolatedTest(RunIsolatedTestBase):
           and '-json-output' in args):
         idx = args.index('-json-output')
         with open(args[idx+1], 'w') as json_out:
-          json.dump({
-              'result': {
-                  subdir: [{
-                      'package': pkg,
-                      'instance_id': ver
-                  } for pkg, ver in packages
-                          ] for subdir, packages in pins_gen.next().items()
-              }
-          }, json_out)
+          json.dump(
+              {
+                  'result': {
+                      subdir: [{
+                          'package': pkg,
+                          'instance_id': ver
+                      } for pkg, ver in packages]
+                      for subdir, packages in six.next(pins_gen).items()
+                  }
+              }, json_out)
         return 0
       if args[0].endswith(os.sep + 'echo' + suffix):
         return 0
@@ -669,7 +663,6 @@ class RunIsolatedTest(RunIsolatedTestBase):
         echo_cmd[0])
     self.assertEqual(echo_cmd[1:], [u'hello', u'world'])
 
-  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_main_naked_with_cipd_client_no_packages(self):
     self.mock(cipd, 'get_platform', lambda: 'linux-amd64')
 
@@ -784,7 +777,6 @@ class RunIsolatedTest(RunIsolatedTestBase):
     with self.assertRaises(SystemExit):
       run_isolated.main(cmd)
 
-  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_main_naked_with_caches(self):
     # An empty named cache better to be kept!
     trimmed = []
@@ -827,12 +819,11 @@ class RunIsolatedTest(RunIsolatedTestBase):
       self.assertTrue(fs.exists(named_path))
     self.assertTrue(trimmed)
 
-  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_modified_cwd(self):
     isolated = json_dumps({
         'command': ['../out/some.exe', 'arg'],
         'relative_cwd': 'some',
-    })
+    }).encode()
     isolated_hash = isolateserver_fake.hash_content(isolated)
     files = {isolated_hash: isolated}
     _ = self._run_tha_test(isolated_hash, files)
@@ -851,12 +842,11 @@ class RunIsolatedTest(RunIsolatedTestBase):
         ],
         self.popen_calls)
 
-  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_python_cmd_lower_priority(self):
     isolated = json_dumps({
         'command': ['../out/cmd.py', 'arg'],
         'relative_cwd': 'some',
-    })
+    }).encode()
     isolated_hash = isolateserver_fake.hash_content(isolated)
     files = {isolated_hash: isolated}
     _ = self._run_tha_test(isolated_hash, files, lower_priority=True)
@@ -876,7 +866,6 @@ class RunIsolatedTest(RunIsolatedTestBase):
     self.assertIn('python', cmd[0])
     self.assertEqual([os.path.join(u'..', 'out', 'cmd.py'), u'arg'], cmd[1:])
 
-  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_run_tha_test_non_isolated(self):
     _ = self._run_tha_test(command=[u'/bin/echo', u'hello', u'world'])
     self.assertEqual(
@@ -965,26 +954,24 @@ class RunIsolatedTest(RunIsolatedTestBase):
     self.assertTrue(stats)
 
 
-@unittest.skipIf(six.PY3, 'crbug.com/1010816')
 class RunIsolatedTestRun(RunIsolatedTestBase):
 
   def setUp(self):
     super(RunIsolatedTestRun, self).setUp()
-    self.mocked_print = mock.patch('__builtin__.print').start()
+    self.mocked_print = mock.patch('six.moves.builtins.print').start()
 
   def tearDown(self):
     super(RunIsolatedTestRun, self).tearDown()
     mock.patch.stopall()
 
   # Runs the actual command requested.
+  @unittest.skipIf(six.PY3 and sys.platform == 'darwin', 'crbug.com/1101705')
   def test_output(self):
     # Starts a full isolate server mock and have run_tha_test() uploads results
     # back after the task completed.
     server = isolateserver_fake.FakeIsolateServer()
     try:
-      script = (
-        'import sys\n'
-        'open(sys.argv[1], "w").write("bar")\n')
+      script = (b'import sys\n' b'open(sys.argv[1], "w").write("bar")\n')
       script_hash = isolateserver_fake.hash_content(script)
       isolated = {
           u'algo': u'sha-1',
@@ -1000,7 +987,7 @@ class RunIsolatedTestRun(RunIsolatedTestBase):
       }
       if sys.platform == 'win32':
         isolated[u'files'][u'cmd.py'].pop(u'm')
-      isolated_data = json_dumps(isolated)
+      isolated_data = json_dumps(isolated).encode()
       isolated_hash = isolateserver_fake.hash_content(isolated_data)
       server.add_content('default-store', script)
       server.add_content('default-store', isolated_data)
@@ -1035,7 +1022,7 @@ class RunIsolatedTestRun(RunIsolatedTestBase):
 
       # It uploaded back. Assert the store has a new item containing foo.
       hashes = {isolated_hash, script_hash}
-      output_hash = isolateserver_fake.hash_content('bar')
+      output_hash = isolateserver_fake.hash_content(b'bar')
       hashes.add(output_hash)
       isolated = {
           u'algo': u'sha-1',
@@ -1050,7 +1037,7 @@ class RunIsolatedTestRun(RunIsolatedTestBase):
       }
       if sys.platform == 'win32':
         isolated[u'files'][u'foo'].pop(u'm')
-      uploaded = json_dumps(isolated)
+      uploaded = json_dumps(isolated).encode()
       uploaded_hash = isolateserver_fake.hash_content(uploaded)
       hashes.add(uploaded_hash)
       self.assertEqual(hashes, set(server.contents['default-store']))
@@ -1333,12 +1320,11 @@ class RunIsolatedTestOutputs(RunIsolatedTestBase):
     self.assertExpectedTree(expected)
 
 
-@unittest.skipIf(six.PY3, 'crbug.com/1010816')
 class RunIsolatedTestOutputFiles(RunIsolatedTestBase):
 
   def setUp(self):
     super(RunIsolatedTestOutputFiles, self).setUp()
-    self.mocked_print = mock.patch('__builtin__.print').start()
+    self.mocked_print = mock.patch('six.moves.builtins.print').start()
 
   def tearDown(self):
     super(RunIsolatedTestOutputFiles, self).tearDown()
@@ -1358,18 +1344,17 @@ class RunIsolatedTestOutputFiles(RunIsolatedTestBase):
       # bardir --> bar1
       #
       # Create the symlinks only on Linux.
-      script = (
-        'import os\n'
-        'import sys\n'
-        'open(sys.argv[1], "w").write("foo1")\n'
-        'bar1_path = os.path.join(sys.argv[3], "bar1")\n'
-        'open(bar1_path, "w").write("bar1")\n'
-        'if sys.platform.startswith("linux"):\n'
-        '  foo_realpath = os.path.abspath("foo2_content")\n'
-        '  open(foo_realpath, "w").write("foo2")\n'
-        '  os.symlink(foo_realpath, sys.argv[2])\n'
-        'else:\n'
-        '  open(sys.argv[2], "w").write("foo2")\n')
+      script = (b'import os\n'
+                b'import sys\n'
+                b'open(sys.argv[1], "w").write("foo1")\n'
+                b'bar1_path = os.path.join(sys.argv[3], "bar1")\n'
+                b'open(bar1_path, "w").write("bar1")\n'
+                b'if sys.platform.startswith("linux"):\n'
+                b'  foo_realpath = os.path.abspath("foo2_content")\n'
+                b'  open(foo_realpath, "w").write("foo2")\n'
+                b'  os.symlink(foo_realpath, sys.argv[2])\n'
+                b'else:\n'
+                b'  open(sys.argv[2], "w").write("foo2")\n')
       script_hash = isolateserver_fake.hash_content(script)
       isolated['files']['cmd.py'] = {
           'h': script_hash,
@@ -1378,7 +1363,7 @@ class RunIsolatedTestOutputFiles(RunIsolatedTestBase):
       }
       if sys.platform == 'win32':
         isolated['files']['cmd.py'].pop('m')
-      isolated_data = json_dumps(isolated)
+      isolated_data = json_dumps(isolated).encode()
       isolated_hash = isolateserver_fake.hash_content(isolated_data)
       server.add_content('default-store', script)
       server.add_content('default-store', isolated_data)
@@ -1418,9 +1403,9 @@ class RunIsolatedTestOutputFiles(RunIsolatedTestBase):
 
       # It uploaded back. Assert the store has a new item containing foo.
       hashes = {isolated_hash, script_hash}
-      foo1_output_hash = isolateserver_fake.hash_content('foo1')
-      foo2_output_hash = isolateserver_fake.hash_content('foo2')
-      bar1_output_hash = isolateserver_fake.hash_content('bar1')
+      foo1_output_hash = isolateserver_fake.hash_content(b'foo1')
+      foo2_output_hash = isolateserver_fake.hash_content(b'foo2')
+      bar1_output_hash = isolateserver_fake.hash_content(b'bar1')
       hashes.add(foo1_output_hash)
       hashes.add(foo2_output_hash)
       hashes.add(bar1_output_hash)
@@ -1449,7 +1434,7 @@ class RunIsolatedTestOutputFiles(RunIsolatedTestBase):
         isolated['files']['foo1'].pop('m')
         isolated['files']['foodir\\foo2_sl'].pop('m')
         isolated['files']['bardir\\bar1'].pop('m')
-      uploaded = json_dumps(isolated)
+      uploaded = json_dumps(isolated).encode()
       uploaded_hash = isolateserver_fake.hash_content(uploaded)
       hashes.add(uploaded_hash)
       self.assertEqual(hashes, set(server.contents['default-store']))
@@ -1463,6 +1448,7 @@ class RunIsolatedTestOutputFiles(RunIsolatedTestBase):
     finally:
       server.close()
 
+  @unittest.skipIf(six.PY3 and sys.platform == 'darwin', 'crbug.com/1101705')
   def test_output_cmd_isolated(self):
     isolated = {
       u'algo': u'sha-1',
@@ -1472,6 +1458,7 @@ class RunIsolatedTestOutputFiles(RunIsolatedTestBase):
     }
     self._run_test(isolated, [], [])
 
+  @unittest.skipIf(six.PY3 and sys.platform == 'darwin', 'crbug.com/1101705')
   def test_output_cmd(self):
     isolated = {
       u'algo': u'sha-1',
@@ -1481,6 +1468,7 @@ class RunIsolatedTestOutputFiles(RunIsolatedTestBase):
     self._run_test(
         isolated, ['cmd.py', 'foo1', 'foodir/foo2_sl', 'bardir/'], [])
 
+  @unittest.skipIf(six.PY3 and sys.platform == 'darwin', 'crbug.com/1101705')
   def test_output_cmd_isolated_extra_args(self):
     isolated = {
       u'algo': u'sha-1',
@@ -1511,7 +1499,7 @@ class RunIsolatedJsonTest(RunIsolatedTestBase):
         self.assertEqual(None, timeout)
         self2.returncode = 0
         with open(self2._path, 'wb') as f:
-          f.write('generated data\n')
+          f.write(b'generated data\n')
         return self2.returncode
 
       def kill(self):
@@ -1519,7 +1507,7 @@ class RunIsolatedJsonTest(RunIsolatedTestBase):
 
     self.mock(subprocess42, 'Popen', Popen)
 
-  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
+  @unittest.skipIf(six.PY3 and sys.platform == 'darwin', 'crbug.com/1101705')
   def test_main_json(self):
     # Instruct the Popen mock to write a file in ISOLATED_OUTDIR so it will be
     # archived back on termination.
@@ -1528,7 +1516,7 @@ class RunIsolatedJsonTest(RunIsolatedTestBase):
       self.ir_dir(u'foo.exe'), u'cmd with space',
       '${ISOLATED_OUTDIR}/out.txt',
     ]
-    isolated_in_json = json_dumps({'command': sub_cmd})
+    isolated_in_json = json_dumps({'command': sub_cmd}).encode()
     isolated_in_hash = isolateserver_fake.hash_content(isolated_in_json)
     def get_storage(server_ref):
       return StorageFake({isolated_in_hash: isolated_in_json}, server_ref)
@@ -1573,7 +1561,7 @@ class RunIsolatedJsonTest(RunIsolatedTestBase):
         'algo': 'sha-1',
         'files': {
             'out.txt': {
-                'h': isolateserver_fake.hash_content('generated data\n'),
+                'h': isolateserver_fake.hash_content(b'generated data\n'),
                 's': 15,
                 'm': 0o600,
             },
@@ -1582,7 +1570,7 @@ class RunIsolatedJsonTest(RunIsolatedTestBase):
     }
     if sys.platform == 'win32':
       del isolated_out['files']['out.txt']['m']
-    isolated_out_json = json_dumps(isolated_out)
+    isolated_out_json = json_dumps(isolated_out).encode()
     isolated_out_hash = isolateserver_fake.hash_content(isolated_out_json)
     expected = {
         u'exit_code': 0,

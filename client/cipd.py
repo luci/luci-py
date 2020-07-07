@@ -183,9 +183,9 @@ class CipdClient(object):
           if '\n' in subdir:
             raise Error('Could not install packages; subdir %r contains newline'
                         % subdir)
-          os.write(ensure_file_handle, '@Subdir %s\n' % (subdir,))
+          os.write(ensure_file_handle, ('@Subdir %s\n' % (subdir,)).encode())
           for pkg, version in pkgs:
-            os.write(ensure_file_handle, '%s %s\n' % (pkg, version))
+            os.write(ensure_file_handle, ('%s %s\n' % (pkg, version)).encode())
       finally:
         os.close(ensure_file_handle)
 
@@ -403,14 +403,14 @@ def get_client(service_url, package_template, version, cache_dir, timeout=None):
     # Convert (package_name, version) to a string that may be used as a
     # filename in disk cache by hashing it.
     version_digest = hashlib.sha1(
-        '%s\n%s' % (package_name, version)).hexdigest()
+        six.ensure_binary('%s\n%s' % (package_name, version))).hexdigest()
     try:
       with version_cache.getfileobj(version_digest) as f:
         instance_id = f.read()
     except local_caching.CacheMiss:
       instance_id = resolve_version(
           service_url, package_name, version, timeout=timeoutfn())
-      version_cache.write(version_digest, instance_id)
+      version_cache.write(version_digest, [six.ensure_binary(instance_id)])
     version_cache.trim()
   else:  # it's a ref, hit the backend
     instance_id = resolve_version(
