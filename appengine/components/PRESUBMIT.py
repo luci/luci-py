@@ -23,7 +23,9 @@ def CommonChecks(input_api, output_api):
       input_api,
       output_api,
       block_list=block_list,
-      disabled_warnings=disabled_warnings)
+      disabled_warnings=disabled_warnings,
+      pylintrc=input_api.os_path.join(input_api.PresubmitLocalPath(), '../../',
+                                      'pylintrc'))
 
 
 # pylint: disable=unused-argument
