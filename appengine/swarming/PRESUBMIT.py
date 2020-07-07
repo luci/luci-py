@@ -10,7 +10,6 @@ details on the presubmit API built into gclient.
 
 
 def CommonChecks(input_api, output_api):
-  output = []
 
   block_list = list(input_api.DEFAULT_BLOCK_LIST) + [
       r'ui2/node_modules/.*',
@@ -20,11 +19,13 @@ def CommonChecks(input_api, output_api):
   disabled_warnings = [
     'relative-import',
   ]
-  output.extend(input_api.canned_checks.RunPylint(
-      input_api, output_api,
+  return input_api.canned_checks.RunPylint(
+      input_api,
+      output_api,
       block_list=block_list,
-      disabled_warnings=disabled_warnings))
-  return output
+      disabled_warnings=disabled_warnings,
+      pylintrc=input_api.os_path.join(input_api.PresubmitLocalPath(), '../../',
+                                      'pylintrc'))
 
 
 # pylint: disable=unused-argument
