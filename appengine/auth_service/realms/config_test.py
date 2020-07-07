@@ -14,6 +14,7 @@ import test_env
 test_env.setup_test_env()
 
 import mock
+import parameterized
 
 from test_support import test_case
 
@@ -159,14 +160,26 @@ class CheckPermissionChangesTest(test_case.TestCase):
 
 
 class ProjectConfigFetchTest(test_case.TestCase):
+  @mock.patch('components.config.common.self_config_set', autospec=True)
   @mock.patch('components.config.fs.get_provider', autospec=True)
-  def test_works(self, get_provider_mock):
+  def test_works(self, get_provider_mock, self_config_set_mock):
     TESTS_DIR = os.path.dirname(os.path.abspath(__file__))
     get_provider_mock.return_value = fs.Provider(
         os.path.join(TESTS_DIR, 'test_data'))
 
+    # See test_data/... layout.
+    self_config_set_mock.return_value = 'services/auth-service-app-id'
+
     revs = config.get_latest_revs_async().get_result()
     self.assertEqual(sorted(revs, key=lambda r: r.project_id), [
+        config.RealmsCfgRev(
+            project_id='@internal',
+            config_rev='unknown',
+            config_digest='90549bf56e8be6c0ff6001d2376db' +
+                'def519b97cc89e65b2813237b252300dea8',
+            config_body='realms {\n  name: "internal-realm"\n}\n',
+            perms_rev=None,
+        ),
         config.RealmsCfgRev(
             project_id='proj1',
             config_rev='unknown',
@@ -187,12 +200,16 @@ class ProjectConfigFetchTest(test_case.TestCase):
 
 
 class RealmsUpdateTest(test_case.TestCase):
-  def test_realms_config_lifecycle(self):
+  @parameterized.parameterized.expand([
+      ('some-proj',),
+      ('@internal',),
+  ])
+  def test_realms_config_lifecycle(self, project_id):
     self.assertEqual(model.get_auth_db_revision(), 0)
 
     # A new config appears.
     rev = config.RealmsCfgRev(
-        project_id='proj1',
+        project_id=project_id,
         config_rev='cfg_rev1',
         config_digest='digest1',
         config_body='realms{ name: "realm1" }',
@@ -203,9 +220,10 @@ class RealmsUpdateTest(test_case.TestCase):
     self.assertEqual(model.get_auth_db_revision(), 1)
 
     # Stored now in the expanded form.
-    ent = model.project_realms_key('proj1').get()
+    ent = model.project_realms_key(project_id).get()
     self.assertEqual(
-        [r.name for r in ent.realms.realms], ['proj1:@root', 'proj1:realm1'])
+        [r.name for r in ent.realms.realms],
+        ['%s:@root' % project_id, '%s:realm1' % project_id])
     self.assertEqual(ent.config_rev, 'cfg_rev1')
     self.assertEqual(ent.perms_rev, 'db-rev1')
 
@@ -217,7 +235,7 @@ class RealmsUpdateTest(test_case.TestCase):
 
     # The config body changes in a way that doesn't affect the expanded form.
     rev = config.RealmsCfgRev(
-        project_id='proj1',
+        project_id=project_id,
         config_rev='cfg_rev2',
         config_digest='digest2',
         config_body='realms{ name: "realm1" }  # blah blah',
@@ -229,7 +247,7 @@ class RealmsUpdateTest(test_case.TestCase):
 
     # The config change significantly now.
     rev = config.RealmsCfgRev(
-        project_id='proj1',
+        project_id=project_id,
         config_rev='cfg_rev3',
         config_digest='digest3',
         config_body='realms{ name: "realm2" }',
@@ -240,24 +258,25 @@ class RealmsUpdateTest(test_case.TestCase):
     self.assertEqual(model.get_auth_db_revision(), 2)
 
     # And new body.
-    ent = model.project_realms_key('proj1').get()
+    ent = model.project_realms_key(project_id).get()
     self.assertEqual(
-        [r.name for r in ent.realms.realms], ['proj1:@root', 'proj1:realm2'])
+        [r.name for r in ent.realms.realms],
+        ['%s:@root' % project_id, '%s:realm2' % project_id])
     self.assertEqual(ent.config_rev, 'cfg_rev3')
     self.assertEqual(ent.perms_rev, 'db-rev2')
 
     # The config is gone.
-    config.delete_realms('proj1')
+    config.delete_realms(project_id)
 
     # This generated a new revision.
     self.assertEqual(model.get_auth_db_revision(), 3)
 
     # And it is indeed gone.
-    ent = model.project_realms_key('proj1').get()
+    ent = model.project_realms_key(project_id).get()
     self.assertIsNone(ent)
 
     # The second deletion is noop.
-    config.delete_realms('proj1')
+    config.delete_realms(project_id)
     self.assertEqual(model.get_auth_db_revision(), 3)
 
 

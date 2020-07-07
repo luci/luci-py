@@ -40,12 +40,17 @@ def expand_realms(db, project_id, realms_cfg):
   Raises:
     ValueError if the validation fails.
   """
+  # `internal` is True when expanding internal realms (defined in a service
+  # config file). Such realms can use internal roles and permissions and they
+  # do not have implicit root bindings (since they are not associated with
+  # any "project:<X>" identity used in implicit root bindings).
+  internal = project_id == common.INTERNAL_PROJECT
+
   # The server code could have changed since the config passed the validation
   # and realms_cfg may not be valid anymore. Verify it still is. The code below
   # depends crucially on the validity of realms_cfg.
   validation.Validator(
-      cfg_validation.Context.raise_on_error(), db,
-      project_id == common.INTERNAL_PROJECT,
+      cfg_validation.Context.raise_on_error(), db, internal,
   ).validate(realms_cfg)
 
   # A lazily populated {role -> tuple of permissions} mapping.
@@ -53,8 +58,9 @@ def expand_realms(db, project_id, realms_cfg):
   # A helper to traverse the realms graph.
   realms_expander = RealmsExpander(roles_expander, realms_cfg.realms)
 
-  # This extends @root realm with additional implicit bindings.
-  realms_expander.extend_root(db.implicit_root_bindings(project_id))
+  # This creates @root realm and (optionally) extends it with implicit bindings.
+  realms_expander.extend_root(
+      db.implicit_root_bindings(project_id) if not internal else [])
 
   # Visit all realms and build preliminary bindings as pairs of
   # (a tuple with permission indexes, a list of principals who have them). The

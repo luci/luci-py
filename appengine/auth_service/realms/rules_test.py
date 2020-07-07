@@ -122,10 +122,10 @@ def binding(role, *principals):
 
 
 class ExpandRealmsTest(test_case.TestCase):
-  def expand(self, cfg, implicit_root_bindings=False):
+  def expand(self, cfg, project_id='p', implicit_root_bindings=False):
     out = rules.expand_realms(
         test_db(implicit_root_bindings),
-        'p',
+        project_id,
         realms_config_pb2.RealmsCfg(**cfg))
     return json_format.MessageToDict(out)
 
@@ -464,6 +464,42 @@ class ExpandRealmsTest(test_case.TestCase):
                     {
                         'permissions': [1, 2],
                         'principals': [u'group:gr1', u'group:gr2'],
+                    },
+                ],
+            },
+        ],
+    })
+
+  def test_implicit_root_binding_in_internal(self):
+    cfg = {
+        'realms': [
+            {
+                'name': 'r',
+                'bindings': [
+                    binding('role/dev.a', 'group:gr'),
+                ],
+            },
+        ],
+    }
+    realms = self.expand(
+        cfg,
+        project_id='@internal',
+        implicit_root_bindings=True)  # should be ignored
+    self.assertEqual(realms, {
+        'permissions': [
+            {'name': u'luci.dev.p1'},
+            {'name': u'luci.dev.p2'},
+        ],
+        'realms': [
+            {
+                'name': u'@internal:@root',  # added empty @root
+            },
+            {
+                'name': u'@internal:r',
+                'bindings': [
+                    {
+                        'permissions': [0, 1],
+                        'principals': [u'group:gr'],
                     },
                 ],
             },

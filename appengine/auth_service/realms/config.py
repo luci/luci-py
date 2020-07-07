@@ -224,8 +224,28 @@ def check_config_changes(db, latest, stored):
 @ndb.tasklet
 def get_latest_revs_async():
   """Returns a list of all current RealmsCfgRev by querying LUCI Config."""
+
+  # In parallel load all project realms (from projects' config sets) and
+  # internal realms (from the service config set).
+  #
+  # Per the config client library API, here
+  #   `configs` is {project_id -> (rev, body, exc)}, where `exc` is always None.
+  #   `internal` is (rev, body) where (None, None) indicates "no such config".
+  configs, internal = yield (
+      config.get_project_configs_async(common.cfg_path()),
+      config.get_self_config_async(common.cfg_path(), store_last_good=False),
+  )
+
+  # Pretend internal realms came from special "@internal" project. Such project
+  # name is forbidden by LUCI Config, so there should be no confusion.
+  if common.INTERNAL_PROJECT in configs:
+    raise ValueError('Unexpected LUCI project %s' % common.INTERNAL_PROJECT)
+  internal_rev, internal_body = internal
+  if internal_body:
+    configs[common.INTERNAL_PROJECT] = (internal_rev, internal_body, None)
+
+  # Convert the result to a list of RealmsCfgRev in no particular order.
   out = []
-  configs = yield config.get_project_configs_async(common.cfg_path())
   for project_id, (rev, body, exc) in configs.items():
     # Errors are impossible when when not specifying 2nd parameter of
     # get_project_configs_async.
