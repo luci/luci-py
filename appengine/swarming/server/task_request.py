@@ -208,6 +208,9 @@ def _validate_dimensions(_prop, value):
           value)
 
     for value in values:
+      if not value:
+        raise datastore_errors.BadValueError(
+            u'dimensions value must be a string, not None')
       or_dimensions_num *= len(value.split(OR_DIM_SEP))
       if or_dimensions_num > max_or_dimensions_num:
         raise datastore_errors.BadValueError(
