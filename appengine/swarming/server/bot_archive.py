@@ -96,6 +96,7 @@ FILES = (
     'third_party/depot_tools/__init__.py',
     'third_party/depot_tools/fix_encoding.py',
     'third_party/depot_tools/subcommand.py',
+    'third_party/distro/__init__.py',
     'third_party/google/__init__.py',
     'third_party/google/auth/__init__.py',
     'third_party/google/auth/_cloud_sdk.py',
