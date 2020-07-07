@@ -817,6 +817,12 @@ class TaskProperties(ndb.Model):
     return self.dimensions.get('pool', [None])[0]
 
   @property
+  def bot_id(self):
+    """Returns the bot ID that this TaskProperties has in dimensions, or None if
+    no id dimension exists."""
+    return self.dimensions.get('id', [None])[0]
+
+  @property
   def dimensions(self):
     """Returns dimensions as a dict(unicode, list(unicode)), even for older
     entities.
@@ -1189,6 +1195,10 @@ class TaskRequest(ndb.Model):
     # all task_slices must have the same pool, and we must have at least one
     # task slice, so just return the 0th's pool.
     return self.task_slice(0).properties.pool
+
+  @property
+  def bot_id(self):
+    return self.task_slice(0).properties.bot_id
 
   @property
   def secret_bytes_key(self):

@@ -351,12 +351,23 @@ def check_task_get_acl(task_request):
   if acl.can_view_task(task_request):
     return
 
-  # check 'swarming.pools.listTasks' permission.
-  pool_realm = pools_config.get_pool_config(task_request.pool).realm
-  if pool_realm and auth.has_permission(
-      get_permission(realms_pb2.REALM_PERMISSION_POOLS_LIST_TASKS),
-      [pool_realm]):
-    return
+  # check 'swarming.pools.listTasks' permission of the pool in task dimensions.
+  if task_request.pool:
+    pool_realm = pools_config.get_pool_config(task_request.pool).realm
+    if pool_realm and auth.has_permission(
+        get_permission(realms_pb2.REALM_PERMISSION_POOLS_LIST_TASKS),
+        [pool_realm]):
+      return
+
+  # check 'swarming.pools.listTasks' permission of the pool in bot dimensions.
+  if task_request.bot_id:
+    pools = _get_pools_from_dimensions_flat(
+        _retrieve_bot_dimensions(task_request.bot_id))
+    pool_realms = [pools_config.get_pool_config(p).realm for p in pools]
+    if pool_realms and auth.has_permission(
+        get_permission(realms_pb2.REALM_PERMISSION_POOLS_LIST_TASKS),
+        pool_realms):
+      return
 
   # check 'swarming.tasks.get' permission.
   task_realm = task_request.realm

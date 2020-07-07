@@ -44,13 +44,15 @@ _TASK_SERVICE_ACCOUNT_IDENTITY = auth.Identity(
     auth.IDENTITY_USER, 'test@test-service-accounts.iam.gserviceaccount.com')
 
 
-def _gen_task_request_mock(realm='test:realm'):
+def _gen_task_request_mock(pool=None, bot_id=None, realm='test:realm'):
   return mock.create_autospec(
       task_request.TaskRequest,
       spec_set=True,
       instance=True,
       max_lifetime_secs=1,
       service_account=_TASK_SERVICE_ACCOUNT_IDENTITY.name,
+      pool=pool,
+      bot_id=bot_id,
       realm=realm)
 
 
@@ -408,17 +410,32 @@ class RealmsTest(test_case.TestCase):
     realms.check_task_get_acl(None)
     self._has_permission_mock.assert_not_called()
 
-  def test_check_task_get_acl_allowed_by_pool_permission(self):
+  def test_check_task_get_acl_allowed_by_task_pool_permission(self):
     # mock
     self.mock(acl, 'can_view_task', lambda _: False)
-    get_pool_config = lambda _: _gen_pool_config(realm='test:pool')
+    get_pool_config = lambda p: _gen_pool_config(realm='test:' + p)
     self.mock(pools_config, 'get_pool_config', get_pool_config)
     self._has_permission_mock.return_value = True
 
     # call
-    realms.check_task_get_acl(_gen_task_request_mock())
+    task = _gen_task_request_mock(pool='pool1')
+    realms.check_task_get_acl(task)
     self._has_permission_mock.assert_called_once_with(_PERM_POOLS_LIST_TASKS,
-                                                      ['test:pool'])
+                                                      ['test:pool1'])
+
+  def test_check_task_get_acl_allowed_by_bot_pool_permission(self):
+    # mock
+    self.mock(acl, 'can_view_task', lambda _: False)
+    get_pool_config = lambda p: _gen_pool_config(realm='test:' + p)
+    self.mock(pools_config, 'get_pool_config', get_pool_config)
+    self._mock_bot(['pool:pool1', 'pool:pool2'])
+    self._has_permission_mock.return_value = True
+
+    # call
+    task = _gen_task_request_mock(bot_id='bot1')
+    realms.check_task_get_acl(task)
+    self._has_permission_mock.assert_called_once_with(
+        _PERM_POOLS_LIST_TASKS, ['test:pool1', 'test:pool2'])
 
   def test_check_task_get_acl_allowed_by_task_permission(self):
     # mock
@@ -428,22 +445,28 @@ class RealmsTest(test_case.TestCase):
     self._has_permission_mock.return_value = True
 
     # call
-    realms.check_task_get_acl(_gen_task_request_mock(realm='test:realm'))
+    task = _gen_task_request_mock(realm='test:realm')
+    realms.check_task_get_acl(task)
     self._has_permission_mock.assert_called_once_with(_PERM_TASKS_GET,
                                                       ['test:realm'])
 
   def test_check_task_get_acl_not_allowed(self):
     # mock
     self.mock(acl, 'can_view_task', lambda _: False)
-    get_pool_config = lambda _: _gen_pool_config(realm='test:pool')
+    get_pool_config = lambda p: _gen_pool_config(realm='test:' + p)
     self.mock(pools_config, 'get_pool_config', get_pool_config)
+    self._mock_bot(['pool:pool1', 'pool:pool2'])
     self._has_permission_mock.return_value = False
 
     # call
     with self.assertRaises(auth.AuthorizationError):
-      realms.check_task_get_acl(_gen_task_request_mock(realm='test:realm'))
+      task = _gen_task_request_mock(
+          pool='pool1', bot_id='bot1', realm='test:realm')
+      realms.check_task_get_acl(task)
     self._has_permission_mock.assert_any_call(_PERM_POOLS_LIST_TASKS,
-                                              ['test:pool'])
+                                              ['test:pool1'])
+    self._has_permission_mock.assert_any_call(_PERM_POOLS_LIST_TASKS,
+                                              ['test:pool1', 'test:pool2'])
     self._has_permission_mock.assert_any_call(_PERM_TASKS_GET, ['test:realm'])
 
   def test_check_task_cancel_acl_with_global_permission(self):
