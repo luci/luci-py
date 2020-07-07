@@ -14,7 +14,11 @@ def CommonChecks(input_api, output_api):
     r'.*_pb2\.py$',
   ]
   return input_api.canned_checks.RunPylint(
-      input_api, output_api, block_list=block_list)
+      input_api,
+      output_api,
+      block_list=block_list,
+      pylintrc=input_api.os_path.join(input_api.PresubmitLocalPath(), '../../',
+                                      'pylintrc'))
 
 
 # pylint: disable=unused-argument
