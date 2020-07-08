@@ -716,7 +716,7 @@ class TestTaskRunnerKilled(TestTaskRunnerBase):
 
   # TODO(maruel): Calculate this value automatically through iteration? This is
   # really bad and prone to flakiness.
-  SHORT_TIME_OUT = 1.
+  SHORT_TIME_OUT = 3.
 
   # Here's a simple script that handles signals properly. Sadly SIGBREAK is not
   # defined on posix.
@@ -844,8 +844,6 @@ class TestTaskRunnerKilled(TestTaskRunnerBase):
 
 
   @unittest.skipIf(six.PY3, 'crbug.com/1010816')
-  @unittest.skipIf(sys.platform == 'darwin',
-                   'TODO(crbug.com/1103068): Fails on Mac CQ')
   @unittest.skipIf(
       sys.platform == 'win32', 'TODO(crbug.com/1017545): fix assertions')
   def test_io(self):
@@ -883,8 +881,6 @@ class TestTaskRunnerKilled(TestTaskRunnerBase):
         output='hi\ngot signal %s\nbye\n' % task_runner.SIG_BREAK_OR_TERM)
 
   @unittest.skipIf(six.PY3, 'crbug.com/1010816')
-  @unittest.skipIf(sys.platform == 'darwin',
-                   'TODO(crbug.com/1103068): Fails on Mac CQ')
   @unittest.skipIf(
       sys.platform == 'win32', 'TODO(crbug.com/1017545): fix assertions')
   def test_io_signal(self):
@@ -925,8 +921,6 @@ class TestTaskRunnerKilled(TestTaskRunnerBase):
     self.expectTask(hard_timeout=True, exit_code=exit_code)
 
   @unittest.skipIf(six.PY3, 'crbug.com/1010816')
-  @unittest.skipIf(sys.platform == 'darwin',
-                   'TODO(crbug.com/1103068): Fails on Mac CQ')
   @unittest.skipIf(
       sys.platform == 'win32',
       'As run_isolated is killed, the children process leaks')
@@ -969,8 +963,6 @@ class TestTaskRunnerKilled(TestTaskRunnerBase):
         output='hi\ngot signal %s\nbye\n' % task_runner.SIG_BREAK_OR_TERM)
 
   @unittest.skipIf(six.PY3, 'crbug.com/1010816')
-  @unittest.skipIf(sys.platform == 'darwin',
-                   'TODO(crbug.com/1103068): Fails on Mac CQ')
   @unittest.skipIf(sys.platform == 'win32',
                    'As run_isolated is killed, the children process leaks')
   def test_io_signal_no_grace(self):
@@ -995,8 +987,6 @@ class TestTaskRunnerKilled(TestTaskRunnerBase):
         output='hi\ngot signal %s\nbye\n' % task_runner.SIG_BREAK_OR_TERM)
 
   @unittest.skipIf(six.PY3, 'crbug.com/1010816')
-  @unittest.skipIf(sys.platform == 'darwin',
-                   'TODO(crbug.com/1103068): Fails on Mac CQ')
   @unittest.skipIf(sys.platform == 'win32',
                    'TODO(crbug.com/1017545): KeyError output')
   def test_isolated_io_signal_grand_children(self):
@@ -1047,7 +1037,7 @@ class TestTaskRunnerKilled(TestTaskRunnerBase):
         #
         # This could be achieved by mocking time, and using a text file as a
         # signal.
-        io_timeout=1,
+        io_timeout=self.SHORT_TIME_OUT,
         grace_period=60.)
     # Actually 0xc000013a
     exit_code = -1073741510 if sys.platform == 'win32' else -signal.SIGTERM
