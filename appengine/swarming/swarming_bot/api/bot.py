@@ -14,6 +14,8 @@ import sys
 import threading
 import time
 
+import six
+
 from api import os_utilities
 
 # Method could be a function - pylint: disable=R0201
@@ -278,7 +280,7 @@ class Bot(object):
 
     This is done asynchronously.
     """
-    assert isinstance(message, basestring), message
+    assert isinstance(message, six.string_types), message
     with self._lock:
       if self._bot_restart_msg:
         self._bot_restart_msg += '\n' + message

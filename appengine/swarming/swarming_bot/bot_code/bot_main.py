@@ -321,6 +321,7 @@ def _call_hook_safe(chained, botobj, name, *args):
   try:
     return _call_hook(chained, botobj, name, *args)
   except Exception as e:
+    traceback.print_exc()
     logging.exception('%s() threw', name)
     msg = '%s\n%s' % (e, traceback.format_exc()[-2048:])
     if botobj:
