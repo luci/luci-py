@@ -331,29 +331,12 @@ class ValidationTestCase(test_case.TestCase):
       refs {
         name: "refs/heads/master"
       }
-      # Invalid configs
-      refs {
-
-      }
-      refs {
-        name: "refs/heads/master"
-        config_path: "non_default"
-      }
-      refs {
-        name: "does_not_start_with_ref"
-        config_path: "../bad/path"
-      }
     '''
     result = validation.validate_config('projects/x', 'refs.cfg', cfg)
 
     self.assertEqual(
         [m.text for m in result.messages],
-        [
-          'Ref #2: name is not specified',
-          'Ref #3: duplicate ref: refs/heads/master',
-          'Ref #4: name does not start with "refs/": does_not_start_with_ref',
-          'Ref #4: must not contain ".." or "." components: ../bad/path'
-        ],
+        ['refs.cfg is not used since 2019 and must be deleted']
     )
 
   def test_validation_by_service_async(self):

@@ -315,19 +315,9 @@ def validate_project_metadata(cfg, ctx):
 @validation.project_config_rule(
     common.REFS_FILENAME, project_config_pb2.RefsCfg)
 def validate_refs_cfg(cfg, ctx):
-  refs = set()
-  for i, ref in enumerate(cfg.refs):
-    with ctx.prefix('Ref #%d: ', i + 1):
-      if not ref.name:
-        ctx.error('name is not specified')
-      elif not ref.name.startswith('refs/'):
-        ctx.error('name does not start with "refs/": %s', ref.name)
-      elif ref.name in refs:
-        ctx.error('duplicate ref: %s', ref.name)
-      else:
-        refs.add(ref.name)
-      if ref.config_path:
-        validate_path(ref.config_path, ctx)
+  del cfg
+  # TODO(crbug/924803): delete refs supporting code entirely.
+  ctx.error('refs.cfg is not used since 2019 and must be deleted')
 
 
 @ndb.tasklet

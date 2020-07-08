@@ -18,10 +18,6 @@ import common
 import storage
 
 
-DEFAULT_REF_CFG = project_config_pb2.RefsCfg(
-    refs=[project_config_pb2.RefsCfg.Ref(name='refs/heads/master')])
-
-
 class RepositoryType(messages.Enum):
   GITILES = 1
 
@@ -148,7 +144,7 @@ def get_metadata_async(project_ids):
 
 
 def get_refs(project_ids):
-  """Returns a mapping {project_id: list of refs}
+  """DEPRECATED. Returns a mapping {project_id: list of refs}
 
   The ref list is None if a project does not exist.
 
@@ -158,7 +154,11 @@ def get_refs(project_ids):
       project_ids, common.REFS_FILENAME, project_config_pb2.RefsCfg
   ).get_result()
   return {
-    pid: None if cfg is None else cfg.refs or DEFAULT_REF_CFG.refs
+    pid: (
+      None if cfg is None
+      # TODO(crbug/924803): remove ref support from the service entirely.
+      else project_config_pb2.RefsCfg(refs=[])
+    )
     for pid, cfg in cfgs.items()
   }
 
