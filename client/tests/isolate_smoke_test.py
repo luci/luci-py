@@ -180,9 +180,9 @@ DEPENDENCIES = {
         assert len(sys.argv) == 1
         expected = {
           os.path.join('subdir', '42.txt'):
-              'the answer to life the universe and everything\\n',
-          'test_file1.txt': 'Foo\\n',
-          'test_file2.txt': 'Bar\\n',
+              b'the answer to life the universe and everything\\n',
+          'test_file1.txt': b'Foo\\n',
+          'test_file2.txt': b'Bar\\n',
         }
         root = 'files2'
         actual = {}
@@ -236,7 +236,7 @@ DEPENDENCIES = {
         print('symlink: touches files2/test_file2.txt')
         assert len(sys.argv) == 1
         with open(os.path.join('files2', 'test_file2.txt'), 'rb') as f:
-          if 'Bar\\n' != f.read():
+          if b'Bar\\n' != f.read():
             print('Failed')
             sys.exit(1)
         """,
@@ -276,7 +276,7 @@ DEPENDENCIES = {
         assert len(sys.argv) == 1
         p = os.path.join('link_outside_build_root', 'test_file3.txt')
         with open(p, 'rb') as f:
-          if 'asdf\\n' != f.read():
+          if b'asdf\\n' != f.read():
             print('Failed')
             sys.exit(1)
         """,
@@ -312,7 +312,7 @@ DEPENDENCIES = {
         import os, sys
         print('child_touch_root: Verify the relative directories')
         root_dir = os.path.dirname(os.path.abspath(
-            __file__.decode(sys.getfilesystemencoding())))
+            __file__))
         parent_dir, base = os.path.split(root_dir)
         parent_dir, base2 = os.path.split(parent_dir)
         if base != 'isolate' or base2 != 'tests':
@@ -375,7 +375,7 @@ DEPENDENCIES = {
           print(expected)
           sys.exit(1)
         root_dir = os.path.dirname(os.path.abspath(
-            __file__.decode(sys.getfilesystemencoding())))
+            __file__))
         parent_dir, base = os.path.split(root_dir)
         if mode == 'trace':
           # Verify the parent directory.
@@ -890,24 +890,20 @@ class Isolate_run(IsolateTempdirBase):
       pass
     self._expect_no_result()
 
-  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_touch_root(self):
     self._execute('run', 'touch_root.isolate', [])
     self._expect_results(['touch_root.py'], None, None, self.isolate_dir)
 
   if sys.platform != 'win32':
 
-    @unittest.skipIf(six.PY3, 'crbug.com/1010816')
     def test_symlink_full(self):
       self._execute('run', 'symlink_full.isolate', [])
       self._expect_results(['symlink_full.py'], None, None, None)
 
-    @unittest.skipIf(six.PY3, 'crbug.com/1010816')
     def test_symlink_partial(self):
       self._execute('run', 'symlink_partial.isolate', [])
       self._expect_results(['symlink_partial.py'], None, None, None)
 
-    @unittest.skipIf(six.PY3, 'crbug.com/1010816')
     def test_symlink_outside_build_root(self):
       self._execute('run', 'symlink_outside_build_root.isolate', [])
       self._expect_results(['symlink_outside_build_root.py'], None, None, None)
@@ -985,7 +981,6 @@ class IsolateNoOutdir(IsolateTempdirBase):
     with self.assertRaises(CalledProcessError):
       self._execute_short('remap', ['--isolate', self.filename()])
 
-  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_run(self):
     self._execute_short('run', ['--isolate', self.filename()])
     files = sorted([
