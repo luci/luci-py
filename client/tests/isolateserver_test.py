@@ -691,7 +691,6 @@ class IsolateServerStorageApiTest(TestCase):
       with self.assertRaises(IOError):
         _ = ''.join(storage.fetch(item, 0, offset))
 
-  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_push_success(self):
     server_ref = isolate_storage.ServerRef('http://example.com', 'default')
     data = b''.join(str(x).encode() for x in range(1000))
@@ -700,14 +699,14 @@ class IsolateServerStorageApiTest(TestCase):
         {'digest': item.digest, 'size': item.size, 'is_isolated': 0}]}
     contains_response = {'items': [{'index': 0, 'upload_ticket': 'ticket!'}]}
     requests = [
-      self.mock_contains_request(
-          server_ref, contains_request, contains_response),
-      self.mock_upload_request(
-          server_ref,
-          base64.b64encode(data),
-          contains_response['items'][0]['upload_ticket'],
-          {'ok': True},
-      ),
+        self.mock_contains_request(server_ref, contains_request,
+                                   contains_response),
+        self.mock_upload_request(
+            server_ref,
+            base64.b64encode(data).decode(),
+            contains_response['items'][0]['upload_ticket'],
+            {'ok': True},
+        ),
     ]
     self.expected_requests(requests)
     storage = isolate_storage.IsolateServer(server_ref)
@@ -718,7 +717,6 @@ class IsolateServerStorageApiTest(TestCase):
     self.assertTrue(push_state.uploaded)
     self.assertTrue(push_state.finalized)
 
-  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_push_failure_upload(self):
     server_ref = isolate_storage.ServerRef('http://example.com', 'default')
     data = b''.join(str(x).encode() for x in range(1000))
@@ -727,13 +725,13 @@ class IsolateServerStorageApiTest(TestCase):
         {'digest': item.digest, 'size': item.size, 'is_isolated': 0}]}
     contains_response = {'items': [{'index': 0, 'upload_ticket': 'ticket!'}]}
     requests = [
-      self.mock_contains_request(
-          server_ref, contains_request, contains_response),
-      self.mock_upload_request(
-          server_ref,
-          base64.b64encode(data),
-          contains_response['items'][0]['upload_ticket'],
-      ),
+        self.mock_contains_request(server_ref, contains_request,
+                                   contains_response),
+        self.mock_upload_request(
+            server_ref,
+            base64.b64encode(data).decode(),
+            contains_response['items'][0]['upload_ticket'],
+        ),
     ]
     self.expected_requests(requests)
     storage = isolate_storage.IsolateServer(server_ref)
@@ -745,7 +743,6 @@ class IsolateServerStorageApiTest(TestCase):
     self.assertFalse(push_state.uploaded)
     self.assertFalse(push_state.finalized)
 
-  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_push_failure_finalize(self):
     server_ref = isolate_storage.ServerRef('http://example.com', 'default')
     data = b''.join(str(x).encode() for x in range(1000))
@@ -769,7 +766,7 @@ class IsolateServerStorageApiTest(TestCase):
                     'Cache-Control': 'public, max-age=31536000'
                 },
             },
-            '',
+            b'',
             {
                 'x-goog-hash':
                     'md5=' +
