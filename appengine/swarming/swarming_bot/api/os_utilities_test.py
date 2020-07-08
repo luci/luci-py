@@ -164,6 +164,7 @@ class TestOsUtilities(auto_stub.TestCase):
       # Bot may not have HiDPI and Xcode preinstalled
       actual.discard(u'hidpi')
       actual.discard(u'xcode_version')
+      actual.discard(u'device')  # iOS devices
     if sys.platform.startswith('linux'):
       expected.add(u'inside_docker')
       expected.add(u'kvm')
