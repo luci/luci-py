@@ -268,10 +268,10 @@ class TaskDetails(object):
     self.caches = data['caches']
 
     self.env = {
-        k.encode('utf-8'): v.encode('utf-8') for k, v in data['env'].items()
+        six.ensure_str(k): six.ensure_str(v) for k, v in data['env'].items()
     }
     self.env_prefixes = {
-        k.encode('utf-8'): [path.encode('utf-8') for path in v]
+        six.ensure_str(k): [six.ensure_str(path) for path in v]
         for k, v in (data.get('env_prefixes') or {}).items()
     }
     self.grace_period = data['grace_period']
