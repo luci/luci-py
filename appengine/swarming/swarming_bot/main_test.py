@@ -106,7 +106,7 @@ class MainTest(TestCase):
   def url(self):
     return self._server.url
 
-  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
+  @unittest.skipIf(six.PY3 and sys.platform == 'darwin', 'crbug.com/1101705')
   @unittest.skipIf(
       sys.platform == 'win32',
       'TODO(crbug.com/1017545): It gets stuck at proc.communicate()')

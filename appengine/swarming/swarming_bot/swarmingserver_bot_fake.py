@@ -51,6 +51,7 @@ class Handler(httpserver.Handler):
   def do_GET(self):
     if self.path == '/swarming/api/v1/bot/server_ping':
       self.send_response(200)
+      self.end_headers()
       return None
     if self.path == '/auth/api/v1/server/oauth_config':
       return self.send_json({
