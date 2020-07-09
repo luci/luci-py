@@ -12,7 +12,6 @@ import logging
 import multiprocessing
 import os
 import pipes
-import platform
 import re
 import shlex
 import subprocess
@@ -144,12 +143,13 @@ def get_os_version_number():
   Returns:
     - 12.04, 10.04, etc.
   """
+  if distro.id() == 'debian':
+    # distro doesn't show minor version for debian.
+    with open('/etc/debian_version') as f:
+      return six.text_type(f.read().strip())
   # On Ubuntu it will return a string like '12.04'. On Raspbian, it will look
   # like '7.6'.
-  if six.PY3:
-    return six.text_type(distro.linux_distribution()[1])
-  # TODO(crbug.com/1010816): use distro in python2 too.
-  return six.text_type(platform.linux_distribution()[1])
+  return six.text_type(distro.version(best=True))
 
 
 def get_temperatures():
