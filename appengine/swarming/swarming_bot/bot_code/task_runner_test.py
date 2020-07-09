@@ -36,24 +36,19 @@ sys.path.insert(0, CLIENT_DIR)
 # Needed for isolateserver_fake.
 sys.path.insert(0, os.path.join(CLIENT_DIR, 'tests'))
 
-# client/third_party/
+from bot_code import bot_auth
+from bot_code import remote_client
+from bot_code import task_runner
 from depot_tools import auto_stub
 from depot_tools import fix_encoding
-# client/tests/
-import isolateserver_fake
-# client/
+from libs import luci_context
 from utils import file_path
 from utils import large
 from utils import logging_utils
 from utils import subprocess42
-from libs import luci_context
+import isolateserver_fake
 import local_caching
-# swarming_bot/
 import swarmingserver_bot_fake
-# bot_code/
-import bot_auth
-import remote_client
-import task_runner
 
 
 def gen_task_id():
@@ -1137,7 +1132,6 @@ class TestTaskRunnerKilled(TestTaskRunnerBase):
     self.assertEqual(expected, exit_code)
     self.assertEqual(b'got it\n', p.stdout.readline())
 
-  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   @unittest.skipIf(sys.platform == 'win32',
                    'TODO(crbug.com/1017545): it gets stuck at proc.wait()')
   def test_signal(self):
@@ -1225,7 +1219,7 @@ class TestTaskRunnerKilled(TestTaskRunnerBase):
     expected = {
         manifest['task_id']: [{
             u'message':
-                u'task_runner received signal %s' %
+                u'task_runner received signal %d' %
                 task_runner.SIG_BREAK_OR_TERM,
             u'id':
                 u'localhost',
