@@ -50,7 +50,8 @@ class ProjectsTestCase(test_case.TestCase):
     )
     self.assertEqual(projects.get_projects(), expected.projects)
 
-  def test_get_refs(self):
+  def test_get_refs_returns_no_refs(self):
+    # TODO(crbug/924803): remove ref support from the service entirely.
     self.mock_latest_config('projects/chromium', '''
       refs {
         name: "refs/heads/master"
@@ -60,16 +61,7 @@ class ProjectsTestCase(test_case.TestCase):
         config_path: "other"
       }
     ''')
-    expected = project_config_pb2.RefsCfg(
-        refs=[
-          project_config_pb2.RefsCfg.Ref(
-              name='refs/heads/master'),
-          project_config_pb2.RefsCfg.Ref(
-              name='refs/heads/release42', config_path='other'),
-        ],
-    )
-    self.assertEqual(
-        projects.get_refs(['chromium']), {'chromium': expected.refs})
+    self.assertEqual(projects.get_refs(['chromium']), {'chromium': []})
 
   def test_get_refs_of_non_existent_project(self):
     self.mock(projects, '_filter_existing', lambda pids: [])
