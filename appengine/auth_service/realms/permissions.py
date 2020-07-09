@@ -115,9 +115,13 @@ def db():
       permission('resultdb.invocations.update'),
   ])
   role('role/resultdb.reader', [
+      permission('resultdb.invocations.list'),
       permission('resultdb.invocations.read'),
+      permission('resultdb.testResults.list'),
       permission('resultdb.testResults.read'),
+      permission('resultdb.artifacts.list'),
       permission('resultdb.artifacts.read'),
+      permission('resultdb.testExonerations.list'),
       permission('resultdb.testExonerations.read'),
   ])
 
