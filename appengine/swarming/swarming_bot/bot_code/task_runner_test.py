@@ -375,7 +375,6 @@ class TestTaskRunner(TestTaskRunnerBase):
                           r'$') % (sep, sep, sep, sep)).encode())
     self.expectTask(task_details.task_id, output=output)
 
-  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_run_command_isolated(self):
     # Hook run_isolated out to see that everything still work.
     task_details = get_task_details(
@@ -394,7 +393,7 @@ class TestTaskRunner(TestTaskRunnerBase):
                        '  args = json.loads(argsfile.read())\n'
                        'if len(args) != 1:\n'
                        '  raise Exception(args);\n'
-                       'with open(args[0], \'wb\') as f:\n'
+                       'with open(args[0], \'w\') as f:\n'
                        '  json.dump({\n'
                        '    \'exit_code\': 0,\n'
                        '    \'had_hard_timeout\': False,\n'
@@ -533,7 +532,6 @@ class TestTaskRunner(TestTaskRunnerBase):
             },
         })
 
-  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   def test_run_command_large(self):
     # Method should have "self" as first argument - pylint: disable=E0213
     class Popen(object):
@@ -550,15 +548,15 @@ class TestTaskRunner(TestTaskRunnerBase):
         self.assertEqual(subprocess42.PIPE, stdin)
         self.assertEqual(True, detached)
         self2._out = [
-          'hi!\n',
-          'hi!\n',
-          'hi!\n' * 100000,
-          'hi!\n',
+            b'hi!\n',
+            b'hi!\n',
+            b'hi!\n' * 100000,
+            b'hi!\n',
         ]
 
       def yield_any(self2, maxsize, timeout):
-        self.assertLess(0, maxsize)
-        self.assertLess(0, timeout)
+        self.assertLess(0, maxsize())
+        self.assertLess(0, timeout())
         for i in self2._out:
           yield 'stdout', i
 
@@ -586,7 +584,7 @@ class TestTaskRunner(TestTaskRunnerBase):
         task_details.task_id,
         bot_overhead=None,
         isolated_stats=None,
-        output='hi!\n' * 100003)
+        output=b'hi!\n' * 100003)
     # Here, we want to carefully check the packets sent to ensure the internal
     # timer works as expected. There's 3 updates:
     # - initial task startup with no output
@@ -595,10 +593,10 @@ class TestTaskRunner(TestTaskRunnerBase):
     updates = self.server.get_tasks()[task_details.task_id]
     self.assertEqual(3, len(updates))
     self.assertEqual(None, updates[0].get(u'output'))
-    self.assertEqual(base64.b64encode('hi!\n' * 100002), updates[1][u'output'])
-    self.assertEqual(base64.b64encode('hi!\n'), updates[2][u'output'])
+    self.assertEqual(
+        base64.b64encode(b'hi!\n' * 100002), updates[1][u'output'].encode())
+    self.assertEqual(base64.b64encode(b'hi!\n'), updates[2][u'output'].encode())
 
-  @unittest.skipIf(six.PY3, 'crbug.com/1010816')
   @unittest.skipIf(
       sys.platform == 'win32',
       'TODO(crbug.com/1017545): fix assertions')
@@ -629,11 +627,11 @@ class TestTaskRunner(TestTaskRunnerBase):
     # This runs the command for real.
     script = ('import os\n'
               'print("hi")\n'
-              'with open("cache_foo/bar", "rb") as f:\n'
+              'with open("cache_foo/bar", "r") as f:\n'
               '  cached = f.read()\n'
-              'with open("../../result", "wb") as f:\n'
+              'with open("../../result", "w") as f:\n'
               '  f.write(cached)\n'
-              'with open("cache_foo/bar", "wb") as f:\n'
+              'with open("cache_foo/bar", "w") as f:\n'
               '  f.write("updated_cache")\n')
     task_details = get_task_details(
         script, caches=[{'name': 'foo', 'path': 'cache_foo', 'hint': '100'}])
@@ -654,7 +652,7 @@ class TestTaskRunner(TestTaskRunnerBase):
 
     # Ensure the 'result' file written my the task contained foo/bar.
     with open(os.path.join(self.root_dir, 'result'), 'rb') as f:
-      self.assertEqual('thecache', f.read())
+      self.assertEqual(b'thecache', f.read())
     os.remove(os.path.join(self.root_dir, 'result'))
 
     cache = local_caching.NamedCache(cache_dir, policies)
@@ -665,7 +663,7 @@ class TestTaskRunner(TestTaskRunnerBase):
     self._expect_files(
         [u'dest/bar', u'c/state.json', u'w/run_isolated_args.json'])
     with open(os.path.join(dest_dir, 'bar'), 'rb') as f:
-      self.assertEqual('updated_cache', f.read())
+      self.assertEqual(b'updated_cache', f.read())
     cache.uninstall(dest_dir, 'foo')
     self.assertFalse(os.path.exists(dest_dir))
     # Now look at the updates sent by the bot as seen by the server.
