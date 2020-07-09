@@ -572,7 +572,7 @@ class _OutputBuffer(object):
     o = self._output_chunk_start
     s = self._stdout
     self._output_chunk_start += len(self._stdout)
-    self._stdout = ''
+    self._stdout = b''
     self._last_pop = monotonic_time()
     return (s, o)
 
