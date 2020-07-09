@@ -60,9 +60,16 @@ class ProjectsTestCase(test_case.TestCase):
         config_path: "other"
       }
     ''')
-    no_refs = project_config_pb2.RefsCfg(refs=[])
+    expected = project_config_pb2.RefsCfg(
+        refs=[
+          project_config_pb2.RefsCfg.Ref(
+              name='refs/heads/master'),
+          project_config_pb2.RefsCfg.Ref(
+              name='refs/heads/release42', config_path='other'),
+        ],
+    )
     self.assertEqual(
-        projects.get_refs(['chromium']), {'chromium': no_refs})
+        projects.get_refs(['chromium']), {'chromium': expected.refs})
 
   def test_get_refs_of_non_existent_project(self):
     self.mock(projects, '_filter_existing', lambda pids: [])
