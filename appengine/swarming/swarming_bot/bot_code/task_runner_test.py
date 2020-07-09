@@ -278,7 +278,10 @@ class TestTaskRunnerBase(auto_stub.TestCase):
     # Use regexp if requested.
     if hasattr(expected[u'output'], 'pattern'):
       v = actual.pop(u'output')
-      self.assertTrue(expected.pop(u'output').match(v))
+      r = expected.pop(u'output')
+      self.assertTrue(
+          r.match(v),
+          "failed to match output. pattern: %s, actual: %s" % (r.pattern, v))
     for key, value in expected.get(u'isolated_stats', {}).items():
       if 'isolated_stats' not in actual:
         # expected but not actual.
