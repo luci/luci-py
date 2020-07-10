@@ -659,7 +659,7 @@ def _cleanup_bot_directory(botobj):
     if any(fnmatch.fnmatch(i, w) for w in PASSLIST):
       continue
     try:
-      p = unicode(os.path.join(botobj.base_dir, i))
+      p = six.ensure_text(os.path.join(botobj.base_dir, i))
       if fs.isdir(p):
         file_path.rmtree(p)
       else:
