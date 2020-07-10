@@ -24,18 +24,8 @@ in `projects/v8` config set.
     `<service_config_location>/<service_id>`.
 
 2. `projects/<project_id>` config set mapping is specified in the
-   `services/luci-config:projects.cfg`. If branch is not specified in
-   `config_location` for a project, it defaults to `infra/config`.
+   `services/luci-config:projects.cfg`.
 
-3. `projects/<project_id>/trees/<tree-name>` mapping is specified in
-   `projects/<project_id>:trees.cfg`. If `config_path` is not specified for a
-    tree, it defaults to `infra/config` directory within the branch.
-    If tree.cfg does not exist, then the mapping defaults to
-    (tree "master") -> ("infra/config" directory of "master" branch in the same
-    repository).
-
-    For example, without trees.cfg, `projects/chromium/trees/master` is mapped
-    to https://chromium.googlesource.com/chromium/src/+/master/./infra/config
 
 Note that services don't need to know location of configs, as long as they know
 config set names.

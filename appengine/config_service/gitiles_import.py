@@ -41,7 +41,6 @@ import validation
 
 
 GITILES_STORAGE_TYPE = admin.ServiceConfigStorageType.GITILES
-GITILES_LOCATION_TYPE = service_config_pb2.ConfigSetLocation.GITILES
 DEFAULT_GITILES_IMPORT_CONFIG = service_config_pb2.ImportCfg.Gitiles(
     fetch_log_deadline=15,
     fetch_archive_deadline=15,
@@ -362,25 +361,7 @@ def import_project(project_id):
   if project is None:
     raise NotFoundError('project %s not found' % project_id)
 
-  if project.HasField('config_location'):
-    # TODO(crbug/1099956): delete legacy config_location support.
-    if project.config_location.storage_type != GITILES_LOCATION_TYPE:
-      raise Error('project %s is not a Gitiles project' % project_id)
-    try:
-      loc = _resolved_location(project.config_location.url)
-    except gitiles.TreeishResolutionError:
-      logging.warning('could not resolve URL %r', project.config_location.url)
-
-      @ndb.transactional
-      def txn():
-        key = ndb.Key(storage.ConfigSet, config_set)
-        if key.get():
-          logging.warning('deleting project %s with unresolved URL', project_id)
-          key.delete()
-
-      txn()
-      return
-  elif project.HasField('gitiles_location'):
+  if project.HasField('gitiles_location'):
     loc = _make_gitiles_location(project.gitiles_location)
   else:
     raise Error('project %s does not have a gitiles location' % project_id)
@@ -402,14 +383,8 @@ def import_ref(project_id, ref_name):
   project = projects.get_project(project_id)
   if project is None:
     raise NotFoundError('project %s not found' % project_id)
-  if project.HasField('config_location'):
-    # TODO(crbug/1099956): delete legacy config_location support.
-    if project.config_location.storage_type != GITILES_LOCATION_TYPE:
-      raise Error('project %s is not a Gitiles project' % project_id)
-    # We don't call _resolved_location here because we are replacing treeish and
-    # path below anyway.
-    loc = gitiles.Location.parse(project.config_location.url)
-  elif project.HasField('gitiles_location'):
+
+  if project.HasField('gitiles_location'):
     loc = _make_gitiles_location(project.gitiles_location)
   else:
     raise Error('project %s does not have a gitiles location' % project_id)

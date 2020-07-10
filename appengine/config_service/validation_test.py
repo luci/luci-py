@@ -32,57 +32,6 @@ class ValidationTestCase(test_case.TestCase):
     self.services = []
     self.mock(services, 'get_services_async', lambda: future(self.services))
 
-  def test_validate_project_registry_legacy(self):
-    cfg = '''
-      projects {
-        id: "a"
-        config_location {
-          storage_type: GITILES
-          url: "https://a.googlesource.com/project/+/refs/heads/master"
-        }
-      }
-      projects {
-        id: "b"
-      }
-      projects {
-        id: "a"
-        config_location {
-          storage_type: GITILES
-          url: "https://no-project.googlesource.com"
-        }
-      }
-      projects {
-        config_location {
-          storage_type: GITILES
-          url: "https://example.googlesource.com/bad_plus/+"
-        }
-      }
-      projects {
-        id: "c"
-        config_location {
-          storage_type: GITILES
-          url: "https://example.googlesource.com/no_ref/"
-        }
-      }
-    '''
-    result = validation.validate_config(
-        config.self_config_set(), 'projects.cfg', cfg)
-
-    self.assertEqual(
-        [m.text for m in result.messages],
-        [
-          'Project b: config_location: storage_type is not set',
-          'Project a: id is not unique',
-          ('Project a: config_location: Invalid Gitiles repo url: '
-           'https://no-project.googlesource.com'),
-          'Project #4: id is not specified',
-          ('Project #4: config_location: Invalid Gitiles repo url: '
-           'https://example.googlesource.com/bad_plus/+'),
-          'Project c: config_location: ref/commit is not specified',
-          'Projects are not sorted by id. First offending id: a',
-        ]
-    )
-
   def test_validate_project_registry(self):
     cfg = '''
       projects {
@@ -123,17 +72,17 @@ class ValidationTestCase(test_case.TestCase):
     self.assertEqual(
         [m.text for m in result.messages],
         [
-           # TODO(crbug/1099956): change to require gitiles_location.
-           'Project b: config_location: storage_type is not set',
-           'Project a: id is not unique',
-           'Project a: gitiles_location: repo: must not end with "/"',
-           'Project a: gitiles_location: path must not start with "/"',
-           'Project #4: id is not specified',
-           'Project #4: gitiles_location: repo: must not end with ".git"',
-           'Project #4: gitiles_location: ref must start with "refs/"',
-           'Project c: gitiles_location: ref is not set',
-           'Projects are not sorted by id. First offending id: a',
-        ]
+          'Project b: gitiles_location: repo: not specified',
+          'Project b: gitiles_location: ref is not set',
+          'Project a: id is not unique',
+          'Project a: gitiles_location: repo: must not end with "/"',
+          'Project a: gitiles_location: path must not start with "/"',
+          'Project #4: id is not specified',
+          'Project #4: gitiles_location: repo: must not end with ".git"',
+          'Project #4: gitiles_location: ref must start with "refs/"',
+          'Project c: gitiles_location: ref is not set',
+          'Projects are not sorted by id. First offending id: a',
+        ],
     )
 
   def test_validate_acl_cfg(self):

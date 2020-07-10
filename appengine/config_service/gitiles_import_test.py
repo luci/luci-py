@@ -429,34 +429,6 @@ class GitilesImportTestCase(test_case.TestCase):
         ),
     )
 
-  def test__project_and_ref_config_sets_legacy(self):
-    # TODO(crbug/1099956): delete legacy config_location support.
-    self.mock(gitiles_import, '_import_config_set', mock.Mock())
-    self.mock(projects, 'get_projects', mock.Mock())
-    self.mock(projects, 'get_refs', mock.Mock())
-    projects.get_projects.return_value = [
-      service_config_pb2.Project(
-          id='chromium',
-          config_location=service_config_pb2.ConfigSetLocation(
-            url='https://localhost/chromium/src/',
-            storage_type=service_config_pb2.ConfigSetLocation.GITILES,
-          )
-      ),
-    ]
-    RefType = project_config_pb2.RefsCfg.Ref
-    projects.get_refs.return_value = {
-      'chromium': [
-        RefType(name='refs/heads/master'),
-        RefType(name='refs/heads/release42', config_path='/my-configs'),
-      ],
-    }
-
-    self.assertEqual(gitiles_import._project_and_ref_config_sets(), [
-      'projects/chromium',
-      'projects/chromium/refs/heads/master',
-      'projects/chromium/refs/heads/release42',
-    ])
-
   def test__project_and_ref_config_sets(self):
     self.mock(gitiles_import, '_import_config_set', mock.Mock())
     self.mock(projects, 'get_projects', mock.Mock())
@@ -484,30 +456,6 @@ class GitilesImportTestCase(test_case.TestCase):
       'projects/chromium/refs/heads/master',
       'projects/chromium/refs/heads/release42',
     ])
-
-  def test_import_project_legacy(self):
-    # TODO(crbug/1099956): delete legacy config_location support.
-    self.mock(gitiles_import, '_import_config_set', mock.Mock())
-    self.mock(projects, 'get_project', mock.Mock())
-    projects.get_project.return_value = service_config_pb2.Project(
-        id='chromium',
-        config_location=service_config_pb2.ConfigSetLocation(
-            url='https://localhost/chromium/src/+/refs/heads/master',
-            storage_type=service_config_pb2.ConfigSetLocation.GITILES,
-        ),
-    )
-
-    gitiles_import.import_project('chromium')
-
-    gitiles_import._import_config_set.assert_called_once_with(
-        'projects/chromium',
-        gitiles.Location(
-            hostname='localhost',
-            project='chromium/src',
-            treeish='refs/heads/master',
-            path='/',
-        ),
-        'chromium')
 
   def test_import_project(self):
     self.mock(gitiles_import, '_import_config_set', mock.Mock())
@@ -541,27 +489,6 @@ class GitilesImportTestCase(test_case.TestCase):
   def test_import_project_invalid_id(self):
     with self.assertRaises(ValueError):
       gitiles_import.import_project(')))')
-
-  def test_import_project_ref_not_resolved(self):
-    # TODO(crbug/1099956): delete legacy config_location support.
-    self.mock(projects, 'get_project', mock.Mock())
-    projects.get_project.return_value = service_config_pb2.Project(
-        id='chromium',
-        config_location=service_config_pb2.ConfigSetLocation(
-            url='https://localhost/chromium/src/',
-            storage_type=service_config_pb2.ConfigSetLocation.GITILES,
-        ),
-    )
-
-    self.mock(
-        gitiles.Location, 'parse_resolve',
-        mock.Mock(side_effect=gitiles.TreeishResolutionError()))
-
-    storage.ConfigSet(
-        id='projects/chromium', location='https://example.com').put()
-
-    gitiles_import.import_project('chromium')
-    self.assertIsNone(storage.ConfigSet.get_by_id('projects/chromium'))
 
   def test_import_ref(self):
     self.mock(gitiles_import, '_import_config_set', mock.Mock())

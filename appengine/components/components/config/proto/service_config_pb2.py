@@ -19,35 +19,10 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   syntax='proto3',
   serialized_options=None,
   create_key=_descriptor._internal_create_key,
-  serialized_pb=b'\n,components/config/proto/service_config.proto\x12\x06\x63onfig\"\x84\x01\n\x11\x43onfigSetLocation\x12\x0b\n\x03url\x18\x01 \x01(\t\x12;\n\x0cstorage_type\x18\x02 \x01(\x0e\x32%.config.ConfigSetLocation.StorageType\"%\n\x0bStorageType\x12\t\n\x05UNSET\x10\x00\x12\x0b\n\x07GITILES\x10\x01\":\n\x0fGitilesLocation\x12\x0c\n\x04repo\x18\x01 \x01(\t\x12\x0b\n\x03ref\x18\x02 \x01(\t\x12\x0c\n\x04path\x18\x03 \x01(\t\"/\n\x0eIdentityConfig\x12\x1d\n\x15service_account_email\x18\x01 \x01(\t\"\xbd\x01\n\x07Project\x12\n\n\x02id\x18\x01 \x01(\t\x12\x34\n\x0f\x63onfig_location\x18\x02 \x01(\x0b\x32\x19.config.ConfigSetLocationH\x00\x12\x33\n\x10gitiles_location\x18\x04 \x01(\x0b\x32\x17.config.GitilesLocationH\x00\x12/\n\x0fidentity_config\x18\x03 \x01(\x0b\x32\x16.config.IdentityConfigB\n\n\x08location\"0\n\x0bProjectsCfg\x12!\n\x08projects\x18\x01 \x03(\x0b\x32\x0f.config.Project\"\xaa\x01\n\x07Service\x12\n\n\x02id\x18\x01 \x01(\t\x12\x0e\n\x06owners\x18\x02 \x03(\t\x12\x14\n\x0cmetadata_url\x18\x04 \x01(\t\x12\x0e\n\x06\x61\x63\x63\x65ss\x18\x05 \x03(\t\x12)\n\x08jwt_auth\x18\x06 \x01(\x0b\x32\x17.config.Service.JWTAuth\x1a\x1b\n\x07JWTAuth\x12\x10\n\x08\x61udience\x18\x01 \x01(\tJ\x04\x08\x03\x10\x04R\x0f\x63onfig_location\"P\n\x16ServiceDynamicMetadata\x12\x0f\n\x07version\x18\x01 \x01(\t\x12%\n\nvalidation\x18\x02 \x01(\x0b\x32\x11.config.Validator\"0\n\x0bServicesCfg\x12!\n\x08services\x18\x01 \x03(\x0b\x32\x0f.config.Service\"\xab\x01\n\x06\x41\x63lCfg\x12\x1c\n\x14project_access_group\x18\x02 \x01(\t\x12\x1c\n\x14service_access_group\x18\x07 \x01(\t\x12\x13\n\x0b\x61\x64min_group\x18\x03 \x01(\t\x12\x18\n\x10validation_group\x18\x05 \x01(\t\x12\x16\n\x0ereimport_group\x18\x06 \x01(\tJ\x04\x08\x04\x10\x05R\x18\x63onfig_get_by_hash_group\"\xe9\x01\n\tImportCfg\x12*\n\x07gitiles\x18\x01 \x01(\x0b\x32\x19.config.ImportCfg.Gitiles\x1a\xaf\x01\n\x07Gitiles\x12\x1a\n\x12\x66\x65tch_log_deadline\x18\x01 \x01(\x05\x12\x1e\n\x16\x66\x65tch_archive_deadline\x18\x02 \x01(\x05\x12\"\n\x1aproject_config_default_ref\x18\x03 \x01(\t\x12#\n\x1bproject_config_default_path\x18\x04 \x01(\t\x12\x1f\n\x17ref_config_default_path\x18\x05 \x01(\t\"]\n\nSchemasCfg\x12*\n\x07schemas\x18\x01 \x03(\x0b\x32\x19.config.SchemasCfg.Schema\x1a#\n\x06Schema\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x0b\n\x03url\x18\x02 \x01(\t\"1\n\rConfigPattern\x12\x12\n\nconfig_set\x18\x01 \x01(\t\x12\x0c\n\x04path\x18\x02 \x01(\t\"A\n\tValidator\x12\'\n\x08patterns\x18\x01 \x03(\x0b\x32\x15.config.ConfigPattern\x12\x0b\n\x03url\x18\x02 \x01(\t\"M\n\x18ValidationRequestMessage\x12\x12\n\nconfig_set\x18\x01 \x01(\t\x12\x0c\n\x04path\x18\x02 \x01(\t\x12\x0f\n\x07\x63ontent\x18\x03 \x01(\x0c\"\x91\x02\n\x19ValidationResponseMessage\x12;\n\x08messages\x18\x01 \x03(\x0b\x32).config.ValidationResponseMessage.Message\x1a\x63\n\x07Message\x12\x0c\n\x04path\x18\x01 \x01(\t\x12<\n\x08severity\x18\x02 \x01(\x0e\x32*.config.ValidationResponseMessage.Severity\x12\x0c\n\x04text\x18\x03 \x01(\t\"R\n\x08Severity\x12\x0b\n\x07UNKNOWN\x10\x00\x12\t\n\x05\x44\x45\x42UG\x10\n\x12\x08\n\x04INFO\x10\x14\x12\x0b\n\x07WARNING\x10\x1e\x12\t\n\x05\x45RROR\x10(\x12\x0c\n\x08\x43RITICAL\x10\x32\x62\x06proto3'
+  serialized_pb=b'\n,components/config/proto/service_config.proto\x12\x06\x63onfig\":\n\x0fGitilesLocation\x12\x0c\n\x04repo\x18\x01 \x01(\t\x12\x0b\n\x03ref\x18\x02 \x01(\t\x12\x0c\n\x04path\x18\x03 \x01(\t\"/\n\x0eIdentityConfig\x12\x1d\n\x15service_account_email\x18\x01 \x01(\t\"\x9e\x01\n\x07Project\x12\n\n\x02id\x18\x01 \x01(\t\x12\x33\n\x10gitiles_location\x18\x04 \x01(\x0b\x32\x17.config.GitilesLocationH\x00\x12/\n\x0fidentity_config\x18\x03 \x01(\x0b\x32\x16.config.IdentityConfigB\n\n\x08locationJ\x04\x08\x02\x10\x03R\x0f\x63onfig_location\"0\n\x0bProjectsCfg\x12!\n\x08projects\x18\x01 \x03(\x0b\x32\x0f.config.Project\"\xaa\x01\n\x07Service\x12\n\n\x02id\x18\x01 \x01(\t\x12\x0e\n\x06owners\x18\x02 \x03(\t\x12\x14\n\x0cmetadata_url\x18\x04 \x01(\t\x12\x0e\n\x06\x61\x63\x63\x65ss\x18\x05 \x03(\t\x12)\n\x08jwt_auth\x18\x06 \x01(\x0b\x32\x17.config.Service.JWTAuth\x1a\x1b\n\x07JWTAuth\x12\x10\n\x08\x61udience\x18\x01 \x01(\tJ\x04\x08\x03\x10\x04R\x0f\x63onfig_location\"P\n\x16ServiceDynamicMetadata\x12\x0f\n\x07version\x18\x01 \x01(\t\x12%\n\nvalidation\x18\x02 \x01(\x0b\x32\x11.config.Validator\"0\n\x0bServicesCfg\x12!\n\x08services\x18\x01 \x03(\x0b\x32\x0f.config.Service\"\xab\x01\n\x06\x41\x63lCfg\x12\x1c\n\x14project_access_group\x18\x02 \x01(\t\x12\x1c\n\x14service_access_group\x18\x07 \x01(\t\x12\x13\n\x0b\x61\x64min_group\x18\x03 \x01(\t\x12\x18\n\x10validation_group\x18\x05 \x01(\t\x12\x16\n\x0ereimport_group\x18\x06 \x01(\tJ\x04\x08\x04\x10\x05R\x18\x63onfig_get_by_hash_group\"\xe9\x01\n\tImportCfg\x12*\n\x07gitiles\x18\x01 \x01(\x0b\x32\x19.config.ImportCfg.Gitiles\x1a\xaf\x01\n\x07Gitiles\x12\x1a\n\x12\x66\x65tch_log_deadline\x18\x01 \x01(\x05\x12\x1e\n\x16\x66\x65tch_archive_deadline\x18\x02 \x01(\x05\x12\"\n\x1aproject_config_default_ref\x18\x03 \x01(\t\x12#\n\x1bproject_config_default_path\x18\x04 \x01(\t\x12\x1f\n\x17ref_config_default_path\x18\x05 \x01(\t\"]\n\nSchemasCfg\x12*\n\x07schemas\x18\x01 \x03(\x0b\x32\x19.config.SchemasCfg.Schema\x1a#\n\x06Schema\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x0b\n\x03url\x18\x02 \x01(\t\"1\n\rConfigPattern\x12\x12\n\nconfig_set\x18\x01 \x01(\t\x12\x0c\n\x04path\x18\x02 \x01(\t\"A\n\tValidator\x12\'\n\x08patterns\x18\x01 \x03(\x0b\x32\x15.config.ConfigPattern\x12\x0b\n\x03url\x18\x02 \x01(\t\"M\n\x18ValidationRequestMessage\x12\x12\n\nconfig_set\x18\x01 \x01(\t\x12\x0c\n\x04path\x18\x02 \x01(\t\x12\x0f\n\x07\x63ontent\x18\x03 \x01(\x0c\"\x91\x02\n\x19ValidationResponseMessage\x12;\n\x08messages\x18\x01 \x03(\x0b\x32).config.ValidationResponseMessage.Message\x1a\x63\n\x07Message\x12\x0c\n\x04path\x18\x01 \x01(\t\x12<\n\x08severity\x18\x02 \x01(\x0e\x32*.config.ValidationResponseMessage.Severity\x12\x0c\n\x04text\x18\x03 \x01(\t\"R\n\x08Severity\x12\x0b\n\x07UNKNOWN\x10\x00\x12\t\n\x05\x44\x45\x42UG\x10\n\x12\x08\n\x04INFO\x10\x14\x12\x0b\n\x07WARNING\x10\x1e\x12\t\n\x05\x45RROR\x10(\x12\x0c\n\x08\x43RITICAL\x10\x32\x62\x06proto3'
 )
 
 
-
-_CONFIGSETLOCATION_STORAGETYPE = _descriptor.EnumDescriptor(
-  name='StorageType',
-  full_name='config.ConfigSetLocation.StorageType',
-  filename=None,
-  file=DESCRIPTOR,
-  create_key=_descriptor._internal_create_key,
-  values=[
-    _descriptor.EnumValueDescriptor(
-      name='UNSET', index=0, number=0,
-      serialized_options=None,
-      type=None,
-      create_key=_descriptor._internal_create_key),
-    _descriptor.EnumValueDescriptor(
-      name='GITILES', index=1, number=1,
-      serialized_options=None,
-      type=None,
-      create_key=_descriptor._internal_create_key),
-  ],
-  containing_type=None,
-  serialized_options=None,
-  serialized_start=152,
-  serialized_end=189,
-)
-_sym_db.RegisterEnumDescriptor(_CONFIGSETLOCATION_STORAGETYPE)
 
 _VALIDATIONRESPONSEMESSAGE_SEVERITY = _descriptor.EnumDescriptor(
   name='Severity',
@@ -89,50 +64,10 @@ _VALIDATIONRESPONSEMESSAGE_SEVERITY = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   serialized_options=None,
-  serialized_start=1741,
-  serialized_end=1823,
+  serialized_start=1575,
+  serialized_end=1657,
 )
 _sym_db.RegisterEnumDescriptor(_VALIDATIONRESPONSEMESSAGE_SEVERITY)
-
-
-_CONFIGSETLOCATION = _descriptor.Descriptor(
-  name='ConfigSetLocation',
-  full_name='config.ConfigSetLocation',
-  filename=None,
-  file=DESCRIPTOR,
-  containing_type=None,
-  create_key=_descriptor._internal_create_key,
-  fields=[
-    _descriptor.FieldDescriptor(
-      name='url', full_name='config.ConfigSetLocation.url', index=0,
-      number=1, type=9, cpp_type=9, label=1,
-      has_default_value=False, default_value=b"".decode('utf-8'),
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
-    _descriptor.FieldDescriptor(
-      name='storage_type', full_name='config.ConfigSetLocation.storage_type', index=1,
-      number=2, type=14, cpp_type=8, label=1,
-      has_default_value=False, default_value=0,
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
-  ],
-  extensions=[
-  ],
-  nested_types=[],
-  enum_types=[
-    _CONFIGSETLOCATION_STORAGETYPE,
-  ],
-  serialized_options=None,
-  is_extendable=False,
-  syntax='proto3',
-  extension_ranges=[],
-  oneofs=[
-  ],
-  serialized_start=57,
-  serialized_end=189,
-)
 
 
 _GITILESLOCATION = _descriptor.Descriptor(
@@ -176,8 +111,8 @@ _GITILESLOCATION = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=191,
-  serialized_end=249,
+  serialized_start=56,
+  serialized_end=114,
 )
 
 
@@ -208,8 +143,8 @@ _IDENTITYCONFIG = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=251,
-  serialized_end=298,
+  serialized_start=116,
+  serialized_end=163,
 )
 
 
@@ -229,21 +164,14 @@ _PROJECT = _descriptor.Descriptor(
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='config_location', full_name='config.Project.config_location', index=1,
-      number=2, type=11, cpp_type=10, label=1,
-      has_default_value=False, default_value=None,
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
-    _descriptor.FieldDescriptor(
-      name='gitiles_location', full_name='config.Project.gitiles_location', index=2,
+      name='gitiles_location', full_name='config.Project.gitiles_location', index=1,
       number=4, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='identity_config', full_name='config.Project.identity_config', index=3,
+      name='identity_config', full_name='config.Project.identity_config', index=2,
       number=3, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
@@ -266,8 +194,8 @@ _PROJECT = _descriptor.Descriptor(
       create_key=_descriptor._internal_create_key,
     fields=[]),
   ],
-  serialized_start=301,
-  serialized_end=490,
+  serialized_start=166,
+  serialized_end=324,
 )
 
 
@@ -298,8 +226,8 @@ _PROJECTSCFG = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=492,
-  serialized_end=540,
+  serialized_start=326,
+  serialized_end=374,
 )
 
 
@@ -330,8 +258,8 @@ _SERVICE_JWTAUTH = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=663,
-  serialized_end=690,
+  serialized_start=497,
+  serialized_end=524,
 )
 
 _SERVICE = _descriptor.Descriptor(
@@ -389,8 +317,8 @@ _SERVICE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=543,
-  serialized_end=713,
+  serialized_start=377,
+  serialized_end=547,
 )
 
 
@@ -428,8 +356,8 @@ _SERVICEDYNAMICMETADATA = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=715,
-  serialized_end=795,
+  serialized_start=549,
+  serialized_end=629,
 )
 
 
@@ -460,8 +388,8 @@ _SERVICESCFG = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=797,
-  serialized_end=845,
+  serialized_start=631,
+  serialized_end=679,
 )
 
 
@@ -520,8 +448,8 @@ _ACLCFG = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=848,
-  serialized_end=1019,
+  serialized_start=682,
+  serialized_end=853,
 )
 
 
@@ -580,8 +508,8 @@ _IMPORTCFG_GITILES = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1080,
-  serialized_end=1255,
+  serialized_start=914,
+  serialized_end=1089,
 )
 
 _IMPORTCFG = _descriptor.Descriptor(
@@ -611,8 +539,8 @@ _IMPORTCFG = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1022,
-  serialized_end=1255,
+  serialized_start=856,
+  serialized_end=1089,
 )
 
 
@@ -650,8 +578,8 @@ _SCHEMASCFG_SCHEMA = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1315,
-  serialized_end=1350,
+  serialized_start=1149,
+  serialized_end=1184,
 )
 
 _SCHEMASCFG = _descriptor.Descriptor(
@@ -681,8 +609,8 @@ _SCHEMASCFG = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1257,
-  serialized_end=1350,
+  serialized_start=1091,
+  serialized_end=1184,
 )
 
 
@@ -720,8 +648,8 @@ _CONFIGPATTERN = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1352,
-  serialized_end=1401,
+  serialized_start=1186,
+  serialized_end=1235,
 )
 
 
@@ -759,8 +687,8 @@ _VALIDATOR = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1403,
-  serialized_end=1468,
+  serialized_start=1237,
+  serialized_end=1302,
 )
 
 
@@ -805,8 +733,8 @@ _VALIDATIONREQUESTMESSAGE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1470,
-  serialized_end=1547,
+  serialized_start=1304,
+  serialized_end=1381,
 )
 
 
@@ -851,8 +779,8 @@ _VALIDATIONRESPONSEMESSAGE_MESSAGE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1640,
-  serialized_end=1739,
+  serialized_start=1474,
+  serialized_end=1573,
 )
 
 _VALIDATIONRESPONSEMESSAGE = _descriptor.Descriptor(
@@ -883,18 +811,12 @@ _VALIDATIONRESPONSEMESSAGE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1550,
-  serialized_end=1823,
+  serialized_start=1384,
+  serialized_end=1657,
 )
 
-_CONFIGSETLOCATION.fields_by_name['storage_type'].enum_type = _CONFIGSETLOCATION_STORAGETYPE
-_CONFIGSETLOCATION_STORAGETYPE.containing_type = _CONFIGSETLOCATION
-_PROJECT.fields_by_name['config_location'].message_type = _CONFIGSETLOCATION
 _PROJECT.fields_by_name['gitiles_location'].message_type = _GITILESLOCATION
 _PROJECT.fields_by_name['identity_config'].message_type = _IDENTITYCONFIG
-_PROJECT.oneofs_by_name['location'].fields.append(
-  _PROJECT.fields_by_name['config_location'])
-_PROJECT.fields_by_name['config_location'].containing_oneof = _PROJECT.oneofs_by_name['location']
 _PROJECT.oneofs_by_name['location'].fields.append(
   _PROJECT.fields_by_name['gitiles_location'])
 _PROJECT.fields_by_name['gitiles_location'].containing_oneof = _PROJECT.oneofs_by_name['location']
@@ -912,7 +834,6 @@ _VALIDATIONRESPONSEMESSAGE_MESSAGE.fields_by_name['severity'].enum_type = _VALID
 _VALIDATIONRESPONSEMESSAGE_MESSAGE.containing_type = _VALIDATIONRESPONSEMESSAGE
 _VALIDATIONRESPONSEMESSAGE.fields_by_name['messages'].message_type = _VALIDATIONRESPONSEMESSAGE_MESSAGE
 _VALIDATIONRESPONSEMESSAGE_SEVERITY.containing_type = _VALIDATIONRESPONSEMESSAGE
-DESCRIPTOR.message_types_by_name['ConfigSetLocation'] = _CONFIGSETLOCATION
 DESCRIPTOR.message_types_by_name['GitilesLocation'] = _GITILESLOCATION
 DESCRIPTOR.message_types_by_name['IdentityConfig'] = _IDENTITYCONFIG
 DESCRIPTOR.message_types_by_name['Project'] = _PROJECT
@@ -928,13 +849,6 @@ DESCRIPTOR.message_types_by_name['Validator'] = _VALIDATOR
 DESCRIPTOR.message_types_by_name['ValidationRequestMessage'] = _VALIDATIONREQUESTMESSAGE
 DESCRIPTOR.message_types_by_name['ValidationResponseMessage'] = _VALIDATIONRESPONSEMESSAGE
 _sym_db.RegisterFileDescriptor(DESCRIPTOR)
-
-ConfigSetLocation = _reflection.GeneratedProtocolMessageType('ConfigSetLocation', (_message.Message,), {
-  'DESCRIPTOR' : _CONFIGSETLOCATION,
-  '__module__' : 'components.config.proto.service_config_pb2'
-  # @@protoc_insertion_point(class_scope:config.ConfigSetLocation)
-  })
-_sym_db.RegisterMessage(ConfigSetLocation)
 
 GitilesLocation = _reflection.GeneratedProtocolMessageType('GitilesLocation', (_message.Message,), {
   'DESCRIPTOR' : _GITILESLOCATION,

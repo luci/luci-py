@@ -32,9 +32,9 @@ class ProjectsTestCase(test_case.TestCase):
     self.mock_latest_config(storage.get_self_config_set(), '''
       projects {
         id: "chromium"
-        config_location {
-          storage_type: GITILES
-          url: "http://localhost"
+        gitiles_location {
+          repo: "https://localhost"
+          ref: "refs/heads/main"
         }
       }
     ''')
@@ -42,10 +42,11 @@ class ProjectsTestCase(test_case.TestCase):
         projects=[
           service_config_pb2.Project(
               id='chromium',
-              config_location=service_config_pb2.ConfigSetLocation(
-                storage_type=service_config_pb2.ConfigSetLocation.GITILES,
-                url='http://localhost')
+              gitiles_location=service_config_pb2.GitilesLocation(
+                repo='https://localhost',
+                ref='refs/heads/main',
               ),
+          ),
         ],
     )
     self.assertEqual(projects.get_projects(), expected.projects)

@@ -13,24 +13,6 @@ syntax = "proto3";
 
 package config;
 
-// DEPRECATED. DO NOT USE because the Gitiles URL is ambiguous due to lack of
-// separation between the Git's ref and the location within the Git repo.
-// Used to specify project/service configuration location.
-message ConfigSetLocation {
-  // Depending on repository type, config service imports configuration files
-  // differently.
-  enum StorageType {
-    // Will be used if storage_type is not set.
-    UNSET = 0;
-    // Gitiles REST API is used to fetch config files.
-    GITILES = 1;
-  }
-  // URL of the repository where project-wide configurations are stored.
-  string url = 1;
-  // Optional. Type of the configuration repository, e.g. GITILES.
-  StorageType storage_type = 2;
-}
-
 // Use to specify configuration stored in Git repository importable via Gitiles
 // API.
 message GitilesLocation {
@@ -95,15 +77,14 @@ message IdentityConfig {
 
 // A tenant of a service. Defined in projects.cfg.
 message Project {
+  reserved 2;
+  reserved 'config_location';
+
   // Globally unique id of the project.
   string id = 1;
 
   // Where to import "projects/<id>" config set from.
   oneof location {
-    // DEPRECATED. Use `gitiles_location` instead.
-    // Where to import "projects/<id>" config set from.
-    ConfigSetLocation config_location = 2;
-
     GitilesLocation gitiles_location = 4;
   }
 

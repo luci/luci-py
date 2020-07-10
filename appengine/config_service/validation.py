@@ -91,9 +91,6 @@ def validate_id(ident, rgx, known_ids, ctx):
 
 
 def validate_config_set_location(loc, ctx, allow_relative_url=False):
-  if not loc:
-    ctx.error('not specified')
-    return
   if is_url_relative(loc.url):
     if not allow_relative_url:
       ctx.error('url is relative')
@@ -164,13 +161,8 @@ def validate_project_registry(cfg, ctx):
   for i, project in enumerate(cfg.projects):
     with ctx.prefix('Project %s: ', project.id or ('#%d' % (i + 1))):
       validate_id(project.id, config.common.PROJECT_ID_RGX, project_ids, ctx)
-      if project.HasField('gitiles_location'):
-        with ctx.prefix('gitiles_location: '):
-          validate_gitiles_location(project.gitiles_location, ctx)
-      else:
-        # TODO(crbug/1099956): delete legacy config_location support.
-        with ctx.prefix('config_location: '):
-          validate_config_set_location(project.config_location, ctx)
+      with ctx.prefix('gitiles_location: '):
+        validate_gitiles_location(project.gitiles_location, ctx)
   check_id_sorted(cfg.projects, 'Projects', ctx)
 
 
