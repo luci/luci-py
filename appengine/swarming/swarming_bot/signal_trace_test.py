@@ -28,14 +28,19 @@ class Test(unittest.TestCase):
                          cwd=THIS_DIR)
     p.stdout.read(1)
     os.kill(p.pid, sig)
-    # Wait for some output before calling communicate(), otherwise there's a
+    # Wait for some output before calling stdin.write(), otherwise there's a
     # race condition with SIGUSR2.
+    e = p.stderr.read(1)
     if stdin:
-      e = p.stderr.read(1)
-    else:
-      e = b''
-    out, err = p.communicate(input=stdin)
-    return out, e + err
+      p.stdin.write(stdin)
+      p.stdin.flush()
+    p.wait()
+    e += p.stderr.read()
+    out = p.stdout.read()
+    p.stdin.close()
+    p.stdout.close()
+    p.stderr.close()
+    return out, e
 
   def test_SIGUSR1(self):
     # The simple case
@@ -64,7 +69,6 @@ class Test(unittest.TestCase):
     self.assertTrue(err.endswith(b'\n** SIGUSR1 end **\n'), repr(err))
     self.assertIn(b'MainThread:', err.splitlines())
 
-  @unittest.skipIf(six.PY3, "crbug.com/1010816")
   def test_SIGUSR2(self):
     cmd = ('import signal_trace,sys,time; signal_trace.register(); '
            'sys.stdout.write("1"); sys.stdout.flush(); time.sleep(60)')
