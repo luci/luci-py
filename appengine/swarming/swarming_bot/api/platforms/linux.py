@@ -93,7 +93,7 @@ def _get_nvidia_version():
   try:
     with open('/sys/module/nvidia/version', 'rb') as f:
       # Looks like '367.27'.
-      return f.read().strip()
+      return six.ensure_text(f.read().strip())
   except (IOError, OSError):
     return None
 
@@ -320,8 +320,8 @@ def get_ssd():
     ssd = []
     for line in out:
       match = re.match(br'(\w+)\s+(0|1)', line)
-      if match and match.group(2) == '0':
-        ssd.append(match.group(1).decode('utf-8'))
+      if match and match.group(2) == b'0':
+        ssd.append(six.ensure_text(match.group(1)))
     return tuple(sorted(ssd))
   except (OSError, subprocess.CalledProcessError) as e:
     logging.error('Failed to read disk info: %s', e)

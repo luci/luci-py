@@ -5,7 +5,10 @@
 
 import logging
 import sys
+import textwrap
 import unittest
+
+import mock
 
 import test_env_platforms
 test_env_platforms.setup_test_env()
@@ -16,6 +19,7 @@ from utils import tools
 import linux
 
 
+# pylint: disable=line-too-long
 EXYNOS_CPU_INFO = r"""
 Processor : ARMv7 Processor rev 4 (v7l)
 processor : 0
@@ -215,6 +219,38 @@ class TestDocker(auto_stub.TestCase):
 
   def test_get_inside_docker_no_k8s(self):
     self.assertEqual(None, self.get_inside_docker(NO_K8S_CGROUP))
+
+
+class TestLinux(auto_stub.TestCase):
+
+  def setUp(self):
+    super(TestLinux, self).setUp()
+    tools.clear_cache_all()
+    self.mock_check_output = mock.patch('subprocess.check_output').start()
+
+  def tearDown(self):
+    super(TestLinux, self).tearDown()
+    mock.patch.stopall()
+    tools.clear_cache_all()
+
+  def test_get_ssd(self):
+    self.mock_check_output.return_value = textwrap.dedent("""\
+      NAME    ROTA
+      nvme0n1    0
+    """).encode()
+    self.assertEqual(linux.get_ssd(), ('nvme0n1',))
+
+  def test_get_gpu(self):
+    # pylint: disable=line-too-long
+    self.mock_check_output.return_value = textwrap.dedent("""\
+      18:00.0 "VGA compatible controller [0300]" "NVIDIA Corporation [10de]" "GP107GL [Quadro P1000] [1cb1]" -ra1 "NVIDIA Corporation [10de]" "GP107GL [Quadro P1000] [11bc]"
+    """).encode()
+    with mock.patch('six.moves.builtins.open',
+                    mock.mock_open(read_data=b'440.82')):
+      self.assertEqual(linux.get_gpu(),
+                       (['10de', '10de:1cb1', '10de:1cb1-440.82'
+                        ], ['Nvidia GP107GL [Quadro P1000] 440.82']))
+
 
 if __name__ == '__main__':
   if '-v' in sys.argv:
