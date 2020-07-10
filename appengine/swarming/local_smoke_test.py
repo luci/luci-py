@@ -13,6 +13,7 @@ tasks with the Swarming client to ensure the system works end to end.
 
 from __future__ import print_function
 
+import argparse
 import base64
 import contextlib
 import json
@@ -1426,16 +1427,14 @@ def cleanup(bot, client, servers, print_all):
     file_path.rmtree(Test.tmpdir)
 
 
-def main():
-  fix_encoding.fix_encoding()
-  verbose = '-v' in sys.argv
-  Test.leak = bool('--leak' in sys.argv)
-  Test.tmpdir = unicode(tempfile.mkdtemp(prefix='local_smoke_test'))
-  if Test.leak:
-    # Note that --leak will not guarantee that 'c' and 'isolated_cache' are
-    # kept. Only the last test case will leak these two directories.
-    sys.argv.remove('--leak')
-  if verbose:
+def process_arguments():
+  parser = argparse.ArgumentParser(description=sys.modules[__name__].__doc__)
+  parser.add_argument('-v', dest='verbose', action='store_true')
+  parser.add_argument('--leak', action='store_true')
+  parser.add_argument('--bot_python')
+  args = parser.parse_args()
+
+  if args.verbose:
     logging.basicConfig(
         format='%(asctime)s %(filename)s:%(lineno)d %(levelname)s %(message)s',
         level=logging.INFO)
@@ -1443,6 +1442,24 @@ def main():
     Test.maxDiff = None
   else:
     logging.basicConfig(level=logging.ERROR)
+
+  if args.leak:
+    # Note that --leak will not guarantee that 'c' and 'isolated_cache' are
+    # kept. Only the last test case will leak these two directories.
+    sys.argv.remove('--leak')
+    Test.leak = args.leak
+
+  if args.bot_python:
+    sys.argv.remove('--bot_python')
+    sys.argv.remove(args.bot_python)
+
+  return args
+
+
+def main():
+  fix_encoding.fix_encoding()
+  args = process_arguments()
+  Test.tmpdir = unicode(tempfile.mkdtemp(prefix='local_smoke_test'))
 
   # Force language to be English, otherwise the error messages differ from
   # expectations.
@@ -1466,7 +1483,8 @@ def main():
     servers.start()
     botdir = os.path.join(Test.tmpdir, 'bot')
     os.mkdir(botdir)
-    bot = start_bot.LocalBot(servers.swarming_server.url, True, botdir)
+    bot = start_bot.LocalBot(servers.swarming_server.url, True, botdir,
+                             args.bot_python)
     Test.bot = bot
     bot.start()
     namespace = 'sha256-deflate'
@@ -1499,7 +1517,7 @@ def main():
       bot.kill()
       bot.wait()
   finally:
-    cleanup(bot, client, servers, failed or verbose)
+    cleanup(bot, client, servers, failed or args.verbose)
   return int(failed)
 
 

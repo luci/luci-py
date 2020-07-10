@@ -46,12 +46,13 @@ class LocalBot(object):
   locally.
   """
 
-  def __init__(self, swarming_server_url, redirect, botdir):
+  def __init__(self, swarming_server_url, redirect, botdir, python=None):
     self._botdir = botdir
     self._swarming_server_url = swarming_server_url
     self._proc = None
     self._logs = {}
     self._redirect = redirect
+    self._python = python or sys.executable
 
   def wipe_cache(self, restart):
     """Blows away this bot's cache and restart it.
@@ -88,7 +89,7 @@ class LocalBot(object):
     assert not self._proc
     bot_zip = os.path.join(self._botdir, 'swarming_bot.zip')
     urllib.request.urlretrieve(self._swarming_server_url + '/bot_code', bot_zip)
-    cmd = [sys.executable, bot_zip, 'start_slave', '--test-mode']
+    cmd = [self._python, bot_zip, 'start_slave', '--test-mode']
     if self._redirect:
       logs = os.path.join(self._botdir, 'logs')
       if not os.path.isdir(logs):
