@@ -868,6 +868,7 @@ class NamedCache(Cache):
             'NamedCache: failed to load named cache state file; obliterating')
         file_path.rmtree(self.cache_dir)
         fs.makedirs(self.cache_dir)
+        self._lru = lru.LRUDict()
       with self._lock:
         self._try_upgrade()
     if time_fn:
