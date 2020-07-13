@@ -55,13 +55,14 @@ class FileRefresherThread(object):
       True to carry on, False to exit the thread.
     """
     try:
+      content = None
+      content = self._producer_callback()
       blob = json.dumps(
-          self._producer_callback(),
-          sort_keys=True,
-          indent=2,
+          content, sort_keys=True, indent=2,
           separators=(',', ': ')).encode('utf-8')
     except Exception:
-      logging.exception('Unexpected exception in the callback')
+      logging.exception('Unexpected exception in the callback, content=%s',
+                        content)
       return True
     if blob == self._last_dumped_blob:
       return True  # already have it on disk
