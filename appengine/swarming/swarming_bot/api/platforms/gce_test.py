@@ -13,6 +13,7 @@ import unittest
 
 from nose2.tools import params
 import mock
+import six
 
 import test_env_platforms
 test_env_platforms.setup_test_env()
@@ -235,7 +236,7 @@ class TestSignedMetadataToken(auto_stub.TestCase):
     self.mock(gce, '_raw_metadata_request', mocked_raw_metadata_request)
 
     tok, exp = gce.signed_metadata_token('https://example.com')
-    self.assertEqual(tok, jwt)
+    self.assertEqual(tok, jwt.decode())
     self.assertEqual(exp, self.now + 3600)
     self.assertEqual(metadata_calls, [
       '/computeMetadata/v1/instance/service-accounts/default/'
@@ -244,14 +245,14 @@ class TestSignedMetadataToken(auto_stub.TestCase):
 
     # Hitting the cache now.
     tok, exp = gce.signed_metadata_token('https://example.com')
-    self.assertEqual(tok, jwt)
+    self.assertEqual(tok, jwt.decode())
     self.assertEqual(exp, self.now + 3600)
     self.assertEqual(len(metadata_calls), 1)  # still same 1 call
 
     # 1h later cache has expired.
     self.now += 3600
     tok, exp = gce.signed_metadata_token('https://example.com')
-    self.assertEqual(tok, jwt)
+    self.assertEqual(tok, jwt.decode())
     self.assertEqual(exp, self.now + 3600)
     self.assertEqual(len(metadata_calls), 2)  # have made a new call
 
