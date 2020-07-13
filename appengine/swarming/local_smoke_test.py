@@ -939,9 +939,8 @@ class Test(unittest.TestCase):
         i['key']: i['value'] for i in self.client.query_bot()['dimensions']}
     self.assertEqual(expected, set(dimensions))
 
+  @unittest.skip('flaky')
   def test_priority(self):
-    if self.bot.python != sys.executable:
-      self.skipTest('crbug.com/1010816')
     # Make a test that keeps the bot busy, while all the other tasks are being
     # created with priorities that are out of order. Then it unblocks the bot
     # and asserts the tasks are run in the expected order, based on priority and
