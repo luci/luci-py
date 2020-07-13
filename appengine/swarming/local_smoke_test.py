@@ -407,9 +407,10 @@ class Test(unittest.TestCase):
         break
 
   def gen_expected(self, **kwargs):
-    dims = [
-      {u'key': k, u'value': v} for k, v in sorted(self.dimensions.items())
-    ]
+    dims = [{
+        u'key': k,
+        u'value': v
+    } for k, v in sorted(self.dimensions.items()) if not k == 'python']
     return gen_expected(bot_dimensions=dims, **kwargs)
 
   def test_raw_bytes_and_dupe_dimensions(self):
@@ -474,6 +475,8 @@ class Test(unittest.TestCase):
     self.assertOneTask(args, summary, {})
 
   def test_io_timeout(self):
+    if self.bot.python != sys.executable:
+      self.skipTest('crbug.com/1010816')
     args = [
       # Need to flush to ensure it will be sent to the server.
       '-T', 'io_timeout', '--io-timeout', '1', '--',
@@ -576,6 +579,8 @@ class Test(unittest.TestCase):
     self.assertPerformanceStats(expected_performance_stats, performance_stats)
 
   def test_isolated_command(self):
+    if self.bot.python != sys.executable:
+      self.skipTest('crbug.com/1010816')
     # Command is specified in Swarming task, still with isolated file.
     # Confirms that --relative-cwd, --env, --env-prefix and --lower-priority
     # work.
@@ -1343,6 +1348,11 @@ class Test(unittest.TestCase):
       self.assertTrue(
           expected_output.match(output),
           '%s does not match %s' % (output, expected_output.pattern))
+
+    # Bot python version may be different.
+    result[u'bot_dimensions'] = [
+        d for d in result[u'bot_dimensions'] if not d['key'] == 'python'
+    ]
 
     self.assertEqual(expected, result)
     return bot_version
