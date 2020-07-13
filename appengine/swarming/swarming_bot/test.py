@@ -46,14 +46,13 @@ def run_tests_sequential():
   # These tests need to be run as executable.
   # because they don't pass when running in parallel
   # or run via test runner.
-  test_files = [
-      'bot_code/singleton_test.py',
+  test_cmds = [
+      [os.path.join(THIS_DIR, 'bot_code/singleton_test.py')],
   ]
-  abs_test_files = [os.path.join(THIS_DIR, t) for t in test_files]
 
   # execute test runner
   from test_support import sequential_test_runner
-  return sequential_test_runner.run_tests(abs_test_files, python3=six.PY3)
+  return sequential_test_runner.run_tests(test_cmds, python3=six.PY3)
 
 
 if __name__ == '__main__':

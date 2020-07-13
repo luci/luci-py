@@ -36,21 +36,21 @@ def run_tests_sequential():
   # These tests need to be run as executable
   # because they don't pass when running in parallel
   # or run via test runner
-  test_files = [
+  abs_path = lambda f: os.path.join(SWARMING_DIR, f)
+  test_cmds = [
       # TODO(crbug.com/10569967)
       # handlers_bot_test.py failing with unknown bot_id errors
-      'handlers_bot_test.py',
-      'handlers_backend_test.py',
-      'handlers_endpoints_test.py',
-      'handlers_prpc_test.py',
-      'server/bot_groups_config_test.py',
-      'server/resultdb_test.py',
-      'local_smoke_test.py',
+      [abs_path('handlers_bot_test.py')],
+      [abs_path('handlers_backend_test.py')],
+      [abs_path('handlers_endpoints_test.py')],
+      [abs_path('handlers_prpc_test.py')],
+      [abs_path('server/bot_groups_config_test.py')],
+      [abs_path('server/resultdb_test.py')],
+      [abs_path('local_smoke_test.py')],
   ]
-  abs_test_files = [os.path.join(SWARMING_DIR, t) for t in test_files]
 
   # execute test runner
-  return sequential_test_runner.run_tests(abs_test_files, python3=six.PY3)
+  return sequential_test_runner.run_tests(test_cmds, python3=six.PY3)
 
 
 if __name__ == '__main__':

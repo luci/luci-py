@@ -32,17 +32,17 @@ def run_tests_sequential():
   # These tests need to be run as executable
   # because they don't pass when running in parallel
   # or run via test runner
-  test_files = [
-      'components/auth/delegation_test.py',
-      'components/auth/project_tokens_test.py',
-      'components/auth/service_account_test.py',
-      'components/utils_test.py',
-      'components/endpoints_webapp2/discovery_test.py',
+  abs_path = lambda f: os.path.join(THIS_DIR, f)
+  test_cmds = [
+      [abs_path('components/auth/delegation_test.py')],
+      [abs_path('components/auth/project_tokens_test.py')],
+      [abs_path('components/auth/service_account_test.py')],
+      [abs_path('components/utils_test.py')],
+      [abs_path('components/endpoints_webapp2/discovery_test.py')],
   ]
-  abs_test_files = [os.path.join(THIS_DIR, t) for t in test_files]
 
   # execute test runner
-  return sequential_test_runner.run_tests(abs_test_files, python3=six.PY3)
+  return sequential_test_runner.run_tests(test_cmds, python3=six.PY3)
 
 
 if __name__ == '__main__':

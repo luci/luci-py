@@ -7,34 +7,34 @@ import subprocess
 import sys
 
 
-def run_tests(test_files, python3=False):
+def run_tests(test_cmds, python3=False):
   """Run tests sequentially"""
   run_cnt = 0
-  skipped_tests = []
-  failed_tests = []
-  for test_file in test_files:
-    _exit_code, skipped = _run_test(test_file, python3=python3)
+  skipped_cmds = []
+  failed_cmds = []
+  for cmd in test_cmds:
+    _exit_code, skipped = _run_test(cmd, python3=python3)
     if skipped:
-      skipped_tests.append(test_file)
+      skipped_cmds.append(cmd)
       continue
 
     if _exit_code:
-      failed_tests.append(test_file)
+      failed_cmds.append(cmd)
 
     run_cnt += 1
 
   print('\n-------------------------------------------------------------------')
   print('Ran %d test files, Skipped %d test files' %
-        (run_cnt, len(skipped_tests)))
+        (run_cnt, len(skipped_cmds)))
 
-  if len(skipped_tests) > 0:
+  if len(skipped_cmds) > 0:
     print('\nSkipped tests:')
-    for t in skipped_tests:
+    for t in skipped_cmds:
       print(' - %s' % t)
 
-  if len(failed_tests) > 0:
+  if len(failed_cmds) > 0:
     print('\nFailed tests:')
-    for t in failed_tests:
+    for t in failed_cmds:
       print(' - %s' % t)
     print('\nFAILED')
     return 1
@@ -43,9 +43,9 @@ def run_tests(test_files, python3=False):
   return 0
 
 
-def _run_test(test_file, python3=False):
-  if python3 and not _has_py3_shebang(test_file):
-    print('Skipping test in python3: %s' % test_file)
+def _run_test(cmd, python3=False):
+  if python3 and not _has_py3_shebang(cmd[0]):
+    print('Skipping test in python3: %s' % cmd)
     return 0, True
 
   # vpython
@@ -53,7 +53,7 @@ def _run_test(test_file, python3=False):
   if python3:
     vpython += '3'
 
-  cmd = [vpython, test_file]
+  cmd = [vpython] + cmd
   shell = False
   if sys.platform == 'win32':
     shell = True
