@@ -122,7 +122,7 @@ def _write(filepath, content):
   """Writes out a file and returns True on success."""
   logging.info('Writing in %s:\n%s', filepath, content)
   try:
-    with open(filepath, mode='wb') as f:
+    with open(filepath, mode='w') as f:
       f.write(content)
     return True
   except IOError as e:
