@@ -168,7 +168,10 @@ def get_os_values():
     # TODO(crbug/1018836): Get rid of this, Linux is not an OS, it's a kernel.
     out.append(u'Linux')
     number = platforms.linux.get_os_version_number()
-    out.append(u'%s-%s' % (os_name, number))
+    version = ''
+    for i in number.split('.'):
+      version += '.' + i
+      out.append(u'%s-%s' % (os_name, version[1:]))
   out.sort()
   return out
 

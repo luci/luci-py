@@ -16,6 +16,7 @@ import tempfile
 import time
 import unittest
 
+import mock
 import six
 
 import test_env_api
@@ -53,6 +54,16 @@ class TestOsUtilities(auto_stub.TestCase):
     if actual == u'x86':
       return
     self.assertTrue(actual.startswith(u'arm'), actual)
+
+  @unittest.skipUnless(
+      sys.platform.startswith('linux'), 'this is only for linux')
+  def test_get_os_values_linux(self):
+    with mock.patch(
+        'platforms.linux.get_os_version_number', lambda: '16.04.6'), mock.patch(
+            'os_utilities.get_os_name', lambda: 'Ubuntu'):
+      self.assertEqual(
+          os_utilities.get_os_values(),
+          ['Linux', 'Ubuntu', 'Ubuntu-16', 'Ubuntu-16.04', 'Ubuntu-16.04.6'])
 
   def test_get_cpu_type_mips(self):
     self.mock(platform, 'machine', lambda: 'mips64')
