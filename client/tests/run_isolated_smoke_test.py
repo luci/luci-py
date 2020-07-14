@@ -151,15 +151,6 @@ CONTENTS['manifest1.isolated'] = json.dumps({
     }
 }).encode()
 
-CONTENTS['manifest2.isolated'] = json.dumps({
-    'files': {
-        'file2.txt': file_meta('file2.txt')
-    },
-    'includes': [
-        isolateserver_fake.hash_content(CONTENTS['manifest1.isolated']),
-    ],
-}).encode()
-
 CONTENTS['tar_archive.isolated'] = json.dumps({
     'command': ['python', 'archive_files.py'],
     'files': {
@@ -197,12 +188,9 @@ CONTENTS['check_files.isolated'] = json.dumps({
         'file2.txt': file_meta('file3.txt'),
     },
     'includes': [
-        isolateserver_fake.hash_content(CONTENTS[i])
-        for i in ('manifest2.isolated', 'repeated_files.isolated')
+        isolateserver_fake.hash_content(CONTENTS['repeated_files.isolated']),
     ]
 }).encode()
-
-DISABLE_CIPD_FOR_TESTS = ['--cipd-enabled', 'false']
 
 
 def list_files_tree(directory):
@@ -288,7 +276,7 @@ class RunIsolatedTest(unittest.TestCase):
 
     Returns a list of the required arguments.
     """
-    return DISABLE_CIPD_FOR_TESTS + [
+    return [
         '--isolated',
         hash_value,
         '--cache',
@@ -326,7 +314,6 @@ class RunIsolatedTest(unittest.TestCase):
     isolated_hash = self._store('repeated_files.isolated')
     expected = [
       'state.json',
-      isolated_hash,
       self._store('file1.txt'),
       self._store('repeated_files.py'),
     ]
@@ -344,7 +331,6 @@ class RunIsolatedTest(unittest.TestCase):
     isolated_hash = self._store('max_path.isolated')
     expected = [
       'state.json',
-      isolated_hash,
       self._store('file1.txt'),
       self._store('max_path.py'),
     ]
@@ -357,7 +343,7 @@ class RunIsolatedTest(unittest.TestCase):
 
   def test_isolated_fail_empty(self):
     isolated_hash = self._store_isolated({})
-    expected = ['state.json', isolated_hash]
+    expected = []
     out, err, returncode = self._run(self._cmd_args(isolated_hash))
     self.assertEqual('', out)
     self.assertIn(
@@ -371,22 +357,20 @@ class RunIsolatedTest(unittest.TestCase):
   def test_isolated_includes(self):
     # Loads an .isolated that includes another one.
 
-    # References manifest2.isolated and repeated_files.isolated. Maps file3.txt
+    # References repeated_files.isolated. Maps file3.txt
     # as file2.txt.
     isolated_hash = self._store('check_files.isolated')
     expected = [
       'state.json',
-      isolated_hash,
       self._store('check_files.py'),
       self._store('file1.txt'),
       self._store('file3.txt'),
-      # Maps file1.txt.
-      self._store('manifest1.isolated'),
-      # References manifest1.isolated. Maps file2.txt but it is overridden.
-      self._store('manifest2.isolated'),
       self._store('repeated_files.py'),
-      self._store('repeated_files.isolated'),
     ]
+    # Maps file1.txt.
+    self._store('manifest1.isolated')
+    self._store('repeated_files.isolated')
+
     out, err, returncode = self._run(self._cmd_args(isolated_hash))
     self.assertEqual('', err)
     self.assertEqual('Success\n', out)
@@ -399,7 +383,6 @@ class RunIsolatedTest(unittest.TestCase):
     isolated_hash = self._store('tar_archive.isolated')
     expected = [
       'state.json',
-      isolated_hash,
       self._store('tar_archive'),
       self._store('archive_files.py'),
     ]
@@ -424,8 +407,7 @@ class RunIsolatedTest(unittest.TestCase):
         # The reason for 0100666 on Windows is that the file node had to be
         # modified to delete the hardlinked node. The read only bit is reset on
         # load.
-        six.text_type(file1_hash): (0o100400, 0o100400, 0o100444),
-        six.text_type(isolated_hash): (0o100400, 0o100400, 0o100444),
+        six.text_type(file1_hash): (0o100644, 0o100644, 0o100644),
     }
     self.assertTreeModes(self._isolated_cache_dir, expected)
 
@@ -439,18 +421,26 @@ class RunIsolatedTest(unittest.TestCase):
     # Ensure that the cache has an invalid file.
     self.assertNotEqual(CONTENTS['file1.txt'], read_content(cached_file_path))
 
+    # Clean up the cache
+    out, err, returncode = self._run([
+        '--clean',
+        '--cache',
+        self._isolated_cache_dir,
+    ])
+    self.assertEqual(0, returncode, (out, err, returncode))
+
     # Rerun the test and make sure the cache contains the right file afterwards.
     out, err, returncode = self._run(self._cmd_args(isolated_hash))
     self.assertEqual(0, returncode, (out, err, returncode))
     expected = {
-        u'.': (0o40707, 0o40707, 0o40777),
-        u'state.json': (0o100606, 0o100606, 0o100666),
-        six.text_type(file1_hash): (0o100400, 0o100400, 0o100444),
-        six.text_type(isolated_hash): (0o100400, 0o100400, 0o100444),
+        u'.': (0o40700, 0o40700, 0o40700),
+        u'state.json': (0o100600, 0o100600, 0o100600),
+        six.text_type(file1_hash): (0o100644, 0o100644, 0o100644),
     }
     self.assertTreeModes(self._isolated_cache_dir, expected)
     return cached_file_path
 
+  @unittest.skipIf(sys.platform == 'darwin', 'crbug.com/1099655')
   def test_isolated_corrupted_cache_entry_different_size(self):
     # Test that an entry with an invalid file size properly gets removed and
     # fetched again. This test case also check for file modes.
@@ -458,18 +448,18 @@ class RunIsolatedTest(unittest.TestCase):
                                                     b' now invalid size')
     self.assertEqual(CONTENTS['file1.txt'], read_content(cached_file_path))
 
+  @unittest.skipIf(sys.platform == 'darwin', 'crbug.com/1099655')
   def test_isolated_corrupted_cache_entry_same_size(self):
     # Test that an entry with an invalid file content but same size is NOT
     # detected property.
     cached_file_path = self._test_corruption_common(CONTENTS['file1.txt'][:-1] +
                                                     b' ')
-    # TODO(maruel): This corruption is NOT detected.
-    # This needs to be fixed.
-    self.assertNotEqual(CONTENTS['file1.txt'], read_content(cached_file_path))
+    self.assertEqual(CONTENTS['file1.txt'], read_content(cached_file_path))
 
   def test_minimal_lower_priority(self):
-    cmd = DISABLE_CIPD_FOR_TESTS + [
-        '--lower-priority', '--raw-cmd', '--', sys.executable, '-c'
+    cmd = [
+        '--cache', self._isolated_cache_dir, '--lower-priority', '--raw-cmd',
+        '--', sys.executable, '-c'
     ]
     if sys.platform == 'win32':
       cmd.append(
@@ -490,7 +480,10 @@ class RunIsolatedTest(unittest.TestCase):
 
   def test_limit_processes(self):
     # Execution fails because it tries to run a second process.
-    cmd = DISABLE_CIPD_FOR_TESTS + ['--limit-processes', '1', '--raw-cmd']
+    cmd = [
+        '--cache', self._isolated_cache_dir, '--limit-processes', '1',
+        '--raw-cmd'
+    ]
     if sys.platform == 'win32':
       cmd.extend(('--containment-type', 'JOB_OBJECT'))
     cmd.extend(('--', sys.executable, '-c'))
@@ -519,9 +512,10 @@ class RunIsolatedTest(unittest.TestCase):
     # Remove two seconds, because lru.py time resolution is one second, which
     # means that it could get rounded *down* and match the value of now.
     now = time.time() - 2
-    cmd = DISABLE_CIPD_FOR_TESTS + [
-        '--named-cache-root', self._named_cache_dir, '--named-cache', 'cache1',
-        'a', '100', '--raw-cmd', '--', sys.executable, '-c',
+    cmd = [
+        '--cache', self._isolated_cache_dir, '--named-cache-root',
+        self._named_cache_dir, '--named-cache', 'cache1', 'a', '100',
+        '--raw-cmd', '--', sys.executable, '-c',
         'open("a/hello","wb").write(b"world");print("Success")'
     ]
     out, err, returncode = self._run(cmd)
