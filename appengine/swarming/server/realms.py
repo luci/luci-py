@@ -353,10 +353,13 @@ def check_task_get_acl(task_request):
 
   # check 'swarming.pools.listTasks' permission of the pool in task dimensions.
   if task_request.pool:
-    pool_realm = pools_config.get_pool_config(task_request.pool).realm
-    if pool_realm and auth.has_permission(
+    pool_cfg = pools_config.get_pool_config(task_request.pool)
+    if not pool_cfg:
+      raise endpoints.InternalServerErrorException(
+          'Pool cfg not found. pool: %s' % task_request.pool)
+    if pool_cfg.realm and auth.has_permission(
         get_permission(realms_pb2.REALM_PERMISSION_POOLS_LIST_TASKS),
-        [pool_realm]):
+        [pool_cfg.realm]):
       return
 
   # check 'swarming.pools.listTasks' permission of the pool in bot dimensions.
@@ -402,12 +405,26 @@ def check_task_cancel_acl(task_request):
   if acl.can_edit_task(task_request):
     return
 
-  # check 'swarming.pools.cancelTask' permission.
-  pool_realm = pools_config.get_pool_config(task_request.pool).realm
-  if pool_realm and auth.has_permission(
-      get_permission(realms_pb2.REALM_PERMISSION_POOLS_CANCEL_TASK),
-      [pool_realm]):
-    return
+  # check 'swarming.pools.cancelTask' permission of the pool in task dimensions.
+  if task_request.pool:
+    pool_cfg = pools_config.get_pool_config(task_request.pool)
+    if not pool_cfg:
+      raise endpoints.InternalServerErrorException(
+          'Pool cfg not found. pool: %s' % task_request.pool)
+    if pool_cfg.realm and auth.has_permission(
+        get_permission(realms_pb2.REALM_PERMISSION_POOLS_CANCEL_TASK),
+        [pool_cfg.realm]):
+      return
+
+  # check 'swarming.pools.cancelTask' permission of the pool in bot dimensions.
+  if task_request.bot_id:
+    pools = _get_pools_from_dimensions_flat(
+        _retrieve_bot_dimensions(task_request.bot_id))
+    pool_realms = [pools_config.get_pool_config(p).realm for p in pools]
+    if pool_realms and auth.has_permission(
+        get_permission(realms_pb2.REALM_PERMISSION_POOLS_CANCEL_TASK),
+        pool_realms):
+      return
 
   # check 'swarming.tasks.cancel' permission.
   task_realm = task_request.realm
@@ -431,7 +448,7 @@ def can_cancel_task(task_request):
   try:
     check_task_cancel_acl(task_request)
     return True
-  except auth.AuthorizationError:
+  except (auth.AuthorizationError, endpoints.InternalServerErrorException):
     return False
 
 

@@ -410,6 +410,17 @@ class RealmsTest(test_case.TestCase):
     realms.check_task_get_acl(None)
     self._has_permission_mock.assert_not_called()
 
+  def test_check_task_get_acl_no_pool_cfg(self):
+    # mock
+    self.mock(acl, 'can_view_task', lambda _: False)
+    self.mock(pools_config, 'get_pool_config', lambda _: None)
+
+    # call
+    task = _gen_task_request_mock(pool='pool1')
+    with self.assertRaises(endpoints.InternalServerErrorException):
+      realms.check_task_get_acl(task)
+    self._has_permission_mock.assert_not_called()
+
   def test_check_task_get_acl_allowed_by_task_pool_permission(self):
     # mock
     self.mock(acl, 'can_view_task', lambda _: False)
@@ -475,17 +486,41 @@ class RealmsTest(test_case.TestCase):
     realms.check_task_cancel_acl(None)
     self._has_permission_mock.assert_not_called()
 
-  def test_check_task_cancel_acl_allowed_by_pool_permission(self):
+  def test_check_task_cancel_acl_no_pool_cfg(self):
     # mock
     self.mock(acl, 'can_edit_task', lambda _: False)
-    get_pool_config = lambda _: _gen_pool_config(realm='test:pool')
+    self.mock(pools_config, 'get_pool_config', lambda _: None)
+
+    # call
+    task = _gen_task_request_mock(pool='pool1')
+    with self.assertRaises(endpoints.InternalServerErrorException):
+      realms.check_task_cancel_acl(task)
+    self._has_permission_mock.assert_not_called()
+
+  def test_check_task_cancel_acl_allowed_by_task_pool_permission(self):
+    # mock
+    self.mock(acl, 'can_edit_task', lambda _: False)
+    get_pool_config = lambda p: _gen_pool_config(realm='test:' + p)
     self.mock(pools_config, 'get_pool_config', get_pool_config)
     self._has_permission_mock.return_value = True
 
     # call
-    realms.check_task_cancel_acl(_gen_task_request_mock())
+    realms.check_task_cancel_acl(_gen_task_request_mock(pool='pool1'))
     self._has_permission_mock.assert_called_once_with(_PERM_POOLS_CANCEL_TASK,
-                                                      ['test:pool'])
+                                                      ['test:pool1'])
+
+  def test_check_task_cancel_acl_allowed_by_bot_pool_permission(self):
+    # mock
+    self.mock(acl, 'can_edit_task', lambda _: False)
+    get_pool_config = lambda p: _gen_pool_config(realm='test:' + p)
+    self.mock(pools_config, 'get_pool_config', get_pool_config)
+    self._mock_bot(['pool:pool1', 'pool:pool2'])
+    self._has_permission_mock.return_value = True
+
+    # call
+    realms.check_task_cancel_acl(_gen_task_request_mock(bot_id='bot1'))
+    self._has_permission_mock.assert_called_once_with(
+        _PERM_POOLS_CANCEL_TASK, ['test:pool1', 'test:pool2'])
 
   def test_check_task_cancel_acl_allowed_by_task_permission(self):
     # mock
@@ -502,15 +537,20 @@ class RealmsTest(test_case.TestCase):
   def test_check_task_cancel_acl_not_allowed(self):
     # mock
     self.mock(acl, 'can_edit_task', lambda _: False)
-    get_pool_config = lambda _: _gen_pool_config(realm='test:pool')
+    get_pool_config = lambda p: _gen_pool_config(realm='test:' + p)
     self.mock(pools_config, 'get_pool_config', get_pool_config)
+    self._mock_bot(['pool:pool1', 'pool:pool2'])
     self._has_permission_mock.return_value = False
 
     # call
     with self.assertRaises(auth.AuthorizationError):
-      realms.check_task_cancel_acl(_gen_task_request_mock(realm='test:realm'))
+      task = _gen_task_request_mock(
+          pool='pool1', bot_id='bot1', realm='test:realm')
+      realms.check_task_cancel_acl(task)
     self._has_permission_mock.assert_any_call(_PERM_POOLS_CANCEL_TASK,
-                                              ['test:pool'])
+                                              ['test:pool1'])
+    self._has_permission_mock.assert_any_call(_PERM_POOLS_CANCEL_TASK,
+                                              ['test:pool1', 'test:pool2'])
     self._has_permission_mock.assert_any_call(_PERM_TASKS_CANCEL,
                                               ['test:realm'])
 
@@ -526,6 +566,12 @@ class RealmsTest(test_case.TestCase):
     self._has_permission_mock.return_value = False
     self.assertFalse(
         realms.can_cancel_task(_gen_task_request_mock(realm='test:realm')))
+
+  def test_can_cancel_task_no_pool_cfg(self):
+    self.mock(acl, 'can_edit_task', lambda _: False)
+    self.mock(pools_config, 'get_pool_config', lambda _: None)
+    self.assertFalse(
+        realms.can_cancel_task(_gen_task_request_mock(pool='pool1')))
 
   def test_check_tasks_list_acl_with_global_permission(self):
     self.mock(acl, 'can_view_all_tasks', lambda: True)
