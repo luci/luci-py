@@ -275,6 +275,11 @@ def trigger_task_shards(swarming, task_request, shards):
             total_shards = int(env_var['value'])
       if total_shards > 1:
         req['name'] += ':%s:%s' % (shard_index, total_shards)
+      if shard_index and total_shards:
+        req['tags'] += [
+            'shard_index:%d' % shard_index,
+            'total_shards:%d' % total_shards,
+        ]
 
     return req, shard_index
 

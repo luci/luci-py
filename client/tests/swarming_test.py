@@ -499,6 +499,7 @@ class TestSwarmingTrigger(NetTestCase):
 
     request_1 = swarming.task_request_to_raw_request(task_request)
     request_1['name'] = u'unit_tests:2:4'
+    request_1['tags'].extend(['shard_index:2', 'total_shards:4'])
     request_1['task_slices'][0]['properties']['env'] = [
         {
             'key': 'GTEST_SHARD_INDEX',
