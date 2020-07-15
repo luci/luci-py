@@ -577,8 +577,6 @@ class Test(unittest.TestCase):
     self.assertPerformanceStats(expected_performance_stats, performance_stats)
 
   def test_isolated_command(self):
-    if self.bot.python != sys.executable:
-      self.skipTest('crbug.com/1010816')
     # Command is specified in Swarming task, still with isolated file.
     # Confirms that --relative-cwd, --env, --env-prefix and --lower-priority
     # work.
@@ -594,8 +592,9 @@ class Test(unittest.TestCase):
         base = os.path.basename(cwd)
         assert base == 'base', base
         cwd = os.path.dirname(cwd)
-        path = os.environ["PATH"].split(os.pathsep)
-        print(os.path.realpath(path[0]).replace(cwd, "$CWD"))
+        paths = os.environ["PATH"].split(os.pathsep)
+        path = [p for p in paths if p.startswith(cwd)][0]
+        print(os.path.realpath(path).replace(cwd, "$CWD"))
         with open(os.path.join(sys.argv[2], 'FOO.txt'), 'wb') as f:
           f.write(os.environ["FOO"])
         with open(os.path.join(sys.argv[2], 'result.txt'), 'wb') as f:
