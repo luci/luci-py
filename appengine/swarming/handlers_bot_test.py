@@ -437,7 +437,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
             },
             u'secret_bytes': None,
             u'realm': {},
-            u'resultdb': {},
+            u'resultdb': None,
             u'io_timeout': 1200,
             u'outputs': [u'foo', u'path/to/foobar'],
             u'service_accounts': {
@@ -515,7 +515,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
             },
             u'secret_bytes': None,
             u'realm': {},
-            u'resultdb': {},
+            u'resultdb': None,
             u'io_timeout': 1200,
             u'outputs': [u'foo', u'path/to/foobar'],
             u'service_accounts': {
@@ -596,7 +596,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
             u'outputs': [u'foo', u'path/to/foobar'],
             u'secret_bytes': None,
             u'realm': {},
-            u'resultdb': {},
+            u'resultdb': None,
             u'service_accounts': {
                 u'system': {
                     u'service_account': u'none'
@@ -764,7 +764,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
             },
             u'secret_bytes': None,
             u'realm': {},
-            u'resultdb': {},
+            u'resultdb': None,
             u'io_timeout': 1200,
             u'outputs': [u'foo', u'path/to/foobar'],
             u'service_accounts': {

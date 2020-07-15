@@ -687,7 +687,7 @@ class BotPollHandler(_BotBaseHandler):
 
     logging.debug('named cache: %s', caches)
 
-    resultdb_context = {}
+    resultdb_context = None
     if request.resultdb_update_token:
       resultdb_context = {
           'hostname':
