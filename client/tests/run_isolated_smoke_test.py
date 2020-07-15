@@ -7,6 +7,7 @@ import ctypes
 import json
 import logging
 import os
+import platform
 import subprocess
 import sys
 import textwrap
@@ -229,6 +230,15 @@ def tree_modes(root):
   return out
 
 
+def less_than_mac_10_15():
+  if sys.platform != 'darwin':
+    return False
+  # E.g.: `10.15.5`
+  v = platform.mac_ver()[0]
+  major, minor = v.split('.')[:2]
+  return int(major) <= 10 and int(minor) < 15
+
+
 class RunIsolatedTest(unittest.TestCase):
   def setUp(self):
     super(RunIsolatedTest, self).setUp()
@@ -440,7 +450,7 @@ class RunIsolatedTest(unittest.TestCase):
     self.assertTreeModes(self._isolated_cache_dir, expected)
     return cached_file_path
 
-  @unittest.skipIf(sys.platform == 'darwin', 'crbug.com/1099655')
+  @unittest.skipIf(less_than_mac_10_15(), 'crbug.com/1099655')
   def test_isolated_corrupted_cache_entry_different_size(self):
     # Test that an entry with an invalid file size properly gets removed and
     # fetched again. This test case also check for file modes.
@@ -448,7 +458,7 @@ class RunIsolatedTest(unittest.TestCase):
                                                     b' now invalid size')
     self.assertEqual(CONTENTS['file1.txt'], read_content(cached_file_path))
 
-  @unittest.skipIf(sys.platform == 'darwin', 'crbug.com/1099655')
+  @unittest.skipIf(less_than_mac_10_15(), 'crbug.com/1099655')
   def test_isolated_corrupted_cache_entry_same_size(self):
     # Test that an entry with an invalid file content but same size is NOT
     # detected property.
