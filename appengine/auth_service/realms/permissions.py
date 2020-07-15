@@ -135,16 +135,29 @@ def db():
   role('role/buildbucket.reader', [
       # Readers of builds should also have read permissions to test results.
       include('role/resultdb.reader'),
+      permission('buildbucket.builds.get'),
+      permission('buildbucket.builds.list'),
+      permission('buildbucket.builders.get'),
+      permission('buildbucket.builders.list'),
+      permission('buildbucket.buckets.get'),  # used by v1 API only
   ])
   role('role/buildbucket.triggerer', [
       include('role/buildbucket.reader'),
+      permission('buildbucket.builds.add'),
+      permission('buildbucket.builds.cancel'),
   ])
   role('role/buildbucket.owner', [
       include('role/buildbucket.reader'),
       include('role/buildbucket.triggerer'),
+      permission('buildbucket.builds.lease'),  # used by v1 API only
+      permission('buildbucket.builds.reset'),  # used by v1 API only
+      permission('buildbucket.builders.setBuildNumber'),
+      permission('buildbucket.buckets.deleteBuilds'),
+      permission('buildbucket.buckets.pause'),  # used by v1 API only
   ])
   role('role/buildbucket.builderServiceAccount', [
       include('role/swarming.taskServiceAccount'),
+      permission('buildbucket.builds.update'),
   ])
 
   # CQ permissions and roles. Placeholders for now.
