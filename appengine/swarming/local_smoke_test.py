@@ -937,8 +937,6 @@ class Test(unittest.TestCase):
     self.assertEqual(expected, set(dimensions))
 
   def test_priority(self):
-    if self.bot.python != sys.executable:
-      self.skipTest('crbug.com/1010816')
     # Make a test that keeps the bot busy, while all the other tasks are being
     # created with priorities that are out of order. Then it unblocks the bot
     # and asserts the tasks are run in the expected order, based on priority and
