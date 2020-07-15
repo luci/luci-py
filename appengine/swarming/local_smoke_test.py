@@ -1443,7 +1443,7 @@ def process_arguments():
   parser.add_argument('-v', dest='verbose', action='store_true')
   parser.add_argument('--leak', action='store_true')
   parser.add_argument('--bot_python')
-  args = parser.parse_args()
+  args, _ = parser.parse_known_args()
 
   if args.verbose:
     logging.basicConfig(
