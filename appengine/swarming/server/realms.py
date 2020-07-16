@@ -608,7 +608,15 @@ def _check_bot_acl(perm_enum, bot_id):
   """
   # retrieve the pools from bot dimensions.
   pools = _get_pools_from_dimensions_flat(_retrieve_bot_dimensions(bot_id))
-  realms = [pools_config.get_pool_config(p).realm for p in pools]
+  realms = []
+  for p in pools:
+    pool_cfg = pools_config.get_pool_config(p)
+    if not pool_cfg:
+      logging.warning('PoolCfg is missing. pool: %s', p)
+      continue
+    if not pool_cfg.realm:
+      continue
+    realms.append(pool_cfg.realm)
 
   # the caller needs to have any permission of the pools.
   _check_permission(get_permission(perm_enum), realms)

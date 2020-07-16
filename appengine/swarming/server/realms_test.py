@@ -325,6 +325,17 @@ class RealmsTest(test_case.TestCase):
       realms.check_bot_get_acl('bot1')
     self._has_permission_mock.assert_not_called()
 
+  def test_check_bot_get_acl_no_pool_cfg(self):
+    # mock
+    self.mock(acl, 'can_view_bot', lambda: False)
+    self._mock_bot(['pool:pool1', 'pool:pool2'])
+    self.mock(pools_config, 'get_pool_config', lambda _: None)
+
+    # call
+    with self.assertRaises(auth.AuthorizationError):
+      realms.check_bot_get_acl('bot1')
+    self._has_permission_mock.assert_not_called()
+
   def test_check_bots_list_acl_with_global_permission(self):
     self.mock(acl, 'can_view_bot', lambda: True)
 
@@ -704,6 +715,17 @@ class RealmsTest(test_case.TestCase):
       realms.check_bot_tasks_acl('bot1')
     self._has_permission_mock.assert_not_called()
 
+  def test_check_bot_tasks_acl_no_pool_cfg(self):
+    # mock
+    self.mock(acl, 'can_view_all_tasks', lambda: False)
+    self._mock_bot(['pool:pool1', 'pool:pool2'])
+    self.mock(pools_config, 'get_pool_config', lambda _: None)
+
+    # call
+    with self.assertRaises(auth.AuthorizationError):
+      realms.check_bot_tasks_acl('bot1')
+    self._has_permission_mock.assert_not_called()
+
   def test_check_tasks_cancel_acl_with_global_permission(self):
     self.mock(acl, 'can_edit_all_tasks', lambda: True)
 
@@ -840,6 +862,17 @@ class RealmsTest(test_case.TestCase):
     self._mock_bot(['pool:pool1', 'pool:pool2'])
     get_pool_config = lambda p: _gen_pool_config(realm=None)
     self.mock(pools_config, 'get_pool_config', get_pool_config)
+
+    # call
+    with self.assertRaises(auth.AuthorizationError):
+      realms.check_bot_terminate_acl('bot1')
+    self._has_permission_mock.assert_not_called()
+
+  def test_check_bot_terminate_acl_no_pool_cfg(self):
+    # mock
+    self.mock(acl, 'can_edit_bot', lambda: False)
+    self._mock_bot(['pool:pool1', 'pool:pool2'])
+    self.mock(pools_config, 'get_pool_config', lambda _: None)
 
     # call
     with self.assertRaises(auth.AuthorizationError):
