@@ -266,6 +266,12 @@ class SwarmingServerService(remote.Service):
   @auth.public
   def permissions(self, request):
     """Returns the caller's permissions."""
+    pools_list_bots = [
+        p for p in pools_config.known() if realms.can_list_bots(p)
+    ]
+    pools_list_tasks = [
+        p for p in pools_config.known() if realms.can_list_tasks(p)
+    ]
     return swarming_rpcs.ClientPermissions(
         delete_bot=acl.can_delete_bot(),
         terminate_bot=realms.can_terminate_bot(request.bot_id),
@@ -273,7 +279,9 @@ class SwarmingServerService(remote.Service):
         put_configs=acl.can_edit_config(),
         cancel_task=self._can_cancel_task(request.task_id),
         cancel_tasks=realms.can_cancel_tasks(request.tags),
-        get_bootstrap_token=acl.can_create_bot())
+        get_bootstrap_token=acl.can_create_bot(),
+        list_bots=pools_list_bots,
+        list_tasks=pools_list_tasks)
 
   def _can_cancel_task(self, task_id):
     if not task_id:

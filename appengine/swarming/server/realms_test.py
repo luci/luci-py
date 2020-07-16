@@ -415,6 +415,21 @@ class RealmsTest(test_case.TestCase):
       realms.check_bots_list_acl(['pool:unknown'])
     self._has_permission_mock.assert_not_called()
 
+  def test_can_list_bots(self):
+    get_pool_config = lambda p: _gen_pool_config(realm='test:' + p)
+    self.mock(pools_config, 'get_pool_config', get_pool_config)
+
+    # True case.
+    self.mock(acl, 'can_view_bot', lambda: True)
+    self.assertTrue(realms.can_list_bots('pool1'))
+    self.mock(acl, 'can_view_bot', lambda: False)
+    self._has_permission_mock.return_value = True
+    self.assertTrue(realms.can_list_bots('pool1'))
+
+    # False case.
+    self._has_permission_mock.return_value = False
+    self.assertFalse(realms.can_list_bots('pool1'))
+
   def test_check_task_get_acl_with_global_permission(self):
     self.mock(acl, 'can_view_task', lambda _: True)
 
@@ -662,6 +677,21 @@ class RealmsTest(test_case.TestCase):
     with self.assertRaises(endpoints.BadRequestException):
       realms.check_tasks_list_acl(['pool:unknown'])
     self._has_permission_mock.assert_not_called()
+
+  def test_can_list_tasks(self):
+    get_pool_config = lambda p: _gen_pool_config(realm='test:' + p)
+    self.mock(pools_config, 'get_pool_config', get_pool_config)
+
+    # True case.
+    self.mock(acl, 'can_view_all_tasks', lambda: True)
+    self.assertTrue(realms.can_list_tasks('pool1'))
+    self.mock(acl, 'can_view_all_tasks', lambda: False)
+    self._has_permission_mock.return_value = True
+    self.assertTrue(realms.can_list_tasks('pool1'))
+
+    # False case.
+    self._has_permission_mock.return_value = False
+    self.assertFalse(realms.can_list_tasks('pool1'))
 
   def test_check_bot_tasks_acl_with_global_permission(self):
     self.mock(acl, 'can_view_all_tasks', lambda: True)

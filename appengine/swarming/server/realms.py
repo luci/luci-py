@@ -329,6 +329,31 @@ def check_bots_list_acl(dimensions_flat):
                            dimensions_flat)
 
 
+def can_list_bots(pool):
+  """Checks if the caller is allowed to list tasks of the pool.
+
+  Args:
+    pool: Pool name
+
+  Returns:
+    allowed: True if allowed, False otherwise.
+  """
+  if acl.can_view_bot():
+    return True
+  pool_cfg = pools_config.get_pool_config(pool)
+  if not pool_cfg:
+    logging.warning('Pool "%s" not found', pool)
+    return False
+
+  try:
+    _check_permission(
+        get_permission(realms_pb2.REALM_PERMISSION_POOLS_LIST_BOTS),
+        [pool_cfg.realm])
+    return True
+  except auth.AuthorizationError:
+    return False
+
+
 def check_task_get_acl(task_request):
   """Checks if the caller is allowed to get the task entities.
 
@@ -476,6 +501,32 @@ def check_tasks_list_acl(tags):
   if acl.can_view_all_tasks():
     return
   _check_pools_filters_acl(realms_pb2.REALM_PERMISSION_POOLS_LIST_TASKS, tags)
+
+
+def can_list_tasks(pool):
+  """Checks if the caller is allowed to list tasks of the pool.
+
+  Args:
+    pool: Pool name
+
+  Returns:
+    allowed: True if allowed, False otherwise.
+  """
+  if acl.can_view_all_tasks():
+    return True
+
+  pool_cfg = pools_config.get_pool_config(pool)
+  if not pool_cfg:
+    logging.warning('Pool "%s" not found', pool)
+    return False
+
+  try:
+    _check_permission(
+        get_permission(realms_pb2.REALM_PERMISSION_POOLS_LIST_TASKS),
+        [pool_cfg.realm])
+    return True
+  except auth.AuthorizationError:
+    return False
 
 
 def check_tasks_cancel_acl(tags):

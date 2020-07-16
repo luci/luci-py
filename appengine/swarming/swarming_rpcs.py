@@ -210,6 +210,8 @@ class ClientPermissions(messages.Message):
   get_bootstrap_token = messages.BooleanField(6)
   # Cancel multiple tasks at once, usually in emergencies.
   cancel_tasks = messages.BooleanField(7)
+  list_bots = messages.StringField(8, repeated=True)
+  list_tasks = messages.StringField(9, repeated=True)
 
 
 class FileContentRequest(messages.Message):

@@ -185,8 +185,10 @@ class ServerApiTest(BaseTest):
     # The user has realm permissions.
     self.set_as_user()
     self.mock_auth_db([
-        auth.Permission('swarming.pools.terminateBot'),
         auth.Permission('swarming.pools.cancelTask'),
+        auth.Permission('swarming.pools.listBots'),
+        auth.Permission('swarming.pools.listTasks'),
+        auth.Permission('swarming.pools.terminateBot'),
     ])
     params = {
         'bot_id': 'bot1',
@@ -200,6 +202,8 @@ class ServerApiTest(BaseTest):
         u'delete_bot': False,
         u'get_bootstrap_token': False,
         u'get_configs': False,
+        u'list_bots': [u'default', u'template'],
+        u'list_tasks': [u'default', u'template'],
         u'put_configs': False,
         u'terminate_bot': True,
     }
