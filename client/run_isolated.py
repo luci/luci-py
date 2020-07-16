@@ -490,6 +490,52 @@ def run_command(
   return exit_code, had_hard_timeout
 
 
+def _run_go_isolated_and_wait(cmd):
+  """
+  Runs a Go `isolated` command and wait for its completion.
+
+  While this is a generic function to launch a subprocess, it has logic that
+  is specific to Go `isolated` for waiting and logging.
+
+  Returns:
+    The subprocess object
+  """
+  proc = subprocess42.Popen(cmd)
+  cmd_str = ' '.join(cmd)
+
+  exceeded_max_timeout = True
+  check_period_sec = 30
+  max_checks = 100
+  # max timeout = max_checks * check_period_sec = 50 minutes
+  for i in range(max_checks):
+    # This is to prevent I/O timeout error during isolated setup.
+    try:
+      retcode = proc.wait(check_period_sec)
+      if retcode != 0:
+        raise ValueError("retcode is not 0: %s (cmd=%s)" % (retcode, cmd_str))
+      exceeded_max_timeout = False
+      break
+    except subprocess42.TimeoutExpired:
+      print('still running isolated (after %d seconds)' %
+            ((i + 1) * check_period_sec))
+
+  if exceeded_max_timeout:
+    proc.terminate()
+    try:
+      proc.wait(check_period_sec)
+    except subprocess42.TimeoutExpired:
+      logging.exception(
+          "failed to terminate? timeout happened after %d seconds",
+          check_period_sec)
+      proc.kill()
+      proc.wait()
+    # Raise unconditionally, because |proc| was forcefully terminated.
+    raise ValueError("timedout after %d seconds (cmd=%s)" %
+                     (check_period_sec * max_checks, cmd_str))
+
+  return proc
+
+
 def _fetch_and_map_with_go(isolated_hash, storage, outdir, go_cache_dir,
                            policies, isolated_client):
   """
@@ -528,38 +574,7 @@ def _fetch_and_map_with_go(isolated_hash, storage, outdir, go_cache_dir,
         '-fetch-and-map-result-json',
         result_json_path,
     ]
-    proc = subprocess42.Popen(cmd)
-    cmd_str = ' '.join(cmd)
-
-    exceeded_max_timeout = True
-    check_period_sec = 30
-    max_checks = 100
-    # max timeout = max_checks * check_period_sec = 50 minutes
-    for i in range(max_checks):
-      # This is to prevent I/O timeout error during isolated setup.
-      try:
-        retcode = proc.wait(check_period_sec)
-        if retcode != 0:
-          raise ValueError("retcode is not 0: %s (cmd=%s)" % (retcode, cmd_str))
-        exceeded_max_timeout = False
-        break
-      except subprocess42.TimeoutExpired:
-        print('still running isolated (after %d seconds)' % (
-            (i + 1) * check_period_sec))
-
-    if exceeded_max_timeout:
-      proc.terminate()
-      try:
-        proc.wait(check_period_sec)
-      except subprocess42.TimeoutExpired:
-        logging.exception(
-            "failed to terminate? timeout happened after %d seconds",
-            check_period_sec)
-        proc.kill()
-        proc.wait()
-      # Raise unconditionally, because |proc| was forcefully terminated.
-      raise ValueError("timedout after %d seconds (cmd=%s)" %
-                       (check_period_sec * max_checks, cmd_str))
+    _run_go_isolated_and_wait(cmd)
 
     with open(result_json_path) as json_file:
       result_json = json.load(json_file)
