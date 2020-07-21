@@ -565,6 +565,7 @@ class TaskRequest(messages.Message):
   task_slices = messages.MessageField(TaskSlice, 13, repeated=True)
   # Indicates what OAuth2 credentials the task uses when calling other services.
   service_account = messages.StringField(10)
+  realm = messages.StringField(16)
 
   pubsub_topic = messages.StringField(11)
   pubsub_userdata = messages.StringField(12)

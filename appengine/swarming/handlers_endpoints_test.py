@@ -2197,14 +2197,21 @@ class TaskApiTest(BaseTest):
     """Asserts that 404 is raised for unknown tasks."""
     self.call_api('request', body={'task_id': '12310'}, status=404)
 
-  def test_request_ok(self):
+  @parameterized.expand(['', 'test:task_realm'])
+  def test_request_ok(self, realm):
     """Asserts that request produces a task request."""
     self.mock(random, 'getrandbits', lambda _: 0x88)
     self.mock_task_service_accounts()
     self.mock_default_pool_acl(['service-account@example.com'])
+    self.mock_auth_db([
+        auth.Permission('swarming.pools.createTask'),
+        auth.Permission('swarming.tasks.createInRealm'),
+    ])
+
     _, task_id = self.client_create_task_raw(
         properties={'secret_bytes': 'zekret'},
-        service_account='service-account@example.com')
+        service_account='service-account@example.com',
+        realm=realm if realm else None)
 
     expected_props = self.gen_props(
         command=[u'python', u'run_test.py'],
@@ -2230,6 +2237,8 @@ class TaskApiTest(BaseTest):
                 u'wait_for_capacity': False,
             },
         ])
+    if realm:
+      expected['realm'] = realm
     response = self.call_api('request', body={'task_id': task_id})
     self.assertEqual(expected, response.json)
 
