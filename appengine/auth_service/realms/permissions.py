@@ -119,16 +119,12 @@ def db():
   role('role/resultdb.reader', [
       permission('resultdb.invocations.list'),
       permission('resultdb.invocations.get'),
-      permission('resultdb.invocations.read'),
       permission('resultdb.testResults.list'),
       permission('resultdb.testResults.get'),
-      permission('resultdb.testResults.read'),
       permission('resultdb.artifacts.list'),
       permission('resultdb.artifacts.get'),
-      permission('resultdb.artifacts.read'),
       permission('resultdb.testExonerations.list'),
       permission('resultdb.testExonerations.get'),
-      permission('resultdb.testExonerations.read'),
   ])
 
   # Buildbucket permissions and roles. Mostly placeholders for now.
