@@ -141,6 +141,7 @@ def gen_request_data(properties=None, **kwargs):
       },],
       'tags': ['tag:a', 'tag:b'],
       'user': 'joe@localhost',
+      'realm': None,
   }
   out.update(kwargs)
   return out
@@ -379,7 +380,8 @@ class TestSwarmingTrigger(NetTestCase):
         ],
         service_account=None,
         tags=['tag:a', 'tag:b'],
-        user='joe@localhost')
+        user='joe@localhost',
+        realm=None)
 
     request_1 = swarming.task_request_to_raw_request(task_request)
     request_1['name'] = u'unit_tests:0:2'
@@ -481,7 +483,8 @@ class TestSwarmingTrigger(NetTestCase):
         ],
         service_account=None,
         tags=['tag:a', 'tag:b'],
-        user='joe@localhost')
+        user='joe@localhost',
+        realm=None)
 
     request_1 = swarming.task_request_to_raw_request(task_request)
     request_1['name'] = u'unit_tests:2:4'
@@ -556,7 +559,8 @@ class TestSwarmingTrigger(NetTestCase):
         ],
         service_account=None,
         tags=['tag:a', 'tag:b'],
-        user='joe@localhost')
+        user='joe@localhost',
+        realm=None)
 
     request = swarming.task_request_to_raw_request(task_request)
     self.assertEqual('123', request['parent_task_id'])
@@ -634,7 +638,8 @@ class TestSwarmingTrigger(NetTestCase):
         ],
         service_account=None,
         tags=['tag:a', 'tag:b'],
-        user='joe@localhost')
+        user='joe@localhost',
+        realm=None)
 
     request = swarming.task_request_to_raw_request(task_request)
     expected = {
@@ -1084,6 +1089,7 @@ class TestMain(NetTestCase):
         },],
         'tags': [],
         'user': None,
+        'realm': None,
     }
     result = gen_request_response(request)
     self.expected_requests([
@@ -1240,6 +1246,7 @@ class TestMain(NetTestCase):
         ],
         'tags': [],
         'user': None,
+        'realm': None,
     }
     result = gen_request_response(request)
     self.expected_requests([
@@ -1397,6 +1404,7 @@ class TestMain(NetTestCase):
         ],
         'tags': [],
         'user': None,
+        'realm': None,
     }
     result = gen_request_response(request)
     self.expected_requests([
@@ -1519,6 +1527,7 @@ class TestMain(NetTestCase):
         ],
         'tags': [],
         'user': None,
+        'realm': None,
     }
     result = gen_request_response(request)
     self.expected_requests([
@@ -1601,6 +1610,7 @@ class TestMain(NetTestCase):
         },],
         'tags': [],
         'user': None,
+        'realm': None,
     }
     result = gen_request_response(request)
     self.expected_requests([
@@ -1668,6 +1678,7 @@ class TestMain(NetTestCase):
         'service_account': 'bot',
         'tags': [],
         'user': None,
+        'realm': None,
     }
     result = gen_request_response(request)
     self.expected_requests([
@@ -1903,6 +1914,7 @@ class TestMain(NetTestCase):
                     },],
                     'tags': ['tag:a', 'tag:b'],
                     'user': 'joe@localhost',
+                    'realm': None,
                 },
             },
             True,
@@ -2296,6 +2308,7 @@ class TestMain(NetTestCase):
         },],
         'tags': [],
         'user': None,
+        'realm': None,
     }
     result = gen_request_response(request)
 
