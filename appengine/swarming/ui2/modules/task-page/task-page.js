@@ -360,6 +360,10 @@ const requestBlock = (request, result, currentSlice) => html`
   <td>Service Account</td>
   <td>${request.service_account}</td>
 </tr>
+<tr ?hidden=${!request.realm}>
+  <td>Realm</td>
+  <td>${request.realm}</td>
+</tr>
 <tr ?hidden=${!currentSlice.properties.secret_bytes}>
   <td>Has Secret Bytes</td>
   <td title="The secret bytes are present on the machine, but not in the UI/API">true</td>

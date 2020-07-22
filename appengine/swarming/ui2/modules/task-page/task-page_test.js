@@ -268,8 +268,8 @@ describe('task-page', function() {
           expect(cell(7, 0)).toMatchTextContent('Wait for Capacity');
           expect(cell(7, 1)).toMatchTextContent('false');
           // 5 dimensions shown on slice 2 + 1 for header
-          expect(cell(14, 0).rowSpan).toEqual(6);
-          expect(cell(14, 0).textContent).toContain('Dimensions');
+          expect(cell(15, 0).rowSpan).toEqual(6);
+          expect(cell(15, 0).textContent).toContain('Dimensions');
 
           const subsections = $('tbody', taskInfo);
           expect(subsections.length).toEqual(2);
@@ -473,7 +473,7 @@ describe('task-page', function() {
           expect(cell(1, 1)).toHaveClass('pending_task');
           expect(cell(2, 0)).toMatchTextContent('Why Pending?');
           expect(rows[5]).toHaveAttribute('hidden', 'deduped message hidden');
-          expect(cell(14, 0).rowSpan).toEqual(5); // 4 dimensions + 1 for header
+          expect(cell(15, 0).rowSpan).toEqual(5); // 4 dimensions + 1 for header
 
           done();
         });
@@ -562,7 +562,7 @@ describe('task-page', function() {
           expect(cell(1, 1)).toHaveClass('pending_task');
           expect(cell(2, 0)).toMatchTextContent('Fleet Capacity');
           expect(rows[5]).toHaveAttribute('hidden', 'deduped message hidden');
-          expect(cell(14, 0).rowSpan).toEqual(5); // 4 dimensions + 1 for header
+          expect(cell(15, 0).rowSpan).toEqual(5); // 4 dimensions + 1 for header
 
           done();
         });
@@ -677,8 +677,8 @@ describe('task-page', function() {
           expect(cell(4, 1)).toMatchTextContent('42e0ec5f54b04411');
           expect(cell(5, 0)).toMatchTextContent('Deduped On');
 
-          expect(cell(14, 0).rowSpan).toEqual(4); // 3 dimensions + 1 for header
-          expect(cell(16, 0)).toMatchTextContent(
+          expect(cell(15, 0).rowSpan).toEqual(4); // 3 dimensions + 1 for header
+          expect(cell(17, 0)).toMatchTextContent(
               'gpu:Intel Sandy Bridge HD Graphics 2000 (8086:0102)');
 
           done();
