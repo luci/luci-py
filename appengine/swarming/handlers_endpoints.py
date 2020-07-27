@@ -495,6 +495,17 @@ class SwarmingTasksService(remote.Service):
       request_obj, secret_bytes, template_apply = (
           message_conversion.new_task_request_from_rpc(
               request, utils.utcnow()))
+
+      # Retrieve pool_cfg, and check the existence.
+      pool = request_obj.pool
+      pool_cfg = pools_config.get_pool_config(pool)
+      if not pool_cfg:
+        logging.warning('Pool "%s" is not in pools.cfg', pool)
+        # TODO(crbug.com/1086058): It currently returns 403 Forbidden, but
+        # should return 400 BadRequest or 422 Unprocessable Entity, instead.
+        raise auth.AuthorizationError(
+            'Can\'t submit tasks to pool "%s", not defined in pools.cfg' % pool)
+
       task_request.init_new_request(
           request_obj, acl.can_schedule_high_priority_tasks(),
           template_apply)
@@ -507,17 +518,6 @@ class SwarmingTasksService(remote.Service):
     except (datastore_errors.BadValueError, TypeError, ValueError) as e:
       logging.warning('Incorrect new task request', exc_info=True)
       raise endpoints.BadRequestException(e.message)
-
-
-    # Retrieve pool_cfg, and check the existence.
-    pool = request_obj.pool
-    pool_cfg = pools_config.get_pool_config(pool)
-    if not pool_cfg:
-      logging.warning('Pool "%s" is not in pools.cfg', pool)
-      # TODO(crbug.com/1086058): It currently returns 403 Forbidden, but should
-      # return 400 BadRequest or 422 Unprocessable Entity, instead.
-      raise auth.AuthorizationError(
-          'Can\'t submit tasks to pool "%s", not defined in pools.cfg' % pool)
 
     # Realm permission 'swarming.pools.createInRealm' checks if the
     # caller is allowed to create a task in the task realm.
