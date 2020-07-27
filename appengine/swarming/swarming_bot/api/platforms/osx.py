@@ -529,6 +529,12 @@ def get_gpu():
   dimensions = set()
   state = set()
   for card in _get_system_profiler('SPDisplaysDataType'):
+    if not 'spdisplays_device-id' in card:
+      # TODO(crbug.com/1109628): the card plist is different format on some
+      # devices.
+      continue
+    dev_id = card['spdisplays_device-id'][2:]
+
     # Warning: the value provided depends on the driver manufacturer.
     # Other interesting values: spdisplays_vram, spdisplays_revision-id
     ven_id = None
@@ -540,7 +546,6 @@ def get_gpu():
       match = re.search(r'\(0x([0-9a-f]{4})\)', card['spdisplays_vendor'])
       if match:
         ven_id = match.group(1)
-    dev_id = card['spdisplays_device-id'][2:]
 
     # Looks like: u'4.0.20 [3.2.8]'
     version = six.text_type(card.get('spdisplays_gmux-version', u''))
