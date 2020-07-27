@@ -32,6 +32,8 @@ import handlers_bot
 import handlers_endpoints
 import swarming_rpcs
 
+from proto.config import realms_pb2
+
 from server import acl
 from server import bot_code
 from server import bot_management
@@ -1277,13 +1279,25 @@ class TasksApiTest(BaseTest):
     response = self.call_api('new', body=message_to_dict(request), status=200)
     self.assertEqual(u'5cee488008810', response.json[u'task_id'])
 
-  def test_new_ok_with_realm(self):
+  def fail_on_using_legacy_acls(self):
+
+    def err(*_args, **_kwargs):
+      raise AssertionError('Must not be called')
+
+    self.mock(task_scheduler, 'check_schedule_request_acl_caller', err)
+    self.mock(task_scheduler, 'check_schedule_request_acl_service_account', err)
+    self.mock(service_accounts, 'get_oauth_token_grant', err)
+
+  def test_new_ok_in_realms_mode(self):
     self.mock(random, 'getrandbits', lambda _: 0x88)
     self.mock(service_accounts, 'has_token_server', lambda: True)
     self.mock_auth_db([
         auth.Permission('swarming.pools.createTask'),
         auth.Permission('swarming.tasks.createInRealm'),
     ])
+
+    # Legacy pool ACLs must no be used in this mode, only realm ACLs are used.
+    self.fail_on_using_legacy_acls()
 
     request = self.create_new_request(
         properties={
@@ -1298,6 +1312,97 @@ class TasksApiTest(BaseTest):
         realm='test:task_realm')
     response = self.call_api('new', body=message_to_dict(request), status=200)
     self.assertEqual(u'5cee488008810', response.json[u'task_id'])
+
+    # Get the produced TaskRequest.
+    key, _ = task_pack.get_request_and_result_keys(response.json[u'task_id'])
+    req = key.get()
+
+    # Make sure associated the task with the correct realm.
+    self.assertEqual('test:task_realm', req.realm)
+    # Correctly initialized the service account state.
+    self.assertEqual('service-account@example.com', req.service_account)
+    self.assertFalse(req.service_account_token)
+
+  def test_new_ok_with_default_task_realm_not_enforced(self):
+    self.mock(random, 'getrandbits', lambda _: 0x88)
+    self.mock(service_accounts, 'has_token_server', lambda: True)
+    self.mock_default_pool_acl(
+        service_accounts=['service-account@example.com'],
+        default_task_realm='test:task_realm',
+        enforced_realm_permissions=None)
+
+    # Realm ACLs should be ignored. Note that they are still called to record
+    # dry run check results.
+    self.mock(auth, 'has_permission', lambda *_args, **_kwargs: False)
+
+    # Uses legacy service account calls.
+    self.mock(service_accounts, 'get_oauth_token_grant', lambda **_: 'tok')
+
+    request = self.create_new_request(
+        properties={
+            u'command': [u'echo', u'hi'],
+            u'dimensions': [{
+                u'key': u'pool',
+                u'value': u'default'
+            }],
+            u'execution_timeout_secs': 30,
+        },
+        service_account='service-account@example.com')
+    response = self.call_api('new', body=message_to_dict(request), status=200)
+    self.assertEqual(u'5cee488008810', response.json[u'task_id'])
+
+    # Get the produced TaskRequest.
+    key, _ = task_pack.get_request_and_result_keys(response.json[u'task_id'])
+    req = key.get()
+
+    # Make sure associated the task with the correct realm.
+    self.assertEqual('test:task_realm', req.realm)
+    # Uses legacy service account token.
+    self.assertEqual('service-account@example.com', req.service_account)
+    self.assertEqual('tok', req.service_account_token)
+
+  def test_new_ok_with_default_task_realm_enforced(self):
+    self.mock(random, 'getrandbits', lambda _: 0x88)
+    self.mock(service_accounts, 'has_token_server', lambda: True)
+    self.mock_auth_db([
+        auth.Permission('swarming.pools.createTask'),
+        auth.Permission('swarming.tasks.createInRealm'),
+    ])
+
+    self.mock_default_pool_acl(
+        service_accounts=['service-account@example.com'],
+        default_task_realm='test:task_realm',
+        enforced_realm_permissions={
+            realms_pb2.REALM_PERMISSION_POOLS_CREATE_TASK,
+            realms_pb2.REALM_PERMISSION_TASKS_CREATE_IN_REALM,
+            realms_pb2.REALM_PERMISSION_TASKS_ACT_AS,
+        })
+
+    # Legacy pool ACLs must no be used in this mode, only realm ACLs are used.
+    self.fail_on_using_legacy_acls()
+
+    request = self.create_new_request(
+        properties={
+            u'command': [u'echo', u'hi'],
+            u'dimensions': [{
+                u'key': u'pool',
+                u'value': u'default'
+            }],
+            u'execution_timeout_secs': 30,
+        },
+        service_account='service-account@example.com')
+    response = self.call_api('new', body=message_to_dict(request), status=200)
+    self.assertEqual(u'5cee488008810', response.json[u'task_id'])
+
+    # Get the produced TaskRequest.
+    key, _ = task_pack.get_request_and_result_keys(response.json[u'task_id'])
+    req = key.get()
+
+    # Make sure associated the task with the correct realm.
+    self.assertEqual('test:task_realm', req.realm)
+    # Correctly initialized the service account state.
+    self.assertEqual('service-account@example.com', req.service_account)
+    self.assertFalse(req.service_account_token)
 
   def test_new_invalid_realm(self):
     request = self.create_new_request(

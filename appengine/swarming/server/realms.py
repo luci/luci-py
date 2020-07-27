@@ -21,7 +21,7 @@ _TRACKING_BUG = 'crbug.com/1066839'
 
 
 def get_permission(enum_permission):
-  """ Generates Realm permission instance from enum value.
+  """Generates Realm permission instance from enum value.
 
   e.g. realms_pb2.REALM_PERMISSION_POOLS_CREATE_TASK
        -> 'swarming.pools.createTask'
@@ -42,7 +42,7 @@ def get_permission(enum_permission):
 
 
 def is_enforced_permission(perm, pool_cfg=None):
-  """ Checks if the Realm permission is enforced.
+  """Checks if the Realm permission is enforced.
 
   Checks if the permission is specified in `enforced_realm_permissions`
   in settings.cfg or pools.cfg for the pool.
@@ -62,7 +62,7 @@ def is_enforced_permission(perm, pool_cfg=None):
 # Realm permission checks
 
 
-def check_pools_create_task(pool, pool_cfg):
+def check_pools_create_task(pool, pool_cfg, enforce):
   """Checks if the caller can create the task in the pool.
 
   Realm permission `swarming.pools.createTask` will be checked,
@@ -75,24 +75,27 @@ def check_pools_create_task(pool, pool_cfg):
     It calls the legacy task_scheduler.check_schedule_request_acl_caller() and
     compare the legacy result with the realm permission check using the dryrun.
 
+  TODO(vadimsh): Stop passing `pool`, it is always equal to `pool_cfg.name`.
+
   Args:
     pool: Pool in which the caller is scheduling a new task.
     pool_cfg: PoolCfg of the pool.
+    enforce: if True enforce realm ACLs regardless of is_enforced_permission.
 
   Returns:
-    None
+    True if used realm ACLs, False if legacy ones.
 
   Raises:
     auth.AuthorizationError: if the caller is not allowed to schedule the task
                              in the pool.
   """
   # 'swarming.pools.createTask'
-  perm = get_permission(realms_pb2.REALM_PERMISSION_POOLS_CREATE_TASK)
+  perm_enum = realms_pb2.REALM_PERMISSION_POOLS_CREATE_TASK
+  perm = get_permission(perm_enum)
 
-  if is_enforced_permission(realms_pb2.REALM_PERMISSION_POOLS_CREATE_TASK,
-                            pool_cfg):
+  if enforce or is_enforced_permission(perm_enum, pool_cfg):
     _check_permission(perm, [pool_cfg.realm])
-    return
+    return True
 
   # legacy-compatible path
 
@@ -112,17 +115,19 @@ def check_pools_create_task(pool, pool_cfg):
     if pool_cfg.realm:
       auth.has_permission_dryrun(
           perm, [pool_cfg.realm], legacy_allowed, tracking_bug=_TRACKING_BUG)
+  return False
 
 
-def check_tasks_create_in_realm(realm, pool_cfg):
+def check_tasks_create_in_realm(realm, pool_cfg, enforce):
   """Checks if the caller is allowed to create a task in the realm.
 
   Args:
-    realm: Realm that a task will be created in.
+    realm: Realm that a task will be created in or None for legacy tasks.
     pool_cfg: PoolConfig of the pool where the task will run.
+    enforce: if True enforce realm ACLs regardless of is_enforced_permission.
 
   Returns:
-    None
+    True if used realm ACLs, False if legacy ones.
 
   Raises:
     auth.AuthorizationError: if the caller is not allowed.
@@ -131,20 +136,19 @@ def check_tasks_create_in_realm(realm, pool_cfg):
   perm_enum = realms_pb2.REALM_PERMISSION_TASKS_CREATE_IN_REALM
   perm = get_permission(perm_enum)
 
-  if realm or is_enforced_permission(perm_enum, pool_cfg):
+  if enforce or is_enforced_permission(perm_enum, pool_cfg):
     _check_permission(perm, [realm])
-    return
+    return True
 
-  if pool_cfg.dry_run_task_realm:
+  if realm:
     # There is no existing permission that corresponds to the realm
     # permission. So always pass expected_result=True to the dryrun.
     auth.has_permission_dryrun(
-        perm, [pool_cfg.dry_run_task_realm],
-        expected_result=True,
-        tracking_bug=_TRACKING_BUG)
+        perm, [realm], expected_result=True, tracking_bug=_TRACKING_BUG)
+  return False
 
 
-def check_tasks_act_as(task_request, pool_cfg):
+def check_tasks_act_as(task_request, pool_cfg, enforce):
   """Checks if the task service account is allowed to run in the task realm.
 
   Realm permission `swarming.tasks.actAs` will be checked,
@@ -161,9 +165,10 @@ def check_tasks_act_as(task_request, pool_cfg):
   Args:
     task_request: TaskRequest entity to be scheduled.
     pool_cfg: PoolConfig of the pool where the task will run.
+    enforce: if True enforce realm ACLs regardless of is_enforced_permission.
 
   Returns:
-    None
+    True if used realm ACLs, False if legacy ones.
 
   Raises:
     auth.AuthorizationError: if the service account is not allowed to run
@@ -173,11 +178,9 @@ def check_tasks_act_as(task_request, pool_cfg):
   perm = get_permission(perm_enum)
   identity = auth.Identity(auth.IDENTITY_USER, task_request.service_account)
 
-  # Enforce if the requested task has realm or it's configured in pools.cfg or
-  # in settings.cfg globally.
-  if task_request.realm or is_enforced_permission(perm_enum, pool_cfg):
+  if enforce or is_enforced_permission(perm_enum, pool_cfg):
     _check_permission(perm, [task_request.realm], identity)
-    return
+    return True
 
   # legacy-compatible path
 
@@ -191,12 +194,13 @@ def check_tasks_act_as(task_request, pool_cfg):
     legacy_allowed = False
     raise  # re-raise the exception
   finally:
-    if pool_cfg.dry_run_task_realm:
+    if task_request.realm:
       auth.has_permission_dryrun(
-          perm, [pool_cfg.dry_run_task_realm],
+          perm, [task_request.realm],
           legacy_allowed,
           identity=identity,
-          tracking_bug='crbug.com/1066839')
+          tracking_bug=_TRACKING_BUG)
+  return False
 
 
 # Handler permission checks

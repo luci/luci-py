@@ -53,8 +53,8 @@ PoolConfig = collections.namedtuple(
         'realm',
         # Set of enforced realm permission enums.
         'enforced_realm_permissions',
-        # Task realm for dry run.
-        'dry_run_task_realm',
+        # Realm to assign to tasks if they don't have any.
+        'default_task_realm',
         # resolved TaskTemplateDeployment (optional).
         'task_template_deployment',
         # resolved BotMonitoring.
@@ -80,7 +80,7 @@ def init_pool_config(**kwargs):
       'service_accounts_groups': tuple(),
       'realm': None,
       'enforced_realm_permissions': frozenset(),
-      'dry_run_task_realm': None,
+      'default_task_realm': None,
       'task_template_deployment': None,
       'bot_monitoring': None,
       'external_schedulers': None,
@@ -615,7 +615,6 @@ def _fetch_pools_config():
   pools = {}
   for msg in cfg.pool:
     for name in msg.name:
-      dryrun_realm = msg.dry_run_task_realm if msg.dry_run_task_realm else None
       pools[name] = init_pool_config(
           name=name,
           rev=rev,
@@ -630,7 +629,8 @@ def _fetch_pools_config():
           service_accounts=frozenset(msg.allowed_service_account),
           service_accounts_groups=tuple(msg.allowed_service_account_group),
           realm=msg.realm if msg.realm else None,
-          dry_run_task_realm=dryrun_realm,
+          default_task_realm=(msg.default_task_realm
+                              if msg.default_task_realm else None),
           enforced_realm_permissions=frozenset(msg.enforced_realm_permissions),
           task_template_deployment=_resolve_deployment(ctx, msg, template_map,
                                                        deployment_map),
@@ -670,6 +670,9 @@ def _validate_pools_cfg(cfg, ctx):
           ctx.error('pool "%s" was already declared', name)
         else:
           pools.add(name)
+
+      # TODO(vadimsh): Validate `realm` and `default_task_realm`, if given,
+      # look like full realm names ("<project>:<name>").
 
       # Validate schedulers.user.
       for u in msg.schedulers.user:

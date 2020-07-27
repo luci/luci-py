@@ -63,15 +63,12 @@ def _gen_bot_event_mock(dimensions_flat=None):
   return mocked
 
 
-def _gen_pool_config(realm='test:pool/realm',
-                     dry_run_task_realm='test:realm_dryrun',
-                     enforced_realm_permissions=()):
+def _gen_pool_config(realm='test:pool/realm', enforced_realm_permissions=()):
   return pools_config.init_pool_config(
       name='default',
       rev='pools_cfg_rev',
       realm=realm,
-      enforced_realm_permissions=frozenset(enforced_realm_permissions),
-      dry_run_task_realm=dry_run_task_realm)
+      enforced_realm_permissions=frozenset(enforced_realm_permissions))
 
 
 class RealmsTest(test_case.TestCase):
@@ -94,7 +91,7 @@ class RealmsTest(test_case.TestCase):
     self.assertEqual(_PERM_POOLS_CREATE_TASK, perm)
 
   @parameterized.expand([
-      # should return False if the permissiion is not configured in settings.cfg
+      # should return False if the permission is not configured in settings.cfg
       # and in pools.cfg.
       (
           False,
@@ -120,15 +117,13 @@ class RealmsTest(test_case.TestCase):
         realms.is_enforced_permission(
             realms_pb2.REALM_PERMISSION_POOLS_CREATE_TASK, pool_cfg))
 
-  def _mock_for_check_pools_create_task_legacy(self, is_allowed_legacy):
-    self.mock(realms, 'is_enforced_permission', lambda *_: False)
-    self.mock(task_scheduler, '_is_allowed_to_schedule',
-              lambda _: is_allowed_legacy)
+  def _mock_is_allowed_to_schedule_legacy(self, ret):
+    self.mock(task_scheduler, '_is_allowed_to_schedule', lambda _: ret)
 
-  def _mock_for_check_pools_create_task(self, pool_realm='test:pool'):
-    self.mock(realms, 'is_enforced_permission', lambda *_: True)
-    self.mock(pools_config, 'get_pool_config',
-              lambda _: _gen_pool_config(realm=pool_realm))
+  def _mock_get_pool_config(self, realm='test:pool'):
+    pool_cfg = _gen_pool_config(realm=realm)
+    self.mock(pools_config, 'get_pool_config', lambda _: pool_cfg)
+    return pool_cfg
 
   def _mock_bot(self, bot_dimensions):
     bot_events = [_gen_bot_event_mock(dimensions_flat=bot_dimensions)]
@@ -136,71 +131,84 @@ class RealmsTest(test_case.TestCase):
     self.mock(bot_management, 'get_events_query', query)
 
   def test_check_pools_create_task_legacy_allowed(self):
-    self._mock_for_check_pools_create_task_legacy(is_allowed_legacy=True)
-    realms.check_pools_create_task('test_pool',
-                                   _gen_pool_config(realm='test:pool'))
+    self._mock_is_allowed_to_schedule_legacy(True)
+    pool_cfg = self._mock_get_pool_config(realm='test:pool')
+    used_realms = realms.check_pools_create_task('test_pool', pool_cfg, False)
+    self.assertFalse(used_realms)
     self._has_permission_dryrun_mock.assert_called_once_with(
         _PERM_POOLS_CREATE_TASK, [u'test:pool'],
         True,
         tracking_bug='crbug.com/1066839')
 
   def test_check_pools_create_task_legacy_allowed_no_pool_realm(self):
-    self._mock_for_check_pools_create_task_legacy(is_allowed_legacy=True)
-    realms.check_pools_create_task('test_pool', _gen_pool_config(realm=None))
+    self._mock_is_allowed_to_schedule_legacy(True)
+    pool_cfg = self._mock_get_pool_config(realm=None)
+    used_realms = realms.check_pools_create_task('test_pool', pool_cfg, False)
+    self.assertFalse(used_realms)
     self._has_permission_dryrun_mock.assert_not_called()
 
   def test_check_pools_create_task_legacy_not_allowed(self):
-    self._mock_for_check_pools_create_task_legacy(is_allowed_legacy=False)
+    self._mock_is_allowed_to_schedule_legacy(False)
+    pool_cfg = self._mock_get_pool_config(realm='test:pool')
     with self.assertRaises(auth.AuthorizationError):
-      realms.check_pools_create_task('test_pool',
-                                     _gen_pool_config(realm='test:pool'))
+      realms.check_pools_create_task('test_pool', pool_cfg, False)
     self._has_permission_dryrun_mock.assert_called_once_with(
         _PERM_POOLS_CREATE_TASK, [u'test:pool'],
         False,
         tracking_bug='crbug.com/1066839')
 
   def test_check_pools_create_task_legacy_not_allowed_no_pool_realm(self):
-    self._mock_for_check_pools_create_task_legacy(is_allowed_legacy=False)
+    self._mock_is_allowed_to_schedule_legacy(False)
+    pool_cfg = self._mock_get_pool_config(realm=None)
     with self.assertRaises(auth.AuthorizationError):
-      realms.check_pools_create_task('test_pool', _gen_pool_config(realm=None))
+      realms.check_pools_create_task('test_pool', pool_cfg, False)
     self._has_permission_dryrun_mock.assert_not_called()
 
   def test_check_pools_create_task_enforced_allowed(self):
-    self._mock_for_check_pools_create_task()
+    pool_cfg = self._mock_get_pool_config()
     self._has_permission_mock.return_value = True
-    realms.check_pools_create_task('test_pool',
-                                   _gen_pool_config(realm='test:pool'))
+    used_realms = realms.check_pools_create_task('test_pool', pool_cfg, True)
+    self.assertTrue(used_realms)
     self._has_permission_mock.assert_called_once_with(
         _PERM_POOLS_CREATE_TASK, [u'test:pool'],
         identity=auth.get_current_identity())
 
   def test_check_pools_create_task_enforced_not_allowed(self):
-    self._mock_for_check_pools_create_task()
+    pool_cfg = self._mock_get_pool_config()
     self._has_permission_mock.return_value = False
     with self.assertRaises(auth.AuthorizationError):
-      realms.check_pools_create_task('test_pool',
-                                     _gen_pool_config(realm='test:pool'))
+      realms.check_pools_create_task('test_pool', pool_cfg, True)
     self._has_permission_mock.assert_called_once_with(
         _PERM_POOLS_CREATE_TASK, [u'test:pool'],
         identity=auth.get_current_identity())
 
-  def test_check_tasks_create_in_realm_legacy(self):
-    pool_cfg_mock = _gen_pool_config()
-    realms.check_tasks_create_in_realm(None, pool_cfg_mock)
-    self._has_permission_dryrun_mock.assert_called_once_with(
-        _PERM_TASKS_CREATE_IN_REALM, [u'test:realm_dryrun'],
-        expected_result=True,
-        tracking_bug=realms._TRACKING_BUG)
+  def test_check_pools_create_task_enforced_no_pool_realm(self):
+    pool_cfg = self._mock_get_pool_config(realm=None)
+    with self.assertRaises(auth.AuthorizationError):
+      realms.check_pools_create_task('test_pool', pool_cfg, True)
+    self._has_permission_mock.assert_not_called()
 
-  def test_check_tasks_create_in_realm_legacy_no_dryrun_realm(self):
-    pool_cfg_mock = _gen_pool_config(dry_run_task_realm=None)
-    realms.check_tasks_create_in_realm(None, pool_cfg_mock)
+  def test_check_tasks_create_in_realm_legacy_not_enforced(self):
+    # If not enforced, allows any legacy (realm-less) task.
+    self.mock(realms, 'is_enforced_permission', lambda *_: False)
+    pool_cfg_mock = _gen_pool_config()
+    used_realms = realms.check_tasks_create_in_realm(None, pool_cfg_mock, False)
+    self.assertFalse(used_realms)
+    self._has_permission_dryrun_mock.assert_not_called()
+
+  def test_check_tasks_create_in_realm_legacy_enforced(self):
+    # If enforced, rejects all legacy (realm-less) tasks.
+    pool_cfg_mock = _gen_pool_config()
+    with self.assertRaises(auth.AuthorizationError):
+      realms.check_tasks_create_in_realm(None, pool_cfg_mock, True)
     self._has_permission_dryrun_mock.assert_not_called()
 
   def test_check_tasks_create_in_realm_enforced_allowed(self):
     self._has_permission_mock.return_value = True
     pool_cfg_mock = _gen_pool_config()
-    realms.check_tasks_create_in_realm('test:realm', pool_cfg_mock)
+    used_realms = realms.check_tasks_create_in_realm('test:realm',
+                                                     pool_cfg_mock, True)
+    self.assertTrue(used_realms)
     self._has_permission_mock.assert_called_once_with(
         _PERM_TASKS_CREATE_IN_REALM, [u'test:realm'],
         identity=auth.get_current_identity())
@@ -209,25 +217,29 @@ class RealmsTest(test_case.TestCase):
     self._has_permission_mock.return_value = False
     pool_cfg_mock = _gen_pool_config()
     with self.assertRaises(auth.AuthorizationError):
-      realms.check_tasks_create_in_realm('test:realm', pool_cfg_mock)
+      realms.check_tasks_create_in_realm('test:realm', pool_cfg_mock, True)
     self._has_permission_mock.assert_called_once_with(
         _PERM_TASKS_CREATE_IN_REALM, [u'test:realm'],
         identity=auth.get_current_identity())
 
-  def test_check_tasks_create_in_realm_enforced_no_realm(self):
-    pool_cfg_mock = _gen_pool_config(enforced_realm_permissions=[
-        realms_pb2.REALM_PERMISSION_TASKS_CREATE_IN_REALM
-    ])
-    with self.assertRaises(auth.AuthorizationError):
-      realms.check_tasks_create_in_realm(None, pool_cfg_mock)
-
-  def test_check_tasks_act_as_legacy_allowed(self):
+  def test_check_tasks_act_as_legacy_allowed_no_realm(self):
     self.mock(task_scheduler, '_is_allowed_service_account', lambda *_: True)
     task_request_mock = _gen_task_request_mock(realm=None)
     pool_cfg_mock = _gen_pool_config()
-    realms.check_tasks_act_as(task_request_mock, pool_cfg_mock)
+    used_realms = realms.check_tasks_act_as(task_request_mock, pool_cfg_mock,
+                                            False)
+    self.assertFalse(used_realms)
+    self._has_permission_dryrun_mock.assert_not_called()
+
+  def test_check_tasks_act_as_legacy_allowed_with_realm(self):
+    self.mock(task_scheduler, '_is_allowed_service_account', lambda *_: True)
+    task_request_mock = _gen_task_request_mock(realm='test:realm')
+    pool_cfg_mock = _gen_pool_config()
+    used_realms = realms.check_tasks_act_as(task_request_mock, pool_cfg_mock,
+                                            False)
+    self.assertFalse(used_realms)
     self._has_permission_dryrun_mock.assert_called_once_with(
-        _PERM_TASKS_ACT_AS, [u'test:realm_dryrun'],
+        _PERM_TASKS_ACT_AS, [u'test:realm'],
         True,
         identity=_TASK_SERVICE_ACCOUNT_IDENTITY,
         tracking_bug=realms._TRACKING_BUG)
@@ -237,18 +249,15 @@ class RealmsTest(test_case.TestCase):
     task_request_mock = _gen_task_request_mock(realm=None)
     pool_cfg_mock = _gen_pool_config()
     with self.assertRaises(auth.AuthorizationError):
-      realms.check_tasks_act_as(task_request_mock, pool_cfg_mock)
-    self._has_permission_dryrun_mock.assert_called_once_with(
-        _PERM_TASKS_ACT_AS, [u'test:realm_dryrun'],
-        False,
-        identity=_TASK_SERVICE_ACCOUNT_IDENTITY,
-        tracking_bug=realms._TRACKING_BUG)
+      realms.check_tasks_act_as(task_request_mock, pool_cfg_mock, False)
 
   def test_check_tasks_act_as_enforced_allowed(self):
     self._has_permission_mock.return_value = True
-    task_request_mock = _gen_task_request_mock()
+    task_request_mock = _gen_task_request_mock(realm='test:realm')
     pool_cfg_mock = _gen_pool_config()
-    realms.check_tasks_act_as(task_request_mock, pool_cfg_mock)
+    used_realms = realms.check_tasks_act_as(task_request_mock, pool_cfg_mock,
+                                            True)
+    self.assertTrue(used_realms)
     self._has_permission_mock.assert_called_once_with(
         _PERM_TASKS_ACT_AS, [u'test:realm'],
         identity=_TASK_SERVICE_ACCOUNT_IDENTITY)
@@ -259,16 +268,16 @@ class RealmsTest(test_case.TestCase):
     pool_cfg_mock = _gen_pool_config(
         enforced_realm_permissions=[realms_pb2.REALM_PERMISSION_TASKS_ACT_AS])
     with self.assertRaises(auth.AuthorizationError):
-      realms.check_tasks_act_as(task_request_mock, pool_cfg_mock)
+      realms.check_tasks_act_as(task_request_mock, pool_cfg_mock, True)
     self._has_permission_mock.assert_not_called()
 
   def test_check_tasks_act_as_enforced_not_allowed(self):
     self.mock(realms, 'is_enforced_permission', lambda *_: True)
     self._has_permission_mock.return_value = False
-    task_request_mock = _gen_task_request_mock()
+    task_request_mock = _gen_task_request_mock(realm='test:realm')
     pool_cfg_mock = _gen_pool_config()
     with self.assertRaises(auth.AuthorizationError):
-      realms.check_tasks_act_as(task_request_mock, pool_cfg_mock)
+      realms.check_tasks_act_as(task_request_mock, pool_cfg_mock, True)
     self._has_permission_mock.assert_called_once_with(
         _PERM_TASKS_ACT_AS, [u'test:realm'],
         identity=_TASK_SERVICE_ACCOUNT_IDENTITY)

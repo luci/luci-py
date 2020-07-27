@@ -1112,10 +1112,6 @@ class TaskRequest(ndb.Model):
   #
   # Possible values are: 'none', 'bot' or <email>. For more information see
   # swarming_rpcs.NewTaskRequest.
-  #
-  # This property exists only for informational purposes and for indexing. When
-  # actually getting an OAuth credentials, the properly signed OAuth grant token
-  # (stored in hidden 'service_account_token' field) is used.
   service_account = ndb.StringProperty(validator=_validate_service_account)
 
   # The "OAuth token grant" generated when the task was posted.
@@ -1124,6 +1120,9 @@ class TaskRequest(ndb.Model):
   # was posted (when the end-user is still present). It can be exchanged
   # for an OAuth token of some service account at a later time (when the task is
   # actually running on some bot).
+  #
+  # Set only for tasks that used legacy (non-realm) ACLs when checking if
+  # a task can use the requested service account.
   #
   # This property never shows up in UI or API responses.
   service_account_token = ndb.BlobProperty()

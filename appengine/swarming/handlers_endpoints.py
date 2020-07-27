@@ -519,13 +519,32 @@ class SwarmingTasksService(remote.Service):
       logging.warning('Incorrect new task request', exc_info=True)
       raise endpoints.BadRequestException(e.message)
 
+    # TODO(crbug.com/1109378): Check ACLs before calling init_new_request to
+    # avoid leaking information about pool templates to unauthorized callers.
+
+    # If the task request supplied a realm it means the task is in a realm-aware
+    # mode and it wants *all* realm ACLs to be enforced. Otherwise assume
+    # the task runs in pool_cfg.default_task_realm and enforce only permissions
+    # specified in enforced_realm_permissions pool config (using legacy ACLs
+    # for the rest). This should simplify the transition to realm ACLs.
+    enforce_realms_acl = False
+    if request_obj.realm:
+      logging.info('Using task realm %r', request_obj.realm)
+      enforce_realms_acl = True
+    elif pool_cfg.default_task_realm:
+      logging.info('Using default_task_realm %r', pool_cfg.default_task_realm)
+      request_obj.realm = pool_cfg.default_task_realm
+    else:
+      logging.info('Not using realms')
+
     # Realm permission 'swarming.pools.createInRealm' checks if the
     # caller is allowed to create a task in the task realm.
-    realms.check_tasks_create_in_realm(request_obj.realm, pool_cfg)
+    realms.check_tasks_create_in_realm(request_obj.realm, pool_cfg,
+                                       enforce_realms_acl)
 
     # Realm permission 'swarming.pools.create' checks if the caller is allowed
     # to create a task in the pool.
-    realms.check_pools_create_task(pool, pool_cfg)
+    realms.check_pools_create_task(pool, pool_cfg, enforce_realms_acl)
 
     # If the request has a service account email, check if the service account
     # is allowed to run.
@@ -537,17 +556,18 @@ class SwarmingTasksService(remote.Service):
 
       # Realm permission 'swarming.tasks.actAs' checks if the service account is
       # allowed to run in the task realm.
-      realms.check_tasks_act_as(request_obj, pool_cfg)
+      used_realms = realms.check_tasks_act_as(request_obj, pool_cfg,
+                                              enforce_realms_acl)
 
-      # If request_obj.realm is not set, use the legacy mechanism to mint oauth
-      # token. Note that this path will be deprecated after migration to
-      # MintServiceAccountToken rpc which accepts realm.
+      # If using legacy ACLs for service accounts, use the legacy mechanism to
+      # mint oauth token as well. Note that this path will be deprecated after
+      # migration to MintServiceAccountToken rpc which accepts realm.
       # It contacts the token server to generate "OAuth token grant" (or grab a
       # cached one). By doing this we check that the given service account usage
       # is allowed by the token server rules at the time the task is posted.
       # This check is also performed later (when running the task), when we get
       # the actual OAuth access token.
-      if not request_obj.realm:
+      if not used_realms:
         max_lifetime_secs = request_obj.max_lifetime_secs
         try:
           duration = datetime.timedelta(seconds=max_lifetime_secs)
@@ -571,7 +591,7 @@ class SwarmingTasksService(remote.Service):
 
     if request.request_uuid and not re.match(
         r'^[\da-fA-F]{8}-[\da-fA-F]{4}-[\da-fA-F]{4}-[\da-fA-F]{4}-'
-        '[\da-fA-F]{12}$', request.request_uuid):
+        r'[\da-fA-F]{12}$', request.request_uuid):
       raise endpoints.BadRequestException(
           'invalid uuid is given as request_uuid')
 

@@ -237,22 +237,19 @@ def get_task_account_token(task_id, bot_id, scopes):
       'swarming:task_name:%s' % task_request.name,
   ]
 
-  if task_request.realm:
-    # If TaskRequest.realm is set, it calls MintServiceAccountToken to grab
-    # a OAuth token. It also re-checks if the service account is still allowed
-    # to run in the realm. because it may have changed since the last check.
+  # task_request.service_account_token can be empty here only when the task has
+  # a realm and the service account was authorized via realm ACLs. Use
+  # MintServiceAccountToken RPC for such tasks.
+  if not task_request.service_account_token:
+    assert task_request.realm
+    # Re-check if the service account is still allowed to run in the realm,
+    # because it may have changed since the last check.
     pool_cfg = pools_config.get_pool_config(task_request.pool)
-    realms.check_tasks_act_as(task_request, pool_cfg)
+    realms.check_tasks_act_as(task_request, pool_cfg, enforce=True)
     access_token, expiry = _mint_service_account_token(
         task_request.service_account, task_request.realm, scopes, audit_tags)
   else:
-    # Should have a token prepared by 'get_oauth_token_grant' already.
-    if not task_request.service_account_token:
-      raise MisconfigurationError(
-          'The task request %s has no associated service account token' %
-          task_id)
-
-    # Use this token to grab the real OAuth token. Note that the bot caches the
+    # Use grant token to grab the real OAuth token. Note that the bot caches the
     # resulting OAuth token internally, so we don't bother to cache it here.
     access_token, expiry = _mint_oauth_token_via_grant(
         task_request.service_account_token, scopes, audit_tags)

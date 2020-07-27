@@ -168,7 +168,10 @@ class AppTestBase(test_case.TestCase):
     return calls
 
   # pylint: disable=redefined-outer-name
-  def mock_default_pool_acl(self, service_accounts):
+  def mock_default_pool_acl(self,
+                            service_accounts,
+                            default_task_realm=None,
+                            enforced_realm_permissions=None):
     """Mocks ACLs of 'default' pool to allow usage of given service accounts."""
     assert isinstance(service_accounts, (list, tuple)), service_accounts
     def mocked_fetch_pools_config():
@@ -199,6 +202,9 @@ class AppTestBase(test_case.TestCase):
                       ]),
                       service_accounts=frozenset(service_accounts),
                       realm='test:pool/default',
+                      default_task_realm=default_task_realm,
+                      enforced_realm_permissions=enforced_realm_permissions or
+                      {},
                       task_template_deployment=pools_config
                       .TaskTemplateDeployment(
                           prod=pools_config.TaskTemplate(
@@ -234,6 +240,9 @@ class AppTestBase(test_case.TestCase):
                           auth.Identity(auth.IDENTITY_USER, 'user@example.com'),
                       ]),
                       realm='test:pool/default',
+                      default_task_realm=default_task_realm,
+                      enforced_realm_permissions=enforced_realm_permissions or
+                      {},
                       service_accounts=frozenset(service_accounts),
                       default_isolate=default_isolate,
                       default_cipd=default_cipd,
