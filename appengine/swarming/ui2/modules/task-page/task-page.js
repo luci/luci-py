@@ -1202,13 +1202,17 @@ window.customElements.define('task-page', class extends SwarmingAppBoilerplate {
     const leaseDuration = parseDuration(leaseDurationEle);
 
     newTask.properties.command = ['python', '-c', `import os, sys, time
-print 'Mapping task: ${location.origin}/task?id=${this._taskId}'
-print 'Files are mapped into: ' + os.getcwd()
-print ''
-print 'Bot id: ' + os.environ['SWARMING_BOT_ID']
-print 'Bot leased for: ${leaseDuration} seconds'
-print 'How to access this bot: http://go/swarming-ssh'
-print 'When done, reboot the host'
+print('Mapping task: ${location.origin}/task?id=${this._taskId}')
+print('Files are mapped into: ' + os.getcwd())
+print('')
+print('Bot id: ' + os.environ['SWARMING_BOT_ID'])
+print('Bot leased for: ${leaseDuration} seconds')
+print('How to access this bot: http://go/swarming-ssh')
+print('When done, reboot the host')
+print('')
+print('Some tests may fail without the following env vars set:')
+print('PATH=' + os.environ['PATH'])
+print('LUCI_CONTEXT=' + os.environ['LUCI_CONTEXT'])
 sys.stdout.flush()
 time.sleep(${leaseDuration})`];
     delete newTask.properties.extra_args;

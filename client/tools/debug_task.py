@@ -29,7 +29,11 @@ print('')
 print('Bot id: ' + os.environ['SWARMING_BOT_ID'])
 print('Bot leased for: %(duration)d seconds')
 print('How to access this bot: %(help_url)s')
-print('When done, reboot the host')
+print('When done, reboot the host.')
+print('')
+print('Some tests may fail without the following env vars set:')
+print('PATH=' + os.environ['PATH'])
+print('LUCI_CONTEXT=' + os.environ['LUCI_CONTEXT'])
 sys.stdout.flush()
 time.sleep(%(duration)d)
 """
@@ -119,13 +123,23 @@ def trigger(swarming, taskid, task, duration, reuse_bot):
   'task'.
   """
   cmd = [
-    sys.executable, 'swarming.py', 'trigger', '-S', swarming,
-    '-S', swarming,
-    '--hard-timeout', str(duration),
-    '--io-timeout', str(duration),
-    '--task-name', 'Debug Task for %s' % taskid,
-    '--raw-cmd',
-    '--tags', 'debug_task:1',
+      sys.executable,
+      'swarming.py',
+      'trigger',
+      '-S',
+      swarming,
+      '--hard-timeout',
+      str(duration),
+      '--io-timeout',
+      str(duration),
+      '--task-name',
+      'Debug Task for %s' % taskid,
+      '--raw-cmd',
+      '--tags',
+      'debug_task:1',
+      # We'll automatically get whatever packages and env vars the template
+      # applied on the original task.
+      '--pool-task-template=SKIP',
   ]
   if reuse_bot:
     pool = [
@@ -155,7 +169,8 @@ def trigger(swarming, taskid, task, duration, reuse_bot):
   cipd = task['properties'].get('cipd_input', {})
   if cipd:
     for p in cipd['packages']:
-      cmd.extend(('--cipd-package', p['package_name'], p['version'], p['path']))
+      cmd.extend(('--cipd-package',
+                  '%s:%s:%s' % (p['path'], p['package_name'], p['version'])))
 
   for i in task['properties'].get('caches', []):
     cmd.extend(('--named-cache', i['name'], i['path']))
