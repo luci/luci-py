@@ -586,20 +586,21 @@ def get_cpuinfo():
   values = common._safe_parse(
       subprocess.check_output(['sysctl', 'machdep.cpu']).decode())
   # http://unix.stackexchange.com/questions/43539/what-do-the-flags-in-proc-cpuinfo-mean
-  return {
+  info = {
       u'flags':
-          sorted(i.lower() for i in values[u'machdep.cpu.features'].split()),
-      u'model': [
-          int(values['machdep.cpu.family']),
-          int(values['machdep.cpu.model']),
-          int(values['machdep.cpu.stepping']),
-          int(values['machdep.cpu.microcode_version']),
-      ],
+          sorted(i.lower()
+                 for i in values.get(u'machdep.cpu.features', '').split()),
       u'name':
-          values[u'machdep.cpu.brand_string'],
+          values.get(u'machdep.cpu.brand_string', 'Unknown'),
       u'vendor':
-          values[u'machdep.cpu.vendor'],
+          values.get(u'machdep.cpu.vendor', 'Unknown'),
   }
+
+  model_keys = ('family', 'model', 'stepping', 'microcode_version')
+  if all(('machdep.cpu.' + key) in values for key in model_keys):
+    info['model'] = [int(values['machdep.cpu.' + key]) for key in model_keys]
+
+  return info
 
 
 def get_temperatures():
