@@ -544,7 +544,7 @@ class SwarmingTasksService(remote.Service):
 
     # Realm permission 'swarming.pools.create' checks if the caller is allowed
     # to create a task in the pool.
-    realms.check_pools_create_task(pool, pool_cfg, enforce_realms_acl)
+    realms.check_pools_create_task(pool_cfg, enforce_realms_acl)
 
     # If the request has a service account email, check if the service account
     # is allowed to run.

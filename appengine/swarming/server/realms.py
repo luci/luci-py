@@ -62,7 +62,7 @@ def is_enforced_permission(perm, pool_cfg=None):
 # Realm permission checks
 
 
-def check_pools_create_task(pool, pool_cfg, enforce):
+def check_pools_create_task(pool_cfg, enforce):
   """Checks if the caller can create the task in the pool.
 
   Realm permission `swarming.pools.createTask` will be checked,
@@ -75,10 +75,7 @@ def check_pools_create_task(pool, pool_cfg, enforce):
     It calls the legacy task_scheduler.check_schedule_request_acl_caller() and
     compare the legacy result with the realm permission check using the dryrun.
 
-  TODO(vadimsh): Stop passing `pool`, it is always equal to `pool_cfg.name`.
-
   Args:
-    pool: Pool in which the caller is scheduling a new task.
     pool_cfg: PoolCfg of the pool.
     enforce: if True enforce realm ACLs regardless of is_enforced_permission.
 
@@ -99,13 +96,14 @@ def check_pools_create_task(pool, pool_cfg, enforce):
 
   # legacy-compatible path
 
-  # pool.realm is optional.
+  # pool_cfg.realm is optional.
   if not pool_cfg.realm:
-    logging.warning('%s: realm is missing in Pool "%s"', _TRACKING_BUG, pool)
+    logging.warning('%s: realm is missing in Pool "%s"', _TRACKING_BUG,
+                    pool_cfg.name)
 
   legacy_allowed = True
   try:
-    task_scheduler.check_schedule_request_acl_caller(pool, pool_cfg)
+    task_scheduler.check_schedule_request_acl_caller(pool_cfg)
   except auth.AuthorizationError:
     legacy_allowed = False
     raise  # re-raise the exception

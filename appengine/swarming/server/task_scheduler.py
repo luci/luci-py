@@ -1097,17 +1097,18 @@ def check_schedule_request_acl(request):
       'Looking at the pool "%s" in pools.cfg, rev "%s"', pool, pool_cfg.rev)
 
   # Verify the caller can use the pool at all.
-  check_schedule_request_acl_caller(pool, pool_cfg)
+  check_schedule_request_acl_caller(pool_cfg)
 
   # Verify the requested task service account is allowed in this pool.
   check_schedule_request_acl_service_account(request, pool_cfg)
 
 
-def check_schedule_request_acl_caller(pool, pool_cfg):
+def check_schedule_request_acl_caller(pool_cfg):
   if not _is_allowed_to_schedule(pool_cfg):
     raise auth.AuthorizationError(
         'User "%s" is not allowed to schedule tasks in the pool "%s", '
-        'see pools.cfg' % (auth.get_current_identity().to_bytes(), pool))
+        'see pools.cfg' %
+        (auth.get_current_identity().to_bytes(), pool_cfg.name))
 
 
 def check_schedule_request_acl_service_account(request, pool_cfg):
