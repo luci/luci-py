@@ -500,9 +500,9 @@ def _run_go_isolated_and_wait(cmd):
   Returns:
     The subprocess object
   """
+  cmd_str = ' '.join(cmd)
   try:
     proc = subprocess42.Popen(cmd)
-    cmd_str = ' '.join(cmd)
 
     exceeded_max_timeout = True
     check_period_sec = 30
