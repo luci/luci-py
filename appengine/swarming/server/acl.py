@@ -82,11 +82,6 @@ def _is_project():
   access to Swarming however they like. A proper Swarming configuration should
   impose additional checks in pool ACLs (e.g. make sure a pool is used only by
   some specific projects).
-
-  Historically 'project:...' identities could not be used in auth_service. This
-  will be resolved with https://crbug.com/1014669. Then in theory this function
-  could be removed and each instance would have the corresponding 'project:...'
-  identity in the user group.
   """
   return auth.get_current_identity().is_project
 
@@ -159,7 +154,6 @@ def can_view_bot():
 
 def can_create_task():
   """Can create a task."""
-  # TODO(crbug/1018872): Remove _is_project().
   return _is_user() or _is_project()
 
 

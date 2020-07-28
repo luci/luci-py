@@ -18,6 +18,9 @@ components_auth_UI_APP_NAME = 'Swarming'
 # a lazily-called callback (called once per minute, when initializing AuthDB).
 components_auth_OAUTH_CLIENT_IDS_PROVIDER = lambda: [config.get_ui_client_id()]
 
+# Recognize X-Luci-Project header on incoming requests.
+components_auth_USE_PROJECT_IDENTITIES = True
+
 
 def hack_windows():
   """Adds support for symlink-as-file on Windows.
