@@ -258,7 +258,7 @@ def get_platform():
   # Normalize machine architecture. Some architectures are identical or
   # compatible with others. We collapse them into one.
   arch = platform.machine().lower()
-  # TODO(crbug.com/1103470): mac-arm64 package isn't ready yet.
+  # TODO(crbug.com/1102967): mac-arm64 package isn't ready yet.
   # Use mac-amd64 package for now.
   if os_name == 'mac' and arch == 'arm64':
     arch = 'amd64'
