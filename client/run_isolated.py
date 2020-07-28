@@ -664,7 +664,76 @@ def copy_recursively(src, dst):
       logging.info("Couldn't collect output file %s: %s", src, e)
 
 
-def upload_then_delete(storage, out_dir, leak_temp_dir):
+def _upload_with_py(storage, out_dir):
+
+  def process_stats(f_st):
+    st = sorted(i.size for i in f_st)
+    return base64.b64encode(large.pack(st)).decode()
+
+  try:
+    results, f_cold, f_hot = isolateserver.archive_files_to_storage(
+        storage, [out_dir], None, verify_push=True)
+
+    isolated = list(results.values())[0]
+    cold = process_stats(f_cold)
+    hot = process_stats(f_hot)
+    return isolated, cold, hot
+
+  except isolateserver.Aborted:
+    # This happens when a signal SIGTERM was received while uploading data.
+    # There is 2 causes:
+    # - The task was too slow and was about to be killed anyway due to
+    #   exceeding the hard timeout.
+    # - The amount of data uploaded back is very large and took too much
+    #   time to archive.
+    sys.stderr.write('Received SIGTERM while uploading')
+    # Re-raise, so it will be treated as an internal failure.
+    raise
+
+
+def _upload_with_go(storage, outdir, isolated_client):
+  """
+  Uploads results back using the Go `isolated` CLI.
+  """
+  server_ref = storage.server_ref
+  isolated_handle, isolated_path = tempfile.mkstemp(
+      prefix=u'isolated-hash-', suffix=u'.txt')
+  stats_json_handle, stats_json_path = tempfile.mkstemp(
+      prefix=u'dump-stats-', suffix=u'.json')
+  os.close(isolated_handle)
+  os.close(stats_json_handle)
+  try:
+    cmd = [
+        isolated_client,
+        'archive',
+        '-isolate-server',
+        server_ref.url,
+        '-namespace',
+        server_ref.namespace,
+        '-dirs',
+        # Format: <working directory>:<relative path to dir>
+        outdir + ':',
+
+        # output
+        '-dump-hash',
+        isolated_path,
+        '-dump-stats-json',
+        stats_json_path,
+    ]
+    _run_go_isolated_and_wait(cmd)
+
+    with open(isolated_path) as isol_file:
+      isolated = isol_file.read()
+    with open(stats_json_path) as json_file:
+      stats_json = json.load(json_file)
+
+    return isolated, stats_json['items_cold'], stats_json['items_hot']
+  finally:
+    fs.remove(isolated_path)
+    fs.remove(stats_json_path)
+
+
+def upload_then_delete(storage, out_dir, leak_temp_dir, go_isolated_client):
   """Deletes the temporary run directory and uploads results back.
 
   Returns:
@@ -679,32 +748,23 @@ def upload_then_delete(storage, out_dir, leak_temp_dir):
   # Upload out_dir and generate a .isolated file out of this directory. It is
   # only done if files were written in the directory.
   outputs_ref = None
-  cold = []
-  hot = []
+  cold = ''
+  hot = ''
   start = time.time()
 
   if fs.isdir(out_dir) and fs.listdir(out_dir):
     with tools.Profiler('ArchiveOutput'):
-      try:
-        results, f_cold, f_hot = isolateserver.archive_files_to_storage(
-            storage, [out_dir], None, verify_push=True)
-        outputs_ref = {
-            'isolated': list(results.values())[0],
-            'isolatedserver': storage.server_ref.url,
-            'namespace': storage.server_ref.namespace,
-        }
-        cold = sorted(i.size for i in f_cold)
-        hot = sorted(i.size for i in f_hot)
-      except isolateserver.Aborted:
-        # This happens when a signal SIGTERM was received while uploading data.
-        # There is 2 causes:
-        # - The task was too slow and was about to be killed anyway due to
-        #   exceeding the hard timeout.
-        # - The amount of data uploaded back is very large and took too much
-        #   time to archive.
-        sys.stderr.write('Received SIGTERM while uploading')
-        # Re-raise, so it will be treated as an internal failure.
-        raise
+      isolated = None
+      if go_isolated_client is None:
+        isolated, cold, hot = _upload_with_py(storage, out_dir)
+      else:
+        isolated, cold, hot = _upload_with_go(storage, out_dir,
+                                              go_isolated_client)
+      outputs_ref = {
+          'isolated': isolated,
+          'isolatedserver': storage.server_ref.url,
+          'namespace': storage.server_ref.namespace,
+      }
 
   success = False
   try:
@@ -718,8 +778,8 @@ def upload_then_delete(storage, out_dir, leak_temp_dir):
     logging.exception('Had difficulties removing out_dir %s: %s', out_dir, e)
   stats = {
       'duration': time.time() - start,
-      'items_cold': base64.b64encode(large.pack(cold)).decode(),
-      'items_hot': base64.b64encode(large.pack(hot)).decode(),
+      'items_cold': cold,
+      'items_hot': hot,
   }
   return outputs_ref, success, stats
 
@@ -804,6 +864,10 @@ def map_and_run(data, constant_run_path):
   if data.relative_cwd:
     cwd = os.path.normpath(os.path.join(cwd, data.relative_cwd))
   command = data.command
+  go_isolated_client = None
+  if data.use_go_isolated:
+    go_isolated_client = os.path.join(isolated_client_dir,
+                                      'isolated' + cipd.EXECUTABLE_SUFFIX)
   try:
     with data.install_packages_fn(run_dir, isolated_client_dir) as cipd_info:
       if cipd_info:
@@ -819,8 +883,7 @@ def map_and_run(data, constant_run_path):
               outdir=run_dir,
               go_cache_dir=data.go_cache_dir,
               policies=data.go_cache_policies,
-              isolated_client=os.path.join(isolated_client_dir,
-                                           'isolated' + cipd.EXECUTABLE_SUFFIX))
+              isolated_client=go_isolated_client)
         else:
           bundle, stats = fetch_and_map(
               isolated_hash=data.isolated_hash,
@@ -927,7 +990,8 @@ def map_and_run(data, constant_run_path):
       if out_dir:
         isolated_stats = result['stats'].setdefault('isolated', {})
         result['outputs_ref'], success, isolated_stats['upload'] = (
-            upload_then_delete(data.storage, out_dir, data.leak_temp_dir))
+            upload_then_delete(data.storage, out_dir, data.leak_temp_dir,
+                               go_isolated_client))
       if not success and result['exit_code'] == 0:
         result['exit_code'] = 1
     except Exception as e:
