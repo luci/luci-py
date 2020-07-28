@@ -539,6 +539,13 @@ def _validate_ident(ctx, title, s):
     ctx.error('bad %s value "%s" - %s', title, s, exc)
 
 
+def _validate_realm(ctx, title, s):
+  try:
+    auth.validate_realm_name(str(s))
+  except ValueError as exc:
+    ctx.error('bad %s value: %s', title, exc)
+
+
 def _validate_url(ctx, value):
   if not value:
     ctx.error('is not set')
@@ -671,8 +678,11 @@ def _validate_pools_cfg(cfg, ctx):
         else:
           pools.add(name)
 
-      # TODO(vadimsh): Validate `realm` and `default_task_realm`, if given,
-      # look like full realm names ("<project>:<name>").
+      # Validate realm names. They are optional for now.
+      if msg.realm:
+        _validate_realm(ctx, 'realm', msg.realm)
+      if msg.default_task_realm:
+        _validate_realm(ctx, 'default_task_realm', msg.default_task_realm)
 
       # Validate schedulers.user.
       for u in msg.schedulers.user:

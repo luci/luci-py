@@ -377,6 +377,32 @@ class PoolsConfigTest(test_case.TestCase):
         'pool #0 (abc): bad allowed_service_account_group #0 "!!!"',
     ])
 
+  def test_bad_pool_realm(self):
+    cfg = pools_pb2.PoolsCfg(pool=[
+        pools_pb2.Pool(
+            name=['abc'],
+            realm='bad-realm',
+            default_task_realm='good:realm',
+        )
+    ])
+    self.validator_test(cfg, [
+        "pool #0 (abc): bad realm value: Bad realm 'bad-realm', "
+        'want "<project>:<name>"',
+    ])
+
+  def test_bad_default_task_realm(self):
+    cfg = pools_pb2.PoolsCfg(pool=[
+        pools_pb2.Pool(
+            name=['abc'],
+            realm='good:realm',
+            default_task_realm='bad-realm',
+        )
+    ])
+    self.validator_test(cfg, [
+        "pool #0 (abc): bad default_task_realm value: Bad realm 'bad-realm', "
+        'want "<project>:<name>"',
+    ])
+
   def test_missing_bot_monitoring(self):
     cfg = pools_pb2.PoolsCfg(
         pool=[pools_pb2.Pool(
