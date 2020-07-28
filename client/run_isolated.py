@@ -500,40 +500,44 @@ def _run_go_isolated_and_wait(cmd):
   Returns:
     The subprocess object
   """
-  proc = subprocess42.Popen(cmd)
-  cmd_str = ' '.join(cmd)
+  try:
+    proc = subprocess42.Popen(cmd)
+    cmd_str = ' '.join(cmd)
 
-  exceeded_max_timeout = True
-  check_period_sec = 30
-  max_checks = 100
-  # max timeout = max_checks * check_period_sec = 50 minutes
-  for i in range(max_checks):
-    # This is to prevent I/O timeout error during isolated setup.
-    try:
-      retcode = proc.wait(check_period_sec)
-      if retcode != 0:
-        raise ValueError("retcode is not 0: %s (cmd=%s)" % (retcode, cmd_str))
-      exceeded_max_timeout = False
-      break
-    except subprocess42.TimeoutExpired:
-      print('still running isolated (after %d seconds)' %
-            ((i + 1) * check_period_sec))
+    exceeded_max_timeout = True
+    check_period_sec = 30
+    max_checks = 100
+    # max timeout = max_checks * check_period_sec = 50 minutes
+    for i in range(max_checks):
+      # This is to prevent I/O timeout error during isolated setup.
+      try:
+        retcode = proc.wait(check_period_sec)
+        if retcode != 0:
+          raise ValueError("retcode is not 0: %s (cmd=%s)" % (retcode, cmd_str))
+        exceeded_max_timeout = False
+        break
+      except subprocess42.TimeoutExpired:
+        print('still running isolated (after %d seconds)' %
+              ((i + 1) * check_period_sec))
 
-  if exceeded_max_timeout:
-    proc.terminate()
-    try:
-      proc.wait(check_period_sec)
-    except subprocess42.TimeoutExpired:
-      logging.exception(
-          "failed to terminate? timeout happened after %d seconds",
-          check_period_sec)
-      proc.kill()
-      proc.wait()
-    # Raise unconditionally, because |proc| was forcefully terminated.
-    raise ValueError("timedout after %d seconds (cmd=%s)" %
-                     (check_period_sec * max_checks, cmd_str))
+    if exceeded_max_timeout:
+      proc.terminate()
+      try:
+        proc.wait(check_period_sec)
+      except subprocess42.TimeoutExpired:
+        logging.exception(
+            "failed to terminate? timeout happened after %d seconds",
+            check_period_sec)
+        proc.kill()
+        proc.wait()
+      # Raise unconditionally, because |proc| was forcefully terminated.
+      raise ValueError("timedout after %d seconds (cmd=%s)" %
+                       (check_period_sec * max_checks, cmd_str))
 
-  return proc
+    return proc
+  except Exception:
+    logging.exception('Failed to run Go cmd %s', cmd_str)
+    raise
 
 
 def _fetch_and_map_with_go(isolated_hash, storage, outdir, go_cache_dir,
