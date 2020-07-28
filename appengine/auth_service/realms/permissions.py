@@ -98,11 +98,28 @@ def db():
       include('role/luci.realmServiceAccount'),
       permission('swarming.tasks.actAs'),
   ])
-  role('role/swarming.realmUser', [
+  role('role/swarming.taskViewer', [
+      permission('swarming.tasks.get'),
+  ])
+  role('role/swarming.taskTriggerer', [
+      include('role/swarming.taskViewer'),
       permission('swarming.tasks.createInRealm'),
+      permission('swarming.tasks.cancel'),
+  ])
+  role('role/swarming.poolViewer', [
+      permission('swarming.pools.listBots'),
+      permission('swarming.pools.listTasks'),
   ])
   role('role/swarming.poolUser', [
+      include('role/swarming.poolViewer'),
       permission('swarming.pools.createTask'),
+  ])
+  role('role/swarming.poolOwner', [
+      include('role/swarming.poolUser'),
+      permission('swarming.pools.cancelTask'),
+      permission('swarming.pools.createBot'),
+      permission('swarming.pools.deleteBot'),
+      permission('swarming.pools.terminateBot'),
   ])
 
   # LogDog permissions and roles. Placeholders for now.
@@ -165,24 +182,22 @@ def db():
   # RPCs when one LUCI micro-service calls another in a context of some project.
   # Thus this role authorizes various internal RPCs between LUCI micro-services
   # when they are scoped to a single project.
-  role(
-      'role/luci.internal.system',
-      [
-          # Allow Swarming to use realm accounts.
-          include('role/luci.serviceAccountTokenCreator'),
-          # Allow Buildbucket to trigger Swarming tasks and use project's pools.
-          include('role/swarming.realmUser'),
-          include('role/swarming.poolUser'),
-          include('role/resultdb.invocationCreator'),
-          # Allow trusted services to create invocations with custom IDs, e.g.
-          # `build:8878494550606210560`.
-          permission(
-              'resultdb.invocations.createWithReservedID', internal=True),
-          # Allow trusted services to populate reserved fields in new
-          # invocations.
-          permission('resultdb.invocations.setProducerResource', internal=True),
-          permission('resultdb.invocations.exportToBigQuery', internal=True),
-      ])
+  role('role/luci.internal.system', [
+      # Allow Swarming to use realm accounts.
+      include('role/luci.serviceAccountTokenCreator'),
+      # Allow Buildbucket to trigger Swarming tasks and use project's pools.
+      include('role/swarming.taskTriggerer'),
+      include('role/swarming.poolUser'),
+      # Allow Buildbucket and Swarming to create new invocations.
+      include('role/resultdb.invocationCreator'),
+      # Allow trusted services to create invocations with custom IDs, e.g.
+      # `build:8878494550606210560`.
+      permission('resultdb.invocations.createWithReservedID', internal=True),
+      # Allow trusted services to populate reserved fields in new
+      # invocations.
+      permission('resultdb.invocations.setProducerResource', internal=True),
+      permission('resultdb.invocations.exportToBigQuery', internal=True),
+  ])
 
   # Bindings implicitly added into the root realm of every project.
   builder.implicit_root_bindings = lambda project_id: [
