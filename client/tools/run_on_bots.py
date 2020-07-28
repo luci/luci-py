@@ -28,7 +28,7 @@ CLIENT_DIR = os.path.dirname(
 sys.path.insert(0, CLIENT_DIR)
 
 from utils import tools
-tools.force_local_third_party()
+tools.force_local_third_party(CLIENT_DIR)
 
 # third_party/
 import colorama
