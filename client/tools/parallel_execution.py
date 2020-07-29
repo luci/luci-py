@@ -89,8 +89,9 @@ class Runner(object):
     self.progress = progress
     self.extra_trigger_args = extra_trigger_args
 
-  def trigger(self, task_name, isolated_hash, dimensions, env):
+  def trigger(self, task_name, isolated_hash, dimensions, caches, env):
     args = sum((['--dimension', k, v] for k, v in dimensions.items()), [])
+    args.extend(sum((['--named-cache', k, v] for k, v in caches), []))
     args.extend(sum((['--env', k, v] for k, v in env), []))
     returncode, stdout, duration, task_id = trigger(
         self.swarming_server,
@@ -127,8 +128,9 @@ def run_swarming_tasks_parallel(swarming_server, isolate_server,
   Arguments:
     extra_trigger_args: list of additional flags to pass down to
         'swarming.py trigger'
-    tasks: list of tuple(task_name, isolated_hash, dimensions) where dimension
-        are --dimension flags to provide when triggering the task.
+    tasks: list of tuple(task_name, isolated_hash, dimensions, caches, env)
+        where dimension are --dimension flags to provide when triggering the
+        task and caches are --named-cache flags.
 
   Yields:
     tuple(name, dimensions, stdout) for the tasks that failed.
@@ -145,9 +147,9 @@ def run_swarming_tasks_parallel(swarming_server, isolate_server,
     runner = Runner(swarming_server, isolate_server, pool.add_task, progress,
                     extra_trigger_args)
 
-    for task_name, isolated_hash, dimensions, env in tasks:
+    for task_name, isolated_hash, dimensions, caches, env in tasks:
       pool.add_task(0, runner.trigger, task_name, isolated_hash, dimensions,
-                    env)
+                    caches, env)
 
     # Runner.collect() only return task failures.
     for failed_task in pool.iter_results():
@@ -181,6 +183,15 @@ class OptionParser(logging_utils.OptionParserWithLogging):
         '-d', '--dimension', default=[], action='append', nargs=2,
         dest='dimensions', metavar='FOO bar',
         help='dimension to filter on')
+    self.add_option(
+        '-n',
+        '--named-cache',
+        default=[],
+        action='append',
+        nargs=2,
+        dest='caches',
+        metavar='FOO bar',
+        help='named caches for swarming to have present')
     self.add_option(
         '--priority',
         type='int',

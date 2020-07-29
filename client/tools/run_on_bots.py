@@ -115,9 +115,9 @@ def batched_subprocess(cmd, sem):
   return thread
 
 
-def run_batches(
-    swarming_server, isolate_server, dimensions, tags, env, priority, deadline,
-    batches, repeat, isolated_hash, name, bots, args):
+def run_batches(swarming_server, isolate_server, dimensions, caches, tags, env,
+                priority, deadline, batches, repeat, isolated_hash, name, bots,
+                args):
   """Runs the task |batches| at a time.
 
   This will be mainly bound by task scheduling latency, especially if the bots
@@ -152,6 +152,8 @@ def run_batches(
       ]
       for k, v in sorted(dimensions.items()):
         cmd.extend(('-d', k, v))
+      for k, v in sorted(caches):
+        cmd.extend(('--named-cache', k, v))
       for t in sorted(tags):
         cmd.extend(('--tags', t))
       for k, v in env:
@@ -164,8 +166,8 @@ def run_batches(
     t.join()
 
 
-def run_serial(swarming_server, isolate_server, dimensions, tags, env, priority,
-               deadline, repeat, isolated_hash, name, bots, args):
+def run_serial(swarming_server, isolate_server, dimensions, caches, tags, env,
+               priority, deadline, repeat, isolated_hash, name, bots, args):
   """Runs the task one at a time.
 
   This will be mainly bound by task scheduling latency, especially if the bots
@@ -199,6 +201,8 @@ def run_serial(swarming_server, isolate_server, dimensions, tags, env, priority,
       ]
       for k, v in sorted(dimensions.items()):
         cmd.extend(('-d', k, v))
+      for k, v in sorted(caches):
+        cmd.extend(('--named-cache', k, v))
       for t in sorted(tags):
         cmd.extend(('--tags', t))
       for k, v in env:
@@ -211,8 +215,8 @@ def run_serial(swarming_server, isolate_server, dimensions, tags, env, priority,
   return result
 
 
-def run_parallel(swarming_server, isolate_server, dimensions, env, priority,
-                 deadline, repeat, isolated_hash, name, bots, args):
+def run_parallel(swarming_server, isolate_server, dimensions, caches, env,
+                 priority, deadline, repeat, isolated_hash, name, bots, args):
   tasks = []
   for i in range(repeat):
     suffix = '/%d' % i if repeat > 1 else ''
@@ -220,7 +224,7 @@ def run_parallel(swarming_server, isolate_server, dimensions, env, priority,
       d = {'id': bot}
       tname = parallel_execution.task_to_name(name, d, isolated_hash) + suffix
       d.update(dimensions)
-      tasks.append((tname, isolated_hash, d, env))
+      tasks.append((tname, isolated_hash, d, caches, env))
   extra_args = ['--priority', priority, '--deadline', deadline]
   extra_args.extend(args)
   print('Using priority %s' % priority)
@@ -299,21 +303,22 @@ def main():
   # 3. Trigger the tasks.
   if options.batches > 0:
     return run_batches(options.swarming, options.isolate_server,
-                       options.dimensions, options.tags, options.env,
-                       str(options.priority), str(
-                           options.deadline), options.batches, options.repeat,
+                       options.dimensions, options.caches,
+                       options.tags, options.env, str(options.priority),
+                       str(options.deadline), options.batches, options.repeat,
                        isolated_hash, name, bots, args[1:])
 
   if options.serial:
     return run_serial(options.swarming, options.isolate_server,
-                      options.dimensions, options.tags, options.env,
-                      str(options.priority), str(options.deadline),
-                      options.repeat, isolated_hash, name, bots, args[1:])
-
-  return run_parallel(options.swarming, options.isolate_server,
-                      options.dimensions, options.env, str(options.priority),
+                      options.dimensions, options.caches,
+                      options.tags, options.env, str(options.priority),
                       str(options.deadline), options.repeat, isolated_hash,
                       name, bots, args[1:])
+
+  return run_parallel(options.swarming, options.isolate_server,
+                      options.dimensions, options.caches, options.env,
+                      str(options.priority), str(options.deadline),
+                      options.repeat, isolated_hash, name, bots, args[1:])
 
 
 if __name__ == '__main__':
