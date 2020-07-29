@@ -4,6 +4,7 @@
 # that can be found in the LICENSE file.
 
 import ctypes
+import hashlib
 import json
 import logging
 import os
@@ -25,6 +26,7 @@ import run_isolated
 from utils import file_path
 
 
+OUTPUT_CONTENT = 'foooo'
 CONTENTS = {
     'check_files.py':
         textwrap.dedent("""
@@ -116,6 +118,11 @@ CONTENTS = {
           print('b contained %r' % d, file=sys.stderr)
           sys.exit(4)
       print('Success')""").encode(),
+    'output.py':
+        textwrap.dedent("""
+      import sys
+      with open(sys.argv[1], 'w') as fh:
+        fh.writelines(['{}'])""".format(OUTPUT_CONTENT)).encode(),
 }
 
 
@@ -191,6 +198,13 @@ CONTENTS['check_files.isolated'] = json.dumps({
     'includes': [
         isolateserver_fake.hash_content(CONTENTS['repeated_files.isolated']),
     ]
+}).encode()
+
+CONTENTS['output.isolated'] = json.dumps({
+    'command': ['python', 'output.py', '${ISOLATED_OUTDIR}/foo.txt'],
+    'files': {
+        'output.py': file_meta('output.py'),
+    },
 }).encode()
 
 
@@ -334,6 +348,25 @@ class RunIsolatedTest(unittest.TestCase):
     self.assertEqual(0, returncode)
     actual = list_files_tree(self._isolated_cache_dir)
     self.assertEqual(sorted(set(expected)), actual)
+
+  def test_isolated_output(self):
+    isolated_hash = self._store('output.isolated')
+    expected = [
+        'state.json',
+        self._store('output.py'),
+    ]
+
+    _, err, returncode = self._run(self._cmd_args(isolated_hash))
+    self.assertEqual('', err)
+    self.assertEqual(0, returncode)
+    actual = list_files_tree(self._isolated_cache_dir)
+    six.assertCountEqual(self, expected, actual)
+
+    encoded_content = OUTPUT_CONTENT.encode()
+    h = hashlib.sha1()
+    h.update(encoded_content)
+    actual_content = self._isolated_server.contents['default'][h.hexdigest()]
+    self.assertEqual(actual_content, encoded_content)
 
   def test_isolated_max_path(self):
     # Make sure we can map and delete a tree that has paths longer than

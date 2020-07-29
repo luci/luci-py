@@ -119,12 +119,13 @@ class FakeIsolateServerHandler(httpserver.Handler):
       request = json.loads(body)
       namespace = request['namespace']['namespace']
       for index, i in enumerate(request['items']):
-        append_entry({
-            'd': i['digest'],
-            'i': i['is_isolated'],
-            'n': namespace,
-            's': i['size'],
-        }, index, response['items'])
+        append_entry(
+            {
+                'd': i['digest'],
+                'i': i['is_isolated'],
+                'n': namespace,
+                's': int(i['size']),
+            }, index, response['items'])
       logging.info('Returning %s' % response)
       self.send_json(response)
     elif self.path.startswith('/_ah/api/isolateservice/v1/store_inline'):

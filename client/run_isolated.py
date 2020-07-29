@@ -723,6 +723,7 @@ def _upload_with_go(storage, outdir, isolated_client):
         isolated_path,
         '-dump-stats-json',
         stats_json_path,
+        '-quiet',
     ]
     _run_go_isolated_and_wait(cmd)
 
@@ -737,16 +738,13 @@ def _upload_with_go(storage, outdir, isolated_client):
     fs.remove(stats_json_path)
 
 
-def upload_then_delete(storage, out_dir, leak_temp_dir, go_isolated_client):
-  """Deletes the temporary run directory and uploads results back.
+def upload_out_dir(storage, out_dir, go_isolated_client):
+  """Uploads the results in |out_dir| back, if there is any.
 
   Returns:
-    tuple(outputs_ref, success, stats)
+    tuple(outputs_ref, stats)
     - outputs_ref: a dict referring to the results archived back to the isolated
           server, if applicable.
-    - success: False if something occurred that means that the task must
-          forcibly be considered a failure, e.g. zombie processes were left
-          behind.
     - stats: uploading stats.
   """
   # Upload out_dir and generate a .isolated file out of this directory. It is
@@ -770,22 +768,12 @@ def upload_then_delete(storage, out_dir, leak_temp_dir, go_isolated_client):
           'namespace': storage.server_ref.namespace,
       }
 
-  success = False
-  try:
-    if (not leak_temp_dir and fs.isdir(out_dir) and
-        not file_path.rmtree(out_dir)):
-      logging.error('Had difficulties removing out_dir %s', out_dir)
-    else:
-      success = True
-  except OSError as e:
-    # When this happens, it means there's a process error.
-    logging.exception('Had difficulties removing out_dir %s: %s', out_dir, e)
   stats = {
       'duration': time.time() - start,
       'items_cold': cold,
       'items_hot': hot,
   }
-  return outputs_ref, success, stats
+  return outputs_ref, stats
 
 
 def map_and_run(data, constant_run_path):
@@ -948,6 +936,14 @@ def map_and_run(data, constant_run_path):
         finally:
           result['duration'] = max(time.time() - start, 0)
 
+      if out_dir:
+        # Try to link files to the output directory, if specified.
+        link_outputs_to_outdir(run_dir, out_dir, data.outputs)
+        isolated_stats = result['stats'].setdefault('isolated', {})
+        # This could use |go_isolated_client|, so make sure it runs when the
+        # CIPD package still exists.
+        result['outputs_ref'], isolated_stats['upload'] = (
+            upload_out_dir(data.storage, out_dir, go_isolated_client))
     # We successfully ran the command, set internal_failure back to
     # None (even if the command failed, it's not an internal error).
     result['internal_failure'] = None
@@ -961,11 +957,7 @@ def map_and_run(data, constant_run_path):
   # Clean up
   finally:
     try:
-      # Try to link files to the output directory, if specified.
-      if out_dir:
-        link_outputs_to_outdir(run_dir, out_dir, data.outputs)
-
-      success = False
+      success = True
       if data.leak_temp_dir:
         success = True
         logging.warning(
@@ -976,11 +968,14 @@ def map_and_run(data, constant_run_path):
         # process locks *.exe file). Examine out_dir only after that call
         # completes (since child processes may write to out_dir too and we need
         # to wait for them to finish).
-        for directory in (run_dir, tmp_dir, isolated_client_dir):
+        dirs_to_remove = [run_dir, tmp_dir, isolated_client_dir]
+        if out_dir:
+          dirs_to_remove.append(out_dir)
+        for directory in dirs_to_remove:
           if not fs.isdir(directory):
             continue
           try:
-            success = file_path.rmtree(directory)
+            success = success and file_path.rmtree(directory)
           except OSError as e:
             logging.error('rmtree(%r) failed: %s', directory, e)
             success = False
@@ -990,12 +985,6 @@ def map_and_run(data, constant_run_path):
             if result['exit_code'] == 0:
               result['exit_code'] = 1
 
-      # This deletes out_dir if leak_temp_dir is not set.
-      if out_dir:
-        isolated_stats = result['stats'].setdefault('isolated', {})
-        result['outputs_ref'], success, isolated_stats['upload'] = (
-            upload_then_delete(data.storage, out_dir, data.leak_temp_dir,
-                               go_isolated_client))
       if not success and result['exit_code'] == 0:
         result['exit_code'] = 1
     except Exception as e:
