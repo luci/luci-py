@@ -298,7 +298,7 @@ ${countBlocks(result, ele._capacityCounts[ele._currentSliceIdx],
 
 const countBlocks = (result, capacityCount, pendingCount,
     runningCount, properties) => html`
-<tr>
+<tr ?hidden=${!capacityCount}>
   <td class=${result.state === 'PENDING'? 'bold': ''}>
     ${result.state === 'PENDING' ? 'Why Pending?' : 'Fleet Capacity'}
   </td>
@@ -312,7 +312,7 @@ const countBlocks = (result, capacityCount, pendingCount,
     ${count(capacityCount, 'maintenance')} maintenance)
   </td>
 </tr>
-<tr>
+<tr ?hidden=${!pendingCount || !runningCount}>
   <td>Similar Load</td>
   <td>
       ${count(pendingCount)}
@@ -1390,7 +1390,7 @@ time.sleep(${leaseDuration})`];
             this.render();
             this.app.finishedTask();
           })
-          .catch((e) => this.fetchError(e, 'bots/count slice ' + i));
+          .catch((e) => this.fetchError(e, 'bots/count slice ' + i, true));
 
       let start = new Date();
       start.setSeconds(0);
@@ -1410,7 +1410,7 @@ time.sleep(${leaseDuration})`];
             this.render();
             this.app.finishedTask();
           })
-          .catch((e) => this.fetchError(e, 'tasks/running slice ' + i));
+          .catch((e) => this.fetchError(e, 'tasks/running slice ' + i, true));
 
       tParams.state = ['PENDING'];
       fetch(`/_ah/api/swarming/v1/tasks/count?${query.fromObject(tParams)}`, extra)
@@ -1420,7 +1420,7 @@ time.sleep(${leaseDuration})`];
             this.render();
             this.app.finishedTask();
           })
-          .catch((e) => this.fetchError(e, 'tasks/pending slice ' + i));
+          .catch((e) => this.fetchError(e, 'tasks/pending slice ' + i, true));
     }
   }
 
