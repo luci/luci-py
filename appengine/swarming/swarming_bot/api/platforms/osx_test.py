@@ -112,6 +112,11 @@ class TestOsx(unittest.TestCase):
       os_version = osx.get_os_version_number()
     self.assertEqual(os_version, '10.15.5')
 
+  def test_get_os_build_version(self):
+    self.mock_check_output.return_value = b'19F101\n'
+    build_version = osx.get_os_build_version()
+    self.assertEqual(build_version, '19F101')
+
   def test_get_audio(self):
     plist = textwrap.dedent("""\
       <plist> <array>

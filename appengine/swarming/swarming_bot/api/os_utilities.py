@@ -162,8 +162,10 @@ def get_os_values():
   elif sys.platform == 'darwin':
     # Expects '10.a.b'. Add both '10.a' and '10.a.b'.
     number = platforms.osx.get_os_version_number()
+    build = platforms.osx.get_os_build_version()
     out.append(u'%s-%s' % (os_name, number.rsplit('.', 1)[0]))
     out.append(u'%s-%s' % (os_name, number))
+    out.append(u'%s-%s-%s' % (os_name, number, build))
   else:
     # TODO(crbug/1018836): Get rid of this, Linux is not an OS, it's a kernel.
     out.append(u'Linux')
