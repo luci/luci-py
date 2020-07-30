@@ -111,7 +111,6 @@ def db():
       permission('swarming.pools.listTasks'),
   ])
   role('role/swarming.poolUser', [
-      include('role/swarming.poolViewer'),
       permission('swarming.pools.createTask'),
   ])
   role('role/swarming.poolOwner', [
