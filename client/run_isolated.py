@@ -1469,14 +1469,18 @@ def main(args):
       parser.error('Can\'t use --json with --clean.')
     if options.named_caches:
       parser.error('Can\t use --named-cache with --clean.')
+
+    logging.info("initial free space: %d", file_path.get_free_space(root))
     # Trim first, then clean.
     local_caching.trim_caches(
         caches,
         root,
         min_free_space=options.min_free_space,
         max_age_secs=MAX_AGE_SECS)
+    logging.info("free space after trim: %d", file_path.get_free_space(root))
     for c in caches:
       c.cleanup()
+    logging.info("free space after cleanup: %d", file_path.get_free_space(root))
     return 0
 
   # Trim must still be done for the following case:
