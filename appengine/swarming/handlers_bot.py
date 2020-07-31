@@ -205,7 +205,7 @@ class BotCodeHandler(_BotAuthenticatingHandler):
   @auth.public  # auth inside check_bot_code_access()
   def get(self, version=None):
     server = self.request.host_url
-    expected, _ = bot_code.get_bot_version(server)
+    expected = bot_code.get_bot_version(server)[0]
     if not version:
       # Historically, the bot_id query argument was used for the bot to pass its
       # ID to the server. More recent bot code uses the X-Luci-Swarming-Bot-ID
@@ -558,7 +558,10 @@ class BotPollHandler(_BotBaseHandler):
     # Bot version is host-specific because the host URL is embedded in
     # swarming_bot.zip
     logging.debug('Fetching bot code version')
-    expected_version, _ = bot_code.get_bot_version(self.request.host_url)
+    # TODO(crbug.com/1087981): compare the expected bot config revision and
+    # the current bot config revision.
+    expected_version, _, _expected_bot_config_rev = bot_code.get_bot_version(
+        self.request.host_url)
     if res.version != expected_version:
       bot_event('request_update')
       self._cmd_update(expected_version)

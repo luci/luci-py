@@ -1324,7 +1324,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(expected, response)
 
   def test_bot_code_as_bot(self):
-    self.mock(bot_code, 'get_bot_version', lambda _: ('0' * 64, None))
+    self.mock(bot_code, 'get_bot_version', lambda _: ('0' * 64, None, 'rev1'))
     code = self.app.get('/swarming/api/v1/bot/bot_code/' + '0' * 64)
     expected = {'config/bot_config.py',
                 'config/config.json'}.union(bot_archive.FILES)
@@ -1332,7 +1332,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
       self.assertEqual(expected, set(z.namelist()))
 
   def test_bot_code_as_bot_query_string(self):
-    self.mock(bot_code, 'get_bot_version', lambda _: ('0' * 64, None))
+    self.mock(bot_code, 'get_bot_version', lambda _: ('0' * 64, None, 'rev1'))
     self.app.get(
         '/swarming/api/v1/bot/bot_code/' + '0' * 64 + '?bot_id=1', status=302)
 
@@ -1341,13 +1341,13 @@ class BotApiTest(test_env_handlers.AppTestBase):
     self.app.get('/bot_code', status=403)
 
   def test_bot_code_with_token(self):
-    self.mock(bot_code, 'get_bot_version', lambda _: ('0' * 64, None))
+    self.mock(bot_code, 'get_bot_version', lambda _: ('0' * 64, None, 'rev1'))
     self.set_as_anonymous()
     tok = bot_code.generate_bootstrap_token()
     self.app.get('/bot_code?tok=%s' % tok, status=302)
 
   def test_bot_code_redirect(self):
-    self.mock(bot_code, 'get_bot_version', lambda _: ('0' * 64, None))
+    self.mock(bot_code, 'get_bot_version', lambda _: ('0' * 64, None, 'rev1'))
     response = self.app.get('/bot_code')
     self.assertEqual(response.status_int, 302)  # Found
     self.assertEqual(
@@ -1355,7 +1355,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
         'http://localhost/swarming/api/v1/bot/bot_code/' + '0' * 64)
 
   def test_bot_code_wrong_version(self):
-    self.mock(bot_code, 'get_bot_version', lambda _: ('0' * 64, None))
+    self.mock(bot_code, 'get_bot_version', lambda _: ('0' * 64, None, 'rev1'))
     response = self.app.get(
         '/swarming/api/v1/bot/bot_code/' + '1' * 64,
         headers={'X-Luci-Swarming-Bot-ID': 'bot1'})

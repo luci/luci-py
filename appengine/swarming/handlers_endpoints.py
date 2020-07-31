@@ -316,7 +316,7 @@ class SwarmingServerService(remote.Service):
   @auth.require(acl.can_view_config, log_identity=True)
   def get_bot_config(self, _request):
     """Retrieves the current version of bot_config.py."""
-    obj = bot_code.get_bot_config()
+    obj, _ = bot_code.get_bot_config()
     return swarming_rpcs.FileContent(
         content=obj.content.decode('utf-8'),
         who=obj.who,

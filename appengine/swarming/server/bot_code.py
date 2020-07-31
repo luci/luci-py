@@ -90,12 +90,12 @@ def get_bot_config():
   rev, cfg = config.get_self_config(
       'scripts/bot_config.py', store_last_good=True)
   if cfg:
-    return File(cfg, config.config_service_hostname(), None, rev)
+    return File(cfg, config.config_service_hostname(), None, rev), rev
 
   # Fallback to the one embedded in the tree.
   path = os.path.join(ROOT_DIR, 'swarming_bot', 'config', 'bot_config.py')
   with open(path, 'rb') as f:
-    return File(f.read(), None, None, None)
+    return File(f.read(), None, None, None), rev
 
 
 def get_bot_version(host):
@@ -105,21 +105,31 @@ def get_bot_version(host):
   is generated and then stored in the memcache.
 
   Returns:
-    tuple(hash of the current bot version, dict of additional files).
+    version: hash of the current bot version.
+    additionals: dict of additional files.
+    bot_config_rev: revision of the bot_config.py.
   """
   signature = _get_signature(host)
   version = memcache.get('version-' + signature, namespace='bot_code')
-  if version:
-    return version, None
+  bot_config_rev = memcache.get(
+      'bot_config_rev-' + signature, namespace='bot_code')
+  if version and bot_config_rev:
+    return version, None, bot_config_rev
 
   # Need to calculate it.
-  additionals = {'config/bot_config.py': get_bot_config().content}
+  bot_config, bot_config_rev = get_bot_config()
+  additionals = {'config/bot_config.py': bot_config.content}
   bot_dir = os.path.join(ROOT_DIR, 'swarming_bot')
   version = bot_archive.get_swarming_bot_version(
       bot_dir, host, utils.get_app_version(), additionals,
       local_config.settings())
   memcache.set('version-' + signature, version, namespace='bot_code', time=60)
-  return version, additionals
+  memcache.set(
+      'bot_config_rev-' + signature,
+      bot_config_rev,
+      namespace='bot_code',
+      time=60)
+  return version, additionals, bot_config_rev
 
 
 def get_swarming_bot_zip(host):
@@ -128,23 +138,28 @@ def get_swarming_bot_zip(host):
   Returns:
     A string representing the zipped file's contents.
   """
-  version, additionals = get_bot_version(host)
-  content = get_cached_swarming_bot_zip(version)
-  if content:
-    logging.debug('memcached bot code %s; %d bytes', version, len(content))
-    return content
+  version, additionals, bot_config_rev = get_bot_version(host)
+  cached_content, cached_bot_config_rev = get_cached_swarming_bot_zip(version)
+  # TODO(crbug.com/1087981): Compare the bot config revisions.
+  # Separate deployment to be safe.
+  if cached_content and cached_bot_config_rev:
+    logging.debug('memcached bot code %s; %d bytes with bot_config.py rev: %s',
+                  version, len(cached_content), cached_bot_config_rev)
+    return cached_content
 
   # Get the start bot script from the database, if present. Pass an empty
   # file if the files isn't present.
+  bot_config, bot_config_rev = get_bot_config()
   additionals = additionals or {
-    'config/bot_config.py': get_bot_config().content,
+      'config/bot_config.py': bot_config.content,
   }
   bot_dir = os.path.join(ROOT_DIR, 'swarming_bot')
   content, version = bot_archive.get_swarming_bot_zip(
       bot_dir, host, utils.get_app_version(), additionals,
       local_config.settings())
-  logging.info('generated bot code %s; %d bytes', version, len(content))
-  cache_swarming_bot_zip(version, content)
+  logging.info('generated bot code %s; %d bytes with bot_config.py rev: %s',
+               version, len(content), bot_config_rev)
+  cache_swarming_bot_zip(version, content, bot_config_rev)
   return content
 
 
@@ -154,7 +169,7 @@ def get_cached_swarming_bot_zip(version):
   meta = bot_memcache_get(version, 'meta').get_result()
   if meta is None:
     logging.info('memcache did not include metadata for version %s', version)
-    return None
+    return None, None
   num_parts, true_sig = meta.split(':')
 
   # Get everything asynchronously. If something's missing, the hash will be
@@ -174,17 +189,20 @@ def get_cached_swarming_bot_zip(version):
   if missing:
     logging.warning(
         'bot code %s was missing %d/%d chunks', version, missing, len(futures))
-    return None
+    return None, None
   h = hashlib.sha256()
   h.update(content)
   if h.hexdigest() != true_sig:
     logging.error('bot code %s had signature %s instead of expected %s',
                   version, h.hexdigest(), true_sig)
-    return None
-  return content
+    return None, None
+
+  bot_config_rev = bot_memcache_get(version, 'bot_config_rev').get_result()
+
+  return content, bot_config_rev
 
 
-def cache_swarming_bot_zip(version, content):
+def cache_swarming_bot_zip(version, content, bot_config_rev):
   """Caches the bot code to memcache."""
   h = hashlib.sha256()
   h.update(content)
@@ -200,8 +218,10 @@ def cache_swarming_bot_zip(version, content):
     f.check_success()
   meta = "%s:%s" % (p, h.hexdigest())
   bot_memcache_set(meta, version, 'meta').check_success()
-  logging.info('bot %s with sig %s saved in memcached in %d chunks',
-               version, h.hexdigest(), p)
+  bot_memcache_set(bot_config_rev, version, 'bot_config_rev').check_success()
+  logging.info(
+      'bot %s with sig %s with bot_config rev: %s saved in memcached in %d '
+      'chunks', version, h.hexdigest(), bot_config_rev, p)
 
 
 def bot_memcache_get(version, desc, part=None):

@@ -52,7 +52,8 @@ class BotManagementTest(test_case.TestCase):
       self.assertEqual('scripts/bootstrap.py', path)
       self.assertEqual(None, revision)
       self.assertEqual(True, store_last_good)
-      return None, 'foo bar'
+      return 'rev1', 'foo bar'
+
     self.mock(config, 'get_self_config', get_self_config_mock)
     f = bot_code.get_bootstrap('localhost', 'token')
     expected = ('#!/usr/bin/env python\n'
@@ -67,18 +68,21 @@ class BotManagementTest(test_case.TestCase):
       self.assertEqual('scripts/bot_config.py', path)
       self.assertEqual(None, revision)
       self.assertEqual(True, store_last_good)
-      return None, 'foo bar'
+      return 'rev1', 'foo bar'
+
     self.mock(config, 'get_self_config', get_self_config_mock)
-    f = bot_code.get_bot_config()
+    f, rev = bot_code.get_bot_config()
     self.assertEqual('foo bar', f.content)
+    self.assertEqual('rev1', rev)
 
   def test_get_bot_version(self):
-    actual, additionals = bot_code.get_bot_version('http://localhost')
+    actual, additionals, bot_config_rev = bot_code.get_bot_version(
+        'http://localhost')
     self.assertTrue(re.match(r'^[0-9a-f]{64}$', actual), actual)
-    expected = {
-      'config/bot_config.py': bot_code.get_bot_config().content,
-    }
+    expected_bot_config, expected_bot_config_rev = bot_code.get_bot_config()
+    expected = {'config/bot_config.py': expected_bot_config.content}
     self.assertEqual(expected, additionals)
+    self.assertEqual(expected_bot_config_rev, bot_config_rev)
 
   def mock_memcache(self):
     local_mc = {'store': {}, 'reads': 0, 'writes': 0}
@@ -104,6 +108,17 @@ class BotManagementTest(test_case.TestCase):
     return local_mc
 
   def test_get_swarming_bot_zip(self):
+    get_self_config_orig = config.get_self_config
+
+    def get_self_config_mock(path, revision=None, store_last_good=False):
+      if path == 'settings.cfg':
+        return get_self_config_orig(path, revision, store_last_good)
+      self.assertEqual('scripts/bot_config.py', path)
+      self.assertEqual(None, revision)
+      self.assertEqual(True, store_last_good)
+      return 'rev1', 'foo bar'
+
+    self.mock(config, 'get_self_config', get_self_config_mock)
     local_mc = self.mock_memcache()
 
     self.assertEqual(0, local_mc['writes'])
