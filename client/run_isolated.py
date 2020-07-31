@@ -982,6 +982,7 @@ def map_and_run(data, constant_run_path):
           if not success:
             sys.stderr.write(
                 OUTLIVING_ZOMBIE_MSG % (directory, data.grace_period))
+            subprocess42.check_call(['tasklist.exe', '/V'], stdout=sys.stderr)
             if result['exit_code'] == 0:
               result['exit_code'] = 1
 
