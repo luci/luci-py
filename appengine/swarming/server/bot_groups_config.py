@@ -71,6 +71,10 @@ BotGroupConfig = collections.namedtuple(
         # handshake.
         'bot_config_script',
 
+        # Revision of the supplemental bot_config.py to inject to the bot during
+        # handshake.
+        'bot_config_script_rev',
+
         # Content of the supplemental bot_config.py to inject to the bot during
         # handshake.
         'bot_config_script_content',
@@ -386,6 +390,7 @@ def _include_bot_config_scripts(cfg, digest, ctx):
       continue
     rev, content = fetch_script('scripts/' + gr.bot_config_script)
     if content:
+      gr.bot_config_script_rev = rev
       gr.bot_config_script_content = content
       digest.update('BOT_CONFIG_SCRIPT_REV:%d' % idx, rev)
     else:
@@ -515,6 +520,7 @@ def _default_bot_groups():
               ip_whitelist=auth.bots_ip_whitelist()),),
           dimensions={},
           bot_config_script='',
+          bot_config_script_rev='',
           bot_config_script_content='',
           system_service_account='',
           is_default=True))
@@ -577,6 +583,7 @@ def _bot_group_proto_to_tuple(msg, trusted_dimensions):
               ip_whitelist=cfg.ip_whitelist) for cfg in msg.auth),
       dimensions={k: sorted(v) for k, v in dimensions.items()},
       bot_config_script=msg.bot_config_script or '',
+      bot_config_script_rev='',
       bot_config_script_content=msg.bot_config_script_content or '',
       system_service_account=msg.system_service_account or '',
       is_default=not msg.bot_id and not msg.bot_id_prefix)

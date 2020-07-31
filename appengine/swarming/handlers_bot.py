@@ -484,8 +484,9 @@ class BotHandshakeHandler(_BotBaseHandler):
         },
     }
     if res.bot_group_cfg.bot_config_script_content:
-      logging.info('Injecting %s: %d bytes',
+      logging.info('Injecting %s: rev %s, %d bytes',
                    res.bot_group_cfg.bot_config_script,
+                   res.bot_group_cfg.bot_config_script_rev,
                    len(res.bot_group_cfg.bot_config_script_content))
       data['bot_config'] = res.bot_group_cfg.bot_config_script_content
     self.send_response(data)

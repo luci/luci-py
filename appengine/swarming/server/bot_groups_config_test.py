@@ -76,6 +76,7 @@ EXPECTED_GROUP_1 = bot_groups_config._make_bot_group_config(
         u'other': [u'D']
     },
     bot_config_script='',
+    bot_config_script_rev='',
     bot_config_script_content='',
     system_service_account='',
     is_default=False)
@@ -91,6 +92,7 @@ EXPECTED_GROUP_2 = bot_groups_config._make_bot_group_config(
     ),),
     dimensions={u'pool': []},
     bot_config_script='foo.py',
+    bot_config_script_rev='',
     bot_config_script_content='print("Hi")',
     system_service_account='bot',
     is_default=False)
@@ -106,6 +108,7 @@ EXPECTED_GROUP_3 = bot_groups_config._make_bot_group_config(
     ),),
     dimensions={u'pool': [u'default']},
     bot_config_script='',
+    bot_config_script_rev='',
     bot_config_script_content='',
     system_service_account='',
     is_default=True)
@@ -141,8 +144,9 @@ class BotGroupsConfigTest(test_case.TestCase):
     bot_groups_config.clear_cache()
 
   def test_version(self):
-    self.assertEqual('hash:4fd27b3abc6eb1', EXPECTED_GROUP_1.version)
-    self.assertEqual('hash:f32dde47be8560', EXPECTED_GROUP_2.version)
+    self.assertEqual('hash:ebb6f818791207', EXPECTED_GROUP_1.version)
+    self.assertEqual('hash:64de2b9a71310d', EXPECTED_GROUP_2.version)
+    self.assertEqual('hash:5d851a90da99d8', EXPECTED_GROUP_3.version)
 
   def test_expand_bot_id_expr_success(self):
 
@@ -640,12 +644,14 @@ class CacheTest(test_case.TestCase):
                     bot_id=['bot1'],
                     auth=[bots_pb2.BotAuth(require_luci_machine_token=True)],
                     bot_config_script='script.py',
+                    bot_config_script_rev='rev2',
                     bot_config_script_content=good_script,
                 ),
                 bots_pb2.BotGroup(
                     bot_id=['bot2'],
                     auth=[bots_pb2.BotAuth(require_luci_machine_token=True)],
                     bot_config_script='script.py',
+                    bot_config_script_rev='rev2',
                     bot_config_script_content=good_script,
                 ),
             ],), cfg.bots)

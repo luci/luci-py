@@ -673,6 +673,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
         ),),
         dimensions={u'pool': [u'server-side']},
         bot_config_script=None,
+        bot_config_script_rev=None,
         bot_config_script_content=None,
         system_service_account=None,
         is_default=True)
@@ -699,6 +700,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
         ),),
         dimensions={},
         bot_config_script='foo.py',
+        bot_config_script_rev='abcd',
         bot_config_script_content='print("Hi");import sys; sys.exit(1)',
         system_service_account=None,
         is_default=True)
@@ -1521,6 +1523,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
         ),),
         dimensions={},
         bot_config_script=None,
+        bot_config_script_rev=None,
         bot_config_script_content=None,
         system_service_account='system@example.com',
         is_default=True)
