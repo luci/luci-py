@@ -23,7 +23,7 @@ import * as query from 'common-sk/modules/query';
 
 import {applyAlias} from '../alias';
 import {canRetry, cipdLink, durationChart, hasRichOutput, humanState,
-  firstDimension, isolateLink, isSummaryTask, parseRequest, parseResult,
+  firstDimension, isolateLink, parseRequest, parseResult,
   richLogsLink, sliceSchedulingDeadline, stateClass, taskCost,
   taskSchedulingDeadline, taskInfoClass, wasDeduped,
   wasPickedUp} from './task-page-helpers';
@@ -864,52 +864,28 @@ const taskLogs = (ele) => {
   return html`
 <div class="horizontal layout">
   <div class=output-picker>
-    <div class=tab ?selected=${!ele._showRawOutput && hasRichOutput(ele)}
-                   ?disabled=${!hasRichOutput(ele)}
-                   @click=${ele._toggleOutput}>
+    <div class=tab selected>
+      Raw Output
+    </div>
+    <div class=tab ?hidden=${!hasRichOutput(ele)}>
       <a rel=noopener target=_blank href=${ifDefined(richLogsLink(ele))}>
         Rich Output
       </a>
     </div>
-    <div class=tab ?selected=${ele._showRawOutput || !hasRichOutput(ele)}
-                   @click=${ele._toggleOutput}>
-      Raw Output
-    </div>
-    <checkbox-sk id=wide_logs ?checked=${ele._wideLogs} @click=${ele._toggleWidth}></checkbox-sk>
+    <checkbox-sk
+      id=wide_logs ?checked=${ele._wideLogs} @click=${ele._toggleWidth}>
+    </checkbox-sk>
     <span>Full Width Logs</span>
   </div>
 </div>
-${richOrRawLogs(ele)}
-`;
+<div class="code stdout tabbed ${ele._wideLogs ? 'wide' : 'break-all'}">
+  ${ele._stdout.map(logBlock)}
+</div>`;
 };
 
 // See comment on this._stdout for explanation on how breaking the logs up
 // increases page performance.
 const logBlock = (log) => html`<div>${log}</div>`;
-
-const richOrRawLogs = (ele) => {
-  // guard should prevent the iframe from reloading on any render,
-  // and only when something relevant changes.
-  return guard([ele._request, ele._showRawOutput, ele._stdout.length,
-    ele._stdoutOffset, ele._wideLogs], () => {
-    if (ele._showRawOutput || !hasRichOutput(ele)) {
-      return html`
-<div class="code stdout tabbed ${ele._wideLogs ? 'wide' : 'break-all'}"
-  >${ele._stdout.map(logBlock)}
-</div>`;
-    }
-    if (!isSummaryTask(ele._taskId)) {
-      return html`
-<div class=tabbed>
-  Milo results are only generated for task summaries, that is, tasks whose ids end in 0.
-  Tasks ending in 1 or 2 represent possible retries of tasks.
-  See <a href="//goo.gl/LE4rwV">the docs</a> for more.
-</div>`;
-    }
-    return html`
-<iframe id=richLogsFrame class=tabbed src=${ifDefined(richLogsLink(ele))}></iframe>`;
-  });
-};
 
 const retryOrDebugPrompt = (ele, sliceProps) => {
   const dimensions = sliceProps.dimensions || [];
@@ -1034,7 +1010,6 @@ window.customElements.define('task-page', class extends SwarmingAppBoilerplate {
     // help stateReflector with types.
     this._taskId = '';
     this._showDetails = false;
-    this._showRawOutput = false;
     this._wideLogs = false;
     this._urlParamsLoaded = false;
     const idx = location.hostname.indexOf('.appspot.com');
@@ -1046,14 +1021,12 @@ window.customElements.define('task-page', class extends SwarmingAppBoilerplate {
           // provide empty values
             'id': this._taskId,
             'd': this._showDetails,
-            'o': this._showRawOutput,
             'w': this._wideLogs,
           };
         }, /* setState*/(newState) => {
           // default values if not specified.
           this._taskId = newState.id || this._taskId;
           this._showDetails = newState.d; // default to false
-          this._showRawOutput = newState.o; // default to false
           this._wideLogs = newState.w; // default to false
           this._urlParamsLoaded = true;
           this._fetch();
@@ -1552,12 +1525,6 @@ time.sleep(${leaseDuration})`];
       return;
     }
     this._useSameBot = !this._useSameBot;
-    this.render();
-  }
-
-  _toggleOutput(e) {
-    this._showRawOutput = !this._showRawOutput;
-    this._stateChanged();
     this.render();
   }
 

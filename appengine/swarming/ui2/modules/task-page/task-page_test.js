@@ -409,25 +409,8 @@ describe('task-page', function() {
         });
       });
 
-      it('shows rich logs in an iframe', function(done) {
-        loggedInTaskPage((ele) => {
-          ele._showRawOutput = false;
-          ele.render();
-
-          const frame = $$('#richLogsFrame', ele);
-          expect(frame).toBeTruthy();
-          expect(frame.src).toEqual('https://example.com/#id='+TEST_TASK_ID);
-
-          // Stdout logs aren't rendered then
-          const logs = $$('.stdout.code', ele);
-          expect(logs).toBeFalsy();
-          done();
-        });
-      });
-
       it('shows stdout logs in a box', function(done) {
         loggedInTaskPage((ele) => {
-          ele._showRawOutput = true;
           ele._wideLogs = false;
           ele.render();
 
@@ -448,7 +431,6 @@ describe('task-page', function() {
 
       it('can show wide logs', function(done) {
         loggedInTaskPage((ele) => {
-          ele._showRawOutput = true;
           ele._wideLogs = true;
           ele.render();
 
@@ -508,21 +490,6 @@ describe('task-page', function() {
           expect(cell(2, 0)).toMatchTextContent('Why Pending?');
           expect(rows[5]).toHaveAttribute('hidden', 'deduped message hidden');
           expect(cell(15, 0).rowSpan).toEqual(5); // 4 dimensions + 1 for header
-
-          done();
-        });
-      });
-
-      it('shows rich output as disabled', function(done) {
-        loggedInTaskPage((ele) => {
-          const picker = $$('.output-picker', ele);
-          expect(picker).toBeTruthy();
-          const tabs = $('.tab', picker);
-          expect(tabs.length).toEqual(2);
-          expect(tabs[0]).toHaveAttribute('disabled');
-          expect(tabs[0]).not.toHaveAttribute('selected');
-          expect(tabs[1]).not.toHaveAttribute('disabled');
-          expect(tabs[1]).toHaveAttribute('selected');
 
           done();
         });
@@ -821,35 +788,9 @@ describe('task-page', function() {
         });
       });
 
-      it('switches between log representations with a tab', function(done) {
-        loggedInTaskPage((ele) => {
-          ele._showRawOutput = false;
-          ele.render();
-          const tabs = $('.output-picker .tab', ele);
-          expect(tabs.length).toEqual(2);
-          expect(tabs[0]).not.toHaveAttribute('disabled');
-          expect(tabs[0]).toHaveAttribute('selected');
-          expect(tabs[1]).not.toHaveAttribute('selected');
-
-          tabs[1].click();
-
-          expect(tabs[0]).not.toHaveAttribute('disabled');
-          expect(tabs[0]).not.toHaveAttribute('selected');
-          expect(tabs[1]).toHaveAttribute('selected');
-
-          tabs[0].click();
-          expect(tabs[0]).not.toHaveAttribute('disabled');
-          expect(tabs[0]).toHaveAttribute('selected');
-          expect(tabs[1]).not.toHaveAttribute('selected');
-
-          done();
-        });
-      });
-
       it('switches between wide and narrow logs', function(done) {
         loggedInTaskPage((ele) => {
           ele._wideLogs = false;
-          ele._showRawOutput = true;
           ele.render();
           const logs = $$('.stdout.code', ele);
           expect(logs).toBeTruthy();
