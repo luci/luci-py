@@ -1376,6 +1376,7 @@ def _get_automatic_tags(request):
   """
   tags = set((
       u'priority:%s' % request.priority,
+      u'realm:%s' % (request.realm or u'None'),
       u'service_account:%s' % (request.service_account or u'None'),
       u'user:%s' % (request.user or u'None'),
   ))

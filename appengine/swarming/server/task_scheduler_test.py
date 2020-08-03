@@ -226,6 +226,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
             u'os:Windows-3.1.1',
             u'pool:default',
             u'priority:50',
+            u'realm:None',
             u'service_account:none',
             u'swarming.pool.template:no_config',
             u'tag:1',
