@@ -36,7 +36,6 @@ from server import task_result
 from server import task_to_run
 import ts_mon_metrics
 
-
 # pylint: disable=W0212
 
 
@@ -66,21 +65,16 @@ def _gen_request_slice(**kwargs):
   """Creates a TaskRequest."""
   now = utils.utcnow()
   args = {
-      'created_ts':
-          now,
+      'created_ts': now,
       'manual_tags': [u'tag:1'],
-      'name':
-          'Request name',
-      'priority':
-          50,
+      'name': 'Request name',
+      'priority': 50,
       'task_slices': [
           task_request.TaskSlice(
               expiration_secs=60, properties=_gen_properties()),
       ],
-      'user':
-          'Jesus',
-      'bot_ping_tolerance_secs':
-          120,
+      'user': 'Jesus',
+      'bot_ping_tolerance_secs': 120,
   }
   args.update(kwargs)
   ret = task_request.TaskRequest(**args)
@@ -94,9 +88,8 @@ def _gen_request(properties=None, **kwargs):
   """Creates a TaskRequest."""
   return _gen_request_slice(
       task_slices=[
-        task_request.TaskSlice(
-            expiration_secs=60,
-            properties=properties or _gen_properties()),
+          task_request.TaskSlice(
+              expiration_secs=60, properties=properties or _gen_properties()),
       ],
       **kwargs)
 
@@ -115,14 +108,14 @@ def _gen_run_result(**kwargs):
   result_summary = _gen_summary_result(**kwargs)
   request = result_summary.request_key.get()
   to_run = task_to_run.new_task_to_run(request, 0)
-  run_result = task_result.new_run_result(
-      request, to_run, 'localhost', 'abc', {})
+  run_result = task_result.new_run_result(request, to_run, 'localhost', 'abc',
+                                          {})
   run_result.started_ts = result_summary.modified_ts
   run_result.modified_ts = utils.utcnow()
   run_result.dead_after_ts = utils.utcnow() + datetime.timedelta(
       seconds=request.bot_ping_tolerance_secs)
-  ndb.transaction(
-      lambda: result_summary.set_from_run_result(run_result, request))
+  ndb.transaction(lambda: result_summary.set_from_run_result(
+      run_result, request))
   ndb.transaction(lambda: ndb.put_multi((result_summary, run_result)))
   return run_result.key.get()
 
@@ -133,8 +126,8 @@ def _safe_cmp(a, b):
 
 
 def get_entities(entity_model):
-  return sorted(
-      (i.to_dict() for i in entity_model.query().fetch()), cmp=_safe_cmp)
+  return sorted((i.to_dict() for i in entity_model.query().fetch()),
+                cmp=_safe_cmp)
 
 
 class TestCase(test_case.TestCase):
@@ -146,6 +139,7 @@ class TestCase(test_case.TestCase):
 
 
 class TaskResultApiTest(TestCase):
+
   def setUp(self):
     super(TaskResultApiTest, self).setUp()
     self.now = datetime.datetime(2014, 1, 2, 3, 4, 5, 6)
@@ -158,55 +152,33 @@ class TaskResultApiTest(TestCase):
   def _gen_summary(self, **kwargs):
     """Returns TaskResultSummary.to_dict()."""
     out = {
-        'abandoned_ts':
-            None,
-        'bot_dimensions':
-            None,
-        'bot_id':
-            None,
-        'bot_version':
-            None,
-        'cipd_pins':
-            None,
+        'abandoned_ts': None,
+        'bot_dimensions': None,
+        'bot_id': None,
+        'bot_version': None,
+        'cipd_pins': None,
         'children_task_ids': [],
-        'completed_ts':
-            None,
+        'completed_ts': None,
         'costs_usd': [],
-        'cost_saved_usd':
-            None,
-        'created_ts':
-            self.now,
-        'current_task_slice':
-            0,
-        'deduped_from':
-            None,
-        'duration':
-            None,
-        'exit_code':
-            None,
-        'expiration_delay':
-            None,
-        'failure':
-            False,
+        'cost_saved_usd': None,
+        'created_ts': self.now,
+        'current_task_slice': 0,
+        'deduped_from': None,
+        'duration': None,
+        'exit_code': None,
+        'expiration_delay': None,
+        'failure': False,
         # Constant due to the mock of both utils.utcnow() and
         # random.getrandbits().
-        'id':
-            '1d69b9f088008810',
-        'internal_failure':
-            False,
-        'modified_ts':
-            None,
-        'name':
-            u'Request name',
-        'outputs_ref':
-            None,
-        'resultdb_info':
-            None,
+        'id': '1d69b9f088008810',
+        'internal_failure': False,
+        'modified_ts': None,
+        'name': u'Request name',
+        'outputs_ref': None,
+        'resultdb_info': None,
         'server_versions': [u'v1a'],
-        'started_ts':
-            None,
-        'state':
-            task_result.State.PENDING,
+        'started_ts': None,
+        'state': task_result.State.PENDING,
         'tags': [
             u'pool:default',
             u'priority:50',
@@ -215,10 +187,8 @@ class TaskResultApiTest(TestCase):
             u'tag:1',
             u'user:Jesus',
         ],
-        'try_number':
-            None,
-        'user':
-            u'Jesus',
+        'try_number': None,
+        'user': u'Jesus',
     }
     out.update(kwargs)
     return out
@@ -276,8 +246,8 @@ class TaskResultApiTest(TestCase):
     self.assertEqual(
         set(task_result.State._NAMES), set(task_result.State.STATES))
     items = (
-      task_result.State.STATES_RUNNING + task_result.State.STATES_DONE +
-      task_result.State.STATES_ABANDONED)
+        task_result.State.STATES_RUNNING + task_result.State.STATES_DONE +
+        task_result.State.STATES_ABANDONED)
     self.assertEqual(set(items), set(task_result.State.STATES))
     self.assertEqual(len(items), len(set(items)))
 
@@ -316,7 +286,9 @@ class TaskResultApiTest(TestCase):
     self.assertEqual(False, actual.can_be_canceled)
 
     actual.children_task_ids = [
-      '1d69ba3ea8008810', '3d69ba3ea8008810', '2d69ba3ea8008810',
+        '1d69ba3ea8008810',
+        '3d69ba3ea8008810',
+        '2d69ba3ea8008810',
     ]
     actual.modified_ts = utils.utcnow()
     ndb.transaction(actual.put)
@@ -326,9 +298,10 @@ class TaskResultApiTest(TestCase):
   def test_new_run_result(self):
     request = _gen_request()
     to_run = task_to_run.new_task_to_run(request, 0)
-    actual = task_result.new_run_result(
-        request, to_run, u'localhost', u'abc',
-        {u'id': [u'localhost'], u'foo': [u'bar', u'biz']})
+    actual = task_result.new_run_result(request, to_run, u'localhost', u'abc', {
+        u'id': [u'localhost'],
+        u'foo': [u'bar', u'biz']
+    })
     actual.modified_ts = self.now
     actual.started_ts = self.now
     actual.dead_after_ts = self.now + datetime.timedelta(
@@ -414,8 +387,10 @@ class TaskResultApiTest(TestCase):
     # on_task_completed should be called even at the initial write if it's the
     # end with no resource error.
     calls = []
+
     def on_task_completed(smry):
       calls.append(smry)
+
     self.mock(ts_mon_metrics, 'on_task_completed', on_task_completed)
     summary.put()
 
@@ -472,14 +447,14 @@ class TaskResultApiTest(TestCase):
     self.mock_now(reap_ts)
     to_run.queue_number = None
     to_run.put()
-    run_result = task_result.new_run_result(
-        request, to_run, u'localhost', u'abc', {})
+    run_result = task_result.new_run_result(request, to_run, u'localhost',
+                                            u'abc', {})
     run_result.started_ts = utils.utcnow()
     run_result.modified_ts = run_result.started_ts
     run_result.dead_after_ts = utils.utcnow() + datetime.timedelta(
         seconds=request.bot_ping_tolerance_secs)
-    ndb.transaction(
-        lambda: result_summary.set_from_run_result(run_result, request))
+    ndb.transaction(lambda: result_summary.set_from_run_result(
+        run_result, request))
     ndb.transaction(lambda: ndb.put_multi((result_summary, run_result)))
     expected = self._gen_summary(
         bot_dimensions={},
@@ -506,15 +481,16 @@ class TaskResultApiTest(TestCase):
         key=task_pack.run_result_key_to_performance_stats_key(run_result.key),
         bot_overhead=0.1,
         isolated_download=task_result.OperationStats(
-            duration=0.05, initial_number_items=10, initial_size=10000,
+            duration=0.05,
+            initial_number_items=10,
+            initial_size=10000,
             items_cold=large.pack([1, 2]),
             items_hot=large.pack([3, 4, 5])),
         isolated_upload=task_result.OperationStats(
-            duration=0.01,
-            items_cold=large.pack([10]))).put()
+            duration=0.01, items_cold=large.pack([10]))).put()
     ndb.transaction(lambda: ndb.put_multi(run_result.append_output('foo', 0)))
-    ndb.transaction(
-        lambda: result_summary.set_from_run_result(run_result, request))
+    ndb.transaction(lambda: result_summary.set_from_run_result(
+        run_result, request))
     ndb.transaction(lambda: ndb.put_multi((result_summary, run_result)))
     expected = self._gen_summary(
         bot_dimensions={},
@@ -610,21 +586,21 @@ class TaskResultApiTest(TestCase):
     result_summary.modified_ts = utils.utcnow()
     ndb.transaction(result_summary.put)
     to_run = task_to_run.new_task_to_run(request, 0)
-    run_result = task_result.new_run_result(
-        request, to_run, 'localhost', 'abc', {})
+    run_result = task_result.new_run_result(request, to_run, 'localhost', 'abc',
+                                            {})
     run_result.started_ts = utils.utcnow()
     run_result.completed_ts = run_result.started_ts
     run_result.modified_ts = run_result.started_ts
     run_result.dead_after_ts = utils.utcnow() + datetime.timedelta(
         seconds=request.bot_ping_tolerance_secs)
-    ndb.transaction(
-        lambda: result_summary.set_from_run_result(run_result, request))
+    ndb.transaction(lambda: result_summary.set_from_run_result(
+        run_result, request))
     ndb.transaction(lambda: ndb.put_multi((run_result, result_summary)))
 
     self.mock_now(self.now +
                   datetime.timedelta(seconds=request.bot_ping_tolerance_secs))
-    self.assertEqual(
-        [], list(task_result.yield_run_result_keys_with_dead_bot()))
+    self.assertEqual([],
+                     list(task_result.yield_run_result_keys_with_dead_bot()))
 
     self.mock_now(
         self.now + datetime.timedelta(seconds=request.bot_ping_tolerance_secs),
@@ -636,8 +612,8 @@ class TaskResultApiTest(TestCase):
     request = _gen_request()
     result_summary = task_result.new_result_summary(request)
     to_run = task_to_run.new_task_to_run(request, 0)
-    run_result = task_result.new_run_result(
-        request, to_run, 'localhost', 'abc', {})
+    run_result = task_result.new_run_result(request, to_run, 'localhost', 'abc',
+                                            {})
     run_result.started_ts = utils.utcnow()
     self.assertTrue(result_summary.need_update_from_run_result(run_result))
     result_summary.modified_ts = utils.utcnow()
@@ -647,8 +623,8 @@ class TaskResultApiTest(TestCase):
     ndb.transaction(lambda: ndb.put_multi((result_summary, run_result)))
 
     self.assertTrue(result_summary.need_update_from_run_result(run_result))
-    ndb.transaction(
-        lambda: result_summary.set_from_run_result(run_result, request))
+    ndb.transaction(lambda: result_summary.set_from_run_result(
+        run_result, request))
     ndb.transaction(lambda: ndb.put_multi([result_summary]))
 
     self.assertFalse(result_summary.need_update_from_run_result(run_result))
@@ -657,8 +633,8 @@ class TaskResultApiTest(TestCase):
     request = _gen_request()
     result_summary = task_result.new_result_summary(request)
     to_run = task_to_run.new_task_to_run(request, 0)
-    run_result = task_result.new_run_result(
-        request, to_run, 'localhost', 'abc', {})
+    run_result = task_result.new_run_result(request, to_run, 'localhost', 'abc',
+                                            {})
     run_result.started_ts = utils.utcnow()
     self.assertTrue(result_summary.need_update_from_run_result(run_result))
     result_summary.modified_ts = utils.utcnow()
@@ -668,21 +644,21 @@ class TaskResultApiTest(TestCase):
     ndb.transaction(lambda: ndb.put_multi((result_summary, run_result)))
 
     self.assertTrue(result_summary.need_update_from_run_result(run_result))
-    ndb.transaction(
-        lambda: result_summary.set_from_run_result(run_result, request))
+    ndb.transaction(lambda: result_summary.set_from_run_result(
+        run_result, request))
     ndb.transaction(lambda: ndb.put_multi([result_summary]))
 
     run_result.signal_server_version('new-version')
     run_result.modified_ts = utils.utcnow()
     run_result.dead_after_ts = utils.utcnow() + datetime.timedelta(
         seconds=request.bot_ping_tolerance_secs)
-    ndb.transaction(
-        lambda: result_summary.set_from_run_result(run_result, request))
+    ndb.transaction(lambda: result_summary.set_from_run_result(
+        run_result, request))
     ndb.transaction(lambda: ndb.put_multi((result_summary, run_result)))
-    self.assertEqual(
-        ['v1a', 'new-version'], run_result.key.get().server_versions)
-    self.assertEqual(
-        ['v1a', 'new-version'], result_summary.key.get().server_versions)
+    self.assertEqual(['v1a', 'new-version'],
+                     run_result.key.get().server_versions)
+    self.assertEqual(['v1a', 'new-version'],
+                     result_summary.key.get().server_versions)
 
   def test_run_result_duration(self):
     run_result = task_result.TaskRunResult(
@@ -706,16 +682,16 @@ class TaskResultApiTest(TestCase):
     result_summary.modified_ts = utils.utcnow()
     ndb.transaction(result_summary.put)
     to_run = task_to_run.new_task_to_run(request, 0)
-    run_result = task_result.new_run_result(
-        request, to_run, 'localhost', 'abc', {})
+    run_result = task_result.new_run_result(request, to_run, 'localhost', 'abc',
+                                            {})
     run_result.state = task_result.State.TIMED_OUT
     run_result.duration = 0.1
     run_result.exit_code = -1
     run_result.started_ts = utils.utcnow()
     run_result.completed_ts = run_result.started_ts
     run_result.modified_ts = run_result.started_ts
-    ndb.transaction(
-        lambda: result_summary.set_from_run_result(run_result, request))
+    ndb.transaction(lambda: result_summary.set_from_run_result(
+        run_result, request))
     ndb.transaction(lambda: ndb.put_multi((run_result, result_summary)))
     run_result = run_result.key.get()
     result_summary = result_summary.key.get()
@@ -738,7 +714,8 @@ class TaskResultApiTest(TestCase):
     # https://crbug.com/916560: TERMINATING
     check(
         swarming_pb2.RAN_INTERNAL_FAILURE,
-        internal_failure=True, state=task_result.State.BOT_DIED)
+        internal_failure=True,
+        state=task_result.State.BOT_DIED)
     # https://crbug.com/902807: DUT_FAILURE
     # https://crbug.com/916553: BOT_DISAPPEARED
     # https://crbug.com/916559: PREEMPTED
@@ -749,7 +726,8 @@ class TaskResultApiTest(TestCase):
     # https://crbug.com/916553: MISSING_INPUTS
     check(
         swarming_pb2.DEDUPED,
-        state=task_result.State.COMPLETED, deduped_from=u'123')
+        state=task_result.State.COMPLETED,
+        deduped_from=u'123')
     check(swarming_pb2.EXPIRED, state=task_result.State.EXPIRED)
     check(swarming_pb2.CANCELED, state=task_result.State.CANCELED)
     check(swarming_pb2.NO_RESOURCE, state=task_result.State.NO_RESOURCE)
@@ -763,14 +741,12 @@ class TaskResultApiTest(TestCase):
     run_result = _gen_run_result(
         properties=_gen_properties(
             cipd_input={
-                u'client_package':
-                    cipd_client_pkg,
+                u'client_package': cipd_client_pkg,
                 u'packages': [
                     task_request.CipdPackage(
                         package_name=u'rm', path=u'bin', version=u'latest'),
                 ],
-                u'server':
-                    u'http://localhost:2'
+                u'server': u'http://localhost:2'
             },
             containment=task_request.Containment(lower_priority=True),
         ),)
@@ -912,10 +888,9 @@ class TaskResultApiTest(TestCase):
             namespace=u'default-gzip'))
     expected.request.create_time.FromDatetime(self.now)
     expected.create_time.FromDatetime(self.now)
-    expected.start_time.FromDatetime(
-        self.now + datetime.timedelta(seconds=20))
-    expected.abandon_time.FromDatetime(
-        self.now + datetime.timedelta(seconds=30))
+    expected.start_time.FromDatetime(self.now + datetime.timedelta(seconds=20))
+    expected.abandon_time.FromDatetime(self.now +
+                                       datetime.timedelta(seconds=30))
     expected.end_time.FromDatetime(self.now + datetime.timedelta(seconds=40))
 
     actual = swarming_pb2.TaskResult()
@@ -968,19 +943,21 @@ class TaskResultApiTest(TestCase):
 
   def _mock_send_to_bq(self, expected_table_name):
     payloads = []
+
     def send_to_bq(table_name, rows):
       self.assertEqual(expected_table_name, table_name)
       if rows:
         # When rows is empty, send_to_bq() can exit early.
         payloads.append(rows)
       return 0
+
     self.mock(bq_state, 'send_to_bq', send_to_bq)
     return payloads
 
   def test_task_bq_run_empty(self):
     # Empty, nothing is done.
     start = utils.utcnow()
-    end = start+datetime.timedelta(seconds=60)
+    end = start + datetime.timedelta(seconds=60)
     self.assertEqual((0, 0), task_result.task_bq_run(start, end))
 
   def test_task_bq_run(self):
@@ -1014,8 +991,8 @@ class TaskResultApiTest(TestCase):
     actual_rows = payloads[0]
     self.assertEqual(2, len(actual_rows))
     expected = [
-      run_result_2.task_id,
-      run_result_3.task_id,
+        run_result_2.task_id,
+        run_result_3.task_id,
     ]
     self.assertEqual(expected, [r[0] for r in actual_rows])
 
@@ -1051,7 +1028,7 @@ class TaskResultApiTest(TestCase):
   def test_task_bq_summary_empty(self):
     # Empty, nothing is done.
     start = utils.utcnow()
-    end = start+datetime.timedelta(seconds=60)
+    end = start + datetime.timedelta(seconds=60)
     self.assertEqual((0, 0), task_result.task_bq_summary(start, end))
 
   def test_task_bq_summary(self):
@@ -1085,8 +1062,8 @@ class TaskResultApiTest(TestCase):
     actual_rows = payloads[0]
     self.assertEqual(2, len(actual_rows))
     expected = [
-      result_2.task_id,
-      result_3.task_id,
+        result_2.task_id,
+        result_3.task_id,
     ]
     self.assertEqual(expected, [r[0] for r in actual_rows])
 
@@ -1143,6 +1120,7 @@ class TaskResultApiTest(TestCase):
 
 
 class TestOutput(TestCase):
+
   def assertTaskOutputChunk(self, expected):
     q = task_result.TaskOutputChunk.query().order(
         task_result.TaskOutputChunk.key)
@@ -1152,9 +1130,11 @@ class TestOutput(TestCase):
     # Force tedious chunking.
     self.mock(task_result.TaskOutput, 'CHUNK_SIZE', 2)
     run_result = _gen_run_result()
+
     # Test that one can stream output and it is returned fine.
     def run(*args):
       ndb.put_multi(run_result.append_output(*args))
+
     run('Part1\n', 0)
     run('Part2\n', len('Part1\n'))
     run('Part3\n', len('Part1P\n'))
@@ -1165,7 +1145,7 @@ class TestOutput(TestCase):
     # Force tedious chunking.
     self.mock(task_result.TaskOutput, 'CHUNK_SIZE', 2)
     self.mock(task_result.TaskOutput, 'PUT_MAX_CHUNKS', 16)
-    self.assertEqual(2*16, task_result.TaskOutput.PUT_MAX_CONTENT())
+    self.assertEqual(2 * 16, task_result.TaskOutput.PUT_MAX_CONTENT())
 
     run_result = _gen_run_result()
 
@@ -1202,12 +1182,15 @@ class TestOutput(TestCase):
 
   def test_append_output_partial_far(self):
     run_result = _gen_run_result()
-    ndb.put_multi(run_result.append_output(
-      'Foo', 10 + task_result.TaskOutput.CHUNK_SIZE))
+    ndb.put_multi(
+        run_result.append_output('Foo', 10 + task_result.TaskOutput.CHUNK_SIZE))
     expected_output = '\x00' * (task_result.TaskOutput.CHUNK_SIZE + 10) + 'Foo'
     self.assertEqual(expected_output, run_result.get_output(0, 0))
     expected = [
-      {'chunk': '\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00Foo', 'gaps': [0, 10]},
+        {
+            'chunk': '\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00Foo',
+            'gaps': [0, 10]
+        },
     ]
     self.assertTaskOutputChunk(expected)
 
@@ -1215,10 +1198,11 @@ class TestOutput(TestCase):
     # Missing, writing happens on two different TaskOutputChunk entities.
     self.mock(task_result.TaskOutput, 'CHUNK_SIZE', 16)
     run_result = _gen_run_result()
-    ndb.put_multi(run_result.append_output(
-        'FooBar', 2 * task_result.TaskOutput.CHUNK_SIZE - 3))
-    expected_output = (
-        '\x00' * (task_result.TaskOutput.CHUNK_SIZE * 2 - 3) + 'FooBar')
+    ndb.put_multi(
+        run_result.append_output('FooBar',
+                                 2 * task_result.TaskOutput.CHUNK_SIZE - 3))
+    expected_output = ('\x00' * (task_result.TaskOutput.CHUNK_SIZE * 2 - 3) +
+                       'FooBar')
     self.assertEqual(expected_output, run_result.get_output(0, 0))
     expected = [
         {
@@ -1275,12 +1259,12 @@ class TestOutput(TestCase):
     # Write the data in reverse order in multiple calls.
     self.mock(task_result.TaskOutput, 'CHUNK_SIZE', 16)
     run_result = _gen_run_result()
-    ndb.put_multi(run_result.append_output(
-        'Wow', task_result.TaskOutput.CHUNK_SIZE + 11))
-    ndb.put_multi(run_result.append_output(
-        'Foo', task_result.TaskOutput.CHUNK_SIZE + 8))
-    ndb.put_multi(run_result.append_output(
-        'Baz', task_result.TaskOutput.CHUNK_SIZE + 0))
+    ndb.put_multi(
+        run_result.append_output('Wow', task_result.TaskOutput.CHUNK_SIZE + 11))
+    ndb.put_multi(
+        run_result.append_output('Foo', task_result.TaskOutput.CHUNK_SIZE + 8))
+    ndb.put_multi(
+        run_result.append_output('Baz', task_result.TaskOutput.CHUNK_SIZE + 0))
     ndb.put_multi(
         run_result.append_output('Bar', task_result.TaskOutput.CHUNK_SIZE + 4))
     expected_output = (

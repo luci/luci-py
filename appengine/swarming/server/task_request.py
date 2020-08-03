@@ -2,7 +2,6 @@
 # Copyright 2014 The LUCI Authors. All rights reserved.
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
-
 """Tasks definition.
 
 Each user request creates a new TaskRequest. The TaskRequest instance saves the
@@ -79,7 +78,6 @@ from server import service_accounts_utils
 from server import task_pack
 from server.constants import OR_DIM_SEP
 
-
 # Maximum acceptable priority value, which is effectively the lowest priority.
 MAXIMUM_PRIORITY = 255
 
@@ -96,25 +94,21 @@ TEMPLATE_CANARY_PREFER = TemplateApplyEnum('TEMPLATE_CANARY_PREFER')
 TEMPLATE_CANARY_NEVER = TemplateApplyEnum('TEMPLATE_CANARY_NEVER')
 TEMPLATE_SKIP = TemplateApplyEnum('TEMPLATE_SKIP')
 
-
 # Maximum allowed timeout for I/O and hard timeouts.
 #
 # Three days in seconds. Includes an additional 10s to account for small jitter.
-MAX_TIMEOUT_SECS = 3*24*60*60 + 10
-
+MAX_TIMEOUT_SECS = 3 * 24 * 60 * 60 + 10
 
 # Maximum allowed expiration for a pending task.
 #
 # Seven days in seconds. Includes an additional 10s to account for small jitter.
-MAX_EXPIRATION_SECS = 7*24*60*60 + 10
-
+MAX_EXPIRATION_SECS = 7 * 24 * 60 * 60 + 10
 
 # Minimum value for timeouts.
 #
 # The rationale for 1s on local dev server is to enable quicker testing in
 # local_smoke_test.py.
 _MIN_TIMEOUT_SECS = 1 if utils.is_local_dev_server() else 30
-
 
 # The world started on 2010-01-01 at 00:00:00 UTC. The rationale is that using
 # EPOCH (1970) means that 40 years worth of keys are wasted.
@@ -123,10 +117,8 @@ _MIN_TIMEOUT_SECS = 1 if utils.is_local_dev_server() else 30
 # datetime.datetime.utcnow() also return naive objects. That's python.
 _BEGINING_OF_THE_WORLD = datetime.datetime(2010, 1, 1, 0, 0, 0, 0)
 
-
 # 1 is for ':'.
 _TAG_LENGTH = config.DIMENSION_KEY_LENGTH + config.DIMENSION_VALUE_LENGTH + 1
-
 
 # Used for isolated files.
 _HASH_CHARS = frozenset('0123456789abcdef')
@@ -134,13 +126,11 @@ _HASH_CHARS = frozenset('0123456789abcdef')
 # Keep synced with named_cache.py
 _CACHE_NAME_RE = re.compile(r'^[a-z0-9_]{1,4096}$')
 
-
 # Early verification of environment variable key name.
 _ENV_KEY_RE = re.compile(r'^[A-Za-z_][A-Za-z0-9_]*$')
 
-
 # TaskRequest entity groups are deleted when they are older than the cutoff.
-_OLD_TASK_REQUEST_CUT_OFF = datetime.timedelta(days=18*31)
+_OLD_TASK_REQUEST_CUT_OFF = datetime.timedelta(days=18 * 31)
 
 # Number of TaskRequest entity groups to be deleted per GAE task. In practice
 # we've observed it's possible to delete 1500 TaskRequest groups per 4.5
@@ -161,8 +151,8 @@ _MIN_BOT_PING_TOLERANCE_SECS = 60
 
 def _validate_length(prop, value, maximum):
   if len(value) > maximum:
-    raise datastore_errors.BadValueError(
-        'too long %s: %d > %d' % (prop._name, len(value), maximum))
+    raise datastore_errors.BadValueError('too long %s: %d > %d' %
+                                         (prop._name, len(value), maximum))
 
 
 def _get_validate_length(maximum):
@@ -172,8 +162,8 @@ def _get_validate_length(maximum):
 def _validate_url(prop, value):
   _validate_length(prop, value, 1024)
   if value and not validation.is_valid_secure_url(value):
-    raise datastore_errors.BadValueError(
-        '%s must be valid HTTPS URL, not %s' % (prop._name, value))
+    raise datastore_errors.BadValueError('%s must be valid HTTPS URL, not %s' %
+                                         (prop._name, value))
 
 
 def _validate_dimensions(_prop, value):
@@ -183,8 +173,8 @@ def _validate_dimensions(_prop, value):
   if not value:
     raise datastore_errors.BadValueError(u'dimensions must be specified')
   if len(value) > maxkeys:
-    raise datastore_errors.BadValueError(
-        u'dimensions can have up to %d keys' % maxkeys)
+    raise datastore_errors.BadValueError(u'dimensions can have up to %d keys' %
+                                         maxkeys)
 
   normalized = {}
   or_dimensions_num = 1
@@ -215,8 +205,8 @@ def _validate_dimensions(_prop, value):
       if or_dimensions_num > max_or_dimensions_num:
         raise datastore_errors.BadValueError(
             'possible dimension subset for \'or\' dimensions '
-            'should not be more than %d, but %d' % (max_or_dimensions_num,
-                                                    or_dimensions_num))
+            'should not be more than %d, but %d' %
+            (max_or_dimensions_num, or_dimensions_num))
 
     if len(values) > maxvalues:
       raise datastore_errors.BadValueError(
@@ -259,24 +249,23 @@ def _validate_env_key(prop, key):
   """Validates TaskProperties.env."""
   maxlen = 64
   if not isinstance(key, unicode):
-    raise TypeError(
-        '%s must have string key, not %r' % (prop._name, key))
+    raise TypeError('%s must have string key, not %r' % (prop._name, key))
   if not key:
-    raise datastore_errors.BadValueError(
-        'valid key are required in %s' % prop._name)
+    raise datastore_errors.BadValueError('valid key are required in %s' %
+                                         prop._name)
   if len(key) > maxlen:
-    raise datastore_errors.BadValueError(
-        'key in %s is too long: %d > %d' % (prop._name, len(key), maxlen))
+    raise datastore_errors.BadValueError('key in %s is too long: %d > %d' %
+                                         (prop._name, len(key), maxlen))
   if not _ENV_KEY_RE.match(key):
-    raise datastore_errors.BadValueError(
-        'key in %s is invalid: %r' % (prop._name, key))
+    raise datastore_errors.BadValueError('key in %s is invalid: %r' %
+                                         (prop._name, key))
 
 
 def _validate_env(prop, value):
   # pylint: disable=protected-access
   if not all(isinstance(v, unicode) for v in value.values()):
-    raise TypeError(
-        '%s must be a dict of strings, not %r' % (prop._name, value))
+    raise TypeError('%s must be a dict of strings, not %r' %
+                    (prop._name, value))
   maxlen = 1024
   for k, v in value.items():
     _validate_env_key(prop, k)
@@ -285,8 +274,8 @@ def _validate_env(prop, value):
           '%s: key %r has too long value: %d > %d' %
           (prop._name, k, len(v), maxlen))
   if len(value) > 64:
-    raise datastore_errors.BadValueError(
-        '%s can have up to 64 keys' % prop._name)
+    raise datastore_errors.BadValueError('%s can have up to 64 keys' %
+                                         prop._name)
 
 
 def _validate_env_prefixes(prop, value):
@@ -296,9 +285,8 @@ def _validate_env_prefixes(prop, value):
     _validate_env_key(prop, k)
     if (not isinstance(values, list) or
         not all(isinstance(v, unicode) for v in values)):
-      raise TypeError(
-          '%s must have list unicode value for key %r, not %r' %
-          (prop._name, k, values))
+      raise TypeError('%s must have list unicode value for key %r, not %r' %
+                      (prop._name, k, values))
     for path in values:
       if len(path) > maxlen:
         raise datastore_errors.BadValueError(
@@ -307,8 +295,8 @@ def _validate_env_prefixes(prop, value):
       _validate_rel_path('Env Prefix', path)
 
   if len(value) > 64:
-    raise datastore_errors.BadValueError(
-        '%s can have up to 64 keys' % prop._name)
+    raise datastore_errors.BadValueError('%s can have up to 64 keys' %
+                                         prop._name)
 
 
 def _check_expiration_secs(name, value):
@@ -335,7 +323,7 @@ def _validate_expiration_secs(prop, value):
 def _validate_grace(prop, value):
   """Validates grace_period_secs in TaskProperties."""
   # pylint: disable=protected-access
-  if not (0 <= value <= 60*60):
+  if not (0 <= value <= 60 * 60):
     raise datastore_errors.BadValueError(
         '%s (%ds) must be between 0s and one hour' % (prop._name, value))
 
@@ -361,8 +349,8 @@ def _validate_hard_timeout(prop, value):
     # 0 is tolerated for termination task, but we don't advertize that, that's
     # an internal detail.
     raise datastore_errors.BadValueError(
-        '%s (%ds) must be between %ds and three days' % (prop._name, value,
-                                                         _MIN_TIMEOUT_SECS))
+        '%s (%ds) must be between %ds and three days' %
+        (prop._name, value, _MIN_TIMEOUT_SECS))
 
 
 def _validate_io_timeout(prop, value):
@@ -371,7 +359,7 @@ def _validate_io_timeout(prop, value):
   if value and not (_MIN_TIMEOUT_SECS <= value <= MAX_TIMEOUT_SECS):
     raise datastore_errors.BadValueError(
         '%s (%ds) must be 0 or between %ds and three days' %
-            (prop._name, value, _MIN_TIMEOUT_SECS))
+        (prop._name, value, _MIN_TIMEOUT_SECS))
 
 
 def _validate_tags(prop, value):
@@ -379,8 +367,8 @@ def _validate_tags(prop, value):
   # pylint: disable=protected-access
   _validate_length(prop, value, _TAG_LENGTH)
   if ':' not in value:
-    raise datastore_errors.BadValueError(
-        '%s must be key:value form, not %s' % (prop._name, value))
+    raise datastore_errors.BadValueError('%s must be key:value form, not %s' %
+                                         (prop._name, value))
 
 
 def _validate_pubsub_topic(prop, value):
@@ -397,8 +385,8 @@ def _validate_package_name_template(prop, value):
   _validate_length(prop, value, 1024)
   if not cipd.is_valid_package_name_template(value):
     raise datastore_errors.BadValueError(
-        '%s must be a valid CIPD package name template "%s"' % (
-              prop._name, value))
+        '%s must be a valid CIPD package name template "%s"' %
+        (prop._name, value))
 
 
 def _validate_package_version(prop, value):
@@ -442,22 +430,21 @@ def _validate_rel_path(value_name, path):
   Length have to be validated first.
   """
   if not path:
-    raise datastore_errors.BadValueError(
-        'No argument provided for %s.' % value_name)
+    raise datastore_errors.BadValueError('No argument provided for %s.' %
+                                         value_name)
   if '\\' in path:
     raise datastore_errors.BadValueError(
         '%s cannot contain \\. On Windows forward-slashes '
         'will be replaced with back-slashes.' % value_name)
   if '..' in path.split('/'):
-    raise datastore_errors.BadValueError(
-        '%s cannot contain "..".' % value_name)
+    raise datastore_errors.BadValueError('%s cannot contain "..".' % value_name)
   normalized = posixpath.normpath(path)
   if path != normalized:
     raise datastore_errors.BadValueError(
         '%s is not normalized. Normalized is "%s".' % (value_name, normalized))
   if path.startswith('/'):
-    raise datastore_errors.BadValueError(
-        '%s cannot start with "/".' % value_name)
+    raise datastore_errors.BadValueError('%s cannot start with "/".' %
+                                         value_name)
 
 
 def _validate_service_account(prop, value):
@@ -469,8 +456,8 @@ def _validate_service_account(prop, value):
                'none') or service_accounts_utils.is_service_account(value):
     return value
   raise datastore_errors.BadValueError(
-      '%r must be an email, "bot" or "none" string, got %r' % (prop._name,
-                                                               value))
+      '%r must be an email, "bot" or "none" string, got %r' %
+      (prop._name, value))
 
 
 def _validate_ping_tolerance(prop, value):
@@ -557,6 +544,7 @@ class FilesRef(ndb.Model):
             'isolated must be lowercase hex of length %d, but length is %d' %
             (expected, length))
 
+
 class SecretBytes(ndb.Model):
   """Defines an optional secret byte string logically defined with the
   TaskProperties.
@@ -565,7 +553,7 @@ class SecretBytes(ndb.Model):
   """
   _use_memcache = False
   secret_bytes = ndb.BlobProperty(
-      validator=_get_validate_length(20*1024), indexed=False)
+      validator=_get_validate_length(20 * 1024), indexed=False)
 
 
 class CipdPackage(ndb.Model):
@@ -655,13 +643,13 @@ class CipdInput(ndb.Model):
       # ndb.LocalStructuredProperty. Call the function manually.
       p._pre_put_hook()
       if not p.path:
-        raise datastore_errors.BadValueError(
-            'package %s:%s: path is required' % (p.package_name, p.version))
+        raise datastore_errors.BadValueError('package %s:%s: path is required' %
+                                             (p.package_name, p.version))
       path_name = (p.path, p.package_name)
       if path_name in package_path_names:
         raise datastore_errors.BadValueError(
-           'package %r is specified more than once in path %r'
-          % (p.package_name, p.path))
+            'package %r is specified more than once in path %r' %
+            (p.package_name, p.path))
       package_path_names.add(path_name)
     self.packages.sort(key=lambda p: (p.path, p.package_name))
 
@@ -692,6 +680,7 @@ class ContainmentType(object):
 
 class ContainmentTypeProperty(ndb.IntegerProperty):
   """See ../proto/api/swarming.proto for details."""
+
   def __init__(self, **kwargs):
     super(ContainmentTypeProperty, self).__init__(
         choices=ContainmentType.values, **kwargs)
@@ -759,7 +748,9 @@ class TaskProperties(ndb.Model):
   # example, Windows or hostname. Encoded as json. 'pool' dimension is required
   # for all tasks except terminate (see _pre_put_hook).
   dimensions_data = datastore_utils.DeterministicJsonProperty(
-      validator=_validate_dimensions, json_type=dict, indexed=False,
+      validator=_validate_dimensions,
+      json_type=dict,
+      indexed=False,
       name='dimensions')
 
   # Environment variables. Encoded as json. Optional.
@@ -800,8 +791,8 @@ class TaskProperties(ndb.Model):
   # A list of outputs expected. If empty, all files written to
   # ${ISOLATED_OUTDIR} will be returned; otherwise, the files in this list
   # will be added to those in that directory.
-  outputs = ndb.StringProperty(repeated=True, indexed=False,
-      validator=_validate_output_path)
+  outputs = ndb.StringProperty(
+      repeated=True, indexed=False, validator=_validate_output_path)
 
   # If True, the TaskRequest embedding these TaskProperties has an associated
   # SecretBytes entity.
@@ -851,8 +842,7 @@ class TaskProperties(ndb.Model):
             self.dimensions_data.keys() == [u'id'])
 
   def to_dict(self):
-    out = super(TaskProperties, self).to_dict(
-        exclude=['dimensions_data'])
+    out = super(TaskProperties, self).to_dict(exclude=['dimensions_data'])
     # Use the data stored as-is, so properties_hash doesn't change.
     out['dimensions'] = self.dimensions_data
     return out
@@ -1328,9 +1318,10 @@ class TaskRequest(ndb.Model):
     if len(self.task_slices) > 1:
       # Make sure there is no duplicate task. It is likely an error from the
       # user. Compare dictionary so it works even if idempotent is False.
-      num_unique = len(set(
-          utils.encode_to_json(t.properties.to_dict())
-          for t in self.task_slices))
+      num_unique = len(
+          set(
+              utils.encode_to_json(t.properties.to_dict())
+              for t in self.task_slices))
       if len(self.task_slices) != num_unique:
         raise datastore_errors.BadValueError(
             'cannot request duplicate task slice')
@@ -1354,8 +1345,8 @@ class TaskRequest(ndb.Model):
 
     if (self.pubsub_topic and
         not pubsub.validate_full_name(self.pubsub_topic, 'topics')):
-      raise datastore_errors.BadValueError(
-          'bad pubsub topic name - %s' % self.pubsub_topic)
+      raise datastore_errors.BadValueError('bad pubsub topic name - %s' %
+                                           self.pubsub_topic)
     if self.pubsub_auth_token and not self.pubsub_topic:
       raise datastore_errors.BadValueError(
           'pubsub_auth_token requires pubsub_topic')
@@ -1384,9 +1375,9 @@ def _get_automatic_tags(request):
   This includes geneated tags from all TaskSlice.
   """
   tags = set((
-    u'priority:%s' % request.priority,
-    u'service_account:%s' % (request.service_account or u'None'),
-    u'user:%s' % (request.user or u'None'),
+      u'priority:%s' % request.priority,
+      u'service_account:%s' % (request.service_account or u'None'),
+      u'user:%s' % (request.user or u'None'),
   ))
   for i in range(request.num_task_slices):
     tags.update(_get_automatic_tags_from_slice(request.task_slice(i)))
@@ -1401,9 +1392,9 @@ def get_automatic_tags(request, index):
   specific TaskSlice.
   """
   tags = set((
-    u'priority:%s' % request.priority,
-    u'service_account:%s' % (request.service_account or u'None'),
-    u'user:%s' % (request.user or u'None'),
+      u'priority:%s' % request.priority,
+      u'service_account:%s' % (request.service_account or u'None'),
+      u'user:%s' % (request.user or u'None'),
   ))
   tags.update(_get_automatic_tags_from_slice(request.task_slice(index)))
   return tags
@@ -1429,10 +1420,10 @@ def create_termination_task(bot_id, wait_for_capacity):
       name=u'Terminate %s' % bot_id,
       priority=0,
       task_slices=[
-        TaskSlice(
-            expiration_secs=24*60*60,
-            properties=properties,
-            wait_for_capacity=wait_for_capacity),
+          TaskSlice(
+              expiration_secs=24 * 60 * 60,
+              properties=properties,
+              wait_for_capacity=wait_for_capacity),
       ],
       manual_tags=[u'terminate:1'])
   assert request.task_slice(0).properties.is_terminate
@@ -1489,8 +1480,8 @@ def datetime_to_request_base_id(now):
   Used for query order().
   """
   if now < _BEGINING_OF_THE_WORLD:
-    raise ValueError(
-        'Time %s is set to before %s' % (now, _BEGINING_OF_THE_WORLD))
+    raise ValueError('Time %s is set to before %s' %
+                     (now, _BEGINING_OF_THE_WORLD))
   delta = now - _BEGINING_OF_THE_WORLD
   return int(round(delta.total_seconds() * 1000.)) << 20
 
@@ -1526,17 +1517,16 @@ def validate_request_key(request_key):
   if not request_shard_key:
     raise ValueError('Expected parent key for TaskRequest, got nothing')
   if request_shard_key.kind() != 'TaskRequestShard':
-    raise ValueError(
-        'Expected key to TaskRequestShard, got %s' % request_shard_key.kind())
+    raise ValueError('Expected key to TaskRequestShard, got %s' %
+                     request_shard_key.kind())
   root_entity_shard_id = request_shard_key.string_id()
   if (not root_entity_shard_id or
       len(root_entity_shard_id) != task_pack.DEPRECATED_SHARDING_LEVEL):
     raise ValueError(
         'Expected root entity key (used for sharding) to be of length %d but '
-        'length was only %d (key value %r)' % (
-            task_pack.DEPRECATED_SHARDING_LEVEL,
-            len(root_entity_shard_id or ''),
-            root_entity_shard_id))
+        'length was only %d (key value %r)' %
+        (task_pack.DEPRECATED_SHARDING_LEVEL, len(root_entity_shard_id or
+                                                  ''), root_entity_shard_id))
 
 
 def _select_task_template(pool, template_apply):
@@ -1574,10 +1564,9 @@ def _select_task_template(pool, template_apply):
     return None, tags
 
   canary = deployment.canary and (
-    (template_apply == TEMPLATE_CANARY_PREFER)
-    or (template_apply == TEMPLATE_AUTO and
-        random.randint(1, 9999) < deployment.canary_chance)
-  )
+      (template_apply == TEMPLATE_CANARY_PREFER) or
+      (template_apply == TEMPLATE_AUTO and
+       random.randint(1, 9999) < deployment.canary_chance))
   to_apply = deployment.canary if canary else deployment.prod
 
   tags += ('swarming.pool.template:%s' % ('canary' if canary else 'prod'),)
@@ -1605,8 +1594,8 @@ def _apply_task_template(task_template, props):
 
     if not envvar.soft:
       if var_name in (props.env or {}):
-        raise ValueError(
-            'request.env[%r] conflicts with pool\'s template' % var_name)
+        raise ValueError('request.env[%r] conflicts with pool\'s template' %
+                         var_name)
       if var_name in (props.env_prefixes or {}):
         raise ValueError(
             'request.env_prefixes[%r] conflicts with pool\'s template' %
@@ -1628,28 +1617,28 @@ def _apply_task_template(task_template, props):
     reserved_cache_names.add(cache.name)
     occlude_checker.add(cache.path, 'task template cache %r' % cache.name, '')
   for cp in task_template.cipd_package:
-    occlude_checker.add(
-        cp.path, 'task template cipd', '%s:%s' % (cp.pkg, cp.version))
+    occlude_checker.add(cp.path, 'task template cipd',
+                        '%s:%s' % (cp.pkg, cp.version))
 
   # Add all task paths, avoiding spurious initializations in the underlying
   # TaskProperties (repeated fields auto-initialize to [] when looped over).
   for cache in (props.caches or ()):
     if cache.name in reserved_cache_names:
-      raise ValueError(
-          'request.cache[%r] conflicts with pool\'s template' % cache.name)
+      raise ValueError('request.cache[%r] conflicts with pool\'s template' %
+                       cache.name)
     occlude_checker.add(cache.path, 'task cache %r' % cache.name, '')
   for cp in (props.cipd_input.packages or () if props.cipd_input else ()):
     if not cp.package_name:
       raise ValueError('package name of cipd package is not set for %s' % cp)
     if not cp.path:
-      raise ValueError(
-          'path for cipd package is not set for %s' % cp.package_name)
+      raise ValueError('path for cipd package is not set for %s' %
+                       cp.package_name)
     if not cp.version:
-      raise ValueError(
-          'verson for cipd package is not set for %s' % cp.package_name)
+      raise ValueError('verson for cipd package is not set for %s' %
+                       cp.package_name)
 
-    occlude_checker.add(
-        cp.path, 'task cipd', '%s:%s' % (cp.package_name, cp.version))
+    occlude_checker.add(cp.path, 'task cipd',
+                        '%s:%s' % (cp.package_name, cp.version))
 
   ctx = validation.Context()
   if occlude_checker.conflicts(ctx):
@@ -1662,8 +1651,8 @@ def _apply_task_template(task_template, props):
     # Only initialize TaskProperties.cipd_input if we have something to add
     props.cipd_input = props.cipd_input or CipdInput()
     for cp in task_template.cipd_package:
-      props.cipd_input.packages.append(CipdPackage(
-          package_name=cp.pkg, path=cp.path, version=cp.version))
+      props.cipd_input.packages.append(
+          CipdPackage(package_name=cp.pkg, path=cp.path, version=cp.version))
 
 
 def init_new_request(request, allow_high_priority, template_apply):
@@ -1717,8 +1706,8 @@ def init_new_request(request, allow_high_priority, template_apply):
   request.service_account = request.service_account or u'none'
   request.service_account_token = None
 
-  task_template, extra_tags = _select_task_template(
-      request.pool, template_apply)
+  task_template, extra_tags = _select_task_template(request.pool,
+                                                    template_apply)
 
   if request.task_slices:
     exp = 0
@@ -1774,7 +1763,7 @@ def cron_delete_old_task_requests():
   # 9.5 minutes (out of 10 allowed for a cron job) results in 'Exceeded soft
   # private memory limit of 512 MB with 512 MB' even if this loop should be
   # fairly light on memory usage.
-  time_to_stop = start + datetime.timedelta(seconds=int(4.5*60))
+  time_to_stop = start + datetime.timedelta(seconds=int(4.5 * 60))
   # Total TaskRequest entities processed
   total = 0
   # GAE tasks queues that were created to do the actual deletion.
@@ -1826,17 +1815,16 @@ def cron_delete_old_task_requests():
 
     def _format_delta(e, s):
       # datetime.timedelta
-      return str(e-s).rsplit('.', 1)[0] if e and s else 'N/A'
+      return str(e - s).rsplit('.', 1)[0] if e and s else 'N/A'
 
     logging.info(
         'Found %d TaskRequest entities to delete. %d tasks triggered;'
-            ' %d failed\n'
+        ' %d failed\n'
         'From %s to %s (%s)\n'
-        'Cut off was %s; trailing by %s',
-        total, tasks_succeeded, tasks_failed,
+        'Cut off was %s; trailing by %s', total, tasks_succeeded, tasks_failed,
         _format_ts(first_ts), _format_ts(last_ts),
-        _format_delta(last_ts, first_ts),
-        _format_ts(end_ts), _format_delta(end_ts, last_ts))
+        _format_delta(last_ts, first_ts), _format_ts(end_ts),
+        _format_delta(end_ts, last_ts))
   return total
 
 
@@ -1859,8 +1847,8 @@ def task_delete_tasks(task_ids):
       count += 1
     return count
   finally:
-    logging.info(
-        'Deleted %d TaskRequest groups; %d entities in total', count, total)
+    logging.info('Deleted %d TaskRequest groups; %d entities in total', count,
+                 total)
 
 
 def task_bq(start, end):
@@ -1876,13 +1864,13 @@ def task_bq(start, end):
   total = 0
   failed = 0
 
-  q = TaskRequest.query(
-      TaskRequest.created_ts >= start, TaskRequest.created_ts <= end)
+  q = TaskRequest.query(TaskRequest.created_ts >= start,
+                        TaskRequest.created_ts <= end)
   cursor = None
   more = True
   while more:
     entities, cursor, more = q.fetch_page(500, start_cursor=cursor)
     total += len(entities)
-    failed += bq_state.send_to_bq(
-        'task_requests', [_convert(e) for e in entities])
+    failed += bq_state.send_to_bq('task_requests',
+                                  [_convert(e) for e in entities])
   return total, failed
