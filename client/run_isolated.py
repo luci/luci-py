@@ -725,7 +725,24 @@ def _upload_with_go(storage, outdir, isolated_client):
         stats_json_path,
         '-quiet',
     ]
-    _run_go_isolated_and_wait(cmd)
+    # Will do exponential backoff, e.g. 10, 20, 40...
+    # This mitigates https://crbug.com/1094369, where there is a data race on
+    # the uploaded files.
+    backoff = 10
+    while True:
+      try:
+        _run_go_isolated_and_wait(cmd)
+        break
+      except Exception:
+        if backoff > 100:
+          raise
+
+        on_error.report('error before %d second backoff' % backoff)
+        logging.exception(
+            '_run_go_isolated_and_wait() failed, will retry after %d seconds',
+            backoff)
+        time.sleep(backoff)
+        backoff *= 2
 
     with open(isolated_path) as isol_file:
       isolated = isol_file.read()
