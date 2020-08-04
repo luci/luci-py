@@ -469,6 +469,10 @@ class BotManagementTest(test_case.TestCase):
         bot_management.BotRoot, 'foo', bot_management.BotSettings, 'settings')
     self.assertEqual(expected, bot_management.get_settings_key('foo'))
 
+  def test_get_aggregation_key(self):
+    expected = ndb.Key(bot_management.DimensionAggregation, 'foo')
+    self.assertEqual(expected, bot_management.get_aggregation_key('foo'))
+
   def test_has_capacity(self):
     # The bot can service this dimensions.
     d = {u'pool': [u'default'], u'os': [u'Ubuntu-16.04']}
@@ -629,8 +633,47 @@ class BotManagementTest(test_case.TestCase):
           bot_management.BotRoot.query().fetch(keys_only=True)])
 
   def test_cron_aggregate_dimensions(self):
-    # TODO(maruel): https://crbug.com/912154
-    self.assertEqual(0, bot_management.cron_aggregate_dimensions())
+    _ensure_bot_info(
+        bot_id='id1', dimensions={
+            'pool': ['p1', 'p2'],
+            'foo1': ['bar1']
+        })
+    _ensure_bot_info(
+        bot_id='id2', dimensions={
+            'pool': ['p3'],
+            'foo2': ['bar2']
+        })
+    bot_management.cron_aggregate_dimensions()
+
+    # dimensions of all pools.
+    dims_all = bot_management.get_aggregation_key('all').get().dimensions
+    self.assertEqual(dims_all, [
+        bot_management.DimensionValues(dimension='foo1', values=['bar1']),
+        bot_management.DimensionValues(dimension='foo2', values=['bar2']),
+        bot_management.DimensionValues(
+            dimension='pool', values=['p1', 'p2', 'p3']),
+    ])
+
+    # dimensions of p1.
+    dims_p1 = bot_management.get_aggregation_key('p1').get().dimensions
+    self.assertEqual(dims_p1, [
+        bot_management.DimensionValues(dimension='foo1', values=['bar1']),
+        bot_management.DimensionValues(dimension='pool', values=['p1', 'p2']),
+    ])
+
+    # dimensions of p2.
+    dims_p1 = bot_management.get_aggregation_key('p2').get().dimensions
+    self.assertEqual(dims_p1, [
+        bot_management.DimensionValues(dimension='foo1', values=['bar1']),
+        bot_management.DimensionValues(dimension='pool', values=['p1', 'p2']),
+    ])
+
+    # dimensions of p2.
+    dims_p1 = bot_management.get_aggregation_key('p3').get().dimensions
+    self.assertEqual(dims_p1, [
+        bot_management.DimensionValues(dimension='foo2', values=['bar2']),
+        bot_management.DimensionValues(dimension='pool', values=['p3']),
+    ])
 
   def test_filter_dimensions(self):
     pass # Tested in handlers_endpoints_test

@@ -104,9 +104,10 @@ class BackendTest(test_env_handlers.AppTestBase):
 
     self.app.get('/internal/cron/monitoring/bots/aggregate_dimensions',
         headers={'X-AppEngine-Cron': 'true'}, status=200)
-    actual = bot_management.DimensionAggregation.KEY_ALL.get()
+    agg_key = bot_management.get_aggregation_key('all')
+    actual = agg_key.get()
     expected = bot_management.DimensionAggregation(
-        key=bot_management.DimensionAggregation.KEY_ALL,
+        key=agg_key,
         dimensions=[
             bot_management.DimensionValues(
                 dimension='foo', values=['alpha', 'beta'])
