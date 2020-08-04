@@ -684,6 +684,12 @@ def _validate_pools_cfg(cfg, ctx):
       if msg.default_task_realm:
         _validate_realm(ctx, 'default_task_realm', msg.default_task_realm)
 
+      # TODO(crbug.com/1066839): Validate enforced_realm_permissions.
+      # The following permissions must be enforced at the same time.
+      # REALM_PERMISSION_TASKS_CREATE_IN_REALM
+      # REALM_PERMISSION_POOLS_CREATE_TASK
+      # REALM_PERMISSION_TASKS_ACT_AS
+
       # Validate schedulers.user.
       for u in msg.schedulers.user:
         _validate_ident(ctx, 'user', u)

@@ -297,6 +297,7 @@ def new_task_request_from_rpc(msg, now):
       manual_tags=msg.tags,
       # This is internal field not settable via RPC.
       service_account_token=None,
+      realms_enabled=None,
       resultdb_update_token=None,
       pool_task_template=None)  # handled out of band
 

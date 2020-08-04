@@ -576,6 +576,7 @@ class TaskRequestApiTest(TestCase):
         },],
         'user': u'Jesus',
         'realm': None,
+        'realms_enabled': False,
         'bot_ping_tolerance_secs': 120,
     }
     actual = req.to_dict()
@@ -687,6 +688,7 @@ class TaskRequestApiTest(TestCase):
         },],
         'user': u'Jesus',
         'realm': None,
+        'realms_enabled': False,
         'bot_ping_tolerance_secs': 120,
     }
     actual = req.to_dict()

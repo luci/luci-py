@@ -539,8 +539,8 @@ class SwarmingTasksService(remote.Service):
 
     # Realm permission 'swarming.pools.createInRealm' checks if the
     # caller is allowed to create a task in the task realm.
-    realms.check_tasks_create_in_realm(request_obj.realm, pool_cfg,
-                                       enforce_realms_acl)
+    request_obj.realms_enabled = realms.check_tasks_create_in_realm(
+        request_obj.realm, pool_cfg, enforce_realms_acl)
 
     # Realm permission 'swarming.pools.create' checks if the caller is allowed
     # to create a task in the pool.
@@ -556,8 +556,7 @@ class SwarmingTasksService(remote.Service):
 
       # Realm permission 'swarming.tasks.actAs' checks if the service account is
       # allowed to run in the task realm.
-      used_realms = realms.check_tasks_act_as(request_obj, pool_cfg,
-                                              enforce_realms_acl)
+      realms.check_tasks_act_as(request_obj, pool_cfg, enforce_realms_acl)
 
       # If using legacy ACLs for service accounts, use the legacy mechanism to
       # mint oauth token as well. Note that this path will be deprecated after
@@ -567,7 +566,7 @@ class SwarmingTasksService(remote.Service):
       # is allowed by the token server rules at the time the task is posted.
       # This check is also performed later (when running the task), when we get
       # the actual OAuth access token.
-      if not used_realms:
+      if not request_obj.realms_enabled:
         max_lifetime_secs = request_obj.max_lifetime_secs
         try:
           duration = datetime.timedelta(seconds=max_lifetime_secs)

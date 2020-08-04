@@ -1162,6 +1162,10 @@ class TaskRequest(ndb.Model):
   # See api/swarming.proto for more details.
   realm = ndb.StringProperty(validator=_validate_realm)
 
+  # Realm enforcement flag.
+  # Use Realm-aware ACLs if True is set.
+  realms_enabled = ndb.BooleanProperty(default=False, indexed=False)
+
   @property
   def num_task_slices(self):
     """Returns the number of TaskSlice, supports old entities."""
