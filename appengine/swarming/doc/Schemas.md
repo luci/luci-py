@@ -188,10 +188,10 @@ This schema is about the audit of the events of bots.
     +-------------------+     +-------------------+
 
 
-    +--------Root--------+
-    |DimensionAggregation|                                     bot_management.py
-    |id=current          |
-    +--------------------+
+    +--------Root---------+
+    |DimensionAggregation |                                     bot_management.py
+    |id=<all or pool name>|
+    +---------------------+
 
 
 # Keys

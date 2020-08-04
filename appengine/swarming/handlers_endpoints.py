@@ -1286,6 +1286,7 @@ class SwarmingBotsService(remote.Service):
   @auth.require(acl.can_view_bot, log_identity=True)
   def dimensions(self, _request):
     """Returns the cached set of dimensions currently in use in the fleet."""
+    # TODO(jwata): change KEY to KEY_ALL once the entity is ready.
     dims = bot_management.DimensionAggregation.KEY.get()
     fd = [
       swarming_rpcs.StringListPair(key=d.dimension, value=d.values)

@@ -41,10 +41,10 @@
     |id=<dimension_hash>| ... |id=<dimension_hash>|
     +-------------------+     +-------------------+
 
-    +--------Root--------+
-    |DimensionAggregation|
-    |id=current          |
-    +--------------------+
+    +--------Root---------+
+    |DimensionAggregation |
+    |id=<all or pool name>|
+    +---------------------+
 
 - BotEvent is a monotonically inserted entity that is added for each event
   happening for the bot.
@@ -442,8 +442,9 @@ class DimensionAggregation(ndb.Model):
 
   ts = ndb.DateTimeProperty()
 
-  # We only store one of these entities. Use this key to refer to any instance.
+  # Key for all dimensions. the legacy key 'current' will be removed.
   KEY = ndb.Key('DimensionAggregation', 'current')
+  KEY_ALL = ndb.Key('DimensionAggregation', 'all')
 
 
 ### Public APIs.
@@ -915,9 +916,13 @@ def cron_aggregate_dimensions():
     for k, values in sorted(seen.items())
   ]
 
+  # TODO(jwata): aggregate dimensions per pool.
+
   logging.info('Saw dimensions %s', dims)
   DimensionAggregation(
       key=DimensionAggregation.KEY, dimensions=dims, ts=now).put()
+  DimensionAggregation(
+      key=DimensionAggregation.KEY_ALL, dimensions=dims, ts=now).put()
   return len(dims)
 
 
