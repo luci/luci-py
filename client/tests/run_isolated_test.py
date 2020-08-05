@@ -970,7 +970,6 @@ class RunIsolatedTestRun(RunIsolatedTestBase):
     mock.patch.stopall()
 
   # Runs the actual command requested.
-  @unittest.skipIf(six.PY3 and sys.platform == 'darwin', 'crbug.com/1101705')
   def test_output(self):
     # Starts a full isolate server mock and have run_tha_test() uploads results
     # back after the task completed.
@@ -1453,7 +1452,6 @@ class RunIsolatedTestOutputFiles(RunIsolatedTestBase):
     finally:
       server.close()
 
-  @unittest.skipIf(six.PY3 and sys.platform == 'darwin', 'crbug.com/1101705')
   def test_output_cmd_isolated(self):
     isolated = {
       u'algo': u'sha-1',
@@ -1463,7 +1461,6 @@ class RunIsolatedTestOutputFiles(RunIsolatedTestBase):
     }
     self._run_test(isolated, [], [])
 
-  @unittest.skipIf(six.PY3 and sys.platform == 'darwin', 'crbug.com/1101705')
   def test_output_cmd(self):
     isolated = {
       u'algo': u'sha-1',
@@ -1473,7 +1470,6 @@ class RunIsolatedTestOutputFiles(RunIsolatedTestBase):
     self._run_test(
         isolated, ['cmd.py', 'foo1', 'foodir/foo2_sl', 'bardir/'], [])
 
-  @unittest.skipIf(six.PY3 and sys.platform == 'darwin', 'crbug.com/1101705')
   def test_output_cmd_isolated_extra_args(self):
     isolated = {
       u'algo': u'sha-1',
@@ -1516,7 +1512,6 @@ class RunIsolatedJsonTest(RunIsolatedTestBase):
 
     self.mock(subprocess42, 'Popen', Popen)
 
-  @unittest.skipIf(six.PY3 and sys.platform == 'darwin', 'crbug.com/1101705')
   def test_main_json(self):
     # Instruct the Popen mock to write a file in ISOLATED_OUTDIR so it will be
     # archived back on termination.

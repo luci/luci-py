@@ -349,7 +349,6 @@ class RunIsolatedTest(unittest.TestCase):
     actual = list_files_tree(self._isolated_cache_dir)
     self.assertEqual(sorted(set(expected)), actual)
 
-  @unittest.skipIf(six.PY3 and sys.platform == 'darwin', 'crbug.com/1101705')
   def test_isolated_output(self):
     isolated_hash = self._store('output.isolated')
     expected = [

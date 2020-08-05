@@ -510,7 +510,6 @@ class StorageTest(TestCase):
       self.assertEqual(os.path.join(self.tempdir, filename), pushed_item.path)
       self.assertEqual(files_content[filename], pushed_content)
 
-  @unittest.skipIf(six.PY3 and sys.platform == 'darwin', 'crbug.com/1101705')
   def test_archive_files_to_storage_symlink(self):
     link_path = os.path.join(self.tempdir, u'link')
     with open(os.path.join(self.tempdir, u'foo'), 'wb') as f:
@@ -534,7 +533,6 @@ class StorageTest(TestCase):
     # The isolated file is pure in-memory.
     self.assertIsInstance(hot[2], isolateserver.BufferItem)
 
-  @unittest.skipIf(six.PY3 and sys.platform == 'darwin', 'crbug.com/1101705')
   def test_archive_files_to_storage_tar(self):
     # Create 5 files, which is the minimum to create a tarball.
     for i in range(5):
@@ -1328,11 +1326,9 @@ class TestArchive(TestCase):
     isolated_hash = isolateserver_fake.hash_content(isolated_data)
     self.checkOutput([mock.call('%s %s' % (isolated_hash, self.tempdir))])
 
-  @unittest.skipIf(six.PY3 and sys.platform == 'darwin', 'crbug.com/1101705')
   def test_archive_directory(self):
     self.help_test_archive(['archive', '-I', 'https://localhost:1'])
 
-  @unittest.skipIf(six.PY3 and sys.platform == 'darwin', 'crbug.com/1101705')
   def test_archive_directory_envvar(self):
     with test_env.EnvVars({'ISOLATE_SERVER': 'https://localhost:1'}):
       self.help_test_archive(['archive'])

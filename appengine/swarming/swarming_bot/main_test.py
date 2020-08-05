@@ -54,7 +54,6 @@ class SimpleMainTest(TestCase):
   def url(self):
     return 'http://localhost:1'
 
-  @unittest.skipIf(six.PY3 and sys.platform == 'darwin', 'crbug.com/1101705')
   @unittest.skipIf(sys.platform == 'win32',
                    'TODO(crbug.com/1017545): fix assertions')
   def test_attributes(self):
@@ -106,7 +105,6 @@ class MainTest(TestCase):
   def url(self):
     return self._server.url
 
-  @unittest.skipIf(six.PY3 and sys.platform == 'darwin', 'crbug.com/1101705')
   @unittest.skipIf(
       sys.platform == 'win32',
       'TODO(crbug.com/1017545): It gets stuck at proc.communicate()')

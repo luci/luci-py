@@ -507,7 +507,6 @@ class Isolate(unittest.TestCase):
     self.assertEqual(sorted(EXPECTED_MODES), sorted(modes))
 
 
-@unittest.skipIf(sys.platform == "darwin" and six.PY3, "crbug.com/1101705")
 class IsolateTempdirBase(unittest.TestCase):
 
   def setUp(self):
@@ -720,7 +719,6 @@ class IsolateTempdirBase(unittest.TestCase):
     self.assertIn(expected, out)
 
 
-@unittest.skipIf(sys.platform == "darwin" and six.PY3, "crbug.com/1101705")
 class IsolateOutdir(IsolateTempdirBase):
 
   def setUp(self):
@@ -762,7 +760,6 @@ class IsolateOutdir(IsolateTempdirBase):
     self._expect_no_tree()
 
 
-@unittest.skipIf(sys.platform == "darwin" and six.PY3, "crbug.com/1101705")
 class Isolate_check(IsolateTempdirBase):
 
   def setUp(self):
@@ -806,7 +803,6 @@ class Isolate_check(IsolateTempdirBase):
       self._expect_results(['symlink_outside_build_root.py'], None, None, None)
 
 
-@unittest.skipIf(sys.platform == "darwin" and six.PY3, "crbug.com/1101705")
 class Isolate_remap(IsolateOutdir):
 
   def setUp(self):
@@ -857,7 +853,6 @@ class Isolate_remap(IsolateOutdir):
       self._expect_results(['symlink_outside_build_root.py'], None, None, None)
 
 
-@unittest.skipIf(sys.platform == "darwin" and six.PY3, "crbug.com/1101705")
 class Isolate_run(IsolateTempdirBase):
 
   def setUp(self):
@@ -909,7 +904,6 @@ class Isolate_run(IsolateTempdirBase):
       self._expect_results(['symlink_outside_build_root.py'], None, None, None)
 
 
-@unittest.skipIf(sys.platform == "darwin" and six.PY3, "crbug.com/1101705")
 class IsolateNoOutdir(IsolateTempdirBase):
   # Test without the --outdir flag.
   # So all the files are first copied in the tempdir and the test is run from

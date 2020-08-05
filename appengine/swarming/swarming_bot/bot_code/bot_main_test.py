@@ -193,7 +193,6 @@ class TestBotMain(TestBotBase):
     expected = {'sleep_streak': 0.1, 'yo': 'dawh'}
     self.assertEqual(expected, bot_main._get_state(obj, 0.1))
 
-  @unittest.skipIf(six.PY3 and sys.platform == 'darwin', 'crbug.com/1101705')
   def test_get_state_quarantine(self):
     botobj = bot_main.get_bot(bot_main.get_config())
     root = u'c:\\' if sys.platform == 'win32' else u'/'
@@ -352,7 +351,6 @@ class TestBotMain(TestBotBase):
     self.assertEqual(a, bot_main._dict_deep_merge(a, None))
     self.assertEqual(a, bot_main._dict_deep_merge(None, a))
 
-  @unittest.skipIf(six.PY3 and sys.platform == 'darwin', 'crbug.com/1101705')
   def test_setup_bot(self):
     setup_bots = []
 

@@ -203,7 +203,6 @@ class TestOsUtilities(auto_stub.TestCase):
     self.assertIsInstance(dimensions[u'id'][0], six.text_type)
     self.assertEqual(dimensions[u'id'][0], u'customid')
 
-  @unittest.skipIf(six.PY3 and sys.platform == 'darwin', 'crbug.com/1101705')
   def test_get_state(self):
     actual = os_utilities.get_state()
     actual.pop('reboot_required', None)
