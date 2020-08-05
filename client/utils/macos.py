@@ -12,11 +12,7 @@ if sys.platform == 'darwin':
   if six.PY3:
     import re
 
-    try:
-      import objc
-    except ImportError:
-      # TODO(crbugg.com/1101705): don't ignore when this is available
-      pass
+    import objc
 
     # Extract 43 from error like 'Mac Error -43'
     _mac_error_re = re.compile('^MAC Error -(\d+)$')
