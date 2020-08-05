@@ -162,6 +162,8 @@ for more information.
 # 3 weeks
 MAX_AGE_SECS = 21*24*60*60
 
+# TODO(1099655): Enable this once all prod issues are gone.
+_USE_GO_ISOLATED_TO_UPLOAD = False
 
 TaskData = collections.namedtuple(
     'TaskData',
@@ -774,11 +776,11 @@ def upload_out_dir(storage, out_dir, go_isolated_client):
   if fs.isdir(out_dir) and fs.listdir(out_dir):
     with tools.Profiler('ArchiveOutput'):
       isolated = None
-      if go_isolated_client is None:
-        isolated, cold, hot = _upload_with_py(storage, out_dir)
-      else:
+      if _USE_GO_ISOLATED_TO_UPLOAD and go_isolated_client is not None:
         isolated, cold, hot = _upload_with_go(storage, out_dir,
                                               go_isolated_client)
+      else:
+        isolated, cold, hot = _upload_with_py(storage, out_dir)
       outputs_ref = {
           'isolated': isolated,
           'isolatedserver': storage.server_ref.url,
