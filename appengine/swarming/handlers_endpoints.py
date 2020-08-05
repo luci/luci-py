@@ -278,7 +278,8 @@ class SwarmingServerService(remote.Service):
         get_configs=acl.can_view_config(),
         put_configs=acl.can_edit_config(),
         cancel_task=self._can_cancel_task(request.task_id),
-        cancel_tasks=realms.can_cancel_tasks(request.tags),
+        cancel_tasks=realms.can_cancel_tasks(
+            bot_management.get_pools_from_dimensions_flat(request.tags)),
         get_bootstrap_token=acl.can_create_bot(),
         list_bots=pools_list_bots,
         list_tasks=pools_list_tasks)
@@ -674,7 +675,8 @@ class SwarmingTasksService(remote.Service):
     # Check permission.
     # If the caller has global permission, it can access all tasks.
     # Otherwise, it requires pool dimension to check ACL.
-    realms.check_tasks_list_acl(request.tags)
+    pools = bot_management.get_pools_from_dimensions_flat(request.tags)
+    realms.check_tasks_list_acl(pools)
 
     now = utils.utcnow()
     try:
@@ -794,7 +796,8 @@ class SwarmingTasksService(remote.Service):
     # Check permission.
     # If the caller has global permission, it can access all tasks.
     # Otherwise, it requires a pool tag to check ACL.
-    realms.check_tasks_cancel_acl(request.tags)
+    pools = bot_management.get_pools_from_dimensions_flat(request.tags)
+    realms.check_tasks_cancel_acl(pools)
 
     now = utils.utcnow()
     cond = task_result.TaskResultSummary.state == task_result.State.PENDING
@@ -841,7 +844,8 @@ class SwarmingTasksService(remote.Service):
     # Check permission.
     # If the caller has global permission, it can access all tasks.
     # Otherwise, it requires pool dimension to check ACL.
-    realms.check_tasks_list_acl(request.tags)
+    pools = bot_management.get_pools_from_dimensions_flat(request.tags)
+    realms.check_tasks_list_acl(pools)
 
     if not request.start:
       raise endpoints.BadRequestException('start (as epoch) is required')
@@ -1215,7 +1219,8 @@ class SwarmingBotsService(remote.Service):
     # Check permission.
     # If the caller has global permission, it can access all bots.
     # Otherwise, it requires pool dimension to check ACL.
-    realms.check_bots_list_acl(request.dimensions)
+    pools = bot_management.get_pools_from_dimensions_flat(request.dimensions)
+    realms.check_bots_list_acl(pools)
 
     now = utils.utcnow()
     # Disable the in-process local cache. This is important, as there can be up
@@ -1253,7 +1258,8 @@ class SwarmingBotsService(remote.Service):
     # Check permission.
     # If the caller has global permission, it can access all bots.
     # Otherwise, it requires pool dimension to check ACL.
-    realms.check_bots_list_acl(request.dimensions)
+    pools = bot_management.get_pools_from_dimensions_flat(request.dimensions)
+    realms.check_bots_list_acl(pools)
 
     now = utils.utcnow()
     q = bot_management.BotInfo.query()

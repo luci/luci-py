@@ -739,6 +739,13 @@ def has_capacity(dimensions):
   return False
 
 
+def get_pools_from_dimensions_flat(dimensions_flat):
+  """Gets pools from dimensions_flat."""
+  return [
+      d.replace('pool:', '') for d in dimensions_flat if d.startswith('pool:')
+  ]
+
+
 def cron_update_bot_info():
   """Refreshes BotInfo.composite for dead bots."""
   @ndb.tasklet
@@ -910,9 +917,6 @@ def cron_delete_old_bot():
 def cron_aggregate_dimensions():
   """Aggregates dimensions for all pools and each pool."""
 
-  def _get_pools_dimension(dims):
-    return [d.replace('pool:', '') for d in dims if d.startswith('pool:')]
-
   # {
   #   'all': { 'os': set(...), 'cpu': set(...), ...},
   #   'pool1': { 'os': set(...), 'cpu': set(...), ...},
@@ -922,7 +926,7 @@ def cron_aggregate_dimensions():
   now = utils.utcnow()
 
   for b in BotInfo.query():
-    groups = _get_pools_dimension(b.dimensions_flat)
+    groups = get_pools_from_dimensions_flat(b.dimensions_flat)
     groups.append('all')
     for i in b.dimensions_flat:
       k, v = i.split(':', 1)

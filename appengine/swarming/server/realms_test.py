@@ -358,7 +358,7 @@ class RealmsTest(test_case.TestCase):
     self.mock(pools_config, 'get_pool_config', get_pool_config)
 
     # call
-    realms.check_bots_list_acl(['pool:pool1', 'pool:pool2'])
+    realms.check_bots_list_acl(['pool1', 'pool2'])
     for pool_realm in ['test:pool1', 'test:pool2']:
       self._has_permission_mock.assert_any_call(
           _PERM_POOLS_LIST_BOTS, [pool_realm],
@@ -373,7 +373,7 @@ class RealmsTest(test_case.TestCase):
 
     # call
     with self.assertRaises(auth.AuthorizationError):
-      realms.check_bots_list_acl(['pool:pool1', 'pool:pool2'])
+      realms.check_bots_list_acl(['pool1', 'pool2'])
     # it checks only the first realm and fails.
     self._has_permission_mock.assert_any_call(
         _PERM_POOLS_LIST_BOTS, ['test:pool1'],
@@ -388,7 +388,7 @@ class RealmsTest(test_case.TestCase):
 
     # call
     with self.assertRaises(auth.AuthorizationError):
-      realms.check_bots_list_acl(['pool:pool1', 'pool:pool2'])
+      realms.check_bots_list_acl(['pool1', 'pool2'])
     for pool_realm in ['test:pool1', 'test:pool2']:
       self._has_permission_mock.assert_any_call(
           _PERM_POOLS_LIST_BOTS, [pool_realm],
@@ -400,7 +400,7 @@ class RealmsTest(test_case.TestCase):
 
     # call
     with self.assertRaises(auth.AuthorizationError):
-      realms.check_bots_list_acl(['id:bot1'])  # no pool dimensions
+      realms.check_bots_list_acl(None)
     self._has_permission_mock.assert_not_called()
 
   def test_check_bots_list_acl_realm_no_pool_realms(self):
@@ -411,7 +411,7 @@ class RealmsTest(test_case.TestCase):
 
     # call
     with self.assertRaises(auth.AuthorizationError):
-      realms.check_bots_list_acl(['pool:pool1', 'pool:pool2'])
+      realms.check_bots_list_acl(['pool1', 'pool2'])
     self._has_permission_mock.assert_not_called()
 
   def test_check_bots_list_acl_realm_unknown_pool(self):
@@ -421,7 +421,7 @@ class RealmsTest(test_case.TestCase):
 
     # call
     with self.assertRaises(endpoints.BadRequestException):
-      realms.check_bots_list_acl(['pool:unknown'])
+      realms.check_bots_list_acl(['unknown'])
     self._has_permission_mock.assert_not_called()
 
   def test_can_list_bots(self):
@@ -621,7 +621,7 @@ class RealmsTest(test_case.TestCase):
     self.mock(pools_config, 'get_pool_config', get_pool_config)
 
     # call
-    realms.check_tasks_list_acl(['pool:pool1', 'pool:pool2'])
+    realms.check_tasks_list_acl(['pool1', 'pool2'])
     for pool_realm in ['test:pool1', 'test:pool2']:
       self._has_permission_mock.assert_any_call(
           _PERM_POOLS_LIST_TASKS, [pool_realm],
@@ -636,7 +636,7 @@ class RealmsTest(test_case.TestCase):
 
     # call
     with self.assertRaises(auth.AuthorizationError):
-      realms.check_tasks_list_acl(['pool:pool1', 'pool:pool2'])
+      realms.check_tasks_list_acl(['pool1', 'pool2'])
     # it checks only the first realm and fails.
     self._has_permission_mock.assert_any_call(
         _PERM_POOLS_LIST_TASKS, ['test:pool1'],
@@ -651,7 +651,7 @@ class RealmsTest(test_case.TestCase):
 
     # call
     with self.assertRaises(auth.AuthorizationError):
-      realms.check_tasks_list_acl(['pool:pool1', 'pool:pool2'])
+      realms.check_tasks_list_acl(['pool1', 'pool2'])
     for pool_realm in ['test:pool1', 'test:pool2']:
       self._has_permission_mock.assert_any_call(
           _PERM_POOLS_LIST_TASKS, [pool_realm],
@@ -663,7 +663,7 @@ class RealmsTest(test_case.TestCase):
 
     # call
     with self.assertRaises(auth.AuthorizationError):
-      realms.check_tasks_list_acl(['id:bot1'])  # no pool dimensions
+      realms.check_tasks_list_acl(None)
     self._has_permission_mock.assert_not_called()
 
   def test_check_tasks_list_acl_realm_no_pool_realms(self):
@@ -674,7 +674,7 @@ class RealmsTest(test_case.TestCase):
 
     # call
     with self.assertRaises(auth.AuthorizationError):
-      realms.check_tasks_list_acl(['pool:pool1', 'pool:pool2'])
+      realms.check_tasks_list_acl(['pool1', 'pool2'])
     self._has_permission_mock.assert_not_called()
 
   def test_check_tasks_list_acl_realm_unknown_pool(self):
@@ -684,7 +684,7 @@ class RealmsTest(test_case.TestCase):
 
     # call
     with self.assertRaises(endpoints.BadRequestException):
-      realms.check_tasks_list_acl(['pool:unknown'])
+      realms.check_tasks_list_acl(['unknown'])
     self._has_permission_mock.assert_not_called()
 
   def test_can_list_tasks(self):
@@ -778,7 +778,7 @@ class RealmsTest(test_case.TestCase):
     self.mock(pools_config, 'get_pool_config', get_pool_config)
 
     # call
-    realms.check_tasks_cancel_acl(['pool:pool1', 'pool:pool2'])
+    realms.check_tasks_cancel_acl(['pool1', 'pool2'])
     for pool_realm in ['test:pool1', 'test:pool2']:
       self._has_permission_mock.assert_any_call(
           _PERM_POOLS_CANCEL_TASK, [pool_realm],
@@ -793,7 +793,7 @@ class RealmsTest(test_case.TestCase):
 
     # call
     with self.assertRaises(auth.AuthorizationError):
-      realms.check_tasks_cancel_acl(['pool:pool1', 'pool:pool2'])
+      realms.check_tasks_cancel_acl(['pool1', 'pool2'])
     # it checks only the first realm and fails.
     self._has_permission_mock.assert_any_call(
         _PERM_POOLS_CANCEL_TASK, ['test:pool1'],
@@ -808,7 +808,7 @@ class RealmsTest(test_case.TestCase):
 
     # call
     with self.assertRaises(auth.AuthorizationError):
-      realms.check_tasks_cancel_acl(['pool:pool1', 'pool:pool2'])
+      realms.check_tasks_cancel_acl(['pool1', 'pool2'])
     for pool_realm in ['test:pool1', 'test:pool2']:
       self._has_permission_mock.assert_any_call(
           _PERM_POOLS_CANCEL_TASK, [pool_realm],
@@ -820,7 +820,7 @@ class RealmsTest(test_case.TestCase):
 
     # call
     with self.assertRaises(auth.AuthorizationError):
-      realms.check_tasks_cancel_acl(['id:bot1'])  # no pool dimensions
+      realms.check_tasks_cancel_acl(None)
     self._has_permission_mock.assert_not_called()
 
   def test_check_tasks_cancel_acl_realm_no_pool_realms(self):
@@ -831,7 +831,7 @@ class RealmsTest(test_case.TestCase):
 
     # call
     with self.assertRaises(auth.AuthorizationError):
-      realms.check_tasks_cancel_acl(['pool:pool1', 'pool:pool2'])
+      realms.check_tasks_cancel_acl(['pool1', 'pool2'])
     self._has_permission_mock.assert_not_called()
 
   def test_check_tasks_cancel_acl_realm_unknown_pool(self):
@@ -841,19 +841,19 @@ class RealmsTest(test_case.TestCase):
 
     # call
     with self.assertRaises(endpoints.BadRequestException):
-      realms.check_tasks_cancel_acl(['pool:unknown'])
+      realms.check_tasks_cancel_acl(['unknown'])
     self._has_permission_mock.assert_not_called()
 
   def test_can_cancel_tasks(self):
     # True case
     self.mock(acl, 'can_edit_all_tasks', lambda: True)
-    self.assertTrue(realms.can_cancel_tasks(['pool:pool1', 'pool:pool2']))
+    self.assertTrue(realms.can_cancel_tasks(['pool1', 'pool2']))
 
     # False case
     get_pool_config = lambda p: _gen_pool_config(realm=None)
     self.mock(pools_config, 'get_pool_config', get_pool_config)
     self.mock(acl, 'can_edit_all_tasks', lambda: False)
-    self.assertFalse(realms.can_cancel_tasks(['pool:pool1', 'pool:pool2']))
+    self.assertFalse(realms.can_cancel_tasks(['pool1', 'pool2']))
 
   def test_check_bot_terminate_acl_with_global_permission(self):
     self.mock(acl, 'can_edit_bot', lambda: True)

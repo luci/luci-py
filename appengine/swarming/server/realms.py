@@ -304,7 +304,7 @@ def can_terminate_bot(bot_id):
     return False
 
 
-def check_bots_list_acl(dimensions_flat):
+def check_bots_list_acl(pools):
   """Checks if the caller is allowed to list or count bots.
 
   Checks if the caller has global permission using acl.can_view_bot().
@@ -315,7 +315,7 @@ def check_bots_list_acl(dimensions_flat):
     in *all* pools.
 
   Args:
-    dimensions_flat: List of dimensions for filtering.
+    pools: List of pools for filtering.
 
   Returns:
     None
@@ -327,8 +327,7 @@ def check_bots_list_acl(dimensions_flat):
   # check global permission.
   if acl.can_view_bot():
     return
-  _check_pools_filters_acl(realms_pb2.REALM_PERMISSION_POOLS_LIST_BOTS,
-                           dimensions_flat)
+  _check_pools_filters_acl(realms_pb2.REALM_PERMISSION_POOLS_LIST_BOTS, pools)
 
 
 def can_list_bots(pool):
@@ -391,7 +390,7 @@ def check_task_get_acl(task_request):
 
   # check 'swarming.pools.listTasks' permission of the pool in bot dimensions.
   if task_request.bot_id:
-    pools = _get_pools_from_dimensions_flat(
+    pools = bot_management.get_pools_from_dimensions_flat(
         _retrieve_bot_dimensions(task_request.bot_id))
     pool_realms = [pools_config.get_pool_config(p).realm for p in pools]
     if pool_realms and auth.has_permission(
@@ -445,7 +444,7 @@ def check_task_cancel_acl(task_request):
 
   # check 'swarming.pools.cancelTask' permission of the pool in bot dimensions.
   if task_request.bot_id:
-    pools = _get_pools_from_dimensions_flat(
+    pools = bot_management.get_pools_from_dimensions_flat(
         _retrieve_bot_dimensions(task_request.bot_id))
     pool_realms = [pools_config.get_pool_config(p).realm for p in pools]
     if pool_realms and auth.has_permission(
@@ -479,18 +478,18 @@ def can_cancel_task(task_request):
     return False
 
 
-def check_tasks_list_acl(tags):
+def check_tasks_list_acl(pools):
   """Checks if the caller is allowed to list or count tasks.
 
   Checks if the caller has global permission using acl.can_view_all_tasks().
 
   If the caller doesn't have any global permissions,
     It checks realm permission 'swarming.pools.listTasks'.
-    The caller is required to specify a pool dimension, and have the permission
+    The caller is required to specify pools, and have the permission
     in *all* pools.
 
   Args:
-    tags: List of tags for filtering.
+    pools: List of pools for filtering.
 
   Returns:
     None
@@ -502,7 +501,7 @@ def check_tasks_list_acl(tags):
   # check global permission.
   if acl.can_view_all_tasks():
     return
-  _check_pools_filters_acl(realms_pb2.REALM_PERMISSION_POOLS_LIST_TASKS, tags)
+  _check_pools_filters_acl(realms_pb2.REALM_PERMISSION_POOLS_LIST_TASKS, pools)
 
 
 def can_list_tasks(pool):
@@ -531,18 +530,18 @@ def can_list_tasks(pool):
     return False
 
 
-def check_tasks_cancel_acl(tags):
+def check_tasks_cancel_acl(pools):
   """Checks if the caller is allowed to cancel tasks.
 
   Checks if the caller has global permission using acl.can_edit_all_tasks().
 
   If the caller doesn't have any global permissions,
     It checks realm permission 'swarming.pools.cancelTask'.
-    The caller is required to specify a pool dimension, and have
-    *all* permissions of the specified pools.
+    The caller is required to specify pools, and have *all* permissions of
+    the pools.
 
   Args:
-    tags: List of tags for filtering.
+    pools: List of pools for filtering.
 
   Returns:
     None
@@ -554,20 +553,20 @@ def check_tasks_cancel_acl(tags):
   # check global permission.
   if acl.can_edit_all_tasks():
     return
-  _check_pools_filters_acl(realms_pb2.REALM_PERMISSION_POOLS_CANCEL_TASK, tags)
+  _check_pools_filters_acl(realms_pb2.REALM_PERMISSION_POOLS_CANCEL_TASK, pools)
 
 
-def can_cancel_tasks(tags):
+def can_cancel_tasks(pools):
   """Checks if the caller is allowed to cancel tasks.
 
   Args:
-    tags: List of tags for filtering.
+    pools: List of pools for filtering.
 
   Returns:
     allowed: True if allowed, False otherwise.
   """
   try:
-    check_tasks_cancel_acl(tags)
+    check_tasks_cancel_acl(pools)
     return True
   except auth.AuthorizationError:
     return False
@@ -611,11 +610,6 @@ def _check_permission(perm, realms, identity=None):
                identity.kind, identity.name, perm.name, realms)
 
 
-def _get_pools_from_dimensions_flat(dimensions):
-  """Gets pools from dimensions_flat."""
-  return [d.replace('pool:', '') for d in dimensions if d.startswith('pool:')]
-
-
 def _retrieve_bot_dimensions(bot_id):
   """Retrieves bot dimensions"""
   # get the last BotEvent because BotInfo may have been deleted.
@@ -625,7 +619,7 @@ def _retrieve_bot_dimensions(bot_id):
   return events[0].dimensions_flat
 
 
-def _check_pools_filters_acl(perm_enum, dimensions):
+def _check_pools_filters_acl(perm_enum, pools):
   """Checks if the caller has the permission in the specified pools.
 
   The caller needs to have the permission in *all* pools.
@@ -633,8 +627,6 @@ def _check_pools_filters_acl(perm_enum, dimensions):
   Raises:
     auth.AuthorizationError: if the caller is not allowed.
   """
-  pools = _get_pools_from_dimensions_flat(dimensions)
-
   # Pool dimension is required if the caller doesn't have global permission.
   if not pools:
     raise auth.AuthorizationError('No pool is specified')
@@ -660,7 +652,8 @@ def _check_bot_acl(perm_enum, bot_id):
     auth.AuthorizationError: if the caller is not allowed.
   """
   # retrieve the pools from bot dimensions.
-  pools = _get_pools_from_dimensions_flat(_retrieve_bot_dimensions(bot_id))
+  pools = bot_management.get_pools_from_dimensions_flat(
+      _retrieve_bot_dimensions(bot_id))
   realms = []
   for p in pools:
     pool_cfg = pools_config.get_pool_config(p)

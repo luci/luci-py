@@ -534,6 +534,11 @@ class BotManagementTest(test_case.TestCase):
     self.assertEqual(False, bot_management.has_capacity(d))
     self.assertEqual(False, bot_management.has_capacity(or_dimensions))
 
+  def test_get_pools_from_dimensions_flat(self):
+    pools = bot_management.get_pools_from_dimensions_flat(
+        ['id:id1', 'os:Linux', 'pool:pool1', 'pool:pool2'])
+    self.assertEqual(pools, ['pool1', 'pool2'])
+
   def test_cron_update_bot_info(self):
     # Create two bots, one becomes dead, updating the cron job fixes composite.
     timeout = bot_management.config.settings().bot_death_timeout_secs
