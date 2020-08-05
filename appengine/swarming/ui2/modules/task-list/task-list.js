@@ -525,14 +525,16 @@ window.customElements.define('task-list', class extends SwarmingAppBoilerplate {
               fetch(`/_ah/api/swarming/v1/tasks/list?${queryParams}`, extra)
                   .then(jsonOrThrow)
                   .then(maybeLoadMore)
-                  .catch((e) => this.fetchError(e, 'tasks/list (paging)'));
+                  .catch((e) => {
+                    this.fetchError(e, 'tasks/list (paging)', true);
+                  });
             } else {
               this.app.finishedTask();
             }
           };
           maybeLoadMore(json);
         })
-        .catch((e) => this.fetchError(e, 'tasks/list'));
+        .catch((e) => this.fetchError(e, 'tasks/list', true));
 
     this._fetchCounts(queryParams, extra);
 
@@ -558,7 +560,7 @@ window.customElements.define('task-list', class extends SwarmingAppBoilerplate {
             this.render();
             this.app.finishedTask();
           })
-          .catch((e) => this.fetchError(e, 'bots/dimensions'));
+          .catch((e) => this.fetchError(e, 'bots/dimensions', true));
     }
   }
 
@@ -571,7 +573,7 @@ window.customElements.define('task-list', class extends SwarmingAppBoilerplate {
           this.app.finishedTask();
           return json.count;
         })
-        .catch((e) => this.fetchError(e, 'count/total'));
+        .catch((e) => this.fetchError(e, 'count/total', true));
     this._queryCounts[0].value = html`${until(totalPromise, '...')}`;
 
     const stateRemoved = queryParams.replace(/state=.+?(&|$)/g, '');
@@ -582,7 +584,7 @@ window.customElements.define('task-list', class extends SwarmingAppBoilerplate {
             this.app.finishedTask();
             return json.count;
           })
-          .catch((e) => this.fetchError(e, `count/${states[i]}`));
+          .catch((e) => this.fetchError(e, `count/${states[i]}`, true));
       this._queryCounts[1 + i].value = html`${until(promise, '...')}`;
     }
   }

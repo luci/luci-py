@@ -152,21 +152,20 @@ describe('task-list', function() {
 
       beforeEach(notAuthorized);
 
-      it('tells the user they should change accounts', function(done) {
-        loggedInTasklist((ele) => {
-          const loginMessage = $$('swarming-app>main .message', ele);
-          expect(loginMessage).toBeTruthy();
-          expect(loginMessage).not.toHaveAttribute('hidden', 'Message should not be hidden');
-          expect(loginMessage.textContent).toContain('different account');
-          done();
-        });
-      });
       it('does not display filters or tasks', function(done) {
         loggedInTasklist((ele) => {
           const taskTable = $$('.task-table', ele);
           expect(taskTable).toBeTruthy();
-          expect(taskTable).toHaveAttribute('hidden', '.task-table should be hidden');
-          expect($$('.header', ele)).toHaveAttribute('hidden', 'no filters seen');
+
+          const taskRows = $$('.task-table .task-row', ele);
+          expect(taskRows).toBeNull();
+
+          const keyFilters = $$('.filter_box .selector.keys .item', ele);
+          expect(keyFilters).toBeNull();
+
+          const valueFilters = $$('.filter_box .selector.values .item', ele);
+          expect(valueFilters).toBeNull();
+
           done();
         });
       });

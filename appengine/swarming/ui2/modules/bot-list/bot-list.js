@@ -528,14 +528,14 @@ window.customElements.define('bot-list', class extends SwarmingAppBoilerplate {
               fetch(`/_ah/api/swarming/v1/bots/list?${queryParams}`, extra)
                   .then(jsonOrThrow)
                   .then(maybeLoadMore)
-                  .catch((e) => this.fetchError(e, 'bots/list (paging)'));
+                  .catch((e) => this.fetchError(e, 'bots/list (paging)', true));
             } else {
               this.app.finishedTask();
             }
           };
           maybeLoadMore(json);
         })
-        .catch((e) => this.fetchError(e, 'bots/list'));
+        .catch((e) => this.fetchError(e, 'bots/list', true));
 
     this.app.addBusyTasks(1);
     // We can re-use the query params from listQueryParams because
@@ -548,7 +548,7 @@ window.customElements.define('bot-list', class extends SwarmingAppBoilerplate {
           this.render();
           this.app.finishedTask();
         })
-        .catch((e) => this.fetchError(e, 'bots/count (query)'));
+        .catch((e) => this.fetchError(e, 'bots/count (query)', true));
 
     // We only need to do this once, because we don't expect it to
     // change (much) after the page has been loaded.
@@ -562,7 +562,7 @@ window.customElements.define('bot-list', class extends SwarmingAppBoilerplate {
             this.render();
             this.app.finishedTask();
           })
-          .catch((e) => this.fetchError(e, 'bots/count (fleet)'));
+          .catch((e) => this.fetchError(e, 'bots/count (fleet)', true));
     }
 
     // fetch dimensions so we can fill out the filters.
@@ -588,7 +588,7 @@ window.customElements.define('bot-list', class extends SwarmingAppBoilerplate {
             this._refilterPossibleColumns(); // calls render
             this.app.finishedTask();
           })
-          .catch((e) => this.fetchError(e, 'bots/dimensions'));
+          .catch((e) => this.fetchError(e, 'bots/dimensions', true));
     }
   }
 

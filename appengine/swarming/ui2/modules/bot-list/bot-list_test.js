@@ -152,23 +152,22 @@ describe('bot-list', function() {
 
       beforeEach(notAuthorized);
 
-      it('tells the user they should change accounts', function(done) {
-        loggedInBotlist((ele) => {
-          const loginMessage = $$('swarming-app>main .message', ele);
-          expect(loginMessage).toBeTruthy();
-          expect(loginMessage).not.toHaveAttribute('hidden', 'Message should not be hidden');
-          expect(loginMessage.textContent).toContain('different account');
-          done();
-        });
-      });
       it('does not display filters or bots', function(done) {
         loggedInBotlist((ele) => {
           const botTable = $$('.bot-table', ele);
           expect(botTable).toBeTruthy();
-          expect(botTable).toHaveAttribute('hidden', '.bot-table should be hidden');
 
-          const filters = $$('.filters', ele);
-          expect(filters).toBeFalsy('.filters should not be shown');
+          const botRaws = $$('.bot-table .bot-row', ele);
+          expect(botRaws).toBeNull();
+
+          const keyFilters = $$('.filter_box .selector.keys .item', ele);
+          console.log('keyFilters', keyFilters);
+          expect(keyFilters).toBeNull();
+
+          const valueFilters = $$('.filter_box .selector.values .item', ele);
+          console.log('valueFilters', valueFilters);
+          expect(valueFilters).toBeNull();
+
           done();
         });
       });
