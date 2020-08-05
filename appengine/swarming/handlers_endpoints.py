@@ -1200,6 +1200,10 @@ BotsCountRequest = endpoints.ResourceContainer(
     dimensions=messages.StringField(1, repeated=True))
 
 
+BotsDimensionsRequest = endpoints.ResourceContainer(
+    message_types.VoidMessage, pool=messages.StringField(1))
+
+
 @swarming_api.api_class(resource_name='bots', path='bots')
 class SwarmingBotsService(remote.Service):
   """Bots-related API."""
@@ -1287,18 +1291,22 @@ class SwarmingBotsService(remote.Service):
 
   @gae_ts_mon.instrument_endpoint()
   @auth.endpoints_method(
-      message_types.VoidMessage, swarming_rpcs.BotsDimensions,
-      http_method='GET')
-  @auth.require(acl.can_view_bot, log_identity=True)
-  def dimensions(self, _request):
+      BotsDimensionsRequest, swarming_rpcs.BotsDimensions, http_method='GET')
+  @auth.require(acl.can_access, log_identity=True)
+  def dimensions(self, request):
     """Returns the cached set of dimensions currently in use in the fleet."""
-    # TODO(jwata): change KEY to KEY_ALL once the entity is ready.
-    dims = bot_management.DimensionAggregation.KEY.get()
-    fd = [
-      swarming_rpcs.StringListPair(key=d.dimension, value=d.values)
-      for d in dims.dimensions
-    ]
-    return swarming_rpcs.BotsDimensions(bots_dimensions=fd, ts=dims.ts)
+    # The caller should be allowed to list bots in the specified pool or all
+    # pools.
+    realms.check_bots_list_acl([request.pool] if request.pool else None)
+
+    # TODO(jwata): change 'current' to 'all' once the entity is ready.
+    agg = bot_management.get_aggregation_key(request.pool or 'current').get()
+    return swarming_rpcs.BotsDimensions(
+        bots_dimensions=[
+            swarming_rpcs.StringListPair(key=d.dimension, value=d.values)
+            for d in agg.dimensions
+        ],
+        ts=agg.ts)
 
 
 def get_routes():
