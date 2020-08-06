@@ -105,3 +105,9 @@ wheel: <
   name: "infra/python/wheels/colorama-py2_py3"
   version: "version:0.4.1"
 >
+
+# required by platforms/osx.py
+wheel: <
+  name: "infra/python/wheels/pyobjc/mac-amd64_cp27_cp27m"
+  version: "version:4.1"
+>
