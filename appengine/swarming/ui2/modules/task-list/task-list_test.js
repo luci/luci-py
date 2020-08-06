@@ -140,8 +140,9 @@ describe('task-list', function() {
         // overwrite the default fetchMock behaviors to have everything return 403.
         fetchMock.get('/_ah/api/swarming/v1/server/details', 403,
             {overwriteRoutes: true});
-        fetchMock.get('/_ah/api/swarming/v1/server/permissions', {},
-            {overwriteRoutes: true});
+        fetchMock.get('/_ah/api/swarming/v1/server/permissions', {
+          list_tasks: ['pool1']
+        }, {overwriteRoutes: true});
         fetchMock.get('glob:/_ah/api/swarming/v1/tasks/list?*', 403,
             {overwriteRoutes: true});
         fetchMock.get('/_ah/api/swarming/v1/bots/dimensions', 403,
@@ -152,19 +153,23 @@ describe('task-list', function() {
 
       beforeEach(notAuthorized);
 
-      it('does not display filters or tasks', function(done) {
+      it('displays only pool filters', function(done) {
         loggedInTasklist((ele) => {
-          const taskTable = $$('.task-table', ele);
+          const taskTable = $('.task-table', ele);
           expect(taskTable).toBeTruthy();
 
-          const taskRows = $$('.task-table .task-row', ele);
-          expect(taskRows).toBeNull();
+          const taskRows = $('.task-table .task-row', ele);
+          expect(taskRows.length).toEqual(0);
 
-          const keyFilters = $$('.filter_box .selector.keys .item', ele);
-          expect(keyFilters).toBeNull();
+          const keyFilters = $('.filter_box .selector.keys .item', ele);
+          expect(keyFilters.length).toBe(1);
+          expect(keyFilters[0]).toMatchTextContent('pool (tag)');
 
-          const valueFilters = $$('.filter_box .selector.values .item', ele);
-          expect(valueFilters).toBeNull();
+          // click 'pool' filter.
+          keyFilters[0].click();
+          const valueFilters = $('.filter_box .selector.values .item', ele);
+          expect(valueFilters.length).toBe(1);
+          expect(valueFilters[0]).toMatchTextContent('pool1');
 
           done();
         });

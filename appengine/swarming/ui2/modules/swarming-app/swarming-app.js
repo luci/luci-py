@@ -305,7 +305,7 @@ window.customElements.define('swarming-app', class extends HTMLElement {
     this.addBusyTasks(1);
     let url = '/_ah/api/swarming/v1/server/permissions';
     if (params) url += `?${query.fromObject(params)}`;
-    fetch(url, auth)
+    return fetch(url, auth)
         .then(jsonOrThrow)
         .then((json) => {
           this._permissions = json;

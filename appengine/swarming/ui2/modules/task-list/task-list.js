@@ -191,6 +191,7 @@ const options = (ele) => html`
     </div>
   </div>
   <a href=${ele._matchingBotsLink()}>View Matching Bots</a>
+  <!-- TODO(jwata): change to permissions.cancel_tasks -->
   <button id=cancel_all
       ?disabled=${!ele.permissions.cancel_task}
       @click=${ele._promptMassCancel}>
@@ -491,7 +492,20 @@ window.customElements.define('task-list', class extends SwarmingAppBoilerplate {
     const tags = this._filters
         .filter((f) => f.split(':')[0] != 'state')
         .map((f) => f.replace('-tag', ''));
-    this.app._fetchPermissions(extra, {tags: tags});
+    this.app._fetchPermissions(extra, {tags: tags})
+        .then(() => {
+          // Users can select only pool dimension at this point.
+          const dims = [{
+            'key': 'pool',
+            'value': this.permissions.list_tasks || [],
+          }];
+          appendPossibleColumns(this._possibleColumns, dims);
+          appendPrimaryMap(this._primaryMap, dims);
+          delete this._primaryMap['state'];
+          this._knownDimensions = ['pool'];
+          this._rebuildFilterables();
+          this.render();
+        });
 
     // Fetch the tasks
     this.app.addBusyTasks(1);
