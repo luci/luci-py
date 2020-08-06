@@ -27,7 +27,7 @@ describe('task-list', function() {
     // These are the default responses to the expected API calls (aka 'matched').
     // They can be overridden for specific tests, if needed.
     mockAppGETs(fetchMock, {});
-    fetchMock.get(new RegExp('/_ah/api/swarming/v1/server/permissions\??.*'), {
+    fetchMock.get('glob:/_ah/api/swarming/v1/server/permissions*', {
       cancel_task: false,
     });
 
