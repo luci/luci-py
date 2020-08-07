@@ -32,7 +32,8 @@ describe('task-list', function() {
     });
 
     fetchMock.get('glob:/_ah/api/swarming/v1/tasks/list?*', tasks_20);
-    fetchMock.get('/_ah/api/swarming/v1/bots/dimensions', fleetDimensions);
+    fetchMock.get(
+        'glob:/_ah/api/swarming/v1/bots/dimensions?*', fleetDimensions);
     fetchMock.get('glob:/_ah/api/swarming/v1/tasks/count?*', {'count': 12345});
 
     // Everything else
@@ -145,7 +146,7 @@ describe('task-list', function() {
         }, {overwriteRoutes: true});
         fetchMock.get('glob:/_ah/api/swarming/v1/tasks/list?*', 403,
             {overwriteRoutes: true});
-        fetchMock.get('/_ah/api/swarming/v1/bots/dimensions', 403,
+        fetchMock.get('glob:/_ah/api/swarming/v1/bots/dimensions?*', 403,
             {overwriteRoutes: true});
         fetchMock.get('/_ah/api/swarming/v1/tasks/count', 403,
             {overwriteRoutes: true});
@@ -923,22 +924,25 @@ describe('task-list', function() {
       expectNoUnmatchedCalls(fetchMock);
     }
 
-    it('maker auth\'d API calls when a logged in user views landing page', function(done) {
-      loggedInTasklist((ele) => {
-        const calls = fetchMock.calls(MATCHED, 'GET');
-        expect(calls).toHaveSize(2+3+12, '2 GETs from swarming-app, 3 from task-list (12 counts)');
-        // calls is an array of 2-length arrays with the first element
-        // being the string of the url and the second element being
-        // the options that were passed in
-        const gets = calls.map((c) => c[0]);
+    it('makes auth\'d API calls when a logged in user views landing page',
+        function(done) {
+          loggedInTasklist((ele) => {
+            const calls = fetchMock.calls(MATCHED, 'GET');
+            expect(calls).toHaveSize(2+3+12,
+                '2 GETs from swarming-app, 3 from task-list (12 counts)');
+            // calls is an array of 2-length arrays with the first element
+            // being the string of the url and the second element being
+            // the options that were passed in
+            const gets = calls.map((c) => c[0]);
 
-        // limit=100 comes from the default limit value.
-        expect(gets).toContainRegex(/\/_ah\/api\/swarming\/v1\/tasks\/list.+limit=100.*/);
+            // limit=100 comes from the default limit value.
+            expect(gets).toContainRegex(
+                /\/_ah\/api\/swarming\/v1\/tasks\/list.+limit=100.*/);
 
-        checkAuthorizationAndNoPosts(calls);
-        done();
-      });
-    });
+            checkAuthorizationAndNoPosts(calls);
+            done();
+          });
+        });
 
     it('counts correctly with filters', function(done) {
       loggedInTasklist((ele) => {
@@ -947,9 +951,10 @@ describe('task-list', function() {
         ele._addFilter('state:PENDING_RUNNING');
         fetchMock.flush(true).then(() => {
           const calls = fetchMock.calls(MATCHED, 'GET');
-          expect(calls).toHaveSize(2+12, '2 from task-list and 12 counts');
+          expect(calls).toHaveSize(3+12, '3 from task-list and 12 counts');
 
-          const gets = calls.map((c) => c[0]);
+          const gets = calls.slice(1).map((c) => c[0])
+              .filter((g) => !g.includes('pool='));
           for (const get of gets) {
             // make sure there aren't two states when we do the count (which
             // appends a state)
@@ -969,9 +974,10 @@ describe('task-list', function() {
         ele._addFilter('state:PENDING_RUNNING');
         fetchMock.flush(true).then(() => {
           const calls = fetchMock.calls(MATCHED, 'GET');
-          expect(calls).toHaveSize(2+12, '2 from task-list and 12 counts');
+          expect(calls).toHaveSize(3+12, '3 from task-list and 12 counts');
 
-          const gets = calls.slice(1).map((c) => c[0]);
+          const gets = calls.slice(1).map((c) => c[0])
+              .filter((g) => !g.includes('pool='));
           for (const get of gets) {
             // make sure there aren't two states when we do the count (which
             // appends a state)

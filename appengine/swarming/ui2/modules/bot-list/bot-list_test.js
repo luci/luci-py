@@ -34,7 +34,8 @@ describe('bot-list', function() {
 
     fetchMock.get('glob:/_ah/api/swarming/v1/server/permissions*', {});
     fetchMock.get('glob:/_ah/api/swarming/v1/bots/list?*', bots_10);
-    fetchMock.get('/_ah/api/swarming/v1/bots/dimensions', fleetDimensions);
+    fetchMock.get(
+        'glob:/_ah/api/swarming/v1/bots/dimensions?*', fleetDimensions);
     fetchMock.get('/_ah/api/swarming/v1/bots/count', fleetCount);
     fetchMock.get('glob:/_ah/api/swarming/v1/bots/count?*', queryCount);
 
@@ -148,7 +149,7 @@ describe('bot-list', function() {
         }, {overwriteRoutes: true});
         fetchMock.get('glob:/_ah/api/swarming/v1/bots/list?*', 403,
             {overwriteRoutes: true});
-        fetchMock.get('/_ah/api/swarming/v1/bots/dimensions', 403,
+        fetchMock.get('glob:/_ah/api/swarming/v1/bots/dimensions?*', 403,
             {overwriteRoutes: true});
       }
 
@@ -971,8 +972,9 @@ describe('bot-list', function() {
         ele._addFilter('alpha:beta');
 
         let calls = fetchMock.calls(MATCHED, 'GET');
-        expect(calls).toHaveSize(3,
-            '1 for the bots, 1 for the count, 1 for the permissions');
+        expect(calls).toHaveSize(4,
+            '1 for the bots, 1 for the count, 1 for the permissions, ' +
+            '1 for the dimensions');
         // calls is an array of 2-length arrays with the first element
         // being the string of the url and the second element being
         // the options that were passed in

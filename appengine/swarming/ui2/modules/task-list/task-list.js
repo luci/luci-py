@@ -552,30 +552,27 @@ window.customElements.define('task-list', class extends SwarmingAppBoilerplate {
 
     this._fetchCounts(queryParams, extra);
 
-    // fetch dimensions so we can fill out the filters.
-    // We only need to do this once, because we don't expect it to
-    // change (much) after the page has been loaded.
-    if (!this._fetchedDimensions) {
-      this._fetchedDimensions = true;
-      this.app.addBusyTasks(1);
-      const extra = {
-        headers: {'authorization': this.auth_header},
-        // No signal here because we shouldn't need to abort it.
-        // This request does not depend on the filters.
-      };
-      fetch('/_ah/api/swarming/v1/bots/dimensions', extra)
-          .then(jsonOrThrow)
-          .then((json) => {
-            appendPossibleColumns(this._possibleColumns, json.bots_dimensions);
-            appendPrimaryMap(this._primaryMap, json.bots_dimensions);
-            this._knownDimensions = json.bots_dimensions.map((d) => d.key);
-            this._rebuildFilterables();
+    this.app.addBusyTasks(1);
+    const extraNoSignal = {
+      headers: {'authorization': this.auth_header},
+      // No signal here because we shouldn't need to abort it.
+      // This request does not depend on the filters.
+    };
+    const pool = this._filters
+        .filter((f) => f.startsWith('pool-tag:'))
+        .map((f) => f.replace('pool-tag:', ''))[0] || '';
+    fetch(`/_ah/api/swarming/v1/bots/dimensions?pool=${pool}`, extraNoSignal)
+        .then(jsonOrThrow)
+        .then((json) => {
+          appendPossibleColumns(this._possibleColumns, json.bots_dimensions);
+          appendPrimaryMap(this._primaryMap, json.bots_dimensions);
+          this._knownDimensions = json.bots_dimensions.map((d) => d.key);
+          this._rebuildFilterables();
 
-            this.render();
-            this.app.finishedTask();
-          })
-          .catch((e) => this.fetchError(e, 'bots/dimensions', true));
-    }
+          this.render();
+          this.app.finishedTask();
+        })
+        .catch((e) => this.fetchError(e, 'bots/dimensions', true));
   }
 
   _fetchCounts(queryParams, extra) {

@@ -574,31 +574,28 @@ window.customElements.define('bot-list', class extends SwarmingAppBoilerplate {
           .catch((e) => this.fetchError(e, 'bots/count (fleet)', true));
     }
 
-    // fetch dimensions so we can fill out the filters.
-    // We only need to do this once, because we don't expect it to
-    // change (much) after the page has been loaded.
-    if (!this._fetchedDimensions) {
-      this._fetchedDimensions = true;
-      this.app.addBusyTasks(1);
-      const extra = {
-        headers: {'authorization': this.auth_header},
-        // No signal here because we shouldn't need to abort it.
-        // This request does not depend on the filters.
-      };
-      fetch('/_ah/api/swarming/v1/bots/dimensions', extra)
-          .then(jsonOrThrow)
-          .then((json) => {
-            this._primaryMap = processPrimaryMap(json.bots_dimensions);
-            this._possibleColumns = makePossibleColumns(json.bots_dimensions);
-            this._filteredPossibleColumns = this._possibleColumns.slice();
-            this._primaryArr = Object.keys(this._primaryMap);
-            this._primaryArr.sort();
-            this._filteredPrimaryArr = this._primaryArr.slice();
-            this._refilterPossibleColumns(); // calls render
-            this.app.finishedTask();
-          })
-          .catch((e) => this.fetchError(e, 'bots/dimensions', true));
-    }
+    this.app.addBusyTasks(1);
+    const extraNoSignal = {
+      headers: {'authorization': this.auth_header},
+      // No signal here because we shouldn't need to abort it.
+      // This request does not depend on the filters.
+    };
+    const pool = this._filters
+        .filter((f) => f.startsWith('pool:'))
+        .map((f) => f.replace('pool:', ''))[0] || '';
+    fetch(`/_ah/api/swarming/v1/bots/dimensions?pool=${pool}`, extraNoSignal)
+        .then(jsonOrThrow)
+        .then((json) => {
+          this._primaryMap = processPrimaryMap(json.bots_dimensions);
+          this._possibleColumns = makePossibleColumns(json.bots_dimensions);
+          this._filteredPossibleColumns = this._possibleColumns.slice();
+          this._primaryArr = Object.keys(this._primaryMap);
+          this._primaryArr.sort();
+          this._filteredPrimaryArr = this._primaryArr.slice();
+          this._refilterPossibleColumns(); // calls render
+          this.app.finishedTask();
+        })
+        .catch((e) => this.fetchError(e, 'bots/dimensions', true));
   }
 
   _filterSearch(e) {

@@ -22,7 +22,7 @@ import {requireLogin, mockAuthdAppGETs} from '../test_util';
   fetchMock.get('glob:/_ah/api/swarming/v1/tasks/list?*',
       requireLogin(tasks_20, 2000));
 
-  fetchMock.get('/_ah/api/swarming/v1/bots/dimensions',
+  fetchMock.get('glob:/_ah/api/swarming/v1/bots/dimensions?*',
       requireLogin(fleetDimensions));
 
   fetchMock.get('glob:/_ah/api/swarming/v1/tasks/count?*',
