@@ -25,6 +25,7 @@ import {requireLogin, mockAuthdAppGETs} from '../test_util';
 
   mockAuthdAppGETs(fetchMock, {
     delete_bot: true,
+    list_bots: ['Chrome'],
   });
 
   fetchMock.get('glob:/_ah/api/swarming/v1/bots/list?*',

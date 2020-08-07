@@ -141,7 +141,7 @@ describe('task-list', function() {
         fetchMock.get('/_ah/api/swarming/v1/server/details', 403,
             {overwriteRoutes: true});
         fetchMock.get('/_ah/api/swarming/v1/server/permissions', {
-          list_tasks: ['pool1']
+          list_tasks: ['pool1'],
         }, {overwriteRoutes: true});
         fetchMock.get('glob:/_ah/api/swarming/v1/tasks/list?*', 403,
             {overwriteRoutes: true});

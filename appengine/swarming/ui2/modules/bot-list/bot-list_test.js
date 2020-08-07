@@ -32,6 +32,7 @@ describe('bot-list', function() {
       delete_bot: true,
     });
 
+    fetchMock.get('glob:/_ah/api/swarming/v1/server/permissions*', {});
     fetchMock.get('glob:/_ah/api/swarming/v1/bots/list?*', bots_10);
     fetchMock.get('/_ah/api/swarming/v1/bots/dimensions', fleetDimensions);
     fetchMock.get('/_ah/api/swarming/v1/bots/count', fleetCount);
@@ -142,8 +143,9 @@ describe('bot-list', function() {
         // overwrite the default fetchMock behaviors to have everything return 403.
         fetchMock.get('/_ah/api/swarming/v1/server/details', 403,
             {overwriteRoutes: true});
-        fetchMock.get('/_ah/api/swarming/v1/server/permissions', {},
-            {overwriteRoutes: true});
+        fetchMock.get('/_ah/api/swarming/v1/server/permissions', {
+          list_bots: ['pool1'],
+        }, {overwriteRoutes: true});
         fetchMock.get('glob:/_ah/api/swarming/v1/bots/list?*', 403,
             {overwriteRoutes: true});
         fetchMock.get('/_ah/api/swarming/v1/bots/dimensions', 403,
@@ -152,21 +154,23 @@ describe('bot-list', function() {
 
       beforeEach(notAuthorized);
 
-      it('does not display filters or bots', function(done) {
+      it('displays only pool filters', function(done) {
         loggedInBotlist((ele) => {
-          const botTable = $$('.bot-table', ele);
+          const botTable = $('.bot-table', ele);
           expect(botTable).toBeTruthy();
 
-          const botRaws = $$('.bot-table .bot-row', ele);
-          expect(botRaws).toBeNull();
+          const botRaws = $('.bot-table .bot-row', ele);
+          expect(botRaws).toHaveSize(0);
 
-          const keyFilters = $$('.filter_box .selector.keys .item', ele);
-          console.log('keyFilters', keyFilters);
-          expect(keyFilters).toBeNull();
+          const keyFilters = $('.filter_box .selector.keys .item', ele);
+          expect(keyFilters).toHaveSize(1);
+          expect(keyFilters[0]).toMatchTextContent('pool');
 
-          const valueFilters = $$('.filter_box .selector.values .item', ele);
-          console.log('valueFilters', valueFilters);
-          expect(valueFilters).toBeNull();
+          // click 'pool' filter.
+          keyFilters[0].click();
+          const valueFilters = $('.filter_box .selector.values .item', ele);
+          expect(valueFilters).toHaveSize(1);
+          expect(valueFilters[0]).toMatchTextContent('pool1');
 
           done();
         });
@@ -945,7 +949,8 @@ describe('bot-list', function() {
     it('makes auth\'d API calls when a logged in user views landing page', function(done) {
       loggedInBotlist((ele) => {
         const calls = fetchMock.calls(MATCHED, 'GET');
-        expect(calls.length).toBe(2+4, '2 GETs from swarming-app, 4 from bot-list');
+        expect(calls).toHaveSize(2+5,
+            '2 GETs from swarming-app, 5 from bot-list');
         // calls is an array of 2-length arrays with the first element
         // being the string of the url and the second element being
         // the options that were passed in
@@ -966,7 +971,8 @@ describe('bot-list', function() {
         ele._addFilter('alpha:beta');
 
         let calls = fetchMock.calls(MATCHED, 'GET');
-        expect(calls.length).toBe(2, '1 for the bots, 1 for the count');
+        expect(calls).toHaveSize(3,
+            '1 for the bots, 1 for the count, 1 for the permissions');
         // calls is an array of 2-length arrays with the first element
         // being the string of the url and the second element being
         // the options that were passed in
