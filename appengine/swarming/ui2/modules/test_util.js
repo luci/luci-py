@@ -187,12 +187,12 @@ export function childrenAsArray(ele) {
  */
 export function expectNoUnmatchedCalls(fetchMock) {
   let calls = fetchMock.calls(UNMATCHED, 'GET');
-  expect(calls.length).toBe(0, 'no unmatched (unexpected) GETs');
+  expect(calls).toHaveSize(0, 'no unmatched (unexpected) GETs');
   if (calls.length) {
     console.warn('unmatched GETS', calls);
   }
   calls = fetchMock.calls(UNMATCHED, 'POST');
-  expect(calls.length).toBe(0, 'no unmatched (unexpected) POSTs');
+  expect(calls).toHaveSize(0, 'no unmatched (unexpected) POSTs');
   if (calls.length) {
     console.warn('unmatched POSTS', calls);
   }

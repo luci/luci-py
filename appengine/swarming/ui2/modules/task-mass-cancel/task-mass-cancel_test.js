@@ -47,7 +47,7 @@ describe('task-mass-cancel', function() {
 
   it('can read in attributes', function(done) {
     createElement((ele) => {
-      expect(ele.tags.length).toBe(2);
+      expect(ele.tags).toHaveSize(2);
       expect(ele.tags).toContain('pool:Chrome');
       expect(ele.tags).toContain('os:Android');
       expect(ele.auth_header).toBe('fake');
@@ -58,7 +58,7 @@ describe('task-mass-cancel', function() {
   it('has a list of the passed in dimensions', function(done) {
     createElement((ele) => {
       const tags = $('ul li', ele);
-      expect(tags.length).toBe(2);
+      expect(tags).toHaveSize(2);
       expect(tags[0]).toMatchTextContent('os:Android');
       done();
     });
@@ -72,7 +72,7 @@ describe('task-mass-cancel', function() {
       fetchMock.flush(true).then(() => {
         expectNoUnmatchedCalls(fetchMock);
         const calls = fetchMock.calls(MATCHED, 'GET');
-        expect(calls.length).toBe(2);
+        expect(calls).toHaveSize(2);
         done();
       });
     });
@@ -92,7 +92,7 @@ describe('task-mass-cancel', function() {
         expectNoUnmatchedCalls(fetchMock);
 
         const calls = fetchMock.calls(MATCHED, 'POST');
-        expect(calls.length).toBe(1, '1 to delete');
+        expect(calls).toHaveSize(1, '1 to delete');
         done();
       });
 

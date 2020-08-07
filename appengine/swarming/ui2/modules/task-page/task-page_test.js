@@ -157,7 +157,7 @@ describe('task-page', function() {
   describe('html structure', function() {
     it('contains swarming-app as its only child', function(done) {
       createElement((ele) => {
-        expect(ele.children.length).toBe(1);
+        expect(ele.children).toHaveSize(1);
         expect(ele.children[0].tagName).toBe('swarming-app'.toUpperCase());
         done();
       });
@@ -178,7 +178,7 @@ describe('task-page', function() {
         createElement((ele) => {
           const topDivs = $('main > div', ele);
           expect(topDivs).toBeTruthy();
-          expect(topDivs.length).toBe(2);
+          expect(topDivs).toHaveSize(2);
           expect(topDivs[0]).toHaveAttribute('hidden', 'left side hidden');
           expect(topDivs[1]).toHaveAttribute('hidden', 'right side hidden');
           done();
@@ -213,7 +213,7 @@ describe('task-page', function() {
         loggedInTaskPage((ele) => {
           const topDivs = $('main > div', ele);
           expect(topDivs).toBeTruthy();
-          expect(topDivs.length).toBe(2);
+          expect(topDivs).toHaveSize(2);
           expect(topDivs[0]).toHaveAttribute('hidden', 'left side hidden');
           expect(topDivs[1]).toHaveAttribute('hidden', 'right side hidden');
           done();
@@ -235,9 +235,9 @@ describe('task-page', function() {
         loggedInTaskPage((ele) => {
           const topDivs = $('main > div', ele);
           expect(topDivs).toBeTruthy();
-          expect(topDivs.length).toBe(2);
-          expect(topDivs[0].children.length).toEqual(2); // only .id_buttons and task not found
-          expect(topDivs[1].children.length).toEqual(0); // everything else removed
+          expect(topDivs).toHaveSize(2);
+          expect(topDivs[0].children).toHaveSize(2); // only .id_buttons and task not found
+          expect(topDivs[1].children).toHaveSize(0); // everything else removed
           done();
         }, true);
       });
@@ -306,7 +306,7 @@ describe('task-page', function() {
           expect(cell(15, 0).textContent).toContain('Dimensions');
 
           const subsections = $('tbody', taskInfo);
-          expect(subsections.length).toEqual(2);
+          expect(subsections).toHaveSize(2);
           expect(subsections[0]).not.toHaveAttribute('hidden');
           expect(subsections[1]).toHaveAttribute('hidden');
 
@@ -322,7 +322,7 @@ describe('task-page', function() {
           const taskTiming = $$('table.task-timing', ele);
           expect(taskTiming).toBeTruthy();
           const rows = $('tr', taskTiming);
-          expect(rows.length).toEqual(9);
+          expect(rows).toHaveSize(9);
 
           // little helper for readability
           const cell = (r, c) => rows[r].children[c];
@@ -385,7 +385,7 @@ describe('task-page', function() {
           const picker = $$('.slice-picker', ele);
           expect(picker).toBeTruthy();
           const tabs = $('.tab', picker);
-          expect(tabs.length).toEqual(2);
+          expect(tabs).toHaveSize(2);
 
           // The 2nd tab ran, so it should be shown by default.
           expect(tabs[0]).not.toHaveAttribute('selected');
@@ -593,7 +593,7 @@ describe('task-page', function() {
           const taskTiming = $$('table.task-timing', ele);
           expect(taskTiming).toBeTruthy();
           const rows = $('tr', taskTiming);
-          expect(rows.length).toEqual(9);
+          expect(rows).toHaveSize(9);
 
           // little helper for readability
           const cell = (r, c) => rows[r].children[c];
@@ -615,7 +615,7 @@ describe('task-page', function() {
           const taskDisamb = $$('table.task-disambiguation', ele);
           expect(taskDisamb).toBeTruthy();
           const rows = $('tr', taskDisamb);
-          expect(rows.length).toEqual(4);
+          expect(rows).toHaveSize(4);
 
           // little helper for readability
           const cell = (r, c) => rows[r].children[c];
@@ -718,7 +718,7 @@ describe('task-page', function() {
           const taskTiming = $$('table.task-timing', ele);
           expect(taskTiming).toBeTruthy();
           const rows = $('tr', taskTiming);
-          expect(rows.length).toEqual(9);
+          expect(rows).toHaveSize(9);
 
           // little helper for readability
           const cell = (r, c) => rows[r].children[c];
@@ -776,7 +776,7 @@ describe('task-page', function() {
           expect(taskinfo).not.toHaveClass('inactive');
 
           const tabs = $('.slice-picker .tab', ele);
-          expect(tabs.length).toEqual(2);
+          expect(tabs).toHaveSize(2);
 
           tabs[0].click();
           expect(taskinfo).toHaveClass('inactive');
@@ -822,9 +822,9 @@ describe('task-page', function() {
           // MATCHED calls are calls that we expect and specified in the
           // beforeEach at the top of this file.
           let calls = fetchMock.calls(MATCHED, 'GET');
-          expect(calls.length).toBe(0);
+          expect(calls).toHaveSize(0);
           calls = fetchMock.calls(MATCHED, 'POST');
-          expect(calls.length).toBe(0);
+          expect(calls).toHaveSize(0);
 
           expectNoUnmatchedCalls(fetchMock);
           done();
@@ -840,7 +840,7 @@ describe('task-page', function() {
       });
 
       calls = fetchMock.calls(MATCHED, 'POST');
-      expect(calls.length).toBe(0, 'no POSTs on task-page');
+      expect(calls).toHaveSize(0, 'no POSTs on task-page');
 
       expectNoUnmatchedCalls(fetchMock);
     }
@@ -849,7 +849,7 @@ describe('task-page', function() {
       serveTask(0, 'running task on try number 3');
       loggedInTaskPage((ele) => {
         const calls = fetchMock.calls(MATCHED, 'GET');
-        expect(calls.length).toBe(2+4+3+2, '2 GETs from swarming-app, 4 from task-page,' +
+        expect(calls).toHaveSize(2+4+3+2, '2 GETs from swarming-app, 4 from task-page,' +
                                            '3 counts * 1 slice, 2 from extra tries');
         // calls is an array of 2-length arrays with the first element
         // being the string of the url and the second element being
@@ -872,7 +872,7 @@ describe('task-page', function() {
       serveTask(1, 'Completed task with 2 slices');
       loggedInTaskPage((ele) => {
         const calls = fetchMock.calls(MATCHED, 'GET');
-        expect(calls.length).toBe(2+4+6, '2 GETs from swarming-app, 4 from task-page, ' +
+        expect(calls).toHaveSize(2+4+6, '2 GETs from swarming-app, 4 from task-page, ' +
                                          '3 counts * 2 slices');
         // calls is an array of 2-length arrays with the first element
         // being the string of the url and the second element being
@@ -900,7 +900,7 @@ describe('task-page', function() {
       serveTask(2, 'Pending task - 1 slice - no rich logs');
       loggedInTaskPage((ele) => {
         const calls = fetchMock.calls(MATCHED, 'GET');
-        expect(calls.length).toBe(2+4+3, '2 GETs from swarming-app, 4 from task-page, '+
+        expect(calls).toHaveSize(2+4+3, '2 GETs from swarming-app, 4 from task-page, '+
                                          '3 counts * 1 slice');
         // calls is an array of 2-length arrays with the first element
         // being the string of the url and the second element being
@@ -945,9 +945,9 @@ describe('task-page', function() {
           // MATCHED calls are calls that we expect and specified in the
           // beforeEach at the top of this file.
           let calls = fetchMock.calls(MATCHED, 'GET');
-          expect(calls.length).toBe(0);
+          expect(calls).toHaveSize(0);
           calls = fetchMock.calls(MATCHED, 'POST');
-          expect(calls.length).toBe(1);
+          expect(calls).toHaveSize(1);
 
           expectNoUnmatchedCalls(fetchMock);
           done();
@@ -987,9 +987,9 @@ describe('task-page', function() {
           // MATCHED calls are calls that we expect and specified in the
           // beforeEach at the top of this file.
           let calls = fetchMock.calls(MATCHED, 'GET');
-          expect(calls.length).toBe(0);
+          expect(calls).toHaveSize(0);
           calls = fetchMock.calls(MATCHED, 'POST');
-          expect(calls.length).toBe(1);
+          expect(calls).toHaveSize(1);
 
           const options = calls[0][1];
           expect(options.headers.authorization).toBeTruthy();
@@ -1042,9 +1042,9 @@ describe('task-page', function() {
           // MATCHED calls are calls that we expect and specified in the
           // beforeEach at the top of this file.
           let calls = fetchMock.calls(MATCHED, 'GET');
-          expect(calls.length).toBe(0);
+          expect(calls).toHaveSize(0);
           calls = fetchMock.calls(MATCHED, 'POST');
-          expect(calls.length).toBe(1);
+          expect(calls).toHaveSize(1);
           const call = calls[0];
           const options = call[1];
           expect(options.body).toEqual('{}');
@@ -1081,9 +1081,9 @@ describe('task-page', function() {
           // MATCHED calls are calls that we expect and specified in the
           // beforeEach at the top of this file.
           let calls = fetchMock.calls(MATCHED, 'GET');
-          expect(calls.length).toBe(0);
+          expect(calls).toHaveSize(0);
           calls = fetchMock.calls(MATCHED, 'POST');
-          expect(calls.length).toBe(1);
+          expect(calls).toHaveSize(1);
           const call = calls[0];
           const options = call[1];
           expect(options.body).toEqual('{"kill_running":true}');
@@ -1132,8 +1132,8 @@ describe('task-page', function() {
 
         // We expect the requests and results to be fetched after
         // the logs notice the state has changed from RUNNING to COMPLETED.
-        expect(callsToResult.length).toEqual(2);
-        expect(callsToRequest.length).toEqual(2);
+        expect(callsToResult).toHaveSize(2);
+        expect(callsToRequest).toHaveSize(2);
 
         done();
       });

@@ -108,7 +108,7 @@ describe('task-list', function() {
   describe('html structure', function() {
     it('contains swarming-app as its only child', function(done) {
       createElement((ele) => {
-        expect(ele.children.length).toBe(1);
+        expect(ele.children).toHaveSize(1);
         expect(ele.children[0].tagName).toBe('swarming-app'.toUpperCase());
         done();
       });
@@ -159,16 +159,16 @@ describe('task-list', function() {
           expect(taskTable).toBeTruthy();
 
           const taskRows = $('.task-table .task-row', ele);
-          expect(taskRows.length).toEqual(0);
+          expect(taskRows).toHaveSize(0);
 
           const keyFilters = $('.filter_box .selector.keys .item', ele);
-          expect(keyFilters.length).toBe(1);
+          expect(keyFilters).toHaveSize(1);
           expect(keyFilters[0]).toMatchTextContent('pool (tag)');
 
           // click 'pool' filter.
           keyFilters[0].click();
           const valueFilters = $('.filter_box .selector.values .item', ele);
-          expect(valueFilters.length).toBe(1);
+          expect(valueFilters).toHaveSize(1);
           expect(valueFilters[0]).toMatchTextContent('pool1');
 
           done();
@@ -182,7 +182,7 @@ describe('task-list', function() {
           loggedInTasklist((ele) => {
             const rows = $('.task-table .task-row', ele);
             expect(rows).toBeTruthy();
-            expect(rows.length).toBe(20, '(num taskRows)');
+            expect(rows).toHaveSize(20, '(num taskRows)');
             done();
           });
         });
@@ -197,7 +197,7 @@ describe('task-list', function() {
 
             const colHeaders = $('.task-table thead th', ele);
             expect(colHeaders).toBeTruthy();
-            expect(colHeaders.length).toBe(7, '(num colHeaders)');
+            expect(colHeaders).toHaveSize(7, '(num colHeaders)');
             expect(colHeaders[0].innerHTML).toContain('<more-vert-icon-sk');
             expect(colHeaders[0]).toMatchTextContent('Task Name');
             expect(colHeaders[1]).toMatchTextContent('Created On');
@@ -209,11 +209,11 @@ describe('task-list', function() {
 
             const rows = $('.task-table .task-row', ele);
             expect(rows).toBeTruthy();
-            expect(rows.length).toBe(20, '20 rows');
+            expect(rows).toHaveSize(20, '20 rows');
 
             const cells = $('.task-table .task-row td', ele);
             expect(cells).toBeTruthy();
-            expect(cells.length).toBe(7 * 20, '7 columns * 20 rows');
+            expect(cells).toHaveSize(7 * 20, '7 columns * 20 rows');
             // little helper for readability
             const cell = (r, c) => cells[7*r+c];
 
@@ -292,7 +292,7 @@ describe('task-list', function() {
 
             const countRows = $('#query_counts tr', ele);
             expect(countRows).toBeTruthy();
-            expect(countRows.length).toBe(1+7, '(num counts, displayed + 7 states)');
+            expect(countRows).toHaveSize(1+7, '(num counts, displayed + 7 states)');
 
             expect(countRows[0]).toMatchTextContent('Displayed: 20');
 
@@ -318,7 +318,7 @@ describe('task-list', function() {
 
             const chips = $('.chip_container .chip', ele);
             expect(chips).toBeTruthy();
-            expect(chips.length).toBe(3, '3 filters, 3 chips');
+            expect(chips).toHaveSize(3, '3 filters, 3 chips');
 
             // They are displayed in order, so check content
             expect(chips[0]).toMatchTextContent('cpu-tag:x86-64-Haswell_GCE');
@@ -340,7 +340,7 @@ describe('task-list', function() {
 
         const sortToggles = $('.task-table thead sort-toggle', ele);
         expect(sortToggles).toBeTruthy();
-        expect(sortToggles.length).toBe(7, '(num sort-toggles)');
+        expect(sortToggles).toHaveSize(7, '(num sort-toggles)');
 
         expect(sortToggles[0].key).toBe('name');
         expect(sortToggles[0].currentKey).toBe('name');
@@ -451,7 +451,7 @@ describe('task-list', function() {
         // check the rendering changed
         let colHeaders = $('.task-table thead th');
         expect(colHeaders).toBeTruthy();
-        expect(colHeaders.length).toBe(2, '(num colHeaders)');
+        expect(colHeaders).toHaveSize(2, '(num colHeaders)');
         const expectedHeader = getColHeader(keyToClick);
         expect(colHeaders.map((c) => c.textContent.trim())).toContain(expectedHeader);
 
@@ -477,7 +477,7 @@ describe('task-list', function() {
         // check the rendering changed
         colHeaders = $('.task-table thead th');
         expect(colHeaders).toBeTruthy();
-        expect(colHeaders.length).toBe(1, '(num colHeaders)');
+        expect(colHeaders).toHaveSize(1, '(num colHeaders)');
         expect(colHeaders.map((c) => c.textContent.trim())).not.toContain(expectedHeader);
         done();
       });
@@ -497,7 +497,7 @@ describe('task-list', function() {
         expect(valueSelector).toBeTruthy();
         let values = childrenAsArray(valueSelector).map((c) => c.textContent.trim());
         // spot check
-        expect(values.length).toBe(15);
+        expect(values).toHaveSize(15);
         expect(values).toContain('Nexus 9 (flounder)');
         expect(values).toContain('iPhone X');
 
@@ -513,7 +513,7 @@ describe('task-list', function() {
         expect(valueSelector).toBeTruthy();
         values = childrenAsArray(valueSelector).map((c) => c.textContent.trim());
         // spot check
-        expect(values.length).toBe(14);
+        expect(values).toHaveSize(14);
         expect(values).toContain('RUNNING');
         expect(values).toContain('COMPLETED_FAILURE');
 
@@ -552,12 +552,12 @@ describe('task-list', function() {
         expect(addIcon).toBeTruthy('there should be an icon for adding');
         addIcon.click();
 
-        expect(ele._filters.length).toBe(1, 'a filter should be added');
+        expect(ele._filters).toHaveSize(1, 'a filter should be added');
         expect(ele._filters[0]).toEqual('state:BOT_DIED');
 
         const chipContainer = $$('.chip_container', ele);
         expect(chipContainer).toBeTruthy('there should be a filter chip container');
-        expect(chipContainer.children.length).toBe(1);
+        expect(chipContainer.children).toHaveSize(1);
         expect(addIcon.hasAttribute('hidden'))
             .toBeTruthy('addIcon should go away after being clicked');
         done();
@@ -576,12 +576,12 @@ describe('task-list', function() {
         expect(icon).toBeTruthy('there should be a icon to remove it');
         icon.click();
 
-        expect(ele._filters.length).toBe(1, 'a filter should be removed');
+        expect(ele._filters).toHaveSize(1, 'a filter should be removed');
         expect(ele._filters[0]).toEqual('state:BOT_DIED', 'pool-tag:Skia should be removed');
 
         const chipContainer = $$('.chip_container', ele);
         expect(chipContainer).toBeTruthy('there should be a filter chip container');
-        expect(chipContainer.children.length).toBe(1);
+        expect(chipContainer.children).toHaveSize(1);
         done();
       });
     });
@@ -619,11 +619,11 @@ describe('task-list', function() {
         ele._filters = [];
         ele.render();
 
-        expect(ele._tasks.length).toBe(20, 'All 20 at the start');
+        expect(ele._tasks).toHaveSize(20, 'All 20 at the start');
 
         let wasCalled = false;
         fetchMock.get('glob:/_ah/api/swarming/v1/tasks/list?*', () => {
-          expect(ele._tasks.length).toBe(2, '2 BOT_DIED there now.');
+          expect(ele._tasks).toHaveSize(2, '2 BOT_DIED there now.');
           wasCalled = true;
           return '[]'; // pretend no tasks match
         }, {overwriteRoutes: true});
@@ -633,7 +633,7 @@ describe('task-list', function() {
         // is when we know the element has updated the _tasks.
         fetchMock.flush(true).then(() => {
           expect(wasCalled).toBeTruthy();
-          expect(ele._tasks.length).toBe(0, 'none were actually returned');
+          expect(ele._tasks).toHaveSize(0, 'none were actually returned');
 
           done();
         });
@@ -756,7 +756,7 @@ describe('task-list', function() {
         expect(ele._primaryKey).toEqual('pool-tag');
 
         const children = $$('.selector.keys', ele).children;
-        expect(children.length).toEqual(1, 'only pool-tag should show up');
+        expect(children).toHaveSize(1, 'only pool-tag should show up');
         expect(children[0].textContent).toContain('pool (tag)');
 
         let row = getChildItemWithText($$('.selector.values'), 'Chrome', ele);
@@ -780,7 +780,7 @@ describe('task-list', function() {
 
         const colSelector = $$('.col_selector', ele);
         expect(colSelector).toBeTruthy();
-        expect(colSelector.children.length).toEqual(12); // 11 hits + the input box
+        expect(colSelector.children).toHaveSize(12); // 11 hits + the input box
 
         let row = getChildItemWithText(colSelector, 'state');
         expect(row).toBeFalsy('state should be hiding');
@@ -798,7 +798,7 @@ describe('task-list', function() {
 
         let countRows = $('#query_counts tr', ele);
         expect(countRows).toBeTruthy();
-        expect(countRows.length).toBe(1+7, '(num counts, displayed + 7 states)');
+        expect(countRows).toHaveSize(1+7, '(num counts, displayed + 7 states)');
 
         let showMore = $$('.summary expand-more-icon-sk');
         let showMore2 = $$('.summary more-horiz-icon-sk');
@@ -811,7 +811,7 @@ describe('task-list', function() {
         expect(ele._allStates).toBeTruthy();
         countRows = $('#query_counts tr', ele);
         expect(countRows).toBeTruthy();
-        expect(countRows.length).toBe(1+12, '(num counts, displayed + 12 states)');
+        expect(countRows).toHaveSize(1+12, '(num counts, displayed + 12 states)');
 
         showMore = $$('.summary expand-more-icon-sk');
         showMore2 = $$('.summary more-horiz-icon-sk');
@@ -824,7 +824,7 @@ describe('task-list', function() {
         expect(ele._allStates).toBeFalsy();
         countRows = $('#query_counts tr', ele);
         expect(countRows).toBeTruthy();
-        expect(countRows.length).toBe(1+7, '(num counts, displayed + 7 states)');
+        expect(countRows).toHaveSize(1+7, '(num counts, displayed + 7 states)');
 
         showMore = $$('.summary expand-more-icon-sk');
         showMore2 = $$('.summary more-horiz-icon-sk');
@@ -901,9 +901,9 @@ describe('task-list', function() {
           // MATCHED calls are calls that we expect and specified in the
           // beforeEach at the top of this file.
           let calls = fetchMock.calls(MATCHED, 'GET');
-          expect(calls.length).toBe(0);
+          expect(calls).toHaveSize(0);
           calls = fetchMock.calls(MATCHED, 'POST');
-          expect(calls.length).toBe(0);
+          expect(calls).toHaveSize(0);
 
           expectNoUnmatchedCalls(fetchMock);
           done();
@@ -918,7 +918,7 @@ describe('task-list', function() {
         expect(c[1].headers.authorization).toContain('Bearer ');
       });
       const postCalls = fetchMock.calls(MATCHED, 'POST');
-      expect(postCalls.length).toBe(0, 'no POSTs on task-list');
+      expect(postCalls).toHaveSize(0, 'no POSTs on task-list');
 
       expectNoUnmatchedCalls(fetchMock);
     }
@@ -926,7 +926,7 @@ describe('task-list', function() {
     it('maker auth\'d API calls when a logged in user views landing page', function(done) {
       loggedInTasklist((ele) => {
         const calls = fetchMock.calls(MATCHED, 'GET');
-        expect(calls.length).toBe(2+3+12, '2 GETs from swarming-app, 3 from task-list (12 counts)');
+        expect(calls).toHaveSize(2+3+12, '2 GETs from swarming-app, 3 from task-list (12 counts)');
         // calls is an array of 2-length arrays with the first element
         // being the string of the url and the second element being
         // the options that were passed in
@@ -947,7 +947,7 @@ describe('task-list', function() {
         ele._addFilter('state:PENDING_RUNNING');
         fetchMock.flush(true).then(() => {
           const calls = fetchMock.calls(MATCHED, 'GET');
-          expect(calls.length).toBe(2+12, '2 from task-list and 12 counts');
+          expect(calls).toHaveSize(2+12, '2 from task-list and 12 counts');
 
           const gets = calls.map((c) => c[0]);
           for (const get of gets) {
@@ -969,7 +969,7 @@ describe('task-list', function() {
         ele._addFilter('state:PENDING_RUNNING');
         fetchMock.flush(true).then(() => {
           const calls = fetchMock.calls(MATCHED, 'GET');
-          expect(calls.length).toBe(2+12, '2 from task-list and 12 counts');
+          expect(calls).toHaveSize(2+12, '2 from task-list and 12 counts');
 
           const gets = calls.slice(1).map((c) => c[0]);
           for (const get of gets) {
@@ -997,7 +997,7 @@ describe('task-list', function() {
         fetchMock.flush(true).then(() => {
           expectNoUnmatchedCalls(fetchMock);
           const calls = fetchMock.calls(MATCHED, 'GET');
-          expect(calls.length).toBe(2, '2 counts, 1 running, 1 pending');
+          expect(calls).toHaveSize(2, '2 counts, 1 running, 1 pending');
 
           const gets = calls.map((c) => c[0]);
           expect(gets).toContain('/_ah/api/swarming/v1/tasks/count?end=1545237983&'+
@@ -1034,9 +1034,9 @@ describe('task-list', function() {
             fetchMock.flush(true).then(() => {
               expectNoUnmatchedCalls(fetchMock);
               let calls = fetchMock.calls(MATCHED, 'GET');
-              expect(calls.length).toBe(0, 'Only posts');
+              expect(calls).toHaveSize(0, 'Only posts');
               calls = fetchMock.calls(MATCHED, 'POST');
-              expect(calls.length).toBe(1, '1 cancel request');
+              expect(calls).toHaveSize(1, '1 cancel request');
               // calls is an array of 2-length arrays with the first element
               // being the string of the url and the second element being
               // the options that were passed in
@@ -1070,7 +1070,7 @@ describe('task-list', function() {
       const tasks = processTasks(null);
 
       expect(tasks).toBeTruthy();
-      expect(tasks.length).toBe(0);
+      expect(tasks).toHaveSize(0);
     });
 
     it('produces a list of tags', function() {
@@ -1078,22 +1078,22 @@ describe('task-list', function() {
       const tasks = processTasks(deepCopy(tasks_20.items), tags);
       const keys = Object.keys(tags);
       expect(keys).toBeTruthy();
-      expect(keys.length).toBe(76);
+      expect(keys).toHaveSize(76);
       expect(keys).toContain('pool');
       expect(keys).toContain('purpose');
       expect(keys).toContain('source_revision');
 
-      expect(tasks.length).toBe(20);
+      expect(tasks).toHaveSize(20);
     });
 
     it('filters tasks based on special keys', function() {
       const tasks = processTasks(deepCopy(tasks_20.items), {});
 
       expect(tasks).toBeTruthy();
-      expect(tasks.length).toBe(20);
+      expect(tasks).toHaveSize(20);
 
       const filtered = filterTasks(['state:COMPLETED_FAILURE'], tasks);
-      expect(filtered.length).toBe(2);
+      expect(filtered).toHaveSize(2);
       const expectedIds = ['41e0310fe0b7c410', '41e031b2c8b46710'];
       const actualIds = filtered.map((task) => task.task_id);
       actualIds.sort();
@@ -1104,27 +1104,27 @@ describe('task-list', function() {
       const tasks = processTasks(deepCopy(tasks_20.items), {});
 
       expect(tasks).toBeTruthy();
-      expect(tasks.length).toBe(20);
+      expect(tasks).toHaveSize(20);
 
       let filtered = filterTasks(['pool-tag:Chrome'], tasks);
-      expect(filtered.length).toBe(7);
+      expect(filtered).toHaveSize(7);
       let actualIds = filtered.map((task) => task.task_id);
       expect(actualIds).toContain('41e0204f39d06210'); // spot check
       expect(actualIds).not.toContain('41e0182a00fcc110');
 
       // some tasks have multiple 'purpose' tags
       filtered = filterTasks(['purpose-tag:luci'], tasks);
-      expect(filtered.length).toBe(8);
+      expect(filtered).toHaveSize(8);
       actualIds = filtered.map((task) => task.task_id);
       expect(actualIds).toContain('41e020504d0a5110'); // spot check
       expect(actualIds).not.toContain('41e0310fe0b7c410');
 
       filtered = filterTasks(['pool-tag:Skia', 'gpu-tag:none'], tasks);
-      expect(filtered.length).toBe(1);
+      expect(filtered).toHaveSize(1);
       expect(filtered[0].task_id).toBe('41e031b2c8b46710');
 
       filtered = filterTasks(['pool-tag:Skia', 'gpu-tag:10de:1cb3-384.59'], tasks);
-      expect(filtered.length).toBe(2);
+      expect(filtered).toHaveSize(2);
       actualIds = filtered.map((task) => task.task_id);
       expect(actualIds).toContain('41dfa79d3bf29010');
       expect(actualIds).toContain('41df677202f20310');

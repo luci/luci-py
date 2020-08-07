@@ -218,7 +218,7 @@ describe('swarming-app', function() {
             // MATCHED calls are calls that we expect and specified in the
             // beforeEach at the top of this file.
             const calls = fetchMock.calls(MATCHED, 'GET');
-            expect(calls.length).toBe(0);
+            expect(calls).toHaveSize(0);
 
             expectNoUnmatchedCalls(fetchMock);
             done();
@@ -230,7 +230,7 @@ describe('swarming-app', function() {
         createElement((ele) => {
           userLogsIn(ele, () => {
             const calls = fetchMock.calls(MATCHED, 'GET');
-            expect(calls.length).toBe(2);
+            expect(calls).toHaveSize(2);
             // calls is an array of 2-length arrays with the first element
             // being the string of the url and the second element being
             // the options that were passed in

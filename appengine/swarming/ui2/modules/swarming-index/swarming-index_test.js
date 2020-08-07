@@ -84,7 +84,7 @@ describe('swarming-index', function() {
   describe('html structure', function() {
     it('contains swarming-app as its only child', function(done) {
       createElement((ele) => {
-        expect(ele.children.length).toBe(1);
+        expect(ele.children).toHaveSize(1);
         expect(ele.children[0].tagName).toBe('swarming-app'.toUpperCase());
         done();
       });
@@ -103,7 +103,7 @@ describe('swarming-index', function() {
         createElement((ele) => {
           const sectionHeaders = ele.querySelectorAll('swarming-app>main h2');
           expect(sectionHeaders).toBeTruthy();
-          expect(sectionHeaders.length).toBe(2);
+          expect(sectionHeaders).toHaveSize(2);
           done();
         });
       });
@@ -135,7 +135,7 @@ describe('swarming-index', function() {
           userLogsIn(ele, () => {
             const sectionHeaders = ele.querySelectorAll('swarming-app>main h2');
             expect(sectionHeaders).toBeTruthy();
-            expect(sectionHeaders.length).toBe(2);
+            expect(sectionHeaders).toHaveSize(2);
             done();
           });
         });
@@ -167,7 +167,7 @@ describe('swarming-index', function() {
           userLogsIn(ele, () => {
             const sectionHeaders = ele.querySelectorAll('swarming-app>main h2');
             expect(sectionHeaders).toBeTruthy();
-            expect(sectionHeaders.length).toBe(2);
+            expect(sectionHeaders).toHaveSize(2);
             done();
           });
         });
@@ -201,7 +201,7 @@ describe('swarming-index', function() {
           userLogsIn(ele, () => {
             const sectionHeaders = ele.querySelectorAll('swarming-app>main h2');
             expect(sectionHeaders).toBeTruthy();
-            expect(sectionHeaders.length).toBe(3);
+            expect(sectionHeaders).toHaveSize(3);
             done();
           });
         });
@@ -227,9 +227,9 @@ describe('swarming-index', function() {
           // MATCHED calls are calls that we expect and specified in the
           // beforeEach at the top of this file.
           let calls = fetchMock.calls(MATCHED, 'GET');
-          expect(calls.length).toBe(0);
+          expect(calls).toHaveSize(0);
           calls = fetchMock.calls(MATCHED, 'POST');
-          expect(calls.length).toBe(0);
+          expect(calls).toHaveSize(0);
 
           expectNoUnmatchedCalls(fetchMock);
           done();
@@ -242,7 +242,7 @@ describe('swarming-index', function() {
         userLogsIn(ele, () => {
           // swarming-app makes some GETs and swarming-app_test.js tests that.
           const calls = fetchMock.calls(MATCHED, 'POST');
-          expect(calls.length).toBe(0);
+          expect(calls).toHaveSize(0);
 
           expectNoUnmatchedCalls(fetchMock);
           done();
@@ -258,7 +258,7 @@ describe('swarming-index', function() {
 
           const calls = fetchMock.calls(MATCHED, 'POST');
           const posts = calls.map((c) => c[0]);
-          expect(calls.length).toBe(1);
+          expect(calls).toHaveSize(1);
           expect(posts).toContain('/_ah/api/swarming/v1/server/token');
 
           // check authorization headers are set

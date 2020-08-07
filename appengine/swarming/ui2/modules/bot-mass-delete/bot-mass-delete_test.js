@@ -46,7 +46,7 @@ describe('bot-mass-delete', function() {
 
   it('can read in attributes', function(done) {
     createElement((ele) => {
-      expect(ele.dimensions.length).toBe(2);
+      expect(ele.dimensions).toHaveSize(2);
       expect(ele.dimensions).toContain('pool:Chrome');
       expect(ele.dimensions).toContain('os:Android');
       expect(ele.auth_header).toBe('fake');
@@ -57,7 +57,7 @@ describe('bot-mass-delete', function() {
   it('has a list of the passed in dimensions', function(done) {
     createElement((ele) => {
       const listedDims = $('ul li', ele);
-      expect(listedDims.length).toBe(2);
+      expect(listedDims).toHaveSize(2);
       expect(listedDims[0]).toMatchTextContent('os:Android');
       done();
     });
@@ -81,7 +81,7 @@ describe('bot-mass-delete', function() {
       fetchMock.flush(true).then(() => {
         expectNoUnmatchedCalls(fetchMock);
         const calls = fetchMock.calls(MATCHED, 'GET');
-        expect(calls.length).toBe(1);
+        expect(calls).toHaveSize(1);
         done();
       });
     });
@@ -110,10 +110,10 @@ describe('bot-mass-delete', function() {
         expect(sawStartEvent).toBeTruthy();
         expectNoUnmatchedCalls(fetchMock);
         let calls = fetchMock.calls(MATCHED, 'GET');
-        expect(calls.length).toBe(1, '1 from list (ele.show() was not called)');
+        expect(calls).toHaveSize(1, '1 from list (ele.show() was not called)');
 
         calls = fetchMock.calls(MATCHED, 'POST');
-        expect(calls.length).toBe(3, '3 to delete');
+        expect(calls).toHaveSize(3, '3 to delete');
         done();
       });
 
@@ -156,10 +156,10 @@ describe('bot-mass-delete', function() {
         expect(sawStartEvent).toBeTruthy();
         expectNoUnmatchedCalls(fetchMock);
         let calls = fetchMock.calls(MATCHED, 'GET');
-        expect(calls.length).toBe(2, '2 from list (ele.show() was not called)');
+        expect(calls).toHaveSize(2, '2 from list (ele.show() was not called)');
 
         calls = fetchMock.calls(MATCHED, 'POST');
-        expect(calls.length).toBe(3, '3 to delete');
+        expect(calls).toHaveSize(3, '3 to delete');
         done();
       });
 
