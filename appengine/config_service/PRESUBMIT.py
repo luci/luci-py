@@ -10,13 +10,13 @@ details on the presubmit API built into gclient.
 
 
 def CommonChecks(input_api, output_api):
-  block_list = list(input_api.DEFAULT_BLOCK_LIST) + [
-    r'.*_pb2\.py$',
+  files_to_skip = list(input_api.DEFAULT_FILES_TO_SKIP) + [
+      r'.*_pb2\.py$',
   ]
   return input_api.canned_checks.RunPylint(
       input_api,
       output_api,
-      block_list=block_list,
+      files_to_skip=files_to_skip,
       pylintrc=input_api.os_path.join(input_api.PresubmitLocalPath(), '../../',
                                       'pylintrc'))
 

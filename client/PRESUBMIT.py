@@ -22,14 +22,14 @@ def CommonChecks(input_api, output_api):
         join('tests'),
         join('third_party'),
     ] + sys.path
-    block_list = list(input_api.DEFAULT_BLOCK_LIST) + [
+    files_to_skip = list(input_api.DEFAULT_FILES_TO_SKIP) + [
         r'.*_pb2\.py$',
     ]
     output.extend(
         input_api.canned_checks.RunPylint(
             input_api,
             output_api,
-            block_list=block_list,
+            files_to_skip=files_to_skip,
             pylintrc=join('../', 'pylintrc')),)
   finally:
     sys.path = sys_path_backup
