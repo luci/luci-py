@@ -249,7 +249,7 @@ def clear_cache():
 # Changing this value is equivalent to removing the entities that hold
 # the cache. Note that we intentionally keep older version of the config to
 # allow GAE instances that still run the old code to use them.
-_BOT_CFG_CACHE_VER = 2
+_BOT_CFG_CACHE_VER = 3
 
 
 # How often to synchronize in-process bots.cfg cache with what's in the
