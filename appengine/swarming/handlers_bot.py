@@ -342,6 +342,7 @@ class _BotBaseHandler(_BotApiHandler):
     # Make sure bot self-reported ID matches the authentication token. Raises
     # auth.AuthorizationError if not.
     bot_group_cfg = bot_auth.validate_bot_id_and_fetch_config(bot_id)
+    logging.debug('Feched bot_group_cfg for %s: %s', bot_id, bot_group_cfg)
 
     # The server side dimensions from bot_group_cfg override bot-provided ones.
     # If both server side config and bot report some dimension, server side
@@ -489,6 +490,8 @@ class BotHandshakeHandler(_BotBaseHandler):
                    res.bot_group_cfg.bot_config_script_rev,
                    len(res.bot_group_cfg.bot_config_script_content))
       data['bot_config'] = res.bot_group_cfg.bot_config_script_content
+      data['bot_config_rev'] = res.bot_group_cfg.bot_config_script_rev
+      data['bot_config_name'] = res.bot_group_cfg.bot_config_script
     self.send_response(data)
 
 

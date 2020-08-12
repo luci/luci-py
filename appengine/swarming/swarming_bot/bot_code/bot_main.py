@@ -235,7 +235,7 @@ def _get_bot_config():
   return _BOT_CONFIG
 
 
-def _register_extra_bot_config(content):
+def _register_extra_bot_config(content, rev, script):
   """Registers the server injected extra injected.py bot_config.
 
   This file is called implicitly by _call_hook() and _call_hook_safe().
@@ -249,6 +249,7 @@ def _register_extra_bot_config(content):
     compiled = compile(content, 'injected.py', 'exec')
     _EXTRA_BOT_CONFIG = types.ModuleType('injected')
     exec(compiled, _EXTRA_BOT_CONFIG.__dict__)
+    logging.debug('extra bot_config %s at rev %s was injected.', script, rev)
   except (SyntaxError, TypeError) as e:
     _set_quarantined(
         'handshake returned invalid injected bot_config.py: %s' % e)
@@ -1165,8 +1166,10 @@ def _do_handshake(botobj, quit_bit):
       if cfg_version:
         botobj._update_bot_group_cfg(cfg_version, resp.get('bot_group_cfg'))
       content = resp.get('bot_config')
+      rev = resp.get('bot_config_rev')
+      script = resp.get('bot_config_name')
       if content:
-        _register_extra_bot_config(content)
+        _register_extra_bot_config(content, rev, script)
       break
     logging.error(
         'Failed to contact for handshake, retrying in %d sec...', sleep_time)

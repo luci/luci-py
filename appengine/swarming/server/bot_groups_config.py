@@ -380,8 +380,6 @@ def _include_bot_config_scripts(cfg, digest, ctx):
   def fetch_script(path):
     if path not in cached:
       rev, content = config.get_self_config(path, store_last_good=True)
-      if content:
-        logging.info('Using bot config script "%s" at rev %s', path, rev)
       cached[path] = (rev, content)
     return cached[path]
 
@@ -389,6 +387,8 @@ def _include_bot_config_scripts(cfg, digest, ctx):
     if gr.bot_config_script_content or not gr.bot_config_script:
       continue
     rev, content = fetch_script('scripts/' + gr.bot_config_script)
+    logging.info('Using bot config script "%s" at rev %s', gr.bot_config_script,
+                 rev)
     if content:
       gr.bot_config_script_rev = rev
       gr.bot_config_script_content = content
