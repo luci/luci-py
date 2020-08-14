@@ -175,6 +175,7 @@ class TaskResultApiTest(TestCase):
         'modified_ts': None,
         'name': u'Request name',
         'outputs_ref': None,
+        'cas_output_root': None,
         'resultdb_info': None,
         'server_versions': [u'v1a'],
         'started_ts': None,
@@ -220,6 +221,7 @@ class TaskResultApiTest(TestCase):
         'killing': None,
         'modified_ts': None,
         'outputs_ref': None,
+        'cas_output_root': None,
         'resultdb_info': None,
         'server_versions': [u'v1a'],
         'started_ts': None,
@@ -787,7 +789,7 @@ class TaskResultApiTest(TestCase):
     run_result.dead_after_ts = None
     run_result.put()
 
-    props_h = '1cae9073cfc09142530e40b9e251b378cbd1b1309bb3cd2f51c36e1d488e1bfa'
+    props_h = '5c7429e5ab9a21f37ec8c39dcbafbe41127fa67075b92ab0642861bb06578a12'
     expected = swarming_pb2.TaskResult(
         request=swarming_pb2.TaskRequest(
             task_slices=[

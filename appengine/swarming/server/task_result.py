@@ -471,9 +471,15 @@ class _TaskResultCommon(ndb.Model):
   children_task_ids = ndb.StringProperty(
       validator=_validate_task_summary_id, repeated=True)
 
-  # File outputs of the task. Only set if TaskRequest.properties.sources_ref is
+  # DEPRECATED. Isolate server is being migrated to RBE-CAS. cas_output_ref will
+  # be used instead.
+  # File outputs of the task. Only set if TaskRequest.properties.inputs_ref is
   # set. The isolateserver and namespace should match.
   outputs_ref = ndb.LocalStructuredProperty(task_request.FilesRef)
+
+  # Reference to the root of the output files.
+  # Only set if TaskRequest.properties.cas_input_root is set.
+  cas_output_root = ndb.LocalStructuredProperty(task_request.CASReference)
 
   # The pinned versions of all the CIPD packages used in the task.
   cipd_pins = ndb.LocalStructuredProperty(CipdPins)

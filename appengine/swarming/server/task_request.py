@@ -545,6 +545,24 @@ class FilesRef(ndb.Model):
             (expected, length))
 
 
+class Digest(ndb.Model):
+  # This is a [Digest][build.bazel.remote.execution.v2.Digest] of a blob on
+  # RBE-CAS.
+  # pylint: disable=line-too-long
+  # See https://github.com/bazelbuild/remote-apis/blob/77cfb44a88577a7ade5dd2400425f6d50469ec6d/build/bazel/remote/execution/v2/remote_execution.proto#L753-L791
+  hash = ndb.StringProperty(indexed=False)
+  size_bytes = ndb.IntegerProperty(indexed=False)
+
+
+class CASReference(ndb.Model):
+  # Full name of RBE-CAS instance. `projects/{project_id}/instances/{instance}`.
+  # e.g. projects/chromium-swarm/instances/default_instance
+  # TODO(crbug.com/1115778): Set validator.
+  cas_instance = ndb.StringProperty(indexed=False)
+  # CAS Digest consists of hash and size bytes.
+  digest = ndb.LocalStructuredProperty(Digest)
+
+
 class SecretBytes(ndb.Model):
   """Defines an optional secret byte string logically defined with the
   TaskProperties.
@@ -732,6 +750,9 @@ class TaskProperties(ndb.Model):
   # in an isolated file, if any, else the root mapped directory.
   relative_cwd = ndb.StringProperty(indexed=False)
 
+  # DEPRECATED. Isolate server is being migrated to RBE-CAS.
+  # Use `cas_input_root` to specify the input root reference to CAS.
+  #
   # Isolate server, namespace and input isolate hash.
   #
   # Despite its name, contains isolate server URL and namespace for isolated
@@ -740,6 +761,10 @@ class TaskProperties(ndb.Model):
   #
   # Only inputs_ref.isolated or command can be specified.
   inputs_ref = ndb.LocalStructuredProperty(FilesRef)
+
+  # Digest of the input root uploaded to RBE-CAS.
+  # This MUST be digest of [build.bazel.remote.execution.v2.Directory].
+  cas_input_root = ndb.LocalStructuredProperty(CASReference)
 
   # CIPD packages to install.
   cipd_input = ndb.LocalStructuredProperty(CipdInput)

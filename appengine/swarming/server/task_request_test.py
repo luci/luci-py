@@ -547,6 +547,7 @@ class TaskRequestApiTest(TestCase):
             'isolatedserver': u'https://isolateserver.appspot.com',
             'namespace': u'default-gzip',
         },
+        'cas_input_root': None,
         'io_timeout_secs': None,
         'outputs': [],
     }
@@ -587,7 +588,7 @@ class TaskRequestApiTest(TestCase):
     # Intentionally hard code the hash value since it has to be deterministic.
     # Other unit tests should use the calculated value.
     self.assertEqual(
-        'b179dd0164f0ddfe7a1a23542370cb8dbbf7abcc83197baf9dfbeed353c4f8f0',
+        'c262bae20e9b1a265fa5937d67aa36f690612b0e28c8af7e38b347dd6746da65',
         req.task_slice(0).properties_hash(req).encode('hex'))
 
   def test_init_new_request_isolated(self):
@@ -658,6 +659,7 @@ class TaskRequestApiTest(TestCase):
             'isolatedserver': u'https://isolateserver.appspot.com',
             'namespace': u'default-gzip',
         },
+        'cas_input_root': None,
         'io_timeout_secs': None,
         'outputs': [],
         'has_secret_bytes': True,
@@ -700,7 +702,122 @@ class TaskRequestApiTest(TestCase):
     # Intentionally hard code the hash value since it has to be deterministic.
     # Other unit tests should use the calculated value.
     self.assertEqual(
-        'ba17d7977b38635c8495f52bba0cfb2fb6677d45a6eba11eaba39de94b63d5df',
+        'f9254eae480e442121919c503c685319ab3a903c2d7b76eac79a947afd09d425',
+        req.task_slice(0).properties_hash(req).encode('hex'))
+
+  def test_init_new_request_cas_input(self):
+    parent = _gen_request()
+    # Parent entity must have a valid key id and be stored.
+    parent.key = task_request.new_request_key()
+    parent.put()
+    # The reference is to the TaskRunResult.
+    parent_id = task_pack.pack_request_key(parent.key) + u'1'
+    cas_input_root = {
+        'cas_instance': u'projects/test/instances/default',
+        'digest': {
+            'hash': u'12345',
+            'size_bytes': 1,
+        }
+    }
+    req = _gen_request(
+        parent_task_id=parent_id,
+        properties=_gen_properties(
+            idempotent=True,
+            has_secret_bytes=True,
+            inputs_ref=None,
+            cas_input_root=cas_input_root,
+        ))
+    # TaskRequest with secret must have a valid key.
+    req.key = task_request.new_request_key()
+    # Needed for the get() call below.
+    req.put()
+    sb = _gen_secret(req, 'I am not a banana')
+    # Needed for properties_hash() call.
+    sb.put()
+    expected_properties = {
+        'caches': [],
+        'cipd_input': {
+            'client_package': {
+                'package_name': u'infra/tools/cipd/${platform}',
+                'path': None,
+                'version': u'git_revision:deadbeef',
+            },
+            'packages': [{
+                'package_name': u'rm',
+                'path': u'bin',
+                'version': u'git_revision:deadbeef',
+            }],
+            'server': u'https://chrome-infra-packages.appspot.com'
+        },
+        'command': [u'command1', u'arg1'],
+        'containment': {
+            u'lower_priority': False,
+            u'containment_type': None,
+            u'limit_processes': None,
+            u'limit_total_committed_memory': None,
+        },
+        'relative_cwd': None,
+        'dimensions': {
+            u'OS': [u'Windows-3.1.1'],
+            u'hostname': [u'localhost'],
+            u'pool': [u'default'],
+        },
+        'env': {
+            u'foo': u'bar',
+            u'joe': u'2'
+        },
+        'env_prefixes': {
+            u'PATH': [u'local/path']
+        },
+        'extra_args': [],
+        'execution_timeout_secs': 30,
+        'grace_period_secs': 30,
+        'idempotent': True,
+        'inputs_ref': None,
+        'cas_input_root': cas_input_root,
+        'io_timeout_secs': None,
+        'outputs': [],
+        'has_secret_bytes': True,
+    }
+    expected_request = {
+        'authenticated': auth_testing.DEFAULT_MOCKED_IDENTITY,
+        'name': u'Request name',
+        'parent_task_id': parent_id,
+        'priority': 50,
+        'pubsub_topic': None,
+        'pubsub_userdata': None,
+        'service_account': u'none',
+        'tags': [
+            u'OS:Windows-3.1.1',
+            u'hostname:localhost',
+            u'pool:default',
+            u'priority:50',
+            u'realm:None',
+            u'service_account:none',
+            u'swarming.pool.template:no_config',
+            u'tag:1',
+            u'user:Jesus',
+        ],
+        'task_slices': [{
+            'expiration_secs': 30,
+            'properties': expected_properties,
+            'wait_for_capacity': False,
+        },],
+        'user': u'Jesus',
+        'realm': None,
+        'realms_enabled': False,
+        'bot_ping_tolerance_secs': 120,
+    }
+    actual = req.to_dict()
+    # expiration_ts - created_ts == scheduling_expiration_secs.
+    actual.pop('created_ts')
+    actual.pop('expiration_ts')
+    self.assertEqual(expected_request, actual)
+    self.assertEqual(30, req.expiration_secs)
+    # Intentionally hard code the hash value since it has to be deterministic.
+    # Other unit tests should use the calculated value.
+    self.assertEqual(
+        '9e1b99c20a5c523ea1ade51276230781f9ddfd3ae396e66c810612a1c5c8062a',
         req.task_slice(0).properties_hash(req).encode('hex'))
 
   def test_init_new_request_parent(self):
@@ -733,7 +850,7 @@ class TaskRequestApiTest(TestCase):
     # Other unit tests should use the calculated value.
     # Ensure the algorithm is deterministic.
     self.assertEqual(
-        '64c02afb2e2ce06a482dab74cd557eb7c3ec092d27714752afa2858ef790dcf0',
+        'b1230281cc4bcc8d9458dab0810c86fcfaf8e4124351f4d39517833eb9541465',
         request.task_slice(0).properties_hash(request).encode('hex'))
 
   def test_init_new_request_bot_service_account(self):
@@ -1011,7 +1128,7 @@ class TaskRequestApiTest(TestCase):
         outputs=[u'foo'],
     )
     # To be updated every time the schema changes.
-    props_h = 'b0855043d05450f3b31a63985a5a4de44a5da09828c1a7247832027a4960ee10'
+    props_h = 'e8718f59959d2c17d9ab1084b6fc9b3ee63e998a704de579543dd84bc1ef603a'
     expected = swarming_pb2.TaskRequest(
         # Scheduling.
         task_slices=[
@@ -1052,6 +1169,10 @@ class TaskRequestApiTest(TestCase):
     actual = swarming_pb2.TaskRequest()
     request.to_proto(actual)
     self.assertEqual(unicode(expected), unicode(actual))
+
+  def test_to_proto_cas_input_root(self):
+    # TODO(crbug.com/1115778): Add test for TaskRequest with cas_input_root
+    pass
 
   def test_TaskRequest_to_proto_empty(self):
     # Assert that it doesn't throw on empty entity.

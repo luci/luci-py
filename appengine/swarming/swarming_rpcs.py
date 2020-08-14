@@ -233,21 +233,35 @@ class FileContent(messages.Message):
 class FilesRef(messages.Message):
   """Defines a data tree reference for Swarming task inputs or outputs.
 
-  It can either be:
-    - a reference to an isolated file on an isolate server
-    - a reference to an isolated file on a RBE CAS server
+  It is a reference to an isolated file on an isolate server.
 
-  In the RBE CAS case, the isolatedserver must be set to GCP name, and namespace
-  must be set to "sha256-GCP". For the moment, RBE CAS requires SHA-256 and
-  doesn't support precompressed data.
+  DEPRECATED. Isolate server is being migrated to RBE-CAS.
+  Use `CASReference` to specify a reference to RBE-CAS.
   """
   # The hash of an isolated archive.
   isolated = messages.StringField(1)
   # The hostname of the isolated server with scheme to use or the Google Cloud
   # Project name.
   isolatedserver = messages.StringField(2)
-  # Namespace on the isolate server or "sha256-GCP" for a GCP hosted RBE CAS.
+  # Namespace on the isolate server.
   namespace = messages.StringField(3)
+
+
+class Digest(messages.Message):
+  # This is a [Digest][build.bazel.remote.execution.v2.Digest] of a blob on
+  # RBE-CAS. See the explanations at the original definition.
+  # pylint: disable=line-too-long
+  # https://github.com/bazelbuild/remote-apis/blob/77cfb44a88577a7ade5dd2400425f6d50469ec6d/build/bazel/remote/execution/v2/remote_execution.proto#L753-L791
+  hash = messages.StringField(1)
+  size_bytes = messages.IntegerField(2)
+
+
+class CASReference(messages.Message):
+  # Full name of RBE-CAS instance. `projects/{project_id}/instances/{instance}`.
+  # e.g. projects/chromium-swarm/instances/default_instance
+  cas_instance = messages.StringField(1)
+  # CAS Digest consists of hash and size bytes.
+  digest = messages.MessageField(Digest, 2)
 
 
 class CipdPackage(messages.Message):
@@ -394,9 +408,15 @@ class TaskProperties(messages.Message):
   # believed to be 100% reproducible with the same outcome. In the case of a
   # successful task, previous results will be reused if possible.
   idempotent = messages.BooleanField(7)
+  # DEPRECATED. Isolate server is being migrated to RBE-CAS.
+  # Use `cas_input_root` to specify the input root reference to CAS.
+  #
   # Isolated inputs to map in the working directory. The isolated file may
   # optionally specify a command to run. Otherwise, 'command' must be specified.
   inputs_ref = messages.MessageField(FilesRef, 8)
+  # Digest of the input root uploaded to RBE-CAS.
+  # This MUST be digest of [build.bazel.remote.execution.v2.Directory].
+  cas_input_root = messages.MessageField(CASReference, 17)
   # Maximum number of seconds the task may be silent (no output to stdout nor
   # stderr) before it is considered hung and it forcibly terminated early and
   # the task results in TIMED_OUT.
@@ -682,8 +702,12 @@ class TaskResult(messages.Message):
   internal_failure = messages.BooleanField(13)
   # Time the results was last updated in the DB.
   modified_ts = message_types.DateTimeField(14)
+  # DEPRECATED. Isolate server is being migrated to RBE-CAS.
   # Isolated outputs, if any.
   outputs_ref = messages.MessageField(FilesRef, 15)
+  # CAS Digest of the output root uploaded to RBE-CAS.
+  # This MUST be digest of [build.bazel.remote.execution.v2.Directory].
+  cas_output_root = messages.MessageField(CASReference, 31)
   # Server versions that touched this task.
   server_versions = messages.StringField(17, repeated=True)
   # Time the task started being run by a bot.
