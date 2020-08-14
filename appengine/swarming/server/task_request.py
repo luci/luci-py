@@ -553,6 +553,11 @@ class Digest(ndb.Model):
   hash = ndb.StringProperty(indexed=False)
   size_bytes = ndb.IntegerProperty(indexed=False)
 
+  def to_proto(self, out):
+    """Converts self to a swarming_pb2.Digest."""
+    out.hash = self.hash
+    out.size_bytes = self.size_bytes
+
 
 class CASReference(ndb.Model):
   # Full name of RBE-CAS instance. `projects/{project_id}/instances/{instance}`.
@@ -561,6 +566,11 @@ class CASReference(ndb.Model):
   cas_instance = ndb.StringProperty(indexed=False)
   # CAS Digest consists of hash and size bytes.
   digest = ndb.LocalStructuredProperty(Digest)
+
+  def to_proto(self, out):
+    """Converts self to a swarming_pb2.CASReference."""
+    out.cas_instance = self.cas_instance
+    self.digest.to_proto(out.digest)
 
 
 class SecretBytes(ndb.Model):
@@ -876,6 +886,8 @@ class TaskProperties(ndb.Model):
     """Converts self to a swarming_pb2.TaskProperties."""
     if self.inputs_ref:
       self.inputs_ref.to_proto(out.cas_inputs)
+    if self.cas_input_root:
+      self.cas_input_root.to_proto(out.cas_input_root)
     if self.cipd_input:
       # It's possible for self.cipd_input to be None.
       for c in self.cipd_input.packages:

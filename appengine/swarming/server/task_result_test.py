@@ -737,6 +737,7 @@ class TaskResultApiTest(TestCase):
     # https://crbug.com/916562: LOAD_SHED
     # https://crbug.com/916557: RESOURCE_EXHAUSTED
 
+  # TODO(crbug.com/1115778): remove after RBE-CAS migration.
   def test_to_proto(self):
     cipd_client_pkg = task_request.CipdPackage(
         package_name=u'infra/tools/cipd/${platform}',
@@ -890,6 +891,174 @@ class TaskResultApiTest(TestCase):
             digest=u'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef',
             server=u'http://localhost:1',
             namespace=u'default-gzip'))
+    expected.request.create_time.FromDatetime(self.now)
+    expected.create_time.FromDatetime(self.now)
+    expected.start_time.FromDatetime(self.now + datetime.timedelta(seconds=20))
+    expected.abandon_time.FromDatetime(self.now +
+                                       datetime.timedelta(seconds=30))
+    expected.end_time.FromDatetime(self.now + datetime.timedelta(seconds=40))
+
+    actual = swarming_pb2.TaskResult()
+    run_result.to_proto(actual)
+    self.assertEqual(unicode(expected), unicode(actual))
+
+  # TODO(crbug.com/1115778): rename to test_to_proto.
+  def test_to_proto_with_cas(self):
+    cipd_client_pkg = task_request.CipdPackage(
+        package_name=u'infra/tools/cipd/${platform}',
+        version=u'git_revision:deadbeef')
+    run_result = _gen_run_result(
+        properties=_gen_properties(
+            cipd_input={
+                u'client_package': cipd_client_pkg,
+                u'packages': [
+                    task_request.CipdPackage(
+                        package_name=u'rm', path=u'bin', version=u'latest'),
+                ],
+                u'server': u'http://localhost:2'
+            },
+            containment=task_request.Containment(lower_priority=True),
+        ),)
+    run_result.started_ts = self.now + datetime.timedelta(seconds=20)
+    run_result.abandoned_ts = self.now + datetime.timedelta(seconds=30)
+    run_result.completed_ts = self.now + datetime.timedelta(seconds=40)
+    run_result.modified_ts = self.now + datetime.timedelta(seconds=50)
+    run_result.duration = 1.
+    run_result.current_task_slice = 2
+    run_result.exit_code = 1
+    run_result.children_task_ids = [u'12310']
+    run_result.cas_output_root = task_request.CASReference(
+        cas_instance=u'projects/test/instances/default',
+        digest={
+            'hash': u'12345',
+            'size_bytes': 1,
+        })
+    run_result.cipd_pins = task_result.CipdPins(
+        client_package=cipd_client_pkg,
+        packages=[
+            task_request.CipdPackage(
+                package_name=u'rm', path=u'bin', version=u'stable'),
+        ])
+    task_result.PerformanceStats(
+        key=task_pack.run_result_key_to_performance_stats_key(run_result.key),
+        bot_overhead=0.1,
+        isolated_download=task_result.OperationStats(
+            duration=0.05,
+            initial_number_items=10,
+            initial_size=10000,
+            items_cold=large.pack([1, 2]),
+            items_hot=large.pack([3, 4, 5])),
+        isolated_upload=task_result.OperationStats(
+            duration=0.01, items_cold=large.pack([10]))).put()
+
+    # Note: It cannot be both TIMED_OUT and have run_result.deduped_from set.
+    run_result.state = task_result.State.TIMED_OUT
+    run_result.bot_dimensions = {u'id': [u'bot1'], u'pool': [u'default']}
+    run_result.dead_after_ts = None
+    run_result.put()
+
+    props_h = '5c7429e5ab9a21f37ec8c39dcbafbe41127fa67075b92ab0642861bb06578a12'
+    expected = swarming_pb2.TaskResult(
+        request=swarming_pb2.TaskRequest(
+            task_slices=[
+                swarming_pb2.TaskSlice(
+                    properties=swarming_pb2.TaskProperties(
+                        cipd_inputs=[
+                            swarming_pb2.CIPDPackage(
+                                package_name=u'rm',
+                                version=u'latest',
+                                dest_path=u'bin',
+                            ),
+                        ],
+                        containment=swarming_pb2.Containment(
+                            lower_priority=True),
+                        command=[u'command1'],
+                        dimensions=[
+                            swarming_pb2.StringListPair(
+                                key=u'pool', values=[u'default']),
+                        ],
+                        execution_timeout=duration_pb2.Duration(seconds=86400),
+                        grace_period=duration_pb2.Duration(seconds=30),
+                    ),
+                    expiration=duration_pb2.Duration(seconds=60),
+                    properties_hash=props_h,
+                ),
+            ],
+            priority=50,
+            service_account=u'none',
+            name=u'Request name',
+            authenticated=u"user:mocked@example.com",
+            tags=[
+                u'pool:default',
+                u'priority:50',
+                u'realm:None',
+                u'service_account:none',
+                u'swarming.pool.template:no_config',
+                u'tag:1',
+                u'user:Jesus',
+            ],
+            user=u'Jesus',
+            task_id=u'1d69b9f088008810',
+        ),
+        duration=duration_pb2.Duration(seconds=1),
+        state=swarming_pb2.TIMED_OUT,
+        state_category=swarming_pb2.CATEGORY_EXECUTION_DONE,
+        try_number=1,
+        current_task_slice=2,
+        bot=swarming_pb2.Bot(
+            bot_id=u'bot1',
+            pools=[u'default'],
+            dimensions=[
+                swarming_pb2.StringListPair(key=u'id', values=[u'bot1']),
+                swarming_pb2.StringListPair(key=u'pool', values=[u'default']),
+            ],
+        ),
+        server_versions=[u'v1a'],
+        children_task_ids=[u'12310'],
+        #deduped_from=u'123410',
+        task_id=u'1d69b9f088008810',
+        run_id=u'1d69b9f088008811',
+        cipd_pins=swarming_pb2.CIPDPins(
+            server=u'http://localhost:2',
+            client_package=swarming_pb2.CIPDPackage(
+                package_name=u'infra/tools/cipd/${platform}',
+                version=u'git_revision:deadbeef',
+            ),
+            packages=[
+                swarming_pb2.CIPDPackage(
+                    package_name=u'rm',
+                    version=u'stable',
+                    dest_path=u'bin',
+                ),
+            ],
+        ),
+        performance=swarming_pb2.TaskPerformance(
+            other_overhead=duration_pb2.Duration(nanos=100000000),
+            setup=swarming_pb2.TaskOverheadStats(
+                duration=duration_pb2.Duration(nanos=50000000),
+                cold=swarming_pb2.CASEntriesStats(
+                    num_items=2,
+                    total_bytes_items=3,
+                ),
+                hot=swarming_pb2.CASEntriesStats(
+                    num_items=3,
+                    total_bytes_items=12,
+                ),
+            ),
+            teardown=swarming_pb2.TaskOverheadStats(
+                duration=duration_pb2.Duration(nanos=10000000),
+                cold=swarming_pb2.CASEntriesStats(
+                    num_items=1,
+                    total_bytes_items=10,
+                ),
+            ),
+        ),
+        exit_code=1,
+        cas_output_root=swarming_pb2.CASReference(
+            cas_instance=u'projects/test/instances/default',
+            digest=swarming_pb2.Digest(hash='12345', size_bytes=1),
+        ),
+    )
     expected.request.create_time.FromDatetime(self.now)
     expected.create_time.FromDatetime(self.now)
     expected.start_time.FromDatetime(self.now + datetime.timedelta(seconds=20))

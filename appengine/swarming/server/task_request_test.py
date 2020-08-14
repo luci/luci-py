@@ -591,6 +591,7 @@ class TaskRequestApiTest(TestCase):
         'c262bae20e9b1a265fa5937d67aa36f690612b0e28c8af7e38b347dd6746da65',
         req.task_slice(0).properties_hash(req).encode('hex'))
 
+  # TODO(crbug.com/1115778): remove after RBE-CAS migration.
   def test_init_new_request_isolated(self):
     parent = _gen_request(
         properties=_gen_properties(
@@ -1019,6 +1020,7 @@ class TaskRequestApiTest(TestCase):
         request_1.task_slice(0).properties_hash(request_1),
         request_2.task_slice(0).properties_hash(request_2))
 
+  # TODO(crbug.com/1115778): remove after RBE-CAS migration.
   def test_to_proto(self):
     # Try to set as much things as possible to exercise most code paths.
     def getrandbits(i):
@@ -1170,9 +1172,160 @@ class TaskRequestApiTest(TestCase):
     request.to_proto(actual)
     self.assertEqual(unicode(expected), unicode(actual))
 
-  def test_to_proto_cas_input_root(self):
-    # TODO(crbug.com/1115778): Add test for TaskRequest with cas_input_root
-    pass
+  # TODO(crbug.com/1115778): rename to test_to_proto.
+  def test_to_proto_with_cas(self):
+    # Try to set as much things as possible to exercise most code paths.
+    def getrandbits(i):
+      self.assertEqual(i, 16)
+      return 0x7766
+
+    self.mock(random, 'getrandbits', getrandbits)
+    self.mock_now(task_request._BEGINING_OF_THE_WORLD)
+
+    # Parent entity must have a valid key id and be stored.
+    # This task uses user:Jesus, which will be inherited automatically.
+    parent = _gen_request()
+    parent.key = task_request.new_request_key()
+    parent.put()
+    # The reference is to the TaskRunResult.
+    parent_id = task_pack.pack_request_key(parent.key) + u'0'
+    parent_run_id = task_pack.pack_request_key(parent.key) + u'1'
+
+    request_props = _gen_properties(
+        inputs_ref=None,
+        cas_input_root={
+            'cas_instance': u'projects/test/instances/default',
+            'digest': {
+                'hash': u'12345',
+                'size_bytes': 1,
+            }
+        },
+        relative_cwd=u'subdir',
+        caches=[
+            task_request.CacheEntry(name=u'git_chromium', path=u'git_cache'),
+        ],
+        cipd_input=_gen_cipd_input(
+            packages=[
+                task_request.CipdPackage(
+                    package_name=u'foo', path=u'tool', version=u'git:12345'),
+            ],),
+        idempotent=True,
+        outputs=[u'foo'],
+        has_secret_bytes=True,
+        containment=task_request.Containment(
+            lower_priority=True,
+            containment_type=task_request.ContainmentType.JOB_OBJECT,
+            limit_processes=1000,
+            limit_total_committed_memory=1024**3,
+        ),
+    )
+    request = _gen_request_slices(
+        task_slices=[
+            task_request.TaskSlice(
+                expiration_secs=30,
+                properties=request_props,
+                wait_for_capacity=True,
+            ),
+        ],
+        # The user is ignored; the value is overridden by the parent task's
+        # user.
+        user=u'Joe',
+        parent_task_id=parent_run_id,
+        service_account=u'foo@gserviceaccount.com',
+        pubsub_topic=u'projects/a/topics/abc',
+        pubsub_auth_token=u'sekret',
+        pubsub_userdata=u'obscure_reference',
+    )
+    # Necessary to have a valid task_id:
+    request.key = task_request.new_request_key()
+    # Necessary to attach a secret to the request:
+    request.put()
+    _gen_secret(request, 'I am a banana').put()
+
+    expected_props = swarming_pb2.TaskProperties(
+        cas_input_root=swarming_pb2.CASReference(
+            cas_instance='projects/test/instances/default',
+            digest=swarming_pb2.Digest(
+                hash='12345', size_bytes=1),
+        ),
+        cipd_inputs=[
+            swarming_pb2.CIPDPackage(
+                package_name=u'foo', version=u'git:12345', dest_path=u'tool'),
+        ],
+        named_caches=[
+            swarming_pb2.NamedCacheEntry(
+                name=u'git_chromium', dest_path=u'git_cache'),
+        ],
+        containment=swarming_pb2.Containment(
+            lower_priority=True,
+            containment_type=swarming_pb2.Containment.JOB_OBJECT,
+            limit_processes=1000,
+            limit_total_committed_memory=1024**3,
+        ),
+        command=[u'command1', u'arg1'],
+        relative_cwd=u'subdir',
+        # extra_args cannot be specified with command.
+        # secret_bytes cannot be retrieved, but is included in properties_hash.
+        has_secret_bytes=True,
+        dimensions=[
+            swarming_pb2.StringListPair(key=u'OS', values=[u'Windows-3.1.1']),
+            swarming_pb2.StringListPair(key=u'hostname', values=[u'localhost']),
+            swarming_pb2.StringListPair(key=u'pool', values=[u'default']),
+        ],
+        env=[
+            swarming_pb2.StringPair(key=u'foo', value=u'bar'),
+            swarming_pb2.StringPair(key=u'joe', value=u'2'),
+        ],
+        env_paths=[
+            swarming_pb2.StringListPair(key=u'PATH', values=[u'local/path']),
+        ],
+        execution_timeout=duration_pb2.Duration(seconds=30),
+        grace_period=duration_pb2.Duration(seconds=30),
+        idempotent=True,
+        outputs=[u'foo'],
+    )
+    # To be updated every time the schema changes.
+    props_h = '516b5f86592b0e5e3bdd9fbf715305ee6f7ddad36320775d5a945e60df67c360'
+    expected = swarming_pb2.TaskRequest(
+        # Scheduling.
+        task_slices=[
+            swarming_pb2.TaskSlice(
+                properties=expected_props,
+                expiration=duration_pb2.Duration(seconds=30),
+                wait_for_capacity=True,
+                properties_hash=props_h,
+            ),
+        ],
+        priority=50,
+        service_account=u'foo@gserviceaccount.com',
+        # Information.
+        create_time=timestamp_pb2.Timestamp(seconds=1262304000),
+        name=u'Request name',
+        authenticated='user:mocked@example.com',
+        tags=[
+            u'OS:Windows-3.1.1',
+            u'hostname:localhost',
+            u'pool:default',
+            u'priority:50',
+            u'realm:None',
+            u'service_account:foo@gserviceaccount.com',
+            u'swarming.pool.template:no_config',
+            u'tag:1',
+            u'user:Jesus',
+        ],
+        user=u'Jesus',
+        # Hierarchy.
+        task_id=u'776610',
+        parent_task_id=parent_id,
+        parent_run_id=parent_run_id,
+        # Notification. auth_token cannot be retrieved.
+        pubsub_notification=swarming_pb2.PubSub(
+            topic=u'projects/a/topics/abc', userdata=u'obscure_reference'),
+    )
+
+    actual = swarming_pb2.TaskRequest()
+    request.to_proto(actual)
+    self.assertEqual(unicode(expected), unicode(actual))
 
   def test_TaskRequest_to_proto_empty(self):
     # Assert that it doesn't throw on empty entity.
