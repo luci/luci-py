@@ -202,6 +202,15 @@ class TaskRequestPrivateTest(TestCase):
     with self.assertRaises(ValueError):
       task_request._validate_task_run_id(Prop(), '1')
 
+  def test_validate_cas_instance(self):
+    valid_cas_instance = 'projects/chromium-swarm/instances/default_instance'
+    self.assertEqual(
+        valid_cas_instance,
+        task_request._validate_cas_instance(Prop(), valid_cas_instance))
+    self.assertEqual(None, task_request._validate_cas_instance(Prop(), ''))
+    with self.assertRaises(datastore_errors.BadValueError):
+      task_request._validate_cas_instance(Prop(), 'invalid')
+
   def test_apply_template_simple(self):
     tt = _gen_task_template(
         cache={'cache': 'c'},

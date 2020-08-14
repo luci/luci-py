@@ -146,6 +146,10 @@ _MAX_BOT_PING_TOLERANCE_SECS = 1200
 # Min time to keep the bot alive before it is declared dead.
 _MIN_BOT_PING_TOLERANCE_SECS = 60
 
+# Full CAS instance name verification.
+# The name should be `projects/{project}/instances/{instance}`.
+_CAS_INSTANCE_RE = re.compile(r'^projects/[a-z0-9-]+/instances/[a-z0-9-_]+$')
+
 ### Properties validators must come before the models.
 
 
@@ -480,6 +484,14 @@ def _validate_realm(_prop, value):
     six.reraise(datastore_errors.BadValueError, e.message, tb)
 
 
+def _validate_cas_instance(_prop, value):
+  if not value:
+    return
+  if _CAS_INSTANCE_RE.match(value):
+    return value
+  raise datastore_errors.BadValueError('invalid cas_instance: %s' % value)
+
+
 ### Models.
 
 
@@ -562,8 +574,8 @@ class Digest(ndb.Model):
 class CASReference(ndb.Model):
   # Full name of RBE-CAS instance. `projects/{project_id}/instances/{instance}`.
   # e.g. projects/chromium-swarm/instances/default_instance
-  # TODO(crbug.com/1115778): Set validator.
-  cas_instance = ndb.StringProperty(indexed=False)
+  cas_instance = ndb.StringProperty(
+      indexed=False, validator=_validate_cas_instance)
   # CAS Digest consists of hash and size bytes.
   digest = ndb.LocalStructuredProperty(Digest)
 
