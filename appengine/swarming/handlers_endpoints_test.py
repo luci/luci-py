@@ -2892,6 +2892,10 @@ class BotsApiTest(BaseTest):
     ])
     self.call_api('dimensions', body={}, status=403)
 
+  def test_dimensions_not_found(self):
+    self.set_as_privileged_user()
+    self.call_api('dimensions', body={'pool': 'unknown'}, status=404)
+
   @parameterized.expand([
       'list',
       'count',

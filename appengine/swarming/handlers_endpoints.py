@@ -1301,6 +1301,9 @@ class SwarmingBotsService(remote.Service):
 
     # TODO(jwata): change 'current' to 'all' once the entity is ready.
     agg = bot_management.get_aggregation_key(request.pool or 'current').get()
+    if not agg:
+      raise endpoints.NotFoundException(
+          'Dimension aggregation for pool %s does not exit' % request.pool)
     return swarming_rpcs.BotsDimensions(
         bots_dimensions=[
             swarming_rpcs.StringListPair(key=d.dimension, value=d.values)
