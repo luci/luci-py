@@ -1938,6 +1938,65 @@ class TaskRequestApiTest(TestCase):
     with self.assertRaises(datastore_errors.BadValueError):
       req.put()
 
+  def test_request_bad_cas_input_root(self):
+
+    def _gen_request_with_cas_input_root(cas_instance, digest):
+      return _gen_request(
+          properties=_gen_properties(
+              inputs_ref=None,  # inputs_ref can't be set with cas_input_root.
+              cas_input_root=task_request.CASReference(
+                  cas_instance=cas_instance, digest=digest)))
+
+    valid_cas_instance = 'projects/test/instances/default'
+    valid_digest = task_request.Digest(hash='12345', size_bytes=1)
+
+    # TaskRequest with a valid cas_input_root.
+    _gen_request_with_cas_input_root(
+        cas_instance=valid_cas_instance, digest=valid_digest).put()
+
+    # Missing cas_instance.
+    with self.assertRaises(datastore_errors.BadValueError):
+      _gen_request_with_cas_input_root(
+          cas_instance=None, digest=valid_digest).put()
+
+    # Invalid cas_instance.
+    with self.assertRaises(datastore_errors.BadValueError):
+      _gen_request_with_cas_input_root(
+          cas_instance='invalid_instance_name', digest=valid_digest).put()
+
+    # Missing digest.
+    with self.assertRaises(datastore_errors.BadValueError):
+      _gen_request_with_cas_input_root(
+          cas_instance=valid_cas_instance, digest=None).put()
+
+    # Missing digest.hash.
+    with self.assertRaises(datastore_errors.BadValueError):
+      _gen_request_with_cas_input_root(
+          cas_instance=valid_cas_instance,
+          digest=task_request.Digest(hash=None, size_bytes=1)).put()
+
+    # Missing digest.size_bytes.
+    with self.assertRaises(datastore_errors.BadValueError):
+      _gen_request_with_cas_input_root(
+          cas_instance=valid_cas_instance,
+          digest=task_request.Digest(hash='12345', size_bytes=None)).put()
+
+  def test_request_conflict_inputs(self):
+    req = _gen_request(
+        properties=_gen_properties(
+            inputs_ref=task_request.FilesRef(
+                isolated='0123456789012345678901234567890123456789',
+                isolatedserver=u'https://isolateserver.appspot.com',
+                namespace=u'default-gzip'),
+            cas_input_root=task_request.CASReference(
+                cas_instance='projects/test/instances/default',
+                digest=task_request.Digest(hash='12345', size_bytes=1)),
+        ))
+    with self.assertRaises(datastore_errors.BadValueError) as e:
+      req.put()
+    self.assertEqual(e.exception.message,
+                     "can't set both inputs_ref and cas_input_root")
+
   def test_request_bad_pubsub(self):
     _gen_request(pubsub_topic=u'projects/a/topics/abc').put()
     with self.assertRaises(datastore_errors.BadValueError):
