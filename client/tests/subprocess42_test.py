@@ -313,7 +313,7 @@ time.sleep(60)
     proc = subprocess42.Popen(
         cmd, stdin=subprocess42.PIPE, stdout=subprocess42.PIPE)
     try:
-      proc.communicate(input=b'12345', timeout=1)
+      proc.communicate(input=b'12345', timeout=2)
       self.fail()
     except subprocess42.TimeoutExpired as e:
       self.assertEqual(b'12345', e.output)
