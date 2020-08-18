@@ -1324,6 +1324,8 @@ class TaskRequest(ndb.Model):
       out.authenticated = self.authenticated.to_bytes()
     if self.realm:
       out.realm = self.realm
+    if self.resultdb_update_token:
+      out.resultdb.enable = True
 
     # Hierarchy and notifications.
     if self.key:

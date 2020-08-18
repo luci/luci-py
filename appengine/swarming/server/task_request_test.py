@@ -2040,6 +2040,12 @@ class TaskRequestApiTest(TestCase):
     with self.assertRaises(datastore_errors.BadValueError):
       _gen_request(realm='invalid_realm').put()
 
+  def test_resultdb_enable(self):
+    request = _gen_request(resultdb_update_token="token")
+    actual = swarming_pb2.TaskRequest()
+    request.to_proto(actual)
+    self.assertTrue(actual.resultdb.enable)
+
   def test_validate_priority(self):
     with self.assertRaises(TypeError):
       task_request.validate_priority(None)
