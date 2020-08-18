@@ -323,6 +323,11 @@ def task_result_to_rpc(entity, send_stats):
   outputs_ref = (
       _ndb_to_rpc(swarming_rpcs.FilesRef, entity.outputs_ref)
       if entity.outputs_ref else None)
+  cas_output_root = None
+  if entity.cas_output_root:
+    digest = _ndb_to_rpc(swarming_rpcs.Digest, entity.cas_output_root.digest)
+    cas_output_root = _ndb_to_rpc(
+        swarming_rpcs.CASReference, entity.cas_output_root, digest=digest)
   cipd_pins = None
   if entity.cipd_pins:
     cipd_pins = swarming_rpcs.CipdPins(
@@ -361,6 +366,8 @@ def task_result_to_rpc(entity, send_stats):
           cipd_pins,
       'outputs_ref':
           outputs_ref,
+      'cas_output_root':
+          cas_output_root,
       'performance_stats':
           performance_stats,
       'state':

@@ -93,6 +93,8 @@ def get_manifest(script=None, isolated=None, **kwargs):
           10.,
       'isolated':
           isolated,
+      'cas_input_root':
+          None,
       'outputs': [],
       'realm':
           None,

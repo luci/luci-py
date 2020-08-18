@@ -119,6 +119,7 @@ def _run_result_to_to_run_key(run_result):
 def _bot_update_task(run_result_key, **kwargs):
   args = {
       'bot_id': 'localhost',
+      'cas_output_root': None,
       'cipd_pins': None,
       'output': 'hi',
       'output_chunk_start': 0,

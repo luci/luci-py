@@ -752,6 +752,13 @@ class BotPollHandler(_BotBaseHandler):
                 'namespace': props.inputs_ref.namespace,
                 'server': props.inputs_ref.isolatedserver,
             } if props.inputs_ref else None,
+            'cas_input_root': {
+                'cas_instance': props.cas_input_root.cas_instance,
+                'digest': {
+                    'hash': props.cas_input_root.digest.hash,
+                    'size_bytes': props.cas_input_root.digest.size_bytes,
+                },
+            } if props.cas_input_root else None,
             'outputs':
                 props.outputs,
             'realm':
@@ -1008,6 +1015,7 @@ class BotTaskUpdateHandler(_BotApiHandler):
   """
   ACCEPTED_KEYS = {
       u'bot_overhead',
+      u'cas_output_root',
       u'cipd_pins',
       u'cipd_stats',
       u'cost_usd',
@@ -1055,6 +1063,7 @@ class BotTaskUpdateHandler(_BotApiHandler):
     output = request.get('output')
     output_chunk_start = request.get('output_chunk_start')
     outputs_ref = request.get('outputs_ref')
+    cas_output_root = request.get('cas_output_root')
     canceled = request.get('canceled')
 
     if (isolated_stats or cipd_stats) and bot_overhead is None:
@@ -1110,6 +1119,10 @@ class BotTaskUpdateHandler(_BotApiHandler):
         logging.error('Failed to decode output\n%s\n%r', e, output)
     if outputs_ref:
       outputs_ref = task_request.FilesRef(**outputs_ref)
+    if cas_output_root:
+      cas_output_root = task_request.CASReference(
+          cas_instance=cas_output_root['cas_instance'],
+          digest=task_request.Digest(**cas_output_root['digest']))
 
     if cipd_pins:
       cipd_pins = task_result.CipdPins(
@@ -1136,6 +1149,7 @@ class BotTaskUpdateHandler(_BotApiHandler):
           io_timeout=io_timeout,
           cost_usd=cost_usd,
           outputs_ref=outputs_ref,
+          cas_output_root=cas_output_root,
           cipd_pins=cipd_pins,
           performance_stats=performance_stats,
           canceled=canceled)

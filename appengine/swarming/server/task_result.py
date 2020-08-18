@@ -1146,6 +1146,7 @@ class TaskResultSummary(_TaskResultCommon):
     self.exit_code = None
     self.internal_failure = False
     self.outputs_ref = None
+    self.cas_output_root = None
     self.started_ts = None
     self.state = State.PENDING
 

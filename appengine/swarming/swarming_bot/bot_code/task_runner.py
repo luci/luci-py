@@ -218,6 +218,7 @@ class TaskDetails(object):
       'bot_authenticated_as',
       'bot_id',
       'caches',
+      'cas_input_root',
       'cipd_input',
       'command',
       'containment',

@@ -435,6 +435,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
                 u'namespace': u'default-gzip',
                 u'server': u'https://pool.config.isolate.example.com',
             },
+            u'cas_input_root': None,
             u'secret_bytes': None,
             u'realm': {},
             u'resultdb': None,
@@ -513,6 +514,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
                 u'namespace': u'default-gzip',
                 u'server': u'https://pool.config.isolate.example.com',
             },
+            u'cas_input_root': None,
             u'secret_bytes': None,
             u'realm': {},
             u'resultdb': None,
@@ -592,6 +594,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
                 u'namespace': u'default-gzip',
                 u'server': u'https://pool.config.isolate.example.com',
             },
+            u'cas_input_root': None,
             u'io_timeout': 1200,
             u'outputs': [u'foo', u'path/to/foobar'],
             u'secret_bytes': None,
@@ -656,6 +659,92 @@ class BotApiTest(test_env_handlers.AppTestBase):
         u'name': u'test:task_realm',
     }
     self.assertEqual(expected, response['manifest']['realm'])
+
+  def test_poll_with_cas_input_root(self):
+    # fix task_id.
+    self.mock(random, 'getrandbits', lambda _: 0x88)
+    params = self.do_handshake(do_first_poll=True)
+
+    self.mock(auth, 'has_permission', lambda *_args, **_kwargs: True)
+    self.mock(service_accounts, 'has_token_server', lambda: True)
+
+    self.set_as_user()
+    _, task_id = self.client_create_task_cas_input_root()
+    task_id = task_id[:-1] + '1'  # conver to run_id.
+
+    self.set_as_bot()
+    response = self.post_json('/swarming/api/v1/bot/poll', params)
+
+    expected = {
+        u'cmd': u'run',
+        u'manifest': {
+            u'bot_id': u'bot1',
+            u'bot_authenticated_as': u'bot:whitelisted-ip',
+            u'caches': [],
+            u'cipd_input': {
+                u'client_package': {
+                    u'package_name': u'infra/tools/cipd/${platform}',
+                    u'path': None,
+                    u'version': u'git_revision:deadbeef',
+                },
+                u'packages': [{
+                    u'package_name': u'rm',
+                    u'path': u'bin',
+                    u'version': u'git_revision:deadbeef',
+                }],
+                u'server': u'https://pool.config.cipd.example.com',
+            },
+            u'command': [u'python', u'run_test.py'],
+            u'containment': {
+                u'lower_priority': True,
+                u'containment_type': 2,
+                u'limit_processes': 1000,
+                u'limit_total_committed_memory': 1024**3,
+            },
+            u'relative_cwd': None,
+            u'dimensions': {
+                u'os': [u'Amiga'],
+                u'pool': [u'default'],
+            },
+            u'env': {},
+            u'env_prefixes': {},
+            u'extra_args': [],
+            u'grace_period': 30,
+            u'hard_timeout': 3600,
+            u'host': u'http://localhost:8080',
+            u'isolated': None,
+            u'cas_input_root': {
+                u'cas_instance': u'projects/test/instances/default',
+                u'digest': {
+                    u'hash': u'12345',
+                    u'size_bytes': 1,
+                }
+            },
+            u'secret_bytes': None,
+            u'realm': {},
+            u'resultdb': None,
+            u'io_timeout': 1200,
+            u'outputs': [u'foo', u'path/to/foobar'],
+            u'service_accounts': {
+                u'system': {
+                    u'service_account': u'none'
+                },
+                u'task': {
+                    u'service_account': u'none'
+                },
+            },
+            u'task_id': task_id,
+        },
+    }
+    self.assertEqual(expected, response)
+
+    self.set_as_user()
+    response = self.client_get_results(task_id)
+    expected = self.gen_run_result(
+        created_ts=fmtdate(self.now),
+        modified_ts=fmtdate(self.now),
+        started_ts=fmtdate(self.now))
+    self.assertEqual(expected, response)
 
   def test_poll_conflicting_dimensions(self):
     params = self.do_handshake()
@@ -764,6 +853,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
                 u'server': u'http://localhost:1',
                 u'namespace': u'default-gzip',
             },
+            u'cas_input_root': None,
             u'secret_bytes': None,
             u'realm': {},
             u'resultdb': None,
@@ -851,6 +941,98 @@ class BotApiTest(test_env_handlers.AppTestBase):
             u'isolatedserver': u'http://localhost:1',
             u'namespace': u'default-gzip',
         },
+        started_ts=fmtdate(self.now),
+        state=u'COMPLETED')
+    self.assertEqual(expected, response)
+
+  def test_complete_task_cas_output_root(self):
+    # Successfully poll a task.
+    self.mock(random, 'getrandbits', lambda _: 0x88)
+    # A bot polls, gets a task, updates it, completes it.
+    params = self.do_handshake(do_first_poll=True)
+    # Enqueue a task.
+    self.set_as_user()
+    _, task_id = self.client_create_task_cas_input_root()
+    self.assertEqual('0', task_id[-1])
+
+    # Convert TaskResultSummary reference to TaskRunResult.
+    task_id = task_id[:-1] + '1'
+    self.set_as_bot()
+    self.post_json('/swarming/api/v1/bot/poll', params)
+
+    # Complete the task.
+    params = {
+        'cost_usd': 0.1,
+        'duration': 3.,
+        'bot_overhead': 0.1,
+        'exit_code': 0,
+        'id': 'bot1',
+        'isolated_stats': {
+            'download': {
+                'duration': 0.1,
+                'initial_number_items': 10,
+                'initial_size': 1000,
+                'items_cold': '',
+                'items_hot': '',
+            },
+            'upload': {
+                'duration': 0.1,
+                'items_cold': '',
+                'items_hot': '',
+            },
+        },
+        'output': base64.b64encode('Ahahah'),
+        'output_chunk_start': 0,
+        'cas_output_root': {
+            'cas_instance': 'projects/test/instances/default',
+            'digest': {
+                'hash': '12345',
+                'size_bytes': 1,
+            }
+        },
+        'cipd_pins': {
+            'client_package': {
+                'package_name': 'infra/tools/cipd/windows-amd64',
+                'version': 'deadbeef' * 5,
+            },
+            'packages': [{
+                'package_name': 'rm',
+                'path': 'bin',
+                'version': 'badc0fee' * 5,
+            }]
+        },
+        'task_id': task_id,
+    }
+    response = self.post_json('/swarming/api/v1/bot/task_update', params)
+    self.assertEqual({u'must_stop': False, u'ok': True}, response)
+
+    self.set_as_user()
+    response = self.client_get_results(task_id)
+    expected = self.gen_run_result(
+        cas_output_root={
+            'cas_instance': 'projects/test/instances/default',
+            'digest': {
+                'hash': '12345',
+                'size_bytes': '1',
+            }
+        },
+        cipd_pins={
+            'client_package': {
+                'package_name': 'infra/tools/cipd/windows-amd64',
+                'version': 'deadbeef' * 5,
+            },
+            'packages': [{
+                'package_name': 'rm',
+                'path': 'bin',
+                'version': 'badc0fee' * 5,
+            }]
+        },
+        completed_ts=fmtdate(self.now),
+        costs_usd=[0.1],
+        created_ts=fmtdate(self.now),
+        duration=3.0,
+        exit_code=u'0',
+        modified_ts=fmtdate(self.now),
         started_ts=fmtdate(self.now),
         state=u'COMPLETED')
     self.assertEqual(expected, response)
