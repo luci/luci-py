@@ -876,6 +876,83 @@ class TasksApiTest(BaseTest):
     response = self.call_api('new', body=message_to_dict(request))
     self.assertEqual(expected, response.json)
 
+  def test_new_ok_cas_input_root(self):
+    """Asserts that new generates appropriate metadata."""
+    self.mock(random, 'getrandbits', lambda _: 0x88)
+    request = self.create_new_request(
+        properties=self.create_props(
+            command=['python', 'test.py'],
+            cas_input_root=swarming_rpcs.CASReference(
+                cas_instance='projects/test/instances/default',
+                digest=swarming_rpcs.Digest(hash='12345', size_bytes=1))))
+    expected_props = self.gen_props(
+        command=[u'python', u'test.py'],
+        cas_input_root={
+            u'cas_instance': u'projects/test/instances/default',
+            u'digest': {
+                u'hash': u'12345',
+                u'size_bytes': u'1',
+            },
+        })
+    expected = {
+        u'request':
+            self.gen_request(
+                created_ts=fmtdate(self.now),
+                properties=expected_props,
+                task_slices=[
+                    {
+                        u'expiration_secs': u'86400',
+                        u'properties': expected_props,
+                        u'wait_for_capacity': False,
+                    },
+                ]),
+        u'task_id':
+            u'5cee488008810',
+        u'task_result': {
+            u'abandoned_ts': u'2010-01-02T03:04:05',
+            u'completed_ts': u'2010-01-02T03:04:05',
+            u'created_ts': u'2010-01-02T03:04:05',
+            u'current_task_slice': u'0',
+            u'failure': False,
+            u'internal_failure': False,
+            u'modified_ts': u'2010-01-02T03:04:05',
+            u'name': u'job1',
+            u'server_versions': [u'v1a'],
+            u'state': u'NO_RESOURCE',
+            u'tags': [
+                u'a:tag',
+                u'os:Amiga',
+                u'pool:default',
+                u'priority:20',
+                u'realm:None',
+                u'service_account:none',
+                u'swarming.pool.template:none',
+                u'swarming.pool.version:pools_cfg_rev',
+                u'user:joe@localhost',
+            ],
+            u'task_id': u'5cee488008810',
+            u'user': u'joe@localhost',
+        },
+    }
+    response = self.call_api('new', body=message_to_dict(request))
+    self.assertEqual(expected, response.json)
+
+  def test_new_conflict_inputs(self):
+    self.mock(random, 'getrandbits', lambda _: 0x88)
+    request = self.create_new_request(
+        properties=self.create_props(
+            command=['python', 'test.py'],
+            cas_input_root=swarming_rpcs.CASReference(
+                cas_instance='projects/test/instances/default',
+                digest=swarming_rpcs.Digest(hash='12345', size_bytes=1)),
+            inputs_ref=swarming_rpcs.FilesRef(
+                isolated='1' * 40,
+                isolatedserver='http://localhost:1',
+                namespace='default-gzip')))
+    response = self.call_api('new', body=message_to_dict(request), status=400)
+    self.assertEqual("can't set both inputs_ref and cas_input_root",
+                     response.json['error']['message'])
+
   def test_new_cipd_package_with_defaults(self):
     self.mock(random, 'getrandbits', lambda _: 0x88)
 
