@@ -557,6 +557,9 @@ class BotPollHandler(_BotBaseHandler):
           self.abort(429, 'Deadline exceeded')
           return
         raise
+      except datastore_errors.BadValueError as e:
+        logging.warning('Invalid BotInfo or BotEvent values', exc_info=True)
+        return self.abort_with_error(400, error=e.message)
 
     # Bot version is host-specific because the host URL is embedded in
     # swarming_bot.zip

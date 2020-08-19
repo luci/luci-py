@@ -283,6 +283,10 @@ class BotApiTest(test_env_handlers.AppTestBase):
     }
     self.assertEqual(expected, response)
 
+    # with non string maintenance message.
+    params['state']['maintenance'] = True
+    self.post_json('/swarming/api/v1/bot/poll', params, status=400)
+
   def test_poll_bad_bot(self):
     # If bot is not sending required keys but report right version, enforce
     # sleeping.
