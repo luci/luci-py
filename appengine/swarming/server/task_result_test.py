@@ -183,7 +183,7 @@ class TaskResultApiTest(TestCase):
         'tags': [
             u'pool:default',
             u'priority:50',
-            u'realm:None',
+            u'realm:none',
             u'service_account:none',
             u'swarming.pool.template:no_config',
             u'tag:1',
@@ -824,7 +824,7 @@ class TaskResultApiTest(TestCase):
             tags=[
                 u'pool:default',
                 u'priority:50',
-                u'realm:None',
+                u'realm:none',
                 u'service_account:none',
                 u'swarming.pool.template:no_config',
                 u'tag:1',
@@ -991,7 +991,7 @@ class TaskResultApiTest(TestCase):
             tags=[
                 u'pool:default',
                 u'priority:50',
-                u'realm:None',
+                u'realm:none',
                 u'service_account:none',
                 u'swarming.pool.template:no_config',
                 u'tag:1',
