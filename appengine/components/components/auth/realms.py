@@ -63,5 +63,7 @@ def merge(permissions, realms, out=None):
           realms_pb2.Binding(permissions=perms, principals=principals)
           for perms, principals in sorted(bindings, key=lambda x: x[0])
       )
+      if old_realm.HasField('data'):
+        new_realm.data.CopyFrom(old_realm.data)
 
   return out

@@ -26,6 +26,7 @@ import time
 
 from six.moves import urllib
 
+from google.appengine.api import app_identity
 from google.appengine.api import oauth
 from google.appengine.api import urlfetch
 from google.appengine.ext import ndb
@@ -60,6 +61,7 @@ __all__ = [
     'get_peer_identity',
     'get_peer_ip',
     'get_process_cache_expiration_sec',
+    'get_realm_data',
     'get_request_auth_db',
     'get_secret',
     'get_web_client_id',
@@ -76,6 +78,7 @@ __all__ = [
     'public',
     'require',
     'root_realm',
+    'should_enforce_realm_acl',
     'validate_realm_name',
     'verify_ip_whitelisted',
     'warmup',
@@ -185,7 +188,8 @@ OAuthConfig = collections.namedtuple('OAuthConfig', [
 # The representation of realms_pb2.Realm used by AuthDB, preprocessed for faster
 # checks.
 CachedRealm = collections.namedtuple('CachedRealm', [
-  'per_permission_sets',  # permission index -> [PrincipalsSet].
+  'per_permission_sets',  # permission index -> [PrincipalsSet]
+  'data',                 # realms_pb2.RealmData (perhaps empty)
 ])
 
 
@@ -443,7 +447,7 @@ class AuthDB(object):
         principals_set = PrincipalsSet(tuple(groups), frozenset(idents))
         for perm_idx in b.permissions:
           per_permission_sets.setdefault(perm_idx, []).append(principals_set)
-      self._realms[realm.name] = CachedRealm(per_permission_sets)
+      self._realms[realm.name] = CachedRealm(per_permission_sets, realm.data)
 
     logging.info('Loaded %d realms', len(self._realms))
 
@@ -862,6 +866,17 @@ class AuthDB(object):
 
     return False
 
+  def get_realm_data(self, realm):
+    """Returns realms_pb2.RealmData for a realm.
+
+    Falls back to the "@root" realm if `realm` doesn't exist. Returns None if
+    the root realm doesn't exist either, which means that either project doesn't
+    exist or it has no realms.cfg file.
+    """
+    self._check_realms_available()
+    realm = self._get_realm_or_its_root(realm)
+    return realm.data if realm else None
+
   def _check_realms_available(self):
     """Raises RealmsError if Realms API is not available.
 
@@ -876,7 +891,7 @@ class AuthDB(object):
     if not self._use_realms:
       raise RealmsError('Realms API is not available')
 
-  def _get_realm_or_its_root(self, name, perm):
+  def _get_realm_or_its_root(self, name, perm=None):
     """Returns either the realm `name` or its @root if `name` doesn't exist.
 
     If the root doesn't exist either, returns None. This may happen if the
@@ -884,10 +899,10 @@ class AuthDB(object):
 
     Args:
       name: a name of the realm to grab.
-      perm: a Permission being checked (used for log messages only).
+      perm: a Permission being checked, if any (used for log messages only).
 
     Returns:
-      CachedRealm or None.
+      CachedRealm or None if there's no such realm and no root realm.
 
     Raises:
       TypeError if `name` is not a string.
@@ -910,21 +925,24 @@ class AuthDB(object):
 
     # Can't fallback to the root if already checking it.
     if name == root_name:
-      logging.warning(
-          'Checking %r in a non-existing root realm %r: denying', perm, name)
+      if perm:
+        logging.warning(
+            'Checking %r in a non-existing root realm %r: denying', perm, name)
       return None
 
     # Fallback to the root and log the outcome.
     root = self._realms.get(root_name)
     if root:
-      logging.warning(
-          'Checking %r in a non-existing realm %r: falling back to the root '
-          'realm %r', perm, name, root_name)
+      if perm:
+        logging.warning(
+            'Checking %r in a non-existing realm %r: falling back to the root '
+            'realm %r', perm, name, root_name)
       return root
 
-    logging.warning(
-        'Checking %r in a non-existing realm %r that doesn\'t have a root '
-        'realm (no such project?): denying', perm, name)
+    if perm:
+      logging.warning(
+          'Checking %r in a non-existing realm %r that doesn\'t have a root '
+          'realm (no such project?): denying', perm, name)
     return None
 
   def _is_identity_in_principals_set(self, ident, principals, checked_groups):
@@ -2266,6 +2284,28 @@ def has_permission_dryrun(
         log_pfx,
         'ALLOW' if result else 'DENY',
         'ALLOW' if expected_result else 'DENY')
+
+
+def get_realm_data(realm):
+  """Returns realms_pb2.RealmData for a realm.
+
+  Falls back to the "@root" realm if `realm` doesn't exist. Returns None if
+  the root realm doesn't exist either, which means that either project doesn't
+  exist or it has no realms.cfg file.
+  """
+  return get_request_cache().auth_db.get_realm_data(realm)
+
+
+def should_enforce_realm_acl(realm):
+  """Returns True if the service should enforce that realm's ACLs.
+
+  Based on `enforce_in_service` realm data. Exists temporarily during the realms
+  migration.
+  """
+  data = get_realm_data(realm)
+  if not data:
+    return False  # no realms.cfg in the project at all
+  return app_identity.get_application_id() in data.enforce_in_service
 
 
 def _validated_realm_project(project):

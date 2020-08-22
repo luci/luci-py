@@ -94,6 +94,7 @@ def expand_realms(db, project_id, realms_cfg):
           realms_pb2.Realm(
               name='%s:%s' % (project_id, name),
               bindings=to_normalized_bindings(perms_to_principals, index_map),
+              data=realms_expander.realm_data(name),
           )
           for name, perms_to_principals in realms
       ])
@@ -170,6 +171,17 @@ class RealmsExpander(object):
   def __init__(self, roles, realms):
     self._roles = roles
     self._realms = {r.name: r for r in realms}
+    self._data = {}  # name -> realms_pb2.RealmData, memoized
+
+  @staticmethod
+  def _parents(realm):
+    """Given a realms_config_pb2.Realm yields names of immediate parents."""
+    if realm.name == common.ROOT_REALM:
+      return
+    yield common.ROOT_REALM
+    for name in realm.extends:
+      if name != common.ROOT_REALM:
+        yield name
 
   def extend_root(self, bindings):
     """Adds the given list of realms_config_pb2.Binding to the root realm."""
@@ -190,22 +202,24 @@ class RealmsExpander(object):
     Returns a lot of duplicates. It's the caller's job to skip them.
     """
     r = self._realms[realm]
+    assert r.name == realm
 
     for b in r.bindings:
       perms = self._roles.role(b.role)  # the tuple of permissions of the role
       for principal in b.principals:
         yield principal, perms
 
-    for parent in r.extends:
-      if parent == common.ROOT_REALM:
-        continue  # will explicitly visit it later
+    for parent in self._parents(r):
       for principal, perms in self.per_principal_bindings(parent):
         yield principal, perms
 
-    # All realms except the root itself implicitly inherit from @root.
-    if realm != common.ROOT_REALM:
-      for principal, perms in self.per_principal_bindings(common.ROOT_REALM):
-        yield principal, perms
+  def realm_data(self, name):
+    """Returns calculated realms_pb2.RealmData for a realm."""
+    if name not in self._data:
+      realm = self._realms[name]
+      extends = [self.realm_data(p) for p in self._parents(realm)]
+      self._data[name] = derive_realm_data(realm, [x for x in extends if x])
+    return self._data[name]
 
 
 def to_normalized_bindings(perms_to_principals, index_map):
@@ -232,3 +246,21 @@ def to_normalized_bindings(perms_to_principals, index_map):
       realms_pb2.Binding(permissions=perms, principals=principals)
       for perms, principals in sorted(normalized, key=lambda x: x[0])
   ]
+
+
+def derive_realm_data(realm, extends):
+  """Calculates realms_pb2.RealmData from the realm config and parent data.
+
+  Args:
+    realm: realms_config_pb2.Realm to calculate the data for.
+    extends: a list of realms_pb2.RealmData it extends from.
+
+  Returns:
+    realms_pb2.RealmData or None if empty.
+  """
+  enforce_in_service = set(realm.enforce_in_service)
+  for d in extends:
+    enforce_in_service.update(d.enforce_in_service)
+  if not enforce_in_service:
+    return None
+  return realms_pb2.RealmData(enforce_in_service=sorted(enforce_in_service))

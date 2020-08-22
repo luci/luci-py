@@ -19,7 +19,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   syntax='proto3',
   serialized_options=b'Z/go.chromium.org/luci/common/proto/realms;realms',
   create_key=_descriptor._internal_create_key,
-  serialized_pb=b'\n\x13realms_config.proto\x12\x0c\x61uth_service\"`\n\tRealmsCfg\x12#\n\x06realms\x18\x01 \x03(\x0b\x32\x13.auth_service.Realm\x12.\n\x0c\x63ustom_roles\x18\x02 \x03(\x0b\x32\x18.auth_service.CustomRole\"O\n\x05Realm\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x0f\n\x07\x65xtends\x18\x02 \x03(\t\x12\'\n\x08\x62indings\x18\x03 \x03(\x0b\x32\x15.auth_service.Binding\"+\n\x07\x42inding\x12\x0c\n\x04role\x18\x01 \x01(\t\x12\x12\n\nprincipals\x18\x02 \x03(\t\"@\n\nCustomRole\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x0f\n\x07\x65xtends\x18\x02 \x03(\t\x12\x13\n\x0bpermissions\x18\x03 \x03(\tB1Z/go.chromium.org/luci/common/proto/realms;realmsb\x06proto3'
+  serialized_pb=b'\n\x13realms_config.proto\x12\x0c\x61uth_service\"`\n\tRealmsCfg\x12#\n\x06realms\x18\x01 \x03(\x0b\x32\x13.auth_service.Realm\x12.\n\x0c\x63ustom_roles\x18\x02 \x03(\x0b\x32\x18.auth_service.CustomRole\"k\n\x05Realm\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x0f\n\x07\x65xtends\x18\x02 \x03(\t\x12\'\n\x08\x62indings\x18\x03 \x03(\x0b\x32\x15.auth_service.Binding\x12\x1a\n\x12\x65nforce_in_service\x18\x04 \x03(\t\"+\n\x07\x42inding\x12\x0c\n\x04role\x18\x01 \x01(\t\x12\x12\n\nprincipals\x18\x02 \x03(\t\"@\n\nCustomRole\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x0f\n\x07\x65xtends\x18\x02 \x03(\t\x12\x13\n\x0bpermissions\x18\x03 \x03(\tB1Z/go.chromium.org/luci/common/proto/realms;realmsb\x06proto3'
 )
 
 
@@ -93,6 +93,13 @@ _REALM = _descriptor.Descriptor(
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='enforce_in_service', full_name='auth_service.Realm.enforce_in_service', index=3,
+      number=4, type=9, cpp_type=9, label=3,
+      has_default_value=False, default_value=[],
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
   ],
   extensions=[
   ],
@@ -106,7 +113,7 @@ _REALM = _descriptor.Descriptor(
   oneofs=[
   ],
   serialized_start=135,
-  serialized_end=214,
+  serialized_end=242,
 )
 
 
@@ -144,8 +151,8 @@ _BINDING = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=216,
-  serialized_end=259,
+  serialized_start=244,
+  serialized_end=287,
 )
 
 
@@ -190,8 +197,8 @@ _CUSTOMROLE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=261,
-  serialized_end=325,
+  serialized_start=289,
+  serialized_end=353,
 )
 
 _REALMSCFG.fields_by_name['realms'].message_type = _REALM

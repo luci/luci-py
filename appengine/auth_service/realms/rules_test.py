@@ -506,6 +506,66 @@ class ExpandRealmsTest(test_case.TestCase):
         ],
     })
 
+  def test_enforce_in_service(self):
+    cfg = {
+        'realms': [
+            {
+                'name': '@root',
+                'enforce_in_service': ['a'],
+            },
+            {
+                'name': 'r1',
+            },
+            {
+                'name': 'r2',
+                'enforce_in_service': ['b'],
+            },
+            {
+                'name': 'r3',
+                'enforce_in_service': ['c'],
+            },
+            {
+                'name': 'r4',
+                'extends': ['r1', 'r2', 'r3'],
+                'enforce_in_service': ['d'],
+            },
+        ],
+    }
+    self.assertEqual(self.expand(cfg), {
+        'realms': [
+            {
+                'name': 'p:@root',
+                'data': {
+                    'enforceInService': ['a'],
+                },
+            },
+            {
+                'name': 'p:r1',
+                'data': {
+                    'enforceInService': ['a'],
+                },
+            },
+            {
+                'name': 'p:r2',
+                'data': {
+                    'enforceInService': ['a', 'b'],
+                },
+            },
+            {
+                'name': 'p:r3',
+                'data': {
+                    'enforceInService': ['a', 'c'],
+                },
+            },
+            {
+                'name': 'p:r4',
+                'data': {
+                    'enforceInService': ['a', 'b', 'c', 'd'],
+                },
+            },
+        ],
+    })
+
 
 if __name__ == '__main__':
   if '-v' in sys.argv:

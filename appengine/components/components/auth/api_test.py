@@ -1230,7 +1230,7 @@ ID2 = model.Identity.from_bytes('user:2@example.com')
 ID3 = model.Identity.from_bytes('user:3@example.com')
 
 
-class PermissionCheckTest(test_case.TestCase):
+class RealmsTest(test_case.TestCase):
   @staticmethod
   def auth_db(realms_map, groups=None, api_version=None):
     return api.AuthDB.from_proto(
@@ -1264,6 +1264,9 @@ class PermissionCheckTest(test_case.TestCase):
                                 ],
                             } for perms, principals in sorted(bindings.items())
                         ],
+                        'data': {
+                            'enforce_in_service': ['data for %s' % name],
+                        },
                     } for name, bindings in sorted(realms_map.items())
                 ],
             },
@@ -1271,7 +1274,7 @@ class PermissionCheckTest(test_case.TestCase):
         additional_client_ids=[])
 
   def setUp(self):
-    super(PermissionCheckTest, self).setUp()
+    super(RealmsTest, self).setUp()
     self.all_perms = {p.name: p for p in ALL_PERMS}
     self.mock(api, '_all_perms', self.all_perms)
     self.logs = {}
@@ -1424,6 +1427,18 @@ class PermissionCheckTest(test_case.TestCase):
     self.assert_logs('exception',
         "bug: has_permission_dryrun('luci.dev.testing1', ['@root'], "
         "'user:1@example.com'), authdb=0: exception ValueError, want ALLOW")
+
+  def test_realm_data(self):
+    db = self.auth_db({'proj:@root': {}, 'proj:r': {}})
+
+    def realm_data(realm):
+      r = db.get_realm_data(realm)
+      return r.enforce_in_service[0] if r else None
+
+    self.assertEqual('data for proj:r', realm_data('proj:r'))
+    self.assertEqual('data for proj:@root', realm_data('proj:@root'))
+    self.assertEqual('data for proj:@root', realm_data('proj:zzz'))
+    self.assertEqual(None, realm_data('zzz:@root'))
 
 
 if __name__ == '__main__':

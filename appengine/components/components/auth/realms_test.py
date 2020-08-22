@@ -87,6 +87,9 @@ class MergeTest(test_case.TestCase):
                                 'principals': ['group:gr1'],
                             },
                         ],
+                        'data': {
+                            'enforce_in_service': ['a'],
+                        },
                     },
                 ],
             ),
@@ -118,6 +121,9 @@ class MergeTest(test_case.TestCase):
                         'principals': ['group:gr1'],
                     },
                 ],
+                'data': {
+                    'enforce_in_service': ['a'],
+                },
             },
             {
                 'name': 'proj2:@root',
