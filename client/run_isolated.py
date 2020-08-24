@@ -117,7 +117,7 @@ ISOLATED_CLIENT_DIR = u'ic'
 # Or take revision from
 # https://ci.chromium.org/p/infra-internal/g/infra-packagers/console
 ISOLATED_PACKAGE = 'infra/tools/luci/isolated/${platform}'
-ISOLATED_REVISION = 'git_revision:bd55cfc91844494ace7d26e9359dbfb5b9717635'
+ISOLATED_REVISION = 'git_revision:3ccf4cc0119188dbc4befff330348d972b15711d'
 
 # Keep synced with task_request.py
 CACHE_NAME_RE = re.compile(r'^[a-z0-9_]{1,4096}$')
