@@ -972,7 +972,10 @@ class NamedCache(Cache):
 
         # Calculate the size of the named cache to keep.
         size = _get_recursive_size(src)
-        logging.info('- Size is %d', size)
+        logging.info('- Size is %s', size)
+        if size is None:
+          # Do not save a named cache that was deleted.
+          return
 
         # Move the dir and create an entry for the named cache.
         rel_cache = self._allocate_dir()
