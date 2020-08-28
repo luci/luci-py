@@ -734,12 +734,14 @@ def _upload_with_go(storage, outdir, isolated_client):
     # This mitigates https://crbug.com/1094369, where there is a data race on
     # the uploaded files.
     backoff = 10
+    started = time.time()
     while True:
       try:
         _run_go_isolated_and_wait(cmd)
         break
       except Exception:
-        if backoff > 100:
+        if time.time() > started + 60 * 2:
+          # This is to not wait task having leaked process long time.
           raise
 
         on_error.report('error before %d second backoff' % backoff)
