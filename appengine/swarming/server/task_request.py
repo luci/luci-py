@@ -1016,10 +1016,12 @@ class TaskProperties(ndb.Model):
       if self.idempotent:
         pinned = lambda p: cipd.is_pinned_version(p.version)
         assert self.cipd_input.packages  # checked by cipd_input._pre_put_hook
-        if any(not pinned(p) for p in self.cipd_input.packages):
+        not_pinned = [p for p in self.cipd_input.packages if not pinned(p)]
+        if not_pinned:
           raise datastore_errors.BadValueError(
               'an idempotent task cannot have unpinned packages; '
-              'use tags or instance IDs as package versions')
+              'use tags or instance IDs as package versions for %s' %
+              not_pinned)
 
     if len(self.outputs) > 4096:
       raise datastore_errors.BadValueError(
