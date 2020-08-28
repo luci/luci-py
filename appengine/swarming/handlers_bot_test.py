@@ -1222,6 +1222,13 @@ class BotApiTest(test_env_handlers.AppTestBase):
 
     self.assertEqual(expected, actual)
 
+  def test_bot_event_bad_request(self):
+    params = self.do_handshake()
+    params['event'] = 'bot_log'
+    params['message'] = 'I have an invalid maintenance message.'
+    params['state']['maintenance'] = True  # non-string maintenance message.
+    self.post_json('/swarming/api/v1/bot/event', params, status=400)
+
   def test_task_complete(self):
     # Runs a task up to completion.
     self.mock(random, 'getrandbits', lambda _: 0x88)

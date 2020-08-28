@@ -843,20 +843,24 @@ class BotEventHandler(_BotBaseHandler):
     # Record the event in a BotEvent entity so it can be listed on the bot's
     # page. The dimensions won't be applied to BotInfo since they may not be
     # valid, but will be applied to BotEvent for analysis purpose.
-    bot_management.bot_event(
-        event_type=event,
-        bot_id=res.bot_id,
-        external_ip=self.request.remote_addr,
-        authenticated_as=auth.get_peer_identity().to_bytes(),
-        dimensions=res.dimensions,
-        state=res.state,
-        version=res.version,
-        quarantined=bool(res.quarantined_msg),
-        maintenance_msg=res.maintenance_msg,
-        task_id=None,
-        task_name=None,
-        message=message,
-        register_dimensions=False)
+    try:
+      bot_management.bot_event(
+          event_type=event,
+          bot_id=res.bot_id,
+          external_ip=self.request.remote_addr,
+          authenticated_as=auth.get_peer_identity().to_bytes(),
+          dimensions=res.dimensions,
+          state=res.state,
+          version=res.version,
+          quarantined=bool(res.quarantined_msg),
+          maintenance_msg=res.maintenance_msg,
+          task_id=None,
+          task_name=None,
+          message=message,
+          register_dimensions=False)
+    except datastore_errors.BadValueError as e:
+      logging.warning('Invalid BotInfo or BotEvent values', exc_info=True)
+      return self.abort_with_error(400, error=e.message)
 
     if event == 'bot_error':
       # Also logs this to ereporter2, so it will be listed in the server's
