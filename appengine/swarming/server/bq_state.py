@@ -11,6 +11,7 @@ import logging
 from google.appengine.api import app_identity
 from google.appengine.api import datastore_errors
 from google.appengine.api import memcache
+from google.appengine.api import urlfetch_errors
 from google.appengine.ext import ndb
 
 from components import net
@@ -217,16 +218,27 @@ def cron_trigger_tasks(
 def send_to_bq(table_name, rows):
   """Sends rows to a BigQuery table.
 
-  Iterates until all rows are sent.
+  Iterates until all rows are sent. And divides the rows when it failed with
+  PayloadTooLargeError,
   """
-  failures = 0
-  if rows:
-    logging.info('Sending %d rows', len(rows))
-    while rows:
-      failed = _send_to_bq_raw('swarming', table_name, rows)
-      if not failed:
-        break
-      failures += len(failed)
-      logging.warning('Failed to insert %s rows', len(failed))
-      rows = [rows[i] for i in failed]
-  return failures
+
+  def _send(r):
+    cnt = 0
+    if r:
+      logging.info('Sending %d rows', len(r))
+      while r:
+        indexes = _send_to_bq_raw('swarming', table_name, r)
+        if not indexes:
+          break
+        cnt += len(indexes)
+        logging.warning('Failed to insert %s rows', len(indexes))
+        r = [r[i] for i in indexes]
+    return cnt
+
+  try:
+    return _send(rows)
+  except urlfetch_errors.PayloadTooLargeError:
+    c = len(rows) // 2
+    failure_cnt = send_to_bq(table_name, rows[:c])
+    failure_cnt += send_to_bq(table_name, rows[c:])
+    return failure_cnt
