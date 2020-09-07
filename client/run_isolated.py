@@ -165,9 +165,6 @@ MAX_AGE_SECS = 21*24*60*60
 # TODO(1099655): Enable this once all prod issues are gone.
 _USE_GO_ISOLATED_TO_UPLOAD = False
 
-# Allocate 10GB to isolated cache at least.
-_MIN_ISOLATED_SPACE = 10 * 1024 * 1024 * 1024
-
 TaskData = collections.namedtuple(
     'TaskData',
     [
@@ -1499,8 +1496,7 @@ def main(args):
     local_caching.trim_caches(
         caches,
         root,
-        # 10GB is for isolated cache.
-        min_free_space=options.min_free_space + _MIN_ISOLATED_SPACE,
+        min_free_space=options.min_free_space,
         max_age_secs=MAX_AGE_SECS)
     logging.info("free space after trim: %d", file_path.get_free_space(root))
     for c in caches:
@@ -1519,8 +1515,7 @@ def main(args):
     local_caching.trim_caches(
         caches,
         root,
-        # 10GB is for isolated cache.
-        min_free_space=options.min_free_space + _MIN_ISOLATED_SPACE,
+        min_free_space=options.min_free_space,
         max_age_secs=MAX_AGE_SECS)
 
   if not options.isolated and not args:
