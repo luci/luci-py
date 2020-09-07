@@ -1932,7 +1932,7 @@ def task_bq(start, end):
   cursor = None
   more = True
   while more:
-    entities, cursor, more = q.fetch_page(500, start_cursor=cursor)
+    entities, cursor, more = q.fetch_page(300, start_cursor=cursor)
     total += len(entities)
     failed += bq_state.send_to_bq('task_requests',
                                   [_convert(e) for e in entities])
