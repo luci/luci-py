@@ -8,6 +8,8 @@ import json
 import logging
 import urlparse
 
+import six
+
 import webob
 import webapp2
 
@@ -301,6 +303,33 @@ class _ProcessResult(object):
     return (self.dimensions or {}).get('os') or []
 
 
+def _validate_dimensions(dimensions):
+  """Validates bot dimensions."""
+  error_msgs = []
+  for key, values in sorted(dimensions.items()):
+    if not config.validate_dimension_key(key):
+      error_msgs.append("Invalid dimension key: %s" % key)
+      # keep validating values.
+    if not isinstance(values, list):
+      error_msgs.append("Dimension values must be list. key: %s, values: %s" %
+                        (key, values))
+      # the following validations assume the values is a list.
+      continue
+    has_invalid_value_type = False
+    for value in sorted(values):
+      if config.validate_dimension_value(value):
+        continue
+      error_msgs.append("Invalid dimension value. key: %s, value: %s" %
+                        (key, value))
+      if not isinstance(value, six.text_type):
+        has_invalid_value_type = True
+    if not has_invalid_value_type and len(values) != len(set(values)):
+      error_msgs.append(
+          "Dimension values include duplication. key: %s, values: %s" %
+          (key, values))
+  return error_msgs
+
+
 class _BotBaseHandler(_BotApiHandler):
   """
   Request body is a JSON dict:
@@ -379,44 +408,26 @@ class _BotBaseHandler(_BotApiHandler):
       result.quarantined_msg = 'Bot self-quarantined'
       return result
 
-    quarantined_msg = None
-    # Use a dummy 'for' to be able to break early from the block.
-    for _ in [0]:
+    # Quarantine if the request is invalid.
+    validation_errors = []
 
-      quarantined_msg = has_unexpected_keys(self.EXPECTED_KEYS, request, 'keys')
-      if quarantined_msg:
-        break
+    err_msg = has_unexpected_keys(self.EXPECTED_KEYS, request, 'keys')
+    if err_msg:
+      validation_errors.append(err_msg)
 
-      quarantined_msg = has_missing_keys(self.REQUIRED_STATE_KEYS, state,
-                                         'state')
-      if quarantined_msg:
-        break
+    if state:
+      err_msg = has_missing_keys(self.REQUIRED_STATE_KEYS, state, 'state')
+      if err_msg:
+        validation_errors.append(err_msg)
 
-      if not bot_id:
-        quarantined_msg = 'Missing bot id'
-        break
-      if not dimensions.get('pool'):
-        quarantined_msg = 'Missing \'pool\' dimension'
-        break
+    dimension_errors = _validate_dimensions(dimensions)
+    if dimension_errors:
+      validation_errors += dimension_errors
+      # reset dimensions to avoid NDB model errors.
+      result.dimensions = {}
 
-      for key, values in sorted(dimensions.items()):
-        if not config.validate_dimension_key(key):
-          quarantined_msg = "Invalid dimension key: %r" % key
-          break
-        if not isinstance(values, list):
-          quarantined_msg = "Key %s has non-list value: %s" % (key, values)
-          break
-        if len(values) != len(set(values)):
-          quarantined_msg = "Key %s has duplicate values: %s" % (key, values)
-          break
-        for value in sorted(values):
-          if not config.validate_dimension_value(value):
-            quarantined_msg = "Key %s has invalid value: %r" % (key, value)
-            break
-        if quarantined_msg:
-          break
-
-    if quarantined_msg:
+    if validation_errors:
+      quarantined_msg = '\n'.join(validation_errors)
       line = 'Quarantined Bot\nhttps://%s/restricted/bot/%s\n%s' % (
           app_identity.get_default_version_hostname(), bot_id, quarantined_msg)
       ereporter2.log_request(self.request, source='bot', message=line)

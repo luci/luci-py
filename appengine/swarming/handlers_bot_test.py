@@ -188,7 +188,8 @@ class BotApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(u'v1a', response['server_version'])
     msg = (u'Quarantined Bot\n'
            'https://test-swarming.appspot.com/restricted/bot/id1\n'
-           'Key pool has duplicate values: [u\'default\', u\'default\']')
+           'Dimension values include duplication. key: pool, values: '
+           '[u\'default\', u\'default\']')
     self.assertEqual([msg], errors)
 
   def test_handshake_long_dimension(self):
@@ -229,7 +230,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(u'v1a', response['server_version'])
     msg = (u'Quarantined Bot\n'
            'https://test-swarming.appspot.com/restricted/bot/id1\n'
-           'Key a has invalid value: u\'%s\'' % ('b' * 1499))
+           'Invalid dimension value. key: a, value: %s' % ('b' * 1499))
     self.assertEqual([msg], errors)
 
   def test_handshake_extra(self):
@@ -252,6 +253,8 @@ class BotApiTest(test_env_handlers.AppTestBase):
         'state': {
             'bar': 2,
             'ip': '127.0.0.1',
+            'running_time': 1234.0,
+            'sleep_streak': 0,
         },
         'version': '123',
     }
@@ -326,6 +329,72 @@ class BotApiTest(test_env_handlers.AppTestBase):
         u'version': latest_version,
     }
     self.assertEqual(expected, response)
+
+  def test_poll_bad_dimensions(self):
+    errors = []
+
+    def add_error(request, source, message):
+      self.assertTrue(request)
+      self.assertEqual('bot', source)
+      errors.append(message)
+
+    self.mock(ereporter2, 'log_request', add_error)
+
+    params = self.do_handshake()
+    params['dimensions']['foo'] = [['bar']]  # list is invalid.
+    response = self.post_json('/swarming/api/v1/bot/poll', params)
+    self.assertTrue(response.pop(u'duration'))
+    expected = {
+        u'cmd': u'sleep',
+        u'quarantined': True,
+    }
+    self.assertEqual(expected, response)
+
+    # Quarantine message should be explicit.
+    msg = (u'Quarantined Bot\n'
+           'https://test-swarming.appspot.com/restricted/bot/bot1\n'
+           'Invalid dimension value. key: foo, value: [u\'bar\']')
+    self.assertEqual([msg], errors)
+
+    # Quarantine event should be registered, too.
+    expected_event = {
+        'authenticated_as': u'bot:whitelisted-ip',
+        # last valid dimensions should be used in BotEvent.
+        'dimensions': {
+            u'id': [u'bot1'],
+            u'pool': [u'default']
+        },
+        'event_type': u'request_sleep',
+        'external_ip': u'192.168.2.2',
+        'last_seen_ts': None,
+        'lease_expiration_ts': None,
+        'lease_id': None,
+        'leased_indefinitely': None,
+        'machine_lease': None,
+        'machine_type': None,
+        'maintenance_msg': None,
+        'message': u"Invalid dimension value. key: foo, value: [u'bar']",
+        'quarantined': True,
+        'state': {
+            u'bot_group_cfg_version': u'default',
+            u'running_time': 1234.0,
+            u'sleep_streak': 0,
+            u'started_ts': 1410990411.111,
+        },
+        'task_id': None,
+        'ts': self.now,
+        'version': self.bot_version,
+    }
+    events = [
+        e.to_dict() for e in bot_management.get_events_query('bot1', True)
+    ]
+    self.assertEqual(events[0], expected_event)
+
+    # BotInfo should be changed to quarantined state, too.
+    bot_info = bot_management.get_info_key('bot1').get()
+    self.assertTrue(bot_info.quarantined)
+    # last valid dimensions should be kept in BotInfo.
+    self.assertEqual(bot_info.dimensions_flat, [u'id:bot1', u'pool:default'])
 
   def test_poll_sleep(self):
     # A bot polls, gets nothing.

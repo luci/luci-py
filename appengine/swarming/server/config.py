@@ -8,6 +8,8 @@ import logging
 import posixpath
 import re
 
+import six
+
 from components import auth
 from components import config
 from components import cipd
@@ -88,11 +90,9 @@ def validate_dimension_key(key):
 
 def validate_dimension_value(value):
   """Returns True if the dimension value is valid."""
-  return (
-      bool(isinstance(value, unicode) and
-      value and
-      len(value) <= DIMENSION_VALUE_LENGTH and
-      value.strip() == value))
+  return (bool(
+      isinstance(value, six.text_type) and value and
+      len(value) <= DIMENSION_VALUE_LENGTH and value.strip() == value))
 
 
 ### Private code.
