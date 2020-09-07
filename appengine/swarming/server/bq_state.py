@@ -237,8 +237,14 @@ def send_to_bq(table_name, rows):
 
   try:
     return _send(rows)
-  except urlfetch_errors.PayloadTooLargeError:
-    c = len(rows) // 2
-    failure_cnt = send_to_bq(table_name, rows[:c])
-    failure_cnt += send_to_bq(table_name, rows[c:])
-    return failure_cnt
+  except net.Error as e:
+    # TODO(crbug.com/1123397): divide rows when the error is
+    # PayloadTooLargeError.
+    # c = len(rows) // 2
+    # failure_cnt = send_to_bq(table_name, rows[:c])
+    # failure_cnt += send_to_bq(table_name, rows[c:])
+    # return failure_cnt
+    logging.debug(
+        "send_to_bq: Got net.Error. status_code=%d, headers=%s, response=%s.",
+        e.status_code, e.headers, e.response)
+    raise e
