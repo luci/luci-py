@@ -188,6 +188,10 @@ TaskData = collections.namedtuple(
         # objects constantly by caching the objects retrieved. Can be on-disk or
         # in-memory.
         'isolate_cache',
+        # Digest of the input root on RBE-CAS.
+        'cas_digest',
+        # Full CAS instance name.
+        'cas_instance',
         # List of paths relative to root_dir to put into the output isolated
         # bundle upon task completion (see link_outputs_to_outdir).
         'outputs',
@@ -846,6 +850,7 @@ def map_and_run(data, constant_run_path):
       # 'client_package': {'package_name': ..., 'version': ...},
       #},
       'outputs_ref': None,
+      'cas_output_root': None,
       'version': 5,
   }
 
@@ -913,6 +918,20 @@ def map_and_run(data, constant_run_path):
           if bundle.relative_cwd:
             cwd = os.path.normpath(os.path.join(cwd, bundle.relative_cwd))
 
+      elif data.cas_digest:
+        # TODO(crbug.com/1117004): download inputs from CAS.
+        # stats = _fetch_and_map_with_cas_client(
+        #     instance=data.cas_instance,
+        #     digest=data.cas_digest,
+        #     out_dir=data.out_dir,
+        #     cas_client=cas_client,
+        #     ...(cache options)...
+        # )
+        #
+        # TODO(crbug.com/1117004): update downlaod stats.
+        # isolated_stats['download'].update(stats)
+        pass
+
       if not command:
         # Handle this as a task failure, not an internal failure.
         sys.stderr.write(
@@ -965,6 +984,9 @@ def map_and_run(data, constant_run_path):
         # CIPD package still exists.
         result['outputs_ref'], isolated_stats['upload'] = (
             upload_out_dir(data.storage, out_dir, go_isolated_client))
+        # TODO(crbug.com/1117004): upload to CAS if the inputs are on CAS.
+        # The `cas_output_root` will be updated instead of `outputs_ref`.
+        result['cas_output_root'] = None
     # We successfully ran the command, set internal_failure back to
     # None (even if the command failed, it's not an internal error).
     result['internal_failure'] = None
@@ -1040,11 +1062,12 @@ def run_tha_test(data, result_json):
   if result_json:
     # Write a json output file right away in case we get killed.
     result = {
-      'exit_code': None,
-      'had_hard_timeout': False,
-      'internal_failure': 'Was terminated before completion',
-      'outputs_ref': None,
-      'version': 5,
+        'exit_code': None,
+        'had_hard_timeout': False,
+        'internal_failure': 'Was terminated before completion',
+        'outputs_ref': None,
+        'cas_output_root': None,
+        'version': 5,
     }
     tools.write_json(result_json, result, dense=True)
 
@@ -1304,10 +1327,18 @@ def create_option_parser():
       'This flag should only be used in swarming bot.')
 
   group = optparse.OptionGroup(parser, 'Data source')
+  # Deprecated. Isoate server is being migrated to RBE-CAS.
+  # Remove --isolated and isolate server options after migration.
   group.add_option(
       '-s', '--isolated',
       help='Hash of the .isolated to grab from the isolate server.')
   isolateserver.add_isolate_server_options(group)
+  group.add_option(
+      '--cas-instance', help='Full CAS instance name for input/output files.')
+  group.add_option(
+      '--cas-digest',
+      help='Digest of the input root on RBE-CAS. The format is '
+      '`{hash}/{size_bytes}`.')
   parser.add_option_group(group)
 
   isolateserver.add_cache_options(parser)
@@ -1638,6 +1669,8 @@ def main(args):
       isolated_hash=options.isolated,
       storage=None,
       isolate_cache=isolate_cache,
+      cas_instance=options.cas_instance,
+      cas_digest=options.cas_digest,
       outputs=options.output,
       install_named_caches=install_named_caches,
       leak_temp_dir=options.leak_temp_dir,

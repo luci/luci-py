@@ -670,6 +670,7 @@ def _cleanup_bot_directory(botobj):
           'Failed to remove %s from bot\'s directory: %s' % (i, e))
 
 
+# TODO(crbug.com/1117004): specify CAS cache options.
 def _run_isolated_flags(botobj):
   """Returns flags to pass to run_isolated.
 

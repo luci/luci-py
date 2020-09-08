@@ -410,6 +410,7 @@ class TestTaskRunner(TestTaskRunnerBase):
                        '      \'isolatedserver\': \'http://localhost:1\',\n'
                        '       \'namespace\': \'default-gzip\',\n'
                        '    },\n'
+                       '    \'cas_output_root\': None,\n'
                        '  }, f)\n'
                        'sys.stdout.write(\'hi\\n\')')
     self.mock(task_runner, 'get_run_isolated',
