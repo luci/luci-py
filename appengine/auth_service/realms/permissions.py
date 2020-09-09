@@ -131,11 +131,11 @@ def db():
       permission('resultdb.invocations.create'),
       permission('resultdb.invocations.update'),
   ])
-  # TODO(crbug.com/1104030): Remove .read permissions after resultdb is updated
-  # to check .get permissions instead.
+
   role('role/resultdb.reader', [
       permission('resultdb.invocations.list'),
       permission('resultdb.invocations.get'),
+      permission('resultdb.invocations.include'),
       permission('resultdb.testResults.list'),
       permission('resultdb.testResults.get'),
       permission('resultdb.artifacts.list'),
