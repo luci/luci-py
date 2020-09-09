@@ -984,9 +984,9 @@ def _run_manifest(botobj, manifest, start):
     if fs.isdir(work_dir):
       try:
         file_path.rmtree(work_dir)
-      except Exception as e:
-        botobj.post_error(
-            'Failed to delete work directory %s: %s' % (work_dir, e))
+      except Exception:
+        botobj.post_error('Failed to delete work directory %s: %s' %
+                          (work_dir, traceback.format_exc()[-2048:]))
         # Failure to delete could be due to a proc with open file handles. Just
         # reboot the machine in that case.
         must_reboot_reason = 'Failure to remove %s' % work_dir
