@@ -133,8 +133,8 @@ class BotApiTest(test_env_handlers.AppTestBase):
       errors.append(message)
 
     self.mock(ereporter2, 'log_request', add_error)
-    response = self.app.post_json(
-        '/swarming/api/v1/bot/handshake', params={}).json
+    params = {'dimensions': {'id': ['id1']}}
+    response = self.app.post_json('/swarming/api/v1/bot/handshake', params).json
     self.assertEqual([
         u'bot_group_cfg',
         u'bot_group_cfg_version',
@@ -145,8 +145,8 @@ class BotApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(u'v1a', response['server_version'])
     expected = [
         'Quarantined Bot\n'
-        'https://test-swarming.appspot.com/restricted/bot/None\n'
-        'Unexpected keys missing: [u\'dimensions\', u\'state\', u\'version\']; '
+        'https://test-swarming.appspot.com/restricted/bot/id1\n'
+        'Unexpected keys missing: [u\'state\', u\'version\']; '
         'did you make a typo?',
     ]
     self.assertEqual(expected, errors)
@@ -302,7 +302,6 @@ class BotApiTest(test_env_handlers.AppTestBase):
 
     self.mock(ereporter2, 'log_request', add_error)
     params = self.do_handshake()
-    params.pop('dimensions')
     params.pop('state')
     response = self.post_json('/swarming/api/v1/bot/poll', params)
     expected = {
@@ -313,11 +312,20 @@ class BotApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(expected, response)
     expected = [
         'Quarantined Bot\n'
-        'https://test-swarming.appspot.com/restricted/bot/None\n'
-        'Unexpected keys missing: [u\'dimensions\', u\'state\']; '
+        'https://test-swarming.appspot.com/restricted/bot/bot1\n'
+        'Unexpected keys missing: [u\'state\']; '
         'did you make a typo?',
     ]
     self.assertEqual(expected, errors)
+
+  def test_poll_no_bot_id(self):
+    params = self.do_handshake()
+    params['dimensions'].pop('id')
+    response = self.post_json('/swarming/api/v1/bot/poll', params, status=403)
+    expected = {
+        u'text': u'Bot ID is not specified',
+    }
+    self.assertEqual(expected, response)
 
   def test_poll_bad_version(self):
     params = self.do_handshake()

@@ -30,7 +30,6 @@ def is_authenticated_bot(bot_id):
     return False
 
 
-# pylint: disable=unused-argument
 def validate_bot_id_and_fetch_config(bot_id):
   """Verifies ID reported by a bot matches the credentials being used.
 
@@ -44,6 +43,9 @@ def validate_bot_id_and_fetch_config(bot_id):
   On success returns the configuration for this bot (BotGroupConfig tuple), as
   defined in bots.cfg.
   """
+  if not bot_id:
+    raise auth.AuthorizationError('Bot ID is not specified')
+
   auth_bot_id, cfg = _get_bot_group_config(bot_id)
 
   # This should not really happen for validated configs.
