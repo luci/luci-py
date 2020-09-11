@@ -849,6 +849,11 @@ message TaskRequest {
   //
   // This points to the TaskResult.run_id (ending with '1', '2' or more).
   string parent_run_id = 11;
+  // Root task id, independent of the depth of recursive tasks.
+  string root_task_id = 16;
+  // Root task run id, independent of the depth of recursive tasks.
+  string root_run_id = 17;
+
   // Send notification to this pubsub topic for updates of this task.
   PubSub pubsub_notification = 10;
   // Maximum delay between bot pings before the bot is considered dead
