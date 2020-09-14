@@ -134,6 +134,7 @@ NewTaskRequest = collections.namedtuple('NewTaskRequest', [
     'parent_task_id',
     'priority',
     'realm',
+    'resultdb',
     'task_slices',
     'service_account',
     'tags',
@@ -1105,6 +1106,11 @@ def add_trigger_options(parser):
       dest='realm',
       metavar='REALM',
       help='Realm associated with the task.')
+  group.add_option(
+      '--resultdb',
+      action='store_true',
+      default=False,
+      help='When set, the task is created with ResultDB enabled.')
   parser.add_option_group(group)
 
 
@@ -1287,7 +1293,8 @@ def process_trigger_options(parser, options, args):
       tags=options.tags,
       user=options.user,
       pool_task_template=options.pool_task_template,
-      realm=options.realm)
+      realm=options.realm,
+      resultdb={'enable': options.resultdb})
 
 
 class TaskOutputStdoutOption(optparse.Option):

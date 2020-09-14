@@ -142,6 +142,9 @@ def gen_request_data(properties=None, **kwargs):
       'tags': ['tag:a', 'tag:b'],
       'user': 'joe@localhost',
       'realm': None,
+      'resultdb': {
+          'enable': False
+      },
   }
   out.update(kwargs)
   return out
@@ -381,7 +384,8 @@ class TestSwarmingTrigger(NetTestCase):
         service_account=None,
         tags=['tag:a', 'tag:b'],
         user='joe@localhost',
-        realm=None)
+        realm=None,
+        resultdb={'enable': False})
 
     request_1 = swarming.task_request_to_raw_request(task_request)
     request_1['name'] = u'unit_tests:0:2'
@@ -484,7 +488,8 @@ class TestSwarmingTrigger(NetTestCase):
         service_account=None,
         tags=['tag:a', 'tag:b'],
         user='joe@localhost',
-        realm=None)
+        realm=None,
+        resultdb={'enable': False})
 
     request_1 = swarming.task_request_to_raw_request(task_request)
     request_1['name'] = u'unit_tests:2:4'
@@ -560,7 +565,8 @@ class TestSwarmingTrigger(NetTestCase):
         service_account=None,
         tags=['tag:a', 'tag:b'],
         user='joe@localhost',
-        realm=None)
+        realm=None,
+        resultdb={'enable': False})
 
     request = swarming.task_request_to_raw_request(task_request)
     self.assertEqual('123', request['parent_task_id'])
@@ -639,7 +645,8 @@ class TestSwarmingTrigger(NetTestCase):
         service_account=None,
         tags=['tag:a', 'tag:b'],
         user='joe@localhost',
-        realm=None)
+        realm=None,
+        resultdb={'enable': False})
 
     request = swarming.task_request_to_raw_request(task_request)
     expected = {
@@ -681,6 +688,63 @@ class TestSwarmingTrigger(NetTestCase):
     }
     self.assertEqual(expected, tasks)
     self._check_output('', 'Priority was reset to 200\n')
+
+  def test_trigger_resultdb_and_realm(self):
+    task_request = swarming.NewTaskRequest(
+        name=TEST_NAME,
+        parent_task_id='123',
+        pool_task_template='AUTO',
+        priority=101,
+        task_slices=[
+            swarming.TaskSlice(
+                expiration_secs=60 * 60,
+                properties=swarming.TaskProperties(
+                    caches=[],
+                    cipd_input=None,
+                    command=['a', 'b'],
+                    containment=swarming.Containment(
+                        lower_priority=False,
+                        containment_type='NONE',
+                    ),
+                    relative_cwd=None,
+                    dimensions=[('os', 'Mac'), ('pool', 'default')],
+                    env={},
+                    env_prefixes=[],
+                    execution_timeout_secs=60,
+                    extra_args=[],
+                    grace_period_secs=30,
+                    idempotent=False,
+                    inputs_ref={
+                        'isolated': None,
+                        'isolatedserver': '',
+                        'namespace': 'default-gzip',
+                    },
+                    io_timeout_secs=60,
+                    outputs=[],
+                    secret_bytes=None),
+                wait_for_capacity=False),
+        ],
+        service_account=None,
+        tags=['tag:a', 'tag:b'],
+        user='joe@localhost',
+        realm="chromium:try",
+        resultdb={'enable': True})
+
+    request = swarming.task_request_to_raw_request(task_request)
+    self.assertTrue(request['resultdb']['enable'])
+    self.assertEqual('chromium:try', request['realm'])
+
+    self.expected_requests([
+        (
+            'https://localhost:1/_ah/api/swarming/v1/tasks/new',
+            {
+                'data': request
+            },
+            gen_request_response(request),
+        ),
+    ])
+    swarming.trigger_task_shards(
+        swarming='https://localhost:1', shards=1, task_request=task_request)
 
 
 class TestSwarmingCollection(NetTestCase):
@@ -1090,6 +1154,9 @@ class TestMain(NetTestCase):
         'tags': [],
         'user': None,
         'realm': None,
+        'resultdb': {
+            'enable': False
+        },
     }
     result = gen_request_response(request)
     self.expected_requests([
@@ -1247,6 +1314,9 @@ class TestMain(NetTestCase):
         'tags': [],
         'user': None,
         'realm': None,
+        'resultdb': {
+            'enable': False
+        },
     }
     result = gen_request_response(request)
     self.expected_requests([
@@ -1405,6 +1475,9 @@ class TestMain(NetTestCase):
         'tags': [],
         'user': None,
         'realm': None,
+        'resultdb': {
+            'enable': False
+        },
     }
     result = gen_request_response(request)
     self.expected_requests([
@@ -1528,6 +1601,9 @@ class TestMain(NetTestCase):
         'tags': [],
         'user': None,
         'realm': None,
+        'resultdb': {
+            'enable': False
+        },
     }
     result = gen_request_response(request)
     self.expected_requests([
@@ -1611,6 +1687,9 @@ class TestMain(NetTestCase):
         'tags': [],
         'user': None,
         'realm': None,
+        'resultdb': {
+            'enable': False
+        },
     }
     result = gen_request_response(request)
     self.expected_requests([
@@ -1679,6 +1758,9 @@ class TestMain(NetTestCase):
         'tags': [],
         'user': None,
         'realm': None,
+        'resultdb': {
+            'enable': False
+        },
     }
     result = gen_request_response(request)
     self.expected_requests([
@@ -1915,6 +1997,9 @@ class TestMain(NetTestCase):
                     'tags': ['tag:a', 'tag:b'],
                     'user': 'joe@localhost',
                     'realm': None,
+                    'resultdb': {
+                        'enable': False
+                    },
                 },
             },
             True,
@@ -2309,6 +2394,9 @@ class TestMain(NetTestCase):
         'tags': [],
         'user': None,
         'realm': None,
+        'resultdb': {
+            'enable': False
+        },
     }
     result = gen_request_response(request)
 
