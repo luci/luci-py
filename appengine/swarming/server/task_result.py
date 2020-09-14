@@ -1633,7 +1633,7 @@ def task_bq_run(start, end):
   cursor = None
   more = True
   while more:
-    entities, cursor, more = q.fetch_page(300, start_cursor=cursor)
+    entities, cursor, more = q.fetch_page(400, start_cursor=cursor)
     rows = [_convert(e) for e in entities]
     seen.update(e.task_id for e in entities)
     total += len(rows)
@@ -1670,7 +1670,7 @@ def task_bq_summary(start, end):
   cursor = None
   more = True
   while more:
-    entities, cursor, more = q.fetch_page(300, start_cursor=cursor)
+    entities, cursor, more = q.fetch_page(400, start_cursor=cursor)
     rows = [_convert(e) for e in entities]
     seen.update(e.task_id for e in entities)
     total += len(rows)
