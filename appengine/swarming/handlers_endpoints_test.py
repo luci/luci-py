@@ -1517,6 +1517,82 @@ class TasksApiTest(BaseTest):
             },
         }, response.json)
 
+  @ndb.tasklet
+  def _updateToken(self, *_args, **_kwargs):
+    return 'update-token'
+
+  def test_new_ok_with_resultdb_and_realm(self):
+    self.mock(random, 'getrandbits', lambda _: 0x88)
+    self.mock_auth_db([
+        auth.Permission('swarming.pools.createTask'),
+        auth.Permission('swarming.tasks.createInRealm'),
+    ])
+
+    with mock.patch(
+        'server.resultdb.create_invocation_async',
+        side_effect=self._updateToken):
+      _, task_id = self.client_create_task(
+          expiration_secs=None,
+          task_slices=[
+              {
+                  'expiration_secs':
+                      180,
+                  'properties':
+                      self.create_props(command=['python', 'run_test.py']),
+                  'wait_for_capacity':
+                      True,
+              },
+          ],
+          resultdb={'enable': True},
+          realm='test:task_realm')
+
+    # Get the produced TaskRequest, and verify the realm and resultdb config.
+    rKey, sKey = task_pack.get_request_and_result_keys(task_id)
+    request, summary = rKey.get(), sKey.get()
+    self.assertEqual('test:task_realm', request.realm)
+    self.assertEqual('invocations/task-test-swarming.appspot.com-5cee488008811',
+                     summary.resultdb_info.invocation)
+
+  def test_new_ok_with_resultdb_and_default_task_realm(self):
+    self.mock(random, 'getrandbits', lambda _: 0x88)
+    self.mock_auth_db([
+        auth.Permission('swarming.pools.createTask'),
+        auth.Permission('swarming.tasks.createInRealm'),
+    ])
+    self.mock_default_pool_acl(
+        service_accounts=['service-account@example.com'],
+        default_task_realm='test:task_realm',
+        enforced_realm_permissions={
+            realms_pb2.REALM_PERMISSION_POOLS_CREATE_TASK,
+            realms_pb2.REALM_PERMISSION_TASKS_CREATE_IN_REALM,
+            realms_pb2.REALM_PERMISSION_TASKS_ACT_AS,
+        })
+
+    with mock.patch(
+        'server.resultdb.create_invocation_async',
+        side_effect=self._updateToken):
+      _, task_id = self.client_create_task(
+          expiration_secs=None,
+          task_slices=[
+              {
+                  'expiration_secs':
+                      180,
+                  'properties':
+                      self.create_props(command=['python', 'run_test.py']),
+                  'wait_for_capacity':
+                      True,
+              },
+          ],
+          # Set resultdb without realm.
+          resultdb={'enable': True})
+
+    # Get the produced TaskRequest, and verify the realm and resultdb config.
+    rKey, sKey = task_pack.get_request_and_result_keys(task_id)
+    request, summary = rKey.get(), sKey.get()
+    self.assertEqual('test:task_realm', request.realm)
+    self.assertEqual('invocations/task-test-swarming.appspot.com-5cee488008811',
+                     summary.resultdb_info.invocation)
+
   def _prepare_mass_cancel(self):
     # Create 3 tasks: one pending, one running, one complete.
     self.mock(random, 'getrandbits', lambda _: 0x88)

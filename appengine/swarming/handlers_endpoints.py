@@ -638,7 +638,7 @@ class SwarmingTasksService(remote.Service):
 
     try:
       enable_resultdb = request.resultdb and request.resultdb.enable
-      if enable_resultdb and not request.realm:
+      if enable_resultdb and not request_obj.realms_enabled:
         raise endpoints.BadRequestException(
             'ResultDB is enabled, but realm is not set')
 
