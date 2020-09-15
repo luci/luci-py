@@ -20,6 +20,7 @@ import webtest
 import handlers_backend
 
 from google.appengine.api import taskqueue
+from google.appengine.ext import ndb
 
 from test_support import test_case
 
@@ -202,8 +203,8 @@ class ExternalSchedulerApiTest(test_env_handlers.AppTestBase):
   def test_notify_requests(self):
     request = _gen_request()
     result_summary = task_scheduler.schedule_request(request, None, False)
-    external_scheduler.notify_requests(
-        self.es_cfg, [(request, result_summary)], False, False)
+    ndb.transaction(lambda: external_scheduler.notify_requests(
+        self.es_cfg, [(request, result_summary)], False, False))
 
     self.assertEqual(len(self._client.called_with_requests), 1)
     called_with = self._client.called_with_requests[0]
@@ -220,8 +221,8 @@ class ExternalSchedulerApiTest(test_env_handlers.AppTestBase):
   def test_notify_request_with_tq(self):
     request = _gen_request()
     result_summary = task_scheduler.schedule_request(request, None, False)
-    external_scheduler.notify_requests(
-      self.es_cfg, [(request, result_summary)], True, False)
+    ndb.transaction(lambda: external_scheduler.notify_requests(
+        self.es_cfg, [(request, result_summary)], True, False))
 
     # There should have been no call to _get_client yet.
     self.assertEqual(self._client, None)
@@ -305,12 +306,15 @@ class ExternalSchedulerApiTestBatchMode(test_env_handlers.AppTestBase):
     self.assertEqual(1, self.execute_tasks())
 
     # Create requests with different scheduler IDs.
-    external_scheduler.notify_requests(
+    ndb.transaction(lambda: external_scheduler.notify_requests(
         self.cfg_foo, [(request, result_summary)], True, False, batch_mode=True)
-    external_scheduler.notify_requests(
+                   )
+    ndb.transaction(lambda: external_scheduler.notify_requests(
         self.cfg_foo, [(request, result_summary)], True, False, batch_mode=True)
-    external_scheduler.notify_requests(
+                   )
+    ndb.transaction(lambda: external_scheduler.notify_requests(
         self.cfg_hoe, [(request, result_summary)], True, False, batch_mode=True)
+                   )
 
     self._setup_client()
 
@@ -346,17 +350,16 @@ class ExternalSchedulerApiTestBatchMode(test_env_handlers.AppTestBase):
 
     self._setup_client()
     # Since use_tq is false, the requests below should be sent out immediately.
-    external_scheduler.notify_requests(
-        self.cfg_foo,
-        [(request, result_summary)],
+    ndb.transaction(lambda: external_scheduler.notify_requests(
+        self.cfg_foo, [(request, result_summary)],
         False,
         False,
-        batch_mode=True)
-    external_scheduler.notify_requests(
+        batch_mode=True))
+    ndb.transaction(lambda: external_scheduler.notify_requests(
         self.cfg_hoe, [(request, result_summary)],
         False,
         False,
-        batch_mode=True)
+        batch_mode=True))
 
     called_with = self._client.called_with_requests
     self.assertEqual(len(called_with), 2)

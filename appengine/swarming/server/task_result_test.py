@@ -738,7 +738,7 @@ class TaskResultApiTest(TestCase):
     # https://crbug.com/916557: RESOURCE_EXHAUSTED
 
   # TODO(crbug.com/1115778): remove after RBE-CAS migration.
-  def test_to_proto(self):
+  def test_to_proto_isolated(self):
     cipd_client_pkg = task_request.CipdPackage(
         package_name=u'infra/tools/cipd/${platform}',
         version=u'git_revision:deadbeef')
@@ -902,8 +902,7 @@ class TaskResultApiTest(TestCase):
     run_result.to_proto(actual)
     self.assertEqual(unicode(expected), unicode(actual))
 
-  # TODO(crbug.com/1115778): rename to test_to_proto.
-  def test_to_proto_with_cas(self):
+  def test_to_proto(self):
     cipd_client_pkg = task_request.CipdPackage(
         package_name=u'infra/tools/cipd/${platform}',
         version=u'git_revision:deadbeef')
@@ -1069,6 +1068,9 @@ class TaskResultApiTest(TestCase):
     actual = swarming_pb2.TaskResult()
     run_result.to_proto(actual)
     self.assertEqual(unicode(expected), unicode(actual))
+    actual = swarming_pb2.TaskResult()
+    ndb.transaction(lambda: run_result.to_proto(actual, transactional=True))
+    self.assertEqual(unicode(expected), unicode(actual))
 
   def test_TaskResultSummary_to_proto_empty(self):
     # Assert that it doesn't throw on empty entity.
@@ -1105,6 +1107,14 @@ class TaskResultApiTest(TestCase):
         task_id='7ffffffffffffb310',
         run_id='7ffffffffffffb311')
     self.assertEqual(expected, actual)
+
+  def test_TaskRunResult_to_proto_transactional(self):
+    actual = swarming_pb2.TaskResult()
+    run_result = _gen_run_result()
+    with self.assertRaises(AssertionError):
+      ndb.transaction(lambda: run_result.to_proto(actual))
+    with self.assertRaises(AssertionError):
+      run_result.to_proto(actual, transactional=True)
 
   def test_performance_stats_pre_put_hook(self):
     with self.assertRaises(datastore_errors.BadValueError):

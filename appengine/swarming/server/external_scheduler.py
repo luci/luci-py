@@ -213,7 +213,7 @@ def notify_requests(es_cfg, requests, use_tq, is_callback, batch_mode=False):
       s_pb.dimensions.extend(flat_dimensions)
 
     res = swarming_pb2.TaskResult()
-    result_summary.to_proto(res)
+    result_summary.to_proto(res, transactional=True)
     item.task.state = res.state
     if result_summary.bot_id:
       # TODO(akeshet): We should only actually set this is state is running.

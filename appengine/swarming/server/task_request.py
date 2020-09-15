@@ -1303,8 +1303,15 @@ class TaskRequest(ndb.Model):
       out['task_slices'] = [t.to_dict() for t in self.task_slices]
     return out
 
-  def to_proto(self, out):
-    """Converts self to a swarming_pb2.TaskRequest."""
+  def to_proto(self, out, transactional=False):
+    """Converts self to a swarming_pb2.TaskRequest.
+
+    When transactional is True, do not fill up root_task_id/root_run_id since
+    this implicitly does a cross-transactional transaction.
+    """
+    assert ndb.in_transaction() == transactional, (
+        'Call to_proto() with the right flag; transactional should be %s' %
+        ndb.in_transaction())
     # Scheduling.
     for task_slice in self.task_slices:
       t = out.task_slices.add()
@@ -1337,18 +1344,19 @@ class TaskRequest(ndb.Model):
       parent_id = self.parent_task_id
       out.parent_run_id = parent_id
       out.parent_task_id = parent_id[:-1] + '0'
-      while True:
-        run_result_key = task_pack.unpack_run_result_key(parent_id)
-        result_summary_key = task_pack.run_result_key_to_result_summary_key(
-            run_result_key)
-        request_key = task_pack.result_summary_key_to_request_key(
-            result_summary_key)
-        parent = request_key.get()
-        if not parent.parent_task_id:
-          break
-        parent_id = parent.parent_task_id
-      out.root_run_id = parent_id
-      out.root_task_id = parent_id[:-1] + '0'
+      if not transactional:
+        while True:
+          run_result_key = task_pack.unpack_run_result_key(parent_id)
+          result_summary_key = task_pack.run_result_key_to_result_summary_key(
+              run_result_key)
+          request_key = task_pack.result_summary_key_to_request_key(
+              result_summary_key)
+          parent = request_key.get()
+          if not parent.parent_task_id:
+            break
+          parent_id = parent.parent_task_id
+        out.root_run_id = parent_id
+        out.root_task_id = parent_id[:-1] + '0'
     if self.pubsub_topic:
       out.pubsub_notification.topic = self.pubsub_topic
     # self.pubsub_auth_token cannot be retrieved.
