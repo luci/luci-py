@@ -1342,11 +1342,6 @@ class TaskRequestApiTest(TestCase):
     actual = swarming_pb2.TaskRequest()
     request.to_proto(actual)
     self.assertEqual(unicode(expected), unicode(actual))
-    actual = swarming_pb2.TaskRequest()
-    expected.root_task_id = ''
-    expected.root_run_id = ''
-    ndb.transaction(lambda: request.to_proto(actual, transactional=True))
-    self.assertEqual(unicode(expected), unicode(actual))
 
   def test_TaskRequest_to_proto_empty(self):
     # Assert that it doesn't throw on empty entity.
@@ -1368,16 +1363,6 @@ class TaskRequestApiTest(TestCase):
     expected = swarming_pb2.TaskProperties()
     expected.grace_period.seconds = 30
     self.assertEqual(expected, actual)
-
-  def test_TaskRequest_to_proto_transactional(self):
-    actual = swarming_pb2.TaskRequest()
-    request = _gen_request()
-    request.key = task_request.new_request_key()
-    request.put()
-    with self.assertRaises(AssertionError):
-      ndb.transaction(lambda: request.to_proto(actual))
-    with self.assertRaises(AssertionError):
-      request.to_proto(actual, transactional=True)
 
   def test_request_bad_values(self):
     with self.assertRaises(AttributeError):

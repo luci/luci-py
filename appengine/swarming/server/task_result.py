@@ -685,9 +685,9 @@ class _TaskResultCommon(ndb.Model):
     out['id'] = self.task_id
     return out
 
-  def to_proto(self, out, transactional=False):
+  def to_proto(self, out):
     """Converts self to a swarming_pb2.TaskResult"""
-    self.request.to_proto(out.request, transactional=transactional)
+    self.request.to_proto(out.request)
     if self.created_ts:
       # Can only be unset in test case.
       out.create_time.FromDatetime(self.created_ts)
