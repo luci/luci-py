@@ -392,7 +392,9 @@ def check_task_get_acl(task_request):
   if task_request.bot_id:
     pools = bot_management.get_pools_from_dimensions_flat(
         _retrieve_bot_dimensions(task_request.bot_id))
-    pool_realms = [pools_config.get_pool_config(p).realm for p in pools]
+    pool_realms = [
+        p.realm for p in map(pools_config.get_pool_config, pools) if p.realm
+    ]
     if pool_realms and auth.has_permission(
         get_permission(realms_pb2.REALM_PERMISSION_POOLS_LIST_TASKS),
         pool_realms):
@@ -446,7 +448,9 @@ def check_task_cancel_acl(task_request):
   if task_request.bot_id:
     pools = bot_management.get_pools_from_dimensions_flat(
         _retrieve_bot_dimensions(task_request.bot_id))
-    pool_realms = [pools_config.get_pool_config(p).realm for p in pools]
+    pool_realms = [
+        p.realm for p in map(pools_config.get_pool_config, pools) if p.realm
+    ]
     if pool_realms and auth.has_permission(
         get_permission(realms_pb2.REALM_PERMISSION_POOLS_CANCEL_TASK),
         pool_realms):
