@@ -9,6 +9,7 @@ import json
 import logging
 import os
 import platform
+import shutil
 import subprocess
 import sys
 import textwrap
@@ -20,6 +21,7 @@ import six
 # Mutates sys.path.
 import test_env
 
+import cipd
 import isolateserver_fake
 
 import run_isolated
@@ -263,6 +265,12 @@ class RunIsolatedTest(unittest.TestCase):
     self._isolated_cache_dir = os.path.join(self.tempdir, 'i')
     self._isolated_server = isolateserver_fake.FakeIsolateServer()
     self._named_cache_dir = os.path.join(self.tempdir, 'n')
+    self._cipd_cache_dir = os.path.join(self.tempdir, u'cipd')
+    self._cipd_packages_cache_dir = os.path.join(self._cipd_cache_dir, 'cache')
+    self._cas_client_dir = os.path.join(self.tempdir, u'cc')
+    # Use the dev instance for testing for now.
+    self._cas_instance = 'chromium-swarm-dev'
+    self._cas_cache_dir = os.path.join(self.tempdir, 'c')
 
   def tearDown(self):
     try:
@@ -271,9 +279,7 @@ class RunIsolatedTest(unittest.TestCase):
     finally:
       super(RunIsolatedTest, self).tearDown()
 
-  def _run(self, args):
-    cmd = [sys.executable, os.path.join(test_env.CLIENT_DIR, 'run_isolated.py')]
-    cmd.extend(args)
+  def _run_cmd(self, cmd):
     pipe = subprocess.PIPE
     logging.debug(' '.join(cmd))
     proc = subprocess.Popen(
@@ -284,6 +290,16 @@ class RunIsolatedTest(unittest.TestCase):
         cwd=self.tempdir)
     out, err = proc.communicate()
     return out, err, proc.returncode
+
+  def _run(self, args):
+    cmd = [sys.executable, os.path.join(test_env.CLIENT_DIR, 'run_isolated.py')]
+    cmd.extend(args)
+    return self._run_cmd(cmd)
+
+  def _run_cas(self, args):
+    cmd = [os.path.join(self._cas_client_dir, 'cas')]
+    cmd.extend(args)
+    return self._run_cmd(cmd)
 
   def _store_isolated(self, data):
     """Stores an isolated file and returns its hash."""
@@ -578,6 +594,66 @@ class RunIsolatedTest(unittest.TestCase):
     self.assertEqual(
         [u'hello'],
         list_files_tree(os.path.join(self._named_cache_dir, rel_path)))
+
+  def test_cas(self):
+    # Prepare inputs on the remote CAS instance.
+    with cipd.get_client(self._cipd_cache_dir) as cipd_client:
+      packages = [('', run_isolated._CAS_PACKAGE, run_isolated._CAS_REVISION)]
+      run_isolated._install_packages(self._cas_client_dir,
+                                     self._cipd_packages_cache_dir, cipd_client,
+                                     packages)
+      inputs_dir = os.path.join(self.tempdir, 'cas_inputs')
+      inputs_root = os.path.join(inputs_dir, 'src')
+      os.makedirs(inputs_root)
+      digest_file = os.path.join(inputs_dir, 'input_root.digest')
+      # prepare files under src/ for `repeated_files.py` task.
+      for filename in ['repeated_files.py', 'file1.txt']:
+        with open(os.path.join(inputs_root, filename), "wb") as f:
+          f.write(CONTENTS[filename])
+      # copy file1.txt.
+      shutil.copyfile(
+          os.path.join(inputs_root, 'file1.txt'),
+          os.path.join(inputs_root, 'file1_copy.txt'))
+
+      cmd = [
+          'archive',
+          '-cas-instance',
+          self._cas_instance,
+          '-paths',
+          '%s:' % inputs_root,
+          '-dump-digest',
+          digest_file,
+      ]
+      out, err, returncode = self._run_cas(cmd)
+      self.assertEqual('', err)
+      self.assertEqual(0, returncode)
+
+      with open(digest_file) as f:
+        cas_digest = f.read()
+
+    # Runs run_isolated with cas options.
+    cmd = [
+        '--cas-instance',
+        self._cas_instance,
+        '--cas-digest',
+        cas_digest,
+        '--cache',
+        self._cas_cache_dir,
+        '--raw-cmd',
+        '--',
+        'python',
+        'repeated_files.py',
+    ]
+
+    out, err, returncode = self._run(cmd)
+    self.assertEqual('', err)
+    self.assertEqual('Success\n', out, out)
+    self.assertEqual(0, returncode)
+    self.assertEqual([
+        'ebea1137c5ece3f8a58f0e1a0da1411fe0a2648501419d190b3b154f3f191259',
+        'f0a8a1a7050bfae60a591d0cb7d74de2ef52963b9913253fc9ec7151aa5d421e',
+        'state.json',
+    ], list_files_tree(self._cas_cache_dir))
 
 
 if __name__ == '__main__':

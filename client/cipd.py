@@ -32,6 +32,11 @@ import local_caching
 # .exe on Windows.
 EXECUTABLE_SUFFIX = '.exe' if sys.platform == 'win32' else ''
 
+_DEFAULT_CIPD_SERVER = 'https://chrome-infra-packages.appspot.com'
+
+_DEFAULT_CIPD_CLIENT_PACKAGE = 'infra/tools/cipd/${platform}'
+
+_DEFAULT_CIPD_CLIENT_VERSION = 'latest'
 
 if sys.platform == 'win32':
 
@@ -61,20 +66,20 @@ def add_cipd_options(parser):
       '--cipd-server',
       help='URL of the CIPD server. '
       'Only relevant with --cipd-enabled or --cipd-package.',
-      default='https://chrome-infra-packages.appspot.com')
+      default=_DEFAULT_CIPD_SERVER)
   group.add_option(
       '--cipd-client-package',
       help='Package name of CIPD client with optional parameters described in '
       '--cipd-package help. '
       'Only relevant with --cipd-enabled or --cipd-package. '
       'Default: "%default"',
-      default='infra/tools/cipd/${platform}')
+      default=_DEFAULT_CIPD_CLIENT_PACKAGE)
   group.add_option(
       '--cipd-client-version',
       help='Version of CIPD client. '
       'Only relevant with --cipd-enabled or --cipd-package. '
       'Default: "%default"',
-      default='latest')
+      default=_DEFAULT_CIPD_CLIENT_VERSION)
   group.add_option(
       '--cipd-package',
       dest='cipd_packages',
@@ -360,7 +365,11 @@ def _fetch_cipd_client(disk_cache, instance_id, fetch_url, timeoutfn):
 
 
 @contextlib.contextmanager
-def get_client(service_url, package_template, version, cache_dir, timeout=None):
+def get_client(cache_dir,
+               service_url=_DEFAULT_CIPD_SERVER,
+               package_template=_DEFAULT_CIPD_CLIENT_PACKAGE,
+               version=_DEFAULT_CIPD_CLIENT_VERSION,
+               timeout=None):
   """Returns a context manager that yields a CipdClient. A blocking call.
 
   Upon exit from the context manager, the client binary may be deleted

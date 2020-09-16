@@ -1884,8 +1884,8 @@ def CMDreproduce(parser, args):
   if properties.get('cipd_input'):
     ci = properties['cipd_input']
     cp = ci['client_package']
-    client_manager = cipd.get_client(ci['server'], cp['package_name'],
-                                     cp['version'], cachedir)
+    client_manager = cipd.get_client(cachedir, ci['server'], cp['package_name'],
+                                     cp['version'])
 
     with client_manager as client:
       by_path = collections.defaultdict(list)
