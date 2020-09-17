@@ -3,6 +3,7 @@
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
 
+import base64
 import ctypes
 import hashlib
 import json
@@ -26,6 +27,7 @@ import isolateserver_fake
 
 import run_isolated
 from utils import file_path
+from utils import large
 
 
 OUTPUT_CONTENT = 'foooo'
@@ -633,6 +635,9 @@ class RunIsolatedTest(unittest.TestCase):
       with open(digest_file) as f:
         cas_digest = f.read()
 
+    # Path to the result json file.
+    result_json = os.path.join(self.tempdir, 'run_isolated_result.json')
+
     def assertRunIsolatedWithCAS(optional_args, expected_retcode=0):
       args = optional_args + [
           '--cas-instance',
@@ -643,19 +648,41 @@ class RunIsolatedTest(unittest.TestCase):
           self._cas_cache_dir,
           '--cipd-cache',
           self._cipd_cache_dir,
+          '--json',
+          result_json,
           '--raw-cmd',
           '--',
           'python',
           'repeated_files.py',
       ]
       out, err, ret = self._run(args)
+
       self.assertEqual(expected_retcode, ret)
       if expected_retcode == 0:
         self.assertEqual('', err)
         self.assertEqual('Success\n', out)
 
+    def load_isolated_stats(key):
+      with open(result_json) as f:
+        actual = json.load(f)
+      stats = actual['stats']['isolated'].get(key)
+      stats.pop('duration')
+      for key in ['items_cold', 'items_hot']:
+        if not stats[key]:
+          continue
+        stats[key] = large.unpack(base64.b64decode(stats[key]))
+      return stats
+
     # Runs run_isolated with cas options.
     assertRunIsolatedWithCAS([])
+    self.assertEqual(
+        {
+            'items_cold': [
+                len(CONTENTS['file1.txt']),
+                len(CONTENTS['repeated_files.py']),
+            ],
+            'items_hot': None
+        }, load_isolated_stats('download'))
     self.assertEqual([
         'ebea1137c5ece3f8a58f0e1a0da1411fe0a2648501419d190b3b154f3f191259',
         'f0a8a1a7050bfae60a591d0cb7d74de2ef52963b9913253fc9ec7151aa5d421e',
@@ -677,6 +704,14 @@ class RunIsolatedTest(unittest.TestCase):
         '1',
     ]
     assertRunIsolatedWithCAS(optional_args)
+    self.assertEqual(
+        {
+            'items_cold': [
+                len(CONTENTS['file1.txt']),
+                len(CONTENTS['repeated_files.py']),
+            ],
+            'items_hot': None
+        }, load_isolated_stats('download'))
     # Only state.json + 1 file should be kept.
     self.assertEqual(2, len(list_files_tree(self._cas_cache_dir)))
 
@@ -686,6 +721,9 @@ class RunIsolatedTest(unittest.TestCase):
         '0',
     ]
     assertRunIsolatedWithCAS(optional_args)
+    download_stats = load_isolated_stats('download')
+    self.assertEqual(1, len(download_stats['items_cold']))
+    self.assertEqual(1, len(download_stats['items_hot']))
     self.assertEqual([
         'state.json',
     ], list_files_tree(self._cas_cache_dir))
