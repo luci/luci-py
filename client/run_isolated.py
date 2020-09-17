@@ -1583,6 +1583,8 @@ def main(args):
       parser.error('Can\'t use --json with --clean.')
     if options.named_caches:
       parser.error('Can\t use --named-cache with --clean.')
+    if options.cas_instance or options.cas_digest:
+      parser.error('Can\t use --cas-instance, --cas-digest with --clean.')
 
     logging.info("initial free space: %d", file_path.get_free_space(root))
     # Trim first, then clean.
