@@ -852,6 +852,54 @@ def upload_out_dir(storage, out_dir, go_isolated_client):
   return outputs_ref, stats
 
 
+def upload_outdir_with_cas(cas_client, cas_instance, outdir):
+  """Uploads the results in |outdir|, if there is any.
+
+  Returns:
+    tuple(root_digest, stats)
+    - root_digest: a digest of the output directory.
+    - stats: uploading stats.
+  """
+  digest_file_handle, digest_path = tempfile.mkstemp(
+      prefix=u'cas-digest', suffix=u'.txt')
+  os.close(digest_file_handle)
+  stats_json_handle, stats_json_path = tempfile.mkstemp(
+      prefix=u'upload-stats', suffix=u'.json')
+  os.close(stats_json_handle)
+
+  try:
+    cmd = [
+        cas_client,
+        'archive',
+        '-cas-instance',
+        cas_instance,
+        '-paths',
+        # Format: <working directory>:<relative path to dir>
+        outdir + ':',
+        # output
+        '-dump-digest',
+        digest_path,
+        '-dump-stats-json',
+        stats_json_path,
+    ]
+
+    start = time.time()
+
+    _run_go_cmd_and_wait(cmd)
+
+    with open(digest_path) as digest_file:
+      digest = digest_file.read()
+    with open(stats_json_path) as stats_file:
+      stats = json.load(stats_file)
+
+    stats['duration'] = time.time() - start
+
+    return digest, stats
+  finally:
+    fs.remove(digest_path)
+    fs.remove(stats_json_path)
+
+
 def map_and_run(data, constant_run_path):
   """Runs a command with optional isolated input/output.
 
@@ -923,10 +971,15 @@ def map_and_run(data, constant_run_path):
     os.mkdir(run_dir, 0o700)
   else:
     run_dir = make_temp_dir(ISOLATED_RUN_DIR, data.root_dir)
+
+  # True if CAS is used for download/upload files.
+  use_cas = bool(data.cas_digest)
+
   # storage should be normally set but don't crash if it is not. This can happen
   # as Swarming task can run without an isolate server.
-  out_dir = make_temp_dir(
-      ISOLATED_OUT_DIR, data.root_dir) if data.storage else None
+  out_dir = None
+  if data.storage or use_cas:
+    out_dir = make_temp_dir(ISOLATED_OUT_DIR, data.root_dir)
   tmp_dir = make_temp_dir(ISOLATED_TMP_DIR, data.root_dir)
   isolated_client_dir = make_temp_dir(ISOLATED_CLIENT_DIR, data.root_dir)
   cwd = run_dir
@@ -937,9 +990,10 @@ def map_and_run(data, constant_run_path):
   if data.use_go_isolated:
     go_isolated_client = os.path.join(isolated_client_dir,
                                       'isolated' + cipd.EXECUTABLE_SUFFIX)
+
   cas_client = None
   cas_client_dir = make_temp_dir(_CAS_CLIENT_DIR, data.root_dir)
-  if data.cas_digest:
+  if use_cas:
     cas_client = os.path.join(cas_client_dir, 'cas' + cipd.EXECUTABLE_SUFFIX)
 
   try:
@@ -1033,13 +1087,14 @@ def map_and_run(data, constant_run_path):
         # Try to link files to the output directory, if specified.
         link_outputs_to_outdir(run_dir, out_dir, data.outputs)
         isolated_stats = result['stats'].setdefault('isolated', {})
-        # This could use |go_isolated_client|, so make sure it runs when the
-        # CIPD package still exists.
-        result['outputs_ref'], isolated_stats['upload'] = (
-            upload_out_dir(data.storage, out_dir, go_isolated_client))
-        # TODO(crbug.com/1117004): upload to CAS if the inputs are on CAS.
-        # The `cas_output_root` will be updated instead of `outputs_ref`.
-        result['cas_output_root'] = None
+        if use_cas:
+          result['cas_output_root'], isolated_stats['upload'] = (
+              upload_outdir_with_cas(cas_client, data.cas_instance, out_dir))
+        else:
+          # This could use |go_isolated_client|, so make sure it runs when the
+          # CIPD package still exists.
+          result['outputs_ref'], isolated_stats['upload'] = (
+              upload_out_dir(data.storage, out_dir, go_isolated_client))
     # We successfully ran the command, set internal_failure back to
     # None (even if the command failed, it's not an internal error).
     result['internal_failure'] = None
