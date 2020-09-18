@@ -873,7 +873,6 @@ class AuthDB(object):
     the root realm doesn't exist either, which means that either project doesn't
     exist or it has no realms.cfg file.
     """
-    self._check_realms_available()
     realm = self._get_realm_or_its_root(realm)
     return realm.data if realm else None
 
