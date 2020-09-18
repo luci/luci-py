@@ -125,12 +125,11 @@ def db():
   role('role/logdog.reader', [])
   role('role/logdog.writer', [])
 
-  # ResultDB permissions and roles. (crbug.com/1013316)
+  # ResultDB permissions and roles (crbug.com/1013316).
   role('role/resultdb.invocationCreator', [
       permission('resultdb.invocations.create'),
       permission('resultdb.invocations.update'),
   ])
-
   role('role/resultdb.reader', [
       permission('resultdb.invocations.list'),
       permission('resultdb.invocations.get'),
@@ -143,7 +142,7 @@ def db():
       permission('resultdb.testExonerations.get'),
   ])
 
-  # Buildbucket permissions and roles. Mostly placeholders for now.
+  # Buildbucket permissions and roles (crbug.com/1091604).
   role('role/buildbucket.reader', [
       # Readers of builds should also have read permissions to test results.
       include('role/resultdb.reader'),
@@ -170,7 +169,7 @@ def db():
   role('role/buildbucket.builderServiceAccount', [
       include('role/swarming.taskServiceAccount'),  # to run on Swarming itself
       include('role/swarming.taskTriggerer'),       # to trigger isolated tests
-      permission('buildbucket.builds.update'),
+      permission('buildbucket.builds.update'),      # to update build steps
   ])
 
   # CQ permissions and roles. Placeholders for now.
@@ -196,6 +195,8 @@ def db():
       # Allow Buildbucket to trigger Swarming tasks and use project's pools.
       include('role/swarming.taskTriggerer'),
       include('role/swarming.poolUser'),
+      # Allow Scheduler and CQ to trigger Buildbucket builds.
+      include('role/buildbucket.triggerer'),
       # Allow Buildbucket and Swarming to create new invocations.
       include('role/resultdb.invocationCreator'),
       # Allow trusted services to create invocations with custom IDs, e.g.
