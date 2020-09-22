@@ -877,27 +877,39 @@ class Popen(subprocess.Popen):
 
     This process may be asynchronous. The user should still call wait() to
     ensure the process is indeed terminated.
+
+    Note that if this Popen uses job containment (e.g. Job Objects on Windows or
+    a process group on Linux/macOS), then `kill()` will have an effect even if
+    `wait()` already returned. Namely, even though the immediate child process
+    finished, there can still be indirect subprocesses in the Job Object or
+    process group which need to be killed.
     """
+    # First check if there's some sort of containment (job object or process
+    # group)
     if self._job:
       # Use the equivalent of SIGKILL on linux. signal.SIGKILL is not available
       # on Windows.
       return self._job.kill(-9)
 
+    if self.pgid:
+      try:
+        os.killpg(self.pgid, signal.SIGKILL)
+        return True
+      except OSError:
+        return False
+
+    # At this point we only have tracking information for the process itself;
+    # Return True if we have a returncode (i.e. it's already been wait()'d),
+    # otherwise defer to subprocess.Popen.kill()
     if self.returncode is not None:
       # If a return code was recorded, it means there's nothing to kill as there
       # was no containment.
       return True
 
-    if self.pgid:
-      try:
-        os.killpg(self.pgid, signal.SIGKILL)
-      except OSError:
-        return False
-    else:
-      try:
-        super(Popen, self).kill()
-      except OSError:
-        return False
+    try:
+      super(Popen, self).kill()
+    except OSError:
+      return False
     return True
 
   def _close(self, which):
