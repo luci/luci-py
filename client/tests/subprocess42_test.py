@@ -6,13 +6,15 @@
 from __future__ import print_function
 
 import ctypes
+import errno
 import itertools
 import os
+import platform
 import signal
 import sys
 import tempfile
+import time
 import unittest
-import platform
 
 import six
 
@@ -66,6 +68,7 @@ SCRIPT_ERR = ('import signal, sys, time;\n'
                                           'win32' else 'signal.SIGTERM')
 
 OUTPUT_SCRIPT = br"""
+import os
 import re
 import sys
 import time
@@ -78,9 +81,9 @@ def main():
         continue
 
       if command.startswith('out_'):
-        pipe = sys.stdout
+        pipe, other = sys.stdout, sys.stderr
       elif command.startswith('err_'):
-        pipe = sys.stderr
+        pipe, other = sys.stderr, sys.stdout
       else:
         return 1
 
@@ -95,6 +98,16 @@ def main():
         pipe.write('\n')
       elif command == 'flush':
         pipe.flush()
+      elif command == 'leak':
+        pid = os.fork()
+        if pid > 0:
+          return 0
+
+        other.write("leaked child is %s %s\n" % (os.getpid(), os.getpgid(0)))
+        other.write("sleeping\n")
+        time.sleep(30)
+        other.write("woke up\n")
+        return 1
       else:
         return 1
     return 0
@@ -450,6 +463,50 @@ time.sleep(60)
       # signal.SIGKILL is not defined on Windows. Validate our assumption here.
       self.assertEqual(9, signal.SIGKILL)
     self.assertEqual(-9, p.returncode)
+
+  @unittest.skipIf(sys.platform == 'win32', 'pgid test')
+  def test_kill_background(self):
+    # Test process group killing.
+
+    # Leaking a pipe through to the grandchild process is the only way to be
+    # sure that we have a way to detect that this grandchild process is still
+    # running or not. When all handles to the `w` end of the pipe have been
+    # dropped, the `r` end will unblock.
+    r, w = os.pipe()
+
+    # Use fcntl instead of os.set_blocking because of python2
+    import fcntl
+    fcntl.fcntl(r, fcntl.F_SETFL, fcntl.fcntl(r, fcntl.F_GETFL) | os.O_NONBLOCK)
+
+    p = subprocess42.Popen(
+        [sys.executable, self.output_script, 'out_leak'],
+        stdout=w, detached=True)
+    os.close(w)  # close so we don't think that a child is hanging onto it.
+
+    self.assertEqual(p.wait(), 0)  # our immediate child has exited!
+
+    with self.assertRaises(OSError):
+      # oops, something still has a handle to this pipe! it's the grandchild!
+      os.read(r, 1)
+
+    # kill the group! That'll show 'em (unless the child actually daemonized, in
+    # which case we're hosed).
+    p.kill()
+
+    # sleepy-loop until the pipe is closed, should take O(ms) but we generously
+    # wait up to 5s. The sub-child will wait 30s and should outlive this loop if
+    # somehow it survived the kill.
+    now = time.time()
+    while True:
+      try:
+        self.assertEqual(os.read(r, 1), b'')  # i.e. EOF
+        return
+      except OSError as ex:
+        if ex.errno != errno.EWOULDBLOCK:
+          raise
+        time.sleep(0.1)
+        if time.time() - now > 5:
+          raise Exception('pipe not unblocked after 5s, bailing')
 
   @staticmethod
   def _cmd_large_memory():
