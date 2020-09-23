@@ -748,6 +748,11 @@ def run_command(remote, task_details, work_dir, cost_usd_hour,
             kill_sent = True
       logging.info('Waiting for process exit')
       exit_code = proc.wait()
+
+      # the process group / job object may be dangling so if we didn't kill
+      # it already, give it a poke now.
+      if not kill_sent:
+        proc.kill()
     except (
         ExitSignal, InternalError, IOError,
         OSError, remote_client.InternalError) as e:

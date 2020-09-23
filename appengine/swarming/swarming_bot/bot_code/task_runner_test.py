@@ -574,7 +574,7 @@ class TestTaskRunner(TestTaskRunnerBase):
 
       @staticmethod
       def kill():
-        self.fail()
+        return True
 
     self.mock(subprocess42, 'Popen', Popen)
 
