@@ -40,6 +40,10 @@ Example contents:
   },
   "luciexe": {
     "cache_dir": "/b/s/w/ir/cache"
+  },
+  "deadline": {
+    "deadline": 1600883265.1039423,
+    "grace_period": 30
   }
 }
 ```
@@ -175,5 +179,46 @@ message ResultSink {
   // secret string required in all ResultSink requests in HTTP header
   // `Authorization: ResultSink <auth-token>`
   string auth_token = 2;
+}
+```
+
+## `deadline`
+
+The Deadline represents an externally-imposed end-time for the process
+observing the `LUCI_CONTEXT`.
+
+Additionally, this contains `grace_period_secs` which can be used to
+communicate how long the external process will allow for clean up once it
+sends SIGTERM/Ctrl-Break.
+
+Intermediate applications SHOULD NOT increase `deadline` or `grace_period_secs`.
+
+If the entire Deadline is missing from `LUCI_CONTEXT`, it should be assumed to
+be:
+
+    {deadline: infinity, grace_period_secs: 30}
+
+```
+message Deadline {
+  // The absolute deadline for execution for this context (as a 'float'
+  // unix timestamp; integer part is seconds, fractional part is fractions of
+  // a second. This is the same as python's `time.time()` representation).
+  //
+  // Processes reading this value SHOULD choose to terminate and clean
+  // themselves up before this deadline.
+  //
+  // Parent processes MAY terminate/kill subprocesses which exceed this
+  // deadline.
+  //
+  // If `deadline` is 0 consider there to be no stated deadline (i.e. infinite).
+  double deadline = 1 [json_name = "deadline"];
+
+  // The amount of time (in fractional seconds), processes in this context have
+  // time to react to a SIGTERM before being killed.
+  //
+  // If an intermediate process has a lot of cleanup work to do after its child
+  // quits (e.g. flushing stats/writing output files/etc.) it SHOULD reduce this
+  // value for the child process by an appropriate margin.
+  double grace_period = 2 [json_name = "grace_period"];
 }
 ```
