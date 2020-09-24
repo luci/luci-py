@@ -1116,7 +1116,8 @@ class TaskResultSummary(_TaskResultCommon):
       return
 
     if self.request.resultdb_update_token:
-      run_id = task_pack.pack_run_result_key(self.run_result_key)
+      run_id = task_pack.pack_run_result_key(
+          task_pack.result_summary_key_to_run_result_key(self.key, 1))
       # TODO(crbug.com/1065139): remove get_result() if ndb.toplevel works fine.
       resultdb.finalize_invocation_async(
           run_id, self.request.resultdb_update_token).get_result()

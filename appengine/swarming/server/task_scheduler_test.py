@@ -703,6 +703,29 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     result_summary = result_summary.key.get()
     self.assertEqual(State.PENDING, result_summary.state)
 
+  @ndb.tasklet
+  def nop_async(self, *_args, **_kwargs):
+    pass
+
+  def test_resultdb_task_expired(self):
+    self._register_bot(0, self.bot_dimensions)
+
+    with mock.patch(
+        'server.resultdb.create_invocation_async',
+        mock.Mock(side_effect=self._mock_create_invocation_async)) as mock_call:
+      request = _gen_request_slices(realm='infra:try')
+      result_summary = task_scheduler.schedule_request(request, None, True)
+      mock_call.assert_called_once_with('1d69b9f088008911', 'infra:try')
+
+    with mock.patch('server.resultdb.finalize_invocation_async',
+                    mock.Mock(side_effect=self.nop_async)) as mock_call:
+      to_run_key = task_to_run.request_to_task_to_run_key(request, 1, 0)
+      task_scheduler._expire_task(to_run_key, request, True)
+      mock_call.assert_called_once_with('1d69b9f088008911',
+                                        u'resultdb-update-token')
+
+    self.assertEqual(1, self.execute_tasks())
+
   def _setup_es(self, allow_es_fallback):
     """Set up mock es_config."""
     es_address = 'externalscheduler_address'
