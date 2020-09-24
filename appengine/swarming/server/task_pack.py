@@ -164,8 +164,8 @@ def unpack_run_result_key(packed_key):
   The expected format of |packed_key| is %x.
   """
   request_key = unpack_request_key(packed_key[:-1])
-  run_id = int(packed_key[-1], 16)
-  if not run_id:
+  try_number = int(packed_key[-1], 16)
+  if not try_number:
     raise ValueError('Can\'t reference to the overall task result.')
   result_summary_key = request_key_to_result_summary_key(request_key)
-  return result_summary_key_to_run_result_key(result_summary_key, run_id)
+  return result_summary_key_to_run_result_key(result_summary_key, try_number)
