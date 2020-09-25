@@ -103,7 +103,7 @@ def get_isolated_args(work_dir, task_details, isolated_result,
     cmd.extend([
         '--cas-instance',
         input_root['cas_instance'],
-        '--digest',
+        '--cas-digest',
         '%s/%s' %
         (input_root['digest']['hash'], input_root['digest']['size_bytes']),
     ])
