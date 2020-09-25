@@ -97,7 +97,7 @@ ALREADY_COMPRESSED_TYPES = [
 DELAY_BETWEEN_UPDATES_IN_SECS = 30
 
 
-DEFAULT_BLACKLIST = (
+DEFAULT_DENYLIST = (
     # Temporary vim or python files.
     r'^.+\.(?:pyc|swp)$',
     # .git or .svn directory.
@@ -1424,7 +1424,7 @@ def fetch_isolated(isolated_hash, storage, cache, outdir, use_symlinks,
   return bundle
 
 
-def _directory_to_metadata(root, algo, blacklist):
+def _directory_to_metadata(root, algo, denylist):
   """Yields every file and/or symlink found.
 
   Yields:
@@ -1437,7 +1437,7 @@ def _directory_to_metadata(root, algo, blacklist):
   for relpath, issymlink in isolated_format.expand_directory_and_symlink(
       root,
       u'.' + os.path.sep,
-      blacklist,
+      denylist,
       follow_symlinks=(sys.platform != 'win32')):
 
     filepath = os.path.join(root, relpath)
@@ -1488,7 +1488,7 @@ def _print_upload_stats(items, missing):
                cache_miss_size * 100. / total_size if total_size else 0)
 
 
-def _enqueue_dir(dirpath, blacklist, hash_algo, hash_algo_name):
+def _enqueue_dir(dirpath, denylist, hash_algo, hash_algo_name):
   """Called by archive_files_to_storage for a directory.
 
   Create an .isolated file.
@@ -1497,8 +1497,8 @@ def _enqueue_dir(dirpath, blacklist, hash_algo, hash_algo_name):
     FileItem for every file found, plus one for the .isolated file itself.
   """
   files = {}
-  for item, relpath, meta in _directory_to_metadata(
-      dirpath, hash_algo, blacklist):
+  for item, relpath, meta in _directory_to_metadata(dirpath, hash_algo,
+                                                    denylist):
     # item is None for a symlink.
     files[relpath] = meta
     if item:
@@ -1520,7 +1520,7 @@ def _enqueue_dir(dirpath, blacklist, hash_algo, hash_algo_name):
 
 def _archive_files_to_storage_internal(storage,
                                        files,
-                                       blacklist,
+                                       denylist,
                                        verify_push=False):
   """Stores every entry into remote storage and returns stats.
 
@@ -1529,7 +1529,7 @@ def _archive_files_to_storage_internal(storage,
     files: iterable of files to upload. If a directory is specified (with a
           trailing slash), a .isolated file is created and its hash is returned.
           Duplicates are skipped.
-    blacklist: function that returns True if a file should be omitted.
+    denylist: function that returns True if a file should be omitted.
     verify_push: verify files are uploaded correctly by fetching from server.
 
   Returns:
@@ -1571,8 +1571,8 @@ def _archive_files_to_storage_internal(storage,
         if fs.isdir(filepath):
           # Uploading a whole directory.
           item = None
-          for item in _enqueue_dir(
-              filepath, blacklist, hash_algo, hash_algo_name):
+          for item in _enqueue_dir(filepath, denylist, hash_algo,
+                                   hash_algo_name):
             channel.send_result(item)
             items_found.append(item)
             # The very last item will be the .isolated file.
@@ -1627,7 +1627,7 @@ def _archive_files_to_storage_internal(storage,
 
 # TODO(crbug.com/1073832):
 # remove this if process leak in coverage build was fixed.
-def archive_files_to_storage(storage, files, blacklist, verify_push=False):
+def archive_files_to_storage(storage, files, denylist, verify_push=False):
   """Calls _archive_files_to_storage_internal with retry.
 
   Arguments:
@@ -1647,7 +1647,7 @@ def archive_files_to_storage(storage, files, blacklist, verify_push=False):
 
   while True:
     try:
-      return _archive_files_to_storage_internal(storage, files, blacklist,
+      return _archive_files_to_storage_internal(storage, files, denylist,
                                                 verify_push)
     except Exception:
       if backoff > 100:
@@ -1685,10 +1685,10 @@ def CMDarchive(parser, args):
   if not files:
     parser.error('Nothing to upload')
   files = (six.ensure_text(f) for f in files)
-  blacklist = tools.gen_blacklist(options.blacklist)
+  denylist = tools.gen_denylist(options.blacklist)
   try:
     with get_storage(server_ref) as storage:
-      results, _cold, _hot = archive_files_to_storage(storage, files, blacklist)
+      results, _cold, _hot = archive_files_to_storage(storage, files, denylist)
   except (Error, local_caching.NoMoreSpace) as e:
     parser.error(e.args[0])
   print('\n'.join('%s %s' % (h, f) for f, h in results.items()))
@@ -1787,9 +1787,10 @@ def CMDdownload(parser, args):
 def add_archive_options(parser):
   parser.add_option(
       '--blacklist',
-      action='append', default=list(DEFAULT_BLACKLIST),
-      help='List of regexp to use as blacklist filter when uploading '
-           'directories')
+      action='append',
+      default=list(DEFAULT_DENYLIST),
+      help='List of regexp to use as denylist filter when uploading '
+      'directories')
 
 
 def add_isolate_server_options(parser):

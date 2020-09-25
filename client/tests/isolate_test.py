@@ -223,7 +223,7 @@ class IsolateTest(IsolateBase):
       'foo.pyc',
       'bar.swp',
     ]
-    blacklist = tools.gen_blacklist(isolateserver.DEFAULT_BLACKLIST)
+    blacklist = tools.gen_denylist(isolateserver.DEFAULT_DENYLIST)
     for i in ok:
       self.assertFalse(blacklist(i), i)
     for i in blocked:
@@ -239,7 +239,7 @@ class IsolateTest(IsolateBase):
       'testserver.log',
       os.path.join('foo', 'testserver.log'),
     ]
-    blacklist = tools.gen_blacklist([r'^.+\.run_test_cases$', r'^.+\.log$'])
+    blacklist = tools.gen_denylist([r'^.+\.run_test_cases$', r'^.+\.log$'])
     for i in ok:
       self.assertFalse(blacklist(i), i)
     for i in blocked:
@@ -307,7 +307,7 @@ class IsolateLoad(IsolateBase):
       isolated = os.path.join(self.isolated_dir, 'foo.isolated')
       outdir = os.path.join(self.directory, 'outdir')
       isolate = isolate_file
-      blacklist = list(isolateserver.DEFAULT_BLACKLIST)
+      blacklist = list(isolateserver.DEFAULT_DENYLIST)
       path_variables = {}
       config_variables = {
         'OS': 'linux',

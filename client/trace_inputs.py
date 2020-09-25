@@ -3363,7 +3363,7 @@ def CMDread(parser, args):
 
   variables = dict(options.variables)
   api = get_api()
-  blacklist = tools.gen_blacklist(options.trace_blacklist)
+  blacklist = tools.gen_denylist(options.trace_blacklist)
   data = api.parse_log(options.log, blacklist, options.trace_name)
   # Process each trace.
   output_as_json = []

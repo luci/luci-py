@@ -503,7 +503,7 @@ class CompleteState(object):
     return cls(isolated_filepath, s)
 
   def load_isolate(self, cwd, isolate_file, path_variables, config_variables,
-                   blacklist, ignore_broken_items, collapse_symlinks):
+                   denylist, ignore_broken_items, collapse_symlinks):
     """Updates self.isolated and self.saved_state with information loaded from a
     .isolate file.
 
@@ -575,12 +575,11 @@ class CompleteState(object):
       follow_symlinks = sys.platform != 'win32'
     # Expand the directories by listing each file inside. Up to now, trailing
     # os.path.sep must be kept.
-    infiles = _expand_directories_and_symlinks(
-        self.saved_state.root_dir,
-        infiles,
-        tools.gen_blacklist(blacklist),
-        follow_symlinks,
-        ignore_broken_items)
+    infiles = _expand_directories_and_symlinks(self.saved_state.root_dir,
+                                               infiles,
+                                               tools.gen_denylist(denylist),
+                                               follow_symlinks,
+                                               ignore_broken_items)
 
     # Finally, update the new data to be able to generate the foo.isolated file,
     # the file that is used by run_isolated.py.
@@ -818,9 +817,9 @@ def _process_infiles(infiles):
   logging.info('Skipped %d duplicated entries', skipped)
 
 
-def _expand_directories_and_symlinks(
-    indir, infiles, blacklist, follow_symlinks, ignore_broken_items):
-  """Expands the directories and the symlinks, applies the blacklist and
+def _expand_directories_and_symlinks(indir, infiles, denylist, follow_symlinks,
+                                     ignore_broken_items):
+  """Expands the directories and the symlinks, applies the denylist and
   verifies files exist.
 
   Files are specified in os native path separator.
@@ -837,10 +836,9 @@ def _expand_directories_and_symlinks(
     try:
       # Ignore the symlink hint, this code will be eventually deleted so it is
       # not worth optimizing.
-      out.extend(
-          relpath for relpath, _is_symlink
-          in isolated_format.expand_directory_and_symlink(
-              indir, relfile, blacklist, follow_symlinks))
+      out.extend(relpath for relpath, _is_symlink in
+                 isolated_format.expand_directory_and_symlink(
+                     indir, relfile, denylist, follow_symlinks))
     except isolated_format.MappingError as e:
       if not ignore_broken_items:
         raise
