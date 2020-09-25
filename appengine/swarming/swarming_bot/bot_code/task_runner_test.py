@@ -1260,10 +1260,6 @@ class TaskRunnerNoServer(auto_stub.TestCase):
     finally:
       super(TaskRunnerNoServer, self).tearDown()
 
-  def _run_command(self, task_details, headers_cb):
-    return run_command(
-        'http://localhost:1', self.root_dir, task_details, headers_cb)
-
   def test_load_and_run_isolated(self):
     self.mock(bot_auth, 'AuthSystem', FakeAuthSystem)
 
