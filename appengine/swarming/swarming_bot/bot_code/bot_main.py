@@ -96,6 +96,7 @@ PASSLIST = (
     'README',
     'README.md',
     'c',
+    'cas_cache',
     'cipd_cache',
     'isolated_cache',
     'logs',
@@ -670,7 +671,6 @@ def _cleanup_bot_directory(botobj):
           'Failed to remove %s from bot\'s directory: %s' % (i, e))
 
 
-# TODO(crbug.com/1117004): specify CAS cache options.
 def _run_isolated_flags(botobj):
   """Returns flags to pass to run_isolated.
 
@@ -684,16 +684,22 @@ def _run_isolated_flags(botobj):
       partition['wiggle'])
   logging.info('size %d, partition %s, min_free %s', size, partition, min_free)
   args = [
-      '--cache',
-      os.path.join(botobj.base_dir, 'isolated_cache'),
+      # Shared option.
       '--min-free-space',
       str(min_free),
-      '--named-cache-root',
-      os.path.join(botobj.base_dir, 'c'),
       '--max-cache-size',
       str(settings['caches']['isolated']['size']),
+      # Isolated cache options.
+      '--cache',
+      os.path.join(botobj.base_dir, 'isolated_cache'),
       '--max-items',
       str(settings['caches']['isolated']['items']),
+      # CAS cache option.
+      '--cas-cache',
+      os.path.join(botobj.base_dir, 'cas_cache'),
+      # Named cache option.
+      '--named-cache-root',
+      os.path.join(botobj.base_dir, 'c'),
   ]
 
   if _IN_TEST_MODE:
