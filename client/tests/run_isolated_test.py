@@ -367,6 +367,8 @@ class RunIsolatedTest(RunIsolatedTestBase):
         use_go_isolated=False,
         go_cache_dir=None,
         go_cache_policies=None,
+        cas_cache_dir=None,
+        cas_cache_policies=None,
         env={},
         env_prefix={},
         lower_priority=lower_priority,
@@ -381,6 +383,7 @@ class RunIsolatedTest(RunIsolatedTestBase):
     files = {isolated_hash: isolated}
     make_tree_call = self._run_tha_test(isolated_hash, files)
     self.assertEqual([
+        'make_tree_deleteable',
         'make_tree_deleteable',
         'make_tree_deleteable',
         'make_tree_deleteable',
@@ -828,6 +831,74 @@ class RunIsolatedTest(RunIsolatedTestBase):
       self.assertTrue(fs.exists(named_path))
     self.assertTrue(trimmed)
 
+  def test_main_clean(self):
+    isolated_cache_dir = os.path.join(self.tempdir, 'isolated_cache')
+    cas_cache_dir = os.path.join(self.tempdir, 'cas_cache')
+    named_cache_dir = os.path.join(self.tempdir, 'named_cache')
+    min_free_space = 1
+    max_cache_size = 2
+    max_items = 3
+
+    cmd = [
+        '--no-log',
+        '--clean',
+        # Shared options.
+        '--min-free-space',
+        str(min_free_space),
+        '--max-cache-size',
+        str(max_cache_size),
+        # Isolated cache options.
+        '--cache',
+        isolated_cache_dir,
+        '--max-items',
+        str(max_items),
+        # CAS cache option.
+        '--cas-cache',
+        cas_cache_dir,
+        # Named cache option.
+        '--named-cache-root',
+        named_cache_dir,
+    ]
+
+    def trim_caches_mock(caches, root_dir, min_free_space, max_age_secs):
+      self.assertEqual(root_dir, isolated_cache_dir)
+      self.assertEqual(min_free_space, min_free_space)
+      self.assertEqual(max_age_secs, run_isolated.MAX_AGE_SECS)
+
+      # Isolated cache.
+      isolated_cache = caches[0]
+      self.assertEqual(
+          isolated_cache.state_file,
+          os.path.join(isolated_cache_dir, isolated_cache.STATE_FILE))
+      self.assertEqual(isolated_cache.policies.max_cache_size, max_cache_size)
+      self.assertEqual(isolated_cache.policies.min_free_space, min_free_space)
+      self.assertEqual(isolated_cache.policies.max_items, max_items)
+
+      # CAS cache.
+      cas_cache = caches[1]
+      self.assertEqual(cas_cache.state_file,
+                       os.path.join(cas_cache_dir, cas_cache.STATE_FILE))
+      self.assertEqual(cas_cache.policies.max_cache_size, max_cache_size)
+      self.assertEqual(cas_cache.policies.min_free_space, min_free_space)
+      self.assertIsNone(cas_cache.policies.max_items)
+
+      # Named cache.
+      named_cache = caches[2]
+      self.assertEqual(named_cache.state_file,
+                       os.path.join(named_cache_dir, named_cache.STATE_FILE))
+      # max_cache_size, max_items, max_age_secs are hardcoded in
+      # run_isolated.process_named_cache_options().
+      self.assertEqual(named_cache._policies.max_cache_size, 1024**4)
+      self.assertEqual(named_cache._policies.min_free_space, min_free_space)
+      self.assertEqual(named_cache._policies.max_items, 50)
+      self.assertEqual(named_cache._policies.max_age_secs,
+                       run_isolated.MAX_AGE_SECS)
+
+    self.mock(local_caching, 'trim_caches', trim_caches_mock)
+
+    ret = run_isolated.main(cmd)
+    self.assertEqual(0, ret)
+
   def test_modified_cwd(self):
     isolated = json_dumps({
         'command': ['../out/some.exe', 'arg'],
@@ -1026,6 +1097,8 @@ class RunIsolatedTestRun(RunIsolatedTestBase):
           use_go_isolated=False,
           go_cache_dir=None,
           go_cache_policies=None,
+          cas_cache_dir=None,
+          cas_cache_policies=None,
           env={},
           env_prefix={},
           lower_priority=False,
@@ -1409,6 +1482,8 @@ class RunIsolatedTestOutputFiles(RunIsolatedTestBase):
           use_go_isolated=False,
           go_cache_dir=None,
           go_cache_policies=None,
+          cas_cache_dir=None,
+          cas_cache_policies=None,
           env={},
           env_prefix={},
           lower_priority=False,

@@ -221,10 +221,14 @@ TaskData = collections.namedtuple(
         'install_packages_fn',
         # Use go isolated client.
         'use_go_isolated',
-        # Cache directory for go `isolated` or `cas` client.
+        # Cache directory for go `isolated` client.
         'go_cache_dir',
-        # Parameters passed to go `isolated` or `cas` client.
+        # Parameters passed to go `isolated` client.
         'go_cache_policies',
+        # Cache directory for `cas` client.
+        'cas_cache_dir',
+        # Parameters passed to `cas` client.
+        'cas_cache_policies',
         # Environment variables to set.
         'env',
         # Environment variables to mutate with relative directories.
@@ -571,8 +575,6 @@ def _fetch_and_map_with_cas(cas_client, digest, instance, output_dir, cache_dir,
         # flags for cache.
         '-cache-dir',
         cache_dir,
-        '-cache-max-items',
-        str(policies.max_items),
         '-cache-max-size',
         str(policies.max_cache_size),
         '-cache-min-free-space',
@@ -1035,8 +1037,8 @@ def map_and_run(data, constant_run_path):
             digest=data.cas_digest,
             instance=data.cas_instance,
             output_dir=run_dir,
-            cache_dir=data.go_cache_dir,
-            policies=data.go_cache_policies)
+            cache_dir=data.cas_cache_dir,
+            policies=data.cas_cache_policies)
         isolated_stats['download'].update(stats)
 
       if not command:
@@ -1119,7 +1121,7 @@ def map_and_run(data, constant_run_path):
         # process locks *.exe file). Examine out_dir only after that call
         # completes (since child processes may write to out_dir too and we need
         # to wait for them to finish).
-        dirs_to_remove = [run_dir, tmp_dir, isolated_client_dir]
+        dirs_to_remove = [run_dir, tmp_dir, isolated_client_dir, cas_client_dir]
         if out_dir:
           dirs_to_remove.append(out_dir)
         for directory in dirs_to_remove:
@@ -1458,7 +1460,9 @@ def create_option_parser():
       '`{hash}/{size_bytes}`.')
   parser.add_option_group(group)
 
+  # Cache options.
   isolateserver.add_cache_options(parser)
+  add_cas_cache_options(parser)
 
   cipd.add_cipd_options(parser)
 
@@ -1514,6 +1518,31 @@ def create_option_parser():
 
   parser.set_defaults(cache='cache')
   return parser
+
+
+def add_cas_cache_options(parser):
+  group = optparse.OptionGroup(parser, 'CAS cache management')
+  group.add_option(
+      '--cas-cache',
+      metavar='DIR',
+      default='cas-cache',
+      help='Directory to keep a local cache of the files. Accelerates download '
+      'by reusing already downloaded files. Default=%default')
+  parser.add_option_group(group)
+
+
+def process_cas_cache_options(options):
+  if options.cas_cache:
+    policies = local_caching.CachePolicies(
+        max_cache_size=options.max_cache_size,
+        min_free_space=options.min_free_space,
+        # max_items isn't used for CAS cache for now.
+        max_items=None,
+        max_age_secs=MAX_AGE_SECS)
+
+    return local_caching.DiskContentAddressedCache(
+        six.text_type(os.path.abspath(options.cas_cache)), policies, trim=False)
+  return local_caching.MemoryContentAddressedCache()
 
 
 def process_named_cache_options(parser, options, time_fn=None):
@@ -1618,14 +1647,22 @@ def main(args):
 
   # TODO(maruel): CIPD caches should be defined at an higher level here too, so
   # they can be cleaned the same way.
-  if use_go_isolated and not options.clean:
-    isolate_cache = None
-  else:
+  # TODO(crbug.com/1131313):
+  # Modifying stats.json from run_isolated.py and Go isolated/cas clients may
+  # cause unexpected issues. Initialize CachePolicies when not using Go client
+  # or executing --clean.
+  isolate_cache = None
+  if options.clean or not use_go_isolated:
     isolate_cache = isolateserver.process_cache_options(options, trim=False)
+  cas_cache = None
+  if options.clean:
+    cas_cache = process_cas_cache_options(options)
 
   caches = []
   if isolate_cache:
     caches.append(isolate_cache)
+  if cas_cache:
+    caches.append(cas_cache)
   if named_cache:
     caches.append(named_cache)
   root = caches[0].cache_dir if caches else six.text_type(os.getcwd())
@@ -1807,6 +1844,13 @@ def main(args):
           max_cache_size=options.max_cache_size,
           min_free_space=options.min_free_space,
           max_items=options.max_items,
+          max_age_secs=None,
+      ),
+      cas_cache_dir=options.cas_cache,
+      cas_cache_policies=local_caching.CachePolicies(
+          max_cache_size=options.max_cache_size,
+          min_free_space=options.min_free_space,
+          max_items=None,
           max_age_secs=None,
       ),
       env=options.env,
