@@ -790,7 +790,9 @@ class RunIsolatedTest(unittest.TestCase):
     result = json.loads(read_content(result_json))
 
     output_dir = os.path.join(self.tempdir, 'out')
-    self._download_from_cas(result['cas_output_root'], output_dir)
+    d = result['cas_output_root']['digest']
+    output_root_digest = "%s/%s" % (d['hash'], d['size_bytes'])
+    self._download_from_cas(output_root_digest, output_dir)
     self.assertEqual(['foo.txt'], list_files_tree(output_dir))
     self.assertEqual(OUTPUT_CONTENT.encode(),
                      read_content(os.path.join(output_dir, 'foo.txt')))

@@ -891,12 +891,20 @@ def upload_outdir_with_cas(cas_client, cas_instance, outdir):
 
     with open(digest_path) as digest_file:
       digest = digest_file.read()
+    h, s = digest.split('/')
+    cas_output_root = {
+        'cas_instance': cas_instance,
+        'digest': {
+            'hash': h,
+            'size_bytes': int(s)
+        }
+    }
     with open(stats_json_path) as stats_file:
       stats = json.load(stats_file)
 
     stats['duration'] = time.time() - start
 
-    return digest, stats
+    return cas_output_root, stats
   finally:
     fs.remove(digest_path)
     fs.remove(stats_json_path)
