@@ -1719,12 +1719,13 @@ def main(args):
   auth.process_auth_options(parser, options)
 
   isolateserver.process_isolate_server_options(parser, options, False)
-  if not options.isolate_server:
-    if options.isolated:
-      parser.error('--isolated requires --isolate-server')
-    if ISOLATED_OUTDIR_PARAMETER in args:
-      parser.error(
-        '%s in args requires --isolate-server' % ISOLATED_OUTDIR_PARAMETER)
+  if ISOLATED_OUTDIR_PARAMETER in args and (not options.isolate_server and
+                                            not options.cas_instance):
+    parser.error('%s in args requires --isolate-server or --cas-instance' %
+                 ISOLATED_OUTDIR_PARAMETER)
+
+  if options.isolated and not options.isolate_server:
+    parser.error('--isolated requires --isolate-server')
 
   if options.root_dir:
     options.root_dir = six.text_type(os.path.abspath(options.root_dir))
