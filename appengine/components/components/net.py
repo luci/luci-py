@@ -41,6 +41,9 @@ class AuthError(Error):
   """Raised if endpoint returns 401 or 403."""
 
 
+class MethodNotAllowed(Error):
+  """Raised if endpoint returns 405."""
+
 # Do not log Error exception raised from a tasklet, it is expected to happen.
 ndb.add_flow_exception(Error)
 
@@ -68,6 +71,8 @@ def _error_class_for_status(status_code):
     return NotFoundError
   if status_code in (401, 403):
     return AuthError
+  if status_code == 405:
+    return MethodNotAllowed
   return Error
 
 

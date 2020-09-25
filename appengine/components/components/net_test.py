@@ -249,6 +249,15 @@ class NetTest(test_case.TestCase):
     with self.assertRaises(net.AuthError):
       net.request('http://localhost/123')
 
+  def test_405(self):
+    self.mock_urlfetch([
+        ({
+            'url': 'http://localhost/123'
+        }, Response(405, 'method not allowed', {})),
+    ])
+    with self.assertRaises(net.MethodNotAllowed):
+      net.request('http://localhost/123')
+
   def test_json_request_works(self):
     self.mock_urlfetch([
         ({
