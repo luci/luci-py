@@ -1330,7 +1330,7 @@ def fetch_isolated(isolated_hash, storage, cache, outdir, use_symlinks,
            locally.
     outdir: Output directory to map file tree to.
     use_symlinks: Use symlinks instead of hardlinks when True.
-    filter_cb: filter that works as whitelist for downloaded files.
+    filter_cb: filter that works as allowlist for downloaded files.
 
   Returns:
     IsolatedBundle object that holds details about loaded *.isolated file.

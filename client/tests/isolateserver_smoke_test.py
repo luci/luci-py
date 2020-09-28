@@ -30,8 +30,8 @@ CONTENTS = {
 
 
 class IsolateServerArchiveSmokeTest(unittest.TestCase):
-  # This test is touching the live infrastructure. It's a pain if your IP
-  # is not whitelisted so do not run them for now. They should use a local fake
+  # This test is touching the live infrastructure. It's a pain if your IP is
+  # not in allowlist, so do not run them for now. They should use a local fake
   # web service instead.
   no_run = 1
 

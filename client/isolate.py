@@ -388,7 +388,7 @@ class SavedState(Flattenable):
     """
 
     def strip(data):
-      """Returns a 'files' entry with only the whitelisted keys."""
+      """Returns a 'files' entry with only the keys in the allowlist."""
       return dict((k, data[k]) for k in ('h', 'l', 'm', 's') if k in data)
 
     out = {
