@@ -367,8 +367,9 @@ def load_and_run(in_file, swarming_server, cost_usd_hour, start, out_file,
       context_edits = {
         'local_auth': local_auth_context,
         'deadline': {
-          'deadline': monotonic_time() + task_details.hard_timeout,
-          'grace_period_secs': task_details.grace_period,
+          # Ironically, "hard_timeout" is actually the soft timeout.
+          'soft_deadline': monotonic_time() + task_details.hard_timeout,
+          'grace_period': task_details.grace_period,
         },
       }
 
