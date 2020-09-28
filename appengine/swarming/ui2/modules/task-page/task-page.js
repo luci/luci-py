@@ -22,7 +22,7 @@ import * as human from 'common-sk/modules/human';
 import * as query from 'common-sk/modules/query';
 
 import {applyAlias} from '../alias';
-import {canRetry, cipdLink, durationChart, hasRichOutput, humanState,
+import {casLink, canRetry, cipdLink, durationChart, hasRichOutput, humanState,
   firstDimension, isolateLink, parseRequest, parseResult,
   richLogsLink, sliceSchedulingDeadline, stateClass, taskCost,
   taskSchedulingDeadline, taskInfoClass, wasDeduped,
@@ -227,6 +227,7 @@ const taskInfoTable = (ele, request, result, currentSlice) => {
   ${requestBlock(request, result, currentSlice)}
   ${dimensionBlock(currentSlice.properties.dimensions || [])}
   ${isolateBlock('Isolated Inputs', currentSlice.properties.inputs_ref || {})}
+  ${casBlock('CAS Inputs', currentSlice.properties.cas_input_root || {})}
   ${arrayInTable(currentSlice.properties.outputs,
       'Expected outputs', (output) => output)}
   ${commitBlock(request.tagMap)}
@@ -407,6 +408,21 @@ const isolateBlock = (title, ref) => {
   <td>
     <a href=${isolateLink(ref)}>
       ${ref.isolated}
+    </a>
+  </td>
+</tr>`;
+};
+
+const casBlock = (title, ref) => {
+  if (!ref.digest) {
+    return '';
+  }
+  return html`
+<tr>
+  <td>${title}</td>
+  <td>
+    <a href=${casLink(ref)} target='_blank'>
+      ${ref.digest.hash}/${ref.digest.size_bytes}
     </a>
   </td>
 </tr>`;
@@ -756,6 +772,7 @@ const taskExecutionSection = (ele, request, result, currentSlice) => {
     <td>$${taskCost(result)}</td>
   </tr>
   ${isolateBlock('Isolated Outputs', result.outputs_ref || {})}
+  ${casBlock('CAS Outputs', result.cas_output_root || {})}
   <tr>
     <td>Bot Version</td>
     <td>${result.bot_version}</td>
