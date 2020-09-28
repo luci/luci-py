@@ -114,6 +114,7 @@ export function mockAuthdAppGETs(fetchMock, permissions) {
     bot_version: 'abcdoeraymeyouandme',
     machine_provider_template: 'https://example.com/leases/%s',
     display_server_url_template: 'https://example.com#id=%s',
+    cas_viewer_server: 'https://cas-viewer-dev.appspot.com',
   }));
 
 

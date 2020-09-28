@@ -97,6 +97,7 @@ window.customElements.define('swarming-app', class extends HTMLElement {
     this._server_details = {
       server_version: 'You must log in to see more details',
       bot_version: '',
+      cas_viewer_server: '',
     };
     this._permissions = {};
   }

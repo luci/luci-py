@@ -120,10 +120,9 @@ export function isolateLink(ref) {
 
 /** casLink constructs a URL to a CAS root directory given a CAS reference.
  */
-export function casLink(ref) {
-  // TODO(crbug.com/1115778): provide CAS viewer host from Swarming server.
-  return `https://cas-viewer-dev.appspot.com/${ref.cas_instance}` +
-         `/blobs/${ref.digest.hash}/${ref.digest.size_bytes}/tree`;
+export function casLink(host, ref) {
+  return `${host}/${ref.cas_instance}/blobs/` +
+    `${ref.digest.hash}/${ref.digest.size_bytes}/tree`;
 }
 
 /** isSummaryTask returns true if this task is a summary taskID

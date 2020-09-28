@@ -227,7 +227,9 @@ const taskInfoTable = (ele, request, result, currentSlice) => {
   ${requestBlock(request, result, currentSlice)}
   ${dimensionBlock(currentSlice.properties.dimensions || [])}
   ${isolateBlock('Isolated Inputs', currentSlice.properties.inputs_ref || {})}
-  ${casBlock('CAS Inputs', currentSlice.properties.cas_input_root || {})}
+  ${casBlock('CAS Inputs',
+      ele._app._server_details.cas_viewer_server,
+      currentSlice.properties.cas_input_root || {})}
   ${arrayInTable(currentSlice.properties.outputs,
       'Expected outputs', (output) => output)}
   ${commitBlock(request.tagMap)}
@@ -413,7 +415,7 @@ const isolateBlock = (title, ref) => {
 </tr>`;
 };
 
-const casBlock = (title, ref) => {
+const casBlock = (title, host, ref) => {
   if (!ref.digest) {
     return '';
   }
@@ -421,7 +423,7 @@ const casBlock = (title, ref) => {
 <tr>
   <td>${title}</td>
   <td>
-    <a href=${casLink(ref)} target='_blank'>
+    <a href=${casLink(host, ref)} target='_blank'>
       ${ref.digest.hash}/${ref.digest.size_bytes}
     </a>
   </td>
@@ -772,7 +774,9 @@ const taskExecutionSection = (ele, request, result, currentSlice) => {
     <td>$${taskCost(result)}</td>
   </tr>
   ${isolateBlock('Isolated Outputs', result.outputs_ref || {})}
-  ${casBlock('CAS Outputs', result.cas_output_root || {})}
+  ${casBlock('CAS Outputs',
+      ele._app._server_details.cas_viewer_server,
+      result.cas_output_root || {})}
   <tr>
     <td>Bot Version</td>
     <td>${result.bot_version}</td>
