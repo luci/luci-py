@@ -209,7 +209,7 @@ class IsolateTest(IsolateBase):
     with self.assertRaises(SystemExit):
       parser.parse_args(['--config-variable', 'Foo'])
 
-  def test_blacklist_default(self):
+  def test_denylist_default(self):
     ok = [
       '.git2',
       '.pyc',
@@ -223,13 +223,13 @@ class IsolateTest(IsolateBase):
       'foo.pyc',
       'bar.swp',
     ]
-    blacklist = tools.gen_denylist(isolateserver.DEFAULT_DENYLIST)
+    denylist = tools.gen_denylist(isolateserver.DEFAULT_DENYLIST)
     for i in ok:
-      self.assertFalse(blacklist(i), i)
+      self.assertFalse(denylist(i), i)
     for i in blocked:
-      self.assertTrue(blacklist(i), i)
+      self.assertTrue(denylist(i), i)
 
-  def test_blacklist_custom(self):
+  def test_denylist_custom(self):
     ok = [
       '.run_test_cases',
       'testserver.log2',
@@ -239,11 +239,11 @@ class IsolateTest(IsolateBase):
       'testserver.log',
       os.path.join('foo', 'testserver.log'),
     ]
-    blacklist = tools.gen_denylist([r'^.+\.run_test_cases$', r'^.+\.log$'])
+    denylist = tools.gen_denylist([r'^.+\.run_test_cases$', r'^.+\.log$'])
     for i in ok:
-      self.assertFalse(blacklist(i), i)
+      self.assertFalse(denylist(i), i)
     for i in blocked:
-      self.assertTrue(blacklist(i), i)
+      self.assertTrue(denylist(i), i)
 
   def test_read_only(self):
     isolate_file = os.path.join(self.cwd, 'fake.isolate')

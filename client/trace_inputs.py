@@ -586,7 +586,8 @@ class ApiBase(object):
 
       Logs all the files this process touched. Ignores directories.
       """
-      def __init__(self, blacklist, pid, initial_cwd):
+
+      def __init__(self, denylist, pid, initial_cwd):
         # Check internal consistency.
         assert isinstance(pid, int), repr(pid)
         assert_is_renderable(initial_cwd)
@@ -598,7 +599,7 @@ class ApiBase(object):
         self.files = {}
         self.executable = None
         self.command = None
-        self._blacklist = blacklist
+        self._denylist = denylist
 
       def to_results_process(self):
         """Resolves file case sensitivity and or late-bound strings."""
@@ -621,14 +622,14 @@ class ApiBase(object):
             x = file_path.get_native_path_case(x)
           return x
 
-        def fix_and_blacklist_path(x, m):
+        def fix_and_denylist_path(x, m):
           """Receives a tuple (filepath, mode) and processes filepath."""
           x = fix_path(x)
           if not x:
             return None, None
-          # The blacklist needs to be reapplied, since path casing could
-          # influence blacklisting.
-          if self._blacklist(x):
+          # The denylist needs to be reapplied, since path casing could
+          # influence the denylisting process.
+          if self._denylist(x):
             return None, None
           # Filters out directories. Some may have passed through.
           if fs.isdir(x):
@@ -638,8 +639,7 @@ class ApiBase(object):
         # Renders all the files as strings, as some could be RelativePath
         # instances. It is important to do it first since there could still be
         # multiple entries with the same path but different modes.
-        rendered = (
-            fix_and_blacklist_path(f, m) for f, m in self.files.items())
+        rendered = (fix_and_denylist_path(f, m) for f, m in self.files.items())
         files = sorted(
           (f for f in rendered if f[0]),
           key=lambda x: (x[0], Results.File.ACCEPTABLE_MODES.index(x[1])))
@@ -654,8 +654,8 @@ class ApiBase(object):
                                [c.to_results_process() for c in self.children])
 
       def add_file(self, filepath, mode):
-        """Adds a file if it passes the blacklist."""
-        if self._blacklist(render(filepath)):
+        """Adds a file if it passes the denylist."""
+        if self._denylist(render(filepath)):
           return
         logging.debug('add_file(%d, %s, %s)', self.pid, filepath, mode)
         # Note that filepath and not render(filepath) is added. It is because
@@ -667,8 +667,8 @@ class ApiBase(object):
           # Take the highest value.
           self.files[filepath] = mode
 
-    def __init__(self, blacklist):
-      self.blacklist = blacklist
+    def __init__(self, denylist):
+      self.denylist = denylist
       # Initial process.
       self.root_process = None
       # dict to accelerate process lookup, to not have to lookup the whole graph
@@ -763,7 +763,7 @@ class ApiBase(object):
     raise NotImplementedError()
 
   @classmethod
-  def parse_log(cls, logname, blacklist, trace_name):
+  def parse_log(cls, logname, denylist, trace_name):
     """Processes trace logs and returns the files opened and the files that do
     not exist.
 
@@ -771,7 +771,7 @@ class ApiBase(object):
 
     Arguments:
       - logname: must be an absolute path.
-      - blacklist: must be a lambda.
+      - denylist: must be a lambda.
       - trace_name: optional trace to read, defaults to reading all traces.
 
     Most of the time, files that do not exist are temporary test files that
@@ -920,7 +920,7 @@ class Strace(ApiBase):
         flat map.
         """
         logging.info('%s(%d)' % (self.__class__.__name__, pid))
-        super(Strace.Context.Process, self).__init__(root.blacklist, pid, None)
+        super(Strace.Context.Process, self).__init__(root.denylist, pid, None)
         assert isinstance(root, ApiBase.Context)
         self._root = weakref.ref(root)
         # The dict key is the function name of the pending call, like 'open'
@@ -1298,13 +1298,13 @@ class Strace(ApiBase):
             return os.path.normpath(os.path.join(self.get_cwd(), filepath))
           return self.RelativePath(self.get_cwd(), filepath)
 
-    def __init__(self, blacklist, root_pid, initial_cwd):
+    def __init__(self, denylist, root_pid, initial_cwd):
       """|root_pid| may be None when the root process is not known.
 
       In that case, a search is done after reading all the logs to figure out
       the root process.
       """
-      super(Strace.Context, self).__init__(blacklist)
+      super(Strace.Context, self).__init__(denylist)
       assert_is_renderable(initial_cwd)
       self.root_pid = root_pid
       self.initial_cwd = initial_cwd
@@ -1533,7 +1533,7 @@ class Strace(ApiBase):
         fs.remove(i)
 
   @classmethod
-  def parse_log(cls, logname, blacklist, trace_name):
+  def parse_log(cls, logname, denylist, trace_name):
     logging.info('parse_log(%s, ..., %s)', logname, trace_name)
     assert os.path.isabs(logname)
     data = tools.read_json(logname)
@@ -1546,7 +1546,7 @@ class Strace(ApiBase):
         'trace': item['trace'],
       }
       try:
-        context = cls.Context(blacklist, item['pid'], item['cwd'])
+        context = cls.Context(denylist, item['pid'], item['cwd'])
         for pidfile in glob.iglob('%s.%s.*' % (logname, item['trace'])):
           logging.debug('Reading %s', pidfile)
           pid = pidfile.rsplit('.', 1)[1]
@@ -1609,10 +1609,10 @@ class Dtrace(ApiBase):
         super(Dtrace.Context.Process, self).__init__(*args)
         self.cwd = self.initial_cwd
 
-    def __init__(self, blacklist, thunk_pid, initial_cwd):
+    def __init__(self, denylist, thunk_pid, initial_cwd):
       logging.info(
           '%s(%d, %s)' % (self.__class__.__name__, thunk_pid, initial_cwd))
-      super(Dtrace.Context, self).__init__(blacklist)
+      super(Dtrace.Context, self).__init__(denylist)
       assert isinstance(initial_cwd, six.text_type), initial_cwd
       # Process ID of the temporary script created by create_subprocess_thunk().
       self._thunk_pid = thunk_pid
@@ -1684,10 +1684,10 @@ class Dtrace(ApiBase):
             None, None, None)
       ppid = int(match.group(1))
       if ppid == self._thunk_pid and not self.root_process:
-        proc = self.root_process = self.Process(
-            self.blacklist, pid, self._initial_cwd)
+        proc = self.root_process = self.Process(self.denylist, pid,
+                                                self._initial_cwd)
       elif ppid in self._process_lookup:
-        proc = self.Process(self.blacklist, pid, self._process_lookup[ppid].cwd)
+        proc = self.Process(self.denylist, pid, self._process_lookup[ppid].cwd)
         self._process_lookup[ppid].children.append(proc)
       else:
         # Another process tree, ignore.
@@ -2367,13 +2367,13 @@ class Dtrace(ApiBase):
         fs.remove(logname + ext)
 
   @classmethod
-  def parse_log(cls, logname, blacklist, trace_name):
+  def parse_log(cls, logname, denylist, trace_name):
     logging.info('parse_log(%s, ..., %s)', logname, trace_name)
     assert os.path.isabs(logname)
 
-    def blacklist_more(filepath):
+    def denylist_more(filepath):
       # All the HFS metadata is in the form /.vol/...
-      return blacklist(filepath) or re.match(r'^\/\.vol\/.+$', filepath)
+      return denylist(filepath) or re.match(r'^\/\.vol\/.+$', filepath)
 
     data = tools.read_json(logname)
     out = []
@@ -2385,7 +2385,7 @@ class Dtrace(ApiBase):
         'trace': item['trace'],
       }
       try:
-        context = cls.Context(blacklist_more, item['pid'], item['cwd'])
+        context = cls.Context(denylist_more, item['pid'], item['cwd'])
         # It's fine to assume the file as UTF-8: OSX enforces the file names to
         # be valid UTF-8 and we control the log output.
         for line in codecs.open(logname + '.log', 'rb', encoding='utf-8'):
@@ -2430,11 +2430,11 @@ class LogmanTrace(ApiBase):
         # Handle file objects that succeeded.
         self.file_objects = {}
 
-    def __init__(self, blacklist, thunk_pid, trace_name, thunk_cmd):
+    def __init__(self, denylist, thunk_pid, trace_name, thunk_cmd):
       logging.info(
           '%s(%d, %s, %s)', self.__class__.__name__, thunk_pid, trace_name,
           thunk_cmd)
-      super(LogmanTrace.Context, self).__init__(blacklist)
+      super(LogmanTrace.Context, self).__init__(denylist)
       self._drive_map = file_path.DosDriveMap()
       # Threads mapping to the corresponding process id.
       self._threads_active = {}
@@ -2645,15 +2645,15 @@ class LogmanTrace(ApiBase):
               ('Parent process is _thunk_pid(%d) but thunk_process(%d) is '
                'already set') % (self._thunk_pid, self._thunk_process.pid),
               None, None, None)
-        proc = self.Process(self.blacklist, pid, None)
+        proc = self.Process(self.denylist, pid, None)
         self._thunk_process = proc
         return
       elif ppid == self._thunk_pid and self._thunk_process:
-        proc = self.Process(self.blacklist, pid, None)
+        proc = self.Process(self.denylist, pid, None)
         self.root_process = proc
         ppid = None
       elif self._process_lookup.get(ppid):
-        proc = self.Process(self.blacklist, pid, None)
+        proc = self.Process(self.denylist, pid, None)
         self._process_lookup[ppid].children.append(proc)
       else:
         # Ignore
@@ -3143,18 +3143,18 @@ class LogmanTrace(ApiBase):
         fs.remove(logname + ext)
 
   @classmethod
-  def parse_log(cls, logname, blacklist, trace_name):
+  def parse_log(cls, logname, denylist, trace_name):
     logging.info('parse_log(%s, ..., %s)', logname, trace_name)
     assert os.path.isabs(logname)
 
-    def blacklist_more(filepath):
+    def denylist_more(filepath):
       # All the NTFS metadata is in the form x:\$EXTEND or stuff like that.
-      return blacklist(filepath) or re.match(r'[A-Z]\:\\\$EXTEND', filepath)
+      return denylist(filepath) or re.match(r'[A-Z]\:\\\$EXTEND', filepath)
 
     # Create a list of (Context, result_dict) tuples. This is necessary because
     # the csv file may be larger than the amount of available memory.
     contexes = [(
-        cls.Context(blacklist_more, item['pid'], item['trace'],
+        cls.Context(denylist_more, item['pid'], item['trace'],
                     item['thunk_cmd']),
         {
             'output': item['output'],
@@ -3207,7 +3207,7 @@ def get_api(**kwargs):
   return flavors.get(sys.platform, Strace)(**kwargs)
 
 
-def extract_directories(root_dir, files, blacklist):
+def extract_directories(root_dir, files, denylist):
   """Detects if all the files in a directory are in |files| and if so, replace
   the individual files by a Results.Directory instance.
 
@@ -3217,7 +3217,7 @@ def extract_directories(root_dir, files, blacklist):
   Arguments:
     - root_dir: Optional base directory that shouldn't be search further.
     - files: list of Results.File instances.
-    - blacklist: lambda to reject unneeded files, for example '.+\\.pyc'.
+    - denylist: lambda to reject unneeded files, for example '.+\\.pyc'.
   """
   logging.info(
       'extract_directories(%s, %d files, ...)' % (root_dir, len(files)))
@@ -3260,7 +3260,7 @@ def extract_directories(root_dir, files, blacklist):
       logging.debug(
           '%s was a directory but doesn\'t exist anymore; ignoring', directory)
       continue
-    actual = set(f for f in fs.listdir(directory) if not blacklist(f))
+    actual = set(f for f in fs.listdir(directory) if not denylist(f))
     expected = set(buckets[directory])
     if not (actual - expected):
       parent = os.path.dirname(directory)
@@ -3353,8 +3353,10 @@ def CMDread(parser, args):
       '-j', '--json', action='store_true',
       help='Outputs raw result data as json')
   parser.add_option(
-      '--trace-blacklist', action='append', default=[],
-      help='List of regexp to use as blacklist filter')
+      '--trace-blacklist',
+      action='append',
+      default=[],
+      help='List of regexp to use as denylist filter')
   options, args = parser.parse_args(args)
 
   if options.root_dir:
@@ -3363,8 +3365,8 @@ def CMDread(parser, args):
 
   variables = dict(options.variables)
   api = get_api()
-  blacklist = tools.gen_denylist(options.trace_blacklist)
-  data = api.parse_log(options.log, blacklist, options.trace_name)
+  denylist = tools.gen_denylist(options.trace_blacklist)
+  data = api.parse_log(options.log, denylist, options.trace_name)
   # Process each trace.
   output_as_json = []
   try:
@@ -3383,8 +3385,8 @@ def CMDread(parser, args):
       if options.json:
         output_as_json.append(results.flatten())
       else:
-        simplified = extract_directories(
-            options.root_dir, results.files, blacklist)
+        simplified = extract_directories(options.root_dir, results.files,
+                                         denylist)
         simplified = [f.replace_variables(variables) for f in simplified]
         if len(data) > 1:
           print('Trace: %s' % item['trace'])
