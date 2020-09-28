@@ -206,7 +206,7 @@ def _expand_symlinks(indir, relfile):
 
 
 @tools.profile
-def expand_directory_and_symlink(indir, relfile, blacklist, follow_symlinks):
+def expand_directory_and_symlink(indir, relfile, denylist, follow_symlinks):
   """Expands a single input. It can result in multiple outputs.
 
   This function is recursive when relfile is a directory.
@@ -273,19 +273,19 @@ def expand_directory_and_symlink(indir, relfile, blacklist, follow_symlinks):
     try:
       for filename in fs.listdir(infile):
         inner_relfile = os.path.join(relfile, filename)
-        if blacklist and blacklist(inner_relfile):
+        if denylist and denylist(inner_relfile):
           continue
         if fs.isdir(os.path.join(indir, inner_relfile)):
           inner_relfile += os.path.sep
         # Apply recursively.
         for i, is_symlink in expand_directory_and_symlink(
-            indir, inner_relfile, blacklist, follow_symlinks):
+            indir, inner_relfile, denylist, follow_symlinks):
           yield i, is_symlink
     except OSError as e:
       raise MappingError(
           u'Unable to iterate over directory %s.\n%s' % (infile, e))
   else:
-    # Always add individual files even if they were blacklisted.
+    # Always add individual files even if they were in the denylist.
     if fs.isdir(infile):
       raise MappingError(
           u'Input directory %s must have a trailing slash' % infile)
