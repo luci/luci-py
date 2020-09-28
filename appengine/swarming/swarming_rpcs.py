@@ -192,6 +192,7 @@ class ServerDetails(messages.Message):
   luci_config = messages.StringField(5)
   default_isolate_server = messages.StringField(6)
   default_isolate_namespace = messages.StringField(7)
+  cas_viewer_server = messages.StringField(8)
 
 
 class BootstrapToken(messages.Message):

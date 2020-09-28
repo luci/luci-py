@@ -140,6 +140,8 @@ class ServerApiTest(BaseTest):
             u'default-gzip',
         u'server_version':
             unicode(utils.get_app_version()),
+        u'cas_viewer_server':
+        u'https://test-cas-viewer-server.com',
     }
     self.assertEqual(expected, response.json)
 

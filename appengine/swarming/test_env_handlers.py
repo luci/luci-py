@@ -75,7 +75,9 @@ class AppTestBase(test_case.TestCase):
             users_group=users_group,
         ),
         resultdb=config_pb2.ResultDBSettings(
-            server='https://test-resultdb-server.com'))
+            server='https://test-resultdb-server.com'),
+        cas=config_pb2.CASSettings(
+            viewer_server='https://test-cas-viewer-server.com'))
     self.mock(config, '_get_settings', lambda: ('test_rev', cfg))
     self.mock(
         app_identity,
