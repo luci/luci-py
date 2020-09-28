@@ -327,6 +327,25 @@ class BotApiTest(test_env_handlers.AppTestBase):
     }
     self.assertEqual(expected, response)
 
+  def test_poll_empty_dimension_value(self):
+    params = self.do_handshake()
+    params['dimensions']['empty_key'] = []
+    errors = []
+
+    def add_error(request, source, message):
+      self.assertTrue(request)
+      self.assertEqual('bot', source)
+      errors.append(message)
+
+    self.mock(ereporter2, 'log_request', add_error)
+    response = self.post_json('/swarming/api/v1/bot/poll', params)
+    self.assertTrue(response['quarantined'])
+    self.assertEqual([
+        'Quarantined Bot\n'
+        'https://test-swarming.appspot.com/restricted/bot/bot1\n'
+        'Dimension values should not be empty. key: empty_key'
+    ], errors)
+
   def test_poll_bad_version(self):
     params = self.do_handshake()
     latest_version = params['version']

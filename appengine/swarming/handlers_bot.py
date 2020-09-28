@@ -315,6 +315,11 @@ def _validate_dimensions(dimensions):
                         (key, values))
       # the following validations assume the values is a list.
       continue
+
+    if len(values) == 0:
+      error_msgs.append("Dimension values should not be empty. key: %s" % key)
+      continue
+
     has_invalid_value_type = False
     for value in sorted(values):
       if config.validate_dimension_value(value):
