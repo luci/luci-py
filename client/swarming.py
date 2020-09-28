@@ -291,11 +291,13 @@ def trigger_task_shards(swarming, task_request, shards):
       print(
           'Priority was reset to %s' % task['request']['priority'],
           file=sys.stderr)
+    view_url = '%s/user/task/%s' % (swarming, task['task_id'])
     tasks[request['name']] = {
         'shard_index': shard_index,
         'task_id': task['task_id'],
-        'view_url': '%s/user/task/%s' % (swarming, task['task_id']),
+        'view_url': view_url,
     }
+    logging.info('Task UI: %s', view_url)
 
   # Some shards weren't triggered. Abort everything.
   if len(tasks) != len(requests):
