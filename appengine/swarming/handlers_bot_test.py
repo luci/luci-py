@@ -1032,6 +1032,35 @@ class BotApiTest(test_env_handlers.AppTestBase):
         ))
     es_client_mock.reset_mock()
 
+    # Enqueue a task that has a parent task.
+    self.set_as_user()
+    _, child_task_id = self.client_create_task_raw(parent_task_id=run_id)
+    child_run_id = child_task_id[:-1] + '1'
+    self.set_as_bot()
+    es_client_mock.AssignTasks.return_value = plugin_pb2.AssignTasksResponse(
+        assignments=[
+            plugin_pb2.TaskAssignment(
+                bot_id=u'bot1', task_id=child_task_id, slice_number=0),
+        ])
+    response = self.post_json('/swarming/api/v1/bot/poll', params)
+    self.assertEqual(response['cmd'], u'run')
+    self.assertEqual(response['manifest']['task_id'], child_run_id)
+
+    # Enqueue a task that has a parent task and a grand parent task.
+    self.set_as_user()
+    _, grand_child_task_id = self.client_create_task_raw(
+        parent_task_id=child_run_id)
+    grand_child_run_id = grand_child_task_id[:-1] + '1'
+    self.set_as_bot()
+    es_client_mock.AssignTasks.return_value = plugin_pb2.AssignTasksResponse(
+        assignments=[
+            plugin_pb2.TaskAssignment(
+                bot_id=u'bot1', task_id=grand_child_task_id, slice_number=0),
+        ])
+    response = self.post_json('/swarming/api/v1/bot/poll', params)
+    self.assertEqual(response['cmd'], u'run')
+    self.assertEqual(response['manifest']['task_id'], grand_child_run_id)
+
     # TODO(crbug.com/1131822): add a test case for _ensure_active_slice() with
     # a task has multiple slices.
 
