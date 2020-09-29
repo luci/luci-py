@@ -465,6 +465,7 @@ def run_command(
           logging.warning('Sending SIGTERM')
           proc.terminate()
 
+      kill_sent = False
       # Ignore signals in grace period. Forcibly give the grace period to the
       # child process.
       if exit_code is None:
@@ -481,8 +482,14 @@ def run_command(
             # - processed exited late, exit code will be -9 on posix.
             logging.warning('Grace exhausted; sending SIGKILL')
             proc.kill()
+            kill_sent = True
       logging.info('Waiting for process exit')
       exit_code = proc.wait()
+
+      # the process group / job object may be dangling so if we didn't kill
+      # it already, give it a poke now.
+      if not kill_sent:
+        proc.kill()
     except OSError as e:
       # This is not considered to be an internal error. The executable simply
       # does not exit.
