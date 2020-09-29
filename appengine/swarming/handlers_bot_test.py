@@ -21,6 +21,7 @@ import test_env_handlers
 
 from google.appengine.api import datastore_errors
 from google.appengine.ext import ndb
+from google.protobuf import json_format
 
 import webapp2
 import webtest
@@ -29,11 +30,14 @@ import handlers_bot
 from components import auth
 from components import ereporter2
 from components import utils
+from proto.api import plugin_pb2
 from server import bot_archive
 from server import bot_auth
 from server import bot_code
 from server import bot_groups_config
 from server import bot_management
+from server import external_scheduler
+from server import pools_config
 from server import service_accounts
 from server import task_pack
 from server import task_queues
@@ -71,8 +75,17 @@ class BotApiTest(test_env_handlers.AppTestBase):
     self.mock_now(self.now)
     self.mock_default_pool_acl([])
 
+  def tearDown(self):
+    super(BotApiTest, self).tearDown()
+    mock.patch.stopall()
+
   @ndb.non_transactional
   def _enqueue_task(self, url, queue_name, **kwargs):
+    if queue_name == 'es-notify-tasks':
+      es_host = kwargs['params']['es_host']
+      proto = plugin_pb2.NotifyTasksRequest()
+      json_format.Parse(kwargs['params']['request_json'], proto)
+      return external_scheduler.notify_request_now(es_host, proto)
     del kwargs
     if queue_name in ('cancel-children-tasks', 'pubsub'):
       return True
@@ -896,6 +909,131 @@ class BotApiTest(test_env_handlers.AppTestBase):
     params = self.do_handshake()
     self.assertEqual(u'print("Hi");import sys; sys.exit(1)',
                      params['bot_config'])
+
+  def test_poll_with_external_scheduler(self):
+    # Inject external scheduler config.
+    es_cfg = pools_config.ExternalSchedulerConfig(
+        address='qscheduler-test.example.com',
+        id='all',
+        dimensions=[],
+        all_dimensions=[],
+        any_dimensions=[],
+        enabled=True,
+        allow_es_fallback=False)
+    mock.patch('server.external_scheduler.config_for_bot').start(
+    ).return_value = es_cfg
+    mock.patch('server.external_scheduler.config_for_task').start(
+    ).return_value = es_cfg
+    # Inject prpc client.
+    es_client_mock = mock.Mock()
+    mock.patch('server.external_scheduler._get_client').start(
+    ).return_value = es_client_mock
+
+    # Register bot.
+    params = self.do_handshake()
+
+    # Enqueue a task.
+    self.set_as_user()
+    resp, task_id = self.client_create_task_raw()
+    task = resp['request']
+    task_dimensions_flat = [
+        '%s:%s' % (d['key'], d['value'])
+        for d in task['task_slices'][0]['properties']['dimensions']
+    ]
+
+    run_id = task_id[:-1] + '1'
+    self.set_as_bot()
+
+    bot_dimensions_flat = task_queues.bot_dimensions_to_flat(
+        params['dimensions'])
+
+    # First, no task assigned.
+    es_client_mock.AssignTasks.return_value = plugin_pb2.AssignTasksResponse()
+    response = self.post_json('/swarming/api/v1/bot/poll', params)
+    expected = {
+        'duration': mock.ANY,
+        'cmd': 'sleep',
+        'quarantined': False,
+    }
+    self.assertEqual(expected, response)
+
+    # Assert prpc calls.
+    es_client_mock.AssignTasks.assert_called_once()
+    es_client_mock.NotifyTasks.assert_called_once()
+    assign_req = es_client_mock.AssignTasks.call_args[0][0]
+    self.assertEqual(
+        assign_req,
+        plugin_pb2.AssignTasksRequest(
+            scheduler_id=u'all',
+            idle_bots=[
+                plugin_pb2.IdleBot(
+                    bot_id=u'bot1', dimensions=bot_dimensions_flat),
+            ],
+            time=assign_req.time,
+        ))
+    notify_req = es_client_mock.NotifyTasks.call_args[0][0]
+    self.assertEqual(
+        notify_req,
+        plugin_pb2.NotifyTasksRequest(
+            scheduler_id=u'all',
+            notifications=[
+                plugin_pb2.NotifyTasksItem(
+                    task=plugin_pb2.TaskSpec(
+                        id=task_id,
+                        tags=task['tags'],
+                        slices=[
+                            plugin_pb2.SliceSpec(
+                                dimensions=task_dimensions_flat),
+                        ],
+                        state=u'PENDING',
+                        enqueued_time=notify_req.notifications[0].time,
+                    ),
+                    time=notify_req.notifications[0].time,
+                ),
+            ],
+        ))
+    es_client_mock.reset_mock()
+
+    # Second, one task assigned.
+    es_client_mock.AssignTasks.return_value = plugin_pb2.AssignTasksResponse(
+        assignments=[
+            plugin_pb2.TaskAssignment(
+                bot_id=u'bot1', task_id=task_id, slice_number=0),
+        ])
+    es_client_mock.NotifyTasks.return_value = plugin_pb2.NotifyTasksResponse()
+    response = self.post_json('/swarming/api/v1/bot/poll', params)
+    self.assertEqual(response['cmd'], u'run')
+    self.assertEqual(response['manifest']['task_id'], run_id)
+
+    # Assert prpc calls.
+    es_client_mock.AssignTasks.assert_called_once()
+    es_client_mock.NotifyTasks.assert_called_once()
+    notify_req = es_client_mock.NotifyTasks.call_args[0][0]
+    self.assertEqual(
+        notify_req,
+        plugin_pb2.NotifyTasksRequest(
+            scheduler_id=u'all',
+            notifications=[
+                plugin_pb2.NotifyTasksItem(
+                    task=plugin_pb2.TaskSpec(
+                        id=task_id,
+                        tags=task['tags'],
+                        slices=[
+                            plugin_pb2.SliceSpec(
+                                dimensions=task_dimensions_flat),
+                        ],
+                        state=u'RUNNING',
+                        bot_id=u'bot1',
+                        enqueued_time=notify_req.notifications[0].time,
+                    ),
+                    time=notify_req.notifications[0].time,
+                ),
+            ],
+        ))
+    es_client_mock.reset_mock()
+
+    # TODO(crbug.com/1131822): add a test case for _ensure_active_slice() with
+    # a task has multiple slices.
 
   def test_complete_task_isolated(self):
     # Successfully poll a task.
