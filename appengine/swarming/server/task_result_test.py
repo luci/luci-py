@@ -309,13 +309,18 @@ class TaskResultApiTest(TestCase):
     actual.started_ts = self.now
     actual.dead_after_ts = self.now + datetime.timedelta(
         seconds=request.bot_ping_tolerance_secs)
+    actual.resultdb_info = task_result.ResultDBInfo(
+        hostname='hostname',
+        invocation='invocation'
+    )
     # Trigger _pre_put_hook().
     actual.put()
     expected = self._gen_result(
         modified_ts=self.now,
         started_ts=self.now,
         dead_after_ts=self.now +
-        datetime.timedelta(seconds=request.bot_ping_tolerance_secs))
+        datetime.timedelta(seconds=request.bot_ping_tolerance_secs),
+        resultdb_info={'hostname':'hostname', 'invocation':'invocation'})
     self.assertEqual(expected, actual.to_dict())
     self.assertEqual(50, actual.request.priority)
     self.assertEqual(True, actual.can_be_canceled)

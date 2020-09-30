@@ -924,7 +924,7 @@ message PubSub {
 // partition to enforce strong consistency and ignore on-going tasks. See
 // https://cloud.google.com/bigquery/streaming-data-into-bigquery#dataconsistency
 // for more information.
-// NEXT_ID: 22
+// NEXT_ID: 23
 message TaskResult {
   TaskRequest request = 1;
 
@@ -1032,6 +1032,9 @@ message TaskResult {
   CASTree outputs = 20;
   // RBE-CAS output, if any.
   CASReference cas_output_root = 21;
+
+  // ResultDB related properties for this task.
+  ResultDBInfo resultdb_info = 22;
 }
 
 // Defines pinned CIPD packages that were installed during the task.
@@ -1286,4 +1289,19 @@ enum TaskState {
 message ResultDBCfg {
   // Flag to indicates the integration is enabled.
   bool enable = 1;
+}
+
+// ResultDB Related properties.
+message ResultDBInfo {
+  // ResultDB hostname, e.g. "results.api.cr.dev"
+  string hostname =1;
+
+  // Name of the task's ResultDB invocation.
+  //
+  // e.g. "invocations/task-chromium-swarm.appspot.com-deadbeef1"
+  // None if Swarming:ResultDB integration was not enabled for this task.
+  //
+  // If the task was deduplicated, this equals invocation name of the original
+  // task.
+  string  invocation = 2;
 }
