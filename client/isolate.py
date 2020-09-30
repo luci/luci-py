@@ -184,19 +184,19 @@ def chromium_save_isolated(isolated, data, path_variables, algo):
   cost by splitting low-churn files off the master .isolated file. It also
   reduces overall isolateserver memcache consumption.
   """
-  slaves = []
+  subs = []
 
   def extract_into_included_isolated(prefix):
-    new_slave = {
-      'algo': data['algo'],
-      'files': {},
-      'version': data['version'],
+    new_sub = {
+        'algo': data['algo'],
+        'files': {},
+        'version': data['version'],
     }
     for f in list(data['files'].keys()):
       if f.startswith(prefix):
-        new_slave['files'][f] = data['files'].pop(f)
-    if new_slave['files']:
-      slaves.append(new_slave)
+        new_sub['files'][f] = data['files'].pop(f)
+    if new_sub['files']:
+      subs.append(new_sub)
 
   # Split test/data/ in its own .isolated file.
   extract_into_included_isolated(os.path.join('test', 'data', ''))
@@ -206,12 +206,12 @@ def chromium_save_isolated(isolated, data, path_variables, algo):
     extract_into_included_isolated(path_variables['PRODUCT_DIR'])
 
   files = []
-  for index, f in enumerate(slaves):
-    slavepath = isolated[:-len('.isolated')] + '.%d.isolated' % index
-    tools.write_json(slavepath, f, True)
-    data.setdefault('includes', []).append(
-        isolated_format.hash_file(slavepath, algo))
-    files.append(os.path.basename(slavepath))
+  for index, f in enumerate(subs):
+    sub_path = isolated[:-len('.isolated')] + '.%d.isolated' % index
+    tools.write_json(sub_path, f, True)
+    data.setdefault('includes',
+                    []).append(isolated_format.hash_file(sub_path, algo))
+    files.append(os.path.basename(sub_path))
 
   isolated_format.save_isolated(isolated, data)
   return files
@@ -280,7 +280,7 @@ class SavedState(Flattenable):
       # Algorithm used to generate the hash. The only supported value is at the
       # time of writing 'sha-1'.
       'algo',
-      # List of included .isolated files. Used to support/remember 'slave'
+      # List of included .isolated files. Used to support/remember 'sub'
       # .isolated files. Relative path to isolated_basedir.
       'child_isolated_files',
       # Cache of the processed command. This value is saved because .isolated
