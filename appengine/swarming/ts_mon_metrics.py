@@ -52,11 +52,10 @@ _bucketer = gae_ts_mon.GeometricBucketer(growth_factor=10**0.05,
 
 # Regular (instance-local) metrics: jobs/completed and jobs/durations.
 # Both have the following metric fields:
-# - project_id: e.g. 'chromium'
+# - project_id: e.g. 'chromium'.
 # - subproject_id: e.g. 'blink'. Set to empty string if not used.
-# - pool: e.g. 'Chrome'
-# - spec_name: name of a job specification, e.g. '<master>:<builder>'
-#     for buildbot jobs.
+# - pool: e.g. 'Chrome'.
+# - spec_name: name of a job specification.
 # - result: one of 'success', 'failure', or 'infra-failure'.
 _jobs_completed = gae_ts_mon.CounterMetric(
     'jobs/completed',
@@ -86,8 +85,7 @@ _jobs_durations = gae_ts_mon.CumulativeDistributionMetric(
 # - project_id: e.g. 'chromium'
 # - subproject_id: e.g. 'blink'. Set to empty string if not used.
 # - pool: e.g. 'Chrome'
-# - spec_name: name of a job specification, e.g. '<master>:<builder>'
-#     for buildbot jobs.
+# - spec_name: name of a job specification.
 # - deduped: boolean describing whether the job was deduped or not.
 _jobs_requested = gae_ts_mon.CounterMetric(
     'jobs/requested',
@@ -101,11 +99,10 @@ _jobs_requested = gae_ts_mon.CounterMetric(
 
 
 # Swarming-specific metric. Metric fields:
-# - project_id: e.g. 'chromium'
+# - project_id: e.g. 'chromium'.
 # - subproject_id: e.g. 'blink'. Set to empty string if not used.
-# - pool: e.g. 'Chrome'
-# - spec_name: name of a job specification, e.g. '<master>:<builder>'
-#     for buildbot jobs.
+# - pool: e.g. 'Chrome'.
+# - spec_name: name of a job specification.
 _tasks_expired = gae_ts_mon.CounterMetric(
     'swarming/tasks/expired', 'Number of expired tasks', [
         gae_ts_mon.StringField('spec_name'),
@@ -145,12 +142,11 @@ _task_bots_runnable = gae_ts_mon.CumulativeDistributionMetric(
 )
 
 
-# Global metric. Metric fields:
-# - project_id: e.g. 'chromium'
+# Global metric. Metric fields:.
+# - project_id: e.g. 'chromium'.
 # - subproject_id: e.g. 'blink'. Set to empty string if not used.
-# - pool: e.g. 'Chrome'
-# - spec_name: name of a job specification, e.g. '<master>:<builder>'
-#     for buildbot jobs.
+# - pool: e.g. 'Chrome'.
+# - spec_name: name of a job specification.
 # Override target field:
 # - hostname: 'autogen:<executor_id>': name of the bot that executed a job,
 #     or an empty string. e.g. 'autogen:swarm42-m4'.
@@ -165,11 +161,10 @@ _jobs_running = gae_ts_mon.BooleanMetric(
     ])
 
 # Global metric. Metric fields:
-# - project_id: e.g. 'chromium'
+# - project_id: e.g. 'chromium'.
 # - subproject_id: e.g. 'blink'. Set to empty string if not used.
-# - pool: e.g. 'Chrome'
-# - spec_name: name of a job specification, e.g. '<master>:<builder>'
-#     for buildbot jobs.
+# - pool: e.g. 'Chrome'.
+# - spec_name: name of a job specification.
 # - status: 'pending' or 'running'.
 _jobs_active = gae_ts_mon.GaugeMetric(
     'jobs/active', 'Number of running, pending or otherwise active jobs.', [

@@ -253,9 +253,9 @@ more information. A path to a `.isolated` file will work too.
 
 ### Running a task asynchronously
 
-The buildbot slaves uses `trigger` + `collect`, so they can do multiple things
-simultaneously. The general idea is that you trigger all the tests you want to
-run immediately, then collect the results.
+Tasks can be triggered asynchronously by using `trigger` + `collect`. The
+general idea is that you trigger all the tests you want to run immediately,
+then collect the results.
 
 
 #### Triggering

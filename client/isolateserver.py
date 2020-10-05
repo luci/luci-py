@@ -91,9 +91,9 @@ ALREADY_COMPRESSED_TYPES = [
     'zip',
 ]
 
-# The delay (in seconds) to wait between logging statements when retrieving
-# the required files. This is intended to let the user (or buildbot) know that
-# the program is still running.
+# The delay (in seconds) to wait between logging statements when retrieving the
+# required files. This is intended to let the user know that the program is
+# still running.
 DELAY_BETWEEN_UPDATES_IN_SECS = 30
 
 

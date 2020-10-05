@@ -618,8 +618,8 @@ The Swarming Bot design used a _negative_ design process. Anti-patterns were
 looked at and a minimal design was created that didn't have any of the undesired
 properties.
 
-Here's the laundry list of anti-patterns observed from our
-[buildbot](https://buildbot.net/) slaves and other similar systems
+Here's the laundry list of anti-patterns observed from the system we
+historically used, [buildbot](https://buildbot.net/), and other similar systems
 ([Jenkins](https://jenkins-ci.org/) and several other CI systems falls in the
 same bucket) and how these were addressed. Don't take this as
 _Jenkins/buildbot/etc is bad_, it's about redesigning the core functionality
