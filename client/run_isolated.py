@@ -118,7 +118,7 @@ _CAS_CLIENT_DIR = u'cc'
 # Or take revision from
 # https://ci.chromium.org/p/infra-internal/g/infra-packagers/console
 ISOLATED_PACKAGE = 'infra/tools/luci/isolated/${platform}'
-ISOLATED_REVISION = 'git_revision:3ccf4cc0119188dbc4befff330348d972b15711d'
+ISOLATED_REVISION = 'git_revision:1259c49ce786d774d28eb6914cb0d3a1ce6f3200'
 _CAS_PACKAGE = 'infra/tools/luci/cas/${platform}'
 # TODO(jwata): pin a stable version.
 _CAS_REVISION = 'latest'
