@@ -333,7 +333,7 @@ class RunIsolatedTest(unittest.TestCase):
   def _ensure_cas_client(self):
     with cipd.get_client(self._cipd_cache_dir) as cipd_client:
       packages = [
-          ('', run_isolated._CAS_PACKAGE, run_isolated._CAS_REVISION),
+          ('', run_isolated._CAS_PACKAGE, run_isolated._LUCI_GO_REVISION),
       ]
       run_isolated._install_packages(self._cas_client_dir,
                                      self._cipd_packages_cache_dir, cipd_client,

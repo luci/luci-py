@@ -8,7 +8,7 @@ cd $(dirname $0)
 
 # take current revision from written tag.
 current_revision=$(
-    grep "^ISOLATED_REVISION = 'git_revision:" run_isolated.py | \
+    grep "^_LUCI_GO_REVISION = 'git_revision:" run_isolated.py | \
     sed -r 's/^.*([a-f0-9]{40,40}).*$/\1/')
 
 # get newer revision and log.
@@ -34,11 +34,18 @@ do
         echo "check https://ci.chromium.org/p/infra-internal/g/infra-packagers/console"
         exit 1
     fi
+
+    if ! [[ $(cipd search "infra/tools/luci/cas/${arch}" \
+              -tag "git_revision:${target_revision}") =~ "Instances" ]]; then
+        echo "package for ${arch} is not made"
+        echo "check https://ci.chromium.org/p/infra-internal/g/infra-packagers/console"
+        exit 1
+    fi
 done
 
 sed -i -e "s/${current_revision}/${target_revision}/" run_isolated.py
 
-git commit -am "client: update isolated client
+git commit -am "client: update go clients
 
 https://chromium.googlesource.com/infra/infra/+log/${current_revision}..${target_revision}/DEPS
 

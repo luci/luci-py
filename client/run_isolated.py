@@ -114,14 +114,12 @@ ISOLATED_CLIENT_DIR = u'ic'
 _CAS_CLIENT_DIR = u'cc'
 
 # TODO(tikuta): take these parameter from luci-config?
-# Update tag by `./client/update_isolated.sh`.
+# Update tag by `./client/update_go_clients.sh`.
 # Or take revision from
 # https://ci.chromium.org/p/infra-internal/g/infra-packagers/console
 ISOLATED_PACKAGE = 'infra/tools/luci/isolated/${platform}'
-ISOLATED_REVISION = 'git_revision:1259c49ce786d774d28eb6914cb0d3a1ce6f3200'
 _CAS_PACKAGE = 'infra/tools/luci/cas/${platform}'
-# TODO(jwata): pin a stable version.
-_CAS_REVISION = 'latest'
+_LUCI_GO_REVISION = 'git_revision:1259c49ce786d774d28eb6914cb0d3a1ce6f3200'
 
 # Keep synced with task_request.py
 CACHE_NAME_RE = re.compile(r'^[a-z0-9_]{1,4096}$')
@@ -1352,11 +1350,11 @@ def install_client_and_packages(run_dir, packages, service_url,
 
     # Install isolated client to |isolated_dir|.
     _install_packages(isolated_dir, cipd_cache_dir, client,
-                      [('', ISOLATED_PACKAGE, ISOLATED_REVISION)])
+                      [('', ISOLATED_PACKAGE, _LUCI_GO_REVISION)])
 
     # Install cas client to |cas_dir|.
     _install_packages(cas_dir, cipd_cache_dir, client,
-                      [('', _CAS_PACKAGE, _CAS_REVISION)])
+                      [('', _CAS_PACKAGE, _LUCI_GO_REVISION)])
 
     file_path.make_tree_files_read_only(run_dir)
 
