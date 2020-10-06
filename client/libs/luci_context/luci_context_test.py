@@ -112,6 +112,20 @@ class TestLuciContext(unittest.TestCase):
     self.assertIsNone(r('other'))
     self.assertIsNone(r('something'))
 
+  def test_write_unchanged(self):
+    with luci_context.write(something={'data': True}):
+      path = os.environ.get(self.ek)
+      with luci_context.write():
+        self.assertDictEqual(luci_context.read_full(),
+                             {'something': {'data': True}})
+        self.assertEqual(os.environ.get(self.ek), path)
+      with luci_context.write(something={'data': True}):
+        self.assertEqual(os.environ.get(self.ek), path)
+        self.assertDictEqual(luci_context.read_full(),
+                             {'something': {'data': True}})
+      with luci_context.write(something={'data': False}):
+        self.assertNotEqual(os.environ.get(self.ek), path)
+
   def test_stage(self):
     path = None
     with luci_context.stage(something={'data': True}) as path:
@@ -119,6 +133,16 @@ class TestLuciContext(unittest.TestCase):
         self.assertEqual('{"something": {"data": true}}', f.read())
     # The file is gone outside 'with' block.
     self.assertFalse(os.path.exists(path))
+
+  def test_stage_unchanged(self):
+    with luci_context.write(something={'data': True}):
+      path = os.environ.get(self.ek)
+      with luci_context.stage() as new_path:
+        self.assertIsNone(new_path)
+      with luci_context.stage(something={'data': True}) as new_path:
+        self.assertIsNone(new_path)
+      with luci_context.stage(something={'data': False}) as new_path:
+        self.assertNotEqual(new_path, path)
 
   def test_to_utf8_bytes(self):
     input_dict = {b'key1': b'value1', b'key2': b'value2'}
