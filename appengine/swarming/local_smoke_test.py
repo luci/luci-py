@@ -1365,6 +1365,7 @@ class Test(unittest.TestCase):
     """
     task_id = self.client.task_trigger_isolated(isolated_hash, name, args)
     actual_summary, actual_files = self.client.task_collect(task_id)
+    self.assertIsNotNone(actual_summary['shards'][0], actual_summary)
     outputs_ref = actual_summary[u'shards'][0].pop('outputs_ref', None)
     performance_stats = actual_summary[u'shards'][0].pop(
         'performance_stats', None)
@@ -1444,6 +1445,7 @@ class Test(unittest.TestCase):
     """Runs a single task at a time."""
     task_id = self.client.task_trigger_raw(args)
     actual_summary, actual_files = self.client.task_collect(task_id)
+    self.assertIsNotNone(actual_summary['shards'][0], actual_summary)
     performance_stats = actual_summary['shards'][0].pop('performance_stats')
     self.assertPerformanceStatsEmpty(performance_stats)
     bot_version = self.assertResults(expected_summary, actual_summary)
