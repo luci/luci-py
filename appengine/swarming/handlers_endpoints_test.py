@@ -1521,7 +1521,7 @@ class TasksApiTest(BaseTest):
 
   @ndb.tasklet
   def _updateToken(self, *_args, **_kwargs):
-    return 'update-token'
+    raise ndb.Return('update-token')
 
   def test_new_ok_with_resultdb_and_realm(self):
     self.mock(random, 'getrandbits', lambda _: 0x88)
