@@ -628,9 +628,9 @@ large (thousands of bots) fleet as we experienced it. As you can see, the list
 is fairly large.
 
 *   Bot management
-    *   Slave code made of multiple files (notable exception is Jenkins).
+    *   Bot code made of multiple files (notable exception is Jenkins).
         *   The Swarming bot is self-contained as a single executable.
-    *   Bot side configuration like config files deployed to the slave is used.
+    *   Bot side configuration like config files deployed to the bot is used.
         Examples include the URL of the server used put in a file or local
         password file used to access third party remote services.
         *   The Swarming bot has no configuration data except the executable
@@ -644,37 +644,37 @@ is fairly large.
     *   Lack of self-diagnosis.
         *   The Swarming bot is able to do a health check and self-quarantine
             itself, effectively telling the server to *not* hand tasks to it.
-    *   Bot version fleet management, it's hard to know which slave runs which
+    *   Bot version fleet management, it's hard to know which bot runs which
         version of the code.
         *   The Swarming bot version is the digest (SHA256) of the content of
             its code and it is reported to the server so there's no ambiguity.
-    *   State management, the slave could create and delete local files.
+    *   State management, the bot could create and delete local files.
         *   The Swarming bot has almost no state. The _checkout_ is deleted
             after every single task.
-    *   Slaves required many python libraries or other third parties to be
+    *   Bots required many python libraries or other third parties to be
         preinstalled.
         *   The Swarming bot contains all the python libraries that are needed.
             The code is designed to not depend on OS specific libraries (like
             pywin32) and use raw calls instead to reduce the footprint.
 *   API and deployment
-    *   Bot API versioning. Updating slaves and master (server) has to be done
+    *   Bot API versioning. Updating bots and Swarming server has to be done
         synchronously and/or the bot API has to be versioned.
         *   The Swarming bot is always accessing the server via the versioned
             URL, e.g. 123-dot-app.appspot.com.
-    *   Building an executable to run on the slave.
+    *   Building an executable to run on the bot.
         *   Since it's all interpreted code and the server generates the zip on
             the fly, there's nothing to compile.
     *   SCM/package management usage for distribution using deb/rpm, checking
         out a git repository or any other installation mean.
         *   The Swarming bot code is downloaded as a single HTTPS GET from the
             server.
-    *   Slaves used unencrypted communication with no server verification.
+    *   Bots used unencrypted communication with no server verification.
         *   Bot only use HTTPS with a valid TLS certificate.
     *   The server is extensible and knows how to build.
         *   The server knows nothing, it doesn't know what a build is, this
             removes all the need for bot<->server state communication.
 *   Resilience
-    *   Unreliable code, slaves having an exception or any kind of internal
+    *   Unreliable code, bots having an exception or any kind of internal
         error would cause it to shut down.
         *   The Swarming bot sustains fairly broken bot code via internal
             compartmentalization, only the code up to the initial poll is
@@ -682,7 +682,7 @@ is fairly large.
             of getting a new version.
         *   The Swarming bot keeps multiple copies of itself on the host and
             alternates between file name while updating itself.
-    *   Complex slave side logic, for example it knows how to checkout via git.
+    *   Complex bot side logic, for example it knows how to checkout via git.
         *   The Swarming bot is as dumb as possible. No logic exists: it can
             only run a single command and returns its output. This reduces the
             risk of a logic error.
@@ -690,8 +690,8 @@ is fairly large.
         *   Every bot connections are meant to be executed immediately and not
             last. There is no hanging connection which would break down for
             various reasons (e.g. RST packets).
-    *   APIs that cannot be retried, it has to succeeds on the first try.
-        *   All the bot API strive to be idempotent; that is, each call can be
+    *   APIs that cannot be retried, it has to succeed on the first try.
+        *   All the bot APIs strive to be idempotent; that is, each call can be
             safely retried without side effect. For example, appending output
             always specify the current offset so retrying this request won't
             cause output corruption.
