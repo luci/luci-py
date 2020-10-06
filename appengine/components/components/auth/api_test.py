@@ -1229,6 +1229,8 @@ ID1 = model.Identity.from_bytes('user:1@example.com')
 ID2 = model.Identity.from_bytes('user:2@example.com')
 ID3 = model.Identity.from_bytes('user:3@example.com')
 
+ADMIN = model.Identity.from_bytes('user:admin@example.com')
+
 
 class RealmsTest(test_case.TestCase):
   @staticmethod
@@ -1394,36 +1396,45 @@ class RealmsTest(test_case.TestCase):
 
   def test_has_permission_dryrun(self):
     rc = api.RequestCache()
-    rc._auth_db = self.auth_db({'proj:@root': {(PERM0,): [ID1]}})
+    rc._auth_db = self.auth_db(
+        {'proj:@root': {(PERM0,): [ID1]}}, groups={'admin': [ADMIN]})
     self.mock(api, 'get_request_cache', lambda: rc)
 
     # Match.
     self.logs['info'] = []
-    api.has_permission_dryrun(PERM0, ['proj:@root'], True, ID1, 'bug')
+    api.has_permission_dryrun(PERM0, ['proj:@root'], True, ID1, 'admin', 'bug')
     self.assert_logs('info',
         "bug: has_permission_dryrun('luci.dev.testing0', ['proj:@root'], "
         "'user:1@example.com'), authdb=0: match - ALLOW")
     self.logs['info'] = []
-    api.has_permission_dryrun(PERM1, ['proj:@root'], False, ID1, 'bug')
+    api.has_permission_dryrun(PERM1, ['proj:@root'], False, ID1, 'admin', 'bug')
     self.assert_logs('info',
         "bug: has_permission_dryrun('luci.dev.testing1', ['proj:@root'], "
         "'user:1@example.com'), authdb=0: match - DENY")
 
     # Mismatch.
     self.logs['warning'] = []
-    api.has_permission_dryrun(PERM0, ['proj:@root'], False, ID1, 'bug')
+    api.has_permission_dryrun(PERM0, ['proj:@root'], False, ID1, 'admin', 'bug')
     self.assert_logs('warning',
         "bug: has_permission_dryrun('luci.dev.testing0', ['proj:@root'], "
         "'user:1@example.com'), authdb=0: mismatch - got ALLOW, want DENY")
     self.logs['warning'] = []
-    api.has_permission_dryrun(PERM1, ['proj:@root'], True, ID1, 'bug')
+    api.has_permission_dryrun(PERM1, ['proj:@root'], True, ID1, 'admin', 'bug')
     self.assert_logs('warning',
         "bug: has_permission_dryrun('luci.dev.testing1', ['proj:@root'], "
         "'user:1@example.com'), authdb=0: mismatch - got DENY, want ALLOW")
 
+    # Admin match.
+    self.logs['info'] = []
+    api.has_permission_dryrun(
+        PERM0, ['proj:@root'], True, ADMIN, 'admin', 'bug')
+    self.assert_logs('info',
+        "bug: has_permission_dryrun('luci.dev.testing0', ['proj:@root'], "
+        "'user:admin@example.com'), authdb=0: match - ADMIN_ALLOW")
+
     # Blow up.
     self.logs['exception'] = []
-    api.has_permission_dryrun(PERM1, ['@root'], True, ID1, 'bug')
+    api.has_permission_dryrun(PERM1, ['@root'], True, ID1, 'admin', 'bug')
     self.assert_logs('exception',
         "bug: has_permission_dryrun('luci.dev.testing1', ['@root'], "
         "'user:1@example.com'), authdb=0: exception ValueError, want ALLOW")

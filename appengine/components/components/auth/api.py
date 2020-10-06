@@ -2229,6 +2229,7 @@ def has_permission_dryrun(
       realms,
       expected_result,
       identity=None,
+      admin_group=None,
       tracking_bug=None
   ):
   """Compares result of has_permission(...) to `expected_result`.
@@ -2249,6 +2250,7 @@ def has_permission_dryrun(
     expected_result: boolean with the expected outcome based on legacy ACLs.
     identity: an instance of Identity to check permission for or None to use
         get_current_identity().
+    admin_group: if given, implicitly grant all permissions to its members.
     tracking_bug: a string like 'crbug.com/<number>' identifying a particular
         migration, for logs.
 
@@ -2277,12 +2279,19 @@ def has_permission_dryrun(
 
   if result == bool(expected_result):
     logging.info('%s: match - %s', log_pfx, 'ALLOW' if result else 'DENY')
-  else:
+  elif not admin_group or not expected_result:
     logging.warning(
         '%s: mismatch - got %s, want %s',
         log_pfx,
         'ALLOW' if result else 'DENY',
         'ALLOW' if expected_result else 'DENY')
+  else:
+    # We expected ALLOW, but got DENY. Maybe the legacy ACL check relied on
+    # the admin group. Check this separately.
+    if auth_db.is_group_member(admin_group, identity):
+      logging.info('%s: match - ADMIN_ALLOW', log_pfx)
+    else:
+      logging.warning('%s: mismatch - got DENY, want ALLOW', log_pfx)
 
 
 def get_realm_data(realm):
