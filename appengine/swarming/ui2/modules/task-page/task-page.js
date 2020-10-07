@@ -810,11 +810,11 @@ const performanceStatsSection = (ele, performanceStats) => {
     <td>${humanDuration(performanceStats.bot_overhead)}</td>
   </tr>
   <tr>
-    <td>Downloading Inputs From Isolate</td>
+    <td>Downloading Inputs</td>
     <td>${humanDuration(performanceStats.isolated_download.duration)}</td>
   </tr>
   <tr>
-    <td>Uploading Outputs To Isolate</td>
+    <td>Uploading Outputs</td>
     <td>${humanDuration(performanceStats.isolated_upload.duration)}</td>
   </tr>
   <tr>
@@ -823,22 +823,22 @@ const performanceStatsSection = (ele, performanceStats) => {
     ${human.bytes(performanceStats.isolated_download.initial_size || 0)}</td>
   </tr>
   <tr>
-    <td>Downloaded Cold Items</td>
+    <td>Inputs (downloaded)</td>
     <td>${performanceStats.isolated_download.num_items_cold || 0} items;
      ${human.bytes(performanceStats.isolated_download.total_bytes_items_cold || 0)}</td>
   </tr>
   <tr>
-    <td>Downloaded Hot Items</td>
+    <td>Inputs (cached)</td>
     <td>${performanceStats.isolated_download.num_items_hot || 0} items;
      ${human.bytes(performanceStats.isolated_download.total_bytes_items_hot || 0)}</td>
   </tr>
   <tr>
-    <td>Uploaded Cold Items</td>
+    <td>Outputs (uploaded)</td>
     <td>${performanceStats.isolated_upload.num_items_cold || 0} items;
      ${human.bytes(performanceStats.isolated_upload.total_bytes_items_cold || 0)}</td>
   </tr>
   <tr>
-    <td>Uploaded Hot Items</td>
+    <td>Outputs (cached)</td>
     <td>${performanceStats.isolated_upload.num_items_hot || 0} items;
      ${human.bytes(performanceStats.isolated_upload.total_bytes_items_hot || 0)}</td>
   </tr>

@@ -372,9 +372,9 @@ describe('task-page', function() {
           // Spot check some of the content
           expect(cell(0, 0)).toMatchTextContent('Total Overhead');
           expect(cell(0, 1)).toMatchTextContent('12.63s');
-          expect(cell(6, 0)).toMatchTextContent('Uploaded Cold Items');
+          expect(cell(6, 0)).toMatchTextContent('Outputs (uploaded)');
           expect(cell(6, 1)).toMatchTextContent('2 items; 12 KB');
-          expect(cell(7, 0)).toMatchTextContent('Uploaded Hot Items');
+          expect(cell(7, 0)).toMatchTextContent('Outputs (cached)');
           expect(cell(7, 1)).toMatchTextContent('0 items; 0 B');
           done();
         });
