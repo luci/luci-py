@@ -968,15 +968,11 @@ def map_and_run(data, constant_run_path):
       'version': 5,
   }
 
-  if data.root_dir:
-    file_path.ensure_tree(data.root_dir, 0o700)
-  elif data.use_go_isolated:
-    data = data._replace(root_dir=os.path.dirname(data.go_cache_dir))
-  elif data.isolate_cache.cache_dir:
-    data = data._replace(
-        root_dir=os.path.dirname(data.isolate_cache.cache_dir))
+  assert os.path.isabs(data.root_dir), ("data.root_dir is not abs path: %s" %
+                                        data.root_dir)
+  file_path.ensure_tree(data.root_dir, 0o700)
+
   # See comment for these constants.
-  # If root_dir is not specified, it is not constant.
   # TODO(maruel): This is not obvious. Change this to become an error once we
   # make the constant_run_path an exposed flag.
   if constant_run_path and data.root_dir:
@@ -1734,6 +1730,8 @@ def main(args):
 
   if options.root_dir:
     options.root_dir = six.text_type(os.path.abspath(options.root_dir))
+  else:
+    options.root_dir = six.text_type(tempfile.mkdtemp(prefix='root'))
   if options.json:
     options.json = six.text_type(os.path.abspath(options.json))
 

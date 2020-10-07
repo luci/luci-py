@@ -413,6 +413,13 @@ class RunIsolatedTest(unittest.TestCase):
     expected_mangled = dict((k, oct(v[index])) for k, v in expected.items())
     self.assertEqual(expected_mangled, actual)
 
+  def test_simple(self):
+    out, err, returncode = self._run(
+        ['--raw-cmd', '--', 'python', '-c', 'print("no --root-dir")'])
+    self.assertEqual('no --root-dir\n', out)
+    self.assertEqual('', err)
+    self.assertEqual(0, returncode)
+
   def test_isolated_normal(self):
     # Loads the .isolated from the store as a hash.
     # Load an isolated file with the same content (same SHA-1), listed under two

@@ -358,7 +358,7 @@ class RunIsolatedTest(RunIsolatedTestBase):
         outputs=None,
         install_named_caches=init_named_caches_stub,
         leak_temp_dir=False,
-        root_dir=None,
+        root_dir=self.tempdir,
         hard_timeout=60,
         grace_period=30,
         bot_file=None,
@@ -461,6 +461,8 @@ class RunIsolatedTest(RunIsolatedTestBase):
         '--named-cache-root',
         os.path.join(self.tempdir, 'named_cache'),
         '--raw-cmd',
+        '--root-dir',
+        self.tempdir,
         '--',
         '/bin/echo',
         'hello',
@@ -693,6 +695,8 @@ class RunIsolatedTest(RunIsolatedTestBase):
         '--raw-cmd',
         '--relative-cwd',
         'a',
+        '--root-dir',
+        self.tempdir,
         '--',
         'bin/echo${EXECUTABLE_SUFFIX}',
         'hello',
@@ -978,6 +982,8 @@ class RunIsolatedTest(RunIsolatedTestBase):
         '42',
         '--limit-total-committed-memory',
         '1024',
+        '--root-dir',
+        self.tempdir,
         '--',
         '/bin/echo',
         'hello',
@@ -985,28 +991,27 @@ class RunIsolatedTest(RunIsolatedTestBase):
     ]
     ret = run_isolated.main(cmd)
     self.assertEqual(0, ret)
-    self.assertEqual(
-        [
-          (
+    self.assertEqual([
+        (
             ['/bin/echo', 'hello', 'world'],
             {
-              'cwd': os.path.join(
-                  # Necessary on macOS.
-                  os.path.realpath(self.tempdir),
-                  'cwd',
-                  run_isolated.ISOLATED_RUN_DIR),
-              'detached': True,
-              'close_fds': True,
-              'lower_priority': True,
-              'containment': subprocess42.Containment(
-                  containment_type=subprocess42.Containment.JOB_OBJECT,
-                  limit_processes=42,
-                  limit_total_committed_memory=1024,
-              ),
+                'cwd':
+                    self.ir_dir(),
+                'detached':
+                    True,
+                'close_fds':
+                    True,
+                'lower_priority':
+                    True,
+                'containment':
+                    subprocess42.Containment(
+                        containment_type=subprocess42.Containment.JOB_OBJECT,
+                        limit_processes=42,
+                        limit_total_committed_memory=1024,
+                    ),
             },
-          ),
-        ],
-        self.popen_calls)
+        ),
+    ], self.popen_calls)
 
   def test_fetch_and_map_with_go_isolated(self):
     # Sanity test for run_isolated._fetch_and_map_with_go_isolated(...).
@@ -1088,7 +1093,7 @@ class RunIsolatedTestRun(RunIsolatedTestBase):
           outputs=None,
           install_named_caches=init_named_caches_stub,
           leak_temp_dir=False,
-          root_dir=None,
+          root_dir=self.tempdir,
           hard_timeout=60,
           grace_period=30,
           bot_file=None,
@@ -1473,7 +1478,7 @@ class RunIsolatedTestOutputFiles(RunIsolatedTestBase):
           ],
           install_named_caches=init_named_caches_stub,
           leak_temp_dir=False,
-          root_dir=None,
+          root_dir=self.tempdir,
           hard_timeout=60,
           grace_period=30,
           bot_file=None,
