@@ -1229,7 +1229,6 @@ def schedule_request(request, secret_bytes, enable_resultdb):
   # be run but the client will not know about it.
   _gen_key = lambda: _gen_new_keys(result_summary, to_run, secret_bytes)
   extra = filter(bool, [result_summary, to_run, secret_bytes])
-  logging.debug('crbug.com/1135417: extra: %s', extra)
   datastore_utils.insert(request, new_key_callback=_gen_key, extra=extra)
 
   # Note: This external_scheduler call is blocking, and adds risk
