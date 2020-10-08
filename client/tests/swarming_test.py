@@ -1,4 +1,5 @@
 #!/usr/bin/env vpython
+# -*- coding: utf-8 -*-
 # Copyright 2013 The LUCI Authors. All rights reserved.
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
@@ -1002,6 +1003,22 @@ class TestSwarmingCollection(NetTestCase):
          '+------------------------------------------------------+', '',
          'Total duration: 1.0s', ''))
     self._check_output(expected, 'Results from some shards are missing: 1\n')
+
+  def test_collect_non_ascii(self):
+    data = gen_result_response(output='Non-ascii character: µ')
+    self.mock(swarming, 'yield_results', lambda *_: [(0, data)])
+    self.assertEqual(0, collect('https://localhost:1', ['10100']))
+    expected = u'\n'.join(
+        ('+------------------------------------------------------+',
+         '| Shard 0  https://localhost:1/user/task/10100         |',
+         '+------------------------------------------------------+',
+         'Non-ascii character: µ',
+         '+------------------------------------------------------+',
+         '| End of shard 0                                       |',
+         '|  Pending: 6.0s  Duration: 1.0s  Bot: swarm6  Exit: 0 |',
+         '+------------------------------------------------------+',
+         'Total duration: 1.0s', ''))
+    self._check_output(expected, '')
 
   def test_collect_multi(self):
     actual_calls = []

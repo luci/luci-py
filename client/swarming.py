@@ -770,13 +770,17 @@ def collect(swarming, task_ids, timeout, decorate, print_status_updates,
       total_duration += metadata.get('duration', 0)
 
       if decorate:
-        # s is bytes in Python3, print could not print
-        # s with nice format, so decode s to str.
-        s = six.ensure_str(
-            decorate_shard_output(swarming, index, metadata,
+        s = decorate_shard_output(swarming, index, metadata,
                                   "console" in task_output_stdout).encode(
-                                      'utf-8', 'replace'))
-        print(s)
+                                      'utf-8', 'replace')
+
+        # The default system encoding is ascii, which can not handle non-ascii
+        # characters, switch to use sys.stdout.buffer.write in Python3 to
+        # send utf-8 to stdout regardless of the console's encoding.
+        if six.PY3:
+          sys.stdout.buffer.write(s)
+        else:
+          print(s)
         if len(seen_shards) < len(task_ids):
           print('')
       else:
