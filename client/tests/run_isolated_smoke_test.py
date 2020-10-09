@@ -742,7 +742,7 @@ class RunIsolatedTest(unittest.TestCase):
     # Specify --max-cache-size option.
     optional_args = [
         '--max-cache-size',
-        '0',
+        '1', # 0 means infinity
     ]
     assertRunIsolatedWithCAS(optional_args)
     download_stats = load_isolated_stats(result_json, 'download')
