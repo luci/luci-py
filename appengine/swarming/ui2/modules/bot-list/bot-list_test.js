@@ -1092,7 +1092,7 @@ describe('bot-list', function() {
       const pMap = processPrimaryMap(deepCopy(fleetDimensions.bots_dimensions));
 
       expect(pMap).toBeTruthy();
-      // Note this list doesn't include the blacklisted keys.
+      // Note this list doesn't include the keys in the denylist.
       const expectedKeys = ['android_devices', 'cores', 'cpu', 'device', 'device_os',
         'device_type', 'gpu', 'hidpi', 'machine_type', 'os', 'pool',
         'xcode_version', 'zone', 'id', 'task', 'status'];

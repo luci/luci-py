@@ -19,7 +19,7 @@ import {botPageLink, compareWithFixedOrder, humanDuration, sanitizeAndHumanizeTi
   taskPageLink} from '../util';
 import {EXCEPTIONAL_STATES, FILTER_STATES, ONGOING_STATES} from '../task';
 
-const BLACKLIST_DIMENSIONS = ['quarantined', 'error'];
+const DIMENSIONS_DENYLIST = ['quarantined', 'error'];
 const EMPTY_VAL = '--';
 
 /** appendPossibleColumns takes the given data and derives columns
@@ -43,7 +43,7 @@ export function appendPossibleColumns(possibleColumns, data) {
   if (Array.isArray(data)) {
     // we have a list of dimensions, which are {key: String, value: Array}
     for (const dim of data) {
-      if (BLACKLIST_DIMENSIONS.indexOf(dim.key) === -1) {
+      if (DIMENSIONS_DENYLIST.indexOf(dim.key) === -1) {
         possibleColumns[dim.key + '-tag'] = true;
       }
     }
@@ -74,7 +74,7 @@ export function appendPrimaryMap(primaryMap, data) {
   if (Array.isArray(data)) {
     // we have a list of dimensions, which are {key: String, value: Array}
     for (const dim of data) {
-      if (BLACKLIST_DIMENSIONS.indexOf(dim.key) === -1) {
+      if (DIMENSIONS_DENYLIST.indexOf(dim.key) === -1) {
         let existing = primaryMap[dim.key + '-tag'];
         for (const value of dim.value) {
           existing = _insertUnique(existing, value);

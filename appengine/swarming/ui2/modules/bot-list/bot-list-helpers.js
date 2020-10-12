@@ -306,11 +306,11 @@ export function makePossibleColumns(arr) {
   }
   const dims = [];
   arr.forEach(function(d) {
-    if (blacklistDimensions.indexOf(d.key) === -1) {
+    if (dimensionsDenylist.indexOf(d.key) === -1) {
       dims.push(d.key);
     }
   });
-  // Make sure 'id' is in there, but not duplicated (see blacklistDimensions)
+  // Make sure 'id' is in there, but not duplicated (see dimensionsDenylist)
   dims.push('id');
   Array.prototype.push.apply(dims, extraKeys);
   dims.sort();
@@ -418,7 +418,7 @@ export function processPrimaryMap(dimensions) {
 
   const pMap = {};
   dimensions.forEach(function(d) {
-    if (blacklistDimensions.indexOf(d.key) >= 0) {
+    if (dimensionsDenylist.indexOf(d.key) >= 0) {
       return;
     }
     // value is an array of all seen values for the dimension d.key
@@ -517,7 +517,7 @@ export function useNaturalSort(key) {
   return naturalSortDims[key];
 }
 
-const blacklistDimensions = ['quarantined', 'error', 'id'];
+const dimensionsDenylist = ['quarantined', 'error', 'id'];
 
 /** extraKeys is a list of things we want to be able to sort by or display
  *  that are not dimensions.
