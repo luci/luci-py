@@ -565,6 +565,17 @@ def _fetch_and_map_with_cas(cas_client, digest, instance, output_dir, cache_dir,
   stats.
   """
 
+  # TODO(crbug.com/chrome-operations/49):
+  # remove this after isolate to RBE-CAS migration.
+  _CAS_EMPTY_DIR_DIGEST = (
+    'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855/0')
+  if digest == _CAS_EMPTY_DIR_DIGEST:
+    return {
+        'duration': 0.0,
+        'items_cold': '',
+        'items_hot': '',
+    }
+
   start = time.time()
   result_json_handle, result_json_path = tempfile.mkstemp(
       prefix=u'fetch-and-map-result-', suffix=u'.json')
