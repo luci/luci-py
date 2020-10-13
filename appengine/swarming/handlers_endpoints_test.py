@@ -1856,7 +1856,7 @@ class TasksApiTest(BaseTest):
     TaskSort = swarming_rpcs.TaskSort
     # List of all unsupported combinations. These can be added either with a new
     # index or by massaging the way entities are stored.
-    blacklisted = [
+    unspported = [
         # (<Using start, end or tags>, TaskStateQuery, TaskSort)
         (None, TaskStateQuery.BOT_DIED, TaskSort.ABANDONED_TS),
         (None, TaskStateQuery.BOT_DIED, TaskSort.COMPLETED_TS),
@@ -1924,8 +1924,8 @@ class TasksApiTest(BaseTest):
               request = handlers_endpoints.TasksRequest.combined_message_class(
                   start=start, end=end, state=state, tags=tags, sort=sort)
               using_filter = bool(start or end or tags)
-              if ((using_filter, state, sort) in blacklisted or
-                  (None, state, sort) in blacklisted):
+              if ((using_filter, state, sort) in unspported or
+                  (None, state, sort) in unspported):
                 try:
                   self.call_api(
                       'list', body=message_to_dict(request), status=400)

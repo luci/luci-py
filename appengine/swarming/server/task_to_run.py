@@ -519,12 +519,12 @@ def match_dimensions(request_dimensions, bot_dimensions):
 def set_lookup_cache(to_run_key, is_available_to_schedule):
   """Updates the quick lookup cache to mark an item as available or not.
 
-  This cache is a blacklist of items that are about to be reaped or are already
+  This cache is a list of items that are about to be reaped or are already
   reaped, so it is not worth trying to reap it with a DB transaction. This saves
   on DB contention when a high number (>1000) of concurrent bots with similar
   dimension are reaping tasks simultaneously. In this case, there is a high
   likelihood that multiple concurrent HTTP handlers are trying to reap the exact
-  same task simultaneously. This blacklist helps reduce the contention by
+  same task simultaneously. This list helps reduce the contention by
   telling the other bots to back off.
 
   Another reason for this negative cache is that the DB index takes some seconds

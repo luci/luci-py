@@ -403,7 +403,7 @@ def _get_state(botobj, sleep_streak):
   if not state.get(u'quarantined'):
     if not _is_base_dir_ok(botobj):
       # Use super hammer in case of dangerous environment.
-      _set_quarantined('Can\'t run from blacklisted directory')
+      _set_quarantined('Can\'t run from the base directory')
     if _QUARANTINED:
       state[u'quarantined'] = _QUARANTINED
 
