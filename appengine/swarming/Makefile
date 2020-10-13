@@ -19,3 +19,13 @@ switch: deploy-check
 
 dev:
 	gae.py devserver -A swarming-local --app-dir . -- --port 9050 --admin_port 8200 --log_level debug
+
+# Used by Spinnaker to build the Appengine artifact.
+# See: https://g3doc.corp.google.com/company/teams/chrome/ops/devx/prod_tech/releases/deploy_appengine.md#makefile
+package_release:
+	rsync -aLK . $(TARDIR)/package
+
+
+# Used by Spinnaker to build to fetch external dependencies.
+# See: https://g3doc.corp.google.com/company/teams/chrome/ops/devx/prod_tech/releases/deploy_appengine.md#makefile
+external_deps:
