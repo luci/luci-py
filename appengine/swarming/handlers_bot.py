@@ -156,7 +156,7 @@ class _BotAuthenticatingHandler(auth.AuthenticatingHandler):
     Four variants here:
       1. A valid bootstrap token is passed as '?tok=...' parameter.
       2. An user, allowed to do a bootstrap, is using their credentials.
-      3. An IP whitelisted machine is making this call.
+      3. A machine whose IP is in the allowlist is making this call.
       4. A bot (with given bot_id) is using it's own machine credentials.
 
     In later three cases we optionally generate and return a new bootstrap

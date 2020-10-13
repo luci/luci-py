@@ -17,7 +17,7 @@ client to poll the server to know when a task is done.
 
 The server uses its DB to store the tasks, the bots' state and stdout from the
 tasks. It exposes the web frontend UI, client JSON REST API and bot JSON API. It
-uses OAuth2 (or optionally IP whitelisting) to authenticate clients.
+uses OAuth2 (or optionally the IP allowlist) to authenticate clients.
 
 Task requests have a set of dimensions associated to it. It's the server that
 matches the request's dimensions to find a bot which has the same set of
@@ -349,7 +349,7 @@ bot.
 
    - The Web UI is implemented in Polymer and uses the same API as the client,
      both are authenticated via OAuth2.
-   - Bots using the REST APIs can optionally be whitelisted by IPs.
+   - Bots using the REST APIs can optionally if their IPs are in the allowlist.
 
 
 ### Access control

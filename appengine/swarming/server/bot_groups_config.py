@@ -647,7 +647,7 @@ def _fetch_bot_groups():
   """Loads bots.cfg and parses it into _BotGroups struct.
 
   If bots.cfg doesn't exist, returns default config that allows any caller from
-  'bots' IP whitelist to act as a bot.
+  'bots' IP allowlist to act as a bot.
 
   Caches the loaded bot config internally.
 

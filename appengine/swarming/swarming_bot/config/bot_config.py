@@ -158,7 +158,7 @@ def get_authentication_headers(bot):
   get_authentication_headers again.
 
   Can be used to implement per-bot authentication. If no headers are returned,
-  the server will use only IP whitelist for bot authentication.
+  the server will use only IP allowlist for bot authentication.
 
   On GCE will use OAuth token of the default GCE service account. It should have
   "User info" API scope enabled (this can be set when starting an instance). The
@@ -176,7 +176,7 @@ def get_authentication_headers(bot):
   if platforms.is_gce():
     # By default, VMs do not have "User info" API enabled, as commented above.
     # When this is the case, the oauth token is unusable. So do not use the
-    # oauth token in this case and fall back to IP based whitelisting.
+    # oauth token in this case and fall back to IP based allowlist.
     if ('https://www.googleapis.com/auth/userinfo.email' in platforms.gce
         .oauth2_available_scopes('default')):
       tok, exp = platforms.gce.oauth2_access_token_with_expiration('default')

@@ -25,8 +25,8 @@ your app. In a fresh instance, group names default to
   have access to the Swarming server also have equivalent access to
   the isolate server.
 
-When specifying members of the auth groups, you can refer to the whitelisted IPs
-using `bots:*`. For individual user accounts simply use their email,
+When specifying members of the auth groups, you can refer to the IPs in the 
+allowlist using `bots:*`. For individual user accounts simply use their email,
 e.g. `user@example.org`. All users in a domain can be specified with a glob,
 e.g. `*@chromium.org`.
 

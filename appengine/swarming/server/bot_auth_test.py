@@ -199,7 +199,7 @@ class BotAuthTest(test_case.TestCase):
     with self.assertRaises(auth.AuthorizationError):
       bot_auth.validate_bot_id_and_fetch_config(
           'bot_with_token_and_ip_whitelist')
-    self.assert_error_log('bot IP is not whitelisted')
+    self.assert_error_log('IP not allowed')
 
   def test_service_account_ok(self):
     # Caller is using valid service account.
@@ -238,7 +238,7 @@ class BotAuthTest(test_case.TestCase):
     with self.assertRaises(auth.AuthorizationError):
       bot_auth.validate_bot_id_and_fetch_config(
           'bot_with_service_account_and_ip_whitelist')
-    self.assert_error_log('bot IP is not whitelisted')
+    self.assert_error_log('IP not allowed')
 
   def test_gce_token_ok(self):
     self.mock_caller(
@@ -321,7 +321,7 @@ class BotAuthTest(test_case.TestCase):
           'bot_with_fallback_to_ip_wl')
     self.assertEqual(
         "All auth methods failed: Bot ID doesn't match the token used; "
-        "Not IP whitelisted", err.exception.message)
+        "IP not allowed", err.exception.message)
 
 
 if __name__ == '__main__':

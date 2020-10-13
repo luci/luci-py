@@ -110,7 +110,7 @@ You still need an OAuth2 client id if you want to use the Web UI:
           echo 'ui_client_id: "<client_id>"' > configs/services/swarming-local/CONFIGS/settings.cfg
 
 *   If you want to access it from another workstation, since the cliend id is
-    whitelisted to localhost, you can `ssh workstation -L 9050:localhost:9050`.
+    allowed to localhost, you can `ssh workstation -L 9050:localhost:9050`.
     Make sure that any corp proxy is bypassed as needed.
 
 You can run a swarming+isolate local setup with:

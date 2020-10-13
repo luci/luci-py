@@ -39,7 +39,7 @@ AuthParams = collections.namedtuple(
 
         # Unix timestamp of when swarming_http_headers expire, or 0 if unknown
         # or None if auth headers are disabled completely.
-        # (e.g. when the bot is using IP whitelist for auth)
+        # (e.g. when the bot is using IP allowlist for auth)
         'swarming_http_headers_exp',
 
         # An email of a service account used by the bot itself or 'none'

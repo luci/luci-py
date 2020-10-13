@@ -166,16 +166,16 @@ def _check_bot_auth(bot_auth, bot_id, peer_ident, ip):
   def error(msg, *args):
     errors.append(msg % args)
 
-  # Check that IP whitelist applies (in addition to credentials), and increment
+  # Check that IP allowlist applies (in addition to credentials), and increment
   # the monitoring counter with number of successful auth events.
   def check_ip_and_finish(auth_method, condition):
     if bot_auth.ip_whitelist:
       if not auth.is_in_ip_whitelist(bot_auth.ip_whitelist, ip):
         error(
-            'bot_auth: bot IP is not whitelisted\n'
-            'bot_id: "%s", peer_ip: "%s", ip_whitelist: "%s"',
-            bot_id, ipaddr.ip_to_string(ip), bot_auth.ip_whitelist)
-        return 'Not IP whitelisted', errors
+            'bot_auth: bot IP is not in the allowlist\n'
+            'bot_id: "%s", peer_ip: "%s", ip_whitelist: "%s"', bot_id,
+            ipaddr.ip_to_string(ip), bot_auth.ip_whitelist)
+        return 'IP not allowed', errors
     ts_mon_metrics.on_bot_auth_success(auth_method, condition)
     return None, []
 
@@ -251,7 +251,7 @@ def _is_valid_ident_for_bot(ident, bot_id):
   'bot:<fqdn>', so we validate that <fqdn> starts with '<bot_id>.'.
 
   We also explicitly skip magical 'bot:ip-whitelisted' identity assigned to
-  bots that use 'bots' IP whitelist for auth (not tokens).
+  bots that use 'bots' IP allowlist for auth (not tokens).
   """
   # TODO(vadimsh): Should bots.cfg also contain a list of allowed domain names,
   # so this check is stricter?
