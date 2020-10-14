@@ -90,7 +90,7 @@ def _is_project():
 
 
 def is_ip_whitelisted_machine():
-  """Returns True if the call is made from IP whitelisted machine."""
+  """Returns True if the call is made from allowed-IP machine."""
   return auth.is_in_ip_whitelist(auth.bots_ip_whitelist(), auth.get_peer_ip(),
                                  False)
 
@@ -191,7 +191,7 @@ def can_view_all_tasks():
 
 
 def bootstrap_dev_server_acls():
-  """Adds localhost to IP whitelist and Swarming groups."""
+  """Adds localhost to IP allowlist and Swarming groups."""
   assert utils.is_local_dev_server()
   if auth.is_replica():
     return

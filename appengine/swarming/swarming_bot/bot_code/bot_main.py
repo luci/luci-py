@@ -85,7 +85,7 @@ THIS_DIR = os.path.dirname(THIS_FILE)
 SINGLETON = singleton.Singleton(THIS_DIR)
 
 
-# Whitelist of files that can be present in the bot's directory. Anything else
+# Allowlist files that can be present in the bot's directory. Anything else
 # will be forcibly deleted on startup! Note that 'w' (work) is not in this list,
 # as we want it to be deleted on startup.
 # See

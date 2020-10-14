@@ -51,7 +51,7 @@ The list of all demo pages so far (for easy clicking):
 By default, the login is mocked so it works w/o an internet connection,
 but if testing the real OAuth 2.0 flow is desired, a client_id may be
 specified (see `swarming-index-demo.html` for an example). Be sure to also
-whitelist `localhost:8080` for that client_id.
+allow `localhost:8080` for that client_id.
 
 ## Running the tests
 

@@ -97,7 +97,7 @@ class RemoteClientNative(object):
 
   If the callback returns (*, None), disables authentication. This allows
   bot_config.py to disable strong authentication on machines that don't have any
-  credentials (the server uses only IP whitelist check in this case).
+  credentials (the server uses only IP allowlist check in this case).
 
   If the callback returns (*, 0), effectively disables the caching of headers:
   the callback will be called for each request.

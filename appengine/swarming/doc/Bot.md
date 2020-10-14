@@ -505,7 +505,7 @@ The zip is a subset of the files inside
 [//appengine/swarming/swarming_bot/](../swarming_bot/), with symlinks resolved
 and a few files ignored (mainly unit tests). The files are stored at their
 respective relative location. The list of imported files is inside
-[whitelist](../server/bot_archive.py). The code contains 3 broad sections split
+[allowlist](../server/bot_archive.py). The code contains 3 broad sections split
 as directories:
 
 *   [api/](../swarming_bot/api/) contains the generic functions for OS

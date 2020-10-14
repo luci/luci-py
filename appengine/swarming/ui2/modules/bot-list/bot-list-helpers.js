@@ -296,7 +296,7 @@ export function longestOrAll(arr, verbose) {
 }
 
 /** makePossibleColumns processes the array of dimensions from the server
- *  and returns it. The primary objective is to remove blacklisted
+ *  and returns it. The primary objective is to remove denied
  *  dimensions and make sure any are there that the server doesn't provide.
  *  This will be turned into possible columns
  */
