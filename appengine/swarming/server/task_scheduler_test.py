@@ -1306,7 +1306,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
             task_request.TaskSlice(
                 expiration_secs=60,
                 properties=_gen_properties(
-                    command=[],
+                    command=['python'],
                     inputs_ref=task_request.FilesRef(
                         isolated='1' * 40,
                         isolatedserver='http://localhost:1',
