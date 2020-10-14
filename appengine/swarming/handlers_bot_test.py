@@ -1097,7 +1097,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
                 }],
                 u'server': u'https://pool.config.cipd.example.com',
             },
-            u'command': [],
+            u'command': ['python', '-c', 'print(1)'],
             u'containment': {
                 u'lower_priority': True,
                 u'containment_type': 2,

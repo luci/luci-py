@@ -422,6 +422,7 @@ class AppTestBase(test_case.TestCase):
             }],
             u'server': u'https://pool.config.cipd.example.com',
         },
+        u'command': ['python', '-c', 'print(1)'],
         u'containment': {
             u'lower_priority': True,
             u'containment_type': swarming_rpcs.ContainmentType.AUTO,
@@ -441,7 +442,7 @@ class AppTestBase(test_case.TestCase):
         u'env': [],
         u'execution_timeout_secs': 3600,
         u'io_timeout_secs': 1200,
-        u'outputs': [u'foo', u'path/to/foobar']
+        u'outputs': [u'foo', u'path/to/foobar'],
     }
     out.update((unicode(k), v) for k, v in kwargs.items())
     return out
@@ -534,6 +535,7 @@ class AppTestBase(test_case.TestCase):
             }],
             u'server': u'https://pool.config.cipd.example.com',
         },
+        u'command': [u'python', u'-c', u'print(1)'],
         u'containment': {
             u'lower_priority': True,
             u'containment_type': u'AUTO',
