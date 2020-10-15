@@ -604,7 +604,7 @@ class TaskRequestApiTest(TestCase):
   def test_init_new_request_isolated(self):
     parent = _gen_request(
         properties=_gen_properties(
-            command=[],
+            command=[u'command1', u'arg1'],
             inputs_ref={
                 'isolated': '0123456789012345678901234567890123456789',
                 'isolatedserver': 'http://localhost:1',
