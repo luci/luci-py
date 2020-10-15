@@ -64,6 +64,8 @@ SIGNAL_TERM = -1073741510 if sys.platform == 'win32' else -signal.SIGTERM
 # indefinitely.
 TIMEOUT_SECS = 20
 
+DEFAULT_COMMAND = ["python", "-u", "%s.py" % HELLO_WORLD]
+
 # The default isolated command is to map and run HELLO_WORLD.
 DEFAULT_ISOLATE_HELLO = """{
   "variables": {
@@ -741,7 +743,8 @@ class Test(unittest.TestCase):
     # Hard timeout is enforced by run_isolated, I/O timeout by task_runner.
     _, outputs_ref, performance_stats = self._run_isolated(
         isolated_hash,
-        name, ['--hard-timeout', '1', '--', '${ISOLATED_OUTDIR}'],
+        name, ['--hard-timeout', '1', '--raw-cmd', '--'] + DEFAULT_COMMAND +
+        ['${ISOLATED_OUTDIR}'],
         expected_summary, {},
         deduped=False)
     self.assertIsNone(outputs_ref)
@@ -800,7 +803,8 @@ class Test(unittest.TestCase):
     # Hard timeout is enforced by run_isolated, I/O timeout by task_runner.
     _, outputs_ref, performance_stats = self._run_isolated(
         isolated_hash,
-        name, ['--hard-timeout', '1', '--', '${ISOLATED_OUTDIR}'],
+        name, ['--hard-timeout', '1', '--raw-cmd', '--'] + DEFAULT_COMMAND +
+        ['${ISOLATED_OUTDIR}'],
         expected_summary,
         expected_files,
         deduped=False)
@@ -833,7 +837,8 @@ class Test(unittest.TestCase):
     expected_summary = self.gen_expected(name=u'idempotent_reuse')
     task_id, outputs_ref, performance_stats = self._run_isolated(
         isolated_hash,
-        name, ['--idempotent'],
+        name, ['--idempotent', '--raw-cmd', '--'] + DEFAULT_COMMAND +
+        ['${ISOLATED_OUTDIR}'],
         expected_summary, {},
         deduped=False)
     self.assertIsNone(outputs_ref)
@@ -860,7 +865,8 @@ class Test(unittest.TestCase):
     expected_summary[u'try_number'] = u'0'
     _, outputs_ref, performance_stats = self._run_isolated(
         isolated_hash,
-        'idempotent_reuse2', ['--idempotent'],
+        'idempotent_reuse2', ['--idempotent', '--raw-cmd', '--'] +
+        DEFAULT_COMMAND + ['${ISOLATED_OUTDIR}'],
         expected_summary, {},
         deduped=True)
     self.assertIsNone(outputs_ref)
@@ -895,7 +901,8 @@ class Test(unittest.TestCase):
       f.write('foobar')
     _, outputs_ref, performance_stats = self._run_isolated(
         isolated_hash,
-        name, ['--secret-bytes-path', tmp, '--', '${ISOLATED_OUTDIR}'],
+        name, ['--secret-bytes-path', tmp, '--raw-cmd', '--'] +
+        DEFAULT_COMMAND + ['${ISOLATED_OUTDIR}'],
         expected_summary, {os.path.join('0', 'sekret'): 'foobar\n'},
         deduped=False)
     result_isolated_size = self.assertOutputsRef(outputs_ref)
@@ -946,7 +953,8 @@ class Test(unittest.TestCase):
     expected_summary = self.gen_expected(name=u'cache_first')
     _, outputs_ref, performance_stats = self._run_isolated(
         isolated_hash,
-        name, ['--named-cache', 'fuu', 'p/b', '--', '${ISOLATED_OUTDIR}/yo'],
+        name, ['--named-cache', 'fuu', 'p/b', '--raw-cmd', '--'] +
+        DEFAULT_COMMAND + ['${ISOLATED_OUTDIR}/yo'],
         expected_summary, {},
         deduped=False)
     self.assertIsNone(outputs_ref)
@@ -979,8 +987,8 @@ class Test(unittest.TestCase):
     }] + expected_summary['bot_dimensions']
     _, outputs_ref, performance_stats = self._run_isolated(
         isolated_hash,
-        'cache_second',
-        ['--named-cache', 'fuu', 'p/b', '--', '${ISOLATED_OUTDIR}/yo'],
+        'cache_second', ['--named-cache', 'fuu', 'p/b', '--raw-cmd', '--'] +
+        DEFAULT_COMMAND + ['${ISOLATED_OUTDIR}/yo'],
         expected_summary, {'0/yo': 'Yo!'},
         deduped=False)
     result_isolated_size = self.assertOutputsRef(outputs_ref)
@@ -1118,8 +1126,9 @@ class Test(unittest.TestCase):
                                                   DEFAULT_ISOLATE_HELLO)
     # Do not use self._run_isolated() here since we want to kill it, not wait
     # for it to complete.
-    task_id = self.client.task_trigger_isolated(isolated_hash, name,
-                                                ['--', '${ISOLATED_OUTDIR}'])
+    task_id = self.client.task_trigger_isolated(
+        isolated_hash, name,
+        ['--raw-cmd', '--'] + DEFAULT_COMMAND + ['${ISOLATED_OUTDIR}'])
 
     # Wait for the task to start on the bot.
     self._wait_for_state(task_id, u'PENDING', u'RUNNING')
