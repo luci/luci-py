@@ -571,12 +571,13 @@ def bot_event(
   bot_info = info_key.get()
   if not bot_info:
     bot_info = BotInfo(key=info_key)
-    # Register only id and pool dimensions at the first handshake.
-    dimensions_flat = task_queues.bot_dimensions_to_flat(dimensions)
-    bot_info.dimensions_flat = [
-        d for d in dimensions_flat
-        if d.startswith('id:') or d.startswith('pool:')
-    ]
+    if dimensions:
+      dimensions_flat = task_queues.bot_dimensions_to_flat(dimensions)
+      # Register only id and pool dimensions at the first handshake.
+      bot_info.dimensions_flat = [
+          d for d in dimensions_flat
+          if d.startswith('id:') or d.startswith('pool:')
+      ]
 
   now = utils.utcnow()
   # bot_missing event is created by a server, not a bot.
