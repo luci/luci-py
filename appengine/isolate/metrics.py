@@ -18,9 +18,9 @@ _bytes_requested = gae_ts_mon.CounterMetric(
 
 
 def file_size(size):
-  """Reports the size of a file fetched from GCS by whitelisted clients.
+  """Reports the size of a file fetched from GCS by allowed clients.
 
-  If the client's requests are not whitelisted for monitoring, does nothing.
+  If the client's requests are not allowed for monitoring, does nothing.
 
   Args:
     size: Size of the file in bytes.

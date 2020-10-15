@@ -434,9 +434,7 @@ def _extract_job_fields(tags_dict):
   """
   spec_name = tags_dict.get('spec_name')
   if not spec_name:
-    spec_name = '%s:%s' % (
-        tags_dict.get('master', ''),
-        tags_dict.get('buildername', ''))
+    spec_name = tags_dict.get('buildername', '')
     if tags_dict.get('build_is_experimental') == 'true':
       spec_name += ':experimental'
 

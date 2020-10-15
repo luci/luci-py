@@ -29,7 +29,7 @@ def get_user_type():
 
 
 def bootstrap():
-  """Adds 127.0.0.1 as a whitelisted IP when testing."""
+  """Adds 127.0.0.1 as a allowed IP when testing."""
   if not utils.is_local_dev_server() or auth.is_replica():
     return
 

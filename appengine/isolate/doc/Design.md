@@ -369,7 +369,7 @@ There is no redundancy in the Isolate Server, as it is running on App Engine.
 ## Security Considerations
 
 Isolate Server require a valid GAIA account to access the content. An IP
-whitelist table is also available.
+allowlist table is also available.
 
 
 ## Testing Plan
