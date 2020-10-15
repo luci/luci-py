@@ -20,10 +20,10 @@ try:
   from adb.contrib import high
   from adb.contrib import parallel
 
-  # Master switch that can easily be temporarily increased to INFO or even DEBUG
-  # when needed by simply pushing a new tainted swarming server version. This
-  # helps quickly debugging issues. On the other hand, even INFO level is quite
-  # verbose so keep it at WARNING by default.
+  # The main switch that can easily be temporarily increased to INFO or even
+  # DEBUG when needed by simply pushing a new tainted swarming server version.
+  # This helps quickly debugging issues. On the other hand, even INFO level is
+  # quite verbose so keep it at WARNING by default.
   LEVEL = logging.WARNING
   adb_commands_safe._LOG.setLevel(LEVEL)
   adb_protocol._LOG.setLevel(LEVEL)

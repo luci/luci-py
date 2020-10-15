@@ -116,7 +116,7 @@ class TestMetrics(test_case.TestCase):
         'project:test_project',
         'subproject:test_subproject',
         'pool:test_pool',
-        'master:test_master',
+        'master:test_main',
         'buildername:test_builder',
         'name:some_tests',
     ]
@@ -124,7 +124,7 @@ class TestMetrics(test_case.TestCase):
         'project_id': 'test_project',
         'subproject_id': 'test_subproject',
         'pool': 'test_pool',
-        'spec_name': 'test_master:test_builder',
+        'spec_name': 'test_main:test_builder',
     }
     summary = _gen_task_result_summary(self.now, 1, tags=tags)
     summary.exit_code = 0 # sets failure = False.
@@ -159,7 +159,7 @@ class TestMetrics(test_case.TestCase):
         'project:test_project',
         'subproject:test_subproject',
         'pool:test_pool',
-        'master:test_master',
+        'master:test_main',
         'buildername:test_builder',
         'name:some_tests',
         'spec_name:my:custom:test:spec:name',
@@ -187,7 +187,7 @@ class TestMetrics(test_case.TestCase):
         'project:test_project',
         'subproject:test_subproject',
         'pool:test_pool',
-        'master:test_master',
+        'master:test_main',
         'buildername:test_builder',
         'name:some_tests',
         'build_is_experimental:true',
@@ -196,7 +196,7 @@ class TestMetrics(test_case.TestCase):
         'project_id': 'test_project',
         'subproject_id': 'test_subproject',
         'pool': 'test_pool',
-        'spec_name': 'test_master:test_builder:experimental',
+        'spec_name': 'test_main:test_builder:experimental',
     }
     summary = _gen_task_result_summary(self.now, 1, tags=tags)
 
@@ -214,7 +214,7 @@ class TestMetrics(test_case.TestCase):
         'project:test_project',
         'subproject:test_subproject',
         'pool:test_pool',
-        'master:test_master',
+        'master:test_main',
         'buildername:test_builder',
         'name:some_tests',
     ]
@@ -260,7 +260,7 @@ class TestMetrics(test_case.TestCase):
         'project_id': 'test_project',
         'subproject_id': 'test_subproject',
         'pool': 'test_pool',
-        'spec_name': 'test_master:test_builder',
+        'spec_name': 'test_main:test_builder',
     }
     jobs_target_fields = dict(ts_mon_metrics._TARGET_FIELDS)
     jobs_target_fields['hostname'] = 'autogen:test_bot1'

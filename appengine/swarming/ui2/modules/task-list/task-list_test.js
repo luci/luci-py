@@ -1084,7 +1084,7 @@ describe('task-list', function() {
       const tasks = processTasks(deepCopy(tasks_20.items), tags);
       const keys = Object.keys(tags);
       expect(keys).toBeTruthy();
-      expect(keys).toHaveSize(76);
+      expect(keys).toHaveSize(75);
       expect(keys).toContain('pool');
       expect(keys).toContain('purpose');
       expect(keys).toContain('source_revision');
