@@ -668,6 +668,8 @@ def _fetch_and_map_with_go_isolated(isolated_hash, storage, outdir,
         'duration': time.time() - start,
         'items_cold': result_json['items_cold'],
         'items_hot': result_json['items_hot'],
+        'initial_number_items': result_json['initial_number_items'],
+        'initial_size': result_json['initial_size'],
     }
   finally:
     fs.remove(result_json_path)

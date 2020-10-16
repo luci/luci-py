@@ -1027,11 +1027,14 @@ class RunIsolatedTest(RunIsolatedTestBase):
 
       json_path = args[args.index('-fetch-and-map-result-json') + 1]
       with open(json_path, 'w') as json_file:
-        json.dump({
-            'isolated': {},
-            'items_cold': '',
-            'items_hot': '',
-        }, json_file)
+        json.dump(
+            {
+                'isolated': {},
+                'items_cold': '',
+                'items_hot': '',
+                'initial_number_items': 0,
+                'initial_size': 0,
+            }, json_file)
       return 0
 
     self.popen_fakes.append(fake_wait)
