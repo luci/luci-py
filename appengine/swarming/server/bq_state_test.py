@@ -214,26 +214,8 @@ class BotManagementTest(test_case.TestCase):
         ('key1', struct_pb2.Struct()),
         ('key2', struct_pb2.Struct()),
     ]
-    self.assertEqual(1, bq_state.send_to_bq('foo', rows))
-
-    self.assertEqual(2, len(payloads), payloads)
-    expected = {
-        'ignoreUnknownValues': False,
-        'kind': 'bigquery#tableDataInsertAllRequest',
-        'skipInvalidRows': True,
-    }
-    actual_rows = payloads[0].pop('rows')
-    self.assertEqual(expected, payloads[0])
-    self.assertEqual(2, len(actual_rows))
-
-    expected = {
-        'ignoreUnknownValues': False,
-        'kind': 'bigquery#tableDataInsertAllRequest',
-        'skipInvalidRows': True,
-    }
-    actual_rows = payloads[1].pop('rows')
-    self.assertEqual(expected, payloads[1])
-    self.assertEqual(1, len(actual_rows))
+    with self.assertRaises(bq_state.BQError):
+      bq_state.send_to_bq('foo', rows)
 
 
 if __name__ == '__main__':

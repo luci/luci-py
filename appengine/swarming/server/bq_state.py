@@ -28,6 +28,10 @@ _OLDEST_BACKFILL = datetime.timedelta(days=364)
 # This is to prevent PayloadTooLargeError when inserting to BQ.
 RAW_LIMIT = 100
 
+
+class BQError(Exception):
+  """Raised if failed to insert rows."""
+
 ### Models
 
 
@@ -132,6 +136,9 @@ def _send_to_bq_raw(dataset, table_name, rows):
       # Log the error for the first entry, useful to diagnose schema failure.
       logging.error('Failed to insert row %s: %r', i, err)
     failed.append(i)
+
+    # TODO(crbug.com/1139745): exclude retryable error.
+    raise BQError("failed to insert rows: %s" % err)
   if dropped:
     logging.warning('%d old rows silently dropped', dropped)
   return failed
