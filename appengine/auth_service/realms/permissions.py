@@ -208,6 +208,131 @@ def db():
       permission('resultdb.invocations.exportToBigQuery', internal=True),
   ])
 
+  # UFS permissions and roles.
+  # Read permission for Registration resources in UFS
+  role('role/ufs.registration.reader', [
+      permission('ufs.registrations.get'),
+      permission('ufs.registrations.list'),
+  ])
+  # Write permission for Registration resources in UFS
+  role('role/ufs.registration.writer', [
+      permission('ufs.registrations.create'),
+      permission('ufs.registrations.update'),
+      permission('ufs.registrations.delete'),
+  ])
+  # Read permission for Inventory resources in UFS
+  role('role/ufs.inventory.reader', [
+      permission('ufs.inventories.get'),
+      permission('ufs.inventories.list'),
+  ])
+  # Write permission for Inventory resources in UFS
+  role('role/ufs.inventory.writer', [
+      permission('ufs.inventories.create'),
+      permission('ufs.inventories.update'),
+      permission('ufs.inventories.delete'),
+  ])
+  # Reserve permission for Inventory resources in UFS
+  role('role/ufs.inventory.reserver', [
+      permission('ufs.inventories.reserve'),
+  ])
+  # Read permission for Configuration resources in UFS
+  role('role/ufs.configuration.reader', [
+      permission('ufs.configurations.get'),
+      permission('ufs.configurations.list'),
+  ])
+  # Write permission for Configuration resources in UFS
+  role('role/ufs.configuration.writer', [
+      permission('ufs.configurations.create'),
+      permission('ufs.configurations.update'),
+      permission('ufs.configurations.delete'),
+  ])
+  # Read permission for Network resources in UFS
+  role('role/ufs.network.reader', [
+      permission('ufs.networks.get'),
+      permission('ufs.networks.list'),
+  ])
+  # Write permission for Network resources in UFS
+  role('role/ufs.network.writer', [
+      permission('ufs.networks.create'),
+      permission('ufs.networks.update'),
+      permission('ufs.networks.delete'),
+  ])
+  # Read permission for State resources in UFS
+  role('role/ufs.state.reader', [
+      permission('ufs.states.get'),
+      permission('ufs.states.list'),
+  ])
+  # Write permission for State resources in UFS
+  role('role/ufs.state.writer', [
+      permission('ufs.states.create'),
+      permission('ufs.states.update'),
+      permission('ufs.states.delete'),
+  ])
+  # Admin permission for Registration resources in UFS
+  role(
+      'role/ufs.registration.admin',
+      [
+          # Allow users to read Registration resources
+          include('role/ufs.registration.reader'),
+          # Allow users to write Registration resources
+          include('role/ufs.registration.writer'),
+      ])
+  # Admin permission for Inventory resources in UFS
+  role(
+      'role/ufs.inventory.admin',
+      [
+          # Allow users to read Inventory resources
+          include('role/ufs.inventory.reader'),
+          # Allow users to write Inventory resources
+          include('role/ufs.inventory.writer'),
+          # Allow users to reserve Inventory resources
+          include('role/ufs.inventory.reserver'),
+      ])
+  # Admin permission for Configuration resources in UFS
+  role(
+      'role/ufs.configuration.admin',
+      [
+          # Allow users to read Configuration resources
+          include('role/ufs.configuration.reader'),
+          # Allow users to write Configuration resources
+          include('role/ufs.configuration.writer'),
+      ])
+  # Admin permission for Network resources in UFS
+  role(
+      'role/ufs.network.admin',
+      [
+          # Allow users to read Network resources
+          include('role/ufs.network.reader'),
+          # Allow users to write Network resources
+          include('role/ufs.network.writer'),
+      ])
+  # Admin permission for State records in UFS
+  role(
+      'role/ufs.state.admin',
+      [
+          # Allow users to read State resources
+          include('role/ufs.state.reader'),
+          # Allow users to write State resources
+          include('role/ufs.state.writer'),
+      ])
+  # Admin permission for UFS
+  role(
+      'role/ufs.admin',
+      [
+          # Allow users to read/write Registration resources
+          include('role/ufs.registration.admin'),
+          # Allow users to read/write Inventory resources
+          include('role/ufs.inventory.admin'),
+          # Allow users to read/write Configuration resources
+          include('role/ufs.configuration.admin'),
+          # Allow users to read/write Network resources
+          include('role/ufs.network.admin'),
+          # Allow users to read/write State resources
+          include('role/ufs.state.admin'),
+          # Allow users to import resources
+          permission('ufs.resources.import'),
+      ])
+
   # Bindings implicitly added into the root realm of every project.
   builder.implicit_root_bindings = lambda project_id: [
       realms_config_pb2.Binding(
