@@ -248,5 +248,5 @@ N/A, all the processes are single host. Files are content-addressed.
   - The isolation code is unit and smoke tested. Since all of the isolate code
     is OS-independent and written in python, testing is relatively easy.
     OS-specific projects are IsolatedDesign and TracingToolsDesign.
-  - A canary Continuous Integration master is run by the chromium team at
-    http://build.chromium.org/p/chromium.swarm/waterfall.
+  - A canary Continuous Integration test is run by the chromium team at
+    https://luci-milo-dev.appspot.com/p/chromium/g/chromium.dev/console.

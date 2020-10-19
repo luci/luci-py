@@ -379,5 +379,5 @@ allowlist table is also available.
     relatively easy.
   - Support for hardlinks, symlinks and native path case need OS-specific code
     which can be tested itself on Swarming to get coverage across OSes.
-  - A canary Continuous Integration master is run by the chromium team at
-    http://build.chromium.org/p/chromium.swarm/waterfall.
+  - A canary Continuous Integration test is run by the chromium team at
+    https://luci-milo-dev.appspot.com/p/chromium/g/chromium.dev/console.
