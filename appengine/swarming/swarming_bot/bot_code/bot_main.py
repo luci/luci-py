@@ -671,7 +671,7 @@ def _cleanup_bot_directory(botobj):
           'Failed to remove %s from bot\'s directory: %s' % (i, e))
 
 
-def _run_isolated_flags(botobj):
+def _run_isolated_flags(botobj, additional_free_space):
   """Returns flags to pass to run_isolated.
 
   These are not meant to be processed by task_runner.py.
@@ -680,8 +680,9 @@ def _run_isolated_flags(botobj):
   partition = settings['free_partition']['bot']
   size = os_utilities.get_disk_size(THIS_FILE)
   min_free = (
-      _min_free_disk({'size_mb': size}, partition) +
-      partition['wiggle'])
+      _min_free_disk({'size_mb': size}, partition) + partition['wiggle'] +
+      additional_free_space)
+
   logging.info('size %d, partition %s, min_free %s', size, partition, min_free)
   args = [
       # Shared option.
@@ -745,7 +746,11 @@ def _clean_cache(botobj):
     '--clean',
     '--log-file', os.path.join(botobj.base_dir, 'logs', 'run_isolated.log'),
   ]
-  cmd.extend(_run_isolated_flags(botobj))
+
+  # Require 2G more free space after clean. This is to ensure that
+  # isolated/cas client don't fail due to no more space to free error.
+  cmd.extend(_run_isolated_flags(botobj, 2 * 1024 * 1024 * 1024))
+
   logging.info('Running: %s', cmd)
   try:
     # Intentionally do not use a timeout, it can take a while to hash 50gb but
@@ -913,7 +918,7 @@ def _run_manifest(botobj, manifest, start):
     # Flags for run_isolated.py are passed through by task_runner.py as-is
     # without interpretation.
     command.append('--')
-    command.extend(_run_isolated_flags(botobj))
+    command.extend(_run_isolated_flags(botobj, 0))
     _call_hook_safe(True, botobj, 'on_before_task', bot_file, command, env)
     logging.debug('Running command: %s', command)
 
