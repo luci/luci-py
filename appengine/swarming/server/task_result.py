@@ -1621,7 +1621,6 @@ def task_bq_run(start, end):
     e.to_proto(out)
     return (e.task_id, out)
 
-  failed = 0
   total = 0
   seen = set()
 
@@ -1639,9 +1638,9 @@ def task_bq_run(start, end):
     rows = [_convert(e) for e in entities]
     seen.update(e.task_id for e in entities)
     total += len(rows)
-    failed += bq_state.send_to_bq('task_results_run', rows)
+    bq_state.send_to_bq('task_results_run', rows)
 
-  return total, failed
+  return total
 
 
 def task_bq_summary(start, end):
@@ -1659,7 +1658,6 @@ def task_bq_summary(start, end):
                       e.task_id, out)
     return (e.task_id, out)
 
-  failed = 0
   total = 0
   seen = set()
 
@@ -1677,6 +1675,6 @@ def task_bq_summary(start, end):
     rows = [_convert(e) for e in entities]
     seen.update(e.task_id for e in entities)
     total += len(rows)
-    failed += bq_state.send_to_bq('task_results_summary', rows)
+    bq_state.send_to_bq('task_results_summary', rows)
 
-  return total, failed
+  return total

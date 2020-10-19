@@ -152,7 +152,7 @@ class BotManagementTest(test_case.TestCase):
 
   def test_send_to_bq_empty(self):
     # Empty, nothing is done. No need to mock the HTTP client.
-    self.assertEqual(0, bq_state.send_to_bq('foo', []))
+    bq_state.send_to_bq('foo', [])
 
   def test_send_to_bq(self):
     payloads = []
@@ -171,7 +171,7 @@ class BotManagementTest(test_case.TestCase):
         ('key1', struct_pb2.Struct()),
         ('key2', struct_pb2.Struct()),
     ]
-    self.assertEqual(0, bq_state.send_to_bq('foo', rows))
+    bq_state.send_to_bq('foo', rows)
     expected = [
         {
             'ignoreUnknownValues': False,

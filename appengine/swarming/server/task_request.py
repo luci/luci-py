@@ -1947,7 +1947,6 @@ def task_bq(start, end):
     return (e.task_id, out)
 
   total = 0
-  failed = 0
 
   q = TaskRequest.query(TaskRequest.created_ts >= start,
                         TaskRequest.created_ts <= end)
@@ -1957,6 +1956,5 @@ def task_bq(start, end):
     entities, cursor, more = q.fetch_page(
         bq_state.RAW_LIMIT, start_cursor=cursor)
     total += len(entities)
-    failed += bq_state.send_to_bq('task_requests',
-                                  [_convert(e) for e in entities])
-  return total, failed
+    bq_state.send_to_bq('task_requests', [_convert(e) for e in entities])
+  return total

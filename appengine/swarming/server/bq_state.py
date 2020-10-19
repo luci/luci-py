@@ -84,9 +84,6 @@ def _send_to_bq_raw(dataset, table_name, rows):
     dataset: BigQuery dataset name that contains the table.
     table_name: BigQuery table to stream the rows to.
     rows: list of (row_id, row) rows to sent to BQ.
-
-  Returns:
-    indexes of rows that failed to be sent.
   """
   # BigQuery API doc:
   # https://cloud.google.com/bigquery/docs/reference/rest/v2/tabledata/insertAll
@@ -115,7 +112,6 @@ def _send_to_bq_raw(dataset, table_name, rows):
       deadline=600)
 
   dropped = 0
-  failed = []
   # Use this error message string to detect the error where we're pushing data
   # that is too old. This can occasionally happen as a cron job looks for old
   # entity and by the time it's sending them BigQuery doesn't accept them, just
@@ -132,16 +128,12 @@ def _send_to_bq_raw(dataset, table_name, rows):
       # will get stuck on it.
       dropped += 1
       continue
-    if not failed:
-      # Log the error for the first entry, useful to diagnose schema failure.
-      logging.error('Failed to insert row %s: %r', i, err)
-    failed.append(i)
 
+    logging.error('Failed to insert row %s: %r', i, err)
     # TODO(crbug.com/1139745): exclude retryable error.
     raise BQError("failed to insert rows: %s" % err)
   if dropped:
     logging.warning('%d old rows silently dropped', dropped)
-  return failed
 
 
 ### Public API.
@@ -228,14 +220,7 @@ def send_to_bq(table_name, rows):
 
   Iterates until all rows are sent.
   """
-  failures = 0
+
   if rows:
     logging.info('Sending %d rows', len(rows))
-    while rows:
-      failed = _send_to_bq_raw('swarming', table_name, rows)
-      if not failed:
-        break
-      failures += len(failed)
-      logging.warning('Failed to insert %s rows', len(failed))
-      rows = [rows[i] for i in failed]
-  return failures
+    _send_to_bq_raw('swarming', table_name, rows)

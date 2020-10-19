@@ -2170,7 +2170,7 @@ class TaskRequestApiTest(TestCase):
     # Empty, nothing is done.
     start = utils.utcnow()
     end = start + datetime.timedelta(seconds=60)
-    self.assertEqual((0, 0), task_request.task_bq(start, end))
+    self.assertEqual(0, task_request.task_bq(start, end))
 
   def test_task_bq(self):
 
@@ -2184,7 +2184,6 @@ class TaskRequestApiTest(TestCase):
     def send_to_bq(table_name, rows):
       self.assertEqual('task_requests', table_name)
       payloads.append(rows)
-      return 0
 
     self.mock(bq_state, 'send_to_bq', send_to_bq)
 
@@ -2201,7 +2200,7 @@ class TaskRequestApiTest(TestCase):
     request_2.put()
     end = self.mock_now(now, 30)
 
-    self.assertEqual((2, 0), task_request.task_bq(start, end))
+    self.assertEqual(2, task_request.task_bq(start, end))
     self.assertEqual(1, len(payloads), payloads)
     actual_rows = payloads[0]
     self.assertEqual(2, len(actual_rows))

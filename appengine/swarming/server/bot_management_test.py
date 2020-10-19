@@ -690,14 +690,14 @@ class BotManagementTest(test_case.TestCase):
     # Empty, nothing is done.
     start = utils.utcnow()
     end = start+datetime.timedelta(seconds=60)
-    self.assertEqual((0, 0), bot_management.task_bq_events(start, end))
+    self.assertEqual(0, bot_management.task_bq_events(start, end))
 
   def test_task_bq_events(self):
     payloads = []
     def send_to_bq(table_name, rows):
       self.assertEqual('bot_events', table_name)
       payloads.append(rows)
-      return 0
+
     self.mock(bq_state, 'send_to_bq', send_to_bq)
 
     # Generate a few events.
@@ -714,7 +714,7 @@ class BotManagementTest(test_case.TestCase):
     end = self.mock_now(self.now, 60)
 
     # normal request_sleep is not streamed.
-    self.assertEqual((4, 0), bot_management.task_bq_events(start, end))
+    self.assertEqual(4, bot_management.task_bq_events(start, end))
     self.assertEqual(1, len(payloads))
     actual_rows = payloads[0]
     expected = [

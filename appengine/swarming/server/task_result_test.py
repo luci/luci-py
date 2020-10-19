@@ -320,7 +320,10 @@ class TaskResultApiTest(TestCase):
         started_ts=self.now,
         dead_after_ts=self.now +
         datetime.timedelta(seconds=request.bot_ping_tolerance_secs),
-        resultdb_info={'hostname':'hostname', 'invocation':'invocation'})
+        resultdb_info={
+            'hostname': 'hostname',
+            'invocation': 'invocation'
+        })
     self.assertEqual(expected, actual.to_dict())
     self.assertEqual(50, actual.request.priority)
     self.assertEqual(True, actual.can_be_canceled)
@@ -1127,7 +1130,6 @@ class TaskResultApiTest(TestCase):
       if rows:
         # When rows is empty, send_to_bq() can exit early.
         payloads.append(rows)
-      return 0
 
     self.mock(bq_state, 'send_to_bq', send_to_bq)
     return payloads
@@ -1136,7 +1138,7 @@ class TaskResultApiTest(TestCase):
     # Empty, nothing is done.
     start = utils.utcnow()
     end = start + datetime.timedelta(seconds=60)
-    self.assertEqual((0, 0), task_result.task_bq_run(start, end))
+    self.assertEqual(0, task_result.task_bq_run(start, end))
 
   def test_task_bq_run(self):
     payloads = self._mock_send_to_bq('task_results_run')
@@ -1164,7 +1166,7 @@ class TaskResultApiTest(TestCase):
     run_result_4.modified_ts = utils.utcnow()
     run_result_4.put()
 
-    self.assertEqual((2, 0), task_result.task_bq_run(start, end))
+    self.assertEqual(2, task_result.task_bq_run(start, end))
     self.assertEqual(1, len(payloads), payloads)
     actual_rows = payloads[0]
     self.assertEqual(2, len(actual_rows))
@@ -1184,7 +1186,7 @@ class TaskResultApiTest(TestCase):
     run_result.put()
     end = self.mock_now(self.now, 60)
 
-    self.assertEqual((0, 0), task_result.task_bq_run(start, end))
+    self.assertEqual(0, task_result.task_bq_run(start, end))
     self.assertEqual(0, len(payloads), payloads)
 
   def test_task_bq_run_recent_abandoned_ts(self):
@@ -1200,14 +1202,14 @@ class TaskResultApiTest(TestCase):
     self.assertIsNone(run_result.key.get().completed_ts)
     end = self.mock_now(self.now, 60)
 
-    self.assertEqual((0, 0), task_result.task_bq_run(start, end))
+    self.assertEqual(0, task_result.task_bq_run(start, end))
     self.assertEqual(0, len(payloads), payloads)
 
   def test_task_bq_summary_empty(self):
     # Empty, nothing is done.
     start = utils.utcnow()
     end = start + datetime.timedelta(seconds=60)
-    self.assertEqual((0, 0), task_result.task_bq_summary(start, end))
+    self.assertEqual(0, task_result.task_bq_summary(start, end))
 
   def test_task_bq_summary(self):
     payloads = self._mock_send_to_bq('task_results_summary')
@@ -1235,7 +1237,7 @@ class TaskResultApiTest(TestCase):
     result_4.modified_ts = utils.utcnow()
     result_4.put()
 
-    self.assertEqual((2, 0), task_result.task_bq_summary(start, end))
+    self.assertEqual(2, task_result.task_bq_summary(start, end))
     self.assertEqual(1, len(payloads), payloads)
     actual_rows = payloads[0]
     self.assertEqual(2, len(actual_rows))
@@ -1255,7 +1257,7 @@ class TaskResultApiTest(TestCase):
     result.put()
     end = self.mock_now(self.now, 60)
 
-    self.assertEqual((0, 0), task_result.task_bq_summary(start, end))
+    self.assertEqual(0, task_result.task_bq_summary(start, end))
     self.assertEqual(0, len(payloads), payloads)
 
   def test_task_bq_summary_running(self):
@@ -1268,7 +1270,7 @@ class TaskResultApiTest(TestCase):
     result.put()
     end = self.mock_now(self.now, 60)
 
-    self.assertEqual((0, 0), task_result.task_bq_summary(start, end))
+    self.assertEqual(0, task_result.task_bq_summary(start, end))
     self.assertEqual(0, len(payloads), payloads)
 
   def test_task_bq_summary_recent_abandoned_ts(self):
@@ -1285,7 +1287,7 @@ class TaskResultApiTest(TestCase):
     self.assertIsNone(result.key.get().completed_ts)
     end = self.mock_now(self.now, 60)
 
-    self.assertEqual((0, 0), task_result.task_bq_summary(start, end))
+    self.assertEqual(0, task_result.task_bq_summary(start, end))
     self.assertEqual(0, len(payloads), payloads)
 
   def test_get_result_summaries_query(self):

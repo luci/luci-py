@@ -960,7 +960,6 @@ def task_bq_events(start, end):
     return (bq_key, out)
 
   total = 0
-  failed = 0
 
   q = BotEvent.query(BotEvent.ts >= start, BotEvent.ts <= end)
   cursor = None
@@ -968,5 +967,5 @@ def task_bq_events(start, end):
   while more:
     entities, cursor, more = q.fetch_page(500, start_cursor=cursor)
     total += len(entities)
-    failed += bq_state.send_to_bq('bot_events', [_convert(e) for e in entities])
-  return total, failed
+    bq_state.send_to_bq('bot_events', [_convert(e) for e in entities])
+  return total
