@@ -25,6 +25,8 @@ import bqh
 # TIMESTAMP is 1 year old. Use 364 days for safety.
 _OLDEST_BACKFILL = datetime.timedelta(days=364)
 
+# This is to prevent PayloadTooLargeError when inserting to BQ.
+RAW_LIMIT = 100
 
 ### Models
 
