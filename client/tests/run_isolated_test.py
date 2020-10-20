@@ -798,7 +798,7 @@ class RunIsolatedTest(RunIsolatedTestBase):
     trimmed = []
     def trim_caches(caches, root, min_free_space, max_age_secs):
       trimmed.append(True)
-      self.assertEqual(2, len(caches))
+      self.assertEqual(3, len(caches))
       self.assertTrue(root)
       # The name cache root is increased by the sum of the two hints.
       self.assertEqual(2*1024*1024*1024 + 1100, min_free_space)

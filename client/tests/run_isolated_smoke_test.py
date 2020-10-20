@@ -475,7 +475,7 @@ class RunIsolatedTest(unittest.TestCase):
 
   def test_isolated_fail_empty(self):
     isolated_hash = self._store_isolated({})
-    expected = []
+    expected = ['state.json']
     out, err, returncode = self._run(self._cmd_args(isolated_hash))
     self.assertEqual('', out)
     self.assertIn(
@@ -654,7 +654,7 @@ class RunIsolatedTest(unittest.TestCase):
     self.assertEqual('', err)
     self.assertEqual('Success\n', out, out)
     self.assertEqual(0, returncode)
-    self.assertEqual([], list_files_tree(self._isolated_cache_dir))
+    self.assertEqual(['state.json'], list_files_tree(self._isolated_cache_dir))
 
     # Load the state file manually. This assumes internal knowledge in
     # local_caching.py.
