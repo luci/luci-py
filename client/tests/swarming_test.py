@@ -348,72 +348,60 @@ class TestIsolated(auto_stub.TestCase, Common):
 class TestSwarmingTrigger(NetTestCase):
 
   def test_trigger_task_shards_2_shards(self):
-    task_request = swarming.NewTaskRequest(
-        name=TEST_NAME,
-        parent_task_id=None,
-        pool_task_template='AUTO',
-        priority=101,
-        task_slices=[
-            swarming.TaskSlice(
-                expiration_secs=60 * 60,
-                properties=swarming.TaskProperties(
-                    caches=[],
-                    cipd_input=None,
-                    command=['a', 'b'],
-                    containment=swarming.Containment(
-                        lower_priority=False,
-                        containment_type='NONE',
-                    ),
-                    relative_cwd=None,
-                    dimensions=[('os', 'Mac'), ('pool', 'default')],
-                    env={},
-                    env_prefixes=[],
-                    execution_timeout_secs=60,
-                    extra_args=[],
-                    grace_period_secs=30,
-                    idempotent=False,
-                    inputs_ref={
-                        'isolated': None,
-                        'isolatedserver': '',
-                        'namespace': 'default-gzip',
-                    },
-                    io_timeout_secs=60,
-                    outputs=[],
-                    secret_bytes=None),
-                wait_for_capacity=False),
-        ],
-        service_account=None,
-        tags=['tag:a', 'tag:b'],
-        user='joe@localhost',
-        realm=None,
-        resultdb={'enable': False})
 
-    request_1 = swarming.task_request_to_raw_request(task_request)
+    def make_new_request(shard_index):
+      return swarming.NewTaskRequest(
+          name=TEST_NAME,
+          parent_task_id=None,
+          pool_task_template='AUTO',
+          priority=101,
+          task_slices=[
+              swarming.TaskSlice(
+                  expiration_secs=60 * 60,
+                  properties=swarming.TaskProperties(
+                      caches=[],
+                      cipd_input=None,
+                      command=['a', 'b'],
+                      containment=swarming.Containment(
+                          lower_priority=False,
+                          containment_type='NONE',
+                      ),
+                      relative_cwd=None,
+                      dimensions=[('os', 'Mac'), ('pool', 'default')],
+                      env={
+                          'GTEST_SHARD_INDEX': str(shard_index),
+                          'GTEST_TOTAL_SHARDS': '2',
+                      },
+                      env_prefixes=[],
+                      execution_timeout_secs=60,
+                      extra_args=[],
+                      grace_period_secs=30,
+                      idempotent=False,
+                      inputs_ref={
+                          'isolated': None,
+                          'isolatedserver': '',
+                          'namespace': 'default-gzip',
+                      },
+                      io_timeout_secs=60,
+                      outputs=[],
+                      secret_bytes=None),
+                  wait_for_capacity=False),
+          ],
+          service_account=None,
+          tags=['tag:a', 'tag:b'],
+          user='joe@localhost',
+          realm=None,
+          resultdb={'enable': False})
+
+    task_request_1 = make_new_request(0)
+    request_1 = swarming.task_request_to_raw_request(task_request_1)
     request_1['name'] = u'unit_tests:0:2'
-    request_1['task_slices'][0]['properties']['env'] = [
-        {
-            'key': 'GTEST_SHARD_INDEX',
-            'value': '0'
-        },
-        {
-            'key': 'GTEST_TOTAL_SHARDS',
-            'value': '2'
-        },
-    ]
     result_1 = gen_request_response(request_1)
 
-    request_2 = swarming.task_request_to_raw_request(task_request)
+    task_request_2 = make_new_request(1)
+    request_2 = swarming.task_request_to_raw_request(task_request_2)
     request_2['name'] = u'unit_tests:1:2'
-    request_2['task_slices'][0]['properties']['env'] = [
-        {
-            'key': 'GTEST_SHARD_INDEX',
-            'value': '1'
-        },
-        {
-            'key': 'GTEST_TOTAL_SHARDS',
-            'value': '2'
-        },
-    ]
+    request_2['tags'] += [u'shard_index:1', u'total_shards:2']
     result_2 = gen_request_response(request_2, task_id='12400')
     self.expected_requests([
         (
@@ -432,8 +420,13 @@ class TestSwarmingTrigger(NetTestCase):
         ),
     ])
 
-    tasks = swarming.trigger_task_shards(
-        swarming='https://localhost:1', task_request=task_request, shards=2)
+    tasks = {}
+    tasks.update(
+        swarming.trigger_task_shards(
+            swarming='https://localhost:1', task_request=task_request_1))
+    tasks.update(
+        swarming.trigger_task_shards(
+            swarming='https://localhost:1', task_request=task_request_2))
     expected = {
         u'unit_tests:0:2': {
             'shard_index': 0,
@@ -518,7 +511,7 @@ class TestSwarmingTrigger(NetTestCase):
     ])
 
     tasks = swarming.trigger_task_shards(
-        swarming='https://localhost:1', task_request=task_request, shards=1)
+        swarming='https://localhost:1', task_request=task_request)
     expected = {
         u'unit_tests:2:4': {
             'shard_index': 2,
@@ -587,7 +580,7 @@ class TestSwarmingTrigger(NetTestCase):
     os.environ['SWARMING_TASK_ID'] = '123'
     try:
       tasks = swarming.trigger_task_shards(
-          swarming='https://localhost:1', shards=1, task_request=task_request)
+          swarming='https://localhost:1', task_request=task_request)
     finally:
       os.environ.pop('SWARMING_TASK_ID')
     expected = {
@@ -677,7 +670,7 @@ class TestSwarmingTrigger(NetTestCase):
     os.environ['SWARMING_TASK_ID'] = '123'
     try:
       tasks = swarming.trigger_task_shards(
-          swarming='https://localhost:1', shards=1, task_request=task_request)
+          swarming='https://localhost:1', task_request=task_request)
     finally:
       os.environ.pop('SWARMING_TASK_ID')
     expected = {
@@ -745,7 +738,7 @@ class TestSwarmingTrigger(NetTestCase):
         ),
     ])
     swarming.trigger_task_shards(
-        swarming='https://localhost:1', shards=1, task_request=task_request)
+        swarming='https://localhost:1', task_request=task_request)
 
 
 class TestSwarmingCollection(NetTestCase):
@@ -1849,8 +1842,6 @@ class TestMain(NetTestCase):
         'https://localhost:1',
         '--isolate-server',
         'https://localhost:2',
-        '--shards',
-        '1',
         '--priority',
         '101',
         '--dimension',
@@ -1935,8 +1926,6 @@ class TestMain(NetTestCase):
         'https://localhost:1',
         '--isolate-server',
         'https://localhost:2',
-        '--shards',
-        '1',
         '--priority',
         '101',
         '--dimension',
@@ -2067,8 +2056,6 @@ class TestMain(NetTestCase):
         'https://localhost:1',
         '--isolate-server',
         'https://localhost:2',
-        '--shards',
-        '1',
         '--priority',
         '101',
         '--dimension',
