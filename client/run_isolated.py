@@ -124,6 +124,7 @@ _LUCI_GO_REVISION = 'git_revision:7939542400b9511d60e67501839275f66bac8d0a'
 # Keep synced with task_request.py
 CACHE_NAME_RE = re.compile(r'^[a-z0-9_]{1,4096}$')
 
+_FREE_SPACE_BUFFER_FOR_GO = 1024 * 1024 * 1024
 
 OUTLIVING_ZOMBIE_MSG = """\
 *** Swarming tried multiple times to delete the %s directory and failed ***
@@ -1712,13 +1713,12 @@ def main(args):
   # - --min-free-space was increased accordingly, thus trimming is needed
   # Otherwise, this will have no effect, as bot_main calls run_isolated with
   # --clean after each task.
-  if hint:
-    logging.info('Additional trimming of %d bytes', hint)
-    local_caching.trim_caches(
-        caches,
-        root,
-        min_free_space=options.min_free_space,
-        max_age_secs=MAX_AGE_SECS)
+  local_caching.trim_caches(
+      caches,
+      root,
+      # Add 1GB more buffer for Go CLI.
+      min_free_space=options.min_free_space + _FREE_SPACE_BUFFER_FOR_GO,
+      max_age_secs=MAX_AGE_SECS)
 
   # Save state of isolate/cas cache not to overwrite state from go client.
   if use_go_isolated:

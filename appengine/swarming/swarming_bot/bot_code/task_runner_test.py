@@ -655,6 +655,7 @@ class TestTaskRunner(TestTaskRunnerBase):
         u'c/*/bar',
         u'c/state.json',
         u'w/cas-cache/state.json',
+        u'w/cache/state.json',
         u'result',
         u'w/run_isolated_args.json',
     ])
@@ -667,13 +668,19 @@ class TestTaskRunner(TestTaskRunnerBase):
     cache = local_caching.NamedCache(cache_dir, policies)
     self.assertFalse(os.path.exists(dest_dir))
     self._expect_files([
-        u'w/cas-cache/state.json', u'c/*/bar', u'c/state.json',
-        u'w/run_isolated_args.json'
+        u'w/cas-cache/state.json',
+        u'c/*/bar',
+        u'c/state.json',
+        u'w/run_isolated_args.json',
+        u'w/cache/state.json',
     ])
     cache.install(dest_dir, 'foo')
     self._expect_files([
-        u'dest/bar', u'c/state.json', u'w/run_isolated_args.json',
-        u'w/cas-cache/state.json'
+        u'dest/bar',
+        u'c/state.json',
+        u'w/run_isolated_args.json',
+        u'w/cas-cache/state.json',
+        u'w/cache/state.json',
     ])
     with open(os.path.join(dest_dir, 'bar'), 'rb') as f:
       self.assertEqual(b'updated_cache', f.read())

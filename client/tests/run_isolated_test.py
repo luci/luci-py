@@ -800,8 +800,10 @@ class RunIsolatedTest(RunIsolatedTestBase):
       trimmed.append(True)
       self.assertEqual(3, len(caches))
       self.assertTrue(root)
-      # The name cache root is increased by the sum of the two hints.
-      self.assertEqual(2*1024*1024*1024 + 1100, min_free_space)
+      # The name cache root is increased by the sum of the two hints and buffer.
+      self.assertEqual(
+          run_isolated._FREE_SPACE_BUFFER_FOR_GO + 2 * 1024 * 1024 * 1024 +
+          1100, min_free_space)
       self.assertEqual(1814400, max_age_secs)
     self.mock(local_caching, 'trim_caches', trim_caches)
     nc = os.path.join(self.tempdir, 'named_cache')
