@@ -848,7 +848,7 @@ def get_free_space(path):
     return free_bytes.value
   # For OSes other than Windows.
   f = fs.statvfs(path)  # pylint: disable=E1101
-  return f.f_bfree * f.f_frsize
+  return f.f_bavail * f.f_frsize
 
 
 ### Write file functions.
