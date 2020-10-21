@@ -159,7 +159,6 @@ CONTENTS['file_with_size.isolated'] = json.dumps({
     'files': {
         'file1.txt': file_meta('file1.txt')
     },
-    'read_only': 1,
 }).encode()
 
 CONTENTS['manifest1.isolated'] = json.dumps({

@@ -86,8 +86,7 @@ def archive_isolated_triggers(isolate_server, tree_isolated, tests):
           'algo': 'sha-1',
           'command': ['python', test],
           'includes': [tree_isolated],
-          'read_only': 0,
-          'version': '1.4',
+          'version': '2.0',
       }
       v = os.path.join(tempdir, test_name + '.isolated')
       tools.write_json(v, isolated, True)

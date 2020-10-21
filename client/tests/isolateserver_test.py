@@ -1119,7 +1119,6 @@ class IsolateServerDownloadTest(TestCase):
                 'l': 'a/foo',
             },
         },
-        'read_only': 1,
         'version': isolated_format.ISOLATED_FILE_VERSION,
     }
     isolated_data = json.dumps(
@@ -1215,7 +1214,6 @@ class IsolateServerDownloadTest(TestCase):
           's': len(files['c'][0]),
         },
       },
-      'read_only': 1,
       'version': isolated_format.ISOLATED_FILE_VERSION,
     }
     isolated_data = json.dumps(

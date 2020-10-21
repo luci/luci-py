@@ -466,11 +466,9 @@ def _wrap_in_condition(variables):
   })
 
 
-def _fix_file_mode(filename, read_only):
-  """4 modes are supported, 0700 (rwx), 0600 (rw), 0500 (rx), 0400 (r)."""
-  min_mode = 0o400
-  if not read_only:
-    min_mode |= 0o200
+def _fix_file_mode(filename):
+  """4 modes are supported, 0700 (rwx), 0600 (rw)."""
+  min_mode = 0o600
   return (min_mode | 0o100) if filename.endswith('.py') else min_mode
 
 
@@ -529,12 +527,11 @@ class IsolateTempdirBase(unittest.TestCase):
       return
     test_env.make_tree(self.isolate_dir, DEPENDENCIES[case][0])
 
-  def _gen_files(self, read_only, empty_file):
+  def _gen_files(self, empty_file):
     """Returns a dict of files like calling isolate.files_to_metadata() on each
     file.
 
     Arguments:
-    - read_only: Mark all the 'm' modes without the writeable bit.
     - empty_file: Add a specific empty file (size 0).
     """
     root_dir = self.isolate_dir
@@ -549,7 +546,7 @@ class IsolateTempdirBase(unittest.TestCase):
       if not is_link:
         v[u's'] = int(filestats.st_size)
         if sys.platform != 'win32':
-          v[u'm'] = _fix_file_mode(relfile, read_only)
+          v[u'm'] = _fix_file_mode(relfile)
       if is_link:
         v[u'l'] = os.readlink(filepath)
       else:
@@ -566,23 +563,20 @@ class IsolateTempdirBase(unittest.TestCase):
       item['s'] = 0
     return files
 
-  def _expected_isolated(self, args, read_only, empty_file):
+  def _expected_isolated(self, args, empty_file):
     """Verifies self.isolated contains the expected data."""
     expected = {
         u'algo': u'sha-1',
-        u'files': self._gen_files(read_only, empty_file),
-        u'read_only': 1,
+        u'files': self._gen_files(empty_file),
         u'version': six.text_type(isolated_format.ISOLATED_FILE_VERSION),
     }
-    if read_only is not None:
-      expected[u'read_only'] = read_only
     if args:
       expected[u'command'] = [u'python'] + [six.ensure_text(x) for x in args]
       expected[u'relative_cwd'] = six.text_type(RELATIVE_CWD[self.case()])
     with open(self.isolated, 'r') as f:
       self.assertEqual(expected, json.load(f))
 
-  def _expected_saved_state(self, args, read_only, empty_file, root_dir):
+  def _expected_saved_state(self, args, empty_file, root_dir):
     expected = {
         u'OS':
             six.text_type(sys.platform),
@@ -595,7 +589,7 @@ class IsolateTempdirBase(unittest.TestCase):
             u'chromeos': 0,
         },
         u'files':
-            self._gen_files(read_only, empty_file),
+            self._gen_files(empty_file),
         u'isolate_file':
             file_path.safe_relpath(
                 file_path.get_native_path_case(
@@ -614,9 +608,9 @@ class IsolateTempdirBase(unittest.TestCase):
     with open(self.saved_state(), 'r') as f:
       self.assertEqual(expected, json.load(f))
 
-  def _expect_results(self, args, read_only, empty_file, root_dir=None):
-    self._expected_isolated(args, read_only, empty_file)
-    self._expected_saved_state(args, read_only, empty_file, root_dir)
+  def _expect_results(self, args, empty_file, root_dir=None):
+    self._expected_isolated(args, empty_file)
+    self._expected_saved_state(args, empty_file, root_dir)
     # Also verifies run_isolated.py will be able to read it.
     with open(self.isolated, 'rb') as f:
       isolated_format.load_isolated(f.read(), ALGO)
@@ -687,7 +681,7 @@ class IsolateTempdirBase(unittest.TestCase):
   def _test_all_items_invalid(self, mode):
     out = self._execute(mode, 'all_items_invalid.isolate',
                         ['--ignore_broken_item'])
-    self._expect_results(['empty.py'], None, None, None)
+    self._expect_results(['empty.py'], None, None)
 
     return out or ''
 
@@ -768,7 +762,7 @@ class Isolate_check(IsolateTempdirBase):
 
   def test_fail(self):
     self._execute('check', 'fail.isolate', [])
-    self._expect_results(['fail.py'], None, None, None)
+    self._expect_results(['fail.py'], None, None)
 
   def test_missing_trailing_slash(self):
     self._test_missing_trailing_slash('check')
@@ -782,25 +776,25 @@ class Isolate_check(IsolateTempdirBase):
 
   def test_no_run(self):
     self._execute('check', 'no_run.isolate', [])
-    self._expect_results([], None, None, None)
+    self._expect_results([], None, None)
 
   def test_touch_root(self):
     self._execute('check', 'touch_root.isolate', [])
-    self._expect_results(['touch_root.py'], None, None, self.isolate_dir)
+    self._expect_results(['touch_root.py'], None, self.isolate_dir)
 
   if sys.platform != 'win32':
 
     def test_symlink_full(self):
       self._execute('check', 'symlink_full.isolate', [])
-      self._expect_results(['symlink_full.py'], None, None, None)
+      self._expect_results(['symlink_full.py'], None, None)
 
     def test_symlink_partial(self):
       self._execute('check', 'symlink_partial.isolate', [])
-      self._expect_results(['symlink_partial.py'], None, None, None)
+      self._expect_results(['symlink_partial.py'], None, None)
 
     def test_symlink_outside_build_root(self):
       self._execute('check', 'symlink_outside_build_root.isolate', [])
-      self._expect_results(['symlink_outside_build_root.py'], None, None, None)
+      self._expect_results(['symlink_outside_build_root.py'], None, None)
 
 
 class Isolate_remap(IsolateOutdir):
@@ -812,7 +806,7 @@ class Isolate_remap(IsolateOutdir):
   def test_fail(self):
     self._execute('remap', 'fail.isolate', [])
     self._expected_tree()
-    self._expect_results(['fail.py'], None, None, None)
+    self._expect_results(['fail.py'], None, None)
 
   def test_missing_trailing_slash(self):
     self._test_missing_trailing_slash('remap')
@@ -828,29 +822,29 @@ class Isolate_remap(IsolateOutdir):
   def test_no_run(self):
     self._execute('remap', 'no_run.isolate', [])
     self._expected_tree()
-    self._expect_results([], None, None, None)
+    self._expect_results([], None, None)
 
   def test_touch_root(self):
     self._execute('remap', 'touch_root.isolate', [])
     self._expected_tree()
-    self._expect_results(['touch_root.py'], None, None, self.isolate_dir)
+    self._expect_results(['touch_root.py'], None, self.isolate_dir)
 
   if sys.platform != 'win32':
 
     def test_symlink_full(self):
       self._execute('remap', 'symlink_full.isolate', [])
       self._expected_tree()
-      self._expect_results(['symlink_full.py'], None, None, None)
+      self._expect_results(['symlink_full.py'], None, None)
 
     def test_symlink_partial(self):
       self._execute('remap', 'symlink_partial.isolate', [])
       self._expected_tree()
-      self._expect_results(['symlink_partial.py'], None, None, None)
+      self._expect_results(['symlink_partial.py'], None, None)
 
     def test_symlink_outside_build_root(self):
       self._execute('remap', 'symlink_outside_build_root.isolate', [])
       self._expected_tree()
-      self._expect_results(['symlink_outside_build_root.py'], None, None, None)
+      self._expect_results(['symlink_outside_build_root.py'], None, None)
 
 
 class Isolate_run(IsolateTempdirBase):
@@ -865,7 +859,7 @@ class Isolate_run(IsolateTempdirBase):
       self.fail()
     except subprocess.CalledProcessError:
       pass
-    self._expect_results(['fail.py'], None, None, None)
+    self._expect_results(['fail.py'], None, None)
 
   def test_missing_trailing_slash(self):
     self._test_missing_trailing_slash('run')
@@ -887,21 +881,21 @@ class Isolate_run(IsolateTempdirBase):
 
   def test_touch_root(self):
     self._execute('run', 'touch_root.isolate', [])
-    self._expect_results(['touch_root.py'], None, None, self.isolate_dir)
+    self._expect_results(['touch_root.py'], None, self.isolate_dir)
 
   if sys.platform != 'win32':
 
     def test_symlink_full(self):
       self._execute('run', 'symlink_full.isolate', [])
-      self._expect_results(['symlink_full.py'], None, None, None)
+      self._expect_results(['symlink_full.py'], None, None)
 
     def test_symlink_partial(self):
       self._execute('run', 'symlink_partial.isolate', [])
-      self._expect_results(['symlink_partial.py'], None, None, None)
+      self._expect_results(['symlink_partial.py'], None, None)
 
     def test_symlink_outside_build_root(self):
       self._execute('run', 'symlink_outside_build_root.isolate', [])
-      self._expect_results(['symlink_outside_build_root.py'], None, None, None)
+      self._expect_results(['symlink_outside_build_root.py'], None, None)
 
 
 class IsolateNoOutdir(IsolateTempdirBase):

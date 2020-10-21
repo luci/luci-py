@@ -297,8 +297,6 @@ class SavedState(Flattenable):
       # GYP variables used to generate the .isolated files paths based on path
       # variables. Frequent examples are DEPTH and PRODUCT_DIR.
       'path_variables',
-      # If the generated directory tree should be read-only. Defaults to 1.
-      'read_only',
       # Relative cwd to use to start the command.
       'relative_cwd',
       # Root directory the files are mapped from.
@@ -337,8 +335,6 @@ class SavedState(Flattenable):
     self.files = {}
     self.isolate_file = None
     self.path_variables = {}
-    # Defaults to 1 when compiling to .isolated.
-    self.read_only = None
     self.relative_cwd = None
     self.root_dir = None
     self.version = self.EXPECTED_VERSION
@@ -364,7 +360,7 @@ class SavedState(Flattenable):
     self.isolate_file = isolate_file
     self.path_variables.update(path_variables)
 
-  def update_isolated(self, command, infiles, read_only, relative_cwd):
+  def update_isolated(self, command, infiles, relative_cwd):
     """Updates the saved state with data necessary to generate a .isolated file.
 
     The new files in |infiles| are added to self.files dict but their hash is
@@ -377,8 +373,6 @@ class SavedState(Flattenable):
     # Prune extraneous files that are not a dependency anymore.
     for f in set(self.files).difference(set(infiles)):
       del self.files[f]
-    if read_only is not None:
-      self.read_only = read_only
     self.relative_cwd = relative_cwd
 
   def to_isolated(self):
@@ -402,7 +396,6 @@ class SavedState(Flattenable):
         'version':
             isolated_format.ISOLATED_FILE_VERSION,
     }
-    out['read_only'] = self.read_only if self.read_only is not None else 1
     if self.command:
       out['command'] = self.command
       if self.relative_cwd:
@@ -475,7 +468,6 @@ class SavedState(Flattenable):
     out += '  command: %s\n' % self.command
     out += '  files: %d\n' % len(self.files)
     out += '  isolate_file: %s\n' % self.isolate_file
-    out += '  read_only: %s\n' % self.read_only
     out += '  relative_cwd: %s\n' % self.relative_cwd
     out += '  child_isolated_files: %s\n' % self.child_isolated_files
     out += '  path_variables: %s\n' % dict_to_str(self.path_variables)
@@ -523,7 +515,7 @@ class CompleteState(object):
     with fs.open(isolate_file, 'r') as f:
       # At that point, variables are not replaced yet in command and infiles.
       # infiles may contain directory entries and is in posix style.
-      command, infiles, read_only, isolate_cmd_dir = (
+      command, infiles, isolate_cmd_dir = (
           isolate_format.load_isolate_for_config(
               os.path.dirname(isolate_file), f.read(),
               self.saved_state.config_variables))
@@ -583,7 +575,7 @@ class CompleteState(object):
 
     # Finally, update the new data to be able to generate the foo.isolated file,
     # the file that is used by run_isolated.py.
-    self.saved_state.update_isolated(command, infiles, read_only, relative_cwd)
+    self.saved_state.update_isolated(command, infiles, relative_cwd)
     logging.debug(self)
 
   def files_to_metadata(self, subdir, collapse_symlinks):
@@ -724,25 +716,17 @@ def load_complete_state(options, cwd, subdir, skip_update):
   return complete_state
 
 
-def create_isolate_tree(outdir, root_dir, files, relative_cwd, read_only):
+def create_isolate_tree(outdir, root_dir, files, relative_cwd):
   """Creates a isolated tree usable for test execution.
 
   Returns the current working directory where the isolated command should be
   started in.
   """
-  # Forcibly copy when the tree has to be read only. Otherwise the inode is
-  # modified, and this cause real problems because the user's source tree
-  # becomes read only. On the other hand, the cost of doing file copy is huge.
-  if read_only not in (0, None):
-    action = file_path.COPY
-  else:
-    action = file_path.HARDLINK_WITH_FALLBACK
-
   recreate_tree(
       outdir=outdir,
       indir=root_dir,
       infiles=files,
-      action=action,
+      action=file_path.HARDLINK_WITH_FALLBACK,
       as_hash=False)
   cwd = os.path.normpath(os.path.join(outdir, relative_cwd))
 
@@ -1063,10 +1047,9 @@ def CMDremap(parser, args):
   if fs.listdir(options.outdir):
     raise ExecutionError('Can\'t remap in a non-empty directory')
 
-  create_isolate_tree(
-      options.outdir, complete_state.root_dir, complete_state.saved_state.files,
-      complete_state.saved_state.relative_cwd,
-      complete_state.saved_state.read_only)
+  create_isolate_tree(options.outdir, complete_state.root_dir,
+                      complete_state.saved_state.files,
+                      complete_state.saved_state.relative_cwd)
   if complete_state.isolated_filepath:
     complete_state.save_files()
   return 0
@@ -1099,10 +1082,9 @@ def CMDrun(parser, args):
       os.path.dirname(complete_state.root_dir))
   try:
     # TODO(maruel): Use run_isolated.run_tha_test().
-    cwd = create_isolate_tree(
-        outdir, complete_state.root_dir, complete_state.saved_state.files,
-        complete_state.saved_state.relative_cwd,
-        complete_state.saved_state.read_only)
+    cwd = create_isolate_tree(outdir, complete_state.root_dir,
+                              complete_state.saved_state.files,
+                              complete_state.saved_state.relative_cwd)
     file_path.ensure_command_has_abs_path(cmd, cwd)
     logging.info('Running %s, cwd=%s' % (cmd, cwd))
     try:

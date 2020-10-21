@@ -161,7 +161,6 @@ class TestIsolated(auto_stub.TestCase):
         }
       },
       u'includes': [u'0123456789abcdef0123456789abcdef01234567'],
-      u'read_only': 1,
       u'relative_cwd': u'somewhere_else',
       u'version': isolated_format.ISOLATED_FILE_VERSION,
     }
@@ -189,15 +188,6 @@ class TestIsolated(auto_stub.TestCase):
       }
       with self.assertRaises(isolated_format.IsolatedError):
         isolated_format.load_isolated(json.dumps(data), isolateserver_fake.ALGO)
-
-  def test_load_isolated_os_only(self):
-    # Tolerate 'os' on older version.
-    data = {
-      u'os': 'HP/UX',
-      u'version': '1.3',
-    }
-    m = isolated_format.load_isolated(json.dumps(data), isolateserver_fake.ALGO)
-    self.assertEqual(data, m)
 
   def test_load_isolated_os_only_bad(self):
     data = {
