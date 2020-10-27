@@ -615,7 +615,7 @@ class Test(unittest.TestCase):
     }
     _, outputs_ref, performance_stats = self._run_isolated(
         isolated_hash,
-        name, ['--', '${ISOLATED_OUTDIR}'],
+        name, ['--raw-cmd', '--'] + DEFAULT_COMMAND + ['${ISOLATED_OUTDIR}'],
         expected_summary,
         expected_files,
         deduped=False)

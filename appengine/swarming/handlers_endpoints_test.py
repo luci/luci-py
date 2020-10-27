@@ -1337,7 +1337,7 @@ class TasksApiTest(BaseTest):
     response = self.call_api('new', body=message_to_dict(request), status=400)
     expected = {
         u'error': {
-            u'message': u'use at least one of command or inputs_ref.isolated',
+            u'message': u'\'command\' must be specified',
         },
     }
     self.assertEqual(expected, response.json)
