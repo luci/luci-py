@@ -954,6 +954,10 @@ class TaskProperties(ndb.Model):
     if not self.command:
       raise datastore_errors.BadValueError(u'\'command\' must be specified')
 
+    if self.extra_args:
+      raise datastore_errors.BadValueError(u'\'extra_args\' is deprecated: %s' %
+                                           self.extra_args)
+
     if not self.execution_timeout_secs:
       # Unlike I/O timeout, hard timeout is required.
       raise datastore_errors.BadValueError(
