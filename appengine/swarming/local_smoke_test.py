@@ -69,7 +69,6 @@ DEFAULT_COMMAND = ["python", "-u", "%s.py" % HELLO_WORLD]
 # The default isolated command is to map and run HELLO_WORLD.
 DEFAULT_ISOLATE_HELLO = """{
   "variables": {
-    "command": ["python", "-u", "%(name)s.py"],
     "files": ["%(name)s.py"],
   },
 }""" % {
@@ -999,7 +998,7 @@ class Test(unittest.TestCase):
             u'initial_size': unicode(sum(items_in)),
             u'items_cold': [],
             # Items are hot.
-            u'items_hot': items_in,
+            u'items_hot': sorted(items_in),
             u'num_items_hot': unicode(len(items_in)),
             u'total_bytes_items_hot': unicode(sum(items_in)),
         },
