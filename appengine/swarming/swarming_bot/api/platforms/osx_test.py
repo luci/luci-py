@@ -107,9 +107,8 @@ class TestOsx(unittest.TestCase):
     self.assertEqual(hw_model, 'MacBookPro15,1')
 
   def test_get_os_version_number(self):
-    with mock.patch('platform.mac_ver') as mock_mac_ver:
-      mock_mac_ver.return_value = ('10.15.5', ('', '', ''), 'x86_64')
-      os_version = osx.get_os_version_number()
+    self.mock_check_output.return_value = b'10.15.5\n'
+    os_version = osx.get_os_version_number()
     self.assertEqual(os_version, '10.15.5')
 
   def test_get_os_build_version(self):
@@ -414,6 +413,7 @@ class TestOsx(unittest.TestCase):
     self.assertIsNotNone(osx.is_locked())
 
   def test_is_beta(self):
+    self.mock_check_output.return_value = b'10.15.5\n'
     self.assertIsNotNone(osx.is_beta())
 
   def mock_physical_disks_list(self, disks_data):

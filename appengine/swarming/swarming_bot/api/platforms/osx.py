@@ -505,8 +505,8 @@ def get_os_version_number():
   Returns:
     Version as a string like '10.12.4'
   """
-  # We expect at least 2 parts. Do not fail if it is not the case.
-  return six.text_type(platform.mac_ver()[0])
+  return six.ensure_text(
+      subprocess.check_output(['sw_vers', '-productVersion']).strip())
 
 
 def get_os_build_version():
