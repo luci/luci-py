@@ -177,13 +177,9 @@ def get_isolated_args(work_dir, task_details, isolated_result,
       cmd.extend(('--env-prefix', '%s=%s' % (key, v)))
 
   # TODO(nodir): Pass the command line arguments via a response file.
-  if task_details.command:
-    cmd.append('--raw-cmd')
-    cmd.append('--')
-    cmd.extend(task_details.command)
-  elif task_details.extra_args:
-    cmd.append('--')
-    cmd.extend(task_details.extra_args)
+  cmd.append('--raw-cmd')
+  cmd.append('--')
+  cmd.extend(task_details.command)
   return cmd
 
 
@@ -236,7 +232,6 @@ class TaskDetails(object):
       'dimensions',
       'env',
       'env_prefixes',
-      'extra_args',
       'grace_period',
       'hard_timeout',
       'host',
@@ -269,7 +264,6 @@ class TaskDetails(object):
     # Isolated command. Is a serialized version of task_request.FilesRef.
     self.isolated = data['isolated']
     self.cas_input_root = data['cas_input_root']
-    self.extra_args = data['extra_args']
 
     self.cipd_input = data['cipd_input']
 

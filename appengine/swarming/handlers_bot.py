@@ -754,8 +754,6 @@ class BotPollHandler(_BotBaseHandler):
                 props.env,
             'env_prefixes':
                 props.env_prefixes,
-            'extra_args':
-                props.extra_args,
             'grace_period':
                 props.grace_period_secs,
             'hard_timeout':
