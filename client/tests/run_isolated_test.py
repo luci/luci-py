@@ -313,16 +313,13 @@ class RunIsolatedTest(RunIsolatedTestBase):
         os.path.join(self.tempdir, 'named_cache'),
         '--root-dir',
         self.tempdir,
-        '--',
-        '--extraargs',
-        'bar',
     ]
     ret = run_isolated.main(cmd)
     self.assertEqual(0, ret)
     self.assertEqual(
         [
           (
-            [self.ir_dir(u'foo.exe'), u'cmd w/ space', '--extraargs', 'bar'],
+            [self.ir_dir(u'foo.exe'), u'cmd w/ space'],
             {
               'cwd': self.ir_dir(),
               'detached': True,
@@ -349,7 +346,6 @@ class RunIsolatedTest(RunIsolatedTestBase):
     data = run_isolated.TaskData(
         command=command or [],
         relative_cwd=None,
-        extra_args=[],
         isolated_hash=isolated_hash,
         storage=StorageFake(files, server_ref),
         isolate_cache=local_caching.MemoryContentAddressedCache(),
@@ -1089,7 +1085,6 @@ class RunIsolatedTestRun(RunIsolatedTestBase):
       data = run_isolated.TaskData(
           command=[],
           relative_cwd=None,
-          extra_args=[],
           isolated_hash=isolated_hash,
           storage=store,
           isolate_cache=local_caching.MemoryContentAddressedCache(),
@@ -1428,7 +1423,7 @@ class RunIsolatedTestOutputFiles(RunIsolatedTestBase):
 
   # Like RunIsolatedTestRun, but ensures that specific output files
   # (as opposed to anything in $(ISOLATED_OUTDIR)) are returned.
-  def _run_test(self, isolated, command, extra_args):
+  def _run_test(self, isolated, command):
     # Starts a full isolate server mock and have run_tha_test() uploads results
     # back after the task completed.
     server = isolateserver_fake.FakeIsolateServer()
@@ -1469,7 +1464,6 @@ class RunIsolatedTestOutputFiles(RunIsolatedTestBase):
       data = run_isolated.TaskData(
           command=command,
           relative_cwd=None,
-          extra_args=extra_args,
           isolated_hash=isolated_hash,
           storage=store,
           isolate_cache=local_caching.MemoryContentAddressedCache(),
@@ -1555,7 +1549,7 @@ class RunIsolatedTestOutputFiles(RunIsolatedTestBase):
       u'files': {},
       u'version': isolated_format.ISOLATED_FILE_VERSION,
     }
-    self._run_test(isolated, [], [])
+    self._run_test(isolated, [])
 
   def test_output_cmd(self):
     isolated = {
@@ -1563,17 +1557,7 @@ class RunIsolatedTestOutputFiles(RunIsolatedTestBase):
       u'files': {},
       u'version': isolated_format.ISOLATED_FILE_VERSION,
     }
-    self._run_test(
-        isolated, ['cmd.py', 'foo1', 'foodir/foo2_sl', 'bardir/'], [])
-
-  def test_output_cmd_isolated_extra_args(self):
-    isolated = {
-      u'algo': u'sha-1',
-      u'command': [u'cmd.py'],
-      u'files': {},
-      u'version': isolated_format.ISOLATED_FILE_VERSION,
-    }
-    self._run_test(isolated, [], ['foo1', 'foodir/foo2_sl', 'bardir/'])
+    self._run_test(isolated, ['cmd.py', 'foo1', 'foodir/foo2_sl', 'bardir/'])
 
 
 class RunIsolatedJsonTest(RunIsolatedTestBase):

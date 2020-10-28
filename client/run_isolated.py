@@ -176,9 +176,6 @@ TaskData = collections.namedtuple(
         'command',
         # Relative directory to start command into.
         'relative_cwd',
-        # List of strings; the arguments to add to the command specified in the
-        # isolated file.
-        'extra_args',
         # Hash of the .isolated file that must be retrieved to recreate the tree
         # of files to run the target executable. The command specified in the
         # .isolated is executed.  Mutually exclusive with command argument.
@@ -1048,7 +1045,7 @@ def map_and_run(data, constant_run_path):
 
         # Inject the command
         if not command and bundle.command:
-          command = bundle.command + data.extra_args
+          command = bundle.command
           # Only set the relative directory if the isolated file specified a
           # command, and no raw command was specified.
           if bundle.relative_cwd:
@@ -1822,7 +1819,6 @@ def main(args):
           logging.exception('Error while removing named cache %r at %r. '
                             'The cache will be lost.', path, name)
 
-  extra_args = []
   command = []
   if options.raw_cmd:
     command = args
@@ -1834,7 +1830,8 @@ def main(args):
   else:
     if options.relative_cwd:
       parser.error('--relative-cwd requires --raw-cmd')
-    extra_args = args
+    if args:
+      parser.error('extra args are specified')
 
   containment_type = subprocess42.Containment.NONE
   if options.containment_type == 'AUTO':
@@ -1849,7 +1846,6 @@ def main(args):
   data = TaskData(
       command=command,
       relative_cwd=options.relative_cwd,
-      extra_args=extra_args,
       isolated_hash=options.isolated,
       storage=None,
       isolate_cache=isolate_cache,
