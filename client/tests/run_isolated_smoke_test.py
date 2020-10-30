@@ -142,20 +142,7 @@ CMD_REPEATED_FILES = ['python', 'repeated_files.py']
 
 CMD_OUTPUT = ['python', 'output.py', '${ISOLATED_OUTDIR}/foo.txt']
 
-CONTENTS['download.isolated'] = json.dumps({
-    'command': CMD_REPEATED_FILES,
-    'files': {
-        'file1.txt': file_meta('file1.txt'),
-        'file1_symlink.txt': {
-            'l': 'files1.txt'
-        },
-        'new_folder/file1.txt': file_meta('file1.txt'),
-        'repeated_files.py': file_meta('repeated_files.py'),
-    },
-}).encode()
-
 CONTENTS['file_with_size.isolated'] = json.dumps({
-    'command': ['python', '-V'],
     'files': {
         'file1.txt': file_meta('file1.txt')
     },
@@ -168,7 +155,6 @@ CONTENTS['manifest1.isolated'] = json.dumps({
 }).encode()
 
 CONTENTS['tar_archive.isolated'] = json.dumps({
-    'command': ['python', 'archive_files.py'],
     'files': {
         'archive': {
             'h': isolateserver_fake.hash_content(CONTENTS['tar_archive']),
@@ -180,7 +166,6 @@ CONTENTS['tar_archive.isolated'] = json.dumps({
 }).encode()
 
 CONTENTS['max_path.isolated'] = json.dumps({
-    'command': ['python', 'max_path.py'],
     'files': {
         'a' * 200 + '/' + 'b' * 200: file_meta('file1.txt'),
         'max_path.py': file_meta('max_path.py'),
@@ -188,7 +173,6 @@ CONTENTS['max_path.isolated'] = json.dumps({
 }).encode()
 
 CONTENTS['repeated_files.isolated'] = json.dumps({
-    'command': CMD_REPEATED_FILES,
     'files': {
         'file1.txt': file_meta('file1.txt'),
         'file1_copy.txt': file_meta('file1.txt'),
@@ -197,7 +181,6 @@ CONTENTS['repeated_files.isolated'] = json.dumps({
 }).encode()
 
 CONTENTS['check_files.isolated'] = json.dumps({
-    'command': ['python', 'check_files.py'],
     'files': {
         'check_files.py': file_meta('check_files.py'),
         # Mapping another file.
@@ -209,7 +192,6 @@ CONTENTS['check_files.isolated'] = json.dumps({
 }).encode()
 
 CONTENTS['output.isolated'] = json.dumps({
-    'command': CMD_OUTPUT,
     'files': {
         'output.py': file_meta('output.py'),
     },
@@ -430,7 +412,9 @@ class RunIsolatedTest(unittest.TestCase):
       self._store('repeated_files.py'),
     ]
 
-    out, err, returncode = self._run(self._cmd_args(isolated_hash))
+    out, err, returncode = self._run(
+        self._cmd_args(isolated_hash) + ['--raw-cmd', '--'] +
+        CMD_REPEATED_FILES)
     self.assertEqual('', err)
     self.assertEqual('Success\n', out, out)
     self.assertEqual(0, returncode)
@@ -444,7 +428,8 @@ class RunIsolatedTest(unittest.TestCase):
         self._store('output.py'),
     ]
 
-    _, err, returncode = self._run(self._cmd_args(isolated_hash))
+    _, err, returncode = self._run(
+        self._cmd_args(isolated_hash) + ['--raw-cmd', '--'] + CMD_OUTPUT)
     self.assertEqual('', err)
     self.assertEqual(0, returncode)
     actual = list_files_tree(self._isolated_cache_dir)
@@ -465,7 +450,9 @@ class RunIsolatedTest(unittest.TestCase):
       self._store('file1.txt'),
       self._store('max_path.py'),
     ]
-    out, err, returncode = self._run(self._cmd_args(isolated_hash))
+    out, err, returncode = self._run(
+        self._cmd_args(isolated_hash) +
+        ['--raw-cmd', '--', 'python', 'max_path.py'])
     self.assertEqual('', err)
     self.assertEqual('Success\n', out, out)
     self.assertEqual(0, returncode)
@@ -502,7 +489,9 @@ class RunIsolatedTest(unittest.TestCase):
     self._store('manifest1.isolated')
     self._store('repeated_files.isolated')
 
-    out, err, returncode = self._run(self._cmd_args(isolated_hash))
+    out, err, returncode = self._run(
+        self._cmd_args(isolated_hash) +
+        ['--raw-cmd', '--', 'python', 'check_files.py'])
     self.assertEqual('', err)
     self.assertEqual('Success\n', out)
     self.assertEqual(0, returncode)
@@ -517,7 +506,9 @@ class RunIsolatedTest(unittest.TestCase):
       self._store('tar_archive'),
       self._store('archive_files.py'),
     ]
-    out, err, returncode = self._run(self._cmd_args(isolated_hash))
+    out, err, returncode = self._run(
+        self._cmd_args(isolated_hash) +
+        ['--raw-cmd', '--', 'python', 'archive_files.py'])
     self.assertEqual('', err)
     self.assertEqual('Success\n', out)
     self.assertEqual(0, returncode)
@@ -530,8 +521,9 @@ class RunIsolatedTest(unittest.TestCase):
 
     # Run the test once to generate the cache.
     # The weird file mode is because of test_env.py that sets umask(0070).
-    _out, _err, returncode = self._run(self._cmd_args(isolated_hash))
-    self.assertEqual(0, returncode)
+    out, err, returncode = self._run(
+        self._cmd_args(isolated_hash) + ['--raw-cmd', '--', 'python', '-V'])
+    self.assertEqual(0, returncode, (out, err, returncode))
     expected = {
         u'.': (0o40707, 0o40707, 0o40777),
         u'state.json': (0o100606, 0o100606, 0o100666),
@@ -561,7 +553,8 @@ class RunIsolatedTest(unittest.TestCase):
     self.assertEqual(0, returncode, (out, err, returncode))
 
     # Rerun the test and make sure the cache contains the right file afterwards.
-    out, err, returncode = self._run(self._cmd_args(isolated_hash))
+    out, err, returncode = self._run(
+        self._cmd_args(isolated_hash) + ['--raw-cmd', '--', 'python', '-V'])
     self.assertEqual(0, returncode, (out, err, returncode))
     expected = {
         u'.': (0o40700, 0o40700, 0o40700),
