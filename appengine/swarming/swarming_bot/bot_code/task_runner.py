@@ -177,7 +177,6 @@ def get_isolated_args(work_dir, task_details, isolated_result,
       cmd.extend(('--env-prefix', '%s=%s' % (key, v)))
 
   # TODO(nodir): Pass the command line arguments via a response file.
-  cmd.append('--raw-cmd')
   cmd.append('--')
   cmd.extend(task_details.command)
   return cmd

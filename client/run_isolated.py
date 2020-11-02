@@ -1819,19 +1819,12 @@ def main(args):
           logging.exception('Error while removing named cache %r at %r. '
                             'The cache will be lost.', path, name)
 
-  command = []
-  if options.raw_cmd:
-    command = args
-    if options.relative_cwd:
-      a = os.path.normpath(os.path.abspath(options.relative_cwd))
-      if not a.startswith(os.getcwd()):
-        parser.error(
-            '--relative-cwd must not try to escape the working directory')
-  else:
-    if options.relative_cwd:
-      parser.error('--relative-cwd requires --raw-cmd')
-    if args:
-      parser.error('extra args are specified')
+  command = args
+  if options.relative_cwd:
+    a = os.path.normpath(os.path.abspath(options.relative_cwd))
+    if not a.startswith(os.getcwd()):
+      parser.error(
+          '--relative-cwd must not try to escape the working directory')
 
   containment_type = subprocess42.Containment.NONE
   if options.containment_type == 'AUTO':

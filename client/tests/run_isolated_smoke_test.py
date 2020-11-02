@@ -396,7 +396,7 @@ class RunIsolatedTest(unittest.TestCase):
 
   def test_simple(self):
     out, err, returncode = self._run(
-        ['--raw-cmd', '--', 'python', '-c', 'print("no --root-dir")'])
+        ['--', 'python', '-c', 'print("no --root-dir")'])
     self.assertEqual('no --root-dir\n', out)
     self.assertEqual('', err)
     self.assertEqual(0, returncode)
@@ -413,8 +413,7 @@ class RunIsolatedTest(unittest.TestCase):
     ]
 
     out, err, returncode = self._run(
-        self._cmd_args(isolated_hash) + ['--raw-cmd', '--'] +
-        CMD_REPEATED_FILES)
+        self._cmd_args(isolated_hash) + ['--'] + CMD_REPEATED_FILES)
     self.assertEqual('', err)
     self.assertEqual('Success\n', out, out)
     self.assertEqual(0, returncode)
@@ -429,7 +428,7 @@ class RunIsolatedTest(unittest.TestCase):
     ]
 
     _, err, returncode = self._run(
-        self._cmd_args(isolated_hash) + ['--raw-cmd', '--'] + CMD_OUTPUT)
+        self._cmd_args(isolated_hash) + ['--'] + CMD_OUTPUT)
     self.assertEqual('', err)
     self.assertEqual(0, returncode)
     actual = list_files_tree(self._isolated_cache_dir)
@@ -451,8 +450,7 @@ class RunIsolatedTest(unittest.TestCase):
       self._store('max_path.py'),
     ]
     out, err, returncode = self._run(
-        self._cmd_args(isolated_hash) +
-        ['--raw-cmd', '--', 'python', 'max_path.py'])
+        self._cmd_args(isolated_hash) + ['--', 'python', 'max_path.py'])
     self.assertEqual('', err)
     self.assertEqual('Success\n', out, out)
     self.assertEqual(0, returncode)
@@ -490,8 +488,7 @@ class RunIsolatedTest(unittest.TestCase):
     self._store('repeated_files.isolated')
 
     out, err, returncode = self._run(
-        self._cmd_args(isolated_hash) +
-        ['--raw-cmd', '--', 'python', 'check_files.py'])
+        self._cmd_args(isolated_hash) + ['--', 'python', 'check_files.py'])
     self.assertEqual('', err)
     self.assertEqual('Success\n', out)
     self.assertEqual(0, returncode)
@@ -507,8 +504,7 @@ class RunIsolatedTest(unittest.TestCase):
       self._store('archive_files.py'),
     ]
     out, err, returncode = self._run(
-        self._cmd_args(isolated_hash) +
-        ['--raw-cmd', '--', 'python', 'archive_files.py'])
+        self._cmd_args(isolated_hash) + ['--', 'python', 'archive_files.py'])
     self.assertEqual('', err)
     self.assertEqual('Success\n', out)
     self.assertEqual(0, returncode)
@@ -522,7 +518,7 @@ class RunIsolatedTest(unittest.TestCase):
     # Run the test once to generate the cache.
     # The weird file mode is because of test_env.py that sets umask(0070).
     out, err, returncode = self._run(
-        self._cmd_args(isolated_hash) + ['--raw-cmd', '--', 'python', '-V'])
+        self._cmd_args(isolated_hash) + ['--', 'python', '-V'])
     self.assertEqual(0, returncode, (out, err, returncode))
     expected = {
         u'.': (0o40707, 0o40707, 0o40777),
@@ -554,7 +550,7 @@ class RunIsolatedTest(unittest.TestCase):
 
     # Rerun the test and make sure the cache contains the right file afterwards.
     out, err, returncode = self._run(
-        self._cmd_args(isolated_hash) + ['--raw-cmd', '--', 'python', '-V'])
+        self._cmd_args(isolated_hash) + ['--', 'python', '-V'])
     self.assertEqual(0, returncode, (out, err, returncode))
     expected = {
         u'.': (0o40700, 0o40700, 0o40700),
@@ -582,8 +578,8 @@ class RunIsolatedTest(unittest.TestCase):
 
   def test_minimal_lower_priority(self):
     cmd = [
-        '--cache', self._isolated_cache_dir, '--lower-priority', '--raw-cmd',
-        '--', sys.executable, '-c'
+        '--cache', self._isolated_cache_dir, '--lower-priority', '--',
+        sys.executable, '-c'
     ]
     if sys.platform == 'win32':
       cmd.append(
@@ -606,7 +602,6 @@ class RunIsolatedTest(unittest.TestCase):
     # Execution fails because it tries to run a second process.
     cmd = [
         '--cache', self._isolated_cache_dir, '--limit-processes', '1',
-        '--raw-cmd'
     ]
     if sys.platform == 'win32':
       cmd.extend(('--containment-type', 'JOB_OBJECT'))
@@ -638,8 +633,8 @@ class RunIsolatedTest(unittest.TestCase):
     now = time.time() - 2
     cmd = [
         '--cache', self._isolated_cache_dir, '--named-cache-root',
-        self._named_cache_dir, '--named-cache', 'cache1', 'a', '100',
-        '--raw-cmd', '--', sys.executable, '-c',
+        self._named_cache_dir, '--named-cache', 'cache1', 'a', '100', '--',
+        sys.executable, '-c',
         'open("a/hello","wb").write(b"world");print("Success")'
     ]
     out, err, returncode = self._run(cmd)
@@ -690,7 +685,6 @@ class RunIsolatedTest(unittest.TestCase):
           self._cipd_cache_dir,
           '--json',
           result_json,
-          '--raw-cmd',
           '--',
       ] + CMD_REPEATED_FILES
       out, err, ret = self._run(args)
@@ -772,7 +766,6 @@ class RunIsolatedTest(unittest.TestCase):
         self._cipd_cache_dir,
         '--json',
         result_json,
-        '--raw-cmd',
         '--',
     ] + CMD_OUTPUT
     _, err, ret = self._run(args)

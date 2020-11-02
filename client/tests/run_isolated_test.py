@@ -456,7 +456,6 @@ class RunIsolatedTest(RunIsolatedTestBase):
         os.path.join(self.tempdir, 'isolated_cache'),
         '--named-cache-root',
         os.path.join(self.tempdir, 'named_cache'),
-        '--raw-cmd',
         '--root-dir',
         self.tempdir,
         '--',
@@ -492,7 +491,6 @@ class RunIsolatedTest(RunIsolatedTestBase):
         os.path.join(self.tempdir, 'named_cache'),
         '--switch-to-account',
         'task',
-        '--raw-cmd',
         '--',
         '/bin/echo',
         'hello',
@@ -522,7 +520,6 @@ class RunIsolatedTest(RunIsolatedTestBase):
         os.path.join(self.tempdir, 'named_cache'),
         '--switch-to-account',
         'task',
-        '--raw-cmd',
         '--',
         '/bin/echo',
         'hello',
@@ -553,7 +550,6 @@ class RunIsolatedTest(RunIsolatedTestBase):
           '--leak-temp-dir',
           '--named-cache-root',
           os.path.join(self.tempdir, 'named_cache'),
-          '--raw-cmd',
           '--',
           '/bin/echo',
           'hello',
@@ -629,7 +625,6 @@ class RunIsolatedTest(RunIsolatedTestBase):
         cipd_cache,
         '--named-cache-root',
         os.path.join(self.tempdir, 'named_cache'),
-        '--raw-cmd',
         '--',
         'bin/echo${EXECUTABLE_SUFFIX}',
         'hello',
@@ -688,7 +683,6 @@ class RunIsolatedTest(RunIsolatedTestBase):
         cipd_cache,
         '--named-cache-root',
         os.path.join(self.tempdir, 'named_cache'),
-        '--raw-cmd',
         '--relative-cwd',
         'a',
         '--root-dir',
@@ -778,7 +772,6 @@ class RunIsolatedTest(RunIsolatedTestBase):
 
   def test_main_bad_relative_cwd(self):
     cmd = self.DISABLE_CIPD_FOR_TESTS + [
-        '--raw-cmd',
         '--relative-cwd',
         'a/../../b',
         '--',
@@ -819,7 +812,6 @@ class RunIsolatedTest(RunIsolatedTestBase):
         'cache_bar',
         'bar',
         '1000',
-        '--raw-cmd',
         '--',
         'bin/echo${EXECUTABLE_SUFFIX}',
         'hello',
@@ -972,7 +964,6 @@ class RunIsolatedTest(RunIsolatedTestBase):
     self.popen_fakes.append(fake_wait)
     cmd = self.DISABLE_CIPD_FOR_TESTS + [
         '--no-log',
-        '--raw-cmd',
         '--lower-priority',
         '--containment-type',
         'JOB_OBJECT',
