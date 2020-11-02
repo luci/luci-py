@@ -492,7 +492,6 @@ class TestTaskRunner(TestTaskRunnerBase):
     }
 
     isolated = json.dumps({
-        'command': ['python', 'parent.py'],
         'files': {
             name: {
                 'h':
@@ -510,7 +509,9 @@ class TestTaskRunner(TestTaskRunnerBase):
             'input': isolated_digest,
             'namespace': 'default-gzip',
             'server': self.isolateserver.url,
-        })
+        },
+        command=['python', 'parent.py'],
+    )
     actual = load_and_run(self.server.url, self.work_dir, manifest, None)
     expected = {
         u'exit_code': 0,
@@ -527,7 +528,7 @@ class TestTaskRunner(TestTaskRunnerBase):
                 u'duration': 0.,
                 u'initial_number_items': 0,
                 u'initial_size': 0,
-                u'items_cold': u'eJzjDmbawggAAvcBFg==',
+                u'items_cold': u'eJzjDmaawAgAAq8A8g==',
                 u'items_hot': u'',
             },
             u'upload': {
@@ -1034,7 +1035,6 @@ class TestTaskRunnerKilled(TestTaskRunnerBase):
         'grand_children.py': self.SCRIPT_SIGNAL_HANG.encode(),
     }
     isolated = json.dumps({
-        'command': ['python', '-u', 'parent.py'],
         'files': {
             name: {
                 'h':
@@ -1053,6 +1053,7 @@ class TestTaskRunnerKilled(TestTaskRunnerBase):
             'namespace': 'default-gzip',
             'server': self.isolateserver.url,
         },
+        command=['python', '-u', 'parent.py'],
         # TODO(maruel): A bit cheezy, we'd want the I/O timeout to be just
         # enough to have the time for the PID to be printed but not more.
         #
@@ -1093,7 +1094,7 @@ class TestTaskRunnerKilled(TestTaskRunnerBase):
     if sys.platform == 'win32':
       items_cold = u'eJybwMjWzigOAAUxATc='
     else:
-      items_cold = u'eJybwMjWzigGAAUwATY='
+      items_cold = u'eJybwMgW6wAAA+UBNQ=='
     self.expectTask(
         manifest['task_id'],
         io_timeout=True,

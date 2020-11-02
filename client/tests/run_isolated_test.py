@@ -255,26 +255,12 @@ class RunIsolatedTest(RunIsolatedTestBase):
 
   def test_main(self):
     self.mock(tools, 'disable_buffering', lambda: None)
-    isolated = json_dumps({
-        'command': ['foo.exe', 'cmd with space'],
-    }).encode()
-    isolated_hash = isolateserver_fake.hash_content(isolated)
-    def get_storage(server_ref):
-      return StorageFake({isolated_hash: isolated}, server_ref)
-    self.mock(isolateserver, 'get_storage', get_storage)
 
     cmd = self.DISABLE_CIPD_FOR_TESTS + [
-        '--no-log',
-        '--isolated',
-        isolated_hash,
-        '--cache',
-        os.path.join(self.tempdir, 'isolated_cache'),
-        '--named-cache-root',
-        os.path.join(self.tempdir, 'named_cache'),
-        '--isolate-server',
-        'https://localhost',
-        '--root-dir',
-        self.tempdir,
+        '--no-log', '--cache',
+        os.path.join(self.tempdir, 'isolated_cache'), '--named-cache-root',
+        os.path.join(self.tempdir, 'named_cache'), '--root-dir', self.tempdir,
+        '--', 'foo.exe', 'cmd with space'
     ]
     ret = run_isolated.main(cmd)
     self.assertEqual(0, ret)
@@ -295,24 +281,18 @@ class RunIsolatedTest(RunIsolatedTestBase):
 
   def test_main_args(self):
     self.mock(tools, 'disable_buffering', lambda: None)
-    isolated = json_dumps({'command': ['foo.exe', 'cmd w/ space']}).encode()
-    isolated_hash = isolateserver_fake.hash_content(isolated)
-    def get_storage(server_ref):
-      return StorageFake({isolated_hash: isolated}, server_ref)
-    self.mock(isolateserver, 'get_storage', get_storage)
 
     cmd = self.DISABLE_CIPD_FOR_TESTS + [
         '--no-log',
-        '--isolated',
-        isolated_hash,
         '--cache',
         os.path.join(self.tempdir, 'isolated_cache'),
-        '--isolate-server',
-        'https://localhost',
         '--named-cache-root',
         os.path.join(self.tempdir, 'named_cache'),
         '--root-dir',
         self.tempdir,
+        '--',
+        'foo.exe',
+        'cmd w/ space',
     ]
     ret = run_isolated.main(cmd)
     self.assertEqual(0, ret)
@@ -331,9 +311,12 @@ class RunIsolatedTest(RunIsolatedTestBase):
         ],
         self.popen_calls)
 
-  def _run_tha_test(
-      self, isolated_hash=None, files=None, command=None,
-      lower_priority=False):
+  def _run_tha_test(self,
+                    isolated_hash=None,
+                    files=None,
+                    command=None,
+                    lower_priority=False,
+                    relative_cwd=None):
     files = files or {}
     make_tree_call = []
     def add(i, _):
@@ -345,7 +328,7 @@ class RunIsolatedTest(RunIsolatedTestBase):
     server_ref = isolate_storage.ServerRef('http://localhost:1', 'default-gzip')
     data = run_isolated.TaskData(
         command=command or [],
-        relative_cwd=None,
+        relative_cwd=relative_cwd,
         isolated_hash=isolated_hash,
         storage=StorageFake(files, server_ref),
         isolate_cache=local_caching.MemoryContentAddressedCache(),
@@ -374,10 +357,7 @@ class RunIsolatedTest(RunIsolatedTestBase):
     return make_tree_call
 
   def test_run_tha_test_naked(self):
-    isolated = json_dumps({'command': ['invalid', 'command']}).encode()
-    isolated_hash = isolateserver_fake.hash_content(isolated)
-    files = {isolated_hash: isolated}
-    make_tree_call = self._run_tha_test(isolated_hash, files)
+    make_tree_call = self._run_tha_test(command=['invalid', 'command'])
     self.assertEqual([
         'make_tree_deleteable',
         'make_tree_deleteable',
@@ -411,24 +391,12 @@ class RunIsolatedTest(RunIsolatedTestBase):
     self.mock(on_error, 'report', lambda _: None)
     # The most naked .isolated file that can exist.
     self.mock(tools, 'disable_buffering', lambda: None)
-    isolated = json_dumps({'command': ['invalid', 'command']}).encode()
-    isolated_hash = isolateserver_fake.hash_content(isolated)
-    def get_storage(server_ref):
-      return StorageFake({isolated_hash: isolated}, server_ref)
-    self.mock(isolateserver, 'get_storage', get_storage)
 
     cmd = self.DISABLE_CIPD_FOR_TESTS + [
-        '--no-log',
-        '--isolated',
-        isolated_hash,
-        '--cache',
-        os.path.join(self.tempdir, 'isolated_cache'),
-        '--isolate-server',
-        'https://localhost',
-        '--named-cache-root',
-        os.path.join(self.tempdir, 'named_cache'),
-        '--root-dir',
-        self.tempdir,
+        '--no-log', '--cache',
+        os.path.join(self.tempdir, 'isolated_cache'), '--named-cache-root',
+        os.path.join(self.tempdir, 'named_cache'), '--root-dir', self.tempdir,
+        '--', 'invalid', 'command'
     ]
     ret = run_isolated.main(cmd)
     self.assertEqual(1, ret)
@@ -894,13 +862,7 @@ class RunIsolatedTest(RunIsolatedTestBase):
     self.assertEqual(0, ret)
 
   def test_modified_cwd(self):
-    isolated = json_dumps({
-        'command': ['../out/some.exe', 'arg'],
-        'relative_cwd': 'some',
-    }).encode()
-    isolated_hash = isolateserver_fake.hash_content(isolated)
-    files = {isolated_hash: isolated}
-    _ = self._run_tha_test(isolated_hash, files)
+    self._run_tha_test(command=['../out/some.exe', 'arg'], relative_cwd='some')
     self.assertEqual(
         [
           (
@@ -917,13 +879,10 @@ class RunIsolatedTest(RunIsolatedTestBase):
         self.popen_calls)
 
   def test_python_cmd_lower_priority(self):
-    isolated = json_dumps({
-        'command': ['../out/cmd.py', 'arg'],
-        'relative_cwd': 'some',
-    }).encode()
-    isolated_hash = isolateserver_fake.hash_content(isolated)
-    files = {isolated_hash: isolated}
-    _ = self._run_tha_test(isolated_hash, files, lower_priority=True)
+    self._run_tha_test(
+        command=['../out/cmd.py', 'arg'],
+        relative_cwd='some',
+        lower_priority=True)
     # Injects sys.executable but on macOS, the path may be different than
     # sys.executable due to symlinks.
     self.assertEqual(1, len(self.popen_calls))
@@ -1027,10 +986,9 @@ class RunIsolatedTest(RunIsolatedTestBase):
       return 0
 
     self.popen_fakes.append(fake_wait)
-    bundle, stats = run_isolated._fetch_and_map_with_go_isolated(
+    stats = run_isolated._fetch_and_map_with_go_isolated(
         'fake_isolated_hash', storage, 'fake_outdir', 'fake_cache_dir',
         local_caching.CachePolicies(0, 0, 0, 0), 'fake/path/to/isolated')
-    self.assertTrue(bundle)
     self.assertTrue(stats)
 
 
@@ -1054,7 +1012,6 @@ class RunIsolatedTestRun(RunIsolatedTestBase):
       script_hash = isolateserver_fake.hash_content(script)
       isolated = {
           u'algo': u'sha-1',
-          u'command': [u'cmd.py', u'${ISOLATED_OUTDIR}/foo'],
           u'files': {
               u'cmd.py': {
                   u'h': script_hash,
@@ -1074,7 +1031,7 @@ class RunIsolatedTestRun(RunIsolatedTestBase):
           isolate_storage.ServerRef(server.url, 'default-store'))
 
       data = run_isolated.TaskData(
-          command=[],
+          command=[u'cmd.py', u'${ISOLATED_OUTDIR}/foo'],
           relative_cwd=None,
           isolated_hash=isolated_hash,
           storage=store,
@@ -1533,15 +1490,6 @@ class RunIsolatedTestOutputFiles(RunIsolatedTestBase):
     finally:
       server.close()
 
-  def test_output_cmd_isolated(self):
-    isolated = {
-      u'algo': u'sha-1',
-      u'command': [u'cmd.py', u'foo1', u'foodir/foo2_sl', 'bardir/'],
-      u'files': {},
-      u'version': isolated_format.ISOLATED_FILE_VERSION,
-    }
-    self._run_test(isolated, [])
-
   def test_output_cmd(self):
     isolated = {
       u'algo': u'sha-1',
@@ -1591,7 +1539,7 @@ class RunIsolatedJsonTest(RunIsolatedTestBase):
       self.ir_dir(u'foo.exe'), u'cmd with space',
       '${ISOLATED_OUTDIR}/out.txt',
     ]
-    isolated_in_json = json_dumps({'command': sub_cmd}).encode()
+    isolated_in_json = json_dumps({}).encode()
     isolated_in_hash = isolateserver_fake.hash_content(isolated_in_json)
     def get_storage(server_ref):
       return StorageFake({isolated_in_hash: isolated_in_json}, server_ref)
@@ -1612,7 +1560,8 @@ class RunIsolatedJsonTest(RunIsolatedTestBase):
         out,
         '--root-dir',
         self.tempdir,
-    ]
+        '--',
+    ] + sub_cmd
     ret = run_isolated.main(cmd)
     self.assertEqual(0, ret)
     # Replace ${ISOLATED_OUTDIR} with the temporary directory.

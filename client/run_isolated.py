@@ -617,7 +617,7 @@ def _fetch_and_map_with_go_isolated(isolated_hash, storage, outdir,
                                     go_cache_dir, policies, isolated_client):
   """
   Fetches an isolated tree using go client, create the tree and returns
-  (bundle, stats).
+  stats.
   """
   start = time.time()
   server_ref = storage.server_ref
@@ -656,13 +656,7 @@ def _fetch_and_map_with_go_isolated(isolated_hash, storage, outdir,
     with open(result_json_path) as json_file:
       result_json = json.load(json_file)
 
-    isolated = result_json['isolated']
-    bundle = isolateserver.IsolatedBundle(filter_cb=None)
-    # Only following properties are used in caller.
-    bundle.command = isolated.get('command')
-    bundle.relative_cwd = isolated.get('relative_cwd')
-
-    return bundle, {
+    return {
         'duration': time.time() - start,
         'items_cold': result_json['items_cold'],
         'items_hot': result_json['items_hot'],
@@ -675,9 +669,9 @@ def _fetch_and_map_with_go_isolated(isolated_hash, storage, outdir,
 
 # TODO(crbug.com/932396): remove this function.
 def fetch_and_map(isolated_hash, storage, cache, outdir):
-  """Fetches an isolated tree, create the tree and returns (bundle, stats)."""
+  """Fetches an isolated tree, create the tree and returns stats."""
   start = time.time()
-  bundle = isolateserver.fetch_isolated(
+  isolateserver.fetch_isolated(
       isolated_hash=isolated_hash,
       storage=storage,
       cache=cache,
@@ -685,7 +679,7 @@ def fetch_and_map(isolated_hash, storage, cache, outdir):
       use_symlinks=False)
   hot = (collections.Counter(cache.used) -
          collections.Counter(cache.added)).elements()
-  return bundle, {
+  return {
       'duration': time.time() - start,
       'items_cold': base64.b64encode(large.pack(sorted(cache.added))).decode(),
       'items_hot': base64.b64encode(large.pack(sorted(hot))).decode(),
@@ -1028,7 +1022,7 @@ def map_and_run(data, constant_run_path):
       isolated_stats = result['stats'].setdefault('isolated', {})
       if data.isolated_hash:
         if data.use_go_isolated:
-          bundle, stats = _fetch_and_map_with_go_isolated(
+          stats = _fetch_and_map_with_go_isolated(
               isolated_hash=data.isolated_hash,
               storage=data.storage,
               outdir=run_dir,
@@ -1036,20 +1030,12 @@ def map_and_run(data, constant_run_path):
               policies=data.go_cache_policies,
               isolated_client=go_isolated_client)
         else:
-          bundle, stats = fetch_and_map(
+          stats = fetch_and_map(
               isolated_hash=data.isolated_hash,
               storage=data.storage,
               cache=data.isolate_cache,
               outdir=run_dir)
         isolated_stats['download'].update(stats)
-
-        # Inject the command
-        if not command and bundle.command:
-          command = bundle.command
-          # Only set the relative directory if the isolated file specified a
-          # command, and no raw command was specified.
-          if bundle.relative_cwd:
-            cwd = os.path.normpath(os.path.join(cwd, bundle.relative_cwd))
 
       elif data.cas_digest:
         stats = _fetch_and_map_with_cas(
