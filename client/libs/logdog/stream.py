@@ -14,15 +14,29 @@ import time
 
 from . import streamname, varint
 
-try:
-  # We use FileObjectThread on gevented processes so that gevent can do work
-  # while we block on sending to a logdog stream.
-  from gevent.fileobject import FileObjectThread
-except ImportError:
-  FileObjectThread = lambda x: x
 
-if sys.platform == "win32":
+_is_win = sys.platform == "win32"
+if _is_win:
   from ctypes import GetLastError
+
+_GeventFileObjWrapper = None
+# We use FileObjectPosix on gevented processes on *nix so that gevent can do
+# work while we block on sending to a logdog stream.
+# See: http://www.gevent.org/api/gevent.fileobject.html
+# We have tried FileObjectThread before which works across all platforms.
+# However, in crbug.com/1134802, we've discovered that the performance
+# of FileObjectThread is way worse than FileObjectPosix or even writing
+# without any gevent fileobj wrapper, especially when writing large chunk
+# of data. Therefore, we use FileObjectPosix to achieve gevent compatibility
+# on *nix and use the raw file object on windows until gevent provides
+# something for windows or we've figured out why the performance is so bad
+# for FileObjectThread.
+if not _is_win:
+  try:
+    from gevent.fileobject import FileObjectPosix as _GeventFileObjWrapper
+  except ImportError:
+    pass
+
 
 _StreamParamsBase = collections.namedtuple(
     '_StreamParamsBase', ('name', 'type', 'content_type', 'tags'))
@@ -362,8 +376,8 @@ class StreamClient(object):
     varint.write_uvarint(fobj, len(params_json))
     fobj.write(params_json)
 
-    if not for_process:
-      fobj = FileObjectThread(fobj)
+    if not for_process and _GeventFileObjWrapper:
+      fobj = _GeventFileObjWrapper(fobj.fileno(), mode='w')
 
     return fobj
 
