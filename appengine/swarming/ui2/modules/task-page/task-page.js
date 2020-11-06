@@ -1510,6 +1510,8 @@ time.sleep(${leaseDuration})`];
       service_account: this._request.service_account,
       tags: this._request.tags,
       user: this.profile.email,
+      resultdb: {enable: Boolean(this._result.resultdb_info)},
+      realm: this._request.realm,
     };
     newTask.tags.push('retry:1');
 
