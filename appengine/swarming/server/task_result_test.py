@@ -109,7 +109,7 @@ def _gen_run_result(**kwargs):
   request = result_summary.request_key.get()
   to_run = task_to_run.new_task_to_run(request, 0)
   run_result = task_result.new_run_result(request, to_run, 'localhost', 'abc',
-                                          {})
+                                          {}, result_summary.resultdb_info)
   run_result.started_ts = result_summary.modified_ts
   run_result.modified_ts = utils.utcnow()
   run_result.dead_after_ts = utils.utcnow() + datetime.timedelta(
@@ -301,18 +301,16 @@ class TaskResultApiTest(TestCase):
   def test_new_run_result(self):
     request = _gen_request()
     to_run = task_to_run.new_task_to_run(request, 0)
-    actual = task_result.new_run_result(request, to_run, u'localhost', u'abc', {
-        u'id': [u'localhost'],
-        u'foo': [u'bar', u'biz']
-    })
+    actual = task_result.new_run_result(
+        request, to_run, u'localhost', u'abc', {
+            u'id': [u'localhost'],
+            u'foo': [u'bar', u'biz']
+        },
+        task_result.ResultDBInfo(hostname='hostname', invocation='invocation'))
     actual.modified_ts = self.now
     actual.started_ts = self.now
     actual.dead_after_ts = self.now + datetime.timedelta(
         seconds=request.bot_ping_tolerance_secs)
-    actual.resultdb_info = task_result.ResultDBInfo(
-        hostname='hostname',
-        invocation='invocation'
-    )
     # Trigger _pre_put_hook().
     actual.put()
     expected = self._gen_result(
@@ -413,7 +411,7 @@ class TaskResultApiTest(TestCase):
     actual = task_result.new_run_result(request, to_run, u'localhost', u'abc', {
         u'id': [u'localhost'],
         u'foo': [u'bar', u'biz']
-    })
+    }, None)
     actual.completed_ts = self.now
     actual.modified_ts = self.now
     actual.started_ts = self.now
@@ -459,7 +457,8 @@ class TaskResultApiTest(TestCase):
     to_run.queue_number = None
     to_run.put()
     run_result = task_result.new_run_result(request, to_run, u'localhost',
-                                            u'abc', {})
+                                            u'abc', {},
+                                            result_summary.resultdb_info)
     run_result.started_ts = utils.utcnow()
     run_result.modified_ts = run_result.started_ts
     run_result.dead_after_ts = utils.utcnow() + datetime.timedelta(
@@ -598,7 +597,7 @@ class TaskResultApiTest(TestCase):
     ndb.transaction(result_summary.put)
     to_run = task_to_run.new_task_to_run(request, 0)
     run_result = task_result.new_run_result(request, to_run, 'localhost', 'abc',
-                                            {})
+                                            {}, result_summary.resultdb_info)
     run_result.started_ts = utils.utcnow()
     run_result.completed_ts = run_result.started_ts
     run_result.modified_ts = run_result.started_ts
@@ -624,7 +623,7 @@ class TaskResultApiTest(TestCase):
     result_summary = task_result.new_result_summary(request)
     to_run = task_to_run.new_task_to_run(request, 0)
     run_result = task_result.new_run_result(request, to_run, 'localhost', 'abc',
-                                            {})
+                                            {}, result_summary.resultdb_info)
     run_result.started_ts = utils.utcnow()
     self.assertTrue(result_summary.need_update_from_run_result(run_result))
     result_summary.modified_ts = utils.utcnow()
@@ -645,7 +644,7 @@ class TaskResultApiTest(TestCase):
     result_summary = task_result.new_result_summary(request)
     to_run = task_to_run.new_task_to_run(request, 0)
     run_result = task_result.new_run_result(request, to_run, 'localhost', 'abc',
-                                            {})
+                                            {}, result_summary.resultdb_info)
     run_result.started_ts = utils.utcnow()
     self.assertTrue(result_summary.need_update_from_run_result(run_result))
     result_summary.modified_ts = utils.utcnow()
@@ -694,7 +693,7 @@ class TaskResultApiTest(TestCase):
     ndb.transaction(result_summary.put)
     to_run = task_to_run.new_task_to_run(request, 0)
     run_result = task_result.new_run_result(request, to_run, 'localhost', 'abc',
-                                            {})
+                                            {}, result_summary.resultdb_info)
     run_result.state = task_result.State.TIMED_OUT
     run_result.duration = 0.1
     run_result.exit_code = -1
