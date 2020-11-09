@@ -229,10 +229,13 @@ const taskInfoTable = (ele, request, result, currentSlice) => {
   ${casBlock('CAS Inputs',
       ele._app._server_details.cas_viewer_server,
       currentSlice.properties.cas_input_root || {})}
+  <tr ?hidden=${!result.resultdb_info}>
+    <td>ResultDB</td>
+    <td>Enabled</td>
+  </tr>
   ${arrayInTable(currentSlice.properties.outputs,
       'Expected outputs', (output) => output)}
   ${commitBlock(request.tagMap)}
-
   <tr class=details>
     <td>More Details</td>
     <td>
