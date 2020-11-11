@@ -168,8 +168,8 @@ def rpc_async(req, response_metadata=None):
       code = codes.INT_TO_CODE[int(ex.headers['X-Prpc-Grpc-Code'])]
     except (ValueError, KeyError, TypeError):
       raise ProtocolError(
-          'response does not contain a valid X-Prpc-Grpc-Code header, '
-          'its body: %r' % msg)
+          'response with HTTP code %r does not contain a valid X-Prpc-Grpc-Code'
+          ' header, its body: %r' % (ex.status_code, msg))
     raise RpcError(msg, code, ex.headers)
 
   # Status code is OK.
