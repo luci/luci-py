@@ -158,6 +158,8 @@ def rpc_async(req, response_metadata=None):
     # Sometime requests fail before reaching the pRPC server. We recognize few
     # such cases.
     if 'X-Prpc-Grpc-Code' not in ex.headers:
+      if ex.status_code is None:
+        raise RpcError(ex.message, codes.StatusCode.UNAVAILABLE, {})
       if ex.status_code == 500:
         raise RpcError(msg, codes.StatusCode.INTERNAL, ex.headers)
       if ex.status_code == 503:

@@ -199,6 +199,19 @@ class PRPCClientTestCase(test_case.TestCase):
     self.assertEqual(cm.exception.status_code, codes.StatusCode.UNAVAILABLE)
 
 
+  @mock.patch('components.net.request_async', autospec=True)
+  def test_response_connection_error(self, request_async):
+    request_async.side_effect = net.Error(
+        msg='boom',
+        status_code=None,
+        response=None,
+        headers=None,
+    )
+    with self.assertRaises(prpc_client.RpcError) as cm:
+      self.make_test_client().Take(empty_pb2.Empty())
+    self.assertEqual(cm.exception.status_code, codes.StatusCode.UNAVAILABLE)
+
+
 if __name__ == '__main__':
   if '-v' in sys.argv:
     unittest.TestCase.maxDiff = None
