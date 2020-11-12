@@ -369,6 +369,7 @@ time.sleep(60)
     self.assertEqual(None, err)
     return out
 
+  @unittest.skipIf(sys.platform == 'win32', 'crbug.com/1148174')
   def test_lower_priority(self):
     out = self._test_lower_priority(True)
     if sys.platform == 'win32':

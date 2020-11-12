@@ -561,6 +561,7 @@ class RunIsolatedTest(unittest.TestCase):
     return cached_file_path
 
   @unittest.skipIf(less_than_mac_10_15(), 'crbug.com/1099655')
+  @unittest.skipIf(sys.platform == 'win32', 'crbug.com/1148174')
   def test_isolated_corrupted_cache_entry_different_size(self):
     # Test that an entry with an invalid file size properly gets removed and
     # fetched again. This test case also check for file modes.
@@ -569,6 +570,7 @@ class RunIsolatedTest(unittest.TestCase):
     self.assertEqual(CONTENTS['file1.txt'], read_content(cached_file_path))
 
   @unittest.skipIf(less_than_mac_10_15(), 'crbug.com/1099655')
+  @unittest.skipIf(sys.platform == 'win32', 'crbug.com/1148174')
   def test_isolated_corrupted_cache_entry_same_size(self):
     # Test that an entry with an invalid file content but same size is NOT
     # detected property.
@@ -576,6 +578,7 @@ class RunIsolatedTest(unittest.TestCase):
                                                     b' ')
     self.assertEqual(CONTENTS['file1.txt'], read_content(cached_file_path))
 
+  @unittest.skipIf(sys.platform == 'win32', 'crbug.com/1148174')
   def test_minimal_lower_priority(self):
     cmd = [
         '--cache', self._isolated_cache_dir, '--lower-priority', '--',
