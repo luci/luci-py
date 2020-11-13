@@ -80,9 +80,9 @@ def create_application():
   gae_ts_mon.instrument_wsgi_application(prpc_api)
 
   ts_mon_metrics.initialize()
-  utils.report_memory(frontend_app)
-  utils.report_memory(endpoints_api)
-  utils.report_memory(prpc_api)
+  utils.report_memory(frontend_app, timeout=60)
+  utils.report_memory(endpoints_api, timeout=60)
+  utils.report_memory(prpc_api, timeout=60)
   return frontend_app, endpoints_api, prpc_api
 
 

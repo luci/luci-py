@@ -116,13 +116,14 @@ def get_request_as_int(request, key, default, min_value, max_value):
   return min(max_value, max(min_value, value))
 
 
-def report_memory(app):
+def report_memory(app, timeout=None):
   """Wraps an app so handlers log when memory usage increased by at least 0.5MB
   after the handler completed.
   """
   min_delta = 0.5
   old_dispatcher = app.router.dispatch
   def dispatch_and_report(*args, **kwargs):
+    time_before = time_time()
     before = _get_memory_usage()
     deadline = False
     try:
@@ -133,6 +134,10 @@ def report_memory(app):
       deadline = True
       raise
     finally:
+      # Don't try to call any function if it is close to the timeout.
+      # https://cloud.google.com/appengine/docs/standard/python/how-instances-are-managed#timeout
+      if timeout and time_time() - time_before > timeout - 5:
+        deadline = True
       if not deadline:
         after = _get_memory_usage()
         if before and after and after >= before + min_delta:
