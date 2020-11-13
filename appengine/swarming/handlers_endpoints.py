@@ -550,6 +550,12 @@ class SwarmingTasksService(remote.Service):
     else:
       logging.info('Not using realms')
 
+    # Warn if the pool has realms configured, but the task is using old ACLs.
+    if pool_cfg.realm and not request_obj.realm:
+      logging.warning(
+          'crbug.com/1066839: %s: %r is not using realms',
+          pool, request_obj.name)
+
     # Realm permission 'swarming.pools.createInRealm' checks if the
     # caller is allowed to create a task in the task realm.
     request_obj.realms_enabled = realms.check_tasks_create_in_realm(
