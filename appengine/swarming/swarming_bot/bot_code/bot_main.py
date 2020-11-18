@@ -414,6 +414,7 @@ def _get_state(botobj, sleep_streak):
     err = _get_disks_quarantine(botobj, disks)
     if err:
       state[u'quarantined'] = err
+      _cleanup_purgeable_space(botobj)
   return state
 
 
@@ -457,6 +458,43 @@ def _get_disks_quarantine(botobj, disks):
       break
   if errors:
     return '\n'.join(errors)
+
+
+def _cleanup_purgeable_space(botobj):
+  """Frees up purgeable space by creating large files and removing them.
+
+  It runs only on ARM Mac bots.
+
+  TODO(crbug.com/1142848): remove this workaround after bot code is fixed to
+  recognize purgeable space.
+  """
+  # Skip if it's not ARM MMac.
+  dims = botobj._attributes.get('dimensions') or {}
+  mac_model = dims.get('mac_model')
+  if not mac_model or mac_model[0] != 'ADP3,2':
+    return
+
+  start = time.time()
+  logging.info('_cleanup_purgeable_space: creating large files.')
+
+  tempdir = os.path.join(botobj.base_dir, 'largefiles')
+  fs.mkdir(tempdir)
+
+  for cnt in range(3):
+    # create a largefile until it stops with 'No space left on device'.
+    fname = os.path.join(tempdir, 'largefile%d' % cnt)
+    cmd = ['dd', 'if=/dev/zero', 'of=%s' % fname, 'bs=32m']
+    output, _ = _Popen(botobj, cmd).communicate(None)
+    logging.info(
+        '_cleanup_purgeable_space: created a large file. cnt=%d. output=%s',
+        cnt, output)
+
+  # remove created all files and the temp directory.
+  file_path.rmtree(tempdir)
+
+  logging.info(
+      '_cleanup_purgeable_space: removed the created files. %s sec elapsed.',
+      time.time() - start)
 
 
 def _get_authentication_headers(botobj):
