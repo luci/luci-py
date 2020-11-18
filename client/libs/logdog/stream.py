@@ -15,27 +15,8 @@ import time
 from . import streamname, varint
 
 
-_is_win = sys.platform == "win32"
-if _is_win:
+if sys.platform == "win32":
   from ctypes import GetLastError
-
-_GeventFileObjWrapper = None
-# We use FileObjectPosix on gevented processes on *nix so that gevent can do
-# work while we block on sending to a logdog stream.
-# See: http://www.gevent.org/api/gevent.fileobject.html
-# We have tried FileObjectThread before which works across all platforms.
-# However, in crbug.com/1134802, we've discovered that the performance
-# of FileObjectThread is way worse than FileObjectPosix or even writing
-# without any gevent fileobj wrapper, especially when writing large chunk
-# of data. Therefore, we use FileObjectPosix to achieve gevent compatibility
-# on *nix and use the raw file object on windows until gevent provides
-# something for windows or we've figured out why the performance is so bad
-# for FileObjectThread.
-if not _is_win:
-  try:
-    from gevent.fileobject import FileObjectPosix as _GeventFileObjWrapper
-  except ImportError:
-    pass
 
 
 _StreamParamsBase = collections.namedtuple(
@@ -352,7 +333,7 @@ class StreamClient(object):
     """
     raise NotImplementedError()
 
-  def new_connection(self, params, for_process):
+  def new_connection(self, params):
     """Returns (file): A new configured stream.
 
     The returned object implements (minimally) `write` and `close`.
@@ -361,8 +342,6 @@ class StreamClient(object):
 
     Args:
       params (StreamParams): The parameters to use with the new connection.
-      for_process (bool): If this connection will be attached to a standard
-        handle on a subprocess.
 
     Raises:
       ValueError if the stream name has already been used, or if the parameters
@@ -375,10 +354,6 @@ class StreamClient(object):
     fobj.write(BUTLER_MAGIC)
     varint.write_uvarint(fobj, len(params_json))
     fobj.write(params_json)
-
-    if not for_process and _GeventFileObjWrapper:
-      fobj = _GeventFileObjWrapper(fobj.fileno(), mode='w')
-
     return fobj
 
   @contextlib.contextmanager
@@ -404,7 +379,7 @@ class StreamClient(object):
       if fobj is not None:
         fobj.close()
 
-  def open_text(self, name, content_type=None, tags=None, for_process=False):
+  def open_text(self, name, content_type=None, tags=None):
     """Returns (file): A file-like object for a single text stream.
 
     This creates a new butler TEXT stream with the specified parameters.
@@ -414,8 +389,6 @@ class StreamClient(object):
       content_type (str): The optional content type of the stream. If None, a
           default content type will be chosen by the Butler.
       tags (dict): An optional key/value dictionary pair of LogDog stream tags.
-      for_process (bool): Indicates that this stream will be directly attached
-        to a subprocess's stdout/stderr
 
     Returns (file): A file-like object to a Butler text stream. This object can
         have UTF-8 text content written to it with its `write` method, and must
@@ -426,8 +399,7 @@ class StreamClient(object):
         type=StreamParams.TEXT,
         content_type=content_type,
         tags=tags)
-    return self._BasicStream(self, params,
-                             self.new_connection(params, for_process))
+    return self._BasicStream(self, params, self.new_connection(params))
 
   @contextlib.contextmanager
   def binary(self, name, **kwargs):
@@ -452,7 +424,7 @@ class StreamClient(object):
       if fobj is not None:
         fobj.close()
 
-  def open_binary(self, name, content_type=None, tags=None, for_process=False):
+  def open_binary(self, name, content_type=None, tags=None):
     """Returns (file): A file-like object for a single binary stream.
 
     This creates a new butler BINARY stream with the specified parameters.
@@ -462,8 +434,6 @@ class StreamClient(object):
       content_type (str): The optional content type of the stream. If None, a
           default content type will be chosen by the Butler.
       tags (dict): An optional key/value dictionary pair of LogDog stream tags.
-      for_process (bool): Indicates that this stream will be directly attached
-        to a subprocess's stdout/stderr
 
     Returns (file): A file-like object to a Butler binary stream. This object
         can have UTF-8 content written to it with its `write` method, and must
@@ -474,8 +444,7 @@ class StreamClient(object):
         type=StreamParams.BINARY,
         content_type=content_type,
         tags=tags)
-    return self._BasicStream(self, params,
-                             self.new_connection(params, for_process))
+    return self._BasicStream(self, params, self.new_connection(params))
 
   @contextlib.contextmanager
   def datagram(self, name, **kwargs):
@@ -518,8 +487,7 @@ class StreamClient(object):
         type=StreamParams.DATAGRAM,
         content_type=content_type,
         tags=tags)
-    return self._DatagramStream(self, params,
-                                self.new_connection(params, False))
+    return self._DatagramStream(self, params, self.new_connection(params))
 
 
 class _NamedPipeStreamClient(StreamClient):
