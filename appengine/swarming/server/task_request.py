@@ -1310,9 +1310,6 @@ class TaskRequest(ndb.Model):
       out['task_slices'] = [t.to_dict() for t in self.task_slices]
     return out
 
-  def to_proto(self, out):
-    """Converts self to a swarming_pb2.TaskRequest."""
-
   def to_proto(self, out, append_root_ids=False):
     """Converts self to a swarming_pb2.TaskRequest.
 
