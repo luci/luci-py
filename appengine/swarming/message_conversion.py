@@ -240,6 +240,10 @@ def task_request_to_rpc(entity):
             t,
             properties=_taskproperties_to_rpc(t.properties)))
 
+  resultdb = None
+  if entity.resultdb:
+    resultdb = _ndb_to_rpc(swarming_rpcs.ResultDBCfg, entity.resultdb)
+
   return _ndb_to_rpc(
       swarming_rpcs.TaskRequest,
       entity,
@@ -247,7 +251,8 @@ def task_request_to_rpc(entity):
       # For some amount of time, the properties will be copied into the
       # task_slices and vice-versa, to give time to the clients to update.
       properties=slices[0].properties,
-      task_slices=slices)
+      task_slices=slices,
+      resultdb=resultdb)
 
 
 def new_task_request_from_rpc(msg, now):
@@ -295,6 +300,10 @@ def new_task_request_from_rpc(msg, now):
     pttf.SKIP: task_request.TEMPLATE_SKIP,
   }[msg.pool_task_template]
 
+  resultdb = None
+  if msg.resultdb:
+    resultdb = _rpc_to_ndb(task_request.ResultDBCfg, msg.resultdb)
+
   req = _rpc_to_ndb(
       task_request.TaskRequest,
       msg,
@@ -311,6 +320,7 @@ def new_task_request_from_rpc(msg, now):
       service_account_token=None,
       realms_enabled=None,
       resultdb_update_token=None,
+      resultdb=resultdb,
       pool_task_template=None)  # handled out of band
 
   return req, secret_bytes, template_apply

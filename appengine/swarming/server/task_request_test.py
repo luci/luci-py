@@ -588,6 +588,7 @@ class TaskRequestApiTest(TestCase):
         'realm': None,
         'realms_enabled': False,
         'bot_ping_tolerance_secs': 120,
+        'resultdb': None,
     }
     actual = req.to_dict()
     actual.pop('created_ts')
@@ -702,6 +703,7 @@ class TaskRequestApiTest(TestCase):
         'realm': None,
         'realms_enabled': False,
         'bot_ping_tolerance_secs': 120,
+        'resultdb': None,
     }
     actual = req.to_dict()
     # expiration_ts - created_ts == scheduling_expiration_secs.
@@ -817,6 +819,7 @@ class TaskRequestApiTest(TestCase):
         'realm': None,
         'realms_enabled': False,
         'bot_ping_tolerance_secs': 120,
+        'resultdb': None,
     }
     actual = req.to_dict()
     # expiration_ts - created_ts == scheduling_expiration_secs.
@@ -2050,7 +2053,7 @@ class TaskRequestApiTest(TestCase):
       _gen_request(realm='invalid_realm').put()
 
   def test_resultdb_enable(self):
-    request = _gen_request(resultdb_update_token="token")
+    request = _gen_request(resultdb=task_request.ResultDBCfg(enable=True))
     actual = swarming_pb2.TaskRequest()
     request.to_proto(actual)
     self.assertTrue(actual.resultdb.enable)

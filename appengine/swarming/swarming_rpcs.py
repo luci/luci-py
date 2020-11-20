@@ -588,6 +588,9 @@ class TaskRequest(messages.Message):
   service_account = messages.StringField(10)
   realm = messages.StringField(16)
 
+  # Configuration of Swarming:ResultDB integration.
+  resultdb = messages.MessageField(ResultDBCfg, 17)
+
   pubsub_topic = messages.StringField(11)
   pubsub_userdata = messages.StringField(12)
   bot_ping_tolerance_secs = messages.IntegerField(14)
