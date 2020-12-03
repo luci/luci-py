@@ -1658,10 +1658,10 @@ def _clean_cmd(parser, options, caches, root):
 
   if options.kvs_file and fs.isfile(six.text_type(options.kvs_file)):
     # Remove kvs file if its size exceeds fixed threshold.
-    st = fs.stat(options.kvs_file)
+    st = fs.stat(six.text_type(options.kvs_file))
     if st.st_size >= _CAS_KVS_CACHE_THRESHOLD:
       logging.info("remove kvs file with size: %d", st.st_size)
-      fs.remove(options.kvs_file)
+      fs.remove(six.text_type(options.kvs_file))
 
   # Trim first, then clean.
   local_caching.trim_caches(
