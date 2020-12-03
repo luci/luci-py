@@ -801,6 +801,13 @@ class RunIsolatedTest(RunIsolatedTestBase):
     isolated_cache_dir = os.path.join(self.tempdir, 'isolated_cache')
     cas_cache_dir = os.path.join(self.tempdir, 'cas_cache')
     named_cache_dir = os.path.join(self.tempdir, 'named_cache')
+    kvs_file = os.path.join(self.tempdir, 'kvs_file')
+    with open(kvs_file, 'w') as f:
+      f.write('0' * 100)
+
+    # override size threshold.
+    run_isolated._CAS_KVS_CACHE_THRESHOLD = 99
+
     min_free_space = 1
     max_cache_size = 2
     max_items = 3
@@ -824,6 +831,8 @@ class RunIsolatedTest(RunIsolatedTestBase):
         # Named cache option.
         '--named-cache-root',
         named_cache_dir,
+        '--kvs-file',
+        kvs_file,
     ]
 
     def trim_caches_mock(caches, root_dir, min_free_space, max_age_secs):
@@ -864,6 +873,10 @@ class RunIsolatedTest(RunIsolatedTestBase):
 
     ret = run_isolated.main(cmd)
     self.assertEqual(0, ret)
+
+    with self.assertRaises(OSError):
+      # kvs file should be removed.
+      fs.stat(kvs_file)
 
   def test_modified_cwd(self):
     self._run_tha_test(command=['../out/some.exe', 'arg'], relative_cwd='some')

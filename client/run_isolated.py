@@ -168,6 +168,8 @@ MAX_AGE_SECS = 21*24*60*60
 # TODO(1099655): Enable this once all prod issues are gone.
 _USE_GO_ISOLATED_TO_UPLOAD = False
 
+_CAS_KVS_CACHE_THRESHOLD = 5 * 1024 * 1024 * 1024  # 5 GiB
+
 TaskData = collections.namedtuple(
     'TaskData',
     [
@@ -1534,6 +1536,10 @@ def add_cas_cache_options(parser):
       default='cas-cache',
       help='Directory to keep a local cache of the files. Accelerates download '
       'by reusing already downloaded files. Default=%default')
+  group.add_option(
+      '--kvs-file',
+      default='',
+      help='CAS cache using kvs for small files. Default=%default')
   parser.add_option_group(group)
 
 
@@ -1628,6 +1634,40 @@ def _calc_named_cache_hint(named_cache, named_caches):
   return size
 
 
+def _clean_cmd(options, parser, caches, root):
+  """Cleanup cache dirs/files."""
+  if options.isolated:
+    parser.error('Can\'t use --isolated with --clean.')
+  if options.isolate_server:
+    parser.error('Can\'t use --isolate-server with --clean.')
+  if options.json:
+    parser.error('Can\'t use --json with --clean.')
+  if options.named_caches:
+    parser.error('Can\t use --named-cache with --clean.')
+  if options.cas_instance or options.cas_digest:
+    parser.error('Can\t use --cas-instance, --cas-digest with --clean.')
+
+  logging.info("initial free space: %d", file_path.get_free_space(root))
+
+  if options.kvs_file and fs.isfile(options.kvs_file):
+    # Remove kvs file if its size exceeds fixed threshold.
+    st = fs.stat(options.kvs_file)
+    if st.st_size >= _CAS_KVS_CACHE_THRESHOLD:
+      logging.info("remove kvs file with size: %d", st.st_size)
+      fs.remove(options.kvs_file)
+
+  # Trim first, then clean.
+  local_caching.trim_caches(
+      caches,
+      root,
+      min_free_space=options.min_free_space,
+      max_age_secs=MAX_AGE_SECS)
+  logging.info("free space after trim: %d", file_path.get_free_space(root))
+  for c in caches:
+    c.cleanup()
+  logging.info("free space after cleanup: %d", file_path.get_free_space(root))
+
+
 def main(args):
   # Warning: when --argsfile is used, the strings are unicode instances, when
   # parsed normally, the strings are str instances.
@@ -1666,28 +1706,7 @@ def main(args):
     caches.append(named_cache)
   root = caches[0].cache_dir if caches else six.text_type(os.getcwd())
   if options.clean:
-    if options.isolated:
-      parser.error('Can\'t use --isolated with --clean.')
-    if options.isolate_server:
-      parser.error('Can\'t use --isolate-server with --clean.')
-    if options.json:
-      parser.error('Can\'t use --json with --clean.')
-    if options.named_caches:
-      parser.error('Can\t use --named-cache with --clean.')
-    if options.cas_instance or options.cas_digest:
-      parser.error('Can\t use --cas-instance, --cas-digest with --clean.')
-
-    logging.info("initial free space: %d", file_path.get_free_space(root))
-    # Trim first, then clean.
-    local_caching.trim_caches(
-        caches,
-        root,
-        min_free_space=options.min_free_space,
-        max_age_secs=MAX_AGE_SECS)
-    logging.info("free space after trim: %d", file_path.get_free_space(root))
-    for c in caches:
-      c.cleanup()
-    logging.info("free space after cleanup: %d", file_path.get_free_space(root))
+    _clean_cmd(options, parser, caches, root)
     return 0
 
   # Trim must still be done for the following case:
