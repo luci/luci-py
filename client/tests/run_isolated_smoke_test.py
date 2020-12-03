@@ -270,6 +270,7 @@ class RunIsolatedTest(unittest.TestCase):
     # Use the dev instance for testing for now.
     self._cas_instance = 'chromium-swarm-dev'
     self._cas_cache_dir = os.path.join(self.tempdir, 'c')
+    self._cas_kvs = os.path.join(self.tempdir, 'cas_kvs')
 
   def tearDown(self):
     try:
@@ -353,6 +354,8 @@ class RunIsolatedTest(unittest.TestCase):
           self._cas_cache_dir,
           '-dir',
           dest,
+          '-kvs-file',
+          self._cas_kvs,
       ]
       _, err, returncode = self._run_cas(cmd)
       self.assertEqual('', err)

@@ -227,6 +227,8 @@ TaskData = collections.namedtuple(
         'cas_cache_dir',
         # Parameters passed to `cas` client.
         'cas_cache_policies',
+        # Parameters for kvs file used by `cas` client.
+        'cas_kvs',
         # Environment variables to set.
         'env',
         # Environment variables to mutate with relative directories.
@@ -559,7 +561,7 @@ def _run_go_cmd_and_wait(cmd):
 
 
 def _fetch_and_map_with_cas(cas_client, digest, instance, output_dir, cache_dir,
-                            policies):
+                            policies, kvs_file):
   """
   Fetches a CAS tree using cas client, create the tree and returns download
   stats.
@@ -601,6 +603,10 @@ def _fetch_and_map_with_cas(cas_client, digest, instance, output_dir, cache_dir,
         '-dump-stats-json',
         result_json_path,
     ]
+
+    if kvs_file:
+      cmd.extend(['-kvs-file', kvs_file])
+
     _run_go_cmd_and_wait(cmd)
 
     with open(result_json_path) as json_file:
@@ -1046,7 +1052,8 @@ def map_and_run(data, constant_run_path):
             instance=data.cas_instance,
             output_dir=run_dir,
             cache_dir=data.cas_cache_dir,
-            policies=data.cas_cache_policies)
+            policies=data.cas_cache_policies,
+            kvs_file=data.cas_kvs)
         isolated_stats['download'].update(stats)
 
       if not command:
@@ -1634,7 +1641,7 @@ def _calc_named_cache_hint(named_cache, named_caches):
   return size
 
 
-def _clean_cmd(options, parser, caches, root):
+def _clean_cmd(parser, options, caches, root):
   """Cleanup cache dirs/files."""
   if options.isolated:
     parser.error('Can\'t use --isolated with --clean.')
@@ -1649,7 +1656,7 @@ def _clean_cmd(options, parser, caches, root):
 
   logging.info("initial free space: %d", file_path.get_free_space(root))
 
-  if options.kvs_file and fs.isfile(options.kvs_file):
+  if options.kvs_file and fs.isfile(six.text_type(options.kvs_file)):
     # Remove kvs file if its size exceeds fixed threshold.
     st = fs.stat(options.kvs_file)
     if st.st_size >= _CAS_KVS_CACHE_THRESHOLD:
@@ -1706,7 +1713,7 @@ def main(args):
     caches.append(named_cache)
   root = caches[0].cache_dir if caches else six.text_type(os.getcwd())
   if options.clean:
-    _clean_cmd(options, parser, caches, root)
+    _clean_cmd(parser, options, caches, root)
     return 0
 
   # Trim must still be done for the following case:
@@ -1873,6 +1880,7 @@ def main(args):
           max_items=None,
           max_age_secs=None,
       ),
+      cas_kvs=options.kvs_file,
       env=options.env,
       env_prefix=options.env_prefix,
       lower_priority=bool(options.lower_priority),

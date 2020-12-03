@@ -97,6 +97,7 @@ PASSLIST = (
     'README.md',
     'c',
     'cas_cache',
+    'cas_kvs.db',
     'cipd_cache',
     'isolated_cache',
     'logs',
@@ -735,6 +736,8 @@ def _run_isolated_flags(botobj):
       # CAS cache option.
       '--cas-cache',
       os.path.join(botobj.base_dir, 'cas_cache'),
+      '--kvs-file',
+      os.path.join(botobj.base_dir, 'cas_kvs.db'),
       # Named cache option.
       '--named-cache-root',
       os.path.join(botobj.base_dir, 'c'),
