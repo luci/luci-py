@@ -4,8 +4,13 @@
 */
 
 #search-box-group {
-  padding-bottom: 10px;
+  padding-bottom: 5px;
   padding-top: 2px;
+}
+
+#show-external-groups-box {
+  margin-top: 0px;
+  margin-bottom: 5px;
 }
 
 #group-chooser-outter {

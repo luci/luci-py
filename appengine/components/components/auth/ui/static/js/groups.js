@@ -84,6 +84,8 @@ function longestMatch(items, text) {
 var GroupChooser = function($element, allowCreateGroup) {
   // Root jquery DOM element.
   this.$element = $element;
+  // True to fetch and show external groups.
+  this.showExternalGroups = false;
   // True to show "Create a new group" item.
   this.allowCreateGroup = allowCreateGroup;
   // Currently known list of groups as shown in UI.
@@ -105,7 +107,7 @@ var GroupChooser = function($element, allowCreateGroup) {
 // Loads list of groups from a server. Updates group chooser UI.
 // Returns deferred.
 GroupChooser.prototype.refetchGroups = function() {
-  var defer = api.groups();
+  var defer = api.groups(!this.showExternalGroups);
   var self = this;
   defer.then(function(response) {
     self.setGroupList(response.data.groups);
@@ -828,6 +830,19 @@ exports.onContentLoaded = function() {
       groupChooser.selectDefault();
     }
   };
+
+  // If have an external group selected in the URL, show external groups by
+  // default.
+  groupChooser.showExternalGroups = isExternalGroupName(getCurrentGroupInURL());
+  $('#show-external-groups').prop('checked', groupChooser.showExternalGroups);
+
+  // Refetch groups on changes to "Show external groups" check box.
+  $('#show-external-groups').change(function() {
+    groupChooser.showExternalGroups = $(this).prop('checked');
+    groupChooser.refetchGroups().then(function() {
+      jumpToCurrentGroup(true);
+    });
+  });
 
   // Load and show data.
   groupChooser.refetchGroups().then(function() {

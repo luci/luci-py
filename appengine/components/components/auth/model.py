@@ -873,7 +873,7 @@ def is_valid_group_name(name):
 
 def is_external_group_name(name):
   """True if group is imported from outside and is not writable."""
-  return is_valid_group_name(name) and '/' in name
+  return '/' in name and is_valid_group_name(name)
 
 
 @ndb.transactional

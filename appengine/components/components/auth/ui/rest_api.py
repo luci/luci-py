@@ -598,14 +598,16 @@ class GroupsHandler(handler.ApiHandler):
   api_doc = [
     {
       'verb': 'GET',
-      'doc': 'Lists names and descriptions of all known groups.',
+      'params': 'exclude_external=1|0',
+      'doc': 'Lists names and descriptions of groups.',
       'response_type': 'Groups',
     },
   ]
 
   @staticmethod
-  def cache_key(auth_db_rev):
-    return 'api:v1:GroupsHandler/%d' % auth_db_rev
+  def cache_key(auth_db_rev, exclude_external):
+    return 'api:v1:GroupsHandler/%d?exclude_external=%d' % (
+        auth_db_rev, 1 if exclude_external else 0)
 
   @staticmethod
   def adjust_response_for_user(response):
@@ -615,9 +617,12 @@ class GroupsHandler(handler.ApiHandler):
 
   @api.require(acl.has_access)
   def get(self):
+    exclude_external = self.request.get('exclude_external') == '1'
+
     # Try to find a cached response for the current revision.
     auth_db_rev = model.get_auth_db_revision()
-    cached_response = memcache.get(self.cache_key(auth_db_rev))
+    cache_key = self.cache_key(auth_db_rev, exclude_external)
+    cached_response = memcache.get(cache_key)
     if cached_response is not None:
       self.adjust_response_for_user(cached_response)
       self.send_response(cached_response)
@@ -626,6 +631,8 @@ class GroupsHandler(handler.ApiHandler):
     # Grab a list of groups and corresponding revision for cache key.
     if not model.is_replica():
       def run():
+        # TODO(vadimsh): We can index "is_external" field and skip fetching
+        # external groups here if exclude_external is True.
         fut = model.AuthGroup.query(ancestor=model.root_key()).fetch_async()
         return model.get_auth_db_revision(), fut.get_result()
       auth_db_rev, group_list = ndb.transaction(run)
@@ -633,6 +640,13 @@ class GroupsHandler(handler.ApiHandler):
       auth_db = api.get_latest_auth_db()
       auth_db_rev = auth_db.auth_db_rev
       group_list = [auth_db.get_group(g) for g in auth_db.get_group_names()]
+
+    # Throw away external groups if asked to.
+    if exclude_external:
+      group_list = [
+          g for g in group_list
+          if not model.is_external_group_name(g.key.string_id())
+      ]
 
     # Currently AuthGroup entity contains a list of group members in the entity
     # body. It's an implementation detail that should not be relied upon.
@@ -647,7 +661,7 @@ class GroupsHandler(handler.ApiHandler):
         for g in sorted(group_list, key=lambda x: x.key.string_id())
       ],
     }
-    memcache.set(self.cache_key(auth_db_rev), response, time=24*3600)
+    memcache.set(cache_key, response, time=24*3600)
     self.adjust_response_for_user(response)
     self.send_response(response)
 

@@ -191,8 +191,12 @@ exports.updateOAuthConfig = function(client_id, client_secret,
 
 
 // Lists all known user groups.
-exports.groups = function() {
-  return call('GET', '/auth/api/v1/groups');
+//
+// If 'excludeExternal' is true, excludes external groups (e.g. "google/...")
+// from the listing.
+exports.groups = function(excludeExternal) {
+  var opt = excludeExternal ? '1' : '0';
+  return call('GET', '/auth/api/v1/groups?exclude_external=' + opt);
 };
 
 
