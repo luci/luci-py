@@ -1209,8 +1209,7 @@ BotsRequest = endpoints.ResourceContainer(
     in_maintenance=messages.EnumField(
         swarming_rpcs.ThreeStateBool, 8, default='NONE'),
     is_dead=messages.EnumField(swarming_rpcs.ThreeStateBool, 5, default='NONE'),
-    is_busy=messages.EnumField(swarming_rpcs.ThreeStateBool, 6, default='NONE'),
-    is_mp=messages.EnumField(swarming_rpcs.ThreeStateBool, 7, default='NONE'))
+    is_busy=messages.EnumField(swarming_rpcs.ThreeStateBool, 6, default='NONE'))
 
 
 BotsCountRequest = endpoints.ResourceContainer(
