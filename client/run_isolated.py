@@ -1402,14 +1402,8 @@ def create_option_parser():
       type='float',
       help='Grace period between SIGTERM and SIGKILL')
   parser.add_option(
-      '--raw-cmd',
-      action='store_true',
-      help='Ignore the isolated command, use the one supplied at the command '
-      'line')
-  parser.add_option(
       '--relative-cwd',
-      help='Ignore the isolated \'relative_cwd\' and use this one instead; '
-      'requires --raw-cmd')
+      help='Ignore the isolated \'relative_cwd\' and use this one instead')
   parser.add_option(
       '--env',
       default=[],
