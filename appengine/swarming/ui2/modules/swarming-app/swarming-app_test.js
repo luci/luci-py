@@ -200,7 +200,8 @@ describe('swarming-app', function() {
             e.stopPropagation();
             const serverVersion = ele.querySelector('header .server-version');
             expect(serverVersion).toBeTruthy();
-            expect(serverVersion.textContent).toContain('1234-abcdefg');
+            expect(serverVersion.textContent)
+                .toContain('swarming-staging-default-v024');
             done();
           });
           const serverVersion = ele.querySelector('header .server-version');
@@ -270,7 +271,8 @@ describe('swarming-app', function() {
           ele.addEventListener('server-details-loaded', (e) => {
             e.stopPropagation();
             expect(ele.server_details).toBeTruthy();
-            expect(ele.server_details.server_version).toBe('1234-abcdefg');
+            expect(ele.server_details.server_version)
+                .toBe('swarming-staging-default-v024');
             done();
           });
           expect(ele.server_details.server_version).toContain('must log in');

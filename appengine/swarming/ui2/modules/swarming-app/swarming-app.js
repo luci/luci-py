@@ -57,23 +57,39 @@ spinner_template.innerHTML =`
 </div>
 `;
 
-function versionLink(details) {
+const pantheon_url = `https://console.cloud.google.com/appengine/versions?project=`
+const version_filter_prefix = `&serviceId=default&pageState=(%22versionsTable` +
+    `%22:(%22f%22:%22%255B%257B_22k_22_3A_22Version` +
+    `_22_2C_22t_22_3A10_2C_22v_22_3A_22_5C_22`;
+const version_filter_postfix = `_5C_22_22_2C_22s_22_3Atrue_2C_22i_22_3A_22` +
+    `id_22%257D%255D%22))`;
+const version_default = 'You must log in to see more details';
+
+function serverLink(details) {
   if (!details || !details.server_version) {
-    return undefined;
+    return version_default;
   }
-  const split = details.server_version.split('-');
+  return html`<a href=${pantheon_url.concat(details.project_id,
+      version_filter_prefix, details.server_version, version_filter_postfix)}>
+      ${details.server_version}</a>`;
+}
+
+function gitLink(details) {
+  if (!details || !details.chops_git_version) {
+    return '';
+  }
+
+  const split = details.chops_git_version.split('-');
   if (split.length !== 2) {
-    return undefined;
+    return '';
   }
-  return `https://chromium.googlesource.com/infra/luci/luci-py/+/${split[1]}`;
+  return html`(<a href=https://chromium.googlesource.com/infra/luci/luci-py/+/${split[1]}>${details.chops_git_version}</a>)`;
 }
 
 const dynamic_content_template = (ele) => html`
 <div class=server-version>
   Server:
-  <a href=${ifDefined(versionLink(ele._server_details))}>
-    ${ele._server_details.server_version}
-  </a>
+  ${serverLink(ele._server_details)} ${gitLink(ele._server_details)}
 </div>
 <oauth-login client_id=${ele.client_id}
              ?testing_offline=${ele.testing_offline}>
@@ -95,7 +111,7 @@ window.customElements.define('swarming-app', class extends HTMLElement {
     this._auth_header = '';
     this._profile = {};
     this._server_details = {
-      server_version: 'You must log in to see more details',
+      server_version: version_default,
       bot_version: '',
       cas_viewer_server: '',
     };
