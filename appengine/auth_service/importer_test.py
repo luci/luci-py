@@ -249,6 +249,10 @@ class ImporterTest(test_case.TestCase):
   def test_import_external_groups(self):
     self.mock_now(datetime.datetime(2010, 1, 2, 3, 4, 5, 6))
 
+    # Land imported groups in a series of transactions.
+    self.mock(importer, 'UPDATE_BATCH_LIMIT', 1)
+    self.mock(importer, 'UPDATE_BATCH_SLEEP', 0.0)
+
     importer.write_config("""
       tarball {
         domain: "example.com"
@@ -293,12 +297,12 @@ class ImporterTest(test_case.TestCase):
     # Run the import.
     initial_auth_db_rev = model.get_auth_db_revision()
     importer.import_external_groups()
-    self.assertEqual(initial_auth_db_rev + 1, model.get_auth_db_revision())
+    self.assertEqual(initial_auth_db_rev + 3, model.get_auth_db_revision())
 
     # Verify final state.
     expected_groups = {
       'ldap/new': {
-        'auth_db_rev': 1,
+        'auth_db_rev': 3,
         'auth_db_prev_rev': None,
         'created_by': model.get_service_self_identity(),
         'created_ts': datetime.datetime(2010, 1, 2, 3, 4, 5, 6),
@@ -324,7 +328,7 @@ class ImporterTest(test_case.TestCase):
         'owners': u'administrators',
       },
       'external/external_2': {
-        'auth_db_rev': 1,
+        'auth_db_rev': 2,
         'auth_db_prev_rev': None,
         'created_by': model.get_service_self_identity(),
         'created_ts': datetime.datetime(2010, 1, 2, 3, 4, 5, 6),

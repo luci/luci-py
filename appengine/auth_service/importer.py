@@ -37,10 +37,11 @@ fetching them). Fetched and uploaded tarballs are handled in the exact same way,
 in particular all caveats related to external group system names apply.
 """
 
+import StringIO
 import contextlib
 import logging
-import StringIO
 import tarfile
+import time
 
 from google.appengine.ext import ndb
 
@@ -52,6 +53,12 @@ from components import utils
 from components.auth import model
 
 from proto import config_pb2
+
+
+# Limit on number of groups updated/deleted in a single transaction.
+UPDATE_BATCH_LIMIT = 200
+# How long to wait between batches in seconds.
+UPDATE_BATCH_SLEEP = 5.0
 
 
 class BundleImportError(Exception):
@@ -275,6 +282,7 @@ def ingest_tarball(name, content):
   # {system -> {group -> identities}} map (aka "bundles set") and import it into
   # the datastore.
   logging.info('Ingesting tarball "%s" uploaded by %s', name, caller.to_bytes())
+  logging.info('Tarball size is %d bytes', len(content))
   bundles = load_tarball(content, entry.systems, entry.groups, entry.domain)
   return import_bundles(
       bundles, caller, 'Uploaded as "%s" tarball' % entry.name)
@@ -380,10 +388,14 @@ def import_bundles(bundles, provided_by, change_log_comment):
     auth.replicate_auth_db()
     return True
 
-  # Try to apply the change until success or deadline. Split transaction into
-  # two (assuming AuthDB changes infrequently) to avoid reading and writing too
-  # much stuff from within a single transaction (and to avoid keeping the
-  # transaction open while calculating the diff).
+  updated_groups = set()
+  revision = 0
+
+  # Try to apply the change in batches until it lands completely or deadline
+  # happens. Split each batch update into two transactions (assuming AuthDB
+  # changes infrequently) to avoid reading and writing too much stuff from
+  # within a single transaction (and to avoid keeping the transaction open while
+  # calculating the diff).
   while True:
     # Use same timestamp everywhere to reflect that groups were imported
     # atomically within a single transaction.
@@ -396,22 +408,57 @@ def import_bundles(bundles, provided_by, change_log_comment):
           system, existing_groups, groups, ts, provided_by)
       entities_to_put.extend(to_put)
       entities_to_delete.extend(to_delete)
+
     if not entities_to_put and not entities_to_delete:
-      break
-    if apply_import(revision, entities_to_put, entities_to_delete, ts):
-      revision += 1
+      logging.info('Nothing to do')
       break
 
-  if not entities_to_put and not entities_to_delete:
-    logging.info('No changes')
-    return [], 0
+    # An `apply_import` transaction can touch at most 500 entities. Cap the
+    # number of entities we create/delete by 200 each. The rest will be updated
+    # on the next cycle of the loop. This is safe to do since:
+    #  * Imported groups are "leaf" groups (have no subgroups) and can be added
+    #    in arbitrary order without worrying about referential integrity.
+    #  * Deleted groups are guaranteed to be unreferenced by `prepare_import`
+    #    and can be deleted in arbitrary order as well.
+    truncated = (
+        len(entities_to_put) > UPDATE_BATCH_LIMIT or
+        len(entities_to_delete) > UPDATE_BATCH_LIMIT)
+    entities_to_put = entities_to_put[:UPDATE_BATCH_LIMIT]
+    entities_to_delete = entities_to_delete[:UPDATE_BATCH_LIMIT]
 
-  logging.info('Groups updated, new authDB rev is %d', revision)
-  updated_groups = []
-  for e in entities_to_put + entities_to_delete:
-    logging.info('%s', e.key.id())
-    updated_groups.append(e.key.id())
-  return sorted(updated_groups), revision
+    # Log what we are about to do to help debugging transaction errors.
+    logging.info(
+        'Preparing AuthDB rev %d with %d puts and %d deletes:',
+        revision+1, len(entities_to_put), len(entities_to_delete))
+    for e in entities_to_put:
+      logging.info('U %s', e.key.id())
+      updated_groups.add(e.key.id())
+    for e in entities_to_delete:
+      logging.info('D %s', e.key.id())
+      updated_groups.add(e.key.id())
+
+    # Land the change iff the current AuthDB revision is still == `revision`.
+    if not apply_import(revision, entities_to_put, entities_to_delete, ts):
+      logging.warning('AuthDB changed between transactions, retrying...')
+      time.sleep(UPDATE_BATCH_SLEEP)
+      continue
+
+    # The new revision has landed.
+    revision += 1
+
+    # We may have more unpushed stuff waiting its turn.
+    if truncated:
+      logging.info('Going for another round to push the rest of the groups...')
+      time.sleep(UPDATE_BATCH_SLEEP)
+      continue
+
+    # Otherwise we are done.
+    logging.info('Done')
+    break
+
+  if updated_groups:
+    return sorted(updated_groups), revision
+  return [], 0
 
 
 def load_tarball(content, systems, groups, domain):
@@ -584,4 +631,6 @@ def prepare_import(
   for group_name in (set(imported_groups) & set(system_groups)):
     update_group(group_name)
 
+  to_put.sort(key=lambda e: e.key.id())
+  to_delete.sort(key=lambda e: e.key.id())
   return to_put, to_delete
