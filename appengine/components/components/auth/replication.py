@@ -357,7 +357,7 @@ def load_sharded_auth_db(primary_url, auth_db_rev, shard_ids):
   out = cStringIO.StringIO()
   decompressor = zlib.decompressobj()
   for idx, shard in enumerate(shards):
-    data = decompressor.decompress(shard.blob, 512*1024)
+    data = decompressor.decompress(shard.blob)
     # Release the memory held by the shard ASAP
     shards[idx] = None
     shard.blob = None
