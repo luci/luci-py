@@ -67,8 +67,14 @@ def _print_version_log(app, to_version):
     print("Can't find any active versions.")
     return
 
-  start = int(from_version.split('-', 1)[0])
-  end = int(to_version.split('-', 1)[0])
+  try:
+    start = int(from_version.split('-', 1)[0])
+    end = int(to_version.split('-', 1)[0])
+  except ValueError:
+    print("Can't get version number. from: %s, to: %s" %
+          (from_version, to_version))
+    return
+
   if start < end:
     pseudo_revision, mergebase = calculate_version.get_remote_pseudo_revision(
         app.app_dir, 'origin/master')
