@@ -163,7 +163,10 @@ def get_os_values():
     # Expects '10.a.b'. Add both '10.a' and '10.a.b'.
     number = platforms.osx.get_os_version_number()
     build = platforms.osx.get_os_build_version()
-    out.append(u'%s-%s' % (os_name, number.rsplit('.', 1)[0]))
+    parts = number.split('.')
+    out.append(u'%s-%s' % (os_name, parts[0]))
+    if len(parts) == 3:
+      out.append(u'%s-%s.%s' % (os_name, parts[0], parts[1]))
     out.append(u'%s-%s' % (os_name, number))
     out.append(u'%s-%s-%s' % (os_name, number, build))
   else:
