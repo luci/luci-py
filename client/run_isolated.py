@@ -1142,11 +1142,15 @@ def map_and_run(data, constant_run_path):
         for directory in dirs_to_remove:
           if not fs.isdir(directory):
             continue
+          start = time.time()
           try:
             success = success and file_path.rmtree(directory)
           except OSError as e:
             logging.error('rmtree(%r) failed: %s', directory, e)
             success = False
+          finally:
+            logging.info('Cleanup: rmtree(%r) took %d seconds', directory,
+                         time.time() - start)
           if not success:
             sys.stderr.write(
                 OUTLIVING_ZOMBIE_MSG % (directory, data.grace_period))
