@@ -860,7 +860,7 @@ const reproduceSection = (ele, currentSlice) => {
 <div class=reproduce>
   <div ?hidden=${!hasIsolated}>Download inputs files into directory <i>foo</i>:</div>
   <div class="code bottom_space" ?hidden=${!hasIsolated}>
-    # (if needed) cipd install 'infra/tools/luci/isolated/\${platform}' -root bar<br>
+    # (if needed, use "\\\${platform}" as-is) cipd install "infra/tools/luci/isolated/\\\${platform}" -root bar<br>
     # (if needed) ./bar/isolated login<br>
     ./bar/isolated download -I ${ref.isolatedserver} --namespace ${ref.namespace}
     -isolated ${ref.isolated} -output-dir foo
