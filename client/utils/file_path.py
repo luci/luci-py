@@ -1146,11 +1146,12 @@ def rmtree(root):
   for i in range(max_tries):
     # pylint: disable=cell-var-from-loop
     # errors is a list of tuple(function, path, excinfo).
-    start = time.time()
     errors = []
     logging.debug('file_path.rmtree(%s) try=%d', root, i)
-
+    start = time.time()
     fs.rmtree(root, onerror=lambda *args: errors.append(args))
+    logging.debug('file_path.rmtree(%s) try=%d took %d seconds', root, i,
+                  time.time() - start)
     if not errors or not fs.exists(root):
       if i:
         sys.stderr.write('Succeeded.\n')
@@ -1161,9 +1162,6 @@ def rmtree(root):
           change_acl_for_delete(path)
         except Exception as e:
           sys.stderr.write('- %s (failed to update ACL: %s)\n' % (path, e))
-
-    logging.debug('file_path.rmtree(%s) try=%d took %d seconds', root, i,
-                  time.time() - start)
 
     if i != max_tries - 1:
       delay = (i+1)*2
