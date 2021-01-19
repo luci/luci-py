@@ -1144,7 +1144,7 @@ def map_and_run(data, constant_run_path):
             continue
           start = time.time()
           try:
-            success = success and file_path.rmtree(directory)
+            file_path.rmtree(directory)
           except OSError as e:
             logging.error('rmtree(%r) failed: %s', directory, e)
             success = False
