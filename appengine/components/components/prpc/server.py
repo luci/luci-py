@@ -70,12 +70,22 @@ class Server(object):
   provides a simpler interface via add_service and get_routes.
   """
 
-  def __init__(self, allow_cors=True):
+  def __init__(self, allow_cors=True, allowed_origins=None):
+    """Initializes a new Server.
+
+    Args:
+      allow_cors: opttional boolean. True if CORS should be allowed.
+      allowed_origins: optional collection of allowed origins. Only used
+        when cors is allowed. If empty, all origins will be allowed, otherwise
+        only listed origins will be allowed.
+
+    """
     self._services = {}
     self._interceptors = ()
     self._discovery_service = discovery.Discovery()
     self.add_service(self._discovery_service)
     self.allow_cors = allow_cors
+    self.allowed_origins = set(allowed_origins or [])
 
   def add_interceptor(self, interceptor):
     """Adds an interceptor to the interceptor chain.
@@ -287,7 +297,8 @@ class Server(object):
         """Sends an empty response with CORS headers for origins, if allowed."""
         origin = self.request.headers.get('Origin')
 
-        if origin and server.allow_cors:
+        if origin and server.allow_cors and (not server.allowed_origins or
+                                             origin in server.allowed_origins):
           self.response.headers['Access-Control-Allow-Origin'] = origin
           self.response.headers['Vary'] = 'Origin'
           self.response.headers['Access-Control-Allow-Credentials'] = 'true'

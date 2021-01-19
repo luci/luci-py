@@ -84,6 +84,17 @@ class PRPCServerTestCase(test_case.TestCase):
         extra_environ={'REMOTE_ADDR': '192.192.192.192'},
     )
 
+    self.allowed_origins = ['allowed.com', 'allowed-2.com']
+
+    explicit_origins_s = server.Server(allowed_origins=self.allowed_origins)
+    explicit_origins_s.add_service(self.service)
+    real_explicit_origins_app = webapp2.WSGIApplication(
+        explicit_origins_s.get_routes(), debug=True)
+    self.explicit_origins_app = webtest.TestApp(
+        real_explicit_origins_app,
+        extra_environ={'REMOTE_ADDR': '::ffff:127.0.0.1'},
+    )
+
     no_cors_s = server.Server(allow_cors=False)
     no_cors_s.add_service(self.service)
     real_no_cors_app = webapp2.WSGIApplication(
@@ -297,6 +308,42 @@ class PRPCServerTestCase(test_case.TestCase):
     self.assertIsNone(no_cors_headers.get('Access-Control-Allow-Headers'))
     self.assertIsNone(no_cors_headers.get('Access-Control-Allow-Methods'))
     self.assertIsNone(no_cors_headers.get('Access-Control-Max-Age'))
+
+  def test_options_allowed_origins(self):
+    """Make sure the server only allows allowlisted origins is specified."""
+    # Check we allow origins found in server.allowed_origins
+    allowed_origin = self.allowed_origins[0]
+    options_headers = self.make_headers(encoding.Encoding.BINARY)
+    options_headers['origin'] = allowed_origin
+
+    allowed_resp = self.explicit_origins_app.options('/prpc/test.Test/Give',
+                                                     options_headers)
+    allowed_headers = allowed_resp.headers
+    self.assertEqual(allowed_headers['Access-Control-Allow-Origin'],
+                     allowed_origin)
+    self.assertEqual(allowed_headers['Vary'], 'Origin')
+    self.assertEqual(allowed_headers['Access-Control-Allow-Credentials'],
+                     'true')
+    self.assertEqual(allowed_headers['Access-Control-Allow-Headers'],
+                     'Origin, Content-Type, Accept, Authorization')
+    self.assertEqual(allowed_headers['Access-Control-Allow-Methods'],
+                     'OPTIONS, POST')
+    self.assertEqual(allowed_headers['Access-Control-Max-Age'], '600')
+
+    # Check we block origins not found in server.allowed_origins if
+    # server.allowed_origins is not empty.
+    options_headers = self.make_headers(encoding.Encoding.BINARY)
+    options_headers['origin'] = 'NotOkaySite.com'
+
+    blocked_resp = self.explicit_origins_app.options('/prpc/test.Test/Give',
+                                                     options_headers)
+    blocked_headers = blocked_resp.headers
+    self.assertIsNone(blocked_headers.get('Access-Control-Allow-Origin'))
+    self.assertIsNone(blocked_headers.get('Very'))
+    self.assertIsNone(blocked_headers.get('Access-Control-Allow-Credentials'))
+    self.assertIsNone(blocked_headers.get('Access-Control-Allow-Headers'))
+    self.assertIsNone(blocked_headers.get('Access-Control-Allow-Methods'))
+    self.assertIsNone(blocked_headers.get('Access-Control-Max-Age'))
 
   def test_options_allow_cors(self):
     """Make sure the server can allow CORs."""
