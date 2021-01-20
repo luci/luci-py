@@ -1256,13 +1256,7 @@ def _output_append(output_key, number_chunks, output, output_chunk_start):
   Creates new TaskOutputChunk entities as necessary as children of
   TaskRunResult/TaskOutput.
 
-  It silently drops saving the output if it goes over ~16Mb. The hard limit is
-  32Mb but HTML escaping can expand the raw data a bit, so just store half of
-  the limit to be on the safe side.
-
-  TODO(maruel): This is because AppEngine can't do response over 32Mb and at
-  this point, it's probably just a ton of junk. Figure out a way to better
-  implement this if necessary.
+  It silently drops saving the output if it goes over ~100Mib.
 
   Does one DB read by key and no puts. It's the responsibility of the caller to
   save the entities.
