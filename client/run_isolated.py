@@ -1723,8 +1723,9 @@ def main(args):
   local_caching.trim_caches(
       caches,
       root,
-      # Add 1GB more buffer for Go CLI.
-      min_free_space=options.min_free_space + _FREE_SPACE_BUFFER_FOR_GO,
+      # Add 5+1GB more buffer for Go CLI.
+      min_free_space=options.min_free_space + _CAS_KVS_CACHE_THRESHOLD +
+      _FREE_SPACE_BUFFER_FOR_GO,
       max_age_secs=MAX_AGE_SECS)
 
   # Save state of isolate/cas cache not to overwrite state from go client.
