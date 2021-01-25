@@ -929,7 +929,13 @@ def expand_dimensions_to_flats(dimensions, is_bot_dim=False):
 
 def bot_dimensions_to_flat(dimensions):
   """Returns a flat '<key>:<value>' sorted list of dimensions."""
-  expanded = expand_dimensions_to_flats(dimensions, is_bot_dim=True)
+  try:
+    expanded = expand_dimensions_to_flats(dimensions, is_bot_dim=True)
+  except AttributeError as e:
+    logging.exception(
+        "crbug.com/1133117: failed to call expand_dimensions_to_flats for %s",
+        dimensions)
+    raise e
   assert len(expanded) == 1, dimensions
   return expanded[0]
 
