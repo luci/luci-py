@@ -693,10 +693,9 @@ class RunIsolatedTest(unittest.TestCase):
           result_json,
           '--',
       ] + CMD_REPEATED_FILES
-      out, err, ret = self._run(args)
+      out, _, ret = self._run(args)
 
       if expected_retcode == 0:
-        self.assertEqual('', err)
         self.assertEqual('Success\n', out)
       self.assertEqual(expected_retcode, ret)
 
@@ -774,10 +773,9 @@ class RunIsolatedTest(unittest.TestCase):
         result_json,
         '--',
     ] + CMD_OUTPUT
-    _, err, ret = self._run(args)
+    _, _, ret = self._run(args)
 
     self.assertEqual(0, ret)
-    self.assertEqual('', err)
     upload_stats = load_isolated_stats(result_json, 'upload')
 
     # TODO(jwata): As we use the same CAS instance, we don't know

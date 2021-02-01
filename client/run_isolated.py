@@ -602,6 +602,8 @@ def _fetch_and_map_with_cas(cas_client, digest, instance, output_dir, cache_dir,
         output_dir,
         '-dump-stats-json',
         result_json_path,
+        '-log-level',
+        'info'
     ]
 
     if kvs_file:
