@@ -121,9 +121,14 @@ def db():
       permission('swarming.pools.terminateBot'),
   ])
 
-  # LogDog permissions and roles. Placeholders for now.
-  role('role/logdog.reader', [])
-  role('role/logdog.writer', [])
+  # LogDog permissions and roles.
+  role('role/logdog.reader', [
+      permission('logdog.logs.get'),
+      permission('logdog.logs.list'),
+  ])
+  role('role/logdog.writer', [
+      permission('logdog.logs.create'),
+  ])
 
   # ResultDB permissions and roles (crbug.com/1013316).
   role('role/resultdb.invocationCreator', [
@@ -144,8 +149,8 @@ def db():
 
   # Buildbucket permissions and roles (crbug.com/1091604).
   role('role/buildbucket.reader', [
-      # Readers of builds should also have read permissions to test results.
-      include('role/resultdb.reader'),
+      include('role/resultdb.reader'),  # to read results of the build
+      include('role/logdog.reader'),    # to read build logs
       permission('buildbucket.builds.get'),
       permission('buildbucket.builds.list'),
       permission('buildbucket.builders.get'),
@@ -168,6 +173,7 @@ def db():
   ])
   role('role/buildbucket.builderServiceAccount', [
       include('role/swarming.taskServiceAccount'),  # to run on Swarming itself
+      include('role/logdog.writer'),                # to create build logs
       include('role/swarming.taskTriggerer'),       # to trigger isolated tests
       permission('buildbucket.builds.update'),      # to update build steps
   ])
