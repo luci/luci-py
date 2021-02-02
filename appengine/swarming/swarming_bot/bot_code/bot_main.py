@@ -84,6 +84,8 @@ THIS_DIR = os.path.dirname(THIS_FILE)
 # The singleton, initially unset.
 SINGLETON = singleton.Singleton(THIS_DIR)
 
+# Filename of kvs cache used to store small files from cas.
+_CAS_KVS_CACHE_DB = 'cas_kvs_cache.db'
 
 # Allowlist files that can be present in the bot's directory. Anything else
 # will be forcibly deleted on startup! Note that 'w' (work) is not in this list,
@@ -97,7 +99,7 @@ PASSLIST = (
     'README.md',
     'c',
     'cas_cache',
-    'cas_kvs.db',
+    _CAS_KVS_CACHE_DB,
     'cipd_cache',
     'isolated_cache',
     'logs',
@@ -737,7 +739,7 @@ def _run_isolated_flags(botobj):
       '--cas-cache',
       os.path.join(botobj.base_dir, 'cas_cache'),
       '--kvs-file',
-      os.path.join(botobj.base_dir, 'cas_kvs.db'),
+      os.path.join(botobj.base_dir, _CAS_KVS_CACHE_DB),
       # Named cache option.
       '--named-cache-root',
       os.path.join(botobj.base_dir, 'c'),
