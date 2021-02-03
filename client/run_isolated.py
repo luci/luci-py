@@ -1680,8 +1680,9 @@ def main(args):
   # parsed normally, the strings are str instances.
   (parser, options, args) = parse_args(args)
 
-  if options.report_on_exception and options.isolate_server:
-    on_error.report_on_exception_exit(options.isolate_server)
+  SWARMING_SERVER = 'SWARMING_SERVER'
+  if options.report_on_exception and SWARMING_SERVER in os.environ:
+    on_error.report_on_exception_exit(os.environ[SWARMING_SERVER])
 
   if not file_path.enable_symlink():
     logging.warning('Symlink support is not enabled')
