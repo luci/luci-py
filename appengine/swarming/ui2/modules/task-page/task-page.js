@@ -874,8 +874,9 @@ const reproduceSection = (ele, currentSlice) => {
 
   <div>Download output results into directory <i>foo</i>:</div>
   <div class="code bottom_space">
-    # (if needed) git clone https://chromium.googlesource.com/infra/luci/client-py<br>
-    python ./client-py/swarming.py collect -S ${hostUrl} --task-output-dir=foo ${ele._taskId}
+    # (if needed, use "\\\${platform}" as-is) cipd install "infra/tools/luci/swarming/\\\${platform}" -root bar<br>
+    # (if needed) ./bar/swarming login<br>
+    ./bar/swarming collect -S ${hostUrl} -output-dir=foo ${ele._taskId}
   </div>
 </div>
 `;
