@@ -15,14 +15,12 @@ import unittest
 import test_env_handlers
 
 import webapp2
-from google.appengine.api import datastore_errors
 from google.appengine.ext import ndb
 
 import webtest
 
 import handlers_backend
 from components import utils
-from components import datastore_utils
 from server import bot_management
 from server import task_queues
 from server import task_request
@@ -162,20 +160,6 @@ class BackendTest(test_env_handlers.AppTestBase):
 
     self.app.get('/internal/cron/monitoring/count_task_bot_distribution',
         headers={'X-AppEngine-Cron': 'true'}, status=200)
-
-  def test_cron_throws(self):
-    def throw():
-      raise datastore_errors.InternalError('Yeah it happens')
-    self.mock(handlers_backend.task_scheduler, 'cron_handle_bot_died', throw)
-
-    self.set_as_admin()
-    resp = self.app.get('/internal/cron/important/scheduler/abort_bot_missing',
-        headers={'X-AppEngine-Cron': 'true'}, status=429)
-    expected = (
-        '429 Too Many Requests\n\n'
-        'The client has sent too many requests in a given amount of time\n\n'
-        ' Silencing exception  ')
-    self.assertEqual(expected, resp.body)
 
   def test_taskqueues(self):
     # Tests all the task queue tasks are securely handled.

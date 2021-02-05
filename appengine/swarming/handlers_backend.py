@@ -38,11 +38,6 @@ import ts_mon_metrics
 
 
 class _CronHandlerBase(webapp2.RequestHandler):
-  @decorators.silence(
-      datastore_errors.InternalError,
-      datastore_errors.Timeout,
-      datastore_errors.TransactionFailedError,
-      datastore_utils.CommitError)
   @decorators.require_cronjob
   def get(self):
     self.run_cron()
