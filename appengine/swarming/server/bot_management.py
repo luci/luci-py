@@ -305,7 +305,7 @@ class BotInfo(_BotCommon):
     """Yields keys of bots who should be dead."""
     return cls.query(
         cls.last_seen_ts <= cls._deadline(),
-        default_options=ndb.QueryOptions(keys_only=True))
+        default_options=ndb.QueryOptions(keys_only=True, deadline=20))
 
   @staticmethod
   def _deadline():
@@ -804,8 +804,11 @@ def cron_update_bot_info():
   }
   try:
     futures = []
+    logging.debug('Updating dead bots...')
     for k in BotInfo.yield_dead_bot_keys():
       cron_stats['seen'] += 1
+      if cron_stats['seen'] % 100 == 0:
+        logging.debug('Fetched %d bot keys', cron_stats['seen'])
       # Retry more often than the default 1. We do not want to throw too much
       # in the logs and there should be plenty of time to do the retries.
       f = datastore_utils.transaction_async(lambda: run(k), retries=5)
