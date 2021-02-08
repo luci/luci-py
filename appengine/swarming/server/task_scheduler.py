@@ -1767,7 +1767,12 @@ def cron_handle_get_callbacks():
         request = request_key.get()
         result = result_key.get()
         items.append((request, result))
-      external_scheduler.notify_requests(es_cfg, items, True, True)
+        # Send mini batch to avoid TaskTooLargeError. crbug.com/1175618
+        if len(items) >= 20:
+          external_scheduler.notify_requests(es_cfg, items, True, True)
+          items = []
+      if items:
+        external_scheduler.notify_requests(es_cfg, items, True, True)
 
 
 def cron_task_bot_distribution():
