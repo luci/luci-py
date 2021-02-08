@@ -301,9 +301,11 @@ class BotInfo(_BotCommon):
     self.composite = self._calc_composite()
 
   @classmethod
-  def yield_dead_bots(cls):
-    """Yields bots who should be dead."""
-    return cls.query(cls.last_seen_ts <= cls._deadline())
+  def yield_dead_bot_keys(cls):
+    """Yields keys of bots who should be dead."""
+    return cls.query(
+        cls.last_seen_ts <= cls._deadline(),
+        default_options=ndb.QueryOptions(keys_only=True))
 
   @staticmethod
   def _deadline():
@@ -760,27 +762,34 @@ def cron_update_bot_info():
     raise ndb.Return(None)
 
   def tx_result(future, stats):
+    bot_key = future.get_result()
+    if not bot_key:
+      # Do nothing.
+      return
+
     try:
-      bot_key = future.get_result()
-      if bot_key:
-        stats['dead'] += 1
-        bot = bot_key.get()
-        logging.info('Sending bot_missing event: %s', bot.id)
-        bot_event(
-            event_type='bot_missing',
-            bot_id=bot.id,
-            message=None,
-            external_ip=None,
-            authenticated_as=None,
-            dimensions=None,
-            state=None,
-            version=None,
-            quarantined=None,
-            maintenance_msg=None,
-            task_id=None,
-            task_name=None,
-            register_dimensions=False,
-            last_seen_ts=bot.last_seen_ts)
+      # Unregister the bot from task queues since it can't reap anything.
+      task_queues.cleanup_after_bot(bot_key.parent())
+
+      stats['dead'] += 1
+
+      bot = bot_key.get()
+      logging.info('Sending bot_missing event: %s', bot.id)
+      bot_event(
+          event_type='bot_missing',
+          bot_id=bot.id,
+          message=None,
+          external_ip=None,
+          authenticated_as=None,
+          dimensions=None,
+          state=None,
+          version=None,
+          quarantined=None,
+          maintenance_msg=None,
+          task_id=None,
+          task_name=None,
+          register_dimensions=False,
+          last_seen_ts=bot.last_seen_ts)
     except datastore_utils.CommitError:
       logging.warning('Failed to commit a Tx')
       stats['failed'] += 1
@@ -795,23 +804,19 @@ def cron_update_bot_info():
   }
   try:
     futures = []
-    for b in BotInfo.yield_dead_bots():
+    for k in BotInfo.yield_dead_bot_keys():
       cron_stats['seen'] += 1
-      if b.is_alive or not b.is_dead:
-        # Make sure the variable is not aliased.
-        k = b.key
-        # Unregister the bot from task queues since it can't reap anything.
-        task_queues.cleanup_after_bot(k.parent())
-        # Retry more often than the default 1. We do not want to throw too much
-        # in the logs and there should be plenty of time to do the retries.
-        f = datastore_utils.transaction_async(lambda: run(k), retries=5)
-        futures.append(f)
-        if len(futures) >= 5:
-          ndb.Future.wait_any(futures)
-          for i in range(len(futures) - 1, -1, -1):
-            if futures[i].done():
-              f = futures.pop(i)
-              tx_result(f, cron_stats)
+      # Retry more often than the default 1. We do not want to throw too much
+      # in the logs and there should be plenty of time to do the retries.
+      f = datastore_utils.transaction_async(lambda: run(k), retries=5)
+      futures.append(f)
+      if len(futures) < 5:
+        continue
+      ndb.Future.wait_any(futures)
+      for i in range(len(futures) - 1, -1, -1):
+        if futures[i].done():
+          f = futures.pop(i)
+          tx_result(f, cron_stats)
     for f in futures:
       tx_result(f, cron_stats)
   finally:
