@@ -1323,13 +1323,9 @@ def host_reboot_and_return(message=None):
       ['shutdown', '-r', '-f', '1'],
     ]
   elif sys.platform.startswith('linux'):
-    # systemd removed support for -f. So Ubuntu 14.04 supports -f but 16.04
-    # won't. This is also the case of Raspbian Jessie, which is on systemd. For
-    # now, just try both. Once pre-systemd system are not supported anymore,
-    # remove the call with -f. We also include 'reboot' in case 'shutdown' gives
+    # We also include 'reboot' in case 'shutdown' gives
     # us 'Failed to talk to init daemon'.
     cmds = [
-        ['sudo', '-n', '/sbin/shutdown', '-f', '-r', 'now'],
         ['sudo', '-n', '/sbin/shutdown', '-r', 'now'],
         ['sudo', '-n', '/sbin/reboot', '-f'],
     ]
