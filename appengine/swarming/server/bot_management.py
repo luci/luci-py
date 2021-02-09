@@ -305,7 +305,7 @@ class BotInfo(_BotCommon):
     """Yields keys of bots who should be dead."""
     return cls.query(
         cls.last_seen_ts <= cls._deadline(),
-        default_options=ndb.QueryOptions(keys_only=True, deadline=20))
+        default_options=ndb.QueryOptions(keys_only=True))
 
   @staticmethod
   def _deadline():
