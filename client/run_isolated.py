@@ -1723,12 +1723,14 @@ def main(args):
   # - --min-free-space was increased accordingly, thus trimming is needed
   # Otherwise, this will have no effect, as bot_main calls run_isolated with
   # --clean after each task.
+  additional_buffer = _FREE_SPACE_BUFFER_FOR_GO
+  if options.kvs_file:
+    additional_buffer += _CAS_KVS_CACHE_THRESHOLD
   local_caching.trim_caches(
       caches,
       root,
       # Add 5+1GB more buffer for Go CLI.
-      min_free_space=options.min_free_space + _CAS_KVS_CACHE_THRESHOLD +
-      _FREE_SPACE_BUFFER_FOR_GO,
+      min_free_space=options.min_free_space + additional_buffer,
       max_age_secs=MAX_AGE_SECS)
 
   # Save state of isolate/cas cache not to overwrite state from go client.

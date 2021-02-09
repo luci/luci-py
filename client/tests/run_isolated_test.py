@@ -764,7 +764,6 @@ class RunIsolatedTest(RunIsolatedTestBase):
       self.assertTrue(root)
       # The name cache root is increased by the sum of the two hints and buffer.
       self.assertEqual(
-          run_isolated._CAS_KVS_CACHE_THRESHOLD +
           run_isolated._FREE_SPACE_BUFFER_FOR_GO + 2 * 1024 * 1024 * 1024 +
           1100, min_free_space)
       self.assertEqual(1814400, max_age_secs)

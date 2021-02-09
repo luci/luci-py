@@ -99,7 +99,6 @@ PASSLIST = (
     'README.md',
     'c',
     'cas_cache',
-    _CAS_KVS_CACHE_DB,
     'cipd_cache',
     'isolated_cache',
     'logs',
@@ -108,6 +107,10 @@ PASSLIST = (
     'swarming_bot.2.zip',
     'swarming_bot.zip',
 )
+
+if sys.platform == 'win32':
+  PASSLIST = PASSLIST + (_CAS_KVS_CACHE_DB,)
+
 
 # These settings are documented in ../config/bot_config.py.
 # Keep in sync with ../config/bot_config.py. This is enforced by a unit test.
@@ -738,12 +741,16 @@ def _run_isolated_flags(botobj):
       # CAS cache option.
       '--cas-cache',
       os.path.join(botobj.base_dir, 'cas_cache'),
-      '--kvs-file',
-      os.path.join(botobj.base_dir, _CAS_KVS_CACHE_DB),
       # Named cache option.
       '--named-cache-root',
       os.path.join(botobj.base_dir, 'c'),
   ]
+
+  if sys.platform == 'win32':
+    args += [
+        '--kvs-file',
+        os.path.join(botobj.base_dir, _CAS_KVS_CACHE_DB),
+    ]
 
   if _IN_TEST_MODE:
     args += ['--cipd-enabled', 'false']
