@@ -303,9 +303,11 @@ class BotInfo(_BotCommon):
   @classmethod
   def yield_dead_bot_keys(cls):
     """Yields keys of bots who should be dead."""
+    # Since fetching last page takes 60 seconds, set long deadline.
+    # https://crbug.com/1174290#c31
     return cls.query(
         cls.last_seen_ts <= cls._deadline(),
-        default_options=ndb.QueryOptions(keys_only=True))
+        default_options=ndb.QueryOptions(keys_only=True, deadline=90))
 
   @staticmethod
   def _deadline():
