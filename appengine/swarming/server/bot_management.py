@@ -902,6 +902,7 @@ def cron_delete_old_bot():
   # fairly light on memory usage.
   time_to_stop = start + datetime.timedelta(seconds=int(4.5*60))
   total = 0
+  skipped = 0
   deleted = []
   try:
     q = BotRoot.query(default_options=ndb.QueryOptions(keys_only=True))
@@ -913,6 +914,7 @@ def cron_delete_old_bot():
       # there's no BotEvent left, it's probably a broken entity or a forgotten
       # dead bot.
       if BotEvent.query(ancestor=bot_root_key).count(limit=1):
+        skipped += 1
         continue
       deleted.append(bot_root_key.string_id())
       # Delete the whole group. An ancestor query will retrieve the entity
@@ -927,8 +929,8 @@ def cron_delete_old_bot():
     pass
   finally:
     logging.info(
-        'Deleted %d entities from the following bots:\n%s',
-        total, ', '.join(sorted(deleted)))
+        'Deleted %d entities from the following bots (%d skipped):\n%s', total,
+        skipped, ', '.join(sorted(deleted)))
 
 
 def cron_aggregate_dimensions():
