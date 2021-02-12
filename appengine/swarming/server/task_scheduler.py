@@ -1777,13 +1777,15 @@ def cron_handle_get_callbacks():
 
 def cron_task_bot_distribution():
   """Sends to TS mon data about the fleet size for each runnable task queues."""
-  # TODO(maruel): This shouls be rewritten in term of task queues.
+  # TODO(maruel): This should be rewritten in term of task queues.
 
   # First, build a dictionary mapping dimensions to a count of how many
   # tasks have those dimensions (exclude id from dimensions).
   n_tasks_by_dimensions = collections.Counter()
   q = task_result.TaskResultSummary.query(
       task_result.TaskResultSummary.state.IN(task_result.State.STATES_RUNNING))
+  cnt = 0
+  logging.debug('Collecting task dimensions...')
   for result in q:
     # Make dimensions immutable so they can be used to index a key.
     req = result.request
@@ -1793,6 +1795,9 @@ def cron_task_bot_distribution():
             (k, tuple(sorted(v)))
             for k, v in t.properties.dimensions.items()))
       n_tasks_by_dimensions[dimensions] += 1
+    cnt += 1
+    if cnt % 100 == 0:
+      logging.debug('Fetched dimensions from %d tasks', cnt)
 
   # Second, count how many bots have those dimensions for each set.
   n_bots_by_dimensions = {}
@@ -1815,6 +1820,8 @@ def cron_task_bot_distribution():
     n_bots_by_dimensions[dimensions] = q.count_async()
 
   # Third, multiply out, aggregating by fixed dimensions.
+  cnt = 0
+  logging.debug('Sending ts_mon metrics...')
   for dimensions, n_tasks in n_tasks_by_dimensions.items():
     n_bots = 0
     if dimensions in n_bots_by_dimensions:
@@ -1824,6 +1831,9 @@ def cron_task_bot_distribution():
     fields = {'pool': dimensions.get('pool', [''])[0]}
     for _ in range(n_tasks):
       ts_mon_metrics._task_bots_runnable.add(n_bots, fields)
+    cnt += 1
+    if cnt % 100 == 0:
+        logging.debug('Sent eligible bots count for %d dimensions sets', cnt)
   return len(n_bots_by_dimensions)
 
 
