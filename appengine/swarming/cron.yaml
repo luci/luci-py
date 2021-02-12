@@ -44,9 +44,9 @@ cron:
   target: backend
 
 - description: Delete old Bot entity groups
- url: /internal/cron/cleanup/bots/delete_old
- schedule: every 5 minutes synchronized
- target: backend
+  url: /internal/cron/cleanup/bots/delete_old
+  schedule: every 5 minutes synchronized
+  target: backend
 
 - description: Delete old BotEvent
   url: /internal/cron/cleanup/bots/delete_old_bot_events
