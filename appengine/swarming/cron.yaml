@@ -43,13 +43,10 @@ cron:
   schedule: every 3 minutes
   target: backend
 
-# This request spins for 600s and doesn't do anything. This should eventually be
-# reenabled but only after proper diagnosis.
-# https://crbug.com/939204
-#- description: Delete old Bot entity groups
-#  url: /internal/cron/cleanup/bots/delete_old
-#  schedule: every 5 minutes synchronized
-#  target: backend
+- description: Delete old Bot entity groups
+ url: /internal/cron/cleanup/bots/delete_old
+ schedule: every 5 minutes synchronized
+ target: backend
 
 - description: Delete old BotEvent
   url: /internal/cron/cleanup/bots/delete_old_bot_events
