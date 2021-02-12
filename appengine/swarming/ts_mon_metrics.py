@@ -31,7 +31,7 @@ _IGNORED_DIMENSIONS = ('android_devices', 'caches', 'id', 'server_version',
 _REQUEST_TIMEOUT_SEC = 50
 # Cap the max number of items per taskqueue task, to keep the total
 # number of collected streams managable within each instance.
-_EXECUTORS_PER_SHARD = 500
+_EXECUTORS_PER_SHARD = 5000
 _JOBS_PER_SHARD = 500
 
 # Override default target fields for app-global metrics.
@@ -366,6 +366,10 @@ def _set_executors_metrics(payload):
     _executors_status.set(status, target_fields=target_fields)
     _executors_pool.set(
         _pool_from_dimensions(bot_info.dimensions), target_fields=target_fields)
+
+    if executors_count % 500 == 0:
+      logging.debug('processed %d bots (%d total)', executors_count,
+                    params.count)
 
   logging.debug(
       '%s: task %d started at %s, processed %d bots (%d total)',
