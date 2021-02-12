@@ -307,7 +307,7 @@ class BotInfo(_BotCommon):
     # https://crbug.com/1174290#c31
     return cls.query(
         cls.last_seen_ts <= cls._deadline(),
-        default_options=ndb.QueryOptions(keys_only=True, deadline=90))
+        default_options=ndb.QueryOptions(keys_only=True))
 
   @staticmethod
   def _deadline():
@@ -804,24 +804,30 @@ def cron_update_bot_info():
       'seen': 0,
       'failed': 0,
   }
+
+  q = BotInfo.yield_dead_bot_keys()
+  futures = []
+  more = True
+  cursor = None
+  logging.debug('Updating dead bots...')
   try:
-    futures = []
-    logging.debug('Updating dead bots...')
-    for k in BotInfo.yield_dead_bot_keys():
-      cron_stats['seen'] += 1
-      if cron_stats['seen'] % 100 == 0:
-        logging.debug('Fetched %d bot keys', cron_stats['seen'])
-      # Retry more often than the default 1. We do not want to throw too much
-      # in the logs and there should be plenty of time to do the retries.
-      f = datastore_utils.transaction_async(lambda: run(k), retries=5)
-      futures.append(f)
-      if len(futures) < 5:
-        continue
-      ndb.Future.wait_any(futures)
-      for i in range(len(futures) - 1, -1, -1):
-        if futures[i].done():
-          f = futures.pop(i)
-          tx_result(f, cron_stats)
+    while more:
+      keys, cursor, more = q.fetch_page(100, start_cursor=cursor)
+      for k in keys:
+        cron_stats['seen'] += 1
+        if cron_stats['seen'] % 100 == 0:
+          logging.debug('Fetched %d bot keys', cron_stats['seen'])
+        # Retry more often than the default 1. We do not want to throw too much
+        # in the logs and there should be plenty of time to do the retries.
+        f = datastore_utils.transaction_async(lambda: run(k), retries=5)
+        futures.append(f)
+        if len(futures) < 5:
+          continue
+        ndb.Future.wait_any(futures)
+        for i in range(len(futures) - 1, -1, -1):
+          if futures[i].done():
+            f = futures.pop(i)
+            tx_result(f, cron_stats)
     for f in futures:
       tx_result(f, cron_stats)
   finally:
