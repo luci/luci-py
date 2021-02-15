@@ -1786,18 +1786,24 @@ def cron_task_bot_distribution():
       task_result.TaskResultSummary.state.IN(task_result.State.STATES_RUNNING))
   cnt = 0
   logging.debug('Collecting task dimensions...')
-  for result in q:
-    # Make dimensions immutable so they can be used to index a key.
-    req = result.request
-    for i in range(req.num_task_slices):
-      t = req.task_slice(i)
-      dimensions = tuple(sorted(
-            (k, tuple(sorted(v)))
-            for k, v in t.properties.dimensions.items()))
-      n_tasks_by_dimensions[dimensions] += 1
-    cnt += 1
-    if cnt % 100 == 0:
-      logging.debug('Fetched dimensions from %d tasks', cnt)
+  try:
+    for result in q:
+      # Make dimensions immutable so they can be used to index a key.
+      req = result.request
+      for i in range(req.num_task_slices):
+        t = req.task_slice(i)
+        dimensions = tuple(
+            sorted((k, tuple(sorted(v)))
+                   for k, v in t.properties.dimensions.items()))
+        n_tasks_by_dimensions[dimensions] += 1
+      cnt += 1
+      if cnt % 100 == 0:
+        logging.debug('Fetched dimensions from %d tasks', cnt)
+  except datastore_errors.Timeout as e:
+    # TODO(crbug.com/1174960):
+    # The last fetch from Datastore tends to fail for Timeout.
+    # Ignore timeout errors to contiune ts_mon metrics reporting.
+    logging.warning('Ignoring timeout %s', e, exc_info=True)
 
   # Second, count how many bots have those dimensions for each set.
   n_bots_by_dimensions = {}
@@ -1833,7 +1839,7 @@ def cron_task_bot_distribution():
       ts_mon_metrics._task_bots_runnable.add(n_bots, fields)
     cnt += 1
     if cnt % 100 == 0:
-        logging.debug('Sent eligible bots count for %d dimensions sets', cnt)
+      logging.debug('Sent eligible bots count for %d dimensions sets', cnt)
   return len(n_bots_by_dimensions)
 
 
