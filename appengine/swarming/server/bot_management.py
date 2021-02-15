@@ -812,11 +812,9 @@ def cron_update_bot_info():
   logging.debug('Updating dead bots...')
   try:
     while more:
-      keys, cursor, more = q.fetch_page(100, start_cursor=cursor)
+      keys, cursor, more = q.fetch_page(50, start_cursor=cursor)
       for k in keys:
         cron_stats['seen'] += 1
-        if cron_stats['seen'] % 100 == 0:
-          logging.debug('Fetched %d bot keys', cron_stats['seen'])
         # Retry more often than the default 1. We do not want to throw too much
         # in the logs and there should be plenty of time to do the retries.
         f = datastore_utils.transaction_async(lambda: run(k), retries=5)
@@ -828,6 +826,7 @@ def cron_update_bot_info():
           if futures[i].done():
             f = futures.pop(i)
             tx_result(f, cron_stats)
+      logging.debug('Fetched %d bot keys', cron_stats['seen'])
     for f in futures:
       tx_result(f, cron_stats)
   finally:
