@@ -31,7 +31,6 @@ _IGNORED_DIMENSIONS = ('android_devices', 'caches', 'id', 'server_version',
 _REQUEST_TIMEOUT_SEC = 50
 # Cap the max number of items per taskqueue task, to keep the total
 # number of collected streams managable within each instance.
-_EXECUTORS_PER_SHARD = 5000
 _JOBS_PER_SHARD = 500
 
 # Override default target fields for app-global metrics.
@@ -336,8 +335,7 @@ def _set_executors_metrics(payload):
   executors_count = 0
   while query_iter.has_next():
     runtime = (utils.utcnow() - params.start_time).total_seconds()
-    if (executors_count >= _EXECUTORS_PER_SHARD or
-        runtime > _REQUEST_TIMEOUT_SEC):
+    if runtime > _REQUEST_TIMEOUT_SEC:
       params.cursor = query_iter.cursor_after()
       params.task_count += 1
       utils.enqueue_task(
