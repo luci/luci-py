@@ -1797,7 +1797,7 @@ def cron_task_bot_distribution():
                    for k, v in t.properties.dimensions.items()))
         n_tasks_by_dimensions[dimensions] += 1
       cnt += 1
-      if cnt % 100 == 0:
+      if cnt % 1000 == 0:
         logging.debug('Fetched dimensions from %d tasks', cnt)
   except datastore_errors.Timeout as e:
     # TODO(crbug.com/1174960):
@@ -1838,7 +1838,7 @@ def cron_task_bot_distribution():
     for _ in range(n_tasks):
       ts_mon_metrics._task_bots_runnable.add(n_bots, fields)
     cnt += 1
-    if cnt % 100 == 0:
+    if cnt % 1000 == 0:
       logging.debug('Sent eligible bots count for %d dimensions sets', cnt)
   return len(n_bots_by_dimensions)
 
