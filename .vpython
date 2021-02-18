@@ -111,3 +111,15 @@ wheel: <
   name: "infra/python/wheels/pyobjc/mac-amd64_cp27_cp27m"
   version: "version:4.1"
 >
+
+# required by change_acl_for_delete() in client/utils/file_path.py
+wheel: <
+  name: "infra/python/wheels/pywin32/${vpython_platform}"
+  version: "version:224"
+  match_tag: <
+    platform: "win_amd64"
+  >
+  match_tag: <
+    platform: "win32"
+  >
+>

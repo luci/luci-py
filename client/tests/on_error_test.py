@@ -191,6 +191,14 @@ class OnErrorServerTest(OnErrorBase):
     self.assertEqual('1', params['v'])
     return params['r']
 
+  def assertRequestParams(self, expected, actual):
+    # Exclude PATH on Windows because PATH in a child process includes
+    # duplicated pywin32_system32 paths, which makes assertion fail.
+    if sys.platform == 'win32':
+      expected['env'].pop('PATH', None)
+      actual['env'].pop('PATH', None)
+    self.assertEqual(expected, actual)
+
   def test_shell_out_hacked(self):
     # Rerun itself, report an error, ensure the error was reported.
     httpd = start_server()
@@ -226,7 +234,7 @@ class OnErrorServerTest(OnErrorBase):
         # The version was added dynamically for testing purpose.
         u'version': u'123',
     }
-    self.assertEqual(expected, actual)
+    self.assertRequestParams(expected, actual)
     httpd.stop()
 
   def test_shell_out_exception(self):
@@ -261,7 +269,7 @@ class OnErrorServerTest(OnErrorBase):
                   u'TypeError: You are not my type',
         u'user': six.text_type(getpass.getuser()),
     }
-    self.assertEqual(expected, actual)
+    self.assertRequestParams(expected, actual)
     httpd.stop()
 
   def test_shell_out_exception_no_msg(self):
@@ -296,7 +304,7 @@ class OnErrorServerTest(OnErrorBase):
                   u'TypeError: You are not my type #2',
         u'user': six.text_type(getpass.getuser()),
     }
-    self.assertEqual(expected, actual)
+    self.assertRequestParams(expected, actual)
     httpd.stop()
 
   def test_shell_out_crash(self):
@@ -339,7 +347,7 @@ class OnErrorServerTest(OnErrorBase):
                   u'  raise ValueError(\'Oops\')',
         u'user': six.text_type(getpass.getuser()),
     }
-    self.assertEqual(expected, actual)
+    self.assertRequestParams(expected, actual)
     httpd.stop()
 
   def test_shell_out_crash_server_down(self):
