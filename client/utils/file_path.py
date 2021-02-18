@@ -385,22 +385,18 @@ if sys.platform == 'win32':
     processes = _get_children_processes_win(root)
     if not processes:
       return False
-    sys.stderr.write('Enumerating processes:\n')
+    logging.debug('Enumerating processes:\n')
     for _, proc in sorted(processes.items()):
-      sys.stderr.write(
-          '- pid %d; Handles: %d; Exe: %s; Cmd: %s\n' % (
-            proc.ProcessId,
-            proc.HandleCount,
-            proc.ExecutablePath,
-            proc.CommandLine))
-    sys.stderr.write('Terminating %d processes:\n' % len(processes))
+      logging.debug('- pid %d; Handles: %d; Exe: %s; Cmd: %s\n', proc.ProcessId,
+                    proc.HandleCount, proc.ExecutablePath, proc.CommandLine)
+    logging.debug('Terminating %d processes:\n', len(processes))
     for pid in sorted(processes):
       try:
         # Killing is asynchronous.
         os.kill(pid, 9)
-        sys.stderr.write('- %d killed\n' % pid)
+        logging.debug('- %d killed\n', pid)
       except OSError as e:
-        sys.stderr.write('- failed to kill %s, error %s\n' % (pid, e))
+        logging.error('- failed to kill %s, error %s\n', pid, e)
     return True
 
 
@@ -1151,29 +1147,27 @@ def rmtree(root):
                   time.time() - start)
     if not errors or not fs.exists(root):
       if i:
-        sys.stderr.write('Succeeded.\n')
+        logging.debug('Succeeded.\n')
       return
     if not i and sys.platform == 'win32':
       for path in sorted(set(path for _, path, _ in errors)):
         try:
           change_acl_for_delete(path)
         except Exception as e:
-          sys.stderr.write('- %s (failed to update ACL: %s)\n' % (path, e))
+          logging.error('- %s (failed to update ACL: %s)\n', path, e)
 
     if i != max_tries - 1:
       delay = (i+1)*2
-      sys.stderr.write(
+      logging.error(
           'Failed to delete %s (%d files remaining).\n'
           '  Maybe the test has a subprocess outliving it.\n'
-          '  Sleeping %d seconds.\n' %
-          (root, len(errors), delay))
+          '  Sleeping %d seconds.\n', root, len(errors), delay)
       time.sleep(delay)
 
-  sys.stderr.write(
-      'Failed to delete %s. The following files remain:\n' % root)
+  logging.error('Failed to delete %s. The following files remain:\n', root)
   # The same path may be listed multiple times.
   for path in sorted(set(path for _, path, _ in errors)):
-    sys.stderr.write('- %s\n' % path)
+    logging.error('- %s\n', path)
 
   # If soft retries fail on Linux, there's nothing better we can do.
   if sys.platform != 'win32':
@@ -1190,7 +1184,7 @@ def rmtree(root):
   else:
     processes = _get_children_processes_win(root)
     if processes:
-      sys.stderr.write('Failed to terminate processes.\n')
+      logging.error('Failed to terminate processes.\n')
       six.reraise(errors[0][2][0], errors[0][2][1], errors[0][2][2])
   logging.debug(
       'file_path.rmtree(%s) killing children processes took %d seconds', root,
@@ -1204,15 +1198,15 @@ def rmtree(root):
   logging.debug('file_path.rmtree(%s) final try took %d seconds', root,
                 time.time() - start)
   if not errors or not fs.exists(root):
-    sys.stderr.write('Succeeded at final try.\n')
+    logging.debug('Succeeded at final try.\n')
     return
 
   # There's no hope: the directory was tried to be removed 4 times. Give up
   # and raise an exception.
-  sys.stderr.write('Failed to delete %s. The following files remain:\n' % root)
+  logging.error('Failed to delete %s. The following files remain:\n', root)
   # The same path may be listed multiple times.
   for path in sorted(set(path for _, path, _ in errors)):
-    sys.stderr.write('- %s\n' % path)
+    logging.error('- %s\n', path)
   six.reraise(errors[0][2][0], errors[0][2][1], errors[0][2][2])
 
 
