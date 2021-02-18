@@ -124,7 +124,7 @@ _LUCI_GO_REVISION = 'git_revision:34b27f20c176c3fb185ceb1e1d5c5dd7f9baa43e'
 # Keep synced with task_request.py
 CACHE_NAME_RE = re.compile(r'^[a-z0-9_]{1,4096}$')
 
-_FREE_SPACE_BUFFER_FOR_GO = 1024 * 1024 * 1024
+_FREE_SPACE_BUFFER_FOR_CIPD_PACKAGES = 2 * 1024 * 1024 * 1024
 
 OUTLIVING_ZOMBIE_MSG = """\
 *** Swarming tried multiple times to delete the %s directory and failed ***
@@ -1723,13 +1723,13 @@ def main(args):
   # - --min-free-space was increased accordingly, thus trimming is needed
   # Otherwise, this will have no effect, as bot_main calls run_isolated with
   # --clean after each task.
-  additional_buffer = _FREE_SPACE_BUFFER_FOR_GO
+  additional_buffer = _FREE_SPACE_BUFFER_FOR_CIPD_PACKAGES
   if options.kvs_file:
     additional_buffer += _CAS_KVS_CACHE_THRESHOLD
   local_caching.trim_caches(
       caches,
       root,
-      # Add 5+1GB more buffer for Go CLI.
+      # Add some buffer for Go CLI.
       min_free_space=options.min_free_space + additional_buffer,
       max_age_secs=MAX_AGE_SECS)
 
