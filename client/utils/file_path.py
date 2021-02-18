@@ -20,7 +20,6 @@ import stat
 import sys
 import tempfile
 import time
-import unicodedata
 
 from utils import fs
 from utils import subprocess42
