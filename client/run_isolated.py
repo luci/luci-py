@@ -92,10 +92,6 @@ SWARMING_BOT_FILE_PARAMETER = '${SWARMING_BOT_FILE}'
 RUN_ISOLATED_LOG_FILE = 'run_isolated.log'
 
 
-# The name of the log to use for the run_test_cases.py command
-RUN_TEST_CASES_LOG = 'run_test_cases.log'
-
-
 # Use short names for temporary directories. This is driven by Windows, which
 # imposes a relatively short maximum path length of 260 characters, often
 # referred to as MAX_PATH. It is relatively easy to create files with longer
