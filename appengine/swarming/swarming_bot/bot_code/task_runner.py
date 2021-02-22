@@ -529,14 +529,14 @@ class _OutputBuffer(object):
   self.should_post_update() is True.
   """
   # To be mocked in tests.
-  _MIN_PACKET_INTERVAL = 10
-  _MAX_PACKET_INTERVAL = 30
+  _MIN_PACKET_INTERVAL = 5
+  _MAX_PACKET_INTERVAL = 15
 
   def __init__(self, task_details, start):
     self._task_details = task_details
     self._start = start
-    # Sends a maximum of 100kb of stdout per task_update packet.
-    self._max_chunk_size = 102400
+    # Sends a maximum of 50kb of stdout per task_update packet.
+    self._max_chunk_size = 51200
     # Minimum wait between task_update packet when there's output.
     self._min_packet_interval = self._MIN_PACKET_INTERVAL
     # Maximum wait between task_update packet when there's no output.
