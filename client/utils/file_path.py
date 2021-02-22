@@ -1123,19 +1123,21 @@ def rmtree(root):
                         repr(root), sys.getdefaultencoding())
   root = six.text_type(root)
 
-  # Change permissions of the tree.
-  start = time.time()
-  try:
-    make_tree_deleteable(root)
-  except OSError as e:
-    logging.warning('Swallowing make_tree_deleteable() error: %s', e)
-  logging.debug('file_path.make_tree_deleteable(%s) took %d seconds', root,
-                time.time() - start)
+  def change_tree_permission():
+    start = time.time()
+    try:
+      make_tree_deleteable(root)
+    except OSError as e:
+      logging.warning('Swallowing make_tree_deleteable() error: %s', e)
+    logging.debug('file_path.make_tree_deleteable(%s) took %d seconds', root,
+                  time.time() - start)
 
   # First try the soft way: tries 3 times to delete and sleep a bit in between.
   # Retries help if test subprocesses outlive main process and try to actively
   # use or write to the directory while it is being deleted.
   max_tries = 3
+  has_called_change_tree_permission = False
+  has_called_change_acl_for_delete = False
   for i in range(max_tries):
     # pylint: disable=cell-var-from-loop
     # errors is a list of tuple(function, path, excinfo).
@@ -1149,14 +1151,24 @@ def rmtree(root):
       if i:
         logging.debug('Succeeded.\n')
       return
-    if not i and sys.platform == 'win32':
+
+    # Try to change tree permission.
+    if not has_called_change_tree_permission:
+      change_tree_permission()
+      has_called_change_tree_permission = True
+      # do not sleep here.
+      continue
+
+    # Try change_acl_for_delete on Windows.
+    if not has_called_change_acl_for_delete and sys.platform == 'win32':
       for path in sorted(set(path for _, path, _ in errors)):
         try:
           change_acl_for_delete(path)
         except Exception as e:
           logging.error('- %s (failed to update ACL: %s)\n', path, e)
+      has_called_change_acl_for_delete = True
 
-    if i != max_tries - 1:
+    if i < max_tries - 1:
       delay = (i+1)*2
       logging.error(
           'Failed to delete %s (%d files remaining).\n'

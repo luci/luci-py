@@ -359,13 +359,7 @@ class RunIsolatedTest(RunIsolatedTestBase):
 
   def test_run_tha_test_naked(self):
     make_tree_call = self._run_tha_test(command=['invalid', 'command'])
-    self.assertEqual([
-        'make_tree_deleteable',
-        'make_tree_deleteable',
-        'make_tree_deleteable',
-        'make_tree_deleteable',
-        'make_tree_deleteable',
-    ], make_tree_call)
+    self.assertEqual([], make_tree_call)
     self.assertEqual(
         [
           (
