@@ -150,6 +150,7 @@ class HttpsMonitor(Monitor):
           body=body,
           headers={'Content-Type': 'application/json'})
       if resp.status == 200:
+        logging.debug('HttpsMonitor.send received status 200')
         self._failed = False
       else:
         logging.warning('HttpsMonitor.send received status %d: %s', resp.status,
