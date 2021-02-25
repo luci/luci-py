@@ -571,6 +571,7 @@ class TaskRequestApiTest(TestCase):
         'tags': [
             u'OS:Windows-3.1.1',
             u'hostname:localhost',
+            u'parent_task_id:%s' % parent_id,
             u'pool:default',
             u'priority:50',
             u'realm:none',
@@ -686,6 +687,7 @@ class TaskRequestApiTest(TestCase):
         'tags': [
             u'OS:Windows-3.1.1',
             u'hostname:localhost',
+            u'parent_task_id:%s' % parent_id,
             u'pool:default',
             u'priority:50',
             u'realm:none',
@@ -802,6 +804,7 @@ class TaskRequestApiTest(TestCase):
         'tags': [
             u'OS:Windows-3.1.1',
             u'hostname:localhost',
+            u'parent_task_id:%s' % parent_id,
             u'pool:default',
             u'priority:50',
             u'realm:none',
@@ -1163,6 +1166,7 @@ class TaskRequestApiTest(TestCase):
         tags=[
             u'OS:Windows-3.1.1',
             u'hostname:localhost',
+            u'parent_task_id:%s' % parent_run_id,
             u'pool:default',
             u'priority:50',
             u'realm:none',
@@ -1211,6 +1215,7 @@ class TaskRequestApiTest(TestCase):
     parent = _gen_request(parent_task_id=grand_parent.task_id[:-1] + u'1')
     parent.key = task_request.new_request_key()
     parent.put()
+    parent_run_id = parent.task_id[:-1] + u'1'
     self.mock_now(task_request._BEGINING_OF_THE_WORLD, 2)
 
     request_props = _gen_properties(
@@ -1327,6 +1332,7 @@ class TaskRequestApiTest(TestCase):
         tags=[
             u'OS:Windows-3.1.1',
             u'hostname:localhost',
+            u'parent_task_id:%s' % parent_run_id,
             u'pool:default',
             u'priority:50',
             u'realm:none',
@@ -1339,7 +1345,7 @@ class TaskRequestApiTest(TestCase):
         # Hierarchy.
         task_id=u'7d0776610',
         parent_task_id=parent.task_id,
-        parent_run_id=parent.task_id[:-1] + u'1',
+        parent_run_id=parent_run_id,
         # Notification. auth_token cannot be retrieved.
         pubsub_notification=swarming_pb2.PubSub(
             topic=u'projects/a/topics/abc', userdata=u'obscure_reference'),

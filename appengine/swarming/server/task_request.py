@@ -1483,6 +1483,8 @@ def _get_automatic_tags(request):
       u'service_account:%s' % (request.service_account or u'none'),
       u'user:%s' % (request.user or u'none'),
   ))
+  if request.parent_task_id:
+    tags.add(u'parent_task_id:%s' % request.parent_task_id)
   for i in range(request.num_task_slices):
     tags.update(_get_automatic_tags_from_slice(request.task_slice(i)))
   return tags
