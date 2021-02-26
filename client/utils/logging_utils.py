@@ -34,7 +34,6 @@ from utils import file_path
 if sys.platform == 'win32':
   import ctypes
   import msvcrt  # pylint: disable=F0401
-  import _subprocess  # pylint: disable=F0401
 
   FILE_ATTRIBUTE_NORMAL = 0x80
   FILE_SHARE_READ = 1
@@ -45,7 +44,7 @@ if sys.platform == 'win32':
   OPEN_ALWAYS = 4
 
   # TODO(maruel): Make it work in cygwin too if necessary. This would have to
-  # use ctypes.cdll.kernel32 instead of _subprocess and msvcrt.
+  # use ctypes.cdll.kernel32 instead of msvcrt.
 
 
   def shared_open(path):

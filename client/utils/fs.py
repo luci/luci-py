@@ -21,7 +21,7 @@ from six.moves import builtins
 if sys.platform == 'win32':
   import ctypes
   from ctypes import wintypes
-  from ctypes.wintypes import windll
+  from ctypes import windll
 
 
   CreateSymbolicLinkW = windll.kernel32.CreateSymbolicLinkW

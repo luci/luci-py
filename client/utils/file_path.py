@@ -40,7 +40,7 @@ HARDLINK, HARDLINK_WITH_FALLBACK, SYMLINK, SYMLINK_WITH_FALLBACK, COPY = range(
 if sys.platform == 'win32':
   import locale
   from ctypes import wintypes  # pylint: disable=ungrouped-imports
-  from ctypes.wintypes import windll  # pylint: disable=ungrouped-imports
+  from ctypes import windll  # pylint: disable=ungrouped-imports
 elif sys.platform == 'darwin':
   from utils import macos
 
