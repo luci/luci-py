@@ -769,7 +769,7 @@ class DiskContentAddressedCache(ContentAddressedCache):
       # That means an internal error.
       raise NoMoreSpace('Nothing to remove, can\'t happend')
     digest, (size, _) = self._lru.pop_oldest()
-    logging.debug('Removing LRU file %s', digest)
+    logging.debug('Removing LRU file %s with size %s bytes', digest, size)
     self._delete_file(digest, size)
     return size
 
