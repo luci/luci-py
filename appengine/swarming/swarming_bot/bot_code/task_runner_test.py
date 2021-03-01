@@ -741,35 +741,36 @@ class TestTaskRunnerKilled(TestTaskRunnerBase):
 
   # Here's a simple script that handles signals properly. Sadly SIGBREAK is not
   # defined on posix.
-  SCRIPT_SIGNAL = ('import signal, sys, time;\n'
-                   'l = [];\n'
+  SCRIPT_SIGNAL = ('import signal, sys, threading;\n'
+                   'event = threading.Event();\n'
                    'def handler(signum, _):\n'
-                   '  l.append(signum);\n'
+                   '  event.set();\n'
                    '  print(\'got signal %%d\' %% signum);\n'
                    '  sys.stdout.flush();\n'
                    'signal.signal(signal.%s, handler);\n'
                    'print(\'hi\');\n'
                    'sys.stdout.flush();\n'
-                   'while not l:\n'
+                   'while not event.is_set():\n'
                    '  pass;\n'
-                   'print(\'bye\')') % ('SIGBREAK' if sys.platform == 'win32'
-                                        else 'SIGTERM')
+                   'print(\'bye\');\n'
+                   'sys.stdout.flush();') % ('SIGBREAK' if sys.platform ==
+                                             'win32' else 'SIGTERM')
 
-  SCRIPT_SIGNAL_HANG = ('import signal, sys, time;\n'
-                        'l = [];\n'
+  SCRIPT_SIGNAL_HANG = ('import signal, sys, time, threading;\n'
+                        'event = threading.Event();\n'
                         'def handler(signum, _):\n'
-                        '  l.append(signum);\n'
+                        '  event.set();\n'
                         '  print(\'got signal %%d\' %% signum);\n'
                         '  sys.stdout.flush();\n'
                         'signal.signal(signal.%s, handler);\n'
                         'print(\'hi\');\n'
                         'sys.stdout.flush();\n'
-                        'while not l:\n'
+                        'while not event.is_set():\n'
                         '  pass;\n'
                         'print(\'bye\');\n'
                         'sys.stdout.flush();\n'
-                        'time.sleep(100)') % ('SIGBREAK' if sys.platform ==
-                                              'win32' else 'SIGTERM')
+                        'time.sleep(100);') % ('SIGBREAK' if sys.platform ==
+                                               'win32' else 'SIGTERM')
 
   SCRIPT_HANG = 'import time; print(\'hi\'); time.sleep(100)'
 
@@ -1089,9 +1090,9 @@ class TestTaskRunnerKilled(TestTaskRunnerBase):
     self.assertEqual(expected, actual)
     # This is cheezy, this depends on the compiled isolated file.
     if sys.platform == 'win32':
-      items_cold = u'eJybwMgWqwIAA8kBGQ=='
+      items_cold = u'eJybwMgW6w0AA/ABQA=='
     else:
-      items_cold = u'eJybwMgWqwwAA8gBGA=='
+      items_cold = u'eJybwMgW6wUAA+8BPw=='
     self.expectTask(
         manifest['task_id'],
         io_timeout=True,

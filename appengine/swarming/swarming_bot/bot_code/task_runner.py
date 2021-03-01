@@ -609,7 +609,6 @@ class _OutputBuffer(object):
     This is necessary as task_runner must send keep-alive to the server to tell
     it that it is not hung, even if the subprocess doesn't output any data.
     """
-    # TODO(maruel): Use exponential backoff. https://crbug.com/825500
     if timed_out:
       # Give a |grace_period| seconds delay.
       if self._task_details.grace_period:
