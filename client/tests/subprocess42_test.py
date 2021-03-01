@@ -1005,9 +1005,9 @@ time.sleep(60)
     proc.terminate()
     # proc is waiting for 5s and SIGTERM/SIGBREAK is sent at 0.5s mark.
     # Expect proc to write to stdout and exit almost immediately (decided
-    # by the poll interval of wait method). We wait for 2 second to give
+    # by the poll interval of wait method). We wait for 3 second to give
     # some buffer here.
-    self.assertEqual(proc.recv_out(timeout=2), b'wait is interrupted')
+    self.assertEqual(proc.recv_out(timeout=3), b'wait is interrupted')
 
 
 if __name__ == '__main__':
