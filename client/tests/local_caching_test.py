@@ -519,6 +519,7 @@ class DiskContentAddressedCacheTest(TestCase, ContentAddressedCacheTestMixin):
     self.assertEqual(fs.listdir(self.cache_dir()), ['state.json'])
 
 
+@unittest.skipIf(sys.platform == 'win32' and six.PY3, 'crbug.com/1182016')
 class NamedCacheTest(TestCase, CacheTestMixin):
   def setUp(self):
     super(NamedCacheTest, self).setUp()
@@ -911,6 +912,7 @@ class FnTest(TestCase):
         [[str(n), [[short_names[n], n], self._now + n - 1]] for n in items])
     self.assertEqual(expected, actual)
 
+  @unittest.skipIf(sys.platform == 'win32' and six.PY3, 'crbug.com/1182016')
   def test_clean_caches_disk(self):
     # Create an isolated cache and a named cache each with 2 items. Ensure that
     # one item from each is removed.
