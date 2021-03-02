@@ -158,8 +158,10 @@ class LRUDict(object):
 
     Raises KeyError if dict is empty.
     """
-    for item in self._items.items():
-      return item
+
+    # self._items.items() is slow if self._items has many items.
+    for key in self._items:
+      return (key, self._items[key])
     raise KeyError('dictionary is empty')
 
   def pop_oldest(self):
