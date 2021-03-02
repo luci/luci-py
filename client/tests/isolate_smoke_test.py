@@ -474,6 +474,7 @@ def _fix_file_mode(filename):
 
 class Isolate(unittest.TestCase):
 
+  @unittest.skipIf(sys.platform == 'win32' and six.PY3, 'crbug.com/1182016')
   def test_help_modes(self):
     # Check coherency in the help and implemented modes.
     cmd = [
@@ -754,6 +755,7 @@ class IsolateOutdir(IsolateTempdirBase):
     self._expect_no_tree()
 
 
+@unittest.skipIf(sys.platform == 'win32' and six.PY3, 'crbug.com/1182016')
 class Isolate_check(IsolateTempdirBase):
 
   def setUp(self):
@@ -797,6 +799,7 @@ class Isolate_check(IsolateTempdirBase):
       self._expect_results(['symlink_outside_build_root.py'], None, None)
 
 
+@unittest.skipIf(sys.platform == 'win32' and six.PY3, 'crbug.com/1182016')
 class Isolate_remap(IsolateOutdir):
 
   def setUp(self):
@@ -847,6 +850,7 @@ class Isolate_remap(IsolateOutdir):
       self._expect_results(['symlink_outside_build_root.py'], None, None)
 
 
+@unittest.skipIf(sys.platform == 'win32' and six.PY3, 'crbug.com/1182016')
 class Isolate_run(IsolateTempdirBase):
 
   def setUp(self):
@@ -954,6 +958,7 @@ class IsolateNoOutdir(IsolateTempdirBase):
     self.assertTrue(os.path.isfile(filename), filename)
     return filename
 
+  @unittest.skipIf(sys.platform == 'win32' and six.PY3, 'crbug.com/1182016')
   def test_check(self):
     self._execute_short('check', ['--isolate', self.filename()])
     files = sorted([
@@ -969,6 +974,7 @@ class IsolateNoOutdir(IsolateTempdirBase):
     with self.assertRaises(CalledProcessError):
       self._execute_short('remap', ['--isolate', self.filename()])
 
+  @unittest.skipIf(sys.platform == 'win32' and six.PY3, 'crbug.com/1182016')
   def test_run(self):
     self._execute_short('run', ['--isolate', self.filename()])
     files = sorted([
@@ -1036,6 +1042,7 @@ class IsolateOther(IsolateTempdirBase):
     self.assertEqual(1, proc.returncode)
     self.assertTrue('simple.py is missing' in stdout)
 
+  @unittest.skipIf(sys.platform == 'win32' and six.PY3, 'crbug.com/1182016')
   def test_empty_and_renamed(self):
     a_isolate = os.path.join(self.tempdir, 'a.isolate')
     with open(a_isolate, 'wb') as f:
