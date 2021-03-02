@@ -5,8 +5,11 @@
 # that can be found in the LICENSE file.
 
 import os
+import sys
 import tempfile
 import unittest
+
+import six
 
 # Mutates sys.path.
 import test_env
@@ -20,6 +23,7 @@ def write_content(path, content):
     f.write(content)
 
 
+@unittest.skipIf(sys.platform == 'win32' and six.PY3, 'crbug.com/1182016')
 class FSTest(unittest.TestCase):
   @classmethod
   def setUpClass(cls):
