@@ -349,6 +349,40 @@ def replace_parameters(arg, out_dir, bot_file):
   return arg
 
 
+def set_temp_dir(env, tmp_dir):
+  """Set temp dir to given env var dictionary"""
+  tmp_dir = _to_str(tmp_dir)
+  # pylint: disable=line-too-long
+  # * python respects $TMPDIR, $TEMP, and $TMP in this order, regardless of
+  #   platform. So $TMPDIR must be set on all platforms.
+  #   https://github.com/python/cpython/blob/2.7/Lib/tempfile.py#L155
+  env['TMPDIR'] = tmp_dir
+  if sys.platform == 'win32':
+    # * chromium's base utils uses GetTempPath().
+    #   https://cs.chromium.org/chromium/src/base/files/file_util_win.cc?q=GetTempPath
+    # * Go uses GetTempPath().
+    # * GetTempDir() uses %TMP%, then %TEMP%, then other stuff. So %TMP% must be
+    #   set.
+    #   https://docs.microsoft.com/en-us/windows/desktop/api/fileapi/nf-fileapi-gettemppathw
+    env['TMP'] = tmp_dir
+    # https://blogs.msdn.microsoft.com/oldnewthing/20150417-00/?p=44213
+    env['TEMP'] = tmp_dir
+  elif sys.platform == 'darwin':
+    # * Chromium uses an hack on macOS before calling into
+    #   NSTemporaryDirectory().
+    #   https://cs.chromium.org/chromium/src/base/files/file_util_mac.mm?q=GetTempDir
+    #   https://developer.apple.com/documentation/foundation/1409211-nstemporarydirectory
+    env['MAC_CHROMIUM_TMPDIR'] = tmp_dir
+  else:
+    # TMPDIR is specified as the POSIX standard envvar for the temp directory.
+    # http://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap08.html
+    # * mktemp on linux respects $TMPDIR.
+    # * Chromium respects $TMPDIR on linux.
+    #   https://cs.chromium.org/chromium/src/base/files/file_util_posix.cc?q=GetTempDir
+    # * Go uses $TMPDIR.
+    #   https://go.googlesource.com/go/+/go1.10.3/src/os/file_unix.go#307
+    pass
+
 
 def get_command_env(tmp_dir, cipd_info, run_dir, env, env_prefixes, out_dir,
                     bot_file):
@@ -388,37 +422,7 @@ def get_command_env(tmp_dir, cipd_info, run_dir, env, env_prefixes, out_dir,
       paths.append(cur)
     out[key] = _to_str(os.path.pathsep.join(paths))
 
-  tmp_dir = _to_str(tmp_dir)
-  # pylint: disable=line-too-long
-  # * python respects $TMPDIR, $TEMP, and $TMP in this order, regardless of
-  #   platform. So $TMPDIR must be set on all platforms.
-  #   https://github.com/python/cpython/blob/2.7/Lib/tempfile.py#L155
-  out['TMPDIR'] = tmp_dir
-  if sys.platform == 'win32':
-    # * chromium's base utils uses GetTempPath().
-    #   https://cs.chromium.org/chromium/src/base/files/file_util_win.cc?q=GetTempPath
-    # * Go uses GetTempPath().
-    # * GetTempDir() uses %TMP%, then %TEMP%, then other stuff. So %TMP% must be
-    #   set.
-    #   https://docs.microsoft.com/en-us/windows/desktop/api/fileapi/nf-fileapi-gettemppathw
-    out['TMP'] = tmp_dir
-    # https://blogs.msdn.microsoft.com/oldnewthing/20150417-00/?p=44213
-    out['TEMP'] = tmp_dir
-  elif sys.platform == 'darwin':
-    # * Chromium uses an hack on macOS before calling into
-    #   NSTemporaryDirectory().
-    #   https://cs.chromium.org/chromium/src/base/files/file_util_mac.mm?q=GetTempDir
-    #   https://developer.apple.com/documentation/foundation/1409211-nstemporarydirectory
-    out['MAC_CHROMIUM_TMPDIR'] = tmp_dir
-  else:
-    # TMPDIR is specified as the POSIX standard envvar for the temp directory.
-    # http://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap08.html
-    # * mktemp on linux respects $TMPDIR.
-    # * Chromium respects $TMPDIR on linux.
-    #   https://cs.chromium.org/chromium/src/base/files/file_util_posix.cc?q=GetTempDir
-    # * Go uses $TMPDIR.
-    #   https://go.googlesource.com/go/+/go1.10.3/src/os/file_unix.go#307
-    pass
+  set_temp_dir(out, tmp_dir)
   return out
 
 
@@ -507,7 +511,7 @@ def run_command(
   return exit_code, had_hard_timeout
 
 
-def _run_go_cmd_and_wait(cmd):
+def _run_go_cmd_and_wait(cmd, tmp_dir):
   """
   Runs an external Go command, `isolated` or `cas`, and wait for its completion.
 
@@ -519,7 +523,9 @@ def _run_go_cmd_and_wait(cmd):
   """
   cmd_str = ' '.join(cmd)
   try:
-    proc = subprocess42.Popen(cmd)
+    env = os.environ.copy()
+    set_temp_dir(env, tmp_dir)
+    proc = subprocess42.Popen(cmd, env=env)
 
     exceeded_max_timeout = True
     check_period_sec = 30
@@ -557,7 +563,7 @@ def _run_go_cmd_and_wait(cmd):
 
 
 def _fetch_and_map_with_cas(cas_client, digest, instance, output_dir, cache_dir,
-                            policies, kvs_file):
+                            policies, kvs_file, tmp_dir):
   """
   Fetches a CAS tree using cas client, create the tree and returns download
   stats.
@@ -605,7 +611,7 @@ def _fetch_and_map_with_cas(cas_client, digest, instance, output_dir, cache_dir,
     if kvs_file:
       cmd.extend(['-kvs-file', kvs_file])
 
-    _run_go_cmd_and_wait(cmd)
+    _run_go_cmd_and_wait(cmd, tmp_dir)
 
     with open(result_json_path) as json_file:
       result_json = json.load(json_file)
@@ -620,7 +626,8 @@ def _fetch_and_map_with_cas(cas_client, digest, instance, output_dir, cache_dir,
 
 
 def _fetch_and_map_with_go_isolated(isolated_hash, storage, outdir,
-                                    go_cache_dir, policies, isolated_client):
+                                    go_cache_dir, policies, isolated_client,
+                                    tmp_dir):
   """
   Fetches an isolated tree using go client, create the tree and returns
   stats.
@@ -657,7 +664,7 @@ def _fetch_and_map_with_go_isolated(isolated_hash, storage, outdir,
         '-fetch-and-map-result-json',
         result_json_path,
     ]
-    _run_go_cmd_and_wait(cmd)
+    _run_go_cmd_and_wait(cmd, tmp_dir)
 
     with open(result_json_path) as json_file:
       result_json = json.load(json_file)
@@ -807,7 +814,7 @@ def _upload_with_go(storage, outdir, isolated_client):
     started = time.time()
     while True:
       try:
-        _run_go_cmd_and_wait(cmd)
+        _run_go_cmd_and_wait(cmd, tmp_dir)
         break
       except Exception:
         if time.time() > started + 60 * 2:
@@ -870,7 +877,7 @@ def upload_out_dir(storage, out_dir, go_isolated_client):
   return outputs_ref, stats
 
 
-def upload_outdir_with_cas(cas_client, cas_instance, outdir):
+def upload_outdir_with_cas(cas_client, cas_instance, outdir, tmp_dir):
   """Uploads the results in |outdir|, if there is any.
 
   Returns:
@@ -903,7 +910,7 @@ def upload_outdir_with_cas(cas_client, cas_instance, outdir):
 
     start = time.time()
 
-    _run_go_cmd_and_wait(cmd)
+    _run_go_cmd_and_wait(cmd, tmp_dir)
 
     with open(digest_path) as digest_file:
       digest = digest_file.read()
@@ -1034,7 +1041,8 @@ def map_and_run(data, constant_run_path):
               outdir=run_dir,
               go_cache_dir=data.go_cache_dir,
               policies=data.go_cache_policies,
-              isolated_client=go_isolated_client)
+              isolated_client=go_isolated_client,
+              tmp_dir=tmp_dir)
         else:
           stats = fetch_and_map(
               isolated_hash=data.isolated_hash,
@@ -1051,7 +1059,8 @@ def map_and_run(data, constant_run_path):
             output_dir=run_dir,
             cache_dir=data.cas_cache_dir,
             policies=data.cas_cache_policies,
-            kvs_file=data.cas_kvs)
+            kvs_file=data.cas_kvs,
+            tmp_dir=tmp_dir)
         isolated_stats['download'].update(stats)
 
       if not command:
@@ -1104,7 +1113,8 @@ def map_and_run(data, constant_run_path):
         isolated_stats = result['stats'].setdefault('isolated', {})
         if use_cas:
           result['cas_output_root'], isolated_stats['upload'] = (
-              upload_outdir_with_cas(cas_client, data.cas_instance, out_dir))
+              upload_outdir_with_cas(cas_client, data.cas_instance, out_dir,
+                                     tmp_dir))
         else:
           # This could use |go_isolated_client|, so make sure it runs when the
           # CIPD package still exists.
