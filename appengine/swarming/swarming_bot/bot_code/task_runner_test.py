@@ -1070,18 +1070,10 @@ class TestTaskRunnerKilled(TestTaskRunnerBase):
       # We need to catch the pid of the grand children to be able to kill it. We
       # do so by processing stdout. Do not use expectTask() output, since it can
       # throw.
-      data = self.getTaskResults(manifest['task_id'])['output']
-      
-      for k in data.splitlines():
-        if sys.platform == 'win32':
-          # TODO(mkiedys): workaround for 'got signal 21', 'bye' and
-          # '6092 2021-03-02 06:08:40.700 E: Failed to delete
-          # c:\\b\\s\\w\\ir\\x\\t\\task_runnerlyj_ac\\w\\ir (1 files remaining)'
-          if not k.isdigit():    
-            continue
-        else:
-          if k in (b'children', b'hi', b'parent'):
-            continue
+      output = self.getTaskResults(manifest['task_id'])['output']
+      for k in output.splitlines():
+        if not k.isdigit():
+          continue
         pid = int(k)
         try:
           if sys.platform == 'win32':
