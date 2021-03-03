@@ -171,6 +171,7 @@ def get_output_sleep_proc_err(sleep_duration):
       cmd, env=ENV, stderr=subprocess42.PIPE, universal_newlines=True)
 
 
+@unittest.skipIf(sys.platform == 'win32' and six.PY3, 'crbug.com/1182016')
 class Subprocess42Test(unittest.TestCase):
 
   def setUp(self):
