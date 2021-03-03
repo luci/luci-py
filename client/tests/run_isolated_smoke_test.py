@@ -253,6 +253,7 @@ def load_isolated_stats(stats_json_path, key):
   return stats
 
 
+@unittest.skipIf(sys.platform == 'win32' and six.PY3, 'crbug.com/1182016')
 class RunIsolatedTest(unittest.TestCase):
   def setUp(self):
     super(RunIsolatedTest, self).setUp()
