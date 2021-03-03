@@ -228,6 +228,7 @@ class UtilsTest(TestCase):
 
       isolateserver.fileobj_copy(outobj, inobj, size=10)
 
+  @unittest.skipIf(sys.platform == 'win32' and six.PY3, 'crbug.com/1182016')
   def test_putfile(self):
     tmpoutdir = None
     tmpindir = None

@@ -729,6 +729,7 @@ class RunIsolatedTest(RunIsolatedTestBase):
     # CIPD_CACHE_DIR is set.
     self.assertEqual(os.path.join(cipd_cache, 'cache'), env['CIPD_CACHE_DIR'])
 
+  @unittest.skipIf(sys.platform == 'win32' and six.PY3, 'crbug.com/1182016')
   def test_main_relative_cwd_no_cmd(self):
     cmd = self.DISABLE_CIPD_FOR_TESTS + [
         '--relative-cwd',
@@ -737,6 +738,7 @@ class RunIsolatedTest(RunIsolatedTestBase):
     with self.assertRaises(SystemExit):
       run_isolated.main(cmd)
 
+  @unittest.skipIf(sys.platform == 'win32' and six.PY3, 'crbug.com/1182016')
   def test_main_bad_relative_cwd(self):
     cmd = self.DISABLE_CIPD_FOR_TESTS + [
         '--relative-cwd',
@@ -749,6 +751,7 @@ class RunIsolatedTest(RunIsolatedTestBase):
     with self.assertRaises(SystemExit):
       run_isolated.main(cmd)
 
+  @unittest.skipIf(sys.platform == 'win32' and six.PY3, 'crbug.com/1182016')
   def test_main_naked_with_caches(self):
     # An empty named cache better to be kept!
     trimmed = []
@@ -1018,6 +1021,7 @@ class RunIsolatedTestRun(RunIsolatedTestBase):
     super(RunIsolatedTestRun, self).tearDown()
     mock.patch.stopall()
 
+  @unittest.skipIf(sys.platform == 'win32' and six.PY3, 'crbug.com/1182016')
   # Runs the actual command requested.
   def test_output(self):
     # Starts a full isolate server mock and have run_tha_test() uploads results
@@ -1171,6 +1175,7 @@ class RunIsolatedTestOutputs(RunIsolatedTestBase):
     self.link_outputs_test(src_dir, outputs)
     self.assertExpectedTree(expected)
 
+  @unittest.skipIf(sys.platform == 'win32' and six.PY3, 'crbug.com/1182016')
   def test_symlink_to_file(self):
     src_dir = {
         'foo_file': (FILE, 'contents of foo'),
@@ -1198,6 +1203,7 @@ class RunIsolatedTestOutputs(RunIsolatedTestBase):
     self.link_outputs_test(src_dir, outputs)
     self.assertExpectedTree(expected)
 
+  @unittest.skipIf(sys.platform == 'win32' and six.PY3, 'crbug.com/1182016')
   def test_relative_symlink(self):
     src_dir = {
         'foo_file': (FILE, 'contents of foo'),
@@ -1215,6 +1221,7 @@ class RunIsolatedTestOutputs(RunIsolatedTestBase):
     self.link_outputs_test(src_dir, outputs)
     self.assertExpectedTree(expected)
 
+  @unittest.skipIf(sys.platform == 'win32' and six.PY3, 'crbug.com/1182016')
   def test_symlink_to_dir_containing_files(self):
     src_dir = {
         'subdir_link': (LINK, 'subdir'),
@@ -1229,6 +1236,7 @@ class RunIsolatedTestOutputs(RunIsolatedTestBase):
     self.link_outputs_test(src_dir, outputs)
     self.assertExpectedTree(expected)
 
+  @unittest.skipIf(sys.platform == 'win32' and six.PY3, 'crbug.com/1182016')
   def test_symlink_to_symlink_to_dir_containing_files(self):
     src_dir = {
         'subdir_link': (LINK, 'subdir_link2'),
@@ -1282,6 +1290,7 @@ class RunIsolatedTestOutputs(RunIsolatedTestBase):
     self.link_outputs_test(src_dir, outputs)
     self.assertExpectedTree(expected)
 
+  @unittest.skipIf(sys.platform == 'win32' and six.PY3, 'crbug.com/1182016')
   def test_symlink_to_empty_dir(self):
     src_dir = {
         'subdir': (DIR, {}),
@@ -1294,6 +1303,7 @@ class RunIsolatedTestOutputs(RunIsolatedTestBase):
     self.link_outputs_test(src_dir, outputs)
     self.assertExpectedTree(expected)
 
+  @unittest.skipIf(sys.platform == 'win32' and six.PY3, 'crbug.com/1182016')
   def test_symlink_to_nonexistent_file(self):
     src_dir = {
         'bad_link': (LINK, 'nonexistent_file'),
@@ -1303,6 +1313,7 @@ class RunIsolatedTestOutputs(RunIsolatedTestBase):
     self.link_outputs_test(src_dir, outputs)
     self.assertExpectedTree(expected)
 
+  @unittest.skipIf(sys.platform == 'win32' and six.PY3, 'crbug.com/1182016')
   def test_symlink_to_symlink_to_file(self):
     src_dir = {
         'first_link': (LINK, 'second_link'),
@@ -1316,6 +1327,7 @@ class RunIsolatedTestOutputs(RunIsolatedTestBase):
     self.link_outputs_test(src_dir, outputs)
     self.assertExpectedTree(expected)
 
+  @unittest.skipIf(sys.platform == 'win32' and six.PY3, 'crbug.com/1182016')
   def test_symlink_to_symlink_to_nonexistent_file(self):
     src_dir = {
         'first_link': (LINK, 'second_link'),
@@ -1326,6 +1338,7 @@ class RunIsolatedTestOutputs(RunIsolatedTestBase):
     self.link_outputs_test(src_dir, outputs)
     self.assertExpectedTree(expected)
 
+  @unittest.skipIf(sys.platform == 'win32' and six.PY3, 'crbug.com/1182016')
   def test_symlink_to_file_in_parent(self):
     src_dir = {
         'subdir': (DIR, {
@@ -1346,6 +1359,7 @@ class RunIsolatedTestOutputs(RunIsolatedTestBase):
     self.link_outputs_test(src_dir, outputs)
     self.assertExpectedTree(expected)
 
+  @unittest.skipIf(sys.platform == 'win32' and six.PY3, 'crbug.com/1182016')
   def test_symlink_to_file_in_dir(self):
     src_dir = {
         'subdir_link': (LINK, 'subdir/child_a'),
@@ -1360,6 +1374,7 @@ class RunIsolatedTestOutputs(RunIsolatedTestBase):
     self.link_outputs_test(src_dir, outputs)
     self.assertExpectedTree(expected)
 
+  @unittest.skipIf(sys.platform == 'win32' and six.PY3, 'crbug.com/1182016')
   def test_symlink_to_symlink_to_file_in_dir(self):
     src_dir = {
         'first_link': (LINK, 'subdir_link'),
@@ -1508,6 +1523,7 @@ class RunIsolatedTestOutputFiles(RunIsolatedTestBase):
     finally:
       server.close()
 
+  @unittest.skipIf(sys.platform == 'win32' and six.PY3, 'crbug.com/1182016')
   def test_output_cmd(self):
     isolated = {
       u'algo': u'sha-1',
