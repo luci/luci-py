@@ -43,7 +43,7 @@ def setup_test_env():
   tp = os.path.join(BOT_DIR, 'third_party')
   if sys.platform == 'win32':
     # third_party is a symlink.
-    with open(tp, 'rb') as f:
+    with open(tp, 'r') as f:
       tp = os.path.join(BOT_DIR, f.read())
   sys.path.insert(0, tp)
 
