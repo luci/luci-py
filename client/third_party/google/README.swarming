@@ -1,8 +1,8 @@
 
 Name: Google Authentication
 Short Name: google-auth
-Version: 14 commits ahead of v1.6.3
-Revision: eae1dcbbaba543b7d6dcab8fa40a322ff5b3d541
+Version: v1.27.1
+Revision: 91ee7a1b634c15ed65130a7666eaee1b9a2b908b
 Home-page: https://github.com/GoogleCloudPlatform/google-auth-library-python
 License: Apache 2.0
 

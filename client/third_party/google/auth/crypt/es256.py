@@ -1,4 +1,4 @@
-# Copyright 2017 Google LLC
+# Copyright 2017 Google Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,35 +12,35 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""RSA verifier and signer that use the ``cryptography`` library.
-
-This is a much faster implementation than the default (in
-``google.auth.crypt._python_rsa``), which depends on the pure-Python
-``rsa`` library.
+"""ECDSA (ES256) verifier and signer that use the ``cryptography`` library.
 """
 
+from cryptography import utils
 import cryptography.exceptions
 from cryptography.hazmat import backends
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives.asymmetric import padding
+from cryptography.hazmat.primitives.asymmetric.utils import decode_dss_signature
+from cryptography.hazmat.primitives.asymmetric.utils import encode_dss_signature
 import cryptography.x509
 
 from google.auth import _helpers
 from google.auth.crypt import base
 
+
 _CERTIFICATE_MARKER = b"-----BEGIN CERTIFICATE-----"
 _BACKEND = backends.default_backend()
 _PADDING = padding.PKCS1v15()
-_SHA256 = hashes.SHA256()
 
 
-class RSAVerifier(base.Verifier):
-    """Verifies RSA cryptographic signatures using public keys.
+class ES256Verifier(base.Verifier):
+    """Verifies ECDSA cryptographic signatures using public keys.
 
     Args:
         public_key (
-                cryptography.hazmat.primitives.asymmetric.rsa.RSAPublicKey):
+                cryptography.hazmat.primitives.asymmetric.ec.ECDSAPublicKey):
             The public key used to verify signatures.
     """
 
@@ -49,9 +49,17 @@ class RSAVerifier(base.Verifier):
 
     @_helpers.copy_docstring(base.Verifier)
     def verify(self, message, signature):
+        # First convert (r||s) raw signature to ASN1 encoded signature.
+        sig_bytes = _helpers.to_bytes(signature)
+        if len(sig_bytes) != 64:
+            return False
+        r = utils.int_from_bytes(sig_bytes[:32], byteorder="big")
+        s = utils.int_from_bytes(sig_bytes[32:], byteorder="big")
+        asn1_sig = encode_dss_signature(r, s)
+
         message = _helpers.to_bytes(message)
         try:
-            self._pubkey.verify(signature, message, _PADDING, _SHA256)
+            self._pubkey.verify(asn1_sig, message, ec.ECDSA(hashes.SHA256()))
             return True
         except (ValueError, cryptography.exceptions.InvalidSignature):
             return False
@@ -85,12 +93,12 @@ class RSAVerifier(base.Verifier):
         return cls(pubkey)
 
 
-class RSASigner(base.Signer, base.FromServiceAccountMixin):
-    """Signs messages with an RSA private key.
+class ES256Signer(base.Signer, base.FromServiceAccountMixin):
+    """Signs messages with an ECDSA private key.
 
     Args:
         private_key (
-                cryptography.hazmat.primitives.asymmetric.rsa.RSAPrivateKey):
+                cryptography.hazmat.primitives.asymmetric.ec.ECDSAPrivateKey):
             The private key to sign with.
         key_id (str): Optional key ID used to identify this private key. This
             can be useful to associate the private key with its associated
@@ -109,7 +117,11 @@ class RSASigner(base.Signer, base.FromServiceAccountMixin):
     @_helpers.copy_docstring(base.Signer)
     def sign(self, message):
         message = _helpers.to_bytes(message)
-        return self._key.sign(message, _PADDING, _SHA256)
+        asn1_signature = self._key.sign(message, ec.ECDSA(hashes.SHA256()))
+
+        # Convert ASN1 encoded signature to (r||s) raw signature.
+        (r, s) = decode_dss_signature(asn1_signature)
+        return utils.int_to_bytes(r, 32) + utils.int_to_bytes(s, 32)
 
     @classmethod
     def from_string(cls, key, key_id=None):

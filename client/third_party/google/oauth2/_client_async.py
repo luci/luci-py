@@ -1,4 +1,4 @@
-# Copyright 2016 Google LLC
+# Copyright 2020 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""OAuth 2.0 client.
+"""OAuth 2.0 async client.
 
 This is a client for interacting with an OAuth 2.0 authorization server's
 token endpoint.
@@ -33,10 +33,7 @@ from six.moves import urllib
 from google.auth import _helpers
 from google.auth import exceptions
 from google.auth import jwt
-
-_URLENCODED_CONTENT_TYPE = "application/x-www-form-urlencoded"
-_JWT_GRANT_TYPE = "urn:ietf:params:oauth:grant-type:jwt-bearer"
-_REFRESH_GRANT_TYPE = "refresh_token"
+from google.oauth2 import _client as client
 
 
 def _handle_error_response(response_body):
@@ -78,7 +75,7 @@ def _parse_expiry(response_data):
         return None
 
 
-def _token_endpoint_request(request, token_uri, body):
+async def _token_endpoint_request(request, token_uri, body):
     """Makes a request to the OAuth 2.0 authorization server's token endpoint.
 
     Args:
@@ -96,18 +93,26 @@ def _token_endpoint_request(request, token_uri, body):
             an error.
     """
     body = urllib.parse.urlencode(body).encode("utf-8")
-    headers = {"content-type": _URLENCODED_CONTENT_TYPE}
+    headers = {"content-type": client._URLENCODED_CONTENT_TYPE}
 
     retry = 0
     # retry to fetch token for maximum of two times if any internal failure
     # occurs.
     while True:
-        response = request(method="POST", url=token_uri, headers=headers, body=body)
-        response_body = (
-            response.data.decode("utf-8")
-            if hasattr(response.data, "decode")
-            else response.data
+
+        response = await request(
+            method="POST", url=token_uri, headers=headers, body=body
         )
+
+        # Using data.read() resulted in zlib decompression errors. This may require future investigation.
+        response_body1 = await response.content()
+
+        response_body = (
+            response_body1.decode("utf-8")
+            if hasattr(response_body1, "decode")
+            else response_body1
+        )
+
         response_data = json.loads(response_body)
 
         if response.status == http_client.OK:
@@ -126,7 +131,7 @@ def _token_endpoint_request(request, token_uri, body):
     return response_data
 
 
-def jwt_grant(request, token_uri, assertion):
+async def jwt_grant(request, token_uri, assertion):
     """Implements the JWT Profile for OAuth 2.0 Authorization Grants.
 
     For more details, see `rfc7523 section 4`_.
@@ -148,9 +153,9 @@ def jwt_grant(request, token_uri, assertion):
 
     .. _rfc7523 section 4: https://tools.ietf.org/html/rfc7523#section-4
     """
-    body = {"assertion": assertion, "grant_type": _JWT_GRANT_TYPE}
+    body = {"assertion": assertion, "grant_type": client._JWT_GRANT_TYPE}
 
-    response_data = _token_endpoint_request(request, token_uri, body)
+    response_data = await _token_endpoint_request(request, token_uri, body)
 
     try:
         access_token = response_data["access_token"]
@@ -163,7 +168,7 @@ def jwt_grant(request, token_uri, assertion):
     return access_token, expiry, response_data
 
 
-def id_token_jwt_grant(request, token_uri, assertion):
+async def id_token_jwt_grant(request, token_uri, assertion):
     """Implements the JWT Profile for OAuth 2.0 Authorization Grants, but
     requests an OpenID Connect ID Token instead of an access token.
 
@@ -188,9 +193,9 @@ def id_token_jwt_grant(request, token_uri, assertion):
         google.auth.exceptions.RefreshError: If the token endpoint returned
             an error.
     """
-    body = {"assertion": assertion, "grant_type": _JWT_GRANT_TYPE}
+    body = {"assertion": assertion, "grant_type": client._JWT_GRANT_TYPE}
 
-    response_data = _token_endpoint_request(request, token_uri, body)
+    response_data = await _token_endpoint_request(request, token_uri, body)
 
     try:
         id_token = response_data["id_token"]
@@ -204,7 +209,7 @@ def id_token_jwt_grant(request, token_uri, assertion):
     return id_token, expiry, response_data
 
 
-def refresh_grant(
+async def refresh_grant(
     request, token_uri, refresh_token, client_id, client_secret, scopes=None
 ):
     """Implements the OAuth 2.0 refresh token grant.
@@ -237,7 +242,7 @@ def refresh_grant(
     .. _rfc6748 section 6: https://tools.ietf.org/html/rfc6749#section-6
     """
     body = {
-        "grant_type": _REFRESH_GRANT_TYPE,
+        "grant_type": client._REFRESH_GRANT_TYPE,
         "client_id": client_id,
         "client_secret": client_secret,
         "refresh_token": refresh_token,
@@ -245,7 +250,7 @@ def refresh_grant(
     if scopes:
         body["scope"] = " ".join(scopes)
 
-    response_data = _token_endpoint_request(request, token_uri, body)
+    response_data = await _token_endpoint_request(request, token_uri, body)
 
     try:
         access_token = response_data["access_token"]

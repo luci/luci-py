@@ -1,4 +1,4 @@
-# Copyright 2016 Google Inc.
+# Copyright 2016 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -31,11 +31,13 @@ Authorization Code grant flow.
 .. _rfc6749 section 4.1: https://tools.ietf.org/html/rfc6749#section-4.1
 """
 
+from datetime import datetime
 import io
 import json
 
 import six
 
+from google.auth import _cloud_sdk
 from google.auth import _helpers
 from google.auth import credentials
 from google.auth import exceptions
@@ -43,15 +45,31 @@ from google.oauth2 import _client
 
 
 # The Google OAuth 2.0 token endpoint. Used for authorized user credentials.
-_GOOGLE_OAUTH2_TOKEN_ENDPOINT = 'https://oauth2.googleapis.com/token'
+_GOOGLE_OAUTH2_TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token"
 
 
-class Credentials(credentials.ReadOnlyScoped, credentials.Credentials):
-    """Credentials using OAuth 2.0 access and refresh tokens."""
+class Credentials(credentials.ReadOnlyScoped, credentials.CredentialsWithQuotaProject):
+    """Credentials using OAuth 2.0 access and refresh tokens.
 
-    def __init__(self, token, refresh_token=None, id_token=None,
-                 token_uri=None, client_id=None, client_secret=None,
-                 scopes=None):
+    The credentials are considered immutable. If you want to modify the
+    quota project, use :meth:`with_quota_project` or ::
+
+        credentials = credentials.with_quota_project('myproject-123)
+    """
+
+    def __init__(
+        self,
+        token,
+        refresh_token=None,
+        id_token=None,
+        token_uri=None,
+        client_id=None,
+        client_secret=None,
+        scopes=None,
+        default_scopes=None,
+        quota_project_id=None,
+        expiry=None,
+    ):
         """
         Args:
             token (Optional(str)): The OAuth 2.0 access token. Can be None
@@ -74,20 +92,54 @@ class Credentials(credentials.ReadOnlyScoped, credentials.Credentials):
                 token if refresh information is provided (e.g. The refresh
                 token scopes are a superset of this or contain a wild card
                 scope like 'https://www.googleapis.com/auth/any-api').
+            default_scopes (Sequence[str]): Default scopes passed by a
+                Google client library. Use 'scopes' for user-defined scopes.
+            quota_project_id (Optional[str]): The project ID used for quota and billing.
+                This project may be different from the project used to
+                create the credentials.
         """
         super(Credentials, self).__init__()
         self.token = token
+        self.expiry = expiry
         self._refresh_token = refresh_token
         self._id_token = id_token
         self._scopes = scopes
+        self._default_scopes = default_scopes
         self._token_uri = token_uri
         self._client_id = client_id
         self._client_secret = client_secret
+        self._quota_project_id = quota_project_id
+
+    def __getstate__(self):
+        """A __getstate__ method must exist for the __setstate__ to be called
+        This is identical to the default implementation.
+        See https://docs.python.org/3.7/library/pickle.html#object.__setstate__
+        """
+        return self.__dict__
+
+    def __setstate__(self, d):
+        """Credentials pickled with older versions of the class do not have
+        all the attributes."""
+        self.token = d.get("token")
+        self.expiry = d.get("expiry")
+        self._refresh_token = d.get("_refresh_token")
+        self._id_token = d.get("_id_token")
+        self._scopes = d.get("_scopes")
+        self._default_scopes = d.get("_default_scopes")
+        self._token_uri = d.get("_token_uri")
+        self._client_id = d.get("_client_id")
+        self._client_secret = d.get("_client_secret")
+        self._quota_project_id = d.get("_quota_project_id")
 
     @property
     def refresh_token(self):
         """Optional[str]: The OAuth 2.0 refresh token."""
         return self._refresh_token
+
+    @property
+    def scopes(self):
+        """Optional[str]: The OAuth 2.0 permission scopes."""
+        return self._scopes
 
     @property
     def token_uri(self):
@@ -122,37 +174,62 @@ class Credentials(credentials.ReadOnlyScoped, credentials.Credentials):
         the initial token is requested and can not be changed."""
         return False
 
+    @_helpers.copy_docstring(credentials.CredentialsWithQuotaProject)
+    def with_quota_project(self, quota_project_id):
+
+        return self.__class__(
+            self.token,
+            refresh_token=self.refresh_token,
+            id_token=self.id_token,
+            token_uri=self.token_uri,
+            client_id=self.client_id,
+            client_secret=self.client_secret,
+            scopes=self.scopes,
+            default_scopes=self.default_scopes,
+            quota_project_id=quota_project_id,
+        )
+
     @_helpers.copy_docstring(credentials.Credentials)
     def refresh(self, request):
-        if (self._refresh_token is None or
-                self._token_uri is None or
-                self._client_id is None or
-                self._client_secret is None):
+        if (
+            self._refresh_token is None
+            or self._token_uri is None
+            or self._client_id is None
+            or self._client_secret is None
+        ):
             raise exceptions.RefreshError(
-                'The credentials do not contain the necessary fields need to '
-                'refresh the access token. You must specify refresh_token, '
-                'token_uri, client_id, and client_secret.')
+                "The credentials do not contain the necessary fields need to "
+                "refresh the access token. You must specify refresh_token, "
+                "token_uri, client_id, and client_secret."
+            )
 
-        access_token, refresh_token, expiry, grant_response = (
-            _client.refresh_grant(
-                request, self._token_uri, self._refresh_token, self._client_id,
-                self._client_secret, self._scopes))
+        scopes = self._scopes if self._scopes is not None else self._default_scopes
+
+        access_token, refresh_token, expiry, grant_response = _client.refresh_grant(
+            request,
+            self._token_uri,
+            self._refresh_token,
+            self._client_id,
+            self._client_secret,
+            scopes,
+        )
 
         self.token = access_token
         self.expiry = expiry
         self._refresh_token = refresh_token
-        self._id_token = grant_response.get('id_token')
+        self._id_token = grant_response.get("id_token")
 
-        if self._scopes and 'scopes' in grant_response:
-            requested_scopes = frozenset(self._scopes)
-            granted_scopes = frozenset(grant_response['scopes'].split())
-            scopes_requested_but_not_granted = (
-                requested_scopes - granted_scopes)
+        if scopes and "scopes" in grant_response:
+            requested_scopes = frozenset(scopes)
+            granted_scopes = frozenset(grant_response["scopes"].split())
+            scopes_requested_but_not_granted = requested_scopes - granted_scopes
             if scopes_requested_but_not_granted:
                 raise exceptions.RefreshError(
-                    'Not all requested scopes were granted by the '
-                    'authorization server, missing scopes {}.'.format(
-                        ', '.join(scopes_requested_but_not_granted)))
+                    "Not all requested scopes were granted by the "
+                    "authorization server, missing scopes {}.".format(
+                        ", ".join(scopes_requested_but_not_granted)
+                    )
+                )
 
     @classmethod
     def from_authorized_user_info(cls, info, scopes=None):
@@ -171,21 +248,40 @@ class Credentials(credentials.ReadOnlyScoped, credentials.Credentials):
         Raises:
             ValueError: If the info is not in the expected format.
         """
-        keys_needed = set(('refresh_token', 'client_id', 'client_secret'))
+        keys_needed = set(("refresh_token", "client_id", "client_secret"))
         missing = keys_needed.difference(six.iterkeys(info))
 
         if missing:
             raise ValueError(
-                'Authorized user info was not in the expected format, missing '
-                'fields {}.'.format(', '.join(missing)))
+                "Authorized user info was not in the expected format, missing "
+                "fields {}.".format(", ".join(missing))
+            )
+
+        # access token expiry (datetime obj); auto-expire if not saved
+        expiry = info.get("expiry")
+        if expiry:
+            expiry = datetime.strptime(
+                expiry.rstrip("Z").split(".")[0], "%Y-%m-%dT%H:%M:%S"
+            )
+        else:
+            expiry = _helpers.utcnow() - _helpers.CLOCK_SKEW
+
+        # process scopes, which needs to be a seq
+        if scopes is None and "scopes" in info:
+            scopes = info.get("scopes")
+            if isinstance(scopes, str):
+                scopes = scopes.split(" ")
 
         return cls(
-            None,  # No access token, must be refreshed.
-            refresh_token=info['refresh_token'],
-            token_uri=_GOOGLE_OAUTH2_TOKEN_ENDPOINT,
+            token=info.get("token"),
+            refresh_token=info.get("refresh_token"),
+            token_uri=_GOOGLE_OAUTH2_TOKEN_ENDPOINT,  # always overrides
             scopes=scopes,
-            client_id=info['client_id'],
-            client_secret=info['client_secret'])
+            client_id=info.get("client_id"),
+            client_secret=info.get("client_secret"),
+            quota_project_id=info.get("quota_project_id"),  # may not exist
+            expiry=expiry,
+        )
 
     @classmethod
     def from_authorized_user_file(cls, filename, scopes=None):
@@ -203,6 +299,93 @@ class Credentials(credentials.ReadOnlyScoped, credentials.Credentials):
         Raises:
             ValueError: If the file is not in the expected format.
         """
-        with io.open(filename, 'r', encoding='utf-8') as json_file:
+        with io.open(filename, "r", encoding="utf-8") as json_file:
             data = json.load(json_file)
             return cls.from_authorized_user_info(data, scopes)
+
+    def to_json(self, strip=None):
+        """Utility function that creates a JSON representation of a Credentials
+        object.
+
+        Args:
+            strip (Sequence[str]): Optional list of members to exclude from the
+                                   generated JSON.
+
+        Returns:
+            str: A JSON representation of this instance. When converted into
+            a dictionary, it can be passed to from_authorized_user_info()
+            to create a new credential instance.
+        """
+        prep = {
+            "token": self.token,
+            "refresh_token": self.refresh_token,
+            "token_uri": self.token_uri,
+            "client_id": self.client_id,
+            "client_secret": self.client_secret,
+            "scopes": self.scopes,
+        }
+        if self.expiry:  # flatten expiry timestamp
+            prep["expiry"] = self.expiry.isoformat() + "Z"
+
+        # Remove empty entries (those which are None)
+        prep = {k: v for k, v in prep.items() if v is not None}
+
+        # Remove entries that explicitely need to be removed
+        if strip is not None:
+            prep = {k: v for k, v in prep.items() if k not in strip}
+
+        return json.dumps(prep)
+
+
+class UserAccessTokenCredentials(credentials.CredentialsWithQuotaProject):
+    """Access token credentials for user account.
+
+    Obtain the access token for a given user account or the current active
+    user account with the ``gcloud auth print-access-token`` command.
+
+    Args:
+        account (Optional[str]): Account to get the access token for. If not
+            specified, the current active account will be used.
+        quota_project_id (Optional[str]): The project ID used for quota
+            and billing.
+    """
+
+    def __init__(self, account=None, quota_project_id=None):
+        super(UserAccessTokenCredentials, self).__init__()
+        self._account = account
+        self._quota_project_id = quota_project_id
+
+    def with_account(self, account):
+        """Create a new instance with the given account.
+
+        Args:
+            account (str): Account to get the access token for.
+
+        Returns:
+            google.oauth2.credentials.UserAccessTokenCredentials: The created
+                credentials with the given account.
+        """
+        return self.__class__(account=account, quota_project_id=self._quota_project_id)
+
+    @_helpers.copy_docstring(credentials.CredentialsWithQuotaProject)
+    def with_quota_project(self, quota_project_id):
+        return self.__class__(account=self._account, quota_project_id=quota_project_id)
+
+    def refresh(self, request):
+        """Refreshes the access token.
+
+        Args:
+            request (google.auth.transport.Request): This argument is required
+                by the base class interface but not used in this implementation,
+                so just set it to `None`.
+
+        Raises:
+            google.auth.exceptions.UserAccessTokenError: If the access token
+                refresh failed.
+        """
+        self.token = _cloud_sdk.get_auth_access_token(self._account)
+
+    @_helpers.copy_docstring(credentials.Credentials)
+    def before_request(self, request, method, url, headers):
+        self.refresh(request)
+        self.apply(headers)

@@ -18,25 +18,30 @@ import json
 import os
 import subprocess
 
+import six
+
 from google.auth import environment_vars
-import google.oauth2.credentials
+from google.auth import exceptions
 
 
 # The ~/.config subdirectory containing gcloud credentials.
-_CONFIG_DIRECTORY = 'gcloud'
+_CONFIG_DIRECTORY = "gcloud"
 # Windows systems store config at %APPDATA%\gcloud
-_WINDOWS_CONFIG_ROOT_ENV_VAR = 'APPDATA'
+_WINDOWS_CONFIG_ROOT_ENV_VAR = "APPDATA"
 # The name of the file in the Cloud SDK config that contains default
 # credentials.
-_CREDENTIALS_FILENAME = 'application_default_credentials.json'
+_CREDENTIALS_FILENAME = "application_default_credentials.json"
 # The name of the Cloud SDK shell script
-_CLOUD_SDK_POSIX_COMMAND = 'gcloud'
-_CLOUD_SDK_WINDOWS_COMMAND = 'gcloud.cmd'
+_CLOUD_SDK_POSIX_COMMAND = "gcloud"
+_CLOUD_SDK_WINDOWS_COMMAND = "gcloud.cmd"
 # The command to get the Cloud SDK configuration
-_CLOUD_SDK_CONFIG_COMMAND = ('config', 'config-helper', '--format', 'json')
+_CLOUD_SDK_CONFIG_COMMAND = ("config", "config-helper", "--format", "json")
+# The command to get google user access token
+_CLOUD_SDK_USER_ACCESS_TOKEN_COMMAND = ("auth", "print-access-token")
 # Cloud SDK's application-default client ID
 CLOUD_SDK_CLIENT_ID = (
-    '764086051850-6qr4p6gpi6hn506pt8ejuq83di341hur.apps.googleusercontent.com')
+    "764086051850-6qr4p6gpi6hn506pt8ejuq83di341hur.apps.googleusercontent.com"
+)
 
 
 def get_config_path():
@@ -52,21 +57,19 @@ def get_config_path():
         pass
 
     # Non-windows systems store this at ~/.config/gcloud
-    if os.name != 'nt':
-        return os.path.join(
-            os.path.expanduser('~'), '.config', _CONFIG_DIRECTORY)
+    if os.name != "nt":
+        return os.path.join(os.path.expanduser("~"), ".config", _CONFIG_DIRECTORY)
     # Windows systems store config at %APPDATA%\gcloud
     else:
         try:
             return os.path.join(
-                os.environ[_WINDOWS_CONFIG_ROOT_ENV_VAR],
-                _CONFIG_DIRECTORY)
+                os.environ[_WINDOWS_CONFIG_ROOT_ENV_VAR], _CONFIG_DIRECTORY
+            )
         except KeyError:
             # This should never happen unless someone is really
             # messing with things, but we'll cover the case anyway.
-            drive = os.environ.get('SystemDrive', 'C:')
-            return os.path.join(
-                drive, '\\', _CONFIG_DIRECTORY)
+            drive = os.environ.get("SystemDrive", "C:")
+            return os.path.join(drive, "\\", _CONFIG_DIRECTORY)
 
 
 def get_application_default_credentials_path():
@@ -81,20 +84,11 @@ def get_application_default_credentials_path():
     return os.path.join(config_path, _CREDENTIALS_FILENAME)
 
 
-def load_authorized_user_credentials(info):
-    """Loads an authorized user credential.
-
-    Args:
-        info (Mapping[str, str]): The loaded file's data.
-
-    Returns:
-        google.oauth2.credentials.Credentials: The constructed credentials.
-
-    Raises:
-        ValueError: if the info is in the wrong format or missing data.
-    """
-    return google.oauth2.credentials.Credentials.from_authorized_user_info(
-        info)
+def _run_subprocess_ignore_stderr(command):
+    """ Return subprocess.check_output with the given command and ignores stderr."""
+    with open(os.devnull, "w") as devnull:
+        output = subprocess.check_output(command, stderr=devnull)
+    return output
 
 
 def get_project_id():
@@ -103,24 +97,63 @@ def get_project_id():
     Returns:
         Optional[str]: The project ID.
     """
-    if os.name == 'nt':
+    if os.name == "nt":
         command = _CLOUD_SDK_WINDOWS_COMMAND
     else:
         command = _CLOUD_SDK_POSIX_COMMAND
 
     try:
-        output = subprocess.check_output(
-            (command,) + _CLOUD_SDK_CONFIG_COMMAND,
-            stderr=subprocess.STDOUT)
+        # Ignore the stderr coming from gcloud, so it won't be mixed into the output.
+        # https://github.com/googleapis/google-auth-library-python/issues/673
+        output = _run_subprocess_ignore_stderr((command,) + _CLOUD_SDK_CONFIG_COMMAND)
     except (subprocess.CalledProcessError, OSError, IOError):
         return None
 
     try:
-        configuration = json.loads(output.decode('utf-8'))
+        configuration = json.loads(output.decode("utf-8"))
     except ValueError:
         return None
 
     try:
-        return configuration['configuration']['properties']['core']['project']
+        return configuration["configuration"]["properties"]["core"]["project"]
     except KeyError:
         return None
+
+
+def get_auth_access_token(account=None):
+    """Load user access token with the ``gcloud auth print-access-token`` command.
+
+    Args:
+        account (Optional[str]): Account to get the access token for. If not
+            specified, the current active account will be used.
+
+    Returns:
+        str: The user access token.
+
+    Raises:
+        google.auth.exceptions.UserAccessTokenError: if failed to get access
+            token from gcloud.
+    """
+    if os.name == "nt":
+        command = _CLOUD_SDK_WINDOWS_COMMAND
+    else:
+        command = _CLOUD_SDK_POSIX_COMMAND
+
+    try:
+        if account:
+            command = (
+                (command,)
+                + _CLOUD_SDK_USER_ACCESS_TOKEN_COMMAND
+                + ("--account=" + account,)
+            )
+        else:
+            command = (command,) + _CLOUD_SDK_USER_ACCESS_TOKEN_COMMAND
+
+        access_token = subprocess.check_output(command, stderr=subprocess.STDOUT)
+        # remove the trailing "\n"
+        return access_token.decode("utf-8").strip()
+    except (subprocess.CalledProcessError, OSError, IOError) as caught_exc:
+        new_exc = exceptions.UserAccessTokenError(
+            "Failed to obtain access token", caught_exc
+        )
+        six.raise_from(new_exc, caught_exc)

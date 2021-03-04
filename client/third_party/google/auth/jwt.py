@@ -1,4 +1,4 @@
-# Copyright 2016 Google Inc.
+# Copyright 2016 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -40,7 +40,11 @@ You can also skip verification::
 
 """
 
-import collections
+try:
+    from collections.abc import Mapping
+# Python 2.7 compatibility
+except ImportError:  # pragma: NO COVER
+    from collections import Mapping
 import copy
 import datetime
 import json
@@ -55,8 +59,18 @@ from google.auth import crypt
 from google.auth import exceptions
 import google.auth.credentials
 
+try:
+    from google.auth.crypt import es256
+except ImportError:  # pragma: NO COVER
+    es256 = None
+
 _DEFAULT_TOKEN_LIFETIME_SECS = 3600  # 1 hour in seconds
 _DEFAULT_MAX_CACHE_SIZE = 10
+_ALGORITHM_TO_VERIFIER_CLASS = {"RS256": crypt.RSAVerifier}
+_CRYPTOGRAPHY_BASED_ALGORITHMS = frozenset(["ES256"])
+
+if es256 is not None:  # pragma: NO COVER
+    _ALGORITHM_TO_VERIFIER_CLASS["ES256"] = es256.ES256Verifier
 
 
 def encode(signer, payload, header=None, key_id=None):
@@ -79,36 +93,35 @@ def encode(signer, payload, header=None, key_id=None):
     if key_id is None:
         key_id = signer.key_id
 
-    header.update({'typ': 'JWT', 'alg': 'RS256'})
+    header.update({"typ": "JWT"})
+
+    if es256 is not None and isinstance(signer, es256.ES256Signer):
+        header.update({"alg": "ES256"})
+    else:
+        header.update({"alg": "RS256"})
 
     if key_id is not None:
-        header['kid'] = key_id
+        header["kid"] = key_id
 
     segments = [
-        _helpers.unpadded_urlsafe_b64encode(
-            json.dumps(header).encode('utf-8')
-        ),
-        _helpers.unpadded_urlsafe_b64encode(
-            json.dumps(payload).encode('utf-8')
-        ),
+        _helpers.unpadded_urlsafe_b64encode(json.dumps(header).encode("utf-8")),
+        _helpers.unpadded_urlsafe_b64encode(json.dumps(payload).encode("utf-8")),
     ]
 
-    signing_input = b'.'.join(segments)
+    signing_input = b".".join(segments)
     signature = signer.sign(signing_input)
-    segments.append(
-        _helpers.unpadded_urlsafe_b64encode(signature)
-    )
+    segments.append(_helpers.unpadded_urlsafe_b64encode(signature))
 
-    return b'.'.join(segments)
+    return b".".join(segments)
 
 
 def _decode_jwt_segment(encoded_section):
     """Decodes a single JWT segment."""
     section_bytes = _helpers.padded_urlsafe_b64decode(encoded_section)
     try:
-        return json.loads(section_bytes.decode('utf-8'))
+        return json.loads(section_bytes.decode("utf-8"))
     except ValueError as caught_exc:
-        new_exc = ValueError('Can\'t parse segment: {0}'.format(section_bytes))
+        new_exc = ValueError("Can't parse segment: {0}".format(section_bytes))
         six.raise_from(new_exc, caught_exc)
 
 
@@ -127,12 +140,11 @@ def _unverified_decode(token):
     """
     token = _helpers.to_bytes(token)
 
-    if token.count(b'.') != 2:
-        raise ValueError(
-            'Wrong number of segments in token: {0}'.format(token))
+    if token.count(b".") != 2:
+        raise ValueError("Wrong number of segments in token: {0}".format(token))
 
-    encoded_header, encoded_payload, signature = token.split(b'.')
-    signed_section = encoded_header + b'.' + encoded_payload
+    encoded_header, encoded_payload, signature = token.split(b".")
+    signed_section = encoded_header + b"." + encoded_payload
     signature = _helpers.padded_urlsafe_b64decode(signature)
 
     # Parse segments
@@ -172,26 +184,25 @@ def _verify_iat_and_exp(payload):
     now = _helpers.datetime_to_secs(_helpers.utcnow())
 
     # Make sure the iat and exp claims are present.
-    for key in ('iat', 'exp'):
+    for key in ("iat", "exp"):
         if key not in payload:
-            raise ValueError(
-                'Token does not contain required claim {}'.format(key))
+            raise ValueError("Token does not contain required claim {}".format(key))
 
     # Make sure the token wasn't issued in the future.
-    iat = payload['iat']
+    iat = payload["iat"]
     # Err on the side of accepting a token that is slightly early to account
     # for clock skew.
     earliest = iat - _helpers.CLOCK_SKEW_SECS
     if now < earliest:
-        raise ValueError('Token used too early, {} < {}'.format(now, iat))
+        raise ValueError("Token used too early, {} < {}".format(now, iat))
 
     # Make sure the token wasn't issued in the past.
-    exp = payload['exp']
+    exp = payload["exp"]
     # Err on the side of accepting a token that is slightly out of date
     # to account for clow skew.
     latest = exp + _helpers.CLOCK_SKEW_SECS
     if latest < now:
-        raise ValueError('Token expired, {} < {}'.format(latest, now))
+        raise ValueError("Token expired, {} < {}".format(latest, now))
 
 
 def decode(token, certs=None, verify=True, audience=None):
@@ -221,14 +232,33 @@ def decode(token, certs=None, verify=True, audience=None):
     if not verify:
         return payload
 
+    # Pluck the key id and algorithm from the header and make sure we have
+    # a verifier that can support it.
+    key_alg = header.get("alg")
+    key_id = header.get("kid")
+
+    try:
+        verifier_cls = _ALGORITHM_TO_VERIFIER_CLASS[key_alg]
+    except KeyError as exc:
+        if key_alg in _CRYPTOGRAPHY_BASED_ALGORITHMS:
+            six.raise_from(
+                ValueError(
+                    "The key algorithm {} requires the cryptography package "
+                    "to be installed.".format(key_alg)
+                ),
+                exc,
+            )
+        else:
+            six.raise_from(
+                ValueError("Unsupported signature algorithm {}".format(key_alg)), exc
+            )
+
     # If certs is specified as a dictionary of key IDs to certificates, then
     # use the certificate identified by the key ID in the token header.
-    if isinstance(certs, collections.Mapping):
-        key_id = header.get('kid')
+    if isinstance(certs, Mapping):
         if key_id:
             if key_id not in certs:
-                raise ValueError(
-                    'Certificate for key id {} not found.'.format(key_id))
+                raise ValueError("Certificate for key id {} not found.".format(key_id))
             certs_to_check = [certs[key_id]]
         # If there's no key id in the header, check against all of the certs.
         else:
@@ -237,25 +267,30 @@ def decode(token, certs=None, verify=True, audience=None):
         certs_to_check = certs
 
     # Verify that the signature matches the message.
-    if not crypt.verify_signature(signed_section, signature, certs_to_check):
-        raise ValueError('Could not verify token signature.')
+    if not crypt.verify_signature(
+        signed_section, signature, certs_to_check, verifier_cls
+    ):
+        raise ValueError("Could not verify token signature.")
 
     # Verify the issued at and created times in the payload.
     _verify_iat_and_exp(payload)
 
     # Check audience.
     if audience is not None:
-        claim_audience = payload.get('aud')
+        claim_audience = payload.get("aud")
         if audience != claim_audience:
             raise ValueError(
-                'Token has wrong audience {}, expected {}'.format(
-                    claim_audience, audience))
+                "Token has wrong audience {}, expected {}".format(
+                    claim_audience, audience
+                )
+            )
 
     return payload
 
 
-class Credentials(google.auth.credentials.Signing,
-                  google.auth.credentials.Credentials):
+class Credentials(
+    google.auth.credentials.Signing, google.auth.credentials.CredentialsWithQuotaProject
+):
     """Credentials that use a JWT as the bearer token.
 
     These credentials require an "audience" claim. This claim identifies the
@@ -305,9 +340,16 @@ class Credentials(google.auth.credentials.Signing,
         new_credentials = credentials.with_claims(audience=new_audience)
     """
 
-    def __init__(self, signer, issuer, subject, audience,
-                 additional_claims=None,
-                 token_lifetime=_DEFAULT_TOKEN_LIFETIME_SECS):
+    def __init__(
+        self,
+        signer,
+        issuer,
+        subject,
+        audience,
+        additional_claims=None,
+        token_lifetime=_DEFAULT_TOKEN_LIFETIME_SECS,
+        quota_project_id=None,
+    ):
         """
         Args:
             signer (google.auth.crypt.Signer): The signer used to sign JWTs.
@@ -319,6 +361,8 @@ class Credentials(google.auth.credentials.Signing,
                 the JWT payload.
             token_lifetime (int): The amount of time in seconds for
                 which the token is valid. Defaults to 1 hour.
+            quota_project_id (Optional[str]): The project ID used for quota
+                and billing.
         """
         super(Credentials, self).__init__()
         self._signer = signer
@@ -326,6 +370,7 @@ class Credentials(google.auth.credentials.Signing,
         self._subject = subject
         self._audience = audience
         self._token_lifetime = token_lifetime
+        self._quota_project_id = quota_project_id
 
         if additional_claims is None:
             additional_claims = {}
@@ -348,8 +393,8 @@ class Credentials(google.auth.credentials.Signing,
         Raises:
             ValueError: If the info is not in the expected format.
         """
-        kwargs.setdefault('subject', info['client_email'])
-        kwargs.setdefault('issuer', info['client_email'])
+        kwargs.setdefault("subject", info["client_email"])
+        kwargs.setdefault("issuer", info["client_email"])
         return cls(signer, **kwargs)
 
     @classmethod
@@ -367,8 +412,7 @@ class Credentials(google.auth.credentials.Signing,
         Raises:
             ValueError: If the info is not in the expected format.
         """
-        signer = _service_account_info.from_dict(
-            info, require=['client_email'])
+        signer = _service_account_info.from_dict(info, require=["client_email"])
         return cls._from_signer_and_info(signer, info, **kwargs)
 
     @classmethod
@@ -384,7 +428,8 @@ class Credentials(google.auth.credentials.Signing,
             google.auth.jwt.Credentials: The constructed credentials.
         """
         info, signer = _service_account_info.from_filename(
-            filename, require=['client_email'])
+            filename, require=["client_email"]
+        )
         return cls._from_signer_and_info(signer, info, **kwargs)
 
     @classmethod
@@ -415,15 +460,13 @@ class Credentials(google.auth.credentials.Signing,
         Returns:
             google.auth.jwt.Credentials: A new Credentials instance.
         """
-        kwargs.setdefault('issuer', credentials.signer_email)
-        kwargs.setdefault('subject', credentials.signer_email)
-        return cls(
-            credentials.signer,
-            audience=audience,
-            **kwargs)
+        kwargs.setdefault("issuer", credentials.signer_email)
+        kwargs.setdefault("subject", credentials.signer_email)
+        return cls(credentials.signer, audience=audience, **kwargs)
 
-    def with_claims(self, issuer=None, subject=None, audience=None,
-                    additional_claims=None):
+    def with_claims(
+        self, issuer=None, subject=None, audience=None, additional_claims=None
+    ):
         """Returns a copy of these credentials with modified claims.
 
         Args:
@@ -448,7 +491,20 @@ class Credentials(google.auth.credentials.Signing,
             issuer=issuer if issuer is not None else self._issuer,
             subject=subject if subject is not None else self._subject,
             audience=audience if audience is not None else self._audience,
-            additional_claims=new_additional_claims)
+            additional_claims=new_additional_claims,
+            quota_project_id=self._quota_project_id,
+        )
+
+    @_helpers.copy_docstring(google.auth.credentials.CredentialsWithQuotaProject)
+    def with_quota_project(self, quota_project_id):
+        return self.__class__(
+            self._signer,
+            issuer=self._issuer,
+            subject=self._subject,
+            audience=self._audience,
+            additional_claims=self._additional_claims,
+            quota_project_id=quota_project_id,
+        )
 
     def _make_jwt(self):
         """Make a signed JWT.
@@ -461,11 +517,11 @@ class Credentials(google.auth.credentials.Signing,
         expiry = now + lifetime
 
         payload = {
-            'iss': self._issuer,
-            'sub': self._subject,
-            'iat': _helpers.datetime_to_secs(now),
-            'exp': _helpers.datetime_to_secs(expiry),
-            'aud': self._audience,
+            "iss": self._issuer,
+            "sub": self._subject,
+            "iat": _helpers.datetime_to_secs(now),
+            "exp": _helpers.datetime_to_secs(expiry),
+            "aud": self._audience,
         }
 
         payload.update(self._additional_claims)
@@ -500,8 +556,8 @@ class Credentials(google.auth.credentials.Signing,
 
 
 class OnDemandCredentials(
-        google.auth.credentials.Signing,
-        google.auth.credentials.Credentials):
+    google.auth.credentials.Signing, google.auth.credentials.CredentialsWithQuotaProject
+):
     """On-demand JWT credentials.
 
     Like :class:`Credentials`, this class uses a JWT as the bearer token for
@@ -519,10 +575,16 @@ class OnDemandCredentials(
     .. _grpc: http://www.grpc.io/
     """
 
-    def __init__(self, signer, issuer, subject,
-                 additional_claims=None,
-                 token_lifetime=_DEFAULT_TOKEN_LIFETIME_SECS,
-                 max_cache_size=_DEFAULT_MAX_CACHE_SIZE):
+    def __init__(
+        self,
+        signer,
+        issuer,
+        subject,
+        additional_claims=None,
+        token_lifetime=_DEFAULT_TOKEN_LIFETIME_SECS,
+        max_cache_size=_DEFAULT_MAX_CACHE_SIZE,
+        quota_project_id=None,
+    ):
         """
         Args:
             signer (google.auth.crypt.Signer): The signer used to sign JWTs.
@@ -534,12 +596,16 @@ class OnDemandCredentials(
                 which the token is valid. Defaults to 1 hour.
             max_cache_size (int): The maximum number of JWT tokens to keep in
                 cache. Tokens are cached using :class:`cachetools.LRUCache`.
+            quota_project_id (Optional[str]): The project ID used for quota
+                and billing.
+
         """
         super(OnDemandCredentials, self).__init__()
         self._signer = signer
         self._issuer = issuer
         self._subject = subject
         self._token_lifetime = token_lifetime
+        self._quota_project_id = quota_project_id
 
         if additional_claims is None:
             additional_claims = {}
@@ -563,8 +629,8 @@ class OnDemandCredentials(
         Raises:
             ValueError: If the info is not in the expected format.
         """
-        kwargs.setdefault('subject', info['client_email'])
-        kwargs.setdefault('issuer', info['client_email'])
+        kwargs.setdefault("subject", info["client_email"])
+        kwargs.setdefault("issuer", info["client_email"])
         return cls(signer, **kwargs)
 
     @classmethod
@@ -582,8 +648,7 @@ class OnDemandCredentials(
         Raises:
             ValueError: If the info is not in the expected format.
         """
-        signer = _service_account_info.from_dict(
-            info, require=['client_email'])
+        signer = _service_account_info.from_dict(info, require=["client_email"])
         return cls._from_signer_and_info(signer, info, **kwargs)
 
     @classmethod
@@ -599,7 +664,8 @@ class OnDemandCredentials(
             google.auth.jwt.OnDemandCredentials: The constructed credentials.
         """
         info, signer = _service_account_info.from_filename(
-            filename, require=['client_email'])
+            filename, require=["client_email"]
+        )
         return cls._from_signer_and_info(signer, info, **kwargs)
 
     @classmethod
@@ -626,8 +692,8 @@ class OnDemandCredentials(
         Returns:
             google.auth.jwt.Credentials: A new Credentials instance.
         """
-        kwargs.setdefault('issuer', credentials.signer_email)
-        kwargs.setdefault('subject', credentials.signer_email)
+        kwargs.setdefault("issuer", credentials.signer_email)
+        kwargs.setdefault("subject", credentials.signer_email)
         return cls(credentials.signer, **kwargs)
 
     def with_claims(self, issuer=None, subject=None, additional_claims=None):
@@ -653,7 +719,21 @@ class OnDemandCredentials(
             issuer=issuer if issuer is not None else self._issuer,
             subject=subject if subject is not None else self._subject,
             additional_claims=new_additional_claims,
-            max_cache_size=self._cache.maxsize)
+            max_cache_size=self._cache.maxsize,
+            quota_project_id=self._quota_project_id,
+        )
+
+    @_helpers.copy_docstring(google.auth.credentials.CredentialsWithQuotaProject)
+    def with_quota_project(self, quota_project_id):
+
+        return self.__class__(
+            self._signer,
+            issuer=self._issuer,
+            subject=self._subject,
+            additional_claims=self._additional_claims,
+            max_cache_size=self._cache.maxsize,
+            quota_project_id=quota_project_id,
+        )
 
     @property
     def valid(self):
@@ -678,11 +758,11 @@ class OnDemandCredentials(
         expiry = now + lifetime
 
         payload = {
-            'iss': self._issuer,
-            'sub': self._subject,
-            'iat': _helpers.datetime_to_secs(now),
-            'exp': _helpers.datetime_to_secs(expiry),
-            'aud': audience,
+            "iss": self._issuer,
+            "sub": self._subject,
+            "iat": _helpers.datetime_to_secs(now),
+            "exp": _helpers.datetime_to_secs(expiry),
+            "aud": audience,
         }
 
         payload.update(self._additional_claims)
@@ -725,7 +805,8 @@ class OnDemandCredentials(
         # pylint: disable=unused-argument
         # (pylint doesn't correctly recognize overridden methods.)
         raise exceptions.RefreshError(
-            'OnDemandCredentials can not be directly refreshed.')
+            "OnDemandCredentials can not be directly refreshed."
+        )
 
     def before_request(self, request, method, url, headers):
         """Performs credential-specific before request logic.
@@ -743,7 +824,8 @@ class OnDemandCredentials(
         parts = urllib.parse.urlsplit(url)
         # Strip query string and fragment
         audience = urllib.parse.urlunsplit(
-            (parts.scheme, parts.netloc, parts.path, "", ""))
+            (parts.scheme, parts.netloc, parts.path, "", "")
+        )
         token = self._get_jwt_for_audience(audience)
         self.apply(headers, token=token)
 
