@@ -368,7 +368,8 @@ def task_result_to_rpc(entity, send_stats):
         swarming_rpcs.PerformanceStats,
         entity.performance_stats,
         isolated_download=op(entity.performance_stats.isolated_download),
-        isolated_upload=op(entity.performance_stats.isolated_upload))
+        isolated_upload=op(entity.performance_stats.isolated_upload),
+        package_installation=op(entity.performance_stats.package_installation))
   kwargs = {
       'bot_dimensions':
           _string_list_pairs_from_dict(entity.bot_dimensions or {}),

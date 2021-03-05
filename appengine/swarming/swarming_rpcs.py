@@ -635,6 +635,7 @@ class PerformanceStats(messages.Message):
   bot_overhead = messages.FloatField(1)
   isolated_download = messages.MessageField(OperationStats, 2)
   isolated_upload = messages.MessageField(OperationStats, 3)
+  package_installation = messages.MessageField(OperationStats, 4)
 
 
 class CancelResponse(messages.Message):

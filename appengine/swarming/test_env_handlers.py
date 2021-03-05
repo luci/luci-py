@@ -380,6 +380,9 @@ class AppTestBase(test_case.TestCase):
                 'items_hot': [1, 2, 3, 50],
             },
         },
+        'cipd_stats': {
+            'duration': 3,
+        },
         'output': base64.b64encode(u'rÉsult string'.encode('utf-8')),
         'output_chunk_start': 0,
         'task_id': None,
@@ -625,6 +628,9 @@ class AppTestBase(test_case.TestCase):
             u'total_bytes_items_cold': u'43',
             u'num_items_hot': u'4',
             u'total_bytes_items_hot': u'56',
+        },
+        u'package_installation': {
+            u'duration': 3.0,
         },
     }
     out.update((unicode(k), v) for k, v in kwargs.items())

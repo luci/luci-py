@@ -635,6 +635,7 @@ class Test(unittest.TestCase):
             u'num_items_cold': unicode(len(items_out)),
             u'total_bytes_items_cold': unicode(sum(items_out)),
         },
+        u'package_installation': {},
     }
     self.assertPerformanceStats(expected_performance_stats, performance_stats)
 
@@ -710,6 +711,7 @@ class Test(unittest.TestCase):
             u'num_items_cold': unicode(len(items_out)),
             u'total_bytes_items_cold': unicode(sum(items_out)),
         },
+        u'package_installation': {},
     }
     self.assertPerformanceStats(expected_performance_stats, performance_stats)
 
@@ -760,6 +762,7 @@ class Test(unittest.TestCase):
             u'items_cold': [],
             u'items_hot': [],
         },
+        u'package_installation': {},
     }
     self.assertPerformanceStats(expected_performance_stats, performance_stats)
 
@@ -824,6 +827,7 @@ class Test(unittest.TestCase):
             u'num_items_cold': unicode(len(items_out)),
             u'total_bytes_items_cold': unicode(sum(items_out)),
         },
+        u'package_installation': {},
     }
     self.assertPerformanceStats(expected_performance_stats, performance_stats)
 
@@ -854,6 +858,7 @@ class Test(unittest.TestCase):
             u'items_cold': [],
             u'items_hot': [],
         },
+        u'package_installation': {},
     }
     self.assertPerformanceStats(expected_performance_stats, performance_stats)
 
@@ -921,6 +926,7 @@ class Test(unittest.TestCase):
             u'num_items_cold': unicode(len(items_out)),
             u'total_bytes_items_cold': unicode(sum(items_out)),
         },
+        u'package_installation': {},
     }
     self.assertPerformanceStats(expected_performance_stats, performance_stats)
 
@@ -970,6 +976,7 @@ class Test(unittest.TestCase):
             u'items_cold': [],
             u'items_hot': [],
         },
+        u'package_installation': {},
     }
     self.assertPerformanceStats(expected_performance_stats, performance_stats)
 
@@ -1008,6 +1015,7 @@ class Test(unittest.TestCase):
             u'num_items_cold': unicode(len(items_out)),
             u'total_bytes_items_cold': unicode(sum(items_out)),
         },
+        u'package_installation': {},
     }
     self.assertPerformanceStats(expected_performance_stats, performance_stats)
 
@@ -1478,6 +1486,7 @@ class Test(unittest.TestCase):
                 u'initial_size': u'0',
             },
             u'isolated_upload': {},
+            u'package_installation': {},
         }, actual)
 
   def assertPerformanceStats(self, expected, actual):
