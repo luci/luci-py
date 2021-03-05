@@ -1827,6 +1827,11 @@ def main(args):
           # *must* be done manually via periodic 'run_isolated.py --clean'.
           named_cache.uninstall(path, name)
         except local_caching.NamedCacheError:
+          if sys.platform == 'win32':
+            # Show running processes.
+            sys.stderr.write("running process\n")
+            subprocess42.check_call(['tasklist.exe', '/V'], stdout=sys.stderr)
+
           logging.exception('Error while removing named cache %r at %r. '
                             'The cache will be lost.', path, name)
 
