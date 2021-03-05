@@ -9,10 +9,17 @@ from __future__ import print_function
 from __future__ import unicode_literals
 
 import multiprocessing.pool
+import sys
+import threading
+
 from multiprocessing.pool import IMapIterator
+
 def wrapper(func):
   def wrap(self, timeout=None):
-    return func(self, timeout=timeout or 1 << 31)
+    default_timeout = (1 << 31 if sys.version_info.major == 2 else
+                       threading.TIMEOUT_MAX)
+    return func(self, timeout=timeout or default_timeout)
+
   return wrap
 IMapIterator.next = wrapper(IMapIterator.next)
 IMapIterator.__next__ = IMapIterator.next
@@ -29,14 +36,17 @@ import re
 import setup_color
 import shutil
 import signal
-import sys
 import tempfile
 import textwrap
-import threading
 
 import subprocess2
 
 from io import BytesIO
+
+
+if sys.version_info.major == 2:
+  # On Python 3, BrokenPipeError is raised instead.
+  BrokenPipeError = IOError
 
 
 ROOT = os.path.abspath(os.path.dirname(__file__))
@@ -65,7 +75,7 @@ FREEZE_MATCHER = re.compile(r'%s.(%s)' % (FREEZE, '|'.join(FREEZE_SECTIONS)))
 
 
 # NOTE: This list is DEPRECATED in favor of the Infra Git wrapper:
-# https://chromium.googlesource.com/infra/infra/+/master/go/src/infra/tools/git
+# https://chromium.googlesource.com/infra/infra/+/HEAD/go/src/infra/tools/git
 #
 # New entries should be added to the Git wrapper, NOT to this list. "git_retry"
 # is, similarly, being deprecated in favor of the Git wrapper.
@@ -444,7 +454,7 @@ def freeze():
       die("Cannot freeze unmerged changes!")
     if limit_mb > 0:
       if s.lstat == '?':
-        untracked_bytes += os.stat(os.path.join(root_path, f)).st_size
+        untracked_bytes += os.lstat(os.path.join(root_path, f)).st_size
   if limit_mb > 0 and untracked_bytes > limit_mb * MB:
     die("""\
       You appear to have too much untracked+unignored data in your git
@@ -459,7 +469,7 @@ def freeze():
         .git/info/exclude
       file. See `git help ignore` for the format of this file.
 
-      If this data is indended as part of your commit, you may adjust the
+      If this data is intended as part of your commit, you may adjust the
       freeze limit by running:
         git config %s <new_limit>
       Where <new_limit> is an integer threshold in megabytes.""",
@@ -520,7 +530,11 @@ def get_or_create_merge_base(branch, parent=None):
   parent = parent or upstream(branch)
   if parent is None or branch is None:
     return None
-  actual_merge_base = run('merge-base', parent, branch)
+
+  try:
+    actual_merge_base = run('merge-base', '--fork-point', parent, branch)
+  except subprocess2.CalledProcessError:
+    actual_merge_base = run('merge-base', parent, branch)
 
   if base_upstream != parent:
     base = None
@@ -615,7 +629,7 @@ def parse_commitrefs(*commitrefs):
 
   A commitref is anything which can resolve to a commit. Popular examples:
     * 'HEAD'
-    * 'origin/master'
+    * 'origin/main'
     * 'cool_branch~2'
   """
   try:
@@ -652,7 +666,8 @@ def rebase(parent, start, branch, abort=False):
   except subprocess2.CalledProcessError as cpe:
     if abort:
       run_with_retcode('rebase', '--abort')  # ignore failure
-    return RebaseRet(False, cpe.stdout, cpe.stderr)
+    return RebaseRet(False, cpe.stdout.decode('utf-8', 'replace'),
+                     cpe.stderr.decode('utf-8', 'replace'))
 
 
 def remove_merge_base(branch):
@@ -665,8 +680,16 @@ def repo_root():
   return run('rev-parse', '--show-toplevel')
 
 
+def upstream_default():
+  """Returns the default branch name of the origin repository."""
+  try:
+    return run('rev-parse', '--abbrev-ref', 'origin/HEAD')
+  except subprocess2.CalledProcessError:
+    return 'origin/master'
+
+
 def root():
-  return get_config('depot-tools.upstream', 'origin/master')
+  return get_config('depot-tools.upstream', upstream_default())
 
 
 @contextlib.contextmanager
@@ -675,9 +698,13 @@ def less():  # pragma: no cover
 
   Automatically checks if sys.stdout is a non-TTY stream. If so, it avoids
   running less and just yields sys.stdout.
+
+  The returned PIPE is opened on binary mode.
   """
   if not setup_color.IS_TTY:
-    yield sys.stdout
+    # On Python 3, sys.stdout doesn't accept bytes, and sys.stdout.buffer must
+    # be used.
+    yield getattr(sys.stdout, 'buffer', sys.stdout)
     return
 
   # Run with the same options that git uses (see setup_pager in git repo).
@@ -689,7 +716,11 @@ def less():  # pragma: no cover
     proc = subprocess2.Popen(cmd, stdin=subprocess2.PIPE)
     yield proc.stdin
   finally:
-    proc.stdin.close()
+    try:
+      proc.stdin.close()
+    except BrokenPipeError:
+      # BrokenPipeError is raised if proc has already completed,
+      pass
     proc.wait()
 
 
@@ -712,7 +743,7 @@ def run_stream(*cmd, **kwargs):
   stderr is dropped to avoid races if the process outputs to both stdout and
   stderr.
   """
-  kwargs.setdefault('stderr', subprocess2.VOID)
+  kwargs.setdefault('stderr', subprocess2.DEVNULL)
   kwargs.setdefault('stdout', subprocess2.PIPE)
   kwargs.setdefault('shell', False)
   cmd = (GIT_EXE, '-c', 'color.ui=never') + cmd
@@ -729,7 +760,7 @@ def run_stream_with_retcode(*cmd, **kwargs):
 
   Raises subprocess2.CalledProcessError on nonzero return code.
   """
-  kwargs.setdefault('stderr', subprocess2.VOID)
+  kwargs.setdefault('stderr', subprocess2.DEVNULL)
   kwargs.setdefault('stdout', subprocess2.PIPE)
   kwargs.setdefault('shell', False)
   cmd = (GIT_EXE, '-c', 'color.ui=never') + cmd
@@ -740,7 +771,7 @@ def run_stream_with_retcode(*cmd, **kwargs):
     retcode = proc.wait()
     if retcode != 0:
       raise subprocess2.CalledProcessError(retcode, cmd, os.getcwd(),
-                                           None, None)
+                                           b'', b'')
 
 
 def run_with_stderr(*cmd, **kwargs):
@@ -1009,18 +1040,23 @@ def get_branches_info(include_tracking_status):
   info_map = {}
   data = run('for-each-ref', format_string, 'refs/heads')
   BranchesInfo = collections.namedtuple(
-      'BranchesInfo', 'hash upstream ahead behind')
+      'BranchesInfo', 'hash upstream commits behind')
   for line in data.splitlines():
     (branch, branch_hash, upstream_branch, tracking_status) = line.split(':')
 
-    ahead_match = re.search(r'ahead (\d+)', tracking_status)
-    ahead = int(ahead_match.group(1)) if ahead_match else None
+    commits = None
+    if include_tracking_status:
+      base = get_or_create_merge_base(branch)
+      if base:
+        commits_list = run('rev-list', '--count', branch, '^%s' % base, '--')
+        commits = int(commits_list) or None
 
     behind_match = re.search(r'behind (\d+)', tracking_status)
     behind = int(behind_match.group(1)) if behind_match else None
 
     info_map[branch] = BranchesInfo(
-        hash=branch_hash, upstream=upstream_branch, ahead=ahead, behind=behind)
+        hash=branch_hash, upstream=upstream_branch, commits=commits, 
+        behind=behind)
 
   # Set None for upstreams which are not branches (e.g empty upstream, remotes
   # and deleted upstream branches).
@@ -1056,6 +1092,7 @@ def make_workdir(repository, new_workdir):
     'refs',
     'remotes',
     'rr-cache',
+    'shallow',
   ]
   make_workdir_common(repository, new_workdir, GIT_DIRECTORY_WHITELIST,
                       ['HEAD'])
