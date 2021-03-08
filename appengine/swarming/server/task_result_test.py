@@ -1,4 +1,5 @@
 #!/usr/bin/env vpython
+# -*- coding: utf-8 -*-
 # Copyright 2014 The LUCI Authors. All rights reserved.
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
@@ -1462,6 +1463,35 @@ class TestOutput(TestCase):
     self.assertEqual(data[12:18], run_result.get_output(12, 6))
     self.assertEqual(data[12:], run_result.get_output(12, 0))
 
+  def test_get_output_utf8(self):
+    self.mock(task_result.TaskOutput, 'CHUNK_SIZE', 4)
+    run_result = _gen_run_result()
+    ndb.put_multi(run_result.append_output(b'Foo🤠Bar', 0))
+    self.assertEqual(b'Foo🤠Bar', run_result.get_output(0, 0))
+    self.assertTaskOutputChunk([
+        {
+            'chunk': b'Foo\xf0',
+            'gaps': []
+        },
+        {
+            'chunk': b'\x9f\xa4\xa0B',
+            'gaps': []
+        },
+        {
+            'chunk': b'ar',
+            'gaps': []
+        },
+    ])
+
+  def test_get_output_utf8_range(self):
+    run_result = _gen_run_result()
+    ndb.put_multi(run_result.append_output(b'Foo🤠Bar', 0))
+    self.assertEqual(b'🤠', run_result.get_output(3, 4))
+
+  def test_get_output_utf8_limit(self):
+    run_result = _gen_run_result()
+    ndb.put_multi(run_result.append_output(b'😀😃😄😁😆', 0))
+    self.assertEqual(b'😀😃😄😁', run_result.get_output(0, 16))
 
 if __name__ == '__main__':
   logging.basicConfig(
