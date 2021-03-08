@@ -15,6 +15,7 @@ COMPONENTS_DIR = os.path.join(APPENGINE_DIR, 'components')
 
 
 def main():
+  os.chdir(THIS_DIR)
   return run_tests_parralel() or run_tests_sequential()
 
 
