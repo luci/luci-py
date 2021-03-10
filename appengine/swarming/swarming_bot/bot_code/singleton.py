@@ -15,6 +15,8 @@ if sys.platform == 'win32':
 else:
   import fcntl
 
+import six
+
 
 class Singleton(object):
   """Creates an global singleton that can be held by only one process on the
@@ -27,7 +29,8 @@ class Singleton(object):
     self.handle = None
     if sys.platform == 'win32':
       # Use the directory name without '\\'. Enforce lowercase.
-      self.key = u'Global\\' + unicode(rootdir.replace('\\', '_')).lower()
+      self.key = u'Global\\' + six.ensure_text(
+        rootdir.replace('\\', '_')).lower()
     else:
       self.key = os.path.join(rootdir, 'swarming.lck')
 
