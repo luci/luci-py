@@ -319,6 +319,7 @@ class TestTaskRunner(TestTaskRunnerBase):
     if expected:
       self.fail(expected)
 
+  @unittest.skipIf(sys.platform == 'win32' and six.PY3, 'crbug.com/1182016')
   def test_run_command_raw(self):
     task_details = get_task_details('print(\'hi\')')
     expected = {
@@ -332,6 +333,7 @@ class TestTaskRunner(TestTaskRunnerBase):
     # Now look at the updates sent by the bot as seen by the server.
     self.expectTask(task_details.task_id)
 
+  @unittest.skipIf(sys.platform == 'win32' and six.PY3, 'crbug.com/1182016')
   def test_run_command_env_prefix_one(self):
     task_details = get_task_details(
         'import os\nprint(os.getenv("PATH").split(os.pathsep)[0])',
@@ -352,6 +354,7 @@ class TestTaskRunner(TestTaskRunnerBase):
         task_details.task_id,
         output=re.compile(('.+%slocal%ssmurf\n$' % (sep, sep)).encode()))
 
+  @unittest.skipIf(sys.platform == 'win32' and six.PY3, 'crbug.com/1182016')
   def test_run_command_env_prefix_multiple(self):
     task_details = get_task_details(
         '\n'.join([
@@ -381,6 +384,7 @@ class TestTaskRunner(TestTaskRunnerBase):
                           r'$') % (sep, sep, sep, sep)).encode())
     self.expectTask(task_details.task_id, output=output)
 
+  @unittest.skipIf(sys.platform == 'win32' and six.PY3, 'crbug.com/1182016')
   def test_run_command_isolated(self):
     # Hook run_isolated out to see that everything still work.
     task_details = get_task_details(isolated={
@@ -434,6 +438,7 @@ class TestTaskRunner(TestTaskRunnerBase):
             u'namespace': u'default-gzip',
         })
 
+  @unittest.skipIf(sys.platform == 'win32' and six.PY3, 'crbug.com/1182016')
   def test_run_command_fail(self):
     task_details = get_task_details('import sys; print(\'hi\'); sys.exit(1)')
     expected = {
@@ -474,6 +479,7 @@ class TestTaskRunner(TestTaskRunnerBase):
     out = self.expectTask(task_details.task_id, exit_code=1, output=output)
     self.assertGreater(10., out[u'cost_usd'])
 
+  @unittest.skipIf(sys.platform == 'win32' and six.PY3, 'crbug.com/1182016')
   def test_isolated_grand_children(self):
     """Runs a normal test involving 3 level deep subprocesses.
 
@@ -687,6 +693,7 @@ class TestTaskRunner(TestTaskRunnerBase):
     # Now look at the updates sent by the bot as seen by the server.
     self.expectTask(task_details.task_id)
 
+  @unittest.skipIf(sys.platform == 'win32' and six.PY3, 'crbug.com/1182016')
   def test_start_task_runner_fail_on_startup(self):
     def _get_run_isolated():
       return ['invalid_commad_that_shouldnt_exist']
@@ -799,6 +806,7 @@ class TestTaskRunnerKilled(TestTaskRunnerBase):
     self.assertLessEqual(0, actual.pop(u'cost_usd'))
     self.assertEqual(expected, actual)
 
+  @unittest.skipIf(sys.platform == 'win32' and six.PY3, 'crbug.com/1182016')
   def test_killed_later(self):
     # Case where a task started and a client asks the server to kill the task.
     # In this case the task results in state KILLED.
@@ -842,6 +850,7 @@ class TestTaskRunnerKilled(TestTaskRunnerBase):
     self.expectTask(task_details.task_id, exit_code=exit_code)
     t.join()
 
+  @unittest.skipIf(sys.platform == 'win32' and six.PY3, 'crbug.com/1182016')
   def test_hard(self):
     task_details = get_task_details(
         self.SCRIPT_HANG, hard_timeout=self.SHORT_TIME_OUT)
@@ -878,6 +887,7 @@ class TestTaskRunnerKilled(TestTaskRunnerBase):
     # Now look at the updates sent by the bot as seen by the server.
     self.expectTask(task_details.task_id, io_timeout=True, exit_code=exit_code)
 
+  @unittest.skipIf(sys.platform == 'win32' and six.PY3, 'crbug.com/1182016')
   def test_hard_signal(self):
     task_details = get_task_details(
         self.SCRIPT_SIGNAL, hard_timeout=self.SHORT_TIME_OUT)
@@ -919,6 +929,7 @@ class TestTaskRunnerKilled(TestTaskRunnerBase):
         output=('hi\ngot signal %d\nbye\n' %
                 task_runner.SIG_BREAK_OR_TERM).encode())
 
+  @unittest.skipIf(sys.platform == 'win32' and six.PY3, 'crbug.com/1182016')
   def test_hard_no_grace(self):
     task_details = get_task_details(
         self.SCRIPT_HANG,
@@ -958,6 +969,7 @@ class TestTaskRunnerKilled(TestTaskRunnerBase):
     # Now look at the updates sent by the bot as seen by the server.
     self.expectTask(task_details.task_id, io_timeout=True, exit_code=exit_code)
 
+  @unittest.skipIf(sys.platform == 'win32' and six.PY3, 'crbug.com/1182016')
   def test_hard_signal_no_grace(self):
     task_details = get_task_details(
         self.SCRIPT_SIGNAL_HANG, hard_timeout=self.SHORT_TIME_OUT,
@@ -1005,6 +1017,7 @@ class TestTaskRunnerKilled(TestTaskRunnerBase):
         output=('hi\ngot signal %d\nbye\n' %
                 task_runner.SIG_BREAK_OR_TERM).encode())
 
+  @unittest.skipIf(sys.platform == 'win32' and six.PY3, 'crbug.com/1182016')
   def test_isolated_io_signal_grand_children(self):
     """Handles grand-children process hanging and signal management.
 
@@ -1109,6 +1122,7 @@ class TestTaskRunnerKilled(TestTaskRunnerBase):
             },
         })
 
+  @unittest.skipIf(sys.platform == 'win32' and six.PY3, 'crbug.com/1182016')
   def test_kill_and_wait(self):
     # Test the case where the script swallows the SIGTERM/SIGBREAK signal and
     # hangs.
