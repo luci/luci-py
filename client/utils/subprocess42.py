@@ -158,23 +158,23 @@ if sys.platform == 'win32':
   def ReadFile(handle, desired_bytes):
     """Calls kernel32.ReadFile()."""
     c_read = wintypes.DWORD()
-    buff = wintypes.create_string_buffer(desired_bytes + 1)
+    buff = ctypes.create_string_buffer(desired_bytes + 1)
     # If it fails, the buffer will probably(?) not be affected.
     windll.kernel32.ReadFile(handle, buff, desired_bytes,
-                             wintypes.byref(c_read), None)
+                             ctypes.byref(c_read), None)
     # NULL terminate it.
-    buff[c_read.value] = '\x00'
-    return wintypes.GetLastError(), buff.value
+    buff[c_read.value] = b'\x00'
+    return ctypes.GetLastError(), buff.value
 
   def PeekNamedPipe(handle):
     """Calls kernel32.PeekNamedPipe(). Simplified version."""
     c_avail = wintypes.DWORD()
     c_message = wintypes.DWORD()
     success = windll.kernel32.PeekNamedPipe(handle, None, 0, None,
-                                            wintypes.byref(c_avail),
-                                            wintypes.byref(c_message))
+                                            ctypes.byref(c_avail),
+                                            ctypes.byref(c_message))
     if not success:
-      raise OSError(wintypes.GetLastError())
+      raise OSError(ctypes.GetLastError())
     return c_avail.value
 
   def recv_multi_impl(conns, maxsize, timeout):
@@ -543,7 +543,11 @@ class Popen(subprocess.Popen):
       with self.popen_lock:
         if sys.platform == 'win32':
           # We need the thread handle, save it.
-          old = subprocess._subprocess.CreateProcess
+          if six.PY2:
+            old = subprocess._subprocess.CreateProcess
+          else:
+            old = subprocess._winapi.CreateProcess
+            old_closehandle = subprocess._winapi.CloseHandle
 
           class FakeHandle(object):
 
@@ -554,15 +558,32 @@ class Popen(subprocess.Popen):
             hp, ht, pid, tid = old(*args, **kwargs)
             # Save the thread handle, and return a fake one that
             # _execute_child() will close indiscriminally.
-            self._handle_thread = ht
-            return hp, FakeHandle(), pid, tid
+            if six.PY2:
+              self._handle_thread = ht
+              return hp, FakeHandle(), pid, tid
+            else:
+              self._handle_thread = subprocess.Handle(ht)
+              return hp, ht, pid, tid
 
-          subprocess._subprocess.CreateProcess = patch_CreateProcess
+          def patch_CloseHandle(ht):
+            if ht == self._handle_thread:
+              return 1
+            return subprocess._winapi.CloseHandle(ht)
+
+          if six.PY2:
+            subprocess._subprocess.CreateProcess = patch_CreateProcess
+          else:
+            subprocess._winapi.CreateProcess = patch_CreateProcess
+            subprocess._winapi.CloseHandle = patch_CloseHandle
         try:
           super(Popen, self).__init__(args, **kwargs)
         finally:
           if sys.platform == 'win32':
-            subprocess._subprocess.CreateProcess = old
+            if six.PY2:
+              subprocess._subprocess.CreateProcess = old
+            else:
+              subprocess._winapi.CreateProcess = old
+              subprocess._winapi.CloseHandle = old_closehandle
     except:
       self._cleanup()
       raise

@@ -125,7 +125,7 @@ def to_native_eol(string):
   if string is None:
     return string
   if sys.platform == 'win32':
-    return string.replace('\n', '\r\n')
+    return string.replace(b'\n', b'\r\n')
   return string
 
 
@@ -171,7 +171,6 @@ def get_output_sleep_proc_err(sleep_duration):
       cmd, env=ENV, stderr=subprocess42.PIPE, universal_newlines=True)
 
 
-@unittest.skipIf(sys.platform == 'win32' and six.PY3, 'crbug.com/1182016')
 class Subprocess42Test(unittest.TestCase):
 
   def setUp(self):
@@ -194,6 +193,7 @@ class Subprocess42Test(unittest.TestCase):
       os.close(handle)
     return self._output_script
 
+  @unittest.skipIf(sys.platform == 'win32' and six.PY3, 'crbug.com/1182016')
   def test_communicate_timeout(self):
     timedout = 1 if sys.platform == 'win32' else -9
     # Format is:
@@ -313,6 +313,7 @@ class Subprocess42Test(unittest.TestCase):
       proc.wait()
       self.assertLessEqual(0.5, proc.duration())
 
+  @unittest.skipIf(sys.platform == 'win32' and six.PY3, 'crbug.com/1182016')
   def test_communicate_input_stdout_timeout(self):
     cmd = [
         sys.executable,
@@ -382,6 +383,7 @@ time.sleep(60)
     else:
       self.assertEqual(str(os.nice(0) + 1).encode(), out)
 
+  @unittest.skipIf(sys.platform == 'win32' and six.PY3, 'crbug.com/1182016')
   def test_lower_priority_False(self):
     out = self._test_lower_priority(False)
     if sys.platform == 'win32':
@@ -418,6 +420,7 @@ time.sleep(60)
         limit_total_committed_memory=1024 * 1024 * 1024)
     self.assertEqual(0, subprocess42.check_call(cmd, containment=containment))
 
+  @unittest.skipIf(sys.platform == 'win32' and six.PY3, 'crbug.com/1182016')
   def test_containment_auto_limit_process(self):
     # Process creates a children process. It should fail, throwing not enough
     # quota.
@@ -444,6 +447,7 @@ time.sleep(60)
       with self.assertRaises(NotImplementedError):
         start()
 
+  @unittest.skipIf(sys.platform == 'win32' and six.PY3, 'crbug.com/1182016')
   def test_containment_auto_kill(self):
     # Test process killing.
     cmd = [
@@ -526,6 +530,7 @@ time.sleep(60)
     cmd = self._cmd_large_memory()
     self.assertEqual(b'hi', subprocess42.check_output(cmd).strip())
 
+  @unittest.skipIf(sys.platform == 'win32' and six.PY3, 'crbug.com/1182016')
   def test_containment_auto_limit_memory(self):
     # Process allocates a lot of memory. It should fail due to quota.
     cmd = self._cmd_large_memory()
@@ -877,6 +882,7 @@ time.sleep(60)
       kwargs['stdout'] = subprocess42.PIPE
     return subprocess42.Popen(cmd, **kwargs)
 
+  @unittest.skipIf(sys.platform == 'win32' and six.PY3, 'crbug.com/1182016')
   def test_detached(self):
     self._test_detached(False)
     self._test_detached(True)
@@ -962,6 +968,7 @@ time.sleep(60)
             ('stdout', b'incomplete last stdout'),
         ])
 
+  @unittest.skipIf(sys.platform == 'win32' and six.PY3, 'crbug.com/1182016')
   def test_wait_can_be_interrupted(self):
     cmd = [
         sys.executable,
