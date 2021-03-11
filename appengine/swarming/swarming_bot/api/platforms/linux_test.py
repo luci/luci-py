@@ -16,7 +16,8 @@ test_env_platforms.setup_test_env()
 from depot_tools import auto_stub
 from utils import tools
 
-import linux
+if sys.platform.startswith('linux'):
+  import linux
 
 
 # pylint: disable=line-too-long
@@ -102,6 +103,7 @@ VCEI exceptions         : not available
 """
 
 
+@unittest.skipUnless(sys.platform.startswith('linux'), 'linux only test')
 class TestCPUInfo(auto_stub.TestCase):
 
   def setUp(self):
@@ -168,7 +170,6 @@ class TestCPUInfo(auto_stub.TestCase):
         u'name': 'Cavium Octeon II V0.1',
     }, self.get_cpuinfo(MIPS64_CPU_INFO))
 
-  @unittest.skipIf(not sys.platform.startswith('linux'), 'linux only test')
   def test_get_num_processors(self):
     self.assertTrue(linux.get_num_processors() != 0)
 
@@ -200,6 +201,7 @@ NO_K8S_CGROUP = """
 """
 
 
+@unittest.skipUnless(sys.platform.startswith('linux'), 'linux only test')
 class TestDocker(auto_stub.TestCase):
 
   def setUp(self):
@@ -221,6 +223,7 @@ class TestDocker(auto_stub.TestCase):
     self.assertEqual(None, self.get_inside_docker(NO_K8S_CGROUP))
 
 
+@unittest.skipUnless(sys.platform.startswith('linux'), 'linux only test')
 class TestLinux(auto_stub.TestCase):
 
   def setUp(self):
