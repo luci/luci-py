@@ -43,7 +43,7 @@ def call_rpc(account_id, scopes):
 @contextlib.contextmanager
 def local_auth_server(token_cb, default_account_id, **overrides):
   class MockedProvider(object):
-    def generate_token(self, account_id, scopes):
+    def generate_access_token(self, account_id, scopes):
       return token_cb(account_id, scopes)
 
   acc = lambda aid: auth_server.Account(id=aid, email=aid+'@example.com')

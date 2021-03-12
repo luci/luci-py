@@ -364,7 +364,7 @@ class AuthSystem(object):
     except ValueError as e:
       raise AuthSystemError('Cannot parse bot_auth_params.json: %s' % e)
 
-  def generate_token(self, account_id, scopes):
+  def generate_access_token(self, account_id, scopes):
     """Generates a new access token with given scopes.
 
     Called by LocalAuthServer from some internal thread whenever new token is

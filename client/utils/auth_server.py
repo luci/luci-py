@@ -53,7 +53,7 @@ class TokenProvider(object):
   Defined as a concrete class only for documentation purposes.
   """
 
-  def generate_token(self, account_id, scopes):
+  def generate_access_token(self, account_id, scopes):
     """Generates a new access token with given scopes.
 
     Will be called from multiple threads (possibly concurrently) whenever
@@ -263,7 +263,7 @@ class LocalAuthServer(object):
     # synchronization.
     if need_refresh:
       try:
-        tok_or_err = token_provider.generate_token(account_id, scopes)
+        tok_or_err = token_provider.generate_access_token(account_id, scopes)
         assert isinstance(tok_or_err, AccessToken), tok_or_err
       except TokenError as exc:
         tok_or_err = exc
@@ -421,8 +421,8 @@ def testing_main():
   logging.basicConfig(level=logging.DEBUG)
 
   class DumbProvider(object):
-    def generate_token(self, account_id, scopes):
-      logging.info('generate_token(%r, %r) called', account_id, scopes)
+    def generate_access_token(self, account_id, scopes):
+      logging.info('generate_access_token(%r, %r) called', account_id, scopes)
       return AccessToken('fake_tok_for_%s' % account_id, time.time() + 80)
 
   server = LocalAuthServer()
