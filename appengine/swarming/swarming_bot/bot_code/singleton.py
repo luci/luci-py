@@ -11,7 +11,7 @@ import sys
 
 
 if sys.platform == 'win32':
-  from ctypes import wintypes
+  import ctypes
 else:
   import fcntl
 
@@ -46,10 +46,10 @@ class Singleton(object):
       # when the process dies. The handle is not inherited so task_runner
       # doesn't get to keep it alive.
       # pylint: disable=undefined-variable
-      self.handle = wintypes.windll.kernel32.CreateMutexW(
-          wintypes.c_int(0), wintypes.c_int(-1),
-          wintypes.create_unicode_buffer(self.key))
-      last_error = wintypes.GetLastError()
+      self.handle = ctypes.windll.kernel32.CreateMutexW(
+          ctypes.c_int(0), ctypes.c_int(-1),
+          ctypes.create_unicode_buffer(self.key))
+      last_error = ctypes.GetLastError()
       logging.info('[singleton] acquire: %s = %s ; %s', self.key, self.handle,
                    last_error)
       if not self.handle:
@@ -81,7 +81,7 @@ class Singleton(object):
       return
     if sys.platform == 'win32':
       # pylint: disable=undefined-variable
-      wintypes.windll.kernel32.CloseHandle(self.handle)
+      ctypes.windll.kernel32.CloseHandle(self.handle)
     else:
       self.handle.close()
       try:
