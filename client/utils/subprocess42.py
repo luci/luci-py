@@ -864,6 +864,7 @@ class Popen(subprocess.Popen):
               six.ensure_binary(data), encoding='utf-8', errors='strict')
         else:
           data = self._translate_newlines(data)
+      data = six.ensure_binary(data)
       return names[index], data
 
   def recv_out(self, maxsize=None, timeout=None):

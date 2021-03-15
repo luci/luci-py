@@ -692,7 +692,7 @@ time.sleep(60)
   def test_recv_any_different_buffering(self):
     # Specifically test all buffering scenarios.
     for flush, unbuffered in itertools.product([True, False], [True, False]):
-      actual = ''
+      actual = b''
       proc = get_output_sleep_proc(flush, unbuffered, 0.5)
       while True:
         p, data = proc.recv_any()
@@ -702,7 +702,7 @@ time.sleep(60)
         self.assertTrue(data, (p, data))
         actual += data
 
-      self.assertEqual('A\nB\n', actual)
+      self.assertEqual(b'A\nB\n', actual)
       # Contrary to yield_any() or recv_any(0), wait() needs to be used here.
       proc.wait()
       self.assertEqual(0, proc.returncode)
@@ -718,7 +718,7 @@ time.sleep(60)
     # least once, due to the sleep of 'duration' and the use of timeout=0.
     for duration in (0.05, 0.1, 0.5, 2):
       got_none = False
-      actual = ''
+      actual = b''
       try:
         proc = get_output_sleep_proc(flush, unbuffered, duration)
         try:
@@ -734,7 +734,7 @@ time.sleep(60)
               continue
             break
 
-          self.assertEqual('A\nB\n', actual)
+          self.assertEqual(b'A\nB\n', actual)
           self.assertEqual(0, proc.returncode)
           self.assertEqual(True, got_none)
           break
@@ -753,8 +753,8 @@ time.sleep(60)
         proc = get_output_sleep_proc(True, True, duration)
         try:
           expected = [
-              'A\n',
-              'B\n',
+              b'A\n',
+              b'B\n',
           ]
           for p, data in proc.yield_any():
             self.assertEqual('stdout', p)
@@ -779,8 +779,8 @@ time.sleep(60)
         proc = get_output_sleep_proc(True, True, duration)
         try:
           expected = [
-              'A\n',
-              'B\n',
+              b'A\n',
+              b'B\n',
           ]
           got_none = False
           for p, data in proc.yield_any(timeout=0):
@@ -807,7 +807,7 @@ time.sleep(60)
     # least once, due to the sleep of 'duration' and the use of timeout=0.
     for duration in (0.05, 0.1, 0.5, 2):
       got_none = False
-      expected = ['A\n', 'B\n']
+      expected = [b'A\n', b'B\n']
       called = []
 
       def timeout():
