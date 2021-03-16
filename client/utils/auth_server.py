@@ -17,7 +17,7 @@ import six
 from six.moves import BaseHTTPServer
 from six.moves import socketserver
 
-# OAuth access token with its expiration time.
+# Access or ID token with its expiration time.
 AccessToken = collections.namedtuple('AccessToken', [
   'access_token',  # urlsafe str with the token
   'expiry',        # expiration time as unix timestamp in seconds
@@ -48,7 +48,7 @@ Account = collections.namedtuple('Account', ['id', 'email'])
 
 
 class TokenProvider(object):
-  """Interface for an object that can create OAuth tokens on demand.
+  """Interface for an object that can create OAuth or ID tokens on demand.
 
   Defined as a concrete class only for documentation purposes.
   """
@@ -59,16 +59,24 @@ class TokenProvider(object):
     Will be called from multiple threads (possibly concurrently) whenever
     LocalAuthServer needs to refresh a token with particular scopes.
 
-    Can rise RPCError exceptions. They will be immediately converted to
+    Can raise RPCError exceptions. They will be immediately converted to
     corresponding RPC error replies (e.g. HTTP 500). This is appropriate for
     low-level or transient errors.
 
-    Can also raise TokenError. It will be converted to GetOAuthToken reply with
+    Can also raise TokenError. It will be converted to an RPC reply with
     non-zero error_code. It will also be cached, so that the provider would
     never be called again for the same set of scopes. This is appropriate for
     high-level fatal errors.
 
     Returns AccessToken on success.
+    """
+    raise NotImplementedError()
+
+  def generate_id_token(self, account_id, audience):
+    """Generates a new ID token with the given audience.
+
+    Behaves similarly to generate_access_token, just produces different sort
+    of tokens.
     """
     raise NotImplementedError()
 
@@ -86,7 +94,7 @@ class LocalAuthServer(object):
   def __init__(self):
     self._lock = threading.Lock() # guards everything below
     self._accept_thread = None
-    self._cache = {}  # dict ((account_id, scopes) => AccessToken | TokenError).
+    self._cache = {}  # see get_cached_token
     self._token_provider = None
     self._accounts = frozenset()  # set of Account tuples
     self._rpc_secret = None
@@ -179,6 +187,8 @@ class LocalAuthServer(object):
     """
     if method == 'GetOAuthToken':
       return self.handle_get_oauth_token(request)
+    if method == 'GetIDToken':
+      return self.handle_get_id_token(request)
     raise RPCError(404, 'Unknown RPC method "%s".' % method)
 
   ### RPC method handlers. Called from internal threads.
@@ -192,7 +202,7 @@ class LocalAuthServer(object):
     {
       "account_id": <str>,
       "scopes": [<str scope1>, <str scope2>, ...],
-      "secret": <str from LUCI_CONTEXT.local_auth.secret>,
+      "secret": <str from LUCI_CONTEXT.local_auth.secret>
     }
 
     Response body:
@@ -203,13 +213,9 @@ class LocalAuthServer(object):
       "expiry": <int with unix timestamp in seconds (on success)>
     }
     """
-    # Logical account to get a token for (e.g. "task" or "system").
-    account_id = request.get('account_id')
-    if not account_id:
-      raise RPCError(400, 'Field "account_id" is required.')
-    if not isinstance(account_id, six.string_types):
-      raise RPCError(400, 'Field "account_id" must be a string')
-    account_id = str(account_id)
+    # Validate 'account_id' and 'secret'. 'account_id' is the logical account to
+    # get a token for (e.g. "task" or "system").
+    account_id = self.check_account_and_secret(request)
 
     # Validate scopes. It is conceptually a set, so remove duplicates.
     scopes = request.get('scopes')
@@ -220,58 +226,10 @@ class LocalAuthServer(object):
       raise RPCError(400, 'Field "scopes" must be a list of strings.')
     scopes = tuple(sorted(set(map(str, scopes))))
 
-    # Validate the secret format.
-    secret = request.get('secret')
-    if not secret:
-      raise RPCError(400, 'Field "secret" is required.')
-    if not isinstance(secret, six.string_types):
-      raise RPCError(400, 'Field "secret" must be a string.')
-    secret = str(secret)
-
-    # Grab the state from the lock-guarded state.
-    with self._lock:
-      if not self._server:
-        raise RPCError(503, 'Stopped already.')
-      rpc_secret = self._rpc_secret
-      accounts = self._accounts
-      token_provider = self._token_provider
-
-    # Use constant time check to prevent malicious processes from discovering
-    # the secret byte-by-byte measuring response time.
-    if not constant_time_equals(secret, rpc_secret):
-      raise RPCError(403, 'Invalid "secret".')
-
-    # Make sure we know about the requested account.
-    if not any(account_id == acc.id for acc in accounts):
-      raise RPCError(404, 'Unrecognized account ID %r.' % account_id)
-
-    # Grab the token (or a fatal error) from the memory cache, checks token
-    # expiration time.
-    cache_key = (account_id, scopes)
-    tok_or_err = None
-    need_refresh = False
-    with self._lock:
-      if not self._server:
-        raise RPCError(503, 'Stopped already.')
-      tok_or_err = self._cache.get(cache_key)
-      need_refresh = (
-          not tok_or_err or
-          isinstance(tok_or_err, AccessToken) and should_refresh(tok_or_err))
-
-    # Do the refresh outside of the RPC server lock to unblock other clients
-    # that are hitting the cache. The token provider should implement its own
-    # synchronization.
-    if need_refresh:
-      try:
-        tok_or_err = token_provider.generate_access_token(account_id, scopes)
-        assert isinstance(tok_or_err, AccessToken), tok_or_err
-      except TokenError as exc:
-        tok_or_err = exc
-      # Cache the token or fatal errors (to avoid useless retry later).
-      with self._lock:
-        if not self._server:
-          raise RPCError(503, 'Stopped already.')
-        self._cache[cache_key] = tok_or_err
+    # Get the cached token or generate a new one.
+    tok_or_err = self.get_cached_token(
+        cache_key=('access_token', account_id, scopes),
+        refresh_callback=lambda p: p.generate_access_token(account_id, scopes))
 
     # Done.
     if isinstance(tok_or_err, AccessToken):
@@ -285,6 +243,150 @@ class LocalAuthServer(object):
           'error_message': str(tok_or_err) or 'unknown',
       }
     raise AssertionError('impossible')
+
+  def handle_get_id_token(self, request):
+    """Returns an ID token representing the task service account.
+
+    The returned token is usable for at least 1 min.
+
+    Request body:
+    {
+      "account_id": <str>,
+      "audience": <str>,
+      "secret": <str from LUCI_CONTEXT.local_auth.secret>
+    }
+
+    Response body:
+    {
+      "error_code": <int, 0 or missing on success>,
+      "error_message": <str, optional>,
+      "id_token": <str with actual token (on success)>,
+      "expiry": <int with unix timestamp in seconds (on success)>
+    }
+    """
+    # Validate 'account_id' and 'secret'. 'account_id' is the logical account to
+    # get a token for (e.g. "task" or "system").
+    account_id = self.check_account_and_secret(request)
+
+    # An audience is a string and it is required.
+    audience = request.get('audience')
+    if not audience:
+      raise RPCError(400, 'Field "audience" is required.')
+    if not isinstance(audience, six.string_types):
+      raise RPCError(400, 'Field "audience" must be a string.')
+    audience = str(audience)
+
+    # Get the cached token or generate a new one.
+    tok_or_err = self.get_cached_token(
+        cache_key=('id_token', account_id, audience),
+        refresh_callback=lambda p: p.generate_id_token(account_id, audience))
+
+    # Done.
+    if isinstance(tok_or_err, AccessToken):
+      return {
+        'id_token': tok_or_err.access_token,
+        'expiry': int(tok_or_err.expiry),
+      }
+    if isinstance(tok_or_err, TokenError):
+      return {
+          'error_code': tok_or_err.code,
+          'error_message': str(tok_or_err) or 'unknown',
+      }
+    raise AssertionError('impossible')
+
+  ### Utilities used by RPC handlers. Called from internal threads.
+
+  def check_account_and_secret(self, request):
+    """Checks 'account_id' and 'secret' fields of the request.
+
+    Returns:
+      Validated account_id.
+
+    Raises:
+      RPCError on validation errors.
+    """
+    # Logical account to get a token for (e.g. "task" or "system").
+    account_id = request.get('account_id')
+    if not account_id:
+      raise RPCError(400, 'Field "account_id" is required.')
+    if not isinstance(account_id, six.string_types):
+      raise RPCError(400, 'Field "account_id" must be a string')
+    account_id = str(account_id)
+
+    # Validate the secret format.
+    secret = request.get('secret')
+    if not secret:
+      raise RPCError(400, 'Field "secret" is required.')
+    if not isinstance(secret, six.string_types):
+      raise RPCError(400, 'Field "secret" must be a string.')
+    secret = str(secret)
+
+    # Grab the state from the lock-guarded area.
+    with self._lock:
+      if not self._server:
+        raise RPCError(503, 'Stopped already.')
+      rpc_secret = self._rpc_secret
+      accounts = self._accounts
+
+    # Use constant time check to prevent malicious processes from discovering
+    # the secret byte-by-byte measuring response time.
+    if not constant_time_equals(secret, rpc_secret):
+      raise RPCError(403, 'Invalid "secret".')
+
+    # Make sure we know about the requested account.
+    if not any(account_id == acc.id for acc in accounts):
+      raise RPCError(404, 'Unrecognized account ID %r.' % account_id)
+
+    return account_id
+
+  def get_cached_token(self, cache_key, refresh_callback):
+    """Grabs a token from the cache, refreshing it if necessary.
+
+    Cache keys have two forms:
+      * ('access_token', account_id, tuple of scopes) - for access tokens.
+      * ('id_token', account_id, audience) - for ID tokens.
+
+    Args:
+      cache_key: a tuple with the cache key identifying the token.
+      refresh_callback: will be called as refresh_callback(token_provider) to
+          refresh the token if the cached one has expired. Must return
+          AccessToken or raise TokenError.
+
+    Returns:
+      Either AccessToken or TokenError.
+
+    Raises:
+      RPCError on internal errors.
+    """
+    # Grab the token (or a fatal error) from the memory cache, check token's
+    # expiration time. Grab _token_provider while we are holding the lock.
+    with self._lock:
+      if not self._server:
+        raise RPCError(503, 'Stopped already.')
+      tok_or_err = self._cache.get(cache_key)
+      if isinstance(tok_or_err, TokenError):
+        return tok_or_err  # cached fatal error
+      if isinstance(tok_or_err, AccessToken) and not should_refresh(tok_or_err):
+        return tok_or_err  # an up-to-date token
+      # Here tok_or_err is either None or a stale AccessToken. We'll refresh it.
+      token_provider = self._token_provider
+
+    # Do the refresh outside of the RPC server lock to unblock other clients
+    # that are hitting the cache. The token provider should implement its own
+    # synchronization.
+    try:
+      tok_or_err = refresh_callback(token_provider)
+      assert isinstance(tok_or_err, AccessToken), tok_or_err
+    except TokenError as exc:
+      tok_or_err = exc
+
+    # Cache the token or fatal errors (to avoid useless retry later).
+    with self._lock:
+      if not self._server:
+        raise RPCError(503, 'Stopped already.')
+      self._cache[cache_key] = tok_or_err
+
+    return tok_or_err
 
 
 def constant_time_equals(a, b):
@@ -423,7 +525,10 @@ def testing_main():
   class DumbProvider(object):
     def generate_access_token(self, account_id, scopes):
       logging.info('generate_access_token(%r, %r) called', account_id, scopes)
-      return AccessToken('fake_tok_for_%s' % account_id, time.time() + 80)
+      return AccessToken('fake_access_tok_%s' % account_id, time.time() + 300)
+    def generate_id_token(self, account_id, audience):
+      logging.info('generate_id_token(%r, %r) called', account_id, audience)
+      return AccessToken('fake_id_tok_%s' % account_id, time.time() + 300)
 
   server = LocalAuthServer()
   ctx = server.start(

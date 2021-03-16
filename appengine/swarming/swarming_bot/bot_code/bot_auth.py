@@ -431,6 +431,28 @@ class AuthSystem(object):
                  service_account, tok.expiry - time.time())
     return tok
 
+  # pylint: disable=unused-argument
+  def generate_id_token(self, account_id, audience):
+    """Generates a new ID token with the given audience.
+
+    Called by LocalAuthServer from some internal thread whenever new token is
+    needed. It happens infrequently, approximately once per hour per a value of
+    audience (when the previously cached token expires).
+
+    See TokenProvider for more details.
+
+    Args:
+      account_id: logical account name (e.g 'system' or 'task').
+      audience: the audience to put into the token.
+
+    Returns:
+      AccessToken.
+
+    Raises:
+      RPCError, TokenError, AuthSystemError.
+    """
+    raise auth_server.TokenError(5, 'ID tokens are not implemented yet')
+
   def _grab_bot_token(self, auth_params):
     """Extracts OAuth token from 'Authorization' header used by the bot itself.
 
