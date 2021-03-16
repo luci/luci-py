@@ -581,31 +581,6 @@ class _TaskResultCommon(ndb.Model):
       return datetime.timedelta(seconds=perf.isolated_upload.duration)
 
   @property
-  def overhead_server(self):
-    """Returns the overhead from server<->bot communication in timedelta."""
-    perf = self.performance_stats
-    if perf.bot_overhead is not None:
-      duration = (self.duration or 0.) + (perf.bot_overhead or 0.)
-      duration += (perf.isolated_download.duration or 0.)
-      duration += (perf.isolated_upload.duration or 0.)
-      out = (
-          (self.duration_as_seen_by_server or datetime.timedelta()) -
-          datetime.timedelta(seconds=duration))
-      if out.total_seconds() >= 0:
-        return out
-
-  @property
-  def overhead_task_runner(self):
-    """Returns the overhead from task_runner in timedelta, excluding isolated
-    overhead.
-
-    This is purely bookeeping type of overhead.
-    """
-    perf = self.performance_stats
-    if perf.bot_overhead is not None:
-      return datetime.timedelta(seconds=perf.bot_overhead)
-
-  @property
   def pending(self):
     """Returns the timedelta the task spent pending to be scheduled.
 
