@@ -13,10 +13,12 @@ import string
 import subprocess
 import sys
 
+import six
+
 from utils import tools
 
 import common
-import gpu
+from api.platforms import gpu
 
 
 ## Private stuff.
@@ -52,7 +54,7 @@ def _get_mount_points():
   # https://msdn.microsoft.com/library/windows/desktop/aa364939.aspx
   return [
       u'%s:\\' % letter
-      for letter in string.lowercase
+      for letter in string.ascii_lowercase
       if ctypes.windll.kernel32.GetDriveTypeW(letter + ':\\') == DRIVE_FIXED
   ]
 
@@ -136,7 +138,7 @@ def _get_os_numbers():
   # - Win1709: Microsoft Windows [Version 10.0.16299.19]
   #
   # Some locale (like fr_CA) use a lower case 'version'.
-  out = subprocess.check_output(['cmd.exe', '/c', 'ver']).strip()
+  out = subprocess.check_output(['cmd.exe', '/c', 'ver']).strip().decode()
   match = re.search(_CMD_RE, out, re.IGNORECASE)
   if not match:
     # Failed to start cmd.exe, that's really bad. Return a dummy value to not
@@ -315,11 +317,14 @@ def get_visual_studio_versions():
   Returns:
     A list of Visual Studio version strings.
   """
-  import _winreg
+  if six.PY3:
+    import winreg
+  else:
+    import _winreg as winreg
 
   try:
-    k = _winreg.OpenKey(
-        _winreg.HKEY_LOCAL_MACHINE,
+    k = winreg.OpenKey(
+        winreg.HKEY_LOCAL_MACHINE,
         'SOFTWARE\\Wow6432Node\\Microsoft\\VSCommon')
   # pylint: disable=undefined-variable
   except WindowsError:
@@ -327,8 +332,8 @@ def get_visual_studio_versions():
 
   try:
     versions = []
-    for i in range(_winreg.QueryInfoKey(k)[0]):
-      sub_key = _winreg.EnumKey(k, i)
+    for i in range(winreg.QueryInfoKey(k)[0]):
+      sub_key = winreg.EnumKey(k, i)
       if re.match(r'\d+\.\d+', sub_key):
         versions.append(sub_key)
     return sorted(versions, key=float, reverse=True)
@@ -341,16 +346,19 @@ def get_cpuinfo():
   # Ironically, the data returned by WMI is mostly worthless.
   # Another option is IsProcessorFeaturePresent().
   # https://msdn.microsoft.com/en-us/library/windows/desktop/ms724482.aspx
-  import _winreg
-  k = _winreg.OpenKey(
-      _winreg.HKEY_LOCAL_MACHINE,
+  if six.PY3:
+    import winreg
+  else:
+    import _winreg as winreg
+  k = winreg.OpenKey(
+      winreg.HKEY_LOCAL_MACHINE,
       'HARDWARE\\DESCRIPTION\\System\\CentralProcessor\\0')
   try:
-    identifier, _ = _winreg.QueryValueEx(k, 'Identifier')
+    identifier, _ = winreg.QueryValueEx(k, 'Identifier')
     match = re.match(r'^.+ Family (\d+) Model (\d+) Stepping (\d+)$',
                      identifier)
-    name, _ = _winreg.QueryValueEx(k, 'ProcessorNameString')
-    vendor, _ = _winreg.QueryValueEx(k, 'VendorIdentifier')
+    name, _ = winreg.QueryValueEx(k, 'ProcessorNameString')
+    vendor, _ = winreg.QueryValueEx(k, 'VendorIdentifier')
     return {
         u'model': [
             int(match.group(1)),
@@ -564,13 +572,16 @@ def get_reboot_required():
   """
   # Based on https://stackoverflow.com/a/45717438
   k = None
-  import _winreg
+  if six.PY3:
+    import winreg
+  else:
+    import _winreg as winreg
   try:
-    k = _winreg.OpenKey(
-        _winreg.HKEY_LOCAL_MACHINE,
+    k = winreg.OpenKey(
+        winreg.HKEY_LOCAL_MACHINE,
         'SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\WindowsUpdate\\'
         'Auto Update\\RebootRequired')
-    _, num_values, _ = _winreg.QueryInfoKey(k)
+    _, num_values, _ = winreg.QueryInfoKey(k)
     return num_values > 0
   except WindowsError:  # pylint: disable=undefined-variable
     # This error very likely means the RebootRequired key does not exist,

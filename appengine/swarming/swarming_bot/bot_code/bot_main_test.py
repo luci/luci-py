@@ -352,7 +352,6 @@ class TestBotMain(TestBotBase):
     self.assertEqual(a, bot_main._dict_deep_merge(a, None))
     self.assertEqual(a, bot_main._dict_deep_merge(None, a))
 
-  @unittest.skipIf(sys.platform == 'win32' and six.PY3, 'crbug.com/1182016')
   def test_setup_bot(self):
     setup_bots = []
 
