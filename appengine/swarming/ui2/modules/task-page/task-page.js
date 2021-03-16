@@ -854,16 +854,28 @@ const reproduceSection = (ele, currentSlice) => {
   }
   const ref = currentSlice.properties && currentSlice.properties.inputs_ref || {};
   const hasIsolated = !!ref.isolated;
+  const casRef = currentSlice.properties && currentSlice.properties.cas_input_root || {};
+  const casDigest = casRef.digest && `${casRef.digest.hash}/${casRef.digest.size_bytes}`;
   const hostUrl = window.location.hostname;
   return html`
 <div class=title>Reproducing the task locally</div>
 <div class=reproduce>
-  <div ?hidden=${!hasIsolated}>Download inputs files into directory <i>foo</i>:</div>
-  <div class="code bottom_space" ?hidden=${!hasIsolated}>
-    # (if needed, use "\\\${platform}" as-is) cipd install "infra/tools/luci/isolated/\\\${platform}" -root bar<br>
-    # (if needed) ./bar/isolated login<br>
-    ./bar/isolated download -I ${ref.isolatedserver} --namespace ${ref.namespace}
-    -isolated ${ref.isolated} -output-dir foo
+  <div ?hidden=${!hasIsolated}>
+    <div>Download inputs files into directory <i>foo</i>:</div>
+    <div class="code bottom_space">
+      # (if needed, use "\\\${platform}" as-is) cipd install "infra/tools/luci/isolated/\\\${platform}" -root bar<br>
+      # (if needed) ./bar/isolated login<br>
+      ./bar/isolated download -I ${ref.isolatedserver} --namespace ${ref.namespace}
+      -isolated ${ref.isolated} -output-dir foo
+    </div>
+  </div>
+  <div ?hidden=${!casDigest}>
+    <div>Download inputs files into directory <i>foo</i>:</div>
+    <div class="code bottom_space">
+      # (if needed, use "\\\${platform}" as-is) cipd install "infra/tools/luci/cas/\\\${platform}" -root bar<br>
+      # (if needed) ./bar/cas login<br>
+      ./bar/cas download -cas-instance ${casRef.cas_instance} -digest ${casDigest} -dir foo
+    </div>
   </div>
 
   <div>Run this task locally:</div>
