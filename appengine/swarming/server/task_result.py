@@ -355,13 +355,13 @@ class PerformanceStats(ndb.Model):
       out.other_overhead.FromTimedelta(
           datetime.timedelta(seconds=self.bot_overhead))
 
+    if self.isolated_download.duration:
+      self.isolated_download.to_proto(out.setup)
+
     dur = ((self.package_installation.duration or 0.) +
            (self.isolated_download.duration or 0.))
     if dur:
       out.setup.duration.FromTimedelta(datetime.timedelta(seconds=dur))
-
-    if self.isolated_download.duration:
-      self.isolated_download.to_proto(out.setup)
 
     if self.isolated_upload.duration:
       self.isolated_upload.to_proto(out.teardown)

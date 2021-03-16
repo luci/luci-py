@@ -790,7 +790,8 @@ class TaskResultApiTest(TestCase):
             items_cold=large.pack([1, 2]),
             items_hot=large.pack([3, 4, 5])),
         isolated_upload=task_result.OperationStats(
-            duration=0.01, items_cold=large.pack([10]))).put()
+            duration=0.01, items_cold=large.pack([10])),
+        package_installation=task_result.OperationStats(duration=0.02)).put()
 
     # Note: It cannot be both TIMED_OUT and have run_result.deduped_from set.
     run_result.state = task_result.State.TIMED_OUT
@@ -876,7 +877,7 @@ class TaskResultApiTest(TestCase):
         performance=swarming_pb2.TaskPerformance(
             other_overhead=duration_pb2.Duration(nanos=100000000),
             setup=swarming_pb2.TaskOverheadStats(
-                duration=duration_pb2.Duration(nanos=50000000),
+                duration=duration_pb2.Duration(nanos=70000000),
                 cold=swarming_pb2.CASEntriesStats(
                     num_items=2,
                     total_bytes_items=3,
@@ -957,7 +958,8 @@ class TaskResultApiTest(TestCase):
             items_cold=large.pack([1, 2]),
             items_hot=large.pack([3, 4, 5])),
         isolated_upload=task_result.OperationStats(
-            duration=0.01, items_cold=large.pack([10]))).put()
+            duration=0.01, items_cold=large.pack([10])),
+        package_installation=task_result.OperationStats(duration=0.02)).put()
 
     # Note: It cannot be both TIMED_OUT and have run_result.deduped_from set.
     run_result.state = task_result.State.TIMED_OUT
@@ -1043,7 +1045,7 @@ class TaskResultApiTest(TestCase):
         performance=swarming_pb2.TaskPerformance(
             other_overhead=duration_pb2.Duration(nanos=100000000),
             setup=swarming_pb2.TaskOverheadStats(
-                duration=duration_pb2.Duration(nanos=50000000),
+                duration=duration_pb2.Duration(nanos=70000000),
                 cold=swarming_pb2.CASEntriesStats(
                     num_items=2,
                     total_bytes_items=3,
