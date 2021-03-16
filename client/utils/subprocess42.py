@@ -647,6 +647,7 @@ class Popen(subprocess.Popen):
         def write():
           try:
             self.stdin.write(input)
+            self.stdin.flush()
           except IOError:
             pass
 

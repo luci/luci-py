@@ -320,7 +320,6 @@ class Subprocess42Test(unittest.TestCase):
       proc.wait()
       self.assertLessEqual(0.5, proc.duration())
 
-  @unittest.skipIf(sys.platform == 'win32' and six.PY3, 'crbug.com/1182016')
   def test_communicate_input_stdout_timeout(self):
     cmd = [
         sys.executable,
