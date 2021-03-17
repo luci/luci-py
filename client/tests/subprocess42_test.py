@@ -389,13 +389,12 @@ time.sleep(60)
     else:
       self.assertEqual(str(os.nice(0) + 1).encode(), out)
 
-  @unittest.skipIf(sys.platform == 'win32' and six.PY3, 'crbug.com/1182016')
   def test_lower_priority_False(self):
     out = self._test_lower_priority(False)
     if sys.platform == 'win32':
       # Should be NORMAL_PRIORITY_CLASS.
       p = ctypes.windll.kernel32.GetPriorityClass(-1)
-      self.assertEqual(hex(p), out)
+      self.assertEqual(hex(p).encode(), out)
     else:
       self.assertEqual(str(os.nice(0)).encode(), out)
 
@@ -426,7 +425,6 @@ time.sleep(60)
         limit_total_committed_memory=1024 * 1024 * 1024)
     self.assertEqual(0, subprocess42.check_call(cmd, containment=containment))
 
-  @unittest.skipIf(sys.platform == 'win32' and six.PY3, 'crbug.com/1182016')
   def test_containment_auto_limit_process(self):
     # Process creates a children process. It should fail, throwing not enough
     # quota.
@@ -443,11 +441,14 @@ time.sleep(60)
       p = start()
       out, err = p.communicate()
       self.assertEqual(1, p.returncode)
-      self.assertEqual('', out)
-      self.assertIn('WindowsError', err)
+      self.assertEqual(b'', out)
+      if six.PY2:
+        self.assertIn('WindowsError', err)
+      else:
+        self.assertIn(b'WinError', err)
       # Value for ERROR_NOT_ENOUGH_QUOTA. See
       # https://docs.microsoft.com/windows/desktop/debug/system-error-codes--1700-3999-
-      self.assertIn('1816', err)
+      self.assertIn(b'1816', err)
     else:
       # JOB_OBJECT is not usable on non-Windows.
       with self.assertRaises(NotImplementedError):
@@ -888,7 +889,6 @@ time.sleep(60)
       kwargs['stdout'] = subprocess42.PIPE
     return subprocess42.Popen(cmd, **kwargs)
 
-  @unittest.skipIf(sys.platform == 'win32' and six.PY3, 'crbug.com/1182016')
   def test_detached(self):
     self._test_detached(False)
     self._test_detached(True)
@@ -906,10 +906,10 @@ time.sleep(60)
         self.assertEqual(0, proc.wait())
         # Windows...
         self.assertIn(proc.recv_any(), (
-            (key, 'got signal 21\r\nioerror\r\nbye\r\n'),
-            (key, 'got signal 21\nioerror\nbye\n'),
-            (key, 'got signal 21\r\nbye\r\n'),
-            (key, 'got signal 21\nbye\n'),
+            (key, b'got signal 21\r\nioerror\r\nbye\r\n'),
+            (key, b'got signal 21\nioerror\nbye\n'),
+            (key, b'got signal 21\r\nbye\r\n'),
+            (key, b'got signal 21\nbye\n'),
         ))
       else:
         self.assertEqual(0, proc.wait())
