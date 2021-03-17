@@ -1866,7 +1866,9 @@ class BotApiTest(test_env_handlers.AppTestBase):
   def test_oauth_token_task_account(self):
     calls = []
 
-    def mocked(task_id, bot_id, scopes):
+    def mocked(task_id, bot_id, kind, scopes=None, audience=None):
+      self.assertEqual(service_accounts.TOKEN_KIND_ACCESS_TOKEN, kind)
+      self.assertIsNone(audience)
       calls.append((task_id, bot_id, scopes))
       return 'blah@example.com', service_accounts.AccessToken('blah', 126240504)
 
@@ -1981,7 +1983,9 @@ class BotApiTest(test_env_handlers.AppTestBase):
 
     calls = []
 
-    def mocked(account, scopes):
+    def mocked(account, kind, scopes=None, audience=None):
+      self.assertEqual(service_accounts.TOKEN_KIND_ACCESS_TOKEN, kind)
+      self.assertIsNone(audience)
       calls.append((account, scopes))
       return account, service_accounts.AccessToken('blah', 126240504)
 
@@ -2005,9 +2009,11 @@ class BotApiTest(test_env_handlers.AppTestBase):
   def test_oauth_token_system_account_none(self):
     self.set_as_bot()
 
-    def mocked(account, scopes):
+    def mocked(account, kind, scopes=None, audience=None):
       self.assertFalse(account)
+      self.assertEqual(service_accounts.TOKEN_KIND_ACCESS_TOKEN, kind)
       self.assertEqual(['scope_a', 'scope_b'], scopes)
+      self.assertIsNone(audience)
       return 'none', None
 
     self.mock(service_accounts, 'get_system_account_token', mocked)

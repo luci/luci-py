@@ -1000,10 +1000,14 @@ class BotOAuthTokenHandler(_BotApiHandler):
     try:
       if account_id == 'task':
         account, token = service_accounts.get_task_account_token(
-            task_id, bot_id, scopes)
+            task_id, bot_id,
+            service_accounts.TOKEN_KIND_ACCESS_TOKEN,
+            scopes=scopes)
       elif account_id == 'system':
         account, token = service_accounts.get_system_account_token(
-            bot_group_cfg.system_service_account, scopes)
+            bot_group_cfg.system_service_account,
+            service_accounts.TOKEN_KIND_ACCESS_TOKEN,
+            scopes=scopes)
       else:
         raise AssertionError('Impossible, there is a check above')
     except service_accounts.PermissionError as exc:

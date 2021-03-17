@@ -23,6 +23,11 @@ from server import service_accounts_utils
 from server import task_pack
 
 
+# Matches tokenserver.minter.SERVICE_ACCOUNT_TOKEN_ACCESS_TOKEN
+TOKEN_KIND_ACCESS_TOKEN = 1
+# Matches tokenserver.minter.SERVICE_ACCOUNT_TOKEN_ID_TOKEN
+TOKEN_KIND_ID_TOKEN = 2
+
 # Brackets for possible lifetimes of OAuth tokens produced by this module.
 MIN_TOKEN_LIFETIME_SEC = 5 * 60
 MAX_TOKEN_LIFETIME_SEC = 3600 * 60  # this is just hardcoded by Google APIs
@@ -30,7 +35,7 @@ MAX_TOKEN_LIFETIME_SEC = 3600 * 60  # this is just hardcoded by Google APIs
 AccessToken = collections.namedtuple(
     'AccessToken',
     [
-        'access_token',  # actual access token
+        'access_token',  # actual access or ID token
         'expiry',  # unix timestamp (in seconds, int) when it expires
     ])
 
@@ -179,8 +184,8 @@ def get_oauth_token_grant(service_account, validity_duration):
   return new_grant
 
 
-def get_task_account_token(task_id, bot_id, scopes):
-  """Returns an access token for a service account associated with a task.
+def get_task_account_token(task_id, bot_id, kind, scopes=None, audience=None):
+  """Returns an access or ID token for a service account associated with a task.
 
   Assumes authorization checks have been made already. If the task is not
   configured to use service account returns ('none', None). If the task is
@@ -196,7 +201,9 @@ def get_task_account_token(task_id, bot_id, scopes):
   Args:
     task_id: ID of the task.
     bot_id: ID of the bot that executes the task, for logs.
-    scopes: list of requested OAuth scopes.
+    kind: either TOKEN_KIND_ACCESS_TOKEN or TOKEN_KIND_ID_TOKEN.
+    scopes: a list of requested OAuth scopes for TOKEN_KIND_ACCESS_TOKEN.
+    audience: a requested audience for TOKEN_KIND_ID_TOKEN.
 
   Returns:
     (<service account email> or 'bot' or 'none', AccessToken or None).
@@ -206,6 +213,9 @@ def get_task_account_token(task_id, bot_id, scopes):
     MisconfigurationError if the service account is misconfigured.
     InternalError if the RPC fails unexpectedly.
   """
+  # Asserts 'scopes' are not empty when using TOKEN_KIND_ACCESS_TOKEN, etc.
+  _check_token_args(kind, scopes, audience)
+
   # Grab corresponding TaskRequest.
   try:
     result_summary_key = task_pack.run_result_key_to_result_summary_key(
@@ -247,22 +257,29 @@ def get_task_account_token(task_id, bot_id, scopes):
     pool_cfg = pools_config.get_pool_config(task_request.pool)
     realms.check_tasks_act_as(task_request, pool_cfg, enforce=True)
     access_token, expiry = _mint_service_account_token(
-        task_request.service_account, task_request.realm, scopes, audit_tags)
+        task_request.service_account, task_request.realm, audit_tags,
+        kind, scopes, audience)
   else:
+    # ID tokens are not supported when using the legacy non-realms method.
+    if kind == TOKEN_KIND_ID_TOKEN:
+      raise MisconfigurationError(
+          'ID tokens are supported only by tasks that use LUCI Realms')
     # Use grant token to grab the real OAuth token. Note that the bot caches the
     # resulting OAuth token internally, so we don't bother to cache it here.
     access_token, expiry = _mint_oauth_token_via_grant(
         task_request.service_account_token, scopes, audit_tags)
 
   # Log and return the token.
-  token = AccessToken(access_token,
-                      int(utils.datetime_to_timestamp(expiry) / 1e6))
-  _check_and_log_token('task associated', task_request.service_account, token)
+  token = AccessToken(
+      access_token, int(utils.datetime_to_timestamp(expiry) / 1e6))
+  _check_and_log_token(
+      'task associated', kind, task_request.service_account, token)
   return task_request.service_account, token
 
 
-def get_system_account_token(system_service_account, scopes):
-  """Returns an access token to use on bots when calling internal services.
+def get_system_account_token(system_service_account, kind,
+                             scopes=None, audience=None):
+  """Returns an access or ID token to use on bots to call internal services.
 
   "Internal services" are (loosely) everything that is needed for correct
   functioning of the internal guts of the bot (at least Isolate and CIPD).
@@ -276,7 +293,9 @@ def get_system_account_token(system_service_account, scopes):
 
   Args:
     system_service_account: whatever is specified in bots.cfg for the bot.
-    scopes: list of requested OAuth scopes.
+    kind: either TOKEN_KIND_ACCESS_TOKEN or TOKEN_KIND_ID_TOKEN.
+    scopes: a list of requested OAuth scopes for TOKEN_KIND_ACCESS_TOKEN.
+    audience: a requested audience for TOKEN_KIND_ID_TOKEN.
 
   Returns:
     (<service account email> or 'bot' or 'none', AccessToken or None).
@@ -286,11 +305,21 @@ def get_system_account_token(system_service_account, scopes):
     MisconfigurationError if the service account is misconfigured.
     InternalError if the RPC fails unexpectedly.
   """
+  # Asserts 'scopes' are not empty when using TOKEN_KIND_ACCESS_TOKEN, etc.
+  _check_token_args(kind, scopes, audience)
+
   if not system_service_account:
     return 'none', None  # no auth is configured
 
   if system_service_account == 'bot':
     return 'bot', None  # the bot should use tokens provided by local hooks
+
+  # TODO(crbug.com/1184230): ID tokens for system account are not implemented.
+  # It is possible to implement them using generateIdToken Cloud IAM call, but
+  # they aren't needed yet.
+  if kind == TOKEN_KIND_ID_TOKEN:
+    raise MisconfigurationError(
+        'ID tokens for system account are not implemented')
 
   # Attempt to mint a token (or grab an existing one from cache).
   try:
@@ -306,7 +335,7 @@ def get_system_account_token(system_service_account, scopes):
   assert isinstance(blob, basestring)
   assert isinstance(expiry, (int, long, float))
   token = AccessToken(blob, int(expiry))
-  _check_and_log_token('bot associated', system_service_account, token)
+  _check_and_log_token('bot associated', kind, system_service_account, token)
   return system_service_account, token
 
 
@@ -321,6 +350,18 @@ def _oauth_token_grant_cache_key(service_account, end_user):
   """Returns a memcache key for cached OAuth token grant."""
   assert '|' not in service_account, service_account
   return '%s|%s' % (service_account, end_user.to_bytes())
+
+
+def _check_token_args(kind, scopes, audience):
+  """Asserts args match the token kind."""
+  if kind == TOKEN_KIND_ACCESS_TOKEN:
+    assert scopes is not None
+    assert audience is None
+  elif kind == TOKEN_KIND_ID_TOKEN:
+    assert scopes is None
+    assert audience is not None
+  else:
+    raise AssertionError('Unknown token kind %s' % (kind,))
 
 
 def _mint_oauth_token_grant(service_account, end_user, validity_duration):
@@ -391,15 +432,17 @@ def _mint_oauth_token_via_grant(grant_token, oauth_scopes, audit_tags):
   return access_token, expiry
 
 
-def _mint_service_account_token(service_account, realm, oauth_scopes,
-                                audit_tags):
-  """Does the RPC to the token server to get an access token using realm.
+def _mint_service_account_token(service_account, realm, audit_tags,
+                                kind, scopes, audience):
+  """Does the RPC to the token server to get an access or ID token using realm.
 
   Args:
     service_account: a service account email to use.
     realm: a realm name to use.
-    oauth_scopes: list of strings with requested OAuth scopes.
-    audit_tags: list with information tags to send with the RPC, for logging.
+    audit_tags: a list with information tags to send with the RPC, for logging.
+    kind: either TOKEN_KIND_ACCESS_TOKEN or TOKEN_KIND_ID_TOKEN.
+    scopes: a list of requested OAuth scopes for TOKEN_KIND_ACCESS_TOKEN.
+    audience: a requested audience for TOKEN_KIND_ID_TOKEN.
 
   Raises:
     PermissionError if the token server forbids the usage.
@@ -412,24 +455,24 @@ def _mint_service_account_token(service_account, realm, oauth_scopes,
   resp = _call_token_server(
       'MintServiceAccountToken',
       {
-          # tokenserver.minter.SERVICE_ACCOUNT_TOKEN_ACCESS_TOKEN
-          'tokenKind': 1,
+          'tokenKind': kind,
           'serviceAccount': service_account,
           'realm': realm,
-          'oauthScope': oauth_scopes,
+          'oauthScope': scopes,
+          'idTokenAudience': audience,
           'minValidityDuration': MIN_TOKEN_LIFETIME_SEC,
           'auditTags': _common_audit_tags() + audit_tags,
       },
       luci_project)
   try:
-    access_token = str(resp['token'])
+    token = str(resp['token'])
     service_version = str(resp['serviceVersion'])
     expiry = utils.parse_rfc3339_datetime(resp['expiry'])
   except (KeyError, ValueError) as exc:
     logging.error('Bad response from the token server (%s):\n%r', exc, resp)
     raise InternalError('Bad response from the token server, see server logs')
   logging.info('The token server replied, its version: %s', service_version)
-  return access_token, expiry
+  return token, expiry
 
 
 def _call_token_server(method, request, project_id=None):
@@ -505,12 +548,19 @@ def _log_token_grant(prefix, token, exp_ts, log_call=logging.info):
       utils.get_token_fingerprint(token), ts, ts - utils.time_time())
 
 
-def _check_and_log_token(flavor, account_email, token):
+def _check_and_log_token(flavor, kind, account_email, token):
   """Checks the lifetime and logs details about the generated access token."""
+  if kind == TOKEN_KIND_ACCESS_TOKEN:
+    kind_str = 'access'
+  elif kind == TOKEN_KIND_ID_TOKEN:
+    kind_str = 'ID'
+  else:
+    raise AssertionError('Impossible %s' % (kind,))
   expires_in = token.expiry - utils.time_time()
   logging.info(
-      'Got %s access token: email=%s, fingerprint=%s, expiry=%d, expiry_in=%d',
-      flavor, account_email, utils.get_token_fingerprint(token.access_token),
+      'Got %s %s token: email=%s, fingerprint=%s, expiry=%d, expiry_in=%d',
+      flavor, kind_str, account_email,
+      utils.get_token_fingerprint(token.access_token),
       token.expiry, expires_in)
   # Give 2 min of wiggle room to account for various effects related to
   # relativity of clocks (us vs Google backends that produce the token) and
