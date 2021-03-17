@@ -632,6 +632,10 @@ class OperationStats(messages.Message):
 
 
 class PerformanceStats(messages.Message):
+  """Performance stats of task execution.
+
+  See task_result.PerformanceStats for details.
+  """
   bot_overhead = messages.FloatField(1)
   isolated_download = messages.MessageField(OperationStats, 2)
   isolated_upload = messages.MessageField(OperationStats, 3)

@@ -762,7 +762,8 @@ def run_command(remote, task_details, work_dir, cost_usd_hour,
     # include the output reference to the archived .isolated file.
     now = monotonic_time()
     params['cost_usd'] = cost_usd_hour * (now - task_start) / 60. / 60.
-    params['duration'] = now - start
+    duration = now - start
+    params['duration'] = duration
     params['io_timeout'] = had_io_timeout
     had_hard_timeout = False
     try:
@@ -804,17 +805,10 @@ def run_command(remote, task_details, work_dir, cost_usd_hour,
         exit_code = run_isolated_result['exit_code']
         params['bot_overhead'] = 0.
         if run_isolated_result.get('duration') is not None:
-          # Calculate the real task duration as measured by run_isolated and
-          # calculate the remaining overhead.
-          params['bot_overhead'] = params['duration']
+          # Store the real task duration as measured by run_isolated and
+          # calculate the total overhead.
           params['duration'] = run_isolated_result['duration']
-          params['bot_overhead'] -= params['duration']
-          params['bot_overhead'] -= run_isolated_result.get('download', {}).get(
-              'duration', 0)
-          params['bot_overhead'] -= run_isolated_result.get(
-              'upload', {}).get('duration', 0)
-          params['bot_overhead'] -= run_isolated_result.get(
-              'cipd', {}).get('duration', 0)
+          params['bot_overhead'] = duration - run_isolated_result['duration']
           if params['bot_overhead'] < 0:
             params['bot_overhead'] = 0
         isolated_stats = run_isolated_result.get('stats', {}).get('isolated')

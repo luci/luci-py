@@ -322,9 +322,9 @@ class PerformanceStats(ndb.Model):
   This entity only exist for isolated tasks. For "raw command task", this entity
   is not stored, since there's nothing to note.
   """
-  # Miscellaneous overhead in seconds, in addition to the overhead from
+  # Total overhead in seconds, including the overheads from
   # package_installation.duration, isolated_download.duration and
-  # isolated_upload.duration
+  # isolated_upload.duration and others.
   bot_overhead = ndb.FloatProperty(indexed=False)
   # Results installing CIPD packages before the task.
   package_installation = ndb.LocalStructuredProperty(OperationStats)
@@ -351,20 +351,24 @@ class PerformanceStats(ndb.Model):
   def to_proto(self, out):
     """Converts self to a swarming_pb2.TaskPerformance"""
     # out.cost_usd is not set here.
-    if self.bot_overhead:
-      out.other_overhead.FromTimedelta(
-          datetime.timedelta(seconds=self.bot_overhead))
+    other_overhead = self.bot_overhead
 
     if self.isolated_download.duration:
       self.isolated_download.to_proto(out.setup)
 
-    dur = ((self.package_installation.duration or 0.) +
-           (self.isolated_download.duration or 0.))
-    if dur:
-      out.setup.duration.FromTimedelta(datetime.timedelta(seconds=dur))
+    setup_dur = ((self.package_installation.duration or 0.) +
+                 (self.isolated_download.duration or 0.))
+    if setup_dur:
+      out.setup.duration.FromTimedelta(datetime.timedelta(seconds=setup_dur))
+      other_overhead -= setup_dur
 
     if self.isolated_upload.duration:
       self.isolated_upload.to_proto(out.teardown)
+      other_overhead -= self.isolated_upload.duration
+
+    if other_overhead:
+      out.other_overhead.FromTimedelta(
+          datetime.timedelta(seconds=other_overhead))
 
   def _pre_put_hook(self):
     if self.bot_overhead is None:

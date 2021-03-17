@@ -875,7 +875,7 @@ class TaskResultApiTest(TestCase):
             ],
         ),
         performance=swarming_pb2.TaskPerformance(
-            other_overhead=duration_pb2.Duration(nanos=100000000),
+            other_overhead=duration_pb2.Duration(nanos=20000000),
             setup=swarming_pb2.TaskOverheadStats(
                 duration=duration_pb2.Duration(nanos=70000000),
                 cold=swarming_pb2.CASEntriesStats(
@@ -1043,7 +1043,7 @@ class TaskResultApiTest(TestCase):
             ],
         ),
         performance=swarming_pb2.TaskPerformance(
-            other_overhead=duration_pb2.Duration(nanos=100000000),
+            other_overhead=duration_pb2.Duration(nanos=20000000),
             setup=swarming_pb2.TaskOverheadStats(
                 duration=duration_pb2.Duration(nanos=70000000),
                 cold=swarming_pb2.CASEntriesStats(
