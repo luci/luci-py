@@ -181,6 +181,19 @@ def get_os_values():
   return out
 
 
+def get_python_versions():
+  """Returns the values to use for 'python' dimension as a list."""
+  v = sys.version_info
+  return [
+      u'%s' % v.major,
+      u'%s.%s' % (v.major, v.minor),
+      # Use sys.version instead of sys.version_info to keep
+      # additional biuld information after micro version.
+      # e.g. 3.8.0+chromium.8
+      six.ensure_text(sys.version.split()[0]),
+  ]
+
+
 @tools.cached
 def get_os_name():
   """Returns standardized OS name.
@@ -947,7 +960,7 @@ def get_dimensions():
       u'os': get_os_values(),
       # This value is frequently overridden by bots.cfg via luci-config.
       u'pool': [u'default'],
-      u'python': [six.ensure_text(sys.version).split()[0]],
+      u'python': get_python_versions(),
   }
 
   # Conditional dimensions:

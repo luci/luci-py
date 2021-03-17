@@ -121,6 +121,24 @@ class TestOsUtilities(auto_stub.TestCase):
       actual = os_utilities._parse_intel_model(i)
       self.assertEqual(expected, actual)
 
+  @unittest.skipUnless(six.PY2, 'Python2 only')
+  def test_get_python_versions_py2(self):
+    versions = os_utilities.get_python_versions()
+    self.assertEqual(len(versions), 3)
+    self.assertEqual(versions[0], u'2')
+    self.assertEqual(versions[1], u'2.7')
+    # we don't know which micro version we use in test.
+    self.assertRegexpMatches(versions[2], u'2.7.[0-9]+')
+
+  @unittest.skipUnless(six.PY3, 'Python3 only')
+  def test_get_python_versions_py3(self):
+    versions = os_utilities.get_python_versions()
+    self.assertEqual(len(versions), 3)
+    self.assertEqual(versions[0], u'3')
+    self.assertEqual(versions[1], u'3.8')
+    # we don't know which micro version we use in test.
+    self.assertRegex(versions[2], u'3.8.[0-9]+')
+
   def test_get_ip(self):
     ip = os_utilities.get_ip()
     self.assertNotEqual('127.0.0.1', ip)
