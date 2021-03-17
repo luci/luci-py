@@ -624,6 +624,9 @@ const taskTimingSection = (ele, request, result) => {
       </tr>
     </tbody>
   </table>
+  <!-- Overheads calculated from task result is not accurate.
+    It contains only the overheads for cipd package installation, task inputs download, task outputs upload.
+    But there are other overheads that are not negligible, such as named cache install/uninstall, removing working dirs.
   <div class=right>
     <stacked-time-chart
       labels='["Pending", "Overhead", "Running", "Overhead"]'
@@ -631,6 +634,7 @@ const taskTimingSection = (ele, request, result) => {
       .values=${durationChart(result)}>
     </stacked-time-chart>
   </div>
+  -->
 </div>
 `;
 };
