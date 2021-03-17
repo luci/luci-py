@@ -805,7 +805,7 @@ class RunIsolatedTest(RunIsolatedTestBase):
       f.write('0' * 100)
 
     # override size threshold.
-    run_isolated._CAS_KVS_CACHE_THRESHOLD = 99
+    self.mock(run_isolated, '_CAS_KVS_CACHE_THRESHOLD', 99)
 
     min_free_space = 1
     max_cache_size = 2
