@@ -905,24 +905,33 @@ def cron_delete_old_bot():
   deleted = []
   try:
     q = BotRoot.query(default_options=ndb.QueryOptions(keys_only=True))
-    for bot_root_key in q:
-      # Check if it has any BotEvent left. If not, it means that the entity is
-      # older than _OLD_BOT_EVENTS_CUF_OFF, so the whole thing can be deleted
-      # now.
-      # In particular, ignore the fact that BotInfo may still exist, since if
-      # there's no BotEvent left, it's probably a broken entity or a forgotten
-      # dead bot.
-      if BotEvent.query(ancestor=bot_root_key).count(limit=1):
-        skipped += 1
-        continue
-      deleted.append(bot_root_key.string_id())
-      # Delete the whole group. An ancestor query will retrieve the entity
-      # itself too, so no need to explicitly delete it.
-      keys = ndb.Query(ancestor=bot_root_key).fetch(keys_only=True)
-      ndb.delete_multi(keys)
-      total += len(keys)
-      if utils.utcnow() >= time_to_stop:
-        break
+    cursor = None
+    more = True
+    while more:
+      bot_root_keys, cursor, more = q.fetch_page(1000, start_cursor=cursor)
+      for bot_root_key in bot_root_keys:
+        # Check if it has any BotEvent left. If not, it means that the entity is
+        # older than _OLD_BOT_EVENTS_CUF_OFF, so the whole thing can be deleted
+        # now.
+        # In particular, ignore the fact that BotInfo may still exist, since if
+        # there's no BotEvent left, it's probably a broken entity or a forgotten
+        # dead bot.
+        if BotEvent.query(ancestor=bot_root_key).count(limit=1):
+          skipped += 1
+          continue
+        deleted.append(bot_root_key.string_id())
+        # Delete the whole group. An ancestor query will retrieve the entity
+        # itself too, so no need to explicitly delete it.
+        keys = ndb.Query(ancestor=bot_root_key).fetch(keys_only=True)
+        ndb.delete_multi(keys)
+        total += len(keys)
+        logging.info(
+            'Deleted %d entities from the following bots (%d skipped):\n%s',
+            total, skipped, ', '.join(sorted(deleted)))
+        deleted = []
+        if utils.utcnow() >= time_to_stop:
+          break
+
     return total
   except runtime.DeadlineExceededError:
     pass
