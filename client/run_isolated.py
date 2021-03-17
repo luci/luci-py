@@ -115,7 +115,7 @@ _CAS_CLIENT_DIR = u'cc'
 # https://ci.chromium.org/p/infra-internal/g/infra-packagers/console
 ISOLATED_PACKAGE = 'infra/tools/luci/isolated/${platform}'
 _CAS_PACKAGE = 'infra/tools/luci/cas/${platform}'
-_LUCI_GO_REVISION = 'git_revision:bb4b3f0e882ad3a947c445966854d0571ab3339e'
+_LUCI_GO_REVISION = 'git_revision:44bdb35090dd40c98500a7fb467cbf313ea4c099'
 
 # Keep synced with task_request.py
 CACHE_NAME_RE = re.compile(r'^[a-z0-9_]{1,4096}$')
@@ -563,7 +563,7 @@ def _run_go_cmd_and_wait(cmd, tmp_dir):
 
 
 def _fetch_and_map_with_cas(cas_client, digest, instance, output_dir, cache_dir,
-                            policies, kvs_file, tmp_dir):
+                            policies, kvs_dir, tmp_dir):
   """
   Fetches a CAS tree using cas client, create the tree and returns download
   stats.
@@ -597,8 +597,8 @@ def _fetch_and_map_with_cas(cas_client, digest, instance, output_dir, cache_dir,
         'info'
     ]
 
-    if kvs_file:
-      cmd.extend(['-kvs-file', kvs_file])
+    if kvs_dir:
+      cmd.extend(['-kvs-dir', kvs_dir])
 
     _run_go_cmd_and_wait(cmd, tmp_dir)
 
@@ -1048,7 +1048,7 @@ def map_and_run(data, constant_run_path):
             output_dir=run_dir,
             cache_dir=data.cas_cache_dir,
             policies=data.cas_cache_policies,
-            kvs_file=data.cas_kvs,
+            kvs_dir=data.cas_kvs,
             tmp_dir=tmp_dir)
         isolated_stats['download'].update(stats)
 
@@ -1539,9 +1539,9 @@ def add_cas_cache_options(parser):
       help='Directory to keep a local cache of the files. Accelerates download '
       'by reusing already downloaded files. Default=%default')
   group.add_option(
-      '--kvs-file',
+      '--kvs-dir',
       default='',
-      help='CAS cache using kvs for small files. Default=%default')
+      help='CAS cache dir using kvs for small files. Default=%default')
   parser.add_option_group(group)
 
 
@@ -1651,12 +1651,12 @@ def _clean_cmd(parser, options, caches, root):
 
   logging.info("initial free space: %d", file_path.get_free_space(root))
 
-  if options.kvs_file and fs.isfile(six.text_type(options.kvs_file)):
+  if options.kvs_dir and fs.isdir(six.text_type(options.kvs_dir)):
     # Remove kvs file if its size exceeds fixed threshold.
-    st = fs.stat(six.text_type(options.kvs_file))
-    if st.st_size >= _CAS_KVS_CACHE_THRESHOLD:
-      logging.info("remove kvs file with size: %d", st.st_size)
-      fs.remove(six.text_type(options.kvs_file))
+    size = file_path.get_recursive_size(options.kvs_dir)
+    if size >= _CAS_KVS_CACHE_THRESHOLD:
+      logging.info("remove kvs dir with size: %d", size)
+      file_path.rmtree(six.text_type(options.kvs_dir))
 
   # Trim first, then clean.
   local_caching.trim_caches(
@@ -1719,7 +1719,7 @@ def main(args):
   # Otherwise, this will have no effect, as bot_main calls run_isolated with
   # --clean after each task.
   additional_buffer = _FREE_SPACE_BUFFER_FOR_CIPD_PACKAGES
-  if options.kvs_file:
+  if options.kvs_dir:
     additional_buffer += _CAS_KVS_CACHE_THRESHOLD
   local_caching.trim_caches(
       caches,
@@ -1884,7 +1884,7 @@ def main(args):
           max_items=None,
           max_age_secs=None,
       ),
-      cas_kvs=options.kvs_file,
+      cas_kvs=options.kvs_dir,
       env=options.env,
       env_prefix=options.env_prefix,
       lower_priority=bool(options.lower_priority),

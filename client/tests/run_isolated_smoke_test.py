@@ -355,7 +355,7 @@ class RunIsolatedTest(unittest.TestCase):
           self._cas_cache_dir,
           '-dir',
           dest,
-          '-kvs-file',
+          '-kvs-dir',
           self._cas_kvs,
       ]
       _, err, returncode = self._run_cas(cmd)
