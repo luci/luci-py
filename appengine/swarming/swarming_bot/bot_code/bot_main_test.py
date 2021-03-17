@@ -193,7 +193,6 @@ class TestBotMain(TestBotBase):
     expected = {'sleep_streak': 0.1, 'yo': 'dawh'}
     self.assertEqual(expected, bot_main._get_state(obj, 0.1))
 
-  @unittest.skipIf(sys.platform == 'win32' and six.PY3, 'crbug.com/1182016')
   def test_get_state_quarantine(self):
     botobj = bot_main.get_bot(bot_main.get_config())
     root = u'c:\\' if sys.platform == 'win32' else u'/'
@@ -980,7 +979,6 @@ class TestBotMain(TestBotBase):
     expected = [(self.bot, 'Execution failed: internal error (1).', '24')]
     self.assertEqual(expected, posted)
 
-  @unittest.skipIf(sys.platform == 'win32' and six.PY3, 'crbug.com/1182016')
   def test_run_manifest_exception(self):
     posted = []
 
