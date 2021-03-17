@@ -27,6 +27,7 @@ from utils import tools
 tools.force_local_third_party()
 
 # third_party/
+from scandir import scandir
 import six
 
 # Types of action accepted by link_file().
@@ -1224,4 +1225,84 @@ def rmtree(root):
   six.reraise(errors[0][2][0], errors[0][2][1], errors[0][2][2])
 
 
+def get_recursive_size(path):
+  """Returns the total data size for the specified path.
+
+  This function can be surprisingly slow on OSX, so its output should be cached.
+  """
+  start = time.time()
+  try:
+    if _use_scandir():
+      total, n_dirs, n_files, n_links = _get_recursive_size_with_scandir(path)
+    else:
+      total, n_dirs, n_files, n_links = _get_recursive_size_with_fswalk(path)
+    elapsed = time.time() - start
+    logging.debug(
+        '_get_recursive_size: traversed %s took %s seconds. '
+        'scandir: %s, files: %d, links: %d, dirs: %d', path, elapsed,
+        _use_scandir(), n_files, n_links, n_dirs)
+    return total
+  except (IOError, OSError, UnicodeEncodeError):
+    logging.exception('Exception while getting the size of %s', path)
+    return None
+
+
 ## Private code.
+
+
+def _use_scandir():
+  # Use scandir in windows for faster execution.
+  # Do not use in other OS due to crbug.com/989409
+  return sys.platform == 'win32'
+
+
+def _get_recursive_size_with_scandir(path):
+  if sys.platform == 'win32':
+
+    def direntIsJunction(entry):
+      # both st_file_attributes and FILE_ATTRIBUTE_REPARSE_POINT are
+      # windows-only symbols.
+      return bool(entry.stat().st_file_attributes
+                  & scandir.FILE_ATTRIBUTE_REPARSE_POINT)
+  else:
+
+    def direntIsJunction(_entry):
+      # This is for test on non-Windows.
+      return False
+
+  total = 0
+  n_dirs = 0
+  n_files = 0
+  n_links = 0
+  stack = [path]
+  while stack:
+    for entry in scandir.scandir(stack.pop()):
+      if entry.is_symlink() or direntIsJunction(entry):
+        n_links += 1
+        continue
+      if entry.is_file():
+        n_files += 1
+        total += entry.stat().st_size
+      elif entry.is_dir():
+        n_dirs += 1
+        stack.append(entry.path)
+      else:
+        logging.warning('non directory/file entry: %s', entry)
+  return total, n_dirs, n_files, n_links
+
+
+def _get_recursive_size_with_fswalk(path):
+  total = 0
+  n_dirs = 0
+  n_files = 0
+  n_links = 0
+  for root, dirs, files in fs.walk(path):
+    n_dirs += len(dirs)
+    for f in files:
+      st = fs.lstat(os.path.join(root, f))
+      if stat.S_ISLNK(st.st_mode):
+        n_links += 1
+        continue
+      n_files += 1
+      total += st.st_size
+  return total, n_dirs, n_files, n_links

@@ -421,6 +421,75 @@ class FilePathTest(auto_stub.TestCase):
           fs.extend(dirpath), win32security.DACL_SECURITY_INFORMATION, sd)
       file_path.rmtree(dirpath)
 
+  def _check_get_recursive_size(self, symlink='symlink'):
+    # Test that _get_recursive_size calculates file size recursively.
+    with open(os.path.join(self.tempdir, '1'), 'w') as f:
+      f.write('0')
+    self.assertEqual(file_path.get_recursive_size(self.tempdir), 1)
+
+    with open(os.path.join(self.tempdir, '2'), 'w') as f:
+      f.write('01')
+    self.assertEqual(file_path.get_recursive_size(self.tempdir), 3)
+
+    nested_dir = os.path.join(self.tempdir, 'dir1', 'dir2')
+    os.makedirs(nested_dir)
+    with open(os.path.join(nested_dir, '4'), 'w') as f:
+      f.write('0123')
+    self.assertEqual(file_path.get_recursive_size(self.tempdir), 7)
+
+    symlink_dir = os.path.join(self.tempdir, 'symlink_dir')
+    symlink_file = os.path.join(self.tempdir, 'symlink_file')
+    if symlink == 'symlink':
+
+      if sys.platform == 'win32':
+        subprocess.check_call('cmd /c mklink /d %s %s' %
+                              (symlink_dir, nested_dir))
+        subprocess.check_call('cmd /c mklink %s %s' %
+                              (symlink_file, os.path.join(self.tempdir, '1')))
+      else:
+        os.symlink(nested_dir, symlink_dir)
+        os.symlink(os.path.join(self.tempdir, '1'), symlink_file)
+
+    elif symlink == 'junction':
+      # junction should be ignored.
+      subprocess.check_call('cmd /c mklink /j %s %s' %
+                            (symlink_dir, nested_dir))
+
+      # This is invalid junction, junction can be made only for directory.
+      subprocess.check_call('cmd /c mklink /j %s %s' %
+                            (symlink_file, os.path.join(self.tempdir, '1')))
+    elif symlink == 'hardlink':
+      # hardlink can be made only for file.
+      subprocess.check_call('cmd /c mklink /h %s %s' %
+                            (symlink_file, os.path.join(self.tempdir, '1')))
+    else:
+      assert False, ("symlink should be one of symlink, "
+                     "junction or hardlink, but: %s" % symlink)
+
+    if symlink == 'hardlink':
+      # hardlinked file is double counted.
+      self.assertEqual(file_path.get_recursive_size(self.tempdir), 8)
+    else:
+      # symlink and junction should be ignored.
+      self.assertEqual(file_path.get_recursive_size(self.tempdir), 7)
+
+  def test_get_recursive_size(self):
+    self._check_get_recursive_size()
+
+  @unittest.skipUnless(sys.platform == 'win32', 'Windows specific')
+  def test_get_recursive_size_win_junction(self):
+    self._check_get_recursive_size(symlink='junction')
+
+  @unittest.skipUnless(sys.platform == 'win32', 'Windows specific')
+  def test_get_recursive_size_win_hardlink(self):
+    self._check_get_recursive_size(symlink='hardlink')
+
+  @unittest.skipIf(sys.platform == 'win32', 'non-Windows specific')
+  def test_get_recursive_size_scandir_on_non_win(self):
+    # Test scandir implementation on non-windows.
+    self.mock(file_path, '_use_scandir', lambda: True)
+    self._check_get_recursive_size()
+
 
 if __name__ == '__main__':
   test_env.main()
