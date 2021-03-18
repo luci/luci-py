@@ -87,6 +87,8 @@ class FrontendTest(test_env_handlers.AppTestBase):
       body = {'id': 'bot-id', 'task_id': 'task_id'}
       if path == '/swarming/api/v1/bot/oauth_token':
         body.update({'account_id': 'system', 'scopes': ['a', 'b']})
+      elif path == '/swarming/api/v1/bot/id_token':
+        body.update({'account_id': 'system', 'audience': 'https://example.com'})
       return body
 
     # Helper function that executes GET or POST handler for corresponding route
