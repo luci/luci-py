@@ -20,6 +20,13 @@ class AuthSystemError(Exception):
   """Fatal errors raised by AuthSystem class."""
 
 
+class NoAssociatedAccountError(auth_server.TokenError):
+  """Trying to mint a token in a task that has no service account attached."""
+  def __init__(self, account_id):
+    super(NoAssociatedAccountError, self).__init__(
+        1, 'The task has no %r account associated with it' % account_id)
+
+
 # Parsed value of JSON at path specified by --auth-params-file task_runner arg.
 AuthParams = collections.namedtuple(
     'AuthParams',
@@ -383,52 +390,37 @@ class AuthSystem(object):
     Raises:
       RPCError, TokenError, AuthSystemError.
     """
-    # Grab AuthParams supplied by the main bot process.
-    with self._lock:
-      if not self._auth_params_reader:
-        raise auth_server.RPCError(503, 'Stopped already.')
-      val = self._auth_params_reader.last_value
-      rpc_client = self._remote_client
-    auth_params = process_auth_params_json(val)
-
     # Note: 'account_id' here is "task" or "system", it's checked below.
-    logging.info('Getting %r token, scopes %r', account_id, scopes)
+    logging.info('Getting %r access token, scopes %r', account_id, scopes)
+
+    # Grab AuthParams supplied by the main bot process.
+    auth_params, rpc_client = self._auth_params_and_rpc_client()
 
     # Grab service account email (or 'none'/'bot' placeholders) of requested
-    # logical account. This is part of the task manifest.
-    service_account = None
-    if account_id == 'task':
-      service_account = auth_params.task_service_account
-    elif account_id == 'system':
-      service_account = auth_params.system_service_account
-    else:
-      raise auth_server.RPCError(404, 'Unknown account %r' % account_id)
+    # logical account. This is a part of the task manifest.
+    service_account = self._email_for_account_id(auth_params, account_id)
 
-    # Note: correctly behaving clients aren't supposed to hit this, since they
-    # should use only accounts specified in 'accounts' section of LUCI_CONTEXT.
+    # Raise an error when seeing "none" account. Correctly behaving clients
+    # aren't supposed to hit this, since they should use only accounts specified
+    # in 'accounts' section of LUCI_CONTEXT and "none" accounts aren't added
+    # there.
     if service_account == 'none':
-      raise auth_server.TokenError(
-          1, 'The task has no %r account associated with it' % account_id)
+      raise NoAssociatedAccountError(account_id)
 
-    if service_account == 'bot':
-      # This works only for bots that use OAuth for authentication (e.g. GCE
-      # bots). It will raise TokenError if the bot is not using OAuth.
-      tok = self._grab_bot_token(auth_params)
+    # Special account "bot" indicates to use bot's own local credentials. This
+    # works only for bots that use OAuth for authentication (e.g. GCE bots). It
+    # will raise TokenError if the bot is not using OAuth.
+    if service_account  == 'bot':
+      tok = self._grab_bot_oauth_token(auth_params)
     else:
-      # Ask Swarming server to generate a new token for us.
+      # Otherwise ask the Swarming server to generate a new token for us.
       if not rpc_client:
         raise auth_server.RPCError(500, 'No RPC client, can\'t fetch token')
-      tok, service_account = self._grab_token_via_rpc(
+      tok, service_account = self._grab_oauth_token_via_rpc(
           auth_params, rpc_client, account_id, scopes)
 
-    if tok.expiry - time.time() < 0:
-      raise auth_server.RPCError(
-          500, ('The new %r token (belonging to %r) has already expired (%d vs '
-                '%d). Check the system clock.' % (
-                    account_id, service_account, tok.expiry, time.time())))
-
-    logging.info('Got %r token (belongs to %r), expires in %d sec', account_id,
-                 service_account, tok.expiry - time.time())
+    # Verify the token we got is not stale already.
+    self._check_and_log_token(tok, account_id, service_account)
     return tok
 
   # pylint: disable=unused-argument
@@ -453,7 +445,53 @@ class AuthSystem(object):
     """
     raise auth_server.TokenError(5, 'ID tokens are not implemented yet')
 
-  def _grab_bot_token(self, auth_params):
+  def _auth_params_and_rpc_client(self):
+    """Reads and decodes current the auth_params and returns the RPC client.
+
+    Returns:
+      (AuthParams tuple, remote_client.RemoteClient).
+    """
+    with self._lock:
+      if not self._auth_params_reader:
+        raise auth_server.RPCError(503, 'Stopped already.')
+      val = self._auth_params_reader.last_value
+      rpc_client = self._remote_client
+    return process_auth_params_json(val), rpc_client
+
+  def _email_for_account_id(self, auth_params, account_id):
+    """Picks the email corresponding to account_id from auth_params.
+
+    Args:
+      auth_params: AuthParams tuple with configuration.
+      account_id: e.g. "task" or "system".
+
+    Returns:
+      A string with email or "bot" or "none".
+    """
+    if account_id == 'task':
+      return auth_params.task_service_account
+    if account_id == 'system':
+      return auth_params.system_service_account
+    else:
+      raise auth_server.RPCError(404, 'Unknown account %r' % account_id)
+
+  def _check_and_log_token(self, tok, account_id, service_account):
+    """Checks token's expiry is not in the past, logs info about the token.
+
+    Args:
+      tok: auth_server.AccessToken to check.
+      account_id: e.g. "task" or "system".
+      service_account: the actual service account email.
+    """
+    if tok.expiry - time.time() < 0:
+      raise auth_server.RPCError(
+          500, ('The new %r token (belonging to %r) has already expired (%d vs '
+                '%d). Check the system clock.' % (
+                    account_id, service_account, tok.expiry, time.time())))
+    logging.info('Got %r token (belongs to %r), expires in %d sec', account_id,
+                 service_account, tok.expiry - time.time())
+
+  def _grab_bot_oauth_token(self, auth_params):
     """Extracts OAuth token from 'Authorization' header used by the bot itself.
 
     This works only for bots that use OAuth for authentication (e.g. GCE bots).
@@ -481,31 +519,22 @@ class AuthSystem(object):
     # scopes.
     return auth_server.AccessToken(tok, exp)
 
-  def _grab_token_via_rpc(self, auth_params, rpc_client, account_id, scopes):
-    """Makes RPC to Swarming to mint a token.
+  @contextlib.contextmanager
+  def _rpc_guard(self, lock_key):
+    """Wraps an RPC call with locks and exception handling.
+
+    Clients of AuthSystem can bombard it with parallel requests for the exact
+    same OAuth or ID token (imagine a task launching N subprocesses in parallel,
+    each one requesting a token). We stop this concurrency here with a battery
+    of locks keyed by (<token kind>, account_id, sorted(scopes) | audience). So
+    the Swarming server will see only one request at a time.
 
     Args:
-      auth_params: AuthParams tuple with configuration.
-      rpc_client: instance of remote_client.RemoteClient to use for RPC.
-      account_id: logical account name (e.g 'system' or 'task').
-      scopes: list of OAuth scopes.
-
-    Returns:
-      (auth_server.AccessToken, <service account email>).
+      lock_key: a tuple identifying the lock to use to guard the RPC.
     """
-    # Clients of AuthSystem can bombard it with parallel requests for the exact
-    # same OAuth token (imagine a task launching N subprocesses in parallel,
-    # each one requesting a token). We stop this concurrency here with a battery
-    # of locks keyed by (account_id, sorted(scopes)). So the Swarming will see
-    # only one request at a time.
-    with self._rpc_locks.lock(key=(account_id, tuple(sorted(scopes)))):
+    with self._rpc_locks.lock(key=lock_key):
       try:
-        # WARNING: This call may indirectly call 'get_bot_headers', so we have
-        # to use a different lock here (not self._lock).
-        resp = rpc_client.mint_oauth_token(
-            task_id=auth_params.task_id,
-            account_id=account_id,
-            scopes=scopes)
+        yield
       except remote_client.InternalError as exc:
         # Raising RPCError propagates transient error status to clients, so that
         # they can decide to retry later.
@@ -516,25 +545,53 @@ class AuthSystem(object):
         # Swarming server.
         raise auth_server.TokenError(4, str(exc))
 
-    # This is <email>, 'bot' or 'none'. We should handle all cases, since
-    # the configuration on the server can change while the bot is running
-    # the task. This is bad, but possible.
-    service_account = resp.get('service_account') or 'unknown'
-    if service_account == 'none':
-      raise auth_server.TokenError(
-          1, 'The task has no %r account associated with it' % account_id)
-    if service_account == 'bot':
-      return self._grab_bot_token(auth_params), 'bot'
+  def _make_token(self, token, expiry):
+    """Constructs auth_server.AccessToken, validating types of arguments.
 
-    # Should have a real token here now. Double check and return. It will be
-    # cached by LocalAuthServer until it expires.
-    access_token = resp.get('access_token')
-    expiry = resp.get('expiry')
-    if not access_token or not isinstance(access_token, six.string_types):
+    Args:
+      token: the received token, validated as a string.
+      expiry: the recieved tokene expiry, validated as an int.
+
+    Returns:
+      auth_server.AccessToken.
+    """
+    if not token or not isinstance(token, six.string_types):
       raise auth_server.RPCError(500, 'Bad server reply, no valid token given')
     if not expiry or not isinstance(expiry, six.integer_types):
       raise auth_server.RPCError(500, 'Bad server reply, no token expiry given')
-
     # Normalize types (unicode -> str, long -> int).
-    tok = auth_server.AccessToken(str(access_token), int(expiry))
-    return tok, str(service_account)
+    return auth_server.AccessToken(str(token), int(expiry))
+
+  def _grab_oauth_token_via_rpc(self, auth_params, rpc_client,
+                                account_id, scopes):
+    """Makes RPC to Swarming to mint an OAuth access token.
+
+    Args:
+      auth_params: AuthParams tuple with configuration.
+      rpc_client: instance of remote_client.RemoteClient to use for RPC.
+      account_id: logical account name (e.g 'system' or 'task').
+      scopes: list of OAuth scopes.
+
+    Returns:
+      (auth_server.AccessToken, <service account email>).
+    """
+    # Limit concurrency of the RPC call, see _rpc_guard doc string.
+    with self._rpc_guard(lock_key=('oauth', account_id, tuple(sorted(scopes)))):
+      resp = rpc_client.mint_oauth_token(
+          task_id=auth_params.task_id,
+          account_id=account_id,
+          scopes=scopes)
+
+    # This is <email>, 'bot' or 'none'. We should handle all cases, since
+    # the configuration on the server can change while the bot is running
+    # the task. This is bad, but possible.
+    service_account = str(resp.get('service_account') or 'unknown')
+    if service_account == 'none':
+      raise NoAssociatedAccountError(account_id)
+    if service_account == 'bot':
+      tok = self._grab_bot_oauth_token(auth_params)
+    else:
+      tok = self._make_token(resp.get('access_token'), resp.get('expiry'))
+
+    # The returned token will be cached by LocalAuthServer until it expires.
+    return tok, service_account
