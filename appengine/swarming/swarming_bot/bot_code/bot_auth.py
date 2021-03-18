@@ -27,6 +27,13 @@ class NoAssociatedAccountError(auth_server.TokenError):
         1, 'The task has no %r account associated with it' % account_id)
 
 
+class BotAccountIDTokenError(auth_server.TokenError):
+  """Trying to mint an ID token based on bots own credentials."""
+  def __init__(self):
+    super(BotAccountIDTokenError, self).__init__(
+        5, 'ID tokens for "bot" account are not supported')
+
+
 # Parsed value of JSON at path specified by --auth-params-file task_runner arg.
 AuthParams = collections.namedtuple(
     'AuthParams',
@@ -423,7 +430,6 @@ class AuthSystem(object):
     self._check_and_log_token(tok, account_id, service_account)
     return tok
 
-  # pylint: disable=unused-argument
   def generate_id_token(self, account_id, audience):
     """Generates a new ID token with the given audience.
 
@@ -443,7 +449,37 @@ class AuthSystem(object):
     Raises:
       RPCError, TokenError, AuthSystemError.
     """
-    raise auth_server.TokenError(5, 'ID tokens are not implemented yet')
+    # Note: 'account_id' here is "task" or "system", it's checked below.
+    logging.info('Getting %r ID token with audience %r', account_id, audience)
+
+    # Grab AuthParams supplied by the main bot process.
+    auth_params, rpc_client = self._auth_params_and_rpc_client()
+
+    # Grab service account email (or 'none'/'bot' placeholders) of requested
+    # logical account. This is a part of the task manifest.
+    service_account = self._email_for_account_id(auth_params, account_id)
+
+    # Raise an error when seeing "none" account. Correctly behaving clients
+    # aren't supposed to hit this, since they should use only accounts specified
+    # in 'accounts' section of LUCI_CONTEXT and "none" accounts aren't added
+    # there.
+    if service_account == 'none':
+      raise NoAssociatedAccountError(account_id)
+
+    # Swarming bot itself is generally not using ID tokens, so we can't produce
+    # them in tasks that use "bot" as a service account.
+    if service_account == 'bot':
+      raise BotAccountIDTokenError()
+
+    # Ask Swarming server to generate a new token for us.
+    if not rpc_client:
+      raise auth_server.RPCError(500, 'No RPC client, can\'t fetch token')
+    tok, service_account = self._grab_id_token_via_rpc(
+        auth_params, rpc_client, account_id, audience)
+
+    # Verify the token we got is not stale already.
+    self._check_and_log_token(tok, account_id, service_account)
+    return tok
 
   def _auth_params_and_rpc_client(self):
     """Reads and decodes current the auth_params and returns the RPC client.
@@ -594,4 +630,37 @@ class AuthSystem(object):
       tok = self._make_token(resp.get('access_token'), resp.get('expiry'))
 
     # The returned token will be cached by LocalAuthServer until it expires.
+    return tok, service_account
+
+  def _grab_id_token_via_rpc(self, auth_params, rpc_client,
+                             account_id, audience):
+    """Makes RPC to Swarming to mint an ID token.
+
+    Args:
+      auth_params: AuthParams tuple with configuration.
+      rpc_client: instance of remote_client.RemoteClient to use for RPC.
+      account_id: logical account name (e.g 'system' or 'task').
+      audience: the audience to put into the token.
+
+    Returns:
+      (auth_server.AccessToken, <service account email>).
+    """
+    # Limit concurrency of the RPC call, see _rpc_guard doc string.
+    with self._rpc_guard(lock_key=('id_token', account_id, audience)):
+      resp = rpc_client.mint_id_token(
+          task_id=auth_params.task_id,
+          account_id=account_id,
+          audience=audience)
+
+    # This is <email>, 'bot' or 'none'. We should handle all cases, since
+    # the configuration on the server can change while the bot is running
+    # the task. This is bad, but possible.
+    service_account = str(resp.get('service_account') or 'unknown')
+    if service_account == 'none':
+      raise NoAssociatedAccountError(account_id)
+    if service_account == 'bot':
+      raise BotAccountIDTokenError()
+
+    # The returned token will be cached by LocalAuthServer until it expires.
+    tok = self._make_token(resp.get('id_token'), resp.get('expiry'))
     return tok, service_account
