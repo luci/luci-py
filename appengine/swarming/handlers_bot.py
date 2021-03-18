@@ -969,13 +969,6 @@ class BotOAuthTokenHandler(_BotApiHandler):
       self.abort_with_error(
           400, error='"task_id" is required when using "account_id" == "task"')
 
-    # BotInfo contains ID of a task the bot currently executes (to compare
-    # with 'task_id' request parameter).
-    current_task_id = None
-    bot_info = bot_management.get_info_key(bot_id).get()
-    if bot_info:
-      current_task_id = bot_info.task_id
-
     # Make sure bot self-reported ID matches the authentication token. Raises
     # auth.AuthorizationError if not. Also fetches corresponding BotGroupConfig
     # that contains system service account email for this bot.
@@ -985,15 +978,21 @@ class BotOAuthTokenHandler(_BotApiHandler):
     # authentication when making it.
     logging.info('Requesting a "%s" token with scopes %s', account_id, scopes)
 
-    # This is mostly a precaution against confused bot processes. We can always
-    # just use 'current_task_id' to look up per-task service account. Datastore
-    # is the source of truth here, not whatever bot reports.
-    if account_id == 'task' and task_id != current_task_id:
-      logging.error(
-          'Bot %s requested "task" access token for task %s, but runs %s',
-          bot_id, task_id, current_task_id)
-      self.abort_with_error(
-          400, error='Wrong task_id: the bot is not executing this task')
+    # Check 'task_id' matches the task currently assigned to the bot. This is
+    # mostly a precaution against confused bot processes. We can always just use
+    # 'current_task_id' to look up per-task service account. Datastore is the
+    # source of truth here, not whatever bot reports.
+    if account_id == 'task':
+      current_task_id = None
+      bot_info = bot_management.get_info_key(bot_id).get()
+      if bot_info:
+        current_task_id = bot_info.task_id
+      if task_id != current_task_id:
+        logging.error(
+            'Bot %s requested "task" token for task %s, but runs %s',
+            bot_id, task_id, current_task_id)
+        self.abort_with_error(
+            400, error='Wrong task_id: the bot is not executing this task')
 
     account = None  # an email or 'bot' or 'none'
     token = None  # service_accounts.AccessToken
