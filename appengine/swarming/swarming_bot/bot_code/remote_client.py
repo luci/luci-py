@@ -19,7 +19,7 @@ from utils import net
 from bot_code.remote_client_errors import BotCodeError
 from bot_code.remote_client_errors import InitializationError
 from bot_code.remote_client_errors import InternalError
-from bot_code.remote_client_errors import MintOAuthTokenError
+from bot_code.remote_client_errors import MintTokenError
 from bot_code.remote_client_errors import PollError
 
 
@@ -375,7 +375,7 @@ class RemoteClientNative(object):
       InternalError if can't contact the server after many attempts or the
       server consistently replies with HTTP 5** errors.
 
-      MintOAuthTokenError on fatal errors.
+      MintTokenError on fatal errors.
     """
     resp = self._url_read_json(
         '/swarming/api/v1/bot/oauth_token',
@@ -387,7 +387,45 @@ class RemoteClientNative(object):
         })
     if not resp:
       raise InternalError(
-          'Error when minting the token for account_id: %s' % account_id)
+          'Error when minting access token for account_id: %s' % account_id)
     if resp.get('error'):
-      raise MintOAuthTokenError(resp['error'])
+      raise MintTokenError(resp['error'])
+    return resp
+
+  def mint_id_token(self, task_id, account_id, audience):
+    """Asks the server to generate an ID token for a service account.
+
+    Like mint_oauth_token, but returns ID tokens instead of OAuth access tokens.
+
+    Args:
+      task_id: identifier of currently executing task.
+      account_id: logical identifier of the account (e.g 'system' or 'task').
+      audience: an audience string to put into the token.
+
+    Returns:
+      {
+        'service_account': <str>,  # account email or 'bot', or 'none'
+        'id_token': <str> or None, # actual token, if using real account
+        'expiry': <int>,           # unix timestamp in seconds
+      }
+
+    Raises:
+      InternalError if can't contact the server after many attempts or the
+      server consistently replies with HTTP 5** errors.
+
+      MintTokenError on fatal errors.
+    """
+    resp = self._url_read_json(
+        '/swarming/api/v1/bot/id_token',
+        data={
+            'account_id': account_id,
+            'id': self.bot_id,
+            'audience': audience,
+            'task_id': task_id,
+        })
+    if not resp:
+      raise InternalError(
+          'Error when minting ID token for account_id: %s' % account_id)
+    if resp.get('error'):
+      raise MintTokenError(resp['error'])
     return resp

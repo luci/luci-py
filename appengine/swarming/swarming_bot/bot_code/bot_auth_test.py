@@ -322,7 +322,7 @@ class AuthSystemTest(auto_stub.TestCase):
             system_service_account='abc@example.com',
             task_service_account='none'))
     rpc_client = self.mocked_rpc_client(
-        remote_client.MintOAuthTokenError('msg'))
+        remote_client.MintTokenError('msg'))
     self.auth_sys.set_remote_client(rpc_client)
 
     code, resp = call_rpc(local_auth_ctx, 'system', ['A', 'B', 'C'])

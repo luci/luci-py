@@ -27,5 +27,5 @@ class PollError(Exception):
   """Raised on unrecoverable errors in RemoteClient.poll."""
 
 
-class MintOAuthTokenError(Exception):
-  """Raised on unrecoverable errors in RemoteClient.mint_oauth_token."""
+class MintTokenError(Exception):
+  """Raised on unrecoverable errors in RemoteClient.mint_*_token."""

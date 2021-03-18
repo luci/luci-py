@@ -510,7 +510,7 @@ class AuthSystem(object):
         # Raising RPCError propagates transient error status to clients, so that
         # they can decide to retry later.
         raise auth_server.RPCError(500, str(exc))
-      except remote_client.MintOAuthTokenError as exc:
+      except remote_client.MintTokenError as exc:
         # Raising fatal TokenError makes LocalAuthServer cache the error, so
         # that retrying clients get the error reply right away, without hitting
         # Swarming server.
