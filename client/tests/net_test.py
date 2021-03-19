@@ -248,6 +248,22 @@ class HttpServiceTest(RetryLoopMockedTest):
     self.assertEqual(1, len(count))
     self.assertAttempts(1, net.URL_OPEN_TIMEOUT)
 
+  def test_request_expected_HTTP_error_code(self):
+    content = b'data'
+
+    count = []
+    def mock_perform_request(request):
+      count.append(request)
+      raise net_utils.make_fake_error(
+          400, request.get_full_url(), content=content)
+
+    service = self.mocked_http_service(perform_request=mock_perform_request)
+    response = service.request('/', data={}, expected_error_codes=(400,))
+    self.assertEqual(400, response.code)
+    self.assertEqual(content, response.read())
+    self.assertEqual(1, len(count))
+    self.assertAttempts(1, net.URL_OPEN_TIMEOUT)
+
   def test_request_HTTP_error_retry_404_endpoints(self):
     response = b'data'
     attempts = []

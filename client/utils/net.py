@@ -435,6 +435,7 @@ class HttpService(object):
       content_type=None,
       max_attempts=URL_OPEN_MAX_ATTEMPTS,
       retry_50x=True,
+      expected_error_codes=None,
       timeout=URL_OPEN_TIMEOUT,
       read_timeout=URL_READ_TIMEOUT,
       stream=True,
@@ -476,10 +477,16 @@ class HttpService(object):
     operation so once you pass non-None |read_timeout| be prepared to handle
     these exceptions in subsequent reads from the stream.
 
+    If |expected_error_codes| is given, it is a set of integer HTTP status codes
+    that are treated as successful replies in additional to standard codes like
+    200. Useful when the caller wants to read a body of e.g. HTTP 400 reply.
+
     Returns a file-like object, where the response may be read from, or None
     if it was unable to connect. If |stream| is False will read whole response
     into memory buffer before returning file-like object that reads from this
     memory buffer.
+
+    The returned value has a property |code| with the response code.
     """
     assert urlpath and urlpath[0] == '/', urlpath
 
@@ -538,6 +545,13 @@ class HttpService(object):
 
       except HttpError as e:
         last_error = e
+
+        # If it is one of the expected codes, we are done.
+        if expected_error_codes and e.response.code in expected_error_codes:
+          logging.debug(
+              'Request %s succeeded with one of the expected codes %d',
+              request.get_full_url(), e.response.code)
+          return e.response
 
         # Access denied -> authenticate.
         if e.response.code in (401, 403):

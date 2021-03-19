@@ -401,6 +401,7 @@ class TestBotMain(TestBotBase):
                     'message': 'error',
                     'task_id': 23,
                 },
+                'expected_error_codes': None,
                 'follow_redirects': False,
                 'headers': {
                     'Cookie': 'GOOGAPPUID=42',
@@ -548,6 +549,7 @@ class TestBotMain(TestBotBase):
             'https://localhost:1/swarming/api/v1/bot/handshake',
             {
                 'data': self.attributes,
+                'expected_error_codes': None,
                 'follow_redirects': False,
                 'headers': {
                     'Cookie': 'GOOGAPPUID=42'
@@ -560,6 +562,7 @@ class TestBotMain(TestBotBase):
             'https://localhost:1/swarming/api/v1/bot/handshake',
             {
                 'data': self.attributes,
+                'expected_error_codes': None,
                 'follow_redirects': False,
                 'headers': {
                     'Cookie': 'GOOGAPPUID=42'
@@ -607,6 +610,7 @@ class TestBotMain(TestBotBase):
             'https://localhost:1/swarming/api/v1/bot/poll',
             {
                 'data': self.attributes,
+                'expected_error_codes': None,
                 'follow_redirects': False,
                 'headers': {
                     'Cookie': 'GOOGAPPUID=42'
@@ -637,6 +641,7 @@ class TestBotMain(TestBotBase):
             'https://localhost:1/swarming/api/v1/bot/poll',
             {
                 'data': self.attributes,
+                'expected_error_codes': None,
                 'follow_redirects': False,
                 'headers': {
                     'A': 'a',
@@ -667,6 +672,7 @@ class TestBotMain(TestBotBase):
             'https://localhost:1/swarming/api/v1/bot/poll',
             {
                 'data': self.bot._attributes,
+                'expected_error_codes': None,
                 'follow_redirects': False,
                 'headers': {
                     'Cookie': 'GOOGAPPUID=42'
@@ -700,6 +706,7 @@ class TestBotMain(TestBotBase):
             'https://localhost:1/swarming/api/v1/bot/poll',
             {
                 'data': self.attributes,
+                'expected_error_codes': None,
                 'follow_redirects': False,
                 'headers': {
                     'Cookie': 'GOOGAPPUID=42'
@@ -730,6 +737,7 @@ class TestBotMain(TestBotBase):
             'https://localhost:1/swarming/api/v1/bot/poll',
             {
                 'data': self.attributes,
+                'expected_error_codes': None,
                 'follow_redirects': False,
                 'headers': {
                     'Cookie': 'GOOGAPPUID=42'
@@ -759,6 +767,7 @@ class TestBotMain(TestBotBase):
             'https://localhost:1/swarming/api/v1/bot/poll',
             {
                 'data': self.attributes,
+                'expected_error_codes': None,
                 'follow_redirects': False,
                 'headers': {
                     'Cookie': 'GOOGAPPUID=42'

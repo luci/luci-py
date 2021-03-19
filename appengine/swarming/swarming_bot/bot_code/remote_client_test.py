@@ -120,7 +120,7 @@ class TestRemoteClient(auto_stub.TestCase):
                                          'localhost', '/')
     c.bot_id = 'bot_id'
 
-    def mocked_call(url_path, data):
+    def mocked_call(url_path, data, expected_error_codes):
       self.assertEqual('/swarming/api/v1/bot/oauth_token', url_path)
       self.assertEqual({
           'account_id': 'account_id',
@@ -128,6 +128,7 @@ class TestRemoteClient(auto_stub.TestCase):
           'scopes': ['a', 'b'],
           'task_id': 'task_id',
       }, data)
+      self.assertEqual((400,), expected_error_codes)
       return fake_resp
     self.mock(c, '_url_read_json', mocked_call)
 
@@ -145,7 +146,7 @@ class TestRemoteClient(auto_stub.TestCase):
                                          'localhost', '/')
     c.bot_id = 'bot_id'
 
-    def mocked_call(url_path, data):
+    def mocked_call(url_path, data, expected_error_codes):
       self.assertEqual('/swarming/api/v1/bot/id_token', url_path)
       self.assertEqual({
           'account_id': 'account_id',
@@ -153,6 +154,7 @@ class TestRemoteClient(auto_stub.TestCase):
           'id': 'bot_id',
           'task_id': 'task_id',
       }, data)
+      self.assertEqual((400,), expected_error_codes)
       return fake_resp
     self.mock(c, '_url_read_json', mocked_call)
 

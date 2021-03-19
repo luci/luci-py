@@ -224,14 +224,15 @@ class RemoteClientNative(object):
           logging.info('Using auth headers (%s).', self._headers.keys())
       return self._headers or {}
 
-  def _url_read_json(self, url_path, data=None):
+  def _url_read_json(self, url_path, data=None, expected_error_codes=None):
     """Does POST (if data is not None) or GET request to a JSON endpoint."""
     return net.url_read_json(
         self._server + url_path,
         data=data,
         headers=self.get_headers(include_auth=True),
         timeout=NET_CONNECTION_TIMEOUT_SEC,
-        follow_redirects=False)
+        follow_redirects=False,
+        expected_error_codes=expected_error_codes)
 
   def _url_retrieve(self, filepath, url_path):
     """Fetches the file from the given URL path on the server."""
@@ -384,7 +385,8 @@ class RemoteClientNative(object):
             'id': self.bot_id,
             'scopes': scopes,
             'task_id': task_id,
-        })
+        },
+        expected_error_codes=(400,))
     if not resp:
       raise InternalError(
           'Error when minting access token for account_id: %s' % account_id)
@@ -422,7 +424,8 @@ class RemoteClientNative(object):
             'id': self.bot_id,
             'audience': audience,
             'task_id': task_id,
-        })
+        },
+        expected_error_codes=(400,))
     if not resp:
       raise InternalError(
           'Error when minting ID token for account_id: %s' % account_id)
