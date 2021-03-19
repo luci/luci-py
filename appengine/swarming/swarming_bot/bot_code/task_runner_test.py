@@ -265,6 +265,9 @@ class TestTaskRunnerBase(auto_stub.TestCase):
         u'output_chunk_start': 0,
         u'task_id': task_id,
     }
+    if six.PY3 and sys.platform == 'win32':
+      expected[u'output'] = expected[u'output'].replace(
+        b'\n', b'\r\n')
     for k, v in kwargs.items():
       if v is None:
         expected.pop(k)
@@ -319,7 +322,6 @@ class TestTaskRunner(TestTaskRunnerBase):
     if expected:
       self.fail(expected)
 
-  @unittest.skipIf(sys.platform == 'win32' and six.PY3, 'crbug.com/1182016')
   def test_run_command_raw(self):
     task_details = get_task_details('print(\'hi\')')
     expected = {
@@ -384,7 +386,6 @@ class TestTaskRunner(TestTaskRunnerBase):
                           r'$') % (sep, sep, sep, sep)).encode())
     self.expectTask(task_details.task_id, output=output)
 
-  @unittest.skipIf(sys.platform == 'win32' and six.PY3, 'crbug.com/1182016')
   def test_run_command_isolated(self):
     # Hook run_isolated out to see that everything still work.
     task_details = get_task_details(isolated={
@@ -438,7 +439,6 @@ class TestTaskRunner(TestTaskRunnerBase):
             u'namespace': u'default-gzip',
         })
 
-  @unittest.skipIf(sys.platform == 'win32' and six.PY3, 'crbug.com/1182016')
   def test_run_command_fail(self):
     task_details = get_task_details('import sys; print(\'hi\'); sys.exit(1)')
     expected = {
@@ -479,7 +479,6 @@ class TestTaskRunner(TestTaskRunnerBase):
     out = self.expectTask(task_details.task_id, exit_code=1, output=output)
     self.assertGreater(10., out[u'cost_usd'])
 
-  @unittest.skipIf(sys.platform == 'win32' and six.PY3, 'crbug.com/1182016')
   def test_isolated_grand_children(self):
     """Runs a normal test involving 3 level deep subprocesses.
 
@@ -693,7 +692,6 @@ class TestTaskRunner(TestTaskRunnerBase):
     # Now look at the updates sent by the bot as seen by the server.
     self.expectTask(task_details.task_id)
 
-  @unittest.skipIf(sys.platform == 'win32' and six.PY3, 'crbug.com/1182016')
   def test_start_task_runner_fail_on_startup(self):
     def _get_run_isolated():
       return ['invalid_commad_that_shouldnt_exist']
