@@ -454,7 +454,6 @@ time.sleep(60)
       with self.assertRaises(NotImplementedError):
         start()
 
-  @unittest.skipIf(sys.platform == 'win32' and six.PY3, 'crbug.com/1182016')
   def test_containment_auto_kill(self):
     # Test process killing.
     cmd = [
@@ -476,7 +475,11 @@ time.sleep(60)
     if sys.platform != 'win32':
       # signal.SIGKILL is not defined on Windows. Validate our assumption here.
       self.assertEqual(9, signal.SIGKILL)
-    self.assertEqual(-9, p.returncode)
+    if six.PY3 and sys.platform == 'win32':
+      # p.returncode is unsigned in python3 on windows
+      self.assertEqual(4294967287, p.returncode)
+    else:
+      self.assertEqual(-9, p.returncode)
 
   @unittest.skipIf(sys.platform == 'win32', 'pgid test')
   def test_kill_background(self):
@@ -955,6 +958,8 @@ time.sleep(60)
         ('stdout', b'incomplete last stdout'),
         ('stderr', b'incomplete last stderr'),
     ]
+    if six.PY3 and sys.platform == 'win32':
+      data = [(d[0], d[1].replace(b'\n', b'\r\n')) for d in data]
     self.assertEqual(
         list(subprocess42.split(data)), [
             ('stdout', b'o1'),

@@ -1060,7 +1060,7 @@ def inhibit_os_error_reporting():
   # - Ubuntu, disable apport if needed.
 
 
-def split(data, sep=b'\n'):
+def split(data):
   """Splits pipe data by |sep|. Does some buffering.
 
   For example, [('stdout', b'a\nb'), ('stdout', b'\n'), ('stderr', b'c\n')] ->
@@ -1073,6 +1073,11 @@ def split(data, sep=b'\n'):
     An iterator of tuples (pipe_name, bytes) where bytes is the input data
     but split by sep into separate tuples.
   """
+  sep = b'\n'
+  if six.PY3 and sys.platform == 'win32':
+    # CRLF is used instead of LF in python3 on windows
+    sep = b'\r\n'
+
   # A dict {pipe_name -> list of pending chunks without separators}
   pending_chunks = collections.defaultdict(list)
   for pipe_name, chunk in data:
@@ -1089,7 +1094,7 @@ def split(data, sep=b'\n'):
         break
 
       to_emit = chunk[start:j]
-      start = j + 1
+      start = j + len(sep)
       if pending:
         # prepend and forget
         to_emit = b''.join(pending) + to_emit
