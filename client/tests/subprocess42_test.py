@@ -532,7 +532,7 @@ time.sleep(60)
         sys.executable,
         '-u',
         '-c',
-        'range(50*1024*1024); print("hi")',
+        'list(range(50*1024*1024)); print("hi")',
     ]
 
   def test_large_memory(self):
@@ -540,7 +540,6 @@ time.sleep(60)
     cmd = self._cmd_large_memory()
     self.assertEqual(b'hi', subprocess42.check_output(cmd).strip())
 
-  @unittest.skipIf(sys.platform == 'win32' and six.PY3, 'crbug.com/1182016')
   def test_containment_auto_limit_memory(self):
     # Process allocates a lot of memory. It should fail due to quota.
     cmd = self._cmd_large_memory()
@@ -558,8 +557,8 @@ time.sleep(60)
       p = start()
       out, err = p.communicate()
       self.assertEqual(1, p.returncode)
-      self.assertEqual('', out)
-      self.assertIn('MemoryError', err)
+      self.assertEqual(b'', out)
+      self.assertIn(b'MemoryError', err)
     else:
       # JOB_OBJECT is not usable on non-Windows.
       with self.assertRaises(NotImplementedError):
