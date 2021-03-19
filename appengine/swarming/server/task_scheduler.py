@@ -384,31 +384,23 @@ def _handle_dead_bot(run_result_key):
 
     result_summary = result_summary_key.get()
     orig_summary_state = result_summary.state
-    if result_summary.try_number != run_result.try_number:
-      # Not updating correct run_result, cancel it without touching
-      # result_summary.
-      to_put = (run_result,)
-      run_result.state = task_result.State.BOT_DIED
-      run_result.internal_failure = True
-      run_result.abandoned_ts = now
-      run_result.completed_ts = now
+
+    # Mark it as KILLED if run_result is in killing state.
+    # Otherwise, mark it BOT_DIED. the bot hasn't been sending for the task.
+    to_put = (run_result, result_summary)
+    if run_result.killing:
+      logging.warning('Killing task %s/%s on the missing bot %s',
+                      run_result.task_id, run_result.current_task_slice,
+                      run_result.bot_id)
+      run_result.killing = False
+      run_result.state = task_result.State.KILLED
+      run_result = _set_fallbacks_to_exit_code_and_duration(run_result, now)
     else:
-      # Kill it as BOT_DIED, there was more than one try, the task expired in
-      # the meantime or it wasn't idempotent.
-      to_put = (run_result, result_summary)
-      if run_result.killing:
-        logging.warning('Killing task %s/%s on the missing bot %s',
-                        run_result.task_id, run_result.current_task_slice,
-                        run_result.bot_id)
-        run_result.killing = False
-        run_result.state = task_result.State.KILLED
-        run_result = _set_fallbacks_to_exit_code_and_duration(run_result, now)
-      else:
-        run_result.state = task_result.State.BOT_DIED
-      run_result.internal_failure = True
-      run_result.abandoned_ts = now
-      run_result.completed_ts = now
-      result_summary.set_from_run_result(run_result, request)
+      run_result.state = task_result.State.BOT_DIED
+    run_result.internal_failure = True
+    run_result.abandoned_ts = now
+    run_result.completed_ts = now
+    result_summary.set_from_run_result(run_result, request)
 
     futures = ndb.put_multi_async(to_put)
     # if result_summary.state != orig_summary_state:
