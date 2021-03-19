@@ -1674,11 +1674,13 @@ def cron_abort_expired_task_to_run():
 
       # Enqueue every 50 TaskToRun's.
       if len(task_to_runs) == 50:
+        logging.debug("expire tasks: %s", task_to_runs)
         _enqueue_task(task_to_runs)
         task_to_runs = []
 
     # Enqueue remaining TaskToRun's.
     if task_to_runs:
+      logging.debug("expire tasks: %s", task_to_runs)
       _enqueue_task(task_to_runs)
   finally:
     logging.debug('Enqueued %d task for %d tasks', len(enqueued), sum(enqueued))
