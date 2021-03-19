@@ -1485,16 +1485,12 @@ def yield_result_summary_by_parent_task_id(parent_task_id):
     yield result_summary_key.get()
 
 
-def yield_run_result_keys_with_dead_bot():
-  """Yields all the TaskRunResult ndb.Key where the bot died recently.
+def yield_active_run_result_keys():
+  """Yields all the TaskRunResult ndb.Key of running tasks.
 
   In practice it is returning a ndb.QueryIterator but this is equivalent.
   """
-  # If a bot didn't ping recently, it is considered dead.
-  now = utils.utcnow()
-  q = TaskRunResult.query(
-      TaskRunResult.dead_after_ts < now,
-      TaskRunResult.dead_after_ts > now - datetime.timedelta(days=366))
+  q = TaskRunResult.query(TaskRunResult.completed_ts == None)
   return q.iter(keys_only=True)
 
 

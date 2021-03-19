@@ -374,7 +374,6 @@ def _handle_dead_bot(run_result_key):
       return False
 
     if not run_result.dead_after_ts or run_result.dead_after_ts > now:
-      # This shouldn't have been filtered in the query. DB index may be stale.
       return False
 
     run_result.signal_server_version(server_version)
@@ -1704,7 +1703,7 @@ def cron_handle_bot_died():
     ignored = 0
     killed = []
     try:
-      for run_result_key in task_result.yield_run_result_keys_with_dead_bot():
+      for run_result_key in task_result.yield_active_run_result_keys():
         result = _handle_dead_bot(run_result_key)
         if result:
           killed.append(task_pack.pack_run_result_key(run_result_key))

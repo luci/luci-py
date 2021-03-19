@@ -591,7 +591,7 @@ class TaskResultApiTest(TestCase):
     expected = [child_summary_1, child_summary_2]
     self.assertEqual(sorted(expected), sorted(s for s in result_summary_iter))
 
-  def test_yield_run_result_keys_with_dead_bot(self):
+  def test_yield_active_run_result_keys(self):
     request = _gen_request()
     result_summary = task_result.new_result_summary(request)
     result_summary.modified_ts = utils.utcnow()
@@ -600,24 +600,19 @@ class TaskResultApiTest(TestCase):
     run_result = task_result.new_run_result(request, to_run, 'localhost', 'abc',
                                             {}, result_summary.resultdb_info)
     run_result.started_ts = utils.utcnow()
-    run_result.completed_ts = run_result.started_ts
     run_result.modified_ts = run_result.started_ts
-    run_result.dead_after_ts = utils.utcnow() + datetime.timedelta(
-        seconds=request.bot_ping_tolerance_secs)
+    run_result.dead_after_ts = run_result.started_ts + datetime.timedelta(
+        seconds=1)
     ndb.transaction(lambda: result_summary.set_from_run_result(
         run_result, request))
     ndb.transaction(lambda: ndb.put_multi((run_result, result_summary)))
 
-    self.mock_now(self.now +
-                  datetime.timedelta(seconds=request.bot_ping_tolerance_secs))
-    self.assertEqual([],
-                     list(task_result.yield_run_result_keys_with_dead_bot()))
-
-    self.mock_now(
-        self.now + datetime.timedelta(seconds=request.bot_ping_tolerance_secs),
-        1)
     self.assertEqual([run_result.key],
-                     list(task_result.yield_run_result_keys_with_dead_bot()))
+                     list(task_result.yield_active_run_result_keys()))
+
+    run_result.completed_ts = run_result.started_ts
+    run_result.put()
+    self.assertEqual([], list(task_result.yield_active_run_result_keys()))
 
   def test_set_from_run_result(self):
     request = _gen_request()
