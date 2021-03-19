@@ -1733,7 +1733,6 @@ class BotApiTest(test_env_handlers.AppTestBase):
     # Now tagged with abandonned_ts, but state not yet updated.
     expected = self.gen_run_result(
         abandoned_ts=fmtdate(self.now),
-        completed_ts=fmtdate(self.now),
         created_ts=fmtdate(self.now),
         modified_ts=fmtdate(self.now),
         started_ts=fmtdate(self.now))

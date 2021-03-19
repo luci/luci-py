@@ -2258,7 +2258,6 @@ class TaskApiTest(BaseTest):
     self.set_as_user()
     expected = self.gen_result_summary(
         abandoned_ts=fmtdate(self.now),
-        completed_ts=fmtdate(self.now),
         costs_usd=[0.1],
         created_ts=fmtdate(self.now),
         modified_ts=fmtdate(self.now),

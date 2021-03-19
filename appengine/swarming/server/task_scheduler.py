@@ -379,10 +379,19 @@ def _handle_dead_bot(run_result_key):
 
     run_result.signal_server_version(server_version)
     run_result.modified_ts = now
+    run_result.completed_ts = now
+    if not run_result.abandoned_ts:
+      run_result.abandoned_ts = now
     # set .dead_after_ts to None since the task is terminated.
     run_result.dead_after_ts = None
+    # mark as internal failure as the task doesn't get completed normally.
+    run_result.internal_failure = True
 
     result_summary = result_summary_key.get()
+    result_summary.modified_ts = now
+    result_summary.completed_ts = now
+    if not result_summary.abandoned_ts:
+      result_summary.abandoned_ts = now
     orig_summary_state = result_summary.state
 
     # Mark it as KILLED if run_result is in killing state.
@@ -397,9 +406,6 @@ def _handle_dead_bot(run_result_key):
       run_result = _set_fallbacks_to_exit_code_and_duration(run_result, now)
     else:
       run_result.state = task_result.State.BOT_DIED
-    run_result.internal_failure = True
-    run_result.abandoned_ts = now
-    run_result.completed_ts = now
     result_summary.set_from_run_result(run_result, request)
 
     futures = ndb.put_multi_async(to_put)
@@ -732,11 +738,19 @@ def _bot_update_tx(run_result_key, bot_id, output, output_chunk_start,
         # reset duration, exit_code since not allowed
         run_result.duration = None
         run_result.exit_code = None
+        run_result.completed_ts = now
       elif duration is not None:
         # A user requested to cancel the task while it was running. Since the
         # task is now stopped, we can tag the task result as KILLED.
         run_result.killing = False
         run_result.state = task_result.State.KILLED
+        run_result.completed_ts = now
+      else:
+        # The bot is still executing the task in this path. The server should
+        # return killing signal to the bot. After the bot stopped the task,
+        # the task update wlll include `duration` and go to the above path to
+        # mark TaskRunResult completed finally.
+        pass
     else:
       if hard_timeout or io_timeout:
         # This needs to be changed with new state TERMINATING;
@@ -832,6 +846,7 @@ def _cancel_task_tx(request, result_summary, kill_running, bot_id, now, es_cfg,
       return False, was_running
     # PENDING.
     result_summary.state = task_result.State.CANCELED
+    result_summary.completed_ts = now
     to_run_key = task_to_run.request_to_task_to_run_key(
         request,
         result_summary.try_number or 1,
@@ -862,13 +877,11 @@ def _cancel_task_tx(request, result_summary, kill_running, bot_id, now, es_cfg,
     # - once the bot reports the task as terminated, set state to KILLED
     run_result.killing = True
     run_result.abandoned_ts = now
-    run_result.completed_ts = now
     run_result.modified_ts = now
+    entities.append(run_result)
     run_result.dead_after_ts = now + datetime.timedelta(
         seconds=request.bot_ping_tolerance_secs)
-    entities.append(run_result)
   result_summary.abandoned_ts = now
-  result_summary.completed_ts = now
   result_summary.modified_ts = now
 
   futures = ndb.put_multi_async(entities)
