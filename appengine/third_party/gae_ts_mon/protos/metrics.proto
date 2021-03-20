@@ -5,10 +5,10 @@ syntax = "proto2";
 
 package ts_mon.proto;
 
-import "any.proto";
-import "timestamp.proto";
-import "acquisition_network_device.proto";
-import "acquisition_task.proto";
+import "infra_libs/ts_mon/protos/any.proto";
+import "infra_libs/ts_mon/protos/timestamp.proto";
+import "infra_libs/ts_mon/protos/acquisition_network_device.proto";
+import "infra_libs/ts_mon/protos/acquisition_task.proto";
 
 message MetricsPayload {
   repeated MetricsCollection metrics_collection = 1;
@@ -16,9 +16,20 @@ message MetricsPayload {
 
 message MetricsCollection {
   repeated MetricsDataSet metrics_data_set = 1;
+  repeated RootLabels root_labels = 2;
+
   oneof target_schema {
     NetworkDevice network_device = 11;
     Task task = 12;
+  }
+
+  message RootLabels {
+    required string key = 1;
+    oneof value {
+      string string_value = 2;
+      int64 int64_value = 3;
+      bool bool_value = 4;
+    }
   }
 }
 

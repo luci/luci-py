@@ -1,7 +1,7 @@
 Name: gae_ts_mon
 Short Name: gae_ts_mon
 URL: https://chromium.googlesource.com/infra/infra/+/master/appengine_module/gae_ts_mon/
-Revision: 0c2b00962aec244573836a0fbb2e465e3426daa1
+Revision: e7e710de99270dd92dd57d8e1055d7589b3ba895
 License: Chromium License
 
 Description:
@@ -14,3 +14,4 @@ compatible at the version you need.
 Local Modifications:
 - Removed all of the following directories: protobuf/, test/, third_party/ .
 - Copied the content of the symlinks.
+- Removed mentions of "third_party_dir" and "protobuf_dir" from __init__.py.

@@ -1,4 +1,4 @@
 handlers:
 - url: /internal/cron/ts_mon/.*
   login: admin
-  script: gae_ts_mon.app
+  script: gae_ts_mon.instrument_webapp2.tasknum_assigner

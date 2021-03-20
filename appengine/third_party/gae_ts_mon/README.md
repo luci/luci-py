@@ -14,18 +14,12 @@
           schedule: every 1 minutes
           target: <cron_module_name>  # optional
 
-1.  Include the URL handler for that scheduled task in your `app.yaml` file.
+1.  Only if your application is using webapp2:
 
-        includes:
-        - gae_ts_mon  # handles /internal/cron/ts_mon/send
+    1.  Include the URL handler for that scheduled task in your `app.yaml` file.
 
-1.  Fix protobuf package import path.
-
-    Make sure the following code is present in appengine_config.py in the root
-    of your AppEngine app. Create the file if it doesn't exist.
-
-        from components import utils
-        utils.fix_protobuf_package()
+            includes:
+            - gae_ts_mon  # handles /internal/cron/ts_mon/send
 
 1.  Initialize the library in your request handler.
 
@@ -34,7 +28,7 @@
         [...]
 
         app = webapp2.WSGIApplication(my_handlers)
-        gae_ts_mon.initialize(app, cron_module='<cron_module_name>')
+        gae_ts_mon.initialize(app)
 
     You must do this in every top-level request handler that's listed in your
     app.yaml to ensure metrics are registered no matter which type of request
@@ -44,10 +38,7 @@
     (e.g. it's a Cloud Endpoints only app), then pass `None` as the
     first argument to `gae_ts_mon.initialize`.
 
-    The `gae_ts_mon.initialize` method takes a few optional parameters:
-     - `cron_module` (str, default='default'): if you specified a custom
-       module for the cron job, you must specify it in every call to
-       `initialize`.
+    The `gae_ts_mon.initialize` method takes an optional parameter:
      - `is_enabled_fn` (function with no arguments returning `bool`):
        a callback to enable/disable sending the actual metrics. Default: `None`
        which is equivalent to `lambda: True`. The callback is called on every
