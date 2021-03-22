@@ -170,7 +170,6 @@ class OnErrorTest(OnErrorBase):
     self.assertEqual([], self._atexit)
 
 
-@unittest.skipIf(sys.platform == 'win32' and six.PY3, 'crbug.com/1182016')
 class OnErrorServerTest(OnErrorBase):
   def call(self, url, arg, returncode):
     cmd = [sys.executable, '-u', 'main.py', url, arg]
