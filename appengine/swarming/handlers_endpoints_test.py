@@ -2901,7 +2901,16 @@ class BotsApiTest(BaseTest):
         quarantined=swarming_rpcs.ThreeStateBool.TRUE)
     response = self.call_api('list', body=message_to_dict(request))
     self.assertEqual(expected, response.json)
-    # A bad request returns 400
+    # OR dimension finds bot1 and bot2
+    expected[u'items'] = [bot1, bot2]
+    request = handlers_endpoints.BotsRequest.combined_message_class(
+        dimensions=['id:id1|id2'])
+    response = self.call_api('list', body=message_to_dict(request))
+    self.assertEqual(expected, response.json)
+
+  def test_list_bad_request(self):
+    self.set_as_privileged_user()
+
     request = handlers_endpoints.BotsRequest.combined_message_class(
         dimensions=['bad'])
     self.call_api('list', body=message_to_dict(request), status=400)
@@ -2945,22 +2954,54 @@ class BotsApiTest(BaseTest):
     response = self.call_api('count', body=message_to_dict(request))
     self.assertEqual(expected, response.json)
 
-    expected[u'quarantined'] = u'1'
-    expected[u'busy'] = u'0'
+    expected = {
+        u'count': u'1',
+        u'quarantined': u'1',
+        u'maintenance': u'0',
+        u'dead': u'0',
+        u'busy': u'0',
+        u'now': unicode(self.now.strftime(DATETIME_NO_MICRO)),
+    }
     request = handlers_endpoints.BotsRequest.combined_message_class(
         dimensions=['pool:default', 'id:id2'])
     response = self.call_api('count', body=message_to_dict(request))
     self.assertEqual(expected, response.json)
 
-    expected[u'dead'] = u'1'
+    # OR dimension
+    expected = {
+        u'count': u'2',
+        u'quarantined': u'1',
+        u'maintenance': u'0',
+        u'dead': u'0',
+        u'busy': u'1',
+        u'now': unicode(self.now.strftime(DATETIME_NO_MICRO)),
+    }
+    request = handlers_endpoints.BotsRequest.combined_message_class(
+        dimensions=['id:id1|id2'])
+    response = self.call_api('count', body=message_to_dict(request))
+    self.assertEqual(expected, response.json)
+
+    expected = {
+        u'count': u'1',
+        u'quarantined': u'1',
+        u'maintenance': u'0',
+        u'dead': u'1',
+        u'busy': u'0',
+        u'now': unicode(self.now.strftime(DATETIME_NO_MICRO)),
+    }
     request = handlers_endpoints.BotsRequest.combined_message_class(
         dimensions=['pool:default', 'id:id3'])
     response = self.call_api('count', body=message_to_dict(request))
     self.assertEqual(expected, response.json)
 
-    expected[u'quarantined'] = u'0'
-    expected[u'dead'] = u'0'
-    expected[u'maintenance'] = u'1'
+    expected = {
+        u'count': u'1',
+        u'quarantined': u'0',
+        u'maintenance': u'1',
+        u'dead': u'0',
+        u'busy': u'0',
+        u'now': unicode(self.now.strftime(DATETIME_NO_MICRO)),
+    }
     request = handlers_endpoints.BotsRequest.combined_message_class(
         dimensions=['pool:default', 'id:id4'])
     response = self.call_api('count', body=message_to_dict(request))
@@ -2979,9 +3020,12 @@ class BotsApiTest(BaseTest):
     }
     self.assertEqual(expected, response.json)
 
+  def test_count_bad_request(self):
+    self.set_as_privileged_user()
+
     request = handlers_endpoints.BotsRequest.combined_message_class(
         dimensions=['bad'])
-    response = self.call_api('count', body=message_to_dict(request), status=400)
+    self.call_api('count', body=message_to_dict(request), status=400)
 
   def test_dimensions_all(self):
     """Asserts that BotsDimensions is returned with the right data."""

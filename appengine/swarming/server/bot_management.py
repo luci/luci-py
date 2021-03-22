@@ -74,6 +74,7 @@ from server import bq_state
 from server import config
 from server import task_pack
 from server import task_queues
+from server.constants import OR_DIM_SEP
 
 
 # BotEvent entities are deleted when they are older than the cutoff.
@@ -497,7 +498,11 @@ def filter_dimensions(q, dimensions):
     parts = d.split(':', 1)
     if len(parts) != 2 or any(i.strip() != i or not i for i in parts):
       raise ValueError('Invalid dimensions')
-    q = q.filter(BotInfo.dimensions_flat == d)
+    # expand OR operator
+    # e.g. 'foo:A|B' -> ['foo:A', 'foo:B']
+    values = parts[1].split(OR_DIM_SEP)
+    dims = ['%s:%s' % (parts[0], v) for v in values]
+    q = q.filter(BotInfo.dimensions_flat.IN(dims))
   return q
 
 

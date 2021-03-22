@@ -1274,6 +1274,9 @@ class SwarmingBotsService(remote.Service):
     except ValueError as e:
       raise endpoints.BadRequestException(str(e))
 
+    # this is required to request MultiQuery for OR dimension support.
+    q = q.order(bot_management.BotInfo._key)
+
     bots, cursor = datastore_utils.fetch_page(q, request.limit, request.cursor)
     return swarming_rpcs.BotList(
         cursor=cursor,
