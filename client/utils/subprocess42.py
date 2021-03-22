@@ -706,7 +706,7 @@ class Popen(subprocess.Popen):
     assert timeout is None or isinstance(timeout, (int, float)), timeout
     if timeout is None:
       super(Popen, self).wait()
-    elif six.PY3:
+    elif six.PY3 and not sys.platform == 'win32':
       super(Popen, self).wait(timeout)
     elif self.returncode is None:
       # If you think the following code is horrible, it's because it is
@@ -727,10 +727,18 @@ class Popen(subprocess.Popen):
     return self.returncode
 
   def _wait_win(self, wait_time):
-    result = subprocess._subprocess.WaitForSingleObject(self._handle,
-                                                        int(wait_time * 1000))
+    if six.PY2:
+      result = subprocess._subprocess.WaitForSingleObject(self._handle,
+                                                          int(wait_time * 1000))
+    else:
+      result = subprocess._winapi.WaitForSingleObject(self._handle,
+                                                          int(wait_time * 1000))
     if result != _WAIT_TIMEOUT:
-      self.returncode = subprocess._subprocess.GetExitCodeProcess(self._handle)
+      if six.PY2:
+        self.returncode = subprocess._subprocess.GetExitCodeProcess(
+          self._handle)
+      else:
+        self.returncode = subprocess._winapi.GetExitCodeProcess(self._handle)
       return True
     return False
 

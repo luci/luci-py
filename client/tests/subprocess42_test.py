@@ -978,7 +978,6 @@ time.sleep(60)
             ('stdout', b'incomplete last stdout'),
         ])
 
-  @unittest.skipIf(sys.platform == 'win32' and six.PY3, 'crbug.com/1182016')
   def test_wait_can_be_interrupted(self):
     cmd = [
         sys.executable,
