@@ -1653,10 +1653,11 @@ def _clean_cmd(parser, options, caches, root):
 
   if options.kvs_dir and fs.isdir(six.text_type(options.kvs_dir)):
     # Remove kvs file if its size exceeds fixed threshold.
-    size = file_path.get_recursive_size(options.kvs_dir)
+    kvs_dir = six.text_type(options.kvs_dir)
+    size = file_path.get_recursive_size(kvs_dir)
     if size >= _CAS_KVS_CACHE_THRESHOLD:
       logging.info("remove kvs dir with size: %d", size)
-      file_path.rmtree(six.text_type(options.kvs_dir))
+      file_path.rmtree(kvs_dir)
 
   # Trim first, then clean.
   local_caching.trim_caches(
