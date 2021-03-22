@@ -878,8 +878,6 @@ def _cancel_task_tx(request, result_summary, kill_running, bot_id, now, es_cfg,
     run_result.abandoned_ts = now
     run_result.modified_ts = now
     entities.append(run_result)
-    run_result.dead_after_ts = now + datetime.timedelta(
-        seconds=request.bot_ping_tolerance_secs)
   result_summary.abandoned_ts = now
   result_summary.modified_ts = now
 
