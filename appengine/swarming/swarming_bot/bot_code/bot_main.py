@@ -106,10 +106,8 @@ PASSLIST = (
     'swarming_bot.1.zip',
     'swarming_bot.2.zip',
     'swarming_bot.zip',
+    _CAS_KVS_CACHE_DB,
 )
-
-if sys.platform == 'win32':
-  PASSLIST = PASSLIST + (_CAS_KVS_CACHE_DB,)
 
 
 # These settings are documented in ../config/bot_config.py.
@@ -746,7 +744,8 @@ def _run_isolated_flags(botobj):
       os.path.join(botobj.base_dir, 'c'),
   ]
 
-  if sys.platform == 'win32':
+  if 1 < int(_get_dimensions(botobj).get('cores', [0])[0]):
+    # bot with a core is likely to have small memory and causes out of memory.
     args += [
         '--kvs-dir',
         os.path.join(botobj.base_dir, _CAS_KVS_CACHE_DB),
