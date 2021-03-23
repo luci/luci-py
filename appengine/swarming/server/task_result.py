@@ -953,9 +953,6 @@ class TaskRunResult(_TaskResultCommon):
     if not self.started_ts:
       raise datastore_errors.BadValueError('Must update .started_ts')
     if self.dead_after_ts:
-      if self.dead_after_ts <= self.modified_ts:
-        raise datastore_errors.BadValueError('.dead_after_ts must be set'
-                                             ' after .modified_ts')
       if self.state != State.RUNNING:
         raise datastore_errors.BadValueError('.dead_after_ts should be None')
     elif self.state == State.RUNNING:
