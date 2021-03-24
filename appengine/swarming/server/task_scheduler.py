@@ -1188,6 +1188,8 @@ def schedule_request(request, secret_bytes, enable_resultdb):
     while index < request.num_task_slices:
       # This needs to be extremely fast.
       to_run = task_to_run.new_task_to_run(request, index)
+      logging.debug('TODO(crbug.com/1186759): expiration_ts %s',
+                    to_run.expiration_ts)
       #  Make sure there's capacity if desired.
       t = request.task_slice(index)
       if (t.wait_for_capacity or
@@ -1374,6 +1376,8 @@ def bot_reap_task(bot_dimensions, bot_version):
         # it informed about the reaped task.
         external_scheduler.notify_requests(es_cfg, [(request, run_result)],
                                            True, False)
+      logging.debug('TODO(crbug.com/1186759): expiration_ts %s',
+                    to_run.expiration_ts)
       return request, secret_bytes, run_result
     return None, None, None
   finally:
