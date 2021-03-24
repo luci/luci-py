@@ -744,8 +744,8 @@ def _run_isolated_flags(botobj):
       os.path.join(botobj.base_dir, 'c'),
   ]
 
-  if 1 < int(_get_dimensions(botobj).get('cores', [0])[0]):
-    # bot with a core is likely to have small memory and causes out of memory.
+  if 2048 <= os_utilities.get_physical_ram():
+    # bot with small memory causes out of memory.
     args += [
         '--kvs-dir',
         os.path.join(botobj.base_dir, _CAS_KVS_CACHE_DB),
