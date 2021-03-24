@@ -127,6 +127,8 @@ class BotApiTest(test_env_handlers.AppTestBase):
     response = self.app.post_json(
         '/swarming/api/v1/bot/handshake', params=params).json
     self.assertEqual([
+        u'bot_config_name',
+        u'bot_config_rev',
         u'bot_group_cfg',
         u'bot_group_cfg_version',
         u'bot_version',
@@ -150,6 +152,8 @@ class BotApiTest(test_env_handlers.AppTestBase):
     params = {'dimensions': {'id': ['id1']}}
     response = self.app.post_json('/swarming/api/v1/bot/handshake', params).json
     self.assertEqual([
+        u'bot_config_name',
+        u'bot_config_rev',
         u'bot_group_cfg',
         u'bot_group_cfg_version',
         u'bot_version',
@@ -191,6 +195,8 @@ class BotApiTest(test_env_handlers.AppTestBase):
     response = self.app.post_json(
         '/swarming/api/v1/bot/handshake', params=params).json
     self.assertEqual([
+        u'bot_config_name',
+        u'bot_config_rev',
         u'bot_group_cfg',
         u'bot_group_cfg_version',
         u'bot_version',
@@ -233,6 +239,8 @@ class BotApiTest(test_env_handlers.AppTestBase):
     response = self.app.post_json(
         '/swarming/api/v1/bot/handshake', params=params).json
     self.assertEqual([
+        u'bot_config_name',
+        u'bot_config_rev',
         u'bot_group_cfg',
         u'bot_group_cfg_version',
         u'bot_version',
@@ -275,6 +283,8 @@ class BotApiTest(test_env_handlers.AppTestBase):
     response = self.app.post_json(
         '/swarming/api/v1/bot/handshake', params=params).json
     self.assertEqual([
+        u'bot_config_name',
+        u'bot_config_rev',
         u'bot_group_cfg',
         u'bot_group_cfg_version',
         u'bot_version',

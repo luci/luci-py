@@ -491,8 +491,11 @@ class BotHandshakeHandler(_BotBaseHandler):
         message=res.quarantined_msg,
         register_dimensions=False)
 
+    bot_ver, _, bot_config_rev = bot_code.get_bot_version(self.request.host_url)
     data = {
-        'bot_version': bot_code.get_bot_version(self.request.host_url)[0],
+        'bot_version': bot_ver,
+        'bot_config_rev': bot_config_rev,
+        'bot_config_name': 'bot_config.py',
         'server_version': utils.get_app_version(),
         'bot_group_cfg_version': res.bot_group_cfg.version,
         'bot_group_cfg': {
