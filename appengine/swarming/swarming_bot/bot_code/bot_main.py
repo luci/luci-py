@@ -1227,6 +1227,7 @@ def _do_handshake(botobj, quit_bit):
       script = resp.get('bot_config_name')
       if content:
         _register_extra_bot_config(content, rev, script)
+      botobj._update_bot_config(script, rev)
       break
     logging.error(
         'Failed to contact for handshake, retrying in %d sec...', sleep_time)

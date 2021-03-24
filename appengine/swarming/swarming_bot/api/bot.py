@@ -96,6 +96,7 @@ class Bot(object):
     self._bot_group_cfg_ver = None
     self._server_side_dimensions = {}
     self._bot_restart_msg = None
+    self._bot_config = None
 
   @property
   def base_dir(self):
@@ -307,8 +308,21 @@ class Bot(object):
       self._bot_group_cfg_ver = cfg_version
       self._server_side_dimensions = (cfg or {}).get('dimensions')
       # Apply changes to 'self._attributes'.
-      self._update_dimensions(self._attributes.get('dimensions') or {})
-      self._update_state(self._attributes.get('state') or {})
+      self._update_dimensions(self._attributes.get('dimensions', {}))
+      self._update_state(self._attributes.get('state', {}))
+
+  def _update_bot_config(self, name, rev):
+    """ Update bot_config script name and revision.
+
+    This is called at start, and aftre handshake if a custom script is injected.
+    """
+    with self._lock:
+      self._bot_config = {
+          'name': name,
+          'revision': rev,
+      }
+      # Apply changes to 'self._attributes'.
+      self._update_state(self._attributes.get('state', {}))
 
   def _update_dimensions(self, new_dimensions):
     """Called internally to update Bot.dimensions."""
@@ -320,4 +334,6 @@ class Bot(object):
     """Called internally to update Bot.state."""
     state = new_state.copy()
     state['bot_group_cfg_version'] = self._bot_group_cfg_ver
+    if self._bot_config:
+      state['bot_config'] = self._bot_config
     self._attributes['state'] = state
