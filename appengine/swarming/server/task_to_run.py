@@ -488,11 +488,9 @@ def new_task_to_run(request, task_slice_index):
   # TODO(maruel): expiration_ts is based on request.created_ts but it could be
   # enqueued sooner or later. crbug.com/781021
   offset = 0
-  if task_slice_index:
-    for i in range(task_slice_index):
-      offset += request.task_slice(i).expiration_secs
-  exp = request.created_ts + datetime.timedelta(
-      seconds=request.task_slice(task_slice_index).expiration_secs+offset)
+  for i in range(task_slice_index + 1):
+    offset += request.task_slice(i).expiration_secs
+  exp = request.created_ts + datetime.timedelta(seconds=offset)
   h = request.task_slice(task_slice_index).properties.dimensions
   qn = _gen_queue_number(
       task_queues.hash_dimensions(h), request.created_ts, request.priority)
