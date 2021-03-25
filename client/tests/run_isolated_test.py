@@ -1019,7 +1019,6 @@ class RunIsolatedTestRun(RunIsolatedTestBase):
     super(RunIsolatedTestRun, self).tearDown()
     mock.patch.stopall()
 
-  @unittest.skipIf(sys.platform == 'win32' and six.PY3, 'crbug.com/1182016')
   # Runs the actual command requested.
   def test_output(self):
     # Starts a full isolate server mock and have run_tha_test() uploads results
@@ -1510,7 +1509,6 @@ class RunIsolatedTestOutputFiles(RunIsolatedTestBase):
     finally:
       server.close()
 
-  @unittest.skipIf(sys.platform == 'win32' and six.PY3, 'crbug.com/1182016')
   def test_output_cmd(self):
     isolated = {
       u'algo': u'sha-1',
