@@ -397,7 +397,6 @@ class RunIsolatedTest(unittest.TestCase):
     expected_mangled = dict((k, oct(v[index])) for k, v in expected.items())
     self.assertEqual(expected_mangled, actual)
 
-  @unittest.skipIf(sys.platform == 'win32' and six.PY3, 'crbug.com/1182016')
   def test_simple(self):
     out, err, returncode = self._run(
         ['--', 'python', '-c', 'print("no --root-dir")'])
@@ -405,7 +404,6 @@ class RunIsolatedTest(unittest.TestCase):
     self.assertEqual('', err)
     self.assertEqual(0, returncode)
 
-  @unittest.skipIf(sys.platform == 'win32' and six.PY3, 'crbug.com/1182016')
   def test_isolated_normal(self):
     # Loads the .isolated from the store as a hash.
     # Load an isolated file with the same content (same SHA-1), listed under two
@@ -425,7 +423,6 @@ class RunIsolatedTest(unittest.TestCase):
     actual = list_files_tree(self._isolated_cache_dir)
     self.assertEqual(sorted(set(expected)), actual)
 
-  @unittest.skipIf(sys.platform == 'win32' and six.PY3, 'crbug.com/1182016')
   def test_isolated_output(self):
     isolated_hash = self._store('output.isolated')
     expected = [
@@ -446,7 +443,6 @@ class RunIsolatedTest(unittest.TestCase):
     actual_content = self._isolated_server.contents['default'][h.hexdigest()]
     self.assertEqual(actual_content, encoded_content)
 
-  @unittest.skipIf(sys.platform == 'win32' and six.PY3, 'crbug.com/1182016')
   def test_isolated_max_path(self):
     # Make sure we can map and delete a tree that has paths longer than
     # MAX_PATH.
@@ -477,7 +473,6 @@ class RunIsolatedTest(unittest.TestCase):
     actual = list_files_tree(self._isolated_cache_dir)
     self.assertEqual(sorted(expected), actual)
 
-  @unittest.skipIf(sys.platform == 'win32' and six.PY3, 'crbug.com/1182016')
   def test_isolated_includes(self):
     # Loads an .isolated that includes another one.
 
@@ -503,7 +498,6 @@ class RunIsolatedTest(unittest.TestCase):
     actual = list_files_tree(self._isolated_cache_dir)
     self.assertEqual(sorted(expected), actual)
 
-  @unittest.skipIf(sys.platform == 'win32' and six.PY3, 'crbug.com/1182016')
   def test_isolated_tar_archive(self):
     # Loads an .isolated that includes an ar archive.
     isolated_hash = self._store('tar_archive.isolated')
@@ -610,7 +604,6 @@ class RunIsolatedTest(unittest.TestCase):
       self.assertEqual(str(os.nice(0)+1), out)
     self.assertEqual(0, returncode)
 
-  @unittest.skipIf(sys.platform == 'win32' and six.PY3, 'crbug.com/1182016')
   def test_limit_processes(self):
     # Execution fails because it tries to run a second process.
     cmd = [
@@ -626,7 +619,10 @@ class RunIsolatedTest(unittest.TestCase):
       cmd.append('import os,sys; sys.stdout.write(str(os.nice(0)))')
     out, err, returncode = self._run(cmd)
     if sys.platform == 'win32':
-      self.assertIn('WindowsError', err)
+      if six.PY2:
+        self.assertIn('WindowsError', err)
+      else:
+        self.assertIn('WinError', err)
       # Value for ERROR_NOT_ENOUGH_QUOTA. See
       # https://docs.microsoft.com/windows/desktop/debug/system-error-codes--1700-3999-
       self.assertIn('1816', err)
@@ -638,7 +634,6 @@ class RunIsolatedTest(unittest.TestCase):
       self.assertEqual('0', out, out)
       self.assertEqual(0, returncode)
 
-  @unittest.skipIf(sys.platform == 'win32' and six.PY3, 'crbug.com/1182016')
   def test_named_cache(self):
     # Runs a task that drops a file in the named cache, and assert that it's
     # correctly saved.
