@@ -741,7 +741,7 @@ class TaskResultApiTest(TestCase):
     # https://crbug.com/916557: RESOURCE_EXHAUSTED
 
   # TODO(crbug.com/1115778): remove after RBE-CAS migration.
-  def test_to_proto(self):
+  def test_TaskRunResult_to_proto_isolated(self):
     cipd_client_pkg = task_request.CipdPackage(
         package_name=u'infra/tools/cipd/${platform}',
         version=u'git_revision:deadbeef')
@@ -906,12 +906,26 @@ class TaskResultApiTest(TestCase):
     run_result.to_proto(actual)
     self.assertEqual(unicode(expected), unicode(actual))
 
-  # TODO(crbug.com/1115778): rename to test_to_proto.
-  def test_to_proto_with_cas(self):
+  def test_TaskRunResult_to_proto(self):
     cipd_client_pkg = task_request.CipdPackage(
         package_name=u'infra/tools/cipd/${platform}',
         version=u'git_revision:deadbeef')
+    # Grand parent entity must have a valid key id and be stored.
+    # This task uses user:Jesus, which will be inherited automatically.
+    grand_parent = _gen_request()
+    grand_parent.key = task_request.new_request_key()
+    grand_parent.put()
+    # Parent entity must have a valid key id and be stored.
+    # Create them 1 second apart to differentiate create_time.
+    self.mock_now(self.now, 1)
+    grand_parent_run_id = grand_parent.task_id[:-1] + u'1'
+    parent = _gen_request(parent_task_id=grand_parent_run_id)
+    parent.key = task_request.new_request_key()
+    parent.put()
+    self.mock_now(self.now, 2)
+
     run_result = _gen_run_result(
+        parent_task_id=parent.task_id[:-1] + u'1',
         properties=_gen_properties(
             cipd_input={
                 u'client_package': cipd_client_pkg,
@@ -922,7 +936,8 @@ class TaskResultApiTest(TestCase):
                 u'server': u'http://localhost:2'
             },
             containment=task_request.Containment(lower_priority=True),
-        ),)
+        ),
+    )
     run_result.started_ts = self.now + datetime.timedelta(seconds=20)
     run_result.abandoned_ts = self.now + datetime.timedelta(seconds=30)
     run_result.completed_ts = self.now + datetime.timedelta(seconds=40)
@@ -994,6 +1009,7 @@ class TaskResultApiTest(TestCase):
             name=u'Request name',
             authenticated=u"user:mocked@example.com",
             tags=[
+                u'parent_task_id:1d69b9f470008811',
                 u'pool:default',
                 u'priority:50',
                 u'realm:none',
@@ -1003,7 +1019,9 @@ class TaskResultApiTest(TestCase):
                 u'user:Jesus',
             ],
             user=u'Jesus',
-            task_id=u'1d69b9f088008810',
+            task_id=u'1d69b9f858008810',
+            parent_task_id='1d69b9f470008810',
+            parent_run_id='1d69b9f470008811',
         ),
         duration=duration_pb2.Duration(seconds=1),
         state=swarming_pb2.TIMED_OUT,
@@ -1020,9 +1038,8 @@ class TaskResultApiTest(TestCase):
         ),
         server_versions=[u'v1a'],
         children_task_ids=[u'12310'],
-        #deduped_from=u'123410',
-        task_id=u'1d69b9f088008810',
-        run_id=u'1d69b9f088008811',
+        task_id=u'1d69b9f858008810',
+        run_id=u'1d69b9f858008811',
         cipd_pins=swarming_pb2.CIPDPins(
             server=u'http://localhost:2',
             client_package=swarming_pb2.CIPDPackage(
@@ -1064,8 +1081,9 @@ class TaskResultApiTest(TestCase):
             digest=swarming_pb2.Digest(hash='12345', size_bytes=1),
         ),
     )
-    expected.request.create_time.FromDatetime(self.now)
-    expected.create_time.FromDatetime(self.now)
+    expected.request.create_time.FromDatetime(self.now +
+                                              datetime.timedelta(seconds=2))
+    expected.create_time.FromDatetime(self.now + datetime.timedelta(seconds=2))
     expected.start_time.FromDatetime(self.now + datetime.timedelta(seconds=20))
     expected.abandon_time.FromDatetime(self.now +
                                        datetime.timedelta(seconds=30))
@@ -1073,6 +1091,18 @@ class TaskResultApiTest(TestCase):
 
     actual = swarming_pb2.TaskResult()
     run_result.to_proto(actual)
+    self.assertEqual(unicode(expected), unicode(actual))
+
+    # Make sure the root task id is the grand parent.
+    self.assertEqual(u'1d69b9f088008810', grand_parent.task_id)
+    self.assertEqual(u'1d69b9f088008811', grand_parent_run_id)
+    # Confirming that the parent and grand parent have different task ID.
+    self.assertEqual(u'1d69b9f470008810', parent.task_id)
+    self.assertEqual(expected.request.parent_task_id, parent.task_id)
+    actual = swarming_pb2.TaskResult()
+    expected.request.root_task_id = grand_parent.task_id
+    expected.request.root_run_id = grand_parent_run_id
+    run_result.to_proto(actual, append_root_ids=True)
     self.assertEqual(unicode(expected), unicode(actual))
 
   def test_TaskResultSummary_to_proto_empty(self):

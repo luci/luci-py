@@ -1036,7 +1036,7 @@ class TaskRequestApiTest(TestCase):
         request_2.task_slice(0).properties_hash(request_2))
 
   # TODO(crbug.com/1115778): remove after RBE-CAS migration.
-  def test_to_proto_isolated(self):
+  def test_TaskRequest_to_proto_isolated(self):
     # Try to set as much things as possible to exercise most code paths.
     def getrandbits(i):
       self.assertEqual(i, 16)
@@ -1196,7 +1196,7 @@ class TaskRequestApiTest(TestCase):
     expected.root_run_id = parent_run_id
     self.assertEqual(unicode(expected), unicode(actual))
 
-  def test_to_proto(self):
+  def test_TaskRequest_to_proto(self):
     # Try to set as much things as possible to exercise most code paths.
     def getrandbits(i):
       self.assertEqual(i, 16)
@@ -1353,6 +1353,11 @@ class TaskRequestApiTest(TestCase):
 
     actual = swarming_pb2.TaskRequest()
     request.to_proto(actual)
+    self.assertEqual(unicode(expected), unicode(actual))
+    actual = swarming_pb2.TaskRequest()
+    expected.root_task_id = grand_parent.task_id
+    expected.root_run_id = grand_parent.task_id[:-1] + u'1'
+    request.to_proto(actual, append_root_ids=True)
     self.assertEqual(unicode(expected), unicode(actual))
 
     # With append_root_ids=True.

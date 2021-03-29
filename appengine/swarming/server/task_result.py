@@ -664,9 +664,9 @@ class _TaskResultCommon(ndb.Model):
     out['id'] = self.task_id
     return out
 
-  def to_proto(self, out):
+  def to_proto(self, out, append_root_ids=False):
     """Converts self to a swarming_pb2.TaskResult"""
-    self.request.to_proto(out.request)
+    self.request.to_proto(out.request, append_root_ids=append_root_ids)
     if self.created_ts:
       # Can only be unset in test case.
       out.create_time.FromDatetime(self.created_ts)
@@ -1586,7 +1586,7 @@ def task_bq_run(start, end):
   def _convert(e):
     """Returns a tuple(bq_key, row)."""
     out = swarming_pb2.TaskResult()
-    e.to_proto(out)
+    e.to_proto(out, append_root_ids=True)
     return (e.task_id, out)
 
   total = 0
@@ -1620,7 +1620,7 @@ def task_bq_summary(start, end):
   def _convert(e):
     """Returns a tuple(bq_key, row)."""
     out = swarming_pb2.TaskResult()
-    e.to_proto(out)
+    e.to_proto(out, append_root_ids=True)
     if not out.HasField('end_time'):
       logging.warning('crbug.com/1064833: task %s does not have end_time %s',
                       e.task_id, out)
