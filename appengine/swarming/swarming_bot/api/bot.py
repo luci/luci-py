@@ -96,7 +96,7 @@ class Bot(object):
     self._bot_group_cfg_ver = None
     self._server_side_dimensions = {}
     self._bot_restart_msg = None
-    self._bot_config = None
+    self._bot_config = {}
 
   @property
   def base_dir(self):
@@ -322,12 +322,16 @@ class Bot(object):
           'revision': rev,
       }
       # Apply changes to 'self._attributes'.
+      self._update_dimensions(self._attributes.get('dimensions', {}))
       self._update_state(self._attributes.get('state', {}))
 
   def _update_dimensions(self, new_dimensions):
     """Called internally to update Bot.dimensions."""
     dimensions = new_dimensions.copy()
     dimensions.update(self._server_side_dimensions)
+    bot_config_name = self._bot_config.get('name')
+    if bot_config_name:
+      dimensions['bot_config'] = [bot_config_name]
     self._attributes['dimensions'] = dimensions
 
   def _update_state(self, new_state):
