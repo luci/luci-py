@@ -7,6 +7,8 @@
 import base64
 import datetime
 import logging
+import math
+import random
 import zlib
 
 from six.moves import urllib
@@ -27,10 +29,15 @@ from . import validation
 
 
 MEMCACHE_PREFIX = 'components.config/v2/'
+
 # Delete LastGoodConfig if it was not accessed for more than a week.
 CONFIG_MAX_TIME_SINCE_LAST_ACCESS = datetime.timedelta(days=7)
-# Update LastGoodConfig.last_access_ts if it will be deleted next day.
-UPDATE_LAST_ACCESS_TIME_FREQUENCY = datetime.timedelta(days=1)
+
+# Update LastGoodConfig.last_access_ts approximately daily.
+#
+# The threshold is random to avoid a stampede, see _maybe_update_last_access_ts.
+UPDATE_LAST_ACCESS_TIME_MIN = datetime.timedelta(hours=22)
+UPDATE_LAST_ACCESS_TIME_MAX = datetime.timedelta(hours=24)
 
 
 class LastGoodConfig(ndb.Model):
@@ -330,7 +337,7 @@ def _get_last_good_async(config_set, path, dest_type):
   # or its proto_message_name is not up to date, then update the entity.
   if (not last_good or
       not last_good.last_access_ts or
-      now - last_good.last_access_ts > UPDATE_LAST_ACCESS_TIME_FREQUENCY or
+      _maybe_update_last_access_ts(now-last_good.last_access_ts) or
       last_good.proto_message_name != proto_message_name):
     # pylint does not like this usage of transactional_tasklet
     # pylint: disable=no-value-for-parameter
@@ -373,6 +380,21 @@ def _get_last_good_async(config_set, path, dest_type):
       cfg.MergeFromString(last_good.content_binary)
   cfg = cfg or common._convert_config(last_good.content, dest_type)
   raise ndb.Return(last_good.revision, cfg)
+
+
+def _maybe_update_last_access_ts(elapsed):
+  if elapsed > UPDATE_LAST_ACCESS_TIME_MAX:
+    return True  # definitely stale
+  if elapsed < UPDATE_LAST_ACCESS_TIME_MIN:
+    return False  # fresh enough, avoid hitting RNG and log
+  # https://en.wikipedia.org/wiki/Cache_stampede#Probabilistic_early_expiration
+  # `delta * beta` is somewhat arbitrarily picked to be 5 min. Taking into
+  # account existence of sys.float_info.min, it implies there's a non-zero
+  # probability to update last_access_ts only once ttl < ~1h (on 64 bit system).
+  # It is very low at first, but quickly increases as ttl approaches 0.
+  ttl = UPDATE_LAST_ACCESS_TIME_MAX - elapsed
+  threshold = datetime.timedelta(minutes=-5*math.log(random.random()))
+  return ttl < threshold
 
 
 def format_url(url_format, *args):
