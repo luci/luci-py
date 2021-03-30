@@ -39,7 +39,7 @@ _CACHED_METADATA_TOKEN_LOCK = threading.Lock()
 def _padded_b64_decode(data):
   mod = len(data) % 4
   if mod:
-    data += '=' * (4 - mod)
+    data += b'=' * (4 - mod)
   return base64.urlsafe_b64decode(data)
 
 

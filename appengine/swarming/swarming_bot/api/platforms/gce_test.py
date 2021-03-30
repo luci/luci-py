@@ -222,11 +222,12 @@ class TestSignedMetadataToken(auto_stub.TestCase):
     # JWTs are '<header>.<payload>.<signature>'. We care only about payload.
     bytes_json = bytes(
         json.dumps({
+            'name': 'test jwt', # this is for testing _padded_b64_decode()
             'iat': self.now - 600,
             'exp': self.now + 3000,  # 1h after 'iat'
         }).encode('utf-8'))
     jwt = b'unimportant.' + base64.urlsafe_b64encode(
-        bytes_json) + b'.unimportant'
+        bytes_json).rstrip(b'=') + b'.unimportant'
 
     metadata_calls = []
     def mocked_raw_metadata_request(path):
