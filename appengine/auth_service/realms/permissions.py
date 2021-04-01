@@ -172,8 +172,9 @@ def db():
       permission('buildbucket.buckets.pause'),  # used by v1 API only
   ])
   role('role/buildbucket.builderServiceAccount', [
-      include('role/swarming.taskServiceAccount'),  # to run on Swarming itself
       include('role/logdog.writer'),                # to create build logs
+      include('role/resultdb.reader'),              # to include invocations
+      include('role/swarming.taskServiceAccount'),  # to run on Swarming itself
       include('role/swarming.taskTriggerer'),       # to trigger isolated tests
       permission('buildbucket.builds.update'),      # to update build steps
   ])
