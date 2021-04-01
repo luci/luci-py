@@ -95,6 +95,7 @@ _CAS_KVS_CACHE_DB = 'cas_kvs_cache'
 # for more details.
 PASSLIST = (
     '*-cacert.pem',
+    '.vpython3',
     'README',
     'README.md',
     'c',
