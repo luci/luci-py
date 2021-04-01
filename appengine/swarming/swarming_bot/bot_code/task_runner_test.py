@@ -1115,7 +1115,6 @@ class TestTaskRunnerKilled(TestTaskRunnerBase):
             },
         })
 
-  @unittest.skipIf(sys.platform == 'win32' and six.PY3, 'crbug.com/1182016')
   def test_kill_and_wait(self):
     # Test the case where the script swallows the SIGTERM/SIGBREAK signal and
     # hangs.
@@ -1124,16 +1123,42 @@ class TestTaskRunnerKilled(TestTaskRunnerBase):
       # The warning signal is received as SIGTERM on posix and SIGBREAK on
       # Windows.
       sig = 'SIGBREAK' if sys.platform == 'win32' else 'SIGTERM'
-      f.write((('import signal, sys, time\n'
-                'def handler(_signum, _frame):\n'
-                '  sys.stdout.write("got it\\n")\n'
-                'signal.signal(signal.%s, handler)\n'
-                'sys.stdout.write("ok\\n")\n'
-                'while True:\n'
-                '  try:\n'
-                '    time.sleep(1)\n'
-                '  except IOError:\n'
-                '    pass\n') % sig).encode())
+      if six.PY3 and sys.platform == 'win32':
+        f.write(("""
+import signal, sys, time, ctypes
+from ctypes import wintypes
+HandlerRoutine = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.DWORD)
+SetConsoleCtrlHandler = ctypes.windll.kernel32.SetConsoleCtrlHandler
+SetConsoleCtrlHandler.argtypes = (HandlerRoutine, wintypes.BOOL)
+SetConsoleCtrlHandler.restype = wintypes.BOOL
+def _handler(signum):
+  if signum == signal.CTRL_BREAK_EVENT:
+    sys.stdout.write("got it\\n")
+    sys.stdout.flush()
+  return 0
+handler = HandlerRoutine(_handler)
+if not SetConsoleCtrlHandler(handler, 1):
+  exit(-1)
+sys.stdout.write("ok\\n")
+while True:
+  try:
+    time.sleep(1)
+  except IOError:
+    pass
+  """).encode())
+      else:
+        f.write(("""
+import signal, sys, time
+def handler(_signum, _frame):
+  sys.stdout.write("got it\\n")
+signal.signal(signal.%s, handler)
+sys.stdout.write("ok\\n")
+while True:
+  try:
+    time.sleep(1)
+  except IOError:
+    pass
+  """ % sig).encode())
     cmd = [sys.executable, '-u', script]
     # detached=True is required on Windows for SIGBREAK to propagate properly.
     p = subprocess42.Popen(cmd, detached=True, stdout=subprocess42.PIPE)
@@ -1141,13 +1166,21 @@ class TestTaskRunnerKilled(TestTaskRunnerBase):
     # Wait for it to write 'ok', so we know it's handling signals. It's
     # important because otherwise SIGTERM/SIGBREAK could be sent before the
     # signal handler is installed, and this is not what we're testing here.
-    self.assertEqual(b'ok\n', p.stdout.readline())
+    self.assertEqual(to_native_eol('ok\n').encode(), p.stdout.readline())
 
     # Send a SIGTERM/SIGBREAK, the process ignores it, send a SIGKILL.
     exit_code = task_runner.kill_and_wait(p, 0.1, 'testing purposes')
-    expected = 1 if sys.platform == 'win32' else -signal.SIGKILL
+    if sys.platform == 'win32':
+      if six.PY2:
+        expected = 1
+      else:
+        # 0xC000013A is STATUS_CONTROL_C_EXIT
+        # https://docs.microsoft.com/en-us/openspecs/windows_protocols/ms-erref/596a1078-e883-4972-9bbc-49e60bebca55
+        expected = 0xC000013A
+    else:
+        expected = -signal.SIGKILL
     self.assertEqual(expected, exit_code)
-    self.assertEqual(b'got it\n', p.stdout.readline())
+    self.assertEqual(to_native_eol('got it\n').encode(), p.stdout.readline())
 
   @unittest.skipIf(sys.platform == 'win32',
                    'TODO(crbug.com/1017545): it gets stuck at proc.wait()')
