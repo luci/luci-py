@@ -1115,7 +1115,6 @@ class TestTaskRunnerKilled(TestTaskRunnerBase):
             },
         })
 
-  @unittest.skipIf(sys.platform == 'win32' and six.PY3, 'crbug.com/1182016')
   def test_kill_and_wait(self):
     # Test the case where the script swallows the SIGTERM/SIGBREAK signal and
     # hangs.
@@ -1131,7 +1130,7 @@ class TestTaskRunnerKilled(TestTaskRunnerBase):
                 'sys.stdout.write("ok\\n")\n'
                 'while True:\n'
                 '  try:\n'
-                '    time.sleep(1)\n'
+                '    time.sleep(0.01)\n'
                 '  except IOError:\n'
                 '    pass\n') % sig).encode())
     cmd = [sys.executable, '-u', script]
@@ -1141,13 +1140,13 @@ class TestTaskRunnerKilled(TestTaskRunnerBase):
     # Wait for it to write 'ok', so we know it's handling signals. It's
     # important because otherwise SIGTERM/SIGBREAK could be sent before the
     # signal handler is installed, and this is not what we're testing here.
-    self.assertEqual(b'ok\n', p.stdout.readline())
+    self.assertEqual(to_native_eol('ok\n').encode(), p.stdout.readline())
 
     # Send a SIGTERM/SIGBREAK, the process ignores it, send a SIGKILL.
-    exit_code = task_runner.kill_and_wait(p, 0.1, 'testing purposes')
+    exit_code = task_runner.kill_and_wait(p, 1, 'testing purposes')
     expected = 1 if sys.platform == 'win32' else -signal.SIGKILL
     self.assertEqual(expected, exit_code)
-    self.assertEqual(b'got it\n', p.stdout.readline())
+    self.assertEqual(to_native_eol('got it\n').encode(), p.stdout.readline())
 
   @unittest.skipIf(sys.platform == 'win32',
                    'TODO(crbug.com/1017545): it gets stuck at proc.wait()')
