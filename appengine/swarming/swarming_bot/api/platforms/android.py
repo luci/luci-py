@@ -201,8 +201,8 @@ def get_dimensions(devices):
         map(_fix_flavor, dimensions[u'device_os_flavor']))
 
   nb_android = len(dimensions[u'android'])
-  dimensions[u'android_devices'] = map(
-      str, range(nb_android, max(0, nb_android-4), -1))
+  dimensions[u'android_devices'] = list(
+      map(str, range(nb_android, max(0, nb_android - 4), -1)))
 
   # TODO(maruel): Add back once dimensions limit is figured out and there's a
   # need.
