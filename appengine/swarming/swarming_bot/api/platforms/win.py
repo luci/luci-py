@@ -317,10 +317,7 @@ def get_visual_studio_versions():
   Returns:
     A list of Visual Studio version strings.
   """
-  if six.PY3:
-    import winreg
-  else:
-    import _winreg as winreg
+  from six.moves import winreg
 
   try:
     k = winreg.OpenKey(
@@ -346,10 +343,7 @@ def get_cpuinfo():
   # Ironically, the data returned by WMI is mostly worthless.
   # Another option is IsProcessorFeaturePresent().
   # https://msdn.microsoft.com/en-us/library/windows/desktop/ms724482.aspx
-  if six.PY3:
-    import winreg
-  else:
-    import _winreg as winreg
+  from six.moves import winreg
   k = winreg.OpenKey(
       winreg.HKEY_LOCAL_MACHINE,
       'HARDWARE\\DESCRIPTION\\System\\CentralProcessor\\0')
@@ -572,10 +566,7 @@ def get_reboot_required():
   """
   # Based on https://stackoverflow.com/a/45717438
   k = None
-  if six.PY3:
-    import winreg
-  else:
-    import _winreg as winreg
+  from six.moves import winreg
   try:
     k = winreg.OpenKey(
         winreg.HKEY_LOCAL_MACHINE,
