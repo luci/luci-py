@@ -14,13 +14,17 @@
 
 """Defines AdbCommandsSafe, an exception safe version of AdbCommands."""
 
-import cStringIO
+from __future__ import absolute_import
 import inspect
 import logging
 import socket
 import subprocess
 import time
 import uuid
+
+import six
+from six.moves import cStringIO
+from six.moves import range
 
 from adb import adb_commands
 from adb import adb_protocol
@@ -495,7 +499,7 @@ class AdbCommandsSafe(object):
 
   def IsShellOk(self, cmd):
     """Returns True if the shell command can be sent."""
-    if isinstance(cmd, unicode):
+    if isinstance(cmd, six.text_type):
       cmd = cmd.encode('utf-8')
     assert isinstance(cmd, str), cmd
     if not self._adb_cmd:
@@ -517,7 +521,7 @@ class AdbCommandsSafe(object):
       - stdout is as unicode if it ran, None if an USB error occurred.
       - exit_code is set if ran.
     """
-    if isinstance(cmd, unicode):
+    if isinstance(cmd, six.text_type):
       cmd = cmd.encode('utf-8')
     assert isinstance(cmd, str), cmd
     if not self._adb_cmd:
@@ -559,7 +563,7 @@ class AdbCommandsSafe(object):
     Yields output as str. The exit code and exceptions are lost. If the device
     context is invalid, the command is silently dropped.
     """
-    if isinstance(cmd, unicode):
+    if isinstance(cmd, six.text_type):
       cmd = cmd.encode('utf-8')
     assert isinstance(cmd, str), cmd
     assert self.IsShellOk(cmd), 'Command is too long: %r' % cmd

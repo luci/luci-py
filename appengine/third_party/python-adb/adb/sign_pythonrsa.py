@@ -12,10 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import rsa
+from __future__ import absolute_import
 
 from pyasn1.codec.der import decoder
 from pyasn1.type import univ
+import rsa
 from rsa import pkcs1
 
 

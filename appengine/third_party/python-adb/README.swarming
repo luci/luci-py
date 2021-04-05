@@ -1,7 +1,8 @@
 Name: Python ADB + Fastboot implementation
 Short Name: python-adb
 URL: https://chromium.googlesource.com/infra/luci/python-adb
-Revision: adb84eb05066227df1a74bd566e2d846a09b17fd
+# TODO(crbug.com/1012230): update the revision after merging https://crrev.com/c/2796724
+Revision: 1d5037ef6d609aab1cab720896f33b48ae1c57cf
 License: Apache License, Version 2.0
 
 Description:
