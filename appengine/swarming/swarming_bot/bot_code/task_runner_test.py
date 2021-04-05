@@ -1010,7 +1010,6 @@ class TestTaskRunnerKilled(TestTaskRunnerBase):
         output=(to_native_eol('hi\ngot signal %d\nbye\n') %
                 task_runner.SIG_BREAK_OR_TERM).encode())
 
-  @unittest.skipIf(sys.platform == 'win32' and six.PY3, 'crbug.com/1182016')
   def test_isolated_io_signal_grand_children(self):
     """Handles grand-children process hanging and signal management.
 
@@ -1061,10 +1060,8 @@ class TestTaskRunnerKilled(TestTaskRunnerBase):
         # signal.
         io_timeout=self.SHORT_TIME_OUT,
         grace_period=60.)
-    # Actually 0xc000013a
-    exit_code = -1073741510 if sys.platform == 'win32' else -signal.SIGTERM
     expected = {
-        u'exit_code': exit_code,
+        u'exit_code': EXIT_CODE_TERM,
         u'hard_timeout': False,
         u'io_timeout': True,
         u'must_signal_internal_failure': None,
@@ -1098,8 +1095,9 @@ class TestTaskRunnerKilled(TestTaskRunnerBase):
     self.expectTask(
         manifest['task_id'],
         io_timeout=True,
-        exit_code=exit_code,
-        output=re.compile(b'parent\n\\d+\nchildren\n\\d+\nhi\n'),
+        exit_code=EXIT_CODE_TERM,
+        output=re.compile(
+          to_native_eol('parent\n\\d+\nchildren\n\\d+\nhi\n').encode()),
         isolated_stats={
             u'download': {
                 u'duration': 0.,
