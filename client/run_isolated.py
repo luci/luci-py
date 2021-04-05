@@ -413,6 +413,10 @@ def get_command_env(tmp_dir, cipd_info, run_dir, env, env_prefixes, out_dir,
     bin_dir = os.path.dirname(cipd_info.client.binary_path)
     out['PATH'] = '%s%s%s' % (_to_str(bin_dir), os.pathsep, out['PATH'])
     out['CIPD_CACHE_DIR'] = _to_str(cipd_info.cache_dir)
+    cipd_info_path = os.path.join(tmp_dir, 'cipd_info.json')
+    with open(cipd_info_path, 'w') as f:
+      json.dump(cipd_info.pins, f)
+    out['ISOLATED_RESOLVED_PACKAGE_VERSIONS_FILE'] = cipd_info_path
 
   for key, paths in env_prefixes.items():
     assert isinstance(paths, list), paths
