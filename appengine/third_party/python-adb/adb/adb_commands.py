@@ -22,17 +22,13 @@ subprocess and a network socket.
 All timeouts are in milliseconds.
 """
 
-from __future__ import absolute_import
+import cStringIO
 import os
 import socket
-
-import six
-from six.moves import cStringIO
 
 from adb import adb_protocol
 from adb import common
 from adb import filesync_protocol
-
 
 # From adb.h
 CLASS = 0xFF
@@ -44,7 +40,7 @@ DeviceIsAvailable = common.InterfaceMatcher(CLASS, SUBCLASS, PROTOCOL)
 
 try:
   # Imported locally to keep compatibility with previous code.
-  from .sign_m2crypto import M2CryptoSigner
+  from sign_m2crypto import M2CryptoSigner
 except ImportError:
   # Ignore this error when M2Crypto is not installed, there are other options.
   pass
@@ -135,7 +131,7 @@ class AdbCommands(object):
     """
     connection = self.conn.Open(
         destination='sync:', timeout_ms=timeout_ms)
-    if isinstance(source_file, six.string_types):
+    if isinstance(source_file, basestring):
       source_file = open(source_file)
     filesync_protocol.FilesyncProtocol.Push(
         connection, source_file, device_filename, mtime=int(mtime))
@@ -152,7 +148,7 @@ class AdbCommands(object):
     Returns:
       The file data if dest_file is not set.
     """
-    if isinstance(dest_file, six.string_types):
+    if isinstance(dest_file, basestring):
       dest_file = open(dest_file, 'w')
     elif not dest_file:
       dest_file = cStringIO.StringIO()

@@ -17,15 +17,13 @@ Implements the ADB protocol as seen in android's adb/adbd binaries, but only the
 host side.
 """
 
-from __future__ import absolute_import
 import collections
 import inspect
 import logging
+import Queue
 import struct
 import threading
 import time
-
-from six.moves import queue
 
 from adb import usb_exceptions
 
@@ -242,7 +240,7 @@ class _AdbConnection(object):
   """One logical ADB connection to a service."""
   class _MessageQueue(object):
     def __init__(self, manager, timeout_ms=None):
-      self._queue = queue.Queue()
+      self._queue = Queue.Queue()
       self._manager = manager
       self._timeout_ms = timeout_ms
 
@@ -253,7 +251,7 @@ class _AdbConnection(object):
       while True:
         try:
           i = self._queue.get_nowait()
-        except queue.Empty:
+        except Queue.Empty:
           # Will reentrantly call self._Add() via parent._OnRead()
           if not self._manager.ReadAndDispatch(timeout_ms=self._timeout_ms):
             # Failed to read from the device, the connection likely dropped.
@@ -377,7 +375,7 @@ class _AdbConnection(object):
       if yielder is None:
         raise InvalidResponseError('Never got \'%s\'' % finish_command, '<N/A>')
       while True:
-        message = next(yielder)
+        message = yielder.next()
         if message.header.command_name == finish_command:
           return message
     except StopIteration:
@@ -471,7 +469,7 @@ class AdbConnectionManager(object):
   def Close(self):
     """Also closes the usb handle."""
     with self._lock:
-      conns = list(self._connections.values())
+      conns = self._connections.values()
     for conn in conns:
       conn._HasClosed()
     with self._lock:
@@ -600,7 +598,7 @@ class AdbConnectionManager(object):
     _LOG.debug(
         '%s._HandleCNXN(): max packet size: %d',
         self.port_path, self.max_packet_size)
-    for conn in self._connections.values():
+    for conn in self._connections.itervalues():
       conn._HasClosed()
     self._connections = {}
 
