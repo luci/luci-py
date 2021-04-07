@@ -29,7 +29,11 @@ if sys.platform == 'win32':
 
 
 if sys.platform.startswith('linux'):
-  from api.platforms import android
+  try:
+    if six.PY2:
+      from api.platforms import android
+  except OSError:
+    android = None
   from api.platforms import gce
   from api.platforms import linux
   from api.platforms import posix
