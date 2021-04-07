@@ -577,6 +577,8 @@ def _fetch_and_map_with_cas(cas_client, digest, instance, output_dir, cache_dir,
   result_json_handle, result_json_path = tempfile.mkstemp(
       prefix=u'fetch-and-map-result-', suffix=u'.json')
   os.close(result_json_handle)
+  profile_dir = tempfile.mkdtemp(dir=tmp_dir)
+
   try:
     cmd = [
         cas_client,
@@ -598,13 +600,25 @@ def _fetch_and_map_with_cas(cas_client, digest, instance, output_dir, cache_dir,
         '-dump-stats-json',
         result_json_path,
         '-log-level',
-        'info'
+        'info',
+        '-profile-output-dir',
+        profile_dir,
+        '-profile-cpu',
+        '-profile-trace',
     ]
 
     if kvs_dir:
       cmd.extend(['-kvs-dir', kvs_dir])
 
+    start = time.time()
     _run_go_cmd_and_wait(cmd, tmp_dir)
+    if time.time() - start >= 120:
+      # If downloading takes long time, upload profile for later performance
+      # analysis.
+      subprocess42.check_call([
+          cas_client, 'archive', '-cas-instance', instance, '-paths',
+          profile_dir + ':.'
+      ])
 
     with open(result_json_path) as json_file:
       result_json = json.load(json_file)
@@ -616,6 +630,7 @@ def _fetch_and_map_with_cas(cas_client, digest, instance, output_dir, cache_dir,
     }
   finally:
     fs.remove(result_json_path)
+    file_path.rmtree(profile_dir)
 
 
 def _fetch_and_map_with_go_isolated(isolated_hash, storage, outdir,
