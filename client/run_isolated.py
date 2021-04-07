@@ -610,9 +610,8 @@ def _fetch_and_map_with_cas(cas_client, digest, instance, output_dir, cache_dir,
     if kvs_dir:
       cmd.extend(['-kvs-dir', kvs_dir])
 
-    start = time.time()
     _run_go_cmd_and_wait(cmd, tmp_dir)
-    if time.time() - start >= 120:
+    if time.time() - start >= 30:
       # If downloading takes long time, upload profile for later performance
       # analysis.
       subprocess42.check_call([
