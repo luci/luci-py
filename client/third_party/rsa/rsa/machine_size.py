@@ -14,18 +14,11 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-"""Python compatibility wrappers."""
-
-from __future__ import absolute_import
+"""Detection of 32-bit and 64-bit machines and byte alignment."""
 
 import sys
-from struct import pack
 
-try:
-    MAX_INT = sys.maxsize
-except AttributeError:
-    MAX_INT = sys.maxint
-
+MAX_INT = sys.maxsize
 MAX_INT64 = (1 << 63) - 1
 MAX_INT32 = (1 << 31) - 1
 MAX_INT16 = (1 << 15) - 1
@@ -40,73 +33,6 @@ elif MAX_INT == MAX_INT32:
 else:
     # Else we just assume 64-bit processor keeping up with modern times.
     MACHINE_WORD_SIZE = 64
-
-try:
-    # < Python3
-    unicode_type = unicode
-except NameError:
-    # Python3.
-    unicode_type = str
-
-# Fake byte literals.
-if str is unicode_type:
-    def byte_literal(s):
-        return s.encode('latin1')
-else:
-    def byte_literal(s):
-        return s
-
-# ``long`` is no more. Do type detection using this instead.
-try:
-    integer_types = (int, long)
-except NameError:
-    integer_types = (int,)
-
-b = byte_literal
-
-# To avoid calling b() multiple times in tight loops.
-ZERO_BYTE = b('\x00')
-EMPTY_BYTE = b('')
-
-
-def is_bytes(obj):
-    """
-    Determines whether the given value is a byte string.
-
-    :param obj:
-        The value to test.
-    :returns:
-        ``True`` if ``value`` is a byte string; ``False`` otherwise.
-    """
-    return isinstance(obj, bytes)
-
-
-def is_integer(obj):
-    """
-    Determines whether the given value is an integer.
-
-    :param obj:
-        The value to test.
-    :returns:
-        ``True`` if ``value`` is an integer; ``False`` otherwise.
-    """
-    return isinstance(obj, integer_types)
-
-
-def byte(num):
-    """
-    Converts a number between 0 and 255 (both inclusive) to a base-256 (byte)
-    representation.
-
-    Use it as a replacement for ``chr`` where you are expecting a byte
-    because this will work on all current versions of Python::
-
-    :param num:
-        An unsigned integer between 0 and 255 (both inclusive).
-    :returns:
-        A single byte.
-    """
-    return pack("B", num)
 
 
 def get_word_alignment(num, force_arch=64,
