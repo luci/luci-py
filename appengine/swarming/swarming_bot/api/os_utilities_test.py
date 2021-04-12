@@ -33,8 +33,6 @@ tools.cached = lambda func: func
 import os_utilities
 
 
-@unittest.skipIf(sys.platform == 'win32',
-                 'TODO(crbug.com/1017545): it fails to mock functions')
 class TestOsUtilities(auto_stub.TestCase):
 
   def setUp(self):
@@ -152,6 +150,7 @@ class TestOsUtilities(auto_stub.TestCase):
   def test_get_physical_ram(self):
     self.assertGreater(os_utilities.get_physical_ram(), 0)
 
+  @unittest.skipIf(sys.platform == 'win32', 'TODO(crbug.com/1017545)')
   def test_get_disks_info(self):
     info = os_utilities.get_disks_info()
     self.assertGreater(len(info), 0)
@@ -221,6 +220,7 @@ class TestOsUtilities(auto_stub.TestCase):
     self.assertIsInstance(dimensions[u'id'][0], six.text_type)
     self.assertEqual(dimensions[u'id'][0], u'customid')
 
+  @unittest.skipIf(sys.platform == 'win32', 'TODO(crbug.com/1017545)')
   def test_get_state(self):
     actual = os_utilities.get_state()
     actual.pop('reboot_required', None)
