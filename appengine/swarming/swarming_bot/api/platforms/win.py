@@ -17,7 +17,7 @@ import six
 
 from utils import tools
 
-import common
+from api.platforms import common
 from api.platforms import gpu
 
 
