@@ -150,11 +150,10 @@ class TestOsUtilities(auto_stub.TestCase):
   def test_get_physical_ram(self):
     self.assertGreater(os_utilities.get_physical_ram(), 0)
 
-  @unittest.skipIf(sys.platform == 'win32', 'TODO(crbug.com/1017545)')
   def test_get_disks_info(self):
     info = os_utilities.get_disks_info()
     self.assertGreater(len(info), 0)
-    root_path = u'C:\\' if sys.platform == 'win32' else u'/'
+    root_path = u'c:\\' if sys.platform == 'win32' else u'/'
     root = info[root_path]
     # Round the same way.
     free_disk = round(
