@@ -215,7 +215,7 @@ class Subprocess42Test(unittest.TestCase):
 
         # On a loaded system, this can be tight.
         (
-            (['out_sleeping', 'out_flush', '60', 'out_slept'], None, 0.5),
+            (['out_sleeping', 'out_flush', '60', 'out_slept'], None, 1),
             (b'Sleeping.\n', None, timedout),
         ),
         (
@@ -233,7 +233,7 @@ class Subprocess42Test(unittest.TestCase):
                     'out_slept',
                 ],
                 subprocess42.PIPE,
-                0.5),
+                1),
             (b'Sleeping.\n', b'printing', timedout),
         ),
         (
