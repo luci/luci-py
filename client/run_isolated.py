@@ -601,17 +601,25 @@ def _fetch_and_map_with_cas(cas_client, digest, instance, output_dir, cache_dir,
         result_json_path,
         '-log-level',
         'info',
-        '-profile-output-dir',
-        profile_dir,
-        '-profile-cpu',
-        '-profile-trace',
     ]
+
+    # cpu profile may not work fast on armv7l.
+    # https://crbug.com/1197523#c10
+    do_profile = platform.machine() != 'armv7l'
+
+    if do_profile:
+      cmd.extend([
+          '-profile-output-dir',
+          profile_dir,
+          '-profile-cpu',
+          '-profile-trace',
+      ])
 
     if kvs_dir:
       cmd.extend(['-kvs-dir', kvs_dir])
 
     _run_go_cmd_and_wait(cmd, tmp_dir)
-    if time.time() - start >= 30:
+    if time.time() - start >= 30 and do_profile:
       # If downloading takes long time, upload profile for later performance
       # analysis.
       subprocess42.check_call([
