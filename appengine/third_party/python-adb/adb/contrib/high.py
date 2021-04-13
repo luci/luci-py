@@ -19,6 +19,8 @@ This module defines high level functions and class to communicate through ADB
 protocol.
 """
 
+from __future__ import absolute_import
+
 import collections
 import logging
 import os
@@ -30,6 +32,8 @@ import string
 import threading
 import time
 
+from six import unichr
+from six.moves import range
 
 from adb import common
 from adb import sign_pythonrsa
@@ -184,7 +188,7 @@ def _InitCache(device):
         properties, external_storage_path, has_su,
         available_frequencies, available_governors)
     # Only save the cache if all the calls above worked.
-    if all(i is not None for i in cache._asdict().itervalues()):
+    if all(i is not None for i in cache._asdict().values()):
       _PER_DEVICE_CACHE.set(device, cache)
   return cache
 
@@ -515,10 +519,10 @@ class HighDevice(object):
     }
     out = {
         v: self.PullContent('/sys/devices/system/cpu/cpu0/cpufreq/' + k)
-        for k, v in mapping.iteritems()
+        for k, v in mapping.items()
     }
     return {
-        k: v.strip() if isinstance(v, str) else v for k, v in out.iteritems()
+        k: v.strip() if isinstance(v, str) else v for k, v in out.items()
     }
 
   def SetCPUScalingGovernor(self, governor):
@@ -759,7 +763,7 @@ class HighDevice(object):
       u'data': u'Data-Free',
       u'system': u'System-Free',
     }
-    return {k: props[v] for k, v in km.iteritems() if v in props}
+    return {k: props[v] for k, v in km.items() if v in props}
 
   def GetPackageVersion(self, package):
     """Returns the installed version of the given package."""
@@ -958,7 +962,7 @@ class HighDevice(object):
       if keys.issubset(old_keys):
         return True
       keys = keys | old_keys
-    assert all('\n' not in k for k in keys), keys
+    assert all(b'\n' not in k for k in keys), keys
     if self.Shell('mkdir -p /data/misc/adb')[1] != 0:
       return False
     if self.Shell('restorecon /data/misc/adb')[1] != 0:
