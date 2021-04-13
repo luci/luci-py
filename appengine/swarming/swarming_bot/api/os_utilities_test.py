@@ -219,7 +219,6 @@ class TestOsUtilities(auto_stub.TestCase):
     self.assertIsInstance(dimensions[u'id'][0], six.text_type)
     self.assertEqual(dimensions[u'id'][0], u'customid')
 
-  @unittest.skipIf(sys.platform == 'win32', 'TODO(crbug.com/1017545)')
   def test_get_state(self):
     actual = os_utilities.get_state()
     actual.pop('reboot_required', None)
@@ -248,8 +247,6 @@ class TestOsUtilities(auto_stub.TestCase):
       expected.add(u'cygwin')
     if sys.platform == 'darwin':
       expected.add(u'xcode')
-    if sys.platform == 'win32':
-      expected.add(u'integrity')
     if u'quarantined' in actual:
       self.fail(actual[u'quarantined'])
     self.assertEqual(expected, set(actual))
