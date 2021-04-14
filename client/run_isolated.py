@@ -502,7 +502,8 @@ def run_command(
           'the command line is too long>\n'
           '<Check for missing .so/.dll in the .isolate or GN file or length of '
           'command line args>\n'
-          '<Command: %s, Exception: %s>\n' % (command, e))
+          '<Command: %s>\n'
+          '<Exception: %s>\n' % (command, e))
       if os.environ.get('SWARMING_TASK_ID'):
         # Give an additional hint when running as a swarming task.
         sys.stderr.write(
