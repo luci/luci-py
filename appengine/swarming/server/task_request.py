@@ -96,8 +96,8 @@ TEMPLATE_SKIP = TemplateApplyEnum('TEMPLATE_SKIP')
 
 # Maximum allowed timeout for I/O and hard timeouts.
 #
-# Three days in seconds. Includes an additional 10s to account for small jitter.
-MAX_TIMEOUT_SECS = 3 * 24 * 60 * 60 + 10
+# Seven days in seconds. Includes an additional 10s to account for small jitter.
+MAX_TIMEOUT_SECS = 7 * 24 * 60 * 60 + 10
 
 # Maximum allowed expiration for a pending task.
 #
@@ -353,7 +353,7 @@ def _validate_hard_timeout(prop, value):
     # 0 is tolerated for termination task, but we don't advertize that, that's
     # an internal detail.
     raise datastore_errors.BadValueError(
-        '%s (%ds) must be between %ds and three days' %
+        '%s (%ds) must be between %ds and seven days' %
         (prop._name, value, _MIN_TIMEOUT_SECS))
 
 
@@ -362,7 +362,7 @@ def _validate_io_timeout(prop, value):
   # pylint: disable=protected-access
   if value and not (_MIN_TIMEOUT_SECS <= value <= MAX_TIMEOUT_SECS):
     raise datastore_errors.BadValueError(
-        '%s (%ds) must be 0 or between %ds and three days' %
+        '%s (%ds) must be 0 or between %ds and seven days' %
         (prop._name, value, _MIN_TIMEOUT_SECS))
 
 
