@@ -54,7 +54,7 @@ class SimpleMainTest(TestCase):
   def url(self):
     return 'http://localhost:1'
 
-  @unittest.skipIf(sys.platform == 'win32',
+  @unittest.skipIf(six.PY2 and sys.platform == 'win32',
                    'TODO(crbug.com/1017545): fix assertions')
   def test_attributes(self):
     actual = json.loads(
