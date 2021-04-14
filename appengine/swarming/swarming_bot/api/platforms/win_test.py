@@ -1,4 +1,4 @@
-#!/usr/bin/env vpython
+#!/usr/bin/env vpython3
 # Copyright 2015 The LUCI Authors. All rights reserved.
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
@@ -10,6 +10,8 @@ import re
 import subprocess
 import sys
 import unittest
+
+import six
 
 import test_env_platforms
 test_env_platforms.setup_test_env()
@@ -94,7 +96,7 @@ class TestWin(auto_stub.TestCase):
     self.assertEqual([marketing_name_client_ver_map[marketing_name]],
                      client_ver)
 
-  @unittest.skipIf(sys.platform == 'win32',
+  @unittest.skipIf(sys.platform == 'win32' or six.PY3,
                    'TODO(crbug.com/1017545): fix assertions')
   def test_get_os_dims_mock_win10(self):
     self.assert_get_os_dims_mock(
@@ -103,7 +105,7 @@ class TestWin(auto_stub.TestCase):
         [u'10', u'10-17763', u'10-17763.503'])
 
   @unittest.skipIf(
-      sys.platform == 'win32',
+      sys.platform == 'win32' or six.PY3,
       'TODO(crbug.com/1017545): fix assertions')
   def test_get_os_dims_mock_win2016(self):
     self.assert_get_os_dims_mock(
@@ -112,7 +114,7 @@ class TestWin(auto_stub.TestCase):
         [u'Server', u'Server-14393'])
 
   @unittest.skipIf(
-      sys.platform == 'win32',
+      sys.platform == 'win32' or six.PY3,
       'TODO(crbug.com/1017545): fix assertions')
   def test_get_os_dims_mock_win2019(self):
     self.assert_get_os_dims_mock(
@@ -120,7 +122,7 @@ class TestWin(auto_stub.TestCase):
         ('10', '10.0.17763', '', u'Multiprocessor Free'),
         [u'Server', u'Server-17763', u'Server-17763.557'])
 
-  @unittest.skipIf(sys.platform == 'win32',
+  @unittest.skipIf(sys.platform == 'win32' or six.PY3,
                    'TODO(crbug.com/1017545): fix assertions')
   def test_get_os_dims_mock_win7sp1(self):
     self.assert_get_os_dims_mock(
@@ -128,7 +130,7 @@ class TestWin(auto_stub.TestCase):
         ('7', '6.1.7601', 'SP1', u'Multiprocessor Free'), [u'7', u'7-SP1'])
 
   @unittest.skipIf(
-      sys.platform == 'win32',
+      sys.platform == 'win32' or six.PY3,
       'TODO(crbug.com/1017545): fix assertions')
   def test_get_os_dims_mock_win8_1(self):
     self.assert_get_os_dims_mock(
