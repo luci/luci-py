@@ -254,6 +254,12 @@ class TestLinux(auto_stub.TestCase):
                        (['10de', '10de:1cb1', '10de:1cb1-440.82'
                         ], ['Nvidia GP107GL [Quadro P1000] 440.82']))
 
+  def test_get_intel_version(self):
+    self.mock_check_output.return_value = textwrap.dedent("""\
+      Version: 1.2.3
+    """).encode()
+    self.assertEqual(linux._get_intel_version(), '1.2.3')
+
 
 if __name__ == '__main__':
   if '-v' in sys.argv:

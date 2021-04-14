@@ -104,7 +104,7 @@ def _get_intel_version():
   driver version.
   """
   try:
-    out = subprocess.check_output(['dpkg', '-s', 'libgl1-mesa-dri'])
+    out = subprocess.check_output(['dpkg', '-s', 'libgl1-mesa-dri']).decode()
     # Looks like 'Version: 17.2.8-0ubuntu0~17.10.1', and we need '17.2.8'.
     for line in out.splitlines():
       match = re.match(r'^Version: (\d+.\d+.\d+)', line)
