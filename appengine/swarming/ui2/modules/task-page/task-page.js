@@ -651,9 +651,7 @@ const logsSection = (ele, request, result) => {
       if (dim.key == 'os') botOS = dim.value[0];
     }
   }
-  // TODO(crbug.com/1053751):
-  // Currently only Linux VMs sends bot logs.
-  const showBotLogsLink = botProjectID && botOS == 'Linux';
+  const showBotLogsLink = !!botProjectID;
   return html`
 <div class=title>Logs Information</div>
 <div class="horizontal layout wrap">
