@@ -102,11 +102,8 @@ const botLogsURL = (ele, request, result, botProjectID) => {
   }
   // limit logs that we care
   // TODO(jwata): Non GCE bots will need a different label.
-  let filter = `labels."compute.googleapis.com/resource_name"="${result.bot_id}"\n`;
-  filter += [
-    `logName:"projects/${botProjectID}/logs/swarming"`,
-    `logName:"projects/${botProjectID}/logs/chromebuild"`,
-  ].join(' OR ');
+  let filter =
+      `labels."compute.googleapis.com/resource_name"="${result.bot_id}"`;
   url += `&advancedFilter=${filter}`;
   return encodeURI(url);
 };
