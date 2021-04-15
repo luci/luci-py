@@ -30,6 +30,14 @@ MockWinVer = collections.namedtuple('MockWinVer', ['product_type'])
 
 class TestWin(auto_stub.TestCase):
 
+  def setUp(self):
+    super(TestWin, self).setUp()
+    tools.clear_cache_all()
+
+  def tearDown(self):
+    super(TestWin, self).tearDown()
+    tools.clear_cache_all()
+
   def test_from_cygwin_path(self):
     data = [
         ('foo', None),
@@ -96,45 +104,32 @@ class TestWin(auto_stub.TestCase):
     self.assertEqual([marketing_name_client_ver_map[marketing_name]],
                      client_ver)
 
-  @unittest.skipIf(sys.platform == 'win32' or six.PY3,
-                   'TODO(crbug.com/1017545): fix assertions')
   def test_get_os_dims_mock_win10(self):
     self.assert_get_os_dims_mock(
-        1, u'\nMicrosoft Windows [Version 10.0.17763.503]',
+        1, b'\nMicrosoft Windows [Version 10.0.17763.503]',
         ('10', '10.0.17763', '', u'Multiprocessor Free'),
         [u'10', u'10-17763', u'10-17763.503'])
 
-  @unittest.skipIf(
-      sys.platform == 'win32' or six.PY3,
-      'TODO(crbug.com/1017545): fix assertions')
   def test_get_os_dims_mock_win2016(self):
     self.assert_get_os_dims_mock(
-        3, '\nMicrosoft Windows [Version 10.0.14393]\n',
+        3, b'\nMicrosoft Windows [Version 10.0.14393]\n',
         ('10', '10.0.14393', '', u'Multiprocessor Free'),
         [u'Server', u'Server-14393'])
 
-  @unittest.skipIf(
-      sys.platform == 'win32' or six.PY3,
-      'TODO(crbug.com/1017545): fix assertions')
   def test_get_os_dims_mock_win2019(self):
     self.assert_get_os_dims_mock(
-        3, '\nMicrosoft Windows [Version 10.0.17763.557]\n',
+        3, b'\nMicrosoft Windows [Version 10.0.17763.557]\n',
         ('10', '10.0.17763', '', u'Multiprocessor Free'),
         [u'Server', u'Server-17763', u'Server-17763.557'])
 
-  @unittest.skipIf(sys.platform == 'win32' or six.PY3,
-                   'TODO(crbug.com/1017545): fix assertions')
   def test_get_os_dims_mock_win7sp1(self):
     self.assert_get_os_dims_mock(
-        1, '\nMicrosoft Windows [Version 6.1.7601]\n',
+        1, b'\nMicrosoft Windows [Version 6.1.7601]\n',
         ('7', '6.1.7601', 'SP1', u'Multiprocessor Free'), [u'7', u'7-SP1'])
 
-  @unittest.skipIf(
-      sys.platform == 'win32' or six.PY3,
-      'TODO(crbug.com/1017545): fix assertions')
   def test_get_os_dims_mock_win8_1(self):
     self.assert_get_os_dims_mock(
-        1, '\nMicrosoft Windows [Version 6.3.9600]\n',
+        1, b'\nMicrosoft Windows [Version 6.3.9600]\n',
         ('8.1', '6.3.9600', '', u'Multiprocessor Free'), [u'8.1', u'8.1-SP0'])
 
 
