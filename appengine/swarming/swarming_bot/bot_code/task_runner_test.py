@@ -46,6 +46,7 @@ from utils import file_path
 from utils import large
 from utils import logging_utils
 from utils import subprocess42
+from utils import tools
 import isolateserver_fake
 import local_caching
 import swarmingserver_bot_fake
@@ -178,6 +179,7 @@ class FakeAuthSystem(object):
 class TestTaskRunnerBase(auto_stub.TestCase):
   def setUp(self):
     super(TestTaskRunnerBase, self).setUp()
+    tools.clear_cache_all()
     self.root_dir = six.ensure_text(tempfile.mkdtemp(prefix=u'task_runner'))
     self.work_dir = os.path.join(self.root_dir, u'w')
     # Create the logs directory so run_isolated.py can put its log there.
@@ -621,7 +623,7 @@ class TestTaskRunner(TestTaskRunnerBase):
       to_native_eol('hi!\n').encode()), updates[2][u'output'].encode())
 
   @unittest.skipIf(
-      sys.platform == 'win32',
+      six.PY2 and sys.platform == 'win32',
       'TODO(crbug.com/1017545): fix assertions')
   def test_run_command_caches(self):
     # This test puts a file into a named cache, remove it, runs a test that
