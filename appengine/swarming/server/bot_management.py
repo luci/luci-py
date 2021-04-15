@@ -638,58 +638,40 @@ def bot_event(
     # Make sure it is not in the queue since it can't reap anything.
     task_queues.cleanup_after_bot(info_key.parent())
 
-  try:
-    # Decide whether saving the event.
-    # It's not much of an even worth saving a BotEvent for but it's worth
-    # updating BotInfo. The only reason BotInfo is GET is to keep first_seen_ts.
-    # It's not necessary to use a transaction here since no BotEvent is being
-    # added, only last_seen_ts is really updated.
-    # crbug.com/1015365: It's useful saving BotEvent when dimensions updates.
-    # crbug.com/952984: It needs to save BotEvent when quarantined.
-    skip_save_event = (not dimensions_updated and not quarantined and
-                       event_type in ('request_sleep', 'task_update'))
-    if skip_save_event:
-      bot_info.put()
-      return
+  # Decide whether saving the event.
+  # It's not much of an even worth saving a BotEvent for but it's worth
+  # updating BotInfo. The only reason BotInfo is GET is to keep first_seen_ts.
+  # It's not necessary to use a transaction here since no BotEvent is being
+  # added, only last_seen_ts is really updated.
+  # crbug.com/1015365: It's useful saving BotEvent when dimensions updates.
+  # crbug.com/952984: It needs to save BotEvent when quarantined.
+  skip_save_event = (not dimensions_updated and not quarantined and
+                     event_type in ('request_sleep', 'task_update'))
+  if skip_save_event:
+    bot_info.put()
+    return
 
-    # When it's a 'bot_*' or 'request_*' event, use the dimensions provided
-    # by the bot.
-    # When it's a 'task_*' event, use BotInfo.dimensios_flat since dimensions
-    # aren't provided by the bot.
-    event_dimensions_flat = dimensions_flat or bot_info.dimensions_flat
+  # When it's a 'bot_*' or 'request_*' event, use the dimensions provided
+  # by the bot.
+  # When it's a 'task_*' event, use BotInfo.dimensios_flat since dimensions
+  # aren't provided by the bot.
+  event_dimensions_flat = dimensions_flat or bot_info.dimensions_flat
 
-    event = BotEvent(
-        parent=get_root_key(bot_id),
-        event_type=event_type,
-        external_ip=external_ip,
-        authenticated_as=authenticated_as,
-        dimensions_flat=event_dimensions_flat,
-        quarantined=bot_info.quarantined,
-        maintenance_msg=bot_info.maintenance_msg,
-        state=bot_info.state,
-        task_id=task_id or bot_info.task_id,
-        version=bot_info.version,
-        **kwargs)
+  event = BotEvent(
+      parent=get_root_key(bot_id),
+      event_type=event_type,
+      external_ip=external_ip,
+      authenticated_as=authenticated_as,
+      dimensions_flat=event_dimensions_flat,
+      quarantined=bot_info.quarantined,
+      maintenance_msg=bot_info.maintenance_msg,
+      state=bot_info.state,
+      task_id=task_id or bot_info.task_id,
+      version=bot_info.version,
+      **kwargs)
 
-    datastore_utils.store_new_version(event, BotRoot, [bot_info])
-    return event.key
-  finally:
-    # Store the event in memcache to accelerate monitoring.
-    # key is at minute resolution, because that's the monitoring precision.
-    key = '%s:%s' % (bot_id, now.strftime('%Y-%m-%dT%H:%M'))
-    m = memcache.Client()
-    while True:
-      data = [event_type, now.second]
-      if m.add(key, data, time=3600, namespace='BotEvents'):
-        break
-      prev_val = m.get(key, for_cas=True, namespace='BotEvents')
-      if prev_val is None:
-        continue
-      data = prev_val + [event_type, now.second]
-      # Keep the data for one hour. If the cron job cannot reap it within 1h,
-      # it's probably broken.
-      if m.cas(key, data, time=3600, namespace='BotEvents'):
-        break
+  datastore_utils.store_new_version(event, BotRoot, [bot_info])
+  return event.key
 
 
 def has_capacity(dimensions):

@@ -289,10 +289,6 @@ class BotManagementTest(test_case.TestCase):
     self.assertEqual(
         expected, bot_management.get_info_key('id1').get().to_dict())
 
-    self.assertEqual([event, 5],
-                     memcache.get(
-                         'id1:2010-01-02T03:04', namespace='BotEvents'))
-
   @parameterized.expand([
       (u'task_completed', True, False),
       (u'task_error', True, False),
@@ -408,10 +404,6 @@ class BotManagementTest(test_case.TestCase):
     self.assertEqual(
         expected,
         [e.to_dict() for e in bot_management.get_events_query('id1', True)])
-
-    self.assertEqual(
-        ['bot_connected', 5, 'request_task', 5],
-        memcache.get('id1:2010-01-02T03:04', namespace='BotEvents'))
 
   def test_bot_event_update_dimensions(self):
     bot_id = 'id1'
