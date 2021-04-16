@@ -180,6 +180,10 @@ if sys.platform == 'win32':
 
     The stdlib is broken.
     https://msdn.microsoft.com/library/windows/desktop/aa365682.aspx
+    os.path.islink() always returns false on WindowsNT/95 and OS/2 in python2,
+    https://github.com/python/cpython/blob/2.7/Lib/ntpath.py#L220
+    and also for Windows prior to 6.0 in python3.
+    https://github.com/python/cpython/blob/3.9/Lib/ntpath.py#L228
     """
     res = GetFileAttributesW(extend(path))
     if res == INVALID_FILE_ATTRIBUTES:
