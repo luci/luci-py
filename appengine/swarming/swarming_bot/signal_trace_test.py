@@ -16,8 +16,8 @@ THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
 @unittest.skipIf(
-    sys.platform == 'win32',
-    'TODO(crbug.com/1017545): signal object has no attribute SIGUSR1')
+  sys.platform == 'win32',
+  'This test is for platforms other than Windows')
 class Test(unittest.TestCase):
 
   def _run(self, cmd, sig, stdin):
