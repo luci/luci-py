@@ -43,6 +43,7 @@ from depot_tools import auto_stub
 from depot_tools import fix_encoding
 from libs import luci_context
 from utils import file_path
+from utils import fs
 from utils import large
 from utils import logging_utils
 from utils import subprocess42
@@ -318,7 +319,7 @@ class TestTaskRunner(TestTaskRunnerBase):
   def _expect_files(self, expected):
     # Confirm work_dir against a dict of expected files.
     expected = expected[:]
-    for root, dirs, filenames in os.walk(self.root_dir):
+    for root, dirs, filenames in fs.walk(self.root_dir):
       if 'logs' in dirs:
         dirs.remove('logs')
       for filename in filenames:
@@ -623,9 +624,6 @@ class TestTaskRunner(TestTaskRunnerBase):
     self.assertEqual(base64.b64encode(
       to_native_eol('hi!\n').encode()), updates[2][u'output'].encode())
 
-  @unittest.skipIf(
-      six.PY2 and sys.platform == 'win32',
-      'TODO(crbug.com/1017545): fix assertions')
   def test_run_command_caches(self):
     # This test puts a file into a named cache, remove it, runs a test that
     # updates the named cache, remaps it and asserts the content was updated.
