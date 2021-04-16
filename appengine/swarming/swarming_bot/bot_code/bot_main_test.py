@@ -475,9 +475,6 @@ class TestBotMain(TestBotBase):
     self.assertTrue(first.is_set())
     self.assertTrue(second.is_set())
 
-  @unittest.skipIf(
-      sys.platform == 'win32', 'TODO(crbug.com/1017545): '
-      '__init__() got an unexpected keyword argument \\\'creationflags\\\'')
   def test_run_bot(self):
     self.mock(threading, 'Event', FakeThreadingEvent)
 
@@ -522,7 +519,7 @@ class TestBotMain(TestBotBase):
     # pylint: disable=unused-argument
     class Popen(object):
       def __init__(
-          self2, cmd, detached, cwd, stdout, stderr, stdin, close_fds):
+          self2, cmd, detached, cwd, stdout, stderr, stdin, **kwargs):
         self2.returncode = None
         expected = [sys.executable, bot_main.THIS_FILE, 'run_isolated']
         self.assertEqual(expected, cmd[:len(expected)])
@@ -530,7 +527,12 @@ class TestBotMain(TestBotBase):
         self.assertEqual(subprocess42.PIPE, stdout)
         self.assertEqual(subprocess42.STDOUT, stderr)
         self.assertEqual(subprocess42.PIPE, stdin)
-        self.assertEqual(sys.platform != 'win32', close_fds)
+        if sys.platform == 'win32':
+          creationflags = kwargs['creationflags']
+          self.assertEqual(subprocess42.CREATE_NEW_CONSOLE, creationflags)
+        else:
+          close_fds = kwargs['close_fds']
+          self.assertTrue(close_fds)
 
       def communicate(self2, i):
         self.assertEqual(None, i)
@@ -798,7 +800,7 @@ class TestBotMain(TestBotBase):
     class Popen(object):
 
       def __init__(self2, cmd, detached, cwd, env, stdout, stderr, stdin,
-                   close_fds):
+                   **kwargs):
         self2.returncode = None
         self2._out_file = os.path.join(self.root_dir, 'w',
                                        'task_runner_out.json')
@@ -831,7 +833,12 @@ class TestBotMain(TestBotBase):
         self.assertTrue(stdout)
         self.assertEqual(subprocess42.STDOUT, stderr)
         self.assertEqual(subprocess42.PIPE, stdin)
-        self.assertEqual(sys.platform != 'win32', close_fds)
+        if sys.platform == 'win32':
+          creationflags = kwargs['creationflags']
+          self.assertEqual(subprocess42.CREATE_NEW_CONSOLE, creationflags)
+        else:
+          close_fds = kwargs['close_fds']
+          self.assertTrue(close_fds)
 
       def wait(self2, timeout=None): # pylint: disable=unused-argument
         self2.returncode = returncode
@@ -842,8 +849,6 @@ class TestBotMain(TestBotBase):
     self.mock(subprocess42, 'Popen', Popen)
     return result
 
-  @unittest.skipIf(sys.platform == 'win32',
-                   'TODO(crbug.com/1017545): post_error_task was called')
   def test_run_manifest(self):
     self.mock(bot_main, '_post_error_task', self.print_err_and_fail)
     def call_hook(botobj, name, *args):
@@ -872,9 +877,6 @@ class TestBotMain(TestBotBase):
     self.assertEqual(self.root_dir, self.bot.base_dir)
     bot_main._run_manifest(self.bot, manifest, time.time())
 
-  @unittest.skipIf(
-      sys.platform == 'win32',
-      'TODO(crbug.com/1017545): post_error_task was called')
   def test_run_manifest_with_auth_headers(self):
     self.bot = self.make_bot(
         auth_headers_cb=lambda: ({'A': 'a'}, time.time() + 3600))
@@ -928,9 +930,6 @@ class TestBotMain(TestBotBase):
     self.assertEqual(self.root_dir, self.bot.base_dir)
     bot_main._run_manifest(self.bot, manifest, time.time())
 
-  @unittest.skipIf(
-      sys.platform == 'win32',
-      'TODO(crbug.com/1017545): post_error_task was called')
   def test_run_manifest_task_failure(self):
     self.mock(bot_main, '_post_error_task', self.print_err_and_fail)
 
@@ -957,9 +956,6 @@ class TestBotMain(TestBotBase):
     }
     bot_main._run_manifest(self.bot, manifest, time.time())
 
-  @unittest.skipIf(
-      sys.platform == 'win32', 'TODO(crbug.com/1017545): '
-      '__init__() got an unexpected keyword argument \\\'creationflags\\\'')
   def test_run_manifest_internal_failure(self):
     posted = []
     self.mock(bot_main, '_post_error_task', lambda *args: posted.append(args))
@@ -1126,9 +1122,6 @@ class TestBotMain(TestBotBase):
 
 class TestBotNotMocked(TestBotBase):
 
-  @unittest.skipIf(
-      sys.platform == 'win32', 'TODO(crbug.com/1017545): '
-      '__init__() got an unexpected keyword argument \\\'creationflags\\\'')
   def test_bot_restart(self):
     calls = []
 
@@ -1138,7 +1131,7 @@ class TestBotNotMocked(TestBotBase):
     self.mock(bot_main.common, 'exec_python', exec_python)
     # pylint: disable=unused-argument
     class Popen(object):
-      def __init__(self2, cmd, cwd, stdin, stdout, stderr, close_fds, detached):
+      def __init__(self2, cmd, cwd, stdin, stdout, stderr, detached, **kwargs):
         self2.returncode = None
         expected = [sys.executable, bot_main.THIS_FILE, 'is_fine']
         self.assertEqual(expected, cmd)
@@ -1147,7 +1140,12 @@ class TestBotNotMocked(TestBotBase):
         self.assertEqual(subprocess42.PIPE, stdout)
         self.assertEqual(subprocess42.STDOUT, stderr)
         self.assertEqual(True, detached)
-        self.assertEqual(True, close_fds)
+        if sys.platform == 'win32':
+          creationflags = kwargs['creationflags']
+          self.assertEqual(subprocess42.CREATE_NEW_CONSOLE, creationflags)
+        else:
+          close_fds = kwargs['close_fds']
+          self.assertTrue(close_fds)
 
       def communicate(self2):
         self2.returncode = 0
