@@ -16,7 +16,7 @@ pushd ../..
 git fetch
 filter="Roll luci-go from "
 target_revision=$(git log --grep "${filter}" --oneline -n 1 \
-                      --pretty=format:"%H" origin/master DEPS)
+                      --pretty=format:"%H" origin/main DEPS)
 logs=$(git --no-pager log --grep "${filter}" --no-decorate \
            "${current_revision}..${target_revision}" DEPS | \
            grep -E '^    202[0-9]-[0-9]{2,2}-[0-9]{2,2} ')
