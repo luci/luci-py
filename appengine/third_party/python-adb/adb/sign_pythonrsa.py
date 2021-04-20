@@ -12,11 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import absolute_import
+import rsa
 
 from pyasn1.codec.der import decoder
 from pyasn1.type import univ
-import rsa
 from rsa import pkcs1
 
 
@@ -25,7 +24,7 @@ from rsa import pkcs1
 # hashing algo for this.
 class _Accum(object):
   def __init__(self):
-    self._buf = b''
+    self._buf = ''
   def update(self, msg):
     self._buf += msg
   def digest(self):

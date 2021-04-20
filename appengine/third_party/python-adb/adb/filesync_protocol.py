@@ -17,15 +17,12 @@ Implements the ADB protocol as seen in android's adb/adbd binaries, but only the
 host side.
 """
 
-from __future__ import absolute_import
-
 import collections
 import stat
 import struct
 import time
 
 import libusb1
-import six
 
 from adb import adb_protocol
 from adb import usb_exceptions
@@ -51,26 +48,26 @@ class FilesyncProtocol(object):
 
   @staticmethod
   def Stat(connection, filename):
-    if isinstance(filename, six.text_type):
+    if isinstance(filename, unicode):
       filename = filename.encode('utf-8')
     cnxn = FileSyncConnection(connection, '<4I')
-    cnxn.Send(b'STAT', filename)
-    command, (mode, size, mtime) = cnxn.ReadNoData((b'STAT',))
+    cnxn.Send('STAT', filename)
+    command, (mode, size, mtime) = cnxn.ReadNoData(('STAT',))
 
-    if command != b'STAT':
+    if command != 'STAT':
       raise adb_protocol.InvalidResponseError(
           'Expected STAT response to STAT, got %s' % command)
     return mode, size, mtime
 
   @classmethod
   def List(cls, connection, path):
-    if isinstance(path, six.text_type):
+    if isinstance(path, unicode):
       path = path.encode('utf-8')
     cnxn = FileSyncConnection(connection, '<5I')
-    cnxn.Send(b'LIST', path)
+    cnxn.Send('LIST', path)
     files = []
-    for cmd_id, header, filename in cnxn.ReadUntil((b'DENT',), b'DONE'):
-      if cmd_id == b'DONE':
+    for cmd_id, header, filename in cnxn.ReadUntil(('DENT',), 'DONE'):
+      if cmd_id == 'DONE':
         break
       mode, size, mtime = header
       files.append(DeviceFile(filename, mode, size, mtime))
@@ -79,12 +76,12 @@ class FilesyncProtocol(object):
   @classmethod
   def Pull(cls, connection, filename, dest_file):
     """Pull a file from the device into the file-like dest_file."""
-    if isinstance(filename, six.text_type):
+    if isinstance(filename, unicode):
       filename = filename.encode('utf-8')
     cnxn = FileSyncConnection(connection, '<2I')
-    cnxn.Send(b'RECV', filename)
-    for cmd_id, _, data in cnxn.ReadUntil((b'DATA',), b'DONE'):
-      if cmd_id == b'DONE':
+    cnxn.Send('RECV', filename)
+    for cmd_id, _, data in cnxn.ReadUntil(('DATA',), 'DONE'):
+      if cmd_id == 'DONE':
         break
       dest_file.write(data)
 
@@ -103,32 +100,32 @@ class FilesyncProtocol(object):
     Raises:
       PushFailedError: Raised on push failure.
     """
-    if isinstance(filename, six.text_type):
+    if isinstance(filename, unicode):
       filename = filename.encode('utf-8')
     fileinfo = '%s,%s' % (filename, st_mode)
     assert len(filename) <= 1024, 'Name too long: %s' % filename
 
     cnxn = FileSyncConnection(connection, '<2I')
-    cnxn.Send(b'SEND', fileinfo)
+    cnxn.Send('SEND', fileinfo)
 
     while True:
       data = datafile.read(cls.SYNC_DATA_MAX)
       if not data:
         break
-      cnxn.Send(b'DATA', data)
+      cnxn.Send('DATA', data)
 
     if mtime == 0:
       mtime = int(time.time())
     # DONE doesn't send data, but it hides the last bit of data in the size
     # field. #youhadonejob
-    cnxn.Send(b'DONE', size=mtime)
-    for cmd_id, _, data in cnxn.ReadUntil((), b'OKAY', b'DATA', b'FAIL'):
-      if cmd_id == b'OKAY':
+    cnxn.Send('DONE', size=mtime)
+    for cmd_id, _, data in cnxn.ReadUntil((), 'OKAY', 'DATA', 'FAIL'):
+      if cmd_id == 'OKAY':
         return
-      if cmd_id == b'DATA':
+      if cmd_id == 'DATA':
         # file_sync_client.cpp CopyDone ignores the cmd_id in this case.
         raise PushFailedError(data)
-      if cmd_id == b'FAIL':
+      if cmd_id == 'FAIL':
         raise PushFailedError(data)
       raise PushFailedError('Unexpected message %s: %s' % (cmd_id, data))
 
@@ -138,8 +135,8 @@ class FileSyncConnection(object):
   """Encapsulate a FileSync service connection."""
 
   _VALID_IDS = [
-      b'STAT', b'LIST', b'SEND', b'RECV', b'DENT', b'DONE', b'DATA', b'OKAY',
-      b'FAIL', b'QUIT',
+      'STAT', 'LIST', 'SEND', 'RECV', 'DENT', 'DONE', 'DATA', 'OKAY',
+      'FAIL', 'QUIT',
   ]
 
   def __init__(self, adb_connection, recv_header_format):
@@ -212,7 +209,7 @@ class FileSyncConnection(object):
         self.adb.Write(chunk)
         # Wait for ack from device, ignoring these for too long causes things
         # to explode.
-        self.adb.ReadUntil(b'OKAY')
+        self.adb.ReadUntil('OKAY')
       except (libusb1.USBError, adb_protocol.InvalidResponseError) as e:
         self.send_buffer = ''
         raise usb_exceptions.WriteFailedError('Could not write %r' % chunk, e)
@@ -222,7 +219,7 @@ class FileSyncConnection(object):
     # Ensure recv buffer has enough data.
     while len(self.recv_buffer) < size:
       try:
-        msg = self.adb.ReadUntil(b'WRTE')
+        msg = self.adb.ReadUntil('WRTE')
       except adb_protocol.InvalidResponseError as e:
         raise usb_exceptions.AdbCommandFailureException(
           'Command failed: %s' % e)
@@ -240,7 +237,7 @@ class FileSyncConnection(object):
       raise usb_exceptions.AdbCommandFailureException(
           'Command failed; incorrect header: %s' % header)
     if command_id not in expected_ids:
-      if command_id == b'FAIL':
+      if command_id == 'FAIL':
         raise usb_exceptions.AdbCommandFailureException('Command failed.')
       raise adb_protocol.InvalidResponseError(
           'Expected one of %s, got %s' % (expected_ids, command_id))

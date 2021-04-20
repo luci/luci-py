@@ -17,15 +17,13 @@
 Call it similar to how you call android's fastboot. Call it similar to how you
 call android's fastboot, but this only accepts usb paths and no serials.
 """
-from __future__ import absolute_import
-
 import sys
 
 import gflags
 import progressbar
 
-from . import common_cli
-from . import fastboot
+import common_cli
+import fastboot
 
 gflags.ADOPT_module_key_flags(common_cli)
 

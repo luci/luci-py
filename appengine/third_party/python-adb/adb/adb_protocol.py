@@ -17,17 +17,13 @@ Implements the ADB protocol as seen in android's adb/adbd binaries, but only the
 host side.
 """
 
-from __future__ import absolute_import
-
 import collections
 import inspect
 import logging
+import Queue
 import struct
 import threading
 import time
-
-import six
-from six.moves import queue
 
 from adb import usb_exceptions
 
@@ -45,26 +41,26 @@ class InvalidResponseError(IOError):
 
 
 def ID2Wire(name):
-  assert len(name) == 4 and isinstance(name, six.binary_type), name
-  assert all('A' <= chr(c) <= 'Z' for c in bytearray(name)), name
-  return sum(c << (i * 8) for i, c in enumerate(bytearray(name)))
+  assert len(name) == 4 and isinstance(name, str), name
+  assert all('A' <= c <= 'Z' for c in name), name
+  return sum(ord(c) << (i * 8) for i, c in enumerate(name))
 
 
 def Wire2ID(encoded):
   assert isinstance(encoded, int), encoded
   name = (
-      six.int2byte(encoded & 0xff) +
-      six.int2byte((encoded >> 8) & 0xff) +
-      six.int2byte((encoded >> 16) & 0xff) +
-      six.int2byte(encoded >> 24))
-  if not all('A' <= chr(c) <= 'Z' for c in bytearray(name)):
-    return b'XXXX'
+      chr(encoded & 0xff) +
+      chr((encoded >> 8) & 0xff) +
+      chr((encoded >> 16) & 0xff) +
+      chr(encoded >> 24))
+  if not all('A' <= c <= 'Z' for c in name):
+    return 'XXXX'
   return name
 
 
 def _CalculateChecksum(data):
   """The checksum is just a sum of all the bytes. I swear."""
-  return sum(bytearray(data)) & 0xFFFFFFFF
+  return sum(ord(d) for d in data) & 0xFFFFFFFF
 
 
 class AuthSigner(object):
@@ -96,7 +92,7 @@ class _AdbMessageHeader(collections.namedtuple(
     WRITE(0, host_id, 'data')
     CLOSE(device_id, host_id, '')
   """
-  _VALID_IDS = (b'AUTH', b'CLSE', b'CNXN', b'FAIL', b'OKAY', b'OPEN', b'SYNC', b'WRTE')
+  _VALID_IDS = ('AUTH', 'CLSE', 'CNXN', 'FAIL', 'OKAY', 'OPEN', 'SYNC', 'WRTE')
 
   # CNXN constants for arg0.
   # If the client initializes a connection to a P+ device with the
@@ -118,7 +114,7 @@ class _AdbMessageHeader(collections.namedtuple(
     assert command_name in cls._VALID_IDS
     assert isinstance(arg0, int), arg0
     assert isinstance(arg1, int), arg1
-    assert isinstance(data, six.binary_type), repr(data)
+    assert isinstance(data, str), repr(data)
     return cls(
         ID2Wire(command_name), arg0, arg1, len(data), _CalculateChecksum(data))
 
@@ -157,7 +153,7 @@ class _AdbMessageHeader(collections.namedtuple(
     command_name = self.command_name
     arg0 = self.arg0
     arg1 = self.arg1
-    if command_name == b'AUTH':
+    if command_name == 'AUTH':
       if arg0 == self.AUTH_TOKEN:
         arg0 = 'TOKEN'
       elif arg0 == self.AUTH_SIGNATURE:
@@ -168,7 +164,7 @@ class _AdbMessageHeader(collections.namedtuple(
         raise InvalidResponseError(
             'Unexpected arg1 value (0x%x) on AUTH packet' % arg1, self)
       return '%s, %s' % (command_name, arg0)
-    elif command_name == b'CNXN':
+    elif command_name == 'CNXN':
       if arg0 == self.DEFAULT_VERSION:
         arg0 = 'v1'
       elif arg0 == self.VERSION_NO_CHECKSUM:
@@ -244,7 +240,7 @@ class _AdbConnection(object):
   """One logical ADB connection to a service."""
   class _MessageQueue(object):
     def __init__(self, manager, timeout_ms=None):
-      self._queue = queue.Queue()
+      self._queue = Queue.Queue()
       self._manager = manager
       self._timeout_ms = timeout_ms
 
@@ -255,7 +251,7 @@ class _AdbConnection(object):
       while True:
         try:
           i = self._queue.get_nowait()
-        except queue.Empty:
+        except Queue.Empty:
           # Will reentrantly call self._Add() via parent._OnRead()
           if not self._manager.ReadAndDispatch(timeout_ms=self._timeout_ms):
             # Failed to read from the device, the connection likely dropped.
@@ -305,7 +301,7 @@ class _AdbConnection(object):
     It's rare that the user needs to do this.
     """
     try:
-      self._Write(b'CLSE', b'')
+      self._Write('CLSE', '')
       for _ in self:
         pass
     except (usb_exceptions.ReadFailedError, usb_exceptions.WriteFailedError):
@@ -331,7 +327,7 @@ class _AdbConnection(object):
     """Calls from within ReadAndDispatch(), so the manager lock is held."""
     # Can be CLSE, OKAY or WRTE. It's generally basically an ACK.
     cmd_name = message.header.command_name
-    if message.header.arg0 != self.remote_id and cmd_name != b'CLSE':
+    if message.header.arg0 != self.remote_id and cmd_name != 'CLSE':
       # We can't assert that for now. TODO(maruel): Investigate the one-off
       # cases.
       logging.warning(
@@ -339,29 +335,29 @@ class _AdbConnection(object):
     if message.header.arg1 != self._local_id:
       # As per adb protocol, "A CLOSE message containing a remote-id which
       # does not map to an open stream on the recipient's side is ignored."
-      if cmd_name == b'CLSE':
+      if cmd_name == 'CLSE':
         # It seems adbd on N devices sends duplicate CLSE packets.
         # TODO(bpastene): Find out why/how to detect it.
         return
       raise InvalidResponseError(
           'Unexpected local ID: expected %d' % self._local_id, message)
-    if cmd_name == b'CLSE':
+    if cmd_name == 'CLSE':
       self._HasClosed()
       return
-    if cmd_name == b'OKAY':
+    if cmd_name == 'OKAY':
       self._yielder._Add(message)
       return
-    if cmd_name == b'WRTE':
+    if cmd_name == 'WRTE':
       try:
-        self._Write(b'OKAY', '')
+        self._Write('OKAY', '')
       except usb_exceptions.WriteFailedError as e:
         _LOG.info('%s._OnRead(): Failed to reply OKAY: %s', self.port_path, e)
       self._yielder._Add(message)
       return
-    if cmd_name == b'AUTH':
+    if cmd_name == 'AUTH':
       self._manager._HandleAUTH(message)
       return
-    if cmd_name == b'CNXN':
+    if cmd_name == 'CNXN':
       self._manager.HandleCNXN(message)
       return
     # Unexpected message.
@@ -370,16 +366,16 @@ class _AdbConnection(object):
   # Adaptors.
 
   def Write(self, data):
-    self._Write(b'WRTE', data)
+    self._Write('WRTE', data)
 
-  def ReadUntil(self, finish_command=b'WRTE'):
+  def ReadUntil(self, finish_command='WRTE'):
     try:
       with self._manager._lock:
         yielder = self._yielder
       if yielder is None:
         raise InvalidResponseError('Never got \'%s\'' % finish_command, '<N/A>')
       while True:
-        message = next(yielder)
+        message = yielder.next()
         if message.header.command_name == finish_command:
           return message
     except StopIteration:
@@ -457,7 +453,7 @@ class AdbConnectionManager(object):
       self._next_local_id += 1
 
     conn = _AdbConnection(self, next_id, destination, timeout_ms=timeout_ms)
-    conn._Write(b'OPEN', destination + b'\0')
+    conn._Write('OPEN', destination + '\0')
     with self._lock:
       self._connections[conn.local_id] = conn
     # TODO(maruel): Timeout.
@@ -473,7 +469,7 @@ class AdbConnectionManager(object):
   def Close(self):
     """Also closes the usb handle."""
     with self._lock:
-      conns = list(self._connections.values())
+      conns = self._connections.values()
     for conn in conns:
       conn._HasClosed()
     with self._lock:
@@ -493,7 +489,7 @@ class AdbConnectionManager(object):
       command: The command to send to the service.
       timeout_ms: Timeout for USB packets, in milliseconds.
     """
-    return self.Open(b'%s:%s' % (service, command), timeout_ms).__iter__()
+    return self.Open('%s:%s' % (service, command), timeout_ms).__iter__()
 
   def Command(self, service, command='', timeout_ms=None):
     return ''.join(msg.data for msg in self.StreamingCommand(service, command,
@@ -536,7 +532,7 @@ class AdbConnectionManager(object):
         except usb_exceptions.ReadFailedError:
           break
         nb += 1
-        if msg.header.command_name in (b'AUTH', b'CNXN'):
+        if msg.header.command_name in ('AUTH', 'CNXN'):
           # Assert the message has the expected host.
           reply = msg
         else:
@@ -550,11 +546,11 @@ class AdbConnectionManager(object):
       if not reply:
         # Initialize the connection using the older protocol version.
         msg = _AdbMessage.Make(
-            b'CNXN', _AdbMessageHeader.DEFAULT_VERSION, self.MAX_ADB_DATA,
-            b'host::%s\0' % self._host_banner)
+            'CNXN', _AdbMessageHeader.DEFAULT_VERSION, self.MAX_ADB_DATA,
+            'host::%s\0' % self._host_banner)
         msg.Write(self._usb)
         reply = _AdbMessage.Read(self._usb)
-      if reply.header.command_name == b'AUTH':
+      if reply.header.command_name == 'AUTH':
         self._HandleAUTH(reply)
       else:
         self._HandleCNXN(reply)
@@ -568,14 +564,14 @@ class AdbConnectionManager(object):
     # Loop through our keys, signing the last data which is the challenge.
     for rsa_key in self._rsa_keys:
       reply = self._HandleReplyChallenge(rsa_key, reply, self._auth_timeout_ms)
-      if reply.header.command_name == b'CNXN':
+      if reply.header.command_name == 'CNXN':
         break
 
-    if reply.header.command_name == b'AUTH':
+    if reply.header.command_name == 'AUTH':
       # None of the keys worked, so send a public key. This will prompt to the
       # user.
       msg = _AdbMessage.Make(
-          b'AUTH', _AdbMessageHeader.AUTH_RSAPUBLICKEY, 0,
+          'AUTH', _AdbMessageHeader.AUTH_RSAPUBLICKEY, 0,
           self._rsa_keys[0].GetPublicKey() + '\0')
       msg.Write(self._usb)
       try:
@@ -589,7 +585,7 @@ class AdbConnectionManager(object):
 
   def _HandleCNXN(self, reply):
     # self._lock must be held.
-    if reply.header.command_name != b'CNXN':
+    if reply.header.command_name != 'CNXN':
       raise usb_exceptions.DeviceAuthError(
           'Accept auth key on device, then retry.')
     if reply.header.arg0 not in _AdbMessageHeader.SUPPORTED_VERSIONS:
@@ -602,7 +598,7 @@ class AdbConnectionManager(object):
     _LOG.debug(
         '%s._HandleCNXN(): max packet size: %d',
         self.port_path, self.max_packet_size)
-    for conn in self._connections.values():
+    for conn in self._connections.itervalues():
       conn._HasClosed()
     self._connections = {}
 
@@ -614,7 +610,7 @@ class AdbConnectionManager(object):
         len(reply.data) != 20):
       raise InvalidResponseError('Unknown AUTH response', reply)
     msg = _AdbMessage.Make(
-        b'AUTH', _AdbMessageHeader.AUTH_SIGNATURE, 0, rsa_key.Sign(reply.data))
+        'AUTH', _AdbMessageHeader.AUTH_SIGNATURE, 0, rsa_key.Sign(reply.data))
     msg.Write(self._usb)
     return _AdbMessage.Read(self._usb, auth_timeout_ms)
 

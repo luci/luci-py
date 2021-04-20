@@ -22,13 +22,9 @@ subprocess and a network socket.
 All timeouts are in milliseconds.
 """
 
-from __future__ import absolute_import
-
-import io
+import cStringIO
 import os
 import socket
-
-import six
 
 from adb import adb_protocol
 from adb import common
@@ -44,7 +40,7 @@ DeviceIsAvailable = common.InterfaceMatcher(CLASS, SUBCLASS, PROTOCOL)
 
 try:
   # Imported locally to keep compatibility with previous code.
-  from .sign_m2crypto import M2CryptoSigner
+  from sign_m2crypto import M2CryptoSigner
 except ImportError:
   # Ignore this error when M2Crypto is not installed, there are other options.
   pass
@@ -134,9 +130,9 @@ class AdbCommands(object):
       timeout_ms: Expected timeout for any part of the push.
     """
     connection = self.conn.Open(
-        destination=b'sync:', timeout_ms=timeout_ms)
-    if isinstance(source_file, six.string_types):
-      source_file = open(source_file, 'rb')
+        destination='sync:', timeout_ms=timeout_ms)
+    if isinstance(source_file, basestring):
+      source_file = open(source_file)
     filesync_protocol.FilesyncProtocol.Push(
         connection, source_file, device_filename, mtime=int(mtime))
     connection.Close()
@@ -152,21 +148,23 @@ class AdbCommands(object):
     Returns:
       The file data if dest_file is not set.
     """
-    if isinstance(dest_file, six.string_types):
-      dest_file = open(dest_file, 'wb')
+    if isinstance(dest_file, basestring):
+      dest_file = open(dest_file, 'w')
     elif not dest_file:
-      dest_file = io.BytesIO()
+      dest_file = cStringIO.StringIO()
     connection = self.conn.Open(
-        destination=b'sync:', timeout_ms=timeout_ms)
+        destination='sync:', timeout_ms=timeout_ms)
     filesync_protocol.FilesyncProtocol.Pull(
         connection, device_filename, dest_file)
     connection.Close()
-    if isinstance(dest_file, io.BytesIO):
+    # An empty call to cStringIO.StringIO returns an instance of
+    # cStringIO.OutputType.
+    if isinstance(dest_file, cStringIO.OutputType):
       return dest_file.getvalue()
 
   def Stat(self, device_filename):
     """Get a file's stat() information."""
-    connection = self.conn.Open(destination=b'sync:')
+    connection = self.conn.Open(destination='sync:')
     mode, size, mtime = filesync_protocol.FilesyncProtocol.Stat(
         connection, device_filename)
     connection.Close()
@@ -178,17 +176,17 @@ class AdbCommands(object):
     Returns:
       list of file_sync_protocol.DeviceFile.
     """
-    connection = self.conn.Open(destination=b'sync:')
+    connection = self.conn.Open(destination='sync:')
     listing = filesync_protocol.FilesyncProtocol.List(connection, device_path)
     connection.Close()
     return listing
 
-  def Reboot(self, destination=b''):
+  def Reboot(self, destination=''):
     """Reboot the device.
 
     Specify 'bootloader' for fastboot.
     """
-    return self.conn.Command(service=b'reboot', command=destination)
+    return self.conn.Command(service='reboot', command=destination)
 
   def RebootBootloader(self):
     """Reboot device into fastboot."""
@@ -196,15 +194,15 @@ class AdbCommands(object):
 
   def Remount(self):
     """Remount / as read-write."""
-    return self.conn.Command(service=b'remount')
+    return self.conn.Command(service='remount')
 
   def Root(self):
     """Restart adbd as root on device."""
-    return self.conn.Command(service=b'root')
+    return self.conn.Command(service='root')
 
   def Unroot(self):
     """Restart adbd as user on device."""
-    # adbd implementation of self.conn.Command(service=b'unroot') is defined in
+    # adbd implementation of self.conn.Command(service='unroot') is defined in
     # the adb code but doesn't work on 4.4.
     # Until then, emulate Hardcoded strings in
     # platform_system_core/adb/services.cpp. #closeenough
@@ -223,7 +221,7 @@ class AdbCommands(object):
   def Shell(self, command, timeout_ms=None):
     """Run command on the device, returning the output."""
     return self.conn.Command(
-        service=b'shell', command=command, timeout_ms=timeout_ms)
+        service='shell', command=command, timeout_ms=timeout_ms)
 
   def StreamingShell(self, command, timeout_ms=None):
     """Run command on the device, yielding each line of output.
@@ -236,9 +234,9 @@ class AdbCommands(object):
       The responses from the shell command.
     """
     return self.conn.StreamingCommand(
-        service=b'shell', command=command, timeout_ms=timeout_ms)
+        service='shell', command=command, timeout_ms=timeout_ms)
 
   def Logcat(self, options, timeout_ms=None):
     """Run 'shell logcat' and stream the output to stdout."""
     return self.conn.StreamingCommand(
-        service=b'shell', command='logcat %s' % options, timeout_ms=timeout_ms)
+        service='shell', command='logcat %s' % options, timeout_ms=timeout_ms)

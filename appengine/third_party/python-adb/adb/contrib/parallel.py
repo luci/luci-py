@@ -14,22 +14,17 @@
 
 """Implements parallel map (pmap)."""
 
-from __future__ import absolute_import
-
 import logging
+import Queue
 import sys
 import threading
-
-import six
-from six.moves import queue
-from six.moves import range
 
 
 # Current thread pools. This is effectively a leak.
 _POOL = []
 _POOL_LOCK = threading.Lock()
-_QUEUE_IN = queue.Queue()
-_QUEUE_OUT = queue.Queue()
+_QUEUE_IN = Queue.Queue()
+_QUEUE_OUT = Queue.Queue()
 
 
 def pmap(fn, items):
@@ -57,7 +52,7 @@ def pmap(fn, items):
       _POOL_LOCK.release()
 
   # A pmap() is currently running, create a temporary pool.
-  return _pmap([], queue.Queue(), queue.Queue(), fn, items)
+  return _pmap([], Queue.Queue(), Queue.Queue(), fn, items)
 
 
 def _pmap(pool, queue_in, queue_out, fn, items):
@@ -85,7 +80,7 @@ def _pmap(pool, queue_in, queue_out, fn, items):
     else:
       out[index] = result
   if e:
-    six.reraise(e[0], e[1], e[2])
+    raise e[0], e[1], e[2]
   return out
 
 

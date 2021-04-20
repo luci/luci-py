@@ -16,15 +16,12 @@
 Common usb browsing, and usb communication.
 """
 
-from __future__ import absolute_import
-
 import logging
 import socket
 import threading
 import traceback
 
 import libusb1
-import six
 import usb1
 
 from adb import usb_exceptions
@@ -291,7 +288,7 @@ class UsbHandle(Handle):
   @classmethod
   def PortPathMatcher(cls, port_path):
     """Returns a device matcher for the given port path."""
-    if isinstance(port_path, six.string_types):
+    if isinstance(port_path, basestring):
       # Convert from sysfs path to port_path.
       port_path = [int(i) for i in port_path.split('/')]
     port_path = tuple(port_path)
