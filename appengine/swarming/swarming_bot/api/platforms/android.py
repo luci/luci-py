@@ -117,11 +117,11 @@ def get_devices(bot=None, endpoints=None, enable_resets=False):
   devices = []
   if not gce.is_gce():
     devices += high.GetLocalDevices(
-        b'swarming', 10000, 10000, as_root=False, enable_resets=enable_resets)
+        'swarming', 10000, 10000, as_root=False, enable_resets=enable_resets)
 
   if endpoints:
     devices += high.GetRemoteDevices(
-        b'swarming', endpoints, 10000, 10000, as_root=False)
+        'swarming', endpoints, 10000, 10000, as_root=False)
 
   return devices
 
