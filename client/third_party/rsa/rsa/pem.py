@@ -6,7 +6,7 @@
 #  you may not use this file except in compliance with the License.
 #  You may obtain a copy of the License at
 #
-#      https://www.apache.org/licenses/LICENSE-2.0
+#      http://www.apache.org/licenses/LICENSE-2.0
 #
 #  Unless required by applicable law or agreed to in writing, software
 #  distributed under the License is distributed on an "AS IS" BASIS,
@@ -14,16 +14,15 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-"""Functions that load and write PEM-encoded files."""
+'''Functions that load and write PEM-encoded files.'''
 
 import base64
 from rsa._compat import b, is_bytes
 
-
 def _markers(pem_marker):
-    """
+    '''
     Returns the start and end PEM markers
-    """
+    '''
 
     if is_bytes(pem_marker):
         pem_marker = pem_marker.decode('utf-8')
@@ -31,25 +30,20 @@ def _markers(pem_marker):
     return (b('-----BEGIN %s-----' % pem_marker),
             b('-----END %s-----' % pem_marker))
 
-
 def load_pem(contents, pem_marker):
-    """Loads a PEM file.
+    '''Loads a PEM file.
 
-    :param contents: the contents of the file to interpret
-    :param pem_marker: the marker of the PEM content, such as 'RSA PRIVATE KEY'
+    @param contents: the contents of the file to interpret
+    @param pem_marker: the marker of the PEM content, such as 'RSA PRIVATE KEY'
         when your file has '-----BEGIN RSA PRIVATE KEY-----' and
         '-----END RSA PRIVATE KEY-----' markers.
 
-    :return: the base64-decoded content between the start and end markers.
+    @return the base64-decoded content between the start and end markers.
 
     @raise ValueError: when the content is invalid, for example when the start
         marker cannot be found.
 
-    """
-
-    # We want bytes, not text. If it's text, it can be converted to ASCII bytes.
-    if not is_bytes(contents):
-        contents = contents.encode('ascii')
+    '''
 
     (pem_start, pem_end) = _markers(pem_marker)
 
@@ -95,26 +89,26 @@ def load_pem(contents, pem_marker):
 
     # Base64-decode the contents
     pem = b('').join(pem_lines)
-    return base64.standard_b64decode(pem)
+    return base64.decodestring(pem)
 
 
 def save_pem(contents, pem_marker):
-    """Saves a PEM file.
+    '''Saves a PEM file.
 
-    :param contents: the contents to encode in PEM format
-    :param pem_marker: the marker of the PEM content, such as 'RSA PRIVATE KEY'
+    @param contents: the contents to encode in PEM format
+    @param pem_marker: the marker of the PEM content, such as 'RSA PRIVATE KEY'
         when your file has '-----BEGIN RSA PRIVATE KEY-----' and
         '-----END RSA PRIVATE KEY-----' markers.
 
-    :return: the base64-encoded content between the start and end markers.
+    @return the base64-encoded content between the start and end markers.
 
-    """
+    '''
 
     (pem_start, pem_end) = _markers(pem_marker)
 
-    b64 = base64.standard_b64encode(contents).replace(b('\n'), b(''))
+    b64 = base64.encodestring(contents).replace(b('\n'), b(''))
     pem_lines = [pem_start]
-
+    
     for block_start in range(0, len(b64), 64):
         block = b64[block_start:block_start + 64]
         pem_lines.append(block)
@@ -123,3 +117,4 @@ def save_pem(contents, pem_marker):
     pem_lines.append(b(''))
 
     return b('\n').join(pem_lines)
+    

@@ -6,7 +6,7 @@
 #  you may not use this file except in compliance with the License.
 #  You may obtain a copy of the License at
 #
-#      https://www.apache.org/licenses/LICENSE-2.0
+#      http://www.apache.org/licenses/LICENSE-2.0
 #
 #  Unless required by applicable law or agreed to in writing, software
 #  distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,6 +15,7 @@
 #  limitations under the License.
 
 """Python compatibility wrappers."""
+
 
 from __future__ import absolute_import
 
@@ -41,12 +42,15 @@ else:
     # Else we just assume 64-bit processor keeping up with modern times.
     MACHINE_WORD_SIZE = 64
 
+
 try:
     # < Python3
     unicode_type = unicode
+    have_python3 = False
 except NameError:
     # Python3.
     unicode_type = str
+    have_python3 = True
 
 # Fake byte literals.
 if str is unicode_type:
@@ -64,6 +68,14 @@ except NameError:
 
 b = byte_literal
 
+try:
+    # Python 2.6 or higher.
+    bytes_type = bytes
+except NameError:
+    # Python 2.5
+    bytes_type = str
+
+
 # To avoid calling b() multiple times in tight loops.
 ZERO_BYTE = b('\x00')
 EMPTY_BYTE = b('')
@@ -78,7 +90,7 @@ def is_bytes(obj):
     :returns:
         ``True`` if ``value`` is a byte string; ``False`` otherwise.
     """
-    return isinstance(obj, bytes)
+    return isinstance(obj, bytes_type)
 
 
 def is_integer(obj):
