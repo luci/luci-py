@@ -67,3 +67,14 @@ wheel: <
  name: "infra/python/wheels/pyobjc/mac-amd64_cp38_cp38"
  version: "version:6.2.2fixed"
 >
+
+wheel: <
+  name: "infra/python/wheels/pywin32/${vpython_platform}"
+  version: "version:300"
+  match_tag: <
+    platform: "win_amd64"
+  >
+  match_tag: <
+    platform: "win32"
+  >
+>
