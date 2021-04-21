@@ -219,7 +219,6 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         'modified_ts': self.now,
         'name': u'yay',
         'outputs_ref': None,
-        'priority': 50,
         'cas_output_root': None,
         'resultdb_info': None,
         'server_versions': [u'v1a'],

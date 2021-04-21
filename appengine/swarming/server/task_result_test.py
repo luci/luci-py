@@ -176,7 +176,6 @@ class TaskResultApiTest(TestCase):
         'modified_ts': None,
         'name': u'Request name',
         'outputs_ref': None,
-        'priority': 50,
         'cas_output_root': None,
         'resultdb_info': None,
         'server_versions': [u'v1a'],

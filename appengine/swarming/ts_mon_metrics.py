@@ -103,14 +103,12 @@ _jobs_requested = gae_ts_mon.CounterMetric(
 # - subproject_id: e.g. 'blink'. Set to empty string if not used.
 # - pool: e.g. 'Chrome'.
 # - spec_name: name of a job specification.
-# - priority: priority of a task.
 _tasks_expired = gae_ts_mon.CounterMetric(
     'swarming/tasks/expired', 'Number of expired tasks', [
         gae_ts_mon.StringField('spec_name'),
         gae_ts_mon.StringField('project_id'),
         gae_ts_mon.StringField('subproject_id'),
         gae_ts_mon.StringField('pool'),
-        gae_ts_mon.IntegerField('priority'),
     ])
 
 
@@ -463,7 +461,6 @@ def on_task_completed(summary):
   """When a task is stopped from being processed."""
   fields = _extract_job_fields(_tags_to_dict(summary.tags))
   if summary.state == task_result.State.EXPIRED:
-    fields['priority'] = summary.priority
     _tasks_expired.increment(fields=fields)
     return
 
