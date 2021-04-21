@@ -979,6 +979,7 @@ class TaskResultSummary(_TaskResultCommon):
   name = ndb.StringProperty()
   user = ndb.StringProperty()
   tags = ndb.StringProperty(repeated=True)
+  priority = ndb.IntegerProperty(indexed=False)
 
   # Value of TaskRequest.properties.properties_hash only when these conditions
   # are met:
@@ -1449,7 +1450,8 @@ def new_result_summary(request):
       name=request.name,
       server_versions=[utils.get_app_version()],
       user=request.user,
-      tags=request.tags)
+      tags=request.tags,
+      priority=request.priority)
 
 
 def new_run_result(request, to_run, bot_id, bot_version, bot_dimensions,
