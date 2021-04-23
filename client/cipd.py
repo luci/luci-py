@@ -211,7 +211,10 @@ class CipdClient(object):
 
       logging.debug('Running %r', cmd)
       process = subprocess42.Popen(
-          cmd, stdout=subprocess42.PIPE, stderr=subprocess42.PIPE)
+          cmd,
+          stdout=subprocess42.PIPE,
+          stderr=subprocess42.PIPE,
+          universal_newlines=True)
       output = []
       for pipe_name, line in process.yield_any_line(timeout=0.1):
         to = timeoutfn()
