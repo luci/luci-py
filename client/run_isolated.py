@@ -541,7 +541,7 @@ def _run_go_cmd_and_wait(cmd, tmp_dir):
       try:
         retcode = proc.wait(check_period_sec)
         if retcode != 0:
-          raise ValueError("retcode is not 0: %s (cmd=%s)" % (retcode, cmd_str))
+          raise subprocess42.CalledProcessError(retcode, cmd=cmd_str)
         exceeded_max_timeout = False
         break
       except subprocess42.TimeoutExpired:
@@ -619,7 +619,17 @@ def _fetch_and_map_with_cas(cas_client, digest, instance, output_dir, cache_dir,
     if kvs_dir:
       cmd.extend(['-kvs-dir', kvs_dir])
 
-    _run_go_cmd_and_wait(cmd, tmp_dir)
+    try:
+      _run_go_cmd_and_wait(cmd, tmp_dir)
+    except subprocess42.CalledProcessError:
+      if not kvs_dir:
+        raise
+      logging.exception('Failed to run cas, removing kvs cache dir and retry.')
+
+      file_path.rmtree(kvs_dir)
+      file_path.rmtree(output_dir)
+      _run_go_cmd_and_wait(cmd, tmp_dir)
+
     if time.time() - start >= 30 and do_profile:
       # If downloading takes long time, upload profile for later performance
       # analysis.
