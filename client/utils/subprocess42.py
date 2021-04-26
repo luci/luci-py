@@ -867,7 +867,9 @@ class Popen(subprocess.Popen):
         if not data:
           # Loop again. The other pipe may still be open.
           if timeout:
-            timeout -= (time.time() - start)
+            timeout -= time.time() - start
+            if timeout < 0:
+              timeout = 0
           continue
 
       if self.universal_newlines and data:
