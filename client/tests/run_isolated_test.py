@@ -70,8 +70,12 @@ def read_tree(path):
 
 
 @contextlib.contextmanager
-def init_named_caches_stub(_run_dir):
+def init_named_caches_stub(_run_dir, _stats):
   yield
+
+
+def trim_caches_stub(_stats):
+  pass
 
 
 def put_to_named_cache(manager, cache_name, file_name, contents):
@@ -352,7 +356,8 @@ class RunIsolatedTest(RunIsolatedTestBase):
         env={},
         env_prefix={},
         lower_priority=lower_priority,
-        containment=None)
+        containment=None,
+        trim_caches_fn=trim_caches_stub)
     ret = run_isolated.run_tha_test(data, None)
     self.assertEqual(0, ret)
     return make_tree_call
@@ -1073,7 +1078,8 @@ class RunIsolatedTestRun(RunIsolatedTestBase):
           env={},
           env_prefix={},
           lower_priority=False,
-          containment=None)
+          containment=None,
+          trim_caches_fn=trim_caches_stub)
       ret = run_isolated.run_tha_test(data, None)
       self.assertEqual(0, ret)
 
@@ -1458,7 +1464,8 @@ class RunIsolatedTestOutputFiles(RunIsolatedTestBase):
           env={},
           env_prefix={},
           lower_priority=False,
-          containment=None)
+          containment=None,
+          trim_caches_fn=trim_caches_stub)
       ret = run_isolated.run_tha_test(data, None)
       self.assertEqual(0, ret)
 
@@ -1626,6 +1633,7 @@ class RunIsolatedJsonTest(RunIsolatedTestBase):
         },
         u'cas_output_root': None,
         u'stats': {
+            u'trim_caches': {},
             u'isolated': {
                 u'download': {
                     u'initial_number_items': 0,
@@ -1638,6 +1646,11 @@ class RunIsolatedJsonTest(RunIsolatedTestBase):
                     u'items_hot': [15],
                 },
             },
+            u'named_caches': {
+                u'install': {},
+                u'uninstall': {},
+            },
+            u'cleanup': {},
         },
         u'version': 5,
     }
@@ -1645,9 +1658,14 @@ class RunIsolatedJsonTest(RunIsolatedTestBase):
     # duration can be exactly 0 due to low timer resolution, especially but not
     # exclusively on Windows.
     self.assertLessEqual(0, actual.pop(u'duration'))
+    self.assertLessEqual(0, actual[u'stats'][u'trim_caches'].pop(u'duration'))
     actual_isolated_stats = actual[u'stats'][u'isolated']
     self.assertLessEqual(0, actual_isolated_stats[u'download'].pop(u'duration'))
     self.assertLessEqual(0, actual_isolated_stats[u'upload'].pop(u'duration'))
+    named_caches_stats = actual[u'stats'][u'named_caches']
+    self.assertLessEqual(0, named_caches_stats[u'install'].pop(u'duration'))
+    self.assertLessEqual(0, named_caches_stats[u'uninstall'].pop(u'duration'))
+    self.assertLessEqual(0, actual[u'stats'][u'cleanup'].pop(u'duration'))
     for i in (u'download', u'upload'):
       for j in (u'items_cold', u'items_hot'):
         actual_isolated_stats[i][j] = large.unpack(

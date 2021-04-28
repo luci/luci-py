@@ -234,6 +234,9 @@ TaskData = collections.namedtuple(
         'lower_priority',
         # subprocess42.Containment instance. Can be None.
         'containment',
+        # Function to trim caches before installing cipd packages and
+        # downloading isolated files.
+        'trim_caches_fn',
     ])
 
 
@@ -987,6 +990,9 @@ def map_and_run(data, constant_run_path):
       'had_hard_timeout': False,
       'internal_failure': 'run_isolated did not complete properly',
       'stats': {
+          'trim_caches': {
+              'duration': 0,
+          },
           #'cipd': {
           #  'duration': 0.,
           #  'get_client_duration': 0.,
@@ -999,6 +1005,17 @@ def map_and_run(data, constant_run_path):
               #  'items_hot': '<large.pack()>',
               #},
           },
+          'named_caches': {
+              'install': {
+                  'duration': 0,
+              },
+              'uninstall': {
+                  'duration': 0,
+              },
+          },
+          'cleanup': {
+              'duration': 0,
+          }
       },
       #'cipd_pins': {
       #  'packages': [
@@ -1050,6 +1067,8 @@ def map_and_run(data, constant_run_path):
   cas_client_dir = make_temp_dir(_CAS_CLIENT_DIR, data.root_dir)
   if use_cas:
     cas_client = os.path.join(cas_client_dir, 'cas' + cipd.EXECUTABLE_SUFFIX)
+
+  data.trim_caches_fn(result['stats']['trim_caches'])
 
   try:
     with data.install_packages_fn(run_dir, isolated_client_dir,
@@ -1113,7 +1132,7 @@ def map_and_run(data, constant_run_path):
       if data.storage and data.outputs:
         isolateserver.create_directories(run_dir, data.outputs)
 
-      with data.install_named_caches(run_dir):
+      with data.install_named_caches(run_dir, result['stats']['named_caches']):
         sys.stdout.flush()
         start = time.time()
         try:
@@ -1159,6 +1178,7 @@ def map_and_run(data, constant_run_path):
   # Clean up
   finally:
     try:
+      cleanup_start = time.time()
       success = True
       if data.leak_temp_dir:
         success = True
@@ -1200,6 +1220,11 @@ def map_and_run(data, constant_run_path):
         logging.exception('Leaking out_dir %s: %s', out_dir, e)
       result['internal_failure'] = str(e)
       on_error.report(None)
+    finally:
+      cleanup_duration = time.time() - cleanup_start
+      result['stats']['cleanup']['duration'] = cleanup_duration
+      logging.info('Cleanup: removing directories took %d seconds',
+                   cleanup_duration)
   return result
 
 
@@ -1759,12 +1784,16 @@ def main(args):
   additional_buffer = _FREE_SPACE_BUFFER_FOR_CIPD_PACKAGES
   if options.kvs_dir:
     additional_buffer += _CAS_KVS_CACHE_THRESHOLD
-  local_caching.trim_caches(
-      caches,
-      root,
-      # Add some buffer for Go CLI.
-      min_free_space=options.min_free_space + additional_buffer,
-      max_age_secs=MAX_AGE_SECS)
+  # Add some buffer for Go CLI.
+  min_free_space = options.min_free_space + additional_buffer
+
+  def trim_caches_fn(stats):
+    start = time.time()
+    local_caching.trim_caches(
+        caches, root, min_free_space=min_free_space, max_age_secs=MAX_AGE_SECS)
+    duration = time.time() - start
+    stats['duration'] = duration
+    logging.info('trim_caches: took %d seconds', duration)
 
   # Save state of isolate/cas cache not to overwrite state from go client.
   if use_go_isolated:
@@ -1841,15 +1870,19 @@ def main(args):
         ))
 
   @contextlib.contextmanager
-  def install_named_caches(run_dir):
+  def install_named_caches(run_dir, stats):
     # WARNING: this function depends on "options" variable defined in the outer
     # function.
     assert six.text_type(run_dir), repr(run_dir)
     assert os.path.isabs(run_dir), run_dir
     named_caches = [(os.path.join(run_dir, six.text_type(relpath)), name)
                     for name, relpath, _ in options.named_caches]
+    install_start = time.time()
     for path, name in named_caches:
       named_cache.install(path, name)
+    install_duration = time.time() - install_start
+    stats['install']['duration'] = install_duration
+    logging.info('named_caches: install took %d seconds', install_duration)
     try:
       yield
     finally:
@@ -1859,6 +1892,7 @@ def main(args):
       #
       # If the Swarming bot cannot clean up the cache, it will handle it like
       # any other bot file that could not be removed.
+      uninstall_start = time.time()
       for path, name in reversed(named_caches):
         try:
           # uninstall() doesn't trim but does call save() implicitly. Trimming
@@ -1872,6 +1906,10 @@ def main(args):
 
           logging.exception('Error while removing named cache %r at %r. '
                             'The cache will be lost.', path, name)
+      uninstall_duration = time.time() - uninstall_start
+      stats['uninstall']['duration'] = uninstall_duration
+      logging.info('named_caches: uninstall took %d seconds',
+                   uninstall_duration)
 
   command = args
   if options.relative_cwd:
@@ -1926,7 +1964,8 @@ def main(args):
       env=options.env,
       env_prefix=options.env_prefix,
       lower_priority=bool(options.lower_priority),
-      containment=containment)
+      containment=containment,
+      trim_caches_fn=trim_caches_fn)
   try:
     if options.isolate_server:
       server_ref = isolate_storage.ServerRef(
