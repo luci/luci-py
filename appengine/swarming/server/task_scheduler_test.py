@@ -1389,13 +1389,13 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         isolated='a' * 40, isolatedserver='http://localhost', namespace='c')
     performance_stats = task_result.PerformanceStats(
         bot_overhead=0.1,
-        isolated_download=task_result.OperationStats(
+        isolated_download=task_result.CASOperationStats(
             duration=0.1,
             initial_number_items=10,
             initial_size=1000,
             items_cold='aa',
             items_hot='bb'),
-        isolated_upload=task_result.OperationStats(
+        isolated_upload=task_result.CASOperationStats(
             duration=0.1, items_cold='aa', items_hot='bb'))
     self.assertEqual(
         State.COMPLETED,

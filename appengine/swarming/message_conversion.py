@@ -360,15 +360,20 @@ def task_result_to_rpc(entity, send_stats):
   if send_stats and entity.performance_stats.is_valid:
 
     def op(entity):
-      if entity:
-        return _ndb_to_rpc(swarming_rpcs.OperationStats, entity)
-      return None
+      if not entity:
+        return None
+      return _ndb_to_rpc(swarming_rpcs.OperationStats, entity)
+
+    def cas_op(entity):
+      if not entity:
+        return None
+      return _ndb_to_rpc(swarming_rpcs.CASOperationStats, entity)
 
     performance_stats = _ndb_to_rpc(
         swarming_rpcs.PerformanceStats,
         entity.performance_stats,
-        isolated_download=op(entity.performance_stats.isolated_download),
-        isolated_upload=op(entity.performance_stats.isolated_upload),
+        isolated_download=cas_op(entity.performance_stats.isolated_download),
+        isolated_upload=cas_op(entity.performance_stats.isolated_upload),
         package_installation=op(entity.performance_stats.package_installation))
   kwargs = {
       'bot_dimensions':

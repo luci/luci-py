@@ -616,6 +616,10 @@ class TasksCancelRequest(messages.Message):
 
 class OperationStats(messages.Message):
   duration = messages.FloatField(1)
+
+
+class CASOperationStats(messages.Message):
+  duration = messages.FloatField(1)
   initial_number_items = messages.IntegerField(2)
   initial_size = messages.IntegerField(3)
   # These buffers are compressed as deflate'd delta-encoded varints. They are
@@ -637,8 +641,8 @@ class PerformanceStats(messages.Message):
   See task_result.PerformanceStats for details.
   """
   bot_overhead = messages.FloatField(1)
-  isolated_download = messages.MessageField(OperationStats, 2)
-  isolated_upload = messages.MessageField(OperationStats, 3)
+  isolated_download = messages.MessageField(CASOperationStats, 2)
+  isolated_upload = messages.MessageField(CASOperationStats, 3)
   package_installation = messages.MessageField(OperationStats, 4)
 
 

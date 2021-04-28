@@ -1190,13 +1190,13 @@ class BotTaskUpdateHandler(_BotApiHandler):
           if x:
             return base64.b64decode(x)
 
-        performance_stats.isolated_download = task_result.OperationStats(
+        performance_stats.isolated_download = task_result.CASOperationStats(
             duration=download.get('duration'),
             initial_number_items=download.get('initial_number_items'),
             initial_size=download.get('initial_size'),
             items_cold=unpack_base64(download, 'items_cold'),
             items_hot=unpack_base64(download, 'items_hot'))
-        performance_stats.isolated_upload = task_result.OperationStats(
+        performance_stats.isolated_upload = task_result.CASOperationStats(
             duration=upload.get('duration'),
             items_cold=unpack_base64(upload, 'items_cold'),
             items_hot=unpack_base64(upload, 'items_hot'))

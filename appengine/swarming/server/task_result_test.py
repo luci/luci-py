@@ -492,13 +492,14 @@ class TaskResultApiTest(TestCase):
     task_result.PerformanceStats(
         key=task_pack.run_result_key_to_performance_stats_key(run_result.key),
         bot_overhead=0.1,
-        isolated_download=task_result.OperationStats(
+        package_installation=task_result.OperationStats(duration=0.01),
+        isolated_download=task_result.CASOperationStats(
             duration=0.05,
             initial_number_items=10,
             initial_size=10000,
             items_cold=large.pack([1, 2]),
             items_hot=large.pack([3, 4, 5])),
-        isolated_upload=task_result.OperationStats(
+        isolated_upload=task_result.CASOperationStats(
             duration=0.01, items_cold=large.pack([10]))).put()
     ndb.transaction(lambda: ndb.put_multi(run_result.append_output('foo', 0)))
     ndb.transaction(lambda: result_summary.set_from_run_result(
@@ -542,15 +543,7 @@ class TaskResultApiTest(TestCase):
             'total_bytes_items_hot': None,
         },
         'package_installation': {
-            'duration': None,
-            'initial_number_items': None,
-            'initial_size': None,
-            'items_cold': None,
-            'items_hot': None,
-            'num_items_cold': None,
-            'total_bytes_items_cold': None,
-            'num_items_hot': None,
-            'total_bytes_items_hot': None,
+            'duration': 0.01,
         },
     }
     self.assertEqual(expected, result_summary.performance_stats.to_dict())
@@ -779,15 +772,16 @@ class TaskResultApiTest(TestCase):
     task_result.PerformanceStats(
         key=task_pack.run_result_key_to_performance_stats_key(run_result.key),
         bot_overhead=0.1,
-        isolated_download=task_result.OperationStats(
+        isolated_download=task_result.CASOperationStats(
             duration=0.05,
             initial_number_items=10,
             initial_size=10000,
             items_cold=large.pack([1, 2]),
             items_hot=large.pack([3, 4, 5])),
-        isolated_upload=task_result.OperationStats(
+        isolated_upload=task_result.CASOperationStats(
             duration=0.01, items_cold=large.pack([10])),
-        package_installation=task_result.OperationStats(duration=0.02)).put()
+        package_installation=task_result.CASOperationStats(
+            duration=0.02)).put()
 
     # Note: It cannot be both TIMED_OUT and have run_result.deduped_from set.
     run_result.state = task_result.State.TIMED_OUT
@@ -962,13 +956,13 @@ class TaskResultApiTest(TestCase):
     task_result.PerformanceStats(
         key=task_pack.run_result_key_to_performance_stats_key(run_result.key),
         bot_overhead=0.1,
-        isolated_download=task_result.OperationStats(
+        isolated_download=task_result.CASOperationStats(
             duration=0.05,
             initial_number_items=10,
             initial_size=10000,
             items_cold=large.pack([1, 2]),
             items_hot=large.pack([3, 4, 5])),
-        isolated_upload=task_result.OperationStats(
+        isolated_upload=task_result.CASOperationStats(
             duration=0.01, items_cold=large.pack([10])),
         package_installation=task_result.OperationStats(duration=0.02)).put()
 
