@@ -1113,9 +1113,11 @@ class BotTaskUpdateHandler(_BotApiHandler):
   """
   ACCEPTED_KEYS = {
       u'bot_overhead',
+      u'cache_trim_stats',
       u'cas_output_root',
       u'cipd_pins',
       u'cipd_stats',
+      u'cleanup_stats',
       u'cost_usd',
       u'duration',
       u'exit_code',
@@ -1123,6 +1125,7 @@ class BotTaskUpdateHandler(_BotApiHandler):
       u'id',
       u'io_timeout',
       u'isolated_stats',
+      u'named_caches_stats',
       u'output',
       u'output_chunk_start',
       u'outputs_ref',
@@ -1158,6 +1161,9 @@ class BotTaskUpdateHandler(_BotApiHandler):
     hard_timeout = request.get('hard_timeout')
     io_timeout = request.get('io_timeout')
     isolated_stats = request.get('isolated_stats')
+    cache_trim_stats = request.get('cache_trim_stats')
+    named_caches_stats = request.get('named_caches_stats')
+    cleanup_stats = request.get('cleanup_stats')
     output = request.get('output')
     output_chunk_start = request.get('output_chunk_start')
     outputs_ref = request.get('outputs_ref')
@@ -1203,6 +1209,19 @@ class BotTaskUpdateHandler(_BotApiHandler):
       if cipd_stats:
         performance_stats.package_installation = task_result.OperationStats(
             duration=cipd_stats.get('duration'))
+      if cache_trim_stats:
+        performance_stats.cache_trim = task_result.OperationStats(
+            duration=cache_trim_stats.get('duration'))
+      if named_caches_stats:
+        install = named_caches_stats.get('install', {})
+        uninstall = named_caches_stats.get('uninstall', {})
+        performance_stats.named_caches_install = task_result.OperationStats(
+            duration=install.get('duration'))
+        performance_stats.named_caches_uninstall = task_result.OperationStats(
+            duration=uninstall.get('duration'))
+      if cleanup_stats:
+        performance_stats.cleanup = task_result.OperationStats(
+            duration=cleanup_stats.get('duration'))
 
     if output is not None:
       try:

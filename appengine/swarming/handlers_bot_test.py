@@ -1152,6 +1152,20 @@ class BotApiTest(test_env_handlers.AppTestBase):
         'bot_overhead': 0.1,
         'exit_code': 0,
         'id': 'bot1',
+        'cache_trim_stats': {
+            'duration': 0.1,
+        },
+        'cipd_stats': {
+            'duration': 0.1,
+        },
+        'named_caches_stats': {
+            'install': {
+                'duration': 0.1,
+            },
+            'uninstall': {
+                'duration': 0.1,
+            },
+        },
         'isolated_stats': {
             'download': {
                 'duration': 0.1,
@@ -1165,6 +1179,9 @@ class BotApiTest(test_env_handlers.AppTestBase):
                 'items_cold': '',
                 'items_hot': '',
             },
+        },
+        'cleanup_stats': {
+            'duration': 0.1,
         },
         'output': base64.b64encode('Ahahah'),
         'output_chunk_start': 0,
@@ -1240,6 +1257,20 @@ class BotApiTest(test_env_handlers.AppTestBase):
         'bot_overhead': 0.1,
         'exit_code': 0,
         'id': 'bot1',
+        'cache_trim_stats': {
+            'duration': 0.1,
+        },
+        'cipd_stats': {
+            'duration': 0.1,
+        },
+        'named_caches_stats': {
+            'install': {
+                'duration': 0.1,
+            },
+            'uninstall': {
+                'duration': 0.1,
+            },
+        },
         'isolated_stats': {
             'download': {
                 'duration': 0.1,
@@ -1253,6 +1284,9 @@ class BotApiTest(test_env_handlers.AppTestBase):
                 'items_cold': '',
                 'items_hot': '',
             },
+        },
+        'cleanup_stats': {
+            'duration': 0.1,
         },
         'output': base64.b64encode('Ahahah'),
         'output_chunk_start': 0,

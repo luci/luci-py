@@ -811,15 +811,25 @@ def run_command(remote, task_details, work_dir, cost_usd_hour,
           params['bot_overhead'] = duration - run_isolated_result['duration']
           if params['bot_overhead'] < 0:
             params['bot_overhead'] = 0
-        isolated_stats = run_isolated_result.get('stats', {}).get('isolated')
+        run_isolated_stats = run_isolated_result.get('stats', {})
+        isolated_stats = run_isolated_stats.get('isolated')
         if isolated_stats:
           params['isolated_stats'] = isolated_stats
-        cipd_stats = run_isolated_result.get('stats', {}).get('cipd')
+        cipd_stats = run_isolated_stats.get('cipd')
         if cipd_stats:
           params['cipd_stats'] = cipd_stats
         cipd_pins = run_isolated_result.get('cipd_pins')
         if cipd_pins:
           params['cipd_pins'] = cipd_pins
+        named_caches_stats = run_isolated_stats.get('named_caches')
+        if named_caches_stats:
+          params['named_caches_stats'] = named_caches_stats
+        cache_trim_stats = run_isolated_stats.get('trim_caches')
+        if cache_trim_stats:
+          params['cache_trim_stats'] = cache_trim_stats
+        cleanup_stats = run_isolated_stats.get('cleanup')
+        if cleanup_stats:
+          params['cleanup_stats'] = cleanup_stats
     except (IOError, OSError, ValueError) as e:
       logging.error('Swallowing error: %s', e)
       if not must_signal_internal_failure:
@@ -852,6 +862,9 @@ def run_command(remote, task_details, work_dir, cost_usd_hour,
         params.pop('isolated_stats', None)
         params.pop('cipd_stats', None)
         params.pop('cipd_pins', None)
+        params.pop('named_caches_stats', None)
+        params.pop('cache_trim_stats', None)
+        params.pop('cleanup_stats', None)
       remote.post_task_update(task_details.task_id, params, buf.pop(),
                               exit_code)
       logging.debug('Last task update finished. task_id: %s, exit_code: %s, '
