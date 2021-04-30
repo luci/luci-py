@@ -515,9 +515,12 @@ class AppTestBase(test_case.TestCase):
     return self.client_create_task(
         properties=self.create_props(**properties), **kwargs)
 
-  def client_get_results(self, task_id):
-    return self.endpoint_call(handlers_endpoints.SwarmingTaskService, 'result',
-                              {'task_id': task_id})
+  def client_get_results(self, task_id, include_performance_stats=False):
+    return self.endpoint_call(
+        handlers_endpoints.SwarmingTaskService, 'result', {
+            'task_id': task_id,
+            'include_performance_stats': include_performance_stats
+        })
 
   @staticmethod
   def gen_props(**kwargs):

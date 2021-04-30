@@ -623,6 +623,10 @@ class Test(unittest.TestCase):
     result_isolated_size = self.assertOutputsRef(outputs_ref)
     items_out = [len('test_isolated'), result_isolated_size]
     expected_performance_stats = {
+        u'cache_trim': {},
+        u'package_installation': {},
+        u'named_caches_install': {},
+        u'named_caches_uninstall': {},
         u'isolated_download': {
             u'initial_number_items': u'0',
             u'initial_size': u'0',
@@ -637,7 +641,7 @@ class Test(unittest.TestCase):
             u'num_items_cold': unicode(len(items_out)),
             u'total_bytes_items_cold': unicode(sum(items_out)),
         },
-        u'package_installation': {},
+        u'cleanup': {},
     }
     self.assertPerformanceStats(expected_performance_stats, performance_stats)
 
@@ -699,6 +703,10 @@ class Test(unittest.TestCase):
         result_isolated_size,
     ]
     expected_performance_stats = {
+        u'cache_trim': {},
+        u'package_installation': {},
+        u'named_caches_install': {},
+        u'named_caches_uninstall': {},
         u'isolated_download': {
             u'initial_number_items': u'0',
             u'initial_size': u'0',
@@ -713,7 +721,7 @@ class Test(unittest.TestCase):
             u'num_items_cold': unicode(len(items_out)),
             u'total_bytes_items_cold': unicode(sum(items_out)),
         },
-        u'package_installation': {},
+        u'cleanup': {},
     }
     self.assertPerformanceStats(expected_performance_stats, performance_stats)
 
@@ -752,6 +760,10 @@ class Test(unittest.TestCase):
         deduped=False)
     self.assertIsNone(outputs_ref)
     expected_performance_stats = {
+        u'cache_trim': {},
+        u'package_installation': {},
+        u'named_caches_install': {},
+        u'named_caches_uninstall': {},
         u'isolated_download': {
             u'initial_number_items': u'0',
             u'initial_size': u'0',
@@ -764,7 +776,7 @@ class Test(unittest.TestCase):
             u'items_cold': [],
             u'items_hot': [],
         },
-        u'package_installation': {},
+        u'cleanup': {},
     }
     self.assertPerformanceStats(expected_performance_stats, performance_stats)
 
@@ -815,6 +827,10 @@ class Test(unittest.TestCase):
     result_isolated_size = self.assertOutputsRef(outputs_ref)
     items_out = [len('test_isolated_hard_timeout_grace'), result_isolated_size]
     expected_performance_stats = {
+        u'cache_trim': {},
+        u'package_installation': {},
+        u'named_caches_install': {},
+        u'named_caches_uninstall': {},
         u'isolated_download': {
             u'initial_number_items': u'0',
             u'initial_size': u'0',
@@ -829,7 +845,7 @@ class Test(unittest.TestCase):
             u'num_items_cold': unicode(len(items_out)),
             u'total_bytes_items_cold': unicode(sum(items_out)),
         },
-        u'package_installation': {},
+        u'cleanup': {},
     }
     self.assertPerformanceStats(expected_performance_stats, performance_stats)
 
@@ -848,6 +864,10 @@ class Test(unittest.TestCase):
         deduped=False)
     self.assertIsNone(outputs_ref)
     expected_performance_stats = {
+        u'cache_trim': {},
+        u'package_installation': {},
+        u'named_caches_install': {},
+        u'named_caches_uninstall': {},
         u'isolated_download': {
             u'initial_number_items': u'0',
             u'initial_size': u'0',
@@ -860,7 +880,7 @@ class Test(unittest.TestCase):
             u'items_cold': [],
             u'items_hot': [],
         },
-        u'package_installation': {},
+        u'cleanup': {},
     }
     self.assertPerformanceStats(expected_performance_stats, performance_stats)
 
@@ -914,6 +934,10 @@ class Test(unittest.TestCase):
     result_isolated_size = self.assertOutputsRef(outputs_ref)
     items_out = [len('foobar\n'), result_isolated_size]
     expected_performance_stats = {
+        u'cache_trim': {},
+        u'package_installation': {},
+        u'named_caches_install': {},
+        u'named_caches_uninstall': {},
         u'isolated_download': {
             u'initial_number_items': u'0',
             u'initial_size': u'0',
@@ -928,7 +952,7 @@ class Test(unittest.TestCase):
             u'num_items_cold': unicode(len(items_out)),
             u'total_bytes_items_cold': unicode(sum(items_out)),
         },
-        u'package_installation': {},
+        u'cleanup': {},
     }
     self.assertPerformanceStats(expected_performance_stats, performance_stats)
 
@@ -966,6 +990,10 @@ class Test(unittest.TestCase):
         deduped=False)
     self.assertIsNone(outputs_ref)
     expected_performance_stats = {
+        u'cache_trim': {},
+        u'package_installation': {},
+        u'named_caches_install': {},
+        u'named_caches_uninstall': {},
         u'isolated_download': {
             u'initial_number_items': u'0',
             u'initial_size': u'0',
@@ -978,7 +1006,7 @@ class Test(unittest.TestCase):
             u'items_cold': [],
             u'items_hot': [],
         },
-        u'package_installation': {},
+        u'cleanup': {},
     }
     self.assertPerformanceStats(expected_performance_stats, performance_stats)
 
@@ -1002,6 +1030,10 @@ class Test(unittest.TestCase):
     result_isolated_size = self.assertOutputsRef(outputs_ref)
     items_out = [3, result_isolated_size]
     expected_performance_stats = {
+        u'cache_trim': {},
+        u'package_installation': {},
+        u'named_caches_install': {},
+        u'named_caches_uninstall': {},
         u'isolated_download': {
             u'initial_number_items': unicode(len(items_in)),
             u'initial_size': unicode(sum(items_in)),
@@ -1017,7 +1049,7 @@ class Test(unittest.TestCase):
             u'num_items_cold': unicode(len(items_out)),
             u'total_bytes_items_cold': unicode(sum(items_out)),
         },
-        u'package_installation': {},
+        u'cleanup': {},
     }
     self.assertPerformanceStats(expected_performance_stats, performance_stats)
 
@@ -1480,21 +1512,33 @@ class Test(unittest.TestCase):
 
   def assertPerformanceStatsEmpty(self, actual):
     self.assertLess(0, actual.pop(u'bot_overhead'))
+    self.assertLess(0, actual[u'cache_trim'].pop(u'duration'))
+    self.assertLessEqual(0, actual[u'named_caches_install'].pop(u'duration'))
+    self.assertLessEqual(0, actual[u'named_caches_uninstall'].pop(u'duration'))
+    self.assertLess(0, actual[u'cleanup'].pop(u'duration'))
     self.assertEqual(
         {
+            u'cache_trim': {},
+            u'package_installation': {},
+            u'named_caches_install': {},
+            u'named_caches_uninstall': {},
             u'isolated_download': {
                 u'initial_number_items': u'0',
                 u'initial_size': u'0',
             },
             u'isolated_upload': {},
-            u'package_installation': {},
+            u'cleanup': {},
         }, actual)
 
   def assertPerformanceStats(self, expected, actual):
     # These are not deterministic (or I'm too lazy to calculate the value).
     self.assertLess(0, actual.pop(u'bot_overhead'))
+    self.assertLess(0, actual[u'cache_trim'].pop(u'duration'))
+    self.assertLessEqual(0, actual[u'named_caches_install'].pop(u'duration'))
+    self.assertLessEqual(0, actual[u'named_caches_uninstall'].pop(u'duration'))
     self.assertLess(0, actual[u'isolated_download'].pop(u'duration'))
     self.assertLess(0, actual[u'isolated_upload'].pop(u'duration'))
+    self.assertLess(0, actual[u'cleanup'].pop(u'duration'))
     for k in (u'isolated_download', u'isolated_upload'):
       for j in (u'items_cold', u'items_hot'):
         actual[k][j] = large.unpack(base64.b64decode(actual[k].get(j, '')))

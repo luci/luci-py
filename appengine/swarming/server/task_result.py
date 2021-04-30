@@ -360,11 +360,21 @@ class PerformanceStats(ndb.Model):
     # to_dict() doesn't correctly call overriden to_dict() on
     # LocalStructuredProperty.
     out = super(PerformanceStats, self).to_dict(exclude=[
-        'package_installation', 'isolated_download', 'isolated_upload'
+        'cache_trim',
+        'package_installation',
+        'named_caches_install',
+        'named_caches_uninstall',
+        'isolated_download',
+        'isolated_upload',
+        'cleanup',
     ])
+    out['cache_trim'] = self.cache_trim.to_dict()
     out['package_installation'] = self.package_installation.to_dict()
+    out['named_caches_install'] = self.named_caches_install.to_dict()
+    out['named_caches_uninstall'] = self.named_caches_uninstall.to_dict()
     out['isolated_download'] = self.isolated_download.to_dict()
     out['isolated_upload'] = self.isolated_upload.to_dict()
+    out['cleanup'] = self.cleanup.to_dict()
     return out
 
   def to_proto(self, out):

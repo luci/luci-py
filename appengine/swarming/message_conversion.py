@@ -369,12 +369,17 @@ def task_result_to_rpc(entity, send_stats):
         return None
       return _ndb_to_rpc(swarming_rpcs.CASOperationStats, entity)
 
+    perf_entity = entity.performance_stats
     performance_stats = _ndb_to_rpc(
         swarming_rpcs.PerformanceStats,
         entity.performance_stats,
-        isolated_download=cas_op(entity.performance_stats.isolated_download),
-        isolated_upload=cas_op(entity.performance_stats.isolated_upload),
-        package_installation=op(entity.performance_stats.package_installation))
+        cache_trim=op(perf_entity.cache_trim),
+        package_installation=op(perf_entity.package_installation),
+        named_caches_install=op(perf_entity.named_caches_install),
+        named_caches_uninstall=op(perf_entity.named_caches_uninstall),
+        isolated_download=cas_op(perf_entity.isolated_download),
+        isolated_upload=cas_op(perf_entity.isolated_upload),
+        cleanup=op(perf_entity.cleanup))
   kwargs = {
       'bot_dimensions':
           _string_list_pairs_from_dict(entity.bot_dimensions or {}),
