@@ -1026,6 +1026,11 @@ def get_dimensions():
     xcode_versions = platforms.osx.get_xcode_versions()
     if xcode_versions:
       dimensions[u'xcode_version'] = xcode_versions
+    display_attached = platforms.osx.is_display_attached()
+    if display_attached:
+      dimensions[u'display_attached'] = [u'1']
+    else:
+      dimensions[u'display_attached'] = [u'0']
 
     # iOS devices
     udids = platforms.osx.get_ios_device_ids()

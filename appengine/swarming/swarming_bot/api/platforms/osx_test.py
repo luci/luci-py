@@ -495,6 +495,13 @@ class TestOsx(unittest.TestCase):
     self.assertEqual(plist['Program'], 'echo')
     self.assertEqual(plist['ProgramArguments'], ['echo', 'hi'])
 
+  def test_is_display_attached(self):
+    # Whether a display is detected or not is going to be dependent on the
+    # hardware, but we can at least ensure that we don't hit any errors before
+    # being able to determine one way or the other.
+    display_attached = osx.is_display_attached()
+    self.assertIsNotNone(display_attached)
+
 
 if __name__ == '__main__':
   if '-v' in sys.argv:

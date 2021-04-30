@@ -198,6 +198,7 @@ class TestOsUtilities(auto_stub.TestCase):
       expected.add(u'gcp')
     if sys.platform == 'darwin':
       expected.add(u'mac_model')
+      expected.add(u'display_attached')
       # Bot may not have HiDPI and Xcode preinstalled
       actual.discard(u'hidpi')
       actual.discard(u'xcode_version')

@@ -32,6 +32,11 @@ try:
 except ImportError:
   Quartz = None
 
+try:
+  import objc
+except ImportError:
+  objc = None
+
 
 ## Private stuff.
 
@@ -710,6 +715,61 @@ def is_locked():
   if not current_session:
     return None
   return bool(current_session.get('CGSSessionScreenIsLocked', False))
+
+
+def is_display_attached():
+  """Returns whether a display is attached to the machine or not.
+
+  Returns:
+    None, True, or False. It is None when the presence of a display cannot be
+    determined, and a bool otherwise returning whether a display is attached.
+  """
+  if Quartz is None:
+    return None
+  if objc is None:
+    return None
+
+  # Synthesize a module for accessing the ColorSync framework.
+  color_sync_framework = ('/System/Library/Frameworks/ApplicationServices.'
+                          'framework/Versions/A/Frameworks/ColorSync.framework')
+  color_sync_bridge_string = """<?xml version='1.0'?>
+    <signatures version='1.0'>
+      <constant name='kColorSyncDeviceDefaultProfileID' type='^{__CFString=}'/>
+      <constant name='kColorSyncDisplayDeviceClass' type='^{__CFString=}'/>
+      <constant name='kColorSyncProfileUserScope' type='^{__CFString=}'/>
+      <function name='CGDisplayCreateUUIDFromDisplayID'>
+        <arg type='I'/>
+        <retval already_retained='true' type='^{__CFUUID=}'/>
+      </function>
+      <function name='ColorSyncDeviceCopyDeviceInfo'>
+        <arg type='^{__CFString=}'/>
+        <arg type='^{__CFUUID=}'/>
+        <retval already_retained='true' type='^{__CFDictionary=}'/>
+      </function>
+      <function name='ColorSyncDeviceSetCustomProfiles'>
+        <arg type='^{__CFString=}'/>
+        <arg type='^{__CFUUID=}'/>
+        <arg type='^{__CFDictionary=}'/>
+        <retval type='B'/>
+      </function>
+    </signatures>"""
+  objc.parseBridgeSupport(color_sync_bridge_string, globals(),
+                          color_sync_framework)
+
+  online_display_list_result = Quartz.CGGetOnlineDisplayList(32, None, None)
+  error = online_display_list_result[0]
+  if error != Quartz.kCGErrorSuccess:
+    logging.error('Quartz was unable to get display list. Error: %s', error)
+    return None
+
+  online_displays = online_display_list_result[1]
+  for display_id in online_displays:
+    device_info = ColorSyncDeviceCopyDeviceInfo(
+        kColorSyncDisplayDeviceClass,
+        CGDisplayCreateUUIDFromDisplayID(display_id))
+    if device_info:
+      return True
+  return False
 
 
 def is_beta():
