@@ -821,12 +821,32 @@ const performanceStatsSection = (ele, performanceStats) => {
     <td>${humanDuration(performanceStats.bot_overhead)}</td>
   </tr>
   <tr>
+    <td>Cache trimming before the task</td>
+    <td>${humanDuration(performanceStats.cache_trim.duration)}</td>
+  </tr>
+  <tr>
+    <td>Installing CIPD packages</td>
+    <td>${humanDuration(performanceStats.package_installation.duration)}</td>
+  </tr>
+  <tr>
+    <td>Installing Named Caches</td>
+    <td>${humanDuration(performanceStats.named_caches_install.duration)}</td>
+  </tr>
+  <tr>
+    <td>Uninstalling Named Caches</td>
+    <td>${humanDuration(performanceStats.named_caches_uninstall.duration)}</td>
+  </tr>
+  <tr>
     <td>Downloading Inputs</td>
     <td>${humanDuration(performanceStats.isolated_download.duration)}</td>
   </tr>
   <tr>
     <td>Uploading Outputs</td>
     <td>${humanDuration(performanceStats.isolated_upload.duration)}</td>
+  </tr>
+  <tr>
+    <td>Cleanup directories</td>
+    <td>${humanDuration(performanceStats.cleanup.duration)}</td>
   </tr>
   <tr>
     <td>Initial bot cache</td>

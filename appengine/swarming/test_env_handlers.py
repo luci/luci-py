@@ -366,6 +366,20 @@ class AppTestBase(test_case.TestCase):
         'bot_overhead': 0.1,
         'exit_code': 0,
         'id': 'bot1',
+        'cache_trim_stats': {
+            'duration': 0.1,
+        },
+        'cipd_stats': {
+            'duration': 3,
+        },
+        'named_caches_stats': {
+            'install': {
+                'duration': 0.1,
+            },
+            'uninstall': {
+                'duration': 0.1,
+            },
+        },
         'isolated_stats': {
             'download': {
                 'duration': 1.,
@@ -380,8 +394,8 @@ class AppTestBase(test_case.TestCase):
                 'items_hot': [1, 2, 3, 50],
             },
         },
-        'cipd_stats': {
-            'duration': 3,
+        'cleanup_stats': {
+            'duration': 0.1,
         },
         'output': base64.b64encode(u'rÉsult string'.encode('utf-8')),
         'output_chunk_start': 0,
@@ -612,6 +626,18 @@ class AppTestBase(test_case.TestCase):
     """
     out = {
         u'bot_overhead': 0.1,
+        u'cache_trim': {
+            u'duration': 0.1,
+        },
+        u'package_installation': {
+            u'duration': 3.0,
+        },
+        u'named_caches_install': {
+            u'duration': 0.1,
+        },
+        u'named_caches_uninstall': {
+            u'duration': 0.1,
+        },
         u'isolated_download': {
             u'duration': 1.0,
             u'initial_number_items': u'10',
@@ -632,8 +658,8 @@ class AppTestBase(test_case.TestCase):
             u'num_items_hot': u'4',
             u'total_bytes_items_hot': u'56',
         },
-        u'package_installation': {
-            u'duration': 3.0,
+        u'cleanup': {
+            u'duration': 0.1,
         },
     }
     out.update((unicode(k), v) for k, v in kwargs.items())

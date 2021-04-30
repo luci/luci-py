@@ -585,10 +585,16 @@ class _TaskResultCommon(ndb.Model):
       key = None if self.deduped_from else self.performance_stats_key
       # pylint: disable=attribute-defined-outside-init
       stats = (key.get() if key else None) or PerformanceStats()
-      stats.isolated_download = stats.isolated_download or CASOperationStats()
-      stats.isolated_upload = stats.isolated_upload or CASOperationStats()
+      stats.cache_trim = stats.cache_trim or OperationStats()
+      stats.named_caches_install = (
+          stats.named_caches_install or OperationStats())
+      stats.named_caches_uninstall = (
+          stats.named_caches_uninstall or OperationStats())
       stats.package_installation = (
           stats.package_installation or OperationStats())
+      stats.isolated_download = stats.isolated_download or CASOperationStats()
+      stats.isolated_upload = stats.isolated_upload or CASOperationStats()
+      stats.cleanup = stats.cleanup or OperationStats()
       self._performance_stats_cache = stats
     return self._performance_stats_cache
 

@@ -272,6 +272,19 @@ export const taskResults = [
     ],
     'resultdb_info':  resultdbInfo,
     'performance_stats': {
+      'bot_overhead': 12.625049114227295,
+      'cache_trim': {
+        'duration': 0.19332058568977994,
+      },
+      'package_installation': {
+        'duration': 1.927985185866525,
+      },
+      'named_caches_install': {
+        'duration': 0.4632923401258997,
+      },
+      'named_caches_uninstall': {
+        'duration': 1.4231980910661515,
+      },
       'isolated_download': {
         'initial_size': '0',
         'initial_number_items': '0',
@@ -282,7 +295,9 @@ export const taskResults = [
         'total_bytes_items_cold': '12617',
         'items_cold': 'eJxrZdyfAAAD+QGm',
       },
-      'bot_overhead': 12.625049114227295,
+      'cleanup': {
+        'duration': 1.706534912256987,
+      },
     },
     'duration': 881.5171999931335,
     'completed_ts': '2019-01-21T10:42:33.353190',
