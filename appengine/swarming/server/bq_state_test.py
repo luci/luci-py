@@ -69,15 +69,13 @@ class BotManagementTest(test_case.TestCase):
     self.assertEqual(1, bq_state.BqState.query().count())
     expected = {
         # Values are exclusive; they are the next values to process.
-        'oldest': datetime.datetime(2020, 1, 2, 2, 51),
-        'recent': datetime.datetime(2020, 1, 2, 3, 2),
+        'oldest': datetime.datetime(2020, 1, 2, 2, 49),
+        'recent': datetime.datetime(2020, 1, 2, 3, 0),
         'ts': now,
     }
     self.assertEqual(expected, bq_state.BqState.get_by_id('mytable').to_dict())
     expected = [
         # Only backfill.
-        '/internal/taskqueue/foo/2020-01-02T03:01',
-        '/internal/taskqueue/foo/2020-01-02T03:00',
         '/internal/taskqueue/foo/2020-01-02T02:59',
         '/internal/taskqueue/foo/2020-01-02T02:58',
         '/internal/taskqueue/foo/2020-01-02T02:57',
@@ -86,6 +84,8 @@ class BotManagementTest(test_case.TestCase):
         '/internal/taskqueue/foo/2020-01-02T02:54',
         '/internal/taskqueue/foo/2020-01-02T02:53',
         '/internal/taskqueue/foo/2020-01-02T02:52',
+        '/internal/taskqueue/foo/2020-01-02T02:51',
+        '/internal/taskqueue/foo/2020-01-02T02:50',
     ]
     self.assertEqual(expected, urls)
 
@@ -103,7 +103,7 @@ class BotManagementTest(test_case.TestCase):
         id='mytable',
         ts=now,
         oldest=oldest,
-        recent=datetime.datetime(2020, 1, 2, 2, 59)).put()
+        recent=datetime.datetime(2020, 1, 2, 2, 57)).put()
 
     urls = []
     def enqueue_task(url, task_name):
@@ -118,15 +118,15 @@ class BotManagementTest(test_case.TestCase):
     self.assertEqual(1, bq_state.BqState.query().count())
     expected = {
         'oldest': datetime.datetime(2019, 1, 3, 3, 4),
-        'recent': datetime.datetime(2020, 1, 2, 3, 2),
+        'recent': datetime.datetime(2020, 1, 2, 3, 0),
         'ts': now,
     }
     self.assertEqual(expected, bq_state.BqState.get_by_id('mytable').to_dict())
     expected = [
         # Front filling.
+        '/internal/taskqueue/foo/2020-01-02T02:57',
+        '/internal/taskqueue/foo/2020-01-02T02:58',
         '/internal/taskqueue/foo/2020-01-02T02:59',
-        '/internal/taskqueue/foo/2020-01-02T03:00',
-        '/internal/taskqueue/foo/2020-01-02T03:01',
         # Backfilling.
         '/internal/taskqueue/foo/2019-01-03T03:07',
         '/internal/taskqueue/foo/2019-01-03T03:06',
@@ -144,8 +144,8 @@ class BotManagementTest(test_case.TestCase):
     self.assertEqual(0, actual)
     self.assertEqual(1, bq_state.BqState.query().count())
     expected = {
-        'oldest': datetime.datetime(2020, 1, 2, 3, 1),
-        'recent': datetime.datetime(2020, 1, 2, 3, 2),
+        'oldest': datetime.datetime(2020, 1, 2, 2, 59),
+        'recent': datetime.datetime(2020, 1, 2, 3, 0),
         'ts': now,
     }
     self.assertEqual(expected, bq_state.BqState.get_by_id('mytable').to_dict())

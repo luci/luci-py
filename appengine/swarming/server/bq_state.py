@@ -164,7 +164,7 @@ def cron_trigger_tasks(
   Returns:
     total number of task queue tasks triggered.
   """
-  RECENT_OFFSET = datetime.timedelta(seconds=120)
+  RECENT_OFFSET = datetime.timedelta(seconds=240)
   minute = datetime.timedelta(seconds=60)
 
   start = utils.utcnow()
