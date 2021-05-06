@@ -17,6 +17,9 @@ import time
 import unittest
 
 import mock
+# TODO(github.com/wolever/parameterized/issues/91)
+# use parameterized after the bug is resolved.
+from nose2.tools import params
 import six
 
 import test_env_api
@@ -47,11 +50,17 @@ class TestOsUtilities(auto_stub.TestCase):
     expected = (u'Debian', u'Linux', u'Mac', u'Raspbian', u'Ubuntu', u'Windows')
     self.assertIn(os_utilities.get_os_name(), expected)
 
-  def test_get_cpu_type(self):
-    actual = os_utilities.get_cpu_type()
-    if actual == u'x86':
-      return
-    self.assertTrue(actual.startswith(u'arm'), actual)
+  @params(
+      ('x86_64', u'x86'),
+      ('amd64', u'x86'),
+      ('i386', u'x86'),
+      ('aarch64', u'arm64'),
+      ('mips64', u'mips'),
+      ('arm64', u'arm64'),
+  )
+  def test_get_cpu_type(self, machine, expected):
+    self.mock(platform, 'machine', lambda: machine)
+    self.assertEqual(os_utilities.get_cpu_type(), expected)
 
   @unittest.skipUnless(
       sys.platform.startswith('linux'), 'this is only for linux')
@@ -72,10 +81,6 @@ class TestOsUtilities(auto_stub.TestCase):
       self.assertEqual(
           os_utilities.get_os_values(),
           ['Mac', 'Mac-10', 'Mac-10.15', 'Mac-10.15.5', 'Mac-10.15.5-19F101'])
-
-  def test_get_cpu_type_mips(self):
-    self.mock(platform, 'machine', lambda: 'mips64')
-    self.assertEqual(os_utilities.get_cpu_type(), u'mips')
 
   def test_get_cpu_bitness(self):
     expected = (u'32', u'64')

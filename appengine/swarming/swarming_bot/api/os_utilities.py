@@ -236,7 +236,7 @@ def get_cpu_type():
     return u'arm64'
   if machine == 'mips64':
     return u'mips'
-  return machine.decode('utf-8')
+  return six.ensure_text(machine)
 
 
 @tools.cached
