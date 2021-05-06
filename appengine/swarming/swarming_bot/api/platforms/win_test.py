@@ -11,6 +11,7 @@ import subprocess
 import sys
 import unittest
 
+import mock
 import six
 
 import test_env_platforms
@@ -22,7 +23,7 @@ from depot_tools import auto_stub
 from utils import tools
 tools.cached = lambda func: func
 
-import win
+from api.platforms import win
 
 
 MockWinVer = collections.namedtuple('MockWinVer', ['product_type'])
@@ -132,6 +133,22 @@ class TestWin(auto_stub.TestCase):
         1, b'\nMicrosoft Windows [Version 6.3.9600]\n',
         ('8.1', '6.3.9600', '', u'Multiprocessor Free'), [u'8.1', u'8.1-SP0'])
 
+  def test_get_gpu(self):
+    SWbemObjectSet = mock.Mock(
+      PNPDeviceID=
+      u'PCI\\VEN_1AE0&DEV_A002&SUBSYS_00011AE0&REV_01\\3&13C0B0C5&0&28',
+      VideoProcessor=u'GGA',
+      DriverVersion=u'1.1.1.18')
+    SWbemServices = mock.Mock()
+    SWbemServices.ExecQuery.return_value = [SWbemObjectSet]
+    with mock.patch(
+      'api.platforms.win._get_wmi_wbem', return_value=SWbemServices):
+      actual = win.get_gpu()
+      SWbemServices.ExecQuery.assert_called_once_with(
+        'SELECT * FROM Win32_VideoController')
+      expected = (
+        ['1ae0', '1ae0:a002', '1ae0:a002-1.1.1.18'], ['Unknown GGA 1.1.1.18'])
+      self.assertEqual(expected, actual)
 
   def test_list_top_windows(self):
     if sys.platform == 'win32':
