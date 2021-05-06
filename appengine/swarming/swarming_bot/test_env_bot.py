@@ -41,8 +41,9 @@ def setup_test_env():
   sys.path.insert(0, client_tests)
 
   tp = os.path.join(BOT_DIR, 'third_party')
-  if sys.platform == 'win32':
-    # third_party is a symlink.
+  if os.path.isfile(tp):
+    # check if third_party is symlink or regular existing file
+    # because support for symlink in git for Windows may be disabled
     with open(tp, 'r') as f:
       tp = os.path.join(BOT_DIR, f.read())
   sys.path.insert(0, tp)
