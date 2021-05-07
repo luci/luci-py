@@ -636,8 +636,13 @@ class Popen(subprocess.Popen):
 
     assert isinstance(timeout, (int, float)), timeout
     if self.stdin or self.stdout or self.stderr:
-      stdout = b'' if self.stdout else None
-      stderr = b'' if self.stderr else None
+      stdout = None
+      if self.stdout:
+        stdout = '' if self.universal_newlines else b''
+      stderr = None
+      if self.stderr:
+        stderr = '' if self.universal_newlines else b''
+
       t = None
       if input is not None:
         assert self.stdin, ('Can\'t use communicate(input) if not using '
@@ -688,9 +693,6 @@ class Popen(subprocess.Popen):
 
     # Indirectly initialize self.end.
     self.wait()
-    if self.universal_newlines:
-      stdout = stdout.decode() if stdout is not None else None
-      stderr = stderr.decode() if stderr is not None else None
     return stdout, stderr
 
   def wait(self,
@@ -770,7 +772,7 @@ class Popen(subprocess.Popen):
 
     Like yield_any, but yields lines.
     """
-    return split(self.yield_any(**kwargs))
+    return split(self.yield_any(**kwargs), self.universal_newlines)
 
   def yield_any(self, maxsize=None, timeout=None):
     """Yields output until the process terminates.
@@ -861,7 +863,7 @@ class Popen(subprocess.Popen):
       conns, names = zip(*pipes)
       index, data, closed = recv_multi_impl(conns, maxsize, timeout)
       if index is None:
-        return index, data
+        return None, None
       if closed:
         self._close(names[index])
         if not data:
@@ -878,7 +880,10 @@ class Popen(subprocess.Popen):
               six.ensure_binary(data), encoding='utf-8', errors='strict')
         else:
           data = self._translate_newlines(data)
-      data = six.ensure_binary(data)
+        # converts str to byte string in Python3.
+        data = data.encode()
+      if six.PY3 and self.universal_newlines:
+        data = data.decode()
       return names[index], data
 
   def recv_out(self, maxsize=None, timeout=None):
@@ -1070,7 +1075,7 @@ def inhibit_os_error_reporting():
   # - Ubuntu, disable apport if needed.
 
 
-def split(data):
+def split(data, universal_newlines):
   """Splits pipe data by |sep|. Does some buffering.
 
   For example, [('stdout', b'a\nb'), ('stdout', b'\n'), ('stderr', b'c\n')] ->
@@ -1087,6 +1092,12 @@ def split(data):
   if six.PY3 and sys.platform == 'win32':
     # CRLF is used instead of LF in python3 on windows
     sep = b'\r\n'
+  if six.PY3 and universal_newlines:
+    sep = sep.decode()
+
+  def _join(d):
+    s = '' if universal_newlines else b''
+    return s.join(d)
 
   # A dict {pipe_name -> list of pending chunks without separators}
   pending_chunks = collections.defaultdict(list)
@@ -1107,7 +1118,7 @@ def split(data):
       start = j + len(sep)
       if pending:
         # prepend and forget
-        to_emit = b''.join(pending) + to_emit
+        to_emit = _join(pending) + to_emit
         pending = []
         pending_chunks[pipe_name] = pending
       yield pipe_name, to_emit
@@ -1115,4 +1126,4 @@ def split(data):
   # Emit remaining chunks that don't end with separators as is.
   for pipe_name, chunks in sorted(pending_chunks.items()):
     if chunks:
-      yield pipe_name, b''.join(chunks)
+      yield pipe_name, _join(chunks)
