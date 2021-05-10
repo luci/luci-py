@@ -217,6 +217,11 @@ class CipdClient(object):
           universal_newlines=True)
       output = []
       for pipe_name, line in process.yield_any_line(timeout=0.1):
+        # TODO(crbug.com/1206402, crbug.com/1207232):
+        # subprocess42.Popen.yield_any_line() doesn't return str even when
+        # universal_newlines=True. Remove six.ensure_str() after fixing
+        # subprocess42.
+        line = six.ensure_str(line, errors='backslashreplace')
         to = timeoutfn()
         if to is not None and to <= 0:
           raise Error(
