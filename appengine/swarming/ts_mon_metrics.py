@@ -463,7 +463,11 @@ def on_task_completed(summary):
   """When a task is stopped from being processed."""
   fields = _extract_job_fields(_tags_to_dict(summary.tags))
   if summary.state == task_result.State.EXPIRED:
-    fields['priority'] = summary.priority
+    if summary.priority is None:
+      # TODO(crbug.com/1200915): remove this after 7 days from deploy.
+      fields['priority'] = -1
+    else:
+      fields['priority'] = summary.priority
     _tasks_expired.increment(fields=fields)
     return
 
