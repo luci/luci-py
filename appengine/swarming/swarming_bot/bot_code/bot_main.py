@@ -28,6 +28,7 @@ import fnmatch
 import json
 import logging
 import os
+import platform
 import shutil
 import sys
 import tempfile
@@ -751,6 +752,11 @@ def _run_isolated_flags(botobj):
     use_kvs = False
 
   if sys.platform.startswith('linux') and platforms.linux.get_inside_docker():
+    use_kvs = False
+
+  if sys.platform == 'win32' and platform.architecture()[0] == '32bit':
+    # 32 bit windows may not work with kvs.
+    # https://crbug.com/1207762
     use_kvs = False
 
   if use_kvs:
