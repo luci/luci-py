@@ -161,9 +161,6 @@ for more information.
 # 3 weeks
 MAX_AGE_SECS = 21*24*60*60
 
-# TODO(1099655): Enable this once all prod issues are gone.
-_USE_GO_ISOLATED_TO_UPLOAD = False
-
 _CAS_KVS_CACHE_THRESHOLD = 5 * 1024 * 1024 * 1024  # 5 GiB
 
 TaskData = collections.namedtuple(
@@ -806,69 +803,7 @@ def _upload_with_py(storage, out_dir):
     raise
 
 
-def _upload_with_go(storage, outdir, isolated_client):
-  """
-  Uploads results back using the Go `isolated` CLI.
-  """
-  server_ref = storage.server_ref
-  isolated_handle, isolated_path = tempfile.mkstemp(
-      prefix=u'isolated-hash-', suffix=u'.txt')
-  stats_json_handle, stats_json_path = tempfile.mkstemp(
-      prefix=u'dump-stats-', suffix=u'.json')
-  os.close(isolated_handle)
-  os.close(stats_json_handle)
-  try:
-    cmd = [
-        isolated_client,
-        'archive',
-        '-isolate-server',
-        server_ref.url,
-        '-namespace',
-        server_ref.namespace,
-        '-dirs',
-        # Format: <working directory>:<relative path to dir>
-        outdir + ':',
-
-        # output
-        '-dump-hash',
-        isolated_path,
-        '-dump-stats-json',
-        stats_json_path,
-        '-quiet',
-    ]
-    # Will do exponential backoff, e.g. 10, 20, 40...
-    # This mitigates https://crbug.com/1094369, where there is a data race on
-    # the uploaded files.
-    backoff = 10
-    started = time.time()
-    while True:
-      try:
-        _run_go_cmd_and_wait(cmd, tmp_dir)
-        break
-      except Exception:
-        if time.time() > started + 60 * 2:
-          # This is to not wait task having leaked process long time.
-          raise
-
-        on_error.report('error before %d second backoff' % backoff)
-        logging.exception(
-            '_run_go_cmd_and_wait() failed, will retry after %d seconds',
-            backoff)
-        time.sleep(backoff)
-        backoff *= 2
-
-    with open(isolated_path) as isol_file:
-      isolated = isol_file.read()
-    with open(stats_json_path) as json_file:
-      stats_json = json.load(json_file)
-
-    return isolated, stats_json['items_cold'], stats_json['items_hot']
-  finally:
-    fs.remove(isolated_path)
-    fs.remove(stats_json_path)
-
-
-def upload_out_dir(storage, out_dir, go_isolated_client):
+def upload_out_dir(storage, out_dir):
   """Uploads the results in |out_dir| back, if there is any.
 
   Returns:
@@ -886,12 +821,7 @@ def upload_out_dir(storage, out_dir, go_isolated_client):
 
   if fs.isdir(out_dir) and fs.listdir(out_dir):
     with tools.Profiler('ArchiveOutput'):
-      isolated = None
-      if _USE_GO_ISOLATED_TO_UPLOAD and go_isolated_client is not None:
-        isolated, cold, hot = _upload_with_go(storage, out_dir,
-                                              go_isolated_client)
-      else:
-        isolated, cold, hot = _upload_with_py(storage, out_dir)
+      isolated, cold, hot = _upload_with_py(storage, out_dir)
       outputs_ref = {
           'isolated': isolated,
           'isolatedserver': storage.server_ref.url,
@@ -1164,7 +1094,7 @@ def map_and_run(data, constant_run_path):
           # This could use |go_isolated_client|, so make sure it runs when the
           # CIPD package still exists.
           result['outputs_ref'], isolated_stats['upload'] = (
-              upload_out_dir(data.storage, out_dir, go_isolated_client))
+              upload_out_dir(data.storage, out_dir))
     # We successfully ran the command, set internal_failure back to
     # None (even if the command failed, it's not an internal error).
     result['internal_failure'] = None
