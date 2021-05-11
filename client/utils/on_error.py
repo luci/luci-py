@@ -207,12 +207,13 @@ def _is_in_test():
 ### Public API.
 
 
-def report_on_exception_exit(server):
+def report_on_exception_exit(server, source=None):
   """Registers the callback at exit to report an error if the process exits due
   to an exception.
   """
   global _HOSTNAME
   global _SERVER
+  global _SOURCE
   if _SERVER:
     raise ValueError('on_error.report_on_exception_exit() was called twice')
 
@@ -229,6 +230,8 @@ def report_on_exception_exit(server):
 
   _HOSTNAME = socket.getfqdn()
   _SERVER = net.get_http_service(server, allow_cached=False)
+  if source:
+    _SOURCE = source
   atexit.register(_check_for_exception_on_exit)
   return True
 
