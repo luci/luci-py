@@ -1,8 +1,8 @@
 Name: python-rsa
 Short Name: rsa
-URL: https://bitbucket.org/sybren/python-rsa/commits/tag/version-3.2.3
-Version: 3.2.3
-Revision: 280:fad443c7ea1a
+URL: https://github.com/sybrenstuvel/python-rsa/releases/tag/version-3.4.2
+Version: 3.4.2
+Revision: fd70d79610ac1af8b072aa27fadf660b4a64797c
 License: Apache License
 
 Description:
