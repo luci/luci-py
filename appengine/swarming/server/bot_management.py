@@ -302,13 +302,17 @@ class BotInfo(_BotCommon):
     self.composite = self._calc_composite()
 
   @classmethod
-  def yield_dead_bot_keys(cls):
-    """Yields keys of bots who should be dead."""
-    # Since fetching last page takes 60 seconds, set long deadline.
-    # https://crbug.com/1174290#c31
-    return cls.query(
-        cls.last_seen_ts <= cls._deadline(),
-        default_options=ndb.QueryOptions(keys_only=True))
+  def yield_alive_bots(cls):
+    """Yields alive bots."""
+    return cls.query(cls.composite == cls.ALIVE)
+
+  @classmethod
+  def yield_bots_should_be_dead(cls):
+    """Yields bots who should be dead."""
+    for b in cls.yield_alive_bots():
+      if not b.should_be_dead:
+        continue
+      yield b
 
   @staticmethod
   def _deadline():
@@ -741,13 +745,12 @@ def get_pools_from_dimensions_flat(dimensions_flat):
 def cron_update_bot_info():
   """Refreshes BotInfo.composite for dead bots."""
   @ndb.tasklet
-  def run(bot_key):
-    bot = yield bot_key.get_async()
+  def run(bot):
     if bot and bot.should_be_dead and (bot.is_alive or not bot.is_dead):
       # bot composite get updated in _pre_put_hook
       yield bot.put_async()
       logging.info('Changing Bot status to DEAD: %s', bot.id)
-      raise ndb.Return(bot_key)
+      raise ndb.Return(bot.key)
     raise ndb.Return(None)
 
   def tx_result(future, stats):
@@ -792,28 +795,24 @@ def cron_update_bot_info():
       'failed': 0,
   }
 
-  q = BotInfo.yield_dead_bot_keys()
   futures = []
-  more = True
-  cursor = None
   logging.debug('Updating dead bots...')
   try:
-    while more:
-      keys, cursor, more = q.fetch_page(50, start_cursor=cursor)
-      for k in keys:
-        cron_stats['seen'] += 1
-        # Retry more often than the default 1. We do not want to throw too much
-        # in the logs and there should be plenty of time to do the retries.
-        f = datastore_utils.transaction_async(lambda: run(k), retries=5)
-        futures.append(f)
-        if len(futures) < 5:
-          continue
-        ndb.Future.wait_any(futures)
-        for i in range(len(futures) - 1, -1, -1):
-          if futures[i].done():
-            f = futures.pop(i)
-            tx_result(f, cron_stats)
-      logging.debug('Fetched %d bot keys', cron_stats['seen'])
+    for b in BotInfo.yield_bots_should_be_dead():
+      cron_stats['seen'] += 1
+      # Retry more often than the default 1. We do not want to throw too much
+      # in the logs and there should be plenty of time to do the retries.
+      f = datastore_utils.transaction_async(lambda: run(b), retries=5)
+      futures.append(f)
+      if len(futures) < 5:
+        continue
+      ndb.Future.wait_any(futures)
+      for i in range(len(futures) - 1, -1, -1):
+        if futures[i].done():
+          f = futures.pop(i)
+          tx_result(f, cron_stats)
+      if cron_stats['seen'] % 50 == 0:
+        logging.debug('Fetched %d bot keys', cron_stats['seen'])
     for f in futures:
       tx_result(f, cron_stats)
   finally:
