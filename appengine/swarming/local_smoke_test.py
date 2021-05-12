@@ -369,12 +369,15 @@ def gen_expected(**kwargs):
       u'server_versions': [u'N/A'],
       u'state': u'COMPLETED',
       u'tags': [
+          u'authenticated:bot:whitelisted-ip',
           u'pool:default',
           u'priority:200',
           u'realm:none',
           u'service_account:none',
           u'swarming.pool.template:none',
           u'swarming.pool.version:pools_cfg_rev',
+          u'use_cas_1143123:0',
+          u'use_isolate_1143123:0',
           u'user:joe@localhost',
       ],
       u'try_number': u'1',
@@ -477,6 +480,7 @@ class Test(unittest.TestCase):
         # The string is mostly converted to 'Replacement Character'.
         output=u'A\ufeff\ufffd\ufffd\ufffdsfs\ufffd(B\n',
         tags=sorted([
+            u'authenticated:bot:whitelisted-ip',
             u'os:' + self.dimensions['os'][0],
             u'os:' + self.dimensions['os'][1],
             u'pool:default',
@@ -485,6 +489,8 @@ class Test(unittest.TestCase):
             u'service_account:none',
             u'swarming.pool.template:none',
             u'swarming.pool.version:pools_cfg_rev',
+            u'use_cas_1143123:0',
+            u'use_isolate_1143123:0',
             u'user:joe@localhost',
         ]))
     self.assertOneTask(args, summary, {})
@@ -610,7 +616,16 @@ class Test(unittest.TestCase):
     isolated_hash, isolated_size = self._archive(name, content,
                                                  DEFAULT_ISOLATE_HELLO)
     items_in = [sum(len(c) for c in content.values()), isolated_size]
-    expected_summary = self.gen_expected(name=u'isolated_task', output=u'hi\n')
+    expected_summary = self.gen_expected(
+        name=u'isolated_task',
+        output=u'hi\n',
+        tags=[
+            u'authenticated:bot:whitelisted-ip', u'pool:default',
+            u'priority:200', u'realm:none', u'service_account:none',
+            u'swarming.pool.template:none',
+            u'swarming.pool.version:pools_cfg_rev', u'use_cas_1143123:0',
+            u'use_isolate_1143123:1', u'user:joe@localhost'
+        ])
     expected_files = {
         os.path.join(u'0', u'💣.txt'.encode('utf-8')): 'test_isolated',
     }
@@ -678,7 +693,14 @@ class Test(unittest.TestCase):
     items_in = [sum(len(c) for c in content.values()), isolated_size]
     expected_summary = self.gen_expected(
         name=u'separate_cmd',
-        output=u'hi💩\n%s\n' % os.sep.join(['$CWD', 'local', 'path']))
+        output=u'hi💩\n%s\n' % os.sep.join(['$CWD', 'local', 'path']),
+        tags=[
+            u'authenticated:bot:whitelisted-ip', u'pool:default',
+            u'priority:200', u'realm:none', u'service_account:none',
+            u'swarming.pool.template:none',
+            u'swarming.pool.version:pools_cfg_rev', u'use_cas_1143123:0',
+            u'use_isolate_1143123:1', u'user:joe@localhost'
+        ])
     expected_files = {
         os.path.join('0', 'result.txt'): 'hey2',
         os.path.join('0', 'FOO.txt'): u'bar💩'.encode('utf-8'),
@@ -750,6 +772,13 @@ class Test(unittest.TestCase):
         name=u'isolated_hard_timeout',
         exit_code=unicode(SIGNAL_TERM),
         failure=True,
+        tags=[
+            u'authenticated:bot:whitelisted-ip', u'pool:default',
+            u'priority:200', u'realm:none', u'service_account:none',
+            u'swarming.pool.template:none',
+            u'swarming.pool.version:pools_cfg_rev', u'use_cas_1143123:0',
+            u'use_isolate_1143123:1', u'user:joe@localhost'
+        ],
         state=u'TIMED_OUT')
     # Hard timeout is enforced by run_isolated, I/O timeout by task_runner.
     _, outputs_ref, performance_stats = self._run_isolated(
@@ -812,6 +841,13 @@ class Test(unittest.TestCase):
         name=u'isolated_hard_timeout_grace',
         output=u'hi\ngot signal 15\n',
         failure=True,
+        tags=[
+            u'authenticated:bot:whitelisted-ip', u'pool:default',
+            u'priority:200', u'realm:none', u'service_account:none',
+            u'swarming.pool.template:none',
+            u'swarming.pool.version:pools_cfg_rev', u'use_cas_1143123:0',
+            u'use_isolate_1143123:1', u'user:joe@localhost'
+        ],
         state=u'TIMED_OUT')
     expected_files = {
         os.path.join('0', 'result.txt'): 'test_isolated_hard_timeout_grace',
@@ -855,7 +891,15 @@ class Test(unittest.TestCase):
     isolated_hash, isolated_size = self._archive(name, content,
                                                  DEFAULT_ISOLATE_HELLO)
     items_in = [sum(len(c) for c in content.values()), isolated_size]
-    expected_summary = self.gen_expected(name=u'idempotent_reuse')
+    expected_summary = self.gen_expected(
+        name=u'idempotent_reuse',
+        tags=[
+            u'authenticated:bot:whitelisted-ip', u'pool:default',
+            u'priority:200', u'realm:none', u'service_account:none',
+            u'swarming.pool.template:none',
+            u'swarming.pool.version:pools_cfg_rev', u'use_cas_1143123:0',
+            u'use_isolate_1143123:1', u'user:joe@localhost'
+        ])
     task_id, outputs_ref, performance_stats = self._run_isolated(
         isolated_hash,
         name, ['--idempotent', '--raw-cmd', '--'] + DEFAULT_COMMAND +
@@ -921,7 +965,15 @@ class Test(unittest.TestCase):
     isolated_hash, isolated_size = self._archive(name, content,
                                                  DEFAULT_ISOLATE_HELLO)
     items_in = [sum(len(c) for c in content.values()), isolated_size]
-    expected_summary = self.gen_expected(name=u'secret_bytes')
+    expected_summary = self.gen_expected(
+        name=u'secret_bytes',
+        tags=[
+            u'authenticated:bot:whitelisted-ip', u'pool:default',
+            u'priority:200', u'realm:none', u'service_account:none',
+            u'swarming.pool.template:none',
+            u'swarming.pool.version:pools_cfg_rev', u'use_cas_1143123:0',
+            u'use_isolate_1143123:1', u'user:joe@localhost'
+        ])
     tmp = os.path.join(self.tmpdir, 'test_secret_bytes')
     with fs.open(tmp, 'wb') as f:
       f.write('foobar')
@@ -981,7 +1033,15 @@ class Test(unittest.TestCase):
     isolated_hash, isolated_size = self._archive(name, content,
                                                  DEFAULT_ISOLATE_HELLO)
     items_in = [sum(len(c) for c in content.values()), isolated_size]
-    expected_summary = self.gen_expected(name=u'cache_first')
+    expected_summary = self.gen_expected(
+        name=u'cache_first',
+        tags=[
+            u'authenticated:bot:whitelisted-ip', u'pool:default',
+            u'priority:200', u'realm:none', u'service_account:none',
+            u'swarming.pool.template:none',
+            u'swarming.pool.version:pools_cfg_rev', u'use_cas_1143123:0',
+            u'use_isolate_1143123:1', u'user:joe@localhost'
+        ])
     _, outputs_ref, performance_stats = self._run_isolated(
         isolated_hash,
         name, ['--named-cache', 'fuu', 'p/b', '--raw-cmd', '--'] +
@@ -1011,7 +1071,15 @@ class Test(unittest.TestCase):
     self.assertPerformanceStats(expected_performance_stats, performance_stats)
 
     # Second run with a cache available.
-    expected_summary = self.gen_expected(name=u'cache_second')
+    expected_summary = self.gen_expected(
+        name=u'cache_second',
+        tags=[
+            u'authenticated:bot:whitelisted-ip', u'pool:default',
+            u'priority:200', u'realm:none', u'service_account:none',
+            u'swarming.pool.template:none',
+            u'swarming.pool.version:pools_cfg_rev', u'use_cas_1143123:0',
+            u'use_isolate_1143123:1', u'user:joe@localhost'
+        ])
     # The previous task caused the bot to have a named cache.
     # pylint: disable=not-an-iterable,unsubscriptable-object
     expected_summary['bot_dimensions'] = (expected_summary['bot_dimensions'][:])
@@ -1071,11 +1139,14 @@ class Test(unittest.TestCase):
     # List of tuple(task_name, priority, task_id).
     tasks = []
     tags = [
+        u'authenticated:bot:whitelisted-ip',
         u'pool:default',
         u'realm:none',
         u'service_account:none',
         u'swarming.pool.template:none',
         u'swarming.pool.version:pools_cfg_rev',
+        u'use_cas_1143123:0',
+        u'use_isolate_1143123:0',
         u'user:joe@localhost',
     ]
     with self._make_wait_task('test_priority'):
@@ -1231,12 +1302,15 @@ class Test(unittest.TestCase):
         name=u'task_slice',
         output=u'first\n',
         tags=[
+            u'authenticated:bot:whitelisted-ip',
             u'pool:default',
             u'priority:40',
             u'realm:none',
             u'service_account:none',
             u'swarming.pool.template:none',
             u'swarming.pool.version:pools_cfg_rev',
+            u'use_cas_1143123:0',
+            u'use_isolate_1143123:0',
             u'user:none',
         ],
         user=u'')
@@ -1297,6 +1371,7 @@ class Test(unittest.TestCase):
         output=u'second\n',
         tags=[
             # Bug!
+            u'authenticated:bot:whitelisted-ip',
             u'invalidkey:invalidvalue',
             u'pool:default',
             u'priority:40',
@@ -1304,6 +1379,8 @@ class Test(unittest.TestCase):
             u'service_account:none',
             u'swarming.pool.template:none',
             u'swarming.pool.version:pools_cfg_rev',
+            u'use_cas_1143123:0',
+            u'use_isolate_1143123:0',
             u'user:none',
         ],
         user=u'')
@@ -1386,12 +1463,15 @@ class Test(unittest.TestCase):
     # Ensure the initial wait task is completed.
     actual_summary, actual_files = self.client.task_collect(wait_task_id)
     tags = [
+        u'authenticated:bot:whitelisted-ip',
         u'pool:default',
         u'priority:20',
         u'realm:none',
         u'service_account:none',
         u'swarming.pool.template:none',
         u'swarming.pool.version:pools_cfg_rev',
+        u'use_cas_1143123:0',
+        u'use_isolate_1143123:0',
         u'user:joe@localhost',
     ]
     performance_stats = actual_summary['shards'][0].pop('performance_stats')

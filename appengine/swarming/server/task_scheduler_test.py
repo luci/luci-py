@@ -226,6 +226,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         'started_ts': None,
         'state': State.PENDING,
         'tags': [
+            u'authenticated:user:mocked@example.com',
             u'os:Windows-3.1.1',
             u'pool:default',
             u'priority:50',
@@ -233,6 +234,8 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
             u'service_account:none',
             u'swarming.pool.template:no_config',
             u'tag:1',
+            u'use_cas_1143123:0',
+            u'use_isolate_1143123:0',
             u'user:Jesus',
         ],
         'try_number': None,

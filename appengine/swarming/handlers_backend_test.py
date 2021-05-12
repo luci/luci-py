@@ -131,6 +131,8 @@ class BackendTest(test_env_handlers.AppTestBase):
         key=task_result.TagAggregation.KEY,
         tags=[
             task_result.TagValues(tag='alpha', values=['beta', 'epsilon']),
+            task_result.TagValues(
+                tag=u'authenticated', values=[u'user:admin@example.com']),
             task_result.TagValues(tag='gamma', values=['delta']),
             task_result.TagValues(tag='os', values=['Amiga']),
             task_result.TagValues(tag='pool', values=['default']),
@@ -141,6 +143,8 @@ class BackendTest(test_env_handlers.AppTestBase):
                 tag='swarming.pool.template', values=['none']),
             task_result.TagValues(
                 tag='swarming.pool.version', values=['pools_cfg_rev']),
+            task_result.TagValues(tag=u'use_cas_1143123', values=[u'0']),
+            task_result.TagValues(tag=u'use_isolate_1143123', values=[u'0']),
             task_result.TagValues(tag='user', values=['joe@localhost']),
             task_result.TagValues(tag='zeta', values=['theta']),
         ],

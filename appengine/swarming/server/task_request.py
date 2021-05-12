@@ -1469,6 +1469,12 @@ def _get_automatic_tags_from_slice(task_slice):
     for value in values:
       for v in value.split(OR_DIM_SEP):
         tags.add(u'%s:%s' % (key, v))
+
+  # TODO(crbug.com/1143123): remove this after migration.
+  tags.add(u'use_isolate_1143123:%s' %
+           int(bool(task_slice.properties.inputs_ref)))
+  tags.add(u'use_cas_1143123:%s' %
+           int(bool(task_slice.properties.cas_input_root)))
   return tags
 
 
@@ -1482,6 +1488,7 @@ def _get_automatic_tags(request):
       u'realm:%s' % (request.realm or u'none'),
       u'service_account:%s' % (request.service_account or u'none'),
       u'user:%s' % (request.user or u'none'),
+      u'authenticated:%s' % request.authenticated.to_bytes(),
   ))
   if request.parent_task_id:
     tags.add(u'parent_task_id:%s' % request.parent_task_id)
