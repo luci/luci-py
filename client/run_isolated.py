@@ -633,10 +633,14 @@ def _fetch_and_map_with_cas(cas_client, digest, instance, output_dir, cache_dir,
     if time.time() - start >= 30 and do_profile:
       # If downloading takes long time, upload profile for later performance
       # analysis.
-      subprocess42.check_call([
-          cas_client, 'archive', '-cas-instance', instance, '-paths',
-          profile_dir + ':.'
-      ])
+      try:
+        subprocess42.check_call([
+            cas_client, 'archive', '-cas-instance', instance, '-paths',
+            profile_dir + ':.'
+        ])
+      except Exception:
+        logging.error('Failed to upload profile data', exc_info=True)
+        on_error.report(None)
 
     with open(result_json_path) as json_file:
       result_json = json.load(json_file)
