@@ -30,9 +30,9 @@ if sys.platform == 'win32':
 
 if sys.platform.startswith('linux'):
   try:
-    if six.PY2:
-      from api.platforms import android
+    from api.platforms import android
   except OSError:
+    logging.warning('failed to import android', exc_info=True)
     android = None
   from api.platforms import gce
   from api.platforms import linux
