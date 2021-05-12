@@ -14,13 +14,18 @@
 
 """Defines AdbCommandsSafe, an exception safe version of AdbCommands."""
 
-import cStringIO
+from __future__ import absolute_import
+
 import inspect
+import io
 import logging
 import socket
 import subprocess
 import time
 import uuid
+
+import six
+from six.moves import range
 
 from adb import adb_commands
 from adb import adb_protocol
@@ -101,7 +106,7 @@ class AdbCommandsSafe(object):
       common.usb1.USBError,
       common.usb1.USBErrorIO)
 
-  _SHELL_SUFFIX = ' ;echo -e "\n$?"'
+  _SHELL_SUFFIX = b' ;echo -e "\n$?"'
 
   def __init__(
       self, handle, banner, rsa_keys, on_error, port_path=None,
@@ -124,10 +129,10 @@ class AdbCommandsSafe(object):
     assert isinstance(auth_timeout_ms, int), auth_timeout_ms
     assert isinstance(default_timeout_ms, int), default_timeout_ms
     assert isinstance(lost_timeout_ms, int), lost_timeout_ms
-    assert isinstance(banner, str), banner
+    assert isinstance(banner, six.binary_type), banner
     assert on_error is None or callable(on_error), on_error
     assert handle is None or isinstance(handle, common.Handle), handle
-    assert all('\n' not in r.GetPublicKey() for r in rsa_keys), rsa_keys
+    assert all(b'\n' not in r.GetPublicKey() for r in rsa_keys), rsa_keys
 
     port_path = handle.port_path if handle else port_path
 
@@ -348,13 +353,13 @@ class AdbCommandsSafe(object):
       for _ in self._Loop():
         try:
           if dest.startswith('/data/local/tmp') or not self._needs_su:
-            self._adb_cmd.Push(cStringIO.StringIO(content), dest, mtime)
+            self._adb_cmd.Push(io.BytesIO(content), dest, mtime)
           else:
             # If we need to use "su" to access root privileges, first push the
             # file to a world-writable dir, then use "su" to move the file
             # over.
             tmp_dest = '/data/local/tmp/%s' % uuid.uuid4()
-            self._adb_cmd.Push(cStringIO.StringIO(content), tmp_dest, mtime)
+            self._adb_cmd.Push(io.BytesIO(content), tmp_dest, mtime)
             _, exit_code = self.Shell('mv %s %s' % (tmp_dest, dest))
             if exit_code:
               return False
@@ -495,9 +500,9 @@ class AdbCommandsSafe(object):
 
   def IsShellOk(self, cmd):
     """Returns True if the shell command can be sent."""
-    if isinstance(cmd, unicode):
+    if isinstance(cmd, six.text_type):
       cmd = cmd.encode('utf-8')
-    assert isinstance(cmd, str), cmd
+    assert isinstance(cmd, six.binary_type), cmd
     if not self._adb_cmd:
       return True
     cmd_size = len(cmd + self._SHELL_SUFFIX)
@@ -517,9 +522,9 @@ class AdbCommandsSafe(object):
       - stdout is as unicode if it ran, None if an USB error occurred.
       - exit_code is set if ran.
     """
-    if isinstance(cmd, unicode):
+    if isinstance(cmd, six.text_type):
       cmd = cmd.encode('utf-8')
-    assert isinstance(cmd, str), cmd
+    assert isinstance(cmd, six.binary_type), cmd
     if not self._adb_cmd:
       return None, None
     # The adb protocol doesn't return the exit code, so embed it inside the
@@ -559,9 +564,9 @@ class AdbCommandsSafe(object):
     Yields output as str. The exit code and exceptions are lost. If the device
     context is invalid, the command is silently dropped.
     """
-    if isinstance(cmd, unicode):
+    if isinstance(cmd, six.text_type):
       cmd = cmd.encode('utf-8')
-    assert isinstance(cmd, str), cmd
+    assert isinstance(cmd, six.binary_type), cmd
     assert self.IsShellOk(cmd), 'Command is too long: %r' % cmd
     if self._adb_cmd:
       try:

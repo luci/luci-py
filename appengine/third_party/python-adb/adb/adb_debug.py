@@ -17,20 +17,23 @@
 Call it similar to how you call android's adb. Takes either --serial or
 --port_path to connect to a device.
 """
+from __future__ import absolute_import
+from __future__ import print_function
+
 import os
 import sys
 
 import gflags
 
-import adb_commands
-import common_cli
+from . import adb_commands
+from . import common_cli
 
 try:
-  import sign_m2crypto
+  from . import sign_m2crypto
   rsa_signer = sign_m2crypto.M2CryptoSigner
 except ImportError:
   try:
-    import sign_pythonrsa
+    from . import sign_pythonrsa
     rsa_signer = sign_pythonrsa.PythonRSASigner.FromRSAKeyPath
   except ImportError:
     rsa_signer = None
@@ -49,7 +52,7 @@ FLAGS = gflags.FLAGS
 def GetRSAKwargs():
   if FLAGS.rsa_key_path:
     if rsa_signer is None:
-      print >> sys.stderr, 'Please install either M2Crypto or python-rsa'
+      print('Please install either M2Crypto or python-rsa', file=sys.stderr)
       sys.exit(1)
     return {
         'rsa_keys': [rsa_signer(os.path.expanduser(path))
