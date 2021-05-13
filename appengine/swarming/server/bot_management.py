@@ -309,10 +309,15 @@ class BotInfo(_BotCommon):
   @classmethod
   def yield_bots_should_be_dead(cls):
     """Yields bots who should be dead."""
-    for b in cls.yield_alive_bots():
-      if not b.should_be_dead:
-        continue
-      yield b
+    q = cls.yield_alive_bots()
+    cursor = None
+    more = True
+    while more:
+      bots, cursor, more = q.fetch_page(1000, start_cursor=cursor)
+      for b in bots:
+        if not b.should_be_dead:
+          continue
+        yield b
 
   @staticmethod
   def _deadline():
