@@ -100,7 +100,7 @@ var GroupChooser = function($element, allowCreateGroup) {
   this.interactionDisabled = false;
 
   // Make group chooser use scroll bar.
-  this.$element.slimScroll({height: '657px'});
+  this.$element.slimScroll({height: '657px', wheelStep: 1});
 };
 
 
