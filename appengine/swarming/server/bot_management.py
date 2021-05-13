@@ -766,6 +766,11 @@ def cron_update_bot_info():
       stats['dead'] += 1
 
       bot = bot_key.get()
+      if not bot:
+        logging.warning('BotInfo does not exist. key: %s', bot_key)
+        stats['failed'] += 1
+        return
+
       logging.info('Sending bot_missing event: %s', bot.id)
       bot_event(
           event_type='bot_missing',
