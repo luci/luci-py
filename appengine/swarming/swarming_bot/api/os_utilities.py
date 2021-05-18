@@ -1139,7 +1139,7 @@ def rmtree(path):
   file_path.rmtree(path)
 
 
-def setup_auto_startup_win(command, cwd, batch_name):
+def setup_auto_startup_win(command, cwd, batch_name, overwrite=True):
   """Uses Startup folder in the Start Menu.
 
   This assumes the user is automatically logged in on OS startup.
@@ -1172,6 +1172,10 @@ def setup_auto_startup_win(command, cwd, batch_name):
     for i in range(len(command)):
       if '/cygdrive/' in command[i]:
         command[i] = platforms.win.from_cygwin_path(command[i])
+
+  if not overwrite and os.path.exists(batch_path):
+    logging.info('%s already exists. Not overwriting it.', batch_path)
+    return
 
   # Don't forget the CRLF, otherwise cmd.exe won't process it.
   #
@@ -1218,7 +1222,7 @@ def setup_auto_startup_win(command, cwd, batch_name):
   return success
 
 
-def setup_auto_startup_osx(command, cwd, plistname):
+def setup_auto_startup_osx(command, cwd, plistname, overwrite=True):
   """Uses launchd to start the command when the user logs in.
 
   This assumes the user is automatically logged in on OS startup.
@@ -1236,6 +1240,9 @@ def setup_auto_startup_osx(command, cwd, plistname):
     # Sometimes ~/Library gets deleted.
     os.makedirs(launchd_dir)
   filepath = os.path.join(launchd_dir, plistname)
+  if not overwrite and os.path.exists(filepath):
+    logging.info('%s already exists. Not overwriting it.', filepath)
+    return
   return _write(
       filepath, platforms.osx.generate_launchd_plist(command, cwd, plistname))
 
@@ -1270,7 +1277,9 @@ def setup_auto_startup_initd_linux(command, cwd, user=None, name='swarming'):
   return True
 
 
-def setup_auto_startup_autostart_desktop_linux(command, name='swarming'):
+def setup_auto_startup_autostart_desktop_linux(command,
+                                               name='swarming',
+                                               overwrite=True):
   """Uses ~/.config/autostart to start automatically the bot on user login.
 
   http://standards.freedesktop.org/autostart-spec/autostart-spec-latest.html
@@ -1279,6 +1288,9 @@ def setup_auto_startup_autostart_desktop_linux(command, name='swarming'):
   if not os.path.isdir(basedir):
     os.makedirs(basedir)
   filepath = os.path.join(basedir, '%s.desktop' % name)
+  if not overwrite and os.path.exists(filepath):
+    logging.info('%s already exists. Not overwriting it.', filepath)
+    return
   return _write(
       filepath, platforms.linux.generate_autostart_desktop(command, name))
 
