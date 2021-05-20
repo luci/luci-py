@@ -83,6 +83,7 @@ from server import large
 from server import resultdb
 from server import task_pack
 from server import task_request
+from server.constants import OR_DIM_SEP
 
 
 class State(object):
@@ -1606,10 +1607,14 @@ def get_result_summaries_query(start, end, sort, state, tags):
     if sort != 'created_ts':
       raise ValueError(
           'Add needed indexes for sort:%s and tags if desired' % sort)
-    tags_filter = TaskResultSummary.tags == tags[0]
-    for tag in tags[1:]:
-      tags_filter = ndb.AND(tags_filter, TaskResultSummary.tags == tag)
-    q = q.filter(tags_filter)
+    for tag in tags:
+      parts = tag.split(':', 1)
+      if len(parts) != 2 or any(i.strip() != i or not i for i in parts):
+        raise ValueError('Invalid tags')
+      values = parts[1].split(OR_DIM_SEP)
+      separated_tags = ['%s:%s' % (parts[0], v) for v in values]
+      q = q.filter(TaskResultSummary.tags.IN(separated_tags))
+
   return _filter_query(TaskResultSummary, q, start, end, sort, state)
 
 

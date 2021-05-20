@@ -1827,6 +1827,16 @@ class TasksApiTest(BaseTest):
     },
                      self.call_api('list', body=message_to_dict(request)).json)
 
+    # With OR tag.
+    request = handlers_endpoints.TasksRequest.combined_message_class(
+        end=end, start=start, tags=['commit:post|pre'])
+    self.assertEqual(
+        {
+            u'now': fmtdate(now_120),
+            u'items': [second, first_no_perf]
+        },
+        self.call_api('list', body=message_to_dict(request)).json)
+
     # A spurious tag.
     request = handlers_endpoints.TasksRequest.combined_message_class(
         end=end, start=start, tags=['foo:bar'])
