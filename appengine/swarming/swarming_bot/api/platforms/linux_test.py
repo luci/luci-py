@@ -3,12 +3,14 @@
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
 
+import io
 import logging
 import sys
 import textwrap
 import unittest
 
 import mock
+import six
 
 import test_env_platforms
 test_env_platforms.setup_test_env()
@@ -259,6 +261,12 @@ class TestLinux(auto_stub.TestCase):
       Version: 1.2.3
     """).encode()
     self.assertEqual(linux._get_intel_version(), '1.2.3')
+
+  def test_get_device_tree_compatible(self):
+    with mock.patch('%s.open' % six.moves.builtins.__name__) as mock_open:
+      mock_open.return_value = io.BytesIO(b'foo,bar')
+      self.assertEqual(linux.get_device_tree_compatible(),
+                       sorted([u'foo', u'bar']))
 
 
 if __name__ == '__main__':

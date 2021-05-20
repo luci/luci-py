@@ -362,13 +362,13 @@ def get_device_tree_compatible():
   """
   try:
     with open('/sys/firmware/devicetree/base/compatible', 'rb') as f:
-      items = f.read().strip().split(',')
+      items = f.read().strip().split(b',')
   except IOError:
     return None
   # The data could contain nul byte or other invalid data, we've observed this
   # on ODROID-C2.
   for i, item in enumerate(items):
-    if '\x00' in item:
+    if b'\x00' in item:
       items[i] = None
     else:
       try:
