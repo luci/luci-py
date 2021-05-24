@@ -751,7 +751,9 @@ def _run_isolated_flags(botobj):
   if os_utilities.get_physical_ram() < 2048:
     use_kvs = False
 
-  if sys.platform.startswith('linux') and platforms.linux.get_inside_docker():
+  if sys.platform.startswith('linux'):
+    # Hardlink is faster than embedded kvs on Linux, and mmap in kvs may consume
+    # many memory on docker.
     use_kvs = False
 
   if sys.platform == 'win32' and platform.architecture()[0] == '32bit':
