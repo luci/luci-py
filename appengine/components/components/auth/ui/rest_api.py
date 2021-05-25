@@ -518,7 +518,7 @@ class ChangeLogHandler(handler.ApiHandler):
   Your GAE app doesn't have indexes required for "Change log" functionality.
 
   If you need this feature, add following indexes to index.yaml. You can do it
-  any time: changes are collected, they are just not queriable until indexed.
+  any time: changes are collected, they are just not queryable until indexed.
 
   - kind: AuthDBChange
     ancestor: yes
@@ -966,7 +966,7 @@ class IPWhitelistHandler(EntityHandlerBase):
 
   @classmethod
   def do_delete(cls, entity):
-    # TODO(vadimsh): Verify it isn't being referenced by whitelist assigments.
+    # TODO(vadimsh): Verify it isn't being referenced by whitelist assignments.
     entity.key.delete()
 
 

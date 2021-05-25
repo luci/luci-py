@@ -2239,13 +2239,13 @@ class ForbidApiOnReplicaTest(test_case.TestCase):
       def get(self):
         calls.append(1)
 
-    mock_replication_state('http://locahost:1234')
+    mock_replication_state('http://localhost:1234')
     response = call_get(Handler, status=405)
 
     self.assertEqual(0, len(calls))
     expected = {
-      'primary_url': 'http://locahost:1234',
-      'text': 'Use Primary service for API requests',
+        'primary_url': 'http://localhost:1234',
+        'text': 'Use Primary service for API requests',
     }
     self.assertEqual(expected, json.loads(response.body))
 
@@ -2270,14 +2270,14 @@ class ForbidUiOnReplicaTest(test_case.TestCase):
       def get(self):
         calls.append(1)
 
-    mock_replication_state('http://locahost:1234')
+    mock_replication_state('http://localhost:1234')
     response = call_get(Handler, status=405)
 
     self.assertEqual(0, len(calls))
     self.assertEqual(
         '405 Method Not Allowed\n\n'
         'The method GET is not allowed for this resource. \n\n '
-        'Not allowed on a replica, see primary at http://locahost:1234',
+        'Not allowed on a replica, see primary at http://localhost:1234',
         response.body)
 
 
@@ -2301,12 +2301,12 @@ class RedirectUiOnReplicaTest(test_case.TestCase):
       def get(self):
         calls.append(1)
 
-    mock_replication_state('http://locahost:1234')
+    mock_replication_state('http://localhost:1234')
     response = call_get(Handler, status=302, uri='/some/method?arg=1')
 
     self.assertEqual(0, len(calls))
-    self.assertEqual(
-        'http://locahost:1234/some/method?arg=1', response.headers['Location'])
+    self.assertEqual('http://localhost:1234/some/method?arg=1',
+                     response.headers['Location'])
 
 
 if __name__ == '__main__':

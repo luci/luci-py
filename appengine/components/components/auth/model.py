@@ -7,25 +7,25 @@
 Overview
 --------
 
-Models defined here are used by central authentication service (that stores all
-groups and secrets) and by services that implement some concrete functionality
-protected with ACLs (like isolate and swarming services).
+Models defined here are used by a central authentication service (that stores
+all groups and secrets) and by services that implement some concrete
+functionality protected with ACLs (like isolate and swarming services).
 
-Applications that use auth component may work in 3 modes:
-  1. Standalone. Application is self contained and manages its own groups.
+Applications that use auth components may work in 3 modes:
+  1. Standalone. The application is self-contained and manages its own groups.
      Useful when developing a new service or for simple installations.
-  2. Replica. Application uses a central authentication service. An application
-     can be dynamically switched from Standalone to Replica mode.
-  3. Primary. Application IS a central authentication service. Only 'auth'
-     service is running in this mode. 'configure_as_primary' call during startup
-     switches application to that mode.
+  2. Replica. The application uses a central authentication service. An
+     application can be dynamically switched from Standalone to Replica mode.
+  3. Primary. The application IS a central authentication service. Only the
+    'auth' service is running in this mode. A 'configure_as_primary' call during
+     startup switches application to that mode.
 
-Central authentication service (Primary) holds authoritative copy of all auth
-related information (groups, secrets, etc.) and acts as a single source of truth
-for it. All other services (Replicas) hold copies of a relevant subset of
+A central authentication service (Primary) holds authoritative copy of all auth
+related information (groups, secrets, etc.) and acts as a single source of
+truth for it. All other services (Replicas) hold copies of a relevant subset of
 this information (that they use to perform authorization checks).
 
-Primary service is responsible for updating replicas' configuration via
+The Primary service is responsible for updating replicas' configuration via
 service-to-service push based replication protocol.
 
 AuthDB holds a list of groups. Each group has a unique name and is defined
@@ -35,9 +35,9 @@ as union of 3 sets:
   3) Set of nested Groups.
 
 Identity defines an actor making an action (it can be a real person, a bot,
-an AppEngine application or special 'anonymous' identity).
+an AppEngine application or the special 'anonymous' identity).
 
-In addition to that, AuthDB stores small amount of authentication related
+In addition to that, AuthDB stores a small amount of authentication related
 configuration data, such as OAuth2 client_id and client_secret and various
 secret keys.
 
@@ -46,9 +46,9 @@ Audit trail
 
 Each change to AuthDB has an associated revision number (that monotonically
 increases with each change). All entities modified by a change are copied to
-append-only log under an entity key associated with the revision (see
+an append-only log under an entity key associated with the revision (see
 historical_revision_key below). Removals are marked by special auth_db_deleted
-flag in entites in the log. This is enough to recover a snapshot of all groups
+flag in entities in the log. This is enough to recover a snapshot of all groups
 at some specific moment in time, or to produce a diff between two revisions.
 
 Note that entities in the historical log are not used by online queries. At any
@@ -57,7 +57,7 @@ moment in time most recent version of an AuthDB entity exists in two copies:
   2) Most recent record in the historical log. Read only.
 
 To reduce a possibility of misuse of historical copies in online transactions,
-history log entity classes are suffixied with 'History' suffix. They also have
+history log entity classes are suffixed with 'History' suffix. They also have
 all indexes stripped.
 
 This mechanism is enabled only on services in Standalone or Primary mode.

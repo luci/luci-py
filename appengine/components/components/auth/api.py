@@ -2,12 +2,12 @@
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
 
-"""Defines main bulk of public API of auth component.
+"""Defines the main bulk of public API of the auth component.
 
 Functions defined here can be safely called often (multiple times per request),
-since they are using in-memory read only cache of Auth DB entities.
+since they use an in-memory read-only cache of Auth DB entities.
 
-Functions that operate on most current state of DB are in model.py. And they are
+Functions that operate on the latest state of the DB are in model.py. And they
 generally should not be used outside of Auth components implementation.
 """
 
@@ -461,18 +461,18 @@ class AuthDB(object):
   def _indexes(self):
     """Lazily builds and returns various indexes used by get_relevant_subgraph.
 
-    Members index is a map from serialized Identity to a list of groups that
-    directly include it (NOT via glob or a nested subgroup).
+    The members index is a map from serialized Identity to a list of groups
+    that directly include it (i.e. NOT via glob or a nested subgroup).
 
-    Globs index is a map from IdentityGlob to a list of groups that directly
-    include it. We store it as OrderedDict to make 'get_relevant_subgraph'
+    The globs index is a map from IdentityGlob to a list of groups that directly
+    include it. We store it as an OrderedDict to make 'get_relevant_subgraph'
     output deterministic (it linearly traverses through globs index keys at some
     point).
 
-    Nested groups index is a map from a group name to a list of groups that
+    THe nested groups index is a map from a group name to a list of groups that
     directly include it.
 
-    Ownership index is a map from a group name to a list of groups directly
+    The ownership index is a map from a group name to a list of groups directly
     owned by it.
 
     Returns:

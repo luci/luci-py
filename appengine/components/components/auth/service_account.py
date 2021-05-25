@@ -325,12 +325,12 @@ def _get_or_mint_token_async(
     min_lifetime_sec,
     minter,
     namespace=_MEMCACHE_NS):
-  """Gets an accress token from the cache or triggers mint flow."""
-  # Randomize refresh time to avoid thundering herd effect when token expires.
-  # Also add 5 sec extra to make sure callers will get the token that lives for
-  # at least min_lifetime_sec even taking into account possible delays in
-  # propagating the token up the stack. We can't give any strict guarantees
-  # here though (need to be able to stop time to do that).
+  """Gets an access token from the cache or triggers mint flow."""
+  # Randomize refresh time to avoid the thundering herd effect when token
+  # expires. Also add 5 seconds extra to make sure callers will get the token
+  # that lives for at least min_lifetime_sec even taking into account possible
+  # delays in propagating the token up the stack. We can't give any strict
+  # guarantees here though (we'd need to be able to stop time to do that).
   token_info = yield _memcache_get(cache_key, namespace=namespace)
 
   min_allowed_exp = (

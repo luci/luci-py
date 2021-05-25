@@ -45,7 +45,7 @@ class FakeSigner(object):
 
 
 class GetProjectAccessTokenTest(test_case.TestCase):
-  # This tests fail when runnin with other tests
+  # This tests fail when running with other tests.
   # Need to run in test_seq.py
   no_run = 1
 

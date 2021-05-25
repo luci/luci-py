@@ -312,7 +312,7 @@ class AuthenticatingHandler(webapp2.RequestHandler):
   def get_content_security_policy(self):
     """Returns a dict {CSP directive (e.g. 'script-src') => list of sources}.
 
-    The returned policy (unless empty or None) will be formated and put in
+    The returned policy (unless empty or None) will be formatted and put in
     Content-Security-Policy header. Default implementation returns a policy
     suitable for apps that depend on Google (and only Google) services.
 
