@@ -688,7 +688,8 @@ class AuthDB(object):
     """Returns groups that include the principal and owned by principal.
 
     Returns it in a graph form where edges represent relations "subset of" and
-    "owned by".
+    "owned by"; returns a completely empty graph if `principal` is a
+    nonexistent group.
 
     Args:
       principal: Identity, IdentityGlob or a group name string.
@@ -707,6 +708,12 @@ class AuthDB(object):
     graph = Graph()
     add_node = graph.add_node
     add_edge = graph.add_edge
+
+    # Return an empty graph to indicate nonexistent group. It's helpful to
+    # differentiate between a group with no owned or including groups, and
+    # a group that just doesn't exist.
+    if isinstance(principal, basestring) and principal not in self._groups:
+      return graph
 
     # Adds the given group and all groups that include it and owned by it (
     # perhaps indirectly) to 'graph'. Traverses group graph from leafs (most

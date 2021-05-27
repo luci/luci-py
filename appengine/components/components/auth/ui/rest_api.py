@@ -1319,6 +1319,11 @@ class SubgraphHandler(handler.ApiHandler):
     auth_db = _get_maybe_cached_auth_db(self.request)
     subgraph = auth_db.get_relevant_subgraph(principal)
 
+    if subgraph.root_id is None:
+      # Empty graph from get_relevant_subgraph means group not found.
+      self.abort_with_error(
+          404, text='The requested group "%s" was not found.' % principal)
+
     def as_dict(node, edges):
       if isinstance(node, model.Identity):
         kind = 'IDENTITY'
@@ -1341,7 +1346,8 @@ class SubgraphHandler(handler.ApiHandler):
         out['edges'] = sorted_edges
       return out
 
-    # Per API contract the requested principal should have ID 0, verify this.
+    # Per API contract the requested principal for a normal response
+    # should have ID 0, verify this.
     assert subgraph.root_id == 0, subgraph.root_id
     self.send_response({
       'subgraph': {

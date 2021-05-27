@@ -1053,8 +1053,8 @@ class RelevantSubgraphTest(test_case.TestCase):
         {0: ('user:a@example.com', {})}, self.call(db, 'user:a@example.com'))
     self.assertEqual(
         {0: ('user:*@example.com', {})}, self.call(db, 'user:*@example.com'))
-    self.assertEqual(
-        {0: ('group', {})}, self.call(db, 'group'))
+    # In the case of a nonexistent group, a empty graph is returned.
+    self.assertEqual({}, self.call(db, 'group'))
 
   def test_identity_discoverable_directly_and_through_glob(self):
     b = AuthDBBuilder()
@@ -1140,7 +1140,6 @@ class RelevantSubgraphTest(test_case.TestCase):
       0: ('g2', {'IN': [1]}),
       1: ('g1', {'OWNS': [1]}),
     }, self.call(b.build(), 'g2'))
-
 
   def test_messy_graph(self):
     b = AuthDBBuilder()

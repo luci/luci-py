@@ -1947,15 +1947,11 @@ class SubgraphHandlerTest(RestAPITestCase):
     }, body)
 
   def test_empty_reply_group(self):
-    status, body, _ = self.get(path='/auth/api/v1/subgraph/group')
-    self.assertEqual(200, status)
-    self.assertEqual({
-      u'subgraph': {
-        u'nodes': [
-          {u'kind': u'GROUP', u'value': u'group'},
-        ],
-      },
-    }, body)
+    status, body, _ = self.get(
+        path='/auth/api/v1/subgraph/group', expect_errors=True)
+    self.assertEqual(404, status)
+    self.assertEqual({'text': 'The requested group "group" was not found.'},
+                     body)
 
   def test_non_empty_reply(self):
     make_group('a-root', nested=['b-inner'])
