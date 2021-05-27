@@ -19,7 +19,10 @@ class TestPosix(unittest.TestCase):
   def test_get_disk_info(self):
     disks = platforms.posix.get_disks_info()
     self.assertGreater(len(disks), 0)
-    for _, info in disks.items():
+    for path, info in disks.items():
+      if path.startswith('/snap/'):
+        # Ignore filesystem managed by snappy.
+        continue
       self.assertGreater(info['free_mb'], 0)
       self.assertGreater(info['size_mb'], 0)
 
