@@ -362,16 +362,21 @@ class IsolateFormatTest(auto_stub.TestCase):
     }
     self.assertEqual(expected, flatten)
 
-  @unittest.skipIf(sys.platform == 'win32', 'crbug.com/1148174')
   def test_ConfigSettings_union(self):
     lhs_values = {}
     rhs_values = {'files': ['data/', 'test/data/']}
-    lhs = isolate_format.ConfigSettings(lhs_values, '/src/net/third_party/nss')
-    rhs = isolate_format.ConfigSettings(rhs_values, '/src/base')
+    if sys.platform == 'win32':
+      root = "C:\\"
+    else:
+      root = "/"
+    lhs_dir = os.path.join(root, "src", "net", "third_party", "nss")
+    rhs_dir = os.path.join(root, "src", "base")
+    lhs = isolate_format.ConfigSettings(lhs_values, lhs_dir)
+    rhs = isolate_format.ConfigSettings(rhs_values, rhs_dir)
     out = lhs.union(rhs)
     expected = {
       'files': ['data/', 'test/data/'],
-      'isolate_dir': '/src/base',
+      'isolate_dir': rhs_dir,
     }
     self.assertEqual(expected, out.flatten())
 
