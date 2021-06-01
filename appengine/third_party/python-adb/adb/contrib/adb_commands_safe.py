@@ -309,7 +309,7 @@ class AdbCommandsSafe(object):
       for _ in self._Loop():
         try:
           if not self._needs_su:
-            return self._adb_cmd.Pull(remotefile, None)
+            return six.ensure_str(self._adb_cmd.Pull(remotefile, None))
           else:
             # If we need su to be root, we likely can't use adb's filesync. So
             # cat the file instead as a normal shell command and return the
@@ -348,6 +348,7 @@ class AdbCommandsSafe(object):
 
     Returns True on success.
     """
+    content = six.ensure_binary(content)
     assert dest.startswith('/'), dest
     if self._adb_cmd:
       for _ in self._Loop():
@@ -519,7 +520,7 @@ class AdbCommandsSafe(object):
 
     Returns:
       tuple(stdout, exit_code)
-      - stdout is as unicode if it ran, None if an USB error occurred.
+      - stdout is str it ran, None if an USB error occurred.
       - exit_code is set if ran.
     """
     if isinstance(cmd, six.text_type):
@@ -532,9 +533,7 @@ class AdbCommandsSafe(object):
     assert self.IsShellOk(cmd), 'Command is too long: %r' % cmd
     if timeout_ms is None:
       timeout_ms = self._default_timeout_ms
-    out = self._adb_cmd.Shell(
-        cmd + self._SHELL_SUFFIX,
-        timeout_ms=timeout_ms).decode('utf-8', 'replace')
+    out = self._adb_cmd.Shell(cmd + self._SHELL_SUFFIX, timeout_ms=timeout_ms)
     # Protect against & or other bash conditional execution that wouldn't make
     # the 'echo $?' command to run.
     if not out:

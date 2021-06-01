@@ -32,6 +32,7 @@ import string
 import threading
 import time
 
+import six
 from six import unichr
 from six.moves import range
 
@@ -82,7 +83,7 @@ class _PerDeviceCache(object):
     """
     device_keys = {d.port_path: d for d in devices}
     with self._lock:
-      for port_path in self._per_device.keys():
+      for port_path in list(self._per_device.keys()):
         dev = device_keys.get(port_path)
         if not dev or not dev.is_valid:
           del self._per_device[port_path]
@@ -631,11 +632,12 @@ class HighDevice(object):
     # developer.android.com/guide/topics/sensors/sensors_environment.html
     out = {}
     for sensor in self.List('/sys/class/thermal') or []:
-      if sensor.filename in ('.', '..'):
+      filename = six.ensure_str(sensor.filename)
+      if filename in ('.', '..'):
         continue
-      if not sensor.filename.startswith('thermal_zone'):
+      if not filename.startswith('thermal_zone'):
         continue
-      path = '/sys/class/thermal/' + sensor.filename
+      path = '/sys/class/thermal/' + filename
       # Expected files:
       # - mode: enabled or disabled.
       # - temp: temperature as reported by the sensor, generally in C or mC.
@@ -956,7 +958,7 @@ class HighDevice(object):
     to the device if unnecessary.
     """
     keys = set(self._device.public_keys)
-    old_content = self.PullContent('/data/misc/adb/adb_keys')
+    old_content = six.ensure_binary(self.PullContent('/data/misc/adb/adb_keys'))
     if old_content:
       old_keys = set(old_content.strip().splitlines())
       if keys.issubset(old_keys):

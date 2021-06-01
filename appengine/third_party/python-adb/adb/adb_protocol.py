@@ -182,7 +182,7 @@ class _AdbMessageHeader(collections.namedtuple(
 
 class _AdbMessage(object):
   """ADB message class including the data."""
-  def __init__(self, header, data=''):
+  def __init__(self, header, data=b''):
     self.header = header
     self.data = data
 
@@ -217,7 +217,7 @@ class _AdbMessage(object):
             'Received checksum %s != %s' % (actual_checksum, hdr.data_checksum),
             hdr)
     else:
-      data = ''
+      data = b''
     msg = cls(hdr, data)
     msg._log_msg(usb)
     return msg
@@ -251,7 +251,7 @@ class _AdbConnection(object):
     def __iter__(self):
       return self
 
-    def next(self):
+    def __next__(self):
       while True:
         try:
           i = self._queue.get_nowait()
@@ -264,6 +264,9 @@ class _AdbConnection(object):
         if isinstance(i, StopIteration):
           raise i
         return i
+
+    # For Python2
+    next = __next__
 
     def _Add(self, message):
       self._queue.put(message)
@@ -353,7 +356,7 @@ class _AdbConnection(object):
       return
     if cmd_name == b'WRTE':
       try:
-        self._Write(b'OKAY', '')
+        self._Write(b'OKAY', b'')
       except usb_exceptions.WriteFailedError as e:
         _LOG.info('%s._OnRead(): Failed to reply OKAY: %s', self.port_path, e)
       self._yielder._Add(message)
@@ -480,7 +483,7 @@ class AdbConnectionManager(object):
       assert not self._connections, self._connections
     self._usb.Close()
 
-  def StreamingCommand(self, service, command='', timeout_ms=None):
+  def StreamingCommand(self, service, command=b'', timeout_ms=None):
     """One complete set of USB packets for a single connection for a single
     command.
 
@@ -495,9 +498,9 @@ class AdbConnectionManager(object):
     """
     return self.Open(b'%s:%s' % (service, command), timeout_ms).__iter__()
 
-  def Command(self, service, command='', timeout_ms=None):
-    return ''.join(msg.data for msg in self.StreamingCommand(service, command,
-                                                             timeout_ms))
+  def Command(self, service, command=b'', timeout_ms=None):
+    return ''.join(msg.data.decode() for msg in self.StreamingCommand(
+        service, command, timeout_ms))
 
   def ReadAndDispatch(self, timeout_ms=None):
     """Receive a response from the device."""

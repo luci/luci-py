@@ -103,9 +103,7 @@ class FilesyncProtocol(object):
     Raises:
       PushFailedError: Raised on push failure.
     """
-    if isinstance(filename, six.text_type):
-      filename = filename.encode('utf-8')
-    fileinfo = '%s,%s' % (filename, st_mode)
+    fileinfo = ('{},{}'.format(filename, int(st_mode))).encode('utf-8')
     assert len(filename) <= 1024, 'Name too long: %s' % filename
 
     cnxn = FileSyncConnection(connection, '<2I')
@@ -146,15 +144,15 @@ class FileSyncConnection(object):
     self.adb = adb_connection
 
     # Sending
-    self.send_buffer = ''
+    self.send_buffer = b''
     self.send_header_len = struct.calcsize('<2I')
 
     # Receiving
-    self.recv_buffer = ''
+    self.recv_buffer = b''
     self.recv_header_format = recv_header_format
     self.recv_header_len = struct.calcsize(recv_header_format)
 
-  def Send(self, command_id, data='', size=0):
+  def Send(self, command_id, data=b'', size=0):
     """Send/buffer FileSync packets.
 
     Packets are buffered and only flushed when this connection is read from. All
