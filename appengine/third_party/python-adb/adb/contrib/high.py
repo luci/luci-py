@@ -958,9 +958,9 @@ class HighDevice(object):
     to the device if unnecessary.
     """
     keys = set(self._device.public_keys)
-    old_content = six.ensure_binary(self.PullContent('/data/misc/adb/adb_keys'))
+    old_content = self.PullContent('/data/misc/adb/adb_keys')
     if old_content:
-      old_keys = set(old_content.strip().splitlines())
+      old_keys = set(six.ensure_binary(old_content).strip().splitlines())
       if keys.issubset(old_keys):
         return True
       keys = keys | old_keys
