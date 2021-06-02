@@ -73,7 +73,7 @@ class FilesyncProtocol(object):
       if cmd_id == b'DONE':
         break
       mode, size, mtime = header
-      files.append(DeviceFile(filename, mode, size, mtime))
+      files.append(DeviceFile(six.ensure_str(filename), mode, size, mtime))
     return files
 
   @classmethod

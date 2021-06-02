@@ -632,12 +632,11 @@ class HighDevice(object):
     # developer.android.com/guide/topics/sensors/sensors_environment.html
     out = {}
     for sensor in self.List('/sys/class/thermal') or []:
-      filename = six.ensure_str(sensor.filename)
-      if filename in ('.', '..'):
+      if sensor.filename in ('.', '..'):
         continue
-      if not filename.startswith('thermal_zone'):
+      if not sensor.filename.startswith('thermal_zone'):
         continue
-      path = '/sys/class/thermal/' + filename
+      path = '/sys/class/thermal/' + sensor.filename
       # Expected files:
       # - mode: enabled or disabled.
       # - temp: temperature as reported by the sensor, generally in C or mC.
