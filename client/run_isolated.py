@@ -115,7 +115,7 @@ _CAS_CLIENT_DIR = u'cc'
 # https://ci.chromium.org/p/infra-internal/g/infra-packagers/console
 ISOLATED_PACKAGE = 'infra/tools/luci/isolated/${platform}'
 _CAS_PACKAGE = 'infra/tools/luci/cas/${platform}'
-_LUCI_GO_REVISION = 'git_revision:29074f05b2f0cfd1a08926fdb0657c8006a90e5b'
+_LUCI_GO_REVISION = 'git_revision:d8815e36ea7b66a4b8c9d69fcc2322012d25715f'
 
 # Keep synced with task_request.py
 CACHE_NAME_RE = re.compile(r'^[a-z0-9_]{1,4096}$')
