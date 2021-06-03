@@ -75,7 +75,9 @@ def KillADB():
     time.sleep(0.001)
 
   try:
-    processes = subprocess.check_output(['ps', 'aux']).splitlines()
+    processes = subprocess.check_output(
+        ['ps', 'aux'],
+        universal_newlines=True).splitlines()
   except subprocess.CalledProcessError:
     _LOG.error('KillADB(): unable to scan process list.')
     processes = []
