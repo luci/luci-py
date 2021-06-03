@@ -983,7 +983,6 @@ class IsolateNoOutdir(IsolateTempdirBase):
 
 class IsolateOther(IsolateTempdirBase):
 
-  @unittest.skipIf(sys.platform == 'win32', 'crbug.com/1148174')
   def test_run_mixed(self):
     # Test when a user mapped from a directory and then replay from another
     # directory. This is a very rare corner case.
@@ -1005,7 +1004,11 @@ class IsolateOther(IsolateTempdirBase):
                             stderr=subprocess.STDOUT,
                             cwd=test_env.CLIENT_DIR)
     stdout = proc.communicate()[0].decode()
-    self.assertEqual(isolate._VARIABLE_WARNING, stdout)
+    if sys.platform == 'win32':
+      variable_warning = isolate._VARIABLE_WARNING.replace('\n', '\r\n')
+    else:
+      variable_warning = isolate._VARIABLE_WARNING
+    self.assertEqual(variable_warning, stdout)
     self.assertEqual(0, proc.returncode)
     expected = [
         'simple.isolate',
