@@ -81,10 +81,6 @@ const template = (ele) => html`
     <div>Bot Version: ${ele.server_details.bot_version} </div>
     <ul>
       <li>
-        <!-- TODO(kjlubick) convert these linked pages to new UI-->
-        <a href=/stats>Usage statistics</a>
-      </li>
-      <li>
         <a href=${instancesURL(ele)}>View version's instances on Cloud Console</a>
       </li>
       <li>
