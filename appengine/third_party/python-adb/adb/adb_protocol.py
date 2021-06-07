@@ -579,7 +579,7 @@ class AdbConnectionManager(object):
       # user.
       msg = _AdbMessage.Make(
           b'AUTH', _AdbMessageHeader.AUTH_RSAPUBLICKEY, 0,
-          self._rsa_keys[0].GetPublicKey() + '\0')
+          self._rsa_keys[0].GetPublicKey() + b'\0')
       msg.Write(self._usb)
       try:
         reply = _AdbMessage.Read(self._usb, self._auth_timeout_ms)
