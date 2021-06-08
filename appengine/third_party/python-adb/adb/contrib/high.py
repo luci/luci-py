@@ -969,7 +969,7 @@ class HighDevice(object):
     if self.Shell('restorecon /data/misc/adb')[1] != 0:
       return False
     if not self.PushContent(
-        ''.join(k + '\n' for k in sorted(keys)), '/data/misc/adb/adb_keys'):
+        b''.join(k + b'\n' for k in sorted(keys)), '/data/misc/adb/adb_keys'):
       return False
     if self.Shell('restorecon /data/misc/adb/adb_keys')[1] != 0:
       return False
