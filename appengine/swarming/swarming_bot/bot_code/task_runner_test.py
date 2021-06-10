@@ -1152,8 +1152,6 @@ class TestTaskRunnerKilled(TestTaskRunnerBase):
     self.assertEqual(expected, exit_code)
     self.assertEqual(to_native_eol('got it\n').encode(), p.stdout.readline())
 
-  @unittest.skipIf(sys.platform == 'win32',
-                   'TODO(crbug.com/1017545): it gets stuck at proc.wait()')
   def test_signal(self):
     # Tests when task_runner gets a SIGTERM.
     signal_file = os.path.join(self.work_dir, 'signal')
