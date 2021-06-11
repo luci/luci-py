@@ -17,6 +17,7 @@ import textwrap
 import time
 import unittest
 
+from nose2.tools import params
 import six
 
 # Mutates sys.path.
@@ -1015,7 +1016,8 @@ time.sleep(60)
     expected = [(e[0], e[1].decode()) for e in expected]
     self.assertEqual(list(subprocess42.split(data, True)), expected)
 
-  def test_wait_can_be_interrupted(self):
+  @params((None, ), (5, ))
+  def test_wait_can_be_interrupted(self, timeout):
     cmd = [
         sys.executable,
         '-c',
@@ -1044,12 +1046,12 @@ time.sleep(60)
               try:
                 sys.stdout.write('hi\n')
                 sys.stdout.flush()
-                proc.wait(5)
+                proc.wait(%s)
               except ExitError:
                 sys.stdout.write('wait is interrupted')
                 sys.stdout.flush()
                 proc.kill()
-        """)
+        """ % timeout),
     ]
     # Set cwd to CLIENT_DIR so that the script can import subprocess42.
     proc = subprocess42.Popen(cmd, stdout=subprocess42.PIPE,
@@ -1057,7 +1059,7 @@ time.sleep(60)
     self._wait_for_hi(proc, False)
     time.sleep(0.5)
     proc.terminate()
-    # proc is waiting for 5s and SIGTERM/SIGBREAK is sent at 0.5s mark.
+    # proc is waiting for 'timeout' and SIGTERM/SIGBREAK is sent at 0.5s mark.
     # Expect proc to write to stdout and exit almost immediately (decided
     # by the poll interval of wait method). We wait for 3 second to give
     # some buffer here.
