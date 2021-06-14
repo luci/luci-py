@@ -627,7 +627,6 @@ def _fetch_and_map_with_cas(cas_client, digest, instance, output_dir, cache_dir,
       logging.exception('Failed to run cas, removing kvs cache dir and retry.')
       on_error.report("Failed to run cas %s" % ex)
       file_path.rmtree(kvs_dir)
-      file_path.rmtree(output_dir)
       _run_go_cmd_and_wait(cmd, tmp_dir)
 
     if time.time() - start >= 30 and do_profile:
