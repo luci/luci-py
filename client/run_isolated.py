@@ -604,18 +604,6 @@ def _fetch_and_map_with_cas(cas_client, digest, instance, output_dir, cache_dir,
         'info',
     ]
 
-    # cpu profile may not work fast on armv7l.
-    # https://crbug.com/1197523#c10
-    do_profile = platform.machine() != 'armv7l'
-
-    if do_profile:
-      cmd.extend([
-          '-profile-output-dir',
-          profile_dir,
-          '-profile-cpu',
-          '-profile-trace',
-      ])
-
     if kvs_dir:
       cmd.extend(['-kvs-dir', kvs_dir])
 
@@ -628,18 +616,6 @@ def _fetch_and_map_with_cas(cas_client, digest, instance, output_dir, cache_dir,
       on_error.report("Failed to run cas %s" % ex)
       file_path.rmtree(kvs_dir)
       _run_go_cmd_and_wait(cmd, tmp_dir)
-
-    if time.time() - start >= 30 and do_profile:
-      # If downloading takes long time, upload profile for later performance
-      # analysis.
-      try:
-        subprocess42.check_call([
-            cas_client, 'archive', '-cas-instance', instance, '-paths',
-            profile_dir + ':.'
-        ])
-      except Exception:
-        logging.error('Failed to upload profile data', exc_info=True)
-        on_error.report(None)
 
     with open(result_json_path) as json_file:
       result_json = json.load(json_file)
