@@ -285,6 +285,33 @@ def check_bot_terminate_acl(bot_id):
   _check_bot_acl(realms_pb2.REALM_PERMISSION_POOLS_TERMINATE_BOT, bot_id)
 
 
+def check_bot_delete_acl(bot_id):
+  """Checks if the caller is allowed to delete the bot.
+
+  Checks if the caller has global permission using acl.can_delete_bot().
+
+  If the caller doesn't have any global permissions,
+    It checks realm permission 'swarming.pools.deleteBot'.
+    The caller is required to have the permissions in *any* pools.
+
+  Args:
+    bot_id: ID of the bot.
+
+  Returns:
+    None
+
+  Raises:
+    auth.AuthorizationError: if the caller is not allowed.
+  """
+
+  # check global permission.
+  if acl.can_delete_bot():
+    return
+
+  # check Realm permission 'swarming.pools.deleteBot'
+  _check_bot_acl(realms_pb2.REALM_PERMISSION_POOLS_DELETE_BOT, bot_id)
+
+
 def can_terminate_bot(bot_id):
   """Checks if the caller is allowed to terminate the bot.
 
@@ -299,6 +326,25 @@ def can_terminate_bot(bot_id):
 
   try:
     check_bot_terminate_acl(bot_id)
+    return True
+  except auth.AuthorizationError:
+    return False
+
+
+def can_delete_bot(bot_id):
+  """Checks if the caller is allowed to delete the bot.
+
+  Args:
+    bot_id: ID of the bot.
+
+  Returns:
+    allowed: True if allowed, False otherwise.
+  """
+  if not bot_id:
+    return acl.can_delete_bot()
+
+  try:
+    check_bot_delete_acl(bot_id)
     return True
   except auth.AuthorizationError:
     return False

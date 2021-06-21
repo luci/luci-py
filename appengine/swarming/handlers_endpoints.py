@@ -299,7 +299,7 @@ class SwarmingServerService(remote.Service):
         p for p in pools_config.known() if realms.can_list_tasks(p)
     ]
     return swarming_rpcs.ClientPermissions(
-        delete_bot=acl.can_delete_bot(),
+        delete_bot=realms.can_delete_bot(request.bot_id),
         terminate_bot=realms.can_terminate_bot(request.bot_id),
         get_configs=acl.can_view_config(),
         put_configs=acl.can_edit_config(),
@@ -1061,7 +1061,7 @@ class SwarmingBotService(remote.Service):
       BotId, swarming_rpcs.DeletedResponse,
       name='delete',
       path='{bot_id}/delete')
-  @auth.require(acl.can_delete_bot, log_identity=True)
+  @auth.require(acl.can_access, log_identity=True)
   def delete(self, request):
     """Deletes the bot corresponding to a provided bot_id.
 
@@ -1074,6 +1074,12 @@ class SwarmingBotService(remote.Service):
     still alive.
     """
     logging.debug('%s', request)
+
+    # Check permission.
+    # The caller needs to have global permission, or a permission in any pools
+    # that the bot belongs to.
+    realms.check_bot_delete_acl(request.bot_id)
+
     bot_info_key = bot_management.get_info_key(request.bot_id)
     get_or_raise(bot_info_key)  # raises 404 if there is no such bot
     # BotRoot is parent to BotInfo. It is important to note that the bot is
