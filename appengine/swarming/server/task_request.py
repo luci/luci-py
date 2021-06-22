@@ -1311,6 +1311,13 @@ class TaskRequest(ndb.Model):
         max_lifetime_secs = mls
     return max_lifetime_secs
 
+  @property
+  def execution_deadline(self):
+    """Calculates the latest time where this task can be in PENDING or RUNNING
+    status.
+    """
+    return self.created_ts + datetime.timedelta(seconds=self.max_lifetime_secs)
+
   def to_dict(self):
     """Supports both old and new format."""
     # to_dict() doesn't recurse correctly into ndb.LocalStructuredProperty! It

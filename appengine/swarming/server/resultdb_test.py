@@ -3,6 +3,7 @@
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
 
+import datetime
 import logging
 import sys
 import unittest
@@ -57,8 +58,9 @@ class ResultDBTest(test_case.TestCase):
         mock.MagicMock(side_effect=self._mock_call_resultdb_recorder_api_async)
     ) as mock_call:
 
-      update_token = resultdb.create_invocation_async('task001',
-                                                      'infra:try').get_result()
+      update_token = resultdb.create_invocation_async(
+          'task001', 'infra:try', datetime.datetime(2020, 1, 2, 3, 4,
+                                                    5)).get_result()
       self.assertEqual(update_token, 'token')
       mock_call.assert_called_once_with(
           'CreateInvocation', {
@@ -67,6 +69,8 @@ class ResultDBTest(test_case.TestCase):
                       '//test-swarming.appspot.com/tasks/task001',
                   'realm':
                       'infra:try',
+                  'deadline':
+                      '2020-01-02T03:04:05Z',
               },
               'requestId': '00000000-0000-0000-0000-000000000000',
               'invocationId': 'task-test-swarming.appspot.com-task001'
@@ -83,6 +87,7 @@ class ResultDBTest(test_case.TestCase):
         resultdb.create_invocation_async(
             'task001',
             'infra:try',
+            datetime.datetime(2020, 1, 2, 3, 4, 5),
         ).get_result()
 
   def test_finalize_invocation_async_success(self):

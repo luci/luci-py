@@ -2089,6 +2089,12 @@ class TaskRequestApiTest(TestCase):
     request.to_proto(actual)
     self.assertTrue(actual.resultdb.enable)
 
+  def test_execution_deadline(self):
+    self.mock_now(datetime.datetime(2020, 1, 2, 3, 4, 5))
+    request = _gen_request()
+    self.assertEqual(request.execution_deadline,
+                     datetime.datetime(2020, 1, 2, 3, 5, 35))
+
   def test_validate_priority(self):
     with self.assertRaises(TypeError):
       task_request.validate_priority(None)

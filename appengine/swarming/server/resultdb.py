@@ -17,7 +17,7 @@ from server import config
 
 
 @ndb.tasklet
-def create_invocation_async(task_run_id, realm):
+def create_invocation_async(task_run_id, realm, deadline):
   """This is wrapper for CreateInvocation API.
 
   Returns:
@@ -26,6 +26,8 @@ def create_invocation_async(task_run_id, realm):
   hostname = app_identity.get_default_version_hostname()
   response_headers = {}
 
+  assert deadline.utcoffset(
+  ) is None, "non-default timezone is not supported, %s" % deadline.utcoffset()
   yield _call_resultdb_recorder_api_async(
       'CreateInvocation', {
           'requestId': str(uuid.uuid4()),
@@ -33,6 +35,7 @@ def create_invocation_async(task_run_id, realm):
           'invocation': {
               'producerResource': '//%s/tasks/%s' % (hostname, task_run_id),
               'realm': realm,
+              'deadline': deadline.isoformat() + 'Z',
           }
       },
       project_id=realm.split(':')[0],

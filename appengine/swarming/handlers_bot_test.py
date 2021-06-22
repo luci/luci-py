@@ -735,7 +735,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(expected, response)
 
   @ndb.tasklet
-  def _mock_create_invocation_async(self, _task_run_id, _realm):
+  def _mock_create_invocation_async(self, _task_run_id, _realm, _deadline):
     raise ndb.Return('resultdb-update-token')
 
   def test_poll_with_resultdb(self):
