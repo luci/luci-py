@@ -49,8 +49,8 @@ import SwarmingAppBoilerplate from '../SwarmingAppBoilerplate';
 const serverLogFilter = `resource.type="gae_app"\n` +
   // limit logs that we care
   [
-    `protoPayload.resource>="/internal/"`, // cron, task queue
-    `protoPayload.resource>="/swarming/api/v1/bot/"`, // requests from bots
+    `protoPayload.resource:"/internal/"`, // cron, task queue
+    `protoPayload.resource:"/swarming/api/v1/bot/"`, // requests from bots
     `protoPayload.method!="GET"`, // POST, PUT, DELETE etc
   ].join(' OR ') + '\n';
 
