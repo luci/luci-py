@@ -1232,6 +1232,7 @@ window.customElements.define('task-page', class extends SwarmingAppBoilerplate {
       pool_task_template: 3, // SKIP
       priority: 20,
       properties: this._currentSlice.properties,
+      realm: this._request.realm,
       service_account: this._request.service_account,
       tags: ['debug_task:1'],
       user: this.profile.email,
