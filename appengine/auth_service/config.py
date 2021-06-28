@@ -166,7 +166,7 @@ def validate_imports_config(conf, ctx):
     ctx.error(str(exc))
 
 
-@validation.self_rule('ip_whitelist.cfg', config_pb2.IPWhitelistConfig)
+# @validation.self_rule('ip_whitelist.cfg', config_pb2.IPWhitelistConfig)
 def validate_ip_whitelist_config(conf, ctx):
   try:
     _validate_ip_whitelist_config(conf)
@@ -538,38 +538,44 @@ def _update_security_config(root, _rev, conf):
 #   'default': Default config value to use if the config file is missing.
 # }
 _CONFIG_SCHEMAS = {
-  'imports.cfg': {
-    'proto_class': None, # importer configs are stored as text
-    'revision_getter': _get_imports_config_revision_async,
-    'updater': _update_imports_config,
-    'use_authdb_transaction': False,
-  },
-  'ip_whitelist.cfg': {
-    'proto_class': config_pb2.IPWhitelistConfig,
-    'revision_getter': lambda: _get_authdb_config_rev_async('ip_whitelist.cfg'),
-    'updater': _update_ip_whitelist_config,
-    'use_authdb_transaction': True,
-  },
-  'oauth.cfg': {
-    'proto_class': config_pb2.OAuthConfig,
-    'revision_getter': lambda: _get_authdb_config_rev_async('oauth.cfg'),
-    'updater': _update_oauth_config,
-    'use_authdb_transaction': True,
-  },
-  'settings.cfg': {
-    'proto_class': None, # settings are stored as text in datastore
-    'default': '',  # it's fine if config file is not there
-    'revision_getter': lambda: _get_service_config_rev_async('settings.cfg'),
-    'updater': lambda _, rev, c: _update_service_config('settings.cfg', rev, c),
-    'use_authdb_transaction': False,
-  },
-  'security.cfg': {
-    'proto_class': security_config_pb2.SecurityConfig,
-    'default': security_config_pb2.SecurityConfig(),
-    'revision_getter': lambda: _get_authdb_config_rev_async('security.cfg'),
-    'updater': _update_security_config,
-    'use_authdb_transaction': True,
-  },
+    'imports.cfg': {
+        'proto_class': None,  # importer configs are stored as text
+        'revision_getter': _get_imports_config_revision_async,
+        'updater': _update_imports_config,
+        'use_authdb_transaction': False,
+    },
+    # 'ip_whitelist.cfg': {
+    #   'proto_class': config_pb2.IPWhitelistConfig,
+    #   'revision_getter':
+    # lambda: _get_authdb_config_rev_async('ip_whitelist.cfg'),
+    #   'updater': _update_ip_whitelist_config,
+    #   'use_authdb_transaction': True,
+    # },
+    'oauth.cfg': {
+        'proto_class': config_pb2.OAuthConfig,
+        'revision_getter': lambda: _get_authdb_config_rev_async('oauth.cfg'),
+        'updater': _update_oauth_config,
+        'use_authdb_transaction': True,
+    },
+    'settings.cfg': {
+        'proto_class':
+            None,  # settings are stored as text in datastore
+        'default':
+            '',  # it's fine if config file is not there
+        'revision_getter':
+            lambda: _get_service_config_rev_async('settings.cfg'),
+        'updater':
+            lambda _, rev, c: _update_service_config('settings.cfg', rev, c),
+        'use_authdb_transaction':
+            False,
+    },
+    'security.cfg': {
+        'proto_class': security_config_pb2.SecurityConfig,
+        'default': security_config_pb2.SecurityConfig(),
+        'revision_getter': lambda: _get_authdb_config_rev_async('security.cfg'),
+        'updater': _update_security_config,
+        'use_authdb_transaction': True,
+    },
 }
 
 
