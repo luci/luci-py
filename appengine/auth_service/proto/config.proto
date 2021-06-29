@@ -108,7 +108,7 @@ message GroupImporterConfig {
 }
 
 
-// Global config. Includes OAuth client_id whitelist and token server URL.
+// Global config. Includes OAuth client_id allowlist and token server URL.
 //
 // Provided via 'oauth.cfg' config file.
 message OAuthConfig {
@@ -118,34 +118,34 @@ message OAuthConfig {
   // by /auth/api/v1/server/oauth_config endpoint to clients. Corresponding
   // callback URL must be localhost or urn:ietf:wg:oauth:2.0:oob.
   string primary_client_secret = 2;
-  // Whitelist of all accepted client_ids (in addition to the primary one).
+  // Allowlist of all accepted client_ids (in addition to the primary one).
   repeated string client_ids = 3;
   // URL of a token server to use to generate delegation tokens.
   string token_server_url = 4;
 }
 
 
-// IP whitelists config: a set of named IP whitelists and a mapping between
-// identity name -> IP whitelist to restrict it to.
-message IPWhitelistConfig {
-  message IPWhitelist {
-    // Name of the IP whitelist.
+// IP allowlists config: a set of named IP allowlists and a mapping between
+// identity name -> IP allowlist to restrict it to.
+message IPAllowlistConfig {
+  message IPAllowlist {
+    // Name of the IP allowlist.
     string name = 1;
     // List of subnets.
     repeated string subnets = 2;
-    // Names of other IPWhitelist entities to include.
+    // Names of other IPAllowlist entities to include.
     repeated string includes = 3;
   }
 
   message Assignment {
     // Identity to restrict IPs to.
     string identity = 1;
-    // Name of the corresponding IPWhitelist with a set of subnets.
-    string ip_whitelist_name = 2;
+    // Name of the corresponding IPAllowlist with a set of subnets.
+    string ip_allowlist_name = 2;
   }
 
   // A set of named subnets.
-  repeated IPWhitelist ip_whitelists = 1;
-  // A mapping "identity name -> IP whitelist name".
+  repeated IPAllowlist ip_allowlists = 1;
+  // A mapping "identity name -> IP allowlist name".
   repeated Assignment assignments = 2;
 }

@@ -524,7 +524,7 @@ class IPWhitelistsHandler(UINavbarTabHandler):
   navbar_tab_id = 'ip_whitelists'
   navbar_tab_title = 'IP Whitelists'
   js_file_url = '/auth/static/js/ip_whitelists.js'
-  template_file = 'auth/ip_whitelists.html'
+  template_file = 'auth/ip_allowlists.html'
 
 
 class ApiDocHandler(UINavbarTabHandler):

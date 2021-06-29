@@ -9,8 +9,8 @@ and modifies auth service datastore state if anything changed.
 
 Following files are fetched:
   imports.cfg - configuration for group importer cron job.
-  ip_whitelist.cfg - IP whitelists.
-  oauth.cfg - OAuth client_id whitelist.
+  ip_allowlist.cfg - IP allowlists.
+  oauth.cfg - OAuth client_id allowlist.
 
 Configs are ASCII serialized protocol buffer messages. The schema is defined in
 proto/config.proto.
@@ -166,10 +166,10 @@ def validate_imports_config(conf, ctx):
     ctx.error(str(exc))
 
 
-# @validation.self_rule('ip_whitelist.cfg', config_pb2.IPWhitelistConfig)
-def validate_ip_whitelist_config(conf, ctx):
+@validation.self_rule('ip_allowlist.cfg', config_pb2.IPAllowlistConfig)
+def validate_ip_allowlist_config(conf, ctx):
   try:
-    _validate_ip_whitelist_config(conf)
+    _validate_ip_allowlist_config(conf)
   except ValueError as exc:
     ctx.error(str(exc))
 
@@ -184,7 +184,7 @@ def validate_oauth_config(conf, ctx):
 
 # Simple auth_service own configs stored in the datastore as plain text.
 # They are different from imports.cfg (no GUI to update them other), and from
-# ip_whitelist.cfg and oauth.cfg (not tied to AuthDB changes).
+# ip_allowlist.cfg and oauth.cfg (not tied to AuthDB changes).
 
 
 class _AuthServiceConfig(ndb.Model):
@@ -324,79 +324,79 @@ def _update_authdb_configs(configs):
   return bool(ingested_revs)
 
 
-def _validate_ip_whitelist_config(conf):
-  if not isinstance(conf, config_pb2.IPWhitelistConfig):
+def _validate_ip_allowlist_config(conf):
+  if not isinstance(conf, config_pb2.IPAllowlistConfig):
     raise ValueError('Wrong message type: %s' % conf.__class__.__name__)
-  whitelists = set()
-  for ip_whitelist in conf.ip_whitelists:
-    if not model.IP_WHITELIST_NAME_RE.match(ip_whitelist.name):
-      raise ValueError('Invalid IP whitelist name: %s' % ip_whitelist.name)
-    if ip_whitelist.name in whitelists:
-      raise ValueError('IP whitelist %s is defined twice' % ip_whitelist.name)
-    whitelists.add(ip_whitelist.name)
-    for net in ip_whitelist.subnets:
+  allowlists = set()
+  for ip_allowlist in conf.ip_allowlists:
+    if not model.IP_WHITELIST_NAME_RE.match(ip_allowlist.name):
+      raise ValueError('Invalid IP allowlist name: %s' % ip_allowlist.name)
+    if ip_allowlist.name in allowlists:
+      raise ValueError('IP allowlist %s is defined twice' % ip_allowlist.name)
+    allowlists.add(ip_allowlist.name)
+    for net in ip_allowlist.subnets:
       # Raises ValueError if subnet is not valid.
       ipaddr.subnet_from_string(net)
   idents = []
   for assignment in conf.assignments:
     # Raises ValueError if identity is not valid.
     ident = model.Identity.from_bytes(assignment.identity)
-    if assignment.ip_whitelist_name not in whitelists:
+    if assignment.ip_allowlist_name not in allowlists:
       raise ValueError(
-          'Unknown IP whitelist: %s' % assignment.ip_whitelist_name)
+          'Unknown IP allowlist: %s' % assignment.ip_allowlist_name)
     if ident in idents:
       raise ValueError('Identity %s is specified twice' % assignment.identity)
     idents.append(ident)
   # This raises ValueError on bad includes.
-  _resolve_ip_whitelist_includes(conf.ip_whitelists)
+  _resolve_ip_allowlist_includes(conf.ip_allowlists)
 
 
-def _resolve_ip_whitelist_includes(whitelists):
-  """Takes a list of IPWhitelist, returns map {name -> [subnets]}.
+def _resolve_ip_allowlist_includes(allowlists):
+  """Takes a list of IPAllowlist, returns map {name -> [subnets]}.
 
   Subnets are returned as sorted list of strings.
   """
-  by_name = {m.name: m for m in whitelists}
+  by_name = {m.name: m for m in allowlists}
 
   def resolve_one(wl, visiting):
     if wl.name in visiting:
       raise ValueError(
-          'IP whitelist %s is part of an include cycle %s' %
+          'IP allowlist %s is part of an include cycle %s' %
           (wl.name, visiting + [wl.name]))
     visiting.append(wl.name)
     subnets = set(wl.subnets)
     for inc in wl.includes:
       if inc not in by_name:
         raise ValueError(
-            'IP whitelist %s includes unknown whitelist %s' % (wl.name, inc))
+            'IP allowlist %s includes unknown allowlist %s' % (wl.name, inc))
       subnets |= resolve_one(by_name[inc], visiting)
     visiting.pop()
     return subnets
 
-  return {m.name: sorted(resolve_one(m, [])) for m in whitelists}
+  return {m.name: sorted(resolve_one(m, [])) for m in allowlists}
 
 
-def _update_ip_whitelist_config(root, rev, conf):
+def _update_ip_allowlist_config(root, rev, conf):
   assert ndb.in_transaction(), 'Must be called in AuthDB transaction'
   assert isinstance(root, model.AuthGlobalConfig), root
   now = utils.utcnow()
 
-  # Existing whitelist entities.
-  existing_ip_whitelists = {
+  # Existing allowlist entities.
+  existing_ip_allowlists = {
     e.key.id(): e
     for e in model.AuthIPWhitelist.query(ancestor=model.root_key())
   }
 
-  # Whitelists being imported (name => [list of subnets]).
-  imported_ip_whitelists = _resolve_ip_whitelist_includes(conf.ip_whitelists)
+  # Allowlists being imported (name => [list of subnets]).
+  imported_ip_allowlists = _resolve_ip_allowlist_includes(conf.ip_allowlists)
 
   to_put = []
   to_delete = []
 
-  # New or modified IP whitelists.
-  for name, subnets in imported_ip_whitelists.items():
-    # An existing whitelist and it hasn't changed?
-    wl = existing_ip_whitelists.get(name)
+  # New or modified IP allowlists.
+  for name, subnets in imported_ip_allowlists.items():
+    # An existing allowlist and it hasn't changed?
+    wl = existing_ip_allowlists.get(name)
     if wl and wl.subnets == subnets:
       continue
     # Update the existing (to preserve auth_db_prev_rev) or create a new one.
@@ -406,33 +406,33 @@ def _update_ip_whitelist_config(root, rev, conf):
           created_ts=now,
           created_by=model.get_service_self_identity())
     wl.subnets = subnets
-    wl.description = 'Imported from ip_whitelist.cfg'
+    wl.description = 'Imported from ip_allowlist.cfg'
     to_put.append(wl)
 
-  # Removed IP whitelists.
-  for wl in existing_ip_whitelists.values():
-    if wl.key.id() not in imported_ip_whitelists:
+  # Removed IP allowlists.
+  for wl in existing_ip_allowlists.values():
+    if wl.key.id() not in imported_ip_allowlists:
       to_delete.append(wl)
 
   # Update assignments. Don't touch created_ts and created_by for existing ones.
-  ip_whitelist_assignments = (
+  ip_allowlist_assignments = (
       model.ip_whitelist_assignments_key().get() or
       model.AuthIPWhitelistAssignments(
           key=model.ip_whitelist_assignments_key()))
   existing = {
     (a.identity.to_bytes(), a.ip_whitelist): a
-    for a in ip_whitelist_assignments.assignments
+    for a in ip_allowlist_assignments.assignments
   }
   updated = []
   for a in conf.assignments:
-    key = (a.identity, a.ip_whitelist_name)
+    key = (a.identity, a.ip_allowlist_name)
     if key in existing:
       updated.append(existing[key])
     else:
       new_one = model.AuthIPWhitelistAssignments.Assignment(
           identity=model.Identity.from_bytes(a.identity),
-          ip_whitelist=a.ip_whitelist_name,
-          comment='Imported from ip_whitelist.cfg at rev %s' % rev.revision,
+          ip_whitelist=a.ip_allowlist_name,
+          comment='Imported from ip_allowlist.cfg at rev %s' % rev.revision,
           created_ts=now,
           created_by=model.get_service_self_identity())
       updated.append(new_one)
@@ -443,12 +443,12 @@ def _update_ip_whitelist_config(root, rev, conf):
     for a in updated
   ]
   if set(updated_keys) != set(existing):
-    ip_whitelist_assignments.assignments = updated
-    to_put.append(ip_whitelist_assignments)
+    ip_allowlist_assignments.assignments = updated
+    to_put.append(ip_allowlist_assignments)
 
   if not to_put and not to_delete:
     return False
-  comment = 'Importing ip_whitelist.cfg at rev %s' % rev.revision
+  comment = 'Importing ip_allowlist.cfg at rev %s' % rev.revision
   for e in to_put:
     e.record_revision(
         modified_by=model.get_service_self_identity(),
@@ -544,13 +544,13 @@ _CONFIG_SCHEMAS = {
         'updater': _update_imports_config,
         'use_authdb_transaction': False,
     },
-    # 'ip_whitelist.cfg': {
-    #   'proto_class': config_pb2.IPWhitelistConfig,
-    #   'revision_getter':
-    # lambda: _get_authdb_config_rev_async('ip_whitelist.cfg'),
-    #   'updater': _update_ip_whitelist_config,
-    #   'use_authdb_transaction': True,
-    # },
+    'ip_allowlist.cfg': {
+      'proto_class': config_pb2.IPAllowlistConfig,
+      'revision_getter':
+    lambda: _get_authdb_config_rev_async('ip_allowlist.cfg'),
+      'updater': _update_ip_allowlist_config,
+      'use_authdb_transaction': True,
+    },
     'oauth.cfg': {
         'proto_class': config_pb2.OAuthConfig,
         'revision_getter': lambda: _get_authdb_config_rev_async('oauth.cfg'),
