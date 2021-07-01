@@ -1,5 +1,6 @@
 *.pyc
 .coverage
-/appengine/swarming/swarming_bot.zip
 /appengine/swarming/swarming_bot.?.zip
+/appengine/swarming/swarming_bot.zip
 /appengine/swarming/ui2/nodejs
+/luci-go
