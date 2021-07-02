@@ -129,8 +129,7 @@ def _make_gitiles_location(cfg):
       path='/' + cfg.path)
 
 
-def _import_revision(
-    config_set, base_location, commit, force_update, project_id):
+def _import_revision(config_set, base_location, commit, project_id):
   """Imports a referenced Gitiles revision into a config set.
 
   |base_location| will be used to set storage.ConfigSet.location.
@@ -162,13 +161,7 @@ def _import_revision(
       version=storage.ConfigSet.CUR_VERSION,
   )
 
-  if not force_update and rev_key.get():
-    attempt.success = True
-    attempt.message = 'Up-to-date'
-    ndb.put_multi([cs_entity, attempt])
-    return
-
-  rev_entities = [cs_entity, storage.Revision(key=rev_key)]
+  rev_entities = [attempt, cs_entity, storage.Revision(key=rev_key)]
 
   # Fetch archive outside ConfigSet transaction.
   archive = location.get_archive(
@@ -205,9 +198,7 @@ def _import_revision(
 
   @ndb.transactional
   def txn():
-    if force_update or not rev_key.get():
-      ndb.put_multi(rev_entities)
-    attempt.put()
+    ndb.put_multi(rev_entities)
 
   txn()
   logging.info('Imported revision %s/%s', config_set, location.treeish)
@@ -306,10 +297,14 @@ def _import_config_set(config_set, location, project_id=None):
 
     config_set_key = ndb.Key(storage.ConfigSet, config_set)
     config_set_entity = config_set_key.get()
-    force_update = (config_set_entity and
-                    config_set_entity.version < storage.ConfigSet.CUR_VERSION)
-    if (config_set_entity and config_set_entity.latest_revision == commit.sha
-        and not force_update):
+
+    need_update = (
+        not config_set_entity or
+        config_set_entity.version < storage.ConfigSet.CUR_VERSION or
+        config_set_entity.latest_revision != commit.sha or
+        config_set_entity.location != str(location))
+
+    if not need_update:
       save_attempt(True, 'Up-to-date')
       logging.debug('Up-to-date')
       import_success_metric.increment(fields={'config_set': config_set})
@@ -318,7 +313,7 @@ def _import_config_set(config_set, location, project_id=None):
     logging.info(
         'Rolling %s => %s',
         config_set_entity and config_set_entity.latest_revision, commit.sha)
-    _import_revision(config_set, location, commit, force_update, project_id)
+    _import_revision(config_set, location, commit, project_id)
     import_success_metric.increment(fields={'config_set': config_set})
   except urlfetch_errors.DeadlineExceededError:
     save_attempt(False, 'Could not import: deadline exceeded')

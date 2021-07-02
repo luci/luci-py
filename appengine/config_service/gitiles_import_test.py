@@ -93,7 +93,6 @@ class GitilesImportTestCase(test_case.TestCase):
             path='/',
         ),
         self.test_commit,
-        False,
         self.test_project_id)
 
     expected_latest_revision_url = (
@@ -129,22 +128,6 @@ class GitilesImportTestCase(test_case.TestCase):
     self.assertEqual(saved_blob.content, 'x\n')
     self.assert_attempt(True, 'Imported')
 
-    # Run second time, assert nothing is fetched from gitiles.
-    ndb.Key(storage.ConfigSet, 'config_set').delete()
-    gitiles.get_archive.reset_mock()
-    gitiles_import._import_revision(
-        'config_set',
-        gitiles.Location(
-            hostname='localhost',
-            project='project',
-            treeish='master',
-            path='/'),
-        self.test_commit,
-        False,
-        self.test_project_id)
-    self.assertFalse(gitiles.get_archive.called)
-    self.assert_attempt(True, 'Up-to-date')
-
   def test_revision_revision_exists(self):
     self.mock(gitiles, 'get_archive', mock.Mock())
     with open(TEST_ARCHIVE_PATH, 'r') as test_archive_file:
@@ -153,12 +136,13 @@ class GitilesImportTestCase(test_case.TestCase):
     loc = gitiles.Location(
         hostname='localhost',
         project='project',
-        treeish='master',
+        treeish='main',
         path='/')
     cs = storage.ConfigSet(
         id='config_set',
         latest_revision=None,
         location=str(loc),
+        version=storage.ConfigSet.CUR_VERSION,
     )
     rev = storage.Revision(
         parent=cs.key,
@@ -170,7 +154,6 @@ class GitilesImportTestCase(test_case.TestCase):
         'config_set',
         loc,
         self.test_commit,
-        False,
         self.test_project_id)
 
     cs_fresh = cs.key.get()
@@ -185,10 +168,9 @@ class GitilesImportTestCase(test_case.TestCase):
         gitiles.Location(
             hostname='localhost',
             project='project',
-            treeish='master',
+            treeish='main',
             path='/'),
         self.test_commit,
-        False,
         self.test_project_id)
     self.assert_attempt(True, 'Config directory not found. Imported as empty')
 
@@ -207,10 +189,9 @@ class GitilesImportTestCase(test_case.TestCase):
         gitiles.Location(
             hostname='localhost',
             project='project',
-            treeish='master',
+            treeish='main',
             path='/'),
         self.test_commit,
-        False,
         self.test_project_id)
     # Assert not saved.
     self.assertIsNone(storage.ConfigSet.get_by_id('config_set'))
@@ -235,7 +216,7 @@ class GitilesImportTestCase(test_case.TestCase):
     storage.ConfigSet(
       location='https://localhost/project',
       latest_revision='deadbeef',
-      version=0,
+      version=storage.ConfigSet.CUR_VERSION,
       id='config_set',
     ).put()
     gitiles_import._import_config_set(
@@ -289,7 +270,8 @@ class GitilesImportTestCase(test_case.TestCase):
         latest_revision_url='https://localhost/project/+/deadbeef/x',
         latest_revision_committer_email=self.john.email,
         latest_revision_time=self.john.time,
-        location='https://localhost/project/+/master/x',
+        location='https://localhost/project/+/refs/heads/main/x',
+        version=storage.ConfigSet.CUR_VERSION,
     )
     cs.put()
 
@@ -316,7 +298,7 @@ class GitilesImportTestCase(test_case.TestCase):
     self.assert_attempt(
         False, 'Could not import: permission denied', no_revision=True)
 
-  def test_import_config_set_with_force_update(self):
+  def test_import_config_set_entity_ver_change(self):
     self.mock_get_log()
     storage.ConfigSet(
         id='config_set',
@@ -324,17 +306,17 @@ class GitilesImportTestCase(test_case.TestCase):
         latest_revision_url='https://localhost/project/+/deadbeef/x',
         latest_revision_committer_email=self.john.email,
         latest_revision_time=self.john.time,
-        location='https://localhost/project/+/master/x',
-        version=0,
+        location='https://localhost/project/+/refs/heads/main/x',
+        version=storage.ConfigSet.CUR_VERSION-1,
     ).put()
     self.mock(gitiles_import, '_import_revision', mock.Mock())
     gitiles_import._import_config_set(
         'config_set',
-        gitiles.Location.parse('https://localhost/project/+/master/x'),
+        gitiles.Location.parse('https://localhost/project/+/main/x'),
         self.test_project_id)
     gitiles_import._import_revision.assert_called_once()
 
-  def test_import_config_set_without_force_update(self):
+  def test_import_config_set_location_change(self):
     self.mock_get_log()
     storage.ConfigSet(
         id='config_set',
@@ -342,13 +324,31 @@ class GitilesImportTestCase(test_case.TestCase):
         latest_revision_url='https://localhost/project/+/deadbeef/x',
         latest_revision_committer_email=self.john.email,
         latest_revision_time=self.john.time,
-        location='https://localhost/project/+/master/x',
-        version=2,
+        location='https://localhost/project/+/refs/heads/not-main/x',
+        version=storage.ConfigSet.CUR_VERSION,
     ).put()
     self.mock(gitiles_import, '_import_revision', mock.Mock())
     gitiles_import._import_config_set(
         'config_set',
-        gitiles.Location.parse('https://localhost/project/+/master/x'),
+        gitiles.Location.parse('https://localhost/project/+/main/x'),
+        self.test_project_id)
+    gitiles_import._import_revision.assert_called_once()
+
+  def test_import_config_set_no_changes(self):
+    self.mock_get_log()
+    storage.ConfigSet(
+        id='config_set',
+        latest_revision='a1841f40264376d170269ee9473ce924b7c2c4e9',
+        latest_revision_url='https://localhost/project/+/deadbeef/x',
+        latest_revision_committer_email=self.john.email,
+        latest_revision_time=self.john.time,
+        location='https://localhost/project/+/refs/heads/main/x',
+        version=storage.ConfigSet.CUR_VERSION,
+    ).put()
+    self.mock(gitiles_import, '_import_revision', mock.Mock())
+    gitiles_import._import_config_set(
+        'config_set',
+        gitiles.Location.parse('https://localhost/project/+/main/x'),
         self.test_project_id)
     self.assertFalse(gitiles_import._import_revision.called)
 
@@ -357,7 +357,7 @@ class GitilesImportTestCase(test_case.TestCase):
     self.mock(gitiles_import, '_import_revision', mock.Mock())
     gitiles_import._import_config_set(
         'config_set',
-        gitiles.Location.parse('https://localhost/project/+/master/x'),
+        gitiles.Location.parse('https://localhost/project/+/main/x'),
         self.test_project_id)
     self.assertTrue(gitiles_import._import_revision.called)
 
@@ -366,9 +366,9 @@ class GitilesImportTestCase(test_case.TestCase):
     self.mock(gitiles, 'get_archive', mock.Mock())
     gitiles.get_archive.side_effect = urlfetch_errors.DeadlineExceededError
     storage.ConfigSet(
-        location='https://localhost/project',
+        location='https://localhost/project/+/refs/heads/main/x',
         latest_revision='deadbeef',
-        version=0,
+        version=storage.ConfigSet.CUR_VERSION,
         id='config_set',
     ).put()
     with self.assertRaises(gitiles_import.Error):
@@ -446,14 +446,14 @@ class GitilesImportTestCase(test_case.TestCase):
     RefType = project_config_pb2.RefsCfg.Ref
     projects.get_refs.return_value = {
       'chromium': [
-        RefType(name='refs/heads/master'),
+        RefType(name='refs/heads/main'),
         RefType(name='refs/heads/release42', config_path='/my-configs'),
       ],
     }
 
     self.assertEqual(gitiles_import._project_and_ref_config_sets(), [
       'projects/chromium',
-      'projects/chromium/refs/heads/master',
+      'projects/chromium/refs/heads/main',
       'projects/chromium/refs/heads/release42',
     ])
 
