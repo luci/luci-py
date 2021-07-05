@@ -333,7 +333,8 @@ def _yield_pages_async(q, size):
     should_continue[0] = more
 
   while should_continue[0]:
-    page_future = q.fetch_page_async(size, start_cursor=next_cursor[0])
+    page_future = q.fetch_page_async(
+        size, start_cursor=next_cursor[0], deadline=60)
     result_future = ndb.Future()
     page_future.add_immediate_callback(fire, page_future, result_future)
     yield result_future
