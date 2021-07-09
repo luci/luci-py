@@ -7,6 +7,7 @@
 from __future__ import print_function
 
 import collections
+import contextlib
 import datetime
 import glob
 import json
@@ -14,8 +15,10 @@ import logging
 import math
 import os
 import re
+import shutil
 import subprocess
 import sys
+import tempfile
 import time
 
 from six.moves import urllib
@@ -301,7 +304,14 @@ def setup_gae_sdk(sdk_path):
   yaml = yaml_module
 
 
-ModuleFile = collections.namedtuple('ModuleFile', ['path', 'data'])
+class ModuleFile(collections.namedtuple('ModuleFile', ['path', 'data'])):
+  @property
+  def is_go(self):
+    return self.data.get('runtime', '').startswith('go')
+
+  @property
+  def name(self):
+    return self.data.get('service', self.data.get('module', 'default'))
 
 
 class Application(object):
@@ -521,12 +531,13 @@ class Application(object):
     mods = []
     try:
       for m in sorted(services or self.services):
-        mod = self._services[m]
-        if mod.data.get('runtime') == 'go' and not os.environ.get('GOROOT'):
-          raise BadEnvironmentError('GOROOT must be set when deploying Go app')
-        mods.append(mod)
+        mods.append(self._services[m])
     except KeyError as e:
       raise ValueError('Unknown service: %s' % e)
+
+    # Need `go` in PATH to deploy Go code.
+    if any(m.is_go for m in mods):
+      _check_go()
 
     # Always make 'default' the first service to be uploaded. It is magical,
     # deploying it first "enables" the application, or so it seems.
@@ -536,9 +547,8 @@ class Application(object):
     hacked = []
 
     try:
-      # Will contain paths to service YAMLs and to all extra YAMLs, like
-      # cron.yaml.
-      yamls = []
+      # Will contain a list of ModuleFile describing YAMLs to deploy.
+      service_yamls = []
 
       # 'gcloud' barfs at 'application' and 'version' fields in app.yaml. Hack
       # them away. Eventually all app.yaml must be updated to not specify
@@ -554,7 +564,7 @@ class Application(object):
         except ValueError as exc:
           raise ValueError('Bad %s: %s' % (os.path.basename(m.path), exc))
         if modified == m.data:
-          yamls.append(m.path)  # the original YAML is good enough
+          service_yamls.append(m)  # the original YAML is good enough
         else:
           if 'application' in m.data or 'version' in m.data:
             logging.error('Remove "application" and "version" from %s', m.path)
@@ -567,8 +577,22 @@ class Application(object):
           logging.debug('Replacing "%s" with\n%s', fnm, hacked_body)
           with open(hacked_path, 'w') as f:
             f.write(hacked_body)  # JSON is YAML, so whatever
-          yamls.append(hacked_path)
+          service_yamls.append(ModuleFile(path=hacked_path, data=modified))
           hacked.append(hacked_path)  # to know what to delete later
+
+      # Deploy services first.
+      if os.getenv('GAE_PY_USE_CLOUDBUILDHELPER') != '1':
+        self._deploy_services(service_yamls, version)  # the old code path
+      else:
+        go, non_go = [], []
+        for m in service_yamls:
+          (go if m.is_go else non_go).append(m)
+        # Deploy non-go services as is, without staging them.
+        self._deploy_services(non_go, version)
+        # Stage *.go files needed to compile services and deploy from there.
+        if go:
+          with _prep_go_deployment(go, self._app_dir) as staged:
+            self._deploy_services(staged, version)
 
       # Deploy all other stuff too. 'app deploy' is a polyglot.
       possible_extra = [
@@ -577,20 +601,26 @@ class Application(object):
         os.path.join(self.default_service_dir, 'cron.yaml'),
         os.path.join(self.default_service_dir, 'dispatch.yaml'),
       ]
-      for extra in possible_extra:
-        if extra and os.path.isfile(extra):
-          yamls.append(extra)
-
-      self.run_gcloud(
-          ['app', 'deploy'] + yamls +
-          [
-            '--version', version, '--quiet',
-            '--no-promote', '--no-stop-previous-version',
-          ])
+      extra = [p for p in possible_extra if os.path.isfile(p)]
+      if extra:
+        self.run_gcloud(['app', 'deploy'] + extra + ['--quiet'])
 
     finally:
       for h in hacked:
         os.remove(h)
+
+  def _deploy_services(self, services, version):
+    if not services:
+      return
+    print(
+        'Initiating gcloud app deploy: %s' %
+        ', '.join(m.name for m in services))
+    self.run_gcloud(
+        ['app', 'deploy'] + [m.path for m in services] +
+        [
+          '--version', version, '--quiet',
+          '--no-promote', '--no-stop-previous-version',
+        ])
 
   def spawn_dev_appserver(self, args, open_ports=False, **kwargs):
     """Launches subprocess with dev_appserver.py.
@@ -850,3 +880,147 @@ def setup_gae_env():
   if not sdk_path:
     raise BadEnvironmentError('Couldn\'t find GAE SDK.')
   setup_gae_sdk(sdk_path)
+
+
+def _parse_version(v):
+  return tuple(map(int, (v.split('.'))))
+
+
+def _check_go(min_version='1.16.0'):
+  """Checks `go` is in PATH and it is fresh enough."""
+  try:
+    # 'go version go1.16.5 darwin/amd64'.
+    ver = subprocess.check_output(['go', 'version'])
+    ver = ver.splitlines()[0].strip()
+    if not ver.startswith('go version go'):
+      raise BadEnvironmentError(
+          'Unexpected output from `go version`: %s' % (ver,))
+    ver = ver[len('go version go'):].split()[0]
+    if _parse_version(ver) < _parse_version(min_version):
+      raise BadEnvironmentError(
+          'Found `go` v%s in PATH, but need at least v%s' % (ver, min_version))
+  except OSError:
+    raise BadEnvironmentError(
+        'Could not find `go` in PATH. Is it needed to deploy Go code.')
+
+
+def _check_cloudbuildhelper(min_version='1.1.9'):
+  """Checks `cloudbuildhelper` is in PATH and it is fresh enough."""
+  explainer = (
+      'It is needed to deploy Go GAE apps now (https://crbug.com/1057067).\n'
+      'Try activating Infra go environment first:\n'
+      '  $ eval `.../infra/go/env.py`.'
+  )
+  try:
+    # 'cloudbuildhelper v1.1.9\nCIPD package: ...'
+    ver = subprocess.check_output(['cloudbuildhelper', 'version'])
+    ver = ver.splitlines()[0].strip()
+    if not ver.startswith('cloudbuildhelper v'):
+      raise BadEnvironmentError(
+          'Unexpected output from `cloudbuildhelper version`: %s' % (ver,))
+    ver = ver[len('cloudbuildhelper v'):]
+    if _parse_version(ver) < _parse_version(min_version):
+      raise BadEnvironmentError(
+          'Found `cloudbuildhelper` v%s in PATH, but need at least v%s. %s' %
+          (ver, min_version, explainer))
+  except OSError:
+    raise BadEnvironmentError(
+        'Could not find `cloudbuildhelper` in PATH. ' + explainer)
+
+
+@contextlib.contextmanager
+def _prep_go_deployment(services, app_dir):
+  """Stages a Go application for deployment.
+
+  Copies all files needed to deploy an app (and only them!) into a temporary
+  directory and adjusts Go env vars in os.environ to point to it.
+
+  Args:
+    services: a list of ModuleFile with Go service YAMLs.
+    app_dir: the application root directory (all YAMLs are under it).
+
+  Yields:
+    A list of ModuleFile pointing to staged files.
+  """
+  _check_cloudbuildhelper()
+
+  # Prepare a manifest YAML for cloudbuildhelper describing what to bundle.
+  manifest_body = {
+    'name': 'gae_app',  # doesn't really matter
+    'inputsdir': '.',   # we'll drop the manifest into the app_dir
+    'build': [],
+  }
+  for m in services:
+    # E.g. "services/module-services.yaml".
+    rel_path = os.path.relpath(m.path, app_dir)
+    # E.g. "services".
+    rel_dir = os.path.dirname(rel_path)
+    # This instructs to bundle GAE module described by m.path (given as relative
+    # to `inputsdir` which is app_dir) into the corresponding output directory
+    # in the staging destination.
+    manifest_body['build'].append({
+        'go_gae_bundle': os.path.join('${inputsdir}', rel_path),
+        'dest': os.path.join('${contextdir}', rel_dir),
+    })
+
+  garbage = []
+  environ = os.environ.copy()
+
+  try:
+    # Drop the manifest YAML into app_dir, so `inputsdir` resolves correctly.
+    manifest = os.path.join(app_dir, '._cbh_manifest.yaml')
+    with open(manifest, 'w') as f:
+      json.dump(manifest_body, f)
+    garbage.append(manifest)
+
+    # Stage all files into a temp directory.
+    stage_dir = tempfile.mkdtemp(prefix='_gae_py_')
+    garbage.append(stage_dir)
+    subprocess.check_call([
+        'cloudbuildhelper', 'stage', manifest, '-output-directory', stage_dir,
+    ])
+
+    # Prepare ModuleFiles which point to staged YAMLs now. It is important to
+    # follow symlinks in the staged output to get to the package directories
+    # in _gopath: that way "gcloud app deploy" will know what Go packages these
+    # YAML correspond too. This information eventually may surface in error
+    # stack traces.
+    staged_services = []
+    for m in services:
+      # E.g. "services/module-services.yaml".
+      rel_path = os.path.relpath(m.path, app_dir)
+      # E.g. "/tmp/_gae_py_xxx/services".
+      abs_dir = os.path.join(stage_dir, os.path.dirname(rel_path))
+      # If it is a symlink, follow it to its destination in _gopath. This is how
+      # cloudbuildhelper packages directories specified via `go_gae_bundle`.
+      abs_dir = os.path.realpath(abs_dir)
+      # The YAML *must* be there.
+      yaml_path = os.path.join(abs_dir, os.path.basename(m.path))
+      assert os.path.isfile(yaml_path), yaml_path
+      staged_services.append(ModuleFile(path=yaml_path, data=m.data))
+
+    # Scrub Go environ to set it up to use staged _gopath only.
+    for k in os.environ.keys():
+      if k.startswith('GO') or k.startswith('CGO'):
+        os.environ.pop(k)
+
+    # We must not fetch any extra code at this point.
+    os.environ['GOPROXY'] = 'off'
+
+    # GOPATH with the staged files, if present, is at _gopath.
+    go_path = os.path.join(stage_dir, '_gopath')
+    if os.path.exists(go_path):
+      os.environ['GOPATH'] = os.path.realpath(go_path)
+      os.environ['GO111MODULE'] = 'off'
+
+    # Proceed using the staged service YAMLs.
+    yield staged_services
+  finally:
+    os.environ.clear()
+    os.environ.update(environ)
+    print('Cleaning up temp files...')
+    for g in garbage:
+      try:
+        os.remove(g)
+      except OSError:
+        shutil.rmtree(g)
