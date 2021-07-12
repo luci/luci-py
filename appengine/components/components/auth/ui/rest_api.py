@@ -50,7 +50,7 @@ def get_rest_api_routes():
     webapp2.Route('/auth/api/v1/groups', GroupsHandler),
     webapp2.Route('/auth/api/v1/groups/<name:%s>' % group_re, GroupHandler),
     webapp2.Route('/auth/api/v1/internal/replication', ReplicationHandler),
-    webapp2.Route('/auth/api/v1/ip_whitelists', IPWhitelistsHandler),
+    webapp2.Route('/auth/api/v1/ip_whitelists', IPAllowlistsHandler),
     webapp2.Route(
         '/auth/api/v1/ip_whitelists/<name:%s>' % ip_whitelist_re,
         IPWhitelistHandler),
@@ -909,7 +909,7 @@ class ReplicationHandler(handler.AuthenticatingHandler):
     self.send_response(response)
 
 
-class IPWhitelistsHandler(handler.ApiHandler):
+class IPAllowlistsHandler(handler.ApiHandler):
   """Lists all IP whitelists.
 
   Available in Standalone, Primary and Replica modes. Replicas only have IP

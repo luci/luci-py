@@ -2,7 +2,7 @@
 // Use of this source code is governed under the Apache License, Version 2.0
 // that can be found in the LICENSE file.
 
-var ip_whitelists = (function() {
+var ip_allowlists = (function() {
 'use strict';
 
 var exports = {};
@@ -17,14 +17,14 @@ var splitSubnetsList = function(subnets) {
 
 
 ////////////////////////////////////////////////////////////////////////////////
-// Selector is a combo box with IP whitelist names and "Create new" item.
+// Selector is a combo box with IP allowlist names and "Create new" item.
 
 
 var Selector = function($element, readonly) {
   this.$element = $element;
   this.readonly = readonly;
-  this.onCreateWhitelist = null;
-  this.onWhitelistSelected = null;
+  this.onCreateAllowlist = null;
+  this.onAllowlistSelected = null;
 
   var that = this;
   $element.change(function() {
@@ -34,7 +34,7 @@ var Selector = function($element, readonly) {
 
 
 // Rebuilds the list.
-Selector.prototype.populate = function(whitelists, selection) {
+Selector.prototype.populate = function(allowlists, selection) {
   this.$element.empty();
 
   var that = this;
@@ -49,19 +49,19 @@ Selector.prototype.populate = function(whitelists, selection) {
     }
   };
 
-  // All whitelists.
-  _.each(whitelists, function(whitelist) {
-    addToSelector(whitelist.name, whitelist);
+  // All allowlists.
+  _.each(allowlists, function(allowlist) {
+    addToSelector(allowlist.name, allowlist);
   });
 
   // Separator and "New list" option.
   if (!this.readonly) {
     addToSelector('----------------------------', 'SEPARATOR');
-    addToSelector('Create new IP whitelist', 'CREATE');
+    addToSelector('Create new IP allowlist', 'CREATE');
   } else {
     // Empty list looks ugly, put something in there.
     if (selected === null) {
-      addToSelector('No IP whitelists', 'SEPARATOR');
+      addToSelector('No IP allowlists', 'SEPARATOR');
     }
   }
 
@@ -76,33 +76,33 @@ Selector.prototype.onSelectionChanged = function() {
   var selectedOption = $('option:selected', this.$element);
   var selectedData = selectedOption.data('selector-data');
   if (selectedData === 'SEPARATOR') {
-    if (this.onWhitelistSelected !== null) {
-      this.onWhitelistSelected(null);
+    if (this.onAllowlistSelected !== null) {
+      this.onAllowlistSelected(null);
     }
   } else if (selectedData === 'CREATE') {
-    if (this.onWhitelistSelected !== null) {
-      this.onWhitelistSelected(null);
+    if (this.onAllowlistSelected !== null) {
+      this.onAllowlistSelected(null);
     }
-    if (this.onCreateWhitelist !== null) {
-      this.onCreateWhitelist();
+    if (this.onCreateAllowlist !== null) {
+      this.onCreateAllowlist();
     }
   } else {
-    if (this.onWhitelistSelected !== null) {
-      this.onWhitelistSelected(selectedData);
+    if (this.onAllowlistSelected !== null) {
+      this.onAllowlistSelected(selectedData);
     }
   }
 };
 
 
 ////////////////////////////////////////////////////////////////////////////////
-// "Create new IP whitelist" modal dialog.
+// "Create new IP allowlist" modal dialog.
 
 
-var NewWhitelistDialog = function($element) {
+var NewAllowlistDialog = function($element) {
   this.$element = $element;
   this.$alerts = $('#alerts-box', $element);
 
-  this.onCreateWhitelist = null;
+  this.onCreateAllowlist = null;
 
   var that = this;
   $('#create-btn', $element).on('click', function() {
@@ -112,7 +112,7 @@ var NewWhitelistDialog = function($element) {
 
 
 // Cleans previous values and alerts, presents the dialog.
-NewWhitelistDialog.prototype.show = function() {
+NewAllowlistDialog.prototype.show = function() {
   $('input[name="name"]', this.$element).val('');
   $('input[name="description"]', this.$element).val('');
   $('textarea[name="subnets"]', this.$element).val('');
@@ -122,21 +122,21 @@ NewWhitelistDialog.prototype.show = function() {
 
 
 // Cleans alerts, hides the dialog.
-NewWhitelistDialog.prototype.hide = function() {
+NewAllowlistDialog.prototype.hide = function() {
   this.$alerts.empty();
   this.$element.modal('hide');
 };
 
 
 // Displays error message in the dialog.
-NewWhitelistDialog.prototype.showError = function(text) {
+NewAllowlistDialog.prototype.showError = function(text) {
   this.$alerts.html(common.getAlertBoxHtml('error', 'Oh snap!', text));
 };
 
 
-// Called when "Create" button is clicked. Invokes onCreateWhitelist callback.
-NewWhitelistDialog.prototype.onCreateClicked = function() {
-  if (this.onCreateWhitelist === null) {
+// Called when "Create" button is clicked. Invokes onCreateAllowlist callback.
+NewAllowlistDialog.prototype.onCreateClicked = function() {
+  if (this.onCreateAllowlist === null) {
     return;
   }
 
@@ -144,7 +144,7 @@ NewWhitelistDialog.prototype.onCreateClicked = function() {
   var desc = $('input[name="description"]', this.$element).val();
   var list = $('textarea[name="subnets"]', this.$element).val();
 
-  this.onCreateWhitelist({
+  this.onCreateAllowlist({
     name: name,
     description: desc,
     subnets: splitSubnetsList(list)
@@ -153,18 +153,18 @@ NewWhitelistDialog.prototype.onCreateClicked = function() {
 
 
 ////////////////////////////////////////////////////////////////////////////////
-// The panel with information about some selected IP whitelist.
+// The panel with information about some selected IP allowlist.
 
 
-var WhitelistPane = function($element) {
+var AllowlistPane = function($element) {
   this.$element = $element;
   this.$alerts = $('#alerts-box', $element);
 
-  this.ipWhitelist = null;
+  this.ipAllowlist = null;
   this.lastModified = null;
 
-  this.onUpdateWhitelist = null;
-  this.onDeleteWhitelist = null;
+  this.onUpdateAllowlist = null;
+  this.onDeleteAllowlist = null;
 
   var that = this;
   $('#update-btn', $element).on('click', function() { that.onUpdateClick(); });
@@ -173,62 +173,62 @@ var WhitelistPane = function($element) {
 
 
 // Shows the pane.
-WhitelistPane.prototype.show = function() {
+AllowlistPane.prototype.show = function() {
   this.$element.show();
 };
 
 
 // Hides the pane.
-WhitelistPane.prototype.hide = function() {
+AllowlistPane.prototype.hide = function() {
   this.$element.hide();
 };
 
 
 // Displays error message in the pane.
-WhitelistPane.prototype.showError = function(text) {
+AllowlistPane.prototype.showError = function(text) {
   this.$alerts.html(common.getAlertBoxHtml('error', 'Oh snap!', text));
 };
 
 
 // Displays success message in the pane.
-WhitelistPane.prototype.showSuccess = function(text) {
+AllowlistPane.prototype.showSuccess = function(text) {
   this.$alerts.html(common.getAlertBoxHtml('success', 'Done!', text));
 };
 
 
-// Fills in the form with details about some IP whitelist.
-WhitelistPane.prototype.populate = function(ipWhitelist) {
-  // TODO(vadimsh): Convert ipWhitelist.modified_ts to a value compatible with
+// Fills in the form with details about some IP allowlist.
+AllowlistPane.prototype.populate = function(ipAllowlist) {
+  // TODO(vadimsh): Convert ipAllowlist.modified_ts to a value compatible with
   // 'If-Unmodified-Since' header and put it into this.lastModified.
-  this.ipWhitelist = ipWhitelist;
-  $('input[name="description"]', this.$element).val(ipWhitelist.description);
+  this.ipAllowlist = ipAllowlist;
+  $('input[name="description"]', this.$element).val(ipAllowlist.description);
   $('textarea[name="subnets"]', this.$element).val(
-      (ipWhitelist.subnets || []).join('\n'));
+      (ipAllowlist.subnets || []).join('\n'));
   this.$alerts.empty();
 };
 
 
 // Called whenever 'Update' button is clicked.
-WhitelistPane.prototype.onUpdateClick = function() {
-  if (!this.onUpdateWhitelist) {
+AllowlistPane.prototype.onUpdateClick = function() {
+  if (!this.onUpdateAllowlist) {
     return;
   }
 
   var desc = $('input[name="description"]', this.$element).val();
   var list = $('textarea[name="subnets"]', this.$element).val();
 
-  var updatedIpWhitelist = _.clone(this.ipWhitelist);
-  updatedIpWhitelist.description = desc;
-  updatedIpWhitelist.subnets = splitSubnetsList(list);
+  var updatedIpAllowlist = _.clone(this.ipAllowlist);
+  updatedIpAllowlist.description = desc;
+  updatedIpAllowlist.subnets = splitSubnetsList(list);
 
-  this.onUpdateWhitelist(updatedIpWhitelist, this.lastModified);
+  this.onUpdateAllowlist(updatedIpAllowlist, this.lastModified);
 };
 
 
 // Called whenever 'Delete' button is clicked.
-WhitelistPane.prototype.onDeleteClick = function() {
-  if (this.onDeleteWhitelist) {
-    this.onDeleteWhitelist(this.ipWhitelist.name, this.lastModified);
+AllowlistPane.prototype.onDeleteClick = function() {
+  if (this.onDeleteAllowlist) {
+    this.onDeleteAllowlist(this.ipAllowlist.name, this.lastModified);
   }
 };
 
@@ -237,8 +237,8 @@ WhitelistPane.prototype.onDeleteClick = function() {
 // Top level logic.
 
 
-// Fetches all IP whitelists, adds them to the selector, selects some.
-var reloadWhitelists = function(selector, selection) {
+// Fetches all IP allowlists, adds them to the selector, selects some.
+var reloadAllowlists = function(selector, selection) {
   var done = $.Deferred();
   api.ipWhitelists().then(function(response) {
     selector.populate(response.data.ip_whitelists, selection);
@@ -256,22 +256,22 @@ var reloadWhitelists = function(selector, selection) {
 exports.onContentLoaded = function() {
   var readonly = config.auth_service_config_locked || !config.is_admin;
   var selector = new Selector($('#ip-allowlists-selector'), readonly);
-  var newListDialog = new NewWhitelistDialog($('#create-ip-allowlist'));
-  var whitelistPane = new WhitelistPane($('#selected-ip-allowlist'));
+  var newListDialog = new NewAllowlistDialog($('#create-ip-allowlist'));
+  var allowlistPane = new AllowlistPane($('#selected-ip-allowlist'));
 
   // Enable\disable UI interactions on the page.
   var setInteractionDisabled = function(disabled) {
     common.setInteractionDisabled(selector.$element, disabled);
     common.setInteractionDisabled(newListDialog.$element, disabled);
-    common.setInteractionDisabled(whitelistPane.$element, disabled);
+    common.setInteractionDisabled(allowlistPane.$element, disabled);
   };
 
-  // Disable UI, wait for defer, reload whitelists, enable UI.
+  // Disable UI, wait for defer, reload allowlists, enable UI.
   var wrapDefer = function(defer, selection) {
     var done = $.Deferred();
     setInteractionDisabled(true);
     defer.then(function(response) {
-      reloadWhitelists(selector, selection).done(function() {
+      reloadAllowlists(selector, selection).done(function() {
         setInteractionDisabled(false);
         done.resolve(response);
       });
@@ -282,59 +282,59 @@ exports.onContentLoaded = function() {
     return done.promise();
   };
 
-  // Show the dialog when 'Create IP whitelist' item is selected.
-  selector.onCreateWhitelist = function() {
+  // Show the dialog when 'Create IP allowlist' item is selected.
+  selector.onCreateAllowlist = function() {
     newListDialog.show();
   };
 
-  // Update whitelistPane with selected whitelist on a selection changes.
-  selector.onWhitelistSelected = function(ipWhitelist) {
-    if (ipWhitelist === null) {
-      whitelistPane.hide();
+  // Update allowlistPane with selected allowlist on a selection changes.
+  selector.onAllowlistSelected = function(ipAllowlist) {
+    if (ipAllowlist === null) {
+      allowlistPane.hide();
     } else {
-      whitelistPane.populate(ipWhitelist);
-      whitelistPane.show();
+      allowlistPane.populate(ipAllowlist);
+      allowlistPane.show();
     }
   };
 
   // Wire dialog's "Create" button.
-  newListDialog.onCreateWhitelist = function(ipWhitelist) {
+  newListDialog.onCreateAllowlist = function(ipAllowlist) {
     // Some minimal client side validation, otherwise handlers nay return 404.
-    if (!ipWhitelist.name.match(/^[0-9a-zA-Z_\-\+\.\ ]{2,200}$/)) {
-      newListDialog.showError('Invalid IP whitelist name.');
+    if (!ipAllowlist.name.match(/^[0-9a-zA-Z_\-\+\.\ ]{2,200}$/)) {
+      newListDialog.showError('Invalid IP allowlist name.');
       return;
     }
-    var defer = wrapDefer(api.ipWhitelistCreate(ipWhitelist), ipWhitelist.name);
+    var defer = wrapDefer(api.ipWhitelistCreate(ipAllowlist), ipAllowlist.name);
     defer.then(function(response) {
       newListDialog.hide();
-      whitelistPane.showSuccess('Created.');
+      allowlistPane.showSuccess('Created.');
     }, function(error) {
       newListDialog.showError(error.text || 'Unknown error');
     });
   };
 
-  // Wire 'Delete whitelist' button.
-  whitelistPane.onDeleteWhitelist = function(name, lastModified) {
+  // Wire 'Delete allowlist' button.
+  allowlistPane.onDeleteAllowlist = function(name, lastModified) {
     var defer = wrapDefer(api.ipWhitelistDelete(name, lastModified), null);
     defer.fail(function(error) {
-      whitelistPane.showError(error.text || 'Unknown error');
+      allowlistPane.showError(error.text || 'Unknown error');
     });
   };
 
-  // Wire 'Update whitelist' button.
-  whitelistPane.onUpdateWhitelist = function(ipWhitelist, lastModified) {
+  // Wire 'Update allowlist' button.
+  allowlistPane.onUpdateAllowlist = function(ipAllowlist, lastModified) {
     var defer = wrapDefer(
-        api.ipWhitelistUpdate(ipWhitelist, lastModified), ipWhitelist.name);
+        api.ipWhitelistUpdate(ipAllowlist, lastModified), ipAllowlist.name);
     defer.then(function(response) {
-      whitelistPane.showSuccess('Updated.');
+      allowlistPane.showSuccess('Updated.');
     }, function(error) {
-      whitelistPane.showError(error.text || 'Unknown error');
+      allowlistPane.showError(error.text || 'Unknown error');
     });
   };
 
   // Initial data fetch.
-  whitelistPane.hide();
-  reloadWhitelists(selector, null);
+  allowlistPane.hide();
+  reloadAllowlists(selector, null);
 
   // Enable XSRF token auto-updater.
   api.setXSRFTokenAutoupdate(true);

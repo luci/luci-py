@@ -158,7 +158,7 @@ class AdminPageHandler(handler.AuthenticatingHandler):
 
   def authorization_error(self, error):
     """Redirects to login or shows 'Access Denied' page."""
-    # Not authenticated or used IP whitelist for auth -> redirect to login.
+    # Not authenticated or used IP allowlist for auth -> redirect to login.
     # Bots doesn't use UI, and users should always use real accounts.
     ident = api.get_current_identity()
     if ident.is_anonymous or ident.is_bot:
@@ -385,7 +385,7 @@ class UIHandler(handler.AuthenticatingHandler):
   def authorization_error(self, error):
     """Redirects to login or shows 'Access Denied' page."""
     # TODO(vadimsh): This will be deleted once we use Google Sign-In.
-    # Not authenticated or used IP whitelist for auth -> redirect to login.
+    # Not authenticated or used IP allowlist for auth -> redirect to login.
     # Bots doesn't use UI, and users should always use real accounts.
     ident = api.get_current_identity()
     if ident.is_anonymous or ident.is_bot:
@@ -518,12 +518,12 @@ class OAuthConfigHandler(UINavbarTabHandler):
   template_file = 'auth/oauth_config.html'
 
 
-class IPWhitelistsHandler(UINavbarTabHandler):
-  """Page with IP whitelists configuration."""
-  navbar_tab_url = '/auth/ip_whitelists'
-  navbar_tab_id = 'ip_whitelists'
-  navbar_tab_title = 'IP Whitelists'
-  js_file_url = '/auth/static/js/ip_whitelists.js'
+class IPAllowlistsHandler(UINavbarTabHandler):
+  """Page with IP allowlists configuration."""
+  navbar_tab_url = '/auth/ip_allowlists'
+  navbar_tab_id = 'ip_allowlists'
+  navbar_tab_title = 'IP Allowlists'
+  js_file_url = '/auth/static/js/ip_allowlists.js'
   template_file = 'auth/ip_allowlists.html'
 
 
@@ -733,6 +733,6 @@ _ui_navbar_tabs = (
   ChangeLogHandler,
   LookupHandler,
   OAuthConfigHandler,
-  IPWhitelistsHandler,
+  IPAllowlistsHandler,
   ApiDocHandler,
 )

@@ -1303,9 +1303,9 @@ class GroupHandlerTest(RestAPITestCase):
     self.assertEqual({'text': 'This group is not writable'}, body)
 
 
-class IPWhitelistsHandlerTest(RestAPITestCase):
+class IPAllowlistsHandlerTest(RestAPITestCase):
   def setUp(self):
-    super(IPWhitelistsHandlerTest, self).setUp()
+    super(IPAllowlistsHandlerTest, self).setUp()
     self.mock_is_admin(True)
 
   def test_requires_admin(self):

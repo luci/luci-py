@@ -471,7 +471,7 @@ def create_application(debug):
         ui.LookupHandler,
         ServicesHandler,
         ui.OAuthConfigHandler,
-        ui.IPWhitelistsHandler,
+        ui.IPAllowlistsHandler,
         ConfigHandler,
         ui.ApiDocHandler,
       ],
