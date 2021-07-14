@@ -50,10 +50,10 @@ def get_rest_api_routes():
     webapp2.Route('/auth/api/v1/groups', GroupsHandler),
     webapp2.Route('/auth/api/v1/groups/<name:%s>' % group_re, GroupHandler),
     webapp2.Route('/auth/api/v1/internal/replication', ReplicationHandler),
-    webapp2.Route('/auth/api/v1/ip_whitelists', IPAllowlistsHandler),
+    webapp2.Route('/auth/api/v1/ip_allowlists', IPAllowlistsHandler),
     webapp2.Route(
-        '/auth/api/v1/ip_whitelists/<name:%s>' % ip_whitelist_re,
-        IPWhitelistHandler),
+        '/auth/api/v1/ip_allowlists/<name:%s>' % ip_whitelist_re,
+        IPAllowlistHandler),
     webapp2.Route(
         '/auth/api/v1/listing/groups/<name:%s>' % group_re,
         GroupListingHandler),
@@ -910,10 +910,10 @@ class ReplicationHandler(handler.AuthenticatingHandler):
 
 
 class IPAllowlistsHandler(handler.ApiHandler):
-  """Lists all IP whitelists.
+  """Lists all IP allowlists.
 
   Available in Standalone, Primary and Replica modes. Replicas only have IP
-  whitelists referenced in "account -> IP whitelist" mapping.
+  allowlists referenced in "account -> IP allowlist" mapping.
   """
 
   @api.require(acl.has_access)
@@ -922,23 +922,23 @@ class IPAllowlistsHandler(handler.ApiHandler):
       raise NotImplementedError()
     entities = model.AuthIPWhitelist.query(ancestor=model.root_key())
     self.send_response({
-      'ip_whitelists': [
+      'ip_allowlists': [
         e.to_serializable_dict(with_id_as='name')
         for e in sorted(entities, key=lambda x: x.key.id())
       ],
     })
 
 
-class IPWhitelistHandler(EntityHandlerBase):
-  """Creating, reading, updating and deleting a single IP whitelist.
+class IPAllowlistHandler(EntityHandlerBase):
+  """Creating, reading, updating and deleting a single IP allowlist.
 
   GET is available in Standalone, Primary and Replica modes.
   Everything else is available only in Standalone and Primary modes.
   """
-  entity_url_prefix = '/auth/api/v1/ip_whitelists/'
+  entity_url_prefix = '/auth/api/v1/ip_allowlists/'
   entity_kind = model.AuthIPWhitelist
-  entity_kind_name = 'ip_whitelist'
-  entity_kind_title = 'ip whitelist'
+  entity_kind_name = 'ip_allowlist'
+  entity_kind_title = 'ip allowlist'
 
   def check_preconditions(self):
     if self.request.method != 'GET' and is_config_locked():
@@ -953,7 +953,7 @@ class IPWhitelistHandler(EntityHandlerBase):
   def do_get(cls, name, request):
     if model.is_replica():
       raise NotImplementedError()
-    return super(IPWhitelistHandler, cls).do_get(name, request)
+    return super(IPAllowlistHandler, cls).do_get(name, request)
 
   @classmethod
   def do_create(cls, entity):

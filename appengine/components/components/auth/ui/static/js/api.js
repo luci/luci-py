@@ -123,12 +123,12 @@ var normalizeGroupObj = function(group) {
 };
 
 
-// IP whitelist object -> IP whitelist object with all necessary fields present.
-var normalizeIpWhitelistObj = function(ipWhitelist) {
+// IP allowlist object -> IP allowlist object with all necessary fields present.
+var normalizeIpAllowlistObj = function(ipAllowlist) {
   return {
-    name: ipWhitelist.name,
-    description: ipWhitelist.description,
-    subnets: ipWhitelist.subnets || []
+    name: ipAllowlist.name,
+    description: ipAllowlist.description,
+    subnets: ipAllowlist.subnets || []
   };
 };
 
@@ -241,47 +241,47 @@ exports.groupUpdate = function(group, lastModified) {
 };
 
 
-// Lists all known IP whitelists.
-exports.ipWhitelists = function() {
-  return call('GET', '/auth/api/v1/ip_whitelists');
+// Lists all known IP allowlists.
+exports.ipAllowlists = function() {
+  return call('GET', '/auth/api/v1/ip_allowlists');
 };
 
 
-// Fetches single IP whitelist given its name.
-exports.ipWhitelistRead = function(name) {
-  return call('GET', '/auth/api/v1/ip_whitelists/' + name);
+// Fetches single IP allowlist given its name.
+exports.ipAllowlistRead = function(name) {
+  return call('GET', '/auth/api/v1/ip_allowlists/' + name);
 };
 
 
-// Deletes an IP whitelist.
-exports.ipWhitelistDelete = function(name, lastModified) {
+// Deletes an IP allowlist.
+exports.ipAllowlistDelete = function(name, lastModified) {
   var headers = {};
   if (lastModified) {
     headers['If-Unmodified-Since'] = lastModified;
   }
-  return call('DELETE', '/auth/api/v1/ip_whitelists/' + name, null, headers);
+  return call('DELETE', '/auth/api/v1/ip_allowlists/' + name, null, headers);
 };
 
 
-// Creates a new IP whitelist.
-exports.ipWhitelistCreate = function(ipWhitelist) {
+// Creates a new IP allowlist.
+exports.ipAllowlistCreate = function(ipAllowlist) {
   return call(
       'POST',
-      '/auth/api/v1/ip_whitelists/' + ipWhitelist.name,
-      normalizeIpWhitelistObj(ipWhitelist));
+      '/auth/api/v1/ip_allowlists/' + ipAllowlist.name,
+      normalizeIpAllowlistObj(ipAllowlist));
 };
 
 
-// Updates an existing IP whitelist.
-exports.ipWhitelistUpdate = function(ipWhitelist, lastModified) {
+// Updates an existing IP allowlist.
+exports.ipAllowlistUpdate = function(ipAllowlist, lastModified) {
   var headers = {};
   if (lastModified) {
     headers['If-Unmodified-Since'] = lastModified;
   }
   return call(
       'PUT',
-      '/auth/api/v1/ip_whitelists/' + ipWhitelist.name,
-      normalizeIpWhitelistObj(ipWhitelist),
+      '/auth/api/v1/ip_allowlists/' + ipAllowlist.name,
+      normalizeIpAllowlistObj(ipAllowlist),
       headers);
 };
 

@@ -240,8 +240,8 @@ AllowlistPane.prototype.onDeleteClick = function() {
 // Fetches all IP allowlists, adds them to the selector, selects some.
 var reloadAllowlists = function(selector, selection) {
   var done = $.Deferred();
-  api.ipWhitelists().then(function(response) {
-    selector.populate(response.data.ip_whitelists, selection);
+  api.ipAllowlists().then(function(response) {
+    selector.populate(response.data.ip_allowlists, selection);
     common.presentContent();
     done.resolve(response);
   }, function(error) {
@@ -304,7 +304,7 @@ exports.onContentLoaded = function() {
       newListDialog.showError('Invalid IP allowlist name.');
       return;
     }
-    var defer = wrapDefer(api.ipWhitelistCreate(ipAllowlist), ipAllowlist.name);
+    var defer = wrapDefer(api.ipAllowlistCreate(ipAllowlist), ipAllowlist.name);
     defer.then(function(response) {
       newListDialog.hide();
       allowlistPane.showSuccess('Created.');
@@ -315,7 +315,7 @@ exports.onContentLoaded = function() {
 
   // Wire 'Delete allowlist' button.
   allowlistPane.onDeleteAllowlist = function(name, lastModified) {
-    var defer = wrapDefer(api.ipWhitelistDelete(name, lastModified), null);
+    var defer = wrapDefer(api.ipAllowlistDelete(name, lastModified), null);
     defer.fail(function(error) {
       allowlistPane.showError(error.text || 'Unknown error');
     });
@@ -324,7 +324,7 @@ exports.onContentLoaded = function() {
   // Wire 'Update allowlist' button.
   allowlistPane.onUpdateAllowlist = function(ipAllowlist, lastModified) {
     var defer = wrapDefer(
-        api.ipWhitelistUpdate(ipAllowlist, lastModified), ipAllowlist.name);
+        api.ipAllowlistUpdate(ipAllowlist, lastModified), ipAllowlist.name);
     defer.then(function(response) {
       allowlistPane.showSuccess('Updated.');
     }, function(error) {

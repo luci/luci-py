@@ -1310,14 +1310,14 @@ class IPAllowlistsHandlerTest(RestAPITestCase):
 
   def test_requires_admin(self):
     self.mock_is_admin(False)
-    status, body, _ = self.get('/auth/api/v1/ip_whitelists', expect_errors=True)
+    status, body, _ = self.get('/auth/api/v1/ip_allowlists', expect_errors=True)
     self.assertEqual(403, status)
     self.assertEqual({'text': 'Access is denied.'}, body)
 
   def test_empty_list(self):
-    status, body, _ = self.get('/auth/api/v1/ip_whitelists')
+    status, body, _ = self.get('/auth/api/v1/ip_allowlists')
     self.assertEqual(200, status)
-    self.assertEqual({'ip_whitelists': []}, body)
+    self.assertEqual({'ip_allowlists': []}, body)
 
   def test_non_empty_list(self):
     self.mock_now(utils.timestamp_to_datetime(1300000000000000))
@@ -1325,36 +1325,36 @@ class IPAllowlistsHandlerTest(RestAPITestCase):
     make_ip_whitelist(
         name='bots',
         created_by=model.Identity.from_bytes('user:creator@example.com'),
-        description='Bots whitelist',
+        description='Bots allowlist',
         modified_by=model.Identity.from_bytes('user:modifier@example.com'),
         subnets=['127.0.0.1/32', '::1/128'])
 
     make_ip_whitelist(
-        name='another whitelist',
+        name='another allowlist',
         created_by=model.Identity.from_bytes('user:creator@example.com'),
-        description='Another whitelist',
+        description='Another allowlist',
         modified_by=model.Identity.from_bytes('user:modifier@example.com'),
         subnets=[])
 
     # Sorted by name. Subnets are normalized.
-    status, body, _ = self.get('/auth/api/v1/ip_whitelists')
+    status, body, _ = self.get('/auth/api/v1/ip_allowlists')
     self.assertEqual(200, status)
     self.assertEqual(
       {
-        'ip_whitelists': [
+        'ip_allowlists': [
           {
             'created_by': 'user:creator@example.com',
             'created_ts': 1300000000000000,
-            'description': 'Another whitelist',
+            'description': 'Another allowlist',
             'modified_by': 'user:modifier@example.com',
             'modified_ts': 1300000000000000,
-            'name': 'another whitelist',
+            'name': 'another allowlist',
             'subnets': [],
           },
           {
             'created_by': 'user:creator@example.com',
             'created_ts': 1300000000000000,
-            'description': 'Bots whitelist',
+            'description': 'Bots allowlist',
             'modified_by': 'user:modifier@example.com',
             'modified_ts': 1300000000000000,
             'name': 'bots',
@@ -1375,10 +1375,10 @@ class IPWhitelistHandlerTest(RestAPITestCase):
 
   def test_get_missing(self):
     status, body, _ = self.get(
-        path='/auth/api/v1/ip_whitelists/some_whitelist',
+        path='/auth/api/v1/ip_allowlists/some_whitelist',
         expect_errors=True)
     self.assertEqual(404, status)
-    self.assertEqual({'text': 'No such ip whitelist'}, body)
+    self.assertEqual({'text': 'No such ip allowlist'}, body)
 
   def test_get_existing(self):
     # Works even if config modifications are forbidden.
@@ -1388,18 +1388,18 @@ class IPWhitelistHandlerTest(RestAPITestCase):
     make_ip_whitelist(
         name='bots',
         created_by=model.Identity.from_bytes('user:creator@example.com'),
-        description='Bots whitelist',
+        description='Bots allowlist',
         modified_by=model.Identity.from_bytes('user:modifier@example.com'),
         subnets=['127.0.0.1/32', '::1/128'])
 
-    status, body, headers = self.get(path='/auth/api/v1/ip_whitelists/bots')
+    status, body, headers = self.get(path='/auth/api/v1/ip_allowlists/bots')
     self.assertEqual(200, status)
     self.assertEqual(
       {
-        'ip_whitelist': {
+        'ip_allowlist': {
           'created_by': 'user:creator@example.com',
           'created_ts': 1300000000000000,
-          'description': 'Bots whitelist',
+          'description': 'Bots allowlist',
           'modified_by': 'user:modifier@example.com',
           'modified_ts': 1300000000000000,
           'name': 'bots',
@@ -1413,7 +1413,7 @@ class IPWhitelistHandlerTest(RestAPITestCase):
   def test_get_requires_admin(self):
     self.mock_is_admin(False)
     status, body, _ = self.get(
-        path='/auth/api/v1/ip_whitelists/bots',
+        path='/auth/api/v1/ip_allowlists/bots',
         expect_errors=True)
     self.assertEqual(403, status)
     self.assertEqual({'text': 'Access is denied.'}, body)
@@ -1424,7 +1424,7 @@ class IPWhitelistHandlerTest(RestAPITestCase):
     ent = make_ip_whitelist('A whitelist')
     self.expect_auth_db_rev_change()
     status, body, _ = self.delete(
-        path='/auth/api/v1/ip_whitelists/A%20whitelist',
+        path='/auth/api/v1/ip_allowlists/A%20whitelist',
         expect_xsrf_token_check=True)
     self.assertEqual(200, status)
     self.assertEqual({'ok': True}, body)
@@ -1447,7 +1447,7 @@ class IPWhitelistHandlerTest(RestAPITestCase):
     ent = make_ip_whitelist('A whitelist')
     self.expect_auth_db_rev_change()
     status, body, _ = self.delete(
-        path='/auth/api/v1/ip_whitelists/A%20whitelist',
+        path='/auth/api/v1/ip_allowlists/A%20whitelist',
         headers={
           'If-Unmodified-Since': utils.datetime_to_rfc2822(ent.modified_ts),
         },
@@ -1459,7 +1459,7 @@ class IPWhitelistHandlerTest(RestAPITestCase):
   def test_delete_existing_with_condition_fail(self):
     make_ip_whitelist('A whitelist')
     status, body, _ = self.delete(
-        path='/auth/api/v1/ip_whitelists/A%20whitelist',
+        path='/auth/api/v1/ip_allowlists/A%20whitelist',
         headers={
           'If-Unmodified-Since': 'Sun, 1 Mar 1990 00:00:00 -0000',
         },
@@ -1467,31 +1467,31 @@ class IPWhitelistHandlerTest(RestAPITestCase):
         expect_xsrf_token_check=True)
     self.assertEqual(412, status)
     self.assertEqual(
-        {'text': 'Ip whitelist was modified by someone else'}, body)
+        {'text': 'Ip allowlist was modified by someone else'}, body)
     self.assertTrue(model.ip_whitelist_key('A whitelist').get())
 
   def test_delete_missing(self):
     status, body, _ = self.delete(
-        path='/auth/api/v1/ip_whitelists/A%20whitelist',
+        path='/auth/api/v1/ip_allowlists/A%20whitelist',
         expect_xsrf_token_check=True)
     self.assertEqual(200, status)
     self.assertEqual({'ok': True}, body)
 
   def test_delete_missing_with_condition(self):
     status, body, _ = self.delete(
-        path='/auth/api/v1/ip_whitelists/A%20whitelist',
+        path='/auth/api/v1/ip_allowlists/A%20whitelist',
         headers={
           'If-Unmodified-Since': 'Sun, 1 Mar 1990 00:00:00 -0000',
         },
         expect_errors=True,
         expect_xsrf_token_check=True)
     self.assertEqual(412, status)
-    self.assertEqual({'text': 'Ip whitelist was deleted by someone else'}, body)
+    self.assertEqual({'text': 'Ip allowlist was deleted by someone else'}, body)
 
   def test_delete_requires_admin(self):
     self.mock_is_admin(False)
     status, body, _ = self.delete(
-        path='/auth/api/v1/ip_whitelists/A%20whitelist',
+        path='/auth/api/v1/ip_allowlists/A%20whitelist',
         expect_errors=True,
         expect_xsrf_token_check=True)
     self.assertEqual(403, status)
@@ -1505,7 +1505,7 @@ class IPWhitelistHandlerTest(RestAPITestCase):
   def test_delete_when_config_locked(self):
     self.mock(rest_api, 'is_config_locked', lambda: True)
     status, body, _ = self.delete(
-        path='/auth/api/v1/ip_whitelists/A%20whitelist',
+        path='/auth/api/v1/ip_allowlists/A%20whitelist',
         expect_errors=True,
         expect_xsrf_token_check=True)
     self.assertEqual(409, status)
@@ -1520,7 +1520,7 @@ class IPWhitelistHandlerTest(RestAPITestCase):
 
     self.expect_auth_db_rev_change()
     status, body, headers = self.post(
-        path='/auth/api/v1/ip_whitelists/A%20whitelist',
+        path='/auth/api/v1/ip_allowlists/A%20whitelist',
         body={
           'description': 'Test whitelist',
           'subnets': ['127.0.0.1/32'],
@@ -1532,7 +1532,7 @@ class IPWhitelistHandlerTest(RestAPITestCase):
     self.assertEqual(
         'Sun, 13 Mar 2011 07:06:40 -0000', headers['Last-Modified'])
     self.assertEqual(
-        'http://localhost/auth/api/v1/ip_whitelists/A%20whitelist',
+        'http://localhost/auth/api/v1/ip_allowlists/A%20whitelist',
         headers['Location'])
 
     entity = model.ip_whitelist_key('A whitelist').get()
@@ -1562,7 +1562,7 @@ class IPWhitelistHandlerTest(RestAPITestCase):
   def test_post_minimal_body(self):
     self.expect_auth_db_rev_change()
     status, body, _ = self.post(
-        path='/auth/api/v1/ip_whitelists/A%20whitelist',
+        path='/auth/api/v1/ip_allowlists/A%20whitelist',
         body={'name': 'A whitelist'},
         expect_xsrf_token_check=True)
     self.assertEqual(201, status)
@@ -1571,7 +1571,7 @@ class IPWhitelistHandlerTest(RestAPITestCase):
   def test_post_mismatching_name(self):
     # 'name' key and name in URL should match.
     status, body, _ = self.post(
-        path='/auth/api/v1/ip_whitelists/A%20whitelist',
+        path='/auth/api/v1/ip_allowlists/A%20whitelist',
         body={'name': 'Another name here'},
         expect_errors=True,
         expect_xsrf_token_check=True)
@@ -1582,7 +1582,7 @@ class IPWhitelistHandlerTest(RestAPITestCase):
   def test_post_bad_body(self):
     # Posting invalid body (bad subnet format).
     status, body, _ = self.post(
-        path='/auth/api/v1/ip_whitelists/A%20whitelist',
+        path='/auth/api/v1/ip_allowlists/A%20whitelist',
         body={'name': 'A whitelist', 'subnets': ['not a subnet']},
         expect_errors=True,
         expect_xsrf_token_check=True)
@@ -1595,17 +1595,17 @@ class IPWhitelistHandlerTest(RestAPITestCase):
   def test_post_already_exists(self):
     make_ip_whitelist('A whitelist')
     status, body, _ = self.post(
-        path='/auth/api/v1/ip_whitelists/A%20whitelist',
+        path='/auth/api/v1/ip_allowlists/A%20whitelist',
         body={'name': 'A whitelist'},
         expect_errors=True,
         expect_xsrf_token_check=True)
     self.assertEqual(409, status)
-    self.assertEqual({'text': 'Such ip whitelist already exists'}, body)
+    self.assertEqual({'text': 'Such ip allowlist already exists'}, body)
 
   def test_post_requires_admin(self):
     self.mock_is_admin(False)
     status, body, _ = self.post(
-        path='/auth/api/v1/ip_whitelists/A%20whitelist',
+        path='/auth/api/v1/ip_allowlists/A%20whitelist',
         body={'name': 'A whitelist'},
         expect_errors=True,
         expect_xsrf_token_check=True)
@@ -1615,7 +1615,7 @@ class IPWhitelistHandlerTest(RestAPITestCase):
   def test_post_when_config_locked(self):
     self.mock(rest_api, 'is_config_locked', lambda: True)
     status, body, _ = self.post(
-        path='/auth/api/v1/ip_whitelists/A%20whitelist',
+        path='/auth/api/v1/ip_allowlists/A%20whitelist',
         body={'name': 'A whitelist'},
         expect_errors=True,
         expect_xsrf_token_check=True)
@@ -1633,7 +1633,7 @@ class IPWhitelistHandlerTest(RestAPITestCase):
 
     self.expect_auth_db_rev_change()
     status, body, headers = self.put(
-        path='/auth/api/v1/ip_whitelists/A%20whitelist',
+        path='/auth/api/v1/ip_allowlists/A%20whitelist',
         body={
           'description': 'Test whitelist',
           'name': 'A whitelist',
@@ -1672,7 +1672,7 @@ class IPWhitelistHandlerTest(RestAPITestCase):
   def test_put_mismatching_name(self):
     make_ip_whitelist('A whitelist')
     status, body, _ = self.put(
-        path='/auth/api/v1/ip_whitelists/A%20whitelist',
+        path='/auth/api/v1/ip_allowlists/A%20whitelist',
         body={
           'subnets': [],
           'name': 'Another name',
@@ -1686,7 +1686,7 @@ class IPWhitelistHandlerTest(RestAPITestCase):
   def test_put_bad_body(self):
     make_ip_whitelist('A whitelist')
     status, body, _ = self.put(
-        path='/auth/api/v1/ip_whitelists/A%20whitelist',
+        path='/auth/api/v1/ip_allowlists/A%20whitelist',
         body={
           'name': 'A whitelist',
           'subnets': ['not a subnet'],
@@ -1701,7 +1701,7 @@ class IPWhitelistHandlerTest(RestAPITestCase):
 
   def test_put_missing(self):
     status, body, _ = self.put(
-        path='/auth/api/v1/ip_whitelists/A%20whitelist',
+        path='/auth/api/v1/ip_allowlists/A%20whitelist',
         body={
           'description': 'Test whitelist',
           'name': 'A whitelist',
@@ -1709,14 +1709,14 @@ class IPWhitelistHandlerTest(RestAPITestCase):
         expect_errors=True,
         expect_xsrf_token_check=True)
     self.assertEqual(404, status)
-    self.assertEqual({'text': 'No such ip whitelist'}, body)
+    self.assertEqual({'text': 'No such ip allowlist'}, body)
 
   def test_put_bad_precondition(self):
     self.mock_now(utils.timestamp_to_datetime(1300000000000000))
 
     make_ip_whitelist('A whitelist')
     status, body, _ = self.put(
-        path='/auth/api/v1/ip_whitelists/A%20whitelist',
+        path='/auth/api/v1/ip_allowlists/A%20whitelist',
         body={
           'description': 'Test whitelist',
           'name': 'A whitelist',
@@ -1728,12 +1728,12 @@ class IPWhitelistHandlerTest(RestAPITestCase):
         expect_xsrf_token_check=True)
     self.assertEqual(412, status)
     self.assertEqual(
-        {'text': 'Ip whitelist was modified by someone else'}, body)
+        {'text': 'Ip allowlist was modified by someone else'}, body)
 
   def test_put_when_config_locked(self):
     self.mock(rest_api, 'is_config_locked', lambda: True)
     status, body, _ = self.put(
-        path='/auth/api/v1/ip_whitelists/A%20whitelist',
+        path='/auth/api/v1/ip_allowlists/A%20whitelist',
         body={
           'description': 'Test whitelist',
           'name': 'A whitelist',
