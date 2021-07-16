@@ -1026,7 +1026,7 @@ message TaskResult {
 
   // Process exit code if relevant. May be forcibly set to -1 in exceptional
   // cases.
-  sint32 exit_code = 19;
+  sint64 exit_code = 19;
   // Isolated outputs, if any.
   // Deprecated: `cas_output_root` will be used.
   CASTree outputs = 20;
