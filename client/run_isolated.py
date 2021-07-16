@@ -67,6 +67,7 @@ from depot_tools import fix_encoding
 import six
 
 # pylint: disable=ungrouped-imports
+import DEPS
 import auth
 import cipd
 import isolate_storage
@@ -115,7 +116,7 @@ _CAS_CLIENT_DIR = u'cc'
 # https://ci.chromium.org/p/infra-internal/g/infra-packagers/console
 ISOLATED_PACKAGE = 'infra/tools/luci/isolated/${platform}'
 _CAS_PACKAGE = 'infra/tools/luci/cas/${platform}'
-_LUCI_GO_REVISION = 'git_revision:f50bf9c6481d50d56d214658cd6edd437696a474'
+_LUCI_GO_REVISION = DEPS.deps['luci-go']['packages'][0]['version']
 
 # Keep synced with task_request.py
 CACHE_NAME_RE = re.compile(r'^[a-z0-9_]{1,4096}$')

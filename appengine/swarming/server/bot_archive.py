@@ -59,6 +59,7 @@ FILES = (
     'bot_code/remote_client_errors.py',
     'bot_code/singleton.py',
     'bot_code/task_runner.py',
+    'client/DEPS.py',
     'client/auth.py',
     'client/cipd.py',
     'client/isolate_storage.py',
