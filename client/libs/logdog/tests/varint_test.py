@@ -3,11 +3,13 @@
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
 
+from io import BytesIO
+
+import binascii
 import itertools
 import os
 import sys
 import unittest
-import StringIO
 
 ROOT_DIR = os.path.dirname(os.path.abspath(os.path.join(
     __file__.decode(sys.getfilesystemencoding()),
@@ -28,9 +30,9 @@ class VarintTestCase(unittest.TestCase):
         (0x81, b'\x81\x01'),
         (0x18080, b'\x80\x81\x06'),
     ):
-      sio = StringIO.StringIO()
-      count = varint.write_uvarint(sio, base)
-      act = sio.getvalue()
+      bytesIO = BytesIO()
+      count = varint.write_uvarint(bytesIO, base)
+      act = bytesIO.getvalue()
 
       self.assertEqual(act, exp,
           "Encoding for %d (%r) doesn't match expected (%r)" % (base, act, exp))
@@ -41,22 +43,21 @@ class VarintTestCase(unittest.TestCase):
   def testVarintEncodeDecode(self):
     seed = (b'\x00', b'\x01', b'\x55', b'\x7F', b'\x80', b'\x81', b'\xff')
     for perm in itertools.permutations(seed):
-      perm = ''.join(perm).encode('hex')
+      perm = b''.join(perm)
 
       while len(perm) > 0:
-        exp = int(perm.encode('hex'), 16)
-
-        sio = StringIO.StringIO()
-        count = varint.write_uvarint(sio, exp)
-        sio.seek(0)
-        act, count = varint.read_uvarint(sio)
+        exp = int(binascii.hexlify(perm), 16)
+        bytesIO = BytesIO()
+        count = varint.write_uvarint(bytesIO, exp)
+        bytesIO.seek(0)
+        act, count = varint.read_uvarint(bytesIO)
 
         self.assertEqual(act, exp,
             "Decoded %r (%d) doesn't match expected (%d)" % (
-                sio.getvalue().encode('hex'), act, exp))
-        self.assertEqual(count, len(sio.getvalue()),
+                binascii.hexlify(bytesIO.getvalue()), act, exp))
+        self.assertEqual(count, len(bytesIO.getvalue()),
             "Decoded length (%d) doesn't match expected (%d)" % (
-                count, len(sio.getvalue())))
+                count, len(bytesIO.getvalue())))
 
         if perm == 0:
           break

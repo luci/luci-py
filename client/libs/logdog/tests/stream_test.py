@@ -1,13 +1,15 @@
 #!/usr/bin/env vpython
+# -*- coding: utf-8 -*-
 # Copyright 2016 The LUCI Authors. All rights reserved.
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
+
+from io import BufferedReader, BytesIO
 
 import json
 import os
 import sys
 import unittest
-import StringIO
 
 ROOT_DIR = os.path.dirname(os.path.abspath(os.path.join(
     __file__.decode(sys.getfilesystemencoding()),
@@ -62,7 +64,7 @@ class StreamClientTestCase(unittest.TestCase):
   class _TestStreamClientConnection(object):
 
     def __init__(self):
-      self.buffer = StringIO.StringIO()
+      self.buffer = BytesIO()
       self.closed = False
 
     def _assert_not_closed(self):
@@ -78,7 +80,7 @@ class StreamClientTestCase(unittest.TestCase):
       self.closed = True
 
     def interpret(self):
-      data = StringIO.StringIO(self.buffer.getvalue())
+      data = BytesIO(self.buffer.getvalue())
       magic = data.read(len(stream.BUTLER_MAGIC))
       if magic != stream.BUTLER_MAGIC:
         raise ValueError('Invalid magic value ([%s] != [%s])' % (
@@ -108,10 +110,10 @@ class StreamClientTestCase(unittest.TestCase):
 
   @staticmethod
   def _split_datagrams(value):
-    sio = StringIO.StringIO(value)
-    while sio.pos < sio.len:
-      size_prefix, _ = varint.read_uvarint(sio)
-      data = sio.read(size_prefix)
+    br = BufferedReader(BytesIO(value))
+    while br.peek(1):
+      size_prefix, _ = varint.read_uvarint(br)
+      data = br.read(size_prefix)
       if len(data) != size_prefix:
         raise ValueError('Expected %d bytes, but only got %d' % (
             size_prefix, len(data)))
@@ -134,14 +136,15 @@ class StreamClientTestCase(unittest.TestCase):
       self.assertEqual(
           fd.get_viewer_url(),
           'https://example.appspot.com/v/?s=test%2Ffoo%2Fbar%2F%2B%2Fmystream')
-      fd.write('text\nstream\nlines')
+      fd.write('text\nstream\nlines\n')
+      fd.write(u'😄\n😄\n😄')
 
     conn = client.last_conn
     self.assertTrue(conn.closed)
 
     header, data = conn.interpret()
     self.assertEqual(header, {'name': 'mystream', 'type': 'text'})
-    self.assertEqual(data, 'text\nstream\nlines')
+    self.assertEqual(data.decode('utf-8'), u'text\nstream\nlines\n😄\n😄\n😄')
 
   def testTextStreamWithParams(self):
     client = self._registry.create('test:value')
@@ -166,7 +169,7 @@ class StreamClientTestCase(unittest.TestCase):
         'contentType': 'foo/bar',
          'tags': {'foo': 'bar', 'baz': 'qux'},
     })
-    self.assertEqual(data, 'text!')
+    self.assertEqual(data.decode('utf-8'), u'text!')
 
   def testBinaryStream(self):
     client = self._registry.create('test:value',
@@ -180,14 +183,14 @@ class StreamClientTestCase(unittest.TestCase):
       self.assertEqual(
           fd.get_viewer_url(),
           'https://example.appspot.com/v/?s=test%2Ffoo%2Fbar%2F%2B%2Fmystream')
-      fd.write('\x60\x0d\xd0\x65')
+      fd.write(b'\x60\x0d\xd0\x65')
 
     conn = client.last_conn
     self.assertTrue(conn.closed)
 
     header, data = conn.interpret()
     self.assertEqual(header, {'name': 'mystream', 'type': 'binary'})
-    self.assertEqual(data, '\x60\x0d\xd0\x65')
+    self.assertEqual(data, b'\x60\x0d\xd0\x65')
 
   def testDatagramStream(self):
     client = self._registry.create('test:value',
@@ -201,10 +204,10 @@ class StreamClientTestCase(unittest.TestCase):
       self.assertEqual(
           fd.get_viewer_url(),
           'https://example.appspot.com/v/?s=test%2Ffoo%2Fbar%2F%2B%2Fmystream')
-      fd.send('datagram0')
-      fd.send('dg1')
-      fd.send('')
-      fd.send('dg3')
+      fd.send(b'datagram0')
+      fd.send(b'dg1')
+      fd.send(b'')
+      fd.send(b'dg3')
 
     conn = client.last_conn
     self.assertTrue(conn.closed)
@@ -212,7 +215,7 @@ class StreamClientTestCase(unittest.TestCase):
     header, data = conn.interpret()
     self.assertEqual(header, {'name': 'mystream', 'type': 'datagram'})
     self.assertEqual(list(self._split_datagrams(data)),
-        ['datagram0', 'dg1', '', 'dg3'])
+        [b'datagram0', b'dg1', b'', b'dg3'])
 
   def testStreamWithoutPrefixCannotGenerateUrls(self):
     client = self._registry.create('test:value',
@@ -257,7 +260,7 @@ class StreamClientTestCase(unittest.TestCase):
 
     header, data = conn.interpret()
     self.assertEqual(header, {'name': 'mystream', 'type': 'text'})
-    self.assertEqual(data, 'Using a text stream.')
+    self.assertEqual(data.decode('utf-8'), u'Using a text stream.')
 
 
 if __name__ == '__main__':
