@@ -20,7 +20,7 @@ if sys.platform == "win32":
 
 
 _PY2 = sys.version_info[0] == 2
-
+_MAPPING = collections.Mapping if _PY2 else collections.abc.Mapping
 
 _StreamParamsBase = collections.namedtuple(
     '_StreamParamsBase', ('name', 'type', 'content_type', 'tags'))
@@ -62,8 +62,7 @@ class StreamParams(_StreamParamsBase):
       raise ValueError('Invalid type (%s)' % (self.type,))
 
     if self.tags is not None:
-      if not isinstance(
-          self.tags, collections.Mapping if _PY2 else collections.abc.Mapping):
+      if not isinstance(self.tags, _MAPPING):
         raise ValueError('Invalid tags type (%s)' % (self.tags,))
       for k, v in self.tags.items():
         streamname.validate_tag(k, v)
