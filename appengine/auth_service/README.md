@@ -54,7 +54,7 @@ of authentication stage. It looks like `<type>:<id>` and can represent:
     project when calling some other LUCI service. **Work in progress**.
   * `bot:<hostname>` - used only by Swarming, individual bots pulling tasks.
   * `bot:whitelisted-ip` - callers authenticated exclusively through an IP
-    whitelist. **Deprecated**.
+    allowlist. **Deprecated**.
   * `service:<app-id>` - GAE application authenticated via
     `X-Appengine-Inbound-Appid` header. **Deprecated**.
 
@@ -63,19 +63,19 @@ other prefix is provided. For example, `*@example.com` in UI actually means
 `user:*@example.com`.
 
 
-### IP whitelists
+### IP allowlists
 
-An IP whitelist as a named set of IPv4 and IPv6 addresses. They are primarily
-used in Swarming when authorizing RPCs from bots. IP whitelists are defined in
-`ip_whitelist.cfg` configuration file.
+An IP allowlist as a named set of IPv4 and IPv6 addresses. They are primarily
+used in Swarming when authorizing RPCs from bots. IP allowlists are defined in
+`ip_allowlist.cfg` configuration file.
 
 
-### OAuth client ID whitelist
+### OAuth client ID allowlist
 
 This is a list of Google [OAuth client IDs] recognized by the LUCI cluster. It
 lists various OAuth clients (standalone binaries, web apps, AppScripts, etc.)
 that are allowed to send end-user OAuth access tokens to LUCI. OAuth client ID
-whitelist is defined in `oauth.cfg` configuration file.
+allowlist is defined in `oauth.cfg` configuration file.
 
 [OAuth client IDs]: https://www.oauth.com/oauth2-servers/client-registration/client-id-secret/
 
