@@ -368,6 +368,40 @@ def get_cpuinfo():
     k.Close()
 
 
+def get_cpu_type_with_wmi():
+  # Get CPU architecture type using WMI.
+  # This is a fallback for when platform.machine() returns None.
+  # References:
+  # https://docs.microsoft.com/en-us/windows/win32/cimwin32prov/win32-processor#properties
+  # https://source.winehq.org/source/include/winnt.h#L680
+  # https://github.com/puppetlabs/facter/blob/2.x/lib/facter/hardwaremodel.rb#L28
+  wbem = _get_wmi_wbem()
+  if not wbem:
+    return None
+  _, pythoncom = _get_win32com()
+  try:
+    q = 'SELECT Architecture, Level, AddressWidth FROM Win32_Processor'
+    for cpu in wbem.ExecQuery(q):
+
+      def intel_arch():
+        arch_level = min(cpu.Level, 6)
+        return 'i%d86' % arch_level  # e.g. i386, i686
+
+      if cpu.Architecture == 10:  # PROCESSOR_ARCHITECTURE_IA32_ON_WIN64
+        return 'i686'
+      if cpu.Architecture == 9:  # PROCESSOR_ARCHITECTURE_AMD64
+        if cpu.AddressWidth == 32:
+          return intel_arch()
+        return 'amd64'
+      if cpu.Architecture == 0:  # PROCESSOR_ARCHITECTURE_INTEL
+        return intel_arch()
+  except pythoncom.com_error as e:
+    # This generally happens when this is called as the host is shutting down.
+    logging.error('get_cpu_type_with_wmi(): %s', e)
+  # Unknown or exception.
+  return None
+
+
 def get_gpu():
   """Returns video device as listed by WMI.
 

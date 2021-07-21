@@ -12,6 +12,9 @@ import sys
 import unittest
 
 import mock
+# TODO(github.com/wolever/parameterized/issues/91)
+# use parameterized after the bug is resolved.
+from nose2.tools import params
 import six
 
 import test_env_platforms
@@ -132,6 +135,22 @@ class TestWin(auto_stub.TestCase):
     self.assert_get_os_dims_mock(
         1, b'\nMicrosoft Windows [Version 6.3.9600]\n',
         ('8.1', '6.3.9600', '', u'Multiprocessor Free'), [u'8.1', u'8.1-SP0'])
+
+  @params(
+      (0, 3, 32, 'i386'),
+      (9, None, 64, 'amd64'),
+      (9, 6, 32, 'i686'),
+      (10, 6, 32, 'i686'),
+      (999, None, None, None),
+  )
+  def test_get_cpu_type_with_wmi(self, arch, level, addr_width, expected):
+    SWbemObjectSet = mock.Mock(
+        Architecture=arch, Level=level, AddressWidth=addr_width)
+    SWbemServices = mock.Mock()
+    SWbemServices.ExecQuery.return_value = [SWbemObjectSet]
+    with mock.patch(
+        'api.platforms.win._get_wmi_wbem', return_value=SWbemServices):
+      self.assertEqual(win.get_cpu_type_with_wmi(), expected)
 
   def test_get_gpu(self):
     SWbemObjectSet = mock.Mock(

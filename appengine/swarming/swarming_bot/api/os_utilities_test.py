@@ -54,6 +54,7 @@ class TestOsUtilities(auto_stub.TestCase):
       ('x86_64', u'x86'),
       ('amd64', u'x86'),
       ('i386', u'x86'),
+      ('i686', u'x86'),
       ('aarch64', u'arm64'),
       ('mips64', u'mips'),
       ('arm64', u'arm64'),
