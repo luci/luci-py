@@ -231,7 +231,7 @@ def get_cpu_type():
   """Returns the type of processor: armv6l, armv7l, arm64 or x86."""
   machine = platform.machine().lower()
   if sys.platform == 'win32' and not machine:
-    machine = win.get_cpu_type_with_wmi()
+    machine = platforms.win.get_cpu_type_with_wmi()
   if machine in ('amd64', 'x86_64', 'i386', 'i686'):
     return u'x86'
   if machine == 'aarch64':
