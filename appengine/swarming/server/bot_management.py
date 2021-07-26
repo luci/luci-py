@@ -948,15 +948,20 @@ def cron_aggregate_dimensions():
   seen = defaultdict(lambda: defaultdict(set))
   now = utils.utcnow()
 
-  for b in BotInfo.query():
-    groups = get_pools_from_dimensions_flat(b.dimensions_flat)
-    groups.append('all')
-    for i in b.dimensions_flat:
-      k, v = i.split(':', 1)
-      if k == 'id':
-        continue
-      for g in groups:
-        seen[g][k].add(v)
+  q = BotInfo.query()
+  cursor = None
+  more = True
+  while more:
+    bots, cursor, more = q.fetch_page(1000, start_cursor=cursor)
+    for b in bots:
+      groups = get_pools_from_dimensions_flat(b.dimensions_flat)
+      groups.append('all')
+      for i in b.dimensions_flat:
+        k, v = i.split(':', 1)
+        if k == 'id':
+          continue
+        for g in groups:
+          seen[g][k].add(v)
 
   for group, dims in seen.items():
     dims_prop = [
