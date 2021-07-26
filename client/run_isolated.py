@@ -111,9 +111,6 @@ ISOLATED_CLIENT_DIR = u'ic'
 _CAS_CLIENT_DIR = u'cc'
 
 # TODO(tikuta): take these parameter from luci-config?
-# Update tag by `./client/update_go_clients.sh`.
-# Or take revision from
-# https://ci.chromium.org/p/infra-internal/g/infra-packagers/console
 ISOLATED_PACKAGE = 'infra/tools/luci/isolated/${platform}'
 _CAS_PACKAGE = 'infra/tools/luci/cas/${platform}'
 _LUCI_GO_REVISION = DEPS.deps['luci-go']['packages'][0]['version']
