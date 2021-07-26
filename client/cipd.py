@@ -284,6 +284,12 @@ def get_platform():
     arch = 'amd64'
   elif arch in ('i386', 'i686', 'x86'):
     arch = '386'
+  elif not arch and os_name == 'windows':
+    # On some 32bit Windows7, platform.machine() returns None.
+    # Fallback to 386 in that case.
+    logging.warning('platform.machine() returns None. '
+                    'Use \'386\' as CPU architecture.')
+    arch = '386'
 
   # If using a 32-bit python on x86_64 kernel on Linux, "downgrade" the arch to
   # 32-bit too (this is the bitness of the userland).
