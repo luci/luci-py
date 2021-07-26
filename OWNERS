@@ -3,3 +3,5 @@ maruel@chromium.org
 smut@google.com
 tikuta@chromium.org
 vadimsh@chromium.org
+
+per-file DEPS=chromium-autoroll@skia-public.iam.gserviceaccount.com
