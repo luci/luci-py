@@ -19,7 +19,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   syntax='proto3',
   serialized_options=None,
   create_key=_descriptor._internal_create_key,
-  serialized_pb=b'\n,components/config/proto/service_config.proto\x12\x06\x63onfig\":\n\x0fGitilesLocation\x12\x0c\n\x04repo\x18\x01 \x01(\t\x12\x0b\n\x03ref\x18\x02 \x01(\t\x12\x0c\n\x04path\x18\x03 \x01(\t\"/\n\x0eIdentityConfig\x12\x1d\n\x15service_account_email\x18\x01 \x01(\t\"\x9e\x01\n\x07Project\x12\n\n\x02id\x18\x01 \x01(\t\x12\x33\n\x10gitiles_location\x18\x04 \x01(\x0b\x32\x17.config.GitilesLocationH\x00\x12/\n\x0fidentity_config\x18\x03 \x01(\x0b\x32\x16.config.IdentityConfigB\n\n\x08locationJ\x04\x08\x02\x10\x03R\x0f\x63onfig_location\"0\n\x0bProjectsCfg\x12!\n\x08projects\x18\x01 \x03(\x0b\x32\x0f.config.Project\"\xaa\x01\n\x07Service\x12\n\n\x02id\x18\x01 \x01(\t\x12\x0e\n\x06owners\x18\x02 \x03(\t\x12\x14\n\x0cmetadata_url\x18\x04 \x01(\t\x12\x0e\n\x06\x61\x63\x63\x65ss\x18\x05 \x03(\t\x12)\n\x08jwt_auth\x18\x06 \x01(\x0b\x32\x17.config.Service.JWTAuth\x1a\x1b\n\x07JWTAuth\x12\x10\n\x08\x61udience\x18\x01 \x01(\tJ\x04\x08\x03\x10\x04R\x0f\x63onfig_location\"P\n\x16ServiceDynamicMetadata\x12\x0f\n\x07version\x18\x01 \x01(\t\x12%\n\nvalidation\x18\x02 \x01(\x0b\x32\x11.config.Validator\"0\n\x0bServicesCfg\x12!\n\x08services\x18\x01 \x03(\x0b\x32\x0f.config.Service\"\xab\x01\n\x06\x41\x63lCfg\x12\x1c\n\x14project_access_group\x18\x02 \x01(\t\x12\x1c\n\x14service_access_group\x18\x07 \x01(\t\x12\x13\n\x0b\x61\x64min_group\x18\x03 \x01(\t\x12\x18\n\x10validation_group\x18\x05 \x01(\t\x12\x16\n\x0ereimport_group\x18\x06 \x01(\tJ\x04\x08\x04\x10\x05R\x18\x63onfig_get_by_hash_group\"\xe9\x01\n\tImportCfg\x12*\n\x07gitiles\x18\x01 \x01(\x0b\x32\x19.config.ImportCfg.Gitiles\x1a\xaf\x01\n\x07Gitiles\x12\x1a\n\x12\x66\x65tch_log_deadline\x18\x01 \x01(\x05\x12\x1e\n\x16\x66\x65tch_archive_deadline\x18\x02 \x01(\x05\x12\"\n\x1aproject_config_default_ref\x18\x03 \x01(\t\x12#\n\x1bproject_config_default_path\x18\x04 \x01(\t\x12\x1f\n\x17ref_config_default_path\x18\x05 \x01(\t\"]\n\nSchemasCfg\x12*\n\x07schemas\x18\x01 \x03(\x0b\x32\x19.config.SchemasCfg.Schema\x1a#\n\x06Schema\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x0b\n\x03url\x18\x02 \x01(\t\"1\n\rConfigPattern\x12\x12\n\nconfig_set\x18\x01 \x01(\t\x12\x0c\n\x04path\x18\x02 \x01(\t\"A\n\tValidator\x12\'\n\x08patterns\x18\x01 \x03(\x0b\x32\x15.config.ConfigPattern\x12\x0b\n\x03url\x18\x02 \x01(\t\"M\n\x18ValidationRequestMessage\x12\x12\n\nconfig_set\x18\x01 \x01(\t\x12\x0c\n\x04path\x18\x02 \x01(\t\x12\x0f\n\x07\x63ontent\x18\x03 \x01(\x0c\"\x91\x02\n\x19ValidationResponseMessage\x12;\n\x08messages\x18\x01 \x03(\x0b\x32).config.ValidationResponseMessage.Message\x1a\x63\n\x07Message\x12\x0c\n\x04path\x18\x01 \x01(\t\x12<\n\x08severity\x18\x02 \x01(\x0e\x32*.config.ValidationResponseMessage.Severity\x12\x0c\n\x04text\x18\x03 \x01(\t\"R\n\x08Severity\x12\x0b\n\x07UNKNOWN\x10\x00\x12\t\n\x05\x44\x45\x42UG\x10\n\x12\x08\n\x04INFO\x10\x14\x12\x0b\n\x07WARNING\x10\x1e\x12\t\n\x05\x45RROR\x10(\x12\x0c\n\x08\x43RITICAL\x10\x32\x62\x06proto3'
+  serialized_pb=b'\n,components/config/proto/service_config.proto\x12\x06\x63onfig\":\n\x0fGitilesLocation\x12\x0c\n\x04repo\x18\x01 \x01(\t\x12\x0b\n\x03ref\x18\x02 \x01(\t\x12\x0c\n\x04path\x18\x03 \x01(\t\"/\n\x0eIdentityConfig\x12\x1d\n\x15service_account_email\x18\x01 \x01(\t\"\xb0\x01\n\x07Project\x12\n\n\x02id\x18\x01 \x01(\t\x12\x33\n\x10gitiles_location\x18\x04 \x01(\x0b\x32\x17.config.GitilesLocationH\x00\x12/\n\x0fidentity_config\x18\x03 \x01(\x0b\x32\x16.config.IdentityConfig\x12\x10\n\x08owned_by\x18\x05 \x01(\tB\n\n\x08locationJ\x04\x08\x02\x10\x03R\x0f\x63onfig_location\"M\n\x04Team\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x1b\n\x13maintenance_contact\x18\x02 \x03(\t\x12\x1a\n\x12\x65scalation_contact\x18\x03 \x03(\t\"M\n\x0bProjectsCfg\x12!\n\x08projects\x18\x01 \x03(\x0b\x32\x0f.config.Project\x12\x1b\n\x05teams\x18\x02 \x03(\x0b\x32\x0c.config.Team\"\xaa\x01\n\x07Service\x12\n\n\x02id\x18\x01 \x01(\t\x12\x0e\n\x06owners\x18\x02 \x03(\t\x12\x14\n\x0cmetadata_url\x18\x04 \x01(\t\x12\x0e\n\x06\x61\x63\x63\x65ss\x18\x05 \x03(\t\x12)\n\x08jwt_auth\x18\x06 \x01(\x0b\x32\x17.config.Service.JWTAuth\x1a\x1b\n\x07JWTAuth\x12\x10\n\x08\x61udience\x18\x01 \x01(\tJ\x04\x08\x03\x10\x04R\x0f\x63onfig_location\"P\n\x16ServiceDynamicMetadata\x12\x0f\n\x07version\x18\x01 \x01(\t\x12%\n\nvalidation\x18\x02 \x01(\x0b\x32\x11.config.Validator\"0\n\x0bServicesCfg\x12!\n\x08services\x18\x01 \x03(\x0b\x32\x0f.config.Service\"\xab\x01\n\x06\x41\x63lCfg\x12\x1c\n\x14project_access_group\x18\x02 \x01(\t\x12\x1c\n\x14service_access_group\x18\x07 \x01(\t\x12\x13\n\x0b\x61\x64min_group\x18\x03 \x01(\t\x12\x18\n\x10validation_group\x18\x05 \x01(\t\x12\x16\n\x0ereimport_group\x18\x06 \x01(\tJ\x04\x08\x04\x10\x05R\x18\x63onfig_get_by_hash_group\"\xe9\x01\n\tImportCfg\x12*\n\x07gitiles\x18\x01 \x01(\x0b\x32\x19.config.ImportCfg.Gitiles\x1a\xaf\x01\n\x07Gitiles\x12\x1a\n\x12\x66\x65tch_log_deadline\x18\x01 \x01(\x05\x12\x1e\n\x16\x66\x65tch_archive_deadline\x18\x02 \x01(\x05\x12\"\n\x1aproject_config_default_ref\x18\x03 \x01(\t\x12#\n\x1bproject_config_default_path\x18\x04 \x01(\t\x12\x1f\n\x17ref_config_default_path\x18\x05 \x01(\t\"]\n\nSchemasCfg\x12*\n\x07schemas\x18\x01 \x03(\x0b\x32\x19.config.SchemasCfg.Schema\x1a#\n\x06Schema\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x0b\n\x03url\x18\x02 \x01(\t\"1\n\rConfigPattern\x12\x12\n\nconfig_set\x18\x01 \x01(\t\x12\x0c\n\x04path\x18\x02 \x01(\t\"A\n\tValidator\x12\'\n\x08patterns\x18\x01 \x03(\x0b\x32\x15.config.ConfigPattern\x12\x0b\n\x03url\x18\x02 \x01(\t\"M\n\x18ValidationRequestMessage\x12\x12\n\nconfig_set\x18\x01 \x01(\t\x12\x0c\n\x04path\x18\x02 \x01(\t\x12\x0f\n\x07\x63ontent\x18\x03 \x01(\x0c\"\x91\x02\n\x19ValidationResponseMessage\x12;\n\x08messages\x18\x01 \x03(\x0b\x32).config.ValidationResponseMessage.Message\x1a\x63\n\x07Message\x12\x0c\n\x04path\x18\x01 \x01(\t\x12<\n\x08severity\x18\x02 \x01(\x0e\x32*.config.ValidationResponseMessage.Severity\x12\x0c\n\x04text\x18\x03 \x01(\t\"R\n\x08Severity\x12\x0b\n\x07UNKNOWN\x10\x00\x12\t\n\x05\x44\x45\x42UG\x10\n\x12\x08\n\x04INFO\x10\x14\x12\x0b\n\x07WARNING\x10\x1e\x12\t\n\x05\x45RROR\x10(\x12\x0c\n\x08\x43RITICAL\x10\x32\x62\x06proto3'
 )
 
 
@@ -64,8 +64,8 @@ _VALIDATIONRESPONSEMESSAGE_SEVERITY = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   serialized_options=None,
-  serialized_start=1575,
-  serialized_end=1657,
+  serialized_start=1701,
+  serialized_end=1783,
 )
 _sym_db.RegisterEnumDescriptor(_VALIDATIONRESPONSEMESSAGE_SEVERITY)
 
@@ -177,6 +177,13 @@ _PROJECT = _descriptor.Descriptor(
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='owned_by', full_name='config.Project.owned_by', index=3,
+      number=5, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"".decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
   ],
   extensions=[
   ],
@@ -195,7 +202,53 @@ _PROJECT = _descriptor.Descriptor(
     fields=[]),
   ],
   serialized_start=166,
-  serialized_end=324,
+  serialized_end=342,
+)
+
+
+_TEAM = _descriptor.Descriptor(
+  name='Team',
+  full_name='config.Team',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  create_key=_descriptor._internal_create_key,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='name', full_name='config.Team.name', index=0,
+      number=1, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"".decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='maintenance_contact', full_name='config.Team.maintenance_contact', index=1,
+      number=2, type=9, cpp_type=9, label=3,
+      has_default_value=False, default_value=[],
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='escalation_contact', full_name='config.Team.escalation_contact', index=2,
+      number=3, type=9, cpp_type=9, label=3,
+      has_default_value=False, default_value=[],
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=344,
+  serialized_end=421,
 )
 
 
@@ -214,6 +267,13 @@ _PROJECTSCFG = _descriptor.Descriptor(
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='teams', full_name='config.ProjectsCfg.teams', index=1,
+      number=2, type=11, cpp_type=10, label=3,
+      has_default_value=False, default_value=[],
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
   ],
   extensions=[
   ],
@@ -226,8 +286,8 @@ _PROJECTSCFG = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=326,
-  serialized_end=374,
+  serialized_start=423,
+  serialized_end=500,
 )
 
 
@@ -258,8 +318,8 @@ _SERVICE_JWTAUTH = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=497,
-  serialized_end=524,
+  serialized_start=623,
+  serialized_end=650,
 )
 
 _SERVICE = _descriptor.Descriptor(
@@ -317,8 +377,8 @@ _SERVICE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=377,
-  serialized_end=547,
+  serialized_start=503,
+  serialized_end=673,
 )
 
 
@@ -356,8 +416,8 @@ _SERVICEDYNAMICMETADATA = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=549,
-  serialized_end=629,
+  serialized_start=675,
+  serialized_end=755,
 )
 
 
@@ -388,8 +448,8 @@ _SERVICESCFG = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=631,
-  serialized_end=679,
+  serialized_start=757,
+  serialized_end=805,
 )
 
 
@@ -448,8 +508,8 @@ _ACLCFG = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=682,
-  serialized_end=853,
+  serialized_start=808,
+  serialized_end=979,
 )
 
 
@@ -508,8 +568,8 @@ _IMPORTCFG_GITILES = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=914,
-  serialized_end=1089,
+  serialized_start=1040,
+  serialized_end=1215,
 )
 
 _IMPORTCFG = _descriptor.Descriptor(
@@ -539,8 +599,8 @@ _IMPORTCFG = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=856,
-  serialized_end=1089,
+  serialized_start=982,
+  serialized_end=1215,
 )
 
 
@@ -578,8 +638,8 @@ _SCHEMASCFG_SCHEMA = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1149,
-  serialized_end=1184,
+  serialized_start=1275,
+  serialized_end=1310,
 )
 
 _SCHEMASCFG = _descriptor.Descriptor(
@@ -609,8 +669,8 @@ _SCHEMASCFG = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1091,
-  serialized_end=1184,
+  serialized_start=1217,
+  serialized_end=1310,
 )
 
 
@@ -648,8 +708,8 @@ _CONFIGPATTERN = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1186,
-  serialized_end=1235,
+  serialized_start=1312,
+  serialized_end=1361,
 )
 
 
@@ -687,8 +747,8 @@ _VALIDATOR = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1237,
-  serialized_end=1302,
+  serialized_start=1363,
+  serialized_end=1428,
 )
 
 
@@ -733,8 +793,8 @@ _VALIDATIONREQUESTMESSAGE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1304,
-  serialized_end=1381,
+  serialized_start=1430,
+  serialized_end=1507,
 )
 
 
@@ -779,8 +839,8 @@ _VALIDATIONRESPONSEMESSAGE_MESSAGE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1474,
-  serialized_end=1573,
+  serialized_start=1600,
+  serialized_end=1699,
 )
 
 _VALIDATIONRESPONSEMESSAGE = _descriptor.Descriptor(
@@ -811,8 +871,8 @@ _VALIDATIONRESPONSEMESSAGE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1384,
-  serialized_end=1657,
+  serialized_start=1510,
+  serialized_end=1783,
 )
 
 _PROJECT.fields_by_name['gitiles_location'].message_type = _GITILESLOCATION
@@ -821,6 +881,7 @@ _PROJECT.oneofs_by_name['location'].fields.append(
   _PROJECT.fields_by_name['gitiles_location'])
 _PROJECT.fields_by_name['gitiles_location'].containing_oneof = _PROJECT.oneofs_by_name['location']
 _PROJECTSCFG.fields_by_name['projects'].message_type = _PROJECT
+_PROJECTSCFG.fields_by_name['teams'].message_type = _TEAM
 _SERVICE_JWTAUTH.containing_type = _SERVICE
 _SERVICE.fields_by_name['jwt_auth'].message_type = _SERVICE_JWTAUTH
 _SERVICEDYNAMICMETADATA.fields_by_name['validation'].message_type = _VALIDATOR
@@ -837,6 +898,7 @@ _VALIDATIONRESPONSEMESSAGE_SEVERITY.containing_type = _VALIDATIONRESPONSEMESSAGE
 DESCRIPTOR.message_types_by_name['GitilesLocation'] = _GITILESLOCATION
 DESCRIPTOR.message_types_by_name['IdentityConfig'] = _IDENTITYCONFIG
 DESCRIPTOR.message_types_by_name['Project'] = _PROJECT
+DESCRIPTOR.message_types_by_name['Team'] = _TEAM
 DESCRIPTOR.message_types_by_name['ProjectsCfg'] = _PROJECTSCFG
 DESCRIPTOR.message_types_by_name['Service'] = _SERVICE
 DESCRIPTOR.message_types_by_name['ServiceDynamicMetadata'] = _SERVICEDYNAMICMETADATA
@@ -870,6 +932,13 @@ Project = _reflection.GeneratedProtocolMessageType('Project', (_message.Message,
   # @@protoc_insertion_point(class_scope:config.Project)
   })
 _sym_db.RegisterMessage(Project)
+
+Team = _reflection.GeneratedProtocolMessageType('Team', (_message.Message,), {
+  'DESCRIPTOR' : _TEAM,
+  '__module__' : 'components.config.proto.service_config_pb2'
+  # @@protoc_insertion_point(class_scope:config.Team)
+  })
+_sym_db.RegisterMessage(Team)
 
 ProjectsCfg = _reflection.GeneratedProtocolMessageType('ProjectsCfg', (_message.Message,), {
   'DESCRIPTOR' : _PROJECTSCFG,
