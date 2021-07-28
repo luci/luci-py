@@ -130,11 +130,15 @@ def get_file_keys(config_set, revision):
       ancestor=ndb.Key(ConfigSet, config_set, Revision, revision)).fetch()
 
 
+def get_config_set(config_set):
+  return ConfigSet.get_by_id(config_set)
+
+
 @ndb.tasklet
 def get_config_sets_async(config_set=None):
   if config_set:
     existing = yield ConfigSet.get_by_id_async(config_set)
-    config_sets = [existing or ConfigSet(id=config_set)]
+    config_sets = [existing] if existing else []
   else:
     config_sets = yield ConfigSet.query().fetch_async()
   raise ndb.Return(config_sets)

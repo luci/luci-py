@@ -55,14 +55,29 @@ class ApiTest(test_case.EndpointsTestCase):
           projects.RepositoryType.GITILES, 'https://v8.example.com'),
     })))
 
-  def mock_config(self, mock_content=True):
-    self.mock(storage, 'get_config_hashes_async', mock.Mock())
-    storage.get_config_hashes_async.return_value = future({
-      'services/luci-config': (
-          'deadbeef', 'https://x.com/+/deadbeef', 'abc0123'),
-    })
+  def mock_config(self, config_set='services/x', mock_content=True):
+    mocked_cs = storage.ConfigSet(
+        id=config_set,
+        location='https://x.googlesource.com/x',
+        latest_revision='deadbeef',
+        latest_revision_url='https://x.googlesource.com/x/+/deadbeef',
+        latest_revision_time=datetime.datetime(2016, 1, 1),
+        latest_revision_committer_email='john@doe.com',
+    )
+
+    self.mock(storage, 'get_config_sets_async', mock.Mock())
+    storage.get_config_sets_async.return_value = future([mocked_cs])
+
+    self.mock(storage, 'get_config_set', mock.Mock())
+    storage.get_config_set.side_effect = (
+        lambda cs: mocked_cs if cs == config_set else None)
 
     if mock_content:
+      self.mock(storage, 'get_config_hashes_async', mock.Mock())
+      storage.get_config_hashes_async.return_value = future({
+        config_set: ('deadbeef', 'https://x.com/+/deadbeef', 'abc0123'),
+      })
+
       self.mock(storage, 'get_configs_by_hashes_async', mock.Mock())
       storage.get_configs_by_hashes_async.return_value = future({
         'abc0123': 'config text',
@@ -110,7 +125,17 @@ class ApiTest(test_case.EndpointsTestCase):
     self.mock(acl, 'can_read_config_sets', mock.Mock(return_value={
       'services/x': False,
     }))
-    with self.call_should_fail(httplib.FORBIDDEN):
+    with self.call_should_fail(httplib.NOT_FOUND):
+      req = {
+        'config_set': 'services/x',
+      }
+      self.call_api('get_mapping', req)
+
+  def test_get_mapping_one_not_found(self):
+    self.mock(acl, 'can_read_config_sets', mock.Mock(return_value={
+      'services/x': True,
+    }))
+    with self.call_should_fail(httplib.NOT_FOUND):
       req = {
         'config_set': 'services/x',
       }
@@ -162,18 +187,8 @@ class ApiTest(test_case.EndpointsTestCase):
   ##############################################################################
   # get_config_sets
 
-  def test_get_config_one(self):
-    self.mock(storage, 'get_config_sets_async', mock.Mock())
-    storage.get_config_sets_async.return_value = future([
-      storage.ConfigSet(
-          id='services/x',
-          location='https://x.googlesource.com/x',
-          latest_revision='deadbeef',
-          latest_revision_url='https://x.googlesource.com/x/+/deadbeef',
-          latest_revision_time=datetime.datetime(2016, 1, 1),
-          latest_revision_committer_email='john@doe.com',
-      ),
-    ])
+  def test_get_config_sets_one(self):
+    self.mock_config()
 
     req = {
       'config_set': 'services/x',
@@ -200,7 +215,7 @@ class ApiTest(test_case.EndpointsTestCase):
 
   @mock.patch('storage.get_file_keys', autospec=True)
   @mock.patch('storage.get_config_sets_async', autospec=True)
-  def test_get_config_with_include_files(
+  def test_get_config_sets_with_include_files(
       self, mock_get_config_sets_async, mock_get_file_keys):
     mock_get_config_sets_async.return_value = future([
       storage.ConfigSet(
@@ -258,14 +273,14 @@ class ApiTest(test_case.EndpointsTestCase):
       ]
     })
 
-  def test_get_config_with_inconsistent_request(self):
+  def test_get_config_sets_with_inconsistent_request(self):
     with self.call_should_fail(httplib.BAD_REQUEST):
       req = {
         'include_files': True,
       }
       self.call_api('get_config_sets', req)
 
-  def test_get_config_one_with_last_attempt(self):
+  def test_get_config_sets_one_with_last_attempt(self):
     self.mock(storage, 'get_config_sets_async', mock.Mock())
     storage.get_config_sets_async.return_value = future([
       storage.ConfigSet(
@@ -354,17 +369,27 @@ class ApiTest(test_case.EndpointsTestCase):
     }
     self.assertEqual(resp, expected_resp)
 
-  def test_get_config_one_forbidden(self):
+  def test_get_config_sets_one_forbidden(self):
     self.mock(acl, 'can_read_config_sets', mock.Mock(return_value={
       'services/x': False,
     }))
-    with self.call_should_fail(httplib.FORBIDDEN):
+    with self.call_should_fail(httplib.NOT_FOUND):
       req = {
         'config_set': 'services/x',
       }
       self.call_api('get_config_sets', req)
 
-  def test_get_config_all(self):
+  def test_get_config_sets_one_not_found(self):
+    self.mock(acl, 'can_read_config_sets', mock.Mock(return_value={
+      'services/x': True,
+    }))
+    with self.call_should_fail(httplib.NOT_FOUND):
+      req = {
+        'config_set': 'services/x',
+      }
+      self.call_api('get_config_sets', req)
+
+  def test_get_config_sets_all(self):
     self.mock(storage, 'get_config_sets_async', mock.Mock())
     storage.get_config_sets_async.return_value = future([
       storage.ConfigSet(
@@ -414,7 +439,7 @@ class ApiTest(test_case.EndpointsTestCase):
       ],
     })
 
-  def test_get_config_all_partially_forbidden(self):
+  def test_get_config_sets_all_partially_forbidden(self):
     self.mock(storage, 'get_config_sets_async', mock.Mock())
     storage.get_config_sets_async.return_value = future([
       storage.ConfigSet(
@@ -454,7 +479,7 @@ class ApiTest(test_case.EndpointsTestCase):
     self.mock_config()
 
     req = {
-      'config_set': 'services/luci-config',
+      'config_set': 'services/x',
       'path': 'my.cfg',
       'revision': 'deadbeef',
     }
@@ -467,14 +492,14 @@ class ApiTest(test_case.EndpointsTestCase):
       'url': 'https://x.com/+/deadbeef',
     })
     storage.get_config_hashes_async.assert_called_once_with(
-        {'services/luci-config': 'deadbeef'}, 'my.cfg')
+        {'services/x': 'deadbeef'}, 'my.cfg')
     storage.get_configs_by_hashes_async.assert_called_once_with(['abc0123'])
 
   def test_get_config_hash_only(self):
     self.mock_config()
 
     req = {
-      'config_set': 'services/luci-config',
+      'config_set': 'services/x',
       'hash_only': True,
       'path': 'my.cfg',
       'revision': 'deadbeef',
@@ -491,18 +516,19 @@ class ApiTest(test_case.EndpointsTestCase):
   def test_get_config_blob_not_found(self):
     self.mock_config(mock_content=False)
     req = {
-      'config_set': 'services/luci-config',
+      'config_set': 'services/x',
       'path': 'my.cfg',
     }
     with self.call_should_fail(httplib.NOT_FOUND):
       self.call_api('get_config', req)
 
-  def test_get_config_not_found(self):
+  def test_get_config_content_not_found(self):
+    self.mock_config(mock_content=True)
+
     def get_config_hashes_async(revs, path):
       _ = path
       return future({cs: (None, None, None) for cs in revs})
-
-    self.mock(storage, 'get_config_hashes_async', get_config_hashes_async)
+    storage.get_config_hashes_async.side_effect = get_config_hashes_async
 
     req = {
       'config_set': 'services/x',
@@ -523,18 +549,31 @@ class ApiTest(test_case.EndpointsTestCase):
       self.call_api('get_config', req)
 
   def test_get_config_without_permissions(self):
+    self.mock_config()
     self.mock(acl, 'can_read_config_sets', mock.Mock(return_value={
-      'services/luci-config': False,
+      'services/x': False,
     }))
-    self.mock(storage, 'get_config_hashes_async', mock.Mock())
 
     req = {
-      'config_set': 'services/luci-config',
+      'config_set': 'services/x',
       'path': 'projects.cfg',
     }
-    with self.call_should_fail(404):
+    with self.call_should_fail(httplib.NOT_FOUND):
       self.call_api('get_config', req)
     self.assertFalse(storage.get_config_hashes_async.called)
+
+  def test_get_config_in_missing_set(self):
+    self.mock(acl, 'can_read_config_sets', mock.Mock(return_value={
+      'services/x': True,
+    }))
+
+    req = {
+      'config_set': 'services/x',
+      'path': 'projects.cfg',
+    }
+    with self.call_should_fail(httplib.NOT_FOUND):
+      self.call_api('get_config', req)
+
 
   ##############################################################################
   # get_config_by_hash
@@ -778,37 +817,42 @@ class ApiTest(test_case.EndpointsTestCase):
   # reimport
 
   def test_reimport_without_permissions(self):
+    self.mock_config()
+    self.mock(acl, 'can_reimport', mock.Mock(return_value=False))
     req = {'config_set': 'services/x'}
-    with self.call_should_fail(403):
+    with self.call_should_fail(httplib.FORBIDDEN):
       self.call_api('reimport', req)
 
   def test_reimport(self):
-    self.mock(acl, 'is_admin', mock.Mock(return_value=True))
+    self.mock_config()
+    self.mock(acl, 'can_reimport', mock.Mock(return_value=True))
     self.mock(gitiles_import, 'import_config_set', mock.Mock())
     req = {'config_set': 'services/x'}
     self.call_api('reimport', req)
     gitiles_import.import_config_set.assert_called_once_with('services/x')
 
   def test_reimport_not_found(self):
-    self.mock(acl, 'is_admin', mock.Mock(return_value=True))
+    self.mock(acl, 'can_reimport', mock.Mock(return_value=True))
     self.mock(gitiles_import, 'import_config_set', mock.Mock())
     gitiles_import.import_config_set.side_effect = gitiles_import.NotFoundError
     req = {'config_set': 'services/x'}
-    with self.call_should_fail(404):
+    with self.call_should_fail(httplib.NOT_FOUND):
       self.call_api('reimport', req)
 
-  def test_reimport_bad_request(self):
-    self.mock(acl, 'is_admin', mock.Mock(return_value=True))
+  def test_reimport_gitiles_error(self):
+    self.mock_config()
+    self.mock(acl, 'can_reimport', mock.Mock(return_value=True))
     self.mock(gitiles_import, 'import_config_set', mock.Mock())
     gitiles_import.import_config_set.side_effect = gitiles_import.Error
     req = {'config_set': 'services/x'}
-    with self.call_should_fail(500):
+    with self.call_should_fail(httplib.INTERNAL_SERVER_ERROR):
       self.call_api('reimport', req)
 
   ##############################################################################
   # validate_config
 
   def test_validate_config(self):
+    self.mock_config()
 
     def validate_mock(_config_set, _path, _content, ctx=None):
       ctx.warning('potential problem')
@@ -819,12 +863,12 @@ class ApiTest(test_case.EndpointsTestCase):
     validation.validate_config_async.side_effect = validate_mock
 
     self.mock(acl, 'can_read_config_sets', mock.Mock(return_value={
-      'services/luci-config': True,
+      'services/x': True,
     }))
     self.mock(acl, 'can_validate', mock.Mock(return_value=True))
 
     req = {
-      'config_set': 'services/luci-config',
+      'config_set': 'services/x',
       'files': [{'path': 'myproj.cfg', 'content': 'mock_content'}]
     }
     resp = self.call_api('validate_config', req).json_body
@@ -841,26 +885,26 @@ class ApiTest(test_case.EndpointsTestCase):
 
   def test_validate_config_no_files(self):
     req = {
-      'config_set': 'services/luci-config',
+      'config_set': 'services/x',
       'files': []
     }
     self.mock(acl, 'can_read_config_sets', mock.Mock(return_value={
-      'services/luci-config': True,
+      'services/x': True,
     }))
     self.mock(acl, 'can_validate', mock.Mock(return_value=True))
-    with self.call_should_fail(400):
+    with self.call_should_fail(httplib.BAD_REQUEST):
       self.call_api('validate_config', req)
 
   def test_validate_config_no_path(self):
     req = {
-      'config_set': 'services/luci-config',
+      'config_set': 'services/x',
       'files': [{'path': '', 'content': 'mock_content'}]
     }
     self.mock(acl, 'can_read_config_sets', mock.Mock(return_value={
-      'services/luci-config': True,
+      'services/x': True,
     }))
     self.mock(acl, 'can_validate', mock.Mock(return_value=True))
-    with self.call_should_fail(400):
+    with self.call_should_fail(httplib.BAD_REQUEST):
       self.call_api('validate_config', req)
 
 

@@ -131,10 +131,13 @@ class ConfigApi(remote.Service):
   def get_mapping(self, request):
     """DEPRECATED. Use get_config_sets."""
     if request.config_set and not can_read_config_set(request.config_set):
-      raise endpoints.ForbiddenException()
+      raise_config_not_found()
 
     config_sets = storage.get_config_sets_async(
         config_set=request.config_set).get_result()
+    if request.config_set and not config_sets:
+      raise_config_not_found()
+
     can_read = can_read_config_sets([cs.key.id() for cs in config_sets])
     return self.GetMappingResponseMessage(
         mappings=[
@@ -189,6 +192,8 @@ class ConfigApi(remote.Service):
           auth.get_current_identity().to_bytes())
       raise endpoints.ForbiddenException()
 
+    check_config_set_exists(request.config_set)
+
     futs = []
     for f in request.files:
       ctx = cfg_validation.Context()
@@ -227,13 +232,15 @@ class ConfigApi(remote.Service):
   def get_config_sets(self, request):
     """Returns config sets."""
     if request.config_set and not can_read_config_set(request.config_set):
-      raise endpoints.ForbiddenException()
+      raise_config_not_found()
     if request.include_files and not request.config_set:
       raise endpoints.BadRequestException(
           'Must specify config_set to use include_files')
 
     config_sets = storage.get_config_sets_async(
         config_set=request.config_set).get_result()
+    if request.config_set and not config_sets:
+      raise_config_not_found()
 
     # The files property must always be a list of File objects (not None).
     files = []
@@ -322,6 +329,8 @@ class ConfigApi(remote.Service):
           auth.get_current_identity().to_bytes(),
           request.config_set)
       raise_config_not_found()
+
+    check_config_set_exists(request.config_set)
 
     content_hashes = storage.get_config_hashes_async(
         {request.config_set: request.revision}, request.path).get_result()
@@ -481,6 +490,9 @@ class ConfigApi(remote.Service):
       raise endpoints.ForbiddenException(
           '%s is now allowed to reimport %r' % (
               auth.get_current_identity().to_bytes(), request.config_set))
+
+    check_config_set_exists(request.config_set)
+
     # Assume it is Gitiles.
     try:
       gitiles_import.import_config_set(request.config_set)
@@ -599,7 +611,14 @@ def get_config_multi(scope, path, hashes_only):
 
 
 def raise_config_not_found():
-  raise endpoints.NotFoundException('The requested config is not found')
+  raise endpoints.NotFoundException(
+      'The requested config file or config set is not found '
+      'or you have no permissions to view it')
+
+
+def check_config_set_exists(config_set):
+  if not storage.get_config_set(config_set):
+    raise_config_not_found()
 
 
 def can_read_config_sets(config_sets):
