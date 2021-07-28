@@ -816,8 +816,9 @@ def _refresh_TaskDimensions_async(now, valid_until_ts, task_dimensions_flats,
   # there's a hash conflict (odds 2^31) plus two concurrent task running
   # simultaneously (over _EXTEND_VALIDITY period) so we can do it in a more
   # adhoc way.
-  key = '%s:%s' % (task_dimensions_key.parent().string_id(),
-                   task_dimensions_key.string_id())
+  key = '%s:dimensions_hash:%d' % (task_dimensions_key.parent().string_id(),
+                                   task_dimensions_key.integer_id())
+  logging.debug('Taking task_queues_tx pseudo-lock. key=%s', key)
   res = yield ndb.get_context().memcache_add(
       key, True, time=60, namespace='task_queues_tx')
   if not res:
