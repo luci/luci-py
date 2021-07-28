@@ -1626,8 +1626,9 @@ def cron_update_tags():
   end = now - datetime.timedelta(hours=1)
   q = TaskResultSummary.query(TaskResultSummary.modified_ts > end)
   cursor = None
-  while True:
-    tasks, cursor = datastore_utils.fetch_page(q, 1000, cursor)
+  more = True
+  while more:
+    tasks, cursor, more = q.fetch_page(1000, start_cursor=cursor)
     count += len(tasks)
     for t in tasks:
       for i in t.tags:
@@ -1639,8 +1640,7 @@ def cron_update_tags():
           if len(s) >= 128:
             logging.info('Limiting tag %s because there are too many', k)
             seen[k] = None
-    if not cursor or not tasks:
-      break
+    logging.debug('Fetched tags from %d tasks', count)
 
   tags = [
     TagValues(tag=k, values=sorted(values or []))

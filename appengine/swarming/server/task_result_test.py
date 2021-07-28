@@ -1260,8 +1260,51 @@ class TaskResultApiTest(TestCase):
       task_result.PerformanceStats().put()
 
   def test_cron_update_tags(self):
-    # TODO(maruel): https://crbug.com/912154
-    self.assertEqual(0, task_result.cron_update_tags())
+    # > 1h
+    self.mock_now(self.now, -3)
+    summary1 = task_result.new_result_summary(_gen_request())
+    summary1.modified_ts = self.now - datetime.timedelta(minutes=60)
+    summary1.tags.append('mtime:60')
+    summary1.put()
+
+    # < 1h
+    self.mock_now(self.now, -2)
+    summary2 = task_result.new_result_summary(_gen_request())
+    summary2.modified_ts = self.now - datetime.timedelta(minutes=59)
+    summary2.tags.append('mtime:59')
+    summary2.put()
+
+    # >= 128 tags
+    self.mock_now(self.now, -1)
+    summary3 = task_result.new_result_summary(_gen_request())
+    summary3.modified_ts = self.now
+    summary3.tags.append('mtime:now')
+    for n in range(0, 128):
+        summary3.tags.append('n:' + str(n))
+    summary3.put()
+
+    self.mock_now(self.now, 0)
+
+    expected = task_result.TagAggregation(
+        key=task_result.TagAggregation.KEY,
+        tags=[task_result.TagValues(
+                tag=u'authenticated', values=[u'user:mocked@example.com']),
+            task_result.TagValues(tag=u'mtime', values=[u'59', u'now']),
+            task_result.TagValues(tag=u'n', values=[]), # >= 128
+            task_result.TagValues(tag=u'pool', values=[u'default']),
+            task_result.TagValues(tag=u'priority', values=[u'50']),
+            task_result.TagValues(tag=u'realm', values=[u'none']),
+            task_result.TagValues(tag=u'service_account', values=[u'none']),
+            task_result.TagValues(
+                tag=u'swarming.pool.template', values=[u'no_config']),
+            task_result.TagValues(tag=u'tag', values=[u'1']),
+            task_result.TagValues(tag=u'use_cas_1143123', values=[u'0']),
+            task_result.TagValues(tag=u'use_isolate_1143123', values=[u'0']),
+            task_result.TagValues(tag=u'user', values=[u'Jesus'])],
+            ts=self.now)
+
+    self.assertEqual(12, task_result.cron_update_tags())
+    self.assertEqual(expected, task_result.TagAggregation.KEY.get())
 
   def _mock_send_to_bq(self, expected_table_name):
     payloads = []
