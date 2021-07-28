@@ -798,13 +798,6 @@ class TasksCount(messages.Message):
   now = message_types.DateTimeField(2)
 
 
-class TasksTags(messages.Message):
-  """Returns all the tags and tag possibilities in the fleet."""
-  tasks_tags = messages.MessageField(StringListPair, 1, repeated=True)
-  # Time at which this summary was calculated.
-  ts = message_types.DateTimeField(2)
-
-
 class TaskRequestMetadata(messages.Message):
   """Provides the ID of the requested TaskRequest."""
   request = messages.MessageField(TaskRequest, 1)

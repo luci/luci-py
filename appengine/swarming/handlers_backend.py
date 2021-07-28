@@ -127,13 +127,6 @@ class CronBotsDimensionAggregationHandler(_CronHandlerBase):
     bot_management.cron_aggregate_dimensions()
 
 
-class CronTasksTagsAggregationHandler(_CronHandlerBase):
-  """Aggregates all task tags from the last hour."""
-
-  def run_cron(self):
-    task_result.cron_update_tags()
-
-
 class CronBotGroupsConfigHandler(_CronHandlerBase):
   """Fetches bots.cfg with all includes, assembles the final config."""
 
@@ -418,8 +411,6 @@ def get_routes():
         CronCountTaskBotDistributionHandler),
     ('/internal/cron/monitoring/bots/aggregate_dimensions',
         CronBotsDimensionAggregationHandler),
-    ('/internal/cron/monitoring/tasks/aggregate_tags',
-        CronTasksTagsAggregationHandler),
     ('/internal/cron/important/bot_groups_config', CronBotGroupsConfigHandler),
     ('/internal/cron/important/external_scheduler/cancellations',
         CronExternalSchedulerCancellationsHandler),

@@ -113,43 +113,6 @@ class BackendTest(test_env_handlers.AppTestBase):
         ts=now)
     self.assertEqual(expected, actual)
 
-  def test_cron_monitoring_tasks_aggregate_tags(self):
-    self.mock_default_pool_acl([])
-    self.set_as_admin()
-    now = datetime.datetime(2011, 1, 2, 3, 4, 5)
-    self.mock_now(now)
-
-    self.client_create_task_raw(tags=['alpha:beta', 'gamma:delta'])
-    self.assertEqual(1, self.execute_tasks())
-    self.client_create_task_raw(tags=['alpha:epsilon', 'zeta:theta'])
-    self.assertEqual(0, self.execute_tasks())
-
-    self.app.get('/internal/cron/monitoring/tasks/aggregate_tags',
-        headers={'X-AppEngine-Cron': 'true'}, status=200)
-    actual = task_result.TagAggregation.KEY.get()
-    expected = task_result.TagAggregation(
-        key=task_result.TagAggregation.KEY,
-        tags=[
-            task_result.TagValues(tag='alpha', values=['beta', 'epsilon']),
-            task_result.TagValues(
-                tag=u'authenticated', values=[u'user:admin@example.com']),
-            task_result.TagValues(tag='gamma', values=['delta']),
-            task_result.TagValues(tag='os', values=['Amiga']),
-            task_result.TagValues(tag='pool', values=['default']),
-            task_result.TagValues(tag='priority', values=['20']),
-            task_result.TagValues(tag='realm', values=['none']),
-            task_result.TagValues(tag='service_account', values=['none']),
-            task_result.TagValues(
-                tag='swarming.pool.template', values=['none']),
-            task_result.TagValues(
-                tag='swarming.pool.version', values=['pools_cfg_rev']),
-            task_result.TagValues(tag=u'use_cas_1143123', values=[u'0']),
-            task_result.TagValues(tag=u'use_isolate_1143123', values=[u'0']),
-            task_result.TagValues(tag='user', values=['joe@localhost']),
-            task_result.TagValues(tag='zeta', values=['theta']),
-        ],
-        ts=now)
-    self.assertEqual(expected, actual)
 
   def test_cron_monitoring_count_task_bot_distribution(self):
     self.mock_default_pool_acl([])

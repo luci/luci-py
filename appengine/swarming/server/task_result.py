@@ -1261,21 +1261,6 @@ class TaskResultSummary(_TaskResultCommon):
     return super(TaskResultSummary, self).to_dict(exclude=['properties_hash'])
 
 
-class TagValues(ndb.Model):
-  tag = ndb.StringProperty()
-  values = ndb.StringProperty(repeated=True)
-
-
-class TagAggregation(ndb.Model):
-  """Has all dimensions that are currently in use."""
-  tags = ndb.LocalStructuredProperty(TagValues, repeated=True)
-
-  ts = ndb.DateTimeProperty()
-
-  # We only store one of these entities. Use this key to refer to any instance.
-  KEY = ndb.Key('TagAggregation', 'current')
-
-
 ### Private stuff.
 
 
@@ -1616,39 +1601,6 @@ def get_result_summaries_query(start, end, sort, state, tags):
       q = q.filter(TaskResultSummary.tags.IN(separated_tags))
 
   return _filter_query(TaskResultSummary, q, start, end, sort, state)
-
-
-def cron_update_tags():
-  """Populates TagAggregation entities."""
-  seen = {}
-  now = utils.utcnow()
-  count = 0
-  end = now - datetime.timedelta(hours=1)
-  q = TaskResultSummary.query(TaskResultSummary.modified_ts > end)
-  cursor = None
-  more = True
-  while more:
-    tasks, cursor, more = q.fetch_page(1000, start_cursor=cursor)
-    count += len(tasks)
-    for t in tasks:
-      for i in t.tags:
-        k, v = i.split(':', 1)
-        s = seen.setdefault(k, set())
-        if s is not None:
-          s.add(v)
-          # 128 is an arbitrary large number to avoid OOM.
-          if len(s) >= 128:
-            logging.info('Limiting tag %s because there are too many', k)
-            seen[k] = None
-    logging.debug('Fetched tags from %d tasks', count)
-
-  tags = [
-    TagValues(tag=k, values=sorted(values or []))
-    for k, values in sorted(seen.items())
-  ]
-  logging.info('From %d tasks, saw %d tags', count, len(tags))
-  TagAggregation(key=TagAggregation.KEY, tags=tags, ts=now).put()
-  return len(tags)
 
 
 def task_bq_run(start, end):

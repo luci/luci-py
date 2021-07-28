@@ -71,11 +71,6 @@ cron:
   schedule: every 5 minutes
   target: backend
 
-- description: Aggregate all tasks tags for easier sorting.
-  url: /internal/cron/monitoring/tasks/aggregate_tags
-  schedule: every 1 hours
-  target: backend
-
 
 ### External schedulers
 
