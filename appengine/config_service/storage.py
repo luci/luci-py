@@ -141,6 +141,13 @@ def get_config_sets_async(config_set=None):
 
 
 @ndb.tasklet
+def get_all_config_set_ids():
+  keys = yield ConfigSet.query(
+      default_options=ndb.QueryOptions(keys_only=True)).fetch_async()
+  raise ndb.Return([k.string_id() for k in keys])
+
+
+@ndb.tasklet
 def get_latest_revisions_async(config_sets):
   """Returns a mapping {config_set: latest_revision}.
 
@@ -320,3 +327,9 @@ def import_blob_async(content, content_hash=None):
 
 def import_blob(content, content_hash=None):
   return import_blob_async(content, content_hash=content_hash).get_result()
+
+
+def delete_config_set_async(config_set):
+  # TODO(crbug.com/1217327): It is possible we need to delete more entities to
+  # make sure the config set is no longer accessible through all public APIs.
+  return ndb.Key(ConfigSet, config_set).delete_async()

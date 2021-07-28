@@ -494,3 +494,17 @@ def cron_run_import():  # pragma: no cover
     q.add(batch)
 
   logging.info('scheduled %d tasks', len(tasks))
+
+  # Delete stale config sets. This is rare, so we do it right here instead of
+  # through a task queue.
+  current = set(config_sets) | {storage.get_self_config_set()}
+  stale = [
+      cs for cs in storage.get_all_config_set_ids().get_result()
+      if cs not in current
+  ]
+  if stale:
+    logging.info('deleting stale config sets: %s', stale)
+    futs = [storage.delete_config_set_async(cs) for cs in stale]
+    ndb.Future.wait_all(futs)
+    for fut in futs:
+      fut.check_success()

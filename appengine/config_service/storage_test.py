@@ -118,6 +118,26 @@ class StorageTestCase(test_case.TestCase):
     actual = storage.get_configs_by_hashes_async(['deadbeef']).get_result()
     self.assertEqual(expected, actual)
 
+  def test_get_all_config_set_ids(self):
+    empty = storage.get_all_config_set_ids().get_result()
+    self.assertEqual([], empty)
+
+    self.put_file('foo', 'deadbeef', 'config.cfg', 'content')
+    self.put_file('bar', 'badcoffee', 'config.cfg', 'content2')
+
+    two = storage.get_all_config_set_ids().get_result()
+    self.assertEqual(['bar', 'foo'], sorted(two))
+
+  def test_delete_config_set_async(self):
+    self.put_file('foo', 'deadbeef', 'config.cfg', 'content')
+    self.assertEqual(['foo'], storage.get_all_config_set_ids().get_result())
+
+    storage.delete_config_set_async('foo').get_result()
+    self.assertEqual([], storage.get_all_config_set_ids().get_result())
+
+    # Noop.
+    storage.delete_config_set_async('foo').get_result()
+
   def test_compute_hash(self):
     content = 'some content\n'
     # echo some content | git hash-object --stdin
