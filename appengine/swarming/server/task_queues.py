@@ -1174,9 +1174,10 @@ def rebuild_task_cache_async(payload):
     ]
     # Done updating, now store the entity. Must use a transaction as there
     # could be other dimensions set in the entity.
-    yield _refresh_TaskDimensions_async(now, valid_until_ts,
-                                        expanded_task_dimensions_flats,
-                                        task_dimensions_key)
+    res = yield _refresh_TaskDimensions_async(now, valid_until_ts,
+                                              expanded_task_dimensions_flats,
+                                              task_dimensions_key)
+    success = res != False
   finally:
     # Any of the calls above could throw. Log how far long we processed.
     duration = (utils.utcnow()-now).total_seconds()
@@ -1184,7 +1185,7 @@ def rebuild_task_cache_async(payload):
         'rebuild_task_cache(%d) in %.3fs\n%s\ndimensions_flat size=%d',
         task_dimensions_hash, duration, task_dimensions,
         len(expanded_task_dimensions_flats))
-  raise ndb.Return(True)
+    raise ndb.Return(success)
 
 
 def cron_tidy_stale():

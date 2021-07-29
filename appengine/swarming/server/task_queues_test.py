@@ -353,6 +353,25 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
     self.assertEqual([], task_queues.get_queues(bot_root_key))
 
   def test_rebuild_task_cache_async_fail(self):
+    now = datetime.datetime(2010, 1, 2, 3, 4, 5)
+    self.mock_now(now, 0)
+    payload = utils.encode_to_json({
+        'dimensions': {
+            'pool': ['foo']
+        },
+        'dimensions_hash': 123,
+        'valid_until_ts': now + datetime.timedelta(minutes=1)
+    })
+
+    @ndb.tasklet
+    def _raise_ndb_return_false(*_args):
+      raise ndb.Return(False)
+
+    self.mock(task_queues, '_refresh_TaskDimensions_async',
+              _raise_ndb_return_false)
+    self.assertFalse(task_queues.rebuild_task_cache_async(payload).get_result())
+
+  def test_assert_task_async_fail(self):
     # pylint: disable=unused-argument
     @ndb.tasklet
     def _enqueue_task_async(url, name, payload):
