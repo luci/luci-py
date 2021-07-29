@@ -192,7 +192,13 @@ class ConfigApi(remote.Service):
           auth.get_current_identity().to_bytes())
       raise endpoints.ForbiddenException()
 
-    check_config_set_exists(request.config_set)
+    if not storage.get_config_set(request.config_set):
+      return self.ValidateConfigResponseMessage(messages=[
+          cfg_endpoint.ValidationMessage(
+              path='.',
+              severity=common.Severity.WARNING,
+              text='The config set is not registered, skipping validation')
+      ])
 
     futs = []
     for f in request.files:

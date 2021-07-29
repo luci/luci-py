@@ -883,6 +883,25 @@ class ApiTest(test_case.EndpointsTestCase):
       ]
     })
 
+  def test_validate_config_no_config_set(self):
+    self.mock(acl, 'can_read_config_sets', mock.Mock(return_value={
+      'services/x': True,
+    }))
+    self.mock(acl, 'can_validate', mock.Mock(return_value=True))
+
+    req = {
+      'config_set': 'services/x',
+      'files': [{'path': 'myproj.cfg', 'content': 'mock_content'}]
+    }
+    resp = self.call_api('validate_config', req).json_body
+    self.assertEqual(resp, {
+      'messages': [
+        {'path': '.',
+         'severity': 'WARNING',
+         'text': 'The config set is not registered, skipping validation'},
+      ]
+    })
+
   def test_validate_config_no_files(self):
     req = {
       'config_set': 'services/x',
