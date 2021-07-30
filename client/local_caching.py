@@ -87,6 +87,8 @@ def trim_caches(caches, path, min_free_space, max_age_secs):
   """
   min_ts = time.time() - max_age_secs if max_age_secs else 0
   free_disk = file_path.get_free_space(path) if min_free_space else 0
+  logging.info("min_ts: %d, free_disk: %d, min_free_space: %d", min_ts,
+               free_disk, min_free_space)
   total = []
   if min_ts or free_disk:
     while True:
@@ -100,6 +102,7 @@ def trim_caches(caches, path, min_free_space, max_age_secs):
       total.append(c.remove_oldest())
       if min_free_space:
         free_disk = file_path.get_free_space(path)
+  logging.info("free_disk after removing oldest entries: %d", free_disk)
   # Evaluate each cache's own policies.
   for c in caches:
     total.extend(c.trim())
@@ -1163,7 +1166,7 @@ class NamedCache(Cache):
   def _remove_lru_item(self):
     """Removes the oldest LRU entry. LRU must not be empty."""
     name, ((_rel_path, size), _ts) = self._lru.get_oldest()
-    logging.info('Removing named cache %r', name)
+    logging.info('Removing named cache %r, %d', name, size)
     self._remove(name)
     return name, size
 

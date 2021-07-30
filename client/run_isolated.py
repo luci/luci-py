@@ -1607,7 +1607,9 @@ def _calc_named_cache_hint(named_cache, named_caches):
     if name not in present:
       hint = int(hint)
       if hint > 0:
+        logging.info("named cache hint: %s, %d", name, hint)
         size += hint
+  logging.info("total size of named cache hint: %d", size)
   return size
 
 
