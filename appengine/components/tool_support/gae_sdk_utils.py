@@ -944,10 +944,17 @@ def _prep_go_deployment(services, app_dir):
   """
   _check_cloudbuildhelper()
 
+  # Base name of `app_dir`. Usually matches the GAE app name.
+  app_name = os.path.basename(os.path.abspath(app_dir))
+
   # Prepare a manifest YAML for cloudbuildhelper describing what to bundle.
+  # Note that due to how cloudbuildhelper works, it needs app.yaml to be in
+  # some subdirectory. So we use the parent directory of `app_dir` as
+  # `inputsdir` in case app.yaml is directly under `app_dir`, as sometimes
+  # happens when deploying single-module applications.
   manifest_body = {
     'name': 'gae_app',  # doesn't really matter
-    'inputsdir': '.',   # we'll drop the manifest into the app_dir
+    'inputsdir': '..',  # we'll drop the manifest into the app_dir
     'build': [],
   }
   for m in services:
@@ -956,11 +963,11 @@ def _prep_go_deployment(services, app_dir):
     # E.g. "services".
     rel_dir = os.path.dirname(rel_path)
     # This instructs to bundle GAE module described by m.path (given as relative
-    # to `inputsdir` which is app_dir) into the corresponding output directory
-    # in the staging destination.
+    # to `inputsdir` which is the parent of app_dir) into the corresponding
+    # output directory in the staging destination.
     manifest_body['build'].append({
-        'go_gae_bundle': os.path.join('${inputsdir}', rel_path),
-        'dest': os.path.join('${contextdir}', rel_dir),
+        'go_gae_bundle': os.path.join('${inputsdir}', app_name, rel_path),
+        'dest': os.path.join('${contextdir}', app_name, rel_dir),
     })
 
   garbage = []
@@ -989,8 +996,8 @@ def _prep_go_deployment(services, app_dir):
     for m in services:
       # E.g. "services/module-services.yaml".
       rel_path = os.path.relpath(m.path, app_dir)
-      # E.g. "/tmp/_gae_py_xxx/services".
-      abs_dir = os.path.join(stage_dir, os.path.dirname(rel_path))
+      # E.g. "/tmp/_gae_py_xxx/app_name/services", matches `dest` in the YAML.
+      abs_dir = os.path.join(stage_dir, app_name, os.path.dirname(rel_path))
       # If it is a symlink, follow it to its destination in _gopath. This is how
       # cloudbuildhelper packages directories specified via `go_gae_bundle`.
       abs_dir = os.path.realpath(abs_dir)
