@@ -1166,6 +1166,8 @@ def rebuild_task_cache_async(payload):
   now = utils.utcnow()
 
   expanded_task_dimensions_flats = expand_dimensions_to_flats(task_dimensions)
+
+  success = None
   try:
     yield [
         _refresh_all_BotTaskDimensions_async(now, valid_until_ts, df,
