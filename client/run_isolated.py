@@ -1603,6 +1603,7 @@ def _calc_named_cache_hint(named_cache, named_caches):
   """Returns the expected size of the missing named caches."""
   present = named_cache.available
   size = 0
+  logging.info('available named cache %s', present)
   for name, _, hint in named_caches:
     if name not in present:
       hint = int(hint)
