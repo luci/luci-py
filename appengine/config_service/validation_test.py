@@ -81,7 +81,71 @@ class ValidationTestCase(test_case.TestCase):
           'Project #4: gitiles_location: repo: must not end with ".git"',
           'Project #4: gitiles_location: ref must start with "refs/"',
           'Project c: gitiles_location: ref is not set',
-          'Projects are not sorted by id. First offending id: a',
+          ('Projects are not sorted by team then id. '
+          'First offending id: "a". Should be placed before "b"'),
+        ],
+    )
+
+  def test_validate_project_registry_teams(self):
+    cfg = '''
+      teams {}
+      teams {maintenance_contact: "not an email"}
+      teams {escalation_contact: "not an email"}
+
+      teams {name: "teamA"}
+      projects {
+        id: "a"
+        owned_by: "teamA"
+      }
+      projects {
+        id: "z"
+        owned_by: "teamA"
+      }
+
+      teams {
+        name: "teamB"
+        maintenance_contact: "person@example.com"
+        escalation_contact: "other_person@example.com"
+      }
+      projects {
+        id: "b"
+        owned_by: "teamB"
+      }
+      projects {
+        id: "zb"
+        owned_by: "teamB"
+      }
+
+      projects {
+        id: "q"
+        owned_by: "none"
+      }
+
+      projects {
+        id: "zed"
+      }
+    '''
+    result = validation.validate_config(
+        config.self_config_set(), 'projects.cfg', cfg)
+
+    filtered = [m.text for m in result.messages if 'gitiles' not in m.text]
+    self.assertEqual(
+        filtered,
+        [
+          'Team #1: name is not specified',
+          'Team #1: maintenance_contact is required',
+          'Team #1: escalation_contact is recommended',
+          'Team #2: name is not specified',
+          'Team #2: invalid email: "not an email"',
+          'Team #2: escalation_contact is recommended',
+          'Team #3: name is not specified',
+          'Team #3: maintenance_contact is required',
+          'Team #3: invalid email: "not an email"',
+          'Team teamA: maintenance_contact is required',
+          'Team teamA: escalation_contact is recommended',
+          'Project q: owned_by unknown team "none"',
+          ('Projects are not sorted by team then id. First offending id: "q".'
+           ' Expected team "", got "none"'),
         ],
     )
 

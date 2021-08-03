@@ -64,17 +64,18 @@ def validate_pattern(pattern, literal_validator, ctx):
     literal_validator(pattern.split(':', 2)[1], ctx)
 
 
-def check_id_sorted(iterable, list_name, ctx):
-  """Emits a warning if the iterable is not sorted by id."""
+def check_sorted(iterable, list_name, field_name, ctx):
+  """Emits a warning if the iterable is not sorted by field_name."""
   prev = None
   for item in iterable:
-    if not item.id:
+    cur = getattr(item, field_name)
+    if not cur:   # done for tests; in prod cur will never be empty
       continue
-    if prev is not None and item.id < prev:
+    if prev is not None and cur < prev:
       ctx.warning(
-          '%s are not sorted by id. First offending id: %s', list_name, item.id)
+          '%s are not sorted by id. First offending id: %s', list_name, cur)
       return
-    prev = item.id
+    prev = cur
 
 
 def validate_id(ident, rgx, known_ids, ctx):
@@ -157,14 +158,68 @@ def validate_gitiles_location(loc, ctx):
 @validation.self_rule(
     common.PROJECT_REGISTRY_FILENAME, service_config_pb2.ProjectsCfg)
 def validate_project_registry(cfg, ctx):
+  team_names = set()
+  for i, team in enumerate(cfg.teams):
+    with ctx.prefix('Team %s: ', team.name or ('#%d' % (i + 1))):
+      if not team.name:
+        ctx.error('name is not specified')
+      else:
+        if team.name in team_names:
+          ctx.error('name is not unique')
+        else:
+          team_names.add(team.name)
+      if not team.maintenance_contact:
+        ctx.error('maintenance_contact is required')
+      for contact in team.maintenance_contact:
+        validate_email(contact, ctx)
+      if not team.escalation_contact:
+        ctx.warning('escalation_contact is recommended')
+      for contact in team.escalation_contact:
+        validate_email(contact, ctx)
+  check_sorted(cfg.teams, 'Teams', 'name', ctx)
+
   project_ids = set()
   for i, project in enumerate(cfg.projects):
     with ctx.prefix('Project %s: ', project.id or ('#%d' % (i + 1))):
       validate_id(project.id, config.common.PROJECT_ID_RGX, project_ids, ctx)
       with ctx.prefix('gitiles_location: '):
         validate_gitiles_location(project.gitiles_location, ctx)
-  check_id_sorted(cfg.projects, 'Projects', ctx)
+      # TODO(iannucci): require team name
+      if project.owned_by:
+        if project.owned_by not in team_names:
+          ctx.error('owned_by unknown team "%s"', project.owned_by)
 
+  check_projects_sorted(cfg.teams, cfg.projects, ctx)
+
+
+def check_projects_sorted(teams, projects, ctx):
+  # projects should be sorted by team, and then sorted by id within the team.
+  # TEMPORARY: if projects don't have a team, they must come last.
+
+  # "if team.name" is for tests
+  team_iter = (team.name for team in teams if team.name)
+  cur_team = next(team_iter, "")
+
+  prev_id = None
+  for project in projects:
+    if project.owned_by != cur_team:
+      next_team = next(team_iter, "")
+      if project.owned_by != next_team:
+        ctx.warning(
+            'Projects are not sorted by team then id. First offending id: "%s".'
+            ' Expected team "%s", got "%s"',
+            project.id, next_team, project.owned_by)
+        return
+      cur_team = next_team
+      prev_id = None
+
+    if prev_id and project.id < prev_id:
+      ctx.warning(
+          'Projects are not sorted by team then id. First offending id: "%s".'
+          ' Should be placed before "%s"',
+          project.id, prev_id)
+      return
+    prev_id = project.id
 
 
 def validate_identity(identity, ctx):
@@ -220,7 +275,7 @@ def validate_services_cfg(cfg, ctx):
           validate_url(service.metadata_url, ctx)
       validate_access_list(service.access, ctx)
 
-  check_id_sorted(cfg.services, 'Services', ctx)
+  check_sorted(cfg.services, 'Services', 'id', ctx)
 
 
 def validate_service_dynamic_metadata_blob(metadata, ctx):
