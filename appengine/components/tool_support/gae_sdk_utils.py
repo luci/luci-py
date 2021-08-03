@@ -904,7 +904,7 @@ def _check_go(min_version='1.16.0'):
         'Could not find `go` in PATH. Is it needed to deploy Go code.')
 
 
-def _check_cloudbuildhelper(min_version='1.1.9'):
+def _check_cloudbuildhelper(min_version='1.1.13'):
   """Checks `cloudbuildhelper` is in PATH and it is fresh enough."""
   explainer = (
       'It is needed to deploy Go GAE apps now (https://crbug.com/1057067).\n'
@@ -912,7 +912,7 @@ def _check_cloudbuildhelper(min_version='1.1.9'):
       '  $ eval `.../infra/go/env.py`.'
   )
   try:
-    # 'cloudbuildhelper v1.1.9\nCIPD package: ...'
+    # 'cloudbuildhelper v1.x.y\nCIPD package: ...'
     ver = subprocess.check_output(['cloudbuildhelper', 'version'])
     ver = ver.splitlines()[0].strip()
     if not ver.startswith('cloudbuildhelper v'):
