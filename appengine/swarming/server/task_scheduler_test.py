@@ -2717,40 +2717,6 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
       self.check_schedule_request_acl(
           properties=_gen_properties(dimensions={u'pool': [u'some-pool']}))
 
-  def test_cron_task_bot_distribution(self):
-    req1 = _gen_request_slices()
-    req1.key = task_request.new_request_key()
-    req1.put()
-    summary1 = task_result.new_result_summary(req1)
-    summary1.state = task_result.State.RUNNING
-    summary1.modified_ts = self.now
-    summary1.put()
-
-    req2 = _gen_request_slices(
-        properties=_gen_properties(dimensions={
-            u'os': [u'Linux'],
-            u'pool': [u'some_other_pool'],
-        }))
-    req2.key = task_request.new_request_key()
-    req2.put()
-    summary2 = task_result.new_result_summary(req2)
-    summary2.state = task_result.State.PENDING
-    summary2.modified_ts = self.now
-    summary2.put()
-
-    req3 = _gen_request_slices()
-    req3.key = task_request.new_request_key()
-    req3.put()
-    summary3 = task_result.new_result_summary(req3)
-    summary3.state = task_result.State.COMPLETED
-    summary3.duration = 31.0
-    summary3.exit_code = 0
-    summary3.modified_ts = self.now
-    summary3.completed_ts = self.now
-    summary3.put()
-
-    self.assertEqual(2, task_scheduler.cron_task_bot_distribution())
-
   def test_ensure_active_slice_nonpending(self):
     # Non-PENDING task cannot have active slice set.
     r = self._quick_schedule(1)

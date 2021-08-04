@@ -112,14 +112,6 @@ class CronNamedCachesUpdate(_CronHandlerBase):
   def run_cron(self):
     named_caches.cron_update_named_caches()
 
-
-class CronCountTaskBotDistributionHandler(_CronHandlerBase):
-  """Counts how many runnable bots per task for monitoring."""
-
-  def run_cron(self):
-    task_scheduler.cron_task_bot_distribution()
-
-
 class CronBotsDimensionAggregationHandler(_CronHandlerBase):
   """Aggregates all bots dimensions (except id) in the fleet."""
 
@@ -407,8 +399,6 @@ def get_routes():
     ('/internal/cron/monitoring/tasks/stats', CronTasksStats),
 
     ('/internal/cron/monitoring/bq', CronSendToBQ),
-    ('/internal/cron/monitoring/count_task_bot_distribution',
-        CronCountTaskBotDistributionHandler),
     ('/internal/cron/monitoring/bots/aggregate_dimensions',
         CronBotsDimensionAggregationHandler),
     ('/internal/cron/important/bot_groups_config', CronBotGroupsConfigHandler),

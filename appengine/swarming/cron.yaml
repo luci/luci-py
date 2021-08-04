@@ -21,13 +21,6 @@ cron:
   schedule: every 10 minutes
   target: backend
 
-- description: >-
-    Count how many runnable bots per task queues for monitoring; send this to
-    ts_mon.
-  url: /internal/cron/monitoring/count_task_bot_distribution
-  schedule: every 1 minutes synchronized
-  target: backend
-
 - description: Delete old TaskRequest
   url: /internal/cron/cleanup/tasks/delete_old
   schedule: every 10 minutes synchronized

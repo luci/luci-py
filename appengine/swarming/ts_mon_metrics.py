@@ -136,14 +136,6 @@ _tasks_slice_expiration_delay = gae_ts_mon.CumulativeDistributionMetric(
 )
 
 
-_task_bots_runnable = gae_ts_mon.CumulativeDistributionMetric(
-    'swarming/tasks/bots_runnable',
-    'Number of bots available to run tasks.', [
-        gae_ts_mon.StringField('pool'),
-    ],
-)
-
-
 # Global metric. Metric fields:.
 # - project_id: e.g. 'chromium'.
 # - subproject_id: e.g. 'blink'. Set to empty string if not used.
