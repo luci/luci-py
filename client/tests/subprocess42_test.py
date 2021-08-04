@@ -1016,7 +1016,7 @@ time.sleep(60)
     expected = [(e[0], e[1].decode()) for e in expected]
     self.assertEqual(list(subprocess42.split(data, True)), expected)
 
-  @params((None, ), (5, ))
+  @params((None,), (10,))
   def test_wait_can_be_interrupted(self, timeout):
     cmd = [
         sys.executable,
@@ -1061,9 +1061,9 @@ time.sleep(60)
     proc.terminate()
     # proc is waiting for 'timeout' and SIGTERM/SIGBREAK is sent at 0.5s mark.
     # Expect proc to write to stdout and exit almost immediately (decided
-    # by the poll interval of wait method). We wait for 3 second to give
+    # by the poll interval of wait method). We wait for 8 second to give
     # some buffer here.
-    self.assertEqual(proc.recv_out(timeout=3), b'wait is interrupted')
+    self.assertEqual(proc.recv_out(timeout=8), b'wait is interrupted')
 
 
 if __name__ == '__main__':
