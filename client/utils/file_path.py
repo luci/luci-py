@@ -1251,24 +1251,34 @@ def get_recursive_size(path):
 
 
 def _use_scandir():
-  # Use scandir in windows for faster execution.
-  # Do not use in other OS due to crbug.com/989409
-  return sys.platform == 'win32'
+  # Python3,
+  #   Use os.scandir in all OSes for faster execution.
+  #   Benchmark:crbug.com/1215459#c12
+  # Python2,
+  #   Use scandir in windows for faster execution.
+  #   Do not use in other OS due to crbug.com/989409.
+  return sys.platform == 'win32' or six.PY3
+
+
+def _is_junction_entry(entry):
+  if sys.platform != 'win32':
+    return False
+  # both st_file_attributes and FILE_ATTRIBUTE_REPARSE_POINT are
+  # windows-only symbols.
+  # TODO(crbug.com/1111688): change from scandir to
+  # stat.FILE_ATTRIBUTE_REPARSE_POINT after Python3 migration.
+  return bool(entry.stat().st_file_attributes
+              & scandir.FILE_ATTRIBUTE_REPARSE_POINT)
 
 
 def _get_recursive_size_with_scandir(path):
-  if sys.platform == 'win32':
-
-    def direntIsJunction(entry):
-      # both st_file_attributes and FILE_ATTRIBUTE_REPARSE_POINT are
-      # windows-only symbols.
-      return bool(entry.stat().st_file_attributes
-                  & scandir.FILE_ATTRIBUTE_REPARSE_POINT)
+  if six.PY3:
+    logging.debug('Using _get_recursive_size_with_scandir with native scandir')
+    _scandir = os.scandir
   else:
-
-    def direntIsJunction(_entry):
-      # This is for test on non-Windows.
-      return False
+    # TODO(crbug.com/1111688): remove after Python3 migration.
+    logging.debug('Using _get_recursive_size_with_scandir with scandir library')
+    _scandir = scandir.scandir
 
   total = 0
   n_dirs = 0
@@ -1276,8 +1286,8 @@ def _get_recursive_size_with_scandir(path):
   n_links = 0
   stack = [path]
   while stack:
-    for entry in scandir.scandir(stack.pop()):
-      if entry.is_symlink() or direntIsJunction(entry):
+    for entry in _scandir(stack.pop()):
+      if entry.is_symlink() or _is_junction_entry(entry):
         n_links += 1
         continue
       if entry.is_file():
@@ -1292,6 +1302,8 @@ def _get_recursive_size_with_scandir(path):
 
 
 def _get_recursive_size_with_fswalk(path):
+  logging.debug('Using _get_recursive_size_with_fswalk')
+
   total = 0
   n_dirs = 0
   n_files = 0
