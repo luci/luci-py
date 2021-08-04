@@ -25,4 +25,16 @@ deps = {
     ],
     'dep_type': 'cipd',
   },
+
+  # Nsjail is used for our unit tests.
+  'nsjail': {
+    'packages': [
+      {
+        'package': 'infra/3pp/tools/nsjail/${{platform}}',
+        'version': 'version:2@3.0.chromium.1',
+      }
+    ],
+    "condition": "checkout_linux",
+    'dep_type': 'cipd',
+  },
 }

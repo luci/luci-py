@@ -121,6 +121,16 @@ if __name__ == '__main__':
   sys.exit(main())
 """
 
+_NSJAIL_CONFIG = br"""
+clone_newnet: false
+clone_newuser: false
+clone_newns: false
+clone_newpid: false
+clone_newipc: false
+clone_newuts: false
+clone_newcgroup: false
+"""
+
 
 def to_native_eol(string):
   if string is None:
@@ -430,6 +440,35 @@ time.sleep(60)
         limit_processes=2,
         limit_total_committed_memory=1024 * 1024 * 1024)
     self.assertEqual(0, subprocess42.check_call(cmd, containment=containment))
+
+  @unittest.skipUnless(
+      sys.platform.startswith('linux'), 'nsjail is only supported on linux')
+  def test_containment_nsjail(self):
+    # Tests that nsjail containment runs the given command in an nsjail.
+    handle, cfg_path = tempfile.mkstemp(prefix='test_nsjail', suffix='.cfg')
+    os.write(handle, _NSJAIL_CONFIG)
+    os.close(handle)
+    nsjail_bin_path = os.path.join(
+        os.path.dirname(test_env.CLIENT_DIR), 'nsjail', 'nsjail')
+    cmd = self._cmd_print_good()
+
+    with tempfile.NamedTemporaryFile(delete=True) as log_file:
+      containment = subprocess42.Containment(
+          containment_type=subprocess42.Containment.NSJAIL,
+          nsjail_bin_path=nsjail_bin_path,
+          nsjail_config_file=cfg_path,
+          nsjail_log_path=log_file.name)
+      p = subprocess42.Popen(
+          cmd,
+          stdout=subprocess42.PIPE,
+          stderr=subprocess42.PIPE,
+          containment=containment)
+      out, err = p.communicate()
+      self.assertIn(b'NSJAIL', log_file.read())
+      self.assertEqual(0, p.returncode)
+      self.assertEqual(b'good\n', out)
+      self.assertEqual(b'', err)
+    os.remove(cfg_path)
 
   def test_containment_auto_limit_process(self):
     # Process creates a children process. It should fail, throwing not enough

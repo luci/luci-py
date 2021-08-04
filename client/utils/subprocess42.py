@@ -395,22 +395,29 @@ class Containment(object):
   # these platforms.
   # See https://docs.microsoft.com/en-us/windows/desktop/procthread/job-objects
   # cgroups will be added.
-  NONE, AUTO, JOB_OBJECT = range(3)
+  NONE, AUTO, JOB_OBJECT, NSJAIL = range(4)
 
   NAMES = {
       NONE: 'NONE',
       AUTO: 'AUTO',
       JOB_OBJECT: 'JOB_OBJECT',
+      NSJAIL: 'NSJAIL',
   }
 
   def __init__(self,
                containment_type=NONE,
                limit_processes=0,
-               limit_total_committed_memory=0):
+               limit_total_committed_memory=0,
+               nsjail_bin_path=None,
+               nsjail_config_file=None,
+               nsjail_log_path=None):
     self.containment_type = containment_type
     # Limit on the number of active processes.
     self.limit_processes = limit_processes
     self.limit_total_committed_memory = limit_total_committed_memory
+    self.nsjail_bin_path = nsjail_bin_path
+    self.nsjail_config_file = nsjail_config_file
+    self.nsjail_log_path = nsjail_log_path
 
   def __eq__(self, rhs):
     if not rhs:
@@ -418,7 +425,9 @@ class Containment(object):
     return (
         self.containment_type == rhs.containment_type and
         self.limit_processes == rhs.limit_processes and
-        self.limit_total_committed_memory == rhs.limit_total_committed_memory)
+        self.limit_total_committed_memory == rhs.limit_total_committed_memory
+        and self.nsjail_bin_path == self.nsjail_bin_path and
+        self.nsjail_config_file == self.nsjail_config_file)
 
   def __str__(self):
     return 'Containment<%s, %s, %s>' % (self.NAMES[self.containment_type],
@@ -535,6 +544,17 @@ class Popen(subprocess.Popen):
         # object, then resume it.
         prev = kwargs.get('creationflags', 0)
         kwargs['creationflags'] = prev | CREATE_SUSPENDED
+      if self.containment.containment_type == Containment.NSJAIL:
+        if not sys.platform.startswith('linux'):
+          raise NotImplementedError(
+              'NSJAIL containment is only supported on linux')
+        # Prepend the passed in command with an nsjail invocation and
+        # configuration.
+        args = [
+            self.containment.nsjail_bin_path, "--config",
+            self.containment.nsjail_config_file, "--log",
+            self.containment.nsjail_log_path, "--"
+        ] + args
 
     self.end = None
     self.pgid = None

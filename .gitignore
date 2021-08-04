@@ -4,3 +4,4 @@
 /appengine/swarming/swarming_bot.zip
 /appengine/swarming/ui2/nodejs
 /luci-go
+/nsjail
