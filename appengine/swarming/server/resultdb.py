@@ -83,7 +83,9 @@ def _call_resultdb_recorder_api_async(method,
                                       project_id=None):
   cfg = config.settings()
   rdb_url = cfg.resultdb.server
-  assert rdb_url, 'ResultDB integration is not configured'
+  if not rdb_url:
+    raise ValueError('ResultDB integration is not configured')
+
   utils.validate_root_service_url(rdb_url)
 
   # See Recoder API for ResultDB in
