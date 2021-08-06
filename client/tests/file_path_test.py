@@ -281,8 +281,7 @@ class FilePathTest(auto_stub.TestCase):
       finally:
         file_path.rmtree(tempdir)
 
-    @unittest.skipIf(sys.platform == 'win32', 'crbug.com/1148174')
-    def test_rmtree_win(self):
+    def test_rmtree_outliving_processes(self):
       # Mock our sleep for faster test case execution.
       sleeps = []
       self.mock(time, 'sleep', sleeps.append)
@@ -298,7 +297,7 @@ class FilePathTest(auto_stub.TestCase):
         while not fs.isfile(os.path.join(subdir, 'a')):
           self.assertEqual(None, proc.poll())
         file_path.rmtree(subdir)
-        self.assertEqual([2, 4, 2], sleeps)
+        self.assertEqual([4, 2], sleeps)
         # sys.stderr.getvalue() would return a fair amount of output but it is
         # not completely deterministic so we're not testing it here.
       finally:
