@@ -8,7 +8,6 @@ This module assumes that filesystem is not changing while current process
 is running and thus it caches results of functions that depend on FS state.
 """
 
-from collections import deque
 import ctypes
 import errno
 import getpass
@@ -876,21 +875,20 @@ def readable_copy(outfile, infile):
       fs.stat(outfile).st_mode | stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH)
 
 
-def set_read_only(path, read_only, orig_mode=None):
+def set_read_only(path, read_only):
   """Sets or resets the write bit on a file or directory.
 
   Zaps out access to 'group' and 'others'.
   """
-  if not orig_mode:
-    orig_mode = fs.lstat(path).st_mode
+  orig_mode = fs.lstat(path).st_mode
   mode = orig_mode
   # TODO(maruel): Stop removing GO bits.
   if read_only:
-    mode &= stat.S_IRUSR | stat.S_IXUSR  # 0500
+    mode &= stat.S_IRUSR|stat.S_IXUSR # 0500
   else:
-    mode |= stat.S_IRUSR | stat.S_IWUSR  # 0600
+    mode |= stat.S_IRUSR|stat.S_IWUSR # 0600
     if sys.platform != 'win32' and stat.S_ISDIR(mode):
-      mode |= stat.S_IXUSR  # 0100
+      mode |= stat.S_IXUSR # 0100
   if hasattr(os, 'lchmod'):
     fs.lchmod(path, mode)  # pylint: disable=E1101
   else:
@@ -902,10 +900,10 @@ def set_read_only(path, read_only, orig_mode=None):
     fs.chmod(path, mode)
 
 
-def set_read_only_swallow(path, read_only, orig_mode=None):
+def set_read_only_swallow(path, read_only):
   """Returns if an OSError exception occurred."""
   try:
-    set_read_only(path, read_only, orig_mode)
+    set_read_only(path, read_only)
   except OSError as e:
     return e
   return None
@@ -1067,21 +1065,8 @@ def make_tree_deleteable(root):
   Warning on Windows: since file permission is modified, the file node is
   modified. This means that for hard-linked files, every directory entry for the
   file node has its file permission modified.
-
-  In Python3, use the os.scandir based implementations.
-  In Python2, use the fs.walk based implementation.
   """
-  if six.PY3:
-    if sys.platform == 'win32':
-      make_tree_deleteable_win(root)
-    else:
-      make_tree_deleteable_posix(root)
-  else:
-    make_tree_deleteable_legacy(root)
-
-
-def make_tree_deleteable_legacy(root):
-  logging.debug('Using file_path.make_tree_deleteable_legacy')
+  logging.debug('file_path.make_tree_deleteable(%s)', root)
   err = None
   sudo_failed = False
 
@@ -1127,64 +1112,6 @@ def make_tree_deleteable_legacy(root):
     raise err
 
 
-def make_tree_deleteable_win(root):
-  logging.debug('Using file_path.make_tree_deleteable_win')
-  err = None
-
-  dirs = deque([root])
-  while dirs:
-    for entry in os.scandir(dirs.popleft()):
-      if entry.is_file():
-        e = set_read_only_swallow(entry.path, False, entry.stat().st_mode)
-        if not err:
-          err = e
-      if not entry.is_dir() or _is_symlink_entry(entry):
-        continue
-      dirs.append(entry.path)
-
-  if err:
-    # pylint: disable=raising-bad-type
-    raise err
-
-
-def make_tree_deleteable_posix(root):
-  logging.debug('Using file_path.make_tree_deleteable_posix')
-  err = None
-  sudo_failed = False
-
-  def try_sudo(p):
-    if sudo_failed:
-      return
-    # Try passwordless sudo, just in case. In practice, it is preferable
-    # to use linux capabilities.
-    with open(os.devnull, 'rb') as f:
-      if not subprocess42.call(['sudo', '-n', 'chmod', 'a+rwX,-t', p], stdin=f):
-        return False
-    logging.debug('sudo chmod %s failed', p)
-    return True
-
-  e = set_read_only_swallow(root, False)
-  if e:
-    sudo_failed = try_sudo(root)
-  if not err:
-    err = e
-
-  dirs = deque([root])
-  while dirs:
-    for entry in os.scandir(dirs.popleft()):
-      if not entry.is_dir() or _is_symlink_entry(entry):
-        continue
-      dirs.append(entry.path)
-      e = set_read_only_swallow(entry.path, False, entry.stat().st_mode)
-      if e:
-        sudo_failed = try_sudo(root)
-      if not err:
-        err = e
-  if err:
-    # pylint: disable=raising-bad-type
-    raise err
-
-
 def rmtree(root):
   """Wrapper around shutil.rmtree() to retry automatically on Windows.
 
@@ -1205,7 +1132,7 @@ def rmtree(root):
       make_tree_deleteable(root)
     except OSError as e:
       logging.warning('Swallowing make_tree_deleteable() error: %s', e)
-    logging.debug('file_path.make_tree_deleteable(%s) took %s seconds', root,
+    logging.debug('file_path.make_tree_deleteable(%s) took %d seconds', root,
                   time.time() - start)
 
   # First try the soft way: tries 3 times to delete and sleep a bit in between.
@@ -1221,7 +1148,7 @@ def rmtree(root):
     logging.debug('file_path.rmtree(%s) try=%d', root, i)
     start = time.time()
     fs.rmtree(root, onerror=lambda *args: errors.append(args))
-    logging.debug('file_path.rmtree(%s) try=%d took %s seconds', root, i,
+    logging.debug('file_path.rmtree(%s) try=%d took %d seconds', root, i,
                   time.time() - start)
     if not errors or not fs.exists(root):
       if i:
@@ -1333,9 +1260,7 @@ def _use_scandir():
   return sys.platform == 'win32' or six.PY3
 
 
-def _is_symlink_entry(entry):
-  if entry.is_symlink():
-    return True
+def _is_junction_entry(entry):
   if sys.platform != 'win32':
     return False
   # both st_file_attributes and FILE_ATTRIBUTE_REPARSE_POINT are
@@ -1362,7 +1287,7 @@ def _get_recursive_size_with_scandir(path):
   stack = [path]
   while stack:
     for entry in _scandir(stack.pop()):
-      if _is_symlink_entry(entry):
+      if entry.is_symlink() or _is_junction_entry(entry):
         n_links += 1
         continue
       if entry.is_file():
