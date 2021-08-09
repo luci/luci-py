@@ -59,7 +59,7 @@ def get_revision_from_project(project):
 def main():
   root = calculate_version.checkout_root('.')
   pseudo_revision, mergebase = calculate_version.get_head_pseudo_revision(
-      root, 'origin/master')
+      root, 'origin/main')
   is_pristine = calculate_version.is_pristine(root, mergebase)
 
   parser = optparse.OptionParser(
@@ -68,7 +68,7 @@ def main():
       description=sys.modules[__name__].__doc__)
   parser.add_option(
       '-f', '--force', action='store_true',
-      help='Run even if not pristine checkout, e.g. HEAD != origin/master')
+      help='Run even if not pristine checkout, e.g. HEAD != origin/main')
   parser.add_option(
       '-F', '--files', action='store_true', help='List all modified files')
   parser.add_option('--project', help='Project ID used to take active revision')

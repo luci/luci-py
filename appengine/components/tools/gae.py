@@ -77,7 +77,7 @@ def _print_version_log(app, to_version):
 
   if start < end:
     pseudo_revision, mergebase = calculate_version.get_remote_pseudo_revision(
-        app.app_dir, 'origin/master')
+        app.app_dir, 'origin/main')
     logs, _ = log_since.get_logs(app.app_dir, pseudo_revision, mergebase, start,
                                  end)
     print('\nLogs between %s and %s:' % (from_version, to_version))

@@ -24,7 +24,7 @@ Turns into the following:
   this: "would\nturn \\ninto\n  a \"single\"\nline"
 
 The format must be compatible with
-https://github.com/luci/luci-go/blob/master/common/proto/multiline.go
+https://github.com/luci/luci-go/blob/main/common/proto/multiline.go
 
 In particular, the inner lines will be treated with `textwrap.dedent`;
 any common leading whitespace that occurs on every line will be removed.

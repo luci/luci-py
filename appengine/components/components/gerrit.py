@@ -38,7 +38,7 @@ Change = collections.namedtuple(
     'Change',
     [
       # A "long" change id, such as
-      # chromium/src~master~If1bfd2e7d0ad2c14908e5d45a513b5335d36ff01
+      # chromium/src~main~If1bfd2e7d0ad2c14908e5d45a513b5335d36ff01
       'id',
       # A "short" change id, such as If1bfd2e7d0ad2c14908e5d45a513b5335d36ff01
       'change_id',

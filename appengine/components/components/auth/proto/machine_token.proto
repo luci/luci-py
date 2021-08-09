@@ -3,7 +3,7 @@
 // that can be found in the LICENSE file.
 
 // This file should match corresponding proto3 source-of-truth file in luci-go:
-// https://github.com/luci/luci-go/blob/master/common/api/tokenserver/machine_token.proto
+// https://github.com/luci/luci-go/blob/main/common/api/tokenserver/machine_token.proto
 
 syntax = "proto3";
 

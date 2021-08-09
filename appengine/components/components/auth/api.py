@@ -2177,7 +2177,7 @@ def validate_realm_name(name):
 
   A realm name is expected to be "<project>:<realm>".
   See also
-  https://chromium.googlesource.com/infra/luci/luci-py/+/refs/heads/master/appengine/components/components/auth/proto/realms.proto
+  https://chromium.googlesource.com/infra/luci/luci-py/+/refs/heads/main/appengine/components/components/auth/proto/realms.proto
 
   Raises:
     ValueError: if the realm name doesn't look valid.

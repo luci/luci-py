@@ -16,9 +16,9 @@ implemented in a dedicated LUCI token server, not in the each individual
 service.
 
 See:
-  * https://github.com/luci/luci-go/tree/master/appengine/cmd/tokenserver
-  * https://github.com/luci/luci-go/tree/master/client/cmd/luci_machine_tokend
-  * https://github.com/luci/luci-go/tree/master/server/auth/machine
+  * https://github.com/luci/luci-go/tree/main/appengine/cmd/tokenserver
+  * https://github.com/luci/luci-go/tree/main/client/cmd/luci_machine_tokend
+  * https://github.com/luci/luci-go/tree/main/server/auth/machine
 """
 
 import base64

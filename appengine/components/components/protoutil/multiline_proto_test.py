@@ -77,7 +77,7 @@ class MultilineProtoTest(unittest.TestCase):
     # pylint: disable=line-too-long
     """Replicate tests from luci-go to ensure identical results.
 
-    See https://github.com/luci/luci-go/blob/master/common/proto/multiline_test.go
+    See https://github.com/luci/luci-go/blob/main/common/proto/multiline_test.go
     """
     # Each test is a tuple ('name', 'expected', 'data').
     tests = [

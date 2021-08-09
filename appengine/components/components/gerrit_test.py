@@ -24,7 +24,7 @@ from test_support import test_case
 
 HOSTNAME = 'chromium-review.googlesource.com'
 SHORT_CHANGE_ID = 'I7c1811882cf59c1dc55018926edb6d35295c53b8'
-CHANGE_ID = 'project~master~%s' % SHORT_CHANGE_ID
+CHANGE_ID = 'project~main~%s' % SHORT_CHANGE_ID
 REVISION = '404d1697dca23824bc1130061a5bd2be4e073922'
 
 
@@ -80,7 +80,7 @@ class GerritTestCase(test_case.TestCase):
     change_reponse = {
       'id': CHANGE_ID,
       'project': 'project',
-      'branch': 'master',
+      'branch': 'main',
       'hashtags': [],
       'change_id': SHORT_CHANGE_ID,
       'subject': 'My change',
@@ -118,7 +118,7 @@ class GerritTestCase(test_case.TestCase):
         HOSTNAME, req_path, params={'o': 'ALL_REVISIONS'})
     self.assertIsNotNone(change)
     self.assertEqual(change.change_id, SHORT_CHANGE_ID)
-    self.assertEqual(change.branch, 'master')
+    self.assertEqual(change.branch, 'main')
     self.assertEqual(change.project, 'project')
     self.assertEqual(change.owner.name, 'John Doe')
     self.assertEqual(change.current_revision, REVISION)

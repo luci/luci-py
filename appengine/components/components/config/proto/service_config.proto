@@ -38,7 +38,7 @@ message GitilesLocation {
   //     refs/heads/infra/config
   //     refs/branch-heads/beta
   //   Not OK:
-  //     master
+  //     main
   //     HEAD
   //     origin/main
   //     tags/123

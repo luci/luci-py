@@ -70,7 +70,7 @@ def project_token_async(
   # End of validation.
 
   # See MintProjectTokenRequest in
-  # https://github.com/luci/luci-go/blob/master/tokenserver/api/minter/v1/token_minter.proto.
+  # https://github.com/luci/luci-go/blob/main/tokenserver/api/minter/v1/token_minter.proto.
   req = {
     'luci_project': project_id,
     'oauth_scope': oauth_scopes,

@@ -164,7 +164,7 @@ class Location(LocationTuple):
   def parse_resolve(cls, url):
     """Like parse, but supports refs with slashes.
 
-    Does not support refs that start with "refs/heads/master/".
+    Does not support refs that start with "refs/heads/main/".
 
     May send a get_refs() request.
 

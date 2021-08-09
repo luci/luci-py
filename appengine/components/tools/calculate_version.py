@@ -115,7 +115,7 @@ def calculate_version(root, tag, additional_chars=0):
   additional characters will be added, and thus that the limit for version
   should actually be 63 - additional_chars.
   """
-  pseudo_revision, mergebase = get_head_pseudo_revision(root, 'origin/master')
+  pseudo_revision, mergebase = get_head_pseudo_revision(root, 'origin/main')
   pristine = is_pristine(root, mergebase)
   user = getpass.getuser()
   if not pristine and not tag:
