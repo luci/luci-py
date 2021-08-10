@@ -804,7 +804,7 @@ def get_ssd():
   """Returns a list of SSD disks."""
   ssd = []
   for disk, disk_info in _get_physical_disks_info().items():
-    if disk_info['SolidState']:
+    if disk_info.get('SolidState'):
       ssd.append(disk)
   return tuple(sorted(ssd))
 
