@@ -51,6 +51,10 @@ class Instance(ndb.Model):
   """
 
   @classmethod
+  def _use_memcache(cls, _):
+    return False
+
+  @classmethod
   def _get_kind(cls):
     return 'TSMonInstance'
 

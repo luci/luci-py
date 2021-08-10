@@ -138,7 +138,6 @@ def initialize(
         monitors.DelegateServiceAccountCredentials(
             shared.PRODXMON_SERVICE_ACCOUNT_EMAIL,
             monitors.AppengineCredentials()))
-    interface.state.use_new_proto = True
 
   interface.register_global_metrics([shared.appengine_default_version])
   interface.register_global_metrics_callback(
