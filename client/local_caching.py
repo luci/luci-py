@@ -87,8 +87,8 @@ def trim_caches(caches, path, min_free_space, max_age_secs):
   """
   min_ts = time.time() - max_age_secs if max_age_secs else 0
   free_disk = file_path.get_free_space(path) if min_free_space else 0
-  logging.info("min_ts: %d, free_disk: %d, min_free_space: %d", min_ts,
-               free_disk, min_free_space)
+  logging.info("Trimming caches. min_ts: %d, free_disk: %d, min_free_space: %d",
+               min_ts, free_disk, min_free_space)
   total = []
   if min_ts or free_disk:
     while True:
@@ -474,6 +474,8 @@ class DiskContentAddressedCache(ContentAddressedCache):
     At that point, the cache was already loaded, trimmed to respect cache
     policies.
     """
+    logging.info('DiskContentAddressedCache.cleanup(): Cleaning %s',
+                 self.cache_dir)
     with self._lock:
       fs.chmod(self.cache_dir, 0o700)
       # Ensure that all files listed in the state still exist and add new ones.
@@ -489,7 +491,9 @@ class DiskContentAddressedCache(ContentAddressedCache):
           continue
 
         # An untracked file. Delete it.
-        logging.warning('Removing unknown file %s from cache', filename)
+        logging.warning(
+            'DiskContentAddressedCache.cleanup(): Removing unknown file %s',
+            filename)
         p = self._path(filename)
         if fs.isdir(p):
           try:
@@ -502,29 +506,50 @@ class DiskContentAddressedCache(ContentAddressedCache):
 
       if previous:
         # Filter out entries that were not found.
-        logging.warning('Removed %d lost files', len(previous))
+        logging.warning(
+            'DiskContentAddressedCache.cleanup(): Removed %d lost files',
+            len(previous))
         for filename in previous:
           self._lru.pop(filename)
         self._save()
 
     # Verify hash of every single item to detect corruption. the corrupted
     # files will be evicted.
+    total = 0
+    verified = 0
+    deleted = 0
+    logging.info(
+        'DiskContentAddressedCache.cleanup(): Verifying modified files')
     with self._lock:
       for digest, (_, timestamp) in list(self._lru._items.items()):
+        total += 1
         # verify only if the mtime is grather than the timestamp in state.json
         # to avoid take too long time.
         if self._get_mtime(digest) <= timestamp:
           continue
-        logging.warning('Item has been modified. item: %s', digest)
-        if self._is_valid_hash(digest):
+        logging.warning(
+            'DiskContentAddressedCache.cleanup(): Item has been modified.'
+            ' verifying item: %s', digest)
+        is_valid = self._is_valid_hash(digest)
+        verified += 1
+        logging.warning(
+            'DiskContentAddressedCache.cleanup(): verified. is_valid: %s, '
+            'item: %s', is_valid, digest)
+        if is_valid:
           # Update timestamp in state.json
           self._lru.touch(digest)
           continue
         # remove corrupted file from LRU and file system
         self._lru.pop(digest)
         self._delete_file(digest, UNKNOWN_FILE_SIZE)
-        logging.error('Deleted corrupted item: %s', digest)
+        deleted += 1
+        logging.error(
+            'DiskContentAddressedCache.cleanup(): Deleted corrupted item: %s',
+            digest)
       self._save()
+    logging.info(
+        'DiskContentAddressedCache.cleanup(): Verified modified files.'
+        ' total: %d, verified: %d, deleted: %d', total, verified, deleted)
 
   # ContentAddressedCache interface implementation.
 
@@ -1079,6 +1104,7 @@ class NamedCache(Cache):
     Does not recalculate the cache size since it's surprisingly slow on some
     OSes.
     """
+    logging.info('NamedCache.cleanup(): Cleaning %s', self.cache_dir)
     success = True
     with self._lock:
       try:
