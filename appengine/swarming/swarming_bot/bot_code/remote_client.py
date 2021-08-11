@@ -226,6 +226,7 @@ class RemoteClientNative(object):
 
   def _url_read_json(self, url_path, data=None, expected_error_codes=None):
     """Does POST (if data is not None) or GET request to a JSON endpoint."""
+    logging.info('Calling %s', url_path)
     return net.url_read_json(
         self._server + url_path,
         data=data,

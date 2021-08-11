@@ -682,6 +682,7 @@ def run_command(remote, task_details, work_dir, cost_usd_hour,
 
   try:
     proc = _start_task_runner(args, work_dir, ctx_file)
+    logging.info('Subprocess for run_isolated started')
   except _FailureOnStart as e:
     return fail_without_command(remote, task_details.task_id, params,
                                 cost_usd_hour, task_start, e.exit_code,
@@ -757,6 +758,8 @@ def run_command(remote, task_details, work_dir, cost_usd_hour,
       # Something wrong happened, try to kill the child process.
       must_signal_internal_failure = str(e) or 'unknown error'
       exit_code = kill_and_wait(proc, task_details.grace_period, str(e))
+
+    logging.info('Subprocess for run_isolated was completed or killed')
 
     # This is the very last packet for this command. It if was an isolated task,
     # include the output reference to the archived .isolated file.
@@ -893,6 +896,7 @@ def run_command(remote, task_details, work_dir, cost_usd_hour,
 
 
 def main(args):
+  logging.info('Starting task_runner script')
   subprocess42.inhibit_os_error_reporting()
 
   # Disable magical auto-detection of OAuth config. See main() in bot_main.py

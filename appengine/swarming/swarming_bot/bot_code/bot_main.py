@@ -992,6 +992,7 @@ def _run_manifest(botobj, manifest, start):
     os_utilities.trim_rolled_log(log_path)
     with fs.open(log_path, 'a+b') as f:
       proc = _Popen(botobj, command, stdout=f, env=env)
+      logging.info('Subprocess for task_runner started.')
       try:
         proc.wait(last_ditch_timeout)
       except subprocess42.TimeoutExpired:
