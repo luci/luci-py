@@ -397,9 +397,6 @@ def _handle_dead_bot(run_result_key):
     # Otherwise, mark it BOT_DIED. the bot hasn't been sending for the task.
     to_put = (run_result, result_summary)
     if run_result.killing:
-      logging.warning('Killing task %s/%s on the missing bot %s',
-                      run_result.task_id, run_result.current_task_slice,
-                      run_result.bot_id)
       run_result.killing = False
       run_result.state = task_result.State.KILLED
       run_result = _set_fallbacks_to_exit_code_and_duration(run_result, now)
@@ -407,6 +404,10 @@ def _handle_dead_bot(run_result_key):
       run_result.state = task_result.State.BOT_DIED
     result_summary.set_from_run_result(run_result, request)
 
+    logging.warning(
+        'Updating task state for bot missing. task:%s, state:%s, bot:%s',
+        run_result.task_id, task_result.State.to_string(run_result.state),
+        run_result.bot_id)
     futures = ndb.put_multi_async(to_put)
     # if result_summary.state != orig_summary_state:
     if orig_summary_state != result_summary.state:
@@ -414,6 +415,8 @@ def _handle_dead_bot(run_result_key):
           result_summary, request, es_cfg, transactional=True)
     for f in futures:
       f.check_success()
+    logging.warning('Task state was successfully updated. task: %s',
+                    run_result.task_id)
     return True
 
   try:
@@ -1703,10 +1706,14 @@ def cron_handle_bot_died():
   - number of task ignored
   """
   try:
+    total = 0
     ignored = 0
     killed = []
     try:
       for run_result_key in task_result.yield_active_run_result_keys():
+        total += 1
+        if total % 500 == 0:
+          logging.info('Fetched %d keys', total)
         result = _handle_dead_bot(run_result_key)
         if result:
           killed.append(task_pack.pack_run_result_key(run_result_key))
