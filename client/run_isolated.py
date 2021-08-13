@@ -1846,8 +1846,11 @@ def main(args):
             sys.stderr.write("running process\n")
             subprocess42.check_call(['tasklist.exe', '/V'], stdout=sys.stderr)
 
-          logging.exception('Error while removing named cache %r at %r. '
-                            'The cache will be lost.', path, name)
+          error = (
+              'Error while removing named cache %r at %r. The cache will be'
+              ' lost.' % (path, name))
+          logging.exception(error)
+          on_error.report(error)
       uninstall_duration = time.time() - uninstall_start
       stats['uninstall']['duration'] = uninstall_duration
       logging.info('named_caches: uninstall took %d seconds',
@@ -1926,6 +1929,7 @@ def main(args):
   except (cipd.Error, local_caching.NamedCacheError,
           local_caching.NoMoreSpace) as ex:
     print(ex.message, file=sys.stderr)
+    on_error.report(None)
     return 1
   finally:
     if tmp_cipd_cache_dir is not None:
