@@ -212,14 +212,23 @@ def _has_access(resources):
     if r:
       access_values.update(r.access)
 
-  has_access = {
-    a: config.api._has_access(a)
-    for a in access_values
-  }
+  identity = auth.get_current_identity()
+  has_access = {a: _check_access_entry(a, identity) for a in access_values}
   return [
     bool(r) and any(has_access[a] for a in r.access)
     for r in resources
   ]
+
+
+def _check_access_entry(access, identity):
+  if access.startswith('group:'):
+    group = access.split(':', 2)[1]
+    return auth.is_group_member(group, identity)
+
+  ac_identity_str = access
+  if ':' not in ac_identity_str:
+    ac_identity_str = 'user:%s' % ac_identity_str
+  return identity.to_bytes() == ac_identity_str
 
 
 def _extract_project_id(config_set):

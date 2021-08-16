@@ -22,7 +22,6 @@ from components import auth
 from . import common
 from . import fs
 from . import remote
-from .proto import project_config_pb2
 
 
 Project = collections.namedtuple('Project', [
@@ -257,35 +256,3 @@ def get_config_set_location_async(config_set):  # pragma: no cover
 def get_config_set_location(config_set):  # pragma: no cover
   """Blocking version of get_config_set_location_async."""
   return get_config_set_location_async(config_set).get_result()
-
-
-def _has_access(access, identity=None):
-  identity = identity or auth.get_current_identity()
-  if access.startswith('group:'):
-    group = access.split(':', 2)[1]
-    return auth.is_group_member(group, identity)
-
-  ac_identity_str = access
-  if ':' not in ac_identity_str:
-    ac_identity_str = 'user:%s' % ac_identity_str
-  return identity.to_bytes() == ac_identity_str
-
-
-@ndb.tasklet
-def has_project_access_async(project_id, identity=None):
-  """Returns True if |identity| has access to project |project_id|.
-
-  The ACL is defined in project.cfg in the project repo, using "access" field.
-  See Project message in proto/service_config.proto for more details.
-
-  This function does not do RPC to config service.
-  """
-  cfg = yield get_project_config_async(
-      project_id, 'project.cfg', project_config_pb2.ProjectCfg,
-      store_last_good=True)
-  raise ndb.Return(cfg and any(_has_access(a, identity) for a in cfg.access))
-
-
-def has_project_access(*args, **kwargs):
-  """Blocking version of has_project_access_async."""
-  return has_project_access_async(*args, **kwargs).get_result()
