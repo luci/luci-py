@@ -1,0 +1,60 @@
+// Copyright 2021 The LUCI Authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+// COPIED FROM go.chromium.org/luci/buildbucket/proto/build.proto
+
+syntax = "proto3";
+
+package bb;
+
+import "google/protobuf/duration.proto";
+
+
+message CacheEntry {
+      // Identifier of the cache. Required. Length is limited to 128.
+      // Must be unique in the build.
+      //
+      // If the pool of swarming bots is shared among multiple LUCI projects and
+      // projects use same cache name, the cache will be shared across projects.
+      // To avoid affecting and being affected by other projects, prefix the
+      // cache name with something project-specific, e.g. "v8-".
+      string name = 1;
+
+      // Relative path where the cache in mapped into. Required.
+      //
+      // Must use POSIX format (forward slashes).
+      // In most cases, it does not need slashes at all.
+      //
+      // In recipes, use api.path['cache'].join(path) to get absolute path.
+      //
+      // Must be unique in the build.
+      string path = 2;
+
+      // Duration to wait for a bot with a warm cache to pick up the
+      // task, before falling back to a bot with a cold (non-existent) cache.
+      //
+      // The default is 0, which means that no preference will be chosen for a
+      // bot with this or without this cache, and a bot without this cache may
+      // be chosen instead.
+      //
+      // If no bot has this cache warm, the task will skip this wait and will
+      // immediately fallback to a cold cache request.
+      //
+      // The value must be multiples of 60 seconds.
+      google.protobuf.Duration wait_for_warm_cache = 3;
+
+      // Environment variable with this name will be set to the path to the cache
+      // directory.
+      string env_var = 4;
+    }
