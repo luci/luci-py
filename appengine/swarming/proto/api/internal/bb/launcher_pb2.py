@@ -15,11 +15,11 @@ _sym_db = _symbol_database.Default()
 
 DESCRIPTOR = _descriptor.FileDescriptor(
   name='launcher.proto',
-  package='swarming.bb',
+  package='bb',
   syntax='proto3',
   serialized_options=None,
   create_key=_descriptor._internal_create_key,
-  serialized_pb=b'\n\x0elauncher.proto\x12\x0bswarming.bb\"M\n\x0c\x42uildSecrets\x12\x13\n\x0b\x62uild_token\x18\x01 \x01(\t\x12(\n resultdb_invocation_update_token\x18\x02 \x01(\tb\x06proto3'
+  serialized_pb=b'\n\x0elauncher.proto\x12\x02\x62\x62\"M\n\x0c\x42uildSecrets\x12\x13\n\x0b\x62uild_token\x18\x01 \x01(\t\x12(\n resultdb_invocation_update_token\x18\x02 \x01(\tb\x06proto3'
 )
 
 
@@ -27,21 +27,21 @@ DESCRIPTOR = _descriptor.FileDescriptor(
 
 _BUILDSECRETS = _descriptor.Descriptor(
   name='BuildSecrets',
-  full_name='swarming.bb.BuildSecrets',
+  full_name='bb.BuildSecrets',
   filename=None,
   file=DESCRIPTOR,
   containing_type=None,
   create_key=_descriptor._internal_create_key,
   fields=[
     _descriptor.FieldDescriptor(
-      name='build_token', full_name='swarming.bb.BuildSecrets.build_token', index=0,
+      name='build_token', full_name='bb.BuildSecrets.build_token', index=0,
       number=1, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=b"".decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='resultdb_invocation_update_token', full_name='swarming.bb.BuildSecrets.resultdb_invocation_update_token', index=1,
+      name='resultdb_invocation_update_token', full_name='bb.BuildSecrets.resultdb_invocation_update_token', index=1,
       number=2, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=b"".decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
@@ -59,8 +59,8 @@ _BUILDSECRETS = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=31,
-  serialized_end=108,
+  serialized_start=22,
+  serialized_end=99,
 )
 
 DESCRIPTOR.message_types_by_name['BuildSecrets'] = _BUILDSECRETS
@@ -69,7 +69,7 @@ _sym_db.RegisterFileDescriptor(DESCRIPTOR)
 BuildSecrets = _reflection.GeneratedProtocolMessageType('BuildSecrets', (_message.Message,), {
   'DESCRIPTOR' : _BUILDSECRETS,
   '__module__' : 'launcher_pb2'
-  # @@protoc_insertion_point(class_scope:swarming.bb.BuildSecrets)
+  # @@protoc_insertion_point(class_scope:bb.BuildSecrets)
   })
 _sym_db.RegisterMessage(BuildSecrets)
 

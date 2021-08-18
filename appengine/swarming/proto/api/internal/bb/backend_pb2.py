@@ -26,7 +26,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   syntax='proto3',
   serialized_options=None,
   create_key=_descriptor._internal_create_key,
-  serialized_pb=b'\n\rbackend.proto\x12\x10swarming.backend\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1egoogle/protobuf/duration.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x0elauncher.proto\x1a\x0c\x63ommon.proto\x1a\x11swarming_bb.proto\"\xb2\x06\n\x0eRunTaskRequest\x12\x0e\n\x06target\x18\x01 \x01(\t\x12\x15\n\rbackend_token\x18\x02 \x01(\t\x12\r\n\x05realm\x18\x03 \x01(\t\x12?\n\x05\x61gent\x18\x04 \x01(\x0b\x32\x30.swarming.backend.RunTaskRequest.AgentExecutable\x12\x12\n\nagent_args\x18\x05 \x03(\t\x12*\n\x07secrets\x18\x06 \x01(\x0b\x32\x19.swarming.bb.BuildSecrets\x12\x10\n\x08\x62uild_id\x18\x07 \x01(\x03\x12\x33\n\ndimensions\x18\x08 \x03(\x0b\x32\x1f.swarming.bb.RequestedDimension\x12\x32\n\x0estart_deadline\x18\t \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x34\n\x11\x65xecution_timeout\x18\n \x01(\x0b\x32\x19.google.protobuf.Duration\x12/\n\x0cgrace_period\x18\x0b \x01(\x0b\x32\x19.google.protobuf.Duration\x12\x1e\n\x06\x63\x61\x63hes\x18\x0c \x03(\x0b\x32\x0e.bb.CacheEntry\x12/\n\x0e\x62\x61\x63kend_config\x18\r \x01(\x0b\x32\x17.google.protobuf.Struct\x12\x13\n\x0b\x65xperiments\x18\x0e \x03(\t\x12\x12\n\nrequest_id\x18\x0f \x01(\t\x1a\x8c\x02\n\x0f\x41gentExecutable\x12L\n\x06source\x18\x01 \x03(\x0b\x32<.swarming.backend.RunTaskRequest.AgentExecutable.SourceEntry\x1a>\n\x0b\x41gentSource\x12\x0e\n\x06sha256\x18\x01 \x01(\t\x12\x12\n\nsize_bytes\x18\x02 \x01(\x03\x12\x0b\n\x03url\x18\x03 \x01(\t\x1ak\n\x0bSourceEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12K\n\x05value\x18\x02 \x01(\x0b\x32<.swarming.backend.RunTaskRequest.AgentExecutable.AgentSource:\x02\x38\x01\x32T\n\x0bTaskBackend\x12\x45\n\x07RunTask\x12 .swarming.backend.RunTaskRequest\x1a\x16.google.protobuf.Empty\"\x00\x62\x06proto3'
+  serialized_pb=b'\n\rbackend.proto\x12\x10swarming.backend\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1egoogle/protobuf/duration.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x0elauncher.proto\x1a\x0c\x63ommon.proto\x1a\x11swarming_bb.proto\"\xa0\x06\n\x0eRunTaskRequest\x12\x0e\n\x06target\x18\x01 \x01(\t\x12\x15\n\rbackend_token\x18\x02 \x01(\t\x12\r\n\x05realm\x18\x03 \x01(\t\x12?\n\x05\x61gent\x18\x04 \x01(\x0b\x32\x30.swarming.backend.RunTaskRequest.AgentExecutable\x12\x12\n\nagent_args\x18\x05 \x03(\t\x12!\n\x07secrets\x18\x06 \x01(\x0b\x32\x10.bb.BuildSecrets\x12\x10\n\x08\x62uild_id\x18\x07 \x01(\x03\x12*\n\ndimensions\x18\x08 \x03(\x0b\x32\x16.bb.RequestedDimension\x12\x32\n\x0estart_deadline\x18\t \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x34\n\x11\x65xecution_timeout\x18\n \x01(\x0b\x32\x19.google.protobuf.Duration\x12/\n\x0cgrace_period\x18\x0b \x01(\x0b\x32\x19.google.protobuf.Duration\x12\x1e\n\x06\x63\x61\x63hes\x18\x0c \x03(\x0b\x32\x0e.bb.CacheEntry\x12/\n\x0e\x62\x61\x63kend_config\x18\r \x01(\x0b\x32\x17.google.protobuf.Struct\x12\x13\n\x0b\x65xperiments\x18\x0e \x03(\t\x12\x12\n\nrequest_id\x18\x0f \x01(\t\x1a\x8c\x02\n\x0f\x41gentExecutable\x12L\n\x06source\x18\x01 \x03(\x0b\x32<.swarming.backend.RunTaskRequest.AgentExecutable.SourceEntry\x1a>\n\x0b\x41gentSource\x12\x0e\n\x06sha256\x18\x01 \x01(\t\x12\x12\n\nsize_bytes\x18\x02 \x01(\x03\x12\x0b\n\x03url\x18\x03 \x01(\t\x1ak\n\x0bSourceEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12K\n\x05value\x18\x02 \x01(\x0b\x32<.swarming.backend.RunTaskRequest.AgentExecutable.AgentSource:\x02\x38\x01\x32T\n\x0bTaskBackend\x12\x45\n\x07RunTask\x12 .swarming.backend.RunTaskRequest\x1a\x16.google.protobuf.Empty\"\x00\x62\x06proto3'
   ,
   dependencies=[google_dot_protobuf_dot_timestamp__pb2.DESCRIPTOR,google_dot_protobuf_dot_duration__pb2.DESCRIPTOR,google_dot_protobuf_dot_struct__pb2.DESCRIPTOR,google_dot_protobuf_dot_empty__pb2.DESCRIPTOR,launcher__pb2.DESCRIPTOR,common__pb2.DESCRIPTOR,swarming__bb__pb2.DESCRIPTOR,])
 
@@ -74,8 +74,8 @@ _RUNTASKREQUEST_AGENTEXECUTABLE_AGENTSOURCE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=856,
-  serialized_end=918,
+  serialized_start=838,
+  serialized_end=900,
 )
 
 _RUNTASKREQUEST_AGENTEXECUTABLE_SOURCEENTRY = _descriptor.Descriptor(
@@ -112,8 +112,8 @@ _RUNTASKREQUEST_AGENTEXECUTABLE_SOURCEENTRY = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=920,
-  serialized_end=1027,
+  serialized_start=902,
+  serialized_end=1009,
 )
 
 _RUNTASKREQUEST_AGENTEXECUTABLE = _descriptor.Descriptor(
@@ -143,8 +143,8 @@ _RUNTASKREQUEST_AGENTEXECUTABLE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=759,
-  serialized_end=1027,
+  serialized_start=741,
+  serialized_end=1009,
 )
 
 _RUNTASKREQUEST = _descriptor.Descriptor(
@@ -273,7 +273,7 @@ _RUNTASKREQUEST = _descriptor.Descriptor(
   oneofs=[
   ],
   serialized_start=209,
-  serialized_end=1027,
+  serialized_end=1009,
 )
 
 _RUNTASKREQUEST_AGENTEXECUTABLE_AGENTSOURCE.containing_type = _RUNTASKREQUEST_AGENTEXECUTABLE
@@ -333,8 +333,8 @@ _TASKBACKEND = _descriptor.ServiceDescriptor(
   index=0,
   serialized_options=None,
   create_key=_descriptor._internal_create_key,
-  serialized_start=1029,
-  serialized_end=1113,
+  serialized_start=1011,
+  serialized_end=1095,
   methods=[
   _descriptor.MethodDescriptor(
     name='RunTask',

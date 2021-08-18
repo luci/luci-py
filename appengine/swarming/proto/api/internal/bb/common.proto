@@ -16,7 +16,7 @@
 
 syntax = "proto3";
 
-package swarming.bb;
+package bb;
 
 import "google/protobuf/duration.proto";
 

@@ -120,7 +120,7 @@ message RunTaskRequest {
   // NOTE: If passed via CLI, Backends SHOULD ensure that task
   // command-lines are not widely readable, or the Backend risks tasks (or
   // malicious actors) impersonating builds.
-  bb.BuildSecrets secrets = 6;
+  .bb.BuildSecrets secrets = 6;
 
   // The id of the build that this request is for.
   //
@@ -139,7 +139,7 @@ message RunTaskRequest {
   //
   // NOTE: These do not include Swarming's "special" named cache dimensions.
   // see `caches` for that information.
-  repeated bb.RequestedDimension dimensions = 8;
+  repeated .bb.RequestedDimension dimensions = 8;
 
   // Start deadline is the absolute timestamp of when this Build must start
   // by before Buildbucket marks it as INFRA_FAILURE.

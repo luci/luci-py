@@ -16,7 +16,7 @@
 
 syntax = "proto3";
 
-package swarming.bb;
+package bb;
 
 // This file is meant for protos passed and used internally.
 
