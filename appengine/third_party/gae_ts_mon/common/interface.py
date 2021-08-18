@@ -65,6 +65,8 @@ class State(object):
       store_ctor = metric_store.InProcessMetricStore
     # The Monitor object that will be used to send all metrics.
     self.global_monitor = None
+    # Proxy zone.
+    self.default_proxy_zone = 'atl'
     # The Target object that will be paired with all metrics that don't supply
     # their own.
     self.target = target
@@ -223,6 +225,10 @@ def _generate_proto():
           _populate_root_labels(collections[target].root_labels, target)
         else:
           target.populate_target_pb(collections[target])
+
+        collections[target].root_labels.add(
+          key='proxy_zone', string_value=state.default_proxy_zone)
+
       collection = collections[target]
 
       key = (target, metric.name)

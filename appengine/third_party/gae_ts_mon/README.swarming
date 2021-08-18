@@ -1,7 +1,7 @@
 Name: gae_ts_mon
 Short Name: gae_ts_mon
 URL: https://chromium.googlesource.com/infra/infra/+/main/appengine_module/gae_ts_mon/
-Revision: https://crrev.com/c/3085829 (tainted)
+Revision: 4c382fdc2de618011635fc3b35e21cb64ab01d22
 License: Chromium License
 
 Description:
