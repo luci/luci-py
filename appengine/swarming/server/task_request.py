@@ -1787,6 +1787,10 @@ def init_new_request(request, allow_high_priority, template_apply):
   - user: overridden by parent.user
 
   template_apply must be one of the TEMPLATE_* singleton values above.
+
+  Raises:
+    ValueError: if given values are not valid or missing.
+    datastore_errors.BadValueError: if the updated TaskRequest is not valid.
   """
   assert request.__class__ is TaskRequest, request
   if not request.num_task_slices:
@@ -1845,6 +1849,79 @@ def init_new_request(request, allow_high_priority, template_apply):
   all_tags = set(request.manual_tags).union(_get_automatic_tags(request))
   all_tags.update(extra_tags)
   request.tags = sorted(all_tags)
+
+  # Apply server defaults after general values are computed and set.
+  for t in request.task_slices:
+    _apply_server_property_defaults(t.properties)
+
+  # Confirm the request itself is valid.
+  request._pre_put_hook()
+
+
+def _apply_server_property_defaults(properties):
+  # type: (TaskProperties) -> None
+  """Fills ndb task properties with default values read from server settings.
+
+  Essentially:
+   - If a property is set by the task explicitly, use that. Else:
+   - If a property is set by the task's template, use that. Else:
+   - If a property is set by the server's settings.cfg, use that.
+  """
+  settings = config.settings()
+  # TODO(iannucci): This was an artifact of the existing test harnesses;
+  # get_pool_config raises on None, but the way it's mocked in
+  # ./test_env_handlers.py allows `get_pool_config` to return None in this case.
+  # This try/except will be cleaned up in a subsequent CL, once I remove these
+  # default services from `config`.
+  try:
+    pool_cfg = pools_config.get_pool_config(properties.pool)
+  except ValueError:
+    pool_cfg = None
+  if not settings and not pool_cfg:
+    return
+
+  _apply_isolate_server_defaults(properties, settings, pool_cfg)
+  _apply_cipd_defaults(properties, settings, pool_cfg)
+
+
+def _apply_isolate_server_defaults(properties, settings, pool_cfg):
+  # Do not set Isolate server defaults when CAS input is set.
+  if properties.cas_input_root:
+    return
+
+  iso_server = settings.isolate.default_server
+  iso_ns = settings.isolate.default_namespace
+  if pool_cfg and pool_cfg.default_isolate:
+    iso_server = pool_cfg.default_isolate.server
+    iso_ns = pool_cfg.default_isolate.namespace
+
+  if iso_server and iso_ns:
+    properties.inputs_ref = properties.inputs_ref or FilesRef()
+    properties.inputs_ref.isolatedserver = (
+        properties.inputs_ref.isolatedserver or iso_server)
+    properties.inputs_ref.namespace = (
+        properties.inputs_ref.namespace or iso_ns)
+
+
+def _apply_cipd_defaults(properties, settings, pool_cfg):
+  cipd_server = settings.cipd.default_server
+  cipd_client = settings.cipd.default_client_package.package_name
+  cipd_vers = settings.cipd.default_client_package.version
+  if pool_cfg and pool_cfg.default_cipd:
+    cipd_server = pool_cfg.default_cipd.server
+    cipd_client = pool_cfg.default_cipd.package_name
+    cipd_vers = pool_cfg.default_cipd.client_version
+
+  if cipd_server and properties.cipd_input:
+    properties.cipd_input.server = (properties.cipd_input.server or cipd_server)
+    properties.cipd_input.client_package = (
+        properties.cipd_input.client_package or CipdPackage())
+    # TODO(iannucci) - finish removing 'client_package' as a task-configurable
+    # setting.
+    properties.cipd_input.client_package.package_name = (
+        properties.cipd_input.client_package.package_name or cipd_client)
+    properties.cipd_input.client_package.version = (
+        properties.cipd_input.client_package.version or cipd_vers)
 
 
 def validate_priority(priority):

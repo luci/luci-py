@@ -1402,7 +1402,7 @@ class TasksApiTest(BaseTest):
     response = self.call_api('new', body=message_to_dict(request), status=400)
     expected = {
         u'error': {
-            u'message': u"get_pool_config called with None",
+            u'message': u"'pool' must be used as dimensions",
         },
     }
     self.assertEqual(expected, response.json)

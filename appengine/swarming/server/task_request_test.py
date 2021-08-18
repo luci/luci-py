@@ -410,7 +410,7 @@ class TaskRequestApiTest(TestCase):
             expiration_secs=60,
             properties=_gen_properties(dimensions={
                 u'os': [u'linux|mac|win'],
-                u'pool': [u'bar']
+                u'pool': [u'foo']
             })),
     ]
     req = _gen_request_slices(task_slices=slices)
@@ -418,7 +418,7 @@ class TaskRequestApiTest(TestCase):
                     u'service_account:none', u'user:Jesus',
                     u'use_isolate_1143123:1', u'use_cas_1143123:0'))
     self.assertEqual(expected, task_request.get_automatic_tags(req, 0))
-    expected = set((u'os:linux', u'os:mac', u'os:win', u'pool:bar',
+    expected = set((u'os:linux', u'os:mac', u'os:win', u'pool:foo',
                     u'priority:50', u'service_account:none', u'user:Jesus',
                     u'use_isolate_1143123:1', u'use_cas_1143123:0'))
     self.assertEqual(expected, task_request.get_automatic_tags(req, 1))
@@ -866,10 +866,9 @@ class TaskRequestApiTest(TestCase):
       _gen_request(parent_task_id='1d69b9f088008810')
 
   def test_init_new_request_missing_name(self):
-    req = _gen_request(name=None)
     with self.assertRaisesRegexp(datastore_errors.BadValueError,
                                  '^name is missing$'):
-      req.put()
+      _gen_request(name=None)
 
   def test_init_new_request_idempotent(self):
     request = _gen_request(properties=_gen_properties(idempotent=True))
@@ -1415,12 +1414,11 @@ class TaskRequestApiTest(TestCase):
   def test_request_bad_values_stale_style(self):
     # Old TaskRequest.properties style.
     # Hack a bit the call to force the incorrect call.
-    req = _gen_request_slices(
-        task_slices=[],
-        expiration_ts=utils.utcnow() + datetime.timedelta(hours=1),
-        properties_old=_gen_properties())
     with self.assertRaises(datastore_errors.BadValueError):
-      req.put()
+      _gen_request_slices(
+          task_slices=[],
+          expiration_ts=utils.utcnow() + datetime.timedelta(hours=1),
+          properties_old=_gen_properties())
 
   def test_request_bad_values_task_slices(self):
     with self.assertRaises(ValueError):
@@ -1448,9 +1446,9 @@ class TaskRequestApiTest(TestCase):
             u'v': [unicode(i)]
         }) for i in range(9)
     ]
-    req = _gen_request_slices(task_slices=slices)
     with self.assertRaises(datastore_errors.BadValueError):
-      req.put()
+      _gen_request_slices(task_slices=slices)
+
     # Different pools.
     slices = [
         task_request.TaskSlice(
@@ -1460,14 +1458,12 @@ class TaskRequestApiTest(TestCase):
             expiration_secs=60,
             properties=_gen_properties(dimensions={u'pool': [u'other']})),
     ]
-    req = _gen_request_slices(task_slices=slices)
     with self.assertRaises(datastore_errors.BadValueError):
-      req.put()
+      _gen_request_slices(task_slices=slices)
 
   def test_request_bad_command(self):
-    req = _gen_request(properties=_gen_properties(command=[], inputs_ref=None))
     with self.assertRaises(datastore_errors.BadValueError):
-      req.put()
+      _gen_request(properties=_gen_properties(command=[], inputs_ref=None))
     with self.assertRaises(datastore_errors.BadValueError):
       _gen_request(properties=_gen_properties(command={'a': 'b'}))
     with self.assertRaises(datastore_errors.BadValueError):
@@ -1505,23 +1501,20 @@ class TaskRequestApiTest(TestCase):
           properties=_gen_properties(
               idempotent=idempotent, cipd_input=_gen_cipd_input(**cipd_input)))
 
-    req = mkcipdreq(packages=[{}])
     with self.assertRaises(datastore_errors.BadValueError):
-      req.put()
+      mkcipdreq(packages=[{}])
     with self.assertRaises(datastore_errors.BadValueError):
       mkcipdreq(packages=[
           task_request.CipdPackage(
               package_name='infra|rm', path='.', version='latest'),
       ])
-    req = mkcipdreq(
-        packages=[task_request.CipdPackage(package_name='rm', path='.')])
     with self.assertRaises(datastore_errors.BadValueError):
-      req.put()
-    req = mkcipdreq(packages=[
-        task_request.CipdPackage(package_name='rm', version='latest'),
-    ])
+      mkcipdreq(
+          packages=[task_request.CipdPackage(package_name='rm', path='.')])
     with self.assertRaises(datastore_errors.BadValueError):
-      req.put()
+      mkcipdreq(packages=[
+          task_request.CipdPackage(package_name='rm', version='latest'),
+      ])
     with self.assertRaises(datastore_errors.BadValueError):
       mkcipdreq(packages=[
           task_request.CipdPackage(
@@ -1542,20 +1535,20 @@ class TaskRequestApiTest(TestCase):
           task_request.CipdPackage(
               package_name='rm', path='a/./b', version='latest'),
       ])
-    req = mkcipdreq(packages=[
-        task_request.CipdPackage(package_name='rm', path='.', version='latest'),
-        task_request.CipdPackage(package_name='rm', path='.', version='canary'),
-    ])
     with self.assertRaises(datastore_errors.BadValueError):
-      req.put()
-    req = mkcipdreq(
-        idempotent=True,
-        packages=[
-            task_request.CipdPackage(
-                package_name='rm', path='.', version='latest'),
-        ])
+      mkcipdreq(packages=[
+          task_request.CipdPackage(
+              package_name='rm', path='.', version='latest'),
+          task_request.CipdPackage(
+              package_name='rm', path='.', version='canary'),
+      ])
     with self.assertRaises(datastore_errors.BadValueError):
-      req.put()
+      mkcipdreq(
+          idempotent=True,
+          packages=[
+              task_request.CipdPackage(
+                  package_name='rm', path='.', version='latest'),
+          ])
     with self.assertRaises(datastore_errors.BadValueError):
       mkcipdreq(server='abc')
     with self.assertRaises(datastore_errors.BadValueError):
@@ -1640,18 +1633,20 @@ class TaskRequestApiTest(TestCase):
 
   def test_request_bad_named_cache_and_cipd_input(self):
     # A CIPD package and named caches cannot be mapped to the same path.
-    req = _gen_request(
-        properties=_gen_properties(
-            caches=[
-                task_request.CacheEntry(name='git_chromium', path='git_cache'),
-            ],
-            cipd_input=_gen_cipd_input(packages=[
-                task_request.CipdPackage(
-                    package_name='foo', path='git_cache', version='latest'),
-            ])))
     with self.assertRaises(datastore_errors.BadValueError):
-      req.put()
-    req = _gen_request(
+      _gen_request(
+          properties=_gen_properties(
+              caches=[
+                  task_request.CacheEntry(
+                      name='git_chromium', path='git_cache'),
+              ],
+              cipd_input=_gen_cipd_input(packages=[
+                  task_request.CipdPackage(
+                      package_name='foo', path='git_cache', version='latest'),
+              ])))
+
+    # Confirm no exceptions raise.
+    _gen_request(
         properties=_gen_properties(
             caches=[
                 task_request.CacheEntry(name='git_chromium', path='git_cache1'),
@@ -1659,7 +1654,7 @@ class TaskRequestApiTest(TestCase):
             cipd_input=_gen_cipd_input(packages=[
                 task_request.CipdPackage(
                     package_name='foo', path='git_cache2', version='latest'),
-            ]))).put()
+            ])))
 
   def test_request_bad_dimensions(self):
     # Type error.
@@ -1868,10 +1863,9 @@ class TaskRequestApiTest(TestCase):
     # When used locally, it is set to 1, which means it's impossible to test
     # below _MIN_TIMEOUT_SECS but above 0.
     self.mock(task_request, '_MIN_TIMEOUT_SECS', 30)
-    p = _gen_request(properties=_gen_properties(execution_timeout_secs=0))
     with self.assertRaises(datastore_errors.BadValueError):
       # Only termination task may have 0.
-      p.put()
+      _gen_request(properties=_gen_properties(execution_timeout_secs=0))
     with self.assertRaises(datastore_errors.BadValueError):
       _gen_request(
           properties=_gen_properties(
@@ -1937,49 +1931,46 @@ class TaskRequestApiTest(TestCase):
                 isolatedserver='http://localhost:1',
                 namespace='default-gzip'))).put()
     # Bad digest.
-    req = _gen_request(
-        properties=_gen_properties(
-            command=['see', 'spot', 'run'],
-            inputs_ref=task_request.FilesRef(
-                isolated='deadbeef',
-                isolatedserver='http://localhost:1',
-                namespace='default-gzip')))
     with self.assertRaises(datastore_errors.BadValueError):
-      req.put()
+      _gen_request(
+          properties=_gen_properties(
+              command=['see', 'spot', 'run'],
+              inputs_ref=task_request.FilesRef(
+                  isolated='deadbeef',
+                  isolatedserver='http://localhost:1',
+                  namespace='default-gzip')))
     # inputs_ref without server/namespace.
-    req = _gen_request(
-        properties=_gen_properties(inputs_ref=task_request.FilesRef()))
     with self.assertRaises(datastore_errors.BadValueError):
-      req.put()
+      _gen_request(
+          properties=_gen_properties(inputs_ref=task_request.FilesRef()))
+
+
     # Without digest nor command.
-    req = _gen_request(
-        properties=_gen_properties(
-            command=[],
-            inputs_ref=task_request.FilesRef(
-                isolatedserver='https://isolateserver.appspot.com',
-                namespace='default-gzip^^^')))
     with self.assertRaises(datastore_errors.BadValueError):
-      req.put()
+      _gen_request(
+          properties=_gen_properties(
+              command=[],
+              inputs_ref=task_request.FilesRef(
+                  isolatedserver='https://isolateserver.appspot.com',
+                  namespace='default-gzip^^^')))
     # For 'sha256-GCP', the length must be 64.
-    req = _gen_request(
-        properties=_gen_properties(
-            command=[],
-            inputs_ref=task_request.FilesRef(
-                isolated='deadbeefdeadbeefdeadbeefdeadbeefdeadbeef',
-                isolatedserver='foo-bar',
-                namespace='sha256-GCP')))
     with self.assertRaises(datastore_errors.BadValueError):
-      req.put()
+      _gen_request(
+          properties=_gen_properties(
+              command=[],
+              inputs_ref=task_request.FilesRef(
+                  isolated='deadbeefdeadbeefdeadbeefdeadbeefdeadbeef',
+                  isolatedserver='foo-bar',
+                  namespace='sha256-GCP')))
     # For 'sha256-GCP', the isolatedserver value must not contain '://'.
-    req = _gen_request(
-        properties=_gen_properties(
-            command=[],
-            inputs_ref=task_request.FilesRef(
-                isolated='dead' * (64 / 4),
-                isolatedserver='foo://bar',
-                namespace='sha256-GCP')))
     with self.assertRaises(datastore_errors.BadValueError):
-      req.put()
+      _gen_request(
+          properties=_gen_properties(
+              command=[],
+              inputs_ref=task_request.FilesRef(
+                  isolated='dead' * (64 / 4),
+                  isolatedserver='foo://bar',
+                  namespace='sha256-GCP')))
 
   def test_request_bad_cas_input_root(self):
 
@@ -2025,20 +2016,19 @@ class TaskRequestApiTest(TestCase):
           digest=task_request.Digest(hash='12345', size_bytes=None)).put()
 
   def test_request_conflict_inputs(self):
-    req = _gen_request(
-        properties=_gen_properties(
-            inputs_ref=task_request.FilesRef(
-                isolated='0123456789012345678901234567890123456789',
-                isolatedserver=u'https://isolateserver.appspot.com',
-                namespace=u'default-gzip'),
-            cas_input_root=task_request.CASReference(
-                cas_instance='projects/test/instances/default',
-                digest=task_request.Digest(hash='12345', size_bytes=1)),
-        ))
     with self.assertRaises(datastore_errors.BadValueError) as e:
-      req.put()
-    self.assertEqual(e.exception.message,
-                     "can't set both inputs_ref and cas_input_root")
+      _gen_request(
+          properties=_gen_properties(
+              inputs_ref=task_request.FilesRef(
+                  isolated='0123456789012345678901234567890123456789',
+                  isolatedserver=u'https://isolateserver.appspot.com',
+                  namespace=u'default-gzip'),
+              cas_input_root=task_request.CASReference(
+                  cas_instance='projects/test/instances/default',
+                  digest=task_request.Digest(hash='12345', size_bytes=1)),
+          ))
+      self.assertEqual(e.exception.message,
+                       "can't set both inputs_ref and cas_input_root")
 
   def test_request_bad_pubsub(self):
     _gen_request(pubsub_topic=u'projects/a/topics/abc').put()
@@ -2266,12 +2256,16 @@ class TaskRequestApiTest(TestCase):
 
   def test_normalize_or_dimensions(self):
     dim1 = _gen_request(
-        properties=_gen_properties(dimensions={u'foo':
-            [u'a|c|b', u'xyz']})).task_slice(0).properties.dimensions
+        properties=_gen_properties(dimensions={
+            u'pool': [u'pool-a'],
+            u'foo': [u'a|c|b', u'xyz']
+        })).task_slice(0).properties.dimensions
     dim2 = _gen_request(
-        properties=_gen_properties(dimensions={u'foo':
-            [u'xyz', u'c|b|a']})).task_slice(0).properties.dimensions
-    expected = {u'foo': [u'a|b|c', u'xyz']}
+        properties=_gen_properties(dimensions={
+            u'pool': [u'pool-a'],
+            u'foo': [u'xyz', u'c|b|a']
+        })).task_slice(0).properties.dimensions
+    expected = {u'foo': [u'a|b|c', u'xyz'], u'pool': [u'pool-a']}
     self.assertEqual(dim1, expected)
     self.assertEqual(dim1, dim2)
 

@@ -673,18 +673,23 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
     # in this case, rebuild_task_cache_async() is called inlined.
     self.assertEqual(0, _assert_bot())
     request = _gen_request(
-        properties=_gen_properties(dimensions={u'id': [u'bot1']}))
+        properties=_gen_properties(dimensions={
+            u'id': [u'bot1'],
+            u'pool': [u'default']
+        }))
     task_queues.assert_task_async(request).get_result()
     self.assertEqual(0, self.execute_tasks())
     self.assert_count(1, bot_management.BotInfo)
     self.assert_count(1, task_queues.BotDimensions)
+    print(task_queues.BotTaskDimensions)
     self.assert_count(1, task_queues.BotTaskDimensions)
     self.assert_count(1, task_queues.TaskDimensions)
 
   def test_assert_task_async_call_rebuld_task_cache_async(self):
     self.assertEqual(0, _assert_bot())
-    dimensions={
+    dimensions = {
         u'id': [u'bot1'],
+        u'pool': [u'default'],
     }
     self.mock_now(datetime.datetime(2020, 1, 2, 3, 4, 5))
     request1 = _gen_request(properties=_gen_properties(dimensions=dimensions))
@@ -762,11 +767,15 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
 
   def test_hash_or_dimensions(self):
     dim1 = _gen_request(
-        properties=_gen_properties(dimensions={u'foo':
-            [u'a|c|b', u'xyz']})).task_slice(0).properties.dimensions
+        properties=_gen_properties(dimensions={
+            u'pool': [u'pool-a'],
+            u'foo': [u'a|c|b', u'xyz']
+        })).task_slice(0).properties.dimensions
     dim2 = _gen_request(
-        properties=_gen_properties(dimensions={u'foo':
-            [u'xyz', u'b|c|a']})).task_slice(0).properties.dimensions
+        properties=_gen_properties(dimensions={
+            u'pool': [u'pool-a'],
+            u'foo': [u'xyz', u'b|c|a']
+        })).task_slice(0).properties.dimensions
     self.assertEqual(
         task_queues.hash_dimensions(dim1), task_queues.hash_dimensions(dim2))
 

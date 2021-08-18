@@ -27,6 +27,8 @@ from components import datastore_utils
 from components import endpoints_webapp2
 from components import utils
 
+import api_helpers
+import handlers_exceptions
 import message_conversion
 import swarming_rpcs
 from server import acl
@@ -35,8 +37,6 @@ from server import bot_management
 from server import config
 from server import pools_config
 from server import realms
-from server import service_accounts
-from server import service_accounts_utils
 from server import task_pack
 from server import task_queues
 from server import task_request
@@ -142,72 +142,6 @@ def get_or_raise(key):
   if not result:
     raise endpoints.NotFoundException('%s not found.' % key.id())
   return result
-
-
-def apply_server_property_defaults(properties):
-  """Fills ndb task properties with default values read from server settings.
-
-  Essentially:
-   - If a property is set by the task explicitly, use that. Else:
-   - If a property is set by the task's template, use that. Else:
-   - If a property is set by the server's settings.cfg, use that.
-  """
-  settings = config.settings()
-  # TODO(iannucci): This was an artifact of the existing test harnesses;
-  # get_pool_config raises on None, but the way it's mocked in
-  # ./test_env_handlers.py allows `get_pool_config` to return None in this case.
-  # This try/except will be cleaned up in a subsequent CL, once I remove these
-  # default services from `config`.
-  try:
-    pool_cfg = pools_config.get_pool_config(properties.pool)
-  except ValueError:
-    pool_cfg = None
-  if not settings and not pool_cfg:
-    return
-
-  _apply_isolate_server_defaults(properties, settings, pool_cfg)
-  _apply_cipd_defaults(properties, settings, pool_cfg)
-
-
-def _apply_isolate_server_defaults(properties, settings, pool_cfg):
-  # Do not set Isolate server defaults when CAS input is set.
-  if properties.cas_input_root:
-    return
-
-  iso_server = settings.isolate.default_server
-  iso_ns = settings.isolate.default_namespace
-  if pool_cfg and pool_cfg.default_isolate:
-    iso_server = pool_cfg.default_isolate.server
-    iso_ns = pool_cfg.default_isolate.namespace
-
-  if iso_server and iso_ns:
-    properties.inputs_ref = properties.inputs_ref or task_request.FilesRef()
-    properties.inputs_ref.isolatedserver = (
-        properties.inputs_ref.isolatedserver or iso_server)
-    properties.inputs_ref.namespace = (
-        properties.inputs_ref.namespace or iso_ns)
-
-
-def _apply_cipd_defaults(properties, settings, pool_cfg):
-  cipd_server = settings.cipd.default_server
-  cipd_client = settings.cipd.default_client_package.package_name
-  cipd_vers = settings.cipd.default_client_package.version
-  if pool_cfg and pool_cfg.default_cipd:
-    cipd_server = pool_cfg.default_cipd.server
-    cipd_client = pool_cfg.default_cipd.package_name
-    cipd_vers = pool_cfg.default_cipd.client_version
-
-  if cipd_server and properties.cipd_input:
-    properties.cipd_input.server = (
-        properties.cipd_input.server or cipd_server)
-    properties.cipd_input.client_package = (
-        properties.cipd_input.client_package or task_request.CipdPackage())
-    # TODO(iannucci) - finish removing 'client_package' as a task-configurable
-    # setting.
-    properties.cipd_input.client_package.package_name = (
-        properties.cipd_input.client_package.package_name or cipd_client)
-    properties.cipd_input.client_package.version = (
-        properties.cipd_input.client_package.version or cipd_vers)
 
 
 ### API
@@ -520,99 +454,18 @@ class SwarmingTasksService(remote.Service):
 
     try:
       request_obj, secret_bytes, template_apply = (
-          message_conversion.new_task_request_from_rpc(
-              request, utils.utcnow()))
-
-      # Retrieve pool_cfg, and check the existence.
-      pool = request_obj.pool
-      pool_cfg = pools_config.get_pool_config(pool)
-      if not pool_cfg:
-        logging.warning('Pool "%s" is not in pools.cfg', pool)
-        # TODO(crbug.com/1086058): It currently returns 403 Forbidden, but
-        # should return 400 BadRequest or 422 Unprocessable Entity, instead.
-        raise auth.AuthorizationError(
-            'Can\'t submit tasks to pool "%s", not defined in pools.cfg' % pool)
-
-      task_request.init_new_request(
-          request_obj, acl.can_schedule_high_priority_tasks(),
-          template_apply)
-      for index in range(request_obj.num_task_slices):
-        apply_server_property_defaults(request_obj.task_slice(index).properties)
-      # We need to call the ndb.Model pre-put check earlier because the
-      # following checks assume that the request itself is valid and could crash
-      # otherwise.
-      request_obj._pre_put_hook()
-    except (datastore_errors.BadValueError, TypeError, ValueError) as e:
-      logging.warning('Incorrect new task request', exc_info=True)
+          message_conversion.new_task_request_from_rpc(request, utils.utcnow()))
+    except (datastore_errors.BadValueError, ValueError) as e:
       raise endpoints.BadRequestException(e.message)
 
-    # TODO(crbug.com/1109378): Check ACLs before calling init_new_request to
-    # avoid leaking information about pool templates to unauthorized callers.
-
-    # If the task request supplied a realm it means the task is in a realm-aware
-    # mode and it wants *all* realm ACLs to be enforced. Otherwise assume
-    # the task runs in pool_cfg.default_task_realm and enforce only permissions
-    # specified in enforced_realm_permissions pool config (using legacy ACLs
-    # for the rest). This should simplify the transition to realm ACLs.
-    enforce_realms_acl = False
-    if request_obj.realm:
-      logging.info('Using task realm %r', request_obj.realm)
-      enforce_realms_acl = True
-    elif pool_cfg.default_task_realm:
-      logging.info('Using default_task_realm %r', pool_cfg.default_task_realm)
-      request_obj.realm = pool_cfg.default_task_realm
-    else:
-      logging.info('Not using realms')
-
-    # Warn if the pool has realms configured, but the task is using old ACLs.
-    if pool_cfg.realm and not request_obj.realm:
-      logging.warning(
-          'crbug.com/1066839: %s: %r is not using realms',
-          pool, request_obj.name)
-
-    # Realm permission 'swarming.pools.createInRealm' checks if the
-    # caller is allowed to create a task in the task realm.
-    request_obj.realms_enabled = realms.check_tasks_create_in_realm(
-        request_obj.realm, pool_cfg, enforce_realms_acl)
-
-    # Realm permission 'swarming.pools.create' checks if the caller is allowed
-    # to create a task in the pool.
-    realms.check_pools_create_task(pool_cfg, enforce_realms_acl)
-
-    # If the request has a service account email, check if the service account
-    # is allowed to run.
-    if service_accounts_utils.is_service_account(request_obj.service_account):
-      if not service_accounts.has_token_server():
-        raise endpoints.BadRequestException(
-            'This Swarming server doesn\'t support task service accounts '
-            'because Token Server URL is not configured')
-
-      # Realm permission 'swarming.tasks.actAs' checks if the service account is
-      # allowed to run in the task realm.
-      realms.check_tasks_act_as(request_obj, pool_cfg, enforce_realms_acl)
-
-      # If using legacy ACLs for service accounts, use the legacy mechanism to
-      # mint oauth token as well. Note that this path will be deprecated after
-      # migration to MintServiceAccountToken rpc which accepts realm.
-      # It contacts the token server to generate "OAuth token grant" (or grab a
-      # cached one). By doing this we check that the given service account usage
-      # is allowed by the token server rules at the time the task is posted.
-      # This check is also performed later (when running the task), when we get
-      # the actual OAuth access token.
-      if not request_obj.realms_enabled:
-        max_lifetime_secs = request_obj.max_lifetime_secs
-        try:
-          duration = datetime.timedelta(seconds=max_lifetime_secs)
-          request_obj.service_account_token = (
-              service_accounts.get_oauth_token_grant(
-                  service_account=request_obj.service_account,
-                  validity_duration=duration))
-        except service_accounts.PermissionError as exc:
-          raise auth.AuthorizationError(exc.message)
-        except service_accounts.MisconfigurationError as exc:
-          raise endpoints.BadRequestException(exc.message)
-        except service_accounts.InternalError as exc:
-          raise endpoints.InternalServerErrorException(exc.message)
+    try:
+      api_helpers.process_task_request(request_obj, template_apply)
+    except (handlers_exceptions.BadRequestException) as e:
+      raise endpoints.BadRequestException(e.message)
+    except handlers_exceptions.PermissionException as e:
+      raise auth.AuthorizationError(e.message)
+    except handlers_exceptions.InternalException as e:
+      raise endpoints.InternalServerErrorException(e.message)
 
     # If the user only wanted to evaluate scheduling the task, but not actually
     # schedule it, return early without a task_id.
@@ -658,14 +511,9 @@ class SwarmingTasksService(remote.Service):
         return request_metadata
 
     try:
-      enable_resultdb = request.resultdb and request.resultdb.enable
-      if enable_resultdb and not request_obj.realms_enabled:
-        raise endpoints.BadRequestException(
-            'ResultDB is enabled, but realm is not set')
-
-      result_summary = task_scheduler.schedule_request(request_obj,
-                                                       secret_bytes,
-                                                       enable_resultdb)
+      result_summary = task_scheduler.schedule_request(
+          request_obj, secret_bytes, request_obj.resultdb and
+          request_obj.resultdb.enable)
     except (datastore_errors.BadValueError, TypeError, ValueError) as e:
       logging.exception("got exception around task_scheduler.schedule_request")
       raise endpoints.BadRequestException(e.message)
