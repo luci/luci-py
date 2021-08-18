@@ -2,6 +2,8 @@
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
 
+import logging
+
 from components import auth
 from components import config
 from components import utils
@@ -31,12 +33,16 @@ def can_reimport(config_set):
 def _can_reimport_project_cs(project_id):
   return _check_project_acl(
       project_id=project_id,
-      permission=_PERMISSION_REIMPORT,
+      perm=_PERMISSION_REIMPORT,
+      global_acl_group='project_reimport_group',
       legacy_acl_group='reimport_group')
 
 
 def _can_reimport_service_cs(service_id):
-  return has_service_access(service_id) and _check_acl_cfg('reimport_group')
+  return _check_service_acl(
+      service_id=service_id,
+      global_acl_group='service_reimport_group',
+      legacy_acl_group='reimport_group')
 
 
 def can_validate(config_set):
@@ -52,12 +58,16 @@ def can_validate(config_set):
 def _can_validate_project_cs(project_id):
   return _check_project_acl(
       project_id=project_id,
-      permission=_PERMISSION_VALIDATE,
+      perm=_PERMISSION_VALIDATE,
+      global_acl_group='project_validation_group',
       legacy_acl_group='validation_group')
 
 
 def _can_validate_service_cs(service_id):
-  return has_service_access(service_id) and _check_acl_cfg('validation_group')
+  return _check_service_acl(
+      service_id=service_id,
+      global_acl_group='service_validation_group',
+      legacy_acl_group='validation_group')
 
 
 def can_read_config_sets(config_sets):
@@ -111,23 +121,18 @@ def is_admin():
 def has_services_access(service_ids):
   """Returns a mapping {service_id: has_access}.
 
-  has_access is True if current requester can read service configs.
+  has_access is True if the current requester can read service configs.
   """
   assert isinstance(service_ids, list)
   if not service_ids:
     return {}
 
+  # If allowed through a global group, no need to check per-service permissions.
   if _check_acl_cfg('service_access_group'):
     return {sid: True for sid in service_ids}
 
-  service_id_set = set(service_ids)
-  cfgs = {
-    s.id: s
-    for s in services.get_services_async().get_result()
-    if s.id in service_id_set
-  }
-  has_access = _has_access([cfgs.get(sid) for sid in service_ids])
-  return dict(zip(service_ids, has_access))
+  cfgs = {cfg.id: cfg for cfg in services.get_services_async().get_result()}
+  return _has_access({sid: cfgs.get(sid) for sid in service_ids})
 
 
 def has_service_access(service_id):
@@ -135,6 +140,18 @@ def has_service_access(service_id):
 
 
 def has_projects_access(project_ids):
+  """Returns a mapping {project_id: has_access}.
+
+  has_access is True if the current requester can read project configs.
+  """
+  assert isinstance(project_ids, list)
+  if not project_ids:
+    return {}
+
+  # If allowed through a global group, no need to check per-project permissions.
+  if _check_acl_cfg('project_access_group'):
+    return {pid: True for pid in project_ids}
+
   # TODO(crbug.com/1068817): During the migration we'll use the legacy response
   # as the final result, but will compare it to realms checks and log
   # discrepancies (this is what has_permission_dryrun does).
@@ -157,45 +174,97 @@ def _has_projects_access_legacy(project_ids):
   if not project_ids:
     return {}
 
-  if _check_acl_cfg('project_access_group'):
-    return {pid: True for pid in project_ids}
-
   metadata = projects.get_metadata_async(project_ids).get_result()
-  has_access = _has_access([metadata.get(pid) for pid in project_ids])
-  return dict(zip(project_ids, has_access))
+  return _has_access({pid: metadata.get(pid) for pid in project_ids})
 
 
-def _check_project_acl(project_id, permission, legacy_acl_group):
-  """Checks legacy and realms ACLs, comparing them.
+def _check_service_acl(service_id, global_acl_group, legacy_acl_group):
+  """Checks global ACLs and per-service permissions for an action.
 
-  Returns the result of the legacy ACL check for now.
+  Args:
+    service_id: a service whose config set is being acted on.
+    global_acl_group: a field name in AclCfg with the global group to check.
+    legacy_acl_group: a field name in AclCfg with the legacy group to check.
+
+  Returns:
+    True to allow the action, False to deny.
   """
-  # TODO(crbug.com/1068817): Switch to using Realms for real.
-  legacy_result = (
-      _has_projects_access_legacy([project_id])[project_id] and
-      _check_acl_cfg(legacy_acl_group))
+  # If the service is not visible, no actions are allowed.
+  if not has_service_access(service_id):
+    return False
+
+  # Unlike projects, service config sets use only global ACLs for actions.
+  if _check_acl_cfg(global_acl_group):
+    return True
+
+  # Log if we had to fallback to the legacy group.
+  if _check_acl_cfg(legacy_acl_group):
+    logging.warning('crbug.com/1068817: using legacy %s', legacy_acl_group)
+    return True
+
+  return False
+
+
+def _check_project_acl(project_id, perm, global_acl_group, legacy_acl_group):
+  """Checks service ACLs and per-project permissions for an action.
+
+  Args:
+    project_id: a project whose config set is being acted on.
+    perm: a permission to check.
+    global_acl_group: a field name in AclCfg with the global group to check.
+    legacy_acl_group: a field name in AclCfg with the legacy group to check.
+
+  Returns:
+    True to allow the action, False to deny.
+  """
+  # If the project is not visible, no actions are allowed.
+  if not has_project_access(project_id):
+    return False
+
+  # If allowed through a global group, no need to check per-project permissions.
+  if _check_acl_cfg(global_acl_group):
+    return True
+
+  # TODO(crbug.com/1068817): Legacy ACLs relied on a global group, but realms
+  # ACL use per-project permissions. During the migration we'll use the legacy
+  # response as the final result, but will compare it to realms checks and log
+  # discrepancies (this is what has_permission_dryrun does).
+  legacy = _check_acl_cfg(legacy_acl_group)
   auth.has_permission_dryrun(
-      permission=permission,
+      permission=perm,
       realms=[auth.root_realm(project_id)],
       tracking_bug='crbug.com/1068817',
-      expected_result=legacy_result)
-  return legacy_result
+      expected_result=legacy)
+  return legacy
 
 
 # Cache acl.cfg for 10min. It never changes.
 @utils.cache_with_expiration(10 * 60)
 def _get_acl_cfg():
-  return storage.get_self_config_async(
+  acl_cfg = storage.get_self_config_async(
       common.ACL_FILENAME, service_config_pb2.AclCfg).get_result()
+  if not acl_cfg.project_validation_group:
+    acl_cfg.project_validation_group = acl_cfg.validation_group
+  if not acl_cfg.project_reimport_group:
+    acl_cfg.project_reimport_group = acl_cfg.reimport_group
+  if not acl_cfg.service_validation_group:
+    acl_cfg.service_validation_group = acl_cfg.validation_group
+  if not acl_cfg.service_reimport_group:
+    acl_cfg.service_reimport_group = acl_cfg.reimport_group
+  return acl_cfg
 
 
 def _check_acl_cfg(group_id):
   """Checks the caller is an admin or a member of a group from acl.cfg."""
   assert group_id in (
+      'project_access_group',
+      'project_reimport_group',
+      'project_validation_group',
+      'service_access_group',
+      'service_reimport_group',
+      'service_validation_group',
       'reimport_group',
       'validation_group',
-      'service_access_group',
-      'project_access_group',
   )
   if is_admin():
     return True
@@ -207,20 +276,33 @@ def _check_acl_cfg(group_id):
 
 
 def _has_access(resources):
-  access_values = set()
-  for r in resources:
-    if r:
-      access_values.update(r.access)
+  """Checks `access` fields in a bunch of configs at once.
 
+  Args:
+    resources: {id => service_config_pb2.Service|project_config_pb2.ProjectCfg}.
+
+  Returns:
+    {id => True|False}.
+  """
+  # Collect a set of strings like "group:X" to check them only once.
+  access_values = set()
+  for cfg in resources.values():
+    if cfg:
+      access_values.update(cfg.access)
+
+  # Do all the checks and get a dict e.g. {"group:X" => True|False}.
   identity = auth.get_current_identity()
   has_access = {a: _check_access_entry(a, identity) for a in access_values}
-  return [
-    bool(r) and any(has_access[a] for a in r.access)
-    for r in resources
-  ]
+
+  # Use results of the checks to construct the final output.
+  return {
+      rid: bool(cfg) and any(has_access[a] for a in cfg.access)
+      for rid, cfg in resources.items()
+  }
 
 
 def _check_access_entry(access, identity):
+  """Checks a single access entry like "group:X" or "user:Y"."""
   if access.startswith('group:'):
     group = access.split(':', 2)[1]
     return auth.is_group_member(group, identity)
