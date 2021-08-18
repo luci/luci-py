@@ -1,7 +1,7 @@
 Name: gae_ts_mon
 Short Name: gae_ts_mon
 URL: https://chromium.googlesource.com/infra/infra/+/main/appengine_module/gae_ts_mon/
-Revision: 4c382fdc2de618011635fc3b35e21cb64ab01d22
+Revision: e8223d7f1bb4db7343cf54a97766108566012b30
 License: Chromium License
 
 Description:
@@ -15,6 +15,3 @@ Local Modifications:
 - Removed all of the following directories: protobuf/, test/, third_party/ .
 - Copied the content of the symlinks.
 - Removed mentions of "third_party_dir" and "protobuf_dir" from __init__.py.
-- Changed endpoint to PA WBL.
-
-# TODO(mkiedys): Push PA WBL upstream after crrev.com/c/3102270 goes live.
