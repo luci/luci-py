@@ -12,7 +12,7 @@ from google.appengine.ext import ndb
 from infra_libs.ts_mon.common import metrics
 
 REGION = 'appengine'
-PRODXMON_ENDPOINT = 'https://prodxmon-pa.googleapis.com/v1:insert'
+PRODXMON_ENDPOINT = 'https://prodxmon-wbl-pa.googleapis.com/v1:insert'
 PRODXMON_SERVICE_ACCOUNT_EMAIL = (
     'app-engine-metric-publishers@'
     'prodx-mon-chrome-infra.google.com.iam.gserviceaccount.com')

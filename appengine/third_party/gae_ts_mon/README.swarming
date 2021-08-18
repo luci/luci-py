@@ -15,3 +15,6 @@ Local Modifications:
 - Removed all of the following directories: protobuf/, test/, third_party/ .
 - Copied the content of the symlinks.
 - Removed mentions of "third_party_dir" and "protobuf_dir" from __init__.py.
+- Changed endpoint to PA WBL.
+
+# TODO(mkiedys): Push PA WBL upstream after crrev.com/c/3102270 goes live.
