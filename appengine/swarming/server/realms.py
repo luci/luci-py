@@ -5,8 +5,6 @@
 import datetime
 import logging
 
-import endpoints
-
 from components import auth
 
 from proto.config import realms_pb2
@@ -427,8 +425,8 @@ def check_task_get_acl(task_request):
   if task_request.pool:
     pool_cfg = pools_config.get_pool_config(task_request.pool)
     if not pool_cfg:
-      raise endpoints.InternalServerErrorException(
-          'Pool cfg not found. pool: %s' % task_request.pool)
+      raise auth.AuthorizationError(
+          'No such pool or no permission to use it: %s' % task_request.pool)
     if pool_cfg.realm and auth.has_permission(
         get_permission(realms_pb2.REALM_PERMISSION_POOLS_LIST_TASKS),
         [pool_cfg.realm]):
@@ -483,8 +481,8 @@ def check_task_cancel_acl(task_request):
   if task_request.pool:
     pool_cfg = pools_config.get_pool_config(task_request.pool)
     if not pool_cfg:
-      raise endpoints.InternalServerErrorException(
-          'Pool cfg not found. pool: %s' % task_request.pool)
+      raise auth.AuthorizationError(
+          'No such pool or no permission to use it: %s' % task_request.pool)
     if pool_cfg.realm and auth.has_permission(
         get_permission(realms_pb2.REALM_PERMISSION_POOLS_CANCEL_TASK),
         [pool_cfg.realm]):
@@ -524,7 +522,7 @@ def can_cancel_task(task_request):
   try:
     check_task_cancel_acl(task_request)
     return True
-  except (auth.AuthorizationError, endpoints.InternalServerErrorException):
+  except auth.AuthorizationError:
     return False
 
 
@@ -665,7 +663,8 @@ def _retrieve_bot_dimensions(bot_id):
   # get the last BotEvent because BotInfo may have been deleted.
   events = bot_management.get_events_query(bot_id, True).fetch(1)
   if not events:
-    raise endpoints.NotFoundException('Bot "%s" not found.' % bot_id)
+    raise auth.AuthorizationError(
+        'No such bot or no permission to use it: "%s".' % bot_id)
   return events[0].dimensions_flat
 
 
@@ -687,7 +686,8 @@ def _check_pools_filters_acl(perm_enum, pools):
   for p in pools:
     pool_cfg = pools_config.get_pool_config(p)
     if not pool_cfg:
-      raise endpoints.BadRequestException('Pool "%s" not found' % p)
+      raise auth.AuthorizationError(
+          'No such pool or no permission to use it: %s' % p)
 
     _check_permission(perm, [pool_cfg.realm])
 

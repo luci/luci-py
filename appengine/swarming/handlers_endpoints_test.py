@@ -3218,8 +3218,9 @@ class BotsApiTest(BaseTest):
 
     # the user needs to specify known pools.
     response = self.call_api(
-        api, body={'dimensions': ['pool:unknown']}, status=400)
-    self.assertErrorResponseMessage('Pool "unknown" not found', response)
+        api, body={'dimensions': ['pool:unknown']}, status=403)
+    self.assertErrorResponseMessage(
+        'No such pool or no permission to use it: unknown', response)
 
 
 class BotApiTest(BaseTest):
@@ -3456,7 +3457,7 @@ class BotApiTest(BaseTest):
     self.set_as_user()
 
     # unknown bot
-    self.call_api('tasks', body={'bot_id': 'unknown_bot'}, status=404)
+    self.call_api('tasks', body={'bot_id': 'unknown_bot'}, status=403)
 
     # the user can't access to tasks of the bot.
     self.set_as_user()

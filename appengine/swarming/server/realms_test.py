@@ -319,7 +319,7 @@ class RealmsTest(test_case.TestCase):
 
   def test_check_bot_get_acl_no_bot(self):
     self.mock(acl, 'can_view_bot', lambda: False)
-    with self.assertRaises(endpoints.NotFoundException):
+    with self.assertRaisesRegexp(auth.AuthorizationError, 'No such bot or'):
       realms.check_bot_get_acl('bot1')
     self._has_permission_mock.assert_not_called()
 
@@ -421,7 +421,7 @@ class RealmsTest(test_case.TestCase):
     self.mock(pools_config, 'get_pool_config', lambda _: None)
 
     # call
-    with self.assertRaises(endpoints.BadRequestException):
+    with self.assertRaisesRegexp(auth.AuthorizationError, 'No such pool or'):
       realms.check_bots_list_acl(['unknown'])
     self._has_permission_mock.assert_not_called()
 
@@ -453,7 +453,7 @@ class RealmsTest(test_case.TestCase):
 
     # call
     task = _gen_task_request_mock(pool='pool1')
-    with self.assertRaises(endpoints.InternalServerErrorException):
+    with self.assertRaisesRegexp(auth.AuthorizationError, 'No such pool or'):
       realms.check_task_get_acl(task)
     self._has_permission_mock.assert_not_called()
 
@@ -542,7 +542,7 @@ class RealmsTest(test_case.TestCase):
 
     # call
     task = _gen_task_request_mock(pool='pool1')
-    with self.assertRaises(endpoints.InternalServerErrorException):
+    with self.assertRaisesRegexp(auth.AuthorizationError, 'No such pool or'):
       realms.check_task_cancel_acl(task)
     self._has_permission_mock.assert_not_called()
 
@@ -710,7 +710,7 @@ class RealmsTest(test_case.TestCase):
     self.mock(pools_config, 'get_pool_config', lambda _: None)
 
     # call
-    with self.assertRaises(endpoints.BadRequestException):
+    with self.assertRaisesRegexp(auth.AuthorizationError, 'No such pool or'):
       realms.check_tasks_list_acl(['unknown'])
     self._has_permission_mock.assert_not_called()
 
@@ -765,7 +765,7 @@ class RealmsTest(test_case.TestCase):
 
   def test_check_bot_tasks_acl_no_bot(self):
     self.mock(acl, 'can_view_all_tasks', lambda: False)
-    with self.assertRaises(endpoints.NotFoundException):
+    with self.assertRaisesRegexp(auth.AuthorizationError, 'No such bot or'):
       realms.check_bot_tasks_acl('bot1')
     self._has_permission_mock.assert_not_called()
 
@@ -867,7 +867,7 @@ class RealmsTest(test_case.TestCase):
     self.mock(pools_config, 'get_pool_config', lambda _: None)
 
     # call
-    with self.assertRaises(endpoints.BadRequestException):
+    with self.assertRaisesRegexp(auth.AuthorizationError, 'No such pool or'):
       realms.check_tasks_cancel_acl(['unknown'])
     self._has_permission_mock.assert_not_called()
 
@@ -918,7 +918,7 @@ class RealmsTest(test_case.TestCase):
 
   def test_check_bot_terminate_acl_no_bot(self):
     self.mock(acl, 'can_edit_bot', lambda: False)
-    with self.assertRaises(endpoints.NotFoundException):
+    with self.assertRaisesRegexp(auth.AuthorizationError, 'No such bot or'):
       realms.check_bot_terminate_acl('bot1')
     self._has_permission_mock.assert_not_called()
 
@@ -988,7 +988,7 @@ class RealmsTest(test_case.TestCase):
 
   def test_check_bot_delete_acl_no_bot(self):
     self.mock(acl, 'can_delete_bot', lambda: False)
-    with self.assertRaises(endpoints.NotFoundException):
+    with self.assertRaisesRegexp(auth.AuthorizationError, 'No such bot or'):
       realms.check_bot_delete_acl('bot1')
     self._has_permission_mock.assert_not_called()
 
