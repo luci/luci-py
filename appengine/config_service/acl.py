@@ -174,6 +174,9 @@ def _has_projects_access_legacy(project_ids):
   if not project_ids:
     return {}
 
+  if _check_acl_cfg('legacy_project_access_group'):
+    return {pid: True for pid in project_ids}
+
   metadata = projects.get_metadata_async(project_ids).get_result()
   return _has_access({pid: metadata.get(pid) for pid in project_ids})
 
@@ -251,6 +254,8 @@ def _get_acl_cfg():
     acl_cfg.service_validation_group = acl_cfg.validation_group
   if not acl_cfg.service_reimport_group:
     acl_cfg.service_reimport_group = acl_cfg.reimport_group
+  if not acl_cfg.legacy_project_access_group:
+    acl_cfg.legacy_project_access_group = acl_cfg.project_access_group
   return acl_cfg
 
 
@@ -265,6 +270,7 @@ def _check_acl_cfg(group_id):
       'service_validation_group',
       'reimport_group',
       'validation_group',
+      'legacy_project_access_group',
   )
   if is_admin():
     return True

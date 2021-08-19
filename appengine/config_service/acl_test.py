@@ -73,6 +73,7 @@ class AclTestCase(test_case.TestCase):
             service_validation_group='service-validation',
             reimport_group='legacy-reimport',
             validation_group='legacy-validation',
+            legacy_project_access_group='legacy-project-access',
     )))
 
     self.mock(projects, '_filter_existing', lambda pids: pids)
@@ -93,6 +94,10 @@ class AclTestCase(test_case.TestCase):
 
   def test_access_project_via_global_acl(self):
     self.mock_membership('project-access')
+    self.assertTrue(can_read(PROJECT_SET))
+
+  def test_access_project_via_global_legacy_acl(self):
+    self.mock_membership('legacy-project-access')
     self.assertTrue(can_read(PROJECT_SET))
 
   def test_access_project_unknown(self):

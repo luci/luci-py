@@ -242,7 +242,7 @@ message ServicesCfg {
 
 
 // Schema of acl.cfg file.
-// Next tag: 12.
+// Next tag: 13.
 message AclCfg {
   reserved 4;
   reserved 'config_get_by_hash_group';
@@ -298,6 +298,11 @@ message AclCfg {
   //
   // DEPRECATED. Used only by legacy ACLs.
   string reimport_group = 6;
+
+  // Name of the group that has global access to all "projects/*" config sets.
+  //
+  // DEPRECATED. Used only by legacy ACLs.
+  string legacy_project_access_group = 12;
 }
 
 // Schema for import.cfg. It specified how to import configuration files from
