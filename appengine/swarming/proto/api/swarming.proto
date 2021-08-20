@@ -608,11 +608,22 @@ message Containment {
   int64 limit_total_committed_memory = 4;
 }
 
+// The user to run the task.
+enum User {
+  // Unspecified; will default to pool-level defaults.
+  USER_UNSPECIFIED = 0;
+  // Historical value; tasks currently run as the same user that Swarming ran
+  // as.
+  USER_SWARMING = 1;
+  // Using the new, unprivileged user to run the task.
+  USER_TEMPORARY = 2;
+}
+
 // Defines the 'what' to run.
 //
 // A serialization of this message is hashed and this hash is what is used for
 // task deduping.
-// NEXT_ID: 19
+// NEXT_ID: 20
 message TaskProperties {
   // Inputs.
 
@@ -727,6 +738,9 @@ message TaskProperties {
   //
   // Items must be sorted.
   repeated string outputs = 17;
+
+  // User to run the task as.
+  User user = 19;
 }
 
 // Defines a possible task execution for a task request to be run on the
