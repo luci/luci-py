@@ -29,3 +29,7 @@ package_release:
 # Used by Spinnaker to build to fetch external dependencies.
 # See: https://g3doc.corp.google.com/company/teams/chrome/ops/devx/prod_tech/releases/deploy_appengine.md#makefile
 external_deps:
+
+
+test:
+	vpython test.py -v
