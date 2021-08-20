@@ -567,6 +567,7 @@ class TaskRequestApiTest(TestCase):
     }
     expected_request = {
         'authenticated': auth_testing.DEFAULT_MOCKED_IDENTITY,
+        'has_build_token': False,
         'name': u'Request name',
         'parent_task_id': unicode(parent_id),
         'priority': 50,
@@ -686,6 +687,7 @@ class TaskRequestApiTest(TestCase):
     }
     expected_request = {
         'authenticated': auth_testing.DEFAULT_MOCKED_IDENTITY,
+        'has_build_token': False,
         'name': u'Request name',
         'parent_task_id': unicode(parent_id),
         'priority': 50,
@@ -806,6 +808,7 @@ class TaskRequestApiTest(TestCase):
     }
     expected_request = {
         'authenticated': auth_testing.DEFAULT_MOCKED_IDENTITY,
+        'has_build_token': False,
         'name': u'Request name',
         'parent_task_id': parent_id,
         'priority': 50,

@@ -34,13 +34,13 @@ Graph of the schema:
     |  +--------------+      +----------------+     +----------------+ |
     |id=<based on epoch>                                               |
     +------------------------------------------------------------------+
-        |          |
-        v          |
-    +-----------+  |
-    |SecretBytes|  |
-    |id=1       |  |
-    +-----------+  |
-                   |
+        |          |      |
+        v          |      v
+    +-----------+  | +----------+
+    |SecretBytes|  | |BuildToken|
+    |id=1       |  | |build_id  |
+    +-----------+  | |token     |
+                   | +----------+
                    v
     <See task_to_run.py and task_result.py>
 
@@ -594,6 +594,18 @@ class SecretBytes(ndb.Model):
   _use_memcache = False
   secret_bytes = ndb.BlobProperty(
       validator=_get_validate_length(20 * 1024), indexed=False)
+
+
+class BuildToken(ndb.Model):
+  """Stores the build_id and a token sent by buildbucket.
+
+  When a task changes state, the token is used in the request to Buildbucket
+  to update the status of the build.
+  """
+
+  _use_memcache = False
+  build_id = ndb.StringProperty(required=True, indexed=True)
+  token = ndb.StringProperty(required=True, indexed=False)
 
 
 class CipdPackage(ndb.Model):
@@ -1244,6 +1256,9 @@ class TaskRequest(ndb.Model):
   # ResultDB property in task new request.
   resultdb = ndb.LocalStructuredProperty(ResultDBCfg, compressed=True)
 
+  # If True, the TaskRequest has an associated BuildToken.
+  has_build_token = ndb.BooleanProperty(default=False, indexed=False)
+
   @property
   def num_task_slices(self):
     """Returns the number of TaskSlice, supports old entities."""
@@ -1280,6 +1295,11 @@ class TaskRequest(ndb.Model):
       for t in self.task_slices:
         if t.properties.has_secret_bytes:
           return task_pack.request_key_to_secret_bytes_key(self.key)
+
+  @property
+  def build_token_key(self):
+    if self.has_build_token:
+      return task_pack.request_key_to_build_token_key(self.key)
 
   @property
   def task_id(self):

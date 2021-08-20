@@ -321,7 +321,8 @@ def new_task_request_from_rpc(msg, now):
       realms_enabled=None,
       resultdb_update_token=None,
       resultdb=resultdb,
-      pool_task_template=None)  # handled out of band
+      pool_task_template=None,  # handled out of band
+      has_build_token=False)
 
   return req, secret_bytes, template_apply
 

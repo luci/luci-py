@@ -33,6 +33,13 @@ def request_key_to_secret_bytes_key(request_key):
   return ndb.Key('SecretBytes', 1, parent=request_key)
 
 
+def request_key_to_build_token_key(request_key):
+  """Returns the BuildToken ndb.Key for this TaskRequest.key."""
+  assert request_key.kind() == 'TaskRequest', request_key
+  assert request_key.integer_id(), request_key
+  return ndb.Key('BuildToken', 1, parent=request_key)
+
+
 def result_summary_key_to_request_key(result_summary_key):
   """Returns the TaskRequest ndb.Key for this TaskResultSummmary key."""
   assert result_summary_key.kind() == 'TaskResultSummary', result_summary_key

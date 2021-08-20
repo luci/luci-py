@@ -58,6 +58,12 @@ class TaskPackApiTest(test_case.TestCase):
     expected = ndb.Key('TaskRequest', 0x7fffffffffffffee, 'SecretBytes', 1)
     self.assertEqual(expected, result_key)
 
+  def test_request_key_to_build_token_key(self):
+    request_key = task_pack.unpack_request_key('11')
+    result_key = task_pack.request_key_to_build_token_key(request_key)
+    expected = ndb.Key('TaskRequest', 0x7fffffffffffffee, 'BuildToken', 1)
+    self.assertEqual(expected, result_key)
+
   def test_result_summary_key_to_request_key(self):
     request_key = task_pack.unpack_request_key('11')
     result_summary_key = task_pack.request_key_to_result_summary_key(
