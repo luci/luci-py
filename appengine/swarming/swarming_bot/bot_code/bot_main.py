@@ -469,7 +469,7 @@ def _get_disks_quarantine(botobj, disks):
 def _cleanup_purgeable_space(botobj):
   """Frees up purgeable space by creating large files and removing them.
 
-  It runs only on ARM Mac bots.
+  It runs only on ARM Macmini.
 
   TODO(crbug.com/1142848): remove this workaround after bot code is fixed to
   recognize purgeable space.
@@ -477,7 +477,7 @@ def _cleanup_purgeable_space(botobj):
   # Skip if it's not ARM MMac.
   dims = botobj._attributes.get('dimensions') or {}
   mac_model = dims.get('mac_model')
-  if not mac_model or mac_model[0] != 'ADP3,2':
+  if not mac_model or mac_model[0] != 'Macmini9,1':
     return
 
   start = time.time()
