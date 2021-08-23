@@ -1102,7 +1102,12 @@ time.sleep(60)
     # Expect proc to write to stdout and exit almost immediately (decided
     # by the poll interval of wait method). We wait for 8 second to give
     # some buffer here.
-    self.assertEqual(proc.recv_out(timeout=8), b'wait is interrupted')
+    start = time.time()
+    got = proc.recv_out(timeout=8)
+    want = b'wait is interrupted'
+    self.assertEqual(
+        got, want,
+        "%s != %s after %s seconds" % (got, want, time.time() - start))
 
 
 if __name__ == '__main__':
