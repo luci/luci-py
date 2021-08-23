@@ -496,6 +496,8 @@ class AdbConnectionManager(object):
       command: The command to send to the service.
       timeout_ms: Timeout for USB packets, in milliseconds.
     """
+    if isinstance(command, six.text_type):
+      command = command.encode('utf-8')
     return self.Open(b'%s:%s' % (service, command), timeout_ms).__iter__()
 
   def Command(self, service, command=b'', timeout_ms=None):
