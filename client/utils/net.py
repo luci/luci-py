@@ -381,9 +381,8 @@ class HttpService(object):
       # Transparently retry 404 IIF it is a CloudEndpoints API call *and* the
       # result is not JSON. This assumes that we only use JSON encoding. This
       # is workaround for known Cloud Endpoints bug.
-      return (
-          suburl.startswith('/_ah/api/') and
-          not resp.content_type.startswith('application/json'))
+      return ('/api/' in suburl and
+              not resp.content_type.startswith('application/json'))
     # All other 4** errors are fatal.
     if resp.code < 500:
       return False
