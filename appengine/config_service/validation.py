@@ -184,17 +184,16 @@ def validate_project_registry(cfg, ctx):
       validate_id(project.id, config.common.PROJECT_ID_RGX, project_ids, ctx)
       with ctx.prefix('gitiles_location: '):
         validate_gitiles_location(project.gitiles_location, ctx)
-      # TODO(iannucci): require team name
-      if project.owned_by:
-        if project.owned_by not in team_names:
-          ctx.error('owned_by unknown team "%s"', project.owned_by)
+      if not project.owned_by:
+        ctx.error('owned_by is required')
+      elif project.owned_by not in team_names:
+        ctx.error('owned_by unknown team "%s"', project.owned_by)
 
   check_projects_sorted(cfg.teams, cfg.projects, ctx)
 
 
 def check_projects_sorted(teams, projects, ctx):
   # projects should be sorted by team, and then sorted by id within the team.
-  # TEMPORARY: if projects don't have a team, they must come last.
 
   # "if team.name" is for tests
   team_iter = (team.name for team in teams if team.name)
@@ -205,7 +204,7 @@ def check_projects_sorted(teams, projects, ctx):
     if project.owned_by != cur_team:
       next_team = next(team_iter, "")
       if project.owned_by != next_team:
-        ctx.warning(
+        ctx.error(
             'Projects are not sorted by team then id. First offending id: "%s".'
             ' Expected team "%s", got "%s"',
             project.id, next_team, project.owned_by)
@@ -214,7 +213,7 @@ def check_projects_sorted(teams, projects, ctx):
       prev_id = None
 
     if prev_id and project.id < prev_id:
-      ctx.warning(
+      ctx.error(
           'Projects are not sorted by team then id. First offending id: "%s".'
           ' Should be placed before "%s"',
           project.id, prev_id)

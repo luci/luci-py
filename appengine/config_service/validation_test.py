@@ -72,15 +72,20 @@ class ValidationTestCase(test_case.TestCase):
     self.assertEqual(
         [m.text for m in result.messages],
         [
+          'Project a: owned_by is required',
           'Project b: gitiles_location: repo: not specified',
           'Project b: gitiles_location: ref is not set',
+          'Project b: owned_by is required',
           'Project a: id is not unique',
           'Project a: gitiles_location: repo: must not end with "/"',
           'Project a: gitiles_location: path must not start with "/"',
+          'Project a: owned_by is required',
           'Project #4: id is not specified',
           'Project #4: gitiles_location: repo: must not end with ".git"',
           'Project #4: gitiles_location: ref must start with "refs/"',
+          'Project #4: owned_by is required',
           'Project c: gitiles_location: ref is not set',
+          'Project c: owned_by is required',
           ('Projects are not sorted by team then id. '
           'First offending id: "a". Should be placed before "b"'),
         ],
@@ -144,6 +149,7 @@ class ValidationTestCase(test_case.TestCase):
           'Team teamA: maintenance_contact is required',
           'Team teamA: escalation_contact is recommended',
           'Project q: owned_by unknown team "none"',
+          'Project zed: owned_by is required',
           ('Projects are not sorted by team then id. First offending id: "q".'
            ' Expected team "", got "none"'),
         ],
