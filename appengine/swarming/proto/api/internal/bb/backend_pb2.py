@@ -26,7 +26,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   syntax='proto3',
   serialized_options=None,
   create_key=_descriptor._internal_create_key,
-  serialized_pb=b'\n\rbackend.proto\x12\x10swarming.backend\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1egoogle/protobuf/duration.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x0elauncher.proto\x1a\x0c\x63ommon.proto\x1a\x11swarming_bb.proto\"\xa0\x06\n\x0eRunTaskRequest\x12\x0e\n\x06target\x18\x01 \x01(\t\x12\x15\n\rbackend_token\x18\x02 \x01(\t\x12\r\n\x05realm\x18\x03 \x01(\t\x12?\n\x05\x61gent\x18\x04 \x01(\x0b\x32\x30.swarming.backend.RunTaskRequest.AgentExecutable\x12\x12\n\nagent_args\x18\x05 \x03(\t\x12!\n\x07secrets\x18\x06 \x01(\x0b\x32\x10.bb.BuildSecrets\x12\x10\n\x08\x62uild_id\x18\x07 \x01(\x03\x12*\n\ndimensions\x18\x08 \x03(\x0b\x32\x16.bb.RequestedDimension\x12\x32\n\x0estart_deadline\x18\t \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x34\n\x11\x65xecution_timeout\x18\n \x01(\x0b\x32\x19.google.protobuf.Duration\x12/\n\x0cgrace_period\x18\x0b \x01(\x0b\x32\x19.google.protobuf.Duration\x12\x1e\n\x06\x63\x61\x63hes\x18\x0c \x03(\x0b\x32\x0e.bb.CacheEntry\x12/\n\x0e\x62\x61\x63kend_config\x18\r \x01(\x0b\x32\x17.google.protobuf.Struct\x12\x13\n\x0b\x65xperiments\x18\x0e \x03(\t\x12\x12\n\nrequest_id\x18\x0f \x01(\t\x1a\x8c\x02\n\x0f\x41gentExecutable\x12L\n\x06source\x18\x01 \x03(\x0b\x32<.swarming.backend.RunTaskRequest.AgentExecutable.SourceEntry\x1a>\n\x0b\x41gentSource\x12\x0e\n\x06sha256\x18\x01 \x01(\t\x12\x12\n\nsize_bytes\x18\x02 \x01(\x03\x12\x0b\n\x03url\x18\x03 \x01(\t\x1ak\n\x0bSourceEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12K\n\x05value\x18\x02 \x01(\x0b\x32<.swarming.backend.RunTaskRequest.AgentExecutable.AgentSource:\x02\x38\x01\x32T\n\x0bTaskBackend\x12\x45\n\x07RunTask\x12 .swarming.backend.RunTaskRequest\x1a\x16.google.protobuf.Empty\"\x00\x62\x06proto3'
+  serialized_pb=b'\n\rbackend.proto\x12\x10swarming.backend\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1egoogle/protobuf/duration.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x0elauncher.proto\x1a\x0c\x63ommon.proto\x1a\x11swarming_bb.proto\"\xba\x06\n\x0eRunTaskRequest\x12\x0e\n\x06target\x18\x01 \x01(\t\x12\x15\n\rbackend_token\x18\x02 \x01(\t\x12\r\n\x05realm\x18\x03 \x01(\t\x12?\n\x05\x61gent\x18\x04 \x01(\x0b\x32\x30.swarming.backend.RunTaskRequest.AgentExecutable\x12\x12\n\nagent_args\x18\x05 \x03(\t\x12!\n\x07secrets\x18\x06 \x01(\x0b\x32\x10.bb.BuildSecrets\x12\x18\n\x10\x62uildbucket_host\x18\x07 \x01(\t\x12\x10\n\x08\x62uild_id\x18\x08 \x01(\x03\x12*\n\ndimensions\x18\t \x03(\x0b\x32\x16.bb.RequestedDimension\x12\x32\n\x0estart_deadline\x18\n \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x34\n\x11\x65xecution_timeout\x18\x0b \x01(\x0b\x32\x19.google.protobuf.Duration\x12/\n\x0cgrace_period\x18\x0c \x01(\x0b\x32\x19.google.protobuf.Duration\x12\x1e\n\x06\x63\x61\x63hes\x18\r \x03(\x0b\x32\x0e.bb.CacheEntry\x12/\n\x0e\x62\x61\x63kend_config\x18\x0e \x01(\x0b\x32\x17.google.protobuf.Struct\x12\x13\n\x0b\x65xperiments\x18\x0f \x03(\t\x12\x12\n\nrequest_id\x18\x10 \x01(\t\x1a\x8c\x02\n\x0f\x41gentExecutable\x12L\n\x06source\x18\x01 \x03(\x0b\x32<.swarming.backend.RunTaskRequest.AgentExecutable.SourceEntry\x1a>\n\x0b\x41gentSource\x12\x0e\n\x06sha256\x18\x01 \x01(\t\x12\x12\n\nsize_bytes\x18\x02 \x01(\x03\x12\x0b\n\x03url\x18\x03 \x01(\t\x1ak\n\x0bSourceEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12K\n\x05value\x18\x02 \x01(\x0b\x32<.swarming.backend.RunTaskRequest.AgentExecutable.AgentSource:\x02\x38\x01\x32T\n\x0bTaskBackend\x12\x45\n\x07RunTask\x12 .swarming.backend.RunTaskRequest\x1a\x16.google.protobuf.Empty\"\x00\x62\x06proto3'
   ,
   dependencies=[google_dot_protobuf_dot_timestamp__pb2.DESCRIPTOR,google_dot_protobuf_dot_duration__pb2.DESCRIPTOR,google_dot_protobuf_dot_struct__pb2.DESCRIPTOR,google_dot_protobuf_dot_empty__pb2.DESCRIPTOR,launcher__pb2.DESCRIPTOR,common__pb2.DESCRIPTOR,swarming__bb__pb2.DESCRIPTOR,])
 
@@ -74,8 +74,8 @@ _RUNTASKREQUEST_AGENTEXECUTABLE_AGENTSOURCE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=838,
-  serialized_end=900,
+  serialized_start=864,
+  serialized_end=926,
 )
 
 _RUNTASKREQUEST_AGENTEXECUTABLE_SOURCEENTRY = _descriptor.Descriptor(
@@ -112,8 +112,8 @@ _RUNTASKREQUEST_AGENTEXECUTABLE_SOURCEENTRY = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=902,
-  serialized_end=1009,
+  serialized_start=928,
+  serialized_end=1035,
 )
 
 _RUNTASKREQUEST_AGENTEXECUTABLE = _descriptor.Descriptor(
@@ -143,8 +143,8 @@ _RUNTASKREQUEST_AGENTEXECUTABLE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=741,
-  serialized_end=1009,
+  serialized_start=767,
+  serialized_end=1035,
 )
 
 _RUNTASKREQUEST = _descriptor.Descriptor(
@@ -198,64 +198,71 @@ _RUNTASKREQUEST = _descriptor.Descriptor(
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='build_id', full_name='swarming.backend.RunTaskRequest.build_id', index=6,
-      number=7, type=3, cpp_type=2, label=1,
+      name='buildbucket_host', full_name='swarming.backend.RunTaskRequest.buildbucket_host', index=6,
+      number=7, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"".decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='build_id', full_name='swarming.backend.RunTaskRequest.build_id', index=7,
+      number=8, type=3, cpp_type=2, label=1,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='dimensions', full_name='swarming.backend.RunTaskRequest.dimensions', index=7,
-      number=8, type=11, cpp_type=10, label=3,
+      name='dimensions', full_name='swarming.backend.RunTaskRequest.dimensions', index=8,
+      number=9, type=11, cpp_type=10, label=3,
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='start_deadline', full_name='swarming.backend.RunTaskRequest.start_deadline', index=8,
-      number=9, type=11, cpp_type=10, label=1,
-      has_default_value=False, default_value=None,
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
-    _descriptor.FieldDescriptor(
-      name='execution_timeout', full_name='swarming.backend.RunTaskRequest.execution_timeout', index=9,
+      name='start_deadline', full_name='swarming.backend.RunTaskRequest.start_deadline', index=9,
       number=10, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='grace_period', full_name='swarming.backend.RunTaskRequest.grace_period', index=10,
+      name='execution_timeout', full_name='swarming.backend.RunTaskRequest.execution_timeout', index=10,
       number=11, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='caches', full_name='swarming.backend.RunTaskRequest.caches', index=11,
-      number=12, type=11, cpp_type=10, label=3,
-      has_default_value=False, default_value=[],
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
-    _descriptor.FieldDescriptor(
-      name='backend_config', full_name='swarming.backend.RunTaskRequest.backend_config', index=12,
-      number=13, type=11, cpp_type=10, label=1,
+      name='grace_period', full_name='swarming.backend.RunTaskRequest.grace_period', index=11,
+      number=12, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='experiments', full_name='swarming.backend.RunTaskRequest.experiments', index=13,
-      number=14, type=9, cpp_type=9, label=3,
+      name='caches', full_name='swarming.backend.RunTaskRequest.caches', index=12,
+      number=13, type=11, cpp_type=10, label=3,
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='request_id', full_name='swarming.backend.RunTaskRequest.request_id', index=14,
-      number=15, type=9, cpp_type=9, label=1,
+      name='backend_config', full_name='swarming.backend.RunTaskRequest.backend_config', index=13,
+      number=14, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='experiments', full_name='swarming.backend.RunTaskRequest.experiments', index=14,
+      number=15, type=9, cpp_type=9, label=3,
+      has_default_value=False, default_value=[],
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='request_id', full_name='swarming.backend.RunTaskRequest.request_id', index=15,
+      number=16, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=b"".decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
@@ -273,7 +280,7 @@ _RUNTASKREQUEST = _descriptor.Descriptor(
   oneofs=[
   ],
   serialized_start=209,
-  serialized_end=1009,
+  serialized_end=1035,
 )
 
 _RUNTASKREQUEST_AGENTEXECUTABLE_AGENTSOURCE.containing_type = _RUNTASKREQUEST_AGENTEXECUTABLE
@@ -333,8 +340,8 @@ _TASKBACKEND = _descriptor.ServiceDescriptor(
   index=0,
   serialized_options=None,
   create_key=_descriptor._internal_create_key,
-  serialized_start=1011,
-  serialized_end=1095,
+  serialized_start=1037,
+  serialized_end=1121,
   methods=[
   _descriptor.MethodDescriptor(
     name='RunTask',

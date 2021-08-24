@@ -122,6 +122,11 @@ message RunTaskRequest {
   // malicious actors) impersonating builds.
   .bb.BuildSecrets secrets = 6;
 
+  // The hostname of the buildbucket service to send RPCs back to.
+  //
+  // e.g. `cr-buildbucket.appspot.com`.
+  string buildbucket_host = 7;
+
   // The id of the build that this request is for.
   //
   // For backends which are NOT using the agent, they can use this build_id to
@@ -129,7 +134,7 @@ message RunTaskRequest {
   //
   // It's possible for multiple RunTaskRequests to be issued for the same
   // build_id; See `request_id` for how this could happen.
-  int64 build_id = 7;
+  int64 build_id = 8;
 
   // Dimensions are key/value pairs which describe the type of "bot" which
   // can process this build. The specific values depend on the Backend.
@@ -139,18 +144,18 @@ message RunTaskRequest {
   //
   // NOTE: These do not include Swarming's "special" named cache dimensions.
   // see `caches` for that information.
-  repeated .bb.RequestedDimension dimensions = 8;
+  repeated .bb.RequestedDimension dimensions = 9;
 
   // Start deadline is the absolute timestamp of when this Build must start
   // by before Buildbucket marks it as INFRA_FAILURE.
-  google.protobuf.Timestamp start_deadline = 9;
+  google.protobuf.Timestamp start_deadline = 10;
 
   // Execution timeout is the amount of time after the Build starts that
   // the Backend should allow it to run before beginning the graceful shutdown
   // process (described in LUCI_CONTEXT['deadline']).
   //
   // Builds which run for longer than this will be marked as INFRA_FAILURE.
-  google.protobuf.Duration execution_timeout = 10;
+  google.protobuf.Duration execution_timeout = 11;
 
   // The amount of time on either `execution_timeout` or on a `cancel` event
   // that the agent should be given to shut down.
@@ -159,25 +164,25 @@ message RunTaskRequest {
   //
   // Buildbucket may mark the build as INFRA_FAILURE if it fails to terminate
   // this much time after being canceled, or after hitting execution_timeout.
-  google.protobuf.Duration grace_period = 11;
+  google.protobuf.Duration grace_period = 12;
 
   // Describes the list of cache ids, their paths (relative to the cache root)
   // and how long the Backend should wait for a bot with a warm cache to
   // become available.
-  repeated .bb.CacheEntry caches = 12;
+  repeated .bb.CacheEntry caches = 13;
 
   // Additional backend-specific settings. For Swarming this would include:
   //   * priority
   //   * wait_for_capacity
   //   * containment
-  google.protobuf.Struct backend_config = 13;
+  google.protobuf.Struct backend_config = 14;
 
   // Experiments are provided in order to allow Backends to roll out new
   // features or behaviors triggered on experiments.
   //
   // This will be the full set of experiments selected for this Build
   // (as they might appear in Build.input.experiments).
-  repeated string experiments = 14;
+  repeated string experiments = 15;
 
   // Buildbucket will provide a request id (formatted as a UUID), which the
   // TaskBackend SHOULD use to deduplicate the RunTaskRequest within a 10
@@ -191,5 +196,5 @@ message RunTaskRequest {
   //
   // See the "RunTask Protocol" section for the full details on how
   // Buildbucket will avoid raciness even in the face of duplicate tasks.
-  string request_id = 15;
+  string request_id = 16;
 }

@@ -40,6 +40,7 @@ Graph of the schema:
     |SecretBytes|  | |BuildToken|
     |id=1       |  | |build_id  |
     +-----------+  | |token     |
+                   | |bb_host   |
                    | +----------+
                    v
     <See task_to_run.py and task_result.py>
@@ -606,6 +607,7 @@ class BuildToken(ndb.Model):
   _use_memcache = False
   build_id = ndb.StringProperty(required=True, indexed=True)
   token = ndb.StringProperty(required=True, indexed=False)
+  buildbucket_host = ndb.StringProperty(required=True, indexed=False)
 
 
 class CipdPackage(ndb.Model):
