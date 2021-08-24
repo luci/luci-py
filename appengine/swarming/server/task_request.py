@@ -605,7 +605,7 @@ class BuildToken(ndb.Model):
   """
 
   _use_memcache = False
-  build_id = ndb.IntegerProperty(required=True, indexed=True)
+  build_id = ndb.StringProperty(required=True, indexed=False)
   token = ndb.StringProperty(required=True, indexed=False)
   buildbucket_host = ndb.StringProperty(required=True, indexed=False)
 

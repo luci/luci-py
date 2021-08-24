@@ -337,8 +337,18 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     reaped_request, _, run_result = task_scheduler.bot_reap_task(
         self.bot_dimensions, 'abc')
 
-    # Reaping causes an additional task if pubsub is specified.
-    self.assertEqual(int('pubsub_topic' in kwargs), self.execute_tasks())
+    queued_tasks = 0
+    # Reaping causes a pubsub task if pubsub is specified.
+    if 'pubsub_topic' in kwargs:
+      self.assertEqual(1, len(self._taskqueue_stub.GetTasks('pubsub')))
+      queued_tasks += 1
+
+    if kwargs.get('has_build_token', False):
+      self.assertEqual(1,
+                       len(self._taskqueue_stub.GetTasks('buildbucket-notify')))
+      queued_tasks += 1
+
+    self.assertEqual(queued_tasks, self.execute_tasks())
     return run_result
 
   def _cancel_running_task(self, run_result):
@@ -364,7 +374,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
 
   def test_bot_reap_task(self):
     # Essentially check _quick_reap() works.
-    run_result = self._quick_reap(1, 0)
+    run_result = self._quick_reap(1, 0, has_build_token=True)
     self.assertEqual('localhost', run_result.bot_id)
     self.assertEqual(1, run_result.try_number)
     to_run_key = task_to_run.request_to_task_to_run_key(

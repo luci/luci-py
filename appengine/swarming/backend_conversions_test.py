@@ -56,7 +56,7 @@ class TestBackendConversions(test_case.TestCase):
     run_task_req = backend_pb2.RunTaskRequest(
         secrets=launcher_pb2.BuildSecrets(build_token='tok'),
         realm='some:realm',
-        build_id=4242,
+        build_id='4242',
         agent_args=['-fantasia', 'pegasus'],
         backend_config=struct_pb2.Struct(
             fields={
@@ -118,7 +118,7 @@ class TestBackendConversions(test_case.TestCase):
     expected_sb = task_request.SecretBytes(
         secret_bytes=run_task_req.secrets.SerializeToString())
     expected_bt = task_request.BuildToken(
-        build_id=4242,
+        build_id='4242',
         token='token-token-token',
         buildbucket_host='cow-buildbucket.appspot.com')
 

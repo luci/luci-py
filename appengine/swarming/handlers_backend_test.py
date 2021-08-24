@@ -119,8 +119,7 @@ class BackendTest(test_env_handlers.AppTestBase):
         self._GetRoutes('/internal/taskqueue/'), key=lambda x: x.template)
     # This help to keep queue.yaml and handlers_backend.py up to date.
     # Format: (<queue-name>, <base-url>, <argument>).
-    expected_task_queues = sorted(
-      [
+    expected_task_queues = sorted([
         ('cancel-task-on-bot',
          '/internal/taskqueue/important/tasks/cancel-task-on-bot'),
         ('cancel-tasks', '/internal/taskqueue/important/tasks/cancel'),
@@ -134,6 +133,8 @@ class BackendTest(test_env_handlers.AppTestBase):
          '/internal/taskqueue/important/external_scheduler/notify-kick'),
         ('pubsub',
          '/internal/taskqueue/important/pubsub/notify-task/abcabcabc'),
+        ('buildbucket-notify',
+         '/internal/taskqueue/important/buildbucket/notify-task/abcabcabc'),
         ('rebuild-task-cache',
          '/internal/taskqueue/important/task_queues/rebuild-cache'),
         ('tsmon', '/internal/taskqueue/monitoring/tsmon/executors'),
@@ -149,8 +150,8 @@ class BackendTest(test_env_handlers.AppTestBase):
         ('monitoring-bq-tasks-results-summary',
          '/internal/taskqueue/monitoring/bq/tasks/results/summary/'
          '2020-01-01T01:01'),
-      ],
-      key=lambda x: x[1])
+    ],
+                                  key=lambda x: x[1])
     self.assertEqual(len(expected_task_queues), len(task_queue_routes))
 
     for i, route in enumerate(task_queue_routes):

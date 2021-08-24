@@ -469,7 +469,7 @@ def _maybe_pubsub_notify_now(result_summary, request):
 
 def _maybe_taskupdate_notify_via_tq(
     result_summary, request, es_cfg, transactional):
-  """Enqueues tasks to send PubSub and es notifications for given request.
+  """Enqueues tasks to send PubSub, es, and bb notifications for given request.
 
   Arguments:
     result_summary: a task_result.TaskResultSummary instance.
@@ -498,11 +498,21 @@ def _maybe_taskupdate_notify_via_tq(
         transactional=transactional,
         payload=utils.encode_to_json(payload))
     if not ok:
-      raise datastore_utils.CommitError('Failed to enqueue task')
+      raise datastore_utils.CommitError('Failed to enqueue pubsub notify task')
 
   if es_cfg:
     external_scheduler.notify_requests(
         es_cfg, [(request, result_summary)], True, False)
+
+  if request.has_build_token:
+    task_id = task_pack.pack_result_summary_key(result_summary.key)
+    ok = utils.enqueue_task(
+        '/internal/taskqueue/important/buildbucket/notify-task/%s' % task_id,
+        'buildbucket-notify',
+        transactional=transactional)
+    if not ok:
+      raise datastore_utils.CommitError(
+          'Failed to enqueue buildbucket notify task')
 
 
 def _pubsub_notify(task_id, topic, auth_token, userdata):

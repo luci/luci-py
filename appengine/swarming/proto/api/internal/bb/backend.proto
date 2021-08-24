@@ -134,7 +134,7 @@ message RunTaskRequest {
   //
   // It's possible for multiple RunTaskRequests to be issued for the same
   // build_id; See `request_id` for how this could happen.
-  int64 build_id = 8;
+  string build_id = 8;
 
   // Dimensions are key/value pairs which describe the type of "bot" which
   // can process this build. The specific values depend on the Backend.

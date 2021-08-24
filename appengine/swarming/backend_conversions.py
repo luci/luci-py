@@ -50,7 +50,7 @@ def compute_task_request(run_task_req):
       expiration_ts=utils.timestamp_to_datetime(
           utils.datetime_to_timestamp(now) + expiration_ms),
       realm=run_task_req.realm,
-      name='bb-%d' % run_task_req.build_id,
+      name='bb-%s' % run_task_req.build_id,
       priority=backend_config.priority,
       bot_ping_tolerance_secs=backend_config.bot_ping_tolerance,
       service_account=backend_config.service_account,
