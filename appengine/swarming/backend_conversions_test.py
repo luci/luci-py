@@ -68,8 +68,6 @@ class TestBackendConversions(test_case.TestCase):
                     struct_pb2.Value(number_value=70),
                 'service_account':
                     struct_pb2.Value(string_value='who@serviceaccount.com'),
-                'user':
-                    struct_pb2.Value(string_value='blame_me'),
                 'parent_run_id':
                     struct_pb2.Value(string_value=parent_task_id),
                 'agent_binary_cipd_filename':
@@ -94,12 +92,13 @@ class TestBackendConversions(test_case.TestCase):
             grace_period_secs=grace_secs,
             dimensions_data={u'required-1': [u'req-1']},
             command=[
-                'agent', '-fantasia', 'pegasus', '-cache-base', 'cache',
+                u'agent', '-fantasia', 'pegasus', '-cache-base', 'cache',
                 '-task-id', '${SWARMING_TASK_ID}'
             ],
             cipd_input=task_request.CipdInput(packages=[
                 task_request.CipdPackage(
-                    package_name='agent/package/${platform}', version='latest')
+                    package_name=u'agent/package/${platform}',
+                    version=u'latest')
             ])))
     expected_tr = task_request.TaskRequest(
         created_ts=utils.utcnow(),
@@ -111,7 +110,6 @@ class TestBackendConversions(test_case.TestCase):
         priority=5,
         bot_ping_tolerance_secs=70,
         service_account='who@serviceaccount.com',
-        user='blame_me',
         parent_task_id=parent_task_id,
     )
     expected_sb = task_request.SecretBytes(
@@ -158,13 +156,15 @@ class TestBackendConversions(test_case.TestCase):
             req_dim_prpc('required-2', 'req-2'),
             req_dim_prpc('required-1', 'req-1-2')
         ])
+    backend_config = backend_conversions._ingest_backend_config(
+        run_task_req.backend_config)
 
     # Create expected slices.
     base_slice = task_request.TaskSlice(
         wait_for_capacity=True,
         properties=task_request.TaskProperties(
             command=[
-                'agent', '-chicken', '1', '-cow', '3', '-cache-base', 'cache',
+                u'agent', '-chicken', '1', '-cow', '3', '-cache-base', 'cache',
                 '-task-id', '${SWARMING_TASK_ID}'
             ],
             has_secret_bytes=True,
@@ -182,7 +182,8 @@ class TestBackendConversions(test_case.TestCase):
             grace_period_secs=grace_secs,
             cipd_input=task_request.CipdInput(packages=[
                 task_request.CipdPackage(
-                    package_name='agent/package/${platform}', version='latest')
+                    package_name=u'agent/package/${platform}',
+                    version=u'latest')
             ])))
 
     slice_1 = task_request.TaskSlice(
@@ -216,7 +217,8 @@ class TestBackendConversions(test_case.TestCase):
 
     self.assertEqual(
         expected_slices,
-        backend_conversions._compute_task_slices(run_task_req, True))
+        backend_conversions._compute_task_slices(
+            run_task_req, backend_config, True))
 
   def test_compute_task_slices_base_slice_only(self):
     exec_secs = 180
@@ -243,13 +245,15 @@ class TestBackendConversions(test_case.TestCase):
             req_dim_prpc('required-2', 'req-2'),
             req_dim_prpc('required-1', 'req-1-2')
         ])
+    backend_config = backend_conversions._ingest_backend_config(
+        run_task_req.backend_config)
 
     base_slice = task_request.TaskSlice(
         wait_for_capacity=True,
         expiration_secs=120,
         properties=task_request.TaskProperties(
             command=[
-                'agent', '-cache-base', 'cache', '-task-id',
+                u'agent', '-cache-base', 'cache', '-task-id',
                 '${SWARMING_TASK_ID}'
             ],
             has_secret_bytes=False,
@@ -261,13 +265,14 @@ class TestBackendConversions(test_case.TestCase):
             },
             cipd_input=task_request.CipdInput(packages=[
                 task_request.CipdPackage(
-                    package_name='agent/package/${platform}', version='latest')
+                    package_name=u'agent/package/${platform}',
+                    version=u'latest')
             ])),
     )
 
     self.assertEqual([base_slice],
                      backend_conversions._compute_task_slices(
-                         run_task_req, False))
+                         run_task_req, backend_config, False))
 
 
 if __name__ == '__main__':
