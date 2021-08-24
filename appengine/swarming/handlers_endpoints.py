@@ -690,7 +690,12 @@ class SwarmingTasksService(remote.Service):
     for tag in request.tags:
       q = q.filter(task_result.TaskResultSummary.tags == tag)
 
-    tasks, cursor = datastore_utils.fetch_page(q, request.limit, request.cursor)
+    try:
+      tasks, cursor = datastore_utils.fetch_page(q, request.limit,
+                                                 request.cursor)
+    except ValueError as e:
+      raise endpoints.BadRequestException(
+          'Inappropriate filter for tasks/list: %s' % e)
 
     if tasks:
       payload = json.dumps(
@@ -789,21 +794,27 @@ class SwarmingQueuesService(remote.Service):
     count = 0
     # As there can be a lot of terminate tasks, try to loop a few times (max 5)
     # to get more items.
-    while len(out) < request.limit and (cursor or not count) and count < 5:
-      items, cursor = datastore_utils.fetch_page(
-          q, request.limit - len(out), cursor)
-      for i in items:
-        for s in i.sets:
-          # Ignore the tasks that are only id specific, since they are
-          # termination tasks. There may be one per bot, and it is not really
-          # useful for the user, the user may just query the list of bots.
-          if (len(s.dimensions_flat) == 1 and
-              s.dimensions_flat[0].startswith('id:')):
-            # A terminate task.
-            continue
-          out.append(swarming_rpcs.TaskQueue(
-              dimensions=s.dimensions_flat, valid_until_ts=s.valid_until_ts))
-      count += 1
+    try:
+      while len(out) < request.limit and (cursor or not count) and count < 5:
+        items, cursor = datastore_utils.fetch_page(q, request.limit - len(out),
+                                                   cursor)
+        for i in items:
+          for s in i.sets:
+            # Ignore the tasks that are only id specific, since they are
+            # termination tasks. There may be one per bot, and it is not really
+            # useful for the user, the user may just query the list of bots.
+            if (len(s.dimensions_flat) == 1 and
+                s.dimensions_flat[0].startswith('id:')):
+              # A terminate task.
+              continue
+            out.append(
+                swarming_rpcs.TaskQueue(
+                    dimensions=s.dimensions_flat,
+                    valid_until_ts=s.valid_until_ts))
+        count += 1
+    except ValueError as e:
+      raise endpoints.BadRequestException(
+          'Inappropriate filter for tasks/list: %s' % e)
     return swarming_rpcs.TaskQueueList(cursor=cursor, items=out, now=now)
 
 
@@ -1117,12 +1128,17 @@ class SwarmingBotsService(remote.Service):
     # this is required to request MultiQuery for OR dimension support.
     q = q.order(bot_management.BotInfo._key)
 
-    bots, cursor = datastore_utils.fetch_page(q, request.limit, request.cursor)
-    return swarming_rpcs.BotList(
-        cursor=cursor,
-        death_timeout=config.settings().bot_death_timeout_secs,
-        items=[message_conversion.bot_info_to_rpc(bot) for bot in bots],
-        now=now)
+    try:
+      bots, cursor = datastore_utils.fetch_page(q, request.limit,
+                                                request.cursor)
+      return swarming_rpcs.BotList(
+          cursor=cursor,
+          death_timeout=config.settings().bot_death_timeout_secs,
+          items=[message_conversion.bot_info_to_rpc(bot) for bot in bots],
+          now=now)
+    except ValueError as e:
+      raise endpoints.BadRequestException(
+          'Inappropriate filter for tasks/list: %s' % e)
 
   @gae_ts_mon.instrument_endpoint()
   @auth.endpoints_method(

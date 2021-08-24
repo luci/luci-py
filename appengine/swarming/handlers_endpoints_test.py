@@ -2999,6 +2999,9 @@ class BotsApiTest(BaseTest):
         dimensions=['bad'])
     self.call_api('list', body=message_to_dict(request), status=400)
 
+    request = handlers_endpoints.BotsRequest.combined_message_class(limit=1001)
+    self.call_api('list', body=message_to_dict(request), status=400)
+
   def test_count_ok(self):
     """Asserts that BotsCount is returned for the appropriate set of bots."""
     self.set_as_privileged_user()
