@@ -81,6 +81,8 @@ class TestBackendConversions(test_case.TestCase):
         execution_timeout=duration_pb2.Duration(seconds=exec_secs),
         start_deadline=timestamp_pb2.Timestamp(seconds=start_deadline_secs),
         dimensions=[req_dim_prpc('required-1', 'req-1')],
+        backend_token='token-token-token',
+        buildbucket_host='cow-buildbucket.appspot.com',
     )
 
     expected_slice = task_request.TaskSlice(
@@ -111,14 +113,20 @@ class TestBackendConversions(test_case.TestCase):
         bot_ping_tolerance_secs=70,
         service_account='who@serviceaccount.com',
         parent_task_id=parent_task_id,
-    )
+        has_build_token=True)
+
     expected_sb = task_request.SecretBytes(
         secret_bytes=run_task_req.secrets.SerializeToString())
+    expected_bt = task_request.BuildToken(
+        build_id=4242,
+        token='token-token-token',
+        buildbucket_host='cow-buildbucket.appspot.com')
 
-    actual_tr, actual_sb = backend_conversions.compute_task_request(
+    actual_tr, actual_sb, actual_bt = backend_conversions.compute_task_request(
         run_task_req)
     self.assertEqual(expected_tr, actual_tr)
     self.assertEqual(expected_sb, actual_sb)
+    self.assertEqual(expected_bt, actual_bt)
 
   def test_compute_task_slices(self):
     exec_secs = 180

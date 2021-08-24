@@ -22,8 +22,13 @@ _CACHE_DIR = 'cache'
 # TODO(crbug/1236848): Replace 'assert's with raised exceptions.
 
 def compute_task_request(run_task_req):
-  # type: (backend_pb2.RunTaskRequest) ->
-  #     Tuple[task_request.TaskRequest, Optional[task_request.SecretBytes]]
+  # type: (backend_pb2.RunTaskRequest) -> Tuple[task_request.TaskRequest,
+  #     Optional[task_request.SecretBytes], task_request.BuildToken]
+
+  build_token = task_request.BuildToken(
+      build_id=run_task_req.build_id,
+      token=run_task_req.backend_token,
+      buildbucket_host=run_task_req.buildbucket_host)
 
   # NOTE: secret_bytes cannot be passed via `-secret_bytes` in `command`
   # because tasks in swarming can view command details of other tasks.
@@ -48,13 +53,14 @@ def compute_task_request(run_task_req):
       name='bb-%d' % run_task_req.build_id,
       priority=backend_config.priority,
       bot_ping_tolerance_secs=backend_config.bot_ping_tolerance,
-      service_account=backend_config.service_account)
+      service_account=backend_config.service_account,
+      has_build_token=True)
 
   parent_id = backend_config.parent_run_id
   if parent_id:
     tr.parent_task_id = parent_id
-  # TODO(crbug/1236848): Create a task_request.BuildToken and return here.
-  return tr, secret_bytes
+
+  return tr, secret_bytes, build_token
 
 
 def _ingest_backend_config(req_backend_config):
