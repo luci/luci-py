@@ -852,6 +852,10 @@ def upload_outdir_with_cas(cas_client, cas_instance, outdir, tmp_dir):
         stats_json_path,
     ]
 
+    if sys.platform.startswith('linux'):
+      # TODO(crbug.com/1243194): remove this after investigation.
+      cmd.extend(['-log-level', 'debug'])
+
     start = time.time()
 
     _run_go_cmd_and_wait(cmd, tmp_dir)
