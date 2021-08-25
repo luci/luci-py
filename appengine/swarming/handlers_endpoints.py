@@ -512,8 +512,9 @@ class SwarmingTasksService(remote.Service):
 
     try:
       result_summary = task_scheduler.schedule_request(
-          request_obj, secret_bytes, request_obj.resultdb and
-          request_obj.resultdb.enable)
+          request_obj,
+          request_obj.resultdb and request_obj.resultdb.enable,
+          secret_bytes=secret_bytes)
     except (datastore_errors.BadValueError, TypeError, ValueError) as e:
       logging.exception("got exception around task_scheduler.schedule_request")
       raise endpoints.BadRequestException(e.message)
@@ -1011,7 +1012,7 @@ class SwarmingBotService(remote.Service):
       raise endpoints.BadRequestException(e.message)
 
     result_summary = task_scheduler.schedule_request(
-        request, secret_bytes=None, enable_resultdb=False)
+        request, enable_resultdb=False)
     return swarming_rpcs.TerminateResponse(
         task_id=task_pack.pack_result_summary_key(result_summary.key))
 
