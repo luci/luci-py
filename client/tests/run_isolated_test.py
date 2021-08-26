@@ -272,6 +272,7 @@ class RunIsolatedTest(RunIsolatedTestBase):
     finally:
       os.environ = old_env
 
+  @mock.patch.dict(os.environ, {'SWARMING_TASK_ID': '4242'})
   def test_main(self):
     self.mock(tools, 'disable_buffering', lambda: None)
 
@@ -279,24 +280,22 @@ class RunIsolatedTest(RunIsolatedTestBase):
         '--no-log', '--cache',
         os.path.join(self.tempdir, 'isolated_cache'), '--named-cache-root',
         os.path.join(self.tempdir, 'named_cache'), '--root-dir', self.tempdir,
-        '--', 'foo.exe', 'cmd with space'
+        '--', 'foo.exe', 'cmd with space', '-task-id', '${SWARMING_TASK_ID}'
     ]
     ret = run_isolated.main(cmd)
     self.assertEqual(0, ret)
-    self.assertEqual(
-        [
-          (
-            [self.ir_dir(u'foo.exe'), u'cmd with space'],
+    self.assertEqual([
+        (
+            [self.ir_dir(u'foo.exe'), u'cmd with space', u'-task-id', u'4242'],
             {
-              'cwd': self.ir_dir(),
-              'detached': True,
-              'close_fds': True,
-              'lower_priority': False,
-              'containment': subprocess42.Containment(),
+                'cwd': self.ir_dir(),
+                'detached': True,
+                'close_fds': True,
+                'lower_priority': False,
+                'containment': subprocess42.Containment(),
             },
-          ),
-        ],
-        self.popen_calls)
+        ),
+    ], self.popen_calls)
 
   def test_main_args(self):
     self.mock(tools, 'disable_buffering', lambda: None)

@@ -27,9 +27,11 @@ environment variables passed in the command line with the `--env` option.
     variable, it will be replaced by the temporary directory that is uploaded
     back to the server after the task execution.
 *   `${SWARMING_BOT_FILE}`: If found on command line argument or environment
-    variable, it will replaced by a file written to by the Swarming bot's
+    variable, it will be replaced by a file written to by the Swarming bot's
     on_before_task() hook in the Swarming server's custom bot_config.py. This is
     used by a Swarming bot to communicate state of the bot to tasks.
+*   `${SWARMING_TASK_ID}`: if found on the command line argument, it will be
+    replaced by the SWARMING_TASK_ID value passed with the --env option.
 
 
 ## Swarming
