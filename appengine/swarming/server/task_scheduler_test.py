@@ -2306,8 +2306,8 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertIsNone(to_run_key_1.get().queue_number)
     self.assertIsNone(to_run_key_1.get().expiration_ts)
 
-    # See _handle_dead_bot() with special case about non-idempotent task that
-    # were never updated.
+    # See _detect_dead_task_async() with special case about non-idempotent task
+    # that were never updated.
     self.mock_now(
         self.now + datetime.timedelta(seconds=request.bot_ping_tolerance_secs),
         1)
