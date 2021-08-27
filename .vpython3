@@ -8,7 +8,7 @@ python_version:"3.8"
 # required by nose2
 wheel: <
  name: "infra/python/wheels/coverage/${vpython_platform}"
- version: "version:5.5"
+ version: "version:5.5.chromium.2"
 >
 
 # required by nose2
