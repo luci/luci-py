@@ -1767,7 +1767,7 @@ def cron_handle_bot_died():
       for run_result_key in task_result.yield_active_run_result_keys():
         count['total'] += 1
         if count['total'] % 500 == 0:
-          logging.info('Fetched %d keys', total)
+          logging.info('Fetched %d keys', count['total'])
         f = _detect_dead_task_async(run_result_key)
         if f:
           futures.append(f)
