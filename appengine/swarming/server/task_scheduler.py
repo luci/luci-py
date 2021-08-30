@@ -1761,6 +1761,7 @@ def cron_handle_bot_died():
         else:
           _futs.append(f)
       futs = _futs
+    return futs
 
   try:
     try:
@@ -1774,14 +1775,15 @@ def cron_handle_bot_died():
         else:
           count['ignored'] += 1
         # Limit the number of futures.
-        _wait_futures(futures, 10)
+        futures = _wait_futures(futures, 10)
       # wait the remaining ones.
       _wait_futures(futures, 0)
     finally:
       if killed:
         logging.error('BOT_DIED!\n%d tasks:\n%s', count['killed'],
                       '\n'.join('  %s' % i for i in killed))
-      logging.info('Killed %d; ignored: %d', count['killed'], count['ignored'])
+      logging.info('total %d, killed %d, ignored: %d', count['total'],
+                   count['killed'], count['ignored'])
     # These are returned primarily for unit testing verification.
     return killed, count['ignored']
   except datastore_errors.NeedIndexError as e:
