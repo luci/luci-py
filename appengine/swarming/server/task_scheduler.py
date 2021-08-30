@@ -371,6 +371,7 @@ def _detect_dead_task_async(run_result_key):
     1x GET, 1x GETs 2~3x PUT.
     """
     run_result = run_result_key.get()
+    run_result._request_cache = request
 
     if run_result.state != task_result.State.RUNNING:
       # It was updated already or not updating last. Likely DB index was stale.
@@ -390,6 +391,7 @@ def _detect_dead_task_async(run_result_key):
     run_result.internal_failure = True
 
     result_summary = result_summary_key.get()
+    result_summary._request_cache = request
     result_summary.modified_ts = now
     result_summary.completed_ts = now
     if not result_summary.abandoned_ts:
