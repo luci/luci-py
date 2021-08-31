@@ -548,6 +548,7 @@ def _find_dupe_task(now, h):
   is equivalent to decreasing TaskRequest.created_ts, ordering by key works as
   well and doesn't require a composite index.
   """
+  logging.info("_find_dupe_task for properties_hash: %s", h)
   # TODO(maruel): Make a reverse map on successful task completion so this
   # becomes a simple ndb.get().
   cls = task_result.TaskResultSummary
@@ -557,7 +558,7 @@ def _find_dupe_task(now, h):
     if (dupe_summary.state != task_result.State.COMPLETED or
         dupe_summary.failure):
       if i == 2:
-        # Indexes are very inconsistent, give up.
+        logging.info("indexes are very inconsistent, give up.")
         return None
       continue
 
@@ -568,7 +569,10 @@ def _find_dupe_task(now, h):
     oldest = now - datetime.timedelta(
         seconds=config.settings().reusable_task_age_secs)
     if dupe_summary.created_ts <= oldest:
+      logging.info("found result (%s) is older than threshold (%s)",
+                   dupe_summary.created_ts, oldest)
       return None
+    logging.info("_find_dupe_task: dupped with %s", dupe_summary.task_id)
     return dupe_summary
   return None
 
