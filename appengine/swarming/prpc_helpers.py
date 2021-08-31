@@ -8,6 +8,8 @@ import functools
 import logging
 import sys
 
+from google.appengine.api import datastore_errors
+
 from components import auth
 from components.prpc import codes
 
@@ -15,6 +17,7 @@ import handlers_exceptions
 
 EXCEPTIONS_TO_CODE = {
     handlers_exceptions.BadRequestException: codes.StatusCode.INVALID_ARGUMENT,
+    datastore_errors.BadValueError: codes.StatusCode.INVALID_ARGUMENT,
     handlers_exceptions.PermissionException: codes.StatusCode.PERMISSION_DENIED,
     auth.AuthorizationError: codes.StatusCode.PERMISSION_DENIED,
     handlers_exceptions.InternalException: codes.StatusCode.INTERNAL,

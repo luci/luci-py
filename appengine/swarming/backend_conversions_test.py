@@ -20,6 +20,7 @@ from google.protobuf import timestamp_pb2
 from test_support import test_case
 
 import backend_conversions
+import handlers_exceptions
 from components import utils
 from server import task_request
 from server import task_pack
@@ -99,6 +100,7 @@ class TestBackendConversions(test_case.TestCase):
             ],
             cipd_input=task_request.CipdInput(packages=[
                 task_request.CipdPackage(
+                    path='.',
                     package_name=u'agent/package/${platform}',
                     version=u'latest')
             ])))
@@ -190,6 +192,7 @@ class TestBackendConversions(test_case.TestCase):
             grace_period_secs=grace_secs,
             cipd_input=task_request.CipdInput(packages=[
                 task_request.CipdPackage(
+                    path='.',
                     package_name=u'agent/package/${platform}',
                     version=u'latest')
             ])))
@@ -273,6 +276,7 @@ class TestBackendConversions(test_case.TestCase):
             },
             cipd_input=task_request.CipdInput(packages=[
                 task_request.CipdPackage(
+                    path='.',
                     package_name=u'agent/package/${platform}',
                     version=u'latest')
             ])),
@@ -281,6 +285,41 @@ class TestBackendConversions(test_case.TestCase):
     self.assertEqual([base_slice],
                      backend_conversions._compute_task_slices(
                          run_task_req, backend_config, False))
+
+  def test_compute_task_slices_exceptions(self):
+    backend_config = swarming_bb_pb2.SwarmingBackendConfig()
+
+    run_task_req = backend_pb2.RunTaskRequest(
+        grace_period=duration_pb2.Duration(nanos=42))
+    with self.assertRaisesRegexp(handlers_exceptions.BadRequestException,
+                                 'grace_period.nanos'):
+      backend_conversions._compute_task_slices(run_task_req, backend_config,
+                                               False)
+
+    run_task_req = backend_pb2.RunTaskRequest(
+        execution_timeout=duration_pb2.Duration(nanos=42))
+    with self.assertRaisesRegexp(handlers_exceptions.BadRequestException,
+                                 'execution_timeout.nanos'):
+      backend_conversions._compute_task_slices(run_task_req, backend_config,
+                                               False)
+
+    run_task_req = backend_pb2.RunTaskRequest(caches=[
+        swarming_bb_pb2.CacheEntry(
+            wait_for_warm_cache=duration_pb2.Duration(nanos=42))
+    ])
+    with self.assertRaisesRegexp(handlers_exceptions.BadRequestException,
+                                 'wait_for_warm_cache.nanos'):
+      backend_conversions._compute_task_slices(run_task_req, backend_config,
+                                               False)
+
+    run_task_req = backend_pb2.RunTaskRequest(dimensions=[
+        common_pb2.RequestedDimension(
+            expiration=duration_pb2.Duration(nanos=42))
+    ])
+    with self.assertRaisesRegexp(handlers_exceptions.BadRequestException,
+                                 'expiration.nanos'):
+      backend_conversions._compute_task_slices(run_task_req, backend_config,
+                                               False)
 
 
 if __name__ == '__main__':

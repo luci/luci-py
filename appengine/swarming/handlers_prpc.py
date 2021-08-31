@@ -6,11 +6,14 @@
 
 import logging
 
+from google.appengine.api import datastore_errors
 from google.protobuf import empty_pb2
 
 from components import prpc
 from components.prpc.codes import StatusCode
 
+import api_helpers
+import backend_conversions
 import prpc_helpers
 from components import datastore_utils
 from proto.api.internal.bb import backend_prpc_pb2
@@ -18,6 +21,8 @@ from proto.api.internal.bb import backend_pb2
 from proto.api import swarming_prpc_pb2  # pylint: disable=no-name-in-module
 from proto.api import swarming_pb2  # pylint: disable=no-name-in-module
 from server import bot_management
+from server import task_request
+from server import task_scheduler
 
 
 class TaskBackendAPIService(prpc_helpers.SwarmingPRPCService):
@@ -26,9 +31,27 @@ class TaskBackendAPIService(prpc_helpers.SwarmingPRPCService):
   DESCRIPTION = backend_prpc_pb2.TaskBackendServiceDescription
 
   @prpc_helpers.PRPCMethod
-  def RunTask(self, _request, _context):
+  def RunTask(self, request, _context):
     # type: (backend_pb2.RunTaskRequest, context.ServicerContext)
     #     -> empty_pb2.Empty
+
+    # TODO(crbug/1236848): Check if user can create tasks
+    # (maybe via auth.require()).
+
+    tr, secret_bytes, build_token = backend_conversions.compute_task_request(
+        request)
+
+    api_helpers.process_task_request(tr, task_request.TEMPLATE_AUTO)
+
+    # TODO(crbug/1236848): Used request.request_id to dedupe tasks within
+    # ten minutes.
+
+    try:
+      result_summary = task_scheduler.schedule_request(
+          tr, secret_bytes=secret_bytes, build_token=build_token)
+      logging.info('Returned ResultSummary: %r', result_summary)
+    except (TypeError, ValueError) as e:
+      raise handlers_exceptions.BadRequestException(e.message)
 
     return empty_pb2.Empty()
 

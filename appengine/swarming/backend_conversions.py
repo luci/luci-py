@@ -7,8 +7,10 @@ import collections
 import copy
 import posixpath
 
+from google.appengine.api import datastore_errors
 from google.protobuf import json_format
 
+import handlers_exceptions
 from components import utils
 from server import task_request
 
@@ -19,11 +21,18 @@ from proto.api.internal.bb import swarming_bb_pb2
 # caches defined in swarmbucket configs.
 _CACHE_DIR = 'cache'
 
-# TODO(crbug/1236848): Replace 'assert's with raised exceptions.
 
 def compute_task_request(run_task_req):
   # type: (backend_pb2.RunTaskRequest) -> Tuple[task_request.TaskRequest,
   #     Optional[task_request.SecretBytes], task_request.BuildToken]
+  """Computes internal ndb objects from a RunTaskRequest.
+
+  Raises:
+    handlers_exceptions.BadRequestException if any `run_task_req` fields are
+        invalid.
+    datastore_errors.BadValueError if any converted ndb object values are
+        invalid.
+  """
 
   build_token = task_request.BuildToken(
       build_id=run_task_req.build_id,
@@ -38,8 +47,8 @@ def compute_task_request(run_task_req):
         secret_bytes=run_task_req.secrets.SerializeToString())
 
   backend_config = _ingest_backend_config(run_task_req.backend_config)
-  slices = _compute_task_slices(
-      run_task_req, backend_config, secret_bytes is not None)
+  slices = _compute_task_slices(run_task_req, backend_config,
+                                secret_bytes is not None)
   expiration_ms = sum([s.expiration_secs for s in slices]) * 1000000
   # The expiration_ts may be different from run_task_req.start_deadline
   # if the last slice's expiration_secs had to be extended to 60s
@@ -66,24 +75,42 @@ def compute_task_request(run_task_req):
 def _ingest_backend_config(req_backend_config):
   # type: (struct_pb2.Struct) -> swarming_bb_pb2.SwarmingBackendConfig
   json_config = json_format.MessageToJson(req_backend_config)
-  return json_format.Parse(json_config, swarming_bb_pb2.SwarmingBackendConfig)
+  return json_format.Parse(json_config, swarming_bb_pb2.SwarmingBackendConfig())
 
 
 def _compute_task_slices(run_task_req, backend_config, has_secret_bytes):
   # type: (backend_pb2.RunTaskRequest, swarming_bb_pb2.SwarmingBackendConfig,
   #     bool) -> Sequence[task_request.TaskSlice]
+  """
+  Raises:
+    handlers_exceptions.BadRequestException if any `run_task_req` fields are
+        invalid.
+    datastore_errors.BadValueError if any converted ndb object values are
+        invalid.
+  """
 
   # {expiration_secs: {'key1': [value1, ...], 'key2': [value1, ...]}
   dims_by_exp = collections.defaultdict(lambda: collections.defaultdict(list))
 
+  if run_task_req.execution_timeout.nanos:
+    raise handlers_exceptions.BadRequestException(
+        '`execution_timeout.nanos` must be 0')
+  if run_task_req.grace_period.nanos:
+    raise handlers_exceptions.BadRequestException(
+        '`grace_period.nanos` must be 0')
+
   for cache in run_task_req.caches:
-    assert not cache.wait_for_warm_cache.nanos
+    if cache.wait_for_warm_cache.nanos:
+      raise handlers_exceptions.BadRequestException(
+          'cache\'s `wait_for_warm_cache.nanos` must be 0')
     if cache.wait_for_warm_cache.seconds:
       dims_by_exp[cache.wait_for_warm_cache.seconds]['caches'].append(
           cache.name)
 
   for dim in run_task_req.dimensions:
-    assert not dim.expiration.nanos
+    if dim.expiration.nanos:
+      raise handlers_exceptions.BadRequestException(
+          'dimension\'s `expiration.nanos` must be 0')
     dims_by_exp[dim.expiration.seconds][dim.key].append(dim.value)
 
   base_dims = dims_by_exp.pop(0, {})
@@ -105,11 +132,12 @@ def _compute_task_slices(run_task_req, backend_config, has_secret_bytes):
           dimensions_data=base_dims,
           execution_timeout_secs=run_task_req.execution_timeout.seconds,
           grace_period_secs=run_task_req.grace_period.seconds,
-          command=_compute_command(
-              run_task_req, backend_config.agent_binary_cipd_filename),
+          command=_compute_command(run_task_req,
+                                   backend_config.agent_binary_cipd_filename),
           has_secret_bytes=has_secret_bytes,
           cipd_input=task_request.CipdInput(packages=[
               task_request.CipdPackage(
+                  path='.',
                   package_name=backend_config.agent_binary_cipd_pkg,
                   version=backend_config.agent_binary_cipd_vers)
           ])),

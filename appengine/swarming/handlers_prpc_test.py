@@ -19,12 +19,27 @@ from google.appengine.ext import ndb
 
 from google.protobuf import struct_pb2
 from google.protobuf import timestamp_pb2
+from google.protobuf import duration_pb2
+
+from test_support import test_case
 
 from components import utils
+from components import prpc
 from components.prpc import encoding
 
 from proto.api import swarming_pb2  # pylint: disable=no-name-in-module
+from proto.api.internal.bb import backend_pb2
+from proto.api.internal.bb import common_pb2
+from proto.api.internal.bb import launcher_pb2
+from proto.config import config_pb2
+
+from server import config
 from server import task_queues
+from server import task_request
+from server import task_scheduler
+from server import pools_config
+from server import realms
+from server import service_accounts
 import handlers_bot
 import handlers_prpc
 
@@ -40,6 +55,146 @@ def _encode(d):
   raw = encoding.get_encoder(encoding.Encoding.JSON)(d)
   assert raw[:5] == ')]}\'\n', raw[:5]
   return raw[5:]
+
+
+class TaskBackendAPIServiceTest(test_env_handlers.AppTestBase):
+
+  def setUp(self):
+    super(TaskBackendAPIServiceTest, self).setUp()
+    s = prpc.Server()
+    s.add_service(handlers_prpc.TaskBackendAPIService())
+    # TODO(crbug/1236848) call handlers_prpc.get_routes() when
+    # the Backend is ready and added.
+    routes = s.get_routes()
+    self.app = webtest.TestApp(
+        webapp2.WSGIApplication(routes, debug=True),
+        extra_environ={
+            'REMOTE_ADDR': self.source_ip,
+            'SERVER_SOFTWARE': os.environ['SERVER_SOFTWARE'],
+        },
+    )
+
+    self._headers = {
+        'Content-Type': encoding.Encoding.JSON[1],
+        'Accept': encoding.Encoding.JSON[1],
+    }
+
+    now = datetime.datetime(2019, 01, 02, 03)
+    test_case.mock_now(self, now, 0)
+
+  # Test helpers.
+  def _req_dim_prpc(self, key, value, exp_secs=None):
+    # type: (str, str, Optional[int]) -> common_pb2.RequestedDimension
+    dim = common_pb2.RequestedDimension(key=key, value=value)
+    if exp_secs is not None:
+      dim.expiration.seconds = exp_secs
+    return dim
+
+  def _basic_run_task_request(self):
+    return backend_pb2.RunTaskRequest(
+        secrets=launcher_pb2.BuildSecrets(build_token='tok'),
+        realm='some:realm',
+        build_id='42423',
+        agent_args=['-fantasia', 'pegasus'],
+        backend_config=struct_pb2.Struct(
+            fields={
+                'wait_for_capacity':
+                    struct_pb2.Value(bool_value=True),
+                'bot_ping_tolerance':
+                    struct_pb2.Value(number_value=70),
+                'service_account':
+                    struct_pb2.Value(string_value='who@serviceaccount.com'),
+                'agent_binary_cipd_filename':
+                    struct_pb2.Value(string_value='agent'),
+                'agent_binary_cipd_pkg':
+                    struct_pb2.Value(string_value='agent/package/${platform}'),
+                'agent_binary_cipd_vers':
+                    struct_pb2.Value(string_value='latest'),
+            }),
+        grace_period=duration_pb2.Duration(seconds=60),
+        execution_timeout=duration_pb2.Duration(seconds=60),
+        start_deadline=timestamp_pb2.Timestamp(
+            seconds=int(utils.time_time() + 120)),
+        dimensions=[self._req_dim_prpc('pool', 'default')],
+        backend_token='token-token-token',
+        buildbucket_host='cow-buildbucket.appspot.com',
+    )
+
+  # Shareable mocking.
+  def _mock_pool_config(self, name):
+
+    def mocked_get_pool_config(pool):
+      if pool == name:
+        return pools_config.init_pool_config(
+            name=name,
+            rev='rev',
+        )
+      return None
+
+    self.mock(pools_config, 'get_pool_config', mocked_get_pool_config)
+
+  def _mock_enqueue_task(self, allowed_queues):
+
+    def mocked_enqueue_task(url, queue_name, **kwargs):
+      del kwargs
+      if queue_name in allowed_queues:
+        return True
+      self.fail(url)
+
+    self.mock(utils, 'enqueue_task', mocked_enqueue_task)
+
+  # Tests
+  def test_run_task(self):
+    # Mocks for process_task_requests()
+    settings_cfg = config_pb2.SettingsCfg(
+        cipd=config_pb2.CipdSettings(
+            default_server='https://chrome-infra-packages.appspot.com',
+            default_client_package=config_pb2.CipdPackage(
+                package_name='chicken/cipd/${platform}', version='latest')))
+    self.mock(config, '_get_settings', lambda: (None, settings_cfg))
+    self._mock_pool_config('default')
+    self.mock(realms, 'check_tasks_create_in_realm', lambda *_: True)
+    self.mock(realms, 'check_pools_create_task', lambda *_: True)
+    self.mock(realms, 'check_tasks_act_as', lambda *_: True)
+    self.mock(service_accounts, 'has_token_server', lambda: True)
+
+    # Mocks for task_scheduler.schedule_request()
+    def mocked_enqueue_task_async(url, queue_name, payload):
+      if queue_name == 'rebuild-task-cache':
+        return task_queues.rebuild_task_cache_async(payload)
+      self.fail(url)
+
+    self.mock(utils, 'enqueue_task_async', mocked_enqueue_task_async)
+    self._mock_enqueue_task(['pubsub', 'buildbucket-notify'])
+
+    request = self._basic_run_task_request()
+    self.app.post('/prpc/swarming.backend.TaskBackend/RunTask',
+                  _encode(request), self._headers)
+    self.assertEqual(1, task_request.TaskRequest.query().count())
+    self.assertEqual(1, task_request.BuildToken.query().count())
+    self.assertEqual(1, task_request.SecretBytes.query().count())
+
+  def test_run_task_exceptions(self):
+
+    request = backend_pb2.RunTaskRequest()
+    raw_resp = self.app.post(
+        '/prpc/swarming.backend.TaskBackend/RunTask',
+        _encode(request),
+        self._headers,
+        expect_errors=True)
+    self.assertEqual(raw_resp.status, '400 Bad Request')
+
+    def mocked_schedule_request():
+      raise TypeError()
+
+    self.mock(task_scheduler, 'schedule_request', mocked_schedule_request)
+    request = self._basic_run_task_request()
+    raw_resp = self.app.post(
+        '/prpc/swarming.backend.TaskBackend/RunTask',
+        _encode(request),
+        self._headers,
+        expect_errors=True)
+    self.assertEqual(raw_resp.status, '400 Bad Request')
 
 
 class PRPCTest(test_env_handlers.AppTestBase):
