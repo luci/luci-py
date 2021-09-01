@@ -1786,7 +1786,7 @@ def cron_handle_bot_died():
         else:
           count['ignored'] += 1
         # Limit the number of futures.
-        futures = _wait_futures(futures, 50)
+        futures = _wait_futures(futures, 10)
       # wait the remaining ones.
       _wait_futures(futures, 0)
     finally:
