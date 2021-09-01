@@ -1747,7 +1747,12 @@ def cron_handle_bot_died():
   futures = []
 
   def _handle_future(f):
-    key = f.get_result()
+    key = None
+    try:
+      key = f.get_result()
+    except datastore_utils.CommitError as e:
+      logging.error('Failed to updated dead task. error=%s', e)
+
     if key:
       killed.append(task_pack.pack_run_result_key(key))
       count['killed'] += 1
