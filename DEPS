@@ -20,7 +20,7 @@ deps = {
     'packages': [
       {
         'package': 'infra/tools/luci/cas/${{platform}}',
-        'version': 'git_revision:981107a5530793ab5f1ffa832a114db87e383fba',
+        'version': 'git_revision:22d5bd90bfef752250fa2b882364090f499f24e6',
       }
     ],
     'dep_type': 'cipd',
