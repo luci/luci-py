@@ -14,12 +14,15 @@ from components.prpc.codes import StatusCode
 
 import api_helpers
 import backend_conversions
+import handlers_exceptions
 import prpc_helpers
+from components import auth
 from components import datastore_utils
 from proto.api.internal.bb import backend_prpc_pb2
 from proto.api.internal.bb import backend_pb2
 from proto.api import swarming_prpc_pb2  # pylint: disable=no-name-in-module
 from proto.api import swarming_pb2  # pylint: disable=no-name-in-module
+from server import acl
 from server import bot_management
 from server import task_request
 from server import task_scheduler
@@ -31,12 +34,11 @@ class TaskBackendAPIService(prpc_helpers.SwarmingPRPCService):
   DESCRIPTION = backend_prpc_pb2.TaskBackendServiceDescription
 
   @prpc_helpers.PRPCMethod
+  @auth.require(
+      acl.can_create_task, 'User cannot create tasks.', log_identity=True)
   def RunTask(self, request, _context):
     # type: (backend_pb2.RunTaskRequest, context.ServicerContext)
     #     -> empty_pb2.Empty
-
-    # TODO(crbug/1236848): Check if user can create tasks
-    # (maybe via auth.require()).
 
     tr, secret_bytes, build_token = backend_conversions.compute_task_request(
         request)
@@ -122,5 +124,7 @@ class BotAPIService(object):
 def get_routes():
   s = prpc.Server()
   s.add_service(BotAPIService())
-  # TODO(crbug/1236848): include: s.add_service(TaskBackendAPIService())
+  # TODO(crbug/1236848): add
+  # s.add_service(TaskBackendAPIService())
+  # s.add_interceptor(auth.prpc_interceptor)
   return s.get_routes()
