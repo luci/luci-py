@@ -38,6 +38,18 @@ service TaskBackend {
   //
   // Buildbucket will invoke this RPC with the Project-scoped identity.
   rpc RunTask(RunTaskRequest) returns (google.protobuf.Empty) {};
+
+  // BB will call FetchTasks when it needs to understand the current
+  // status of jobs.
+  //
+  // This will happen at a regular, unspecified, interval when
+  // UpdateBuild/UpdateBuildTask haven't been called recently.
+  //
+  // Once the build is in a terminal state, FetchTasks SHOULD return
+  // the same response every time.
+  //
+  // Buildbucket will invoke this RPC with the Project-scoped identity.
+  rpc FetchTasks(FetchTasksRequest) returns (FetchTasksResponse) {};
 }
 
 message RunTaskRequest {
@@ -197,4 +209,47 @@ message RunTaskRequest {
   // See the "RunTask Protocol" section for the full details on how
   // Buildbucket will avoid raciness even in the face of duplicate tasks.
   string request_id = 16;
+}
+
+message FetchTasksRequest {
+  repeated TaskID task_ids = 1;
+}
+
+message FetchTasksResponse {
+  // These should represent the current state of the requested tasks.
+  repeated Task tasks = 1;
+}
+
+
+message Task {
+  TaskID id = 1;
+
+  // (optional) Human-clickable link to the status page for this task.
+  string link = 2;
+
+  // The backend's status for handling this task.
+  .bb.Status status = 3;
+
+  // The 'status_details' around handling this task.
+  .bb.StatusDetails status_details = 4;
+
+  // Human-readable commentary around the handling of this task.
+  string summary_html = 5;
+
+  // Additional backend-specific details about the task.
+  //
+  // This could be used to indicate things like named-cache status, task
+  // startup/end time, etc.
+  google.protobuf.Struct details = 6;
+}
+
+message TaskID {
+  // The backend target, e.g. "swarming://chromium-swarm"
+  string target = 1;
+
+  // id must uniquely identify the state associated with this Task
+  // in the Backend for the given target.
+  //
+  // Example: for Swarming this would be the task ID.
+  string id = 2;
 }

@@ -13,7 +13,10 @@ from google.protobuf import json_format
 import handlers_exceptions
 from components import utils
 from server import task_request
+from server import task_result
 
+from proto.api.internal.bb import backend_pb2
+from proto.api.internal.bb import common_pb2
 from proto.api.internal.bb import swarming_bb_pb2
 
 # This is the path, relative to the swarming run dir, to the directory that
@@ -182,3 +185,71 @@ def _compute_command(run_task_req, agent_binary_name):
   args = [agent_binary_name] + run_task_req.agent_args[:]
   args.extend(['-cache-base', _CACHE_DIR, '-task-id', '${SWARMING_TASK_ID}'])
   return args
+
+
+def convert_results_to_tasks(task_results, task_ids):
+  # type: (Sequence[Union[task_result._TaskResultCommon, None]], Sequence[str])
+  #     -> Sequence[backend_pb2.Task]
+  """Converts the given task results to a backend Tasks
+
+  The length and order of `task_results` is expected to match those of
+  `task_ids`.
+
+  Raises:
+    handlers_exceptions.InternalException if any tasks have an
+        unexpected state.
+  """
+  tasks = []
+
+  for i, result in enumerate(task_results):
+    task = backend_pb2.Task(
+        id = backend_pb2.TaskID(
+            target = 'swarming://',
+            id = task_ids[i],
+        ))
+
+    if result is None:
+      task.status = common_pb2.INFRA_FAILURE
+      task.summary_html = 'Swarming task %s not found' % task_ids[i]
+      tasks.append(task)
+      continue
+
+    if result.state == task_result.State.PENDING:
+      task.status = common_pb2.SCHEDULED
+
+    elif result.state == task_result.State.RUNNING:
+      task.status = common_pb2.STARTED
+
+    elif result.state == task_result.State.EXPIRED:
+      task.status = common_pb2.INFRA_FAILURE
+      task.summary_html = 'Task expired.'
+      task.status_details.resource_exhaustion.SetInParent()
+      task.status_details.timeout.SetInParent()
+
+    elif result.state == task_result.State.TIMED_OUT:
+      task.status = common_pb2.INFRA_FAILURE
+      task.summary_html = 'Task timed out.'
+      task.status_details.timeout.SetInParent()
+
+    elif result.state == task_result.State.BOT_DIED:
+      task.status = common_pb2.INFRA_FAILURE
+      task.summary_html = 'Task bot died.'
+
+    elif result.state in [task_result.State.CANCELED, task_result.State.KILLED]:
+      task.status = common_pb2.CANCELED
+
+    elif result.state == task_result.State.NO_RESOURCE:
+      task.status = common_pb2.INFRA_FAILURE
+      task.summary_html = 'Task did not start, no resource.'
+      task.status_details.resource_exhaustion.SetInParent()
+
+    elif result.state == task_result.State.COMPLETED:
+      task.status = common_pb2.SUCCESS
+    else:
+      logging.exception('Unexpected state for task result: %r', result)
+      raise handlers_exceptions.InternalException('Unrecognized task status')
+
+    # TODO(crbug/1236848): Fill Task.details.
+    tasks.append(task)
+
+  return tasks

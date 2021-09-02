@@ -23,6 +23,7 @@ import backend_conversions
 import handlers_exceptions
 from components import utils
 from server import task_request
+from server import task_result
 from server import task_pack
 
 from proto.api.internal.bb import backend_pb2
@@ -320,6 +321,67 @@ class TestBackendConversions(test_case.TestCase):
                                  'expiration.nanos'):
       backend_conversions._compute_task_slices(run_task_req, backend_config,
                                                False)
+
+  def test_convert_results_to_tasks(self):
+    def test_task(status, task_id=None, summary=None, set_timeout=False,
+                  set_exhaustion=False):
+      task = backend_pb2.Task(
+        id = backend_pb2.TaskID(
+            target = 'swarming://'),
+        status=status)
+      if task_id is not None:
+        task.id.id = str(task_id)
+      if summary is not None:
+        task.summary_html = summary
+      if set_timeout:
+        task.status_details.timeout.SetInParent()
+      if set_exhaustion:
+        task.status_details.resource_exhaustion.SetInParent()
+      return task
+
+    # PENDING TaskResultSummary
+    req_1 = task_request.TaskRequest(id=1230)
+    req_1.key=task_request.new_request_key()
+    res_sum_1 = task_result.TaskResultSummary(
+        parent=req_1.key,
+        state=task_result.State.PENDING)
+
+    # EXPIRED TaskRunResult
+    req_2 = task_request.TaskRequest(id=1220)
+    req_2.key = task_request.new_request_key()
+    res_sum_2 = task_result.TaskResultSummary(
+        key=ndb.Key('TaskResultSummary', 1, parent=req_2.key))
+    run_res_2 = task_result.TaskRunResult(
+        key=ndb.Key('TaskRunResult', 1, parent=res_sum_2.key),
+        state=task_result.State.EXPIRED)
+
+    # CANCELED TaskRunResult
+    req_3 = task_request.TaskRequest(id=1230)
+    req_3.key=task_request.new_request_key()
+    res_sum_3 = task_result.TaskResultSummary(
+        key=ndb.Key('TaskResultSummary', 1, parent=req_3.key))
+    run_res_3 = task_result.TaskRunResult(
+        key=ndb.Key('TaskRunResult', 2,  parent=res_sum_3.key),
+        state=task_result.State.CANCELED)
+
+    results = [res_sum_1, run_res_2, run_res_3, None]
+
+    expected_tasks = [
+        test_task(common_pb2.SCHEDULED, task_id=res_sum_1.task_id),
+        test_task(
+            common_pb2.INFRA_FAILURE, task_id=run_res_2.task_id,
+            summary='Task expired.', set_timeout=True, set_exhaustion=True),
+        test_task(common_pb2.CANCELED, task_id=run_res_3.task_id),
+        test_task(
+            common_pb2.INFRA_FAILURE, task_id='4',
+            summary='Swarming task 4 not found'),
+    ]
+
+    self.assertEqual(
+        expected_tasks,
+        backend_conversions.convert_results_to_tasks(
+            results, [res_sum_1.task_id, run_res_2.task_id,
+                      run_res_3.task_id, '4']))
 
 
 if __name__ == '__main__':
