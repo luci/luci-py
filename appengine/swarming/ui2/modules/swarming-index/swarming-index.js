@@ -38,23 +38,24 @@ const logsURL = (project_id) =>
 const bootstrapTemplate = (ele) => html`
 <div>
   <h2>Bootstrapping a bot</h2>
-  To bootstrap a bot, run one of these (all links are valid for 1 hour):
+  <div>To bootstrap a bot, run one of these (all links are valid for 1 hour):</div>
   <ol>
     <li>
       <strong> TL;DR; </strong>
-<pre class=command>python -c "import urllib; exec urllib.urlopen('${ele._host_url}/bootstrap?tok=${ele._bootstrap_token}').read()"</pre>
+<pre class=command>python3 -c "import urllib.request; exec(urllib.request.urlopen('${ele._host_url}/bootstrap?tok=${ele._bootstrap_token}').read())"</pre>
     </li>
     <li>
       Escaped version to pass as a ssh argument:
-<pre class=command>'python -c "import urllib; exec urllib.urlopen('"'${ele._host_url}/bootstrap?tok=${ele._bootstrap_token}'"').read()"'</pre>
+<pre class=command>'python3 -c "import urllib.request; exec(urllib.request.urlopen('"'${ele._host_url}/bootstrap?tok=${ele._bootstrap_token}'"').read())"'</pre>
     </li>
     <li>
       Manually:
 <pre class=command>mkdir bot; cd bot
 rm -f swarming_bot.zip; curl -sSLOJ ${ele._host_url}/bot_code?tok=${ele._bootstrap_token}
-python swarming_bot.zip</pre>
+python3 swarming_bot.zip</pre>
     </li>
   </ol>
+  <div>Windows bot requires pywin32, Mac bot requires pyobjc</div>
 </div>
 `;
 
