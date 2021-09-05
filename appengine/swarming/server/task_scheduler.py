@@ -1791,8 +1791,8 @@ def cron_handle_bot_died():
       _wait_futures(futures, 0)
     finally:
       if killed:
-        logging.error('BOT_DIED!\n%d tasks:\n%s', count['killed'],
-                      '\n'.join('  %s' % i for i in killed))
+        logging.warning('BOT_DIED!\n%d tasks:\n%s', count['killed'],
+                        '\n'.join('  %s' % i for i in killed))
       logging.info('total %d, killed %d, ignored: %d', count['total'],
                    count['killed'], count['ignored'])
     # These are returned primarily for unit testing verification.
