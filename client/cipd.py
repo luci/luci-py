@@ -433,7 +433,12 @@ def get_client(cache_dir,
     try:
       with version_cache.getfileobj(version_digest) as f:
         instance_id = six.ensure_str(f.read())
+      logging.info("instance_id %s", instance_id)
     except local_caching.CacheMiss:
+      logging.info("version_cache miss for %s", version_digest)
+      instance_id = ''
+
+    if not instance_id:
       instance_id = resolve_version(
           service_url, package_name, version, timeout=timeoutfn())
       version_cache.write(version_digest, [six.ensure_binary(instance_id)])
