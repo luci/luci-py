@@ -5,8 +5,12 @@
 
 import datetime
 import logging
+import re
 
 from google.appengine.api import datastore_errors
+from google.appengine.api import memcache
+
+from components import auth
 
 import handlers_exceptions
 from server import acl
@@ -115,3 +119,31 @@ def process_task_request(tr, template_apply):
         raise handlers_exceptions.BadRequestException(e.message)
       except service_accounts.InternalError as e:
         raise handlers_exceptions.InternalException(e.message)
+
+
+def cache_request(namespace, request_uuid, func):
+  """Checks and returns the cached result of the identical request.
+
+  If the cache doesn't exist, the result of the function will be cached.
+  """
+  if request_uuid and not re.match(
+      r'^[\da-fA-F]{8}-[\da-fA-F]{4}-[\da-fA-F]{4}-[\da-fA-F]{4}-'
+      r'[\da-fA-F]{12}$', request_uuid):
+    raise handlers_exceptions.BadRequestException(
+        'invalid uuid is given as request_uuid')
+
+  request_idempotency_key = None
+  if request_uuid:
+    request_idempotency_key = 'request_id/%s/%s' % (
+        request_uuid, auth.get_current_identity().to_bytes())
+
+  if request_idempotency_key:
+    result_cache = memcache.get(request_idempotency_key, namespace=namespace)
+    if result_cache is not None:
+      return result_cache
+
+  result = func()
+  if request_idempotency_key:
+    memcache.add(
+        request_idempotency_key, result, namespace=namespace, time=10 * 60)
+  return result

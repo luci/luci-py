@@ -474,67 +474,46 @@ class SwarmingTasksService(remote.Service):
       return swarming_rpcs.TaskRequestMetadata(
           request=message_conversion.task_request_to_rpc(request_obj))
 
-    if request.request_uuid and not re.match(
-        r'^[\da-fA-F]{8}-[\da-fA-F]{4}-[\da-fA-F]{4}-[\da-fA-F]{4}-'
-        r'[\da-fA-F]{12}$', request.request_uuid):
-      raise endpoints.BadRequestException(
-          'invalid uuid is given as request_uuid')
+    # This check is for idempotency when creating new tasks.
+    # TODO(crbug.com/997221): Make idempotency robust.
+    # There is still possibility of duplicate task creation if requests with
+    # the same uuid are sent in a short period of time.
+    def _schedule_request():
+      try:
+        result_summary = task_scheduler.schedule_request(
+            request_obj,
+            request_obj.resultdb and request_obj.resultdb.enable,
+            secret_bytes=secret_bytes)
+      except (datastore_errors.BadValueError, TypeError, ValueError) as e:
+        logging.exception(
+            "got exception around task_scheduler.schedule_request")
+        raise endpoints.BadRequestException(e.message)
 
-    # TODO(crbug.com/997221): move this to task_scheduler.py after
-    # crbug.com/1018982.
-    request_idempotency_key = None
-    if request.request_uuid:
-      request_idempotency_key = 'request_id/%s/%s' % (
-          request.request_uuid, auth.get_current_identity().to_bytes())
+      returned_result = message_conversion.task_result_to_rpc(
+          result_summary, False)
 
-    if request_idempotency_key:
-      # This check is for idempotency when creating new tasks.
-      # TODO(crbug.com/997221): Make idempotency robust.
-      # There is still possibility of duplicate task creation if requests with
-      # the same uuid are sent in a short period of time.
-      request_metadata = memcache.get(
-          request_idempotency_key, namespace='task_new')
-      if request_metadata is not None:
-        # request_obj does not have task_id, so need to delete before
-        # validation.
-        task_id_orig = request_metadata.request.task_id
-        request_metadata.request.task_id = None
-        if request_metadata.request != message_conversion.task_request_to_rpc(
-            request_obj):
-          logging.warning(
-              'the same request_uuid value was reused for different task '
-              'requests')
+      return swarming_rpcs.TaskRequestMetadata(
+          request=message_conversion.task_request_to_rpc(request_obj),
+          task_id=task_pack.pack_result_summary_key(result_summary.key),
+          task_result=returned_result)
 
-        request_metadata.request.task_id = task_id_orig
-        logging.info('Reusing task %s with uuid %s', task_id_orig,
-                     request.request_uuid)
-        return request_metadata
+    request_metadata = api_helpers.cache_request('task_new',
+                                                 request.request_uuid,
+                                                 _schedule_request)
 
-    try:
-      result_summary = task_scheduler.schedule_request(
-          request_obj,
-          request_obj.resultdb and request_obj.resultdb.enable,
-          secret_bytes=secret_bytes)
-    except (datastore_errors.BadValueError, TypeError, ValueError) as e:
-      logging.exception("got exception around task_scheduler.schedule_request")
-      raise endpoints.BadRequestException(e.message)
-
-    returned_result = message_conversion.task_result_to_rpc(
-      result_summary, False)
-
-    request_metadata = swarming_rpcs.TaskRequestMetadata(
-        request=message_conversion.task_request_to_rpc(request_obj),
-        task_id=task_pack.pack_result_summary_key(result_summary.key),
-        task_result=returned_result)
-
-    # TODO(crbug.com/997221): move this to task_scheduler.py after
-    # crbug.com/1018982.
-    if request_idempotency_key:
-      memcache.add(
-          request_idempotency_key,
-          request_metadata,
-          time=60 * 60,
-          namespace='task_new')
+    # The returned metadata may be a cache. Compare it with request_obj.
+    # Since request_obj does not have task_id, it needs to be excluded for
+    # validation.
+    task_id_orig = request_metadata.request.task_id
+    request_metadata.request.task_id = None
+    if request_metadata.request != message_conversion.task_request_to_rpc(
+        request_obj):
+      logging.warning(
+          'the same request_uuid value was reused for different task '
+          'requests')
+    request_metadata.request.task_id = task_id_orig
+    logging.info('Reusing task %s with uuid %s', task_id_orig,
+                 request.request_uuid)
 
     return request_metadata
 

@@ -7,6 +7,8 @@ import logging
 import sys
 import unittest
 
+import mock
+
 import swarming_test_env
 swarming_test_env.setup_test_env()
 
@@ -158,6 +160,58 @@ class TestProcessTaskRequest(test_case.TestCase):
       return None
 
     self.mock(pools_config, 'get_pool_config', mocked_get_pool_config)
+
+
+class TestCheckIdenticalRequest(test_case.TestCase):
+
+  def setUp(self):
+    super(TestCheckIdenticalRequest, self).setUp()
+    self.now = test_case.mock_now(self, datetime.datetime(2019, 01, 02, 03), 0)
+
+  def test_cache_hit(self):
+    func = mock.Mock(return_value='ok')
+    request_uuid = 'cf60878f-8f2a-4f1e-b1f5-8b5ec88813a9'
+
+    self.assertEqual(
+        'ok', api_helpers.cache_request('test_request', request_uuid, func))
+    func.assert_called_once()
+
+    func.reset_mock()
+
+    self.assertEqual(
+        'ok', api_helpers.cache_request('test_request', request_uuid, func))
+    func.assert_not_called()
+
+  def test_ttl(self):
+    func = mock.Mock(return_value='ok')
+    request_uuid = 'cf60878f-8f2a-4f1e-b1f5-8b5ec88813a9'
+
+    self.assertEqual(
+        'ok', api_helpers.cache_request('test_request', request_uuid, func))
+    func.assert_called_once()
+
+    # the cache just got expired.
+    self.mock_now(self.now, 10 * 60)
+    func.reset_mock()
+
+    self.assertEqual(
+        'ok', api_helpers.cache_request('test_request', request_uuid, func))
+    func.assert_called_once()
+
+  def test_namespace(self):
+    request_uuid = 'cf60878f-8f2a-4f1e-b1f5-8b5ec88813a9'
+    func1 = mock.Mock(return_value='ok')
+    func2 = mock.Mock(return_value='great')
+
+    self.assertEqual(
+        'ok', api_helpers.cache_request('test_request_1', request_uuid, func1))
+    func1.assert_called_once()
+
+    # the cache won't hit because this is in a different namespace.
+    self.assertEqual(
+        'great', api_helpers.cache_request('test_request_2', request_uuid,
+                                           func2))
+    func2.assert_called_once()
 
 
 if __name__ == '__main__':
