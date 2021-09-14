@@ -213,6 +213,19 @@ class TestCheckIdenticalRequest(test_case.TestCase):
                                            func2))
     func2.assert_called_once()
 
+  def test_invalid_request_uuid(self):
+    func = mock.Mock(return_value='ok')
+
+    with self.assertRaises(handlers_exceptions.BadRequestException):
+      api_helpers.cache_request('test_request', 'foo', func)
+
+  def test_tuple(self):
+    func = mock.Mock(return_value=('ok', 'great'))
+    request_uuid = 'cf60878f-8f2a-4f1e-b1f5-8b5ec88813a9'
+
+    result = api_helpers.cache_request('test_request', request_uuid, func)
+    self.assertEqual(('ok', 'great'), result)
+
 
 if __name__ == '__main__':
   if '-v' in sys.argv:

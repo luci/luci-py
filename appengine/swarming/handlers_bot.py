@@ -19,6 +19,7 @@ from google.appengine.ext import ndb
 from google.appengine import runtime
 from google.appengine.runtime import apiproxy_errors
 
+import api_helpers
 from components import auth
 from components import decorators
 from components import ereporter2
@@ -346,6 +347,7 @@ class _BotBaseHandler(_BotApiHandler):
   """
 
   EXPECTED_KEYS = {u'dimensions', u'state', u'version'}
+  OPTIONAL_KEYS = {u'request_uuid'}
   REQUIRED_STATE_KEYS = {u'running_time', u'sleep_streak'}
 
   def _process(self):
@@ -416,7 +418,9 @@ class _BotBaseHandler(_BotApiHandler):
     # Quarantine if the request is invalid.
     validation_errors = []
 
-    err_msg = has_unexpected_keys(self.EXPECTED_KEYS, request, 'keys')
+    err_msg = has_unexpected_subset_keys(
+        self.EXPECTED_KEYS | self.OPTIONAL_KEYS, self.EXPECTED_KEYS, request,
+        'keys')
     if err_msg:
       validation_errors.append(err_msg)
 
@@ -659,14 +663,19 @@ class BotPollHandler(_BotBaseHandler):
       self.abort(429, 'Datastore internal error. %s' % e)
       return
 
-    # Try to grab a task.
-    try:
+    def _reap_task():
       try:
         # This is a fairly complex function call, exceptions are expected.
         request, secret_bytes, run_result = task_scheduler.bot_reap_task(
             res.dimensions, res.version)
       except (datastore_errors.Timeout, apiproxy_errors.CancelledError):
         self.abort(429, 'Deadline exceeded while accessing datastore')
+      return request, secret_bytes, run_result
+
+    # Try to grab a task.
+    try:
+      request, secret_bytes, run_result = api_helpers.cache_request(
+          'bot_poll', res.request.get('request_uuid'), _reap_task)
 
       if not request:
         # No task found, tell it to sleep a bit.

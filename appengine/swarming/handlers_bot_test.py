@@ -1071,6 +1071,24 @@ class BotApiTest(test_env_handlers.AppTestBase):
     # TODO(crbug.com/1131822): add a test case for _ensure_active_slice() with
     # a task has multiple slices.
 
+  def test_poll_idempotent(self):
+    params = self.do_handshake(do_first_poll=True)
+
+    self.set_as_user()
+    self.mock(auth, 'has_permission', lambda *_args, **_kwargs: True)
+
+    params['request_uuid'] = 'cf60878f-8f2a-4f1e-b1f5-8b5ec88813a9'
+    task_res, _ = self.client_create_task_raw()
+    run_id = task_res['task_id'][:-1] + '1'
+
+    self.set_as_bot()
+    res1 = self.post_json('/swarming/api/v1/bot/poll', params)
+    self.assertEqual(res1['cmd'], 'run')
+    self.assertEqual(res1['manifest']['task_id'], run_id)
+
+    res2 = self.post_json('/swarming/api/v1/bot/poll', params)
+    self.assertEqual(res1, res2)
+
   def test_complete_task_isolated(self):
     # Successfully poll a task.
     self.mock(random, 'getrandbits', lambda _: 0x88)
