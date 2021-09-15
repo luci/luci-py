@@ -15,6 +15,7 @@ import test_env_handlers
 import webapp2
 import webtest
 
+from google.appengine.api import memcache
 from google.appengine.ext import ndb
 
 from google.protobuf import struct_pb2
@@ -156,11 +157,32 @@ class TaskBackendAPIServiceTest(test_env_handlers.AppTestBase):
     self._mock_enqueue_task(['pubsub', 'buildbucket-notify'])
 
     request = self._basic_run_task_request()
+    request_id = 'cf60878f-8f2a-4f1e-b1f5-8b5ec88813a9'
+    request.request_id = request_id
     self.app.post('/prpc/swarming.backend.TaskBackend/RunTask',
                   _encode(request), self._headers)
     self.assertEqual(1, task_request.TaskRequest.query().count())
     self.assertEqual(1, task_request.BuildToken.query().count())
     self.assertEqual(1, task_request.SecretBytes.query().count())
+    request_idempotency_key = 'request_id/%s/%s' % (
+        request_id, auth.get_current_identity().to_bytes())
+    self.assertIsNotNone(
+        memcache.get(request_idempotency_key, namespace='backend_run_task'))
+
+    # Test requests are correctly deduped if `request_id` matches.
+    self.app.post('/prpc/swarming.backend.TaskBackend/RunTask',
+                  _encode(request), self._headers)
+    self.assertEqual(1, task_request.TaskRequest.query().count())
+    self.assertEqual(1, task_request.BuildToken.query().count())
+    self.assertEqual(1, task_request.SecretBytes.query().count())
+
+    # Test tasks with different `request_id`s are not deduped.
+    request.request_id = 'cf60878f-8f2a-4f1e-b1f5-8b5ec88813a8'
+    self.app.post('/prpc/swarming.backend.TaskBackend/RunTask',
+                  _encode(request), self._headers)
+    self.assertEqual(2, task_request.TaskRequest.query().count())
+    self.assertEqual(2, task_request.BuildToken.query().count())
+    self.assertEqual(2, task_request.SecretBytes.query().count())
 
   def test_run_task_exceptions_bad_conversion(self):
     self.set_as_user()

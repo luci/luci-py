@@ -122,28 +122,29 @@ def process_task_request(tr, template_apply):
 
 
 def cache_request(namespace, request_uuid, func):
+  # type: (str, str, Callable[[], Any]) -> Tuple[Any, bool]
   """Checks and returns the cached result of the identical request.
 
-  If the cache doesn't exist, the result of the function will be cached.
+  If the cache doesn't exist, the result of the function will be cached
+  and the boolean will be False.
   """
-  if request_uuid and not re.match(
-      r'^[\da-fA-F]{8}-[\da-fA-F]{4}-[\da-fA-F]{4}-[\da-fA-F]{4}-'
-      r'[\da-fA-F]{12}$', request_uuid):
-    raise handlers_exceptions.BadRequestException(
-        'invalid uuid is given as request_uuid')
-
   request_idempotency_key = None
   if request_uuid:
+    if not re.match(
+        r'^[\da-fA-F]{8}-[\da-fA-F]{4}-[\da-fA-F]{4}-[\da-fA-F]{4}-'
+        r'[\da-fA-F]{12}$', request_uuid):
+      raise handlers_exceptions.BadRequestException(
+          'invalid uuid is given as request_uuid')
+
     request_idempotency_key = 'request_id/%s/%s' % (
         request_uuid, auth.get_current_identity().to_bytes())
 
-  if request_idempotency_key:
     result_cache = memcache.get(request_idempotency_key, namespace=namespace)
     if result_cache is not None:
-      return result_cache
+      return result_cache, True
 
   result = func()
   if request_idempotency_key:
     memcache.add(
         request_idempotency_key, result, namespace=namespace, time=10 * 60)
-  return result
+  return result, False

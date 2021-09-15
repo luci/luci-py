@@ -172,30 +172,34 @@ class TestCheckIdenticalRequest(test_case.TestCase):
     func = mock.Mock(return_value='ok')
     request_uuid = 'cf60878f-8f2a-4f1e-b1f5-8b5ec88813a9'
 
-    self.assertEqual(
-        'ok', api_helpers.cache_request('test_request', request_uuid, func))
+    self.assertEqual(('ok', False),
+                     api_helpers.cache_request('test_request', request_uuid,
+                                               func))
     func.assert_called_once()
 
     func.reset_mock()
 
-    self.assertEqual(
-        'ok', api_helpers.cache_request('test_request', request_uuid, func))
+    self.assertEqual(('ok', True),
+                     api_helpers.cache_request('test_request', request_uuid,
+                                               func))
     func.assert_not_called()
 
   def test_ttl(self):
     func = mock.Mock(return_value='ok')
     request_uuid = 'cf60878f-8f2a-4f1e-b1f5-8b5ec88813a9'
 
-    self.assertEqual(
-        'ok', api_helpers.cache_request('test_request', request_uuid, func))
+    self.assertEqual(('ok', False),
+                     api_helpers.cache_request('test_request', request_uuid,
+                                               func))
     func.assert_called_once()
 
     # the cache just got expired.
     self.mock_now(self.now, 10 * 60)
     func.reset_mock()
 
-    self.assertEqual(
-        'ok', api_helpers.cache_request('test_request', request_uuid, func))
+    self.assertEqual(('ok', False),
+                     api_helpers.cache_request('test_request', request_uuid,
+                                               func))
     func.assert_called_once()
 
   def test_namespace(self):
@@ -203,14 +207,15 @@ class TestCheckIdenticalRequest(test_case.TestCase):
     func1 = mock.Mock(return_value='ok')
     func2 = mock.Mock(return_value='great')
 
-    self.assertEqual(
-        'ok', api_helpers.cache_request('test_request_1', request_uuid, func1))
+    self.assertEqual(('ok', False),
+                     api_helpers.cache_request('test_request_1', request_uuid,
+                                               func1))
     func1.assert_called_once()
 
     # the cache won't hit because this is in a different namespace.
-    self.assertEqual(
-        'great', api_helpers.cache_request('test_request_2', request_uuid,
-                                           func2))
+    self.assertEqual(('great', False),
+                     api_helpers.cache_request('test_request_2', request_uuid,
+                                               func2))
     func2.assert_called_once()
 
   def test_invalid_request_uuid(self):
@@ -224,7 +229,7 @@ class TestCheckIdenticalRequest(test_case.TestCase):
     request_uuid = 'cf60878f-8f2a-4f1e-b1f5-8b5ec88813a9'
 
     result = api_helpers.cache_request('test_request', request_uuid, func)
-    self.assertEqual(('ok', 'great'), result)
+    self.assertEqual((('ok', 'great'), False), result)
 
 
 if __name__ == '__main__':

@@ -674,8 +674,9 @@ class BotPollHandler(_BotBaseHandler):
 
     # Try to grab a task.
     try:
-      request, secret_bytes, run_result = api_helpers.cache_request(
-          'bot_poll', res.request.get('request_uuid'), _reap_task)
+      (request, secret_bytes,
+       run_result), _is_deduped = api_helpers.cache_request(
+           'bot_poll', res.request.get('request_uuid'), _reap_task)
 
       if not request:
         # No task found, tell it to sleep a bit.

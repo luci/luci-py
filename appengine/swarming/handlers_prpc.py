@@ -45,15 +45,19 @@ class TaskBackendAPIService(prpc_helpers.SwarmingPRPCService):
 
     api_helpers.process_task_request(tr, task_request.TEMPLATE_AUTO)
 
-    # TODO(crbug/1236848): Used request.request_id to dedupe tasks within
-    # ten minutes.
+    def _schedule_request():
+      try:
+        return task_scheduler.schedule_request(
+            tr, secret_bytes=secret_bytes, build_token=build_token)
+      except (TypeError, ValueError) as e:
+        raise handlers_exceptions.BadRequestException(e.message)
 
-    try:
-      result_summary = task_scheduler.schedule_request(
-          tr, secret_bytes=secret_bytes, build_token=build_token)
-      logging.info('Returned ResultSummary: %r', result_summary)
-    except (TypeError, ValueError) as e:
-      raise handlers_exceptions.BadRequestException(e.message)
+    result, is_deduped = api_helpers.cache_request('backend_run_task',
+                                                   request.request_id,
+                                                   _schedule_request)
+    if is_deduped:
+      logging.info('Reusing task %s with uuid %s', result.task_id,
+                   request.request_id)
 
     return empty_pb2.Empty()
 

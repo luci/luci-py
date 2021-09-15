@@ -497,23 +497,24 @@ class SwarmingTasksService(remote.Service):
           task_id=task_pack.pack_result_summary_key(result_summary.key),
           task_result=returned_result)
 
-    request_metadata = api_helpers.cache_request('task_new',
-                                                 request.request_uuid,
-                                                 _schedule_request)
+    request_metadata, is_deduped = api_helpers.cache_request(
+        'task_new', request.request_uuid, _schedule_request)
 
-    # The returned metadata may be a cache. Compare it with request_obj.
-    # Since request_obj does not have task_id, it needs to be excluded for
-    # validation.
-    task_id_orig = request_metadata.request.task_id
-    request_metadata.request.task_id = None
-    if request_metadata.request != message_conversion.task_request_to_rpc(
-        request_obj):
-      logging.warning(
-          'the same request_uuid value was reused for different task '
-          'requests')
-    request_metadata.request.task_id = task_id_orig
-    logging.info('Reusing task %s with uuid %s', task_id_orig,
-                 request.request_uuid)
+    if is_deduped:
+      # The returned metadata may have been fetched from cache.
+      # Compare it with request_obj.
+      # Since request_obj does not have task_id, it needs to be excluded for
+      # validation.
+      task_id_orig = request_metadata.request.task_id
+      request_metadata.request.task_id = None
+      if request_metadata.request != message_conversion.task_request_to_rpc(
+          request_obj):
+        logging.warning(
+            'the same request_uuid value was reused for different task '
+            'requests')
+      request_metadata.request.task_id = task_id_orig
+      logging.info('Reusing task %s with uuid %s', task_id_orig,
+                   request.request_uuid)
 
     return request_metadata
 
