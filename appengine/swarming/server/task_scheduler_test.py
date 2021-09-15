@@ -2009,6 +2009,91 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(3, len(pub_sub_calls))  # CANCELED
     self.assertEqual(1, self.execute_tasks())
 
+  def test_cancel_tasks(self):
+    # Create RUNNING task
+    pub_sub_calls = self.mock_pub_sub()
+    self._quick_reap(1, 0, pubsub_topic='projects/abc/topics/def')
+
+    # Create PENDING task
+    task_slices = [
+        task_request.TaskSlice(
+            expiration_secs=60,
+            properties=_gen_properties(
+                dimensions={
+                    u'pool': [u'default'],
+                    u'os': [u'v1|v2'],
+                    u'gpu': [u'sega', u'amd|nv'],
+                }),
+            wait_for_capacity=True),
+    ]
+    self._quick_schedule(1, task_slices=task_slices)
+
+    cursor, results = task_scheduler.cancel_tasks(3, kill_running=True)
+    self.assertIsNone(cursor)
+    self.assertEqual(len(results), 2)
+    self.execute_tasks()
+
+  def test_cancel_tasks_skip_running(self):
+    # Create RUNNING task
+    pub_sub_calls = self.mock_pub_sub()
+    running_result = self._quick_reap(
+        1, 0, pubsub_topic='projects/abc/topics/def')
+
+    # Create PENDING task
+    task_slices = [
+        task_request.TaskSlice(
+            expiration_secs=60,
+            properties=_gen_properties(
+                dimensions={
+                    u'pool': [u'default'],
+                    u'os': [u'v1|v2'],
+                    u'gpu': [u'sega', u'amd|nv'],
+                }),
+            wait_for_capacity=True),
+    ]
+    pending_result = self._quick_schedule(1, task_slices=task_slices)
+
+    cursor, results = task_scheduler.cancel_tasks(3, kill_running=False)
+    self.assertIsNone(cursor)
+    self.assertEqual(len(results), 1)
+    self.execute_tasks()
+
+  def test_cancel_tasks_conditions(self):
+    # Create PENDING tasks
+    task_slices = [
+        task_request.TaskSlice(
+            expiration_secs=60,
+            properties=_gen_properties(
+                dimensions={
+                    u'pool': [u'default'],
+                    u'os': [u'v1|v2'],
+                    u'gpu': [u'sega', u'amd|nv'],
+                }),
+            wait_for_capacity=True),
+    ]
+    pending_result_1 = self._quick_schedule(
+        1, task_slices=task_slices, manual_tags=['tag:1', 'tag:2'])
+
+    pending_result_2 = self._quick_schedule(
+        1, task_slices=task_slices, manual_tags=['tag:2', 'tag:1'])
+    self._quick_schedule(
+        1, task_slices=task_slices, manual_tags=['tag:3', 'tag:2'])
+    self._quick_schedule(1, task_slices=task_slices, manual_tags=['tag:4'])
+    pending_results = [pending_result_1, pending_result_2]
+
+    tags = [u'tag:1', u'tag:2']
+    conds = task_result.TaskResultSummary.tags == tags[0]
+    for tag in tags[1:]:
+      conds = ndb.AND(conds, task_result.TaskResultSummary.tags == tag)
+
+    cursor, results = task_scheduler.cancel_tasks(
+        5, condition=conds, kill_running=False)
+    self.assertIsNone(cursor)
+    self.assertEqual(len(results), 2)
+    self.assertItemsEqual([res.task_id for res in results],
+                          [res.task_id for res in pending_results])
+    self.execute_tasks()
+
   def test_cron_abort_expired_task_to_run(self):
     pub_sub_calls = self.mock_pub_sub()
     self._register_bot(0, self.bot_dimensions)

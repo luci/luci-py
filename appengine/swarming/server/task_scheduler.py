@@ -9,6 +9,7 @@ This is the interface closest to the HTTP handlers.
 
 import collections
 import datetime
+import json
 import logging
 import math
 import random
@@ -1679,6 +1680,44 @@ def cancel_task(request, result_key, kill_running, bot_id):
         request, result_summary, kill_running, bot_id, now, es_cfg)
 
   return datastore_utils.transaction(run)
+
+
+def cancel_tasks(limit, condition=None, cursor=None, kill_running=False):
+  # type: (int, Optional[ndb.Node], Optional[str], Optional[bool])
+  #     -> Tuple[str, Sequence[task_result.TaskResultSummary]]
+  """
+  Raises:
+    ValueError if limit is not within [1, 1000] or cursor is not valid.
+    handlers_exceptions.InternalException if cancel request could not be
+        enqueued.
+  """
+  cond = task_result.TaskResultSummary.state == task_result.State.PENDING
+  if kill_running:
+    cond = ndb.OR(
+        cond, task_result.TaskResultSummary.state == task_result.State.RUNNING)
+  q = task_result.TaskResultSummary.query(cond).order(
+      task_result.TaskResultSummary.key)
+  if condition is not None:
+    q = q.filter(condition)
+
+  results, cursor = datastore_utils.fetch_page(q, limit, cursor)
+
+  if results:
+    payload = json.dumps({
+        'tasks': [r.task_id for r in results],
+        'kill_running': kill_running,
+    })
+    ok = utils.enqueue_task(
+        '/internal/taskqueue/important/tasks/cancel',
+        'cancel-tasks',
+        payload=payload)
+    if not ok:
+      raise handlers_exceptions.InternalException(
+          'Could not enqueue cancel request, try again later')
+  else:
+    logging.info('No tasks to cancel.')
+
+  return cursor, results
 
 
 ### Cron job.

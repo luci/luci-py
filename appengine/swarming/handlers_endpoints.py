@@ -648,42 +648,25 @@ class SwarmingTasksService(remote.Service):
     realms.check_tasks_cancel_acl(pools)
 
     now = utils.utcnow()
-    cond = task_result.TaskResultSummary.state == task_result.State.PENDING
-    if request.kill_running:
-      cond = ndb.OR(
-          cond,
-          task_result.TaskResultSummary.state == task_result.State.RUNNING)
-    q = task_result.TaskResultSummary.query(cond).order(
-        task_result.TaskResultSummary.key)
-    for tag in request.tags:
-      q = q.filter(task_result.TaskResultSummary.tags == tag)
 
+    filter_nodes = None
+    if request.tags:
+      filter_nodes = task_result.TaskResultSummary.tags == request.tags[0]
+      for tag in request.tags[1:]:
+        filter_nodes = ndb.AND(filter_nodes,
+                               task_result.TaskResultSummary.tags == tag)
     try:
-      tasks, cursor = datastore_utils.fetch_page(q, request.limit,
-                                                 request.cursor)
+      cursor, results = task_scheduler.cancel_tasks(
+          request.limit,
+          condition=filter_nodes,
+          cursor=request.cursor,
+          kill_running=bool(request.kill_running))
     except ValueError as e:
       raise endpoints.BadRequestException(
           'Inappropriate filter for tasks/list: %s' % e)
 
-    if tasks:
-      payload = json.dumps(
-          {
-            'tasks': [t.task_id for t in tasks],
-            'kill_running': request.kill_running or False,
-          })
-      ok = utils.enqueue_task(
-          '/internal/taskqueue/important/tasks/cancel', 'cancel-tasks',
-          payload=payload)
-      if not ok:
-        raise endpoints.InternalServerErrorException(
-            'Could not enqueue cancel request, try again later')
-    else:
-      logging.info('No tasks to cancel.')
-
     return swarming_rpcs.TasksCancelResponse(
-        cursor=cursor,
-        matched=len(tasks),
-        now=now)
+        cursor=cursor, matched=len(results), now=now)
 
   @gae_ts_mon.instrument_endpoint()
   @auth.endpoints_method(
