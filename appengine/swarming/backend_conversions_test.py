@@ -12,6 +12,7 @@ import copy
 import swarming_test_env
 swarming_test_env.setup_test_env()
 
+from google.appengine.api import app_identity
 from google.appengine.ext import ndb
 from google.protobuf import struct_pb2
 from google.protobuf import duration_pb2
@@ -326,9 +327,9 @@ class TestBackendConversions(test_case.TestCase):
     def test_task(status, task_id=None, summary=None, set_timeout=False,
                   set_exhaustion=False):
       task = backend_pb2.Task(
-        id = backend_pb2.TaskID(
-            target = 'swarming://'),
-        status=status)
+          id=backend_pb2.TaskID(target='swarming://%s' %
+                                app_identity.get_application_id()),
+          status=status)
       if task_id is not None:
         task.id.id = str(task_id)
       if summary is not None:
@@ -364,24 +365,54 @@ class TestBackendConversions(test_case.TestCase):
         key=ndb.Key('TaskRunResult', 2,  parent=res_sum_3.key),
         state=task_result.State.CANCELED)
 
-    results = [res_sum_1, run_res_2, run_res_3, None]
+    # COMPLETED TaskRunResult failure
+    req_4 = task_request.TaskRequest(id=1240)
+    req_4.key = task_request.new_request_key()
+    res_sum_4 = task_result.TaskResultSummary(
+        key=ndb.Key('TaskResultSummary', 1, parent=req_4.key))
+    run_res_4 = task_result.TaskRunResult(
+        key=ndb.Key('TaskRunResult', 2, parent=res_sum_4.key),
+        state=task_result.State.COMPLETED,
+        exit_code=1)
+
+    # COMPLETED TaskRunResult success
+    req_5 = task_request.TaskRequest(id=1250)
+    req_5.key = task_request.new_request_key()
+    res_sum_5 = task_result.TaskResultSummary(
+        key=ndb.Key('TaskResultSummary', 1, parent=req_5.key))
+    run_res_5 = task_result.TaskRunResult(
+        key=ndb.Key('TaskRunResult', 2, parent=res_sum_5.key),
+        state=task_result.State.COMPLETED,
+        exit_code=0)
+
+    results = [None, res_sum_1, run_res_2, run_res_3, run_res_4, run_res_5]
 
     expected_tasks = [
+        test_task(
+            common_pb2.INFRA_FAILURE,
+            task_id='1',
+            summary='Swarming task 1 not found'),
         test_task(common_pb2.SCHEDULED, task_id=res_sum_1.task_id),
         test_task(
-            common_pb2.INFRA_FAILURE, task_id=run_res_2.task_id,
-            summary='Task expired.', set_timeout=True, set_exhaustion=True),
+            common_pb2.INFRA_FAILURE,
+            task_id=run_res_2.task_id,
+            summary='Task expired.',
+            set_timeout=True,
+            set_exhaustion=True),
         test_task(common_pb2.CANCELED, task_id=run_res_3.task_id),
         test_task(
-            common_pb2.INFRA_FAILURE, task_id='4',
-            summary='Swarming task 4 not found'),
+            common_pb2.FAILURE,
+            task_id=run_res_4.task_id,
+            summary='Task completed with failure.'),
+        test_task(common_pb2.SUCCESS, task_id=run_res_5.task_id),
     ]
 
     self.assertEqual(
         expected_tasks,
-        backend_conversions.convert_results_to_tasks(
-            results, [res_sum_1.task_id, run_res_2.task_id,
-                      run_res_3.task_id, '4']))
+        backend_conversions.convert_results_to_tasks(results, [
+            '1', res_sum_1.task_id, run_res_2.task_id, run_res_3.task_id,
+            run_res_4.task_id, run_res_5.task_id
+        ]))
 
 
 if __name__ == '__main__':

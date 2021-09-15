@@ -7,6 +7,7 @@ import collections
 import copy
 import posixpath
 
+from google.appengine.api import app_identity
 from google.appengine.api import datastore_errors
 from google.protobuf import json_format
 
@@ -203,9 +204,9 @@ def convert_results_to_tasks(task_results, task_ids):
 
   for i, result in enumerate(task_results):
     task = backend_pb2.Task(
-        id = backend_pb2.TaskID(
-            target = 'swarming://',
-            id = task_ids[i],
+        id=backend_pb2.TaskID(
+            target='swarming://%s' % app_identity.get_application_id(),
+            id=task_ids[i],
         ))
 
     if result is None:
@@ -244,9 +245,13 @@ def convert_results_to_tasks(task_results, task_ids):
       task.status_details.resource_exhaustion.SetInParent()
 
     elif result.state == task_result.State.COMPLETED:
-      task.status = common_pb2.SUCCESS
+      if result.failure:
+        task.status = common_pb2.FAILURE
+        task.summary_html = ('Task completed with failure.')
+      else:
+        task.status = common_pb2.SUCCESS
     else:
-      logging.exception('Unexpected state for task result: %r', result)
+      logging.error('Unexpected state for task result: %r', result)
       raise handlers_exceptions.InternalException('Unrecognized task status')
 
     # TODO(crbug/1236848): Fill Task.details.
