@@ -14,6 +14,7 @@ import textwrap
 import threading
 import time
 import unittest
+import uuid
 import zipfile
 
 import six
@@ -39,6 +40,9 @@ from utils import zip_package
 
 
 # pylint: disable=no-self-argument
+
+
+REQUEST_UUID = '7905e667-d415-48f1-9df7-f914541d6331'
 
 
 class FakeThreadingEvent(object):
@@ -606,12 +610,15 @@ class TestBotMain(TestBotBase):
     from config import bot_config
     called = []
     self.mock(bot_config, 'on_bot_idle', lambda _bot, _s: called.append(1))
+    self.mock(uuid, 'uuid4', lambda: uuid.UUID(REQUEST_UUID))
 
+    data = self.attributes.copy()
+    data['request_uuid'] = REQUEST_UUID
     self.expected_requests([
         (
             'https://localhost:1/swarming/api/v1/bot/poll',
             {
-                'data': self.attributes,
+                'data': data,
                 'expected_error_codes': None,
                 'follow_redirects': False,
                 'headers': {
@@ -635,14 +642,17 @@ class TestBotMain(TestBotBase):
     self.mock(bit, 'wait', slept.append)
     self.mock(bot_main, '_run_manifest', self.fail)
     self.mock(bot_main, '_update_bot', self.fail)
+    self.mock(uuid, 'uuid4', lambda: uuid.UUID(REQUEST_UUID))
 
     self.bot = self.make_bot(lambda: ({'A': 'a'}, time.time() + 3600))
 
+    data = self.attributes.copy()
+    data['request_uuid'] = REQUEST_UUID
     self.expected_requests([
         (
             'https://localhost:1/swarming/api/v1/bot/poll',
             {
-                'data': self.attributes,
+                'data': data,
                 'expected_error_codes': None,
                 'follow_redirects': False,
                 'headers': {
@@ -668,12 +678,15 @@ class TestBotMain(TestBotBase):
     self.mock(bot_main, '_run_manifest', lambda *args: manifest.append(args))
     self.mock(bot_main, '_clean_cache', lambda *args: clean.append(args))
     self.mock(bot_main, '_update_bot', self.fail)
+    self.mock(uuid, 'uuid4', lambda: uuid.UUID(REQUEST_UUID))
 
+    data = self.bot._attributes.copy()
+    data['request_uuid'] = REQUEST_UUID
     self.expected_requests([
         (
             'https://localhost:1/swarming/api/v1/bot/poll',
             {
-                'data': self.bot._attributes,
+                'data': data,
                 'expected_error_codes': None,
                 'follow_redirects': False,
                 'headers': {
@@ -702,12 +715,15 @@ class TestBotMain(TestBotBase):
     self.mock(bit, 'wait', self.fail)
     self.mock(bot_main, '_run_manifest', self.fail)
     self.mock(bot_main, '_update_bot', lambda *args: update.append(args))
+    self.mock(uuid, 'uuid4', lambda: uuid.UUID(REQUEST_UUID))
 
+    data = self.attributes.copy()
+    data['request_uuid'] = REQUEST_UUID
     self.expected_requests([
         (
             'https://localhost:1/swarming/api/v1/bot/poll',
             {
-                'data': self.attributes,
+                'data': data,
                 'expected_error_codes': None,
                 'follow_redirects': False,
                 'headers': {
@@ -733,12 +749,15 @@ class TestBotMain(TestBotBase):
     self.mock(bot_main, '_update_bot', self.fail)
     self.mock(self.bot, 'host_reboot', self.fail)
     self.mock(bot_main, '_bot_restart', lambda obj, x: restarts.append(x))
+    self.mock(uuid, 'uuid4', lambda: uuid.UUID(REQUEST_UUID))
 
+    data = self.attributes.copy()
+    data['request_uuid'] = REQUEST_UUID
     self.expected_requests([
         (
             'https://localhost:1/swarming/api/v1/bot/poll',
             {
-                'data': self.attributes,
+                'data': data,
                 'expected_error_codes': None,
                 'follow_redirects': False,
                 'headers': {
@@ -763,12 +782,15 @@ class TestBotMain(TestBotBase):
     self.mock(bot_main, '_run_manifest', self.fail)
     self.mock(bot_main, '_update_bot', self.fail)
     self.mock(self.bot, 'host_reboot', lambda *args: reboots.append(args))
+    self.mock(uuid, 'uuid4', lambda: uuid.UUID(REQUEST_UUID))
 
+    data = self.attributes.copy()
+    data['request_uuid'] = REQUEST_UUID
     self.expected_requests([
         (
             'https://localhost:1/swarming/api/v1/bot/poll',
             {
-                'data': self.attributes,
+                'data': data,
                 'expected_error_codes': None,
                 'follow_redirects': False,
                 'headers': {
