@@ -21,6 +21,7 @@ test_env.setup_test_env()
 from google.protobuf import duration_pb2
 
 from google.appengine.api import datastore_errors
+from google.appengine.api import memcache
 from google.appengine.ext import ndb
 
 import webtest
@@ -1435,6 +1436,25 @@ class TaskResultApiTest(TestCase):
   def test_get_run_results_query(self):
     # Indirectly tested by API.
     pass
+
+  def test_fetch_task_results(self):
+    running_res = _gen_run_result()  # RUNNING
+    pending_res = _gen_summary_result()  # PENDING
+
+    ndb.get_context().clear_cache()
+    memcache.flush_all()
+
+    running_res_cache = _gen_run_result()  # RUNNING in cache
+    pending_res_cache = _gen_summary_result()  # PENDING in cache
+
+    results = task_result.fetch_task_results([
+        running_res.task_id, pending_res.task_id, running_res_cache.task_id,
+        pending_res_cache.task_id, '1d69b9f088008812'
+    ])
+
+    self.assertEqual(
+        results,
+        [running_res, pending_res, running_res_cache, pending_res_cache, None])
 
 
 class TestOutput(TestCase):

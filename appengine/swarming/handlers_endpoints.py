@@ -571,28 +571,15 @@ class SwarmingTasksService(remote.Service):
   # looking up each TaskRequest.
   @auth.require(acl.can_view_all_tasks, log_identity=True)
   def get_states(self, request):
-    """Returns task state for a specific set of tasks.
-    """
+    """Returns task state for a specific set of tasks."""
     logging.debug('%s', request)
-    result_keys = [_to_keys(task_id)[1] for task_id in request.task_id]
 
-    # Hot path. Fetch everything we can from memcache.
-    entities = ndb.get_multi(
-        result_keys, use_cache=True, use_memcache=True, use_datastore=False)
-    states = [t.state if t else task_result.State.PENDING for t in entities]
-    # Now fetch both the ones in non-stable state or not in memcache.
-    missing_keys = [
-      result_keys[i] for i, state in enumerate(states)
-      if state in task_result.State.STATES_RUNNING
+    task_results = task_result.fetch_task_results(
+        [task_id for task_id in request.task_id])
+    states = [
+        result.state if result else task_result.State.PENDING
+        for result in task_results
     ]
-    if missing_keys:
-      more = ndb.get_multi(
-          missing_keys, use_cache=False, use_memcache=False, use_datastore=True)
-      # This relies on missing_keys being in the same order as states (for
-      # common elements).
-      for i, s in enumerate(states):
-        if s in task_result.State.STATES_RUNNING:
-          states[i] = more.pop(0).state
 
     return swarming_rpcs.TaskStates(
         states=[swarming_rpcs.TaskState(state) for state in states])

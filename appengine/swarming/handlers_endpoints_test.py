@@ -1923,8 +1923,8 @@ class TasksApiTest(BaseTest):
 
     # Basic request.
     request = handlers_endpoints.TaskStatesRequest.combined_message_class(
-        task_id=[first_id, second_id])
-    expected = {u'states': ['COMPLETED', 'PENDING']}
+        task_id=[first_id, second_id, '1d69b9f088008810'])
+    expected = {u'states': ['COMPLETED', 'PENDING', 'PENDING']}
     actual = self.call_api('get_states', body=message_to_dict(request)).json
     self.assertEqual(expected, actual)
 

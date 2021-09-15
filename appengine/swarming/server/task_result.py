@@ -1672,3 +1672,34 @@ def task_bq_summary(start, end):
     bq_state.send_to_bq('task_results_summary', rows)
 
   return total
+
+
+def fetch_task_results(task_ids):
+  # type: (Sequence[str]) ->
+  #     Sequence[Union[task_result._TaskResultCommon, None]]
+  """Returns the task results for the given tasks in the same order.
+
+  Raises:
+    ValueError if any task_id is in an unexpected format.
+  """
+  result_keys = [
+      task_pack.get_request_and_result_keys(task_id)[1] for task_id in task_ids
+  ]
+
+  # Hot path. Fetch everything we can from memcache.
+  task_results = ndb.get_multi(result_keys, use_datastore=False)
+
+  # Fetch ones in a non-stable state or not in memcache.
+  missing_keys = [
+      result_keys[i]
+      for i, result in enumerate(task_results)
+      if result is None or result.state in State.STATES_RUNNING
+  ]
+  if missing_keys:
+    more_results = ndb.get_multi(
+        missing_keys, use_cache=False, use_memcache=False)
+    for i, result in enumerate(task_results):
+      if result is None or result.state in State.STATES_RUNNING:
+        task_results[i] = more_results.pop(0)
+
+  return task_results
