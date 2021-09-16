@@ -159,6 +159,7 @@ class ServerApiTest(BaseTest):
         u'cancel_task': False,
         u'cancel_tasks': False,
         u'delete_bot': False,
+        u'delete_bots': False,
         u'get_bootstrap_token': False,
         u'get_configs': False,
         u'put_configs': False,
@@ -174,6 +175,7 @@ class ServerApiTest(BaseTest):
         u'cancel_task': False,
         u'cancel_tasks': False,
         u'delete_bot': False,
+        u'delete_bots': False,
         u'get_bootstrap_token': False,
         u'get_configs': False,
         u'put_configs': False,
@@ -185,37 +187,98 @@ class ServerApiTest(BaseTest):
     """Asserts that permissions respond correctly to a user has pool
        permissions.
     """
-    # create a bot, and a task.
+    self.mock_default_pool_acl([])
+
+    # create a bot.
     self.set_as_bot()
     self.bot_poll()
-    self.set_as_admin()
+
+    # The user has realm permissions.
+    self.set_as_user()
+    self.mock_auth_db([
+        auth.Permission('swarming.pools.deleteBot'),
+        auth.Permission('swarming.pools.listBots'),
+        auth.Permission('swarming.pools.terminateBot'),
+    ])
+    params = {
+        'bot_id': 'bot1',
+    }
+    response = self.call_api('permissions', body=params, status=200)
+    expected = {
+        u'cancel_task': False,
+        u'cancel_tasks': False,
+        u'delete_bot': True,
+        u'delete_bots': False,
+        u'get_bootstrap_token': False,
+        u'get_configs': False,
+        u'list_bots': [u'default', u'template'],
+        u'put_configs': False,
+        u'terminate_bot': True,
+    }
+    self.assertEqual(expected, response.json)
+
+  def test_user_permissions_with_task_id(self):
+    """Asserts that permissions respond correctly to a user has pool
+       permissions.
+    """
     self.mock_default_pool_acl([])
+
+    # create a task.
+    self.set_as_admin()
     _, task_id = self.client_create_task_raw()
 
     # The user has realm permissions.
     self.set_as_user()
     self.mock_auth_db([
         auth.Permission('swarming.pools.cancelTask'),
-        auth.Permission('swarming.pools.listBots'),
         auth.Permission('swarming.pools.listTasks'),
-        auth.Permission('swarming.pools.terminateBot'),
     ])
     params = {
-        'bot_id': 'bot1',
         'task_id': task_id,
-        'tags': ['pool:default'],
     }
     response = self.call_api('permissions', body=params, status=200)
     expected = {
         u'cancel_task': True,
+        u'cancel_tasks': False,
+        u'delete_bot': False,
+        u'delete_bots': False,
+        u'get_bootstrap_token': False,
+        u'get_configs': False,
+        u'list_tasks': [u'default', u'template'],
+        u'put_configs': False,
+        u'terminate_bot': False,
+    }
+    self.assertEqual(expected, response.json)
+
+  def test_user_permissions_with_pool_tags(self):
+    """Asserts that permissions respond correctly to a user has pool
+       permissions.
+    """
+    self.mock_default_pool_acl([])
+
+    # The user has realm permissions.
+    self.set_as_user()
+    self.mock_auth_db([
+        auth.Permission('swarming.pools.cancelTask'),
+        auth.Permission('swarming.pools.deleteBot'),
+        auth.Permission('swarming.pools.listBots'),
+        auth.Permission('swarming.pools.listTasks'),
+    ])
+    params = {
+        'tags': ['pool:default'],
+    }
+    response = self.call_api('permissions', body=params, status=200)
+    expected = {
+        u'cancel_task': False,
         u'cancel_tasks': True,
         u'delete_bot': False,
+        u'delete_bots': True,
         u'get_bootstrap_token': False,
         u'get_configs': False,
         u'list_bots': [u'default', u'template'],
         u'list_tasks': [u'default', u'template'],
         u'put_configs': False,
-        u'terminate_bot': True,
+        u'terminate_bot': False,
     }
     self.assertEqual(expected, response.json)
 
@@ -227,6 +290,7 @@ class ServerApiTest(BaseTest):
         u'cancel_task': True,
         u'cancel_tasks': False,
         u'delete_bot': False,
+        u'delete_bots': False,
         u'get_bootstrap_token': False,
         u'get_configs': False,
         u'put_configs': False,
@@ -242,6 +306,7 @@ class ServerApiTest(BaseTest):
         u'cancel_task': True,
         u'cancel_tasks': True,
         u'delete_bot': True,
+        u'delete_bots': True,
         u'get_bootstrap_token': True,
         u'get_configs': True,
         u'put_configs': True,

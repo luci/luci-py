@@ -232,14 +232,15 @@ class SwarmingServerService(remote.Service):
     pools_list_tasks = [
         p for p in pools_config.known() if realms.can_list_tasks(p)
     ]
+    pool_tags = bot_management.get_pools_from_dimensions_flat(request.tags)
     return swarming_rpcs.ClientPermissions(
         delete_bot=realms.can_delete_bot(request.bot_id),
+        delete_bots=realms.can_delete_bots(pool_tags),
         terminate_bot=realms.can_terminate_bot(request.bot_id),
         get_configs=acl.can_view_config(),
         put_configs=acl.can_edit_config(),
         cancel_task=self._can_cancel_task(request.task_id),
-        cancel_tasks=realms.can_cancel_tasks(
-            bot_management.get_pools_from_dimensions_flat(request.tags)),
+        cancel_tasks=realms.can_cancel_tasks(pool_tags),
         get_bootstrap_token=acl.can_create_bot(),
         list_bots=pools_list_bots,
         list_tasks=pools_list_tasks)

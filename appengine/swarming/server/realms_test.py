@@ -1027,6 +1027,80 @@ class RealmsTest(test_case.TestCase):
     self.mock(pools_config, 'get_pool_config', get_pool_config)
     self.assertFalse(realms.can_delete_bot('bot1'))
 
+  def test_can_delete_bots_acl_with_global_permission(self):
+    self.mock(acl, 'can_delete_bot', lambda: True)
+
+    self.assertTrue(realms.can_delete_bots(None))
+    self._has_permission_mock.assert_not_called()
+
+  def test_can_delete_bots_acl_realm_allowed(self):
+    # mock
+    self.mock(acl, 'can_delete_bot', lambda: False)
+    get_pool_config = lambda p: _gen_pool_config(realm='test:' + p)
+    self.mock(pools_config, 'get_pool_config', get_pool_config)
+
+    # call
+    self.assertTrue(realms.can_delete_bots(['pool1', 'pool2']))
+    for pool_realm in ['test:pool1', 'test:pool2']:
+      self._has_permission_mock.assert_any_call(
+          _PERM_POOLS_DELETE_BOT, [pool_realm],
+          identity=auth.get_current_identity())
+
+  def test_can_delete_bots_acl_realm_not_allowed(self):
+    # mock
+    self.mock(acl, 'can_delete_bot', lambda: False)
+    get_pool_config = lambda p: _gen_pool_config(realm='test:' + p)
+    self.mock(pools_config, 'get_pool_config', get_pool_config)
+    self._has_permission_mock.return_value = False
+
+    # call
+    self.assertFalse(realms.can_delete_bots(['pool1', 'pool2']))
+    # it checks only the first realm and fails.
+    self._has_permission_mock.assert_any_call(
+        _PERM_POOLS_DELETE_BOT, ['test:pool1'],
+        identity=auth.get_current_identity())
+
+  def test_can_delete_bots_acl_realm_missing_any_permission(self):
+    # mock
+    self.mock(acl, 'can_delete_bot', lambda: False)
+    get_pool_config = lambda p: _gen_pool_config(realm='test:' + p)
+    self.mock(pools_config, 'get_pool_config', get_pool_config)
+    self._has_permission_mock.side_effect = [True, False]
+
+    # call
+    self.assertFalse(realms.can_delete_bots(['pool1', 'pool2']))
+    for pool_realm in ['test:pool1', 'test:pool2']:
+      self._has_permission_mock.assert_any_call(
+          _PERM_POOLS_DELETE_BOT, [pool_realm],
+          identity=auth.get_current_identity())
+
+  def test_can_delete_bots_acl_realm_no_pool_dimension(self):
+    # mock
+    self.mock(acl, 'can_delete_bot', lambda: False)
+
+    # call
+    self.assertFalse(realms.can_delete_bots(None))
+    self._has_permission_mock.assert_not_called()
+
+  def test_can_delete_bots_acl_realm_no_pool_realms(self):
+    # mock
+    self.mock(acl, 'can_delete_bot', lambda: False)
+    get_pool_config = lambda p: _gen_pool_config(realm=None)
+    self.mock(pools_config, 'get_pool_config', get_pool_config)
+
+    # call
+    self.assertFalse(realms.can_delete_bots(['pool1', 'pool2']))
+    self._has_permission_mock.assert_not_called()
+
+  def test_can_delete_bots_acl_realm_unknown_pool(self):
+    # mock
+    self.mock(acl, 'can_delete_bot', lambda: False)
+    self.mock(pools_config, 'get_pool_config', lambda _: None)
+
+    # call
+    self.assertFalse(realms.can_delete_bots(['unknown']))
+    self._has_permission_mock.assert_not_called()
+
 
 if __name__ == '__main__':
   if '-v' in sys.argv:

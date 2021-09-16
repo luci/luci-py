@@ -348,6 +348,26 @@ def can_delete_bot(bot_id):
     return False
 
 
+def can_delete_bots(pools):
+  """Checks if the caller is allowed to delete bots in the pools.
+
+  Args:
+    pools: List of pools.
+
+  Returns:
+    allowed: True if allowed, False otherwise.
+  """
+  if not pools:
+    return acl.can_delete_bot()
+
+  try:
+    _check_pools_filters_acl(realms_pb2.REALM_PERMISSION_POOLS_DELETE_BOT,
+                             pools)
+    return True
+  except auth.AuthorizationError:
+    return False
+
+
 def check_bots_list_acl(pools):
   """Checks if the caller is allowed to list or count bots.
 

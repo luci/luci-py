@@ -205,6 +205,7 @@ class BootstrapToken(messages.Message):
 class ClientPermissions(messages.Message):
   """Reports the client's permissions."""
   delete_bot = messages.BooleanField(1)
+  delete_bots = messages.BooleanField(10)
   terminate_bot = messages.BooleanField(2)
   get_configs = messages.BooleanField(3)
   put_configs = messages.BooleanField(4)
