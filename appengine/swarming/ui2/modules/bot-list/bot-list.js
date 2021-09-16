@@ -131,7 +131,7 @@ const options = (ele) => html`
   </div>
   <a href=${ele._matchingTasksLink()}>View Matching Tasks</a>
   <button id=delete_all
-      ?disabled=${!ele.permissions.delete_bot}
+      ?disabled=${!ele.permissions.delete_bots}
       @click=${ele._promptMassDelete}>
     DELETE ALL DEAD BOTS
   </button>
