@@ -15,6 +15,7 @@ import test_env_handlers
 import webapp2
 import webtest
 
+from google.appengine.api import app_identity
 from google.appengine.api import memcache
 from google.appengine.ext import ndb
 
@@ -60,6 +61,9 @@ def _encode(d):
 
 
 class TaskBackendAPIServiceTest(test_env_handlers.AppTestBase):
+  # These test fail with 'Unknown bot ID, not in config'
+  # Need to run in sequential_test_runner.py
+  no_run = 1
 
   def setUp(self):
     super(TaskBackendAPIServiceTest, self).setUp()
@@ -70,7 +74,7 @@ class TaskBackendAPIServiceTest(test_env_handlers.AppTestBase):
     # the Backend is ready and added.
     routes = s.get_routes()
     self.app = webtest.TestApp(
-        webapp2.WSGIApplication(routes, debug=True),
+        webapp2.WSGIApplication(routes + handlers_bot.get_routes(), debug=True),
         extra_environ={
             'REMOTE_ADDR': self.source_ip,
             'SERVER_SOFTWARE': os.environ['SERVER_SOFTWARE'],
@@ -135,6 +139,15 @@ class TaskBackendAPIServiceTest(test_env_handlers.AppTestBase):
 
     self.mock(utils, 'enqueue_task', mocked_enqueue_task)
 
+  def _mock_enqueue_task_async(self):
+
+    def mocked_enqueue_task_async(url, queue_name, payload):
+      if queue_name == 'rebuild-task-cache':
+        return task_queues.rebuild_task_cache_async(payload)
+      self.fail(url)
+
+    self.mock(utils, 'enqueue_task_async', mocked_enqueue_task_async)
+
   # Tests
   def test_run_task(self):
     self.set_as_user()
@@ -148,12 +161,7 @@ class TaskBackendAPIServiceTest(test_env_handlers.AppTestBase):
     self.mock(service_accounts, 'has_token_server', lambda: True)
 
     # Mocks for task_scheduler.schedule_request()
-    def mocked_enqueue_task_async(url, queue_name, payload):
-      if queue_name == 'rebuild-task-cache':
-        return task_queues.rebuild_task_cache_async(payload)
-      self.fail(url)
-
-    self.mock(utils, 'enqueue_task_async', mocked_enqueue_task_async)
+    self._mock_enqueue_task_async()
     self._mock_enqueue_task(['pubsub', 'buildbucket-notify'])
 
     request = self._basic_run_task_request()
@@ -233,6 +241,62 @@ class TaskBackendAPIServiceTest(test_env_handlers.AppTestBase):
     self.assertEqual(raw_resp.status, '403 Forbidden')
     self.assertTrue(('X-Prpc-Grpc-Code', '7') in raw_resp._headerlist)
     self.assertEqual(raw_resp.body, 'User cannot create tasks.')
+
+  def test_fetch_tasks(self):
+    self._mock_enqueue_task_async()
+    self.mock_default_pool_acl([])
+
+    # Create bot
+    self.set_as_bot()
+    self.bot_poll()
+
+    # Create two tasks, one COMPLETED, one PENDING
+    self.set_as_user()
+    # first request
+    _, first_id = self.client_create_task_raw(
+        name='first',
+        tags=['project:yay', 'commit:post'],
+        properties=dict(idempotent=True))
+    self.set_as_bot()
+    self._mock_enqueue_task(['cancel-children-tasks'])
+    self.bot_run_task()
+
+    # Clear cache to test fetching from datastore path.
+    ndb.get_context().clear_cache()
+    memcache.flush_all()
+
+    # second request
+    self.set_as_user()
+    _, second_id = self.client_create_task_raw(
+        name='second',
+        user='jack@localhost',
+        tags=['project:yay', 'commit:pre'])
+
+    request = backend_pb2.FetchTasksRequest(task_ids=[
+        backend_pb2.TaskID(id=str(first_id)),
+        backend_pb2.TaskID(id=str(second_id)),
+        backend_pb2.TaskID(id='1d69b9f088008810'),  # Does not exist.
+    ])
+
+    target = 'swarming://%s' % app_identity.get_application_id()
+    expected_response = backend_pb2.FetchTasksResponse(tasks=[
+        backend_pb2.Task(
+            id=backend_pb2.TaskID(target=target, id=first_id),
+            status=common_pb2.SUCCESS),
+        backend_pb2.Task(
+            id=backend_pb2.TaskID(target=target, id=second_id),
+            status=common_pb2.SCHEDULED),
+        backend_pb2.Task(
+            id=backend_pb2.TaskID(target=target, id='1d69b9f088008810'),
+            summary_html='Swarming task 1d69b9f088008810 not found',
+            status=common_pb2.INFRA_FAILURE),
+    ])
+
+    raw_resp = self.app.post('/prpc/swarming.backend.TaskBackend/FetchTasks',
+                             _encode(request), self._headers)
+    resp = backend_pb2.FetchTasksResponse()
+    _decode(raw_resp.body, resp)
+    self.assertEqual(resp, expected_response)
 
 
 class PRPCTest(test_env_handlers.AppTestBase):

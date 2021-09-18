@@ -88,6 +88,9 @@ def get_request_and_result_keys(task_id):
   Returns:
     tuple(request_key, result_key): ndb.Key that yield TaskRequest and either
                                     (TaskRunResult or TaskResultSummay).
+
+  Raises:
+    ValueError if the task_id is in an unexpected format.
   """
   try:
     key = unpack_result_summary_key(task_id)
