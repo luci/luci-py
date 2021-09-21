@@ -38,7 +38,7 @@ import '../sort-toggle';
 import '../swarming-app';
 
 
-import {applyAlias, handleLegacyFilters, maybeApplyAlias} from '../alias';
+import {applyAlias, maybeApplyAlias} from '../alias';
 import {aggregateTemps, attribute, botLink, column, devices, dimensionsOnly,
   filterBots, forcedColumns, fromDimension, fromState, getColHeader,
   initCounts, listQueryParams, longestOrAll, processBots, processCounts,
@@ -347,7 +347,7 @@ window.customElements.define('bot-list', class extends SwarmingAppBoilerplate {
             this._cols = ['id', 'task', 'os', 'status'];
           }
           this._dir = newState.d || 'asc';
-          this._filters = handleLegacyFilters(newState.f); // default to []
+          this._filters = newState.f || []; // default to []
           this._primaryKey = newState.k; // default to ''
           this._sort = newState.s || 'id';
           this._verbose = newState.v; // default to false

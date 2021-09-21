@@ -44,7 +44,7 @@ import 'flatpickr/dist/flatpickr.css';
 // query.fromObject is more readable than just 'fromObject'
 import * as query from 'common-sk/modules/query';
 
-import {applyAlias, handleLegacyFilters, maybeApplyAlias} from '../alias';
+import {applyAlias, maybeApplyAlias} from '../alias';
 import {appendPossibleColumns, appendPrimaryMap, column, filterTasks,
   floorSecond, getColHeader, humanizePrimaryKey, legacyTags, listQueryParams,
   processTasks, sortColumns, sortPossibleColumns, specialSortMap,
@@ -353,7 +353,7 @@ window.customElements.define('task-list', class extends SwarmingAppBoilerplate {
               'duration', 'pool-tag'];
           }
           this._dir = newState.d || 'desc';
-          this._filters = handleLegacyFilters(newState.f); // default to []
+          this._filters = newState.f || [];
           this._filters = legacyTags(this._filters);
           this._limit = INITIAL_LOAD;
           this._now = newState.n; // default to true

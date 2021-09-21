@@ -173,40 +173,6 @@ const aliasMap = {
   'os': OS_ALIASES,
 };
 
-const oldStyle = /.+\((.+)\)/;
-
-/** handle legacy filters goes through a list of filters and
- *  transforms any from the "old-style" (e.g. Polymer version)
- *  to the new version.
- *
- *  @param {Array<string>} filters - a list of colon-separated key-values.
- *
- *  @return {Array<string>} - the cleaned up filters.
- */
-export function handleLegacyFilters(filters) {
-  if (!filters) {
-    return [];
-  }
-  return filters.map((f) => {
-    const potentialKey = f.split(':')[0];
-    if (aliasMap[potentialKey]) {
-      // This could be new/correct-style:
-      //   "gpu:10de:1cb3-415.27"
-      // or the old-style with the alias:
-      //   "gpu:NVIDIA Quadro P400 (10de:1cb3-415.27)"
-      // If it's the old-style, convert it to new-style.
-      const found = f.match(oldStyle);
-      if (found) {
-        return potentialKey + ':' + found[1];
-      } else {
-        return f;
-      }
-    } else {
-      return f;
-    }
-  });
-}
-
 /** maybeApplyAlias will take a filter (e.g. foo:bar) and apply
  *  the alias to it inline, returning it to be displayed on the UI.
  *  This means we can display it in a human-friendly way, without
