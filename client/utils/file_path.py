@@ -1338,11 +1338,9 @@ def get_recursive_size(path):
 def _use_scandir():
   if six.PY3:
     # Python3,
-    #   Use os.scandir in Mac/Win for faster execution.
+    #   Use os.scandir for faster execution.
     #   Benchmark:crbug.com/1215459#c12
-    #   Since ChromeOS Linux has a permission issue crbug.com/1238772,
-    #   disable scandir on Linux for now.
-    return sys.platform != 'linux'
+    return True
   else:
     # Python2,
     #   Use scandir in windows for faster execution.
