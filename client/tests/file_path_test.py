@@ -515,6 +515,11 @@ class FilePathTest(auto_stub.TestCase):
       f.write('0123')
     self.assertEqual(file_path.get_recursive_size(self.tempdir), 7)
 
+    # Add an unreadable directory.
+    secure_dir = os.path.join(self.tempdir, 'dir_secure')
+    os.makedirs(secure_dir, mode=0o000)
+    self.assertEqual(file_path.get_recursive_size(self.tempdir), 7)
+
     symlink_dir = os.path.join(self.tempdir, 'symlink_dir')
     symlink_file = os.path.join(self.tempdir, 'symlink_file')
     if symlink == 'symlink':
@@ -554,6 +559,12 @@ class FilePathTest(auto_stub.TestCase):
   def test_get_recursive_size(self):
     self._check_get_recursive_size()
 
+  @unittest.skipIf(sys.platform == 'win32', 'Posix specific')
+  def test_get_recursive_size_scandir(self):
+    # Test scandir implementation on posix.
+    self.mock(file_path, '_use_scandir', lambda: True)
+    self._check_get_recursive_size()
+
   @unittest.skipUnless(sys.platform == 'win32', 'Windows specific')
   def test_get_recursive_size_win_junction(self):
     self._check_get_recursive_size(symlink='junction')
@@ -561,12 +572,6 @@ class FilePathTest(auto_stub.TestCase):
   @unittest.skipUnless(sys.platform == 'win32', 'Windows specific')
   def test_get_recursive_size_win_hardlink(self):
     self._check_get_recursive_size(symlink='hardlink')
-
-  @unittest.skipIf(sys.platform == 'win32', 'non-Windows specific')
-  def test_get_recursive_size_scandir_on_non_win(self):
-    # Test scandir implementation on non-windows.
-    self.mock(file_path, '_use_scandir', lambda: True)
-    self._check_get_recursive_size()
 
 
 if __name__ == '__main__':
