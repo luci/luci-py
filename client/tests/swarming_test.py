@@ -245,7 +245,7 @@ class Common(object):
 
 class NetTestCase(net_utils.TestCase, Common):
   # These test fail when running in parallel
-  # Need to run in test_seq.py as an executable
+  # Need to run in sequential_test_runner.py as an executable
   no_run = 1
   """Base class that defines the url_open mock."""
 
@@ -259,7 +259,7 @@ class NetTestCase(net_utils.TestCase, Common):
 
 class TestIsolated(auto_stub.TestCase, Common):
   # These test fail when running in parallel
-  # Need to run in test_seq.py as an executable
+  # Need to run in sequential_test_runner.py as an executable
   no_run = 1
   """Test functions with isolated_ prefix."""
 

@@ -118,7 +118,7 @@ class StorageFake(object):
 class RunIsolatedTestBase(auto_stub.TestCase):
   # These tests fail with the following error
   # 'AssertionError: Items in the first set but not the second'
-  # Need to run in test_seq.py as an executable
+  # Need to run in sequential_test_runner.py as an executable
   no_run = 1
   DISABLE_CIPD_FOR_TESTS = ['--cipd-enabled', False]
 

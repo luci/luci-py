@@ -82,7 +82,7 @@ def _bot_event(event_type, bot_id, **kwargs):
 
 class BaseTest(test_env_handlers.AppTestBase, test_case.EndpointsTestCase):
   # These test fail with 'Unknown bot ID, not in config'
-  # Need to run in test_seq.py
+  # Need to run in sequential_test_runner.py
   no_run = 1
 
   def setUp(self):

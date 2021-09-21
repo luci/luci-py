@@ -373,7 +373,7 @@ class TaskBackendAPIServiceTest(test_env_handlers.AppTestBase):
 
 class PRPCTest(test_env_handlers.AppTestBase):
   # These test fail with 'Unknown bot ID, not in config'
-  # Need to run in test_seq.py
+  # Need to run in sequential_test_runner.py
   no_run = 1
 
   """Tests the pRPC handlers."""

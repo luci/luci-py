@@ -66,7 +66,7 @@ def seal_token(subtoken):
 class DelegationTestBase(test_case.TestCase):
   # These tests fail with
   # 'TokenCreationError: Token server URL is not configured'
-  # Needs to run in test_seq.py as an executable
+  # Needs to run in sequential_test_runner.py as an executable
   no_run = 1
 
 

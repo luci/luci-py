@@ -25,7 +25,7 @@ _LOG_HEADER_PID = r'^\d+ \d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d\.\d\d\d'
 
 class Test(unittest.TestCase):
   # This test fails when running via test runner
-  # Need to run in test_seq.py as an executable
+  # Need to run in sequential_test_runner.py as an executable
   no_run = 1
 
   def setUp(self):

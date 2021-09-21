@@ -423,7 +423,7 @@ class BotGroupsConfigTest(test_case.TestCase):
 
 class CacheTest(test_case.TestCase):
   # This test needs be run independently
-  # run by test_seq.py
+  # run by sequential_test_runner.py
   no_run = 1
 
   def setUp(self):

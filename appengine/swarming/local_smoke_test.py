@@ -395,7 +395,7 @@ class Test(unittest.TestCase):
   bot = None
   leak = False
   # This test can't pass when running via test runner
-  # run by test_seq.py
+  # run by sequential_test_runner.py
   no_run = 1
 
   def setUp(self):

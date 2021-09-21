@@ -46,7 +46,7 @@ class FakeSigner(object):
 
 class GetProjectAccessTokenTest(test_case.TestCase):
   # This tests fail when running with other tests.
-  # Need to run in test_seq.py
+  # Need to run in sequential_test_runner.py
   no_run = 1
 
   Response = collections.namedtuple('Response', ['status_code', 'content'])
