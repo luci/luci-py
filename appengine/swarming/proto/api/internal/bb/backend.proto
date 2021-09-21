@@ -50,6 +50,16 @@ service TaskBackend {
   //
   // Buildbucket will invoke this RPC with the Project-scoped identity.
   rpc FetchTasks(FetchTasksRequest) returns (FetchTasksResponse) {};
+
+  // BB will call this if it was requested to cancel some build(s).
+  // The backend SHOULD implement cancelation as best as it can, but
+  // simple backends may choose to ignore this (because the next call
+  // to UpdateBuild will indicate that the build is Canceled, and so the
+  // agent would quit).
+  //
+  // Buildbucket will invoke this RPC with the Project-scoped identity.
+  rpc CancelTasks(CancelTasksRequest) returns (CancelTasksResponse) {};
+
 }
 
 message RunTaskRequest {
@@ -220,6 +230,25 @@ message FetchTasksResponse {
   repeated Task tasks = 1;
 }
 
+message CancelTasksRequest {
+  repeated TaskID task_ids = 1;
+}
+
+message CancelTasksResponse {
+  // These represent the current state of the tasks.
+  //
+  // If they're not indicated as canceled, Buildbucket will continue
+  // to call FetchTasks, or wait until the TaskBackend calls UpdateBuildTask.
+  // In other words, cancellation may be sync OR async (and this is up to
+  // the specific backend).
+  //
+  // The TaskBackend SHOULD only indicate a Task is in the canceled when that
+  // task has actually stopped execution. For example, if cancelation entails
+  // leaving a note for the bot to do the cancelation, ideally these Task
+  // objects should only contain the canceled status once the bot has actually
+  // terminated (not just when the 'please cancel' note was written).
+  repeated Task tasks = 1;
+}
 
 message Task {
   TaskID id = 1;

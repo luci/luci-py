@@ -10,6 +10,8 @@ import random
 import sys
 import unittest
 
+import mock
+
 import test_env_handlers
 
 import webapp2
@@ -39,6 +41,7 @@ from proto.config import config_pb2
 from server import config
 from server import task_queues
 from server import task_request
+from server import task_result
 from server import task_scheduler
 from server import pools_config
 from server import realms
@@ -72,7 +75,7 @@ class TaskBackendAPIServiceTest(test_env_handlers.AppTestBase):
     s.add_service(handlers_prpc.TaskBackendAPIService())
     # TODO(crbug/1236848) call handlers_prpc.get_routes() when
     # the Backend is ready and added.
-    routes = s.get_routes()
+    routes = s.get_routes() + handlers_bot.get_routes()
     self.app = webtest.TestApp(
         webapp2.WSGIApplication(routes + handlers_bot.get_routes(), debug=True),
         extra_environ={
@@ -242,6 +245,76 @@ class TaskBackendAPIServiceTest(test_env_handlers.AppTestBase):
     self.assertTrue(('X-Prpc-Grpc-Code', '7') in raw_resp._headerlist)
     self.assertEqual(raw_resp.body, 'User cannot create tasks.')
 
+  @mock.patch('components.utils.enqueue_task')
+  def test_cancel_tasks(self, mocked_enqueue_task):
+    self._mock_enqueue_task_async()
+    self.mock_default_pool_acl([])
+    mocked_enqueue_task.return_value = True
+
+    # Create bot
+    self.set_as_bot()
+    self.bot_poll()
+
+    # Create two tasks, one COMPLETED, one PENDING
+
+    # first request
+    self.set_as_user()
+    _, first_id = self.client_create_task_raw(
+        name='first',
+        tags=['project:yay', 'commit:post'],
+        properties=dict(idempotent=True))
+    self.set_as_bot()
+    self.bot_run_task()
+
+    # second request
+    self.set_as_user()
+    _, second_id = self.client_create_task_raw(
+        name='second',
+        user='jack@localhost',
+        tags=['project:yay', 'commit:pre'])
+
+    request = backend_pb2.CancelTasksRequest(task_ids=[
+        backend_pb2.TaskID(id=str(first_id)),
+        backend_pb2.TaskID(id=str(second_id)),
+        backend_pb2.TaskID(id='1d69b9f088008810'),  # Does not exist.
+    ])
+
+    target = 'swarming://%s' % app_identity.get_application_id()
+    expected_response = backend_pb2.CancelTasksResponse(tasks=[
+      backend_pb2.Task(
+            id=backend_pb2.TaskID(target=target, id=first_id),
+            status=common_pb2.SUCCESS),
+      # Task to cancel this should be enqueued
+      backend_pb2.Task(
+          id=backend_pb2.TaskID(target=target, id=second_id),
+          status=common_pb2.SCHEDULED),
+      backend_pb2.Task(
+          id=backend_pb2.TaskID(target=target, id='1d69b9f088008810'),
+          summary_html='Swarming task 1d69b9f088008810 not found',
+          status=common_pb2.INFRA_FAILURE),
+    ])
+
+    raw_resp = self.app.post(
+        '/prpc/swarming.backend.TaskBackend/CancelTasks',
+        _encode(request),
+        self._headers,
+        expect_errors=False)
+
+    resp = backend_pb2.CancelTasksResponse()
+    _decode(raw_resp.body, resp)
+    self.assertEqual(resp, expected_response)
+
+    utils.enqueue_task.assert_has_calls([
+        mock.call(
+            '/internal/taskqueue/important/tasks/cancel-children-tasks',
+            'cancel-children-tasks',
+            payload=mock.ANY),
+        mock.call(
+            '/internal/taskqueue/important/tasks/cancel',
+            'cancel-tasks',
+            payload='{"kill_running": true, "tasks": ["%s"]}' % second_id),
+    ])
+
   def test_fetch_tasks(self):
     self._mock_enqueue_task_async()
     self.mock_default_pool_acl([])
@@ -297,7 +370,6 @@ class TaskBackendAPIServiceTest(test_env_handlers.AppTestBase):
     resp = backend_pb2.FetchTasksResponse()
     _decode(raw_resp.body, resp)
     self.assertEqual(resp, expected_response)
-
 
 class PRPCTest(test_env_handlers.AppTestBase):
   # These test fail with 'Unknown bot ID, not in config'

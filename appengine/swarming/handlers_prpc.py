@@ -7,8 +7,11 @@
 import logging
 
 from google.appengine.api import datastore_errors
+from google.appengine.ext import ndb
 from google.protobuf import empty_pb2
 
+from components import auth
+from components import datastore_utils
 from components import prpc
 from components.prpc.codes import StatusCode
 
@@ -16,17 +19,18 @@ import api_helpers
 import backend_conversions
 import handlers_exceptions
 import prpc_helpers
-from components import auth
-from components import datastore_utils
+
 from proto.api.internal.bb import backend_prpc_pb2
 from proto.api.internal.bb import backend_pb2
 from proto.api import swarming_prpc_pb2  # pylint: disable=no-name-in-module
 from proto.api import swarming_pb2  # pylint: disable=no-name-in-module
 from server import acl
 from server import bot_management
+from server import task_pack
 from server import task_request
 from server import task_result
 from server import task_scheduler
+from server import task_result
 
 
 class TaskBackendAPIService(prpc_helpers.SwarmingPRPCService):
@@ -61,6 +65,31 @@ class TaskBackendAPIService(prpc_helpers.SwarmingPRPCService):
                    request.request_id)
 
     return empty_pb2.Empty()
+
+  @prpc_helpers.PRPCMethod
+  @auth.require(acl.can_access, log_identity=True)
+  def CancelTasks(self, request, _context):
+    # type: (backend_pb2.CancelTasksRequest, context.ServicerContext)
+    #     -> backend_pb2.CancelTasksResponse
+
+    # TODO(crbug/1236848): Check cancel permissions for pools:
+    # `realms.check_tasks_cancel_acl(pools)`
+    task_ids = [task_id.id for task_id in request.task_ids]
+    task_result_keys = [task_pack.get_request_and_result_keys(task_id)[1]
+                        for task_id in task_ids]
+
+    # TODO(crbug/1236848): Fetch limits and/or return cursor from the request.
+    filter_node = task_result.TaskResultSummary.key.IN(task_result_keys)
+    task_scheduler.cancel_tasks(
+        100, condition=filter_node, kill_running=True)
+
+    # CancelTasksResponse should return ALL tasks in `request.task_ids`
+    # not just the tasks that are actually getting cancelled.
+    task_results = task_result.fetch_task_results(task_ids)
+
+    return backend_pb2.CancelTasksResponse(
+        tasks=backend_conversions.convert_results_to_tasks(
+            task_results, task_ids))
 
 
   @prpc_helpers.PRPCMethod
