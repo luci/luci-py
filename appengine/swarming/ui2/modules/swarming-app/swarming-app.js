@@ -80,16 +80,17 @@ function gitLink(details) {
   }
 
   const split = details.chops_git_version.split('-');
-  if (split.length !== 2) {
+  if (split.length >= 3) {
+    console.error(`Invalid Git version. version=${details.chops_git_version}`);
     return '';
   }
-  return html`(<a href=https://chromium.googlesource.com/infra/luci/luci-py/+/${split[1]}>${details.chops_git_version}</a>)`;
+  const version = (split.length == 2) ? split[1] : split[0];
+  return html`<a href=https://chromium.googlesource.com/infra/luci/luci-py/+/${version}>${version}</a>`;
 }
 
 const dynamic_content_template = (ele) => html`
 <div class=server-version>
-  Server:
-  ${serverLink(ele._server_details)} ${gitLink(ele._server_details)}
+  AppEngine version: ${serverLink(ele._server_details)} Git version:${gitLink(ele._server_details)}
 </div>
 <oauth-login client_id=${ele.client_id}
              ?testing_offline=${ele.testing_offline}>
