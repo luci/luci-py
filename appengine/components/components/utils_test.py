@@ -221,6 +221,7 @@ class UtilsTest(test_case.TestCase):
         ('15626-39642e9a', None),
         ('15626-39642e', None),
         ('15626-39642eg', None),
+        ('39642e9', '39642e9'),
     ]
 
     for val, want in test_cases:

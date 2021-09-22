@@ -477,10 +477,14 @@ def get_chops_git_version():
   """Returns the Chops Git version if set."""
   # See go/spinnakergit for further information.
   chopsver = os.getenv("CHOPS_GIT_VERSION")
-  if chopsver:
-    p = re.compile('^\d{4,}-[0-9a-f]{7}$')
-    if p.match(chopsver):
-      return chopsver
+  if not chopsver:
+    return None
+  p = re.compile('^\d{4,}-[0-9a-f]{7}$')  # <Commit position>-<Git revision>
+  if p.match(chopsver):
+    return chopsver
+  p = re.compile('^[0-9a-f]{7}$')  # Git revision only.
+  if p.match(chopsver):
+    return chopsver
   return None
 
 
