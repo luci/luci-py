@@ -1393,7 +1393,7 @@ def _get_recur_size_with_scandir(path):
           n_others += 1
           logging.warning('non directory/file entry: %s', entry)
     except PermissionError:
-      logging.error('Failed to scan directory', exc_info=True)
+      logging.warning('Failed to scan directory', exc_info=True)
   return total, n_dirs, n_files, n_links, n_others
 
 
