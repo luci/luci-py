@@ -8,7 +8,6 @@ from __future__ import print_function
 import base64
 import contextlib
 import functools
-import hashlib
 import json
 import logging
 import os
@@ -44,29 +43,8 @@ from utils import subprocess42
 from utils import tools
 
 
-ALGO = hashlib.sha1
-
-
-def write_content(filepath, content):
-  with open(filepath, 'wb') as f:
-    f.write(content)
-
-
 def json_dumps(data):
   return json.dumps(data, sort_keys=True, separators=(',', ':'))
-
-
-def read_tree(path):
-  """Returns a dict with {filepath: content}."""
-  if not fs.isdir(path):
-    return None
-  out = {}
-  for root, _, filenames in fs.walk(path):
-    for filename in filenames:
-      p = os.path.join(root, filename)
-      with fs.open(p, 'rb') as f:
-        out[os.path.relpath(p, path)] = f.read()
-  return out
 
 
 @contextlib.contextmanager
@@ -76,19 +54,6 @@ def init_named_caches_stub(_run_dir, _stats):
 
 def trim_caches_stub(_stats):
   pass
-
-
-def put_to_named_cache(manager, cache_name, file_name, contents):
-  """Puts files into named cache."""
-  tdir = tempfile.mkdtemp(prefix=u'run_isolated_test')
-  try:
-    cache_dir = os.path.join(tdir, 'cache')
-    manager.install(cache_dir, cache_name)
-    with open(os.path.join(cache_dir, file_name), 'wb') as f:
-      f.write(contents)
-    manager.uninstall(cache_dir, cache_name)
-  finally:
-    file_path.rmtree(tdir)
 
 
 class StorageFake(object):

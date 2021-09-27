@@ -855,14 +855,6 @@ class FnTest(TestCase):
         local_caching.MemoryContentAddressedCache, 'remove_oldest',
         remove_oldest)
 
-  def put_to_named_cache(self, manager, cache_name, file_name, contents):
-    """Puts files into named cache."""
-    cache_dir = os.path.join(self.tempdir, 'put_to_named_cache')
-    manager.install(cache_dir, cache_name)
-    with fs.open(os.path.join(cache_dir, file_name), 'wb') as f:
-      f.write(contents)
-    manager.uninstall(cache_dir, cache_name)
-
   def _prepare_cache(self, cache):
     now = self._now
     for i in range(1, 11):
