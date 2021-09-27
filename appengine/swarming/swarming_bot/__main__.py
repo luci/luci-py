@@ -16,6 +16,7 @@ import json
 import logging
 import os
 import shutil
+import socket
 import sys
 import zipfile
 
@@ -248,7 +249,7 @@ def main():
   if not os.path.isdir('logs'):
     os.mkdir('logs')
 
-  net.set_user_agent('swarming_bot/' + __version__)
+  net.set_user_agent('swarming_bot/' + __version__ + '@' + socket.gethostname())
 
   # This is necessary so os.path.join() works with unicode path. No kidding.
   # This must be done here as each of the command take wildly different code
