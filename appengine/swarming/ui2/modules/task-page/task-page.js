@@ -89,7 +89,7 @@ const serverBotLogsURL = (ele, request, result) => {
   return encodeURI(url);
 };
 
-const botLogsURL = (ele, request, result, botProjectID) => {
+const botLogsURL = (ele, request, result, botProjectID, botZone) => {
   let url = `https://console.cloud.google.com/logs/viewer`;
   url += `?project=${botProjectID}`;
   if (result.started_ts) {
@@ -104,6 +104,7 @@ const botLogsURL = (ele, request, result, botProjectID) => {
   // TODO(jwata): Non GCE bots will need a different label.
   let filter =
       `labels."compute.googleapis.com/resource_name"="${result.bot_id}"`;
+  filter += `OR protoPayload.resourceName="projects/google.com:chromecompute/zones/${botZone}/instances/${result.bot_id}"`;
   url += `&advancedFilter=${filter}`;
   return encodeURI(url);
 };
@@ -650,11 +651,12 @@ const logsSection = (ele, request, result) => {
     return '';
   }
   let botProjectID = null;
-  let botOS = null;
+  let botZone = null;
   if (result && result.bot_dimensions) {
     for (const dim of result.bot_dimensions) {
       if (dim.key == 'gcp') botProjectID = dim.value[0];
-      if (dim.key == 'os') botOS = dim.value[0];
+      if (dim.key == 'zone') botZone = dim.value.reduce(
+        (a, b) => a.length > b.length ? a : b );
     }
   }
   const showBotLogsLink = !!botProjectID;
@@ -684,7 +686,7 @@ const logsSection = (ele, request, result) => {
       <tr>
         <td>Bot Logs</td>
         <td>
-          <a href=${botLogsURL(ele, request, result, botProjectID)} target="_blank" ?hidden=${!showBotLogsLink}>
+          <a href=${botLogsURL(ele, request, result, botProjectID, botZone)} target="_blank" ?hidden=${!showBotLogsLink}>
             View on Cloud Console
           </a>
           <p ?hidden=${showBotLogsLink}>--</p>
