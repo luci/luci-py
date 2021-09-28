@@ -168,7 +168,7 @@ class TestBackendConversions(test_case.TestCase):
             req_dim_prpc('required-2', 'req-2'),
             req_dim_prpc('required-1', 'req-1-2')
         ])
-    backend_config = backend_conversions._ingest_backend_config(
+    backend_config = backend_conversions.ingest_backend_config(
         run_task_req.backend_config)
 
     # Create expected slices.
@@ -258,7 +258,7 @@ class TestBackendConversions(test_case.TestCase):
             req_dim_prpc('required-2', 'req-2'),
             req_dim_prpc('required-1', 'req-1-2')
         ])
-    backend_config = backend_conversions._ingest_backend_config(
+    backend_config = backend_conversions.ingest_backend_config(
         run_task_req.backend_config)
 
     base_slice = task_request.TaskSlice(

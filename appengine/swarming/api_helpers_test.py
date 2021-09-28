@@ -26,6 +26,7 @@ from server import service_accounts
 from server import task_request
 from test_support import test_case
 
+from proto.api.internal.bb import swarming_bb_pb2
 
 class TestProcessTaskRequest(test_case.TestCase):
 
@@ -230,6 +231,37 @@ class TestCheckIdenticalRequest(test_case.TestCase):
 
     result = api_helpers.cache_request('test_request', request_uuid, func)
     self.assertEqual((('ok', 'great'), False), result)
+
+
+  def test_validate_configs(self):
+    configs = [
+        swarming_bb_pb2.SwarmingBackendConfig(
+            priority=task_request.MAXIMUM_PRIORITY + 1,
+            bot_ping_tolerance=task_request._MAX_BOT_PING_TOLERANCE_SECS + 1,
+            service_account='bokbok',
+            parent_run_id='123',
+            agent_binary_cipd_filename='agent',
+            agent_binary_cipd_pkg='agent/package/${platform}??',
+            agent_binary_cipd_vers='3'),
+        swarming_bb_pb2.SwarmingBackendConfig(priority=0)
+        ]
+    errors = api_helpers.validate_backend_configs(configs)
+
+    expected_errors = [
+        (0, "priority (256) must be between 0 and 255 (inclusive)"),
+        (0, "bot_ping_tolerance (1201) must range between 60 and 1200"),
+        (0, "parent_run_id (123) got error: Invalid key u'12'"),
+        (0, ("service_account must be an email, \"bot\" or \"none\""
+         " string, got u\'bokbok\'")),
+        (0, ("agent_binary_cipd_pkg must be a valid CIPD package name"
+             " template, got \"agent/package/${platform}??\"")),
+        (1, "bot_ping_tolerance (0) must range between 60 and 1200"),
+        (1, ("agent_binary_cipd_pkg must be a valid CIPD package name"
+             " template, got \"\"")),
+        (1, "agent_binary_cipd_vers must be a valid package version, got \"\""),
+        (1, "missing `agent_binary_cipd_filename`"),
+    ]
+    self.assertEqual(expected_errors, errors)
 
 
 if __name__ == '__main__':

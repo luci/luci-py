@@ -2101,6 +2101,35 @@ class TaskRequestApiTest(TestCase):
     task_request.validate_priority(1)
     task_request.validate_priority(task_request.MAXIMUM_PRIORITY)
 
+  def test_validate_ping_tolerance(self):
+    with self.assertRaises(datastore_errors.BadValueError):
+      task_request.validate_ping_tolerance(
+          'ping_tol', task_request._MAX_BOT_PING_TOLERANCE_SECS + 1)
+      task_request.validate_ping_tolerance(
+          'ping_tol', task_request._MAX_BOT_PING_TOLERANCE_SECS)
+
+  def test_validate_service_account(self):
+    with self.assertRaises(datastore_errors.BadValueError):
+      task_request.validate_service_account('email', 'bad-eamil')
+    task_request.validate_service_account('email', 'service-email@email.com')
+
+  def test_validate_task_run_id(self):
+    # Tested in TaskRequestPrivateTest.test_validate_task_run_id()
+    pass
+
+  def test_validate_package_name_template(self):
+    with self.assertRaises(datastore_errors.BadValueError):
+      task_request.validate_package_name_template(
+          'package', 'agent/package/${platform}??')
+    task_request.validate_package_name_template(
+        'package', 'agent/package/${platform}')
+
+  def test_validate_package_version(self):
+    with self.assertRaises(datastore_errors.BadValueError):
+      task_request.validate_package_version('version', '??')
+    task_request.validate_package_version('version', '7')
+
+
   def test_datetime_to_request_base_id(self):
     now = datetime.datetime(2012, 1, 2, 3, 4, 5, 123456)
     self.assertEqual(0xeb5313d0300000,

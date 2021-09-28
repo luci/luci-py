@@ -11,6 +11,7 @@ from google.appengine.ext import ndb
 from google.protobuf import empty_pb2
 
 from components import auth
+from components import cipd
 from components import datastore_utils
 from components import prpc
 from components.prpc.codes import StatusCode
@@ -46,6 +47,8 @@ class TaskBackendAPIService(prpc_helpers.SwarmingPRPCService):
     # type: (backend_pb2.RunTaskRequest, context.ServicerContext)
     #     -> empty_pb2.Empty
 
+    api_helpers.validate_backend_configs(
+        [backend_conversions.ingest_backend_config(request.backend_config)])
     tr, secret_bytes, build_token = backend_conversions.compute_task_request(
         request)
 
@@ -118,6 +121,22 @@ class TaskBackendAPIService(prpc_helpers.SwarmingPRPCService):
     return backend_pb2.FetchTasksResponse(
         tasks=backend_conversions.convert_results_to_tasks(
             task_results, requested_task_ids))
+
+  @prpc_helpers.PRPCMethod
+  def ValidateConfigs(self, request, _context):
+    # type: (backend_pb2.ValidateConfigsRequest, context.ServicerContext)
+    #     -> backend_pb2.ValidateConfigsResponse
+
+    configs = [backend_conversions.ingest_backend_config(config.config_json) for
+               config in request.configs]
+
+    errors = api_helpers.validate_backend_configs(configs)
+
+    return backend_pb2.ValidateConfigsResponse(
+        config_errors=[
+            backend_pb2.ValidateConfigsResponse.ErrorDetail(
+                index=i, error=error)
+            for (i, error) in errors])
 
 
 class BotAPIService(object):

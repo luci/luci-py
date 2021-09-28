@@ -644,7 +644,7 @@ class TasksApiTest(BaseTest):
     self.assertEqual(
         {
             u'error': {
-                u'message': u'\'service_account\' must be an email, "bot" or '
+                u'message': u'service_account must be an email, "bot" or '
                             '"none" string, got u\'bad email\''
             },
         }, response.json)

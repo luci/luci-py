@@ -154,14 +154,14 @@ _CAS_INSTANCE_RE = re.compile(r'^projects/[a-z0-9-]+/instances/[a-z0-9-_]+$')
 ### Properties validators must come before the models.
 
 
-def _validate_length(prop, value, maximum):
+def _validate_length(prop_name, value, maximum):
   if len(value) > maximum:
     raise datastore_errors.BadValueError('too long %s: %d > %d' %
-                                         (prop._name, len(value), maximum))
+                                         (prop_name, len(value), maximum))
 
 
 def _get_validate_length(maximum):
-  return lambda prop, value: _validate_length(prop, value, maximum)
+  return lambda prop, value: _validate_length(prop._name, value, maximum)
 
 
 def _validate_url(prop, value):
@@ -339,11 +339,11 @@ def _validate_priority(_prop, value):
   return value
 
 
-def _validate_task_run_id(_prop, value):
+def _validate_task_run_id(prop, value):
   """Validates a task_id looks valid without fetching the entity."""
   if not value:
     return None
-  task_pack.unpack_run_result_key(value)
+  validate_task_run_id(prop._name, value)
   return value
 
 
@@ -370,7 +370,7 @@ def _validate_io_timeout(prop, value):
 def _validate_tags(prop, value):
   """Validates TaskRequest.tags."""
   # pylint: disable=protected-access
-  _validate_length(prop, value, _TAG_LENGTH)
+  _validate_length(prop._name, value, _TAG_LENGTH)
   if ':' not in value:
     raise datastore_errors.BadValueError('%s must be key:value form, not %s' %
                                          (prop._name, value))
@@ -379,7 +379,7 @@ def _validate_tags(prop, value):
 def _validate_pubsub_topic(prop, value):
   """Validates TaskRequest.pubsub_topic."""
   # pylint: disable=protected-access
-  _validate_length(prop, value, 1024)
+  _validate_length(prop._name, value, 1024)
   if value and '/' not in value:
     raise datastore_errors.BadValueError(
         '%s must be a well formatted pubsub topic' % (prop._name))
@@ -387,36 +387,29 @@ def _validate_pubsub_topic(prop, value):
 
 def _validate_package_name_template(prop, value):
   """Validates a CIPD package name template."""
-  _validate_length(prop, value, 1024)
-  if not cipd.is_valid_package_name_template(value):
-    raise datastore_errors.BadValueError(
-        '%s must be a valid CIPD package name template "%s"' %
-        (prop._name, value))
+  validate_package_name_template(prop._name, value)
 
 
 def _validate_package_version(prop, value):
   """Validates a CIPD package version."""
-  _validate_length(prop, value, 1024)
-  if not cipd.is_valid_version(value):
-    raise datastore_errors.BadValueError(
-        '%s must be a valid package version "%s"' % (prop._name, value))
+  validate_package_version(prop._name, value)
 
 
 def _validate_cache_name(prop, value):
-  _validate_length(prop, value, 128)
+  _validate_length(prop._name, value, 128)
   if not _CACHE_NAME_RE.match(value):
     raise datastore_errors.BadValueError(
         '%s %r does not match %s' % (prop._name, value, _CACHE_NAME_RE.pattern))
 
 
 def _validate_cache_path(prop, value):
-  _validate_length(prop, value, 256)
+  _validate_length(prop._name, value, 256)
   _validate_rel_path('Cache path', value)
 
 
 def _validate_package_path(prop, value):
   """Validates a CIPD installation path."""
-  _validate_length(prop, value, 256)
+  _validate_length(prop._name, value, 256)
   if not value:
     raise datastore_errors.BadValueError(
         'CIPD package path is required. Use "." to install to run dir.')
@@ -425,7 +418,7 @@ def _validate_package_path(prop, value):
 
 def _validate_output_path(prop, value):
   """Validates a path for an output file."""
-  _validate_length(prop, value, 512)
+  _validate_length(prop._name, value, 512)
   _validate_rel_path('output file', value)
 
 
@@ -454,25 +447,15 @@ def _validate_rel_path(value_name, path):
 
 def _validate_service_account(prop, value):
   """Validates that 'service_account' field is 'bot', 'none' or email."""
-  _validate_length(prop, value, 128)
   if not value:
     return None
-  if value in ('bot',
-               'none') or service_accounts_utils.is_service_account(value):
-    return value
-  raise datastore_errors.BadValueError(
-      '%r must be an email, "bot" or "none" string, got %r' %
-      (prop._name, value))
+  validate_service_account(prop._name, value)
+  return value
 
 
 def _validate_ping_tolerance(prop, value):
   """Validates the range of input tolerance for bot to be declared dead."""
-  if (value > _MAX_BOT_PING_TOLERANCE_SECS or
-      value < _MIN_BOT_PING_TOLERANCE_SECS):
-    raise datastore_errors.BadValueError(
-        '%s (%d) must range between %d and %d' %
-        (prop._name, value, _MIN_BOT_PING_TOLERANCE_SECS,
-         _MAX_BOT_PING_TOLERANCE_SECS))
+  validate_ping_tolerance(prop._name, value)
 
 
 def _validate_realm(_prop, value):
@@ -539,7 +522,7 @@ class FilesRef(ndb.Model):
             'isolatedserver must be valid GCP project')
     else:
       _validate_url(self.__class__.isolatedserver, self.isolatedserver)
-      _validate_length(self.__class__.namespace, self.namespace, 128)
+      _validate_length(self.__class__.namespace._name, self.namespace, 128)
       if not pools_config.NAMESPACE_RE.match(self.namespace):
         raise datastore_errors.BadValueError('malformed namespace')
 
@@ -1945,9 +1928,9 @@ def _apply_cipd_defaults(properties, settings, pool_cfg):
     properties.cipd_input.client_package.version = (
         properties.cipd_input.client_package.version or cipd_vers)
 
-
+# Shared validate_foo() methods.
 def validate_priority(priority):
-  """Throws ValueError if priority is not a valid value."""
+  """Throws BadValueError if priority is not a valid value."""
   if not isinstance(priority, int):
     raise TypeError('priority (%s) must be int type, got %s' %
                     (priority, type(priority)))
@@ -1955,6 +1938,52 @@ def validate_priority(priority):
     raise datastore_errors.BadValueError(
         'priority (%d) must be between 0 and %d (inclusive)' %
         (priority, MAXIMUM_PRIORITY))
+  return priority
+
+def validate_ping_tolerance(prop_name, ping_tolerance):
+  # type: (str, int) -> None
+   """Throws BadValueError if ping_tolerance is not a valid value."""
+   if (ping_tolerance > _MAX_BOT_PING_TOLERANCE_SECS or
+       ping_tolerance < _MIN_BOT_PING_TOLERANCE_SECS):
+     raise datastore_errors.BadValueError(
+         '%s (%d) must range between %d and %d' %
+         (prop_name, ping_tolerance, _MIN_BOT_PING_TOLERANCE_SECS,
+          _MAX_BOT_PING_TOLERANCE_SECS))
+
+def validate_service_account(prop_name, service_account):
+  # type: (str, str) -> None
+  """Throws BadValueError if service_account is not a valid value."""
+  _validate_length(prop_name, service_account, 128)
+  if not (service_account in (
+      'bot', 'none') or
+          service_accounts_utils.is_service_account(service_account)):
+    raise datastore_errors.BadValueError(
+        '%s must be an email, "bot" or "none" string, got %r' %
+        (prop_name, service_account))
+
+def validate_task_run_id(prop_name, run_id):
+  # type: (str, str) -> None
+  """Throws ValueError if the run_id is not a valid value."""
+  try:
+    task_pack.unpack_run_result_key(run_id)
+  except ValueError as e:
+    raise ValueError(
+        '%s (%s) got error: %s' % (prop_name, run_id, e.message))
+
+def validate_package_name_template(prop_name, name):
+  # type: (str, str) -> None
+  _validate_length(prop_name, name, 1024)
+  if not cipd.is_valid_package_name_template(name):
+    raise datastore_errors.BadValueError(
+        '%s must be a valid CIPD package name template, got "%s"' %
+        (prop_name, name))
+
+def validate_package_version(prop_name, version):
+  # type: (str, str) -> None
+  _validate_length(prop_name, version, 1024)
+  if not cipd.is_valid_version(version):
+    raise datastore_errors.BadValueError(
+        '%s must be a valid package version, got "%s"' % (prop_name, version))
 
 
 def yield_request_keys_by_parent_task_id(parent_task_id):

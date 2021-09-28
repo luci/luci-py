@@ -50,7 +50,7 @@ def compute_task_request(run_task_req):
     secret_bytes = task_request.SecretBytes(
         secret_bytes=run_task_req.secrets.SerializeToString())
 
-  backend_config = _ingest_backend_config(run_task_req.backend_config)
+  backend_config = ingest_backend_config(run_task_req.backend_config)
   slices = _compute_task_slices(run_task_req, backend_config,
                                 secret_bytes is not None)
   expiration_ms = sum([s.expiration_secs for s in slices]) * 1000000
@@ -76,7 +76,7 @@ def compute_task_request(run_task_req):
   return tr, secret_bytes, build_token
 
 
-def _ingest_backend_config(req_backend_config):
+def ingest_backend_config(req_backend_config):
   # type: (struct_pb2.Struct) -> swarming_bb_pb2.SwarmingBackendConfig
   json_config = json_format.MessageToJson(req_backend_config)
   return json_format.Parse(json_config, swarming_bb_pb2.SwarmingBackendConfig())

@@ -60,6 +60,14 @@ service TaskBackend {
   // Buildbucket will invoke this RPC with the Project-scoped identity.
   rpc CancelTasks(CancelTasksRequest) returns (CancelTasksResponse) {};
 
+  // BB will call this when it is asked to validate project configuration i.e.
+  // the Builder.backend.config_json field.
+  //
+  // Buildbucket will invoke this RPC with the Project-scoped identity.
+  rpc ValidateConfigs(ValidateConfigsRequest)
+     returns (ValidateConfigsResponse) {};
+
+
 }
 
 message RunTaskRequest {
@@ -248,6 +256,30 @@ message CancelTasksResponse {
   // objects should only contain the canceled status once the bot has actually
   // terminated (not just when the 'please cancel' note was written).
   repeated Task tasks = 1;
+}
+
+message ValidateConfigsRequest {
+  message ConfigContext {
+    string target = 1;
+    google.protobuf.Struct config_json = 2;  // guaranteed to be valid JSON
+  }
+  // A list of all unique target+config_jsons that Buildbucket is requesting
+  // validation for.
+  repeated ConfigContext configs = 1;
+}
+
+message ValidateConfigsResponse {
+  message ErrorDetail {
+    // The 0-based index in the ValidateConfigsRequest.configs list.
+    //
+    // Note: `config_errors` can contain multiple ErrorDetail messages with
+    // the same `index` value, to indicate multiple errors on the same item.
+    int32  index = 1;
+    string error = 2;
+  }
+  // Must be sorted by `index`, and multiple ErrorDetails for the same index
+  // should be assumed to be in an order which makes sense to the backend.
+  repeated ErrorDetail config_errors = 1;
 }
 
 message Task {
