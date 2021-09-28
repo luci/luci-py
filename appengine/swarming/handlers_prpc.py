@@ -72,15 +72,19 @@ class TaskBackendAPIService(prpc_helpers.SwarmingPRPCService):
   def CancelTasks(self, request, _context):
     # type: (backend_pb2.CancelTasksRequest, context.ServicerContext)
     #     -> backend_pb2.CancelTasksResponse
-
-    # TODO(crbug/1236848): Check cancel permissions for pools:
-    # `realms.check_tasks_cancel_acl(pools)`
     task_ids = [task_id.id for task_id in request.task_ids]
-    task_result_keys = [task_pack.get_request_and_result_keys(task_id)[1]
-                        for task_id in task_ids]
+    request_keys, result_keys = zip(*[
+        task_pack.get_request_and_result_keys(task_id) for task_id in task_ids
+    ])
+
+    pools = []
+    for tr in ndb.get_multi(request_keys):
+      if tr:
+        pools += bot_management.get_pools_from_dimensions_flat(tr.tags)
+    realms.check_tasks_cancel_acl(pools)
 
     # TODO(crbug/1236848): Fetch limits and/or return cursor from the request.
-    filter_node = task_result.TaskResultSummary.key.IN(task_result_keys)
+    filter_node = task_result.TaskResultSummary.key.IN(result_keys)
     task_scheduler.cancel_tasks(
         100, condition=filter_node, kill_running=True)
 

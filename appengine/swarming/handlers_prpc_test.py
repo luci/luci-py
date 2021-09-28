@@ -294,6 +294,7 @@ class TaskBackendAPIServiceTest(test_env_handlers.AppTestBase):
           status=common_pb2.INFRA_FAILURE),
     ])
 
+    self.mock_auth_db([auth.Permission('swarming.pools.cancelTask')])
     raw_resp = self.app.post(
         '/prpc/swarming.backend.TaskBackend/CancelTasks',
         _encode(request),
@@ -314,6 +315,32 @@ class TaskBackendAPIServiceTest(test_env_handlers.AppTestBase):
             'cancel-tasks',
             payload='{"kill_running": true, "tasks": ["%s"]}' % second_id),
     ])
+
+  def test_cancel_tasks(self):
+    self._mock_enqueue_task_async()
+    self.mock_default_pool_acl([])
+
+    # Create task
+    self.set_as_user()
+    _, first_id = self.client_create_task_raw(
+        name='first',
+        tags=['project:yay', 'commit:post'],
+        properties=dict(idempotent=True))
+
+    request = backend_pb2.CancelTasksRequest(task_ids=[
+        backend_pb2.TaskID(id=str(first_id)),
+    ])
+
+    self.mock_auth_db([])
+    raw_resp = self.app.post(
+        '/prpc/swarming.backend.TaskBackend/CancelTasks',
+        _encode(request),
+        self._headers,
+        expect_errors=True)
+    self.assertEqual(raw_resp.status, '403 Forbidden')
+    self.assertIn(('X-Prpc-Grpc-Code', '7'), raw_resp._headerlist)
+    self.assertEqual(raw_resp.body, ('user "user@example.com" does not have '
+                                     'permission "swarming.pools.cancelTask"'))
 
   def test_fetch_tasks(self):
     self._mock_enqueue_task_async()
