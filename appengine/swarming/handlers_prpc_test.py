@@ -205,7 +205,7 @@ class TaskBackendAPIServiceTest(test_env_handlers.AppTestBase):
         self._headers,
         expect_errors=True)
     self.assertEqual(raw_resp.status, '400 Bad Request')
-    self.assertTrue(('X-Prpc-Grpc-Code', '3') in raw_resp._headerlist)
+    self.assertIn(('X-Prpc-Grpc-Code', '3'), raw_resp._headerlist)
     self.assertIn('must be a valid package', raw_resp.body)
 
   def test_run_task_exceptions_schedule_request_error(self):
@@ -231,7 +231,7 @@ class TaskBackendAPIServiceTest(test_env_handlers.AppTestBase):
         self._headers,
         expect_errors=True)
     self.assertEqual(raw_resp.status, '400 Bad Request')
-    self.assertTrue(('X-Prpc-Grpc-Code', '3') in raw_resp._headerlist)
+    self.assertIn(('X-Prpc-Grpc-Code', '3'), raw_resp._headerlist)
     self.assertEqual(raw_resp.body, 'chicken')
 
   def test_run_task_exceptions_auth_error(self):
@@ -242,7 +242,7 @@ class TaskBackendAPIServiceTest(test_env_handlers.AppTestBase):
         self._headers,
         expect_errors=True)
     self.assertEqual(raw_resp.status, '403 Forbidden')
-    self.assertTrue(('X-Prpc-Grpc-Code', '7') in raw_resp._headerlist)
+    self.assertIn(('X-Prpc-Grpc-Code', '7'), raw_resp._headerlist)
     self.assertEqual(raw_resp.body, 'User cannot create tasks.')
 
   @mock.patch('components.utils.enqueue_task')
@@ -365,11 +365,40 @@ class TaskBackendAPIServiceTest(test_env_handlers.AppTestBase):
             status=common_pb2.INFRA_FAILURE),
     ])
 
+    self.mock_auth_db([auth.Permission('swarming.pools.listTasks')])
     raw_resp = self.app.post('/prpc/swarming.backend.TaskBackend/FetchTasks',
                              _encode(request), self._headers)
     resp = backend_pb2.FetchTasksResponse()
     _decode(raw_resp.body, resp)
     self.assertEqual(resp, expected_response)
+
+  def test_fetch_tasks_forbidden(self):
+    self._mock_enqueue_task_async()
+    self.mock_default_pool_acl([])
+
+    # Create task
+    self.set_as_user()
+    # first request
+    _, first_id = self.client_create_task_raw(
+        name='first',
+        tags=['project:yay', 'commit:post'],
+        properties=dict(idempotent=True))
+
+    request = backend_pb2.FetchTasksRequest(task_ids=[
+        backend_pb2.TaskID(id=str(first_id)),
+    ])
+
+    self.mock_auth_db([])
+    raw_resp = self.app.post(
+        '/prpc/swarming.backend.TaskBackend/FetchTasks',
+        _encode(request),
+        self._headers,
+        expect_errors=True)
+    self.assertEqual(raw_resp.status, '403 Forbidden')
+    self.assertIn(('X-Prpc-Grpc-Code', '7'), raw_resp._headerlist)
+    self.assertEqual(raw_resp.body, ('user "user@example.com" does not have '
+                                     'permission "swarming.pools.listTasks"'))
+
 
 class PRPCTest(test_env_handlers.AppTestBase):
   # These test fail with 'Unknown bot ID, not in config'

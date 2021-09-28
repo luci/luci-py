@@ -26,6 +26,7 @@ from proto.api import swarming_prpc_pb2  # pylint: disable=no-name-in-module
 from proto.api import swarming_pb2  # pylint: disable=no-name-in-module
 from server import acl
 from server import bot_management
+from server import realms
 from server import task_pack
 from server import task_request
 from server import task_result
@@ -96,10 +97,18 @@ class TaskBackendAPIService(prpc_helpers.SwarmingPRPCService):
   def FetchTasks(self, request, _context):
     # type: (backend_pb2.FetchTasksRequest, context.ServicerContext)
     #     -> backend_pb2.FetchTaskResponse
-
-    # TODO(crbug/1236848): Check user can view each task.
-
     requested_task_ids = [task_id.id for task_id in request.task_ids]
+
+    request_keys = [
+        task_pack.get_request_and_result_keys(task_id)[0]
+        for task_id in requested_task_ids
+    ]
+    pools = []
+    for tr in ndb.get_multi(request_keys):
+      if tr:
+        pools += bot_management.get_pools_from_dimensions_flat(tr.tags)
+    realms.check_tasks_list_acl(pools)
+
     task_results = task_result.fetch_task_results(requested_task_ids)
 
     return backend_pb2.FetchTasksResponse(
