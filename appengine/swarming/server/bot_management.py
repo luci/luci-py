@@ -265,7 +265,7 @@ class BotInfo(_BotCommon):
   @property
   def should_be_dead(self):
     # check if the last seen is over deadline
-    return self.last_seen_ts <= self._deadline()
+    return self.last_seen_ts and self.last_seen_ts <= self._deadline()
 
   @property
   def is_dead(self):
@@ -596,6 +596,8 @@ def bot_event(
           d for d in dimensions_flat
           if d.startswith('id:') or d.startswith('pool:')
       ]
+  # Store previous composite to detect status change.
+  prev_composite = bot_info._calc_composite()
 
   now = utils.utcnow()
   # bot_missing event is created by a server, not a bot.
@@ -653,8 +655,10 @@ def bot_event(
   # It's not necessary to use a transaction here since no BotEvent is being
   # added, only last_seen_ts is really updated.
   # crbug.com/1015365: It's useful saving BotEvent when dimensions updates.
-  # crbug.com/952984: It needs to save BotEvent when quarantined.
-  skip_save_event = (not dimensions_updated and not quarantined and
+  # crbug.com/952984, crbug.com/1040345: It needs to save BotEvent when
+  # changing status.
+  status_updated = prev_composite != bot_info._calc_composite()
+  skip_save_event = (not dimensions_updated and not status_updated and
                      event_type in ('request_sleep', 'task_update'))
   if skip_save_event:
     bot_info.put()

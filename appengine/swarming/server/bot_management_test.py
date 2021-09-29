@@ -695,28 +695,50 @@ class BotManagementTest(test_case.TestCase):
     # Generate a few events.
     start = self.mock_now(self.now, 10)
     _bot_event(bot_id=u'id1', event_type='bot_connected')
+    self.mock_now(self.now, 11)
+    _bot_event(event_type='request_sleep')  # stored
+    self.mock_now(self.now, 12)
+    _bot_event(event_type='request_sleep')  # not stored
+    self.mock_now(self.now, 13)
+    _bot_event(event_type='request_sleep', quarantined=True)  # stored
+    self.mock_now(self.now, 14)
+    _bot_event(event_type='request_sleep', quarantined=True)  # not stored
+    self.mock_now(self.now, 15)
+    _bot_event(event_type='request_sleep')  # stored
+    self.mock_now(self.now, 16)
+    _bot_event(event_type='request_sleep')  # not stored
+    self.mock_now(self.now, 17)
+    _bot_event(event_type='request_sleep', maintenance_msg='foo')  # stored
+    self.mock_now(self.now, 18)
+    _bot_event(event_type='request_sleep', maintenance_msg='bar')  # not stored
+    self.mock_now(self.now, 19)
+    _bot_event(event_type='request_sleep')  # stored
     self.mock_now(self.now, 20)
-    _bot_event(event_type='request_sleep')
-    self.mock_now(self.now, 30)
-    _bot_event(event_type='request_sleep')
-    self.mock_now(self.now, 40)
-    _bot_event(event_type='request_sleep', quarantined=True)
-    self.mock_now(self.now, 50)
+    _bot_event(event_type='request_sleep')  # not stored
+    self.mock_now(self.now, 21)
     _bot_event(event_type='request_task', task_id='12311', task_name='yo')
-    end = self.mock_now(self.now, 60)
+    end = self.mock_now(self.now, 22)
 
     # normal request_sleep is not streamed.
-    self.assertEqual(4, bot_management.task_bq_events(start, end))
+    bot_management.task_bq_events(start, end)
     self.assertEqual(1, len(payloads))
     actual_rows = payloads[0]
     expected = [
-        'id1:2010-01-02T03:04:15.000006Z',  # bot_connected
-        'id1:2010-01-02T03:04:25.000006Z',  # request_sleep (dimensions update)
-        'id1:2010-01-02T03:04:45.000006Z',  # request_sleep + quarantined
-        'id1:2010-01-02T03:04:55.000006Z',  # request_task
+        (r[0], bot_management.BotEvent._MAPPING[r[1]]) for r in [
+            # (bq_key, event)
+            ('id1:2010-01-02T03:04:15.000006Z', 'bot_connected'),
+            ('id1:2010-01-02T03:04:16.000006Z',
+             'request_sleep'),  # dimensions update
+            ('id1:2010-01-02T03:04:18.000006Z',
+             'request_sleep'),  # quarantine start
+            ('id1:2010-01-02T03:04:20.000006Z', 'request_sleep'),  # recovered
+            ('id1:2010-01-02T03:04:22.000006Z',
+             'request_sleep'),  # maintenance start
+            ('id1:2010-01-02T03:04:24.000006Z', 'request_sleep'),  # recovered
+            ('id1:2010-01-02T03:04:26.000006Z', 'request_task'),
+        ]
     ]
-    self.assertEqual(len(expected), len(actual_rows))
-    self.assertEqual(expected, [r[0] for r in actual_rows])
+    self.assertEqual(expected, [(r[0], r[1].event) for r in actual_rows])
 
 
 if __name__ == '__main__':
