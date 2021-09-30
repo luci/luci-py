@@ -553,18 +553,6 @@ def _validate_url(ctx, value):
     ctx.error('must start with "https://" or "http://localhost"')
 
 
-def _validate_external_services_isolate(ctx, cfg):
-  with ctx.prefix('isolate '):
-    with ctx.prefix('server '):
-      _validate_url(ctx, cfg.server)
-
-    with ctx.prefix('namespace '):
-      if not cfg.namespace:
-        ctx.error('is not set')
-      elif not NAMESPACE_RE.match(cfg.namespace):
-        ctx.error('is invalid "%s"', cfg.namespace)
-
-
 def _validate_external_services_cipd(ctx, cfg):
   """Validates ExternalServices.CIPD message."""
   with ctx.prefix('cipd '):
@@ -583,7 +571,6 @@ def _validate_external_services_cipd(ctx, cfg):
 
 def _validate_external_services(ctx, cfg):
   """Validates an ExternalServices message"""
-  _validate_external_services_isolate(ctx, cfg.isolate)
   _validate_external_services_cipd(ctx, cfg.cipd)
 
 

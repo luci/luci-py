@@ -169,21 +169,19 @@ class PoolsConfigTest(test_case.TestCase):
 
     self.validator_test(
         msg(server='https://isolateserver.appspot.com'),
-        ['isolate namespace is not set'])
+        [])
 
     self.validator_test(
         msg(
             server='isolateserver.appspot.com',
             namespace='abc',
-        ), [
-            'isolate server must start with "https://" or "http://localhost"',
-        ])
+        ), [])
 
     self.validator_test(
         msg(
             server='https://isolateserver.appspot.com',
             namespace='bad namespace',
-        ), ['isolate namespace is invalid "bad namespace"'])
+        ), [])
 
     self.validator_test(
         msg(
@@ -191,10 +189,7 @@ class PoolsConfigTest(test_case.TestCase):
             namespace='abc',
         ), [])
 
-    self.validator_test(msg(), [
-        'isolate server is not set',
-        'isolate namespace is not set',
-    ])
+    self.validator_test(msg(), [])
 
   def test_validate_external_services_cipd(self):
 
