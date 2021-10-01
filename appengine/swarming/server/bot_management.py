@@ -307,8 +307,8 @@ class BotInfo(_BotCommon):
     return cls.query(cls.composite == cls.ALIVE)
 
   @classmethod
-  def yield_bots_should_be_dead(cls):
-    """Yields bots who should be dead."""
+  def yield_should_be_dead_bot_keys(cls):
+    """Yields keys of bots that should be dead."""
     q = cls.yield_alive_bots()
     cursor = None
     more = True
@@ -317,7 +317,7 @@ class BotInfo(_BotCommon):
       for b in bots:
         if not b.should_be_dead:
           continue
-        yield b
+        yield b.key
 
   @staticmethod
   def _deadline():
@@ -754,31 +754,34 @@ def get_pools_from_dimensions_flat(dimensions_flat):
 def cron_update_bot_info():
   """Refreshes BotInfo.composite for dead bots."""
   @ndb.tasklet
-  def run(bot):
-    if bot and bot.should_be_dead and (bot.is_alive or not bot.is_dead):
+  def run(bot_key):
+    # The query results that yielded the bot_key may have been stale
+    # or changes may have been made since the query so we want to
+    # bypass cache.
+    # crbug.com/1252454#c12, crbug.com/1247362#c19, crbug.com/1252454
+    bot = bot_key.get(use_memcache=False, use_cache=False)
+    if not bot:
+      logging.debug('BotInfo %s deleted since query or query was stale',
+                    bot_key)
+      raise ndb.Return(None)
+    if bot.should_be_dead and bot.is_alive and not bot.is_dead:
       # bot composite get updated in _pre_put_hook
       yield bot.put_async()
       logging.info('Changing Bot status to DEAD: %s', bot.id)
-      raise ndb.Return(bot.key)
+      raise ndb.Return(bot)
+    logging.debug('BotInfo changed since query or query was stale, %r', bot)
     raise ndb.Return(None)
 
   def tx_result(future, stats):
-    bot_key = future.get_result()
-    if not bot_key:
-      # Do nothing.
+    bot = future.get_result()
+    if not bot:
       return
 
     try:
       # Unregister the bot from task queues since it can't reap anything.
-      task_queues.cleanup_after_bot(bot_key.parent())
+      task_queues.cleanup_after_bot(bot.key.parent())
 
       stats['dead'] += 1
-
-      bot = bot_key.get()
-      if not bot:
-        logging.warning('BotInfo does not exist. key: %s', bot_key)
-        stats['failed'] += 1
-        return
 
       logging.info('Sending bot_missing event: %s', bot.id)
       bot_event(
@@ -812,11 +815,11 @@ def cron_update_bot_info():
   futures = []
   logging.debug('Updating dead bots...')
   try:
-    for b in BotInfo.yield_bots_should_be_dead():
+    for key in BotInfo.yield_should_be_dead_bot_keys():
       cron_stats['seen'] += 1
       # Retry more often than the default 1. We do not want to throw too much
       # in the logs and there should be plenty of time to do the retries.
-      f = datastore_utils.transaction_async(lambda: run(b), retries=5)
+      f = datastore_utils.transaction_async(lambda: run(key), retries=5)
       futures.append(f)
       if len(futures) < 5:
         continue
