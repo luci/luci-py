@@ -11,11 +11,20 @@
 
 lucicfg.check_version("1.24.2", "Please update depot_tools")
 
+# Enable LUCI Realms support.
+lucicfg.enable_experiment("crbug.com/1085650")
+
 luci.project(
     name = "luci-py",
     buildbucket = "cr-buildbucket.appspot.com",
     tricium = "tricium-prod.appspot.com",
     acls = [
+        acl.entry(
+            roles = [
+                acl.PROJECT_CONFIGS_READER,
+            ],
+            groups = "all",
+        ),
         acl.entry(
             roles = [
                 acl.CQ_COMMITTER,
@@ -29,6 +38,8 @@ luci.project(
 lucicfg.config(
     config_dir = "generated",
     tracked_files = [
+        "project.cfg",
+        "realms.cfg",
         "tricium-prod.cfg",
     ],
     fail_on_warnings = True,
