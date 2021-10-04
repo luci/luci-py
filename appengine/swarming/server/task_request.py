@@ -1481,12 +1481,6 @@ def _get_automatic_tags_from_slice(task_slice):
     for value in values:
       for v in value.split(OR_DIM_SEP):
         tags.add(u'%s:%s' % (key, v))
-
-  # TODO(crbug.com/1143123): remove this after migration.
-  tags.add(u'use_isolate_1143123:%s' %
-           int(bool(task_slice.properties.inputs_ref)))
-  tags.add(u'use_cas_1143123:%s' %
-           int(bool(task_slice.properties.cas_input_root)))
   return tags
 
 

@@ -364,8 +364,7 @@ class TaskRequestApiTest(TestCase):
   def test_get_automatic_tags(self):
     req = _gen_request()
     expected = set((u'hostname:localhost', u'OS:Windows-3.1.1', u'pool:default',
-                    u'priority:50', u'service_account:none', u'user:Jesus',
-                    u'use_isolate_1143123:1', u'use_cas_1143123:0'))
+                    u'priority:50', u'service_account:none', u'user:Jesus'))
     self.assertEqual(expected, task_request.get_automatic_tags(req, 0))
     with self.assertRaises(IndexError):
       task_request.get_automatic_tags(req, 1)
@@ -387,13 +386,11 @@ class TaskRequestApiTest(TestCase):
             })),
     ]
     req = _gen_request_slices(task_slices=slices)
-    expected = set(
-        (u'gpu:1234:5678', u'pool:GPU', u'priority:50', u'service_account:none',
-         u'user:Jesus', u'use_isolate_1143123:1', u'use_cas_1143123:0'))
+    expected = set((u'gpu:1234:5678', u'pool:GPU', u'priority:50',
+                    u'service_account:none', u'user:Jesus'))
     self.assertEqual(expected, task_request.get_automatic_tags(req, 0))
-    expected = set(
-        (u'gpu:none', u'pool:GPU', u'priority:50', u'service_account:none',
-         u'user:Jesus', u'use_isolate_1143123:1', u'use_cas_1143123:0'))
+    expected = set((u'gpu:none', u'pool:GPU', u'priority:50',
+                    u'service_account:none', u'user:Jesus'))
     self.assertEqual(expected, task_request.get_automatic_tags(req, 1))
     with self.assertRaises(IndexError):
       task_request.get_automatic_tags(req, 2)
@@ -415,12 +412,10 @@ class TaskRequestApiTest(TestCase):
     ]
     req = _gen_request_slices(task_slices=slices)
     expected = set((u'gpu:nv', u'gpu:amd', u'pool:foo', u'priority:50',
-                    u'service_account:none', u'user:Jesus',
-                    u'use_isolate_1143123:1', u'use_cas_1143123:0'))
+                    u'service_account:none', u'user:Jesus'))
     self.assertEqual(expected, task_request.get_automatic_tags(req, 0))
     expected = set((u'os:linux', u'os:mac', u'os:win', u'pool:foo',
-                    u'priority:50', u'service_account:none', u'user:Jesus',
-                    u'use_isolate_1143123:1', u'use_cas_1143123:0'))
+                    u'priority:50', u'service_account:none', u'user:Jesus'))
     self.assertEqual(expected, task_request.get_automatic_tags(req, 1))
 
   def test_create_termination_task(self):
@@ -585,8 +580,6 @@ class TaskRequestApiTest(TestCase):
             u'service_account:none',
             u'swarming.pool.template:no_config',
             u'tag:1',
-            u'use_cas_1143123:0',
-            u'use_isolate_1143123:1',
             u'user:Jesus',
         ],
         'task_slices': [{
@@ -705,8 +698,6 @@ class TaskRequestApiTest(TestCase):
             u'service_account:none',
             u'swarming.pool.template:no_config',
             u'tag:1',
-            u'use_cas_1143123:0',
-            u'use_isolate_1143123:1',
             u'user:Jesus',
         ],
         'task_slices': [{
@@ -826,8 +817,6 @@ class TaskRequestApiTest(TestCase):
             u'service_account:none',
             u'swarming.pool.template:no_config',
             u'tag:1',
-            u'use_cas_1143123:1',
-            u'use_isolate_1143123:0',
             u'user:Jesus',
         ],
         'task_slices': [{
@@ -1190,8 +1179,6 @@ class TaskRequestApiTest(TestCase):
             u'service_account:foo@gserviceaccount.com',
             u'swarming.pool.template:no_config',
             u'tag:1',
-            u"use_cas_1143123:0",
-            u"use_isolate_1143123:1",
             u'user:Jesus',
         ],
         user=u'Jesus',
@@ -1359,8 +1346,6 @@ class TaskRequestApiTest(TestCase):
             u'service_account:foo@gserviceaccount.com',
             u'swarming.pool.template:no_config',
             u'tag:1',
-            u"use_cas_1143123:1",
-            u"use_isolate_1143123:0",
             u'user:Jesus',
         ],
         user=u'Jesus',

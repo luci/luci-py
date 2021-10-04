@@ -615,8 +615,6 @@ class AppTestBase(test_case.TestCase):
             u'service_account:none',
             u'swarming.pool.template:none',
             u'swarming.pool.version:pools_cfg_rev',
-            u'use_cas_1143123:0',
-            u'use_isolate_1143123:0',
             u'user:joe@localhost',
         ],
         u'user': u'joe@localhost',
