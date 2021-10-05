@@ -70,9 +70,12 @@ def db():
   role('role/configs.reader', [
       permission('configs.configSets.read'),
   ])
-  role('role/configs.developer', [
+  role('role/configs.validator', [
       include('role/configs.reader'),
       permission('configs.configSets.validate'),
+  ])
+  role('role/configs.developer', [
+      include('role/configs.validator'),
       permission('configs.configSets.reimport'),
   ])
 
