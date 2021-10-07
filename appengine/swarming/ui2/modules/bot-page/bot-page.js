@@ -299,9 +299,10 @@ const eventRow = (event, showAll, serverVersion) => {
   if (!showAll && !event.message) {
     return '';
   }
+  const msg = [event.message, event.maintenance_msg].filter(Boolean).join('\n');
   return html`
 <tr>
-  <td class=message>${event.message}</td>
+  <td class=message>${msg}</td>
   <td>${event.event_type}</td>
   <td>${event.human_ts}</td>
   <td>
