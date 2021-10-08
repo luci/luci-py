@@ -2030,10 +2030,7 @@ export const taskRequests = [
             },
           ],
           'idempotent': false,
-          'inputs_ref': {
-            'isolatedserver': 'https://isolateserver-dev.appspot.com',
-            'namespace': 'default-gzip',
-          },
+          'cas_input_root': casRef,
           'command': [
             '/opt/infra-tools/moonshark_swarming_worker',
             '-task-name',
@@ -2063,10 +2060,7 @@ export const taskRequests = [
         },
       ],
       'idempotent': false,
-      'inputs_ref': {
-        'isolatedserver': 'https://isolateserver-dev.appspot.com',
-        'namespace': 'default-gzip',
-      },
+      'cas_input_root': casRef,
       'command': [
         '/opt/infra-tools/moonshark_swarming_worker',
         '-task-name',
