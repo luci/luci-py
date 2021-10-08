@@ -261,11 +261,6 @@ export const taskResults = [
       },
     },
     'run_id': '40110b3c0fac7811',
-    'outputs_ref': {
-      'isolatedserver': 'https://isolateserver.appspot.com',
-      'namespace': 'default-gzip',
-      'isolated': '9b7e9a85c14f3012e0395ae1d92d1d7339f5f99e',
-    },
     'cas_output_root': casRef,
     'server_versions': [
       '3779-c5c026e',
@@ -520,11 +515,6 @@ export const taskResults = [
       },
     },
     'run_id': '42e0ec5f54b04411',
-    'outputs_ref': {
-      'isolatedserver': 'https://isolateserver.appspot.com',
-      'namespace': 'default-gzip',
-      'isolated': 'd50a6620dd3d7907be0d8f79d9aab89c4a7d07e7',
-    },
     'cas_output_root': casRef,
     'resultdb_info':  resultdbInfo,
     'server_versions': [
@@ -836,11 +826,6 @@ export const taskRequests = [
             },
           ],
           'execution_timeout_secs': '3600',
-          'inputs_ref': {
-            'isolatedserver': 'https://isolateserver.appspot.com',
-            'namespace': 'default-gzip',
-            'isolated': 'cdf03f96d6b922b0ef716a69567c7e29014f70d0',
-          },
           'cas_input_root': casRef,
           'grace_period_secs': '30',
           'caches': [
@@ -936,11 +921,6 @@ export const taskRequests = [
         },
       ],
       'execution_timeout_secs': '3600',
-      'inputs_ref': {
-        'isolatedserver': 'https://isolateserver.appspot.com',
-        'namespace': 'default-gzip',
-        'isolated': 'cdf03f96d6b922b0ef716a69567c7e29014f70d0',
-      },
       'cas_input_root': casRef,
       'grace_period_secs': '30',
       'caches': [
@@ -1723,11 +1703,6 @@ export const taskRequests = [
             },
           ],
           'execution_timeout_secs': '3600',
-          'inputs_ref': {
-            'isolatedserver': 'https://isolateserver.appspot.com',
-            'namespace': 'default-gzip',
-            'isolated': 'a79744f6cd528bb345b6c79e001523a17e5c83b8',
-          },
           'cas_input_root': casRef,
           'grace_period_secs': '30',
           'caches': [
@@ -1816,11 +1791,6 @@ export const taskRequests = [
         },
       ],
       'execution_timeout_secs': '3600',
-      'inputs_ref': {
-        'isolatedserver': 'https://isolateserver.appspot.com',
-        'namespace': 'default-gzip',
-        'isolated': 'a79744f6cd528bb345b6c79e001523a17e5c83b8',
-      },
       'cas_input_root': casRef,
       'grace_period_secs': '30',
       'caches': [
@@ -1931,11 +1901,6 @@ export const taskRequests = [
             },
           ],
           'execution_timeout_secs': '3600',
-          'inputs_ref': {
-            'isolatedserver': 'https://isolateserver.appspot.com',
-            'namespace': 'default-gzip',
-            'isolated': '4d4a0d0e1d2c04e3530d07f190911235e1209e44',
-          },
           'cas_input_root': casRef,
           'grace_period_secs': '30',
           'caches': [
@@ -2014,11 +1979,6 @@ export const taskRequests = [
         },
       ],
       'execution_timeout_secs': '3600',
-      'inputs_ref': {
-        'isolatedserver': 'https://isolateserver.appspot.com',
-        'namespace': 'default-gzip',
-        'isolated': '4d4a0d0e1d2c04e3530d07f190911235e1209e44',
-      },
       'cas_input_root': casRef,
       'grace_period_secs': '30',
       'caches': [
