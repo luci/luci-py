@@ -78,8 +78,7 @@ def _ensure_bot_info(bot_id=u'id1', **kwargs):
 
 def _gen_bot_info(**kwargs):
   out = {
-      'authenticated_as':
-          u'bot:id1.domain',
+      'authenticated_as': u'bot:id1.domain',
       'composite': [
           bot_management.BotInfo.NOT_IN_MAINTENANCE,
           bot_management.BotInfo.ALIVE,
@@ -91,39 +90,25 @@ def _gen_bot_info(**kwargs):
           u'os': [u'Ubuntu', u'Ubuntu-16.04'],
           u'pool': [u'default'],
       },
-      'external_ip':
-          u'8.8.4.4',
-      'first_seen_ts':
-          utils.utcnow(),
-      'id':
-          'id1',
-      'is_dead':
-          False,
-      'last_seen_ts':
-          utils.utcnow(),
-      'lease_id':
-          None,
-      'lease_expiration_ts':
-          None,
-      'leased_indefinitely':
-          None,
-      'machine_lease':
-          None,
-      'machine_type':
-          None,
-      'quarantined':
-          False,
-      'maintenance_msg':
-          None,
+      'external_ip': u'8.8.4.4',
+      'first_seen_ts': utils.utcnow(),
+      'id': 'id1',
+      'idle_since_ts': None,
+      'is_dead': False,
+      'last_seen_ts': utils.utcnow(),
+      'lease_id': None,
+      'lease_expiration_ts': None,
+      'leased_indefinitely': None,
+      'machine_lease': None,
+      'machine_type': None,
+      'quarantined': False,
+      'maintenance_msg': None,
       'state': {
           u'ram': 65
       },
-      'task_id':
-          None,
-      'task_name':
-          None,
-      'version':
-          _VERSION,
+      'task_id': None,
+      'task_name': None,
+      'version': _VERSION,
   }
   out.update(kwargs)
   return out
@@ -138,6 +123,7 @@ def _gen_bot_event(**kwargs):
           u'pool': [u'default'],
       },
       'external_ip': u'8.8.4.4',
+      'idle_since_ts': None,
       'last_seen_ts': None,
       'lease_id': None,
       'lease_expiration_ts': None,
@@ -191,7 +177,7 @@ class BotManagementTest(test_case.TestCase):
     for name in bot_management.BotEvent.ALLOWED_EVENTS:
       event_key = _bot_event(
           event_type=name, bot_id=u'id1', dimensions=dimensions)
-      if name in (u'request_sleep', u'task_update'):
+      if name == u'task_update':
         # TODO(maruel): Store request_sleep IFF the state changed.
         self.assertIsNone(event_key, name)
         continue
@@ -285,7 +271,7 @@ class BotManagementTest(test_case.TestCase):
     event = 'request_sleep'
     _bot_event(event_type=event, bot_id='id1', dimensions=d)
 
-    expected = _gen_bot_info()
+    expected = _gen_bot_info(idle_since_ts=self.now)
     self.assertEqual(
         expected, bot_management.get_info_key('id1').get().to_dict())
 
@@ -320,19 +306,28 @@ class BotManagementTest(test_case.TestCase):
         bot_management.BotInfo.ALIVE,
         bot_management.BotInfo.HEALTHY,
     ]
+    if event == 'request_sleep':
+      composite += [bot_management.BotInfo.IDLE]
+      idle_since_ts = self.now
+    else:
+      composite += [bot_management.BotInfo.BUSY]
+      idle_since_ts = None
+
     if reset_task:
       # bot_info.task_id and bot_info.task_name should be reset
       expected = _gen_bot_info(
-          composite=composite+[bot_management.BotInfo.IDLE],
+          composite=composite,
           id=bot_id,
-          task_name=None)
+          task_name=None,
+          idle_since_ts=idle_since_ts)
     else:
       # bot_info.task_id and bot_info.task_name should be kept
       expected = _gen_bot_info(
-          composite=composite+[bot_management.BotInfo.BUSY],
+          composite=composite,
           id=bot_id,
           task_id=task_id,
-          task_name=task_name)
+          task_name=task_name,
+          idle_since_ts=None)
 
     self.assertEqual(expected, bot_info.key.get().to_dict())
 
@@ -353,12 +348,14 @@ class BotManagementTest(test_case.TestCase):
     _bot_event(event_type='request_sleep')
 
     # Assert that BotInfo was updated too.
-    expected = _gen_bot_info(composite=[
-        bot_management.BotInfo.NOT_IN_MAINTENANCE,
-        bot_management.BotInfo.ALIVE,
-        bot_management.BotInfo.HEALTHY,
-        bot_management.BotInfo.IDLE,
-    ])
+    expected = _gen_bot_info(
+        idle_since_ts=self.now,
+        composite=[
+            bot_management.BotInfo.NOT_IN_MAINTENANCE,
+            bot_management.BotInfo.ALIVE,
+            bot_management.BotInfo.HEALTHY,
+            bot_management.BotInfo.IDLE,
+        ])
 
     bot_info = bot_management.get_info_key('id1').get()
     self.assertEqual(expected, bot_info.to_dict())
@@ -534,18 +531,21 @@ class BotManagementTest(test_case.TestCase):
   def test_cron_update_bot_info(self):
     # Create two bots, one becomes dead, updating the cron job fixes composite.
     timeout = bot_management.config.settings().bot_death_timeout_secs
-    def check(dead, alive):
+
+    def check_dead(bots):
       q = bot_management.filter_availability(
           bot_management.BotInfo.query(), quarantined=None, in_maintenance=None,
           is_dead=True, is_busy=None)
-      self.assertEqual(dead, [t.to_dict() for t in q])
+      self.assertEqual(bots, [t.to_dict() for t in q])
+
+    def check_alive(bots):
       q = bot_management.filter_availability(
           bot_management.BotInfo.query(),
           quarantined=None,
           in_maintenance=None,
           is_dead=False,
           is_busy=None)
-      self.assertEqual(alive, [t.to_dict() for t in q])
+      self.assertEqual(bots, [t.to_dict() for t in q])
 
     _bot_event(event_type='request_sleep')
     # One second before the timeout value.
@@ -557,7 +557,7 @@ class BotManagementTest(test_case.TestCase):
         dimensions={'id': ['id2'], 'foo': ['bar']})
 
     bot1_alive = _gen_bot_info(
-        first_seen_ts=self.now, last_seen_ts=self.now)
+        first_seen_ts=self.now, idle_since_ts=self.now, last_seen_ts=self.now)
     bot1_dead = _gen_bot_info(
         first_seen_ts=self.now,
         last_seen_ts=self.now,
@@ -565,7 +565,7 @@ class BotManagementTest(test_case.TestCase):
             bot_management.BotInfo.NOT_IN_MAINTENANCE,
             bot_management.BotInfo.DEAD,
             bot_management.BotInfo.HEALTHY,
-            bot_management.BotInfo.IDLE,
+            bot_management.BotInfo.BUSY,
         ],
         is_dead=True)
     bot2_alive = _gen_bot_info(
@@ -576,18 +576,23 @@ class BotManagementTest(test_case.TestCase):
         },
         first_seen_ts=then,
         id='id2',
+        idle_since_ts=then,
         last_seen_ts=then)
-    check([], [bot1_alive, bot2_alive])
+    check_dead([])
+    check_alive([bot1_alive, bot2_alive])
     self.assertEqual(0, bot_management.cron_update_bot_info())
-    check([], [bot1_alive, bot2_alive])
+    check_dead([])
+    check_alive([bot1_alive, bot2_alive])
 
     # Just stale enough to trigger the dead logic.
     then = self.mock_now(self.now, timeout)
     # The cron job didn't run yet, so it still has ALIVE bit.
-    check([], [bot1_alive, bot2_alive])
+    check_dead([])
+    check_alive([bot1_alive, bot2_alive])
     self.assertEqual(1, bot_management.cron_update_bot_info())
     # The cron job ran, so it's now correct.
-    check([bot1_dead], [bot2_alive])
+    check_dead([bot1_dead])
+    check_alive([bot2_alive])
 
     # the last event should be bot_missing
     events = list(bot_management.get_events_query('id1', order=True))
@@ -717,7 +722,13 @@ class BotManagementTest(test_case.TestCase):
     _bot_event(event_type='request_sleep')  # not stored
     self.mock_now(self.now, 21)
     _bot_event(event_type='request_task', task_id='12311', task_name='yo')
-    end = self.mock_now(self.now, 22)
+    self.mock_now(self.now, 22)
+    _bot_event(event_type='task_update', task_id='12311') # not stored
+    self.mock_now(self.now, 23)
+    _bot_event(event_type='task_completed', task_id='12311')
+    self.mock_now(self.now, 24)
+    _bot_event(event_type='request_sleep')  # stored
+    end = self.mock_now(self.now, 25)
 
     # normal request_sleep is not streamed.
     bot_management.task_bq_events(start, end)
@@ -736,6 +747,8 @@ class BotManagementTest(test_case.TestCase):
              'request_sleep'),  # maintenance start
             ('id1:2010-01-02T03:04:24.000006Z', 'request_sleep'),  # recovered
             ('id1:2010-01-02T03:04:26.000006Z', 'request_task'),
+            ('id1:2010-01-02T03:04:28.000006Z', 'task_completed'),
+            ('id1:2010-01-02T03:04:29.000006Z', 'request_sleep'),  # first idle
         ]
     ]
     self.assertEqual(expected, [(r[0], r[1].event) for r in actual_rows])

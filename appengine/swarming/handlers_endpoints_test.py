@@ -3031,7 +3031,7 @@ class BotsApiTest(BaseTest):
         u'quarantined': u'2',
         u'maintenance': u'1',
         u'dead': u'0',
-        u'busy': u'1',
+        u'busy': u'4',
         u'now': unicode(self.now.strftime(DATETIME_NO_MICRO)),
     }
     request = handlers_endpoints.BotsRequest.combined_message_class()
@@ -3060,7 +3060,7 @@ class BotsApiTest(BaseTest):
         u'quarantined': u'1',
         u'maintenance': u'0',
         u'dead': u'0',
-        u'busy': u'0',
+        u'busy': u'1',
         u'now': unicode(self.now.strftime(DATETIME_NO_MICRO)),
     }
     request = handlers_endpoints.BotsRequest.combined_message_class(
@@ -3074,7 +3074,7 @@ class BotsApiTest(BaseTest):
         u'quarantined': u'1',
         u'maintenance': u'0',
         u'dead': u'0',
-        u'busy': u'1',
+        u'busy': u'2',
         u'now': unicode(self.now.strftime(DATETIME_NO_MICRO)),
     }
     request = handlers_endpoints.BotsRequest.combined_message_class(
@@ -3087,7 +3087,7 @@ class BotsApiTest(BaseTest):
         u'quarantined': u'1',
         u'maintenance': u'0',
         u'dead': u'1',
-        u'busy': u'0',
+        u'busy': u'1',
         u'now': unicode(self.now.strftime(DATETIME_NO_MICRO)),
     }
     request = handlers_endpoints.BotsRequest.combined_message_class(
@@ -3100,7 +3100,7 @@ class BotsApiTest(BaseTest):
         u'quarantined': u'0',
         u'maintenance': u'1',
         u'dead': u'0',
-        u'busy': u'0',
+        u'busy': u'1',
         u'now': unicode(self.now.strftime(DATETIME_NO_MICRO)),
     }
     request = handlers_endpoints.BotsRequest.combined_message_class(

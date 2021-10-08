@@ -138,6 +138,10 @@ class _BotCommon(ndb.Model):
   # Last time the bot pinged and this entity was updated
   last_seen_ts = ndb.DateTimeProperty()
 
+  # Time the bot started polling for next task.
+  # None is set during running task or hooks.
+  idle_since_ts = ndb.DateTimeProperty()
+
   @property
   def dimensions(self):
     """Returns a dict representation of self.dimensions_flat."""
@@ -259,7 +263,7 @@ class BotInfo(_BotCommon):
         if self.maintenance_msg else self.NOT_IN_MAINTENANCE,
         self.DEAD if self.should_be_dead else self.ALIVE,
         self.QUARANTINED if self.quarantined else self.HEALTHY,
-        self.BUSY if self.task_id else self.IDLE
+        self.IDLE if self.idle_since_ts else self.BUSY,
     ]
 
   @property
@@ -611,6 +615,13 @@ def bot_event(
     bot_info.external_ip = external_ip
     bot_info.authenticated_as = authenticated_as
     bot_info.maintenance_msg = maintenance_msg
+  # idle_since_ts is updated only when bot starts polling with healthy state.
+  is_idle = (
+      event_type == 'request_sleep' and not quarantined and not maintenance_msg)
+  if is_idle:
+    bot_info.idle_since_ts = bot_info.idle_since_ts or now
+  else:
+    bot_info.idle_since_ts = None
   dimensions_updated = False
   dimensions_flat = []
   if dimensions:
