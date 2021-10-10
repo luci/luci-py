@@ -201,6 +201,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         'abandoned_ts': None,
         'bot_dimensions': None,
         'bot_id': None,
+        'bot_idle_since_ts': None,
         'bot_version': None,
         'cipd_pins': None,
         'children_task_ids': [],
@@ -245,6 +246,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     """Returns the dict for a TaskResultSummary for a pending task."""
     kwargs.setdefault(u'bot_dimensions', self.bot_dimensions.copy())
     kwargs.setdefault(u'bot_id', u'localhost')
+    kwargs.setdefault(u'bot_idle_since_ts', self.now)
     kwargs.setdefault(u'bot_version', u'abc')
     kwargs.setdefault(u'state', State.RUNNING)
     kwargs.setdefault(u'try_number', 1)
@@ -255,6 +257,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         'abandoned_ts': None,
         'bot_dimensions': self.bot_dimensions,
         'bot_id': u'localhost',
+        'bot_idle_since_ts': self.now,
         'bot_version': u'abc',
         'cipd_pins': None,
         'children_task_ids': [],
@@ -779,6 +782,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
       er_calls.append(args)
       return None, None, None
 
+    self._register_bot(0, self.bot_dimensions)
     result_summary = self._quick_schedule(
         1,
         task_slices=[
@@ -870,6 +874,8 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
   def test_bot_reap_task_es_with_pending_task(self):
     self._setup_es(False)
     self._mock_es_notify()
+
+    self._register_bot(0, self.bot_dimensions)
     result_summary = self._quick_schedule(
         1,
         task_slices=[
@@ -2447,7 +2453,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         modified_ts=now_1,
         state=State.BOT_DIED)
     self.assertEqual(expected, run_result.key.get().to_dict())
-    expected = self._gen_result_summary_pending(
+    expected = self._gen_result_summary_reaped(
         abandoned_ts=now_1,
         bot_dimensions=self.bot_dimensions.copy(),
         bot_version=u'abc',

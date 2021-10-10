@@ -235,6 +235,9 @@ def _reap_task(bot_dimensions, bot_version, to_run_key, request,
   assert request.key == task_to_run.task_to_run_key_to_request_key(to_run_key)
   result_summary_key = task_pack.request_key_to_result_summary_key(request.key)
   bot_id = bot_dimensions[u'id'][0]
+  bot_info = bot_management.get_info_key(bot_id).get()
+  if not bot_info:
+    raise Error("Bot %s doesn't exist." % bot_id)
 
   now = utils.utcnow()
   # Log before the task id in case the function fails in a bad state where the
@@ -282,6 +285,9 @@ def _reap_task(bot_dimensions, bot_version, to_run_key, request,
     # the first ping.
     run_result.started_ts = now
     run_result.modified_ts = now
+    # The bot may became available at this request. Use current time in that
+    # case.
+    run_result.bot_idle_since_ts = bot_info.idle_since_ts or now
     # Upon bot reap, set .dead_after_ts taking into consideration the
     # user-provided keep-alive value. This is updated after each ping
     # from the bot."

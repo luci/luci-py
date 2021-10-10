@@ -158,6 +158,7 @@ class TaskResultApiTest(TestCase):
         'abandoned_ts': None,
         'bot_dimensions': None,
         'bot_id': None,
+        'bot_idle_since_ts': None,
         'bot_version': None,
         'cipd_pins': None,
         'children_task_ids': [],
@@ -209,6 +210,7 @@ class TaskResultApiTest(TestCase):
             u'foo': [u'bar', u'biz']
         },
         'bot_id': u'localhost',
+        'bot_idle_since_ts': None,
         'bot_version': u'abc',
         'children_task_ids': [],
         'cipd_pins': None,

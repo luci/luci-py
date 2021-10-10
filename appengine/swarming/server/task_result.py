@@ -491,6 +491,10 @@ class _TaskResultCommon(ndb.Model):
   bot_dimensions = datastore_utils.DeterministicJsonProperty(
       json_type=dict, compressed=True)
 
+  # Time when the bot becomes available. This will be used to calculate
+  # overhead.
+  bot_idle_since_ts = ndb.DateTimeProperty()
+
   # Active server version(s). Note that during execution, the active server
   # version may have changed, this list will list all versions seen as the task
   # was updated.
