@@ -696,6 +696,8 @@ class TaskResult(messages.Message):
   bot_dimensions = messages.MessageField(StringListPair, 2, repeated=True)
   # Unique ID of the bot.
   bot_id = messages.StringField(3)
+  # Time the bot became ready for a next task.
+  bot_idle_since_ts = message_types.DateTimeField(32)
   # Hash of the bot code which ran the task.
   bot_version = messages.StringField(4)
   # List of task IDs that this task triggered, if any.

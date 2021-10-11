@@ -310,5 +310,5 @@ export function wasPickedUp(result) {
          result.state !== 'CANCELED' && result.state !== 'EXPIRED';
 }
 
-const TASK_TIMES = ['abandoned_ts', 'completed_ts', 'created_ts', 'modified_ts',
-  'started_ts'];
+const TASK_TIMES = ['abandoned_ts', 'bot_idle_since_ts', 'completed_ts',
+  'created_ts', 'modified_ts', 'started_ts'];

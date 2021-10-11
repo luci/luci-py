@@ -760,6 +760,10 @@ const taskExecutionSection = (ele, request, result, currentSlice) => {
     <td><a href=${botPageLink(result.bot_id)}>${result.bot_id}</td>
   </tr>
   <tr>
+    <td>Bot idle since</td>
+    <td>${result.human_bot_idle_since_ts}</td>
+  </tr>
+  <tr>
     <td rowspan=${botDimensions.length+1}>
       Dimensions
     </td>

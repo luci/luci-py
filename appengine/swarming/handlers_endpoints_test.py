@@ -673,6 +673,7 @@ class TasksApiTest(BaseTest):
 
     # Expectations.
     t_result = self.gen_result_summary(
+        bot_idle_since_ts=fmtdate(self.now),
         completed_ts=fmtdate(self.now),
         costs_usd=[0.1],
         created_ts=fmtdate(self.now),
@@ -768,6 +769,7 @@ class TasksApiTest(BaseTest):
             },
         ])
     deduped_result = self.gen_result_summary(
+        bot_idle_since_ts=fmtdate(self.now),
         completed_ts=fmtdate(self.now),
         cost_saved_usd=0.1,
         created_ts=fmtdate(now_30),
@@ -2098,6 +2100,7 @@ class TasksApiTest(BaseTest):
     entity.put()
 
     first = self.gen_result_summary(
+        bot_idle_since_ts=fmtdate(self.now),
         completed_ts=fmtdate(self.now),
         costs_usd=[0.1],
         created_ts=fmtdate(self.now),
@@ -2122,6 +2125,7 @@ class TasksApiTest(BaseTest):
         ],
         try_number=u'1')
     deduped = self.gen_result_summary(
+        bot_idle_since_ts=fmtdate(self.now),
         completed_ts=fmtdate(self.now),
         cost_saved_usd=0.1,
         created_ts=fmtdate(now_60),
@@ -2307,6 +2311,7 @@ class TaskApiTest(BaseTest):
     self.assertEqual({u'must_stop': False, u'ok': True}, response)
     self.set_as_user()
     expected = self.gen_result_summary(
+        bot_idle_since_ts=fmtdate(self.now),
         costs_usd=[0.1],
         created_ts=fmtdate(self.now),
         modified_ts=fmtdate(self.now),
@@ -2352,6 +2357,7 @@ class TaskApiTest(BaseTest):
     self.set_as_user()
     expected = self.gen_result_summary(
         abandoned_ts=fmtdate(self.now),
+        bot_idle_since_ts=fmtdate(self.now),
         costs_usd=[0.1],
         created_ts=fmtdate(self.now),
         modified_ts=fmtdate(self.now),
@@ -2385,6 +2391,7 @@ class TaskApiTest(BaseTest):
     self.set_as_user()
     expected = self.gen_result_summary(
         abandoned_ts=fmtdate(self.now),
+        bot_idle_since_ts=fmtdate(self.now),
         completed_ts=fmtdate(self.now),
         costs_usd=[0.1],
         created_ts=fmtdate(self.now),
@@ -2463,6 +2470,7 @@ class TaskApiTest(BaseTest):
     self.set_as_user()
     response = self.call_api('result', body={'task_id': run_id})
     expected = self.gen_run_result(
+        bot_idle_since_ts=fmtdate(self.now),
         created_ts=fmtdate(self.now),
         modified_ts=fmtdate(self.now),
         started_ts=fmtdate(self.now))
@@ -2480,6 +2488,7 @@ class TaskApiTest(BaseTest):
     self.set_as_user()
     response = self.call_api('result', body={'task_id': task_id})
     expected = self.gen_run_result(
+        bot_idle_since_ts=fmtdate(self.now),
         completed_ts=fmtdate(self.now),
         costs_usd=[0.1],
         created_ts=fmtdate(self.now),
@@ -3434,6 +3443,7 @@ class BotApiTest(BaseTest):
     expected = {
         u'items': [
             self.gen_run_result(
+                bot_idle_since_ts=fmtdate(now_1),
                 completed_ts=fmtdate(now_1),
                 costs_usd=[0.1],
                 created_ts=fmtdate(now_1),

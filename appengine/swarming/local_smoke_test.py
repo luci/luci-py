@@ -1545,6 +1545,7 @@ class Test(unittest.TestCase):
     self.assertTrue(task_id.endswith('0'), task_id)
     if not deduped:
       self.assertEqual(task_id[:-1] + '1', run_id)
+    self.assertTrue(result.pop(u'bot_idle_since_ts'))
     self.assertTrue(result.pop(u'modified_ts'))
     self.assertTrue(result.pop(u'started_ts'))
 

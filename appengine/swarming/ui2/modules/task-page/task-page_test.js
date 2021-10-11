@@ -352,8 +352,8 @@ describe('task-page', function() {
           expect(cell(0, 0)).toMatchTextContent('Bot assigned to task');
           expect(cell(0, 1).innerHTML).toContain('<a ', 'has a link');
           expect(cell(0, 1).innerHTML).toContain('href="/bot?id=swarm1931-c4"', 'link is correct');
-          expect(cell(1, 0).rowSpan).toEqual(17); // 16 dimensions shown + 1 for header
-          expect(cell(7, 0)).toMatchTextContent('gpu:Intel (8086)' +
+          expect(cell(2, 0).rowSpan).toEqual(17); // 16 dimensions shown + 1 for header
+          expect(cell(8, 0)).toMatchTextContent('gpu:Intel (8086)' +
                     'Intel Sandy Bridge HD Graphics 2000 (8086:0102)');
 
           done();
@@ -582,8 +582,8 @@ describe('task-page', function() {
           // little helper for readability
           const cell = (r, c) => rows[r].children[c];
 
-          expect(cell(20, 0)).toMatchTextContent('Try Number');
-          expect(cell(20, 1)).toMatchTextContent('3');
+          expect(cell(21, 0)).toMatchTextContent('Try Number');
+          expect(cell(21, 1)).toMatchTextContent('3');
           done();
         });
       });

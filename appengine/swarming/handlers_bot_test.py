@@ -581,6 +581,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
     self.set_as_user()
     response = self.client_get_results(task_id)
     expected = self.gen_run_result(
+        bot_idle_since_ts=fmtdate(self.now),
         created_ts=fmtdate(self.now),
         modified_ts=fmtdate(self.now),
         started_ts=fmtdate(self.now))
@@ -862,6 +863,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
     self.set_as_user()
     response = self.client_get_results(task_id)
     expected = self.gen_run_result(
+        bot_idle_since_ts=fmtdate(self.now),
         created_ts=fmtdate(self.now),
         modified_ts=fmtdate(self.now),
         started_ts=fmtdate(self.now))
@@ -1228,6 +1230,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
     self.set_as_user()
     response = self.client_get_results(task_id, include_performance_stats=True)
     expected = self.gen_run_result(
+        bot_idle_since_ts=fmtdate(self.now),
         cipd_pins={
             u'client_package': {
                 u'package_name': u'infra/tools/cipd/windows-amd64',
@@ -1361,6 +1364,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
     self.set_as_user()
     response = self.client_get_results(task_id, include_performance_stats=True)
     expected = self.gen_run_result(
+        bot_idle_since_ts=fmtdate(self.now),
         cas_output_root={
             'cas_instance': 'projects/test/instances/default',
             'digest': {
@@ -1645,6 +1649,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
     self.set_as_user()
     response = self.client_get_results(task_id)
     expected = self.gen_run_result(
+        bot_idle_since_ts=fmtdate(self.now),
         costs_usd=[0.1],
         created_ts=fmtdate(self.now),
         modified_ts=fmtdate(self.now),
@@ -1664,6 +1669,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
     params = _params(
         duration=0.1, exit_code=23, output=base64.b64encode('Ahahah'))
     expected = self.gen_run_result(
+        bot_idle_since_ts=fmtdate(self.now),
         completed_ts=fmtdate(self.now),
         costs_usd=[0.1],
         created_ts=fmtdate(self.now),
@@ -1768,6 +1774,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
     self.set_as_user()
     response = self.client_get_results(task_id)
     expected = self.gen_run_result(
+        bot_idle_since_ts=fmtdate(self.now),
         completed_ts=fmtdate(self.now),
         costs_usd=[0.1],
         created_ts=fmtdate(self.now),
@@ -1808,6 +1815,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
     self.set_as_user()
     response = self.client_get_results(task_id)
     expected = self.gen_run_result(
+        bot_idle_since_ts=fmtdate(self.now),
         abandoned_ts=fmtdate(self.now),
         completed_ts=fmtdate(self.now),
         created_ts=fmtdate(self.now),
@@ -1850,6 +1858,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
     # Now tagged with abandonned_ts, but state not yet updated.
     expected = self.gen_run_result(
         abandoned_ts=fmtdate(self.now),
+        bot_idle_since_ts=fmtdate(self.now),
         created_ts=fmtdate(self.now),
         modified_ts=fmtdate(self.now),
         started_ts=fmtdate(self.now))
@@ -1863,6 +1872,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
     self.set_as_user()
     expected = self.gen_run_result(
         abandoned_ts=fmtdate(self.now),
+        bot_idle_since_ts=fmtdate(self.now),
         completed_ts=fmtdate(self.now),
         costs_usd=[0.1],
         created_ts=fmtdate(self.now),
@@ -1880,6 +1890,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
 
     expected = self.gen_run_result(
         abandoned_ts=fmtdate(self.now),
+        bot_idle_since_ts=fmtdate(self.now),
         completed_ts=fmtdate(self.now),
         costs_usd=[0.1],
         created_ts=fmtdate(self.now),
