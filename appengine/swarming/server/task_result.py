@@ -759,6 +759,8 @@ class _TaskResultCommon(ndb.Model):
     if self.try_number is not None:
       out.try_number = self.try_number
     out.current_task_slice = self.current_task_slice
+    if self.bot_idle_since_ts:
+      out.bot.info.idle_since_ts.FromDatetime(self.bot_idle_since_ts)
     if self.bot_dimensions:
       # TODO(maruel): Keep a complete snapshot. This is a bit clunky at the
       # moment. https://crbug.com/850560

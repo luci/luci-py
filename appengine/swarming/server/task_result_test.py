@@ -992,6 +992,7 @@ class TaskResultApiTest(TestCase):
             containment=task_request.Containment(lower_priority=True),
         ),
     )
+    run_result.bot_idle_since_ts = self.now + datetime.timedelta(seconds=10)
     run_result.started_ts = self.now + datetime.timedelta(seconds=20)
     run_result.abandoned_ts = self.now + datetime.timedelta(seconds=30)
     run_result.completed_ts = self.now + datetime.timedelta(seconds=40)
@@ -1094,6 +1095,7 @@ class TaskResultApiTest(TestCase):
                 swarming_pb2.StringListPair(key=u'id', values=[u'bot1']),
                 swarming_pb2.StringListPair(key=u'pool', values=[u'default']),
             ],
+            info=swarming_pb2.BotInfo(),
         ),
         server_versions=[u'v1a'],
         children_task_ids=[u'12310'],
@@ -1177,6 +1179,8 @@ class TaskResultApiTest(TestCase):
     expected.request.create_time.FromDatetime(self.now +
                                               datetime.timedelta(seconds=2))
     expected.create_time.FromDatetime(self.now + datetime.timedelta(seconds=2))
+    expected.bot.info.idle_since_ts.FromDatetime(self.now +
+            datetime.timedelta(seconds=10))
     expected.start_time.FromDatetime(self.now + datetime.timedelta(seconds=20))
     expected.abandon_time.FromDatetime(self.now +
                                        datetime.timedelta(seconds=30))

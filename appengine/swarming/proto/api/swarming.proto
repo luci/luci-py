@@ -283,6 +283,9 @@ message BotInfo {
 
   // This field is used in BOT_MISSING event to know the timestamp of the last activity.
   google.protobuf.Timestamp last_seen_ts = 10;
+
+  // The time when the bot became idle.
+  google.protobuf.Timestamp idle_since_ts = 11;
 }
 
 // PhysicalEntity includes information about an host or device.
