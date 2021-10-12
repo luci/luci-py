@@ -230,6 +230,7 @@ message RunTaskRequest {
 }
 
 message FetchTasksRequest {
+  // The number of TaskID will never be more than 1000.
   repeated TaskID task_ids = 1;
 }
 
@@ -239,6 +240,7 @@ message FetchTasksResponse {
 }
 
 message CancelTasksRequest {
+  // The number of TaskID will never be more than 500.
   repeated TaskID task_ids = 1;
 }
 

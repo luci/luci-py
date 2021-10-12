@@ -34,6 +34,9 @@ from server import task_result
 from server import task_scheduler
 from server import task_result
 
+_FETCH_TASKS_LIMIT = 1000
+_CANCEL_TASKS_LIMIT = 500
+
 
 class TaskBackendAPIService(prpc_helpers.SwarmingPRPCService):
   """Service implements the pRPC service in backend.proto."""
@@ -76,6 +79,11 @@ class TaskBackendAPIService(prpc_helpers.SwarmingPRPCService):
     # type: (backend_pb2.CancelTasksRequest, context.ServicerContext)
     #     -> backend_pb2.CancelTasksResponse
     task_ids = [task_id.id for task_id in request.task_ids]
+    if len(task_ids) > _CANCEL_TASKS_LIMIT:
+      raise handlers_exceptions.BadRequestException(
+          'Requesting %d tasks for cancellation when the allowed max is %d.' %
+          (len(task_ids), _CANCEL_TASKS_LIMIT))
+
     request_keys, result_keys = zip(*[
         task_pack.get_request_and_result_keys(task_id) for task_id in task_ids
     ])
@@ -86,10 +94,9 @@ class TaskBackendAPIService(prpc_helpers.SwarmingPRPCService):
         pools += bot_management.get_pools_from_dimensions_flat(tr.tags)
     realms.check_tasks_cancel_acl(pools)
 
-    # TODO(crbug/1236848): Fetch limits and/or return cursor from the request.
     filter_node = task_result.TaskResultSummary.key.IN(result_keys)
     task_scheduler.cancel_tasks(
-        100, condition=filter_node, kill_running=True)
+        len(task_ids), condition=filter_node, kill_running=True)
 
     # CancelTasksResponse should return ALL tasks in `request.task_ids`
     # not just the tasks that are actually getting cancelled.
@@ -105,6 +112,10 @@ class TaskBackendAPIService(prpc_helpers.SwarmingPRPCService):
     # type: (backend_pb2.FetchTasksRequest, context.ServicerContext)
     #     -> backend_pb2.FetchTaskResponse
     requested_task_ids = [task_id.id for task_id in request.task_ids]
+    if len(requested_task_ids) > _FETCH_TASKS_LIMIT:
+      raise handlers_exceptions.BadRequestException(
+          'Requesting %d tasks when the allowed max is %d.' %
+          (len(requested_task_ids), _FETCH_TASKS_LIMIT))
 
     request_keys = [
         task_pack.get_request_and_result_keys(task_id)[0]

@@ -316,7 +316,7 @@ class TaskBackendAPIServiceTest(test_env_handlers.AppTestBase):
             payload='{"kill_running": true, "tasks": ["%s"]}' % second_id),
     ])
 
-  def test_cancel_tasks(self):
+  def test_cancel_tasks_permission_denied(self):
     self._mock_enqueue_task_async()
     self.mock_default_pool_acl([])
 
@@ -341,6 +341,26 @@ class TaskBackendAPIServiceTest(test_env_handlers.AppTestBase):
     self.assertIn(('X-Prpc-Grpc-Code', '7'), raw_resp._headerlist)
     self.assertEqual(raw_resp.body, ('user "user@example.com" does not have '
                                      'permission "swarming.pools.cancelTask"'))
+
+  @mock.patch('handlers_prpc._CANCEL_TASKS_LIMIT', 2)
+  def test_cancel_tasks_too_many(self):
+    self.set_as_user()
+
+    request = backend_pb2.CancelTasksRequest(task_ids=[
+        backend_pb2.TaskID(id=str("1")),
+        backend_pb2.TaskID(id=str("2")),
+        backend_pb2.TaskID(id=str("3")),
+    ])
+    raw_resp = self.app.post(
+        '/prpc/swarming.backend.TaskBackend/CancelTasks',
+        _encode(request),
+        self._headers,
+        expect_errors=True)
+    self.assertEqual(raw_resp.status, '400 Bad Request')
+    self.assertIn(('X-Prpc-Grpc-Code', '3'), raw_resp._headerlist)
+    self.assertEqual(raw_resp.body, ('Requesting 3 tasks for cancellation '
+                                     'when the allowed max is 2.'))
+
 
   def test_fetch_tasks(self):
     self._mock_enqueue_task_async()
@@ -425,6 +445,27 @@ class TaskBackendAPIServiceTest(test_env_handlers.AppTestBase):
     self.assertIn(('X-Prpc-Grpc-Code', '7'), raw_resp._headerlist)
     self.assertEqual(raw_resp.body, ('user "user@example.com" does not have '
                                      'permission "swarming.pools.listTasks"'))
+
+  @mock.patch('handlers_prpc._FETCH_TASKS_LIMIT', 2)
+  def test_fetch_tasks_too_many(self):
+    self.set_as_user()
+
+    request = backend_pb2.FetchTasksRequest(task_ids=[
+        backend_pb2.TaskID(id='1'),
+        backend_pb2.TaskID(id='2'),
+        backend_pb2.TaskID(id='3'),
+    ])
+
+    self.mock_auth_db([])
+    raw_resp = self.app.post(
+        '/prpc/swarming.backend.TaskBackend/FetchTasks',
+        _encode(request),
+        self._headers,
+        expect_errors=True)
+    self.assertEqual(raw_resp.status, '400 Bad Request')
+    self.assertIn(('X-Prpc-Grpc-Code', '3'), raw_resp._headerlist)
+    self.assertEqual(raw_resp.body,
+                     'Requesting 3 tasks when the allowed max is 2.')
 
   def test_validate_configs(self):
     request = backend_pb2.ValidateConfigsRequest(
