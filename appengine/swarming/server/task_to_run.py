@@ -339,6 +339,7 @@ def _yield_pages_async(q, size):
     page_future.add_immediate_callback(fire, page_future, result_future)
     yield result_future
     result_future.get_result()
+  logging.debug('_yield_pages_async: %s completed', q)
 
 
 def _get_task_to_run_query(dimensions_hash):
@@ -372,15 +373,18 @@ def _yield_potential_tasks(bot_id):
     - All queries exhausted
   """
   bot_root_key = bot_management.get_root_key(bot_id)
-  potential_dimensions_hashes = task_queues.get_queues(bot_root_key)
+  dim_hashes = task_queues.get_queues(bot_root_key)
   # Note that the default ndb.EVENTUAL_CONSISTENCY is used so stale items may be
   # returned. It's handled specifically by consumers of this function.
   start = time.time()
-  queries = [_get_task_to_run_query(d) for d in potential_dimensions_hashes]
+  queries = [_get_task_to_run_query(d) for d in dim_hashes]
   yielders = [_yield_pages_async(q, 10) for q in queries]
   # We do care about the first page of each query so we cannot merge all the
   # results of every query insensibly.
   futures = []
+
+  def _to_active_yielders(futs):
+    return [dim_hashes[i] for i, f in enumerate(futs) if f]
 
   try:
     for y in yielders:
@@ -392,10 +396,11 @@ def _yield_potential_tasks(bot_id):
         break
       time.sleep(r)
     logging.debug(
-        '_yield_potential_tasks(%s): waited %.3fs for %d items from %d Futures',
-        bot_id, time.time() - start,
+        '_yield_potential_tasks(%s): waited %.3fs for %d items from yielders '
+        '%s', bot_id,
+        time.time() - start,
         sum(len(f.get_result()) for f in futures if f.done()),
-        len(futures))
+        _to_active_yielders(futures))
     # items is a list of TaskToRun. The entities are needed because property
     # queue_number is used to sort according to each task's priority.
     items = []
@@ -409,6 +414,10 @@ def _yield_potential_tasks(bot_id):
           items.extend(i for i in r if i.queue_number)
           # Prime the next page, in case.
           futures[i] = next(yielders[i], None)
+        else:
+          logging.warning(
+              '_yield_potential_tasks(%s): no results from yielder for %d',
+              bot_id, dim_hashes[i])
 
     # That's going to be our search space for now.
     items.sort(key=_queue_number_order_priority)
@@ -417,10 +426,13 @@ def _yield_potential_tasks(bot_id):
     # more than 1 second.
     # It is possible that all futures are done if every queue has less than 10
     # task pending.
-    while any(futures) or items:
+    def _log_yielding():
       logging.debug(
-          '_yield_potential_tasks(%s): yielding %s items and %s active futures',
-          bot_id, len(items), len(list(filter(bool, futures))))
+          '_yield_potential_tasks(%s): yielding %s items. active yielders %s',
+          bot_id, len(items), _to_active_yielders(futures))
+
+    _log_yielding()
+    while any(futures) or items:
       if items:
         yield items[0]
         items = items[1:]
@@ -434,6 +446,10 @@ def _yield_potential_tasks(bot_id):
           items.extend(i for i in f.get_result() if i.queue_number)
           futures[i] = next(yielders[i], None)
           changed = True
+          if not futures[i]:
+            logging.warning('_yield_potential_tasks(%s): yielder %d completed',
+                            bot_id, dim_hashes[i])
+          _log_yielding()
       if changed:
         items.sort(key=_queue_number_order_priority)
   except apiproxy_errors.DeadlineExceededError as e:
