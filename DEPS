@@ -15,11 +15,23 @@ deps = {
     'dep_type': 'cipd',
   },
 
-  # This is used only for autoroll as ./client/DEPS.py.
+  # luci-go clients are used for client/run_isolated.py and integration tests.
   'luci-go': {
     'packages': [
       {
         'package': 'infra/tools/luci/cas/${{platform}}',
+        'version': 'git_revision:d1c03082ecda0148d8096f1fd8bf5491eafc7323',
+      },
+      {
+        'package': 'infra/tools/luci/fakecas/${{platform}}',
+        'version': 'git_revision:d1c03082ecda0148d8096f1fd8bf5491eafc7323',
+      },
+      {
+        'package': 'infra/tools/luci/isolate/${{platform}}',
+        'version': 'git_revision:d1c03082ecda0148d8096f1fd8bf5491eafc7323',
+      },
+      {
+        'package': 'infra/tools/luci/swarming/${{platform}}',
         'version': 'git_revision:d1c03082ecda0148d8096f1fd8bf5491eafc7323',
       }
     ],
