@@ -415,7 +415,7 @@ def _yield_potential_tasks(bot_id):
           # Prime the next page, in case.
           futures[i] = next(yielders[i], None)
         else:
-          logging.warning(
+          logging.debug(
               '_yield_potential_tasks(%s): no results from yielder for %d',
               bot_id, dim_hashes[i])
 
@@ -447,8 +447,8 @@ def _yield_potential_tasks(bot_id):
           futures[i] = next(yielders[i], None)
           changed = True
           if not futures[i]:
-            logging.warning('_yield_potential_tasks(%s): yielder %d completed',
-                            bot_id, dim_hashes[i])
+            logging.debug('_yield_potential_tasks(%s): yielder %d completed',
+                          bot_id, dim_hashes[i])
           _log_yielding()
       if changed:
         items.sort(key=_queue_number_order_priority)
