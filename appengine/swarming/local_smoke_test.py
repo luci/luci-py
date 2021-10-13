@@ -275,6 +275,11 @@ class SwarmingClient(object):
       for l in log.splitlines():
         sys.stderr.write('  %s\n' % l)
 
+  def _rotate_logfile(self):
+    filename = os.path.join(self._tmpdir, u'client_%d.log' % self._index)
+    self._index += 1
+    return filename
+
   def _run_swarming(self, command, args):
     """Runs swarming.py and capture the stdout to a log file.
 
@@ -284,8 +289,6 @@ class SwarmingClient(object):
     Returns:
       The process exit code.
     """
-    name = os.path.join(self._tmpdir, u'client_%d.log' % self._index)
-    self._index += 1
     cmd = [
         sys.executable,
         'swarming.py',
@@ -294,7 +297,7 @@ class SwarmingClient(object):
         self._swarming_server,
         '--verbose',
     ] + args
-    with fs.open(name, 'wb') as f:
+    with fs.open(self._rotate_logfile(), 'wb') as f:
       f.write('\nRunning: %s\n' % ' '.join(cmd))
       f.flush()
       p = subprocess42.Popen(
@@ -311,8 +314,6 @@ class SwarmingClient(object):
     Returns:
       The process exit code.
     """
-    name = os.path.join(self._tmpdir, u'client_%d.log' % self._index)
-    self._index += 1
     cmd = [
         sys.executable,
         'isolateserver.py',
@@ -321,7 +322,7 @@ class SwarmingClient(object):
         self._isolate_server,
         '--verbose',
     ] + args
-    with fs.open(name, 'wb') as f:
+    with fs.open(self._rotate_logfile(), 'wb') as f:
       f.write('\nRunning: %s\n' % ' '.join(cmd))
       f.flush()
       p = subprocess42.Popen(
@@ -330,8 +331,7 @@ class SwarmingClient(object):
       return p.returncode
 
   def _capture_swarming(self, command, args, stdin):
-    name = os.path.join(self._tmpdir, u'client_%d.log' % self._index)
-    self._index += 1
+    name = self._rotate_logfile()
     cmd = [
         sys.executable, 'swarming.py', command, '-S', self._swarming_server,
         '--log-file', name
@@ -343,8 +343,7 @@ class SwarmingClient(object):
     return p.communicate(stdin)[0]
 
   def _capture_isolate(self, command, args, stdin):
-    name = os.path.join(self._tmpdir, u'client_%d.log' % self._index)
-    self._index += 1
+    name = self._rotate_logfile()
     cmd = [
         sys.executable, 'isolate.py', command, '-I', self._isolate_server,
         '--log-file', name
