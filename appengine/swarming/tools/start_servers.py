@@ -8,17 +8,23 @@
 from __future__ import print_function
 
 import argparse
+import logging
 import os
 import shutil
+import subprocess
 import sys
 import tempfile
 
 
 APP_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-CLIENT_DIR = os.path.join(os.path.dirname(os.path.dirname(APP_DIR)), 'client')
+LUCI_DIR = os.path.dirname(os.path.dirname(APP_DIR))
+CLIENT_DIR = os.path.join(LUCI_DIR, 'client')
 sys.path.insert(0, APP_DIR)
-
 sys.path.insert(0, os.path.join(CLIENT_DIR, 'third_party'))
+
+EXECUTABLE_SUFFIX = '.exe' if sys.platform == 'win32' else ''
+FAKECAS_BIN = os.path.join(LUCI_DIR, 'luci-go', 'fakecas' + EXECUTABLE_SUFFIX)
+
 from depot_tools import fix_encoding
 sys.path.pop(0)
 
@@ -33,6 +39,9 @@ class LocalServers(object):
   def __init__(self, listen_all, root):
     self._isolate_server = None
     self._swarming_server = None
+    self._cas = None
+    self._cas_addr = None
+    self._cas_log = None
     self._listen_all = listen_all
     self._root = root
 
@@ -45,12 +54,17 @@ class LocalServers(object):
     return self._swarming_server
 
   @property
+  def cas_server_address(self):
+    return self._cas_addr
+
+  @property
   def http_client(self):
     """Returns the raw local_app.HttpClient."""
     return self._swarming_server.client
 
   def start(self):
-    """Starts both the Swarming and Isolate servers."""
+    """Starts both the Swarming and CAS and Isolate servers."""
+    self._start_cas()
     self._swarming_server = local_app.LocalApplication(
         APP_DIR, 9050, self._listen_all, self._root, 'swarming-local')
     self._swarming_server.start()
@@ -71,6 +85,15 @@ class LocalServers(object):
     self.http_client.url_opener.addheaders.append(
         ('X-XSRF-Token', self._swarming_server.client.xsrf_token))
 
+  def _start_cas(self):
+    log_path = os.path.join(self._root, 'cas.log')
+    logging.info('Launcing cas local at :9000, log is %s', log_path)
+    self._cas_addr = ':9000'
+    self._cas_log = open(log_path, 'wb')
+    self._cas = subprocess.Popen([FAKECAS_BIN],
+                                 stdout=self._cas_log,
+                                 stderr=subprocess.STDOUT)
+
   def stop(self):
     """Stops the local Swarming and Isolate servers.
 
@@ -78,6 +101,10 @@ class LocalServers(object):
     """
     exit_code = None
     try:
+      if self._cas:
+        self._cas.terminate()
+      if self._cas_log:
+        self._cas_log.close()
       if self._isolate_server:
         exit_code = exit_code or self._isolate_server.stop()
     finally:
