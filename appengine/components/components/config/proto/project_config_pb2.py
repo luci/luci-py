@@ -19,7 +19,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   syntax='proto3',
   serialized_options=None,
   create_key=_descriptor._internal_create_key,
-  serialized_pb=b'\n,components/config/proto/project_config.proto\x12\x06\x63onfig\"*\n\nProjectCfg\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x0e\n\x06\x61\x63\x63\x65ss\x18\x02 \x03(\t\"V\n\x07RefsCfg\x12!\n\x04refs\x18\x01 \x03(\x0b\x32\x13.config.RefsCfg.Ref\x1a(\n\x03Ref\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x13\n\x0b\x63onfig_path\x18\x03 \x01(\tb\x06proto3'
+  serialized_pb=b'\n,components/config/proto/project_config.proto\x12\x06\x63onfig\"V\n\nProjectCfg\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x0e\n\x06\x61\x63\x63\x65ss\x18\x02 \x03(\t\x12*\n\x07lucicfg\x18\x03 \x01(\x0b\x32\x19.config.GeneratorMetadata\"\xad\x01\n\x11GeneratorMetadata\x12\x0f\n\x07version\x18\x01 \x01(\t\x12\x12\n\nconfig_dir\x18\x02 \x01(\t\x12\x13\n\x0b\x65ntry_point\x18\x03 \x01(\t\x12\x31\n\x04vars\x18\x04 \x03(\x0b\x32#.config.GeneratorMetadata.VarsEntry\x1a+\n\tVarsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"V\n\x07RefsCfg\x12!\n\x04refs\x18\x01 \x03(\x0b\x32\x13.config.RefsCfg.Ref\x1a(\n\x03Ref\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x13\n\x0b\x63onfig_path\x18\x03 \x01(\tb\x06proto3'
 )
 
 
@@ -47,6 +47,13 @@ _PROJECTCFG = _descriptor.Descriptor(
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='lucicfg', full_name='config.ProjectCfg.lucicfg', index=2,
+      number=3, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
   ],
   extensions=[
   ],
@@ -60,7 +67,98 @@ _PROJECTCFG = _descriptor.Descriptor(
   oneofs=[
   ],
   serialized_start=56,
-  serialized_end=98,
+  serialized_end=142,
+)
+
+
+_GENERATORMETADATA_VARSENTRY = _descriptor.Descriptor(
+  name='VarsEntry',
+  full_name='config.GeneratorMetadata.VarsEntry',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  create_key=_descriptor._internal_create_key,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='key', full_name='config.GeneratorMetadata.VarsEntry.key', index=0,
+      number=1, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"".decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='value', full_name='config.GeneratorMetadata.VarsEntry.value', index=1,
+      number=2, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"".decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=b'8\001',
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=275,
+  serialized_end=318,
+)
+
+_GENERATORMETADATA = _descriptor.Descriptor(
+  name='GeneratorMetadata',
+  full_name='config.GeneratorMetadata',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  create_key=_descriptor._internal_create_key,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='version', full_name='config.GeneratorMetadata.version', index=0,
+      number=1, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"".decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='config_dir', full_name='config.GeneratorMetadata.config_dir', index=1,
+      number=2, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"".decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='entry_point', full_name='config.GeneratorMetadata.entry_point', index=2,
+      number=3, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"".decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='vars', full_name='config.GeneratorMetadata.vars', index=3,
+      number=4, type=11, cpp_type=10, label=3,
+      has_default_value=False, default_value=[],
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+  ],
+  extensions=[
+  ],
+  nested_types=[_GENERATORMETADATA_VARSENTRY, ],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=145,
+  serialized_end=318,
 )
 
 
@@ -98,8 +196,8 @@ _REFSCFG_REF = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=146,
-  serialized_end=186,
+  serialized_start=366,
+  serialized_end=406,
 )
 
 _REFSCFG = _descriptor.Descriptor(
@@ -129,13 +227,17 @@ _REFSCFG = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=100,
-  serialized_end=186,
+  serialized_start=320,
+  serialized_end=406,
 )
 
+_PROJECTCFG.fields_by_name['lucicfg'].message_type = _GENERATORMETADATA
+_GENERATORMETADATA_VARSENTRY.containing_type = _GENERATORMETADATA
+_GENERATORMETADATA.fields_by_name['vars'].message_type = _GENERATORMETADATA_VARSENTRY
 _REFSCFG_REF.containing_type = _REFSCFG
 _REFSCFG.fields_by_name['refs'].message_type = _REFSCFG_REF
 DESCRIPTOR.message_types_by_name['ProjectCfg'] = _PROJECTCFG
+DESCRIPTOR.message_types_by_name['GeneratorMetadata'] = _GENERATORMETADATA
 DESCRIPTOR.message_types_by_name['RefsCfg'] = _REFSCFG
 _sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
@@ -145,6 +247,21 @@ ProjectCfg = _reflection.GeneratedProtocolMessageType('ProjectCfg', (_message.Me
   # @@protoc_insertion_point(class_scope:config.ProjectCfg)
   })
 _sym_db.RegisterMessage(ProjectCfg)
+
+GeneratorMetadata = _reflection.GeneratedProtocolMessageType('GeneratorMetadata', (_message.Message,), {
+
+  'VarsEntry' : _reflection.GeneratedProtocolMessageType('VarsEntry', (_message.Message,), {
+    'DESCRIPTOR' : _GENERATORMETADATA_VARSENTRY,
+    '__module__' : 'components.config.proto.project_config_pb2'
+    # @@protoc_insertion_point(class_scope:config.GeneratorMetadata.VarsEntry)
+    })
+  ,
+  'DESCRIPTOR' : _GENERATORMETADATA,
+  '__module__' : 'components.config.proto.project_config_pb2'
+  # @@protoc_insertion_point(class_scope:config.GeneratorMetadata)
+  })
+_sym_db.RegisterMessage(GeneratorMetadata)
+_sym_db.RegisterMessage(GeneratorMetadata.VarsEntry)
 
 RefsCfg = _reflection.GeneratedProtocolMessageType('RefsCfg', (_message.Message,), {
 
@@ -162,4 +279,5 @@ _sym_db.RegisterMessage(RefsCfg)
 _sym_db.RegisterMessage(RefsCfg.Ref)
 
 
+_GENERATORMETADATA_VARSENTRY._options = None
 # @@protoc_insertion_point(module_scope)
