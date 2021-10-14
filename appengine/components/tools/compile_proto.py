@@ -121,7 +121,7 @@ def compile_all_files(root_dir, proto_path):
   success = True
   for path in find_proto_files(root_dir):
     try:
-      compile_proto(path, os.path.dirname(path), proto_path)
+      compile_proto(path, os.getcwd(), proto_path)
     except subprocess.CalledProcessError:
       print('Failed to compile: %s' % path[len(root_dir) + 1:], file=sys.stderr)
       success = False
