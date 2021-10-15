@@ -18,9 +18,9 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/empty.proto";
 
-import "launcher.proto";
-import "common.proto";
-import "swarming_bb.proto";
+import "proto/api/internal/bb/launcher.proto";
+import "proto/api/internal/bb/common.proto";
+import "proto/api/internal/bb/swarming_bb.proto";
 
 
 service TaskBackend {

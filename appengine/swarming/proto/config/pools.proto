@@ -6,8 +6,8 @@ syntax = "proto3";
 
 package swarming.config;
 
-import "config.proto";
-import "realms.proto";
+import "proto/config/config.proto";
+import "proto/config/realms.proto";
 
 option go_package = "go.chromium.org/luci/swarming/proto/config;configpb";
 

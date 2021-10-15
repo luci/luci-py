@@ -2,10 +2,5 @@
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
 
-SUBDIRS := $(wildcard */.)
-
-all: $(SUBDIRS)
-$(SUBDIRS):
-	$(MAKE) -C $@
-
-.PHONY: all $(SUBDIRS)
+compile:
+	../../components/tools/compile_proto.py -v --proto_path=../ .

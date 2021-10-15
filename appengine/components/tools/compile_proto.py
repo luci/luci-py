@@ -37,24 +37,24 @@ PROTOC_INSTALL_HELP = (
 
 
 # Paths that should not be searched for *.proto.
-BLACKLISTED_PATHS = [
+IGNORED_PATHS = [
   re.compile(r'.*(/|\\)third_party(/|\\)?'),
 ]
 
 
-def is_blacklisted(path):
-  """True if |path| matches any regexp in |blacklist|."""
-  return any(b.match(path) for b in BLACKLISTED_PATHS)
+def is_ignored(path):
+  """True if |path| matches any regexp in IGNORED_PATHS."""
+  return any(b.match(path) for b in IGNORED_PATHS)
 
 
 def find_proto_files(path):
   """Recursively searches for *.proto files, yields absolute paths to them."""
   path = os.path.abspath(path)
   for dirpath, dirnames, filenames in os.walk(path, followlinks=True):
-    # Skip hidden and blacklisted directories
+    # Skip hidden and ignored directories
     skipped = [
       x for x in dirnames
-      if x[0] == '.' or is_blacklisted(os.path.join(dirpath, x))
+      if x[0] == '.' or is_ignored(os.path.join(dirpath, x))
     ]
     for dirname in skipped:
       dirnames.remove(dirname)
@@ -68,14 +68,21 @@ def get_protoc():
   """Returns protoc executable path (maybe relative to PATH)."""
   return 'protoc.exe' if sys.platform == 'win32' else 'protoc'
 
-def compile_proto(proto_file, output_path, proto_path):
+
+def compile_proto(proto_file, proto_path, output_path=None):
   """Invokes 'protoc', compiling single *.proto file into *_pb2.py file.
 
+  Args:
+    proto_file: the file to compile.
+    proto_path: the root of proto file directory tree.
+    output_path: the root of the output directory tree.
+      Defaults to `proto_path`.
+
   Returns:
-      The path of the generated _pb2.py file.
+    The path of the generated _pb2.py file.
   """
+  output_path = output_path or proto_path
   cmd = [get_protoc()]
-  proto_path = proto_path or os.path.dirname(proto_file)
   cmd.append('--proto_path=%s' % proto_path)
   cmd.append('--python_out=%s' % output_path)
   cmd.append('--prpc-python_out=%s' % output_path)
@@ -107,7 +114,7 @@ def check_proto_compiled(proto_file, proto_path):
   tmp_dir = tempfile.mkdtemp()
   try:
     try:
-      compiled = compile_proto(proto_file, tmp_dir, proto_path)
+      compiled = compile_proto(proto_file, proto_path, output_path=tmp_dir)
     except subprocess.CalledProcessError:
       return False
     return read(compiled) == read(expected_path)
@@ -121,7 +128,7 @@ def compile_all_files(root_dir, proto_path):
   success = True
   for path in find_proto_files(root_dir):
     try:
-      compile_proto(path, os.getcwd(), proto_path)
+      compile_proto(path, proto_path)
     except subprocess.CalledProcessError:
       print('Failed to compile: %s' % path[len(root_dir) + 1:], file=sys.stderr)
       success = False
@@ -171,8 +178,10 @@ def main(args, app_dir=None):
   parser.add_option('-v', '--verbose', action='store_true')
   parser.add_option(
       '--proto_path',
-      help=('Passed through to protoc. If not set, will be set to the directory'
-            ' containing the proto file being compiled.'))
+      help=(
+          'Used to calculate relative paths of proto files in the registry. '
+          'Defaults to the input directory.'
+      ))
 
   options, args = parser.parse_args(args)
   logging.basicConfig(level=logging.DEBUG if options.verbose else logging.ERROR)
@@ -198,6 +207,7 @@ def main(args, app_dir=None):
           file=sys.stderr)
     sys.stderr.write(PROTOC_INSTALL_HELP)
     return 1
+
   # Make sure protoc produces code compatible with vendored libprotobuf.
   if protoc_version > MAX_SUPPORTED_PROTOC_VERSION:
     existing = '.'.join(map(str, protoc_version))
@@ -209,13 +219,12 @@ def main(args, app_dir=None):
     sys.stderr.write(PROTOC_INSTALL_HELP)
     return 1
 
-  if options.proto_path:
-    options.proto_path = os.path.abspath(options.proto_path)
+  proto_path = os.path.abspath(options.proto_path or root_dir)
 
   if options.check:
-    success = check_all_files(root_dir, options.proto_path)
+    success = check_all_files(root_dir, proto_path)
   else:
-    success = compile_all_files(root_dir, options.proto_path)
+    success = compile_all_files(root_dir, proto_path)
 
   return int(not success)
 
