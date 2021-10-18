@@ -297,6 +297,7 @@ class SwarmingClient(object):
         self._swarming_server,
         '--verbose',
     ] + args
+    logging.debug('SwarmingClient._run_swarming: executing command. %s', cmd)
     with fs.open(self._rotate_logfile(), 'wb') as f:
       f.write('\nRunning: %s\n' % ' '.join(cmd))
       f.flush()
@@ -322,6 +323,8 @@ class SwarmingClient(object):
         self._isolate_server,
         '--verbose',
     ] + args
+    logging.debug('SwarmingClient._run_isolateserver: executing command. %s',
+                  cmd)
     with fs.open(self._rotate_logfile(), 'wb') as f:
       f.write('\nRunning: %s\n' % ' '.join(cmd))
       f.flush()
@@ -336,6 +339,8 @@ class SwarmingClient(object):
         sys.executable, 'swarming.py', command, '-S', self._swarming_server,
         '--log-file', name
     ] + args
+    logging.debug('SwarmingClient._capture_swarming: executing command. %s',
+                  cmd)
     with fs.open(name, 'wb') as f:
       f.write('\nRunning: %s\n' % ' '.join(cmd))
     p = subprocess42.Popen(
@@ -348,6 +353,7 @@ class SwarmingClient(object):
         sys.executable, 'isolate.py', command, '-I', self._isolate_server,
         '--log-file', name
     ] + args
+    logging.debug('SwarmingClient._capture_isolate: executing command. %s', cmd)
     with fs.open(name, 'wb') as f:
       f.write('\nRunning: %s\n' % ' '.join(cmd))
     p = subprocess42.Popen(
@@ -1665,7 +1671,7 @@ def process_arguments():
   if args.verbose:
     logging.basicConfig(
         format='%(asctime)s %(filename)s:%(lineno)d %(levelname)s %(message)s',
-        level=logging.INFO)
+        level=logging.DEBUG)
 
     Test.maxDiff = None
   else:
