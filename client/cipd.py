@@ -11,6 +11,7 @@ import logging
 import optparse
 import os
 import platform
+import socket
 import sys
 import tempfile
 import time
@@ -286,12 +287,18 @@ def get_platform():
   if not os_name:
     raise Error('Unknown OS: %s' % sys.platform)
 
+  # TODO(crbug.com/1186562): mac-arm64 package isn't ready yet.
+  # Use mac-amd64 package for now.
+  def _use_mac_amd64():
+    # Experiment native mac-arm64 packages on dev.
+    if socket.getfqdn() == 'mac-382-h9.golo.chromium.org':
+      return False
+    return os_name == 'mac' and arch == 'arm64'
+
   # Normalize machine architecture. Some architectures are identical or
   # compatible with others. We collapse them into one.
   arch = platform.machine().lower()
-  # TODO(crbug.com/1186562): mac-arm64 package isn't ready yet.
-  # Use mac-amd64 package for now.
-  if os_name == 'mac' and arch == 'arm64':
+  if _use_mac_amd64():
     arch = 'amd64'
   elif arch in ('arm64', 'aarch64'):
     arch = 'arm64'
