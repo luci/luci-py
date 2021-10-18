@@ -89,6 +89,11 @@ class LocalBot(object):
     assert not self._proc
     bot_zip = os.path.join(self._botdir, 'swarming_bot.zip')
     urllib.request.urlretrieve(self._swarming_server_url + '/bot_code', bot_zip)
+    tmpdir = os.path.join(self._botdir, 'tmp')
+    if not os.path.exists(tmpdir):
+      os.makedirs(tmpdir)
+    env = os.environ.copy()
+    env['TEMP'] = tmpdir
     cmd = [self.python, bot_zip, 'start_slave', '--test-mode']
     if self._redirect:
       logs = os.path.join(self._botdir, 'logs')
@@ -96,9 +101,10 @@ class LocalBot(object):
         os.mkdir(logs)
       with open(os.path.join(logs, 'bot_stdout.log'), 'wb') as f:
         self._proc = subprocess42.Popen(
-            cmd, cwd=self._botdir, stdout=f, stderr=f, detached=True)
+            cmd, cwd=self._botdir, stdout=f, stderr=f, env=env, detached=True)
     else:
-      self._proc = subprocess42.Popen(cmd, cwd=self._botdir, detached=True)
+      self._proc = subprocess42.Popen(
+          cmd, cwd=self._botdir, env=env, detached=True)
 
   def stop(self):
     """Stops the local Swarming bot. Returns the process exit code."""

@@ -108,6 +108,7 @@ PASSLIST = (
     'swarming_bot.1.zip',
     'swarming_bot.2.zip',
     'swarming_bot.zip',
+    'tmp',
     _CAS_KVS_CACHE_DB,
 )
 
@@ -1183,6 +1184,8 @@ def _run_bot_inner(arg_error, quit_bit):
       _call_hook_safe(False, botobj, 'on_before_poll')
       dims = _get_dimensions(botobj)
       states = _get_state(botobj, consecutive_sleeps)
+      logging.debug('Dimensions %s', dims)
+      logging.debug('States %s', states)
       with botobj._lock:
         botobj._update_dimensions(dims)
         botobj._update_state(states)
