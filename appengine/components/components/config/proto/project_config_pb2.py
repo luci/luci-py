@@ -19,7 +19,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   syntax='proto3',
   serialized_options=None,
   create_key=_descriptor._internal_create_key,
-  serialized_pb=b'\n,components/config/proto/project_config.proto\x12\x06\x63onfig\"V\n\nProjectCfg\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x0e\n\x06\x61\x63\x63\x65ss\x18\x02 \x03(\t\x12*\n\x07lucicfg\x18\x03 \x01(\x0b\x32\x19.config.GeneratorMetadata\"\xad\x01\n\x11GeneratorMetadata\x12\x0f\n\x07version\x18\x01 \x01(\t\x12\x12\n\nconfig_dir\x18\x02 \x01(\t\x12\x13\n\x0b\x65ntry_point\x18\x03 \x01(\t\x12\x31\n\x04vars\x18\x04 \x03(\x0b\x32#.config.GeneratorMetadata.VarsEntry\x1a+\n\tVarsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"V\n\x07RefsCfg\x12!\n\x04refs\x18\x01 \x03(\x0b\x32\x13.config.RefsCfg.Ref\x1a(\n\x03Ref\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x13\n\x0b\x63onfig_path\x18\x03 \x01(\tb\x06proto3'
+  serialized_pb=b'\n,components/config/proto/project_config.proto\x12\x06\x63onfig\"V\n\nProjectCfg\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x0e\n\x06\x61\x63\x63\x65ss\x18\x02 \x03(\t\x12*\n\x07lucicfg\x18\x03 \x01(\x0b\x32\x19.config.GeneratorMetadata\"\xc2\x01\n\x11GeneratorMetadata\x12\x0f\n\x07version\x18\x01 \x01(\t\x12\x13\n\x0bpackage_dir\x18\x05 \x01(\t\x12\x12\n\nconfig_dir\x18\x02 \x01(\t\x12\x13\n\x0b\x65ntry_point\x18\x03 \x01(\t\x12\x31\n\x04vars\x18\x04 \x03(\x0b\x32#.config.GeneratorMetadata.VarsEntry\x1a+\n\tVarsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"V\n\x07RefsCfg\x12!\n\x04refs\x18\x01 \x03(\x0b\x32\x13.config.RefsCfg.Ref\x1a(\n\x03Ref\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x13\n\x0b\x63onfig_path\x18\x03 \x01(\tb\x06proto3'
 )
 
 
@@ -105,8 +105,8 @@ _GENERATORMETADATA_VARSENTRY = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=275,
-  serialized_end=318,
+  serialized_start=296,
+  serialized_end=339,
 )
 
 _GENERATORMETADATA = _descriptor.Descriptor(
@@ -125,21 +125,28 @@ _GENERATORMETADATA = _descriptor.Descriptor(
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='config_dir', full_name='config.GeneratorMetadata.config_dir', index=1,
+      name='package_dir', full_name='config.GeneratorMetadata.package_dir', index=1,
+      number=5, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"".decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='config_dir', full_name='config.GeneratorMetadata.config_dir', index=2,
       number=2, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=b"".decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='entry_point', full_name='config.GeneratorMetadata.entry_point', index=2,
+      name='entry_point', full_name='config.GeneratorMetadata.entry_point', index=3,
       number=3, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=b"".decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='vars', full_name='config.GeneratorMetadata.vars', index=3,
+      name='vars', full_name='config.GeneratorMetadata.vars', index=4,
       number=4, type=11, cpp_type=10, label=3,
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
@@ -158,7 +165,7 @@ _GENERATORMETADATA = _descriptor.Descriptor(
   oneofs=[
   ],
   serialized_start=145,
-  serialized_end=318,
+  serialized_end=339,
 )
 
 
@@ -196,8 +203,8 @@ _REFSCFG_REF = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=366,
-  serialized_end=406,
+  serialized_start=387,
+  serialized_end=427,
 )
 
 _REFSCFG = _descriptor.Descriptor(
@@ -227,8 +234,8 @@ _REFSCFG = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=320,
-  serialized_end=406,
+  serialized_start=341,
+  serialized_end=427,
 )
 
 _PROJECTCFG.fields_by_name['lucicfg'].message_type = _GENERATORMETADATA
