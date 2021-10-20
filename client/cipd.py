@@ -291,7 +291,11 @@ def get_platform():
   # Use mac-amd64 package for now.
   def _use_mac_amd64():
     # Experiment native mac-arm64 packages on dev.
-    if socket.getfqdn() == 'mac-382-h9.golo.chromium.org':
+    experimental_hosts = [
+        'mac-381-h9.golo.chromium.org',
+        'mac-382-h9.golo.chromium.org',
+    ]
+    if socket.getfqdn() in experimental_hosts:
       return False
     return os_name == 'mac' and arch == 'arm64'
 
