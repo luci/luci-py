@@ -1721,7 +1721,7 @@ def main():
                              args.bot_python)
     Test.bot = bot
     bot.start()
-    namespace = 'sha256-deflate'
+    namespace = 'default'
     client = SwarmingClient(servers.swarming_server.url,
                             servers.isolate_server.url, namespace, Test.tmpdir)
     # Test cases only interact with the client; except for test_update_continue
