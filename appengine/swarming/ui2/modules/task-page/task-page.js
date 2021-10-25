@@ -655,8 +655,10 @@ const logsSection = (ele, request, result) => {
   if (result && result.bot_dimensions) {
     for (const dim of result.bot_dimensions) {
       if (dim.key == 'gcp') botProjectID = dim.value[0];
-      if (dim.key == 'zone') botZone = dim.value.reduce(
-        (a, b) => a.length > b.length ? a : b );
+      if (dim.key == 'zone') {
+        botZone = dim.value.reduce(
+            (a, b) => a.length > b.length ? a : b );
+      }
     }
   }
   const showBotLogsLink = !!botProjectID;

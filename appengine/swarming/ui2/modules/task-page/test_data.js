@@ -26,9 +26,9 @@ const casRef = {
 };
 
 const resultdbInfo = {
-    'hostname': 'resultdb',
-    'invocation': 'invocations/task-swarm-4fb51b7e86ed8611',
-}
+  'hostname': 'resultdb',
+  'invocation': 'invocations/task-swarm-4fb51b7e86ed8611',
+};
 
 export const taskResults = [
   {
@@ -146,7 +146,7 @@ export const taskResults = [
     'task_id': 'testid000',
     'run_id': '42e18650b1b4e411',
     'internal_failure': false,
-    'resultdb_info':  resultdbInfo,
+    'resultdb_info': resultdbInfo,
     'tags': [
       'build_is_experimental:false',
       'buildername:Linux ChromiumOS MSan Tests',
@@ -265,7 +265,7 @@ export const taskResults = [
     'server_versions': [
       '3779-c5c026e',
     ],
-    'resultdb_info':  resultdbInfo,
+    'resultdb_info': resultdbInfo,
     'performance_stats': {
       'bot_overhead': 12.625049114227295,
       'cache_trim': {
@@ -516,7 +516,7 @@ export const taskResults = [
     },
     'run_id': '42e0ec5f54b04411',
     'cas_output_root': casRef,
-    'resultdb_info':  resultdbInfo,
+    'resultdb_info': resultdbInfo,
     'server_versions': [
       '4064-3687a02',
     ],

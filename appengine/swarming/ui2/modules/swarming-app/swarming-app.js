@@ -57,7 +57,7 @@ spinner_template.innerHTML =`
 </div>
 `;
 
-const pantheon_url = `https://console.cloud.google.com/appengine/versions?project=`
+const pantheon_url = `https://console.cloud.google.com/appengine/versions?project=`;
 const version_filter_prefix = `&serviceId=default&pageState=(%22versionsTable` +
     `%22:(%22f%22:%22%255B%257B_22k_22_3A_22Version` +
     `_22_2C_22t_22_3A10_2C_22v_22_3A_22_5C_22`;

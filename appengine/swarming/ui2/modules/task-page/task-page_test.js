@@ -1098,9 +1098,9 @@ describe('task-page', function() {
       jasmine.clock().uninstall(); // re-enable setTimeout
       serveTask(0, 'running task on try number 3', true);
       const FIRST_LINE = 'first log line💥\nthis is cut';
-      const FIRST_LINE_LEN_BYTES = 30 // 💥 uses 4 bytes
+      const FIRST_LINE_LEN_BYTES = 30; // 💥 uses 4 bytes
       const SECOND_LINE = 'off on the second log line\r\n';
-      const SECOND_LINE_LEN_BYTES = 28
+      const SECOND_LINE_LEN_BYTES = 28;
       const THIRD_LINE = 'third log line\n';
       fetchMock.get(`/_ah/api/swarming/v1/task/${TEST_TASK_ID}/stdout?offset=0&length=102400`, {
         state: 'RUNNING',
