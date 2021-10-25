@@ -46,7 +46,21 @@ import SwarmingAppBoilerplate from '../SwarmingAppBoilerplate';
  *    Instead, dummy data will be used. Ideal for local testing.
  */
 
-const serverLogFilter = `resource.type="gae_app"\n` +
+const cloudLoggingURL = (project, query, start, end) => {
+  let url = `https://pantheon.corp.google.com/logs/query`;
+  url += `;query=${encodeURIComponent(query)}`;
+  if (start) {
+    url += `;cursorTimestamp=${start.toISOString()}`;
+    if (end) {
+      const range = [start, end].map((e) => e.toISOString()).join('/');
+      url += `;timeRange=${encodeURIComponent(range)}`;
+    }
+  }
+  url += `?project=${project}`;
+  return url;
+};
+
+const serverLogBaseQuery = `resource.type="gae_app"\n` +
   // limit logs that we care
   [
     `protoPayload.resource:"/internal/"`, // cron, task queue
@@ -54,59 +68,41 @@ const serverLogFilter = `resource.type="gae_app"\n` +
     `protoPayload.method!="GET"`, // POST, PUT, DELETE etc
   ].join(' OR ') + '\n';
 
-const serverLogsBaseURL = (ele, request, result) => {
-  let url = `https://console.cloud.google.com/logs/viewer`;
-  url += `?project=${ele._project_id}`;
-  url += `&resource=gae_app`;
-  if (request.created_ts) {
-    // task creation request happens before record creation in DB
-    const timeStart = new Date(request.created_ts.getTime() - 60*1000);
-    const tsEnd = result.completed_ts || result.abandoned_ts;
-    const timeEnd = tsEnd ? new Date(tsEnd.getTime() + 60*1000) : new Date();
-    url += `&interval=CUSTOM`;
-    url += `&dateRangeStart=${timeStart.toISOString()}`;
-    url += `&dateRangeEnd=${timeEnd.toISOString()}`;
-  }
-  return url;
+const serverLogTimeRange = (request, result) => {
+  if (!request.created_ts) return [null, null];
+  const timeStart = new Date(request.created_ts.getTime() - 60*1000);
+  const tsEnd = result.completed_ts || result.abandoned_ts;
+  const timeEnd = tsEnd ? new Date(tsEnd.getTime() + 60*1000) : new Date();
+  return [timeStart, timeEnd];
 };
 
-const serverTaskLogsURL = (ele, request, result) => {
-  let url = serverLogsBaseURL(ele, request, result);
-  let filter = serverLogFilter;
-
+const serverTaskLogsURL = (project, taskId, request, result) => {
   // cut the last character that represents try number
-  filter += `${ele._taskId.slice(0, -1)}`;
-  url += `&advancedFilter=${filter}`;
-  return encodeURI(url);
+  const query = serverLogBaseQuery + taskId.slice(0, -1);
+  const [timeStart, timeEnd] = serverLogTimeRange(request, result);
+  return cloudLoggingURL(project, query, timeStart, timeEnd);
 };
 
-const serverBotLogsURL = (ele, request, result) => {
-  let url = serverLogsBaseURL(ele, request, result);
-  let filter = serverLogFilter;
-
-  filter += `${result.bot_id}`;
-  url += `&advancedFilter=${filter}`;
-  return encodeURI(url);
+const serverBotLogsURL = (project, request, result) => {
+  const query = serverLogBaseQuery + result.bot_id;
+  const [timeStart, timeEnd] = serverLogTimeRange(request, result);
+  return cloudLoggingURL(project, query, timeStart, timeEnd);
 };
 
-const botLogsURL = (ele, request, result, botProjectID, botZone) => {
-  let url = `https://console.cloud.google.com/logs/viewer`;
-  url += `?project=${botProjectID}`;
-  if (result.started_ts) {
-    const timeStart = new Date(result.started_ts.getTime() - 60*1000);
-    const tsEnd = result.completed_ts || result.abandoned_ts;
-    const timeEnd = tsEnd ? new Date(tsEnd.getTime() + 60*1000) : new Date();
-    url += `&interval=CUSTOM`;
-    url += `&dateRangeStart=${timeStart.toISOString()}`;
-    url += `&dateRangeEnd=${timeEnd.toISOString()}`;
-  }
+const botLogsURL = (botProjectID, botZone, request, result) => {
   // limit logs that we care
   // TODO(jwata): Non GCE bots will need a different label.
-  let filter =
+  let query =
       `labels."compute.googleapis.com/resource_name"="${result.bot_id}" OR `;
-  filter += `protoPayload.resourceName="projects/google.com:chromecompute/zones/${botZone}/instances/${result.bot_id}"`;
-  url += `&advancedFilter=${filter}`;
-  return encodeURI(url);
+  query += `protoPayload.resourceName="projects/google.com:chromecompute/zones/${botZone}/instances/${result.bot_id}"`;
+  let timeStart;
+  let timeEnd;
+  if (result.started_ts) {
+    timeStart = new Date(result.started_ts.getTime() - 60*1000);
+    const tsEnd = result.completed_ts || result.abandoned_ts;
+    timeEnd = tsEnd ? new Date(tsEnd.getTime() + 60*1000) : new Date();
+  }
+  return cloudLoggingURL(botProjectID, query, timeStart, timeEnd);
 };
 
 const idAndButtons = (ele) => {
@@ -670,7 +666,7 @@ const logsSection = (ele, request, result) => {
       <tr>
         <td>Task related server Logs</td>
         <td>
-          <a href=${serverTaskLogsURL(ele, request, result)} target="_blank">
+          <a href=${serverTaskLogsURL(ele._project_id, ele._taskId, request, result)} target="_blank">
             View on Cloud Console
           </a>
         </td>
@@ -678,7 +674,7 @@ const logsSection = (ele, request, result) => {
       <tr>
         <td>Bot related server Logs</td>
         <td>
-          <a href=${serverBotLogsURL(ele, request, result)} target="_blank"
+          <a href=${serverBotLogsURL(ele._project_id, request, result)} target="_blank"
              ?hidden=${!result.bot_id}>
             View on Cloud Console
           </a>
@@ -688,7 +684,7 @@ const logsSection = (ele, request, result) => {
       <tr>
         <td>Bot Logs</td>
         <td>
-          <a href=${botLogsURL(ele, request, result, botProjectID, botZone)} target="_blank" ?hidden=${!showBotLogsLink}>
+          <a href=${botLogsURL(botProjectID, botZone, request, result)} target="_blank" ?hidden=${!showBotLogsLink}>
             View on Cloud Console
           </a>
           <p ?hidden=${showBotLogsLink}>--</p>
