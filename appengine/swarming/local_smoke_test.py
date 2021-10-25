@@ -192,7 +192,11 @@ class SwarmingClient(object):
     logging.debug('task_id = %s', task_id)
     return task_id
 
-  def task_collect(self, task_id, timeout=TIMEOUT_SECS, wait=True):
+  def task_collect(self,
+                   task_id,
+                   timeout=TIMEOUT_SECS,
+                   wait=True,
+                   include_output=True):
     """Collects the results for a task.
 
     Returns:
@@ -205,7 +209,7 @@ class SwarmingClient(object):
         '-task-summary-json',
         tmp,
         '-task-output-stdout',
-        'json',
+        'json' if include_output else 'none',
         '-output-dir',
         self._tmpdir,
         '-perf',
@@ -243,10 +247,9 @@ class SwarmingClient(object):
                                   list(args) + [str(task_id)], '') == ''
 
   def task_result(self, task_id):
-    """Queries a task result without waiting for it to complete."""
-    # collect -timeout 0 now works the same.
-    return json.loads(
-        self._capture_swarming('query', ['task/%s/result' % task_id], ''))
+    """Gets a task result without waiting for it to complete."""
+    result, _ = self.task_collect(task_id, wait=False, include_output=False)
+    return result['shards'][0]
 
   def task_stdout(self, task_id):
     """Returns current task stdout without waiting for it to complete."""
@@ -1259,12 +1262,11 @@ class Test(unittest.TestCase):
     ]
     with self._make_wait_task('test_cancel_pending'):
       task_id = self.client.task_trigger_raw(args)
-      actual, _ = self.client.task_collect(task_id, wait=False)
-      self.assertEqual(u'PENDING', actual[u'shards'][0][u'state'])
+      result = self.client.task_result(task_id)
+      self.assertEqual(u'PENDING', result[u'state'])
       self.assertTrue(self.client.task_cancel(task_id, []))
-    actual, _ = self.client.task_collect(task_id, wait=False)
-    self.assertEqual(u'CANCELED', actual[u'shards'][0][u'state'],
-                     actual[u'shards'][0])
+    result = self.client.task_result(task_id)
+    self.assertEqual(u'CANCELED', result[u'state'], result)
 
   def test_kill_running(self):
     # Kill a running task. Make sure the target process handles the signal
