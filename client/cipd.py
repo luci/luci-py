@@ -292,8 +292,11 @@ def get_platform():
   def _use_mac_amd64():
     # Experiment native mac-arm64 packages on dev.
     experimental_hosts = [
+        # For dev mac-arm-rel-swarming builder
         'mac-381-h9.golo.chromium.org',
         'mac-382-h9.golo.chromium.org',
+        # prod luci.chromium.ci
+        'mac-6-h9.golo.chromium.org',
     ]
     if socket.getfqdn() in experimental_hosts:
       return False
