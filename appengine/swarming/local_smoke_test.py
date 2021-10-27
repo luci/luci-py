@@ -257,16 +257,11 @@ class SwarmingClient(object):
     return result['shards'][0]['output']
 
   def terminate(self, bot_id):
-    task_id = self._capture_swarming('terminate', [bot_id], '').strip()
-    logging.info('swarming terminate returned %r', task_id)
-    if not task_id:
-      return 1
     args = [
-        '-timeout',
-        '%ds' % TIMEOUT_SECS,
-        task_id,
+        '-wait',
+        bot_id,
     ]
-    return self._run_swarming('collect', args)
+    return self._run_swarming('termiante', args)
 
   def query_bot(self):
     """Returns the bot's properties."""
