@@ -296,7 +296,11 @@ def get_platform():
         'mac-381-h9.golo.chromium.org',
         'mac-382-h9.golo.chromium.org',
         # prod luci.chromium.ci
+        'mac-5-h9.golo.chromium.org',
         'mac-6-h9.golo.chromium.org',
+        'mac-7-h9.golo.chromium.org',
+        # prod chromium.tests
+        'mac-23-h9.golo.chromium.org',
     ]
     if socket.getfqdn() in experimental_hosts:
       return False
