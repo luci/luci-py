@@ -734,7 +734,10 @@ class RunIsolatedTest(RunIsolatedTestBase):
       run_isolated.main(cmd)
 
   def test_main_naked_with_caches(self):
-    # An empty named cache better to be kept!
+    # An empty named cache is not kept!
+    # Interestingly, because we would need to put something in the named cache
+    # for it to be kept, we need the tool to write to it. This is tested in the
+    # smoke test.
     trimmed = []
     def trim_caches(caches, root, min_free_space, max_age_secs):
       trimmed.append(True)
@@ -773,7 +776,7 @@ class RunIsolatedTest(RunIsolatedTestBase):
 
     for cache_name in ('cache_foo', 'cache_bar'):
       named_path = os.path.join(nc, 'named', cache_name)
-      self.assertTrue(fs.exists(named_path))
+      self.assertFalse(fs.exists(named_path))
     self.assertTrue(trimmed)
 
   def test_main_clean(self):

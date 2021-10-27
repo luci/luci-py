@@ -958,12 +958,14 @@ class NamedCache(Cache):
           logging.error('- overwriting existing cache!')
           self._remove(name)
 
-        # Calculate the size of the named cache to keep.
+        # Calculate the size of the named cache to keep. It's important because
+        # if size is zero (it's empty), we do not want to add it back to the
+        # named caches cache.
         size = file_path.get_recursive_size(src)
-        logging.info('- Size is %s', size)
-        if size is None:
-          # Do not save a named cache that was deleted.
-          return
+        logging.info('- Size is %d', size)
+        if not size:
+          # Do not save empty named cache.
+          return size
 
         # Move the dir and create an entry for the named cache.
         rel_cache = self._allocate_dir()
