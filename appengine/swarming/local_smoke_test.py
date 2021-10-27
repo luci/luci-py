@@ -253,8 +253,8 @@ class SwarmingClient(object):
 
   def task_stdout(self, task_id):
     """Returns current task stdout without waiting for it to complete."""
-    raw = self._capture_swarming('query', ['task/%s/stdout' % task_id], '')
-    return json.loads(raw).get('output')
+    result, _ = self.task_collect(task_id, wait=False)
+    return result['shards'][0]['output']
 
   def terminate(self, bot_id):
     task_id = self._capture_swarming('terminate', [bot_id], '').strip()
