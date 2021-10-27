@@ -265,12 +265,18 @@ class SwarmingClient(object):
 
   def query_bot(self):
     """Returns the bot's properties."""
-    raw = self._capture_swarming('query', ['bots/list', '--limit', '10'], '')
-    data = json.loads(raw)
-    if not data.get('items'):
-      return None
-    assert len(data['items']) == 1
-    return data['items'][0]
+    tmp = os.path.join(self._tmpdir, 'bots.json')
+    args = [
+        '-json',
+        tmp,
+    ]
+    ret = self._run_swarming('bots', args)
+    assert ret == 0, 'Failed to fetch bots. exit_code=%d' % ret
+    with fs.open(tmp, 'rb') as f:
+      bots = json.load(f)
+    if not bots:
+      return
+    return bots[0]
 
   def dump_log(self):
     print('-' * 60, file=sys.stderr)
