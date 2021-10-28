@@ -11,7 +11,6 @@ import logging
 import optparse
 import os
 import platform
-import socket
 import sys
 import tempfile
 import time
@@ -287,31 +286,10 @@ def get_platform():
   if not os_name:
     raise Error('Unknown OS: %s' % sys.platform)
 
-  # TODO(crbug.com/1186562): mac-arm64 package isn't ready yet.
-  # Use mac-amd64 package for now.
-  def _use_mac_amd64():
-    # Experiment native mac-arm64 packages on dev.
-    experimental_hosts = [
-        # For dev mac-arm-rel-swarming builder
-        'mac-381-h9.golo.chromium.org',
-        'mac-382-h9.golo.chromium.org',
-        # prod luci.chromium.ci
-        'mac-5-h9.golo.chromium.org',
-        'mac-6-h9.golo.chromium.org',
-        'mac-7-h9.golo.chromium.org',
-        # prod chromium.tests
-        'mac-23-h9.golo.chromium.org',
-    ]
-    if socket.getfqdn() in experimental_hosts:
-      return False
-    return os_name == 'mac' and arch == 'arm64'
-
   # Normalize machine architecture. Some architectures are identical or
   # compatible with others. We collapse them into one.
   arch = platform.machine().lower()
-  if _use_mac_amd64():
-    arch = 'amd64'
-  elif arch in ('arm64', 'aarch64'):
+  if arch in ('arm64', 'aarch64'):
     arch = 'arm64'
   elif arch.startswith('armv') and arch.endswith('l'):
     # 32-bit ARM: Standardize on ARM v6 baseline.
