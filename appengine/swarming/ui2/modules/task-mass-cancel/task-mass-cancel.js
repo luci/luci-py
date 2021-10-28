@@ -102,6 +102,11 @@ window.customElements.define('task-mass-cancel', class extends HTMLElement {
     }
     // sort for determinism
     this.tags.sort();
+
+    // Change unit from milliseconds to seconds.
+    this.start = Math.round(this.start/1000);
+    this.end = Math.round(this.end/1000);
+
     this.render();
   }
 

@@ -95,7 +95,7 @@ describe('task-mass-cancel', function() {
         expect(calls).toHaveSize(1, '1 to delete');
         const req = calls[0];
         expect(req[0]).toBe('/_ah/api/swarming/v1/tasks/cancel');
-        expect(req[1].body).toBe('{"limit":100,"tags":["os:Android","pool:Chrome"],"start":"10000","end":"20000"}');
+        expect(req[1].body).toBe('{"limit":100,"tags":["os:Android","pool:Chrome"],"start":10,"end":20}');
         done();
       });
 
