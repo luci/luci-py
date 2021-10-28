@@ -248,10 +248,15 @@ class SwarmingClient(object):
           file_outputs[name] = f.read()
     return summary, file_outputs
 
-  def task_cancel(self, task_id, args):
+  def task_cancel(self, task_id, kill_running=False):
     """Cancels a task."""
-    return self._capture_swarming('cancel',
-                                  list(args) + [str(task_id)], '') == ''
+    args = []
+    if kill_running:
+      args.append('-kill-running')
+    args.append(task_id)
+    ret = self._run_swarming('cancel', args)
+    assert ret == 0, 'Failed to cancel task. exit_code=%d, args=%s' % (ret,
+                                                                       args)
 
   def task_result(self, task_id):
     """Gets a task result without waiting for it to complete."""
@@ -355,20 +360,6 @@ class SwarmingClient(object):
           cmd, stdout=f, stderr=subprocess42.STDOUT, cwd=CLIENT_DIR)
       p.communicate()
       return p.returncode
-
-  def _capture_swarming(self, command, args, stdin):
-    name = self._rotate_logfile()
-    cmd = [
-        sys.executable, 'swarming.py', command, '-S', self._swarming_server,
-        '--log-file', name
-    ] + args
-    logging.debug('SwarmingClient._capture_swarming: executing command. %s',
-                  cmd)
-    with fs.open(name, 'wb') as f:
-      f.write('\nRunning: %s\n' % ' '.join(cmd))
-    p = subprocess42.Popen(
-        cmd, stdin=subprocess42.PIPE, stdout=subprocess42.PIPE, cwd=CLIENT_DIR)
-    return p.communicate(stdin)[0]
 
   def _capture_isolate(self, command, args, stdin):
     name = self._rotate_logfile()
@@ -1272,7 +1263,7 @@ class Test(unittest.TestCase):
       task_id = self.client.task_trigger(args)
       result = self.client.task_result(task_id)
       self.assertEqual(u'PENDING', result[u'state'])
-      self.assertTrue(self.client.task_cancel(task_id, []))
+      self.client.task_cancel(task_id)
     result = self.client.task_result(task_id)
     self.assertEqual(u'CANCELED', result[u'state'], result)
 
@@ -1319,7 +1310,7 @@ class Test(unittest.TestCase):
     self.assertEqual(out, 'hi\n')
 
     # Cancel it.
-    self.assertTrue(self.client.task_cancel(task_id, ['--kill-running']))
+    self.client.task_cancel(task_id, kill_running=True)
 
     result = self._wait_for_state(task_id, u'RUNNING', u'KILLED')
     # Make sure the exit code is what the script returned, which means the
