@@ -67,8 +67,9 @@ def main():
 
   subprocess.run([
       os.path.join(base, "../../../components/tools/compile_proto.py"),
-      "--proto_path", base,
-      "go.chromium.org/luci/buildbucket/proto/"])
+      "--proto_path", base, "go.chromium.org/luci/buildbucket/proto/"
+  ],
+                 check=True)
 
   print('Done.')
 
