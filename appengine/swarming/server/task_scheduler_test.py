@@ -2032,7 +2032,12 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     ]
     self._quick_schedule(1, task_slices=task_slices)
 
-    cursor, results = task_scheduler.cancel_tasks(3, kill_running=True)
+    query = task_result.get_result_summaries_query(start=None,
+                                                   end=None,
+                                                   sort='created_ts',
+                                                   state='pending_running',
+                                                   tags=[])
+    cursor, results = task_scheduler.cancel_tasks(3, query)
     self.assertIsNone(cursor)
     self.assertEqual(len(results), 2)
     self.execute_tasks()
@@ -2056,8 +2061,12 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
             wait_for_capacity=True),
     ]
     pending_result = self._quick_schedule(1, task_slices=task_slices)
-
-    cursor, results = task_scheduler.cancel_tasks(3, kill_running=False)
+    query = task_result.get_result_summaries_query(start=None,
+                                                   end=None,
+                                                   sort='created_ts',
+                                                   state='pending',
+                                                   tags=[])
+    cursor, results = task_scheduler.cancel_tasks(3, query)
     self.assertIsNone(cursor)
     self.assertEqual(len(results), 1)
     self.execute_tasks()
@@ -2085,13 +2094,12 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self._quick_schedule(1, task_slices=task_slices, manual_tags=['tag:4'])
     pending_results = [pending_result_1, pending_result_2]
 
-    tags = [u'tag:1', u'tag:2']
-    conds = task_result.TaskResultSummary.tags == tags[0]
-    for tag in tags[1:]:
-      conds = ndb.AND(conds, task_result.TaskResultSummary.tags == tag)
-
-    cursor, results = task_scheduler.cancel_tasks(
-        5, condition=conds, kill_running=False)
+    query = task_result.get_result_summaries_query(start=None,
+                                                   end=None,
+                                                   sort='created_ts',
+                                                   state='pending',
+                                                   tags=[u'tag:1', u'tag:2'])
+    cursor, results = task_scheduler.cancel_tasks(5, query)
     self.assertIsNone(cursor)
     self.assertEqual(len(results), 2)
     self.assertItemsEqual([res.task_id for res in results],

@@ -1689,8 +1689,8 @@ def cancel_task(request, result_key, kill_running, bot_id):
   return datastore_utils.transaction(run)
 
 
-def cancel_tasks(limit, condition=None, cursor=None, kill_running=False):
-  # type: (int, Optional[ndb.Node], Optional[str], Optional[bool])
+def cancel_tasks(limit, query, cursor=None):
+  # type: (int, ndb.Query, Optional[str], Optional[bool])
   #     -> Tuple[str, Sequence[task_result.TaskResultSummary]]
   """
   Raises:
@@ -1698,21 +1698,12 @@ def cancel_tasks(limit, condition=None, cursor=None, kill_running=False):
     handlers_exceptions.InternalException if cancel request could not be
         enqueued.
   """
-  cond = task_result.TaskResultSummary.state == task_result.State.PENDING
-  if kill_running:
-    cond = ndb.OR(
-        cond, task_result.TaskResultSummary.state == task_result.State.RUNNING)
-  q = task_result.TaskResultSummary.query(cond).order(
-      task_result.TaskResultSummary.key)
-  if condition is not None:
-    q = q.filter(condition)
-
-  results, cursor = datastore_utils.fetch_page(q, limit, cursor)
+  results, cursor = datastore_utils.fetch_page(query, limit, cursor)
 
   if results:
     payload = json.dumps({
         'tasks': [r.task_id for r in results],
-        'kill_running': kill_running,
+        'kill_running': True,
     })
     ok = utils.enqueue_task(
         '/internal/taskqueue/important/tasks/cancel',

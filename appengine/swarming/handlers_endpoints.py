@@ -650,18 +650,16 @@ class SwarmingTasksService(remote.Service):
 
     now = utils.utcnow()
 
-    filter_nodes = None
-    if request.tags:
-      filter_nodes = task_result.TaskResultSummary.tags == request.tags[0]
-      for tag in request.tags[1:]:
-        filter_nodes = ndb.AND(filter_nodes,
-                               task_result.TaskResultSummary.tags == tag)
+    start = message_conversion.epoch_to_datetime(request.start)
+    end = message_conversion.epoch_to_datetime(request.end)
+    query = task_result.get_result_summaries_query(
+        start, end, 'created_ts',
+        'pending_running' if request.kill_running else 'pending', request.tags)
+
     try:
-      cursor, results = task_scheduler.cancel_tasks(
-          request.limit,
-          condition=filter_nodes,
-          cursor=request.cursor,
-          kill_running=bool(request.kill_running))
+      cursor, results = task_scheduler.cancel_tasks(request.limit,
+                                                    query=query,
+                                                    cursor=request.cursor)
     except ValueError as e:
       raise endpoints.BadRequestException(
           'Inappropriate filter for tasks/list: %s' % e)

@@ -1414,7 +1414,10 @@ def _datetime_to_key(date):
   return task_request.convert_to_request_key(date)
 
 
-def _filter_query(cls, q, start, end, sort, state):
+### Public API.
+
+
+def filter_query(cls, q, start, end, sort, state):
   """Filters a query by creation time, state and order."""
   # Inequalities are <= and >= because keys are in reverse chronological
   # order.
@@ -1481,9 +1484,6 @@ def _filter_query(cls, q, start, end, sort, state):
     return q.filter(cls.state == State.NO_RESOURCE)
 
   raise ValueError('Invalid state')
-
-
-### Public API.
 
 
 def state_to_string(state_obj):
@@ -1572,7 +1572,7 @@ def get_run_results_query(start, end, sort, state, bot_id):
   q = TaskRunResult.query(
       TaskRunResult.bot_id == bot_id,
       default_options=ndb.QueryOptions(use_cache=False))
-  return _filter_query(TaskRunResult, q, start, end, sort, state)
+  return filter_query(TaskRunResult, q, start, end, sort, state)
 
 
 def get_result_summaries_query(start, end, sort, state, tags):
@@ -1606,7 +1606,7 @@ def get_result_summaries_query(start, end, sort, state, tags):
       separated_tags = ['%s:%s' % (parts[0], v) for v in values]
       q = q.filter(TaskResultSummary.tags.IN(separated_tags))
 
-  return _filter_query(TaskResultSummary, q, start, end, sort, state)
+  return filter_query(TaskResultSummary, q, start, end, sort, state)
 
 
 def task_bq_run(start, end):

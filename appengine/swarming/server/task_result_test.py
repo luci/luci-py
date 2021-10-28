@@ -261,6 +261,19 @@ class TaskResultApiTest(TestCase):
     self.assertEqual(set(items), set(task_result.State.STATES))
     self.assertEqual(len(items), len(set(items)))
 
+  def test_filter_query(self):
+    # This only tests that the function doesn't raise exception for typical
+    # args.
+    now = self.now
+    self.assertIsNotNone(
+        task_result.filter_query(task_result.TaskResultSummary,
+                                 task_result.TaskResultSummary.query(), now,
+                                 now, 'created_ts', 'all'))
+    self.assertIsNotNone(
+        task_result.filter_query(task_result.TaskResultSummary,
+                                 task_result.TaskResultSummary.query(), None,
+                                 None, 'started_ts', 'pending_running'))
+
   def test_state_to_string(self):
     # Same code as State.to_string() except that it works for
     # TaskResultSummary too.
