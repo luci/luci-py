@@ -1048,7 +1048,11 @@ describe('task-list', function() {
               // the options that were passed in
               const cancelPost = calls[0];
               expect(cancelPost[0]).toEqual('/_ah/api/swarming/v1/tasks/cancel');
-              expect(cancelPost[1].body).toEqual('{"limit":100,"tags":["pool:Chrome"]}');
+
+              const req = JSON.parse(cancelPost[1].body);
+              delete req['start'];
+              delete req['end'];
+              expect(req).toEqual({'limit': 100, 'tags': ['pool:Chrome']});
 
               done();
             });

@@ -93,6 +93,8 @@ window.customElements.define('task-mass-cancel', class extends HTMLElement {
 
   connectedCallback() {
     initPropertyFromAttrOrProperty(this, 'auth_header');
+    initPropertyFromAttrOrProperty(this, 'end');
+    initPropertyFromAttrOrProperty(this, 'start');
     initPropertyFromAttrOrProperty(this, 'tags');
     // Used for when default was loaded via attribute.
     if (typeof this.tags === 'string') {
@@ -111,6 +113,8 @@ window.customElements.define('task-mass-cancel', class extends HTMLElement {
     const payload = {
       limit: CANCEL_BATCH_SIZE,
       tags: this.tags,
+      start: this.start,
+      end: this.end,
     };
 
     if (this._both) {
@@ -133,6 +137,8 @@ window.customElements.define('task-mass-cancel', class extends HTMLElement {
         const payload = {
           limit: CANCEL_BATCH_SIZE,
           tags: this.tags,
+          start: this.start,
+          end: this.end,
           cursor: json.cursor,
         };
         if (this._both) {
