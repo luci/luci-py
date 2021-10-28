@@ -103,10 +103,6 @@ window.customElements.define('task-mass-cancel', class extends HTMLElement {
     // sort for determinism
     this.tags.sort();
 
-    // Change unit from milliseconds to seconds.
-    this.start = Math.round(this.start/1000);
-    this.end = Math.round(this.end/1000);
-
     this.render();
   }
 
@@ -115,11 +111,15 @@ window.customElements.define('task-mass-cancel', class extends HTMLElement {
     this.dispatchEvent(new CustomEvent('tasks-canceling-started', {bubbles: true}));
     this.render();
 
+    // Change unit from milliseconds to seconds.
+    const start = Math.round(this.start/1000);
+    const end = Math.round(this.end/1000);
+
     const payload = {
       limit: CANCEL_BATCH_SIZE,
       tags: this.tags,
-      start: this.start,
-      end: this.end,
+      start: start,
+      end: end,
     };
 
     if (this._both) {
@@ -142,8 +142,8 @@ window.customElements.define('task-mass-cancel', class extends HTMLElement {
         const payload = {
           limit: CANCEL_BATCH_SIZE,
           tags: this.tags,
-          start: this.start,
-          end: this.end,
+          start: start,
+          end: end,
           cursor: json.cursor,
         };
         if (this._both) {
