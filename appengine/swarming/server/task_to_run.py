@@ -407,11 +407,17 @@ def _yield_potential_tasks(bot_id):
     for i, f in enumerate(futures):
       if f and f.done():
         # The ndb.Future returns a list of up to 10 TaskToRun entities.
-        r = f.get_result()
-        if r:
+        runs = f.get_result()
+        if runs:
           # The ndb.Query ask for a valid queue_number but under load, it
           # happens the value is not valid anymore.
-          items.extend(i for i in r if i.queue_number)
+          for r in runs:
+            if not r.queue_number:
+              logging.warning(
+                  '_yield_potential_tasks(%s): TaskToRun %s does not have '
+                  'queue_number', bot_id, r.task_id)
+              continue
+            items.append(r)
           # Prime the next page, in case.
           futures[i] = next(yielders[i], None)
         else:
