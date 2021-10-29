@@ -313,6 +313,10 @@ class ModuleFile(collections.namedtuple('ModuleFile', ['path', 'data'])):
   def name(self):
     return self.data.get('service', self.data.get('module', 'default'))
 
+  @property
+  def app_engine_apis(self):
+    return bool(self.data.get('app_engine_apis'))
+
 
 class Application(object):
   """Configurable GAE application.
@@ -610,17 +614,27 @@ class Application(object):
         os.remove(h)
 
   def _deploy_services(self, services, version):
-    if not services:
-      return
-    print(
-        'Initiating gcloud app deploy: %s' %
-        ', '.join(m.name for m in services))
-    self.run_gcloud(
-        ['app', 'deploy'] + [m.path for m in services] +
-        [
-          '--version', version, '--quiet',
-          '--no-promote', '--no-stop-previous-version',
-        ])
+    args = [
+        '--version', version,
+        '--quiet',
+        '--no-promote',
+        '--no-stop-previous-version',
+    ]
+
+    # Use "beta" variant of the command if the module has "app_engine_apis",
+    # otherwise this setting has no effect.
+    #
+    # See https://cloud.google.com/appengine/docs/standard/go/services/access.
+    beta = [s for s in services if s.app_engine_apis]
+    if beta:
+      print('gcloud beta app deploy: %s' % ', '.join(m.name for m in beta))
+      self.run_gcloud(['beta', 'app', 'deploy'] + args + [m.path for m in beta])
+
+    # Use the mainline variant of "gcloud app" for the rest.
+    main = [s for s in services if not s.app_engine_apis]
+    if main:
+      print('gcloud app deploy: %s' % ', '.join(m.name for m in main))
+      self.run_gcloud(['app', 'deploy'] + args + [m.path for m in main])
 
   def spawn_dev_appserver(self, args, open_ports=False, **kwargs):
     """Launches subprocess with dev_appserver.py.
