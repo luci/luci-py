@@ -87,8 +87,7 @@ def _taskproperties_from_rpc(props):
 
   containment = task_request.Containment()
   if props.containment:
-    containment = _rpc_to_ndb(
-        task_request.Containment, props.containment,
+    containment = task_request.Containment(
         containment_type=int(props.containment.containment_type or 0))
 
   inputs_ref = None
@@ -151,9 +150,7 @@ def _taskproperties_to_rpc(props):
 
   containment = swarming_rpcs.Containment()
   if props.containment:
-    containment = _ndb_to_rpc(
-        swarming_rpcs.Containment,
-        props.containment,
+    containment = swarming_rpcs.Containment(
         containment_type=swarming_rpcs.ContainmentType(
             props.containment.containment_type or 0))
 

@@ -749,35 +749,25 @@ class BotPollHandler(_BotBaseHandler):
     out = {
         'cmd': 'run',
         'manifest': {
-            'bot_id':
-                bot_id,
-            'bot_authenticated_as':
-                auth.get_peer_identity().to_bytes(),
-            'caches':
-                caches,
+            'bot_id': bot_id,
+            'bot_authenticated_as': auth.get_peer_identity().to_bytes(),
+            'caches': caches,
             'cipd_input': {
                 'client_package': props.cipd_input.client_package.to_dict(),
                 'packages': [p.to_dict() for p in props.cipd_input.packages],
                 'server': props.cipd_input.server,
             } if props.cipd_input else None,
-            'command':
-                props.command,
-            'containment':
-                props.containment.to_dict() if props.containment else {},
-            'dimensions':
-                props.dimensions,
-            'env':
-                props.env,
-            'env_prefixes':
-                props.env_prefixes,
-            'grace_period':
-                props.grace_period_secs,
-            'hard_timeout':
-                props.execution_timeout_secs,
-            'host':
-                utils.get_versioned_hosturl(),
-            'io_timeout':
-                props.io_timeout_secs,
+            'command': props.command,
+            'containment': {
+                'containment_type': props.containment.containment_type,
+            } if props.containment else {},
+            'dimensions': props.dimensions,
+            'env': props.env,
+            'env_prefixes': props.env_prefixes,
+            'grace_period': props.grace_period_secs,
+            'hard_timeout': props.execution_timeout_secs,
+            'host': utils.get_versioned_hosturl(),
+            'io_timeout': props.io_timeout_secs,
             'secret_bytes': (secret_bytes.secret_bytes.encode('base64')
                              if secret_bytes else None),
             'isolated': {
@@ -792,14 +782,10 @@ class BotPollHandler(_BotBaseHandler):
                     'size_bytes': props.cas_input_root.digest.size_bytes,
                 },
             } if props.cas_input_root else None,
-            'outputs':
-                props.outputs,
-            'realm':
-                realm_context,
-            'relative_cwd':
-                props.relative_cwd,
-            'resultdb':
-                resultdb_context,
+            'outputs': props.outputs,
+            'realm': realm_context,
+            'relative_cwd': props.relative_cwd,
+            'resultdb': resultdb_context,
             'service_accounts': {
                 'system': {
                     # 'none', 'bot' or email. Bot interprets 'none' and 'bot'
@@ -813,8 +799,7 @@ class BotPollHandler(_BotBaseHandler):
                     'service_account': request.service_account,
                 },
             },
-            'task_id':
-                task_pack.pack_run_result_key(run_result.key),
+            'task_id': task_pack.pack_run_result_key(run_result.key),
         },
     }
     self.send_response(utils.to_json_encodable(out))

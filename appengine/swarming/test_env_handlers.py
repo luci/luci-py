@@ -445,10 +445,7 @@ class AppTestBase(test_case.TestCase):
         },
         u'command': ['python', '-c', 'print(1)'],
         u'containment': {
-            u'lower_priority': True,
             u'containment_type': swarming_rpcs.ContainmentType.AUTO,
-            u'limit_processes': 1000,
-            u'limit_total_committed_memory': 1024**3,
         },
         u'dimensions': [
             {
@@ -561,10 +558,7 @@ class AppTestBase(test_case.TestCase):
         },
         u'command': [u'python', u'-c', u'print(1)'],
         u'containment': {
-            u'lower_priority': True,
             u'containment_type': u'AUTO',
-            u'limit_processes': u'1000',
-            u'limit_total_committed_memory': unicode(1024**3),
         },
         u'dimensions': [
             {

@@ -97,7 +97,6 @@ StringListPair = collections.namedtuple(
 
 # See ../appengine/swarming/swarming_rpcs.py.
 Containment = collections.namedtuple('Containment', [
-    'lower_priority',
     'containment_type',
 ])
 
@@ -980,10 +979,6 @@ def add_trigger_options(parser):
       default=20 * 60,
       metavar='SECS',
       help='Seconds to allow the task to be silent.')
-  parser.add_option(
-      '--lower-priority',
-      action='store_true',
-      help='Lowers the child process priority')
   containment_choices = ('NONE', 'AUTO', 'JOB_OBJECT')
   parser.add_option(
       '--containment-type',
@@ -1192,7 +1187,6 @@ def process_trigger_options(parser, options, args):
       cipd_input=cipd_input,
       command=command,
       containment=Containment(
-          lower_priority=bool(options.lower_priority),
           containment_type=options.containment_type,
       ),
       relative_cwd=options.relative_cwd,

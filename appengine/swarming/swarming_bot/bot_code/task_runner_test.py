@@ -87,10 +87,7 @@ def get_manifest(script=None, isolated=None, **kwargs):
       'command': [sys.executable, '-u', '-c', script]
                  if not isolated_input else None,
       'containment': {
-          'lower_priority': True,
           'containment_type': 'NONE',
-          'limit_processes': 0,
-          'limit_total_committed_memory': 0,
       },
       'dimensions': {},
       'env': {},

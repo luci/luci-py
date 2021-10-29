@@ -186,32 +186,19 @@ class Containment(object):
   """Containment details."""
   _EXPECTED = frozenset((
       'containment_type',
-      'limit_processes',
-      'limit_total_committed_memory',
-      'lower_priority',
   ))
 
   def __init__(self, data):
     if set(data) != self._EXPECTED:
       raise InternalError(
           'Unexpected keys: %s != %s' % (sorted(data), sorted(self._EXPECTED)))
-    self.lower_priority = bool(data['lower_priority'])
     self.containment_type = data['containment_type']
-    self.limit_processes = data['limit_processes']
-    self.limit_total_committed_memory = data['limit_total_committed_memory']
 
   def flags(self):
     """Returns flags to use for run_isolated.py."""
     out = []
-    if self.lower_priority:
-      out.append('--lower-priority')
     if self.containment_type != 'NONE':
       pass
-    if self.limit_processes:
-      out.extend(('--limit-processes', str(self.limit_processes)))
-    if self.limit_total_committed_memory:
-      out.extend(('--limit-total-committed-memory',
-                  str(self.limit_total_committed_memory)))
     return out
 
 

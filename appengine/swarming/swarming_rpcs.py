@@ -342,10 +342,8 @@ class ContainmentType(messages.Enum):
 
 class Containment(messages.Message):
   """See proto/api/swarming.proto for description."""
-  lower_priority = messages.BooleanField(1)
   containment_type = messages.EnumField(ContainmentType, 2)
-  limit_processes = messages.IntegerField(3)
-  limit_total_committed_memory = messages.IntegerField(4)
+  # Deprecated: lower_priority, limit_processes, limit_total_committed_memory
 
 
 class TaskProperties(messages.Message):

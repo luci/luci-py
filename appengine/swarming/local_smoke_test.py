@@ -670,8 +670,7 @@ class Test(unittest.TestCase):
 
   def test_isolated_command(self):
     # Command is specified in Swarming task, still with isolated file.
-    # Confirms that --relative-cwd, --env, --env-prefix and --lower-priority
-    # work.
+    # Confirms that --relative-cwd, --env and --env-prefix work.
     content = {
         os.path.join(u'base', HELLO_WORLD + u'.py'):
             _script(u"""
@@ -716,9 +715,8 @@ class Test(unittest.TestCase):
         isolated_hash,
         name, [
             '-relative-cwd', 'base', '-env', 'FOO=bar💩', '-env',
-            'SWARMING_TASK_ID=""', '-env-prefix', 'PATH=local/path',
-            '-lower-priority', '--', 'python', HELLO_WORLD + u'.py', u'hi💩',
-            '${ISOLATED_OUTDIR}'
+            'SWARMING_TASK_ID=""', '-env-prefix', 'PATH=local/path', '--',
+            'python', HELLO_WORLD + u'.py', u'hi💩', '${ISOLATED_OUTDIR}'
         ],
         expected_summary,
         expected_files,

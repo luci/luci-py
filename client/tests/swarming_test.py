@@ -95,7 +95,6 @@ def gen_properties(**kwargs):
       'cipd_input': None,
       'command': None,
       'containment': {
-          'lower_priority': False,
           'containment_type': 'NONE',
       },
       'relative_cwd': None,
@@ -363,7 +362,6 @@ class TestSwarmingTrigger(NetTestCase):
                       cipd_input=None,
                       command=['a', 'b'],
                       containment=swarming.Containment(
-                          lower_priority=False,
                           containment_type='NONE',
                       ),
                       relative_cwd=None,
@@ -455,7 +453,6 @@ class TestSwarmingTrigger(NetTestCase):
                     cipd_input=None,
                     command=['a', 'b'],
                     containment=swarming.Containment(
-                        lower_priority=False,
                         containment_type='NONE',
                     ),
                     relative_cwd=None,
@@ -535,7 +532,6 @@ class TestSwarmingTrigger(NetTestCase):
                     cipd_input=None,
                     command=['a', 'b'],
                     containment=swarming.Containment(
-                        lower_priority=False,
                         containment_type='NONE',
                     ),
                     relative_cwd=None,
@@ -615,7 +611,6 @@ class TestSwarmingTrigger(NetTestCase):
                         server=None),
                     command=['a', 'b'],
                     containment=swarming.Containment(
-                        lower_priority=False,
                         containment_type='NONE',
                     ),
                     relative_cwd=None,
@@ -697,7 +692,6 @@ class TestSwarmingTrigger(NetTestCase):
                     cipd_input=None,
                     command=['a', 'b'],
                     containment=swarming.Containment(
-                        lower_priority=False,
                         containment_type='NONE',
                     ),
                     relative_cwd=None,
