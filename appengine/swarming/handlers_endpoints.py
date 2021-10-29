@@ -650,13 +650,13 @@ class SwarmingTasksService(remote.Service):
 
     now = utils.utcnow()
 
-    start = message_conversion.epoch_to_datetime(request.start)
-    end = message_conversion.epoch_to_datetime(request.end)
-    query = task_result.get_result_summaries_query(
-        start, end, 'created_ts',
-        'pending_running' if request.kill_running else 'pending', request.tags)
-
     try:
+      start = message_conversion.epoch_to_datetime(request.start)
+      end = message_conversion.epoch_to_datetime(request.end)
+      query = task_result.get_result_summaries_query(
+          start, end, 'created_ts',
+          'pending_running' if request.kill_running else 'pending',
+          request.tags)
       cursor, results = task_scheduler.cancel_tasks(request.limit,
                                                     query=query,
                                                     cursor=request.cursor)
