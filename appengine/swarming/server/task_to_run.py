@@ -404,20 +404,24 @@ def _yield_potential_tasks(bot_id):
     # items is a list of TaskToRun. The entities are needed because property
     # queue_number is used to sort according to each task's priority.
     items = []
+
+    def _append_runs_to_items(runs):
+      # The ndb.Query ask for a valid queue_number but under load, it
+      # happens the value is not valid anymore.
+      for r in runs:
+        if not r.queue_number:
+          logging.warning(
+              '_yield_potential_tasks(%s): TaskToRun %s does not have '
+              'queue_number', bot_id, r.task_id)
+          continue
+        items.append(r)
+
     for i, f in enumerate(futures):
       if f and f.done():
         # The ndb.Future returns a list of up to 10 TaskToRun entities.
         runs = f.get_result()
         if runs:
-          # The ndb.Query ask for a valid queue_number but under load, it
-          # happens the value is not valid anymore.
-          for r in runs:
-            if not r.queue_number:
-              logging.warning(
-                  '_yield_potential_tasks(%s): TaskToRun %s does not have '
-                  'queue_number', bot_id, r.task_id)
-              continue
-            items.append(r)
+          _append_runs_to_items(runs)
           # Prime the next page, in case.
           futures[i] = next(yielders[i], None)
         else:
@@ -448,8 +452,7 @@ def _yield_potential_tasks(bot_id):
       changed = False
       for i, f in enumerate(futures):
         if f and f.done():
-          # See loop above for explanation.
-          items.extend(i for i in f.get_result() if i.queue_number)
+          _append_runs_to_items(f.get_result())
           futures[i] = next(yielders[i], None)
           changed = True
           if not futures[i]:
