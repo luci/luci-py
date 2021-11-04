@@ -66,7 +66,7 @@ queue:
 # /internal/taskqueue/important/external_scheduler/notify-tasks
 - name: es-notify-tasks
   bucket_size: 100
-  rate: 50/s
+  rate: 75/s
   # Additional notifications of the state of a task will be sent by swarming
   # if it observes a state that differs from the external scheduler's opinion
   # of that task state. Therefore, we don't need to retry tasks on this queue
