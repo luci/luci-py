@@ -15,7 +15,6 @@ import mock
 # TODO(github.com/wolever/parameterized/issues/91)
 # use parameterized after the bug is resolved.
 from nose2.tools import params
-import six
 
 import test_env_platforms
 test_env_platforms.setup_test_env()

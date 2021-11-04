@@ -563,47 +563,29 @@ class Popen(subprocess.Popen):
       with self.popen_lock:
         if sys.platform == 'win32':
           # We need the thread handle, save it.
-          if six.PY2:
-            old = subprocess._subprocess.CreateProcess
-          else:
-            old = subprocess._winapi.CreateProcess
-            old_closehandle = subprocess._winapi.CloseHandle
-
-          class FakeHandle(object):
-
-            def Close(self):
-              pass
+          old = subprocess._winapi.CreateProcess
+          old_closehandle = subprocess._winapi.CloseHandle
 
           def patch_CreateProcess(*args, **kwargs):
             hp, ht, pid, tid = old(*args, **kwargs)
             # Save the thread handle, and return a fake one that
             # _execute_child() will close indiscriminally.
-            if six.PY2:
-              self._handle_thread = ht
-              return hp, FakeHandle(), pid, tid
-            else:
-              self._handle_thread = subprocess.Handle(ht)
-              return hp, ht, pid, tid
+            self._handle_thread = subprocess.Handle(ht)
+            return hp, ht, pid, tid
 
           def patch_CloseHandle(ht):
             if ht == self._handle_thread:
               return 1
             return subprocess._winapi.CloseHandle(ht)
 
-          if six.PY2:
-            subprocess._subprocess.CreateProcess = patch_CreateProcess
-          else:
-            subprocess._winapi.CreateProcess = patch_CreateProcess
-            subprocess._winapi.CloseHandle = patch_CloseHandle
+          subprocess._winapi.CreateProcess = patch_CreateProcess
+          subprocess._winapi.CloseHandle = patch_CloseHandle
         try:
           super(Popen, self).__init__(args, **kwargs)
         finally:
           if sys.platform == 'win32':
-            if six.PY2:
-              subprocess._subprocess.CreateProcess = old
-            else:
-              subprocess._winapi.CreateProcess = old
-              subprocess._winapi.CloseHandle = old_closehandle
+            subprocess._winapi.CreateProcess = old
+            subprocess._winapi.CloseHandle = old_closehandle
     except:
       self._cleanup()
       raise
@@ -756,18 +738,10 @@ class Popen(subprocess.Popen):
     return self.returncode
 
   def _wait_win(self, wait_time):
-    if six.PY2:
-      result = subprocess._subprocess.WaitForSingleObject(self._handle,
-                                                          int(wait_time * 1000))
-    else:
-      result = subprocess._winapi.WaitForSingleObject(self._handle,
-                                                          int(wait_time * 1000))
+    result = subprocess._winapi.WaitForSingleObject(self._handle,
+                                                    int(wait_time * 1000))
     if result != _WAIT_TIMEOUT:
-      if six.PY2:
-        self.returncode = subprocess._subprocess.GetExitCodeProcess(
-          self._handle)
-      else:
-        self.returncode = subprocess._winapi.GetExitCodeProcess(self._handle)
+      self.returncode = subprocess._winapi.GetExitCodeProcess(self._handle)
       return True
     return False
 
@@ -1116,7 +1090,7 @@ def split(data, universal_newlines):
     but split by sep into separate tuples.
   """
   sep = b'\n'
-  if six.PY3 and sys.platform == 'win32':
+  if sys.platform == 'win32':
     # CRLF is used instead of LF in python3 on windows
     sep = b'\r\n'
   if six.PY3 and universal_newlines:

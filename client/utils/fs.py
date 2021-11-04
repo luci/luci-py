@@ -138,8 +138,7 @@ if sys.platform == 'win32':
     # - Win10: Microsoft Windows [Version 10.0.10240]
     # - Win7 or Win2K8R2: Microsoft Windows [Version 6.1.7601]
     try:
-      out = six.ensure_text(
-        subprocess.check_output(['cmd.exe', '/c', 'ver']).strip())
+      out = subprocess.check_output(['cmd.exe', '/c', 'ver'], text=True).strip()
       match = re.search(r'\[Version (\d+\.\d+)\.(\d+)\]', out, re.IGNORECASE)
       if match:
         # That's a bit gross but good enough.
@@ -160,14 +159,14 @@ if sys.platform == 'win32':
     not enforced.
     """
     assert os.path.isabs(path), path
-    assert isinstance(path, six.text_type), "%s, type: %s" % (path, type(path))
+    assert isinstance(path, str), "%s, type: %s" % (path, type(path))
     prefix = u'\\\\?\\'
     return path if path.startswith(prefix) else prefix + path
 
 
   def trim(path):
     """Removes '\\\\?\\' when receiving a path."""
-    assert isinstance(path, six.text_type), "%s, type: %s" % (path, type(path))
+    assert isinstance(path, str), "%s, type: %s" % (path, type(path))
     prefix = u'\\\\?\\'
     if path.startswith(prefix):
       path = path[len(prefix):]
@@ -207,9 +206,6 @@ if sys.platform == 'win32':
     Windows 10 and developer mode:
       https://blogs.windows.com/buildingapps/2016/12/02/symlinks-windows-10/
     """
-    # Accept relative links, and implicitly promote source to unicode.
-    if isinstance(source, str):
-      source = six.text_type(source)
     f = extend(link_name)
     # We need to convert to absolute path, so we can test if it points to a
     # directory or a file.
@@ -277,7 +273,6 @@ if sys.platform == 'win32':
 
   def readlink(path):
     """Reads a symlink on Windows."""
-    path = six.text_type(path)
     # Interestingly, when using FILE_FLAG_OPEN_REPARSE_POINT and the destination
     # is not a reparse point, the actual file will be opened. It's the
     # DeviceIoControl() below that will fail with 4390.
