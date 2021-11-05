@@ -54,6 +54,7 @@ test_env_bot.setup_test_env()
 from api import os_utilities
 
 SWARMING_CLI = os.path.join(LUCI_DIR, 'luci-go', 'swarming')
+ISOLATE_CLI = os.path.join(LUCI_DIR, 'luci-go', 'isolate')
 
 # Use a variable because it is corrupting my text editor from the 80s.
 # One important thing to note is that this character U+1F310 is not in the BMP
@@ -71,8 +72,8 @@ DEFAULT_COMMAND = ["python", "-u", "%s.py" % HELLO_WORLD]
 
 # The default isolated command is to map and run HELLO_WORLD.
 DEFAULT_ISOLATE_HELLO = """{
-  "variables": {
-    "files": ["%(name)s.py"],
+  'variables': {
+    'files': ['%(name)s.py'],
   },
 }""" % {
     'name': HELLO_WORLD.encode('utf-8')
@@ -100,15 +101,33 @@ class SwarmingClient(object):
     """Archives a .isolate file into the isolate server and returns the isolated
     hash.
     """
-    args = [
-        '--namespace',
+    dump_json = os.path.join(self._tmpdir, 'digest_or_hash.json')
+    cmd = [
+        ISOLATE_CLI,
+        'archive',
+        '-I',
+        self._isolate_server,
+        '-namespace',
         self._namespace,
         '-i',
         isolate_path,
         '-s',
         isolated_path,
+        '-dump-json',
+        dump_json,
+        '-log-level',
+        'debug',
     ]
-    isolated_hash = self._capture_isolate('archive', args, '').split()[0]
+    logging.debug('SwarmingClient.isolate: executing command. %s', cmd)
+    with fs.open(self._rotate_logfile(), 'wb') as f:
+      f.write('\nRunning: %s\n' % ' '.join(cmd))
+      p = subprocess42.Popen(cmd, stdout=f, stderr=f)
+      p.communicate()
+    assert p.returncode == 0, ('Failed to isolate files. exit_code=%d, cmd=%s' %
+                               (p.returncode, cmd))
+    with fs.open(dump_json) as f:
+      data = json.load(f)
+    isolated_hash = data.values()[0]
     logging.debug('%s = %s', isolated_path, isolated_hash)
     return isolated_hash
 
@@ -329,8 +348,7 @@ class SwarmingClient(object):
     with fs.open(self._rotate_logfile(), 'wb') as f:
       f.write('\nRunning: %s\n' % ' '.join(cmd))
       f.flush()
-      p = subprocess42.Popen(
-          cmd, stdout=f, stderr=subprocess42.STDOUT, cwd=CLIENT_DIR)
+      p = subprocess42.Popen(cmd, stdout=f, stderr=f)
       p.communicate()
       return p.returncode
 
@@ -360,20 +378,6 @@ class SwarmingClient(object):
           cmd, stdout=f, stderr=subprocess42.STDOUT, cwd=CLIENT_DIR)
       p.communicate()
       return p.returncode
-
-  def _capture_isolate(self, command, args, stdin):
-    name = self._rotate_logfile()
-    cmd = [
-        sys.executable, 'isolate.py', command, '-I', self._isolate_server,
-        '--log-file', name
-    ] + args
-    logging.debug('SwarmingClient._capture_isolate: executing command. %s', cmd)
-    with fs.open(name, 'wb') as f:
-      f.write('\nRunning: %s\n' % ' '.join(cmd))
-    p = subprocess42.Popen(
-        cmd, stdin=subprocess42.PIPE, stdout=subprocess42.PIPE, cwd=CLIENT_DIR)
-    return p.communicate(stdin)[0]
-
 
 def gen_expected(**kwargs):
   expected = {
@@ -618,7 +622,7 @@ class Test(unittest.TestCase):
     name = 'isolated_task'
     isolated_hash, isolated_size = self._archive(name, content,
                                                  DEFAULT_ISOLATE_HELLO)
-    items_in = [sum(len(c) for c in content.values()), isolated_size]
+    items_in = [3072, isolated_size]
     expected_summary = self.gen_expected(
         name=u'isolated_task',
         output=u'hi\n',
@@ -693,11 +697,11 @@ class Test(unittest.TestCase):
           f.write('hey2')
         """),
     }
-    isolate_content = '{"variables": {"files": ["%s"]}}' % os.path.join(
+    isolate_content = "{'variables': {'files': ['%s']}}" % os.path.join(
         u'base', HELLO_WORLD + u'.py').encode('utf-8')
     name = 'separate_cmd'
     isolated_hash, isolated_size = self._archive(name, content, isolate_content)
-    items_in = [sum(len(c) for c in content.values()), isolated_size]
+    items_in = [3584, isolated_size]
     expected_summary = self.gen_expected(
         name=u'separate_cmd',
         output=u'hi💩\n%s\n' % os.sep.join(['$CWD', 'local', 'path']),
@@ -776,7 +780,7 @@ class Test(unittest.TestCase):
     name = 'isolated_hard_timeout'
     isolated_hash, isolated_size = self._archive(name, content,
                                                  DEFAULT_ISOLATE_HELLO)
-    items_in = [sum(len(c) for c in content.values()), isolated_size]
+    items_in = [3072, isolated_size]
     expected_summary = self.gen_expected(
         name=u'isolated_hard_timeout',
         exit_code=unicode(SIGNAL_TERM),
@@ -856,7 +860,7 @@ class Test(unittest.TestCase):
     name = 'isolated_hard_timeout_grace'
     isolated_hash, isolated_size = self._archive(name, content,
                                                  DEFAULT_ISOLATE_HELLO)
-    items_in = [sum(len(c) for c in content.values()), isolated_size]
+    items_in = [3072, isolated_size]
     expected_summary = self.gen_expected(
         name=u'isolated_hard_timeout_grace',
         output=u'hi\ngot signal 15\n',
@@ -920,7 +924,7 @@ class Test(unittest.TestCase):
     name = 'idempotent_reuse'
     isolated_hash, isolated_size = self._archive(name, content,
                                                  DEFAULT_ISOLATE_HELLO)
-    items_in = [sum(len(c) for c in content.values()), isolated_size]
+    items_in = [3072, isolated_size]
     expected_summary = self.gen_expected(
         name=u'idempotent_reuse',
         tags=[
@@ -1004,7 +1008,7 @@ class Test(unittest.TestCase):
     name = 'secret_bytes'
     isolated_hash, isolated_size = self._archive(name, content,
                                                  DEFAULT_ISOLATE_HELLO)
-    items_in = [sum(len(c) for c in content.values()), isolated_size]
+    items_in = [3072, isolated_size]
     expected_summary = self.gen_expected(
         name=u'secret_bytes',
         tags=[
@@ -1077,7 +1081,7 @@ class Test(unittest.TestCase):
     name = 'cache_first'
     isolated_hash, isolated_size = self._archive(name, content,
                                                  DEFAULT_ISOLATE_HELLO)
-    items_in = [sum(len(c) for c in content.values()), isolated_size]
+    items_in = [3072, isolated_size]
     expected_summary = self.gen_expected(
         name=u'cache_first',
         tags=[
