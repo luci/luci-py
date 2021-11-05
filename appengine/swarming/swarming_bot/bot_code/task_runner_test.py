@@ -482,7 +482,7 @@ class TestTaskRunner(TestTaskRunnerBase):
     self.assertEqual(expected, self._run_command(task_details))
     # Now look at the updates sent by the bot as seen by the server.
     pattern = (
-        # This is a beginning of run_isolate.py's output if binary is not
+        # This is a beginning of run_isolated.py's output if binary is not
         # found.
         br'^<The executable does not exist, a dependent library is missing or '
         br'the command line is too long>\n'

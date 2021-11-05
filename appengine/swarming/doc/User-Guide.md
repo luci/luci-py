@@ -125,7 +125,7 @@ Other things of note are:
 *   No access to any remote service. This include HTTP(S), DNS lookup, etc. No
     file can be 'downloaded' or 'uploaded' by the task. They must be mapped in,
     content addressed, up front. Results must be inside `${ISOLATED_OUTDIR}`.
-    *   This is also important from a performance PoV since `run_isolate.py`
+    *   This is also important from a performance PoV since `run_isolated.py`
         keeps a local content addressed cache.
 *   No dependency on the time of the day or any other side-signal.
 
