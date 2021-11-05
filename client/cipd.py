@@ -41,10 +41,6 @@ _DEFAULT_CIPD_CLIENT_VERSION = 'latest'
 MISSING_MAC_ARM64_PACKAGES = [
     # TODO(crbug.com/1250425): buildbucket package is being migrated to bbagent.
     'infra/tools/buildbucket',
-    # TODO(crbug.com/1207808): Python scripts executed in Swarming tasks need to
-    # be migrated to Python3, or replace the legacy cpython package with the 3pp
-    # cpython package.
-    'infra/python/cpython',
 ]
 
 if sys.platform == 'win32':
