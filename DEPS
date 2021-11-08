@@ -13,6 +13,7 @@ deps = {
       }
     ],
     'dep_type': 'cipd',
+    'condition': 'checkout_x64',
   },
 
   # luci-go clients are used for client/run_isolated.py and integration tests.
@@ -36,6 +37,7 @@ deps = {
       }
     ],
     'dep_type': 'cipd',
+    'condition': 'checkout_x64',
   },
 
   # Nsjail is used for our unit tests.
