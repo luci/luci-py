@@ -18,7 +18,9 @@ import sys
 import tempfile
 
 THIS_DIR = os.path.dirname(os.path.abspath(__file__))
-CLIENT_DIR = os.path.join(THIS_DIR, '..', '..', '..', 'client')
+LUCI_DIR = os.path.dirname(os.path.dirname(os.path.dirname(THIS_DIR)))
+CLIENT_DIR = os.path.join(LUCI_DIR, 'client')
+GO_CLIENT_DIR = os.path.join(LUCI_DIR, 'luci-go')
 sys.path.insert(0, CLIENT_DIR)
 sys.path.insert(0, os.path.join(CLIENT_DIR, 'third_party'))
 # third_party/
@@ -97,6 +99,7 @@ class LocalBot(object):
     env = os.environ.copy()
     env['TEMP'] = tmpdir
     env['RUN_ISOLATED_CAS_ADDRESS'] = self._cas_addr
+    env['LUCI_GO_CLIENT_DIR'] = GO_CLIENT_DIR
     cmd = [self.python, bot_zip, 'start_slave', '--test-mode']
     if self._redirect:
       logs = os.path.join(self._botdir, 'logs')

@@ -28,8 +28,10 @@ import six
 import test_env_bot_code
 test_env_bot_code.setup_test_env()
 
-CLIENT_DIR = os.path.normpath(
-    os.path.join(test_env_bot_code.BOT_DIR, '..', '..', '..', 'client'))
+ROOT_DIR = os.path.dirname(
+    os.path.dirname(os.path.dirname(test_env_bot_code.BOT_DIR)))
+CLIENT_DIR = os.path.join(ROOT_DIR, 'client')
+LUCI_GO_CLIENT_DIR = os.path.join(ROOT_DIR, 'luci-go')
 
 # Needed for local_caching, and others on Windows when symlinks are not enabled.
 sys.path.insert(0, CLIENT_DIR)
@@ -200,6 +202,7 @@ class TestTaskRunnerBase(auto_stub.TestCase):
     os.environ.pop('SWARMING_TASK_ID', None)
     os.environ.pop('SWARMING_SERVER', None)
     os.environ.pop('ISOLATE_SERVER', None)
+    os.environ['LUCI_GO_CLIENT_DIR'] = LUCI_GO_CLIENT_DIR
     # Make HTTP headers consistent
     self.mock(remote_client, 'make_appengine_id', lambda *a: 42)
     self._server = None

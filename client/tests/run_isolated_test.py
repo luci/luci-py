@@ -43,6 +43,11 @@ from utils import subprocess42
 from utils import tools
 
 
+ROOT_DIR = os.path.dirname(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+LUCI_GO_CLIENT_DIR = os.path.join(ROOT_DIR, 'luci-go')
+
+
 def json_dumps(data):
   return json.dumps(data, sort_keys=True, separators=(',', ':'))
 
@@ -97,6 +102,7 @@ class RunIsolatedTestBase(auto_stub.TestCase):
   def setUp(self):
     super(RunIsolatedTestBase, self).setUp()
     os.environ.pop('LUCI_CONTEXT', None)
+    os.environ['LUCI_GO_CLIENT_DIR'] = LUCI_GO_CLIENT_DIR
     self._previous_dir = six.text_type(os.getcwd())
     self.tempdir = tempfile.mkdtemp(prefix=u'run_isolated_test')
     logging.debug('Temp dir: %s', self.tempdir)
@@ -325,7 +331,7 @@ class RunIsolatedTest(RunIsolatedTestBase):
         grace_period=30,
         bot_file=None,
         switch_to_account=False,
-        install_packages_fn=run_isolated.noop_install_packages,
+        install_packages_fn=run_isolated.copy_local_packages,
         use_go_isolated=False,
         go_cache_dir=None,
         go_cache_policies=None,
@@ -342,8 +348,7 @@ class RunIsolatedTest(RunIsolatedTestBase):
     return make_tree_call
 
   def test_run_tha_test_naked(self):
-    make_tree_call = self._run_tha_test(command=['invalid', 'command'])
-    self.assertEqual([], make_tree_call)
+    self._run_tha_test(command=['invalid', 'command'])
     self.assertEqual(
         [
           (
@@ -1050,7 +1055,7 @@ class RunIsolatedTestRun(RunIsolatedTestBase):
           grace_period=30,
           bot_file=None,
           switch_to_account=False,
-          install_packages_fn=run_isolated.noop_install_packages,
+          install_packages_fn=run_isolated.copy_local_packages,
           use_go_isolated=False,
           go_cache_dir=None,
           go_cache_policies=None,
@@ -1436,7 +1441,7 @@ class RunIsolatedTestOutputFiles(RunIsolatedTestBase):
           grace_period=30,
           bot_file=None,
           switch_to_account=False,
-          install_packages_fn=run_isolated.noop_install_packages,
+          install_packages_fn=run_isolated.copy_local_packages,
           use_go_isolated=False,
           go_cache_dir=None,
           go_cache_policies=None,
