@@ -1,1 +1,0 @@
-../../../../client/isolate_format.py
