@@ -238,19 +238,6 @@ the client side script to manage Swarming tasks at the command line.
     overview is given here:
 
 
-### Running a task synchronously
-
-If you just want to run something remotely, you can use the `run` command. It is
-going to block until the command has completely run remotely.
-
-```
-swarming.py run --swarming <host> --isolate-server <isolate_host> <isolated|hash>
-```
-
-The `<hash>` is what `isolate.py archive` gave you. See IsolatedUserGuide for
-more information. A path to a `.isolated` file will work too.
-
-
 ### Running a task asynchronously
 
 Tasks can be triggered asynchronously by using `trigger` + `collect`. The
