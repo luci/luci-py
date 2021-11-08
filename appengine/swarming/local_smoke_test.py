@@ -1778,8 +1778,9 @@ def main():
     servers.start()
     botdir = os.path.join(Test.tmpdir, 'bot')
     os.mkdir(botdir)
-    bot = start_bot.LocalBot(servers.swarming_server.url, True, botdir,
-                             args.bot_python)
+    bot = start_bot.LocalBot(servers.swarming_server.url,
+                             servers.cas_server_address,
+                             True, botdir, args.bot_python)
     Test.bot = bot
     bot.start()
     namespace = 'default'

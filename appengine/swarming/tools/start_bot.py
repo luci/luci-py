@@ -46,9 +46,11 @@ class LocalBot(object):
   locally.
   """
 
-  def __init__(self, swarming_server_url, redirect, botdir, python=None):
+  def __init__(self, swarming_server_url, cas_addr, redirect, botdir,
+               python=None):
     self._botdir = botdir
     self._swarming_server_url = swarming_server_url
+    self._cas_addr = cas_addr
     self._proc = None
     self._logs = {}
     self._redirect = redirect
@@ -94,6 +96,7 @@ class LocalBot(object):
       os.makedirs(tmpdir)
     env = os.environ.copy()
     env['TEMP'] = tmpdir
+    env['RUN_ISOLATED_CAS_ADDRESS'] = self._cas_addr
     cmd = [self.python, bot_zip, 'start_slave', '--test-mode']
     if self._redirect:
       logs = os.path.join(self._botdir, 'logs')
@@ -163,11 +166,12 @@ class LocalBot(object):
 def main():
   parser = argparse.ArgumentParser(description=sys.modules[__name__].__doc__)
   parser.add_argument('server', help='Swarming server to connect bot to.')
+  parser.add_argument('cas-addr', help='CAS server to connect bot to.')
   args = parser.parse_args()
   fix_encoding.fix_encoding()
   botdir = tempfile.mkdtemp(prefix='start_bot')
   try:
-    bot = LocalBot(args.server, False, botdir)
+    bot = LocalBot(args.server, args.cas_addr, False, botdir)
     try:
       bot.start()
       bot.wait()

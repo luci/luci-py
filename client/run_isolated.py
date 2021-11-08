@@ -597,8 +597,6 @@ def _fetch_and_map_with_cas(cas_client, digest, instance, output_dir, cache_dir,
         'download',
         '-digest',
         digest,
-        '-cas-instance',
-        instance,
         # flags for cache.
         '-cache-dir',
         cache_dir,
@@ -614,6 +612,20 @@ def _fetch_and_map_with_cas(cas_client, digest, instance, output_dir, cache_dir,
         '-log-level',
         'info',
     ]
+
+    # When RUN_ISOLATED_CAS_ADDRESS is set in test mode,
+    # Use it and ignore CAS instance option.
+    cas_addr = os.environ.get('RUN_ISOLATED_CAS_ADDRESS')
+    if cas_addr:
+      cmd.extend([
+        '-cas-addr',
+        cas_addr,
+      ])
+    else:
+      cmd.extend([
+        '-cas-instance',
+        instance
+      ])
 
     if kvs_dir:
       cmd.extend(['-kvs-dir', kvs_dir])
@@ -849,8 +861,6 @@ def upload_outdir_with_cas(cas_client, cas_instance, outdir, tmp_dir):
     cmd = [
         cas_client,
         'archive',
-        '-cas-instance',
-        cas_instance,
         '-paths',
         # Format: <working directory>:<relative path to dir>
         outdir + ':',
@@ -860,6 +870,20 @@ def upload_outdir_with_cas(cas_client, cas_instance, outdir, tmp_dir):
         '-dump-stats-json',
         stats_json_path,
     ]
+
+    # When RUN_ISOLATED_CAS_ADDRESS is set in test mode,
+    # Use it and ignore CAS instance option.
+    cas_addr = os.environ.get('RUN_ISOLATED_CAS_ADDRESS')
+    if cas_addr:
+      cmd.extend([
+        '-cas-addr',
+        cas_addr,
+      ])
+    else:
+      cmd.extend([
+        '-cas-instance',
+        cas_instance
+      ])
 
     if sys.platform.startswith('linux'):
       # TODO(crbug.com/1243194): remove this after investigation.
