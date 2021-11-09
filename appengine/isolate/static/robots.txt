@@ -1,3 +1,0 @@
-# An Isolate Server is not really a browseable site.
-User-agent: *
-Disallow: /
