@@ -478,6 +478,11 @@ def gen_expected(**kwargs):
   return expected
 
 
+def _filter_out_go_client_logs(output):
+  return '\n'.join(
+      [o for o in output.split('\n') if not re.match('^.* \S+\.go:\d+\]', o)])
+
+
 class Test(unittest.TestCase):
   maxDiff = None
   client = None
@@ -1412,12 +1417,14 @@ class Test(unittest.TestCase):
         """) % ('SIGBREAK' if sys.platform == 'win32' else 'SIGTERM'),
     }
     name = 'kill_running'
-    isolated_hash, _isolated_size = self._archive(name, content,
-                                                  DEFAULT_ISOLATE_HELLO)
+    digest, _ = self._archive(name,
+                              content,
+                              DEFAULT_ISOLATE_HELLO,
+                              use_cas=True)
     # Do not use self._run_isolated() here since we want to kill it, not wait
     # for it to complete.
-    task_id = self.client.task_trigger_isolated(
-        isolated_hash, name, ['--'] + DEFAULT_COMMAND + ['${ISOLATED_OUTDIR}'])
+    task_id = self.client.task_trigger_with_cas(
+        digest, name, ['--'] + DEFAULT_COMMAND + ['${ISOLATED_OUTDIR}'])
 
     # Wait for the task to start on the bot.
     self._wait_for_state(task_id, u'PENDING', u'RUNNING')
@@ -1426,7 +1433,7 @@ class Test(unittest.TestCase):
     start = time.time()
     out = None
     while time.time() - start < 45.:
-      out = self.client.task_stdout(task_id)
+      out = _filter_out_go_client_logs(self.client.task_stdout(task_id))
       if out == 'hi\n':
         break
     self.assertEqual(out, 'hi\n')
@@ -1682,8 +1689,7 @@ class Test(unittest.TestCase):
         'performance_stats', None)
     # filter luci-go client logs out.
     output = actual_summary['shards'][0]['output']
-    actual_summary['shards'][0]['output'] = '\n'.join(
-        [o for o in output.split('\n') if not re.match('^.* \S+\.go:\d+\]', o)])
+    actual_summary['shards'][0]['output'] = _filter_out_go_client_logs(output)
     self.assertResults(expected_summary, actual_summary, deduped=deduped)
     self.assertEqual(expected_files, actual_files)
     return task_id, output_root, performance_stats
