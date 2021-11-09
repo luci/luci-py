@@ -19,6 +19,7 @@ import json
 import logging
 import os
 import re
+import shutil
 import signal
 import socket
 import sys
@@ -53,8 +54,9 @@ test_env_bot.setup_test_env()
 
 from api import os_utilities
 
-SWARMING_CLI = os.path.join(LUCI_DIR, 'luci-go', 'swarming')
+CAS_CLI = os.path.join(LUCI_DIR, 'luci-go', 'cas')
 ISOLATE_CLI = os.path.join(LUCI_DIR, 'luci-go', 'isolate')
+SWARMING_CLI = os.path.join(LUCI_DIR, 'luci-go', 'swarming')
 
 # Use a variable because it is corrupting my text editor from the 80s.
 # One important thing to note is that this character U+1F310 is not in the BMP
@@ -143,6 +145,32 @@ class SwarmingClient(object):
     else:
       logging.debug('CAS digest = %s', hash_or_digest)
     return hash_or_digest
+
+  def cas_archive(self, paths):
+    """Archives specified paths to CAS."""
+    dump_digest = os.path.join(self._tmpdir, 'archive_digest')
+    cmd = [
+        CAS_CLI,
+        'archive',
+        '-cas-addr',
+        self._cas_addr,
+        '-dump-digest',
+        dump_digest,
+        '-log-level',
+        'debug',
+    ]
+    for p in paths:
+      cmd.extend(['-paths', p])
+    logging.debug('SwarmingClient.cas_archive: executing command. %s', cmd)
+    with fs.open(self._rotate_logfile(), 'wb') as f:
+      f.write('\nRunning: %s\n' % ' '.join(cmd))
+      p = subprocess42.Popen(cmd, stdout=f, stderr=f)
+      p.communicate()
+    assert p.returncode == 0, ('Failed to archive. exit_code=%d, cmd=%s' %
+                               (p.returncode, cmd))
+    with fs.open(dump_digest) as f:
+      digest = f.read()
+    return digest
 
   def retrieve_file(self, isolated_hash, dst):
     """Retrieves a single isolated content."""
@@ -460,6 +488,16 @@ class Test(unittest.TestCase):
   # This test can't pass when running via test runner
   # run by sequential_test_runner.py
   no_run = 1
+
+  @classmethod
+  def setUpClass(cls):
+    super(Test, cls).setUpClass()
+
+    # TODO(crbug.com/1268267): uploading an empty dir produces non-empty digest.
+    # Upload an empty dir for performance stats in tests to be consistent.
+    emptydir = tempfile.mkdtemp()
+    cls.client.cas_archive([emptydir + ':.'])
+    shutil.rmtree(emptydir)
 
   def setUp(self):
     super(Test, self).setUp()
@@ -865,7 +903,7 @@ class Test(unittest.TestCase):
     }
     self.assertEqual(output_root, expected_output)
     output_root_size = int(output_root['digest']['size_bytes'])
-    items_out = [output_root_size]
+    items_out = [0, output_root_size]
     expected_performance_stats = {
         u'cache_trim': {},
         u'package_installation': {},
@@ -884,12 +922,12 @@ class Test(unittest.TestCase):
         u'isolated_upload': {
             u'initial_number_items': u'0',
             u'initial_size': u'0',
-            u'items_cold': sorted(items_out),
-            u'items_hot': [0],
-            u'num_items_cold': unicode(len(items_out)),
-            u'num_items_hot': u'1',
-            u'total_bytes_items_cold': unicode(sum(items_out)),
-            u'total_bytes_items_hot': u'0',
+            u'items_cold': [],
+            u'items_hot': sorted(items_out),
+            u'num_items_cold': u'0',
+            u'num_items_hot': unicode(len(items_out)),
+            u'total_bytes_items_cold': u'0',
+            u'total_bytes_items_hot': unicode(sum(items_out)),
         },
         u'cleanup': {},
     }
