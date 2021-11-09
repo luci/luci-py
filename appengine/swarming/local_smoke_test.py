@@ -846,9 +846,8 @@ class Test(unittest.TestCase):
     self.assertPerformanceStats(expected_performance_stats, performance_stats)
 
   def test_hard_timeout_with_cas(self):
-    # Make an isolated file, archive it, have it time out. Similar to
-    # test_hard_timeout. The script doesn't handle signal so it failed the grace
-    # period.
+    # Similar to test_hard_timeout. The script doesn't handle signal so it
+    # failed the grace period.
     content = {
         HELLO_WORLD + u'.py':
         _script(u"""
@@ -933,12 +932,12 @@ class Test(unittest.TestCase):
     }
     self.assertPerformanceStats(expected_performance_stats, performance_stats)
 
-  def test_isolated_hard_timeout_grace(self):
-    # Make an isolated file, archive it, have it time out. Similar to
-    # test_hard_timeout. The script handles signal so it send results back.
+  def test_hard_timeout_grace_with_cas(self):
+    # Similar to test_hard_timeout. The script handles signal so it send
+    # results back.
     content = {
         HELLO_WORLD + u'.py':
-            _script(u"""
+        _script(u"""
         import os
         import signal
         import sys
@@ -954,15 +953,18 @@ class Test(unittest.TestCase):
         while not bit.wait(0.01):
           pass
         with open(os.path.join(sys.argv[1], 'result.txt'), 'wb') as f:
-          f.write('test_isolated_hard_timeout_grace')
+          f.write('test_hard_timeout_grace_with_cas')
         """ % ('SIGBREAK' if sys.platform == 'win32' else 'SIGTERM')),
     }
-    name = 'isolated_hard_timeout_grace'
-    isolated_hash, isolated_size = self._archive(name, content,
-                                                 DEFAULT_ISOLATE_HELLO)
-    items_in = [3072, isolated_size]
+    name = 'hard_timeout_grace'
+    digest, _ = self._archive(name,
+                              content,
+                              DEFAULT_ISOLATE_HELLO,
+                              use_cas=True)
+    content_size = sum(len(c) for c in content.values())
+    items_in = [content_size]
     expected_summary = self.gen_expected(
-        name=u'isolated_hard_timeout_grace',
+        name=u'hard_timeout_grace',
         output=u'hi\ngot signal 15\n',
         failure=True,
         tags=[
@@ -978,18 +980,18 @@ class Test(unittest.TestCase):
         state=u'TIMED_OUT')
     expected_summary.pop('exit_code')
     expected_files = {
-        'result.txt': 'test_isolated_hard_timeout_grace',
+        'result.txt': 'test_hard_timeout_grace_with_cas',
     }
     # Hard timeout is enforced by run_isolated, I/O timeout by task_runner.
-    _, outputs_ref, performance_stats = self._run_isolated(
-        isolated_hash,
+    _, output_root, performance_stats = self._run_with_cas(
+        digest,
         name,
         ['-hard-timeout', '1', '--'] + DEFAULT_COMMAND + ['${ISOLATED_OUTDIR}'],
         expected_summary,
         expected_files,
         deduped=False)
-    result_isolated_size = self.assertOutputsRef(outputs_ref)
-    items_out = [len('test_isolated_hard_timeout_grace'), result_isolated_size]
+    output_root_size = int(output_root['digest']['size_bytes'])
+    items_out = [len('test_hard_timeout_grace_with_cas'), output_root_size]
     expected_performance_stats = {
         u'cache_trim': {},
         u'package_installation': {},
@@ -1022,9 +1024,12 @@ class Test(unittest.TestCase):
   def test_idempotent_reuse(self):
     content = {HELLO_WORLD + u'.py': 'print("hi")\n'}
     name = 'idempotent_reuse'
-    isolated_hash, isolated_size = self._archive(name, content,
-                                                 DEFAULT_ISOLATE_HELLO)
-    items_in = [3072, isolated_size]
+    digest, _ = self._archive(name,
+                              content,
+                              DEFAULT_ISOLATE_HELLO,
+                              use_cas=True)
+    content_size = sum(len(c) for c in content.values())
+    items_in = [content_size]
     expected_summary = self.gen_expected(
         name=u'idempotent_reuse',
         tags=[
@@ -1037,12 +1042,24 @@ class Test(unittest.TestCase):
             u'swarming.pool.version:pools_cfg_rev',
             u'user:joe@localhost',
         ])
-    task_id, outputs_ref, performance_stats = self._run_isolated(
-        isolated_hash,
+    task_id, output_root, performance_stats = self._run_with_cas(
+        digest,
         name, ['--idempotent', '--'] + DEFAULT_COMMAND + ['${ISOLATED_OUTDIR}'],
         expected_summary, {},
         deduped=False)
-    self.assertIsNone(outputs_ref)
+    # Root dir has an empty dir like
+    # https://cas-viewer.appspot.com/projects/chromium-swarm/instances/default_instance/blobs/24b2420bc49d8b8fdc1d011a163708927532b37dc9f91d7d8d6877e3a86559ca/73/tree
+    expected_output = {
+        'cas_instance': 'projects/test/instances/default_instance',
+        'digest': {
+            'hash':
+            '24b2420bc49d8b8fdc1d011a163708927532b37dc9f91d7d8d6877e3a86559ca',
+            'size_bytes': '73',
+        },
+    }
+    self.assertEqual(output_root, expected_output)
+    output_root_size = int(output_root['digest']['size_bytes'])
+    items_out = [0, output_root_size]
     expected_performance_stats = {
         u'cache_trim': {},
         u'package_installation': {},
@@ -1062,11 +1079,11 @@ class Test(unittest.TestCase):
             u'initial_number_items': u'0',
             u'initial_size': u'0',
             u'items_cold': [],
-            u'items_hot': [],
+            u'items_hot': sorted(items_out),
             u'num_items_cold': u'0',
-            u'num_items_hot': u'0',
+            u'num_items_hot': unicode(len(items_out)),
             u'total_bytes_items_cold': u'0',
-            u'total_bytes_items_hot': u'0',
+            u'total_bytes_items_hot': unicode(sum(items_out)),
         },
         u'cleanup': {},
     }
@@ -1077,13 +1094,13 @@ class Test(unittest.TestCase):
     expected_summary[u'cost_saved_usd'] = 0.02
     expected_summary[u'deduped_from'] = task_id[:-1] + u'1'
     expected_summary.pop(u'try_number')
-    _, outputs_ref, performance_stats = self._run_isolated(
-        isolated_hash,
+    _, output_root, performance_stats = self._run_with_cas(
+        digest,
         'idempotent_reuse2',
         ['--idempotent', '--'] + DEFAULT_COMMAND + ['${ISOLATED_OUTDIR}'],
         expected_summary, {},
         deduped=True)
-    self.assertIsNone(outputs_ref)
+    self.assertEqual(output_root, expected_output)
     self.assertIsNone(performance_stats)
 
   def test_secret_bytes(self):
@@ -1106,9 +1123,12 @@ class Test(unittest.TestCase):
       """),
     }
     name = 'secret_bytes'
-    isolated_hash, isolated_size = self._archive(name, content,
-                                                 DEFAULT_ISOLATE_HELLO)
-    items_in = [3072, isolated_size]
+    digest, _ = self._archive(name,
+                              content,
+                              DEFAULT_ISOLATE_HELLO,
+                              use_cas=True)
+    content_size = sum(len(c) for c in content.values())
+    items_in = [content_size]
     expected_summary = self.gen_expected(
         name=u'secret_bytes',
         tags=[
@@ -1120,14 +1140,14 @@ class Test(unittest.TestCase):
     tmp = os.path.join(self.tmpdir, 'test_secret_bytes')
     with fs.open(tmp, 'wb') as f:
       f.write('foobar')
-    _, outputs_ref, performance_stats = self._run_isolated(
-        isolated_hash,
+    _, output_root, performance_stats = self._run_with_cas(
+        digest,
         name, ['--secret-bytes-path', tmp, '--'] + DEFAULT_COMMAND +
         ['${ISOLATED_OUTDIR}'],
         expected_summary, {'sekret': 'foobar\n'},
         deduped=False)
-    result_isolated_size = self.assertOutputsRef(outputs_ref)
-    items_out = [len('foobar\n'), result_isolated_size]
+    output_root_size = int(output_root['digest']['size_bytes'])
+    items_out = [len('foobar\n'), output_root_size]
     expected_performance_stats = {
         u'cache_trim': {},
         u'package_installation': {},
