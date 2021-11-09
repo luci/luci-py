@@ -3,7 +3,7 @@
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
 
-"""Starts local Swarming and Isolate servers."""
+"""Starts local Swarming and CAS servers."""
 
 from __future__ import print_function
 
@@ -35,19 +35,15 @@ from tool_support import local_app
 
 
 class LocalServers(object):
-  """Local Swarming and Isolate servers."""
+  """Local Swarming and CAS servers."""
+
   def __init__(self, listen_all, root):
-    self._isolate_server = None
     self._swarming_server = None
     self._cas = None
     self._cas_addr = None
     self._cas_log = None
     self._listen_all = listen_all
     self._root = root
-
-  @property
-  def isolate_server(self):
-    return self._isolate_server
 
   @property
   def swarming_server(self):
@@ -63,23 +59,12 @@ class LocalServers(object):
     return self._swarming_server.client
 
   def start(self):
-    """Starts both the Swarming and CAS and Isolate servers."""
+    """Starts both the Swarming and CAS and CAS servers."""
     self._start_cas()
     self._swarming_server = local_app.LocalApplication(
         APP_DIR, 9050, self._listen_all, self._root, 'swarming-local')
     self._swarming_server.start()
-
-    # We wait for the Swarming server to be started up so the isolate server
-    # ports do not clash.
-    self._isolate_server = local_app.LocalApplication(
-        os.path.join(APP_DIR, '..', 'isolate'),
-        10050,
-        self._listen_all,
-        self._root,
-        app_id='local-isolate')
-    self._isolate_server.start()
     self._swarming_server.ensure_serving()
-    self._isolate_server.ensure_serving()
 
     self.http_client.login_as_admin('smoke-test@example.com')
     self.http_client.url_opener.addheaders.append(
@@ -95,7 +80,7 @@ class LocalServers(object):
                                  stderr=subprocess.STDOUT)
 
   def stop(self):
-    """Stops the local Swarming and Isolate servers.
+    """Stops the local Swarming and CAS servers.
 
     Returns the exit code with priority to non-zero.
     """
@@ -105,8 +90,6 @@ class LocalServers(object):
         self._cas.terminate()
       if self._cas_log:
         self._cas_log.close()
-      if self._isolate_server:
-        exit_code = exit_code or self._isolate_server.stop()
     finally:
       if self._swarming_server:
         exit_code = exit_code or self._swarming_server.stop()
@@ -114,14 +97,10 @@ class LocalServers(object):
 
   def wait(self):
     """Wait for the processes to normally exit."""
-    if self._isolate_server:
-      self._isolate_server.wait()
     if self._swarming_server:
       self._swarming_server.wait()
 
   def dump_log(self):
-    if self._isolate_server:
-      self._isolate_server.dump_log()
     if self._swarming_server:
       self._swarming_server.dump_log()
 
@@ -143,7 +122,6 @@ def main():
       servers.start()
       print('Logs    : %s' % root)
       print('Swarming: %s' % servers.swarming_server.url)
-      print('Isolate : %s' % servers.isolate_server.url)
       print('CAS     : %s' % servers.cas_server_address)
       servers.wait()
     except KeyboardInterrupt:
