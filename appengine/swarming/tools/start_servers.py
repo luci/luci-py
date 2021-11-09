@@ -141,9 +141,10 @@ def main():
     dump_log = True
     try:
       servers.start()
-      print('Logs:     %s' % root)
+      print('Logs    : %s' % root)
       print('Swarming: %s' % servers.swarming_server.url)
       print('Isolate : %s' % servers.isolate_server.url)
+      print('CAS     : %s' % servers.cas_server_address)
       servers.wait()
     except KeyboardInterrupt:
       print('<Ctrl-C> received; stopping servers', file=sys.stderr)

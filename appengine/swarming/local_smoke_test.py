@@ -87,17 +87,19 @@ def _script(content):
 
 class SwarmingClient(object):
 
-  def __init__(self, swarming_server, isolate_server, namespace, tmpdir):
+  def __init__(self, swarming_server, isolate_server, namespace, cas_addr,
+               tmpdir):
     self._swarming_server = swarming_server
     self._isolate_server = isolate_server
     self._namespace = namespace
+    self._cas_addr = cas_addr
     self._tmpdir = tmpdir
     self._index = 0
 
   def ensure_logged_out(self):
     assert not self._run_swarming('logout', []), 'swarming logout failed'
 
-  def isolate(self, isolate_path, isolated_path):
+  def isolate(self, isolate_path, isolated_path, use_cas=False):
     """Archives a .isolate file into the isolate server and returns the isolated
     hash.
     """
@@ -105,10 +107,6 @@ class SwarmingClient(object):
     cmd = [
         ISOLATE_CLI,
         'archive',
-        '-I',
-        self._isolate_server,
-        '-namespace',
-        self._namespace,
         '-i',
         isolate_path,
         '-s',
@@ -118,6 +116,18 @@ class SwarmingClient(object):
         '-log-level',
         'debug',
     ]
+    if use_cas:
+      cmd += [
+          '-cas-addr',
+          self._cas_addr,
+      ]
+    else:
+      cmd += [
+          '-I',
+          self._isolate_server,
+          '-namespace',
+          self._namespace,
+      ]
     logging.debug('SwarmingClient.isolate: executing command. %s', cmd)
     with fs.open(self._rotate_logfile(), 'wb') as f:
       f.write('\nRunning: %s\n' % ' '.join(cmd))
@@ -127,9 +137,12 @@ class SwarmingClient(object):
                                (p.returncode, cmd))
     with fs.open(dump_json) as f:
       data = json.load(f)
-    isolated_hash = data.values()[0]
-    logging.debug('%s = %s', isolated_path, isolated_hash)
-    return isolated_hash
+    hash_or_digest = data.values()[0]
+    if not use_cas:
+      logging.debug('%s = %s', isolated_path, hash_or_digest)
+    else:
+      logging.debug('CAS digest = %s', hash_or_digest)
+    return hash_or_digest
 
   def retrieve_file(self, isolated_hash, dst):
     """Retrieves a single isolated content."""
@@ -165,6 +178,35 @@ class SwarmingClient(object):
       task_id = data['tasks'][0]['task_id']
       logging.debug('task_id = %s', task_id)
       return task_id
+
+  def task_trigger_with_cas(self, digest, name, extra):
+    """Triggers a task and return the task id."""
+    h, tmp = tempfile.mkstemp(dir=self._tmpdir,
+                              prefix='trigger_with_cas',
+                              suffix='.json')
+    os.close(h)
+    cmd = [
+        '-user',
+        'joe@localhost',
+        '-d',
+        'pool=default',
+        '-dump-json',
+        tmp,
+        '-task-name',
+        name,
+        '-cas-instance',
+        'projects/test/instances/default_instance',
+        '-digest',
+        digest,
+    ]
+    if extra:
+      cmd.extend(extra)
+    assert not self._run_swarming('trigger', cmd)
+    with fs.open(tmp, 'rb') as f:
+      data = json.load(f)
+    task_id = data['tasks'][0]['task_id']
+    logging.debug('task_id = %s', task_id)
+    return task_id
 
   def task_trigger_isolated(self, isolated_hash, name, extra):
     """Triggers a task and return the task id."""
@@ -232,6 +274,8 @@ class SwarmingClient(object):
     tmp = os.path.join(self._tmpdir, task_id + '.json')
     # swarming collect will return the exit code of the task.
     args = [
+        '-cas-addr',
+        self._cas_addr,
         '-task-summary-json',
         tmp,
         '-task-output-stdout',
@@ -602,8 +646,8 @@ class Test(unittest.TestCase):
       self.assertResults(summary, actual_summary)
       self.assertEqual(files, actual_files)
 
-  def test_isolated(self):
-    # Make an isolated file, archive it.
+  def test_with_cas(self):
+    # Archive input file.
     # Assert that the environment variable SWARMING_TASK_ID is set.
     content = {
         HELLO_WORLD + u'.py':
@@ -620,9 +664,12 @@ class Test(unittest.TestCase):
     # The problem here is that we don't know the isolzed size yet, so we need to
     # do this first.
     name = 'isolated_task'
-    isolated_hash, isolated_size = self._archive(name, content,
-                                                 DEFAULT_ISOLATE_HELLO)
-    items_in = [3072, isolated_size]
+    digest, _ = self._archive(name,
+                              content,
+                              DEFAULT_ISOLATE_HELLO,
+                              use_cas=True)
+    content_size = sum(len(c) for c in content.values())
+    items_in = [content_size]
     expected_summary = self.gen_expected(
         name=u'isolated_task',
         output=u'hi\n',
@@ -635,14 +682,14 @@ class Test(unittest.TestCase):
     expected_files = {
         u'💣.txt': 'test_isolated',
     }
-    _, outputs_ref, performance_stats = self._run_isolated(
-        isolated_hash,
+    _, output_root, performance_stats = self._run_with_cas(
+        digest,
         name, ['--'] + DEFAULT_COMMAND + ['${ISOLATED_OUTDIR}'],
         expected_summary,
         expected_files,
         deduped=False)
-    result_isolated_size = self.assertOutputsRef(outputs_ref)
-    items_out = [len('test_isolated'), result_isolated_size]
+    output_root_size = int(output_root['digest']['size_bytes'])
+    items_out = [output_root_size, len('test_isolated')]
     expected_performance_stats = {
         u'cache_trim': {},
         u'package_installation': {},
@@ -1542,6 +1589,32 @@ class Test(unittest.TestCase):
         self.gen_expected(name=u'wait', tags=tags, output=u'hi\nhi again\n'),
         actual_summary)
 
+  def _run_with_cas(self, digest, name, args, expected_summary, expected_files,
+                    deduped):
+    """Triggers a Swarming task and asserts results.
+
+    It runs a python script archived as an isolated file.
+
+    Returns:
+      tuple of:
+        task_id
+        cas_output_root if any, or None
+        performance_stats if any, or None
+    """
+    task_id = self.client.task_trigger_with_cas(digest, name, args)
+    actual_summary, actual_files = self.client.task_collect(task_id)
+    self.assertIsNotNone(actual_summary['shards'][0], actual_summary)
+    output_root = actual_summary['shards'][0].pop('cas_output_root', None)
+    performance_stats = actual_summary[u'shards'][0].pop(
+        'performance_stats', None)
+    # filter luci-go client logs out.
+    output = actual_summary['shards'][0]['output']
+    actual_summary['shards'][0]['output'] = '\n'.join(
+        [o for o in output.split('\n') if not re.match('^.* \S+\.go:\d+\]', o)])
+    self.assertResults(expected_summary, actual_summary, deduped=deduped)
+    self.assertEqual(expected_files, actual_files)
+    return task_id, output_root, performance_stats
+
   def _run_isolated(self, isolated_hash, name, args, expected_summary,
                     expected_files, deduped):
     """Triggers a Swarming task and asserts results.
@@ -1564,10 +1637,10 @@ class Test(unittest.TestCase):
     self.assertEqual(expected_files, actual_files)
     return task_id, outputs_ref, performance_stats
 
-  def _archive(self, name, contents, isolate_content):
-    """Archives data to the isolate server.
+  def _archive(self, name, contents, isolate_content, use_cas=False):
+    """Archives data to the isolate server or RBE-CAS.
 
-    Returns the isolated hash and its size.
+    Returns the isolated hash or CAS digest and its size.
     """
     # Shared code for all test_isolated_* test cases.
     root = os.path.join(self.tmpdir, name)
@@ -1586,8 +1659,10 @@ class Test(unittest.TestCase):
         os.makedirs(d)
       with fs.open(p, 'wb') as f:
         f.write(content)
-    isolated_hash = self.client.isolate(isolate_path, isolated_path)
-    return isolated_hash, fs.stat(isolated_path).st_size
+    hash_or_digest = self.client.isolate(isolate_path, isolated_path, use_cas)
+    if use_cas:
+      return hash_or_digest, int(hash_or_digest.split('/')[1])
+    return hash_or_digest, fs.stat(isolated_path).st_size
 
   def assertResults(self, expected, result, deduped=False):
     """Compares the outputs of a swarming task."""
@@ -1785,7 +1860,8 @@ def main():
     bot.start()
     namespace = 'default'
     client = SwarmingClient(servers.swarming_server.url,
-                            servers.isolate_server.url, namespace, Test.tmpdir)
+                            servers.isolate_server.url, namespace,
+                            servers.cas_server_address, Test.tmpdir)
     # All requests in local_smoke_test.py are expected to be authenticated with
     # IP address.
     # If it's logged in, luci-go clients send auth header unexpectedly.
