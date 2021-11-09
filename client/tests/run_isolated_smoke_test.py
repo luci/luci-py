@@ -33,35 +33,8 @@ from utils import large
 
 OUTPUT_CONTENT = 'foooo'
 CONTENTS = {
-    'check_files.py':
-        textwrap.dedent("""
-      from __future__ import print_function
-      import os, sys
-      ROOT_DIR = os.path.dirname(os.path.abspath(
-          __file__))
-      expected = [
-        'check_files.py', 'file1.txt', 'file1_copy.txt', 'file2.txt',
-        'repeated_files.py',
-      ]
-      actual = sorted(os.listdir(ROOT_DIR))
-      if expected != actual:
-        print('Expected list doesn\\'t match:', file=sys.stderr)
-        print(
-             '%s\\n%s' % (','.join(expected), ','.join(actual)),
-             file=sys.stderr)
-        sys.exit(1)
-      # Check that file2.txt is in reality file3.txt.
-      with open(os.path.join(ROOT_DIR, 'file2.txt'), 'rb') as f:
-        if f.read() != b'File3\\n':
-          print('file2.txt should be file3.txt in reality', file=sys.stderr)
-          sys.exit(2)
-      print('Success')""").encode(),
     'file1.txt':
         b'File1\n',
-    'file2.txt':
-        b'File2.txt\n',
-    'file3.txt':
-        b'File3\n',
     'repeated_files.py':
         textwrap.dedent("""
       from __future__ import print_function
@@ -87,41 +60,6 @@ CONTENTS = {
         if actual != b'File1\\n':
           print('Unexpected content: %s' % actual, file=sys.stderr)
           sys.exit(1)
-      print('Success')""").encode(),
-    'tar_archive':
-        open(os.path.join(test_env.TESTS_DIR, 'archive.tar'), 'rb').read(),
-    'archive_files.py':
-        textwrap.dedent("""
-      from __future__ import print_function
-      import os, sys
-      ROOT_DIR = os.path.dirname(os.path.abspath(
-          __file__))
-      expected = ['a', 'archive_files.py', 'b']
-      actual = sorted(os.listdir(ROOT_DIR))
-      if expected != actual:
-        print('Expected list doesn\\'t match:', file=sys.stderr)
-        print('%s\\n%s' % (','.join(expected), ','.join(actual)),
-        file=sys.stderr)
-        sys.exit(1)
-      expected = ['foo']
-      actual = sorted(os.listdir(os.path.join(ROOT_DIR, 'a')))
-      if expected != actual:
-        print('Expected list doesn\\'t match:', file=sys.stderr)
-        print('%s\\n%s' % (','.join(expected), ','.join(actual)),
-        file=sys.stderr)
-        sys.exit(2)
-      # Check that a/foo has right contents.
-      with open(os.path.join(ROOT_DIR, 'a/foo'), 'rb') as f:
-        d = f.read()
-        if d != b'Content':
-          print('a/foo contained %r' % d, file=sys.stderr)
-          sys.exit(3)
-      # Check that b has right contents.
-      with open(os.path.join(ROOT_DIR, 'b'), 'rb') as f:
-        d = f.read()
-        if d != b'More content':
-          print('b contained %r' % d, file=sys.stderr)
-          sys.exit(4)
       print('Success')""").encode(),
     'output.py':
         textwrap.dedent("""
@@ -154,17 +92,6 @@ CONTENTS['manifest1.isolated'] = json.dumps({
     }
 }).encode()
 
-CONTENTS['tar_archive.isolated'] = json.dumps({
-    'files': {
-        'archive': {
-            'h': isolateserver_fake.hash_content(CONTENTS['tar_archive']),
-            's': len(CONTENTS['tar_archive']),
-            't': 'tar',
-        },
-        'archive_files.py': file_meta('archive_files.py'),
-    },
-}).encode()
-
 CONTENTS['max_path.isolated'] = json.dumps({
     'files': {
         'a' * 200 + '/' + 'b' * 200: file_meta('file1.txt'),
@@ -178,17 +105,6 @@ CONTENTS['repeated_files.isolated'] = json.dumps({
         'file1_copy.txt': file_meta('file1.txt'),
         'repeated_files.py': file_meta('repeated_files.py'),
     },
-}).encode()
-
-CONTENTS['check_files.isolated'] = json.dumps({
-    'files': {
-        'check_files.py': file_meta('check_files.py'),
-        # Mapping another file.
-        'file2.txt': file_meta('file3.txt'),
-    },
-    'includes': [
-        isolateserver_fake.hash_content(CONTENTS['repeated_files.isolated']),
-    ]
 }).encode()
 
 CONTENTS['output.isolated'] = json.dumps({
@@ -470,47 +386,6 @@ class RunIsolatedTest(unittest.TestCase):
         '<Please secify a command when triggering your Swarming task>\n',
         err)
     self.assertEqual(1, returncode)
-    actual = list_files_tree(self._isolated_cache_dir)
-    self.assertEqual(sorted(expected), actual)
-
-  def test_isolated_includes(self):
-    # Loads an .isolated that includes another one.
-
-    # References repeated_files.isolated. Maps file3.txt
-    # as file2.txt.
-    isolated_hash = self._store('check_files.isolated')
-    expected = [
-      'state.json',
-      self._store('check_files.py'),
-      self._store('file1.txt'),
-      self._store('file3.txt'),
-      self._store('repeated_files.py'),
-    ]
-    # Maps file1.txt.
-    self._store('manifest1.isolated')
-    self._store('repeated_files.isolated')
-
-    out, err, returncode = self._run(
-        self._cmd_args(isolated_hash) + ['--', 'python', 'check_files.py'])
-    self.assertEqual('', err)
-    self.assertEqual('Success\n', out)
-    self.assertEqual(0, returncode)
-    actual = list_files_tree(self._isolated_cache_dir)
-    self.assertEqual(sorted(expected), actual)
-
-  def test_isolated_tar_archive(self):
-    # Loads an .isolated that includes an ar archive.
-    isolated_hash = self._store('tar_archive.isolated')
-    expected = [
-      'state.json',
-      self._store('tar_archive'),
-      self._store('archive_files.py'),
-    ]
-    out, err, returncode = self._run(
-        self._cmd_args(isolated_hash) + ['--', 'python', 'archive_files.py'])
-    self.assertEqual('', err)
-    self.assertEqual('Success\n', out)
-    self.assertEqual(0, returncode)
     actual = list_files_tree(self._isolated_cache_dir)
     self.assertEqual(sorted(expected), actual)
 
