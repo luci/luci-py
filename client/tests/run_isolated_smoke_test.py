@@ -182,7 +182,6 @@ class RunIsolatedTest(unittest.TestCase):
     self._named_cache_dir = os.path.join(self.tempdir, 'n')
     self._cipd_cache_dir = os.path.join(self.tempdir, u'cipd')
     self._cipd_packages_cache_dir = os.path.join(self._cipd_cache_dir, 'cache')
-    self._cas_client_dir = os.path.join(self.tempdir, u'cc')
     # Use the dev instance for testing for now.
     self._cas_instance = 'chromium-swarm-dev'
     self._cas_cache_dir = os.path.join(self.tempdir, 'c')
@@ -213,9 +212,11 @@ class RunIsolatedTest(unittest.TestCase):
     return self._run_cmd(cmd)
 
   def _run_cas(self, args):
-    cmd = [os.path.join(self._cas_client_dir, 'cas')]
-    cmd.extend(args)
-    return self._run_cmd(cmd)
+    return self._run_cmd([
+        os.path.join(
+            os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+            'luci-go', 'cas')
+    ] + args)
 
   def _store_isolated(self, data):
     """Stores an isolated file and returns its hash."""
@@ -227,55 +228,42 @@ class RunIsolatedTest(unittest.TestCase):
     """Stores a test data file in the table and returns its hash."""
     return self._isolated_server.add_content('default', CONTENTS[filename])
 
-  @contextlib.contextmanager
-  def _ensure_cas_client(self):
-    with cipd.get_client(self._cipd_cache_dir) as cipd_client:
-      packages = [
-          ('', run_isolated._CAS_PACKAGE, run_isolated._LUCI_GO_REVISION),
-      ]
-      run_isolated._install_packages(self._cas_client_dir,
-                                     self._cipd_packages_cache_dir, cipd_client,
-                                     packages)
-      yield
-
   def _upload_to_cas(self, upload_dir):
     """Uploads a directory to CAS and returns a digest of the root directory."""
-    with self._ensure_cas_client():
-      digest_file = os.path.join(self.tempdir, 'cas-digest.txt')
-      cmd = [
-          'archive',
-          '-cas-instance',
-          self._cas_instance,
-          '-paths',
-          '%s:' % upload_dir,
-          '-dump-digest',
-          digest_file,
-      ]
-      _, err, returncode = self._run_cas(cmd)
-      self.assertEqual('', err)
-      self.assertEqual(0, returncode)
+    digest_file = os.path.join(self.tempdir, 'cas-digest.txt')
+    cmd = [
+        'archive',
+        '-cas-instance',
+        self._cas_instance,
+        '-paths',
+        '%s:' % upload_dir,
+        '-dump-digest',
+        digest_file,
+    ]
+    _, err, returncode = self._run_cas(cmd)
+    self.assertEqual('', err)
+    self.assertEqual(0, returncode)
 
     return read_content(digest_file).decode()
 
   def _download_from_cas(self, root_digest, dest):
     """Downloads files from CAS."""
-    with self._ensure_cas_client():
-      cmd = [
-          'download',
-          '-cas-instance',
-          self._cas_instance,
-          '-digest',
-          root_digest,
-          '-cache-dir',
-          self._cas_cache_dir,
-          '-dir',
-          dest,
-          '-kvs-dir',
-          self._cas_kvs,
-      ]
-      _, err, returncode = self._run_cas(cmd)
-      self.assertEqual('', err)
-      self.assertEqual(0, returncode)
+    cmd = [
+        'download',
+        '-cas-instance',
+        self._cas_instance,
+        '-digest',
+        root_digest,
+        '-cache-dir',
+        self._cas_cache_dir,
+        '-dir',
+        dest,
+        '-kvs-dir',
+        self._cas_kvs,
+    ]
+    _, err, returncode = self._run_cas(cmd)
+    self.assertEqual('', err)
+    self.assertEqual(0, returncode)
 
   def _cmd_args(self, hash_value):
     """Generates the standard arguments used with |hash_value| as the hash.
