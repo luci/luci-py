@@ -1879,27 +1879,7 @@ def _apply_server_property_defaults(properties):
   if not settings and not pool_cfg:
     return
 
-  _apply_isolate_server_defaults(properties, settings, pool_cfg)
   _apply_cipd_defaults(properties, settings, pool_cfg)
-
-
-def _apply_isolate_server_defaults(properties, settings, pool_cfg):
-  # Do not set Isolate server defaults when CAS input is set.
-  if properties.cas_input_root:
-    return
-
-  iso_server = settings.isolate.default_server
-  iso_ns = settings.isolate.default_namespace
-  if pool_cfg and pool_cfg.default_isolate:
-    iso_server = pool_cfg.default_isolate.server
-    iso_ns = pool_cfg.default_isolate.namespace
-
-  if iso_server and iso_ns:
-    properties.inputs_ref = properties.inputs_ref or FilesRef()
-    properties.inputs_ref.isolatedserver = (
-        properties.inputs_ref.isolatedserver or iso_server)
-    properties.inputs_ref.namespace = (
-        properties.inputs_ref.namespace or iso_ns)
 
 
 def _apply_cipd_defaults(properties, settings, pool_cfg):

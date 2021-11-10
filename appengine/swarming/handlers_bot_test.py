@@ -535,7 +535,8 @@ class BotApiTest(test_env_handlers.AppTestBase):
                     u'path': u'bin',
                     u'version': u'git_revision:deadbeef',
                 }],
-                u'server': u'https://pool.config.cipd.example.com',
+                u'server':
+                u'https://pool.config.cipd.example.com',
             },
             u'command': [u'python', u'run_test.py'],
             u'containment': {
@@ -551,11 +552,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
             u'grace_period': 30,
             u'hard_timeout': 3600,
             u'host': u'http://localhost:8080',
-            u'isolated': {
-                u'input': None,
-                u'namespace': u'default-gzip',
-                u'server': u'https://pool.config.isolate.example.com',
-            },
+            u'isolated': None,
             u'cas_input_root': None,
             u'secret_bytes': None,
             u'realm': {},
@@ -611,7 +608,8 @@ class BotApiTest(test_env_handlers.AppTestBase):
                     u'path': u'bin',
                     u'version': u'git_revision:deadbeef',
                 }],
-                u'server': u'https://pool.config.cipd.example.com',
+                u'server':
+                u'https://pool.config.cipd.example.com',
             },
             u'command': [u'python', u'run_test.py'],
             u'containment': {
@@ -627,11 +625,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
             u'grace_period': 30,
             u'hard_timeout': 3600,
             u'host': u'http://localhost:8080',
-            u'isolated': {
-                u'input': None,
-                u'namespace': u'default-gzip',
-                u'server': u'https://pool.config.isolate.example.com',
-            },
+            u'isolated': None,
             u'cas_input_root': None,
             u'secret_bytes': None,
             u'realm': {},
@@ -669,13 +663,17 @@ class BotApiTest(test_env_handlers.AppTestBase):
     expected = {
         u'cmd': u'run',
         u'manifest': {
-            u'bot_id': u'bot1',
-            u'bot_authenticated_as': u'bot:whitelisted-ip',
-            u'caches': [{
-                u'hint': '-1',
-                u'name': u'git_infra',
-                u'path': u'git_cache',
-            },],
+            u'bot_id':
+            u'bot1',
+            u'bot_authenticated_as':
+            u'bot:whitelisted-ip',
+            u'caches': [
+                {
+                    u'hint': '-1',
+                    u'name': u'git_infra',
+                    u'path': u'git_cache',
+                },
+            ],
             u'cipd_input': {
                 u'client_package': {
                     u'package_name': u'infra/tools/cipd/${platform}',
@@ -687,33 +685,39 @@ class BotApiTest(test_env_handlers.AppTestBase):
                     u'path': u'bin',
                     u'version': u'git_revision:deadbeef',
                 }],
-                u'server': u'https://pool.config.cipd.example.com',
+                u'server':
+                u'https://pool.config.cipd.example.com',
             },
             u'command': [u'python', u'run_test.py'],
             u'containment': {
                 u'containment_type': 2,
             },
-            u'relative_cwd': None,
+            u'relative_cwd':
+            None,
             u'dimensions': {
                 u'os': [u'Amiga'],
                 u'pool': [u'default'],
             },
             u'env': {},
             u'env_prefixes': {},
-            u'grace_period': 30,
-            u'hard_timeout': 3600,
-            u'host': u'http://localhost:8080',
-            u'isolated': {
-                u'input': None,
-                u'namespace': u'default-gzip',
-                u'server': u'https://pool.config.isolate.example.com',
-            },
-            u'cas_input_root': None,
-            u'io_timeout': 1200,
+            u'grace_period':
+            30,
+            u'hard_timeout':
+            3600,
+            u'host':
+            u'http://localhost:8080',
+            u'isolated':
+            None,
+            u'cas_input_root':
+            None,
+            u'io_timeout':
+            1200,
             u'outputs': [u'foo', u'path/to/foobar'],
-            u'secret_bytes': None,
+            u'secret_bytes':
+            None,
             u'realm': {},
-            u'resultdb': None,
+            u'resultdb':
+            None,
             u'service_accounts': {
                 u'system': {
                     u'service_account': u'none'
@@ -722,7 +726,8 @@ class BotApiTest(test_env_handlers.AppTestBase):
                     u'service_account': u'none'
                 },
             },
-            u'task_id': task_id,
+            u'task_id':
+            task_id,
         },
     }
     self.assertEqual(expected, response)
@@ -1079,194 +1084,6 @@ class BotApiTest(test_env_handlers.AppTestBase):
 
     res2 = self.post_json('/swarming/api/v1/bot/poll', params)
     self.assertEqual(res1, res2)
-
-  def test_complete_task_isolated(self):
-    # Successfully poll a task.
-    self.mock(random, 'getrandbits', lambda _: 0x88)
-    # A bot polls, gets a task, updates it, completes it.
-    params = self.do_handshake(do_first_poll=True)
-    # Enqueue a task.
-    self.set_as_user()
-    _, task_id = self.client_create_task_isolated()
-    self.assertEqual('0', task_id[-1])
-
-    # Convert TaskResultSummary reference to TaskRunResult.
-    task_id = task_id[:-1] + '1'
-    self.set_as_bot()
-    response = self.post_json('/swarming/api/v1/bot/poll', params)
-    expected = {
-        u'cmd': u'run',
-        u'manifest': {
-            u'bot_id': u'bot1',
-            u'bot_authenticated_as': u'bot:whitelisted-ip',
-            u'caches': [],
-            u'cipd_input': {
-                u'client_package': {
-                    u'package_name': u'infra/tools/cipd/${platform}',
-                    u'path': None,
-                    u'version': u'git_revision:deadbeef',
-                },
-                u'packages': [{
-                    u'package_name': u'rm',
-                    u'path': u'bin',
-                    u'version': u'git_revision:deadbeef',
-                }],
-                u'server': u'https://pool.config.cipd.example.com',
-            },
-            u'command': ['python', '-c', 'print(1)'],
-            u'containment': {
-                u'containment_type': 2,
-            },
-            u'relative_cwd': None,
-            u'dimensions': {
-                u'os': [u'Amiga'],
-                u'pool': [u'default'],
-            },
-            u'env': {},
-            u'env_prefixes': {},
-            u'hard_timeout': 3600,
-            u'grace_period': 30,
-            u'host': u'http://localhost:8080',
-            u'isolated': {
-                u'input': u'0123456789012345678901234567890123456789',
-                u'server': u'http://localhost:1',
-                u'namespace': u'default-gzip',
-            },
-            u'cas_input_root': None,
-            u'secret_bytes': None,
-            u'realm': {},
-            u'resultdb': None,
-            u'io_timeout': 1200,
-            u'outputs': [u'foo', u'path/to/foobar'],
-            u'service_accounts': {
-                u'system': {
-                    u'service_account': u'none'
-                },
-                u'task': {
-                    u'service_account': u'none'
-                },
-            },
-            u'task_id': task_id,
-        },
-    }
-    self.assertEqual(expected, response)
-
-    # Complete the isolated task.
-    params = {
-        'cost_usd': 0.1,
-        'duration': 3.,
-        'bot_overhead': 0.1,
-        'exit_code': 0,
-        'id': 'bot1',
-        'cache_trim_stats': {
-            'duration': 0.1,
-        },
-        'cipd_stats': {
-            'duration': 0.1,
-        },
-        'named_caches_stats': {
-            'install': {
-                'duration': 0.1,
-            },
-            'uninstall': {
-                'duration': 0.1,
-            },
-        },
-        'isolated_stats': {
-            'download': {
-                'duration': 0.1,
-                'initial_number_items': 10,
-                'initial_size': 1000,
-                'items_cold': '',
-                'items_hot': '',
-            },
-            'upload': {
-                'duration': 0.1,
-                'items_cold': '',
-                'items_hot': '',
-            },
-        },
-        'cleanup_stats': {
-            'duration': 0.1,
-        },
-        'output': base64.b64encode('Ahahah'),
-        'output_chunk_start': 0,
-        'outputs_ref': {
-            u'isolated': u'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
-            u'isolatedserver': u'http://localhost:1',
-            u'namespace': u'default-gzip',
-        },
-        'cipd_pins': {
-            u'client_package': {
-                u'package_name': u'infra/tools/cipd/windows-amd64',
-                u'version': u'deadbeef' * 5,
-            },
-            u'packages': [{
-                u'package_name': u'rm',
-                u'path': u'bin',
-                u'version': u'badc0fee' * 5,
-            }]
-        },
-        'task_id': task_id,
-    }
-    response = self.post_json('/swarming/api/v1/bot/task_update', params)
-    self.assertEqual({u'must_stop': False, u'ok': True}, response)
-
-    self.set_as_user()
-    response = self.client_get_results(task_id, include_performance_stats=True)
-    expected = self.gen_run_result(
-        bot_idle_since_ts=fmtdate(self.now),
-        cipd_pins={
-            u'client_package': {
-                u'package_name': u'infra/tools/cipd/windows-amd64',
-                u'version': u'deadbeef' * 5,
-            },
-            u'packages': [{
-                u'package_name': u'rm',
-                u'path': u'bin',
-                u'version': u'badc0fee' * 5,
-            }]
-        },
-        completed_ts=fmtdate(self.now),
-        costs_usd=[0.1],
-        created_ts=fmtdate(self.now),
-        duration=3.0,
-        performance_stats={
-            u'bot_overhead': 0.1,
-            u'cache_trim': {
-                u'duration': 0.1,
-            },
-            u'package_installation': {
-                u'duration': 0.1,
-            },
-            u'named_caches_install': {
-                u'duration': 0.1,
-            },
-            u'named_caches_uninstall': {
-                u'duration': 0.1,
-            },
-            u'isolated_download': {
-                u'duration': 0.1,
-                u'initial_number_items': u'10',
-                u'initial_size': u'1000',
-            },
-            u'isolated_upload': {
-                u'duration': 0.1,
-            },
-            u'cleanup': {
-                u'duration': 0.1,
-            },
-        },
-        exit_code=u'0',
-        modified_ts=fmtdate(self.now),
-        outputs_ref={
-            u'isolated': u'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
-            u'isolatedserver': u'http://localhost:1',
-            u'namespace': u'default-gzip',
-        },
-        started_ts=fmtdate(self.now),
-        state=u'COMPLETED')
-    self.assertEqual(expected, response)
 
   def test_complete_task_cas_output_root(self):
     # Successfully poll a task.

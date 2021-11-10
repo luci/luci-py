@@ -496,18 +496,6 @@ class AppTestBase(test_case.TestCase):
                                   'new', request)
     return response, response['task_id']
 
-  def client_create_task_isolated(self, properties=None, **kwargs):
-    """Creates a TaskRequest using an isolated tree via the Cloud Endpoints API.
-    """
-    properties = (properties or {}).copy()
-    properties[u'inputs_ref'] = {
-        u'isolated': u'0123456789012345678901234567890123456789',
-        u'isolatedserver': u'http://localhost:1',
-        u'namespace': u'default-gzip',
-    }
-    return self.client_create_task(
-        properties=self.create_props(**properties), **kwargs)
-
   def client_create_task_cas_input_root(self, properties=None, **kwargs):
     """Creates a TaskRequest using a CAS tree via the Cloud Endpoints API.
     """
@@ -576,11 +564,6 @@ class AppTestBase(test_case.TestCase):
         u'io_timeout_secs': u'1200',
         u'outputs': [u'foo', u'path/to/foobar']
     }
-    if 'cas_input_root' not in kwargs:
-      out['inputs_ref'] = {
-          u'isolatedserver': u'https://pool.config.isolate.example.com',
-          u'namespace': u'default-gzip',
-      }
     out.update((unicode(k), v) for k, v in kwargs.items())
     return out
 
