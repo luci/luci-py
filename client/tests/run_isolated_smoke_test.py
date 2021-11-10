@@ -482,10 +482,7 @@ class RunIsolatedTest(unittest.TestCase):
       cmd.append('import os,sys; sys.stdout.write(str(os.nice(0)))')
     out, err, returncode = self._run(cmd)
     if sys.platform == 'win32':
-      if six.PY2:
-        self.assertIn('WindowsError', err)
-      else:
-        self.assertIn('WinError', err)
+      self.assertIn('WinError', err)
       # Value for ERROR_NOT_ENOUGH_QUOTA. See
       # https://docs.microsoft.com/windows/desktop/debug/system-error-codes--1700-3999-
       self.assertIn('1816', err)
