@@ -1151,10 +1151,6 @@ export const taskRequests = [
             },
           ],
           'execution_timeout_secs': '10800',
-          'inputs_ref': {
-            'isolatedserver': 'https://isolateserver.appspot.com',
-            'namespace': 'default-gzip',
-          },
           'grace_period_secs': '30',
           'caches': [
             {
@@ -1358,10 +1354,6 @@ export const taskRequests = [
             },
           ],
           'execution_timeout_secs': '10800',
-          'inputs_ref': {
-            'isolatedserver': 'https://isolateserver.appspot.com',
-            'namespace': 'default-gzip',
-          },
           'grace_period_secs': '30',
           'caches': [
             {
@@ -1563,10 +1555,6 @@ export const taskRequests = [
         },
       ],
       'execution_timeout_secs': '10800',
-      'inputs_ref': {
-        'isolatedserver': 'https://isolateserver.appspot.com',
-        'namespace': 'default-gzip',
-      },
       'grace_period_secs': '30',
       'caches': [
         {

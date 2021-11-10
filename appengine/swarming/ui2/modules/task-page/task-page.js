@@ -219,7 +219,6 @@ const taskInfoTable = (ele, request, result, currentSlice) => {
   ${stateLoadBlock(ele, request, result)}
   ${requestBlock(request, result, currentSlice)}
   ${dimensionBlock(currentSlice.properties.dimensions || [])}
-  ${isolateBlock('Isolated Inputs', currentSlice.properties.inputs_ref || {})}
   ${casBlock('CAS Inputs',
       ele._app._server_details.cas_viewer_server,
       currentSlice.properties.cas_input_root || {})}
@@ -404,21 +403,6 @@ const dimensionRow = (dimension) => html`
   <td class=break-all><b class=dim_key>${dimension.key}:</b>${applyAlias(dimension.value, dimension.key)}</td>
 </tr>
 `;
-
-const isolateBlock = (title, ref) => {
-  if (!ref.isolated) {
-    return '';
-  }
-  return html`
-<tr>
-  <td>${title}</td>
-  <td>
-    <a href=${isolateLink(ref)}>
-      ${ref.isolated}
-    </a>
-  </td>
-</tr>`;
-};
 
 const casBlock = (title, host, ref) => {
   if (!ref.digest) {
@@ -787,7 +771,6 @@ const taskExecutionSection = (ele, request, result, currentSlice) => {
     <td>Cost (USD)</td>
     <td>$${taskCost(result)}</td>
   </tr>
-  ${isolateBlock('Isolated Outputs', result.outputs_ref || {})}
   ${casBlock('CAS Outputs',
       ele._app._server_details.cas_viewer_server,
       result.cas_output_root || {})}
@@ -884,23 +867,12 @@ const reproduceSection = (ele, currentSlice) => {
   if (!ele._taskId || ele._notFound) {
     return '';
   }
-  const ref = currentSlice.properties && currentSlice.properties.inputs_ref || {};
-  const hasIsolated = !!ref.isolated;
   const casRef = currentSlice.properties && currentSlice.properties.cas_input_root || {};
   const casDigest = casRef.digest && `${casRef.digest.hash}/${casRef.digest.size_bytes}`;
   const hostUrl = window.location.hostname;
   return html`
 <div class=title>Reproducing the task locally</div>
 <div class=reproduce>
-  <div ?hidden=${!hasIsolated}>
-    <div>Download inputs files into directory <i>foo</i>:</div>
-    <div class="code bottom_space">
-      # (if needed, use "\\\${platform}" as-is) cipd install "infra/tools/luci/isolated/\\\${platform}" -root bar<br>
-      # (if needed) ./bar/isolated login<br>
-      ./bar/isolated download -I ${ref.isolatedserver} --namespace ${ref.namespace}
-      -isolated ${ref.isolated} -output-dir foo
-    </div>
-  </div>
   <div ?hidden=${!casDigest}>
     <div>Download inputs files into directory <i>foo</i>:</div>
     <div class="code bottom_space">

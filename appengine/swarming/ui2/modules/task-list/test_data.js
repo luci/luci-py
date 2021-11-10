@@ -453,11 +453,6 @@ export const tasks_20 = {
         },
       },
       'run_id': '41e023035ecced11',
-      'outputs_ref': {
-        'isolatedserver': 'https://isolateserver.appspot.com',
-        'namespace': 'default-gzip',
-        'isolated': '6a872951f78a349bd9b96b01fc547628305af99b',
-      },
       'server_versions': [
         '3945-402d3be',
       ],
@@ -637,11 +632,6 @@ export const tasks_20 = {
         },
       },
       'run_id': '41e01fe02b981411',
-      'outputs_ref': {
-        'isolatedserver': 'https://isolateserver.appspot.com',
-        'namespace': 'default-gzip',
-        'isolated': '7b97a56916509478552ef30c6375d3564b126b96',
-      },
       'server_versions': [
         '3945-402d3be',
       ],
@@ -1090,11 +1080,6 @@ export const tasks_20 = {
         },
       },
       'run_id': '41def2cd67262111',
-      'outputs_ref': {
-        'isolatedserver': 'https://isolateserver.appspot.com',
-        'namespace': 'default-gzip',
-        'isolated': '5dc1c4de48f0c991b793f322856824dbfe6c7280',
-      },
       'server_versions': [
         '3945-402d3be',
       ],
@@ -1271,11 +1256,6 @@ export const tasks_20 = {
         },
       },
       'run_id': '41db9ded68fb5c11',
-      'outputs_ref': {
-        'isolatedserver': 'https://isolateserver.appspot.com',
-        'namespace': 'default-gzip',
-        'isolated': 'de32bbbe91a211fb52550fe465ac63bc6ef314a9',
-      },
       'server_versions': [
         '3945-402d3be',
       ],
@@ -1643,11 +1623,6 @@ export const tasks_20 = {
         },
       },
       'run_id': '41e031b2c8b46711',
-      'outputs_ref': {
-        'isolatedserver': 'https://isolateserver.appspot.com',
-        'namespace': 'default-gzip',
-        'isolated': '690fc083605d7f9a9401d79a18f8c3ced8789c8c',
-      },
       'server_versions': [
         '3945-402d3be',
       ],
@@ -1883,11 +1858,6 @@ export const tasks_20 = {
         },
       },
       'run_id': '41e0310fe0b7c411',
-      'outputs_ref': {
-        'isolatedserver': 'https://isolateserver.appspot.com',
-        'namespace': 'default-gzip',
-        'isolated': 'fa47a85e703554abc3b93101d143f840079331f7',
-      },
       'server_versions': [
         '3945-402d3be',
       ],
@@ -2099,11 +2069,6 @@ export const tasks_20 = {
         },
       },
       'run_id': '41dfa79d3bf29011',
-      'outputs_ref': {
-        'isolatedserver': 'https://isolateserver.appspot.com',
-        'namespace': 'default-gzip',
-        'isolated': '8f82f443ba36f4c6d7fa4a803cdcfb0b5c22d992',
-      },
       'server_versions': [
         '3945-402d3be',
       ],
@@ -2330,11 +2295,6 @@ export const tasks_20 = {
         },
       },
       'run_id': '41df677202f20311',
-      'outputs_ref': {
-        'isolatedserver': 'https://isolateserver.appspot.com',
-        'namespace': 'default-gzip',
-        'isolated': '20751b9c699bc9af5b6951bb42631bbf2fbd39b6',
-      },
       'server_versions': [
         '3945-402d3be',
       ],
