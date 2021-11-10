@@ -762,12 +762,6 @@ class TaskProperties(ndb.Model):
 
   This model is immutable.
   """
-  # TODO(maruel): convert inputs_ref and _TaskResultCommon.outputs_ref as:
-  # - input = String which is the isolated input, if any
-  # - isolated_server = <server, metadata e.g. namespace> which is a
-  #   simplified version of FilesRef
-  # - _TaskResultCommon.output = String which is isolated output, if any.
-
   caches = ndb.LocalStructuredProperty(CacheEntry, repeated=True)
 
   # Command to run. This overrides the command in the isolated file if any.
@@ -777,16 +771,8 @@ class TaskProperties(ndb.Model):
   # in an isolated file, if any, else the root mapped directory.
   relative_cwd = ndb.StringProperty(indexed=False)
 
-  # DEPRECATED. Isolate server is being migrated to RBE-CAS.
+  # DEPRECATED. Isolate server has been migrated to RBE-CAS.
   # Use `cas_input_root` to specify the input root reference to CAS.
-  #
-  # Isolate server, namespace and input isolate hash.
-  #
-  # Despite its name, contains isolate server URL and namespace for isolated
-  # output too. See TODO at the top of this class.
-  # May be non-None even if task input is not isolated.
-  #
-  # Only inputs_ref.isolated or command can be specified.
   inputs_ref = ndb.LocalStructuredProperty(FilesRef)
 
   # Digest of the input root uploaded to RBE-CAS.
@@ -881,7 +867,6 @@ class TaskProperties(ndb.Model):
     """If True, it is a terminate request."""
     # Check dimensions last because it's a bit slower.
     return (not self.caches and not self.command
-            and not (self.inputs_ref and self.inputs_ref.isolated)
             and not self.cipd_input and not self.env and not self.env_prefixes
             and not self.execution_timeout_secs and not self.grace_period_secs
             and not self.io_timeout_secs and not self.idempotent
@@ -890,14 +875,14 @@ class TaskProperties(ndb.Model):
 
   def to_dict(self):
     out = super(TaskProperties, self).to_dict(exclude=['dimensions_data'])
+    # TODO(crbug.com/1255535): deprecated.
+    out.pop('inputs_ref')
     # Use the data stored as-is, so properties_hash doesn't change.
     out['dimensions'] = self.dimensions_data
     return out
 
   def to_proto(self, out):
     """Converts self to a swarming_pb2.TaskProperties."""
-    if self.inputs_ref:
-      self.inputs_ref.to_proto(out.cas_inputs)
     if self.cas_input_root:
       self.cas_input_root.to_proto(out.cas_input_root)
     if self.cipd_input:
@@ -952,28 +937,14 @@ class TaskProperties(ndb.Model):
     if not self.command:
       raise datastore_errors.BadValueError(u'\'command\' must be specified')
 
+    if len(self.command) > 128:
+      raise datastore_errors.BadValueError(
+          'command can have up to 128 arguments')
+
     if not self.execution_timeout_secs:
       # Unlike I/O timeout, hard timeout is required.
       raise datastore_errors.BadValueError(
           u'\'execution_timeout_secs\' must be specified')
-
-    # Isolated input and CAS input can't be set at the same time.
-    if self.inputs_ref and self.cas_input_root:
-      raise datastore_errors.BadValueError(
-          'can\'t set both inputs_ref and cas_input_root')
-
-    # Isolated input and commands.
-    isolated_input = self.inputs_ref and self.inputs_ref.isolated
-    if not self.command and not isolated_input:
-      raise datastore_errors.BadValueError(
-          'use at least one of command or inputs_ref.isolated')
-    if self.inputs_ref:
-      # _pre_put_hook() doesn't recurse correctly into
-      # ndb.LocalStructuredProperty. Call the function manually.
-      self.inputs_ref._pre_put_hook()
-    if len(self.command) > 128:
-      raise datastore_errors.BadValueError(
-          'command can have up to 128 arguments')
 
     # Validate caches.
     if len(self.caches) > 32:

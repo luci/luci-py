@@ -842,7 +842,7 @@ class TaskResultApiTest(TestCase):
     run_result.dead_after_ts = None
     run_result.put()
 
-    props_h = 'cc7091fb9447fc1c5aecb8db18d27b658771a1fee1104b535872d1b173eb53a1'
+    props_h = '09057c5f724649e6f5566ecc1594e73515c41d507aa68dd79b5466394edbda3c'
     expected = swarming_pb2.TaskResult(
         request=swarming_pb2.TaskRequest(
             task_slices=[

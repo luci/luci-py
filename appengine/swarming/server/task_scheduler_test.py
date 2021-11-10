@@ -1319,7 +1319,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     # task should be scheduled without error
     result_summary = self._quick_schedule(0, parent_task_id=invalid_parent_id)
 
-  def test_task_parent_isolated(self):
+  def test_task_parent(self):
     run_result = self._quick_reap(
         1,
         0,
@@ -1328,10 +1328,10 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
                 expiration_secs=60,
                 properties=_gen_properties(
                     command=['python'],
-                    inputs_ref=task_request.FilesRef(
-                        isolated='1' * 40,
-                        isolatedserver='http://localhost:1',
-                        namespace='default-gzip')),
+                    cas_input_root=task_request.CASReference(
+                        cas_instance='projects/test/instances/default_instance',
+                        digest=task_request.Digest(hash='1' * 32,
+                                                   size_bytes=1))),
                 wait_for_capacity=False),
         ])
     self.assertEqual('localhost', run_result.bot_id)

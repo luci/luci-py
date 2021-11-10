@@ -82,10 +82,6 @@ def _gen_properties(**kwargs):
           30,
       u'idempotent':
           False,
-      u'inputs_ref':
-          task_request.FilesRef(
-              isolatedserver=u'https://isolateserver.appspot.com',
-              namespace=u'default-gzip'),
       u'io_timeout_secs':
           None,
       u'has_secret_bytes':
@@ -550,11 +546,6 @@ class TaskRequestApiTest(TestCase):
         'grace_period_secs': 30,
         'has_secret_bytes': True,
         'idempotent': True,
-        'inputs_ref': {
-            'isolated': None,
-            'isolatedserver': u'https://isolateserver.appspot.com',
-            'namespace': u'default-gzip',
-        },
         'cas_input_root': None,
         'io_timeout_secs': None,
         'outputs': [],
@@ -600,125 +591,7 @@ class TaskRequestApiTest(TestCase):
     # Intentionally hard code the hash value since it has to be deterministic.
     # Other unit tests should use the calculated value.
     self.assertEqual(
-        '47702738bd229d47c9d07a292b0cb3262694a526d453ac38bdaac77bf0a339b0',
-        req.task_slice(0).properties_hash(req).encode('hex'))
-
-  # TODO(crbug.com/1115778): remove after RBE-CAS migration.
-  def test_init_new_request_isolated(self):
-    parent = _gen_request(
-        properties=_gen_properties(
-            command=[u'command1', u'arg1'],
-            inputs_ref={
-                'isolated': '0123456789012345678901234567890123456789',
-                'isolatedserver': 'http://localhost:1',
-                'namespace': 'default-gzip',
-            }))
-    # Parent entity must have a valid key id and be stored.
-    parent.key = task_request.new_request_key()
-    parent.put()
-    # The reference is to the TaskRunResult.
-    parent_id = task_pack.pack_request_key(parent.key) + u'1'
-    req = _gen_request(
-        properties=_gen_properties(idempotent=True, has_secret_bytes=True),
-        parent_task_id=parent_id)
-    # TaskRequest with secret must have a valid key.
-    req.key = task_request.new_request_key()
-    # Needed for the get() call below.
-    req.put()
-    sb = _gen_secret(req, 'I am not a banana')
-    # Needed for properties_hash() call.
-    sb.put()
-    expected_properties = {
-        'caches': [],
-        'cipd_input': {
-            'client_package': {
-                'package_name': u'infra/tools/cipd/${platform}',
-                'path': None,
-                'version': u'git_revision:deadbeef',
-            },
-            'packages': [{
-                'package_name': u'rm',
-                'path': u'bin',
-                'version': u'git_revision:deadbeef',
-            }],
-            'server': u'https://chrome-infra-packages.appspot.com'
-        },
-        'command': [u'command1', u'arg1'],
-        'containment': {
-            u'lower_priority': False,
-            u'containment_type': None,
-            u'limit_processes': None,
-            u'limit_total_committed_memory': None,
-        },
-        'relative_cwd': None,
-        'dimensions': {
-            u'OS': [u'Windows-3.1.1'],
-            u'hostname': [u'localhost'],
-            u'pool': [u'default'],
-        },
-        'env': {
-            u'foo': u'bar',
-            u'joe': u'2'
-        },
-        'env_prefixes': {
-            u'PATH': [u'local/path']
-        },
-        'execution_timeout_secs': 30,
-        'grace_period_secs': 30,
-        'idempotent': True,
-        'inputs_ref': {
-            'isolated': None,
-            'isolatedserver': u'https://isolateserver.appspot.com',
-            'namespace': u'default-gzip',
-        },
-        'cas_input_root': None,
-        'io_timeout_secs': None,
-        'outputs': [],
-        'has_secret_bytes': True,
-    }
-    expected_request = {
-        'authenticated': auth_testing.DEFAULT_MOCKED_IDENTITY,
-        'has_build_token': False,
-        'name': u'Request name',
-        'parent_task_id': unicode(parent_id),
-        'priority': 50,
-        'pubsub_topic': None,
-        'pubsub_userdata': None,
-        'service_account': u'none',
-        'tags': [
-            u'OS:Windows-3.1.1',
-            u'authenticated:user:mocked@example.com',
-            u'hostname:localhost',
-            u'parent_task_id:%s' % parent_id,
-            u'pool:default',
-            u'priority:50',
-            u'realm:none',
-            u'service_account:none',
-            u'swarming.pool.template:no_config',
-            u'tag:1',
-            u'user:Jesus',
-        ],
-        'task_slices': [{
-            'expiration_secs': 30,
-            'properties': expected_properties,
-            'wait_for_capacity': False,
-        },],
-        'user': u'Jesus',
-        'realm': None,
-        'realms_enabled': False,
-        'bot_ping_tolerance_secs': 120,
-        'resultdb': None,
-    }
-    actual = req.to_dict()
-    # expiration_ts - created_ts == scheduling_expiration_secs.
-    actual.pop('created_ts')
-    actual.pop('expiration_ts')
-    self.assertEqual(expected_request, actual)
-    self.assertEqual(30, req.expiration_secs)
-    # Intentionally hard code the hash value since it has to be deterministic.
-    # Other unit tests should use the calculated value.
-    self.assertEqual(
-        '0d6b986f327ca25a3cc9b5b2154c224085cec0477b81f3539c584edd3de6b90c',
+        '01c7cb24beefad19fe79f8adab4e72447175a6d8b290fb22930f102fc71cf596',
         req.task_slice(0).properties_hash(req).encode('hex'))
 
   def test_init_new_request_cas_input(self):
@@ -740,7 +613,6 @@ class TaskRequestApiTest(TestCase):
         properties=_gen_properties(
             idempotent=True,
             has_secret_bytes=True,
-            inputs_ref=None,
             cas_input_root=cas_input_root,
         ))
     # TaskRequest with secret must have a valid key.
@@ -788,7 +660,6 @@ class TaskRequestApiTest(TestCase):
         'execution_timeout_secs': 30,
         'grace_period_secs': 30,
         'idempotent': True,
-        'inputs_ref': None,
         'cas_input_root': cas_input_root,
         'io_timeout_secs': None,
         'outputs': [],
@@ -836,7 +707,7 @@ class TaskRequestApiTest(TestCase):
     # Intentionally hard code the hash value since it has to be deterministic.
     # Other unit tests should use the calculated value.
     self.assertEqual(
-        'b9f9a01398cea5aeb939100a7df703f5477bde41c52af0013cff0fa4f7c2d97c',
+        'be94b558a518f4d2864960ce0b1a3dbdce050e2713df668d52fd4f43fc0ce2c2',
         req.task_slice(0).properties_hash(req).encode('hex'))
 
   def test_init_new_request_parent(self):
@@ -868,7 +739,7 @@ class TaskRequestApiTest(TestCase):
     # Other unit tests should use the calculated value.
     # Ensure the algorithm is deterministic.
     self.assertEqual(
-        '91ec5e7344af2d11dff84d7a27cb432eafb2d045ac883f5cd2503d675f108c12',
+        '7f75debbd69ed0838c40cacc5ff6942e0199644103b84cf49a84c5deb44f6b78',
         request.task_slice(0).properties_hash(request).encode('hex'))
 
   def test_init_new_request_bot_service_account(self):
@@ -877,26 +748,6 @@ class TaskRequestApiTest(TestCase):
     as_dict = request.to_dict()
     self.assertEqual('bot', as_dict['service_account'])
     self.assertIn(u'service_account:bot', as_dict['tags'])
-
-  def test_init_new_request_RBE_CAS(self):
-    request = _gen_request(
-        properties=_gen_properties(
-            inputs_ref=task_request.FilesRef(
-                isolated='dead' * (64 / 4),
-                isolatedserver='astuce-service',
-                namespace='sha256-GCP')))
-    request.put()
-    as_dict = request.to_dict()
-    expected = {
-        'isolated':
-            u'deaddeaddeaddeaddeaddeaddeaddeaddeaddeaddeaddeaddeaddeaddeaddead',
-        'isolatedserver':
-            u'astuce-service',
-        'namespace':
-            u'sha256-GCP',
-    }
-    self.assertEqual(expected,
-                     as_dict['task_slices'][0]['properties']['inputs_ref'])
 
   def _set_pool_config_with_templates(self,
                                       prod=None,
@@ -1037,167 +888,6 @@ class TaskRequestApiTest(TestCase):
         request_1.task_slice(0).properties_hash(request_1),
         request_2.task_slice(0).properties_hash(request_2))
 
-  # TODO(crbug.com/1115778): remove after RBE-CAS migration.
-  def test_TaskRequest_to_proto_isolated(self):
-    # Try to set as much things as possible to exercise most code paths.
-    def getrandbits(i):
-      self.assertEqual(i, 16)
-      return 0x7766
-
-    self.mock(random, 'getrandbits', getrandbits)
-    self.mock_now(task_request._BEGINING_OF_THE_WORLD)
-
-    # Parent entity must have a valid key id and be stored.
-    # This task uses user:Jesus, which will be inherited automatically.
-    parent = _gen_request()
-    parent.key = task_request.new_request_key()
-    parent.put()
-    # The reference is to the TaskRunResult.
-    parent_id = task_pack.pack_request_key(parent.key) + u'0'
-    parent_run_id = task_pack.pack_request_key(parent.key) + u'1'
-
-    self.mock_now(task_request._BEGINING_OF_THE_WORLD, 2)
-    request_props = _gen_properties(
-        inputs_ref={
-            'isolated': '0123456789012345678901234567890123456789',
-            'isolatedserver': 'http://localhost:1',
-            'namespace': 'default-gzip',
-        },
-        relative_cwd=u'subdir',
-        caches=[
-            task_request.CacheEntry(name=u'git_chromium', path=u'git_cache'),
-        ],
-        cipd_input=_gen_cipd_input(
-            packages=[
-                task_request.CipdPackage(
-                    package_name=u'foo', path=u'tool', version=u'git:12345'),
-            ],),
-        idempotent=True,
-        outputs=[u'foo'],
-        has_secret_bytes=True,
-        containment=task_request.Containment(
-            lower_priority=True,
-            containment_type=task_request.ContainmentType.JOB_OBJECT,
-            limit_processes=1000,
-            limit_total_committed_memory=1024**3,
-        ),
-    )
-    request = _gen_request_slices(
-        task_slices=[
-            task_request.TaskSlice(
-                expiration_secs=30,
-                properties=request_props,
-                wait_for_capacity=True,
-            ),
-        ],
-        # The user is ignored; the value is overridden by the parent task's
-        # user.
-        user=u'Joe',
-        parent_task_id=parent_run_id,
-        service_account=u'foo@gserviceaccount.com',
-        pubsub_topic=u'projects/a/topics/abc',
-        pubsub_auth_token=u'sekret',
-        pubsub_userdata=u'obscure_reference',
-    )
-    # Necessary to have a valid task_id:
-    request.key = task_request.new_request_key()
-    # Necessary to attach a secret to the request:
-    request.put()
-    _gen_secret(request, 'I am a banana').put()
-
-    expected_props = swarming_pb2.TaskProperties(
-        cas_inputs=swarming_pb2.CASTree(
-            digest=u'0123456789012345678901234567890123456789',
-            server=u'http://localhost:1',
-            namespace=u'default-gzip',
-        ),
-        cipd_inputs=[
-            swarming_pb2.CIPDPackage(
-                package_name=u'foo', version=u'git:12345', dest_path=u'tool'),
-        ],
-        named_caches=[
-            swarming_pb2.NamedCacheEntry(
-                name=u'git_chromium', dest_path=u'git_cache'),
-        ],
-        containment=swarming_pb2.Containment(
-            lower_priority=True,
-            containment_type=swarming_pb2.Containment.JOB_OBJECT,
-            limit_processes=1000,
-            limit_total_committed_memory=1024**3,
-        ),
-        command=[u'command1', u'arg1'],
-        relative_cwd=u'subdir',
-        # secret_bytes cannot be retrieved, but is included in properties_hash.
-        has_secret_bytes=True,
-        dimensions=[
-            swarming_pb2.StringListPair(key=u'OS', values=[u'Windows-3.1.1']),
-            swarming_pb2.StringListPair(key=u'hostname', values=[u'localhost']),
-            swarming_pb2.StringListPair(key=u'pool', values=[u'default']),
-        ],
-        env=[
-            swarming_pb2.StringPair(key=u'foo', value=u'bar'),
-            swarming_pb2.StringPair(key=u'joe', value=u'2'),
-        ],
-        env_paths=[
-            swarming_pb2.StringListPair(key=u'PATH', values=[u'local/path']),
-        ],
-        execution_timeout=duration_pb2.Duration(seconds=30),
-        grace_period=duration_pb2.Duration(seconds=30),
-        idempotent=True,
-        outputs=[u'foo'],
-    )
-    # To be updated every time the schema changes.
-    props_h = 'd8653c1c6c55b03b74096557479c0de8f12c70ef90ae6aaec77e2b6e05eba84c'
-    expected = swarming_pb2.TaskRequest(
-        # Scheduling.
-        task_slices=[
-            swarming_pb2.TaskSlice(
-                properties=expected_props,
-                expiration=duration_pb2.Duration(seconds=30),
-                wait_for_capacity=True,
-                properties_hash=props_h,
-            ),
-        ],
-        priority=50,
-        service_account=u'foo@gserviceaccount.com',
-        # Information.
-        create_time=timestamp_pb2.Timestamp(seconds=1262304002),
-        name=u'Request name',
-        authenticated='user:mocked@example.com',
-        tags=[
-            u'OS:Windows-3.1.1',
-            u"authenticated:user:mocked@example.com",
-            u'hostname:localhost',
-            u'parent_task_id:%s' % parent_run_id,
-            u'pool:default',
-            u'priority:50',
-            u'realm:none',
-            u'service_account:foo@gserviceaccount.com',
-            u'swarming.pool.template:no_config',
-            u'tag:1',
-            u'user:Jesus',
-        ],
-        user=u'Jesus',
-        # Hierarchy.
-        task_id=u'7d0776610',
-        parent_task_id=parent_id,
-        parent_run_id=parent_run_id,
-        # Notification. auth_token cannot be retrieved.
-        pubsub_notification=swarming_pb2.PubSub(
-            topic=u'projects/a/topics/abc', userdata=u'obscure_reference'),
-    )
-
-    actual = swarming_pb2.TaskRequest()
-    request.to_proto(actual)
-    self.assertEqual(unicode(expected), unicode(actual))
-
-    # with append_root_ids=True.
-    actual = swarming_pb2.TaskRequest()
-    request.to_proto(actual, append_root_ids=True)
-    expected.root_task_id = parent_id
-    expected.root_run_id = parent_run_id
-    self.assertEqual(unicode(expected), unicode(actual))
-
   def test_TaskRequest_to_proto(self):
     # Try to set as much things as possible to exercise most code paths.
     def getrandbits(i):
@@ -1221,7 +911,6 @@ class TaskRequestApiTest(TestCase):
     self.mock_now(task_request._BEGINING_OF_THE_WORLD, 2)
 
     request_props = _gen_properties(
-        inputs_ref=None,
         cas_input_root={
             'cas_instance': u'projects/test/instances/default',
             'digest': {
@@ -1313,7 +1002,7 @@ class TaskRequestApiTest(TestCase):
         outputs=[u'foo'],
     )
     # To be updated every time the schema changes.
-    props_h = 'd583facbce395f301712f0e99bfd3f8e6f083c3844efde370e93eb73f46d8050'
+    props_h = '9ec1cdcbafd6a2c84132f76b21b609ad0d05382d3abfbd0d76bea337130d44f8'
     expected = swarming_pb2.TaskRequest(
         # Scheduling.
         task_slices=[
@@ -1446,7 +1135,7 @@ class TaskRequestApiTest(TestCase):
 
   def test_request_bad_command(self):
     with self.assertRaises(datastore_errors.BadValueError):
-      _gen_request(properties=_gen_properties(command=[], inputs_ref=None))
+      _gen_request(properties=_gen_properties(command=[]))
     with self.assertRaises(datastore_errors.BadValueError):
       _gen_request(properties=_gen_properties(command={'a': 'b'}))
     with self.assertRaises(datastore_errors.BadValueError):
@@ -1884,63 +1573,11 @@ class TaskRequestApiTest(TestCase):
                 properties=_gen_properties()),
         ]).put()
 
-  def test_request_bad_inputs_ref(self):
-    # Both command and inputs_ref.isolated.
-    _gen_request(
-        properties=_gen_properties(
-            command=['python'],
-            inputs_ref=task_request.FilesRef(
-                isolated='deadbeefdeadbeefdeadbeefdeadbeefdeadbeef',
-                isolatedserver='http://localhost:1',
-                namespace='default-gzip'))).put()
-    # Bad digest.
-    with self.assertRaises(datastore_errors.BadValueError):
-      _gen_request(
-          properties=_gen_properties(
-              command=['see', 'spot', 'run'],
-              inputs_ref=task_request.FilesRef(
-                  isolated='deadbeef',
-                  isolatedserver='http://localhost:1',
-                  namespace='default-gzip')))
-    # inputs_ref without server/namespace.
-    with self.assertRaises(datastore_errors.BadValueError):
-      _gen_request(
-          properties=_gen_properties(inputs_ref=task_request.FilesRef()))
-
-
-    # Without digest nor command.
-    with self.assertRaises(datastore_errors.BadValueError):
-      _gen_request(
-          properties=_gen_properties(
-              command=[],
-              inputs_ref=task_request.FilesRef(
-                  isolatedserver='https://isolateserver.appspot.com',
-                  namespace='default-gzip^^^')))
-    # For 'sha256-GCP', the length must be 64.
-    with self.assertRaises(datastore_errors.BadValueError):
-      _gen_request(
-          properties=_gen_properties(
-              command=[],
-              inputs_ref=task_request.FilesRef(
-                  isolated='deadbeefdeadbeefdeadbeefdeadbeefdeadbeef',
-                  isolatedserver='foo-bar',
-                  namespace='sha256-GCP')))
-    # For 'sha256-GCP', the isolatedserver value must not contain '://'.
-    with self.assertRaises(datastore_errors.BadValueError):
-      _gen_request(
-          properties=_gen_properties(
-              command=[],
-              inputs_ref=task_request.FilesRef(
-                  isolated='dead' * (64 / 4),
-                  isolatedserver='foo://bar',
-                  namespace='sha256-GCP')))
-
   def test_request_bad_cas_input_root(self):
 
     def _gen_request_with_cas_input_root(cas_instance, digest):
       return _gen_request(
           properties=_gen_properties(
-              inputs_ref=None,  # inputs_ref can't be set with cas_input_root.
               cas_input_root=task_request.CASReference(
                   cas_instance=cas_instance, digest=digest)))
 
@@ -1977,21 +1614,6 @@ class TaskRequestApiTest(TestCase):
       _gen_request_with_cas_input_root(
           cas_instance=valid_cas_instance,
           digest=task_request.Digest(hash='12345', size_bytes=None)).put()
-
-  def test_request_conflict_inputs(self):
-    with self.assertRaises(datastore_errors.BadValueError) as e:
-      _gen_request(
-          properties=_gen_properties(
-              inputs_ref=task_request.FilesRef(
-                  isolated='0123456789012345678901234567890123456789',
-                  isolatedserver=u'https://isolateserver.appspot.com',
-                  namespace=u'default-gzip'),
-              cas_input_root=task_request.CASReference(
-                  cas_instance='projects/test/instances/default',
-                  digest=task_request.Digest(hash='12345', size_bytes=1)),
-          ))
-      self.assertEqual(e.exception.message,
-                       "can't set both inputs_ref and cas_input_root")
 
   def test_request_bad_pubsub(self):
     _gen_request(pubsub_topic=u'projects/a/topics/abc').put()

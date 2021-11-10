@@ -79,10 +79,6 @@ def _gen_properties(**kwargs):
           30,
       u'idempotent':
           False,
-      u'inputs_ref':
-          task_request.FilesRef(
-              isolatedserver=u'https://isolateserver.appspot.com',
-              namespace=u'default-gzip'),
       u'io_timeout_secs':
           None,
       u'has_secret_bytes':
@@ -891,7 +887,6 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
             dimensions=request_dimensions,
             env=None,
             env_prefixes=None,
-            inputs_ref=None,
             execution_timeout_secs=0,
             grace_period_secs=0))
     self.assertTrue(
