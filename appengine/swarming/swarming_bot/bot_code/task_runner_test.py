@@ -1299,14 +1299,16 @@ class TaskRunnerNoServer(auto_stub.TestCase):
       }
     self.mock(task_runner, 'run_command', _run_command)
 
-    manifest = get_manifest(
-        command=['hello.exe'],
-        env={'d': 'e'},
-        isolated={
-            'input': '123',
-            'server': 'http://localhost:1',
-            'namespace': 'default-gzip',
-        })
+    manifest = get_manifest(command=['hello.exe'],
+                            env={'d': 'e'},
+                            cas_input_root={
+                                'cas_instance':
+                                'projects/test/instances/default_instance',
+                                'digest': {
+                                    'hash': '123',
+                                    'size': 1,
+                                },
+                            })
     actual = load_and_run(
         'http://localhost:1', self.root_dir, manifest,
         '/path/to/auth-params-file')
