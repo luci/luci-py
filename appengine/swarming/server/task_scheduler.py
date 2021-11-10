@@ -688,9 +688,9 @@ def _is_allowed_service_account(service_account, pool_cfg):
 
 def _bot_update_tx(run_result_key, bot_id, output, output_chunk_start,
                    exit_code, duration, hard_timeout, io_timeout, cost_usd,
-                   outputs_ref, cas_output_root, cipd_pins, need_cancel,
-                   performance_stats, now, result_summary_key, server_version,
-                   request, es_cfg, canceled):
+                   cas_output_root, cipd_pins, need_cancel, performance_stats,
+                   now, result_summary_key, server_version, request, es_cfg,
+                   canceled):
   """Runs the transaction for bot_update_task().
 
   es_cfg is only required when need_cancel is True.
@@ -743,8 +743,6 @@ def _bot_update_tx(run_result_key, bot_id, output, output_chunk_start,
       run_result.duration = duration
       run_result.exit_code = exit_code
 
-  if outputs_ref:
-    run_result.outputs_ref = outputs_ref
   if cas_output_root:
     run_result.cas_output_root = cas_output_root
 
@@ -1439,8 +1437,7 @@ def bot_reap_task(bot_dimensions, bot_version):
 
 def bot_update_task(run_result_key, bot_id, output, output_chunk_start,
                     exit_code, duration, hard_timeout, io_timeout, cost_usd,
-                    outputs_ref, cas_output_root, cipd_pins, performance_stats,
-                    canceled):
+                    cas_output_root, cipd_pins, performance_stats, canceled):
   """Updates a TaskRunResult and TaskResultSummary, along TaskOutputChunk.
 
   Arguments:
@@ -1453,7 +1450,6 @@ def bot_update_task(run_result_key, bot_id, output, output_chunk_start,
   - hard_timeout: Bool set if an hard timeout occured.
   - io_timeout: Bool set if an I/O timeout occured.
   - cost_usd: Cost in $USD of this task up to now.
-  - outputs_ref: task_request.FilesRef instance or None.
   - cas_output_root: task_request.CASReference or None.
   - cipd_pins: None or task_result.CipdPins
   - performance_stats: task_result.PerformanceStats instance or None. Can only
@@ -1483,11 +1479,11 @@ def bot_update_task(run_result_key, bot_id, output, output_chunk_start,
 
   packed = task_pack.pack_run_result_key(run_result_key)
   logging.debug(
-      'bot_update_task(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)',
-      packed, bot_id,
+      'bot_update_task(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)', packed,
+      bot_id,
       len(output) if output else output, output_chunk_start, exit_code,
-      duration, hard_timeout, io_timeout, cost_usd, outputs_ref,
-      cas_output_root, cipd_pins, performance_stats)
+      duration, hard_timeout, io_timeout, cost_usd, cas_output_root, cipd_pins,
+      performance_stats)
 
   result_summary_key = task_pack.run_result_key_to_result_summary_key(
       run_result_key)
@@ -1509,9 +1505,9 @@ def bot_update_task(run_result_key, bot_id, output, output_chunk_start,
   now = utils.utcnow()
   run = lambda: _bot_update_tx(
       run_result_key, bot_id, output, output_chunk_start, exit_code, duration,
-      hard_timeout, io_timeout, cost_usd, outputs_ref, cas_output_root,
-      cipd_pins, need_cancel, performance_stats, now, result_summary_key,
-      server_version, request, es_cfg, canceled)
+      hard_timeout, io_timeout, cost_usd, cas_output_root, cipd_pins,
+      need_cancel, performance_stats, now, result_summary_key, server_version,
+      request, es_cfg, canceled)
   try:
     smry, run_result, error = datastore_utils.transaction(run)
   except datastore_utils.CommitError as e:

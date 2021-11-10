@@ -127,7 +127,6 @@ def _bot_update_task(run_result_key, **kwargs):
       'hard_timeout': False,
       'io_timeout': False,
       'cost_usd': 0.1,
-      'outputs_ref': None,
       'performance_stats': None,
       'canceled': None,
   }
@@ -218,7 +217,6 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         'internal_failure': False,
         'modified_ts': self.now,
         'name': u'yay',
-        'outputs_ref': None,
         'priority': 50,
         'cas_output_root': None,
         'resultdb_info': None,
@@ -271,7 +269,6 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         'internal_failure': False,
         'killing': None,
         'modified_ts': self.now,
-        'outputs_ref': None,
         'cas_output_root': None,
         'resultdb_info': None,
         'server_versions': [u'v1a'],
@@ -1408,8 +1405,9 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     # The bot completes the task.
     done_ts = self.now + datetime.timedelta(seconds=120)
     self.mock_now(done_ts)
-    outputs_ref = task_request.FilesRef(
-        isolated='a' * 40, isolatedserver='http://localhost', namespace='c')
+    cas_output_root = task_request.CASReference(
+        cas_instance='projects/test/instances/default_instance',
+        digest=task_request.Digest(hash='a' * 32, size_bytes=1))
     performance_stats = task_result.PerformanceStats(
         bot_overhead=0.1,
         isolated_download=task_result.CASOperationStats(
@@ -1422,22 +1420,20 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
             duration=0.1, items_cold='aa', items_hot='bb'))
     self.assertEqual(
         State.COMPLETED,
-        _bot_update_task(
-            run_result.key,
-            exit_code=0,
-            duration=3.,
-            outputs_ref=outputs_ref,
-            performance_stats=performance_stats))
+        _bot_update_task(run_result.key,
+                         exit_code=0,
+                         duration=3.,
+                         cas_output_root=cas_output_root,
+                         performance_stats=performance_stats))
     # Simulate an unexpected retry, e.g. the response of the previous RPC never
     # got the client even if it succeedded.
     self.assertEqual(
         State.COMPLETED,
-        _bot_update_task(
-            run_result.key,
-            exit_code=0,
-            duration=3.,
-            outputs_ref=outputs_ref,
-            performance_stats=performance_stats))
+        _bot_update_task(run_result.key,
+                         exit_code=0,
+                         duration=3.,
+                         cas_output_root=cas_output_root,
+                         performance_stats=performance_stats))
     result_summary, run_results = _get_results(result_summary.request_key)
     expected = self._gen_result_summary_reaped(
         completed_ts=done_ts,
@@ -1447,30 +1443,34 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         exit_code=0,
         id='1d69b9f088008910',
         modified_ts=done_ts,
-        outputs_ref={
-            'isolated': u'a' * 40,
-            'isolatedserver': u'http://localhost',
-            'namespace': u'c',
+        cas_output_root={
+            'cas_instance': u'projects/test/instances/default_instance',
+            'digest': {
+                'hash': u'a' * 32,
+                'size_bytes': 1,
+            }
         },
         started_ts=reaped_ts,
         state=State.COMPLETED,
         try_number=1)
     self.assertEqual(expected, result_summary.to_dict())
     expected = [
-        self._gen_run_result(
-            completed_ts=done_ts,
-            cost_usd=0.1,
-            duration=3.0,
-            exit_code=0,
-            id='1d69b9f088008911',
-            modified_ts=done_ts,
-            outputs_ref={
-                'isolated': u'a' * 40,
-                'isolatedserver': u'http://localhost',
-                'namespace': u'c',
-            },
-            started_ts=reaped_ts,
-            state=State.COMPLETED),
+        self._gen_run_result(completed_ts=done_ts,
+                             cost_usd=0.1,
+                             duration=3.0,
+                             exit_code=0,
+                             id='1d69b9f088008911',
+                             modified_ts=done_ts,
+                             cas_output_root={
+                                 'cas_instance':
+                                 u'projects/test/instances/default_instance',
+                                 'digest': {
+                                     'hash': u'a' * 32,
+                                     'size_bytes': 1,
+                                 }
+                             },
+                             started_ts=reaped_ts,
+                             state=State.COMPLETED),
     ]
     self.assertEqual(expected, [t.to_dict() for t in run_results])
     self.assertEqual(2, self.execute_tasks())

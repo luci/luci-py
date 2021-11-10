@@ -1139,7 +1139,6 @@ class BotTaskUpdateHandler(_BotApiHandler):
       u'named_caches_stats',
       u'output',
       u'output_chunk_start',
-      u'outputs_ref',
       u'task_id',
   }
   REQUIRED_KEYS = {u'id', u'task_id'}
@@ -1177,7 +1176,6 @@ class BotTaskUpdateHandler(_BotApiHandler):
     cleanup_stats = request.get('cleanup_stats')
     output = request.get('output')
     output_chunk_start = request.get('output_chunk_start')
-    outputs_ref = request.get('outputs_ref')
     cas_output_root = request.get('cas_output_root')
     canceled = request.get('canceled')
 
@@ -1245,8 +1243,6 @@ class BotTaskUpdateHandler(_BotApiHandler):
         # and returning a HTTP 500 would only force the bot to stay in a retry
         # loop.
         logging.error('Failed to decode output\n%s\n%r', e, output)
-    if outputs_ref:
-      outputs_ref = task_request.FilesRef(**outputs_ref)
     if cas_output_root:
       cas_output_root = task_request.CASReference(
           cas_instance=cas_output_root['cas_instance'],
@@ -1276,7 +1272,6 @@ class BotTaskUpdateHandler(_BotApiHandler):
           hard_timeout=hard_timeout,
           io_timeout=io_timeout,
           cost_usd=cost_usd,
-          outputs_ref=outputs_ref,
           cas_output_root=cas_output_root,
           cipd_pins=cipd_pins,
           performance_stats=performance_stats,

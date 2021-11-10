@@ -731,6 +731,8 @@ class _TaskResultCommon(ndb.Model):
 
   def to_dict(self, **kwargs):
     out = super(_TaskResultCommon, self).to_dict(**kwargs)
+    # TODO(crbug.com/1255535): deprecated.
+    out.pop('outputs_ref')
     # stdout_chunks is an implementation detail.
     out.pop('stdout_chunks')
     out['id'] = self.task_id
@@ -803,8 +805,6 @@ class _TaskResultCommon(ndb.Model):
       self.resultdb_info.to_proto(out.resultdb_info)
     if self.exit_code is not None:
       out.exit_code = self.exit_code
-    if self.outputs_ref:
-      self.outputs_ref.to_proto(out.outputs)
     if self.cas_output_root:
       self.cas_output_root.to_proto(out.cas_output_root)
 
@@ -1197,7 +1197,6 @@ class TaskResultSummary(_TaskResultCommon):
     self.duration = None
     self.exit_code = None
     self.internal_failure = False
-    self.outputs_ref = None
     self.cas_output_root = None
     self.started_ts = None
     self.state = State.PENDING
