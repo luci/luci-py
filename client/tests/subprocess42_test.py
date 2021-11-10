@@ -520,7 +520,7 @@ time.sleep(60)
     if sys.platform != 'win32':
       # signal.SIGKILL is not defined on Windows. Validate our assumption here.
       self.assertEqual(9, signal.SIGKILL)
-    if six.PY3 and sys.platform == 'win32':
+    if sys.platform == 'win32':
       # p.returncode is unsigned in python3 on windows
       self.assertEqual(4294967287, p.returncode)
     else:
@@ -1044,7 +1044,7 @@ time.sleep(60)
         ('stderr', b'incomplete last stderr'),
         ('stdout', b'incomplete last stdout'),
     ]
-    if six.PY3 and sys.platform == 'win32':
+    if sys.platform == 'win32':
       data = [(d[0], d[1].replace(b'\n', b'\r\n')) for d in data]
 
     # With universal_newlines=False

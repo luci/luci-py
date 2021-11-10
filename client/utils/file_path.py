@@ -1074,7 +1074,7 @@ def make_tree_deleteable(root):
   Python3 Win/Mac, use the os.scandir based implementations.
   Python2 or Python3 Linux, use the fs.walk based implementation.
   """
-  if six.PY3 and sys.platform == 'win32':
+  if sys.platform == 'win32':
     make_tree_deleteable_win(root)
   elif six.PY3:
     make_tree_deleteable_posix(root)
