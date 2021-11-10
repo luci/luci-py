@@ -826,7 +826,7 @@ class TaskResultApiTest(TestCase):
     run_result.dead_after_ts = None
     run_result.put()
 
-    props_h = '5c7429e5ab9a21f37ec8c39dcbafbe41127fa67075b92ab0642861bb06578a12'
+    props_h = 'cc7091fb9447fc1c5aecb8db18d27b658771a1fee1104b535872d1b173eb53a1'
     expected = swarming_pb2.TaskResult(
         request=swarming_pb2.TaskRequest(
             task_slices=[
@@ -1049,7 +1049,7 @@ class TaskResultApiTest(TestCase):
     run_result.dead_after_ts = None
     run_result.put()
 
-    props_h = '5c7429e5ab9a21f37ec8c39dcbafbe41127fa67075b92ab0642861bb06578a12'
+    props_h = 'cc7091fb9447fc1c5aecb8db18d27b658771a1fee1104b535872d1b173eb53a1'
     expected = swarming_pb2.TaskResult(
         request=swarming_pb2.TaskRequest(
             task_slices=[

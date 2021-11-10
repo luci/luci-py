@@ -340,7 +340,7 @@ class TaskProperties(messages.Message):
   # packages do not expire from the server.
   cipd_input = messages.MessageField(CipdInput, 10)
   # Command to run. This has priority over a command specified in the isolated
-  # files. Only one of 'command' or 'extra_args' can be specified.
+  # files.
   command = messages.StringField(1, repeated=True)
   # Relative working directory to start the 'command' in, defaults to the root
   # mapped directory or what is provided in the isolated file, if any.
@@ -382,10 +382,6 @@ class TaskProperties(messages.Message):
   # Maximum number of seconds the task can run before its process is forcibly
   # terminated and the task results in TIMED_OUT.
   execution_timeout_secs = messages.IntegerField(4)
-  # Extraneous arguments to append to the command specified in the isolated
-  # file. Can only be used when an isolated file specifies a command. Only one
-  # of 'command' or 'extra_args' can be specified.
-  extra_args = messages.StringField(5, repeated=True)
   # Number of second to give the child process after a SIGTERM before sending a
   # SIGKILL. See doc/Bot.md#timeout-handling
   grace_period_secs = messages.IntegerField(6)

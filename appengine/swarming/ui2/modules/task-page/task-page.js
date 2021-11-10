@@ -460,10 +460,6 @@ const commitBlock = (tagMap) => {
 
 const executionBlock = (properties, env, env_prefixes) => html`
 <tr>
-  <td>Extra Args</td>
-  <td class="code break-all">${(properties.extra_args || []).join(' ') || '--'}</td>
-</tr>
-<tr>
   <td>Command</td>
   <td class="code break-all">${(properties.command || []).join(' ') || '--'}</td>
 </tr>
@@ -1233,8 +1229,6 @@ print('PATH=' + os.environ['PATH'])
 print('LUCI_CONTEXT=' + os.environ['LUCI_CONTEXT'])
 sys.stdout.flush()
 time.sleep(${leaseDuration})`];
-    delete newTask.properties.extra_args;
-
     newTask.properties.execution_timeout_secs = leaseDuration;
     newTask.properties.io_timeout_secs = leaseDuration;
     const dims = this._collectDimensions();

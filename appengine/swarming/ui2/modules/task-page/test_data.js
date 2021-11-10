@@ -791,13 +791,6 @@ export const taskRequests = [
             },
             'server': 'https://chrome-infra-packages.appspot.com',
           },
-          'extra_args': [
-            '--enable-features=WebUIPolymer2',
-            '--disable-features=WebUIPolymer2Exceptions',
-            '--test-launcher-filter-file=../../testing/buildbot/filters/webui_polymer2_browser_tests.filter',
-            '--test-launcher-print-test-stdio=always',
-            '--test-launcher-summary-output=${ISOLATED_OUTDIR}/output.json',
-          ],
           'relative_cwd': '.',
           'io_timeout_secs': '1200',
           'env_prefixes': [
@@ -887,13 +880,6 @@ export const taskRequests = [
         },
         'server': 'https://chrome-infra-packages.appspot.com',
       },
-      'extra_args': [
-        '--enable-features=WebUIPolymer2',
-        '--disable-features=WebUIPolymer2Exceptions',
-        '--test-launcher-filter-file=../../testing/buildbot/filters/webui_polymer2_browser_tests.filter',
-        '--test-launcher-print-test-stdio=always',
-        '--test-launcher-summary-output=${ISOLATED_OUTDIR}/output.json',
-      ],
       'io_timeout_secs': '1200',
       'env_prefixes': [
         {
@@ -1669,11 +1655,6 @@ export const taskRequests = [
             },
             'server': 'https://chrome-infra-packages.appspot.com',
           },
-          'extra_args': [
-            '--gs-results-bucket=chromium-result-details',
-            '--recover-devices',
-            '--test-launcher-summary-output=${ISOLATED_OUTDIR}/output.json',
-          ],
           'io_timeout_secs': '1200',
           'env_prefixes': [
             {
@@ -1757,11 +1738,6 @@ export const taskRequests = [
         },
         'server': 'https://chrome-infra-packages.appspot.com',
       },
-      'extra_args': [
-        '--gs-results-bucket=chromium-result-details',
-        '--recover-devices',
-        '--test-launcher-summary-output=${ISOLATED_OUTDIR}/output.json',
-      ],
       'io_timeout_secs': '1200',
       'env_prefixes': [
         {
@@ -1868,10 +1844,6 @@ export const taskRequests = [
             },
             'server': 'https://chrome-infra-packages.appspot.com',
           },
-          'extra_args': [
-            '--isolated-script-test-output=${ISOLATED_OUTDIR}/output.json',
-            '--isolated-script-test-perf-output=${ISOLATED_OUTDIR}/perftest-output.json',
-          ],
           'io_timeout_secs': '1200',
           'env_prefixes': [
             {
@@ -1946,10 +1918,6 @@ export const taskRequests = [
         },
         'server': 'https://chrome-infra-packages.appspot.com',
       },
-      'extra_args': [
-        '--isolated-script-test-output=${ISOLATED_OUTDIR}/output.json',
-        '--isolated-script-test-perf-output=${ISOLATED_OUTDIR}/perftest-output.json',
-      ],
       'io_timeout_secs': '1200',
       'env_prefixes': [
         {

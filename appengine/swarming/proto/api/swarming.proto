@@ -656,14 +656,13 @@ message TaskProperties {
   // Items must be sorted per the named cache name.
   repeated NamedCacheEntry named_caches = 3;
   // Command to run. This has priority over a command specified in the isolated
-  // files. Only one of 'command' or 'extra_args' can be specified.
+  // files.
   repeated string command = 4;
   // Relative working directory to start the 'command' in, defaults to the root
   // mapped directory or what is provided in the isolated file, if any.
   string relative_cwd = 5;
   // Extraneous arguments to append to the command specified in the isolated
-  // file. Can only be used when an isolated file specifies a command. Only one
-  // of 'command' or 'extra_args' can be specified.
+  // file. Can only be used when an isolated file specifies a command.
   //
   // Deprecated.
   repeated string extra_args = 6;

@@ -66,10 +66,6 @@ Inputs can be a mix of all 4 of:
 Command execution environment is defined as:
 
 *   Command line:
-    *   From the isolated file. In this case, it is possible to extend with
-        `extra_args` to specify arguments _appended_ to the command on a
-        per-task basis. A good use is to shard test runs into multiple
-        subshards.
     *   In the task properties. In this case, the actual command is listed as a
         list.
 *   Idempotency flag to signify possibility of reusing previous succeeding

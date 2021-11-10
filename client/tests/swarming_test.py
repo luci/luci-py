@@ -111,7 +111,6 @@ def gen_properties(**kwargs):
       'env': [],
       'env_prefixes': [],
       'execution_timeout_secs': 60,
-      'extra_args': ['--some-arg', '123'],
       'grace_period_secs': 30,
       'idempotent': False,
       'inputs_ref': {
@@ -284,7 +283,6 @@ class TestSwarmingTrigger(NetTestCase):
                       },
                       env_prefixes=[],
                       execution_timeout_secs=60,
-                      extra_args=[],
                       grace_period_secs=30,
                       idempotent=False,
                       inputs_ref={
@@ -375,7 +373,6 @@ class TestSwarmingTrigger(NetTestCase):
                     },
                     env_prefixes=[],
                     execution_timeout_secs=60,
-                    extra_args=[],
                     grace_period_secs=30,
                     idempotent=False,
                     inputs_ref={
@@ -451,7 +448,6 @@ class TestSwarmingTrigger(NetTestCase):
                     env={},
                     env_prefixes=[],
                     execution_timeout_secs=60,
-                    extra_args=[],
                     grace_period_secs=30,
                     idempotent=False,
                     inputs_ref={
@@ -530,7 +526,6 @@ class TestSwarmingTrigger(NetTestCase):
                     env={},
                     env_prefixes=[],
                     execution_timeout_secs=60,
-                    extra_args=[],
                     grace_period_secs=30,
                     idempotent=False,
                     inputs_ref={
@@ -611,7 +606,6 @@ class TestSwarmingTrigger(NetTestCase):
                     env={},
                     env_prefixes=[],
                     execution_timeout_secs=60,
-                    extra_args=[],
                     grace_period_secs=30,
                     idempotent=False,
                     inputs_ref={
@@ -1060,7 +1054,6 @@ class TestMain(NetTestCase):
                         'value': 'default'
                     }],
                     execution_timeout_secs=3600,
-                    extra_args=None,
                     inputs_ref=None,
                     io_timeout_secs=1200,
                     relative_cwd='deeep'),
@@ -1151,7 +1144,6 @@ class TestMain(NetTestCase):
                             },
                         ],
                         execution_timeout_secs=3600,
-                        extra_args=None,
                         inputs_ref=None,
                         io_timeout_secs=1200,
                         relative_cwd='deeep'),
@@ -1187,7 +1179,6 @@ class TestMain(NetTestCase):
                             },
                         ],
                         execution_timeout_secs=3600,
-                        extra_args=None,
                         inputs_ref=None,
                         io_timeout_secs=1200,
                         relative_cwd='deeep'),
@@ -1219,7 +1210,6 @@ class TestMain(NetTestCase):
                             },
                         ],
                         execution_timeout_secs=3600,
-                        extra_args=None,
                         inputs_ref=None,
                         io_timeout_secs=1200,
                         relative_cwd='deeep'),
@@ -1324,7 +1314,6 @@ class TestMain(NetTestCase):
                             },
                         ],
                         execution_timeout_secs=3600,
-                        extra_args=None,
                         inputs_ref=None,
                         io_timeout_secs=1200,
                         relative_cwd='deeep'),
@@ -1352,7 +1341,6 @@ class TestMain(NetTestCase):
                             },
                         ],
                         execution_timeout_secs=3600,
-                        extra_args=None,
                         inputs_ref=None,
                         io_timeout_secs=1200,
                         relative_cwd='deeep'),
@@ -1380,7 +1368,6 @@ class TestMain(NetTestCase):
                             },
                         ],
                         execution_timeout_secs=3600,
-                        extra_args=None,
                         inputs_ref=None,
                         io_timeout_secs=1200,
                         relative_cwd='deeep'),
@@ -1478,7 +1465,6 @@ class TestMain(NetTestCase):
                             },
                         ],
                         execution_timeout_secs=3600,
-                        extra_args=None,
                         inputs_ref=None,
                         io_timeout_secs=1200,
                         relative_cwd='deeep'),
@@ -1506,7 +1492,6 @@ class TestMain(NetTestCase):
                             },
                         ],
                         execution_timeout_secs=3600,
-                        extra_args=None,
                         inputs_ref=None,
                         io_timeout_secs=1200,
                         relative_cwd='deeep'),
@@ -1590,7 +1575,6 @@ class TestMain(NetTestCase):
                         'value': 'default'
                     }],
                     execution_timeout_secs=3600,
-                    extra_args=None,
                     inputs_ref={
                         'isolated': u'1111111111111111111111111111111111111111',
                         'isolatedserver': 'https://localhost:2',
@@ -1664,7 +1648,6 @@ class TestMain(NetTestCase):
                         'value': 'default'
                     }],
                     execution_timeout_secs=3600,
-                    extra_args=None,
                     inputs_ref=None,
                     io_timeout_secs=1200),
             'wait_for_capacity':
@@ -2019,7 +2002,7 @@ class TestMain(NetTestCase):
       ])
     self._check_output(
         '', 'Usage: swarming.py trigger [options] (hash|isolated) '
-        '[-- extra_args|raw command]\n'
+        '[-- raw command]\n'
         '\n'
         'swarming.py: error: Specify at least one of --raw-cmd or --isolated '
         'or both\n')
@@ -2029,7 +2012,7 @@ class TestMain(NetTestCase):
       main(['trigger'])
     self._check_output(
         '', 'Usage: swarming.py trigger [options] (hash|isolated) '
-        '[-- extra_args|raw command]'
+        '[-- raw command]'
         '\n\n'
         'swarming.py: error: --swarming is required.'
         '\n')
@@ -2040,7 +2023,7 @@ class TestMain(NetTestCase):
         main(['trigger', '-T' 'foo', 'foo.isolated'])
     self._check_output(
         '', 'Usage: swarming.py trigger [options] (hash|isolated) '
-        '[-- extra_args|raw command]'
+        '[-- raw command]'
         '\n\n'
         'swarming.py: error: --swarming is required.'
         '\n')
@@ -2051,7 +2034,7 @@ class TestMain(NetTestCase):
         main(['trigger', 'foo.isolated', '-d', 'pool', 'default'])
     self._check_output(
         '', 'Usage: swarming.py trigger [options] (hash|isolated) '
-        '[-- extra_args|raw command]'
+        '[-- raw command]'
         '\n\n'
         'swarming.py: error: Specify at least one of --raw-cmd or --isolated '
         'or both\n')
@@ -2068,7 +2051,7 @@ class TestMain(NetTestCase):
       ])
     self._check_output(
         '', 'Usage: swarming.py trigger [options] (hash|isolated) '
-        '[-- extra_args|raw command]'
+        '[-- raw command]'
         '\n\n'
         'swarming.py: error: Please at least specify one --dimension\n')
 
@@ -2240,7 +2223,6 @@ class TestMain(NetTestCase):
                         'value': 'default'
                     }],
                     execution_timeout_secs=3600,
-                    extra_args=None,
                     inputs_ref=None,
                     io_timeout_secs=1200,
                     relative_cwd='deeep'),

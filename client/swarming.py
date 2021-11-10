@@ -110,7 +110,6 @@ TaskProperties = collections.namedtuple('TaskProperties', [
     'env',
     'env_prefixes',
     'execution_timeout_secs',
-    'extra_args',
     'grace_period_secs',
     'idempotent',
     'inputs_ref',
@@ -1130,7 +1129,6 @@ def process_trigger_options(parser, options, args):
 
   # Command
   command = None
-  extra_args = None
   if options.raw_cmd:
     command = args
     if options.relative_cwd:
@@ -1141,7 +1139,6 @@ def process_trigger_options(parser, options, args):
   else:
     if options.relative_cwd:
       parser.error('--relative-cwd requires --raw-cmd')
-    extra_args = args
 
   # CIPD
   cipd_packages = []
@@ -1193,7 +1190,6 @@ def process_trigger_options(parser, options, args):
       env=options.env,
       env_prefixes=[StringListPair(k, v) for k, v in env_prefixes.items()],
       execution_timeout_secs=options.hard_timeout,
-      extra_args=extra_args,
       grace_period_secs=30,
       idempotent=options.idempotent,
       inputs_ref=inputs_ref,
@@ -1672,7 +1668,7 @@ def CMDquery_list(parser, args):
   return 0
 
 
-@subcommand.usage('(hash|isolated) [-- extra_args]')
+@subcommand.usage('(hash|isolated) [-- raw command]')
 def CMDrun(parser, args):
   """Triggers a task and wait for the results.
 
@@ -1744,7 +1740,7 @@ def CMDterminate(parser, args):
   return 0
 
 
-@subcommand.usage("(hash|isolated) [-- extra_args|raw command]")
+@subcommand.usage("(hash|isolated) [-- raw command]")
 def CMDtrigger(parser, args):
   """Triggers a Swarming task.
 

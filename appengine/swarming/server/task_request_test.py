@@ -546,7 +546,6 @@ class TaskRequestApiTest(TestCase):
         'env_prefixes': {
             u'PATH': [u'local/path']
         },
-        'extra_args': [],
         'execution_timeout_secs': 30,
         'grace_period_secs': 30,
         'has_secret_bytes': True,
@@ -601,7 +600,7 @@ class TaskRequestApiTest(TestCase):
     # Intentionally hard code the hash value since it has to be deterministic.
     # Other unit tests should use the calculated value.
     self.assertEqual(
-        'c262bae20e9b1a265fa5937d67aa36f690612b0e28c8af7e38b347dd6746da65',
+        '47702738bd229d47c9d07a292b0cb3262694a526d453ac38bdaac77bf0a339b0',
         req.task_slice(0).properties_hash(req).encode('hex'))
 
   # TODO(crbug.com/1115778): remove after RBE-CAS migration.
@@ -664,7 +663,6 @@ class TaskRequestApiTest(TestCase):
         'env_prefixes': {
             u'PATH': [u'local/path']
         },
-        'extra_args': [],
         'execution_timeout_secs': 30,
         'grace_period_secs': 30,
         'idempotent': True,
@@ -720,7 +718,7 @@ class TaskRequestApiTest(TestCase):
     # Intentionally hard code the hash value since it has to be deterministic.
     # Other unit tests should use the calculated value.
     self.assertEqual(
-        'f9254eae480e442121919c503c685319ab3a903c2d7b76eac79a947afd09d425',
+        '0d6b986f327ca25a3cc9b5b2154c224085cec0477b81f3539c584edd3de6b90c',
         req.task_slice(0).properties_hash(req).encode('hex'))
 
   def test_init_new_request_cas_input(self):
@@ -787,7 +785,6 @@ class TaskRequestApiTest(TestCase):
         'env_prefixes': {
             u'PATH': [u'local/path']
         },
-        'extra_args': [],
         'execution_timeout_secs': 30,
         'grace_period_secs': 30,
         'idempotent': True,
@@ -839,7 +836,7 @@ class TaskRequestApiTest(TestCase):
     # Intentionally hard code the hash value since it has to be deterministic.
     # Other unit tests should use the calculated value.
     self.assertEqual(
-        '9e1b99c20a5c523ea1ade51276230781f9ddfd3ae396e66c810612a1c5c8062a',
+        'b9f9a01398cea5aeb939100a7df703f5477bde41c52af0013cff0fa4f7c2d97c',
         req.task_slice(0).properties_hash(req).encode('hex'))
 
   def test_init_new_request_parent(self):
@@ -871,7 +868,7 @@ class TaskRequestApiTest(TestCase):
     # Other unit tests should use the calculated value.
     # Ensure the algorithm is deterministic.
     self.assertEqual(
-        'b1230281cc4bcc8d9458dab0810c86fcfaf8e4124351f4d39517833eb9541465',
+        '91ec5e7344af2d11dff84d7a27cb432eafb2d045ac883f5cd2503d675f108c12',
         request.task_slice(0).properties_hash(request).encode('hex'))
 
   def test_init_new_request_bot_service_account(self):
@@ -1130,7 +1127,6 @@ class TaskRequestApiTest(TestCase):
         ),
         command=[u'command1', u'arg1'],
         relative_cwd=u'subdir',
-        # extra_args cannot be specified with command.
         # secret_bytes cannot be retrieved, but is included in properties_hash.
         has_secret_bytes=True,
         dimensions=[
@@ -1151,7 +1147,7 @@ class TaskRequestApiTest(TestCase):
         outputs=[u'foo'],
     )
     # To be updated every time the schema changes.
-    props_h = 'e8718f59959d2c17d9ab1084b6fc9b3ee63e998a704de579543dd84bc1ef603a'
+    props_h = 'd8653c1c6c55b03b74096557479c0de8f12c70ef90ae6aaec77e2b6e05eba84c'
     expected = swarming_pb2.TaskRequest(
         # Scheduling.
         task_slices=[
@@ -1297,7 +1293,6 @@ class TaskRequestApiTest(TestCase):
         ),
         command=[u'command1', u'arg1'],
         relative_cwd=u'subdir',
-        # extra_args cannot be specified with command.
         # secret_bytes cannot be retrieved, but is included in properties_hash.
         has_secret_bytes=True,
         dimensions=[
@@ -1318,7 +1313,7 @@ class TaskRequestApiTest(TestCase):
         outputs=[u'foo'],
     )
     # To be updated every time the schema changes.
-    props_h = '516b5f86592b0e5e3bdd9fbf715305ee6f7ddad36320775d5a945e60df67c360'
+    props_h = 'd583facbce395f301712f0e99bfd3f8e6f083c3844efde370e93eb73f46d8050'
     expected = swarming_pb2.TaskRequest(
         # Scheduling.
         task_slices=[
@@ -1461,26 +1456,6 @@ class TaskRequestApiTest(TestCase):
     _gen_request(properties=_gen_properties(command=[u'python'] * 128)).put()
     with self.assertRaises(datastore_errors.BadValueError):
       _gen_request(properties=_gen_properties(command=[u'python'] * 129)).put()
-
-  def test_request_extra_args(self):
-    with self.assertRaises(datastore_errors.BadValueError):
-      _gen_request(
-          properties=_gen_properties(
-              command=[],
-              extra_args=[u'python'],
-              inputs_ref=task_request.FilesRef(
-                  isolated='deadbeefdeadbeefdeadbeefdeadbeefdeadbeef',
-                  isolatedserver='http://localhost:1',
-                  namespace='default-gzip'))).put()
-    with self.assertRaises(datastore_errors.BadValueError):
-      _gen_request(
-          properties=_gen_properties(
-              command=[u'python'],
-              extra_args=[u'python'],
-              inputs_ref=task_request.FilesRef(
-                  isolated='deadbeefdeadbeefdeadbeefdeadbeefdeadbeef',
-                  isolatedserver='http://localhost:1',
-                  namespace='default-gzip'))).put()
 
   def test_request_bad_cipd_input(self):
 
