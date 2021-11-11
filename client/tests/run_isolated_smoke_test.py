@@ -31,6 +31,10 @@ from utils import file_path
 from utils import large
 
 
+_LUCI_GO = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(
+        os.path.abspath(__file__)))), 'luci-go')
+
 OUTPUT_CONTENT = 'foooo'
 CONTENTS = {
     'file1.txt':
@@ -182,27 +186,42 @@ class RunIsolatedTest(unittest.TestCase):
     self._named_cache_dir = os.path.join(self.tempdir, 'n')
     self._cipd_cache_dir = os.path.join(self.tempdir, u'cipd')
     self._cipd_packages_cache_dir = os.path.join(self._cipd_cache_dir, 'cache')
-    # Use the dev instance for testing for now.
-    self._cas_instance = 'chromium-swarm-dev'
+
     self._cas_cache_dir = os.path.join(self.tempdir, 'c')
     self._cas_kvs = os.path.join(self.tempdir, 'cas_kvs')
+
+    addr_file = os.path.join(self.tempdir, 'cas_addr')
+    self._fakecas = subprocess.Popen([
+        os.path.join(_LUCI_GO, 'fakecas'), '-port', '0', '-addr-file', addr_file
+    ])
+
+    while not os.path.exists(addr_file):
+      # wait until addr_file is created.
+      time.sleep(0.1)
+
+    with open(addr_file) as f:
+      self._cas_addr = f.read()
 
   def tearDown(self):
     try:
       file_path.rmtree(self.tempdir)
       self._isolated_server.close()
+      self._fakecas.terminate()
+      self._fakecas.wait()
     finally:
       super(RunIsolatedTest, self).tearDown()
 
   def _run_cmd(self, cmd):
     pipe = subprocess.PIPE
     logging.debug(' '.join(cmd))
-    proc = subprocess.Popen(
-        cmd,
-        stdout=pipe,
-        stderr=pipe,
-        universal_newlines=True,
-        cwd=self.tempdir)
+    env = os.environ.copy()
+    env['RUN_ISOLATED_CAS_ADDRESS'] = self._cas_addr
+    proc = subprocess.Popen(cmd,
+                            stdout=pipe,
+                            stderr=pipe,
+                            universal_newlines=True,
+                            cwd=self.tempdir,
+                            env=env)
     out, err = proc.communicate()
     return out, err, proc.returncode
 
@@ -212,11 +231,7 @@ class RunIsolatedTest(unittest.TestCase):
     return self._run_cmd(cmd)
 
   def _run_cas(self, args):
-    return self._run_cmd([
-        os.path.join(
-            os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
-            'luci-go', 'cas')
-    ] + args)
+    return self._run_cmd([os.path.join(_LUCI_GO, 'cas')] + args)
 
   def _store_isolated(self, data):
     """Stores an isolated file and returns its hash."""
@@ -233,8 +248,8 @@ class RunIsolatedTest(unittest.TestCase):
     digest_file = os.path.join(self.tempdir, 'cas-digest.txt')
     cmd = [
         'archive',
-        '-cas-instance',
-        self._cas_instance,
+        '-cas-addr',
+        self._cas_addr,
         '-paths',
         '%s:' % upload_dir,
         '-dump-digest',
@@ -250,8 +265,8 @@ class RunIsolatedTest(unittest.TestCase):
     """Downloads files from CAS."""
     cmd = [
         'download',
-        '-cas-instance',
-        self._cas_instance,
+        '-cas-addr',
+        self._cas_addr,
         '-digest',
         root_digest,
         '-cache-dir',
@@ -544,8 +559,6 @@ class RunIsolatedTest(unittest.TestCase):
       args = optional_args + [
           '--root-dir',
           self._root_dir,
-          '--cas-instance',
-          self._cas_instance,
           '--cas-digest',
           inputs_root_digest,
           '--cas-cache',
@@ -624,8 +637,6 @@ class RunIsolatedTest(unittest.TestCase):
     args = [
         '--root-dir',
         self._root_dir,
-        '--cas-instance',
-        self._cas_instance,
         '--cas-digest',
         inputs_root_digest,
         '--cas-cache',
@@ -636,15 +647,12 @@ class RunIsolatedTest(unittest.TestCase):
         result_json,
         '--',
     ] + CMD_OUTPUT
-    _, _, ret = self._run(args)
+    out, err, ret = self._run(args)
 
-    self.assertEqual(0, ret)
+    self.assertEqual(0, ret,
+                     "stdout\n%s\nstderr\n%s\nret: %d" % (out, err, ret))
     upload_stats = load_isolated_stats(result_json, 'upload')
-
-    # TODO(jwata): As we use the same CAS instance, we don't know
-    # if the file is available or expired/deleted. So it needs to check both
-    # items_hot and items_cold for that reason.
-    upload_size = (upload_stats['items_cold'] or upload_stats['items_hot'])[0]
+    upload_size = upload_stats['items_cold'][0]
     self.assertEqual(len(OUTPUT_CONTENT), upload_size)
     result = json.loads(read_content(result_json))
 
