@@ -11,6 +11,7 @@ import time
 CLIENT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LUCI_DIR = os.path.dirname(CLIENT_DIR)
 FAKECAS_BIN = os.path.join(LUCI_DIR, 'luci-go', 'fakecas')
+CAS_CLI = os.path.join(LUCI_DIR, 'luci-go', 'cas')
 
 
 class LocalCAS(object):
@@ -56,3 +57,38 @@ class LocalCAS(object):
       self._proc.terminate()
       self._proc.wait()
       self._log.close()
+
+  def archive_files(self, files):
+    """Uploads contents to the local CAS server"""
+    with tempfile.TemporaryDirectory() as tmpdir:
+      for path, content in files.items():
+        with open(os.path.join(tmpdir, path), 'wb') as f:
+          f.write(content)
+      return self.archive_dir(tmpdir)
+
+  def archive_dir(self, upload_dir):
+    """Uploads directory to the local CAS server"""
+    with tempfile.TemporaryDirectory() as tmpdir:
+      digest_dump = os.path.join(tmpdir, 'digest')
+      cmd = [
+          CAS_CLI,
+          'archive',
+          '-cas-addr',
+          self.address,
+          '-paths',
+          upload_dir + ':.',
+          '-dump-digest',
+          digest_dump,
+          '-log-level',
+          'debug',
+      ]
+      proc = subprocess.Popen(cmd,
+                              stdout=subprocess.PIPE,
+                              stderr=subprocess.STDOUT)
+      out = proc.communicate()[0]
+      if proc.returncode:
+        raise Exception(
+            'Failed to run cas archive. exit_code=%d, cmd="%s"\n%s' %
+            (proc.returncode, ' '.join(cmd), out.decode('unicode-escape')))
+      with open(digest_dump) as f:
+        return f.read()
