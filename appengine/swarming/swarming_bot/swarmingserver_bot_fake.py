@@ -3,6 +3,7 @@
 # that can be found in the LICENSE file.
 
 import base64
+import copy
 import json
 import os
 import sys
@@ -122,7 +123,7 @@ class Server(httpserver.Server):
   def get_tasks(self):
     """Returns the tasks run by the bots."""
     with self._lock:
-      return self._tasks.copy()
+      return copy.deepcopy(self._tasks)
 
   def get_task_errors(self):
     """Returns the task errors reported by the bots."""

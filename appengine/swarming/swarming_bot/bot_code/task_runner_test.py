@@ -246,6 +246,15 @@ class TestTaskRunnerBase(auto_stub.TestCase):
     # Always decode the output;
     if u'output' in actual:
       actual[u'output'] = base64.b64decode(actual[u'output'])
+    if u'isolated_stats' in actual:
+      isolated_stats = actual['isolated_stats']
+      for action in ['download', 'upload']:
+        if action in isolated_stats:
+          stats = isolated_stats[action]
+          for k in ['items_cold', 'items_hot']:
+            if k not in stats:
+              continue
+            stats[k] = large.unpack(base64.b64decode(stats[k]))
     return actual
 
   def expectTask(self, task_id, **kwargs):
@@ -541,23 +550,24 @@ class TestTaskRunner(TestTaskRunnerBase):
         u'must_signal_internal_failure': None,
         u'version': task_runner.OUT_VERSION,
     }
+    contens = list(files.values()) + [isolated]
+    items_in = [len(c) for c in contens]
     self.assertEqual(expected, actual)
-    self.expectTask(
-        manifest['task_id'],
-        isolated_stats={
-            u'download': {
-                u'duration': 0.,
-                u'initial_number_items': 0,
-                u'initial_size': 0,
-                u'items_cold': u'eJzjDmaawAgAAq8A8g==',
-                u'items_hot': u'',
-            },
-            u'upload': {
-                u'duration': 0.,
-                u'items_cold': u'',
-                u'items_hot': u'',
-            },
-        })
+    self.expectTask(manifest['task_id'],
+                    isolated_stats={
+                        u'download': {
+                            u'duration': 0.,
+                            u'initial_number_items': 0,
+                            u'initial_size': 0,
+                            u'items_cold': sorted(items_in),
+                            u'items_hot': [],
+                        },
+                        u'upload': {
+                            u'duration': 0.,
+                            u'items_cold': [],
+                            u'items_hot': [],
+                        },
+                    })
 
   def test_run_command_large(self):
     # Method should have "self" as first argument - pylint: disable=E0213
@@ -1091,29 +1101,26 @@ class TestTaskRunnerKilled(TestTaskRunnerBase):
         except OSError:
           pass
     self.assertEqual(expected, actual)
-    # This is cheezy, this depends on the compiled isolated file.
-    if sys.platform == 'win32':
-      items_cold = u'eJybwMgW6w0AA/ABQA=='
-    else:
-      items_cold = u'eJybwMgW6wUAA+8BPw=='
+    contens = list(files.values()) + [isolated]
+    items_in = [len(c) for c in contens]
     self.expectTask(
         manifest['task_id'],
         io_timeout=True,
         exit_code=EXIT_CODE_TERM,
         output=re.compile(
-          to_native_eol('parent\n\\d+\nchildren\n\\d+\nhi\n').encode()),
+            to_native_eol('parent\n\\d+\nchildren\n\\d+\nhi\n').encode()),
         isolated_stats={
             u'download': {
                 u'duration': 0.,
                 u'initial_number_items': 0,
                 u'initial_size': 0,
-                u'items_cold': items_cold,
-                u'items_hot': u'',
+                u'items_cold': sorted(items_in),
+                u'items_hot': [],
             },
             u'upload': {
                 u'duration': 0.,
-                u'items_cold': u'',
-                u'items_hot': u'',
+                u'items_cold': [],
+                u'items_hot': [],
             },
         })
 
