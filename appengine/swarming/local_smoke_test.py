@@ -1805,12 +1805,12 @@ def main():
     botdir = os.path.join(Test.tmpdir, 'bot')
     os.mkdir(botdir)
     bot = start_bot.LocalBot(servers.swarming_server.url,
-                             servers.cas_server_address,
-                             True, botdir, args.bot_python)
+                             servers.cas_server.address, True, botdir,
+                             args.bot_python)
     Test.bot = bot
     bot.start()
     client = SwarmingClient(servers.swarming_server.url,
-                            servers.cas_server_address, Test.tmpdir)
+                            servers.cas_server.address, Test.tmpdir)
     # All requests in local_smoke_test.py are expected to be authenticated with
     # IP address.
     # If it's logged in, luci-go clients send auth header unexpectedly.

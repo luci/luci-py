@@ -34,14 +34,45 @@ swarming_test_env.setup_test_env()
 from tool_support import local_app
 
 
+class LocalCAS(object):
+  def __init__(self, root, port):
+    self._root = root
+    self._port = port
+    self._proc = None
+    self._log = None
+
+  @property
+  def address(self):
+    return ':' + self._port
+
+  @property
+  def _log_path(self):
+    return os.path.join(self._root, 'cas.log')
+
+  def start(self):
+    logging.info('Launcing cas local at :%s, log is %s', self._port,
+                 self._log_path)
+    if not os.path.exists(self._log_path):
+      os.makedirs(self._root)
+    self._log = open(self._log_path, 'wb')
+    self._proc = subprocess.Popen([FAKECAS_BIN, '-port', self._port],
+                                  stdout=self._log,
+                                  stderr=subprocess.STDOUT)
+
+  def stop(self):
+    if self._proc:
+      self._proc.terminate()
+      self._proc.wait()
+    if self._log:
+      self._log.close()
+
+
 class LocalServers(object):
   """Local Swarming and CAS servers."""
 
   def __init__(self, listen_all, root):
     self._swarming_server = None
     self._cas = None
-    self._cas_addr = None
-    self._cas_log = None
     self._listen_all = listen_all
     self._root = root
 
@@ -50,8 +81,8 @@ class LocalServers(object):
     return self._swarming_server
 
   @property
-  def cas_server_address(self):
-    return self._cas_addr
+  def cas_server(self):
+    return self._cas
 
   @property
   def http_client(self):
@@ -60,7 +91,8 @@ class LocalServers(object):
 
   def start(self):
     """Starts both the Swarming and CAS and CAS servers."""
-    self._start_cas()
+    self._cas = LocalCAS(os.path.join(self._root, 'cas-local'), port='9000')
+    self._cas.start()
     self._swarming_server = local_app.LocalApplication(
         APP_DIR, 9050, self._listen_all, self._root, 'swarming-local')
     self._swarming_server.start()
@@ -70,15 +102,6 @@ class LocalServers(object):
     self.http_client.url_opener.addheaders.append(
         ('X-XSRF-Token', self._swarming_server.client.xsrf_token))
 
-  def _start_cas(self):
-    log_path = os.path.join(self._root, 'cas.log')
-    logging.info('Launcing cas local at :9000, log is %s', log_path)
-    self._cas_addr = ':9000'
-    self._cas_log = open(log_path, 'wb')
-    self._cas = subprocess.Popen([FAKECAS_BIN],
-                                 stdout=self._cas_log,
-                                 stderr=subprocess.STDOUT)
-
   def stop(self):
     """Stops the local Swarming and CAS servers.
 
@@ -86,10 +109,7 @@ class LocalServers(object):
     """
     exit_code = None
     try:
-      if self._cas:
-        self._cas.terminate()
-      if self._cas_log:
-        self._cas_log.close()
+      self._cas.stop()
     finally:
       if self._swarming_server:
         exit_code = exit_code or self._swarming_server.stop()
@@ -122,7 +142,7 @@ def main():
       servers.start()
       print('Logs    : %s' % root)
       print('Swarming: %s' % servers.swarming_server.url)
-      print('CAS     : %s' % servers.cas_server_address)
+      print('CAS     : %s' % servers.cas_server.address)
       servers.wait()
     except KeyboardInterrupt:
       print('<Ctrl-C> received; stopping servers', file=sys.stderr)
