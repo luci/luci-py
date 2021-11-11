@@ -22,6 +22,7 @@ import six
 # Mutates sys.path.
 import test_env
 
+import cas_util
 import cipd
 import isolateserver_fake
 
@@ -180,24 +181,15 @@ class RunIsolatedTest(unittest.TestCase):
     self._cas_cache_dir = os.path.join(self.tempdir, 'c')
     self._cas_kvs = os.path.join(self.tempdir, 'cas_kvs')
 
-    addr_file = os.path.join(self.tempdir, 'cas_addr')
-    self._fakecas = subprocess.Popen([
-        os.path.join(_LUCI_GO, 'fakecas'), '-port', '0', '-addr-file', addr_file
-    ])
-
-    while not os.path.exists(addr_file):
-      # wait until addr_file is created.
-      time.sleep(0.1)
-
-    with open(addr_file) as f:
-      self._cas_addr = f.read()
+    self._fakecas = cas_util.LocalCAS(self.tempdir)
+    self._fakecas.start()
+    self._cas_addr = self._fakecas.address
 
   def tearDown(self):
     try:
+      self._fakecas.stop()
       file_path.rmtree(self.tempdir)
       self._isolated_server.close()
-      self._fakecas.terminate()
-      self._fakecas.wait()
     finally:
       super(RunIsolatedTest, self).tearDown()
 
