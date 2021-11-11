@@ -10,7 +10,6 @@ import hashlib
 import json
 import logging
 import os
-import platform
 import shutil
 import subprocess
 import sys
@@ -152,15 +151,6 @@ def tree_modes(root):
       p = os.path.join(dirpath, dirname)
       out[p[offset:]] = oct(os.stat(p).st_mode)
   return out
-
-
-def less_than_mac_10_15():
-  if sys.platform != 'darwin':
-    return False
-  # E.g.: `10.15.5`
-  v = platform.mac_ver()[0]
-  major, minor = v.split('.')[:2]
-  return int(major) <= 10 and int(minor) < 15
 
 
 def load_isolated_stats(stats_json_path, key):
@@ -441,7 +431,6 @@ class RunIsolatedTest(unittest.TestCase):
     self.assertTreeModes(self._isolated_cache_dir, expected)
     return cached_file_path
 
-  @unittest.skipIf(less_than_mac_10_15(), 'crbug.com/1099655')
   @unittest.skipIf(sys.platform == 'win32', 'crbug.com/1148174')
   def test_isolated_corrupted_cache_entry_different_size(self):
     # Test that an entry with an invalid file size properly gets removed and
@@ -450,7 +439,6 @@ class RunIsolatedTest(unittest.TestCase):
                                                     b' now invalid size')
     self.assertEqual(CONTENTS['file1.txt'], read_content(cached_file_path))
 
-  @unittest.skipIf(less_than_mac_10_15(), 'crbug.com/1099655')
   @unittest.skipIf(sys.platform == 'win32', 'crbug.com/1148174')
   def test_isolated_corrupted_cache_entry_same_size(self):
     # Test that an entry with an invalid file content but same size is NOT
