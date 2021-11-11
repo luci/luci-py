@@ -53,10 +53,30 @@ class AclTestCase(test_case.TestCase):
         ),
     ])))
 
-    # TODO(vadimsh): Replace with has_permission mocking.
+    perms_map = {
+        auth.root_realm(TEST_PROJECT): {
+            acl._PERMISSION_READ: 'some-project-access',
+            acl._PERMISSION_VALIDATE: 'some-project-validate',
+            acl._PERMISSION_REIMPORT: 'some-project-reimport',
+        },
+    }
+    def has_permission_mock(perm, realms):
+      assert len(realms) == 1, realms
+      group = perms_map.get(realms[0], {}).get(perm)
+      return group and auth.is_group_member(group)
+    self.mock(auth, 'has_permission', has_permission_mock)
+
+    self.legacy_acl_fallbacks = 0
+    def log_fallback_mock(*_args):
+      self.legacy_acl_fallbacks += 1
+    self.mock(acl, '_log_acl_fallback', log_fallback_mock)
+
     self.mock(projects, 'get_metadata_async', mock.Mock(return_value=future({
         TEST_PROJECT: project_config_pb2.ProjectCfg(
-            access=['group:some-project-access'],
+            access=[
+                'group:some-project-access',
+                'group:some-project-access-legacy',
+            ],
         ),
         'hidden': project_config_pb2.ProjectCfg(
             access=['group:hidden'],
@@ -91,6 +111,12 @@ class AclTestCase(test_case.TestCase):
   def test_access_project_via_project_acl(self):
     self.mock_membership('some-project-access')
     self.assertTrue(can_read(PROJECT_SET))
+    self.assertEqual(self.legacy_acl_fallbacks, 0)
+
+  def test_access_project_via_legacy_project_acl(self):
+    self.mock_membership('some-project-access-legacy')
+    self.assertTrue(can_read(PROJECT_SET))
+    self.assertEqual(self.legacy_acl_fallbacks, 1)
 
   def test_access_project_via_global_acl(self):
     self.mock_membership('project-access')
@@ -112,17 +138,19 @@ class AclTestCase(test_case.TestCase):
     self.assertFalse(can_validate(PROJECT_SET))
 
   def test_validate_project_via_project_acl(self):
-    # TODO(vadimsh): Implement when realms are enforced. There's no per-project
-    # ACL with legacy ACLs.
-    pass
+    self.mock_membership('some-project-access', 'some-project-validate')
+    self.assertTrue(can_validate(PROJECT_SET))
+    self.assertEqual(self.legacy_acl_fallbacks, 0)
 
   def test_validate_project_via_global_acl(self):
     self.mock_membership('project-access', 'project-validation')
     self.assertTrue(can_validate(PROJECT_SET))
+    self.assertEqual(self.legacy_acl_fallbacks, 0)
 
   def test_validate_project_via_legacy_acl(self):
     self.mock_membership('project-access', 'legacy-validation')
     self.assertTrue(can_validate(PROJECT_SET))
+    self.assertEqual(self.legacy_acl_fallbacks, 1)
 
   def test_reimport_project_invisible(self):
     self.assertFalse(can_reimport(PROJECT_SET))
@@ -132,17 +160,19 @@ class AclTestCase(test_case.TestCase):
     self.assertFalse(can_reimport(PROJECT_SET))
 
   def test_reimport_project_via_project_acl(self):
-    # TODO(vadimsh): Implement when realms are enforced. There's no per-project
-    # ACL with legacy ACLs.
-    pass
+    self.mock_membership('some-project-access', 'some-project-reimport')
+    self.assertTrue(can_reimport(PROJECT_SET))
+    self.assertEqual(self.legacy_acl_fallbacks, 0)
 
   def test_reimport_project_via_global_acl(self):
     self.mock_membership('project-access', 'project-reimport')
     self.assertTrue(can_reimport(PROJECT_SET))
+    self.assertEqual(self.legacy_acl_fallbacks, 0)
 
   def test_reimport_project_via_legacy_acl(self):
     self.mock_membership('project-access', 'legacy-reimport')
     self.assertTrue(can_reimport(PROJECT_SET))
+    self.assertEqual(self.legacy_acl_fallbacks, 1)
 
   def test_access_service_frobidden(self):
     self.assertFalse(can_read(SERVICE_SET))

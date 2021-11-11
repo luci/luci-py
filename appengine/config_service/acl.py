@@ -152,17 +152,21 @@ def has_projects_access(project_ids):
   if _check_acl_cfg('project_access_group'):
     return {pid: True for pid in project_ids}
 
-  # TODO(crbug.com/1068817): During the migration we'll use the legacy response
-  # as the final result, but will compare it to realms checks and log
-  # discrepancies (this is what has_permission_dryrun does).
+  # TODO(crbug.com/1068817): During the migration we'll use the union of legacy
+  # and realm ACLs, but log when falling back to legacy ACLs.
+
+  realms = {
+      pid: auth.has_permission(_PERMISSION_READ, realms=[auth.root_realm(pid)])
+      for pid in project_ids
+  }
+
   legacy = _has_projects_access_legacy(project_ids)
+
   for pid in project_ids:
-    auth.has_permission_dryrun(
-        permission=_PERMISSION_READ,
-        realms=[auth.root_realm(pid)],
-        tracking_bug='crbug.com/1068817',
-        expected_result=legacy[pid])
-  return legacy
+    if not realms[pid] and legacy[pid]:
+      _log_acl_fallback(_PERMISSION_READ, pid)
+
+  return {pid: realms[pid] or legacy[pid] for pid in project_ids}
 
 
 def has_project_access(project_id):
@@ -228,17 +232,22 @@ def _check_project_acl(project_id, perm, global_acl_group, legacy_acl_group):
   if _check_acl_cfg(global_acl_group):
     return True
 
-  # TODO(crbug.com/1068817): Legacy ACLs relied on a global group, but realms
-  # ACL use per-project permissions. During the migration we'll use the legacy
-  # response as the final result, but will compare it to realms checks and log
-  # discrepancies (this is what has_permission_dryrun does).
+  # TODO(crbug.com/1068817): During the migration we'll use the union of legacy
+  # and realm ACLs, but log when falling back to legacy ACLs.
+
+  realms = auth.has_permission(perm, realms=[auth.root_realm(project_id)])
   legacy = _check_acl_cfg(legacy_acl_group)
-  auth.has_permission_dryrun(
-      permission=perm,
-      realms=[auth.root_realm(project_id)],
-      tracking_bug='crbug.com/1068817',
-      expected_result=legacy)
-  return legacy
+
+  if not realms and legacy:
+    _log_acl_fallback(perm, project_id)
+
+  return realms or legacy
+
+
+def _log_acl_fallback(perm, project_id):
+  logging.warning(
+      'crbug.com/1068817: fallback %r %r %r',
+      perm, project_id, auth.get_current_identity().to_bytes())
 
 
 # Cache acl.cfg for 10min. It never changes.
