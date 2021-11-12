@@ -50,6 +50,7 @@ from utils import large
 from utils import logging_utils
 from utils import subprocess42
 from utils import tools
+import cas_util
 import isolateserver_fake
 import local_caching
 import swarmingserver_bot_fake
@@ -205,6 +206,7 @@ class TestTaskRunnerBase(auto_stub.TestCase):
     self.mock(remote_client, 'make_appengine_id', lambda *a: 42)
     self._server = None
     self._isolateserver = None
+    self._cas = None
 
   def tearDown(self):
     os.chdir(test_env_bot_code.BOT_DIR)
@@ -238,6 +240,15 @@ class TestTaskRunnerBase(auto_stub.TestCase):
       self._isolateserver = isolateserver_fake.FakeIsolateServer()
     return self._isolateserver
 
+  @property
+  def cas(self):
+    """Lazily starts an local CAS server."""
+    if not self._cas:
+      self._cas = cas_util.LocalCAS(tempfile.mkdtemp(prefix=u'local_cas'))
+      self._cas.start()
+      os.environ['RUN_ISOLATED_CAS_ADDRESS'] = self._cas.address
+    return self._cas
+
   def getTaskResults(self, task_id):
     """Returns a flattened task result."""
     tasks = self.server.get_tasks()
@@ -245,16 +256,14 @@ class TestTaskRunnerBase(auto_stub.TestCase):
     actual = swarmingserver_bot_fake.flatten_task_updates(tasks[task_id])
     # Always decode the output;
     if u'output' in actual:
-      actual[u'output'] = base64.b64decode(actual[u'output'])
+      actual[u'output'] = cas_util.filter_out_go_logs(
+          base64.b64decode(actual[u'output']).decode()).encode()
     if u'isolated_stats' in actual:
-      isolated_stats = actual['isolated_stats']
-      for action in ['download', 'upload']:
-        if action in isolated_stats:
-          stats = isolated_stats[action]
-          for k in ['items_cold', 'items_hot']:
-            if k not in stats:
-              continue
-            stats[k] = large.unpack(base64.b64decode(stats[k]))
+      stats = actual['isolated_stats']
+      for i in stats.keys():
+        for j in ['items_cold', 'items_hot']:
+          if stats[i] and j in stats[i]:
+            stats[i][j] = large.unpack(base64.b64decode(stats[i][j] or ''))
     return actual
 
   def expectTask(self, task_id, **kwargs):
@@ -304,13 +313,15 @@ class TestTaskRunnerBase(auto_stub.TestCase):
       self.assertTrue(
           r.match(v),
           "failed to match output. pattern: %s, actual: %s" % (r.pattern, v))
-    for key, value in expected.get(u'isolated_stats', {}).items():
+    for key, stats in expected.get(u'isolated_stats', {}).items():
       if 'isolated_stats' not in actual:
         # expected but not actual.
         break
-      if u'duration' in value:
+      if not stats:
+        continue
+      if u'duration' in stats:
         v = actual[u'isolated_stats'][key].pop(u'duration')
-        self.assertLessEqual(value.pop(u'duration'), v)
+        self.assertLessEqual(stats.pop(u'duration'), v)
 
     # drop duration stats.
     actual.pop(u'cache_trim_stats', None)
@@ -1047,24 +1058,14 @@ class TestTaskRunnerKilled(TestTaskRunnerBase):
                         b'sys.exit(p.returncode)\n'),
         'grand_children.py': self.SCRIPT_SIGNAL_HANG.encode(),
     }
-    isolated = json.dumps({
-        'files': {
-            name: {
-                'h':
-                    self.isolateserver.add_content_compressed(
-                        'default-gzip', content),
-                's':
-                    len(content),
-            } for name, content in files.items()
-        },
-    })
-    isolated_digest = self.isolateserver.add_content_compressed(
-        'default-gzip', isolated.encode())
+    digest = self.cas.archive_files(files)
     manifest = get_manifest(
-        isolated={
-            'input': isolated_digest,
-            'namespace': 'default-gzip',
-            'server': self.isolateserver.url,
+        cas_input_root={
+            'cas_instance': 'projects/test/instances/default_instance',
+            'digest': {
+                'hash': digest.split('/')[0],
+                'size_bytes': digest.split('/')[1],
+            },
         },
         command=['python', '-u', 'parent.py'],
         # TODO(maruel): A bit cheezy, we'd want the I/O timeout to be just
@@ -1101,7 +1102,7 @@ class TestTaskRunnerKilled(TestTaskRunnerBase):
         except OSError:
           pass
     self.assertEqual(expected, actual)
-    contens = list(files.values()) + [isolated]
+    contens = list(files.values())
     items_in = [len(c) for c in contens]
     self.expectTask(
         manifest['task_id'],
@@ -1117,11 +1118,7 @@ class TestTaskRunnerKilled(TestTaskRunnerBase):
                 u'items_cold': sorted(items_in),
                 u'items_hot': [],
             },
-            u'upload': {
-                u'duration': 0.,
-                u'items_cold': [],
-                u'items_hot': [],
-            },
+            u'upload': None,
         })
 
   def test_kill_and_wait(self):
