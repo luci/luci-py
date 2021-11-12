@@ -38,11 +38,6 @@ _DEFAULT_CIPD_CLIENT_PACKAGE = 'infra/tools/cipd/${platform}'
 
 _DEFAULT_CIPD_CLIENT_VERSION = 'latest'
 
-MISSING_MAC_ARM64_PACKAGES = [
-    # TODO(crbug.com/1250425): buildbucket package is being migrated to bbagent.
-    'infra/tools/buildbucket',
-]
-
 if sys.platform == 'win32':
 
   def _ensure_batfile(client_path):
@@ -186,9 +181,6 @@ class CipdClient(object):
         dir=tmp_dir, prefix=u'cipd-ensure-result-', suffix='.json')
     os.close(json_out_file_handle)
 
-    # CIPD client ${platform}.
-    cipd_platform = get_platform()
-
     try:
       try:
         for subdir, pkgs in sorted(packages.items()):
@@ -197,12 +189,6 @@ class CipdClient(object):
                         % subdir)
           os.write(ensure_file_handle, ('@Subdir %s\n' % (subdir,)).encode())
           for pkg, version in pkgs:
-            # TODO(crbug.com/1186562):
-            # We are not going to prepare mac-arm64 packages for the legacy
-            # tools. Fallback to mac-amd64 instead.
-            if cipd_platform == 'mac-arm64' and any(
-                pkg.startswith(p) for p in MISSING_MAC_ARM64_PACKAGES):
-              pkg = pkg.replace('${platform}', 'mac-amd64')
             os.write(ensure_file_handle, ('%s %s\n' % (pkg, version)).encode())
       finally:
         os.close(ensure_file_handle)
