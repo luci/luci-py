@@ -35,8 +35,6 @@ LUCI_GO_CLIENT_DIR = os.path.join(ROOT_DIR, 'luci-go')
 
 # Needed for local_caching, and others on Windows when symlinks are not enabled.
 sys.path.insert(0, CLIENT_DIR)
-# Needed for isolateserver_fake.
-sys.path.insert(0, os.path.join(CLIENT_DIR, 'tests'))
 
 from bot_code import bot_auth
 from bot_code import remote_client
@@ -51,7 +49,6 @@ from utils import logging_utils
 from utils import subprocess42
 from utils import tools
 import cas_util
-import isolateserver_fake
 import local_caching
 import swarmingserver_bot_fake
 
@@ -205,7 +202,6 @@ class TestTaskRunnerBase(auto_stub.TestCase):
     # Make HTTP headers consistent
     self.mock(remote_client, 'make_appengine_id', lambda *a: 42)
     self._server = None
-    self._isolateserver = None
     self._cas = None
 
   def tearDown(self):
@@ -232,13 +228,6 @@ class TestTaskRunnerBase(auto_stub.TestCase):
     if not self._server:
       self._server = swarmingserver_bot_fake.Server()
     return self._server
-
-  @property
-  def isolateserver(self):
-    """Lazily starts an isolate fake API server."""
-    if not self._isolateserver:
-      self._isolateserver = isolateserver_fake.FakeIsolateServer()
-    return self._isolateserver
 
   @property
   def cas(self):
@@ -532,24 +521,14 @@ class TestTaskRunner(TestTaskRunnerBase):
         'grand_children.py': b'print(\'hi\')',
     }
 
-    isolated = json.dumps({
-        'files': {
-            name: {
-                'h':
-                    self.isolateserver.add_content_compressed(
-                        'default-gzip', content),
-                's':
-                    len(content),
-            } for name, content in files.items()
-        },
-    }).encode()
-    isolated_digest = self.isolateserver.add_content_compressed(
-        'default-gzip', isolated)
+    digest = self.cas.archive_files(files)
     manifest = get_manifest(
-        isolated={
-            'input': isolated_digest,
-            'namespace': 'default-gzip',
-            'server': self.isolateserver.url,
+        cas_input_root={
+            'cas_instance': 'projects/test/instances/default_instance',
+            'digest': {
+                'hash': digest.split('/')[0],
+                'size_bytes': digest.split('/')[1],
+            },
         },
         command=['python', 'parent.py'],
     )
@@ -561,7 +540,7 @@ class TestTaskRunner(TestTaskRunnerBase):
         u'must_signal_internal_failure': None,
         u'version': task_runner.OUT_VERSION,
     }
-    contens = list(files.values()) + [isolated]
+    contens = list(files.values())
     items_in = [len(c) for c in contens]
     self.assertEqual(expected, actual)
     self.expectTask(manifest['task_id'],
@@ -573,11 +552,7 @@ class TestTaskRunner(TestTaskRunnerBase):
                             u'items_cold': sorted(items_in),
                             u'items_hot': [],
                         },
-                        u'upload': {
-                            u'duration': 0.,
-                            u'items_cold': [],
-                            u'items_hot': [],
-                        },
+                        u'upload': None,
                     })
 
   def test_run_command_large(self):
