@@ -103,13 +103,11 @@ CONTENTS['max_path.isolated'] = json.dumps({
     },
 }).encode()
 
-CONTENTS['repeated_files.isolated'] = json.dumps({
-    'files': {
-        'file1.txt': file_meta('file1.txt'),
-        'file1_copy.txt': file_meta('file1.txt'),
-        'repeated_files.py': file_meta('repeated_files.py'),
-    },
-}).encode()
+_repeated_files = {
+    'file1.txt': CONTENTS['file1.txt'],
+    'file1_copy.txt': CONTENTS['file1.txt'],
+    'repeated_files.py': CONTENTS['repeated_files.py'],
+}
 
 CONTENTS['output.isolated'] = json.dumps({
     'files': {
@@ -244,14 +242,23 @@ class RunIsolatedTest(unittest.TestCase):
     self.assertEqual('', err)
     self.assertEqual(0, returncode)
 
-  def _cmd_args(self, hash_value):
-    """Generates the standard arguments used with |hash_value| as the hash.
+  def _cmd_args(self, hash_or_digest):
+    """Generates the standard arguments used with |hash_or_digest| as the
+    isolated hash or digest.
 
     Returns a list of the required arguments.
     """
+    if '/' in hash_or_digest:
+      return [
+          '--cas-digest',
+          hash_or_digest,
+          '--cas-cache',
+          self._cas_cache_dir,
+      ]
+
     return [
         '--isolated',
-        hash_value,
+        hash_or_digest,
         '--cache',
         self._isolated_cache_dir,
         '--isolate-server',
@@ -288,22 +295,21 @@ class RunIsolatedTest(unittest.TestCase):
     self.assertEqual(0, returncode)
 
   def test_isolated_normal(self):
-    # Loads the .isolated from the store as a hash.
-    # Load an isolated file with the same content (same SHA-1), listed under two
-    # different names and ensure both are created.
-    isolated_hash = self._store('repeated_files.isolated')
+    # Upload files from test dir having files with the same content (same
+    # digest), listed under two different names and ensure both are created.
+    cas_digest = self._fakecas.archive_files(_repeated_files)
     expected = [
-      'state.json',
-      self._store('file1.txt'),
-      self._store('repeated_files.py'),
+        'state.json',
+        cas_util.cashe_hash(CONTENTS['file1.txt']),
+        cas_util.cashe_hash(CONTENTS['repeated_files.py']),
     ]
 
     out, err, returncode = self._run(
-        self._cmd_args(isolated_hash) + ['--'] + CMD_REPEATED_FILES)
-    self.assertEqual('', err)
+        self._cmd_args(cas_digest) + ['--'] + CMD_REPEATED_FILES)
+    self.assertEqual('', cas_util.filter_out_go_logs(err))
     self.assertEqual('Success\n', out, out)
     self.assertEqual(0, returncode)
-    actual = list_files_tree(self._isolated_cache_dir)
+    actual = list_files_tree(self._cas_cache_dir)
     self.assertEqual(sorted(set(expected)), actual)
 
   def test_isolated_output(self):
@@ -343,18 +349,15 @@ class RunIsolatedTest(unittest.TestCase):
     actual = list_files_tree(self._isolated_cache_dir)
     self.assertEqual(sorted(set(expected)), actual)
 
-  def test_isolated_fail_empty(self):
-    isolated_hash = self._store_isolated({})
-    expected = ['state.json']
-    out, err, returncode = self._run(self._cmd_args(isolated_hash))
+  def test_isolated_fail_empty_args(self):
+    out, err, returncode = self._run([])
     self.assertEqual('', out)
-    self.assertIn(
-        '<No command was specified!>\n'
-        '<Please secify a command when triggering your Swarming task>\n',
-        err)
-    self.assertEqual(1, returncode)
-    actual = list_files_tree(self._isolated_cache_dir)
-    self.assertEqual(sorted(expected), actual)
+    self.assertEqual(
+        'Usage: run_isolated.py <options> [command to run or extra args]\n\n'
+        'run_isolated.py: error: command to run is required.\n', err)
+    self.assertEqual(2, returncode)
+    actual = list_files_tree(self._cas_cache_dir)
+    self.assertEqual([], actual)
 
   def _test_corruption_common(self, new_content):
     isolated_hash = self._store('file_with_size.isolated')

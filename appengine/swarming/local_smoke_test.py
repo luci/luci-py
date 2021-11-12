@@ -33,6 +33,7 @@ BOT_DIR = os.path.join(APP_DIR, 'swarming_bot')
 LUCI_DIR = os.path.dirname(os.path.dirname(APP_DIR))
 CLIENT_DIR = os.path.join(LUCI_DIR, 'client')
 sys.path.insert(0, CLIENT_DIR)
+sys.path.insert(0, os.path.join(CLIENT_DIR, 'tests'))
 sys.path.insert(0, os.path.join(CLIENT_DIR, 'third_party'))
 
 # client/
@@ -42,6 +43,9 @@ from utils import large
 from utils import subprocess42
 from tools import start_bot
 from tools import start_servers
+
+# client/tests
+import cas_util
 
 # client/third_party/
 from depot_tools import fix_encoding
@@ -389,11 +393,6 @@ def gen_expected(**kwargs):
   }
   expected.update({unicode(k): v for k, v in kwargs.items()})
   return expected
-
-
-def _filter_out_go_client_logs(output):
-  return '\n'.join(
-      [o for o in output.split('\n') if not re.match('^.* \S+\.go:\d+\]', o)])
 
 
 class Test(unittest.TestCase):
@@ -1339,7 +1338,7 @@ class Test(unittest.TestCase):
     start = time.time()
     out = None
     while time.time() - start < 45.:
-      out = _filter_out_go_client_logs(self.client.task_stdout(task_id))
+      out = cas_util.filter_out_go_logs(self.client.task_stdout(task_id))
       if out == 'hi\n':
         break
     self.assertEqual(out, 'hi\n')
@@ -1595,7 +1594,7 @@ class Test(unittest.TestCase):
         'performance_stats', None)
     # filter luci-go client logs out.
     output = actual_summary['shards'][0]['output']
-    actual_summary['shards'][0]['output'] = _filter_out_go_client_logs(output)
+    actual_summary['shards'][0]['output'] = cas_util.filter_out_go_logs(output)
     self.assertResults(expected_summary, actual_summary, deduped=deduped)
     self.assertEqual(expected_files, actual_files)
     return task_id, output_root, performance_stats

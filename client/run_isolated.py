@@ -1787,8 +1787,8 @@ def main(args):
     cas_cache.save()
     cas_cache = None
 
-  if not options.isolated and not args:
-    parser.error('--isolated or command to run is required.')
+  if not args:
+    parser.error('command to run is required.')
 
   auth.process_auth_options(parser, options)
 

@@ -2,8 +2,10 @@
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
 
+import hashlib
 import logging
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -99,3 +101,12 @@ class LocalCAS(object):
         return f.read()
     finally:
       shutil.rmtree(tmpdir)
+
+
+def filter_out_go_logs(output):
+  return '\n'.join(
+      [o for o in output.split('\n') if not re.match('^.* \S+\.go:\d+\]', o)])
+
+
+def cashe_hash(contents):
+  return hashlib.sha256(contents).hexdigest()
