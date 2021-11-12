@@ -109,12 +109,6 @@ _repeated_files = {
     'repeated_files.py': CONTENTS['repeated_files.py'],
 }
 
-CONTENTS['output.isolated'] = json.dumps({
-    'files': {
-        'output.py': file_meta('output.py'),
-    },
-}).encode()
-
 
 def list_files_tree(directory):
   """Returns the list of all the files in a tree."""
@@ -311,26 +305,6 @@ class RunIsolatedTest(unittest.TestCase):
     self.assertEqual(0, returncode)
     actual = list_files_tree(self._cas_cache_dir)
     self.assertEqual(sorted(set(expected)), actual)
-
-  def test_isolated_output(self):
-    isolated_hash = self._store('output.isolated')
-    expected = [
-        'state.json',
-        self._store('output.py'),
-    ]
-
-    _, err, returncode = self._run(
-        self._cmd_args(isolated_hash) + ['--'] + CMD_OUTPUT)
-    self.assertEqual('', err)
-    self.assertEqual(0, returncode)
-    actual = list_files_tree(self._isolated_cache_dir)
-    six.assertCountEqual(self, expected, actual)
-
-    encoded_content = OUTPUT_CONTENT.encode()
-    h = hashlib.sha1()
-    h.update(encoded_content)
-    actual_content = self._isolated_server.contents['default'][h.hexdigest()]
-    self.assertEqual(actual_content, encoded_content)
 
   def test_isolated_max_path(self):
     # Make sure we can map and delete a tree that has paths longer than
