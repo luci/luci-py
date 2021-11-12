@@ -69,52 +69,36 @@ if sys.platform == 'win32':
   EXIT_CODE_TERM = 3221225786
 
 
-def get_manifest(script=None, isolated=None, **kwargs):
+def get_manifest(script=None, **kwargs):
   """Returns a task manifest similar to what the server sends back to the bot.
 
   Eventually this should be a proto message.
   """
-  isolated_input = isolated and isolated.get('input')
   out = {
-      'bot_authenticated_as':
-          'foo',
-      'bot_id':
-          'localhost',
+      'bot_authenticated_as': 'foo',
+      'bot_id': 'localhost',
       'caches': [],
       'cipd_input': {},
-      'command': [sys.executable, '-u', '-c', script]
-                 if not isolated_input else None,
+      'command': [sys.executable, '-u', '-c', script],
       'containment': {
           'containment_type': 'NONE',
       },
       'dimensions': {},
       'env': {},
       'env_prefixes': {},
-      'grace_period':
-          30.,
-      'hard_timeout':
-          10.,
-      'host':
-          'bar',
-      'io_timeout':
-          10.,
-      'isolated':
-          isolated,
-      'cas_input_root':
-          None,
+      'grace_period': 30.,
+      'hard_timeout': 10.,
+      'host': 'bar',
+      'io_timeout': 10.,
+      'isolated': None,
+      'cas_input_root': None,
       'outputs': [],
-      'realm':
-          None,
-      'relative_cwd':
-          None,
-      'resultdb':
-          None,
-      'secret_bytes':
-          None,
-      'service_accounts':
-          None,
-      'task_id':
-          six.text_type(gen_task_id()),
+      'realm': None,
+      'relative_cwd': None,
+      'resultdb': None,
+      'secret_bytes': None,
+      'service_accounts': None,
+      'task_id': six.text_type(gen_task_id()),
   }
   out.update(kwargs)
   return out
@@ -197,7 +181,6 @@ class TestTaskRunnerBase(auto_stub.TestCase):
     os.environ.pop('SWARMING_BOT_ID', None)
     os.environ.pop('SWARMING_TASK_ID', None)
     os.environ.pop('SWARMING_SERVER', None)
-    os.environ.pop('ISOLATE_SERVER', None)
     os.environ['LUCI_GO_CLIENT_DIR'] = LUCI_GO_CLIENT_DIR
     # Make HTTP headers consistent
     self.mock(remote_client, 'make_appengine_id', lambda *a: 42)
@@ -431,12 +414,15 @@ class TestTaskRunner(TestTaskRunnerBase):
                        '    \'exit_code\': 0,\n'
                        '    \'had_hard_timeout\': False,\n'
                        '    \'internal_failure\': None,\n'
-                       '    \'outputs_ref\': {\n'
-                       '      \'isolated\': \'123\',\n'
-                       '      \'isolatedserver\': \'http://localhost:1\',\n'
-                       '       \'namespace\': \'default-gzip\',\n'
+                       '    \'outputs_ref\': None,\n'
+                       '    \'cas_output_root\': {\n'
+                       '      \'cas_instance\': '
+                       '        \'projects/test/instances/default_instance\',\n'
+                       '      \'digest\': {\n'
+                       '        \'hash\': \'123\',\n'
+                       '        \'size_bytes\': 1,\n'
+                       '      }, \n'
                        '    },\n'
-                       '    \'cas_output_root\': None,\n'
                        '  }, f)\n'
                        'sys.stdout.write(\'hi\\n\')')
     self.mock(task_runner, 'get_run_isolated',
@@ -454,14 +440,16 @@ class TestTaskRunner(TestTaskRunnerBase):
     }
     self.assertEqual(expected, self._run_command(task_details))
     # Now look at the updates sent by the bot as seen by the server.
-    self.expectTask(
-        task_details.task_id,
-        isolated_stats=None,
-        outputs_ref={
-            u'isolated': u'123',
-            u'isolatedserver': u'http://localhost:1',
-            u'namespace': u'default-gzip',
-        })
+    self.expectTask(task_details.task_id,
+                    isolated_stats=None,
+                    cas_output_root={
+                        u'cas_instance':
+                        u'projects/test/instances/default_instance',
+                        u'digest': {
+                            u'hash': u'123',
+                            u'size_bytes': 1,
+                        },
+                    })
 
   def test_run_command_fail(self):
     task_details = get_task_details('import sys; print(\'hi\'); sys.exit(1)')
