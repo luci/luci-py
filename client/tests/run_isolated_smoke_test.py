@@ -294,8 +294,8 @@ class RunIsolatedTest(unittest.TestCase):
     cas_digest = self._fakecas.archive_files(_repeated_files)
     expected = [
         'state.json',
-        cas_util.cashe_hash(CONTENTS['file1.txt']),
-        cas_util.cashe_hash(CONTENTS['repeated_files.py']),
+        cas_util.cache_hash(CONTENTS['file1.txt']),
+        cas_util.cache_hash(CONTENTS['repeated_files.py']),
     ]
 
     out, err, returncode = self._run(

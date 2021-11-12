@@ -108,5 +108,5 @@ def filter_out_go_logs(output):
       [o for o in output.split('\n') if not re.match('^.* \S+\.go:\d+\]', o)])
 
 
-def cashe_hash(contents):
+def cache_hash(contents):
   return hashlib.sha256(contents).hexdigest()
