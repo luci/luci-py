@@ -132,32 +132,6 @@ class SwarmingClient(object):
     logging.debug('CAS digest = %s', digest)
     return digest
 
-  def cas_archive(self, paths):
-    """Archives specified paths to CAS."""
-    dump_digest = os.path.join(self._tmpdir, 'archive_digest')
-    cmd = [
-        CAS_CLI,
-        'archive',
-        '-cas-addr',
-        self._cas_addr,
-        '-dump-digest',
-        dump_digest,
-        '-log-level',
-        'debug',
-    ]
-    for p in paths:
-      cmd.extend(['-paths', p])
-    logging.debug('SwarmingClient.cas_archive: executing command. %s', cmd)
-    with fs.open(self._rotate_logfile(), 'wb') as f:
-      f.write('\nRunning: %s\n' % ' '.join(cmd))
-      p = subprocess42.Popen(cmd, stdout=f, stderr=f)
-      p.communicate()
-    assert p.returncode == 0, ('Failed to archive. exit_code=%d, cmd=%s' %
-                               (p.returncode, cmd))
-    with fs.open(dump_digest) as f:
-      digest = f.read()
-    return digest
-
   def task_trigger(self, args):
     """Triggers a task and return the task id."""
     h, tmp = tempfile.mkstemp(
@@ -404,16 +378,6 @@ class Test(unittest.TestCase):
   # This test can't pass when running via test runner
   # run by sequential_test_runner.py
   no_run = 1
-
-  @classmethod
-  def setUpClass(cls):
-    super(Test, cls).setUpClass()
-
-    # TODO(crbug.com/1268267): uploading an empty dir produces non-empty digest.
-    # Upload an empty dir for performance stats in tests to be consistent.
-    emptydir = tempfile.mkdtemp()
-    cls.client.cas_archive([emptydir + ':.'])
-    shutil.rmtree(emptydir)
 
   def setUp(self):
     super(Test, self).setUp()
@@ -800,19 +764,7 @@ class Test(unittest.TestCase):
         ['-hard-timeout', '1', '--'] + DEFAULT_COMMAND + ['${ISOLATED_OUTDIR}'],
         expected_summary, {},
         deduped=False)
-    # Root dir has an empty dir like
-    # https://cas-viewer.appspot.com/projects/chromium-swarm/instances/default_instance/blobs/24b2420bc49d8b8fdc1d011a163708927532b37dc9f91d7d8d6877e3a86559ca/73/tree
-    expected_output = {
-        'cas_instance': 'projects/test/instances/default_instance',
-        'digest': {
-            'hash':
-            '24b2420bc49d8b8fdc1d011a163708927532b37dc9f91d7d8d6877e3a86559ca',
-            'size_bytes': '73',
-        },
-    }
-    self.assertEqual(output_root, expected_output)
-    output_root_size = int(output_root['digest']['size_bytes'])
-    items_out = [0, output_root_size]
+    self.assertIsNone(output_root)
     expected_performance_stats = {
         u'cache_trim': {},
         u'package_installation': {},
@@ -828,16 +780,7 @@ class Test(unittest.TestCase):
             u'total_bytes_items_cold': unicode(sum(items_in)),
             u'total_bytes_items_hot': u'0',
         },
-        u'isolated_upload': {
-            u'initial_number_items': u'0',
-            u'initial_size': u'0',
-            u'items_cold': [],
-            u'items_hot': sorted(items_out),
-            u'num_items_cold': u'0',
-            u'num_items_hot': unicode(len(items_out)),
-            u'total_bytes_items_cold': u'0',
-            u'total_bytes_items_hot': unicode(sum(items_out)),
-        },
+        u'isolated_upload': {},
         u'cleanup': {},
     }
     self.assertPerformanceStats(expected_performance_stats, performance_stats)
@@ -951,19 +894,7 @@ class Test(unittest.TestCase):
         name, ['--idempotent', '--'] + DEFAULT_COMMAND + ['${ISOLATED_OUTDIR}'],
         expected_summary, {},
         deduped=False)
-    # Root dir has an empty dir like
-    # https://cas-viewer.appspot.com/projects/chromium-swarm/instances/default_instance/blobs/24b2420bc49d8b8fdc1d011a163708927532b37dc9f91d7d8d6877e3a86559ca/73/tree
-    expected_output = {
-        'cas_instance': 'projects/test/instances/default_instance',
-        'digest': {
-            'hash':
-            '24b2420bc49d8b8fdc1d011a163708927532b37dc9f91d7d8d6877e3a86559ca',
-            'size_bytes': '73',
-        },
-    }
-    self.assertEqual(output_root, expected_output)
-    output_root_size = int(output_root['digest']['size_bytes'])
-    items_out = [0, output_root_size]
+    self.assertIsNone(output_root)
     expected_performance_stats = {
         u'cache_trim': {},
         u'package_installation': {},
@@ -979,16 +910,7 @@ class Test(unittest.TestCase):
             u'total_bytes_items_cold': unicode(sum(items_in)),
             u'total_bytes_items_hot': u'0',
         },
-        u'isolated_upload': {
-            u'initial_number_items': u'0',
-            u'initial_size': u'0',
-            u'items_cold': [],
-            u'items_hot': sorted(items_out),
-            u'num_items_cold': u'0',
-            u'num_items_hot': unicode(len(items_out)),
-            u'total_bytes_items_cold': u'0',
-            u'total_bytes_items_hot': unicode(sum(items_out)),
-        },
+        u'isolated_upload': {},
         u'cleanup': {},
     }
     self.assertPerformanceStats(expected_performance_stats, performance_stats)
@@ -1004,7 +926,7 @@ class Test(unittest.TestCase):
         ['--idempotent', '--'] + DEFAULT_COMMAND + ['${ISOLATED_OUTDIR}'],
         expected_summary, {},
         deduped=True)
-    self.assertEqual(output_root, expected_output)
+    self.assertIsNone(output_root)
     self.assertIsNone(performance_stats)
 
   def test_secret_bytes(self):
@@ -1117,17 +1039,7 @@ class Test(unittest.TestCase):
         ['${ISOLATED_OUTDIR}/yo'],
         expected_summary, {},
         deduped=False)
-    expected_output = {
-        'cas_instance': 'projects/test/instances/default_instance',
-        'digest': {
-            'hash':
-            '24b2420bc49d8b8fdc1d011a163708927532b37dc9f91d7d8d6877e3a86559ca',
-            'size_bytes': '73',
-        },
-    }
-    self.assertEqual(output_root, expected_output)
-    output_root_size = int(output_root['digest']['size_bytes'])
-    items_out = [0, output_root_size]
+    self.assertIsNone(output_root)
     expected_performance_stats = {
         u'cache_trim': {},
         u'package_installation': {},
@@ -1143,16 +1055,7 @@ class Test(unittest.TestCase):
             u'total_bytes_items_cold': unicode(sum(items_in)),
             u'total_bytes_items_hot': u'0',
         },
-        u'isolated_upload': {
-            u'initial_number_items': u'0',
-            u'initial_size': u'0',
-            u'items_cold': [],
-            u'items_hot': sorted(items_out),
-            u'num_items_cold': u'0',
-            u'num_items_hot': unicode(len(items_out)),
-            u'total_bytes_items_cold': u'0',
-            u'total_bytes_items_hot': unicode(sum(items_out)),
-        },
+        u'isolated_upload': {},
         u'cleanup': {},
     }
     self.assertPerformanceStats(expected_performance_stats, performance_stats)
@@ -1701,11 +1604,12 @@ class Test(unittest.TestCase):
     self.assertLessEqual(0,
                          actual[u'named_caches_uninstall'].pop(u'duration', 0))
     self.assertLess(0, actual[u'isolated_download'].pop(u'duration'))
-    self.assertLess(0, actual[u'isolated_upload'].pop(u'duration'))
+    self.assertLessEqual(0, actual[u'isolated_upload'].pop(u'duration', 0))
     self.assertLess(0, actual[u'cleanup'].pop(u'duration'))
     for k in (u'isolated_download', u'isolated_upload'):
       for j in (u'items_cold', u'items_hot'):
-        actual[k][j] = large.unpack(base64.b64decode(actual[k].get(j, '')))
+        if j in actual[k]:
+          actual[k][j] = large.unpack(base64.b64decode(actual[k][j]))
     self.assertEqual(expected, actual)
 
   def _wait_for_state(self, task_id, current, new):

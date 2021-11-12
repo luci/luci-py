@@ -851,6 +851,8 @@ def upload_outdir_with_cas(cas_client, cas_instance, outdir, tmp_dir):
     - root_digest: a digest of the output directory.
     - stats: uploading stats.
   """
+  if not fs.listdir(outdir):
+    return None, None
   digest_file_handle, digest_path = tempfile.mkstemp(
       prefix=u'cas-digest', suffix=u'.txt')
   os.close(digest_file_handle)
