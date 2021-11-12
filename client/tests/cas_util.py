@@ -11,6 +11,13 @@ import subprocess
 import tempfile
 import time
 
+import six
+
+# Mutates sys.path.
+import test_env
+
+from utils import fs
+
 CLIENT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LUCI_DIR = os.path.dirname(CLIENT_DIR)
 FAKECAS_BIN = os.path.join(LUCI_DIR, 'luci-go', 'fakecas')
@@ -66,11 +73,16 @@ class LocalCAS(object):
     tmpdir = tempfile.mkdtemp()
     try:
       for path, content in files.items():
-        with open(os.path.join(tmpdir, path), 'wb') as f:
+        path = six.text_type(os.path.join(tmpdir, path))
+        pdir = os.path.dirname(path)
+        if not fs.exists(pdir):
+          fs.makedirs(pdir)
+
+        with fs.open(path, 'wb') as f:
           f.write(content)
       return self.archive_dir(tmpdir)
     finally:
-      shutil.rmtree(tmpdir)
+      fs.rmtree(six.text_type(tmpdir))
 
   def archive_dir(self, upload_dir):
     """Uploads directory to the local CAS server"""

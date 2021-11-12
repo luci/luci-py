@@ -24,7 +24,6 @@ import test_env
 
 import cas_util
 import cipd
-import isolateserver_fake
 
 import run_isolated
 from utils import file_path
@@ -73,35 +72,9 @@ CONTENTS = {
 }
 
 
-def file_meta(filename):
-  return {
-    'h': isolateserver_fake.hash_content(CONTENTS[filename]),
-    's': len(CONTENTS[filename]),
-  }
-
-
 CMD_REPEATED_FILES = ['python', 'repeated_files.py']
 
 CMD_OUTPUT = ['python', 'output.py', '${ISOLATED_OUTDIR}/foo.txt']
-
-CONTENTS['file_with_size.isolated'] = json.dumps({
-    'files': {
-        'file1.txt': file_meta('file1.txt')
-    },
-}).encode()
-
-CONTENTS['manifest1.isolated'] = json.dumps({
-    'files': {
-        'file1.txt': file_meta('file1.txt')
-    }
-}).encode()
-
-CONTENTS['max_path.isolated'] = json.dumps({
-    'files': {
-        'a' * 200 + '/' + 'b' * 200: file_meta('file1.txt'),
-        'max_path.py': file_meta('max_path.py'),
-    },
-}).encode()
 
 _repeated_files = {
     'file1.txt': CONTENTS['file1.txt'],
@@ -164,8 +137,6 @@ class RunIsolatedTest(unittest.TestCase):
     logging.debug(self.tempdir)
     self._root_dir = os.path.join(self.tempdir, 'w')
     # The run_isolated local cache.
-    self._isolated_cache_dir = os.path.join(self.tempdir, 'i')
-    self._isolated_server = isolateserver_fake.FakeIsolateServer()
     self._named_cache_dir = os.path.join(self.tempdir, 'n')
     self._cipd_cache_dir = os.path.join(self.tempdir, u'cipd')
     self._cipd_packages_cache_dir = os.path.join(self._cipd_cache_dir, 'cache')
@@ -181,7 +152,6 @@ class RunIsolatedTest(unittest.TestCase):
     try:
       self._fakecas.stop()
       file_path.rmtree(self.tempdir)
-      self._isolated_server.close()
     finally:
       super(RunIsolatedTest, self).tearDown()
 
@@ -207,16 +177,6 @@ class RunIsolatedTest(unittest.TestCase):
   def _run_cas(self, args):
     return self._run_cmd([os.path.join(_LUCI_GO, 'cas')] + args)
 
-  def _store_isolated(self, data):
-    """Stores an isolated file and returns its hash."""
-    return self._isolated_server.add_content(
-        'default',
-        json.dumps(data, sort_keys=True).encode())
-
-  def _store(self, filename):
-    """Stores a test data file in the table and returns its hash."""
-    return self._isolated_server.add_content('default', CONTENTS[filename])
-
   def _download_from_cas(self, root_digest, dest):
     """Downloads files from CAS."""
     cmd = [
@@ -236,29 +196,16 @@ class RunIsolatedTest(unittest.TestCase):
     self.assertEqual('', err)
     self.assertEqual(0, returncode)
 
-  def _cmd_args(self, hash_or_digest):
-    """Generates the standard arguments used with |hash_or_digest| as the
-    isolated hash or digest.
+  def _cmd_args(self, digest):
+    """Generates the standard arguments used with |digest| as the CAS digest.
 
     Returns a list of the required arguments.
     """
-    if '/' in hash_or_digest:
-      return [
-          '--cas-digest',
-          hash_or_digest,
-          '--cas-cache',
-          self._cas_cache_dir,
-      ]
-
     return [
-        '--isolated',
-        hash_or_digest,
-        '--cache',
-        self._isolated_cache_dir,
-        '--isolate-server',
-        self._isolated_server.url,
-        '--namespace',
-        'default',
+        '--cas-digest',
+        digest,
+        '--cas-cache',
+        self._cas_cache_dir,
     ]
 
   def assertTreeModes(self, root, expected):
@@ -309,18 +256,24 @@ class RunIsolatedTest(unittest.TestCase):
   def test_isolated_max_path(self):
     # Make sure we can map and delete a tree that has paths longer than
     # MAX_PATH.
-    isolated_hash = self._store('max_path.isolated')
+    cas_digest = self._fakecas.archive_files({
+        os.path.join('a' * 200, 'b' * 200):
+        CONTENTS['file1.txt'],
+        'max_path.py':
+        CONTENTS['max_path.py'],
+    })
     expected = [
-      'state.json',
-      self._store('file1.txt'),
-      self._store('max_path.py'),
+        'state.json',
+        cas_util.cache_hash(CONTENTS['file1.txt']),
+        cas_util.cache_hash(CONTENTS['max_path.py']),
     ]
     out, err, returncode = self._run(
-        self._cmd_args(isolated_hash) + ['--', 'python', 'max_path.py'])
+        self._cmd_args(cas_digest) + ['--', 'python', 'max_path.py'])
+    err = cas_util.filter_out_go_logs(err)
     self.assertEqual('', err)
     self.assertEqual('Success\n', out, out)
     self.assertEqual(0, returncode)
-    actual = list_files_tree(self._isolated_cache_dir)
+    actual = list_files_tree(self._cas_cache_dir)
     self.assertEqual(sorted(set(expected)), actual)
 
   def test_isolated_fail_empty_args(self):
@@ -334,13 +287,15 @@ class RunIsolatedTest(unittest.TestCase):
     self.assertEqual([], actual)
 
   def _test_corruption_common(self, new_content):
-    isolated_hash = self._store('file_with_size.isolated')
-    file1_hash = self._store('file1.txt')
+    cas_digest = self._fakecas.archive_files({
+        'file1.txt': CONTENTS['file1.txt'],
+    })
+    file1_hash = cas_util.cache_hash(CONTENTS['file1.txt'])
 
     # Run the test once to generate the cache.
     # The weird file mode is because of test_env.py that sets umask(0070).
     out, err, returncode = self._run(
-        self._cmd_args(isolated_hash) + ['--', 'python', '-V'])
+        self._cmd_args(cas_digest) + ['--', 'python', '-V'])
     self.assertEqual(0, returncode, (out, err, returncode))
     expected = {
         u'.': (0o40707, 0o40707, 0o40777),
@@ -348,12 +303,12 @@ class RunIsolatedTest(unittest.TestCase):
         # The reason for 0100666 on Windows is that the file node had to be
         # modified to delete the hardlinked node. The read only bit is reset on
         # load.
-        six.text_type(file1_hash): (0o100644, 0o100644, 0o100644),
+        six.text_type(file1_hash): (0o100604, 0o100604, 0o100604),
     }
-    self.assertTreeModes(self._isolated_cache_dir, expected)
+    self.assertTreeModes(self._cas_cache_dir, expected)
 
     # Modify one of the files in the cache to be invalid.
-    cached_file_path = os.path.join(self._isolated_cache_dir, file1_hash)
+    cached_file_path = os.path.join(self._cas_cache_dir, file1_hash)
     previous_mode = os.stat(cached_file_path).st_mode
     os.chmod(cached_file_path, 0o600)
     write_content(cached_file_path, new_content)
@@ -365,21 +320,21 @@ class RunIsolatedTest(unittest.TestCase):
     # Clean up the cache
     out, err, returncode = self._run([
         '--clean',
-        '--cache',
-        self._isolated_cache_dir,
+        '--cas-cache',
+        self._cas_cache_dir,
     ])
     self.assertEqual(0, returncode, (out, err, returncode))
 
     # Rerun the test and make sure the cache contains the right file afterwards.
     out, err, returncode = self._run(
-        self._cmd_args(isolated_hash) + ['--', 'python', '-V'])
+        self._cmd_args(cas_digest) + ['--', 'python', '-V'])
     self.assertEqual(0, returncode, (out, err, returncode))
     expected = {
         u'.': (0o40700, 0o40700, 0o40700),
         u'state.json': (0o100600, 0o100600, 0o100600),
-        six.text_type(file1_hash): (0o100644, 0o100644, 0o100644),
+        six.text_type(file1_hash): (0o100604, 0o100604, 0o100604),
     }
-    self.assertTreeModes(self._isolated_cache_dir, expected)
+    self.assertTreeModes(self._cas_cache_dir, expected)
     return cached_file_path
 
   @unittest.skipIf(sys.platform == 'win32', 'crbug.com/1148174')
@@ -400,10 +355,7 @@ class RunIsolatedTest(unittest.TestCase):
 
   @unittest.skipIf(sys.platform == 'win32', 'crbug.com/1148174')
   def test_minimal_lower_priority(self):
-    cmd = [
-        '--cache', self._isolated_cache_dir, '--lower-priority', '--',
-        sys.executable, '-c'
-    ]
+    cmd = ['--lower-priority', '--', sys.executable, '-c']
     if sys.platform == 'win32':
       cmd.append(
           'import ctypes,sys; v=ctypes.windll.kernel32.GetPriorityClass(-1);'
@@ -424,7 +376,8 @@ class RunIsolatedTest(unittest.TestCase):
   def test_limit_processes(self):
     # Execution fails because it tries to run a second process.
     cmd = [
-        '--cache', self._isolated_cache_dir, '--limit-processes', '1',
+        '--limit-processes',
+        '1',
     ]
     if sys.platform == 'win32':
       cmd.extend(('--containment-type', 'JOB_OBJECT'))
@@ -455,7 +408,7 @@ class RunIsolatedTest(unittest.TestCase):
     # means that it could get rounded *down* and match the value of now.
     now = time.time() - 2
     cmd = [
-        '--cache', self._isolated_cache_dir, '--named-cache-root',
+        '--cas-cache', self._cas_cache_dir, '--named-cache-root',
         self._named_cache_dir, '--named-cache', 'cache1', 'a', '100', '--',
         sys.executable, '-c',
         'open("a/hello","wb").write(b"world");print("Success")'
@@ -464,7 +417,7 @@ class RunIsolatedTest(unittest.TestCase):
     self.assertEqual('', err)
     self.assertEqual('Success\n', out, out)
     self.assertEqual(0, returncode)
-    self.assertEqual(['state.json'], list_files_tree(self._isolated_cache_dir))
+    self.assertEqual(['state.json'], list_files_tree(self._cas_cache_dir))
 
     # Load the state file manually. This assumes internal knowledge in
     # local_caching.py.
