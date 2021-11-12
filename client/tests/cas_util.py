@@ -4,6 +4,7 @@
 
 import logging
 import os
+import shutil
 import subprocess
 import tempfile
 import time
@@ -60,15 +61,19 @@ class LocalCAS(object):
 
   def archive_files(self, files):
     """Uploads contents to the local CAS server"""
-    with tempfile.TemporaryDirectory() as tmpdir:
+    tmpdir = tempfile.mkdtemp()
+    try:
       for path, content in files.items():
         with open(os.path.join(tmpdir, path), 'wb') as f:
           f.write(content)
       return self.archive_dir(tmpdir)
+    finally:
+      shutil.rmtree(tmpdir)
 
   def archive_dir(self, upload_dir):
     """Uploads directory to the local CAS server"""
-    with tempfile.TemporaryDirectory() as tmpdir:
+    tmpdir = tempfile.mkdtemp()
+    try:
       digest_dump = os.path.join(tmpdir, 'digest')
       cmd = [
           CAS_CLI,
@@ -92,3 +97,5 @@ class LocalCAS(object):
             (proc.returncode, ' '.join(cmd), out.decode('unicode-escape')))
       with open(digest_dump) as f:
         return f.read()
+    finally:
+      shutil.rmtree(tmpdir)

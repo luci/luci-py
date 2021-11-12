@@ -225,24 +225,6 @@ class RunIsolatedTest(unittest.TestCase):
     """Stores a test data file in the table and returns its hash."""
     return self._isolated_server.add_content('default', CONTENTS[filename])
 
-  def _upload_to_cas(self, upload_dir):
-    """Uploads a directory to CAS and returns a digest of the root directory."""
-    digest_file = os.path.join(self.tempdir, 'cas-digest.txt')
-    cmd = [
-        'archive',
-        '-cas-addr',
-        self._cas_addr,
-        '-paths',
-        '%s:' % upload_dir,
-        '-dump-digest',
-        digest_file,
-    ]
-    _, err, returncode = self._run_cas(cmd)
-    self.assertEqual('', err)
-    self.assertEqual(0, returncode)
-
-    return read_content(digest_file).decode()
-
   def _download_from_cas(self, root_digest, dest):
     """Downloads files from CAS."""
     cmd = [
@@ -521,16 +503,14 @@ class RunIsolatedTest(unittest.TestCase):
 
   def test_cas_input(self):
     # Prepare inputs on the remote CAS instance.
-    inputs_root = os.path.join(self.tempdir, 'cas_inputs')
-    os.makedirs(inputs_root)
-    # prepare files for `repeated_files.py` task.
-    for filename in ['repeated_files.py', 'file1.txt']:
-      write_content(os.path.join(inputs_root, filename), CONTENTS[filename])
-    # copy file1.txt.
-    shutil.copyfile(
-        os.path.join(inputs_root, 'file1.txt'),
-        os.path.join(inputs_root, 'file1_copy.txt'))
-    inputs_root_digest = self._upload_to_cas(inputs_root)
+    inputs_root_digest = self._fakecas.archive_files({
+        'repeated_files.py':
+        CONTENTS['repeated_files.py'],
+        'file1.txt':
+        CONTENTS['file1.txt'],
+        'file1_copy.txt':
+        CONTENTS['file1.txt'],
+    })
 
     # Path to the result json file.
     result_json = os.path.join(self.tempdir, 'run_isolated_result.json')
@@ -606,10 +586,8 @@ class RunIsolatedTest(unittest.TestCase):
 
   def test_cas_output(self):
     # Prepare inputs on CAS instance for `output.py` task.
-    inputs_root = os.path.join(self.tempdir, 'cas_inputs')
-    os.makedirs(inputs_root)
-    write_content(os.path.join(inputs_root, 'output.py'), CONTENTS['output.py'])
-    inputs_root_digest = self._upload_to_cas(inputs_root)
+    inputs_root_digest = self._fakecas.archive_files(
+        {'output.py': CONTENTS['output.py']})
 
     # Path to the result json file.
     result_json = os.path.join(self.tempdir, 'run_isolated_result.json')
