@@ -552,7 +552,6 @@ class BotApiTest(test_env_handlers.AppTestBase):
             u'grace_period': 30,
             u'hard_timeout': 3600,
             u'host': u'http://localhost:8080',
-            u'isolated': None,
             u'cas_input_root': None,
             u'secret_bytes': None,
             u'realm': {},
@@ -625,7 +624,6 @@ class BotApiTest(test_env_handlers.AppTestBase):
             u'grace_period': 30,
             u'hard_timeout': 3600,
             u'host': u'http://localhost:8080',
-            u'isolated': None,
             u'cas_input_root': None,
             u'secret_bytes': None,
             u'realm': {},
@@ -706,8 +704,6 @@ class BotApiTest(test_env_handlers.AppTestBase):
             3600,
             u'host':
             u'http://localhost:8080',
-            u'isolated':
-            None,
             u'cas_input_root':
             None,
             u'io_timeout':
@@ -827,7 +823,6 @@ class BotApiTest(test_env_handlers.AppTestBase):
             u'grace_period': 30,
             u'hard_timeout': 3600,
             u'host': u'http://localhost:8080',
-            u'isolated': None,
             u'cas_input_root': {
                 u'cas_instance': u'projects/test/instances/default',
                 u'digest': {

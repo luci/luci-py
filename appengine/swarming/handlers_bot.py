@@ -781,8 +781,6 @@ class BotPollHandler(_BotBaseHandler):
             props.io_timeout_secs,
             'secret_bytes': (secret_bytes.secret_bytes.encode('base64')
                              if secret_bytes else None),
-            'isolated':
-            None,  # TODO(crbug.com/1255535): deprecated
             'cas_input_root': {
                 'cas_instance': props.cas_input_root.cas_instance,
                 'digest': {

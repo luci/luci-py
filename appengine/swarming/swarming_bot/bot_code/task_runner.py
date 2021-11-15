@@ -81,22 +81,6 @@ def get_isolated_args(work_dir, task_details, isolated_result,
     os.remove(isolated_result)
   cmd = []
 
-  # Isolated options.
-  if task_details.isolated:
-    cmd.extend([
-        '-I',
-        task_details.isolated['server'],
-        '--namespace',
-        task_details.isolated['namespace'],
-        '--report-on-exception',
-    ])
-    isolated_input = task_details.isolated.get('input')
-    if isolated_input:
-      cmd.extend(
-          [
-            '--isolated', isolated_input,
-          ])
-
   # CAS options.
   if task_details.cas_input_root:
     input_root = task_details.cas_input_root
@@ -222,7 +206,6 @@ class TaskDetails(object):
       'hard_timeout',
       'host',
       'io_timeout',
-      'isolated',
       'outputs',
       'realm',
       'relative_cwd',
@@ -243,12 +226,10 @@ class TaskDetails(object):
     # Get all the data first so it fails early if the task details is invalid.
     self.bot_id = data['bot_id']
 
-    # Raw command. Only self.command or self.isolated.input can be set.
+    # Raw command.
     self.command = data['command'] or []
     self.relative_cwd = data['relative_cwd']
 
-    # Isolated command. Is a serialized version of task_request.FilesRef.
-    self.isolated = data['isolated']
     self.cas_input_root = data['cas_input_root']
 
     self.cipd_input = data['cipd_input']
@@ -748,8 +729,8 @@ def run_command(remote, task_details, work_dir, cost_usd_hour,
 
     logging.info('Subprocess for run_isolated was completed or killed')
 
-    # This is the very last packet for this command. It if was an isolated task,
-    # include the output reference to the archived .isolated file.
+    # This is the very last packet for this command. If it was a task with CAS,
+    # include the output reference to the archived CAS digest.
     now = monotonic_time()
     params['cost_usd'] = cost_usd_hour * (now - task_start) / 60. / 60.
     duration = now - start
@@ -777,8 +758,6 @@ def run_command(remote, task_details, work_dir, cost_usd_hour,
         logging.debug('run_isolated:\n%s', run_isolated_result)
         # TODO(maruel): Grab statistics (cache hit rate, data downloaded,
         # mapping time, etc) from run_isolated and push them to the server.
-        if run_isolated_result['outputs_ref']:
-          params['outputs_ref'] = run_isolated_result['outputs_ref']
         if run_isolated_result['cas_output_root']:
           params['cas_output_root'] = run_isolated_result['cas_output_root']
         had_hard_timeout = run_isolated_result['had_hard_timeout']

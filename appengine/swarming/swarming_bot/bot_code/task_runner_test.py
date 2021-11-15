@@ -90,7 +90,6 @@ def get_manifest(script=None, **kwargs):
       'hard_timeout': 10.,
       'host': 'bar',
       'io_timeout': 10.,
-      'isolated': None,
       'cas_input_root': None,
       'outputs': [],
       'realm': None,
@@ -395,11 +394,7 @@ class TestTaskRunner(TestTaskRunnerBase):
 
   def test_run_command_isolated(self):
     # Hook run_isolated out to see that everything still work.
-    task_details = get_task_details(isolated={
-        'input': '123',
-        'server': 'localhost:1',
-        'namespace': 'default-gzip',
-    })
+    task_details = get_task_details()
     # Mock running run_isolated with a script.
     SCRIPT_ISOLATED = ('import json, sys;\n'
                        'args = []\n'
