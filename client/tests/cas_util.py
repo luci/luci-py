@@ -114,6 +114,27 @@ class LocalCAS(object):
     finally:
       shutil.rmtree(tmpdir)
 
+  def download(self, digest, dest):
+    """Download directory from the local CAS server"""
+    cmd = [
+        CAS_CLI,
+        'download',
+        '-cas-addr',
+        self.address,
+        '-digest',
+        digest,
+        '-dir',
+        dest,
+    ]
+    proc = subprocess.Popen(cmd,
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.STDOUT)
+    out = proc.communicate()[0]
+    if proc.returncode:
+      raise Exception(
+          'Failed to run cas download. exit_code=%d, cmd="%s"\n%s' %
+          (proc.returncode, ' '.join(cmd), out.decode('unicode-escape')))
+
 
 def filter_out_go_logs(output):
   return '\n'.join(

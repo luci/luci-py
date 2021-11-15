@@ -27,6 +27,7 @@ from depot_tools import auto_stub
 import isolateserver_fake
 import cipdserver_fake
 
+import cas_util
 import cipd
 import isolate_storage
 import isolated_format
@@ -1005,101 +1006,65 @@ class RunIsolatedTestRun(RunIsolatedTestBase):
 
   def setUp(self):
     super(RunIsolatedTestRun, self).setUp()
-    self.mocked_print = mock.patch('six.moves.builtins.print').start()
+    # Starts a full CAS server mock and have run_tha_test() uploads results
+    # back after the task completed.
+    self._server = cas_util.LocalCAS(self.tempdir)
+    self._server.start()
 
   def tearDown(self):
+    self._server.stop()
     super(RunIsolatedTestRun, self).tearDown()
-    mock.patch.stopall()
 
   # Runs the actual command requested.
   def test_output(self):
-    # Starts a full isolate server mock and have run_tha_test() uploads results
-    # back after the task completed.
-    server = isolateserver_fake.FakeIsolateServer()
-    try:
-      script = (b'import sys\n' b'open(sys.argv[1], "w").write("bar")\n')
-      script_hash = isolateserver_fake.hash_content(script)
-      isolated = {
-          u'algo': u'sha-1',
-          u'files': {
-              u'cmd.py': {
-                  u'h': script_hash,
-                  u'm': 0o700,
-                  u's': len(script),
-              },
-          },
-          u'version': isolated_format.ISOLATED_FILE_VERSION,
-      }
-      if sys.platform == 'win32':
-        isolated[u'files'][u'cmd.py'].pop(u'm')
-      isolated_data = json_dumps(isolated).encode()
-      isolated_hash = isolateserver_fake.hash_content(isolated_data)
-      server.add_content('default-store', script)
-      server.add_content('default-store', isolated_data)
-      store = isolateserver.get_storage(
-          isolate_storage.ServerRef(server.url, 'default-store'))
+    digest = self._server.archive_files(
+        {'cmd.py': b'import sys\n'
+         b'open(sys.argv[1], "w").write("bar")\n'})
 
-      data = run_isolated.TaskData(
-          command=[u'cmd.py', u'${ISOLATED_OUTDIR}/foo'],
-          relative_cwd=None,
-          isolated_hash=isolated_hash,
-          storage=store,
-          isolate_cache=local_caching.MemoryContentAddressedCache(),
-          cas_instance=None,
-          cas_digest=None,
-          outputs=None,
-          install_named_caches=init_named_caches_stub,
-          leak_temp_dir=False,
-          root_dir=self.tempdir,
-          hard_timeout=60,
-          grace_period=30,
-          bot_file=None,
-          switch_to_account=False,
-          install_packages_fn=run_isolated.copy_local_packages,
-          use_go_isolated=False,
-          go_cache_dir=None,
-          go_cache_policies=None,
-          cas_cache_dir=None,
-          cas_cache_policies=None,
-          cas_kvs='',
-          env={},
-          env_prefix={},
-          lower_priority=False,
-          containment=None,
-          trim_caches_fn=trim_caches_stub)
-      ret = run_isolated.run_tha_test(data, None)
-      self.assertEqual(0, ret)
+    os.environ['RUN_ISOLATED_CAS_ADDRESS'] = self._server.address
+    data = run_isolated.TaskData(
+        command=[u'python3', u'cmd.py', u'${ISOLATED_OUTDIR}/foo'],
+        relative_cwd=None,
+        isolated_hash=None,
+        storage=None,
+        isolate_cache=None,
+        cas_instance=None,
+        cas_digest=digest,
+        outputs=None,
+        install_named_caches=init_named_caches_stub,
+        leak_temp_dir=False,
+        root_dir=self.tempdir,
+        hard_timeout=60,
+        grace_period=30,
+        bot_file=None,
+        switch_to_account=False,
+        install_packages_fn=run_isolated.copy_local_packages,
+        use_go_isolated=False,
+        go_cache_dir=None,
+        go_cache_policies=None,
+        cas_cache_dir='',
+        cas_cache_policies=local_caching.CachePolicies(0, 0, 0, 0),
+        cas_kvs='',
+        env={},
+        env_prefix={},
+        lower_priority=False,
+        containment=None,
+        trim_caches_fn=trim_caches_stub)
 
-      # It uploaded back. Assert the store has a new item containing foo.
-      hashes = {isolated_hash, script_hash}
-      output_hash = isolateserver_fake.hash_content(b'bar')
-      hashes.add(output_hash)
-      isolated = {
-          u'algo': u'sha-1',
-          u'files': {
-              u'foo': {
-                  u'h': output_hash,
-                  u'm': 0o600,
-                  u's': 3,
-              },
-          },
-          u'version': isolated_format.ISOLATED_FILE_VERSION,
-      }
-      if sys.platform == 'win32':
-        isolated[u'files'][u'foo'].pop(u'm')
-      uploaded = json_dumps(isolated).encode()
-      uploaded_hash = isolateserver_fake.hash_content(uploaded)
-      hashes.add(uploaded_hash)
-      self.assertEqual(hashes, set(server.contents['default-store']))
+    result_json = os.path.join(self.tempdir, 'result.json')
+    ret = run_isolated.run_tha_test(data, result_json)
+    self.assertEqual(0, ret)
+    with open(result_json) as f:
+      result = json.load(f)
 
-      expected = ''.join([
-          '[run_isolated_out_hack]',
-          '{"hash":"%s","namespace":"default-store","storage":%s}' %
-          (uploaded_hash, json.dumps(server.url)), '[/run_isolated_out_hack]'
-      ])
-      self.mocked_print.assert_called_once_with(expected)
-    finally:
-      server.close()
+    output_digest = result['cas_output_root']['digest']
+    dest = os.path.join(self.tempdir, 'output')
+    self._server.download(
+        output_digest['hash'] + '/' + str(output_digest['size_bytes']), dest)
+
+    self.assertEqual(os.listdir(dest), ['foo'])
+    with open(os.path.join(dest, 'foo'), 'rb') as f:
+      self.assertEqual(f.read(), b'bar')
 
 
 FILE, LINK, RELATIVE_LINK, DIR = range(4)
