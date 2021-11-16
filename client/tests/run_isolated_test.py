@@ -4,6 +4,7 @@
 # that can be found in the LICENSE file.
 
 from __future__ import print_function
+from __future__ import unicode_literals
 
 import base64
 import contextlib
@@ -150,6 +151,27 @@ class RunIsolatedTestBase(auto_stub.TestCase):
     Where to map all files in run_isolated.run_tha_test().
     """
     return os.path.join(self.tempdir, run_isolated.ISOLATED_RUN_DIR, *args)
+
+  def assertExpectedTree(self, expected, root_dir=None):
+    # Assume expected path are relative to root if not specified.
+    root_dir = root_dir or os.path.join(self.tempdir, 'io')
+
+    # Return True is the entries in out_dir are exactly the same as entries in
+    # expected. Return False otherwise.
+    count = 0
+    for path in expected:
+      content = expected[path]
+      full_path = os.path.join(root_dir, path)
+      self.assertTrue(fs.exists(full_path), "%s doesn't exist" % full_path)
+      while fs.islink(full_path):
+        full_path = fs.readlink(full_path)
+      # If we expect a non-empty directory, check the entries in dir.
+      # If we expect an empty dir, its existence (checked above) is sufficient.
+      if not fs.isdir(full_path):
+        with open(full_path, 'r') as f:
+          self.assertEqual(f.read(), content)
+      count += 1
+    self.assertEqual(count, len(expected))
 
 
 class RunIsolatedTest(RunIsolatedTestBase):
@@ -1030,26 +1052,6 @@ class RunIsolatedTestOutputs(RunIsolatedTestBase):
         fs.mkdir(full_path)
         self.create_src_tree(os.path.join(run_dir, path), content)
 
-  def assertExpectedTree(self, expected):
-    # Return True is the entries in out_dir are exactly the same as entries in
-    # expected. Return False otherwise.
-    count = 0
-    for path in expected:
-      content = expected[path]
-      # Assume expected path are always relative to root.
-      root_dir = os.path.join(self.tempdir, 'io')
-      full_path = os.path.join(root_dir, path)
-      self.assertTrue(fs.exists(full_path), "%s doesn't exist" % full_path)
-      while fs.islink(full_path):
-        full_path = fs.readlink(full_path)
-      # If we expect a non-empty directory, check the entries in dir.
-      # If we expect an empty dir, its existence (checked above) is sufficient.
-      if not fs.isdir(full_path):
-        with open(full_path, 'r') as f:
-          self.assertEqual(f.read(), content)
-      count += 1
-    self.assertEqual(count, len(expected))
-
   def link_outputs_test(self, src_dir, outputs):
     run_dir = os.path.join(self.tempdir, 'ir')
     out_dir = os.path.join(self.tempdir, 'io')
@@ -1278,139 +1280,96 @@ class RunIsolatedTestOutputFiles(RunIsolatedTestBase):
 
   def setUp(self):
     super(RunIsolatedTestOutputFiles, self).setUp()
-    self.mocked_print = mock.patch('six.moves.builtins.print').start()
+
+    # Starts a full CAS server mock and have run_tha_test() uploads results
+    # back after the task completed.
+    self._server = cas_util.LocalCAS(self.tempdir)
+    self._server.start()
+    os.environ['RUN_ISOLATED_CAS_ADDRESS'] = self._server.address
 
   def tearDown(self):
+    self._server.stop()
     super(RunIsolatedTestOutputFiles, self).tearDown()
-    mock.patch.stopall()
 
   # Like RunIsolatedTestRun, but ensures that specific output files
   # (as opposed to anything in $(ISOLATED_OUTDIR)) are returned.
-  def _run_test(self, isolated, command):
-    # Starts a full isolate server mock and have run_tha_test() uploads results
-    # back after the task completed.
-    server = isolateserver_fake.FakeIsolateServer()
-    try:
-      # Output the following structure:
-      #
-      # foo1
-      # foodir --> foo2_sl (symlink to "foo2_content" file)
-      # bardir --> bar1
-      #
-      # Create the symlinks only on Linux.
-      script = (b'import os\n'
-                b'import sys\n'
-                b'open(sys.argv[1], "w").write("foo1")\n'
-                b'bar1_path = os.path.join(sys.argv[3], "bar1")\n'
-                b'open(bar1_path, "w").write("bar1")\n'
-                b'if sys.platform.startswith("linux"):\n'
-                b'  foo_realpath = os.path.abspath("foo2_content")\n'
-                b'  open(foo_realpath, "w").write("foo2")\n'
-                b'  os.symlink(foo_realpath, sys.argv[2])\n'
-                b'else:\n'
-                b'  open(sys.argv[2], "w").write("foo2")\n')
-      script_hash = isolateserver_fake.hash_content(script)
-      isolated['files']['cmd.py'] = {
-          'h': script_hash,
-          'm': 0o700,
-          's': len(script),
-      }
-      if sys.platform == 'win32':
-        isolated['files']['cmd.py'].pop('m')
-      isolated_data = json_dumps(isolated).encode()
-      isolated_hash = isolateserver_fake.hash_content(isolated_data)
-      server.add_content('default-store', script)
-      server.add_content('default-store', isolated_data)
-      store = isolateserver.get_storage(
-          isolate_storage.ServerRef(server.url, 'default-store'))
-
-      data = run_isolated.TaskData(
-          command=command,
-          relative_cwd=None,
-          isolated_hash=isolated_hash,
-          storage=store,
-          isolate_cache=local_caching.MemoryContentAddressedCache(),
-          cas_instance=None,
-          cas_digest=None,
-          outputs=[
-              'foo1',
-              # They must be in OS native path.
-              os.path.join('foodir', 'foo2_sl'),
-              os.path.join('bardir', ''),
-          ],
-          install_named_caches=init_named_caches_stub,
-          leak_temp_dir=False,
-          root_dir=self.tempdir,
-          hard_timeout=60,
-          grace_period=30,
-          bot_file=None,
-          switch_to_account=False,
-          install_packages_fn=run_isolated.copy_local_packages,
-          cas_cache_dir=None,
-          cas_cache_policies=None,
-          cas_kvs='',
-          env={},
-          env_prefix={},
-          lower_priority=False,
-          containment=None,
-          trim_caches_fn=trim_caches_stub)
-      ret = run_isolated.run_tha_test(data, None)
-      self.assertEqual(0, ret)
-
-      # It uploaded back. Assert the store has a new item containing foo.
-      hashes = {isolated_hash, script_hash}
-      foo1_output_hash = isolateserver_fake.hash_content(b'foo1')
-      foo2_output_hash = isolateserver_fake.hash_content(b'foo2')
-      bar1_output_hash = isolateserver_fake.hash_content(b'bar1')
-      hashes.add(foo1_output_hash)
-      hashes.add(foo2_output_hash)
-      hashes.add(bar1_output_hash)
-      isolated = {
-          u'algo': u'sha-1',
-          u'files': {
-              u'foo1': {
-                  u'h': foo1_output_hash,
-                  u'm': 0o600,
-                  u's': 4,
-              },
-              os.path.join(u'foodir', 'foo2_sl'): {
-                  u'h': foo2_output_hash,
-                  u'm': 0o600,
-                  u's': 4,
-              },
-              os.path.join(u'bardir', 'bar1'): {
-                  u'h': bar1_output_hash,
-                  u'm': 0o600,
-                  u's': 4,
-              },
-          },
-          u'version': isolated_format.ISOLATED_FILE_VERSION,
-      }
-      if sys.platform == 'win32':
-        isolated['files']['foo1'].pop('m')
-        isolated['files']['foodir\\foo2_sl'].pop('m')
-        isolated['files']['bardir\\bar1'].pop('m')
-      uploaded = json_dumps(isolated).encode()
-      uploaded_hash = isolateserver_fake.hash_content(uploaded)
-      hashes.add(uploaded_hash)
-      self.assertEqual(hashes, set(server.contents['default-store']))
-
-      expected = ''.join([
-          '[run_isolated_out_hack]',
-          '{"hash":"%s","namespace":"default-store","storage":%s}' %
-          (uploaded_hash, json.dumps(server.url)), '[/run_isolated_out_hack]'
-      ])
-      self.mocked_print.assert_called_once_with(expected)
-    finally:
-      server.close()
-
   def test_output_cmd(self):
-    isolated = {
-      u'algo': u'sha-1',
-      u'files': {},
-      u'version': isolated_format.ISOLATED_FILE_VERSION,
-    }
-    self._run_test(isolated, ['cmd.py', 'foo1', 'foodir/foo2_sl', 'bardir/'])
+    # Output the following structure:
+    #
+    # foo1
+    # foodir --> foo2_sl (symlink to "foo2_content" file)
+    # bardir --> bar1
+    #
+    # Create the symlinks only on Linux.
+    cas_digest = self._server.archive_files({
+        'cmd.py':
+        b'import os\n'
+        b'import sys\n'
+        b'open(sys.argv[1], "w").write("foo1")\n'
+        b'bar1_path = os.path.join(sys.argv[3], "bar1")\n'
+        b'open(bar1_path, "w").write("bar1")\n'
+        b'if sys.platform.startswith("linux"):\n'
+        b'  foo_realpath = os.path.abspath("foo2_content")\n'
+        b'  open(foo_realpath, "w").write("foo2")\n'
+        b'  os.symlink(foo_realpath, sys.argv[2])\n'
+        b'else:\n'
+        b'  open(sys.argv[2], "w").write("foo2")\n'
+    })
+
+    data = run_isolated.TaskData(
+        command=['python3', 'cmd.py', 'foo1', 'foodir/foo2_sl', 'bardir/'],
+        relative_cwd=None,
+        isolated_hash=None,
+        storage=None,
+        isolate_cache=None,
+        cas_instance=None,
+        cas_digest=cas_digest,
+        outputs=[
+            'foo1',
+            # They must be in OS native path.
+            os.path.join('foodir', 'foo2_sl'),
+            os.path.join('bardir', ''),
+        ],
+        install_named_caches=init_named_caches_stub,
+        leak_temp_dir=False,
+        root_dir=self.tempdir,
+        hard_timeout=60,
+        grace_period=30,
+        bot_file=None,
+        switch_to_account=False,
+        install_packages_fn=run_isolated.copy_local_packages,
+        cas_cache_dir='',
+        cas_cache_policies=local_caching.CachePolicies(0, 0, 0, 0),
+        cas_kvs='',
+        env={},
+        env_prefix={},
+        lower_priority=False,
+        containment=None,
+        trim_caches_fn=trim_caches_stub)
+    result_json = os.path.join(self.tempdir, 'result.json')
+    ret = run_isolated.run_tha_test(data, result_json)
+    self.assertEqual(0, ret)
+
+    # It uploaded back. Assert the store has a new item containing foo.
+
+    with open(result_json) as f:
+      result = json.load(f)
+
+    output_digest = result['cas_output_root']['digest']
+    dest = os.path.join(self.tempdir, 'outputs')
+    self._server.download(
+        output_digest['hash'] + '/' + str(output_digest['size_bytes']), dest)
+
+    self.assertExpectedTree(
+        {
+            os.path.join('foodir', 'foo2_sl'): 'foo2',
+            'foo1': 'foo1',
+            os.path.join('bardir', 'bar1'): 'bar1',
+        }, dest)
+
+    six.assertCountEqual(self, os.listdir(dest), ['foodir', 'foo1', 'bardir'])
+    self.assertEqual(os.listdir(os.path.join(dest, 'foodir')), ['foo2_sl'])
+    self.assertEqual(os.listdir(os.path.join(dest, 'bardir')), ['bar1'])
 
 
 class RunIsolatedJsonTest(RunIsolatedTestBase):

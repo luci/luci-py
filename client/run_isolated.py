@@ -1013,7 +1013,7 @@ def map_and_run(data, constant_run_path):
 
       # If we have an explicit list of files to return, make sure their
       # directories exist now.
-      if data.storage and data.outputs:
+      if data.outputs:
         file_path.create_directories(run_dir, data.outputs)
 
       with data.install_named_caches(run_dir, result['stats']['named_caches']):
