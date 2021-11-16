@@ -1042,6 +1042,22 @@ def ensure_tree(path, perm=0o777):
         raise
 
 
+def create_directories(base_directory, files):
+  """Creates the directory structure needed by the given list of files."""
+  logging.debug('create_directories(%s, %d)', base_directory, len(files))
+  # Creates the tree of directories to create.
+  directories = set(os.path.dirname(f) for f in files)
+  for item in list(directories):
+    while item:
+      directories.add(item)
+      item = os.path.dirname(item)
+  for d in sorted(directories):
+    if d:
+      abs_d = os.path.join(base_directory, d)
+      if not fs.isdir(abs_d):
+        fs.mkdir(abs_d)
+
+
 def make_tree_files_read_only(root):
   """Makes all the files in the directories read only but not the directories
   themselves.

@@ -676,7 +676,7 @@ def link_outputs_to_outdir(run_dir, out_dir, outputs):
   """
   if not outputs:
     return
-  isolateserver.create_directories(out_dir, outputs)
+  file_path.create_directories(out_dir, outputs)
   for o in outputs:
     copy_recursively(os.path.join(run_dir, o), os.path.join(out_dir, o))
 
@@ -1014,7 +1014,7 @@ def map_and_run(data, constant_run_path):
       # If we have an explicit list of files to return, make sure their
       # directories exist now.
       if data.storage and data.outputs:
-        isolateserver.create_directories(run_dir, data.outputs)
+        file_path.create_directories(run_dir, data.outputs)
 
       with data.install_named_caches(run_dir, result['stats']['named_caches']):
         sys.stdout.flush()

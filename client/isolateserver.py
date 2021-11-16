@@ -307,22 +307,6 @@ def _get_zip_compression_level(filename):
   return 0 if file_ext in ALREADY_COMPRESSED_TYPES else 7
 
 
-def create_directories(base_directory, files):
-  """Creates the directory structure needed by the given list of files."""
-  logging.debug('create_directories(%s, %d)', base_directory, len(files))
-  # Creates the tree of directories to create.
-  directories = set(os.path.dirname(f) for f in files)
-  for item in list(directories):
-    while item:
-      directories.add(item)
-      item = os.path.dirname(item)
-  for d in sorted(directories):
-    if d:
-      abs_d = os.path.join(base_directory, d)
-      if not fs.isdir(abs_d):
-        fs.mkdir(abs_d)
-
-
 def _create_symlinks(base_directory, files):
   """Creates any symlinks needed by the given set of files."""
   for filepath, properties in files:
@@ -1364,7 +1348,7 @@ def fetch_isolated(isolated_hash, storage, cache, outdir, use_symlinks,
   with tools.Profiler('GetRest'):
     # Create file system hierarchy.
     file_path.ensure_tree(outdir)
-    create_directories(outdir, bundle.files)
+    file_path.create_directories(outdir, bundle.files)
     _create_symlinks(outdir, bundle.files.items())
 
     # Ensure working directory exists.
