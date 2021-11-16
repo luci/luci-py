@@ -59,28 +59,19 @@ class AclTestCase(test_case.TestCase):
             acl._PERMISSION_VALIDATE: 'some-project-validate',
             acl._PERMISSION_REIMPORT: 'some-project-reimport',
         },
+        auth.root_realm('hidden'): {
+            acl._PERMISSION_READ: 'hidden',
+        },
     }
     def has_permission_mock(perm, realms):
       assert len(realms) == 1, realms
       group = perms_map.get(realms[0], {}).get(perm)
-      return group and auth.is_group_member(group)
+      return bool(group and auth.is_group_member(group))
     self.mock(auth, 'has_permission', has_permission_mock)
 
-    self.legacy_acl_fallbacks = 0
-    def log_fallback_mock(*_args):
-      self.legacy_acl_fallbacks += 1
-    self.mock(acl, '_log_acl_fallback', log_fallback_mock)
-
     self.mock(projects, 'get_metadata_async', mock.Mock(return_value=future({
-        TEST_PROJECT: project_config_pb2.ProjectCfg(
-            access=[
-                'group:some-project-access',
-                'group:some-project-access-legacy',
-            ],
-        ),
-        'hidden': project_config_pb2.ProjectCfg(
-            access=['group:hidden'],
-        ),
+        TEST_PROJECT: project_config_pb2.ProjectCfg(),
+        'hidden': project_config_pb2.ProjectCfg(),
     })))
 
     self.mock(storage, 'get_self_config_async', lambda *_: future(
@@ -91,9 +82,6 @@ class AclTestCase(test_case.TestCase):
             service_access_group='service-access',
             service_reimport_group='service-reimport',
             service_validation_group='service-validation',
-            reimport_group='legacy-reimport',
-            validation_group='legacy-validation',
-            legacy_project_access_group='legacy-project-access',
     )))
 
     self.mock(projects, '_filter_existing', lambda pids: pids)
@@ -111,19 +99,9 @@ class AclTestCase(test_case.TestCase):
   def test_access_project_via_project_acl(self):
     self.mock_membership('some-project-access')
     self.assertTrue(can_read(PROJECT_SET))
-    self.assertEqual(self.legacy_acl_fallbacks, 0)
-
-  def test_access_project_via_legacy_project_acl(self):
-    self.mock_membership('some-project-access-legacy')
-    self.assertTrue(can_read(PROJECT_SET))
-    self.assertEqual(self.legacy_acl_fallbacks, 1)
 
   def test_access_project_via_global_acl(self):
     self.mock_membership('project-access')
-    self.assertTrue(can_read(PROJECT_SET))
-
-  def test_access_project_via_global_legacy_acl(self):
-    self.mock_membership('legacy-project-access')
     self.assertTrue(can_read(PROJECT_SET))
 
   def test_access_project_unknown(self):
@@ -140,17 +118,10 @@ class AclTestCase(test_case.TestCase):
   def test_validate_project_via_project_acl(self):
     self.mock_membership('some-project-access', 'some-project-validate')
     self.assertTrue(can_validate(PROJECT_SET))
-    self.assertEqual(self.legacy_acl_fallbacks, 0)
 
   def test_validate_project_via_global_acl(self):
     self.mock_membership('project-access', 'project-validation')
     self.assertTrue(can_validate(PROJECT_SET))
-    self.assertEqual(self.legacy_acl_fallbacks, 0)
-
-  def test_validate_project_via_legacy_acl(self):
-    self.mock_membership('project-access', 'legacy-validation')
-    self.assertTrue(can_validate(PROJECT_SET))
-    self.assertEqual(self.legacy_acl_fallbacks, 1)
 
   def test_reimport_project_invisible(self):
     self.assertFalse(can_reimport(PROJECT_SET))
@@ -162,17 +133,10 @@ class AclTestCase(test_case.TestCase):
   def test_reimport_project_via_project_acl(self):
     self.mock_membership('some-project-access', 'some-project-reimport')
     self.assertTrue(can_reimport(PROJECT_SET))
-    self.assertEqual(self.legacy_acl_fallbacks, 0)
 
   def test_reimport_project_via_global_acl(self):
     self.mock_membership('project-access', 'project-reimport')
     self.assertTrue(can_reimport(PROJECT_SET))
-    self.assertEqual(self.legacy_acl_fallbacks, 0)
-
-  def test_reimport_project_via_legacy_acl(self):
-    self.mock_membership('project-access', 'legacy-reimport')
-    self.assertTrue(can_reimport(PROJECT_SET))
-    self.assertEqual(self.legacy_acl_fallbacks, 1)
 
   def test_access_service_frobidden(self):
     self.assertFalse(can_read(SERVICE_SET))
@@ -200,10 +164,6 @@ class AclTestCase(test_case.TestCase):
     self.mock_membership('service-access', 'service-validation')
     self.assertTrue(can_validate(SERVICE_SET))
 
-  def test_validate_service_via_legacy_acl(self):
-    self.mock_membership('service-access', 'legacy-validation')
-    self.assertTrue(can_validate(SERVICE_SET))
-
   def test_reimport_service_invisible(self):
     self.assertFalse(can_reimport(SERVICE_SET))
 
@@ -213,10 +173,6 @@ class AclTestCase(test_case.TestCase):
 
   def test_reimport_service_via_global_acl(self):
     self.mock_membership('service-access', 'service-reimport')
-    self.assertTrue(can_reimport(SERVICE_SET))
-
-  def test_reimport_service_via_legacy_acl(self):
-    self.mock_membership('service-access', 'legacy-reimport')
     self.assertTrue(can_reimport(SERVICE_SET))
 
   ### Tests for can_read_config_sets batch mode.
@@ -237,10 +193,10 @@ class AclTestCase(test_case.TestCase):
         'services/unknown': False,
     })
 
-  ### Tests for _has_access helper.
+  ### Tests for _check_service_config_acl helper.
 
-  def test_has_access_as_identity(self):
-    res = acl._has_access({
+  def test_check_service_config_acl_as_identity(self):
+    res = acl._check_service_config_acl({
         'missing': None,
         'empty': service_config_pb2.Service(),
         'yes': service_config_pb2.Service(
@@ -258,9 +214,9 @@ class AclTestCase(test_case.TestCase):
         'also-yes': True,
     })
 
-  def test_has_access_via_group(self):
+  def test_check_service_config_acl_via_group(self):
     self.mock_membership('some-group')
-    res = acl._has_access({
+    res = acl._check_service_config_acl({
         'missing': None,
         'empty': service_config_pb2.Service(),
         'yes': service_config_pb2.Service(

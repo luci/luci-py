@@ -22,8 +22,6 @@ from protorpc import remote
 from components import auth
 from components.datastore_utils import config
 
-import acl
-
 
 # This is used by endpoints indirectly.
 package = 'luci-config'
@@ -58,7 +56,7 @@ class AdminApi(remote.Service):
 
   @auth.endpoints_method(
       message_types.VoidMessage, GlobalConfigMessage, name='readGlobalConfig')
-  @auth.require(acl.is_admin)
+  @auth.require(auth.is_superuser)
   def read_global_config(self, _request):
     """Reads global configuration."""
     conf = GlobalConfig.fetch()
@@ -71,7 +69,7 @@ class AdminApi(remote.Service):
 
   @auth.endpoints_method(
       GlobalConfigMessage, GlobalConfigMessage, name='writeGlobalConfig')
-  @auth.require(acl.is_admin)
+  @auth.require(auth.is_superuser)
   def write_global_config(self, request):
     """Writes global configuration."""
     conf = GlobalConfig.fetch()
