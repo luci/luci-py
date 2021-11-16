@@ -118,7 +118,6 @@ _CAS_CLIENT_DIR = u'cc'
 _NSJAIL_DIR = u'ns'
 
 # TODO(tikuta): take these parameter from luci-config?
-ISOLATED_PACKAGE = 'infra/tools/luci/isolated/${platform}'
 _CAS_PACKAGE = 'infra/tools/luci/cas/${platform}'
 _LUCI_GO_REVISION = DEPS.deps['luci-go']['packages'][0]['version']
 _NSJAIL_PACKAGE = 'infra/3pp/tools/nsjail/${platform}'
@@ -217,12 +216,6 @@ TaskData = collections.namedtuple(
         'switch_to_account',
         # Context manager dir => CipdInfo, see install_client_and_packages.
         'install_packages_fn',
-        # Use go isolated client.
-        'use_go_isolated',
-        # Cache directory for go `isolated` client.
-        'go_cache_dir',
-        # Parameters passed to go `isolated` client.
-        'go_cache_policies',
         # Cache directory for `cas` client.
         'cas_cache_dir',
         # Parameters passed to `cas` client.
@@ -657,61 +650,6 @@ def _fetch_and_map_with_cas(cas_client, digest, instance, output_dir, cache_dir,
     file_path.rmtree(profile_dir)
 
 
-def _fetch_and_map_with_go_isolated(isolated_hash, storage, outdir,
-                                    go_cache_dir, policies, isolated_client,
-                                    tmp_dir):
-  """
-  Fetches an isolated tree using go client, create the tree and returns
-  stats.
-  """
-  start = time.time()
-  server_ref = storage.server_ref
-  result_json_handle, result_json_path = tempfile.mkstemp(
-      prefix=u'fetch-and-map-result-', suffix=u'.json')
-  os.close(result_json_handle)
-  try:
-    cmd = [
-        isolated_client,
-        'download',
-        '-isolate-server',
-        server_ref.url,
-        '-namespace',
-        server_ref.namespace,
-        '-isolated',
-        isolated_hash,
-
-        # flags for cache
-        '-cache-dir',
-        go_cache_dir,
-        '-cache-max-items',
-        str(policies.max_items),
-        '-cache-max-size',
-        str(policies.max_cache_size),
-        '-cache-min-free-space',
-        str(policies.min_free_space),
-
-        # flags for output
-        '-output-dir',
-        outdir,
-        '-fetch-and-map-result-json',
-        result_json_path,
-    ]
-    _run_go_cmd_and_wait(cmd, tmp_dir)
-
-    with open(result_json_path) as json_file:
-      result_json = json.load(json_file)
-
-    return {
-        'duration': time.time() - start,
-        'items_cold': result_json['items_cold'],
-        'items_hot': result_json['items_hot'],
-        'initial_number_items': result_json['initial_number_items'],
-        'initial_size': result_json['initial_size'],
-    }
-  finally:
-    fs.remove(result_json_path)
-
-
 # TODO(crbug.com/932396): remove this function.
 def fetch_and_map(isolated_hash, storage, cache, outdir):
   """Fetches an isolated tree, create the tree and returns stats."""
@@ -1010,15 +948,10 @@ def map_and_run(data, constant_run_path):
   if data.storage or use_cas:
     out_dir = make_temp_dir(ISOLATED_OUT_DIR, data.root_dir)
   tmp_dir = make_temp_dir(ISOLATED_TMP_DIR, data.root_dir)
-  isolated_client_dir = make_temp_dir(ISOLATED_CLIENT_DIR, data.root_dir)
   cwd = run_dir
   if data.relative_cwd:
     cwd = os.path.normpath(os.path.join(cwd, data.relative_cwd))
   command = data.command
-  go_isolated_client = None
-  if data.use_go_isolated:
-    go_isolated_client = os.path.join(isolated_client_dir,
-                                      'isolated' + cipd.EXECUTABLE_SUFFIX)
 
   cas_client = None
   cas_client_dir = make_temp_dir(_CAS_CLIENT_DIR, data.root_dir)
@@ -1033,7 +966,7 @@ def map_and_run(data, constant_run_path):
     nsjail_dir = make_temp_dir(_NSJAIL_DIR, data.root_dir)
 
   try:
-    with data.install_packages_fn(run_dir, isolated_client_dir, cas_client_dir,
+    with data.install_packages_fn(run_dir, cas_client_dir,
                                   nsjail_dir) as cipd_info:
       if cipd_info:
         result['stats']['cipd'] = cipd_info.stats
@@ -1041,21 +974,10 @@ def map_and_run(data, constant_run_path):
 
       isolated_stats = result['stats'].setdefault('isolated', {})
       if data.isolated_hash:
-        if data.use_go_isolated:
-          stats = _fetch_and_map_with_go_isolated(
-              isolated_hash=data.isolated_hash,
-              storage=data.storage,
-              outdir=run_dir,
-              go_cache_dir=data.go_cache_dir,
-              policies=data.go_cache_policies,
-              isolated_client=go_isolated_client,
-              tmp_dir=tmp_dir)
-        else:
-          stats = fetch_and_map(
-              isolated_hash=data.isolated_hash,
-              storage=data.storage,
-              cache=data.isolate_cache,
-              outdir=run_dir)
+        stats = fetch_and_map(isolated_hash=data.isolated_hash,
+                              storage=data.storage,
+                              cache=data.isolate_cache,
+                              outdir=run_dir)
         isolated_stats['download'].update(stats)
 
       elif data.cas_digest:
@@ -1152,7 +1074,7 @@ def map_and_run(data, constant_run_path):
         # process locks *.exe file). Examine out_dir only after that call
         # completes (since child processes may write to out_dir too and we need
         # to wait for them to finish).
-        dirs_to_remove = [run_dir, tmp_dir, isolated_client_dir, cas_client_dir]
+        dirs_to_remove = [run_dir, tmp_dir, cas_client_dir]
         if out_dir:
           dirs_to_remove.append(out_dir)
         for directory in dirs_to_remove:
@@ -1261,7 +1183,7 @@ CipdInfo = collections.namedtuple('CipdInfo', [
 
 
 @contextlib.contextmanager
-def copy_local_packages(_run_dir, _isolated_dir, cas_dir, _nsjail_dir):
+def copy_local_packages(_run_dir, cas_dir, _nsjail_dir):
   """Copies CIPD packages from luci/luci-go dir."""
   go_client_dir = os.environ.get('LUCI_GO_CLIENT_DIR')
   assert go_client_dir, ('Please set LUCI_GO_CLIENT_DIR env var to install CIPD'
@@ -1327,7 +1249,7 @@ def _install_packages(run_dir, cipd_cache_dir, client, packages):
 @contextlib.contextmanager
 def install_client_and_packages(run_dir, packages, service_url,
                                 client_package_name, client_version, cache_dir,
-                                isolated_dir, cas_dir, nsjail_dir):
+                                cas_dir, nsjail_dir):
   """Bootstraps CIPD client and installs CIPD packages.
 
   Yields CipdClient, stats, client info and pins (as single CipdInfo object).
@@ -1359,7 +1281,6 @@ def install_client_and_packages(run_dir, packages, service_url,
     client_package_name (str): CIPD package name of CIPD client.
     client_version (str): Version of CIPD client.
     cache_dir (str): where to keep cache of cipd clients, packages and tags.
-    isolated_dir (str): where to download isolated client.
     cas_dir (str): where to download cas client.
     nsjail_dir (str): where to download nsjail. If set to None, nsjail is not
       downloaded.
@@ -1384,10 +1305,6 @@ def install_client_and_packages(run_dir, packages, service_url,
     if packages:
       package_pins = _install_packages(run_dir, cipd_cache_dir, client,
                                        packages)
-
-    # Install isolated client to |isolated_dir|.
-    _install_packages(isolated_dir, cipd_cache_dir, client,
-                      [('', ISOLATED_PACKAGE, _LUCI_GO_REVISION)])
 
     # Install cas client to |cas_dir|.
     _install_packages(cas_dir, cipd_cache_dir, client,
@@ -1742,9 +1659,6 @@ def main(args):
     options.min_free_space += hint
     named_cache = process_named_cache_options(parser, options)
 
-  # TODO(crbug.com/932396): Remove this.
-  use_go_isolated = options.cipd_enabled
-
   # TODO(maruel): CIPD caches should be defined at an higher level here too, so
   # they can be cleaned the same way.
 
@@ -1783,10 +1697,7 @@ def main(args):
     stats['duration'] = duration
     logging.info('trim_caches: took %d seconds', duration)
 
-  # Save state of isolate/cas cache not to overwrite state from go client.
-  if use_go_isolated:
-    isolate_cache.save()
-    isolate_cache = None
+  # Save state of cas cache not to overwrite state from go client.
   if cas_cache:
     cas_cache.save()
     cas_cache = None
@@ -1845,18 +1756,17 @@ def main(args):
     if not cache_dir:
       tmp_cipd_cache_dir = six.text_type(tempfile.mkdtemp())
       cache_dir = tmp_cipd_cache_dir
-    install_packages_fn = (lambda run_dir, isolated_dir, cas_dir, nsjail_dir:
-                           install_client_and_packages(
-                               run_dir,
-                               cipd.parse_package_args(options.cipd_packages),
-                               options.cipd_server,
-                               options.cipd_client_package,
-                               options.cipd_client_version,
-                               cache_dir=cache_dir,
-                               isolated_dir=isolated_dir,
-                               cas_dir=cas_dir,
-                               nsjail_dir=nsjail_dir,
-                           ))
+    install_packages_fn = (
+        lambda run_dir, cas_dir, nsjail_dir: install_client_and_packages(
+            run_dir,
+            cipd.parse_package_args(options.cipd_packages),
+            options.cipd_server,
+            options.cipd_client_package,
+            options.cipd_client_version,
+            cache_dir=cache_dir,
+            cas_dir=cas_dir,
+            nsjail_dir=nsjail_dir,
+        ))
 
   @contextlib.contextmanager
   def install_named_caches(run_dir, stats):
@@ -1941,14 +1851,6 @@ def main(args):
       bot_file=options.bot_file,
       switch_to_account=options.switch_to_account,
       install_packages_fn=install_packages_fn,
-      use_go_isolated=use_go_isolated,
-      go_cache_dir=options.cache,
-      go_cache_policies=local_caching.CachePolicies(
-          max_cache_size=options.max_cache_size,
-          min_free_space=options.min_free_space,
-          max_items=options.max_items,
-          max_age_secs=None,
-      ),
       cas_cache_dir=options.cas_cache,
       cas_cache_policies=local_caching.CachePolicies(
           max_cache_size=options.max_cache_size,
