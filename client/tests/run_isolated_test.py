@@ -249,8 +249,7 @@ class RunIsolatedTest(RunIsolatedTestBase):
     self.mock(tools, 'disable_buffering', lambda: None)
 
     cmd = self.DISABLE_CIPD_FOR_TESTS + [
-        '--no-log', '--cache',
-        os.path.join(self.tempdir, 'isolated_cache'), '--named-cache-root',
+        '--no-log', '--named-cache-root',
         os.path.join(self.tempdir, 'named_cache'), '--root-dir', self.tempdir,
         '--', 'foo.exe', 'cmd with space', '-task-id', '${SWARMING_TASK_ID}'
     ]
@@ -274,8 +273,6 @@ class RunIsolatedTest(RunIsolatedTestBase):
 
     cmd = self.DISABLE_CIPD_FOR_TESTS + [
         '--no-log',
-        '--cache',
-        os.path.join(self.tempdir, 'isolated_cache'),
         '--named-cache-root',
         os.path.join(self.tempdir, 'named_cache'),
         '--root-dir',
@@ -302,12 +299,9 @@ class RunIsolatedTest(RunIsolatedTestBase):
         self.popen_calls)
 
   def _run_tha_test(self,
-                    isolated_hash=None,
-                    files=None,
                     command=None,
                     lower_priority=False,
                     relative_cwd=None):
-    files = files or {}
     make_tree_call = []
     def add(i, _):
       make_tree_call.append(i)
@@ -315,13 +309,12 @@ class RunIsolatedTest(RunIsolatedTestBase):
     for i in ('make_tree_files_read_only', 'make_tree_deleteable'):
       self.mock(file_path, i, functools.partial(add, i))
 
-    server_ref = isolate_storage.ServerRef('http://localhost:1', 'default-gzip')
     data = run_isolated.TaskData(
         command=command or [],
         relative_cwd=relative_cwd,
-        isolated_hash=isolated_hash,
-        storage=StorageFake(files, server_ref),
-        isolate_cache=local_caching.MemoryContentAddressedCache(),
+        isolated_hash=None,
+        storage=None,
+        isolate_cache=None,
         cas_instance=None,
         cas_digest=None,
         outputs=None,
@@ -378,8 +371,7 @@ class RunIsolatedTest(RunIsolatedTestBase):
     self.mock(tools, 'disable_buffering', lambda: None)
 
     cmd = self.DISABLE_CIPD_FOR_TESTS + [
-        '--no-log', '--cache',
-        os.path.join(self.tempdir, 'isolated_cache'), '--named-cache-root',
+        '--no-log', '--named-cache-root',
         os.path.join(self.tempdir, 'named_cache'), '--root-dir', self.tempdir,
         '--', 'invalid', 'command'
     ]
@@ -406,8 +398,6 @@ class RunIsolatedTest(RunIsolatedTestBase):
     self.mock_popen_with_oserr()
     cmd = self.DISABLE_CIPD_FOR_TESTS + [
         '--no-log',
-        '--cache',
-        os.path.join(self.tempdir, 'isolated_cache'),
         '--named-cache-root',
         os.path.join(self.tempdir, 'named_cache'),
         '--root-dir',
@@ -440,8 +430,6 @@ class RunIsolatedTest(RunIsolatedTestBase):
     self.mock_popen_with_oserr()
     cmd = self.DISABLE_CIPD_FOR_TESTS + [
         '--no-log',
-        '--cache',
-        os.path.join(self.tempdir, 'isolated_cache'),
         '--named-cache-root',
         os.path.join(self.tempdir, 'named_cache'),
         '--switch-to-account',
@@ -470,8 +458,6 @@ class RunIsolatedTest(RunIsolatedTestBase):
     self.mock_popen_with_oserr()
     cmd = self.DISABLE_CIPD_FOR_TESTS + [
         '--no-log',
-        '--cache',
-        os.path.join(self.tempdir, 'isolated_cache'),
         '--named-cache-root',
         os.path.join(self.tempdir, 'named_cache'),
         '--switch-to-account',
@@ -500,8 +486,6 @@ class RunIsolatedTest(RunIsolatedTestBase):
     try:
       cmd = self.DISABLE_CIPD_FOR_TESTS + [
           '--no-log',
-          '--cache',
-          os.path.join(self.tempdir, 'isolated_cache'),
           '--root-dir',
           workdir,
           '--leak-temp-dir',
@@ -566,8 +550,6 @@ class RunIsolatedTest(RunIsolatedTestBase):
     cipd_cache = os.path.join(self.tempdir, 'cipd_cache')
     cmd = [
         '--no-log',
-        '--cache',
-        os.path.join(self.tempdir, 'isolated_cache'),
         '--cipd-client-version',
         'git:wowza',
         '--cipd-package',
@@ -630,8 +612,6 @@ class RunIsolatedTest(RunIsolatedTestBase):
     cipd_cache = os.path.join(self.tempdir, 'cipd_cache')
     cmd = [
         '--no-log',
-        '--cache',
-        os.path.join(self.tempdir, 'isolated_cache'),
         '--cipd-client-version',
         'git:wowza',
         '--cipd-server',
