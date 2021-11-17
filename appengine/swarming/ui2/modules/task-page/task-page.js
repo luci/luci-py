@@ -22,10 +22,9 @@ import * as query from 'common-sk/modules/query';
 
 import {applyAlias} from '../alias';
 import {casLink, canRetry, cipdLink, durationChart, hasRichOutput, humanState,
-  firstDimension, isolateLink, parseRequest, parseResult,
-  richLogsLink, sliceSchedulingDeadline, stateClass, taskCost,
-  taskSchedulingDeadline, taskInfoClass, wasDeduped,
-  wasPickedUp} from './task-page-helpers';
+  firstDimension, parseRequest, parseResult, richLogsLink,
+  sliceSchedulingDeadline, stateClass, taskCost, taskSchedulingDeadline,
+  taskInfoClass, wasDeduped, wasPickedUp} from './task-page-helpers';
 import {botListLink, botPageLink, humanDuration, parseDuration,
   taskListLink, taskPageLink} from '../util';
 

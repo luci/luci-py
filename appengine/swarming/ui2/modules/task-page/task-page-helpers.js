@@ -110,14 +110,6 @@ export function humanState(result, currentSliceIdx) {
   return state;
 }
 
-/** isolateLink constructs a URL to a isolate resource given an
- *  isolate ref object.
- */
-export function isolateLink(ref) {
-  return ref.isolatedserver + '/browse?namespace='+ref.namespace +
-         '&hash=' + ref.isolated;
-}
-
 /** casLink constructs a URL to a CAS root directory given a CAS reference.
  */
 export function casLink(host, ref) {
