@@ -175,14 +175,6 @@ class SwarmingServerService(remote.Service):
     host = 'https://' + os.environ['HTTP_HOST']
 
     cfg = config.settings()
-    isolate, _cipd = pools_config.get_default_external_services()
-
-    default_isolate_server = cfg.isolate.default_server
-    default_isolate_namespace = cfg.isolate.default_namespace
-    if isolate:
-      default_isolate_server = isolate.server
-      default_isolate_namespace = isolate.namespace
-
     server_version = utils.get_app_version()
     chops_git_version = utils.get_chops_git_version()
 
@@ -201,8 +193,6 @@ class SwarmingServerService(remote.Service):
         chops_git_version=chops_git_version,
         display_server_url_template=cfg.display_server_url_template,
         luci_config=config.config.config_service_hostname(),
-        default_isolate_server=default_isolate_server,
-        default_isolate_namespace=default_isolate_namespace,
         cas_viewer_server=cfg.cas.viewer_server)
 
   @gae_ts_mon.instrument_endpoint()

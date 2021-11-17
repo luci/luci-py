@@ -140,10 +140,6 @@ class ServerApiTest(BaseTest):
             u'5626-39642e9',
         u'luci_config':
             u'a.server',
-        u'default_isolate_server':
-            u'https://pool.config.isolate.example.com',
-        u'default_isolate_namespace':
-            u'default-gzip',
         u'server_version':
             unicode(utils.get_app_version()),
         u'cas_viewer_server':

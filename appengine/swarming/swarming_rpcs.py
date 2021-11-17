@@ -190,8 +190,6 @@ class ServerDetails(messages.Message):
   machine_provider_template = messages.StringField(3)
   display_server_url_template = messages.StringField(4)
   luci_config = messages.StringField(5)
-  default_isolate_server = messages.StringField(6)
-  default_isolate_namespace = messages.StringField(7)
   cas_viewer_server = messages.StringField(8)
   project_id = messages.StringField(9)
   chops_git_version = messages.StringField(10)

@@ -76,34 +76,6 @@ class ConfigTest(test_case.TestCase):
     self.assertTrue(config.validate_dimension_value(u'b' * l))
     self.assertFalse(config.validate_dimension_value(u'b'*(l+1)))
 
-  def test_validate_isolate_settings(self):
-    self.validator_test(
-        config._validate_isolate_settings,
-        config_pb2.IsolateSettings(
-            default_server='https://isolateserver.appspot.com'), [
-                'either specify both default_server and default_namespace or '
-                'none',
-            ])
-
-    self.validator_test(
-        config._validate_isolate_settings,
-        config_pb2.IsolateSettings(
-            default_server='isolateserver.appspot.com',
-            default_namespace='abc',
-        ), [
-            'default_server must start with "https://" or "http://localhost"',
-        ])
-
-    self.validator_test(
-        config._validate_isolate_settings,
-        config_pb2.IsolateSettings(
-            default_server='https://isolateserver.appspot.com',
-            default_namespace='abc',
-        ), [])
-
-    self.validator_test(config._validate_isolate_settings,
-                        config_pb2.IsolateSettings(), [])
-
   def test_validate_cipd_settings(self):
     self.validator_test(
         config._validate_cipd_settings,
