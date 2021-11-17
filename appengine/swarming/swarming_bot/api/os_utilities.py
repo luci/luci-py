@@ -660,25 +660,6 @@ def get_cipd_cache_info():
   return 0
 
 
-def get_isolated_cache_info():
-  """Returns the items in state.json describing isolated caches."""
-  # Strictly speaking, this is a layering violation. This data is managed by
-  # run_isolated.py but this is valuable to expose this as a Swarming bot
-  # state so ¯\_(ツ)_/¯
-  #
-  # Assumptions:
-  # - ../__main__.py calls os.chdir(__file__)
-  # - ../bot_code/bot_main.py specifies
-  #   --cache os.path.join(botobj.base_dir, 'isolated_cache') to run_isolated.
-  # - state.json is lru.LRUDict format.
-  # - ../client/isolateserver.py behavior
-  try:
-    with open(os.path.join(u'isolated_cache', u'state.json'), 'rb') as f:
-      return dict(json.load(f)['items'])
-  except (IOError, KeyError, OSError, TypeError, ValueError):
-    return {}
-
-
 def get_named_caches_info():
   """"Returns the items in state.json describing named caches."""
   # Strictly speaking, this is a layering violation. This data is managed by
