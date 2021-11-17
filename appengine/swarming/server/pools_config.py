@@ -61,8 +61,6 @@ PoolConfig = collections.namedtuple(
         'bot_monitoring',
         # Tuple of ExternalSchedulerConfigs for this pool, if defined (or None).
         'external_schedulers',
-        # resolved default IsolateServer
-        'default_isolate',
         # resolved default CipdServer
         'default_cipd',
     ])
@@ -84,17 +82,11 @@ def init_pool_config(**kwargs):
       'task_template_deployment': None,
       'bot_monitoring': None,
       'external_schedulers': None,
-      'default_isolate': None,
       'default_cipd': None,
   }
   args.update(kwargs)
   return PoolConfig(**args)
 
-
-IsolateServer = collections.namedtuple('IsolateServer', [
-    'server',
-    'namespace',
-])
 
 CipdServer = collections.namedtuple('CipdServer', [
     'server',
@@ -408,11 +400,6 @@ def get_pool_config(pool_name):
   return _fetch_pools_config().pools.get(pool_name)
 
 
-def get_default_external_services():
-  """Returns the globally configured (IsolateServer, CipdServer)."""
-  return _fetch_pools_config().default_external_services
-
-
 def known():
   """Returns the list of all pool names."""
   return sorted(_fetch_pools_config().pools)
@@ -429,7 +416,7 @@ _LOCAL_FAKE_CONFIG = None
 _PoolsCfg = collections.namedtuple('_PoolsCfg', [
   'pools',  # dict {pool name => PoolConfig tuple}
 
-  'default_external_services', # (IsolateServer, CipdServer)
+  'default_external_services', # (CipdServer)
 ])
 
 
@@ -597,10 +584,9 @@ def _fetch_pools_config():
       ctx, template_map, cfg.task_template_deployment)
   bot_monitorings = _resolve_bot_monitoring(ctx, cfg.bot_monitoring)
 
-  default_isolate = default_cipd = None
+  default_cipd = None
   if cfg.HasField('default_external_services'):
     ext = cfg.default_external_services
-    default_isolate = IsolateServer(ext.isolate.server, ext.isolate.namespace)
     default_cipd = CipdServer(
         ext.cipd.server,
         ext.cipd.client_package.package_name,
@@ -631,9 +617,8 @@ def _fetch_pools_config():
           bot_monitoring=bot_monitorings.get(name),
           external_schedulers=_resolve_external_schedulers(
               msg.external_schedulers),
-          default_isolate=default_isolate,
           default_cipd=default_cipd)
-  return _PoolsCfg(pools, (default_isolate, default_cipd))
+  return _PoolsCfg(pools, (default_cipd))
 
 
 @validation.self_rule(POOLS_CFG_FILENAME, pools_pb2.PoolsCfg)

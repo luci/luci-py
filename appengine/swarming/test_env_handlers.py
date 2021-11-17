@@ -180,10 +180,6 @@ class AppTestBase(test_case.TestCase):
     assert isinstance(service_accounts, (list, tuple)), service_accounts
 
     def mocked_fetch_pools_config():
-      default_isolate = pools_config.IsolateServer(
-          server='https://pool.config.isolate.example.com',
-          namespace='default-gzip',
-      )
       default_cipd = pools_config.CipdServer(
           server='https://pool.config.cipd.example.com',
           package_name='cipd-client-pkg',
@@ -227,7 +223,6 @@ class AppTestBase(test_case.TestCase):
                               inclusions=()),
                           canary_chance=0.5,
                       ),
-                      default_isolate=default_isolate,
                       default_cipd=default_cipd,
                   ),
               "default":
@@ -249,11 +244,10 @@ class AppTestBase(test_case.TestCase):
                       enforced_realm_permissions=enforced_realm_permissions or
                       {},
                       service_accounts=frozenset(service_accounts),
-                      default_isolate=default_isolate,
                       default_cipd=default_cipd,
                   ),
           },
-          (default_isolate, default_cipd))
+          (default_cipd))
 
     self.mock(pools_config, '_fetch_pools_config', mocked_fetch_pools_config)
 

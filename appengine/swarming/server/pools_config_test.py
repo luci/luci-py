@@ -66,10 +66,6 @@ TEST_CONFIG = pools_pb2.PoolsCfg(
         ),
     ],
     default_external_services=pools_pb2.ExternalServices(
-        isolate=pools_pb2.ExternalServices.Isolate(
-            server='https://isolate.server.example.com',
-            namespace='default-gzip',
-        ),
         cipd=pools_pb2.ExternalServices.CIPD(
             server='https://cipd.server.example.com',
             client_package=config_pb2.CipdPackage(
@@ -127,10 +123,6 @@ class PoolsConfigTest(test_case.TestCase):
         realm='test:pool/realm',
         enforced_realm_permissions=frozenset(
             [realms_pb2.REALM_PERMISSION_POOLS_CREATE_TASK]),
-        default_isolate=pools_config.IsolateServer(
-            server='https://isolate.server.example.com',
-            namespace='default-gzip',
-        ),
         default_cipd=pools_config.CipdServer(
             server='https://cipd.server.example.com',
             package_name='some-cipd-client',
@@ -153,53 +145,11 @@ class PoolsConfigTest(test_case.TestCase):
     self.assertEqual(['another_name', 'pool_name'], pools_config.known())
 
 
-  def test_validate_external_services_isolate(self):
-    def msg(**kwargs):
-      return pools_pb2.PoolsCfg(
-          default_external_services=pools_pb2.ExternalServices(
-              isolate=pools_pb2.ExternalServices.Isolate(**kwargs),
-              cipd=pools_pb2.ExternalServices.CIPD(
-                  server="https://example.com",
-                  client_package=config_pb2.CipdPackage(
-                      package_name='some-cipd-client',
-                      version='test',
-                  ),
-              ),
-          ))
-
-    self.validator_test(
-        msg(server='https://isolateserver.appspot.com'),
-        [])
-
-    self.validator_test(
-        msg(
-            server='isolateserver.appspot.com',
-            namespace='abc',
-        ), [])
-
-    self.validator_test(
-        msg(
-            server='https://isolateserver.appspot.com',
-            namespace='bad namespace',
-        ), [])
-
-    self.validator_test(
-        msg(
-            server='https://isolateserver.appspot.com',
-            namespace='abc',
-        ), [])
-
-    self.validator_test(msg(), [])
-
   def test_validate_external_services_cipd(self):
 
     def msg(server=None, package_name=None, version=None):
       return pools_pb2.PoolsCfg(
           default_external_services=pools_pb2.ExternalServices(
-              isolate=pools_pb2.ExternalServices.Isolate(
-                  server="https://example.com",
-                  namespace="test",
-              ),
               cipd=pools_pb2.ExternalServices.CIPD(
                   server=server,
                   client_package=config_pb2.CipdPackage(

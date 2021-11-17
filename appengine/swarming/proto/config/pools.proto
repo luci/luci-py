@@ -440,20 +440,8 @@ message ExternalSchedulerConfig {
 }
 
 message ExternalServices {
-  message Isolate {
-    // (required) URL of the default isolate server to use if it is not
-    // specified in the task.
-    //
-    // Must start with "https://" or "http://".
-    //
-    // e.g. "https://isolateserver.appspot.com"
-    string server = 1;
-
-    // (required) Default namespace to use if it is not specified in a task,
-    // e.g. "default-gzip"
-    string namespace = 2;
-  }
-  Isolate isolate = 1;
+  // (deprecated) isolate field is not used.
+  reserve 1;
 
   message CIPD {
     reserved 2; // Used to be "client_version", no longer used.
