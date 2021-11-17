@@ -244,8 +244,12 @@ message ServicesCfg {
 // Schema of acl.cfg file.
 // Next tag: 13.
 message AclCfg {
-  reserved 4;
+  reserved 3, 4, 5, 6, 12;
   reserved 'config_get_by_hash_group';
+  reserved 'admin_group';
+  reserved 'validation_group';
+  reserved 'reimport_group';
+  reserved 'legacy_project_access_group';
 
   // Name of the group that has global access to all "projects/*" config sets.
   //
@@ -282,27 +286,6 @@ message AclCfg {
 
   // Name of the group that can call reimport API for any accessible service.
   string service_reimport_group = 11;
-
-  // Name of the group that has global admin access to LUCI Config service.
-  //
-  // Its members will be able to read all configs and call validation and
-  // reimport APIs for any config set. Should be used sparingly.
-  string admin_group = 3;
-
-  // Name of the group that has global permission to call validation API.
-  //
-  // DEPRECATED. Used only by legacy ACLs.
-  string validation_group = 5;
-
-  // Name of the group that has global permission to call reimport API.
-  //
-  // DEPRECATED. Used only by legacy ACLs.
-  string reimport_group = 6;
-
-  // Name of the group that has global access to all "projects/*" config sets.
-  //
-  // DEPRECATED. Used only by legacy ACLs.
-  string legacy_project_access_group = 12;
 }
 
 // Schema for import.cfg. It specified how to import configuration files from
