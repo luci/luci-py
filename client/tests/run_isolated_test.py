@@ -25,14 +25,10 @@ import test_env
 # third_party/
 from depot_tools import auto_stub
 
-import isolateserver_fake
 import cipdserver_fake
 
 import cas_util
 import cipd
-import isolate_storage
-import isolated_format
-import isolateserver
 import local_caching
 import run_isolated
 from libs import luci_context
@@ -1377,56 +1373,35 @@ class RunIsolatedJsonTest(RunIsolatedTestBase):
   # generate a json result file.
   def setUp(self):
     super(RunIsolatedJsonTest, self).setUp()
-    self.popen_calls = []
 
-    # pylint: disable=no-self-argument
-    class Popen(object):
-      def __init__(self2, args, **kwargs):
-        kwargs.pop('env', None)
-        self.popen_calls.append((args, kwargs))
-        # Assume ${ISOLATED_OUTDIR} is the last one for testing purpose.
-        self2._path = args[-1]
-        self2.returncode = None
+    # Starts a full CAS server mock and have run_tha_test() uploads results
+    # back after the task completed.
+    self._server = cas_util.LocalCAS(self.tempdir)
+    self._server.start()
+    os.environ['RUN_ISOLATED_CAS_ADDRESS'] = self._server.address
 
-      def yield_any_line(self2, timeout=None):
-        self.assertEqual(None, timeout)
-        return ()
-
-      def wait(self2, timeout=None):
-        self.assertEqual(None, timeout)
-        self2.returncode = 0
-        with open(self2._path, 'wb') as f:
-          f.write(b'generated data\n')
-        return self2.returncode
-
-      def kill(self):
-        pass
-
-    self.mock(subprocess42, 'Popen', Popen)
+  def tearDown(self):
+    self._server.stop()
+    super(RunIsolatedJsonTest, self).tearDown()
 
   def test_main_json(self):
-    # Instruct the Popen mock to write a file in ISOLATED_OUTDIR so it will be
-    # archived back on termination.
-    self.mock(tools, 'disable_buffering', lambda: None)
     sub_cmd = [
-      self.ir_dir(u'foo.exe'), u'cmd with space',
-      '${ISOLATED_OUTDIR}/out.txt',
+        'python3',
+        '-c',
+        'import sys; open(sys.argv[1], "wb").write(b"generated data\\n")',
+        '${ISOLATED_OUTDIR}/out.txt',
     ]
-    isolated_in_json = json_dumps({}).encode()
-    isolated_in_hash = isolateserver_fake.hash_content(isolated_in_json)
-    def get_storage(server_ref):
-      return StorageFake({isolated_in_hash: isolated_in_json}, server_ref)
-    self.mock(isolateserver, 'get_storage', get_storage)
+
+    # This is to upload file to CAS.
+    # TODO(crbug.com/1253255): remove this when code for isolate is removed.
+    empty_digest = (
+        'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855/0')
 
     out = os.path.join(self.tempdir, 'res.json')
     cmd = self.DISABLE_CIPD_FOR_TESTS + [
         '--no-log',
-        '--isolated',
-        isolated_in_hash,
-        '--cache',
-        os.path.join(self.tempdir, 'isolated_cache'),
-        '--isolate-server',
-        'http://localhost:1',
+        '--cas-digest',
+        empty_digest,
         '--named-cache-root',
         os.path.join(self.tempdir, 'named_cache'),
         '--json',
@@ -1437,60 +1412,35 @@ class RunIsolatedJsonTest(RunIsolatedTestBase):
     ] + sub_cmd
     ret = run_isolated.main(cmd)
     self.assertEqual(0, ret)
-    # Replace ${ISOLATED_OUTDIR} with the temporary directory.
-    sub_cmd[2] = self.popen_calls[0][0][2]
-    self.assertNotIn('ISOLATED_OUTDIR', sub_cmd[2])
-    self.assertEqual(
-        [
-          (
-            sub_cmd,
-            {
-              'cwd': self.ir_dir(),
-              'detached': True,
-              'close_fds': True,
-              'lower_priority': False,
-              'containment': subprocess42.Containment(),
-            },
-          ),
-        ],
-        self.popen_calls)
-    isolated_out = {
-        'algo': 'sha-1',
-        'files': {
-            'out.txt': {
-                'h': isolateserver_fake.hash_content(b'generated data\n'),
-                's': 15,
-                'm': 0o600,
-            },
-        },
-        'version': isolated_format.ISOLATED_FILE_VERSION,
-    }
-    if sys.platform == 'win32':
-      del isolated_out['files']['out.txt']['m']
-    isolated_out_json = json_dumps(isolated_out).encode()
-    isolated_out_hash = isolateserver_fake.hash_content(isolated_out_json)
+
+    cas_hash = (
+        '5868195adddf130eeb09a939bc40a17033fb058288b7b0bec0144dcb07e9cf78')
+
     expected = {
         u'exit_code': 0,
         u'had_hard_timeout': False,
         u'internal_failure': None,
-        u'outputs_ref': {
-            u'isolated': six.text_type(isolated_out_hash),
-            u'isolatedserver': u'http://localhost:1',
-            u'namespace': u'default-gzip',
+        u'cas_output_root': {
+            # Local cas server uses its own default instance.
+            'cas_instance': None,
+            'digest': {
+                'hash': cas_hash,
+                'size_bytes': 81
+            },
         },
-        u'cas_output_root': None,
+        'outputs_ref': None,
         u'stats': {
             u'trim_caches': {},
             u'isolated': {
                 u'download': {
                     u'initial_number_items': 0,
                     u'initial_size': 0,
-                    u'items_cold': [len(isolated_in_json)],
-                    u'items_hot': [],
+                    u'items_cold': None,
+                    u'items_hot': [0],
                 },
                 u'upload': {
-                    u'items_cold': [len(isolated_out_json)],
-                    u'items_hot': [15],
+                    u'items_cold': [15, 81],
+                    u'items_hot': None,
                 },
             },
             u'named_caches': {
@@ -1515,8 +1465,9 @@ class RunIsolatedJsonTest(RunIsolatedTestBase):
     self.assertLessEqual(0, actual[u'stats'][u'cleanup'].pop(u'duration'))
     for i in (u'download', u'upload'):
       for j in (u'items_cold', u'items_hot'):
-        actual_isolated_stats[i][j] = large.unpack(
-            base64.b64decode(actual_isolated_stats[i][j]))
+        if actual_isolated_stats[i][j]:
+          actual_isolated_stats[i][j] = large.unpack(
+              base64.b64decode(actual_isolated_stats[i][j]))
     self.assertEqual(expected, actual)
 
 
