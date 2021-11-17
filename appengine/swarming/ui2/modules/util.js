@@ -203,11 +203,10 @@ export function sanitizeAndHumanizeTime(obj, key) {
  *    {key:String, value:Array<String>}. If Array<String>, the Strings
  *    should be valid filters (e.g. 'foo:bar').
  *  @param {Array<String>} columns - the column names that should be shown.
- *
- *  Any trailing args after columns will be assumed to be strings that
- *  should be treated as valid filters.
+ *  @param {Date} start - start time of the list.
+ *  @param {Date} end - end time of the list.
  */
-export function taskListLink(filters=[], columns=[]) {
+export function taskListLink(filters=[], columns=[], start, end) {
   const fArr = [];
   for (const f of filters) {
     if (f.key && f.value) {
@@ -222,14 +221,19 @@ export function taskListLink(filters=[], columns=[]) {
       fArr.push(f);
     }
   }
-  // can't use .foreach, as arguments isn't really an Array.
-  for (let i = 2; i < arguments.length; i++) {
-    fArr.push(arguments[i]);
-  }
   const obj = {
     f: fArr,
     c: columns,
   };
+
+  if (start) {
+    obj['st'] = [start.getTime()];
+  }
+  if (end) {
+    obj['et'] = [end.getTime()];
+    obj['n'] = [false];
+  }
+
   return '/tasklist?' + query.fromParamSet(obj);
 }
 

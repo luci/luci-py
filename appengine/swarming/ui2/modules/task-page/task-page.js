@@ -314,10 +314,10 @@ const countBlocks = (result, capacityCount, pendingCount,
   <td>Similar Load</td>
   <td>
       ${count(pendingCount)}
-      <a href=${taskListLink(properties.dimensions, [], 'state:PENDING')}>
+      <a href=${taskListLink((properties.dimensions || []).concat({key: 'state', value: 'PENDING'}))}>
         similar pending tasks</a>,
       ${count(runningCount)}
-      <a href=${taskListLink(properties.dimensions, [], 'state:RUNNING')}>
+      <a href=${taskListLink((properties.dimensions || []).concat({key: 'state', value: 'RUNNING'}))}>
         similar running tasks</a>
   </td>
 </tr>
@@ -378,7 +378,10 @@ const requestBlock = (request, result, currentSlice) => html`
   <td>Child Tasks</td>
   <td>
     <a href=${taskListLink(
-      [{'key': 'parent_task_id-tag', 'value': result.run_id}])}>
+      [{'key': 'parent_task_id-tag', 'value': result.run_id}],
+      [],
+      result.started_ts,
+      result.completed_ts)}>
       Task List
     </a>
   </td>
