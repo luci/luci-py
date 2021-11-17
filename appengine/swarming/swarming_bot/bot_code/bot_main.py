@@ -102,7 +102,6 @@ PASSLIST = (
     'c',
     'cas_cache',
     'cipd_cache',
-    'isolated_cache',
     'logs',
     'swarming.lck',
     'swarming_bot.1.zip',
@@ -734,11 +733,6 @@ def _run_isolated_flags(botobj):
       str(min_free),
       '--max-cache-size',
       str(settings['caches']['isolated']['size']),
-      # Isolated cache options.
-      '--cache',
-      os.path.join(botobj.base_dir, 'isolated_cache'),
-      '--max-items',
-      str(settings['caches']['isolated']['items']),
       # CAS cache option.
       '--cas-cache',
       os.path.join(botobj.base_dir, 'cas_cache'),
