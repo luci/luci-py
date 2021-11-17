@@ -1153,8 +1153,13 @@ class TestTaskRunnerKilled(TestTaskRunnerBase):
     logging.info('%s', cmd)
     proc = subprocess42.Popen(cmd, cwd=self.root_dir, detached=True)
     logging.info('Waiting for child process to be alive')
+
+    now = time.time()
     while os.path.isfile(signal_file):
       time.sleep(0.01)
+      # prevent infinite loop.
+      self.assertLess(time.time(), now + 20)
+
     # Send SIGTERM to task_runner itself. Ensure the right thing happen.
     # Note that on Windows, this is actually sending a SIGBREAK since there's no
     # such thing as SIGTERM.
