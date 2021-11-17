@@ -11,6 +11,8 @@ import logging
 import optparse
 import os
 import platform
+import re
+import shutil
 import sys
 import tempfile
 import time
@@ -24,8 +26,6 @@ from utils import net
 from utils import subprocess42
 from utils import tools
 
-import isolated_format
-import isolateserver
 import local_caching
 
 
@@ -374,6 +374,12 @@ def _fetch_cipd_client(disk_cache, instance_id, fetch_url, timeoutfn):
   raise Error('Could not fetch CIPD client after 5 retries')
 
 
+def _is_valid_hash(value):
+  """Returns if the value is a valid hash for the corresponding algorithm."""
+  size = 2 * hashlib.sha1().digest_size
+  return bool(re.match(r'^[a-fA-F0-9]{%d}$' % size, value))
+
+
 @contextlib.contextmanager
 def get_client(cache_dir,
                service_url=_DEFAULT_CIPD_SERVER,
@@ -407,7 +413,7 @@ def get_client(cache_dir,
 
   # Resolve version to instance id.
   # Is it an instance id already? They look like HEX SHA1.
-  if isolated_format.is_valid_hash(version, hashlib.sha1):
+  if _is_valid_hash(version):
     instance_id = version
   elif ':' in version:  # it's an immutable tag, cache the resolved version
     # version_cache is {hash(package_name, tag) -> instance id} mapping.
@@ -478,8 +484,10 @@ def get_client(cache_dir,
   else:
     file_path.ensure_tree(cipd_bin_dir)
 
-  with instance_cache.getfileobj(instance_id) as f:
-    isolateserver.putfile(f, binary_path, 0o511)  # -r-x--x--x
+  with instance_cache.getfileobj(instance_id) as f, fs.open(binary_path,
+                                                            'wb') as dest:
+    shutil.copyfileobj(f, dest)
+  fs.chmod(binary_path, 0o511)  # -r-x--x--x
 
   _ensure_batfile(binary_path)
 
