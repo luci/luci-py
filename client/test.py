@@ -52,7 +52,6 @@ def run_tests_sequential():
   test_cmds = [
       [abs_path('tests/swarming_test.py')],
       [abs_path('tests/run_isolated_test.py')],
-      [abs_path('tests/isolateserver_test.py')],
       [abs_path('tests/logging_utils_test.py')],
   ]
 
