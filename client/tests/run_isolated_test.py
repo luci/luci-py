@@ -596,8 +596,9 @@ class RunIsolatedTest(RunIsolatedTestBase):
     # Test cipd client cache. `git:wowza` was a tag and so is cacheable.
     self.assertEqual(len(fs.listdir(os.path.join(cipd_cache, 'versions'))), 2)
     version_file = six.text_type(
-        os.path.join(cipd_cache, 'versions',
-                     '765a0de4c618f91faf923cb68a47bb564aed412d'))
+        os.path.join(
+            cipd_cache, 'versions',
+            '5c2ee864d65c435dfa1eb06bf4c52f58854db39392340a91fc91e88d6000d737'))
     self.assertTrue(fs.isfile(version_file))
     with open(version_file) as f:
       self.assertEqual(f.read(), 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa')

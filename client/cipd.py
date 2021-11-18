@@ -430,7 +430,7 @@ def get_client(cache_dir,
         trim=True)
     # Convert (package_name, version) to a string that may be used as a
     # filename in disk cache by hashing it.
-    version_digest = hashlib.sha1(
+    version_digest = hashlib.sha256(
         six.ensure_binary('%s\n%s' % (package_name, version))).hexdigest()
     try:
       with version_cache.getfileobj(version_digest) as f:

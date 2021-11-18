@@ -7,6 +7,7 @@
 from __future__ import print_function
 
 import errno
+import hashlib
 import io
 import logging
 import os
@@ -25,8 +26,6 @@ tools.force_local_third_party()
 
 # third_party/
 import six
-
-import isolated_format
 
 # The file size to be used when we don't know the correct file size,
 # generally used for .isolated files.
@@ -797,10 +796,14 @@ class DiskContentAddressedCache(ContentAddressedCache):
 
   def _is_valid_hash(self, digest):
     """Verify digest with supported hash algos."""
-    for _, algo in isolated_format.SUPPORTED_ALGOS.items():
-      if digest == isolated_format.hash_file(self._path(digest), algo):
-        return True
-    return False
+    d = hashlib.sha256()
+    with fs.open(self._path(digest), 'rb') as f:
+      while True:
+        chunk = f.read(1024 * 1024)
+        if not chunk:
+          break
+        d.update(chunk)
+    return digest == d.hexdigest()
 
 
 class NamedCache(Cache):

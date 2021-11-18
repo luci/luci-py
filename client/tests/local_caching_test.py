@@ -58,7 +58,7 @@ class TestCase(auto_stub.TestCase):
   def setUp(self):
     super(TestCase, self).setUp()
     self.tempdir = tempfile.mkdtemp(prefix=u'local_caching')
-    self._algo = hashlib.sha1
+    self._algo = hashlib.sha256
     # Time mocking.
     self._now = 1000
     self.mock(time, 'time', lambda: float(self._now))
