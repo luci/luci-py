@@ -81,6 +81,7 @@ class HttpsServer(BaseHTTPServer.HTTPServer):
     urllib.request.urlopen(self.url + '/_quit').read()
     self._thread.join()
     self._thread = None
+    self.socket.close()
 
   def register_call(self, request):
     if request.path not in ('/_quit', '/_warmup'):
