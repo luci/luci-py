@@ -192,6 +192,8 @@ class TestTaskRunnerBase(auto_stub.TestCase):
       try:
         if self._server:
           self._server.close()
+        if self._cas:
+          self._cas.stop()
       finally:
         logging.debug(self.logs_dir)
         for i in os.listdir(self.logs_dir):
