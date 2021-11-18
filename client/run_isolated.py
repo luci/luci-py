@@ -842,24 +842,17 @@ def map_and_run(data, constant_run_path):
   else:
     run_dir = make_temp_dir(ISOLATED_RUN_DIR, data.root_dir)
 
-  # True if CAS is used for download/upload files.
-  use_cas = bool(data.cas_digest)
-
   # storage should be normally set but don't crash if it is not. This can happen
   # as Swarming task can run without an isolate server.
-  out_dir = None
-  if use_cas:
-    out_dir = make_temp_dir(ISOLATED_OUT_DIR, data.root_dir)
+  out_dir = make_temp_dir(ISOLATED_OUT_DIR, data.root_dir)
   tmp_dir = make_temp_dir(ISOLATED_TMP_DIR, data.root_dir)
   cwd = run_dir
   if data.relative_cwd:
     cwd = os.path.normpath(os.path.join(cwd, data.relative_cwd))
   command = data.command
 
-  cas_client = None
   cas_client_dir = make_temp_dir(_CAS_CLIENT_DIR, data.root_dir)
-  if use_cas:
-    cas_client = os.path.join(cas_client_dir, 'cas' + cipd.EXECUTABLE_SUFFIX)
+  cas_client = os.path.join(cas_client_dir, 'cas' + cipd.EXECUTABLE_SUFFIX)
 
   data.trim_caches_fn(result['stats']['trim_caches'])
 
@@ -933,14 +926,13 @@ def map_and_run(data, constant_run_path):
         finally:
           result['duration'] = max(time.time() - start, 0)
 
-      if out_dir:
-        # Try to link files to the output directory, if specified.
-        link_outputs_to_outdir(run_dir, out_dir, data.outputs)
-        isolated_stats = result['stats'].setdefault('isolated', {})
-        if use_cas:
-          result['cas_output_root'], isolated_stats['upload'] = (
-              upload_outdir(cas_client, data.cas_instance, out_dir,
-                                     tmp_dir))
+      # Try to link files to the output directory, if specified.
+      link_outputs_to_outdir(run_dir, out_dir, data.outputs)
+      isolated_stats = result['stats'].setdefault('isolated', {})
+      result['cas_output_root'], upload_stats = upload_outdir(
+          cas_client, data.cas_instance, out_dir, tmp_dir)
+      if upload_stats:
+        isolated_stats['upload'] = upload_stats
 
     # We successfully ran the command, set internal_failure back to
     # None (even if the command failed, it's not an internal error).

@@ -1364,16 +1364,9 @@ class RunIsolatedJsonTest(RunIsolatedTestBase):
         '${ISOLATED_OUTDIR}/out.txt',
     ]
 
-    # This is to upload file to CAS.
-    # TODO(crbug.com/1253255): remove this when code for isolate is removed.
-    empty_digest = (
-        'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855/0')
-
     out = os.path.join(self.tempdir, 'res.json')
     cmd = self.DISABLE_CIPD_FOR_TESTS + [
         '--no-log',
-        '--cas-digest',
-        empty_digest,
         '--named-cache-root',
         os.path.join(self.tempdir, 'named_cache'),
         '--json',
@@ -1404,10 +1397,7 @@ class RunIsolatedJsonTest(RunIsolatedTestBase):
         u'stats': {
             u'trim_caches': {},
             u'isolated': {
-                u'download': {
-                    u'items_cold': None,
-                    u'items_hot': [0],
-                },
+                u'download': {},
                 u'upload': {
                     u'items_cold': [15, 81],
                     u'items_hot': None,
@@ -1426,18 +1416,16 @@ class RunIsolatedJsonTest(RunIsolatedTestBase):
     # exclusively on Windows.
     self.assertLessEqual(0, actual.pop(u'duration'))
     self.assertLessEqual(0, actual[u'stats'][u'trim_caches'].pop(u'duration'))
-    actual_isolated_stats = actual[u'stats'][u'isolated']
-    self.assertLessEqual(0, actual_isolated_stats[u'download'].pop(u'duration'))
-    self.assertLessEqual(0, actual_isolated_stats[u'upload'].pop(u'duration'))
+    actual_upload_stats = actual[u'stats'][u'isolated'][u'upload']
+    self.assertLessEqual(0, actual_upload_stats.pop(u'duration'))
     named_caches_stats = actual[u'stats'][u'named_caches']
     self.assertLessEqual(0, named_caches_stats[u'install'].pop(u'duration'))
     self.assertLessEqual(0, named_caches_stats[u'uninstall'].pop(u'duration'))
     self.assertLessEqual(0, actual[u'stats'][u'cleanup'].pop(u'duration'))
-    for i in (u'download', u'upload'):
-      for j in (u'items_cold', u'items_hot'):
-        if actual_isolated_stats[i][j]:
-          actual_isolated_stats[i][j] = large.unpack(
-              base64.b64decode(actual_isolated_stats[i][j]))
+    for i in (u'items_cold', u'items_hot'):
+      if actual_upload_stats[i]:
+        actual_upload_stats[i] = large.unpack(
+            base64.b64decode(actual_upload_stats[i]))
     self.assertEqual(expected, actual)
 
 

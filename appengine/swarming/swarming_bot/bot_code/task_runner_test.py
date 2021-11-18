@@ -530,7 +530,6 @@ class TestTaskRunner(TestTaskRunnerBase):
                             u'items_cold': sorted(items_in),
                             u'items_hot': [],
                         },
-                        u'upload': None,
                     })
 
   def test_run_command_large(self):
@@ -1066,7 +1065,6 @@ class TestTaskRunnerKilled(TestTaskRunnerBase):
                 u'items_cold': sorted(items_in),
                 u'items_hot': [],
             },
-            u'upload': None,
         })
 
   def test_kill_and_wait(self):
