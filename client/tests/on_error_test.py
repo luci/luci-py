@@ -219,7 +219,7 @@ class OnErrorServerTest(OnErrorBase):
     self.assertEqual(expected, out)
 
     actual = self.one_request(httpd)
-    self.assertGreater(actual.pop('duration'), 0.000001)
+    self.assertGreater(actual.pop('duration'), 0.0)
     expected = {
         u'args': [u'main.py', six.text_type(httpd.url), u'report'],
         u'category': u'report',

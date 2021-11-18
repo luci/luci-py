@@ -42,7 +42,10 @@ _SOURCE = zip_package.get_main_script_path()
 if _SOURCE:
   _SOURCE = os.path.basename(_SOURCE)
 
-_TIME_STARTED = time.time()
+if sys.version_info.major == 2:
+  _TIME_STARTED_NS = time.time() * 1e9
+else:
+  _TIME_STARTED_NS = time.perf_counter_ns()
 
 _HOSTNAME = None
 
@@ -137,17 +140,22 @@ def _report_exception(message, e, stack):
       message += '\n'
     message += (_format_exception(e)).rstrip()
 
+  if sys.version_info.major == 2:
+    now_ns = time.time() * 1e9
+  else:
+    now_ns = time.perf_counter_ns()
+
   params = {
-    'args': sys.argv,
-    'cwd': os.getcwd(),
-    'duration': time.time() - _TIME_STARTED,
-    'env': _serialize_env(),
-    'hostname': _HOSTNAME,
-    'message': message,
-    'os': sys.platform,
-    'python_version': platform.python_version(),
-    'source': _SOURCE,
-    'user': getpass.getuser(),
+      'args': sys.argv,
+      'cwd': os.getcwd(),
+      'duration': (now_ns - _TIME_STARTED_NS) / 1e9,
+      'env': _serialize_env(),
+      'hostname': _HOSTNAME,
+      'message': message,
+      'os': sys.platform,
+      'python_version': platform.python_version(),
+      'source': _SOURCE,
+      'user': getpass.getuser(),
   }
   if e:
     params['category'] = 'exception'
