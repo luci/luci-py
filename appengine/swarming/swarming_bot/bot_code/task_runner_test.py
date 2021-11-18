@@ -257,10 +257,7 @@ class TestTaskRunnerBase(auto_stub.TestCase):
         u'id': u'localhost',
         u'io_timeout': False,
         u'isolated_stats': {
-            u'download': {
-                u'initial_number_items': 0,
-                u'initial_size': 0,
-            },
+            u'download': {},
         },
         u'output': to_native_eol('hi\n').encode(),
         u'output_chunk_start': 0,
@@ -529,9 +526,7 @@ class TestTaskRunner(TestTaskRunnerBase):
     self.expectTask(manifest['task_id'],
                     isolated_stats={
                         u'download': {
-                            u'duration': 0.,
-                            u'initial_number_items': 0,
-                            u'initial_size': 0,
+                            u'duration': 0,
                             u'items_cold': sorted(items_in),
                             u'items_hot': [],
                         },
@@ -653,7 +648,6 @@ class TestTaskRunner(TestTaskRunnerBase):
         u'c/*/bar',
         u'c/state.json',
         u'w/cas-cache/state.json',
-        u'w/cache/state.json',
         u'result',
         u'w/run_isolated_args.json',
     ])
@@ -670,7 +664,6 @@ class TestTaskRunner(TestTaskRunnerBase):
         u'c/*/bar',
         u'c/state.json',
         u'w/run_isolated_args.json',
-        u'w/cache/state.json',
     ])
     cache.install(dest_dir, 'foo')
     self._expect_files([
@@ -678,7 +671,6 @@ class TestTaskRunner(TestTaskRunnerBase):
         u'c/state.json',
         u'w/run_isolated_args.json',
         u'w/cas-cache/state.json',
-        u'w/cache/state.json',
     ])
     with open(os.path.join(dest_dir, 'bar'), 'rb') as f:
       self.assertEqual(b'updated_cache', f.read())
@@ -1070,9 +1062,7 @@ class TestTaskRunnerKilled(TestTaskRunnerBase):
             to_native_eol('parent\n\\d+\nchildren\n\\d+\nhi\n').encode()),
         isolated_stats={
             u'download': {
-                u'duration': 0.,
-                u'initial_number_items': 0,
-                u'initial_size': 0,
+                u'duration': 0,
                 u'items_cold': sorted(items_in),
                 u'items_hot': [],
             },
@@ -1147,8 +1137,6 @@ class TestTaskRunnerKilled(TestTaskRunnerBase):
         '--start',
         str(time.time()),
         '--',
-        '--cache',
-        'isolated_cache_party',
     ] + DISABLE_CIPD_FOR_TESTS
     logging.info('%s', cmd)
     proc = subprocess42.Popen(cmd, cwd=self.root_dir, detached=True)
@@ -1176,7 +1164,6 @@ class TestTaskRunnerKilled(TestTaskRunnerBase):
         '-cacert.'
         'pem',
         'w',
-        'isolated_cache_party',
         'logs',
         'c',
         'cas-cache',

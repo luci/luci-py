@@ -471,8 +471,6 @@ class RunIsolatedTest(unittest.TestCase):
     download_stats.pop('duration')
     self.assertEqual(
         {
-            'initial_number_items': 0,
-            'initial_size': 0,
             'items_cold': [
                 len(CONTENTS['file1.txt']),
                 len(CONTENTS['repeated_files.py']),

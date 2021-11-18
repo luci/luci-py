@@ -74,7 +74,6 @@ import six
 import DEPS
 import auth
 import cipd
-import isolateserver
 import local_caching
 from libs import luci_context
 from utils import file_path
@@ -175,18 +174,6 @@ TaskData = collections.namedtuple(
         'command',
         # Relative directory to start command into.
         'relative_cwd',
-        # Hash of the .isolated file that must be retrieved to recreate the tree
-        # of files to run the target executable. The command specified in the
-        # .isolated is executed.  Mutually exclusive with command argument.
-        'isolated_hash',
-        # isolateserver.Storage instance to retrieve remote objects. This object
-        # has a reference to an isolateserver.StorageApi, which does the actual
-        # I/O.
-        'storage',
-        # isolateserver.LocalCache instance to keep from retrieving the same
-        # objects constantly by caching the objects retrieved. Can be on-disk or
-        # in-memory.
-        'isolate_cache',
         # Digest of the input root on RBE-CAS.
         'cas_digest',
         # Full CAS instance name.
@@ -786,17 +773,14 @@ def map_and_run(data, constant_run_path):
   Returns metadata about the result.
   """
 
-  if data.isolate_cache:
-    download_stats = {
-        #'duration': 0.,
-        'initial_number_items': len(data.isolate_cache),
-        'initial_size': data.isolate_cache.total_size,
-        #'items_cold': '<large.pack()>',
-        #'items_hot': '<large.pack()>',
-    }
-  else:
-    # TODO(tikuta): take stats from state.json in this case too.
-    download_stats = {}
+  # TODO(tikuta): take stats from state.json in this case too.
+  download_stats = {
+      # 'duration': 0.,
+      # 'initial_number_items': len(data.cas_cache),
+      # 'initial_size': data.cas_cache.total_size,
+      # 'items_cold': '<large.pack()>',
+      # 'items_hot': '<large.pack()>',
+  }
 
   result = {
       'duration': None,
@@ -1316,15 +1300,6 @@ def create_option_parser():
       help='Whether report exception during execution to isolate server. '
       'This flag should only be used in swarming bot.')
 
-  group = optparse.OptionGroup(parser, 'Data source - Isolate server')
-  # Deprecated. Isoate server is being migrated to RBE-CAS.
-  # Remove --isolated and isolate server options after migration.
-  group.add_option(
-      '-s', '--isolated',
-      help='Hash of the .isolated to grab from the isolate server.')
-  isolateserver.add_isolate_server_options(group)
-  parser.add_option_group(group)
-
   group = optparse.OptionGroup(parser,
                                'Data source - Content Addressed Storage')
   group.add_option(
@@ -1336,7 +1311,6 @@ def create_option_parser():
   parser.add_option_group(group)
 
   # Cache options.
-  isolateserver.add_cache_options(parser)
   add_cas_cache_options(parser)
 
   cipd.add_cipd_options(parser)
@@ -1407,6 +1381,19 @@ def add_cas_cache_options(parser):
       '--kvs-dir',
       default='',
       help='CAS cache dir using kvs for small files. Default=%default')
+  group.add_option(
+      '--max-cache-size',
+      type='int',
+      metavar='NNN',
+      default=50 * 1024 * 1024 * 1024,
+      help='Trim if the cache gets larger than this value, default=%default')
+  group.add_option(
+      '--min-free-space',
+      type='int',
+      metavar='NNN',
+      default=2 * 1024 * 1024 * 1024,
+      help='Trim if disk free space becomes lower than this value, '
+      'default=%default')
   parser.add_option_group(group)
 
 
@@ -1506,10 +1493,6 @@ def _calc_named_cache_hint(named_cache, named_caches):
 
 def _clean_cmd(parser, options, caches, root):
   """Cleanup cache dirs/files."""
-  if options.isolated:
-    parser.error('Can\'t use --isolated with --clean.')
-  if options.isolate_server:
-    parser.error('Can\'t use --isolate-server with --clean.')
   if options.json:
     parser.error('Can\'t use --json with --clean.')
   if options.named_caches:
@@ -1571,12 +1554,9 @@ def main(args):
   # TODO(maruel): CIPD caches should be defined at an higher level here too, so
   # they can be cleaned the same way.
 
-  isolate_cache = isolateserver.process_cache_options(options, trim=False)
   cas_cache = process_cas_cache_options(options)
 
   caches = []
-  if isolate_cache:
-    caches.append(isolate_cache)
   if cas_cache:
     caches.append(cas_cache)
   if named_cache:
@@ -1616,14 +1596,9 @@ def main(args):
 
   auth.process_auth_options(parser, options)
 
-  isolateserver.process_isolate_server_options(parser, options, False)
-  if ISOLATED_OUTDIR_PARAMETER in args and (not options.isolate_server and
-                                            not options.cas_instance):
-    parser.error('%s in args requires --isolate-server or --cas-instance' %
+  if ISOLATED_OUTDIR_PARAMETER in args and not options.cas_instance:
+    parser.error('%s in args requires --cas-instance' %
                  ISOLATED_OUTDIR_PARAMETER)
-
-  if options.isolated and not options.isolate_server:
-    parser.error('--isolated requires --isolate-server')
 
   if options.root_dir:
     options.root_dir = six.text_type(os.path.abspath(options.root_dir))
@@ -1746,9 +1721,6 @@ def main(args):
   data = TaskData(
       command=command,
       relative_cwd=options.relative_cwd,
-      isolated_hash=options.isolated,
-      storage=None,
-      isolate_cache=isolate_cache,
       cas_instance=options.cas_instance,
       cas_digest=options.cas_digest,
       outputs=options.output,

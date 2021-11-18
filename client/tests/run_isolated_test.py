@@ -330,9 +330,6 @@ class RunIsolatedTest(RunIsolatedTestBase):
     data = run_isolated.TaskData(
         command=command or [],
         relative_cwd=relative_cwd,
-        isolated_hash=None,
-        storage=None,
-        isolate_cache=None,
         cas_instance=None,
         cas_digest=None,
         outputs=None,
@@ -738,7 +735,7 @@ class RunIsolatedTest(RunIsolatedTestBase):
     trimmed = []
     def trim_caches(caches, root, min_free_space, max_age_secs):
       trimmed.append(True)
-      self.assertEqual(3, len(caches))
+      self.assertEqual(2, len(caches))
       self.assertTrue(root)
       # The name cache root is increased by the sum of the two hints and buffer.
       self.assertEqual(
@@ -750,8 +747,6 @@ class RunIsolatedTest(RunIsolatedTestBase):
     cmd = self.DISABLE_CIPD_FOR_TESTS + [
         '--no-log',
         '--leak-temp-dir',
-        '--cache',
-        os.path.join(self.tempdir, 'isolated_cache'),
         '100',
         '--named-cache-root',
         nc,
@@ -777,7 +772,6 @@ class RunIsolatedTest(RunIsolatedTestBase):
     self.assertTrue(trimmed)
 
   def test_main_clean(self):
-    isolated_cache_dir = os.path.join(self.tempdir, 'isolated_cache')
     cas_cache_dir = os.path.join(self.tempdir, 'cas_cache')
     named_cache_dir = os.path.join(self.tempdir, 'named_cache')
     kvs_dir = os.path.join(self.tempdir, 'kvs_dir')
@@ -790,7 +784,6 @@ class RunIsolatedTest(RunIsolatedTestBase):
 
     min_free_space = 1
     max_cache_size = 2
-    max_items = 3
 
     cmd = [
         '--no-log',
@@ -800,11 +793,6 @@ class RunIsolatedTest(RunIsolatedTestBase):
         str(min_free_space),
         '--max-cache-size',
         str(max_cache_size),
-        # Isolated cache options.
-        '--cache',
-        isolated_cache_dir,
-        '--max-items',
-        str(max_items),
         # CAS cache option.
         '--cas-cache',
         cas_cache_dir,
@@ -815,22 +803,12 @@ class RunIsolatedTest(RunIsolatedTestBase):
         kvs_dir,
     ]
 
-    def trim_caches_mock(caches, root_dir, min_free_space, max_age_secs):
-      self.assertEqual(root_dir, isolated_cache_dir)
+    def trim_caches_mock(caches, _root_dir, min_free_space, max_age_secs):
       self.assertEqual(min_free_space, min_free_space)
       self.assertEqual(max_age_secs, run_isolated.MAX_AGE_SECS)
 
-      # Isolated cache.
-      isolated_cache = caches[0]
-      self.assertEqual(
-          isolated_cache.state_file,
-          os.path.join(isolated_cache_dir, isolated_cache.STATE_FILE))
-      self.assertEqual(isolated_cache.policies.max_cache_size, max_cache_size)
-      self.assertEqual(isolated_cache.policies.min_free_space, min_free_space)
-      self.assertEqual(isolated_cache.policies.max_items, max_items)
-
       # CAS cache.
-      cas_cache = caches[1]
+      cas_cache = caches[0]
       self.assertEqual(cas_cache.state_file,
                        os.path.join(cas_cache_dir, cas_cache.STATE_FILE))
       self.assertEqual(cas_cache.policies.max_cache_size, max_cache_size)
@@ -838,7 +816,7 @@ class RunIsolatedTest(RunIsolatedTestBase):
       self.assertIsNone(cas_cache.policies.max_items)
 
       # Named cache.
-      named_cache = caches[2]
+      named_cache = caches[1]
       self.assertEqual(named_cache.state_file,
                        os.path.join(named_cache_dir, named_cache.STATE_FILE))
       # max_cache_size, max_items, max_age_secs are hardcoded in
@@ -985,9 +963,6 @@ class RunIsolatedTestRun(RunIsolatedTestBase):
     data = run_isolated.TaskData(
         command=[u'python3', u'cmd.py', u'${ISOLATED_OUTDIR}/foo'],
         relative_cwd=None,
-        isolated_hash=None,
-        storage=None,
-        isolate_cache=None,
         cas_instance=None,
         cas_digest=digest,
         outputs=None,
@@ -1315,9 +1290,6 @@ class RunIsolatedTestOutputFiles(RunIsolatedTestBase):
     data = run_isolated.TaskData(
         command=['python3', 'cmd.py', 'foo1', 'foodir/foo2_sl', 'bardir/'],
         relative_cwd=None,
-        isolated_hash=None,
-        storage=None,
-        isolate_cache=None,
         cas_instance=None,
         cas_digest=cas_digest,
         outputs=[
@@ -1433,8 +1405,6 @@ class RunIsolatedJsonTest(RunIsolatedTestBase):
             u'trim_caches': {},
             u'isolated': {
                 u'download': {
-                    u'initial_number_items': 0,
-                    u'initial_size': 0,
                     u'items_cold': None,
                     u'items_hot': [0],
                 },
