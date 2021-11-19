@@ -31,6 +31,7 @@ _WIN32_CLIENT_NAMES = {
     u'6.2': u'8',
     u'6.3': u'8.1',
     u'10.0': u'10',
+    u'11.0': u'11',
 }
 
 _WIN32_SERVER_NAMES = {
@@ -206,10 +207,19 @@ def get_os_version_number():
   """Returns the normalized OS version number as a string.
 
   Returns:
-    - '5.1', '6.1', '10.0', etc. There is no way to distinguish between Windows
-      7 and Windows Server 2008R2 since they both report 6.1.
+    - '5.1', '6.1', '10.0', etc. There is no way to distinguish between some
+      versions of Windows because they share the same major version number.
+      Examples of this are Windows 7 and Server 2008 with 6.1, and Windows 10
+      and Windows 11 with 10.0.
   """
-  return _get_os_numbers()[0]
+
+  os_numbers = _get_os_numbers()
+  major_version = os_numbers[0]
+  build = os_numbers[1].split('.')[0]
+  if int(build) >= 22000:
+    major_version = '11.0'
+
+  return major_version
 
 
 @tools.cached
