@@ -607,12 +607,14 @@ class Popen(subprocess.Popen):
         # sometimes the process can run+finish before we collect its pgid. fun.
         pass
 
+    logging.info('crbug.com/1271827: before _job check')
     if self._job:
       try:
         self._job.assign_proc(self)
       except OSError:
         self.kill()
         self.wait()
+    logging.info('crbug.com/1271827: before return')
 
   def duration(self):
     """Duration of the child process.
