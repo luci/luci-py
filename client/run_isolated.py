@@ -445,6 +445,7 @@ def run_command(
           had_signal.append(True)
           raise subprocess42.TimeoutExpired(command, None)
 
+      logging.info('crbug.com/1271827: before subprocess42.Popen')
       proc = subprocess42.Popen(
           command, cwd=cwd, env=env, detached=True, close_fds=True,
           lower_priority=lower_priority, containment=containment)
