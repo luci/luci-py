@@ -77,6 +77,7 @@ from server import directory_occlusion
 from server import pools_config
 from server import service_accounts_utils
 from server import task_pack
+from server import task_queues
 from server.constants import OR_DIM_SEP
 
 # Maximum acceptable priority value, which is effectively the lowest priority.
@@ -861,6 +862,11 @@ class TaskProperties(ndb.Model):
       break
     # Compatibility code for old entities.
     return {k: [v] for k, v in data.items()}
+
+  @property
+  def dimensions_hash(self):
+    """Returns a dimensions hash."""
+    return task_queues.hash_dimensions(self.dimensions)
 
   @property
   def is_terminate(self):

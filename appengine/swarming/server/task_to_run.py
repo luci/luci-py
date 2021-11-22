@@ -49,6 +49,8 @@ from server import task_request
 
 ### Models.
 
+N_SHARDS = 8 # the number of TaskToRunShards
+
 
 class TaskToRun(ndb.Model):
   """Defines a TaskRequest ready to be scheduled on a bot.
@@ -156,6 +158,13 @@ class TaskToRun(ndb.Model):
       raise datastore_errors.BadValueError(
           ('%s.queue_number must be None when expiration_ts is None' %
            self.__class__.__name__))
+
+
+def get_shard_kind(shard):
+  """Returns a TaskToRunShard kind for the given shard number."""
+  assert shard < N_SHARDS, 'Shard number must be < %d, but %d is given' % (
+      N_SHARDS, shard)
+  return type('TaskToRunShard%d' % shard, (TaskToRun, ), {})
 
 
 ### Private functions.
@@ -343,17 +352,26 @@ def _yield_pages_async(q, size):
 
 
 def _get_task_to_run_query(dimensions_hash):
-  """Returns a ndb.Query of TaskToRun within this dimensions_hash queue."""
+  """Returns a ndb.Query of TaskToRunShard within this dimensions_hash queue.
+     During migration, it returns two queries TaskToRun and TaskToRunShard.
+  """
   # dimensions_hash should be 32 bits but on AppEngine, which is using 32 bits
   # python, it is silently upgraded to long.
   assert isinstance(dimensions_hash, (int, long)), repr(dimensions_hash)
-  opts = ndb.QueryOptions(deadline=30)
   # See _gen_queue_number() as of why << 31. This query cannot use the key
   # because it is not a root entity.
-  return TaskToRun.query(default_options=opts).order(
-          TaskToRun.queue_number).filter(
-              TaskToRun.queue_number >= (dimensions_hash << 31),
-              TaskToRun.queue_number < ((dimensions_hash+1) << 31))
+  def _query(kind):
+    opts = ndb.QueryOptions(deadline=30)
+    return kind.query(default_options=opts).order(
+        kind.queue_number).filter(
+            kind.queue_number >= (dimensions_hash << 31),
+            kind.queue_number < ((dimensions_hash + 1) << 31))
+
+  # TODO(crbug.com/1272390): Remove TaskToRun after migration.
+  return [
+      _query(k)
+      for k in [get_shard_kind(dimensions_hash % N_SHARDS), TaskToRun]
+  ]
 
 
 def _yield_potential_tasks(bot_id):
@@ -377,14 +395,18 @@ def _yield_potential_tasks(bot_id):
   # Note that the default ndb.EVENTUAL_CONSISTENCY is used so stale items may be
   # returned. It's handled specifically by consumers of this function.
   start = time.time()
-  queries = [_get_task_to_run_query(d) for d in dim_hashes]
-  yielders = [_yield_pages_async(q, 10) for q in queries]
+  yielders = []
+  to_dim_hashes = []  # store future/yieler index to dimension hash.
+  for d in dim_hashes:
+    for q in _get_task_to_run_query(d):
+      yielders.append(_yield_pages_async(q, 10))
+      to_dim_hashes.append(d)
   # We do care about the first page of each query so we cannot merge all the
   # results of every query insensibly.
   futures = []
 
   def _to_active_yielders(futs):
-    return [dim_hashes[i] for i, f in enumerate(futs) if f]
+    return [to_dim_hashes[i] for i, f in enumerate(futs) if f]
 
   try:
     for y in yielders:
@@ -427,7 +449,7 @@ def _yield_potential_tasks(bot_id):
         else:
           logging.debug(
               '_yield_potential_tasks(%s): no results from yielder for %d',
-              bot_id, dim_hashes[i])
+              bot_id, to_dim_hashes[i])
 
     # That's going to be our search space for now.
     items.sort(key=_queue_number_order_priority)
@@ -457,7 +479,7 @@ def _yield_potential_tasks(bot_id):
           changed = True
           if not futures[i]:
             logging.debug('_yield_potential_tasks(%s): yielder %d completed',
-                          bot_id, dim_hashes[i])
+                          bot_id, to_dim_hashes[i])
           _log_yielding()
       if changed:
         items.sort(key=_queue_number_order_priority)
@@ -475,17 +497,21 @@ def _yield_potential_tasks(bot_id):
 ### Public API.
 
 
-def request_to_task_to_run_key(request, try_number, task_slice_index):
+def request_to_task_to_run_key(request,
+                               try_number,
+                               task_slice_index,
+                               use_shard=False):
   """Returns the ndb.Key for a TaskToRun from a TaskRequest."""
   assert 1 <= try_number <= 2, try_number
   assert 0 <= task_slice_index < request.num_task_slices
-  return ndb.Key(
-      TaskToRun, try_number | (task_slice_index << 4), parent=request.key)
+  h = request.task_slice(task_slice_index).properties.dimensions_hash
+  kind = get_shard_kind(h % N_SHARDS) if use_shard else TaskToRun
+  return ndb.Key(kind, try_number | (task_slice_index << 4), parent=request.key)
 
 
 def task_to_run_key_to_request_key(to_run_key):
   """Returns the ndb.Key for a TaskToRun from a TaskRequest key."""
-  assert to_run_key.kind() == 'TaskToRun', to_run_key
+  assert to_run_key.kind().startswith('TaskToRun'), to_run_key
   return to_run_key.parent()
 
 
@@ -501,7 +527,7 @@ def task_to_run_key_try_number(to_run_key):
   return to_run_key.integer_id() & 15
 
 
-def new_task_to_run(request, task_slice_index):
+def new_task_to_run(request, task_slice_index, use_shard=False):
   """Returns a fresh new TaskToRun for the task ready to be scheduled.
 
   Returns:
@@ -517,14 +543,14 @@ def new_task_to_run(request, task_slice_index):
   for i in range(task_slice_index + 1):
     offset += request.task_slice(i).expiration_secs
   exp = request.created_ts + datetime.timedelta(seconds=offset)
-  h = request.task_slice(task_slice_index).properties.dimensions
-  qn = _gen_queue_number(
-      task_queues.hash_dimensions(h), request.created_ts, request.priority)
-  return TaskToRun(
-      key=request_to_task_to_run_key(request, 1, task_slice_index),
-      created_ts=created,
-      queue_number=qn,
-      expiration_ts=exp)
+  h = request.task_slice(task_slice_index).properties.dimensions_hash
+  qn = _gen_queue_number(h, request.created_ts, request.priority)
+  kind = get_shard_kind(h % N_SHARDS) if use_shard else TaskToRun
+  key = request_to_task_to_run_key(request,
+                                   1,
+                                   task_slice_index,
+                                   use_shard=use_shard)
+  return kind(key=key, created_ts=created, queue_number=qn, expiration_ts=exp)
 
 
 def match_dimensions(request_dimensions, bot_dimensions):

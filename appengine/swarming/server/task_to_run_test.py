@@ -174,10 +174,10 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
     req.put()
     return req
 
-  def _gen_new_task_to_run(self, nb_task, **kwargs):
+  def _gen_new_task_to_run(self, nb_task, use_shard=False, **kwargs):
     """Returns TaskRequest, TaskToRun saved in the DB."""
     request = self.mkreq(nb_task, _gen_request(**kwargs))
-    to_run = task_to_run.new_task_to_run(request, 0)
+    to_run = task_to_run.new_task_to_run(request, 0, use_shard)
     to_run.put()
     return request, to_run
 
@@ -549,25 +549,6 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
     ]
     self.assertEqual(expected, actual)
 
-  def test_yield_next_available_task_shard(self):
-    request_dimensions = {u'os': [u'Windows-3.1.1'], u'pool': [u'default']}
-    _request, _ = self._gen_new_task_to_run(
-        1, properties=_gen_properties(dimensions=request_dimensions))
-    bot_dimensions = request_dimensions.copy()
-    bot_dimensions[u'id'] = [u'bot1']
-    actual = _yield_next_available_task_to_dispatch(bot_dimensions)
-    expected = [
-        {
-            'created_ts': self.now,
-            'expiration_ts': self.now + datetime.timedelta(minutes=1),
-            'expiration_delay': None,
-            'queue_number': '0x1a3aa6631f3d248e',
-            'task_slice_index': 0,
-            'try_number': 1,
-        },
-    ]
-    self.assertEqual(expected, actual)
-
   def test_yield_next_available_task_to_dispatch_subset_multivalue(self):
     request_dimensions = {u'os': [u'Windows-3.1.1'], u'pool': [u'default']}
     _request, _ = self._gen_new_task_to_run(
@@ -907,6 +888,46 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
     ]
     self.assertEqual(expected, actual)
 
+  # TODO(crbug.com/1272390): Remove after migration.
+  def test_yield_next_available_task_to_run_shard_migration(self):
+    task_dimensions1 = {u'os': [u'Linux'], u'pool': [u'default']}
+    _request1, _task1 = self._gen_new_task_to_run(
+        1, properties=_gen_properties(dimensions=task_dimensions1))
+    task_dimensions2 = {u'os': [u'Ubuntu'], u'pool': [u'default']}
+    request2, _task2 = self._gen_new_task_to_run(
+        1,
+        use_shard=True,
+        properties=_gen_properties(dimensions=task_dimensions2))
+    self.assertEqual(len(task_to_run.TaskToRun.query().fetch()), 1)
+    shard = request2.task_slice(
+        0).properties.dimensions_hash % task_to_run.N_SHARDS
+    self.assertEqual(len(task_to_run.get_shard_kind(shard).query().fetch()), 1)
+    bot_dimensions = {
+        u'id': [u'bot1'],
+        u'os': [u'Linux', u'Ubuntu'],
+        u'pool': [u'default'],
+    }
+    actual = _yield_next_available_task_to_dispatch(bot_dimensions)
+    expected = [
+        {
+            'created_ts': self.now,
+            'expiration_ts': self.now + datetime.timedelta(minutes=1),
+            'expiration_delay': None,
+            'queue_number': '0x02fa03dd9f3d248e',
+            'task_slice_index': 0,
+            'try_number': 1,
+        },
+        {
+            'created_ts': self.now,
+            'expiration_ts': self.now + datetime.timedelta(minutes=1),
+            'expiration_delay': None,
+            'queue_number': '0x060d70d19f3d248e',
+            'task_slice_index': 0,
+            'try_number': 1,
+        },
+    ]
+    self.assertEqual(expected, actual)
+
   def test_yield_expired_task_to_run(self):
     # There's a cut off at 2019-09-01, so the default self.now on Jan 2nd
     # doesn't work when looking 4 weeks ago.
@@ -1010,6 +1031,14 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
     # no error if both expiration_ts and queue_number is None
     to_run.queue_number = None
     to_run.put()
+
+  def test_get_shard_kind(self):
+    k = task_to_run.get_shard_kind(0)
+    self.assertEqual(k.__name__, 'TaskToRunShard0')
+    self.assertTrue(issubclass(k, task_to_run.TaskToRun))
+
+    with self.assertRaises(AssertionError):
+      task_to_run.get_shard_kind(task_to_run.N_SHARDS)
 
 
 if __name__ == '__main__':
