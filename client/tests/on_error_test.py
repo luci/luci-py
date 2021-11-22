@@ -219,7 +219,7 @@ class OnErrorServerTest(OnErrorBase):
     self.assertEqual(expected, out)
 
     actual = self.one_request(httpd)
-    self.assertGreater(actual.pop('duration'), 0.0)
+    self.assertGreaterEqual(actual.pop('duration'), 0)
     expected = {
         u'args': [u'main.py', six.text_type(httpd.url), u'report'],
         u'category': u'report',
@@ -249,7 +249,7 @@ class OnErrorServerTest(OnErrorBase):
     self.assertEqual(expected, out)
 
     actual = self.one_request(httpd)
-    self.assertGreater(actual.pop('duration'), 0.000001)
+    self.assertGreaterEqual(actual.pop('duration'), 0)
     # Remove numbers so editing the code doesn't invalidate the expectation.
     actual['stack'] = re.sub(r' \d+', ' 0', actual['stack'])
     expected = {
@@ -284,7 +284,7 @@ class OnErrorServerTest(OnErrorBase):
     self.assertEqual(expected, out)
 
     actual = self.one_request(httpd)
-    self.assertGreater(actual.pop('duration'), 0.000001)
+    self.assertGreaterEqual(actual.pop('duration'), 0)
     # Remove numbers so editing the code doesn't invalidate the expectation.
     actual['stack'] = re.sub(r' \d+', ' 0', actual['stack'])
     expected = {
@@ -329,7 +329,7 @@ class OnErrorServerTest(OnErrorBase):
     actual = self.one_request(httpd)
     # Remove numbers so editing the code doesn't invalidate the expectation.
     actual['stack'] = re.sub(r' \d+', ' 0', actual['stack'])
-    self.assertGreater(actual.pop('duration'), 0.000001)
+    self.assertGreaterEqual(actual.pop('duration'), 0)
     expected = {
         u'args': [u'main.py', six.text_type(httpd.url), u'crash'],
         u'category': u'exception',
