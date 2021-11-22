@@ -81,13 +81,13 @@ def _expire_task_tx(now, request, to_run_key, result_summary_key, capacity,
 
   # record expiration delay
   delay = (now - to_run.expiration_ts).total_seconds()
-  to_run.expiration_delay = max(0, delay)
-
-  if delay <= 0:
+  if delay < 0:
     logging.warning(
-        '_expire_task_tx: slice_expiration_delay is expected to be > 0, '
-        'but was %s sec. run_id=%s, now=%s, expiration_ts=%s', delay,
-        to_run.task_id, now, to_run.expiration_ts)
+        '_expire_task_tx: the task is not expired. task_id=%s slice=%d '
+        'expiration_ts=%s', to_run.task_id, to_run.task_slice_index,
+        to_run.expiration_ts)
+    return None, None
+  to_run.expiration_delay = delay
 
   # In any case, dequeue the TaskToRun.
   to_run.queue_number = None

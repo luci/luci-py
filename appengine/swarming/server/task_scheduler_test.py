@@ -738,6 +738,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     with mock.patch('server.resultdb.finalize_invocation_async',
                     mock.Mock(side_effect=self.nop_async)) as mock_call:
       to_run_key = task_to_run.request_to_task_to_run_key(request, 1, 0)
+      self.mock_now(self.now, 60)
       task_scheduler._expire_task(to_run_key, request, True)
       mock_call.assert_called_once_with('1d69b9f088008911',
                                         u'resultdb-update-token')
@@ -2893,6 +2894,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     # task_expire_tasks should expire the task.
     try_number = 1
     to_runs = [(result_summary.task_id, try_number, invalid_slice_index)]
+    self.mock_now(self.now, 1200)
     task_scheduler.task_expire_tasks(to_runs)
     self.assertEqual(State.EXPIRED, result_summary.key.get().state)
 
