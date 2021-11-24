@@ -512,9 +512,7 @@ class Popen(subprocess.Popen):
         def new_preexec_fn_1():
           if old_preexec_fn_1:
             old_preexec_fn_1()
-          logging.info('crbug.com/1271827: before os.setpgid')
           os.setpgid(0, 0)
-          logging.info('crbug.com/1271827: after os.setpgid')
 
         kwargs['preexec_fn'] = new_preexec_fn_1
 
@@ -564,9 +562,7 @@ class Popen(subprocess.Popen):
     self.pgid = None
     self.start = time.time()
     try:
-      logging.info('crbug.com/1271827: before popen_lock')
       with self.popen_lock:
-        logging.info('crbug.com/1271827: took popen_lock')
         if sys.platform == 'win32':
           # We need the thread handle, save it.
           old = subprocess._winapi.CreateProcess
@@ -587,9 +583,7 @@ class Popen(subprocess.Popen):
           subprocess._winapi.CreateProcess = patch_CreateProcess
           subprocess._winapi.CloseHandle = patch_CloseHandle
         try:
-          logging.info('crbug.com/1271827: before subprocess.Popen')
           super(Popen, self).__init__(args, **kwargs)
-          logging.info('crbug.com/1271827: after subprocess.Popen')
         finally:
           if sys.platform == 'win32':
             subprocess._winapi.CreateProcess = old
@@ -601,22 +595,17 @@ class Popen(subprocess.Popen):
     self.args = args
     if self.detached and sys.platform != 'win32':
       try:
-        logging.info('crbug.com/1271827: before os.getpgid')
         self.pgid = os.getpgid(self.pid)
-        logging.info('crbug.com/1271827: after os.getpgid')
       except OSError:
         # sometimes the process can run+finish before we collect its pgid. fun.
         pass
 
-    logging.info('crbug.com/1271827: before _job check')
     if self._job:
       try:
         self._job.assign_proc(self)
       except OSError:
         self.kill()
         self.wait()
-    logging.info('crbug.com/1271827: before return %s',
-                 traceback.format_stack())
 
   def duration(self):
     """Duration of the child process.
