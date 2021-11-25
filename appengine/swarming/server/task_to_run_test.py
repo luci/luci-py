@@ -1049,6 +1049,17 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
     with self.assertRaises(AssertionError):
       task_to_run.get_shard_kind(task_to_run.N_SHARDS)
 
+  def test_get_task_to_runs(self):
+    request = self.mkreq(1, _gen_request())
+    to_run_shard = task_to_run.new_task_to_run(request, 0, use_shard=True)
+    to_run_shard.put()
+    to_run = task_to_run.new_task_to_run(request, 0)
+    to_run.put()
+
+    actual = task_to_run.get_task_to_runs(request, to_run.task_slice_index)
+    expected = [to_run_shard, to_run]
+    self.assertEqual(expected, actual)
+
 
 if __name__ == '__main__':
   if '-v' in sys.argv:

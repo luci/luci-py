@@ -870,19 +870,15 @@ def _cancel_task_tx(request, result_summary, kill_running, bot_id, now, es_cfg,
     # PENDING.
     result_summary.state = task_result.State.CANCELED
     result_summary.completed_ts = now
-    to_run_key = task_to_run.request_to_task_to_run_key(
-        request,
-        result_summary.try_number or 1,
-        result_summary.current_task_slice or 0)
-    to_run_future = to_run_key.get_async()
 
-    # Add it to the negative cache.
-    task_to_run.set_lookup_cache(to_run_key, False)
-
-    to_run = to_run_future.get_result()
-    entities.append(to_run)
-    to_run.queue_number = None
-    to_run.expiration_ts = None
+    to_runs = task_to_run.get_task_to_runs(
+        request, result_summary.current_task_slice or 0)
+    for to_run in to_runs:
+      # Add it to the negative cache.
+      task_to_run.set_lookup_cache(to_run.key, False)
+      to_run.queue_number = None
+      to_run.expiration_ts = None
+      entities.append(to_run)
   else:
     if not kill_running:
       # Deny canceling a task that started.
@@ -973,7 +969,7 @@ def _ensure_active_slice(request, task_slice_index):
   def run():
     logging.debug('_ensure_active_slice(%s, %d)', request.task_id,
                   task_slice_index)
-    to_runs = task_to_run.TaskToRun.query(ancestor=request.key).fetch()
+    to_runs = task_to_run.get_task_to_runs(request, task_slice_index)
     to_runs = [r for r in to_runs if r.queue_number]
     if to_runs:
       if len(to_runs) != 1:
@@ -1912,7 +1908,7 @@ def task_expire_tasks(task_to_runs):
   skipped = 0
 
   try:
-    for task_id, try_number, task_slice_index in task_to_runs:
+    for task_id, _try_number, task_slice_index in task_to_runs:
       # retrieve request
       request_key, _ = task_pack.get_request_and_result_keys(task_id)
       request = request_key.get()
@@ -1920,19 +1916,23 @@ def task_expire_tasks(task_to_runs):
         logging.error('Task for %s was not found.', task_id)
         continue
 
-      to_run_key = task_to_run.request_to_task_to_run_key(
-          request, try_number, task_slice_index)
+      to_runs = task_to_run.get_task_to_runs(request, task_slice_index)
+      if len(to_runs) != 1:
+        # There should not be multiple TaskToRuns. But it needs to expire all
+        # of them.
+        logging.warning('Too many TaskToRuns. %s', to_runs)
 
-      # execute task expiration
-      summary, new_to_run = _expire_task(to_run_key, request, inline=False)
-      if new_to_run:
-        # Expiring a TaskToRun for TaskSlice may reenqueue a new TaskToRun.
-        reenqueued += 1
-      elif summary:
-        killed.append(request)
-      else:
-        # It's not a big deal, the bot will continue running.
-        skipped += 1
+      for to_run in to_runs:
+        # execute task expiration
+        summary, new_to_run = _expire_task(to_run.key, request, inline=False)
+        if new_to_run:
+          # Expiring a TaskToRun for TaskSlice may reenqueue a new TaskToRun.
+          reenqueued += 1
+        elif summary:
+          killed.append(request)
+        else:
+          # It's not a big deal, the bot will continue running.
+          skipped += 1
   finally:
     if killed:
       logging.info(
