@@ -49,7 +49,7 @@ from server import task_request
 
 ### Models.
 
-N_SHARDS = 8 # the number of TaskToRunShards
+N_SHARDS = 16  # the number of TaskToRunShards
 
 
 class TaskToRun(ndb.Model):
