@@ -181,10 +181,10 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
     to_run.put()
     return request, to_run
 
-  def _gen_new_task_to_run_slices(self, nb_task, **kwargs):
+  def _gen_new_task_to_run_slices(self, nb_task, use_shard=False, **kwargs):
     """Returns TaskRequest, TaskToRun saved in the DB."""
     request = self.mkreq(nb_task, _gen_request_slices(**kwargs))
-    to_run = task_to_run.new_task_to_run(request, 0)
+    to_run = task_to_run.new_task_to_run(request, 0, use_shard)
     to_run.put()
     return request, to_run
 
@@ -965,21 +965,27 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
             'expiration_secs': 60,
             'properties': _gen_properties()
         }])
+    # task_to_run_shard: already passed the expiration time.
+    _, to_run_shard = self._gen_new_task_to_run_slices(
+        0,
+        use_shard=True,
+        created_ts=self.now - datetime.timedelta(days=1),
+        task_slices=[{
+            'expiration_secs': 60,
+            'properties': _gen_properties()
+        }])
 
     bot_dimensions = {u'id': [u'bot1'], u'pool': [u'default']}
 
     self.assertEqual(
         0, len(_yield_next_available_task_to_dispatch(bot_dimensions)))
 
-    expired_task_to_runs = list(task_to_run.yield_expired_task_to_run())
+    actual = list(task_to_run.yield_expired_task_to_run())
 
-    # Only to_run_2 and to_run_3 should be yielded. to_run_4 is too old and is
-    # ignored.
-    expected = [to_run_2, to_run_3]
-    sort_key = lambda x: x.expiration_ts
-    self.assertEqual(
-        sorted(expected, key=sort_key),
-        sorted(expired_task_to_runs, key=sort_key))
+    # Only to_run_2 and to_run_3 and to_run_shard should be yielded.
+    # to_run_4 is too old and is ignored.
+    expected = [to_run_3, to_run_2, to_run_shard]
+    self.assertEqual(expected, actual)
 
   def test_is_reapable(self):
     request_dimensions = {u'os': [u'Windows-3.1.1'], u'pool': [u'default']}

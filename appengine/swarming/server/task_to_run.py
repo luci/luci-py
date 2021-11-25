@@ -682,25 +682,27 @@ def yield_expired_task_to_run():
   # The query fetches tasks that reached expiration time recently
   # to avoid fetching all past tasks. It uses a large batch size
   # since the entities are very small and to reduce RPC overhead.
-  def expire(q):
-    total = 0
-    try:
-      for task in q:
+  def _query(kind):
+    now = utils.utcnow()
+    # The backsearch here is just to ensure that we find entities that we forgot
+    # about before because the cron job couldn't keep up. In practice
+    # expiration_ts should not be more than 1 minute old (as the cron job runs
+    # every minutes) but keep it high in case there's an outage.
+    cut_off = now - datetime.timedelta(hours=24)
+    return kind.query(kind.expiration_ts < now,
+                      kind.expiration_ts > cut_off,
+                      default_options=ndb.QueryOptions(batch_size=256))
+
+  total = 0
+  try:
+    # TODO(crbug.com/1272390): remove after migration.
+    for task in _query(TaskToRun):
+      yield task
+      total += 1
+
+    for shard in range(N_SHARDS):
+      for task in _query(get_shard_kind(shard)):
         yield task
         total += 1
-    finally:
-      logging.debug('Yielded %d tasks', total)
-
-  opts = ndb.QueryOptions(batch_size=256)
-  now = utils.utcnow()
-  # The backsearch here is just to ensure that we find entities that we forgot
-  # about before because the cron job couldn't keep up. In practice
-  # expiration_ts should not be more than 1 minute old (as the cron job runs
-  # every minutes) but keep it high in case there's an outage.
-  cut_off = now - datetime.timedelta(hours=24)
-  q = TaskToRun.query(
-      TaskToRun.expiration_ts < now,
-      TaskToRun.expiration_ts > cut_off,
-      default_options=opts)
-  for task in expire(q):
-    yield task
+  finally:
+    logging.debug('Yielded %d tasks', total)
