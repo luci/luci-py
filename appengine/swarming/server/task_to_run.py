@@ -710,12 +710,16 @@ def yield_expired_task_to_run():
 
 def get_task_to_runs(request, slice_until):
   """Get TaskToRun and/or TaskToRunShard entities by TaskRequest"""
-  to_runs = []
+  shards = set()
   for slice_index in range(slice_until + 1):
     if len(request.task_slices) <= slice_index:
       break
     h = request.task_slice(slice_index).properties.dimensions_hash
-    runs = get_shard_kind(h % N_SHARDS).query(ancestor=request.key).fetch()
+    shards.add(h % N_SHARDS)
+
+  to_runs = []
+  for shard in shards:
+    runs = get_shard_kind(shard).query(ancestor=request.key).fetch()
     to_runs.extend(runs)
 
   # TODO(crbug.com/1272390): remove after migration.
