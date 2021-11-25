@@ -2854,16 +2854,26 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         ],
     )
 
+    def assertNumberOfActiveRuns(expected):
+      to_runs = task_to_run.get_task_to_runs(r.request,
+                                             r.request.num_task_slices - 1)
+      actual = len([t for t in to_runs if t.queue_number])
+      self.assertEqual(expected, actual)
+
     to_run, _ = task_scheduler._ensure_active_slice(r.request, 0)
     self.assertEqual(to_run.task_slice_index, 0)
+    assertNumberOfActiveRuns(1)
     to_run, _ = task_scheduler._ensure_active_slice(r.request, 1)
     self.assertEqual(to_run.task_slice_index, 1)
+    assertNumberOfActiveRuns(1)
     to_run, _ = task_scheduler._ensure_active_slice(r.request, 0)
     self.assertEqual(to_run.task_slice_index, 0)
+    assertNumberOfActiveRuns(1)
     # This works even if there is no to_run entity.
     to_run.key.delete()
     to_run, _ = task_scheduler._ensure_active_slice(r.request, 1)
     self.assertEqual(to_run.task_slice_index, 1)
+    assertNumberOfActiveRuns(1)
 
   def test_task_expire_tasks(self):
     # Tested indirectly via test_cron_abort_expired_*
