@@ -174,14 +174,14 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
     req.put()
     return req
 
-  def _gen_new_task_to_run(self, nb_task, use_shard=True, **kwargs):
+  def _gen_new_task_to_run(self, nb_task, use_shard=False, **kwargs):
     """Returns TaskRequest, TaskToRun saved in the DB."""
     request = self.mkreq(nb_task, _gen_request(**kwargs))
     to_run = task_to_run.new_task_to_run(request, 0, use_shard)
     to_run.put()
     return request, to_run
 
-  def _gen_new_task_to_run_slices(self, nb_task, use_shard=True, **kwargs):
+  def _gen_new_task_to_run_slices(self, nb_task, use_shard=False, **kwargs):
     """Returns TaskRequest, TaskToRun saved in the DB."""
     request = self.mkreq(nb_task, _gen_request_slices(**kwargs))
     to_run = task_to_run.new_task_to_run(request, 0, use_shard)
@@ -206,12 +206,9 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
   def test_request_to_task_to_run_key(self):
     self.mock(random, 'getrandbits', lambda _: 0x88)
     request = self.mkreq(1, _gen_request())
-    shard = request.task_slice(
-        0).properties.dimensions_hash % task_to_run.N_SHARDS
-    expected_kind = 'TaskToRunShard%d' % shard
     # Ensures that the hash value is constant for the same input.
     self.assertEqual(
-        ndb.Key('TaskRequest', 0x7bddaa9d777ff77e, expected_kind, 1),
+        ndb.Key('TaskRequest', 0x7bddaa9d777ff77e, 'TaskToRun', 1),
         task_to_run.request_to_task_to_run_key(request, 1, 0))
 
   def test_gen_queue_number(self):
@@ -411,12 +408,8 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
     # Warning: Ordering by key doesn't work because of TaskToRunShard; e.g.
     # the entity key ordering DOES NOT correlate with .queue_number
     # Ensure they come out in expected order.
-    actual = []
-    for shard in range(task_to_run.N_SHARDS):
-      to_runs = task_to_run.get_shard_kind(shard).query().order(
-          task_to_run.TaskToRun.queue_number).fetch()
-      actual.extend(to_runs)
-    self.assertEqual(expected, map(flatten, actual))
+    q = task_to_run.TaskToRun.query().order(task_to_run.TaskToRun.queue_number)
+    self.assertEqual(expected, map(flatten, q.fetch()))
 
   def test_match_dimensions(self):
     data_true = (
@@ -899,12 +892,11 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
   def test_yield_next_available_task_to_run_shard_migration(self):
     task_dimensions1 = {u'os': [u'Linux'], u'pool': [u'default']}
     _request1, _task1 = self._gen_new_task_to_run(
-        1,
-        properties=_gen_properties(dimensions=task_dimensions1),
-        use_shard=False)
+        1, properties=_gen_properties(dimensions=task_dimensions1))
     task_dimensions2 = {u'os': [u'Ubuntu'], u'pool': [u'default']}
     request2, _task2 = self._gen_new_task_to_run(
         1,
+        use_shard=True,
         properties=_gen_properties(dimensions=task_dimensions2))
     self.assertEqual(len(task_to_run.TaskToRun.query().fetch()), 1)
     shard = request2.task_slice(
@@ -973,10 +965,10 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
             'expiration_secs': 60,
             'properties': _gen_properties()
         }])
-    # task_to_run_legacy: already passed the expiration time.
-    _, to_run_legacy = self._gen_new_task_to_run_slices(
+    # task_to_run_shard: already passed the expiration time.
+    _, to_run_shard = self._gen_new_task_to_run_slices(
         0,
-        use_shard=False,
+        use_shard=True,
         created_ts=self.now - datetime.timedelta(days=1),
         task_slices=[{
             'expiration_secs': 60,
@@ -990,9 +982,9 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
 
     actual = list(task_to_run.yield_expired_task_to_run())
 
-    # Only to_run_2 and to_run_3 and to_run_legacy should be yielded.
+    # Only to_run_2 and to_run_3 and to_run_shard should be yielded.
     # to_run_4 is too old and is ignored.
-    expected = [to_run_legacy, to_run_3, to_run_2]
+    expected = [to_run_3, to_run_2, to_run_shard]
     self.assertEqual(expected, actual)
 
   def test_is_reapable(self):
@@ -1059,13 +1051,13 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
 
   def test_get_task_to_runs(self):
     request = self.mkreq(1, _gen_request())
+    to_run_shard = task_to_run.new_task_to_run(request, 0, use_shard=True)
+    to_run_shard.put()
     to_run = task_to_run.new_task_to_run(request, 0)
     to_run.put()
-    to_run_legacy = task_to_run.new_task_to_run(request, 0, use_shard=False)
-    to_run_legacy.put()
 
     actual = task_to_run.get_task_to_runs(request, to_run.task_slice_index)
-    expected = [to_run, to_run_legacy]
+    expected = [to_run_shard, to_run]
     self.assertEqual(expected, actual)
 
 
