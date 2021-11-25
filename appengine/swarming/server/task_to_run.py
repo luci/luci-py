@@ -159,12 +159,20 @@ class TaskToRun(ndb.Model):
           ('%s.queue_number must be None when expiration_ts is None' %
            self.__class__.__name__))
 
+# Cache TaskToRunShard kinds.
+_TaskToRunShards = {}
+
 
 def get_shard_kind(shard):
   """Returns a TaskToRunShard kind for the given shard number."""
   assert shard < N_SHARDS, 'Shard number must be < %d, but %d is given' % (
       N_SHARDS, shard)
-  return type('TaskToRunShard%d' % shard, (TaskToRun, ), {})
+  kind = 'TaskToRunShard%d' % shard
+  # check cached kind.
+  if kind in _TaskToRunShards:
+    return _TaskToRunShards[kind]
+  _TaskToRunShards[kind] = type(kind, (TaskToRun, ), {})
+  return _TaskToRunShards[kind]
 
 
 ### Private functions.

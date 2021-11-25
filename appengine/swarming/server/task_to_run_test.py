@@ -1037,6 +1037,9 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(k.__name__, 'TaskToRunShard0')
     self.assertTrue(issubclass(k, task_to_run.TaskToRun))
 
+    # The next call should return the cached kind.
+    self.assertEqual(k, task_to_run.get_shard_kind(0))
+
     with self.assertRaises(AssertionError):
       task_to_run.get_shard_kind(task_to_run.N_SHARDS)
 
