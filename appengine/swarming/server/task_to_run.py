@@ -508,7 +508,7 @@ def _yield_potential_tasks(bot_id):
 def request_to_task_to_run_key(request,
                                try_number,
                                task_slice_index,
-                               use_shard=False):
+                               use_shard=True):
   """Returns the ndb.Key for a TaskToRun from a TaskRequest."""
   assert 1 <= try_number <= 2, try_number
   assert 0 <= task_slice_index < request.num_task_slices
@@ -535,7 +535,7 @@ def task_to_run_key_try_number(to_run_key):
   return to_run_key.integer_id() & 15
 
 
-def new_task_to_run(request, task_slice_index, use_shard=False):
+def new_task_to_run(request, task_slice_index, use_shard=True):
   """Returns a fresh new TaskToRun for the task ready to be scheduled.
 
   Returns:
