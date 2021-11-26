@@ -1916,7 +1916,13 @@ def task_expire_tasks(task_to_runs):
         logging.error('Task for %s was not found.', task_id)
         continue
 
-      to_runs = task_to_run.get_task_to_runs(request, task_slice_index)
+      to_runs = [
+          r for r in task_to_run.get_task_to_runs(request, task_slice_index)
+          # task_to_run.get_task_to_runs() may include expired TaskToRuns or
+          # TaskToRuns for other silce indexes. _expire_task() will ignore them,
+          # but it's better to filter them out here.
+          if r.expiration_ts and r.task_slice_index == task_slice_index
+      ]
       if len(to_runs) != 1:
         # There should not be multiple TaskToRuns. But it needs to expire all
         # of them.
