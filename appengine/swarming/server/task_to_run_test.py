@@ -175,14 +175,14 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
     return req
 
   def _gen_new_task_to_run(self, nb_task, **kwargs):
-    """Returns TaskRequest, TaskToRun saved in the DB."""
+    """Returns TaskRequest, TaskToRunShard saved in the DB."""
     request = self.mkreq(nb_task, _gen_request(**kwargs))
     to_run = task_to_run.new_task_to_run(request, 0)
     to_run.put()
     return request, to_run
 
   def _gen_new_task_to_run_slices(self, nb_task, **kwargs):
-    """Returns TaskRequest, TaskToRun saved in the DB."""
+    """Returns TaskRequest, TaskToRunShard saved in the DB."""
     request = self.mkreq(nb_task, _gen_request_slices(**kwargs))
     to_run = task_to_run.new_task_to_run(request, 0)
     to_run.put()
@@ -630,10 +630,10 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(sorted(expected), sorted(actual))
 
   def test_yield_next_available_task_to_dispatch_clock_skew(self):
-    # Asserts that a TaskToRun added later in the DB (with a Key with an higher
-    # value) but with a timestamp sooner (for example, time desynchronization
-    # between machines) is still returned in the timestamp order, e.g. priority
-    # is done based on timestamps and priority only.
+    # Asserts that a TaskToRunShard added later in the DB (with a Key with an
+    # higher value) but with a timestamp sooner (for example, time
+    # desynchronization between machines) is still returned in the timestamp
+    # order, e.g. priority is done based on timestamps and priority only.
     request_dimensions_1 = {
         u'foo': [u'bar'],
         u'os': [u'Windows-3.1.1'],
@@ -964,8 +964,8 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(False, to_run.is_reapable)
 
   def test_set_lookup_cache(self):
-    # Create two TaskToRun on the same TaskRequest and assert that affecting one
-    # negative cache entry doesn't affect the other.
+    # Create two TaskToRunShard on the same TaskRequest and assert that
+    # affecting one negative cache entry doesn't affect the other.
     request = self.mkreq(1, _gen_request())
     to_run_1 = task_to_run.new_task_to_run(request, 0)
     to_run_1.put()

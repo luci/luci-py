@@ -109,7 +109,9 @@ def _get_results(request_key):
 
 
 def _run_result_to_to_run_key(run_result):
-  """Returns a TaskToRun ndb.Key that was used to trigger the TaskRunResult."""
+  """Returns a TaskToRunShard ndb.Key that was used to trigger
+     the TaskRunResult.
+  """
   return task_to_run.request_to_task_to_run_key(run_result.request_key.get(),
                                                 run_result.try_number,
                                                 run_result.current_task_slice)
@@ -993,7 +995,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     _, _, run_result = task_scheduler.bot_reap_task(self.bot_dimensions, 'abc')
     self.assertIsNone(run_result)
     # The second bot is able to reap it immediately. This is because when the
-    # first bot tried to reap the task, it expired the first TaskToRun and
+    # first bot tried to reap the task, it expired the first TaskToRunShard and
     # created a new one, which the second bot *can* reap.
     _, _, run_result = task_scheduler.bot_reap_task(second_bot, 'second')
     self.assertEqual(1, run_result.current_task_slice)
@@ -1170,7 +1172,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         ])
     request = result_summary.request_key.get()
     to_run_key = task_to_run.request_to_task_to_run_key(request, 1, 0)
-    # TaskToRun was not stored.
+    # TaskToRunShard was not stored.
     self.assertIsNone(to_run_key.get())
     # Bot can't reap.
     reaped_request, _, _ = task_scheduler.bot_reap_task(self.bot_dimensions,
@@ -1378,7 +1380,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(expected, result_summary.to_dict())
     self.assertEqual([], run_results)
 
-    # A bot reaps the TaskToRun.
+    # A bot reaps the TaskToRunShard.
     reaped_ts = self.now + datetime.timedelta(seconds=60)
     self.mock_now(reaped_ts)
     reaped_request, _, run_result = task_scheduler.bot_reap_task(
@@ -1833,7 +1835,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(State.CANCELED, result_summary.state)
     self.assertEqual(1, len(pub_sub_calls))  # No other message.
 
-    # Make sure the TaskToRun is added to the negative cache.
+    # Make sure the TaskToRunShard is added to the negative cache.
     request = result_summary.request_key.get()
     to_run_key = task_to_run.request_to_task_to_run_key(request, 1, 0)
     actual = task_to_run._lookup_cache_is_taken_async(to_run_key).get_result()
@@ -1858,7 +1860,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(State.CANCELED, result_summary.state)
     self.assertEqual(1, len(pub_sub_calls))  # No other message.
 
-    # Make sure the TaskToRun is added to the negative cache.
+    # Make sure the TaskToRunShard is added to the negative cache.
     request = result_summary.request_key.get()
     to_run_key = task_to_run.request_to_task_to_run_key(request, 1, 0)
     actual = task_to_run._lookup_cache_is_taken_async(to_run_key).get_result()
@@ -2426,7 +2428,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(State.BOT_DIED, run_result.state)
     result_summary = run_result.result_summary_key.get()
     self.assertEqual(State.BOT_DIED, result_summary.state)
-    # The old TaskToRun is not reused.
+    # The old TaskToRunShard is not reused.
     self.assertIsNone(to_run_key_1.get().queue_number)
     self.assertIsNone(to_run_key_1.get().expiration_ts)
 

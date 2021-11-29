@@ -450,8 +450,8 @@ class TaskResultApiTest(TestCase):
     self.assertEqual(expected, actual.to_dict())
 
   def test_integration(self):
-    # Creates a TaskRequest, along its TaskResultSummary and TaskToRun. Have a
-    # bot reap the task, and complete the task. Ensure the resulting
+    # Creates a TaskRequest, along its TaskResultSummary and TaskToRunShard.
+    # Have a bot reap the task, and complete the task. Ensure the resulting
     # TaskResultSummary and TaskRunResult are properly updated.
     #
     # Force tedious chunking.

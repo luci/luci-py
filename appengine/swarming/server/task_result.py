@@ -933,7 +933,7 @@ class _TaskResultCommon(ndb.Model):
 
 
 class TaskRunResult(_TaskResultCommon):
-  """Contains the results for a TaskToRun scheduled on a bot.
+  """Contains the results for a TaskToRunShard scheduled on a bot.
 
   Parent is a TaskResultSummary. Key id is 1 on the initial try, then increases
   linearly on automatic retries (if they are required, for example there could
@@ -988,7 +988,7 @@ class TaskRunResult(_TaskResultCommon):
 
   @property
   def result_summary_key(self):
-    """Returns the TaskToRun ndb.Key that is parent of this entity."""
+    """Returns the TaskToRunShard ndb.Key that is parent of this entity."""
     return task_pack.run_result_key_to_result_summary_key(self.key)
 
   @property

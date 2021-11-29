@@ -23,10 +23,10 @@ Graph of the schema:
         |
         |
         v
-    +---------------+     +---------------+
-    |TaskToRunShardX| ... |TaskToRunShardX|
-    |id=<composite> | ... |id=<composite> |
-    +---------------+     +---------------+
+    +--------------+     +--------------+
+    |TaskToRunShard| ... |TaskToRunShard|
+    |id=<composite>| ... |id=<composite>|
+    +--------------+     +--------------+
 """
 
 import collections
@@ -139,7 +139,7 @@ class _TaskToRunBase(ndb.Model):
 
   @property
   def task_id(self):
-    """Returns an encoded task id for this TaskToRun.
+    """Returns an encoded task id for this TaskToRunShard.
 
     Note: this includes the try_number but not the task_slice_index.
     """
@@ -183,7 +183,7 @@ def get_shard_kind(shard):
 
 
 def _gen_queue_number(dimensions_hash, timestamp, priority):
-  """Generates a 63 bit packed value used for TaskToRun.queue_number.
+  """Generates a 63 bit packed value used for TaskToRunShard.queue_number.
 
   Arguments:
   - dimensions_hash: 32 bit integer to classify in a queue.
@@ -254,7 +254,7 @@ def _queue_number_priority(v):
 
 
 def _memcache_to_run_key(to_run_key):
-  """Encodes the key as a string to uniquely address the TaskToRun in the
+  """Encodes the key as a string to uniquely address the TaskToRunShard in the
   negative cache in memcache.
 
   See set_lookup_cache() for more explanation.
@@ -295,13 +295,13 @@ class _QueryStats(object):
 
 @ndb.tasklet
 def _validate_task_async(bot_dimensions, stats, now, to_run):
-  """Validates the TaskToRun and updates stats.
+  """Validates the TaskToRunShard and updates stats.
 
   Returns:
     None if the task cannot be reaped by this bot.
     TaskRequest if this is a good candidate to reap.
   """
-  # TODO(maruel): Create one TaskToRun per TaskRunResult.
+  # TODO(maruel): Create one TaskToRunShard per TaskRunResult.
   packed = task_pack.pack_request_key(
       task_to_run_key_to_request_key(to_run.key)) + '0'
   stats.total += 1
@@ -390,9 +390,9 @@ def _yield_potential_tasks(bot_id):
   latency. The number of queries is unbounded.
 
   Yields:
-    TaskToRun entities, trying to yield the highest priority one first. To have
-    finite execution time, starts yielding results once one of these conditions
-    are met:
+    TaskToRunShard entities, trying to yield the highest priority one first.
+    To have finite execution time, starts yielding results once one of these
+    conditions are met:
     - 1 second elapsed; in this case, continue iterating in the background
     - First page of every query returned
     - All queries exhausted
@@ -430,8 +430,8 @@ def _yield_potential_tasks(bot_id):
         time.time() - start,
         sum(len(f.get_result()) for f in futures if f.done()),
         _to_active_yielders(futures))
-    # items is a list of TaskToRun. The entities are needed because property
-    # queue_number is used to sort according to each task's priority.
+    # items is a list of TaskToRunShard. The entities are needed because
+    # property queue_number is used to sort according to each task's priority.
     items = []
 
     def _append_runs_to_items(runs):
@@ -440,14 +440,14 @@ def _yield_potential_tasks(bot_id):
       for r in runs:
         if not r.queue_number:
           logging.warning(
-              '_yield_potential_tasks(%s): TaskToRun %s does not have '
+              '_yield_potential_tasks(%s): TaskToRunShard %s does not have '
               'queue_number', bot_id, r.task_id)
           continue
         items.append(r)
 
     for i, f in enumerate(futures):
       if f and f.done():
-        # The ndb.Future returns a list of up to 10 TaskToRun entities.
+        # The ndb.Future returns a list of up to 10 TaskToRunShard entities.
         runs = f.get_result()
         if runs:
           _append_runs_to_items(runs)
@@ -505,7 +505,7 @@ def _yield_potential_tasks(bot_id):
 
 
 def request_to_task_to_run_key(request, try_number, task_slice_index):
-  """Returns the ndb.Key for a TaskToRun from a TaskRequest."""
+  """Returns the ndb.Key for a TaskToRunShard from a TaskRequest."""
   assert 1 <= try_number <= 2, try_number
   assert 0 <= task_slice_index < request.num_task_slices
   h = request.task_slice(task_slice_index).properties.dimensions_hash
@@ -514,14 +514,14 @@ def request_to_task_to_run_key(request, try_number, task_slice_index):
 
 
 def task_to_run_key_to_request_key(to_run_key):
-  """Returns the ndb.Key for a TaskToRun from a TaskRequest key."""
+  """Returns the ndb.Key for a TaskToRunShard from a TaskRequest key."""
   assert to_run_key.kind().startswith('TaskToRunShard'), to_run_key
   return to_run_key.parent()
 
 
 def task_to_run_key_slice_index(to_run_key):
-  """Returns the TaskRequest.task_slice() index this TaskToRun entity represents
-  as pending.
+  """Returns the TaskRequest.task_slice() index this TaskToRunShard entity
+  represents as pending.
   """
   return to_run_key.integer_id() >> 4
 
@@ -532,10 +532,10 @@ def task_to_run_key_try_number(to_run_key):
 
 
 def new_task_to_run(request, task_slice_index):
-  """Returns a fresh new TaskToRun for the task ready to be scheduled.
+  """Returns a fresh new TaskToRunShard for the task ready to be scheduled.
 
   Returns:
-    Unsaved TaskToRun entity.
+    Unsaved TaskToRunShard entity.
   """
   assert 0 <= task_slice_index < 64, task_slice_index
   created = request.created_ts
@@ -604,7 +604,7 @@ def set_lookup_cache(to_run_key, is_available_to_schedule):
 
 
 def yield_next_available_task_to_dispatch(bot_dimensions):
-  """Yields next available (TaskRequest, TaskToRun) in decreasing order of
+  """Yields next available (TaskRequest, TaskToRunShard) in decreasing order of
   priority.
 
   Once the caller determines the task is suitable to execute, it must use
@@ -671,7 +671,7 @@ def yield_next_available_task_to_dispatch(bot_dimensions):
 
 
 def yield_expired_task_to_run():
-  """Yields the expired TaskToRun still marked as available."""
+  """Yields the expired TaskToRunShard still marked as available."""
   # The query fetches tasks that reached expiration time recently
   # to avoid fetching all past tasks. It uses a large batch size
   # since the entities are very small and to reduce RPC overhead.

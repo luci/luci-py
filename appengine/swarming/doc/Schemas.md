@@ -26,13 +26,13 @@ The scheduling optimisation is done via:
       exists. The details of the task is saved in TaskProperties embedded in
       TaskRequest. If the task contains any SecretBytes, a child SecretBytes
       entity with id=1 will also be saved.
-    - A TaskToRun is created to dispatch this request so it can be run on a
+    - A TaskToRunShard is created to dispatch this request so it can be run on a
       bot. It is marked as ready to be triggered when created.
     - A TaskResultSummary is created to describe the request's overall status,
       taking in account retries.
     - A TaskDimensions is stored to describe the precise set of dimensions.
   - Bots poll for work. It looks at the queues described by BotTaskDimensions.
-    Once a bot reaps a TaskToRun, the server creates the corresponding
+    Once a bot reaps a TaskToRunShard, the server creates the corresponding
     TaskRunResult for this run and updates it as required until completed. The
     TaskRunResult describes the result for this run on this specific bot.
   - When the bot is done, a PerformanceStats entity is saved as a child entity
@@ -77,7 +77,7 @@ failure, or tasks with no secret bytes provided (for SecretBytes).
         |      |
         |      v
         |  +--------------+      +--------------+
-        |  |TaskToRun     |* ... |TaskToRun     |*                task_to_run.py
+        |  |TaskToRunShard|* ... |TaskToRunShard|*                task_to_run.py
         |  |id=<composite>|  ... |id=<composite>|
         |  +--------------+      +--------------+
         |
@@ -204,7 +204,7 @@ reduce DB contention.
     to make it decreasing. See task_request.py for more detail.
   - TaskResultSummary has key ID = 1.
   - TaskRunResult has monotonically increasing key ID starting at 1.
-  - TaskToRun has the key ID as `dimensions_hash` value is calculated as an
+  - TaskToRunShard has the key ID as `dimensions_hash` value is calculated as an
     int32 from the TaskRequest.properties.dimensions dictionary.
   - PerformanceStats has key ID = 1.
   - BotTaskDimensions and TaskDimensions have key ID `dimensions_hash`. This

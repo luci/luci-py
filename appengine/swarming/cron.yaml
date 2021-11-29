@@ -9,7 +9,7 @@ cron:
   schedule: every 1 minutes
   target: backend
 
-- description: Catch TaskToRun's that are expired.
+- description: Catch TaskToRunShards that are expired.
   url: /internal/cron/important/scheduler/abort_expired
   schedule: every 1 minutes
   target: backend

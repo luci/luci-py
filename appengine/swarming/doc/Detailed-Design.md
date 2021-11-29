@@ -77,8 +77,8 @@ to dedupe the task requests when the exact same `.isolated` file is ran multiple
 times, so that task-deduplication can be eventually implemented.
 
 A task also has a `TaskResultSummary` to describe its pending state and a tiny
-`TaskToRun` entity for the actual scheduling. They are respectively defined in
-[task_result.py](../server/task_result.py) and
+`TaskToRunShard` entity for the actual scheduling. They are respectively
+defined in [task_result.py](../server/task_result.py) and
 [task_to_run.py](../server/task_to_run.py).
 
 The task ID is the milliseconds since epoch plus low order random bits and the
@@ -109,8 +109,8 @@ For example, it could be "os=Windows-Vista-SP2; gpu=15ad:0405".
 
 To make the process efficient, the dimensions are MD5 hashed and only the first
 32 bits are saved so integer comparison can be used. This greatly reduce the
-size of the hot `TaskToRun` entities used for task scheduling and the amount of
-memory necessary on the frontend server.
+size of the hot `TaskToRunShard` entities used for task scheduling and the
+amount of memory necessary on the frontend server.
 
 Once a bot is assigned to a task, a `TaskRunResult` is created. If the task is
 actually a retry, multiple `TaskRunResult` can be created for a single

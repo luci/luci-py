@@ -89,7 +89,7 @@ def _expire_task_tx(now, request, to_run_key, result_summary_key, capacity,
     return None, None
   to_run.expiration_delay = delay
 
-  # In any case, dequeue the TaskToRun.
+  # In any case, dequeue the TaskToRunShard.
   to_run.queue_number = None
   to_run.expiration_ts = None
   result_summary = result_summary_future.get_result()
@@ -118,10 +118,10 @@ def _expire_task_tx(now, request, to_run_key, result_summary_key, capacity,
           'index=%d, capacity=%s\n'
           'TaskResultSummary: task_id=%s, current_task_slice=%d, '
           'num_task_slices=%d\n'
-          'TaskToRun: task_id=%s, task_slice_index=%d, try_number=%d', index,
-          capacity, result_summary.task_id, result_summary.current_task_slice,
-          request.num_task_slices, to_run.task_id, to_run.task_slice_index,
-          to_run.try_number)
+          'TaskToRunShard: task_id=%s, task_slice_index=%d, try_number=%d',
+          index, capacity, result_summary.task_id,
+          result_summary.current_task_slice, request.num_task_slices,
+          to_run.task_id, to_run.task_slice_index, to_run.try_number)
 
   if not new_to_run:
     # There's no fallback, giving up.
@@ -155,23 +155,23 @@ def _expire_task_tx(now, request, to_run_key, result_summary_key, capacity,
 
 
 def _expire_task(to_run_key, request, inline):
-  """Expires a TaskResultSummary and unschedules the TaskToRun.
+  """Expires a TaskResultSummary and unschedules the TaskToRunShard.
 
   This function is only meant to process PENDING tasks.
 
   Arguments:
-    to_run_key: the TaskToRun to expire
+    to_run_key: the TaskToRunShard to expire
     request: the corresponding TaskRequest instance
     inline: True if this is done as part of a bot polling for a task to run,
             in this case it should abort as quickly as possible
 
-  If a follow up TaskSlice is available, reenqueue a new TaskToRun instead of
-  expiring the TaskResultSummary.
+  If a follow up TaskSlice is available, reenqueue a new TaskToRunShard instead
+  of expiring the TaskResultSummary.
 
   Returns:
     tuple of
     - TaskResultSummary on success
-    - TaskToRun if a new TaskSlice was reenqueued
+    - TaskToRunShard if a new TaskSlice was reenqueued
   """
   # Add it to the negative cache *before* running the transaction. Either way
   # the task was already reaped or the task is correctly expired and not
@@ -180,9 +180,9 @@ def _expire_task(to_run_key, request, inline):
     logging.info('Not expiring inline task with negative cache set')
     return None, None
 
-  # Look if the TaskToRun is reapable once before doing the check inside the
-  # transaction. This reduces the likelihood of failing this check inside the
-  # transaction, which is an order of magnitude more costly.
+  # Look if the TaskToRunShard is reapable once before doing the check inside
+  # the transaction. This reduces the likelihood of failing this check inside
+  # the transaction, which is an order of magnitude more costly.
   to_run = to_run_key.get()
   if not to_run.is_reapable:
     if not to_run.expiration_ts:
@@ -264,7 +264,7 @@ def _reap_task(bot_dimensions, bot_version, to_run_key, request,
     if t.properties.has_secret_bytes:
       secret_bytes = secret_bytes_future.get_result()
     if not to_run:
-      logging.error('Missing TaskToRun?\n%s', result_summary.task_id)
+      logging.error('Missing TaskToRunShard?\n%s', result_summary.task_id)
       return None, None
     if not to_run.is_reapable:
       logging.info('%s is not reapable', result_summary.task_id)
@@ -315,12 +315,12 @@ def _reap_task(bot_dimensions, bot_version, to_run_key, request,
     run_result, secret_bytes = datastore_utils.transaction(run, retries=0)
   except datastore_utils.CommitError:
     # The challenge here is that the transaction may have failed because:
-    # - The DB had an hickup and the TaskToRun, TaskRunResult and
+    # - The DB had an hickup and the TaskToRunShard, TaskRunResult and
     #   TaskResultSummary haven't been updated.
     # - The entities had been updated by a concurrent transaction on another
     #   handler so it was not reapable anyway. This does cause exceptions as
-    #   both GET returns the TaskToRun.queue_number != None but only one succeed
-    #   at the PUT.
+    #   both GET returns the TaskToRunShard.queue_number != None but only one
+    #   succeed at the PUT.
     #
     # In the first case, we may want to reset the negative cache, while we don't
     # want to in the later case. The trade off are one of:
@@ -916,7 +916,7 @@ def _get_task_from_external_scheduler(es_cfg, bot_dimensions):
     es_cfg: pool_config.ExternalSchedulerConfig instance.
     bot_dimensions: dimensions {string key: list of string values}
 
-  Returns: (TaskRequest, TaskToRun) if a task was available,
+  Returns: (TaskRequest, TaskToRunShard) if a task was available,
            or (None, None) otherwise.
   """
   task_id, slice_number = external_scheduler.assign_task(es_cfg, bot_dimensions)
@@ -947,11 +947,11 @@ def _get_task_from_external_scheduler(es_cfg, bot_dimensions):
 
 
 def _ensure_active_slice(request, task_slice_index):
-  """Ensures the existence of a TaskToRun for the given request, try, slice.
+  """Ensures the existence of a TaskToRunShard for the given request, slice.
 
-  Ensure that the given request is currently active at a given try_number and
-  task_slice_index (modifying the current try or slice if necessary), and that
-  no other TaskToRun is pending.
+  Ensure that the given request is currently active at a given task_slice_index
+  (modifying the current try or slice if necessary), and that
+  no other TaskToRunShard is pending.
 
   This is intended for use as part of the external scheduler flow.
 
@@ -962,8 +962,8 @@ def _ensure_active_slice(request, task_slice_index):
     task_slice_index: slice index to ensure is active.
 
   Returns:
-    TaskToRun: A saved TaskToRun instance corresponding to the given request,
-               try_number, and slice, if exists, or None otherwise.
+    TaskToRunShard: A saved TaskToRunShard instance corresponding to the given
+                    request, and slice, if exists, or None otherwise.
     Boolean: Whether or not it should raise exception
   """
   def run():
@@ -973,10 +973,10 @@ def _ensure_active_slice(request, task_slice_index):
     to_runs = [r for r in to_runs if r.queue_number]
     if to_runs:
       if len(to_runs) != 1:
-        logging.warning('_ensure_active_slice: %s != 1 TaskToRuns',
+        logging.warning('_ensure_active_slice: %s != 1 TaskToRunShards',
                         len(to_runs))
         return None, True
-      assert len(to_runs) == 1, 'Too many pending TaskToRuns.'
+      assert len(to_runs) == 1, 'Too many pending TaskToRunShards.'
 
     to_run = to_runs[0] if to_runs else None
 
@@ -985,18 +985,19 @@ def _ensure_active_slice(request, task_slice_index):
         logging.debug('_ensure_active_slice: already active')
         return to_run, False
 
-      # Deactivate old TaskToRun, create new one.
+      # Deactivate old TaskToRunShard, create new one.
       to_run.queue_number = None
       to_run.expiration_ts = None
       new_to_run = task_to_run.new_task_to_run(request, task_slice_index)
       ndb.put_multi([to_run, new_to_run])
-      logging.debug('_ensure_active_slice: added new TaskToRun')
+      logging.debug('_ensure_active_slice: added new TaskToRunShard')
       return new_to_run, False
 
     result_summary = task_pack.request_key_to_result_summary_key(
         request.key).get()
     if not result_summary:
-      logging.warning('_ensure_active_slice: no TaskToRun or TaskResultSummary')
+      logging.warning(
+          '_ensure_active_slice: no TaskToRunShard or TaskResultSummary')
       return None, True
 
     if not result_summary.is_pending:
@@ -1009,14 +1010,15 @@ def _ensure_active_slice(request, task_slice_index):
 
     new_to_run = task_to_run.new_task_to_run(request, task_slice_index)
     new_to_run.put()
-    logging.debug('ensure_active_slice: added new TaskToRun (no previous one)')
+    logging.debug(
+        'ensure_active_slice: added new TaskToRunShard (no previous one)')
     return new_to_run, False
 
   return datastore_utils.transaction(run)
 
 
 def _bot_reap_task_external_scheduler(bot_dimensions, bot_version, es_cfg):
-  """Reaps a TaskToRun (chosen by external scheduler) if available.
+  """Reaps a TaskToRunShard (chosen by external scheduler) if available.
 
   This is a simpler version of bot_reap_task that skips a lot of the steps
   normally taken by the native scheduler.
@@ -1163,7 +1165,7 @@ def schedule_request(request,
 
   Assumes ACL check has already happened (see 'check_schedule_request_acl').
 
-  The number of entities created is ~4: TaskRequest, TaskToRun and
+  The number of entities created is ~4: TaskRequest, TaskToRunShard and
   TaskResultSummary and (optionally) SecretBytes. They are in single entity
   group and saved in a single transaction.
 
@@ -1178,7 +1180,7 @@ def schedule_request(request,
              be set and the entity will be stored by this function.
 
   Returns:
-    TaskResultSummary. TaskToRun is not returned.
+    TaskResultSummary. TaskToRunShard is not returned.
   """
   assert isinstance(request, task_request.TaskRequest), request
   assert not request.key, request.key
@@ -1201,7 +1203,7 @@ def schedule_request(request,
         # In this code path, there's not much to do as the task will not be run,
         # previous results are returned. We still need to store the TaskRequest
         # and TaskResultSummary.
-        # Since the task is never scheduled, TaskToRun is not stored.
+        # Since the task is never scheduled, TaskToRunShard is not stored.
         # Since the has_secret_bytes/has_build_token property is already set
         # for UI purposes, and the task itself will never be run, we skip
         # storing storing the SecretBytes/BuildToken, as they would never be
@@ -1309,9 +1311,9 @@ def schedule_request(request,
 
 
 def bot_reap_task(bot_dimensions, bot_version):
-  """Reaps a TaskToRun if one is available.
+  """Reaps a TaskToRunShard if one is available.
 
-  The process is to find a TaskToRun where its .queue_number is set, then
+  The process is to find a TaskToRunShard where its .queue_number is set, then
   create a TaskRunResult for it.
 
   Arguments:
@@ -1321,7 +1323,7 @@ def bot_reap_task(bot_dimensions, bot_version):
 
   Returns:
     tuple of (TaskRequest, SecretBytes, TaskRunResult) for the task that was
-    reaped. The TaskToRun involved is not returned.
+    reaped. The TaskToRunShard involved is not returned.
   """
   start = time.time()
   bot_id = bot_dimensions[u'id'][0]
@@ -1378,7 +1380,8 @@ def bot_reap_task(bot_dimensions, bot_version):
           failures += 1
           continue
 
-        # Expiring a TaskToRun for TaskSlice may reenqueue a new TaskToRun.
+        # Expiring a TaskToRunShard for TaskSlice may reenqueue a new
+        # TaskToRunShard.
         summary, new_to_run = _expire_task(to_run.key, request, inline=True)
         if not new_to_run:
           if summary:
@@ -1392,8 +1395,8 @@ def bot_reap_task(bot_dimensions, bot_version):
         # of the current task slice expiration. But let's handle this, just in
         # case.
         reenqueued += 1
-        # We need to do an adhoc validation to check the new TaskToRun, so see
-        # if we can harvest it too. This is slightly duplicating work in
+        # We need to do an adhoc validation to check the new TaskToRunShard,
+        # so see if we can harvest it too. This is slightly duplicating work in
         # yield_next_available_task_to_dispatch().
         slice_index = task_to_run.task_to_run_key_slice_index(new_to_run.key)
         t = request.task_slice(slice_index)
@@ -1627,9 +1630,9 @@ def cancel_task_with_id(task_id, kill_running, bot_id):
 def cancel_task(request, result_key, kill_running, bot_id):
   """Cancels a task if possible, setting it to either CANCELED or KILLED.
 
-  Ensures that the associated TaskToRun is canceled (when pending) and updates
-  the TaskResultSummary/TaskRunResult accordingly. The TaskRunResult.state is
-  immediately set to KILLED for running tasks.
+  Ensures that the associated TaskToRunShard is canceled (when pending) and
+  updates the TaskResultSummary/TaskRunResult accordingly.
+  The TaskRunResult.state is immediately set to KILLED for running tasks.
 
   Warning: ACL check must have been done before.
 
@@ -1673,7 +1676,7 @@ def cancel_task(request, result_key, kill_running, bot_id):
 
   def run():
     """1 DB GET, 1 memcache write, 2x DB PUTs, 1x task queue."""
-    # Need to get the current try number to know which TaskToRun to fetch.
+    # Need to get the current try number to know which TaskToRunShard to fetch.
     result_summary = result_key.get()
     return _cancel_task_tx(
         request, result_summary, kill_running, bot_id, now, es_cfg)
@@ -1714,7 +1717,7 @@ def cancel_tasks(limit, query, cursor=None):
 
 
 def cron_abort_expired_task_to_run():
-  """Aborts expired TaskToRun requests to execute a TaskRequest on a bot.
+  """Aborts expired TaskToRunShard requests to execute a TaskRequest on a bot.
 
   Three reasons can cause this situation:
   - Higher throughput of task requests incoming than the rate task requests
@@ -1748,13 +1751,13 @@ def cron_abort_expired_task_to_run():
       # TODO(maruel): Use (to_run.task_id, to_run.task_slice_index).
       task_to_runs.append((task_id, to_run.try_number, to_run.task_slice_index))
 
-      # Enqueue every 50 TaskToRun's.
+      # Enqueue every 50 TaskToRunShards.
       if len(task_to_runs) == 50:
         logging.debug("expire tasks: %s", task_to_runs)
         _enqueue_task(task_to_runs)
         task_to_runs = []
 
-    # Enqueue remaining TaskToRun's.
+    # Enqueue remaining TaskToRunShards.
     if task_to_runs:
       logging.debug("expire tasks: %s", task_to_runs)
       _enqueue_task(task_to_runs)
@@ -1918,21 +1921,22 @@ def task_expire_tasks(task_to_runs):
 
       to_runs = [
           r for r in task_to_run.get_task_to_runs(request, task_slice_index)
-          # task_to_run.get_task_to_runs() may include expired TaskToRuns or
-          # TaskToRuns for other silce indexes. _expire_task() will ignore them,
-          # but it's better to filter them out here.
+          # task_to_run.get_task_to_runs() may include expired TaskToRunShards
+          # or TaskToRunShards for other silce indexes. _expire_task() will
+          # ignore them, but it's better to filter them out here.
           if r.expiration_ts and r.task_slice_index == task_slice_index
       ]
       if len(to_runs) != 1:
-        # There should not be multiple TaskToRuns. But it needs to expire all
-        # of them.
-        logging.warning('Too many TaskToRuns. %s', to_runs)
+        # There should not be multiple TaskToRunShards. But it needs to expire
+        # all of them.
+        logging.warning('Too many TaskToRunShards. %s', to_runs)
 
       for to_run in to_runs:
         # execute task expiration
         summary, new_to_run = _expire_task(to_run.key, request, inline=False)
         if new_to_run:
-          # Expiring a TaskToRun for TaskSlice may reenqueue a new TaskToRun.
+          # Expiring a TaskToRunShard for TaskSlice may reenqueue a new
+          # TaskToRunShard.
           reenqueued += 1
         elif summary:
           killed.append(request)
