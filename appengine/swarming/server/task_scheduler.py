@@ -312,7 +312,9 @@ def _reap_task(bot_dimensions, bot_version, to_run_key, request,
     return None, None
 
   try:
-    run_result, secret_bytes = datastore_utils.transaction(run, retries=0)
+    run_result, secret_bytes = datastore_utils.transaction(run,
+                                                           retries=0,
+                                                           deadline=30)
   except datastore_utils.CommitError:
     # The challenge here is that the transaction may have failed because:
     # - The DB had an hickup and the TaskToRunShard, TaskRunResult and
