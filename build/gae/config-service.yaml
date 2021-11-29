@@ -1,0 +1,14 @@
+name: luci-py/config-service
+extends: base.yaml
+
+contextdir: ../../appengine/config_service
+
+sources:
+  - ../../appengine/config_service
+  - ../../appengine/components/components
+
+build:
+  - run: ['make', 'release']
+    cwd: ${contextdir}/ui
+    outputs:
+      - ${contextdir}/ui/build/default
