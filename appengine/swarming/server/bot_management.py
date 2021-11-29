@@ -136,11 +136,11 @@ class _BotCommon(ndb.Model):
   dimensions_flat = ndb.StringProperty(repeated=True)
 
   # Last time the bot pinged and this entity was updated
-  last_seen_ts = ndb.DateTimeProperty()
+  last_seen_ts = ndb.DateTimeProperty(indexed=False)
 
   # Time the bot started polling for next task.
   # None is set during running task or hooks.
-  idle_since_ts = ndb.DateTimeProperty()
+  idle_since_ts = ndb.DateTimeProperty(indexed=False)
 
   @property
   def dimensions(self):

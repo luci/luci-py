@@ -1696,16 +1696,6 @@ class TasksApiTest(BaseTest):
             u'items': [second, first_no_perf]
         }, actual)
 
-    # Sort by MODIFIED_TS.
-    request = handlers_endpoints.TasksRequest.combined_message_class(
-        sort=swarming_rpcs.TaskSort.MODIFIED_TS)
-    actual = self.call_api('list', body=message_to_dict(request)).json
-    self.assertEqual(
-        {
-            u'now': fmtdate(now_120),
-            u'items': [first_no_perf, second]
-        }, actual)
-
     # With two tags.
     request = handlers_endpoints.TasksRequest.combined_message_class(
         end=end, start=start, tags=['project:yay', 'commit:pre'])
@@ -1894,6 +1884,7 @@ class TasksApiTest(BaseTest):
         (True, TaskStateQuery.ALL, TaskSort.COMPLETED_TS),
         (True, TaskStateQuery.ALL, TaskSort.MODIFIED_TS),
         (True, TaskStateQuery.ALL, TaskSort.STARTED_TS),
+        (None, TaskStateQuery.ALL, TaskSort.MODIFIED_TS),
     ]
     _, _, now_120, start, end = self._gen_two_tasks()
     for state in TaskStateQuery:

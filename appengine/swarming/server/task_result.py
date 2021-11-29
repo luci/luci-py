@@ -493,7 +493,7 @@ class _TaskResultCommon(ndb.Model):
 
   # Time when the bot becomes available. This will be used to calculate
   # overhead.
-  bot_idle_since_ts = ndb.DateTimeProperty()
+  bot_idle_since_ts = ndb.DateTimeProperty(indexed=False)
 
   # Active server version(s). Note that during execution, the active server
   # version may have changed, this list will list all versions seen as the task
@@ -502,7 +502,7 @@ class _TaskResultCommon(ndb.Model):
 
   # This entity is updated everytime the bot sends data so it is equivalent to
   # 'last_ping'.
-  modified_ts = ndb.DateTimeProperty()
+  modified_ts = ndb.DateTimeProperty(indexed=False)
 
   # Records that the task failed, e.g. one process had a non-zero exit code. The
   # task may be retried if desired to weed out flakiness.
@@ -1395,8 +1395,7 @@ def _outputchunk_key_to_request(output_chunk_key):
 
 def _sort_property(sort):
   """Returns a datastore_query.PropertyOrder based on 'sort'."""
-  if sort not in ('created_ts', 'modified_ts', 'completed_ts', 'abandoned_ts',
-                  'started_ts'):
+  if sort not in ('created_ts', 'completed_ts', 'abandoned_ts', 'started_ts'):
     raise ValueError('Unexpected sort %r' % sort)
   if sort == 'created_ts':
     return datastore_query.PropertyOrder(

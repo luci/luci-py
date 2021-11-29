@@ -1109,7 +1109,7 @@ class TaskRequest(ndb.Model):
   #
   # When task_slices is used, this value is the same as
   # self.task_slices[-1].expiration_ts.
-  expiration_ts = ndb.DateTimeProperty(indexed=True, required=True)
+  expiration_ts = ndb.DateTimeProperty(indexed=False, required=True)
 
   ## Why and other contexts
 
