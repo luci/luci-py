@@ -174,17 +174,17 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
     req.put()
     return req
 
-  def _gen_new_task_to_run(self, nb_task, use_shard=True, **kwargs):
+  def _gen_new_task_to_run(self, nb_task, **kwargs):
     """Returns TaskRequest, TaskToRun saved in the DB."""
     request = self.mkreq(nb_task, _gen_request(**kwargs))
-    to_run = task_to_run.new_task_to_run(request, 0, use_shard)
+    to_run = task_to_run.new_task_to_run(request, 0)
     to_run.put()
     return request, to_run
 
-  def _gen_new_task_to_run_slices(self, nb_task, use_shard=True, **kwargs):
+  def _gen_new_task_to_run_slices(self, nb_task, **kwargs):
     """Returns TaskRequest, TaskToRun saved in the DB."""
     request = self.mkreq(nb_task, _gen_request_slices(**kwargs))
-    to_run = task_to_run.new_task_to_run(request, 0, use_shard)
+    to_run = task_to_run.new_task_to_run(request, 0)
     to_run.put()
     return request, to_run
 
@@ -253,7 +253,7 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
       self.assertEqual((i, '0x%016x' % expected_v), (i, '0x%016x' % actual))
       # Ensure we can extract the priority back. That said, it is corrupted by
       # time.
-      v = task_to_run.TaskToRun(queue_number=actual)
+      v = task_to_run._TaskToRunBase(queue_number=actual)
       self.assertEqual((i, expected_p),
                        (i, task_to_run._queue_number_priority(v)))
 
@@ -414,7 +414,7 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
     actual = []
     for shard in range(task_to_run.N_SHARDS):
       to_runs = task_to_run.get_shard_kind(shard).query().order(
-          task_to_run.TaskToRun.queue_number).fetch()
+          task_to_run._TaskToRunBase.queue_number).fetch()
       actual.extend(to_runs)
     self.assertEqual(expected, map(flatten, actual))
 
@@ -895,47 +895,6 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
     ]
     self.assertEqual(expected, actual)
 
-  # TODO(crbug.com/1272390): Remove after migration.
-  def test_yield_next_available_task_to_run_shard_migration(self):
-    task_dimensions1 = {u'os': [u'Linux'], u'pool': [u'default']}
-    _request1, _task1 = self._gen_new_task_to_run(
-        1,
-        properties=_gen_properties(dimensions=task_dimensions1),
-        use_shard=False)
-    task_dimensions2 = {u'os': [u'Ubuntu'], u'pool': [u'default']}
-    request2, _task2 = self._gen_new_task_to_run(
-        1,
-        properties=_gen_properties(dimensions=task_dimensions2))
-    self.assertEqual(len(task_to_run.TaskToRun.query().fetch()), 1)
-    shard = request2.task_slice(
-        0).properties.dimensions_hash % task_to_run.N_SHARDS
-    self.assertEqual(len(task_to_run.get_shard_kind(shard).query().fetch()), 1)
-    bot_dimensions = {
-        u'id': [u'bot1'],
-        u'os': [u'Linux', u'Ubuntu'],
-        u'pool': [u'default'],
-    }
-    actual = _yield_next_available_task_to_dispatch(bot_dimensions)
-    expected = [
-        {
-            'created_ts': self.now,
-            'expiration_ts': self.now + datetime.timedelta(minutes=1),
-            'expiration_delay': None,
-            'queue_number': '0x02fa03dd9f3d248e',
-            'task_slice_index': 0,
-            'try_number': 1,
-        },
-        {
-            'created_ts': self.now,
-            'expiration_ts': self.now + datetime.timedelta(minutes=1),
-            'expiration_delay': None,
-            'queue_number': '0x060d70d19f3d248e',
-            'task_slice_index': 0,
-            'try_number': 1,
-        },
-    ]
-    self.assertEqual(expected, actual)
-
   def test_yield_expired_task_to_run(self):
     # There's a cut off at 2019-09-01, so the default self.now on Jan 2nd
     # doesn't work when looking 4 weeks ago.
@@ -973,15 +932,6 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
             'expiration_secs': 60,
             'properties': _gen_properties()
         }])
-    # task_to_run_legacy: already passed the expiration time.
-    _, to_run_legacy = self._gen_new_task_to_run_slices(
-        0,
-        use_shard=False,
-        created_ts=self.now - datetime.timedelta(days=1),
-        task_slices=[{
-            'expiration_secs': 60,
-            'properties': _gen_properties()
-        }])
 
     bot_dimensions = {u'id': [u'bot1'], u'pool': [u'default']}
 
@@ -990,9 +940,9 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
 
     actual = list(task_to_run.yield_expired_task_to_run())
 
-    # Only to_run_2 and to_run_3 and to_run_legacy should be yielded.
-    # to_run_4 is too old and is ignored.
-    expected = [to_run_legacy, to_run_3, to_run_2]
+    # Only to_run_2 and to_run_3 should be yielded. to_run_4 is too old and is
+    # ignored.
+    expected = [to_run_3, to_run_2]
     self.assertEqual(expected, actual)
 
   def test_is_reapable(self):
@@ -1049,7 +999,7 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
   def test_get_shard_kind(self):
     k = task_to_run.get_shard_kind(0)
     self.assertEqual(k.__name__, 'TaskToRunShard0')
-    self.assertTrue(issubclass(k, task_to_run.TaskToRun))
+    self.assertTrue(issubclass(k, task_to_run._TaskToRunBase))
 
     # The next call should return the cached kind.
     self.assertEqual(k, task_to_run.get_shard_kind(0))
@@ -1061,11 +1011,9 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
     request = self.mkreq(1, _gen_request())
     to_run = task_to_run.new_task_to_run(request, 0)
     to_run.put()
-    to_run_legacy = task_to_run.new_task_to_run(request, 0, use_shard=False)
-    to_run_legacy.put()
 
-    actual = task_to_run.get_task_to_runs(request, to_run.task_slice_index)
-    expected = [to_run, to_run_legacy]
+    actual = task_to_run.get_task_to_runs(request, 0)
+    expected = [to_run]
     self.assertEqual(expected, actual)
 
 

@@ -49,18 +49,19 @@ def _gen_task_result_summary(now, key_id, properties=None, **kwargs):
 
 
 def _get_task_to_run(now, request_key_id, slice_index, **kwargs):
-  """Creates a TaskToRun."""
+  """Creates a TaskToRunShard."""
   request_key = ndb.Key('TaskRequest', request_key_id)
   try_number = 1
-  to_run_key = ndb.Key(
-      'TaskToRun', try_number | (slice_index << 4), parent=request_key)
+  to_run_key = ndb.Key('TaskToRunShard0',
+                       try_number | (slice_index << 4),
+                       parent=request_key)
   args = {
       'key': to_run_key,
       'created_ts': now,
       'queue_number': None,
   }
   args.update(kwargs)
-  return task_to_run.TaskToRun(**args)
+  return task_to_run.get_shard_kind(0)(**args)
 
 
 def _gen_bot_info(key_id, last_seen_ts, **kwargs):

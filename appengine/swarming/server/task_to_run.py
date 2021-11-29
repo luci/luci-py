@@ -23,10 +23,10 @@ Graph of the schema:
         |
         |
         v
-    +--------------+     +--------------+
-    |TaskToRun     | ... |TaskToRun     |
-    |id=<composite>| ... |id=<composite>|
-    +--------------+     +--------------+
+    +---------------+     +---------------+
+    |TaskToRunShardX| ... |TaskToRunShardX|
+    |id=<composite> | ... |id=<composite> |
+    +---------------+     +---------------+
 """
 
 import collections
@@ -52,7 +52,7 @@ from server import task_request
 N_SHARDS = 16  # the number of TaskToRunShards
 
 
-class TaskToRun(ndb.Model):
+class _TaskToRunBase(ndb.Model):
   """Defines a TaskRequest ready to be scheduled on a bot.
 
   This specific request for a specific task can be executed multiple times,
@@ -69,6 +69,10 @@ class TaskToRun(ndb.Model):
   - lower 4 bits is the try number. The only supported values are 1 and 2.
   - next 5 bits are TaskResultSummary.current_task_slice (shifted by 4 bits).
   - rest is 0.
+
+  This is a base class of TaskToRunShard, and get_shard_kind() should be used
+  to get a TaskToRunShard kind. The shard number is derived determistically by
+  calculating dimensions hash % N_SHARDS.
   """
   # This entity is used in transactions. It is not worth using either cache.
   # https://cloud.google.com/appengine/docs/standard/python/ndb/cache
@@ -143,7 +147,7 @@ class TaskToRun(ndb.Model):
 
   def to_dict(self):
     """Purely used for unit testing."""
-    out = super(TaskToRun, self).to_dict()
+    out = super(_TaskToRunBase, self).to_dict()
     # Consistent formatting makes it easier to reason about.
     if out['queue_number']:
       out['queue_number'] = '0x%016x' % out['queue_number']
@@ -152,7 +156,7 @@ class TaskToRun(ndb.Model):
     return out
 
   def _pre_put_hook(self):
-    super(TaskToRun, self)._pre_put_hook()
+    super(_TaskToRunBase, self)._pre_put_hook()
 
     if self.expiration_ts is None and self.queue_number:
       raise datastore_errors.BadValueError(
@@ -171,7 +175,7 @@ def get_shard_kind(shard):
   # check cached kind.
   if kind in _TaskToRunShards:
     return _TaskToRunShards[kind]
-  _TaskToRunShards[kind] = type(kind, (TaskToRun, ), {})
+  _TaskToRunShards[kind] = type(kind, (_TaskToRunBase, ), {})
   return _TaskToRunShards[kind]
 
 
@@ -361,7 +365,6 @@ def _yield_pages_async(q, size):
 
 def _get_task_to_run_query(dimensions_hash):
   """Returns a ndb.Query of TaskToRunShard within this dimensions_hash queue.
-     During migration, it returns two queries TaskToRun and TaskToRunShard.
   """
   # dimensions_hash should be 32 bits but on AppEngine, which is using 32 bits
   # python, it is silently upgraded to long.
@@ -375,11 +378,7 @@ def _get_task_to_run_query(dimensions_hash):
             kind.queue_number >= (dimensions_hash << 31),
             kind.queue_number < ((dimensions_hash + 1) << 31))
 
-  # TODO(crbug.com/1272390): Remove TaskToRun after migration.
-  return [
-      _query(k)
-      for k in [get_shard_kind(dimensions_hash % N_SHARDS), TaskToRun]
-  ]
+  return [_query(get_shard_kind(dimensions_hash % N_SHARDS))]
 
 
 def _yield_potential_tasks(bot_id):
@@ -505,21 +504,18 @@ def _yield_potential_tasks(bot_id):
 ### Public API.
 
 
-def request_to_task_to_run_key(request,
-                               try_number,
-                               task_slice_index,
-                               use_shard=True):
+def request_to_task_to_run_key(request, try_number, task_slice_index):
   """Returns the ndb.Key for a TaskToRun from a TaskRequest."""
   assert 1 <= try_number <= 2, try_number
   assert 0 <= task_slice_index < request.num_task_slices
   h = request.task_slice(task_slice_index).properties.dimensions_hash
-  kind = get_shard_kind(h % N_SHARDS) if use_shard else TaskToRun
+  kind = get_shard_kind(h % N_SHARDS)
   return ndb.Key(kind, try_number | (task_slice_index << 4), parent=request.key)
 
 
 def task_to_run_key_to_request_key(to_run_key):
   """Returns the ndb.Key for a TaskToRun from a TaskRequest key."""
-  assert to_run_key.kind().startswith('TaskToRun'), to_run_key
+  assert to_run_key.kind().startswith('TaskToRunShard'), to_run_key
   return to_run_key.parent()
 
 
@@ -535,7 +531,7 @@ def task_to_run_key_try_number(to_run_key):
   return to_run_key.integer_id() & 15
 
 
-def new_task_to_run(request, task_slice_index, use_shard=True):
+def new_task_to_run(request, task_slice_index):
   """Returns a fresh new TaskToRun for the task ready to be scheduled.
 
   Returns:
@@ -553,11 +549,8 @@ def new_task_to_run(request, task_slice_index, use_shard=True):
   exp = request.created_ts + datetime.timedelta(seconds=offset)
   h = request.task_slice(task_slice_index).properties.dimensions_hash
   qn = _gen_queue_number(h, request.created_ts, request.priority)
-  kind = get_shard_kind(h % N_SHARDS) if use_shard else TaskToRun
-  key = request_to_task_to_run_key(request,
-                                   1,
-                                   task_slice_index,
-                                   use_shard=use_shard)
+  kind = get_shard_kind(h % N_SHARDS)
+  key = request_to_task_to_run_key(request, 1, task_slice_index)
   return kind(key=key, created_ts=created, queue_number=qn, expiration_ts=exp)
 
 
@@ -695,11 +688,6 @@ def yield_expired_task_to_run():
 
   total = 0
   try:
-    # TODO(crbug.com/1272390): remove after migration.
-    for task in _query(TaskToRun):
-      yield task
-      total += 1
-
     for shard in range(N_SHARDS):
       for task in _query(get_shard_kind(shard)):
         yield task
@@ -709,7 +697,7 @@ def yield_expired_task_to_run():
 
 
 def get_task_to_runs(request, slice_until):
-  """Get TaskToRun and/or TaskToRunShard entities by TaskRequest"""
+  """Get TaskToRunShard entities by TaskRequest"""
   shards = set()
   for slice_index in range(slice_until + 1):
     if len(request.task_slices) <= slice_index:
@@ -722,6 +710,4 @@ def get_task_to_runs(request, slice_until):
     runs = get_shard_kind(shard).query(ancestor=request.key).fetch()
     to_runs.extend(runs)
 
-  # TODO(crbug.com/1272390): remove after migration.
-  to_runs.extend(TaskToRun.query(ancestor=request.key).fetch())
   return to_runs
