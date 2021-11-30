@@ -1,5 +1,5 @@
 name: luci-py/swarming
-extends: base.yaml
+extends: ../gae.yaml
 
 contextdir: ../../appengine/swarming
 

@@ -1,5 +1,5 @@
 name: luci-py/auth-service
-extends: base.yaml
+extends: ../gae.yaml
 
 contextdir: ../../appengine/auth_service
 
