@@ -4,8 +4,8 @@ extends: ../gae.yaml
 contextdir: ../../appengine/swarming
 
 sources:
-  - ../../luci/DEPS
-  - ../../luci/appengine/components/components
-  - ../../luci/appengine/swarming
-  - ../../luci/appengine/third_party
-  - ../../luci/client
+  - ../../DEPS
+  - ../../appengine/components/components
+  - ../../appengine/swarming
+  - ../../appengine/third_party
+  - ../../client
