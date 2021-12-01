@@ -9,6 +9,10 @@
 // for bot state. Swarming has the limitation of not supporting children
 // devices: as a single bot is a single execution unit, unlike RBE.
 
+// TODO(crbug/1236848): Everything in the bb/ directory is temporary and
+// should be removed and replaced in swarming code by the protos
+// in proto/bb_backend once the design on the buildbucket side is stable.
+
 syntax = "proto3";
 
 package swarming.backend;
