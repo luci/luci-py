@@ -39,6 +39,7 @@ from server import bot_groups_config
 from server import bot_management
 from server import external_scheduler
 from server import pools_config
+from server import realms
 from server import service_accounts
 from server import task_pack
 from server import task_queues
@@ -1832,9 +1833,12 @@ class BotApiTest(test_env_handlers.AppTestBase):
       self.assertEqual(expected_audience, audience)
       return 'blah@example.com', service_accounts.AccessToken('blah', 126240504)
 
+    self.mock(service_accounts, 'has_token_server', lambda: True)
     self.mock(service_accounts, 'get_task_account_token', mocked)
-    self.mock_task_service_accounts()
     self.mock_default_pool_acl(['blah@example.com'])
+    self.mock(realms, 'check_tasks_create_in_realm', lambda *_: True)
+    self.mock(realms, 'check_pools_create_task', lambda *_: True)
+    self.mock(realms, 'check_tasks_act_as', lambda *_: True)
 
     self.set_as_bot()
     resp = self.bot_poll()
@@ -1842,7 +1846,8 @@ class BotApiTest(test_env_handlers.AppTestBase):
     # Create a task.
     self.set_as_user()
     _, task_summary_id = self.client_create_task_raw(
-        service_account='blah@example.com')
+        service_account='blah@example.com',
+        realm='test:task_realm')
     self.assertEqual('0', task_summary_id[-1])
     # Convert TaskResultSummary reference to TaskRunResult.
     task_id = task_summary_id[:-1] + '1'

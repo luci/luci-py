@@ -132,23 +132,18 @@ class TestProcessTaskRequest(test_case.TestCase):
     tr = self.basic_task_request()
     tr.service_account = 'service-account@example.com'
 
-    expected_tr = self.basic_task_request()
-    expected_tr.service_account = 'service-account@example.com'
-    task_request.init_new_request(expected_tr,
+    task_request.init_new_request(tr,
                                   acl.can_schedule_high_priority_tasks(),
                                   task_request.TEMPLATE_AUTO)
-    expected_tr.realms_enabled = False
-    expected_tr.service_account_token = 'tok'
 
     self.mock(realms, 'check_tasks_create_in_realm', lambda *_: False)
     self.mock(realms, 'check_pools_create_task', lambda *_: True)
-    self.mock(realms, 'check_tasks_act_as', lambda *_: True)
     self.mock(service_accounts, 'has_token_server', lambda: True)
-    self.mock(service_accounts, 'get_oauth_token_grant', lambda **_: 'tok')
 
-    api_helpers.process_task_request(tr, task_request.TEMPLATE_AUTO)
-
-    self.assertEqual(expected_tr, tr)
+    with self.assertRaises(handlers_exceptions.BadRequestException) as exc:
+      api_helpers.process_task_request(tr, task_request.TEMPLATE_AUTO)
+    self.assertIn(
+        'only if the task is associated with a realm', exc.exception.message)
 
   def mock_pool_config(self, name):
 

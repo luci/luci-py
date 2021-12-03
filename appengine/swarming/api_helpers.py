@@ -94,31 +94,16 @@ def process_task_request(tr, template_apply):
       raise handlers_exceptions.BadRequestException(
           'This Swarming server doesn\'t support task service accounts '
           'because Token Server URL is not configured')
+
+    # Service accounts are supported only in realms mode.
+    if not tr.realms_enabled:
+      raise handlers_exceptions.BadRequestException(
+          'Task service accounts are supported only if the task is associated '
+          'with a realm')
+
     # Realm permission 'swarming.tasks.actAs' checks if the service account is
     # allowed to run in the task realm.
     realms.check_tasks_act_as(tr, pool_cfg, enforce_realms_acl)
-
-    # If using legacy ACLs for service accounts, use the legacy mechanism to
-    # mint oauth token as well. Note that this path will be deprecated after
-    # migration to MintServiceAccountToken rpc which accepts realm.
-    # It contacts the token server to generate "OAuth token grant" (or grab a
-    # cached one). By doing this we check that the given service account usage
-    # is allowed by the token server rules at the time the task is posted.
-    # This check is also performed later (when running the task), when we get
-    # the actual OAuth access token.
-    if not tr.realms_enabled:
-      max_lifetime_secs = tr.max_lifetime_secs
-      try:
-        duration = datetime.timedelta(seconds=max_lifetime_secs)
-        tr.service_account_token = (
-            service_accounts.get_oauth_token_grant(
-                service_account=tr.service_account, validity_duration=duration))
-      except service_accounts.PermissionError as e:
-        raise handlers_exceptions.PermissionException(e.message)
-      except service_accounts.MisconfigurationError as e:
-        raise handlers_exceptions.BadRequestException(e.message)
-      except service_accounts.InternalError as e:
-        raise handlers_exceptions.InternalException(e.message)
 
 
 def cache_request(namespace, request_uuid, func):

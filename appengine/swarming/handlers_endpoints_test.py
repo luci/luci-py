@@ -364,11 +364,16 @@ class TasksApiTest(BaseTest):
     super(TasksApiTest, self).setUp()
     utils.clear_cache(config.settings)
     self.mock_default_pool_acl(['service-account@example.com'])
+    self.mock(service_accounts, 'has_token_server', lambda: True)
 
   def test_new_ok_raw(self):
     """Asserts that new generates appropriate metadata."""
-    oauth_grant_calls = self.mock_task_service_accounts()
     self.mock(random, 'getrandbits', lambda _: 0x88)
+
+    self.mock_auth_db([
+        auth.Permission('swarming.pools.createTask'),
+        auth.Permission('swarming.tasks.createInRealm'),
+    ])
 
     request = self.create_new_request(
         expiration_secs=30,
@@ -380,6 +385,7 @@ class TasksApiTest(BaseTest):
         pubsub_auth_token='secret that must not be shown',
         pubsub_userdata='userdata',
         service_account='service-account@example.com',
+        realm='test:task_realm',
     )
     expected_props = self.gen_props(
         command=[u'rm', u'-rf', u'/'],
@@ -396,13 +402,15 @@ class TasksApiTest(BaseTest):
                 pubsub_userdata=u'userdata',
                 tags=[
                     u'a:tag', u'authenticated:user:user@example.com',
-                    u'os:Amiga', u'pool:default', u'priority:20', u'realm:none',
+                    u'os:Amiga', u'pool:default', u'priority:20',
+                    u'realm:test:task_realm',
                     u'service_account:service-account@example.com',
                     u'swarming.pool.template:none',
                     u'swarming.pool.version:pools_cfg_rev',
                     u'user:joe@localhost'
                 ],
                 service_account=u'service-account@example.com',
+                realm=u'test:task_realm',
                 task_slices=[
                     {
                         u'expiration_secs': u'30',
@@ -439,7 +447,7 @@ class TasksApiTest(BaseTest):
             u'os:Amiga',
             u'pool:default',
             u'priority:20',
-            u'realm:none',
+            u'realm:test:task_realm',
             u'service_account:service-account@example.com',
             u'swarming.pool.template:none',
             u'swarming.pool.version:pools_cfg_rev',
@@ -452,12 +460,6 @@ class TasksApiTest(BaseTest):
     # Time advanced since the evaluate_only call.
     expected['request']['created_ts'] = fmtdate(self.now)
     self.assertEqual(expected, response.json)
-
-    # Asked for a correct grant(s), since both evaluate and non-evaluate modes
-    # do auth check.
-    self.assertEqual([
-        (u'service-account@example.com', datetime.timedelta(0, 30 + 30 + 15))
-    ] * 2, oauth_grant_calls)
 
   def test_new_ok_template(self):
     """Asserts that new generates appropriate metadata for a templated task."""
@@ -621,7 +623,6 @@ class TasksApiTest(BaseTest):
                      response.json[u'request'][u'properties'][u'cipd_input'])
 
   def test_new_bad_service_account(self):
-    oauth_grant_calls = self.mock_task_service_accounts()
     request = self.create_new_request(
         properties=self.create_props(command=['rm', '-rf', '/']),
         service_account='bad email')
@@ -633,20 +634,6 @@ class TasksApiTest(BaseTest):
                             '"none" string, got u\'bad email\''
             },
         }, response.json)
-    self.assertFalse(oauth_grant_calls)
-
-  def test_new_forbidden_service_account(self):
-    self.mock_task_service_accounts(
-        exc=auth.AuthorizationError('forbidden account'))
-    request = self.create_new_request(
-        properties=self.create_props(command=['rm', '-rf', '/']),
-        service_account='service-account@example.com')
-    response = self.call_api('new', body=message_to_dict(request), status=403)
-    self.assertEqual({
-        u'error': {
-            u'message': u'forbidden account'
-        },
-    }, response.json)
 
   def test_new_ok_deduped(self):
     """Asserts that new returns task result for deduped."""
@@ -1163,8 +1150,12 @@ class TasksApiTest(BaseTest):
 
   def test_new_idempotent(self):
     """Asserts that new generates appropriate metadata."""
-    self.mock_task_service_accounts()
     self.mock(random, 'getrandbits', lambda _: 0x88)
+
+    self.mock_auth_db([
+        auth.Permission('swarming.pools.createTask'),
+        auth.Permission('swarming.tasks.createInRealm'),
+    ])
 
     request = self.create_new_request(
         expiration_secs=30,
@@ -1176,6 +1167,7 @@ class TasksApiTest(BaseTest):
         pubsub_auth_token='secret that must not be shown',
         pubsub_userdata='userdata',
         service_account='service-account@example.com',
+        realm='test:task_realm',
         request_uuid=u'cf60878f-8f2a-4f1e-b1f5-8b5ec88813a9')
     expected_props = self.gen_props(
         command=[u'rm', u'-rf', u'/'],
@@ -1196,13 +1188,14 @@ class TasksApiTest(BaseTest):
                     u'os:Amiga',
                     u'pool:default',
                     u'priority:20',
-                    u'realm:none',
+                    u'realm:test:task_realm',
                     u'service_account:service-account@example.com',
                     u'swarming.pool.template:none',
                     u'swarming.pool.version:pools_cfg_rev',
                     u'user:joe@localhost',
                 ],
                 service_account=u'service-account@example.com',
+                realm=u'test:task_realm',
                 task_slices=[
                     {
                         u'expiration_secs': u'30',
@@ -1239,7 +1232,7 @@ class TasksApiTest(BaseTest):
             u'os:Amiga',
             u'pool:default',
             u'priority:20',
-            u'realm:none',
+            u'realm:test:task_realm',
             u'service_account:service-account@example.com',
             u'swarming.pool.template:none',
             u'swarming.pool.version:pools_cfg_rev',
@@ -1341,7 +1334,6 @@ class TasksApiTest(BaseTest):
 
     self.mock(task_scheduler, 'check_schedule_request_acl_caller', err)
     self.mock(task_scheduler, 'check_schedule_request_acl_service_account', err)
-    self.mock(service_accounts, 'get_oauth_token_grant', err)
 
   def test_new_ok_in_realms_mode(self):
     self.mock(random, 'getrandbits', lambda _: 0x88)
@@ -1376,22 +1368,17 @@ class TasksApiTest(BaseTest):
     self.assertEqual('test:task_realm', req.realm)
     # Correctly initialized the service account state.
     self.assertEqual('service-account@example.com', req.service_account)
-    self.assertFalse(req.service_account_token)
 
   def test_new_ok_with_default_task_realm_not_enforced(self):
     self.mock(random, 'getrandbits', lambda _: 0x88)
-    self.mock(service_accounts, 'has_token_server', lambda: True)
     self.mock_default_pool_acl(
-        service_accounts=['service-account@example.com'],
+        service_accounts=[],
         default_task_realm='test:task_realm',
         enforced_realm_permissions=None)
 
     # Realm ACLs should be ignored. Note that they are still called to record
     # dry run check results.
     self.mock(auth, 'has_permission', lambda *_args, **_kwargs: False)
-
-    # Uses legacy service account calls.
-    self.mock(service_accounts, 'get_oauth_token_grant', lambda **_: 'tok')
 
     request = self.create_new_request(
         properties={
@@ -1401,8 +1388,7 @@ class TasksApiTest(BaseTest):
                 u'value': u'default'
             }],
             u'execution_timeout_secs': 30,
-        },
-        service_account='service-account@example.com')
+        })
     response = self.call_api('new', body=message_to_dict(request), status=200)
     self.assertEqual(u'5cee488008810', response.json[u'task_id'])
 
@@ -1412,9 +1398,6 @@ class TasksApiTest(BaseTest):
 
     # Make sure associated the task with the correct realm.
     self.assertEqual('test:task_realm', req.realm)
-    # Uses legacy service account token.
-    self.assertEqual('service-account@example.com', req.service_account)
-    self.assertEqual('tok', req.service_account_token)
 
   def test_new_ok_with_default_task_realm_enforced(self):
     self.mock(random, 'getrandbits', lambda _: 0x88)
@@ -1457,7 +1440,6 @@ class TasksApiTest(BaseTest):
     self.assertEqual('test:task_realm', req.realm)
     # Correctly initialized the service account state.
     self.assertEqual('service-account@example.com', req.service_account)
-    self.assertFalse(req.service_account_token)
 
   def test_new_invalid_realm(self):
     request = self.create_new_request(
@@ -2017,6 +1999,7 @@ class TaskApiTest(BaseTest):
     self.tasks_api = test_case.Endpoints(
         handlers_endpoints.SwarmingTasksService)
     self.mock_default_pool_acl([])
+    self.mock(service_accounts, 'has_token_server', lambda: True)
 
   def test_cancel_pending(self):
     """Asserts that task cancellation goes smoothly."""
@@ -2437,11 +2420,9 @@ class TaskApiTest(BaseTest):
     """Asserts that 404 is raised for unknown tasks."""
     self.call_api('request', body={'task_id': '12310'}, status=404)
 
-  @parameterized.expand(['', 'test:task_realm'])
-  def test_request_ok(self, realm):
+  def test_request_ok(self):
     """Asserts that request produces a task request."""
     self.mock(random, 'getrandbits', lambda _: 0x88)
-    self.mock_task_service_accounts()
     self.mock_default_pool_acl(['service-account@example.com'])
     self.mock_auth_db([
         auth.Permission('swarming.pools.createTask'),
@@ -2451,7 +2432,7 @@ class TaskApiTest(BaseTest):
     _, task_id = self.client_create_task_raw(
         properties={'secret_bytes': 'zekret'},
         service_account='service-account@example.com',
-        realm=realm if realm else None)
+        realm='test:task_realm')
 
     expected_props = self.gen_props(
         command=[u'python', u'run_test.py'],
@@ -2460,13 +2441,14 @@ class TaskApiTest(BaseTest):
         created_ts=fmtdate(self.now),
         properties=expected_props,
         service_account=u'service-account@example.com',
+        realm=u'test:task_realm',
         tags=[
             u'a:tag',
             u'authenticated:user:user@example.com',
             u'os:Amiga',
             u'pool:default',
             u'priority:20',
-            u'realm:%s' % (realm if realm else 'none'),
+            u'realm:test:task_realm',
             u'service_account:service-account@example.com',
             u'swarming.pool.template:none',
             u'swarming.pool.version:pools_cfg_rev',
@@ -2479,8 +2461,6 @@ class TaskApiTest(BaseTest):
                 u'wait_for_capacity': False,
             },
         ])
-    if realm:
-      expected['realm'] = realm
     response = self.call_api('request', body={'task_id': task_id})
     self.assertEqual(expected, response.json)
 
