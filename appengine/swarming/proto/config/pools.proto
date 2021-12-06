@@ -441,7 +441,7 @@ message ExternalSchedulerConfig {
 
 message ExternalServices {
   // (deprecated) isolate field is not used.
-  reserve 1;
+  reserved 1;
 
   message CIPD {
     reserved 2; // Used to be "client_version", no longer used.
