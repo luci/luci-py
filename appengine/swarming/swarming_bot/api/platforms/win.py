@@ -144,7 +144,14 @@ def _get_os_numbers():
     # crash.
     logging.error('Failed to run cmd.exe /c ver:\n%s', out)
     return '0.0', '0'
-  return match.group(1), match.group(2)
+
+  os_version = match.group(1)
+  build_number = match.group(2)
+  major_build_number = build_number.split('.')[0]
+  if os_version == '10.0' and int(major_build_number) >= 22000:
+    os_version = '11.0'
+
+  return os_version, build_number
 
 
 def _is_topmost_window(hwnd):
@@ -213,13 +220,7 @@ def get_os_version_number():
       and Windows 11 with 10.0.
   """
 
-  os_numbers = _get_os_numbers()
-  major_version = os_numbers[0]
-  build = os_numbers[1].split('.')[0]
-  if int(build) >= 22000:
-    major_version = '11.0'
-
-  return major_version
+  return _get_os_numbers()[0]
 
 
 @tools.cached
@@ -259,7 +260,7 @@ def get_os_version_names():
   lookup = _WIN32_SERVER_NAMES if is_server else _WIN32_CLIENT_NAMES
   version_number, build_number = _get_os_numbers()
   marketing_name = lookup.get(version_number, version_number)
-  if version_number == u'10.0':
+  if version_number in (u'10.0', u'11.0'):
     rv = [marketing_name]
     # Windows 10 doesn't have service packs, the build number now is the
     # reference number. More discussion in
