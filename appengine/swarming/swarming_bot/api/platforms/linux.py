@@ -17,7 +17,6 @@ import shlex
 import subprocess
 
 import distro
-import six
 
 from utils import tools
 
@@ -91,9 +90,9 @@ def _lspci():
 @tools.cached
 def _get_nvidia_version():
   try:
-    with open('/sys/module/nvidia/version', 'rb') as f:
+    with open('/sys/module/nvidia/version') as f:
       # Looks like '367.27'.
-      return six.ensure_text(f.read().strip())
+      return f.read().strip()
   except (IOError, OSError):
     return None
 
@@ -146,10 +145,10 @@ def get_os_version_number():
   if distro.id() == 'debian':
     # distro doesn't show minor version for debian.
     with open('/etc/debian_version') as f:
-      return six.text_type(f.read().strip())
+      return f.read().strip()
   # On Ubuntu it will return a string like '12.04'. On Raspbian, it will look
   # like '7.6'.
-  return six.text_type(distro.version(best=True))
+  return distro.version(best=True)
 
 
 def get_temperatures():
@@ -181,7 +180,7 @@ def get_audio():
     return None
   # Join columns 'Vendor' and 'Device'. 'man lspci' for more details.
   return [
-    u': '.join(l[2:4]) for l in pci_devices if l[1] == 'Audio device [0403]'
+      ': '.join(l[2:4]) for l in pci_devices if l[1] == 'Audio device [0403]'
   ]
 
 
@@ -189,54 +188,54 @@ def get_audio():
 def get_cpuinfo():
   values = common._safe_parse(_read_cpuinfo())
   cpu_info = {}
-  if u'vendor_id' in values:
+  if 'vendor_id' in values:
     # Intel.
-    cpu_info[u'flags'] = values[u'flags']
-    cpu_info[u'model'] = [
-        int(values[u'cpu family']),
-        int(values[u'model']),
-        int(values[u'stepping']),
-        int(values[u'microcode'], 0),
+    cpu_info['flags'] = values['flags']
+    cpu_info['model'] = [
+        int(values['cpu family']),
+        int(values['model']),
+        int(values['stepping']),
+        int(values['microcode'], 0),
     ]
-    cpu_info[u'name'] = values[u'model name']
-    cpu_info[u'vendor'] = values[u'vendor_id']
-  elif u'mips' in values.get('isa', ''):
+    cpu_info['name'] = values['model name']
+    cpu_info['vendor'] = values['vendor_id']
+  elif 'mips' in values.get('isa', ''):
     # MIPS.
-    cpu_info[u'flags'] = values[u'isa']
-    cpu_info[u'name'] = values[u'cpu model']
+    cpu_info['flags'] = values['isa']
+    cpu_info['name'] = values['cpu model']
   else:
     # CPU implementer == 0x41 means ARM.
-    cpu_info[u'flags'] = values[u'Features']
-    cpu_info[u'model'] = (
-        int(values[u'CPU variant'], 0),
-        int(values[u'CPU part'], 0),
-        int(values[u'CPU revision']),
+    cpu_info['flags'] = values['Features']
+    cpu_info['model'] = (
+        int(values['CPU variant'], 0),
+        int(values['CPU part'], 0),
+        int(values['CPU revision']),
     )
     # ARM CPUs have a serial number embedded. Intel did try on the Pentium III
     # but gave up after backlash;
     # http://www.wired.com/1999/01/intel-on-privacy-whoops/
     # http://www.theregister.co.uk/2000/05/04/intel_processor_serial_number_q/
     # It is very ironic that ARM based manufacturers are getting away with.
-    if u'Serial' in values:
-      cpu_info[u'serial'] = values[u'Serial'].lstrip(u'0')
-    if u'Revision' in values:
-      cpu_info[u'revision'] = values[u'Revision']
+    if 'Serial' in values:
+      cpu_info['serial'] = values['Serial'].lstrip('0')
+    if 'Revision' in values:
+      cpu_info['revision'] = values['Revision']
 
     # 'Hardware' field has better content so use it instead of 'model name' /
     # 'Processor' field.
-    if u'Hardware' in values:
-      cpu_info[u'name'] = values[u'Hardware']
+    if 'Hardware' in values:
+      cpu_info['name'] = values['Hardware']
       # Samsung felt this was useful information. Strip that.
       suffix = ' (Flattened Device Tree)'
-      if cpu_info[u'name'].endswith(suffix):
-        cpu_info[u'name'] = cpu_info[u'name'][:-len(suffix)]
+      if cpu_info['name'].endswith(suffix):
+        cpu_info['name'] = cpu_info['name'][:-len(suffix)]
     # SAMSUNG EXYNOS5 uses 'Processor' instead of 'model name' as the key for
     # its name <insert exasperation meme here>.
-    cpu_info[u'vendor'] = (
-        values.get(u'model name') or values.get(u'Processor') or u'N/A')
+    cpu_info['vendor'] = (values.get('model name') or values.get('Processor')
+                          or 'N/A')
 
   # http://unix.stackexchange.com/questions/43539/what-do-the-flags-in-proc-cpuinfo-mean
-  cpu_info[u'flags'] = sorted(i for i in cpu_info[u'flags'].split())
+  cpu_info['flags'] = sorted(i for i in cpu_info['flags'].split())
   return cpu_info
 
 
@@ -273,20 +272,20 @@ def get_gpu():
     dev_id = device.group(2)
 
     # TODO(maruel): Implement for AMD once needed.
-    version = u''
+    version = ''
     if ven_id == gpu.NVIDIA:
       version = _get_nvidia_version()
     elif ven_id == gpu.INTEL:
       version = _get_intel_version()
     ven_name, dev_name = gpu.ids_to_names(ven_id, ven_name, dev_id, dev_name)
 
-    dimensions.add(six.text_type(ven_id))
-    dimensions.add(u'%s:%s' % (ven_id, dev_id))
+    dimensions.add(ven_id)
+    dimensions.add('%s:%s' % (ven_id, dev_id))
     if version:
-      dimensions.add(u'%s:%s-%s' % (ven_id, dev_id, version))
-      state.add(u'%s %s %s' % (ven_name, dev_name, version))
+      dimensions.add('%s:%s-%s' % (ven_id, dev_id, version))
+      state.add('%s %s %s' % (ven_name, dev_name, version))
     else:
-      state.add(u'%s %s' % (ven_name, dev_name))
+      state.add('%s %s' % (ven_name, dev_name))
   return sorted(dimensions), sorted(state)
 
 
@@ -315,13 +314,13 @@ def get_reboot_required():
 def get_ssd():
   """Returns a list of SSD disks."""
   try:
-    out = subprocess.check_output(['lsblk', '-d', '-o',
-                                   'name,rota']).splitlines()
+    out = subprocess.check_output(['lsblk', '-d', '-o', 'name,rota'],
+                                  text=True).splitlines()
     ssd = []
     for line in out:
-      match = re.match(br'(\w+)\s+(0|1)', line)
-      if match and match.group(2) == b'0':
-        ssd.append(six.ensure_text(match.group(1)))
+      match = re.match(r'(\w+)\s+(0|1)', line)
+      if match and match.group(2) == '0':
+        ssd.append(match.group(1))
     return tuple(sorted(ssd))
   except (OSError, subprocess.CalledProcessError) as e:
     logging.error('Failed to read disk info: %s', e)
@@ -343,15 +342,15 @@ def get_inside_docker():
 
   Returns:
     - None if not run in docker.
-    - u'stock' if running in standard docker.
-    - u'nvidia' if running in nvidia-docker.
+    - 'stock' if running in standard docker.
+    - 'nvidia' if running in nvidia-docker.
   """
-  if u':/k8s.io' in _read_cgroup():
-    return u'stock'
+  if ':/k8s.io' in _read_cgroup():
+    return 'stock'
   if not os.path.isfile('/.docker_env') and not os.path.isfile('/.dockerenv'):
     return None
   # TODO(maruel): Detect nvidia-docker.
-  return u'stock'
+  return 'stock'
 
 
 @tools.cached
@@ -386,8 +385,8 @@ def get_cpu_scaling_governor(cpu_num):
   ]
   for p in files:
     try:
-      with open(p, 'rb') as f:
-        return [six.ensure_text(f.read().strip())]
+      with open(p) as f:
+        return [f.read().strip()]
     except IOError:
       continue
   return None

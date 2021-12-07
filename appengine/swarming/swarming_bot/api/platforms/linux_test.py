@@ -10,7 +10,6 @@ import textwrap
 import unittest
 
 import mock
-import six
 
 import test_env_platforms
 test_env_platforms.setup_test_env()
@@ -121,56 +120,59 @@ class TestCPUInfo(auto_stub.TestCase):
     return linux.get_cpuinfo()
 
   def test_get_cpuinfo_exynos(self):
-    self.assertEqual({
-        u'flags': [
-            u'edsp',
-            u'fastmult',
-            u'half',
-            u'idiva',
-            u'idivt',
-            u'neon',
-            u'swp',
-            u'thumb',
-            u'thumbee',
-            u'tls',
-            u'vfp',
-            u'vfpv3',
-            u'vfpv4',
-        ],
-        u'model': (0, 3087, 4),
-        u'name':
-            u'SAMSUNG EXYNOS5',
-        u'revision':
-            u'0000',
-        u'serial':
-            u'',
-        u'vendor':
-            u'ARMv7 Processor rev 4 (v7l)',
-    }, self.get_cpuinfo(EXYNOS_CPU_INFO))
+    self.assertEqual(
+        {
+            'flags': [
+                'edsp',
+                'fastmult',
+                'half',
+                'idiva',
+                'idivt',
+                'neon',
+                'swp',
+                'thumb',
+                'thumbee',
+                'tls',
+                'vfp',
+                'vfpv3',
+                'vfpv4',
+            ],
+            'model': (0, 3087, 4),
+            'name':
+            'SAMSUNG EXYNOS5',
+            'revision':
+            '0000',
+            'serial':
+            '',
+            'vendor':
+            'ARMv7 Processor rev 4 (v7l)',
+        }, self.get_cpuinfo(EXYNOS_CPU_INFO))
 
   def test_get_cpuinfo_cavium(self):
-    self.assertEqual({
-        u'flags': [
-            u'aes',
-            u'asimd',
-            u'atomics',
-            u'crc32',
-            u'evtstrm',
-            u'fp',
-            u'pmull',
-            u'sha1',
-            u'sha2',
-        ],
-        u'model': (1, 161, 1),
-        u'vendor':
-            u'N/A',
-    }, self.get_cpuinfo(CAVIUM_CPU_INFO))
+    self.assertEqual(
+        {
+            'flags': [
+                'aes',
+                'asimd',
+                'atomics',
+                'crc32',
+                'evtstrm',
+                'fp',
+                'pmull',
+                'sha1',
+                'sha2',
+            ],
+            'model': (1, 161, 1),
+            'vendor':
+            'N/A',
+        }, self.get_cpuinfo(CAVIUM_CPU_INFO))
 
   def test_get_cpuinfo_mips(self):
-    self.assertEqual({
-        u'flags': [u'mips2', u'mips3', u'mips4', u'mips5', u'mips64r2'],
-        u'name': 'Cavium Octeon II V0.1',
-    }, self.get_cpuinfo(MIPS64_CPU_INFO))
+    self.assertEqual(
+        {
+            'flags': ['mips2', 'mips3', 'mips4', 'mips5', 'mips64r2'],
+            'name': 'Cavium Octeon II V0.1',
+        }, self.get_cpuinfo(MIPS64_CPU_INFO))
 
   def test_get_num_processors(self):
     self.assertTrue(linux.get_num_processors() != 0)
@@ -219,7 +221,7 @@ class TestDocker(auto_stub.TestCase):
     return linux.get_inside_docker()
 
   def test_get_inside_docker_k8s(self):
-    self.assertEqual(u'stock', self.get_inside_docker(K8S_CGROUP))
+    self.assertEqual('stock', self.get_inside_docker(K8S_CGROUP))
 
   def test_get_inside_docker_no_k8s(self):
     self.assertEqual(None, self.get_inside_docker(NO_K8S_CGROUP))
@@ -242,7 +244,7 @@ class TestLinux(auto_stub.TestCase):
     self.mock_check_output.return_value = textwrap.dedent("""\
       NAME    ROTA
       nvme0n1    0
-    """).encode()
+    """)
     self.assertEqual(linux.get_ssd(), ('nvme0n1',))
 
   def test_get_gpu(self):
@@ -250,8 +252,7 @@ class TestLinux(auto_stub.TestCase):
     self.mock_check_output.return_value = textwrap.dedent("""\
       18:00.0 "VGA compatible controller [0300]" "NVIDIA Corporation [10de]" "GP107GL [Quadro P1000] [1cb1]" -ra1 "NVIDIA Corporation [10de]" "GP107GL [Quadro P1000] [11bc]"
     """).encode()
-    with mock.patch('six.moves.builtins.open',
-                    mock.mock_open(read_data=b'440.82')):
+    with mock.patch('builtins.open', mock.mock_open(read_data='440.82')):
       self.assertEqual(linux.get_gpu(),
                        (['10de', '10de:1cb1', '10de:1cb1-440.82'
                         ], ['Nvidia GP107GL [Quadro P1000] 440.82']))
@@ -263,10 +264,10 @@ class TestLinux(auto_stub.TestCase):
     self.assertEqual(linux._get_intel_version(), '1.2.3')
 
   def test_get_device_tree_compatible(self):
-    with mock.patch('%s.open' % six.moves.builtins.__name__) as mock_open:
+    with mock.patch('builtins.open') as mock_open:
       mock_open.return_value = io.BytesIO(b'foo,bar')
       self.assertEqual(linux.get_device_tree_compatible(),
-                       sorted([u'foo', u'bar']))
+                       sorted(['foo', 'bar']))
 
 
 if __name__ == '__main__':
