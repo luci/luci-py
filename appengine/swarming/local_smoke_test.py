@@ -1655,7 +1655,6 @@ def process_arguments():
   parser = argparse.ArgumentParser(description=sys.modules[__name__].__doc__)
   parser.add_argument('-v', dest='verbose', action='store_true')
   parser.add_argument('--leak', action='store_true')
-  parser.add_argument('--bot_python')
   args, _ = parser.parse_known_args()
 
   if args.verbose:
@@ -1672,10 +1671,6 @@ def process_arguments():
     # kept. Only the last test case will leak these two directories.
     sys.argv.remove('--leak')
     Test.leak = args.leak
-
-  if args.bot_python:
-    sys.argv.remove('--bot_python')
-    sys.argv.remove(args.bot_python)
 
   return args
 
@@ -1709,7 +1704,7 @@ def main():
     os.mkdir(botdir)
     bot = start_bot.LocalBot(servers.swarming_server.url,
                              servers.cas_server.address, True, botdir,
-                             args.bot_python)
+                             'vpython3')
     Test.bot = bot
     bot.start()
     client = SwarmingClient(servers.swarming_server.url,
