@@ -22,6 +22,7 @@ import re
 import shutil
 import signal
 import socket
+import subprocess
 import sys
 import tempfile
 import textwrap
@@ -55,8 +56,6 @@ sys.path.pop(0)
 sys.path.insert(0, BOT_DIR)
 import test_env_bot
 test_env_bot.setup_test_env()
-
-from api import os_utilities
 
 CAS_CLI = os.path.join(LUCI_DIR, 'luci-go', 'cas')
 ISOLATE_CLI = os.path.join(LUCI_DIR, 'luci-go', 'isolate')
@@ -369,6 +368,13 @@ def gen_expected(**kwargs):
   return expected
 
 
+def get_bot_dimensions():
+  return json.loads(
+      subprocess.check_output(
+          ['vpython3',
+           os.path.join(APP_DIR, 'tools', 'os_utilities.py')]))['dimensions']
+
+
 class Test(unittest.TestCase):
   maxDiff = None
   client = None
@@ -381,7 +387,8 @@ class Test(unittest.TestCase):
 
   def setUp(self):
     super(Test, self).setUp()
-    self.dimensions = os_utilities.get_dimensions()
+
+    self.dimensions = get_bot_dimensions()
     # The bot forcibly adds server_version, and bot_config.
     self.dimensions[u'server_version'] = [u'N/A']
     self.dimensions[u'bot_config'] = [u'bot_config.py']
