@@ -315,7 +315,7 @@ def get_ssd():
   """Returns a list of SSD disks."""
   try:
     out = subprocess.check_output(['lsblk', '-d', '-o', 'name,rota'],
-                                  text=True).splitlines()
+                                  universal_newlines=True).splitlines()
     ssd = []
     for line in out:
       match = re.match(r'(\w+)\s+(0|1)', line)
