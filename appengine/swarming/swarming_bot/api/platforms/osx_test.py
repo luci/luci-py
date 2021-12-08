@@ -412,10 +412,6 @@ class TestOsx(unittest.TestCase):
   def test_is_locked(self):
     self.assertIsNotNone(osx.is_locked())
 
-  def test_is_beta(self):
-    self.mock_check_output.return_value = b'10.15.5\n'
-    self.assertIsNotNone(osx.is_beta())
-
   def mock_physical_disks_list(self, disks_data):
     content = []
     content.append(
