@@ -31,6 +31,8 @@ from api.platforms import win
 MockWinVer = collections.namedtuple('MockWinVer', ['product_type'])
 
 
+@unittest.skipUnless(sys.platform == 'win32',
+                     'Tests only run under Windows platform')
 class TestWin(auto_stub.TestCase):
 
   def setUp(self):
@@ -63,19 +65,14 @@ class TestWin(auto_stub.TestCase):
       actual = win.to_cygwin_path(inputs)
       self.assertEqual(expected, actual, (inputs, expected, actual, i))
 
-  def test_get_os_version_names_native(self):
-    if sys.platform == 'win32':
-      names = win.get_os_version_names()
-      # All versions have at least two names.
-      self.assertTrue(len(names) >= 2)
-      self.assertTrue(isinstance(name, unicode) for name in names)
+  def test_get_os_version_names(self):
+    names = win.get_os_version_names()
+    # All versions have at least two names.
+    self.assertTrue(len(names) >= 2)
+    self.assertTrue(isinstance(name, unicode) for name in names)
 
   def assert_get_os_dims_mock(self, product_type_int, cmd_ver_out,
                               win32_ver_out, expected_version_names):
-    if sys.platform != 'win32':
-      # This method only exists on Windows, so we have to trick the mock into
-      # allowing us to mock a nonexistent method.
-      sys.getwindowsversion = None
     self.mock(sys, 'getwindowsversion', lambda: MockWinVer(product_type_int))
     # Assume this is "cmd.exe /c ver".
     self.mock(subprocess, 'check_output', lambda _: cmd_ver_out)
@@ -85,22 +82,20 @@ class TestWin(auto_stub.TestCase):
     self.assertTrue(isinstance(name, unicode) for name in names)
 
   def test_get_client_versions(self):
-    if sys.platform != 'win32':
-      return
     marketing_name_client_ver_map = {
-        u'Server': u'10',
-        u'2012ServerR2': u'8.1',
-        u'2012Server': u'8',
-        u'2008ServerR2': u'7',
-        u'2008Server': u'Vista',
-        u'2003Server': u'XP',
-        u'10': u'10',
-        u'8.1': u'8.1',
-        u'8': u'8',
-        u'7': u'7',
-        u'Vista': u'Vista',
-        u'XP': u'XP',
-        u'2000': u'2000',
+        'Server': '10',
+        '2012ServerR2': '8.1',
+        '2012Server': '8',
+        '2008ServerR2': '7',
+        '2008Server': 'Vista',
+        '2003Server': 'XP',
+        '10': '10',
+        '8.1': '8.1',
+        '8': '8',
+        '7': '7',
+        'Vista': 'Vista',
+        'XP': 'XP',
+        '2000': '2000',
     }
     marketing_name = win.get_os_version_names()[0]
     client_ver = win.get_client_versions()
@@ -110,30 +105,30 @@ class TestWin(auto_stub.TestCase):
   def test_get_os_dims_mock_win10(self):
     self.assert_get_os_dims_mock(
         1, b'\nMicrosoft Windows [Version 10.0.17763.503]',
-        ('10', '10.0.17763', '', u'Multiprocessor Free'),
-        [u'10', u'10-17763', u'10-17763.503'])
+        ('10', '10.0.17763', '', 'Multiprocessor Free'),
+        ['10', '10-17763', '10-17763.503'])
 
   def test_get_os_dims_mock_win2016(self):
     self.assert_get_os_dims_mock(
         3, b'\nMicrosoft Windows [Version 10.0.14393]\n',
-        ('10', '10.0.14393', '', u'Multiprocessor Free'),
-        [u'Server', u'Server-14393'])
+        ('10', '10.0.14393', '', 'Multiprocessor Free'),
+        ['Server', 'Server-14393'])
 
   def test_get_os_dims_mock_win2019(self):
     self.assert_get_os_dims_mock(
         3, b'\nMicrosoft Windows [Version 10.0.17763.557]\n',
-        ('10', '10.0.17763', '', u'Multiprocessor Free'),
-        [u'Server', u'Server-17763', u'Server-17763.557'])
+        ('10', '10.0.17763', '', 'Multiprocessor Free'),
+        ['Server', 'Server-17763', 'Server-17763.557'])
 
   def test_get_os_dims_mock_win7sp1(self):
     self.assert_get_os_dims_mock(
         1, b'\nMicrosoft Windows [Version 6.1.7601]\n',
-        ('7', '6.1.7601', 'SP1', u'Multiprocessor Free'), [u'7', u'7-SP1'])
+        ('7', '6.1.7601', 'SP1', 'Multiprocessor Free'), ['7', '7-SP1'])
 
   def test_get_os_dims_mock_win8_1(self):
-    self.assert_get_os_dims_mock(
-        1, b'\nMicrosoft Windows [Version 6.3.9600]\n',
-        ('8.1', '6.3.9600', '', u'Multiprocessor Free'), [u'8.1', u'8.1-SP0'])
+    self.assert_get_os_dims_mock(1, b'\nMicrosoft Windows [Version 6.3.9600]\n',
+                                 ('8.1', '6.3.9600', '', 'Multiprocessor Free'),
+                                 ['8.1', '8.1-SP0'])
 
   @params(
       (0, 3, 32, 'i386'),
@@ -153,10 +148,10 @@ class TestWin(auto_stub.TestCase):
 
   def test_get_gpu(self):
     SWbemObjectSet = mock.Mock(
-      PNPDeviceID=
-      u'PCI\\VEN_1AE0&DEV_A002&SUBSYS_00011AE0&REV_01\\3&13C0B0C5&0&28',
-      VideoProcessor=u'GGA',
-      DriverVersion=u'1.1.1.18')
+        PNPDeviceID=
+        'PCI\\VEN_1AE0&DEV_A002&SUBSYS_00011AE0&REV_01\\3&13C0B0C5&0&28',
+        VideoProcessor='GGA',
+        DriverVersion='1.1.1.18')
     SWbemServices = mock.Mock()
     SWbemServices.ExecQuery.return_value = [SWbemObjectSet]
     with mock.patch(
@@ -169,8 +164,7 @@ class TestWin(auto_stub.TestCase):
       self.assertEqual(expected, actual)
 
   def test_list_top_windows(self):
-    if sys.platform == 'win32':
-      win.list_top_windows()
+    win.list_top_windows()
 
   def test_version(self):
     m = re.search(

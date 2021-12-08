@@ -23,24 +23,24 @@ from api.platforms import gpu
 
 
 _WIN32_CLIENT_NAMES = {
-    u'5.0': u'2000',
-    u'5.1': u'XP',
-    u'5.2': u'XP',
-    u'6.0': u'Vista',
-    u'6.1': u'7',
-    u'6.2': u'8',
-    u'6.3': u'8.1',
-    u'10.0': u'10',
-    u'11.0': u'11',
+    '5.0': '2000',
+    '5.1': 'XP',
+    '5.2': 'XP',
+    '6.0': 'Vista',
+    '6.1': '7',
+    '6.2': '8',
+    '6.3': '8.1',
+    '10.0': '10',
+    '11.0': '11',
 }
 
 _WIN32_SERVER_NAMES = {
-    u'5.2': u'2003Server',
-    u'6.0': u'2008Server',
-    u'6.1': u'2008ServerR2',
-    u'6.2': u'2012Server',
-    u'6.3': u'2012ServerR2',
-    u'10.0': u'Server',
+    '5.2': '2003Server',
+    '6.0': '2008Server',
+    '6.1': '2008ServerR2',
+    '6.2': '2012Server',
+    '6.3': '2012ServerR2',
+    '10.0': 'Server',
 }
 
 
@@ -52,8 +52,7 @@ def _get_mount_points():
   DRIVE_FIXED = 3
   # https://msdn.microsoft.com/library/windows/desktop/aa364939.aspx
   return [
-      u'%s:\\' % letter
-      for letter in string.ascii_lowercase
+      '%s:\\' % letter for letter in string.ascii_lowercase
       if ctypes.windll.kernel32.GetDriveTypeW(letter + ':\\') == DRIVE_FIXED
   ]
 
@@ -66,8 +65,8 @@ def _get_disk_info(mount_point):
       ctypes.c_wchar_p(mount_point), None, ctypes.pointer(total_bytes),
       ctypes.pointer(free_bytes))
   return {
-    u'free_mb': round(free_bytes.value / 1024. / 1024., 1),
-    u'size_mb': round(total_bytes.value / 1024. / 1024., 1),
+      'free_mb': round(free_bytes.value / 1024. / 1024., 1),
+      'size_mb': round(total_bytes.value / 1024. / 1024., 1),
   }
 
 
@@ -260,19 +259,19 @@ def get_os_version_names():
   lookup = _WIN32_SERVER_NAMES if is_server else _WIN32_CLIENT_NAMES
   version_number, build_number = _get_os_numbers()
   marketing_name = lookup.get(version_number, version_number)
-  if version_number in (u'10.0', u'11.0'):
+  if version_number in ('10.0', '11.0'):
     rv = [marketing_name]
     # Windows 10 doesn't have service packs, the build number now is the
     # reference number. More discussion in
     # https://docs.google.com/document/d/1iF1tbc1oedCQ9J6aL7sHeuaayY3bs52fuvKxvLLZ0ig
     if '.' in build_number:
-      major_version = build_number.split(u'.')[0]
-      rv.append(u'%s-%s' % (marketing_name, major_version))
-    rv.append(u'%s-%s' % (marketing_name, build_number))
+      major_version = build_number.split('.')[0]
+      rv.append('%s-%s' % (marketing_name, major_version))
+    rv.append('%s-%s' % (marketing_name, build_number))
     rv.sort()
     return rv
-  service_pack = platform.win32_ver()[2] or u'SP0'
-  return [marketing_name, u'%s-%s' % (marketing_name, service_pack)]
+  service_pack = platform.win32_ver()[2] or 'SP0'
+  return [marketing_name, '%s-%s' % (marketing_name, service_pack)]
 
 
 def get_startup_dir():
@@ -284,7 +283,7 @@ def get_startup_dir():
   # CSIDL_STARTUP = 7
   # https://msdn.microsoft.com/library/windows/desktop/bb762180.aspx
   # shell.SHGetFolderLocation(NULL, CSIDL_STARTUP, NULL, NULL, string)
-  if get_os_version_number() == u'5.1':
+  if get_os_version_number() == '5.1':
     startup = 'Start Menu\\Programs\\Startup'
   else:
     # Vista+
@@ -363,15 +362,12 @@ def get_cpuinfo():
     name, _ = winreg.QueryValueEx(k, 'ProcessorNameString')
     vendor, _ = winreg.QueryValueEx(k, 'VendorIdentifier')
     return {
-        u'model': [
-            int(match.group(1)),
-            int(match.group(2)),
-            int(match.group(3))
-        ],
-        u'name':
-            name,
-        u'vendor':
-            vendor,
+        'model':
+        [int(match.group(1)),
+         int(match.group(2)),
+         int(match.group(3))],
+        'name': name,
+        'vendor': vendor,
     }
   finally:
     k.Close()
@@ -429,8 +425,8 @@ def get_gpu():
       # The string looks like:
       #  PCI\VEN_15AD&DEV_0405&SUBSYS_040515AD&REV_00\3&2B8E0B4B&0&78
       pnp_string = device.PNPDeviceID
-      ven_id = u'UNKNOWN'
-      dev_id = u'UNKNOWN'
+      ven_id = 'UNKNOWN'
+      dev_id = 'UNKNOWN'
       match = re.search(r'VEN_([0-9A-F]{4})', pnp_string)
       if match:
         ven_id = match.group(1).lower()
@@ -438,18 +434,17 @@ def get_gpu():
       if match:
         dev_id = match.group(1).lower()
 
-      dev_name = device.VideoProcessor or u''
-      version = device.DriverVersion or u''
-      ven_name, dev_name = gpu.ids_to_names(
-        ven_id, u'Unknown', dev_id, dev_name)
+      dev_name = device.VideoProcessor or ''
+      version = device.DriverVersion or ''
+      ven_name, dev_name = gpu.ids_to_names(ven_id, 'Unknown', dev_id, dev_name)
 
       dimensions.add(ven_id)
-      dimensions.add(u'%s:%s' % (ven_id, dev_id))
+      dimensions.add('%s:%s' % (ven_id, dev_id))
       if version:
-        dimensions.add(u'%s:%s-%s' % (ven_id, dev_id, version))
-        state.add(u'%s %s %s' % (ven_name, dev_name, version))
+        dimensions.add('%s:%s-%s' % (ven_id, dev_id, version))
+        state.add('%s %s %s' % (ven_name, dev_name, version))
       else:
-        state.add(u'%s %s' % (ven_name, dev_name))
+        state.add('%s %s' % (ven_name, dev_name))
   except pythoncom.com_error as e:
     # This generally happens when this is called as the host is shutting down.
     logging.error('get_gpu(): %s', e)
@@ -464,18 +459,18 @@ def get_integrity_level():
   ctypes.windll is unaccessible and it is not known to the author how to use
   stdcall convention through ctypes.cdll.
   """
-  if get_os_version_number() == u'5.1':
+  if get_os_version_number() == '5.1':
     # Integrity level is Vista+.
     return None
 
   mapping = {
-      0x0000: u'untrusted',
-      0x1000: u'low',
-      0x2000: u'medium',
-      0x2100: u'medium high',
-      0x3000: u'high',
-      0x4000: u'system',
-      0x5000: u'protected process',
+      0x0000: 'untrusted',
+      0x1000: 'low',
+      0x2000: 'medium',
+      0x2100: 'medium high',
+      0x3000: 'high',
+      0x4000: 'system',
+      0x5000: 'protected process',
   }
 
   # This was specifically written this way to work on cygwin except for the
@@ -563,7 +558,7 @@ def get_integrity_level():
     res = ctypes.windll.advapi32.GetSidSubAuthority(
         token_info.Label.Sid, p_sid_size.contents.value - 1)
     value = res.contents.value
-    return mapping.get(value) or u'0x%04x' % value
+    return mapping.get(value) or '0x%04x' % value
   finally:
     ctypes.windll.kernel32.CloseHandle(token)
 
