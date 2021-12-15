@@ -86,9 +86,8 @@ message Pool {
   // tasks and sniffing service account tokens).
   repeated string allowed_service_account = 4;
 
-  // Same as 'allowed_service_account', but the set of service accounts is
-  // specified through an auth group.
-  repeated string allowed_service_account_group = 5;
+  reserved 5;
+  reserved "allowed_service_account_group";
 
   oneof task_deployment_scheme {
     // Most Pools will include a task_template_deployment by name.

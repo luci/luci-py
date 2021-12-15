@@ -677,14 +677,6 @@ def _is_allowed_service_account(service_account, pool_cfg):
         'explicitly in pools.cfg', service_account, pool_cfg.name)
     return True
 
-  ident = auth.Identity(auth.IDENTITY_USER, service_account)
-  for group in pool_cfg.service_accounts_groups:
-    if auth.is_group_member(group, ident):
-      logging.info(
-          'Service account "%s" is allowed in the pool "%s" by being listed '
-          'through group "%s"', service_account, pool_cfg.name, group)
-      return True
-
   return False
 
 
@@ -1154,9 +1146,8 @@ def check_schedule_request_acl_service_account(request, pool_cfg):
       not _is_allowed_service_account(request.service_account, pool_cfg)):
     raise auth.AuthorizationError(
         'Task service account "%s" as specified in the task request is not '
-        'allowed to be used in the pool "%s". Is allowed_service_account or '
-        'allowed_service_account_group specified in pools.cfg?' %
-        (request.service_account, request.pool))
+        'allowed to be used in the pool "%s". Is allowed_service_account '
+        'specified in pools.cfg?' % (request.service_account, request.pool))
 
 
 def schedule_request(request,

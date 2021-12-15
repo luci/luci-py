@@ -2643,7 +2643,6 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
                        scheduling_groups=None,
                        trusted_delegatees=None,
                        service_accounts=None,
-                       service_accounts_groups=None,
                        external_schedulers=None):
     self._known_pools = self._known_pools or set()
     self._known_pools.add(name)
@@ -2660,7 +2659,6 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
                 for peer, tags in (trusted_delegatees or {}).items()
             },
             service_accounts=frozenset(service_accounts or []),
-            service_accounts_groups=tuple(service_accounts_groups or []),
             external_schedulers=external_schedulers,
         )
       return None
@@ -2771,34 +2769,17 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         properties=_gen_properties(dimensions={u'pool': [u'some-pool']}),
         service_account='good@example.com')
 
-  def test_check_schedule_request_acl_good_service_acc_through_group(self):
-
-    def mocked_is_group_member(group, ident):
-      return group == 'accounts' and ident.to_bytes() == 'user:good@example.com'
-
-    self.mock(auth, 'is_group_member', mocked_is_group_member)
-
-    self.mock_pool_config(
-        'some-pool',
-        scheduling_users=[auth_testing.DEFAULT_MOCKED_IDENTITY],
-        service_accounts_groups=['accounts'])
-    self.check_schedule_request_acl(
-        properties=_gen_properties(dimensions={u'pool': [u'some-pool']}),
-        service_account='good@example.com')
-
   def test_check_schedule_request_acl_bad_service_acc(self):
     self.mock_pool_config(
         'some-pool',
         scheduling_users=[auth_testing.DEFAULT_MOCKED_IDENTITY],
-        service_accounts=['good@example.com'],
-        service_accounts_groups=['accounts'])
+        service_accounts=['good@example.com'])
     with self.assertRaises(auth.AuthorizationError) as ctx:
       self.check_schedule_request_acl(
           properties=_gen_properties(dimensions={u'pool': [u'some-pool']}),
           service_account='bad@example.com')
-    self.assertIn(
-        'Is allowed_service_account or allowed_service_account_group specified '
-        'in pools.cfg?', str(ctx.exception))
+    self.assertIn('Is allowed_service_account specified in pools.cfg?',
+                  str(ctx.exception))
 
   def test_check_schedule_request_acl_caller(self):
     # the functionality is already  tested by

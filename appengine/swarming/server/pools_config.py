@@ -47,8 +47,6 @@ PoolConfig = collections.namedtuple(
         # Set of service account emails allowed in this pool, specified
         # explicitly.
         'service_accounts',
-        # Additional list of groups with allowed service accounts.
-        'service_accounts_groups',
         # Pool realm.
         'realm',
         # Set of enforced realm permission enums.
@@ -75,7 +73,6 @@ def init_pool_config(**kwargs):
       'scheduling_groups': frozenset(),
       'trusted_delegatees': {},
       'service_accounts': frozenset(),
-      'service_accounts_groups': tuple(),
       'realm': None,
       'enforced_realm_permissions': frozenset(),
       'default_task_realm': None,
@@ -607,7 +604,6 @@ def _fetch_pools_config():
               for d in msg.schedulers.trusted_delegation
           },
           service_accounts=frozenset(msg.allowed_service_account),
-          service_accounts_groups=tuple(msg.allowed_service_account_group),
           realm=msg.realm if msg.realm else None,
           default_task_realm=(msg.default_task_realm
                               if msg.default_task_realm else None),
@@ -691,11 +687,6 @@ def _validate_pools_cfg(cfg, ctx):
       for i, account in enumerate(msg.allowed_service_account):
         if not service_accounts_utils.is_service_account(account):
           ctx.error('bad allowed_service_account #%d "%s"', i, account)
-
-      # Validate service account groups.
-      for i, group in enumerate(msg.allowed_service_account_group):
-        if not auth.is_valid_group_name(group):
-          ctx.error('bad allowed_service_account_group #%d "%s"', i, group)
 
       # Validate external schedulers.
       for i, es in enumerate(msg.external_schedulers):

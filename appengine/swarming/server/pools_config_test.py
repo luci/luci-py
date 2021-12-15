@@ -45,10 +45,6 @@ TEST_CONFIG = pools_pb2.PoolsCfg(
                 'a1@example.com',
                 'a2@example.com',
             ],
-            allowed_service_account_group=[
-                'accounts_group1',
-                'accounts_group2',
-            ],
             realm='test:pool/realm',
             enforced_realm_permissions=[
                 realms_pb2.REALM_PERMISSION_POOLS_CREATE_TASK,
@@ -119,7 +115,6 @@ class PoolsConfigTest(test_case.TestCase):
                 ),
         },
         service_accounts=frozenset([u'a2@example.com', u'a1@example.com']),
-        service_accounts_groups=(u'accounts_group1', u'accounts_group2'),
         realm='test:pool/realm',
         enforced_realm_permissions=frozenset(
             [realms_pb2.REALM_PERMISSION_POOLS_CREATE_TASK]),
@@ -309,17 +304,6 @@ class PoolsConfigTest(test_case.TestCase):
     ])
     self.validator_test(cfg, [
         'pool #0 (abc): bad allowed_service_account #0 "not an email"',
-    ])
-
-  def test_bad_service_account_group(self):
-    cfg = pools_pb2.PoolsCfg(pool=[
-        pools_pb2.Pool(
-            name=['abc'],
-            allowed_service_account_group=['!!!'],
-        )
-    ])
-    self.validator_test(cfg, [
-        'pool #0 (abc): bad allowed_service_account_group #0 "!!!"',
     ])
 
   def test_bad_pool_realm(self):
