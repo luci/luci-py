@@ -222,6 +222,17 @@ class Validator(object):
           auth.Identity.from_bytes(p)
         except ValueError:
           self.error('invalid principal format: "%s"', p)
+    for i, cond in enumerate(binding.conditions):
+      with self.prefix('condition #%d: ', i+1):
+        if cond.HasField('restrict'):
+          self.validate_restrict_condition(cond.restrict)
+        else:
+          self.error('invalid empty condition')
+
+  def validate_restrict_condition(self, condition):
+    """Emits errors if the AttributeRestriction is invalid."""
+    if condition.attribute not in self.db.attributes:
+      self.error('unknown attribute "%s"', condition.attribute)
 
 
 def find_cycle(start, graph):

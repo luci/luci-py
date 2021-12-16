@@ -33,6 +33,7 @@ DB = collections.namedtuple(
         'revision',       # an arbitrary string identifying a particular version
         'permissions',    # a dict {permission str => realms_pb2.Permission}
         'roles',          # a dict {full role name str => Role}
+        'attributes',     # a set with attribute names allowed in conditions
         'implicit_root_bindings',  # f(proj_id) -> [realms_config_pb2.Binding]
     ])
 
@@ -57,6 +58,7 @@ def db():
   permission = builder.permission
   include = builder.include
   role = builder.role
+  attribute = builder.attribute
 
   # LUCI Token Server permissions and roles (crbug.com/1082960).
   role('role/luci.realmServiceAccount', [
@@ -94,6 +96,9 @@ def db():
       permission('scheduler.jobs.resume'),
       permission('scheduler.jobs.abort'),
   ])
+
+  # LUCI Scheduler attributes.
+  attribute('scheduler.job.name')
 
   # Swarming permissions and roles (crbug.com/1066839).
   # See swarming/proto/config/realms.proto for more details.
@@ -364,6 +369,7 @@ class Builder(object):
     self.revision = revision
     self.permissions = {}  # permission name -> realms_pb2.Permission
     self.roles = {}  # role name => set of str with permissions
+    self.attributes = set()  # a set of str
     self.implicit_root_bindings = lambda _: []  # see DB.implicit_root_bindings
 
   def permission(self, name, internal=False):
@@ -428,6 +434,12 @@ class Builder(object):
         raise ValueError('Unknown include %s' % (inc,))
     self.roles[name] = perms
 
+  def attribute(self, name):
+    """Defines an attribute that can be referenced in conditions."""
+    if not isinstance(name, basestring):
+      raise TypeError('Attribute names must be strings')
+    self.attributes.add(name)
+
   def finish(self):
     return DB(
         revision=self.revision,
@@ -436,4 +448,5 @@ class Builder(object):
             name: Role(name=name, permissions=tuple(sorted(perms)))
             for name, perms in self.roles.items()
         },
+        attributes=self.attributes,
         implicit_root_bindings=self.implicit_root_bindings)

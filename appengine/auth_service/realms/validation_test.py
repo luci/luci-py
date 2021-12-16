@@ -33,6 +33,7 @@ def test_db():
   b.role('role/luci.internal.int', [
       b.permission('luci.dev.int', internal=True),
   ])
+  b.attribute('some.known.attribute')
   return b.finish()
 
 
@@ -113,6 +114,18 @@ class ValidationTest(test_case.TestCase):
                     {
                         'role': 'role/dev.a',
                         'principals': ['group:aaa'],
+                    },
+                    {
+                        'role': 'role/dev.a',
+                        'principals': ['group:bbb'],
+                        'conditions': [
+                            {
+                                'restrict': {
+                                    'attribute': 'some.known.attribute',
+                                    'values': ['a', 'b', 'c'],
+                                },
+                            },
+                        ],
                     },
                 ],
             },
@@ -363,6 +376,27 @@ class ValidationTest(test_case.TestCase):
         ],
     })
 
+  def test_bindings_bad_restrict_condition(self):
+    self.assert_has_error('unknown attribute', {
+        'realms': [
+            {
+                'name': 'a',
+                'bindings': [
+                    {
+                        'role': 'role/dev.a',
+                        'principals': ['group:aaa'],
+                        'conditions': [
+                            {
+                                'restrict': {
+                                    'attribute': 'unknown.attribute',
+                                },
+                            },
+                        ],
+                    },
+                ],
+            },
+        ],
+    })
 
 
 class FindCycleTest(test_case.TestCase):
