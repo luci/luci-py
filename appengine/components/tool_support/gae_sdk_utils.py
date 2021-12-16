@@ -343,7 +343,7 @@ class Application(object):
     self._services = {}
     for yaml_path in find_app_yamls(self._app_dir):
       with open(yaml_path) as f:
-        data = yaml.load(f)
+        data = yaml.safe_load(f)
         # The service ID can be specified in the field "service", or
         # "module" (deprecated name). If not specified at all, then
         # it's the default service.
