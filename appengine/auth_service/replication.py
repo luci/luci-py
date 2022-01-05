@@ -400,7 +400,7 @@ def store_auth_db_snapshot(replication_state, auth_db_blob):
     replication_state: AuthReplicationState that correspond to auth_db_blob.
     auth_db_blob: serialized ReplicationPushRequest message (has AuthDB inside).
   """
-  deflated = zlib.compress(auth_db_blob)
+  deflated = zlib.compress(auth_db_blob, 9)
   sha256 = hashlib.sha256(auth_db_blob).hexdigest()
   key = auth_db_snapshot_key(replication_state.auth_db_rev)
   latest_key = auth_db_snapshot_latest_key()
