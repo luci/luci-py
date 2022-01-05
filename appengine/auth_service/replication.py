@@ -35,6 +35,9 @@ PUSH_STATUS_SUCCESS = 0
 PUSH_STATUS_TRANSIENT_ERROR = 1
 PUSH_STATUS_FATAL_ERROR = 2
 
+# Max size of AuthDBShard.
+MAX_SHARD_SIZE = 900*1024
+
 
 class ReplicationTriggerError(Exception):
   """Failed to trigger a replication task."""
@@ -95,10 +98,20 @@ class AuthDBSnapshot(ndb.Model):
   """
   # Deflated serialized ReplicationPushRequest proto message.
   auth_db_deflated = ndb.BlobProperty()
+  # A list of shard IDs if sharded or empty if auth_db_deflated should be used.
+  shard_ids = ndb.StringProperty(repeated=True, indexed=False)
   # SHA256 hex digest of auth_db (before compression).
   auth_db_sha256 = ndb.StringProperty(indexed=False)
   # When this revision was created.
   created_ts = ndb.DateTimeProperty(indexed=True)
+
+
+class AuthDBShard(ndb.Model):
+  """A shard of deflated serialized ReplicationPushRequest.
+
+  Root entity. ID is "<auth_db_revision:<blob hash>".
+  """
+  blob = ndb.BlobProperty()
 
 
 class AuthDBSnapshotLatest(ndb.Model):
@@ -157,6 +170,8 @@ def get_auth_db_snapshot(rev, skip_body):
     return None
   if skip_body:
     s.auth_db_deflated = None
+  elif s.shard_ids:
+    s.auth_db_deflated = unshard_authdb(s.shard_ids)
   return s
 
 
@@ -400,19 +415,32 @@ def store_auth_db_snapshot(replication_state, auth_db_blob):
     replication_state: AuthReplicationState that correspond to auth_db_blob.
     auth_db_blob: serialized ReplicationPushRequest message (has AuthDB inside).
   """
-  deflated = zlib.compress(auth_db_blob, 9)
+  logging.debug('Deflating AuthDB')
+  deflated = zlib.compress(auth_db_blob)
   sha256 = hashlib.sha256(auth_db_blob).hexdigest()
   key = auth_db_snapshot_key(replication_state.auth_db_rev)
   latest_key = auth_db_snapshot_latest_key()
 
-  logging.debug('AuthDB deflated blob size is %d bytes', len(deflated))
+  # Split it into shards to avoid hitting entity size limits. Do it only if
+  # `deflated` is larger than the limit. Otherwise it is more efficient to store
+  # it inline in AuthDBSnapshot (it is also how it is stored in older entities,
+  # before sharding was introduced).
+  shard_ids = []
+  if len(deflated) > MAX_SHARD_SIZE:
+    shard_ids = shard_authdb(
+        replication_state.auth_db_rev, deflated, MAX_SHARD_SIZE)
+
+  logging.debug(
+      'AuthDB deflated blob size is %d bytes (stored in %d shards)',
+      len(deflated), len(shard_ids))
 
   @ndb.transactional
   def insert():
     if not key.get():
       e = AuthDBSnapshot(
         key=key,
-        auth_db_deflated=deflated,
+        auth_db_deflated=deflated if not shard_ids else None,
+        shard_ids=shard_ids,
         auth_db_sha256=sha256,
         created_ts=replication_state.modified_ts)
       e.put()
@@ -609,3 +637,43 @@ def _update_state_on_fail(key, started_ts, finished_ts, old_auth_db_rev, exc):
   state.put()
 
   return state.auth_db_rev
+
+
+def shard_authdb(auth_db_rev, blob, max_size):
+  """Given a blob splits it into multiple AuthDBShard entities.
+
+  Stores shards sequentially to avoid making a bunch of memory-hungry RPCs in
+  parallel.
+
+  Args:
+    auth_db_rev: AuthDB revision to use in AuthDBShard entity keys.
+    blob: a blob to split.
+    max_size: the maximum shard size.
+
+  Returns:
+    A list of shard IDs.
+  """
+  logging.debug('Sharding AuthDB')
+  ids = []
+  while blob:
+    shard, blob = blob[:max_size], blob[max_size:]
+    ids.append('%d:%s' % (auth_db_rev, hashlib.sha256(shard).hexdigest()))
+    AuthDBShard(
+        id=ids[-1],
+        blob=shard,
+    ).put()
+  return ids
+
+
+def unshard_authdb(shard_ids):
+  """Fetches a list of AuthDBShard entities and merges their payload.
+
+  Args:
+    shard_ids: a list of shard IDs as produced by shard_authdb.
+
+  Returns:
+    The final merged blob.
+  """
+  logging.debug('Unsharding AuthDB from %d shards', len(shard_ids))
+  shards = ndb.get_multi(ndb.Key(AuthDBShard, sid) for sid in shard_ids)
+  return ''.join(shard.blob for shard in shards)
