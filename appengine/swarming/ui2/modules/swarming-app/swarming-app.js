@@ -65,23 +65,23 @@ const version_filter_postfix = `_5C_22_22_2C_22s_22_3Atrue_2C_22i_22_3A_22` +
     `id_22%257D%255D%22))`;
 const version_default = 'You must log in to see more details';
 
-function serverLink(details) {
+function serverLink(project_id, details) {
   if (!details || !details.server_version) {
     return version_default;
   }
-  return html`<a href=${pantheon_url.concat(details.project_id,
+  return html`<a href=${pantheon_url.concat(project_id,
       version_filter_prefix, details.server_version, version_filter_postfix)}>
       ${details.server_version}</a>`;
 }
 
 function gitLink(details) {
-  if (!details || !details.chops_git_version) {
+  if (!details || !details.server_version) {
     return '';
   }
 
-  const split = details.chops_git_version.split('-');
+  const split = details.server_version.split('-');
   if (split.length >= 3) {
-    console.error(`Invalid Git version. version=${details.chops_git_version}`);
+    console.error(`Invalid Git version. version=${details.server_version}`);
     return '';
   }
   const version = (split.length == 2) ? split[1] : split[0];
@@ -90,7 +90,7 @@ function gitLink(details) {
 
 const dynamic_content_template = (ele) => html`
 <div class=server-version>
-  AppEngine version: ${serverLink(ele._server_details)} Git version:${gitLink(ele._server_details)}
+  AppEngine version: ${serverLink(ele._project_id, ele._server_details)} Git version:${gitLink(ele._server_details)}
 </div>
 <oauth-login client_id=${ele.client_id}
              ?testing_offline=${ele.testing_offline}>
