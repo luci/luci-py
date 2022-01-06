@@ -159,7 +159,7 @@ describe('swarming-index', function() {
             const serverVersion = ele.querySelector('swarming-app>main .server_version');
             expect(serverVersion).toBeTruthy();
             expect(serverVersion.innerText)
-                .toContain('swarming-staging-default-v024');
+                .toContain('1234-abcdefg');
             done();
           });
         });
@@ -185,39 +185,6 @@ describe('swarming-index', function() {
       });
     });
 
-    describe('when logged in as user without chops-git-version', function() {
-      beforeEach(function() {
-        fetchMock.get('/_ah/api/swarming/v1/server/details', {
-          project_id: 'chromium-swarm',
-          server_version: '1234-abcdefg',
-          bot_version: 'abcdoeraymeyouandme',
-          machine_provider_template: 'https://example.com/leases/%s',
-          display_server_url_template: 'https://example.com#id=%s',
-        }, {overwriteRoutes: true});
-      });
-
-      it('displays the server versionn', function(done) {
-        createElement((ele) => {
-          userLogsIn(ele, () => {
-            const serverDiv =
-              ele.querySelector('swarming-app>header .server-version');
-            const serverVersion =
-              ele.querySelector(`swarming-app>header
-                  .server-version>a:nth-child(1)`);
-            const gitVersion =
-              ele.querySelector(`swarming-app>header
-                  .server-version>a:nth-child(2)`);
-            expect(serverVersion).toBeTruthy();
-            expect(gitVersion).toBeNull();
-            expect(serverVersion.innerText)
-                .toContain('1234-abcdefg');
-            expect(serverDiv.innerHTML).toContain('chromium-swarm');
-            done();
-          });
-        });
-      });
-    });
-
     describe('when logged in as admin (boostrap_token)', function() {
       beforeEach(becomeAdmin);
 
@@ -228,7 +195,7 @@ describe('swarming-index', function() {
                 .querySelector('swarming-app>main .server_version');
             expect(serverVersion).toBeTruthy();
             expect(serverVersion.innerText)
-                .toContain('swarming-staging-default-v024');
+                .toContain('1234-abcdefg');
             done();
           });
         });

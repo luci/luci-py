@@ -10,7 +10,6 @@ import logging
 import os
 import re
 
-from google.appengine.api import app_identity
 from google.appengine.api import datastore_errors
 from google.appengine.api import memcache
 from google.appengine.ext import ndb
@@ -176,21 +175,10 @@ class SwarmingServerService(remote.Service):
 
     cfg = config.settings()
     server_version = utils.get_app_version()
-    chops_git_version = utils.get_chops_git_version()
-
-    # chops_git_version contains the chops git version
-    # eg. '5629-2cfcb6'.
-    # In cases where the Appengine version is set to the
-    # chops git version chops_git_version will be identical
-    # to server_version.
-    if not chops_git_version:
-      chops_git_version = server_version
 
     return swarming_rpcs.ServerDetails(
         bot_version=bot_code.get_bot_version(host)[0],
-        project_id=app_identity.get_application_id(),
         server_version=server_version,
-        chops_git_version=chops_git_version,
         display_server_url_template=cfg.display_server_url_template,
         luci_config=config.config.config_service_hostname(),
         cas_viewer_server=cfg.cas.viewer_server)

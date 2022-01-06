@@ -191,8 +191,6 @@ class ServerDetails(messages.Message):
   display_server_url_template = messages.StringField(4)
   luci_config = messages.StringField(5)
   cas_viewer_server = messages.StringField(8)
-  project_id = messages.StringField(9)
-  chops_git_version = messages.StringField(10)
 
 
 class BootstrapToken(messages.Message):
