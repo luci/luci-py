@@ -146,21 +146,21 @@ def get_dimensions(devices):
   # build.product because the latter is deprecated.
   # https://android.googlesource.com/platform/build/+/master/tools/buildinfo.sh
   dimension_properties = {
-      u'device_os': ['build.id'],
-      u'device_os_flavor': ['product.brand', 'product.system.brand'],
-      u'device_os_type': ['build.type'],
-      u'device_type': ['product.device', 'build.product', 'product.board'],
+      'device_os': ['build.id'],
+      'device_os_flavor': ['product.brand', 'product.system.brand'],
+      'device_os_type': ['build.type'],
+      'device_type': ['product.device', 'build.product', 'product.board'],
   }
   for dim in dimension_properties:
     dimensions[dim] = set()
 
-  dimensions[u'android'] = []
+  dimensions['android'] = []
   for device in devices:
     properties = device.cache.build_props
     if properties:
       for dim, props in dimension_properties.items():
         for prop in props:
-          real_prop = u'ro.' + prop
+          real_prop = 'ro.' + prop
           if real_prop in properties:
             p = properties[real_prop].strip()
             if p and p not in dimensions[dim]:
@@ -172,16 +172,15 @@ def get_dimensions(devices):
               # [the device_type of the 2015 Shield]). Rather than knowing
               # which of the three keys is "correct", just report all of them.
       # Only advertize devices that can be used.
-      dimensions[u'android'].append(device.serial)
+      dimensions['android'].append(device.serial)
 
   # Add the first character of each device_os to the dimension.
   android_vers = {
       os[0]
-      for os in dimensions.get(u'device_os', [])
-      if os and os[0].isupper()
+      for os in dimensions.get('device_os', []) if os and os[0].isupper()
   }
-  dimensions[u'device_os'] = dimensions[u'device_os'].union(android_vers)
-  dimensions[u'android'].sort()
+  dimensions['device_os'] = dimensions['device_os'].union(android_vers)
+  dimensions['android'].sort()
   for dim in dimension_properties:
     if not dimensions[dim]:
       del dimensions[dim]
@@ -189,7 +188,8 @@ def get_dimensions(devices):
       dimensions[dim] = sorted(dimensions[dim])
 
   # Tweaks the 'product.brand' prop to be a little more readable.
-  if dimensions.get(u'device_os_flavor'):
+  if dimensions.get('device_os_flavor'):
+
     def _fix_flavor(flavor):
       flavor = flavor.lower()
       # Non-aosp stock android is reported as 'google'. Other OEMs that ship
@@ -197,20 +197,20 @@ def get_dimensions(devices):
       # is reported as 'NVIDIA'.
       return 'aosp' if flavor == 'android' else flavor
 
-    dimensions[u'device_os_flavor'] = list(
-        map(_fix_flavor, dimensions[u'device_os_flavor']))
+    dimensions['device_os_flavor'] = list(
+        map(_fix_flavor, dimensions['device_os_flavor']))
 
-  nb_android = len(dimensions[u'android'])
-  dimensions[u'android_devices'] = list(
+  nb_android = len(dimensions['android'])
+  dimensions['android_devices'] = list(
       map(str, range(nb_android, max(0, nb_android - 4), -1)))
 
   # TODO(maruel): Add back once dimensions limit is figured out and there's a
   # need.
-  del dimensions[u'android']
+  del dimensions['android']
 
   # Trim 'os' to reduce the number of dimensions and not run tests by accident
   # on it.
-  dimensions[u'os'] = ['Android']
+  dimensions['os'] = ['Android']
 
   logging.info(
       'get_dimensions() (device part) took %gs' %
@@ -225,9 +225,9 @@ def get_dimensions(devices):
     return sorted(versions)
 
   # Add gms core and Playstore versions
-  dimensions[u'device_gms_core_version'] = (
+  dimensions['device_gms_core_version'] = (
       _get_package_versions('com.google.android.gms') or ['unknown'])
-  dimensions[u'device_playstore_version'] = (
+  dimensions['device_playstore_version'] = (
       _get_package_versions('com.android.vending') or ['unknown'])
 
   return dimensions
@@ -236,52 +236,52 @@ def get_dimensions(devices):
 def get_state(devices):
   """Returns state information about all the devices connected to the host.
   """
-  keys = (u'board.platform', u'build.product', u'build.fingerprint',
-          u'build.id', u'build.type', u'build.version.sdk', u'product.board',
-          u'product.cpu.abi', u'product.device')
+  keys = ('board.platform', 'build.product', 'build.fingerprint', 'build.id',
+          'build.type', 'build.version.sdk', 'product.board', 'product.cpu.abi',
+          'product.device')
 
   def fn(device):
     if not device.is_valid or device.failure:
-      return {u'state': device.failure or 'unavailable'}
+      return {'state': device.failure or 'unavailable'}
     properties = device.cache.build_props
     if not properties:
-      return {u'state': 'unavailable'}
-    no_sd_card = properties.get(u'ro.product.model', '') in ['Chromecast']
+      return {'state': 'unavailable'}
+    no_sd_card = properties.get('ro.product.model', '') in ['Chromecast']
     return {
-        u'battery':
-            device.GetBattery(),
-        u'build': {
-            key: properties.get(u'ro.' + key, '<missing>') for key in keys
-        },
-        u'cpu':
-            device.GetCPUScale(),
-        u'disk':
-            device.GetDisk(),
-        u'imei':
-            device.GetIMEI(),
-        u'ip':
-            device.GetIPs(),
-        u'max_uid':
-            device.GetLastUID(),
-        u'mem':
-            device.GetMemInfo(),
-        u'other_packages':
-            get_unknown_apps(device),
-        u'port_path':
-            device.port_path,
-        u'processes':
-            device.GetProcessCount(),
-        u'state': (u'available'
-                   if no_sd_card or device.IsFullyBooted()[0] else u'booting'),
-        u'temp':
-            device.GetTemperatures(),
-        u'uptime':
-            device.GetUptime(),
+        'battery':
+        device.GetBattery(),
+        'build':
+        {key: properties.get('ro.' + key, '<missing>')
+         for key in keys},
+        'cpu':
+        device.GetCPUScale(),
+        'disk':
+        device.GetDisk(),
+        'imei':
+        device.GetIMEI(),
+        'ip':
+        device.GetIPs(),
+        'max_uid':
+        device.GetLastUID(),
+        'mem':
+        device.GetMemInfo(),
+        'other_packages':
+        get_unknown_apps(device),
+        'port_path':
+        device.port_path,
+        'processes':
+        device.GetProcessCount(),
+        'state':
+        ('available' if no_sd_card or device.IsFullyBooted()[0] else 'booting'),
+        'temp':
+        device.GetTemperatures(),
+        'uptime':
+        device.GetUptime(),
     }
 
   start = time.time()
   state = {
-      u'devices': {
+      'devices': {
           device.serial: out
           for device, out in zip(devices, parallel.pmap(fn, devices))
       }

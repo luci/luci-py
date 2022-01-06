@@ -6,91 +6,91 @@
 
 
 
-AMD = u'1002'
-ASPEED = u'1a03'
-INTEL = u'8086'
-MAXTROX = u'102b'
-NVIDIA = u'10de'
+AMD = '1002'
+ASPEED = '1a03'
+INTEL = '8086'
+MAXTROX = '102b'
+NVIDIA = '10de'
 
 
 _VENDOR_MAPPING = {
     AMD: (
-        u'AMD',
+        'AMD',
         {
             # http://developer.amd.com/resources/ati-catalyst-pc-vendor-id-1002-li/
-            u'6613': u'Radeon R7 240',  # The table is incorrect
-            u'6646': u'Radeon R9 M280X',
-            u'6779': u'Radeon HD 6450/7450/8450',
-            u'679e': u'Radeon HD 7800',
-            u'67ef': u'Radeon RX 560',
-            u'6821':
-                u'Radeon R8 M370X',  # 'HD 8800M' or 'R7 M380' based on rev_id
-            u'683d': u'Radeon HD 7700',
-            u'9830': u'Radeon HD 8400',
-            u'9874': u'Carrizo',
+            '6613': 'Radeon R7 240',  # The table is incorrect
+            '6646': 'Radeon R9 M280X',
+            '6779': 'Radeon HD 6450/7450/8450',
+            '679e': 'Radeon HD 7800',
+            '67ef': 'Radeon RX 560',
+            '6821':
+            'Radeon R8 M370X',  # 'HD 8800M' or 'R7 M380' based on rev_id
+            '683d': 'Radeon HD 7700',
+            '9830': 'Radeon HD 8400',
+            '9874': 'Carrizo',
         }),
     ASPEED: (
-        u'ASPEED',
+        'ASPEED',
         {
             # https://pci-ids.ucw.cz/read/PC/1a03/2000
             # It seems all ASPEED graphics cards use the same device id
             # (for driver reasons?)
-            u'2000': u'ASPEED Graphics Family',
+            '2000': 'ASPEED Graphics Family',
         }),
     INTEL: (
-        u'Intel',
+        'Intel',
         {
             # http://downloadmirror.intel.com/23188/eng/config.xml
-            u'0046': u'Ironlake HD Graphics',
-            u'0102': u'Sandy Bridge HD Graphics 2000',
-            u'0116': u'Sandy Bridge HD Graphics 3000',
-            u'0166': u'Ivy Bridge HD Graphics 4000',
-            u'0412': u'Haswell HD Graphics 4600',
-            u'041a': u'Haswell HD Graphics',
-            u'0a16': u'Intel Haswell HD Graphics 4400',
-            u'0a26': u'Haswell HD Graphics 5000',
-            u'0a2e': u'Haswell Iris Graphics 5100',
-            u'0d26': u'Haswell Iris Pro Graphics 5200',
-            u'0f31': u'Bay Trail HD Graphics',
-            u'1616': u'Broadwell HD Graphics 5500',
-            u'161e': u'Broadwell HD Graphics 5300',
-            u'1626': u'Broadwell HD Graphics 6000',
-            u'162b': u'Broadwell Iris Graphics 6100',
-            u'1912': u'Skylake HD Graphics 530',
-            u'191e': u'Skylake HD Graphics 515',
-            u'1926': u'Skylake Iris 540/550',
-            u'193b': u'Skylake Iris Pro 580',
-            u'22b1': u'Braswell HD Graphics',
-            u'3e92': u'Coffee Lake UHD Graphics 630',
-            u'5912': u'Kaby Lake HD Graphics 630',
-            u'591e': u'Kaby Lake HD Graphics 615',
-            u'5926': u'Kaby Lake Iris Plus Graphics 640',
+            '0046': 'Ironlake HD Graphics',
+            '0102': 'Sandy Bridge HD Graphics 2000',
+            '0116': 'Sandy Bridge HD Graphics 3000',
+            '0166': 'Ivy Bridge HD Graphics 4000',
+            '0412': 'Haswell HD Graphics 4600',
+            '041a': 'Haswell HD Graphics',
+            '0a16': 'Intel Haswell HD Graphics 4400',
+            '0a26': 'Haswell HD Graphics 5000',
+            '0a2e': 'Haswell Iris Graphics 5100',
+            '0d26': 'Haswell Iris Pro Graphics 5200',
+            '0f31': 'Bay Trail HD Graphics',
+            '1616': 'Broadwell HD Graphics 5500',
+            '161e': 'Broadwell HD Graphics 5300',
+            '1626': 'Broadwell HD Graphics 6000',
+            '162b': 'Broadwell Iris Graphics 6100',
+            '1912': 'Skylake HD Graphics 530',
+            '191e': 'Skylake HD Graphics 515',
+            '1926': 'Skylake Iris 540/550',
+            '193b': 'Skylake Iris Pro 580',
+            '22b1': 'Braswell HD Graphics',
+            '3e92': 'Coffee Lake UHD Graphics 630',
+            '5912': 'Kaby Lake HD Graphics 630',
+            '591e': 'Kaby Lake HD Graphics 615',
+            '5926': 'Kaby Lake Iris Plus Graphics 640',
         }),
-    MAXTROX: (u'Matrox', {
-        u'0522': u'MGA G200e',
-        u'0532': u'MGA G200eW',
-        u'0534': u'G200eR2',
+    MAXTROX: ('Matrox', {
+        '0522': 'MGA G200e',
+        '0532': 'MGA G200eW',
+        '0534': 'G200eR2',
     }),
     NVIDIA: (
-        u'Nvidia',
+        'Nvidia',
         {
             # pylint: disable=line-too-long
             # ftp://download.nvidia.com/XFree86/Linux-x86_64/352.21/README/README.txt
-            u'06fa': u'Quadro NVS 450',
-            u'08a4': u'GeForce 320M',
-            u'08aa': u'GeForce 320M',
-            u'0a65': u'GeForce 210',
-            u'0df8': u'Quadro 600',
-            u'0fd5': u'GeForce GT 650M',
-            u'0fe9': u'GeForce GT 750M Mac Edition',
-            u'0ffa': u'Quadro K600',
-            u'104a': u'GeForce GT 610',
-            u'11c0': u'GeForce GTX 660',
-            u'1244': u'GeForce GTX 550 Ti',
-            u'1401': u'GeForce GTX 960',
-            u'1ba1': u'GeForce GTX 1070',
-            u'1cb3': u'Quadro P400',
-            u'2184': u'GeForce GTX 1660',
+            '06fa': 'Quadro NVS 450',
+            '08a4': 'GeForce 320M',
+            '08aa': 'GeForce 320M',
+            '0a65': 'GeForce 210',
+            '0df8': 'Quadro 600',
+            '0fd5': 'GeForce GT 650M',
+            '0fe9': 'GeForce GT 750M Mac Edition',
+            '0ffa': 'Quadro K600',
+            '104a': 'GeForce GT 610',
+            '11c0': 'GeForce GTX 660',
+            '1244': 'GeForce GTX 550 Ti',
+            '1401': 'GeForce GTX 960',
+            '1ba1': 'GeForce GTX 1070',
+            '1cb3': 'Quadro P400',
+            '2184': 'GeForce GTX 1660',
         }),
 }
 

@@ -26,10 +26,10 @@ def _run_df():
                           stderr=subprocess.PIPE)
   for l in proc.communicate()[0].splitlines():
     l = l.decode('utf-8')
-    if l.startswith(u'/dev/'):
+    if l.startswith('/dev/'):
       items = l.split()
-      if (sys.platform == 'darwin' and
-          items[5].startswith(u'/Volumes/firmwaresyncd.')):
+      if (sys.platform == 'darwin'
+          and items[5].startswith('/Volumes/firmwaresyncd.')):
         # There's an issue on OSX where sometimes a small volume is mounted
         # during boot time and may be caught here by accident. Just ignore it as
         # it could trigger the low free disk space check and cause an unexpected
@@ -60,8 +60,8 @@ def get_disks_info():
         # bot is likely not running as root, it present an inflated value of
         # what is usable.
         #u'free_mb': round(float(items[3]) / 1024., 1),
-        u'free_mb': round(float(f.f_bavail * f.f_frsize) / 1024. / 1024., 1),
-        u'size_mb': round(float(block_size) / 1024., 1),
+        'free_mb': round(float(f.f_bavail * f.f_frsize) / 1024. / 1024., 1),
+        'size_mb': round(float(block_size) / 1024., 1),
     }
 
   return out

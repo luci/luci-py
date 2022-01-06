@@ -26,71 +26,84 @@ from api.platforms import gce
 
 class TestGCE(auto_stub.TestCase):
   _METADATA = {
-      u'project': {
-          u'projectId': u'test-proj',
-          u'numericProjectId': 123456
+      'project': {
+          'projectId': 'test-proj',
+          'numericProjectId': 123456
       },
-      u'instance': {
-          u'cpuPlatform': u'Intel Broadwell',
-          u'scheduling': {
-              u'automaticRestart': u'TRUE',
-              u'preemptible': u'FALSE',
-              u'onHostMaintenance': u'MIGRATE'
+      'instance': {
+          'cpuPlatform':
+          'Intel Broadwell',
+          'scheduling': {
+              'automaticRestart': 'TRUE',
+              'preemptible': 'FALSE',
+              'onHostMaintenance': 'MIGRATE'
           },
-          u'hostname': u'host.name',
-          u'machineType': u'projects/123456/machineTypes/n1-standard-8',
-          u'description': u'',
-          u'zone': u'projects/123456/zones/us-west1-c',
-          u'maintenanceEvent': u'NONE',
-          u'image': u'projects/test-proj/global/images/test-image',
-          u'disks': [{
-              u'interface': u'SCSI',
-              u'deviceName': u'persistent-disk-0',
-              u'type': u'PERSISTENT',
-              u'mode': u'READ_WRITE',
-              u'index': 0
+          'hostname':
+          'host.name',
+          'machineType':
+          'projects/123456/machineTypes/n1-standard-8',
+          'description':
+          '',
+          'zone':
+          'projects/123456/zones/us-west1-c',
+          'maintenanceEvent':
+          'NONE',
+          'image':
+          'projects/test-proj/global/images/test-image',
+          'disks': [{
+              'interface': 'SCSI',
+              'deviceName': 'persistent-disk-0',
+              'type': 'PERSISTENT',
+              'mode': 'READ_WRITE',
+              'index': 0
           }],
-          u'licenses': [{
-              u'id': u'1000001'
+          'licenses': [{
+              'id': '1000001'
           }],
-          u'preempted': u'FALSE',
-          u'remainingCpuTime': -1,
-          u'virtualClock': {
-              u'driftToken': u'0'
+          'preempted':
+          'FALSE',
+          'remainingCpuTime':
+          -1,
+          'virtualClock': {
+              'driftToken': '0'
           },
-          u'legacyEndpointAccess': {
-              u'0.1': 0,
-              u'v1beta1': 0
+          'legacyEndpointAccess': {
+              '0.1': 0,
+              'v1beta1': 0
           },
-          u'serviceAccounts': {
-              u'default': {
-                  u'scopes': [
-                      u'https://www.googleapis.com/auth/compute',
-                      u'https://www.googleapis.com/auth/logging.write',
-                      u'https://www.googleapis.com/auth/monitoring',
+          'serviceAccounts': {
+              'default': {
+                  'scopes': [
+                      'https://www.googleapis.com/auth/compute',
+                      'https://www.googleapis.com/auth/logging.write',
+                      'https://www.googleapis.com/auth/monitoring',
                   ],
-                  u'email': u'test@test-proj.iam.gserviceaccount.com',
-                  u'aliases': [u'default']
+                  'email':
+                  'test@test-proj.iam.gserviceaccount.com',
+                  'aliases': ['default']
               },
-              u'test@test-proj.iam.gserviceaccount.com': {
-                  u'scopes': [
-                      u'https://www.googleapis.com/auth/compute',
-                      u'https://www.googleapis.com/auth/logging.write',
-                      u'https://www.googleapis.com/auth/monitoring',
+              'test@test-proj.iam.gserviceaccount.com': {
+                  'scopes': [
+                      'https://www.googleapis.com/auth/compute',
+                      'https://www.googleapis.com/auth/logging.write',
+                      'https://www.googleapis.com/auth/monitoring',
                   ],
-                  u'email': u'test@test-proj.iam.gserviceaccount.com',
-                  u'aliases': [u'default']
+                  'email':
+                  'test@test-proj.iam.gserviceaccount.com',
+                  'aliases': ['default']
               }
           },
-          u'networkInterfaces': [],
-          u'guestAttributes': {},
-          u'id': 987654,
-          u'tags': [u'tag1', u'tag2'],
-          u'name': u'test-inst'
+          'networkInterfaces': [],
+          'guestAttributes': {},
+          'id':
+          987654,
+          'tags': ['tag1', 'tag2'],
+          'name':
+          'test-inst'
       },
-      u'oslogin': {
-          u'authenticate': {
-              u'sessions': {}
+      'oslogin': {
+          'authenticate': {
+              'sessions': {}
           }
       }
   }

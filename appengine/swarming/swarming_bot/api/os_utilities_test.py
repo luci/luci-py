@@ -20,7 +20,6 @@ import mock
 # TODO(github.com/wolever/parameterized/issues/91)
 # use parameterized after the bug is resolved.
 from nose2.tools import params
-import six
 
 import test_env_api
 test_env_api.setup_test_env()
@@ -47,17 +46,17 @@ class TestOsUtilities(auto_stub.TestCase):
     tools.clear_cache_all()
 
   def test_get_os_name(self):
-    expected = (u'Debian', u'Linux', u'Mac', u'Raspbian', u'Ubuntu', u'Windows')
+    expected = ('Debian', 'Linux', 'Mac', 'Raspbian', 'Ubuntu', 'Windows')
     self.assertIn(os_utilities.get_os_name(), expected)
 
   @params(
-      ('x86_64', u'x86'),
-      ('amd64', u'x86'),
-      ('i386', u'x86'),
-      ('i686', u'x86'),
-      ('aarch64', u'arm64'),
-      ('mips64', u'mips'),
-      ('arm64', u'arm64'),
+      ('x86_64', 'x86'),
+      ('amd64', 'x86'),
+      ('i386', 'x86'),
+      ('i686', 'x86'),
+      ('aarch64', 'arm64'),
+      ('mips64', 'mips'),
+      ('arm64', 'arm64'),
   )
   def test_get_cpu_type(self, machine, expected):
     self.mock(platform, 'machine', lambda: machine)
@@ -84,7 +83,7 @@ class TestOsUtilities(auto_stub.TestCase):
           ['Mac', 'Mac-10', 'Mac-10.15', 'Mac-10.15.5', 'Mac-10.15.5-19F101'])
 
   def test_get_cpu_bitness(self):
-    expected = (u'32', u'64')
+    expected = ('32', '64')
     self.assertIn(os_utilities.get_cpu_bitness(), expected)
 
   def test_get_cpu_dimensions(self):
@@ -92,17 +91,13 @@ class TestOsUtilities(auto_stub.TestCase):
     self.assertGreater(len(values), 1)
 
   def test_get_cpu_dimensions_mips(self):
-    if six.PY2:
-      self.mock(sys, 'platform', 'linux2')
-    else:
-      self.mock(sys, 'platform', 'linux')
+    self.mock(sys, 'platform', 'linux')
     self.mock(platform, 'machine', lambda: 'mips64')
-    self.mock(os_utilities, 'get_cpuinfo',
-              lambda: {u'name': 'Cavium Octeon II V0.1'})
+    self.mock(os_utilities,
+              'get_cpuinfo', lambda: {'name': 'Cavium Octeon II V0.1'})
     self.mock(sys, 'maxsize', 2**31 - 1)
-    self.assertEqual(
-        os_utilities.get_cpu_dimensions(),
-        [u'mips', u'mips-32', u'mips-32-Cavium_Octeon_II_V0.1'])
+    self.assertEqual(os_utilities.get_cpu_dimensions(),
+                     ['mips', 'mips-32', 'mips-32-Cavium_Octeon_II_V0.1'])
 
   def test_parse_intel_model(self):
     examples = [
@@ -125,23 +120,13 @@ class TestOsUtilities(auto_stub.TestCase):
       actual = os_utilities._parse_intel_model(i)
       self.assertEqual(expected, actual)
 
-  @unittest.skipUnless(six.PY2, 'Python2 only')
-  def test_get_python_versions_py2(self):
-    versions = os_utilities.get_python_versions()
-    self.assertEqual(len(versions), 3)
-    self.assertEqual(versions[0], u'2')
-    self.assertEqual(versions[1], u'2.7')
-    # we don't know which micro version we use in test.
-    self.assertRegexpMatches(versions[2], u'2.7.[0-9]+')
-
-  @unittest.skipUnless(six.PY3, 'Python3 only')
   def test_get_python_versions_py3(self):
     versions = os_utilities.get_python_versions()
     self.assertEqual(len(versions), 3)
-    self.assertEqual(versions[0], u'3')
-    self.assertEqual(versions[1], u'3.8')
+    self.assertEqual(versions[0], '3')
+    self.assertEqual(versions[1], '3.8')
     # we don't know which micro version we use in test.
-    self.assertRegex(versions[2], u'3.8.[0-9]+')
+    self.assertRegex(versions[2], '3.8.[0-9]+')
 
   def test_get_ip(self):
     ip = os_utilities.get_ip()
@@ -159,7 +144,7 @@ class TestOsUtilities(auto_stub.TestCase):
   def test_get_disks_info(self):
     info = os_utilities.get_disks_info()
     self.assertGreater(len(info), 0)
-    root_path = u'c:\\' if sys.platform == 'win32' else u'/'
+    root_path = 'c:\\' if sys.platform == 'win32' else '/'
     root = info[root_path]
     # Round the same way.
     free_disk = round(
@@ -176,44 +161,43 @@ class TestOsUtilities(auto_stub.TestCase):
   def test_get_dimensions(self):
     dimensions = os_utilities.get_dimensions()
     for key, values in dimensions.items():
-      self.assertIsInstance(key, six.text_type)
+      self.assertIsInstance(key, str)
       self.assertIsInstance(values, list)
       for value in values:
-        self.assertIsInstance(value, six.text_type)
+        self.assertIsInstance(value, str)
     actual = set(dimensions)
     # Only set when the process is running in a properly configured GUI context.
-    actual.discard(u'locale')
+    actual.discard('locale')
     # Only set on machines with SSD.
-    actual.discard(u'ssd')
+    actual.discard('ssd')
     # There are cases where this dimension is not set.
-    actual.discard(u'machine_type')
+    actual.discard('machine_type')
     # Only set on ARM Linux machines.
-    actual.discard(u'device_tree_compatible')
+    actual.discard('device_tree_compatible')
     # Only set on bare metal Linux machines.
-    actual.discard(u'cpu_governor')
+    actual.discard('cpu_governor')
     # Only set on Windows machines.
-    actual.discard(u'visual_studio_version')
+    actual.discard('visual_studio_version')
     # Only set on Windows machines.
-    actual.discard(u'windows_client_version')
+    actual.discard('windows_client_version')
 
-    expected = {
-        u'cores', u'cpu', u'gce', u'gpu', u'id', u'os', u'pool', u'python'}
+    expected = {'cores', 'cpu', 'gce', 'gpu', 'id', 'os', 'pool', 'python'}
     if platforms.is_gce():
-      expected.add(u'image')
-      expected.add(u'zone')
-      expected.add(u'gcp')
+      expected.add('image')
+      expected.add('zone')
+      expected.add('gcp')
     if sys.platform == 'darwin':
-      expected.add(u'mac_model')
-      expected.add(u'display_attached')
+      expected.add('mac_model')
+      expected.add('display_attached')
       # Bot may not have HiDPI and Xcode preinstalled
-      actual.discard(u'hidpi')
-      actual.discard(u'xcode_version')
-      actual.discard(u'device')  # iOS devices
+      actual.discard('hidpi')
+      actual.discard('xcode_version')
+      actual.discard('device')  # iOS devices
     if sys.platform.startswith('linux'):
-      expected.add(u'inside_docker')
-      expected.add(u'kvm')
+      expected.add('inside_docker')
+      expected.add('kvm')
     if sys.platform == 'win32':
-      expected.add(u'integrity')
+      expected.add('integrity')
     self.assertEqual(expected, actual)
 
   def test_override_id_via_env(self):
@@ -221,41 +205,41 @@ class TestOsUtilities(auto_stub.TestCase):
     mock_env['SWARMING_BOT_ID'] = 'customid'
     self.mock(os, 'environ', mock_env)
     dimensions = os_utilities.get_dimensions()
-    self.assertIsInstance(dimensions[u'id'], list)
-    self.assertEqual(len(dimensions[u'id']), 1)
-    self.assertIsInstance(dimensions[u'id'][0], six.text_type)
-    self.assertEqual(dimensions[u'id'][0], u'customid')
+    self.assertIsInstance(dimensions['id'], list)
+    self.assertEqual(len(dimensions['id']), 1)
+    self.assertIsInstance(dimensions['id'][0], str)
+    self.assertEqual(dimensions['id'][0], 'customid')
 
   def test_get_state(self):
     actual = os_utilities.get_state()
     actual.pop('reboot_required', None)
     actual.pop('temp', None)
     expected = {
-        u'audio',
-        u'cost_usd_hour',
-        u'cpu_name',
-        u'cwd',
-        u'disks',
-        u'env',
-        u'gpu',
-        u'ip',
-        u'hostname',
-        u'nb_files_in_temp',
-        u'pid',
-        u'python',
-        u'ram',
-        u'running_time',
-        u'ssd',
-        u'started_ts',
-        u'uptime',
-        u'user',
+        'audio',
+        'cost_usd_hour',
+        'cpu_name',
+        'cwd',
+        'disks',
+        'env',
+        'gpu',
+        'ip',
+        'hostname',
+        'nb_files_in_temp',
+        'pid',
+        'python',
+        'ram',
+        'running_time',
+        'ssd',
+        'started_ts',
+        'uptime',
+        'user',
     }
     if sys.platform in ('cygwin', 'win32'):
-      expected.add(u'cygwin')
+      expected.add('cygwin')
     if sys.platform == 'darwin':
-      expected.add(u'xcode')
-    if u'quarantined' in actual:
-      self.fail(actual[u'quarantined'])
+      expected.add('xcode')
+    if 'quarantined' in actual:
+      self.fail(actual['quarantined'])
     self.assertEqual(expected, set(actual))
 
   def test_get_hostname_gce_docker(self):

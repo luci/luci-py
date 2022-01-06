@@ -8,7 +8,6 @@
 
 import sys
 
-import six
 
 if sys.platform == 'cygwin':
   from api.platforms import gce

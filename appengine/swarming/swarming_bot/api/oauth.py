@@ -9,8 +9,7 @@
 import json
 import logging
 import time
-
-from six.moves import urllib
+import urllib.request
 
 
 def oauth2_access_token_from_url(url, headers):

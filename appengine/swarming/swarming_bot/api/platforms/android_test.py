@@ -138,51 +138,55 @@ class TestGetDimensions(unittest.TestCase):
     })
 
   def test_shield_get_dimensions(self):
-    self.assertEqual({
-        u'android_devices': ['1'],
-        u'device_gms_core_version': ['unknown'],
-        u'device_os': ['N', 'NRD90M'],
-        u'device_os_flavor': ['nvidia'],
-        u'device_playstore_version': ['unknown'],
-        u'device_type': ['darcy', 'foster'],
-        u'os': ['Android'],
-    }, android.get_dimensions([self.get_mock_nvidia_shield()]))
+    self.assertEqual(
+        {
+            'android_devices': ['1'],
+            'device_gms_core_version': ['unknown'],
+            'device_os': ['N', 'NRD90M'],
+            'device_os_flavor': ['nvidia'],
+            'device_playstore_version': ['unknown'],
+            'device_type': ['darcy', 'foster'],
+            'os': ['Android'],
+        }, android.get_dimensions([self.get_mock_nvidia_shield()]))
 
   def test_nexus5x_get_dimensions(self):
-    self.assertEqual({
-        u'android_devices': ['1'],
-        u'device_gms_core_version': ['8.1.86'],
-        u'device_os': ['M', 'MMB29Q'],
-        u'device_os_flavor': ['google'],
-        u'device_os_type': ['userdebug'],
-        u'device_playstore_version': ['1.2.3'],
-        u'device_type': ['bullhead'],
-        u'os': ['Android'],
-    }, android.get_dimensions([self.get_mock_nexus5x()]))
+    self.assertEqual(
+        {
+            'android_devices': ['1'],
+            'device_gms_core_version': ['8.1.86'],
+            'device_os': ['M', 'MMB29Q'],
+            'device_os_flavor': ['google'],
+            'device_os_type': ['userdebug'],
+            'device_playstore_version': ['1.2.3'],
+            'device_type': ['bullhead'],
+            'os': ['Android'],
+        }, android.get_dimensions([self.get_mock_nexus5x()]))
 
   def test_pixel2xl_get_dimensions(self):
-    self.assertEqual({
-        u'android_devices': ['1'],
-        u'device_gms_core_version': ['12.8.62'],
-        u'device_os': ['P', 'PPR1.180610.009'],
-        u'device_os_flavor': ['google'],
-        u'device_os_type': ['userdebug'],
-        u'device_playstore_version': ['1.2.3'],
-        u'device_type': ['taimen'],
-        u'os': ['Android'],
-    }, android.get_dimensions([self.get_mock_pixel2xl()]))
+    self.assertEqual(
+        {
+            'android_devices': ['1'],
+            'device_gms_core_version': ['12.8.62'],
+            'device_os': ['P', 'PPR1.180610.009'],
+            'device_os_flavor': ['google'],
+            'device_os_type': ['userdebug'],
+            'device_playstore_version': ['1.2.3'],
+            'device_type': ['taimen'],
+            'os': ['Android'],
+        }, android.get_dimensions([self.get_mock_pixel2xl()]))
 
   def test_galaxyS6_get_dimensions(self):
-    self.assertEqual({
-        u'android_devices': ['1'],
-        u'device_gms_core_version': ['11.5.09'],
-        u'device_os': ['N', 'NRD90M'],
-        u'device_os_flavor': ['samsung'],
-        u'device_os_type': ['user'],
-        u'device_playstore_version': ['1.2.3'],
-        u'device_type': ['universal7420', 'zerofltetmo'],
-        u'os': ['Android'],
-    }, android.get_dimensions([self.get_mock_galaxyS6()]))
+    self.assertEqual(
+        {
+            'android_devices': ['1'],
+            'device_gms_core_version': ['11.5.09'],
+            'device_os': ['N', 'NRD90M'],
+            'device_os_flavor': ['samsung'],
+            'device_os_type': ['user'],
+            'device_playstore_version': ['1.2.3'],
+            'device_type': ['universal7420', 'zerofltetmo'],
+            'os': ['Android'],
+        }, android.get_dimensions([self.get_mock_galaxyS6()]))
 
 
 if __name__ == '__main__':
