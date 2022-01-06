@@ -126,13 +126,18 @@ class ServerApiTest(BaseTest):
     self.mock_default_pool_acl([])
     self.mock(config.config, 'config_service_hostname', lambda: 'a.server')
 
-    response = self.call_api('details')
+    with mock.patch.dict("os.environ", {"CHOPS_GIT_VERSION": '5626-39642e9'}):
+      response = self.call_api('details')
 
     expected = {
         u'bot_version':
             unicode(bot_code.get_bot_version('https://testbed.example.com')[0]),
         u'display_server_url_template':
             u'',
+        u'project_id':
+            u'sample-app',
+        u'chops_git_version':
+            u'5626-39642e9',
         u'luci_config':
             u'a.server',
         u'server_version':

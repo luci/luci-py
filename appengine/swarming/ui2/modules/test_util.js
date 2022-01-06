@@ -98,7 +98,9 @@ function isElement(ele) {
 
 export function mockAppGETs(fetchMock, permissions) {
   fetchMock.get('/_ah/api/swarming/v1/server/details', {
-    server_version: '1234-abcdefg',
+    project_id: 'chromium-swarm',
+    server_version: 'swarming-staging-default-v024',
+    chops_git_version: '5629-2cfcb6',
     bot_version: 'abcdoeraymeyouandme',
     machine_provider_template: 'https://example.com/leases/%s',
     display_server_url_template: 'https://example.com#id=%s',
@@ -110,7 +112,9 @@ export function mockAppGETs(fetchMock, permissions) {
 
 export function mockAuthdAppGETs(fetchMock, permissions) {
   fetchMock.get('/_ah/api/swarming/v1/server/details', requireLogin({
-    server_version: '1234-abcdefg',
+    project_id: 'chromium-swarm',
+    server_version: 'swarming-staging-default-v024',
+    chops_git_version: '5629-2cfcb6',
     bot_version: 'abcdoeraymeyouandme',
     machine_provider_template: 'https://example.com/leases/%s',
     display_server_url_template: 'https://example.com#id=%s',
