@@ -5,15 +5,15 @@
 
 import logging
 import os
+import plistlib
 import sys
 import textwrap
 import unittest
+from unittest import mock
 
 # TODO(github.com/wolever/parameterized/issues/91)
 # use parameterized after the bug is resolved.
 from nose2.tools import params
-import mock
-import six
 
 import test_env_platforms
 test_env_platforms.setup_test_env()
@@ -44,7 +44,7 @@ class TestOsx(unittest.TestCase):
     self.mock_check_output.return_value = textwrap.dedent("""\
       Xcode 11.5
       Build version 11E608c
-    """).encode()
+    """)
     self.mock_listdir.side_effect = [
         # os.listdir('/Applications')
         ['Google Chrome.app', 'Safari.app', 'Xcode.app'],
@@ -66,11 +66,11 @@ class TestOsx(unittest.TestCase):
         textwrap.dedent("""\
         Xcode 11.5
         Build version abcd
-      """).encode(),
+      """),
         textwrap.dedent("""\
         Xcode 11.4
         Build version efgh
-      """).encode(),
+      """),
     ]
     self.mock_listdir.side_effect = [
         # os.listdir('/Applications')
@@ -84,35 +84,35 @@ class TestOsx(unittest.TestCase):
     self.mock_check_output.return_value = textwrap.dedent("""\
       Xcode 11.5
       Build version 11E608c
-    """).encode()
+    """)
 
     version = osx.get_current_xcode_version()
     self.assertEqual(version, ('11.5', '11E608c'))
 
   def test_get_ios_device_ids(self):
-    self.mock_check_output.return_value = b'1234abcd\n'
+    self.mock_check_output.return_value = '1234abcd\n'
     self.assertEqual(osx.get_ios_device_ids(), ['1234abcd'])
 
   def test_get_ios_version(self):
-    self.mock_check_output.return_value = b'13.5\n'
+    self.mock_check_output.return_value = '13.5\n'
     self.assertEqual(osx.get_ios_version('1234abcd'), '13.5')
 
   def test_get_ios_device_type(self):
-    self.mock_check_output.return_value = b'iPhone12,1\n'
+    self.mock_check_output.return_value = 'iPhone12,1\n'
     self.assertEqual(osx.get_ios_device_type('1234abcd'), 'iPhone12,1')
 
   def test_get_hardware_model_string(self):
-    self.mock_check_output.return_value = b'MacBookPro15,1\n'
+    self.mock_check_output.return_value = 'MacBookPro15,1\n'
     hw_model = osx.get_hardware_model_string()
     self.assertEqual(hw_model, 'MacBookPro15,1')
 
   def test_get_os_version_number(self):
-    self.mock_check_output.return_value = b'10.15.5\n'
+    self.mock_check_output.return_value = '10.15.5\n'
     os_version = osx.get_os_version_number()
     self.assertEqual(os_version, '10.15.5')
 
   def test_get_os_build_version(self):
-    self.mock_check_output.return_value = b'19F101\n'
+    self.mock_check_output.return_value = '19F101\n'
     build_version = osx.get_os_build_version()
     self.assertEqual(build_version, '19F101')
 
@@ -232,8 +232,8 @@ class TestOsx(unittest.TestCase):
     self.mock_check_output.side_effect = [plist]
 
     gpus = osx.get_gpu()
-    self.assertEqual(([u'1002', u'1002:67ef', u'8086', u'8086:3e9b'
-                      ], [u'AMD Radeon RX 560', u'Intel UHD Graphics 630']),
+    self.assertEqual((['1002', '1002:67ef', '8086', '8086:3e9b'
+                       ], ['AMD Radeon RX 560', 'Intel UHD Graphics 630']),
                      gpus)
 
   def test_get_cpuinfo(self):
@@ -291,22 +291,23 @@ class TestOsx(unittest.TestCase):
         machdep.cpu.tlb.data.small_level1: 64
         machdep.cpu.address_bits.physical: 39
         machdep.cpu.address_bits.virtual: 48
-    """).encode()
+    """)
 
     expected = {
-        u'vendor': u'GenuineIntel',
-        u'model': [6, 158, 10, 202],
-        u'flags': [
-            u'acpi', u'aes', u'apic', u'avx1.0', u'clfsh', u'cmov', u'cx16',
-            u'cx8', u'de', u'ds', u'dscpl', u'dtes64', u'est', u'f16c', u'fma',
-            u'fpu', u'fxsr', u'htt', u'mca', u'mce', u'mmx', u'mon', u'movbe',
-            u'msr', u'mtrr', u'osxsave', u'pae', u'pat', u'pbe', u'pcid',
-            u'pclmulqdq', u'pdcm', u'pge', u'popcnt', u'pse', u'pse36',
-            u'rdrand', u'seglim64', u'sep', u'ss', u'sse', u'sse2', u'sse3',
-            u'sse4.1', u'sse4.2', u'ssse3', u'tm', u'tm2', u'tpr', u'tsc',
-            u'tsctmr', u'vme', u'vmx', u'x2apic', u'xsave'
+        'vendor':
+        'GenuineIntel',
+        'model': [6, 158, 10, 202],
+        'flags': [
+            'acpi', 'aes', 'apic', 'avx1.0', 'clfsh', 'cmov', 'cx16', 'cx8',
+            'de', 'ds', 'dscpl', 'dtes64', 'est', 'f16c', 'fma', 'fpu', 'fxsr',
+            'htt', 'mca', 'mce', 'mmx', 'mon', 'movbe', 'msr', 'mtrr',
+            'osxsave', 'pae', 'pat', 'pbe', 'pcid', 'pclmulqdq', 'pdcm', 'pge',
+            'popcnt', 'pse', 'pse36', 'rdrand', 'seglim64', 'sep', 'ss', 'sse',
+            'sse2', 'sse3', 'sse4.1', 'sse4.2', 'ssse3', 'tm', 'tm2', 'tpr',
+            'tsc', 'tsctmr', 'vme', 'vmx', 'x2apic', 'xsave'
         ],
-        u'name': u'Intel(R) Core(TM) i7-8750H CPU @ 2.20GHz'
+        'name':
+        'Intel(R) Core(TM) i7-8750H CPU @ 2.20GHz'
     }
     self.assertEqual(osx.get_cpuinfo(), expected)
 
@@ -464,7 +465,7 @@ class TestOsx(unittest.TestCase):
     self.mock_check_output.side_effect = side_effect
 
     ssd = osx.get_ssd()
-    self.assertEqual((u'disk0', u'disk2'), ssd)
+    self.assertEqual(('disk0', 'disk2'), ssd)
 
   def test_get_disks_model(self):
     disks_data = {
@@ -481,12 +482,12 @@ class TestOsx(unittest.TestCase):
     self.mock_check_output.side_effect = side_effect
 
     disks_model = osx.get_disks_model()
-    self.assertEqual((u'APPLE SSD AP0256M', u'APPLE SSD AP0257M'), disks_model)
+    self.assertEqual(('APPLE SSD AP0256M', 'APPLE SSD AP0257M'), disks_model)
 
   def test_generate_launchd_plist(self):
     plist_data = osx.generate_launchd_plist(['echo', 'hi'], os.getcwd(),
                                             'org.swarm.bot.plist')
-    plist = osx._read_plist(plist_data.encode())
+    plist = plistlib.loads(plist_data.encode())
     self.assertEqual(plist['Label'], 'org.swarm.bot.plist')
     self.assertEqual(plist['Program'], 'echo')
     self.assertEqual(plist['ProgramArguments'], ['echo', 'hi'])
