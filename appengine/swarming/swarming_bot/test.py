@@ -6,8 +6,6 @@
 import os
 import sys
 
-import six
-
 
 THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 APPENGINE_DIR = os.path.dirname(os.path.dirname(THIS_DIR))
@@ -40,7 +38,7 @@ def run_tests_parralel():
   # execute test runner
   sys.path.insert(0, COMPONENTS_DIR)
   from test_support import parallel_test_runner
-  return parallel_test_runner.run_tests(python3=six.PY3, plugins=plugins)
+  return parallel_test_runner.run_tests(python3=True, plugins=plugins)
 
 
 def run_tests_sequential():
@@ -53,7 +51,7 @@ def run_tests_sequential():
 
   # execute test runner
   from test_support import sequential_test_runner
-  return sequential_test_runner.run_tests(test_cmds, python3=six.PY3)
+  return sequential_test_runner.run_tests(test_cmds, python3=True)
 
 
 if __name__ == '__main__':

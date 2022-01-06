@@ -13,8 +13,6 @@ import time
 import traceback
 import uuid
 
-from six.moves import urllib
-
 from utils import net
 
 from bot_code.remote_client_errors import BotCodeError

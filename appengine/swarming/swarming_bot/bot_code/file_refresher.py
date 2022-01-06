@@ -4,9 +4,8 @@
 
 import json
 import logging
+import queue
 import threading
-
-from six.moves import queue
 
 from utils import file_path
 

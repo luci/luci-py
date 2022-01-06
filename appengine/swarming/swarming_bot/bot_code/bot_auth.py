@@ -8,8 +8,6 @@ import logging
 import threading
 import time
 
-import six
-
 from utils import auth_server
 
 from bot_code import file_reader
@@ -138,11 +136,11 @@ def process_auth_params_json(val):
     raise ValueError('Expecting dict, got %r' % (val,))
 
   bot_id = val.get('bot_id')
-  if not isinstance(bot_id, six.string_types):
+  if not isinstance(bot_id, str):
     raise ValueError('Expecting "bot_id" to be a string, got %r' % (bot_id,))
 
   task_id = val.get('task_id')
-  if not isinstance(task_id, six.string_types):
+  if not isinstance(task_id, str):
     raise ValueError('Expecting "task_id" to be a string, got %r' % (task_id,))
 
   headers = val.get('swarming_http_headers') or {}
@@ -151,7 +149,7 @@ def process_auth_params_json(val):
         'Expecting "swarming_http_headers" to be dict, got %r' % (headers,))
 
   exp = val.get('swarming_http_headers_exp')
-  if not (exp is None or isinstance(exp, six.integer_types)):
+  if not (exp is None or isinstance(exp, int)):
     raise ValueError(
         'Expecting "swarming_http_headers_exp" to be int or None, got %r'
         % (exp,))
@@ -163,7 +161,7 @@ def process_auth_params_json(val):
 
   def read_account(key):
     acc = val.get(key) or 'none'
-    if not isinstance(acc, six.string_types):
+    if not isinstance(acc, str):
       raise ValueError('Expecting "%s" to be a string, got %r' % (key, acc))
     return str(acc)
 
@@ -591,9 +589,9 @@ class AuthSystem(object):
     Returns:
       auth_server.AccessToken.
     """
-    if not token or not isinstance(token, six.string_types):
+    if not token or not isinstance(token, str):
       raise auth_server.RPCError(500, 'Bad server reply, no valid token given')
-    if not expiry or not isinstance(expiry, six.integer_types):
+    if not expiry or not isinstance(expiry, int):
       raise auth_server.RPCError(500, 'Bad server reply, no token expiry given')
     # Normalize types (unicode -> str, long -> int).
     return auth_server.AccessToken(str(token), int(expiry))

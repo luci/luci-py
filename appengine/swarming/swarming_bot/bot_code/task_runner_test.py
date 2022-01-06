@@ -23,7 +23,6 @@ import time
 import unittest
 
 import mock
-import six
 
 import test_env_bot_code
 test_env_bot_code.setup_test_env()
@@ -97,7 +96,7 @@ def get_manifest(script=None, **kwargs):
       'resultdb': None,
       'secret_bytes': None,
       'service_accounts': None,
-      'task_id': six.text_type(gen_task_id()),
+      'task_id': gen_task_id(),
   }
   out.update(kwargs)
   return out
@@ -159,7 +158,7 @@ class TestTaskRunnerBase(auto_stub.TestCase):
   def setUp(self):
     super(TestTaskRunnerBase, self).setUp()
     tools.clear_cache_all()
-    self.root_dir = six.ensure_text(tempfile.mkdtemp(prefix=u'task_runner'))
+    self.root_dir = tempfile.mkdtemp(prefix=u'task_runner')
     self.work_dir = os.path.join(self.root_dir, u'w')
     # Create the logs directory so run_isolated.py can put its log there.
     self.logs_dir = os.path.join(self.root_dir, u'logs')
@@ -269,7 +268,7 @@ class TestTaskRunnerBase(auto_stub.TestCase):
       if v is None:
         expected.pop(k)
       else:
-        expected[six.ensure_text(k)] = v
+        expected[k] = v
 
     # Use explicit <= verification for these.
     for k in (u'bot_overhead', u'cost_usd', u'duration'):
@@ -1214,7 +1213,7 @@ class TaskRunnerNoServer(auto_stub.TestCase):
 
   def setUp(self):
     super(TaskRunnerNoServer, self).setUp()
-    self.root_dir = six.ensure_text(tempfile.mkdtemp(prefix=u'task_runner'))
+    self.root_dir = tempfile.mkdtemp(prefix=u'task_runner')
 
   def tearDown(self):
     try:

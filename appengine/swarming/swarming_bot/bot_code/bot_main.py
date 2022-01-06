@@ -38,8 +38,6 @@ import traceback
 import types
 import zipfile
 
-import six
-
 # Import _strptime before threaded code. datetime.datetime.strptime is
 # threadsafe except for the initial import of the _strptime module.
 # See https://bugs.python.org/issue7980.
@@ -78,7 +76,7 @@ _ERROR_HANDLER_WAS_REGISTERED = False
 #
 # Note: this more or less requires the bot to be in a path without non-ASCII
 # characters.
-THIS_FILE = six.ensure_text(os.path.abspath(zip_package.get_main_script_path()))
+THIS_FILE = os.path.abspath(zip_package.get_main_script_path())
 THIS_DIR = os.path.dirname(THIS_FILE)
 
 
@@ -248,7 +246,7 @@ def _register_extra_bot_config(content, rev, script):
   This file is called implicitly by _call_hook() and _call_hook_safe().
   """
   global _EXTRA_BOT_CONFIG
-  if isinstance(content, six.text_type):
+  if isinstance(content, str):
     # compile will throw if there's a '# coding: utf-8' line and the string is
     # in unicode. <3 python.
     content = content.encode('utf-8')
@@ -705,7 +703,7 @@ def _cleanup_bot_directory(botobj):
     if any(fnmatch.fnmatch(i, w) for w in PASSLIST):
       continue
     try:
-      p = six.ensure_text(os.path.join(botobj.base_dir, i))
+      p = os.path.join(botobj.base_dir, i)
       if fs.isdir(p):
         file_path.rmtree(p)
       else:
@@ -1166,7 +1164,7 @@ def _run_bot_inner(arg_error, quit_bit):
     return 0
 
   # This environment variable is accessible to the tasks executed by this bot.
-  os.environ['SWARMING_BOT_ID'] = six.ensure_str(botobj.id)
+  os.environ['SWARMING_BOT_ID'] = botobj.id
 
   # bot_id is used in 'X-Luci-Swarming-Bot-ID' header.
   botobj.remote.bot_id = botobj.id

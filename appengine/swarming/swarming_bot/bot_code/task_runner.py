@@ -23,8 +23,6 @@ import sys
 import time
 import traceback
 
-import six
-
 from api import os_utilities
 from bot_code import bot_auth
 from bot_code import remote_client
@@ -229,20 +227,11 @@ class TaskDetails(object):
     # Raw command.
     self.command = data['command'] or []
     self.relative_cwd = data['relative_cwd']
-
     self.cas_input_root = data['cas_input_root']
-
     self.cipd_input = data['cipd_input']
-
     self.caches = data['caches']
-
-    self.env = {
-        six.ensure_str(k): six.ensure_str(v) for k, v in data['env'].items()
-    }
-    self.env_prefixes = {
-        six.ensure_str(k): [six.ensure_str(path) for path in v]
-        for k, v in (data.get('env_prefixes') or {}).items()
-    }
+    self.env = data['env']
+    self.env_prefixes = data.get('env_prefixes') or {}
     self.grace_period = data['grace_period']
     self.hard_timeout = data['hard_timeout']
     self.io_timeout = data['io_timeout']
@@ -858,7 +847,7 @@ def run_command(remote, task_details, work_dir, cost_usd_hour,
         u'version': OUT_VERSION,
     }
   finally:
-    file_path.try_remove(six.ensure_text(isolated_result))
+    file_path.try_remove(isolated_result)
 
 
 def main(args):

@@ -17,8 +17,6 @@ import unittest
 import uuid
 import zipfile
 
-import six
-
 import test_env_bot_code
 test_env_bot_code.setup_test_env()
 
@@ -93,7 +91,7 @@ class TestBotBase(net_utils.TestCase):
         remote_client.createRemoteClient('https://localhost:1', auth_headers_cb,
                                          'localhost', self.root_dir),
         copy.deepcopy(self.attributes), 'https://localhost:1', 'version1',
-        six.ensure_text(self.root_dir), self.fail)
+        self.root_dir, self.fail)
 
 
 class TestBotMain(TestBotBase):
@@ -115,10 +113,8 @@ class TestBotMain(TestBotBase):
       config = json.load(f)
     self.mock(bot_main, 'get_config', lambda: config)
     self.mock(bot_main, '_bot_restart', self.fail)
-    self.mock(
-        bot_main, 'THIS_FILE',
-        six.ensure_text(
-            os.path.join(test_env_bot_code.BOT_DIR, 'swarming_bot.zip')))
+    self.mock(bot_main, 'THIS_FILE',
+              os.path.join(test_env_bot_code.BOT_DIR, 'swarming_bot.zip'))
     # Need to disable this otherwise it'd kill the current checkout.
     self.mock(bot_main, '_cleanup_bot_directory', lambda _: None)
     # Test results shouldn't depend on where they run. And they should not use
@@ -1051,9 +1047,8 @@ class TestBotMain(TestBotBase):
       restarts.append(1)
     self.mock(bot_main, '_bot_restart', bot_restart)
     # Mock the file to download in the temporary directory.
-    self.mock(
-        bot_main, 'THIS_FILE',
-        six.ensure_text(os.path.join(self.root_dir, 'swarming_bot.1.zip')))
+    self.mock(bot_main, 'THIS_FILE',
+              os.path.join(self.root_dir, 'swarming_bot.1.zip'))
     new_zip = os.path.join(self.root_dir, 'swarming_bot.2.zip')
     # This is necessary otherwise zipfile will crash.
     self.mock(time, 'time', lambda: 1400000000)

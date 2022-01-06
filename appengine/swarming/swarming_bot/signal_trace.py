@@ -13,19 +13,10 @@ import sys
 import threading
 import traceback
 
-import six
-
 
 def _dump(_sig, frame):
   """Dumps the stack trace of all threads."""
-
-  # traceback.print_stack uses bytes-like object in python2, but not in
-  # python3
-  if six.PY2:
-    buf = io.BytesIO()
-  else:
-    buf = io.StringIO()
-
+  buf = io.StringIO()
   buf.write('** SIGUSR1 received **\n')
   for t in sorted(threading.enumerate(), key=lambda x: x.name):
     buf.write('%s:\n' % t.name)

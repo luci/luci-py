@@ -10,8 +10,6 @@ import subprocess
 import sys
 import unittest
 
-import six
-
 THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
