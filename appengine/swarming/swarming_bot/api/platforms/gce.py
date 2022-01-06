@@ -11,13 +11,11 @@ import re
 import socket
 import threading
 import time
+import urllib.parse
+import urllib.request
 
 from api import oauth
 from utils import tools
-
-from six.moves import urllib
-import six
-
 
 ### Private stuff.
 
@@ -46,7 +44,7 @@ def _padded_b64_decode(data):
 def _raw_metadata_request(path):
   """Sends a request to metadata.google.internal, retrying on errors.
 
-  Returns raw response as str or None if not running on GCE or if the metadata
+  Returns raw response as bytes or None if not running on GCE or if the metadata
   server is unreachable (after multiple attempts). Logs errors internally.
 
   Args:
@@ -232,7 +230,7 @@ def signed_metadata_token(audience):
       logging.error('Metadata server returned invalid JWT (%s):\n%s', exc, jwt)
       return None, None
 
-    jwt = six.ensure_str(jwt)
+    jwt = jwt.decode()
     _CACHED_METADATA_TOKEN[audience] = {'jwt': jwt, 'exp': exp}
     return jwt, exp
 
@@ -242,7 +240,7 @@ def get_image():
   """Returns the image used by the GCE VM."""
   # Format is projects/<id>/global/images/<image>
   metadata = get_metadata()
-  return six.text_type(metadata['instance']['image'].rsplit('/', 1)[-1])
+  return metadata['instance']['image'].rsplit('/', 1)[-1]
 
 
 @tools.cached
@@ -250,7 +248,7 @@ def get_zone():
   """Returns the zone containing the GCE VM."""
   # Format is projects/<id>/zones/<zone>
   metadata = get_metadata()
-  return six.text_type(metadata['instance']['zone'].rsplit('/', 1)[-1])
+  return metadata['instance']['zone'].rsplit('/', 1)[-1]
 
 
 @tools.cached
@@ -274,7 +272,7 @@ def get_zones():
 def get_gcp():
   """Returns the string identifier of the GCE VM's Cloud Project."""
   metadata = get_metadata()
-  return [six.text_type(metadata['project']['projectId'])]
+  return [metadata['project']['projectId']]
 
 
 @tools.cached
@@ -282,7 +280,7 @@ def get_machine_type():
   """Returns the GCE machine type."""
   # Format is projects/<id>/machineTypes/<machine_type>
   metadata = get_metadata()
-  return six.text_type(metadata['instance']['machineType'].rsplit('/', 1)[-1])
+  return metadata['instance']['machineType'].rsplit('/', 1)[-1]
 
 
 @tools.cached
@@ -291,7 +289,7 @@ def get_cpuinfo():
   metadata = get_metadata()
   if not metadata:
     return None
-  cpu_platform = six.text_type(metadata['instance']['cpuPlatform'])
+  cpu_platform = metadata['instance']['cpuPlatform']
   if not cpu_platform:
     return None
   # Normalize according to the expected name as reported by the CPUID

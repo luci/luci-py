@@ -13,7 +13,6 @@ import unittest
 
 from nose2.tools import params
 import mock
-import six
 
 import test_env_platforms
 test_env_platforms.setup_test_env()
