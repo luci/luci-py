@@ -473,21 +473,6 @@ def get_app_version():
   return modules.get_current_version_name() or 'N/A'
 
 
-def get_chops_git_version():
-  """Returns the Chops Git version if set."""
-  # See go/spinnakergit for further information.
-  chopsver = os.getenv("CHOPS_GIT_VERSION")
-  if not chopsver:
-    return None
-  p = re.compile('^\d{4,}-[0-9a-f]{7}$')  # <Commit position>-<Git revision>
-  if p.match(chopsver):
-    return chopsver
-  p = re.compile('^[0-9a-f]{7}$')  # Git revision only.
-  if p.match(chopsver):
-    return chopsver
-  return None
-
-
 @cache
 def get_versioned_hosturl():
   """Returns the url hostname of this instance locked to the currently running
