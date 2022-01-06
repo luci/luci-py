@@ -116,6 +116,8 @@ window.customElements.define('swarming-app', class extends HTMLElement {
       bot_version: '',
       cas_viewer_server: '',
     };
+    const idx = location.hostname.indexOf('.appspot.com');
+    this._project_id = location.hostname.substring(0, idx);
     this._permissions = {};
   }
 
