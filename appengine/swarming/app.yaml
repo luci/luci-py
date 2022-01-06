@@ -113,9 +113,3 @@ skip_files:
 - ui2/modules/.+
 - ui2/nodejs/.+
 - ui2/pages/.+
-
-# Used by the Spinnaker deployment system.
-# cl/340614618
-# go/spinnakergit
-env_variables:
-  CHOPS_GIT_VERSION: '${CHOPS_GIT_VERSION}'
