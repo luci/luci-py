@@ -2675,112 +2675,6 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         auth,
         'get_delegation_token', lambda: delegation_pb2.Subtoken(tags=tags))
 
-  def check_schedule_request_acl(self, properties, **kwargs):
-    task_scheduler.check_schedule_request_acl(
-        _gen_request_slices(
-            task_slices=[
-                task_request.TaskSlice(
-                    expiration_secs=60,
-                    properties=properties,
-                    wait_for_capacity=False),
-            ],
-            **kwargs))
-
-  def test_check_schedule_request_acl(self):
-
-    # There's no "default ACL" anymore if there's no pool config.
-    with self.assertRaises(auth.AuthorizationError) as ctx:
-      self.check_schedule_request_acl(
-          properties=_gen_properties(dimensions={u'pool': [u'some-pool']}))
-    self.assertIn(
-        'Can\'t submit tasks to pool "some-pool", not defined in pools.cfg',
-        str(ctx.exception))
-
-    # Service accounts are not allowed if not configured.
-    with self.assertRaises(auth.AuthorizationError) as ctx:
-      self.check_schedule_request_acl(
-          properties=_gen_properties(dimensions={u'pool': [u'some-pool']}),
-          service_account='robot@example.com')
-    self.assertIn(
-        'Can\'t submit tasks to pool "some-pool", not defined in pools.cfg',
-        str(ctx.exception))
-
-  def test_check_schedule_request_acl_unknown_forbidden(self):
-    self.mock_pool_config('some-other-pool')
-    with self.assertRaises(auth.AuthorizationError) as ctx:
-      self.check_schedule_request_acl(
-          properties=_gen_properties(dimensions={u'pool': [u'some-pool']}))
-    self.assertIn('not defined in pools.cfg', str(ctx.exception))
-
-  def test_check_schedule_request_acl_forbidden(self):
-    self.mock_pool_config('some-pool')
-    with self.assertRaises(auth.AuthorizationError) as ctx:
-      self.check_schedule_request_acl(
-          properties=_gen_properties(dimensions={u'pool': [u'some-pool']}))
-    self.assertIn('not allowed to schedule tasks', str(ctx.exception))
-
-  def test_check_schedule_request_acl_allowed_explicitly(self):
-    self.mock_pool_config(
-        'some-pool', scheduling_users=[auth_testing.DEFAULT_MOCKED_IDENTITY])
-    self.check_schedule_request_acl(
-        properties=_gen_properties(dimensions={u'pool': [u'some-pool']}))
-
-  def test_check_schedule_request_acl_allowed_through_the_group(self):
-    self.mock_pool_config('some-pool', scheduling_groups=['mocked'])
-
-    def mocked_is_group_member(group, ident):
-      return group == 'mocked' and ident == auth_testing.DEFAULT_MOCKED_IDENTITY
-
-    self.mock(auth, 'is_group_member', mocked_is_group_member)
-    self.check_schedule_request_acl(
-        properties=_gen_properties(dimensions={u'pool': [u'some-pool']}))
-
-  def test_check_schedule_request_acl_unknown_delegation(self):
-    delegatee1 = auth.Identity.from_bytes('user:d1@example.com')
-    delegatee2 = auth.Identity.from_bytes('user:d2@example.com')
-    self.mock_pool_config('some-pool', trusted_delegatees={delegatee1: ['t1']})
-    self.mock_delegation(delegatee2, ['t1'])
-    with self.assertRaises(auth.AuthorizationError):
-      self.check_schedule_request_acl(
-          properties=_gen_properties(dimensions={u'pool': [u'some-pool']}))
-
-  def test_check_schedule_request_acl_delegation_ok(self):
-    delegatee = auth.Identity.from_bytes('user:d1@example.com')
-    self.mock_pool_config(
-        'some-pool', trusted_delegatees={delegatee: ['t1', 'other']})
-    self.mock_delegation(delegatee, ['t1', 'extra'])
-    self.check_schedule_request_acl(
-        properties=_gen_properties(dimensions={u'pool': [u'some-pool']}))
-
-  def test_check_schedule_request_acl_delegation_missing_tag(self):
-    delegatee = auth.Identity.from_bytes('user:d1@example.com')
-    self.mock_pool_config('some-pool', trusted_delegatees={delegatee: ['t1']})
-    self.mock_delegation(delegatee, ['another'])
-    with self.assertRaises(auth.AuthorizationError):
-      self.check_schedule_request_acl(
-          properties=_gen_properties(dimensions={u'pool': [u'some-pool']}))
-
-  def test_check_schedule_request_acl_good_service_acc(self):
-    self.mock_pool_config(
-        'some-pool',
-        scheduling_users=[auth_testing.DEFAULT_MOCKED_IDENTITY],
-        service_accounts=['good@example.com'])
-    self.check_schedule_request_acl(
-        properties=_gen_properties(dimensions={u'pool': [u'some-pool']}),
-        service_account='good@example.com')
-
-  def test_check_schedule_request_acl_bad_service_acc(self):
-    self.mock_pool_config(
-        'some-pool',
-        scheduling_users=[auth_testing.DEFAULT_MOCKED_IDENTITY],
-        service_accounts=['good@example.com'])
-    with self.assertRaises(auth.AuthorizationError) as ctx:
-      self.check_schedule_request_acl(
-          properties=_gen_properties(dimensions={u'pool': [u'some-pool']}),
-          service_account='bad@example.com')
-    self.assertIn('Is allowed_service_account specified in pools.cfg?',
-                  str(ctx.exception))
-
   def test_check_schedule_request_acl_caller(self):
     # the functionality is already  tested by
     # test_check_schedule_request_acl_*.
@@ -2790,23 +2684,6 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     # the functionality is already  tested by
     # test_check_schedule_request_acl_*.
     pass
-
-  def test_check_schedule_request_wildcard_acl_delegation_ok(self):
-    delegatee = auth.Identity.from_bytes('user:d1@example.com')
-    self.mock_pool_config(
-        'some-pool', trusted_delegatees={delegatee: ['t1/*', 'other']})
-    self.mock_delegation(delegatee, ['t1/foo', 'extra'])
-    self.check_schedule_request_acl(
-        properties=_gen_properties(dimensions={u'pool': [u'some-pool']}))
-
-  def test_check_schedule_request_wildcard_acl_delegation_missing_tag(self):
-    delegatee = auth.Identity.from_bytes('user:d1@example.com')
-    self.mock_pool_config(
-        'some-pool', trusted_delegatees={delegatee: ['t1', 'other/*']})
-    self.mock_delegation(delegatee, ['t1/foo', 'extra'])
-    with self.assertRaises(auth.AuthorizationError):
-      self.check_schedule_request_acl(
-          properties=_gen_properties(dimensions={u'pool': [u'some-pool']}))
 
   def test_ensure_active_slice_nonpending(self):
     # Non-PENDING task cannot have active slice set.

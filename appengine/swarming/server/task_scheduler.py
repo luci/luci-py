@@ -1096,39 +1096,6 @@ def exponential_backoff(attempt_num):
   return min(max_wait, math.pow(1.5, min(attempt_num, 10) + 1))
 
 
-def check_schedule_request_acl(request):
-  """Verifies the current caller can schedule a given task request.
-
-  Arguments:
-  - request: TaskRequest entity with information about the new task.
-
-  Raises:
-    auth.AuthorizationError if the caller is not allowed to schedule this task.
-  """
-  # Only terminate tasks don't have a pool. ACLs for them are handled through
-  # 'acl.can_edit_bot', see 'terminate' RPC handler. Such tasks do not end up
-  # hitting this function, and so we can assume there's a pool set (this is
-  # checked in TaskProperties's pre put hook).
-  pool = request.pool
-  pool_cfg = pools_config.get_pool_config(pool)
-
-  if not pool_cfg:
-    logging.warning('Pool "%s" is not in pools.cfg', pool)
-    # TODO(crbug.com/1086058): It currently returns 403 Forbidden, but should
-    # return 400 BadRequest or 422 Unprocessable Entity, instead.
-    raise auth.AuthorizationError(
-        'Can\'t submit tasks to pool "%s", not defined in pools.cfg' % pool)
-
-  logging.info(
-      'Looking at the pool "%s" in pools.cfg, rev "%s"', pool, pool_cfg.rev)
-
-  # Verify the caller can use the pool at all.
-  check_schedule_request_acl_caller(pool_cfg)
-
-  # Verify the requested task service account is allowed in this pool.
-  check_schedule_request_acl_service_account(request, pool_cfg)
-
-
 def check_schedule_request_acl_caller(pool_cfg):
   if not _is_allowed_to_schedule(pool_cfg):
     raise auth.AuthorizationError(
@@ -1156,7 +1123,8 @@ def schedule_request(request,
                      build_token=None):
   """Creates and stores all the entities to schedule a new task request.
 
-  Assumes ACL check has already happened (see 'check_schedule_request_acl').
+  Assumes ACL check has already happened (see
+  'api_helpers.process_task_request').
 
   The number of entities created is ~4: TaskRequest, TaskToRunShard and
   TaskResultSummary and (optionally) SecretBytes. They are in single entity

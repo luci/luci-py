@@ -5,7 +5,7 @@
 """Functions to fetch and parse pools.cfg file with list of pools.
 
 See comments in proto/pools.proto for more context. Structures defined here are
-used primarily by task_scheduler.check_schedule_request_acl.
+used primarily by task_scheduler.check_schedule_request_acl_caller.
 """
 
 import collections
