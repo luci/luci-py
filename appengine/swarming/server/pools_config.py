@@ -22,7 +22,6 @@ from components.config import validation
 from proto.config import pools_pb2
 from server import config as local_config
 from server import directory_occlusion
-from server import service_accounts_utils
 
 
 POOLS_CFG_FILENAME = 'pools.cfg'
@@ -44,9 +43,6 @@ PoolConfig = collections.namedtuple(
         'scheduling_groups',
         # Map {auth.Identity of a delegatee => TrustedDelegatee tuple}.
         'trusted_delegatees',
-        # Set of service account emails allowed in this pool, specified
-        # explicitly.
-        'service_accounts',
         # Pool realm.
         'realm',
         # Set of enforced realm permission enums.
@@ -72,7 +68,6 @@ def init_pool_config(**kwargs):
       'scheduling_users': frozenset(),
       'scheduling_groups': frozenset(),
       'trusted_delegatees': {},
-      'service_accounts': frozenset(),
       'realm': None,
       'enforced_realm_permissions': frozenset(),
       'default_task_realm': None,
@@ -603,7 +598,6 @@ def _fetch_pools_config():
                   required_delegation_tags=frozenset(d.require_any_of.tag))
               for d in msg.schedulers.trusted_delegation
           },
-          service_accounts=frozenset(msg.allowed_service_account),
           realm=msg.realm if msg.realm else None,
           default_task_realm=(msg.default_task_realm
                               if msg.default_task_realm else None),
@@ -682,11 +676,6 @@ def _validate_pools_cfg(cfg, ctx):
           for i, tag in enumerate(d.require_any_of.tag):
             if ':' not in tag:
               ctx.error('bad tag #%d "%s" - must be <key>:<value>', i, tag)
-
-      # Validate service accounts.
-      for i, account in enumerate(msg.allowed_service_account):
-        if not service_accounts_utils.is_service_account(account):
-          ctx.error('bad allowed_service_account #%d "%s"', i, account)
 
       # Validate external schedulers.
       for i, es in enumerate(msg.external_schedulers):

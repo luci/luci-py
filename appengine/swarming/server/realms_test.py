@@ -223,30 +223,20 @@ class RealmsTest(test_case.TestCase):
         _PERM_TASKS_CREATE_IN_REALM, [u'test:realm'],
         identity=auth.get_current_identity())
 
-  def test_check_tasks_act_as_legacy_allowed_no_realm(self):
-    self.mock(task_scheduler, '_is_allowed_service_account', lambda *_: True)
-    task_request_mock = _gen_task_request_mock(realm=None)
-    pool_cfg_mock = _gen_pool_config()
-    used_realms = realms.check_tasks_act_as(task_request_mock, pool_cfg_mock,
-                                            False)
-    self.assertFalse(used_realms)
-    self._has_permission_dryrun_mock.assert_not_called()
-
-  def test_check_tasks_act_as_legacy_allowed_with_realm(self):
-    self.mock(task_scheduler, '_is_allowed_service_account', lambda *_: True)
+  def test_check_tasks_act_as_legacy_not_allowed_with_realm(self):
     task_request_mock = _gen_task_request_mock(realm='test:realm')
     pool_cfg_mock = _gen_pool_config()
-    used_realms = realms.check_tasks_act_as(task_request_mock, pool_cfg_mock,
-                                            False)
-    self.assertFalse(used_realms)
+
+    with self.assertRaises(auth.AuthorizationError):
+      realms.check_tasks_act_as(task_request_mock, pool_cfg_mock, False)
+
     self._has_permission_dryrun_mock.assert_called_once_with(
         _PERM_TASKS_ACT_AS, [u'test:realm'],
-        True,
+        False,
         identity=_TASK_SERVICE_ACCOUNT_IDENTITY,
         tracking_bug=realms._TRACKING_BUG)
 
   def test_check_tasks_act_as_legacy_not_allowed(self):
-    self.mock(task_scheduler, '_is_allowed_service_account', lambda *_: False)
     task_request_mock = _gen_task_request_mock(realm=None)
     pool_cfg_mock = _gen_pool_config()
     with self.assertRaises(auth.AuthorizationError):

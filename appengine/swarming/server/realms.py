@@ -184,8 +184,7 @@ def check_tasks_act_as(task_request, pool_cfg, enforce):
 
   try:
     # ACL check
-    task_scheduler.check_schedule_request_acl_service_account(
-        task_request, pool_cfg)
+    task_scheduler.check_schedule_request_acl_service_account(task_request)
   except auth.AuthorizationError:
     legacy_allowed = False
     raise  # re-raise the exception

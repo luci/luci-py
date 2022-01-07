@@ -186,7 +186,6 @@ class AppTestBase(test_case.TestCase):
                           auth.Identity(auth.IDENTITY_USER, 'priv@example.com'),
                           auth.Identity(auth.IDENTITY_USER, 'user@example.com'),
                       ]),
-                      service_accounts=frozenset(service_accounts),
                       realm='test:pool/default',
                       default_task_realm=default_task_realm,
                       enforced_realm_permissions=enforced_realm_permissions or
@@ -228,7 +227,6 @@ class AppTestBase(test_case.TestCase):
                       default_task_realm=default_task_realm,
                       enforced_realm_permissions=enforced_realm_permissions or
                       {},
-                      service_accounts=frozenset(service_accounts),
                       default_cipd=default_cipd,
                   ),
           },
