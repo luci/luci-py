@@ -3,6 +3,7 @@
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
 
+import collections
 import logging
 import sys
 import unittest
@@ -44,11 +45,26 @@ def test_db(implicit_root_bindings=False):
   b.role('role/implicitRoot', [
       b.permission('luci.dev.implicitRoot'),
   ])
+  b.attribute('a1')
+  b.attribute('a2')
+  b.attribute('root')
   if implicit_root_bindings:
     b.implicit_root_bindings = lambda project_id: [
         realms_config_pb2.Binding(
             role='role/implicitRoot',
             principals=['project:'+project_id],
+        ),
+        realms_config_pb2.Binding(
+            role='role/implicitRoot',
+            principals=['group:root'],
+            conditions=[
+                realms_config_pb2.Condition(
+                    restrict=realms_config_pb2.Condition.AttributeRestriction(
+                        attribute='root',
+                        values=['yes'],
+                    ),
+                )
+            ],
         ),
     ]
   return b.finish()
@@ -117,8 +133,55 @@ class RolesExpanderTest(test_case.TestCase):
     })
 
 
-def binding(role, *principals):
-  return {'role': role, 'principals': principals}
+class ConditionsSetTest(test_case.TestCase):
+  def test_works(self):
+    def restriction(attr, values):
+      return realms_config_pb2.Condition(
+          restrict=realms_config_pb2.Condition.AttributeRestriction(
+              attribute=attr,
+              values=values,
+          ),
+      )
+
+    r1 = restriction('b', ['1', '2'])
+    r2 = restriction('a', ['2', '1', '1'])
+    r3 = restriction('a', ['1', '2'])
+    r4 = restriction('a', ['3', '4'])
+
+    cs = rules.ConditionsSet()
+    cs.add_condition(r1)
+    cs.add_condition(r1)  # the exact same object
+    cs.add_condition(r2)
+    cs.add_condition(r3)
+    cs.add_condition(r4)
+
+    out = [json_format.MessageToDict(cond) for cond in cs.finalize()]
+    self.assertEqual(out, [
+        {'restrict': {'attribute': 'a', 'values': ['1', '2']}},
+        {'restrict': {'attribute': 'a', 'values': ['3', '4']}},
+        {'restrict': {'attribute': 'b', 'values': ['1', '2']}}
+    ])
+
+    self.assertEqual(cs.indexes([]), ())
+    self.assertEqual(cs.indexes([r1]), (2,))
+    self.assertEqual(cs.indexes([r2]), (0,))
+    self.assertEqual(cs.indexes([r3]), (0,))
+    self.assertEqual(cs.indexes([r4]), (1,))
+    self.assertEqual(cs.indexes([r1, r2, r3, r4]), (0, 1, 2))
+
+
+restrict = collections.namedtuple('restrict', ('attr', 'values'))
+
+
+def binding(role, *terms):
+  return {
+      'role': role,
+      'principals': [t for t in terms if not isinstance(t, restrict)],
+      'conditions': [
+          {'restrict': {'attribute': t.attr, 'values': t.values}}
+          for t in terms if isinstance(t, restrict)
+      ],
+  }
 
 
 class ExpandRealmsTest(test_case.TestCase):
@@ -187,6 +250,71 @@ class ExpandRealmsTest(test_case.TestCase):
                         'principals': [u'group:gr3', u'group:gr4'],
                     },
                     {
+                        'permissions': [1, 2],
+                        'principals': [u'group:gr2'],
+                    },
+                ],
+            },
+        ],
+    })
+
+  def test_simple_bindings_with_conditions(self):
+    cfg = {'realms': [
+        {
+            'name': 'r',
+            'bindings': [
+                binding('role/dev.a', 'group:gr1', 'group:gr3'),
+                binding('role/dev.b', 'group:gr2', 'group:gr3'),
+                binding('role/dev.all', 'group:gr4'),
+                binding('role/dev.a', 'group:gr1', restrict('a1', ['1', '2'])),
+                binding('role/dev.a', 'group:gr1', restrict('a1', ['1', '2'])),
+                binding('role/dev.a', 'group:gr2', restrict('a1', ['2', '1'])),
+                binding('role/dev.b', 'group:gr2', restrict('a1', ['1', '2'])),
+                binding('role/dev.b', 'group:gr2', restrict('a2', ['1', '2'])),
+            ],
+        },
+    ]}
+    self.assertEqual(self.expand(cfg), {
+        'conditions': [
+            {'restrict': {'attribute': u'a1', 'values': [u'1', u'2']}},
+            {'restrict': {'attribute': u'a2', 'values': [u'1', u'2']}},
+        ],
+        'permissions': [
+            {'name': u'luci.dev.p1'},
+            {'name': u'luci.dev.p2'},
+            {'name': u'luci.dev.p3'},
+        ],
+        'realms': [
+            {
+                'name': u'p:@root',
+            },
+            {
+                'name': u'p:r',
+                'bindings': [
+                    {
+                        'permissions': [0, 1],
+                        'principals': [u'group:gr1'],
+                    },
+                    {
+                        'conditions': [0],
+                        'permissions': [0, 1],
+                        'principals': [u'group:gr1']
+                    },
+                    {
+                        'permissions': [0, 1, 2],
+                        'principals': [u'group:gr3', u'group:gr4'],
+                    },
+                    {
+                        'conditions': [0],
+                        'permissions': [0, 1, 2],
+                        'principals': [u'group:gr2'],
+                    },
+                    {
+                        'permissions': [1, 2],
+                        'principals': [u'group:gr2'],
+                    },
+                    {
+                        'conditions': [1],
                         'permissions': [1, 2],
                         'principals': [u'group:gr2'],
                     },
@@ -314,6 +442,111 @@ class ExpandRealmsTest(test_case.TestCase):
         ],
     })
 
+  def test_realm_inheritance_with_conditions(self):
+    cfg = {
+        'realms': [
+            {
+                'name': '@root',
+                'bindings': [
+                    binding('role/dev.all', 'group:gr4'),
+                    binding('role/dev.a', 'group:gr5', restrict('a1', ['1'])),
+                ],
+            },
+            {
+                'name': 'r1',
+                'bindings': [
+                    binding('role/dev.a', 'group:gr1', 'group:gr3'),
+                    binding('role/dev.a', 'group:gr6', restrict('a1', ['1'])),
+                ],
+            },
+            {
+                'name': 'r2',
+                'bindings': [
+                    binding('role/dev.b', 'group:gr2', 'group:gr3'),
+                    binding(
+                        'role/dev.a',
+                        'group:gr1',
+                        'group:gr6',
+                        'group:gr7',
+                        restrict('a1', ['1']),
+                    ),
+                ],
+                'extends': ['r1', '@root'],
+            },
+        ],
+    }
+    self.assertEqual(self.expand(cfg), {
+        'conditions': [
+            {'restrict': {'attribute': u'a1', 'values': [u'1']}},
+        ],
+        'permissions': [
+            {'name': u'luci.dev.p1'},
+            {'name': u'luci.dev.p2'},
+            {'name': u'luci.dev.p3'},
+        ],
+        'realms': [
+            {
+                'name': u'p:@root',
+                'bindings': [
+                    {
+                        'conditions': [0],
+                        'permissions': [0, 1],
+                        'principals': [u'group:gr5'],
+                    },
+                    {
+                        'permissions': [0, 1, 2],
+                        'principals': [u'group:gr4'],
+                    },
+                ],
+            },
+            {
+                'name': u'p:r1',
+                'bindings': [
+                    {
+                        'permissions': [0, 1],
+                        'principals': [u'group:gr1', u'group:gr3'],
+                    },
+                    {
+                        'conditions': [0],
+                        'permissions': [0, 1],
+                        'principals': [u'group:gr5', u'group:gr6',],
+                    },
+                    {
+                        'permissions': [0, 1, 2],
+                        'principals': [u'group:gr4'],
+                    },
+                ],
+            },
+            {
+                'name': u'p:r2',
+                'bindings': [
+                    {
+                        'permissions': [0, 1],
+                        'principals': [u'group:gr1'],
+                    },
+                    {
+                        'conditions': [0],
+                        'permissions': [0, 1],
+                        'principals': [
+                            u'group:gr1',
+                            u'group:gr5',
+                            u'group:gr6',
+                            u'group:gr7',
+                        ],
+                    },
+                    {
+                        'permissions': [0, 1, 2],
+                        'principals': [u'group:gr3', u'group:gr4'],
+                    },
+                    {
+                        'permissions': [1, 2],
+                        'principals': [u'group:gr2'],
+                    },
+                ],
+            },
+        ],
+    })
+
   def test_custom_roles(self):
     cfg = {
         'custom_roles': [
@@ -386,6 +619,9 @@ class ExpandRealmsTest(test_case.TestCase):
         ],
     }
     self.assertEqual(self.expand(cfg, implicit_root_bindings=True), {
+        'conditions': [
+            {'restrict': {'attribute': u'root', 'values': [u'yes']}},
+        ],
         'permissions': [
             {'name': u'luci.dev.implicitRoot'},
             {'name': u'luci.dev.p1'},
@@ -399,6 +635,11 @@ class ExpandRealmsTest(test_case.TestCase):
                         'permissions': [0],
                         'principals': [u'project:p'],
                     },
+                    {
+                        'conditions': [0],
+                        'permissions': [0],
+                        'principals': [u'group:root'],
+                    },
                 ],
             },
             {
@@ -407,6 +648,11 @@ class ExpandRealmsTest(test_case.TestCase):
                     {
                         'permissions': [0],
                         'principals': [u'project:p'],
+                    },
+                    {
+                        'conditions': [0],
+                        'permissions': [0],
+                        'principals': [u'group:root'],
                     },
                     {
                         'permissions': [1, 2],
@@ -430,11 +676,19 @@ class ExpandRealmsTest(test_case.TestCase):
                 'name': 'r',
                 'bindings': [
                     binding('role/dev.a', 'group:gr2'),
+                    binding(
+                        'role/dev.a', 'group:gr2', restrict('root', ['yes'])),
+                    binding(
+                        'role/dev.a', 'group:gr3', restrict('a1', ['1'])),
                 ],
             },
         ],
     }
     self.assertEqual(self.expand(cfg, implicit_root_bindings=True), {
+        'conditions': [
+            {'restrict': {'attribute': u'a1', 'values': [u'1']}},
+            {'restrict': {'attribute': u'root', 'values': [u'yes']}},
+        ],
         'permissions': [
             {'name': u'luci.dev.implicitRoot'},
             {'name': u'luci.dev.p1'},
@@ -447,6 +701,11 @@ class ExpandRealmsTest(test_case.TestCase):
                     {
                         'permissions': [0],
                         'principals': [u'project:p'],
+                    },
+                    {
+                        'conditions': [1],
+                        'permissions': [0],
+                        'principals': [u'group:root'],
                     },
                     {
                         'permissions': [1, 2],
@@ -462,8 +721,23 @@ class ExpandRealmsTest(test_case.TestCase):
                         'principals': [u'project:p'],
                     },
                     {
+                        'conditions': [1],
+                        'permissions': [0],
+                        'principals': [u'group:root'],
+                    },
+                    {
                         'permissions': [1, 2],
                         'principals': [u'group:gr1', u'group:gr2'],
+                    },
+                    {
+                        'conditions': [0],
+                        'permissions': [1, 2],
+                        'principals': [u'group:gr3'],
+                    },
+                    {
+                        'conditions': [1],
+                        'permissions': [1, 2],
+                        'principals': [u'group:gr2'],
                     },
                 ],
             },
