@@ -127,7 +127,7 @@ message Permission {
 // the check.
 //
 // A list of available attributes and meaning of their values depends on
-// the permission being checked and the service should documented it in its API
+// the permission being checked and the service should document it in its API
 // documentation.
 message Condition {
   // AttributeRestriction checks that the attributes set (as a set of key-value
