@@ -60,21 +60,21 @@ class SimpleMainTest(TestCase):
     # get_config() doesn't work when called outside of a zip, so patch the
     # server_version manually with the default value in config/config.json.
     expected = bot_main.get_attributes(None)
-    self.assertEqual([u'N/A'], expected[u'dimensions'][u'server_version'])
-    expected[u'dimensions'][u'server_version'] = [u'1']
+    self.assertEqual(['N/A'], expected['dimensions']['server_version'])
+    expected['dimensions']['server_version'] = ['1']
 
-    NON_DETERMINISTIC = (u'cwd', u'disks', u'nb_files_in_temp', u'pid',
-                         u'running_time', u'started_ts', u'uptime')
+    NON_DETERMINISTIC = ('cwd', 'disks', 'nb_files_in_temp', 'pid',
+                         'running_time', 'started_ts', 'uptime')
     for key in NON_DETERMINISTIC:
-      del actual[u'state'][key]
-      del expected[u'state'][key]
-    actual[u'state'].pop('temp', None)
-    expected[u'state'].pop('temp', None)
-    del actual[u'version']
-    del expected[u'version']
+      del actual['state'][key]
+      del expected['state'][key]
+    actual['state'].pop('temp', None)
+    expected['state'].pop('temp', None)
+    del actual['version']
+    del expected['version']
     self.assertAlmostEqual(
-        actual[u'state'].pop(u'cost_usd_hour'),
-        expected[u'state'].pop(u'cost_usd_hour'),
+        actual['state'].pop('cost_usd_hour'),
+        expected['state'].pop('cost_usd_hour'),
         places=5)
     self.assertEqual(expected, actual)
 
@@ -128,14 +128,14 @@ class MainTest(TestCase):
       event.pop('version')
     expected = [
         {
-            u'event': u'bot_shutdown',
-            u'message': u'Signal was received',
+            'event': 'bot_shutdown',
+            'message': 'Signal was received',
         },
     ]
     if sys.platform == 'win32':
       # Sadly, the signal handler generate an error.
       # TODO(maruel): Fix one day.
-      self.assertEqual(u'bot_error', events.pop(0)['event'])
+      self.assertEqual('bot_error', events.pop(0)['event'])
     self.assertEqual(expected, events)
 
 

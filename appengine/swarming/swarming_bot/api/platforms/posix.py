@@ -59,7 +59,7 @@ def get_disks_info():
         # space, including the free space reserved by root. Since the Swarming
         # bot is likely not running as root, it present an inflated value of
         # what is usable.
-        #u'free_mb': round(float(items[3]) / 1024., 1),
+        # 'free_mb': round(float(items[3]) / 1024., 1),
         'free_mb': round(float(f.f_bavail * f.f_frsize) / 1024. / 1024., 1),
         'size_mb': round(float(block_size) / 1024., 1),
     }

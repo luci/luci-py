@@ -259,7 +259,7 @@ class ExitSignal(Exception):
   """Raised on a signal that the process must exit immediately."""
 
   def __init__(self, sig):
-    super(ExitSignal, self).__init__(u'task_runner received signal %s' % sig)
+    super(ExitSignal, self).__init__('task_runner received signal %s' % sig)
     self.signal = sig
 
 
@@ -379,11 +379,11 @@ def load_and_run(in_file, swarming_server, cost_usd_hour, start, out_file,
     logging.exception('Exception caught in run_command().')
     if not task_result:
       task_result = {
-          u'exit_code': -1,
-          u'hard_timeout': False,
-          u'io_timeout': False,
-          u'must_signal_internal_failure': str(e) or 'unknown error',
-          u'version': OUT_VERSION,
+          'exit_code': -1,
+          'hard_timeout': False,
+          'io_timeout': False,
+          'must_signal_internal_failure': str(e) or 'unknown error',
+          'version': OUT_VERSION,
       }
   finally:
     # We've found tests to delete the working directory work_dir when quitting,
@@ -419,11 +419,11 @@ def fail_without_command(remote, task_id, params, cost_usd_hour, task_start,
   # Ignore server reply to stop.
   remote.post_task_update(task_id, params, (stdout, 0), 1)
   return {
-      u'exit_code': exit_code,
-      u'hard_timeout': False,
-      u'io_timeout': False,
-      u'must_signal_internal_failure': None,
-      u'version': OUT_VERSION,
+      'exit_code': exit_code,
+      'hard_timeout': False,
+      'io_timeout': False,
+      'must_signal_internal_failure': None,
+      'version': OUT_VERSION,
   }
 
 
@@ -620,11 +620,11 @@ def run_command(remote, task_details, work_dir, cost_usd_hour,
     params['canceled'] = True
     remote.post_task_update(task_details.task_id, params, exit_code=-1)
     return {
-        u'exit_code': -1,
-        u'hard_timeout': False,
-        u'io_timeout': False,
-        u'must_signal_internal_failure': None,
-        u'version': OUT_VERSION,
+        'exit_code': -1,
+        'hard_timeout': False,
+        'io_timeout': False,
+        'must_signal_internal_failure': None,
+        'version': OUT_VERSION,
     }
 
   isolated_result = os.path.join(work_dir, 'isolated_result.json')
@@ -840,11 +840,11 @@ def run_command(remote, task_details, work_dir, cost_usd_hour,
         must_signal_internal_failure = str(e) or 'unknown error'
 
     return {
-        u'exit_code': exit_code,
-        u'hard_timeout': had_hard_timeout,
-        u'io_timeout': had_io_timeout,
-        u'must_signal_internal_failure': must_signal_internal_failure,
-        u'version': OUT_VERSION,
+        'exit_code': exit_code,
+        'hard_timeout': had_hard_timeout,
+        'io_timeout': had_io_timeout,
+        'must_signal_internal_failure': must_signal_internal_failure,
+        'version': OUT_VERSION,
     }
   finally:
     file_path.try_remove(isolated_result)

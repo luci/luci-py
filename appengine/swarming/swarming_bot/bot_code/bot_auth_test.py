@@ -131,8 +131,8 @@ class AuthSystemTest(auto_stub.TestCase):
     # the token specified by 'swarming_http_headers'.
     code, resp = call_rpc(local_auth_ctx, 'task', scopes=['A', 'B', 'C'])
     self.assertEqual(200, code)
-    self.assertEqual([u'access_token', u'expiry'], sorted(resp))
-    self.assertEqual(u'bot-own-token', resp['access_token'])
+    self.assertEqual(['access_token', 'expiry'], sorted(resp))
+    self.assertEqual('bot-own-token', resp['access_token'])
     self.assertEqual(exp, resp['expiry'])
 
     # No 'system' token at all.
@@ -167,8 +167,8 @@ class AuthSystemTest(auto_stub.TestCase):
     # the token specified by 'swarming_http_headers'.
     code, resp = call_rpc(local_auth_ctx, 'system', scopes=['A', 'B', 'C'])
     self.assertEqual(200, code)
-    self.assertEqual([u'access_token', u'expiry'], sorted(resp))
-    self.assertEqual(u'bot-own-token', resp['access_token'])
+    self.assertEqual(['access_token', 'expiry'], sorted(resp))
+    self.assertEqual('bot-own-token', resp['access_token'])
     self.assertEqual(exp, resp['expiry'])
 
     # No 'task' token at all.
@@ -209,8 +209,8 @@ class AuthSystemTest(auto_stub.TestCase):
     for account_id in ('system', 'task'):
       code, resp = call_rpc(local_auth_ctx, account_id, scopes=['A', 'B', 'C'])
       self.assertEqual(200, code)
-      self.assertEqual([u'access_token', u'expiry'], sorted(resp))
-      self.assertEqual(u'bot-own-token', resp['access_token'])
+      self.assertEqual(['access_token', 'expiry'], sorted(resp))
+      self.assertEqual('bot-own-token', resp['access_token'])
       self.assertEqual(exp, resp['expiry'])
 
   def test_using_bot_without_known_email(self):
@@ -284,7 +284,7 @@ class AuthSystemTest(auto_stub.TestCase):
 
     code, resp = call_rpc(local_auth_ctx, 'system', scopes=['A', 'B', 'C'])
     self.assertEqual(200, code)
-    self.assertEqual({u'access_token': u'blah', u'expiry': expiry}, resp)
+    self.assertEqual({'access_token': 'blah', 'expiry': expiry}, resp)
     self.assertEqual([{
         'method': 'mint_oauth_token',
         'account_id': 'system',
@@ -296,7 +296,7 @@ class AuthSystemTest(auto_stub.TestCase):
     # The token is cached.
     code, resp = call_rpc(local_auth_ctx, 'system', scopes=['A', 'B', 'C'])
     self.assertEqual(200, code)
-    self.assertEqual({u'access_token': u'blah', u'expiry': expiry}, resp)
+    self.assertEqual({'access_token': 'blah', 'expiry': expiry}, resp)
     self.assertFalse(rpc_client.calls)
 
   def test_minting_via_rpc_internal_error(self):
@@ -338,14 +338,14 @@ class AuthSystemTest(auto_stub.TestCase):
 
     code, resp = call_rpc(local_auth_ctx, 'system', scopes=['A', 'B', 'C'])
     self.assertEqual(200, code)
-    self.assertEqual({u'error_message': u'msg', u'error_code': 4}, resp)
+    self.assertEqual({'error_message': 'msg', 'error_code': 4}, resp)
     self.assertTrue(rpc_client.calls)
     del rpc_client.calls[:]
 
     # The error is cached, no RPCs are made.
     code, resp = call_rpc(local_auth_ctx, 'system', scopes=['A', 'B', 'C'])
     self.assertEqual(200, code)
-    self.assertEqual({u'error_message': u'msg', u'error_code': 4}, resp)
+    self.assertEqual({'error_message': 'msg', 'error_code': 4}, resp)
     self.assertFalse(rpc_client.calls)
 
   def test_minting_via_rpc_switching_to_none(self):
@@ -365,8 +365,8 @@ class AuthSystemTest(auto_stub.TestCase):
     code, resp = call_rpc(local_auth_ctx, 'system', scopes=['A', 'B', 'C'])
     self.assertEqual(200, code)
     self.assertEqual({
-        u'error_code': 1,
-        u'error_message': u"The task has no 'system' account associated with it"
+        'error_code': 1,
+        'error_message': u"The task has no 'system' account associated with it"
     }, resp)
 
   def test_minting_via_rpc_switching_to_bot(self):
@@ -387,7 +387,7 @@ class AuthSystemTest(auto_stub.TestCase):
     code, resp = call_rpc(local_auth_ctx, 'system', scopes=['A', 'B', 'C'])
     self.assertEqual(200, code)
     self.assertEqual(
-        {u'access_token': u'bot-own-token', u'expiry': expiry}, resp)
+        {'access_token': 'bot-own-token', 'expiry': expiry}, resp)
 
   def test_minting_id_token_via_rpc_ok(self):
     local_auth_ctx = self.init_auth_system(
@@ -415,7 +415,7 @@ class AuthSystemTest(auto_stub.TestCase):
 
     code, resp = call_rpc(local_auth_ctx, 'system', audience='example.com')
     self.assertEqual(200, code)
-    self.assertEqual({u'id_token': u'blah', u'expiry': expiry}, resp)
+    self.assertEqual({'id_token': 'blah', 'expiry': expiry}, resp)
     self.assertEqual([{
         'method': 'mint_id_token',
         'account_id': 'system',
@@ -427,7 +427,7 @@ class AuthSystemTest(auto_stub.TestCase):
     # The token is cached.
     code, resp = call_rpc(local_auth_ctx, 'system', audience='example.com')
     self.assertEqual(200, code)
-    self.assertEqual({u'id_token': u'blah', u'expiry': expiry}, resp)
+    self.assertEqual({'id_token': 'blah', 'expiry': expiry}, resp)
     self.assertFalse(rpc_client.calls)
 
   def test_id_token_for_bot_not_supported(self):
@@ -444,8 +444,8 @@ class AuthSystemTest(auto_stub.TestCase):
     code, resp = call_rpc(local_auth_ctx, 'task', audience='example.com')
     self.assertEqual(200, code)
     self.assertEqual({
-        u'error_message': u'ID tokens for "bot" account are not supported',
-        u'error_code': 5,
+        'error_message': 'ID tokens for "bot" account are not supported',
+        'error_code': 5,
     }, resp)
 
 

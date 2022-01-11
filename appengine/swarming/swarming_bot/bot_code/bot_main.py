@@ -169,8 +169,8 @@ def _pool_from_dimensions(dimensions):
     # Strip all the prefixes of other values. values is already sorted.
     for i, value in enumerate(values):
       if not any(v.startswith(value) for v in values[i+1:]):
-        pairs.append(u'%s:%s' % (key, value))
-  return u'|'.join(sorted(pairs))
+        pairs.append('%s:%s' % (key, value))
+  return '|'.join(sorted(pairs))
 
 
 def _monitor_call(func):
@@ -186,7 +186,7 @@ def _monitor_call(func):
         if flat_dims:
           logging.info('ts_mon hook_name=%r pool=%r', name, flat_dims)
           _hooks_durations.add(
-              duration, fields={u'hookname': name, u'pool': flat_dims})
+              duration, fields={'hookname': name, 'pool': flat_dims})
       logging.info('%s(): %gs', name, round(duration/1000., 3))
   return hook
 
@@ -343,26 +343,26 @@ def _get_dimensions(botobj):
   out = _call_hook_safe(False, botobj, 'get_dimensions')
   if isinstance(out, dict):
     out = out.copy()
-    out[u'server_version'] = [_get_server_version_safe()]
+    out['server_version'] = [_get_server_version_safe()]
     return out
   try:
     _set_quarantined('get_dimensions(): expected a dict, got %r' % out)
     out = os_utilities.get_dimensions()
-    out[u'quarantined'] = [u'1']
-    out[u'server_version'] = [_get_server_version_safe()]
+    out['quarantined'] = ['1']
+    out['server_version'] = [_get_server_version_safe()]
     return out
   except Exception as e:
     logging.exception('os.utilities.get_dimensions() failed')
     return {
-      u'error': [u'%s\n%s' % (e, traceback.format_exc()[-2048:])],
-      u'id': [_get_botid_safe()],
-      u'quarantined': [u'1'],
-      u'server_version': [_get_server_version_safe()],
+      'error': ['%s\n%s' % (e, traceback.format_exc()[-2048:])],
+      'id': [_get_botid_safe()],
+      'quarantined': ['1'],
+      'server_version': [_get_server_version_safe()],
     }
 
 
 def _get_server_version_safe():
-  return get_config().get(u'server_version', u'N/A')
+  return get_config().get('server_version', 'N/A')
 
 
 @tools.cached
@@ -402,22 +402,22 @@ def _get_state(botobj, sleep_streak):
   state = _call_hook_safe(False, botobj, 'get_state')
   if not isinstance(state, dict):
     _set_quarantined('get_state(): expected a dict, got %r' % state)
-    state = {u'broken': state}
+    state = {'broken': state}
 
-  if not state.get(u'quarantined'):
+  if not state.get('quarantined'):
     if not _is_base_dir_ok(botobj):
       # Use super hammer in case of dangerous environment.
       _set_quarantined('Can\'t run from the base directory')
     if _QUARANTINED:
-      state[u'quarantined'] = _QUARANTINED
+      state['quarantined'] = _QUARANTINED
 
-  state[u'sleep_streak'] = sleep_streak
-  if not state.get(u'quarantined') and botobj:
+  state['sleep_streak'] = sleep_streak
+  if not state.get('quarantined') and botobj:
     # Reuse the data from 'state/disks'
-    disks = state.get(u'disks', {})
+    disks = state.get('disks', {})
     err = _get_disks_quarantine(botobj, disks)
     if err:
-      state[u'quarantined'] = err
+      state['quarantined'] = err
       _cleanup_purgeable_space(botobj)
   return state
 
@@ -436,10 +436,10 @@ def _get_disks_quarantine(botobj, disks):
 
   def _check_for_quarantine(r, i, key):
     min_free = _min_free_disk(i, settings[key])
-    if int(i[u'free_mb']*1024*1024) < min_free:
+    if int(i['free_mb']*1024*1024) < min_free:
       errors.append(
-          u'Not enough free disk space on %s. %.1fmib < %.1fmib' %
-          (r, i[u'free_mb'], round(min_free / 1024. / 1024., 1)))
+          'Not enough free disk space on %s. %.1fmib < %.1fmib' %
+          (r, i['free_mb'], round(min_free / 1024. / 1024., 1)))
 
   # root may be missing in the case of netbooted devices.
   if root in disks:
@@ -526,7 +526,7 @@ def _min_free_disk(infos, settings):
 
   See _get_settings() in ../config/bot_config.py for an explanation.
   """
-  size = int(infos[u'size_mb']*1024*1024)
+  size = int(infos['size_mb']*1024*1024)
   x1 = settings['size'] or 0
   x2 = int(round(size * float(settings['max_percent'] or 0) * 0.01))
   # Select the lowest non-zero value.
@@ -622,9 +622,9 @@ def get_attributes(botobj):
   - botobj: bot.Bot instance or None
   """
   return {
-    u'dimensions': _get_dimensions(botobj),
-    u'state': _get_state(botobj, 0),
-    u'version': generate_version(),
+    'dimensions': _get_dimensions(botobj),
+    'state': _get_state(botobj, 0),
+    'version': generate_version(),
   }
 
 
@@ -638,7 +638,7 @@ def get_bot(config):
   # This variable is used to bootstrap the initial bot.Bot object, which then is
   # used to get the dimensions and state.
   attributes = {
-    'dimensions': {u'id': ['none']},
+    'dimensions': {'id': ['none']},
     'state': {},
     'version': generate_version(),
   }
@@ -676,8 +676,8 @@ def get_config():
   except (zipfile.BadZipfile, IOError, OSError, TypeError, ValueError):
     logging.exception('Invalid config.json!')
     config = {
-      u'server': u'',
-      u'server_version': u'N/A',
+      'server': '',
+      'server_version': 'N/A',
     }
   if not _ERROR_HANDLER_WAS_REGISTERED and config['server']:
     on_error.report_on_exception_exit(config['server'])
@@ -899,7 +899,7 @@ def _run_manifest(botobj, manifest, start):
   auth_params_dumper = None
   must_reboot_reason = None
   # Use 'w' instead of 'work' because path length is precious on Windows.
-  work_dir = os.path.join(botobj.base_dir, u'w')
+  work_dir = os.path.join(botobj.base_dir, 'w')
   try:
     try:
       if fs.isdir(work_dir):
@@ -910,13 +910,13 @@ def _run_manifest(botobj, manifest, start):
       # around the undeleteable directory by creating a temporary directory
       # instead. This is not normal behavior. The bot will report a failure on
       # start.
-      work_dir = tempfile.mkdtemp(dir=botobj.base_dir, prefix=u'w')
+      work_dir = tempfile.mkdtemp(dir=botobj.base_dir, prefix='w')
     else:
       try:
         fs.makedirs(work_dir)
       except OSError:
         # Sometimes it's a race condition, so do a last ditch attempt.
-        work_dir = tempfile.mkdtemp(dir=botobj.base_dir, prefix=u'w')
+        work_dir = tempfile.mkdtemp(dir=botobj.base_dir, prefix='w')
 
     env = os.environ.copy()
     # Windows in particular does not tolerate unicode strings in environment
@@ -973,7 +973,7 @@ def _run_manifest(botobj, manifest, start):
     _call_hook_safe(True, botobj, 'on_before_task', bot_file, command, env)
     logging.debug('Running command: %s', command)
 
-    base_log = os.path.join(botobj.base_dir, u'logs')
+    base_log = os.path.join(botobj.base_dir, 'logs')
     if not fs.isdir(base_log):
       # It was observed that this directory may be unexpectedly deleted.
       # Recreate as needed, otherwise it may throw at the open() call below.
@@ -1019,9 +1019,9 @@ def _run_manifest(botobj, manifest, start):
       logging.warning('task_runner failed to write metadata')
       msg = 'Execution failed: internal error (no metadata).'
       internal_failure = True
-    elif task_result[u'must_signal_internal_failure']:
+    elif task_result['must_signal_internal_failure']:
       msg = (
-        'Execution failed: %s' % task_result[u'must_signal_internal_failure'])
+        'Execution failed: %s' % task_result['must_signal_internal_failure'])
       internal_failure = True
 
     failure = bool(task_result.get('exit_code')) if task_result else False
@@ -1255,7 +1255,7 @@ def _poll_server(botobj, quit_bit, last_action):
     cmd, value = botobj.remote.poll(botobj._attributes)
   except remote_client_errors.PollError as e:
     # Back off on failure.
-    delay = max(1, min(60, botobj.state.get(u'sleep_streak', 10) * 2))
+    delay = max(1, min(60, botobj.state.get('sleep_streak', 10) * 2))
     logging.warning('Poll failed (%s), sleeping %.1f sec', e, delay)
     quit_bit.wait(delay)
     return False
@@ -1453,7 +1453,7 @@ def _maybe_update_lkgbc(botobj):
     if not fs.isfile(THIS_FILE):
       # TODO(maruel): Try to download the code again from the server.
       return False
-    golden = os.path.join(botobj.base_dir, u'swarming_bot.zip')
+    golden = os.path.join(botobj.base_dir, 'swarming_bot.zip')
     if fs.isfile(golden):
       org = fs.stat(golden)
       cur = fs.stat(THIS_FILE)

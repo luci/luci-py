@@ -139,14 +139,14 @@ class TestBotMain(TestBotBase):
     def get_dimensions(botobj):
       self.assertEqual(obj, botobj)
       obj.bot_restart('Yo')
-      return {u'id': [u'foo'], u'pool': [u'bar']}
+      return {'id': ['foo'], 'pool': ['bar']}
     self.mock(bot_config, 'get_dimensions', get_dimensions)
     restarts = []
     self.mock(bot_main, '_bot_restart', lambda *args: restarts.append(args))
     expected = {
-        u'id': [u'foo'],
-        u'pool': [u'bar'],
-        u'server_version': [u'version1']
+        'id': ['foo'],
+        'pool': ['bar'],
+        'server_version': ['version1']
     }
     self.assertEqual(expected, bot_main._get_dimensions(obj))
     self.assertEqual('Yo', obj.bot_restart_msg())
@@ -157,10 +157,10 @@ class TestBotMain(TestBotBase):
     obj = self.make_bot()
     def get_dimensions(botobj):
       self.assertEqual(obj, botobj)
-      return {u'yo': [u'dawh']}
+      return {'yo': ['dawh']}
 
     self.mock(bot_config, 'get_dimensions', get_dimensions)
-    expected = {u'server_version': [u'version1'], u'yo': [u'dawh']}
+    expected = {'server_version': ['version1'], 'yo': ['dawh']}
     self.assertEqual(expected, bot_main._get_dimensions(obj))
 
   def test_get_dimensions_extra(self):
@@ -168,16 +168,16 @@ class TestBotMain(TestBotBase):
     obj = self.make_bot()
     def get_dimensions(botobj):
       self.assertEqual(obj, botobj)
-      return {u'yo': [u'dawh']}
+      return {'yo': ['dawh']}
     self.mock(bot_config, 'get_dimensions', get_dimensions)
 
     # The extra version takes priority.
     class extra(object):
       def get_dimensions(self2, botobj): # pylint: disable=no-self-argument
         self.assertEqual(obj, botobj)
-        return {u'alternative': [u'truth']}
+        return {'alternative': ['truth']}
     self.mock(bot_main, '_EXTRA_BOT_CONFIG', extra())
-    expected = {u'alternative': [u'truth'], u'server_version': [u'version1']}
+    expected = {'alternative': ['truth'], 'server_version': ['version1']}
     self.assertEqual(expected, bot_main._get_dimensions(obj))
 
   def test_generate_version(self):
@@ -195,17 +195,17 @@ class TestBotMain(TestBotBase):
 
   def test_get_state_quarantine(self):
     botobj = bot_main.get_bot(bot_main.get_config())
-    root = u'c:\\' if sys.platform == 'win32' else u'/'
+    root = 'c:\\' if sys.platform == 'win32' else '/'
     def get_state(_):
       return {
-          u'disks': {
+          'disks': {
               root: {
-                  u'free_mb': 0.1,
-                  u'size_mb': 1000,
+                  'free_mb': 0.1,
+                  'size_mb': 1000,
               },
               botobj.base_dir: {
-                  u'free_mb': 0.1,
-                  u'size_mb': 1000,
+                  'free_mb': 0.1,
+                  'size_mb': 1000,
               },
           },
       }
@@ -219,21 +219,21 @@ class TestBotMain(TestBotBase):
     from config import bot_config
     self.mock(bot_config, 'get_state', get_state)
     expected = {
-        u'disks': {
-            u'c:\\' if sys.platform == 'win32' else u'/': {
-                u'free_mb': 0.1,
-                u'size_mb': 1000,
+        'disks': {
+            'c:\\' if sys.platform == 'win32' else '/': {
+                'free_mb': 0.1,
+                'size_mb': 1000,
             },
             botobj.base_dir: {
-                u'free_mb': 0.1,
-                u'size_mb': 1000,
+                'free_mb': 0.1,
+                'size_mb': 1000,
             },
         },
-        u'quarantined':
-            (u'Not enough free disk space on %s. 0.1mib < 100.0mib\n'
-             u'Not enough free disk space on %s. 0.1mib < 150.0mib') %
+        'quarantined':
+            ('Not enough free disk space on %s. 0.1mib < 100.0mib\n'
+             'Not enough free disk space on %s. 0.1mib < 150.0mib') %
             (root, botobj.base_dir),
-        u'sleep_streak':
+        'sleep_streak':
             1,
     }
     self.assertEqual(expected, bot_main._get_state(botobj, 1))
@@ -250,7 +250,7 @@ class TestBotMain(TestBotBase):
     self.mock(bot_config, 'get_dimensions', get_dimensions)
 
     def get_dimensions_os():
-      return {u'os': [u'safe']}
+      return {'os': ['safe']}
 
     self.mock(os_utilities, 'get_dimensions', get_dimensions_os)
     def get_state(botobj):
@@ -259,9 +259,9 @@ class TestBotMain(TestBotBase):
     self.mock(bot_config, 'get_state', get_state)
 
     expected = {
-        u'os': [u'safe'],
-        u'quarantined': [u'1'],
-        u'server_version': [u'version1'],
+        'os': ['safe'],
+        'quarantined': ['1'],
+        'server_version': ['version1'],
     }
     self.assertEqual(expected, bot_main._get_dimensions(obj))
     expected = {
@@ -283,8 +283,8 @@ class TestBotMain(TestBotBase):
             'size_mb': 0,
         },
     }
-    expected = (u'Not enough free disk space on %s. 0.0mib < 1024.0mib\n'
-                u'Not enough free disk space on %s. 0.0mib < 4096.0mib') % (
+    expected = ('Not enough free disk space on %s. 0.0mib < 1024.0mib\n'
+                'Not enough free disk space on %s. 0.0mib < 4096.0mib') % (
                     root, self.bot.base_dir)
     self.assertEqual(expected, bot_main._get_disks_quarantine(self.bot, disks))
 

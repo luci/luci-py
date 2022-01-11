@@ -27,7 +27,7 @@ class Singleton(object):
     self.handle = None
     if sys.platform == 'win32':
       # Use the directory name without '\\'. Enforce lowercase.
-      self.key = u'Global\\' + rootdir.replace('\\', '_').lower()
+      self.key = 'Global\\' + rootdir.replace('\\', '_').lower()
     else:
       self.key = os.path.join(rootdir, 'swarming.lck')
 
