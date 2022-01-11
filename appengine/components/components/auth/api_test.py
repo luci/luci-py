@@ -1233,7 +1233,7 @@ ADMIN = model.Identity.from_bytes('user:admin@example.com')
 
 class RealmsTest(test_case.TestCase):
   @staticmethod
-  def auth_db(realms_map, groups=None, api_version=None):
+  def auth_db(realms_map, groups=None, conditions=None, api_version=None):
     return api.AuthDB.from_proto(
         replication_state=model.AuthReplicationState(),
         auth_db=replication_pb2.AuthDB(
@@ -1247,6 +1247,7 @@ class RealmsTest(test_case.TestCase):
             ],
             realms={
                 'api_version': api_version or realms.API_VERSION,
+                'conditions': conditions or [],
                 'permissions': [
                     {'name': p.name} for p in ALL_PERMS
                 ],
@@ -1255,6 +1256,7 @@ class RealmsTest(test_case.TestCase):
                         'name': name,
                         'bindings': [
                             {
+                                'conditions': conds,
                                 'permissions': [
                                     ALL_PERMS.index(p)
                                     for p in perms
@@ -1263,7 +1265,7 @@ class RealmsTest(test_case.TestCase):
                                     p if isinstance(p, str) else p.to_bytes()
                                     for p in principals
                                 ],
-                            } for perms, principals in sorted(bindings.items())
+                            } for conds, perms, principals in sorted(bindings)
                         ],
                         'data': {
                             'enforce_in_service': ['data for %s' % name],
@@ -1293,73 +1295,114 @@ class RealmsTest(test_case.TestCase):
         any(msg in m for m in self.logs[lvl]),
         '%r not in %r' % (msg, self.logs[lvl]))
 
-  def assert_check(self, db, perm, realms, ident, outcome):
+  def assert_check(self, db, perm, realms, ident, attrs, outcome):
     self.assertEqual(
-        outcome, db.has_permission(perm, realms, ident),
-        'has_permission(%r, %r, %r) is %s, but should be %s' %
-        (perm, realms, ident.to_bytes(), not outcome, outcome))
+        outcome, db.has_permission(perm, realms, ident, attributes=attrs),
+        'has_permission(%r, %r, %r, %r) is %s, but should be %s' %
+        (perm, realms, ident.to_bytes(), attrs, not outcome, outcome))
 
   def test_direct_inclusion_in_binding(self):
     db = self.auth_db({
-        'proj:@root': {},
-        'proj:realm': {
-            (PERM0, PERM1): [ID1],
-            (PERM0, PERM2): [ID2],
-        },
-        'proj:another/realm': {
-            (PERM2,): [ID1, ID3],
-        },
+        'proj:@root': [],
+        'proj:realm': [
+            ([], [PERM0, PERM1], [ID1]),
+            ([], [PERM0, PERM2], [ID2]),
+        ],
+        'proj:another/realm': [
+            ([], [PERM2], [ID1, ID3]),
+        ],
     })
-    self.assert_check(db, PERM0, ['proj:realm'], ID1, True)
-    self.assert_check(db, PERM1, ['proj:realm'], ID1, True)
-    self.assert_check(db, PERM2, ['proj:realm'], ID1, False)
-    self.assert_check(db, PERM0, ['proj:realm'], ID2, True)
-    self.assert_check(db, PERM1, ['proj:realm'], ID2, False)
-    self.assert_check(db, PERM2, ['proj:realm'], ID2, True)
+    self.assert_check(db, PERM0, ['proj:realm'], ID1, None, True)
+    self.assert_check(db, PERM1, ['proj:realm'], ID1, None, True)
+    self.assert_check(db, PERM2, ['proj:realm'], ID1, None, False)
+    self.assert_check(db, PERM0, ['proj:realm'], ID2, None, True)
+    self.assert_check(db, PERM1, ['proj:realm'], ID2, None, False)
+    self.assert_check(db, PERM2, ['proj:realm'], ID2, None, True)
     self.assert_check(
-        db, PERM2, ['proj:realm', 'proj:another/realm'], ID1, True)
+        db, PERM2, ['proj:realm', 'proj:another/realm'], ID1, None, True)
     self.assert_check(
-        db, PERM2, ['proj:realm', 'proj:another/realm'], ID3, True)
+        db, PERM2, ['proj:realm', 'proj:another/realm'], ID3, None, True)
 
   def test_inclusion_through_group(self):
     db = self.auth_db({
-        'proj:@root': {},
-        'proj:realm': {
-            (PERM0, PERM1): ['group:empty', 'group:g1'],
-            (PERM0, PERM2): ['group:empty', 'group:g2'],
-        },
+        'proj:@root': [],
+        'proj:realm': [
+            ([], [PERM0, PERM1], ['group:empty', 'group:g1']),
+            ([], [PERM0, PERM2], ['group:empty', 'group:g2']),
+        ],
     }, groups={'empty': [], 'g1': [ID1], 'g2': [ID2]})
-    self.assert_check(db, PERM0, ['proj:realm'], ID1, True)
-    self.assert_check(db, PERM1, ['proj:realm'], ID1, True)
-    self.assert_check(db, PERM2, ['proj:realm'], ID1, False)
-    self.assert_check(db, PERM0, ['proj:realm'], ID2, True)
-    self.assert_check(db, PERM1, ['proj:realm'], ID2, False)
-    self.assert_check(db, PERM2, ['proj:realm'], ID2, True)
+    self.assert_check(db, PERM0, ['proj:realm'], ID1, None, True)
+    self.assert_check(db, PERM1, ['proj:realm'], ID1, None, True)
+    self.assert_check(db, PERM2, ['proj:realm'], ID1, None, False)
+    self.assert_check(db, PERM0, ['proj:realm'], ID2, None, True)
+    self.assert_check(db, PERM1, ['proj:realm'], ID2, None, False)
+    self.assert_check(db, PERM2, ['proj:realm'], ID2, None, True)
+
+  def test_conditional_bindings(self):
+    conditions = [
+        {'restrict': {'attribute': 'a1', 'values': ['a', 'b']}}, # 0
+        {'restrict': {'attribute': 'a2', 'values': ['c']}},      # 1
+        {'restrict': {'attribute': 'a3', 'values': []}},         # 2
+        {'restrict': {'attribute': 'a1', 'values': ['c']}},      # 3
+    ]
+    db = self.auth_db({
+        'p:r': [
+            ([0], [PERM0], [ID1]),
+            ([0, 1], [PERM1], [ID1]),
+            ([0, 2], [PERM2], [ID1]),
+
+            ([0], [PERM0], [ID2]),
+            ([3], [PERM0], [ID2]),
+        ],
+    }, conditions=conditions)
+
+    # "Restrict" condition works.
+    self.assert_check(db, PERM0, ['p:r'], ID1, {'a1': 'a'}, True)
+    self.assert_check(db, PERM0, ['p:r'], ID1, {'a1': 'b'}, True)
+    self.assert_check(db, PERM0, ['p:r'], ID1, {'a1': 'c'}, False)
+    self.assert_check(db, PERM0, ['p:r'], ID1, {'xx': 'a'}, False)
+    self.assert_check(db, PERM0, ['p:r'], ID1, None, False)
+
+    # ANDing conditions works.
+    self.assert_check(db, PERM1, ['p:r'], ID1, {'a1': 'a', 'a2': 'c'}, True)
+    self.assert_check(db, PERM1, ['p:r'], ID1, {'a1': 'a'}, False)
+    self.assert_check(db, PERM1, ['p:r'], ID1, {'a2': 'c'}, False)
+
+    # Empty restriction is allowed and evaluates to False.
+    self.assert_check(db, PERM2, ['p:r'], ID1, {'a1': 'a', 'a3': 'c'}, False)
+    self.assert_check(db, PERM2, ['p:r'], ID1, {'a1': 'a'}, False)
+
+    # ORing conditions via multiple bindings.
+    self.assert_check(db, PERM0, ['p:r'], ID2, {'a1': 'a'}, True) # via 0
+    self.assert_check(db, PERM0, ['p:r'], ID2, {'a1': 'b'}, True) # via 0
+    self.assert_check(db, PERM0, ['p:r'], ID2, {'a1': 'c'}, True) # via 3
+    self.assert_check(db, PERM0, ['p:r'], ID2, {'a1': 'x'}, False)
+    self.assert_check(db, PERM0, ['p:r'], ID2, None, False)
 
   def test_fallback_to_root(self):
-    db = self.auth_db({'proj:@root': {(PERM0,): [ID1]}})
-    self.assert_check(db, PERM0, ['proj:@root'], ID1, True)
-    self.assert_check(db, PERM0, ['proj:@root'], ID2, False)
+    db = self.auth_db({'proj:@root': [([], [PERM0], [ID1])]})
+    self.assert_check(db, PERM0, ['proj:@root'], ID1, None, True)
+    self.assert_check(db, PERM0, ['proj:@root'], ID2, None, False)
 
     self.assert_logs_empty('warning')
-    self.assert_check(db, PERM0, ['proj:realm'], ID1, True)
+    self.assert_check(db, PERM0, ['proj:realm'], ID1, None, True)
     self.assert_logs('warning', 'falling back to the root')
 
-    self.assert_check(db, PERM0, ['proj:realm'], ID2, False)
-    self.assert_check(db, PERM0, ['proj:another/realm'], ID1, True)
+    self.assert_check(db, PERM0, ['proj:realm'], ID2, None, False)
+    self.assert_check(db, PERM0, ['proj:another/realm'], ID1, None, True)
 
   def test_missing_project(self):
     db = self.auth_db({})
 
-    self.assert_check(db, PERM0, ['proj:@root'], ID1, False)
+    self.assert_check(db, PERM0, ['proj:@root'], ID1, None, False)
     self.assert_logs('warning', 'a non-existing root realm')
     self.logs['warning'] = []
 
-    self.assert_check(db, PERM0, ['proj:@legacy'], ID1, False)
+    self.assert_check(db, PERM0, ['proj:@legacy'], ID1, None, False)
     self.assert_logs('warning', 'doesn\'t have a root realm')
     self.logs['warning'] = []
 
-    self.assert_check(db, PERM0, ['proj:another/realm'], ID1, False)
+    self.assert_check(db, PERM0, ['proj:another/realm'], ID1, None, False)
     self.assert_logs('warning', 'doesn\'t have a root realm')
     self.logs['warning'] = []
 
@@ -1367,10 +1410,10 @@ class RealmsTest(test_case.TestCase):
     unknown = api.Permission('luci.dev.unknown')
     self.all_perms[unknown.name] = unknown
 
-    db = self.auth_db({'proj:realm': {(PERM0,): [ID1]}})
+    db = self.auth_db({'proj:realm': [([], [PERM0], [ID1])]})
     self.assert_logs('warning', 'is not in the AuthDB')
 
-    self.assert_check(db, unknown, ['proj:realm'], ID1, False)
+    self.assert_check(db, unknown, ['proj:realm'], ID1, None, False)
     self.assert_logs('warning', 'not present in the AuthDB')
 
   def test_realms_unavailable(self):
@@ -1396,29 +1439,37 @@ class RealmsTest(test_case.TestCase):
   def test_has_permission_dryrun(self):
     rc = api.RequestCache()
     rc._auth_db = self.auth_db(
-        {'proj:@root': {(PERM0,): [ID1]}}, groups={'admin': [ADMIN]})
+        {'proj:@root': [([], [PERM0], [ID1])]}, groups={'admin': [ADMIN]})
     self.mock(api, 'get_request_cache', lambda: rc)
 
     # Match.
     self.logs['info'] = []
-    api.has_permission_dryrun(PERM0, ['proj:@root'], True, ID1, 'admin', 'bug')
+    api.has_permission_dryrun(
+        PERM0, ['proj:@root'], True, ID1,
+        admin_group='admin', tracking_bug='bug')
     self.assert_logs('info',
         "bug: has_permission_dryrun('luci.dev.testing0', ['proj:@root'], "
         "'user:1@example.com'), authdb=0: match - ALLOW")
     self.logs['info'] = []
-    api.has_permission_dryrun(PERM1, ['proj:@root'], False, ID1, 'admin', 'bug')
+    api.has_permission_dryrun(
+        PERM1, ['proj:@root'], False, ID1,
+        admin_group='admin', tracking_bug='bug')
     self.assert_logs('info',
         "bug: has_permission_dryrun('luci.dev.testing1', ['proj:@root'], "
         "'user:1@example.com'), authdb=0: match - DENY")
 
     # Mismatch.
     self.logs['warning'] = []
-    api.has_permission_dryrun(PERM0, ['proj:@root'], False, ID1, 'admin', 'bug')
+    api.has_permission_dryrun(
+        PERM0, ['proj:@root'], False, ID1,
+        admin_group='admin', tracking_bug='bug')
     self.assert_logs('warning',
         "bug: has_permission_dryrun('luci.dev.testing0', ['proj:@root'], "
         "'user:1@example.com'), authdb=0: mismatch - got ALLOW, want DENY")
     self.logs['warning'] = []
-    api.has_permission_dryrun(PERM1, ['proj:@root'], True, ID1, 'admin', 'bug')
+    api.has_permission_dryrun(
+        PERM1, ['proj:@root'], True, ID1,
+        admin_group='admin', tracking_bug='bug')
     self.assert_logs('warning',
         "bug: has_permission_dryrun('luci.dev.testing1', ['proj:@root'], "
         "'user:1@example.com'), authdb=0: mismatch - got DENY, want ALLOW")
@@ -1426,20 +1477,23 @@ class RealmsTest(test_case.TestCase):
     # Admin match.
     self.logs['info'] = []
     api.has_permission_dryrun(
-        PERM0, ['proj:@root'], True, ADMIN, 'admin', 'bug')
+        PERM0, ['proj:@root'], True, ADMIN,
+        admin_group='admin', tracking_bug='bug')
     self.assert_logs('info',
         "bug: has_permission_dryrun('luci.dev.testing0', ['proj:@root'], "
         "'user:admin@example.com'), authdb=0: match - ADMIN_ALLOW")
 
     # Blow up.
     self.logs['exception'] = []
-    api.has_permission_dryrun(PERM1, ['@root'], True, ID1, 'admin', 'bug')
+    api.has_permission_dryrun(
+        PERM1, ['@root'], True, ID1,
+        admin_group='admin', tracking_bug='bug')
     self.assert_logs('exception',
         "bug: has_permission_dryrun('luci.dev.testing1', ['@root'], "
         "'user:1@example.com'), authdb=0: exception ValueError, want ALLOW")
 
   def test_realm_data(self):
-    db = self.auth_db({'proj:@root': {}, 'proj:r': {}})
+    db = self.auth_db({'proj:@root': [], 'proj:r': []})
 
     def realm_data(realm):
       r = db.get_realm_data(realm)

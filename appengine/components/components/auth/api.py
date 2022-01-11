@@ -188,15 +188,16 @@ OAuthConfig = collections.namedtuple('OAuthConfig', [
 # The representation of realms_pb2.Realm used by AuthDB, preprocessed for faster
 # checks.
 CachedRealm = collections.namedtuple('CachedRealm', [
-  'per_permission_sets',  # permission index -> [PrincipalsSet]
+  'per_permission_sets',  # permission index -> [ConditionalPrincipalsSet]
   'data',                 # realms_pb2.RealmData (perhaps empty)
 ])
 
 
-# Represents a set of groups and identities, used by CachedRealm.
-PrincipalsSet = collections.namedtuple('PrincipalsSet', [
-  'groups',  # tuple(['group1', 'group2', ...])
-  'idents',  # frozenset(['user:abc@example.com', ...])
+# Represents a set of groups and identities + a condition, used by CachedRealm.
+ConditionalPrincipalsSet = collections.namedtuple('ConditionalPrincipalsSet', [
+  'groups',      # tuple(['group1', 'group2', ...])
+  'idents',      # frozenset(['user:abc@example.com', ...])
+  'conditions',  # tuple([func, func, func]) AND'ed together
 ])
 
 
@@ -430,13 +431,26 @@ class AuthDB(object):
         logging.warning(
             'Permission %r is not in the AuthDB rev %d', p, self.auth_db_rev)
 
-    # Conceptually, for each realm we are building a map "permission -> set of
-    # principals". But to save memory we represent "set of principals" as a list
-    # of PrincipalsSet objects (one per an original Binding message). That way
-    # multiple per_permission_sets entries may share the same PrincipalsSet
+    # Lazily convert conditions into predicate lambdas.
+    conds = {}
+    def condition(idx):
+      func = conds.get(idx)
+      if not func:
+        func = _condition_pb_to_predicate(realms_pb.conditions[idx])
+        conds[idx] = func
+      return func
+
+    # Conceptually, for each realm we are building a map:
+    #
+    #     permission -> [(condition, set of principals)].
+    #
+    # But to save memory we represent (condition, set of principals) as a
+    # single ConditionalPrincipalsSet objects (one per an original Binding
+    # message) without trying to merge them in any way. That way multiple
+    # per_permission_sets entries may share the same ConditionalPrincipalsSet
     # object. The expense is more computations during has_permission(...).
     for realm in realms_pb.realms:
-      per_permission_sets = {}  # permission index => list of PrincipalsSet
+      per_permission_sets = {}  # permission index => [ConditionalPrincipalsSet]
       for b in realm.bindings:
         groups, idents = [], []
         for p in b.principals:
@@ -444,7 +458,10 @@ class AuthDB(object):
             groups.append(p[6:])  # 6 == len('group:')
           else:
             idents.append(p)
-        principals_set = PrincipalsSet(tuple(groups), frozenset(idents))
+        principals_set = ConditionalPrincipalsSet(
+            tuple(groups),
+            frozenset(idents),
+            tuple(condition(idx) for idx in b.conditions))
         for perm_idx in b.permissions:
           per_permission_sets.setdefault(perm_idx, []).append(principals_set)
       self._realms[realm.name] = CachedRealm(per_permission_sets, realm.data)
@@ -835,12 +852,24 @@ class AuthDB(object):
         self._internal_domains_re and
         self._internal_domains_re.match(domain))
 
-  def has_permission(self, permission, realms, identity):
+  def has_permission(self, permission, realms, identity, attributes=None):
     """Returns True if the identity has the given permission in any of `realms`.
 
     See has_permission() function below for more info.
     """
     self._check_realms_available()
+
+    if not attributes:
+      attributes = {}
+    else:
+      if not isinstance(attributes, dict):
+        raise TypeError('Attributes must be a dict')
+      for k, v in attributes.items():
+        if not isinstance(k, basestring):
+          raise TypeError('Attribute name must be a string, got %r' % (k,))
+        if not isinstance(v, basestring):
+          raise TypeError(
+              'Attribute value for key %r must be a string, got %r' % (k, v))
 
     if not isinstance(permission, Permission):
       raise TypeError(
@@ -864,11 +893,13 @@ class AuthDB(object):
       if not realm:
         continue
 
-      # Check if `identity` is in any of PrincipalsSet's that are granted the
-      # permission. This does group checks inside. Note that this implementation
-      # is pretty dumb and can be optimized more if necessary.
+      # Check if `identity` is in any of ConditionalPrincipalsSet's that are
+      # granted the permission and `attributes` pass corresponding conditions.
+      # This does group checks inside. Note that this implementation is pretty
+      # dumb and can be optimized more if necessary.
       for ps in realm.per_permission_sets.get(perm_idx, []):
-        if self._is_identity_in_principals_set(identity, ps, checked_groups):
+        if self._is_identity_in_conditional_principals_set(
+            identity, ps, attributes, checked_groups):
           return True
 
     return False
@@ -951,15 +982,32 @@ class AuthDB(object):
           'realm (no such project?): denying', perm, name)
     return None
 
-  def _is_identity_in_principals_set(self, ident, principals, checked_groups):
-    """Returns True if `ident` is in a PrincipalsSet.
+  def _is_identity_in_conditional_principals_set(
+        self,
+        ident,
+        principals,
+        attributes,
+        checked_groups
+    ):
+    """Returns True if `ident` is in a ConditionalPrincipalsSet.
+
+    Checks attributes pass the condition on the ConditionalPrincipalsSet.
 
     Args:
       ident: an Identity to check.
-      principals: a PrincipalsSet object.
+      principals: a ConditionalPrincipalsSet object.
+      attributes: a {str: str} dict to check in conditions.
       checked_groups: a set of already checked groups that do not have the
           identity. Mutated inside with each new negative is_group_member check.
     """
+    # Conditions are faster to check compared to groups, since for now we
+    # support only simple AttributeRestriction conditions which are just set
+    # lookups. Check conditions before checking groups. This may need to be
+    # adjusted if we ever support more computationally complex conditions. Note
+    # that an empty principals.conditions means "no conditions should be
+    # applied", and all([]) correctly returns True for this case.
+    if not all(cond(attributes) for cond in principals.conditions):
+      return False
     if ident.to_bytes() in principals.idents:
       return True
     for gr in principals.groups:
@@ -2201,7 +2249,7 @@ def validate_realm_name(name):
         (name, _REALM_NAME_RE.pattern, ' or '.join(_SPECIAL_REALMS)))
 
 
-def has_permission(permission, realms, identity=None):
+def has_permission(permission, realms, identity=None, attributes=None):
   """Returns True if the identity has the given permission in any of the realms.
 
   Uses an in-memory cache and can be considered "fast". Makes no RPCs.
@@ -2218,6 +2266,7 @@ def has_permission(permission, realms, identity=None):
         permission in.
     identity: an instance of Identity to check permission for or None to use
         get_current_identity().
+    attributes: a {str: str} dict with values to check in conditional bindings.
 
   Returns:
     True: if the identity has the given permission in any of the given realms.
@@ -2228,7 +2277,7 @@ def has_permission(permission, realms, identity=None):
     RealmsError if Realms API is unavailable or misconfigured.
   """
   return get_request_cache().auth_db.has_permission(
-      permission, realms, identity or get_current_identity())
+      permission, realms, identity or get_current_identity(), attributes)
 
 
 def has_permission_dryrun(
@@ -2236,6 +2285,7 @@ def has_permission_dryrun(
       realms,
       expected_result,
       identity=None,
+      attributes=None,
       admin_group=None,
       tracking_bug=None
   ):
@@ -2257,6 +2307,7 @@ def has_permission_dryrun(
     expected_result: boolean with the expected outcome based on legacy ACLs.
     identity: an instance of Identity to check permission for or None to use
         get_current_identity().
+    attributes: a {str: str} dict with values to check in conditional bindings.
     admin_group: if given, implicitly grant all permissions to its members.
     tracking_bug: a string like 'crbug.com/<number>' identifying a particular
         migration, for logs.
@@ -2277,7 +2328,7 @@ def has_permission_dryrun(
     log_pfx = '%s: %s' % (tracking_bug, log_pfx)
 
   try:
-    result = auth_db.has_permission(permission, realms, identity)
+    result = auth_db.has_permission(permission, realms, identity, attributes)
   except (ValueError, RealmsError) as exc:
     logging.exception(
         '%s: exception %s, want %s',
@@ -2332,3 +2383,17 @@ def _validated_realm_project(project):
         'Invalid project name %r: should match %r' %
         (project, _PROJECT_NAME_RE.pattern))
   return str(project)  # get rid of 'unicode'
+
+
+def _condition_pb_to_predicate(cond_pb):
+  """Returns a predicate func(attributes) for the given realms_pb.Condition."""
+  if cond_pb.HasField('restrict'):
+    attr = cond_pb.restrict.attribute
+    vals = frozenset(cond_pb.restrict.values)
+    return lambda attrs: attrs.get(attr) in vals
+
+  # Allow parsing AuthDB with unrecognized condition kinds, but refuse to use
+  # any bindings that refer to them.
+  logging.warning(
+      'Unknown condition kind %r, always evaluating it to False', cond_pb)
+  return lambda _attrs: False
