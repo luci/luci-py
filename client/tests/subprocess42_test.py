@@ -18,7 +18,6 @@ import time
 import unittest
 
 from nose2.tools import params
-import six
 
 # Mutates sys.path.
 import test_env
@@ -487,10 +486,7 @@ time.sleep(60)
       out, err = p.communicate()
       self.assertEqual(1, p.returncode)
       self.assertEqual(b'', out)
-      if six.PY2:
-        self.assertIn('WindowsError', err)
-      else:
-        self.assertIn(b'WinError', err)
+      self.assertIn(b'WinError', err)
       # Value for ERROR_NOT_ENOUGH_QUOTA. See
       # https://docs.microsoft.com/windows/desktop/debug/system-error-codes--1700-3999-
       self.assertIn(b'1816', err)
