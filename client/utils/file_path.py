@@ -25,10 +25,6 @@ import time
 from utils import fs
 from utils import subprocess42
 from utils import tools
-tools.force_local_third_party()
-
-# third_party/
-import six
 
 # Types of action accepted by link_file().
 HARDLINK, HARDLINK_WITH_FALLBACK, SYMLINK, SYMLINK_WITH_FALLBACK, COPY = range(
@@ -91,18 +87,15 @@ if sys.platform == 'win32':
 
 
   def FormatError(err):
-    """Returns a formatted error on Windows in unicode in python2 and str in
-    python3.
-    """
+    """Returns a formatted error on Windows."""
     # We need to take in account the current code page.
-    return six.ensure_text(
-      ctypes.FormatError(err), locale.getpreferredencoding(), 'replace')
+    return ctypes.FormatError(err)
 
 
   def QueryDosDevice(drive_letter):
     """Returns the Windows 'native' path for a DOS drive letter."""
     assert re.match(r'^[a-zA-Z]:$', drive_letter), drive_letter
-    assert isinstance(drive_letter, six.text_type)
+    assert isinstance(drive_letter, str)
     # Guesswork. QueryDosDeviceW never returns the required number of bytes.
     chars = 1024
     p = wintypes.create_unicode_buffer(chars)
@@ -267,7 +260,7 @@ if sys.platform == 'win32':
 
     On Windows, removes any leading '\\?\'.
     """
-    assert isinstance(p, six.text_type), repr(p)
+    assert isinstance(p, str), repr(p)
     if not isabs(p):
       raise ValueError(
           'get_native_path_case(%r): Require an absolute path' % p, p)
@@ -321,7 +314,7 @@ if sys.platform == 'win32':
   def get_luid(name):
     """Returns the LUID for a privilege."""
     luid = LUID()
-    if not LookupPrivilegeValue(None, six.text_type(name), ctypes.byref(luid)):
+    if not LookupPrivilegeValue(None, str(name), ctypes.byref(luid)):
       # pylint: disable=undefined-variable
       raise WindowsError('Couldn\'t lookup privilege value')
     return luid
@@ -423,9 +416,9 @@ if sys.platform == 'win32':
     """
     def normalize_path(filename):
       try:
-        return GetLongPathName(six.text_type(filename)).lower()
+        return GetLongPathName(str(filename)).lower()
       except:  # pylint: disable=W0702
-        return six.text_type(filename).lower()
+        return str(filename).lower()
 
     root_dir = normalize_path(root_dir)
 
@@ -520,7 +513,7 @@ elif sys.platform == 'darwin':
     Technically, it's only HFS+ on OSX that is case preserving and
     insensitive. It's the default setting on HFS+ but can be changed.
     """
-    assert isinstance(path, six.text_type), repr(path)
+    assert isinstance(path, str), repr(path)
     if not isabs(path):
       raise ValueError(
           'get_native_path_case(%r): Require an absolute path' % path, path)
@@ -624,7 +617,7 @@ else:  # OSes other than Windows and OSX.
 
     TODO(maruel): This is not strictly true. Implement if necessary.
     """
-    assert isinstance(path, six.text_type), repr(path)
+    assert isinstance(path, str), repr(path)
     if not isabs(path):
       raise ValueError(
           'get_native_path_case(%r): Require an absolute path' % path, path)
@@ -855,8 +848,8 @@ def hardlink(source, link_name):
 
   Add support for os.link() on Windows.
   """
-  assert isinstance(source, six.text_type), source
-  assert isinstance(link_name, six.text_type), link_name
+  assert isinstance(source, str), source
+  assert isinstance(link_name, str), link_name
   if sys.platform == 'win32':
     if not windll.kernel32.CreateHardLinkW(
         fs.extend(link_name), fs.extend(source), 0):
@@ -1010,7 +1003,7 @@ def atomic_replace(path, body):
       os.rename(tmp_name, path)
     else:
       # Flags are MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH.
-      MoveFileEx(six.text_type(tmp_name), six.text_type(path), 0x1 | 0x8)
+      MoveFileEx(tmp_name, path, 0x1 | 0x8)
     tmp_name = None # no need to remove it in 'finally' block anymore
   finally:
     if tmp_name:
@@ -1080,63 +1073,11 @@ def make_tree_deleteable(root):
   Warning on Windows: since file permission is modified, the file node is
   modified. This means that for hard-linked files, every directory entry for the
   file node has its file permission modified.
-
-  Python3 Win/Mac, use the os.scandir based implementations.
-  Python2 or Python3 Linux, use the fs.walk based implementation.
   """
   if sys.platform == 'win32':
     make_tree_deleteable_win(root)
-  elif six.PY3:
-    make_tree_deleteable_posix(root)
   else:
-    make_tree_deleteable_legacy(root)
-
-
-def make_tree_deleteable_legacy(root):
-  logging.debug('Using file_path.make_tree_deleteable_legacy')
-  err = None
-  sudo_failed = False
-
-  def try_sudo(p):
-    if sys.platform in ('darwin', 'linux2', 'linux') and not sudo_failed:
-      # Try passwordless sudo, just in case. In practice, it is preferable
-      # to use linux capabilities.
-      with open(os.devnull, 'rb') as f:
-        if not subprocess42.call(
-            ['sudo', '-n', 'chmod', 'a+rwX,-t', p], stdin=f):
-          return False
-      logging.debug('sudo chmod %s failed', p)
-    return True
-
-  if sys.platform != 'win32':
-    e = set_read_only_swallow(root, False)
-    if e:
-      sudo_failed = try_sudo(root)
-    if not err:
-      err = e
-  for dirpath, dirnames, filenames in fs.walk(root, topdown=True):
-    if sys.platform == 'win32':
-      for filename in filenames:
-        e = set_read_only_swallow(os.path.join(dirpath, filename), False)
-        if not err:
-          err = e
-    else:
-      for dirname in dirnames:
-        try:
-          p = os.path.join(dirpath, dirname)
-        except UnicodeDecodeError:
-          logging.error('failed to join "%s" with %s and "%s" with %s',
-                        map(ord, dirpath), type(dirpath), map(ord, dirname),
-                        type(dirname))
-          raise
-        e = set_read_only_swallow(p, False)
-        if e:
-          sudo_failed = try_sudo(p)
-        if not err:
-          err = e
-  if err:
-    # pylint: disable=raising-bad-type
-    raise err
+    make_tree_deleteable_posix(root)
 
 
 def make_tree_deleteable_win(root):
@@ -1206,10 +1147,7 @@ def rmtree(root):
   Raises an exception if it failed.
   """
   logging.info('file_path.rmtree(%s)', root)
-  assert isinstance(root,
-                    six.text_type) or sys.getdefaultencoding() == 'utf-8', (
-                        repr(root), sys.getdefaultencoding())
-  root = six.text_type(root)
+  assert isinstance(root, str), repr(root)
 
   def change_tree_permission():
     logging.debug('file_path.make_tree_deleteable(%s) starting', root)
@@ -1275,7 +1213,7 @@ def rmtree(root):
 
   # If soft retries fail on Linux, there's nothing better we can do.
   if sys.platform != 'win32':
-    six.reraise(errors[0][2][0], errors[0][2][1], errors[0][2][2])
+    raise errors[0][2][1]
 
   # The soft way was not good enough. Try the hard way.
   start = time.time()
@@ -1289,7 +1227,7 @@ def rmtree(root):
     processes = _get_children_processes_win(root)
     if processes:
       logging.error('Failed to terminate processes.\n')
-      six.reraise(errors[0][2][0], errors[0][2][1], errors[0][2][2])
+      raise errors[0][2][1]
   logging.debug(
       'file_path.rmtree(%s) killing children processes took %d seconds', root,
       time.time() - start)
@@ -1311,7 +1249,7 @@ def rmtree(root):
   # The same path may be listed multiple times.
   for path in sorted(set(path for _, path, _ in errors)):
     logging.error('- %s\n', path)
-  six.reraise(errors[0][2][0], errors[0][2][1], errors[0][2][2])
+  raise errors[0][2][1]
 
 
 def get_recursive_size(path):

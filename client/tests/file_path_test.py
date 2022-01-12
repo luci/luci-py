@@ -13,8 +13,6 @@ import tempfile
 import time
 import unittest
 
-import six
-
 # Mutates sys.path.
 import test_env
 
@@ -321,7 +319,7 @@ class FilePathTest(auto_stub.TestCase):
   if sys.platform == 'win32':
     def test_native_case_alternate_datastream(self):
       # Create the file manually, since tempfile doesn't support ADS.
-      tempdir = six.text_type(tempfile.mkdtemp(prefix=u'trace_inputs'))
+      tempdir = tempfile.mkdtemp(prefix=u'trace_inputs')
       try:
         tempdir = file_path.get_native_path_case(tempdir)
         basename = 'foo.txt'
