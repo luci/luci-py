@@ -25,7 +25,7 @@ from utils import oauth
 class LuciContextAuthTest(auto_stub.TestCase):
   @contextlib.contextmanager
   def lucicontext(self, token_response=None, response_code=200):
-    class MockLuciContextServer(object):
+    class MockLuciContextServer:
       @staticmethod
       def request(uri=None, method=None, body=None, headers=None):
         self.assertEqual('POST', method)

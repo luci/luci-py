@@ -94,7 +94,7 @@ else:  # Not Windows.
 LEVELS = [logging.ERROR, logging.INFO, logging.DEBUG]
 
 
-class CaptureLogs(object):
+class CaptureLogs:
   """Captures all the logs in a context."""
   def __init__(self, prefix, root=None):
     handle, self._path = tempfile.mkstemp(prefix=prefix, suffix='.log')
@@ -152,12 +152,11 @@ class UTCFormatter(logging.Formatter):
     ct = self.converter(record.created)
     if datefmt:
       return time.strftime(datefmt, ct)
-    else:
-      t = time.strftime("%Y-%m-%d %H:%M:%S", ct)
-      return "%s.%03d" % (t, record.msecs)
+    t = time.strftime("%Y-%m-%d %H:%M:%S", ct)
+    return "%s.%03d" % (t, record.msecs)
 
 
-class Filter(object):
+class Filter:
   """Adds fields used by the infra-specific formatter.
 
   Fields added:

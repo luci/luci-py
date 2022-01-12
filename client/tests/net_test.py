@@ -131,7 +131,7 @@ class HttpServiceTest(RetryLoopMockedTest):
       def login(self, allow_user_interaction):
         return login(allow_user_interaction) if login else False
 
-    class MockedRequestEngine(object):
+    class MockedRequestEngine:
 
       @net.maybe_inject_user_agent
       def perform_request(self, request):

@@ -31,7 +31,7 @@ class AuthServiceError(Exception):
   """Unexpected response from authentication service."""
 
 
-class AuthService(object):
+class AuthService:
   """Represents remote Authentication service."""
 
   def __init__(self, url):

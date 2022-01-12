@@ -28,7 +28,7 @@ _caches = []
 _caches_lock = threading.Lock()
 
 
-class Profiler(object):
+class Profiler:
   """Context manager that records time spend inside its body."""
   def __init__(self, name):
     self.name = name
@@ -44,7 +44,7 @@ class Profiler(object):
                  self.name, time_taken)
 
 
-class ProfileCounter(object):
+class ProfileCounter:
   """Records total time spent in a chunk of code during lifetime of a process.
 
   Recursive calls count as a single call (i.e. only the time spent in the outer
@@ -149,7 +149,7 @@ def report_cache_stats_at_exit(func, cache):
     size = sys.getsizeof(obj)
     if isinstance(obj, (list, tuple)):
       return size + sum(get_size(x, seen) for x in obj)
-    elif isinstance(obj, dict):
+    if isinstance(obj, dict):
       return size + sum(
           get_size(k, seen) + get_size(v, seen) for k, v in obj.items())
     return size
@@ -224,7 +224,7 @@ def clear_cache(func):
   func.__cache__.clear()
 
 
-class Unbuffered(object):
+class Unbuffered:
   """Disable buffering on a file object."""
   def __init__(self, stream):
     self.stream = stream

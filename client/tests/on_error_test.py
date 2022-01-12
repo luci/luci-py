@@ -133,7 +133,7 @@ def start_server():
   # verification for more recent version.
   create_unverified_https_context = getattr(
       ssl, '_create_unverified_context', None)
-  # pylint: disable=using-constant-test
+  # pylint: disable=using-constant-test,missing-parentheses-for-call-in-test
   if create_unverified_https_context:
     ssl._create_default_https_context = create_unverified_https_context
   httpd = HttpsServer(('127.0.0.1', 0), Handler, 'localhost', pem=PEM)

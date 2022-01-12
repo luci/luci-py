@@ -223,7 +223,7 @@ if sys.platform == 'win32':
       # Polling rocks.
       time.sleep(0.001)
 
-  class _JobObject(object):
+  class _JobObject:
     """Manages a job object."""
 
     def __init__(self, containment):
@@ -382,7 +382,7 @@ else:
                                                           self.timeout)
 
 
-class Containment(object):
+class Containment:
   """Defines the containment used to run the process.
 
   On Windows, this is done via a Job Object.

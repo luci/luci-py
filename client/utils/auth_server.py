@@ -47,7 +47,7 @@ class RPCError(Exception):
 Account = collections.namedtuple('Account', ['id', 'email'])
 
 
-class TokenProvider(object):
+class TokenProvider:
   """Interface for an object that can create OAuth or ID tokens on demand.
 
   Defined as a concrete class only for documentation purposes.
@@ -81,7 +81,7 @@ class TokenProvider(object):
     raise NotImplementedError()
 
 
-class LocalAuthServer(object):
+class LocalAuthServer:
   """LocalAuthServer handles /rpc/LuciLocalAuthService.* requests.
 
   It exposes an HTTP JSON RPC API that is used by task processes to grab an
@@ -429,7 +429,7 @@ class _HTTPServer(socketserver.ThreadingMixIn, BaseHTTPServer.HTTPServer):
     BaseHTTPServer.HTTPServer.serve_forever(
         self, poll_interval or self.poll_interval)
 
-  def handle_error(self, request, client_address):
+  def handle_error(self, _request, _client_address):
     """Overrides default handle_error that dumbs stuff to stdout."""
     logging.exception('local auth server: Exception happened')
 
@@ -522,7 +522,7 @@ def testing_main():
 
   logging.basicConfig(level=logging.DEBUG)
 
-  class DumbProvider(object):
+  class DumbProvider:
     def generate_access_token(self, account_id, scopes):
       logging.info('generate_access_token(%r, %r) called', account_id, scopes)
       return AccessToken('fake_access_tok_%s' % account_id, time.time() + 300)

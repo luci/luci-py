@@ -122,10 +122,10 @@ def tree_modes(root):
 def load_isolated_stats(stats_json_path, key):
   actual = json.loads(read_content(stats_json_path))
   stats = actual['stats']['isolated'].get(key)
-  for key in ['items_cold', 'items_hot']:
-    if not stats[key]:
+  for k in ['items_cold', 'items_hot']:
+    if not stats[k]:
       continue
-    stats[key] = large.unpack(base64.b64decode(stats[key]))
+    stats[k] = large.unpack(base64.b64decode(stats[k]))
   return stats
 
 

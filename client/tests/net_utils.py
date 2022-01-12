@@ -17,7 +17,8 @@ def make_fake_response(content, url, code=200, headers=None):
   assert isinstance(content, six.binary_type), content
   headers = dict(headers or {})
   headers['Content-Length'] = len(content)
-  class _Fake(object):
+
+  class _Fake:
     def __init__(self):
       self.content = content
     def iter_content(self, chunk_size):

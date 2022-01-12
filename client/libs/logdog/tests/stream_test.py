@@ -61,7 +61,7 @@ class StreamParamsTestCase(unittest.TestCase):
 
 class StreamClientTestCase(unittest.TestCase):
 
-  class _TestStreamClientConnection(object):
+  class _TestStreamClientConnection:
 
     def __init__(self):
       self.buffer = BytesIO()

@@ -497,7 +497,7 @@ class AutoRetryThreadPoolTest(unittest.TestCase):
     self.assertEqual(16, threading_utils.IOAutoRetryThreadPool.MAX_WORKERS)
 
 
-class FakeProgress(object):
+class FakeProgress:
   @staticmethod
   def print_update():
     pass

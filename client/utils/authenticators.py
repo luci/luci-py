@@ -10,7 +10,7 @@ import threading
 from utils import oauth
 
 
-class Authenticator(object):
+class Authenticator:
   """Base class for objects that know how to authenticate into http services."""
 
   supports_login = False

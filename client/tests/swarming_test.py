@@ -34,7 +34,7 @@ def main(args):
   return dispatcher.execute(swarming.OptionParserSwarming(), args)
 
 
-class Common(object):
+class Common:
   # pylint: disable=no-member
 
   def setUp(self):

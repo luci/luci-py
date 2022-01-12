@@ -122,9 +122,7 @@ def _initial_load():
         if _check_ok(loaded):
           to_assign = loaded
     except OSError as ex:
-      _LOGGER.error('LUCI_CONTEXT failed to open: %s', ex)
-    except IOError as ex:
-      _LOGGER.error('LUCI_CONTEXT failed to read: %s', ex)
+      _LOGGER.error('LUCI_CONTEXT failed to open or read: %s', ex)
     except ValueError as ex:
       _LOGGER.error('LUCI_CONTEXT failed to decode: %s', ex)
 
@@ -152,8 +150,8 @@ def _mutate(section_values):
         changed = True
       new_val[section] = value
     else:
-      raise ValueError(
-        'Bad type for LUCI_CONTEXT[%r]: %s', section, type(value).__name__)
+      raise ValueError('Bad type for LUCI_CONTEXT[%r]: %s' %
+                       (section, type(value).__name__))
   return new_val, changed
 
 

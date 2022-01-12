@@ -11,7 +11,7 @@ import time
 CURRENT_VERSION = 3
 
 
-class LRUDict(object):
+class LRUDict:
   """Dictionary that can evict least recently used items.
 
   Implemented as a wrapper around OrderedDict object. An OrderedDict stores

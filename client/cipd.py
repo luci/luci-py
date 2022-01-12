@@ -129,7 +129,7 @@ def validate_cipd_options(parser, options):
         'cipd is enabled, --cipd-client-version is required')
 
 
-class CipdClient(object):
+class CipdClient:
   """Installs packages."""
 
   def __init__(self, binary_path, package_name, instance_id, service_url):
@@ -366,7 +366,7 @@ def _fetch_cipd_client(disk_cache, instance_id, fetch_url, timeoutfn):
         disk_cache.write(instance_id, res.iter_content(64 * 1024))
         return
     except net.TimeoutError as ex:
-      raise Error('Could not fetch CIPD client: %s', ex)
+      raise Error('Could not fetch CIPD client: %s' % ex)
     except net.NetError as ex:
       logging.warning('Could not fetch CIPD client on attempt #%d: %s',
                       attempt + 1, ex)

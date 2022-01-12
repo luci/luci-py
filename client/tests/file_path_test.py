@@ -74,7 +74,7 @@ class FilePathTest(auto_stub.TestCase):
   def assertFileMode(self, filepath, mode, umask=None):
     umask = test_env.umask() if umask is None else umask
     actual = fs.stat(filepath).st_mode
-    expected = mode & ~umask
+    expected = mode & ~umask  # pylint: disable=invalid-unary-operand-type
     self.assertEqual(
         expected,
         actual,

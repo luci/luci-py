@@ -105,7 +105,6 @@ if sys.platform == 'win32':
     assert isinstance(drive_letter, six.text_type)
     # Guesswork. QueryDosDeviceW never returns the required number of bytes.
     chars = 1024
-    drive_letter = drive_letter
     p = wintypes.create_unicode_buffer(chars)
     if not windll.kernel32.QueryDosDeviceW(drive_letter, p, chars):
       err = ctypes.GetLastError()
@@ -165,7 +164,7 @@ if sys.platform == 'win32':
       raise WindowsError(err, msg.encode('utf-8'))
 
 
-  class DosDriveMap(object):
+  class DosDriveMap:
     """Maps \\Device\\HarddiskVolumeN to N: on Windows."""
     # Keep one global cache.
     _MAPPING = {}
@@ -415,7 +414,7 @@ if sys.platform == 'win32':
     import win32com.client  # pylint: disable=F0401
     wmi_service = win32com.client.Dispatch('WbemScripting.SWbemLocator')
     wbem = wmi_service.ConnectServer('.', 'root\\cimv2')
-    return [proc for proc in wbem.ExecQuery('SELECT * FROM Win32_Process')]
+    return list(wbem.ExecQuery('SELECT * FROM Win32_Process'))
 
 
   def _filter_processes_dir_win(processes, root_dir):

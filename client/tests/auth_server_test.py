@@ -57,7 +57,7 @@ def call_rpc(account_id, scopes=None, audience=None):
 
 @contextlib.contextmanager
 def local_auth_server(token_cb, default_account_id, **overrides):
-  class MockedProvider(object):
+  class MockedProvider:
     def generate_access_token(self, account_id, scopes):
       return token_cb(account_id, scopes=scopes)
     def generate_id_token(self, account_id, audience):
@@ -377,7 +377,7 @@ class LocalAuthHttpServiceTest(auto_stub.TestCase):
       url='http://example.com',
       perform_request=None):
 
-    class MockedRequestEngine(object):
+    class MockedRequestEngine:
       def perform_request(self, request):
         return perform_request(request) if perform_request else None
 

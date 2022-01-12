@@ -24,7 +24,7 @@ FAKECAS_BIN = os.path.join(LUCI_DIR, 'luci-go', 'fakecas')
 CAS_CLI = os.path.join(LUCI_DIR, 'luci-go', 'cas')
 
 
-class LocalCAS(object):
+class LocalCAS:
   def __init__(self, root):
     self._root = root
     self._proc = None

@@ -59,7 +59,7 @@ def trim_caches_stub(_stats):
   pass
 
 
-class StorageFake(object):
+class StorageFake:
   def __init__(self, files, server_ref):
     self._files = files.copy()
     self._server_ref = server_ref
@@ -184,7 +184,7 @@ class RunIsolatedTest(RunIsolatedTestBase):
     self.capture_luci_ctx = False
 
     # pylint: disable=no-self-argument
-    class Popen(object):
+    class Popen:
       def __init__(self2, args, **kwargs):
         if not self.capture_popen_env:
           kwargs.pop('env', None)

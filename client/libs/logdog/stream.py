@@ -93,7 +93,7 @@ class StreamParams(_StreamParamsBase):
     return json.dumps(obj, sort_keys=True, ensure_ascii=True, indent=None)
 
 
-class StreamProtocolRegistry(object):
+class StreamProtocolRegistry:
   """Registry of streamserver URI protocols and their client classes.
   """
 
@@ -137,11 +137,11 @@ _default_registry = StreamProtocolRegistry()
 create = _default_registry.create
 
 
-class StreamClient(object):
+class StreamClient:
   """Abstract base class for a streamserver client.
   """
 
-  class _StreamBase(object):
+  class _StreamBase:
     """ABC for StreamClient streams."""
 
     def __init__(self, stream_client, params):
@@ -209,13 +209,14 @@ class StreamClient(object):
         # discontinued in py3. User should switch to binary stream instead
         # if there's a need to write bytes.
         return self._fd.write(data)
-      elif _PY2 and isinstance(data, unicode):
+      if _PY2 and isinstance(data, unicode):
         return self._fd.write(data.encode('utf-8'))
-      elif not _PY2 and isinstance(data, str):
+      if not _PY2 and isinstance(data, str):
         return self._fd.write(data.encode('utf-8'))
-      else:
-        raise ValueError(
-            'expect str, got %r that is type %s' % (data, type(data),))
+      raise ValueError('expect str, got %r that is type %s' % (
+          data,
+          type(data),
+      ))
 
 
   class _DatagramStream(_StreamBase):
@@ -554,7 +555,7 @@ class _UnixDomainSocketStreamClient(StreamClient):
   """A StreamClient implementation that uses a UNIX domain socket.
   """
 
-  class SocketFile(object):
+  class SocketFile:
     """A write-only file-like object that writes to a UNIX socket."""
 
     def __init__(self, sock):

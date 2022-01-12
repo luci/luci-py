@@ -58,7 +58,7 @@ class Handler(BaseHTTPServer.BaseHTTPRequestHandler):
         fmt % args)
 
 
-class Server(object):
+class Server:
   """Server implements a simple HTTP server to implement a fake."""
   _HANDLER_CLS = None
 

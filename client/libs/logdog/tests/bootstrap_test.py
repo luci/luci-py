@@ -40,7 +40,7 @@ class BootstrapTestCase(unittest.TestCase):
         return cls(**kwargs)
 
       def _connect_raw(self):
-        class fakeFile(object):
+        class fakeFile:
           def write(self, data):
             pass
         return fakeFile()

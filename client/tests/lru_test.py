@@ -73,7 +73,7 @@ class LRUDictTest(unittest.TestCase):
     self.assertFalse(lru_dict)
     self.assertEqual(len(lru_dict), 0)
     self.assertFalse(1 in lru_dict)
-    self.assertFalse([i for i in lru_dict])
+    self.assertFalse(list(lru_dict))
     with self.assertRaises(KeyError):
       _ = lru_dict[1]
 
@@ -86,7 +86,7 @@ class LRUDictTest(unittest.TestCase):
     self.assertEqual(len(lru_dict), 1)
     self.assertTrue(1 in lru_dict)
     self.assertFalse(2 in lru_dict)
-    self.assertTrue([i for i in lru_dict])
+    self.assertTrue(list(lru_dict))
     self.assertEqual('one', lru_dict[1])
 
   def test_add(self):

@@ -51,7 +51,7 @@ class ZipPackageError(RuntimeError):
   """Failed to create a zip package."""
 
 
-class ZipPackage(object):
+class ZipPackage:
   """A set of files that can be zipped to file on disk or into memory buffer.
 
   Usage:

@@ -98,7 +98,7 @@ class TestCase(auto_stub.TestCase):
       # This covers both MemoryContentAddressedCache and
       # DiskContentAddressedCache.
       return cache.write(self._algo(data).hexdigest(), [data])
-    elif isinstance(cache, local_caching.NamedCache):
+    if isinstance(cache, local_caching.NamedCache):
       # In this case, map a named cache, add a file, unmap it.
       dest_dir = os.path.join(self.tempdir, 'dest')
       self.assertFalse(fs.exists(dest_dir))
@@ -124,7 +124,7 @@ def _get_policies(
       max_age_secs=max_age_secs)
 
 
-class CacheTestMixin(object):
+class CacheTestMixin:
   """Adds testing for the Cache interface."""
   # pylint: disable=no-member
 

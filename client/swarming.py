@@ -35,7 +35,6 @@ from utils import subprocess42
 
 class Failure(Exception):
   """Generic failure."""
-  pass
 
 
 ### API management.

@@ -27,7 +27,7 @@ PRIORITY_MED = 2 << 8
 PRIORITY_LOW = 3 << 8
 
 
-class LockWithAssert(object):
+class LockWithAssert:
   """Wrapper around (non recursive) Lock that tracks its owner."""
 
   def __init__(self):
@@ -52,20 +52,17 @@ class LockWithAssert(object):
 
 class ThreadPoolError(Exception):
   """Base class for exceptions raised by ThreadPool."""
-  pass
 
 
 class ThreadPoolEmpty(ThreadPoolError):
   """Trying to get task result from a thread pool with no pending tasks."""
-  pass
 
 
 class ThreadPoolClosed(ThreadPoolError):
   """Trying to do something with a closed thread pool."""
-  pass
 
 
-class ThreadPool(object):
+class ThreadPool:
   """Multithreaded worker pool with priority support.
 
   When the priority of tasks match, it works in strict FIFO mode.
@@ -436,7 +433,7 @@ class IOAutoRetryThreadPool(AutoRetryThreadPool):
         'io')
 
 
-class Progress(object):
+class Progress:
   """Prints progress and accepts updates thread-safely."""
   def __init__(self, columns):
     """Creates a Progress bar that will updates asynchronously from the worker
@@ -604,7 +601,7 @@ class ThreadPoolWithProgress(ThreadPool):
     self.tasks.progress.print_update()
 
 
-class DeadlockDetector(object):
+class DeadlockDetector:
   """Context manager that can detect deadlocks.
 
   It will dump stack frames of all running threads if its 'ping' method isn't
@@ -721,7 +718,7 @@ class DeadlockDetector(object):
     output('===========================================================')
 
 
-class TaskChannel(object):
+class TaskChannel:
   """Queue of results of async task execution."""
 
   class Timeout(Exception):

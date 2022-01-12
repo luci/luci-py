@@ -20,9 +20,9 @@ def main():
   command = sys.argv[1]
   if command == 'access':
     return not os.access(path, os.R_OK)
-  elif command == 'isfile':
+  if command == 'isfile':
     return not os.path.isfile(path)
-  elif command == 'stat':
+  if command == 'stat':
     return not os.stat(path).st_size
   return 1
 

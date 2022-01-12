@@ -94,11 +94,11 @@ class NetError(IOError):
     self.inner_exc = inner_exc
 
 
-class TimeoutError(NetError):
+class TimeoutError(NetError):  # pylint: disable=redefined-builtin
   """Timeout while reading HTTP response."""
 
 
-class ConnectionError(NetError):
+class ConnectionError(NetError):  # pylint: disable=redefined-builtin
   """Failed to connect to the server."""
 
 
@@ -359,7 +359,7 @@ def get_case_insensitive_dict(original):
   return normalized
 
 
-class HttpService(object):
+class HttpService:
   """Base class for a class that provides an API to HTTP based service:
     - Provides 'request' method.
     - Supports automatic request retries.
@@ -638,7 +638,7 @@ class HttpService(object):
       return None
 
 
-class HttpRequest(object):
+class HttpRequest:
   """Request to HttpService."""
 
   def __init__(
@@ -678,7 +678,7 @@ class HttpRequest(object):
     return '%s?%s' % (self.url, urllib.parse.urlencode(self.params))
 
 
-class HttpResponse(object):
+class HttpResponse:
   """Response from HttpService.
 
   Wraps a file-like object that holds the body of the response. This object may
@@ -757,7 +757,7 @@ class HttpResponse(object):
     return self.get_header('Content-Type') or ''
 
 
-class _UserAgentHolder(object):
+class _UserAgentHolder:
 
   def __init__(self):
     # TODO(crbug/1084410): Consider guarding it with a RWLock
@@ -793,7 +793,7 @@ def set_user_agent(user_agent):
   _user_agent_holder.user_agent = user_agent
 
 
-class RequestsLibEngine(object):
+class RequestsLibEngine:
   """Class that knows how to execute HttpRequests via requests library."""
 
   # This engine doesn't know how to authenticate requests on transport level.
@@ -865,7 +865,8 @@ class RequestsLibEngine(object):
     except (requests.ConnectionError, socket.timeout, ssl.SSLError) as e:
       raise ConnectionError(e)
 
-class RetryAttempt(object):
+
+class RetryAttempt:
   """Contains information about current retry attempt.
 
   Yielded from retry_loop.

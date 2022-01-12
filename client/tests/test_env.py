@@ -32,7 +32,7 @@ from utils import fs
 _UMASK = None
 
 
-class EnvVars(object):
+class EnvVars:
   """Context manager for environment variables.
 
   Passed a dict to the constructor it sets variables named with the key to the
