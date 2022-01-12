@@ -7,6 +7,7 @@ import StringIO
 import logging
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -32,7 +33,6 @@ sys.path.insert(0, os.path.join(
     CLIENT_DIR, 'third_party', 'httplib2', 'python%d' % sys.version_info.major))
 sys.path.insert(0, os.path.join(CLIENT_DIR, 'third_party'))
 from depot_tools import fix_encoding
-from utils import file_path
 sys.path.pop(0)
 sys.path.pop(0)
 
@@ -154,7 +154,7 @@ class BotManagementTest(test_case.TestCase):
       out = proc.communicate()[0]
       self.assertEqual(0, proc.returncode, out)
     finally:
-      file_path.rmtree(temp_dir)
+      shutil.rmtree(temp_dir)
 
   def test_get_swarming_bot_zip_is_reproducible(self):
     self.mock(time, 'time', lambda: 1500000000.0)

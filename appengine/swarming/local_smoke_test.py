@@ -38,10 +38,7 @@ sys.path.insert(0, os.path.join(CLIENT_DIR, 'tests'))
 sys.path.insert(0, os.path.join(CLIENT_DIR, 'third_party'))
 
 # client/
-from utils import fs
-from utils import file_path
 from utils import large
-from utils import subprocess42
 from tools import start_bot
 from tools import start_servers
 
@@ -119,13 +116,13 @@ class SwarmingClient(object):
         'debug',
     ]
     logging.debug('SwarmingClient.isolate: executing command. %s', cmd)
-    with fs.open(self._rotate_logfile(), 'wb') as f:
+    with open(self._rotate_logfile(), 'wb') as f:
       f.write('\nRunning: %s\n' % ' '.join(cmd))
-      p = subprocess42.Popen(cmd, stdout=f, stderr=f)
+      p = subprocess.Popen(cmd, stdout=f, stderr=f)
       p.communicate()
     assert p.returncode == 0, ('Failed to isolate files. exit_code=%d, cmd=%s' %
                                (p.returncode, cmd))
-    with fs.open(dump_json) as f:
+    with open(dump_json) as f:
       data = json.load(f)
     digest = data.values()[0]
     logging.debug('CAS digest = %s', digest)
@@ -147,7 +144,7 @@ class SwarmingClient(object):
     cmd.extend(args)
     assert not self._run_swarming('trigger',
                                   cmd), 'Failed to trigger a task. cmd=%s' % cmd
-    with fs.open(tmp, 'rb') as f:
+    with open(tmp, 'rb') as f:
       data = json.load(f)
       task_id = data['tasks'][0]['task_id']
       logging.debug('task_id = %s', task_id)
@@ -176,7 +173,7 @@ class SwarmingClient(object):
     if extra:
       cmd.extend(extra)
     assert not self._run_swarming('trigger', cmd)
-    with fs.open(tmp, 'rb') as f:
+    with open(tmp, 'rb') as f:
       data = json.load(f)
     task_id = data['tasks'][0]['task_id']
     logging.debug('task_id = %s', task_id)
@@ -186,7 +183,7 @@ class SwarmingClient(object):
     """Triggers a task with the very raw RPC and returns the task id.
     """
     input_json = os.path.join(self._tmpdir, 'task_trigger_raw_input.json')
-    with fs.open(input_json, 'wb') as f:
+    with open(input_json, 'wb') as f:
       json.dump({'requests': [request]}, f)
     output_json = os.path.join(self._tmpdir, 'task_trigger_raw_output.json')
     args = [
@@ -198,7 +195,7 @@ class SwarmingClient(object):
     ret = self._run_swarming('spawn-tasks', args)
     assert ret == 0, 'Failed to spawn a task. exit_code=%d, args=%s' % (ret,
                                                                         args)
-    with fs.open(output_json, 'rb') as f:
+    with open(output_json, 'rb') as f:
       data = json.load(f)
       task_id = data['tasks'][0]['task_id']
       logging.debug('task_id = %s', task_id)
@@ -238,7 +235,7 @@ class SwarmingClient(object):
       args.append('-wait=false')
     args.append(task_id)
     self._run_swarming('collect', args)
-    with fs.open(tmp, 'rb') as f:
+    with open(tmp, 'rb') as f:
       data = f.read()
     try:
       summary = json.loads(data)
@@ -247,11 +244,11 @@ class SwarmingClient(object):
       raise
     file_outputs = {}
     outdir = os.path.join(self._tmpdir, task_id)
-    for root, _, files in fs.walk(outdir):
+    for root, _, files in os.walk(outdir):
       for i in files:
         p = os.path.join(root, i)
         name = p[len(outdir) + 1:]
-        with fs.open(p, 'rb') as f:
+        with open(p, 'rb') as f:
           file_outputs[name] = f.read()
     return summary, file_outputs
 
@@ -291,7 +288,7 @@ class SwarmingClient(object):
     ]
     ret = self._run_swarming('bots', args)
     assert ret == 0, 'Failed to fetch bots. exit_code=%d' % ret
-    with fs.open(tmp, 'rb') as f:
+    with open(tmp, 'rb') as f:
       bots = json.load(f)
     if not bots:
       return
@@ -302,7 +299,7 @@ class SwarmingClient(object):
     print('Client calls', file=sys.stderr)
     print('-' * 60, file=sys.stderr)
     for i in range(self._index):
-      with fs.open(os.path.join(self._tmpdir, 'client_%d.log' % i), 'rb') as f:
+      with open(os.path.join(self._tmpdir, 'client_%d.log' % i), 'rb') as f:
         log = f.read().strip('\n')
       for l in log.splitlines():
         sys.stderr.write('  %s\n' % l)
@@ -333,10 +330,10 @@ class SwarmingClient(object):
       ]
     cmd += args
     logging.debug('SwarmingClient._run_swarming: executing command. %s', cmd)
-    with fs.open(self._rotate_logfile(), 'wb') as f:
+    with open(self._rotate_logfile(), 'wb') as f:
       f.write('\nRunning: %s\n' % ' '.join(cmd))
       f.flush()
-      p = subprocess42.Popen(cmd, stdout=f, stderr=f)
+      p = subprocess.Popen(cmd, stdout=f, stderr=f)
       p.communicate()
       return p.returncode
 
@@ -968,7 +965,7 @@ class Test(unittest.TestCase):
             u'swarming.pool.version:pools_cfg_rev', u'user:joe@localhost'
         ])
     tmp = os.path.join(self.tmpdir, 'test_secret_bytes')
-    with fs.open(tmp, 'wb') as f:
+    with open(tmp, 'wb') as f:
       f.write('foobar')
     _, output_root, performance_stats = self._run_with_cas(
         digest,
@@ -1440,7 +1437,7 @@ class Test(unittest.TestCase):
     being done.
     """
     signal_file = os.path.join(self.tmpdir, name)
-    fs.open(signal_file, 'wb').close()
+    open(signal_file, 'wb').close()
     args = [
         '-task-name',
         'wait',
@@ -1519,16 +1516,16 @@ class Test(unittest.TestCase):
     # Refuse reusing the same task name twice, it makes the whole test suite
     # more manageable.
     self.assertFalse(os.path.isdir(root), root)
-    fs.mkdir(root)
+    os.mkdir(root)
     isolate_path = os.path.join(root, 'i.isolate')
-    with fs.open(isolate_path, 'wb') as f:
+    with open(isolate_path, 'wb') as f:
       f.write(isolate_content)
     for relpath, content in contents.items():
       p = os.path.join(root, relpath)
       d = os.path.dirname(p)
       if not os.path.isdir(d):
         os.makedirs(d)
-      with fs.open(p, 'wb') as f:
+      with open(p, 'wb') as f:
         f.write(content)
     return self.client.isolate(isolate_path)
 
@@ -1655,7 +1652,7 @@ def cleanup(bot, client, servers, print_all):
     if client:
       client.dump_log()
   if not Test.leak:
-    file_path.rmtree(Test.tmpdir)
+    shutil.rmtree(Test.tmpdir)
 
 
 def process_arguments():
@@ -1733,11 +1730,7 @@ def main():
     if client.terminate(bot.bot_id) != 0:
       print('swarming terminate failed', file=sys.stderr)
       failed = True
-    try:
-      bot.wait(10)
-    except subprocess42.TimeoutExpired:
-      print('Bot is still alive after swarming terminate', file=sys.stderr)
-      failed = True
+    bot.wait()
   except KeyboardInterrupt:
     print('<Ctrl-C>', file=sys.stderr)
     failed = True

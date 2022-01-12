@@ -14,6 +14,7 @@ import os
 import shutil
 import signal
 import socket
+import subprocess
 import sys
 import tempfile
 
@@ -27,8 +28,6 @@ sys.path.insert(0, os.path.join(CLIENT_DIR, 'third_party'))
 from depot_tools import fix_encoding
 from six.moves import urllib
 
-from utils import file_path
-from utils import subprocess42
 sys.path.pop(0)
 sys.path.pop(0)
 
@@ -36,7 +35,7 @@ sys.path.pop(0)
 def _safe_rm(path):
   if os.path.exists(path):
     try:
-      file_path.rmtree(path)
+      shutil.rmtree(path)
     except OSError as e:
       logging.error('Failed to delete %s: %s', path, e)
 
@@ -106,11 +105,13 @@ class LocalBot(object):
       if not os.path.isdir(logs):
         os.mkdir(logs)
       with open(os.path.join(logs, 'bot_stdout.log'), 'wb') as f:
-        self._proc = subprocess42.Popen(
-            cmd, cwd=self._botdir, stdout=f, stderr=f, env=env, detached=True)
+        self._proc = subprocess.Popen(cmd,
+                                      cwd=self._botdir,
+                                      stdout=f,
+                                      stderr=f,
+                                      env=env)
     else:
-      self._proc = subprocess42.Popen(
-          cmd, cwd=self._botdir, env=env, detached=True)
+      self._proc = subprocess.Popen(cmd, cwd=self._botdir, env=env)
 
   def stop(self):
     """Stops the local Swarming bot. Returns the process exit code."""
@@ -134,10 +135,10 @@ class LocalBot(object):
     if self._proc:
       self._proc.poll()
 
-  def wait(self, timeout=None):
+  def wait(self):
     """Waits for the process to normally exit."""
     if self._proc:
-      return self._proc.wait(timeout)
+      return self._proc.wait()
 
   def kill(self):
     """Kills the child forcibly."""
