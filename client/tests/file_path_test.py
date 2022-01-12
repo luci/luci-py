@@ -559,12 +559,6 @@ class FilePathTest(auto_stub.TestCase):
   def test_get_recursive_size(self):
     self._check_get_recursive_size()
 
-  @unittest.skipIf(sys.platform == 'win32', 'Posix specific')
-  def test_get_recursive_size_scandir(self):
-    # Test scandir implementation on posix.
-    self.mock(file_path, '_use_scandir', lambda: True)
-    self._check_get_recursive_size()
-
   @unittest.skipUnless(sys.platform == 'win32', 'Windows specific')
   def test_get_recursive_size_win_junction(self):
     self._check_get_recursive_size(symlink='junction')

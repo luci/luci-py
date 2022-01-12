@@ -28,7 +28,6 @@ from utils import tools
 tools.force_local_third_party()
 
 # third_party/
-from scandir import scandir
 import six
 
 # Types of action accepted by link_file().
@@ -45,10 +44,6 @@ if sys.platform == 'win32':
   from ctypes import windll  # pylint: disable=ungrouped-imports
 elif sys.platform == 'darwin':
   from utils import macos
-
-# TODO(crbug.com/1111688): PermissionError doesn't exist in Python2.
-if six.PY2:
-  PermissionError = OSError
 
 if sys.platform == 'win32':
   class LUID(ctypes.Structure):
@@ -1328,17 +1323,13 @@ def get_recursive_size(path):
   """
   start = time.time()
   try:
-    if _use_scandir():
-      total, n_dirs, n_files, n_links, n_others = _get_recur_size_with_scandir(
-          path)
-    else:
-      total, n_dirs, n_files, n_links, n_others = _get_recur_size_with_fswalk(
-          path)
+    total, n_dirs, n_files, n_links, n_others = _get_recur_size_with_scandir(
+        path)
     elapsed = time.time() - start
     logging.debug(
         '_get_recursive_size: traversed %s took %s seconds. '
-        'scandir: %s, files: %d, links: %d, dirs: %d, others: %d', path,
-        elapsed, _use_scandir(), n_files, n_links, n_dirs, n_others)
+        'files: %d, links: %d, dirs: %d, others: %d', path, elapsed, n_files,
+        n_links, n_dirs, n_others)
     return total
   except (IOError, OSError, UnicodeEncodeError):
     logging.exception('Exception while getting the size of %s', path)
@@ -1348,19 +1339,6 @@ def get_recursive_size(path):
 ## Private code.
 
 
-def _use_scandir():
-  if six.PY3:
-    # Python3,
-    #   Use os.scandir for faster execution.
-    #   Benchmark:crbug.com/1215459#c12
-    return True
-  else:
-    # Python2,
-    #   Use scandir in windows for faster execution.
-    #   Do not use in other OS due to crbug.com/989409.
-    return sys.platform == 'win32'
-
-
 def _is_symlink_entry(entry):
   if entry.is_symlink():
     return True
@@ -1368,22 +1346,11 @@ def _is_symlink_entry(entry):
     return False
   # both st_file_attributes and FILE_ATTRIBUTE_REPARSE_POINT are
   # windows-only symbols.
-  # TODO(crbug.com/1111688): change from scandir to
-  # stat.FILE_ATTRIBUTE_REPARSE_POINT after Python3 migration.
   return bool(entry.stat().st_file_attributes
-              & scandir.FILE_ATTRIBUTE_REPARSE_POINT)
+              & stat.FILE_ATTRIBUTE_REPARSE_POINT)
 
 
 def _get_recur_size_with_scandir(path):
-  # type: (str) -> Tuple[int, int, int, int, int]
-  if six.PY3:
-    logging.debug('Using _get_recur_size_with_scandir with native scandir')
-    _scandir = os.scandir
-  else:
-    # TODO(crbug.com/1111688): remove after Python3 migration.
-    logging.debug('Using _get_recur_size_with_scandir with scandir library')
-    _scandir = scandir.scandir
-
   total = 0
   n_dirs = 0
   n_files = 0
@@ -1392,7 +1359,7 @@ def _get_recur_size_with_scandir(path):
   stack = [path]
   while stack:
     try:
-      for entry in _scandir(stack.pop()):
+      for entry in os.scandir(stack.pop()):
         if _is_symlink_entry(entry):
           n_links += 1
           continue
@@ -1408,23 +1375,3 @@ def _get_recur_size_with_scandir(path):
     except PermissionError:
       logging.warning('Failed to scan directory', exc_info=True)
   return total, n_dirs, n_files, n_links, n_others
-
-
-def _get_recur_size_with_fswalk(path):
-  # type: (str) -> Tuple[int, int, int, int, int]
-  logging.debug('Using _get_recur_size_with_fswalk')
-
-  total = 0
-  n_dirs = 0
-  n_files = 0
-  n_links = 0
-  for root, dirs, files in fs.walk(path):
-    n_dirs += len(dirs)
-    for f in files:
-      st = fs.lstat(os.path.join(root, f))
-      if stat.S_ISLNK(st.st_mode):
-        n_links += 1
-        continue
-      n_files += 1
-      total += st.st_size
-  return total, n_dirs, n_files, n_links, 0
