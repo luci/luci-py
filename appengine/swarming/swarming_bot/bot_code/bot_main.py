@@ -919,10 +919,8 @@ def _run_manifest(botobj, manifest, start):
         work_dir = tempfile.mkdtemp(dir=botobj.base_dir, prefix='w')
 
     env = os.environ.copy()
-    # Windows in particular does not tolerate unicode strings in environment
-    # variables.
-    env['SWARMING_TASK_ID'] = task_id.encode('ascii')
-    env['SWARMING_SERVER'] = botobj.server.encode('ascii')
+    env['SWARMING_TASK_ID'] = task_id
+    env['SWARMING_SERVER'] = botobj.server
 
     task_in_file = os.path.join(work_dir, 'task_runner_in.json')
     with fs.open(task_in_file, 'w') as f:

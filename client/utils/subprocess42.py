@@ -42,8 +42,6 @@ import subprocess
 from subprocess import CalledProcessError, PIPE, STDOUT  # pylint: disable=W0611
 from subprocess import list2cmdline
 
-import six
-
 
 # Default maxsize argument.
 MAX_SIZE = 16384
@@ -362,24 +360,12 @@ else:
         fcntl.fcntl(conn, fcntl.F_SETFL, flags)
 
 
-if six.PY3:
+# TODO: appengine/swarming/test.py somehow failed to import subprocess42.py
+# with Python2.
+if hasattr(subprocess, 'TimeoutExpired'):
   TimeoutExpired = subprocess.TimeoutExpired
 else:
-
-  class TimeoutExpired(Exception):
-    """Compatible with python3 subprocess."""
-
-    def __init__(self, cmd, timeout, output=None, stderr=None):
-      self.cmd = cmd
-      self.timeout = timeout
-      self.output = output
-      # Non-standard:
-      self.stderr = stderr
-      super(TimeoutExpired, self).__init__(str(self))
-
-    def __str__(self):
-      return "Command '%s' timed out after %s seconds" % (self.cmd,
-                                                          self.timeout)
+  TimeoutExpired = None
 
 
 class Containment:
@@ -483,16 +469,6 @@ class Popen(subprocess.Popen):
   popen_lock = threading.Lock()
 
   def __init__(self, args, **kwargs):
-    # Windows version of subprocess.Popen() really doens't like unicode. In
-    # practice we should use the current ANSI code page, but settle for utf-8
-    # across all OSes for consistency.
-    to_str = lambda i: i if isinstance(i, str) else six.ensure_str(i)
-    args = [to_str(i) for i in args]
-    if kwargs.get('cwd') is not None:
-      kwargs['cwd'] = to_str(kwargs['cwd'])
-    if kwargs.get('env'):
-      kwargs['env'] = {to_str(k): to_str(v) for k, v in kwargs['env'].items()}
-
     # Set via contrived monkey patching below, because stdlib doesn't expose
     # thread handle. Only set on Windows.
     self._handle_thread = None
@@ -632,8 +608,8 @@ class Popen(subprocess.Popen):
     if not timeout:
       return super(Popen, self).communicate(input=input)
 
-    if six.PY3 and not sys.platform == 'win32':
-      return super(Popen, self).communicate(  # pylint: disable=unexpected-keyword-arg
+    if sys.platform != 'win32':
+      return super(Popen, self).communicate(
           input=input,
           timeout=timeout,
       )
@@ -717,7 +693,7 @@ class Popen(subprocess.Popen):
     # timeout is not supported in Python 2 on every platform.
     if timeout is None and not sys.platform == 'win32':
       super(Popen, self).wait()
-    elif six.PY3 and not sys.platform == 'win32':
+    elif sys.platform != 'win32':
       super(Popen, self).wait(timeout)
     elif self.returncode is None:
       # If you think the following code is horrible, it's because it is
@@ -878,15 +854,9 @@ class Popen(subprocess.Popen):
           continue
 
       if self.universal_newlines and data:
-        if six.PY3:
-          data = self._translate_newlines(
-              six.ensure_binary(data), encoding='utf-8', errors='strict')
-        else:
-          data = self._translate_newlines(data)
-        # converts str to byte string in Python3.
-        data = data.encode()
-      if six.PY3 and self.universal_newlines:
-        data = data.decode()
+        if isinstance(data, str):
+          data = data.encode()
+        data = self._translate_newlines(data, encoding='utf-8', errors='strict')
       return names[index], data
 
   def recv_out(self, maxsize=None, timeout=None):
@@ -1095,7 +1065,7 @@ def split(data, universal_newlines):
   if sys.platform == 'win32':
     # CRLF is used instead of LF in python3 on windows
     sep = b'\r\n'
-  if six.PY3 and universal_newlines:
+  if universal_newlines:
     sep = sep.decode()
 
   def _join(d):

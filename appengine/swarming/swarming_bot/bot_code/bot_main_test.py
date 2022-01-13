@@ -847,7 +847,7 @@ class TestBotMain(TestBotBase):
           self.assertEqual(cmd[:2], ['--auth-params-file', auth_params_file])
         self.assertEqual(True, detached)
         self.assertEqual(self.bot.base_dir, cwd)
-        self.assertEqual(b'24', env['SWARMING_TASK_ID'])
+        self.assertEqual('24', env['SWARMING_TASK_ID'])
         self.assertTrue(stdout)
         self.assertEqual(subprocess42.STDOUT, stderr)
         self.assertEqual(subprocess42.PIPE, stdin)
