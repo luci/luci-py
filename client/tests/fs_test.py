@@ -9,8 +9,6 @@ import sys
 import tempfile
 import unittest
 
-import six
-
 # Mutates sys.path.
 import test_env
 

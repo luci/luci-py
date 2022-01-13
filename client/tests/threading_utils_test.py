@@ -3,7 +3,6 @@
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
 
-from __future__ import print_function
 import functools
 import signal
 import sys
@@ -11,9 +10,6 @@ import threading
 import time
 import traceback
 import unittest
-
-# third_party/
-import six
 
 # Mutates sys.path.
 import test_env
@@ -511,7 +507,7 @@ class WorkerPoolTest(unittest.TestCase):
       for i in range(32):
         pool.add_task(0, mapper, i)
       results = pool.join()
-    six.assertCountEqual(self, range(-31, 1), results)
+    self.assertCountEqual(range(-31, 1), results)
 
   def test_exception(self):
     class FearsomeException(Exception):

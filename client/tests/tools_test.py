@@ -12,8 +12,6 @@ import sys
 import tempfile
 import unittest
 
-import six
-
 # Mutates sys.path.
 import test_env
 
@@ -45,8 +43,6 @@ class FindExecutableTest(auto_stub.TestCase):
 
     if 'WIN' in self.id():
       self.mock(sys, "platform", "win32")
-    elif six.PY2:
-      self.mock(sys, "platform", "linux2")
     else:
       self.mock(sys, "platform", "linux")
 

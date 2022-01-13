@@ -7,10 +7,8 @@ import os
 import sys
 import unittest
 
-import six
-
 # Directory client/tests/
-TESTS_DIR = os.path.dirname(os.path.abspath(six.text_type(__file__)))
+TESTS_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # Directory client/
 CLIENT_DIR = os.path.dirname(TESTS_DIR)
@@ -80,7 +78,7 @@ def make_tree(out, contents):
         # pylint: disable=no-member
         flags |= os.O_BINARY
       with os.fdopen(os.open(filepath, flags, mode), 'wb') as f:
-        f.write(six.ensure_binary(content))
+        f.write(content)
 
 
 def setup():

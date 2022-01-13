@@ -1,12 +1,10 @@
-#!/usr/bin/env vpython
+#!/usr/bin/env vpython3
 # Copyright 2019 The LUCI Authors. All rights reserved.
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
 
 import os
 import sys
-
-import six
 
 THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 TESTS_DIR = os.path.join(THIS_DIR, 'tests')
@@ -41,7 +39,7 @@ def run_tests_parralel():
   sys.argv.extend(['--attribute', '!no_run'])
 
   # execute test runner
-  return parallel_test_runner.run_tests(python3=six.PY3, plugins=plugins)
+  return parallel_test_runner.run_tests(python3=True, plugins=plugins)
 
 
 def run_tests_sequential():
@@ -57,7 +55,7 @@ def run_tests_sequential():
 
   # execute test runner
   from test_support import sequential_test_runner
-  return sequential_test_runner.run_tests(test_cmds, python3=six.PY3)
+  return sequential_test_runner.run_tests(test_cmds, python3=True)
 
 
 if __name__ == '__main__':

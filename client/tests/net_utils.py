@@ -7,14 +7,13 @@ import threading
 
 # third_party/
 from depot_tools import auto_stub
-import six
 
 from utils import net
 
 
 def make_fake_response(content, url, code=200, headers=None):
   """Returns HttpResponse with predefined content, useful in tests."""
-  assert isinstance(content, six.binary_type), content
+  assert isinstance(content, bytes), content
   headers = dict(headers or {})
   headers['Content-Length'] = len(content)
 

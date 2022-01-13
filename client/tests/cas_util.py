@@ -12,7 +12,6 @@ import sys
 import tempfile
 import time
 
-import six
 
 
 CLIENT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -78,7 +77,7 @@ class LocalCAS:
     tmpdir = tempfile.mkdtemp()
     try:
       for path, content in files.items():
-        path = six.text_type(os.path.join(tmpdir, path))
+        path = os.path.join(tmpdir, path)
         pdir = os.path.dirname(path)
         if not os.path.exists(pdir):
           os.makedirs(pdir)
@@ -87,7 +86,7 @@ class LocalCAS:
           f.write(content)
       return self.archive_dir(tmpdir)
     finally:
-      shutil.rmtree(extend(six.text_type(tmpdir)))
+      shutil.rmtree(extend(tmpdir))
 
   def archive_dir(self, upload_dir):
     """Uploads directory to the local CAS server"""

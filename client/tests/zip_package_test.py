@@ -11,8 +11,6 @@ import tempfile
 import unittest
 import zipfile
 
-import six
-
 # Mutates sys.path.
 import test_env
 
