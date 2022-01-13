@@ -6,6 +6,7 @@
 import atexit
 import cgi
 import getpass
+import http.server
 import json
 import logging
 import os
@@ -17,16 +18,14 @@ import subprocess
 import sys
 import threading
 import unittest
-
-import six
-from six.moves import BaseHTTPServer
+import urllib.parse
+import urllib.request
 
 # Mutates sys.path.
 import test_env
 
 # third_party/
 from depot_tools import auto_stub
-from six.moves import urllib
 
 from utils import on_error
 
@@ -34,15 +33,9 @@ from utils import on_error
 PEM = os.path.join(test_env.TESTS_DIR, 'self_signed.pem')
 
 
-def _serialize_env():
-  return dict((six.ensure_text(k),
-               six.ensure_text(v.encode('ascii', 'replace')))
-              for k, v in os.environ.items())
-
-
-class HttpsServer(BaseHTTPServer.HTTPServer):
+class HttpsServer(http.server.HTTPServer):
   def __init__(self, addr, cls, hostname, pem):
-    BaseHTTPServer.HTTPServer.__init__(self, addr, cls)
+    http.server.HTTPServer.__init__(self, addr, cls)
     self.hostname = hostname
     self.pem = pem
     self.socket = ssl.wrap_socket(
@@ -88,7 +81,7 @@ class HttpsServer(BaseHTTPServer.HTTPServer):
       self.requests.append((request.path, request.parse_POST()))
 
 
-class Handler(BaseHTTPServer.BaseHTTPRequestHandler):
+class Handler(http.server.BaseHTTPRequestHandler):
   def log_message(self, fmt, *args):  # pylint: disable=arguments-differ
     logging.debug(
         '%s - - [%s] %s',
@@ -221,17 +214,17 @@ class OnErrorServerTest(OnErrorBase):
     actual = self.one_request(httpd)
     self.assertGreaterEqual(actual.pop('duration'), 0)
     expected = {
-        u'args': [u'main.py', six.text_type(httpd.url), u'report'],
+        u'args': [u'main.py', httpd.url, u'report'],
         u'category': u'report',
         u'cwd': os.path.join(test_env.TESTS_DIR, 'on_error'),
-        u'env': _serialize_env(),
-        u'hostname': six.text_type(socket.getfqdn()),
+        u'env': on_error._serialize_env(),
+        u'hostname': socket.getfqdn(),
         u'message': u'Oh dang',
-        u'os': six.text_type(sys.platform),
-        u'python_version': six.text_type(platform.python_version()),
+        u'os': sys.platform,
+        u'python_version': platform.python_version(),
         u'source': u'main.py',
-        u'stack': u'None' if six.PY2 else 'NoneType: None',
-        u'user': six.text_type(getpass.getuser()),
+        u'stack': 'NoneType: None',
+        u'user': getpass.getuser(),
         # The version was added dynamically for testing purpose.
         u'version': u'123',
     }
@@ -253,22 +246,32 @@ class OnErrorServerTest(OnErrorBase):
     # Remove numbers so editing the code doesn't invalidate the expectation.
     actual['stack'] = re.sub(r' \d+', ' 0', actual['stack'])
     expected = {
-        u'args': [u'main.py',
-                  six.text_type(httpd.url), u'exception'],
-        u'cwd': os.path.join(test_env.TESTS_DIR, 'on_error'),
-        u'category': u'exception',
-        u'env': _serialize_env(),
-        u'exception_type': u'TypeError',
-        u'hostname': six.text_type(socket.getfqdn()),
-        u'message': u'Really\nYou are not my type',
-        u'os': six.text_type(sys.platform),
-        u'python_version': six.text_type(platform.python_version()),
-        u'source': u'main.py',
-        u'stack': u'Traceback (most recent call last):\n'
-                  u'  File "main.py", line 0, in run_shell_out\n'
-                  u'    raise TypeError(\'You are not my type\')\n'
-                  u'TypeError: You are not my type',
-        u'user': six.text_type(getpass.getuser()),
+        u'args': [u'main.py', httpd.url, u'exception'],
+        u'cwd':
+        os.path.join(test_env.TESTS_DIR, 'on_error'),
+        u'category':
+        u'exception',
+        u'env':
+        on_error._serialize_env(),
+        u'exception_type':
+        u'TypeError',
+        u'hostname':
+        socket.getfqdn(),
+        u'message':
+        u'Really\nYou are not my type',
+        u'os':
+        sys.platform,
+        u'python_version':
+        platform.python_version(),
+        u'source':
+        u'main.py',
+        u'stack':
+        u'Traceback (most recent call last):\n'
+        u'  File "main.py", line 0, in run_shell_out\n'
+        u'    raise TypeError(\'You are not my type\')\n'
+        u'TypeError: You are not my type',
+        u'user':
+        getpass.getuser(),
     }
     self.assertRequestParams(expected, actual)
     httpd.stop()
@@ -288,22 +291,32 @@ class OnErrorServerTest(OnErrorBase):
     # Remove numbers so editing the code doesn't invalidate the expectation.
     actual['stack'] = re.sub(r' \d+', ' 0', actual['stack'])
     expected = {
-        u'args': [u'main.py',
-                  six.text_type(httpd.url), u'exception_no_msg'],
-        u'category': u'exception',
-        u'cwd': os.path.join(test_env.TESTS_DIR, 'on_error'),
-        u'env': _serialize_env(),
-        u'exception_type': u'TypeError',
-        u'hostname': six.text_type(socket.getfqdn()),
-        u'message': u'You are not my type #2',
-        u'os': six.text_type(sys.platform),
-        u'python_version': six.text_type(platform.python_version()),
-        u'source': u'main.py',
-        u'stack': u'Traceback (most recent call last):\n'
-                  u'  File "main.py", line 0, in run_shell_out\n'
-                  u'    raise TypeError(\'You are not my type #2\')\n'
-                  u'TypeError: You are not my type #2',
-        u'user': six.text_type(getpass.getuser()),
+        u'args': [u'main.py', httpd.url, u'exception_no_msg'],
+        u'category':
+        u'exception',
+        u'cwd':
+        os.path.join(test_env.TESTS_DIR, 'on_error'),
+        u'env':
+        on_error._serialize_env(),
+        u'exception_type':
+        u'TypeError',
+        u'hostname':
+        socket.getfqdn(),
+        u'message':
+        u'You are not my type #2',
+        u'os':
+        sys.platform,
+        u'python_version':
+        platform.python_version(),
+        u'source':
+        u'main.py',
+        u'stack':
+        u'Traceback (most recent call last):\n'
+        u'  File "main.py", line 0, in run_shell_out\n'
+        u'    raise TypeError(\'You are not my type #2\')\n'
+        u'TypeError: You are not my type #2',
+        u'user':
+        getpass.getuser(),
     }
     self.assertRequestParams(expected, actual)
     httpd.stop()
@@ -331,22 +344,33 @@ class OnErrorServerTest(OnErrorBase):
     actual['stack'] = re.sub(r' \d+', ' 0', actual['stack'])
     self.assertGreaterEqual(actual.pop('duration'), 0)
     expected = {
-        u'args': [u'main.py', six.text_type(httpd.url), u'crash'],
-        u'category': u'exception',
-        u'cwd': os.path.join(test_env.TESTS_DIR, 'on_error'),
-        u'env': _serialize_env(),
-        u'exception_type': u'ValueError',
-        u'hostname': six.text_type(socket.getfqdn()),
-        u'message': u'Process exited due to exception\nOops',
-        u'os': six.text_type(sys.platform),
-        u'python_version': six.text_type(platform.python_version()),
-        u'source': u'main.py',
+        u'args': [u'main.py', httpd.url, u'crash'],
+        u'category':
+        u'exception',
+        u'cwd':
+        os.path.join(test_env.TESTS_DIR, 'on_error'),
+        u'env':
+        on_error._serialize_env(),
+        u'exception_type':
+        u'ValueError',
+        u'hostname':
+        socket.getfqdn(),
+        u'message':
+        u'Process exited due to exception\nOops',
+        u'os':
+        sys.platform,
+        u'python_version':
+        platform.python_version(),
+        u'source':
+        u'main.py',
         # The stack trace is stripped off the heading and absolute paths.
-        u'stack': u'File "main.py", line 0, in <module>\n'
-                  u'  sys.exit(run_shell_out(*sys.argv[1:]))\n'
-                  u'File "main.py", line 0, in run_shell_out\n'
-                  u'  raise ValueError(\'Oops\')',
-        u'user': six.text_type(getpass.getuser()),
+        u'stack':
+        u'File "main.py", line 0, in <module>\n'
+        u'  sys.exit(run_shell_out(*sys.argv[1:]))\n'
+        u'File "main.py", line 0, in run_shell_out\n'
+        u'  raise ValueError(\'Oops\')',
+        u'user':
+        getpass.getuser(),
     }
     self.assertRequestParams(expected, actual)
     httpd.stop()
