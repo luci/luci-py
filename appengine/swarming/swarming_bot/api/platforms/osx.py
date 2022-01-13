@@ -452,7 +452,7 @@ def get_ios_version(udid):
   """
   try:
     out = subprocess.check_output(
-        ['ideviceinfo', '-k', 'ProductVersion', '-', udid],
+        ['ideviceinfo', '-k', 'ProductVersion', '-u', udid],
         universal_newlines=True).splitlines()
     if len(out) == 1:
       return out[0]
@@ -472,7 +472,7 @@ def get_ios_device_type(udid):
   """
   try:
     out = subprocess.check_output(
-        ['ideviceinfo', '-k', 'ProductType', '-', udid],
+        ['ideviceinfo', '-k', 'ProductType', '-u', udid],
         universal_newlines=True).splitlines()
     if len(out) == 1:
       return out[0]
