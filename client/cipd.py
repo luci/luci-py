@@ -16,9 +16,7 @@ import shutil
 import sys
 import tempfile
 import time
-
-import six
-from six.moves import urllib
+import urllib.parse
 
 from utils import file_path
 from utils import fs
@@ -211,9 +209,8 @@ class CipdClient:
 
       logging.debug('Running %r', cmd)
       kwargs = {}
-      if six.PY3:
-        kwargs['encoding'] = 'utf-8'
-        kwargs['errors'] = 'backslashreplace'
+      kwargs['encoding'] = 'utf-8'
+      kwargs['errors'] = 'backslashreplace'
       process = subprocess42.Popen(
           cmd,
           stdout=subprocess42.PIPE,
@@ -419,7 +416,7 @@ def get_client(cache_dir,
     # version_cache is {hash(package_name, tag) -> instance id} mapping.
     # It does not take a lot of disk space.
     version_cache = local_caching.DiskContentAddressedCache(
-        six.text_type(os.path.join(cache_dir, 'versions')),
+        os.path.join(cache_dir, 'versions'),
         local_caching.CachePolicies(
             # 1GiB.
             max_cache_size=1024 * 1024 * 1024,
@@ -431,10 +428,10 @@ def get_client(cache_dir,
     # Convert (package_name, version) to a string that may be used as a
     # filename in disk cache by hashing it.
     version_digest = hashlib.sha256(
-        six.ensure_binary('%s\n%s' % (package_name, version))).hexdigest()
+        ('%s\n%s' % (package_name, version)).encode()).hexdigest()
     try:
       with version_cache.getfileobj(version_digest) as f:
-        instance_id = six.ensure_str(f.read())
+        instance_id = f.read().decode()
       logging.info("instance_id %s", instance_id)
     except local_caching.CacheMiss:
       logging.info("version_cache miss for %s", version_digest)
@@ -443,7 +440,7 @@ def get_client(cache_dir,
     if not instance_id:
       instance_id = resolve_version(
           service_url, package_name, version, timeout=timeoutfn())
-      version_cache.write(version_digest, [six.ensure_binary(instance_id)])
+      version_cache.write(version_digest, [instance_id.encode()])
     version_cache.trim()
   else:  # it's a ref, hit the backend
     instance_id = resolve_version(
@@ -452,7 +449,7 @@ def get_client(cache_dir,
   # instance_cache is {instance_id -> client binary} mapping.
   # It is bounded by 5 client versions.
   instance_cache = local_caching.DiskContentAddressedCache(
-      six.text_type(os.path.join(cache_dir, 'clients')),
+      os.path.join(cache_dir, 'clients'),
       local_caching.CachePolicies(
           # 1GiB.
           max_cache_size=1024 * 1024 * 1024,
@@ -469,7 +466,7 @@ def get_client(cache_dir,
 
   # A single host can run multiple swarming bots, but they cannot share same
   # root bot directory. Thus, it is safe to use the same name for the binary.
-  cipd_bin_dir = six.text_type(os.path.join(cache_dir, 'bin'))
+  cipd_bin_dir = os.path.join(cache_dir, 'bin')
   binary_path = os.path.join(cipd_bin_dir, 'cipd' + EXECUTABLE_SUFFIX)
   if fs.isfile(binary_path):
     # TODO(maruel): Do not unconditionally remove the binary.

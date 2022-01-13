@@ -22,10 +22,6 @@ from utils import fs
 from utils import lru
 from utils import threading_utils
 from utils import tools
-tools.force_local_third_party()
-
-# third_party/
-import six
 
 # The file size to be used when we don't know the correct file size,
 # generally used for .isolated files.
@@ -158,7 +154,7 @@ class Cache:
 
   def __init__(self, cache_dir):
     if cache_dir is not None:
-      assert isinstance(cache_dir, six.text_type), cache_dir
+      assert isinstance(cache_dir, str), cache_dir
       assert file_path.isabs(cache_dir), cache_dir
     self.cache_dir = cache_dir
     self._lock = threading_utils.LockWithAssert()
@@ -380,7 +376,7 @@ class MemoryContentAddressedCache(ContentAddressedCache):
 
   def write(self, digest, content):
     # Assemble whole stream before taking the lock.
-    data = six.b('').join(content)
+    data = b''.join(content)
     with self._lock:
       self._lru.add(digest, data)
       self._added.append(len(data))
@@ -834,7 +830,7 @@ class NamedCache(Cache):
       try:
         self._lru = lru.LRUDict.load(self.state_file)
         for _, size in self._lru.values():
-          if not isinstance(size, six.integer_types):
+          if not isinstance(size, int):
             with open(self.state_file, 'r') as f:
               logging.info('named cache state file: %s\n%s', self.state_file,
                            f.read())
@@ -922,7 +918,7 @@ class NamedCache(Cache):
         # Raise using the original traceback.
         exc = NamedCacheError(
             'cannot install cache named %r at %r: %s' % (name, dst, ex))
-        six.reraise(type(exc), exc, sys.exc_info()[2])
+        raise exc.with_traceback(sys.exc_info()[2])
       finally:
         self._save()
 
@@ -997,7 +993,7 @@ class NamedCache(Cache):
         # Raise using the original traceback.
         exc = NamedCacheError(
             'cannot uninstall cache named %r at %r: %s' % (name, src, ex))
-        six.reraise(type(exc), exc, sys.exc_info()[2])
+        raise exc.with_traceback(sys.exc_info()[2])
       finally:
         # Call save() at every uninstall. The assumptions are:
         # - The total the number of named caches is low, so the state.json file

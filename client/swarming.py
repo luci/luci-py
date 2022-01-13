@@ -1,10 +1,8 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # Copyright 2013 The LUCI Authors. All rights reserved.
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
 """Client tool to trigger tasks or retrieve results from a Swarming server."""
-
-from __future__ import print_function
 
 __version__ = '1.0'
 
@@ -14,6 +12,7 @@ import optparse
 import os
 import sys
 import textwrap
+import urllib.parse
 
 from utils import tools
 tools.force_local_third_party()
@@ -22,8 +21,6 @@ tools.force_local_third_party()
 import colorama
 from depot_tools import fix_encoding
 from depot_tools import subcommand
-import six
-from six.moves import urllib
 
 # pylint: disable=ungrouped-imports
 import auth
@@ -168,7 +165,7 @@ def CMDquery(parser, args):
     sys.stderr.write('\n')
     sys.stderr.flush()
   if options.json:
-    options.json = six.text_type(os.path.abspath(options.json))
+    options.json = os.path.abspath(options.json)
     tools.write_json(options.json, data, True)
   else:
     try:
@@ -194,7 +191,7 @@ def CMDquery_list(parser, args):
   except APIError as e:
     parser.error(str(e))
   if options.json:
-    options.json = six.text_type(os.path.abspath(options.json))
+    options.json = os.path.abspath(options.json)
     with fs.open(options.json, 'wb') as f:
       json.dump(apis, f)
   else:
