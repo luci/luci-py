@@ -41,7 +41,7 @@ class FSTest(unittest.TestCase):
   @property
   def tempdir(self):
     if not self._tempdir:
-      self._tempdir = tempfile.mkdtemp(prefix=u'fs_test')
+      self._tempdir = tempfile.mkdtemp(prefix='fs_test')
     return self._tempdir
 
   def test_symlink_relative(self):

@@ -35,9 +35,9 @@ _LUCI_GO = os.path.join(
 OUTPUT_CONTENT = 'foooo'
 CONTENTS = {
     'file1.txt':
-        b'File1\n',
+    b'File1\n',
     'repeated_files.py':
-        textwrap.dedent("""
+    textwrap.dedent("""
       from __future__ import print_function
       import os, sys
       expected = ['file1.txt', 'file1_copy.txt', 'repeated_files.py']
@@ -51,10 +51,10 @@ CONTENTS = {
         sys.exit(1)
       print('Success')""").encode(),
     'max_path.py':
-        textwrap.dedent("""
+    textwrap.dedent("""
       from __future__ import print_function
       import os, sys
-      prefix = u'\\\\\\\\?\\\\' if sys.platform == 'win32' else u''
+      prefix = '\\\\\\\\?\\\\' if sys.platform == 'win32' else ''
       path = os.path.join(os.getcwd(), 'a' * 200, 'b' * 200)
       with open(prefix + path, 'rb') as f:
         actual = f.read()
@@ -63,7 +63,7 @@ CONTENTS = {
           sys.exit(1)
       print('Success')""").encode(),
     'output.py':
-        textwrap.dedent("""
+    textwrap.dedent("""
       import sys
       with open(sys.argv[1], 'w') as fh:
         fh.writelines(['{}'])""".format(OUTPUT_CONTENT)).encode(),
@@ -106,7 +106,7 @@ def tree_modes(root):
   """
   out = {}
   offset = len(root.rstrip('/\\')) + 1
-  out[u'.'] = oct(os.stat(root).st_mode)
+  out['.'] = oct(os.stat(root).st_mode)
   for dirpath, dirnames, filenames in os.walk(root):
     for filename in filenames:
       p = os.path.join(dirpath, filename)
@@ -130,13 +130,13 @@ def load_isolated_stats(stats_json_path, key):
 class RunIsolatedTest(unittest.TestCase):
   def setUp(self):
     super(RunIsolatedTest, self).setUp()
-    self.tempdir = run_isolated.make_temp_dir(
-        u'run_isolated_smoke_test', test_env.CLIENT_DIR)
+    self.tempdir = run_isolated.make_temp_dir('run_isolated_smoke_test',
+                                              test_env.CLIENT_DIR)
     logging.debug(self.tempdir)
     self._root_dir = os.path.join(self.tempdir, 'w')
     # The run_isolated local cache.
     self._named_cache_dir = os.path.join(self.tempdir, 'n')
-    self._cipd_cache_dir = os.path.join(self.tempdir, u'cipd')
+    self._cipd_cache_dir = os.path.join(self.tempdir, 'cipd')
     self._cipd_packages_cache_dir = os.path.join(self._cipd_cache_dir, 'cache')
 
     self._cas_cache_dir = os.path.join(self.tempdir, 'c')
@@ -296,8 +296,8 @@ class RunIsolatedTest(unittest.TestCase):
         self._cmd_args(cas_digest) + ['--', 'python', '-V'])
     self.assertEqual(0, returncode, (out, err, returncode))
     expected = {
-        u'.': (0o40707, 0o40707, 0o40777),
-        u'state.json': (0o100606, 0o100606, 0o100666),
+        '.': (0o40707, 0o40707, 0o40777),
+        'state.json': (0o100606, 0o100606, 0o100666),
         # The reason for 0100666 on Windows is that the file node had to be
         # modified to delete the hardlinked node. The read only bit is reset on
         # load.
@@ -328,8 +328,8 @@ class RunIsolatedTest(unittest.TestCase):
         self._cmd_args(cas_digest) + ['--', 'python', '-V'])
     self.assertEqual(0, returncode, (out, err, returncode))
     expected = {
-        u'.': (0o40700, 0o40700, 0o40700),
-        u'state.json': (0o100600, 0o100600, 0o100600),
+        '.': (0o40700, 0o40700, 0o40700),
+        'state.json': (0o100600, 0o100600, 0o100600),
         file1_hash: (0o100604, 0o100604, 0o100604),
     }
     self.assertTreeModes(self._cas_cache_dir, expected)
@@ -419,15 +419,15 @@ class RunIsolatedTest(unittest.TestCase):
 
     # Load the state file manually. This assumes internal knowledge in
     # local_caching.py.
-    with open(os.path.join(self._named_cache_dir, u'state.json'), 'rb') as f:
+    with open(os.path.join(self._named_cache_dir, 'state.json'), 'rb') as f:
       data = json.load(f)
     name, ((rel_path, size), timestamp) = data['items'][0]
-    self.assertEqual(u'cache1', name)
+    self.assertEqual('cache1', name)
     self.assertGreaterEqual(timestamp, now)
     self.assertEqual(len('world'), size)
-    self.assertEqual(
-        [u'hello'],
-        list_files_tree(os.path.join(self._named_cache_dir, rel_path)))
+    self.assertEqual(['hello'],
+                     list_files_tree(
+                         os.path.join(self._named_cache_dir, rel_path)))
 
   def test_cas_input(self):
     # Prepare inputs on the remote CAS instance.

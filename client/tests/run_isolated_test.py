@@ -101,7 +101,7 @@ class RunIsolatedTestBase(auto_stub.TestCase):
     os.environ.pop('LUCI_CONTEXT', None)
     os.environ['LUCI_GO_CLIENT_DIR'] = LUCI_GO_CLIENT_DIR
     self._previous_dir = os.getcwd()
-    self.tempdir = tempfile.mkdtemp(prefix=u'run_isolated_test')
+    self.tempdir = tempfile.mkdtemp(prefix='run_isolated_test')
     logging.debug('Temp dir: %s', self.tempdir)
     cwd = os.path.join(self.tempdir, 'cwd')
     fs.mkdir(cwd)
@@ -274,7 +274,7 @@ class RunIsolatedTest(RunIsolatedTestBase):
     self.assertEqual(0, ret)
     self.assertEqual([
         (
-            [self.ir_dir(u'foo.exe'), u'cmd with space', u'-task-id', u'4242'],
+            [self.ir_dir('foo.exe'), 'cmd with space', '-task-id', '4242'],
             {
                 'cwd': self.ir_dir(),
                 'detached': True,
@@ -300,20 +300,18 @@ class RunIsolatedTest(RunIsolatedTestBase):
     ]
     ret = run_isolated.main(cmd)
     self.assertEqual(0, ret)
-    self.assertEqual(
-        [
-          (
-            [self.ir_dir(u'foo.exe'), u'cmd w/ space'],
+    self.assertEqual([
+        (
+            [self.ir_dir('foo.exe'), 'cmd w/ space'],
             {
-              'cwd': self.ir_dir(),
-              'detached': True,
-              'close_fds': True,
-              'lower_priority': False,
-              'containment': subprocess42.Containment(),
+                'cwd': self.ir_dir(),
+                'detached': True,
+                'close_fds': True,
+                'lower_priority': False,
+                'containment': subprocess42.Containment(),
             },
-          ),
-        ],
-        self.popen_calls)
+        ),
+    ], self.popen_calls)
 
   def _run_tha_test(self,
                     command=None,
@@ -354,20 +352,18 @@ class RunIsolatedTest(RunIsolatedTestBase):
 
   def test_run_tha_test_naked(self):
     self._run_tha_test(command=['invalid', 'command'])
-    self.assertEqual(
-        [
-          (
-            [self.ir_dir(u'invalid'), u'command'],
+    self.assertEqual([
+        (
+            [self.ir_dir('invalid'), 'command'],
             {
-              'cwd': self.ir_dir(),
-              'detached': True,
-              'close_fds': True,
-              'lower_priority': False,
-              'containment': None,
+                'cwd': self.ir_dir(),
+                'detached': True,
+                'close_fds': True,
+                'lower_priority': False,
+                'containment': None,
             },
-          ),
-        ],
-        self.popen_calls)
+        ),
+    ], self.popen_calls)
 
   def mock_popen_with_oserr(self):
     def r(self, args, **kwargs):
@@ -389,20 +385,18 @@ class RunIsolatedTest(RunIsolatedTestBase):
     ret = run_isolated.main(cmd)
     self.assertEqual(1, ret)
     self.assertEqual(1, len(self.popen_calls))
-    self.assertEqual(
-        [
-          (
-            [self.ir_dir(u'invalid'), u'command'],
+    self.assertEqual([
+        (
+            [self.ir_dir('invalid'), 'command'],
             {
-              'cwd': self.ir_dir(),
-              'detached': True,
-              'close_fds': True,
-              'lower_priority': False,
-              'containment': subprocess42.Containment(),
+                'cwd': self.ir_dir(),
+                'detached': True,
+                'close_fds': True,
+                'lower_priority': False,
+                'containment': subprocess42.Containment(),
             },
-          ),
-        ],
-        self.popen_calls)
+        ),
+    ], self.popen_calls)
 
   @unittest.skipIf(sys.platform == 'win32', 'crbug.com/1148174')
   def test_main_naked_without_isolated(self):
@@ -610,7 +604,7 @@ class RunIsolatedTest(RunIsolatedTestBase):
     self.assertTrue(echo_cmd[0].endswith(
         os.path.sep + 'bin' + os.path.sep + 'echo' + cipd.EXECUTABLE_SUFFIX),
         echo_cmd[0])
-    self.assertEqual(echo_cmd[1:], [u'hello', u'world'])
+    self.assertEqual(echo_cmd[1:], ['hello', 'world'])
 
   def test_main_naked_with_cipd_client_no_packages(self):
     self.mock(cipd, 'get_platform', lambda: 'linux-amd64')
@@ -678,7 +672,7 @@ class RunIsolatedTest(RunIsolatedTestBase):
     self.assertTrue(fs.isfile(client_binary_link))
 
     env = self.popen_calls[1][1].pop('env')
-    exec_path = self.ir_dir(u'a', 'bin', 'echo')
+    exec_path = self.ir_dir('a', 'bin', 'echo')
     if sys.platform == 'win32':
       exec_path += '.exe'
     self.assertEqual(
@@ -835,20 +829,18 @@ class RunIsolatedTest(RunIsolatedTestBase):
 
   def test_modified_cwd(self):
     self._run_tha_test(command=['../out/some.exe', 'arg'], relative_cwd='some')
-    self.assertEqual(
-        [
-          (
-            [self.ir_dir(u'out', u'some.exe'), 'arg'],
+    self.assertEqual([
+        (
+            [self.ir_dir('out', 'some.exe'), 'arg'],
             {
-              'cwd': self.ir_dir('some'),
-              'detached': True,
-              'close_fds': True,
-              'lower_priority': False,
-              'containment': None,
+                'cwd': self.ir_dir('some'),
+                'detached': True,
+                'close_fds': True,
+                'lower_priority': False,
+                'containment': None,
             },
-          ),
-        ],
-        self.popen_calls)
+        ),
+    ], self.popen_calls)
 
   @unittest.skipIf(sys.platform == 'win32', 'crbug.com/1148174')
   def test_python_cmd_lower_priority(self):
@@ -870,25 +862,23 @@ class RunIsolatedTest(RunIsolatedTestBase):
         },
         args)
     self.assertIn('python', cmd[0])
-    self.assertEqual([os.path.join(u'..', 'out', 'cmd.py'), u'arg'], cmd[1:])
+    self.assertEqual([os.path.join('..', 'out', 'cmd.py'), 'arg'], cmd[1:])
 
   @unittest.skipIf(sys.platform == 'win32', 'crbug.com/1148174')
   def test_run_tha_test_non_isolated(self):
-    _ = self._run_tha_test(command=[u'/bin/echo', u'hello', u'world'])
-    self.assertEqual(
-        [
-          (
-            [u'/bin/echo', u'hello', u'world'],
+    _ = self._run_tha_test(command=['/bin/echo', 'hello', 'world'])
+    self.assertEqual([
+        (
+            ['/bin/echo', 'hello', 'world'],
             {
-              'cwd': self.ir_dir(),
-              'detached': True,
-              'close_fds': True,
-              'lower_priority': False,
-              'containment': None,
+                'cwd': self.ir_dir(),
+                'detached': True,
+                'close_fds': True,
+                'lower_priority': False,
+                'containment': None,
             },
-          ),
-        ],
-        self.popen_calls)
+        ),
+    ], self.popen_calls)
 
   @unittest.skipIf(sys.platform == 'win32', 'crbug.com/1148174')
   def test_main_containment(self):
@@ -958,7 +948,7 @@ class RunIsolatedTestRun(RunIsolatedTestBase):
 
     os.environ['RUN_ISOLATED_CAS_ADDRESS'] = self._server.address
     data = run_isolated.TaskData(
-        command=[u'python3', u'cmd.py', u'${ISOLATED_OUTDIR}/foo'],
+        command=['python3', 'cmd.py', '${ISOLATED_OUTDIR}/foo'],
         relative_cwd=None,
         cas_instance=None,
         cas_digest=digest,
@@ -1379,10 +1369,10 @@ class RunIsolatedJsonTest(RunIsolatedTestBase):
         '5868195adddf130eeb09a939bc40a17033fb058288b7b0bec0144dcb07e9cf78')
 
     expected = {
-        u'exit_code': 0,
-        u'had_hard_timeout': False,
-        u'internal_failure': None,
-        u'cas_output_root': {
+        'exit_code': 0,
+        'had_hard_timeout': False,
+        'internal_failure': None,
+        'cas_output_root': {
             # Local cas server uses its own default instance.
             'cas_instance': None,
             'digest': {
@@ -1391,35 +1381,35 @@ class RunIsolatedJsonTest(RunIsolatedTestBase):
             },
         },
         'outputs_ref': None,
-        u'stats': {
-            u'trim_caches': {},
-            u'isolated': {
-                u'download': {},
-                u'upload': {
-                    u'items_cold': [15, 81],
-                    u'items_hot': None,
+        'stats': {
+            'trim_caches': {},
+            'isolated': {
+                'download': {},
+                'upload': {
+                    'items_cold': [15, 81],
+                    'items_hot': None,
                 },
             },
-            u'named_caches': {
-                u'install': {},
-                u'uninstall': {},
+            'named_caches': {
+                'install': {},
+                'uninstall': {},
             },
-            u'cleanup': {},
+            'cleanup': {},
         },
-        u'version': 5,
+        'version': 5,
     }
     actual = tools.read_json(out)
     # duration can be exactly 0 due to low timer resolution, especially but not
     # exclusively on Windows.
-    self.assertLessEqual(0, actual.pop(u'duration'))
-    self.assertLessEqual(0, actual[u'stats'][u'trim_caches'].pop(u'duration'))
-    actual_upload_stats = actual[u'stats'][u'isolated'][u'upload']
-    self.assertLessEqual(0, actual_upload_stats.pop(u'duration'))
-    named_caches_stats = actual[u'stats'][u'named_caches']
-    self.assertLessEqual(0, named_caches_stats[u'install'].pop(u'duration'))
-    self.assertLessEqual(0, named_caches_stats[u'uninstall'].pop(u'duration'))
-    self.assertLessEqual(0, actual[u'stats'][u'cleanup'].pop(u'duration'))
-    for i in (u'items_cold', u'items_hot'):
+    self.assertLessEqual(0, actual.pop('duration'))
+    self.assertLessEqual(0, actual['stats']['trim_caches'].pop('duration'))
+    actual_upload_stats = actual['stats']['isolated']['upload']
+    self.assertLessEqual(0, actual_upload_stats.pop('duration'))
+    named_caches_stats = actual['stats']['named_caches']
+    self.assertLessEqual(0, named_caches_stats['install'].pop('duration'))
+    self.assertLessEqual(0, named_caches_stats['uninstall'].pop('duration'))
+    self.assertLessEqual(0, actual['stats']['cleanup'].pop('duration'))
+    for i in ('items_cold', 'items_hot'):
       if actual_upload_stats[i]:
         actual_upload_stats[i] = large.unpack(
             base64.b64decode(actual_upload_stats[i]))

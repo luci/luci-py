@@ -112,30 +112,38 @@ class LocalAuthServerTest(auto_stub.TestCase):
     with local_auth_server(token_gen, 'acc_1'):
       # Grab initial token.
       resp = call_rpc('acc_1', scopes=['B', 'B', 'A', 'C'])
-      self.assertEqual(
-          {u'access_token': u'tok_acc_1', u'expiry': self.epoch + 300}, resp)
+      self.assertEqual({
+          'access_token': 'tok_acc_1',
+          'expiry': self.epoch + 300
+      }, resp)
       self.assertEqual([('acc_1', ('A', 'B', 'C'))], calls)
       del calls[:]
 
       # Reuses cached token until it is close to expiration.
       self.mock_time(60)
       resp = call_rpc('acc_1', scopes=['B', 'A', 'C'])
-      self.assertEqual(
-          {u'access_token': u'tok_acc_1', u'expiry': self.epoch + 300}, resp)
+      self.assertEqual({
+          'access_token': 'tok_acc_1',
+          'expiry': self.epoch + 300
+      }, resp)
       self.assertFalse(calls)
 
       # Asking for different account gives another token.
       resp = call_rpc('acc_2', scopes=['B', 'B', 'A', 'C'])
-      self.assertEqual(
-          {u'access_token': u'tok_acc_2', u'expiry': self.epoch + 360}, resp)
+      self.assertEqual({
+          'access_token': 'tok_acc_2',
+          'expiry': self.epoch + 360
+      }, resp)
       self.assertEqual([('acc_2', ('A', 'B', 'C'))], calls)
       del calls[:]
 
       # First token has expired. Generated new one.
       self.mock_time(300)
       resp = call_rpc('acc_1', scopes=['A', 'B', 'C'])
-      self.assertEqual(
-          {u'access_token': u'tok_acc_1', u'expiry': self.epoch + 600}, resp)
+      self.assertEqual({
+          'access_token': 'tok_acc_1',
+          'expiry': self.epoch + 600
+      }, resp)
       self.assertEqual([('acc_1', ('A', 'B', 'C'))], calls)
 
   def test_id_tokens(self):
@@ -148,37 +156,47 @@ class LocalAuthServerTest(auto_stub.TestCase):
     with local_auth_server(token_gen, 'acc_1'):
       # Grab initial token.
       resp = call_rpc('acc_1', audience='some-audience')
-      self.assertEqual(
-          {u'id_token': u'tok_acc_1', u'expiry': self.epoch + 300}, resp)
+      self.assertEqual({
+          'id_token': 'tok_acc_1',
+          'expiry': self.epoch + 300
+      }, resp)
       self.assertEqual([('acc_1', 'some-audience')], calls)
       del calls[:]
 
       # Reuses cached token until it is close to expiration.
       self.mock_time(60)
       resp = call_rpc('acc_1', audience='some-audience')
-      self.assertEqual(
-          {u'id_token': u'tok_acc_1', u'expiry': self.epoch + 300}, resp)
+      self.assertEqual({
+          'id_token': 'tok_acc_1',
+          'expiry': self.epoch + 300
+      }, resp)
       self.assertFalse(calls)
 
       # Asking for different audience gives another token.
       resp = call_rpc('acc_1', audience='another-audience')
-      self.assertEqual(
-          {u'id_token': u'tok_acc_1', u'expiry': self.epoch + 360}, resp)
+      self.assertEqual({
+          'id_token': 'tok_acc_1',
+          'expiry': self.epoch + 360
+      }, resp)
       self.assertEqual([('acc_1', 'another-audience')], calls)
       del calls[:]
 
       # Asking for different account gives another token.
       resp = call_rpc('acc_2', audience='some-audience')
-      self.assertEqual(
-          {u'id_token': u'tok_acc_2', u'expiry': self.epoch + 360}, resp)
+      self.assertEqual({
+          'id_token': 'tok_acc_2',
+          'expiry': self.epoch + 360
+      }, resp)
       self.assertEqual([('acc_2', 'some-audience')], calls)
       del calls[:]
 
       # First token has expired. Generated new one.
       self.mock_time(300)
       resp = call_rpc('acc_1', audience='some-audience')
-      self.assertEqual(
-          {u'id_token': u'tok_acc_1', u'expiry': self.epoch + 600}, resp)
+      self.assertEqual({
+          'id_token': 'tok_acc_1',
+          'expiry': self.epoch + 600
+      }, resp)
       self.assertEqual([('acc_1', 'some-audience')], calls)
 
   def test_handles_token_errors(self):
@@ -188,15 +206,17 @@ class LocalAuthServerTest(auto_stub.TestCase):
       raise auth_server.TokenError(123, 'error message')
 
     with local_auth_server(token_gen, 'acc_1'):
-      self.assertEqual(
-          {u'error_code': 123, u'error_message': u'error message'},
-          call_rpc('acc_1', scopes=['B', 'B', 'A', 'C']))
+      self.assertEqual({
+          'error_code': 123,
+          'error_message': 'error message'
+      }, call_rpc('acc_1', scopes=['B', 'B', 'A', 'C']))
       self.assertEqual(1, len(calls))
 
       # Errors are cached. Same error is returned.
-      self.assertEqual(
-          {u'error_code': 123, u'error_message': u'error message'},
-          call_rpc('acc_1', scopes=['B', 'B', 'A', 'C']))
+      self.assertEqual({
+          'error_code': 123,
+          'error_message': 'error message'
+      }, call_rpc('acc_1', scopes=['B', 'B', 'A', 'C']))
       self.assertEqual(1, len(calls))
 
   def test_http_level_errors(self):
@@ -401,8 +421,7 @@ class LocalAuthHttpServiceTest(auto_stub.TestCase):
       self.assertTrue(
           request.get_full_url().startswith(service_url + request_url))
       self.assertEqual(b'', request.body)
-      self.assertEqual(u'Bearer %s' % token,
-                       request.headers['Authorization'])
+      self.assertEqual('Bearer %s' % token, request.headers['Authorization'])
       return net_utils.make_fake_response(response, request.get_full_url())
 
     with local_auth_server(token_gen, 'acc_1'):

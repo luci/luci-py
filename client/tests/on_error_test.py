@@ -214,19 +214,19 @@ class OnErrorServerTest(OnErrorBase):
     actual = self.one_request(httpd)
     self.assertGreaterEqual(actual.pop('duration'), 0)
     expected = {
-        u'args': [u'main.py', httpd.url, u'report'],
-        u'category': u'report',
-        u'cwd': os.path.join(test_env.TESTS_DIR, 'on_error'),
-        u'env': on_error._serialize_env(),
-        u'hostname': socket.getfqdn(),
-        u'message': u'Oh dang',
-        u'os': sys.platform,
-        u'python_version': platform.python_version(),
-        u'source': u'main.py',
-        u'stack': 'NoneType: None',
-        u'user': getpass.getuser(),
+        'args': ['main.py', httpd.url, 'report'],
+        'category': 'report',
+        'cwd': os.path.join(test_env.TESTS_DIR, 'on_error'),
+        'env': on_error._serialize_env(),
+        'hostname': socket.getfqdn(),
+        'message': 'Oh dang',
+        'os': sys.platform,
+        'python_version': platform.python_version(),
+        'source': 'main.py',
+        'stack': 'NoneType: None',
+        'user': getpass.getuser(),
         # The version was added dynamically for testing purpose.
-        u'version': u'123',
+        'version': '123',
     }
     self.assertRequestParams(expected, actual)
     httpd.stop()
@@ -246,31 +246,31 @@ class OnErrorServerTest(OnErrorBase):
     # Remove numbers so editing the code doesn't invalidate the expectation.
     actual['stack'] = re.sub(r' \d+', ' 0', actual['stack'])
     expected = {
-        u'args': [u'main.py', httpd.url, u'exception'],
-        u'cwd':
+        'args': ['main.py', httpd.url, 'exception'],
+        'cwd':
         os.path.join(test_env.TESTS_DIR, 'on_error'),
-        u'category':
-        u'exception',
-        u'env':
+        'category':
+        'exception',
+        'env':
         on_error._serialize_env(),
-        u'exception_type':
-        u'TypeError',
-        u'hostname':
+        'exception_type':
+        'TypeError',
+        'hostname':
         socket.getfqdn(),
-        u'message':
-        u'Really\nYou are not my type',
-        u'os':
+        'message':
+        'Really\nYou are not my type',
+        'os':
         sys.platform,
-        u'python_version':
+        'python_version':
         platform.python_version(),
-        u'source':
-        u'main.py',
-        u'stack':
-        u'Traceback (most recent call last):\n'
-        u'  File "main.py", line 0, in run_shell_out\n'
-        u'    raise TypeError(\'You are not my type\')\n'
-        u'TypeError: You are not my type',
-        u'user':
+        'source':
+        'main.py',
+        'stack':
+        'Traceback (most recent call last):\n'
+        '  File "main.py", line 0, in run_shell_out\n'
+        '    raise TypeError(\'You are not my type\')\n'
+        'TypeError: You are not my type',
+        'user':
         getpass.getuser(),
     }
     self.assertRequestParams(expected, actual)
@@ -291,31 +291,31 @@ class OnErrorServerTest(OnErrorBase):
     # Remove numbers so editing the code doesn't invalidate the expectation.
     actual['stack'] = re.sub(r' \d+', ' 0', actual['stack'])
     expected = {
-        u'args': [u'main.py', httpd.url, u'exception_no_msg'],
-        u'category':
-        u'exception',
-        u'cwd':
+        'args': ['main.py', httpd.url, 'exception_no_msg'],
+        'category':
+        'exception',
+        'cwd':
         os.path.join(test_env.TESTS_DIR, 'on_error'),
-        u'env':
+        'env':
         on_error._serialize_env(),
-        u'exception_type':
-        u'TypeError',
-        u'hostname':
+        'exception_type':
+        'TypeError',
+        'hostname':
         socket.getfqdn(),
-        u'message':
-        u'You are not my type #2',
-        u'os':
+        'message':
+        'You are not my type #2',
+        'os':
         sys.platform,
-        u'python_version':
+        'python_version':
         platform.python_version(),
-        u'source':
-        u'main.py',
-        u'stack':
-        u'Traceback (most recent call last):\n'
-        u'  File "main.py", line 0, in run_shell_out\n'
-        u'    raise TypeError(\'You are not my type #2\')\n'
-        u'TypeError: You are not my type #2',
-        u'user':
+        'source':
+        'main.py',
+        'stack':
+        'Traceback (most recent call last):\n'
+        '  File "main.py", line 0, in run_shell_out\n'
+        '    raise TypeError(\'You are not my type #2\')\n'
+        'TypeError: You are not my type #2',
+        'user':
         getpass.getuser(),
     }
     self.assertRequestParams(expected, actual)
@@ -325,17 +325,16 @@ class OnErrorServerTest(OnErrorBase):
     # Rerun itself, report an error with a crash, ensure the error was reported.
     httpd = start_server()
     out = self.call(httpd.url, 'crash', 1)
-    expected = (
-        u'Traceback (most recent call last):\n'
-        u'  File "main.py", line 0, in <module>\n'
-        u'    sys.exit(run_shell_out(*sys.argv[1:]))\n'
-        u'  File "main.py", line 0, in run_shell_out\n'
-        u'    raise ValueError(\'Oops\')\n'
-        u'ValueError: Oops\n'
-        u'Sending the crash report ... done.\n'
-        u'Report URL: https://localhost/error/1234\n'
-        u'Process exited due to exception\n'
-        u'Oops\n')
+    expected = ('Traceback (most recent call last):\n'
+                '  File "main.py", line 0, in <module>\n'
+                '    sys.exit(run_shell_out(*sys.argv[1:]))\n'
+                '  File "main.py", line 0, in run_shell_out\n'
+                '    raise ValueError(\'Oops\')\n'
+                'ValueError: Oops\n'
+                'Sending the crash report ... done.\n'
+                'Report URL: https://localhost/error/1234\n'
+                'Process exited due to exception\n'
+                'Oops\n')
     # Remove numbers so editing the code doesn't invalidate the expectation.
     self.assertEqual(expected, re.sub(r' \d+', ' 0', out))
 
@@ -344,32 +343,32 @@ class OnErrorServerTest(OnErrorBase):
     actual['stack'] = re.sub(r' \d+', ' 0', actual['stack'])
     self.assertGreaterEqual(actual.pop('duration'), 0)
     expected = {
-        u'args': [u'main.py', httpd.url, u'crash'],
-        u'category':
-        u'exception',
-        u'cwd':
+        'args': ['main.py', httpd.url, 'crash'],
+        'category':
+        'exception',
+        'cwd':
         os.path.join(test_env.TESTS_DIR, 'on_error'),
-        u'env':
+        'env':
         on_error._serialize_env(),
-        u'exception_type':
-        u'ValueError',
-        u'hostname':
+        'exception_type':
+        'ValueError',
+        'hostname':
         socket.getfqdn(),
-        u'message':
-        u'Process exited due to exception\nOops',
-        u'os':
+        'message':
+        'Process exited due to exception\nOops',
+        'os':
         sys.platform,
-        u'python_version':
+        'python_version':
         platform.python_version(),
-        u'source':
-        u'main.py',
+        'source':
+        'main.py',
         # The stack trace is stripped off the heading and absolute paths.
-        u'stack':
-        u'File "main.py", line 0, in <module>\n'
-        u'  sys.exit(run_shell_out(*sys.argv[1:]))\n'
-        u'File "main.py", line 0, in run_shell_out\n'
-        u'  raise ValueError(\'Oops\')',
-        u'user':
+        'stack':
+        'File "main.py", line 0, in <module>\n'
+        '  sys.exit(run_shell_out(*sys.argv[1:]))\n'
+        'File "main.py", line 0, in run_shell_out\n'
+        '  raise ValueError(\'Oops\')',
+        'user':
         getpass.getuser(),
     }
     self.assertRequestParams(expected, actual)
@@ -378,16 +377,15 @@ class OnErrorServerTest(OnErrorBase):
   def test_shell_out_crash_server_down(self):
     # Rerun itself, report an error, ensure the error was reported.
     out = self.call('https://localhost:1', 'crash', 1)
-    expected = (
-        u'Traceback (most recent call last):\n'
-        u'  File "main.py", line 0, in <module>\n'
-        u'    sys.exit(run_shell_out(*sys.argv[1:]))\n'
-        u'  File "main.py", line 0, in run_shell_out\n'
-        u'    raise ValueError(\'Oops\')\n'
-        u'ValueError: Oops\n'
-        u'Sending the crash report ... failed!\n'
-        u'Process exited due to exception\n'
-        u'Oops\n')
+    expected = ('Traceback (most recent call last):\n'
+                '  File "main.py", line 0, in <module>\n'
+                '    sys.exit(run_shell_out(*sys.argv[1:]))\n'
+                '  File "main.py", line 0, in run_shell_out\n'
+                '    raise ValueError(\'Oops\')\n'
+                'ValueError: Oops\n'
+                'Sending the crash report ... failed!\n'
+                'Process exited due to exception\n'
+                'Oops\n')
     # Remove numbers so editing the code doesn't invalidate the expectation.
     self.assertEqual(expected, re.sub(r' \d+', ' 0', out))
 

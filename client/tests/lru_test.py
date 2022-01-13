@@ -16,7 +16,7 @@ from utils import lru
 
 def _load_from_raw(state_text):
   """Makes a LRUDict by loading the given JSON from a file."""
-  handle, tmp_name = tempfile.mkstemp(prefix=u'lru_test')
+  handle, tmp_name = tempfile.mkstemp(prefix='lru_test')
   os.close(handle)
   try:
     with open(tmp_name, 'w') as f:
@@ -31,7 +31,7 @@ def _load_from_raw(state_text):
 
 def _save_and_load(lru_dict):
   """Saves then reloads a LRUDict instance."""
-  handle, tmp_name = tempfile.mkstemp(prefix=u'lru_test')
+  handle, tmp_name = tempfile.mkstemp(prefix='lru_test')
   os.close(handle)
   try:
     lru_dict.save(tmp_name)

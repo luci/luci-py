@@ -26,7 +26,7 @@ def check_output(*args, **kwargs):
 class ZipPackageTest(unittest.TestCase):
   def setUp(self):
     super(ZipPackageTest, self).setUp()
-    self.temp_dir = tempfile.mkdtemp(prefix=u'zip_package_test')
+    self.temp_dir = tempfile.mkdtemp(prefix='zip_package_test')
 
   def tearDown(self):
     try:
@@ -187,7 +187,7 @@ class ZipPackageTest(unittest.TestCase):
     self.assertEqual(list(pkg.files), ['buf1'])
     # No text types.
     with self.assertRaises(AssertionError):
-      pkg.add_buffer('buf2', u'unicode')
+      pkg.add_buffer('buf2', 'unicode')
 
   def test_zipping(self):
     data = {'a': b'123', 'b/c': b'456'}

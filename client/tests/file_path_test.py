@@ -50,7 +50,7 @@ class FilePathTest(auto_stub.TestCase):
   @property
   def tempdir(self):
     if not self._tempdir:
-      self._tempdir = tempfile.mkdtemp(prefix=u'file_path_test')
+      self._tempdir = tempfile.mkdtemp(prefix='file_path_test')
     return self._tempdir
 
   def test_atomic_replace_new_file(self):
@@ -58,7 +58,7 @@ class FilePathTest(auto_stub.TestCase):
     file_path.atomic_replace(path, b'blah')
     with open(path, 'rb') as f:
       self.assertEqual(b'blah', f.read())
-    self.assertEqual([u'new_file'], os.listdir(self.tempdir))
+    self.assertEqual(['new_file'], os.listdir(self.tempdir))
 
   def test_atomic_replace_existing_file(self):
     path = os.path.join(self.tempdir, 'existing_file')
@@ -67,7 +67,7 @@ class FilePathTest(auto_stub.TestCase):
     file_path.atomic_replace(path, b'new body')
     with open(path, 'rb') as f:
       self.assertEqual(b'new body', f.read())
-    self.assertEqual([u'existing_file'], os.listdir(self.tempdir))
+    self.assertEqual(['existing_file'], os.listdir(self.tempdir))
 
   def assertFileMode(self, filepath, mode, umask=None):
     umask = test_env.umask() if umask is None else umask
@@ -249,8 +249,8 @@ class FilePathTest(auto_stub.TestCase):
   def test_rmtree_unicode(self):
     subdir = os.path.join(self.tempdir, 'hi')
     fs.mkdir(subdir)
-    filepath = os.path.join(
-        subdir, u'\u0627\u0644\u0635\u064A\u0646\u064A\u0629')
+    filepath = os.path.join(subdir,
+                            '\u0627\u0644\u0635\u064A\u0646\u064A\u0629')
     with fs.open(filepath, 'wb') as f:
       f.write(b'hi')
     # In particular, it fails when the input argument is a str.
@@ -288,7 +288,7 @@ class FilePathTest(auto_stub.TestCase):
       # letters on both Windows and OSX.
       # This test also ensures that the output is independent on the input
       # string case.
-      path = os.path.expanduser(u'~')
+      path = os.path.expanduser('~')
       self.assertTrue(os.path.isdir(path))
       path = path.replace('/', os.path.sep)
       if sys.platform == 'win32':
@@ -306,7 +306,7 @@ class FilePathTest(auto_stub.TestCase):
       # string case.
       non_existing = os.path.join(
           'trace_input_test_this_dir_should_not_exist', 'really not', '')
-      path = os.path.expanduser(os.path.join(u'~', non_existing))
+      path = os.path.expanduser(os.path.join('~', non_existing))
       path = path.replace('/', os.path.sep)
       self.assertFalse(fs.exists(path))
       lower = file_path.get_native_path_case(path.lower())
@@ -319,7 +319,7 @@ class FilePathTest(auto_stub.TestCase):
   if sys.platform == 'win32':
     def test_native_case_alternate_datastream(self):
       # Create the file manually, since tempfile doesn't support ADS.
-      tempdir = tempfile.mkdtemp(prefix=u'trace_inputs')
+      tempdir = tempfile.mkdtemp(prefix='trace_inputs')
       try:
         tempdir = file_path.get_native_path_case(tempdir)
         basename = 'foo.txt'
