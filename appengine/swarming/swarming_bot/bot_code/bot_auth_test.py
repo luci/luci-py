@@ -313,7 +313,8 @@ class AuthSystemTest(auto_stub.TestCase):
 
     code, resp = call_rpc(local_auth_ctx, 'system', scopes=['A', 'B', 'C'])
     self.assertEqual(500, code)
-    self.assertEqual(b'msg\n', resp)
+    self.assertIn(b'500', resp)
+    self.assertIn(b'msg\n', resp)
     self.assertTrue(rpc_client.calls)
     del rpc_client.calls[:]
 

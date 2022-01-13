@@ -5,17 +5,15 @@
 
 import base64
 import collections
+import http.server
 import json
 import logging
 import os
 import re
+import socketserver
 import sys
 import threading
 import time
-
-import six
-from six.moves import BaseHTTPServer
-from six.moves import socketserver
 
 # Access or ID token with its expiration time.
 AccessToken = collections.namedtuple('AccessToken', [
@@ -172,7 +170,7 @@ class LocalAuthServer:
     """Called by _RequestHandler to handle one RPC call.
 
     Called from internal server thread. May be called even if the server is
-    already stopped (due to BaseHTTPServer.HTTPServer implementation that
+    already stopped (due to http.server.HTTPServer implementation that
     stupidly leaks handler threads).
 
     Args:
@@ -221,8 +219,8 @@ class LocalAuthServer:
     scopes = request.get('scopes')
     if not scopes:
       raise RPCError(400, 'Field "scopes" is required.')
-    if (not isinstance(scopes, list) or
-        not all(isinstance(s, six.string_types) for s in scopes)):
+    if (not isinstance(scopes, list)
+        or not all(isinstance(s, str) for s in scopes)):
       raise RPCError(400, 'Field "scopes" must be a list of strings.')
     scopes = tuple(sorted(set(map(str, scopes))))
 
@@ -272,7 +270,7 @@ class LocalAuthServer:
     audience = request.get('audience')
     if not audience:
       raise RPCError(400, 'Field "audience" is required.')
-    if not isinstance(audience, six.string_types):
+    if not isinstance(audience, str):
       raise RPCError(400, 'Field "audience" must be a string.')
     audience = str(audience)
 
@@ -309,7 +307,7 @@ class LocalAuthServer:
     account_id = request.get('account_id')
     if not account_id:
       raise RPCError(400, 'Field "account_id" is required.')
-    if not isinstance(account_id, six.string_types):
+    if not isinstance(account_id, str):
       raise RPCError(400, 'Field "account_id" must be a string')
     account_id = str(account_id)
 
@@ -317,7 +315,7 @@ class LocalAuthServer:
     secret = request.get('secret')
     if not secret:
       raise RPCError(400, 'Field "secret" is required.')
-    if not isinstance(secret, six.string_types):
+    if not isinstance(secret, str):
       raise RPCError(400, 'Field "secret" must be a string.')
     secret = str(secret)
 
@@ -406,7 +404,7 @@ def should_refresh(tok):
   return time.time() > tok.expiry - 3*60
 
 
-class _HTTPServer(socketserver.ThreadingMixIn, BaseHTTPServer.HTTPServer):
+class _HTTPServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
   """Used internally by LocalAuthServer."""
 
   # How often to poll 'select' in local HTTP server.
@@ -417,24 +415,31 @@ class _HTTPServer(socketserver.ThreadingMixIn, BaseHTTPServer.HTTPServer):
 
   # From socketserver.ThreadingMixIn.
   daemon_threads = True
-  # From BaseHTTPServer.HTTPServer.
+  # From http.server.HTTPServer.
   request_queue_size = 50
 
   def __init__(self, local_auth_server, addr):
-    BaseHTTPServer.HTTPServer.__init__(self, addr, _RequestHandler)
+    http.server.HTTPServer.__init__(self, addr, _RequestHandler)
     self.local_auth_server = local_auth_server
 
   def serve_forever(self, poll_interval=None):
     """Overrides default poll interval."""
-    BaseHTTPServer.HTTPServer.serve_forever(
-        self, poll_interval or self.poll_interval)
+    http.server.HTTPServer.serve_forever(self, poll_interval
+                                         or self.poll_interval)
 
   def handle_error(self, _request, _client_address):
     """Overrides default handle_error that dumbs stuff to stdout."""
     logging.exception('local auth server: Exception happened')
 
 
-class _RequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
+ERROR_MESSAGE = """\
+  Error code: %(code)d
+  Message: %(message)s
+  Explanation: %(explain)s
+"""
+
+
+class _RequestHandler(http.server.BaseHTTPRequestHandler):
   """Used internally by LocalAuthServer.
 
   Parses the request, serializes and write the response.
@@ -443,21 +448,14 @@ class _RequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
   # Buffer the reply, no need to send each line separately.
   wbufsize = -1
 
-  def log_message(self, fmt, *args):
+  # Overrides to send 'text/plain' error response.
+  error_message_format = ERROR_MESSAGE
+
+  error_content_type = 'text/plain;charset=utf-8'
+
+  def log_message(self, fmt, *args):  # pylint: disable=arguments-differ
     """Overrides default log_message to not abuse stderr."""
     logging.debug('local auth server: ' + fmt, *args)
-
-  def send_error(self, code, message=None):
-    """Overrides default send_error to send 'text/plain' response."""
-    assert isinstance(message, str), 'unicode is not allowed'
-    logging.warning('local auth server: HTTP %d - %s', code, message)
-    message = (message or '') + '\n'
-    self.send_response(code)
-    self.send_header('Connection', 'close')
-    self.send_header('Content-Length', str(len(message)))
-    self.send_header('Content-Type', 'text/plain')
-    self.end_headers()
-    self.wfile.write(message.encode('utf-8'))
 
   def do_POST(self):
     """Implements POST handler."""
