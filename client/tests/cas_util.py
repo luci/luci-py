@@ -8,20 +8,25 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 import time
 
 import six
 
-# Mutates sys.path.
-import test_env
-
-from utils import fs
 
 CLIENT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LUCI_DIR = os.path.dirname(CLIENT_DIR)
 FAKECAS_BIN = os.path.join(LUCI_DIR, 'luci-go', 'fakecas')
 CAS_CLI = os.path.join(LUCI_DIR, 'luci-go', 'cas')
+
+
+def extend(path):
+  """Opens a file with extended path on Windows."""
+  if sys.platform != 'win32':
+    return path
+  prefix = '\\\\?\\'
+  return path if path.startswith(prefix) else prefix + path
 
 
 class LocalCAS:
@@ -75,14 +80,14 @@ class LocalCAS:
       for path, content in files.items():
         path = six.text_type(os.path.join(tmpdir, path))
         pdir = os.path.dirname(path)
-        if not fs.exists(pdir):
-          fs.makedirs(pdir)
+        if not os.path.exists(pdir):
+          os.makedirs(pdir)
 
-        with fs.open(path, 'wb') as f:
+        with open(extend(path), 'wb') as f:
           f.write(content)
       return self.archive_dir(tmpdir)
     finally:
-      fs.rmtree(six.text_type(tmpdir))
+      shutil.rmtree(extend(six.text_type(tmpdir)))
 
   def archive_dir(self, upload_dir):
     """Uploads directory to the local CAS server"""
@@ -112,7 +117,7 @@ class LocalCAS:
       with open(digest_dump) as f:
         return f.read()
     finally:
-      shutil.rmtree(tmpdir)
+      shutil.rmtree(extend(tmpdir))
 
   def download(self, digest, dest):
     """Download directory from the local CAS server"""

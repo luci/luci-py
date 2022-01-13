@@ -360,12 +360,7 @@ else:
         fcntl.fcntl(conn, fcntl.F_SETFL, flags)
 
 
-# TODO: appengine/swarming/test.py somehow failed to import subprocess42.py
-# with Python2.
-if hasattr(subprocess, 'TimeoutExpired'):
-  TimeoutExpired = subprocess.TimeoutExpired
-else:
-  TimeoutExpired = None
+TimeoutExpired = subprocess.TimeoutExpired
 
 
 class Containment:

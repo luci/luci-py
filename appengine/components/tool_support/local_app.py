@@ -28,12 +28,6 @@ from six.moves import urllib
 
 from . import gae_sdk_utils
 
-try:
-  from utils import file_path
-  rmtree = file_path.rmtree
-except ImportError:
-  rmtree = shutil.rmtree
-
 
 def terminate_with_parent():
   """Sets up current process to receive SIGTERM when its parent dies.
