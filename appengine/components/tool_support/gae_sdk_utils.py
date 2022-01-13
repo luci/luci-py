@@ -545,7 +545,7 @@ class Application(object):
 
     # Always make 'default' the first service to be uploaded. It is magical,
     # deploying it first "enables" the application, or so it seems.
-    mods.sort(key=lambda x: '' if x == 'default' else x)
+    mods.sort(key=lambda x: '' if x.name == 'default' else x.name)
 
     # List of temp YAMLs we wrote and need to delete before exiting.
     hacked = []
