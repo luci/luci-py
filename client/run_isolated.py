@@ -68,7 +68,6 @@ tools.force_local_third_party()
 
 # third_party/
 from depot_tools import fix_encoding
-import six
 
 # pylint: disable=ungrouped-imports
 import DEPS
@@ -222,27 +221,9 @@ TaskData = collections.namedtuple(
     ])
 
 
-def _to_str(s):
-  """Downgrades a unicode instance to str. Pass str through as-is."""
-  if isinstance(s, str):
-    return s
-  # This is technically incorrect, especially on Windows. In theory
-  # sys.getfilesystemencoding() should be used to use the right 'ANSI code
-  # page' on Windows, but that causes other problems, as the character set
-  # is very limited.
-  return s.encode('utf-8')
-
-
-def _to_unicode(s):
-  """Upgrades a str instance to unicode. Pass unicode through as-is."""
-  if isinstance(s, six.text_type) or s is None:
-    return s
-  return s.decode('utf-8')
-
-
 def make_temp_dir(prefix, root_dir):
   """Returns a new unique temporary directory."""
-  return six.text_type(tempfile.mkdtemp(prefix=prefix, dir=root_dir))
+  return tempfile.mkdtemp(prefix=prefix, dir=root_dir)
 
 
 @contextlib.contextmanager
@@ -340,7 +321,6 @@ def replace_parameters(arg, out_dir, bot_file):
 
 def set_temp_dir(env, tmp_dir):
   """Set temp dir to given env var dictionary"""
-  tmp_dir = _to_str(tmp_dir)
   # pylint: disable=line-too-long
   # * python respects $TMPDIR, $TEMP, and $TMP in this order, regardless of
   #   platform. So $TMPDIR must be set on all platforms.
@@ -400,8 +380,8 @@ def get_command_env(tmp_dir, cipd_info, run_dir, env, env_prefixes, out_dir,
 
   if cipd_info:
     bin_dir = os.path.dirname(cipd_info.client.binary_path)
-    out['PATH'] = '%s%s%s' % (_to_str(bin_dir), os.pathsep, out['PATH'])
-    out['CIPD_CACHE_DIR'] = _to_str(cipd_info.cache_dir)
+    out['PATH'] = '%s%s%s' % (bin_dir, os.pathsep, out['PATH'])
+    out['CIPD_CACHE_DIR'] = cipd_info.cache_dir
     cipd_info_path = os.path.join(tmp_dir, 'cipd_info.json')
     with open(cipd_info_path, 'w') as f:
       json.dump(cipd_info.pins, f)
@@ -413,7 +393,7 @@ def get_command_env(tmp_dir, cipd_info, run_dir, env, env_prefixes, out_dir,
     cur = out.get(key)
     if cur:
       paths.append(cur)
-    out[key] = _to_str(os.path.pathsep.join(paths))
+    out[key] = os.path.pathsep.join(paths)
 
   set_temp_dir(out, tmp_dir)
   return out
@@ -1398,8 +1378,10 @@ def process_cas_cache_options(options):
         max_items=None,
         max_age_secs=MAX_AGE_SECS)
 
-    return local_caching.DiskContentAddressedCache(
-        six.text_type(os.path.abspath(options.cas_cache)), policies, trim=False)
+    return local_caching.DiskContentAddressedCache(os.path.abspath(
+        options.cas_cache),
+                                                   policies,
+                                                   trim=False)
   return local_caching.MemoryContentAddressedCache()
 
 
@@ -1429,7 +1411,7 @@ def process_named_cache_options(parser, options, time_fn=None):
         min_free_space=options.min_free_space,
         max_items=50,
         max_age_secs=MAX_AGE_SECS)
-    root_dir = six.text_type(os.path.abspath(options.named_cache_root))
+    root_dir = os.path.abspath(options.named_cache_root)
     cache = local_caching.NamedCache(root_dir, policies, time_fn=time_fn)
     # Touch any named caches we're going to use to minimize thrashing
     # between tasks that request some (but not all) of the same named caches.
@@ -1494,9 +1476,9 @@ def _clean_cmd(parser, options, caches, root):
 
   logging.info("initial free space: %d", file_path.get_free_space(root))
 
-  if options.kvs_dir and fs.isdir(six.text_type(options.kvs_dir)):
+  if options.kvs_dir and fs.isdir(options.kvs_dir):
     # Remove kvs file if its size exceeds fixed threshold.
-    kvs_dir = six.text_type(options.kvs_dir)
+    kvs_dir = options.kvs_dir
     size = file_path.get_recursive_size(kvs_dir)
     if size >= _CAS_KVS_CACHE_THRESHOLD:
       logging.info("remove kvs dir with size: %d", size)
@@ -1553,7 +1535,7 @@ def main(args):
     caches.append(cas_cache)
   if named_cache:
     caches.append(named_cache)
-  root = caches[0].cache_dir if caches else six.text_type(os.getcwd())
+  root = caches[0].cache_dir if caches else os.getcwd()
   if options.clean:
     _clean_cmd(parser, options, caches, root)
     return 0
@@ -1593,11 +1575,11 @@ def main(args):
                  ISOLATED_OUTDIR_PARAMETER)
 
   if options.root_dir:
-    options.root_dir = six.text_type(os.path.abspath(options.root_dir))
+    options.root_dir = os.path.abspath(options.root_dir)
   else:
-    options.root_dir = six.text_type(tempfile.mkdtemp(prefix='root'))
+    options.root_dir = tempfile.mkdtemp(prefix='root')
   if options.json:
-    options.json = six.text_type(os.path.abspath(options.json))
+    options.json = os.path.abspath(options.json)
 
   if any('=' not in i for i in options.env):
     parser.error(
@@ -1630,7 +1612,7 @@ def main(args):
   if options.cipd_enabled:
     cache_dir = options.cipd_cache
     if not cache_dir:
-      tmp_cipd_cache_dir = six.text_type(tempfile.mkdtemp())
+      tmp_cipd_cache_dir = tempfile.mkdtemp()
       cache_dir = tmp_cipd_cache_dir
     install_packages_fn = (
         lambda run_dir, cas_dir, nsjail_dir: install_client_and_packages(
@@ -1648,9 +1630,9 @@ def main(args):
   def install_named_caches(run_dir, stats):
     # WARNING: this function depends on "options" variable defined in the outer
     # function.
-    assert six.text_type(run_dir), repr(run_dir)
+    assert str(run_dir), repr(run_dir)
     assert os.path.isabs(run_dir), run_dir
-    named_caches = [(os.path.join(run_dir, six.text_type(relpath)), name)
+    named_caches = [(os.path.join(run_dir, str(relpath)), name)
                     for name, relpath, _ in options.named_caches]
     install_start = time.time()
     for path, name in named_caches:
@@ -1710,33 +1692,32 @@ def main(args):
       limit_processes=options.limit_processes,
       limit_total_committed_memory=options.limit_total_committed_memory)
 
-  data = TaskData(
-      command=command,
-      relative_cwd=options.relative_cwd,
-      cas_instance=options.cas_instance,
-      cas_digest=options.cas_digest,
-      outputs=options.output,
-      install_named_caches=install_named_caches,
-      leak_temp_dir=options.leak_temp_dir,
-      root_dir=_to_unicode(options.root_dir),
-      hard_timeout=options.hard_timeout,
-      grace_period=options.grace_period,
-      bot_file=options.bot_file,
-      switch_to_account=options.switch_to_account,
-      install_packages_fn=install_packages_fn,
-      cas_cache_dir=options.cas_cache,
-      cas_cache_policies=local_caching.CachePolicies(
-          max_cache_size=options.max_cache_size,
-          min_free_space=options.min_free_space,
-          max_items=None,
-          max_age_secs=None,
-      ),
-      cas_kvs=options.kvs_dir,
-      env=options.env,
-      env_prefix=options.env_prefix,
-      lower_priority=bool(options.lower_priority),
-      containment=containment,
-      trim_caches_fn=trim_caches_fn)
+  data = TaskData(command=command,
+                  relative_cwd=options.relative_cwd,
+                  cas_instance=options.cas_instance,
+                  cas_digest=options.cas_digest,
+                  outputs=options.output,
+                  install_named_caches=install_named_caches,
+                  leak_temp_dir=options.leak_temp_dir,
+                  root_dir=options.root_dir,
+                  hard_timeout=options.hard_timeout,
+                  grace_period=options.grace_period,
+                  bot_file=options.bot_file,
+                  switch_to_account=options.switch_to_account,
+                  install_packages_fn=install_packages_fn,
+                  cas_cache_dir=options.cas_cache,
+                  cas_cache_policies=local_caching.CachePolicies(
+                      max_cache_size=options.max_cache_size,
+                      min_free_space=options.min_free_space,
+                      max_items=None,
+                      max_age_secs=None,
+                  ),
+                  cas_kvs=options.kvs_dir,
+                  env=options.env,
+                  env_prefix=options.env_prefix,
+                  lower_priority=bool(options.lower_priority),
+                  containment=containment,
+                  trim_caches_fn=trim_caches_fn)
   try:
     return run_tha_test(data, options.json)
   except (cipd.Error, local_caching.NamedCacheError,

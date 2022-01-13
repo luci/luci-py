@@ -17,7 +17,6 @@ import tempfile
 import unittest
 
 import mock
-import six
 
 # Mutates sys.path.
 import test_env
@@ -101,7 +100,7 @@ class RunIsolatedTestBase(auto_stub.TestCase):
     super(RunIsolatedTestBase, self).setUp()
     os.environ.pop('LUCI_CONTEXT', None)
     os.environ['LUCI_GO_CLIENT_DIR'] = LUCI_GO_CLIENT_DIR
-    self._previous_dir = six.text_type(os.getcwd())
+    self._previous_dir = os.getcwd()
     self.tempdir = tempfile.mkdtemp(prefix=u'run_isolated_test')
     logging.debug('Temp dir: %s', self.tempdir)
     cwd = os.path.join(self.tempdir, 'cwd')
@@ -511,7 +510,7 @@ class RunIsolatedTest(RunIsolatedTestBase):
       ret = run_isolated.main(cmd)
       self.assertEqual(0, ret)
     finally:
-      fs.rmtree(six.ensure_text(workdir))
+      fs.rmtree(workdir)
 
   def test_main_naked_with_packages(self):
     self.mock(cipd, 'get_platform', lambda: 'linux-amd64')
@@ -545,7 +544,7 @@ class RunIsolatedTest(RunIsolatedTestBase):
                           'package': pkg,
                           'instance_id': ver
                       } for pkg, ver in packages]
-                      for subdir, packages in six.next(pins_gen).items()
+                      for subdir, packages in next(pins_gen).items()
                   }
               }, json_out)
         return 0
@@ -595,17 +594,15 @@ class RunIsolatedTest(RunIsolatedTestBase):
 
     # Test cipd client cache. `git:wowza` was a tag and so is cacheable.
     self.assertEqual(len(fs.listdir(os.path.join(cipd_cache, 'versions'))), 2)
-    version_file = six.text_type(
-        os.path.join(
-            cipd_cache, 'versions',
-            '5c2ee864d65c435dfa1eb06bf4c52f58854db39392340a91fc91e88d6000d737'))
+    version_file = os.path.join(
+        cipd_cache, 'versions',
+        '5c2ee864d65c435dfa1eb06bf4c52f58854db39392340a91fc91e88d6000d737')
     self.assertTrue(fs.isfile(version_file))
     with open(version_file) as f:
       self.assertEqual(f.read(), 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa')
 
-    client_binary_file = six.text_type(
-        os.path.join(cipd_cache, 'clients',
-                     'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'))
+    client_binary_file = os.path.join(
+        cipd_cache, 'clients', 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa')
     self.assertTrue(fs.isfile(client_binary_file))
 
     # Test echo call.
@@ -673,12 +670,11 @@ class RunIsolatedTest(RunIsolatedTestBase):
     self.assertEqual(0, ret)
 
     # The CIPD client was bootstrapped and hardlinked (or copied on Win).
-    client_binary_file = six.text_type(
-        os.path.join(cipd_cache, 'clients',
-                     'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'))
+    client_binary_file = os.path.join(
+        cipd_cache, 'clients', 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa')
     self.assertTrue(fs.isfile(client_binary_file))
-    client_binary_link = six.text_type(
-        os.path.join(cipd_cache, 'bin', 'cipd' + cipd.EXECUTABLE_SUFFIX))
+    client_binary_link = os.path.join(cipd_cache, 'bin',
+                                      'cipd' + cipd.EXECUTABLE_SUFFIX)
     self.assertTrue(fs.isfile(client_binary_link))
 
     env = self.popen_calls[1][1].pop('env')
@@ -1336,7 +1332,7 @@ class RunIsolatedTestOutputFiles(RunIsolatedTestBase):
             os.path.join('bardir', 'bar1'): 'bar1',
         }, dest)
 
-    six.assertCountEqual(self, os.listdir(dest), ['foodir', 'foo1', 'bardir'])
+    self.assertCountEqual(os.listdir(dest), ['foodir', 'foo1', 'bardir'])
     self.assertEqual(os.listdir(os.path.join(dest, 'foodir')), ['foo2_sl'])
     self.assertEqual(os.listdir(os.path.join(dest, 'bardir')), ['bar1'])
 
