@@ -14,8 +14,6 @@ import tempfile
 import time
 import unittest
 
-import six
-
 # Mutates sys.path.
 import test_env
 
@@ -51,7 +49,7 @@ def read_tree(path):
 
 
 def _gen_data(size):
-  return six.ensure_binary(string.digits * ((size + 9) // 10))[:size]
+  return (string.digits.encode() * ((size + 9) // 10))[:size]
 
 
 class TestCase(auto_stub.TestCase):
@@ -102,7 +100,7 @@ class TestCase(auto_stub.TestCase):
       # In this case, map a named cache, add a file, unmap it.
       dest_dir = os.path.join(self.tempdir, 'dest')
       self.assertFalse(fs.exists(dest_dir))
-      name = six.text_type(size)
+      name = str(size)
       cache.install(dest_dir, name)
       # Put a file in there named 'hello', otherwise it'll stay empty.
       with fs.open(os.path.join(dest_dir, 'hello'), 'wb') as f:
@@ -378,14 +376,14 @@ class DiskContentAddressedCacheTest(TestCase, ContentAddressedCacheTestMixin):
     self.mock(cache, '_get_mtime', _get_mtime)
     self.assertEqual([(h_a, (1, mtime_a)), (h_b, (1, mtime_b))],
                      list(cache._lru._items.items()))
-    six.assertCountEqual(self, ([h_a, h_b, cache.STATE_FILE]),
-                         (fs.listdir(cache.cache_dir)))
+    self.assertCountEqual(([h_a, h_b, cache.STATE_FILE]),
+                          (fs.listdir(cache.cache_dir)))
 
     # if the mtime is same with the timestamp in state.json,
     # the varification won't run.
     cache.cleanup()
-    six.assertCountEqual(self, ([h_a, h_b, cache.STATE_FILE]),
-                         (fs.listdir(cache.cache_dir)))
+    self.assertCountEqual(([h_a, h_b, cache.STATE_FILE]),
+                          (fs.listdir(cache.cache_dir)))
 
     # if the mtime is after the timestamp in the state.json
     # the varification will run and removed the corrupted file.
@@ -393,9 +391,9 @@ class DiskContentAddressedCacheTest(TestCase, ContentAddressedCacheTestMixin):
     mtime_b += 1
     self.mock(cache._lru, 'time_fn', lambda: mtime_b)
     cache.cleanup()
-    six.assertCountEqual(self, ([h_b, cache.STATE_FILE]),
-                         (fs.listdir(cache.cache_dir)))
-    six.assertCountEqual(self, [(h_b, (1, mtime_b))], cache._lru._items.items())
+    self.assertCountEqual(([h_b, cache.STATE_FILE]),
+                          (fs.listdir(cache.cache_dir)))
+    self.assertCountEqual([(h_b, (1, mtime_b))], cache._lru._items.items())
 
   def test_policies_active_trimming(self):
     # Start with a larger cache, add many object.
@@ -435,10 +433,8 @@ class DiskContentAddressedCacheTest(TestCase, ContentAddressedCacheTestMixin):
 
     # At this point, after the implicit trim in __exit__(), h_a and h_large were
     # evicted.
-    self.assertEqual(
-        sorted([six.ensure_text(h_b),
-                six.text_type(h_c), cache.STATE_FILE]),
-        sorted(fs.listdir(cache.cache_dir)))
+    self.assertEqual(sorted([h_b, h_c, cache.STATE_FILE]),
+                     sorted(fs.listdir(cache.cache_dir)))
 
     # Allow 3 items and 101 bytes so h_large is kept.
     cache = self.get_cache(_get_policies(
@@ -866,13 +862,12 @@ class FnTest(TestCase):
   def _verify_isolated_cache(self, cache, items):
     # Isolated cache verification.
     expected = {
-        six.text_type(self._algo(_gen_data(n)).hexdigest()): _gen_data(n)
+        self._algo(_gen_data(n)).hexdigest(): _gen_data(n)
         for n in items
     }
-    expected[cache.STATE_FILE] = _gen_state([[
-        six.ensure_text(self._algo(_gen_data(n)).hexdigest()),
-        [n, self._now + n - 1]
-    ] for n in items])
+    expected[cache.STATE_FILE] = _gen_state(
+        [[self._algo(_gen_data(n)).hexdigest(), [n, self._now + n - 1]]
+         for n in items])
     self.assertEqual(expected, read_tree(cache.cache_dir))
 
   def _prepare_named_cache(self, cache):
@@ -881,9 +876,8 @@ class FnTest(TestCase):
     items = range(1, 11)
     short_names = {
         n: os.path.basename(
-            fs.readlink(
-                os.path.join(cache.cache_dir, cache.NAMED_DIR,
-                             six.text_type(n)))) for n in items
+            fs.readlink(os.path.join(cache.cache_dir, cache.NAMED_DIR, str(n))))
+        for n in items
     }
     self._verify_named_cache(cache, short_names, items)
     return short_names
