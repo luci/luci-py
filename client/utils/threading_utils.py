@@ -8,17 +8,11 @@ import functools
 import inspect
 import logging
 import os
+import queue
 import sys
 import threading
 import time
 import traceback
-
-from utils import tools
-tools.force_local_third_party()
-
-# third_party/
-import six
-from six.moves import queue as Queue
 
 
 # Priorities for tasks in AutoRetryThreadPool, particular values are important.
@@ -67,7 +61,7 @@ class ThreadPool:
 
   When the priority of tasks match, it works in strict FIFO mode.
   """
-  QUEUE_CLASS = Queue.PriorityQueue
+  QUEUE_CLASS = queue.PriorityQueue
   # Enqueueing None causes the worker to stop.
   # Python3 doesn't support to compare None with any integer, so putting None
   # in priority queue will cause exception. Switch to use sys.maxsize, since
@@ -243,7 +237,7 @@ class ThreadPool:
     with self._outputs_exceptions_cond:
       if self._exceptions:
         e = self._exceptions.pop(0)
-        six.reraise(e[0], e[1], e[2])
+        raise e[1]
       out = self._outputs
       self._outputs = []
     return out
@@ -270,7 +264,7 @@ class ThreadPool:
       with self._outputs_exceptions_cond:
         if self._exceptions:
           e = self._exceptions.pop(0)
-          six.reraise(e[0], e[1], e[2])
+          raise e[1]
         if self._outputs:
           # Remember the result to yield it outside of the lock.
           result = self._outputs.pop(0)
@@ -317,7 +311,7 @@ class ThreadPool:
         self.tasks.get_nowait()
         self.tasks.task_done()
         index += 1
-      except Queue.Empty:
+      except queue.Empty:
         return index
 
   def _on_iter_results_step(self):
@@ -457,7 +451,7 @@ class Progress:
     self._value_changed = True
 
     # To be used in all threads.
-    self._queued_updates = Queue.Queue()
+    self._queued_updates = queue.Queue()
 
   def update_item(self, name, raw=False, **kwargs):
     """Queue information to print out.
@@ -485,7 +479,7 @@ class Progress:
     while True:
       try:
         name, raw, args = self._queued_updates.get_nowait()
-      except Queue.Empty:
+      except queue.Empty:
         break
 
       for k, v in args:
@@ -540,10 +534,10 @@ class Progress:
     return '/'.join(i.rjust(max_len) for i in columns_as_str)
 
 
-class QueueWithProgress(Queue.PriorityQueue):
+class QueueWithProgress(queue.PriorityQueue):
   """Implements progress support in join()."""
   def __init__(self, progress, *args, **kwargs):
-    Queue.PriorityQueue.__init__(self, *args, **kwargs)
+    queue.PriorityQueue.__init__(self, *args, **kwargs)
     self.progress = progress
 
   def task_done(self):
@@ -729,7 +723,7 @@ class TaskChannel:
   _ITEM_DONE = object()
 
   def __init__(self):
-    self._queue = Queue.Queue()
+    self._queue = queue.Queue()
 
   def send_result(self, result):
     """Enqueues a result of task execution."""
@@ -784,7 +778,7 @@ class TaskChannel:
         item_type, value = self._queue.get(
             timeout=timeout if timeout is not None else 30.0)
         break
-      except Queue.Empty:
+      except queue.Empty:
         if timeout is None:
           continue
         raise TaskChannel.Timeout()
@@ -795,7 +789,7 @@ class TaskChannel:
       # to preserve stack frame of original exception (that was raised in
       # another thread).
       assert isinstance(value, tuple) and len(value) == 3
-      six.reraise(value[0], value[1], value[2])
+      raise value[1]
     if item_type == self._ITEM_DONE:
       raise StopIteration()
     assert False, 'Impossible queue item type: %r' % item_type

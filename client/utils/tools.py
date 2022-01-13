@@ -6,6 +6,7 @@
 
 import atexit
 import functools
+import io
 import json
 import logging
 import os
@@ -369,9 +370,7 @@ def format_json(data, dense):
 
   If dense is True, the json is packed. Otherwise, it is human readable.
   """
-  import six
-
-  buf = six.StringIO()
+  buf = io.StringIO()
   write_json(buf, data, dense)
   return buf.getvalue()
 

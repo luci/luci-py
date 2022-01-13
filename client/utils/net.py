@@ -5,6 +5,7 @@
 """Classes and functions for generic network communication over HTTP."""
 
 import functools
+import http.cookiejar
 import io
 import itertools
 import json
@@ -17,6 +18,7 @@ import socket
 import ssl
 import threading
 import time
+import urllib.parse
 
 from utils import tools
 tools.force_local_third_party()
@@ -25,9 +27,6 @@ tools.force_local_third_party()
 import requests
 from requests import adapters
 from requests import structures
-import six
-from six.moves import http_cookiejar as cookielib
-from six.moves import urllib
 import urllib3
 
 from utils import authenticators
@@ -131,7 +130,7 @@ class HttpError(NetError):
     """
     if self._body_for_desc is None:
       try:
-        self._body_for_desc = self.response.read()
+        self._body_for_desc = self.response.read().decode()
       except Exception as exc:
         self._body_for_desc = '<failed to read the response body: %s>' % exc
 
@@ -153,7 +152,7 @@ class HttpError(NetError):
         if not header.lower().startswith('x-'):
           out.append('%s: %s' % (header.capitalize(), value))
       out.append('')
-    out.append(six.ensure_str(self._body_for_desc) or '<empty body>')
+    out.append(self._body_for_desc or '<empty body>')
     out.append('----------')
     return '\n'.join(out)
 
@@ -162,7 +161,7 @@ def _fish_out_error_message(maybe_json_blob):
   try:
     as_json = json.loads(maybe_json_blob)
     err = as_json.get('error')
-    if isinstance(err, six.string_types):
+    if isinstance(err, str):
       return err
     if isinstance(err, dict):
       return str(err.get('message') or '<no error message>')
@@ -393,15 +392,15 @@ class HttpService:
   def encode_request_body(body, content_type):
     """Returns request body encoded according to its content type."""
     # No body or it is already encoded.
-    if body is None or isinstance(body, (str, bytes)):
+    if body is None or isinstance(body, bytes):
       return body
+    if isinstance(body, str):
+      return body.encode()
     # Any body should have content type set.
     assert content_type, 'Request has body, but no content type'
     encoder = CONTENT_ENCODERS.get(content_type)
     assert encoder, ('Unknown content type %s' % content_type)
-    if six.PY3 and isinstance(body, bytes):
-      return body
-    return encoder(body)
+    return encoder(body).encode()
 
   def login(self, allow_user_interaction):
     """Runs authentication flow to refresh short lived access token.
@@ -494,8 +493,6 @@ class HttpService:
       method = method or 'POST'
       content_type = content_type or DEFAULT_CONTENT_TYPE
       body = self.encode_request_body(data, content_type)
-      # data in http request is expected to be bytes in Python3.
-      body = six.ensure_binary(body)
     else:
       assert method in (None, 'DELETE', 'GET')
       method = method or 'GET'
@@ -668,7 +665,7 @@ class HttpRequest:
   def cookies(self):
     """CookieJar object that will be used for cookies in this request."""
     if self._cookies is None:
-      self._cookies = cookielib.CookieJar()
+      self._cookies = http.cookiejar.CookieJar()
     return self._cookies
 
   def get_full_url(self):
