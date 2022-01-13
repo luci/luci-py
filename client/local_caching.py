@@ -388,7 +388,7 @@ class DiskContentAddressedCache(ContentAddressedCache):
 
   Saves its state as json file.
   """
-  STATE_FILE = u'state.json'
+  STATE_FILE = 'state.json'
 
   def __init__(self, cache_dir, policies, trim, time_fn=None):
     """
@@ -807,8 +807,8 @@ class NamedCache(Cache):
       puts the requested cache directory at the path.
   """
   _DIR_ALPHABET = string.ascii_letters + string.digits
-  STATE_FILE = u'state.json'
-  NAMED_DIR = u'named'
+  STATE_FILE = 'state.json'
+  NAMED_DIR = 'named'
 
   def __init__(self, cache_dir, policies, time_fn=None):
     """Initializes NamedCaches.
@@ -980,7 +980,7 @@ class NamedCache(Cache):
           file_path.ensure_tree(os.path.dirname(named_path))
 
         try:
-          fs.symlink(os.path.join(u'..', rel_cache), named_path)
+          fs.symlink(os.path.join('..', rel_cache), named_path)
           logging.info(
               'NamedCache: Created symlink %r to %r', named_path, abs_cache)
         except OSError:
@@ -1148,7 +1148,7 @@ class NamedCache(Cache):
           # Confirm entries. Do not add missing ones for now.
           for name in expected.intersection(actual):
             p = os.path.join(self.cache_dir, self.NAMED_DIR, name)
-            expected_link = os.path.join(u'..', self._lru[name][0])
+            expected_link = os.path.join('..', self._lru[name][0])
             if fs.islink(p):
               link = fs.readlink(p)
               if expected_link == link:

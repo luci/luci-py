@@ -106,12 +106,12 @@ RUN_ISOLATED_LOG_FILE = 'run_isolated.log'
 # - it stands for isolated_tmp
 # - ic stands for isolated_client
 # - ns stands for nsjail
-ISOLATED_RUN_DIR = u'ir'
-ISOLATED_OUT_DIR = u'io'
-ISOLATED_TMP_DIR = u'it'
-ISOLATED_CLIENT_DIR = u'ic'
-_CAS_CLIENT_DIR = u'cc'
-_NSJAIL_DIR = u'ns'
+ISOLATED_RUN_DIR = 'ir'
+ISOLATED_OUT_DIR = 'io'
+ISOLATED_TMP_DIR = 'it'
+ISOLATED_CLIENT_DIR = 'ic'
+_CAS_CLIENT_DIR = 'cc'
+_NSJAIL_DIR = 'ns'
 
 # TODO(tikuta): take these parameter from luci-config?
 _CAS_PACKAGE = 'infra/tools/luci/cas/${platform}'
@@ -548,7 +548,7 @@ def _fetch_and_map(cas_client, digest, instance, output_dir, cache_dir,
 
   start = time.time()
   result_json_handle, result_json_path = tempfile.mkstemp(
-      prefix=u'fetch-and-map-result-', suffix=u'.json')
+      prefix='fetch-and-map-result-', suffix='.json')
   os.close(result_json_handle)
   profile_dir = tempfile.mkdtemp(dir=tmp_dir)
 
@@ -679,11 +679,11 @@ def upload_outdir(cas_client, cas_instance, outdir, tmp_dir):
   """
   if not fs.listdir(outdir):
     return None, None
-  digest_file_handle, digest_path = tempfile.mkstemp(
-      prefix=u'cas-digest', suffix=u'.txt')
+  digest_file_handle, digest_path = tempfile.mkstemp(prefix='cas-digest',
+                                                     suffix='.txt')
   os.close(digest_file_handle)
-  stats_json_handle, stats_json_path = tempfile.mkstemp(
-      prefix=u'upload-stats', suffix=u'.json')
+  stats_json_handle, stats_json_path = tempfile.mkstemp(prefix='upload-stats',
+                                                        suffix='.json')
   os.close(stats_json_handle)
 
   try:

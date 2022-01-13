@@ -174,9 +174,9 @@ class CipdClient:
     logging.info('Installing packages %r into %s', packages, site_root)
 
     ensure_file_handle, ensure_file_path = tempfile.mkstemp(
-        dir=tmp_dir, prefix=u'cipd-ensure-file-', suffix='.txt')
+        dir=tmp_dir, prefix='cipd-ensure-file-', suffix='.txt')
     json_out_file_handle, json_file_path = tempfile.mkstemp(
-        dir=tmp_dir, prefix=u'cipd-ensure-result-', suffix='.json')
+        dir=tmp_dir, prefix='cipd-ensure-result-', suffix='.json')
     os.close(json_out_file_handle)
 
     try:

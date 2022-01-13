@@ -103,8 +103,8 @@ if sys.platform == 'win32':
       err = ctypes.GetLastError()
       if err:
         # pylint: disable=undefined-variable
-        msg = u'QueryDosDevice(%s): %s (%d)' % (
-              drive_letter, FormatError(err), err)
+        msg = 'QueryDosDevice(%s): %s (%d)' % (drive_letter, FormatError(err),
+                                               err)
         raise WindowsError(err, msg.encode('utf-8'))
     return p.value
 
@@ -121,8 +121,7 @@ if sys.platform == 'win32':
     err = ctypes.GetLastError()
     if err:
       # pylint: disable=undefined-variable
-      msg = u'GetShortPathName(%s): %s (%d)' % (
-            long_path, FormatError(err), err)
+      msg = 'GetShortPathName(%s): %s (%d)' % (long_path, FormatError(err), err)
       raise WindowsError(err, msg.encode('utf-8'))
     return None
 
@@ -139,8 +138,7 @@ if sys.platform == 'win32':
     err = ctypes.GetLastError()
     if err:
       # pylint: disable=undefined-variable
-      msg = u'GetLongPathName(%s): %s (%d)' % (
-            short_path, FormatError(err), err)
+      msg = 'GetLongPathName(%s): %s (%d)' % (short_path, FormatError(err), err)
       raise WindowsError(err, msg.encode('utf-8'))
     return None
 
@@ -152,8 +150,8 @@ if sys.platform == 'win32':
     if not windll.kernel32.MoveFileExW(old_p, new_p, int(flags)):
       # pylint: disable=undefined-variable
       err = ctypes.GetLastError()
-      msg = u'MoveFileEx(%s, %s, %d): %s (%d)' % (
-            oldpath, newpath, flags, FormatError(err), err)
+      msg = 'MoveFileEx(%s, %s, %d): %s (%d)' % (oldpath, newpath, flags,
+                                                 FormatError(err), err)
       raise WindowsError(err, msg.encode('utf-8'))
 
 
@@ -166,12 +164,12 @@ if sys.platform == 'win32':
       """Lazy loads the cache."""
       if not self._MAPPING:
         # This is related to UNC resolver on windows. Ignore that.
-        self._MAPPING[u'\\Device\\Mup'] = None
-        self._MAPPING[u'\\SystemRoot'] = os.environ[u'SystemRoot']
+        self._MAPPING['\\Device\\Mup'] = None
+        self._MAPPING['\\SystemRoot'] = os.environ['SystemRoot']
 
         for letter in (chr(l) for l in range(ord('C'), ord('Z') + 1)):
           try:
-            letter = u'%s:' % letter
+            letter = '%s:' % letter
             mapped = QueryDosDevice(letter)
             if mapped in self._MAPPING:
               logging.warning(
@@ -339,9 +337,8 @@ if sys.platform == 'win32':
     try:
       if not AdjustTokenPrivileges(token, False, tp, 0, None, None):
         # pylint: disable=undefined-variable
-        raise WindowsError(
-            u'AdjustTokenPrivileges(%r): failed: %s' %
-              (name, ctypes.GetLastError()))
+        raise WindowsError('AdjustTokenPrivileges(%r): failed: %s' %
+                           (name, ctypes.GetLastError()))
     finally:
       windll.kernel32.CloseHandle(token)
     return ctypes.GetLastError() != ERROR_NOT_ALL_ASSIGNED
@@ -366,7 +363,7 @@ if sys.platform == 'win32':
     Returns:
     - True if symlink support is enabled.
     """
-    return enable_privilege(u'SeCreateSymbolicLinkPrivilege')
+    return enable_privilege('SeCreateSymbolicLinkPrivilege')
 
 
   def kill_children_processes(root):

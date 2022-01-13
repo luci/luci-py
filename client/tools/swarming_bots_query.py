@@ -40,9 +40,9 @@ def fetch_bots(swarming, dimensions):
       '0',
       'bots/list?' + urllib.parse.urlencode(data),
   ]
-  bots = _run_json(cmd)[u'items']
+  bots = _run_json(cmd)['items']
   for b in bots:
-    b[u'state'] = json.loads(b[u'state'])
+    b['state'] = json.loads(b['state'])
   return bots
 
 
@@ -77,12 +77,9 @@ def main():
 
   bots = fetch_bots(options.swarming, options.dimensions)
   if options.key:
-    out = {
-      bot[u'bot_id']: bot[u'state'].get(options.key, None)
-      for bot in bots
-    }
+    out = {bot['bot_id']: bot['state'].get(options.key, None) for bot in bots}
   else:
-    out = {bot[u'bot_id']: bot[u'state'] for bot in bots}
+    out = {bot['bot_id']: bot['state'] for bot in bots}
   json.dump(out, sys.stdout, sort_keys=True, indent=2)
   return 0
 

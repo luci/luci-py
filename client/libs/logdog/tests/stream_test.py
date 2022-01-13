@@ -137,14 +137,14 @@ class StreamClientTestCase(unittest.TestCase):
           fd.get_viewer_url(),
           'https://example.appspot.com/v/?s=test%2Ffoo%2Fbar%2F%2B%2Fmystream')
       fd.write('text\nstream\nlines\n')
-      fd.write(u'😄\n😄\n😄')
+      fd.write('😄\n😄\n😄')
 
     conn = client.last_conn
     self.assertTrue(conn.closed)
 
     header, data = conn.interpret()
     self.assertEqual(header, {'name': 'mystream', 'type': 'text'})
-    self.assertEqual(data.decode('utf-8'), u'text\nstream\nlines\n😄\n😄\n😄')
+    self.assertEqual(data.decode('utf-8'), 'text\nstream\nlines\n😄\n😄\n😄')
 
   def testTextStreamWithParams(self):
     client = self._registry.create('test:value')
@@ -169,7 +169,7 @@ class StreamClientTestCase(unittest.TestCase):
         'contentType': 'foo/bar',
          'tags': {'foo': 'bar', 'baz': 'qux'},
     })
-    self.assertEqual(data.decode('utf-8'), u'text!')
+    self.assertEqual(data.decode('utf-8'), 'text!')
 
   def testBinaryStream(self):
     client = self._registry.create('test:value',
@@ -260,7 +260,7 @@ class StreamClientTestCase(unittest.TestCase):
 
     header, data = conn.interpret()
     self.assertEqual(header, {'name': 'mystream', 'type': 'text'})
-    self.assertEqual(data.decode('utf-8'), u'Using a text stream.')
+    self.assertEqual(data.decode('utf-8'), 'Using a text stream.')
 
 
 if __name__ == '__main__':

@@ -320,10 +320,9 @@ def extract_resource(package, resource, temp_dir=None):
     if filepath:
       return filepath
 
-  fd, filepath = tempfile.mkstemp(
-      prefix=u'.zip_pkg-',
-      suffix=u'-' + os.path.basename(resource),
-      dir=temp_dir)
+  fd, filepath = tempfile.mkstemp(prefix='.zip_pkg-',
+                                  suffix='-' + os.path.basename(resource),
+                                  dir=temp_dir)
   with os.fdopen(fd, 'wb') as stream:
     stream.write(data)
 

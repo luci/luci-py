@@ -153,14 +153,14 @@ if sys.platform == 'win32':
     """
     assert os.path.isabs(path), path
     assert isinstance(path, str), "%s, type: %s" % (path, type(path))
-    prefix = u'\\\\?\\'
+    prefix = '\\\\?\\'
     return path if path.startswith(prefix) else prefix + path
 
 
   def trim(path):
     """Removes '\\\\?\\' when receiving a path."""
     assert isinstance(path, str), "%s, type: %s" % (path, type(path))
-    prefix = u'\\\\?\\'
+    prefix = '\\\\?\\'
     if path.startswith(prefix):
       path = path[len(prefix):]
     assert os.path.isabs(path), path
@@ -224,11 +224,10 @@ if sys.platform == 'win32':
       err = ctypes.GetLastError()
       if err == 1314:
         raise WindowsError(
-            (u'symlink(%r, %r) failed: ERROR_PRIVILEGE_NOT_HELD(1314). Try '
-             u'calling file_path.enable_symlink() first') %
-              (source, link_name))
-      raise WindowsError(
-          u'symlink(%r, %r) failed: %s' % (source, link_name, err))
+            ('symlink(%r, %r) failed: ERROR_PRIVILEGE_NOT_HELD(1314). Try '
+             'calling file_path.enable_symlink() first') % (source, link_name))
+      raise WindowsError('symlink(%r, %r) failed: %s' %
+                         (source, link_name, err))
 
 
   def remove(path):
@@ -253,15 +252,13 @@ if sys.platform == 'win32':
     if isdir(path):
       if not RemoveDirectory(path):
         # pylint: disable=undefined-variable
-        raise WindowsError(
-            u'unlink(%r): could not remove directory: %s' %
-              (path, ctypes.GetLastError()))
+        raise WindowsError('unlink(%r): could not remove directory: %s' %
+                           (path, ctypes.GetLastError()))
     else:
       if not DeleteFile(path):
         # pylint: disable=undefined-variable
-        raise WindowsError(
-            u'unlink(%r): could not delete file: %s' %
-              (path, ctypes.GetLastError()))
+        raise WindowsError('unlink(%r): could not delete file: %s' %
+                           (path, ctypes.GetLastError()))
 
 
   def readlink(path):
@@ -279,8 +276,8 @@ if sys.platform == 'win32':
         None)
     if handle == INVALID_HANDLE_VALUE:
       # pylint: disable=undefined-variable
-      raise WindowsError(
-          u'readlink(%r): failed to open: %s' % (path, ctypes.GetLastError()))
+      raise WindowsError('readlink(%r): failed to open: %s' %
+                         (path, ctypes.GetLastError()))
     try:
       buf = REPARSE_DATA_BUFFER()
       returned = wintypes.DWORD()
@@ -294,18 +291,17 @@ if sys.platform == 'win32':
         if err == 4390:
           # pylint: disable=undefined-variable
           raise WindowsError(
-              u'readlink(%r): failed to read: ERROR_NOT_A_REPARSE_POINT(4390)' %
+              'readlink(%r): failed to read: ERROR_NOT_A_REPARSE_POINT(4390)' %
               path)
         # pylint: disable=undefined-variable
-        raise WindowsError(
-            u'readlink(%r): failed to read: %s' % (path, err))
+        raise WindowsError('readlink(%r): failed to read: %s' % (path, err))
       if buf.ReparseTag == IO_REPARSE_TAG_SYMLINK:
         actual = buf.ReparseBuffer.SymbolicLinkReparseBuffer
       elif buf.ReparseTag == IO_REPARSE_TAG_MOUNT_POINT:
         actual = buf.ReparseBuffer.MountPointReparseBuffer
       else:
         raise WindowsError(  # pylint: disable=undefined-variable
-            u'readlink(%r): succeeded but doesn\'t know how to parse result!' %
+            'readlink(%r): succeeded but doesn\'t know how to parse result!' %
             path)
       off = actual.PrintNameOffset // 2
       end = off + actual.PrintNameLength // 2
