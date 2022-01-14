@@ -19,9 +19,6 @@ if sys.platform == "win32":
   from ctypes import GetLastError
 
 
-_PY2 = sys.version_info[0] == 2
-_MAPPING = collections.Mapping if _PY2 else collections.abc.Mapping
-
 _StreamParamsBase = collections.namedtuple(
     '_StreamParamsBase', ('name', 'type', 'content_type', 'tags'))
 
@@ -62,7 +59,7 @@ class StreamParams(_StreamParamsBase):
       raise ValueError('Invalid type (%s)' % (self.type,))
 
     if self.tags is not None:
-      if not isinstance(self.tags, _MAPPING):
+      if not isinstance(self.tags, collections.abc.Mapping):
         raise ValueError('Invalid tags type (%s)' % (self.tags,))
       for k, v in self.tags.items():
         streamname.validate_tag(k, v)
@@ -203,15 +200,7 @@ class StreamClient:
       self._fd = fd
 
     def write(self, data):
-      if _PY2 and isinstance(data, str):
-        # byte string is unfortunately accepted in py2 because of
-        # undifferentiated usage of `str` and `unicode` but it should be
-        # discontinued in py3. User should switch to binary stream instead
-        # if there's a need to write bytes.
-        return self._fd.write(data)
-      if _PY2 and isinstance(data, unicode):
-        return self._fd.write(data.encode('utf-8'))
-      if not _PY2 and isinstance(data, str):
+      if isinstance(data, str):
         return self._fd.write(data.encode('utf-8'))
       raise ValueError('expect str, got %r that is type %s' % (
           data,

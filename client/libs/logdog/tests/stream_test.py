@@ -1,4 +1,4 @@
-#!/usr/bin/env vpython
+#!/usr/bin/env vpython3
 # -*- coding: utf-8 -*-
 # Copyright 2016 The LUCI Authors. All rights reserved.
 # Use of this source code is governed under the Apache License, Version 2.0
@@ -11,9 +11,8 @@ import os
 import sys
 import unittest
 
-ROOT_DIR = os.path.dirname(os.path.abspath(os.path.join(
-    __file__.decode(sys.getfilesystemencoding()),
-    os.pardir, os.pardir, os.pardir)))
+ROOT_DIR = os.path.dirname(
+    os.path.abspath(os.path.join(__file__, os.pardir, os.pardir, os.pardir)))
 sys.path.insert(0, ROOT_DIR)
 
 # pylint: disable=no-name-in-module

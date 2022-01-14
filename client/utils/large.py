@@ -9,6 +9,9 @@ The algorithm is intentionally simple.
 
 This only works with sorted list of integers. The resulting compression level
 can be very high for monotonically increasing sets.
+
+TODO(crbug.com/1247959): large.py is also used by Swarming server code which
+requires Python2 support.
 """
 
 import sys

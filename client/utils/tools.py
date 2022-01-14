@@ -451,8 +451,7 @@ def force_local_third_party(root=None):
       # python3 transition, as it makes the edit-debug loop much faster.
       root = os.path.dirname(os.getcwd())
       logging.warning('Falling back to current directory %s', root)
-  sys.path.insert(0, os.path.join(
-      root, 'third_party', 'httplib2', 'python%d' % sys.version_info.major))
+  sys.path.insert(0, os.path.join(root, 'third_party', 'httplib2', 'python3'))
   sys.path.insert(0, os.path.join(root, 'third_party', 'pyasn1'))
   sys.path.insert(0, os.path.join(root, 'third_party', 'rsa'))
   sys.path.insert(0, os.path.join(root, 'third_party'))

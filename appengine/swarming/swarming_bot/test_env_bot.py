@@ -46,7 +46,4 @@ def setup_test_env():
   google_pkg = os.path.join(client, 'third_party', 'google')
   if google_pkg not in google.__path__:
     google.__path__.insert(0, google_pkg)
-  sys.path.insert(
-      0,
-      os.path.join(client, 'third_party', 'httplib2',
-                   'python%d' % sys.version_info.major))
+  sys.path.insert(0, os.path.join(client, 'third_party', 'httplib2', 'python3'))

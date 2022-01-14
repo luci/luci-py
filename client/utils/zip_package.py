@@ -35,18 +35,6 @@ _extracted_files = []
 _extracted_files_lock = threading.Lock()
 
 
-# Patch zipimport.zipimporter hook to accept unicode strings
-def zipimporter_unicode(archivepath):
-  if sys.version_info.major == 2 and isinstance(archivepath, unicode):
-    archivepath = archivepath.encode(sys.getfilesystemencoding())
-  return zipimport.zipimporter(archivepath)
-
-
-for i, hook in enumerate(sys.path_hooks):
-  if hook is zipimport.zipimporter:
-    sys.path_hooks[i] = zipimporter_unicode
-
-
 class ZipPackageError(RuntimeError):
   """Failed to create a zip package."""
 
@@ -167,11 +155,7 @@ class ZipPackage:
 
     |archive_path| is a path in archive for this file.
     """
-    # Only 'str' is allowed here, no 'unicode'
-    if sys.version_info.major == 2:
-      assert isinstance(buf, str), buf
-    else:
-      assert isinstance(buf, bytes), buf
+    assert isinstance(buf, bytes), buf
     self._add_entry(archive_path, ZipPackage._BufferRef(buf))
 
   def zip_into_buffer(self, compress=True):
@@ -257,8 +241,6 @@ def get_main_script_path():
 
   path = getattr(main, '__file__', None)
   if path:
-    if sys.version_info.major == 2:
-      return path.decode(sys.getfilesystemencoding())
     return path
 
 
@@ -300,10 +282,7 @@ def extract_resource(package, resource, temp_dir=None):
   # For regular non-zip packages just construct an absolute path.
   if not is_zipped_module(package):
     # Package's __file__ attribute is always an absolute path.
-    if sys.version_info.major == 2:
-      ppath = package.__file__.decode(sys.getfilesystemencoding())
-    else:
-      ppath = package.__file__
+    ppath = package.__file__
     path = os.path.join(os.path.dirname(ppath),
         resource.replace('/', os.sep))
     if not os.path.exists(path):
