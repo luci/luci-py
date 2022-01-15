@@ -266,6 +266,68 @@ def expand_luci_gae_vars(body, app_id):
   return sub(body)
 
 
+def expand_files_with_luci_gae_vars(mods, app_id):
+  """Expands YAML files with luci_gae_vars and persists them as new files.
+
+  Args:
+    mods: A list of ModuleFile objects
+    app_id: A list which contains application ID
+
+  Returns:
+    A tuple of: a list of ModileFile objects which contain expanded
+    body and have paths to new files and a callback function to clean up.
+
+  Raises:
+    ValueError is expansion failed.
+  """
+  expanded_mods = []
+  tmp_files = []  # Paths to files this function persisted.
+
+  # 'gcloud' breaks on 'application' and 'version' fields in app.yaml.
+  # Delete them. Eventually all app.yaml must be updated to not specify
+  # 'application' or 'version'. Additionally, handle luci_gae_vars
+  # sections by reading vars from them and substituting their values into
+  # the rest of the YAML, see expand_luci_gae_vars helper.
+  for m in mods:
+    modified_body = m.data.copy()
+    modified_body.pop('application', None)
+    modified_body.pop('version', None)
+    try:
+      modified_body = expand_luci_gae_vars(modified_body, app_id)
+    except ValueError as exc:
+      raise ValueError('Bad %s: %s' % (os.path.basename(m.path), exc))
+    if modified_body == m.data:
+      expanded_mods.append(m)  # the original YAML doesn't need expansion
+    else:
+      if 'application' in m.data or 'version' in m.data:
+        logging.error('Remove "application" and "version" from %s', m.path)
+      # Need to write a new version in same directory, so all paths are
+      # relative.
+      filename = os.path.basename(m.path)
+      new_path = os.path.join(os.path.dirname(m.path), '._gae_py_' + filename)
+      # Format and prepare modified YAML body for writting into a file.
+      new_body_text = json.dumps(modified_body,
+                                 sort_keys=True,
+                                 indent=2,
+                                 separators=(',', ': '))
+      logging.debug('Replacing "%s" with\n%s', filename, new_body_text)
+      with open(new_path, 'w') as f:
+        f.write(new_body_text)  # JSON is YAML
+      expanded_mods.append(ModuleFile(path=new_path, data=modified_body))
+      tmp_files.append(new_path)
+
+  # Callback for callers to trigger temporary files deletion.
+  def cleanup():
+    for f in tmp_files:
+      os.remove(f)
+
+  # Always make 'default' the first service to be uploaded. It is magical,
+  # deploying it first "enables" the application, or so it seems.
+  expanded_mods.sort(key=lambda x: '' if x.name == 'default' else x.name)
+
+  return expanded_mods, cleanup
+
+
 def is_app_dir(path):
   """Returns True if |path| is structure like GAE app directory."""
   try:
@@ -543,53 +605,16 @@ class Application(object):
     if any(m.is_go for m in mods):
       _check_go()
 
-    # Always make 'default' the first service to be uploaded. It is magical,
-    # deploying it first "enables" the application, or so it seems.
-    mods.sort(key=lambda x: '' if x.name == 'default' else x.name)
-
-    # List of temp YAMLs we wrote and need to delete before exiting.
-    hacked = []
-
     try:
-      # Will contain a list of ModuleFile describing YAMLs to deploy.
-      service_yamls = []
-
-      # 'gcloud' barfs at 'application' and 'version' fields in app.yaml. Hack
-      # them away. Eventually all app.yaml must be updated to not specify
-      # 'application' or 'version'. Additionally, handle hacky luci_gae_vars
-      # sections by reading vars from them and substituting their values into
-      # the rest of the YAML, see expand_luci_gae_vars.
-      for m in mods:
-        modified = m.data.copy()
-        modified.pop('application', None)
-        modified.pop('version', None)
-        try:
-          modified = expand_luci_gae_vars(modified, self.app_id)
-        except ValueError as exc:
-          raise ValueError('Bad %s: %s' % (os.path.basename(m.path), exc))
-        if modified == m.data:
-          service_yamls.append(m)  # the original YAML is good enough
-        else:
-          if 'application' in m.data or 'version' in m.data:
-            logging.error('Remove "application" and "version" from %s', m.path)
-          # Need to write a hacked version in same directory, so all paths are
-          # relative.
-          fnm = os.path.basename(m.path)
-          hacked_path = os.path.join(os.path.dirname(m.path), '._gae_py_' + fnm)
-          hacked_body = json.dumps(
-              modified, sort_keys=True, indent=2, separators=(',', ': '))
-          logging.debug('Replacing "%s" with\n%s', fnm, hacked_body)
-          with open(hacked_path, 'w') as f:
-            f.write(hacked_body)  # JSON is YAML, so whatever
-          service_yamls.append(ModuleFile(path=hacked_path, data=modified))
-          hacked.append(hacked_path)  # to know what to delete later
+      expanded_yamls, cleanup = expand_files_with_luci_gae_vars(
+          mods, self.app_id)
 
       # Deploy services first.
       if os.getenv('GAE_PY_USE_CLOUDBUILDHELPER') != '1':
-        self._deploy_services(service_yamls, version)  # the old code path
+        self._deploy_services(expanded_yamls, version)  # the old code path
       else:
         go, non_go = [], []
-        for m in service_yamls:
+        for m in expanded_yamls:
           (go if m.is_go else non_go).append(m)
         # Deploy non-go services as is, without staging them.
         self._deploy_services(non_go, version)
@@ -610,8 +635,7 @@ class Application(object):
         self.run_gcloud(['app', 'deploy'] + extra + ['--quiet'])
 
     finally:
-      for h in hacked:
-        os.remove(h)
+      cleanup()
 
   def _deploy_services(self, services, version):
     args = [
@@ -645,15 +669,20 @@ class Application(object):
       kwargs: passed as is to subprocess.Popen.
 
     Returns:
-      Instance of subprocess.Popen.
+      Instance of subprocess.Popen and a cleanup callback function.
     """
+    expanded_mods, cleanup = expand_files_with_luci_gae_vars(
+        self._services.values(), self.app_id)
+
     cmd = [
-      sys.executable,
-      os.path.join(self._gae_sdk, 'dev_appserver.py'),
-      '--application', self.app_id,
-      '--skip_sdk_update_check=yes',
-      '--require_indexes=yes',
-    ] + self.service_yamls
+        sys.executable,
+        os.path.join(self._gae_sdk, 'dev_appserver.py'),
+        '--application',
+        self.app_id,
+        '--skip_sdk_update_check=yes',
+        '--require_indexes=yes',
+    ] + [m.path for m in expanded_mods]
+
     if self.dispatch_yaml:
       cmd += [self.dispatch_yaml]
     cmd += args
@@ -661,7 +690,8 @@ class Application(object):
       cmd.extend(('--host', '0.0.0.0', '--admin_host', '0.0.0.0'))
     if self._verbose:
       cmd.extend(('--log_level', 'debug'))
-    return subprocess.Popen(cmd, cwd=self.app_dir, **kwargs)
+
+    return subprocess.Popen(cmd, cwd=self.app_dir, **kwargs), cleanup
 
   def run_dev_appserver(self, args, open_ports=False):
     """Runs the application locally via dev_appserver.py.
@@ -673,7 +703,12 @@ class Application(object):
     Returns:
       dev_appserver.py exit code.
     """
-    return self.spawn_dev_appserver(args, open_ports).wait()
+    sbp, cleanup = self.spawn_dev_appserver(args, open_ports)
+
+    try:
+      return sbp.wait()
+    finally:
+      cleanup()
 
   def get_uploaded_versions(self, services=None):
     """Returns list of versions that are deployed to all given |services|.

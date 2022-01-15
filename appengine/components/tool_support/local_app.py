@@ -77,6 +77,7 @@ class LocalApplication(object):
     self._log = None
     self._port = None
     self._proc = None
+    self._proc_callback = None
     self._serving = False
     self._root = os.path.join(root, self.app_id)
     self._listen_all = listen_all
@@ -157,11 +158,8 @@ class LocalApplication(object):
     if sys.platform != 'win32':
       kwargs['preexec_fn'] = terminate_with_parent
     with open(log_file, 'wb') as f:
-      self._proc = self._app.spawn_dev_appserver(
-          cmd,
-          stdout=f,
-          stderr=subprocess.STDOUT,
-          **kwargs)
+      self._proc, self._proc_callback = self._app.spawn_dev_appserver(
+          cmd, stdout=f, stderr=subprocess.STDOUT, **kwargs)
 
     # Create a client that can talk to the service.
     self._client = HttpClient(self.url)
@@ -221,6 +219,7 @@ class LocalApplication(object):
       self._client = None
       self._port = None
       self._proc = None
+      self._proc_callback()
       self._serving = False
     return exit_code
 
