@@ -408,7 +408,9 @@ def CMDupload(parser, args):
   _print_version_log(app, version)
   print('Switching as default version')
   print()
-  app.set_default_version(version, roll_duration=options.roll_duration)
+  app.set_default_version(version,
+                          services,
+                          roll_duration=options.roll_duration)
   return 0
 
 
