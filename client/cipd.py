@@ -258,7 +258,6 @@ def get_platform():
   # linux, mac or windows.
   os_name = {
       'darwin': 'mac',
-      'linux2': 'linux',
       'linux': 'linux',
       'win32': 'windows',
   }.get(sys.platform)

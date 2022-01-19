@@ -31,7 +31,7 @@ def pack(values):
   if not values:
     return b''
   last = 0
-  max_value = long(2)**63 if sys.version_info.major == 2 else 2**63
+  max_value = 2**63
   assert 0 <= values[0] < max_value, 'Values must be between 0 and 2**63'
   assert 0 <= values[-1] < max_value, 'Values must be between 0 and 2**63'
   for value in values:
