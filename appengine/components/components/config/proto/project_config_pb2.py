@@ -19,7 +19,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   syntax='proto3',
   serialized_options=None,
   create_key=_descriptor._internal_create_key,
-  serialized_pb=b'\n,components/config/proto/project_config.proto\x12\x06\x63onfig\"V\n\nProjectCfg\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x0e\n\x06\x61\x63\x63\x65ss\x18\x02 \x03(\t\x12*\n\x07lucicfg\x18\x03 \x01(\x0b\x32\x19.config.GeneratorMetadata\"\xc2\x01\n\x11GeneratorMetadata\x12\x0f\n\x07version\x18\x01 \x01(\t\x12\x13\n\x0bpackage_dir\x18\x05 \x01(\t\x12\x12\n\nconfig_dir\x18\x02 \x01(\t\x12\x13\n\x0b\x65ntry_point\x18\x03 \x01(\t\x12\x31\n\x04vars\x18\x04 \x03(\x0b\x32#.config.GeneratorMetadata.VarsEntry\x1a+\n\tVarsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"V\n\x07RefsCfg\x12!\n\x04refs\x18\x01 \x03(\x0b\x32\x13.config.RefsCfg.Ref\x1a(\n\x03Ref\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x13\n\x0b\x63onfig_path\x18\x03 \x01(\tb\x06proto3'
+  serialized_pb=b'\n,components/config/proto/project_config.proto\x12\x06\x63onfig\"V\n\nProjectCfg\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x0e\n\x06\x61\x63\x63\x65ss\x18\x02 \x03(\t\x12*\n\x07lucicfg\x18\x03 \x01(\x0b\x32\x19.config.GeneratorMetadata\"\xd7\x01\n\x11GeneratorMetadata\x12\x0f\n\x07version\x18\x01 \x01(\t\x12\x13\n\x0bpackage_dir\x18\x05 \x01(\t\x12\x12\n\nconfig_dir\x18\x02 \x01(\t\x12\x13\n\x0b\x65ntry_point\x18\x03 \x01(\t\x12\x31\n\x04vars\x18\x04 \x03(\x0b\x32#.config.GeneratorMetadata.VarsEntry\x12\x13\n\x0b\x65xperiments\x18\x06 \x03(\t\x1a+\n\tVarsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"V\n\x07RefsCfg\x12!\n\x04refs\x18\x01 \x03(\x0b\x32\x13.config.RefsCfg.Ref\x1a(\n\x03Ref\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x13\n\x0b\x63onfig_path\x18\x03 \x01(\tb\x06proto3'
 )
 
 
@@ -105,8 +105,8 @@ _GENERATORMETADATA_VARSENTRY = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=296,
-  serialized_end=339,
+  serialized_start=317,
+  serialized_end=360,
 )
 
 _GENERATORMETADATA = _descriptor.Descriptor(
@@ -152,6 +152,13 @@ _GENERATORMETADATA = _descriptor.Descriptor(
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='experiments', full_name='config.GeneratorMetadata.experiments', index=5,
+      number=6, type=9, cpp_type=9, label=3,
+      has_default_value=False, default_value=[],
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
   ],
   extensions=[
   ],
@@ -165,7 +172,7 @@ _GENERATORMETADATA = _descriptor.Descriptor(
   oneofs=[
   ],
   serialized_start=145,
-  serialized_end=339,
+  serialized_end=360,
 )
 
 
@@ -203,8 +210,8 @@ _REFSCFG_REF = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=387,
-  serialized_end=427,
+  serialized_start=408,
+  serialized_end=448,
 )
 
 _REFSCFG = _descriptor.Descriptor(
@@ -234,8 +241,8 @@ _REFSCFG = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=341,
-  serialized_end=427,
+  serialized_start=362,
+  serialized_end=448,
 )
 
 _PROJECTCFG.fields_by_name['lucicfg'].message_type = _GENERATORMETADATA
