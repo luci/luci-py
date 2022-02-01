@@ -61,6 +61,8 @@ const DEVICE_TYPE_ALIASES = {
   'mako': 'Nexus 4',
   'manta': 'Nexus 10',
   'marlin': 'Pixel XL',
+  'mdarcy': 'NVIDIA Shield [2019]',
+  'oriole': 'Pixel 6',
   'sailfish': 'Pixel',
   'sargo': 'Pixel 3a',
   'shamu': 'Nexus 6',
