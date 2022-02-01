@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # Copyright 2014 The LUCI Authors. All rights reserved.
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
@@ -98,7 +98,7 @@ def test_device_rule(device):
 
 
 def main():
-  if not sys.platform.startswith('linux'):
+  if sys.platform != 'linux':
     print('Only tested on linux')
     return 1
 

@@ -744,7 +744,7 @@ def _run_isolated_flags(botobj):
   if os_utilities.get_physical_ram() < 2048:
     use_kvs = False
 
-  if sys.platform.startswith('linux') and platforms.linux.get_inside_docker():
+  if sys.platform == 'linux' and platforms.linux.get_inside_docker():
     use_kvs = False
 
   if sys.platform == 'win32' and platform.architecture()[0] == '32bit':

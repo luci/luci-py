@@ -30,7 +30,7 @@ def run_tests_parralel():
 
   # enable plugins only on linux
   plugins = []
-  if sys.platform.startswith('linux'):
+  if sys.platform == 'linux':
     plugins.append('nose2.plugins.mp')
 
   # append attribute filter option "--attribute '!no_run'"

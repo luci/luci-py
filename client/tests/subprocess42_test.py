@@ -440,8 +440,8 @@ time.sleep(60)
         limit_total_committed_memory=1024 * 1024 * 1024)
     self.assertEqual(0, subprocess42.check_call(cmd, containment=containment))
 
-  @unittest.skipUnless(
-      sys.platform.startswith('linux'), 'nsjail is only supported on linux')
+  @unittest.skipUnless(sys.platform == 'linux',
+                       'nsjail is only supported on linux')
   def test_containment_nsjail(self):
     # Tests that nsjail containment runs the given command in an nsjail.
     handle, cfg_path = tempfile.mkstemp(prefix='test_nsjail', suffix='.cfg')

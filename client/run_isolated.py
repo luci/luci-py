@@ -714,7 +714,7 @@ def upload_outdir(cas_client, cas_instance, outdir, tmp_dir):
         cas_instance
       ])
 
-    if sys.platform.startswith('linux'):
+    if sys.platform == 'linux':
       # TODO(crbug.com/1243194): remove this after investigation.
       cmd.extend(['-log-level', 'debug'])
 

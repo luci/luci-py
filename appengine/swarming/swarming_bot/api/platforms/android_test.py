@@ -10,7 +10,7 @@ import unittest
 import test_env_platforms
 test_env_platforms.setup_test_env()
 
-if sys.platform.startswith('linux'):
+if sys.platform == 'linux':
   import android
 
 
@@ -18,8 +18,7 @@ GMS_PACKAGE = 'com.google.android.gms'
 PLAYSTORE_PACKAGE = 'com.android.vending'
 
 
-@unittest.skipUnless(
-    sys.platform.startswith('linux'), 'Android tests run only on linux')
+@unittest.skipUnless(sys.platform == 'linux', 'Android tests run only on linux')
 class TestGetDimensions(unittest.TestCase):
 
   def empty_object(self):

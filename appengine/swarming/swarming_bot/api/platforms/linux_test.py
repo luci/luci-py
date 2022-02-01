@@ -17,7 +17,7 @@ test_env_platforms.setup_test_env()
 from depot_tools import auto_stub
 from utils import tools
 
-if sys.platform.startswith('linux'):
+if sys.platform == 'linux':
   import linux
 
 
@@ -104,7 +104,7 @@ VCEI exceptions         : not available
 """
 
 
-@unittest.skipUnless(sys.platform.startswith('linux'), 'linux only test')
+@unittest.skipUnless(sys.platform == 'linux', 'linux only test')
 class TestCPUInfo(auto_stub.TestCase):
 
   def setUp(self):
@@ -205,7 +205,7 @@ NO_K8S_CGROUP = """
 """
 
 
-@unittest.skipUnless(sys.platform.startswith('linux'), 'linux only test')
+@unittest.skipUnless(sys.platform == 'linux', 'linux only test')
 class TestDocker(auto_stub.TestCase):
 
   def setUp(self):
@@ -227,7 +227,7 @@ class TestDocker(auto_stub.TestCase):
     self.assertEqual(None, self.get_inside_docker(NO_K8S_CGROUP))
 
 
-@unittest.skipUnless(sys.platform.startswith('linux'), 'linux only test')
+@unittest.skipUnless(sys.platform == 'linux', 'linux only test')
 class TestLinux(auto_stub.TestCase):
 
   def setUp(self):

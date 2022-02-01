@@ -1266,7 +1266,7 @@ class RunIsolatedTestOutputFiles(RunIsolatedTestBase):
         b'open(sys.argv[1], "w").write("foo1")\n'
         b'bar1_path = os.path.join(sys.argv[3], "bar1")\n'
         b'open(bar1_path, "w").write("bar1")\n'
-        b'if sys.platform.startswith("linux"):\n'
+        b'if sys.platform == "linux":\n'
         b'  foo_realpath = os.path.abspath("foo2_content")\n'
         b'  open(foo_realpath, "w").write("foo2")\n'
         b'  os.symlink(foo_realpath, sys.argv[2])\n'

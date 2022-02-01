@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # Copyright 2015 The LUCI Authors. All rights reserved.
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
@@ -24,7 +24,7 @@ def main():
 
   # Pass an empty tag, so pop it up since it has no significance.
   devices = None
-  if sys.platform.startswith('linux'):
+  if sys.platform == 'linux':
     devices = platforms.android.get_devices(None)
     if devices:
       try:

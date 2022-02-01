@@ -310,7 +310,7 @@ def on_bot_idle(bot, since_last_action):
                        bot has been idle.
   """
   # Don't try this if running inside docker.
-  #if (not sys.platform.startswith('linux') or
+  #if (sys.platform != 'linux' or
   #    not platforms.linux.get_inside_docker()):
   #  uptime = os_utilities.get_uptime()
   #  if uptime > 12*60*60 * (1. + bot.get_pseudo_rand(0.2)):

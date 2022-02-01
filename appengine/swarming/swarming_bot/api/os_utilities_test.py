@@ -62,8 +62,7 @@ class TestOsUtilities(auto_stub.TestCase):
     self.mock(platform, 'machine', lambda: machine)
     self.assertEqual(os_utilities.get_cpu_type(), expected)
 
-  @unittest.skipUnless(
-      sys.platform.startswith('linux'), 'this is only for linux')
+  @unittest.skipUnless(sys.platform == 'linux', 'this is only for linux')
   def test_get_os_values_linux(self):
     with mock.patch(
         'platforms.linux.get_os_version_number', lambda: '16.04.6'), mock.patch(
@@ -193,7 +192,7 @@ class TestOsUtilities(auto_stub.TestCase):
       actual.discard('hidpi')
       actual.discard('xcode_version')
       actual.discard('device')  # iOS devices
-    if sys.platform.startswith('linux'):
+    if sys.platform == 'linux':
       expected.add('inside_docker')
       expected.add('kvm')
     if sys.platform == 'win32':

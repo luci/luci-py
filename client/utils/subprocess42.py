@@ -518,7 +518,7 @@ class Popen(subprocess.Popen):
         prev = kwargs.get('creationflags', 0)
         kwargs['creationflags'] = prev | CREATE_SUSPENDED
       if self.containment.containment_type == Containment.NSJAIL:
-        if not sys.platform.startswith('linux'):
+        if sys.platform != 'linux':
           raise NotImplementedError(
               'NSJAIL containment is only supported on linux')
         # Prepend the passed in command with an nsjail invocation and
