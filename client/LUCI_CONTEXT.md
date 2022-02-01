@@ -249,3 +249,18 @@ message Deadline {
   double grace_period = 2 [json_name = "grace_period"];
 }
 ```
+
+## `buildbucket`
+
+This section describes data to update a buildbucket build.
+
+```proto
+message Buildbucket {
+  // Buildbucket host name.
+  // E.g. cr-buildbucket.appspot.com.
+  string hostname = 1 [json_name = "hostname"];
+
+  // Token to use to schedule child builds for this build.
+  string schedule_build_token = 2 [json_name = "schedule_build_token"];
+}
+```
