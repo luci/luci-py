@@ -708,10 +708,13 @@ def run_command(remote, task_details, work_dir, cost_usd_hour,
       # the process group / job object may be dangling so if we didn't kill
       # it already, give it a poke now.
       if not kill_sent:
+        logging.info('got exit code %d, but kill whole process group',
+                     exit_code)
         proc.kill()
     except (
         ExitSignal, InternalError, IOError,
         OSError, remote_client.InternalError) as e:
+      logging.exception('got some exception, killing process')
       # Something wrong happened, try to kill the child process.
       must_signal_internal_failure = str(e) or 'unknown error'
       exit_code = kill_and_wait(proc, task_details.grace_period, str(e))

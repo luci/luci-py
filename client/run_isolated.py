@@ -432,7 +432,8 @@ def run_command(
       with subprocess42.set_signal_handler(subprocess42.STOP_SIGNALS, handler):
         try:
           exit_code = proc.wait(hard_timeout or None)
-          logging.info("finished with exit code %d", exit_code)
+          logging.info("finished with exit code %d after hard_timeout %s",
+                       exit_code, hard_timeout)
         except subprocess42.TimeoutExpired:
           if not had_signal:
             logging.warning('Hard timeout')
@@ -448,7 +449,8 @@ def run_command(
         with subprocess42.set_signal_handler(subprocess42.STOP_SIGNALS, ignore):
           try:
             exit_code = proc.wait(grace_period or None)
-            logging.info("finished with exit code %d", exit_code)
+            logging.info("finished with exit code %d after grace_period %s",
+                         exit_code, grace_period)
           except subprocess42.TimeoutExpired:
             # Now kill for real. The user can distinguish between the
             # following states:
