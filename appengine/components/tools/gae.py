@@ -365,6 +365,10 @@ def CMDupload(parser, args):
   parser.add_option(
       '-x', '--switch', action='store_true',
       help='Switch version after uploading new code')
+  parser.add_option(
+      '--target-version', action='store',
+      help='Overrides the version that is uploaded. '
+           'If this is set, the --tag option is ignored.')
   parser.add_switch_option()
   parser.add_force_option()
   parser.allow_positional_args = True
@@ -374,9 +378,12 @@ def CMDupload(parser, args):
     if service not in app.services:
       parser.error('No such service: %s' % service)
 
-  # Additional chars is for the app_id as well as 5 chars for '-dot-'.
-  version = calculate_version.calculate_version(
-    app.app_dir, options.tag, len(app.app_id)+5)
+  if options.target_version:
+    version = options.target_version
+  else:
+    # Additional chars is for the app_id as well as 5 chars for '-dot-'.
+    version = calculate_version.calculate_version(
+      app.app_dir, options.tag, len(app.app_id)+5)
 
   # Updating indexes, queues, etc is a disruptive operation. Confirm.
   if not options.force:
