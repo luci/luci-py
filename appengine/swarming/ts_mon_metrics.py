@@ -50,6 +50,12 @@ _TARGET_FIELDS = {
 _bucketer = gae_ts_mon.GeometricBucketer(growth_factor=10**0.05,
                                          num_finite_buckets=100)
 
+# Custom bucketer with 2% resolution in the range of 100ms...1000ms. Used for
+# pubsub latency measurements.
+# Roughly speaking measurements range between 150ms and 300ms.
+_pubsub_bucketer = gae_ts_mon.GeometricBucketer(growth_factor=10**0.01,
+                                                num_finite_buckets=100,
+                                                scale=100)
 # Regular (instance-local) metrics: jobs/completed and jobs/durations.
 # Both have the following metric fields:
 # - project_id: e.g. 'chromium'.
@@ -233,6 +239,23 @@ _bot_auth_successes = gae_ts_mon.CounterMetric(
         gae_ts_mon.StringField('auth_method'),
         gae_ts_mon.StringField('condition'),
     ])
+
+
+# Global metric. Metric fields:
+# - project_id: e.g. 'chromium'.
+# - pool: e.g. 'skia'.
+# - status: e.g. 'TIMEOUT'.
+_task_state_change_pubsub_notify_latencies = \
+  gae_ts_mon.CumulativeDistributionMetric(
+    'swarming/tasks/state_change_pubsub_notify_latencies',
+    'Latency (in ms) of pubsub notification when backend receives task_update',
+    [
+        gae_ts_mon.StringField('project_id'),
+        gae_ts_mon.StringField('pool'),
+        gae_ts_mon.StringField('status')
+    ],
+    bucketer=_pubsub_bucketer,
+)
 
 
 ### Private stuff.
@@ -441,6 +464,20 @@ def _extract_job_fields(tags_dict):
   return fields
 
 
+def _extract_pubsub_job_fields(tags_dict, status):
+  """Extracts common job metric fields from TaskResultSummary for pubsub
+     metrics.
+
+  Args:
+    tags_dict: tags dictionary.
+  """
+  fields = {
+      'project_id': tags_dict.get('project', ''),
+      'pool': tags_dict.get('pool', ''),
+      'status': task_result.State.to_string(status)
+  }
+  return fields
+
 ### Public API.
 
 
@@ -502,6 +539,12 @@ def set_global_metrics(kind, payload=None):
     _set_executors_metrics(payload)
   else:
     logging.error('set_global_metrics(kind=%s): unknown kind.', kind)
+
+
+def on_task_status_change_pubsub_notify_latency(summary, latency):
+  fields = _extract_pubsub_job_fields(_tags_to_dict(summary.tags),
+                                      summary.state)
+  _task_state_change_pubsub_notify_latencies.add(latency, fields=fields)
 
 
 def initialize():

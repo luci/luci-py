@@ -120,6 +120,9 @@ class TestCase(auto_stub.TestCase):
   def mock_now(self, now, seconds=0):
     return mock_now(self, now, seconds)
 
+  def mock_milliseconds_since_epoch(self, milliseconds):
+    self.mock(utils, "milliseconds_since_epoch", lambda: milliseconds)
+
   def _SendToAdmins(self, request, *args, **kwargs):
     """Make sure the request is logged.
 

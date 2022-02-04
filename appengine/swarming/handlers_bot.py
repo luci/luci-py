@@ -1146,6 +1146,9 @@ class BotTaskUpdateHandler(_BotApiHandler):
   def post(self, task_id=None):
     # Unlike handshake and poll, we do not accept invalid keys here. This code
     # path is much more strict.
+
+    # Take the time now - for measuring pubsub task change latency.
+    now = utils.milliseconds_since_epoch()
     request = self.parse_body()
     msg = log_unexpected_subset_keys(self.ACCEPTED_KEYS, self.REQUIRED_KEYS,
                                      request, self.request, 'bot', 'keys')
@@ -1273,7 +1276,8 @@ class BotTaskUpdateHandler(_BotApiHandler):
           cas_output_root=cas_output_root,
           cipd_pins=cipd_pins,
           performance_stats=performance_stats,
-          canceled=canceled)
+          canceled=canceled,
+          start_time=now)
       if not state:
         logging.info('Failed to update, please retry')
         self.abort_with_error(500, error='Failed to update, please retry')

@@ -163,7 +163,7 @@ def time_time():
   return (utcnow() - EPOCH).total_seconds()
 
 
-def milliseconds_since_epoch(now):
+def milliseconds_since_epoch(now=None):
   """Returns the number of milliseconds since unix epoch as an int."""
   now = now or utcnow()
   return int(round((now - EPOCH).total_seconds() * 1000.))

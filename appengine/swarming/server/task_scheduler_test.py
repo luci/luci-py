@@ -24,6 +24,7 @@ from google.appengine.ext import ndb
 import webtest
 
 import handlers_backend
+import ts_mon_metrics
 
 from components import auth
 from components import auth_testing
@@ -73,18 +74,22 @@ def _gen_request_slices(properties=None, **kwargs):
   args = {
       # Don't be confused, this is not part of the API. This code is
       # constructing a DB entity, not a swarming_rpcs.NewTaskRequest.
-      u'created_ts': now,
-      u'manual_tags': [u'tag:1'],
-      u'name': u'yay',
-      u'priority': 50,
+      u'created_ts':
+      now,
+      u'manual_tags': [u'tag:1', u'project:test_project'],
+      u'name':
+      u'yay',
+      u'priority':
+      50,
       u'task_slices': [
-          task_request.TaskSlice(
-              expiration_secs=60,
-              properties=properties or _gen_properties(),
-              wait_for_capacity=False),
+          task_request.TaskSlice(expiration_secs=60,
+                                 properties=properties or _gen_properties(),
+                                 wait_for_capacity=False),
       ],
-      u'user': u'Jesus',
-      u'bot_ping_tolerance_secs': 120,
+      u'user':
+      u'Jesus',
+      u'bot_ping_tolerance_secs':
+      120,
   }
   args.update(kwargs)
   ret = task_request.TaskRequest(**args)
@@ -106,6 +111,16 @@ def _get_results(request_key):
   q = task_result.TaskRunResult.query(ancestor=result_summary_key)
   q = q.order(task_result.TaskRunResult.key)
   return result_summary, q.fetch()
+
+
+def _get_fields(**kwargs):
+  fields = {
+      u'project_id': u'test_project',
+      u'pool': 'default',
+      u'status': State.to_string(State.COMPLETED),
+  }
+  fields.update(kwargs)
+  return fields
 
 
 def _run_result_to_to_run_key(run_result):
@@ -131,6 +146,7 @@ def _bot_update_task(run_result_key, **kwargs):
       'cost_usd': 0.1,
       'performance_stats': None,
       'canceled': None,
+      'start_time': 0,
   }
   args.update(kwargs)
   return task_scheduler.bot_update_task(run_result_key, **args)
@@ -199,45 +215,71 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
   def _gen_result_summary_pending(self, **kwargs):
     """Returns the dict for a TaskResultSummary for a pending task."""
     expected = {
-        'abandoned_ts': None,
-        'bot_dimensions': None,
-        'bot_id': None,
-        'bot_idle_since_ts': None,
-        'bot_version': None,
-        'cipd_pins': None,
+        'abandoned_ts':
+        None,
+        'bot_dimensions':
+        None,
+        'bot_id':
+        None,
+        'bot_idle_since_ts':
+        None,
+        'bot_version':
+        None,
+        'cipd_pins':
+        None,
         'children_task_ids': [],
-        'completed_ts': None,
+        'completed_ts':
+        None,
         'costs_usd': [],
-        'cost_saved_usd': None,
-        'created_ts': self.now,
-        'current_task_slice': 0,
-        'deduped_from': None,
-        'duration': None,
-        'exit_code': None,
-        'expiration_delay': None,
-        'failure': False,
-        'internal_failure': False,
-        'modified_ts': self.now,
-        'name': u'yay',
-        'priority': 50,
-        'cas_output_root': None,
-        'resultdb_info': None,
+        'cost_saved_usd':
+        None,
+        'created_ts':
+        self.now,
+        'current_task_slice':
+        0,
+        'deduped_from':
+        None,
+        'duration':
+        None,
+        'exit_code':
+        None,
+        'expiration_delay':
+        None,
+        'failure':
+        False,
+        'internal_failure':
+        False,
+        'modified_ts':
+        self.now,
+        'name':
+        u'yay',
+        'priority':
+        50,
+        'cas_output_root':
+        None,
+        'resultdb_info':
+        None,
         'server_versions': [u'v1a'],
-        'started_ts': None,
-        'state': State.PENDING,
+        'started_ts':
+        None,
+        'state':
+        State.PENDING,
         'tags': [
             u'authenticated:user:mocked@example.com',
             u'os:Windows-3.1.1',
             u'pool:default',
             u'priority:50',
+            u'project:test_project',
             u'realm:none',
             u'service_account:none',
             u'swarming.pool.template:no_config',
             u'tag:1',
             u'user:Jesus',
         ],
-        'try_number': None,
-        'user': u'Jesus',
+        'try_number':
+        None,
+        'user':
+        u'Jesus',
     }
     expected.update(kwargs)
     return expected
@@ -1355,15 +1397,23 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
   def test_task_timeout(self):
     # Create a task, but the bot tries to timeout but fails to report exit code
     # and duration.
-    run_result = self._quick_reap(1, 0)
+    pub_sub_calls = self.mock_pub_sub()
+    run_result = self._quick_reap(1, 0, pubsub_topic='projects/abc/topics/def')
     to_run_key = _run_result_to_to_run_key(run_result)
     self.mock_now(self.now, 10.5)
+    self.mock_milliseconds_since_epoch(100)
     self.assertEqual(State.TIMED_OUT,
                      _bot_update_task(run_result.key, hard_timeout=True))
     self.assertEqual(1, self.execute_tasks())
     run_result = run_result.key.get()
     self.assertEqual(-1, run_result.exit_code)
     self.assertEqual(10.5, run_result.duration)
+
+    status = State.to_string(State.TIMED_OUT)
+    self.assertEqual(
+        100,
+        ts_mon_metrics._task_state_change_pubsub_notify_latencies.get(
+            fields=_get_fields(status=status)).sum)
 
   def test_get_results(self):
     # TODO(maruel): Split in more focused tests.
@@ -1526,7 +1576,10 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
 
   def test_bot_update_task(self):
     self.mock(task_result.TaskOutput, 'CHUNK_SIZE', 2)
-    run_result = self._quick_reap(1, 0)
+    self.mock_pub_sub()
+    self.mock_milliseconds_since_epoch(100)
+    run_result = self._quick_reap(1, 0, pubsub_topic='projects/abc/topics/def')
+
     self.assertEqual(
         State.RUNNING,
         _bot_update_task(run_result.key, output='hi', output_chunk_start=0))
@@ -1538,6 +1591,11 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
             output_chunk_start=2,
             exit_code=0,
             duration=0.1))
+    self.assertEqual(
+        100,
+        ts_mon_metrics._task_state_change_pubsub_notify_latencies.get(
+            fields=_get_fields()).sum)
+
     self.assertEqual('hihey', run_result.key.get().get_output(0, 0))
     self.assertEqual(1, self.execute_tasks())
 
@@ -1561,17 +1619,26 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
       raise datastore_utils.CommitError('Sorry!')
 
     self.mock(ndb, 'put_multi', r)
-    self.assertEqual(
+    self.assertIsNone(
         None, _bot_update_task(run_result.key, exit_code=0, duration=0.1))
+
+    self.assertIsNone(
+        ts_mon_metrics._task_state_change_pubsub_notify_latencies.get(
+            fields=_get_fields()))
 
   def test_bot_update_pubsub_error(self):
     pub_sub_calls = self.mock_pub_sub()
     run_result = self._quick_reap(1, 0, pubsub_topic='projects/abc/topics/def')
-
+    self.mock_milliseconds_since_epoch(100)
     # Attempt to terminate the task with success, but make PubSub call fail.
     self.publish_successful = False
+    self.assertIsNone(
+        _bot_update_task(run_result.key, exit_code=0, duration=0.1))
+
     self.assertEqual(
-        None, _bot_update_task(run_result.key, exit_code=0, duration=0.1))
+        100,
+        ts_mon_metrics._task_state_change_pubsub_notify_latencies.get(
+            fields=_get_fields()).sum)
 
     # Bot retries bot_update, now PubSub works and notification is sent.
     self.publish_successful = True
@@ -1580,6 +1647,10 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         _bot_update_task(run_result.key, exit_code=0, duration=0.1))
     self.assertEqual(2, len(pub_sub_calls))  # notification is sent
     self.assertEqual(1, self.execute_tasks())
+    self.assertEqual(
+        200,
+        ts_mon_metrics._task_state_change_pubsub_notify_latencies.get(
+            fields=_get_fields()).sum)
 
   def _bot_update_timeouts(self, hard, io):
     run_result = self._quick_reap(1, 0)
@@ -1869,6 +1940,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
   def test_cancel_task_running(self):
     # Cancel a running task.
     pub_sub_calls = self.mock_pub_sub()
+    self.mock_milliseconds_since_epoch(100)
     run_result = self._quick_reap(1, 0, pubsub_topic='projects/abc/topics/def')
     self.assertEqual(1, len(pub_sub_calls))  # RUNNING
 
@@ -1925,6 +1997,12 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(4, len(pub_sub_calls))  # KILLED
     self.assertEqual(1, self.execute_tasks())
 
+    status = State.to_string(State.KILLED)
+    self.assertEqual(
+        100,
+        ts_mon_metrics._task_state_change_pubsub_notify_latencies.get(
+            fields=_get_fields(status=status)).sum)
+
   def test_cancel_task_bot_id(self):
     # Cancel a running task.
     pub_sub_calls = self.mock_pub_sub()
@@ -1977,6 +2055,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
   def test_cancel_task_running_setup(self):
     # Cancel a assigned task before running
     pub_sub_calls = self.mock_pub_sub()
+    self.mock_milliseconds_since_epoch(100)
     run_result = self._quick_reap(1, 0, pubsub_topic='projects/abc/topics/def')
     self.assertEqual(1, len(pub_sub_calls))  # RUNNING
 
@@ -2015,6 +2094,12 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(State.CANCELED, run_result.state)
     self.assertEqual(3, len(pub_sub_calls))  # CANCELED
     self.assertEqual(1, self.execute_tasks())
+
+    status = State.to_string(State.CANCELED)
+    self.assertEqual(
+        100,
+        ts_mon_metrics._task_state_change_pubsub_notify_latencies.get(
+            fields=_get_fields(status=status)).sum)
 
   def test_cancel_tasks(self):
     # Create RUNNING task
