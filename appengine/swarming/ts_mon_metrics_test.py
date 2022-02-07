@@ -327,11 +327,9 @@ class TestMetrics(test_case.TestCase):
 
   def test_on_task_status_change_pubsub_notify_latency(self):
     tags = [
-        'project:test_project',
-        'subproject:test_subproject',
-        'pool:test_pool',
-        'buildername:test_builder',
-        'name:some_tests',
+        'project:test_project', 'subproject:test_subproject', 'pool:test_pool',
+        'buildername:test_builder', 'name:some_tests',
+        'build_is_experimental:true'
     ]
 
     summary = _gen_task_result_summary(self.now,
@@ -379,6 +377,57 @@ class TestMetrics(test_case.TestCase):
         750,
         ts_mon_metrics._task_state_change_pubsub_notify_latencies.get(
             fields=fields).sum)
+
+  def test_on_pubsub_publish_success(self):
+    tags = [
+        'project:test_project',
+        'subproject:test_subproject',
+        'pool:test_pool',
+        'buildername:test_builder',
+        'name:some_tests',
+        'build_is_experimental:true',
+    ]
+    summary = _gen_task_result_summary(self.now,
+                                       1,
+                                       tags=tags,
+                                       expiration_delay=1,
+                                       state=task_result.State.COMPLETED)
+    ts_mon_metrics.on_task_status_change_pubsub_publish_success(summary)
+    fields = {
+        'project_id': 'test_project',
+        'pool': 'test_pool',
+        'status': task_result.State.to_string(task_result.State.COMPLETED)
+    }
+    self.assertEqual(
+        1,
+        ts_mon_metrics._task_state_change_pubsub_notify_count.get(
+            fields=fields))
+
+  def test_on_pubsub_publish_failure(self):
+    tags = [
+        'project:test_project',
+        'subproject:test_subproject',
+        'pool:test_pool',
+        'buildername:test_builder',
+        'name:some_tests',
+        'build_is_experimental:true',
+    ]
+    summary = _gen_task_result_summary(self.now,
+                                       1,
+                                       tags=tags,
+                                       expiration_delay=1,
+                                       state=task_result.State.COMPLETED)
+    ts_mon_metrics.on_task_status_change_pubsub_publish_failure(summary, 404)
+    fields = {
+        'project_id': 'test_project',
+        'pool': 'test_pool',
+        'status': task_result.State.to_string(task_result.State.COMPLETED),
+        'http_status_code': 404
+    }
+    self.assertEqual(
+        1,
+        ts_mon_metrics._task_state_change_pubsub_notify_error_count.get(
+            fields=fields))
 
 
 if __name__ == '__main__':

@@ -240,6 +240,36 @@ _bot_auth_successes = gae_ts_mon.CounterMetric(
         gae_ts_mon.StringField('condition'),
     ])
 
+# Global metric. Metric fields:
+# - project_id: e.g. 'chromium'.
+# - pool: e.g. 'skia'.
+# - status: e.g. 'TIMEOUT'.
+_task_state_change_pubsub_notify_count = gae_ts_mon.CounterMetric(
+    'swarming/tasks/state_change_pubsub_notify_count',
+    'Count of successful pubsub transactions',
+    [
+        gae_ts_mon.StringField('project_id'),
+        gae_ts_mon.StringField('pool'),
+        gae_ts_mon.StringField('status')
+    ],
+)
+
+# Global metric. Metric fields:
+# - project_id: e.g. 'chromium'.
+# - pool: e.g. 'skia'.
+# - status: e.g. 'TIMEOUT'.
+# - http_status_code: e.g. 404.
+_task_state_change_pubsub_notify_error_count = gae_ts_mon.CounterMetric(
+    'swarming/tasks/state_change_pubsub_notify_error_count',
+    'Count of failed pubsub transactions',
+    [
+        gae_ts_mon.StringField('project_id'),
+        gae_ts_mon.StringField('pool'),
+        gae_ts_mon.StringField('status'),
+        gae_ts_mon.IntegerField('http_status_code'),
+    ],
+)
+
 
 # Global metric. Metric fields:
 # - project_id: e.g. 'chromium'.
@@ -470,6 +500,7 @@ def _extract_pubsub_job_fields(tags_dict, status):
 
   Args:
     tags_dict: tags dictionary.
+    status: A task_result.State
   """
   fields = {
       'project_id': tags_dict.get('project', ''),
@@ -545,6 +576,19 @@ def on_task_status_change_pubsub_notify_latency(summary, latency):
   fields = _extract_pubsub_job_fields(_tags_to_dict(summary.tags),
                                       summary.state)
   _task_state_change_pubsub_notify_latencies.add(latency, fields=fields)
+
+
+def on_task_status_change_pubsub_publish_success(summary):
+  fields = _extract_pubsub_job_fields(_tags_to_dict(summary.tags),
+                                      summary.state)
+  _task_state_change_pubsub_notify_count.increment(fields=fields)
+
+
+def on_task_status_change_pubsub_publish_failure(summary, http_status_code):
+  fields = _extract_pubsub_job_fields(_tags_to_dict(summary.tags),
+                                      summary.state)
+  fields['http_status_code'] = http_status_code
+  _task_state_change_pubsub_notify_error_count.increment(fields=fields)
 
 
 def initialize():

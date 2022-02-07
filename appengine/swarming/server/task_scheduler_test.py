@@ -5,6 +5,7 @@
 
 import datetime
 import logging
+import json
 import os
 import random
 import sys
@@ -29,6 +30,7 @@ import ts_mon_metrics
 from components import auth
 from components import auth_testing
 from components import datastore_utils
+from components import net
 from components import pubsub
 from components import utils
 from components.auth.proto import delegation_pb2
@@ -206,7 +208,8 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
 
     def pubsub_publish(**kwargs):
       if not self.publish_successful:
-        raise pubsub.TransientError('Fail')
+        e = net.Error('Fail', 404, json.dumps({'error': 'some error'}))
+        raise pubsub.TransientError(e)
       calls.append(('directly', kwargs))
 
     self.mock(pubsub, 'publish', pubsub_publish)
@@ -1414,6 +1417,10 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         100,
         ts_mon_metrics._task_state_change_pubsub_notify_latencies.get(
             fields=_get_fields(status=status)).sum)
+    self.assertEqual(
+        1,
+        ts_mon_metrics._task_state_change_pubsub_notify_count.get(
+            fields=_get_fields(status=status)))
 
   def test_get_results(self):
     # TODO(maruel): Split in more focused tests.
@@ -1598,6 +1605,10 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
 
     self.assertEqual('hihey', run_result.key.get().get_output(0, 0))
     self.assertEqual(1, self.execute_tasks())
+    self.assertEqual(
+        1,
+        ts_mon_metrics._task_state_change_pubsub_notify_count.get(
+            fields=_get_fields()))
 
   def test_bot_update_task_new_overwrite(self):
     self.mock(task_result.TaskOutput, 'CHUNK_SIZE', 2)
@@ -1626,6 +1637,13 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         ts_mon_metrics._task_state_change_pubsub_notify_latencies.get(
             fields=_get_fields()))
 
+    self.assertIsNone(
+        ts_mon_metrics._task_state_change_pubsub_notify_count.get(
+            fields=_get_fields()))
+    self.assertIsNone(
+        ts_mon_metrics._task_state_change_pubsub_notify_error_count.get(
+            fields=_get_fields(http_status_code=404)))
+
   def test_bot_update_pubsub_error(self):
     pub_sub_calls = self.mock_pub_sub()
     run_result = self._quick_reap(1, 0, pubsub_topic='projects/abc/topics/def')
@@ -1640,8 +1658,16 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         ts_mon_metrics._task_state_change_pubsub_notify_latencies.get(
             fields=_get_fields()).sum)
 
+    self.assertIsNone(
+        ts_mon_metrics._task_state_change_pubsub_notify_count.get(
+            fields=_get_fields()))
+    self.assertEqual(
+        1,
+        ts_mon_metrics._task_state_change_pubsub_notify_error_count.get(
+            fields=_get_fields(http_status_code=404)))
     # Bot retries bot_update, now PubSub works and notification is sent.
     self.publish_successful = True
+
     self.assertEqual(
         State.COMPLETED,
         _bot_update_task(run_result.key, exit_code=0, duration=0.1))
@@ -1651,6 +1677,15 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         200,
         ts_mon_metrics._task_state_change_pubsub_notify_latencies.get(
             fields=_get_fields()).sum)
+
+    self.assertEqual(
+        1,
+        ts_mon_metrics._task_state_change_pubsub_notify_count.get(
+            fields=_get_fields()))
+    self.assertEqual(
+        1,
+        ts_mon_metrics._task_state_change_pubsub_notify_error_count.get(
+            fields=_get_fields(http_status_code=404)))
 
   def _bot_update_timeouts(self, hard, io):
     run_result = self._quick_reap(1, 0)
@@ -2002,6 +2037,10 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         100,
         ts_mon_metrics._task_state_change_pubsub_notify_latencies.get(
             fields=_get_fields(status=status)).sum)
+    self.assertEqual(
+        1,
+        ts_mon_metrics._task_state_change_pubsub_notify_count.get(
+            fields=_get_fields(status=status)))
 
   def test_cancel_task_bot_id(self):
     # Cancel a running task.
@@ -2100,6 +2139,10 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         100,
         ts_mon_metrics._task_state_change_pubsub_notify_latencies.get(
             fields=_get_fields(status=status)).sum)
+    self.assertEqual(
+        1,
+        ts_mon_metrics._task_state_change_pubsub_notify_count.get(
+            fields=_get_fields(status=status)))
 
   def test_cancel_tasks(self):
     # Create RUNNING task

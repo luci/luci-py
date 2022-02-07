@@ -469,11 +469,17 @@ def _maybe_pubsub_notify_now(result_summary, request, start_time):
     try:
       _pubsub_notify(task_id, request.pubsub_topic, request.pubsub_auth_token,
                      request.pubsub_userdata)
-    except pubsub.TransientError:
+      ts_mon_metrics.on_task_status_change_pubsub_publish_success(
+          result_summary)
+    except pubsub.TransientError as e:
       logging.exception('Transient error when sending PubSub notification')
+      ts_mon_metrics.on_task_status_change_pubsub_publish_failure(
+          result_summary, e.inner.status_code)
       return False
-    except pubsub.Error:
+    except pubsub.Error as e:
       logging.exception('Fatal error when sending PubSub notification')
+      ts_mon_metrics.on_task_status_change_pubsub_publish_failure(
+          result_summary, e.inner.status_code)
       return True # do not retry it
     finally:
       now = utils.milliseconds_since_epoch()
@@ -537,8 +543,8 @@ def _maybe_taskupdate_notify_via_tq(
 def _pubsub_notify(task_id, topic, auth_token, userdata):
   """Sends PubSub notification about task completion.
 
-  Raises pubsub.TransientError on transient errors. Fatal errors are logged, but
-  not retried.
+  Raises pubsub.TransientError on transient errors otherwise raises pubsub.Error
+  for fatal errors.
   """
   logging.debug(
       'Sending PubSub notify to "%s" (with userdata "%s") about '
@@ -546,13 +552,9 @@ def _pubsub_notify(task_id, topic, auth_token, userdata):
   msg = {'task_id': task_id}
   if userdata:
     msg['userdata'] = userdata
-  try:
-    pubsub.publish(
-        topic=topic,
-        message=utils.encode_to_json(msg),
-        attributes={'auth_token': auth_token} if auth_token else None)
-  except pubsub.Error:
-    logging.exception('Fatal error when sending PubSub notification')
+  pubsub.publish(topic=topic,
+                 message=utils.encode_to_json(msg),
+                 attributes={'auth_token': auth_token} if auth_token else None)
 
 
 def _find_dupe_task(now, h):
@@ -1861,9 +1863,11 @@ def task_handle_pubsub_task(payload):
   """Handles task enqueued by _maybe_pubsub_notify_via_tq."""
   # Do not catch errors to trigger task queue task retry. Errors should not
   # happen in normal case.
-  _pubsub_notify(
-      payload['task_id'], payload['topic'],
-      payload['auth_token'], payload['userdata'])
+  try:
+    _pubsub_notify(payload['task_id'], payload['topic'], payload['auth_token'],
+                   payload['userdata'])
+  except pubsub.Error:
+    logging.exception('Fatal error when sending PubSub notification')
 
 
 def task_expire_tasks(task_to_runs):
