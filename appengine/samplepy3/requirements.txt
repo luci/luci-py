@@ -5,7 +5,7 @@ google-auth==1.6.3
 google-cloud-bigquery==1.20.0
 google-cloud-datastore==1.9.0
 google-cloud-ndb==0.1.0
-protobuf==3.10.0
+protobuf==3.15.0
 pycrypto==2.6.1
 pyyaml==5.1.2
 requests==2.22.0
