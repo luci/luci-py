@@ -50,12 +50,14 @@ _TARGET_FIELDS = {
 _bucketer = gae_ts_mon.GeometricBucketer(growth_factor=10**0.05,
                                          num_finite_buckets=100)
 
-# Custom bucketer with 2% resolution in the range of 100ms...1000ms. Used for
+# Custom bucketer with 2% resolution in the range of 100ms...10s. Used for
 # pubsub latency measurements.
-# Roughly speaking measurements range between 150ms and 300ms.
+# Roughly speaking measurements range between 150ms and 300ms. However timeout
+# for pubsub notification is 10s.
 _pubsub_bucketer = gae_ts_mon.GeometricBucketer(growth_factor=10**0.01,
-                                                num_finite_buckets=100,
+                                                num_finite_buckets=200,
                                                 scale=100)
+
 # Regular (instance-local) metrics: jobs/completed and jobs/durations.
 # Both have the following metric fields:
 # - project_id: e.g. 'chromium'.
