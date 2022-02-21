@@ -184,7 +184,8 @@ def request_async(
 
   attempt = 0
   response = None
-  last_status_code = None
+  # 901 CLIENT STATUS_ERROR. See gae_ts_mon/common/http_metrics.py
+  last_status_code = 901
   while attempt < max_attempts:
     if attempt:
       logging.info('Retrying...')
@@ -202,6 +203,8 @@ def request_async(
     except (apiproxy_errors.DeadlineExceededError, urlfetch.Error) as e:
       # Transient network error or URL fetch service RPC deadline.
       logging.warning('%s %s failed: %s', method, url, e)
+      # 902 CLIENT STATUS_TIMEOUT. See gae_ts_mon/common/http_metrics.py
+      last_status_code = 902
       continue
 
     last_status_code = response.status_code
@@ -233,7 +236,7 @@ def request_async(
 
   raise _error_class_for_status(last_status_code)(
       'Failed to call %s after %d attempts' % (url, max_attempts),
-      response.status_code if response else None,
+      response.status_code if response else last_status_code,
       response.content if response else None,
       headers=response.headers if response else None)
 
@@ -315,7 +318,8 @@ def json_request_async(url,
   try:
     response = json.loads(response.lstrip(")]}'\n"))
   except ValueError as e:
-    raise Error('Bad JSON response: %s' % e, None, response)
+    # 901 CLIENT STATUS_ERROR. See gae_ts_mon/common/http_metrics.py
+    raise Error('Bad JSON response: %s' % e, 901, response)
   raise ndb.Return(response)
 
 

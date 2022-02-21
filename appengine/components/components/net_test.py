@@ -13,6 +13,7 @@ test_env.setup_test_env()
 
 from google.appengine.api import urlfetch
 from google.appengine.ext import ndb
+from google.appengine.runtime import apiproxy_errors
 
 from components import auth
 from components import net
@@ -168,6 +169,16 @@ class NetTest(test_case.TestCase):
     ])
     net.request(url='https://internal.example.com/123', project_id='project-id')
 
+  def test_deadline_exceeded_error(self):
+    self.mock_urlfetch([
+        ({
+            'url': 'http://localhost/123'
+        }, apiproxy_errors.DeadlineExceededError()),
+    ])
+    with self.assertRaises(net.Error) as e:
+      net.request('http://localhost/123', max_attempts=1)
+    self.assertEqual(902, e.exception.status_code)
+
   def test_retries_transient_errors(self):
     self.mock_urlfetch([
         ({
@@ -198,8 +209,9 @@ class NetTest(test_case.TestCase):
             'url': 'http://localhost/123'
         }, Response(200, 'response body', {})),
     ])
-    with self.assertRaises(net.Error):
+    with self.assertRaises(net.Error) as e:
       net.request('http://localhost/123', max_attempts=2)
+    self.assertEqual(500, e.exception.status_code)
 
   def test_404(self):
     self.mock_urlfetch([
@@ -395,8 +407,9 @@ class NetTest(test_case.TestCase):
             'url': 'http://localhost/123'
         }, Response(200, 'not a json', {})),
     ])
-    with self.assertRaises(net.Error):
+    with self.assertRaises(net.Error) as e:
       net.json_request('http://localhost/123')
+    self.assertEqual(901, e.exception.status_code)
 
 
 if __name__ == '__main__':
