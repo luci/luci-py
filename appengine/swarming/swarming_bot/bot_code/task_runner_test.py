@@ -511,7 +511,7 @@ class TestTaskRunner(TestTaskRunnerBase):
                 'size_bytes': digest.split('/')[1],
             },
         },
-        command=['python', 'parent.py'],
+        command=['python3', 'parent.py'],
     )
     actual = load_and_run(self.server.url, self.work_dir, manifest, None)
     expected = {
@@ -1017,7 +1017,7 @@ class TestTaskRunnerKilled(TestTaskRunnerBase):
                 'size_bytes': digest.split('/')[1],
             },
         },
-        command=['python', '-u', 'parent.py'],
+        command=['python3', '-u', 'parent.py'],
         # TODO(maruel): A bit cheezy, we'd want the I/O timeout to be just
         # enough to have the time for the PID to be printed but not more.
         #
