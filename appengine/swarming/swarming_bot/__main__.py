@@ -126,6 +126,7 @@ def CMDreboot(_args):
   """Utility subcommand that hides the difference between each OS to reboot
   the host."""
   logging_utils.prepare_logging(None)
+  logging.info("reboot with args: %s", args)
   import os_utilities
   # This function doesn't return.
   os_utilities.host_reboot()
@@ -188,6 +189,7 @@ def CMDshell(args):
 def CMDstart_bot(args):
   """Starts the swarming bot."""
   logging_utils.prepare_logging(os.path.join('logs', 'swarming_bot.log'))
+  logging.info("start_bot with args: %s", args)
   from bot_code import bot_main
   logging.info('importing bot_main: %s, %s', THIS_FILE,
                bot_main.generate_version())
@@ -206,6 +208,7 @@ def CMDstart_slave(args):
   """Ill named command that actually sets up the bot then start it."""
   # TODO(maruel): Rename function.
   logging_utils.prepare_logging(os.path.join('logs', 'bot_config.log'))
+  logging.info("start_slave with args: %s", args)
   parser = argparse.ArgumentParser()
   parser.add_argument(
       '--survive',
@@ -227,6 +230,7 @@ def CMDstart_slave(args):
 def CMDtask_runner(args):
   """Internal command to run a swarming task."""
   logging_utils.prepare_logging(os.path.join('logs', 'task_runner.log'))
+  logging.info("task_runner with args: %s", args)
   from bot_code import task_runner
   return task_runner.main(args)
 
