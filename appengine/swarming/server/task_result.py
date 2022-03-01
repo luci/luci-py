@@ -672,7 +672,7 @@ class _TaskResultCommon(ndb.Model):
     Similar to .pending except that its return value is not deterministic.
     """
     if self.deduped_from:
-      return None
+      return now - self.created_ts
     return (self.started_ts or now) - self.created_ts
 
   @property
