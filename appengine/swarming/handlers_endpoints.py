@@ -345,12 +345,14 @@ class SwarmingTaskService(remote.Service):
 
     If a bot was running the task, the bot will forcibly cancel the task.
     """
+    start_time = utils.utcnow()
     logging.debug('request %s', request)
     request_key, result_key = _to_keys(request.task_id)
     request_obj = _get_task_request_async(request.task_id, request_key,
                                           _CANCEL).get_result()
-    ok, was_running = task_scheduler.cancel_task(
-        request_obj, result_key, request.kill_running or False, None)
+    ok, was_running = task_scheduler.cancel_task(request_obj, result_key,
+                                                 request.kill_running or False,
+                                                 None, start_time)
     return swarming_rpcs.CancelResponse(ok=ok, was_running=was_running)
 
   @gae_ts_mon.instrument_endpoint()
@@ -423,6 +425,7 @@ class SwarmingTasksService(remote.Service):
     earliest opportunity by a bot that has at least the dimensions as described
     in the task request.
     """
+    start_time = utils.milliseconds_since_epoch()
     sb = (request.properties.secret_bytes
           if request.properties is not None else None)
     if sb is not None:
@@ -461,6 +464,7 @@ class SwarmingTasksService(remote.Service):
       try:
         result_summary = task_scheduler.schedule_request(
             request_obj,
+            start_time,
             request_obj.resultdb and request_obj.resultdb.enable,
             secret_bytes=secret_bytes)
       except (datastore_errors.BadValueError, TypeError, ValueError) as e:
@@ -921,6 +925,7 @@ class SwarmingBotService(remote.Service):
     # TODO(maruel): Disallow a terminate task when there's one currently
     # pending or if the bot is considered 'dead', e.g. no contact since 10
     # minutes.
+    start_time = utils.milliseconds_since_epoch()
     logging.debug('%s', request)
     bot_id = unicode(request.bot_id)
 
@@ -938,8 +943,9 @@ class SwarmingBotService(remote.Service):
     except (datastore_errors.BadValueError, TypeError, ValueError) as e:
       raise endpoints.BadRequestException(e.message)
 
-    result_summary = task_scheduler.schedule_request(
-        request, enable_resultdb=False)
+    result_summary = task_scheduler.schedule_request(request,
+                                                     start_time=start_time,
+                                                     enable_resultdb=False)
     return swarming_rpcs.TerminateResponse(
         task_id=task_pack.pack_result_summary_key(result_summary.key))
 
