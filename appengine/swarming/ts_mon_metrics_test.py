@@ -364,8 +364,7 @@ class TestMetrics(test_case.TestCase):
                                        state=task_result.State.KILLED)
 
     latency = 500
-    ts_mon_metrics.on_task_status_change_pubsub_notify_latency(
-        summary.tags, summary.state, latency)
+    ts_mon_metrics.on_task_status_change_pubsub_notify_latency(summary, latency)
 
     fields = {
         'project_id': 'test_project',
@@ -379,8 +378,7 @@ class TestMetrics(test_case.TestCase):
             fields=fields).sum)
 
     latency = 250
-    ts_mon_metrics.on_task_status_change_pubsub_notify_latency(
-        summary.tags, summary.state, latency)
+    ts_mon_metrics.on_task_status_change_pubsub_notify_latency(summary, latency)
 
     self.assertEqual(
         750,
@@ -392,8 +390,7 @@ class TestMetrics(test_case.TestCase):
     summary.state = task_result.State.TIMED_OUT
 
     latency = 300
-    ts_mon_metrics.on_task_status_change_pubsub_notify_latency(
-        summary.tags, summary.state, latency)
+    ts_mon_metrics.on_task_status_change_pubsub_notify_latency(summary, latency)
 
     self.assertEqual(
         300,
@@ -420,8 +417,7 @@ class TestMetrics(test_case.TestCase):
                                        tags=tags,
                                        expiration_delay=1,
                                        state=task_result.State.COMPLETED)
-    ts_mon_metrics.on_task_status_change_pubsub_publish_success(
-        summary.tags, summary.state)
+    ts_mon_metrics.on_task_status_change_pubsub_publish_success(summary)
     fields = {
         'project_id': 'test_project',
         'pool': 'test_pool',
@@ -446,8 +442,7 @@ class TestMetrics(test_case.TestCase):
                                        tags=tags,
                                        expiration_delay=1,
                                        state=task_result.State.COMPLETED)
-    ts_mon_metrics.on_task_status_change_pubsub_publish_failure(
-        summary.tags, summary.state, 404)
+    ts_mon_metrics.on_task_status_change_pubsub_publish_failure(summary, 404)
     fields = {
         'project_id': 'test_project',
         'pool': 'test_pool',
