@@ -75,7 +75,7 @@ def _expire_task_tx(now, request, to_run_key, result_summary_key, capacity,
   if not to_run or not to_run.is_reapable:
     if not to_run.expiration_ts:
       result_summary_future.get_result()
-      return None, None, False
+      return None, None
     logging.info('%s/%s: not reapable. but continuing expiration.',
                  to_run.task_id, to_run.task_slice_index)
 
@@ -86,14 +86,13 @@ def _expire_task_tx(now, request, to_run_key, result_summary_key, capacity,
         '_expire_task_tx: the task is not expired. task_id=%s slice=%d '
         'expiration_ts=%s', to_run.task_id, to_run.task_slice_index,
         to_run.expiration_ts)
-    return None, None, False
+    return None, None
   to_run.expiration_delay = delay
 
   # In any case, dequeue the TaskToRunShard.
   to_run.queue_number = None
   to_run.expiration_ts = None
   result_summary = result_summary_future.get_result()
-  orig_summary_state = result_summary.state
   to_put = [to_run, result_summary]
   # Check if there's a TaskSlice fallback that could be reenqueued.
   new_to_run = None
@@ -151,9 +150,8 @@ def _expire_task_tx(now, request, to_run_key, result_summary_key, capacity,
       result_summary, request, es_cfg, transactional=True)
   for f in futures:
     f.check_success()
-  state_changed = result_summary.state != orig_summary_state
 
-  return result_summary, new_to_run, state_changed
+  return result_summary, new_to_run
 
 
 def _expire_task(to_run_key, request, inline):
@@ -217,8 +215,7 @@ def _expire_task(to_run_key, request, inline):
   run = lambda: _expire_task_tx(
       now, request, to_run_key, result_summary_key, capacity, es_cfg)
   try:
-    summary, new_to_run, state_changed = datastore_utils.transaction(
-        run, retries=retries)
+    summary, new_to_run = datastore_utils.transaction(run, retries=retries)
   except datastore_utils.CommitError:
     summary = None
     new_to_run = None
@@ -226,8 +223,6 @@ def _expire_task(to_run_key, request, inline):
     logging.info(
         'Expired %s', task_pack.pack_result_summary_key(result_summary_key))
     ts_mon_metrics.on_task_expired(summary, to_run_key.get())
-  if state_changed:
-    ts_mon_metrics.on_task_status_change_scheduler_latency(summary)
   return summary, new_to_run
 
 
@@ -270,10 +265,10 @@ def _reap_task(bot_dimensions, bot_version, to_run_key, request,
       secret_bytes = secret_bytes_future.get_result()
     if not to_run:
       logging.error('Missing TaskToRunShard?\n%s', result_summary.task_id)
-      return None, None, None, False
+      return None, None
     if not to_run.is_reapable:
       logging.info('%s is not reapable', result_summary.task_id)
-      return None, None, None, False
+      return None, None
     if result_summary.bot_id == bot_id:
       # This means two things, first it's a retry, second it's that the first
       # try failed and the retry is being reaped by the same bot. Deny that, as
@@ -281,7 +276,7 @@ def _reap_task(bot_dimensions, bot_version, to_run_key, request,
       # TODO(maruel): Allow retry for bot locked task using 'id' dimension.
       logging.warning('%s can\'t retry its own internal failure task',
                       result_summary.task_id)
-      return None, None, None, False
+      return None, None
     to_run.queue_number = None
     to_run.expiration_ts = None
     run_result = task_result.new_run_result(request, to_run, bot_id,
@@ -301,12 +296,10 @@ def _reap_task(bot_dimensions, bot_version, to_run_key, request,
         seconds=request.bot_ping_tolerance_secs)
     result_summary.set_from_run_result(run_result, request)
     ndb.put_multi([to_run, run_result, result_summary])
-    state_changed = result_summary.state != orig_summary_state
     if result_summary.state != orig_summary_state:
       _maybe_taskupdate_notify_via_tq(
           result_summary, request, es_cfg, transactional=True)
-      state_changed = True
-    return run_result, secret_bytes, result_summary, state_changed
+    return run_result, secret_bytes
 
   # Add it to the negative cache *before* running the transaction. This will
   # inhibit concurrently readers to try to reap this task. The downside is if
@@ -319,8 +312,9 @@ def _reap_task(bot_dimensions, bot_version, to_run_key, request,
     return None, None
 
   try:
-    run_result, secret_bytes, summary, state_changed = \
-      datastore_utils.transaction(run, retries=0, deadline=30)
+    run_result, secret_bytes = datastore_utils.transaction(run,
+                                                           retries=0,
+                                                           deadline=30)
   except datastore_utils.CommitError:
     # The challenge here is that the transaction may have failed because:
     # - The DB had an hickup and the TaskToRunShard, TaskRunResult and
@@ -343,8 +337,6 @@ def _reap_task(bot_dimensions, bot_version, to_run_key, request,
     # The bot will reap the next available task in case of failure, no big deal.
     run_result = None
     secret_bytes = None
-  if state_changed:
-    ts_mon_metrics.on_task_status_change_scheduler_latency(summary)
   return run_result, secret_bytes
 
 
@@ -853,23 +845,21 @@ def _cancel_task_tx(request, result_summary, kill_running, bot_id, now, es_cfg,
     run_result: Used when this is given, otherwise took from result_summary.
 
   Returns:
-    tuple(bool, bool, bool)
+    tuple(bool, bool)
     - True if the cancellation succeeded. Either the task atomically changed
       from PENDING to CANCELED or it was RUNNING and killing bit has been set.
     - True if the task was running while it was canceled.
-    - True if the task's state has changed and the run result has been committed
-      to the datastore
+
   """
   was_running = result_summary.state == task_result.State.RUNNING
   if not result_summary.can_be_canceled:
-    return False, was_running, False
+    return False, was_running
 
-  orig_summary_state = result_summary.state
   entities = [result_summary]
   if not was_running:
     if bot_id:
       # Deny cancelling a non-running task if bot_id was specified.
-      return False, was_running, False
+      return False, was_running
     # PENDING.
     result_summary.state = task_result.State.CANCELED
     result_summary.completed_ts = now
@@ -885,11 +875,11 @@ def _cancel_task_tx(request, result_summary, kill_running, bot_id, now, es_cfg,
   else:
     if not kill_running:
       # Deny canceling a task that started.
-      return False, was_running, False
+      return False, was_running
     if bot_id and bot_id != result_summary.bot_id:
       # Deny cancelling a task if bot_id was specified, but task is not
       # on this bot.
-      return False, was_running, False
+      return False, was_running
     # RUNNING.
     run_result = run_result or result_summary.run_result_key.get()
     entities.append(run_result)
@@ -909,8 +899,7 @@ def _cancel_task_tx(request, result_summary, kill_running, bot_id, now, es_cfg,
       result_summary, request, es_cfg, transactional=True)
   for f in futures:
     f.check_success()
-  state_changed = orig_summary_state != result_summary.state
-  return True, was_running, state_changed
+  return True, was_running
 
 
 def _get_task_from_external_scheduler(es_cfg, bot_dimensions):
@@ -1277,7 +1266,6 @@ def schedule_request(request,
   if result_summary.state != task_result.State.PENDING:
     _maybe_taskupdate_notify_via_tq(
         result_summary, request, es_cfg, transactional=False)
-    ts_mon_metrics.on_task_status_change_scheduler_latency(result_summary)
   return result_summary
 
 
@@ -1655,14 +1643,9 @@ def cancel_task(request, result_key, kill_running, bot_id):
     # Need to get the current try number to know which TaskToRunShard to fetch.
     result_summary = result_key.get()
     return _cancel_task_tx(
-        request, result_summary, kill_running, bot_id, now, es_cfg) + \
-        (result_summary,)
+        request, result_summary, kill_running, bot_id, now, es_cfg)
 
-  succeeded, was_running, state_changed, result_summary = \
-    datastore_utils.transaction(run)
-  if state_changed:
-    ts_mon_metrics.on_task_status_change_scheduler_latency(result_summary)
-  return succeeded, was_running
+  return datastore_utils.transaction(run)
 
 
 def cancel_tasks(limit, query, cursor=None):

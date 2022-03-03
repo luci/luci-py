@@ -325,31 +325,6 @@ class TestMetrics(test_case.TestCase):
         ts_mon_metrics._tasks_slice_expiration_delay.get(
             fields=dict(fields, slice_index=0)).sum)
 
-  def test_on_task_status_change_scheduler_latency(self):
-    tags = [
-        'project:test_project', 'subproject:test_subproject', 'pool:test_pool',
-        'buildername:test_builder', 'name:some_tests',
-        'build_is_experimental:true'
-    ]
-
-    summary = _gen_task_result_summary(self.now,
-                                       1,
-                                       tags=tags,
-                                       expiration_delay=1,
-                                       state=task_result.State.KILLED)
-    self.mock_now(self.now, 1)
-    ts_mon_metrics.on_task_status_change_scheduler_latency(summary)
-
-    fields = {
-        'project_id': 'test_project',
-        'pool': 'test_pool',
-        'status': task_result.State.to_string(task_result.State.KILLED)
-    }
-    self.assertEqual(
-        1000,
-        ts_mon_metrics._task_state_change_schedule_latencies.get(
-            fields=fields).sum)
-
   def test_on_task_status_change_pubsub_notify_latency(self):
     tags = [
         'project:test_project', 'subproject:test_subproject', 'pool:test_pool',
