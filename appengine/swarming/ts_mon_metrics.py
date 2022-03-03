@@ -58,6 +58,12 @@ _pubsub_bucketer = gae_ts_mon.GeometricBucketer(growth_factor=10**0.01,
                                                 num_finite_buckets=200,
                                                 scale=100)
 
+# Custom bucketer with 2% resolution in the range of 100ms...100000s. Used for
+# task scheduling latency measurements.
+_scheduler_bucketer = gae_ts_mon.GeometricBucketer(growth_factor=10**0.01,
+                                                   num_finite_buckets=600,
+                                                   scale=100)
+
 # Regular (instance-local) metrics: jobs/completed and jobs/durations.
 # Both have the following metric fields:
 # - project_id: e.g. 'chromium'.
@@ -242,7 +248,7 @@ _bot_auth_successes = gae_ts_mon.CounterMetric(
         gae_ts_mon.StringField('condition'),
     ])
 
-# Global metric. Metric fields:
+# Instance metric. Metric fields:
 # - project_id: e.g. 'chromium'.
 # - pool: e.g. 'skia'.
 # - status: e.g. 'TIMEOUT'.
@@ -256,7 +262,7 @@ _task_state_change_pubsub_notify_count = gae_ts_mon.CounterMetric(
     ],
 )
 
-# Global metric. Metric fields:
+# Instance metric. Metric fields:
 # - project_id: e.g. 'chromium'.
 # - pool: e.g. 'skia'.
 # - status: e.g. 'TIMEOUT'.
@@ -273,7 +279,7 @@ _task_state_change_pubsub_notify_error_count = gae_ts_mon.CounterMetric(
 )
 
 
-# Global metric. Metric fields:
+# Instance metric. Metric fields:
 # - project_id: e.g. 'chromium'.
 # - pool: e.g. 'skia'.
 # - status: e.g. 'TIMEOUT'.
@@ -281,6 +287,22 @@ _task_state_change_pubsub_notify_latencies = \
   gae_ts_mon.CumulativeDistributionMetric(
     'swarming/tasks/state_change_pubsub_notify_latencies',
     'Latency (in ms) of pubsub notification when backend receives task_update',
+    [
+        gae_ts_mon.StringField('project_id'),
+        gae_ts_mon.StringField('pool'),
+        gae_ts_mon.StringField('status')
+    ],
+    bucketer=_pubsub_bucketer,
+)
+
+# Instance metric. Metric fields:
+# - project_id: e.g. 'chromium'.
+# - pool: e.g. 'skia'.
+# - status: e.g. 'TIMEOUT'.
+_task_state_change_schedule_latencies = \
+  gae_ts_mon.CumulativeDistributionMetric(
+    'swarming/tasks/state_change_scheduling_latencies',
+    'Latency (in ms) of task scheduling request',
     [
         gae_ts_mon.StringField('project_id'),
         gae_ts_mon.StringField('pool'),
@@ -591,6 +613,13 @@ def on_task_status_change_pubsub_publish_failure(summary, http_status_code):
                                       summary.state)
   fields['http_status_code'] = http_status_code
   _task_state_change_pubsub_notify_error_count.increment(fields=fields)
+
+
+def on_task_status_change_scheduler_latency(summary):
+  fields = _extract_pubsub_job_fields(_tags_to_dict(summary.tags),
+                                      summary.state)
+  latency = round(summary.pending_now(utils.utcnow()).total_seconds() * 1000)
+  _task_state_change_schedule_latencies.add(latency, fields=fields)
 
 
 def initialize():
