@@ -21,7 +21,7 @@ deps = {
     'packages': [
       {
         'package': 'infra/tools/luci/cas/${{platform}}',
-        'version': 'git_revision:be2264bd5c0140007c91c6e84b340f646dca57f6',
+        'version': 'git_revision:cb424e70e75136736a86359ef070aa96425fe7a3',
       },
       {
         'package': 'infra/tools/luci/fakecas/${{platform}}',
