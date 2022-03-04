@@ -308,7 +308,7 @@ _task_state_change_schedule_latencies = \
         gae_ts_mon.StringField('pool'),
         gae_ts_mon.StringField('status')
     ],
-    bucketer=_pubsub_bucketer,
+    bucketer=_scheduler_bucketer,
 )
 
 
