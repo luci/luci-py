@@ -201,7 +201,7 @@ class ExternalSchedulerApiTest(test_env_handlers.AppTestBase):
 
   def test_notify_requests(self):
     request = _gen_request()
-    result_summary = task_scheduler.schedule_request(request)
+    result_summary = task_scheduler.schedule_request(request, 0)
     external_scheduler.notify_requests(
         self.es_cfg, [(request, result_summary)], False, False)
 
@@ -219,7 +219,7 @@ class ExternalSchedulerApiTest(test_env_handlers.AppTestBase):
 
   def test_notify_request_with_tq(self):
     request = _gen_request()
-    result_summary = task_scheduler.schedule_request(request)
+    result_summary = task_scheduler.schedule_request(request, 0)
     external_scheduler.notify_requests(
       self.es_cfg, [(request, result_summary)], True, False)
 
@@ -301,7 +301,7 @@ class ExternalSchedulerApiTestBatchMode(test_env_handlers.AppTestBase):
 
   def test_notify_request_with_tq_batch_mode(self):
     request = _gen_request()
-    result_summary = task_scheduler.schedule_request(request)
+    result_summary = task_scheduler.schedule_request(request, 0)
     self.assertEqual(1, self.execute_tasks())
 
     # Create requests with different scheduler IDs.
@@ -340,7 +340,7 @@ class ExternalSchedulerApiTestBatchMode(test_env_handlers.AppTestBase):
 
   def test_notify_request_with_tq_batch_mode_false(self):
     request = _gen_request()
-    result_summary = task_scheduler.schedule_request(request)
+    result_summary = task_scheduler.schedule_request(request, 0)
     self.cfg.enable_batch_es_notifications = True
     self.assertEqual(1, self.execute_tasks())
 

@@ -538,6 +538,7 @@ class BotPollHandler(_BotBaseHandler):
 
     It makes recovery of the fleet in case of catastrophic failure much easier.
     """
+    now = utils.milliseconds_since_epoch()
     logging.debug('Request started')
     if config.settings().force_bots_to_sleep_and_not_run_task:
       # Ignore everything, just sleep. Tell the bot it is quarantined to inform
@@ -667,7 +668,7 @@ class BotPollHandler(_BotBaseHandler):
       try:
         # This is a fairly complex function call, exceptions are expected.
         request, secret_bytes, run_result = task_scheduler.bot_reap_task(
-            res.dimensions, res.version)
+            res.dimensions, res.version, start_time=now)
       except (datastore_errors.Timeout, apiproxy_errors.CancelledError):
         self.abort(429, 'Deadline exceeded while accessing datastore')
       return request, secret_bytes, run_result
@@ -1342,6 +1343,7 @@ class BotTaskErrorHandler(_BotApiHandler):
 
   @auth.public  # auth happens in bot_auth.validate_bot_id_and_fetch_config
   def post(self, task_id=None):
+    start_time = utils.milliseconds_since_epoch()
     request = self.parse_body()
     # TODO(crbug.com/1015701): take from X-Luci-Swarming-Bot-ID header.
     bot_id = request.get('id')
@@ -1379,7 +1381,7 @@ class BotTaskErrorHandler(_BotApiHandler):
       self.abort_with_error(400, error=msg)
 
     msg = task_scheduler.bot_terminate_task(
-        task_pack.unpack_run_result_key(task_id), bot_id)
+        task_pack.unpack_run_result_key(task_id), bot_id, start_time)
     if msg:
       logging.error(msg)
       self.abort_with_error(400, error=msg)
