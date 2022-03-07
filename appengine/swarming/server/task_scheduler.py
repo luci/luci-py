@@ -219,6 +219,7 @@ def _expire_task(to_run_key, request, inline, start_time):
   # It'll be caught by next cron job execution in case of failure.
   run = lambda: _expire_task_tx(now, request, to_run_key, result_summary_key,
                                 capacity, es_cfg, start_time)
+  state_changed = False
   try:
     summary, new_to_run, state_changed = datastore_utils.transaction(
         run, retries=retries)
@@ -324,6 +325,7 @@ def _reap_task(bot_dimensions, bot_version, to_run_key, request,
     logging.debug('hit negative cache')
     return None, None
 
+  state_changed = False
   try:
     run_result, secret_bytes, summary, state_changed = \
       datastore_utils.transaction(run, retries=0, deadline=30)
