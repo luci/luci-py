@@ -93,7 +93,11 @@ class TestGCE(auto_stub.TestCase):
                   'aliases': ['default']
               }
           },
-          'networkInterfaces': [],
+          'networkInterfaces': [{
+              'network': 'some/network1'
+          }, {
+              'network': 'some/network2'
+          }],
           'guestAttributes': {},
           'id':
           987654,
@@ -173,6 +177,9 @@ class TestGCE(auto_stub.TestCase):
 
   def test_get_tags(self):
     self.assertEqual(gce.get_tags(), ['tag1', 'tag2'])
+
+  def test_get_networks(self):
+    self.assertEqual(gce.get_networks(), ['some/network1', 'some/network2'])
 
 
 @unittest.skipUnless(gce.is_gce(), 'TestMetadata runs only on GCE machines')

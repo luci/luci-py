@@ -211,6 +211,7 @@ class TestOsUtilities(auto_stub.TestCase):
 
   def test_get_state(self):
     actual = os_utilities.get_state()
+    actual.pop('networks', None)
     actual.pop('reboot_required', None)
     actual.pop('temp', None)
     expected = {

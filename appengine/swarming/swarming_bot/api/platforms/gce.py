@@ -252,6 +252,16 @@ def get_zone():
 
 
 @tools.cached
+def get_networks():
+  """Returns the names of the networks used by the GCE VM."""
+  metadata = get_metadata()
+  names = []
+  for network in metadata['instance'].get('networkInterfaces', []):
+    names.append(network['network'])
+  return names
+
+
+@tools.cached
 def get_zones():
   """Returns the list of zone values for the GCE VM."""
   # Ref: https://cloud.google.com/compute/docs/regions-zones/

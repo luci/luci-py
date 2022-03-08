@@ -1099,6 +1099,10 @@ def get_state():
     docker_host_hostname = os.environ.get('DOCKER_HOST_HOSTNAME')
     if docker_host_hostname:
       state['docker_host_hostname'] = docker_host_hostname
+  if platforms.is_gce():
+    networks = platforms.gce.get_networks()
+    if networks:
+      state['networks'] = networks
 
   # Put an arbitrary limit on the amount of junk that can stay in TEMP.
   if nb_files_in_temp == 'N/A':
