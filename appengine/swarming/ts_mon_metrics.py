@@ -217,6 +217,7 @@ _jobs_pending_durations = gae_ts_mon.NonCumulativeDistributionMetric(
         gae_ts_mon.StringField('subproject_id'),
         gae_ts_mon.StringField('pool'),
         gae_ts_mon.StringField('status'),
+        gae_ts_mon.StringField('device_type'),
     ],
     bucketer=_bucketer)
 
@@ -235,6 +236,7 @@ _jobs_max_pending_duration = gae_ts_mon.FloatMetric(
         gae_ts_mon.StringField('subproject_id'),
         gae_ts_mon.StringField('pool'),
         gae_ts_mon.StringField('status'),
+        gae_ts_mon.StringField('device_type'),
     ])
 
 
@@ -360,7 +362,8 @@ def _set_jobs_metrics(payload):
     jobs_total += 1
     summary = query_iter.next()
     status = state_map.get(summary.state, '')
-    fields = _extract_job_fields(_tags_to_dict(summary.tags))
+    tags_dict = _tags_to_dict(summary.tags)
+    fields = _extract_job_fields(tags_dict)
     target_fields = dict(_TARGET_FIELDS)
     if summary.bot_id:
       target_fields['hostname'] = 'autogen:' + summary.bot_id
@@ -371,6 +374,9 @@ def _set_jobs_metrics(payload):
     key = tuple(sorted(fields.items()))
 
     jobs_counts[key] += 1
+
+    fields['device_type'] = tags_dict.get('device_type', '')
+    key = tuple(sorted(fields.items()))
 
     pending_duration = summary.pending_now(utils.utcnow())
     if pending_duration is not None:
