@@ -588,11 +588,16 @@ def _pubsub_notify(task_id, topic, auth_token, userdata, tags, state,
     if tags and state and start_time is not None:
       now = utils.milliseconds_since_epoch()
       latency = now - start_time
+      if latency < 0:
+        logging.warning(
+            'ts_mon_metric pubsub latency %dms (%d - %d) is negative. '
+            'Setting latency to 0', latency, now, start_time)
+        latency = 0
+      logging.debug(
+          'Updating ts_mon_metric pubsub with latency: %dms (%d - %d)', latency,
+          now, start_time)
       ts_mon_metrics.on_task_status_change_pubsub_notify_latency(
           tags, state, latency)
-      logging.debug(
-          'Updating ts_mon_metric pubsub with latency: '
-          '%dms (%d - %d)', latency, now, start_time)
 
 
 def _find_dupe_task(now, h):

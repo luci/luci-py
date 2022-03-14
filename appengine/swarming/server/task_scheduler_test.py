@@ -1748,6 +1748,20 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         ts_mon_metrics._task_state_change_pubsub_notify_error_count.get(
             fields=_get_fields(http_status_code=404)))
 
+  def test_bot_update_pubsub_negative_latency(self):
+    pub_sub_calls = self.mock_pub_sub()
+    run_result = self._quick_reap(1, 0, pubsub_topic='projects/abc/topics/def')
+    self.mock_milliseconds_since_epoch(-100)
+    self.assertEqual(
+        State.COMPLETED,
+        _bot_update_task(run_result.key, exit_code=0, duration=0.1))
+    self.assertEqual(2, len(pub_sub_calls))  # notification is sent
+    self.assertEqual(1, self.execute_tasks())
+    self.assertEqual(
+        0,
+        ts_mon_metrics._task_state_change_pubsub_notify_latencies.get(
+            fields=_get_fields()).sum)
+
   def test_bot_update_pubsub_error(self):
     pub_sub_calls = self.mock_pub_sub()
     run_result = self._quick_reap(1, 0, pubsub_topic='projects/abc/topics/def')

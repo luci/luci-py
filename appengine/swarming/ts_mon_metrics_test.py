@@ -352,6 +352,32 @@ class TestMetrics(test_case.TestCase):
         ts_mon_metrics._task_state_change_schedule_latencies.get(
             fields=fields).sum)
 
+  def test_on_task_status_change_scheduler_negative_latency(self):
+    tags = [
+        'project:test_project', 'subproject:test_subproject', 'pool:test_pool',
+        'buildername:test_builder', 'name:some_tests',
+        'build_is_experimental:true'
+    ]
+    self.mock_now(self.now, 0)
+    summary = _gen_task_result_summary(self.now,
+                                       1,
+                                       tags=tags,
+                                       expiration_delay=1,
+                                       state=task_result.State.KILLED,
+                                       created_ts=self.now +
+                                       datetime.timedelta(seconds=1))
+    # negative latencies should be recorded as 0
+    ts_mon_metrics.on_task_status_change_scheduler_latency(summary)
+    fields = {
+        'project_id': 'test_project',
+        'pool': 'test_pool',
+        'status': task_result.State.to_string(task_result.State.KILLED)
+    }
+    self.assertEqual(
+        0,
+        ts_mon_metrics._task_state_change_schedule_latencies.get(
+            fields=fields).sum)
+
   def test_on_task_status_change_pubsub_notify_latency(self):
     tags = [
         'project:test_project', 'subproject:test_subproject', 'pool:test_pool',
