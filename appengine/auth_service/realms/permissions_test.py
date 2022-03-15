@@ -10,9 +10,11 @@ import unittest
 import test_env
 test_env.setup_test_env()
 
-from proto import realms_config_pb2
-from realms import permissions
+from components.config import validation as cfgvalidation
 from test_support import test_case
+
+from proto import realms_config_pb2
+from realms import permissions, validation
 
 
 class BuilderTest(test_case.TestCase):
@@ -99,8 +101,9 @@ class HardcodedDBTest(test_case.TestCase):
 
   def test_can_be_built(self):
     db = permissions.db()
+    val = validation.Validator(cfgvalidation.Context.raise_on_error(), db, True)
     for b in db.implicit_root_bindings('proj'):
-      self.assertIsInstance(b, realms_config_pb2.Binding)
+      val.validate_binding(b, {})
 
 
 if __name__ == '__main__':
