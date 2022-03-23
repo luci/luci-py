@@ -223,13 +223,15 @@ def db():
       permission('resultdb.invocations.exportToBigQuery', internal=True),
   ])
 
-  # Allows to see the list of builders (but not builds) in a LUCI project.
+  # Allows to see the list of builders and read builds in a LUCI project.
   # Granted to Milo's own account in all LUCI projects to allow it to fetch
-  # (and cache) global builder list with a single RPC, instead of doing N
-  # per-project RPCs.
-  role('role/luci.internal.buildbucket.builders.reader', [
+  # (and cache) global builder list with a single RPC (instead of doing N
+  # per-project RPCs) and to grab any build by its numeric ID without knowing
+  # in advance what project it belongs to.
+  role('role/luci.internal.buildbucket.reader', [
       permission('buildbucket.builders.get'),
       permission('buildbucket.builders.list'),
+      permission('buildbucket.builds.get'),
   ])
 
   # UFS permissions and roles.
@@ -364,8 +366,8 @@ def db():
           principals=['project:'+project_id],
       ),
       realms_config_pb2.Binding(
-          role='role/luci.internal.buildbucket.builders.reader',
-          principals=['group:buildbucket-builders-readers'],
+          role='role/luci.internal.buildbucket.reader',
+          principals=['group:buildbucket-internal-readers'],
       ),
   ]
 
