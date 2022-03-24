@@ -599,8 +599,8 @@ class HttpService:
     else:
       error_msg = str(last_error)
     logging.error(
-        'Unable to open given url, %s, after %d attempts.\n%s',
-        request.get_full_url(), max_attempts, error_msg)
+        'Unable to open given url, %s, after %d attempts or %d timeout.\n%s',
+        request.get_full_url(), max_attempts, timeout, error_msg)
 
     return None
 

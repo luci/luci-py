@@ -44,7 +44,7 @@ AUTH_HEADERS_EXPIRATION_SEC = 9*60+30
 # How long to wait for a response from the server. Must not be greater than
 # AUTH_HEADERS_EXPIRATION_SEC, since otherwise there's a chance auth headers
 # will expire while we wait for connection.
-NET_CONNECTION_TIMEOUT_SEC = 3*60
+NET_CONNECTION_TIMEOUT_SEC = 4 * 60
 
 
 def createRemoteClient(server, auth, hostname, work_dir):
