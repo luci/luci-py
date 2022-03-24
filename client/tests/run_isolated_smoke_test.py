@@ -70,9 +70,9 @@ CONTENTS = {
 }
 
 
-CMD_REPEATED_FILES = ['python', 'repeated_files.py']
+CMD_REPEATED_FILES = ['python3', 'repeated_files.py']
 
-CMD_OUTPUT = ['python', 'output.py', '${ISOLATED_OUTDIR}/foo.txt']
+CMD_OUTPUT = ['python3', 'output.py', '${ISOLATED_OUTDIR}/foo.txt']
 
 _repeated_files = {
     'file1.txt': CONTENTS['file1.txt'],
