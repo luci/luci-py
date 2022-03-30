@@ -39,7 +39,7 @@ SERVICE_ID_PATTERN = r'[a-z0-9\-_]+'
 SERVICE_ID_RGX = re.compile(r'^%s$' % SERVICE_ID_PATTERN)
 SERVICE_CONFIG_SET_RGX = re.compile(r'^services/(%s)$' % SERVICE_ID_PATTERN)
 
-PROJECT_ID_PATTERN = r'[a-z0-9\-]{1,40}'
+PROJECT_ID_PATTERN = r'[a-z0-9\-]{1,30}'
 PROJECT_ID_RGX = re.compile(r'^%s$' % PROJECT_ID_PATTERN)
 PROJECT_CONFIG_SET_RGX = re.compile(r'^projects/(%s)$' % PROJECT_ID_PATTERN)
 
