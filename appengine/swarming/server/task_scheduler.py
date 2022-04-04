@@ -564,15 +564,12 @@ def _pubsub_notify(task_id, topic, auth_token, userdata, tags, state,
   msg = {'task_id': task_id}
   if userdata:
     msg['userdata'] = userdata
-  # TODO(b/213376141): Remove conditional checks once PubSub queues has
-  # stabilised with the new payloads
   try:
     pubsub.publish(
         topic=topic,
         message=utils.encode_to_json(msg),
         attributes={'auth_token': auth_token} if auth_token else None)
-    if tags and state and start_time is not None:
-      ts_mon_metrics.on_task_status_change_pubsub_publish_success(tags, state)
+    ts_mon_metrics.on_task_status_change_pubsub_publish_success(tags, state)
   except pubsub.TransientError as e:
     logging.exception('Transient error when sending PubSub notification')
     ts_mon_metrics.on_task_status_change_pubsub_publish_failure(
@@ -580,24 +577,21 @@ def _pubsub_notify(task_id, topic, auth_token, userdata, tags, state,
     raise e
   except pubsub.Error as e:
     logging.exception('Fatal error when sending PubSub notification')
-    if tags and state and start_time is not None:
-      ts_mon_metrics.on_task_status_change_pubsub_publish_failure(
-          tags, state, e.inner.status_code)
+    ts_mon_metrics.on_task_status_change_pubsub_publish_failure(
+        tags, state, e.inner.status_code)
     raise e
   finally:
-    if tags and state and start_time is not None:
-      now = utils.milliseconds_since_epoch()
-      latency = now - start_time
-      if latency < 0:
-        logging.warning(
-            'ts_mon_metric pubsub latency %dms (%d - %d) is negative. '
-            'Setting latency to 0', latency, now, start_time)
-        latency = 0
-      logging.debug(
-          'Updating ts_mon_metric pubsub with latency: %dms (%d - %d)', latency,
-          now, start_time)
-      ts_mon_metrics.on_task_status_change_pubsub_notify_latency(
-          tags, state, latency)
+    now = utils.milliseconds_since_epoch()
+    latency = now - start_time
+    if latency < 0:
+      logging.warning(
+          'ts_mon_metric pubsub latency %dms (%d - %d) is negative. '
+          'Setting latency to 0', latency, now, start_time)
+      latency = 0
+    logging.debug('Updating ts_mon_metric pubsub with latency: %dms (%d - %d)',
+                  latency, now, start_time)
+    ts_mon_metrics.on_task_status_change_pubsub_notify_latency(
+        tags, state, latency)
 
 
 def _find_dupe_task(now, h):
@@ -1945,12 +1939,9 @@ def task_handle_pubsub_task(payload):
   # happen in normal case.
   logging.debug("Received PubSub notify payload: (%s)", str(payload))
   try:
-    # TODO(b/213376141): Replace calls to get() with [] once PubSub queues have
-    # stabilised
-    _pubsub_notify(payload['task_id'], payload['topic'],
-                   payload['auth_token'], payload['userdata'],
-                   payload.get('tags'), payload.get('state'),
-                   payload.get('start_time'))
+    _pubsub_notify(payload['task_id'], payload['topic'], payload['auth_token'],
+                   payload['userdata'], payload['tags'], payload['state'],
+                   payload['start_time'])
   except pubsub.Error:
     logging.exception('Fatal error when sending PubSub notification')
 
