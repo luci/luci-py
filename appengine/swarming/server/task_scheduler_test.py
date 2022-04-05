@@ -78,7 +78,7 @@ def _gen_request_slices(properties=None, **kwargs):
       # constructing a DB entity, not a swarming_rpcs.NewTaskRequest.
       u'created_ts':
       now,
-      u'manual_tags': [u'tag:1', u'project:test_project'],
+      u'manual_tags': [u'tag:1'],
       u'name':
       u'yay',
       u'priority':
@@ -117,7 +117,6 @@ def _get_results(request_key):
 
 def _get_fields(**kwargs):
   fields = {
-      u'project_id': u'test_project',
       u'pool': 'default',
       u'status': State.to_string(State.COMPLETED),
   }
@@ -272,7 +271,6 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
             u'os:Windows-3.1.1',
             u'pool:default',
             u'priority:50',
-            u'project:test_project',
             u'realm:none',
             u'service_account:none',
             u'swarming.pool.template:no_config',
@@ -1221,7 +1219,6 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
             u'os:Windows-3.1.1',
             u'pool:default',
             u'priority:50',
-            u'project:test_project',
             u'realm:none',
             u'service_account:none',
             u'swarming.pool.template:no_config',

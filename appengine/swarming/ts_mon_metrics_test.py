@@ -343,7 +343,6 @@ class TestMetrics(test_case.TestCase):
     ts_mon_metrics.on_task_status_change_scheduler_latency(summary)
 
     fields = {
-        'project_id': 'test_project',
         'pool': 'test_pool',
         'status': task_result.State.to_string(task_result.State.KILLED)
     }
@@ -369,7 +368,6 @@ class TestMetrics(test_case.TestCase):
     # negative latencies should be recorded as 0
     ts_mon_metrics.on_task_status_change_scheduler_latency(summary)
     fields = {
-        'project_id': 'test_project',
         'pool': 'test_pool',
         'status': task_result.State.to_string(task_result.State.KILLED)
     }
@@ -396,7 +394,6 @@ class TestMetrics(test_case.TestCase):
         summary.tags, summary.state, latency)
 
     fields = {
-        'project_id': 'test_project',
         'pool': 'test_pool',
         'status': task_result.State.to_string(task_result.State.KILLED)
     }
@@ -451,7 +448,6 @@ class TestMetrics(test_case.TestCase):
     ts_mon_metrics.on_task_status_change_pubsub_publish_success(
         summary.tags, summary.state)
     fields = {
-        'project_id': 'test_project',
         'pool': 'test_pool',
         'status': task_result.State.to_string(task_result.State.COMPLETED)
     }
@@ -477,7 +473,6 @@ class TestMetrics(test_case.TestCase):
     ts_mon_metrics.on_task_status_change_pubsub_publish_failure(
         summary.tags, summary.state, 404)
     fields = {
-        'project_id': 'test_project',
         'pool': 'test_pool',
         'status': task_result.State.to_string(task_result.State.COMPLETED),
         'http_status_code': 404
