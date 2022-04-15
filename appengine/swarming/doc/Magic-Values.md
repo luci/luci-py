@@ -12,8 +12,6 @@ dimensions and state values have special meaning.
 
 For tools in luci-py/client, the following environment variables have effect:
 
-*   `ISOLATE_SERVER` sets the default value of --isolate-server.
-*   `ISOLATE_DEBUG` sets --verbose verbosity.
 *   `SWARMING_SERVER` sets the default value for --swarming.
 
 

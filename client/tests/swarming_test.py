@@ -147,7 +147,6 @@ class TestMain(NetTestCase):
 
 
 if __name__ == '__main__':
-  for env_var_to_remove in ('ISOLATE_SERVER', 'SWARMING_TASK_ID',
-                            'SWARMING_SERVER'):
+  for env_var_to_remove in ('SWARMING_TASK_ID', 'SWARMING_SERVER'):
     os.environ.pop(env_var_to_remove, None)
   test_env.main()
