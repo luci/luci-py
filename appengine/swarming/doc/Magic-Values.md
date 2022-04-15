@@ -52,23 +52,11 @@ starting `swarming_bot.zip` to alter the bot's behavior:
 *   `DOCKER_HOST_HOSTNAME` dumps the value of this env var to the bot's state
     under the `docker_host_hostname` field. Used to advertise the hostname of
     the host machine when the bot is running within a container.
-*   `LUCI_GRPC_PROXY_TLS_ROOTS=<file>` and points to a .crt file containing
-    certificate authorities. `LUCI_GRPC_PROXY_TLS_OVERRIDE=<name>` specifies the
-    name of the server in the certificate. These are useful for testing a gRPC
-    proxy running on localhost but with TLS enabled. Unlike the `*_GRPC_PROXY`
-    env vars, these are shared between Swarming and Isolated since they're only
-    used in the limited case when you need to override TLS. See
-    [/client/utils/grpc_proxy.py](../../../client/utils/grpc_proxy.py) for more
-    information.
-*   `LUCI_GRPC_PROXY_VERBOSE` dumps out additional gRPC proxy information if set
-    to a truthy value (e.g. `1`).
 *   `SWARMING_BOT_ID` can be used to override hostname-based bot ID with a
     custom value. Must be specified before Swarming script is started. Note that
     this environment variable will be set even if it was not specified manually
     and will always contain the bot ID used.
 *   `SWARMING_EXTERNAL_BOT_SETUP=1` disables `bot_config.setup_bot()` hook.
-*   `SWARMING_GRPC_PROXY=<url>` and `ISOLATED_GRPC_PROXY=<url>` override the
-    equivalent value in the bot config.
 
 
 #### Bot dimensions
@@ -81,7 +69,7 @@ starting `swarming_bot.zip` to alter the bot's behavior:
 *   `pool`: **must** be a list with at least one value. Pools are used to
     provide some isolation between categories of tasks, and as a secondary
     access control mechanism. See
-    [pools.proto](https://chromium.googlesource.com/infra/luci/luci-py.git/+/master/appengine/swarming/proto/pools.proto)
+    [pools.proto](../proto/config/pools.proto)
     for more information.
 
 **Optional**:
@@ -148,7 +136,7 @@ The tags are in `key:value` format but other than that, they are free form and
 user chosen. A small subset of the tags have predefined meaning:
 
 *   `allow_milo:1`: Tells Swarming Web UI to enable the [LUCI
-    Milo](https://chromium.googlesource.com/infra/luci/luci-go/+/master/milo/)
+    Milo](https://chromium.googlesource.com/infra/luci/luci-go/+/main/milo/)
     annotation processing support.
 *   `source_revision`: if present, it specifies the SCM revision related to the
     task. This allows the UI to link to the relevant revision.

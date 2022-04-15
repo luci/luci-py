@@ -30,6 +30,10 @@
     *   Unique bot ID across the fleet. The bot ID uses the base hostname (not
         FQDN) by default so by default, hostnames should be unique. You may
         specify custom bot ID using `SWARMING_BOT_ID` environment variable.
+*   Windows
+    * [pywin32](https://pypi.org/project/pywin32/)
+*   macOS
+    * [PyObjC](https://pypi.org/project/pyobjc/)
 *   Android
     *   On an Debian desktop host, the current user must be a member
         of `plugdev` so it can open USB ports.
@@ -160,16 +164,14 @@ to have more slower Swarming bots to reduce the overall latency.
 
 #### Disk space usage
 
-`run_isolated.py` by default keeps a local cache of 20gb or 100,000 items, which
-ever comes first. It also enforces that at least 2gb of free disk space remains
-at the start and end of execution. Taking in account the swarming_bot code is of
-negligible size and the amount of data used in the chrome infrastructure is
-fairly static, 30gb of free disk space (after OS installation) should be
-sufficient for most purposes. YMMV. This could have to be revisited in case of
-significant use case change, e.g. starting to run tests for another project. As
-an example, Blink layout tests consist of ~80k files so it is near the 100k
-items default limit. As such, 50gb would be ample free room, anything above is
-likely wasted space.
+`run_isolated.py` by default keeps a local cache of 50GiB or 50k items for large
+files, which ever comes first. It also enforces that at least 4GiB of free disk
+space remains at the start and end of execution. Taking in account the
+swarming_bot code is of negligible size and the amount of data used in the
+chrome infrastructure is fairly static, 30GiB of free disk space (after OS
+installation) should be sufficient for most purposes. YMMV. This could have to
+be revisited in case of significant use case change, e.g. starting to run tests
+for another project.
 
 
 #### CPU and RAM Specing
@@ -197,7 +199,7 @@ There are two places where bots behavior can be tweaked:
     server, and injected into the swarming_bot.zip each time a zip is requested.
     It is a python module that defines hook functions called during various
     stages of the bot life. It can contain essentially any code, and it is
-    executed only on the bot. See Hooks section below.
+    executed only on the bot. See [Hooks](#hooks) section below.
 *   `bots.cfg` (with the schema defined by
     [bots.proto](../proto/config/bots.proto)).
     This is purely server side configuration, fetched via luci-config. It
@@ -239,7 +241,7 @@ are classified by a few categories via their prefix:
         requests to the server. The bot may pick different authentication
         methods based on where it runs. This should match to what the server
         expects to see (as defined by bots.cfg, see `require_*` fields in
-        [bots.proto](../proto/bots.proto)).
+        [bots.proto](../proto/config/bots.proto)).
     *   `get_settings` returns "settings" to setup specific settings, e.g.
         minimum free space to keep, maximum number of items to keep in the
         cache, etc. See [bot_config.py](../swarming_bot/config/bot_config.py)
@@ -253,10 +255,10 @@ are classified by a few categories via their prefix:
 
 The Swarming bot runs health self-check and reports itself as quarantined if any
 of the checks do not pass. The report is done through either [`quarantined`
-dimension](Magic-Values.md#dimensions) or [`quarantined`
-state](Magic-Values.md#state). State is preferred, since it is easier to include
-a long string describing the issue observed. Support for `quarantined` in
-dimensions may be removed at a later time. By default, the bot runs the
+dimension](Magic-Values.md#bot-dimensions) or [`quarantined`
+state](Magic-Values.md#bot-states). State is preferred, since it is easier to
+include a long string describing the issue observed. Support for `quarantined`
+in dimensions may be removed at a later time. By default, the bot runs the
 following rules:
 
 *   `TEMP` contains no more than 1024 files. Otherwise it likely means a leak is
@@ -301,7 +303,8 @@ The bot aggressively manages the directory containing `swarming_bot.zip`.
     are for incremental builds, local git clones, etc. Deleting it causes the
     next task to start with a fresh empty cache.
 *   `cipd_cache/` is a version cache for CIPD packages.
-*   `isolated_cache/` is the isolated cache. It is managed by run_isolated.py.
+*   `cas_cache/` and `cas_kvs_cache_db` are the RBE-CAS cache. It is managed by
+    run_isolated.py.
     Deleting it causes the next task to download all the inputs files instead of
     reusing previously downloaded files.
 *   `logs/` is the logs for all the processes. Deleting it is fine, the
@@ -339,7 +342,7 @@ processes themselves. The logs are as follow:
     not supposed to do any output so it can be analysed here for any internal
     failure that would cause a dump to stderr.
 
-Logs are currently not upstreamed to the server.
+Some bots upload logs to Cloud Logging.
 
 
 ### Control flow
@@ -405,8 +408,9 @@ task_runner starts run_isolated. run_isolated handles the download of inputs
 Inside the manifest describing the task to run, the server adds the versioned
 URL of the server to use for the lifetime of the task, so that the bot is not
 affected by default server version change while the bot is running. So while
-config.json declares a server URL like `https://foo.com`, the manifest will tell
-the bot to send all requests related to the task to `https://1234-dot-foo.com`.
+config.json declares a server URL like `https://foo.appspot.com`, the manifest
+will tell the bot to send all requests related to the task to
+`https://1234-dot-foo.appspot.com`.
 This removes the need to version the bot API at all.
 
 Only once a task is executed successfully that swarming_bot.zip is updated with
@@ -441,15 +445,15 @@ task_runner defers the actual task execution to
 #### Isolated task
 
 [run_isolated.py](../../../client/run_isolated.py) doesn't know about Swarming
-at all, it only knows about the Isolate server. task_runner doesn't know about
-isolate, it only knows how to stream stdout back to the Swarming server.
+at all, it only knows about the RBE-CAS server. task_runner doesn't know about
+RBE-CAS, it only knows how to stream stdout back to the Swarming server.
 
 This clear separation of tasks permits much simpler and focused code.
 task_runner purely handle the Swarming task management while run_isolated purely
 handles the cache management and isolated file processing, including uploading
 results back.
 
-This also reduces the knowledge of Isolate as much as possible from the Swarming
+This also reduces the knowledge of RBE-CAS as much as possible from the Swarming
 bot. Only task_runner knows how to translate the isolated Swarming task to
 run_isolated command line arguments.
 
@@ -458,7 +462,7 @@ The process tree ends up like this:
     bot_main -> task_runner -> run_isolated -> child_process
 
 
-##### Isolated cache
+##### RBE-CAS cache
 
 What makes isolated testing efficient is the high cache hit rate. To ensure high
 cache hit rate, a local content addressed read only cache must outlive each
@@ -466,7 +470,7 @@ task. task_runner tells run_isolated to use the same local cache directory at
 each task that is outside the `work` directory.
 
 While it is preferable to keep `cache` directory, it is safe to delete, it will
-be recreated as needed from the isolate server.
+be recreated as needed from the RBE-CAS server.
 
 
 #### Event reporting
@@ -542,9 +546,9 @@ Most importantly, [config.json](../swarming_bot/config/config.json) contains the
 *URL of server*, so the bot knows which server to contact for execution.
 
 The URL listed is the hostname that was used to do the HTTP GET request. That
-is, if a user does `https://foo.com/bot_bot` and another does
-`https://foo.com:443/bot_code`, the generated zips will be different and will
-have different digests.
+is, if a user does `https://foo.appspot.com/bot_bot` and another does
+`https://foo.appspot.com:443/bot_code`, the generated zips will be different and
+will have different digests.
 
 
 #### Versioning
@@ -576,8 +580,6 @@ Enforcement falls on different process:
 
 *   [run_isolated.py](../../../client/run_isolated.py) implements hard timeout,
     which excludes the overhead of download and upload.
-*   [task_runner.py](../swarming_bot/bot_code/task_runner.py) implements hard
-    timeout for raw task. For isolated task, it let run_isolated enforce it.
 *   [task_runner.py](../swarming_bot/bot_code/task_runner.py) implements I/O
     timeout, since it's the one handling the task's process output.
 *   [bot_main.py](../swarming_bot/bot_code/bot_main.py) implements a last ditch
@@ -619,8 +621,8 @@ looked at and a minimal design was created that didn't have any of the undesired
 properties.
 
 Here's the laundry list of anti-patterns observed from the system we
-historically used, [buildbot](https://buildbot.net/), and other similar systems
-([Jenkins](https://jenkins-ci.org/) and several other CI systems falls in the
+historically used, [buildbot](https://buildbot.net), and other similar systems
+([Jenkins](https://jenkins.io) and several other CI systems falls in the
 same bucket) and how these were addressed. Don't take this as
 _Jenkins/buildbot/etc is bad_, it's about redesigning the core functionality
 from observed failure modes. The primary goal is to reduce maintenance work for
@@ -653,9 +655,8 @@ is fairly large.
             after every single task.
     *   Bots required many python libraries or other third parties to be
         preinstalled.
-        *   The Swarming bot contains all the python libraries that are needed.
-            The code is designed to not depend on OS specific libraries (like
-            pywin32) and use raw calls instead to reduce the footprint.
+        *   The Swarming bot contains almost all the python libraries that are
+            needed except for pywin32 on Windows and PyObjC on macOS.
 *   API and deployment
     *   Bot API versioning. Updating bots and Swarming server has to be done
         synchronously and/or the bot API has to be versioned.
