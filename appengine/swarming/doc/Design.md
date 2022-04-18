@@ -61,7 +61,8 @@ the internet and bots manage their version by themselves.
 ## Non Goals
 
   - Very low latency (<5s) tasks distribution.
-  - File distribution. Use the [[Isolated Design|Isolate Server]] for that.
+  - File distribution. Use the [RBE-CAS](http://go/rbe/dev/architecture/cas) (google
+    internal) for that.
   - Leasing a bot. There's no connectivity between the clients and the bot.
 
 
@@ -101,7 +102,7 @@ Here's how it looks like once running via Swarming:
                                          |
                                          v
                          +-----------------------------------+
-                         |Archive to Isolate Server (30 secs)|
+                         |Archive to RBE-CAS Server (30 secs)|
                          +---------------+-------------------+
                                          |
                                          |
@@ -117,7 +118,8 @@ test named "Test Extra Slow"? It's still a 10 minutes builds. *Run tests in
 O(1)*.
 
 What's the secret sauce to make it work efficiently in practice and lower file
-transfer overhead? The [[Isolated Design|Isolate Server]].
+transfer overhead? The [RBE-CAS](http://go/rbe/dev/architecture/cas) (google
+internal).
 
 
 ## No single point of failure
@@ -181,7 +183,7 @@ Things you don't have to care about anymore:
    - NoSQL means no schema update.
    - No upfront cost, usage based cost.
    - Because there's no single server, all the states are always, and by
-     definition, saved in the [Cloud DB](https://developers.google.com/datastore/).
+     definition, saved in the [Cloud DB](https://cloud.google.com/datastore/docs).
 
 
 ## Performance expectations
