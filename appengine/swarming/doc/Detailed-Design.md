@@ -10,14 +10,15 @@ network or device flakiness.
 
 ### Server
 
-The server runs on [AppEngine](https://developers.google.com/appengine/) and is
+The server runs on [AppEngine](https://cloud.google.com/appengine/docs) and is
 the only communication point for any client or bot that wants to use Swarming.
 Clients send task requests to the server and receive a task ID. It's up to the
 client to poll the server to know when a task is done.
 
-The server uses its DB to store the tasks, the bots' state and stdout from the
-tasks. It exposes the web frontend UI, client JSON REST API and bot JSON API. It
-uses OAuth2 (or optionally the IP allowlist) to authenticate clients.
+The server uses its DB to store the tasks, the bots' state and stdout/stderr
+from the tasks. It exposes the web frontend UI, client JSON REST API and bot
+JSON API. It uses OAuth2 (or optionally the IP allowlist) to authenticate
+clients.
 
 Task requests have a set of dimensions associated to it. It's the server that
 matches the request's dimensions to find a bot which has the same set of
@@ -132,10 +133,9 @@ task is marked as `COMPLETED_SUCCESS` when the exit code is 0.
 
 #### Orphaned task
 
-If a task stops being updated by its bot after 5 minutes, a cron job will abort
-the task with BOT_DIED. This condition is **masked by retrying the task
-transparently on the next available bot**. Only **one** retry is permitted to
-not overflow the infrastructure with potentially broken tasks.
+If a task stops being updated by its bot after 20 minutes (this can be
+configured by `bot_ping_tolerance_secs` in task request property), a cron job
+will abort the task with BOT_DIED.
 
 If any part of the scheduling, execution or processing of results fails, this is
 considered an infrastructure failure.
@@ -143,7 +143,7 @@ considered an infrastructure failure.
 
 ### Task deduplication
 
-If a task is marked as idempotent, e.g. `--idempotent` is used, the client
+If a task is marked as idempotent, e.g. `-idempotent` is used, the client
 certifies that the task do not have side effects. This means that running the
 task twice shall return the same results (pending flakiness).
 
@@ -165,9 +165,10 @@ information.
 
 ### Caveats of running on AppEngine
 
-   - Reliability. The main caveat of running on AppEngine is that it is ~99.99%
-     stable. A simple task scheduling services that is running on a single host
-     would never have to care about this. This forces the code and client to be
+   - Reliability. The main caveat of running on AppEngine is that it is
+     [99.95%](https://cloud.google.com/appengine/sla) stable. A simple task
+     scheduling services that is running on a single host would never have to
+     care about this. This forces the code and client to be
      *extremely defensive*.
    - No "process" or "thread" makes simple things difficult; message passing has
      to be DB based, cannot be only in-memory. Have to use memcache instead of
@@ -213,7 +214,7 @@ server. Once done, it starts polling again.
 Only two basic assumptions are:
 
    - The bot must be able to access the server through HTTPS.
-   - python 2.7 must be installed.
+   - python3.6+ must be installed.
 
 The bot's code is served directly from the server as a self-packaged
 `swarming_bot.zip`. The server generates it on the fly and embeds its own URL in
@@ -272,7 +273,7 @@ Raspbian.
 
 The bot publishes a dictionary of *dimensions*, which is a dict(key,
 list(values)), where each value can have multiple values. For example, a Windows
-XP bot would have `'os': ['Windows', 'Windows-10-15063']`. This permits broad or
+10 bot would have `'os': ['Windows', 'Windows-10-15063']`. This permits broad or
 scoped selection of bot type.
 
 For desktop OSes, it's about the OS and hardware properties. For devices, it's
@@ -330,7 +331,7 @@ See [APIs](#apis) above to write your own client.
 ### Requesting a task
 
 When a client wishes to run something on Swarming, they can use the REST API or
-use the client script `swarming.py trigger`. It's a simple HTTPS POST with the
+use the Go client `swarming trigger`. It's a simple HTTPS POST with the
 `TaskRequest` and `TaskProperties` serialized as JSON.
 
 The request message is `NewTaskRequest` as defined in
@@ -342,13 +343,14 @@ The request message is `NewTaskRequest` as defined in
 The bot selection process is inverted. It's the bot that polls for tasks. It
 looks at all the products of all the `dimensions` it has and look at the oldest
 task with highest priority that has `dimensions` which are also defined on the
-bot.
+bot. If a task uses OR dimension (e.g. '|' in 'os:Ubuntu-18|Ubuntu-16), then
+bots having one of the OR'd dimension can poll the task.
 
 
 ### Authentication
 
-   - The Web UI is implemented in Polymer and uses the same API as the client,
-     both are authenticated via OAuth2.
+   - The Web UI is implemented in [lit](https://lit.dev/) and uses the same API
+     as the client, both are authenticated via OAuth2.
    - Bots using the REST APIs can optionally if their IPs are in the allowlist.
 
 
