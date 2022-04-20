@@ -35,8 +35,8 @@ class BackendTest(test_env_handlers.AppTestBase):
   no_run = 1
 
   def mock_pubsub_requests(self):
-    self.mock(pubsub, 'publish_multi', lambda _topic, _message: None)
-    return None
+    # enumerate `messages` to evaluate comprehensions at test-time.
+    self.mock(pubsub, 'publish_multi', lambda _topic, messages: list(messages))
 
   def _GetRoutes(self, prefix):
     """Returns the list of all routes handled."""

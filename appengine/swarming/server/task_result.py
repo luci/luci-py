@@ -1652,11 +1652,9 @@ def task_bq_run(start, end):
     bq_state.send_to_bq('task_results_run', rows)
     pubsub.publish_multi(
         'projects/%s/topics/task_results_run' %
-        (app_identity.get_application_id()), {
-            str(index): json_format.MessageToJson(result[1])
-            for index, result in enumerate(rows)
-        })
-
+        (app_identity.get_application_id()),
+        ((json_format.MessageToJson(result), None)
+         for _task_id, result in rows))
   return total
 
 
@@ -1695,11 +1693,9 @@ def task_bq_summary(start, end):
     bq_state.send_to_bq('task_results_summary', rows)
     pubsub.publish_multi(
         'projects/%s/topics/task_results_summary' %
-        (app_identity.get_application_id()), {
-            str(index): json_format.MessageToJson(summary[1])
-            for index, summary in enumerate(rows)
-        })
-
+        (app_identity.get_application_id()),
+        ((json_format.MessageToJson(summary), None)
+         for _task_id, summary in rows))
   return total
 
 
