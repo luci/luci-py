@@ -1,5 +1,7 @@
 # Monitoring
 
+There is [internal](http://go/swarming/monitoring) document too.
+
 Monitoring is done in two parts: capacity and throughput.
 
 Capacity is about the bots and what they are doing. Are bots efficient, mostly
