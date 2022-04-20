@@ -1,3 +1,3 @@
 # api
 
-Contains the protobufs for the Swarming pRPC API.
+Contains the protobufs for the Swarming BigQuery schema/pRPC API.
