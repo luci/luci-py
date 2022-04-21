@@ -27,9 +27,7 @@ from google.appengine.ext import ndb
 import webtest
 
 from components import auth_testing
-from components import pubsub
 from components import utils
-from depot_tools import auto_stub
 from test_support import test_case
 
 from proto.api import swarming_pb2  # pylint: disable=no-name-in-module
@@ -150,12 +148,6 @@ class TaskResultApiTest(TestCase):
     self.now = datetime.datetime(2014, 1, 2, 3, 4, 5, 6)
     self.mock_now(self.now)
     self.mock(random, 'getrandbits', lambda _: 0x88)
-    self.sMock = auto_stub.SimpleMock(self)
-    self.sMock._register_call(caller_name="pubsub.publish_multi")
-
-  def mock_pubsub_requests(self):
-    self.mock(pubsub, 'publish_multi', lambda _topic, _message: None)
-    return None
 
   def assertEntities(self, expected, entity_model):
     self.assertEqual(expected, get_entities(entity_model))
@@ -1091,11 +1083,7 @@ class TaskResultApiTest(TestCase):
     # Empty, nothing is done.
     start = utils.utcnow()
     end = start + datetime.timedelta(seconds=60)
-    self.mock_pubsub_requests()
     self.assertEqual(0, task_result.task_bq_run(start, end))
-
-    # assert pubsub_multi was called
-    self.assertTrue(self.sMock.pop_calls())
 
   def test_task_bq_run(self):
     payloads = self._mock_send_to_bq('task_results_run')
@@ -1123,11 +1111,8 @@ class TaskResultApiTest(TestCase):
     run_result_4.modified_ts = utils.utcnow()
     run_result_4.put()
 
-    self.mock_pubsub_requests()
     self.assertEqual(2, task_result.task_bq_run(start, end))
     self.assertEqual(1, len(payloads), payloads)
-    # assert pubsub_multi was called
-    self.assertTrue(self.sMock.pop_calls())
     actual_rows = payloads[0]
     self.assertEqual(2, len(actual_rows))
     expected = [
@@ -1146,11 +1131,8 @@ class TaskResultApiTest(TestCase):
     run_result.put()
     end = self.mock_now(self.now, 60)
 
-    self.mock_pubsub_requests()
     self.assertEqual(0, task_result.task_bq_run(start, end))
     self.assertEqual(0, len(payloads), payloads)
-    # assert pubsub_multi was called
-    self.assertTrue(self.sMock.pop_calls())
 
   def test_task_bq_run_recent_abandoned_ts(self):
     # Confirm that a recent entity without completed_ts set is not found.
@@ -1165,17 +1147,13 @@ class TaskResultApiTest(TestCase):
     self.assertIsNone(run_result.key.get().completed_ts)
     end = self.mock_now(self.now, 60)
 
-    self.mock_pubsub_requests()
     self.assertEqual(0, task_result.task_bq_run(start, end))
     self.assertEqual(0, len(payloads), payloads)
-    # assert pubsub_multi was called
-    self.assertTrue(self.sMock.pop_calls())
 
   def test_task_bq_summary_empty(self):
     # Empty, nothing is done.
     start = utils.utcnow()
     end = start + datetime.timedelta(seconds=60)
-    self.mock_pubsub_requests()
     self.assertEqual(0, task_result.task_bq_summary(start, end))
 
   def test_task_bq_summary(self):
@@ -1204,11 +1182,8 @@ class TaskResultApiTest(TestCase):
     result_4.modified_ts = utils.utcnow()
     result_4.put()
 
-    self.mock_pubsub_requests()
     self.assertEqual(2, task_result.task_bq_summary(start, end))
     self.assertEqual(1, len(payloads), payloads)
-    # assert pubsub_multi was called
-    self.assertTrue(self.sMock.pop_calls())
     actual_rows = payloads[0]
     self.assertEqual(2, len(actual_rows))
     expected = [
@@ -1227,11 +1202,8 @@ class TaskResultApiTest(TestCase):
     result.put()
     end = self.mock_now(self.now, 60)
 
-    self.mock_pubsub_requests()
     self.assertEqual(0, task_result.task_bq_summary(start, end))
     self.assertEqual(0, len(payloads), payloads)
-    # assert pubsub_multi was called
-    self.assertTrue(self.sMock.pop_calls())
 
   def test_task_bq_summary_running(self):
     payloads = self._mock_send_to_bq('task_results_summary')
@@ -1243,11 +1215,8 @@ class TaskResultApiTest(TestCase):
     result.put()
     end = self.mock_now(self.now, 60)
 
-    self.mock_pubsub_requests()
     self.assertEqual(0, task_result.task_bq_summary(start, end))
     self.assertEqual(0, len(payloads), payloads)
-    # assert pubsub_multi was called
-    self.assertTrue(self.sMock.pop_calls())
 
   def test_task_bq_summary_recent_abandoned_ts(self):
     # Confirm that a recent entity without completed_ts set is not found.
@@ -1263,11 +1232,8 @@ class TaskResultApiTest(TestCase):
     self.assertIsNone(result.key.get().completed_ts)
     end = self.mock_now(self.now, 60)
 
-    self.mock_pubsub_requests()
     self.assertEqual(0, task_result.task_bq_summary(start, end))
     self.assertEqual(0, len(payloads), payloads)
-    # assert pubsub_multi was called
-    self.assertTrue(self.sMock.pop_calls())
 
   def test_get_result_summaries_query(self):
     # Indirectly tested by API.

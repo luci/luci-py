@@ -63,14 +63,11 @@ import hashlib
 import logging
 
 from google.appengine import runtime
-from google.appengine.api import app_identity
 from google.appengine.api import datastore_errors
 from google.appengine.api import memcache
 from google.appengine.ext import ndb
-from google.protobuf import json_format
 
 from components import datastore_utils
-from components import pubsub
 from components import utils
 from proto.api import swarming_pb2  # pylint: disable=no-name-in-module
 from server import bq_state
@@ -1015,11 +1012,5 @@ def task_bq_events(start, end):
   while more:
     entities, cursor, more = q.fetch_page(500, start_cursor=cursor)
     total += len(entities)
-    rows = [_convert(e) for e in entities]
-    bq_state.send_to_bq('bot_events', rows)
-    pubsub.publish_multi(
-        'projects/%s/topics/bot_events' % (app_identity.get_application_id()), {
-            str(index): json_format.MessageToJson(event[1])
-            for index, event in enumerate(rows)
-        })
+    bq_state.send_to_bq('bot_events', [_convert(e) for e in entities])
   return total

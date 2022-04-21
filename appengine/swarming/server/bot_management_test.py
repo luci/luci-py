@@ -20,9 +20,7 @@ from google.protobuf import timestamp_pb2
 from google.appengine.api import memcache
 from google.appengine.ext import ndb
 
-from components import pubsub
 from components import utils
-from depot_tools import auto_stub
 from test_support import test_case
 
 from proto.api import swarming_pb2  # pylint: disable=no-name-in-module
@@ -153,12 +151,6 @@ class BotManagementTest(test_case.TestCase):
     super(BotManagementTest, self).setUp()
     self.now = datetime.datetime(2010, 1, 2, 3, 4, 5, 6)
     self.mock_now(self.now)
-    self.sMock = auto_stub.SimpleMock(self)
-    self.sMock._register_call(caller_name="pubsub.publish_multi")
-
-  def mock_pubsub_requests(self):
-    self.mock(pubsub, 'publish_multi', lambda _topic, _message: None)
-    return None
 
   def test_all_apis_are_tested(self):
     actual = frozenset(i[5:] for i in dir(self) if i.startswith('test_'))
@@ -695,11 +687,7 @@ class BotManagementTest(test_case.TestCase):
     # Empty, nothing is done.
     start = utils.utcnow()
     end = start+datetime.timedelta(seconds=60)
-    self.mock_pubsub_requests()
     self.assertEqual(0, bot_management.task_bq_events(start, end))
-
-    # assert pubsub_multi was called
-    self.assertTrue(self.sMock.pop_calls())
 
   def test_task_bq_events(self):
     payloads = []
@@ -742,14 +730,9 @@ class BotManagementTest(test_case.TestCase):
     _bot_event(event_type='request_sleep')  # stored
     end = self.mock_now(self.now, 25)
 
-    # Mock pubsub calls
-    self.mock_pubsub_requests()
-
     # normal request_sleep is not streamed.
     bot_management.task_bq_events(start, end)
     self.assertEqual(1, len(payloads))
-    # assert pubsub_multi was called
-    self.assertTrue(self.sMock.pop_calls())
     actual_rows = payloads[0]
     expected = [
         (r[0], bot_management.BotEvent._MAPPING[r[1]]) for r in [

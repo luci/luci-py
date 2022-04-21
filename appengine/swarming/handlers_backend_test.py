@@ -20,9 +20,7 @@ from google.appengine.ext import ndb
 import webtest
 
 import handlers_backend
-from components import pubsub
 from components import utils
-from depot_tools import auto_stub
 from server import bot_management
 from server import task_queues
 from server import task_request
@@ -34,10 +32,6 @@ class BackendTest(test_env_handlers.AppTestBase):
   # Need to run in sequential_test_runner.py
   no_run = 1
 
-  def mock_pubsub_requests(self):
-    self.mock(pubsub, 'publish_multi', lambda _topic, _message: None)
-    return None
-
   def _GetRoutes(self, prefix):
     """Returns the list of all routes handled."""
     return [
@@ -47,8 +41,6 @@ class BackendTest(test_env_handlers.AppTestBase):
 
   def setUp(self):
     super(BackendTest, self).setUp()
-    self.sMock = auto_stub.SimpleMock(self)
-    self.sMock._register_call(caller_name="pubsub.publish_multi")
     # By default requests in tests are coming from bot with fake IP.
     self.app = webtest.TestApp(
         handlers_backend.create_application(True),
@@ -69,8 +61,6 @@ class BackendTest(test_env_handlers.AppTestBase):
     return self._enqueue_task_async_orig(*args, **kwargs)
 
   def test_crons(self):
-    # Mock the response to pub/sub calls made in bot_management
-    self.mock_pubsub_requests()
     # Tests all the cron tasks are securely handled.
     prefix = '/internal/cron/'
     cron_job_urls = [r.template for r in self._GetRoutes(prefix)]
@@ -91,8 +81,6 @@ class BackendTest(test_env_handlers.AppTestBase):
           response.body)
     # The actual number doesn't matter, just make sure they are unqueued.
     self.execute_tasks()
-    # assert pubsub_multi was called
-    self.assertTrue(self.sMock.pop_calls())
 
   def test_cron_monitoring_bots_aggregate_dimensions(self):
     # Tests that the aggregation works
