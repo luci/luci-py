@@ -168,9 +168,8 @@ def publish_multi(topic, messages):
 
   Args:
     topic: Full name of the topic to publish to.
-    messages: Sequence of (message data, attributes) tuples, where attributes
-      is a {str: str} dictionary (None is treated as an empty dict). The
-      message data will be base64 encoded for you.
+    messages: Content of the message to publish mapped to any attributes to
+      send with the message.
 
   Raises:
     Error or TransientError.
@@ -178,7 +177,7 @@ def publish_multi(topic, messages):
   assert validate_full_name(topic, 'topics'), topic
   messages = [
       {'attributes': attributes or {}, 'data': base64.b64encode(message)}
-      for message, attributes in messages
+      for message, attributes in messages.items()
   ]
 
   def call_publish():
@@ -198,7 +197,7 @@ def publish(topic, message, attributes):
   Raises:
     Error or TransientError.
   """
-  publish_multi(topic, ((message, attributes),))
+  publish_multi(topic, {message: attributes})
 
 
 def modify_ack_deadline_async(subscription, deadline, *ack_ids):
