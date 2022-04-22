@@ -60,12 +60,12 @@ release process.
 *   If you plan to use a [config service](../config_service) (the normal case):
     *   Make sure it is setup already.
     *   Make sure you set
-        [SettingsCfg.ui_client_id](https://chromium.googlesource.com/infra/luci/luci-py/+/master/appengine/swarming/proto/config.proto)
+        [SettingsCfg.ui_client_id](proto/config/config.proto)
         to be \<client_id\>
     *   [Follow instruction
         here](../components/components/config/#linking-to-the-config-service).
 *   If you are not using a config service, see [Configuring using FS
-    mode](https://chromium.googlesource.com/infra/luci/luci-py/+/master/appengine/components/components/config/README.md#fs-mode).
+    mode](../components/components/config/README.md#fs-mode).
     *   You'll need to add an entry to settings.cfg like `ui_client_id:
         "<client_id>"`
     *   You also need to update chrome-infra-auth/oauth.cfg to add `client_ids:
@@ -103,7 +103,7 @@ You still need an OAuth2 client id if you want to use the Web UI:
             `012345678901-abcdefghijklmnopqrstuvwxyzabcdef.apps.googleusercontent.com`.
         *   You will have to do the 'consent' flow.
 *   Configure to use this client ID [using FS
-    mode](https://chromium.googlesource.com/infra/luci/luci-py/+/master/appengine/components/components/config/README.md#fs-mode).
+    mode](../components/components/config/README.md#fs-mode).
     Create `configs/services/swarming-local/CONFIGS/settings.cfg` with:
 
           mkdir -p configs/services/swarming-local/CONFIGS/
@@ -113,7 +113,7 @@ You still need an OAuth2 client id if you want to use the Web UI:
     allowed to localhost, you can `ssh workstation -L 9050:localhost:9050`.
     Make sure that any corp proxy is bypassed as needed.
 
-You can run a swarming+isolate local setup with:
+You can run a swarming+RBE-CAS local setup with:
 
     ./tools/start_servers.py
 
