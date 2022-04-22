@@ -37,17 +37,11 @@ The scheduling optimisation is done via:
     TaskRunResult describes the result for this run on this specific bot.
   - When the bot is done, a PerformanceStats entity is saved as a child entity
     of the TaskRunResult.
-  - If the TaskRequest is retried automatically due to the bot dying, an
-    automatic on task failure or another infrastructure related failure, another
-    TaskRunResult will be created when another bot reaps the task again.
-    TaskResultSummary is the summary of the last relevant TaskRunResult.
 
 
 ### Task schema
 
-This schema is an example of a task with two tries. This happens when the first
-try resulted in `TaskRunResult.state == BOT_DIED`. This is a relatively rare
-case.
+This schema is an example of a task.
 
 **Note**: Entities marked with an asterisk `*` may not be stored in certain
 situations, like for deduplicated tasks, tasks that didn't run due to internal
@@ -90,16 +84,16 @@ failure, or tasks with no secret bytes provided (for SecretBytes).
     |id=1             |
     +-----------------+
         |
-        +----------------+
-        |                |
-        v                v
-    +-------------+   +-------------+
-    |TaskRunResult|*  |TaskRunResult|*                            task_result.py
-    |  +--------+ |   |  +--------+ |
-    |  |FilesRef| |   |  |FilesRef| |
-    |  +--------+ |   |  +--------+ |
-    |id=1 <try #> |   |id=2         |
-    +-------------+   +-------------+
+        |
+        |
+        v
+    +-------------+
+    |TaskRunResult|*                                              task_result.py
+    |  +--------+ |
+    |  |FilesRef| |
+    |  +--------+ |
+    |id=1         |
+    +-------------+
         |
         +----------------------+
         |                      |
@@ -168,7 +162,7 @@ This schema is about the audit of the events of bots.
         |      v           v              v
         |  +--------+  +--------+     +--------+
         |  |BotEvent|  |BotEvent| ... |BotEvent|               bot_management.py
-        |  |id=fffff|  |if=ffffe| ... |id=00000|
+        |  |id=fffff|  |id=ffffe| ... |id=00000|
         |  +--------+  +--------+     +--------+
         |
         +------+
