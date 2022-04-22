@@ -18,14 +18,14 @@ your app. In a fresh instance, group names default to
 
 * Configure the group names for each role in the configuration file;
   see the [`config_service`](../../config_service) for details, and
-  AuthSettings in [proto/config.proto](../proto/config.proto) for the
-  schema.
+  AuthSettings in [proto/config/config.proto](../proto/config/config.proto) for
+  the schema.
 * Create the appropriate groups under `/auth`.
 * Add relevant users and IPs to the groups. Make sure that users who
   have access to the Swarming server also have equivalent access to
-  the isolate server.
+  the RBE-CAS server.
 
-When specifying members of the auth groups, you can refer to the IPs in the 
+When specifying members of the auth groups, you can refer to the IPs in the
 allowlist using `bots:*`. For individual user accounts simply use their email,
 e.g. `user@example.org`. All users in a domain can be specified with a glob,
 e.g. `*@chromium.org`.
@@ -44,8 +44,6 @@ Members of this group can:
 
 Members have limited visibility over the whole system, and cannot view other user
 tasks or bots.
-
-Make sure members of this group are also member of `isolate-access`.
 
 ### `privileged_users_group`
 
@@ -70,10 +68,14 @@ Members of this group can do all of the above plus:
 
 ## Pool ACLs
 
+See http://go/luci-authorization#swarming-permissions for the LUCI Relam
+explanation.
+
 A bot pool is a named collection of bots usually dedicated to some single
 kind of workload or a single project. Swarming assigns bots to pools by forcibly
 setting `pool:<name>` dimension on them based on configuration defined in
-`bots.cfg` config file (see [proto/bots.proto](../proto/bots.proto)).
+`bots.cfg` config file (see
+[proto/config/bots.proto](../proto/config/bots.proto)).
 
 Pool ACLs specify who is allowed to trigger tasks in a pool. This is a second
 layer of ACLs that is consulted when triggering new tasks (and only then) after
@@ -83,6 +85,6 @@ Only the triggering authorization can be controlled with a finer precision,
 everything else is controlled through *server global groups* described above.
 
 Pool ACLs are defined in `pools.cfg` config file (see
-[proto/pools.proto](../proto/pools.proto)). If this file is missing or empty,
-pool ACLs are completely disabled for the service, meaning only the
-server-global ACLs are consulted.
+[proto/config/pools.proto](../proto/config/pools.proto)). If this file is
+missing or empty, pool ACLs are completely disabled for the service, meaning
+only the server-global ACLs are consulted.
