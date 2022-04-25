@@ -180,6 +180,10 @@ class _BotCommon(ndb.Model):
     if self.is_dead:
       out.status = swarming_pb2.MISSING
       out.status_msg = ''
+
+    if self.is_idle:
+      out.status = swarming_pb2.IDLE
+
     # https://crbug.com/757931: QUARANTINED_BY_SERVER
     # https://crbug.com/870723: OVERHEAD_BOT_INTERNAL
     # https://crbug.com/870723: HOST_REBOOTING
@@ -409,6 +413,11 @@ class BotEvent(_BotCommon):
   @property
   def is_dead(self):
     return self.event_type == 'bot_missing'
+
+  @property
+  def is_idle(self):
+    return (self.event_type == 'request_sleep' and not self.quarantined
+            and not self.maintenance_msg)
 
   @property
   def previous_key(self):

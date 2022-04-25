@@ -161,6 +161,30 @@ class BotManagementTest(test_case.TestCase):
     missing = expected - actual
     self.assertFalse(missing)
 
+  def test_BotEvent_proto_idle(self):
+    event_key = _bot_event(event_type=u'request_sleep',
+                           bot_id=u'id1',
+                           dimensions={
+                               u'id': [u'id1'],
+                           })
+    actual = swarming_pb2.BotEvent()
+    event_key.get().to_proto(actual)
+    self.assertEqual(swarming_pb2.INSTRUCT_IDLE, actual.event)
+    self.assertEqual(swarming_pb2.IDLE, actual.bot.status)
+
+  def test_BotEvent_proto_busy(self):
+    event_key = _bot_event(event_type=u'request_task',
+                           task_id=u'task1',
+                           bot_id=u'id1',
+                           dimensions={
+                               u'id': [u'id1'],
+                           })
+    actual = swarming_pb2.BotEvent()
+    event_key.get().to_proto(actual)
+    self.assertEqual(swarming_pb2.INSTRUCT_START_TASK, actual.event)
+    self.assertEqual(swarming_pb2.BUSY, actual.bot.status)
+    self.assertEqual(u'task1', actual.bot.current_task_id)
+
   def test_BotEvent_proto_empty(self):
     # Assert that it doesn't throw on empty entity.
     actual = swarming_pb2.BotEvent()
