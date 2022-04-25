@@ -9,6 +9,7 @@ import logging
 import sys
 import unittest
 
+import mock
 from parameterized import parameterized
 
 import test_env
@@ -754,8 +755,12 @@ class BotManagementTest(test_case.TestCase):
     _bot_event(event_type='request_sleep')  # stored
     end = self.mock_now(self.now, 25)
 
-    # normal request_sleep is not streamed.
-    bot_management.task_bq_events(start, end)
+    with mock.patch(
+        'components.pubsub.publish_multi',
+        side_effect=lambda _topic, messages: list(messages)) as mocked:
+      # normal request_sleep is not streamed.
+      bot_management.task_bq_events(start, end)
+      mocked.assert_called()
     self.assertEqual(1, len(payloads))
     actual_rows = payloads[0]
     expected = [

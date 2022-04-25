@@ -1111,7 +1111,11 @@ class TaskResultApiTest(TestCase):
     run_result_4.modified_ts = utils.utcnow()
     run_result_4.put()
 
-    self.assertEqual(2, task_result.task_bq_run(start, end))
+    with mock.patch(
+        'components.pubsub.publish_multi',
+        side_effect=lambda _topic, messages: list(messages)) as mocked:
+      self.assertEqual(2, task_result.task_bq_run(start, end))
+      mocked.assert_called()
     self.assertEqual(1, len(payloads), payloads)
     actual_rows = payloads[0]
     self.assertEqual(2, len(actual_rows))
@@ -1182,7 +1186,9 @@ class TaskResultApiTest(TestCase):
     result_4.modified_ts = utils.utcnow()
     result_4.put()
 
-    self.assertEqual(2, task_result.task_bq_summary(start, end))
+    with mock.patch('components.pubsub.publish_multi', ) as mocked:
+      self.assertEqual(2, task_result.task_bq_summary(start, end))
+      mocked.assert_called()
     self.assertEqual(1, len(payloads), payloads)
     actual_rows = payloads[0]
     self.assertEqual(2, len(actual_rows))

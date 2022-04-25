@@ -71,11 +71,14 @@ import random
 import re
 
 from google.appengine import runtime
+from google.appengine.api import app_identity
 from google.appengine.api import datastore_errors
 from google.appengine.datastore import datastore_query
 from google.appengine.ext import ndb
+from google.protobuf import json_format
 
 from components import datastore_utils
+from components import pubsub
 from components import utils
 from proto.api import swarming_pb2  # pylint: disable=no-name-in-module
 from server import bq_state
@@ -1647,7 +1650,12 @@ def task_bq_run(start, end):
     seen.update(e.task_id for e in entities)
     total += len(rows)
     bq_state.send_to_bq('task_results_run', rows)
-
+    if rows:
+      pubsub.publish_multi(
+          'projects/%s/topics/task_results_run' %
+          (app_identity.get_application_id()),
+          ((json_format.MessageToJson(result), None)
+           for _task_id, result in rows))
   return total
 
 
@@ -1684,6 +1692,12 @@ def task_bq_summary(start, end):
     seen.update(e.task_id for e in entities)
     total += len(rows)
     bq_state.send_to_bq('task_results_summary', rows)
+    if rows:
+      pubsub.publish_multi(
+          'projects/%s/topics/task_results_summary' %
+          (app_identity.get_application_id()),
+          ((json_format.MessageToJson(summary), None)
+           for _task_id, summary in rows))
 
   return total
 
