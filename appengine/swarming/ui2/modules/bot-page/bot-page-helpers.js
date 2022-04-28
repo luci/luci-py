@@ -75,6 +75,7 @@ export function parseEvents(events) {
   }
   for (const event of events) {
     sanitizeAndHumanizeTime(event, 'ts');
+    event.state = event.state ? JSON.parse(event.state) : {};
   }
 
   // Sort the most recent events first.

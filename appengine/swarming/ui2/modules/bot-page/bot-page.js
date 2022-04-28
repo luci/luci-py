@@ -299,7 +299,11 @@ const eventRow = (event, showAll, serverVersion) => {
   if (!showAll && !event.message) {
     return '';
   }
-  const msg = [event.message, event.maintenance_msg].filter(Boolean).join('\n');
+  const msg = [
+    event.message,
+    event.maintenance_msg,
+    event.state.quarantined,
+  ].filter(Boolean).join('\n');
   return html`
 <tr>
   <td class=message>${msg}</td>
