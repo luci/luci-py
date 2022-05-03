@@ -218,6 +218,9 @@ def _validate_dimensions(_prop, value):
       raise datastore_errors.BadValueError(
           u'dimension key %r has too many values; maximum is %d' %
           (k, maxvalues))
+    if len(values) > 1:
+      logging.warning(
+          'DEPRECATED: task contains multi-valued dimension for %r.', k)
     if len(values) != len(set(values)):
       raise datastore_errors.BadValueError(
           u'dimension key %r has repeated values' % k)
