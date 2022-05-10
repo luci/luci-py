@@ -5,6 +5,7 @@
 
 import io
 import logging
+import os
 import sys
 import textwrap
 import unittest
@@ -239,6 +240,16 @@ class TestLinux(auto_stub.TestCase):
     super(TestLinux, self).tearDown()
     mock.patch.stopall()
     tools.clear_cache_all()
+
+  def test_get_kernel(self):
+    release = '1.2.3-4-generic'
+
+    class mock_uname():
+      def __init__(self):
+        self.release = release
+
+    self.mock(os, 'uname', mock_uname)
+    self.assertEqual(linux.get_kernel(), release)
 
   def test_get_ssd(self):
     self.mock_check_output.return_value = textwrap.dedent("""\

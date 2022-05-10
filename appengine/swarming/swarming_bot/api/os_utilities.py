@@ -985,6 +985,7 @@ def get_dimensions():
     else:
       dimensions['inside_docker'] = ['1', inside_docker]
 
+    dimensions['kernel'] = [platforms.linux.get_kernel()]
     dimensions['kvm'] = [str(int(platforms.linux.get_kvm()))]
 
     comp = platforms.linux.get_device_tree_compatible()

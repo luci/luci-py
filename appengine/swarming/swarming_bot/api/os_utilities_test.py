@@ -182,9 +182,9 @@ class TestOsUtilities(auto_stub.TestCase):
 
     expected = {'cores', 'cpu', 'gce', 'gpu', 'id', 'os', 'pool', 'python'}
     if platforms.is_gce():
+      expected.add('gcp')
       expected.add('image')
       expected.add('zone')
-      expected.add('gcp')
     if sys.platform == 'darwin':
       expected.add('mac_model')
       expected.add('display_attached')
@@ -194,6 +194,7 @@ class TestOsUtilities(auto_stub.TestCase):
       actual.discard('device')  # iOS devices
     if sys.platform == 'linux':
       expected.add('inside_docker')
+      expected.add('kernel')
       expected.add('kvm')
     if sys.platform == 'win32':
       expected.add('integrity')

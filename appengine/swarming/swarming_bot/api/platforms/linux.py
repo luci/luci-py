@@ -328,6 +328,12 @@ def get_ssd():
 
 
 @tools.cached
+def get_kernel():
+  """Returns the currently running kernel version string."""
+  return os.uname().release
+
+
+@tools.cached
 def get_kvm():
   """Check whether KVM is available."""
   # We only check the file existence, not whether we can access it. This avoids
