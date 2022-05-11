@@ -28,7 +28,7 @@
         [...]
 
         app = webapp2.WSGIApplication(my_handlers)
-        gae_ts_mon.initialize(app)
+        gae_ts_mon.initialize_prod(app)
 
     You must do this in every top-level request handler that's listed in your
     app.yaml to ensure metrics are registered no matter which type of request
@@ -38,8 +38,19 @@
     (e.g. it's a Cloud Endpoints only app), then pass `None` as the
     first argument to `gae_ts_mon.initialize`.
 
+    There are multiple variations of the `gae_ts_mon.initialize` method:
+     - `gae_ts_mon.initialize` Maintained for backwards compatibility for apps
+        which have not been flipped over to either initialize_adhoc() or
+        initialize_prod(). New apps must use initialize_prod().
+     - `gae_ts_mon.initialize_adhoc` By default this uses the shared
+        prodx-mon-chrome-infra service account for authentication with
+        Prod X Mon. This is deprecated and no longer recommended.
+     - `gae_ts_mon.initialize_prod` This uses the default App Engine service
+        account for authentication with Prod X Mon. All new apps must use this
+        method.
+
     The `gae_ts_mon.initialize` method takes an optional parameter:
-     - `is_enabled_fn` (function with no arguments returning `bool`):
+     - `is_enabled_fn` (function with n0o arguments returning `bool`):
        a callback to enable/disable sending the actual metrics. Default: `None`
        which is equivalent to `lambda: True`. The callback is called on every
        metrics flush, and takes effect immediately. Make sure the callback is
@@ -53,6 +64,15 @@
           ...
 
 1.  Give your app's service account permission to send metrics to the API.
+    There are two ways to do this, the latter has been deprecated.
+
+    ### **Recommended**
+    You need to follow the go/monapi-onboarding to allow the project to send
+    metrics to Prod X Mon. It is advised to use the default App Engine service
+    account (which looks like $GCP_PROJECT_NAME@appspot.gserviceaccount.com)
+    to include the role "roles/prodx.metricPublisher".
+
+    ### **Deprecated**
     You need the email address of your app's "App Engine default service
     account" from the `IAM & Admin` page in the cloud console.  It'll look
     something like `app-id@appspot.gserviceaccount.com`.
@@ -62,8 +82,10 @@
     by selecting it from the list and clicking "Permissions".
     If you see an error "You do not have viewing permissions for the selected
     resource.", then please ask the current chrome-trooper to do it for you.
-
-1.  You also need to enable the Google Identity and Access Management (IAM) API
+    You'll then need to pass in the Service Account
+    `app-engine-metric-publishers@prodx-mon-chrome-infra.google.com.iam.gserviceaccount.com`
+    into the `gae_ts_mon.initialize` method (see above).
+    You also need to enable the Google Identity and Access Management (IAM) API
     for your project if it's not enabled already.
 
 You're done!  You can now use ts_mon metrics exactly as you normally would using

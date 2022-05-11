@@ -27,6 +27,8 @@ sys.modules['infra_libs'].httplib2_utils = infra_libs.ts_mon.httplib2_utils
 sys.modules['infra_libs.httplib2_utils'] = infra_libs.ts_mon.httplib2_utils
 
 from .config import initialize
+from .config import initialize_adhoc
+from .config import initialize_prod
 from .instrument_endpoint import instrument as instrument_endpoint
 from .config import instrument_wsgi_application
 from .config import reset_for_unittest

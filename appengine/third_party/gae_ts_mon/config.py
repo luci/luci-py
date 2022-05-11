@@ -67,6 +67,9 @@ def _internal_callback():
         modules.get_default_version(module_name), target_fields=target_fields)
 
 
+# TODO(crbug.com/1322775) This is maintained for backwards compatibility.
+# Make this method the same as intialize_prod() once there are no more
+# references.
 def initialize(
     app,
     is_enabled_fn=None,
@@ -74,7 +77,10 @@ def initialize(
     is_local_unittest=None):
   """Instruments webapp2 `app` with gae_ts_mon metrics.
 
-  Instruments all the endpoints in `app` with basic metrics.
+  Instruments all the endpoints in `app` with basic metrics. This method should
+  not be used anymore. Please switch to initialize_adhoc(), or initialise_prod()
+  if the App has migrated away from the shared prodx-mon-chrome-infra service
+  account (crbug.com/1322775).
 
   Args:
     app (webapp2 app): the app to instrument.
@@ -84,12 +90,59 @@ def initialize(
     cron_module (str): DEPRECATED. This param is noop.
     is_local_unittest (bool or None): whether we are running in a unittest.
   """
+  logging.error("Please switch to initialize_adhoc() or intialize_prod()."
+                "The latter is recommended, please see crbug.com/1322775")
+  return initialize_adhoc(app, is_enabled_fn, is_local_unittest, True)
+
+
+def initialize_prod(app, is_enabled_fn=None, is_local_unittest=None):
+  """Instruments webapp2 `app` with gae_ts_mon metrics.
+
+  Instruments all the endpoints in `app` with basic metrics.
+  Uses the default App Engine service account for authentication with
+  Prod X Mon .
+
+  Args:
+    app (webapp2 app): the app to instrument.
+    is_enabled_fn (function or None): a function returning bool if ts_mon should
+      send the actual metrics. None (default) is equivalent to lambda: True.
+      This allows apps to turn monitoring on or off dynamically, per app.
+    is_local_unittest (bool or None): whether we are running in a unittest.
+  """
+  return initialize_adhoc(app, is_enabled_fn, is_local_unittest, False)
+
+
+# TODO(crbug.com/1322775) Remove the use_service_account param and
+# move logic into initialize_prod() once all gae_ts_mon apps have migrated away
+# from the shared prodx-mon-chrome-infra service account.
+def initialize_adhoc(app,
+                     is_enabled_fn=None,
+                     is_local_unittest=None,
+                     use_service_account=True):
+  """DEPRECATED: Instruments webapp2 `app` with gae_ts_mon metrics.
+
+  Instruments all the endpoints in `app` with basic metrics.
+
+  It is recommended to migrate the app away from the shared
+  prodx-mon-chrome-infra service account and use initialize_prod() see
+  crbug.com/1322775.
+
+  Args:
+    app (webapp2 app): the app to instrument.
+    is_enabled_fn (function or None): a function returning bool if ts_mon should
+      send the actual metrics. None (default) is equivalent to lambda: True.
+      This allows apps to turn monitoring on or off dynamically, per app.
+    is_local_unittest (bool or None): whether we are running in a unittest.
+    use_service_account (bool): Use the prodx-mon-chrome-infra service account
+      for authentication with Prod X Mon. Involves extra delegation credentials.
+  """
   if is_local_unittest is None:  # pragma: no cover
     # Since gae_ts_mon.initialize is called at module-scope by appengine apps,
     # AppengineTestCase.setUp() won't have run yet and none of the appengine
     # stubs will be initialized, so accessing Datastore or even getting the
     # application ID will fail.
-    is_local_unittest = ('expect_tests' in sys.argv[0])
+    is_local_unittest = ('expect_tests' in sys.argv[0]) or (
+        'unittest' in sys.argv[0])
 
   if is_enabled_fn is not None:
     interface.state.flush_enabled_fn = is_enabled_fn
@@ -131,13 +184,18 @@ def initialize(
     logging.debug('Using debug monitor')
     interface.state.global_monitor = monitors.DebugMonitor()
   else:
+    if use_service_account:
+      prodxmon_service_account = shared.PRODXMON_SERVICE_ACCOUNT_EMAIL
+      interface.state.global_monitor = monitors.HttpsMonitor(
+          shared.PRODXMON_ENDPOINT,
+          monitors.DelegateServiceAccountCredentials(
+              prodxmon_service_account, monitors.AppengineCredentials()))
+    else:
+      prodxmon_service_account = app_identity.get_service_account_name()
+      interface.state.global_monitor = monitors.HttpsMonitor(
+          shared.PRODXMON_ENDPOINT, monitors.AppengineCredentials())
     logging.debug('Using https monitor %s with %s', shared.PRODXMON_ENDPOINT,
-                  shared.PRODXMON_SERVICE_ACCOUNT_EMAIL)
-    interface.state.global_monitor = monitors.HttpsMonitor(
-        shared.PRODXMON_ENDPOINT,
-        monitors.DelegateServiceAccountCredentials(
-            shared.PRODXMON_SERVICE_ACCOUNT_EMAIL,
-            monitors.AppengineCredentials()))
+                  prodxmon_service_account)
 
   interface.register_global_metrics([shared.appengine_default_version])
   interface.register_global_metrics_callback(
