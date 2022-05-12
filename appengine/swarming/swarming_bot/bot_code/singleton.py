@@ -70,6 +70,7 @@ class Singleton(object):
       self.handle.seek(0, os.SEEK_SET)
       self.handle.truncate(0)
       self.handle.write(str(os.getpid()).encode('utf-8'))
+      self.handle.flush()
       return True
 
   def release(self):
