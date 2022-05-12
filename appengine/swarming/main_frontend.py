@@ -61,7 +61,7 @@ def create_application():
 
   # App that serves HTML pages and old API.
   frontend_app = handlers_frontend.create_application(False)
-  gae_ts_mon.initialize(frontend_app, is_enabled_fn=is_enabled_callback)
+  gae_ts_mon.initialize_prod(frontend_app, is_enabled_fn=is_enabled_callback)
 
   endpoints_api = endpoints_webapp2.api_server([
     handlers_endpoints.SwarmingServerService,

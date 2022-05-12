@@ -51,7 +51,7 @@ def create_application():
     return config.settings().enable_ts_monitoring
 
   backend_app = handlers_backend.create_application(False)
-  gae_ts_mon.initialize(backend_app, is_enabled_fn=is_enabled_callback)
+  gae_ts_mon.initialize_prod(backend_app, is_enabled_fn=is_enabled_callback)
 
   ts_mon_metrics.initialize()
   utils.report_memory(backend_app)
