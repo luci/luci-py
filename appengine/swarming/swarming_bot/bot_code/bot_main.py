@@ -1513,6 +1513,9 @@ def main(argv):
       msg = ('Found a previous bot, %d rebooting as a workaround for '
              'https://crbug.com/1061531' % os.getpid())
     print(msg, file=sys.stderr)
+    _PRE_REBOOT_SLEEP_SECS = 5 * 60
+    print('Sleeping for %s secs' % _PRE_REBOOT_SLEEP_SECS, file=sys.stderr)
+    time.sleep(_PRE_REBOOT_SLEEP_SECS)
     os_utilities.host_reboot(msg)
     return 1
 
