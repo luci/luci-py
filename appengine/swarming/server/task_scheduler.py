@@ -564,21 +564,23 @@ def _pubsub_notify(task_id, topic, auth_token, userdata, tags, state,
   msg = {'task_id': task_id}
   if userdata:
     msg['userdata'] = userdata
+  http_status_code = 0
   try:
     pubsub.publish(
         topic=topic,
         message=utils.encode_to_json(msg),
         attributes={'auth_token': auth_token} if auth_token else None)
-    ts_mon_metrics.on_task_status_change_pubsub_publish_success(tags, state)
+    http_status_code = 200
   except pubsub.TransientError as e:
     logging.exception('Transient error when sending PubSub notification')
-    ts_mon_metrics.on_task_status_change_pubsub_publish_failure(
-        tags, state, e.inner.status_code)
+    http_status_code = e.inner.status_code
     raise e
   except pubsub.Error as e:
     logging.exception('Fatal error when sending PubSub notification')
-    ts_mon_metrics.on_task_status_change_pubsub_publish_failure(
-        tags, state, e.inner.status_code)
+    http_status_code = e.inner.status_code
+    raise e
+  except Exception as e:
+    logging.exception("Unknown exception (%s) not handled by _pubsub_notify", e)
     raise e
   finally:
     now = utils.milliseconds_since_epoch()
@@ -590,8 +592,8 @@ def _pubsub_notify(task_id, topic, auth_token, userdata, tags, state,
       latency = 0
     logging.debug('Updating ts_mon_metric pubsub with latency: %dms (%d - %d)',
                   latency, now, start_time)
-    ts_mon_metrics.on_task_status_change_pubsub_notify_latency(
-        tags, state, latency)
+    ts_mon_metrics.on_task_status_change_pubsub_update_metrics(
+        tags, state, http_status_code, latency)
 
 
 def _find_dupe_task(now, h):

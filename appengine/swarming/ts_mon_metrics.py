@@ -253,24 +253,14 @@ _bot_auth_successes = gae_ts_mon.CounterMetric(
 # Instance metric. Metric fields:
 # - pool: e.g. 'skia'.
 # - status: e.g. 'User canceled'.
+# - http_status_code: e.g. 404.
 _task_state_change_pubsub_notify_count = gae_ts_mon.CounterMetric(
     'swarming/tasks/state_change_pubsub_notify_count',
-    'Count of successful PubSub transactions',
-    [gae_ts_mon.StringField('pool'),
-     gae_ts_mon.StringField('status')],
-)
-
-# Instance metric. Metric fields:
-# - pool: e.g. 'skia'.
-# - status: e.g. 'User canceled'.
-# - http_status_code: e.g. 404.
-_task_state_change_pubsub_notify_error_count = gae_ts_mon.CounterMetric(
-    'swarming/tasks/state_change_pubsub_notify_error_count',
-    'Count of failed PubSub transactions',
+    'Count of sent PubSub notifications',
     [
         gae_ts_mon.StringField('pool'),
         gae_ts_mon.StringField('status'),
-        gae_ts_mon.IntegerField('http_status_code'),
+        gae_ts_mon.IntegerField('http_status_code')
     ],
 )
 
@@ -590,20 +580,12 @@ def set_global_metrics(kind, payload=None):
     logging.error('set_global_metrics(kind=%s): unknown kind.', kind)
 
 
-def on_task_status_change_pubsub_notify_latency(tags, state, latency):
+def on_task_status_change_pubsub_update_metrics(tags, state, http_status_code,
+                                                latency):
   fields = _extract_pubsub_job_fields(_tags_to_dict(tags), state)
   _task_state_change_pubsub_notify_latencies.add(latency, fields=fields)
-
-
-def on_task_status_change_pubsub_publish_success(tags, state):
-  fields = _extract_pubsub_job_fields(_tags_to_dict(tags), state)
-  _task_state_change_pubsub_notify_count.increment(fields=fields)
-
-
-def on_task_status_change_pubsub_publish_failure(tags, state, http_status_code):
-  fields = _extract_pubsub_job_fields(_tags_to_dict(tags), state)
   fields['http_status_code'] = http_status_code
-  _task_state_change_pubsub_notify_error_count.increment(fields=fields)
+  _task_state_change_pubsub_notify_count.increment(fields=fields)
 
 
 def on_task_status_change_scheduler_latency(summary):
