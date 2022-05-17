@@ -267,13 +267,15 @@ _task_state_change_pubsub_notify_count = gae_ts_mon.CounterMetric(
 # Instance metric. Metric fields:
 # - pool: e.g. 'skia'.
 # - status: e.g. 'User canceled'.
+# - http_status_code: e.g. 404.
 _task_state_change_pubsub_notify_latencies = \
   gae_ts_mon.CumulativeDistributionMetric(
     'swarming/tasks/state_change_pubsub_notify_latencies',
     'Latency (in ms) of PubSub notification when backend receives task_update',
     [
         gae_ts_mon.StringField('pool'),
-        gae_ts_mon.StringField('status')
+        gae_ts_mon.StringField('status'),
+        gae_ts_mon.IntegerField('http_status_code')
     ],
     bucketer=_pubsub_bucketer,
 )
@@ -583,8 +585,10 @@ def set_global_metrics(kind, payload=None):
 def on_task_status_change_pubsub_update_metrics(tags, state, http_status_code,
                                                 latency):
   fields = _extract_pubsub_job_fields(_tags_to_dict(tags), state)
-  _task_state_change_pubsub_notify_latencies.add(latency, fields=fields)
   fields['http_status_code'] = http_status_code
+  logging.debug('Incrementing ts_mon PubSub notification count with fields=%s',
+                fields)
+  _task_state_change_pubsub_notify_latencies.add(latency, fields=fields)
   _task_state_change_pubsub_notify_count.increment(fields=fields)
 
 

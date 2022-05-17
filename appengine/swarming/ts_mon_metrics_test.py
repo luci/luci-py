@@ -395,7 +395,8 @@ class TestMetrics(test_case.TestCase):
 
     fields = {
         'pool': 'test_pool',
-        'status': task_result.State.to_string(task_result.State.KILLED)
+        'status': task_result.State.to_string(task_result.State.KILLED),
+        'http_status_code': 200
     }
 
     self.assertEqual(
@@ -458,7 +459,6 @@ class TestMetrics(test_case.TestCase):
             fields=fields))
 
     # latency should update as well
-    fields.pop('http_status_code')
     self.assertEqual(
         100,
         ts_mon_metrics._task_state_change_pubsub_notify_latencies.get(
@@ -491,7 +491,6 @@ class TestMetrics(test_case.TestCase):
             fields=fields))
 
     # latency should update as well
-    fields.pop('http_status_code')
     self.assertEqual(
         100,
         ts_mon_metrics._task_state_change_pubsub_notify_latencies.get(

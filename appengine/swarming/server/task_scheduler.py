@@ -572,12 +572,16 @@ def _pubsub_notify(task_id, topic, auth_token, userdata, tags, state,
         attributes={'auth_token': auth_token} if auth_token else None)
     http_status_code = 200
   except pubsub.TransientError as e:
-    logging.exception('Transient error when sending PubSub notification')
     http_status_code = e.inner.status_code
+    logging.exception(
+        'Transient error (status_code=%s) when sending PubSub notification',
+        http_status_code)
     raise e
   except pubsub.Error as e:
-    logging.exception('Fatal error when sending PubSub notification')
     http_status_code = e.inner.status_code
+    logging.exception(
+        'Fatal error (status_code=%s) when sending PubSub notification',
+        http_status_code)
     raise e
   except Exception as e:
     logging.exception("Unknown exception (%s) not handled by _pubsub_notify", e)

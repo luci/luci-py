@@ -562,7 +562,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     status = State.to_string(State.PENDING)
     self.assertIsNone(
         ts_mon_metrics._task_state_change_pubsub_notify_latencies.get(
-            fields=_get_fields(status=status)))
+            fields=_get_fields(status=status, http_status_code=200)))
 
   def test_schedule_request_new_key(self):
     # Ensure that _gen_new_keys work by generating deterministic key.
@@ -641,7 +641,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(
         100,
         ts_mon_metrics._task_state_change_pubsub_notify_latencies.get(
-            fields=_get_fields(status=status)).sum)
+            fields=_get_fields(status=status, http_status_code=200)).sum)
     self.assertEqual(
         1,
         ts_mon_metrics._task_state_change_pubsub_notify_count.get(
@@ -672,7 +672,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(
         100,
         ts_mon_metrics._task_state_change_pubsub_notify_latencies.get(
-            fields=_get_fields(status=status)).sum)
+            fields=_get_fields(status=status, http_status_code=200)).sum)
     self.assertEqual(
         1,
         ts_mon_metrics._task_state_change_pubsub_notify_count.get(
@@ -1118,7 +1118,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(
         100,
         ts_mon_metrics._task_state_change_pubsub_notify_latencies.get(
-            fields=_get_fields(status=status)).sum)
+            fields=_get_fields(status=status, http_status_code=200)).sum)
     self.assertEqual(
         1,
         ts_mon_metrics._task_state_change_pubsub_notify_count.get(
@@ -1512,7 +1512,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(
         100,
         ts_mon_metrics._task_state_change_pubsub_notify_latencies.get(
-            fields=_get_fields(status=status)).sum)
+            fields=_get_fields(status=status, http_status_code=200)).sum)
     self.assertEqual(
         1,
         ts_mon_metrics._task_state_change_pubsub_notify_count.get(
@@ -1702,7 +1702,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(
         100,
         ts_mon_metrics._task_state_change_pubsub_notify_latencies.get(
-            fields=_get_fields()).sum)
+            fields=_get_fields(http_status_code=200)).sum)
 
     self.assertEqual('hihey', run_result.key.get().get_output(0, 0))
     self.assertEqual(1, self.execute_tasks())
@@ -1736,7 +1736,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
 
     self.assertIsNone(
         ts_mon_metrics._task_state_change_pubsub_notify_latencies.get(
-            fields=_get_fields()))
+            fields=_get_fields(http_status_code=200)))
 
     self.assertIsNone(
         ts_mon_metrics._task_state_change_pubsub_notify_count.get(
@@ -1757,7 +1757,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(
         0,
         ts_mon_metrics._task_state_change_pubsub_notify_latencies.get(
-            fields=_get_fields()).sum)
+            fields=_get_fields(http_status_code=200)).sum)
 
   def test_bot_update_pubsub_error(self):
     pub_sub_calls = self.mock_pub_sub()
@@ -1771,7 +1771,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(
         100,
         ts_mon_metrics._task_state_change_pubsub_notify_latencies.get(
-            fields=_get_fields()).sum)
+            fields=_get_fields(http_status_code=404)).sum)
 
     self.assertIsNone(
         ts_mon_metrics._task_state_change_pubsub_notify_count.get(
@@ -1789,9 +1789,9 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(2, len(pub_sub_calls))  # notification is sent
     self.assertEqual(1, self.execute_tasks())
     self.assertEqual(
-        200,
+        100,
         ts_mon_metrics._task_state_change_pubsub_notify_latencies.get(
-            fields=_get_fields()).sum)
+            fields=_get_fields(http_status_code=200)).sum)
 
     self.assertEqual(
         1,
@@ -1989,7 +1989,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(
         100,
         ts_mon_metrics._task_state_change_pubsub_notify_latencies.get(
-            fields=_get_fields(status=status)).sum)
+            fields=_get_fields(status=status, http_status_code=200)).sum)
     self.assertEqual(
         1,
         ts_mon_metrics._task_state_change_pubsub_notify_count.get(
@@ -2046,7 +2046,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(
         100,
         ts_mon_metrics._task_state_change_pubsub_notify_latencies.get(
-            fields=_get_fields(status=status)).sum)
+            fields=_get_fields(status=status, http_status_code=200)).sum)
     self.assertEqual(
         1,
         ts_mon_metrics._task_state_change_pubsub_notify_count.get(
@@ -2085,7 +2085,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(
         100,
         ts_mon_metrics._task_state_change_pubsub_notify_latencies.get(
-            fields=_get_fields(status=status)).sum)
+            fields=_get_fields(status=status, http_status_code=200)).sum)
     self.assertEqual(
         1,
         ts_mon_metrics._task_state_change_pubsub_notify_count.get(
@@ -2116,7 +2116,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(
         100,
         ts_mon_metrics._task_state_change_pubsub_notify_latencies.get(
-            fields=_get_fields(status=status)).sum)
+            fields=_get_fields(status=status, http_status_code=200)).sum)
     self.assertEqual(
         1,
         ts_mon_metrics._task_state_change_pubsub_notify_count.get(
@@ -2196,7 +2196,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(
         100,
         ts_mon_metrics._task_state_change_pubsub_notify_latencies.get(
-            fields=_get_fields(status=status)).sum)
+            fields=_get_fields(status=status, http_status_code=200)).sum)
     self.assertEqual(
         1,
         ts_mon_metrics._task_state_change_pubsub_notify_count.get(
@@ -2298,7 +2298,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(
         100,
         ts_mon_metrics._task_state_change_pubsub_notify_latencies.get(
-            fields=_get_fields(status=status)).sum)
+            fields=_get_fields(status=status, http_status_code=200)).sum)
     self.assertEqual(
         1,
         ts_mon_metrics._task_state_change_pubsub_notify_count.get(
@@ -2436,7 +2436,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(
         0,
         ts_mon_metrics._task_state_change_pubsub_notify_latencies.get(
-            fields=_get_fields(status=status)).sum)
+            fields=_get_fields(status=status, http_status_code=200)).sum)
     self.assertEqual(
         1,
         ts_mon_metrics._task_state_change_pubsub_notify_count.get(
@@ -2605,7 +2605,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(
         100,
         ts_mon_metrics._task_state_change_pubsub_notify_latencies.get(
-            fields=_get_fields(status=status)).sum)
+            fields=_get_fields(status=status, http_status_code=200)).sum)
     self.assertEqual(
         1,
         ts_mon_metrics._task_state_change_pubsub_notify_count.get(
@@ -2656,7 +2656,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(
         100,
         ts_mon_metrics._task_state_change_pubsub_notify_latencies.get(
-            fields=_get_fields(status=status)).sum)
+            fields=_get_fields(status=status, http_status_code=200)).sum)
     self.assertEqual(
         1,
         ts_mon_metrics._task_state_change_pubsub_notify_count.get(
@@ -2675,7 +2675,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(
         100,
         ts_mon_metrics._task_state_change_pubsub_notify_latencies.get(
-            fields=_get_fields(status=status)).sum)
+            fields=_get_fields(status=status, http_status_code=200)).sum)
     self.assertEqual(
         1,
         ts_mon_metrics._task_state_change_pubsub_notify_count.get(
@@ -3117,7 +3117,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(
         100,
         ts_mon_metrics._task_state_change_pubsub_notify_latencies.get(
-            fields=_get_fields(status=status)).sum)
+            fields=_get_fields(status=status, http_status_code=200)).sum)
     self.assertEqual(
         1,
         ts_mon_metrics._task_state_change_pubsub_notify_count.get(
