@@ -390,8 +390,9 @@ class TestMetrics(test_case.TestCase):
                                        state=task_result.State.KILLED)
 
     latency = 500
-    ts_mon_metrics.on_task_status_change_pubsub_update_metrics(
-        summary.tags, summary.state, 200, latency)
+    ts_mon_metrics.on_task_status_change_pubsub_latency(summary.tags,
+                                                        summary.state, 200,
+                                                        latency)
 
     fields = {
         'pool': 'test_pool',
@@ -405,8 +406,9 @@ class TestMetrics(test_case.TestCase):
             fields=fields).sum)
 
     latency = 250
-    ts_mon_metrics.on_task_status_change_pubsub_update_metrics(
-        summary.tags, summary.state, 200, latency)
+    ts_mon_metrics.on_task_status_change_pubsub_latency(summary.tags,
+                                                        summary.state, 200,
+                                                        latency)
 
     self.assertEqual(
         750,
@@ -418,8 +420,9 @@ class TestMetrics(test_case.TestCase):
     summary.state = task_result.State.TIMED_OUT
 
     latency = 300
-    ts_mon_metrics.on_task_status_change_pubsub_update_metrics(
-        summary.tags, summary.state, 200, latency)
+    ts_mon_metrics.on_task_status_change_pubsub_latency(summary.tags,
+                                                        summary.state, 200,
+                                                        latency)
 
     self.assertEqual(
         300,
@@ -446,17 +449,13 @@ class TestMetrics(test_case.TestCase):
                                        tags=tags,
                                        expiration_delay=1,
                                        state=task_result.State.COMPLETED)
-    ts_mon_metrics.on_task_status_change_pubsub_update_metrics(
-        summary.tags, summary.state, 200, 100)
+    ts_mon_metrics.on_task_status_change_pubsub_latency(summary.tags,
+                                                        summary.state, 200, 100)
     fields = {
         'pool': 'test_pool',
         'status': task_result.State.to_string(task_result.State.COMPLETED),
         'http_status_code': 200
     }
-    self.assertEqual(
-        1,
-        ts_mon_metrics._task_state_change_pubsub_notify_count.get(
-            fields=fields))
 
     # latency should update as well
     self.assertEqual(
@@ -478,17 +477,13 @@ class TestMetrics(test_case.TestCase):
                                        tags=tags,
                                        expiration_delay=1,
                                        state=task_result.State.COMPLETED)
-    ts_mon_metrics.on_task_status_change_pubsub_update_metrics(
-        summary.tags, summary.state, 404, 100)
+    ts_mon_metrics.on_task_status_change_pubsub_latency(summary.tags,
+                                                        summary.state, 404, 100)
     fields = {
         'pool': 'test_pool',
         'status': task_result.State.to_string(task_result.State.COMPLETED),
         'http_status_code': 404
     }
-    self.assertEqual(
-        1,
-        ts_mon_metrics._task_state_change_pubsub_notify_count.get(
-            fields=fields))
 
     # latency should update as well
     self.assertEqual(
