@@ -1029,5 +1029,7 @@ def task_bq_events(start, end):
     if rows:
       pubsub.publish_multi(
           'projects/%s/topics/bot_events' % (app_identity.get_application_id()),
-          ((json_format.MessageToJson(event), None) for _bq_key, event in rows))
+          ((json_format.MessageToJson(event,
+                                      preserving_proto_field_name=True), None)
+           for _bq_key, event in rows))
   return total

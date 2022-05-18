@@ -1653,9 +1653,9 @@ def task_bq_run(start, end):
     if rows:
       pubsub.publish_multi(
           'projects/%s/topics/task_results_run' %
-          (app_identity.get_application_id()),
-          ((json_format.MessageToJson(result), None)
-           for _task_id, result in rows))
+          (app_identity.get_application_id()), ((json_format.MessageToJson(
+              result, preserving_proto_field_name=True), None)
+                                                for _task_id, result in rows))
   return total
 
 
@@ -1695,9 +1695,9 @@ def task_bq_summary(start, end):
     if rows:
       pubsub.publish_multi(
           'projects/%s/topics/task_results_summary' %
-          (app_identity.get_application_id()),
-          ((json_format.MessageToJson(summary), None)
-           for _task_id, summary in rows))
+          (app_identity.get_application_id()), ((json_format.MessageToJson(
+              summary, preserving_proto_field_name=True), None)
+                                                for _task_id, summary in rows))
 
   return total
 
