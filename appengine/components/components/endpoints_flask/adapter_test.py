@@ -46,7 +46,7 @@ class EndpointsService(remote.Service):
     raise endpoints.ForbiddenException('access denied')
 
 
-class EndpointsWebapp2TestCase(test_case.TestCase):
+class EndpointsFlaskTestCase(test_case.TestCase):
   def test_decode_message_post(self):
     request = webapp2.Request(
         {
