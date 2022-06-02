@@ -14,6 +14,7 @@ from endpoints import protojson
 from protorpc import message_types
 from protorpc import messages
 from protorpc import remote
+import flask
 import webapp2
 
 from components import template
@@ -210,10 +211,7 @@ def api_routes(api_classes, base_path='/_ah/api', regex='[^/]+'):
 
 
 def api_server(api_classes, base_path='/_ah/api', regex='[^/]+'):
-  """Creates a webapp2 application for the given Endpoints v1 services.
-
-  A shortcut for webapp2.WSGIApplication(api_routes(...)), which exists to
-  match endpoints.api_server's behavior of returning a webapp2.WSGIApplication.
+  """Creates a Flask application for the given Endpoints v1 services.
 
   Args:
     api_classes: A list of protorpc.remote.Service classes to create routes for.
@@ -222,9 +220,9 @@ def api_server(api_classes, base_path='/_ah/api', regex='[^/]+'):
     regex: Regular expression to allow in path parameters.
 
   Returns:
-    A webapp2.WSGIApplication.
+    A Flask applications.
   """
-  return webapp2.WSGIApplication(api_routes(api_classes, base_path, regex))
+  return flask.Flask(api_routes(api_classes, base_path, regex))
 
 
 def discovery_handler_factory(api_classes, base_path):
