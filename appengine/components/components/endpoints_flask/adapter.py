@@ -85,11 +85,13 @@ def decode_message(remote_method_info, request):
   return result
 
 
-def add_cors_headers(headers):
+def add_cors_headers():
+  headers = {}
   headers['Access-Control-Allow-Origin'] = '*'
   headers['Access-Control-Allow-Headers'] = (
       'Origin, Authorization, Content-Type, Accept, User-Agent')
   headers['Access-Control-Allow-Methods'] = ('DELETE, GET, OPTIONS, POST, PUT')
+  return headers
 
 
 class CorsHandler(webapp2.RequestHandler):
@@ -98,69 +100,54 @@ class CorsHandler(webapp2.RequestHandler):
     add_cors_headers(self.response.headers)
 
 
-def path_handler(api_class, api_method, service_path):
-  """Returns a webapp2.RequestHandler subclass for the API methods."""
+def path_handler_factory(api_class, api_method, service_path):
+  """Returns a Flask handler function for the API methods."""
 
-  # Why return a class? Because webapp2 explicitly checks if handler that we
-  # passed to Route is a class.
+  def path_handler():
+    headers = add_cors_headers()
 
-  class Handler(webapp2.RequestHandler):
-    def dispatch(self):
-      add_cors_headers(self.response.headers)
+    api = api_class()
+    api.initialize_request_state(
+        remote.HttpRequestState(
+            remote_host=None,
+            remote_address=flask.request.values['remote_addr'],
+            server_host=flask.request.values['host'],
+            server_port=flask.request.values['server_port'],
+            http_method=flask.request.values['method'],
+            service_path=service_path,
+            headers=flask.request.headers.items()))
 
-      api = api_class()
-      api.initialize_request_state(
-          remote.HttpRequestState(remote_host=None,
-                                  remote_address=self.request.remote_addr,
-                                  server_host=self.request.host,
-                                  server_port=self.request.server_port,
-                                  http_method=self.request.method,
-                                  service_path=service_path,
-                                  headers=self.request.headers.items()))
-
+    try:
+      req = decode_message(api_method.remote, flask.request)
+      # Check that required fields are populated.
+      req.check_initialized()
+    except (messages.DecodeError, messages.ValidationError, ValueError) as ex:
+      response = {'error': {'message': ex.message}}
+      return (response, http_client.BAD_REQUEST, headers)
+    try:
+      res = api_method(api, req)
+    except endpoints.ServiceException as ex:
+      response = {'error': {'message': ex.message}}
+      return (response, ex.http_status, headers)
+    if isinstance(res, message_types.VoidMessage):
+      return (None, http_client.NO_CONTENT, headers)
+    # Flask jsonifies Python dicts, so this format is more convenient.
+    response = json.loads(PROTOCOL.encode_message(res))
+    if flask.request.get('fields'):
       try:
-        req = decode_message(api_method.remote, self.request)
-        # Check that required fields are populated.
-        req.check_initialized()
-      except (messages.DecodeError, messages.ValidationError, ValueError) as ex:
-        response_body = json.dumps({'error': {'message': ex.message}})
-        self.response.set_status(http_client.BAD_REQUEST)
-      else:
-        try:
-          res = api_method(api, req)
-        except endpoints.ServiceException as ex:
-          response_body = json.dumps({'error': {'message': ex.message}})
-          self.response.set_status(ex.http_status)
-        else:
-          if isinstance(res, message_types.VoidMessage):
-            self.response.set_status(204)
-            response_body = None
-          else:
-            response_body = PROTOCOL.encode_message(res)
-            if self.request.get('fields'):
-              try:
-                # PROTOCOL.encode_message checks that the message is initialized
-                # before dumping it directly to JSON string. Therefore we can't
-                # mask the protocol buffer (if masking removes a required field
-                # then encode_message will fail). Instead, call encode_message
-                # first, then load the JSON string into a dict, mask the dict,
-                # and dump it back to JSON.
-                response_body = json.dumps(
-                    partial.mask(json.loads(response_body),
-                                 self.request.get('fields')))
-              except (partial.ParsingError, ValueError) as e:
-                # Log the error but return the full response.
-                logging.warning('Ignoring erroneous field mask %r: %s',
-                                self.request.get('fields'), e)
+        # PROTOCOL.encode_message checks that the message is initialized
+        # before dumping it directly to JSON string. Therefore we can't
+        # mask the protocol buffer (if masking removes a required field
+        # then encode_message will fail). Instead, call encode_message
+        # first, mask the dict,and dump it back to JSON.
+        response = partial.mask(response, flask.request.get('fields'))
+      except (partial.ParsingError, ValueError) as e:
+        # Log the error but return the full response.
+        logging.warning('Ignoring erroneous field mask %r: %s',
+                        flask.request.get('fields'), e)
+    return (response, http_client.OK, headers)
 
-      if self.response.status_int != 204:
-        self.response.content_type = 'application/json; charset=utf-8'
-        self.response.out.write(response_body)
-      else:
-        # webob sets content_type to text/html by default.
-        self.response.content_type = ''
-
-  return Handler
+  return path_handler
 
 
 def api_routes(api_classes, base_path='/_ah/api', regex='[^/]+'):
@@ -193,7 +180,7 @@ def api_routes(api_classes, base_path='/_ah/api', regex='[^/]+'):
       method_path = method_path.replace('{', '<').replace('}', ':%s>' % regex)
       t = posixpath.join(api_base_path, method_path)
       http_method = info.http_method.upper() or 'POST'
-      handler = path_handler(api_class, method, api_base_path)
+      handler = path_handler_factory(api_class, method, api_base_path)
       routes.append((t, handler, [http_method]))
       templates.add(t)
 
