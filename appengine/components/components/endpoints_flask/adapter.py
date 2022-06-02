@@ -26,6 +26,13 @@ import partial
 PROTOCOL = protojson.EndpointsProtoJson()
 
 THIS_DIR = os.path.dirname(os.path.abspath(__file__))
+CORS_HEADERS = {
+    'Access-Control-Allow-Origin':
+    '*',
+    'Access-Control-Allow-Headers':
+    ('Origin, Authorization, Content-Type, Accept, User-Agent'),
+    'Access-Control-Allow-Methods': ('DELETE, GET, OPTIONS, POST, PUT')
+}
 
 
 def decode_field(field, value):
@@ -85,26 +92,15 @@ def decode_message(remote_method_info, request):
   return result
 
 
-def add_cors_headers():
-  headers = {}
-  headers['Access-Control-Allow-Origin'] = '*'
-  headers['Access-Control-Allow-Headers'] = (
-      'Origin, Authorization, Content-Type, Accept, User-Agent')
-  headers['Access-Control-Allow-Methods'] = ('DELETE, GET, OPTIONS, POST, PUT')
-  return headers
-
-
-class CorsHandler(webapp2.RequestHandler):
-  # TODO: make this work with a flask handler function, remove self references
-  def options(self, *_args, **_kwargs):
-    add_cors_headers(self.response.headers)
+def cors_handler():
+  return flask.Response(headers=CORS_HEADERS)
 
 
 def path_handler_factory(api_class, api_method, service_path):
   """Returns a Flask handler function for the API methods."""
 
   def path_handler():
-    headers = add_cors_headers()
+    headers = CORS_HEADERS
 
     api = api_class()
     api.initialize_request_state(
@@ -186,7 +182,7 @@ def api_routes(api_classes, base_path='/_ah/api', regex='[^/]+'):
 
     # Add routes for HTTP OPTIONS (to add CORS headers) for each method.
     for t in sorted(templates):
-      routes.append((t, CorsHandler, ['OPTIONS']))
+      routes.append((t, cors_handler, ['OPTIONS']))
 
   # Add generic routes.
   routes.extend([
