@@ -16,6 +16,7 @@ from protorpc import messages
 from protorpc import remote
 import flask
 import webapp2
+import flask
 
 from components import template
 
@@ -349,15 +350,14 @@ def explorer_redirect_route(base_path):
     base_path: The base path under which all service paths exist.
 
   Returns:
-    A webapp2.Route.
+    A tuple containing a URL string and a Flask handler function.
   """
 
-  class RedirectHandler(webapp2.RequestHandler):
+  def redirect_handler():
     """Returns a handler redirecting to the API explorer."""
 
-    def get(self):
-      host = self.request.headers['Host']
-      self.redirect('https://apis-explorer.appspot.com/apis-explorer'
-                    '/?base=https://%s%s' % (host, base_path))
+    host = flask.request.headers['Host']
+    flask.redirect('https://apis-explorer.appspot.com/apis-explorer'
+                   '/?base=https://%s%s' % (host, base_path))
 
-  return ('%s/explorer' % base_path, RedirectHandler)
+  return ('%s/explorer' % base_path, redirect_handler)
