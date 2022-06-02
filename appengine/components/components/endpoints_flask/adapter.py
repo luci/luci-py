@@ -304,18 +304,16 @@ def explorer_proxy_route(base_path):
     A tuple containing a URL string and a path.
   """
 
-  class ProxyHandler(webapp2.RequestHandler):
+  def proxy_handler():
     """Returns a proxy capable of handling requests from API explorer."""
 
-    def get(self):
-      self.response.write(
-          template.render('adapter/proxy.html', params={'base_path':
-                                                        base_path}))
+    return flask.render_template('adapter/proxy.html', base_path=base_path)
 
   template.bootstrap({
       'adapter': os.path.join(THIS_DIR, 'templates'),
   })
-  return ('%s/static/proxy.html' % base_path, ProxyHandler)
+
+  return ('%s/static/proxy.html' % base_path, proxy_handler)
 
 
 def explorer_redirect_route(base_path):
