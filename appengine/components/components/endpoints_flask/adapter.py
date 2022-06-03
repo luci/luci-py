@@ -261,22 +261,14 @@ def directory_handler_factory(api_classes, base_path):
     base_path: The base path under which all service paths exist.
 
   Returns:
-    A webapp2.RequestHandler.
+    A Flask request handler function.
   """
 
-  class DirectoryHandler(webapp2.RequestHandler):
-    """Returns a directory list for known services."""
+  def directory_handler():
+    host = flask.request.headers['Host']
+    return discovery.directory(api_classes, host, base_path)
 
-    def get(self):
-      host = self.request.headers['Host']
-      self.response.headers['Content-Type'] = 'application/json'
-      json.dump(discovery.directory(api_classes, host, base_path),
-                self.response,
-                indent=2,
-                sort_keys=True,
-                separators=(',', ':'))
-
-  return DirectoryHandler
+  return directory_handler
 
 
 def directory_service_route(api_classes, base_path):
