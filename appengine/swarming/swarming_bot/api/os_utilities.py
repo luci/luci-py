@@ -978,11 +978,10 @@ def get_dimensions():
   else:
     dimensions['ssd'] = ['0']
 
+  dimensions['inside_docker'] = ['0']
   if sys.platform == 'linux':
     inside_docker = platforms.linux.get_inside_docker()
-    if not inside_docker:
-      dimensions['inside_docker'] = ['0']
-    else:
+    if inside_docker:
       dimensions['inside_docker'] = ['1', inside_docker]
 
     dimensions['kernel'] = [platforms.linux.get_kernel()]
