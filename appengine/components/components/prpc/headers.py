@@ -110,5 +110,5 @@ def parse_headers(headers):
   return ParsedHeaders(
       content_type,
       _parse_accept_header(headers.get('Accept')),
-      _parse_timeout(headers.get('X-Prpc-Timeout')),
+      _parse_timeout(headers.get('X-Prpc-Grpc-Timeout')),
       invocation_metadata)

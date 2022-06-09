@@ -120,7 +120,7 @@ def rpc_async(req, response_metadata=None):
   # https://godoc.org/go.chromium.org/luci/grpc/prpc#hdr-Protocol
 
   # Ensure timeout is set, such that we use same values for deadline
-  # parameter in net.request_async and X-Prpc-Timeout value are same.
+  # parameter in net.request_async and X-Prpc-Grpc-Timeout value are same.
   # Default to 10s, which is the default used in net.request_async.
   timeout = req.timeout or 10
 
@@ -128,7 +128,7 @@ def rpc_async(req, response_metadata=None):
   encoding.encode_bin_metadata(headers)
   headers['Content-Type'] = _BINARY_MEDIA_TYPE
   headers['Accept'] = _BINARY_MEDIA_TYPE
-  headers['X-Prpc-Timeout'] = '%dS' % timeout
+  headers['X-Prpc-Grpc-Timeout'] = '%dS' % timeout
 
   try:
     res_bytes = yield net.request_async(

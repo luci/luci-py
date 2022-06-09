@@ -61,7 +61,7 @@ class PRPCHeadersTestCase(test_case.TestCase):
         self.parse_headers(
             [
               ('Accept', encoding.Encoding.JSON[1]),
-              ('X-Prpc-Timeout', t),
+              ('X-Prpc-Grpc-Timeout', t),
             ],
             expect_accept=encoding.Encoding.JSON,
         ).timeout,
@@ -76,7 +76,7 @@ class PRPCHeadersTestCase(test_case.TestCase):
     with self.assertRaises(ValueError):
       self.parse_headers([
         ('Accept', encoding.Encoding.JSON[1]),
-        ('X-Prpc-Timeout', '222222'),
+        ('X-Prpc-Grpc-Timeout', '222222'),
       ])
 
   def test_parse_headers_content_type(self):
@@ -101,7 +101,7 @@ class PRPCHeadersTestCase(test_case.TestCase):
     ctx = self.parse_headers(
         [
           ('Accept', encoding.Encoding.JSON[1]),
-          ('X-Prpc-Timeout', '1m'),    # skipped from metadata
+          ('X-Prpc-Grpc-Timeout', '1m'),    # skipped from metadata
           ('X-Prpc-Future-Option', 'zzz'),  # same
           ('What-Bin', base64.b64encode('haha')),
           ('What', 'dup is ok'),
