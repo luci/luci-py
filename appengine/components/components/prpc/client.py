@@ -43,7 +43,7 @@ Request = collections.namedtuple(
         'response_message',
         # A dict of call metadata. Will be available to the server.
         'metadata',
-        # RPC timeout in seconds.
+        # RPC timeout in seconds (10s by default).
         'timeout',
         # OAuth2 scopes for the access token (ok skip auth if None).
         'scopes',
@@ -244,7 +244,13 @@ class Client(object):
   Otherwise, they raise an Error.
   """
 
-  def __init__(self, hostname, service_description, insecure=False):
+  def __init__(
+      self,
+      hostname,
+      service_description,
+      insecure=False,
+      timeout=10,
+      max_attempts=4):
     """Initializes a new pRPC Client.
 
     Args:
@@ -254,9 +260,13 @@ class Client(object):
         _prpc_pb2.py file.
       insecure: True if the client must use HTTP, as opposed to HTTPS.
         Useful for local servers.
+      timeout: is the default timeout (in seconds) to use for all RPCs.
+      max_attempts: is how many times to retry on transient errors by default.
     """
     self._hostname = hostname
     self._insecure = insecure
+    self._timeout = timeout
+    self._max_attempts = max_attempts
 
     desc = service_description['service_descriptor']
     self._full_service_name = desc.name
@@ -292,7 +302,8 @@ class Client(object):
           request_message=request,
           response_message=response_py_type(),
           metadata=metadata,
-          timeout=timeout,
+          timeout=timeout or self._timeout,
+          max_attempts=self._max_attempts,
       )
 
       if credentials:
