@@ -79,7 +79,7 @@ class PRPCClientTestCase(test_case.TestCase):
           headers={
               'Content-Type': 'application/prpc; encoding=binary',
               'Accept': 'application/prpc; encoding=binary',
-              'X-Prpc-Grpc-Timeout': '10S',
+              'X-Prpc-Timeout': '10S',
               'Jennys-Number-Bin': 'ODY3LTUzMDk=',  # '867-5309'
           },
           scopes=None,
@@ -135,7 +135,7 @@ class PRPCClientTestCase(test_case.TestCase):
       self.make_test_client().Give(test_pb2.GiveRequest(), timeout=20)
       _, kwargs = net.request_async.call_args
       self.assertEqual(kwargs['deadline'], 20)
-      self.assertEqual(kwargs['headers']['X-Prpc-Grpc-Timeout'], '20S')
+      self.assertEqual(kwargs['headers']['X-Prpc-Timeout'], '20S')
 
   def test_response_ok(self):
     expected = test_pb2.TakeResponse(k=1)
