@@ -15,8 +15,6 @@ from protorpc import message_types
 from protorpc import messages
 from protorpc import remote
 import flask
-import webapp2
-import flask
 
 from components import template
 
@@ -56,18 +54,18 @@ def decode_message(remote_method_info, request):
   req_msg = endpoints.ResourceContainer.get_request_message(remote_method_info)
   if isinstance(req_msg, endpoints.ResourceContainer):
     res_container = req_msg
-    body_type = req_msg.body_message_class
+    data_type = req_msg.body_message_class
   else:
     res_container = None
-    body_type = remote_method_info.request_type
+    data_type = remote_method_info.request_type
 
-  body = PROTOCOL.decode_message(body_type, request.body)
+  data = PROTOCOL.decode_message(data_type, request.data)
   if res_container:
     result = res_container.combined_message_class()
-    for f in body.all_fields():
-      setattr(result, f.name, getattr(body, f.name))
+    for f in data.all_fields():
+      setattr(result, f.name, getattr(data, f.name))
   else:
-    result = body
+    result = data
 
   # Read field values from query string parameters or URL path.
   if res_container or request.method == 'GET':
@@ -82,7 +80,7 @@ def decode_message(remote_method_info, request):
       if f.name in request.args:
         values = [request.args[f.name]]
       else:
-        values = request.values.get_list(f.name)
+        values = request.values.getlist(f.name)
       if values:
         values = [decode_field(f, v) for v in values]
         if f.repeated:
