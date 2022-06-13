@@ -35,9 +35,7 @@ def _get_client(address):
   return client.Client(
       address,
       plugin_prpc_pb2.ExternalSchedulerServiceDescription,
-      insecure=utils.is_local_dev_server(),
-      timeout=20,
-      max_attempts=2)
+      insecure=utils.is_local_dev_server())
 
 
 def _creds():
