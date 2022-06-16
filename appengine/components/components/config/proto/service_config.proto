@@ -228,6 +228,8 @@ message ServiceDynamicMetadata {
   string version = 1;
   // What configs this service can validate and how to validate them.
   Validator validation = 2;
+  // True if the server recognizes "Content-Encoding: gzip" in requests.
+  bool supports_gzip_compression = 3;
 }
 
 // Schema of services.cfg

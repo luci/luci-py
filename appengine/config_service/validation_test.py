@@ -225,6 +225,7 @@ class ValidationTestCase(test_case.TestCase):
         'validation': {
           'url' : 'https://something.example.com/validate',
         },
+        'supports_gzip_compression': True,
     })
 
     expect_errors([], ['Service dynamic metadata must be an object'])
@@ -280,6 +281,15 @@ class ValidationTestCase(test_case.TestCase):
          'must not contain ".." or "." components: ../b'),
       ]
     )
+    expect_errors(
+      {
+        'version': '1.0',
+        'validation': {
+          'url' : 'https://something.example.com/validate',
+        },
+        'supports_gzip_compression': 'not a bool',
+      },
+      ['supports_gzip_compression: must be a boolean'])
 
   def test_validate_schemas(self):
     cfg = '''
@@ -401,7 +411,8 @@ class ValidationTestCase(test_case.TestCase):
     services.get_metadata_async.side_effect = get_metadata_async
 
     @ndb.tasklet
-    def json_request_async(url, **_kwargs):
+    def call_service_async(service, url, **_kwargs):
+      _ = service
       raise ndb.Return({
         'messages': [{
           'text': 'OK from %s' % url,
@@ -410,7 +421,9 @@ class ValidationTestCase(test_case.TestCase):
       })
 
     self.mock(
-        net, 'json_request_async', mock.Mock(side_effect=json_request_async))
+        services,
+        'call_service_async',
+        mock.Mock(side_effect=call_service_async))
 
     ############################################################################
 
@@ -423,7 +436,8 @@ class ValidationTestCase(test_case.TestCase):
           validation_context.Message(
               text='OK from https://ultimate.verifier', severity=logging.INFO)
         ])
-    net.json_request_async.assert_any_call(
+    services.call_service_async.assert_any_call(
+        service_config_pb2.Service(id='a'),
         'https://bar.verifier',
         method='POST',
         payload={
@@ -431,12 +445,10 @@ class ValidationTestCase(test_case.TestCase):
             'path': 'bar.cfg',
             'content': cfg_b64,
         },
-        deadline=50,
-        scopes=net.EMAIL_SCOPE,
-        use_jwt_auth=False,
-        audience=None,
+        gzip_request_body=False,
     )
-    net.json_request_async.assert_any_call(
+    services.call_service_async.assert_any_call(
+        service_config_pb2.Service(id='c'),
         'https://ultimate.verifier',
         method='POST',
         payload={
@@ -444,10 +456,7 @@ class ValidationTestCase(test_case.TestCase):
             'path': 'bar.cfg',
             'content': cfg_b64,
         },
-        deadline=50,
-        scopes=net.EMAIL_SCOPE,
-        use_jwt_auth=False,
-        audience=None,
+        gzip_request_body=False,
     )
 
     ############################################################################
@@ -461,7 +470,8 @@ class ValidationTestCase(test_case.TestCase):
           validation_context.Message(
               text='OK from https://ultimate.verifier', severity=logging.INFO)
         ])
-    net.json_request_async.assert_any_call(
+    services.call_service_async.assert_any_call(
+        service_config_pb2.Service(id='b'),
         'https://bar2.verifier',
         method='POST',
         payload={
@@ -469,12 +479,10 @@ class ValidationTestCase(test_case.TestCase):
             'path': 'bar.cfg',
             'content': cfg_b64,
         },
-        deadline=50,
-        scopes=net.EMAIL_SCOPE,
-        use_jwt_auth=False,
-        audience=None,
+        gzip_request_body=False,
     )
-    net.json_request_async.assert_any_call(
+    services.call_service_async.assert_any_call(
+        service_config_pb2.Service(id='c'),
         'https://ultimate.verifier',
         method='POST',
         payload={
@@ -482,18 +490,15 @@ class ValidationTestCase(test_case.TestCase):
             'path': 'bar.cfg',
             'content': cfg_b64,
         },
-        deadline=50,
-        scopes=net.EMAIL_SCOPE,
-        use_jwt_auth=False,
-        audience=None,
+        gzip_request_body=False,
     )
 
     ############################################################################
     # Error found
 
-    net.json_request_async.side_effect = None
-    net.json_request_async.return_value = ndb.Future()
-    net.json_request_async.return_value.set_result({
+    services.call_service_async.side_effect = None
+    services.call_service_async.return_value = ndb.Future()
+    services.call_service_async.return_value.set_result({
       'messages': [{
         'text': 'error',
         'severity': 'ERROR',
@@ -510,8 +515,8 @@ class ValidationTestCase(test_case.TestCase):
     ############################################################################
     # Validation messages from Go applications with integer severities
 
-    net.json_request_async.return_value = ndb.Future()
-    net.json_request_async.return_value.set_result({
+    services.call_service_async.return_value = ndb.Future()
+    services.call_service_async.return_value.set_result({
       'messages': [{
         'text': 'warn',
         'severity': logging.WARNING,
@@ -536,8 +541,8 @@ class ValidationTestCase(test_case.TestCase):
         {'text': '%s', 'severity': logging.INFO},  # format string
       ]
     }
-    net.json_request_async.return_value = ndb.Future()
-    net.json_request_async.return_value.set_result(res)
+    services.call_service_async.return_value = ndb.Future()
+    services.call_service_async.return_value.set_result(res)
 
     result = validation.validate_config('projects/baz/refs/x', 'qux.cfg', cfg)
     self.assertEqual(result.messages, [
@@ -564,6 +569,56 @@ class ValidationTestCase(test_case.TestCase):
           severity=logging.INFO,
           text='%s'),
     ])
+
+  def test_validation_request_gzip(self):
+    cfg = '# a config'
+    cfg_b64 = base64.b64encode(cfg)
+
+    self.services = [service_config_pb2.Service(id='a')]
+
+    @ndb.tasklet
+    def get_metadata_async(service_id):
+      assert service_id == 'a'
+      raise ndb.Return(service_config_pb2.ServiceDynamicMetadata(
+          validation=service_config_pb2.Validator(
+              patterns=[service_config_pb2.ConfigPattern(
+                  config_set='services/foo',
+                  path='bar.cfg',
+              )],
+              url='https://bar.verifier',
+          ),
+          supports_gzip_compression=True,
+      ))
+    self.mock(services, 'get_metadata_async', mock.Mock())
+    services.get_metadata_async.side_effect = get_metadata_async
+
+    @ndb.tasklet
+    def call_service_async(service, url, **_kwargs):
+      _ = service
+      raise ndb.Return({
+        'messages': [{
+          'text': 'OK from %s' % url,
+          # default severity
+        }],
+      })
+
+    self.mock(
+        services,
+        'call_service_async',
+        mock.Mock(side_effect=call_service_async))
+
+    validation.validate_config('services/foo', 'bar.cfg', cfg)
+    services.call_service_async.assert_any_call(
+        service_config_pb2.Service(id='a'),
+        'https://bar.verifier',
+        method='POST',
+        payload={
+            'config_set': 'services/foo',
+            'path': 'bar.cfg',
+            'content': cfg_b64,
+        },
+        gzip_request_body=True,
+    )
 
   def test_validate_json_files(self):
     with self.assertRaises(ValueError):

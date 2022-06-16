@@ -91,6 +91,7 @@ class ServiceDynamicMetadata(messages.Message):
 
   version = messages.StringField(1, required=True)
   validation = messages.MessageField(Validator, 2)
+  supports_gzip_compression = messages.BooleanField(3, default=False)
 
 
 @auth.endpoints_api(name='config', version='v1', title='Configuration service')

@@ -7,8 +7,9 @@ from test_env import future
 import test_env
 test_env.setup_test_env()
 
-import mock
+import json
 import logging
+import mock
 
 from components import net
 from components.config.proto import service_config_pb2
@@ -99,7 +100,7 @@ class ProjectsTestCase(test_case.TestCase):
 
   def test_update_service_metadata_async_same(self):
     self.mock_metadata_entity()
-    self.mock(net, 'json_request_async', mock.Mock())
+    self.mock(net, 'request_async', mock.Mock())
     dct = {
       'version': '1.0',
       'validation': {
@@ -111,15 +112,16 @@ class ProjectsTestCase(test_case.TestCase):
       }
     }
 
-    net.json_request_async.return_value = future(dct)
+    net.request_async.return_value = future(json.dumps(dct))
     self.mock(logging, 'info', mock.Mock())
     services._update_service_metadata_async(self.service_proto()).get_result()
     self.assertFalse(logging.info.called)
 
-    net.json_request_async.assert_called_once_with(
+    net.request_async.assert_called_once_with(
         'https://a.com/metadata',
         method='GET',
         payload=None,
+        headers={'Accept': 'application/json; charset=utf-8'},
         deadline=50,
         scopes=net.EMAIL_SCOPE,
         use_jwt_auth=False,
@@ -127,7 +129,7 @@ class ProjectsTestCase(test_case.TestCase):
 
   def test_update_service_metadata_async_jwt(self):
     self.mock_metadata_entity()
-    self.mock(net, 'json_request_async', mock.Mock())
+    self.mock(net, 'request_async', mock.Mock())
     dct = {
       'version': '1.0',
       'validation': {
@@ -139,7 +141,7 @@ class ProjectsTestCase(test_case.TestCase):
       }
     }
 
-    net.json_request_async.return_value = future(dct)
+    net.request_async.return_value = future(json.dumps(dct))
     self.mock(logging, 'info', mock.Mock())
     svc = self.service_proto(
         jwt_auth=service_config_pb2.Service.JWTAuth(
@@ -147,10 +149,11 @@ class ProjectsTestCase(test_case.TestCase):
     services._update_service_metadata_async(svc).get_result()
     self.assertFalse(logging.info.called)
 
-    net.json_request_async.assert_called_once_with(
+    net.request_async.assert_called_once_with(
         'https://a.com/metadata',
         method='GET',
         payload=None,
+        headers={'Accept': 'application/json; charset=utf-8'},
         deadline=50,
         scopes=None,
         use_jwt_auth=True,
@@ -158,7 +161,7 @@ class ProjectsTestCase(test_case.TestCase):
 
   def test_update_service_metadata_async_different(self):
     self.mock_metadata_entity()
-    self.mock(net, 'json_request_async', mock.Mock())
+    self.mock(net, 'request_async', mock.Mock())
     dct = {
       'version': '1.0',
       'validation': {
@@ -170,7 +173,7 @@ class ProjectsTestCase(test_case.TestCase):
       }
     }
 
-    net.json_request_async.return_value = future(dct)
+    net.request_async.return_value = future(json.dumps(dct))
     self.mock(logging, 'info', mock.Mock())
     services._update_service_metadata_async(self.service_proto()).get_result()
     self.assertTrue(logging.info.called)
@@ -184,6 +187,32 @@ class ProjectsTestCase(test_case.TestCase):
     svc = self.service_proto(metadata_url='')
     services._update_service_metadata_async(svc).get_result()
     self.assertTrue(logging.info.called)
+
+  def test_call_service_async_with_compression(self):
+    self.mock(net, 'request_async', mock.Mock())
+    net.request_async.return_value = future('{"x": "y"}')
+
+    res = services.call_service_async(
+        service_config_pb2.Service(id='a'),
+        'https://a.com',
+        method='POST',
+        payload={'long': 'x'*512*1024},
+        gzip_request_body=True).get_result()
+    self.assertEqual(res, {'x': 'y'})
+
+    net.request_async.assert_called_once_with(
+        'https://a.com',
+        method='POST',
+        payload=mock.ANY,  # some byte blob with gzip data
+        headers={
+            'Accept': 'application/json; charset=utf-8',
+            'Content-Type': 'application/json; charset=utf-8',
+            'Content-Encoding': 'gzip',
+        },
+        deadline=50,
+        scopes=net.EMAIL_SCOPE,
+        use_jwt_auth=False,
+        audience=None)
 
 
 if __name__ == '__main__':

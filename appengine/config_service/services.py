@@ -4,6 +4,9 @@
 
 """Provides info about registered luci services."""
 
+import cStringIO
+import gzip
+import json
 import logging
 
 from google.appengine.ext import ndb
@@ -50,6 +53,8 @@ def _dict_to_dynamic_metadata(data):
       pattern = metadata.validation.patterns.add()
       pattern.config_set = p['config_set']
       pattern.path = p['path']
+  metadata.supports_gzip_compression = data.get(
+      'supports_gzip_compression', False)
   return metadata
 
 
@@ -69,7 +74,9 @@ def get_metadata_async(service_id):
   raise ndb.Return(msg)
 
 
-def call_service_async(service, url, method='GET', payload=None):
+@ndb.tasklet
+def call_service_async(
+    service, url, method='GET', payload=None, gzip_request_body=False):
   """Sends JSON RPC request to a service, with authentication.
 
   Args:
@@ -77,6 +84,8 @@ def call_service_async(service, url, method='GET', payload=None):
     url: full URL to send the request to.
     method: HTTP method to use.
     payload: JSON-serializable body to send in PUT/POST requests.
+    gzip_request_body: if True and payload is large enough, gzip the request
+      body and set "Content-Encoding: gzip" request header.
 
   Returns:
     Deserialized JSON response.
@@ -84,14 +93,36 @@ def call_service_async(service, url, method='GET', payload=None):
   Raises:
     net.Error on errors.
   """
-  return net.json_request_async(
+  headers = {'Accept': 'application/json; charset=utf-8'}
+  if payload is not None:
+    headers['Content-Type'] = 'application/json; charset=utf-8'
+    payload = utils.encode_to_json(payload)
+    if gzip_request_body and len(payload) > 512 * 1024:
+      logging.info('Compressing the request: it is %d bytes', len(payload))
+      headers['Content-Encoding'] = 'gzip'
+      payload = _gzip_compress(payload)
+  response = yield net.request_async(
       url,
       method=method,
       payload=payload,
+      headers=headers,
       deadline=50,
       scopes=None if service.HasField('jwt_auth') else net.EMAIL_SCOPE,
       use_jwt_auth=service.HasField('jwt_auth'),
       audience=service.jwt_auth.audience or None)
+  try:
+    response = json.loads(response.lstrip(")]}'\n"))
+  except ValueError as e:
+    # 901 CLIENT STATUS_ERROR. See gae_ts_mon/common/http_metrics.py
+    raise net.Error('Bad JSON response: %s' % e, 901, response)
+  raise ndb.Return(response)
+
+
+def _gzip_compress(blob):
+  out = cStringIO.StringIO()
+  with gzip.GzipFile(fileobj=out, mode='w') as f:
+    f.write(blob)
+  return out.getvalue()
 
 
 @ndb.tasklet

@@ -311,6 +311,11 @@ def validate_service_dynamic_metadata_blob(metadata, ctx):
         with ctx.prefix('path: '):
           validate_pattern(p.get('path'), validate_path, ctx)
 
+  with ctx.prefix('supports_gzip_compression: '):
+    val = metadata.get('supports_gzip_compression', False)
+    if not isinstance(val, bool):
+      ctx.error('must be a boolean')
+
 
 @validation.self_rule(common.ACL_FILENAME, service_config_pb2.AclCfg)
 def validate_acl_cfg(cfg, ctx):
@@ -420,7 +425,11 @@ def _validate_by_service_async(service, config_set, path, content, ctx):
       'content': base64.b64encode(content),
     }
     res = yield services.call_service_async(
-        service, url, method='POST', payload=req)
+        service,
+        url,
+        method='POST',
+        payload=req,
+        gzip_request_body=metadata.supports_gzip_compression)
   except net.Error as ex:
     report_error('Net error: %s' % ex)
     return
