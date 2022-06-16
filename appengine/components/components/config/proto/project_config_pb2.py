@@ -17,9 +17,9 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   name='components/config/proto/project_config.proto',
   package='config',
   syntax='proto3',
-  serialized_options=None,
+  serialized_options=b'Z(go.chromium.org/luci/common/proto/config',
   create_key=_descriptor._internal_create_key,
-  serialized_pb=b'\n,components/config/proto/project_config.proto\x12\x06\x63onfig\"V\n\nProjectCfg\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x0e\n\x06\x61\x63\x63\x65ss\x18\x02 \x03(\t\x12*\n\x07lucicfg\x18\x03 \x01(\x0b\x32\x19.config.GeneratorMetadata\"\xd7\x01\n\x11GeneratorMetadata\x12\x0f\n\x07version\x18\x01 \x01(\t\x12\x13\n\x0bpackage_dir\x18\x05 \x01(\t\x12\x12\n\nconfig_dir\x18\x02 \x01(\t\x12\x13\n\x0b\x65ntry_point\x18\x03 \x01(\t\x12\x31\n\x04vars\x18\x04 \x03(\x0b\x32#.config.GeneratorMetadata.VarsEntry\x12\x13\n\x0b\x65xperiments\x18\x06 \x03(\t\x1a+\n\tVarsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"V\n\x07RefsCfg\x12!\n\x04refs\x18\x01 \x03(\x0b\x32\x13.config.RefsCfg.Ref\x1a(\n\x03Ref\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x13\n\x0b\x63onfig_path\x18\x03 \x01(\tb\x06proto3'
+  serialized_pb=b'\n,components/config/proto/project_config.proto\x12\x06\x63onfig\"V\n\nProjectCfg\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x0e\n\x06\x61\x63\x63\x65ss\x18\x02 \x03(\t\x12*\n\x07lucicfg\x18\x03 \x01(\x0b\x32\x19.config.GeneratorMetadata\"\xd7\x01\n\x11GeneratorMetadata\x12\x0f\n\x07version\x18\x01 \x01(\t\x12\x13\n\x0bpackage_dir\x18\x05 \x01(\t\x12\x12\n\nconfig_dir\x18\x02 \x01(\t\x12\x13\n\x0b\x65ntry_point\x18\x03 \x01(\t\x12\x31\n\x04vars\x18\x04 \x03(\x0b\x32#.config.GeneratorMetadata.VarsEntry\x12\x13\n\x0b\x65xperiments\x18\x06 \x03(\t\x1a+\n\tVarsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"V\n\x07RefsCfg\x12!\n\x04refs\x18\x01 \x03(\x0b\x32\x13.config.RefsCfg.Ref\x1a(\n\x03Ref\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x13\n\x0b\x63onfig_path\x18\x03 \x01(\tB*Z(go.chromium.org/luci/common/proto/configb\x06proto3'
 )
 
 
@@ -293,5 +293,6 @@ _sym_db.RegisterMessage(RefsCfg)
 _sym_db.RegisterMessage(RefsCfg.Ref)
 
 
+DESCRIPTOR._options = None
 _GENERATORMETADATA_VARSENTRY._options = None
 # @@protoc_insertion_point(module_scope)
