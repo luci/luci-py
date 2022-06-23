@@ -552,8 +552,10 @@ class AuthGlobalConfig(ndb.Model, AuthVersionedEntityMixin):
    * AuthReplicationState
    * AuthSecret
   """
-  # Disable useless in-process per-request cache.
+  # Disable memcache and always fetch from Datastore. This means we can see
+  # changes from the Go version of the app.
   _use_cache = False
+  _use_memcache = False
 
   # OAuth2 client_id to use to mint new OAuth2 tokens.
   oauth_client_id = ndb.StringProperty(indexed=False, default='')
@@ -579,6 +581,11 @@ class AuthReplicationState(ndb.Model, datastore_utils.SerializableModelMixin):
   changes to AuthDB are made, Replica updates it whenever it receives a push
   from Primary.
   """
+  # Disable memcache and always fetch from Datastore. This means we can see
+  # changes from the Go version of the app.
+  _use_cache = False
+  _use_memcache = False
+
   # How to convert this entity to or from serializable dict.
   serializable_properties = {
     'primary_id': datastore_utils.READABLE,
@@ -821,8 +828,10 @@ class AuthGroup(
   Primary service holds authoritative list of Groups, that gets replicated to
   all Replicas.
   """
-  # Disable useless in-process per-request cache.
+  # Disable memcache and always fetch from Datastore. This means we can see
+  # changes from the Go version of the app.
   _use_cache = False
+  _use_memcache = False
 
   # How to convert this entity to or from serializable dict.
   serializable_properties = {
@@ -1026,8 +1035,10 @@ class AuthSecret(ndb.Model):
   validate existing tokens. That way secret can be rotated without invalidating
   any existing outstanding tokens.
   """
-  # Disable useless in-process per-request cache.
+  # Disable memcache and always fetch from Datastore. This means we can see
+  # changes from the Go version of the app.
   _use_cache = False
+  _use_memcache = False
 
   # Last several values of a secret, with current value in front.
   values = ndb.BlobProperty(repeated=True, indexed=False)
@@ -1083,8 +1094,10 @@ class AuthIPWhitelistAssignments(ndb.Model, AuthVersionedEntityMixin):
 
   See AuthIPWhitelist for more info about IP whitelists.
   """
-  # Disable useless in-process per-request cache.
+  # Disable memcache and always fetch from Datastore. This means we can see
+  # changes from the Go version of the app.
   _use_cache = False
+  _use_memcache = False
 
   class Assignment(ndb.Model):
     # Identity name to limit by IP whitelist. Unique key in 'assignments' list.
@@ -1115,8 +1128,10 @@ class AuthIPWhitelist(
 
   Entity id is a name of the whitelist. Parent entity is root_key().
   """
-  # Disable useless in-process per-request cache.
+  # Disable memcache and always fetch from Datastore. This means we can see
+  # changes from the Go version of the app.
   _use_cache = False
+  _use_memcache = False
 
   # How to convert this entity to or from serializable dict.
   serializable_properties = {
@@ -1298,8 +1313,10 @@ class AuthRealmsGlobals(ndb.Model, AuthVersionedEntityMixin):
 
   Entity key is realms_globals_key(). Parent entity is root_key().
   """
-  # Disable useless in-process per-request cache.
+  # Disable memcache and always fetch from Datastore. This means we can see
+  # changes from the Go version of the app.
   _use_cache = False
+  _use_memcache = False
 
   # All globally defined permissions, in alphabetical order.
   permissions = datastore_utils.ProtobufProperty(
@@ -1317,8 +1334,10 @@ class AuthProjectRealms(ndb.Model, AuthVersionedEntityMixin):
 
   Entity key is project_realms_key(...). Parent entity is root_key().
   """
-  # Disable useless in-process per-request cache.
+  # Disable memcache and always fetch from Datastore. This means we can see
+  # changes from the Go version of the app.
   _use_cache = False
+  _use_memcache = False
 
   # All realms of a project, see the AuthProjectRealms doc string above.
   realms = datastore_utils.ProtobufProperty(realms_pb2.Realms, compressed=True)
