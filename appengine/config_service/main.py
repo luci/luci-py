@@ -58,5 +58,5 @@ def initialize():  # pragma: no cover
   ereporter2.register_formatter()
   apps = (create_html_app(), create_endpoints_app(), create_backend_app())
   for app in apps:
-    gae_ts_mon.initialize(app=app)
+    gae_ts_mon.initialize_prod(app=app)
   return apps
