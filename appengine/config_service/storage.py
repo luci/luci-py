@@ -5,6 +5,7 @@
 """Storage of config files."""
 
 import hashlib
+import logging
 
 from google.appengine.api import app_identity
 from google.appengine.ext import ndb
@@ -325,7 +326,11 @@ def import_blob_async(content, content_hash=None):
 
   # pylint: disable=E1120
   if not Blob.get_by_id(content_hash):
+    logging.info('Storing blob %s', content_hash)
     yield Blob(id=content_hash, content=content).put_async()
+  else:
+    logging.info('Already seen blob %s', content_hash)
+
   raise ndb.Return(content_hash)
 
 

@@ -198,6 +198,7 @@ def _import_revision(config_set, base_location, commit, project_id):
 
   @ndb.transactional
   def txn():
+    logging.info('Transactionally storing %d entities', len(rev_entities))
     ndb.put_multi(rev_entities)
 
   txn()
@@ -216,7 +217,6 @@ def _read_and_validate_archive(config_set, rev_key, archive, location):
   logging.info('%s archive size: %d bytes' % (config_set, len(archive)))
 
   stream = StringIO.StringIO(archive)
-  blob_futures = []
   with tarfile.open(mode='r|gz', fileobj=stream) as tar:
     files = {}
     ctx = config.validation.Context()
@@ -233,11 +233,24 @@ def _read_and_validate_archive(config_set, rev_key, archive, location):
   if ctx.result().has_errors:
     return [], ctx.result()
 
+  hashes = set()
+  blob_futures = []
   entities = []
+
   for name, content in files.items():
     content_hash = storage.compute_hash(content)
-    blob_futures.append(storage.import_blob_async(
-      content=content, content_hash=content_hash))
+    logging.info('File %r hashes to %s', name, content_hash)
+
+    # Avoid adding the exact same blob multiple times. May happen if the config
+    # set has duplicate files. This is an optimization to avoid collisions in
+    # concurrent ndb.put(...).
+    if content_hash not in hashes:
+      hashes.add(content_hash)
+      blob_futures.append(storage.import_blob_async(
+        content=content, content_hash=content_hash))
+    else:
+      logging.info('Already importing blob %s, skipping', content_hash)
+
     entities.append(
       storage.File(
         id=name,
@@ -245,8 +258,11 @@ def _read_and_validate_archive(config_set, rev_key, archive, location):
         content_hash=content_hash,
         url=str(location.join(name)))
     )
-  # Wait for Blobs to be imported before proceeding.
-  ndb.Future.wait_all(blob_futures)
+
+  # Wait for Blobs to be imported successfully before proceeding.
+  for fut in blob_futures:
+    fut.check_success()
+
   return entities, ctx.result()
 
 
