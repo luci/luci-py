@@ -13,6 +13,7 @@ import unittest
 from protorpc import messages
 from protorpc import remote
 import endpoints
+import flask
 import mock
 
 from test_support import test_case
@@ -84,51 +85,48 @@ class EndpointsFlaskTestCase(test_case.TestCase):
     self.assertEqual(rc.s2, 'b')
     self.assertEqual(rc.x, 'c')
 
-#   def test_handle_403(self):
-#     app = webapp2.WSGIApplication(adapter.api_routes([EndpointsService],
-#                                                      '/_ah/api'),
-#                                   debug=True)
-#     request = webapp2.Request.blank('/_ah/api/Service/v1/post_403')
-#     request.method = 'POST'
-#     response = request.get_response(app)
-#     self.assertEqual(response.status_int, 403)
-#     self.assertEqual(json.loads(response.body), {
-#         'error': {
-#             'message': 'access denied',
-#         },
-#     })
+  # def test_handle_403(self):
+  #   app = adapter.api_server([EndpointsService], base_path='/_ah/api')
+  #   with app.test_client() as client:
+  #     response = client.post('/_ah/api/Service/v1/post_403')
+  #   self.assertEqual(response.status, 403)
+  #   self.assertEqual(json.loads(response.body), {
+  #       'error': {
+  #           'message': 'access denied',
+  #       },
+  #   })
 
-#   def test_api_routes(self):
-#     routes = sorted(
-#         [r.template for r in adapter.api_routes([EndpointsService])])
-#     self.assertEqual(
-#         routes,
-#         [
-#             # Each route appears twice below because each route has two
-#             # different handlers, one for HTTP OPTIONS and the other for
-#             # user-defined methods.
-#             '/_ah/api/Service/v1/get',
-#             '/_ah/api/Service/v1/get',
-#             '/_ah/api/Service/v1/get_container',
-#             '/_ah/api/Service/v1/get_container',
-#             '/_ah/api/Service/v1/post',
-#             '/_ah/api/Service/v1/post',
-#             '/_ah/api/Service/v1/post_403',
-#             '/_ah/api/Service/v1/post_403',
-#             '/_ah/api/discovery/v1/apis',
-#             '/_ah/api/discovery/v1/apis/<name>/<version>/rest',
-#             '/_ah/api/explorer',
-#             '/_ah/api/static/proxy.html',
-#         ])
+  def test_api_routes(self):
+    routes = sorted([
+        route for route, _, _, _ in adapter.api_routes([EndpointsService],
+                                                       base_path='/_ah/api')
+    ])
+    self.assertEqual(
+        routes,
+        [
+            # Flask URLs must be unique
+            '/_ah/api/Service/v1/get',
+            '/_ah/api/Service/v1/get',
+            '/_ah/api/Service/v1/get_container',
+            '/_ah/api/Service/v1/get_container',
+            '/_ah/api/Service/v1/post',
+            '/_ah/api/Service/v1/post',
+            '/_ah/api/Service/v1/post_403',
+            '/_ah/api/Service/v1/post_403',
+            '/_ah/api/discovery/v1/apis',
+            '/_ah/api/discovery/v1/apis/<name>/<version>/rest',
+            '/_ah/api/explorer',
+            '/_ah/api/static/proxy.html',
+        ])
 
-#   def test_discovery_routing(self):
-#     app = webapp2.WSGIApplication(
-#         [adapter.discovery_service_route([EndpointsService], '/api')],
-#         debug=True) #TODO: use flask.Flask instead
-#     request = webapp2.Request.blank('/api/discovery/v1/apis/Service/v1/rest')
-#     request.method = 'GET'
-#     response = json.loads(request.get_response(app).body)
-#     self.assertEqual(response['id'], 'Service:v1')
+  # def test_discovery_routing(self):
+  #   app = adapter.api_server([EndpointsService], base_path='/_ah/api')
+  #   with app.test_client() as client:
+  #   request = webapp2.Request.blank('/api/discovery/v1/apis/Service/v1/rest')
+  #   request.method = 'GET'
+  #   response = json.loads(request.get_response(app).body)
+  #   self.assertEqual(response['id'], 'Service:v1')
+
 
 #   def test_directory_routing(self):
 #     app = webapp2.WSGIApplication(

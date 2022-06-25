@@ -175,12 +175,11 @@ def api_routes(api_classes, base_path='/_ah/api', regex='[^/]+'):
       t = posixpath.join(api_base_path, method_path)
       http_method = info.http_method.upper() or 'POST'
       handler = path_handler_factory(api_class, method, api_base_path)
-      routes.append((t, handler, [http_method]))
+      routes.append((t, method_path, handler, [http_method]))
       templates.add(t)
 
-    # Add routes for HTTP OPTIONS (to add CORS headers) for each method.
-    for t in sorted(templates):
-      routes.append((t, cors_handler, ['OPTIONS']))
+      # Add routes for HTTP OPTIONS (to add CORS headers) for each method.
+      routes.append((t, 'cors_handler', None, ['OPTIONS']))
 
   # Add generic routes.
   routes.extend([
@@ -204,7 +203,15 @@ def api_server(api_classes, base_path='/_ah/api', regex='[^/]+'):
   Returns:
     A Flask applications.
   """
-  return flask.Flask(api_routes(api_classes, base_path, regex))
+  app = flask.Flask(__name__)
+  routes = api_routes(api_classes, base_path, regex)
+  for rule, endpoint, view_func, methods in routes:
+    app.add_url_rule(rule,
+                     endpoint=endpoint,
+                     view_func=view_func,
+                     methods=methods)
+  app.view_functions['cors_handler'] = cors_handler
+  return app
 
 
 def discovery_handler_factory(api_classes, base_path):
@@ -244,10 +251,11 @@ def discovery_service_route(api_classes, base_path):
     base_path: The base path under which all service paths exist.
 
   Returns:
-    A tuple containing a URL string and a path.
+    A tuple with a URL rule, endpoint name, view function, and method type.
   """
   return ('%s/discovery/v1/apis/<name>/<version>/rest' % base_path,
-          discovery_handler_factory(api_classes, base_path))
+          'discovery_handler',
+          discovery_handler_factory(api_classes, base_path), ['GET'])
 
 
 def directory_handler_factory(api_classes, base_path):
@@ -278,10 +286,10 @@ def directory_service_route(api_classes, base_path):
     base_path: The base path under which all service paths exist.
 
   Returns:
-    A tuple containing a URL string and a path.
+    A tuple with a URL rule, endpoint name, view function, and method type.
   """
-  return ('%s/discovery/v1/apis' % base_path,
-          directory_handler_factory(api_classes, base_path))
+  return ('%s/discovery/v1/apis' % base_path, 'directory_handler',
+          directory_handler_factory(api_classes, base_path), ['GET'])
 
 
 def explorer_proxy_route(base_path):
@@ -291,7 +299,7 @@ def explorer_proxy_route(base_path):
     base_path: The base path under which all service paths exist.
 
   Returns:
-    A tuple containing a URL string and a path.
+    A tuple with a URL rule, endpoint name, view function, and method type.
   """
 
   def proxy_handler():
@@ -303,7 +311,8 @@ def explorer_proxy_route(base_path):
       'adapter': os.path.join(THIS_DIR, 'templates'),
   })
 
-  return ('%s/static/proxy.html' % base_path, proxy_handler)
+  return ('%s/static/proxy.html' % base_path, 'proxy_handler', proxy_handler,
+          ['GET'])
 
 
 def explorer_redirect_route(base_path):
@@ -313,7 +322,7 @@ def explorer_redirect_route(base_path):
     base_path: The base path under which all service paths exist.
 
   Returns:
-    A tuple containing a URL string and a Flask handler function.
+    A tuple with a URL rule, endpoint name, view function, and method type.
   """
 
   def redirect_handler():
@@ -323,4 +332,5 @@ def explorer_redirect_route(base_path):
     flask.redirect('https://apis-explorer.appspot.com/apis-explorer'
                    '/?base=https://%s%s' % (host, base_path))
 
-  return ('%s/explorer' % base_path, redirect_handler)
+  return ('%s/explorer' % base_path, 'redirect_handler', redirect_handler,
+          ['GET'])
