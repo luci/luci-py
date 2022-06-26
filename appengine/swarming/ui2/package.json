@@ -44,7 +44,7 @@
     "karma-jasmine": "~1.1.2",
     "karma-spec-reporter": "0.0.32",
     "karma-webpack": "^4.0.2",
-    "node-fetch": "^2.6.0",
+    "node-fetch": "^2.6.7",
     "postcss-loader": "^2.1.6",
     "pulito": "~4.4.0",
     "puppeteer": "^1.20.0",
