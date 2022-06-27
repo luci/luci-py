@@ -325,7 +325,7 @@ def import_blob_async(content, content_hash=None):
   content_hash = content_hash or compute_hash(content)
 
   # pylint: disable=E1120
-  if not Blob.get_by_id(content_hash):
+  if not (yield Blob.get_by_id_async(content_hash)):
     logging.info('Storing blob %s', content_hash)
     yield Blob(id=content_hash, content=content).put_async()
   else:
