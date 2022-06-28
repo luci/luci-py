@@ -74,7 +74,7 @@ def parse_headers(headers):
 
   Args:
     headers: the self.request.headers dictionary-like object from a
-        webapp2.RequestHandler.
+        webapp2/flask Request.
 
   Returns:
     ParsedHeaders named tuple, see its definition for more info.
