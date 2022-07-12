@@ -100,31 +100,32 @@ def path_handler_factory(api_class, api_method, service_path):
   def path_handler():
     headers = CORS_HEADERS
 
+    split_host = flask.request.host.split(':')
+    port = split_host[1] if len(split_host) > 1 else '80'
+
     api = api_class()
     api.initialize_request_state(
-        remote.HttpRequestState(
-            remote_host=None,
-            remote_address=flask.request.values['remote_addr'],
-            server_host=flask.request.values['host'],
-            server_port=flask.request.values['server_port'],
-            http_method=flask.request.values['method'],
-            service_path=service_path,
-            headers=flask.request.headers.items()))
-
+        remote.HttpRequestState(remote_host=None,
+                                remote_address=flask.request.remote_addr,
+                                server_host=flask.request.host,
+                                server_port=port,
+                                http_method=flask.request.method,
+                                service_path=service_path,
+                                headers=flask.request.headers.items()))
     try:
       req = decode_message(api_method.remote, flask.request)
       # Check that required fields are populated.
       req.check_initialized()
     except (messages.DecodeError, messages.ValidationError, ValueError) as ex:
       response = {'error': {'message': ex.message}}
-      return (response, http_client.BAD_REQUEST, headers)
+      return flask.jsonify(response), http_client.BAD_REQUEST, headers
     try:
       res = api_method(api, req)
     except endpoints.ServiceException as ex:
       response = {'error': {'message': ex.message}}
-      return (response, ex.http_status, headers)
+      return flask.jsonify(response), ex.http_status, headers
     if isinstance(res, message_types.VoidMessage):
-      return (None, http_client.NO_CONTENT, headers)
+      return '', http_client.NO_CONTENT, headers
     # Flask jsonifies Python dicts, so this format is more convenient.
     response = json.loads(PROTOCOL.encode_message(res))
     if flask.request.get('fields'):
@@ -139,19 +140,18 @@ def path_handler_factory(api_class, api_method, service_path):
         # Log the error but return the full response.
         logging.warning('Ignoring erroneous field mask %r: %s',
                         flask.request.get('fields'), e)
-    return (response, http_client.OK, headers)
+    return flask.jsonify(response), http_client.OK, headers
 
   return path_handler
 
 
-def api_routes(api_classes, base_path='/_ah/api', regex='[^/]+'):
+def api_routes(api_classes, base_path='/_ah/api'):
   """Creates routes for the given Endpoints v1 services.
 
   Args:
     api_classes: A list of protorpc.remote.Service classes to create routes for.
     base_path: The base path under which all service paths should exist. If
       unspecified, defaults to /_ah/api.
-    regex: Regular expression to allow in path parameters.
 
   Returns:
     A list of tuples, each consisting of three parts: a URL rule string,
@@ -171,7 +171,7 @@ def api_routes(api_classes, base_path='/_ah/api', regex='[^/]+'):
     for _, method in sorted(api_class.all_remote_methods().items()):
       info = method.method_info
       method_path = info.get_path(api_class.api_info)
-      method_path = method_path.replace('{', '<').replace('}', ':%s>' % regex)
+      method_path = method_path.replace('{', '<string:').replace('}', '>')
       t = posixpath.join(api_base_path, method_path)
       http_method = info.http_method.upper() or 'POST'
       handler = path_handler_factory(api_class, method, api_base_path)
@@ -191,20 +191,19 @@ def api_routes(api_classes, base_path='/_ah/api', regex='[^/]+'):
   return routes
 
 
-def api_server(api_classes, base_path='/_ah/api', regex='[^/]+'):
+def api_server(api_classes, base_path='/_ah/api'):
   """Creates a Flask application for the given Endpoints v1 services.
 
   Args:
     api_classes: A list of protorpc.remote.Service classes to create routes for.
     base_path: The base path under which all service paths should exist. If
       unspecified, defaults to /_ah/api.
-    regex: Regular expression to allow in path parameters.
 
   Returns:
     A Flask applications.
   """
   app = flask.Flask(__name__)
-  routes = api_routes(api_classes, base_path, regex)
+  routes = api_routes(api_classes, base_path)
   for rule, endpoint, view_func, methods in routes:
     app.add_url_rule(rule,
                      endpoint=endpoint,
@@ -237,7 +236,7 @@ def discovery_handler_factory(api_classes, base_path):
     if not services:
       flask.abort(404)
 
-    return discovery.generate(services, host, base_path)
+    return flask.jsonify(discovery.generate(services, host, base_path))
 
   return discovery_handler
 
@@ -272,7 +271,7 @@ def directory_handler_factory(api_classes, base_path):
 
   def directory_handler():
     host = flask.request.headers['Host']
-    return discovery.directory(api_classes, host, base_path)
+    return flask.jsonify(discovery.directory(api_classes, host, base_path))
 
   return directory_handler
 
@@ -305,7 +304,8 @@ def explorer_proxy_route(base_path):
   def proxy_handler():
     """Returns a proxy capable of handling requests from API explorer."""
 
-    return flask.render_template('adapter/proxy.html', base_path=base_path)
+    return template.render('adapter/proxy.html',
+                           params={'base_path': base_path})
 
   template.bootstrap({
       'adapter': os.path.join(THIS_DIR, 'templates'),
@@ -329,8 +329,8 @@ def explorer_redirect_route(base_path):
     """Returns a handler redirecting to the API explorer."""
 
     host = flask.request.headers['Host']
-    flask.redirect('https://apis-explorer.appspot.com/apis-explorer'
-                   '/?base=https://%s%s' % (host, base_path))
+    return flask.redirect('https://apis-explorer.appspot.com/apis-explorer'
+                          '/?base=https://%s%s' % (host, base_path))
 
   return ('%s/explorer' % base_path, 'redirect_handler', redirect_handler,
           ['GET'])

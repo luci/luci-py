@@ -85,16 +85,15 @@ class EndpointsFlaskTestCase(test_case.TestCase):
     self.assertEqual(rc.s2, 'b')
     self.assertEqual(rc.x, 'c')
 
-  # def test_handle_403(self):
-  #   app = adapter.api_server([EndpointsService], base_path='/_ah/api')
-  #   with app.test_client() as client:
-  #     response = client.post('/_ah/api/Service/v1/post_403')
-  #   self.assertEqual(response.status, 403)
-  #   self.assertEqual(json.loads(response.body), {
-  #       'error': {
-  #           'message': 'access denied',
-  #       },
-  #   })
+  def test_handle_403(self):
+    app = adapter.api_server([EndpointsService], base_path='/_ah/api')
+    with app.test_client() as client:
+      response = client.post('/_ah/api/Service/v1/post_403')
+    self.assertEqual(response.status, '403 FORBIDDEN')
+    self.assertEqual(json.loads(response.data),
+                     {'error': {
+                         'message': 'access denied'
+                     }})
 
   def test_api_routes(self):
     routes = sorted([
@@ -119,40 +118,44 @@ class EndpointsFlaskTestCase(test_case.TestCase):
             '/_ah/api/static/proxy.html',
         ])
 
-  # def test_discovery_routing(self):
-  #   app = adapter.api_server([EndpointsService], base_path='/_ah/api')
-  #   with app.test_client() as client:
-  #   request = webapp2.Request.blank('/api/discovery/v1/apis/Service/v1/rest')
-  #   request.method = 'GET'
-  #   response = json.loads(request.get_response(app).body)
-  #   self.assertEqual(response['id'], 'Service:v1')
+  def test_discovery_routing(self):
+    app = adapter.api_server([EndpointsService], base_path='/api')
+    with app.test_client() as client:
+      response = client.get('/api/discovery/v1/apis/Service/v1/rest')
+    data = json.loads(response.data)
+    self.assertEqual(data['id'], 'Service:v1')
 
+  def test_directory_routing(self):
+    app = adapter.api_server([EndpointsService], base_path='/api')
+    with app.test_client() as client:
+      response = client.get('/api/discovery/v1/apis')
+    data = json.loads(response.data)
+    self.assertEqual(len(data.get('items', [])), 1)
+    self.assertEqual(data['items'][0]['id'], 'Service:v1')
 
-#   def test_directory_routing(self):
-#     app = webapp2.WSGIApplication(
-#         [adapter.directory_service_route([EndpointsService], '/api')],
-#         debug=True)
-#     request = webapp2.Request.blank('/api/discovery/v1/apis')
-#     request.method = 'GET'
-#     response = json.loads(request.get_response(app).body)
-#     self.assertEqual(len(response.get('items', [])), 1)
-#     self.assertEqual(response['items'][0]['id'], 'Service:v1')
+  def test_proxy_routing(self):
+    app = flask.Flask(__name__)
+    rule, endpoint, view_func, methods = adapter.explorer_proxy_route('/api')
+    app.add_url_rule(rule,
+                     endpoint=endpoint,
+                     view_func=view_func,
+                     methods=methods)
+    with app.test_client() as client:
+      response = client.get('/api/static/proxy.html')
+    self.assertIn('/api', response.data)
 
-#   def test_proxy_routing(self):
-#     app = webapp2.WSGIApplication([adapter.explorer_proxy_route('/api')],
-#                                   debug=True)
-#     request = webapp2.Request.blank('/api/static/proxy.html')
-#     request.method = 'GET'
-#     response = request.get_response(app).body
-#     self.assertIn('/api', response)
+  def test_redirect_routing(self):
+    app = flask.Flask(__name__)
+    rule, endpoint, view_func, methods = adapter.explorer_redirect_route('/api')
+    app.add_url_rule(rule,
+                     endpoint=endpoint,
+                     view_func=view_func,
+                     methods=methods)
 
-#   def test_redirect_routing(self):
-#     app = webapp2.WSGIApplication([adapter.explorer_redirect_route('/api')],
-#                                   debug=True)
-#     request = webapp2.Request.blank('/api/explorer')
-#     request.method = 'GET'
-#     response = request.get_response(app)
-#     self.assertEqual(response.status, '302 Moved Temporarily')
+    with app.test_client() as client:
+      response = client.get('/api/explorer')
+    self.assertEqual(response.status, '302 FOUND')
+
 
 if __name__ == '__main__':
   if '-v' in sys.argv:

@@ -1,13 +1,12 @@
-# endpoints_webapp2/
+# endpoints_flask/
 
 `endpoints_flask` is a package which implements Cloud Endpoints v1 over
-Flask routes by acting as an adapter. This directory has been copied and
-modified to work with Monorail's migration to Python 3.
+Flask routes by acting as an adapter. This is a copy of the `endpoints_webapp2` directory that has been modified to run using Flask instead.
 
 ## Usage
 
 The adapter is a drop-in replacement. Simply replace your calls to
-`endpoints.api_server` with calls to `endpoints_webapp2.api_server`.
+`endpoints.api_server` with calls to `endpoints_flask.api_server`.
 You will need to update your app configuration in as well.
 
 ### Before
