@@ -19,13 +19,14 @@ def CommonChecks(input_api, output_api):
   disabled_warnings = [
     'relative-import',
   ]
-  return input_api.canned_checks.RunPylint(
-      input_api,
-      output_api,
-      files_to_skip=files_to_skip,
-      disabled_warnings=disabled_warnings,
-      pylintrc=input_api.os_path.join(input_api.PresubmitLocalPath(), '../../',
-                                      'pylintrc'))
+  return input_api.canned_checks.RunPylint(input_api,
+                                           output_api,
+                                           files_to_skip=files_to_skip,
+                                           disabled_warnings=disabled_warnings,
+                                           pylintrc=input_api.os_path.join(
+                                               input_api.PresubmitLocalPath(),
+                                               '../../', 'pylintrc'),
+                                           version='1.5')
 
 
 # pylint: disable=unused-argument
