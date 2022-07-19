@@ -300,8 +300,10 @@ def _pool_from_dimensions(dimensions):
 def _set_jobs_metrics(payload):
   params = _ShardParams(payload)
 
-  state_map = {task_result.State.RUNNING: 'running',
-               task_result.State.PENDING: 'pending'}
+  state_map = {
+      task_result.State.RUNNING: 'running',
+      task_result.State.PENDING: 'pending'
+  }
   jobs_counts = defaultdict(lambda: 0)
   jobs_total = 0
   jobs_pending_distributions = defaultdict(
@@ -310,8 +312,8 @@ def _set_jobs_metrics(payload):
       lambda: 0.0)
 
   query_iter = task_result.get_result_summaries_query(
-      None, None, 'created_ts', 'pending_running', None).iter(
-      produce_cursors=True, start_cursor=params.cursor)
+      None, None, 'created_ts', 'pending_running',
+      None).iter(produce_cursors=True, start_cursor=params.cursor)
 
   while query_iter.has_next():
     runtime = (utils.utcnow() - params.start_time).total_seconds()

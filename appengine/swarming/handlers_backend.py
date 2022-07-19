@@ -53,8 +53,7 @@ class CronBotDiedHandler(_CronHandlerBase):
   """
 
   def run_cron(self):
-    start_time = utils.milliseconds_since_epoch()
-    task_scheduler.cron_handle_bot_died(start_time)
+    task_scheduler.cron_handle_bot_died()
 
 
 class CronAbortExpiredShardToRunHandler(_CronHandlerBase):

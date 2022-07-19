@@ -2526,16 +2526,15 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         1)
     self.mock_milliseconds_since_epoch(100)
     self.assertEqual(([run_result.task_id], 0),
-                     task_scheduler.cron_handle_bot_died(0))
+                     task_scheduler.cron_handle_bot_died())
     self.assertEqual(1, self.execute_tasks())
     self.assertEqual(2, len(pub_sub_calls))  # RUNNING -> COMPLETED
     self.assertEqual(False, is_in_negative_cache(1))
     self.assertEqual(False, is_in_negative_cache(2))
     status = State.to_string(State.BOT_DIED)
-    self.assertEqual(
-        100,
+    self.assertIsNone(
         ts_mon_metrics._task_state_change_pubsub_notify_latencies.get(
-            fields=_get_fields(status=status, http_status_code=200)).sum)
+            fields=_get_fields(status=status, http_status_code=200)))
 
     # Refresh and compare:
     expected = self._gen_result_summary_reaped(
@@ -2590,14 +2589,13 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         self.now + datetime.timedelta(seconds=request.bot_ping_tolerance_secs),
         1)
     self.assertEqual(([run_result.task_id], 0),
-                     task_scheduler.cron_handle_bot_died(0))
+                     task_scheduler.cron_handle_bot_died())
     self.assertEqual(1, self.execute_tasks())
     self.assertEqual(2, len(pub_sub_calls))  # RUNNING -> COMPLETED
     status = State.to_string(State.BOT_DIED)
-    self.assertEqual(
-        100,
+    self.assertIsNone(
         ts_mon_metrics._task_state_change_pubsub_notify_latencies.get(
-            fields=_get_fields(status=status, http_status_code=200)).sum)
+            fields=_get_fields(status=status, http_status_code=200)))
 
     # Refresh and compare:
     expected = self._gen_result_summary_reaped(
@@ -2645,7 +2643,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     # Very unusual, the TaskRequest disappeared:
     run_result.request_key.delete()
 
-    self.assertEqual(([], 1), task_scheduler.cron_handle_bot_died(0))
+    self.assertEqual(([], 1), task_scheduler.cron_handle_bot_died())
 
   def test_bot_poll_http_500_but_bot_reapears_after_BOT_PING_TOLERANCE(self):
     # A bot reaped a task, sleeps for over BOT_PING_TOLERANCE (2 minutes), then
@@ -2673,7 +2671,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         self.now + datetime.timedelta(seconds=request.bot_ping_tolerance_secs),
         1)
     self.assertEqual(([to_run_key_1.get().task_id], 0),
-                     task_scheduler.cron_handle_bot_died(0))
+                     task_scheduler.cron_handle_bot_died())
 
     # Now the task is available. Bot magically wakes up (let's say a laptop that
     # went to sleep). The update is denied.
@@ -2712,7 +2710,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         self.now + datetime.timedelta(seconds=request.bot_ping_tolerance_secs),
         1)
     self.assertEqual(([run_result.task_id], 0),
-                     task_scheduler.cron_handle_bot_died(0))
+                     task_scheduler.cron_handle_bot_died())
     # Refresh and compare:
     # The interesting point here is that even though the task is PENDING, it has
     # worker information from the initial BOT_DIED task.
@@ -2765,7 +2763,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         self.now + datetime.timedelta(seconds=request.bot_ping_tolerance_secs),
         601)
     self.assertEqual((['1d69b9f088008911'], 0),
-                     task_scheduler.cron_handle_bot_died(0))
+                     task_scheduler.cron_handle_bot_died())
 
   def test_cron_handle_bot_died_killing(self):
     # Test first retry, then success.
@@ -2788,7 +2786,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         self.now + datetime.timedelta(seconds=request.bot_ping_tolerance_secs),
         601)
     self.assertEqual(([run_result.task_id], 0),
-                     task_scheduler.cron_handle_bot_died(0))
+                     task_scheduler.cron_handle_bot_died())
     # state should be KILLED
     run_result = run_result.key.get()
     self.assertEqual(

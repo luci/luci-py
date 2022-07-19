@@ -356,7 +356,7 @@ def _reap_task(bot_dimensions, bot_version, to_run_key, request,
   return run_result, secret_bytes
 
 
-def _detect_dead_task_async(run_result_key, start_time):
+def _detect_dead_task_async(run_result_key):
   """Checks if the bot has stopped working on the task.
 
   Transactionally updates the entities depending on the state of this task. The
@@ -445,8 +445,7 @@ def _detect_dead_task_async(run_result_key, start_time):
       _maybe_taskupdate_notify_via_tq(result_summary,
                                       request,
                                       es_cfg,
-                                      transactional=True,
-                                      start_time=start_time)
+                                      transactional=True)
     yield futures
     logging.warning('Task state was successfully updated. task: %s',
                     run_result.task_id)
@@ -469,7 +468,7 @@ def _copy_summary(src, dst, skip_list):
   dst.populate(**kwargs)
 
 
-def _maybe_pubsub_notify_now(result_summary, request, start_time):
+def _maybe_pubsub_notify_now(result_summary, request, start_time=None):
   """Examines result_summary and sends task completion PubSub message.
 
   Does it only if result_summary indicates a task in some finished state and
@@ -496,8 +495,11 @@ def _maybe_pubsub_notify_now(result_summary, request, start_time):
   return True
 
 
-def _maybe_taskupdate_notify_via_tq(result_summary, request, es_cfg,
-                                    transactional, start_time):
+def _maybe_taskupdate_notify_via_tq(result_summary,
+                                    request,
+                                    es_cfg,
+                                    transactional,
+                                    start_time=None):
   """Enqueues tasks to send PubSub, es, and bb notifications for given request.
 
   Arguments:
@@ -524,8 +526,9 @@ def _maybe_taskupdate_notify_via_tq(result_summary, request, es_cfg,
         'userdata': request.pubsub_userdata,
         'tags': result_summary.tags,
         'state': result_summary.state,
-        'start_time': start_time
     }
+    if start_time is not None:
+      payload['start_time'] = start_time
     logging.debug("Enqueuing PubSub msg with payload: %s", str(payload))
     ok = utils.enqueue_task(
         '/internal/taskqueue/important/pubsub/notify-task/%s' % task_id,
@@ -587,18 +590,19 @@ def _pubsub_notify(task_id, topic, auth_token, userdata, tags, state,
     logging.exception("Unknown exception (%s) not handled by _pubsub_notify", e)
     raise e
   finally:
-    now = utils.milliseconds_since_epoch()
-    latency = now - start_time
-    if latency < 0:
-      logging.warning(
-          'ts_mon_metric pubsub latency %dms (%d - %d) is negative. '
-          'Setting latency to 0', latency, now, start_time)
-      latency = 0
-    logging.debug('Updating ts_mon_metric pubsub with latency: %dms (%d - %d)',
-                  latency, now, start_time)
-    ts_mon_metrics.on_task_status_change_pubsub_latency(tags, state,
-                                                        http_status_code,
-                                                        latency)
+    if start_time is not None:
+      now = utils.milliseconds_since_epoch()
+      latency = now - start_time
+      if latency < 0:
+        logging.warning(
+            'ts_mon_metric pubsub latency %dms (%d - %d) is negative. '
+            'Setting latency to 0', latency, now, start_time)
+        latency = 0
+      logging.debug(
+          'Updating ts_mon_metric pubsub with latency: %dms (%d - %d)', latency,
+          now, start_time)
+      ts_mon_metrics.on_task_status_change_pubsub_latency(
+          tags, state, http_status_code, latency)
 
 
 def _find_dupe_task(now, h):
@@ -1810,7 +1814,7 @@ def cron_abort_expired_task_to_run():
     logging.debug('Enqueued %d task for %d tasks', len(enqueued), sum(enqueued))
 
 
-def cron_handle_bot_died(start_time):
+def cron_handle_bot_died():
   """Aborts TaskRunResult where the bot stopped sending updates.
 
   The task will be canceled.
@@ -1857,7 +1861,7 @@ def cron_handle_bot_died(start_time):
         count['total'] += 1
         if count['total'] % 500 == 0:
           logging.info('Fetched %d keys', count['total'])
-        f = _detect_dead_task_async(run_result_key, start_time)
+        f = _detect_dead_task_async(run_result_key)
         if f:
           futures.append(f)
         else:
@@ -1948,7 +1952,7 @@ def task_handle_pubsub_task(payload):
   try:
     _pubsub_notify(payload['task_id'], payload['topic'], payload['auth_token'],
                    payload['userdata'], payload['tags'], payload['state'],
-                   payload['start_time'])
+                   payload.get('start_time'))
   except pubsub.Error:
     logging.exception('Fatal error when sending PubSub notification')
 
