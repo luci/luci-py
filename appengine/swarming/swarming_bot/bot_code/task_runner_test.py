@@ -131,6 +131,11 @@ def load_and_run(server_url, work_dir, manifest, auth_params_file):
     return json.load(f)
 
 
+def wrap_output_bytes_in_re(output):
+  """Wraps output in a regexp which matches '<any-string>output'"""
+  return re.compile(b"(\\s|\\S)*%s" % output)
+
+
 class FakeAuthSystem(object):
   local_auth_context = None
 
@@ -260,7 +265,7 @@ class TestTaskRunnerBase(auto_stub.TestCase):
         'isolated_stats': {
             'download': {},
         },
-        'output': to_native_eol('hi\n').encode(),
+        'output': wrap_output_bytes_in_re(to_native_eol('hi\n').encode()),
         'output_chunk_start': 0,
         'task_id': task_id,
     }
@@ -354,10 +359,10 @@ class TestTaskRunner(TestTaskRunnerBase):
     self.assertEqual(expected, self._run_command(task_details))
     # Now look at the updates sent by the bot as seen by the server.
     sep = re.escape(os.sep)
-    self.expectTask(
-        task_details.task_id,
-        output=re.compile(
-          (to_native_eol('.+%slocal%ssmurf\n$') % (sep, sep)).encode()))
+    self.expectTask(task_details.task_id,
+                    output=re.compile(
+                        (to_native_eol('(\\s|\\S)*%slocal%ssmurf\n$') %
+                         (sep, sep)).encode()))
 
   def test_run_command_env_prefix_multiple(self):
     task_details = get_task_details(
@@ -381,7 +386,7 @@ class TestTaskRunner(TestTaskRunnerBase):
     self.assertEqual(expected, self._run_command(task_details))
     # Now look at the updates sent by the bot as seen by the server.
     sep = re.escape(os.sep)
-    output = re.compile(((r'^'
+    output = re.compile(((r'(\s|\S)*'
                           r'(?P<cwd>[^\n]*)\n'
                           r'(?P=cwd)%slocal%ssmurf\n'
                           r'(?P=cwd)%sother%sthing\n'
@@ -475,7 +480,8 @@ class TestTaskRunner(TestTaskRunnerBase):
     pattern = (
         # This is a beginning of run_isolated.py's output if binary is not
         # found.
-        br'^<The executable does not exist, a dependent library is missing or '
+        br'(\S|\s)*'
+        br'<The executable does not exist, a dependent library is missing or '
         br'the command line is too long>\n'
         br'<Check for missing .so/.dll in the .isolate or GN file or length of '
         br'command line args>')
@@ -875,11 +881,12 @@ class TestTaskRunnerKilled(TestTaskRunnerBase):
     }
     self.assertEqual(expected, self._run_command(task_details))
     # Now look at the updates sent by the bot as seen by the server.
-    self.expectTask(
-        task_details.task_id,
-        hard_timeout=True,
-        output=(to_native_eol('hi\ngot signal %d\nbye\n') %
-                task_runner.SIG_BREAK_OR_TERM).encode())
+    expected_output_re = wrap_output_bytes_in_re(
+        (to_native_eol('hi\ngot signal %d\nbye\n') %
+         task_runner.SIG_BREAK_OR_TERM).encode())
+    self.expectTask(task_details.task_id,
+                    hard_timeout=True,
+                    output=expected_output_re)
 
   def test_io_signal(self):
     task_details = get_task_details(
@@ -895,11 +902,12 @@ class TestTaskRunnerKilled(TestTaskRunnerBase):
     self.assertEqual(expected, self._run_command(task_details))
     # Now look at the updates sent by the bot as seen by the server.
     #    output_re='^hi\ngot signal %d\nbye\n$' % task_runner.SIG_BREAK_OR_TERM)
-    self.expectTask(
-        task_details.task_id,
-        io_timeout=True,
-        output=(to_native_eol('hi\ngot signal %d\nbye\n') %
-                task_runner.SIG_BREAK_OR_TERM).encode())
+    expected_output_re = wrap_output_bytes_in_re(
+        (to_native_eol('hi\ngot signal %d\nbye\n') %
+         task_runner.SIG_BREAK_OR_TERM).encode())
+    self.expectTask(task_details.task_id,
+                    io_timeout=True,
+                    output=expected_output_re)
 
   def test_hard_no_grace(self):
     task_details = get_task_details(
@@ -953,12 +961,13 @@ class TestTaskRunnerKilled(TestTaskRunnerBase):
     self.assertEqual(expected, self._run_command(task_details))
     # Now look at the updates sent by the bot as seen by the server.
     #  output_re='^hi\ngot signal %d\nbye\n$' % task_runner.SIG_BREAK_OR_TERM)
-    self.expectTask(
-        task_details.task_id,
-        hard_timeout=True,
-        exit_code=exit_code,
-        output=(to_native_eol('hi\ngot signal %d\nbye\n') %
-                task_runner.SIG_BREAK_OR_TERM).encode())
+    expected_output_re = wrap_output_bytes_in_re(
+        (to_native_eol('hi\ngot signal %d\nbye\n') %
+         task_runner.SIG_BREAK_OR_TERM).encode())
+    self.expectTask(task_details.task_id,
+                    hard_timeout=True,
+                    exit_code=exit_code,
+                    output=expected_output_re)
 
   @unittest.skipIf(sys.platform == 'win32',
                    'As run_isolated is killed, the children process leaks')
@@ -978,12 +987,13 @@ class TestTaskRunnerKilled(TestTaskRunnerBase):
     self.assertEqual(expected, self._run_command(task_details))
     # Now look at the updates sent by the bot as seen by the server.
     #  output_re='^hi\ngot signal %d\nbye\n$' % task_runner.SIG_BREAK_OR_TERM)
-    self.expectTask(
-        task_details.task_id,
-        io_timeout=True,
-        exit_code=exit_code,
-        output=(to_native_eol('hi\ngot signal %d\nbye\n') %
-                task_runner.SIG_BREAK_OR_TERM).encode())
+    output = (to_native_eol('hi\ngot signal %d\nbye\n') %
+              task_runner.SIG_BREAK_OR_TERM).encode()
+    output_re = b'(\\s|\\S)*%s' % output
+    self.expectTask(task_details.task_id,
+                    io_timeout=True,
+                    exit_code=exit_code,
+                    output=re.compile(output_re))
 
   def test_isolated_io_signal_grand_children(self):
     """Handles grand-children process hanging and signal management.
@@ -1059,7 +1069,8 @@ class TestTaskRunnerKilled(TestTaskRunnerBase):
         io_timeout=True,
         exit_code=EXIT_CODE_TERM,
         output=re.compile(
-            to_native_eol('parent\n\\d+\nchildren\n\\d+\nhi\n').encode()),
+            to_native_eol(
+                '(\\s|\\S)*parent\n\\d+\nchildren\n\\d+\nhi\n').encode()),
         isolated_stats={
             'download': {
                 'duration': 0,
@@ -1176,6 +1187,10 @@ class TestTaskRunnerKilled(TestTaskRunnerBase):
         'task_id': manifest['task_id'],
     }
     actual = self.getTaskResults(manifest['task_id'])
+    # We don't care about output in this test
+    actual.pop('output')
+    actual.pop('output_chunk_start')
+
     self.assertLessEqual(0, actual.pop('cost_usd'))
     self.assertEqual(expected, actual)
 

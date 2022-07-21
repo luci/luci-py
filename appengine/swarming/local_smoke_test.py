@@ -340,14 +340,21 @@ class SwarmingClient(object):
 
 def gen_expected(**kwargs):
   expected = {
-      u'bot_dimensions': None,
-      u'bot_id': unicode(socket.getfqdn().split('.', 1)[0]),
-      u'current_task_slice': u'0',
-      u'exit_code': u'0',
-      u'name': u'',
-      u'output': u'hi\n',
+      u'bot_dimensions':
+      None,
+      u'bot_id':
+      unicode(socket.getfqdn().split('.', 1)[0]),
+      u'current_task_slice':
+      u'0',
+      u'exit_code':
+      u'0',
+      u'name':
+      u'',
+      u'output':
+      re.compile(u'(\\s|\\S)*hi\n'),
       u'server_versions': [u'N/A'],
-      u'state': u'COMPLETED',
+      u'state':
+      u'COMPLETED',
       u'tags': [
           u'authenticated:bot:whitelisted-ip',
           u'pool:default',
@@ -358,8 +365,10 @@ def gen_expected(**kwargs):
           u'swarming.pool.version:pools_cfg_rev',
           u'user:joe@localhost',
       ],
-      u'try_number': u'1',
-      u'user': u'joe@localhost',
+      u'try_number':
+      u'1',
+      u'user':
+      u'joe@localhost',
   }
   expected.update({unicode(k): v for k, v in kwargs.items()})
   return expected
@@ -385,6 +394,7 @@ class Test(unittest.TestCase):
   def setUp(self):
     super(Test, self).setUp()
 
+    self.maxDiff = None
     self.dimensions = get_bot_dimensions()
     # The bot forcibly adds server_version, and bot_config.
     self.dimensions[u'server_version'] = [u'N/A']
@@ -455,7 +465,7 @@ class Test(unittest.TestCase):
     summary = self.gen_expected(
         name=u'non_utf8',
         # The string is mostly converted to 'Replacement Character'.
-        output=u'A\ufeff\ufffd\ufffd\ufffdsfs\ufffd(B\n',
+        output=re.compile(u'(\\s|\\S)*A﻿���sfs�\\(B'),
         tags=sorted([
             u'authenticated:bot:whitelisted-ip',
             u'os:' + self.dimensions['os'][0],
@@ -476,7 +486,8 @@ class Test(unittest.TestCase):
         exit_code=u'1',
         failure=True,
         output=re.compile(
-            r'^<The executable does not exist, a dependent library '
+            r'(\s|\S)*'
+            r'<The executable does not exist, a dependent library '
             r'is missing or the command line is too long>\n'
             r'<Check for missing .so/.dll in the .isolate or GN file or '
             r'length of command line args>'))
@@ -591,7 +602,7 @@ class Test(unittest.TestCase):
     items_in = [content_size]
     expected_summary = self.gen_expected(
         name=u'isolated_task',
-        output=u'hi\n',
+        output=re.compile(u'(\\s|\\S)*hi\n'),
         tags=[
             u'authenticated:bot:whitelisted-ip', u'pool:default',
             u'priority:200', u'realm:none', u'service_account:none',
@@ -668,9 +679,10 @@ class Test(unittest.TestCase):
     digest = self._archive(name, content, isolate_content)
     content_size = sum(len(c) for c in content.values())
     items_in = [content_size]
+    expected_output = u'hi💩\n%s\n' % os.sep.join(['$CWD', 'local', 'path'])
     expected_summary = self.gen_expected(
         name=u'command_env',
-        output=u'hi💩\n%s\n' % os.sep.join(['$CWD', 'local', 'path']),
+        output=re.compile(u'(\\s|\\S)*%s' % re.escape(expected_output)),
         tags=[
             u'authenticated:bot:whitelisted-ip', u'pool:default',
             u'priority:200', u'realm:none', u'service_account:none',
@@ -819,7 +831,7 @@ class Test(unittest.TestCase):
     items_in = [content_size]
     expected_summary = self.gen_expected(
         name=u'hard_timeout_grace',
-        output=u'hi\ngot signal 15\n',
+        output=re.compile(u'(\\s|\\S)*hi\ngot signal 15\n'),
         failure=True,
         tags=[
             u'authenticated:bot:whitelisted-ip',
@@ -920,9 +932,20 @@ class Test(unittest.TestCase):
     self.assertPerformanceStats(expected_performance_stats, performance_stats)
 
     # The task name changes, there's a bit less data but the rest is the same.
-    expected_summary[u'name'] = u'idempotent_reuse2'
-    expected_summary[u'cost_saved_usd'] = 0.02
-    expected_summary[u'deduped_from'] = task_id[:-1] + u'1'
+    expected_summary = self.gen_expected(
+        name=u'idempotent_reuse2',
+        cost_saved_usd=0.02,
+        deduped_from=task_id[:-1] + u'1',
+        tags=[
+            u'authenticated:bot:whitelisted-ip',
+            u'pool:default',
+            u'priority:200',
+            u'realm:none',
+            u'service_account:none',
+            u'swarming.pool.template:none',
+            u'swarming.pool.version:pools_cfg_rev',
+            u'user:joe@localhost',
+        ])
     expected_summary.pop(u'try_number')
     _, output_root, performance_stats = self._run_with_cas(
         digest,
@@ -1248,7 +1271,7 @@ class Test(unittest.TestCase):
       out = cas_util.filter_out_go_logs(self.client.task_stdout(task_id))
       if out == 'hi\n':
         break
-    self.assertEqual(out, 'hi\n')
+    self.assertTrue(re.compile('(\\s|\\S)*hi\n'))
 
     # Cancel it.
     self.client.task_cancel(task_id, kill_running=True)
@@ -1302,7 +1325,7 @@ class Test(unittest.TestCase):
     task_id = self.client.task_trigger_raw(request)
     expected_summary = self.gen_expected(
         name=u'task_slice',
-        output=u'first\n',
+        output=re.compile('(\\s|\\S)*first$'),
         tags=[
             u'authenticated:bot:whitelisted-ip',
             u'pool:default',
@@ -1373,7 +1396,7 @@ class Test(unittest.TestCase):
     expected_summary = self.gen_expected(
         name=u'task_slice_fallback',
         current_task_slice=u'1',
-        output=u'second\n',
+        output=re.compile(u'(\\s|\\S)*second\n'),
         tags=[
             # Bug!
             u'authenticated:bot:whitelisted-ip',
@@ -1478,7 +1501,9 @@ class Test(unittest.TestCase):
     performance_stats = actual_summary['shards'][0].pop('performance_stats')
     self.assertPerformanceStatsEmpty(performance_stats)
     self.assertResults(
-        self.gen_expected(name=u'wait', tags=tags, output=u'hi\nhi again\n'),
+        self.gen_expected(name=u'wait',
+                          tags=tags,
+                          output=re.compile(u'(\\S|\\s)*hi\nhi again\n')),
         actual_summary)
 
   def _run_with_cas(self, digest, name, args, expected_summary, expected_files,

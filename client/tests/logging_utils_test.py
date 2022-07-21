@@ -9,7 +9,9 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import unittest.mock as mock
 import re
+from io import StringIO
 
 # Mutates sys.path.
 import test_env
@@ -21,7 +23,6 @@ from utils import logging_utils
 # PID YYYY-MM-DD HH:MM:SS.MMM
 _LOG_HEADER = r'^%d \d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d\.\d\d\d' % os.getpid()
 _LOG_HEADER_PID = r'^\d+ \d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d\.\d\d\d'
-
 
 class Test(unittest.TestCase):
   # This test fails when running via test runner
@@ -37,6 +38,35 @@ class Test(unittest.TestCase):
       file_path.rmtree(self.tmp)
     finally:
       super(Test, self).tearDown()
+
+  def test_user_logs_function(self):
+    with mock.patch('sys.stdout', new=StringIO()) as fake_stdout:
+      logger = logging.Logger(name="relevance_logger")
+      logging_utils.set_user_level_logging(logger)
+
+      with mock.patch('logging.root', new=logger):
+        message = "I'm sorry %s"
+        logging_utils.user_logs(message, "dave")
+
+      self.assertTrue(fake_stdout.getvalue().endswith(message % "dave\n"))
+
+  def test_user_logs_filter(self):
+    with mock.patch('sys.stdout', new=StringIO()) as fake_stdout:
+      logger = logging.Logger(name="relevance_logger")
+      logging_utils.set_user_level_logging(logger)
+
+      message = "a message"
+      logger.log(logging_utils.USER_LOGS, message)
+
+      info_message = "info_message"
+      logger.info(info_message)
+
+      fake_stdout_contents = fake_stdout.getvalue()
+      self.assertRegex(fake_stdout_contents, message)
+      # Test implicitly tests logging_utils.ExactLevelFilter
+      # since logging_utils.ExactLevelFilter would prevent
+      # logging.info from being called
+      self.assertNotRegex(fake_stdout_contents, info_message)
 
   def test_capture(self):
     root = logging.RootLogger(logging.DEBUG)

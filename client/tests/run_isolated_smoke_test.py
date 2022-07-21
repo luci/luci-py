@@ -16,6 +16,7 @@ import sys
 import textwrap
 import time
 import unittest
+import re
 
 # Mutates sys.path.
 import test_env
@@ -226,10 +227,15 @@ class RunIsolatedTest(unittest.TestCase):
     expected_mangled = dict((k, oct(v[index])) for k, v in expected.items())
     self.assertEqual(expected_mangled, actual)
 
+  def assertEndsWith(self, expected_ending, output):
+    """ Tests whether output ends with expected_ending"""
+    self.assertRegex(output,
+                     re.compile("(\\s|\\S)*%s$" % re.escape(expected_ending)))
+
   def test_simple(self):
     out, err, returncode = self._run(
         ['--', 'python', '-c', 'print("no --root-dir")'])
-    self.assertEqual('no --root-dir\n', out)
+    self.assertEndsWith('no --root-dir\n', out)
     self.assertEqual('', err)
     self.assertEqual(0, returncode)
 
@@ -246,7 +252,7 @@ class RunIsolatedTest(unittest.TestCase):
     out, err, returncode = self._run(
         self._cmd_args(cas_digest) + ['--'] + CMD_REPEATED_FILES)
     self.assertEqual('', cas_util.filter_out_go_logs(err))
-    self.assertEqual('Success\n', out, out)
+    self.assertEndsWith('Success\n', out)
     self.assertEqual(0, returncode)
     actual = list_files_tree(self._cas_cache_dir)
     self.assertEqual(sorted(set(expected)), actual)
@@ -269,14 +275,14 @@ class RunIsolatedTest(unittest.TestCase):
         self._cmd_args(cas_digest) + ['--', 'python', 'max_path.py'])
     err = cas_util.filter_out_go_logs(err)
     self.assertEqual('', err)
-    self.assertEqual('Success\n', out, out)
+    self.assertEndsWith('Success\n', out)
     self.assertEqual(0, returncode)
     actual = list_files_tree(self._cas_cache_dir)
     self.assertEqual(sorted(set(expected)), actual)
 
   def test_isolated_fail_empty_args(self):
     out, err, returncode = self._run([])
-    self.assertEqual('', out)
+    self.assertEndsWith('Starting run_isolated script', out)
     self.assertEqual(
         'Usage: run_isolated.py <options> [command to run or extra args]\n\n'
         'run_isolated.py: error: command to run is required.\n', err)
@@ -368,7 +374,7 @@ class RunIsolatedTest(unittest.TestCase):
       BELOW_NORMAL_PRIORITY_CLASS = 0x4000
       self.assertEqual(hex(BELOW_NORMAL_PRIORITY_CLASS), out)
     else:
-      self.assertEqual(str(os.nice(0)+1), out)
+      self.assertEndsWith(str(os.nice(0) + 1), out)
     self.assertEqual(0, returncode)
 
   def test_limit_processes(self):
@@ -391,12 +397,12 @@ class RunIsolatedTest(unittest.TestCase):
       # Value for ERROR_NOT_ENOUGH_QUOTA. See
       # https://docs.microsoft.com/windows/desktop/debug/system-error-codes--1700-3999-
       self.assertIn('1816', err)
-      self.assertEqual('', out)
+      self.assertEndsWith('', out)
       self.assertEqual(1, returncode)
     else:
       # TODO(maruel): Add containment on other platforms.
       self.assertEqual('', err)
-      self.assertEqual('0', out, out)
+      self.assertEndsWith('0', out)
       self.assertEqual(0, returncode)
 
   def test_named_cache(self):
@@ -413,7 +419,7 @@ class RunIsolatedTest(unittest.TestCase):
     ]
     out, err, returncode = self._run(cmd)
     self.assertEqual('', err)
-    self.assertEqual('Success\n', out, out)
+    self.assertEndsWith('Success\n', out)
     self.assertEqual(0, returncode)
     self.assertEqual(['state.json'], list_files_tree(self._cas_cache_dir))
 
@@ -460,7 +466,7 @@ class RunIsolatedTest(unittest.TestCase):
       out, _, ret = self._run(args)
 
       if expected_retcode == 0:
-        self.assertEqual('Success\n', out)
+        self.assertEndsWith('Success\n', out)
       self.assertEqual(expected_retcode, ret)
 
     # Runs run_isolated with cas options.

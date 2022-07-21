@@ -86,6 +86,8 @@ else:  # Not Windows.
 
   NoInheritRotatingFileHandler = logging.handlers.RotatingFileHandler
 
+# INFO has a priority of 20
+USER_LOGS = logging.INFO + 5
 
 # Levels used for logging.
 LEVELS = [logging.ERROR, logging.INFO, logging.DEBUG]
@@ -153,7 +155,7 @@ class UTCFormatter(logging.Formatter):
     return "%s.%03d" % (t, record.msecs)
 
 
-class Filter:
+class SeverityFilter(logging.Filter):
   """Adds fields used by the infra-specific formatter.
 
   Fields added:
@@ -172,13 +174,13 @@ def find_stderr(root=None):
       return log
 
 
+
 def prepare_logging(filename, root=None):
   """Prepare logging for scripts.
 
   Makes it log in UTC all the time. Prepare a rotating file based log.
   """
   assert not find_stderr(root)
-  formatter = UTCFormatter('%(process)d %(asctime)s %(severity)s: %(message)s')
 
   # It is a requirement that the root logger is set to DEBUG, so the messages
   # are not lost. It defaults to WARNING otherwise.
@@ -189,9 +191,12 @@ def prepare_logging(filename, root=None):
     return
   logger.setLevel(logging.DEBUG)
 
+  utc_formatter = UTCFormatter(
+      '%(process)d %(asctime)s %(severity)s: %(message)s')
+
   stderr = logging.StreamHandler()
-  stderr.setFormatter(formatter)
-  stderr.addFilter(Filter())
+  stderr.setFormatter(utc_formatter)
+  stderr.addFilter(SeverityFilter())
   # Default to ERROR.
   stderr.setLevel(logging.ERROR)
   logger.addHandler(stderr)
@@ -205,8 +210,8 @@ def prepare_logging(filename, root=None):
           filename, maxBytes=10 * 1024 * 1024, backupCount=5,
           encoding='utf-8')
       rotating_file.setLevel(logging.DEBUG)
-      rotating_file.setFormatter(formatter)
-      rotating_file.addFilter(Filter())
+      rotating_file.setFormatter(utc_formatter)
+      rotating_file.addFilter(SeverityFilter())
       logger.addHandler(rotating_file)
     except Exception:
       # May happen on cygwin. Do not crash.
@@ -221,6 +226,53 @@ def set_console_level(level, root=None):
     print('OMG NO STDERR', file=sys.stderr)
     return
   handler.setLevel(level)
+
+
+class ExactLevelFilter(logging.Filter):
+  """
+  A log filter which filters out log messages
+  which are not an exact level.
+  """
+
+  def __init__(self, level):
+    super(ExactLevelFilter, self).__init__()
+    self._level = level
+
+  def filter(self, record):
+    return record.levelno == self._level
+
+
+def set_user_level_logging(logger=None):
+  """
+  Creates a logger which writes logger.level = USER_LOGS to stdout.
+  Some scripts (run_isolated.py) have all their output displayed to
+  users in the swarming UI. As a result we may want to display some
+  logging as more important than others. These are not errors so should
+  not be logged to stderr.
+
+  USER_LOGS are seen as more important than INFO logs but less
+  important than error logs.
+
+  That may lead to double logging if say another stream is already
+  configured to listen to logging for stdout.
+  """
+  if logger is None:
+    logger = logging.getLogger()
+
+  logging.addLevelName(USER_LOGS, "USER_LOGS")
+  user_logs_formatter = UTCFormatter(
+      "swarming_bot_logs: %(asctime)s: %(message)s")
+
+  stdout_handler = logging.StreamHandler(stream=sys.stdout)
+  stdout_handler.setLevel(USER_LOGS)
+  stdout_handler.addFilter(ExactLevelFilter(USER_LOGS))
+  stdout_handler.addFilter(SeverityFilter())
+  stdout_handler.setFormatter(user_logs_formatter)
+  logger.addHandler(stdout_handler)
+
+
+def user_logs(message, *args, **kwargs):
+  logging.log(USER_LOGS, message, *args, **kwargs)
 
 
 class OptionParserWithLogging(optparse.OptionParser):
@@ -258,6 +310,7 @@ class OptionParserWithLogging(optparse.OptionParser):
     prepare_logging(self.enable_log_file and options.log_file, self.logger_root)
     set_console_level(
         LEVELS[min(len(LEVELS) - 1, options.verbose)], self.logger_root)
+
     return options, args
 
 
@@ -298,4 +351,5 @@ class ArgumentParserWithLogging(argparse.ArgumentParser):
     prepare_logging(self.enable_log_file and args.log_file, self.logger_root)
     set_console_level(
         LEVELS[min(len(LEVELS) - 1, args.verbose)], self.logger_root)
+
     return args

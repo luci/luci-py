@@ -22,6 +22,7 @@ from utils import fs
 from utils import lru
 from utils import threading_utils
 from utils import tools
+from utils import logging_utils
 
 # The file size to be used when we don't know the correct file size,
 # generally used for .isolated files.
@@ -84,8 +85,9 @@ def trim_caches(caches, path, min_free_space, max_age_secs):
   """
   min_ts = time.time() - max_age_secs if max_age_secs else 0
   free_disk = file_path.get_free_space(path) if min_free_space else 0
-  logging.info("Trimming caches. min_ts: %d, free_disk: %d, min_free_space: %d",
-               min_ts, free_disk, min_free_space)
+  logging_utils.user_logs(
+      "Trimming caches. min_ts: %d, free_disk: %d, min_free_space: %d", min_ts,
+      free_disk, min_free_space)
   total = []
   if min_ts or free_disk:
     while True:
@@ -102,6 +104,7 @@ def trim_caches(caches, path, min_free_space, max_age_secs):
   logging.info("free_disk after removing oldest entries: %d", free_disk)
   # Evaluate each cache's own policies.
   for c in caches:
+    logging_utils.user_logs("trimming cache with dir %s", c.cache_dir)
     total.extend(c.trim())
   return total
 
