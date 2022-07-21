@@ -124,11 +124,13 @@ const GPU_ALIASES = {
   '8086:1926': 'Intel Skylake Iris 540/550',
   '8086:193b': 'Intel Skylake Iris Pro 580',
   '8086:22b1': 'Intel Braswell HD Graphics',
-  '8086:3e92': 'Intel Coffee Lake UHD Graphics 630',
+  '8086:3e92': 'Intel Coffee Lake S UHD Graphics 630',
+  '8086:3e9b': 'Intel Coffee Lake H UHD Graphics 630',
   '8086:3ea5': 'Intel Coffee Lake Iris Plus Graphics 655',
   '8086:5912': 'Intel Kaby Lake HD Graphics 630',
   '8086:591e': 'Intel Kaby Lake HD Graphics 615',
   '8086:5926': 'Intel Kaby Lake Iris Plus Graphics 640',
+  '8086:9bc5': 'Intel Comet Lake S UHD Graphics 630',
 };
 
 const DEVICE_ALIASES = {

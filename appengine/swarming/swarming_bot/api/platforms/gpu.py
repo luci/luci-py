@@ -61,10 +61,14 @@ _VENDOR_MAPPING = {
             '1926': 'Skylake Iris 540/550',
             '193b': 'Skylake Iris Pro 580',
             '22b1': 'Braswell HD Graphics',
-            '3e92': 'Coffee Lake UHD Graphics 630',
+            '3e92': 'Coffee Lake S UHD Graphics 630',
+            # Full name is actually '3e9b': 'Coffee Lake H UHD Graphics 630',
+            # However, system_profiler returns just 'Intel UHD Graphics 630'
+            '3e9b': 'UHD Graphics 630',
             '5912': 'Kaby Lake HD Graphics 630',
             '591e': 'Kaby Lake HD Graphics 615',
             '5926': 'Kaby Lake Iris Plus Graphics 640',
+            '9bc5': 'Comet Lake S UHD Graphics 630',
         }),
     MAXTROX: ('Matrox', {
         '0522': 'MGA G200e',
