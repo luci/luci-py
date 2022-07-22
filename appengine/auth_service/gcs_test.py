@@ -49,7 +49,8 @@ class GCSTest(test_case.TestCase):
     self.expected_update_calls += 1
 
   def mock_config(self, **kwargs):
-    self.mock(config, 'get_settings', lambda: config_pb2.SettingsCfg(**kwargs))
+    settings = config_pb2.SettingsCfg(**kwargs)
+    self.mock(config, 'get_settings', lambda: settings)
 
   def test_authorize_and_deauthorize(self):
     self.mock_update_gcs_acls()

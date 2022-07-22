@@ -268,8 +268,8 @@ class ConditionsSet(object):
     # Sort according to their binary representations. The order doesn't matter
     # as long as it is reproducible.
     conds = [
-        val for _, val in
-        sorted(self._normalized.items(), key=lambda (key, _): key)
+        val
+        for _, val in sorted(self._normalized.items(), key=lambda item: item[0])
     ]
     self._normalized = None   # won't need it anymore
 

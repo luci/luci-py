@@ -50,8 +50,7 @@ def build_tar_gz(content):
 def ident(name):
   if '@' not in name:
     return auth.Identity(auth.IDENTITY_USER, '%s@example.com' % name)
-  else:
-    return auth.Identity(auth.IDENTITY_USER, name)
+  return auth.Identity(auth.IDENTITY_USER, name)
 
 
 def group(name, members, nested=None):

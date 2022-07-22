@@ -184,6 +184,7 @@ disable=
   unsupported-membership-test,
   unused-import,
   useless-else-on-loop,
+  useless-object-inheritance,
   useless-suppression,
   using-cmp-argument,
   using-constant-test,

@@ -284,7 +284,7 @@ class ImporterIngestTarballHandler(auth.ApiHandler):
   xsrf_token_enforce_on = ()
 
   @classmethod
-  def get_auth_methods(cls, conf):
+  def get_auth_methods(cls, _conf):
     return [auth.oauth_authentication]
 
   # The real authorization check is inside 'ingest_tarball'. This one just
