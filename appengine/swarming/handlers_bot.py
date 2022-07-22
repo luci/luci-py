@@ -538,7 +538,6 @@ class BotPollHandler(_BotBaseHandler):
 
     It makes recovery of the fleet in case of catastrophic failure much easier.
     """
-    now = utils.milliseconds_since_epoch()
     logging.debug('Request started')
     if config.settings().force_bots_to_sleep_and_not_run_task:
       # Ignore everything, just sleep. Tell the bot it is quarantined to inform
@@ -668,7 +667,7 @@ class BotPollHandler(_BotBaseHandler):
       try:
         # This is a fairly complex function call, exceptions are expected.
         request, secret_bytes, run_result = task_scheduler.bot_reap_task(
-            res.dimensions, res.version, start_time=now)
+            res.dimensions, res.version)
       except (datastore_errors.Timeout, apiproxy_errors.CancelledError):
         self.abort(429, 'Deadline exceeded while accessing datastore')
       return request, secret_bytes, run_result
@@ -1148,8 +1147,6 @@ class BotTaskUpdateHandler(_BotApiHandler):
     # Unlike handshake and poll, we do not accept invalid keys here. This code
     # path is much more strict.
 
-    # Take the time now - for measuring pubsub task change latency.
-    now = utils.milliseconds_since_epoch()
     request = self.parse_body()
     msg = log_unexpected_subset_keys(self.ACCEPTED_KEYS, self.REQUIRED_KEYS,
                                      request, self.request, 'bot', 'keys')
@@ -1277,8 +1274,7 @@ class BotTaskUpdateHandler(_BotApiHandler):
           cas_output_root=cas_output_root,
           cipd_pins=cipd_pins,
           performance_stats=performance_stats,
-          canceled=canceled,
-          start_time=now)
+          canceled=canceled)
       if not state:
         logging.info('Failed to update, please retry')
         self.abort_with_error(500, error='Failed to update, please retry')
@@ -1343,7 +1339,6 @@ class BotTaskErrorHandler(_BotApiHandler):
 
   @auth.public  # auth happens in bot_auth.validate_bot_id_and_fetch_config
   def post(self, task_id=None):
-    start_time = utils.milliseconds_since_epoch()
     request = self.parse_body()
     # TODO(crbug.com/1015701): take from X-Luci-Swarming-Bot-ID header.
     bot_id = request.get('id')
@@ -1381,7 +1376,7 @@ class BotTaskErrorHandler(_BotApiHandler):
       self.abort_with_error(400, error=msg)
 
     msg = task_scheduler.bot_terminate_task(
-        task_pack.unpack_run_result_key(task_id), bot_id, start_time)
+        task_pack.unpack_run_result_key(task_id), bot_id)
     if msg:
       logging.error(msg)
       self.abort_with_error(400, error=msg)

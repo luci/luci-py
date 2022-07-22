@@ -201,14 +201,13 @@ class TaskCancelTasksHandler(webapp2.RequestHandler):
   @decorators.silence(datastore_utils.CommitError)
   @decorators.require_taskqueue('cancel-tasks')
   def post(self):
-    start_time = utils.milliseconds_since_epoch()
     payload = json.loads(self.request.body)
     logging.info('Cancelling tasks with ids: %s', payload['tasks'])
     kill_running = payload['kill_running']
     # TODO(maruel): Parallelize.
     for task_id in payload['tasks']:
       ok, was_running = task_scheduler.cancel_task_with_id(
-          task_id, kill_running, None, start_time)
+          task_id, kill_running, None)
       logging.info('task %s canceled: %s was running: %s',
                    task_id, ok, was_running)
 
@@ -222,7 +221,6 @@ class TaskCancelTaskOnBotHandler(webapp2.RequestHandler):
 
   @decorators.require_taskqueue('cancel-task-on-bot')
   def post(self):
-    start_time = utils.milliseconds_since_epoch()
     payload = json.loads(self.request.body)
     task_id = payload.get('task_id')
     if not task_id:
@@ -231,7 +229,7 @@ class TaskCancelTaskOnBotHandler(webapp2.RequestHandler):
     bot_id = payload.get('bot_id')
     try:
       ok, was_running = task_scheduler.cancel_task_with_id(
-          task_id, True, bot_id, start_time)
+          task_id, True, bot_id)
       logging.info('task %s canceled: %s was running: %s',
                    task_id, ok, was_running)
     except ValueError:
@@ -258,9 +256,8 @@ class TaskExpireTasksHandler(webapp2.RequestHandler):
 
   @decorators.require_taskqueue('task-expire')
   def post(self):
-    start_time = utils.milliseconds_since_epoch()
     payload = json.loads(self.request.body)
-    task_scheduler.task_expire_tasks(payload.get('task_to_runs'), start_time)
+    task_scheduler.task_expire_tasks(payload.get('task_to_runs'))
 
 
 class TaskDeleteTasksHandler(webapp2.RequestHandler):

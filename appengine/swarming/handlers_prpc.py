@@ -52,7 +52,6 @@ class TaskBackendAPIService(prpc_helpers.SwarmingPRPCService):
     # type: (backend_pb2.RunTaskRequest, context.ServicerContext)
     #     -> empty_pb2.Empty
 
-    start_time = utils.milliseconds_since_epoch()
     api_helpers.validate_backend_configs(
         [backend_conversions.ingest_backend_config(request.backend_config)])
     tr, secret_bytes, build_token = backend_conversions.compute_task_request(
@@ -63,7 +62,6 @@ class TaskBackendAPIService(prpc_helpers.SwarmingPRPCService):
     def _schedule_request():
       try:
         return task_scheduler.schedule_request(tr,
-                                               start_time=start_time,
                                                secret_bytes=secret_bytes,
                                                build_token=build_token)
       except (TypeError, ValueError) as e:

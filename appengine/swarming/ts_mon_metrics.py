@@ -56,7 +56,7 @@ _bucketer = gae_ts_mon.GeometricBucketer(growth_factor=10**0.05,
 # for pubsub notification is 10s.
 _pubsub_bucketer = gae_ts_mon.GeometricBucketer(growth_factor=10**0.01,
                                                 num_finite_buckets=300,
-                                                scale=100)
+                                                scale=10)
 
 # Custom bucketer with 2% resolution in the range of 100ms...100000s. Used for
 # task scheduling latency measurements.
