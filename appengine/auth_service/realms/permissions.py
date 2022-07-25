@@ -155,6 +155,51 @@ def db():
       permission('resultdb.testExonerations.get'),
   ])
 
+  # Weetbix permissions and roles (b/239768873).
+  # Weetbix checks all permissions against the <project>:@root
+  # realm.
+  role(
+      'role/weetbix.limitedReader',
+      [
+          # Access to read basic information about rules and clusters,
+          # including the associated bugs for rules and aggregated
+          # statistics about the failures in the cluster.
+          # Should not reveal to the user any Test IDs or failure
+          # reasons they do not already have access to in ResultDB.
+          permission('weetbix.rules.get'),
+          permission('weetbix.rules.list'),
+          permission('weetbix.clusters.get'),
+          permission('weetbix.clusters.list'),
+          permission('weetbix.clusters.getByFailure'),
+      ])
+  role(
+      'role/weetbix.reader',
+      [
+          # Access to the definition of a failure association rule
+          # e.g. ('reason where '%some failure%'). This could allow
+          # the user to see arbitrary failure reasons or test IDs from
+          # the project.
+          include('role/weetbix.limitedReader'),
+          permission('weetbix.rules.getDefinition'),
+      ])
+  role(
+      'role/weetbix.editor',
+      [
+          # Ability to update failure association rules.
+          include('role/weetbix.reader'),
+          permission('weetbix.rules.create'),
+          permission('weetbix.rules.update'),
+      ])
+  role(
+      'role/weetbix.queryUser',
+      [
+          # Grants the ability to run queries that hit BigQuery.
+          # Often this role is granted in conjunction with
+          # another role (e.g. reader or editor).
+          include('role/weetbix.limitedReader'),
+          permission('weetbix.clusters.expensiveQueries'),
+      ])
+
   # Buildbucket permissions and roles (crbug.com/1091604).
   role('role/buildbucket.reader', [
       include('role/resultdb.reader'),  # to read results of the build
