@@ -39,6 +39,13 @@ of the modules (found in ./modules/) or one of the top level HTML files
 (found in ./pages/). The pages in ./modules have mock data, so those are
 generally more useful.
 
+If you are running `make serve` on a cloudtop you can access the demo pages on your local machine by using an ssh-tunnel. Run the command
+
+    ssh <your-user-name>@<your-cloudtop-host> -L 8080:localhost:8080
+
+
+All the links should work as expected if opened on local machine.
+
 The list of all demo pages so far (for easy clicking):
 
   - [bot-list](http://localhost:8080/newres/bot-list.html)
