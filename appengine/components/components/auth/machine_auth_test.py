@@ -84,7 +84,7 @@ class MachineAuthTest(test_case.TestCase):
         issued_at=int(utils.time_time()),
         lifetime=3600,
         ca_id=1,
-        cert_sn=3456)
+        cert_sn=b'/x00/x01/x02/x03')
 
   def test_good_token(self):
     try:

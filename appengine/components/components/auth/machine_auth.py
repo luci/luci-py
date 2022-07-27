@@ -22,6 +22,7 @@ See:
 """
 
 import base64
+import binascii
 import logging
 
 from google.protobuf import message
@@ -204,6 +205,6 @@ def log_error(request, token_body, exc, msg, *args):
       '  now: %s' % int(utils.time_time()), # for comparison with issued_at
       '  lifetime: %s' % token_body.lifetime,
       '  ca_id: %s' % token_body.ca_id,
-      '  cert_sn: %s' % token_body.cert_sn,
+      '  cert_sn: %s' % binascii.hexlify(token_body.cert_sn),
     ])
   logging.warning('\n'.join(lines))

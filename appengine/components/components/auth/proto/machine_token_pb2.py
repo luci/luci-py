@@ -19,7 +19,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   syntax='proto3',
   serialized_options=None,
   create_key=_descriptor._internal_create_key,
-  serialized_pb=b'\n)components/auth/proto/machine_token.proto\x12\x0f\x63omponents.auth\"\x80\x01\n\x10MachineTokenBody\x12\x14\n\x0cmachine_fqdn\x18\x01 \x01(\t\x12\x11\n\tissued_by\x18\x02 \x01(\t\x12\x11\n\tissued_at\x18\x03 \x01(\x04\x12\x10\n\x08lifetime\x18\x04 \x01(\x04\x12\r\n\x05\x63\x61_id\x18\x05 \x01(\x03\x12\x0f\n\x07\x63\x65rt_sn\x18\x06 \x01(\x04\"N\n\x14MachineTokenEnvelope\x12\x12\n\ntoken_body\x18\x01 \x01(\x0c\x12\x0e\n\x06key_id\x18\x02 \x01(\t\x12\x12\n\nrsa_sha256\x18\x03 \x01(\x0c\x62\x06proto3'
+  serialized_pb=b'\n)components/auth/proto/machine_token.proto\x12\x0f\x63omponents.auth\"\x86\x01\n\x10MachineTokenBody\x12\x14\n\x0cmachine_fqdn\x18\x01 \x01(\t\x12\x11\n\tissued_by\x18\x02 \x01(\t\x12\x11\n\tissued_at\x18\x03 \x01(\x04\x12\x10\n\x08lifetime\x18\x04 \x01(\x04\x12\r\n\x05\x63\x61_id\x18\x05 \x01(\x03\x12\x0f\n\x07\x63\x65rt_sn\x18\x07 \x01(\x0cJ\x04\x08\x06\x10\x07\"N\n\x14MachineTokenEnvelope\x12\x12\n\ntoken_body\x18\x01 \x01(\x0c\x12\x0e\n\x06key_id\x18\x02 \x01(\t\x12\x12\n\nrsa_sha256\x18\x03 \x01(\x0c\x62\x06proto3'
 )
 
 
@@ -70,8 +70,8 @@ _MACHINETOKENBODY = _descriptor.Descriptor(
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
       name='cert_sn', full_name='components.auth.MachineTokenBody.cert_sn', index=5,
-      number=6, type=4, cpp_type=4, label=1,
-      has_default_value=False, default_value=0,
+      number=7, type=12, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"",
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
@@ -88,7 +88,7 @@ _MACHINETOKENBODY = _descriptor.Descriptor(
   oneofs=[
   ],
   serialized_start=63,
-  serialized_end=191,
+  serialized_end=197,
 )
 
 
@@ -133,8 +133,8 @@ _MACHINETOKENENVELOPE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=193,
-  serialized_end=271,
+  serialized_start=199,
+  serialized_end=277,
 )
 
 DESCRIPTOR.message_types_by_name['MachineTokenBody'] = _MACHINETOKENBODY
