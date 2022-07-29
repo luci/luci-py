@@ -141,7 +141,7 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
 
   def setUp(self):
     super(TaskToRunApiTest, self).setUp()
-    self.now = datetime.datetime(2019, 01, 02, 03, 04, 05, 06)
+    self.now = datetime.datetime(2019, 1, 2, 3, 4, 5, 6)
     self.mock_now(self.now)
     auth_testing.mock_get_current_identity(self)
     # Setup the backend to handle task queues.
@@ -217,7 +217,6 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
   def test_gen_queue_number(self):
     # tuples of (input, expected).
     # 0x3fc00000 is the priority mask.
-    # pylint: disable=bad-whitespace
     data = [
         # Priorities.
         ((1, '1970-01-01 00:00:00.000', 0), (0x92cc0300, 75)),
@@ -245,7 +244,6 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
         ((1, '9998-12-31 23:59:59.999', 1), (0x80400000, 1)),
         ((1, '9998-12-31 23:59:59.999', 255), (0xbfc00000, 255)),
     ]
-    # pylint: enable=bad-whitespace
     for i, ((dimensions_hash, timestamp, priority),
             (expected_v, expected_p)) in enumerate(data):
       d = datetime.datetime.strptime(timestamp, '%Y-%m-%d %H:%M:%S.%f')
@@ -898,7 +896,7 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
   def test_yield_expired_task_to_run(self):
     # There's a cut off at 2019-09-01, so the default self.now on Jan 2nd
     # doesn't work when looking 4 weeks ago.
-    self.now = datetime.datetime(2019, 10, 10, 03, 04, 05, 06)
+    self.now = datetime.datetime(2019, 10, 10, 3, 4, 5, 6)
     self.mock_now(self.now, 0)
     # task_to_run_1: still active
     _, _to_run_1 = self._gen_new_task_to_run_slices(

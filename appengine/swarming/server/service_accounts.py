@@ -40,7 +40,7 @@ AccessToken = collections.namedtuple(
     ])
 
 
-class PermissionError(Exception):
+class PermissionError(Exception):  # pylint: disable=redefined-builtin
   """The service account is not allowed to be used by the caller."""
 
 

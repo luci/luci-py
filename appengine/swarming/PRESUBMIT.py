@@ -17,7 +17,8 @@ def CommonChecks(input_api, output_api):
       r'.*_pb2\.py$',
   ]
   disabled_warnings = [
-    'relative-import',
+      'relative-import',
+      'useless-object-inheritance',
   ]
   return input_api.canned_checks.RunPylint(input_api,
                                            output_api,
@@ -26,7 +27,7 @@ def CommonChecks(input_api, output_api):
                                            pylintrc=input_api.os_path.join(
                                                input_api.PresubmitLocalPath(),
                                                '../../', 'pylintrc'),
-                                           version='1.5')
+                                           version='2.7')
 
 
 # pylint: disable=unused-argument

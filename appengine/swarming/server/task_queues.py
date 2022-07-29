@@ -171,7 +171,6 @@ class TaskDimensionsRoot(ndb.Model):
   id is either 'id:<value>' or 'pool:<value>'. For a request dimensions set that
   specifies both keys, TaskDimensions is listed under 'id:<value>'.
   """
-  pass
 
 
 class TaskDimensionsSet(ndb.Model):

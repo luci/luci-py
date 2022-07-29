@@ -426,7 +426,7 @@ class Test(unittest.TestCase):
         self.fail('Bot took too long to start after wipe_cache()')
       state = self.client.query_bot()
       if not state or not any(
-          [d['key'] == 'server_version' for d in state['dimensions']]):
+          (d['key'] == 'server_version' for d in state['dimensions'])):
         time.sleep(0.1)
         continue
       if not had_cache:

@@ -1436,8 +1436,8 @@ class TestOutput(TestCase):
   def test_get_output_utf8(self):
     self.mock(task_result.TaskOutput, 'CHUNK_SIZE', 4)
     run_result = _gen_run_result()
-    ndb.put_multi(run_result.append_output(b'Foo🤠Bar', 0))
-    self.assertEqual(b'Foo🤠Bar', run_result.get_output(0, 0))
+    ndb.put_multi(run_result.append_output('Foo🤠Bar', 0))
+    self.assertEqual('Foo🤠Bar', run_result.get_output(0, 0))
     self.assertTaskOutputChunk([
         {
             'chunk': b'Foo\xf0',
@@ -1455,13 +1455,14 @@ class TestOutput(TestCase):
 
   def test_get_output_utf8_range(self):
     run_result = _gen_run_result()
-    ndb.put_multi(run_result.append_output(b'Foo🤠Bar', 0))
-    self.assertEqual(b'🤠', run_result.get_output(3, 4))
+    ndb.put_multi(run_result.append_output('Foo🤠Bar', 0))
+    self.assertEqual('🤠', run_result.get_output(3, 4))
 
   def test_get_output_utf8_limit(self):
     run_result = _gen_run_result()
-    ndb.put_multi(run_result.append_output(b'😀😃😄😁😆', 0))
-    self.assertEqual(b'😀😃😄😁', run_result.get_output(0, 16))
+    ndb.put_multi(run_result.append_output('😀😃😄😁😆', 0))
+    self.assertEqual('😀😃😄😁', run_result.get_output(0, 16))
+
 
 if __name__ == '__main__':
   logging.basicConfig(

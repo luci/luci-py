@@ -13,7 +13,7 @@ from google.appengine.ext import ndb
 
 
 # Mask to TaskRequest key ids so they become decreasing numbers.
-TASK_REQUEST_KEY_ID_MASK = int(2L**63-1)
+TASK_REQUEST_KEY_ID_MASK = int(2**63 - 1)
 
 
 ### Entities relationships.
@@ -152,8 +152,7 @@ def unpack_request_key(request_id):
     if task_id_int < 0:
       raise ValueError('Invalid task id (overflowed)')
     return ndb.Key('TaskRequest', task_id_int ^ TASK_REQUEST_KEY_ID_MASK)
-  else:
-    raise ValueError('Invalid key %r' % request_id)
+  raise ValueError('Invalid key %r' % request_id)
 
 
 def unpack_result_summary_key(packed_key):

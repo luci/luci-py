@@ -428,8 +428,7 @@ def get_disks_info():
   """Returns a dict of dict of free and total disk space."""
   if sys.platform == 'win32':
     return platforms.win.get_disks_info()
-  else:
-    return platforms.posix.get_disks_info()
+  return platforms.posix.get_disks_info()
 
 
 @tools.cached
@@ -457,9 +456,9 @@ def get_audio():
   # on OSX when an audio cable is plugged in.
   if sys.platform == 'darwin':
     return platforms.osx.get_audio()
-  elif sys.platform == 'linux':
+  if sys.platform == 'linux':
     return platforms.linux.get_audio()
-  elif sys.platform == 'win32':
+  if sys.platform == 'win32':
     return platforms.win.get_audio()
   return None
 

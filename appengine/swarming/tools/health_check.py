@@ -111,7 +111,7 @@ def main():
       '--raw-cmd', '--', 'python', '-c', 'pass'
   ])
   if rv != 0:
-    print >> sys.stderr, 'Failed to run no-op task'
+    print('Failed to run no-op task', file=sys.stderr)
     return 2
   return 0
 

@@ -200,8 +200,7 @@ def _gen_queue_number(dimensions_hash, timestamp, priority):
   # dimensions_hash should be 32 bits but on AppEngine, which is using 32 bits
   # python, it is silently upgraded to long.
   assert isinstance(dimensions_hash, (int, long)), repr(dimensions_hash)
-  assert dimensions_hash > 0 and dimensions_hash <= 0xFFFFFFFF, hex(
-      dimensions_hash)
+  assert 0 < dimensions_hash <= 0xFFFFFFFF, hex(dimensions_hash)
   assert isinstance(timestamp, datetime.datetime), repr(timestamp)
   task_request.validate_priority(priority)
 
@@ -218,15 +217,13 @@ def _gen_queue_number(dimensions_hash, timestamp, priority):
     # assert works.
     t = long(round((timestamp - year_start).total_seconds() * 10.))
 
-  assert t >= 0 and t <= 0x7FFFFFFF, (
-      hex(t), dimensions_hash, timestamp, priority)
+  assert 0 <= t <= 0x7FFFFFFF, (hex(t), dimensions_hash, timestamp, priority)
   # 31-22 == 9, leaving room for overflow with the addition.
   # 0x3fc00000 is the priority mask.
   # It is important that priority mixed with time is an addition, not a bitwise
   # or.
   low_part = (long(priority) << 22) + t
-  assert low_part >= 0 and low_part <= 0xFFFFFFFF, '0x%X is out of band' % (
-      low_part)
+  assert 0 <= low_part <= 0xFFFFFFFF, '0x%X is out of band' % (low_part)
   # int may be 32 bits, upgrade to long for consistency, albeit this is
   # significantly slower.
   high_part = long(dimensions_hash) << 31

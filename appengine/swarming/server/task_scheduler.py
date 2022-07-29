@@ -1109,15 +1109,24 @@ def _should_allow_es_fallback(es_cfg, request):
   return task_es_cfg == es_cfg
 
 
-def _gen_new_keys(
-    result_summary,  # type: task_result.TaskResultSummary
-    to_run=None,  # type: Optional[task_to_run.TaskToRun
-    secret_bytes=None,  # type: Optional[task_request.SecretBytes]
-    build_token=None):  # type: Optional[task_request.BuildToken]
-  # type: (...) -> ndb.Key
+def _gen_new_keys(result_summary,
+                  to_run=None,
+                  secret_bytes=None,
+                  build_token=None):
   """Creates new keys for the entities and returns the TaskRequest key.
 
   Warning: this assumes knowledge about the hierarchy of each entity.
+
+  Arguments:
+    - result_summary: a task_result.TaskResultSummary instance.
+    - to_run: a task_to_run.TaskToRun instances
+    - secret_bytes: Optional SecretBytes entity to be saved in the DB. It's key
+              will be set and the entity will be stored by this function.
+    - build_token: Optional BuildToken entity to be saved in the DB. It's key
+              will be set and the entity will be stored by this function.
+
+  Returns:
+    A valid ndb.Key.
   """
   key = task_request.new_request_key()
   if to_run:
@@ -1376,7 +1385,7 @@ def bot_reap_task(bot_dimensions, bot_version):
       for i in range(slice_index + 1):
         t = request.task_slice(i)
         slice_expiration += datetime.timedelta(seconds=t.expiration_secs)
-      if now <= slice_expiration and expiration_ts < now:
+      if expiration_ts < now <= slice_expiration:
         logging.info('Task slice is expired, but task is not expired; '
                      'slice index: %d, slice expiration: %s, '
                      'task expiration: %s',

@@ -6,14 +6,9 @@
 
 class BadRequestException(Exception):
   """The request is invalid."""
-  pass
-
 
 class PermissionException(Exception):
   """Permission requirements are not fulfilled."""
-  pass
-
 
 class InternalException(Exception):
   """Unexpected error occurred."""
-  pass

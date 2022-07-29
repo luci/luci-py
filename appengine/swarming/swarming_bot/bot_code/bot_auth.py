@@ -506,8 +506,7 @@ class AuthSystem(object):
       return auth_params.task_service_account
     if account_id == 'system':
       return auth_params.system_service_account
-    else:
-      raise auth_server.RPCError(404, 'Unknown account %r' % account_id)
+    raise auth_server.RPCError(404, 'Unknown account %r' % account_id)
 
   def _check_and_log_token(self, tok, account_id, service_account):
     """Checks token's expiry is not in the past, logs info about the token.

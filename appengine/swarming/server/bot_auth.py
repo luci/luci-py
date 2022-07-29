@@ -276,6 +276,6 @@ def _extract_primary_hostname(bot_id):
   parts = bot_id.split('--')
   if len(parts) == 2:
     return parts[0]
-  elif len(parts) > 2:
+  if len(parts) > 2:
     logging.error('Unable to parse composed bot_id: %s', bot_id)
   return bot_id

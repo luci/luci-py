@@ -1866,7 +1866,7 @@ class TaskRequestApiTest(TestCase):
 
     it = task_request.yield_request_keys_by_parent_task_id(parent_summary_id)
     expected = [child_request_1_key, child_request_2_key]
-    self.assertEqual(sorted(expected), sorted([k for k in it]))
+    self.assertEqual(sorted(expected), sorted(list(it)))
 
   def test_normalize_or_dimensions(self):
     dim1 = _gen_request(

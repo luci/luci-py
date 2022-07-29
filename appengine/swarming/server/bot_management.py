@@ -295,16 +295,16 @@ class BotInfo(_BotCommon):
     out['is_dead'] = self.is_dead
     return out
 
-  def to_proto(self, out):
-    """Converts self to a swarming_pb2.Bot."""
-    # This populates most of the data.
-    super(BotInfo, self).to_proto(out)
-    # https://crbug.com/757931: QUARANTINED_BY_SERVER
-    # https://crbug.com/870723: OVERHEAD_BOT_INTERNAL
-    # https://crbug.com/870723: HOST_REBOOTING
-    # https://crbug.com/913978: RESERVED
-    # TODO(maruel): Populate bot.info.host and bot.info.devices.
-    # https://crbug.com/916570
+  #def to_proto(self, out):
+  #  """Converts self to a swarming_pb2.Bot."""
+  # This populates most of the data.
+  # super(BotInfo, self).to_proto(out)
+  # https://crbug.com/757931: QUARANTINED_BY_SERVER
+  # https://crbug.com/870723: OVERHEAD_BOT_INTERNAL
+  # https://crbug.com/870723: HOST_REBOOTING
+  # https://crbug.com/913978: RESERVED
+  # TODO(maruel): Populate bot.info.host and bot.info.devices.
+  # https://crbug.com/916570
 
   def _pre_put_hook(self):
     super(BotInfo, self)._pre_put_hook()

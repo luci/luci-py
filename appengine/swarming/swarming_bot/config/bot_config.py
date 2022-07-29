@@ -195,7 +195,6 @@ def on_bot_shutdown(bot):
   Arguments:
   - bot: bot.Bot instance. See ../api/bot.py.
   """
-  pass
 
 
 def on_bot_startup(bot):
@@ -207,7 +206,6 @@ def on_bot_startup(bot):
   Arguments:
   - bot: bot.Bot instance. See ../api/bot.py.
   """
-  pass
 
 
 def on_handshake(bot):
@@ -223,7 +221,6 @@ def on_handshake(bot):
   Arguments:
   - bot: bot.Bot instance. See ../api/bot.py.
   """
-  pass
 
 
 def on_before_poll(bot):
@@ -235,7 +232,6 @@ def on_before_poll(bot):
   Arguments:
   - bot: bot.Bot instance. See ../api/bot.py.
   """
-  pass
 
 
 def on_after_poll(bot, cmd):
@@ -246,7 +242,6 @@ def on_after_poll(bot, cmd):
   - cmd: The action that the server asked the bot to perform (e.g. "sleep",
          "terminate", "run").
   """
-  pass
 
 
 def on_before_task(bot, bot_file, runner_cmd, runner_env):
@@ -266,7 +261,6 @@ def on_before_task(bot, bot_file, runner_cmd, runner_env):
                 and/or add a wrapper script around it. USE WITH CAUTION.
   - runner_env: Environment in which test runner is launched. Can be mutated.
   """
-  pass
 
 
 def on_after_task(bot, failure, internal_failure, task_dimensions, summary):

@@ -203,11 +203,11 @@ def _validate_dimensions(_prop, value):
           u'dimensions must be a dict of strings or list of string, not %r' %
           value)
 
-    for value in values:
-      if not value:
+    for val in values:
+      if not val:
         raise datastore_errors.BadValueError(
             u'dimensions value must be a string, not None')
-      or_dimensions_num *= len(value.split(OR_DIM_SEP))
+      or_dimensions_num *= len(val.split(OR_DIM_SEP))
       if or_dimensions_num > max_or_dimensions_num:
         raise datastore_errors.BadValueError(
             'possible dimension subset for \'or\' dimensions '
@@ -226,12 +226,12 @@ def _validate_dimensions(_prop, value):
           u'dimension key %r has repeated values' % k)
 
     normalized_values = []
-    for value in values:
-      or_values = value.split(OR_DIM_SEP)
+    for val in values:
+      or_values = val.split(OR_DIM_SEP)
       for v in or_values:
         if not config.validate_dimension_value(v):
           raise datastore_errors.BadValueError(
-              u'dimension key %r has invalid value %r' % (k, value))
+              u'dimension key %r has invalid value %r' % (k, val))
       # sorts OR's operands, so that dimension_hash for semantically equivalent
       # dimension values will be the same.
       normalized_values.append(OR_DIM_SEP.join(sorted(or_values)))

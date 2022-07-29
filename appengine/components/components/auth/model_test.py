@@ -225,7 +225,7 @@ class GroupBootstrapTest(test_case.TestCase):
   """Test for bootstrap_group function."""
 
   def test_group_bootstrap_empty(self):
-    mocked_now = datetime.datetime(2014, 01, 01)
+    mocked_now = datetime.datetime(2014, 1, 1)
     self.mock_now(mocked_now)
 
     added = model.bootstrap_group('some-group', [], 'Blah description')
@@ -252,7 +252,7 @@ class GroupBootstrapTest(test_case.TestCase):
     ident1 = model.Identity(model.IDENTITY_USER, 'joe@example.com')
     ident2 = model.Identity(model.IDENTITY_USER, 'sam@example.com')
 
-    mocked_now = datetime.datetime(2014, 01, 01)
+    mocked_now = datetime.datetime(2014, 1, 1)
     self.mock_now(mocked_now)
 
     added = model.bootstrap_group(
@@ -374,7 +374,7 @@ class IpWhitelistTest(test_case.TestCase):
   def test_bootstrap_ip_whitelist_empty(self):
     self.assertIsNone(model.ip_whitelist_key('list').get())
 
-    mocked_now = datetime.datetime(2014, 01, 01)
+    mocked_now = datetime.datetime(2014, 1, 1)
     self.mock_now(mocked_now)
 
     ret = model.bootstrap_ip_whitelist('list', [], 'comment')
@@ -396,7 +396,7 @@ class IpWhitelistTest(test_case.TestCase):
   def test_bootstrap_ip_whitelist(self):
     self.assertIsNone(model.ip_whitelist_key('list').get())
 
-    mocked_now = datetime.datetime(2014, 01, 01)
+    mocked_now = datetime.datetime(2014, 1, 1)
     self.mock_now(mocked_now)
 
     ret = model.bootstrap_ip_whitelist(
@@ -420,7 +420,7 @@ class IpWhitelistTest(test_case.TestCase):
     self.assertFalse(model.bootstrap_ip_whitelist('list', ['not a subnet']))
 
   def test_bootstrap_ip_whitelist_assignment_new(self):
-    self.mock_now(datetime.datetime(2014, 01, 01))
+    self.mock_now(datetime.datetime(2014, 1, 1))
 
     ret = model.bootstrap_ip_whitelist_assignment(
         model.Identity(model.IDENTITY_USER, 'a@example.com'),
@@ -445,7 +445,7 @@ class IpWhitelistTest(test_case.TestCase):
       }, model.ip_whitelist_assignments_key().get().to_dict())
 
   def test_bootstrap_ip_whitelist_assignment_modify(self):
-    self.mock_now(datetime.datetime(2014, 01, 01))
+    self.mock_now(datetime.datetime(2014, 1, 1))
 
     ret = model.bootstrap_ip_whitelist_assignment(
         model.Identity(model.IDENTITY_USER, 'a@example.com'),

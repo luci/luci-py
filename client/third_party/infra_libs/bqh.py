@@ -65,18 +65,17 @@ def _to_bq_value(value, field_desc):
       raise ValueError('Invalid value %r for enum type %s' % (
           value, field_desc.enum_type.full_name))
     return enum_val.name
-  elif isinstance(value, duration_pb2.Duration):
+  if isinstance(value, duration_pb2.Duration):
     return value.ToTimedelta().total_seconds()
-  elif isinstance(value, struct_pb2.Struct):
+  if isinstance(value, struct_pb2.Struct):
     # Structs are stored as JSONPB strings,
     # see https://bit.ly/chromium-bq-struct
     return json_format.MessageToJson(value)
-  elif isinstance(value, timestamp_pb2.Timestamp):
+  if isinstance(value, timestamp_pb2.Timestamp):
     return value.ToDatetime().isoformat()
-  elif isinstance(value, message_pb.Message):
+  if isinstance(value, message_pb.Message):
     return message_to_dict(value)
-  else:
-    return value
+  return value
 
 
 def send_rows(bq_client, dataset_id, table_id, rows, batch_size=_BATCH_DEFAULT):
@@ -108,7 +107,7 @@ def send_rows(bq_client, dataset_id, table_id, rows, batch_size=_BATCH_DEFAULT):
     if isinstance(row, tuple):
       rows_to_send.append(row)
       continue
-    elif isinstance(row, message_pb.Message):
+    if isinstance(row, message_pb.Message):
       rows_to_send.append(message_to_dict(row))
     else:
       raise UnsupportedTypeError(type(row).__name__)

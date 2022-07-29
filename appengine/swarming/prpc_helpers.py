@@ -6,6 +6,7 @@
 import cgi
 import functools
 import logging
+import six
 import sys
 
 from google.appengine.api import datastore_errors
@@ -53,7 +54,7 @@ def ProcessException(e, prpc_context):
   if code is None:
     prpc_context.set_code(codes.StatusCode.INTERNAL)
     prpc_context.set_details('Potential programming error.')
-    raise e.__class__, e, sys.exc_info()[2]
+    six.reraise(e.__class__, e, sys.exc_info()[2])
 
   prpc_context.set_code(code)
   prpc_context.set_details(cgi.escape(e.message, quote=True))

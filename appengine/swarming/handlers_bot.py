@@ -148,7 +148,7 @@ class _BotAuthenticatingHandler(auth.AuthenticatingHandler):
   _X_LUCI_SWARMING_BOT_ID = 'X-Luci-Swarming-Bot-ID'
 
   @classmethod
-  def get_auth_methods(cls, conf):
+  def get_auth_methods(cls, conf):  # pylint: disable=unused-argument
     return _BOT_AUTH_METHODS
 
   def check_bot_code_access(self, bot_id, generate_token):
@@ -266,7 +266,7 @@ class _BotApiHandler(auth.ApiHandler):
   xsrf_token_enforce_on = ()
 
   @classmethod
-  def get_auth_methods(cls, conf):
+  def get_auth_methods(cls, conf):  # pylint: disable=unused-argument
     return _BOT_AUTH_METHODS
 
 

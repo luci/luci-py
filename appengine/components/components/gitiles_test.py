@@ -43,19 +43,19 @@ class GitilesTestCase(test_case.TestCase):
 
   def test_parse_time(self):
     time_str = 'Fri Nov 07 17:09:03 2014'
-    expected = datetime.datetime(2014, 11, 07, 17, 9, 3)
+    expected = datetime.datetime(2014, 11, 7, 17, 9, 3)
     actual = gitiles.parse_time(time_str)
     self.assertEqual(expected, actual)
 
   def test_parse_time_with_positive_timezone(self):
     time_str = 'Fri Nov 07 17:09:03 2014 +01:00'
-    expected = datetime.datetime(2014, 11, 07, 16, 9, 3)
+    expected = datetime.datetime(2014, 11, 7, 16, 9, 3)
     actual = gitiles.parse_time(time_str)
     self.assertEqual(expected, actual)
 
   def test_parse_time_with_negative_timezone(self):
     time_str = 'Fri Nov 07 17:09:03 2014 -01:00'
-    expected = datetime.datetime(2014, 11, 07, 18, 9, 3)
+    expected = datetime.datetime(2014, 11, 7, 18, 9, 3)
     actual = gitiles.parse_time(time_str)
     self.assertEqual(expected, actual)
 

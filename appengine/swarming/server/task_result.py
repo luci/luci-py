@@ -143,13 +143,11 @@ class State(object):
 class StateProperty(ndb.IntegerProperty):
   """State of a single task as a model property."""
   def __init__(self, **kwargs):
-    # pylint: disable=E1002
     super(StateProperty, self).__init__(choices=State.STATES, **kwargs)
 
 
 def _validate_not_pending(prop, value):
   if value == State.PENDING:
-    # pylint: disable=W0212
     raise datastore_errors.BadValueError('%s cannot be PENDING' % prop._name)
 
 
@@ -165,7 +163,6 @@ class LargeIntegerArray(ndb.BlobProperty):
   """Contains a large integer array as compressed by large."""
 
   def __init__(self, **kwargs):
-    # pylint: disable=E1002
     super(LargeIntegerArray, self).__init__(
         indexed=False, compressed=False, **kwargs)
 
@@ -1030,7 +1027,7 @@ class TaskRunResult(_TaskResultCommon):
     assert self.stdout_chunks <= TaskOutput.PUT_MAX_CHUNKS
     return entities
 
-  def to_dict(self):
+  def to_dict(self, **kwargs):
     out = super(TaskRunResult, self).to_dict()
     out['try_number'] = self.try_number
     return out
@@ -1201,7 +1198,7 @@ class TaskResultSummary(_TaskResultCommon):
         '_send_job_completed_metric: '
         'Task completed. prev_state:"%s", current_state:"%s".\n'
         'Sending metric...', prev_state, State.to_string(self.state))
-    import ts_mon_metrics
+    import ts_mon_metrics  # pylint: disable=cyclic-import
     ts_mon_metrics.on_task_completed(self)
 
   def reset_to_pending(self):
@@ -1275,7 +1272,7 @@ class TaskResultSummary(_TaskResultCommon):
         self.state != run_result.state or
         self.try_number != run_result.try_number)
 
-  def to_dict(self):
+  def to_dict(self, **kwargs):
     return super(TaskResultSummary, self).to_dict(exclude=['properties_hash'])
 
 
@@ -1373,12 +1370,12 @@ def _output_append(output_key, number_chunks, output, output_chunk_start):
       # If the gap overlaps the chunk being written, strip it. Cases:
       #   Gap:     |   |
       #   Chunk: |   |
-      if start <= gap_start <= end and end <= gap_end:
+      if start <= gap_start <= end <= gap_end:
         gap_start = end
 
       #   Gap:     |   |
       #   Chunk:     |   |
-      if gap_start <= start and start <= gap_end <= end:
+      if gap_start <= start <= gap_end <= end:
         gap_end = start
 
       #   Gap:       |  |

@@ -89,7 +89,7 @@ class TaskBackendAPIServiceTest(test_env_handlers.AppTestBase):
         'Accept': encoding.Encoding.JSON[1],
     }
 
-    now = datetime.datetime(2019, 01, 02, 03)
+    now = datetime.datetime(2019, 1, 2, 3)
     test_case.mock_now(self, now, 0)
 
   # Test helpers.

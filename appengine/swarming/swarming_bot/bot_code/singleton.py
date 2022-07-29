@@ -55,23 +55,22 @@ class Singleton(object):
       if last_error == 183:
         self.release()
       return bool(self.handle)
-    else:
-      self.handle = open(self.key, 'a+b')
-      try:
-        fcntl.flock(self.handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
-      except IOError:
-        # There's a small race condition where it could report a previous pid.
-        logging.exception('Singleton "%s" is held by "%s"', self.key,
-                          self.handle.read())
-        self.handle.close()
-        self.handle = None
-        return False
-      logging.info('[singleton] acquire: %s = %s', self.key, self.handle)
-      self.handle.seek(0, os.SEEK_SET)
-      self.handle.truncate(0)
-      self.handle.write(str(os.getpid()).encode('utf-8'))
-      self.handle.flush()
-      return True
+    self.handle = open(self.key, 'a+b')
+    try:
+      fcntl.flock(self.handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except IOError:
+      # There's a small race condition where it could report a previous pid.
+      logging.exception('Singleton "%s" is held by "%s"', self.key,
+                        self.handle.read())
+      self.handle.close()
+      self.handle = None
+      return False
+    logging.info('[singleton] acquire: %s = %s', self.key, self.handle)
+    self.handle.seek(0, os.SEEK_SET)
+    self.handle.truncate(0)
+    self.handle.write(str(os.getpid()).encode('utf-8'))
+    self.handle.flush()
+    return True
 
   def release(self):
     """Release the singleton."""

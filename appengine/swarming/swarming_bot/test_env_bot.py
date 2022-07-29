@@ -24,7 +24,7 @@ def setup_test_env():
       'Please enable symlink. '
       'Run \'git config --global core.symlinks true\' '
       'and fetch the repository again')
-    exit(1)
+    sys.exit(1)
   sys.path.insert(0, tp)
 
   # libusb1 expects to be directly in sys.path.

@@ -58,7 +58,7 @@ class TestBotBase(net_utils.TestCase):
     super(TestBotBase, self).setUp()
     # Throw away all swarming environ if running the test on Swarming. It may
     # interfere with the test.
-    for k in os.environ.keys():
+    for k in os.environ:
       if k.startswith('SWARMING_'):
         os.environ.pop(k)
     self.root_dir = tempfile.mkdtemp(prefix='bot_main')
