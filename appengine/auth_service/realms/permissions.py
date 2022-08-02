@@ -161,11 +161,17 @@ def db():
   role(
       'role/weetbix.limitedReader',
       [
-          # Access to read basic information about rules and clusters,
-          # including the associated bugs for rules and aggregated
-          # statistics about the failures in the cluster.
-          # Should not reveal to the user any Test IDs or failure
-          # reasons they do not already have access to in ResultDB.
+          # Allows viewing project configuration, and listing all rules
+          # and clusters in the project (with associated bugs and
+          # aggregated impact for each), except:
+          # - For rule-based clusters, access to the rule definition
+          #   ('reason where '%some failure%') is not granted.
+          #   The user can however see the failures they already have
+          #   access to (in ResultDB) which match the definition.
+          # - For suggested clusters, cluster definition is not visible
+          #   unless they user has access at least one test failure in
+          #   the cluster.
+          permission('weetbix.config.get'),
           permission('weetbix.rules.get'),
           permission('weetbix.rules.list'),
           permission('weetbix.clusters.get'),
