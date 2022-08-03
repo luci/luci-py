@@ -115,8 +115,11 @@ def _get_intel_version():
 
 
 def _read_cpuinfo():
-  with open('/proc/cpuinfo', 'r') as f:
-    return f.read()
+  try:
+    with open('/proc/cpuinfo', 'r') as f:
+      return f.read()
+  except (IOError, OSError):
+    return ''
 
 
 def _read_cgroup():
@@ -235,7 +238,8 @@ def get_cpuinfo():
                           or 'N/A')
 
   # http://unix.stackexchange.com/questions/43539/what-do-the-flags-in-proc-cpuinfo-mean
-  cpu_info['flags'] = sorted(i for i in cpu_info['flags'].split())
+  if 'flags' in cpu_info:
+    cpu_info['flags'] = sorted(i for i in cpu_info['flags'].split())
   return cpu_info
 
 
