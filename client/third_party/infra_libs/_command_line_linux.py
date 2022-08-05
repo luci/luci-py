@@ -24,7 +24,7 @@ def set_command_line(cmdline):
     # thing in memory is the sum of all the argument byte-lengths, plus 1 null
     # byte for each.
     _CACHED_CMDLINE_LENGTH = sum(
-        len(argv[i]) for i in xrange(0, argc.value)) + argc.value
+        len(argv[i]) for i in range(0, argc.value)) + argc.value
 
   # Pad the cmdline string to the required length.  If it's longer than the
   # current commandline, truncate it.

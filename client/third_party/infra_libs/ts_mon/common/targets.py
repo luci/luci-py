@@ -79,12 +79,13 @@ class DeviceTarget(Target):
       collection (metrics_pb2.MetricsCollection): the collection proto to be
           populated.
     """
-    collection.network_device.metro = self.region
-    collection.network_device.role = self.role
-    collection.network_device.hostgroup = self.network
-    collection.network_device.hostname = self.hostname
-    collection.network_device.realm = self.realm
-    collection.network_device.alertable = self.alertable
+    root_labels = collection.root_labels
+    root_labels.add(key='metro', string_value=self.region)
+    root_labels.add(key='role', string_value=self.role)
+    root_labels.add(key='hostgroup', string_value=self.network)
+    root_labels.add(key='hostname', string_value=self.hostname)
+    root_labels.add(key='realm', string_value=self.realm)
+    root_labels.add(key='alertable', bool_value=self.alertable)
 
 
 class TaskTarget(Target):
@@ -116,8 +117,9 @@ class TaskTarget(Target):
       collection (metrics_pb2.MetricsCollection): the collection proto to be
           populated.
     """
-    collection.task.service_name = self.service_name
-    collection.task.job_name = self.job_name
-    collection.task.data_center = self.region
-    collection.task.host_name = self.hostname
-    collection.task.task_num = self.task_num
+    root_labels = collection.root_labels
+    root_labels.add(key='service_name', string_value=self.service_name)
+    root_labels.add(key='job_name', string_value=self.job_name)
+    root_labels.add(key='data_center', string_value=self.region)
+    root_labels.add(key='host_name', string_value=self.hostname)
+    root_labels.add(key='task_num', int64_value=self.task_num)

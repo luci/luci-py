@@ -5,6 +5,8 @@
 """Miscellaneous utility functions."""
 
 
+from __future__ import print_function
+
 import contextlib
 import datetime
 import errno
@@ -15,6 +17,8 @@ import subprocess
 import sys
 import tempfile
 import time
+
+from six import text_type
 
 
 # UTC datetime corresponding to zero Unix timestamp.
@@ -102,10 +106,10 @@ def read_json_as_utf8(filename=None, text=None):
 
   def to_utf8(obj):
     if isinstance(obj, dict):
-      return {to_utf8(key): to_utf8(value) for key, value in obj.iteritems()}
+      return {to_utf8(key): to_utf8(value) for key, value in list(obj.items())}
     if isinstance(obj, list):
       return [to_utf8(item) for item in obj]
-    if isinstance(obj, unicode):
+    if isinstance(obj, text_type):
       return obj.encode('utf-8')
     return obj
 
@@ -139,7 +143,7 @@ def rmtree(file_path):  # pragma: no cover
     return
 
   if os.path.isfile(file_path):
-    for i in xrange(3):
+    for i in range(3):
       try:
         os.remove(file_path)
         return
@@ -151,7 +155,7 @@ def rmtree(file_path):  # pragma: no cover
   if sys.platform == 'win32':
     # Give up and use cmd.exe's rd command.
     file_path = os.path.normcase(file_path)
-    for i in xrange(3):
+    for i in range(3):
       try:
         subprocess.check_call(['cmd.exe', '/c', 'rd', '/q', '/s', file_path])
         return
@@ -242,5 +246,5 @@ def temporary_directory(suffix="", prefix="tmp", dir=None,
         # TODO(pgervais,496347) Make this work reliably on Windows.
         shutil.rmtree(tempdir, ignore_errors=True)
       except OSError as ex:  # pragma: no cover
-        print >> sys.stderr, (
-          "ERROR: {!r} while cleaning up {!r}".format(ex, tempdir))
+        print(("ERROR: {!r} while cleaning up {!r}".format(ex, tempdir)),
+              file=sys.stderr)

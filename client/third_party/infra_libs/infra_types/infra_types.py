@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import collections
+import functools
 import operator
 
 
@@ -19,7 +20,7 @@ def freeze(obj):
   Will raise TypeError if you pass an object which is not hashable.
   """
   if isinstance(obj, dict):
-    return FrozenDict((freeze(k), freeze(v)) for k, v in obj.iteritems())
+    return FrozenDict((freeze(k), freeze(v)) for k, v in obj.items())
   elif isinstance(obj, (list, tuple)):
     return tuple(freeze(i) for i in obj)
   elif isinstance(obj, set):
@@ -32,8 +33,7 @@ def freeze(obj):
 def thaw(obj):
   """Takes an object from freeze() and returns a mutable copy of it."""
   if isinstance(obj, FrozenDict):
-    return collections.OrderedDict(
-        (thaw(k), thaw(v)) for k, v in obj.iteritems())
+    return collections.OrderedDict((thaw(k), thaw(v)) for k, v in obj.items())
   elif isinstance(obj, tuple):
     return list(thaw(i) for i in obj)
   elif isinstance(obj, frozenset):
@@ -52,8 +52,9 @@ class FrozenDict(collections.Mapping):
 
     # Calculate the hash immediately so that we know all the items are
     # hashable too.
-    self._hash = reduce(operator.xor,
-                        (hash(i) for i in enumerate(self._d.iteritems())), 0)
+    self._hash = functools.reduce(operator.xor,
+                                  (hash(i) for i in enumerate(self._d.items())),
+                                  0)
 
   def __eq__(self, other):
     if not isinstance(other, collections.Mapping):
@@ -62,7 +63,7 @@ class FrozenDict(collections.Mapping):
       return True
     if len(self) != len(other):
       return False
-    for k, v in self.iteritems():
+    for k, v in self.items():
       if k not in other or other[k] != v:
         return False
     return True
@@ -80,4 +81,4 @@ class FrozenDict(collections.Mapping):
     return self._hash
 
   def __repr__(self):
-    return 'FrozenDict(%r)' % (self._d.items(),)
+    return 'FrozenDict(%r)' % (list(self._d.items()),)

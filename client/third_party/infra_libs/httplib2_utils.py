@@ -11,9 +11,10 @@ import re
 import socket
 import sys
 import time
-import urllib
 
 from six.moves import http_client
+from six.moves import urllib
+from six import string_types
 import httplib2
 import oauth2client.client
 
@@ -117,9 +118,9 @@ def get_signed_jwt_assertion_credentials(credentials_filename,
       to this path. None means 'use default location'.
   """
   scope = scope or DEFAULT_SCOPES
-  if isinstance(scope, basestring):
+  if isinstance(scope, string_types):
     scope = [scope]
-  assert all(isinstance(s, basestring) for s in scope)
+  assert all(isinstance(s, string_types) for s in scope)
 
   key = load_service_account_credentials(
     credentials_filename,
@@ -199,7 +200,7 @@ class DelegateServiceAccountCredentials(
     self.access_token = None
 
   def _canonicalize_scopes(self, scopes):
-    if isinstance(scopes, basestring):
+    if isinstance(scopes, string_types):
       return [scopes]
     return scopes
 
@@ -210,17 +211,16 @@ class DelegateServiceAccountCredentials(
     }
 
     response, content = (
-      self._http.request(
-        uri='https://iamcredentials.googleapis.com/v1/projects/%s/'
-            'serviceAccounts/%s:generateAccessToken' %
-            (urllib.quote_plus(self._project),
-             urllib.quote_plus(self._sa_email)),
-        method='POST',
-        body=json.dumps(req),
-        headers={
-          'Content-Type': 'application/json',
-        },
-      ))
+        self._http.request(
+            uri='https://iamcredentials.googleapis.com/v1/projects/%s/'
+            'serviceAccounts/%s:generateAccessToken' % (urllib.parse.quote_plus(
+                self._project), urllib.parse.quote_plus(self._sa_email)),
+            method='POST',
+            body=json.dumps(req),
+            headers={
+                'Content-Type': 'application/json',
+            },
+        ))
 
     if response.status != 200:
       msg = ('Unable to generate access token,'
@@ -375,7 +375,7 @@ class HttpMock(object):
       new_headers = copy.copy(headers)
       new_headers['status'] = int(new_headers['status'])
 
-      if not isinstance(body, basestring):
+      if not isinstance(body, string_types):
         raise TypeError("'body' must be a string, got %s" % type(body))
       self._uris.append((compiled_uri, new_headers, body))
 

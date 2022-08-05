@@ -51,13 +51,14 @@ class MemoizedFunction(object):
     self.func = func
     self.ignore = frozenset(ignore or ())
     self.memo_dict = memo_dict
-    self.im_self = None
+    self.__self__ = None
+    # TODO: Make this Python 3-compatible. `im_class` is not available in Py3.
     self.im_class = None
 
   def __repr__(self):
     properties = [str(self.func)]
-    if self.im_self is not None:
-      properties.append('bound=%s' % (self.im_self,))
+    if self.__self__ is not None:
+      properties.append('bound=%s' % (self.__self__,))
     if len(self.ignore) > 0:
       properties.append('ignore=%s' % (','.join(sorted(self.ignore))))
     return '%s(%s)' % (type(self).__name__, ', '.join(properties))
@@ -66,26 +67,26 @@ class MemoizedFunction(object):
     # Make this callable class a bindable Descriptor
     if klass is None:
       klass = type(obj)
-    self.im_self = obj
+    self.__self__ = obj
     self.im_class = klass
     return self
 
   def _get_call_args(self, args):
     """Returns the call arguments, factoring in 'self' if this method is bound.
     """
-    if self.im_self is not None:
-      return (self.im_self,) + args
+    if self.__self__ is not None:
+      return (self.__self__,) + args
     return args
 
   def _get_memo_dict(self):
     """Returns: (dict) the memoization dictionary to store return values in."""
     memo_dict = None
-    if self.im_self is not None:
+    if self.__self__ is not None:
       # Is the instance dictionary defined?
-      memo_dict = getattr(self.im_self, MEMO_INSTANCE_VARIABLE, None)
+      memo_dict = getattr(self.__self__, MEMO_INSTANCE_VARIABLE, None)
       if memo_dict is None:
         memo_dict = {}
-        setattr(self.im_self, MEMO_INSTANCE_VARIABLE, memo_dict)
+        setattr(self.__self__, MEMO_INSTANCE_VARIABLE, memo_dict)
       return memo_dict
 
     # No instance dict; use our local 'memo_dict'.
@@ -98,14 +99,13 @@ class MemoizedFunction(object):
 
     This 'ignored' parameters are removed prior to generating the key.
     """
-    if self.im_self is not None:
+    if self.__self__ is not None:
       # We are bound to an instance; use None for args[0] ("self").
       args = (None,) + tuple(args)
 
     call_params = inspect.getcallargs(self.func, *args, **kwargs)
-    return tuple((k, v)
-                 for k, v in sorted(call_params.iteritems())
-                 if k not in self.ignore)
+    return tuple(
+        (k, v) for k, v in sorted(call_params.items()) if k not in self.ignore)
 
   def __call__(self, *args, **kwargs):
     """Retrieves the memoized function result.

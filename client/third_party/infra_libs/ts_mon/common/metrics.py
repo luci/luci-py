@@ -41,6 +41,7 @@ class Field(object):
             self.__dict__ == other.__dict__)
 
   def validate_value(self, metric_name, value):
+    # pylint: disable=isinstance-second-argument-not-valid-type
     if not isinstance(value, self.allowed_python_types):
       raise errors.MonitoringInvalidFieldTypeError(
           metric_name, self.name, value)

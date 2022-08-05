@@ -161,5 +161,5 @@ def _check_scopes(scopes):
   """Raises TypeError is list of scopes is malformed."""
   if not isinstance(scopes, (list, tuple)):
     raise TypeError('Scopes must be a list or a tuple')
-  if not all(isinstance(s, basestring) for s in scopes):
+  if not all(isinstance(s, str) for s in scopes):
     raise TypeError('Each scope must be a string')

@@ -1388,6 +1388,7 @@ class RunIsolatedJsonTest(RunIsolatedTestBase):
                 'upload': {
                     'items_cold': [15, 81],
                     'items_hot': None,
+                    'result': 'success'
                 },
             },
             'named_caches': {

@@ -23,7 +23,7 @@ import struct
 
 def _is_active(labels, percent):
   h = hashlib.md5()
-  for label, value in sorted(labels.iteritems()):
+  for label, value in sorted(labels.items()):
     h.update(label)
     h.update(value)
 

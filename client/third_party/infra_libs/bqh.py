@@ -49,7 +49,18 @@ def message_to_dict(msg):
     val = getattr(msg, f.name)
     if f.label == f.LABEL_REPEATED:
       if val:  # Omit empty arrays.
-        row[f.name] = [_to_bq_value(elem, f) for elem in val]
+        if hasattr(val, 'items'):  # it's a map<K, V>
+          # Get the synthesized key/value message type
+          synthDESC = f.message_type
+          row[f.name] = [
+            {
+              'key': _to_bq_value(key, synthDESC.fields_by_name['key']),
+              'value': _to_bq_value(value, synthDESC.fields_by_name['value']),
+            }
+            for key, value in sorted(val.items())
+          ]
+        else:
+          row[f.name] = [_to_bq_value(elem, f) for elem in val]
     else:
       bq_value = _to_bq_value(val, f)
       if bq_value is not None:  # Omit NULL values.
@@ -121,7 +132,7 @@ def send_rows(bq_client, dataset_id, table_id, rows, batch_size=_BATCH_DEFAULT):
 
 
 def _batch(rows, batch_size):
-  for i in xrange(0, len(rows), batch_size):
+  for i in range(0, len(rows), batch_size):
     yield rows[i:i + batch_size]
 
 

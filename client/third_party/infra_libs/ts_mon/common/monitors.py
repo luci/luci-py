@@ -9,6 +9,7 @@ import base64
 import httplib2
 import json
 import logging
+import six
 import socket
 import traceback
 
@@ -58,12 +59,17 @@ class GCECredentials(CredentialFactory):
 class AppengineCredentials(CredentialFactory):
   def create(self, scopes):  # pragma: no cover
     # This import doesn't work outside appengine, so delay it until it's used.
-    try: # pragma: no cover
-      from oauth2client import appengine
-    except ImportError: # pragma: no cover
-      # Try oauth2client 3.0.0 location.
-      from oauth2client.contrib import appengine
-    return appengine.AppAssertionCredentials(scopes)
+    if six.PY2:
+      try:  # pragma: no cover
+        from oauth2client import appengine
+      except ImportError:  # pragma: no cover
+        # Try oauth2client 3.0.0 location.
+        from oauth2client.contrib import appengine
+      return appengine.AppAssertionCredentials(scopes)
+    else:
+      import google.auth
+      credentials, _ = google.auth.default(scopes)
+      return credentials
 
 
 class FileCredentials(CredentialFactory):
@@ -90,7 +96,12 @@ class DelegateServiceAccountCredentials(CredentialFactory):
   def create(self, scopes):
     logging.info('Delegating to service account %s', self.service_account_email)
     http = httplib2_utils.InstrumentedHttp('actor-credentials')
-    http = self.base.create([self.IAM_SCOPE]).authorize(http)
+    credentials = self.base.create([self.IAM_SCOPE])
+    if hasattr(credentials, 'authorize'):
+      http = credentials.authorize(http)
+    else:  # pragma: no cover
+      import google_auth_httplib2
+      http = google_auth_httplib2.AuthorizedHttp(credentials, http=http)
     return httplib2_utils.DelegateServiceAccountCredentials(
         http, self.service_account_email, scopes)
 
@@ -136,7 +147,11 @@ class HttpsMonitor(Monitor):
       http = httplib2_utils.RetriableHttp(
           httplib2_utils.InstrumentedHttp('acq-mon-api', ca_certs=ca_certs),
           max_tries=2)
-    self._http = credentials.authorize(http)
+    if hasattr(credentials, 'authorize'):
+      self._http = credentials.authorize(http)
+    else:  # pragma: no cover
+      import google_auth_httplib2
+      self._http = google_auth_httplib2.AuthorizedHttp(credentials, http=http)
 
   def encode_to_json(self, metric_pb):
     return json.dumps({'payload': pb_to_popo.convert(metric_pb)})
