@@ -178,7 +178,7 @@ def oauth2_available_scopes(account='default'):
   metadata = get_metadata()
   if not metadata:
     return []
-  accounts = metadata['instance']['serviceAccounts']
+  accounts = metadata['instance'].get('serviceAccounts', {})
   return accounts.get(account, {}).get('scopes') or []
 
 
@@ -240,7 +240,10 @@ def get_image():
   """Returns the image used by the GCE VM."""
   # Format is projects/<id>/global/images/<image>
   metadata = get_metadata()
-  return metadata['instance']['image'].rsplit('/', 1)[-1]
+  image = metadata['instance'].get('image')
+  if not image:
+    return 'unknown'
+  return image.rsplit('/', 1)[-1]
 
 
 @tools.cached
@@ -248,7 +251,10 @@ def get_zone():
   """Returns the zone containing the GCE VM."""
   # Format is projects/<id>/zones/<zone>
   metadata = get_metadata()
-  return metadata['instance']['zone'].rsplit('/', 1)[-1]
+  zone = metadata['instance'].get('zone')
+  if not zone:
+    return 'unknown'
+  return zone.rsplit('/', 1)[-1]
 
 
 @tools.cached
@@ -282,7 +288,8 @@ def get_zones():
 def get_gcp():
   """Returns the string identifier of the GCE VM's Cloud Project."""
   metadata = get_metadata()
-  return [metadata['project']['projectId']]
+  project = metadata.get('project', {}).get('projectId')
+  return [project] if project else []
 
 
 @tools.cached
@@ -290,7 +297,10 @@ def get_machine_type():
   """Returns the GCE machine type."""
   # Format is projects/<id>/machineTypes/<machine_type>
   metadata = get_metadata()
-  return metadata['instance']['machineType'].rsplit('/', 1)[-1]
+  machine_type = metadata['instance'].get('machineType')
+  if not machine_type:
+    return 'unknown'
+  return machine_type.rsplit('/', 1)[-1]
 
 
 @tools.cached
@@ -299,7 +309,7 @@ def get_cpuinfo():
   metadata = get_metadata()
   if not metadata:
     return None
-  cpu_platform = metadata['instance']['cpuPlatform']
+  cpu_platform = metadata['instance'].get('cpuPlatform')
   if not cpu_platform:
     return None
   # Normalize according to the expected name as reported by the CPUID
@@ -330,4 +340,4 @@ def get_cpuinfo():
 @tools.cached
 def get_tags():
   """Returns a list of instance tags or empty list if not GCE VM."""
-  return get_metadata()['instance']['tags']
+  return get_metadata()['instance'].get('tags') or []
