@@ -820,10 +820,10 @@ class SwarmingBotService(remote.Service):
           maintenance_msg=events[0].maintenance_msg,
           task_id=events[0].task_id,
           last_seen_ts=events[0].ts)
-      # message_conversion.bot_info_to_rpc calls `is_dead`, `is_alive`. And
-      # Those properties require components to be calculated. The calculation
-      # is done in _pre_put_hook usually. But the BotInfo shouldn't be stored
-      # in this case, as it's already deleted.
+      # message_conversion.bot_info_to_rpc calls `is_dead` and this property
+      # require `composite` to be calculated. The calculation is done in
+      # _pre_put_hook usually. But the BotInfo shouldn't be stored in this case,
+      # as it's already deleted.
       bot.composite = bot._calc_composite()
       deleted = True
 

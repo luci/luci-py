@@ -59,6 +59,7 @@
 
 from collections import defaultdict
 import datetime
+import functools
 import hashlib
 import logging
 
@@ -268,25 +269,20 @@ class BotInfo(_BotCommon):
     return [
         self.IN_MAINTENANCE
         if self.maintenance_msg else self.NOT_IN_MAINTENANCE,
-        self.DEAD if self.should_be_dead else self.ALIVE,
+        self.DEAD if self._should_be_dead() else self.ALIVE,
         self.QUARANTINED if self.quarantined else self.HEALTHY,
         self.IDLE if self.idle_since_ts else self.BUSY,
     ]
 
-  @property
-  def should_be_dead(self):
-    # check if the last seen is over deadline
-    return self.last_seen_ts and self.last_seen_ts <= self._deadline()
+  def _should_be_dead(self, deadline=None):
+    if not self.last_seen_ts:
+      return False
+    return self.last_seen_ts <= (deadline or self._deadline())
 
   @property
   def is_dead(self):
     assert self.composite, 'Please store first'
     return self.DEAD in self.composite
-
-  @property
-  def is_alive(self):
-    assert self.composite, 'Please store first'
-    return self.ALIVE in self.composite
 
   def to_dict(self, exclude=None):
     out = super(BotInfo, self).to_dict(exclude=exclude)
@@ -314,21 +310,14 @@ class BotInfo(_BotCommon):
 
   @classmethod
   def yield_alive_bots(cls):
-    """Yields alive bots."""
-    return cls.query(cls.composite == cls.ALIVE)
-
-  @classmethod
-  def yield_should_be_dead_bot_keys(cls):
-    """Yields keys of bots that should be dead."""
-    q = cls.yield_alive_bots()
+    """Yields BotInfo of all alive bots."""
+    q = cls.query(cls.composite == cls.ALIVE)
     cursor = None
     more = True
     while more:
       bots, cursor, more = q.fetch_page(1000, start_cursor=cursor)
       for b in bots:
-        if not b.should_be_dead:
-          continue
-        yield b.key
+        yield b
 
   @staticmethod
   def _deadline():
@@ -778,34 +767,37 @@ def cron_update_bot_info():
   """Refreshes BotInfo.composite for dead bots."""
   @ndb.tasklet
   def run(bot_key):
-    # The query results that yielded the bot_key may have been stale
-    # or changes may have been made since the query so we want to
-    # bypass cache.
-    # crbug.com/1252454#c12, crbug.com/1247362#c19, crbug.com/1252454
-    bot = bot_key.get(use_memcache=False, use_cache=False)
+    bot = bot_key.get()
     if not bot:
       logging.debug('BotInfo %s deleted since query or query was stale',
                     bot_key)
       raise ndb.Return(None)
-    if bot.should_be_dead and bot.is_alive and not bot.is_dead:
-      # bot composite get updated in _pre_put_hook
-      yield bot.put_async()
+    if not bot.is_dead and bot._should_be_dead():
+      # `is_dead` is updated in _pre_put_hook based on should_be_dead.
       logging.info('Changing Bot status to DEAD: %s', bot.id)
+      yield bot.put_async()
       raise ndb.Return(bot)
     logging.debug('BotInfo changed since query or query was stale, %r', bot)
     raise ndb.Return(None)
 
+  # Note: tx_result can potentially block for a significant amount of time since
+  # it makes several datastore updates (including a transaction) in a blocking
+  # way.
   def tx_result(future, stats):
-    bot = future.get_result()
-    if not bot:
-      return
-
     try:
+      bot = future.get_result()
+      if not bot:
+        stats['stale'] += 1
+        return
+      stats['dead'] += 1
+
       # Unregister the bot from task queues since it can't reap anything.
       task_queues.cleanup_after_bot(bot.key.parent())
 
-      stats['dead'] += 1
-
+      # Note: this is best effort at this point. If it fails, there'll be no
+      # retry: the bot is already marked as dead. It is also a transaction over
+      # BotInfo entity, which we just mutated above, so it also has a higher
+      # chance to fail.
       logging.info('Sending bot_missing event: %s', bot.id)
       bot_event(
           event_type='bot_missing',
@@ -826,38 +818,64 @@ def cron_update_bot_info():
       logging.warning('Failed to commit a Tx')
       stats['failed'] += 1
 
-  # The assumption here is that a cron job can churn through all the entities
-  # fast enough. The number of dead bot is expected to be <10k. In practice the
-  # average runtime is around 8 seconds.
+  # The assumption here is that a cron job can visit all alive bots fast enough.
+  # The number of bots is expected to be up to ~30k. It takes about a minute to
+  # process them (assuming there's negligible amount of dead bots). See also
+  # cron.yaml `/internal/cron/monitoring/bots/update_bot_info` entry that
+  # depends on this timing.
   cron_stats = {
-      'dead': 0,
       'seen': 0,
+      'dead': 0,
       'failed': 0,
+      'stale': 0,
   }
 
+  # _deadline() hits the instance config cache. Do it only once here instead of
+  # several thousand times inside _should_be_dead() in the loop below.
+  deadline = BotInfo._deadline()
+
   futures = []
-  logging.debug('Updating dead bots...')
+  logging.debug('Finding dead based on deadline %s...', deadline)
   try:
-    for key in BotInfo.yield_should_be_dead_bot_keys():
+    for info in BotInfo.yield_alive_bots():
       cron_stats['seen'] += 1
-      # Retry more often than the default 1. We do not want to throw too much
-      # in the logs and there should be plenty of time to do the retries.
-      f = datastore_utils.transaction_async(lambda: run(key), retries=5)
-      futures.append(f)
-      if len(futures) < 5:
-        continue
-      ndb.Future.wait_any(futures)
-      for i in range(len(futures) - 1, -1, -1):
-        if futures[i].done():
-          f = futures.pop(i)
-          tx_result(f, cron_stats)
       if cron_stats['seen'] % 50 == 0:
-        logging.debug('Fetched %d bot keys', cron_stats['seen'])
+        logging.debug('Visited %d bots so far', cron_stats['seen'])
+
+      # We visit all alive bots and check if any should be marked as dead now.
+      # Note that an alternative would be to have an index on `last_seen_ts`,
+      # but this index turns out to be very hot (being update on every poll).
+      # See https://chromium.googlesource.com/infra/luci/luci-py/+/4e9aecba.
+      if info.is_dead or not info._should_be_dead(deadline):
+        continue
+
+      # Transactionally flip the state of the bot to DEAD. Retry more often than
+      # the default 1. We do not want to throw too much in the logs and there
+      # should be plenty of time to do the retries.
+      f = datastore_utils.transaction_async(functools.partial(run, info.key),
+                                            retries=5)
+      futures.append(f)
+
+      # Limit the number of concurrent transactions to avoid OOMs.
+      if len(futures) > 20:
+        ndb.Future.wait_any(futures)
+        pending = []
+        for f in futures:
+          if f.done():
+            tx_result(f, cron_stats)
+          else:
+            pending.append(f)
+        futures = pending
+
+    # Collect all remaining futures.
     for f in futures:
       tx_result(f, cron_stats)
+
   finally:
-    logging.debug('Seen %d bots, updated %d dead bots, failed %d tx',
-                  cron_stats['seen'], cron_stats['dead'], cron_stats['failed'])
+    logging.debug('Seen: %d, marked as dead: %d, stale: %d, failed: %d',
+                  cron_stats['seen'], cron_stats['dead'], cron_stats['stale'],
+                  cron_stats['failed'])
+
   return cron_stats['dead']
 
 

@@ -31,7 +31,7 @@ cron:
 
 - description: Update BotInfo.composite for dead bots.
   url: /internal/cron/monitoring/bots/update_bot_info
-  # BotInfo.yield_dead_bot_keys() takes 1+ minute to complete.
+  # BotInfo.yield_alive_bots() takes 1+ minute to complete.
   # Set enough interval to avoid running multiple jobs at the same time.
   schedule: every 3 minutes
   target: backend
