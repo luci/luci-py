@@ -839,7 +839,7 @@ def cron_update_bot_info():
   try:
     for info in BotInfo.yield_alive_bots():
       cron_stats['seen'] += 1
-      if cron_stats['seen'] % 50 == 0:
+      if cron_stats['seen'] % 500 == 0:
         logging.debug('Visited %d bots so far', cron_stats['seen'])
 
       # We visit all alive bots and check if any should be marked as dead now.
