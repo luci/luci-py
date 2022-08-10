@@ -120,6 +120,12 @@ class TestCPUInfo(auto_stub.TestCase):
     self.mock(linux, '_read_cpuinfo', lambda: text)
     return linux.get_cpuinfo()
 
+  def test_get_cpuinfo_empty(self):
+    self.assertEqual({}, self.get_cpuinfo(''))
+
+  def test_get_cpuinfo_empty(self):
+    self.assertEqual({'vendor': 'N/A'}, self.get_cpuinfo('foo: bar'))
+
   def test_get_cpuinfo_exynos(self):
     self.assertEqual(
         {

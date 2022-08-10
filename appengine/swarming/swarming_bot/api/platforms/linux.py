@@ -206,14 +206,16 @@ def get_cpuinfo():
     # MIPS.
     cpu_info['flags'] = values['isa']
     cpu_info['name'] = values['cpu model']
-  else:
+  elif values:
     # CPU implementer == 0x41 means ARM.
-    cpu_info['flags'] = values['Features']
-    cpu_info['model'] = (
-        int(values['CPU variant'], 0),
-        int(values['CPU part'], 0),
-        int(values['CPU revision']),
-    )
+    if 'Features' in values:
+      cpu_info['flags'] = values['Features']
+    if 'CPU variant' in values:
+      cpu_info['model'] = (
+          int(values['CPU variant'], 0),
+          int(values.get('CPU part', 0), 0),
+          int(values.get('CPU revision', 0)),
+      )
     # ARM CPUs have a serial number embedded. Intel did try on the Pentium III
     # but gave up after backlash;
     # http://www.wired.com/1999/01/intel-on-privacy-whoops/
