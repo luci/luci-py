@@ -64,6 +64,13 @@ _scheduler_bucketer = gae_ts_mon.GeometricBucketer(growth_factor=10**0.01,
                                                    num_finite_buckets=600,
                                                    scale=100)
 
+# Custom bucketer with 2% resolution in the range of 100ms...100000s. Used for
+# task dead detection latency.
+# cron job runs every 60s, but can also fail for a few hours.
+_detection_bucketer = gae_ts_mon.GeometricBucketer(growth_factor=10**0.01,
+                                                   num_finite_buckets=600,
+                                                   scale=100)
+
 # Regular (instance-local) metrics: jobs/completed and jobs/durations.
 # Both have the following metric fields:
 # - project_id: e.g. 'chromium'.
@@ -264,6 +271,22 @@ _task_state_change_pubsub_notify_latencies = \
         gae_ts_mon.IntegerField('http_status_code')
     ],
     bucketer=_pubsub_bucketer,
+)
+
+# Instance metric. Measures the latency for Swarming to recognise a task
+# death (KILLED or BOT_DIED) and commit the state to storage.
+# Metric fields:
+# - pool: e.g. 'skia'.
+# - cron: e.g. True if dead task was initiated by cron job, False otherwise
+_dead_task_detection_latencies = \
+  gae_ts_mon.CumulativeDistributionMetric(
+    'swarming/tasks/dead_task_detection_latencies',
+    'Latency (in ms) of task scheduling request',
+    [
+        gae_ts_mon.StringField('pool'),
+        gae_ts_mon.BooleanField('cron'),
+    ],
+    bucketer=_detection_bucketer,
 )
 
 # Instance metric. Metric fields:
@@ -472,6 +495,20 @@ def _tags_to_dict(tags):
   return tags_dict
 
 
+def _extract_given_job_fields(tags, tag_names):
+  """Extracts job metric fields given by tag name from TaskResultSummary.
+
+  Args:
+    tags: list of tags.
+    tags_names: list of tag names to extract.
+  """
+  tags_dict = _tags_to_dict(tags)
+  fields = {}
+  for tag in tag_names:
+    fields[tag] = tags_dict.get(tag, '')
+  return fields
+
+
 def _extract_job_fields(tags_dict):
   """Extracts common job's metric fields from TaskResultSummary.
 
@@ -493,22 +530,7 @@ def _extract_job_fields(tags_dict):
   return fields
 
 
-def _extract_pubsub_job_fields(tags_dict, status):
-  """Extracts common job metric fields from TaskResultSummary for pubsub
-     metrics.
-
-  Args:
-    tags_dict: tags dictionary.
-    status: A task_result.State
-  """
-  fields = {
-      'pool': tags_dict.get('pool', ''),
-      'status': task_result.State.to_string(status)
-  }
-  return fields
-
 ### Public API.
-
 
 def on_task_requested(summary, deduped):
   """When a task is created."""
@@ -572,7 +594,10 @@ def set_global_metrics(kind, payload=None):
 
 def on_task_status_change_pubsub_latency(tags, state, http_status_code,
                                          latency):
-  fields = _extract_pubsub_job_fields(_tags_to_dict(tags), state)
+  fields = _extract_given_job_fields(tags, [
+      'pool',
+  ])
+  fields['status'] = task_result.State.to_string(state)
   fields['http_status_code'] = http_status_code
   logging.debug('Incrementing ts_mon PubSub notification count with fields=%s',
                 fields)
@@ -580,12 +605,23 @@ def on_task_status_change_pubsub_latency(tags, state, http_status_code,
 
 
 def on_task_status_change_scheduler_latency(summary):
-  fields = _extract_pubsub_job_fields(_tags_to_dict(summary.tags),
-                                      summary.state)
+  fields = _extract_given_job_fields(summary.tags, [
+      'pool',
+  ])
+  fields['status'] = task_result.State.to_string(summary.state)
   latency = summary.pending_now(utils.utcnow())
   _task_state_change_schedule_latencies.add(round(latency.total_seconds() *
                                                   1000),
                                             fields=fields)
+
+
+def on_dead_task_detection_latency(tags, latency, cron):
+  fields = _extract_given_job_fields(tags, [
+      'pool',
+  ])
+  fields['cron'] = cron
+  _dead_task_detection_latencies.add(round(latency.total_seconds() * 1000),
+                                     fields=fields)
 
 
 def initialize():

@@ -1904,7 +1904,9 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(1, len(pub_sub_calls))  # PENDING -> RUNNING
 
     self.assertEqual(
-        None, task_scheduler.bot_terminate_task(run_result.key, 'localhost'))
+        None,
+        task_scheduler.bot_terminate_task(run_result.key, 'localhost',
+                                          self.now))
     expected = self._gen_result_summary_reaped(
         abandoned_ts=self.now,
         completed_ts=self.now,
@@ -1933,13 +1935,15 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     pub_sub_calls = self.mock_pub_sub()
     run_result = self._quick_reap(1, 0, pubsub_topic='projects/abc/topics/def')
     self.assertEqual(1, len(pub_sub_calls))  # PENDING -> RUNNING
+    start_time = utils.milliseconds_since_epoch() - 100
 
     # cancel task
     self._cancel_running_task(run_result)
     self.assertEqual(2, len(pub_sub_calls))  # RUNNING -> killing
 
     # execute termination task
-    err = task_scheduler.bot_terminate_task(run_result.key, 'localhost')
+    err = task_scheduler.bot_terminate_task(run_result.key, 'localhost',
+                                            start_time)
 
     self.assertEqual(None, err)
 
@@ -1980,13 +1984,19 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         0,
         ts_mon_metrics._task_state_change_pubsub_notify_latencies.get(
             fields=_get_fields(status=status, http_status_code=200)).sum)
+    self.assertLessEqual(
+        0,
+        ts_mon_metrics._dead_task_detection_latencies.get(fields={
+            'pool': 'default',
+            'cron': False,
+        }).sum)
 
   def test_bot_terminate_task_wrong_bot(self):
     run_result = self._quick_reap(1, 0)
     expected = (
         'Bot bot1 sent task kill for task 1d69b9f088008911 owned by bot '
         'localhost')
-    err = task_scheduler.bot_terminate_task(run_result.key, 'bot1')
+    err = task_scheduler.bot_terminate_task(run_result.key, 'bot1', 0)
     self.assertEqual(expected, err)
 
   def test_cancel_task(self):
@@ -2530,6 +2540,12 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         internal_failure=True,
         modified_ts=now_1,
         state=State.BOT_DIED)
+    self.assertLessEqual(
+        0,
+        ts_mon_metrics._dead_task_detection_latencies.get(fields={
+            'pool': 'default',
+            'cron': True,
+        }).sum)
     self.assertEqual(expected, run_result.key.get().to_dict())
 
     self.assertEqual(0, self.execute_tasks())
@@ -2570,7 +2586,13 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertLessEqual(
         0,
         ts_mon_metrics._task_state_change_pubsub_notify_latencies.get(
-            fields=_get_fields(status=status, http_status_code=200)).sum)
+            fields=_get_fields(status=status, http_status_code=200)))
+    self.assertLessEqual(
+        0,
+        ts_mon_metrics._dead_task_detection_latencies.get(fields={
+            'pool': 'default',
+            'cron': True,
+        }).sum)
 
     # Refresh and compare:
     expected = self._gen_result_summary_reaped(
@@ -2711,7 +2733,12 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         state=State.BOT_DIED,
         try_number=1)
     self.assertEqual(expected, run_result.result_summary_key.get().to_dict())
-
+    self.assertLessEqual(
+        0,
+        ts_mon_metrics._dead_task_detection_latencies.get(fields={
+            'pool': 'default',
+            'cron': True,
+        }).sum)
     # Task was retried but the same bot polls again, it's denied the task.
     now_2 = self.mock_now(
         self.now + datetime.timedelta(seconds=request.bot_ping_tolerance_secs),
@@ -2767,6 +2794,12 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(
         task_result.State.to_string(task_result.State.KILLED),
         task_result.State.to_string(run_result.state))
+    self.assertLessEqual(
+        0,
+        ts_mon_metrics._dead_task_detection_latencies.get(fields={
+            'pool': 'default',
+            'cron': True,
+        }).sum)
 
   def test_cron_handle_external_cancellations(self):
     es_address = 'externalscheduler_address'

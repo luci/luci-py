@@ -1339,6 +1339,7 @@ class BotTaskErrorHandler(_BotApiHandler):
 
   @auth.public  # auth happens in bot_auth.validate_bot_id_and_fetch_config
   def post(self, task_id=None):
+    start_time = utils.utcnow()
     request = self.parse_body()
     # TODO(crbug.com/1015701): take from X-Luci-Swarming-Bot-ID header.
     bot_id = request.get('id')
@@ -1376,7 +1377,7 @@ class BotTaskErrorHandler(_BotApiHandler):
       self.abort_with_error(400, error=msg)
 
     msg = task_scheduler.bot_terminate_task(
-        task_pack.unpack_run_result_key(task_id), bot_id)
+        task_pack.unpack_run_result_key(task_id), bot_id, start_time)
     if msg:
       logging.error(msg)
       self.abort_with_error(400, error=msg)
