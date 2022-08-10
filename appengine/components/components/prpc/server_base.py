@@ -12,7 +12,6 @@ https://github.com/grpc/grpc/tree/master/src/python/grpcio/grpc
 
 import collections
 import logging
-import httplib
 
 from google.protobuf import symbol_database
 
@@ -50,25 +49,6 @@ class ServerBase(object):
   Server is intended to vaguely mimic gRPC's Server as an abstraction, but
   provides a simpler interface via add_service and get_routes.
   """
-
-  # pylint: disable=pointless-string-statement
-
-  _PRPC_TO_HTTP_STATUS = {
-      StatusCode.OK: httplib.OK,
-      StatusCode.CANCELLED: httplib.NO_CONTENT,
-      StatusCode.INVALID_ARGUMENT: httplib.BAD_REQUEST,
-      StatusCode.DEADLINE_EXCEEDED: httplib.SERVICE_UNAVAILABLE,
-      StatusCode.NOT_FOUND: httplib.NOT_FOUND,
-      StatusCode.ALREADY_EXISTS: httplib.CONFLICT,
-      StatusCode.PERMISSION_DENIED: httplib.FORBIDDEN,
-      StatusCode.RESOURCE_EXHAUSTED: httplib.SERVICE_UNAVAILABLE,
-      StatusCode.FAILED_PRECONDITION: httplib.PRECONDITION_FAILED,
-      StatusCode.OUT_OF_RANGE: httplib.BAD_REQUEST,
-      StatusCode.UNIMPLEMENTED: httplib.NOT_IMPLEMENTED,
-      StatusCode.INTERNAL: httplib.INTERNAL_SERVER_ERROR,
-      StatusCode.UNAVAILABLE: httplib.SERVICE_UNAVAILABLE,
-      StatusCode.UNAUTHENTICATED: httplib.UNAUTHORIZED,
-  }
 
   def __init__(self, allow_cors=True, allowed_origins=None):
     """Initializes a new Server.
@@ -309,8 +289,9 @@ class ServerBase(object):
       response.headers['Access-Control-Allow-Origin'] = origin
       response.headers['Vary'] = 'Origin'
       response.headers['Access-Control-Allow-Credentials'] = 'true'
-    self._response_body_and_status_writer(
-        response, status=self._PRPC_TO_HTTP_STATUS[context._code])
+    self._response_body_and_status_writer(response,
+                                          status=StatusCode.to_http_code(
+                                              context._code))
     response.headers['X-Prpc-Grpc-Code'] = str(context._code.value)
     response.headers['Access-Control-Expose-Headers'] = ('X-Prpc-Grpc-Code')
     response.headers['X-Content-Type-Options'] = 'nosniff'
