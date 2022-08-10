@@ -442,9 +442,9 @@ class BotManagementTest(test_case.TestCase):
     self.assertEqual(bot_info_key.get().dimensions_flat,
                      [u'id:id1', u'pool:default'])
 
-    # 'bot_hook_log' event does not register dimensions other than id and pool.
+    # 'bot_error' event does not register dimensions other than id and pool.
     _bot_event(
-        bot_id=bot_id, event_type='bot_hook_log', dimensions=dimensions_invalid)
+        bot_id=bot_id, event_type='bot_error', dimensions=dimensions_invalid)
     self.assertEqual(bot_info_key.get().dimensions_flat,
                      [u'id:id1', u'pool:default'])
 

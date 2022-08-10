@@ -1402,7 +1402,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
 
   def test_bot_event_bad_request(self):
     params = self.do_handshake()
-    params['event'] = 'bot_log'
+    params['event'] = 'bot_error'
     params['message'] = 'I have an invalid maintenance message.'
     params['state']['maintenance'] = True  # non-string maintenance message.
     self.post_json('/swarming/api/v1/bot/event', params, status=400)

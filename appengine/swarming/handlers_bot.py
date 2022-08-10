@@ -856,7 +856,7 @@ class BotEventHandler(_BotBaseHandler):
 
   EXPECTED_KEYS = _BotBaseHandler.EXPECTED_KEYS | {u'event', u'message'}
 
-  ALLOWED_EVENTS = ('bot_error', 'bot_log', 'bot_rebooting', 'bot_shutdown')
+  ALLOWED_EVENTS = ('bot_error', 'bot_rebooting', 'bot_shutdown')
 
   @auth.public  # auth happens in self._process()
   def post(self):

@@ -335,24 +335,15 @@ class BotEvent(_BotCommon):
   """
   _MAPPING = {
       'bot_connected': swarming_pb2.BOT_NEW_SESSION,
-      'bot_internal_failure': swarming_pb2.BOT_INTERNAL_FAILURE,
-      'bot_hook_error': swarming_pb2.BOT_HOOK_ERROR,
-      'bot_hook_log': swarming_pb2.BOT_HOOK_LOG,
-      # Historically ambiguous. It used to be both bot_internal_failure and
-      # bot_hook_error.
       'bot_error': swarming_pb2.BOT_HOOK_ERROR,
-      # Historical misnaming. This is equivalent to bot_hook_log.
-      'bot_log': swarming_pb2.BOT_HOOK_LOG,
-      # TODO(maruel): Add definition if desired.
-      'bot_leased': None,
-      # Historical misnaming.
+      'bot_missing': swarming_pb2.BOT_MISSING,
       'bot_rebooting': swarming_pb2.BOT_REBOOTING_HOST,
       'bot_shutdown': swarming_pb2.BOT_SHUTDOWN,
-      # Historical misnaming.
       'bot_terminate': swarming_pb2.INSTRUCT_TERMINATE_BOT,
-      'bot_missing': swarming_pb2.BOT_MISSING,
+
       'request_restart': swarming_pb2.INSTRUCT_RESTART_BOT,
-      # Shall only be sorted when there is a significant difference in the bot
+
+      # Shall only be stored when there is a significant difference in the bot
       # state versus the previous event.
       'request_sleep': swarming_pb2.INSTRUCT_IDLE,
       'request_task': swarming_pb2.INSTRUCT_START_TASK,
@@ -360,6 +351,7 @@ class BotEvent(_BotCommon):
       'task_completed': swarming_pb2.TASK_COMPLETED,
       'task_error': swarming_pb2.TASK_INTERNAL_FAILURE,
       'task_killed': swarming_pb2.TASK_KILLED,
+
       # This value is not registered in the API.
       'task_update': None
   }
@@ -367,16 +359,7 @@ class BotEvent(_BotCommon):
   ALLOWED_EVENTS = {
       # Bot specific events that are outside the scope of a task:
       'bot_connected',
-      # Deprecated. Use bot_hook_error or bot_internal_failure.
-      # TODO(maruel): Remove 2020-01-01.
       'bot_error',
-      'bot_internal_failure',
-      'bot_hook_error',
-      'bot_hook_log',
-      'bot_leased',
-      # Deprecated. Use bot_hook_log.
-      # TODO(maruel): Remove 2020-01-01.
-      'bot_log',
       'bot_missing',
       'bot_rebooting',
       'bot_shutdown',
@@ -423,7 +406,6 @@ class BotEvent(_BotCommon):
       out.event_time.FromDatetime(self.ts)
     # Populates out.bot with _BotCommon.
     _BotCommon.to_proto(self, out.bot)
-    # https://crbug.com/905087: BOT_DELETED
     e = self._MAPPING.get(self.event_type)
     if e:
       out.event = e
@@ -586,6 +568,7 @@ def bot_event(
   Returns:
     ndb.Key to BotEvent entity if one was added.
   """
+  assert event_type in BotEvent.ALLOWED_EVENTS, event_type
   if not bot_id:
     return
 
