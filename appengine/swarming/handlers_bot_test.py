@@ -1607,6 +1607,10 @@ class BotApiTest(test_env_handlers.AppTestBase):
         'id': params['dimensions']['id'][0],
         'message': 'Oh',
         'task_id': task_id,
+        'client_error': {
+            'missing_cas': None,
+            'missing_cipd': [],
+        },
     }
     self.post_json('/swarming/api/v1/bot/task_error', params)
 

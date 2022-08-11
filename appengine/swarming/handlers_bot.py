@@ -1335,7 +1335,7 @@ class BotTaskErrorHandler(_BotApiHandler):
   This can be used by bot_main.py to kill the task when task_runner misbehaved.
   """
 
-  EXPECTED_KEYS = {u'id', u'message', u'task_id'}
+  EXPECTED_KEYS = {u'id', u'message', u'task_id', u'client_error'}
 
   @auth.public  # auth happens in bot_auth.validate_bot_id_and_fetch_config
   def post(self, task_id=None):
@@ -1345,6 +1345,7 @@ class BotTaskErrorHandler(_BotApiHandler):
     bot_id = request.get('id')
     task_id = request.get('task_id', '')
     message = request.get('message', 'unknown')
+    # TODO(b/239491333): handle missing_cas and missing_cipd cases.
 
     # Make sure bot self-reported ID matches the authentication token. Raises
     # auth.AuthorizationError if not.
@@ -1373,8 +1374,10 @@ class BotTaskErrorHandler(_BotApiHandler):
 
     msg = log_unexpected_keys(self.EXPECTED_KEYS, request, self.request, 'bot',
                               'keys')
-    if msg:
-      self.abort_with_error(400, error=msg)
+
+    # TODO(b/239491333): re-enable once all bot_code has propagated completely
+    #if msg:
+    #  self.abort_with_error(400, error=msg)
 
     msg = task_scheduler.bot_terminate_task(
         task_pack.unpack_run_result_key(task_id), bot_id, start_time)

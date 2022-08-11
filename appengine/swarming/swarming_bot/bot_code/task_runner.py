@@ -651,6 +651,8 @@ def run_command(remote, task_details, work_dir, cost_usd_hour,
     exit_code = None
     had_io_timeout = False
     must_signal_internal_failure = None
+    missing_cas = None
+    missing_cipd = []
     term_sent = False
     kill_sent = False
     timed_out = None
@@ -750,47 +752,53 @@ def run_command(remote, task_details, work_dir, cost_usd_hour,
         logging.debug('run_isolated:\n%s', run_isolated_result)
         # TODO(maruel): Grab statistics (cache hit rate, data downloaded,
         # mapping time, etc) from run_isolated and push them to the server.
-        if run_isolated_result['cas_output_root']:
-          params['cas_output_root'] = run_isolated_result['cas_output_root']
-        had_hard_timeout = run_isolated_result['had_hard_timeout']
-        if not had_io_timeout and not had_hard_timeout:
-          if run_isolated_result['internal_failure']:
-            must_signal_internal_failure = (
-                run_isolated_result['internal_failure'])
-            logging.error('%s', must_signal_internal_failure)
-          elif exit_code:
-            # TODO(maruel): Grab stdout from run_isolated.
-            must_signal_internal_failure = (
-                'run_isolated internal failure %d' % exit_code)
-            logging.error('%s', must_signal_internal_failure)
-        exit_code = run_isolated_result['exit_code']
-        params['bot_overhead'] = 0.
-        if run_isolated_result.get('duration') is not None:
-          # Store the real task duration as measured by run_isolated and
-          # calculate the total overhead.
-          params['duration'] = run_isolated_result['duration']
-          params['bot_overhead'] = duration - run_isolated_result['duration']
-          if params['bot_overhead'] < 0:
-            params['bot_overhead'] = 0
-        run_isolated_stats = run_isolated_result.get('stats', {})
-        isolated_stats = run_isolated_stats.get('isolated')
-        if isolated_stats:
-          params['isolated_stats'] = isolated_stats
-        cipd_stats = run_isolated_stats.get('cipd')
-        if cipd_stats:
-          params['cipd_stats'] = cipd_stats
-        cipd_pins = run_isolated_result.get('cipd_pins')
-        if cipd_pins:
-          params['cipd_pins'] = cipd_pins
-        named_caches_stats = run_isolated_stats.get('named_caches')
-        if named_caches_stats:
-          params['named_caches_stats'] = named_caches_stats
-        cache_trim_stats = run_isolated_stats.get('trim_caches')
-        if cache_trim_stats:
-          params['cache_trim_stats'] = cache_trim_stats
-        cleanup_stats = run_isolated_stats.get('cleanup')
-        if cleanup_stats:
-          params['cleanup_stats'] = cleanup_stats
+        missing_cas = run_isolated_result.get('missing_cas')
+        missing_cipd = run_isolated_result.get('missing_cipd', [])
+        if missing_cipd or missing_cas:
+          must_signal_internal_failure = run_isolated_result['internal_failure']
+        else:
+          if run_isolated_result['cas_output_root']:
+            params['cas_output_root'] = run_isolated_result['cas_output_root']
+          had_hard_timeout = run_isolated_result['had_hard_timeout']
+          if not had_io_timeout and not had_hard_timeout:
+            if run_isolated_result['internal_failure']:
+              must_signal_internal_failure = (
+                  run_isolated_result['internal_failure'])
+              logging.error('%s', must_signal_internal_failure)
+            elif exit_code:
+              # TODO(maruel): Grab stdout from run_isolated.
+              must_signal_internal_failure = (
+                  'run_isolated internal failure %d' % exit_code)
+              logging.error('%s', must_signal_internal_failure)
+          exit_code = run_isolated_result['exit_code']
+          params['bot_overhead'] = 0.
+          if run_isolated_result.get('duration') is not None:
+            # Store the real task duration as measured by run_isolated and
+            # calculate the total overhead.
+            params['duration'] = run_isolated_result['duration']
+            params['bot_overhead'] = duration - run_isolated_result['duration']
+            if params['bot_overhead'] < 0:
+              params['bot_overhead'] = 0
+
+          run_isolated_stats = run_isolated_result.get('stats', {})
+          isolated_stats = run_isolated_stats.get('isolated')
+          if isolated_stats:
+            params['isolated_stats'] = isolated_stats
+          cipd_stats = run_isolated_stats.get('cipd')
+          if cipd_stats:
+            params['cipd_stats'] = cipd_stats
+          cipd_pins = run_isolated_result.get('cipd_pins')
+          if cipd_pins:
+            params['cipd_pins'] = cipd_pins
+          named_caches_stats = run_isolated_stats.get('named_caches')
+          if named_caches_stats:
+            params['named_caches_stats'] = named_caches_stats
+          cache_trim_stats = run_isolated_stats.get('trim_caches')
+          if cache_trim_stats:
+            params['cache_trim_stats'] = cache_trim_stats
+          cleanup_stats = run_isolated_stats.get('cleanup')
+          if cleanup_stats:
+            params['cleanup_stats'] = cleanup_stats
     except (IOError, OSError, ValueError) as e:
       logging.error('Swallowing error: %s', e)
       if not must_signal_internal_failure:
@@ -832,7 +840,9 @@ def run_command(remote, task_details, work_dir, cost_usd_hour,
                     'params: %s.', task_details.task_id, exit_code, params)
       if must_signal_internal_failure:
         remote.post_task_error(task_details.task_id,
-                               must_signal_internal_failure)
+                               must_signal_internal_failure,
+                               missing_cas=missing_cas,
+                               missing_cipd=missing_cipd)
         # Clear out this error as we've posted it now (we already cleared out
         # exit_code above). Note: another error could arise after this point,
         # which is fine, since bot_main.py will post it).

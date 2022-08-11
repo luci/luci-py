@@ -462,6 +462,105 @@ class TestTaskRunner(TestTaskRunnerBase):
     # Now look at the updates sent by the bot as seen by the server.
     self.expectTask(task_details.task_id, exit_code=1)
 
+  def test_run_command_bad_cas(self):
+    task_details = get_task_details()
+    # Mock running run_isolated with a script that outputs 'missing_cas' field
+    SCRIPT_ISOLATED = (
+        'import json, sys;\n'
+        'args = []\n'
+        'if len(sys.argv) != 3 or sys.argv[1] != \'-a\':\n'
+        '  raise Exception(sys.argv)\n'
+        'with open(sys.argv[2], \'r\') as argsfile:\n'
+        '  args = json.loads(argsfile.read())\n'
+        'if len(args) != 1:\n'
+        '  raise Exception(args);\n'
+        'with open(args[0], \'w\') as f:\n'
+        '  json.dump({\n'
+        '    \'exit_code\': 1,\n'
+        '    \'had_hard_timeout\': False,\n'
+        '    \'internal_failure\': \'Invalid CAS blahblahblah\',\n'
+        '    \'missing_cas\': {\n'
+        '       \'digest\': \'blahblahblah\',\n'
+        '       \'instance\': \'some_instance\'\n'
+        '    },\n'
+        '  }, f)\n'
+        'sys.stdout.write(\'hi\\n\')')
+    self.mock(task_runner, 'get_run_isolated', lambda:
+              [sys.executable, '-u', '-c', SCRIPT_ISOLATED])
+    self.mock(
+        task_runner, 'get_isolated_args', lambda work_dir, details,
+        isolated_result, bot_file, run_isolated_flags: [isolated_result])
+
+    self._run_command(task_details)
+    # Verify the correct error was posted.
+    errors = self.server.get_task_errors()
+    expected = {
+        task_details.task_id: [{
+            'message': 'Invalid CAS blahblahblah',
+            'id': 'localhost',
+            'task_id': task_details.task_id,
+            'client_error': {
+                'missing_cas': {
+                    'digest': 'blahblahblah',
+                    'instance': 'some_instance'
+                },
+                'missing_cipd': [],
+            }
+        }],
+    }
+    self.assertEqual(expected, errors)
+
+  def test_run_command_bad_cipd(self):
+    task_details = get_task_details()
+    # Mock running run_isolated with a script that outputs 'missing_cipd' field
+    SCRIPT_ISOLATED = (
+        'import json, sys;\n'
+        'args = []\n'
+        'if len(sys.argv) != 3 or sys.argv[1] != \'-a\':\n'
+        '  raise Exception(sys.argv)\n'
+        'with open(sys.argv[2], \'r\') as argsfile:\n'
+        '  args = json.loads(argsfile.read())\n'
+        'if len(args) != 1:\n'
+        '  raise Exception(args);\n'
+        'with open(args[0], \'w\') as f:\n'
+        '  json.dump({\n'
+        '    \'exit_code\': 1,\n'
+        '    \'had_hard_timeout\': False,\n'
+        '    \'internal_failure\': \'Invalid CIPD blahblahblah\',\n'
+        '    \'missing_cipd\': [{\n'
+        '       \'package_name\': \'blahblahblah\',\n'
+        '       \'version\': \'abcd1234\',\n'
+        '       \'path\': \'not/found/here\'\n'
+        '     }],\n'
+        '  }, f)\n'
+        'sys.stdout.write(\'hi\\n\')')
+    self.mock(task_runner, 'get_run_isolated', lambda:
+              [sys.executable, '-u', '-c', SCRIPT_ISOLATED])
+    self.mock(
+        task_runner, 'get_isolated_args', lambda work_dir, details,
+        isolated_result, bot_file, run_isolated_flags: [isolated_result])
+
+    self._run_command(task_details)
+    # Verify the correct error was posted.
+    errors = self.server.get_task_errors()
+    expected = {
+        task_details.task_id: [{
+            'message': 'Invalid CIPD blahblahblah',
+            'id': 'localhost',
+            'task_id': task_details.task_id,
+            'client_error': {
+                'missing_cipd': [{
+                    'package_name': 'blahblahblah',
+                    'version': 'abcd1234',
+                    'path': 'not/found/here'
+                }],
+                'missing_cas':
+                None,
+            },
+        }],
+    }
+    self.assertEqual(expected, errors)
+
   def test_run_command_os_error(self):
     task_details = get_task_details(
         command=[
@@ -1212,12 +1311,15 @@ class TestTaskRunnerKilled(TestTaskRunnerBase):
     expected = {
         manifest['task_id']: [{
             'message':
-                'task_runner received signal %d' %
-                task_runner.SIG_BREAK_OR_TERM,
+            'task_runner received signal %d' % task_runner.SIG_BREAK_OR_TERM,
+            'client_error': {
+                'missing_cas': None,
+                'missing_cipd': [],
+            },
             'id':
-                'localhost',
+            'localhost',
             'task_id':
-                manifest['task_id'],
+            manifest['task_id'],
         }],
     }
     self.assertEqual(expected, errors)

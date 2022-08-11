@@ -291,13 +291,22 @@ class RemoteClientNative(object):
           resp.get('error') if resp else 'Failed to contact server')
     return not resp.get('must_stop', False)
 
-  def post_task_error(self, task_id, message):
+  def post_task_error(self,
+                      task_id,
+                      message,
+                      missing_cas=None,
+                      missing_cipd=None):
     """Logs task-specific info to the server"""
     data = {
         'id': self.bot_id,
         'message': message,
         'task_id': task_id,
+        'client_error': {
+            'missing_cas': missing_cas,
+            'missing_cipd': missing_cipd or [],
+        },
     }
+
     resp = self._url_read_json(
         '/swarming/api/v1/bot/task_error/%s' % task_id,
         data=data)

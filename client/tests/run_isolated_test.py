@@ -986,6 +986,124 @@ class RunIsolatedTestRun(RunIsolatedTestBase):
       self.assertEqual(f.read(), b'bar')
 
 
+class RunIsolatedTestCase(RunIsolatedTestRun):
+  def test_bad_cas_json_output(self):
+    def dump_bad_json(cmd, _):
+      json_path = cmd[cmd.index('-dump-json') + 1]
+      with open(json_path, 'w') as fp:
+        fp.write("{i[]nv[[]alid js{}on")
+
+    digest = self._server.archive_files(
+        {'cmd.py': b'import sys\n'
+         b'open(sys.argv[1], "w").write("bar")\n'})
+
+    self.mock(run_isolated, "_run_go_cmd_and_wait", dump_bad_json)
+
+    data = run_isolated.TaskData(
+        command=['python3', 'cmd.py', '${ISOLATED_OUTDIR}/foo'],
+        relative_cwd=None,
+        cas_instance="some_instance",
+        cas_digest=digest,
+        outputs=None,
+        install_named_caches=init_named_caches_stub,
+        leak_temp_dir=False,
+        root_dir=self.tempdir,
+        hard_timeout=60,
+        grace_period=30,
+        bot_file=None,
+        switch_to_account=False,
+        install_packages_fn=run_isolated.copy_local_packages,
+        cas_cache_dir='',
+        cas_cache_policies=local_caching.CachePolicies(0, 0, 0, 0),
+        cas_kvs=None,
+        env={},
+        env_prefix={},
+        lower_priority=False,
+        containment=None,
+        trim_caches_fn=trim_caches_stub)
+
+    result_json = os.path.join(self.tempdir, 'result.json')
+    run_isolated.run_tha_test(data, result_json)
+    with open(result_json) as f:
+      result = json.load(f)
+    # Don't care the exact error, so long as its not reported as a missing_cas
+    self.assertTrue(result.get('internal_failure'))
+    self.assertIsNone(result.get('missing_cas'))
+
+  def test_bad_cas_digest(self):
+    digest = "notvaliddigest"
+    os.environ['RUN_ISOLATED_CAS_ADDRESS'] = self._server.address
+    data = run_isolated.TaskData(
+        command=['python3', 'cmd.py', '${ISOLATED_OUTDIR}/foo'],
+        relative_cwd=None,
+        cas_instance="some_instance",
+        cas_digest=digest,
+        outputs=None,
+        install_named_caches=init_named_caches_stub,
+        leak_temp_dir=False,
+        root_dir=self.tempdir,
+        hard_timeout=60,
+        grace_period=30,
+        bot_file=None,
+        switch_to_account=False,
+        install_packages_fn=run_isolated.copy_local_packages,
+        cas_cache_dir='',
+        cas_cache_policies=local_caching.CachePolicies(0, 0, 0, 0),
+        cas_kvs='',
+        env={},
+        env_prefix={},
+        lower_priority=False,
+        containment=None,
+        trim_caches_fn=trim_caches_stub)
+
+    result_json = os.path.join(self.tempdir, 'result.json')
+    ret = run_isolated.run_tha_test(data, result_json)
+    with open(result_json) as f:
+      result = json.load(f)
+    self.assertEqual(1, ret)
+    self.assertEqual(digest, result['missing_cas']['digest'])
+    self.assertEqual('some_instance', result['missing_cas']['instance'])
+
+  def test_bad_cipd_package(self):
+    def emulate_bad_cipd(_run_dir, cas_dir, _nsjail_dir):
+      raise run_isolated.NonRetriableCipdException("missing_cipd",
+                                                   "foo_package",
+                                                   "not/found/foo", "deadbeef")
+
+    data = run_isolated.TaskData(
+        command=['python3', 'cmd.py', '${ISOLATED_OUTDIR}/foo'],
+        relative_cwd=None,
+        cas_instance=None,
+        cas_digest=None,
+        outputs=None,
+        install_named_caches=init_named_caches_stub,
+        leak_temp_dir=False,
+        root_dir=self.tempdir,
+        hard_timeout=60,
+        grace_period=30,
+        bot_file=None,
+        switch_to_account=False,
+        install_packages_fn=emulate_bad_cipd,
+        cas_cache_dir='',
+        cas_cache_policies=local_caching.CachePolicies(0, 0, 0, 0),
+        cas_kvs='',
+        env={},
+        env_prefix={},
+        lower_priority=False,
+        containment=None,
+        trim_caches_fn=trim_caches_stub)
+
+    result_json = os.path.join(self.tempdir, 'result.json')
+    ret = run_isolated.run_tha_test(data, result_json)
+    with open(result_json) as f:
+      result = json.load(f)
+
+    self.assertEqual(1, ret)
+    self.assertEqual('foo_package', result['missing_cipd'][0]['package_name'])
+    self.assertEqual('not/found/foo', result['missing_cipd'][0]['path'])
+    self.assertEqual('deadbeef', result['missing_cipd'][0]['version'])
+
+
 FILE, LINK, RELATIVE_LINK, DIR = range(4)
 
 
