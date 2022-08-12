@@ -368,7 +368,13 @@ enum BotEventType {
   // BotEvent.event_msg shall contain the error message.
   BOT_HOOK_ERROR = 3;
 
-  // Currently unused.
+  // Bot hook logged information. The bot hooks can log locally to the local log
+  // file, which itself can be streamed out of band. For special notifications
+  // that are worth notifying the administrator, this event can be used to raise
+  // these. Due to the cost of doing an RPC just for this, this should be used
+  // sparingly; vs local logging.
+  //
+  // BotEvent.event_msg shall contain the log entry.
   BOT_HOOK_LOG = 4;
 
   // Bot initiated a host reboot. An example is a bot hook requesting to reboot

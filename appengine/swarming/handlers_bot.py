@@ -856,14 +856,14 @@ class BotEventHandler(_BotBaseHandler):
 
   EXPECTED_KEYS = _BotBaseHandler.EXPECTED_KEYS | {u'event', u'message'}
 
-  ALLOWED_EVENTS = ('bot_error', 'bot_rebooting', 'bot_shutdown')
+  ALLOWED_EVENTS = ('bot_error', 'bot_log', 'bot_rebooting', 'bot_shutdown')
 
   @auth.public  # auth happens in self._process()
   def post(self):
     res = self._process()
     event = res.request.get('event')
     if event not in self.ALLOWED_EVENTS:
-      logging.error('Unexpected event type')
+      logging.error('Unexpected event type: %s', event)
       self.abort_with_error(400, error='Unsupported event type')
     message = res.request.get('message')
     # Record the event in a BotEvent entity so it can be listed on the bot's

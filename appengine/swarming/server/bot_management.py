@@ -336,6 +336,7 @@ class BotEvent(_BotCommon):
   _MAPPING = {
       'bot_connected': swarming_pb2.BOT_NEW_SESSION,
       'bot_error': swarming_pb2.BOT_HOOK_ERROR,
+      'bot_log': swarming_pb2.BOT_HOOK_LOG,
       'bot_missing': swarming_pb2.BOT_MISSING,
       'bot_rebooting': swarming_pb2.BOT_REBOOTING_HOST,
       'bot_shutdown': swarming_pb2.BOT_SHUTDOWN,
@@ -360,6 +361,7 @@ class BotEvent(_BotCommon):
       # Bot specific events that are outside the scope of a task:
       'bot_connected',
       'bot_error',
+      'bot_log',
       'bot_missing',
       'bot_rebooting',
       'bot_shutdown',
