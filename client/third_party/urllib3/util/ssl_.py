@@ -281,7 +281,12 @@ def create_urllib3_context(
     if (cert_reqs == ssl.CERT_REQUIRED or sys.version_info >= (3, 7, 4)) and getattr(
         context, "post_handshake_auth", None
     ) is not None:
-        context.post_handshake_auth = True
+        try:
+            # TODO(b/117801554): in google3 this attribute is read-only
+            # remove this patch once BoringSSL supports post_handshake
+            context.post_handshake_auth = True
+        except AttributeError:
+            pass
 
     context.verify_mode = cert_reqs
     if (
