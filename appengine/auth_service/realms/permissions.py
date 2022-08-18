@@ -207,6 +207,22 @@ def db():
       ])
 
   # Buildbucket permissions and roles (crbug.com/1091604).
+  role(
+      'role/buildbucket.limitedReader',
+      [
+          # Grants limited read access to builds.
+          # Designed to allow listing builds and viewing a restricted set of
+          # build and test metadata (e.g. name, status).
+          # Explicitly does *not* grant access to any kind of logs.
+          # May grant access to failure summaries that have been sanitized to
+          # remove sensitive data.
+          # This role is designed to allow users to see build and test failures
+          # in Gerrit even if they don't have full read permission on the builds
+          # themselves.
+          permission('buildbucket.builds.list'),
+          permission('buildbucket.builders.get'),
+          permission('buildbucket.builders.list'),
+      ])
   role('role/buildbucket.reader', [
       include('role/resultdb.reader'),  # to read results of the build
       include('role/logdog.reader'),    # to read build logs
