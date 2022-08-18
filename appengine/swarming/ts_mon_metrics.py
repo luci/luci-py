@@ -303,6 +303,26 @@ _task_state_change_schedule_latencies = \
     bucketer=_scheduler_bucketer,
 )
 
+# Instance metric. Metric fields:
+# - pool: e.g. 'skia'.
+# - queue_count: number of queues scanned in parallel (up to 30).
+_scheduler_scans = gae_ts_mon.CounterMetric(
+    'swarming/scheduler/scans', 'Number of queue scans', [
+        gae_ts_mon.StringField('pool'),
+        gae_ts_mon.IntegerField('queue_count'),
+    ])
+
+# Instance metric. Metric fields:
+# - pool: e.g. 'skia'.
+# - status: 'cache', 'expired', 'ignored', 'mismatch', 'total'.
+_scheduler_visits = gae_ts_mon.CumulativeDistributionMetric(
+    'swarming/scheduler/visits',
+    'Distribution of TaskToRun visited per scan', [
+        gae_ts_mon.StringField('pool'),
+        gae_ts_mon.StringField('status'),
+    ],
+    bucketer=gae_ts_mon.FixedWidthBucketer(width=5))
+
 
 ### Private stuff.
 
@@ -622,6 +642,25 @@ def on_dead_task_detection_latency(tags, latency, cron):
   fields['cron'] = cron
   _dead_task_detection_latencies.add(round(latency.total_seconds() * 1000),
                                      fields=fields)
+
+
+def on_scheduler_scan(pool, queue_count):
+  _scheduler_scans.increment(
+      fields={
+          'pool': pool,
+          'queue_count': 30 if queue_count > 30 else queue_count,
+      })
+
+
+def on_scheduler_visits(pool, cache, expired, ignored, mismatch, total):
+  def add(key, val):
+    _scheduler_visits.add(val, fields={'pool': pool, 'status': key})
+
+  add('cache', cache)
+  add('expired', expired)
+  add('ignored', ignored)
+  add('mismatch', mismatch)
+  add('total', total)
 
 
 def initialize():

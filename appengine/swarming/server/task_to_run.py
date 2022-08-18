@@ -45,6 +45,7 @@ from server import config
 from server import task_pack
 from server import task_queues
 from server import task_request
+import ts_mon_metrics
 
 
 ### Models.
@@ -273,21 +274,17 @@ def _lookup_cache_is_taken_async(to_run_key):
 
 class _QueryStats(object):
   """Statistics for a yield_next_available_task_to_dispatch() loop."""
-  broken = 0
-  cache_lookup = 0
+  cache = 0
   expired = 0
-  hash_mismatch = 0
   ignored = 0
-  no_queue = 0
-  real_mismatch = 0
+  mismatch = 0
   total = 0
 
   def __str__(self):
-    return (
-        '%d total, %d exp %d no_queue, %d hash mismatch, %d cache negative, '
-        '%d dimensions mismatch, %d ignored, %d broken') % (
-            self.total, self.expired, self.no_queue, self.hash_mismatch,
-            self.cache_lookup, self.real_mismatch, self.ignored, self.broken)
+    return ('%d total, %d exp, %d cache negative, '
+            '%d dimensions mismatch, %d ignored') % (self.total, self.expired,
+                                                     self.cache, self.mismatch,
+                                                     self.ignored)
 
 
 @ndb.tasklet
@@ -307,7 +304,7 @@ def _validate_task_async(bot_dimensions, stats, now, to_run):
   neg = yield _lookup_cache_is_taken_async(to_run.key)
   if neg:
     logging.debug('_validate_task_async(%s): negative cache', packed)
-    stats.cache_lookup += 1
+    stats.cache += 1
     raise ndb.Return((None, None))
 
   # Ok, it's now worth taking a real look at the entity.
@@ -321,7 +318,7 @@ def _validate_task_async(bot_dimensions, stats, now, to_run):
   # purpose.
   if not match_dimensions(props.dimensions, bot_dimensions):
     logging.debug('_validate_task_async(%s): dimensions mismatch', packed)
-    stats.real_mismatch += 1
+    stats.mismatch += 1
     raise ndb.Return((None, None))
 
   # Expire as the bot polls by returning it, and task_scheduler will handle it.
@@ -378,7 +375,7 @@ def _get_task_to_run_query(dimensions_hash):
   return [_query(get_shard_kind(dimensions_hash % N_SHARDS))]
 
 
-def _yield_potential_tasks(bot_id):
+def _yield_potential_tasks(bot_id, pool):
   """Queries all the known task queues in parallel and yields the task in order
   of priority.
 
@@ -396,6 +393,10 @@ def _yield_potential_tasks(bot_id):
   """
   bot_root_key = bot_management.get_root_key(bot_id)
   dim_hashes = task_queues.get_queues(bot_root_key)
+
+  # Keep track how many queues we scan in parallel.
+  ts_mon_metrics.on_scheduler_scan(pool, len(dim_hashes))
+
   # Note that the default ndb.EVENTUAL_CONSISTENCY is used so stale items may be
   # returned. It's handled specifically by consumers of this function.
   start = time.time()
@@ -614,13 +615,15 @@ def yield_next_available_task_to_dispatch(bot_dimensions):
       matched.
   """
   assert len(bot_dimensions['id']) == 1, bot_dimensions
-  # List of all the valid dimensions hashed.
+  # Pool is used only for metric fields to have at least some breakdown of
+  # scheduler stats by bots.
+  pool = (bot_dimensions.get('pool') or ['-'])[0]
   now = utils.utcnow()
   stats = _QueryStats()
   bot_id = bot_dimensions[u'id'][0]
   futures = collections.deque()
   try:
-    for ttr in _yield_potential_tasks(bot_id):
+    for ttr in _yield_potential_tasks(bot_id, pool):
       duration = (utils.utcnow() - now).total_seconds()
       if duration > 40.:
         # Stop searching after too long, since the odds of the request blowing
@@ -665,6 +668,12 @@ def yield_next_available_task_to_dispatch(bot_dimensions):
     logging.debug(
         'yield_next_available_task_to_dispatch(%s) in %.3fs: %s',
         bot_id, (utils.utcnow() - now).total_seconds(), stats)
+    ts_mon_metrics.on_scheduler_visits(pool=pool,
+                                       cache=stats.cache,
+                                       expired=stats.expired,
+                                       ignored=stats.ignored,
+                                       mismatch=stats.mismatch,
+                                       total=stats.total)
 
 
 def yield_expired_task_to_run():
