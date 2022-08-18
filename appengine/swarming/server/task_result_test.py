@@ -680,7 +680,9 @@ class TaskResultApiTest(TestCase):
         run_result, request))
     ndb.transaction(lambda: ndb.put_multi([result_summary]))
 
-    run_result.signal_server_version('new-version')
+    self.mock(utils, 'get_app_version', lambda: 'new-version')
+    run_result.signal_server_version()
+
     run_result.modified_ts = utils.utcnow()
     run_result.dead_after_ts = utils.utcnow() + datetime.timedelta(
         seconds=request.bot_ping_tolerance_secs)

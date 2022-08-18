@@ -818,8 +818,9 @@ class _TaskResultCommon(ndb.Model):
     if self.cas_output_root:
       self.cas_output_root.to_proto(out.cas_output_root)
 
-  def signal_server_version(self, server_version):
-    """Adds `server_version` to self.server_versions if relevant."""
+  def signal_server_version(self):
+    """Adds the current version to self.server_versions."""
+    server_version = utils.get_app_version()
     if not self.server_versions or self.server_versions[-1] != server_version:
       self.server_versions.append(server_version)
 

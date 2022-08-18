@@ -370,11 +370,8 @@ def _detect_dead_task_async(run_result_key):
   """
   result_summary_key = task_pack.run_result_key_to_result_summary_key(
       run_result_key)
-  request_key = task_pack.result_summary_key_to_request_key(result_summary_key)
-  request_future = request_key.get_async()
-  now = utils.utcnow()
-  server_version = utils.get_app_version()
-  request = request_future.get_result()
+  request = task_pack.result_summary_key_to_request_key(
+      result_summary_key).get()
   if not request:
     # That's a particularly broken task, there's no TaskRequest in the DB!
     #
@@ -390,6 +387,7 @@ def _detect_dead_task_async(run_result_key):
     # So for now, just skip it to unblock the cron job.
     return None
 
+  now = utils.utcnow()
   es_cfg = external_scheduler.config_for_task(request)
 
   @ndb.tasklet
@@ -410,7 +408,7 @@ def _detect_dead_task_async(run_result_key):
     old_abandoned_ts = run_result.abandoned_ts
     old_dead_after_ts = run_result.dead_after_ts
 
-    run_result.signal_server_version(server_version)
+    run_result.signal_server_version()
     run_result.modified_ts = now
     run_result.completed_ts = now
     if not run_result.abandoned_ts:
@@ -736,8 +734,7 @@ def _is_allowed_to_schedule(pool_cfg):
 def _bot_update_tx(run_result_key, bot_id, output, output_chunk_start,
                    exit_code, duration, hard_timeout, io_timeout, cost_usd,
                    cas_output_root, cipd_pins, need_cancel, performance_stats,
-                   now, result_summary_key, server_version, request, es_cfg,
-                   canceled):
+                   now, result_summary_key, request, es_cfg, canceled):
   """Runs the transaction for bot_update_task().
 
   es_cfg is only required when need_cancel is True.
@@ -757,9 +754,8 @@ def _bot_update_tx(run_result_key, bot_id, output, output_chunk_start,
   # - hard_timeout or io_timeout can still happen in the case of killing. This
   #   still needs to result in KILLED, not TIMED_OUT.
 
-  run_result_future = run_result_key.get_async()
   result_summary_future = result_summary_key.get_async()
-  run_result = run_result_future.get_result()
+  run_result = run_result_key.get()
   if not run_result:
     result_summary_future.wait()
     return None, None, 'is missing'
@@ -818,7 +814,7 @@ def _bot_update_tx(run_result_key, bot_id, output, output_chunk_start,
       else:
         # The bot is still executing the task in this path. The server should
         # return killing signal to the bot. After the bot stopped the task,
-        # the task update wlll include `duration` and go to the above path to
+        # the task update will include `duration` and go to the above path to
         # mark TaskRunResult completed finally.
         pass
     else:
@@ -832,7 +828,7 @@ def _bot_update_tx(run_result_key, bot_id, output, output_chunk_start,
         run_result.state = task_result.State.COMPLETED
         run_result.completed_ts = now
 
-  run_result.signal_server_version(server_version)
+  run_result.signal_server_version()
   to_put = [run_result]
   if output:
     # This does 1 multi GETs. This also modifies run_result in place.
@@ -869,6 +865,7 @@ def _bot_update_tx(run_result_key, bot_id, output, output_chunk_start,
     _cancel_task_tx(request, result_summary, True, bot_id, now, es_cfg,
                     run_result)
 
+  logging.info('Storing %d entities', len(to_put))
   ndb.put_multi(to_put)
 
   return result_summary, run_result, None
@@ -929,6 +926,9 @@ def _cancel_task_tx(request,
         request, result_summary.current_task_slice or 0)
     for to_run in to_runs:
       # Add it to the negative cache.
+      #
+      # TODO(vadimsh): This is problematic. The transaction may fail to commit,
+      # but we mutate the cache regardless.
       task_to_run.set_lookup_cache(to_run.key, False)
       to_run.queue_number = None
       to_run.expiration_ts = None
@@ -1519,10 +1519,8 @@ def bot_update_task(run_result_key, bot_id, output, output_chunk_start,
 
   result_summary_key = task_pack.run_result_key_to_result_summary_key(
       run_result_key)
-  request_key = task_pack.result_summary_key_to_request_key(result_summary_key)
-  request_future = request_key.get_async()
-  server_version = utils.get_app_version()
-  request = request_future.get_result()
+  request = task_pack.result_summary_key_to_request_key(
+      result_summary_key).get()
 
   need_cancel = False
   es_cfg = None
@@ -1538,10 +1536,10 @@ def bot_update_task(run_result_key, bot_id, output, output_chunk_start,
   run = lambda: _bot_update_tx(
       run_result_key, bot_id, output, output_chunk_start, exit_code, duration,
       hard_timeout, io_timeout, cost_usd, cas_output_root, cipd_pins,
-      need_cancel, performance_stats, now, result_summary_key, server_version,
-      request, es_cfg, canceled)
+      need_cancel, performance_stats, now, result_summary_key, request, es_cfg,
+      canceled)
   try:
-    smry, run_result, error = datastore_utils.transaction(run)
+    smry, run_result, error = datastore_utils.transaction(run, retries=3)
   except datastore_utils.CommitError as e:
     logging.info('Got commit error: %s', e)
     # It is important that the caller correctly surface this error as the bot
@@ -1594,7 +1592,6 @@ def bot_terminate_task(run_result_key, bot_id, start_time):
       run_result_key)
   request = task_pack.result_summary_key_to_request_key(
       result_summary_key).get()
-  server_version = utils.get_app_version()
   now = utils.utcnow()
   packed = task_pack.pack_run_result_key(run_result_key)
   es_cfg = external_scheduler.config_for_task(request)
@@ -1610,7 +1607,7 @@ def bot_terminate_task(run_result_key, bot_id, start_time):
       # Ignore this failure.
       return None
 
-    run_result.signal_server_version(server_version)
+    run_result.signal_server_version()
     if run_result.killing:
       run_result.killing = False
       run_result.state = task_result.State.KILLED
