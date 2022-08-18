@@ -282,11 +282,52 @@ def constant_time_equals(a, b):
 ## Cache
 
 
-class _Cache(object):
-  """Holds state of a cache for cache_with_expiration and cache decorators.
+class _EternalCache(object):
+  """Holds state of a cache for @cache decorators.
 
-  May call func more than once.
-  Thread- and NDB tasklet-safe.
+  May call |func| more than once and concurrently. Thread- and NDB tasklet-safe.
+  """
+
+  def __init__(self, func):
+    self.func = func
+    self.value = None
+    self.value_is_set = False
+
+  def get_value(self):
+    """Returns a cached value getting it first if necessary."""
+    # We assume Python booleans are "atomic". They are in CPython.
+    # Note: attempting to protect this initialization with a lock leads to
+    # issues when using ndb tasklets inside `func`: they easily can end up
+    # calling other unrelated code (while the lock is still held), eventually
+    # leading to deadlocks if this code calls get_value again. There's a test
+    # for that in utils_test.py.
+    if not self.value_is_set:
+      self.value = self.func()
+      self.value_is_set = True
+    return self.value
+
+  def clear(self):
+    """Clears stored cached value."""
+    self.value_is_set = False
+    self.value = None
+
+  def get_wrapper(self):
+    """Returns a callable object that can be used in place of |func|.
+
+    It's basically self.get_value, updated by functools.wraps to look more like
+    original function.
+    """
+    # functools.wraps doesn't like 'instancemethod', use lambda as a proxy.
+    # pylint: disable=W0108
+    wrapper = functools.wraps(self.func)(lambda: self.get_value())
+    wrapper.__parent_cache__ = self
+    return wrapper
+
+
+class _ExpiringCache(object):
+  """Holds state of a cache for @cache_with_expiration decorators.
+
+  May call |func| more than once and concurrently. Thread- and NDB tasklet-safe.
   """
 
   def __init__(self, func, expiration_sec):
@@ -308,8 +349,7 @@ class _Cache(object):
     with self.lock:
       self.value = new_value
       self.value_is_set = True
-      if self.expiration_sec:
-        self.expires = time_time() + self.expiration_sec
+      self.expires = time_time() + self.expiration_sec
 
     return self.value
 
@@ -335,18 +375,22 @@ class _Cache(object):
 
 def cache(func):
   """Decorator that implements permanent cache of a zero-parameter function."""
-  return _Cache(func, None).get_wrapper()
+  return _EternalCache(func).get_wrapper()
 
 
 def cache_with_expiration(expiration_sec):
   """Decorator that implements in-memory cache for a zero-parameter function."""
+  assert expiration_sec > 0, expiration_sec
   def decorator(func):
-    return _Cache(func, expiration_sec).get_wrapper()
+    return _ExpiringCache(func, expiration_sec).get_wrapper()
   return decorator
 
 
 def clear_cache(func):
-  """Given a function decorated with @cache, resets cached value."""
+  """Given a function decorated with @cache, resets cached value.
+
+  Exclusively for tests!
+  """
   func.__parent_cache__.clear()
 
 
