@@ -175,6 +175,17 @@ class TestGCE(auto_stub.TestCase):
         'vendor': 'AuthenticAMD'
     })
 
+  def test_get_cpuinfo_ampere(self):
+    self.mock_get_metadata.return_value = {
+        'instance': {
+            'cpuPlatform': 'Ampere Altra',
+        }
+    }
+    self.assertEqual(gce.get_cpuinfo(), {
+        'name': 'Ampere Altra GCE',
+        'vendor': 'ARM'
+    })
+
   def test_get_tags(self):
     self.assertEqual(gce.get_tags(), ['tag1', 'tag2'])
 

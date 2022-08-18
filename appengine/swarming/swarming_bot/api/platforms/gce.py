@@ -330,6 +330,9 @@ def get_cpuinfo():
   elif cpu_platform.startswith('AMD '):
     cpu_name = '%s GCE' % cpu_platform
     vendor = 'AuthenticAMD'
+  elif cpu_platform.startswith('Ampere '):
+    cpu_name = '%s GCE' % cpu_platform
+    vendor = 'ARM'
   assert cpu_name is not None, cpu_platform
   return {
       'name': cpu_name,
