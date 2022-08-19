@@ -893,6 +893,39 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
     ]
     self.assertEqual(expected, actual)
 
+  def test_yield_next_available_task_to_dispatch_large_queue(self):
+    submitted = []
+
+    def submit_bunch(count, request_dimensions):
+      for i in range(count):
+        self.mock_now(self.now, len(submitted))
+        request = self.mkreq(
+            1 if i == 0 else 0,
+            _gen_request(
+                properties=_gen_properties(dimensions=request_dimensions),
+                priority=50))
+        ttr = task_to_run.new_task_to_run(request, 0)
+        ttr.put()
+        submitted.append(ttr.to_dict())
+
+    submit_bunch(51, {u'os': [u'Windows-3.1.1'], u'pool': [u'p1']})
+    submit_bunch(11, {u'os': [u'Windows-3.1.1'], u'pool': [u'p2']})
+    submit_bunch(9, {u'os': [u'Windows-3.1.1'], u'pool': [u'p3']})
+
+    # Got them all.
+    bot_dimensions = {
+        u'id': [u'localhost'],
+        u'os': [u'Windows-3.1.1'],
+        u'pool': [u'p1', u'p2', u'p3'],
+    }
+    collected = list(_yield_next_available_task_to_dispatch(bot_dimensions))
+    self.assertEqual(len(submitted), len(collected))
+
+    # Same items. Ignore order, there are other tests for that.
+    submitted.sort(key=lambda ttr: ttr['created_ts'])
+    collected.sort(key=lambda ttr: ttr['created_ts'])
+    self.assertEqual(submitted, collected)
+
   def test_yield_expired_task_to_run(self):
     # There's a cut off at 2019-09-01, so the default self.now on Jan 2nd
     # doesn't work when looking 4 weeks ago.

@@ -336,28 +336,6 @@ def _validate_task_async(bot_dimensions, stats, now, to_run):
   raise ndb.Return((request, to_run))
 
 
-def _yield_pages_async(q, size):
-  """Given a ndb.Query, yields ndb.Future that returns pages of results
-  asynchronously.
-  """
-  next_cursor = [None]
-  should_continue = [True]
-  def fire(page, result):
-    results, cursor, more = page.get_result()
-    result.set_result(results)
-    next_cursor[0] = cursor
-    should_continue[0] = more
-
-  while should_continue[0]:
-    page_future = q.fetch_page_async(
-        size, start_cursor=next_cursor[0], deadline=60)
-    result_future = ndb.Future()
-    page_future.add_immediate_callback(fire, page_future, result_future)
-    yield result_future
-    result_future.get_result()
-  logging.debug('_yield_pages_async: %s completed', q)
-
-
 def _get_task_to_run_query(dimensions_hash):
   """Returns a ndb.Query of TaskToRunShard within this dimensions_hash queue.
   """
@@ -411,11 +389,14 @@ class _PriorityQueue(object):
 
 
 class _ActiveQuery(object):
+  PAGE_SIZE = 10
+  DEADLINE = 60
+
   def __init__(self, query, dim_hash):
-    self._iter = _yield_pages_async(query, 10)
-    self._future = next(self._iter, None)
+    self._query = query
     self._dim_hash = dim_hash
-    assert self._future
+    self._future = query.fetch_page_async(self.PAGE_SIZE,
+                                          deadline=self.DEADLINE)
 
   @property
   def dim_hash(self):
@@ -425,11 +406,18 @@ class _ActiveQuery(object):
     return self._future and self._future.done()
 
   def page(self):
-    return self._future.get_result()
+    results, _cursor, _more = self._future.get_result()
+    return results
 
   def advance(self):
-    self._future = next(self._iter, None)
-    return bool(self._future)
+    _results, cursor, more = self._future.get_result()
+    if more:
+      self._future = self._query.fetch_page_async(self.PAGE_SIZE,
+                                                  start_cursor=cursor,
+                                                  deadline=self.DEADLINE)
+    else:
+      self._future = None
+    return more
 
 
 def _yield_potential_tasks(bot_id, pool):
