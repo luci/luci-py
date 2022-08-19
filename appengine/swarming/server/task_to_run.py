@@ -31,6 +31,7 @@ Graph of the schema:
 
 import collections
 import datetime
+import heapq
 import logging
 import time
 
@@ -375,6 +376,62 @@ def _get_task_to_run_query(dimensions_hash):
   return [_query(get_shard_kind(dimensions_hash % N_SHARDS))]
 
 
+class _TaskToRunItem(object):
+  __slots__ = ('key', 'ttr')
+
+  def __init__(self, ttr):
+    self.key = _queue_number_order_priority(ttr)
+    self.ttr = ttr
+
+  def __cmp__(self, other):
+    return cmp(self.key, other.key)
+
+
+class _PriorityQueue(object):
+  def __init__(self):
+    self._heap = []
+
+  def add_heapified(self, ttr):
+    heapq.heappush(self._heap, _TaskToRunItem(ttr))
+
+  def add_unordered(self, ttr):
+    self._heap.append(_TaskToRunItem(ttr))
+
+  def heapify(self):
+    heapq.heapify(self._heap)
+
+  def pop(self):
+    return heapq.heappop(self._heap).ttr
+
+  def size(self):
+    return len(self._heap)
+
+  def empty(self):
+    return not self._heap
+
+
+class _ActiveQuery(object):
+  def __init__(self, query, dim_hash):
+    self._iter = _yield_pages_async(query, 10)
+    self._future = next(self._iter, None)
+    self._dim_hash = dim_hash
+    assert self._future
+
+  @property
+  def dim_hash(self):
+    return self._dim_hash
+
+  def ready(self):
+    return self._future and self._future.done()
+
+  def page(self):
+    return self._future.get_result()
+
+  def advance(self):
+    self._future = next(self._iter, None)
+    return bool(self._future)
+
+
 def _yield_potential_tasks(bot_id, pool):
   """Queries all the known task queues in parallel and yields the task in order
   of priority.
@@ -397,97 +454,103 @@ def _yield_potential_tasks(bot_id, pool):
   # Keep track how many queues we scan in parallel.
   ts_mon_metrics.on_scheduler_scan(pool, len(dim_hashes))
 
-  # Note that the default ndb.EVENTUAL_CONSISTENCY is used so stale items may be
-  # returned. It's handled specifically by consumers of this function.
-  start = time.time()
-  yielders = []
-  to_dim_hashes = []  # store future/yieler index to dimension hash.
-  for d in dim_hashes:
-    for q in _get_task_to_run_query(d):
-      yielders.append(_yield_pages_async(q, 10))
-      to_dim_hashes.append(d)
-  # We do care about the first page of each query so we cannot merge all the
-  # results of every query insensibly.
-  futures = []
-
-  def _to_active_yielders(futs):
-    return [to_dim_hashes[i] for i, f in enumerate(futs) if f]
-
   try:
-    for y in yielders:
-      futures.append(next(y, None))
+    # Start fetching first pages of each per dimension set query. Note that
+    # the default ndb.EVENTUAL_CONSISTENCY is used so stale items may be
+    # returned. It's handled specifically by consumers of this function.
+    queries = []
+    for d in dim_hashes:
+      for q in _get_task_to_run_query(d):
+        queries.append(_ActiveQuery(q, d))
 
-    while (time.time() - start) < 1 and not all(f.done() for f in futures if f):
+    # Run tasklets for at most 1 sec or until all fetches are done.
+    #
+    # TODO(vadimsh): Why only 1 sec? This also makes priority-based sorting kind
+    # of useless for loaded multi-queue bots, since we can't control what
+    # queries manage to finish first within 1 sec.
+    start = time.time()
+    while (time.time() - start) < 1 and not all(q.ready() for q in queries):
       r = ndb.eventloop.run0()
       if r is None:
         break
-      time.sleep(r)
+      if r > 0:
+        time.sleep(r)
+
+    # Log how many items we actually got. On loaded servers it will actually
+    # be 0 pretty often, since 1 sec is not that much.
     logging.debug(
-        '_yield_potential_tasks(%s): waited %.3fs for %d items from yielders '
+        '_yield_potential_tasks(%s): waited %.3fs for %d items from queues '
         '%s', bot_id,
         time.time() - start,
-        sum(len(f.get_result()) for f in futures if f.done()),
-        _to_active_yielders(futures))
-    # items is a list of TaskToRunShard. The entities are needed because
-    # property queue_number is used to sort according to each task's priority.
-    items = []
+        sum(len(q.page()) for q in queries if q.ready()),
+        [q.dim_hash for q in queries])
 
-    def _append_runs_to_items(runs):
-      # The ndb.Query ask for a valid queue_number but under load, it
-      # happens the value is not valid anymore.
-      for r in runs:
-        if not r.queue_number:
-          logging.warning(
-              '_yield_potential_tasks(%s): TaskToRunShard %s does not have '
-              'queue_number', bot_id, r.task_id)
+    # A priority queue with TaskToRunShard ordered by the priority+timestamp,
+    # extracted from queue_number using _queue_number_order_priority.
+    queue = _PriorityQueue()
+
+    def _poll_queries(queries, use_heap):
+      enqueue = queue.add_heapified if use_heap else queue.add_unordered
+
+      # Get items from pages we already fetched and add them into `queue`. We
+      # don't block here, just pick what already was fetched.
+      pending = []
+      for q in queries:
+        # Retain in the pending list if still working on some page.
+        if not q.ready():
+          pending.append(q)
           continue
-        items.append(r)
 
-    for i, f in enumerate(futures):
-      if f and f.done():
-        # The ndb.Future returns a list of up to 10 TaskToRunShard entities.
-        runs = f.get_result()
+        # Got a page of results.
+        runs = q.page()
         if runs:
-          _append_runs_to_items(runs)
-          # Prime the next page, in case.
-          futures[i] = next(yielders[i], None)
+          logging.debug(
+              '_yield_potential_tasks(%s): got %d items from queue %d',
+              bot_id, len(runs), q.dim_hash)
+
+        # Add them to the local priority queue.
+        for r in runs:
+          if r.queue_number:
+            enqueue(r)
+          else:
+            # The query is eventually consistent. It is possible TaskToRun was
+            # already processed and its queue_number was cleared.
+            logging.warning(
+                '_yield_potential_tasks(%s): TaskToRunShard %s does not have '
+                'queue_number', bot_id, r.task_id)
+
+        # Start fetching the next page, if any.
+        if q.advance():
+          pending.append(q)
         else:
           logging.debug(
-              '_yield_potential_tasks(%s): no results from yielder for %d',
-              bot_id, to_dim_hashes[i])
+              '_yield_potential_tasks(%s): queue %d is exhausted',
+              bot_id, q.dim_hash)
 
-    # That's going to be our search space for now.
-    items.sort(key=_queue_number_order_priority)
-
-    # It is possible that there is no items yet, in case all futures are taking
-    # more than 1 second.
-    # It is possible that all futures are done if every queue has less than 10
-    # task pending.
-    def _log_yielding():
+      # Log the final stats.
       logging.debug(
-          '_yield_potential_tasks(%s): yielding %s items. active yielders %s',
-          bot_id, len(items), _to_active_yielders(futures))
+          '_yield_potential_tasks(%s): %s items pending. active queues %s',
+          bot_id, queue.size(), [q.dim_hash for q in pending])
+      return pending
 
-    _log_yielding()
-    while any(futures) or items:
-      if items:
-        yield items[0]
-        items = items[1:]
+    # Pick up all first pages we managed to fetch in 1 sec above and put them
+    # into the list in whatever order they were fetched.
+    queries = _poll_queries(queries, use_heap=False)
+
+    # Transform the list into an actual priority queue before polling from it.
+    queue.heapify()
+
+    while not queue.empty() or queries:
+      # Grab the top-priority item and let the caller try to process it.
+      if not queue.empty():
+        yield queue.pop()
       else:
-        # Let activity happen.
+        # No pending items, but there are some pending futures. Run one step of
+        # ndb event loop to move things forward.
         ndb.eventloop.run1()
-      changed = False
-      for i, f in enumerate(futures):
-        if f and f.done():
-          _append_runs_to_items(f.get_result())
-          futures[i] = next(yielders[i], None)
-          changed = True
-          if not futures[i]:
-            logging.debug('_yield_potential_tasks(%s): yielder %d completed',
-                          bot_id, to_dim_hashes[i])
-          _log_yielding()
-      if changed:
-        items.sort(key=_queue_number_order_priority)
+      # Poll for any new query pages, adding fetched items to the queue.
+      queries = _poll_queries(queries, use_heap=True)
+
   except apiproxy_errors.DeadlineExceededError as e:
     # This is normally due to: "The API call datastore_v3.RunQuery() took too
     # long to respond and was cancelled."
@@ -580,7 +643,7 @@ def set_lookup_cache(to_run_key, is_available_to_schedule):
   to be updated, which means it can return stale items (e.g. already reaped).
 
   It can be viewed as a lock, except that the 'lock' is never released, it is
-  impliclity released after 15 seconds.
+  implicitly released after 15 seconds.
 
   Returns:
     True if the key was updated, False if was trying to reap and the entry was
