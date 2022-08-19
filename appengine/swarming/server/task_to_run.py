@@ -33,6 +33,7 @@ import collections
 import datetime
 import heapq
 import logging
+import random
 import time
 
 from google.appengine.api import datastore_errors
@@ -389,13 +390,13 @@ class _PriorityQueue(object):
 
 
 class _ActiveQuery(object):
-  PAGE_SIZE = 10
   DEADLINE = 60
 
   def __init__(self, query, dim_hash):
     self._query = query
     self._dim_hash = dim_hash
-    self._future = query.fetch_page_async(self.PAGE_SIZE,
+    self._page_size = 10
+    self._future = query.fetch_page_async(self._page_size,
                                           deadline=self.DEADLINE)
 
   @property
@@ -412,7 +413,12 @@ class _ActiveQuery(object):
   def advance(self):
     _results, cursor, more = self._future.get_result()
     if more:
-      self._future = self._query.fetch_page_async(self.PAGE_SIZE,
+      # We start with a small page size to get pending items ASAP to start
+      # processing them sooner. If the backlog is large (i.e. we end up fetching
+      # many pages), make pages larger with each iteration to reduce number of
+      # datastore calls we make.
+      self._page_size = min(50, self._page_size + 5)
+      self._future = self._query.fetch_page_async(self._page_size,
                                                   start_cursor=cursor,
                                                   deadline=self.DEADLINE)
     else:
@@ -496,6 +502,13 @@ def _yield_potential_tasks(bot_id, pool):
           logging.debug(
               '_yield_potential_tasks(%s): got %d items from queue %d',
               bot_id, len(runs), q.dim_hash)
+
+        # TaskToRun submitted within the same 100ms interval at the same
+        # priority have the same queue sorting number (see _gen_queue_number).
+        # By shuffling them here we reduce chances of multiple bots contesting
+        # over the same items. This is effective only for queues with more than
+        # 10 tasks per second.
+        random.shuffle(runs)
 
         # Add them to the local priority queue.
         for r in runs:
