@@ -483,6 +483,7 @@ def _yield_potential_tasks(bot_id, pool):
       # Get items from pages we already fetched and add them into `queue`. We
       # don't block here, just pick what already was fetched.
       pending = []
+      changed = False
       for q in queries:
         # Retain in the pending list if still working on some page.
         if not q.ready():
@@ -500,6 +501,7 @@ def _yield_potential_tasks(bot_id, pool):
         for r in runs:
           if r.queue_number:
             enqueue(r)
+            changed = True
           else:
             # The query is eventually consistent. It is possible TaskToRun was
             # already processed and its queue_number was cleared.
@@ -511,14 +513,16 @@ def _yield_potential_tasks(bot_id, pool):
         if q.advance():
           pending.append(q)
         else:
+          changed = True
           logging.debug(
               '_yield_potential_tasks(%s): queue %d is exhausted',
               bot_id, q.dim_hash)
 
-      # Log the final stats.
-      logging.debug(
-          '_yield_potential_tasks(%s): %s items pending. active queues %s',
-          bot_id, queue.size(), [q.dim_hash for q in pending])
+      # Log the final stats if anything changed.
+      if changed:
+        logging.debug(
+            '_yield_potential_tasks(%s): %s items pending. active queues %s',
+            bot_id, queue.size(), [q.dim_hash for q in pending])
       return pending
 
     # Pick up all first pages we managed to fetch in 1 sec above and put them
