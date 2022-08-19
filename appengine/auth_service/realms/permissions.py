@@ -220,6 +220,7 @@ def db():
           # in Gerrit even if they don't have full read permission on the builds
           # themselves.
           permission('buildbucket.builds.list'),
+          permission('buildbucket.builds.getLimited'),
           permission('buildbucket.builders.get'),
           permission('buildbucket.builders.list'),
       ])
