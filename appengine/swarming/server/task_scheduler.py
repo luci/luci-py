@@ -1370,13 +1370,23 @@ def bot_reap_task(bot_dimensions, bot_version):
     logging.info('External scheduler did not reap any tasks, trying native '
                  'scheduler.')
 
+  # Used to filter out task requests that don't match bot's dimensions. This
+  # can happen if there's a collision on dimension's hash (which is a 32bit
+  # number).
+  match_bot_dimensions = task_to_run.dimensions_matcher(bot_dimensions)
+
+  # Pool is used exclusively for monitoring metrics to have some break down of
+  # performance by pool.
+  pool = (bot_dimensions.get(u'pool') or ['-'])[0]
+
   iterated = 0
   reenqueued = 0
   expired = 0
   failures = 0
   stale_index = 0
   try:
-    q = task_to_run.yield_next_available_task_to_dispatch(bot_dimensions)
+    q = task_to_run.yield_next_available_task_to_dispatch(
+        bot_id, pool, match_bot_dimensions)
     for request, to_run in q:
       iterated += 1
       # When falling back from external scheduler, ignore other es-owned tasks.
@@ -1434,8 +1444,7 @@ def bot_reap_task(bot_dimensions, bot_version):
         # yield_next_available_task_to_dispatch().
         slice_index = task_to_run.task_to_run_key_slice_index(new_to_run.key)
         t = request.task_slice(slice_index)
-        if not task_to_run.match_dimensions(
-            t.properties.dimensions, bot_dimensions):
+        if not match_bot_dimensions(t.properties.dimensions):
           continue
         to_run = new_to_run
 

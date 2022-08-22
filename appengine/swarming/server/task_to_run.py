@@ -47,6 +47,7 @@ from server import config
 from server import task_pack
 from server import task_queues
 from server import task_request
+from server.constants import OR_DIM_SEP
 import ts_mon_metrics
 
 
@@ -290,7 +291,7 @@ class _QueryStats(object):
 
 
 @ndb.tasklet
-def _validate_task_async(bot_dimensions, stats, now, to_run):
+def _validate_task_async(bot_dims_matcher, stats, now, to_run):
   """Validates the TaskToRunShard and updates stats.
 
   Returns:
@@ -318,7 +319,7 @@ def _validate_task_async(bot_dimensions, stats, now, to_run):
   #
   # There's a probability of 2**-31 of conflicts, which is low enough for our
   # purpose.
-  if not match_dimensions(props.dimensions, bot_dimensions):
+  if not bot_dims_matcher(props.dimensions):
     logging.debug('_validate_task_async(%s): dimensions mismatch', packed)
     stats.mismatch += 1
     raise ndb.Return((None, None))
@@ -620,17 +621,30 @@ def new_task_to_run(request, task_slice_index):
   return kind(key=key, created_ts=created, queue_number=qn, expiration_ts=exp)
 
 
-def match_dimensions(request_dimensions, bot_dimensions):
-  """Returns True if the bot dimensions satisfies the request dimensions."""
-  assert isinstance(request_dimensions, dict), request_dimensions
-  assert isinstance(bot_dimensions, dict), bot_dimensions
-  if not frozenset(request_dimensions).issubset(bot_dimensions):
-    return False
+def dimensions_matcher(bot_dimensions):
+  """Returns a predicate that can check if request dimensions match bot's ones.
 
+  Assumes request dimensions have been validated already.
+
+  Returns:
+    func(request_dimensions) -> bool.
+  """
+  assert isinstance(bot_dimensions, dict), bot_dimensions
   bot_flat = frozenset(task_queues.bot_dimensions_to_flat(bot_dimensions))
-  return any(
-      frozenset(f).issubset(bot_flat)
-      for f in task_queues.expand_dimensions_to_flats(request_dimensions))
+
+  def matcher(request_dimensions):
+    assert isinstance(request_dimensions, dict), request_dimensions
+    for key, vals in request_dimensions.iteritems():
+      # Here if key='k' and vals=['a', 'b|c'], we should check that
+      #   ('k:a' in bot_flat) AND ('k:b' in bot_flat OR 'k:c' in bot_flat)
+      for val in vals:
+        match = any(u'%s:%s' % (key, variant) in bot_flat
+                    for variant in val.split(OR_DIM_SEP))
+        if not match:
+          return False
+    return True
+
+  return matcher
 
 
 def set_lookup_cache(to_run_key, is_available_to_schedule):
@@ -669,7 +683,7 @@ def set_lookup_cache(to_run_key, is_available_to_schedule):
   return memcache.add(key, True, time=cache_lifetime, namespace='task_to_run')
 
 
-def yield_next_available_task_to_dispatch(bot_dimensions):
+def yield_next_available_task_to_dispatch(bot_id, pool, bot_dims_matcher):
   """Yields next available (TaskRequest, TaskToRunShard) in decreasing order of
   priority.
 
@@ -679,16 +693,13 @@ def yield_next_available_task_to_dispatch(bot_dimensions):
   Performance is the top most priority here.
 
   Arguments:
-  - bot_dimensions: dimensions (as a dict) defined by the bot that can be
-      matched.
+  - bot_id: id of the bot to poll tasks for.
+  - pool: this bot's pool for monitoring metrics.
+  - bot_dims_matcher: a predicate that checks if task dimensions match bot's
+      dimensions.
   """
-  assert len(bot_dimensions['id']) == 1, bot_dimensions
-  # Pool is used only for metric fields to have at least some breakdown of
-  # scheduler stats by bots.
-  pool = (bot_dimensions.get('pool') or ['-'])[0]
   now = utils.utcnow()
   stats = _QueryStats()
-  bot_id = bot_dimensions[u'id'][0]
   futures = collections.deque()
   try:
     for ttr in _yield_potential_tasks(bot_id, pool):
@@ -701,7 +712,7 @@ def yield_next_available_task_to_dispatch(bot_dimensions):
         # search to 40s, it gives 20s to complete the reaping and complete the
         # HTTP request.
         return
-      futures.append(_validate_task_async(bot_dimensions, stats, now, ttr))
+      futures.append(_validate_task_async(bot_dims_matcher, stats, now, ttr))
       while futures:
         # Keep a FIFO or LIFO queue ordering, depending on configuration.
         if futures[0].done():

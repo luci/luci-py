@@ -131,9 +131,11 @@ def _yield_next_available_task_to_dispatch(bot_dimensions):
       register_dimensions=False)
   bot_root_key = bot_management.get_root_key(bot_id)
   task_queues.assert_bot_async(bot_root_key, bot_dimensions).get_result()
+  matcher = task_to_run.dimensions_matcher(bot_dimensions)
   return [
-      to_run.to_dict() for _request, to_run in task_to_run
-      .yield_next_available_task_to_dispatch(bot_dimensions)
+      to_run.to_dict()
+      for _request, to_run in task_to_run.yield_next_available_task_to_dispatch(
+          bot_id, 'pool-for-monitoring', matcher)
   ]
 
 
@@ -416,7 +418,10 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
       actual.extend(to_runs)
     self.assertEqual(expected, map(flatten, actual))
 
-  def test_match_dimensions(self):
+  def test_dimensions_matcher(self):
+    def match_dimensions(request_dimensions, bot_dimensions):
+      return task_to_run.dimensions_matcher(bot_dimensions)(request_dimensions)
+
     data_true = (
         ({}, {}),
         ({}, {
@@ -459,9 +464,8 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
     )
 
     for request_dimensions, bot_dimensions in data_true:
-      self.assertEqual(
-          True, task_to_run.match_dimensions(request_dimensions,
-                                             bot_dimensions))
+      self.assertEqual(True, match_dimensions(request_dimensions,
+                                              bot_dimensions))
 
     data_false = (
         ({
@@ -481,9 +485,8 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
         }),
     )
     for request_dimensions, bot_dimensions in data_false:
-      self.assertEqual(
-          False, task_to_run.match_dimensions(request_dimensions,
-                                              bot_dimensions))
+      self.assertEqual(False,
+                       match_dimensions(request_dimensions, bot_dimensions))
 
   def test_yield_next_available_task_to_dispatch_none(self):
     request_dimensions = {u'os': [u'Windows-3.1.1'], u'pool': [u'default']}
