@@ -64,6 +64,8 @@ class TaskStateQuery(messages.Enum):
   KILLED = 12
   # Query for all tasks that are TaskState.NO_RESOURCE.
   NO_RESOURCE = 13
+  # Query for all tasks that are TaskState.CLIENT_ERROR.
+  CLIENT_ERROR = 14
 
 
 class TaskState(messages.Enum):
@@ -117,6 +119,10 @@ class TaskState(messages.Enum):
   # The task ran and completed normally. The task process exit code may be 0 or
   # another value.
   COMPLETED = taskstate_pb2.COMPLETED
+  # The task run into an issue that was caused by the client. It can be due to
+  # a bad CIPD or CAS package. Retrying the task with the same parameters will
+  # not change the result.
+  CLIENT_ERROR = taskstate_pb2.CLIENT_ERROR
   # The task ran but was manually killed via the 'cancel' API. This means the
   # bot forcefully killed the task process as described in the graceful
   # termination dance in the documentation.

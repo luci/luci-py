@@ -1587,10 +1587,11 @@ def bot_update_task(run_result_key, bot_id, output, output_chunk_start,
   return run_result.state
 
 
-def bot_terminate_task(run_result_key, bot_id, start_time):
+def bot_terminate_task(run_result_key, bot_id, start_time, client_error):
   """Terminates a task that is currently running as an internal failure.
 
   Sets the TaskRunResult's state to
+  - CLIENT_ERROR if missing_cipd or missing_cas
   - KILLED if it's canceled
   - BOT_DIED otherwise
 
@@ -1617,12 +1618,31 @@ def bot_terminate_task(run_result_key, bot_id, start_time):
       return None
 
     run_result.signal_server_version()
+    missing_cas = None
+    missing_cipd = None
+    if client_error:
+      missing_cas = client_error.get('missing_cas')
+      missing_cipd = client_error.get('missing_cipd')
     if run_result.killing:
       run_result.killing = False
       run_result.state = task_result.State.KILLED
       run_result = _set_fallbacks_to_exit_code_and_duration(run_result, now)
       # run_result.abandoned_ts is set when run_result.killing == True
       actual_state_change_time = run_result.abandoned_ts
+    elif missing_cipd or missing_cas:
+      run_result.state = task_result.State.CLIENT_ERROR
+      actual_state_change_time = start_time
+      run_result = _set_fallbacks_to_exit_code_and_duration(run_result, now)
+      if missing_cipd:
+        run_result.missing_cipd = [
+            task_request.CipdPackage.create_from_json(cipd)
+            for cipd in missing_cipd
+        ]
+      if missing_cas:
+        run_result.missing_cas = [
+            task_request.CASReference.create_from_json(missing_cas)
+        ]
+
     else:
       run_result.state = task_result.State.BOT_DIED
       # this should technically be the exact time when the bot terminates the

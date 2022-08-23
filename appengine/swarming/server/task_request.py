@@ -572,6 +572,18 @@ class CASReference(ndb.Model):
     out.cas_instance = self.cas_instance
     self.digest.to_proto(out.digest)
 
+  @classmethod
+  def create_from_json(cls, json):
+    """Create a CASReference from JSON input"""
+    cas_instance = json.get('instance')
+    digest = json.get('digest')
+    h = ''
+    size = 0
+    if digest:
+      h, size = digest.split('/')
+    return cls(cas_instance=cas_instance,
+               digest=Digest(hash=h, size_bytes=int(size)))
+
 
 class SecretBytes(ndb.Model):
   """Defines an optional secret byte string logically defined with the
@@ -632,6 +644,13 @@ class CipdPackage(ndb.Model):
       raise datastore_errors.BadValueError('CIPD package name is required')
     if not self.version:
       raise datastore_errors.BadValueError('CIPD package version is required')
+
+  @classmethod
+  def create_from_json(cls, json):
+    result = {}
+    for name in ('package_name', 'version', 'path'):
+      result[name] = json.get(name)
+    return cls(**result)
 
 
 class CipdInput(ndb.Model):

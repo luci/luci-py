@@ -20,7 +20,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   syntax='proto3',
   serialized_options=b'Z+go.chromium.org/luci/swarming/proto/jsonrpc',
   create_key=_descriptor._internal_create_key,
-  serialized_pb=b'\n\x1dproto/jsonrpc/taskstate.proto\x12\x07jsonrpc*\x98\x01\n\tTaskState\x12\x0b\n\x07INVALID\x10\x00\x12\x0b\n\x07RUNNING\x10\x10\x12\x0b\n\x07PENDING\x10 \x12\x0b\n\x07\x45XPIRED\x10\x30\x12\r\n\tTIMED_OUT\x10@\x12\x0c\n\x08\x42OT_DIED\x10P\x12\x0c\n\x08\x43\x41NCELED\x10`\x12\r\n\tCOMPLETED\x10p\x12\x0b\n\x06KILLED\x10\x80\x01\x12\x10\n\x0bNO_RESOURCE\x10\x80\x02\x42-Z+go.chromium.org/luci/swarming/proto/jsonrpcb\x06proto3'
+  serialized_pb=b'\n\x1dproto/jsonrpc/taskstate.proto\x12\x07jsonrpc*\xab\x01\n\tTaskState\x12\x0b\n\x07INVALID\x10\x00\x12\x0b\n\x07RUNNING\x10\x10\x12\x0b\n\x07PENDING\x10 \x12\x0b\n\x07\x45XPIRED\x10\x30\x12\r\n\tTIMED_OUT\x10@\x12\x0c\n\x08\x42OT_DIED\x10P\x12\x0c\n\x08\x43\x41NCELED\x10`\x12\r\n\tCOMPLETED\x10p\x12\x0b\n\x06KILLED\x10\x80\x01\x12\x10\n\x0bNO_RESOURCE\x10\x80\x02\x12\x11\n\x0c\x43LIENT_ERROR\x10\x80\x04\x42-Z+go.chromium.org/luci/swarming/proto/jsonrpcb\x06proto3'
 )
 
 _TASKSTATE = _descriptor.EnumDescriptor(
@@ -80,11 +80,16 @@ _TASKSTATE = _descriptor.EnumDescriptor(
       serialized_options=None,
       type=None,
       create_key=_descriptor._internal_create_key),
+    _descriptor.EnumValueDescriptor(
+      name='CLIENT_ERROR', index=10, number=512,
+      serialized_options=None,
+      type=None,
+      create_key=_descriptor._internal_create_key),
   ],
   containing_type=None,
   serialized_options=None,
   serialized_start=43,
-  serialized_end=195,
+  serialized_end=214,
 )
 _sym_db.RegisterEnumDescriptor(_TASKSTATE)
 
@@ -99,6 +104,7 @@ CANCELED = 96
 COMPLETED = 112
 KILLED = 128
 NO_RESOURCE = 256
+CLIENT_ERROR = 512
 
 
 DESCRIPTOR.enum_types_by_name['TaskState'] = _TASKSTATE

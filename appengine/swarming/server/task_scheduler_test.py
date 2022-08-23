@@ -250,6 +250,8 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         False,
         'internal_failure':
         False,
+        'missing_cas': [],
+        'missing_cipd': [],
         'modified_ts':
         self.now,
         'name':
@@ -301,6 +303,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         'bot_id': u'localhost',
         'bot_idle_since_ts': self.now,
         'bot_version': u'abc',
+        'cas_output_root': None,
         'cipd_pins': None,
         'children_task_ids': [],
         'completed_ts': None,
@@ -312,8 +315,9 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         'failure': False,
         'internal_failure': False,
         'killing': None,
+        'missing_cas': [],
+        'missing_cipd': [],
         'modified_ts': self.now,
-        'cas_output_root': None,
         'resultdb_info': None,
         'server_versions': [u'v1a'],
         'started_ts': self.now,
@@ -1905,8 +1909,11 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
 
     self.assertEqual(
         None,
-        task_scheduler.bot_terminate_task(run_result.key, 'localhost',
-                                          self.now))
+        task_scheduler.bot_terminate_task(run_result.key, 'localhost', self.now,
+                                          {
+                                              'missing_cas': None,
+                                              'missing_cipd': []
+                                          }))
     expected = self._gen_result_summary_reaped(
         abandoned_ts=self.now,
         completed_ts=self.now,
@@ -1943,7 +1950,10 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
 
     # execute termination task
     err = task_scheduler.bot_terminate_task(run_result.key, 'localhost',
-                                            start_time)
+                                            start_time, {
+                                                'missing_cas': None,
+                                                'missing_cipd': []
+                                            })
 
     self.assertEqual(None, err)
 
@@ -1991,12 +2001,134 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
             'cron': False,
         }).sum)
 
+  def test_bot_terminate_task_missing_cas(self):
+    pub_sub_calls = self.mock_pub_sub()
+    run_result = self._quick_reap(1, 0, pubsub_topic='projects/abc/topics/def')
+    self.assertEqual(1, len(pub_sub_calls))  # PENDING -> RUNNING
+    client_error = {
+        'missing_cas': {
+            'digest': '93b45bab427ab9fe55asdq123324adsdaf8d5/1292',
+            'instance': 'projects/chromium-swarm/instances/default_instance',
+        },
+        'missing_cipd': [],
+    }
+
+    self.assertEqual(
+        None,
+        task_scheduler.bot_terminate_task(run_result.key, 'localhost', self.now,
+                                          client_error))
+    expected_missing_cas = [{
+        'cas_instance': 'projects/chromium-swarm/instances/default_instance',
+        'digest': {
+            'hash': '93b45bab427ab9fe55asdq123324adsdaf8d5',
+            'size_bytes': 1292
+        }
+    }]
+    # check result summary
+    expected = self._gen_result_summary_reaped(
+        abandoned_ts=self.now,
+        completed_ts=self.now,
+        costs_usd=[0.],
+        id='1d69b9f088008910',
+        internal_failure=True,
+        missing_cas=expected_missing_cas,
+        started_ts=self.now,
+        state=State.CLIENT_ERROR,
+        duration=0.0,
+        exit_code=-1,
+        failure=True,
+    )
+    self.assertEqual(expected, run_result.result_summary_key.get().to_dict())
+
+    # check run result
+    expected = self._gen_run_result(
+        abandoned_ts=self.now,
+        completed_ts=self.now,
+        id='1d69b9f088008911',
+        internal_failure=True,
+        missing_cas=expected_missing_cas,
+        state=State.CLIENT_ERROR,
+        killing=None,
+        duration=0.0,
+        exit_code=-1,
+        failure=True,
+    )
+    self.assertEqual(expected, run_result.key.get().to_dict())
+    self.assertEqual(1, self.execute_tasks())
+    self.assertEqual(2, len(pub_sub_calls))  # RUNNING -> CLIENT_ERROR
+
+    status = State.to_string(State.CLIENT_ERROR)
+    self.assertLessEqual(
+        0,
+        ts_mon_metrics._task_state_change_pubsub_notify_latencies.get(
+            fields=_get_fields(status=status, http_status_code=200)).sum)
+
+  def test_bot_terminate_task_missing_cipd(self):
+    pub_sub_calls = self.mock_pub_sub()
+    run_result = self._quick_reap(1, 0, pubsub_topic='projects/abc/topics/def')
+    self.assertEqual(1, len(pub_sub_calls))  # PENDING -> CLIENT_ERROR
+    client_error = {
+        'missing_cas':
+        None,
+        'missing_cipd': [{
+            'package_name': u'foo',
+            'version': u'deadbeef',
+            'path': u'not/found/here',
+        }],
+    }
+
+    self.assertEqual(
+        None,
+        task_scheduler.bot_terminate_task(run_result.key, 'localhost', self.now,
+                                          client_error))
+    # check result summary
+    expected = self._gen_result_summary_reaped(
+        abandoned_ts=self.now,
+        completed_ts=self.now,
+        costs_usd=[0.],
+        id='1d69b9f088008910',
+        internal_failure=True,
+        missing_cipd=client_error['missing_cipd'],
+        started_ts=self.now,
+        state=State.CLIENT_ERROR,
+        duration=0.0,
+        exit_code=-1,
+        failure=True,
+    )
+    self.assertEqual(expected, run_result.result_summary_key.get().to_dict())
+
+    # check run result
+    expected = self._gen_run_result(
+        abandoned_ts=self.now,
+        completed_ts=self.now,
+        id='1d69b9f088008911',
+        internal_failure=True,
+        missing_cipd=client_error['missing_cipd'],
+        state=State.CLIENT_ERROR,
+        killing=None,
+        duration=0.0,
+        exit_code=-1,
+        failure=True,
+    )
+    self.assertEqual(expected, run_result.key.get().to_dict())
+    self.assertEqual(1, self.execute_tasks())
+    self.assertEqual(2, len(pub_sub_calls))  # RUNNING -> CLIENT_ERROR
+
+    status = State.to_string(State.CLIENT_ERROR)
+    self.assertLessEqual(
+        0,
+        ts_mon_metrics._task_state_change_pubsub_notify_latencies.get(
+            fields=_get_fields(status=status, http_status_code=200)).sum)
+
   def test_bot_terminate_task_wrong_bot(self):
     run_result = self._quick_reap(1, 0)
     expected = (
         'Bot bot1 sent task kill for task 1d69b9f088008911 owned by bot '
         'localhost')
-    err = task_scheduler.bot_terminate_task(run_result.key, 'bot1', 0)
+    err = task_scheduler.bot_terminate_task(run_result.key, 'bot1', 0, {
+        'missing_cas': None,
+        'missing_cipd': []
+    })
     self.assertEqual(expected, err)
 
   def test_cancel_task(self):

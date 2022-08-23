@@ -155,35 +155,61 @@ class TaskResultApiTest(TestCase):
   def _gen_summary(self, **kwargs):
     """Returns TaskResultSummary.to_dict()."""
     out = {
-        'abandoned_ts': None,
-        'bot_dimensions': None,
-        'bot_id': None,
-        'bot_idle_since_ts': None,
-        'bot_version': None,
-        'cipd_pins': None,
+        'abandoned_ts':
+        None,
+        'bot_dimensions':
+        None,
+        'bot_id':
+        None,
+        'bot_idle_since_ts':
+        None,
+        'bot_version':
+        None,
+        'cipd_pins':
+        None,
         'children_task_ids': [],
-        'completed_ts': None,
+        'completed_ts':
+        None,
         'costs_usd': [],
-        'cost_saved_usd': None,
-        'created_ts': self.now,
-        'current_task_slice': 0,
-        'deduped_from': None,
-        'duration': None,
-        'exit_code': None,
-        'expiration_delay': None,
-        'failure': False,
+        'cost_saved_usd':
+        None,
+        'created_ts':
+        self.now,
+        'current_task_slice':
+        0,
+        'deduped_from':
+        None,
+        'duration':
+        None,
+        'exit_code':
+        None,
+        'expiration_delay':
+        None,
+        'failure':
+        False,
         # Constant due to the mock of both utils.utcnow() and
         # random.getrandbits().
-        'id': '1d69b9f088008810',
-        'internal_failure': False,
-        'modified_ts': None,
-        'name': u'Request name',
-        'priority': 50,
-        'cas_output_root': None,
-        'resultdb_info': None,
+        'id':
+        '1d69b9f088008810',
+        'internal_failure':
+        False,
+        'missing_cas': [],
+        'missing_cipd': [],
+        'modified_ts':
+        None,
+        'name':
+        u'Request name',
+        'priority':
+        50,
+        'cas_output_root':
+        None,
+        'resultdb_info':
+        None,
         'server_versions': [u'v1a'],
-        'started_ts': None,
-        'state': task_result.State.PENDING,
+        'started_ts':
+        None,
+        'state':
+        task_result.State.PENDING,
         'tags': [
             u'authenticated:user:mocked@example.com',
             u'pool:default',
@@ -194,8 +220,10 @@ class TaskResultApiTest(TestCase):
             u'tag:1',
             u'user:Jesus',
         ],
-        'try_number': None,
-        'user': u'Jesus',
+        'try_number':
+        None,
+        'user':
+        u'Jesus',
     }
     out.update(kwargs)
     return out
@@ -211,6 +239,7 @@ class TaskResultApiTest(TestCase):
         'bot_id': u'localhost',
         'bot_idle_since_ts': None,
         'bot_version': u'abc',
+        'cas_output_root': None,
         'children_task_ids': [],
         'cipd_pins': None,
         'completed_ts': None,
@@ -226,7 +255,8 @@ class TaskResultApiTest(TestCase):
         'internal_failure': False,
         'killing': None,
         'modified_ts': None,
-        'cas_output_root': None,
+        'missing_cipd': [],
+        'missing_cas': [],
         'resultdb_info': None,
         'server_versions': [u'v1a'],
         'started_ts': None,

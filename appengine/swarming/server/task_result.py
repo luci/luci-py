@@ -107,16 +107,17 @@ class State(object):
   COMPLETED = 0x70  # 112
   KILLED = 0x80  # 128
   NO_RESOURCE = 0x100  # 256
+  CLIENT_ERROR = 0x200  # 512
 
   STATES = (RUNNING, PENDING, EXPIRED, TIMED_OUT, BOT_DIED, CANCELED, COMPLETED,
-            KILLED, NO_RESOURCE)
+            KILLED, NO_RESOURCE, CLIENT_ERROR)
   # State will mutate again. Anything else means not queued, not running.
   STATES_RUNNING = (RUNNING, PENDING)
   # Abnormal termination.
-  STATES_EXCEPTIONAL = (
-      EXPIRED, TIMED_OUT, BOT_DIED, CANCELED, KILLED, NO_RESOURCE)
+  STATES_EXCEPTIONAL = (EXPIRED, TIMED_OUT, BOT_DIED, CANCELED, KILLED,
+                        NO_RESOURCE, CLIENT_ERROR)
   # Task ran and is done running.
-  STATES_DONE = (TIMED_OUT, COMPLETED, KILLED)
+  STATES_DONE = (TIMED_OUT, COMPLETED, KILLED, CLIENT_ERROR)
   # Task didn't run (except for BOT_DIED, which may or may not have run).
   STATES_ABANDONED = (EXPIRED, BOT_DIED, CANCELED, NO_RESOURCE)
 
@@ -130,6 +131,7 @@ class State(object):
       COMPLETED: 'Completed',
       KILLED: 'Killed',
       NO_RESOURCE: 'No resource available',
+      CLIENT_ERROR: 'Client error',
   }
 
   @classmethod
@@ -554,6 +556,14 @@ class _TaskResultCommon(ndb.Model):
   # The pinned versions of all the CIPD packages used in the task.
   cipd_pins = ndb.LocalStructuredProperty(CipdPins)
 
+  # Reported missing CIPD packages on CLIENT_ERROR state
+  missing_cipd = ndb.LocalStructuredProperty(task_request.CipdPackage,
+                                             repeated=True)
+
+  # Reported missing CAS packages on CLIENT_ERROR state
+  missing_cas = ndb.LocalStructuredProperty(task_request.CASReference,
+                                            repeated=True)
+
   # Index in the TaskRequest.task_slices that this entity is current waiting on,
   # running or ran.
   current_task_slice = ndb.IntegerProperty(indexed=False, default=0)
@@ -893,7 +903,7 @@ class _TaskResultCommon(ndb.Model):
           raise datastore_errors.BadValueError(
               'exit_code must be set with state %s' %
               State.to_string(self.state))
-    elif self.state != State.BOT_DIED:
+    elif self.state != State.BOT_DIED and self.state != State.CLIENT_ERROR:
       # Allow duration and exit_code to be either missing or set for BOT_DIED,
       # but they should be not present for any running/pending states.
       if self.duration is not None:
@@ -1230,6 +1240,8 @@ class TaskResultSummary(_TaskResultCommon):
     # pylint: disable=W0201
     self.state = run_result.state
     self.try_number = run_result.try_number
+    self.missing_cas = run_result.missing_cas
+    self.missing_cipd = run_result.missing_cipd
 
     while len(self.costs_usd) < run_result.try_number:
       self.costs_usd.append(0.)
@@ -1482,6 +1494,9 @@ def filter_query(cls, q, start, end, sort, state):
 
   if state == 'bot_died':
     return q.filter(cls.state == State.BOT_DIED)
+
+  if state == 'client_error':
+    return q.filter(cls.state == State.CLIENT_ERROR)
 
   if state == 'canceled':
     return q.filter(cls.state == State.CANCELED)

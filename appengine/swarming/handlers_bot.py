@@ -1345,7 +1345,7 @@ class BotTaskErrorHandler(_BotApiHandler):
     bot_id = request.get('id')
     task_id = request.get('task_id', '')
     message = request.get('message', 'unknown')
-    # TODO(b/239491333): handle missing_cas and missing_cipd cases.
+    client_errors = request.get('client_error')
 
     # Make sure bot self-reported ID matches the authentication token. Raises
     # auth.AuthorizationError if not.
@@ -1378,9 +1378,11 @@ class BotTaskErrorHandler(_BotApiHandler):
     # TODO(b/239491333): re-enable once all bot_code has propagated completely
     #if msg:
     #  self.abort_with_error(400, error=msg)
-
+    # TODO(b/242270173) Remove this line when Swarming UI changes have been made
+    client_errors = None
     msg = task_scheduler.bot_terminate_task(
-        task_pack.unpack_run_result_key(task_id), bot_id, start_time)
+        task_pack.unpack_run_result_key(task_id), bot_id, start_time,
+        client_errors)
     if msg:
       logging.error(msg)
       self.abort_with_error(400, error=msg)
