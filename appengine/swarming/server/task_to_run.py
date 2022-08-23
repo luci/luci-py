@@ -324,7 +324,10 @@ def _validate_task_async(bot_dims_matcher, stats, now, to_run):
   # There's a probability of 2**-31 of conflicts, which is low enough for our
   # purpose.
   if not bot_dims_matcher(props.dimensions):
-    logging.debug('_validate_task_async(%s): dimensions mismatch', packed)
+    logging.debug(
+        '_validate_task_async(%s): dimensions mismatch '
+        '(slice index %d, queue_number %r)', packed, to_run.task_slice_index,
+        to_run.queue_number)
     stats.mismatch += 1
     raise ndb.Return((None, None))
 
@@ -688,6 +691,8 @@ def dimensions_matcher(bot_dimensions):
         match = any(u'%s:%s' % (key, variant) in bot_flat
                     for variant in val.split(OR_DIM_SEP))
         if not match:
+          logging.warning('Mismatch: bot %r, req %r', bot_dimensions,
+                          request_dimensions)
           return False
     return True
 
