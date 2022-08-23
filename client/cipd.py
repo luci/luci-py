@@ -24,6 +24,7 @@ from utils import net
 from utils import subprocess42
 from utils import tools
 
+import errors
 import local_caching
 
 
@@ -234,15 +235,32 @@ class CipdClient:
           logging.info('cipd client: %s', line)
 
       exit_code = process.wait(timeout=timeoutfn())
+
+      ensure_result = {}
+      if os.path.exists(json_file_path):
+        with open(json_file_path) as jfile:
+          result_json = json.load(jfile)
+          ensure_result = result_json['result']
+          status = result_json.get('error_code')
+          if status in ('auth_error', 'bad_argument_error',
+                        'invalid_version_error', 'stale_error',
+                        'hash_mismatch_error'):
+            details = result_json.get('error_details')
+            cipd_package = cipd_version = cipd_subdir = None
+            if details:
+              cipd_package = details.get('package')
+              cipd_version = details.get('version')
+              cipd_subdir = details.get('subdir')
+            raise errors.NonRecoverableCipdException(status, cipd_package,
+                                                     cipd_subdir, cipd_version)
+
       if exit_code != 0:
         raise Error(
             'Could not install packages; exit code %d\noutput:%s' % (
             exit_code, '\n'.join(output)))
-      with open(json_file_path) as jfile:
-        result_json = json.load(jfile)
       return {
-          subdir: [(x['package'], x['instance_id']) for x in pins
-                  ] for subdir, pins in result_json['result'].items()
+          subdir: [(x['package'], x['instance_id']) for x in pins]
+          for subdir, pins in ensure_result.items()
       }
     finally:
       fs.remove(ensure_file_path)

@@ -73,6 +73,7 @@ from depot_tools import fix_encoding
 import DEPS
 import auth
 import cipd
+import errors
 import local_caching
 from libs import luci_context
 from utils import file_path
@@ -219,57 +220,6 @@ TaskData = collections.namedtuple(
         # downloading isolated files.
         'trim_caches_fn',
     ])
-
-
-class NonRecoverableException(Exception):
-  """For handling errors where we cannot recover from and should not retry."""
-
-  def __init__(self, status, msg):
-    super(Exception, self).__init__(msg)
-    self.status = status
-
-  def to_dict(self):
-    """Returns a dictionary with the attributes serialised."""
-    raise NotImplementedError()
-
-
-class NonRetriableCasException(NonRecoverableException):
-  """For handling a bad CAS input where we should not attempt to retry."""
-
-  def __init__(self, status, digest, instance):
-    super(NonRetriableCasException, self).__init__(
-        status, "CAS error: {} with digest {} on instance {}".format(
-            status, digest, instance))
-    self.digest = digest
-    self.instance = instance
-
-  def to_dict(self):
-    return {
-        'status': self.status,
-        'digest': self.digest,
-        'instance': self.instance,
-    }
-
-
-class NonRetriableCipdException(NonRecoverableException):
-  """For handling a bad CIPD package where we should not attempt to retry."""
-
-  def __init__(self, status, package_name, path, version):
-    super(NonRetriableCipdException, self).__init__(
-        status, "CIPD error: {} with package {}, version {} on path {}".format(
-            status, package_name, version, path))
-    self.package_name = package_name
-    self.path = path
-    self.version = version
-
-  def to_dict(self):
-    return {
-        'status': self.status,
-        'package_name': self.package_name,
-        'path': self.path,
-        'version': self.version
-    }
-
 
 def make_temp_dir(prefix, root_dir):
   """Returns a new unique temporary directory."""
@@ -660,7 +610,8 @@ def _fetch_and_map(cas_client, digest, instance, output_dir, cache_dir,
           file_path.rmtree(kvs_dir)
           file_path.rmtree(output_dir)
       if cas_error:
-        raise NonRetriableCasException(result_json['result'], digest, instance)
+        raise errors.NonRecoverableCasException(result_json['result'], digest,
+                                                instance)
       return result_json
 
     try:
@@ -988,7 +939,7 @@ def map_and_run(data, constant_run_path):
     # We successfully ran the command, set internal_failure back to
     # None (even if the command failed, it's not an internal error).
     result['internal_failure'] = None
-  except NonRetriableCasException as e:
+  except errors.NonRecoverableCasException as e:
     # We could not find the CAS package. The swarming task should not
     # be retried automatically
     result['missing_cas'] = e.to_dict()
@@ -996,7 +947,7 @@ def map_and_run(data, constant_run_path):
     result['internal_failure'] = str(e)
     on_error.report(None)
 
-  except NonRetriableCipdException as e:
+  except errors.NonRecoverableCipdException as e:
     # We could not find the CIPD package. The swarming task should not
     # be retried automatically
     result['missing_cipd'] = [e.to_dict()]
@@ -1810,8 +1761,8 @@ def main(args):
                   trim_caches_fn=trim_caches_fn)
   try:
     return run_tha_test(data, options.json)
-  except (cipd.Error, local_caching.NamedCacheError,
-          local_caching.NoMoreSpace) as ex:
+  except (cipd.Error, local_caching.NamedCacheError, local_caching.NoMoreSpace,
+          errors.NonRecoverableCipdException) as ex:
     print(ex.message, file=sys.stderr)
     on_error.report(None)
     return 1

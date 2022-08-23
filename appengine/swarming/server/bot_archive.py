@@ -62,6 +62,7 @@ FILES = (
     'client/DEPS.py',
     'client/auth.py',
     'client/cipd.py',
+    'client/errors.py',
     'client/local_caching.py',
     'client/run_isolated.py',
     'config/__init__.py',

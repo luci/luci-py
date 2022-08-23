@@ -28,6 +28,7 @@ import cipdserver_fake
 
 import cas_util
 import cipd
+import errors
 import local_caching
 import run_isolated
 from libs import luci_context
@@ -606,6 +607,64 @@ class RunIsolatedTest(RunIsolatedTestBase):
         echo_cmd[0])
     self.assertEqual(echo_cmd[1:], ['hello', 'world'])
 
+  def test_main_naked_with_invalid_cipd_package(self):
+    self.mock(cipd, 'get_platform', lambda: 'linux-amd64')
+    suffix = '.exe' if sys.platform == 'win32' else ''
+
+    def fake_ensure(args, **kwargs):
+      if (args[0].endswith(os.path.join('bin', 'cipd' + suffix))
+          and args[1] == 'ensure' and '-json-output' in args):
+        idx = args.index('-json-output')
+        with open(args[idx + 1], 'w') as json_out:
+          json.dump(
+              {
+                  "error":
+                  "failed to resolve does/not/exists/linux-amd64@latest",
+                  "error_code": "invalid_version_error",
+                  "error_details": {
+                      "package": "does/not/exists/linux-amd64",
+                      "version": "latest"
+                  },
+                  "result": None
+              }, json_out)
+        return 0
+      if args[0].endswith(os.sep + 'echo' + suffix):
+        return 0
+      self.fail('unexpected: %s, %s' % (args, kwargs))
+      return 1
+
+    self.popen_fakes.append(fake_ensure)
+    result_json_path = os.path.join(self.tempdir, 'result.json')
+    cipd_cache = os.path.join(self.tempdir, 'cipd_cache')
+    cmd = [
+        '--json',
+        result_json_path,
+        '--no-log',
+        '--cipd-package',
+        'bin:does/not/exists/${platform}:latest',
+        '--cipd-server',
+        self.cipd_server.url,
+        '--cipd-cache',
+        cipd_cache,
+        '--named-cache-root',
+        os.path.join(self.tempdir, 'named_cache'),
+        '--',
+        'bin/echo${EXECUTABLE_SUFFIX}',
+        'hello',
+        'world',
+    ]
+    ret = run_isolated.main(cmd)
+    self.assertEqual(1, ret)
+    with open(result_json_path, 'r') as fp:
+      result_json = json.load(fp)
+    self.assertEqual(1, len(result_json['missing_cipd']))
+    missing_cipd = result_json['missing_cipd'][0]
+    self.assertEqual('does/not/exists/linux-amd64',
+                     missing_cipd['package_name'])
+    self.assertEqual('invalid_version_error', missing_cipd['status'])
+    self.assertEqual('latest', missing_cipd['version'])
+    self.assertIsNone(missing_cipd['path'])
+
   def test_main_naked_with_cipd_client_no_packages(self):
     self.mock(cipd, 'get_platform', lambda: 'linux-amd64')
 
@@ -1066,9 +1125,8 @@ class RunIsolatedTestCase(RunIsolatedTestRun):
 
   def test_bad_cipd_package(self):
     def emulate_bad_cipd(_run_dir, cas_dir, _nsjail_dir):
-      raise run_isolated.NonRetriableCipdException("missing_cipd",
-                                                   "foo_package",
-                                                   "not/found/foo", "deadbeef")
+      raise errors.NonRecoverableCipdException("missing_cipd", "foo_package",
+                                               "not/found/foo", "deadbeef")
 
     data = run_isolated.TaskData(
         command=['python3', 'cmd.py', '${ISOLATED_OUTDIR}/foo'],
