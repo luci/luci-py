@@ -281,13 +281,15 @@ class _QueryStats(object):
   expired = 0
   ignored = 0
   mismatch = 0
+  stale = 0
   total = 0
+  visited = 0
 
   def __str__(self):
-    return ('%d total, %d exp, %d cache negative, '
-            '%d dimensions mismatch, %d ignored') % (self.total, self.expired,
-                                                     self.cache, self.mismatch,
-                                                     self.ignored)
+    return ('%d total, %d visited, %d exp, %d cache negative, %d stale, '
+            '%d dimensions mismatch, %d ignored') % (
+                self.total, self.visited, self.expired, self.cache, self.stale,
+                self.mismatch, self.ignored)
 
 
 @ndb.tasklet
@@ -298,12 +300,14 @@ def _validate_task_async(bot_dims_matcher, stats, now, to_run):
     None if the task cannot be reaped by this bot.
     TaskRequest if this is a good candidate to reap.
   """
-  # TODO(maruel): Create one TaskToRunShard per TaskRunResult.
   packed = task_pack.pack_request_key(
       task_to_run_key_to_request_key(to_run.key)) + '0'
-  stats.total += 1
+  stats.visited += 1
 
-  # Do this after the basic weeding out but before fetching TaskRequest.
+  # Even though we checked the cache already in _yield_potential_tasks, an
+  # unbound amount of time may have passed since then, due to how
+  # yield_next_available_task_to_dispatch dequeues and processes items. It will
+  # not hurt to re-check the cache again (it should be fast anyway).
   neg = yield _lookup_cache_is_taken_async(to_run.key)
   if neg:
     logging.debug('_validate_task_async(%s): negative cache', packed)
@@ -390,15 +394,19 @@ class _PriorityQueue(object):
     return not self._heap
 
 
+_MC_CLIENT = memcache.Client()
+
+
 class _ActiveQuery(object):
   DEADLINE = 60
 
-  def __init__(self, query, dim_hash):
+  def __init__(self, query, dim_hash, bot_id, stats):
     self._query = query
     self._dim_hash = dim_hash
+    self._bot_id = bot_id
+    self._stats = stats
     self._page_size = 10
-    self._future = query.fetch_page_async(self._page_size,
-                                          deadline=self.DEADLINE)
+    self._future = self._fetch_and_filter(None)
 
   @property
   def dim_hash(self):
@@ -419,15 +427,64 @@ class _ActiveQuery(object):
       # many pages), make pages larger with each iteration to reduce number of
       # datastore calls we make.
       self._page_size = min(50, self._page_size + 5)
-      self._future = self._query.fetch_page_async(self._page_size,
-                                                  start_cursor=cursor,
-                                                  deadline=self.DEADLINE)
+      self._future = self._fetch_and_filter(cursor)
     else:
       self._future = None
     return more
 
+  @ndb.tasklet
+  def _fetch_and_filter(self, cursor):
+    """Fetches a page of query results and filters out unusable items.
 
-def _yield_potential_tasks(bot_id, pool):
+    A TaskToRunShard is unusable if either queue_number is None, or it was
+    already claimed by some other bot based on the state in memcache.
+
+    Yields:
+      ([list of potentially consumable TaskToRunShard], cursor, more).
+    """
+    fetched, cursor, more = yield self._query.fetch_page_async(
+        self._page_size, start_cursor=cursor, deadline=self.DEADLINE)
+
+    self._stats.total += len(fetched)
+
+    # The query is eventually consistent. It is possible TaskToRunShard was
+    # already processed and its queue_number was cleared. Filter out all such
+    # entries.
+    fresh = []
+    for ttr in fetched:
+      if ttr.queue_number is not None:
+        fresh.append(ttr)
+      else:
+        self._log('TaskToRunShard %s is stale', ttr.task_id)
+    self._stats.stale += len(fetched) - len(fresh)
+
+    # Filter out all entries that have already been claimed by other bots. This
+    # is an optimization to skip claimed entries as fast as possible. The bots
+    # will then contest on remaining entries in `set_lookup_cache`, and finally
+    # in the datastore transaction.
+    available = []
+    if fresh:
+      keys = [_memcache_to_run_key(ttr.key) for ttr in fresh]
+      taken = yield _MC_CLIENT.get_multi_async(keys, namespace='task_to_run')
+      for i in xrange(len(keys)):
+        if not taken.get(keys[i]):
+          available.append(fresh[i])
+      self._stats.cache += len(fresh) - len(available)
+
+    if fetched:
+      self._log('got %d items (%d stale, %d negative cache)', len(fetched),
+                len(fetched) - len(fresh),
+                len(fresh) - len(available))
+    if not more:
+      self._log('exhausted')
+    raise ndb.Return((available, cursor, more))
+
+  def _log(self, msg, *args):
+    logging.debug('_ActiveQuery(%s, %d): %s', self._bot_id, self._dim_hash,
+                  msg % args)
+
+
+def _yield_potential_tasks(bot_id, pool, stats):
   """Queries all the known task queues in parallel and yields the task in order
   of priority.
 
@@ -456,7 +513,7 @@ def _yield_potential_tasks(bot_id, pool):
     queries = []
     for d in dim_hashes:
       for q in _get_task_to_run_query(d):
-        queries.append(_ActiveQuery(q, d))
+        queries.append(_ActiveQuery(q, d, bot_id, stats))
 
     # Run tasklets for at most 1 sec or until all fetches are done.
     #
@@ -497,40 +554,26 @@ def _yield_potential_tasks(bot_id, pool):
           pending.append(q)
           continue
 
-        # Got a page of results.
         runs = q.page()
         if runs:
-          logging.debug(
-              '_yield_potential_tasks(%s): got %d items from queue %d',
-              bot_id, len(runs), q.dim_hash)
+          # TaskToRun submitted within the same 100ms interval at the same
+          # priority have the same queue sorting number (see _gen_queue_number).
+          # By shuffling them here we reduce chances of multiple bots contesting
+          # over the same items. This is effective only for queues with more
+          # than 10 tasks per second.
+          random.shuffle(runs)
 
-        # TaskToRun submitted within the same 100ms interval at the same
-        # priority have the same queue sorting number (see _gen_queue_number).
-        # By shuffling them here we reduce chances of multiple bots contesting
-        # over the same items. This is effective only for queues with more than
-        # 10 tasks per second.
-        random.shuffle(runs)
-
-        # Add them to the local priority queue.
-        for r in runs:
-          if r.queue_number:
+          # Add them to the local priority queue.
+          changed = True
+          for r in runs:
             enqueue(r)
-            changed = True
-          else:
-            # The query is eventually consistent. It is possible TaskToRun was
-            # already processed and its queue_number was cleared.
-            logging.warning(
-                '_yield_potential_tasks(%s): TaskToRunShard %s does not have '
-                'queue_number', bot_id, r.task_id)
 
         # Start fetching the next page, if any.
         if q.advance():
           pending.append(q)
         else:
+          # The queue has no more results, don't add it to `pending`.
           changed = True
-          logging.debug(
-              '_yield_potential_tasks(%s): queue %d is exhausted',
-              bot_id, q.dim_hash)
 
       # Log the final stats if anything changed.
       if changed:
@@ -706,7 +749,7 @@ def yield_next_available_task_to_dispatch(bot_id, pool, bot_dims_matcher):
   stats = _QueryStats()
   futures = collections.deque()
   try:
-    for ttr in _yield_potential_tasks(bot_id, pool):
+    for ttr in _yield_potential_tasks(bot_id, pool, stats):
       duration = (utils.utcnow() - now).total_seconds()
       if duration > 40.:
         # Stop searching after too long, since the odds of the request blowing
@@ -756,7 +799,9 @@ def yield_next_available_task_to_dispatch(bot_id, pool, bot_dims_matcher):
                                        expired=stats.expired,
                                        ignored=stats.ignored,
                                        mismatch=stats.mismatch,
-                                       total=stats.total)
+                                       stale=stats.stale,
+                                       total=stats.total,
+                                       visited=stats.visited)
 
 
 def yield_expired_task_to_run():

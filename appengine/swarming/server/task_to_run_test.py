@@ -929,6 +929,48 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
     collected.sort(key=lambda ttr: ttr['created_ts'])
     self.assertEqual(submitted, collected)
 
+  def test_yield_next_available_task_checks_cache(self):
+    request_dimensions = {u'os': [u'Windows-3.1.1'], u'pool': [u'p1']}
+    bot_dimensions = {
+        u'id': [u'localhost'],
+        u'os': [u'Windows-3.1.1'],
+        u'pool': [u'p1', u'p2', u'p3'],
+    }
+
+    submitted = []
+
+    def submit_bunch(count, mark_as_consumed):
+      bunch = []
+      for _ in range(count):
+        self.mock_now(self.now, len(submitted))
+        request = self.mkreq(
+            1 if not submitted else 0,
+            _gen_request(
+                properties=_gen_properties(dimensions=request_dimensions),
+                priority=50))
+        ttr = task_to_run.new_task_to_run(request, 0)
+        ttr.put()
+        submitted.append(ttr)
+        bunch.append(ttr.to_dict())
+        if mark_as_consumed:
+          task_to_run.set_lookup_cache(ttr.key, False)
+      return bunch
+
+    available = []
+
+    available.extend(submit_bunch(7, False))
+    submit_bunch(7, True)
+    available.extend(submit_bunch(7, False))
+
+    # Got only ones that weren't marked as consumed.
+    collected = list(_yield_next_available_task_to_dispatch(bot_dimensions))
+    self.assertEqual(len(available), len(collected))
+
+    # Same items. Ignore order, there are other tests for that.
+    available.sort(key=lambda ttr: ttr['created_ts'])
+    collected.sort(key=lambda ttr: ttr['created_ts'])
+    self.assertEqual(available, collected)
+
   def test_yield_expired_task_to_run(self):
     # There's a cut off at 2019-09-01, so the default self.now on Jan 2nd
     # doesn't work when looking 4 weeks ago.
