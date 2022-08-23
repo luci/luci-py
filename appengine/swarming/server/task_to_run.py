@@ -554,8 +554,12 @@ def _yield_potential_tasks(bot_id, pool):
         # No pending items, but there are some pending futures. Run one step of
         # ndb event loop to move things forward.
         ndb.eventloop.run1()
-      # Poll for any new query pages, adding fetched items to the queue.
-      queries = _poll_queries(queries, use_heap=True)
+      # Poll for any new query pages, adding fetched items to the local queue.
+      # Do it only if the local queue is sufficiently shallow. If it is not,
+      # then the consumer is too slow. Adding more items will just result in
+      # eventually running out of memory.
+      if queue.size() < 1000:
+        queries = _poll_queries(queries, use_heap=True)
 
   except apiproxy_errors.DeadlineExceededError as e:
     # This is normally due to: "The API call datastore_v3.RunQuery() took too
