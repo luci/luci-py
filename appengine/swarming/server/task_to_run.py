@@ -41,6 +41,7 @@ from google.appengine.runtime import apiproxy_errors
 from google.appengine.api import memcache
 from google.appengine.ext import ndb
 
+from components import datastore_utils
 from components import utils
 from server import bot_management
 from server import config
@@ -88,6 +89,12 @@ class _TaskToRunBase(ndb.Model):
   # ones have created_ts set at the time the new entity is created: when the
   # task is reenqueued.
   created_ts = ndb.DateTimeProperty(indexed=False)
+
+  # Copy of dimensions from the corresponding task slice of TaskRequest.
+  # Used to quickly check if a bot can reap this TaskToRun right after fetching
+  # it from a datastore query.
+  dimensions = datastore_utils.DeterministicJsonProperty(json_type=dict,
+                                                         indexed=False)
 
   # Everything above is immutable, everything below is mutable.
 
@@ -151,7 +158,7 @@ class _TaskToRunBase(ndb.Model):
 
   def to_dict(self):
     """Purely used for unit testing."""
-    out = super(_TaskToRunBase, self).to_dict()
+    out = super(_TaskToRunBase, self).to_dict(exclude=['dimensions'])
     # Consistent formatting makes it easier to reason about.
     if out['queue_number']:
       out['queue_number'] = '0x%016x' % out['queue_number']
@@ -318,12 +325,19 @@ def _validate_task_async(bot_dims_matcher, stats, now, to_run):
   request = yield task_to_run_key_to_request_key(to_run.key).get_async()
   props = request.task_slice(to_run.task_slice_index).properties
 
-  # The hash may have conflicts. Ensure the dimensions actually match by
-  # verifying the TaskRequest.
+  # Newer TaskToRun have dimensions embedded. Older ones don't.
   #
-  # There's a probability of 2**-31 of conflicts, which is low enough for our
-  # purpose.
-  if not bot_dims_matcher(props.dimensions):
+  # TODO(vadimsh): Remove the fallback once it no longer happens in production.
+  dimensions = to_run.dimensions
+  if not dimensions:
+    logging.warning('_validate_task_async(%s): no dimensions in TaskToRun',
+                    packed)
+    dimensions = props.dimensions
+
+  # The hash may have conflicts or the queues returned by get_queues(...) aren't
+  # matching the bot anymore (if this cache is stale). Ensure the dimensions
+  # actually match the bot.
+  if not bot_dims_matcher(dimensions):
     logging.debug(
         '_validate_task_async(%s): dimensions mismatch '
         '(slice index %d, queue_number %r)', packed, to_run.task_slice_index,
@@ -455,7 +469,7 @@ class _ActiveQuery(object):
     # entries.
     fresh = []
     for ttr in fetched:
-      if ttr.queue_number is not None:
+      if ttr.is_reapable:
         fresh.append(ttr)
       else:
         self._log('TaskToRunShard %s is stale', ttr.task_id)
@@ -664,11 +678,16 @@ def new_task_to_run(request, task_slice_index):
   for i in range(task_slice_index + 1):
     offset += request.task_slice(i).expiration_secs
   exp = request.created_ts + datetime.timedelta(seconds=offset)
-  h = request.task_slice(task_slice_index).properties.dimensions_hash
+  dims = request.task_slice(task_slice_index).properties.dimensions
+  h = task_queues.hash_dimensions(dims)
   qn = _gen_queue_number(h, request.created_ts, request.priority)
   kind = get_shard_kind(h % N_SHARDS)
   key = request_to_task_to_run_key(request, 1, task_slice_index)
-  return kind(key=key, created_ts=created, queue_number=qn, expiration_ts=exp)
+  return kind(key=key,
+              created_ts=created,
+              dimensions=dims,
+              queue_number=qn,
+              expiration_ts=exp)
 
 
 def dimensions_matcher(bot_dimensions):
