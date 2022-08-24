@@ -177,12 +177,14 @@ def _expire_task(to_run_key, request, inline):
     - TaskResultSummary on success
     - TaskToRunShard if a new TaskSlice was reenqueued
   """
-  # Add it to the negative cache *before* running the transaction. Either way
-  # the task was already reaped or the task is correctly expired and not
-  # reapable.
-  if not task_to_run.set_lookup_cache(to_run_key, False) and inline:
-    logging.info('Not expiring inline task with negative cache set')
-    return None, None
+  # If running from a cron (inline==False), claim the task as non-reapable to
+  # make sure bot_reap_task doesn't try to pick it up. Don't do it when running
+  # from bot_reap_task (inline==True): the caller already holds the claim.
+  if not inline:
+    if not task_to_run.set_lookup_cache(to_run_key, False):
+      logging.warning('%s/%s is marked as claimed, proceeding anyway',
+                      request.task_id,
+                      task_to_run.task_to_run_key_slice_index(to_run_key))
 
   # Look if the TaskToRunShard is reapable once before doing the check inside
   # the transaction. This reduces the likelihood of failing this check inside
@@ -234,8 +236,7 @@ def _expire_task(to_run_key, request, inline):
   return summary, new_to_run
 
 
-def _reap_task(bot_dimensions, bot_version, to_run_key, request,
-               use_lookup_cache):
+def _reap_task(bot_dimensions, bot_version, to_run_key, request):
   """Reaps a task and insert the results entity.
 
   Returns:
@@ -312,16 +313,6 @@ def _reap_task(bot_dimensions, bot_version, to_run_key, request,
                                       transactional=True)
       state_changed = True
     return run_result, secret_bytes, result_summary, state_changed
-
-  # Add it to the negative cache *before* running the transaction. This will
-  # inhibit concurrently readers to try to reap this task. The downside is if
-  # this request fails in the middle of the transaction, the task may stay
-  # unreapable for up to 15 seconds.
-  # This is unnecessary and skipped when using an external scheduler, because
-  # that already avoids datastore entity contention.
-  if use_lookup_cache and not task_to_run.set_lookup_cache(to_run_key, False):
-    logging.debug('hit negative cache')
-    return None, None
 
   state_changed = False
   try:
@@ -1091,7 +1082,7 @@ def _bot_reap_task_external_scheduler(bot_dimensions, bot_version, es_cfg):
     return None, None, None
 
   run_result, secret_bytes = _reap_task(bot_dimensions, bot_version, to_run.key,
-                                        request, False)
+                                        request)
   if not run_result:
     raise external_scheduler.ExternalSchedulerException(
         'failed to reap %s' % task_pack.pack_request_key(to_run.request_key))
@@ -1387,8 +1378,10 @@ def bot_reap_task(bot_dimensions, bot_version):
   try:
     q = task_to_run.yield_next_available_task_to_dispatch(
         bot_id, pool, match_bot_dimensions)
-    for request, to_run in q:
+    for to_run in q:
       iterated += 1
+      request = task_to_run.task_to_run_key_to_request_key(to_run.key).get()
+
       # When falling back from external scheduler, ignore other es-owned tasks.
       if es_cfg and not _should_allow_es_fallback(es_cfg, request):
         logging.debug('Skipped es-owned request %s during es fallback',
@@ -1446,10 +1439,15 @@ def bot_reap_task(bot_dimensions, bot_version):
         t = request.task_slice(slice_index)
         if not match_bot_dimensions(t.properties.dimensions):
           continue
+
+        # Try to claim it for ourselves right away. On failure, give it up for
+        # some other bot to claim.
+        if not task_to_run.set_lookup_cache(new_to_run.key, False):
+          continue
         to_run = new_to_run
 
       run_result, secret_bytes = _reap_task(bot_dimensions, bot_version,
-                                            to_run.key, request, True)
+                                            to_run.key, request)
       if not run_result:
         failures += 1
         # Sad thing is that there is not way here to know the try number.

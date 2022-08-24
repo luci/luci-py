@@ -134,7 +134,7 @@ def _yield_next_available_task_to_dispatch(bot_dimensions):
   matcher = task_to_run.dimensions_matcher(bot_dimensions)
   return [
       to_run.to_dict()
-      for _request, to_run in task_to_run.yield_next_available_task_to_dispatch(
+      for to_run in task_to_run.yield_next_available_task_to_dispatch(
           bot_id, 'pool-for-monitoring', matcher)
   ]
 

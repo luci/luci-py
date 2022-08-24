@@ -285,78 +285,15 @@ def _lookup_cache_is_taken_async(to_run_key):
 class _QueryStats(object):
   """Statistics for a yield_next_available_task_to_dispatch() loop."""
   cache = 0
-  expired = 0
-  ignored = 0
   mismatch = 0
   stale = 0
   total = 0
   visited = 0
 
   def __str__(self):
-    return ('%d total, %d visited, %d exp, %d cache negative, %d stale, '
-            '%d dimensions mismatch, %d ignored') % (
-                self.total, self.visited, self.expired, self.cache, self.stale,
-                self.mismatch, self.ignored)
-
-
-@ndb.tasklet
-def _validate_task_async(bot_dims_matcher, stats, now, to_run):
-  """Validates the TaskToRunShard and updates stats.
-
-  Returns:
-    None if the task cannot be reaped by this bot.
-    TaskRequest if this is a good candidate to reap.
-  """
-  packed = task_pack.pack_request_key(
-      task_to_run_key_to_request_key(to_run.key)) + '0'
-  stats.visited += 1
-
-  # Even though we checked the cache already in _yield_potential_tasks, an
-  # unbound amount of time may have passed since then, due to how
-  # yield_next_available_task_to_dispatch dequeues and processes items. It will
-  # not hurt to re-check the cache again (it should be fast anyway).
-  neg = yield _lookup_cache_is_taken_async(to_run.key)
-  if neg:
-    logging.debug('_validate_task_async(%s): negative cache', packed)
-    stats.cache += 1
-    raise ndb.Return((None, None))
-
-  # Ok, it's now worth taking a real look at the entity.
-  request = yield task_to_run_key_to_request_key(to_run.key).get_async()
-  props = request.task_slice(to_run.task_slice_index).properties
-
-  # Newer TaskToRun have dimensions embedded. Older ones don't.
-  #
-  # TODO(vadimsh): Remove the fallback once it no longer happens in production.
-  dimensions = to_run.dimensions
-  if not dimensions:
-    logging.warning('_validate_task_async(%s): no dimensions in TaskToRun',
-                    packed)
-    dimensions = props.dimensions
-
-  # The hash may have conflicts or the queues returned by get_queues(...) aren't
-  # matching the bot anymore (if this cache is stale). Ensure the dimensions
-  # actually match the bot.
-  if not bot_dims_matcher(dimensions):
-    logging.debug(
-        '_validate_task_async(%s): dimensions mismatch '
-        '(slice index %d, queue_number %r)', packed, to_run.task_slice_index,
-        to_run.queue_number)
-    stats.mismatch += 1
-    raise ndb.Return((None, None))
-
-  # Expire as the bot polls by returning it, and task_scheduler will handle it.
-  if to_run.expiration_ts < now:
-    logging.debug(
-        '_validate_task_async(%s): expired %s < %s',
-        packed, to_run.expiration_ts, now)
-    stats.expired += 1
-  else:
-    # It's a valid task! Note that in the meantime, another bot may have reaped
-    # it. This is verified one last time in task_scheduler._reap_task() by
-    # calling set_lookup_cache().
-    logging.info('_validate_task_async(%s): ready to reap!', packed)
-  raise ndb.Return((request, to_run))
+    return ('%d total, %d visited, %d cache negative, %d stale, '
+            '%d dimensions mismatch') % (self.total, self.visited, self.cache,
+                                         self.stale, self.mismatch)
 
 
 def _get_task_to_run_query(dimensions_hash):
@@ -417,11 +354,12 @@ _MC_CLIENT = memcache.Client()
 class _ActiveQuery(object):
   DEADLINE = 60
 
-  def __init__(self, query, dim_hash, bot_id, stats):
+  def __init__(self, query, dim_hash, bot_id, stats, bot_dims_matcher):
     self._query = query
     self._dim_hash = dim_hash
     self._bot_id = bot_id
     self._stats = stats
+    self._bot_dims_matcher = bot_dims_matcher
     self._page_size = 10
     self._future = self._fetch_and_filter(None)
 
@@ -453,8 +391,9 @@ class _ActiveQuery(object):
   def _fetch_and_filter(self, cursor):
     """Fetches a page of query results and filters out unusable items.
 
-    A TaskToRunShard is unusable if either queue_number is None, or it was
-    already claimed by some other bot based on the state in memcache.
+    A TaskToRunShard is unusable if either queue_number is None, it was
+    already claimed by some other bot based on the state in memcache, or
+    dimensions doesn't actually match bot one's.
 
     Yields:
       ([list of potentially consumable TaskToRunShard], cursor, more).
@@ -472,7 +411,8 @@ class _ActiveQuery(object):
       if ttr.is_reapable:
         fresh.append(ttr)
       else:
-        self._log('TaskToRunShard %s is stale', ttr.task_id)
+        self._log('TaskToRunShard %s (slice %d) is stale', ttr.task_id,
+                  ttr.task_slice_index)
     self._stats.stale += len(fetched) - len(fresh)
 
     # Filter out all entries that have already been claimed by other bots. This
@@ -488,20 +428,56 @@ class _ActiveQuery(object):
           available.append(fresh[i])
       self._stats.cache += len(fresh) - len(available)
 
+    # Older TaskToRun entities don't have `dimensions` populated. Back fill them
+    # based on TaskRequest. This should be relatively rare and eventually can be
+    # removed.
+    #
+    # TODO(vadimsh): Remove when there are no more hits in production,
+    # approximately Sep 7 2022.
+    request_keys = [
+        task_to_run_key_to_request_key(ttr.key) for ttr in available
+        if not ttr.dimensions
+    ]
+    if request_keys:
+      self._log('missing_dims: %r',
+                [ttr.task_id for ttr in available if not ttr.dimensions])
+      requests = yield ndb.get_multi_async(request_keys)
+      idx = 0
+      for ttr in available:
+        if not ttr.dimensions:
+          props = requests[idx].task_slice(ttr.task_slice_index).properties
+          ttr.dimensions = props.dimensions
+          idx += 1
+
+    # The queue_number hash may have conflicts or the queues returned by
+    # get_queues(...) aren't matching the bot anymore (if this cache is stale).
+    # Filter out all requests that don't match bot dimensions.
+    matched = []
+    for ttr in available:
+      if self._bot_dims_matcher(ttr.dimensions):
+        matched.append(ttr)
+      else:
+        self._log('TaskToRunShard %s (slice %d) dimensions mismatch',
+                  ttr.task_id, ttr.task_slice_index)
+    self._stats.mismatch += len(available) - len(matched)
+
     if fetched:
-      self._log('got %d items (%d stale, %d negative cache)', len(fetched),
-                len(fetched) - len(fresh),
-                len(fresh) - len(available))
+      self._log(
+          'got %d items (%d stale, %d negative cache, '
+          '%d mismatch, %d backfilled dims)', len(fetched),
+          len(fetched) - len(fresh),
+          len(fresh) - len(available),
+          len(available) - len(matched), len(request_keys))
     if not more:
       self._log('exhausted')
-    raise ndb.Return((available, cursor, more))
+    raise ndb.Return((matched, cursor, more))
 
   def _log(self, msg, *args):
     logging.debug('_ActiveQuery(%s, %d): %s', self._bot_id, self._dim_hash,
                   msg % args)
 
 
-def _yield_potential_tasks(bot_id, pool, stats):
+def _yield_potential_tasks(bot_id, pool, stats, bot_dims_matcher):
   """Queries all the known task queues in parallel and yields the task in order
   of priority.
 
@@ -530,7 +506,7 @@ def _yield_potential_tasks(bot_id, pool, stats):
     queries = []
     for d in dim_hashes:
       for q in _get_task_to_run_query(d):
-        queries.append(_ActiveQuery(q, d, bot_id, stats))
+        queries.append(_ActiveQuery(q, d, bot_id, stats, bot_dims_matcher))
 
     # Run tasklets for at most 1 sec or until all fetches are done.
     #
@@ -620,6 +596,7 @@ def _yield_potential_tasks(bot_id, pool, stats):
       # eventually running out of memory.
       if queue.size() < 1000:
         queries = _poll_queries(queries, use_heap=True)
+    logging.debug('_yield_potential_tasks(%s): all queues exhausted', bot_id)
 
   except apiproxy_errors.DeadlineExceededError as e:
     # This is normally due to: "The API call datastore_v3.RunQuery() took too
@@ -755,13 +732,12 @@ def set_lookup_cache(to_run_key, is_available_to_schedule):
 
 
 def yield_next_available_task_to_dispatch(bot_id, pool, bot_dims_matcher):
-  """Yields next available (TaskRequest, TaskToRunShard) in decreasing order of
+  """Yields next available TaskToRunShard in roughly decreasing order of
   priority.
 
-  Once the caller determines the task is suitable to execute, it must use
-  reap_task_to_run(task.key) to mark that it is not to be scheduled anymore.
-
-  Performance is the top most priority here.
+  All yielded items are already "claimed" via set_lookup_cache. The caller
+  should do necessary datastore transactions to finalize the assignment and
+  remove TaskToRun from the queue.
 
   Arguments:
   - bot_id: id of the bot to poll tasks for.
@@ -771,57 +747,36 @@ def yield_next_available_task_to_dispatch(bot_id, pool, bot_dims_matcher):
   """
   now = utils.utcnow()
   stats = _QueryStats()
-  futures = collections.deque()
   try:
-    for ttr in _yield_potential_tasks(bot_id, pool, stats):
-      duration = (utils.utcnow() - now).total_seconds()
-      if duration > 40.:
-        # Stop searching after too long, since the odds of the request blowing
-        # up right after succeeding in reaping a task is not worth the dangling
-        # task request that will stay in limbo until the cron job reaps it and
-        # retry it. The current handlers are given 60s to complete. By limiting
-        # search to 40s, it gives 20s to complete the reaping and complete the
-        # HTTP request.
+    for ttr in _yield_potential_tasks(bot_id, pool, stats, bot_dims_matcher):
+      # Stop searching after too long, since the odds of the request blowing
+      # up right after succeeding in reaping a task is not worth the dangling
+      # task request that will stay in limbo until the cron job reaps it and
+      # retry it. The current handlers are given 60s to complete. By limiting
+      # search to 40s, it gives 20s to complete the reaping and complete the
+      # HTTP request.
+      if (utils.utcnow() - now).total_seconds() > 40.:
+        logging.debug(
+            'yield_next_available_task_to_dispatch(%s): exit by timeout',
+            bot_id)
         return
-      futures.append(_validate_task_async(bot_dims_matcher, stats, now, ttr))
-      while futures:
-        # Keep a FIFO or LIFO queue ordering, depending on configuration.
-        if futures[0].done():
-          request, task = futures[0].get_result()
-          if request and task:
-            yield request, task
-            # If the code is still executed, it means that the task reaping
-            # wasn't successful. Note that this includes expired ones, which is
-            # kinda weird but it's not a big deal.
-            stats.ignored += 1
-          futures.popleft()
-        # Don't batch too much.
-        if len(futures) < 50:
-          break
-        futures[0].wait()
 
-    # No more tasks to yield. Empty the pending futures.
-    while futures:
-      request, task = futures[0].get_result()
-      if request and task:
-        yield request, task
-        # If the code is still executed, it means that the task reaping
-        # wasn't successful. Same as above about expired.
-        stats.ignored += 1
-      futures.popleft()
+      # Try to claim this TaskToRun. Only one bot will pass this. It then will
+      # have ~15s to submit a transaction that assigns the TaskToRun to this
+      # bot before another bot will be able to try that.
+      if set_lookup_cache(ttr.key, False):
+        logging.debug(
+            'yield_next_available_task_to_dispatch(%s): ready to reap %s',
+            bot_id, ttr.task_id)
+        stats.visited += 1
+        yield ttr
+
   finally:
-    # Don't leave stray RPCs as much as possible, this can mess up following
-    # HTTP handlers.
-    ndb.Future.wait_all(futures)
-    # stats output is a bit misleading here, as many _validate_task_async()
-    # could be started yet never yielded.
     logging.debug(
         'yield_next_available_task_to_dispatch(%s) in %.3fs: %s',
         bot_id, (utils.utcnow() - now).total_seconds(), stats)
     ts_mon_metrics.on_scheduler_visits(pool=pool,
                                        cache=stats.cache,
-                                       expired=stats.expired,
-                                       ignored=stats.ignored,
                                        mismatch=stats.mismatch,
                                        stale=stats.stale,
                                        total=stats.total,

@@ -869,7 +869,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
 
     def reap(*args):
       r_calls.append(args)
-      return [(result_summary.request, to_run_key.get())]
+      return [to_run_key.get()]
 
     self.mock(task_scheduler, '_bot_reap_task_external_scheduler', ext_reap)
     self.mock(task_to_run, 'yield_next_available_task_to_dispatch', reap)
