@@ -58,25 +58,38 @@ N_SHARDS = 16  # the number of TaskToRunShards
 
 
 class _TaskToRunBase(ndb.Model):
-  """Defines a TaskRequest ready to be scheduled on a bot.
+  """Defines a TaskRequest slice ready to be scheduled on a bot.
 
-  This specific request for a specific task can be executed multiple times,
-  each execution will create a new child task_result.TaskResult of
-  task_result.TaskResultSummary.
+  Each TaskRequest results in one or more TaskToRunShard entities (one per
+  slice). They are created sequentially, one by one, as the task progresses
+  through its slices. Each TaskToRunShard is eventually either picked up by
+  a bot for execution or expires. Each TaskToRunShard picked up for execution
+  has an associated task_result.TaskResult entity (expired ones don't).
 
-  This entity must be kept small and contain the minimum data to enable the
-  queries for two reasons:
-  - it is updated inside a transaction for each scheduling event, e.g. when a
-    bot gets assigned this task item to work on.
-  - all the ones currently active are fetched at once in a cron job.
+  A TaskToRunShard can be in two states:
+  - reapable: queue_number and expiration_ts are both not None.
+  - consumed: queue_number and expiration_ts are both None.
+
+  The entity starts its life in reapable state and then transitions to consumed
+  state either by being picked up by a bot for execution or when it expires.
+  Consumed state is final.
+
+  This entity must be kept small and contain the minimum amount of data (in
+  particular indexes) for two reasons:
+  - It is created and transactionally mutated at high QPS.
+  - Each bot_reap_task(...) runs a datastore scan for available TaskToRunShard.
 
   The key id is:
-  - lower 4 bits is the try number. The only supported values are 1 and 2.
+  - lower 4 bits is the try number. The only supported values are 1.
   - next 5 bits are TaskResultSummary.current_task_slice (shifted by 4 bits).
   - rest is 0.
 
+  TODO(crbug.com/1065101): Try number is always 1 now. Swarming-level retries
+  have been removed. Anything related to try numbers is dead code that needs to
+  be cleaned up.
+
   This is a base class of TaskToRunShard, and get_shard_kind() should be used
-  to get a TaskToRunShard kind. The shard number is derived determistically by
+  to get a TaskToRunShard kind. The shard number is derived deterministically by
   calculating dimensions hash % N_SHARDS.
   """
   # This entity is used in transactions. It is not worth using either cache.
@@ -84,43 +97,41 @@ class _TaskToRunBase(ndb.Model):
   _use_cache = False
   _use_memcache = False
 
-  # Used to know when retries are enqueued. The very first TaskToRun
-  # (try_number=1) has the same value as TaskRequest.created_ts, but following
-  # ones have created_ts set at the time the new entity is created: when the
-  # task is reenqueued.
+  # Used to know when the entity is enqueued. The very first TaskToRunShard
+  # has the same value as TaskRequest.created_ts, but following ones (when using
+  # task slices) have created_ts set at the time the new entity is created.
   created_ts = ndb.DateTimeProperty(indexed=False)
 
   # Copy of dimensions from the corresponding task slice of TaskRequest.
-  # Used to quickly check if a bot can reap this TaskToRun right after fetching
-  # it from a datastore query.
+  # Used to quickly check if a bot can reap this TaskToRunShard right after
+  # fetching it from a datastore query.
   dimensions = datastore_utils.DeterministicJsonProperty(json_type=dict,
                                                          indexed=False)
 
   # Everything above is immutable, everything below is mutable.
 
-  # Moment by which this TaskSlice has to be requested by a bot.
-  # expiration_ts is based on TaskSlice.expiration_ts. This is used to figure
-  # out TaskSlice fallback and enable a cron job query to clean up stale tasks.
-  # This is reset to None at expiration not to be queried in the cron job.
+  # Moment by which this TaskToRunShard has to be claimed by a bot.
+  # It is based on TaskSlice.expiration_ts. It is used to figure out when to
+  # fallback on the next task slice. It is scanned by a cron job and thus needs
+  # to be indexed.
+  # Reset to None when the TaskToRunShard is consumed.
   expiration_ts = ndb.DateTimeProperty()
 
   # Delay from the expiration_ts to the actual expired time in seconds.
-  # This is set at expiration process.
+  # This is set at expiration process. Exclusively for monitoring.
   expiration_delay = ndb.FloatProperty(indexed=False)
 
-  # priority and request creation timestamp are mixed together to allow queries
+  # Priority and request creation timestamp are mixed together to allow queries
   # to order the results by this field to allow sorting by priority first, and
   # then timestamp. See _gen_queue_number() for details. This value is only set
   # when the task is available to run, i.e.
   # ndb.TaskResult.query(ancestor=self.key).get().state==AVAILABLE.
-  # If this task it not ready to be scheduled, it must be None.
+  # Reset to None when the TaskToRunShard is consumed.
   queue_number = ndb.IntegerProperty()
 
   @property
   def task_slice_index(self):
-    """Returns the TaskRequest.task_slice() index this entity represents as
-    pending.
-    """
+    """Returns the TaskRequest.task_slice() index this entity represents."""
     return task_to_run_key_slice_index(self.key)
 
   @property
@@ -140,8 +151,8 @@ class _TaskToRunBase(ndb.Model):
 
   @property
   def run_result_key(self):
-    """Returns the TaskRunResult ndb.Key that will be created for this TaskToRun
-    once reaped.
+    """Returns the TaskRunResult ndb.Key that will be created for this
+    TaskToRunShard once reaped.
     """
     summary_key = task_pack.request_key_to_result_summary_key(
         self.request_key)
@@ -174,20 +185,19 @@ class _TaskToRunBase(ndb.Model):
           ('%s.queue_number must be None when expiration_ts is None' %
            self.__class__.__name__))
 
-# Cache TaskToRunShard kinds.
-_TaskToRunShards = {}
+
+# Instantiate all TaskToRunShard<X> classes.
+_TaskToRunShards = {
+    shard: type('TaskToRunShard%d' % shard, (_TaskToRunBase, ), {})
+    for shard in range(N_SHARDS)
+}
 
 
 def get_shard_kind(shard):
   """Returns a TaskToRunShard kind for the given shard number."""
   assert shard < N_SHARDS, 'Shard number must be < %d, but %d is given' % (
       N_SHARDS, shard)
-  kind = 'TaskToRunShard%d' % shard
-  # check cached kind.
-  if kind in _TaskToRunShards:
-    return _TaskToRunShards[kind]
-  _TaskToRunShards[kind] = type(kind, (_TaskToRunBase, ), {})
-  return _TaskToRunShards[kind]
+  return _TaskToRunShards[shard]
 
 
 ### Private functions.
@@ -262,10 +272,9 @@ def _queue_number_priority(v):
 
 
 def _memcache_to_run_key(to_run_key):
-  """Encodes the key as a string to uniquely address the TaskToRunShard in the
-  negative cache in memcache.
+  """Encodes TaskToRunShard key as a string to address it in the memcache.
 
-  See set_lookup_cache() for more explanation.
+  See Claim for more explanation.
   """
   request_key = task_to_run_key_to_request_key(to_run_key)
   return '%x-%d-%d' % (
@@ -274,25 +283,17 @@ def _memcache_to_run_key(to_run_key):
       task_to_run_key_slice_index(to_run_key))
 
 
-@ndb.tasklet
-def _lookup_cache_is_taken_async(to_run_key):
-  """Queries the quick lookup cache to reduce DB operations."""
-  key = _memcache_to_run_key(to_run_key)
-  neg = yield ndb.get_context().memcache_get(key, namespace='task_to_run')
-  raise ndb.Return(bool(neg))
-
-
 class _QueryStats(object):
   """Statistics for a yield_next_available_task_to_dispatch() loop."""
-  cache = 0
+  claimed = 0
   mismatch = 0
   stale = 0
   total = 0
   visited = 0
 
   def __str__(self):
-    return ('%d total, %d visited, %d cache negative, %d stale, '
-            '%d dimensions mismatch') % (self.total, self.visited, self.cache,
+    return ('%d total, %d visited, %d already claimed, %d stale, '
+            '%d dimensions mismatch') % (self.total, self.visited, self.claimed,
                                          self.stale, self.mismatch)
 
 
@@ -417,20 +418,20 @@ class _ActiveQuery(object):
 
     # Filter out all entries that have already been claimed by other bots. This
     # is an optimization to skip claimed entries as fast as possible. The bots
-    # will then contest on remaining entries in `set_lookup_cache`, and finally
+    # will then contest on remaining entries in Claim.obtain(...), and finally
     # in the datastore transaction.
     available = []
     if fresh:
       keys = [_memcache_to_run_key(ttr.key) for ttr in fresh]
-      taken = yield _MC_CLIENT.get_multi_async(keys, namespace='task_to_run')
+      taken = yield _MC_CLIENT.get_multi_async(keys, namespace=Claim._NAMESPACE)
       for i in xrange(len(keys)):
         if not taken.get(keys[i]):
           available.append(fresh[i])
-      self._stats.cache += len(fresh) - len(available)
+      self._stats.claimed += len(fresh) - len(available)
 
-    # Older TaskToRun entities don't have `dimensions` populated. Back fill them
-    # based on TaskRequest. This should be relatively rare and eventually can be
-    # removed.
+    # Older TaskToRunShard entities don't have `dimensions` populated. Back fill
+    # them based on TaskRequest. This should be relatively rare and eventually
+    # can be removed.
     #
     # TODO(vadimsh): Remove when there are no more hits in production,
     # approximately Sep 7 2022.
@@ -463,7 +464,7 @@ class _ActiveQuery(object):
 
     if fetched:
       self._log(
-          'got %d items (%d stale, %d negative cache, '
+          'got %d items (%d stale, %d already claimed, '
           '%d mismatch, %d backfilled dims)', len(fetched),
           len(fetched) - len(fresh),
           len(fresh) - len(available),
@@ -549,7 +550,7 @@ def _yield_potential_tasks(bot_id, pool, stats, bot_dims_matcher):
 
         runs = q.page()
         if runs:
-          # TaskToRun submitted within the same 100ms interval at the same
+          # TaskToRunShard submitted within the same 100ms interval at the same
           # priority have the same queue sorting number (see _gen_queue_number).
           # By shuffling them here we reduce chances of multiple bots contesting
           # over the same items. This is effective only for queues with more
@@ -695,49 +696,89 @@ def dimensions_matcher(bot_dimensions):
   return matcher
 
 
-def set_lookup_cache(to_run_key, is_available_to_schedule):
-  """Updates the quick lookup cache to mark an item as available or not.
+class Claim(object):
+  """Represents a claim on a TaskToRunShard."""
+  _NAMESPACE = 'task_to_run'
 
-  This cache is a list of items that are about to be reaped or are already
-  reaped, so it is not worth trying to reap it with a DB transaction. This saves
-  on DB contention when a high number (>1000) of concurrent bots with similar
-  dimension are reaping tasks simultaneously. In this case, there is a high
-  likelihood that multiple concurrent HTTP handlers are trying to reap the exact
-  same task simultaneously. This list helps reduce the contention by
-  telling the other bots to back off.
+  __slots__ = ('_key', '_expiry', '_released')
 
-  Another reason for this negative cache is that the DB index takes some seconds
-  to be updated, which means it can return stale items (e.g. already reaped).
+  @classmethod
+  def obtain(cls, to_run_key, duration=15):
+    """Atomically marks a TaskToRunShard as "claimed" in the memcache.
 
-  It can be viewed as a lock, except that the 'lock' is never released, it is
-  implicitly released after 15 seconds.
+    Returns a Claim object if TaskToRunShard was claimed by the caller, or None
+    if it was already claimed by someone else. When claimed, the caller has up
+    to `duration` seconds to do anything they want with TaskToRunShard until
+    someone else is able to claim it. The caller may also release the claim
+    sooner by calling `release` on the returned Claim object (or using it as
+    a context manager).
 
-  Returns:
-    True if the key was updated, False if was trying to reap and the entry was
-    already set.
-  """
-  # Set the expiration time for items in the negative cache as 15 seconds. This
-  # copes with significant index inconsistency but do not clog the memcache
-  # server with unneeded keys.
-  cache_lifetime = 15
+    This is essentially a best-effort self-expiring lock. It exists to reduce
+    contention in datastore transactions that touch the TaskToRunShard entity,
+    in particular in the very hot `yield_next_available_task_to_dispatch` loop.
+    It is an optimization. It does not by itself guarantee correctness and
+    should not be used for that (use datastore transactions instead).
 
-  key = _memcache_to_run_key(to_run_key)
-  if is_available_to_schedule:
-    # The item is now available, so remove it from memcache.
-    memcache.delete(key, namespace='task_to_run')
-    return True
+    Returns:
+      Claim if the TaskToRunShard was claimed by us or None if by someone else.
+    """
+    assert duration > 1, duration
+    expiry = utils.time_time() + duration
+    key = _memcache_to_run_key(to_run_key)
+    if not memcache.add(key, True, time=duration, namespace=cls._NAMESPACE):
+      return None
+    return cls(key, expiry)
 
-  # add() returns True if the entry was added, False otherwise. That's perfect.
-  return memcache.add(key, True, time=cache_lifetime, namespace='task_to_run')
+  @classmethod
+  def check(cls, to_run_key):
+    """Returns True if there's an existing claim on TaskToRunShard."""
+    key = _memcache_to_run_key(to_run_key)
+    val = ndb.get_context().memcache_get(key,
+                                         namespace=cls._NAMESPACE).get_result()
+    return val is not None
+
+  def __init__(self, key, expiry):
+    self._key = key
+    self._expiry = expiry
+    self._released = False
+
+  def release(self):
+    """Releases the claim prematurely.
+
+    This call is totally optional and should be used **only** if it is OK
+    for the TaskToRunShard to be claimed by someone else immediately.
+
+    In particular, if the TaskToRunShard reached its final consumed state (and
+    won't be mutated anymore), it is fine (and even faster) to not explicitly
+    release the claim and let it expire naturally.
+
+    Note: this is a best-effort method and it may theoretically release "wrong"
+    claim if the memcache was flushed recently, but this is fine, since the
+    entire Claim mechanism is best effort and should not be used to guarantee
+    correctness (use datastore transactions for that).
+    """
+    # Don't touch soon-to-be-expired claims: there is a high chance that our
+    # indiscriminate memcache.delete(...) below will actually delete a wrong
+    # claim set by someone else after our claim expires. Note that 2 sec was
+    # picked arbitrarily.
+    if not self._released and self._expiry - utils.time_time() > 2:
+      memcache.delete(self._key, namespace=self._NAMESPACE)
+      self._released = True
+
+  def __enter__(self):
+    return self
+
+  def __exit__(self, _exc_type, _exc_val, _exc_tb):
+    self.release()
 
 
 def yield_next_available_task_to_dispatch(bot_id, pool, bot_dims_matcher):
   """Yields next available TaskToRunShard in roughly decreasing order of
   priority.
 
-  All yielded items are already "claimed" via set_lookup_cache. The caller
-  should do necessary datastore transactions to finalize the assignment and
-  remove TaskToRun from the queue.
+  All yielded items are already claimed via Claim.obtain(...). The caller should
+  do necessary datastore transactions to finalize the assignment and remove
+  TaskToRunShard from the queue.
 
   Arguments:
   - bot_id: id of the bot to poll tasks for.
@@ -761,10 +802,10 @@ def yield_next_available_task_to_dispatch(bot_id, pool, bot_dims_matcher):
             bot_id)
         return
 
-      # Try to claim this TaskToRun. Only one bot will pass this. It then will
-      # have ~15s to submit a transaction that assigns the TaskToRun to this
-      # bot before another bot will be able to try that.
-      if set_lookup_cache(ttr.key, False):
+      # Try to claim this TaskToRunShard. Only one bot will pass this. It then
+      # will have ~15s to submit a transaction that assigns the TaskToRunShard
+      # to this bot before another bot will be able to try that.
+      if Claim.obtain(ttr.key):
         logging.debug(
             'yield_next_available_task_to_dispatch(%s): ready to reap %s',
             bot_id, ttr.task_id)
@@ -776,7 +817,7 @@ def yield_next_available_task_to_dispatch(bot_id, pool, bot_dims_matcher):
         'yield_next_available_task_to_dispatch(%s) in %.3fs: %s',
         bot_id, (utils.utcnow() - now).total_seconds(), stats)
     ts_mon_metrics.on_scheduler_visits(pool=pool,
-                                       cache=stats.cache,
+                                       claimed=stats.claimed,
                                        mismatch=stats.mismatch,
                                        stale=stats.stale,
                                        total=stats.total,

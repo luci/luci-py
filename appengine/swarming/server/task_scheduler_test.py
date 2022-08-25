@@ -2156,10 +2156,10 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         0,
         ts_mon_metrics._task_state_change_pubsub_notify_latencies.get(
             fields=_get_fields(status=status, http_status_code=200)).sum)
-    # Make sure the TaskToRunShard is added to the negative cache.
+    # Make sure the TaskToRunShard is claimed.
     request = result_summary.request_key.get()
     to_run_key = task_to_run.request_to_task_to_run_key(request, 1, 0)
-    actual = task_to_run._lookup_cache_is_taken_async(to_run_key).get_result()
+    actual = task_to_run.Claim.check(to_run_key)
     self.assertEqual(True, actual)
 
   def test_cancel_task_with_id(self):
@@ -2187,10 +2187,10 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(State.CANCELED, result_summary.state)
     self.assertEqual(1, len(pub_sub_calls))  # No other message.
 
-    # Make sure the TaskToRunShard is added to the negative cache.
+    # Make sure the TaskToRunShard is claimed.
     request = result_summary.request_key.get()
     to_run_key = task_to_run.request_to_task_to_run_key(request, 1, 0)
-    actual = task_to_run._lookup_cache_is_taken_async(to_run_key).get_result()
+    actual = task_to_run.Claim.check(to_run_key)
     self.assertEqual(True, actual)
 
   def test_cancel_task_running(self):
@@ -2630,12 +2630,12 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(1, len(pub_sub_calls))  # PENDING -> RUNNING
     request = run_result.request_key.get()
 
-    def is_in_negative_cache(t):
+    def is_claimed(t):
       to_run_key = task_to_run.request_to_task_to_run_key(request, t, 0)
-      return task_to_run._lookup_cache_is_taken_async(to_run_key).get_result()
+      return task_to_run.Claim.check(to_run_key)
 
-    self.assertEqual(True, is_in_negative_cache(1))  # Was just reaped.
-    self.assertEqual(False, is_in_negative_cache(2))
+    self.assertEqual(True, is_claimed(1))  # Was just reaped.
+    self.assertEqual(False, is_claimed(2))
 
     now_0 = self.now
     now_1 = self.mock_now(
@@ -2645,8 +2645,8 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
                      task_scheduler.cron_handle_bot_died())
     self.assertEqual(1, self.execute_tasks())
     self.assertEqual(2, len(pub_sub_calls))  # RUNNING -> COMPLETED
-    self.assertEqual(False, is_in_negative_cache(1))
-    self.assertEqual(False, is_in_negative_cache(2))
+    self.assertEqual(False, is_claimed(1))
+    self.assertEqual(False, is_claimed(2))
     status = State.to_string(State.BOT_DIED)
     self.assertLessEqual(
         0,

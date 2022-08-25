@@ -103,7 +103,7 @@ def _expire_task_tx(now, request, to_run_key, result_summary_key, capacity,
     # Use the lookup created just before the transaction. There's a small race
     # condition in here but we're willing to accept it.
     if len(capacity) > index and capacity[index]:
-      # Enqueue a new TasktoRun for this next TaskSlice, it has capacity!
+      # Enqueue a new TasktoRunShard for this next TaskSlice, it has capacity!
       new_to_run = task_to_run.new_task_to_run(request, index + offset)
       result_summary.current_task_slice = index+offset
       to_put.append(new_to_run)
@@ -181,7 +181,7 @@ def _expire_task(to_run_key, request, inline):
   # make sure bot_reap_task doesn't try to pick it up. Don't do it when running
   # from bot_reap_task (inline==True): the caller already holds the claim.
   if not inline:
-    if not task_to_run.set_lookup_cache(to_run_key, False):
+    if not task_to_run.Claim.obtain(to_run_key):
       logging.warning('%s/%s is marked as claimed, proceeding anyway',
                       request.task_id,
                       task_to_run.task_to_run_key_slice_index(to_run_key))
@@ -327,10 +327,10 @@ def _reap_task(bot_dimensions, bot_version, to_run_key, request):
     #   both GET returns the TaskToRunShard.queue_number != None but only one
     #   succeed at the PUT.
     #
-    # In the first case, we may want to reset the negative cache, while we don't
+    # In the first case, we may want to release the claim, while we don't
     # want to in the later case. The trade off are one of:
-    # - negative cache is incorrectly set, so the task is not reapable for 15s
-    # - resetting the negative cache would cause even more contention
+    # - the claim is not released, so the task is not reapable for 15s
+    # - releasing the claim would cause even more contention
     #
     # We chose the first one here for now, as the when the DB starts misbehaving
     # and the index becomes stale, it means the DB is *already* not in good
@@ -916,11 +916,10 @@ def _cancel_task_tx(request,
     to_runs = task_to_run.get_task_to_runs(
         request, result_summary.current_task_slice or 0)
     for to_run in to_runs:
-      # Add it to the negative cache.
+      # Tell bots that they should skip this TaskToRunShard.
       #
-      # TODO(vadimsh): This is problematic. The transaction may fail to commit,
-      # but we mutate the cache regardless.
-      task_to_run.set_lookup_cache(to_run.key, False)
+      # TODO(vadimsh): This should be done before the transaction.
+      task_to_run.Claim.obtain(to_run.key)
       to_run.queue_number = None
       to_run.expiration_ts = None
       entities.append(to_run)
@@ -1122,7 +1121,7 @@ def _gen_new_keys(result_summary,
 
   Arguments:
     - result_summary: a task_result.TaskResultSummary instance.
-    - to_run: a task_to_run.TaskToRun instances
+    - to_run: a task_to_run.TaskToRunShard instance.
     - secret_bytes: Optional SecretBytes entity to be saved in the DB. It's key
               will be set and the entity will be stored by this function.
     - build_token: Optional BuildToken entity to be saved in the DB. It's key
@@ -1442,7 +1441,7 @@ def bot_reap_task(bot_dimensions, bot_version):
 
         # Try to claim it for ourselves right away. On failure, give it up for
         # some other bot to claim.
-        if not task_to_run.set_lookup_cache(new_to_run.key, False):
+        if not task_to_run.Claim.obtain(new_to_run.key):
           continue
         to_run = new_to_run
 

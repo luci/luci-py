@@ -314,10 +314,10 @@ _scheduler_scans = gae_ts_mon.CounterMetric(
 
 # Instance metric. Metric fields:
 # - pool: e.g. 'skia'.
-# - status: 'cache', 'expired', etc.
+# - status: 'claimed', 'expired', etc.
 _scheduler_visits = gae_ts_mon.CumulativeDistributionMetric(
     'swarming/scheduler/visits',
-    'Distribution of TaskToRun visited per scan', [
+    'Distribution of TaskToRunShard visited per scan', [
         gae_ts_mon.StringField('pool'),
         gae_ts_mon.StringField('status'),
     ],
@@ -652,11 +652,11 @@ def on_scheduler_scan(pool, queue_count):
       })
 
 
-def on_scheduler_visits(pool, cache, mismatch, stale, total, visited):
+def on_scheduler_visits(pool, claimed, mismatch, stale, total, visited):
   def add(key, val):
     _scheduler_visits.add(val, fields={'pool': pool, 'status': key})
 
-  add('cache', cache)
+  add('claimed', claimed)
   add('mismatch', mismatch)
   add('stale', stale)
   add('total', total)

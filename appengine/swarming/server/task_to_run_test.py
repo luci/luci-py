@@ -939,7 +939,7 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
 
     submitted = []
 
-    def submit_bunch(count, mark_as_consumed):
+    def submit_bunch(count, mark_as_claimed):
       bunch = []
       for _ in range(count):
         self.mock_now(self.now, len(submitted))
@@ -952,8 +952,8 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
         ttr.put()
         submitted.append(ttr)
         bunch.append(ttr.to_dict())
-        if mark_as_consumed:
-          task_to_run.set_lookup_cache(ttr.key, False)
+        if mark_as_claimed:
+          task_to_run.Claim.obtain(ttr.key)
       return bunch
 
     available = []
@@ -1039,23 +1039,13 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
     to_run.put()
     self.assertEqual(False, to_run.is_reapable)
 
-  def test_set_lookup_cache(self):
-    # Create two TaskToRunShard on the same TaskRequest and assert that
-    # affecting one negative cache entry doesn't affect the other.
+  def test_claim(self):
     request = self.mkreq(1, _gen_request())
-    to_run_1 = task_to_run.new_task_to_run(request, 0)
-    to_run_1.put()
-    lookup = lambda k: task_to_run._lookup_cache_is_taken_async(k).get_result()
-    # By default, the negative cache is false, i.e. it is safe to reap the task.
-    self.assertEqual(False, lookup(to_run_1.key))
-    # Mark to_run_1 as safe to reap.
-    task_to_run.set_lookup_cache(to_run_1.key, True)
-    self.assertEqual(False, lookup(to_run_1.key))
-    # Mark to_run_1 as unreapable, i.e. a bot is about to reap it.
-    task_to_run.set_lookup_cache(to_run_1.key, False)
-    self.assertEqual(True, lookup(to_run_1.key))
-    task_to_run.set_lookup_cache(to_run_1.key, True)
-    self.assertEqual(False, lookup(to_run_1.key))
+    to_run = task_to_run.new_task_to_run(request, 0).key
+    self.assertFalse(task_to_run.Claim.check(to_run))
+    with task_to_run.Claim.obtain(to_run):
+      self.assertTrue(task_to_run.Claim.check(to_run))
+    self.assertFalse(task_to_run.Claim.check(to_run))
 
   def test_pre_put_hook(self):
     _, to_run = self._gen_new_task_to_run(1)
@@ -1073,12 +1063,12 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
     to_run.put()
 
   def test_get_shard_kind(self):
-    k = task_to_run.get_shard_kind(0)
-    self.assertEqual(k.__name__, 'TaskToRunShard0')
-    self.assertTrue(issubclass(k, task_to_run._TaskToRunBase))
-
-    # The next call should return the cached kind.
-    self.assertEqual(k, task_to_run.get_shard_kind(0))
+    for i in range(task_to_run.N_SHARDS):
+      k = task_to_run.get_shard_kind(i)
+      self.assertEqual(k.__name__, 'TaskToRunShard%d' % i)
+      self.assertTrue(issubclass(k, task_to_run._TaskToRunBase))
+      # The next call should return the cached kind.
+      self.assertEqual(k, task_to_run.get_shard_kind(i))
 
     with self.assertRaises(AssertionError):
       task_to_run.get_shard_kind(task_to_run.N_SHARDS)
