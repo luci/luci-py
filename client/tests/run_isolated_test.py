@@ -607,6 +607,43 @@ class RunIsolatedTest(RunIsolatedTestBase):
         echo_cmd[0])
     self.assertEqual(echo_cmd[1:], ['hello', 'world'])
 
+  def test_main_naked_with_invalid_cas_input(self):
+    def dump_bad_digest_json(cmd, _):
+      json_path = cmd[cmd.index('-dump-json') + 1]
+      with open(json_path, 'w') as fp:
+        json.dump({'result': 'digest_invalid'}, fp)
+
+    self.mock(run_isolated, "_run_go_cmd_and_wait", dump_bad_digest_json)
+    result_json_path = os.path.join(self.tempdir, 'result.json')
+
+    cmd = [
+        '--json',
+        result_json_path,
+        '--no-log',
+        '--named-cache-root',
+        os.path.join(self.tempdir, 'named_cache'),
+        '--cipd-enabled',
+        'False',
+        '--cas-digest',
+        'not_valid',
+        '--cas-instance',
+        'some_cas_instance',
+        '--',
+        'bin/echo${EXECUTABLE_SUFFIX}',
+        'hello',
+        'world',
+    ]
+
+    ret = run_isolated.main(cmd)
+    self.assertEqual(1, ret)
+    with open(result_json_path, 'r') as fp:
+      result_json = json.load(fp)
+
+    missing_cas = result_json['missing_cas']
+    self.assertEqual('digest_invalid', missing_cas['status'])
+    self.assertEqual('not_valid', missing_cas['digest'])
+    self.assertEqual('some_cas_instance', missing_cas['instance'])
+
   def test_main_naked_with_invalid_cipd_package(self):
     self.mock(cipd, 'get_platform', lambda: 'linux-amd64')
     suffix = '.exe' if sys.platform == 'win32' else ''

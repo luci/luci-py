@@ -1761,8 +1761,8 @@ def main(args):
                   trim_caches_fn=trim_caches_fn)
   try:
     return run_tha_test(data, options.json)
-  except (cipd.Error, local_caching.NamedCacheError, local_caching.NoMoreSpace,
-          errors.NonRecoverableCipdException) as ex:
+  except (cipd.Error, local_caching.NamedCacheError,
+          local_caching.NoMoreSpace) as ex:
     print(ex.message, file=sys.stderr)
     on_error.report(None)
     return 1
