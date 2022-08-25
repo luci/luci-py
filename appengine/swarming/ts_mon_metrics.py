@@ -323,6 +323,17 @@ _scheduler_visits = gae_ts_mon.CumulativeDistributionMetric(
     ],
     bucketer=gae_ts_mon.FixedWidthBucketer(width=5))
 
+# Number of timeouts. Metric fields:
+# - endpoint: e.g. 'bot/poll'
+# - stage: e.g. 'assert_bot_async'
+# - exception: e.g. 'DeadlineExceededError'
+_handler_timeouts = gae_ts_mon.CounterMetric(
+    'api/timeouts', 'Number of timeout events in API handlers.', [
+        gae_ts_mon.StringField('endpoint'),
+        gae_ts_mon.StringField('stage'),
+        gae_ts_mon.StringField('exception'),
+    ])
+
 
 ### Private stuff.
 
@@ -661,6 +672,14 @@ def on_scheduler_visits(pool, claimed, mismatch, stale, total, visited):
   add('stale', stale)
   add('total', total)
   add('visited', visited)
+
+
+def on_handler_timeout(endpoint, stage, exception):
+  _handler_timeouts.increment(fields={
+      'endpoint': endpoint,
+      'stage': stage,
+      'exception': exception,
+  })
 
 
 def initialize():

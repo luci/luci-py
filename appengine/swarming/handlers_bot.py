@@ -19,8 +19,8 @@ from google.appengine.ext import ndb
 from google.appengine import runtime
 from google.appengine.runtime import apiproxy_errors
 
-import api_helpers
 from components import auth
+from components import datastore_utils
 from components import decorators
 from components import ereporter2
 from components import utils
@@ -37,6 +37,8 @@ from server import task_queues
 from server import task_request
 from server import task_result
 from server import task_scheduler
+import api_helpers
+import ts_mon_metrics
 
 # Methods used to authenticate requests from bots, see get_auth_methods().
 #
@@ -528,6 +530,22 @@ class BotPollHandler(_BotBaseHandler):
   assigned anymore.
   """
 
+  # All exception classes that can indicate a datastore or overall timeout.
+  _TIMEOUT_EXCEPTIONS = (
+      apiproxy_errors.CancelledError,
+      apiproxy_errors.DeadlineExceededError,
+      datastore_errors.InternalError,
+      datastore_errors.Timeout,
+      datastore_utils.CommitError,  # one reason is timeout
+      runtime.DeadlineExceededError,
+  )
+
+  def _abort_by_timeout(self, stage, exc):
+    clazz = exc.__class__.__name__
+    ts_mon_metrics.on_handler_timeout('bot/poll', stage, clazz)
+    logging.exception('abort_by_timeout: %s %s', stage, clazz)
+    self.abort(429, 'Timeout in %s (%s)' % (stage, clazz))
+
   @auth.public  # auth happens in self._process()
   def post(self):
     """Handles a polling request.
@@ -570,19 +588,11 @@ class BotPollHandler(_BotBaseHandler):
             task_name=task_name,
             message=res.quarantined_msg,
             register_dimensions=True)
-      except runtime.DeadlineExceededError as e:
-        # Ignore runtime.DeadlineExceededError at the following events
-        # and return 429 for the bot to retry later
-        # if the event_type is 'request_task' or 'bot_terminate', the exception
-        # will be handled at the end of BotPollHandler.post
-        if event_type in ('request_sleep', 'request_update', 'request_restart'):
-          logging.debug('Ignoring deadline exceeded error. %s', e)
-          self.abort(429, 'Deadline exceeded')
-          return
-        raise
+      except self._TIMEOUT_EXCEPTIONS as e:
+        self._abort_by_timeout('bot_event:%s' % event_type, e)
       except datastore_errors.BadValueError as e:
         logging.warning('Invalid BotInfo or BotEvent values', exc_info=True)
-        return self.abort_with_error(400, error=e.message)
+        self.abort_with_error(400, error=e.message)
 
     # Bot version is host-specific because the host URL is embedded in
     # swarming_bot.zip
@@ -645,7 +655,7 @@ class BotPollHandler(_BotBaseHandler):
       # Prepare BotTaskDimensions
       bot_root_key = bot_management.get_root_key(res.bot_id)
       task_queues.assert_bot_async(bot_root_key, res.dimensions).get_result()
-    except runtime.DeadlineExceededError as e:
+    except self._TIMEOUT_EXCEPTIONS as e:
       # TODO(crbug.com/1027431): assert_bot_async().get_result()
       # takes longer than 60 sec which ends up with "DeadlineExceededError".
       # Returning 429 for the bot to retry.
@@ -655,64 +665,39 @@ class BotPollHandler(_BotBaseHandler):
       # after reaping task.
       # See discussion:
       # https://crrev.com/c/1948022/2#message-15c7ac534cdc49794fcb66cd209e5d2272ea22a5
-      logging.warning(
-          'crbug.com/1027431: '
-          'Ignoring Deadline exceeded error: %s', e)
-      self.abort(429, 'Deadline exceeded while asserting bot')
-    except datastore_errors.InternalError as e:
-      self.abort(429, 'Datastore internal error. %s' % e)
-      return
-
-    def _reap_task():
-      try:
-        # This is a fairly complex function call, exceptions are expected.
-        request, secret_bytes, run_result = task_scheduler.bot_reap_task(
-            res.dimensions, res.version)
-      except (datastore_errors.Timeout, apiproxy_errors.CancelledError):
-        self.abort(429, 'Deadline exceeded while accessing datastore')
-      return request, secret_bytes, run_result
+      self._abort_by_timeout('assert_bot_async', e)
 
     # Try to grab a task.
+    request_uuid = res.request.get('request_uuid')
     try:
-      request_uuid = res.request.get('request_uuid')
       (request, secret_bytes,
        run_result), is_deduped = api_helpers.cache_request(
-           'bot_poll', request_uuid, _reap_task)
-      if is_deduped:
-        logging.info('Reusing cache with uuid %s', request_uuid)
+           'bot_poll', request_uuid, lambda: task_scheduler.bot_reap_task(
+               res.dimensions, res.version))
+    except self._TIMEOUT_EXCEPTIONS as e:
+      self._abort_by_timeout('bot_reap_task', e)
 
-      if not request:
-        # No task found, tell it to sleep a bit.
-        bot_event('request_sleep')
-        self._cmd_sleep(sleep_streak, quarantined)
-        return
+    if is_deduped:
+      logging.info('Reusing request cache with uuid %s', request_uuid)
 
-      try:
-        # This part is tricky since it intentionally runs a transaction after
-        # another one.
-        if request.task_slice(
-            run_result.current_task_slice).properties.is_terminate:
-          bot_event('bot_terminate', task_id=run_result.task_id)
-          self._cmd_terminate(run_result.task_id)
-        else:
-          bot_event(
-              'request_task',
-              task_id=run_result.task_id,
-              task_name=request.name)
-          self._cmd_run(request, secret_bytes, run_result, res.bot_id, res.os,
-                        res.bot_group_cfg)
-      except:
-        logging.exception('Dang, exception after reaping')
-        raise
-    except runtime.DeadlineExceededError:
-      # If the timeout happened before a task was assigned there is no problems.
-      # If the timeout occurred after a task was assigned, that task will
-      # timeout (BOT_DIED) since the bot didn't get the details required to
-      # run it) and it will automatically get retried (TODO) when the task times
-      # out.
-      # TODO(maruel): Note the task if possible and hand it out on next poll.
-      # https://code.google.com/p/swarming/issues/detail?id=130
-      self.abort(500, 'Deadline')
+    if not request:
+      # No task found, tell it to sleep a bit.
+      bot_event('request_sleep')
+      self._cmd_sleep(sleep_streak, quarantined)
+      return
+
+    # This part is tricky since it intentionally runs a transaction after
+    # another one.
+    if request.task_slice(
+        run_result.current_task_slice).properties.is_terminate:
+      bot_event('bot_terminate', task_id=run_result.task_id)
+      self._cmd_terminate(run_result.task_id)
+    else:
+      bot_event('request_task',
+                task_id=run_result.task_id,
+                task_name=request.name)
+      self._cmd_run(request, secret_bytes, run_result, res.bot_id, res.os,
+                    res.bot_group_cfg)
 
   def _cmd_run(self, request, secret_bytes, run_result, bot_id, oses,
                bot_group_cfg):
