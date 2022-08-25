@@ -306,11 +306,9 @@ def _get_task_to_run_query(dimensions_hash):
   # See _gen_queue_number() as of why << 31. This query cannot use the key
   # because it is not a root entity.
   def _query(kind):
-    opts = ndb.QueryOptions(deadline=30)
-    return kind.query(default_options=opts).order(
-        kind.queue_number).filter(
-            kind.queue_number >= (dimensions_hash << 31),
-            kind.queue_number < ((dimensions_hash + 1) << 31))
+    return kind.query().order(kind.queue_number).filter(
+        kind.queue_number >= (dimensions_hash << 31), kind.queue_number <
+        ((dimensions_hash + 1) << 31))
 
   return [_query(get_shard_kind(dimensions_hash % N_SHARDS))]
 
@@ -353,14 +351,15 @@ _MC_CLIENT = memcache.Client()
 
 
 class _ActiveQuery(object):
-  DEADLINE = 60
-
-  def __init__(self, query, dim_hash, bot_id, stats, bot_dims_matcher):
+  def __init__(self, query, dim_hash, bot_id, stats, bot_dims_matcher,
+               deadline):
     self._query = query
     self._dim_hash = dim_hash
     self._bot_id = bot_id
     self._stats = stats
     self._bot_dims_matcher = bot_dims_matcher
+    self._deadline = deadline
+    self._canceled = False
     self._page_size = 10
     self._future = self._fetch_and_filter(None)
 
@@ -388,6 +387,13 @@ class _ActiveQuery(object):
       self._future = None
     return more
 
+  def cancel(self):
+    self._canceled = True
+
+  @property
+  def canceled(self):
+    return self._canceled
+
   @ndb.tasklet
   def _fetch_and_filter(self, cursor):
     """Fetches a page of query results and filters out unusable items.
@@ -399,8 +405,25 @@ class _ActiveQuery(object):
     Yields:
       ([list of potentially consumable TaskToRunShard], cursor, more).
     """
-    fetched, cursor, more = yield self._query.fetch_page_async(
-        self._page_size, start_cursor=cursor, deadline=self.DEADLINE)
+    deadline = (self._deadline - utils.utcnow()).total_seconds()
+    if not self._canceled and deadline < 1.0:
+      self._log('not enough time to make an RPC, canceling this query')
+      self._canceled = True
+
+    if not self._canceled:
+      try:
+        fetched, cursor, more = yield self._query.fetch_page_async(
+            self._page_size, start_cursor=cursor, deadline=deadline)
+      except apiproxy_errors.DeadlineExceededError:
+        # TODO(vadimsh): Maybe it makes sense to use a smaller RPC deadline and
+        # instead retry the call a bunch of times until reaching the overall
+        # deadline?
+        self._log('RPC deadline exceeded, canceling this query')
+        self._canceled = True
+
+    # Exit ASAP if the query was cancelled while waiting in fetch_page_async.
+    if self._canceled:
+      raise ndb.Return(([], None, False))
 
     self._stats.total += len(fetched)
 
@@ -478,9 +501,9 @@ class _ActiveQuery(object):
                   msg % args)
 
 
-def _yield_potential_tasks(bot_id, pool, stats, bot_dims_matcher):
+def _yield_potential_tasks(bot_id, pool, stats, bot_dims_matcher, deadline):
   """Queries all the known task queues in parallel and yields the task in order
-  of priority.
+  of priority until all queues are exhausted or the deadline is reached.
 
   The ordering is opportunistic, not strict. There's a risk of not returning
   exactly in the priority order depending on index staleness and query execution
@@ -493,124 +516,154 @@ def _yield_potential_tasks(bot_id, pool, stats, bot_dims_matcher):
     - 1 second elapsed; in this case, continue iterating in the background
     - First page of every query returned
     - All queries exhausted
+
+  Raises:
+    ScanDeadlineError if reached the deadline before exhausting queues.
   """
+  if utils.utcnow() >= deadline:
+    logging.debug('_yield_potential_tasks(%s): skipping due to deadline',
+                  bot_id)
+    raise ScanDeadlineError('No time left to run the scan at all')
+
   bot_root_key = bot_management.get_root_key(bot_id)
   dim_hashes = task_queues.get_queues(bot_root_key)
 
   # Keep track how many queues we scan in parallel.
   ts_mon_metrics.on_scheduler_scan(pool, len(dim_hashes))
 
-  try:
-    # Start fetching first pages of each per dimension set query. Note that
-    # the default ndb.EVENTUAL_CONSISTENCY is used so stale items may be
-    # returned. It's handled specifically by consumers of this function.
-    queries = []
-    for d in dim_hashes:
-      for q in _get_task_to_run_query(d):
-        queries.append(_ActiveQuery(q, d, bot_id, stats, bot_dims_matcher))
+  # Start fetching first pages of each per dimension set query. Note that
+  # the default ndb.EVENTUAL_CONSISTENCY is used so stale items may be
+  # returned. It's handled specifically by consumers of this function.
+  queries = []
+  for d in dim_hashes:
+    for q in _get_task_to_run_query(d):
+      queries.append(
+          _ActiveQuery(q, d, bot_id, stats, bot_dims_matcher, deadline))
 
-    # Run tasklets for at most 1 sec or until all fetches are done.
-    #
-    # TODO(vadimsh): Why only 1 sec? This also makes priority-based sorting kind
-    # of useless for loaded multi-queue bots, since we can't control what
-    # queries manage to finish first within 1 sec.
-    start = time.time()
-    while (time.time() - start) < 1 and not all(q.ready() for q in queries):
-      r = ndb.eventloop.run0()
-      if r is None:
-        break
-      if r > 0:
-        time.sleep(r)
+  # Run tasklets for at most 1 sec or until all fetches are done.
+  #
+  # TODO(vadimsh): Why only 1 sec? This also makes priority-based sorting kind
+  # of useless for loaded multi-queue bots, since we can't control what
+  # queries manage to finish first within 1 sec.
+  start = time.time()
+  while (time.time() - start) < 1 and not all(q.ready() for q in queries):
+    r = ndb.eventloop.run0()
+    if r is None:
+      break
+    if r > 0:
+      time.sleep(r)
 
-    # Log how many items we actually got. On loaded servers it will actually
-    # be 0 pretty often, since 1 sec is not that much.
-    logging.debug(
-        '_yield_potential_tasks(%s): waited %.3fs for %d items from queues '
-        '%s', bot_id,
-        time.time() - start,
-        sum(len(q.page()) for q in queries if q.ready()),
-        [q.dim_hash for q in queries])
+  # Log how many items we actually got. On loaded servers it will actually
+  # be 0 pretty often, since 1 sec is not that much.
+  logging.debug(
+      '_yield_potential_tasks(%s): waited %.3fs for %d items from queues '
+      '%s', bot_id,
+      time.time() - start, sum(len(q.page()) for q in queries if q.ready()),
+      [q.dim_hash for q in queries])
 
-    # A priority queue with TaskToRunShard ordered by the priority+timestamp,
-    # extracted from queue_number using _queue_number_order_priority.
-    queue = _PriorityQueue()
+  # We may be running of time already if task_queues.get_queues above was
+  # particularly slow.
+  if utils.utcnow() >= deadline:
+    for q in queries:
+      q.cancel()
+    logging.debug('_yield_potential_tasks(%s): deadline before the poll loop',
+                  bot_id)
+    raise ScanDeadlineError('Deadline before the poll loop')
 
-    def _poll_queries(queries, use_heap):
-      enqueue = queue.add_heapified if use_heap else queue.add_unordered
+  # A priority queue with TaskToRunShard ordered by the priority+timestamp,
+  # extracted from queue_number using _queue_number_order_priority.
+  queue = _PriorityQueue()
 
-      # Get items from pages we already fetched and add them into `queue`. We
-      # don't block here, just pick what already was fetched.
-      pending = []
-      changed = False
-      for q in queries:
-        # Retain in the pending list if still working on some page.
-        if not q.ready():
-          pending.append(q)
-          continue
+  def _poll_queries(queries, use_heap):
+    enqueue = queue.add_heapified if use_heap else queue.add_unordered
 
-        runs = q.page()
-        if runs:
-          # TaskToRunShard submitted within the same 100ms interval at the same
-          # priority have the same queue sorting number (see _gen_queue_number).
-          # By shuffling them here we reduce chances of multiple bots contesting
-          # over the same items. This is effective only for queues with more
-          # than 10 tasks per second.
-          random.shuffle(runs)
+    # Get items from pages we already fetched and add them into `queue`. We
+    # don't block here, just pick what already was fetched.
+    pending = []
+    changed = False
+    for q in queries:
+      # Retain in the pending list if still working on some page.
+      if not q.ready():
+        pending.append(q)
+        continue
 
-          # Add them to the local priority queue.
-          changed = True
-          for r in runs:
-            enqueue(r)
+      runs = q.page()
+      if runs:
+        # TaskToRunShard submitted within the same 100ms interval at the same
+        # priority have the same queue sorting number (see _gen_queue_number).
+        # By shuffling them here we reduce chances of multiple bots contesting
+        # over the same items. This is effective only for queues with more
+        # than 10 tasks per second.
+        random.shuffle(runs)
 
-        # Start fetching the next page, if any.
-        if q.advance():
-          pending.append(q)
-        else:
-          # The queue has no more results, don't add it to `pending`.
-          changed = True
+        # Add them to the local priority queue.
+        changed = True
+        for r in runs:
+          enqueue(r)
 
-      # Log the final stats if anything changed.
-      if changed:
-        logging.debug(
-            '_yield_potential_tasks(%s): %s items pending. active queues %s',
-            bot_id, queue.size(), [q.dim_hash for q in pending])
-      return pending
-
-    # Pick up all first pages we managed to fetch in 1 sec above and put them
-    # into the list in whatever order they were fetched.
-    queries = _poll_queries(queries, use_heap=False)
-
-    # Transform the list into an actual priority queue before polling from it.
-    queue.heapify()
-
-    while not queue.empty() or queries:
-      # Grab the top-priority item and let the caller try to process it.
-      if not queue.empty():
-        yield queue.pop()
+      # Start fetching the next page, if any.
+      if q.advance():
+        pending.append(q)
       else:
-        # No pending items, but there are some pending futures. Run one step of
-        # ndb event loop to move things forward.
-        ndb.eventloop.run1()
-      # Poll for any new query pages, adding fetched items to the local queue.
-      # Do it only if the local queue is sufficiently shallow. If it is not,
-      # then the consumer is too slow. Adding more items will just result in
-      # eventually running out of memory.
-      if queue.size() < 1000:
-        queries = _poll_queries(queries, use_heap=True)
-    logging.debug('_yield_potential_tasks(%s): all queues exhausted', bot_id)
+        # The queue has no more results, don't add it to `pending`.
+        changed = True
 
-  except apiproxy_errors.DeadlineExceededError as e:
-    # This is normally due to: "The API call datastore_v3.RunQuery() took too
-    # long to respond and was cancelled."
-    # At that point, the Cloud DB index is not able to sustain the load. So the
-    # best thing to do is to back off a bit and not return any task to the bot
-    # for this poll.
-    logging.error(
-        'Failed to yield a task due to an RPC timeout. Returning no '
-        'task to the bot: %s', e)
+    # Log the final stats if anything changed.
+    if changed:
+      logging.debug(
+          '_yield_potential_tasks(%s): %s items pending. active queues %s',
+          bot_id, queue.size(), [q.dim_hash for q in pending])
+    return pending
+
+  # Pick up all first pages we managed to fetch in 1 sec above and put them
+  # into the list in whatever order they were fetched.
+  active = _poll_queries(queries, use_heap=False)
+
+  # Transform the list into an actual priority queue before polling from it.
+  queue.heapify()
+
+  while not queue.empty() or active:
+    # Grab the top-priority item and let the caller try to process it.
+    if not queue.empty():
+      yield queue.pop()
+    else:
+      # No pending items, but there are some pending futures. Run one step of
+      # ndb event loop to move things forward.
+      ndb.eventloop.run1()
+    # On the overall deadline asynchronously cancel remaining queries and exit.
+    if utils.utcnow() >= deadline:
+      for q in active:
+        q.cancel()
+      break
+    # Poll for any new query pages, adding fetched items to the local queue.
+    # Do it only if the local queue is sufficiently shallow. If it is not,
+    # then the consumer is too slow. Adding more items will just result in
+    # eventually running out of memory.
+    if queue.size() < 1000:
+      active = _poll_queries(active, use_heap=True)
+
+  canceled = [q for q in queries if q.canceled]
+  if canceled:
+    logging.debug(
+        '_yield_potential_tasks(%s): deadline in queues %s, dropping %d items',
+        bot_id, [q.dim_hash for q in canceled], queue.size())
+    raise ScanDeadlineError('Deadline fetching queues')
+
+  if utils.utcnow() >= deadline:
+    logging.debug(
+        '_yield_potential_tasks(%s): deadline processing, dropping %d items',
+        bot_id, queue.size())
+    raise ScanDeadlineError('Deadline processing fetched items')
+
+  logging.debug('_yield_potential_tasks(%s): all queues exhausted', bot_id)
 
 
 ### Public API.
+
+
+class ScanDeadlineError(Exception):
+  """Raised when yield_next_available_task_to_dispatch reaches the deadline
+  before exhausting pending queues."""
 
 
 def request_to_task_to_run_key(request, try_number, task_slice_index):
@@ -772,7 +825,8 @@ class Claim(object):
     self.release()
 
 
-def yield_next_available_task_to_dispatch(bot_id, pool, bot_dims_matcher):
+def yield_next_available_task_to_dispatch(bot_id, pool, bot_dims_matcher,
+                                          deadline):
   """Yields next available TaskToRunShard in roughly decreasing order of
   priority.
 
@@ -785,23 +839,16 @@ def yield_next_available_task_to_dispatch(bot_id, pool, bot_dims_matcher):
   - pool: this bot's pool for monitoring metrics.
   - bot_dims_matcher: a predicate that checks if task dimensions match bot's
       dimensions.
+  - deadline: datetime.datetime when to give up.
+
+  Raises:
+    ScanDeadlineError if reached the deadline before clearing queues.
   """
   now = utils.utcnow()
   stats = _QueryStats()
   try:
-    for ttr in _yield_potential_tasks(bot_id, pool, stats, bot_dims_matcher):
-      # Stop searching after too long, since the odds of the request blowing
-      # up right after succeeding in reaping a task is not worth the dangling
-      # task request that will stay in limbo until the cron job reaps it and
-      # retry it. The current handlers are given 60s to complete. By limiting
-      # search to 40s, it gives 20s to complete the reaping and complete the
-      # HTTP request.
-      if (utils.utcnow() - now).total_seconds() > 40.:
-        logging.debug(
-            'yield_next_available_task_to_dispatch(%s): exit by timeout',
-            bot_id)
-        return
-
+    for ttr in _yield_potential_tasks(bot_id, pool, stats, bot_dims_matcher,
+                                      deadline):
       # Try to claim this TaskToRunShard. Only one bot will pass this. It then
       # will have ~15s to submit a transaction that assigns the TaskToRunShard
       # to this bot before another bot will be able to try that.
@@ -811,7 +858,6 @@ def yield_next_available_task_to_dispatch(bot_id, pool, bot_dims_matcher):
             bot_id, ttr.task_id)
         stats.visited += 1
         yield ttr
-
   finally:
     logging.debug(
         'yield_next_available_task_to_dispatch(%s) in %.3fs: %s',

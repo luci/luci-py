@@ -4,6 +4,7 @@
 """Internal bot API handlers."""
 
 import base64
+import datetime
 import json
 import logging
 import urlparse
@@ -37,6 +38,7 @@ from server import task_queues
 from server import task_request
 from server import task_result
 from server import task_scheduler
+from server import task_to_run
 import api_helpers
 import ts_mon_metrics
 
@@ -538,6 +540,7 @@ class BotPollHandler(_BotBaseHandler):
       datastore_errors.Timeout,
       datastore_utils.CommitError,  # one reason is timeout
       runtime.DeadlineExceededError,
+      task_to_run.ScanDeadlineError,
   )
 
   def _abort_by_timeout(self, stage, exc):
@@ -564,6 +567,7 @@ class BotPollHandler(_BotBaseHandler):
       self._cmd_sleep(1000, True)
       return
 
+    deadline = utils.utcnow() + datetime.timedelta(seconds=60)
     res = self._process()
 
     sleep_streak = res.state.get('sleep_streak', 0)
@@ -667,13 +671,14 @@ class BotPollHandler(_BotBaseHandler):
       # https://crrev.com/c/1948022/2#message-15c7ac534cdc49794fcb66cd209e5d2272ea22a5
       self._abort_by_timeout('assert_bot_async', e)
 
-    # Try to grab a task.
+    # Try to grab a task. Leave ~10s for bot_event(...) transaction below.
+    reap_deadline = deadline - datetime.timedelta(seconds=10)
     request_uuid = res.request.get('request_uuid')
     try:
       (request, secret_bytes,
        run_result), is_deduped = api_helpers.cache_request(
            'bot_poll', request_uuid, lambda: task_scheduler.bot_reap_task(
-               res.dimensions, res.version))
+               res.dimensions, res.version, reap_deadline))
     except self._TIMEOUT_EXCEPTIONS as e:
       self._abort_by_timeout('bot_reap_task', e)
 

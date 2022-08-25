@@ -1334,7 +1334,7 @@ def schedule_request(request,
   return result_summary
 
 
-def bot_reap_task(bot_dimensions, bot_version):
+def bot_reap_task(bot_dimensions, bot_version, deadline):
   """Reaps a TaskToRunShard if one is available.
 
   The process is to find a TaskToRunShard where its .queue_number is set, then
@@ -1344,6 +1344,7 @@ def bot_reap_task(bot_dimensions, bot_version):
   - bot_dimensions: The dimensions of the bot as a dictionary in
           {string key: list of string values} format.
   - bot_version: String version of the bot client.
+  - deadline: datetime.datetime of when to give up.
 
   Returns:
     tuple of (TaskRequest, SecretBytes, TaskRunResult) for the task that was
@@ -1369,6 +1370,9 @@ def bot_reap_task(bot_dimensions, bot_version):
   # performance by pool.
   pool = (bot_dimensions.get(u'pool') or ['-'])[0]
 
+  # Allocate ~10s for _reap_task.
+  scan_deadline = deadline - datetime.timedelta(seconds=10)
+
   iterated = 0
   reenqueued = 0
   expired = 0
@@ -1376,7 +1380,7 @@ def bot_reap_task(bot_dimensions, bot_version):
   stale_index = 0
   try:
     q = task_to_run.yield_next_available_task_to_dispatch(
-        bot_id, pool, match_bot_dimensions)
+        bot_id, pool, match_bot_dimensions, scan_deadline)
     for to_run in q:
       iterated += 1
       request = task_to_run.task_to_run_key_to_request_key(to_run.key).get()
@@ -1469,7 +1473,7 @@ def bot_reap_task(bot_dimensions, bot_version):
   finally:
     logging.debug(
         'bot_reap_task(%s) in %.3fs: %d iterated, %d reenqueued, %d expired, '
-        '%d stale_index, %d failured', bot_id,
+        '%d stale_index, %d failed', bot_id,
         time.time() - start, iterated, reenqueued, expired, stale_index,
         failures)
 

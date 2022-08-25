@@ -135,7 +135,8 @@ def _yield_next_available_task_to_dispatch(bot_dimensions):
   return [
       to_run.to_dict()
       for to_run in task_to_run.yield_next_available_task_to_dispatch(
-          bot_id, 'pool-for-monitoring', matcher)
+          bot_id, 'pool-for-monitoring', matcher,
+          utils.utcnow() + datetime.timedelta(minutes=1))
   ]
 
 
@@ -970,6 +971,42 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
     available.sort(key=lambda ttr: ttr['created_ts'])
     collected.sort(key=lambda ttr: ttr['created_ts'])
     self.assertEqual(available, collected)
+
+  def test_yield_next_available_task_to_dispatch_deadline(self):
+    request_dimensions = {u'os': [u'Windows-3.1.1'], u'pool': [u'p1']}
+    for i in range(40):
+      request = self.mkreq(
+          1 if i == 0 else 0,
+          _gen_request(
+              properties=_gen_properties(dimensions=request_dimensions),
+              priority=50))
+      ttr = task_to_run.new_task_to_run(request, 0)
+      ttr.put()
+
+    bot_id = u'localhost'
+    bot_dimensions = {
+        u'id': [bot_id],
+        u'os': [u'Windows-3.1.1'],
+        u'pool': [u'p1'],
+    }
+    bot_root_key = bot_management.get_root_key(bot_id)
+    task_queues.assert_bot_async(bot_root_key, bot_dimensions).get_result()
+    matcher = task_to_run.dimensions_matcher(bot_dimensions)
+
+    seen = 0
+    raised = False
+    try:
+      deadline = utils.utcnow() + datetime.timedelta(seconds=23)
+      for _ in task_to_run.yield_next_available_task_to_dispatch(
+          bot_id, 'pool-for-monitoring', matcher, deadline):
+        seen += 1
+        self.mock_now(self.now, seen)  # 1 sec per iteration
+    except task_to_run.ScanDeadlineError:
+      raised = True
+
+    # Gave up soon enough.
+    self.assertTrue(raised)
+    self.assertEqual(23, seen)
 
   def test_yield_expired_task_to_run(self):
     # There's a cut off at 2019-09-01, so the default self.now on Jan 2nd
