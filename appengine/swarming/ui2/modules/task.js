@@ -23,6 +23,7 @@ export const COUNT_FILTERS = [
   {label: 'Running', value: '...', filter: 'RUNNING'},
   {label: 'Timed Out', value: '...', filter: 'TIMED_OUT'},
   {label: 'Bot Died', value: '...', filter: 'BOT_DIED'},
+  {label: 'Client Error', value: '...', filter: 'CLIENT_ERROR'},
   {label: 'Deduplicated', value: '...', filter: 'DEDUPED'},
   {label: 'Expired', value: '...', filter: 'EXPIRED'},
   {label: 'No Resource', value: '...', filter: 'NO_RESOURCE'},
@@ -45,4 +46,5 @@ export const FILTER_STATES = [
   'NO_RESOURCE',
   'CANCELED',
   'KILLED',
+  'CLIENT_ERROR',
 ];

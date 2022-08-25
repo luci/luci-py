@@ -247,6 +247,9 @@ export function stateClass(result) {
   if (state === 'BOT_DIED') {
     return 'bot_died';
   }
+  if (state === 'CLIENT_ERROR') {
+    return 'client_error';
+  }
   if (ONGOING_STATES.has(state)) {
     return 'pending_task';
   }

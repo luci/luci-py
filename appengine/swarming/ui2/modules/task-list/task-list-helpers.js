@@ -469,6 +469,9 @@ export function taskClass(task) {
   if (state === 'BOT_DIED') {
     return 'bot_died';
   }
+  if (state === 'CLIENT_ERROR') {
+    return 'client_error';
+  }
   if (state === 'COMPLETED (FAILURE)') {
     return 'failed_task';
   }

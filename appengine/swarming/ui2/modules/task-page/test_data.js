@@ -687,6 +687,59 @@ export const taskResults = [
     'completed_ts': '2019-02-04T13:37:13.437068',
     'current_task_slice': '0',
   },
+  {
+    'created_ts': '2019-02-04T14:27:01.423453',
+    'name': 'Client Task Error',
+    'task_id': '42f58eef9464ab11',
+    'tags': [
+      'background_task:Repair_2edf5fd5-8898-46b4-b9af-bdc41cba65ea',
+      'dut_id:2edf5fd5-8898-46b4-b9af-bdc41cba65ea',
+      'dut_state:needs_repair',
+      'log_location:logdog://example.com/chromeos/moonshark/86c6d31f-267d-4749-8fcb-18397e3eac7a/+/annotations',
+      'luci_project:chromeos',
+      'pool:ChromeOSSkylab',
+      'priority:35',
+      'service_account:none',
+      'moonshark:fleet_admin',
+      'swarming.pool.template:none',
+      'swarming.pool.version:1c55a1fcfe44ea9af5180cbc762b83a830b34e39',
+      'user:none',
+    ],
+    'internal_failure': false,
+    'server_versions': [
+      '4080-d2e3428',
+    ],
+    'abandoned_ts': '2019-02-04T14:31:07.896875',
+    'exit_code': 1,
+    'failure': true,
+    'state': 'CLIENT_ERROR',
+    'missing_cas': [
+      {
+        'cas_instance': 'projects/chromium-swarm/instances/default_instance',
+        'digest': {
+          'hash': '1d1e14a2d0da6348f3f37312ef524a2cea1db4ead9ebc6c335f99qef',
+          'size_bytes': 232,
+        },
+      },
+    ],
+    'missing_cipd': [
+      {
+        'path': 'cipd_bin_packages',
+        'version': 'b245a31a4df87bd38f7e7d0cf19d492695bd7a7e',
+        'package_name': 'infra/git/linux-amd64',
+      },
+      {
+        'path': '.swarming_module',
+        'version': 'git_revision:96f81e737868d43124b4661cf1c325296ca04944',
+        'package_name': 'infra/tools/luci/vpython/linux-amd64',
+      },
+    ],
+    'bot_id': 'swarm1931-c4',
+    'modified_ts': '2019-02-04T14:31:07.896875',
+    'user': '',
+    'completed_ts': '2019-02-04T14:31:07.896875',
+    'current_task_slice': '0',
+  },
 ];
 
 
@@ -1949,6 +2002,89 @@ export const taskRequests = [
     'created_ts': '2019-02-04T13:27:06.891224',
     'authenticated': 'user:staging-user@appspot.gserviceaccount.com',
     'name': 'Expired Task',
+    'tags': [
+      'background_task:Repair_2edf5fd5-8898-46b4-b9af-bdc41cba65ea',
+      'dut_id:2edf5fd5-8898-46b4-b9af-bdc41cba65ea',
+      'dut_state:needs_repair',
+      'log_location:logdog://example.com/chromeos/moonshark/86c6d31f-267d-4749-8fcb-18397e3eac7a/+/annotations',
+      'luci_project:chromeos',
+      'moonshark:fleet_admin',
+      'pool:ChromeOSSkylab',
+      'priority:30',
+      'service_account:none',
+      'swarming.pool.template:none',
+      'swarming.pool.version:1c55a1fcfe44ea9af5180cbc762b83a830b34e39',
+      'user:none',
+    ],
+    'priority': '30',
+    'user': '',
+    'service_account': 'none',
+    'task_slices': [
+      {
+        'expiration_secs': '600',
+        'wait_for_capacity': true,
+        'properties': {
+          'dimensions': [
+            {
+              'value': 'needs_repair',
+              'key': 'dut_state',
+            },
+            {
+              'value': 'ChromeOSSkylab',
+              'key': 'pool',
+            },
+            {
+              'value': '2edf5fd5-8898-46b4-b9af-bdc41cba65ea',
+              'key': 'dut_id',
+            },
+          ],
+          'idempotent': false,
+          'cas_input_root': casRef,
+          'command': [
+            '/opt/infra-tools/moonshark_swarming_worker',
+            '-task-name',
+            'admin_repair',
+            '-logdog-annotation-url',
+            'logdog://example.com/chromeos/moonshark/86c6d31f-267d-4749-8fcb-18397e3eac7a/+/annotations',
+          ],
+          'execution_timeout_secs': '5400',
+          'grace_period_secs': '30',
+        },
+      },
+    ],
+    'expiration_secs': '600',
+    'properties': {
+      'dimensions': [
+        {
+          'value': 'needs_repair',
+          'key': 'dut_state',
+        },
+        {
+          'value': 'ChromeOSSkylab',
+          'key': 'pool',
+        },
+        {
+          'value': '2edf5fd5-8898-46b4-b9af-bdc41cba65ea',
+          'key': 'dut_id',
+        },
+      ],
+      'idempotent': false,
+      'cas_input_root': casRef,
+      'command': [
+        '/opt/infra-tools/moonshark_swarming_worker',
+        '-task-name',
+        'admin_repair',
+        '-logdog-annotation-url',
+        'logdog://example.com/chromeos/moonshark/86c6d31f-267d-4749-8fcb-18397e3eac7a/+/annotations',
+      ],
+      'execution_timeout_secs': '5400',
+      'grace_period_secs': '30',
+    },
+  },
+  {
+    'created_ts': '2019-02-04T13:27:06.891224',
+    'authenticated': 'user:staging-user@appspot.gserviceaccount.com',
+    'name': 'Client Error Task',
     'tags': [
       'background_task:Repair_2edf5fd5-8898-46b4-b9af-bdc41cba65ea',
       'dut_id:2edf5fd5-8898-46b4-b9af-bdc41cba65ea',

@@ -96,6 +96,23 @@ When debugging certain tests, it may be useful to prefix the `it` or `describe`
 statement with a letter 'f' (for force). Then, only tests with the 'f' prefix
 will run. Conversely, tests can be disabled with an 'x' prefix.
 
+If you are running on a local environment and get a disconnection error in the form: `Disconnectedreconnect failed before timeout of X ms`, try using the following custom launcher (which can be added to karma.conf.js):
+
+    customLaunchers: {
+        'ChromeHeadless': {
+            base: 'Chrome',
+            flags: [
+                '--headless',
+                '--disable-gpu',
+                '--no-sandbox',
+                '--disable-web-security',
+                // Without a debugging port, Chrome exits immediately.
+                '--remote-debugging-port=9222'
+            ],
+            debug: true
+        }
+    },
+
 ## Generating the docs
 
 We use [JSDoc](http://usejsdoc.org) to document the modules. While the

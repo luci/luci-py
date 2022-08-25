@@ -420,6 +420,39 @@ const casBlock = (title, host, ref) => {
 </tr>`;
 };
 
+const missingCasBlock = (title, host, missingCas) => {
+  if (!missingCas) {
+    return '';
+  }
+  const casInputs = missingCas || [];
+  return html`
+<tr>
+  <td>${title}</td>
+  <td class='exception'>
+    ${casInputs.map((input) => missingCasRowSet(host, input))}
+  </td>
+</tr>`;
+};
+
+const missingCasRowSet = (host, input) => html`
+<tr>
+  <tr>
+    <td>
+      Instance:
+      ${input.cas_instance}
+    </td>
+  </tr>
+  <tr>
+    <td>
+      Digest:
+      <a href=${casLink(host, input)} target='_blank'>
+        ${input.digest.hash}/${input.digest.size_bytes}
+      </a>
+    </td>
+  </tr>
+</tr>
+`;
+
 const arrayInTable = (array, label, keyFn) => {
   if (!array || !array.length) {
     return html`
@@ -476,6 +509,34 @@ ${arrayInTable(env_prefixes, 'Environment Prefixes',
   <td>Idempotent</td>
   <td>${!!properties.idempotent}</td>
 </tr>
+`;
+
+const missingCipdBlock = (title, missingCipd) => {
+  if (!missingCipd) {
+    return '';
+  }
+
+  const missingCipdPackages = missingCipd || [];
+  return html`
+  <tr>
+    <td>${title}</td>
+    <td class='exception'>
+      ${missingCipdPackages.map((pkg) => missingCipdRowSet(pkg))}
+    </td>
+  </tr>
+`;
+};
+
+const missingCipdRowSet = (cipd) => html`
+  <tr>
+    <td>Path:${cipd.path}</td>
+  </tr>
+  <tr>
+    <td>Package:${cipd.package_name}</td>
+  </tr>
+  <tr>
+    <td>Version:${cipd.version}</td>
+  </tr>
 `;
 
 const cipdBlock = (cipdInput, result) => {
@@ -768,6 +829,11 @@ const taskExecutionSection = (ele, request, result, currentSlice) => {
     <td>Cost (USD)</td>
     <td>$${taskCost(result)}</td>
   </tr>
+  ${missingCasBlock('Missing CAS Input(s)',
+      ele._app._server_details.cas_viewer_server,
+      result.missing_cas)}
+  ${missingCipdBlock('Missing CIPD Package(s)',
+      result.missing_cipd)}
   ${casBlock('CAS Outputs',
       ele._app._server_details.cas_viewer_server,
       result.cas_output_root || {})}

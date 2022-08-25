@@ -4,7 +4,7 @@
 
 import './index.js';
 
-import {tasks_20} from './test_data';
+import {tasks_22} from './test_data';
 import {fleetDimensions} from '../bot-list/test_data';
 import {requireLogin, mockAuthdAppGETs} from '../test_util';
 
@@ -20,7 +20,7 @@ import {requireLogin, mockAuthdAppGETs} from '../test_util';
   });
 
   fetchMock.get('glob:/_ah/api/swarming/v1/tasks/list?*',
-      requireLogin(tasks_20, 2000));
+      requireLogin(tasks_22, 2000));
 
   fetchMock.get('glob:/_ah/api/swarming/v1/bots/dimensions?*',
       requireLogin(fleetDimensions));

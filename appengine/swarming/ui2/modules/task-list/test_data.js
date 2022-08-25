@@ -5,7 +5,7 @@
 // This file has some data used for task-list tests.
 
 // 2 tasks of each of the various states.
-export const tasks_20 = {
+export const tasks_22 = {
   'items': [
     {
       'created_ts': '2018-12-19T16:31:28.290449',
@@ -43,6 +43,190 @@ export const tasks_20 = {
       'modified_ts': '2018-12-19T16:31:28.333370',
       'user': '',
       'current_task_slice': '0',
+    },
+    {
+      'created_ts': '2018-12-19T16:31:28.290449',
+      'name': 'gfx_unittests/Mac-12/f4c7893a7e/mac12-arm64-rel-tests/503',
+      'task_id': '41e020504d0a5119',
+      'run_id': '41e0222290be8111',
+      'tags': [
+        'build_is_experimental:false',
+        'buildername:mac12-arm64-rel-tests',
+        'buildnumber:503',
+        'data:f4c7893a7e2958a8d451d7a5a2d39a98127aa78293272bd6e4fa3d11470',
+        'name:gfx_unittests',
+        'os:Mac-12',
+        'pool:chromium.tests',
+        'priority:25',
+        'project:chromium',
+        'purpose:CI',
+        'purpose:luci',
+        'purpose:post-commit',
+        'service_account:none',
+        'botname:swarm1596-c4',
+        'spec_name:chromium.ci:android-marshmallow-arm64-rel',
+        'stepname:webview_instrumentation_test_apk on Android device Nexus 5X',
+        'swarming.pool.template:prod',
+        'swarming.pool.version:3105689c391c8dfb9bb4c91393c1d2dc63ac0cef',
+        'user:none',
+      ],
+      'internal_failure': false,
+      'server_versions': [
+        '3945-402d3be',
+      ],
+      'failure': true,
+      'state': 'CLIENT_ERROR',
+      'modified_ts': '2018-12-19T16:31:28.333370',
+      'user': '',
+      'current_task_slice': '0',
+      'abandoned_ts': '2018-12-19T15:58:11.142556',
+      'bot_id': 'gce-lucid-e542d7b5-au-syd-c-l9hr',
+      'try_number': '1',
+      'started_ts': '2018-12-19T16:59:23.543213',
+    },
+    {
+      'created_ts': '2018-12-19T16:38:20.601393',
+      'bot_dimensions': [
+        {
+          'value': [
+            'swarming_module_cache_vpython',
+          ],
+          'key': 'caches',
+        },
+        {
+          'value': [
+            '8',
+          ],
+          'key': 'cores',
+        },
+        {
+          'value': [
+            'x86',
+            'x86-64',
+            'x86-64-Broadwell_GCE',
+            'x86-64-avx2',
+          ],
+          'key': 'cpu',
+        },
+        {
+          'value': [
+            '1',
+          ],
+          'key': 'gce',
+        },
+        {
+          'value': [
+            'none',
+          ],
+          'key': 'gpu',
+        },
+        {
+          'value': [
+            'gce-trusty-e833d7b0-us-east1-b-fb3g',
+          ],
+          'key': 'id',
+        },
+        {
+          'value': [
+            'chrome-trusty-18091700-38cc06ee3ee',
+          ],
+          'key': 'image',
+        },
+        {
+          'value': [
+            '0',
+          ],
+          'key': 'inside_docker',
+        },
+        {
+          'value': [
+            '1',
+          ],
+          'key': 'kvm',
+        },
+        {
+          'value': [
+            'n1-standard-8',
+          ],
+          'key': 'machine_type',
+        },
+        {
+          'value': [
+            'Linux',
+            'Ubuntu',
+            'Ubuntu-14.04',
+          ],
+          'key': 'os',
+        },
+        {
+          'value': [
+            'Chrome',
+          ],
+          'key': 'pool',
+        },
+        {
+          'value': [
+            '2.7.6',
+          ],
+          'key': 'python',
+        },
+        {
+          'value': [
+            '3945-402d3be',
+          ],
+          'key': 'server_version',
+        },
+        {
+          'value': [
+            'us',
+            'us-east',
+            'us-east1',
+            'us-east1-b',
+          ],
+          'key': 'zone',
+        },
+      ],
+      'bot_version': '14fa84c24d76966aabd6df511c4f24bad7f85c257fbfc5598ebc215b5d8f9e97',
+      'task_id': '41e04320743a3840',
+      'run_id': '41e0222076a33011',
+      'internal_failure': false,
+      'tags': [
+        'build_is_experimental:false',
+        'buildername:linux_chromium_tsan_rel_ng',
+        'buildnumber:169264',
+        'cpu:x86-64',
+        'data:43a2e2aa4e30148b59eeacb57ee1374175ae6dcd4e67bac5ddc21',
+        'gerrit:https://chromium-review.googlesource.com/c/3853109/1',
+        'gpu:none',
+        'name:shell_encryption_unittests',
+        'os:Ubuntu-18.04',
+        'patch_project:chromium/src',
+        'pool:chromium',
+        'priority:30',
+        'project:chromium',
+        'purpose:ManualTS',
+        'purpose:luci',
+        'purpose:pre-commit',
+        'service_account:none',
+        'spec_name:chromium.try:linux-chromeos-rel',
+        'stepname:shell_encryption_unittests (with patch) on Ubuntu-18.04',
+        'swarming.pool.template:prod',
+        'swarming.pool.version:52c1d92081960bbd259ed4c5b8003509537d2a0b',
+        'user:none',
+      ],
+      'server_versions': [
+        '8542-983e6ae',
+      ],
+      'costs_usd': [
+        0,
+      ],
+      'name': 'shell_encryption_unittests (with patch)/Ubuntu-18.04/43a2e2aa4e/linux-chromeos-rel/1289494',
+      'failure': true,
+      'state': 'CLIENT_ERROR',
+      'user': '',
+      'current_task_slice': '0',
+      'try_number': '1',
+      'bot_id': 'build42-b2',
     },
     {
       'created_ts': '2018-12-19T16:31:28.036976',
