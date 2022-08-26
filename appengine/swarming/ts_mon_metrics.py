@@ -328,7 +328,7 @@ _scheduler_visits = gae_ts_mon.CumulativeDistributionMetric(
 # - stage: e.g. 'assert_bot_async'
 # - exception: e.g. 'DeadlineExceededError'
 _handler_timeouts = gae_ts_mon.CounterMetric(
-    'api/timeouts', 'Number of timeout events in API handlers.', [
+    'swarming/api/timeouts', 'Number of timeout events in API handlers.', [
         gae_ts_mon.StringField('endpoint'),
         gae_ts_mon.StringField('stage'),
         gae_ts_mon.StringField('exception'),

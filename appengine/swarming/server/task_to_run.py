@@ -360,6 +360,7 @@ class _ActiveQuery(object):
     self._bot_dims_matcher = bot_dims_matcher
     self._deadline = deadline
     self._canceled = False
+    self._pages = 0
     self._page_size = 10
     self._future = self._fetch_and_filter(None)
 
@@ -412,9 +413,11 @@ class _ActiveQuery(object):
 
     if not self._canceled:
       try:
+        self._pages += 1
+        self._log('fetching page #%d (deadline %.3fs)', self._pages, deadline)
         fetched, cursor, more = yield self._query.fetch_page_async(
             self._page_size, start_cursor=cursor, deadline=deadline)
-      except apiproxy_errors.DeadlineExceededError:
+      except (apiproxy_errors.DeadlineExceededError, datastore_errors.Timeout):
         # TODO(vadimsh): Maybe it makes sense to use a smaller RPC deadline and
         # instead retry the call a bunch of times until reaching the overall
         # deadline?
