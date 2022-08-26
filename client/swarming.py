@@ -4,10 +4,10 @@
 # that can be found in the LICENSE file.
 """Client tool to trigger tasks or retrieve results from a Swarming server."""
 
-# [VPYTHON:BEGIN]
 # This spec is for the case swarming.py is used via
 # https://chromium.googlesource.com/infra/luci/client-py
 #
+# [VPYTHON:BEGIN]
 # wheel: <
 #  name: "infra/python/wheels/pyobjc/${vpython_platform}"
 #  version: "version:7.3.chromium.1"
