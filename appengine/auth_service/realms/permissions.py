@@ -158,6 +158,8 @@ def db():
   # Weetbix permissions and roles (b/239768873).
   # Weetbix checks all permissions against the <project>:@root
   # realm.
+  # TODO(b/243488110): Delete roles when Weetbix renaming to LUCI
+  # analysis complete.
   role(
       'role/weetbix.limitedReader',
       [
@@ -204,6 +206,57 @@ def db():
           # another role (e.g. reader or editor).
           include('role/weetbix.limitedReader'),
           permission('weetbix.clusters.expensiveQueries'),
+      ])
+
+  # LUCI Analysis permissions and roles (b/239768873).
+  # LUCI Analysis checks all permissions against the <project>:@root
+  # realm.
+  role(
+      'role/analysis.limitedReader',
+      [
+          # Allows viewing project configuration, and listing all rules
+          # and clusters in the project (with associated bugs and
+          # aggregated impact for each), except:
+          # - For rule-based clusters, access to the rule definition
+          #   ('reason where '%some failure%') is not granted.
+          #   The user can however see the failures they already have
+          #   access to (in ResultDB) which match the definition.
+          # - For suggested clusters, cluster definition is not visible
+          #   unless they user has access at least one test failure in
+          #   the cluster.
+          permission('analysis.config.get'),
+          permission('analysis.rules.get'),
+          permission('analysis.rules.list'),
+          permission('analysis.clusters.get'),
+          permission('analysis.clusters.list'),
+          permission('analysis.clusters.getByFailure'),
+      ])
+  role(
+      'role/analysis.reader',
+      [
+          # Access to the definition of a failure association rule
+          # e.g. ('reason where '%some failure%'). This could allow
+          # the user to see arbitrary failure reasons or test IDs from
+          # the project.
+          include('role/analysis.limitedReader'),
+          permission('analysis.rules.getDefinition'),
+      ])
+  role(
+      'role/analysis.editor',
+      [
+          # Ability to update failure association rules.
+          include('role/analysis.reader'),
+          permission('analysis.rules.create'),
+          permission('analysis.rules.update'),
+      ])
+  role(
+      'role/analysis.queryUser',
+      [
+          # Grants the ability to run queries that hit BigQuery.
+          # Often this role is granted in conjunction with
+          # another role (e.g. reader or editor).
+          include('role/analysis.limitedReader'),
+          permission('analysis.clusters.expensiveQueries'),
       ])
 
   # Buildbucket permissions and roles (crbug.com/1091604).
