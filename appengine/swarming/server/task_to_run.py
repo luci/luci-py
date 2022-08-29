@@ -526,7 +526,7 @@ def _yield_potential_tasks(bot_id, pool, stats, bot_dims_matcher, deadline):
   if utils.utcnow() >= deadline:
     logging.debug('_yield_potential_tasks(%s): skipping due to deadline',
                   bot_id)
-    raise ScanDeadlineError('No time left to run the scan at all')
+    raise ScanDeadlineError('skipped', 'No time left to run the scan at all')
 
   bot_root_key = bot_management.get_root_key(bot_id)
   dim_hashes = task_queues.get_queues(bot_root_key)
@@ -571,7 +571,7 @@ def _yield_potential_tasks(bot_id, pool, stats, bot_dims_matcher, deadline):
       q.cancel()
     logging.debug('_yield_potential_tasks(%s): deadline before the poll loop',
                   bot_id)
-    raise ScanDeadlineError('Deadline before the poll loop')
+    raise ScanDeadlineError('initializing', 'Deadline before the poll loop')
 
   # A priority queue with TaskToRunShard ordered by the priority+timestamp,
   # extracted from queue_number using _queue_number_order_priority.
@@ -650,13 +650,13 @@ def _yield_potential_tasks(bot_id, pool, stats, bot_dims_matcher, deadline):
     logging.debug(
         '_yield_potential_tasks(%s): deadline in queues %s, dropping %d items',
         bot_id, [q.dim_hash for q in canceled], queue.size())
-    raise ScanDeadlineError('Deadline fetching queues')
+    raise ScanDeadlineError('fetching', 'Deadline fetching queues')
 
   if utils.utcnow() >= deadline:
     logging.debug(
         '_yield_potential_tasks(%s): deadline processing, dropping %d items',
         bot_id, queue.size())
-    raise ScanDeadlineError('Deadline processing fetched items')
+    raise ScanDeadlineError('processing', 'Deadline processing fetched items')
 
   logging.debug('_yield_potential_tasks(%s): all queues exhausted', bot_id)
 
@@ -666,7 +666,14 @@ def _yield_potential_tasks(bot_id, pool, stats, bot_dims_matcher, deadline):
 
 class ScanDeadlineError(Exception):
   """Raised when yield_next_available_task_to_dispatch reaches the deadline
-  before exhausting pending queues."""
+  before exhausting pending queues.
+
+  Has a string-valued code that is used as a monitoring metric field.
+  """
+
+  def __init__(self, code, msg):
+    super(ScanDeadlineError, self).__init__(msg)
+    self.code = code
 
 
 def request_to_task_to_run_key(request, try_number, task_slice_index):

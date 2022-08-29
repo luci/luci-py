@@ -544,6 +544,8 @@ class BotPollHandler(_BotBaseHandler):
   )
 
   def _abort_by_timeout(self, stage, exc):
+    if isinstance(exc, task_to_run.ScanDeadlineError):
+      stage += ':%s' % exc.code
     clazz = exc.__class__.__name__
     ts_mon_metrics.on_handler_timeout('bot/poll', stage, clazz)
     logging.exception('abort_by_timeout: %s %s', stage, clazz)
