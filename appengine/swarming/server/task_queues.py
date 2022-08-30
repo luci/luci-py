@@ -108,15 +108,15 @@ class BotDimensions(ndb.Model):
   Parent is BotRoot.
   Key id is 1.
 
-  This is redundant from BotEvent but it is leveraged to quickly assert if
-  _rebuild_bot_cache_async() must be called or not.
+  This duplicates information from BotEvent but it is leveraged to quickly
+  assert if _rebuild_bot_cache_async() must be called or not.
   """
   # 'key:value' strings. This is stored to enable the removal of stale entities
   # when the bot changes its dimensions.
   dimensions_flat = ndb.StringProperty(repeated=True)
 
   # Validity time, at which this entity should be considered irrelevant.
-  valid_until_ts = ndb.DateTimeProperty()
+  valid_until_ts = ndb.DateTimeProperty(indexed=False)
 
   def _pre_put_hook(self):
     super(BotDimensions, self)._pre_put_hook()
@@ -127,10 +127,15 @@ class BotDimensions(ndb.Model):
 
 
 class BotTaskDimensions(ndb.Model):
-  """Stores the precalculated hashes for this bot.
+  """Stores a single precalculated queue hash for this bot.
 
   Parent is BotRoot.
   Key id is <dimensions_hash>. It is guaranteed to fit 32 bits.
+
+  TODO(vadimsh): Move this entity hierarchy under a different entity group.
+  There are no transactions that touch both BotEvent (etc.) and
+  BotTaskDimensions (etc.) at the same time. These sets of entities just
+  cause bogus transaction collisions.
 
   This hash could be conflicting different properties set, but this doesn't
   matter at this level because disambiguation is done in TaskDimensions
@@ -139,7 +144,7 @@ class BotTaskDimensions(ndb.Model):
   The number of stored entities is:
     <number of bots> x <TaskDimensions each bot support>
 
-  The actual number if a direct function of the variety of the TaskDimensions.
+  The actual number is a direct function of the variety of the TaskDimensions.
   """
   # Validity time, at which this entity should be considered irrelevant.
   valid_until_ts = ndb.DateTimeProperty()
@@ -330,100 +335,98 @@ def _validate_dimensions_flat(obj):
         '%s.dimensions_flat must be sorted' % obj.__class__.__name__)
 
 
-def _get_task_queries_for_bot(bot_dimensions):
-  """Returns all the ndb.Query for TaskDimensions relevant for this bot.
-
-  In practice it returns one query for the bot id and one per pool.
-  """
-  ancestors = [ndb.Key(TaskDimensionsRoot, u'id:' + bot_dimensions[u'id'][0])]
-  for pool in bot_dimensions['pool']:
-    ancestors.append(ndb.Key(TaskDimensionsRoot, u'pool:' + pool))
-  # These are consistent queries because they use an ancestor. The old entries
-  # are removed by cron job /internal/cron/task_queues_tidy triggered every N
-  # minutes (see cron.yaml).
-  return [TaskDimensions.query(ancestor=a) for a in ancestors]
-
-
 def _flush_futures(futures):
   return [f.get_result() for f in futures]
 
 
 @ndb.tasklet
-def _delete_stale_BotTaskDimensions_async(bot_dimensions, bot_root_key,
-                                          cleaned):
-  """Deletes any BotTaskDimensions that do not match the current dimensions."""
-  qit = BotTaskDimensions.query(ancestor=bot_root_key).iter(batch_size=256)
-  iter_cnt = 0
+def _stale_BotTaskDimensions_async(bot_dimensions, bot_root_key):
+  """Finds BotTaskDimensions keys that do not match the current dimensions.
+
+  Returns:
+    A list of ndb.Key of BotTaskDimensions entities.
+  """
+  qit = BotTaskDimensions.query(ancestor=bot_root_key).iter(batch_size=256,
+                                                            deadline=60)
+  scanned = 0
+  stale = []
   try:
     while (yield qit.has_next_async()):
-      iter_cnt += 1
+      scanned += 1
       ent = qit.next()
       if not ent.is_valid(bot_dimensions):
-        # This BotTaskDimensions doesn't match bot_dimensions anymore, remove.
-        yield ent.key.delete_async()
-        # This hack so that even if the task queue throws a deadline exceeded
-        # exception, we still get the number of cleaned items.
-        cleaned[0] += 1
+        stale.append(ent.key)
+    raise ndb.Return(stale)
   finally:
     logging.info(
-        'crbug.com/1064848: call from _delete_stale_BotTaskDimensions_async: '
-        '%d', iter_cnt)
+        'crbug.com/1064848: call from _stale_BotTaskDimensions_async: '
+        'scanned %d, stale %d', scanned, len(stale))
 
 
 @ndb.tasklet
-def _update_BotTaskDimensions_slice_async(bot_dimensions, bot_root_key, now,
-                                          matches, q):
-  """Updates BotTaskDimensions for task queues with the TaskDimensions query for
-  this bot.
-
-  The TaskDimension ndb.Query is either rooted on the bot id or one of its pool.
+def _fresh_BotTaskDimensions_slice_async(bot_dimensions, bot_root_key, now,
+                                         tasks_root_key):
+  """Generates fresh BotTaskDimensions for this bot with matching task queues
+  from the given TaskDimensionsRoot entity group.
 
   The expected total number of TaskDimensions is in the tens or few hundreds, as
   it depends on all the kinds of different task dimensions that this bot could
   run that are ACTIVE queues, e.g. TaskDimensions.valid_until_ts is in the
   future.
+
+  Returns:
+    List of BotTaskDimensions entities ready to be put into datastore.
   """
-  qit = q.iter(batch_size=256, deadline=60)
-  iter_cnt = 0
-  match_cnt = 0
+  qit = TaskDimensions.query(ancestor=tasks_root_key).iter(batch_size=256,
+                                                           deadline=60)
+  scanned = 0
+  fresh = []
   try:
     while (yield qit.has_next_async()):
-      iter_cnt += 1
+      scanned += 1
       task_dimensions = qit.next()
       # match_bot() returns a TaskDimensionsSet if there's a match. It may still
       # be expired.
       s = task_dimensions.match_bot(bot_dimensions)
       dimensions_hash = task_dimensions.key.integer_id()
       if s and s.valid_until_ts >= now:
-        match_cnt += 1
-        # Valid TaskDimensionsSet.
         # Reuse TaskDimensionsSet.valid_until_ts.
-        obj = BotTaskDimensions(
-            id=dimensions_hash,
-            parent=bot_root_key,
-            valid_until_ts=s.valid_until_ts,
-            dimensions_flat=s.dimensions_flat)
-        yield obj.put_async()
-        matches.append(dimensions_hash)
+        fresh.append(
+            BotTaskDimensions(id=dimensions_hash,
+                              parent=bot_root_key,
+                              valid_until_ts=s.valid_until_ts,
+                              dimensions_flat=s.dimensions_flat))
       elif s:
         logging.debug(
             'crbug.com/1064848: found a matching TaskDimensionsSet(%s), '
-            'but was stale.', dimensions_hash)
+            'but it was stale.', dimensions_hash)
+    raise ndb.Return(fresh)
   finally:
     logging.debug(
-        'crbug.com/1064848: call from _update_BotTaskDimensions_slice_async: '
-        'checked %d TaskDimensions, found %d matches.', iter_cnt, match_cnt)
+        'crbug.com/1064848: call from _fresh_BotTaskDimensions_slice_async: '
+        'scanned %d, fresh %d', scanned, len(fresh))
 
 
 @ndb.tasklet
-def _update_BotTaskDimensions_async(bot_dimensions, bot_root_key, now, matches):
-  """Updates all task queues known for this bot."""
-  # There's one per pool plus one for the bot id.
-  yield [
-      _update_BotTaskDimensions_slice_async(bot_dimensions, bot_root_key, now,
-                                            matches, q)
-      for q in _get_task_queries_for_bot(bot_dimensions)
+def _fresh_BotTaskDimensions_async(bot_dimensions, bot_root_key, now):
+  """Generates fresh BotTaskDimensions for this bot.
+
+  Returns:
+    List of BotTaskDimensions entities ready to be put into datastore.
+  """
+  # All TaskDimensionsRoot with tasks that can potentially hit this bot.
+  # There's one per pool plus one for the bot id. The old entries are removed by
+  # cron job /internal/cron/task_queues_tidy triggered every N minutes
+  # (see cron.yaml).
+  roots = [ndb.Key(TaskDimensionsRoot, u'id:' + bot_dimensions[u'id'][0])]
+  for pool in bot_dimensions['pool']:
+    roots.append(ndb.Key(TaskDimensionsRoot, u'pool:' + pool))
+  # Run queries in parallel, then just merge the results.
+  fresh = yield [
+      _fresh_BotTaskDimensions_slice_async(bot_dimensions, bot_root_key, now, r)
+      for r in roots
   ]
+  raise ndb.Return(sum(fresh, []))
 
 
 @ndb.tasklet
@@ -450,37 +453,54 @@ def _rebuild_bot_cache_async(bot_dimensions, bot_root_key):
   """
   now = utils.utcnow()
   bot_id = bot_dimensions[u'id'][0]
-  matches = []
-  cleaned = [0]
+  stale = []
+  matches = set()
   try:
-    future_bots = _delete_stale_BotTaskDimensions_async(bot_dimensions,
-                                                        bot_root_key, cleaned)
-    future_tasks = _update_BotTaskDimensions_async(bot_dimensions, bot_root_key,
-                                                   now, matches)
-    yield [future_bots, future_tasks]
+    # Find keys to delete and entities to add.
+    stale, fresh = yield [
+        _stale_BotTaskDimensions_async(bot_dimensions, bot_root_key),
+        _fresh_BotTaskDimensions_async(bot_dimensions, bot_root_key, now),
+    ]
 
-    # Seal the fact that it has been updated.
-    # The expirations are distributed to avoid accessing Datastore
-    # at the same time.
-    valid_until_ts = now + datetime.timedelta(minutes=random.randint(20, 40))
-    obj = BotDimensions(
-        id=1,
-        parent=bot_root_key,
-        dimensions_flat=bot_dimensions_to_flat(bot_dimensions),
-        valid_until_ts=valid_until_ts)
-    # Do these steps in order.
-    yield obj.put_async()
+    # A set of fresh (still matching) queue numbers.
+    matches = set(ent.key.integer_id() for ent in fresh)
+    # A fresh match is not actually stale.
+    stale = [ent for ent in stale if ent.integer_id() not in matches]
+
+    # Land all changes in one big happy transaction.
+    @ndb.tasklet
+    def commit_async():
+      to_put = fresh
+      # Seal the fact that it has been updated.
+      # The expiration is randomized to make sure different bots refresh
+      # BotTaskDimensions cache at different times to spread the load.
+      valid_until_ts = now + datetime.timedelta(minutes=random.randint(20, 40))
+      to_put.append(
+          BotDimensions(id=1,
+                        parent=bot_root_key,
+                        dimensions_flat=bot_dimensions_to_flat(bot_dimensions),
+                        valid_until_ts=valid_until_ts))
+      yield [
+          ndb.put_multi_async(to_put),
+          ndb.delete_multi_async(stale),
+      ]
+
+    yield datastore_utils.transaction_async(commit_async)
+
+    # Proactive refresh the cache with new values.
     yield ndb.get_context().memcache_set(
         bot_id,
         sorted(matches),
         namespace='task_queues',
         time=_EXPIRATION_TIME_TASK_QUEUES)
+
     raise ndb.Return(len(matches))
+
   finally:
     logging.debug(
-        '_rebuild_bot_cache_async(%s) in %.3fs. Registered for queues %s; '
-        'cleaned %d', bot_id, (utils.utcnow() - now).total_seconds(), matches,
-        cleaned[0])
+        '_rebuild_bot_cache_async(%s) in %.3fs. Registered for queues %d; '
+        'cleaned %d', bot_id, (utils.utcnow() - now).total_seconds(),
+        len(matches), len(stale))
 
 
 def _get_task_dimensions_key(dimensions_hash, dimensions):
@@ -978,8 +998,8 @@ def assert_bot_async(bot_root_key, bot_dimensions):
     Number of matches or None if hit the cache, thus nothing was updated.
   """
   # Check if the bot dimensions changed since last _rebuild_bot_cache_async()
-  # call and still valids. It rebuilds cache every 20-40 minutes to avoid
-  # missing tasks that can be assigined to the bot. Tasks can be missed because
+  # call and still valid. It rebuilds cache every 20-40 minutes to avoid
+  # missing tasks that can be assigned to the bot. Tasks can be missed because
   # _rebuild_bot_cache_async isn't an atomic operation, and also it takes time
   # for secondary indices to be ready since they are *eventually* consistent.
   now = utils.utcnow()
