@@ -751,11 +751,10 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
     self.assert_count(1, task_queues.TaskDimensions)
     self.assertEqual([2980491642], task_queues.get_queues(bot_root_key))
 
-    # TaskDimension expired. The fact that the bot changed dimensions after an
-    # hour didn't impact BotTaskDimensions expiration.
+    # BotTaskDimensions expired.
     self.mock_now(now, exp.total_seconds() + 1)
     self.assertEqual(0, _assert_bot())
-    self.assert_count(1, task_queues.BotTaskDimensions)
+    self.assert_count(0, task_queues.BotTaskDimensions)
     self.assert_count(1, task_queues.TaskDimensions)
     self.assertEqual([], task_queues.get_queues(bot_root_key))
 
@@ -843,8 +842,19 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
     self.assertEqual([2980491642], task_queues.get_queues(bot_root_key))
 
     # TaskDimension expired but is still kept; get_queues() doesn't return it
-    # anymore even if still in the DB. BotTaskDimensions was evicted.
+    # anymore even if still in the DB. BotTaskDimensions is not evicted yet,
+    # since the cron allows some time for assert_bot_async to do the expiration.
     self.mock_now(now, exp.total_seconds() + 1)
+    task_queues.cron_tidy_stale()
+    self.assert_count(1, task_queues.BotTaskDimensions)
+    self.assert_count(1, task_queues.TaskDimensions)
+    self.assertEqual([], task_queues.get_queues(bot_root_key))
+
+    # After _TIDY_BOT_DIMENSIONS_CRON_LAG the cron job kicks out stale bot
+    # dimensions for good.
+    self.mock_now(
+        now,
+        (exp + task_queues._TIDY_BOT_DIMENSIONS_CRON_LAG).total_seconds() + 1)
     task_queues.cron_tidy_stale()
     self.assert_count(0, task_queues.BotTaskDimensions)
     self.assert_count(1, task_queues.TaskDimensions)
