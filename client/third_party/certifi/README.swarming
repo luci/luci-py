@@ -10,3 +10,5 @@ Description:
 Local Modifications:
 curl -sL URL: https://github.com/certifi/python-certifi/archive/2018.11.29.tar.gz | \
     tar xvz --strip-components 2
+    
+curl -sL URL: "https://pki.google.com/roots.pem" > cacert.pem
