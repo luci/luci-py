@@ -746,6 +746,12 @@ class TaskResult(messages.Message):
   # None if the integration was not enabled for this task.
   resultdb_info = messages.MessageField(ResultDBInfo, 30)
 
+  # Reported missing CAS packages on CLIENT_ERROR state
+  missing_cas = messages.MessageField(CASReference, 33, repeated=True)
+
+  # Reported missing CIPD packages on CLIENT_ERROR state
+  missing_cipd = messages.MessageField(CipdPackage, 34, repeated=True)
+
 
 class TaskStates(messages.Message):
   """Only holds states. Used in the 'get_states' RPC."""

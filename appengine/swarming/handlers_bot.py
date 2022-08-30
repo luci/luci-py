@@ -1370,8 +1370,6 @@ class BotTaskErrorHandler(_BotApiHandler):
     # TODO(b/239491333): re-enable once all bot_code has propagated completely
     #if msg:
     #  self.abort_with_error(400, error=msg)
-    # TODO(b/242270173) Remove this line when Swarming UI changes have been made
-    client_errors = None
     msg = task_scheduler.bot_terminate_task(
         task_pack.unpack_run_result_key(task_id), bot_id, start_time,
         client_errors)

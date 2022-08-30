@@ -1628,6 +1628,7 @@ def bot_terminate_task(run_result_key, bot_id, start_time, client_error):
       run_result.killing = False
       run_result.state = task_result.State.KILLED
       run_result = _set_fallbacks_to_exit_code_and_duration(run_result, now)
+      run_result.internal_failure = True
       # run_result.abandoned_ts is set when run_result.killing == True
       actual_state_change_time = run_result.abandoned_ts
     elif missing_cipd or missing_cas:
@@ -1643,13 +1644,13 @@ def bot_terminate_task(run_result_key, bot_id, start_time, client_error):
         run_result.missing_cas = [
             task_request.CASReference.create_from_json(missing_cas)
         ]
-
+      run_result.internal_failure = False
     else:
       run_result.state = task_result.State.BOT_DIED
       # this should technically be the exact time when the bot terminates the
       # running this task as a bot died, but this is a close approximation
       actual_state_change_time = start_time
-    run_result.internal_failure = True
+      run_result.internal_failure = True
     run_result.abandoned_ts = now
     run_result.completed_ts = now
     run_result.modified_ts = now
@@ -1663,7 +1664,6 @@ def bot_terminate_task(run_result_key, bot_id, start_time, client_error):
                                     transactional=True)
     for f in futures:
       f.check_success()
-
     latency = utils.utcnow() - actual_state_change_time
     ts_mon_metrics.on_dead_task_detection_latency(result_summary.tags, latency,
                                                   False)

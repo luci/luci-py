@@ -1372,6 +1372,9 @@ enum TaskState {
   // The task never ran, the server had an internal failure, unrelated to the
   // task itself. It can be due to a server bug or network I/O issues.
   SKIPPED_INTERNAL_FAILURE = 0x56;  // Not used yet. https://crbug.com/916553
+  // The task encounted an error caused by the client. This means that
+  // rerunning the task with the same parameters will not change the result
+  CLIENT_ERROR = 0x57;
 }
 
 // Swarming:ResultDB integration configuration for a task.

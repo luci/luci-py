@@ -345,6 +345,22 @@ def task_result_to_rpc(entity, send_stats):
         invocation=entity.resultdb_info.invocation,
     )
 
+  missing_cas = None
+  if entity.missing_cas:
+    missing_cas = []
+    for pkg in entity.missing_cas:
+      digest = _ndb_to_rpc(swarming_rpcs.Digest, pkg.digest)
+      missing_cas.append(
+          _ndb_to_rpc(swarming_rpcs.CASReference, pkg, digest=digest)
+      )
+
+  missing_cipd = None
+  if entity.missing_cipd:
+    missing_cipd = [
+      _ndb_to_rpc(swarming_rpcs.CipdPackage, pkg)
+      for pkg in entity.missing_cipd
+    ]
+
   performance_stats = None
   if send_stats and entity.performance_stats.is_valid:
 
@@ -382,6 +398,10 @@ def task_result_to_rpc(entity, send_stats):
           swarming_rpcs.TaskState(entity.state),
       'resultdb_info':
           resultdb_info,
+      'missing_cas':
+          missing_cas,
+      'missing_cipd':
+          missing_cipd,
   }
   if entity.__class__ is task_result.TaskRunResult:
     kwargs['costs_usd'] = []

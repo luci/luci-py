@@ -743,6 +743,8 @@ class _TaskResultCommon(ndb.Model):
       return swarming_pb2.CANCELED
     if self.state == State.NO_RESOURCE:
       return swarming_pb2.NO_RESOURCE
+    if self.state == State.CLIENT_ERROR:
+      return swarming_pb2.CLIENT_ERROR
     # Internal error.
     return swarming_pb2.TASK_STATE_INVALID
 
