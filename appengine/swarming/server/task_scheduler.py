@@ -1642,7 +1642,8 @@ def bot_terminate_task(run_result_key, bot_id, start_time, client_error):
         ]
       if missing_cas:
         run_result.missing_cas = [
-            task_request.CASReference.create_from_json(missing_cas)
+            task_request.CASReference.create_from_json(cas)
+            for cas in missing_cas
         ]
       run_result.internal_failure = False
     else:

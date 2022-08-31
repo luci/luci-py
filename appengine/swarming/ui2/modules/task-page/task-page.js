@@ -438,13 +438,13 @@ const missingCasRowSet = (host, input) => html`
 <tr>
   <tr>
     <td>
-      Instance:
+      <b>Instance: </b>
       ${input.cas_instance}
     </td>
   </tr>
   <tr>
     <td>
-      Digest:
+      <b>Digest: </b>
       <a href=${casLink(host, input)} target='_blank'>
         ${input.digest.hash}/${input.digest.size_bytes}
       </a>
@@ -529,13 +529,22 @@ const missingCipdBlock = (title, missingCipd) => {
 
 const missingCipdRowSet = (cipd) => html`
   <tr>
-    <td>Path:${cipd.path}</td>
+    <td>
+      <b>Path: </b>
+      ${cipd.path}
+    </td>
   </tr>
   <tr>
-    <td>Package:${cipd.package_name}</td>
+    <td>
+      <b>Package: </b>
+      ${cipd.package_name}
+    </td>
   </tr>
   <tr>
-    <td>Version:${cipd.version}</td>
+    <td>
+      <b>Version: </b>
+      ${cipd.version}
+    </td>
   </tr>
 `;
 

@@ -942,7 +942,7 @@ def map_and_run(data, constant_run_path):
   except errors.NonRecoverableCasException as e:
     # We could not find the CAS package. The swarming task should not
     # be retried automatically
-    result['missing_cas'] = e.to_dict()
+    result['missing_cas'] = [e.to_dict()]
     logging.exception('internal failure: %s', e)
     result['internal_failure'] = str(e)
     on_error.report(None)

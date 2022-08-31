@@ -2018,10 +2018,12 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     run_result = self._quick_reap(1, 0, pubsub_topic='projects/abc/topics/def')
     self.assertEqual(1, len(pub_sub_calls))  # PENDING -> RUNNING
     client_error = {
-        'missing_cas': {
-            'digest': '93b45bab427ab9fe55asdq123324adsdaf8d5/1292',
-            'instance': 'projects/chromium-swarm/instances/default_instance',
-        },
+        'missing_cas': [{
+            'digest':
+            '93b45bab427ab9fe55asdq123324adsdaf8d5/1292',
+            'instance':
+            'projects/chromium-swarm/instances/default_instance',
+        }],
         'missing_cipd': [],
     }
 

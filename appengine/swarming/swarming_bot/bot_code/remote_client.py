@@ -302,7 +302,7 @@ class RemoteClientNative(object):
         'message': message,
         'task_id': task_id,
         'client_error': {
-            'missing_cas': missing_cas,
+            'missing_cas': missing_cas or [],
             'missing_cipd': missing_cipd or [],
         },
     }

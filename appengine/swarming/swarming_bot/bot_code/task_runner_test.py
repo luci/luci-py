@@ -554,8 +554,7 @@ class TestTaskRunner(TestTaskRunnerBase):
                     'version': 'abcd1234',
                     'path': 'not/found/here'
                 }],
-                'missing_cas':
-                None,
+                'missing_cas': [],
             },
         }],
     }
@@ -1313,7 +1312,7 @@ class TestTaskRunnerKilled(TestTaskRunnerBase):
             'message':
             'task_runner received signal %d' % task_runner.SIG_BREAK_OR_TERM,
             'client_error': {
-                'missing_cas': None,
+                'missing_cas': [],
                 'missing_cipd': [],
             },
             'id':

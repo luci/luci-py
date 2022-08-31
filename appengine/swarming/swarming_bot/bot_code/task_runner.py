@@ -651,7 +651,7 @@ def run_command(remote, task_details, work_dir, cost_usd_hour,
     exit_code = None
     had_io_timeout = False
     must_signal_internal_failure = None
-    missing_cas = None
+    missing_cas = []
     missing_cipd = []
     term_sent = False
     kill_sent = False
@@ -752,7 +752,7 @@ def run_command(remote, task_details, work_dir, cost_usd_hour,
         logging.debug('run_isolated:\n%s', run_isolated_result)
         # TODO(maruel): Grab statistics (cache hit rate, data downloaded,
         # mapping time, etc) from run_isolated and push them to the server.
-        missing_cas = run_isolated_result.get('missing_cas')
+        missing_cas = run_isolated_result.get('missing_cas', [])
         missing_cipd = run_isolated_result.get('missing_cipd', [])
         if missing_cipd or missing_cas:
           must_signal_internal_failure = run_isolated_result['internal_failure']

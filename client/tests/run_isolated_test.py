@@ -639,7 +639,7 @@ class RunIsolatedTest(RunIsolatedTestBase):
     with open(result_json_path, 'r') as fp:
       result_json = json.load(fp)
 
-    missing_cas = result_json['missing_cas']
+    missing_cas = result_json['missing_cas'][0]
     self.assertEqual('digest_invalid', missing_cas['status'])
     self.assertEqual('not_valid', missing_cas['digest'])
     self.assertEqual('some_cas_instance', missing_cas['instance'])
@@ -1157,8 +1157,8 @@ class RunIsolatedTestCase(RunIsolatedTestRun):
     with open(result_json) as f:
       result = json.load(f)
     self.assertEqual(1, ret)
-    self.assertEqual(digest, result['missing_cas']['digest'])
-    self.assertEqual('some_instance', result['missing_cas']['instance'])
+    self.assertEqual(digest, result['missing_cas'][0]['digest'])
+    self.assertEqual('some_instance', result['missing_cas'][0]['instance'])
 
   def test_bad_cipd_package(self):
     def emulate_bad_cipd(_run_dir, cas_dir, _nsjail_dir):

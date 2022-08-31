@@ -400,7 +400,7 @@ class TestBotMain(TestBotBase):
                     'id': expected_attribs['dimensions']['id'][0],
                     'message': 'error',
                     'client_error': {
-                        'missing_cas': None,
+                        'missing_cas': [],
                         'missing_cipd': [],
                     },
                     'task_id': 23,
