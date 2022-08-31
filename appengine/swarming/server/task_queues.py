@@ -206,14 +206,23 @@ class TaskDimensionsSet(ndb.Model):
   # available.
   valid_until_ts = ndb.DateTimeProperty()
 
-  # 'key:value' strings. This is stored to enable match_bot(). This is important
-  # as the dimensions_hash in TaskDimensions can be colliding, so the exact list
-  # is needed to ensure we are comparing the expected dimensions.
+  # A list 'key:value' strings in arbitrary order, but without duplicates.
+  #
+  # This is stored to enable _match_bot(). Stores flattened dimension sets as
+  # produced by expand_dimensions_to_flats, i.e. dimension values here never
+  # have "|" in them. Such dimension sets can directly be matched with bot
+  # dimensions (as happens in _match_bot).
   dimensions_flat = ndb.StringProperty(repeated=True, indexed=False)
 
-  def match_bot(self, bot_dimensions):
+  def _equals(self, dimensions_flat_set):
+    """True if the set of 'key:value' pairs equals stored dimensions_flat."""
+    assert isinstance(dimensions_flat_set, set)
+    if len(dimensions_flat_set) != len(self.dimensions_flat):
+      return False
+    return dimensions_flat_set.issuperset(self.dimensions_flat)
+
+  def _match_bot(self, bot_dimensions):
     """Returns True if this bot can run this request dimensions set."""
-    # Always called via TaskDimensions.match_bot().
     for d in self.dimensions_flat:
       key, value = d.split(':', 1)
       if value not in bot_dimensions.get(key, []):
@@ -229,22 +238,20 @@ class TaskDimensionsSet(ndb.Model):
 
 
 class TaskDimensions(ndb.Model):
-  """List dimensions for each kind of task.
+  """List dimension sets that match some dimensions hash.
 
   Parent is TaskDimensionsRoot
   Key id is <dimensions_hash>. It is guaranteed to fit 32 bits.
 
-  A single dimensions_hash may represent multiple independent queues in a single
-  root. This is because the hash is very compressed (32 bits). This is handled
-  specifically here by having one set of TaskDimensionsSet per 'set'.
+  For tasks that use OR-ed dimensions (`{"k": "a|b"}`), the <dimensions_hash> is
+  taken over the original dimensions (with "|" still inside), but the stored
+  dimensions set are flat (i.e. `sets` stores `[{"k": "a"}, {"k": "b"}]`).
 
-  The worst case of having hash collision is unneeded scanning for unrelated
-  tasks in get_queues(). This is bad but not the end of the world.
-
-  It is only a function of the number of different tasks, so it is not expected
-  to be very large, only in the few hundreds. The exception is when one task per
-  bot is triggered, which leads to have at <number of bots> TaskDimensions
-  entities.
+  If there's a collision on <dimensions_hash> (i.e. two different dimensions
+  sets hash to the same value), `sets` stores dimensions sets from all colliding
+  entries. Collisions are eventually resolved when bots poll for tasks: they
+  get all tasks that match <dimensions_hash>, and then filter out ones that
+  don't match bot's dimensions.
   """
   # Lowest value of TaskDimensionsSet.valid_until_ts where this entity must be
   # updated. See its documentation for more details.
@@ -254,56 +261,71 @@ class TaskDimensions(ndb.Model):
       lambda self: self._calc_valid_until_ts())
 
   # One or multiple sets of request dimensions this dimensions_hash represents.
+  # A bot will consume tasks with this <dimensions_hash> if it matches any of
+  # sets stored here. Stores flat dimension dicts.
   sets = ndb.LocalStructuredProperty(TaskDimensionsSet, repeated=True)
 
   def assert_request(self, now, valid_until_ts, task_dimensions_flat):
     """Updates this entity to assert this task_dimensions_flat is supported.
 
+    `task_dimensions_flat` here don't have "|" in them anymore, i.e. they are
+    already flattened via expand_dimensions_to_flats(...).
+
     Returns:
       True if the entity was updated; it can be that a TaskDimensionsSet was
       added, updated or a stale one was removed.
     """
-    cutoff = now - _KEEP_DEAD
+    # Update the expiration timestamp or add a new entry.
+    updated = False
     s = self._match_request_flat(task_dimensions_flat)
-    if s:
-      if s.valid_until_ts > valid_until_ts:
-        # It was updated already, skip storing again.
-        old = len(self.sets)
-        # Trim.
-        self.sets = [s for s in self.sets if s.valid_until_ts >= cutoff]
-        return len(self.sets) != old
-      # Bump valid_until_ts.
-      s.valid_until_ts = valid_until_ts
-    else:
+    if not s:
       self.sets.append(
           TaskDimensionsSet(
               valid_until_ts=valid_until_ts,
               dimensions_flat=task_dimensions_flat))
-    # Trim.
+      updated = True
+    elif s.valid_until_ts <= valid_until_ts:
+      s.valid_until_ts = valid_until_ts
+      updated = True
+
+    # Always trim old entries.
+    cutoff = now - _KEEP_DEAD
+    old = len(self.sets)
     self.sets = [s for s in self.sets if s.valid_until_ts >= cutoff]
-    return True
+
+    # True if anything has changed.
+    return updated or len(self.sets) != old
 
   def match_request(self, dimensions):
-    """Confirms that this instance actually stores this set."""
+    """Confirms that this instance actually stores this set.
+
+    Note that `dimensions` values here may still contain "|" inside.
+
+    Returns:
+      Matching TaskDimensionsSet or None if there's no match.
+    """
     flat = []
     for k, values in dimensions.items():
       for v in values:
         flat.append(u'%s:%s' % (k, v))
+    # TODO(vadimsh): This is wrong. _match_request_flat expects flattened
+    # dimensions with "|" already gone, but `flat` may still have "|" in them.
     return self._match_request_flat(flat)
 
   def match_bot(self, bot_dimensions):
-    """Returns the TaskDimensionsSet that matches this bot_dimensions, if any.
-    """
+    """Returns the TaskDimensionsSet that matches bot_dimensions or None."""
     for s in self.sets:
-      if s.match_bot(bot_dimensions):
+      if s._match_bot(bot_dimensions):
         return s
     return None
 
   def _match_request_flat(self, task_dimensions_flat):
-    d = frozenset(task_dimensions_flat)
+    """Returns the stored TaskDimensionsSet that equals task_dimensions_flat."""
+    d = set(task_dimensions_flat)
     for s in self.sets:
-      if not d.difference(s.dimensions_flat):
+      if s._equals(d):
         return s
+    return None
 
   def _calc_valid_until_ts(self):
     if not self.sets:
@@ -528,25 +550,29 @@ def _get_task_dimensions_key(dimensions_hash, dimensions):
 @ndb.tasklet
 def _ensure_TaskDimensions_async(task_dimensions_key, now, valid_until_ts,
                                  task_dimensions_flats):
-  """Adds, updates or deletes the TaskDimensions."""
-  action = None
+  """Adds, updates or deletes the TaskDimensions.
+
+  Returns:
+    What it did (created, updated, etc.) as a string, for logging.
+  """
+  outcome = None
   obj = yield task_dimensions_key.get_async()
   if not obj:
     obj = TaskDimensions(key=task_dimensions_key)
-    action = 'created'
-  # Force all elements in |task_dimensions_flats| to be evaluated
+    outcome = 'created'
+  # Force all elements in `task_dimensions_flats` to be evaluated
   updated = [
       obj.assert_request(now, valid_until_ts, df)
       for df in task_dimensions_flats
   ]
   if any(updated):
-    if not action:
-      action = 'updated'
-    if not obj.sets:
+    if obj.sets:
+      outcome = outcome or 'updated'
+      yield obj.put_async()
+    else:
+      outcome = 'deleted'
       yield obj.key.delete_async()
-      raise ndb.Return('deleted')
-    yield obj.put_async()
-  raise ndb.Return(action)
+  raise ndb.Return(outcome or 'up-to-date')
 
 
 def _hash_data(data):
@@ -581,8 +607,8 @@ def _remove_old_entity_async(key, now):
   raise ndb.Return(res)
 
 
-def _get_query_BotTaskDimensions_keys(task_dimensions_flat):
-  """Returns a BotTaskDimensions ndb.Key ndb.QueryIterator for the bots that
+def _get_query_BotDimensions_keys(task_dimensions_flat):
+  """Returns a BotDimensions ndb.Key ndb.QueryIterator for the bots that
   corresponds to these task request dimensions.
   """
   assert not ndb.in_transaction()
@@ -649,6 +675,7 @@ def _tidy_stale_TaskDimensions(now):
 
   Leave entities in the DB for at least _KEEP_DEAD to reduce churn.
   """
+  # TODO(vadimsh): Group mutations by entity group root key.
   cutoff = now - _KEEP_DEAD
   qit = TaskDimensions.query(TaskDimensions.valid_until_ts < cutoff).iter(
       batch_size=64, keys_only=True)
@@ -723,7 +750,6 @@ def _assert_task_props_async(properties, expiration_ts):
 
   Implementation of assert_task_async().
   """
-  # TODO(maruel): Make it a tasklet.
   dimensions_hash = hash_dimensions(properties.dimensions)
   data = {
     u'dimensions': properties.dimensions,
@@ -734,12 +760,11 @@ def _assert_task_props_async(properties, expiration_ts):
   }
   payload = utils.encode_to_json(data)
 
-  # If this task specifies an 'id' value, updates the cache inline since we know
+  # If this task specifies an 'id' value, update the cache inline since we know
   # there's only one bot that can run it, so it won't take long. This permits
   # tasks for specific bots like 'terminate' tasks to execute faster.
   # Related bug: crbug.com/1062746
   if properties.dimensions.get(u'id'):
-    # TODO(maruel): Handle when it needs to be retried.
     yield rebuild_task_cache_async(payload)
     raise ndb.Return(None)
 
@@ -747,7 +772,7 @@ def _assert_task_props_async(properties, expiration_ts):
                                                  properties.dimensions)
   obj = yield task_dimensions_key.get_async()
   if obj:
-    # Reduce the check to be 5~10 minutes earlier to help reduce an attack of
+    # Reduce the check to be 5~10 minutes earlier to help reduce an attack on
     # task queues when there's a strong on-going load of tasks happening. This
     # jitter is essentially removed from _EXTEND_VALIDITY window.
     jitter = datetime.timedelta(seconds=random.randint(5*60, 10*60))
@@ -755,8 +780,6 @@ def _assert_task_props_async(properties, expiration_ts):
     s = obj.match_request(properties.dimensions)
     if s:
       if s.valid_until_ts >= valid_until_ts:
-        # Cache hit. It is important to reconfirm the dimensions because a hash
-        # can be conflicting.
         logging.debug('assert_task_async(%d): hit. valid_until_ts(%s)',
                       dimensions_hash, s.valid_until_ts)
         raise ndb.Return(None)
@@ -765,6 +788,9 @@ def _assert_task_props_async(properties, expiration_ts):
           'triggering rebuild-task-cache', dimensions_hash, s.valid_until_ts,
           valid_until_ts)
     else:
+      # TaskDimensions(dimensions_hash) actually contains a list of dimension
+      # dicts all matching `dimensions_hash` (regardless of collisions). The
+      # enqueued task will just add entries to this list.
       logging.info(
           'assert_task_async(%d): failed to match the dimensions; triggering '
           'rebuild-task-cache', dimensions_hash)
@@ -773,24 +799,28 @@ def _assert_task_props_async(properties, expiration_ts):
         'assert_task_async(%d): new request kind; triggering '
         'rebuild-task-cache', dimensions_hash)
 
-  # We can't use the request ID since the request was not stored yet, so embed
-  # all the necessary information.
+  # This eventually calls rebuild_task_cache_async(...). We can't use the
+  # request ID since the request was not stored yet, so embed all the necessary
+  # information.
   res = yield utils.enqueue_task_async(
       '/internal/taskqueue/important/task_queues/rebuild-cache',
       'rebuild-task-cache',
       payload=payload)
   if not res:
     logging.error('Failed to enqueue TaskDimensions update %x', dimensions_hash)
-    # Technically we'd want to raise a endpoints.InternalServerErrorException.
-    # Raising anything that is not TypeError or ValueError is fine.
     raise Error('Failed to trigger task queue; please try again')
-  raise ndb.Return(None)
 
 
 @ndb.tasklet
 def _refresh_all_BotTaskDimensions_async(
     now, valid_until_ts, task_dimensions_flat, task_dimensions_hash):
   """Updates BotTaskDimensions for task_dimensions_flat.
+
+  `task_dimensions_flat` here is a dimensions dict with values that don't have
+  "|" in them, they are already flattened via expand_dimensions_to_flats.
+
+  `task_dimensions_hash` is hash of the original dimensions, pre-flattening,
+  matching the key of the corresponding TaskDimensions entity.
 
   Used by rebuild_task_cache_async.
   """
@@ -803,12 +833,14 @@ def _refresh_all_BotTaskDimensions_async(
   # Number of BotTaskDimensions entities that matched this task queue.
   viable = 0
   try:
+    # TODO(vadimsh): Group mutations by BotRoot entity group key.
     pending = []
-    qit = _get_query_BotTaskDimensions_keys(task_dimensions_flat)
+    qit = _get_query_BotDimensions_keys(task_dimensions_flat)
     while (yield qit.has_next_async()):
-      bot_info_key = qit.next()
-      bot_task_key = ndb.Key(
-          BotTaskDimensions, task_dimensions_hash, parent=bot_info_key.parent())
+      bot_dims_key = qit.next()
+      bot_task_key = ndb.Key(BotTaskDimensions,
+                             task_dimensions_hash,
+                             parent=bot_dims_key.parent())
       viable += 1
       future = _refresh_BotTaskDimensions_async(
           now, valid_until_ts, task_dimensions_flat, bot_task_key)
@@ -848,23 +880,32 @@ def _refresh_TaskDimensions_async(now, valid_until_ts, task_dimensions_flats,
 
   Used by rebuild_task_cache_async.
 
-  task_dimensions_flats is a list of task_dimensions_flat that is expanded from
-  a task's dimensions.
+  `task_dimensions_flats` is a list of dimension dicts that don't have "|" in
+  them, i.e. they are already flattened via expand_dimensions_to_flats.
+
+  Returns:
+    True if was updated or already up-to-date, or False if should retry.
   """
   # First do a dry run. If the dry run passes, skip the transaction.
   #
-  # The rationale is that there can be concurrent trigger of this taskqueue
-  # (rebuild-cache) when there are conccurent task creation. The dry run cost
-  # not much overhead and if it passes, it saves transaction contention.
+  # The rationale is that there can be concurrent triggers of this task queue
+  # task (rebuild-cache) when there are concurrent task creations. The dry run
+  # doesn't cost much, and if it passes it reduces transaction contention.
   #
-  # The transaction contention can be problematic on pool with a high
+  # The transaction contention can be problematic on pools with a high
   # cardinality of the dimension sets.
+  #
+  # TODO(vadimsh): Is this really necessary considering the code below doesn't
+  # run transactionally anymore and essentially just re-executes the exact same
+  # check again? Do we need to disable ndb in-process cache for this check to
+  # be useful?
   obj = yield task_dimensions_key.get_async()
   if obj and not any(
       obj.assert_request(now, valid_until_ts, df)
       for df in task_dimensions_flats):
-    logging.debug('Skipped transaction!')
-    raise ndb.Return(None)
+    logging.debug('TaskDimensions already contains requested dimension sets')
+    raise ndb.Return(True)
+
   # Do an adhoc transaction instead of using datastore_utils.transaction().
   # This is because for some pools, the transaction rate may be so high that
   # it's impossible to get a good performance on the entity group.
@@ -874,34 +915,33 @@ def _refresh_TaskDimensions_async(now, valid_until_ts, task_dimensions_flats,
   # there's a hash conflict (odds 2^31) plus two concurrent task running
   # simultaneously (over _EXTEND_VALIDITY period) so we can do it in a more
   # adhoc way.
+  #
+  # TODO(vadimsh): Should this be a "lock" on the root entity key instead? The
+  # "expiration jitter" mechanism in _assert_task_props_async should already
+  # provide sufficient reduction in number of tasks per TaskDimensions entity
+  # (but not per the parent entity group).
+  #
+  # TODO(vadimsh): This can accidentally overwrite dimension sets added
+  # concurrently since memcache is not a replacement for transactions (e.g.
+  # it can get wiped, the key evicted etc.).
   key = '%s:dimensions_hash:%d' % (task_dimensions_key.parent().string_id(),
                                    task_dimensions_key.integer_id())
   logging.debug('Taking task_queues_tx pseudo-lock. key=%s', key)
   res = yield ndb.get_context().memcache_add(
       key, True, time=60, namespace='task_queues_tx')
   if not res:
-    # add() returns True if the entry was added, False otherwise. That's
-    # perfect.
-    logging.warning('Failed taking pseudo-lock for %s; reenqueuing', key)
+    # add() returns True if the entry was added, False otherwise.
+    logging.warning('Failed taking pseudo-lock for %s; triggering retry', key)
     raise ndb.Return(False)
   try:
-    action = yield _ensure_TaskDimensions_async(
-        task_dimensions_key, now, valid_until_ts, task_dimensions_flats)
+    outcome = yield _ensure_TaskDimensions_async(task_dimensions_key, now,
+                                                 valid_until_ts,
+                                                 task_dimensions_flats)
+    logging.info('_refresh_TaskDimensions_async: %s', outcome)
   finally:
     yield ndb.get_context().memcache_delete(key, namespace='task_queues_tx')
 
-  # Keeping this dead code for now, in case we find a solution for the
-  # transaction rate issue.
-  #try:
-  #  action = yield datastore_utils.transaction_async(_run, retries=4)
-  #except datastore_utils.CommitError as e:
-  #  # Still log an error but no need for a stack trace in the logs. It is
-  #  # important to surface that the call failed so the task queue is
-  #  # retried later.
-  #  logging.warning('Failed updating TaskDimensions: %s; reenqueuing', e)
-  #  raise ndb.Return(False)
-  if action:
-    logging.info('_refresh_TaskDimensions_async: Did %s', action)
+  raise ndb.Return(True)
 
 
 ### Public APIs.
@@ -1002,8 +1042,11 @@ def bot_dimensions_to_flat(dimensions):
 def hash_dimensions(dimensions):
   """Returns a 32 bits int that is a hash of the request dimensions specified.
 
+  Dimensions values still have "|" in them, i.e. this is calculated prior to
+  expansion of OR-ed dimensions into a disjunction of dimension sets.
+
   Arguments:
-    dimensions: dict(str, str)
+    dimensions: dict(str, [str])
 
   The return value is guaranteed to be a non-zero int so it can be used as a key
   id in a ndb.Key.
@@ -1089,16 +1132,15 @@ def assert_task_async(request):
   worst. This only occurs on new kind of requests, which is not that often in
   practice.
   """
-  # It's important that the TaskRequest to not be stored in the DB yet, still
-  # its key could be set.
+  # Note that TaskRequest may not be stored in the datastore yet, but it is
+  # fully populated at this point.
   exp_ts = request.created_ts
   futures = []
   for i in range(request.num_task_slices):
     t = request.task_slice(i)
     exp_ts += datetime.timedelta(seconds=t.expiration_secs)
     futures.append(_assert_task_props_async(t.properties, exp_ts))
-  for f in futures:
-    yield f
+  yield futures
 
 
 def get_queues(bot_root_key):
@@ -1189,15 +1231,15 @@ def rebuild_task_cache_async(payload):
 
   This function is called in two cases:
   - A new kind of task request dimensions never seen before
-  - The TaskDimensions.valid_until_ts expired
+  - The TaskDimensions.valid_until_ts is close to expiration
 
   It is a cache miss, query all the bots and check for the ones which can run
   the task.
 
   Warning: There's a race condition, where the TaskDimensions query could be
-  missing some instances due to eventually coherent consistency in the BotInfo
-  query. This only happens when there's new request dimensions set AND a bot
-  that can run this task recently showed up.
+  missing some instances due to eventual consistency in the BotInfo query. This
+  only happens when there's new request dimensions set AND a bot that can run
+  this task recently showed up.
 
   Runtime expectation: the scale on the number of bots that can run the task,
   via BotInfo.dimensions_flat filtering. As there can be tens of thousands of
@@ -1225,19 +1267,18 @@ def rebuild_task_cache_async(payload):
 
   expanded_task_dimensions_flats = expand_dimensions_to_flats(task_dimensions)
 
-  success = None
+  success = False
   try:
+    # Scan through matching bots and create/refresh their BotTaskDimensions.
     yield [
         _refresh_all_BotTaskDimensions_async(now, valid_until_ts, df,
                                              task_dimensions_hash)
         for df in expanded_task_dimensions_flats
     ]
-    # Done updating, now store the entity. Must use a transaction as there
-    # could be other dimensions set in the entity.
-    res = yield _refresh_TaskDimensions_async(now, valid_until_ts,
-                                              expanded_task_dimensions_flats,
-                                              task_dimensions_key)
-    success = res != False
+    # Done updating, now add expanded_task_dimensions_flats to TaskDimensions.
+    success = yield _refresh_TaskDimensions_async(
+        now, valid_until_ts, expanded_task_dimensions_flats,
+        task_dimensions_key)
   finally:
     # Any of the calls above could throw. Log how far long we processed.
     duration = (utils.utcnow()-now).total_seconds()
@@ -1245,7 +1286,7 @@ def rebuild_task_cache_async(payload):
         'rebuild_task_cache(%d) in %.3fs\n%s\ndimensions_flat size=%d',
         task_dimensions_hash, duration, task_dimensions,
         len(expanded_task_dimensions_flats))
-    raise ndb.Return(success)
+  raise ndb.Return(success)
 
 
 def cron_tidy_stale():
