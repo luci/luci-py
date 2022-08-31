@@ -584,29 +584,6 @@ def _hash_data(data):
   return int(struct.unpack('<L', digest[:4])[0]) or 1
 
 
-@ndb.tasklet
-def _remove_old_entity_async(key, now):
-  """Removes a stale TaskDimensions or BotTaskDimensions instance.
-
-  Returns:
-    key if it was deleted.
-  """
-  obj = yield key.get_async()
-  if not obj or obj.valid_until_ts >= now:
-    raise ndb.Return(None)
-
-  @ndb.tasklet
-  def tx():
-    obj = yield key.get_async()
-    if obj and obj.valid_until_ts < now:
-      yield key.delete_async()
-      raise ndb.Return(key)
-
-  res = yield datastore_utils.transaction_async(
-      tx, propagation=ndb.TransactionOptions.INDEPENDENT)
-  raise ndb.Return(res)
-
-
 def _get_query_BotDimensions_keys(task_dimensions_flat):
   """Returns a BotDimensions ndb.Key ndb.QueryIterator for the bots that
   corresponds to these task request dimensions.
@@ -673,22 +650,41 @@ def _refresh_BotTaskDimensions_async(now, valid_until_ts, task_dimensions_flat,
 def _tidy_stale_TaskDimensions(now):
   """Removes all stale TaskDimensions entities.
 
-  Leave entities in the DB for at least _KEEP_DEAD to reduce churn.
+  Returns:
+    Number of TaskDimensions entities deleted.
   """
-  # TODO(vadimsh): Group mutations by entity group root key.
+  # Inactive TaskDimensions are kept up to _KEEP_DEAD (to reduce churn on
+  # TaskDimensions for tasks that show up, disappear and then show up again, all
+  # within _KEEP_DEAD time interval).
   cutoff = now - _KEEP_DEAD
   qit = TaskDimensions.query(TaskDimensions.valid_until_ts < cutoff).iter(
-      batch_size=64, keys_only=True)
-  td = []
+      batch_size=512, keys_only=True, deadline=5 * 60)
+
+  # Group stale TaskDimensions by the root entity key, to delete entities
+  # from the same entity group via a single transaction.
+  cleanup_by_root = {}
   while (yield qit.has_next_async()):
     key = qit.next()
-    # This function takes care of confirming that the entity is indeed
-    # expired.
-    res = yield _remove_old_entity_async(key, cutoff)
-    td.append(res)
-    if res:
-      logging.info('- TD: %s', res.integer_id())
-  raise ndb.Return(td)
+    cleanup_by_root.setdefault(key.root, []).append(key)
+
+  # Deletes stale TaskDimensions.
+  @ndb.tasklet
+  def cleanup(keys):
+    @ndb.tasklet
+    def txn():
+      ents = yield ndb.get_multi_async(keys)
+      stale = [ent.key for ent in ents if ent and ent.valid_until_ts < cutoff]
+      yield ndb.delete_multi_async(stale)
+      raise ndb.Return(stale)
+
+    deleted = yield datastore_utils.transaction_async(txn)
+    for key in deleted:
+      logging.debug('- TD: %d', key.integer_id())
+    raise ndb.Return(len(deleted))
+
+  # Cleanup all entity groups in parallel.
+  deleted = yield [cleanup(keys) for keys in cleanup_by_root.values()]
+  raise ndb.Return(sum(deleted))
 
 
 @ndb.tasklet
@@ -1290,14 +1286,10 @@ def rebuild_task_cache_async(payload):
 
 
 def cron_tidy_stale():
-  """Searches for all stale BotTaskDimensions and TaskDimensions and deletes
-  them.
-
-  Their .valid_until_ts is compared to the current time and the entity is
-  deleted if it's older.
-  """
+  """Removes stale BotTaskDimensions and TaskDimensions."""
+  # TODO(vadimsh): This can be two separate crons (to avoid OOMing).
   now = utils.utcnow()
-  td = []
+  td = 0
   btd = 0
   try:
     future_tasks = _tidy_stale_TaskDimensions(now)
@@ -1306,6 +1298,6 @@ def cron_tidy_stale():
     btd = future_bots.get_result()
   finally:
     logging.info(
-        'cron_tidy_stale() in %.3fs; TaskDimensions: found %d, deleted %d; '
+        'cron_tidy_stale() in %.3fs; TaskDimensions: deleted %d; '
         'BotTaskDimensions: deleted %d', (utils.utcnow() - now).total_seconds(),
-        len(td), sum(1 for i in td if i), btd)
+        td, btd)
