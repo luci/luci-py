@@ -119,6 +119,9 @@ class BotDimensions(ndb.Model):
   This duplicates information from BotEvent but it is leveraged to quickly
   assert if _rebuild_bot_cache_async() must be called or not.
   """
+  # Disable useless in-process per-request cache to save some RAM.
+  _use_cache = False
+
   # 'key:value' strings. This is stored to enable the removal of stale entities
   # when the bot changes its dimensions.
   dimensions_flat = ndb.StringProperty(repeated=True)
@@ -154,6 +157,11 @@ class BotTaskDimensions(ndb.Model):
 
   The actual number is a direct function of the variety of the TaskDimensions.
   """
+  # Disable useless in-process per-request cache to save some RAM.
+  _use_cache = False
+  # Don't bother with memcache, this entity is read only through queries.
+  _use_memcache = False
+
   # Validity time, at which this entity should be considered irrelevant.
   valid_until_ts = ndb.DateTimeProperty()
   # 'key:value' strings. This is stored to enable the removal of stale entities
@@ -245,6 +253,9 @@ class TaskDimensions(ndb.Model):
   get all tasks that match <dimensions_hash>, and then filter out ones that
   don't match bot's dimensions.
   """
+  # Disable useless in-process per-request cache to save some RAM.
+  _use_cache = False
+
   # Lowest value of TaskDimensionsSet.valid_until_ts where this entity must be
   # updated. See its documentation for more details.
   #
