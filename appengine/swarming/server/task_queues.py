@@ -208,10 +208,10 @@ class TaskDimensionsSet(ndb.Model):
 
   # A list 'key:value' strings in arbitrary order, but without duplicates.
   #
-  # This is stored to enable _match_bot(). Stores flattened dimension sets as
+  # This is stored to enable match_bot(). Stores flattened dimension sets as
   # produced by expand_dimensions_to_flats, i.e. dimension values here never
   # have "|" in them. Such dimension sets can directly be matched with bot
-  # dimensions (as happens in _match_bot).
+  # dimensions (as happens in match_bot).
   dimensions_flat = ndb.StringProperty(repeated=True, indexed=False)
 
   def _equals(self, dimensions_flat_set):
@@ -220,14 +220,6 @@ class TaskDimensionsSet(ndb.Model):
     if len(dimensions_flat_set) != len(self.dimensions_flat):
       return False
     return dimensions_flat_set.issuperset(self.dimensions_flat)
-
-  def _match_bot(self, bot_dimensions):
-    """Returns True if this bot can run this request dimensions set."""
-    for d in self.dimensions_flat:
-      key, value = d.split(':', 1)
-      if value not in bot_dimensions.get(key, []):
-        return False
-    return True
 
   def _pre_put_hook(self):
     super(TaskDimensionsSet, self)._pre_put_hook()
@@ -312,10 +304,14 @@ class TaskDimensions(ndb.Model):
     # dimensions with "|" already gone, but `flat` may still have "|" in them.
     return self._match_request_flat(flat)
 
-  def match_bot(self, bot_dimensions):
-    """Returns the TaskDimensionsSet that matches bot_dimensions or None."""
+  def match_bot(self, bot_dimensions_set):
+    """Returns the TaskDimensionsSet that matches bot_dimensions_set or None.
+
+    Arguments:
+      - bot_dimensions_set a set of "key:value" pairs with bot dimensions.
+    """
     for s in self.sets:
-      if s._match_bot(bot_dimensions):
+      if bot_dimensions_set.issuperset(s.dimensions_flat):
         return s
     return None
 
@@ -395,7 +391,7 @@ def _stale_BotTaskDimensions_async(bot_dimensions, bot_root_key, now):
 
 
 @ndb.tasklet
-def _fresh_BotTaskDimensions_slice_async(bot_dimensions, bot_root_key, now,
+def _fresh_BotTaskDimensions_slice_async(bot_dimensions_set, bot_root_key, now,
                                          tasks_root_key):
   """Generates fresh BotTaskDimensions for this bot with matching task queues
   from the given TaskDimensionsRoot entity group.
@@ -418,7 +414,7 @@ def _fresh_BotTaskDimensions_slice_async(bot_dimensions, bot_root_key, now,
       task_dimensions = qit.next()
       # match_bot() returns a TaskDimensionsSet if there's a match. It may still
       # be expired.
-      s = task_dimensions.match_bot(bot_dimensions)
+      s = task_dimensions.match_bot(bot_dimensions_set)
       dimensions_hash = task_dimensions.key.integer_id()
       if s and s.valid_until_ts >= now:
         # Reuse TaskDimensionsSet.valid_until_ts.
@@ -453,9 +449,10 @@ def _fresh_BotTaskDimensions_async(bot_dimensions, bot_root_key, now):
   for pool in bot_dimensions['pool']:
     roots.append(ndb.Key(TaskDimensionsRoot, u'pool:' + pool))
   # Run queries in parallel, then just merge the results.
+  bot_dimensions_set = set(bot_dimensions_to_flat(bot_dimensions))
   fresh = yield [
-      _fresh_BotTaskDimensions_slice_async(bot_dimensions, bot_root_key, now, r)
-      for r in roots
+      _fresh_BotTaskDimensions_slice_async(bot_dimensions_set, bot_root_key,
+                                           now, r) for r in roots
   ]
   raise ndb.Return(sum(fresh, []))
 
