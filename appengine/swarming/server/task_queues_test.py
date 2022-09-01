@@ -125,9 +125,10 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
     self.mock(utils, 'enqueue_task_async', _enqueue_task_async)
     return payloads
 
-  def _assert_task(self, tasks=1):
+  def _assert_task(self, dimensions=None, tasks=1):
     """Creates one pending TaskRequest and asserts it in task_queues."""
-    request = _gen_request()
+    request = _gen_request(properties=_gen_properties(
+        dimensions=dimensions) if dimensions else None)
     task_queues.assert_task_async(request).get_result()
     self.assertEqual(tasks, self.execute_tasks())
     return request
@@ -249,6 +250,21 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
     self._assert_task(tasks=0)
     self.assertEqual(
         valid_until_ts, task_queues.TaskDimensions.query().get().valid_until_ts)
+
+  def test_assert_task_async_or_dims(self):
+    self._assert_task(dimensions={
+        u'pool': [u'default'],
+        u'os': [u'v1|v2'],
+        u'gpu': [u'nv|amd'],
+    },
+                      tasks=1)
+    # Already seen it, no new tasks.
+    self._assert_task(dimensions={
+        u'pool': [u'default'],
+        u'os': [u'v1|v2'],
+        u'gpu': [u'nv|amd'],
+    },
+                      tasks=0)
 
   def test_get_queues(self):
     # See more complex test below.

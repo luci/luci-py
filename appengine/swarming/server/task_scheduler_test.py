@@ -496,7 +496,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
 
     # The second part checks for task -> bot
     # Send an identical request
-    self._quick_schedule(1, task_slices=task_slices)
+    self._quick_schedule(0, task_slices=task_slices)
     # Then register another bot
     bot2_dimensions = self.bot_dimensions.copy()
     bot2_dimensions[u'id'] = [u'bot2']
@@ -2448,11 +2448,13 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     pending_result_1 = self._quick_schedule(
         1, task_slices=task_slices, manual_tags=['tag:1', 'tag:2'])
 
-    pending_result_2 = self._quick_schedule(
-        1, task_slices=task_slices, manual_tags=['tag:2', 'tag:1'])
-    self._quick_schedule(
-        1, task_slices=task_slices, manual_tags=['tag:3', 'tag:2'])
-    self._quick_schedule(1, task_slices=task_slices, manual_tags=['tag:4'])
+    pending_result_2 = self._quick_schedule(0,
+                                            task_slices=task_slices,
+                                            manual_tags=['tag:2', 'tag:1'])
+    self._quick_schedule(0,
+                         task_slices=task_slices,
+                         manual_tags=['tag:3', 'tag:2'])
+    self._quick_schedule(0, task_slices=task_slices, manual_tags=['tag:4'])
     pending_results = [pending_result_1, pending_result_2]
 
     query = task_result.get_result_summaries_query(start=None,
