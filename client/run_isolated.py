@@ -70,7 +70,6 @@ tools.force_local_third_party()
 from depot_tools import fix_encoding
 
 # pylint: disable=ungrouped-imports
-import DEPS
 import auth
 import cipd
 import errors
@@ -116,9 +115,9 @@ _NSJAIL_DIR = 'ns'
 
 # TODO(tikuta): take these parameter from luci-config?
 _CAS_PACKAGE = 'infra/tools/luci/cas/${platform}'
-_LUCI_GO_REVISION = DEPS.deps['luci-go']['packages'][0]['version']
+_LUCI_GO_REVISION = 'git_revision:e71b07162fb1593f8bfba873ffe1174e1f24c88c'
 _NSJAIL_PACKAGE = 'infra/3pp/tools/nsjail/${platform}'
-_NSJAIL_VERSION = DEPS.deps['nsjail']['packages'][0]['version']
+_NSJAIL_VERSION = 'version:2@3.0.chromium.1'
 
 # Keep synced with task_request.py
 CACHE_NAME_RE = re.compile(r'^[a-z0-9_]{1,4096}$')
