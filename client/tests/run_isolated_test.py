@@ -611,7 +611,13 @@ class RunIsolatedTest(RunIsolatedTestBase):
     def dump_bad_digest_json(cmd, _):
       json_path = cmd[cmd.index('-dump-json') + 1]
       with open(json_path, 'w') as fp:
-        json.dump({'result': 'digest_invalid'}, fp)
+        json.dump(
+            {
+                'result': 'digest_invalid',
+                'error_details': {
+                    'digest': 'abcd1234/21'
+                }
+            }, fp)
 
     self.mock(run_isolated, "_run_go_cmd_and_wait", dump_bad_digest_json)
     result_json_path = os.path.join(self.tempdir, 'result.json')
@@ -641,7 +647,7 @@ class RunIsolatedTest(RunIsolatedTestBase):
 
     missing_cas = result_json['missing_cas'][0]
     self.assertEqual('digest_invalid', missing_cas['status'])
-    self.assertEqual('not_valid', missing_cas['digest'])
+    self.assertEqual('abcd1234/21', missing_cas['digest'])
     self.assertEqual('some_cas_instance', missing_cas['instance'])
 
   def test_main_naked_with_invalid_cipd_package(self):

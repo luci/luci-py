@@ -596,12 +596,16 @@ def _fetch_and_map(cas_client, digest, instance, output_dir, cache_dir,
     def open_json_and_check(result_json_path, cleanup_dirs):
       cas_error = False
       result_json = {}
+      error_digest = digest
       try:
         with open(result_json_path) as json_file:
           result_json = json.load(json_file)
           cas_error = result_json.get('result') in ('digest_invalid',
                                                     'authentication_error',
                                                     'arguments_invalid')
+          if cas_error and result_json.get('error_details'):
+            error_digest = result_json['error_details'].get('digest', digest)
+
       except (IOError, ValueError):
         logging.error('Failed to read json file: %s', result_json_path)
         raise
@@ -610,8 +614,8 @@ def _fetch_and_map(cas_client, digest, instance, output_dir, cache_dir,
           file_path.rmtree(kvs_dir)
           file_path.rmtree(output_dir)
       if cas_error:
-        raise errors.NonRecoverableCasException(result_json['result'], digest,
-                                                instance)
+        raise errors.NonRecoverableCasException(result_json['result'],
+                                                error_digest, instance)
       return result_json
 
     try:
