@@ -68,15 +68,6 @@ class CronAbortExpiredShardToRunHandler(_CronHandlerBase):
     task_scheduler.cron_abort_expired_task_to_run()
 
 
-class CronTidyTaskQueues(_CronHandlerBase):
-  """Removes unused tasks queues, the 'dimensions sets' without active task
-  flows.
-  """
-
-  def run_cron(self):
-    task_queues.cron_tidy_stale()
-
-
 class CronTidyTaskQueuesTasks(_CronHandlerBase):
   """Removes unused 'dimensions sets' without active task flows."""
 
@@ -408,7 +399,6 @@ def get_routes():
        CronBotDiedHandler),
       ('/internal/cron/important/scheduler/abort_expired',
        CronAbortExpiredShardToRunHandler),
-      ('/internal/cron/cleanup/task_queues', CronTidyTaskQueues),
       ('/internal/cron/cleanup/task_queues_tasks', CronTidyTaskQueuesTasks),
       ('/internal/cron/cleanup/task_queues_bots', CronTidyTaskQueuesBots),
       ('/internal/cron/monitoring/bots/update_bot_info',

@@ -89,9 +89,9 @@ _KEEP_DEAD = datetime.timedelta(days=1, minutes=10)
 
 
 # How long to keep BotTaskDimensions past their actual expiration time in
-# cron_tidy_stale. This is needed to reduce contention between cron_tidy_stale
+# cron_tidy_bots. This is needed to reduce contention between cron_tidy_bots
 # and assert_bot_async. assert_bot_async will delete BotTaskDimensions as soon
-# as their expire, and cron_tidy_stale will delete remaining ones (e.g. dead
+# as their expire, and cron_tidy_bots will delete remaining ones (e.g. dead
 # bot dimensions) a bit later.
 _TIDY_BOT_DIMENSIONS_CRON_LAG = datetime.timedelta(minutes=5)
 
@@ -1324,11 +1324,3 @@ def cron_tidy_tasks():
 def cron_tidy_bots():
   """Removes stale BotTaskDimensions."""
   _tidy_stale_BotTaskDimensions().get_result()
-
-
-def cron_tidy_stale():
-  """Removes stale BotTaskDimensions and TaskDimensions."""
-  # TODO(vadimsh): Remove once cron.yaml with two separate crons is fully
-  # deployed.
-  for f in [_tidy_stale_TaskDimensions(), _tidy_stale_BotTaskDimensions()]:
-    f.get_result()
