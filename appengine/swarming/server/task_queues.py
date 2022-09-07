@@ -656,9 +656,14 @@ def _tidy_stale_TaskDimensions():
   # Group stale TaskDimensions by the root entity key, to delete entities
   # from the same entity group via a single transaction.
   cleanup_by_root = {}
-  while (yield qit.has_next_async()):
-    key = qit.next()
-    cleanup_by_root.setdefault(key.root(), []).append(key)
+  fetched = 0
+  try:
+    while (yield qit.has_next_async()):
+      key = qit.next()
+      cleanup_by_root.setdefault(key.root(), []).append(key)
+      fetched += 1
+  except datastore_errors.Timeout:
+    logging.error('Timeout after fetching %d entities, proceeding...', fetched)
 
   # Deletes stale TaskDimensions.
   @ndb.tasklet
@@ -710,9 +715,14 @@ def _tidy_stale_BotTaskDimensions():
   # Group stale BotTaskDimensions by the root entity key, to delete entities
   # from the same entity group via a single transaction.
   cleanup_by_root = {}
-  while (yield qit.has_next_async()):
-    key = qit.next()
-    cleanup_by_root.setdefault(key.root(), []).append(key)
+  fetched = 0
+  try:
+    while (yield qit.has_next_async()):
+      key = qit.next()
+      cleanup_by_root.setdefault(key.root(), []).append(key)
+      fetched += 1
+  except datastore_errors.Timeout:
+    logging.error('Timeout after fetching %d entities, proceeding...', fetched)
 
   # Deletes stale BotTaskDimensions and flushes memcache.
   @ndb.tasklet
