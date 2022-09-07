@@ -1367,9 +1367,8 @@ class BotTaskErrorHandler(_BotApiHandler):
     msg = log_unexpected_keys(self.EXPECTED_KEYS, request, self.request, 'bot',
                               'keys')
 
-    # TODO(b/239491333): re-enable once all bot_code has propagated completely
-    #if msg:
-    #  self.abort_with_error(400, error=msg)
+    if msg:
+      self.abort_with_error(400, error=msg)
     msg = task_scheduler.bot_terminate_task(
         task_pack.unpack_run_result_key(task_id), bot_id, start_time,
         client_errors)
