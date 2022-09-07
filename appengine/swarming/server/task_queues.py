@@ -658,7 +658,7 @@ def _tidy_stale_TaskDimensions():
   cleanup_by_root = {}
   while (yield qit.has_next_async()):
     key = qit.next()
-    cleanup_by_root.setdefault(key.root, []).append(key)
+    cleanup_by_root.setdefault(key.root(), []).append(key)
 
   # Deletes stale TaskDimensions.
   @ndb.tasklet
@@ -685,7 +685,7 @@ def _tidy_stale_TaskDimensions():
 
   # Cleanup all entity groups in parallel.
   deleted = yield [cleanup(keys) for keys in cleanup_by_root.values()]
-  logging.info('_tidy_stale_TaskDimensions(): deleted %d', sum(deleted))
+  logging.info('_tidy_stale_TaskDimensions: deleted %d', sum(deleted))
 
 
 @ndb.tasklet
@@ -712,7 +712,7 @@ def _tidy_stale_BotTaskDimensions():
   cleanup_by_root = {}
   while (yield qit.has_next_async()):
     key = qit.next()
-    cleanup_by_root.setdefault(key.root, []).append(key)
+    cleanup_by_root.setdefault(key.root(), []).append(key)
 
   # Deletes stale BotTaskDimensions and flushes memcache.
   @ndb.tasklet
@@ -741,7 +741,7 @@ def _tidy_stale_BotTaskDimensions():
 
   # Cleanup all entity groups in parallel.
   deleted = yield [cleanup(keys) for keys in cleanup_by_root.values()]
-  logging.info('_tidy_stale_BotTaskDimensions(): deleted %d', sum(deleted))
+  logging.info('_tidy_stale_BotTaskDimensions: deleted %d', sum(deleted))
 
 
 @ndb.tasklet
