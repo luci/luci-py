@@ -838,6 +838,56 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
     }
     self.assertEqual(actual, expected)
 
+  def test_cron_tidy_tasks(self):
+    now = datetime.datetime(2010, 1, 2, 3, 4, 5)
+    self.mock_now(now)
+    request = self._assert_task()
+    exp = (request.expiration_ts - request.created_ts +
+        task_queues._EXTEND_VALIDITY)
+    self.assert_count(1, task_queues.TaskDimensions)
+
+    # No-op.
+    task_queues.cron_tidy_tasks()
+    self.assert_count(1, task_queues.TaskDimensions)
+
+    # Just before _KEEP_DEAD.
+    self.mock_now(now, (exp + task_queues._KEEP_DEAD).total_seconds())
+    task_queues.cron_tidy_tasks()
+    self.assert_count(1, task_queues.TaskDimensions)
+
+    # TaskDimension expired, after KEEP_DEAD.
+    self.mock_now(now, (exp + task_queues._KEEP_DEAD).total_seconds() + 1)
+    task_queues.cron_tidy_tasks()
+    self.assert_count(0, task_queues.TaskDimensions)
+
+  def test_cron_tidy_bots(self):
+    now = datetime.datetime(2010, 1, 2, 3, 4, 5)
+    self.mock_now(now)
+    self.assertEqual(0, _assert_bot())
+    request = self._assert_task()
+    exp = (request.expiration_ts - request.created_ts +
+        task_queues._EXTEND_VALIDITY)
+    self.assert_count(1, task_queues.BotTaskDimensions)
+    self.assert_count(1, task_queues.TaskDimensions)
+    bot_root_key = bot_management.get_root_key(u'bot1')
+    self.assertEqual([2980491642], task_queues.get_queues(bot_root_key))
+
+    # TaskDimension expired but is still kept; get_queues() doesn't return it
+    # anymore even if still in the DB. BotTaskDimensions is not evicted yet,
+    # since the cron allows some time for assert_bot_async to do the expiration.
+    self.mock_now(now, exp.total_seconds() + 1)
+    task_queues.cron_tidy_bots()
+    self.assert_count(1, task_queues.BotTaskDimensions)
+    self.assertEqual([], task_queues.get_queues(bot_root_key))
+
+    # After _TIDY_BOT_DIMENSIONS_CRON_LAG the cron job kicks out stale bot
+    # dimensions for good.
+    self.mock_now(
+        now,
+        (exp + task_queues._TIDY_BOT_DIMENSIONS_CRON_LAG).total_seconds() + 1)
+    task_queues.cron_tidy_bots()
+    self.assert_count(0, task_queues.BotTaskDimensions)
+    self.assertEqual([], task_queues.get_queues(bot_root_key))
 
   def test_cron_tidy_stale(self):
     now = datetime.datetime(2010, 1, 2, 3, 4, 5)

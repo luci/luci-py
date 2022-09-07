@@ -77,6 +77,20 @@ class CronTidyTaskQueues(_CronHandlerBase):
     task_queues.cron_tidy_stale()
 
 
+class CronTidyTaskQueuesTasks(_CronHandlerBase):
+  """Removes unused 'dimensions sets' without active task flows."""
+
+  def run_cron(self):
+    task_queues.cron_tidy_tasks()
+
+
+class CronTidyTaskQueuesBots(_CronHandlerBase):
+  """Detaches bots from no longer active queues."""
+
+  def run_cron(self):
+    task_queues.cron_tidy_bots()
+
+
 class CronUpdateBotInfoComposite(_CronHandlerBase):
   """Updates BotInfo.composite if needed, e.g. the bot became dead because it
   hasn't pinged for a while.
@@ -395,6 +409,8 @@ def get_routes():
       ('/internal/cron/important/scheduler/abort_expired',
        CronAbortExpiredShardToRunHandler),
       ('/internal/cron/cleanup/task_queues', CronTidyTaskQueues),
+      ('/internal/cron/cleanup/task_queues_tasks', CronTidyTaskQueuesTasks),
+      ('/internal/cron/cleanup/task_queues_bots', CronTidyTaskQueuesBots),
       ('/internal/cron/monitoring/bots/update_bot_info',
        CronUpdateBotInfoComposite),
       ('/internal/cron/cleanup/bots/delete_old', CronDeleteOldBots),

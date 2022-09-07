@@ -14,10 +14,13 @@ cron:
   schedule: every 1 minutes
   target: backend
 
-- description: >-
-    Clean up stale BotTaskDimensions and TaskDimensions so no composite indexes
-    are needed.
-  url: /internal/cron/cleanup/task_queues
+- description: Removes unused 'dimensions sets' without active task flows.
+  url: /internal/cron/cleanup/task_queues_tasks
+  schedule: every 10 minutes
+  target: backend
+
+- description: Detaches bots from no longer active queues.
+  url: /internal/cron/cleanup/task_queues_bots
   schedule: every 10 minutes
   target: backend
 

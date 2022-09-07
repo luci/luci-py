@@ -1306,8 +1306,19 @@ def rebuild_task_cache_async(payload):
   raise ndb.Return(success)
 
 
+def cron_tidy_tasks():
+  """Removes stale TaskDimensions."""
+  _tidy_stale_TaskDimensions().get_result()
+
+
+def cron_tidy_bots():
+  """Removes stale BotTaskDimensions."""
+  _tidy_stale_BotTaskDimensions().get_result()
+
+
 def cron_tidy_stale():
   """Removes stale BotTaskDimensions and TaskDimensions."""
-  # TODO(vadimsh): This can be two separate crons (to avoid OOMing).
+  # TODO(vadimsh): Remove once cron.yaml with two separate crons is fully
+  # deployed.
   for f in [_tidy_stale_TaskDimensions(), _tidy_stale_BotTaskDimensions()]:
     f.get_result()
