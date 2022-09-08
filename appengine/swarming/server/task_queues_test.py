@@ -50,7 +50,8 @@ def _assert_bot(bot_id=u'bot1', dimensions=None):
       None,
       register_dimensions=True)
   bot_root_key = bot_management.get_root_key(bot_id)
-  return task_queues.assert_bot_async(bot_root_key, bot_dimensions).get_result()
+  return task_queues._assert_bot_async(bot_root_key,
+                                       bot_dimensions).get_result()
 
 
 def _gen_properties(**kwargs):
@@ -201,7 +202,7 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
       self.fail([i.to_dict() for i in entity.query()])
     self.assertEqual(count, actual)
 
-  def test_assert_bot_async(self):
+  def test_assert_bot(self):
     self.assert_count(0, task_queues.BotDimensions)
     self.assert_count(0, task_queues.BotTaskDimensions)
     self.assert_count(0, task_queues.TaskDimensions)
@@ -266,7 +267,7 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
     },
                       tasks=0)
 
-  def test_get_queues(self):
+  def test_freshen_up_queues(self):
     # See more complex test below.
     pass
 
@@ -326,10 +327,10 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(6, task_queues.BotTaskDimensions.query().count())
     self.assertEqual(2, task_queues.TaskDimensions.query().count())
     self.assertEqual([227177418, 1843498234],
-                     task_queues.get_queues(bot_root_key))
+                     task_queues._get_queues(bot_root_key))
     memcache.flush_all()
-    self.assertEqual(
-        [227177418, 1843498234], task_queues.get_queues(bot_root_key))
+    self.assertEqual([227177418, 1843498234],
+                     task_queues._get_queues(bot_root_key))
 
     # Now expire the two TaskDimensions, one at a time, and rebuild the task
     # queue.
@@ -340,11 +341,11 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(True, f.get_result())
     self.assertEqual(6, task_queues.BotTaskDimensions.query().count())
     self.assertEqual(2, task_queues.TaskDimensions.query().count())
-    self.assertEqual(
-        [227177418, 1843498234], task_queues.get_queues(bot_root_key))
+    self.assertEqual([227177418, 1843498234],
+                     task_queues._get_queues(bot_root_key))
     # Observe the effect of memcache. See comment in get_queues().
     memcache.flush_all()
-    self.assertEqual([], task_queues.get_queues(bot_root_key))
+    self.assertEqual([], task_queues._get_queues(bot_root_key))
 
     # Re-running still do not delete TaskDimensions because they are kept until
     # _KEEP_DEAD.
@@ -352,7 +353,7 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(True, f.get_result())
     self.assertEqual(6, task_queues.BotTaskDimensions.query().count())
     self.assertEqual(2, task_queues.TaskDimensions.query().count())
-    self.assertEqual([], task_queues.get_queues(bot_root_key))
+    self.assertEqual([], task_queues._get_queues(bot_root_key))
 
     # Get past _KEEP_DEAD.
     offset = (
@@ -361,12 +362,12 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
             seconds=request_1.expiration_secs)
       ).total_seconds() + 1
     self.mock_now(now, offset)
-    self.assertEqual([], task_queues.get_queues(bot_root_key))
+    self.assertEqual([], task_queues._get_queues(bot_root_key))
     f = task_queues.rebuild_task_cache_async(payloads[0])
     self.assertEqual(True, f.get_result())
     self.assertEqual(6, task_queues.BotTaskDimensions.query().count())
     self.assertEqual(1, task_queues.TaskDimensions.query().count())
-    self.assertEqual([], task_queues.get_queues(bot_root_key))
+    self.assertEqual([], task_queues._get_queues(bot_root_key))
 
   def test_rebuild_task_cache_async_fail(self):
     now = datetime.datetime(2010, 1, 2, 3, 4, 5)
@@ -440,8 +441,8 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(4, len(task_queues.TaskDimensions.query().get().sets))
     bot1_root_key = bot_management.get_root_key(u'bot1')
     bot2_root_key = bot_management.get_root_key(u'bot2')
-    self.assertEqual(1, len(task_queues.get_queues(bot1_root_key)))
-    self.assertEqual(1, len(task_queues.get_queues(bot2_root_key)))
+    self.assertEqual(1, len(task_queues._get_queues(bot1_root_key)))
+    self.assertEqual(1, len(task_queues._get_queues(bot2_root_key)))
 
     request2 = _gen_request(
         properties=_gen_properties(dimensions={
@@ -458,8 +459,8 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
     # Only bot1 can handle |request2|
     self.assert_count(3, task_queues.BotTaskDimensions)
     self.assert_count(2, task_queues.TaskDimensions)
-    self.assertEqual(2, len(task_queues.get_queues(bot1_root_key)))
-    self.assertEqual(1, len(task_queues.get_queues(bot2_root_key)))
+    self.assertEqual(2, len(task_queues._get_queues(bot1_root_key)))
+    self.assertEqual(1, len(task_queues._get_queues(bot2_root_key)))
 
   def test_or_dimensions_new_bots(self):
     # Tasks are already registered, then new bots show up
@@ -503,8 +504,8 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
     self.assert_count(2, task_queues.BotTaskDimensions)
     bot1_root_key = bot_management.get_root_key(u'bot1')
     bot2_root_key = bot_management.get_root_key(u'bot2')
-    self.assertEqual(1, len(task_queues.get_queues(bot1_root_key)))
-    self.assertEqual(1, len(task_queues.get_queues(bot2_root_key)))
+    self.assertEqual(1, len(task_queues._get_queues(bot1_root_key)))
+    self.assertEqual(1, len(task_queues._get_queues(bot2_root_key)))
 
   def test_or_dimensions_same_hash(self):
     self.mock_now(datetime.datetime(2020, 1, 2, 3, 4, 5))
@@ -542,9 +543,9 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
     bot1_root_key = bot_management.get_root_key(u'bot1')
     bot2_root_key = bot_management.get_root_key(u'bot2')
     bot3_root_key = bot_management.get_root_key(u'bot3')
-    self.assertEqual(1, len(task_queues.get_queues(bot1_root_key)))
-    self.assertEqual(1, len(task_queues.get_queues(bot2_root_key)))
-    self.assertEqual(1, len(task_queues.get_queues(bot3_root_key)))
+    self.assertEqual(1, len(task_queues._get_queues(bot1_root_key)))
+    self.assertEqual(1, len(task_queues._get_queues(bot2_root_key)))
+    self.assertEqual(1, len(task_queues._get_queues(bot3_root_key)))
 
   def test_bot_dimensions_to_flat(self):
     actual = task_queues.bot_dimensions_to_flat({
@@ -646,7 +647,7 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
 
     # It get sets only once get_queues() is called.
     bot_root_key = bot_management.get_root_key(u'bot1')
-    task_queues.get_queues(bot_root_key)
+    task_queues._get_queues(bot_root_key)
     self.assertEqual(True, task_queues.probably_has_capacity(d))
     self.assertEqual(
         [1843498234], memcache.get('bot1', namespace='task_queues'))
@@ -673,7 +674,7 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
     self.assert_count(1, task_queues.BotTaskDimensions)
     self.assert_count(1, task_queues.TaskDimensions)
     bot_root_key = bot_management.get_root_key(u'bot1')
-    self.assertEqual([2980491642], task_queues.get_queues(bot_root_key))
+    self.assertEqual([2980491642], task_queues._get_queues(bot_root_key))
 
   def test_assert_task_async_then_bot(self):
     self._assert_task()
@@ -682,7 +683,7 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
     self.assert_count(1, task_queues.BotTaskDimensions)
     self.assert_count(1, task_queues.TaskDimensions)
     bot_root_key = bot_management.get_root_key(u'bot1')
-    self.assertEqual([2980491642], task_queues.get_queues(bot_root_key))
+    self.assertEqual([2980491642], task_queues._get_queues(bot_root_key))
 
   def test_assert_bot_then_task_with_id(self):
     # Assert a task that includes an 'id' dimension. No task queue is triggered
@@ -714,7 +715,7 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
     self.assert_count(1, task_queues.BotTaskDimensions)
     self.assert_count(1, task_queues.TaskDimensions)
     bot_root_key = bot_management.get_root_key('bot1')
-    self.assertEqual(1, len(task_queues.get_queues(bot_root_key)))
+    self.assertEqual(1, len(task_queues._get_queues(bot_root_key)))
 
     # expire BotTaskDimensions by changing time.
     memcache.flush_all()
@@ -722,7 +723,7 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
         ancestor=bot_root_key).fetch()[0]
     self.mock_now(bot_task_dimensions.valid_until_ts +
                   datetime.timedelta(seconds=1))
-    self.assertEqual(0, len(task_queues.get_queues(bot_root_key)))
+    self.assertEqual(0, len(task_queues._get_queues(bot_root_key)))
 
     # request a task with the same dimensions.
     memcache.flush_all()
@@ -731,7 +732,7 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
     self.assert_count(1, task_queues.BotDimensions)
     self.assert_count(1, task_queues.BotTaskDimensions)
     self.assert_count(1, task_queues.TaskDimensions)
-    self.assertEqual(1, len(task_queues.get_queues(bot_root_key)))
+    self.assertEqual(1, len(task_queues._get_queues(bot_root_key)))
 
   def test_cleanup_after_bot(self):
     self.assertEqual(0, _assert_bot())
@@ -758,21 +759,21 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
     self.assert_count(1, task_queues.BotTaskDimensions)
     self.assert_count(1, task_queues.TaskDimensions)
     bot_root_key = bot_management.get_root_key(u'bot1')
-    self.assertEqual([2980491642], task_queues.get_queues(bot_root_key))
+    self.assertEqual([2980491642], task_queues._get_queues(bot_root_key))
 
     # One second before expiration.
     self.mock_now(now, exp.total_seconds())
     self.assertEqual(None, _assert_bot(dimensions={u'gpu': u'Matrox'}))
     self.assert_count(1, task_queues.BotTaskDimensions)
     self.assert_count(1, task_queues.TaskDimensions)
-    self.assertEqual([2980491642], task_queues.get_queues(bot_root_key))
+    self.assertEqual([2980491642], task_queues._get_queues(bot_root_key))
 
     # BotTaskDimensions expired.
     self.mock_now(now, exp.total_seconds() + 1)
     self.assertEqual(0, _assert_bot())
     self.assert_count(0, task_queues.BotTaskDimensions)
     self.assert_count(1, task_queues.TaskDimensions)
-    self.assertEqual([], task_queues.get_queues(bot_root_key))
+    self.assertEqual([], task_queues._get_queues(bot_root_key))
 
   def test_hash_dimensions(self):
     with self.assertRaises(AttributeError):
@@ -870,7 +871,7 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
     self.assert_count(1, task_queues.BotTaskDimensions)
     self.assert_count(1, task_queues.TaskDimensions)
     bot_root_key = bot_management.get_root_key(u'bot1')
-    self.assertEqual([2980491642], task_queues.get_queues(bot_root_key))
+    self.assertEqual([2980491642], task_queues._get_queues(bot_root_key))
 
     # TaskDimension expired but is still kept; get_queues() doesn't return it
     # anymore even if still in the DB. BotTaskDimensions is not evicted yet,
@@ -878,7 +879,7 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
     self.mock_now(now, exp.total_seconds() + 1)
     task_queues.cron_tidy_bots()
     self.assert_count(1, task_queues.BotTaskDimensions)
-    self.assertEqual([], task_queues.get_queues(bot_root_key))
+    self.assertEqual([], task_queues._get_queues(bot_root_key))
 
     # After _TIDY_BOT_DIMENSIONS_CRON_LAG the cron job kicks out stale bot
     # dimensions for good.
@@ -887,7 +888,7 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
         (exp + task_queues._TIDY_BOT_DIMENSIONS_CRON_LAG).total_seconds() + 1)
     task_queues.cron_tidy_bots()
     self.assert_count(0, task_queues.BotTaskDimensions)
-    self.assertEqual([], task_queues.get_queues(bot_root_key))
+    self.assertEqual([], task_queues._get_queues(bot_root_key))
 
 
 if __name__ == '__main__':

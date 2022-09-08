@@ -130,12 +130,12 @@ def _yield_next_available_task_to_dispatch(bot_dimensions):
       None,
       register_dimensions=False)
   bot_root_key = bot_management.get_root_key(bot_id)
-  task_queues.assert_bot_async(bot_root_key, bot_dimensions).get_result()
+  queues = task_queues.assert_bot(bot_root_key, bot_dimensions)
   matcher = task_to_run.dimensions_matcher(bot_dimensions)
   return [
       to_run.to_dict()
       for to_run in task_to_run.yield_next_available_task_to_dispatch(
-          bot_id, 'pool-for-monitoring', matcher,
+          bot_id, 'pool-for-monitoring', queues, matcher,
           utils.utcnow() + datetime.timedelta(minutes=1))
   ]
 
@@ -990,7 +990,7 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
         u'pool': [u'p1'],
     }
     bot_root_key = bot_management.get_root_key(bot_id)
-    task_queues.assert_bot_async(bot_root_key, bot_dimensions).get_result()
+    queues = task_queues.assert_bot(bot_root_key, bot_dimensions)
     matcher = task_to_run.dimensions_matcher(bot_dimensions)
 
     seen = 0
@@ -998,7 +998,7 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
     try:
       deadline = utils.utcnow() + datetime.timedelta(seconds=23)
       for _ in task_to_run.yield_next_available_task_to_dispatch(
-          bot_id, 'pool-for-monitoring', matcher, deadline):
+          bot_id, 'pool-for-monitoring', queues, matcher, deadline):
         seen += 1
         self.mock_now(self.now, seen)  # 1 sec per iteration
     except task_to_run.ScanDeadlineError:

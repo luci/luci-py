@@ -457,6 +457,40 @@ def _fresh_BotTaskDimensions_async(bot_dimensions, bot_root_key, now):
 
 
 @ndb.tasklet
+def _assert_bot_async(bot_root_key, bot_dimensions):
+  """Prepares BotTaskDimensions entities as needed.
+
+  Coupled with assert_task_async(), enables get_queues() to work by by knowing
+  which TaskDimensions applies to this bot.
+
+  Arguments:
+    bot_root_key: ndb.Key to bot_management.BotRoot
+    bot_dimensions: dictionary of the bot dimensions
+
+  Returns:
+    Number of matches or None if hit the cache, thus nothing was updated.
+  """
+  # Check if the bot dimensions changed since last _rebuild_bot_cache_async()
+  # call and still valid. It rebuilds cache every 20-40 minutes to avoid
+  # missing tasks that can be assigned to the bot. Tasks can be missed because
+  # _rebuild_bot_cache_async isn't an atomic operation, and also it takes time
+  # for secondary indices to be ready since they are *eventually* consistent.
+  now = utils.utcnow()
+  dims = yield ndb.Key(BotDimensions, 1, parent=bot_root_key).get_async()
+  if (dims and dims.dimensions_flat == bot_dimensions_to_flat(bot_dimensions)
+      and dims.valid_until_ts > now):
+    # Cache hit, no need to look further.
+    logging.debug(
+        'assert_bot_async: cache hit. bot_id: %s, valid_until: %s, '
+        'bot_dimensions: %s', bot_root_key.string_id(), dims.valid_until_ts,
+        bot_dimensions)
+    raise ndb.Return(None)
+
+  matches = yield _rebuild_bot_cache_async(bot_dimensions, bot_root_key)
+  raise ndb.Return(matches)
+
+
+@ndb.tasklet
 def _rebuild_bot_cache_async(bot_dimensions, bot_root_key):
   """Rebuilds the BotTaskDimensions cache for a single bot.
 
@@ -971,6 +1005,56 @@ def _refresh_TaskDimensions_async(now, valid_until_ts, task_dimensions_flats,
   raise ndb.Return(True)
 
 
+def _get_queues(bot_root_key):
+  """Returns the known task queues as integers.
+
+  This function is called to get the task queues to poll, as the bot is trying
+  to reap a task, any task.
+
+  It is also called while the bot is running a task, to refresh the task queues.
+
+  Arguments:
+    bot_root_key: ndb.Key to bot_management.BotRoot
+
+  Returns:
+    dimensions_hashes: list of dimension_hash for the bot
+  """
+  bot_id = bot_root_key.string_id()
+  dimensions_hashes = memcache.get(bot_id, namespace='task_queues')
+  if dimensions_hashes is not None:
+    # Note: This may return stale queues. We may want to change the format to
+    # include the expiration.
+    logging.debug('get_queues(%s): can run from %d queues (memcache)\n%s',
+                  bot_id, len(dimensions_hashes), dimensions_hashes)
+    # Refresh all the keys.
+    memcache.set_multi({str(d): True
+                        for d in dimensions_hashes},
+                       time=61,
+                       namespace='task_queues_tasks')
+    return dimensions_hashes
+
+  # Retrieve all the dimensions_hash that this bot could run that have
+  # actually been triggered in the past. Since this is under a root entity, this
+  # should be fast.
+  now = utils.utcnow()
+  dimensions_hashes = sorted(
+      obj.key.integer_id()
+      for obj in BotTaskDimensions.query(ancestor=bot_root_key)
+      if obj.valid_until_ts >= now)
+  memcache.set(bot_id,
+               dimensions_hashes,
+               namespace='task_queues',
+               time=_EXPIRATION_TIME_TASK_QUEUES)
+  logging.info('get_queues(%s): Query in %.3fs: can run from %d queues\n%s',
+               bot_id, (utils.utcnow() - now).total_seconds(),
+               len(dimensions_hashes), dimensions_hashes)
+  memcache.set_multi({str(d): True
+                      for d in dimensions_hashes},
+                     time=61,
+                     namespace='task_queues_tasks')
+  return dimensions_hashes
+
+
 ### Public APIs.
 
 
@@ -1092,38 +1176,31 @@ def hash_dimensions(dimensions):
   return _hash_data(data)
 
 
-@ndb.tasklet
-def assert_bot_async(bot_root_key, bot_dimensions):
-  """Prepares BotTaskDimensions entities as needed.
+def assert_bot(bot_root_key, bot_dimensions):
+  """Prepares BotTaskDimensions entities as needed, fetches matching queues.
 
-  Coupled with assert_task_async(), enables get_queues() to work by by knowing
-  which TaskDimensions applies to this bot.
+  Coupled with assert_task_async(), enables assignment of tasks to bots by
+  putting tasks into logical queues (represented by queue numbers), and
+  assigning each bot a list of queues it needs to poll tasks from.
 
   Arguments:
-    bot_root_key: ndb.Key to bot_management.BotRoot
-    bot_dimensions: dictionary of the bot dimensions
+    bot_root_key: ndb.Key to bot_management.BotRoot.
+    bot_dimensions: dictionary of the bot dimensions.
 
   Returns:
-    Number of matches or None if hit the cache, thus nothing was updated.
+    A list of integers with queues to poll.
   """
-  # Check if the bot dimensions changed since last _rebuild_bot_cache_async()
-  # call and still valid. It rebuilds cache every 20-40 minutes to avoid
-  # missing tasks that can be assigned to the bot. Tasks can be missed because
-  # _rebuild_bot_cache_async isn't an atomic operation, and also it takes time
-  # for secondary indices to be ready since they are *eventually* consistent.
-  now = utils.utcnow()
-  obj = yield ndb.Key(BotDimensions, 1, parent=bot_root_key).get_async()
-  if (obj and obj.dimensions_flat == bot_dimensions_to_flat(bot_dimensions) and
-      obj.valid_until_ts > now):
-    # Cache hit, no need to look further.
-    logging.debug(
-        'assert_bot_async: cache hit. bot_id: %s, valid_until: %s, '
-        'bot_dimensions: %s', bot_root_key.string_id(), obj.valid_until_ts,
-        bot_dimensions)
-    raise ndb.Return(None)
+  _assert_bot_async(bot_root_key, bot_dimensions).get_result()
+  return _get_queues(bot_root_key)
 
-  matches = yield _rebuild_bot_cache_async(bot_dimensions, bot_root_key)
-  raise ndb.Return(matches)
+
+def freshen_up_queues(bot_root_key):
+  """Refreshes memcache entries for queues polled by the bot.
+
+  Arguments:
+    bot_root_key: ndb.Key to bot_management.BotRoot.
+  """
+  _get_queues(bot_root_key)
 
 
 def cleanup_after_bot(bot_root_key):
@@ -1168,57 +1245,6 @@ def assert_task_async(request):
     exp_ts += datetime.timedelta(seconds=t.expiration_secs)
     futures.append(_assert_task_props_async(t.properties, exp_ts))
   yield futures
-
-
-def get_queues(bot_root_key):
-  """Returns the known task queues as integers.
-
-  This function is called to get the task queues to poll, as the bot is trying
-  to reap a task, any task.
-
-  It is also called while the bot is running a task, to refresh the task queues.
-
-  Arguments:
-    bot_root_key: ndb.Key to bot_management.BotRoot
-
-  Returns:
-    dimensions_hashes: list of dimension_hash for the bot
-  """
-  bot_id = bot_root_key.string_id()
-  dimensions_hashes = memcache.get(bot_id, namespace='task_queues')
-  if dimensions_hashes is not None:
-    # Note: This may return stale queues. We may want to change the format to
-    # include the expiration.
-    logging.debug(
-        'get_queues(%s): can run from %d queues (memcache)\n%s',
-        bot_id, len(dimensions_hashes), dimensions_hashes)
-    # Refresh all the keys.
-    memcache.set_multi(
-        {str(d): True for d in dimensions_hashes},
-        time=61, namespace='task_queues_tasks')
-    return dimensions_hashes
-
-  # Retrieve all the dimensions_hash that this bot could run that have
-  # actually been triggered in the past. Since this is under a root entity, this
-  # should be fast.
-  now = utils.utcnow()
-  dimensions_hashes = sorted(
-      obj.key.integer_id()
-      for obj in BotTaskDimensions.query(ancestor=bot_root_key)
-      if obj.valid_until_ts >= now)
-  memcache.set(
-      bot_id,
-      dimensions_hashes,
-      namespace='task_queues',
-      time=_EXPIRATION_TIME_TASK_QUEUES)
-  logging.info(
-      'get_queues(%s): Query in %.3fs: can run from %d queues\n%s',
-      bot_id, (utils.utcnow()-now).total_seconds(),
-      len(dimensions_hashes), dimensions_hashes)
-  memcache.set_multi(
-      {str(d): True for d in dimensions_hashes},
-      time=61, namespace='task_queues_tasks')
-  return dimensions_hashes
 
 
 def probably_has_capacity(dimensions):

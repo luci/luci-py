@@ -476,9 +476,9 @@ class _ActiveQuery(object):
           ttr.dimensions = props.dimensions
           idx += 1
 
-    # The queue_number hash may have conflicts or the queues returned by
-    # get_queues(...) aren't matching the bot anymore (if this cache is stale).
-    # Filter out all requests that don't match bot dimensions.
+    # The queue_number hash may have conflicts or the queues being polled aren't
+    # matching the bot anymore (if this cache is stale). Filter out all requests
+    # that don't match bot dimensions.
     matched = []
     for ttr in available:
       if self._bot_dims_matcher(ttr.dimensions):
@@ -504,13 +504,23 @@ class _ActiveQuery(object):
                   msg % args)
 
 
-def _yield_potential_tasks(bot_id, pool, stats, bot_dims_matcher, deadline):
-  """Queries all the known task queues in parallel and yields the task in order
+def _yield_potential_tasks(bot_id, pool, queues, stats, bot_dims_matcher,
+                           deadline):
+  """Queries given task queues in parallel and yields the tasks in order
   of priority until all queues are exhausted or the deadline is reached.
 
   The ordering is opportunistic, not strict. There's a risk of not returning
   exactly in the priority order depending on index staleness and query execution
   latency. The number of queries is unbounded.
+
+  Arguments:
+  - bot_id: id of the bot to poll tasks for.
+  - pool: this bot's pool for monitoring metrics.
+  - queues: a list of integers with dimensions hashes of queues to poll.
+  - stats: a _QueryStats object to update in-place.
+  - bot_dims_matcher: a predicate that checks if task dimensions match bot's
+      dimensions.
+  - deadline: datetime.datetime when to give up.
 
   Yields:
     TaskToRunShard entities, trying to yield the highest priority one first.
@@ -528,17 +538,14 @@ def _yield_potential_tasks(bot_id, pool, stats, bot_dims_matcher, deadline):
                   bot_id)
     raise ScanDeadlineError('skipped', 'No time left to run the scan at all')
 
-  bot_root_key = bot_management.get_root_key(bot_id)
-  dim_hashes = task_queues.get_queues(bot_root_key)
-
   # Keep track how many queues we scan in parallel.
-  ts_mon_metrics.on_scheduler_scan(pool, len(dim_hashes))
+  ts_mon_metrics.on_scheduler_scan(pool, len(queues))
 
   # Start fetching first pages of each per dimension set query. Note that
   # the default ndb.EVENTUAL_CONSISTENCY is used so stale items may be
   # returned. It's handled specifically by consumers of this function.
   queries = []
-  for d in dim_hashes:
+  for d in queues:
     for q in _get_task_to_run_query(d):
       queries.append(
           _ActiveQuery(q, d, bot_id, stats, bot_dims_matcher, deadline))
@@ -564,7 +571,7 @@ def _yield_potential_tasks(bot_id, pool, stats, bot_dims_matcher, deadline):
       time.time() - start, sum(len(q.page()) for q in queries if q.ready()),
       [q.dim_hash for q in queries])
 
-  # We may be running of time already if task_queues.get_queues above was
+  # We may be running of time already if the initial fetch above was
   # particularly slow.
   if utils.utcnow() >= deadline:
     for q in queries:
@@ -835,8 +842,8 @@ class Claim(object):
     self.release()
 
 
-def yield_next_available_task_to_dispatch(bot_id, pool, bot_dims_matcher,
-                                          deadline):
+def yield_next_available_task_to_dispatch(bot_id, pool, queues,
+                                          bot_dims_matcher, deadline):
   """Yields next available TaskToRunShard in roughly decreasing order of
   priority.
 
@@ -847,6 +854,7 @@ def yield_next_available_task_to_dispatch(bot_id, pool, bot_dims_matcher,
   Arguments:
   - bot_id: id of the bot to poll tasks for.
   - pool: this bot's pool for monitoring metrics.
+  - queues: a list of integers with dimensions hashes of queues to poll.
   - bot_dims_matcher: a predicate that checks if task dimensions match bot's
       dimensions.
   - deadline: datetime.datetime when to give up.
@@ -857,8 +865,8 @@ def yield_next_available_task_to_dispatch(bot_id, pool, bot_dims_matcher,
   now = utils.utcnow()
   stats = _QueryStats()
   try:
-    for ttr in _yield_potential_tasks(bot_id, pool, stats, bot_dims_matcher,
-                                      deadline):
+    for ttr in _yield_potential_tasks(bot_id, pool, queues, stats,
+                                      bot_dims_matcher, deadline):
       # Try to claim this TaskToRunShard. Only one bot will pass this. It then
       # will have ~15s to submit a transaction that assigns the TaskToRunShard
       # to this bot before another bot will be able to try that.

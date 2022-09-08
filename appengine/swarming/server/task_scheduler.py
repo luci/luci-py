@@ -1334,7 +1334,7 @@ def schedule_request(request,
   return result_summary
 
 
-def bot_reap_task(bot_dimensions, bot_version, deadline):
+def bot_reap_task(bot_dimensions, queues, bot_version, deadline):
   """Reaps a TaskToRunShard if one is available.
 
   The process is to find a TaskToRunShard where its .queue_number is set, then
@@ -1343,6 +1343,7 @@ def bot_reap_task(bot_dimensions, bot_version, deadline):
   Arguments:
   - bot_dimensions: The dimensions of the bot as a dictionary in
           {string key: list of string values} format.
+  - queues: a list of integers with dimensions hashes of queues to poll.
   - bot_version: String version of the bot client.
   - deadline: datetime.datetime of when to give up.
 
@@ -1380,7 +1381,7 @@ def bot_reap_task(bot_dimensions, bot_version, deadline):
   stale_index = 0
   try:
     q = task_to_run.yield_next_available_task_to_dispatch(
-        bot_id, pool, match_bot_dimensions, scan_deadline)
+        bot_id, pool, queues, match_bot_dimensions, scan_deadline)
     for to_run in q:
       iterated += 1
       request = task_to_run.task_to_run_key_to_request_key(to_run.key).get()

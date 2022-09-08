@@ -658,9 +658,9 @@ class BotPollHandler(_BotBaseHandler):
     # The bot is in good shape.
 
     try:
-      # Prepare BotTaskDimensions
+      # Prepare BotTaskDimensions and fetch queues matching bot's dimensions.
       bot_root_key = bot_management.get_root_key(res.bot_id)
-      task_queues.assert_bot_async(bot_root_key, res.dimensions).get_result()
+      queues = task_queues.assert_bot(bot_root_key, res.dimensions)
     except self._TIMEOUT_EXCEPTIONS as e:
       # TODO(crbug.com/1027431): assert_bot_async().get_result()
       # takes longer than 60 sec which ends up with "DeadlineExceededError".
@@ -671,7 +671,7 @@ class BotPollHandler(_BotBaseHandler):
       # after reaping task.
       # See discussion:
       # https://crrev.com/c/1948022/2#message-15c7ac534cdc49794fcb66cd209e5d2272ea22a5
-      self._abort_by_timeout('assert_bot_async', e)
+      self._abort_by_timeout('assert_bot', e)
 
     # Try to grab a task. Leave ~10s for bot_event(...) transaction below.
     reap_deadline = deadline - datetime.timedelta(seconds=10)
@@ -680,7 +680,7 @@ class BotPollHandler(_BotBaseHandler):
       (request, secret_bytes,
        run_result), is_deduped = api_helpers.cache_request(
            'bot_poll', request_uuid, lambda: task_scheduler.bot_reap_task(
-               res.dimensions, res.version, reap_deadline))
+               res.dimensions, queues, res.version, reap_deadline))
     except self._TIMEOUT_EXCEPTIONS as e:
       self._abort_by_timeout('bot_reap_task', e)
 
@@ -1250,7 +1250,7 @@ class BotTaskUpdateHandler(_BotApiHandler):
     # Tell the task queues management engine that the bot is still alive, and
     # it shall refresh the task queues.
     bot_root_key = bot_management.get_root_key(bot_id)
-    task_queues.get_queues(bot_root_key)
+    task_queues.freshen_up_queues(bot_root_key)
 
     try:
       state = task_scheduler.bot_update_task(

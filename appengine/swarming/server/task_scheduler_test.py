@@ -185,6 +185,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         u'pool': [u'default'],
     }
     self._known_pools = None
+    self._last_registered_bot_dims = self.bot_dimensions.copy()
 
   def _enqueue(self, *args, **kwargs):
     # Only then add use_dedicated_module as default False.
@@ -376,16 +377,24 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     bot_root_key = bot_management.get_root_key(bot_id)
     self.assertEqual(
         num_btd_updated,
-        task_queues.assert_bot_async(bot_root_key, bot_dimensions).get_result())
+        task_queues._assert_bot_async(bot_root_key,
+                                      bot_dimensions).get_result())
     self.assertEqual(0, self.execute_tasks())
+    self._last_registered_bot_dims = bot_dimensions.copy()
+
+  def _bot_reap_task(self, bot_dimensions=None, version=None):
+    bot_dimensions = bot_dimensions or self._last_registered_bot_dims
+    bot_id = bot_dimensions['id'][0]
+    queues = task_queues._get_queues(bot_management.get_root_key(bot_id))
+    return task_scheduler.bot_reap_task(bot_dimensions, queues, version
+                                        or 'abc', _deadline())
 
   def _quick_reap(self, num_task, num_btd_updated, **kwargs):
     """Makes sure the bot is registered and have it reap a task."""
     self._register_bot(num_btd_updated, self.bot_dimensions)
     self._quick_schedule(num_task, **kwargs)
 
-    reaped_request, _, run_result = task_scheduler.bot_reap_task(
-        self.bot_dimensions, 'abc', _deadline())
+    reaped_request, _, run_result = self._bot_reap_task()
 
     queued_tasks = 0
     # Reaping causes a pubsub task if pubsub is specified.
@@ -483,8 +492,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
             wait_for_capacity=False),
     ]
     self._quick_schedule(1, task_slices=task_slices)
-    _, _, run_result = task_scheduler.bot_reap_task(bot1_dimensions, 'abc',
-                                                    _deadline())
+    _, _, run_result = self._bot_reap_task()
     self.assertEqual(u'bot1', run_result.bot_id)
     to_run_key = _run_result_to_to_run_key(run_result)
     self.assertIsNone(to_run_key.get().queue_number)
@@ -504,8 +512,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     bot2_dimensions[u'gpu'] = [u'amd', u'sega']
     self._register_bot(1, bot2_dimensions)
 
-    _, _, run_result = task_scheduler.bot_reap_task(bot2_dimensions, 'def',
-                                                    _deadline())
+    _, _, run_result = self._bot_reap_task()
     self.assertEqual(u'bot2', run_result.bot_id)
     to_run_key = _run_result_to_to_run_key(run_result)
     self.assertIsNone(to_run_key.get().queue_number)
@@ -517,19 +524,17 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
 
   @parameterized.expand([(0,), (1,)])
   def test_either_bot_reap_tasks_using_or_dimensions(self, bi):
-    bots_ids = [u'bot1', u'bot2']
     bot1_dimensions = self.bot_dimensions.copy()
-    bot1_dimensions[u'id'] = [bots_ids[0]]
+    bot1_dimensions[u'id'] = [u'bot1']
     bot1_dimensions[u'os'] = [u'v1', u'v2']
     bot1_dimensions[u'gpu'] = [u'nv', u'sega']
     self._register_bot(0, bot1_dimensions)
 
     bot2_dimensions = self.bot_dimensions.copy()
-    bot2_dimensions[u'id'] = [bots_ids[1]]
+    bot2_dimensions[u'id'] = [u'bot2']
     bot2_dimensions[u'os'] = [u'v2']
     bot2_dimensions[u'gpu'] = [u'amd', u'sega']
     self._register_bot(0, bot2_dimensions)
-    bots_dimensions = [bot1_dimensions, bot2_dimensions]
 
     task_slices = [
         task_request.TaskSlice(
@@ -544,9 +549,14 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     ]
     self._quick_schedule(1, task_slices=task_slices)
 
-    test_bot_id = bots_ids[bi]
-    _, _, run_result = task_scheduler.bot_reap_task(bots_dimensions[bi], 'abc',
-                                                    _deadline())
+    if bi == 0:
+      test_bot_id = u'bot1'
+      test_bot_dimensions = bot1_dimensions
+    else:
+      test_bot_id = u'bot2'
+      test_bot_dimensions = bot2_dimensions
+
+    _, _, run_result = self._bot_reap_task(test_bot_dimensions)
     self.assertEqual(test_bot_id, run_result.bot_id)
     to_run_key = _run_result_to_to_run_key(run_result)
     self.assertIsNone(to_run_key.get().queue_number)
@@ -722,8 +732,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     request = result_summary.request_key.get()
     self.mock_now(request.expiration_ts, 1)
 
-    actual_request, _, run_result = task_scheduler.bot_reap_task(
-        self.bot_dimensions, 'abc', _deadline())
+    actual_request, _, run_result = self._bot_reap_task()
     # The task is not returned because it's expired.
     self.assertIsNone(actual_request)
     self.assertIsNone(run_result)
@@ -754,8 +763,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.mock_now(result_summaries[-1].request_key.get().expiration_ts, 1)
 
     # Fail to reap a task.
-    actual_request, _, run_result = task_scheduler.bot_reap_task(
-        self.bot_dimensions, 'abc', _deadline())
+    actual_request, _, run_result = self._bot_reap_task()
     self.assertIsNone(actual_request)
     self.assertIsNone(run_result)
     # They all got expired ...
@@ -783,8 +791,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.mock_now(result_summaries[-1].request_key.get().expiration_ts, 1)
 
     # Fail to reap a task.
-    actual_request, _, run_result = task_scheduler.bot_reap_task(
-        self.bot_dimensions, 'abc', _deadline())
+    actual_request, _, run_result = self._bot_reap_task()
     self.assertIsNone(actual_request)
     self.assertIsNone(run_result)
     # They all got expired ...
@@ -919,7 +926,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     # are incidental to this test.
     del notify_calls[:]
 
-    task_scheduler.bot_reap_task(self.bot_dimensions, 'abc', _deadline())
+    self._bot_reap_task()
 
     self.assertEqual(len(er_calls), 1, 'external scheduler was not called')
     self.assertEqual(len(r_calls), 1, 'native scheduler was not called')
@@ -928,7 +935,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self._setup_es(False)
     self._mock_es_assign(None, 0)
 
-    task_scheduler.bot_reap_task(self.bot_dimensions, 'abc', _deadline())
+    self._bot_reap_task()
 
   def test_bot_reap_task_es_with_nonpending_task(self):
     self._setup_es(False)
@@ -942,7 +949,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
 
     # It should notify to external scheduler. But an exception won't be raised
     # because the task is already running or has finished including failures.
-    task_scheduler.bot_reap_task(self.bot_dimensions, 'abc', _deadline())
+    self._bot_reap_task()
     self.assertEqual(len(notify_calls), 1)
 
   def test_bot_reap_task_es_with_pending_task(self):
@@ -962,8 +969,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self._mock_es_assign(result_summary.task_id, 0)
 
     # Able to successfully reap given PENDING task from external scheduler.
-    request, _, _ = task_scheduler.bot_reap_task(self.bot_dimensions, 'abc',
-                                                 _deadline())
+    request, _, _ = self._bot_reap_task()
     self.assertEqual(request.task_id, result_summary.task_id)
 
   def test_bot_reap_task_for_nonexternal_pool(self):
@@ -987,7 +993,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     }
     # CTS pool has disabled external scheduler, so notify_calls should have
     # nothing recorded.
-    task_scheduler.bot_reap_task(bot_dimensions, 'abc', _deadline())
+    self._bot_reap_task(bot_dimensions)
     self.assertEqual(len(notify_calls), 0)
 
   def test_schedule_request_slice_fallback_to_second_immediate(self):
@@ -1009,8 +1015,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
                 properties=_gen_properties(),
                 wait_for_capacity=False),
         ])
-    request, _, run_result = task_scheduler.bot_reap_task(
-        self.bot_dimensions, 'abc', _deadline())
+    request, _, run_result = self._bot_reap_task()
     self.assertEqual(1, run_result.current_task_slice)
 
   def test_schedule_request_slice_use_first_after_expiration(self):
@@ -1028,18 +1033,20 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.mock_now(self.now, 181)
     # The first slice is returned from bot_reap_task if it is called earlier
     # than cron_abort_expired_task_to_run.
-    request, _, run_result = task_scheduler.bot_reap_task(
-        self.bot_dimensions, 'abc', _deadline())
+    request, _, run_result = self._bot_reap_task()
     self.assertEqual(0, run_result.current_task_slice)
 
   def test_schedule_request_slice_fallback_to_different_property(self):
+    dims1 = self.bot_dimensions
+    self._register_bot(0, dims1)
+
+    dims2 = self.bot_dimensions.copy()
+    dims2[u'id'] = [u'second']
+    dims2[u'os'] = [u'Atari']
+    self._register_bot(0, dims2)
+
     # The first TaskSlice couldn't run so it was eventually expired and the
     # second couldn't be run by the bot that was polling.
-    self._register_bot(0, self.bot_dimensions)
-    second_bot = self.bot_dimensions.copy()
-    second_bot[u'id'] = [u'second']
-    second_bot[u'os'] = [u'Atari']
-    self._register_bot(0, second_bot)
     self._quick_schedule(
         2,
         task_slices=[
@@ -1054,8 +1061,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
                 })),
         ])
     # The second bot can't reap the task.
-    _, _, run_result = task_scheduler.bot_reap_task(second_bot, 'second',
-                                                    _deadline())
+    _, _, run_result = self._bot_reap_task(dims2, 'second')
     self.assertIsNone(run_result)
 
     self.mock_now(self.now, 181)
@@ -1068,14 +1074,12 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
 
     # The first is explicitly expired, and the second TaskSlice cannot be
     # reaped by this bot.
-    _, _, run_result = task_scheduler.bot_reap_task(self.bot_dimensions, 'abc',
-                                                    _deadline())
+    _, _, run_result = self._bot_reap_task(dims1)
     self.assertIsNone(run_result)
     # The second bot is able to reap it immediately. This is because when the
     # first bot tried to reap the task, it expired the first TaskToRunShard and
     # created a new one, which the second bot *can* reap.
-    _, _, run_result = task_scheduler.bot_reap_task(second_bot, 'second',
-                                                    _deadline())
+    _, _, run_result = self._bot_reap_task(dims2, 'second')
     self.assertEqual(1, run_result.current_task_slice)
 
   def test_schedule_request_slice_no_capacity(self):
@@ -1286,8 +1290,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     # TaskToRunShard was not stored.
     self.assertIsNone(to_run_key.get())
     # Bot can't reap.
-    reaped_request, _, _ = task_scheduler.bot_reap_task(self.bot_dimensions,
-                                                        'abc', _deadline())
+    reaped_request, _, _ = self._bot_reap_task()
     self.assertIsNone(reaped_request)
 
     result_summary_duped, run_results_duped = _get_results(request.key)
@@ -1521,8 +1524,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     # A bot reaps the TaskToRunShard.
     reaped_ts = self.now + datetime.timedelta(seconds=60)
     self.mock_now(reaped_ts)
-    reaped_request, _, run_result = task_scheduler.bot_reap_task(
-        self.bot_dimensions, 'abc', _deadline())
+    reaped_request, _, run_result = self._bot_reap_task()
     self.assertEqual(result_summary.request_key.get(), reaped_request)
     self.assertTrue(run_result)
     result_summary, run_results = _get_results(result_summary.request_key)
@@ -1806,8 +1808,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     parent_result_summary = task_scheduler.schedule_request(parent_request)
     self.assertEqual(1, self.execute_tasks())
 
-    _, _, parent_run_result = task_scheduler.bot_reap_task(
-        self.bot_dimensions, 'abc', _deadline())
+    _, _, parent_run_result = self._bot_reap_task()
 
     # Run a child task.
     child_request = _gen_request_slices(
@@ -1818,8 +1819,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     bot2_dimensions = self.bot_dimensions.copy()
     bot2_dimensions['id'] = [bot2_dimensions['id'][0] + '2']
     self._register_bot(1, bot2_dimensions)
-    _, _, child_run_result = task_scheduler.bot_reap_task(
-        bot2_dimensions, 'abc', _deadline())
+    _, _, child_run_result = self._bot_reap_task()
     self.assertEqual(0, self.execute_tasks())
 
     # Run a child task 2.
@@ -1831,8 +1831,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     bot3_dimensions = self.bot_dimensions.copy()
     bot3_dimensions['id'] = [bot3_dimensions['id'][0] + '3']
     self._register_bot(1, bot3_dimensions)
-    _, _, child_run_result2 = task_scheduler.bot_reap_task(
-        bot3_dimensions, 'abc', _deadline())
+    _, _, child_run_result2 = self._bot_reap_task()
     self.assertEqual(0, self.execute_tasks())
 
     # Run a child task 3. This will be cancelled before running.
@@ -1910,8 +1909,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     # deterministic when running on GAE but it should be deterministic in the
     # unit test.
     for i, e in enumerate(expected):
-      request, _, _ = task_scheduler.bot_reap_task(self.bot_dimensions, 'abc',
-                                                   _deadline())
+      request, _, _ = self._bot_reap_task()
       self.assertEqual(request.priority, e)
 
   def test_bot_terminate_task(self):
@@ -2891,8 +2889,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     now_2 = self.mock_now(
         self.now + datetime.timedelta(seconds=request.bot_ping_tolerance_secs),
         2)
-    request, _, run_result = task_scheduler.bot_reap_task(
-        self.bot_dimensions, 'abc', _deadline())
+    request, _, run_result = self._bot_reap_task()
     self.assertIsNone(request)
     self.assertIsNone(run_result)
 
