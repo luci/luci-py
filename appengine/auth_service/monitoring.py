@@ -15,7 +15,7 @@ def is_ts_monitoring_enabled():
 
 def wrap_webapp2_app(app):
   """Instruments webapp2 application to track HTTP endpoints performance."""
-  gae_ts_mon.initialize(app=app, is_enabled_fn=is_ts_monitoring_enabled)
+  gae_ts_mon.initialize_prod(app=app, is_enabled_fn=is_ts_monitoring_enabled)
   return app
 
 
