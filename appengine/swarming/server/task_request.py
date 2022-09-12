@@ -1923,7 +1923,7 @@ def yield_request_keys_by_parent_task_id(parent_task_id):
   """Returns an iterator of child TaskRequest keys."""
   parent_summary_key = task_pack.unpack_result_summary_key(parent_task_id)
   run_result_key = task_pack.result_summary_key_to_run_result_key(
-      parent_summary_key, 1)
+      parent_summary_key)
   run_result_id = task_pack.pack_run_result_key(run_result_key)
   return TaskRequest.query(TaskRequest.parent_task_id == run_result_id).iter(
       keys_only=True)

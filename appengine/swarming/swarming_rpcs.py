@@ -710,9 +710,6 @@ class TaskResult(messages.Message):
   state = messages.EnumField(TaskState, 19)
   # Summary task ID (ending with '0') when creating a new task.
   task_id = messages.StringField(20)
-  # Can be 0, 1 or 2. It is 0 for a deduped task, since nothing ran. It is
-  # normally 1. It is 2 if the first try had an internal failure.
-  try_number = messages.IntegerField(21)
 
   # Can be multiple values only in TaskResultSummary.
   costs_usd = messages.FloatField(22, repeated=True)

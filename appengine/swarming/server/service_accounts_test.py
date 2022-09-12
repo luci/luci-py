@@ -86,8 +86,7 @@ class TaskAccountTokenTest(TestBase):
     req.put()
 
     summary_key = task_pack.request_key_to_result_summary_key(req.key)
-    run_result_key = task_pack.result_summary_key_to_run_result_key(
-        summary_key, 1)
+    run_result_key = task_pack.result_summary_key_to_run_result_key(summary_key)
     return task_pack.pack_run_result_key(run_result_key)
 
   def test_access_token_with_realm(self):

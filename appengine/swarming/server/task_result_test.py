@@ -1293,7 +1293,7 @@ class TaskResultApiTest(TestCase):
 
     results = task_result.fetch_task_results([
         running_res.task_id, pending_res.task_id, running_res_cache.task_id,
-        pending_res_cache.task_id, '1d69b9f088008812'
+        pending_res_cache.task_id, '1d69b9f188008811'
     ])
 
     self.assertEqual(

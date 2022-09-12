@@ -1858,7 +1858,7 @@ class TaskRequestApiTest(TestCase):
         parent_request.key)
     parent_summary_id = task_pack.pack_result_summary_key(parent_summary_key)
     parent_run_key = task_pack.result_summary_key_to_run_result_key(
-        parent_summary_key, 1)
+        parent_summary_key)
     parent_run_id = task_pack.pack_run_result_key(parent_run_key)
 
     child_request_1_key = _gen_request(parent_task_id=parent_run_id).put()

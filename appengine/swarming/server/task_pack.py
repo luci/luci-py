@@ -46,23 +46,17 @@ def result_summary_key_to_request_key(result_summary_key):
   return result_summary_key.parent()
 
 
-def result_summary_key_to_run_result_key(result_summary_key, try_number):
+def result_summary_key_to_run_result_key(result_summary_key):
   """Returns the TaskRunResult ndb.Key for this TaskResultSummary.key.
 
   Arguments:
     result_summary_key: ndb.Key for a TaskResultSummary entity.
-    try_number: the try on which TaskRunResult was created for. The first try
-        is 1, the second is 2, etc.
 
   Returns:
     ndb.Key for the corresponding TaskRunResult entity.
   """
   assert result_summary_key.kind() == 'TaskResultSummary', result_summary_key
-  if try_number < 1:
-    raise ValueError('Try number(%d) must be above 0' % try_number)
-  if try_number > 2:
-    raise ValueError('Try number(%d) > 2 is not supported' % try_number)
-  return ndb.Key('TaskRunResult', try_number, parent=result_summary_key)
+  return ndb.Key('TaskRunResult', 1, parent=result_summary_key)
 
 
 def run_result_key_to_result_summary_key(run_result_key):
@@ -145,14 +139,13 @@ def unpack_request_key(request_id):
   assert isinstance(request_id, basestring)
   if not request_id:
     raise ValueError('Invalid null key')
-  c = request_id[-1]
-  if c == '1':
-    # The key id is the reverse of the value.
-    task_id_int = int(request_id, 16)
-    if task_id_int < 0:
-      raise ValueError('Invalid task id (overflowed)')
-    return ndb.Key('TaskRequest', task_id_int ^ TASK_REQUEST_KEY_ID_MASK)
-  raise ValueError('Invalid key %r' % request_id)
+  if request_id[-1] != '1':
+    raise ValueError('Invalid key %r' % request_id)
+  # The key id is the reverse of the value.
+  task_id_int = int(request_id, 16)
+  if task_id_int < 0:
+    raise ValueError('Invalid task id (overflowed)')
+  return ndb.Key('TaskRequest', task_id_int ^ TASK_REQUEST_KEY_ID_MASK)
 
 
 def unpack_result_summary_key(packed_key):
@@ -173,8 +166,5 @@ def unpack_run_result_key(packed_key):
   The expected format of |packed_key| is %x.
   """
   request_key = unpack_request_key(packed_key[:-1])
-  try_number = int(packed_key[-1], 16)
-  if not try_number:
-    raise ValueError('Can\'t reference to the overall task result.')
   result_summary_key = request_key_to_result_summary_key(request_key)
-  return result_summary_key_to_run_result_key(result_summary_key, try_number)
+  return result_summary_key_to_run_result_key(result_summary_key)

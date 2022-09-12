@@ -1089,8 +1089,9 @@ class TaskResultSummary(_TaskResultCommon):
   # State of this task. The value from TaskRunResult will be copied over.
   state = StateProperty(default=State.PENDING)
 
-  # Represent the last try attempt of the task. Starts at 1 EXCEPT when the
-  # results were deduped, in this case it's 0.
+  # Is 1 EXCEPT when the results were deduped. If deduped it is 0.
+  # This field is left over from when swarming had internal retries.
+  # See https://crbug.com/1065101
   try_number = ndb.IntegerProperty()
 
   # Effective cost of this task for each try. Use self.cost_usd for the sum.
@@ -1147,8 +1148,7 @@ class TaskResultSummary(_TaskResultCommon):
 
     if not self.try_number:
       return None
-    return task_pack.result_summary_key_to_run_result_key(
-        self.key, self.try_number)
+    return task_pack.result_summary_key_to_run_result_key(self.key)
 
   @property
   def task_id(self):
@@ -1191,7 +1191,7 @@ class TaskResultSummary(_TaskResultCommon):
 
     if self.request.resultdb_update_token:
       run_id = task_pack.pack_run_result_key(
-          task_pack.result_summary_key_to_run_result_key(self.key, 1))
+          task_pack.result_summary_key_to_run_result_key(self.key))
       # TODO(crbug.com/1065139): remove get_result() if ndb.toplevel works fine.
       resultdb.finalize_invocation_async(
           run_id, self.request.resultdb_update_token).get_result()
@@ -1245,9 +1245,11 @@ class TaskResultSummary(_TaskResultCommon):
     self.missing_cas = run_result.missing_cas
     self.missing_cipd = run_result.missing_cipd
 
-    while len(self.costs_usd) < run_result.try_number:
-      self.costs_usd.append(0.)
-    self.costs_usd[run_result.try_number-1] = run_result.cost_usd
+    # try_number == 0 implies dedup so set cost to 0.
+    if run_result.try_number == 0:
+      self.costs_usd = [0.]
+    else:
+      self.costs_usd = [run_result.cost_usd]
 
     # Update the automatic tags, removing the ones from the other
     # TaskProperties.
@@ -1550,8 +1552,7 @@ def new_run_result(request, to_run, bot_id, bot_version, bot_dimensions,
   assert isinstance(request, task_request.TaskRequest)
   summary_key = task_pack.request_key_to_result_summary_key(request.key)
   return TaskRunResult(
-      key=task_pack.result_summary_key_to_run_result_key(
-          summary_key, to_run.try_number),
+      key=task_pack.result_summary_key_to_run_result_key(summary_key),
       bot_dimensions=bot_dimensions,
       bot_id=bot_id,
       bot_version=bot_version,

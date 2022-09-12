@@ -194,10 +194,6 @@ def stats(tasks, show_cost):
   # Note worthy results.
   failures = [i for i in tasks if i.get('failure')]
   internal_failures = [i for i in tasks if i.get('internal_failure')]
-  two_tries = [
-      i for i in tasks
-      if i.get('try_number') == '2' and not i.get('deduped_from')
-  ]
   # TODO(maruel): 'state'
 
   # Summations.
@@ -233,7 +229,6 @@ def stats(tasks, show_cost):
   percent_dd_cost_rel = sp(cost_dd, cost_dd + cost_ri)
   reliability = 100. - sp(len(internal_failures), len(tasks))
   percent_failures = sp(len(failures), len(tasks))
-  percent_two_tries = sp(len(two_tries), len(tasks))
 
 
   # Print results as a table.
@@ -278,8 +273,6 @@ def stats(tasks, show_cost):
         (reliability, len(internal_failures)))
   print('        Tasks failures: %-4d (%5.3f%%)' % (len(failures),
                                                     percent_failures))
-  print('        Retried:        %-4d (%5.3f%%)  (Upgraded an internal failure '
-        'to a successful task)' % (len(two_tries), percent_two_tries))
   print('        Pending  Total: %13s    Avg: %7s    Median: %7s  P99%%: %7s' %
         (pending_total, pending_avg, pending_med, pending_p99))
 

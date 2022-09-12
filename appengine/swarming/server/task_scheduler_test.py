@@ -129,7 +129,6 @@ def _run_result_to_to_run_key(run_result):
      the TaskRunResult.
   """
   return task_to_run.request_to_task_to_run_key(run_result.request_key.get(),
-                                                run_result.try_number,
                                                 run_result.current_task_slice)
 
 
@@ -437,7 +436,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual('localhost', run_result.bot_id)
     self.assertEqual(1, run_result.try_number)
     to_run_key = task_to_run.request_to_task_to_run_key(
-        run_result.request_key.get(), 1, 0)
+        run_result.request_key.get(), 0)
     self.assertIsNone(to_run_key.get().queue_number)
     self.assertIsNone(to_run_key.get().expiration_ts)
 
@@ -467,7 +466,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual('localhost', run_result.bot_id)
     self.assertEqual(1, run_result.try_number)
     to_run_key = task_to_run.request_to_task_to_run_key(
-        run_result.request_key.get(), 1, 0)
+        run_result.request_key.get(), 0)
     self.assertIsNone(to_run_key.get().queue_number)
     self.assertIsNone(to_run_key.get().expiration_ts)
 
@@ -572,7 +571,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self._register_bot(0, self.bot_dimensions)
     result_summary = self._quick_schedule(1)
     to_run_key = task_to_run.request_to_task_to_run_key(
-        result_summary.request_key.get(), 1, 0)
+        result_summary.request_key.get(), 0)
     self.assertTrue(to_run_key.get().queue_number)
     self.assertEqual(State.PENDING, result_summary.state)
     status = State.to_string(State.PENDING)
@@ -737,7 +736,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertIsNone(actual_request)
     self.assertIsNone(run_result)
     # It's effectively expired.
-    to_run_key = task_to_run.request_to_task_to_run_key(request, 1, 0)
+    to_run_key = task_to_run.request_to_task_to_run_key(request, 0)
     self.assertIsNone(to_run_key.get().queue_number)
     self.assertIsNone(to_run_key.get().expiration_ts)
     self.assertEqual(State.EXPIRED, result_summary.key.get().state)
@@ -822,7 +821,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
 
     with mock.patch('server.resultdb.finalize_invocation_async',
                     mock.Mock(side_effect=self.nop_async)) as mock_call:
-      to_run_key = task_to_run.request_to_task_to_run_key(request, 1, 0)
+      to_run_key = task_to_run.request_to_task_to_run_key(request, 0)
       self.mock_now(self.now, 60)
       task_scheduler._expire_task(to_run_key, request, True)
       mock_call.assert_called_once_with('1d69b9f088008911',
@@ -877,7 +876,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
                 wait_for_capacity=True),
         ])
     to_run_key = task_to_run.request_to_task_to_run_key(result_summary.request,
-                                                        1, 0)
+                                                        0)
 
     r_calls = []
 
@@ -1286,7 +1285,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         ],
         created_ts=created_ts or utils.utcnow())
     request = result_summary.request_key.get()
-    to_run_key = task_to_run.request_to_task_to_run_key(request, 1, 0)
+    to_run_key = task_to_run.request_to_task_to_run_key(request, 0)
     # TaskToRunShard was not stored.
     self.assertIsNone(to_run_key.get())
     # Bot can't reap.
@@ -1345,7 +1344,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         ])
     # The task was enqueued for execution.
     to_run_key = task_to_run.request_to_task_to_run_key(
-        result_summary.request_key.get(), 1, 0)
+        result_summary.request_key.get(), 0)
     self.assertTrue(to_run_key.get().queue_number)
 
   def test_task_idempotent_three(self):
@@ -1378,7 +1377,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         ])
     # The task was enqueued for execution.
     to_run_key = task_to_run.request_to_task_to_run_key(
-        result_summary.request_key.get(), 1, 0)
+        result_summary.request_key.get(), 0)
     self.assertTrue(to_run_key.get().queue_number)
 
   def test_task_idempotent_variable(self):
@@ -1434,10 +1433,10 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         ],
         created_ts=utils.utcnow() - datetime.timedelta(seconds=1))
     to_run_key = task_to_run.request_to_task_to_run_key(
-        result_summary.request_key.get(), 1, 0)
+        result_summary.request_key.get(), 0)
     self.assertIsNone(to_run_key.get())
     to_run_key = task_to_run.request_to_task_to_run_key(
-        result_summary.request_key.get(), 1, 1)
+        result_summary.request_key.get(), 1)
     self.assertIsNone(to_run_key.get())
     self.assertEqual(State.COMPLETED, result_summary.state)
     self.assertEqual(task_id, result_summary.deduped_from)
@@ -2170,7 +2169,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
             fields=_get_fields(status=status, http_status_code=200)).sum)
     # Make sure the TaskToRunShard is claimed.
     request = result_summary.request_key.get()
-    to_run_key = task_to_run.request_to_task_to_run_key(request, 1, 0)
+    to_run_key = task_to_run.request_to_task_to_run_key(request, 0)
     actual = task_to_run.Claim.check(to_run_key)
     self.assertEqual(True, actual)
 
@@ -2201,7 +2200,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
 
     # Make sure the TaskToRunShard is claimed.
     request = result_summary.request_key.get()
-    to_run_key = task_to_run.request_to_task_to_run_key(request, 1, 0)
+    to_run_key = task_to_run.request_to_task_to_run_key(request, 0)
     actual = task_to_run.Claim.check(to_run_key)
     self.assertEqual(True, actual)
 
@@ -2553,7 +2552,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
 
     # The first task slice should be expired.
     request = result_summary.request_key.get()
-    to_run_1 = task_to_run.request_to_task_to_run_key(request, 1, 0).get()
+    to_run_1 = task_to_run.request_to_task_to_run_key(request, 0).get()
     self.assertEqual(to_run_1.expiration_delay, 601 - 600)
 
   def test_cron_abort_expired_fallback_wait_for_capacity(self):
@@ -2601,7 +2600,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     abandoned_ts = self.mock_now(self.now, request.expiration_secs + 1)
 
     # set queue_number to None
-    to_run_key = task_to_run.request_to_task_to_run_key(request, 1, 0)
+    to_run_key = task_to_run.request_to_task_to_run_key(request, 0)
     to_run = to_run_key.get()
     to_run.queue_number = None
     to_run.put()
@@ -2644,12 +2643,11 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(1, len(pub_sub_calls))  # PENDING -> RUNNING
     request = run_result.request_key.get()
 
-    def is_claimed(t):
-      to_run_key = task_to_run.request_to_task_to_run_key(request, t, 0)
-      return task_to_run.Claim.check(to_run_key)
+    def is_claimed(key):
+      return task_to_run.Claim.check(key)
 
-    self.assertEqual(True, is_claimed(1))  # Was just reaped.
-    self.assertEqual(False, is_claimed(2))
+    key = task_to_run.request_to_task_to_run_key(request, 0)
+    self.assertEqual(True, is_claimed(key))  # Was just reaped.
 
     now_0 = self.now
     now_1 = self.mock_now(
@@ -2659,8 +2657,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
                      task_scheduler.cron_handle_bot_died())
     self.assertEqual(1, self.execute_tasks())
     self.assertEqual(2, len(pub_sub_calls))  # RUNNING -> COMPLETED
-    self.assertEqual(False, is_claimed(1))
-    self.assertEqual(False, is_claimed(2))
+    self.assertEqual(False, is_claimed(key))
     status = State.to_string(State.BOT_DIED)
     self.assertLessEqual(
         0,
@@ -2778,7 +2775,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         ])
     request = run_result.request_key.get()
     to_run_key = task_to_run.request_to_task_to_run_key(
-        run_result.request_key.get(), 1, 0)
+        run_result.request_key.get(), 0)
     now_1 = self.mock_now(
         self.now + datetime.timedelta(seconds=request.bot_ping_tolerance_secs),
         1)
@@ -2804,7 +2801,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         ])
     request = run_result.request_key.get()
     to_run_key_1 = task_to_run.request_to_task_to_run_key(
-        run_result.request_key.get(), 1, 0)
+        run_result.request_key.get(), 0)
     self.assertIsNone(to_run_key_1.get().queue_number)
     self.assertIsNone(to_run_key_1.get().expiration_ts)
 
@@ -3166,9 +3163,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(State.PENDING, result_summary.state)
     self.assertEqual(0, result_summary.current_task_slice)
 
-    # task_expire_tasks should expire the task.
-    try_number = 1
-    to_runs = [(result_summary.task_id, try_number, invalid_slice_index)]
+    to_runs = [(result_summary.task_id, invalid_slice_index)]
     expiration_secs = 1200
     self.mock_now(self.now, expiration_secs)
     task_scheduler.task_expire_tasks(to_runs)

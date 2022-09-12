@@ -667,8 +667,7 @@ class TasksApiTest(BaseTest):
             u'swarming.pool.template:none',
             u'swarming.pool.version:pools_cfg_rev',
             u'user:joe@localhost',
-        ],
-        try_number=u'1')
+        ])
     t_request = self.gen_request(
         created_ts=fmtdate(self.now),
         properties=self.gen_props(
@@ -1927,31 +1926,29 @@ class TasksApiTest(BaseTest):
     entity.modified_ts = now_120
     entity.put()
 
-    first = self.gen_result_summary(
-        bot_idle_since_ts=fmtdate(self.now),
-        completed_ts=fmtdate(self.now),
-        costs_usd=[0.1],
-        created_ts=fmtdate(self.now),
-        duration=0.1,
-        exit_code=u'0',
-        modified_ts=fmtdate(now_120),
-        name=u'first',
-        performance_stats=self.gen_perf_stats(),
-        started_ts=fmtdate(self.now),
-        tags=[
-            u'authenticated:user:user@example.com',
-            u'commit:post',
-            u'os:Amiga',
-            u'pool:default',
-            u'priority:20',
-            u'project:yay',
-            u'realm:none',
-            u'service_account:none',
-            u'swarming.pool.template:none',
-            u'swarming.pool.version:pools_cfg_rev',
-            u'user:joe@localhost',
-        ],
-        try_number=u'1')
+    first = self.gen_result_summary(bot_idle_since_ts=fmtdate(self.now),
+                                    completed_ts=fmtdate(self.now),
+                                    costs_usd=[0.1],
+                                    created_ts=fmtdate(self.now),
+                                    duration=0.1,
+                                    exit_code=u'0',
+                                    modified_ts=fmtdate(now_120),
+                                    name=u'first',
+                                    performance_stats=self.gen_perf_stats(),
+                                    started_ts=fmtdate(self.now),
+                                    tags=[
+                                        u'authenticated:user:user@example.com',
+                                        u'commit:post',
+                                        u'os:Amiga',
+                                        u'pool:default',
+                                        u'priority:20',
+                                        u'project:yay',
+                                        u'realm:none',
+                                        u'service_account:none',
+                                        u'swarming.pool.template:none',
+                                        u'swarming.pool.version:pools_cfg_rev',
+                                        u'user:joe@localhost',
+                                    ])
     deduped = self.gen_result_summary(
         bot_idle_since_ts=fmtdate(self.now),
         completed_ts=fmtdate(self.now),
@@ -2157,8 +2154,7 @@ class TaskApiTest(BaseTest):
             u'swarming.pool.template:none',
             u'swarming.pool.version:pools_cfg_rev',
             u'user:joe@localhost',
-        ],
-        try_number=u'1')
+        ])
     self.assertEqual(expected, self.client_get_results(task_id))
 
     # Denied if kill_running == False.
@@ -2203,8 +2199,7 @@ class TaskApiTest(BaseTest):
             u'swarming.pool.template:none',
             u'swarming.pool.version:pools_cfg_rev',
             u'user:joe@localhost',
-        ],
-        try_number=u'1')
+        ])
     self.assertEqual(expected, self.client_get_results(task_id))
 
     # Bot terminates the task.
@@ -2240,8 +2235,7 @@ class TaskApiTest(BaseTest):
             u'swarming.pool.template:none',
             u'swarming.pool.version:pools_cfg_rev',
             u'user:joe@localhost',
-        ],
-        try_number=u'1')
+        ])
     self.assertEqual(expected, self.client_get_results(task_id))
 
   def test_result_unknown(self):
