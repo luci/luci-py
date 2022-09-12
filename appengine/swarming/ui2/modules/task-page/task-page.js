@@ -1291,7 +1291,7 @@ window.customElements.define('task-page', class extends SwarmingAppBoilerplate {
     const leaseDurationEle = $$('#lease_duration').value;
     const leaseDuration = parseDuration(leaseDurationEle);
 
-    newTask.properties.command = ['python', '-c', `import os, sys, time
+    newTask.properties.command = ['python3', '-c', `import os, sys, time
 print('Mapping task: ${location.origin}/task?id=${this._taskId}')
 print('Files are mapped into: ' + os.getcwd())
 print('')
