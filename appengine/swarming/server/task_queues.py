@@ -49,12 +49,14 @@ Used to optimize scheduling.
     +----------------------+     +----------------------+
 """
 
+import collections
 import datetime
 import hashlib
 import json
 import logging
 import random
 import struct
+import time
 
 from google.appengine.api import datastore_errors
 from google.appengine.api import memcache
@@ -1361,6 +1363,207 @@ def _tq_rescan_matching_task_sets_async(bot_id, rescan_counter, rescan_reason):
   _ = rescan_counter
   _ = rescan_reason
   raise ndb.Return(True)
+
+
+### Some generic helpers.
+
+
+class _Logger(object):
+  """Prefixes a string and request duration to logged messages."""
+
+  def __init__(self, pfx, *args):
+    self._pfx = pfx % args
+    self._ts = time.time()
+
+  def derive(self, sfx, *args):
+    """Derives a new logger with prefix extended by the given message."""
+    logger = _Logger('%s: %s', self._pfx, sfx % args)
+    logger._ts = self._ts
+    return logger
+
+  def _log(self, lvl, msg, args):
+    lvl('[%.2fs] %s: %s', time.time() - self._ts, self._pfx, msg % args)
+    #print '[%.2fs] %s: %s' % (time.time() - self._ts, self._pfx, msg % args)
+
+  def info(self, msg, *args):
+    self._log(logging.info, msg, args)
+
+  def warning(self, msg, *args):
+    self._log(logging.warning, msg, args)
+
+  def error(self, msg, *args):
+    self._log(logging.error, msg, args)
+
+
+class _AsyncWorkQueue(object):
+  """A queue of work items with limits on concurrency.
+
+  Used internally by _map_async.
+  """
+
+  def __init__(self, producers):
+    """Creates a queue that accepts items from a number of producers.
+
+    Arguments:
+      producers: number of producers that would enqueue items. Each one is
+        expected to call done() when they are done. Once all producers are done,
+        the queue is not accepting new items. This eventually causes
+        consume_async tasklet to exit.
+    """
+    assert producers > 0
+    self._queue = collections.deque()
+    self._producers = producers
+    self._waiter = None
+
+  def _wakeup(self):
+    if self._waiter:
+      waiter, self._waiter = self._waiter, None
+      waiter.set_result(None)
+
+  def enqueue(self, items):
+    """Enqueues a batch of items to be processed.
+
+    Arguments:
+      items: an iterable of items, each one will eventually be passed to the
+        callback in `cb` which may decide to launch a tasklet to process this
+        item.
+    """
+    assert self._producers > 0
+    if items:
+      self._queue.extend(items)
+      self._wakeup()
+
+  def done(self):
+    """Must be called by a producer when they are done with the queue."""
+    assert self._producers > 0
+    self._producers -= 1
+    if not self._producers:
+      self._wakeup()
+
+  @ndb.tasklet
+  def consume_async(self, cb, max_concurrency):
+    """Runs a loop that dequeues items and calls the callback for each item.
+
+    See _map_async for expected behavior of the callback.
+
+    Returns:
+      True if all futures returned by the callback resolved into True.
+    """
+    ok = True
+    running = []
+    while self._producers or self._queue:
+      # While have stuff in the queue, keep launching and executing it.
+      while self._queue:
+        fut = cb(self._queue.popleft())
+        if not isinstance(fut, ndb.Future):
+          continue
+        running.append(fut)
+
+        # If running too much stuff, wait for some of it to finish. What we'd
+        # really like is ndb.Future.wait_any_async(running), but there's no
+        # async variant of wait_any in Python 2 ndb library (there's one in
+        # Python 3 ndb). So instead just wait for the oldest future to finish
+        # and then collect all the ones that finished during that time.
+        if len(running) >= max_concurrency:
+          yield running[0]
+          pending = []
+          for f in running:
+            if f.done():
+              ok = ok and f.get_result()
+            else:
+              pending.append(f)
+          running = pending
+
+      # If the queue is drained and there are no more producers, we are done.
+      if not self._producers:
+        break
+
+      # If the queue is drained, but there are producers, wait for more items
+      # to appear or when the last producer drops.
+      assert not self._waiter
+      self._waiter = ndb.Future()
+      yield self._waiter
+
+    # Wait for the completion of the rest of the items.
+    oks = yield running
+    raise ndb.Return(ok and all(oks))
+
+
+@ndb.tasklet
+def _map_async(queries,
+               cb,
+               max_concurrency=100,
+               page_size=1000,
+               timeout=300,
+               max_pages=None):
+  """Applies a callback to results of a bunch of queries.
+
+  This is roughly similar to ndb.Query.map_async, except it tries to make
+  progress on errors and timeouts and it limits number of concurrent tasklets
+  to avoid grinding to a halt when processing large sets.
+
+  Arguments:
+    queries: a list of (ndb.Query, _Logger) with queries to fetch results of.
+    cb: a callback that takes a fetched entity and optionally returns a future
+      to wait on. The future must resolve in a boolean, where True indicates
+      the item was processed successfully and False if the processing failed.
+      If the callback doesn't return a future, the item is assumed to be
+      processed successfully. The callback must not raise exceptions, they
+      will abort the whole thing. The callback may be called multiple times
+      with the same entity if this entity is returned by multiple queries.
+    max_concurrency: a limit on number of concurrently pending futures.
+    page_size: a page size for datastore queries.
+    timeout: how long (in seconds) to run the query loop before giving up.
+    max_pages: a limit on number of pages to fetch (mostly for tests).
+
+  Returns:
+    True if all queries finished to completion and all fetched items were
+    processed successfully.
+  """
+  queue = _AsyncWorkQueue(len(queries))
+
+  @ndb.tasklet
+  def scan(q, logger):
+    # For some reason queries that use has_next_async() API have a hard deadline
+    # of 60s regardless of query options. This is not enough for busy servers.
+    # Instead we'll use an explicitly paginated query.
+    try:
+      logger.info('scanning')
+      deadline = utils.time_time() + timeout
+      count = 0
+      pages = 0
+      cursor = None
+      more = True
+      while more:
+        rpc_deadline = deadline - utils.time_time()
+        if rpc_deadline < 0 or (max_pages and pages >= max_pages):
+          raise ndb.Return(False)
+        try:
+          page, cursor, more = yield q.fetch_page_async(page_size,
+                                                        start_cursor=cursor,
+                                                        deadline=rpc_deadline)
+          # Avoid favoring items that appear earlier in the page. It is
+          # important when _map_async is retried, e.g. as a part of TQ task
+          # retry. Gives some opportunity for tail items to be processed. Mostly
+          # useful for larger page sizes.
+          random.shuffle(page)
+          queue.enqueue(page)
+          count += len(page)
+          pages += 1
+        except (datastore_errors.BadRequestError, datastore_errors.Timeout):
+          logger.error('scan timed out, visited %d items', count)
+          raise ndb.Return(False)
+      logger.info('scan completed, visited %d items', count)
+      raise ndb.Return(True)
+    finally:
+      queue.done()
+
+  # Run scans that enqueue items into a queue, and in parallel consume items
+  # from this queue.
+  futs = [scan(q, logger) for q, logger in queries]
+  futs.append(queue.consume_async(cb, max_concurrency))
+  ok = yield futs
+  raise ndb.Return(all(ok))
 
 
 ### Public APIs.

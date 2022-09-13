@@ -7,6 +7,7 @@
 import datetime
 import logging
 import os
+import random
 import sys
 import unittest
 
@@ -889,6 +890,126 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
     task_queues.cron_tidy_bots()
     self.assert_count(0, task_queues.BotTaskDimensions)
     self.assertEqual([], task_queues._get_queues(bot_root_key))
+
+
+class TestMapAsync(test_env_handlers.AppTestBase):
+  # Page size in queries.
+  PAGE = 4
+
+  @staticmethod
+  def populate(bot_dims):
+    ndb.put_multi([
+        task_queues.BotDimensionsMatches(id=bot_id, dimensions=dims)
+        for bot_id, dims in bot_dims.items()
+    ])
+    return sorted(bot_dims.keys())
+
+  @staticmethod
+  def query(dim=None):
+    q = task_queues.BotDimensionsMatches.query()
+    if dim:
+      q = q.filter(task_queues.BotDimensionsMatches.dimensions == dim)
+    return q, task_queues._Logger('')
+
+  @staticmethod
+  def call(queries, cb, max_pages=None):
+    return task_queues._map_async(queries,
+                                  cb,
+                                  max_concurrency=3,
+                                  page_size=TestMapAsync.PAGE,
+                                  max_pages=max_pages).get_result()
+
+  def test_single_query_sync_cb(self):
+    seen = []
+
+    def cb(ent):
+      seen.append(ent.key.string_id())
+
+    bots = self.populate({'bot%d' % i: [] for i in range(10)})
+    self.assertTrue(self.call([self.query()], cb))
+    self.assertEqual(sorted(seen), bots)
+
+  def test_many_queries_sync_cb(self):
+    seen = []
+
+    def cb(ent):
+      seen.append(ent.key.string_id())
+
+    bots = []
+    bots.extend(self.populate({'bot1-%d' % i: ['k:v1'] for i in range(10)}))
+    bots.extend(self.populate({'bot2-%d' % i: ['k:v2'] for i in range(10)}))
+    bots.extend(self.populate({'bot3-%d' % i: ['k:v3'] for i in range(10)}))
+
+    queries = [self.query('k:v1'), self.query('k:v2'), self.query('k:v3')]
+    self.assertTrue(self.call(queries, cb))
+    self.assertEqual(sorted(seen), bots)
+
+  def test_single_query_async_cb(self):
+    seen = []
+
+    @ndb.tasklet
+    def cb(ent):
+      seen.append(ent.key.string_id())
+      yield ndb.sleep(random.uniform(0.0, 0.1))
+      raise ndb.Return(True)
+
+    bots = self.populate({'bot%d' % i: [] for i in range(10)})
+    self.assertTrue(self.call([self.query()], cb))
+    self.assertEqual(sorted(seen), bots)
+
+  def test_many_queries_async_cb(self):
+    seen = []
+
+    @ndb.tasklet
+    def cb(ent):
+      seen.append(ent.key.string_id())
+      yield ndb.sleep(random.uniform(0.0, 0.1))
+      raise ndb.Return(True)
+
+    bots = []
+    bots.extend(self.populate({'bot1-%d' % i: ['k:v1'] for i in range(10)}))
+    bots.extend(self.populate({'bot2-%d' % i: ['k:v2'] for i in range(10)}))
+    bots.extend(self.populate({'bot3-%d' % i: ['k:v3'] for i in range(10)}))
+
+    queries = [self.query('k:v1'), self.query('k:v2'), self.query('k:v3')]
+    self.assertTrue(self.call(queries, cb))
+    self.assertEqual(sorted(seen), bots)
+
+  def test_query_timeout(self):
+    seen = []
+
+    @ndb.tasklet
+    def cb(ent):
+      seen.append(ent.key.string_id())
+      yield ndb.sleep(random.uniform(0.0, 0.1))
+      raise ndb.Return(True)
+
+    b1 = self.populate({'b1-%d' % i: ['k:v1'] for i in range(self.PAGE * 2)})
+    b2 = self.populate({'b2-%d' % i: ['k:v2'] for i in range(self.PAGE * 2)})
+    b3 = self.populate({'b3-%d' % i: ['k:v3'] for i in range(self.PAGE * 3)})
+
+    queries = [self.query('k:v1'), self.query('k:v2'), self.query('k:v3')]
+    self.assertFalse(self.call(queries, cb, max_pages=2))
+
+    # The last page if k:v3 query is missing.
+    expected = []
+    expected.extend(b1)
+    expected.extend(b2)
+    expected.extend(b3[:self.PAGE * 2])
+    self.assertEqual(sorted(seen), expected)
+
+  def test_processing_error(self):
+    seen = []
+
+    @ndb.tasklet
+    def cb(ent):
+      seen.append(ent.key.string_id())
+      yield ndb.sleep(random.uniform(0.0, 0.1))
+      raise ndb.Return(ent.key.string_id() != 'bot5')
+
+    bots = self.populate({'bot%d' % i: [] for i in range(10)})
+    self.assertFalse(self.call([self.query()], cb))
+    self.assertEqual(sorted(seen), bots)
 
 
 if __name__ == '__main__':
