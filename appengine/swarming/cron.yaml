@@ -16,7 +16,7 @@ cron:
 
 - description: Removes unused 'dimensions sets' without active task flows.
   url: /internal/cron/cleanup/task_queues_tasks
-  schedule: every 10 minutes
+  schedule: every 1 minutes
   target: backend
 
 - description: Detaches bots from no longer active queues.
@@ -26,7 +26,7 @@ cron:
 
 - description: Removes expired task dimension sets from the datastore.
   url: /internal/cron/cleanup/task_dimension_sets
-  schedule: every 10 minutes
+  schedule: every 1 minutes
   target: backend
 
 - description: Delete old TaskRequest
