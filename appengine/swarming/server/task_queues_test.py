@@ -50,8 +50,8 @@ def _assert_bot(bot_id=u'bot1', dimensions=None):
       None,
       register_dimensions=True)
   bot_root_key = bot_management.get_root_key(bot_id)
-  return task_queues._assert_bot_async(bot_root_key,
-                                       bot_dimensions).get_result()
+  return task_queues._assert_bot_old_async(bot_root_key,
+                                           bot_dimensions).get_result()
 
 
 def _gen_properties(**kwargs):
