@@ -206,7 +206,7 @@ def api_routes(api_classes, base_path='/_ah/api', regex='[^/]+'):
   return routes
 
 
-def api_server(api_classes, base_path='/_ah/api', regex='[^/]+'):
+def api_server(api_classes, base_path='/_ah/api', regex='[^/]+', debug=False):
   """Creates a webapp2 application for the given Endpoints v1 services.
 
   A shortcut for webapp2.WSGIApplication(api_routes(...)), which exists to
@@ -217,11 +217,13 @@ def api_server(api_classes, base_path='/_ah/api', regex='[^/]+'):
     base_path: The base path under which all service paths should exist. If
       unspecified, defaults to /_ah/api.
     regex: Regular expression to allow in path parameters.
+    debug: if True, send stack traces in error responses.
 
   Returns:
     A webapp2.WSGIApplication.
   """
-  return webapp2.WSGIApplication(api_routes(api_classes, base_path, regex))
+  return webapp2.WSGIApplication(api_routes(api_classes, base_path, regex),
+                                 debug=debug)
 
 
 def discovery_handler_factory(api_classes, base_path):

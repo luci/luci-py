@@ -202,7 +202,7 @@ class Endpoints(object):
   def __init__(self, api_service_cls, regex=None, source_ip='127.0.0.1'):
     super(Endpoints, self).__init__()
     self._api_service_cls = api_service_cls
-    kwargs = {}
+    kwargs = {'debug': True}
     if regex:
       kwargs['regex'] = regex
     self._api_app = webtest.TestApp(
