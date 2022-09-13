@@ -863,6 +863,7 @@ describe('task-list', function() {
             'c=pending_time&c=duration&c=bot&c=pool-tag&c=state&d=desc&et=1545237981000&' +
             'f=pool-tag%3AChrome&f=state%3ACOMPLETED_FAILURE&k=&n=true&s=completed_ts&' +
             'st=1545151583000&v=false');
+
         done();
       });
     });
@@ -878,6 +879,7 @@ describe('task-list', function() {
 
         expect(link.href).toContain('/botlist?c=id&c=os&c=task&c=status&c=device_type' +
                                     '&f=device_type%3Anemo');
+
         done();
       });
     });
@@ -1146,6 +1148,12 @@ describe('task-list', function() {
       actualIds = filtered.map((task) => task.task_id);
       expect(actualIds).toContain('41dfa79d3bf29010');
       expect(actualIds).toContain('41df677202f20310');
+
+      filtered = filterTasks(['state:DEDUPED'], tasks);
+      expect(filtered).toHaveSize(2);
+      actualIds = filtered.map((task) => task.task_id);
+      expect(actualIds).toContain('41e0284bc3ef4f10');
+      expect(actualIds).toContain('41e0284bf01aef10');
     });
 
     it('correctly makes query params from filters', function() {

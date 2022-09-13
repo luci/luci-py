@@ -151,9 +151,8 @@ export const specialFilters = {
     if (s === 'COMPLETED_FAILURE') {
       return state === 'COMPLETED' && failure;
     }
-    const tryNum = task.try_number;
     if (s === 'DEDUPED') {
-      return state === 'COMPLETED' && tryNum === '0';
+      return state === 'COMPLETED' && task.deduped_from;
     }
   },
 };
@@ -180,17 +179,16 @@ export function filterTasks(filters, tasks) {
     for (const filter of parsedFilters) {
       let [key, value] = filter;
       if (specialFilters[key]) {
-        matches &= specialFilters[key](task, value);
+        matches = matches && specialFilters[key](task, value);
       } else {
         key = stripTag(key);
         // it's a tag,  which is *not* aliased, so we can just
         // do an exact match (reminder, aliasing only happens in column)
-        matches &= ((task.tagMap[key] || []).indexOf(value) !== -1);
+        matches = matches && ((task.tagMap[key] || []).indexOf(value) !== -1);
       }
     }
     return matches;
   });
-  return tasks;
 }
 
 /** floorSecond rounds the timestamp down to the second (i.e. removes milliseconds).
@@ -580,7 +578,7 @@ const colMap = {
       if (task.failure) {
         return 'COMPLETED (FAILURE)';
       }
-      if (task.try_number === '0') {
+      if (task.deduped_from) {
         return 'COMPLETED (DEDUPED)';
       }
       return 'COMPLETED (SUCCESS)';

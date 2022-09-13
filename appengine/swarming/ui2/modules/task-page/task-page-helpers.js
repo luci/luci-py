@@ -155,11 +155,6 @@ export function parseResult(result) {
     sanitizeAndHumanizeTime(result, time);
   });
 
-  // In the JSON, this is a string
-  if (result.try_number) {
-    result.try_number = +result.try_number;
-  }
-
   const now = new Date();
   // Running and bot_died tasks have no duration set, so we can figure it out.
   if (!result.duration && result.state === 'RUNNING' && result.started_ts) {
@@ -295,7 +290,7 @@ export function taskInfoClass(ele, result) {
 /** wasDeduped returns true or false depending on if this task was de-duped.
  */
 export function wasDeduped(result) {
-  return result.try_number === 0;
+  return result.deduped_from;
 }
 
 /** wasPickedUp returns true iff a task was started.

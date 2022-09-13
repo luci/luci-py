@@ -130,32 +130,6 @@ const idAndButtons = (ele) => {
 </div>`;
 };
 
-const taskDisambiguation = (ele, result) => {
-  // Only tasks with id ending in 0 can be summaries
-  if (!ele._taskId || ele._notFound || !ele._taskId.endsWith('0')) {
-    return '';
-  }
-  // This is the most frequent case - no automatic retry
-  // or task was deduped/expired
-  if (result.try_number === 1 || !result.try_number) {
-    return '';
-  }
-  return html`
-<h2>Displaying a summary for a task with multiple tries</h2>
-<table class=task-disambiguation>
-  <thead>
-    <tr>
-      <th>Try ID</th>
-      <th>Bot ID</th>
-      <th>Status</th>
-    </tr>
-  </thead>
-  <tbody>
-    ${ele._extraTries.map(taskRow)}
-  </tbody>
-</table>`;
-};
-
 const taskRow = (result, idx) => {
   if (!result.task_id) {
     return html`<tr><td>&lt;loading&gt;</td><td></td><td></td></tr>`;
@@ -823,10 +797,6 @@ const taskExecutionSection = (ele, request, result, currentSlice) => {
     <td>${result.exit_code}</td>
   </tr>
   <tr>
-    <td>Try Number</td>
-    <td>${result.try_number}</td>
-  </tr>
-  <tr>
     <td>Failure</td>
     <td class=${result.failure ? 'failed_task': ''}>${!!result.failure}</td>
   </tr>
@@ -1072,7 +1042,6 @@ const template = (ele) => html`
       Task not found
     </h2>
 
-    ${taskDisambiguation(ele, ele._result)}
 
     ${slicePicker(ele)}
 
@@ -1370,12 +1339,6 @@ time.sleep(${leaseDuration})`];
         .then(jsonOrThrow)
         .then((json) => {
           this._result = parseResult(json);
-          if (this._result.try_number > 1) {
-            this._extraTries[this._result.try_number - 1] = this._result;
-            // put placeholder objects in the rest
-            this._extraTries.fill({}, 0, this._result.try_number - 1);
-            this._fetchExtraTries(this._taskId, this._result.try_number - 1, extra);
-          }
           currIdx = +this._result.current_task_slice;
           this._setSlice(currIdx); // calls render
           this.app.finishedTask();

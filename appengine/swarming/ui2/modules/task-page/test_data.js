@@ -183,7 +183,6 @@ export const taskResults = [
     'user': '',
     'bot_id': 'gce-trusty-e833d7b0-us-east1-b-s2c5',
     'current_task_slice': '0',
-    'try_number': '3',
     'started_ts': '2019-02-04T16:05:49.489858',
   },
   {
@@ -441,7 +440,6 @@ export const taskResults = [
         'key': 'zone',
       },
     ],
-    'try_number': '1',
     'current_task_slice': '1',
     'costs_usd': [
       0.5054023369562476,
@@ -653,7 +651,6 @@ export const taskResults = [
         'key': 'zone',
       },
     ],
-    'try_number': '0',
     'current_task_slice': '0',
     'bot_id': 'build20-b3',
   },
