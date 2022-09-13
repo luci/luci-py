@@ -94,10 +94,16 @@ class BotApiTest(test_env_handlers.AppTestBase):
     self.fail(url)
 
   @ndb.non_transactional
-  def _enqueue_task_async(self, url, queue_name, **kwargs):
+  def _enqueue_task_async(self, url, queue_name, payload, transactional=False):
     if queue_name == 'rebuild-task-cache':
-      # Call directly into it.
-      return task_queues.rebuild_task_cache_async(kwargs['payload'])
+      self.assertFalse(transactional)
+      return task_queues.rebuild_task_cache_async(payload)
+    if queue_name == 'rescan-matching-task-sets':
+      self.assertTrue(transactional)
+      return task_queues.rescan_matching_task_sets_async(payload)
+    if queue_name == 'update-bot-matches':
+      self.assertTrue(transactional)
+      return task_queues.update_bot_matches_async(payload)
     self.fail(url)
 
   def mock_bot_group_config(self, **kwargs):

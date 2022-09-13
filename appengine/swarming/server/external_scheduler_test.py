@@ -302,7 +302,7 @@ class ExternalSchedulerApiTestBatchMode(test_env_handlers.AppTestBase):
   def test_notify_request_with_tq_batch_mode(self):
     request = _gen_request()
     result_summary = task_scheduler.schedule_request(request)
-    self.assertEqual(1, self.execute_tasks())
+    self.execute_tasks()
 
     # Create requests with different scheduler IDs.
     external_scheduler.notify_requests(
@@ -342,7 +342,7 @@ class ExternalSchedulerApiTestBatchMode(test_env_handlers.AppTestBase):
     request = _gen_request()
     result_summary = task_scheduler.schedule_request(request)
     self.cfg.enable_batch_es_notifications = True
-    self.assertEqual(1, self.execute_tasks())
+    self.execute_tasks()
 
     self._setup_client()
     # Since use_tq is false, the requests below should be sent out immediately.

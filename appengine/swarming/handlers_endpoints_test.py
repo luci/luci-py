@@ -112,9 +112,16 @@ class BaseTest(test_env_handlers.AppTestBase, test_case.EndpointsTestCase):
     self.fail(url)
 
   @ndb.non_transactional
-  def _enqueue_task_async(self, url, queue_name, payload):
+  def _enqueue_task_async(self, url, queue_name, payload, transactional=False):
     if queue_name == 'rebuild-task-cache':
+      self.assertFalse(transactional)
       return task_queues.rebuild_task_cache_async(payload)
+    if queue_name == 'rescan-matching-task-sets':
+      self.assertTrue(transactional)
+      return task_queues.rescan_matching_task_sets_async(payload)
+    if queue_name == 'update-bot-matches':
+      self.assertTrue(transactional)
+      return task_queues.update_bot_matches_async(payload)
     self.fail(url)
 
 

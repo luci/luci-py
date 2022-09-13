@@ -143,13 +143,20 @@ class TaskBackendAPIServiceTest(test_env_handlers.AppTestBase):
     self.mock(utils, 'enqueue_task', mocked_enqueue_task)
 
   def _mock_enqueue_task_async(self):
-
-    def mocked_enqueue_task_async(url, queue_name, payload):
+    @ndb.non_transactional
+    def enqueue_async(url, queue_name, payload, transactional=False):
       if queue_name == 'rebuild-task-cache':
+        self.assertFalse(transactional)
         return task_queues.rebuild_task_cache_async(payload)
+      if queue_name == 'rescan-matching-task-sets':
+        self.assertTrue(transactional)
+        return task_queues.rescan_matching_task_sets_async(payload)
+      if queue_name == 'update-bot-matches':
+        self.assertTrue(transactional)
+        return task_queues.update_bot_matches_async(payload)
       self.fail(url)
 
-    self.mock(utils, 'enqueue_task_async', mocked_enqueue_task_async)
+    self.mock(utils, 'enqueue_task_async', enqueue_async)
 
   # Tests
   def test_run_task(self):
@@ -548,9 +555,16 @@ class PRPCTest(test_env_handlers.AppTestBase):
     return False
 
   @ndb.non_transactional
-  def _enqueue_task_async(self, url, queue_name, payload):
+  def _enqueue_task_async(self, url, queue_name, payload, transactional=False):
     if queue_name == 'rebuild-task-cache':
+      self.assertFalse(transactional)
       return task_queues.rebuild_task_cache_async(payload)
+    if queue_name == 'rescan-matching-task-sets':
+      self.assertTrue(transactional)
+      return task_queues.rescan_matching_task_sets_async(payload)
+    if queue_name == 'update-bot-matches':
+      self.assertTrue(transactional)
+      return task_queues.update_bot_matches_async(payload)
     self.fail(url)
 
   def _test_bot_events_simple(self, request):
