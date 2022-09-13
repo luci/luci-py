@@ -37,6 +37,16 @@ queue:
   bucket_size: 100
   rate: 500/s
 
+# /internal/taskqueue/important/task_queues/update-bot-matches
+- name: update-bot-matches
+  bucket_size: 100
+  rate: 500/s
+
+# /internal/taskqueue/important/task_queues/rescan-matching-task-sets
+- name: rescan-matching-task-sets
+  bucket_size: 100
+  rate: 500/s
+
 # /internal/taskqueue/monitoring/bq/tasks/requests/<timestamp:\d{4}-\d\d-\d\dT\d\d:\d\d>
 - name: monitoring-bq-tasks-requests
   rate: 10/s

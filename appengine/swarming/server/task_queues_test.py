@@ -891,6 +891,18 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
     self.assert_count(0, task_queues.BotTaskDimensions)
     self.assertEqual([], task_queues._get_queues(bot_root_key))
 
+  def test_update_bot_matches_async(self):
+    # Tested as a part of the overall workflow.
+    pass
+
+  def test_rescan_matching_task_sets_async(self):
+    # Tested as a part of the overall workflow.
+    pass
+
+  def test_tidy_task_dimension_sets_async(self):
+    # TODO: Write a test.
+    pass
+
 
 class TestMapAsync(test_env_handlers.AppTestBase):
   # Page size in queries.

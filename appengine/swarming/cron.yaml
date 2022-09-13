@@ -24,6 +24,11 @@ cron:
   schedule: every 10 minutes
   target: backend
 
+- description: Removes expired task dimension sets from the datastore.
+  url: /internal/cron/cleanup/task_dimension_sets
+  schedule: every 10 minutes
+  target: backend
+
 - description: Delete old TaskRequest
   url: /internal/cron/cleanup/tasks/delete_old
   schedule: every 10 minutes synchronized

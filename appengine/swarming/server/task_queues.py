@@ -1881,3 +1881,35 @@ def cron_tidy_tasks():
 def cron_tidy_bots():
   """Removes stale BotTaskDimensions."""
   _tidy_stale_BotTaskDimensions().get_result()
+
+
+def update_bot_matches_async(payload):
+  """Assigns new task dimension set to matching bots.
+
+  Task queue task handler, part of assert_task_async(...) implementation.
+  """
+  logging.info('TQ task payload:\n%s', payload)
+  payload = json.loads(payload)
+  return _tq_update_bot_matches_async(
+      payload['task_sets_id'], payload['dimensions'],
+      utils.parse_datetime(payload['enqueued_ts']))
+
+
+def rescan_matching_task_sets_async(payload):
+  """A task queue task that finds all matching TaskDimensionsSets for a bot."""
+  logging.info('TQ task payload:\n%s', payload)
+  payload = json.loads(payload)
+  return _tq_rescan_matching_task_sets_async(payload['bot_id'],
+                                             payload['rescan_counter'],
+                                             payload['rescan_reason'])
+
+
+@ndb.tasklet
+def tidy_task_dimension_sets_async():
+  """Removes expired task dimension sets from the datastore.
+
+  Returns:
+    True if cleaned up everything, False if something failed.
+  """
+  # TODO: implement
+  raise ndb.Return(True)

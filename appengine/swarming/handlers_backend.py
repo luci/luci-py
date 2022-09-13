@@ -82,6 +82,15 @@ class CronTidyTaskQueuesBots(_CronHandlerBase):
     task_queues.cron_tidy_bots()
 
 
+class CronTidyTaskDimensionSets(_CronHandlerBase):
+  """Removes expired task dimension sets from the datastore."""
+
+  def run_cron(self):
+    f = task_queues.tidy_task_dimension_sets_async()
+    if not f.get_result():
+      self.response.set_status(429, 'Need to retry')
+
+
 class CronUpdateBotInfoComposite(_CronHandlerBase):
   """Updates BotInfo.composite if needed, e.g. the bot became dead because it
   hasn't pinged for a while.
@@ -289,6 +298,26 @@ class TaskDimensionsHandler(webapp2.RequestHandler):
       self.response.set_status(429, 'Need to retry')
 
 
+class TaskUpdateBotMatchesHandler(webapp2.RequestHandler):
+  """Assigns new task queues to existing bots."""
+
+  @decorators.require_taskqueue('update-bot-matches')
+  def post(self):
+    f = task_queues.update_bot_matches_async(self.request.body)
+    if not f.get_result():
+      self.response.set_status(429, 'Need to retry')
+
+
+class TaskRescanMatchingTaskSetsHandler(webapp2.RequestHandler):
+  """A task queue task that finds all matching TaskDimensionsSets for a bot."""
+
+  @decorators.require_taskqueue('rescan-matching-task-sets')
+  def post(self):
+    f = task_queues.rescan_matching_task_sets_async(self.request.body)
+    if not f.get_result():
+      self.response.set_status(429, 'Need to retry')
+
+
 class TaskSendPubSubMessage(webapp2.RequestHandler):
   """Sends PubSub notification about task completion."""
 
@@ -401,6 +430,7 @@ def get_routes():
        CronAbortExpiredShardToRunHandler),
       ('/internal/cron/cleanup/task_queues_tasks', CronTidyTaskQueuesTasks),
       ('/internal/cron/cleanup/task_queues_bots', CronTidyTaskQueuesBots),
+      ('/internal/cron/cleanup/task_dimension_sets', CronTidyTaskDimensionSets),
       ('/internal/cron/monitoring/bots/update_bot_info',
        CronUpdateBotInfoComposite),
       ('/internal/cron/cleanup/bots/delete_old', CronDeleteOldBots),
@@ -434,6 +464,10 @@ def get_routes():
       ('/internal/taskqueue/cleanup/tasks/delete', TaskDeleteTasksHandler),
       ('/internal/taskqueue/important/task_queues/rebuild-cache',
        TaskDimensionsHandler),
+      ('/internal/taskqueue/important/task_queues/update-bot-matches',
+       TaskUpdateBotMatchesHandler),
+      ('/internal/taskqueue/important/task_queues/rescan-matching-task-sets',
+       TaskRescanMatchingTaskSetsHandler),
       (r'/internal/taskqueue/important/pubsub/notify-task/<task_id:[0-9a-f]+>',
        TaskSendPubSubMessage),
       (r'/internal/taskqueue/important/buildbucket/notify-task/'
