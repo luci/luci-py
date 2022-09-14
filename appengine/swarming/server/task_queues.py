@@ -61,6 +61,7 @@ import time
 from google.appengine.api import datastore_errors
 from google.appengine.api import memcache
 from google.appengine.ext import ndb
+from google.appengine.runtime import apiproxy_errors
 
 from components import datastore_utils
 from components import utils
@@ -1228,6 +1229,90 @@ class BotDimensionsMatches(ndb.Model):
   last_addition_ts = ndb.DateTimeProperty(indexed=False)
 
 
+def _sets_to_expiry_map(sets):
+  """Constructs a mapping of task dimension tuples to their expiry time.
+
+  Arguments:
+    sets: a value of `TaskDimensionsInfo.sets` entity property. In particular,
+      `expiry` in dicts is populated.
+
+  Returns:
+    A dict {tuple(task dimensions list) => expiry datetime.datetime}
+  """
+  return {
+      tuple(s['dimensions']): utils.timestamp_to_datetime(s['expiry'] * 1e6)
+      for s in sets
+  }
+
+
+def _expiry_map_to_sets(expiry_map, with_expiry=True):
+  """Converts an expiry map back into a list that can be stored in `sets`.
+
+  Reverse of _sets_to_expiry_map(...). Optionally drops the expiry time for
+  storing `sets` in TaskDimensionsSets.
+
+  Arguments:
+    expiry_map: a {tuple(task dimensions list) => datetime.datetime}.
+    with_expiry: if True, populate `expiry` field in the result.
+
+  Returns:
+    A list with dicts, can be stored in `sets` entity property.
+  """
+  sets = []
+  for dims, exp in sorted(expiry_map.items()):
+    d = {'dimensions': dims}
+    if with_expiry:
+      d['expiry'] = int(utils.datetime_to_timestamp(exp) / 1e6)
+    sets.append(d)
+  return sets
+
+
+def _put_task_dimensions_sets_async(sets_id, expiry_map):
+  """Puts TaskDimensionsSets and TaskDimensionsInfo entities.
+
+  Must be called in a transaction to make sure both entities stay in sync.
+
+  Arguments:
+    sets_id: string ID of TaskDimensionsSets to store under.
+    expiry_map: an expiry map to store there, must not be empty.
+  """
+  assert ndb.in_transaction()
+  assert expiry_map
+
+  sets_key = ndb.Key(TaskDimensionsSets, sets_id)
+  info_key = ndb.Key(TaskDimensionsInfo, 1, parent=sets_key)
+
+  # Schedule a cleanup a little bit past the expiry of the entry that expires
+  # first (to clean it up). Mostly to avoid hitting weird edge cases related
+  # to not perfectly synchronized clocks.
+  next_cleanup_ts = min(expiry_map.values()) + datetime.timedelta(minutes=5)
+
+  return ndb.put_multi_async([
+      TaskDimensionsSets(key=sets_key,
+                         sets=_expiry_map_to_sets(expiry_map,
+                                                  with_expiry=False)),
+      TaskDimensionsInfo(
+          key=info_key,
+          sets=_expiry_map_to_sets(expiry_map, with_expiry=True),
+          next_cleanup_ts=next_cleanup_ts,
+      ),
+  ])
+
+
+def _delete_task_dimensions_sets_async(sets_id):
+  """Deletes TaskDimensionsSets and TaskDimensionsInfo entities.
+
+  Must be called in a transaction to make sure both entities stay in sync.
+
+  Arguments:
+    sets_id: string ID of TaskDimensionsSets to delete.
+  """
+  assert ndb.in_transaction()
+  sets_key = ndb.Key(TaskDimensionsSets, sets_id)
+  info_key = ndb.Key(TaskDimensionsInfo, 1, parent=sets_key)
+  return ndb.delete_multi_async([sets_key, info_key])
+
+
 @ndb.tasklet
 def _assert_task_dimensions_async(task_dimensions, exp_ts):
   """Ensures there's corresponding TaskDimensionsSets stored in the datastore.
@@ -1285,7 +1370,7 @@ def _tq_update_bot_matches_async(task_sets_id, task_sets_dims, enqueued_ts):
 
 @ndb.tasklet
 def _cleanup_task_dimensions_async(dims_info, log):
-  """Removes stale dimensions sets from a TaskDimensions[Sets|Info] entity.
+  """Removes stale dimensions sets from a TaskDimensions[Sets|Info] entities.
 
   Deletes entities entirely if all sets there are stale. Called as part of the
   cleanup cron.
@@ -1297,14 +1382,38 @@ def _cleanup_task_dimensions_async(dims_info, log):
   Returns:
     True if cleaned up, False if already clean or gone.
   """
-  # TODO:
-  #
-  # Scan for suspect entities based on next_cleanup_ts. Transactionally update
-  # TaskDimensionsSets and TaskDimensionsInfo (perhaps deleting them if the have
-  # no more `sets`). No bots unmatching! It happens lazily when bot poll.
-  _ = dims_info
-  _ = log
-  raise ndb.Return(True)
+  now = utils.utcnow()
+  sets_id = dims_info.key.parent().string_id()
+
+  # Confirm we have something to cleanup before opening a transaction.
+  expiry_map = _sets_to_expiry_map(dims_info.sets)
+  if all(expiry >= now for expiry in expiry_map.values()):
+    raise ndb.Return(False)
+
+  @ndb.tasklet
+  def txn():
+    txn_ent = yield dims_info.key.get_async()
+    if not txn_ent:
+      raise ndb.Return(False)
+    expiry_map = _sets_to_expiry_map(txn_ent.sets)
+
+    changed = False
+    for dims, expiry in expiry_map.items():
+      if expiry < now:
+        log.info('%s: dropping %s, expired at %s', sets_id, dims, expiry)
+        expiry_map.pop(dims)
+        changed = True
+
+    if changed:
+      if not expiry_map:
+        yield _delete_task_dimensions_sets_async(sets_id)
+      else:
+        yield _put_task_dimensions_sets_async(sets_id, expiry_map)
+
+    raise ndb.Return(changed)
+
+  changed = yield datastore_utils.transaction_async(txn, retries=3)
+  raise ndb.Return(changed)
 
 
 @ndb.tasklet
@@ -1911,5 +2020,30 @@ def tidy_task_dimension_sets_async():
   Returns:
     True if cleaned up everything, False if something failed.
   """
-  # TODO: implement
-  raise ndb.Return(True)
+  log = _Logger('tidy_task_dims')
+
+  updated = []
+
+  @ndb.tasklet
+  def cleanup_async(dim_info):
+    sets_id = dim_info.key.parent().string_id()
+    try:
+      cleaned = yield _cleanup_task_dimensions_async(dim_info, log)
+      if cleaned:
+        updated.append(sets_id)
+      raise ndb.Return(True)
+    except (apiproxy_errors.DeadlineExceededError, datastore_utils.CommitError):
+      log.warning('error cleaning %s', sets_id)
+      raise ndb.Return(False)
+
+  q = TaskDimensionsInfo.query(
+      TaskDimensionsInfo.next_cleanup_ts < utils.utcnow())
+  ok = yield _map_async([(q, log)], cleanup_async)
+  log.info('cleaned %d', len(updated))
+
+  # Retry the whole thing if something failed or the query timed out. This is
+  # faster than waiting for the next cron tick. Will also give some monitoring
+  # signal.
+  if not ok:
+    log.error('need a retry')
+  raise ndb.Return(ok)

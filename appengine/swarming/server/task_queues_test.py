@@ -888,6 +888,29 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
     self.assert_count(0, task_queues.BotTaskDimensions)
     self.assertEqual([], task_queues._get_queues(bot_root_key))
 
+  def test_expiry_map(self):
+    sets = [
+        {
+            'dimensions': ('a:b', 'a:c'),
+            'expiry': 1663040000
+        },
+        {
+            'dimensions': ('a:d', 'a:e'),
+            'expiry': 1663041111
+        },
+    ]
+    expiry_map = task_queues._sets_to_expiry_map(sets)
+    self.assertEqual(sets, task_queues._expiry_map_to_sets(expiry_map))
+    without_ts = task_queues._expiry_map_to_sets(expiry_map, False)
+    self.assertEqual([
+        {
+            'dimensions': ('a:b', 'a:c')
+        },
+        {
+            'dimensions': ('a:d', 'a:e')
+        },
+    ], without_ts)
+
   def test_update_bot_matches_async(self):
     # Tested as a part of the overall workflow.
     pass
@@ -897,8 +920,73 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
     pass
 
   def test_tidy_task_dimension_sets_async(self):
-    # TODO: Write a test.
-    pass
+    now = datetime.datetime(2010, 1, 2, 3, 4, 5)
+
+    # Use a transaction to be able to use _put_task_dimensions_sets_async that
+    # has an assert inside. We don't really care about atomicity here.
+    @ndb.transactional_tasklet(xg=True)
+    def prep():
+      # Fully survives the cleanup.
+      yield task_queues._put_task_dimensions_sets_async(
+          'set0', {
+              ('0:a', ): now + datetime.timedelta(hours=2),
+              ('0:b', ): now + datetime.timedelta(hours=2),
+          })
+      # Partially survives the cleanup.
+      yield task_queues._put_task_dimensions_sets_async(
+          'set1', {
+              ('1:a', ): now + datetime.timedelta(hours=1),
+              ('1:b', ): now + datetime.timedelta(hours=2),
+          })
+      # Doesn't survive the cleanup.
+      yield task_queues._put_task_dimensions_sets_async(
+          'set2', {
+              ('2:a', ): now + datetime.timedelta(hours=1),
+              ('2:b', ): now + datetime.timedelta(hours=1),
+          })
+
+    prep().get_result()
+
+    self.mock_now(now + datetime.timedelta(hours=1.5))
+    self.assertTrue(task_queues.tidy_task_dimension_sets_async().get_result())
+
+    def fetch(sets_id):
+      sets_key = ndb.Key(task_queues.TaskDimensionsSets, sets_id)
+      info_key = ndb.Key(task_queues.TaskDimensionsInfo, 1, parent=sets_key)
+      sets, info = ndb.get_multi([sets_key, info_key])
+      if not sets:
+        # Both must be missing at the same time.
+        self.assertIsNone(info)
+        return None
+      self.assertIsNotNone(info)
+      # Must contain same sets (sans `expiry`).
+      expless = [{'dimensions': s['dimensions']} for s in info.sets]
+      self.assertEqual(sets.sets, expless)
+      return task_queues._sets_to_expiry_map(info.sets)
+
+    # Fully survived.
+    self.assertEqual(
+        fetch('set0'), {
+            ('0:a', ): now + datetime.timedelta(hours=2),
+            ('0:b', ): now + datetime.timedelta(hours=2),
+        })
+    # Partially survived.
+    self.assertEqual(fetch('set1'), {
+        ('1:b', ): now + datetime.timedelta(hours=2),
+    })
+    # Fully gone.
+    self.assertIsNone(fetch('set2'))
+
+    # Noop run for code coverage.
+    self.assertTrue(task_queues.tidy_task_dimension_sets_async().get_result())
+
+    # Full cleanup.
+    self.mock_now(now + datetime.timedelta(hours=2, minutes=6))
+    self.assertTrue(task_queues.tidy_task_dimension_sets_async().get_result())
+
+    # All gone now.
+    self.assertIsNone(fetch('set0'))
+    self.assertIsNone(fetch('set1'))
 
 
 class TestMapAsync(test_env_handlers.AppTestBase):
