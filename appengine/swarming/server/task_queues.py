@@ -2000,6 +2000,14 @@ def assert_task_async(request):
   worst. This only occurs on new kind of requests, which is not that often in
   practice.
   """
+  # Ignore errors for now, the result of this call is not used in production.
+  @ndb.tasklet
+  def assert_task_dims_async(dims, exp_ts):
+    try:
+      yield _assert_task_dimensions_async(dims, exp_ts)
+    except (apiproxy_errors.DeadlineExceededError, datastore_utils.CommitError):
+      logging.error('_assert_task_dimensions_async error, ignoring')
+
   # Note that TaskRequest may not be stored in the datastore yet, but it is
   # fully populated at this point.
   exp_ts = request.created_ts
@@ -2011,8 +2019,7 @@ def assert_task_async(request):
     # for real, the new one just used to pre-fill entities before the switch
     # to use it for real.
     futures.append(_assert_task_props_old_async(t.properties, exp_ts))
-    futures.append(
-        _assert_task_dimensions_async(t.properties.dimensions, exp_ts))
+    futures.append(assert_task_dims_async(t.properties.dimensions, exp_ts))
   yield futures
 
 
@@ -2183,6 +2190,7 @@ class BackfillStats(object):
     self.added = 0
     self.updated = 0
     self.untouched = 0
+    self.failures = 0
     self.noop_txns = 0
 
 
@@ -2191,7 +2199,7 @@ def backfill_task_sets_async(stats=None):
   """Backfills TaskDimensionsSets based on TaskDimensions."""
   log = _Logger('backfill')
 
-  # Stats: added, updated, untouched, noop txns.
+  # Stats: added, updated, untouched, noop txns, failures.
   stats = stats or BackfillStats()
 
   @ndb.tasklet
@@ -2251,7 +2259,13 @@ def backfill_task_sets_async(stats=None):
         yield _put_task_dimensions_sets_async(sets_id, new_expiry_map)
       raise ndb.Return((changed, missing))
 
-    changed, missing = yield datastore_utils.transaction_async(txn, retries=3)
+    try:
+      changed, missing = yield datastore_utils.transaction_async(txn, retries=3)
+    except (apiproxy_errors.DeadlineExceededError, datastore_utils.CommitError):
+      log.warning('error processing %s', root_id)
+      stats.failures += 1
+      raise ndb.Return(False)
+
     if changed:
       if missing:
         stats.added += 1
@@ -2260,6 +2274,7 @@ def backfill_task_sets_async(stats=None):
     else:
       stats.untouched += 1
       stats.noop_txns += 1
+
     raise ndb.Return(True)
 
   # Note: we ignore the status code. The error is already logged and we don't
@@ -2271,4 +2286,5 @@ def backfill_task_sets_async(stats=None):
   log.info('added: %d', stats.added)
   log.info('updated: %d', stats.updated)
   log.info('untouched: %d', stats.untouched)
+  log.info('failures: %d', stats.failures)
   log.info('noop txns: %d', stats.noop_txns)

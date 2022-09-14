@@ -25,6 +25,7 @@ from google.appengine.ext import ndb
 
 import handlers_backend
 
+from components import datastore_utils
 from components import utils
 from server import bot_management
 from server import task_queues
@@ -241,6 +242,20 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
         task_queues.BotTaskDimensions.query().get().valid_until_ts)
 
   def test_assert_task_async(self):
+    self.assert_count(0, task_queues.BotTaskDimensions)
+    self.assert_count(0, task_queues.TaskDimensions)
+    self._assert_task()
+    self.assert_count(0, bot_management.BotInfo)
+    self.assert_count(0, task_queues.BotDimensions)
+    self.assert_count(0, task_queues.BotTaskDimensions)
+    self.assert_count(1, task_queues.TaskDimensions)
+
+  def test_assert_task_async_new_impl_fails(self):
+    @ndb.tasklet
+    def fail(*_args):
+      raise datastore_utils.CommitError('Boom')
+    self.mock(task_queues, '_assert_task_dimensions_async', fail)
+
     self.assert_count(0, task_queues.BotTaskDimensions)
     self.assert_count(0, task_queues.TaskDimensions)
     self._assert_task()
@@ -1274,6 +1289,7 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(stats.added, 1)
     self.assertEqual(stats.updated, 1)
     self.assertEqual(stats.untouched, 1)
+    self.assertEqual(stats.failures, 0)
     self.assertEqual(stats.noop_txns, 0)
 
     # Check the final state matches expectations.
@@ -1289,6 +1305,7 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(stats.added, 0)
     self.assertEqual(stats.updated, 0)
     self.assertEqual(stats.untouched, 3)
+    self.assertEqual(stats.failures, 0)
     self.assertEqual(stats.noop_txns, 0)
 
 
