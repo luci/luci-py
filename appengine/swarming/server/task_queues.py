@@ -57,6 +57,7 @@ import logging
 import random
 import struct
 import time
+import urllib
 
 from google.appengine.api import datastore_errors
 from google.appengine.api import memcache
@@ -1119,6 +1120,33 @@ class TaskDimensionsSets(ndb.Model):
   # The order of dicts is irrelevant. Never empty.
   sets = datastore_utils.DeterministicJsonProperty(indexed=False)
 
+  @staticmethod
+  def dimensions_to_id(dimensions):
+    """Returns a string ID for this entity given the task dimensions dict.
+
+    Arguments:
+      dimensions: a dict with task dimensions prior to expansion of "|".
+    """
+    # Both `id` and `pool` are guaranteed to have at most 1 item. If a task
+    # targets a specific bot via `id`, use `bot:` key prefix to allow this bot
+    # to find the task faster, otherwise use `pool:`.
+    if u'id' in dimensions:
+      kind = 'bot'
+      pfx = dimensions[u'id'][0]
+    else:
+      kind = 'pool'
+      pfx = dimensions[u'pool'][0]
+    dimensions_hash = hash_dimensions(dimensions)
+    return '%s:%d' % (TaskDimensionsSets.id_prefix(kind, pfx), dimensions_hash)
+
+  @staticmethod
+  def id_prefix(kind, pfx):
+    """Returns either `bot:<url-encoded-id>` or `pool:<url-encoded-id>`."""
+    assert kind in ('bot', 'pool'), kind
+    if isinstance(pfx, unicode):
+      pfx = pfx.encode('utf-8')
+    return '%s:%s' % (kind, urllib.quote_plus(pfx))
+
 
 class TaskDimensionsInfo(ndb.Model):
   """Accompanies TaskDimensionsSets and caries expiration timestamps.
@@ -1325,16 +1353,114 @@ def _assert_task_dimensions_async(task_dimensions, exp_ts):
     task_dimensions: a dict with task dimensions (prior to expansion of "|").
     exp_ts: datetime.datetime with task expiration (aka scheduling deadline).
   """
-  # TODO:
-  #
-  # Fetch TaskDimensionsInfo and see if we need to add a new set or trigger a
-  # refresh:
-  #   * If need to add a new set, do it and transactionally enqueue a task to
-  #     update bots. If this is `bot:...` set, execute the task inline.
-  #   * If this is expiry refresh, launch a transaction and update it, perhaps
-  #     triggering "new set" code flow if necessary.
-  _ = task_dimensions
-  _ = exp_ts
+  # This is e.g. "pool:<url-encoded-pool-id>:<number>".
+  sets_id = TaskDimensionsSets.dimensions_to_id(task_dimensions)
+  sets_key = ndb.Key(TaskDimensionsSets, sets_id)
+  info_key = ndb.Key(TaskDimensionsInfo, 1, parent=sets_key)
+
+  log = _Logger('assert_task(%s)', sets_id)
+
+  # Load expiration of known dimensions sets to see if they need to be updated.
+  info = yield info_key.get_async()
+  expiry_map = _sets_to_expiry_map(info.sets if info else [])
+
+  # Randomize expiration time a bit. This is done for two reasons:
+  #   * Reduce transaction collisions when checking the expiry from concurrent
+  #     requests (only the most unlucky one will do the transaction below).
+  #   * Spread out load for TaskDimensionsSets cleanup cron a bit in case a
+  #     lot of tasks appeared at once.
+  # Some extra time will also be added in the transaction below, see comments
+  # there.
+  exp_ts += _random_timedelta_mins(0, 30)
+
+  # This expands e.g. `{"k": "a|b"}` into `[("k:a",), ("k:b",)]`.
+  expanded = [tuple(s) for s in expand_dimensions_to_flats(task_dimensions)]
+
+  # Check all sets are known and fresh.
+  fresh = True
+  for dims in expanded:
+    cur_expiry = expiry_map.get(dims)
+    if not cur_expiry or cur_expiry < exp_ts:
+      fresh = False
+      break
+  if fresh:
+    raise ndb.Return(None)
+
+  # Some dimensions sets are either missing or stale. We need to transactionally
+  # update the entity to add them, perhaps emitting a task queue task to find
+  # matching bots.
+  @ndb.tasklet
+  def txn():
+    # Set the stored expiration time far in advance. This reduces frequency of
+    # transactions that update the expiration time in case of a steady stream of
+    # requests (one transaction "covers" all next ~5h of requests: they'll see
+    # the entity as fresh). The downside is that we keep stuff in datastore for
+    # longer than strictly necessary per `exp_ts`. But this is actually a good
+    # thing for infrequent tasks with short expiration time. We **want** to keep
+    # TaskDimensionsSets for them in the datastore longer (perhaps even if there
+    # are no such tasks the queues) to avoid frequently creating and deleting
+    # TaskDimensionsSets entities for them. Creating TaskDimensionsSets is a
+    # costly operation since it requires a scan to find matching bots.
+    extended_ts = exp_ts + datetime.timedelta(hours=5)
+
+    # Load the fresh state, since we are in the transaction now.
+    info = yield info_key.get_async()
+    expiry_map = _sets_to_expiry_map(info.sets if info else [])
+
+    # Bump the expiry and add new sets.
+    created = []
+    updated = []
+    for dims in expanded:
+      cur_expiry = expiry_map.get(dims)
+      if not cur_expiry:
+        log.info('adding %s, expiry %s', dims, extended_ts)
+        expiry_map[dims] = extended_ts
+        created.append(dims)
+      elif cur_expiry < extended_ts:
+        log.info('expiry of %s: %s => %s', dims, cur_expiry, extended_ts)
+        expiry_map[dims] = extended_ts
+        updated.append(dims)
+
+    # It is possible the entity was already updated by another transaction.
+    if not created and not updated:
+      log.info('nothing to commit, already updated by another txn')
+      raise ndb.Return(None)
+
+    # Kick out old sets since we are going to commit the mutation anyway.
+    now = utils.utcnow()
+    for dims, expiry in expiry_map.items():
+      if expiry < now:
+        log.info('dropping %s, expired at %s', dims, expiry)
+        expiry_map.pop(dims)
+
+    # Some sets must survive, since we just added/updated fresh sets.
+    assert len(expiry_map) > 0
+    yield _put_task_dimensions_sets_async(sets_id, expiry_map)
+
+    # If we added new sets, need to launch a task to find matching bots ASAP.
+    # This reduces scheduling latency for new kinds of tasks. This eventually
+    # calls _tq_update_bot_matches_async. Note we don't need to do this if we
+    # are just updating the expiration time. The assignments of tasks to bots
+    # were already done at that point.
+    if created:
+      log.info('enqueuing a task to find matches for %s', created)
+      ok = yield utils.enqueue_task_async(
+          '/internal/taskqueue/important/task_queues/update-bot-matches',
+          'update-bot-matches',
+          payload=utils.encode_to_json({
+              'task_sets_id': sets_id,
+              'dimensions': created,
+              'enqueued_ts': now,
+          }),
+          transactional=True,
+      )
+      if not ok:
+        raise datastore_utils.CommitError('Failed to enqueue a TQ task')
+
+  # Do it!
+  log.info('launching txn')
+  yield datastore_utils.transaction_async(txn, retries=3)
+  log.info('txn completed')
 
 
 @ndb.tasklet
@@ -1362,9 +1488,7 @@ def _tq_update_bot_matches_async(task_sets_id, task_sets_dims, enqueued_ts):
   # * Transactionally add new ID to the list if not there yet. When doing a
   #   transaction  opportunistically kick out expired entries.
   # * Succeed only if all updates are successful.
-  _ = task_sets_id
-  _ = task_sets_dims
-  _ = enqueued_ts
+  logging.info('%s %s %s', task_sets_id, task_sets_dims, enqueued_ts)
   raise ndb.Return(True)
 
 
@@ -1502,6 +1626,11 @@ class _Logger(object):
 
   def error(self, msg, *args):
     self._log(logging.error, msg, args)
+
+
+def _random_timedelta_mins(a, b):
+  """Returns a random timedelta in [a min; b min) range."""
+  return datetime.timedelta(minutes=random.uniform(a, b))
 
 
 class _AsyncWorkQueue(object):

@@ -16,6 +16,7 @@ APP_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, APP_DIR)
 import test_env_handlers
 
+from parameterized import parameterized
 import webtest
 
 from google.appengine.api import datastore_errors
@@ -71,6 +72,10 @@ def _gen_request(properties=None):
   return req
 
 
+def _to_timestamp(dt):
+  return int(utils.datetime_to_timestamp(dt) / 1e6)
+
+
 class TaskQueuesApiTest(test_env_handlers.AppTestBase):
 
   def setUp(self):
@@ -84,6 +89,11 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
         })
     self._enqueue_async_orig = self.mock(utils, 'enqueue_task_async',
                                          self._enqueue_async)
+
+    def random_dt(a, b):
+      return datetime.timedelta(minutes=(a + b) / 2.0)
+
+    self.mock(task_queues, '_random_timedelta_mins', random_dt)
 
   def _enqueue_async(self, *args, **kwargs):
     return self._enqueue_async_orig(*args, use_dedicated_module=False, **kwargs)
@@ -910,6 +920,189 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
             'dimensions': ('a:d', 'a:e')
         },
     ], without_ts)
+
+  @staticmethod
+  def _stored_task_dims_expiry(expiry):
+    """Expiry of sets stored in TaskDimensionsSets given a task slice expiry."""
+    expiry += datetime.timedelta(minutes=15)  # mocked randomization
+    expiry += datetime.timedelta(hours=5)  # extra time added in the txn
+    return expiry
+
+  @parameterized.expand([
+      ({
+          'pool': ['p'],
+          'k': ['v1']
+      }, 'pool:p:1496061212'),
+      ({
+          'pool': ['p'],
+          'k': ['v1|v2']
+      }, 'pool:p:3930364299'),
+      ({
+          'pool': ['a:b'],
+          'k': ['v1']
+      }, 'pool:a%3Ab:2715169585'),
+      ({
+          'id': ['b'],
+          'pool': ['p'],
+          'k': ['v1']
+      }, 'bot:b:174937362'),
+      ({
+          'id': ['b'],
+          'pool': ['p'],
+          'k': ['v1|v2']
+      }, 'bot:b:903320086'),
+  ])
+  def test_assert_task_dimensions_async(self, task_dims, expected_sets_id):
+    now = datetime.datetime(2010, 1, 2, 3, 4, 5)
+    self.mock_now(now)
+
+    expected_sets = task_queues.expand_dimensions_to_flats(task_dims)
+
+    tq_tasks = []
+
+    @ndb.tasklet
+    def mocked_tq_task(task_sets_id, task_sets_dims, enqueued_ts):
+      self.assertEqual(task_sets_id, expected_sets_id)
+      self.assertEqual(task_sets_dims, expected_sets)
+      self.assertEqual(enqueued_ts, utils.utcnow())
+      tq_tasks.append(1)
+      raise ndb.Return(True)
+
+    self.mock(task_queues, '_tq_update_bot_matches_async', mocked_tq_task)
+
+    def assert_task(expiry):
+      task_queues._assert_task_dimensions_async(task_dims, expiry).get_result()
+      self.execute_tasks()
+      seen = len(tq_tasks)
+      del tq_tasks[:]
+      return seen
+
+    requested_exp = now + datetime.timedelta(hours=1)
+    stored_exp = self._stored_task_dims_expiry(requested_exp)
+
+    # Add a never seen before task, should enqueue a TQ task.
+    self.assertEqual(assert_task(requested_exp), 1)
+
+    # Check entities are correct and have correct expiry.
+    sets_key = ndb.Key(task_queues.TaskDimensionsSets, expected_sets_id)
+    sets_ent = sets_key.get()
+    self.assertEqual(sets_ent.to_dict(), {
+        'sets': [{
+            'dimensions': dims
+        } for dims in expected_sets],
+    })
+    info_key = ndb.Key(task_queues.TaskDimensionsInfo, 1, parent=sets_key)
+    info_ent = info_key.get()
+    self.assertEqual(
+        info_ent.to_dict(), {
+            'sets': [{
+                'dimensions': dims,
+                'expiry': _to_timestamp(stored_exp)
+            } for dims in expected_sets],
+            'next_cleanup_ts':
+            stored_exp + datetime.timedelta(minutes=5),
+        })
+
+    # A bit later (before the stored expiry) add the exact same task. Should
+    # result in no TQ tasks and untouched entities.
+    now += datetime.timedelta(hours=1.5)
+    self.mock_now(now)
+    self.assertEqual(assert_task(now + datetime.timedelta(hours=1)), 0)
+    self.assertEqual(sets_key.get(), sets_ent)
+    self.assertEqual(info_key.get(), info_ent)
+
+    # Adding a task even later results in the bump to the stored expiry (but no
+    # new TQ tasks).
+    now += datetime.timedelta(hours=6)
+    self.mock_now(now)
+    self.assertEqual(assert_task(now + datetime.timedelta(hours=1)), 0)
+    self.assertEqual(
+        info_key.get().next_cleanup_ts,
+        self._stored_task_dims_expiry(now + datetime.timedelta(hours=1)) +
+        datetime.timedelta(minutes=5))
+
+  def test_assert_task_dimensions_async_collision(self):
+    now = datetime.datetime(2010, 1, 2, 3, 4, 5)
+    self.mock_now(now)
+
+    # Simulate a hash collision, since it is hard (but not impossible) to get
+    # one for real.
+    self.mock(task_queues, 'hash_dimensions', lambda _dims: 42)
+
+    expected_sets_id = 'pool:p:42'
+    sets_key = ndb.Key(task_queues.TaskDimensionsSets, expected_sets_id)
+    info_key = ndb.Key(task_queues.TaskDimensionsInfo, 1, parent=sets_key)
+
+    tq_tasks = []
+
+    @ndb.tasklet
+    def mocked_tq_task(task_sets_id, task_sets_dims, enqueued_ts):
+      self.assertEqual(task_sets_id, expected_sets_id)
+      self.assertEqual(len(task_sets_dims), 1)
+      self.assertEqual(enqueued_ts, utils.utcnow())
+      tq_tasks.append(tuple(task_sets_dims[0]))
+      raise ndb.Return(True)
+
+    self.mock(task_queues, '_tq_update_bot_matches_async', mocked_tq_task)
+
+    def assert_task(dim, exp):
+      task_queues._assert_task_dimensions_async({
+          'pool': ['p'],
+          'key': [dim],
+      }, exp).get_result()
+      self.execute_tasks()
+      seen = tq_tasks[:]
+      del tq_tasks[:]
+      return seen
+
+    # Create a new TaskDimensionsSets.
+    exp1 = now + datetime.timedelta(hours=1)
+    stored_exp1 = self._stored_task_dims_expiry(exp1)
+    self.assertEqual(assert_task('1', exp1), [('key:1', 'pool:p')])
+
+    # Append a new set to an existing TaskDimensionsSets.
+    now += datetime.timedelta(hours=1)
+    self.mock_now(now)
+    exp2 = now + datetime.timedelta(hours=1)
+    stored_exp2 = self._stored_task_dims_expiry(exp2)
+    self.assertEqual(assert_task('2', exp2), [('key:2', 'pool:p')])
+
+    # Have both of them now.
+    self.assertEqual(
+        info_key.get().to_dict(), {
+            'sets': [
+                {
+                    'dimensions': ['key:1', 'pool:p'],
+                    'expiry': _to_timestamp(stored_exp1),
+                },
+                {
+                    'dimensions': ['key:2', 'pool:p'],
+                    'expiry': _to_timestamp(stored_exp2),
+                },
+            ],
+            'next_cleanup_ts':
+            stored_exp1 + datetime.timedelta(minutes=5),
+        })
+
+    # Refresh expiry of the second set, it should kick the first out as stale.
+    now = stored_exp2 - datetime.timedelta(hours=0.5)
+    self.mock_now(now)
+    exp3 = now + datetime.timedelta(hours=1)
+    stored_exp3 = self._stored_task_dims_expiry(exp3)
+    self.assertEqual(assert_task('2', exp3), [])
+
+    # Have only one set now.
+    self.assertEqual(
+        info_key.get().to_dict(), {
+            'sets': [
+                {
+                    'dimensions': ['key:2', 'pool:p'],
+                    'expiry': _to_timestamp(stored_exp3),
+                },
+            ],
+            'next_cleanup_ts':
+            stored_exp3 + datetime.timedelta(minutes=5),
+        })
 
   def test_update_bot_matches_async(self):
     # Tested as a part of the overall workflow.
