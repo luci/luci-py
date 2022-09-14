@@ -1181,6 +1181,116 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
     self.assertIsNone(fetch('set0'))
     self.assertIsNone(fetch('set1'))
 
+  @parameterized.expand(['pool', 'id'])
+  def test_backfill_task_sets_async(self, root_kind):
+    now = datetime.datetime(2010, 1, 2, 3, 4, 5)
+    self.mock_now(now)
+
+    def new_ent_id(set_id, dim_hash):
+      kind = 'pool' if root_kind == 'pool' else 'bot'
+      pfx = task_queues.TaskDimensionsSets.id_prefix(kind, set_id)
+      return '%s:%d' % (pfx, dim_hash)
+
+    # Creates an entity in old format.
+    def old(set_id, expiry_map, dim_hash=123):
+      root = ndb.Key('TaskDimensionsRoot', '%s:%s' % (root_kind, set_id))
+      sets = [
+          task_queues.TaskDimensionsSet(
+              dimensions_flat=list(dims),
+              valid_until_ts=exp,
+          ) for dims, exp in sorted(expiry_map.items())
+      ]
+      task_queues.TaskDimensions(id=dim_hash, parent=root, sets=sets).put()
+
+    # Creates an entity in new format.
+    def new(set_id, expiry_map, dim_hash=123):
+      ndb.transaction_async(lambda: task_queues._put_task_dimensions_sets_async(
+          new_ent_id(set_id, dim_hash), expiry_map)).get_result()
+
+    all_expected = {}
+
+    # Records what entity in new format we expect to see after the backfill.
+    def expected(set_id, expiry_map, dim_hash=123):
+      all_expected[new_ent_id(set_id, dim_hash)] = expiry_map
+
+    # Ancient entity that will be completely ignored.
+    old('ancient', {('a:b', ): now - datetime.timedelta(hours=1)})
+
+    # Old entity that doesn't need a migration.
+    old(
+        'uptodate', {
+            ('a:1', ): now + datetime.timedelta(hours=1),
+            ('a:2', ): now + datetime.timedelta(hours=1),
+        })
+    new(
+        'uptodate', {
+            ('a:1', ): now + datetime.timedelta(hours=2),
+            ('a:2', ): now + datetime.timedelta(hours=2),
+            ('a:3', ): now + datetime.timedelta(hours=1),
+        })
+    expected(
+        'uptodate', {
+            ('a:1', ): now + datetime.timedelta(hours=2),
+            ('a:2', ): now + datetime.timedelta(hours=2),
+            ('a:3', ): now + datetime.timedelta(hours=1),
+        })
+
+    # Entity that will be partially migrated.
+    old(
+        'mixed', {
+            ('a:1', ): now + datetime.timedelta(hours=1),
+            ('a:2', ): now + datetime.timedelta(hours=2),
+            ('a:4', ): now + datetime.timedelta(hours=1),
+        })
+    new(
+        'mixed', {
+            ('a:1', ): now + datetime.timedelta(hours=2),
+            ('a:2', ): now + datetime.timedelta(hours=1),
+            ('a:3', ): now + datetime.timedelta(hours=1),
+        })
+    expected(
+        'mixed', {
+            ('a:1', ): now + datetime.timedelta(hours=2),
+            ('a:2', ): now + datetime.timedelta(hours=2),
+            ('a:3', ): now + datetime.timedelta(hours=1),
+            ('a:4', ): now + datetime.timedelta(hours=1),
+        })
+
+    # Entities that will be fully migrated.
+    old(
+        'new', {
+            ('a:1', ): now + datetime.timedelta(hours=2),
+            ('a:2', ): now + datetime.timedelta(hours=2),
+        })
+    expected(
+        'new', {
+            ('a:1', ): now + datetime.timedelta(hours=2),
+            ('a:2', ): now + datetime.timedelta(hours=2),
+        })
+
+    # Run the migration.
+    stats = task_queues.BackfillStats()
+    task_queues.backfill_task_sets_async(stats).get_result()
+    self.assertEqual(stats.added, 1)
+    self.assertEqual(stats.updated, 1)
+    self.assertEqual(stats.untouched, 1)
+    self.assertEqual(stats.noop_txns, 0)
+
+    # Check the final state matches expectations.
+    infos = {
+        ent.key.parent().string_id(): task_queues._sets_to_expiry_map(ent.sets)
+        for ent in task_queues.TaskDimensionsInfo.query()
+    }
+    self.assertEqual(all_expected, infos)
+
+    # Running it again doesn't touch anything.
+    stats = task_queues.BackfillStats()
+    task_queues.backfill_task_sets_async(stats).get_result()
+    self.assertEqual(stats.added, 0)
+    self.assertEqual(stats.updated, 0)
+    self.assertEqual(stats.untouched, 3)
+    self.assertEqual(stats.noop_txns, 0)
+
 
 class TestMapAsync(test_env_handlers.AppTestBase):
   # Page size in queries.

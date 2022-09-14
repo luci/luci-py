@@ -68,6 +68,13 @@ class CronAbortExpiredShardToRunHandler(_CronHandlerBase):
     task_scheduler.cron_abort_expired_task_to_run()
 
 
+class CronBackfillHandler(_CronHandlerBase):
+  """Backfills TaskDimensionsSets based on TaskDimensions."""
+
+  def run_cron(self):
+    task_queues.backfill_task_sets_async().get_result()
+
+
 class CronTidyTaskQueuesTasks(_CronHandlerBase):
   """Removes unused 'dimensions sets' without active task flows."""
 
@@ -428,6 +435,7 @@ def get_routes():
        CronBotDiedHandler),
       ('/internal/cron/important/scheduler/abort_expired',
        CronAbortExpiredShardToRunHandler),
+      ('/internal/cron/important/backfill', CronBackfillHandler),
       ('/internal/cron/cleanup/task_queues_tasks', CronTidyTaskQueuesTasks),
       ('/internal/cron/cleanup/task_queues_bots', CronTidyTaskQueuesBots),
       ('/internal/cron/cleanup/task_dimension_sets', CronTidyTaskDimensionSets),

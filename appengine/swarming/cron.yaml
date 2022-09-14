@@ -14,6 +14,11 @@ cron:
   schedule: every 1 minutes
   target: backend
 
+- description: Backfills TaskDimensionsSets based on TaskDimensions.
+  url: /internal/cron/important/backfill
+  schedule: every 6 hours
+  target: backend
+
 - description: Removes unused 'dimensions sets' without active task flows.
   url: /internal/cron/cleanup/task_queues_tasks
   schedule: every 1 minutes

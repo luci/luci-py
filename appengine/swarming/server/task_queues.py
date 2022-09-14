@@ -2176,3 +2176,99 @@ def tidy_task_dimension_sets_async():
   if not ok:
     log.error('need a retry')
   raise ndb.Return(ok)
+
+
+class BackfillStats(object):
+  def __init__(self):
+    self.added = 0
+    self.updated = 0
+    self.untouched = 0
+    self.noop_txns = 0
+
+
+@ndb.tasklet
+def backfill_task_sets_async(stats=None):
+  """Backfills TaskDimensionsSets based on TaskDimensions."""
+  log = _Logger('backfill')
+
+  # Stats: added, updated, untouched, noop txns.
+  stats = stats or BackfillStats()
+
+  @ndb.tasklet
+  def backfill_async(old_task_dim):
+    # This is either 'pool:<id>' or 'id:<id>'.
+    root_id = old_task_dim.key.parent().string_id()
+    # This is <dimensions_hash>.
+    dims_hash = old_task_dim.key.integer_id()
+
+    # Constructs ID of the new TaskDimensionsSets entity.
+    if root_id.startswith('pool:'):
+      pfx = TaskDimensionsSets.id_prefix('pool', root_id[len('pool:'):])
+    elif root_id.startswith('id:'):
+      pfx = TaskDimensionsSets.id_prefix('bot', root_id[len('id:'):])
+    else:
+      log.warning('unexpected TaskDimensionsRoot ID: %s', root_id)
+      raise ndb.Return(True)
+    sets_id = '%s:%d' % (pfx, dims_hash)
+    sets_key = ndb.Key(TaskDimensionsSets, sets_id)
+    info_key = ndb.Key(TaskDimensionsInfo, 1, parent=sets_key)
+
+    # Sets and their expiration as stored in the old entity.
+    old_expiry_map = {
+        tuple(s.dimensions_flat): s.valid_until_ts
+        for s in old_task_dim.sets
+    }
+
+    # Sets and their expiration as stored in the new entity (if any).
+    info = yield info_key.get_async()
+    new_expiry_map = _sets_to_expiry_map(info.sets if info else [])
+
+    # New map should have all sets from the old map, and they should have larger
+    # or equal expiry.
+    stale = False
+    for dims, old_exp in old_expiry_map.items():
+      new_exp = new_expiry_map.get(dims)
+      if not new_exp or new_exp < old_exp:
+        stale = True
+        break
+    if not stale:
+      stats.untouched += 1
+      raise ndb.Return(True)
+
+    # Transactionally add old entries into the new entity.
+    @ndb.tasklet
+    def txn():
+      info = yield info_key.get_async()
+      missing = not info
+      new_expiry_map = _sets_to_expiry_map(info.sets if info else [])
+      changed = False
+      for dims, old_exp in old_expiry_map.items():
+        new_exp = new_expiry_map.get(dims)
+        if not new_exp or new_exp < old_exp:
+          new_expiry_map[dims] = old_exp
+          changed = True
+      if changed:
+        yield _put_task_dimensions_sets_async(sets_id, new_expiry_map)
+      raise ndb.Return((changed, missing))
+
+    changed, missing = yield datastore_utils.transaction_async(txn, retries=3)
+    if changed:
+      if missing:
+        stats.added += 1
+      else:
+        stats.updated += 1
+    else:
+      stats.untouched += 1
+      stats.noop_txns += 1
+    raise ndb.Return(True)
+
+  # Note: we ignore the status code. The error is already logged and we don't
+  # want to automatically retry this cron job.
+  q = TaskDimensions.query(TaskDimensions.valid_until_ts > utils.utcnow())
+  yield _map_async([(q, log)], backfill_async, timeout=9 * 60)
+
+  # Log some stats.
+  log.info('added: %d', stats.added)
+  log.info('updated: %d', stats.updated)
+  log.info('untouched: %d', stats.untouched)
+  log.info('noop txns: %d', stats.noop_txns)
