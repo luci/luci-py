@@ -100,20 +100,6 @@ class TestMetrics(test_case.TestCase):
     expected = u'cpu:x86-64|os:Linux|os:Ubuntu-14.04'
     self.assertEqual(expected, ts_mon_metrics._pool_from_dimensions(dimensions))
 
-  def test_shard_params(self):
-    payload = {
-        'cursor': None,
-        'task_start': '2016-04-07 12:13:14',
-        'task_count': 2,
-        'count': 42,
-    }
-    params = ts_mon_metrics._ShardParams(json.dumps(payload))
-    self.assertEqual(json.loads(params.json()), payload)
-
-  def test_shard_params_fail(self):
-    with self.assertRaises(ValueError):
-      ts_mon_metrics._ShardParams('invalid}')
-
   def test_on_task_completed(self):
     tags = [
         'project:test_project',

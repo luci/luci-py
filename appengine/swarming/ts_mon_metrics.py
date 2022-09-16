@@ -27,12 +27,6 @@ from server import task_result
 # Keep in sync with ../swarming_bot/bot_code/bot_main.py
 _IGNORED_DIMENSIONS = ('android_devices', 'caches', 'id', 'server_version',
                        'temp_band')
-# Real timeout is 60s, keep it slightly under to bail out early.
-_REQUEST_TIMEOUT_SEC = 50
-# Cap the max number of items per taskqueue task, to keep the total
-# number of collected streams managable within each instance.
-_EXECUTORS_PER_SHARD = 500
-_JOBS_PER_SHARD = 500
 
 # Override default target fields for app-global metrics.
 _TARGET_FIELDS = {
@@ -351,9 +345,7 @@ def _pool_from_dimensions(dimensions):
   return u'|'.join(sorted(pairs))
 
 
-def _set_jobs_metrics(payload):
-  params = _ShardParams(payload)
-
+def _set_jobs_metrics():
   state_map = {
       task_result.State.RUNNING: 'running',
       task_result.State.PENDING: 'pending'
@@ -365,56 +357,43 @@ def _set_jobs_metrics(payload):
   jobs_max_pending_durations = defaultdict(
       lambda: 0.0)
 
-  query_iter = task_result.get_result_summaries_query(
-      None, None, 'created_ts', 'pending_running',
-      None).iter(produce_cursors=True, start_cursor=params.cursor)
+  q = task_result.get_result_summaries_query(start=None,
+                                             end=None,
+                                             sort='created_ts',
+                                             state='pending_running',
+                                             tags=None)
+  cursor = None
+  more = True
+  while more:
+    summaries, cursor, more = q.fetch_page(1000, start_cursor=cursor)
+    for summary in summaries:
+      jobs_total += 1
+      status = state_map.get(summary.state, '')
+      tags_dict = _tags_to_dict(summary.tags)
+      fields = _extract_job_fields(tags_dict)
+      target_fields = dict(_TARGET_FIELDS)
+      if summary.bot_id:
+        target_fields['hostname'] = 'autogen:' + summary.bot_id
+      if summary.bot_id and status == 'running':
+        _jobs_running.set(True, target_fields=target_fields, fields=fields)
+      fields['status'] = status
 
-  while query_iter.has_next():
-    runtime = (utils.utcnow() - params.start_time).total_seconds()
-    if jobs_total >= _JOBS_PER_SHARD or runtime > _REQUEST_TIMEOUT_SEC:
-      params.cursor = query_iter.cursor_after()
-      params.task_count += 1
-      utils.enqueue_task(
-          '/internal/taskqueue/monitoring/tsmon/jobs',
-          'tsmon',
-          payload=params.json())
-      params.task_count -= 1  # For accurate logging below.
-      break
+      key = tuple(sorted(fields.items()))
 
-    params.count += 1
-    jobs_total += 1
-    summary = query_iter.next()
-    status = state_map.get(summary.state, '')
-    tags_dict = _tags_to_dict(summary.tags)
-    fields = _extract_job_fields(tags_dict)
-    target_fields = dict(_TARGET_FIELDS)
-    if summary.bot_id:
-      target_fields['hostname'] = 'autogen:' + summary.bot_id
-    if summary.bot_id and status == 'running':
-      _jobs_running.set(True, target_fields=target_fields, fields=fields)
-    fields['status'] = status
+      jobs_counts[key] += 1
 
-    key = tuple(sorted(fields.items()))
+      fields['device_type'] = tags_dict.get('device_type', '')
+      key = tuple(sorted(fields.items()))
 
-    jobs_counts[key] += 1
+      pending_duration = summary.pending_now(utils.utcnow())
+      if pending_duration is not None:
+        jobs_pending_distributions[key].add(pending_duration.total_seconds())
+        jobs_max_pending_durations[key] = max(jobs_max_pending_durations[key],
+                                              pending_duration.total_seconds())
 
-    fields['device_type'] = tags_dict.get('device_type', '')
-    key = tuple(sorted(fields.items()))
+    logging.debug('_set_jobs_metrics: processed %d jobs', jobs_total)
 
-    pending_duration = summary.pending_now(utils.utcnow())
-    if pending_duration is not None:
-      jobs_pending_distributions[key].add(pending_duration.total_seconds())
-      jobs_max_pending_durations[key] = max(
-          jobs_max_pending_durations[key],
-          pending_duration.total_seconds())
-
-  logging.debug(
-      '_set_jobs_metrics: task %d started at %s, processed %d jobs (%d total)',
-      params.task_count, params.task_start, jobs_total, params.count)
-
-  # Global counts are sharded by task_num and aggregated in queries.
   target_fields = dict(_TARGET_FIELDS)
-  target_fields['task_num'] = params.task_count
 
   for key, count in jobs_counts.items():
     _jobs_active.set(count, target_fields=target_fields, fields=dict(key))
@@ -428,86 +407,40 @@ def _set_jobs_metrics(payload):
         val, target_fields=target_fields, fields=dict(key))
 
 
-def _set_executors_metrics(payload):
-  params = _ShardParams(payload)
-  query_iter = bot_management.BotInfo.query().iter(
-      produce_cursors=True, start_cursor=params.cursor)
-
+def _set_executors_metrics():
   executors_count = 0
-  while query_iter.has_next():
-    runtime = (utils.utcnow() - params.start_time).total_seconds()
-    if (executors_count >= _EXECUTORS_PER_SHARD or
-        runtime > _REQUEST_TIMEOUT_SEC):
-      params.cursor = query_iter.cursor_after()
-      params.task_count += 1
-      utils.enqueue_task(
-          '/internal/taskqueue/monitoring/tsmon/executors',
-          'tsmon',
-          payload=params.json())
-      params.task_count -= 1  # For accurate logging below.
-      break
 
-    params.count += 1
-    executors_count += 1
-    bot_info = query_iter.next()
-    status = 'ready'
-    if bot_info.task_id:
-      status = 'running'
-    elif bot_info.quarantined:
-      status = 'quarantined'
-    elif bot_info.is_dead:
-      status = 'dead'
-    elif bot_info.state and bot_info.state.get('maintenance', False):
-      status = 'maintenance'
+  q = bot_management.BotInfo.query()
+  cursor = None
+  more = True
+  while more:
+    bots, cursor, more = q.fetch_page(1000, start_cursor=cursor)
+    for bot_info in bots:
+      executors_count += 1
 
-    target_fields = dict(_TARGET_FIELDS)
-    target_fields['hostname'] = 'autogen:' + bot_info.id
+      status = 'ready'
+      if bot_info.task_id:
+        status = 'running'
+      elif bot_info.quarantined:
+        status = 'quarantined'
+      elif bot_info.is_dead:
+        status = 'dead'
+      elif bot_info.state and bot_info.state.get('maintenance', False):
+        status = 'maintenance'
 
-    _executors_status.set(status, target_fields=target_fields)
-    _executors_pool.set(
-        _pool_from_dimensions(bot_info.dimensions), target_fields=target_fields)
+      target_fields = dict(_TARGET_FIELDS)
+      target_fields['hostname'] = 'autogen:' + bot_info.id
 
-  logging.debug(
-      '%s: task %d started at %s, processed %d bots (%d total)',
-      '_set_executors_metrics', params.task_count, params.task_start,
-       executors_count, params.count)
+      _executors_status.set(status, target_fields=target_fields)
+      _executors_pool.set(_pool_from_dimensions(bot_info.dimensions),
+                          target_fields=target_fields)
+
+    logging.debug('_set_executors_metrics: processed %d bots', executors_count)
 
 
 def _set_global_metrics():
   utils.enqueue_task('/internal/taskqueue/monitoring/tsmon/jobs', 'tsmon')
   utils.enqueue_task('/internal/taskqueue/monitoring/tsmon/executors', 'tsmon')
-
-
-class _ShardParams(object):
-  """Parameters for a chain of taskqueue tasks."""
-  def __init__(self, payload):
-    self.start_time = utils.utcnow()
-    self.cursor = None
-    self.task_start = self.start_time
-    self.task_count = 0
-    self.count = 0
-    if not payload:
-      return
-    try:
-      params = json.loads(payload)
-      if params['cursor']:
-        self.cursor = Cursor(urlsafe=params['cursor'])
-      self.task_start = datetime.datetime.strptime(
-          params['task_start'], utils.DATETIME_FORMAT)
-      self.task_count = params['task_count']
-      self.count = params['count']
-    except (ValueError, KeyError) as e:
-      logging.error('_ShardParams: bad JSON: %s: %s', payload, e)
-      # Stop the task chain and let the request fail.
-      raise
-
-  def json(self):
-    return utils.encode_to_json({
-        'cursor': self.cursor.urlsafe() if self.cursor else None,
-        'task_start': self.task_start,
-        'task_count': self.task_count,
-        'count': self.count,
-    })
 
 
 def _tags_to_dict(tags):
@@ -614,11 +547,11 @@ def on_bot_auth_success(auth_method, condition):
   })
 
 
-def set_global_metrics(kind, payload=None):
+def set_global_metrics(kind):
   if kind == 'jobs':
-    _set_jobs_metrics(payload)
+    _set_jobs_metrics()
   elif kind == 'executors':
-    _set_executors_metrics(payload)
+    _set_executors_metrics()
   else:
     logging.error('set_global_metrics(kind=%s): unknown kind.', kind)
 
