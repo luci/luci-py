@@ -1699,19 +1699,103 @@ def _tq_rescan_matching_task_sets_async(bot_id, rescan_counter, rescan_reason):
   Returns:
     True if succeeded, False if the TQ task needs to be retried.
   """
-  # TODO:
+  log = _Logger('tq_rescan_matches(%s)', bot_id)
+  log.info('rescan: %s', rescan_reason)
+
+  # Verify the task is still fresh and load dimensions to match on.
+  matches = yield BotDimensionsMatches.get_or_default_async(bot_id)
+  if matches.rescan_counter != rescan_counter:
+    log.info('skipping, rescan counter %d != %s', matches.rescan_counter,
+             rescan_counter)
+    raise ndb.Return(True)
+  log.info('enqueued %s ago', utils.utcnow() - matches.last_rescan_enqueued_ts)
+
+  bot_dimensions_flat = matches.dimensions
+  bot_dimensions_set = set(bot_dimensions_flat)
+
+  def scan_prefix_query(set_kind, pfx):
+    pfx = TaskDimensionsSets.id_prefix(set_kind, pfx)
+    start = '%s:%s' % (pfx, chr(ord('0') - 1))
+    end = '%s:%s' % (pfx, chr(ord('9') + 1))
+    query = ndb.Query(
+        kind='TaskDimensionsSets',
+        filters=ndb.ConjunctionNode(
+            ndb.FilterNode('__key__', '>', ndb.Key(TaskDimensionsSets, start)),
+            ndb.FilterNode('__key__', '<', ndb.Key(TaskDimensionsSets, end)),
+        ),
+    )
+    return query, log.derive('%s', pfx)
+
+  # Construct queries that scan for potentially matching TaskDimensionsSets.
   #
-  # * Fetch BotDimensionsMatches and confirm the revision still matches. Grab
-  #   `BotDimensionsMatches.dimensions`.
-  # * Find *all* possible TaskDimensionsSets using a key prefix scan.
-  # * Filter out ones that don't match bot dimensions.
-  # * In a BotDimensionsMatches transaction:
-  #    * Check `BotDimensionsMatches.dimensions` is still what we scanned for.
-  #    * See what existing sets are not in the calculated list above.
-  #    * Double check they are really gone.
-  #    * Store the up-to-date list.
-  logging.info('%s %d %s', bot_id, rescan_counter, rescan_reason)
-  raise ndb.Return(True)
+  # TODO(vadimsh): Each query can be sharded to parallelize the scan even more
+  # if necessary.
+  queries = [scan_prefix_query('bot', bot_id)]
+  for kv in bot_dimensions_flat:
+    k, v = kv.split(':', 1)
+    if k == 'pool':
+      queries.append(scan_prefix_query('pool', v))
+
+  # A set of matching TaskDimensionsSets IDs discovered by the scans.
+  alive = set()
+  # A counter of visited items for debugging.
+  visited = [0]
+
+  def visit_task_dimensions_set(task_dims_sets):
+    visited[0] += 1
+    if task_dims_sets.matches_bot_dimensions(bot_dimensions_set):
+      alive.add(task_dims_sets.key.string_id())
+
+  # Find all TaskDimensionsSets matching the bot dimensions.
+  visited_all = yield _map_async(queries, visit_task_dimensions_set)
+  log.info('visited %d entities, found %d matches', visited[0], len(alive))
+
+  # Double check any currently matched sets that were not discovered by the scan
+  # are indeed dead and should be unmatched. This is particularly important if
+  # scans were incomplete due to timeouts (i.e. visited_all is False), but also
+  # matters if the query is "eventually consistent" and omits some very recent
+  # entities. We don't want to delete active matches.
+  _, stale = yield _check_matches_async(
+      bot_dimensions_set, [sid for sid in matches.matches if sid not in alive])
+
+  # Store new matches in the entity if the entity still has dimensions we
+  # scanned for. This returns `last_rescan_enqueued_ts` if the entity was
+  # updated or None if not.
+  @ndb.tasklet
+  def txn():
+    now = utils.utcnow()
+    txn_ent = yield BotDimensionsMatches.get_or_default_async(bot_id)
+    if txn_ent.dimensions != bot_dimensions_flat:
+      log.warning('dimensions changed while we were scanning, aborting')
+      raise ndb.Return(None)
+    # Carefully merge `alive` and `stale` into `matches` to avoid stomping over
+    # matches that may have been added concurrently by _maybe_add_match_async.
+    cur = set(txn_ent.matches)
+    new = (cur | alive) - stale
+    if cur == new:
+      log.info('no changes to the matched set')
+    for x in cur - new:
+      log.info('unmatched %s', x)
+    for x in new - cur:
+      log.info('matched %s', x)
+    txn_ent.matches = sorted(new)
+    txn_ent.last_rescan_finished_ts = now
+    txn_ent.last_cleanup_ts = now
+    yield txn_ent.put_async()
+    raise ndb.Return(txn_ent.last_rescan_enqueued_ts)
+
+  log.info('storing changes')
+  rescan_enqueued_ts = yield datastore_utils.transaction_async(txn, retries=3)
+  if rescan_enqueued_ts:
+    log.info('rescan delay: %s', utils.utcnow() - rescan_enqueued_ts)
+
+  # Retire the TQ task if the entity is already stale or we successfully
+  # scanned and updated everything.
+  if not rescan_enqueued_ts:
+    log.warning('this task queue task is stale, retiring it')
+  elif not visited_all:
+    log.error('some scans did not complete, need a retry')
+  raise ndb.Return(stale or visited_all)
 
 
 ### Some generic helpers.

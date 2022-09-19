@@ -1333,20 +1333,22 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(stats.failures, 0)
     self.assertEqual(stats.noop_txns, 0)
 
+  @staticmethod
+  def _create_task_dims_set(sets_id, task_dims):
+    ndb.transaction_async(lambda: task_queues._put_task_dimensions_sets_async(
+        sets_id, {
+            tuple(task_dims): utils.utcnow() + datetime.timedelta(hours=10),
+        })).get_result()
+
+  @staticmethod
+  def _delete_task_dims_set(sets_id):
+    ndb.transaction_async(lambda: task_queues.
+                          _delete_task_dimensions_sets_async(sets_id
+                                                             )).get_result()
+
   def test_assert_bot_dimensions_async(self):
     now = datetime.datetime(2010, 1, 2, 3, 4, 5)
     self.mock_now(now)
-
-    def create_task_dims_set(sets_id, task_dims):
-      ndb.transaction_async(lambda: task_queues._put_task_dimensions_sets_async(
-          sets_id, {
-              tuple(task_dims): utils.utcnow() + datetime.timedelta(hours=10),
-          })).get_result()
-
-    def delete_task_dims_set(sets_id):
-      ndb.transaction_async(lambda: task_queues.
-                            _delete_task_dimensions_sets_async(sets_id
-                                                               )).get_result()
 
     tq = self._mock_enqueue_task_async('rescan-matching-task-sets')
 
@@ -1388,11 +1390,11 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
     del tq[:]
 
     # Mock assignment of the queues. This happens in the TQ task usually.
-    create_task_dims_set('bot:bot-id:1', ['id:bot-id'])
-    create_task_dims_set('pool:pool1:2', ['pool:pool1'])
-    create_task_dims_set('pool:pool1:3', ['pool:pool1', 'dim:0'])
-    create_task_dims_set('pool:pool2:4', ['pool:pool2'])
-    create_task_dims_set('pool:pool2:5', ['pool:pool2', 'dim:0'])
+    self._create_task_dims_set('bot:bot-id:1', ['id:bot-id'])
+    self._create_task_dims_set('pool:pool1:2', ['pool:pool1'])
+    self._create_task_dims_set('pool:pool1:3', ['pool:pool1', 'dim:0'])
+    self._create_task_dims_set('pool:pool2:4', ['pool:pool2'])
+    self._create_task_dims_set('pool:pool2:5', ['pool:pool2', 'dim:0'])
     bot_matches.matches = [
         'bot:bot-id:1',
         'pool:pool1:2',
@@ -1456,7 +1458,7 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
     # Some task set disappears (e.g. gets cleaned up by the cron).
     now += datetime.timedelta(minutes=5)
     self.mock_now(now)
-    delete_task_dims_set('pool:pool2:4')
+    self._delete_task_dims_set('pool:pool2:4')
 
     # It is no longer assigned to the bot. This doesn't enqueue a task.
     queues = task_queues._assert_bot_dimensions_async(dims).get_result()
@@ -1478,6 +1480,84 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
             'matches': [u'bot:bot-id:1', u'pool:pool1:2'],
             'next_rescan_ts': prev_state['next_rescan_ts'],
             'rescan_counter': prev_state['rescan_counter'],
+        })
+
+  def test_tq_rescan_matching_task_sets_async(self):
+    now = datetime.datetime(2010, 1, 2, 3, 4, 5)
+    self.mock_now(now)
+
+    # Prepare all active task dims sets.
+    self._create_task_dims_set('bot:bot-id:1', ['id:bot-id'])
+    self._create_task_dims_set('bot:bot-id:2', ['id:bot-id', 'dim:0'])
+    self._create_task_dims_set('bot:bot-id:3', ['id:bot-id', 'dim:1'])
+    self._create_task_dims_set('pool:pool1:4', ['pool:pool1'])
+    self._create_task_dims_set('pool:pool1:5', ['pool:pool1', 'dim:0'])
+    self._create_task_dims_set('pool:pool1:6', ['pool:pool1', 'dim:1'])
+    self._create_task_dims_set('pool:pool2:7', ['pool:pool2'])
+    self._create_task_dims_set('pool:pool2:8', ['pool:pool2', 'dim:0'])
+    self._create_task_dims_set('pool:pool2:9', ['pool:pool2', 'dim:1'])
+
+    # Put some extra garbage that must no be visited since it is outside of the
+    # range of datastore scan query.
+    self._create_task_dims_set('bot:bot-id:', ['id:bot-id'])
+    self._create_task_dims_set('bot:bot-id:/', ['id:bot-id'])
+    self._create_task_dims_set('bot:bot-id::', ['id:bot-id'])
+    self._create_task_dims_set('pool:pool1:', ['pool:pool1'])
+    self._create_task_dims_set('pool:pool1:/', ['pool:pool1'])
+    self._create_task_dims_set('pool:pool1::', ['pool:pool1'])
+
+    # Prepare BotDimensionsMatches in some initial pre-scan state: it has new
+    # dimensions (dim:1), but matches are still for old ones (dim:0).
+    task_queues.BotDimensionsMatches(
+        id='bot-id',
+        dimensions=[u'dim:1', u'id:bot-id', u'pool:pool1', u'pool:pool2'],
+        matches=[
+            u'bot:bot-id:1',
+            u'bot:bot-id:2',
+            u'bot:bot-id:444',  # missing, should be unmatched
+            u'pool:missing:555',  # missing, should be unmatched
+            u'pool:pool1:4',
+            u'pool:pool1:5',
+            u'pool:pool2:7',
+            u'pool:pool2:8',
+        ],
+        last_rescan_enqueued_ts=now,
+        next_rescan_ts=now + datetime.timedelta(hours=1),
+        rescan_counter=555,
+    ).put()
+
+    # Run the rescan.
+    self.assertTrue(
+        task_queues._tq_rescan_matching_task_sets_async('bot-id', 555,
+                                                        'reason').get_result())
+
+    # The state was updated correctly to match on `dim:1`. Old entries were
+    # kicked out.
+    ent = ndb.Key(task_queues.BotDimensionsMatches, 'bot-id').get()
+    self.assertEqual(
+        ent.to_dict(), {
+            'dimensions':
+            [u'dim:1', u'id:bot-id', u'pool:pool1', u'pool:pool2'],
+            'last_addition_ts':
+            None,
+            'last_cleanup_ts':
+            now,
+            'last_rescan_enqueued_ts':
+            now,
+            'last_rescan_finished_ts':
+            now,
+            'matches': [
+                u'bot:bot-id:1',
+                u'bot:bot-id:3',
+                u'pool:pool1:4',
+                u'pool:pool1:6',
+                u'pool:pool2:7',
+                u'pool:pool2:9',
+            ],
+            'next_rescan_ts':
+            now + datetime.timedelta(hours=1),
+            'rescan_counter':
+            555,
         })
 
 
