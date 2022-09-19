@@ -2328,15 +2328,27 @@ def assert_bot(bot_root_key, bot_dimensions):
   """
   # Run old and new implementation concurrently. The old one is still used
   # for real, the new one just used to pre-fill entities before the switch
-  # to use it for real.
+  # to use it for real and to show the potential difference.
   matches_fut = _assert_bot_dimensions_async(bot_dimensions)
   _assert_bot_old_async(bot_root_key, bot_dimensions).get_result()
-  queues = _get_queues(bot_root_key)
+  old_queues = _get_queues(bot_root_key)
   try:
-    _ = matches_fut.get_result()
+    new_queues = matches_fut.get_result()
+
+    old_set = set(old_queues)
+    new_set = set(new_queues)
+
+    old_diff_new = old_set - new_set
+    if old_diff_new:
+      logging.warning('queues_old_diff_new: %s', sorted(old_diff_new))
+
+    new_diff_old = new_set - old_set
+    if new_diff_old:
+      logging.warning('queues_new_diff_old: %s', sorted(new_diff_old))
+
   except (apiproxy_errors.DeadlineExceededError, datastore_utils.CommitError):
     logging.error('_assert_bot_dimensions_async commit error')
-  return queues
+  return old_queues
 
 
 def freshen_up_queues(bot_root_key):
