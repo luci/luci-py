@@ -1120,6 +1120,15 @@ class TaskDimensionsSets(ndb.Model):
   # The order of dicts is irrelevant. Never empty.
   sets = datastore_utils.DeterministicJsonProperty(indexed=False)
 
+  def matches_bot_dimensions(self, bot_dimensions_set):
+    """True if any of stored `sets` matches given bot dimensions.
+
+    Arguments:
+      bot_dimensions_set: a set of `k:v` pairs with bot dimensions.
+    """
+    return any(
+        bot_dimensions_set.issuperset(s['dimensions']) for s in self.sets)
+
   @staticmethod
   def dimensions_to_id(dimensions):
     """Returns a string ID for this entity given the task dimensions dict.
@@ -1256,6 +1265,17 @@ class BotDimensionsMatches(ndb.Model):
   # The last time a match was added via _maybe_add_match_async, for debugging.
   last_addition_ts = ndb.DateTimeProperty(indexed=False)
 
+  @classmethod
+  @ndb.tasklet
+  def get_or_default_async(cls, bot_id):
+    """Fetches an existing entity or constructs a default one.
+
+    The constructed entity is not saved here yet. It is caller's responsibility
+    to eventually store it.
+    """
+    ent = yield ndb.Key(cls, bot_id).get_async()
+    raise ndb.Return(ent or cls(id=bot_id))
+
 
 def _sets_to_expiry_map(sets):
   """Constructs a mapping of task dimension tuples to their expiry time.
@@ -1339,6 +1359,31 @@ def _delete_task_dimensions_sets_async(sets_id):
   sets_key = ndb.Key(TaskDimensionsSets, sets_id)
   info_key = ndb.Key(TaskDimensionsInfo, 1, parent=sets_key)
   return ndb.delete_multi_async([sets_key, info_key])
+
+
+@ndb.tasklet
+def _check_matches_async(bot_dimensions_set, sets_ids):
+  """Loads TaskDimensionsSets and checks if they still exist and match the bot.
+
+  Arguments:
+    bot_dimensions_set: a set of `k:v` pairs with bot dimensions.
+    sets_ids: string IDs of TaskDimensionsSets to load and check.
+
+  Returns:
+    set(alive and still matching sets IDs), set(stale sets IDs).
+  """
+  sets_ents = yield ndb.get_multi_async(
+      [ndb.Key(TaskDimensionsSets, sets_id) for sets_id in sets_ids])
+
+  alive = set()
+  stale = set()
+  for sets_id, sets_ent in zip(sets_ids, sets_ents):
+    if sets_ent and sets_ent.matches_bot_dimensions(bot_dimensions_set):
+      alive.add(sets_id)
+    else:
+      stale.add(sets_id)
+
+  raise ndb.Return((alive, stale))
 
 
 @ndb.tasklet
@@ -1547,25 +1592,98 @@ def _assert_bot_dimensions_async(bot_dimensions):
   Runs as part of /bot/poll and must be fast.
 
   Arguments:
-    bot_dimensions: a dict with bot dimensions (including "id" dimension).
+    bot_dimensions: a dict with bot dimensions (including "id" dimension), i.e.
+      `{key: [value]}`.
 
   Returns:
     A list of integers with queues to poll.
   """
-  # TODO:
-  #
-  # Fetch BotDimensionsMatches.
-  #
-  # Filter out stale TaskDimensionsSets:
-  #    * Ones no longer present in the datastore.
-  #    * Ones no longer matching bot dimensions.
-  #
-  # If the set changed or dimensions changed or next rescan TS arrived:
-  #    * Start a txn.
-  #    * If dimensions changed or next rescan arrived: enqueue a task.
-  #    * Store updated set numbers, removing no longer matching ones.
-  _ = bot_dimensions
-  raise ndb.Return([])
+  bot_id = bot_dimensions[u'id'][0]
+  bot_dimensions_flat = bot_dimensions_to_flat(bot_dimensions)
+  bot_dimensions_set = set(bot_dimensions_flat)
+
+  log = _Logger('assert_bot(%s)', bot_id)
+
+  # Load queue numbers assigned to the bot.
+  log.info('loading bot dimensions matches')
+  matches = yield BotDimensionsMatches.get_or_default_async(bot_id)
+
+  # Load associated dimension sets to check the bot still matches them. This is
+  # the hottest spot that heavily relies on ndb memcache.
+  log.info('checking %d dimensions sets', len(matches.matches))
+  alive, stale = yield _check_matches_async(bot_dimensions_set, matches.matches)
+  if stale:
+    log.info('will unmatch: %s', ' '.join(stale))
+
+  # We need to trigger a rescan of all potentially matching TaskDimensionsSets
+  # when bot dimensions change and also periodically (to workaround eventual
+  # consistency of datastore queries and various races in the code).
+  rescan_reason = None
+  if matches.dimensions != bot_dimensions_flat:
+    rescan_reason = _diff_bot_dims(matches.dimensions, bot_dimensions_flat)
+  elif matches.next_rescan_ts and utils.utcnow() > matches.next_rescan_ts:
+    rescan_reason = 'periodic'
+
+  if rescan_reason is not None:
+
+    @ndb.tasklet
+    def enqueue_rescan_txn():
+      now = utils.utcnow()
+      txn_ent = yield BotDimensionsMatches.get_or_default_async(bot_id)
+      if txn_ent.next_rescan_ts != matches.next_rescan_ts:
+        # This can theoretically happen if a bot is calling /bot/poll in
+        # parallel, which it should not be doing.
+        log.warning('aborting txn, the entity state changed')
+        raise ndb.Return(None)
+      txn_ent.dimensions = bot_dimensions_flat
+      txn_ent.matches = [x for x in txn_ent.matches if x not in stale]
+      txn_ent.rescan_counter += 1
+      txn_ent.next_rescan_ts = now + _random_timedelta_mins(5, 15)
+      txn_ent.last_rescan_enqueued_ts = now
+      txn_ent.last_cleanup_ts = now
+      # This eventually calls _tq_rescan_matching_task_sets_async.
+      ok = yield utils.enqueue_task_async(
+          '/internal/taskqueue/important/task_queues/rescan-matching-task-sets',
+          'rescan-matching-task-sets',
+          payload=utils.encode_to_json({
+              'bot_id': bot_id,
+              'rescan_counter': txn_ent.rescan_counter,
+              'rescan_reason': rescan_reason,
+          }),
+          transactional=True)
+      if not ok:
+        raise datastore_utils.CommitError('Failed to enqueue TQ task')
+      yield txn_ent.put_async()
+
+    log.info('triggering rescan: %s', rescan_reason)
+    yield datastore_utils.transaction_async(enqueue_rescan_txn, retries=3)
+  elif stale:
+    # If the rescan is not needed, but we have stale matches, clean them up now
+    # to reduce amount of work for future checks. This can be "fire and forget"
+    # operation, but ndb async tasklet model makes this impossible, so we'll
+    # wait. Ignore errors though, they are not critical at this stage.
+    @ndb.tasklet
+    def unmatch_txn():
+      txn_ent = yield BotDimensionsMatches.get_or_default_async(bot_id)
+      if txn_ent.dimensions != bot_dimensions_flat:
+        log.warning('aborting txn, the entity state changed')
+        raise ndb.Return(None)
+      before = len(txn_ent.matches)
+      txn_ent.matches = [x for x in txn_ent.matches if x not in stale]
+      if len(txn_ent.matches) != before:
+        txn_ent.last_cleanup_ts = utils.utcnow()
+        yield txn_ent.put_async()
+
+    try:
+      yield datastore_utils.transaction_async(unmatch_txn, retries=3)
+    except (apiproxy_errors.DeadlineExceededError, datastore_utils.CommitError):
+      log.warning('error when cleaning matches, ignoring')
+
+  # Convert IDs that look like `pool:xxx:<number>` into integers.
+  sets_id_to_int = lambda x: int(x[x.rfind(':') + 1:])
+  queue_ids = sorted(sets_id_to_int(sets_id) for sets_id in alive)
+  log.info('queues: %s', queue_ids)
+  raise ndb.Return(queue_ids)
 
 
 @ndb.tasklet
@@ -1592,9 +1710,7 @@ def _tq_rescan_matching_task_sets_async(bot_id, rescan_counter, rescan_reason):
   #    * See what existing sets are not in the calculated list above.
   #    * Double check they are really gone.
   #    * Store the up-to-date list.
-  _ = bot_id
-  _ = rescan_counter
-  _ = rescan_reason
+  logging.info('%s %d %s', bot_id, rescan_counter, rescan_reason)
   raise ndb.Return(True)
 
 
@@ -1626,6 +1742,30 @@ class _Logger(object):
 
   def error(self, msg, *args):
     self._log(logging.error, msg, args)
+
+
+def _diff_bot_dims(old, new):
+  """Pretty-prints changes to bot dimensions into a string.
+
+  Arguments:
+    old: old bot dimensions as a list of `k:v` strings.
+    new: new bot dimensions as as list of `k:v` strings.
+
+  Returns:
+    A string for logging.
+  """
+  old_set = set(old)
+  new_set = set(new)
+
+  add = ' '.join(dim for dim in new if dim not in old_set)
+  rem = ' '.join(dim for dim in old if dim not in new_set)
+
+  parts = []
+  if add:
+    parts.append('dims added [%s]' % add)
+  if rem:
+    parts.append('dims removed [%s]' % rem)
+  return ', '.join(parts)
 
 
 def _random_timedelta_mins(a, b):

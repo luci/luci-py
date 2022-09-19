@@ -5,6 +5,7 @@
 # that can be found in the LICENSE file.
 
 import datetime
+import json
 import logging
 import os
 import random
@@ -99,19 +100,38 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
   def _enqueue_async(self, *args, **kwargs):
     return self._enqueue_async_orig(*args, use_dedicated_module=False, **kwargs)
 
-  def _mock_enqueue_task_async_for_rebuild_task_cache(self):
-    payloads = []
+  def _mock_enqueue_task_async(self, *queues):
+    # queue name => URL, transactional.
+    expected = {
+        'rebuild-task-cache': (
+            '/internal/taskqueue/important/task_queues/rebuild-cache',
+            False,
+        ),
+        'update-bot-matches': (
+            '/internal/taskqueue/important/task_queues/update-bot-matches',
+            True,
+        ),
+        'rescan-matching-task-sets': (
+            '/internal/taskqueue/important/task_queues/'
+            'rescan-matching-task-sets',
+            True,
+        ),
+    }
+    for q in queues:
+      self.assertIn(q, expected)
+
+    payloads = tuple([] for _ in queues)
 
     @ndb.tasklet
     def _enqueue_task_async(url, name, payload, transactional=False):
-      if url == '/internal/taskqueue/important/task_queues/rebuild-cache':
-        self.assertFalse(transactional)
-        self.assertEqual('rebuild-task-cache', name)
-        payloads.append(payload)
+      self.assertIn(name, queues)
+      self.assertEqual(expected[name][0], url)
+      self.assertEqual(expected[name][1], transactional)
+      payloads[queues.index(name)].append(payload)
       raise ndb.Return(True)
 
     self.mock(utils, 'enqueue_task_async', _enqueue_task_async)
-    return payloads
+    return payloads[0] if len(payloads) == 1 else payloads
 
   def _assert_bot(self, bot_id=u'bot1', dimensions=None):
     bot_dimensions = {
@@ -315,7 +335,8 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
     # testing with 50 bots, would make the unit test slow.
     self.mock(task_queues, '_CAP_FUTURES_LIMIT', 1)
 
-    payloads = self._mock_enqueue_task_async_for_rebuild_task_cache()
+    payloads, _ = self._mock_enqueue_task_async('rebuild-task-cache',
+                                                'update-bot-matches')
 
     # The equivalent of self._assert_task() except that we snapshot the payload.
     # Trigger multiple task queues to go deeper in the code.
@@ -442,7 +463,8 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
                              u'gpu': [u'amd'],
                          }))
 
-    payloads = self._mock_enqueue_task_async_for_rebuild_task_cache()
+    payloads, _ = self._mock_enqueue_task_async('rebuild-task-cache',
+                                                'update-bot-matches')
 
     request1 = _gen_request(
         properties=_gen_properties(dimensions={
@@ -488,7 +510,9 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
     # Tasks are already registered, then new bots show up
     self.mock_now(datetime.datetime(2020, 1, 2, 3, 4, 5))
 
-    payloads = self._mock_enqueue_task_async_for_rebuild_task_cache()
+    payloads, _, _ = self._mock_enqueue_task_async('rebuild-task-cache',
+                                                   'update-bot-matches',
+                                                   'rescan-matching-task-sets')
 
     request1 = _gen_request(
         properties=_gen_properties(dimensions={
@@ -538,7 +562,9 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(
         0, self._assert_bot(bot_id=u'bot3', dimensions={u'os': [u'v3']}))
 
-    payloads = self._mock_enqueue_task_async_for_rebuild_task_cache()
+    payloads, _ = self._mock_enqueue_task_async('rebuild-task-cache',
+                                                'update-bot-matches')
+
     # Both requests should have the same dimension_hash
     request1 = _gen_request(
         properties=_gen_properties(dimensions={
@@ -720,7 +746,6 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
     self.execute_tasks()
     self.assert_count(1, bot_management.BotInfo)
     self.assert_count(1, task_queues.BotDimensions)
-    print(task_queues.BotTaskDimensions)
     self.assert_count(1, task_queues.BotTaskDimensions)
     self.assert_count(1, task_queues.TaskDimensions)
 
@@ -1307,6 +1332,153 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(stats.untouched, 3)
     self.assertEqual(stats.failures, 0)
     self.assertEqual(stats.noop_txns, 0)
+
+  def test_assert_bot_dimensions_async(self):
+    now = datetime.datetime(2010, 1, 2, 3, 4, 5)
+    self.mock_now(now)
+
+    def create_task_dims_set(sets_id, task_dims):
+      ndb.transaction_async(lambda: task_queues._put_task_dimensions_sets_async(
+          sets_id, {
+              tuple(task_dims): utils.utcnow() + datetime.timedelta(hours=10),
+          })).get_result()
+
+    def delete_task_dims_set(sets_id):
+      ndb.transaction_async(lambda: task_queues.
+                            _delete_task_dimensions_sets_async(sets_id
+                                                               )).get_result()
+
+    tq = self._mock_enqueue_task_async('rescan-matching-task-sets')
+
+    dims = {
+        'id': ['bot-id'],
+        'pool': ['pool1', 'pool2'],
+        'dim': ['0'],
+    }
+    bot_matches_key = ndb.Key(task_queues.BotDimensionsMatches, 'bot-id')
+
+    # The first call ever, no queues are assigned yet.
+    queues = task_queues._assert_bot_dimensions_async(dims).get_result()
+    self.assertEqual(queues, [])
+
+    # Created the entity.
+    bot_matches = bot_matches_key.get()
+    self.assertEqual(
+        bot_matches.to_dict(), {
+            'dimensions':
+            [u'dim:0', u'id:bot-id', u'pool:pool1', u'pool:pool2'],
+            'last_addition_ts': None,
+            'last_cleanup_ts': now,
+            'last_rescan_enqueued_ts': now,
+            'last_rescan_finished_ts': None,
+            'matches': [],
+            'next_rescan_ts': now + datetime.timedelta(minutes=10),
+            'rescan_counter': 1
+        })
+
+    # Enqueued the rescan task.
+    self.assertEqual(len(tq), 1)
+    self.assertEqual(
+        json.loads(tq[0]), {
+            u'bot_id': u'bot-id',
+            u'rescan_counter': 1,
+            u'rescan_reason':
+            u'dims added [dim:0 id:bot-id pool:pool1 pool:pool2]',
+        })
+    del tq[:]
+
+    # Mock assignment of the queues. This happens in the TQ task usually.
+    create_task_dims_set('bot:bot-id:1', ['id:bot-id'])
+    create_task_dims_set('pool:pool1:2', ['pool:pool1'])
+    create_task_dims_set('pool:pool1:3', ['pool:pool1', 'dim:0'])
+    create_task_dims_set('pool:pool2:4', ['pool:pool2'])
+    create_task_dims_set('pool:pool2:5', ['pool:pool2', 'dim:0'])
+    bot_matches.matches = [
+        'bot:bot-id:1',
+        'pool:pool1:2',
+        'pool:pool1:3',
+        'pool:pool2:4',
+        'pool:pool2:5',
+    ]
+    bot_matches.put()
+
+    # The next call discovers them and doesn't submit any TQ tasks.
+    queues = task_queues._assert_bot_dimensions_async(dims).get_result()
+    self.assertEqual(queues, [1, 2, 3, 4, 5])
+    self.assertEqual(len(tq), 0)
+
+    # Some time later the rescan is triggered.
+    now += datetime.timedelta(minutes=11)
+    self.mock_now(now)
+    queues = task_queues._assert_bot_dimensions_async(dims).get_result()
+    self.assertEqual(queues, [1, 2, 3, 4, 5])
+
+    # Enqueued the rescan task.
+    self.assertEqual(len(tq), 1)
+    self.assertEqual(json.loads(tq[0]), {
+        u'bot_id': u'bot-id',
+        u'rescan_counter': 2,
+        u'rescan_reason': u'periodic',
+    })
+    del tq[:]
+
+    # Bots dimensions change. Unmatching queues are no longer reported.
+    dims['dim'] = ['1']
+    queues = task_queues._assert_bot_dimensions_async(dims).get_result()
+    self.assertEqual(queues, [1, 2, 4])
+
+    # Enqueued the rescan task.
+    self.assertEqual(len(tq), 1)
+    self.assertEqual(
+        json.loads(tq[0]), {
+            u'bot_id': u'bot-id',
+            u'rescan_counter': 3,
+            u'rescan_reason': u'dims added [dim:1], dims removed [dim:0]',
+        })
+    del tq[:]
+
+    # Changes are reflected in the entity.
+    bot_matches = bot_matches_key.get()
+    self.assertEqual(
+        bot_matches.to_dict(),
+        {
+            'dimensions':
+            [u'dim:1', u'id:bot-id', u'pool:pool1', u'pool:pool2'],
+            'last_addition_ts': None,
+            'last_cleanup_ts': now,
+            'last_rescan_enqueued_ts': now,
+            'last_rescan_finished_ts': None,  # we mocked this out
+            'matches': [u'bot:bot-id:1', u'pool:pool1:2', u'pool:pool2:4'],
+            'next_rescan_ts': now + datetime.timedelta(minutes=10),
+            'rescan_counter': 3
+        })
+
+    # Some task set disappears (e.g. gets cleaned up by the cron).
+    now += datetime.timedelta(minutes=5)
+    self.mock_now(now)
+    delete_task_dims_set('pool:pool2:4')
+
+    # It is no longer assigned to the bot. This doesn't enqueue a task.
+    queues = task_queues._assert_bot_dimensions_async(dims).get_result()
+    self.assertEqual(queues, [1, 2])
+    self.assertEqual(len(tq), 0)
+
+    # Changes are reflected in the entity.
+    prev_state = bot_matches.to_dict()
+    bot_matches = bot_matches_key.get()
+    self.assertEqual(
+        bot_matches.to_dict(),
+        {
+            'dimensions':
+            [u'dim:1', u'id:bot-id', u'pool:pool1', u'pool:pool2'],
+            'last_addition_ts': None,
+            'last_cleanup_ts': now,
+            'last_rescan_enqueued_ts': prev_state['last_rescan_enqueued_ts'],
+            'last_rescan_finished_ts': None,  # we mocked this out
+            'matches': [u'bot:bot-id:1', u'pool:pool1:2'],
+            'next_rescan_ts': prev_state['next_rescan_ts'],
+            'rescan_counter': prev_state['rescan_counter'],
+        })
 
 
 class TestMapAsync(test_env_handlers.AppTestBase):
