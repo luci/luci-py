@@ -1334,11 +1334,13 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(stats.noop_txns, 0)
 
   @staticmethod
-  def _create_task_dims_set(sets_id, task_dims):
+  def _create_task_dims_set(sets_id, *task_dims):
+    exp_map = {
+        tuple(dims): utils.utcnow() + datetime.timedelta(hours=10)
+        for dims in task_dims
+    }
     ndb.transaction_async(lambda: task_queues._put_task_dimensions_sets_async(
-        sets_id, {
-            tuple(task_dims): utils.utcnow() + datetime.timedelta(hours=10),
-        })).get_result()
+        sets_id, exp_map)).get_result()
 
   @staticmethod
   def _delete_task_dims_set(sets_id):
@@ -1559,6 +1561,143 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
             'rescan_counter':
             555,
         })
+
+  def test_tq_update_bot_matches_async_pool(self):
+    now = datetime.datetime(2010, 1, 2, 3, 4, 5)
+    self.mock_now(now)
+
+    task_sets_id = 'pool:p:1'
+    task_sets_dims = [['pool:p', 'dim:0'], ['pool:p', 'dim:1']]
+    self._create_task_dims_set(task_sets_id, *task_sets_dims)
+
+    def register_bot(bot_id, dims, matches):
+      task_queues.BotDimensionsMatches(
+          id=bot_id,
+          dimensions=sorted(dims + ['id:' + bot_id]),
+          matches=matches,
+          last_addition_ts=utils.EPOCH,
+      ).put()
+
+    # Bots that should be matched.
+    register_bot('match-0', ['pool:p', 'dim:0'], ['pool:p:555'])
+    register_bot('match-1', ['pool:p', 'dim:1'], [])
+    register_bot('match-2', ['pool:p', 'dim:0', 'dim:1'], [])
+    register_bot('match-3', ['pool:p', 'dim:0', 'extra:0'], [])
+
+    # Will be visited, but not updated (since it already has the match)
+    register_bot('untouched-0', ['pool:p', 'dim:0'], [task_sets_id])
+
+    # Bots that should be left untouched.
+    register_bot('mismatch-0', ['pool:p'], ['pool:p:555'])
+    register_bot('mismatch-1', ['pool:p', 'dim:nope'], ['pool:p:555'])
+    register_bot('mismatch-2', ['pool:another', 'dim:0'], ['pool:p:555'])
+
+    self.assertTrue(
+        task_queues._tq_update_bot_matches_async(task_sets_id, task_sets_dims,
+                                                 now).get_result())
+
+    def assert_matched(bot_id, matches):
+      ent = ndb.Key(task_queues.BotDimensionsMatches, bot_id).get()
+      self.assertEqual(ent.matches, matches)
+      self.assertEqual(ent.last_addition_ts, now)
+
+    def assert_untouched(bot_id, matches):
+      ent = ndb.Key(task_queues.BotDimensionsMatches, bot_id).get()
+      self.assertEqual(ent.matches, matches)
+      self.assertEqual(ent.last_addition_ts, utils.EPOCH)
+
+    assert_matched('match-0', [task_sets_id, 'pool:p:555'])
+    assert_matched('match-1', [task_sets_id])
+    assert_matched('match-2', [task_sets_id])
+    assert_matched('match-3', [task_sets_id])
+
+    assert_untouched('untouched-0', [task_sets_id])
+    assert_untouched('mismatch-0', ['pool:p:555'])
+    assert_untouched('mismatch-1', ['pool:p:555'])
+    assert_untouched('mismatch-2', ['pool:p:555'])
+
+  def test_tq_update_bot_matches_async_bot(self):
+    now = datetime.datetime(2010, 1, 2, 3, 4, 5)
+    self.mock_now(now)
+
+    task_queues.BotDimensionsMatches(
+        id='bot-id',
+        dimensions=['id:bot-id', 'dim:0', 'dim:1', 'pool:p'],
+        matches=['pool:p:123', 'bot:bot-id:456'],
+        last_addition_ts=utils.EPOCH,
+    ).put()
+
+    def match_task(task_sets_id, task_sets_dims):
+      self._create_task_dims_set(task_sets_id, *task_sets_dims)
+      self.assertTrue(
+          task_queues._tq_update_bot_matches_async(task_sets_id, task_sets_dims,
+                                                   now).get_result())
+
+    # Will be matched.
+    match_task('bot:bot-id:1', [['id:bot-id', 'dim:0']])
+    match_task('bot:bot-id:2', [['id:bot-id', 'dim:1']])
+    match_task('bot:bot-id:3', [['id:bot-id', 'dim:0', 'dim:1']])
+    match_task('bot:bot-id:4', [['id:bot-id', 'dim:z'], ['id:bot-id', 'dim:0']])
+    match_task('bot:bot-id:5', [['id:bot-id']])
+
+    # Will not be matched, wrong dims.
+    match_task('bot:bot-id:6', [['id:bot-id', 'dim:3']])
+    match_task('bot:bot-id:7', [['id:bot-id', 'dim:0', 'extra:1']])
+
+    ent = ndb.Key(task_queues.BotDimensionsMatches, 'bot-id').get()
+    self.assertEqual(ent.matches, [
+        u'bot:bot-id:1',
+        u'bot:bot-id:2',
+        u'bot:bot-id:3',
+        u'bot:bot-id:4',
+        u'bot:bot-id:456',
+        u'bot:bot-id:5',
+        u'pool:p:123',
+    ])
+
+  def test_tq_update_bot_matches_async_skip(self):
+    now = datetime.datetime(2010, 1, 2, 3, 4, 5)
+    self.mock_now(now)
+
+    task_queues.BotDimensionsMatches(
+        id='bot-id',
+        dimensions=['id:bot-id', 'dim:0', 'dim:1', 'pool:p'],
+        matches=[],
+        last_addition_ts=utils.EPOCH,
+    ).put()
+
+    def matches():
+      return ndb.Key(task_queues.BotDimensionsMatches, 'bot-id').get().matches
+
+    def call(sets_id, tasks_dims):
+      return task_queues._tq_update_bot_matches_async(sets_id, tasks_dims,
+                                                      now).get_result()
+
+    # Will do nothing, no TaskDimensionsSets entity is stored.
+    self.assertTrue(call('bot:bot-id:1', [['id:bot-id']]))
+    self.assertEqual(matches(), [])
+
+    # Will do nothing, all sets are not in the entity.
+    self._create_task_dims_set('bot:bot-id:1', ['id:bot-id', 'dim:0'])
+    self.assertTrue(
+        call('bot:bot-id:1', [['id:bot-id'], ['id:bot-id', 'dim:1']]))
+    self.assertEqual(matches(), [])
+
+  def test_tq_update_bot_matches_async_no_matches(self):
+    now = datetime.datetime(2010, 1, 2, 3, 4, 5)
+    self.mock_now(now)
+
+    def call(sets_id, tasks_dims):
+      return task_queues._tq_update_bot_matches_async(sets_id, tasks_dims,
+                                                      now).get_result()
+
+    # No matching bot.
+    self._create_task_dims_set('bot:bot-id:1', ['id:bot-id'])
+    self.assertTrue(call('bot:bot-id:1', [['id:bot-id']]))
+
+    # No matches in a pool.
+    self._create_task_dims_set('pool:p:1', ['pool:p'])
+    self.assertTrue(call('pool:p:1', [['pool:p']]))
 
 
 class TestMapAsync(test_env_handlers.AppTestBase):
