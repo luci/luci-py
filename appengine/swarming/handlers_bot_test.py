@@ -444,9 +444,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
         'ts': self.now,
         'version': self.bot_version,
     }
-    events = [
-        e.to_dict() for e in bot_management.get_events_query('bot1', True)
-    ]
+    events = [e.to_dict() for e in bot_management.get_events_query('bot1')]
     self.assertEqual(events[0], expected_event)
 
     # BotInfo should be changed to quarantined state, too.
@@ -1349,9 +1347,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
       self.assertEqual({}, response)
 
     # TODO(maruel): Replace with client api to query last BotEvent.
-    actual = [
-        e.to_dict() for e in bot_management.get_events_query('bot1', True)
-    ]
+    actual = [e.to_dict() for e in bot_management.get_events_query('bot1')]
     expected = [{
         'authenticated_as': u'bot:whitelisted-ip',
         'dimensions': dimensions,

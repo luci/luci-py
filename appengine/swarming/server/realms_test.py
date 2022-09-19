@@ -73,6 +73,8 @@ def _gen_pool_config(realm='test:pool/realm', enforced_realm_permissions=()):
 
 
 class RealmsTest(test_case.TestCase):
+  # Ensures that the test suite picks up the correct index.yaml file
+  APP_DIR = test_env.APP_DIR
 
   def setUp(self):
     super(RealmsTest, self).setUp()

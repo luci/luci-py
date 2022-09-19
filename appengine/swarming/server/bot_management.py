@@ -328,8 +328,7 @@ class BotInfo(_BotCommon):
 class BotEvent(_BotCommon):
   """This entity is immutable.
 
-  Parent is BotRoot. Key id is monotonically decreasing with
-  datastore_utils.store_new_version().
+  Parent is BotRoot.
 
   This entity is created on each bot state transition.
   """
@@ -396,12 +395,6 @@ class BotEvent(_BotCommon):
     return (self.event_type == 'request_sleep' and not self.quarantined
             and not self.maintenance_msg)
 
-  @property
-  def previous_key(self):
-    """Returns the ndb.Key to the previous event."""
-    return ndb.Key(
-        self.__class__, self.key.integer_id()+1, parent=self.key.parent())
-
   def to_proto(self, out):
     """Converts self to a swarming_pb2.BotEvent."""
     if self.ts:
@@ -465,7 +458,7 @@ def get_info_key(bot_id):
   return ndb.Key(BotInfo, 'info', parent=get_root_key(bot_id))
 
 
-def get_events_query(bot_id, order):
+def get_events_query(bot_id):
   """Returns an ndb.Query for most recent events in reverse chronological order.
   """
   # Disable the in-process local cache. This is important, as there can be up to
@@ -475,8 +468,7 @@ def get_events_query(bot_id, order):
   q = BotEvent.query(
       default_options=ndb.QueryOptions(use_cache=False),
       ancestor=get_root_key(bot_id))
-  if order:
-    q = q.order(BotEvent.key)
+  q = q.order(-BotEvent.ts)
   return q
 
 
@@ -667,20 +659,20 @@ def bot_event(
   # aren't provided by the bot.
   event_dimensions_flat = dimensions_flat or bot_info.dimensions_flat
 
-  event = BotEvent(
-      parent=get_root_key(bot_id),
-      event_type=event_type,
-      external_ip=external_ip,
-      authenticated_as=authenticated_as,
-      dimensions_flat=event_dimensions_flat,
-      quarantined=bot_info.quarantined,
-      maintenance_msg=bot_info.maintenance_msg,
-      state=bot_info.state,
-      task_id=task_id or bot_info.task_id,
-      version=bot_info.version,
-      **kwargs)
+  event = BotEvent(parent=get_root_key(bot_id),
+                   event_type=event_type,
+                   external_ip=external_ip,
+                   authenticated_as=authenticated_as,
+                   dimensions_flat=event_dimensions_flat,
+                   quarantined=bot_info.quarantined,
+                   maintenance_msg=bot_info.maintenance_msg,
+                   state=bot_info.state,
+                   task_id=task_id or bot_info.task_id,
+                   version=bot_info.version,
+                   **kwargs)
 
   datastore_utils.store_new_version(event, BotRoot, [bot_info])
+
   return event.key
 
 

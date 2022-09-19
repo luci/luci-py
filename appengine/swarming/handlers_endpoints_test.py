@@ -3327,24 +3327,34 @@ class BotApiTest(BaseTest):
   def test_events(self):
     # Run one task, push an event manually.
     self.mock(random, 'getrandbits', lambda _: 0x88)
+    first_ticker = test_case.Ticker(self.now, datetime.timedelta(seconds=1))
+    t1 = self.mock_now(first_ticker())
 
     self.set_as_bot()
-    params = self.do_handshake(do_first_poll=True)
+    params = self.do_handshake()
+    t2 = self.mock_now(first_ticker())
+
+    self.bot_poll(params=params)
     self.set_as_user()
     self.client_create_task_raw()
     self.set_as_bot()
+    t3 = self.mock_now(first_ticker())
+
     res = self.bot_poll(params=params)
-    now_60 = self.mock_now(self.now, 60)
+    now_60 = first_ticker.last() + datetime.timedelta(seconds=60)
+    second_ticker = test_case.Ticker(now_60, datetime.timedelta(seconds=1))
+    t4 = self.mock_now(second_ticker())
+
     response = self.bot_complete_task(task_id=res['manifest']['task_id'])
     self.assertEqual({u'must_stop': False, u'ok': True}, response)
-
     params['event'] = 'bot_rebooting'
     params['message'] = 'for the best'
+    t5 = self.mock_now(second_ticker())
+
     response = self.post_json('/swarming/api/v1/bot/event', params)
     self.assertEqual({}, response)
-
-    start = utils.datetime_to_timestamp(self.now) / 1000000.
-    end = utils.datetime_to_timestamp(now_60) / 1000000.
+    start = utils.datetime_to_timestamp(first_ticker.first()) / 1000000.
+    end = utils.datetime_to_timestamp(second_ticker.last()) / 1000000.
     self.set_as_privileged_user()
     body = message_to_dict(
         handlers_endpoints.BotEventsRequest.combined_message_class(
@@ -3375,73 +3385,71 @@ class BotApiTest(BaseTest):
     state_dict.pop('bot_group_cfg_version')
     state_no_cfg_ver = unicode(
         json.dumps(state_dict, sort_keys=True, separators=(',', ':')))
-    expected = {
-        u'items': [
-            {
-                u'authenticated_as': u'bot:whitelisted-ip',
-                u'dimensions': dimensions,
-                u'event_type': u'bot_rebooting',
-                u'external_ip': unicode(self.source_ip),
-                u'message': u'for the best',
-                u'quarantined': False,
-                u'state': state,
-                u'ts': fmtdate(now_60),
-                u'version': unicode(self.bot_version),
-            },
-            {
-                u'authenticated_as': u'bot:whitelisted-ip',
-                u'dimensions': dimensions,
-                u'event_type': u'task_completed',
-                u'external_ip': unicode(self.source_ip),
-                u'quarantined': False,
-                u'state': state,
-                u'task_id': u'5cee488008811',
-                u'ts': fmtdate(now_60),
-                u'version': unicode(self.bot_version),
-            },
-            {
-                u'authenticated_as': u'bot:whitelisted-ip',
-                u'dimensions': dimensions,
-                u'event_type': u'request_task',
-                u'external_ip': unicode(self.source_ip),
-                u'quarantined': False,
-                u'state': state,
-                u'task_id': u'5cee488008811',
-                u'ts': fmtdate(self.now),
-                u'version': unicode(self.bot_version),
-            },
-            {
-                u'authenticated_as': u'bot:whitelisted-ip',
-                u'dimensions': dimensions,
-                u'event_type': u'request_sleep',
-                u'external_ip': unicode(self.source_ip),
-                u'quarantined': False,
-                u'state': state,
-                u'ts': fmtdate(self.now),
-                u'version': unicode(self.bot_version),
-            },
-            {
-                u'authenticated_as': u'bot:whitelisted-ip',
-                u'dimensions': dimensions,
-                u'event_type': u'bot_connected',
-                u'external_ip': unicode(self.source_ip),
-                u'quarantined': False,
-                u'state': state_no_cfg_ver,
-                u'ts': fmtdate(self.now),
-                u'version': u'123',
-            },
-        ],
-        u'now': fmtdate(now_60),
-    }
-    self.assertEqual(expected, response.json)
+    expected = [
+        {
+            u'authenticated_as': u'bot:whitelisted-ip',
+            u'dimensions': dimensions,
+            u'event_type': u'bot_rebooting',
+            u'external_ip': unicode(self.source_ip),
+            u'message': u'for the best',
+            u'quarantined': False,
+            u'state': state,
+            u'ts': fmtdate(t5),
+            u'version': unicode(self.bot_version),
+        },
+        {
+            u'authenticated_as': u'bot:whitelisted-ip',
+            u'dimensions': dimensions,
+            u'event_type': u'task_completed',
+            u'external_ip': unicode(self.source_ip),
+            u'quarantined': False,
+            u'state': state,
+            u'task_id': res['manifest']['task_id'],
+            u'ts': fmtdate(t4),
+            u'version': unicode(self.bot_version),
+        },
+        {
+            u'authenticated_as': u'bot:whitelisted-ip',
+            u'dimensions': dimensions,
+            u'event_type': u'request_task',
+            u'external_ip': unicode(self.source_ip),
+            u'quarantined': False,
+            u'state': state,
+            u'task_id': res['manifest']['task_id'],
+            u'ts': fmtdate(t3),
+            u'version': unicode(self.bot_version),
+        },
+        {
+            u'authenticated_as': u'bot:whitelisted-ip',
+            u'dimensions': dimensions,
+            u'event_type': u'request_sleep',
+            u'external_ip': unicode(self.source_ip),
+            u'quarantined': False,
+            u'state': state,
+            u'ts': fmtdate(t2),
+            u'version': unicode(self.bot_version),
+        },
+        {
+            u'authenticated_as': u'bot:whitelisted-ip',
+            u'dimensions': dimensions,
+            u'event_type': u'bot_connected',
+            u'external_ip': unicode(self.source_ip),
+            u'quarantined': False,
+            u'state': state_no_cfg_ver,
+            u'ts': fmtdate(t1),
+            u'version': u'123',
+        },
+    ]
+    self.assertEqual(expected, response.json['items'])
 
     # Now test with a subset.
+    start = utils.datetime_to_timestamp(second_ticker.first()) / 1000000.
+    end = utils.datetime_to_timestamp(second_ticker.last()) / 1000000.
     body = message_to_dict(
         handlers_endpoints.BotEventsRequest.combined_message_class(
-            bot_id='bot1', start=end, end=end + 1))
+            bot_id='bot1', start=start, end=end + 1))
     response = self.call_api('events', body=body)
-    expected['items'] = expected['items'][:2]
-    self.assertEqual(expected, response.json)
+    self.assertEqual(expected[:2], response.json['items'])
 
   def test_terminate_admin(self):
     self.set_as_bot()

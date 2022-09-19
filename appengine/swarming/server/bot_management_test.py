@@ -359,15 +359,14 @@ class BotManagementTest(test_case.TestCase):
     # bot_event should have task_id
     if not skip_store_event:
       expected_event = _gen_bot_event(event_type=event, task_id=task_id)
-      last_event = bot_management.get_events_query(bot_id, True).get()
+      last_event = bot_management.get_events_query(bot_id).get()
       self.assertEqual(expected_event, last_event.to_dict())
 
   def test_get_events_query(self):
     _bot_event(event_type='bot_connected')
     expected = [_gen_bot_event(event_type=u'bot_connected')]
     self.assertEqual(
-        expected,
-        [i.to_dict() for i in bot_management.get_events_query('id1', True)])
+        expected, [i.to_dict() for i in bot_management.get_events_query('id1')])
 
   def test_bot_event_poll_sleep(self):
     _bot_event(event_type='request_sleep')
@@ -387,7 +386,7 @@ class BotManagementTest(test_case.TestCase):
 
     # BotEvent is registered for poll when BotInfo creates
     expected_event = _gen_bot_event(event_type=u'request_sleep')
-    bot_events = bot_management.get_events_query('id1', True)
+    bot_events = bot_management.get_events_query('id1')
     self.assertEqual([expected_event], [e.to_dict() for e in bot_events])
 
     # flush bot events
@@ -395,13 +394,13 @@ class BotManagementTest(test_case.TestCase):
 
     # BotEvent is not registered for poll when no dimensions change
     _bot_event(event_type='request_sleep')
-    self.assertEqual([], bot_management.get_events_query('id1', True).fetch())
+    self.assertEqual([], bot_management.get_events_query('id1').fetch())
 
     # BotEvent is registered for poll when dimensions change
     dims = {u'foo': [u'bar']}
     _bot_event(event_type='request_sleep', dimensions=dims)
     expected_event['dimensions'] = dims
-    bot_events = bot_management.get_events_query('id1', True).fetch()
+    bot_events = bot_management.get_events_query('id1').fetch()
     self.assertEqual([expected_event], [e.to_dict() for e in bot_events])
 
   def test_bot_event_busy(self):
@@ -424,8 +423,7 @@ class BotManagementTest(test_case.TestCase):
         _gen_bot_event(event_type=u'bot_connected'),
     ]
     self.assertEqual(
-        expected,
-        [e.to_dict() for e in bot_management.get_events_query('id1', True)])
+        expected, [e.to_dict() for e in bot_management.get_events_query('id1')])
 
   def test_bot_event_update_dimensions(self):
     bot_id = 'id1'
@@ -620,7 +618,7 @@ class BotManagementTest(test_case.TestCase):
     check_alive([bot2_alive])
 
     # the last event should be bot_missing
-    events = list(bot_management.get_events_query('id1', order=True))
+    events = list(bot_management.get_events_query('id1'))
     event = events[0]
     bq_event = swarming_pb2.BotEvent()
     event.to_proto(bq_event)

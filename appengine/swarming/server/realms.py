@@ -680,7 +680,7 @@ def _check_permission(perm, realms, identity=None):
 def _retrieve_bot_dimensions(bot_id):
   """Retrieves bot dimensions"""
   # get the last BotEvent because BotInfo may have been deleted.
-  events = bot_management.get_events_query(bot_id, True).fetch(1)
+  events = bot_management.get_events_query(bot_id).fetch(1)
   if not events:
     raise auth.AuthorizationError(
         'No such bot or no permission to use it: "%s".' % bot_id)

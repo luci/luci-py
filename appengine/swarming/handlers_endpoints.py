@@ -805,7 +805,7 @@ class SwarmingBotService(remote.Service):
       # entity. If this is the case, it means the bot was deleted but it's
       # useful to show information about it to the user even if the bot was
       # deleted.
-      events = bot_management.get_events_query(bot_id, True).fetch(1)
+      events = bot_management.get_events_query(bot_id).fetch(1)
       if not events:
         raise endpoints.NotFoundException('%s not found.' % bot_id)
       bot = bot_management.BotInfo(
@@ -882,10 +882,7 @@ class SwarmingBotService(remote.Service):
       now = utils.utcnow()
       start = message_conversion.epoch_to_datetime(request.start)
       end = message_conversion.epoch_to_datetime(request.end)
-      order = not (start or end)
-      q = bot_management.get_events_query(bot_id, order)
-      if not order:
-        q = q.order(-bot_management.BotEvent.ts, bot_management.BotEvent.key)
+      q = bot_management.get_events_query(bot_id)
       if start:
         q = q.filter(bot_management.BotEvent.ts >= start)
       if end:

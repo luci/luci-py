@@ -35,6 +35,33 @@ def mock_now(test, now, seconds):
   return now
 
 
+class Ticker(object):
+  def __init__(self, start, increment=None):
+    """Creates a ticker timer, which will start incrementing a timer whenever
+    __call__ is invoked.
+    Args:
+    - increment: default value is datetime.timedelta(seconds=1)
+    - start: the starting point of the timer
+    """
+    self._current = start
+    self._start = start
+    if increment:
+      self._increment = increment
+    else:
+      self._increment = datetime.timedelta(seconds=1)
+
+  def first(self):
+    return self._start
+
+  def last(self):
+    return self._current
+
+  def __call__(self):
+    old = self._current
+    self._current += self._increment
+    return old
+
+
 class TestCase(auto_stub.TestCase):
   """Support class to enable more unit testing in GAE.
 
@@ -195,7 +222,6 @@ class TestCase(auto_stub.TestCase):
         continue
       return t
     return None
-
 
 class Endpoints(object):
   """Handles endpoints API calls."""
