@@ -1480,7 +1480,7 @@ def _assert_task_dimensions_async(task_dimensions, exp_ts):
   def txn():
     # Set the stored expiration time far in advance. This reduces frequency of
     # transactions that update the expiration time in case of a steady stream of
-    # requests (one transaction "covers" all next ~5h of requests: they'll see
+    # requests (one transaction "covers" all next ~4h of requests: they'll see
     # the entity as fresh). The downside is that we keep stuff in datastore for
     # longer than strictly necessary per `exp_ts`. But this is actually a good
     # thing for infrequent tasks with short expiration time. We **want** to keep
@@ -1488,7 +1488,7 @@ def _assert_task_dimensions_async(task_dimensions, exp_ts):
     # are no such tasks the queues) to avoid frequently creating and deleting
     # TaskDimensionsSets entities for them. Creating TaskDimensionsSets is a
     # costly operation since it requires a scan to find matching bots.
-    extended_ts = exp_ts + datetime.timedelta(hours=5)
+    extended_ts = exp_ts + datetime.timedelta(hours=4)
 
     # Load the fresh state, since we are in the transaction now.
     info = yield info_key.get_async()
@@ -1801,7 +1801,7 @@ def _assert_bot_dimensions_async(bot_dimensions):
       txn_ent.dimensions = bot_dimensions_flat
       txn_ent.matches = [x for x in txn_ent.matches if x not in stale]
       txn_ent.rescan_counter += 1
-      txn_ent.next_rescan_ts = now + _random_timedelta_mins(5, 15)
+      txn_ent.next_rescan_ts = now + _random_timedelta_mins(20, 40)
       txn_ent.last_rescan_enqueued_ts = now
       txn_ent.last_cleanup_ts = now
       # This eventually calls _tq_rescan_matching_task_sets_async.

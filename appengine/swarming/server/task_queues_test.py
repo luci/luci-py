@@ -965,7 +965,7 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
   def _stored_task_dims_expiry(expiry):
     """Expiry of sets stored in TaskDimensionsSets given a task slice expiry."""
     expiry += datetime.timedelta(minutes=15)  # mocked randomization
-    expiry += datetime.timedelta(hours=5)  # extra time added in the txn
+    expiry += datetime.timedelta(hours=4)  # extra time added in the txn
     return expiry
 
   @parameterized.expand([
@@ -1376,7 +1376,7 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
             'last_rescan_enqueued_ts': now,
             'last_rescan_finished_ts': None,
             'matches': [],
-            'next_rescan_ts': now + datetime.timedelta(minutes=10),
+            'next_rescan_ts': now + datetime.timedelta(minutes=30),
             'rescan_counter': 1
         })
 
@@ -1412,7 +1412,7 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(len(tq), 0)
 
     # Some time later the rescan is triggered.
-    now += datetime.timedelta(minutes=11)
+    now += datetime.timedelta(minutes=31)
     self.mock_now(now)
     queues = task_queues._assert_bot_dimensions_async(dims).get_result()
     self.assertEqual(queues, [1, 2, 3, 4, 5])
@@ -1453,7 +1453,7 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
             'last_rescan_enqueued_ts': now,
             'last_rescan_finished_ts': None,  # we mocked this out
             'matches': [u'bot:bot-id:1', u'pool:pool1:2', u'pool:pool2:4'],
-            'next_rescan_ts': now + datetime.timedelta(minutes=10),
+            'next_rescan_ts': now + datetime.timedelta(minutes=30),
             'rescan_counter': 3
         })
 
