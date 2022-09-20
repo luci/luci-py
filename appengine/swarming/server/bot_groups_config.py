@@ -82,6 +82,9 @@ BotGroupConfig = collections.namedtuple(
         # An email, "bot" or "". See 'system_service_account' in bots.proto.
         'system_service_account',
 
+        # The cloud project id where the bot saves its logs.
+        'logs_cloud_project',
+
         # True if it's default group config.
         'is_default',
     ])
@@ -525,6 +528,7 @@ def _default_bot_groups():
           bot_config_script_rev='',
           bot_config_script_content='',
           system_service_account='',
+          logs_cloud_project=None,
           is_default=True))
 
 
@@ -588,6 +592,7 @@ def _bot_group_proto_to_tuple(msg, trusted_dimensions):
       bot_config_script_rev='',
       bot_config_script_content=msg.bot_config_script_content or '',
       system_service_account=msg.system_service_account or '',
+      logs_cloud_project=msg.logs_cloud_project or None,
       is_default=not msg.bot_id and not msg.bot_id_prefix)
 
 

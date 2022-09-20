@@ -36,6 +36,7 @@ from server import large
 from server import task_pack
 from server import task_request
 from server import task_result
+from server import task_scheduler
 from server import task_to_run
 import ts_mon_metrics
 
@@ -111,8 +112,10 @@ def _gen_run_result(**kwargs):
   result_summary = _gen_summary_result(**kwargs)
   request = result_summary.request_key.get()
   to_run = task_to_run.new_task_to_run(request, 0)
-  run_result = task_result.new_run_result(request, to_run, 'localhost', 'abc',
-                                          {}, result_summary.resultdb_info)
+  bot_details = task_scheduler.BotDetails('abc', 'test_project')
+  run_result = task_result.new_run_result(request, to_run, 'localhost',
+                                          bot_details, {},
+                                          result_summary.resultdb_info)
   run_result.started_ts = result_summary.modified_ts
   run_result.modified_ts = utils.utcnow()
   run_result.dead_after_ts = utils.utcnow() + datetime.timedelta(
@@ -164,6 +167,8 @@ class TaskResultApiTest(TestCase):
         'bot_idle_since_ts':
         None,
         'bot_version':
+        None,
+        'bot_logs_cloud_project':
         None,
         'cipd_pins':
         None,
@@ -239,6 +244,7 @@ class TaskResultApiTest(TestCase):
         'bot_id': u'localhost',
         'bot_idle_since_ts': None,
         'bot_version': u'abc',
+        'bot_logs_cloud_project': None,
         'cas_output_root': None,
         'children_task_ids': [],
         'cipd_pins': None,
@@ -349,8 +355,9 @@ class TaskResultApiTest(TestCase):
   def test_new_run_result(self):
     request = _gen_request()
     to_run = task_to_run.new_task_to_run(request, 0)
+    bot_details = task_scheduler.BotDetails(u'abc', None)
     actual = task_result.new_run_result(
-        request, to_run, u'localhost', u'abc', {
+        request, to_run, u'localhost', bot_details, {
             u'id': [u'localhost'],
             u'foo': [u'bar', u'biz']
         },
@@ -456,7 +463,9 @@ class TaskResultApiTest(TestCase):
   def test_new_run_result_duration_no_exit_code(self):
     request = _gen_request()
     to_run = task_to_run.new_task_to_run(request, 0)
-    actual = task_result.new_run_result(request, to_run, u'localhost', u'abc', {
+    bot_details = task_scheduler.BotDetails(u'abc', None)
+    actual = task_result.new_run_result(request, to_run, u'localhost',
+        bot_details, {
         u'id': [u'localhost'],
         u'foo': [u'bar', u'biz']
     }, None)
@@ -504,8 +513,9 @@ class TaskResultApiTest(TestCase):
     self.mock_now(reap_ts)
     to_run.queue_number = None
     to_run.put()
+    bot_details = task_scheduler.BotDetails(u'abc', 'test_project')
     run_result = task_result.new_run_result(request, to_run, u'localhost',
-                                            u'abc', {},
+                                            bot_details, {},
                                             result_summary.resultdb_info)
     run_result.started_ts = utils.utcnow()
     run_result.modified_ts = run_result.started_ts
@@ -518,6 +528,7 @@ class TaskResultApiTest(TestCase):
         bot_dimensions={},
         bot_version=u'abc',
         bot_id=u'localhost',
+        bot_logs_cloud_project=u'test_project',
         costs_usd=[0.],
         modified_ts=reap_ts,
         state=task_result.State.RUNNING,
@@ -559,6 +570,7 @@ class TaskResultApiTest(TestCase):
         bot_dimensions={},
         bot_version=u'abc',
         bot_id=u'localhost',
+        bot_logs_cloud_project=u'test_project',
         completed_ts=complete_ts,
         costs_usd=[0.],
         duration=0.1,
@@ -653,8 +665,10 @@ class TaskResultApiTest(TestCase):
     result_summary.modified_ts = utils.utcnow()
     ndb.transaction(result_summary.put)
     to_run = task_to_run.new_task_to_run(request, 0)
-    run_result = task_result.new_run_result(request, to_run, 'localhost', 'abc',
-                                            {}, result_summary.resultdb_info)
+    bot_details = task_scheduler.BotDetails('abc', 'test_project')
+    run_result = task_result.new_run_result(request, to_run, 'localhost',
+                                            bot_details, {},
+                                            result_summary.resultdb_info)
     run_result.started_ts = utils.utcnow()
     run_result.modified_ts = run_result.started_ts
     run_result.dead_after_ts = run_result.started_ts + datetime.timedelta(
@@ -674,8 +688,10 @@ class TaskResultApiTest(TestCase):
     request = _gen_request()
     result_summary = task_result.new_result_summary(request)
     to_run = task_to_run.new_task_to_run(request, 0)
-    run_result = task_result.new_run_result(request, to_run, 'localhost', 'abc',
-                                            {}, result_summary.resultdb_info)
+    bot_details = task_scheduler.BotDetails('abc', 'test_project')
+    run_result = task_result.new_run_result(request, to_run, 'localhost',
+                                            bot_details, {},
+                                            result_summary.resultdb_info)
     run_result.started_ts = utils.utcnow()
     self.assertTrue(result_summary.need_update_from_run_result(run_result))
     result_summary.modified_ts = utils.utcnow()
@@ -695,8 +711,10 @@ class TaskResultApiTest(TestCase):
     request = _gen_request()
     result_summary = task_result.new_result_summary(request)
     to_run = task_to_run.new_task_to_run(request, 0)
-    run_result = task_result.new_run_result(request, to_run, 'localhost', 'abc',
-                                            {}, result_summary.resultdb_info)
+    bot_details = task_scheduler.BotDetails('abc', 'test_project')
+    run_result = task_result.new_run_result(request, to_run, 'localhost',
+                                            bot_details, {},
+                                            result_summary.resultdb_info)
     run_result.started_ts = utils.utcnow()
     self.assertTrue(result_summary.need_update_from_run_result(run_result))
     result_summary.modified_ts = utils.utcnow()
@@ -746,8 +764,10 @@ class TaskResultApiTest(TestCase):
     result_summary.modified_ts = utils.utcnow()
     ndb.transaction(result_summary.put)
     to_run = task_to_run.new_task_to_run(request, 0)
-    run_result = task_result.new_run_result(request, to_run, 'localhost', 'abc',
-                                            {}, result_summary.resultdb_info)
+    bot_details = task_scheduler.BotDetails('abc', 'test_project')
+    run_result = task_result.new_run_result(request, to_run, 'localhost',
+                                            bot_details, {},
+                                            result_summary.resultdb_info)
     run_result.state = task_result.State.TIMED_OUT
     run_result.duration = 0.1
     run_result.exit_code = -1

@@ -677,10 +677,12 @@ class BotPollHandler(_BotBaseHandler):
     reap_deadline = deadline - datetime.timedelta(seconds=10)
     request_uuid = res.request.get('request_uuid')
     try:
+      bot_details = task_scheduler.BotDetails(res.version, res.bot_group_cfg.
+          logs_cloud_project)
       (request, secret_bytes,
        run_result), is_deduped = api_helpers.cache_request(
            'bot_poll', request_uuid, lambda: task_scheduler.bot_reap_task(
-               res.dimensions, queues, res.version, reap_deadline))
+               res.dimensions, queues, bot_details, reap_deadline))
     except self._TIMEOUT_EXCEPTIONS as e:
       self._abort_by_timeout('bot_reap_task', e)
 

@@ -675,6 +675,8 @@ class TaskResult(messages.Message):
   bot_idle_since_ts = message_types.DateTimeField(32)
   # Hash of the bot code which ran the task.
   bot_version = messages.StringField(4)
+  # The cloud project id where the bot saves its logs.
+  bot_logs_cloud_project = messages.StringField(35)
   # List of task IDs that this task triggered, if any.
   children_task_ids = messages.StringField(5, repeated=True)
   # Time the task completed normally. Only one of abandoned_ts or completed_ts

@@ -497,6 +497,9 @@ class _TaskResultCommon(ndb.Model):
   # overhead.
   bot_idle_since_ts = ndb.DateTimeProperty(indexed=False)
 
+  # The cloud project id where the bot saves its logs.
+  bot_logs_cloud_project = ndb.StringProperty(indexed=False)
+
   # Active server version(s). Note that during execution, the active server
   # version may have changed, this list will list all versions seen as the task
   # was updated.
@@ -1541,7 +1544,7 @@ def new_result_summary(request):
       priority=request.priority)
 
 
-def new_run_result(request, to_run, bot_id, bot_version, bot_dimensions,
+def new_run_result(request, to_run, bot_id, bot_details, bot_dimensions,
                    resultdb_info):
   """Returns a new TaskRunResult for a TaskRequest.
 
@@ -1555,7 +1558,8 @@ def new_run_result(request, to_run, bot_id, bot_version, bot_dimensions,
       key=task_pack.result_summary_key_to_run_result_key(summary_key),
       bot_dimensions=bot_dimensions,
       bot_id=bot_id,
-      bot_version=bot_version,
+      bot_version=bot_details.bot_version,
+      bot_logs_cloud_project=bot_details.logs_cloud_project,
       resultdb_info=resultdb_info,
       current_task_slice=to_run.task_slice_index,
       server_versions=[utils.get_app_version()])

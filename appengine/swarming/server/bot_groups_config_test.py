@@ -32,6 +32,7 @@ TEST_CONFIG = bots_pb2.BotsCfg(
             ],
             owners=['owner@example.com'],
             dimensions=['pool:A', 'pool:B', 'other:D'],
+            logs_cloud_project='google.com:chromecompute',
         ),
         # This group includes an injected bot_config and system_service_account.
         bots_pb2.BotGroup(
@@ -39,7 +40,8 @@ TEST_CONFIG = bots_pb2.BotsCfg(
             bot_id_prefix=['bot'],
             auth=[bots_pb2.BotAuth(require_service_account=['a@example.com'])],
             bot_config_script='foo.py',
-            system_service_account='bot'),
+            system_service_account='bot',
+            logs_cloud_project='chrome-infra-logs'),
         bots_pb2.BotGroup(
             auth=[bots_pb2.BotAuth(ip_whitelist='bots')],
             dimensions=['pool:default']),
@@ -79,7 +81,8 @@ EXPECTED_GROUP_1 = bot_groups_config._make_bot_group_config(
     bot_config_script_rev='',
     bot_config_script_content='',
     system_service_account='',
-    is_default=False)
+    is_default=False,
+    logs_cloud_project='google.com:chromecompute')
 
 EXPECTED_GROUP_2 = bot_groups_config._make_bot_group_config(
     owners=(),
@@ -95,7 +98,8 @@ EXPECTED_GROUP_2 = bot_groups_config._make_bot_group_config(
     bot_config_script_rev='',
     bot_config_script_content='print("Hi")',
     system_service_account='bot',
-    is_default=False)
+    is_default=False,
+    logs_cloud_project='chrome-infra-logs')
 
 EXPECTED_GROUP_3 = bot_groups_config._make_bot_group_config(
     owners=(),
@@ -111,7 +115,8 @@ EXPECTED_GROUP_3 = bot_groups_config._make_bot_group_config(
     bot_config_script_rev='',
     bot_config_script_content='',
     system_service_account='',
-    is_default=True)
+    is_default=True,
+    logs_cloud_project=None)
 
 
 DEFAULT_AUTH_CFG = [bots_pb2.BotAuth(ip_whitelist='bots')]
@@ -144,9 +149,9 @@ class BotGroupsConfigTest(test_case.TestCase):
     bot_groups_config.clear_cache()
 
   def test_version(self):
-    self.assertEqual('hash:ebb6f818791207', EXPECTED_GROUP_1.version)
-    self.assertEqual('hash:64de2b9a71310d', EXPECTED_GROUP_2.version)
-    self.assertEqual('hash:5d851a90da99d8', EXPECTED_GROUP_3.version)
+    self.assertEqual('hash:7d27288175e223', EXPECTED_GROUP_1.version)
+    self.assertEqual('hash:2208a8f7c5f4aa', EXPECTED_GROUP_2.version)
+    self.assertEqual('hash:035053f35deb41', EXPECTED_GROUP_3.version)
 
   def test_expand_bot_id_expr_success(self):
 
