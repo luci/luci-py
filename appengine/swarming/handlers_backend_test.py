@@ -141,7 +141,6 @@ class BackendTest(test_env_handlers.AppTestBase):
          '/internal/taskqueue/important/task_queues/update-bot-matches'),
         ('rescan-matching-task-sets',
          '/internal/taskqueue/important/task_queues/rescan-matching-task-sets'),
-        ('tsmon', '/internal/taskqueue/monitoring/tsmon/executors'),
         ('named-cache-task',
          '/internal/taskqueue/important/named_cache/update-pool'),
         ('monitoring-bq-bots-events',

@@ -179,6 +179,22 @@ class CronTasksStats(_CronHandlerBase):
     stats_tasks.cron_generate_stats()
 
 
+class CronTSMonExecutors(_CronHandlerBase):
+  """Exports bot metrics."""
+
+  @decorators.require_cronjob
+  def run_cron(self):
+    ts_mon_metrics.set_global_metrics('executors')
+
+
+class CronTSMonJobs(_CronHandlerBase):
+  """Exports task metrics."""
+
+  @decorators.require_cronjob
+  def run_cron(self):
+    ts_mon_metrics.set_global_metrics('jobs')
+
+
 class CronSendToBQ(_CronHandlerBase):
   """Triggers many tasks queues to send data to BigQuery."""
 
@@ -416,14 +432,6 @@ class TaskMonitoringTasksResultsSummaryBQ(webapp2.RequestHandler):
     task_result.task_bq_summary(start, end)
 
 
-class TaskMonitoringTSMon(webapp2.RequestHandler):
-  """Compute global metrics for timeseries monitoring."""
-
-  @decorators.require_taskqueue('tsmon')
-  def post(self, kind):
-    ts_mon_metrics.set_global_metrics(kind)
-
-
 ###
 
 
@@ -451,6 +459,8 @@ def get_routes():
 
       # Not yet used.
       ('/internal/cron/monitoring/tasks/stats', CronTasksStats),
+      ('/internal/cron/monitoring/tsmon/executors', CronTSMonExecutors),
+      ('/internal/cron/monitoring/tsmon/jobs', CronTSMonJobs),
       ('/internal/cron/monitoring/bq', CronSendToBQ),
       ('/internal/cron/monitoring/bots/aggregate_dimensions',
        CronBotsDimensionAggregationHandler),
@@ -496,8 +506,6 @@ def get_routes():
       (r'/internal/taskqueue/monitoring/bq/tasks/results/summary/'
        r'<timestamp:\d{4}-\d\d-\d\dT\d\d:\d\d>',
        TaskMonitoringTasksResultsSummaryBQ),
-      (r'/internal/taskqueue/monitoring/tsmon/<kind:[0-9A-Za-z_]+>',
-       TaskMonitoringTSMon),
   ]
   return [webapp2.Route(*a) for a in routes]
 

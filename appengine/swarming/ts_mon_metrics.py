@@ -9,8 +9,6 @@ import datetime
 import json
 import logging
 
-from google.appengine.datastore.datastore_query import Cursor
-
 from components import utils
 import gae_ts_mon
 
@@ -374,8 +372,8 @@ def _set_jobs_metrics():
       target_fields = dict(_TARGET_FIELDS)
       if summary.bot_id:
         target_fields['hostname'] = 'autogen:' + summary.bot_id
-      if summary.bot_id and status == 'running':
-        _jobs_running.set(True, target_fields=target_fields, fields=fields)
+        if status == 'running':
+          _jobs_running.set(True, target_fields=target_fields, fields=fields)
       fields['status'] = status
 
       key = tuple(sorted(fields.items()))
@@ -436,11 +434,6 @@ def _set_executors_metrics():
                           target_fields=target_fields)
 
     logging.debug('_set_executors_metrics: processed %d bots', executors_count)
-
-
-def _set_global_metrics():
-  utils.enqueue_task('/internal/taskqueue/monitoring/tsmon/jobs', 'tsmon')
-  utils.enqueue_task('/internal/taskqueue/monitoring/tsmon/executors', 'tsmon')
 
 
 def _tags_to_dict(tags):
@@ -625,4 +618,3 @@ def initialize():
       _jobs_pending_durations,
       _jobs_running,
   ])
-  gae_ts_mon.register_global_metrics_callback('callback', _set_global_metrics)
