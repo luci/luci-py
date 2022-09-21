@@ -2353,31 +2353,29 @@ def assert_bot(bot_root_key, bot_dimensions):
   Returns:
     A list of integers with queues to poll.
   """
-  # Run old and new implementation concurrently. The old one is still used
-  # for real, the new one just used to pre-fill entities before the switch
-  # to use it for real and to show the potential difference.
+  # Run old and new implementation concurrently. The new one is used for real,
+  # the old one is still involved to simplify the rollout and rollbacks. Once
+  # the new one sticks, the old one can be dismantled.
   matches_fut = _assert_bot_dimensions_async(bot_dimensions)
+
   _assert_bot_old_async(bot_root_key, bot_dimensions).get_result()
   old_queues = _get_queues_old(bot_root_key)
-  try:
-    new_queues = matches_fut.get_result()
 
-    old_set = set(old_queues)
-    new_set = set(new_queues)
+  new_queues = matches_fut.get_result()
 
-    old_diff_new = old_set - new_set
-    if old_diff_new:
-      logging.warning('queues_old_diff_new: %s', sorted(old_diff_new))
+  old_set = set(old_queues)
+  new_set = set(new_queues)
 
-    new_diff_old = new_set - old_set
-    if new_diff_old:
-      logging.warning('queues_new_diff_old: %s', sorted(new_diff_old))
+  old_diff_new = old_set - new_set
+  if old_diff_new:
+    logging.warning('queues_old_diff_new: %s', sorted(old_diff_new))
 
-  except (apiproxy_errors.DeadlineExceededError, datastore_utils.CommitError):
-    logging.error('_assert_bot_dimensions_async commit error')
+  new_diff_old = new_set - old_set
+  if new_diff_old:
+    logging.warning('queues_new_diff_old: %s', sorted(new_diff_old))
 
-  _freshen_up_queues_memcache(old_queues)
-  return old_queues
+  _freshen_up_queues_memcache(new_queues)
+  return new_queues
 
 
 def freshen_up_queues(bot_root_key):
@@ -2391,15 +2389,14 @@ def freshen_up_queues(bot_root_key):
   Returns:
     A list of queues consumed by the bot.
   """
-  # New queues are not used yet but we fetch them to verify nothing blows up.
+  # Keep the memcache structs used by the old implementation up-to-date for now.
+  _ = _get_queues_old(bot_root_key)
+  # But use the new implementation for real.
   matches = ndb.Key(BotDimensionsMatches, bot_root_key.string_id()).get()
-  new_queues = TaskDimensionsSets.ids_to_queue_numbers(
+  queues = TaskDimensionsSets.ids_to_queue_numbers(
       matches.matches) if matches else []
-  _ = new_queues
-  # Still use old queues.
-  old_queues = _get_queues_old(bot_root_key)
-  _freshen_up_queues_memcache(old_queues)
-  return old_queues
+  _freshen_up_queues_memcache(queues)
+  return queues
 
 
 def cleanup_after_bot(bot_root_key):
@@ -2437,14 +2434,6 @@ def assert_task_async(request):
   worst. This only occurs on new kind of requests, which is not that often in
   practice.
   """
-  # Ignore errors for now, the result of this call is not used in production.
-  @ndb.tasklet
-  def assert_task_dims_async(dims, exp_ts):
-    try:
-      yield _assert_task_dimensions_async(dims, exp_ts)
-    except (apiproxy_errors.DeadlineExceededError, datastore_utils.CommitError):
-      logging.error('_assert_task_dimensions_async error, ignoring')
-
   # Note that TaskRequest may not be stored in the datastore yet, but it is
   # fully populated at this point.
   exp_ts = request.created_ts
@@ -2452,11 +2441,11 @@ def assert_task_async(request):
   for i in range(request.num_task_slices):
     t = request.task_slice(i)
     exp_ts += datetime.timedelta(seconds=t.expiration_secs)
-    # Run old and new implementation concurrently. The old one is still used
-    # for real, the new one just used to pre-fill entities before the switch
-    # to use it for real.
+    # Run old and new implementation concurrently. The new one is used for real,
+    # but we still keep the old one around for easier roll out and rollbacks.
     futures.append(_assert_task_props_old_async(t.properties, exp_ts))
-    futures.append(assert_task_dims_async(t.properties.dimensions, exp_ts))
+    futures.append(
+        _assert_task_dimensions_async(t.properties.dimensions, exp_ts))
   yield futures
 
 

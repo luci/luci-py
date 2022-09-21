@@ -99,30 +99,9 @@ class BaseTest(test_env_handlers.AppTestBase, test_case.EndpointsTestCase):
         '%s, %s' % (args, kwargs)))
     # Client API test cases run by default as user.
     self.set_as_user()
-    self.mock(utils, 'enqueue_task', self._enqueue_task)
-    self.mock(utils, 'enqueue_task_async', self._enqueue_task_async)
     self.now = datetime.datetime(2010, 1, 2, 3, 4, 5)
     self.mock_now(self.now)
-
-  @ndb.non_transactional
-  def _enqueue_task(self, url, queue_name, **kwargs):
-    del kwargs
-    if queue_name in ('cancel-children-tasks', 'pubsub'):
-      return True
-    self.fail(url)
-
-  @ndb.non_transactional
-  def _enqueue_task_async(self, url, queue_name, payload, transactional=False):
-    if queue_name == 'rebuild-task-cache':
-      self.assertFalse(transactional)
-      return task_queues.rebuild_task_cache_async(payload)
-    if queue_name == 'rescan-matching-task-sets':
-      self.assertTrue(transactional)
-      return task_queues.rescan_matching_task_sets_async(payload)
-    if queue_name == 'update-bot-matches':
-      self.assertTrue(transactional)
-      return task_queues.update_bot_matches_async(payload)
-    self.fail(url)
+    self.mock_tq_tasks()
 
 
 class ServerApiTest(BaseTest):

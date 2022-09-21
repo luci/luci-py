@@ -83,7 +83,6 @@ class TaskBackendAPIServiceTest(test_env_handlers.AppTestBase):
             'SERVER_SOFTWARE': os.environ['SERVER_SOFTWARE'],
         },
     )
-
     self._headers = {
         'Content-Type': encoding.Encoding.JSON[1],
         'Accept': encoding.Encoding.JSON[1],
@@ -91,6 +90,8 @@ class TaskBackendAPIServiceTest(test_env_handlers.AppTestBase):
 
     now = datetime.datetime(2019, 1, 2, 3)
     test_case.mock_now(self, now, 0)
+
+    self.mock_tq_tasks()
 
   # Test helpers.
   def _req_dim_prpc(self, key, value, exp_secs=None):
@@ -132,32 +133,6 @@ class TaskBackendAPIServiceTest(test_env_handlers.AppTestBase):
         buildbucket_host='cow-buildbucket.appspot.com',
     )
 
-  def _mock_enqueue_task(self, allowed_queues):
-
-    def mocked_enqueue_task(url, queue_name, **kwargs):
-      del kwargs
-      if queue_name in allowed_queues:
-        return True
-      self.fail(url)
-
-    self.mock(utils, 'enqueue_task', mocked_enqueue_task)
-
-  def _mock_enqueue_task_async(self):
-    @ndb.non_transactional
-    def enqueue_async(url, queue_name, payload, transactional=False):
-      if queue_name == 'rebuild-task-cache':
-        self.assertFalse(transactional)
-        return task_queues.rebuild_task_cache_async(payload)
-      if queue_name == 'rescan-matching-task-sets':
-        self.assertTrue(transactional)
-        return task_queues.rescan_matching_task_sets_async(payload)
-      if queue_name == 'update-bot-matches':
-        self.assertTrue(transactional)
-        return task_queues.update_bot_matches_async(payload)
-      self.fail(url)
-
-    self.mock(utils, 'enqueue_task_async', enqueue_async)
-
   # Tests
   def test_run_task(self):
     self.set_as_user()
@@ -169,10 +144,6 @@ class TaskBackendAPIServiceTest(test_env_handlers.AppTestBase):
     self.mock(realms, 'check_pools_create_task', lambda *_: True)
     self.mock(realms, 'check_tasks_act_as', lambda *_: True)
     self.mock(service_accounts, 'has_token_server', lambda: True)
-
-    # Mocks for task_scheduler.schedule_request()
-    self._mock_enqueue_task_async()
-    self._mock_enqueue_task(['pubsub', 'buildbucket-notify'])
 
     request = self._basic_run_task_request()
     request_id = 'cf60878f-8f2a-4f1e-b1f5-8b5ec88813a9'
@@ -257,7 +228,6 @@ class TaskBackendAPIServiceTest(test_env_handlers.AppTestBase):
 
   @mock.patch('components.utils.enqueue_task')
   def test_cancel_tasks(self, mocked_enqueue_task):
-    self._mock_enqueue_task_async()
     self.mock_default_pool_acl([])
     mocked_enqueue_task.return_value = True
 
@@ -327,7 +297,6 @@ class TaskBackendAPIServiceTest(test_env_handlers.AppTestBase):
     ])
 
   def test_cancel_tasks_permission_denied(self):
-    self._mock_enqueue_task_async()
     self.mock_default_pool_acl([])
 
     # Create task
@@ -373,7 +342,6 @@ class TaskBackendAPIServiceTest(test_env_handlers.AppTestBase):
 
 
   def test_fetch_tasks(self):
-    self._mock_enqueue_task_async()
     self.mock_default_pool_acl([])
 
     # Create bot
@@ -388,7 +356,6 @@ class TaskBackendAPIServiceTest(test_env_handlers.AppTestBase):
         tags=['project:yay', 'commit:post'],
         properties=dict(idempotent=True))
     self.set_as_bot()
-    self._mock_enqueue_task(['cancel-children-tasks'])
     self.bot_run_task()
 
     # Clear cache to test fetching from datastore path.
@@ -430,7 +397,6 @@ class TaskBackendAPIServiceTest(test_env_handlers.AppTestBase):
     self.assertEqual(resp, expected_response)
 
   def test_fetch_tasks_forbidden(self):
-    self._mock_enqueue_task_async()
     self.mock_default_pool_acl([])
 
     # Create task
@@ -538,34 +504,10 @@ class PRPCTest(test_env_handlers.AppTestBase):
       'Content-Type': encoding.Encoding.JSON[1],
       'Accept': encoding.Encoding.JSON[1],
     }
-    self._enqueue_task_orig = self.mock(
-        utils, 'enqueue_task', self._enqueue_task)
-    self._enqueue_task_async_orig = self.mock(utils, 'enqueue_task_async',
-                                              self._enqueue_task_async)
     self.now = datetime.datetime(2010, 1, 2, 3, 4, 5)
     self.mock_now(self.now)
     self.mock_default_pool_acl([])
-
-  @ndb.non_transactional
-  def _enqueue_task(self, url, queue_name, **kwargs):
-    del kwargs
-    if queue_name in ('cancel-children-tasks', 'pubsub'):
-      return True
-    self.fail(url)
-    return False
-
-  @ndb.non_transactional
-  def _enqueue_task_async(self, url, queue_name, payload, transactional=False):
-    if queue_name == 'rebuild-task-cache':
-      self.assertFalse(transactional)
-      return task_queues.rebuild_task_cache_async(payload)
-    if queue_name == 'rescan-matching-task-sets':
-      self.assertTrue(transactional)
-      return task_queues.rescan_matching_task_sets_async(payload)
-    if queue_name == 'update-bot-matches':
-      self.assertTrue(transactional)
-      return task_queues.update_bot_matches_async(payload)
-    self.fail(url)
+    self.mock_tq_tasks()
 
   def _test_bot_events_simple(self, request):
     self.set_as_bot()

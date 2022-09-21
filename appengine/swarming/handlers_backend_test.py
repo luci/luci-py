@@ -48,17 +48,7 @@ class BackendTest(test_env_handlers.AppTestBase):
           'REMOTE_ADDR': self.source_ip,
           'SERVER_SOFTWARE': os.environ['SERVER_SOFTWARE'],
         })
-    self._enqueue_task_orig = self.mock(
-        utils, 'enqueue_task', self._enqueue_task)
-    self._enqueue_task_async_orig = self.mock(utils, 'enqueue_task_async',
-                                              self._enqueue_task_async)
-
-  def _enqueue_task(self, *args, **kwargs):
-    return self._enqueue_task_orig(*args, use_dedicated_module=False, **kwargs)
-
-  def _enqueue_task_async(self, *args, **kwargs):
-    kwargs['use_dedicated_module'] = False
-    return self._enqueue_task_async_orig(*args, **kwargs)
+    self.mock_tq_tasks()
 
   def test_crons(self):
     # Tests all the cron tasks are securely handled.
