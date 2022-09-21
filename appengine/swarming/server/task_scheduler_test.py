@@ -383,7 +383,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
   def _bot_reap_task(self, bot_dimensions=None, version=None):
     bot_dimensions = bot_dimensions or self._last_registered_bot_dims
     bot_id = bot_dimensions['id'][0]
-    queues = task_queues._get_queues(bot_management.get_root_key(bot_id))
+    queues = task_queues.freshen_up_queues(bot_management.get_root_key(bot_id))
     bot_details = task_scheduler.BotDetails(version or 'abc', None)
     return task_scheduler.bot_reap_task(bot_dimensions, queues, bot_details,
                                         _deadline())

@@ -1009,7 +1009,7 @@ def _refresh_TaskDimensions_async(now, valid_until_ts, task_dimensions_flats,
   raise ndb.Return(True)
 
 
-def _get_queues(bot_root_key):
+def _get_queues_old(bot_root_key):
   """Returns the known task queues as integers.
 
   This function is called to get the task queues to poll, as the bot is trying
@@ -1030,11 +1030,6 @@ def _get_queues(bot_root_key):
     # include the expiration.
     logging.debug('get_queues(%s): can run from %d queues (memcache)\n%s',
                   bot_id, len(dimensions_hashes), dimensions_hashes)
-    # Refresh all the keys.
-    memcache.set_multi({str(d): True
-                        for d in dimensions_hashes},
-                       time=61,
-                       namespace='task_queues_tasks')
     return dimensions_hashes
 
   # Retrieve all the dimensions_hash that this bot could run that have
@@ -1052,10 +1047,6 @@ def _get_queues(bot_root_key):
   logging.info('get_queues(%s): Query in %.3fs: can run from %d queues\n%s',
                bot_id, (utils.utcnow() - now).total_seconds(),
                len(dimensions_hashes), dimensions_hashes)
-  memcache.set_multi({str(d): True
-                      for d in dimensions_hashes},
-                     time=61,
-                     namespace='task_queues_tasks')
   return dimensions_hashes
 
 
@@ -1184,6 +1175,19 @@ class TaskDimensionsSets(ndb.Model):
       return (kind, urllib.unquote(pfx), int(num))
     except ValueError:
       raise ValueError('Invalid TaskDimensionsSets ID %r' % sets_id)
+
+  @staticmethod
+  def ids_to_queue_numbers(sets_ids):
+    """Given an iterable of TaskDimensionsSets IDs returns a list of queues.
+
+    Arguments:
+      sets_ids: an iterable with TaskDimensionsSets string IDs.
+
+    Returns:
+      A sorted list with queue numbers aka dimensions hashes.
+    """
+    sets_id_to_int = lambda x: int(x[x.rfind(':') + 1:])
+    return sorted(sets_id_to_int(sets_id) for sets_id in sets_ids)
 
 
 class TaskDimensionsInfo(ndb.Model):
@@ -1851,10 +1855,9 @@ def _assert_bot_dimensions_async(bot_dimensions):
       log.warning('error when cleaning matches, ignoring')
 
   # Convert IDs that look like `pool:xxx:<number>` into integers.
-  sets_id_to_int = lambda x: int(x[x.rfind(':') + 1:])
-  queue_ids = sorted(sets_id_to_int(sets_id) for sets_id in alive)
-  log.info('queues: %s', queue_ids)
-  raise ndb.Return(queue_ids)
+  queue_numbers = TaskDimensionsSets.ids_to_queue_numbers(alive)
+  log.info('queues (%d): %s', len(queue_numbers), queue_numbers)
+  raise ndb.Return(queue_numbers)
 
 
 @ndb.tasklet
@@ -1967,6 +1970,22 @@ def _tq_rescan_matching_task_sets_async(bot_id, rescan_counter, rescan_reason):
   elif not visited_all:
     log.error('some scans did not complete, need a retry')
   raise ndb.Return(stale or visited_all)
+
+
+def _freshen_up_queues_memcache(queues):
+  """Updates memcache records with liveness of given queues.
+
+  This is needed by probably_has_capacity(...) check.
+
+  Arguments:
+    queues: a list of integers with queue numbers (aka dimension hashes).
+  """
+  # TODO(vadimsh): Stop hammering memcache. These entries here easily end up
+  # getting 2k-3k QPS each.
+  memcache.set_multi({str(d): True
+                      for d in queues},
+                     time=61,
+                     namespace='task_queues_tasks')
 
 
 ### Some generic helpers.
@@ -2339,7 +2358,7 @@ def assert_bot(bot_root_key, bot_dimensions):
   # to use it for real and to show the potential difference.
   matches_fut = _assert_bot_dimensions_async(bot_dimensions)
   _assert_bot_old_async(bot_root_key, bot_dimensions).get_result()
-  old_queues = _get_queues(bot_root_key)
+  old_queues = _get_queues_old(bot_root_key)
   try:
     new_queues = matches_fut.get_result()
 
@@ -2356,6 +2375,8 @@ def assert_bot(bot_root_key, bot_dimensions):
 
   except (apiproxy_errors.DeadlineExceededError, datastore_utils.CommitError):
     logging.error('_assert_bot_dimensions_async commit error')
+
+  _freshen_up_queues_memcache(old_queues)
   return old_queues
 
 
@@ -2366,10 +2387,19 @@ def freshen_up_queues(bot_root_key):
 
   Arguments:
     bot_root_key: ndb.Key to bot_management.BotRoot.
+
+  Returns:
+    A list of queues consumed by the bot.
   """
-  # TODO: Maintain some lightweight best-effort memcache structure on top of
-  # BotDimensionsMatches.
-  _get_queues(bot_root_key)
+  # New queues are not used yet but we fetch them to verify nothing blows up.
+  matches = ndb.Key(BotDimensionsMatches, bot_root_key.string_id()).get()
+  new_queues = TaskDimensionsSets.ids_to_queue_numbers(
+      matches.matches) if matches else []
+  _ = new_queues
+  # Still use old queues.
+  old_queues = _get_queues_old(bot_root_key)
+  _freshen_up_queues_memcache(old_queues)
+  return old_queues
 
 
 def cleanup_after_bot(bot_root_key):
