@@ -1324,6 +1324,10 @@ _TXN_EXCEPTIONS = (
     apiproxy_errors.DeadlineExceededError,
     # Transaction handle has expired.
     datastore_errors.BadRequestError,
+    # Internal error of unknown origin.
+    datastore_errors.InternalError,
+    # Datastore-specific timeout.
+    datastore_errors.Timeout,
     # Transaction collisions or internal errors.
     datastore_utils.CommitError,
 )
