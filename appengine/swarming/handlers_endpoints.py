@@ -711,12 +711,7 @@ class SwarmingQueuesService(remote.Service):
   def list(self, request):
     logging.debug('%s', request)
     now = utils.utcnow()
-    # Disable the in-process local cache. This is important, as there can be up
-    # to a thousand entities loaded in memory, and this is a pure memory leak,
-    # as there's no chance this specific instance will need these again,
-    # therefore this leads to 'Exceeded soft memory limit' AppEngine errors.
-    q = task_queues.TaskDimensions.query(
-        default_options=ndb.QueryOptions(use_cache=False))
+    q = task_queues.TaskDimensionsInfo.query()
     cursor = request.cursor
     out = []
     count = 0
@@ -727,18 +722,15 @@ class SwarmingQueuesService(remote.Service):
         items, cursor = datastore_utils.fetch_page(q, request.limit - len(out),
                                                    cursor)
         for i in items:
-          for s in i.sets:
+          for (dims_flat, valid_until_ts) in i.expiry_map().items():
             # Ignore the tasks that are only id specific, since they are
             # termination tasks. There may be one per bot, and it is not really
             # useful for the user, the user may just query the list of bots.
-            if (len(s.dimensions_flat) == 1 and
-                s.dimensions_flat[0].startswith('id:')):
-              # A terminate task.
+            if len(dims_flat) == 1 and dims_flat[0].startswith('id:'):
               continue
             out.append(
-                swarming_rpcs.TaskQueue(
-                    dimensions=s.dimensions_flat,
-                    valid_until_ts=s.valid_until_ts))
+                swarming_rpcs.TaskQueue(dimensions=list(dims_flat),
+                                        valid_until_ts=valid_until_ts))
         count += 1
     except ValueError as e:
       raise endpoints.BadRequestException(

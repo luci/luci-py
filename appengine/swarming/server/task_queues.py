@@ -1235,6 +1235,14 @@ class TaskDimensionsInfo(ndb.Model):
   # based on expiry of individual dimensions sets.
   next_cleanup_ts = ndb.DateTimeProperty(indexed=True)
 
+  def expiry_map(self):
+    """Returns sets as a mapping of task dimension tuples to their expiry time.
+
+    Returns:
+      A dict {tuple(task dimensions list) => expiry datetime.datetime}
+    """
+    return _sets_to_expiry_map(self.sets)
+
 
 class BotDimensionsMatches(ndb.Model):
   """Stores what TaskDimensionsSets are matched to a bot.
