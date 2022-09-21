@@ -16,6 +16,9 @@ INTERNAL_PROJECT = '@internal'
 ROOT_REALM = '@root'
 # Legacy realm is used for older realm-less resources, see realms_config.proto.
 LEGACY_REALM = '@legacy'
+# Project realm is used as a place to put whole-project resources, see
+# realms_config.proto.
+PROJECT_REALM = '@project'
 
 # Allowed non-special (not "@...") realm names in realms.cfg.
 REALM_NAME_RE = re.compile(r'^[a-z0-9_\.\-/]{1,400}$')

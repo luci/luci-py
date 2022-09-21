@@ -108,6 +108,12 @@ class ValidationTest(test_case.TestCase):
                 ],
             },
             {
+                'name': '@project',
+                'extends': [
+                    'some-realm/b',
+                ],
+            },
+            {
                 'name': 'some-realm/a',
                 'extends': ['some-realm/b'],
                 'bindings': [

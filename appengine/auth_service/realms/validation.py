@@ -198,11 +198,11 @@ class Validator(object):
   def validate_realm_name(self, name):
     """Emits errors and returns False if the realm name is malformed."""
     if name.startswith('@'):
-      if name in (common.ROOT_REALM, common.LEGACY_REALM):
+      if name in (common.ROOT_REALM, common.LEGACY_REALM, common.PROJECT_REALM):
         return True
       self.error(
-          'unknown special realm name, only "%s" and "%s" are allowed',
-          common.ROOT_REALM, common.LEGACY_REALM)
+          'unknown special realm name, only "%s", "%s" and "%s" are allowed',
+          common.ROOT_REALM, common.LEGACY_REALM, common.PROJECT_REALM)
       return False
     if not common.REALM_NAME_RE.match(name):
       self.error('the name must match "%s"', common.REALM_NAME_RE.pattern)

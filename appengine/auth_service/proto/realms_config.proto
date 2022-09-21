@@ -49,8 +49,8 @@ message RealmsCfg {
 // Cartesian product of a set of permissions (defined via the role) and a set of
 // principals (defined via a direct listing or via groups).
 //
-// There are two special realms (both optional) that a project can have: "@root"
-// and "@legacy".
+// There are three special realms (all optional) that a project can have: "@root"
+// "@legacy" and "@project".
 //
 // The root realm is implicitly included into all other realms (including
 // "@legacy"), and it is also used as a fallback when a resource points to
@@ -72,6 +72,12 @@ message RealmsCfg {
 // attributes. Some services may not have legacy resources at all. The legacy
 // realm is not used in these case. Refer to the service documentation.
 //
+// The project realm is used to store realms-aware resources which are global to
+// the entire project, for example the configuration of the project itself, or
+// derevations thereof. The root realm is explicitly NOT recommended for this
+// because there's no way to grant permissions in the root realm without also
+// implicitly granting them in ALL other realms.
+//
 // A realm can also carry some small amount of data (usually auth related) that
 // LUCI services use when dealing with this realm. It should be something that
 // all (or at least more than one) LUCI services use. Configuration specific to
@@ -79,7 +85,8 @@ message RealmsCfg {
 message Realm {
   // Name of the realm.
   //
-  // Must match `^[a-z0-9_\.\-/]{1,400}$` or be literals "@root" or "@legacy".
+  // Must match `^[a-z0-9_\.\-/]{1,400}$` or be literals "@root", "@legacy" or
+  // "@project".
   //
   // Realm names must be unique within a project.
   string name = 1;
