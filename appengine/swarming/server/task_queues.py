@@ -1318,6 +1318,17 @@ class BotDimensionsMatches(ndb.Model):
     raise ndb.Return(ent or cls(id=bot_id))
 
 
+# Exceptions that can be raised by transaction_async(...).
+_TXN_EXCEPTIONS = (
+    # Deadline starting or landing the transaction.
+    apiproxy_errors.DeadlineExceededError,
+    # Transaction handle has expired.
+    datastore_errors.BadRequestError,
+    # Transaction collisions or internal errors.
+    datastore_utils.CommitError,
+)
+
+
 def _is_bot_matching_any_task_dims(bot_dimensions_flat, task_dims_sets):
   """True if a bot can execute tasks with any of given dimensions.
 
@@ -1702,12 +1713,12 @@ def _maybe_add_match_async(bot_matches_ent, task_sets_id, task_sets_dims,
     raise ndb.Return(True)
 
   try:
-    updated = yield datastore_utils.transaction_async(txn, retries=3)
+    updated = yield datastore_utils.transaction_async(txn, retries=5)
     if updated:
       log.info('updated %s, delay %s', bot_id, utils.utcnow() - enqueued_ts)
       bots_updated.append(bot_id)
     raise ndb.Return(True)
-  except (apiproxy_errors.DeadlineExceededError, datastore_utils.CommitError):
+  except _TXN_EXCEPTIONS:
     log.warning('error updating %s', bot_id)
     raise ndb.Return(False)
 
@@ -1831,7 +1842,7 @@ def _assert_bot_dimensions_async(bot_dimensions):
       yield txn_ent.put_async()
 
     log.info('triggering rescan: %s', rescan_reason)
-    yield datastore_utils.transaction_async(enqueue_rescan_txn, retries=3)
+    yield datastore_utils.transaction_async(enqueue_rescan_txn, retries=5)
   elif stale:
     # If the rescan is not needed, but we have stale matches, clean them up now
     # to reduce amount of work for future checks. This can be "fire and forget"
@@ -1850,8 +1861,8 @@ def _assert_bot_dimensions_async(bot_dimensions):
         yield txn_ent.put_async()
 
     try:
-      yield datastore_utils.transaction_async(unmatch_txn, retries=3)
-    except (apiproxy_errors.DeadlineExceededError, datastore_utils.CommitError):
+      yield datastore_utils.transaction_async(unmatch_txn, retries=5)
+    except _TXN_EXCEPTIONS:
       log.warning('error when cleaning matches, ignoring')
 
   # Convert IDs that look like `pool:xxx:<number>` into integers.
@@ -1959,7 +1970,7 @@ def _tq_rescan_matching_task_sets_async(bot_id, rescan_counter, rescan_reason):
     raise ndb.Return(txn_ent.last_rescan_enqueued_ts)
 
   log.info('storing changes')
-  rescan_enqueued_ts = yield datastore_utils.transaction_async(txn, retries=3)
+  rescan_enqueued_ts = yield datastore_utils.transaction_async(txn, retries=5)
   if rescan_enqueued_ts:
     log.info('rescan delay: %s', utils.utcnow() - rescan_enqueued_ts)
 
@@ -2144,7 +2155,7 @@ class _AsyncWorkQueue(object):
 @ndb.tasklet
 def _map_async(queries,
                cb,
-               max_concurrency=100,
+               max_concurrency=200,
                page_size=1000,
                timeout=300,
                max_pages=None):
@@ -2594,7 +2605,7 @@ def tidy_task_dimension_sets_async():
       if cleaned:
         updated.append(sets_id)
       raise ndb.Return(True)
-    except (apiproxy_errors.DeadlineExceededError, datastore_utils.CommitError):
+    except _TXN_EXCEPTIONS:
       log.warning('error cleaning %s', sets_id)
       raise ndb.Return(False)
 
