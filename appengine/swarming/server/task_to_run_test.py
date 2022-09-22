@@ -150,10 +150,9 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
                              None,
                              None,
                              register_dimensions=False)
-    bot_root_key = bot_management.get_root_key(bot_id)
-    task_queues.assert_bot(bot_root_key, bot_dimensions)
+    task_queues.assert_bot(bot_dimensions)
     self.execute_tasks()
-    queues = task_queues.freshen_up_queues(bot_root_key)
+    queues = task_queues.freshen_up_queues(bot_id)
     matcher = task_to_run.dimensions_matcher(bot_dimensions)
     return [
         to_run.to_dict()
@@ -935,10 +934,9 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
         u'os': [u'Windows-3.1.1'],
         u'pool': [u'p1'],
     }
-    bot_root_key = bot_management.get_root_key(bot_id)
-    task_queues.assert_bot(bot_root_key, bot_dimensions)
+    task_queues.assert_bot(bot_dimensions)
     self.execute_tasks()
-    queues = task_queues.freshen_up_queues(bot_root_key)
+    queues = task_queues.freshen_up_queues(bot_id)
     matcher = task_to_run.dimensions_matcher(bot_dimensions)
 
     seen = 0

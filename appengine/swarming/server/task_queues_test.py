@@ -122,8 +122,7 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
                              None,
                              None,
                              register_dimensions=True)
-    bot_root_key = bot_management.get_root_key(bot_id)
-    task_queues.assert_bot(bot_root_key, bot_dimensions)
+    task_queues.assert_bot(bot_dimensions)
     return self.execute_tasks()
 
   def _assert_task(self, dimensions=None):
@@ -169,7 +168,7 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
   def test_assert_task_async_no_update(self):
     # Ran TQ tasks to register the new dimension set.
     tq_tasks = self._assert_task()
-    self.assertEqual(tq_tasks, 2)
+    self.assertEqual(tq_tasks, 1)
     # Already seen it, no new tasks.
     tq_tasks = self._assert_task()
     self.assertEqual(tq_tasks, 0)
@@ -181,7 +180,7 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
         u'os': [u'v1|v2'],
         u'gpu': [u'nv|amd'],
     })
-    self.assertEqual(tq_tasks, 2)
+    self.assertEqual(tq_tasks, 1)
     # Already seen it, no new tasks.
     tq_tasks = self._assert_task({
         u'pool': [u'default'],
@@ -215,10 +214,8 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
     })
 
     # Both bots should be able to handle it.
-    bot1_root_key = bot_management.get_root_key(u'bot1')
-    self.assertEqual([787294789], task_queues.freshen_up_queues(bot1_root_key))
-    bot2_root_key = bot_management.get_root_key(u'bot2')
-    self.assertEqual([787294789], task_queues.freshen_up_queues(bot2_root_key))
+    self.assertEqual([787294789], task_queues.freshen_up_queues('bot1'))
+    self.assertEqual([787294789], task_queues.freshen_up_queues('bot2'))
 
     # Another task comes in that matches only bot1.
     self._assert_task({
@@ -229,8 +226,8 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
 
     # Only bot1 can handle the second task.
     self.assertEqual([787294789, 1873318153],
-                     task_queues.freshen_up_queues(bot1_root_key))
-    self.assertEqual([787294789], task_queues.freshen_up_queues(bot2_root_key))
+                     task_queues.freshen_up_queues('bot1'))
+    self.assertEqual([787294789], task_queues.freshen_up_queues('bot2'))
 
   def test_or_dimensions_new_bots(self):
     # Register a task that uses "|" dimensions.
@@ -259,11 +256,9 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
                      })
 
     # The bots got correct matches.
-    bot1_root_key = bot_management.get_root_key(u'bot1')
     self.assertEqual([787294789, 1873318153],
-                     task_queues.freshen_up_queues(bot1_root_key))
-    bot2_root_key = bot_management.get_root_key(u'bot2')
-    self.assertEqual([787294789], task_queues.freshen_up_queues(bot2_root_key))
+                     task_queues.freshen_up_queues('bot1'))
+    self.assertEqual([787294789], task_queues.freshen_up_queues('bot2'))
 
   def test_or_dimensions_same_hash(self):
     self._assert_bot(bot_id=u'bot1', dimensions={u'os': [u'v1']})
@@ -281,12 +276,9 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
     })
 
     # All 3 bots are matched to the same queue.
-    bot1_root_key = bot_management.get_root_key(u'bot1')
-    self.assertEqual([1060356668], task_queues.freshen_up_queues(bot1_root_key))
-    bot2_root_key = bot_management.get_root_key(u'bot2')
-    self.assertEqual([1060356668], task_queues.freshen_up_queues(bot2_root_key))
-    bot3_root_key = bot_management.get_root_key(u'bot3')
-    self.assertEqual([1060356668], task_queues.freshen_up_queues(bot3_root_key))
+    self.assertEqual([1060356668], task_queues.freshen_up_queues('bot1'))
+    self.assertEqual([1060356668], task_queues.freshen_up_queues('bot2'))
+    self.assertEqual([1060356668], task_queues.freshen_up_queues('bot3'))
 
   def test_bot_dimensions_to_flat(self):
     actual = task_queues.bot_dimensions_to_flat({
@@ -385,8 +377,7 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(None, task_queues.probably_has_capacity(d))
 
     # It gets set only once freshen_up_queues() is called.
-    bot_root_key = bot_management.get_root_key(u'bot1')
-    task_queues.freshen_up_queues(bot_root_key)
+    task_queues.freshen_up_queues('bot1')
     self.assertEqual(True, task_queues.probably_has_capacity(d))
 
   def test_set_has_capacity(self):
@@ -405,21 +396,19 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(None, task_queues.probably_has_capacity(d))
 
   def test_assert_bot_then_task(self):
-    bot_root_key = bot_management.get_root_key(u'bot1')
     self._assert_bot()
     self._assert_task()
-    self.assertEqual([2980491642], task_queues.freshen_up_queues(bot_root_key))
+    self.assertEqual([2980491642], task_queues.freshen_up_queues('bot1'))
 
   def test_assert_task_async_then_bot(self):
-    bot_root_key = bot_management.get_root_key(u'bot1')
     self._assert_task()
     self._assert_bot()
-    self.assertEqual([2980491642], task_queues.freshen_up_queues(bot_root_key))
+    self.assertEqual([2980491642], task_queues.freshen_up_queues('bot1'))
 
   def test_cleanup_after_bot(self):
     self._assert_bot()
     self._assert_task()
-    task_queues.cleanup_after_bot(bot_management.get_root_key('bot1'))
+    task_queues.cleanup_after_bot('bot1')
     # BotInfo is deleted separately.
     self.assert_count(0, task_queues.BotDimensionsMatches)
     self.assert_count(1, bot_management.BotInfo)
@@ -436,8 +425,7 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
     self._assert_bot(dimensions={u'os': [u'Amiga']})
 
     # The bot is matched to the task now.
-    bot_root_key = bot_management.get_root_key(u'bot1')
-    self.assertEqual([2828582055], task_queues.freshen_up_queues(bot_root_key))
+    self.assertEqual([2828582055], task_queues.freshen_up_queues('bot1'))
 
     # One hour later, the bot changes dimensions.
     now += datetime.timedelta(hours=1)
@@ -445,7 +433,7 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
     self._assert_bot(dimensions={u'os': u'Commodore'})
 
     # It is no longer matched to the task.
-    self.assertEqual([], task_queues.freshen_up_queues(bot_root_key))
+    self.assertEqual([], task_queues.freshen_up_queues('bot1'))
 
   def test_task_dimensions_expiry(self):
     now = datetime.datetime(2010, 1, 2, 3, 4, 5)
@@ -455,18 +443,16 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
     self._assert_bot()
 
     # The bot is matched to the task now.
-    bot_root_key = bot_management.get_root_key(u'bot1')
-    self.assertEqual([2980491642], task_queues.freshen_up_queues(bot_root_key))
+    self.assertEqual([2980491642], task_queues.freshen_up_queues('bot1'))
 
     # Some time later the task dimensions set expires and gets cleaned up.
     now += datetime.timedelta(hours=5)
     self.mock_now(now)
-    task_queues.cron_tidy_tasks()
     task_queues.tidy_task_dimension_sets_async().get_result()
 
     # The bot is no longer matching the task.
     self._assert_bot()
-    self.assertEqual([], task_queues.freshen_up_queues(bot_root_key))
+    self.assertEqual([], task_queues.freshen_up_queues('bot1'))
 
   def test_hash_dimensions(self):
     with self.assertRaises(AttributeError):
@@ -531,18 +517,6 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
         (u'foo:c', u'foo:z'),
     }
     self.assertEqual(actual, expected)
-
-  def test_rebuild_task_cache_async(self):
-    # TODO(vadimsh): Delete.
-    pass
-
-  def test_cron_tidy_tasks(self):
-    # TODO(vadimsh): Delete.
-    pass
-
-  def test_cron_tidy_bots(self):
-    # TODO(vadimsh): Delete.
-    pass
 
   def test_expiry_map(self):
     sets = [
@@ -826,118 +800,6 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
     # All gone now.
     self.assertIsNone(fetch('set0'))
     self.assertIsNone(fetch('set1'))
-
-  @parameterized.expand(['pool', 'id'])
-  def test_backfill_task_sets_async(self, root_kind):
-    now = datetime.datetime(2010, 1, 2, 3, 4, 5)
-    self.mock_now(now)
-
-    def new_ent_id(set_id, dim_hash):
-      kind = 'pool' if root_kind == 'pool' else 'bot'
-      pfx = task_queues.TaskDimensionsSets.id_prefix(kind, set_id)
-      return '%s:%d' % (pfx, dim_hash)
-
-    # Creates an entity in old format.
-    def old(set_id, expiry_map, dim_hash=123):
-      root = ndb.Key('TaskDimensionsRoot', '%s:%s' % (root_kind, set_id))
-      sets = [
-          task_queues.TaskDimensionsSet(
-              dimensions_flat=list(dims),
-              valid_until_ts=exp,
-          ) for dims, exp in sorted(expiry_map.items())
-      ]
-      task_queues.TaskDimensions(id=dim_hash, parent=root, sets=sets).put()
-
-    # Creates an entity in new format.
-    def new(set_id, expiry_map, dim_hash=123):
-      ndb.transaction_async(lambda: task_queues._put_task_dimensions_sets_async(
-          new_ent_id(set_id, dim_hash), expiry_map)).get_result()
-
-    all_expected = {}
-
-    # Records what entity in new format we expect to see after the backfill.
-    def expected(set_id, expiry_map, dim_hash=123):
-      all_expected[new_ent_id(set_id, dim_hash)] = expiry_map
-
-    # Ancient entity that will be completely ignored.
-    old('ancient', {('a:b', ): now - datetime.timedelta(hours=1)})
-
-    # Old entity that doesn't need a migration.
-    old(
-        'uptodate', {
-            ('a:1', ): now + datetime.timedelta(hours=1),
-            ('a:2', ): now + datetime.timedelta(hours=1),
-        })
-    new(
-        'uptodate', {
-            ('a:1', ): now + datetime.timedelta(hours=2),
-            ('a:2', ): now + datetime.timedelta(hours=2),
-            ('a:3', ): now + datetime.timedelta(hours=1),
-        })
-    expected(
-        'uptodate', {
-            ('a:1', ): now + datetime.timedelta(hours=2),
-            ('a:2', ): now + datetime.timedelta(hours=2),
-            ('a:3', ): now + datetime.timedelta(hours=1),
-        })
-
-    # Entity that will be partially migrated.
-    old(
-        'mixed', {
-            ('a:1', ): now + datetime.timedelta(hours=1),
-            ('a:2', ): now + datetime.timedelta(hours=2),
-            ('a:4', ): now + datetime.timedelta(hours=1),
-        })
-    new(
-        'mixed', {
-            ('a:1', ): now + datetime.timedelta(hours=2),
-            ('a:2', ): now + datetime.timedelta(hours=1),
-            ('a:3', ): now + datetime.timedelta(hours=1),
-        })
-    expected(
-        'mixed', {
-            ('a:1', ): now + datetime.timedelta(hours=2),
-            ('a:2', ): now + datetime.timedelta(hours=2),
-            ('a:3', ): now + datetime.timedelta(hours=1),
-            ('a:4', ): now + datetime.timedelta(hours=1),
-        })
-
-    # Entities that will be fully migrated.
-    old(
-        'new', {
-            ('a:1', ): now + datetime.timedelta(hours=2),
-            ('a:2', ): now + datetime.timedelta(hours=2),
-        })
-    expected(
-        'new', {
-            ('a:1', ): now + datetime.timedelta(hours=2),
-            ('a:2', ): now + datetime.timedelta(hours=2),
-        })
-
-    # Run the migration.
-    stats = task_queues.BackfillStats()
-    task_queues.backfill_task_sets_async(stats).get_result()
-    self.assertEqual(stats.added, 1)
-    self.assertEqual(stats.updated, 1)
-    self.assertEqual(stats.untouched, 1)
-    self.assertEqual(stats.failures, 0)
-    self.assertEqual(stats.noop_txns, 0)
-
-    # Check the final state matches expectations.
-    infos = {
-        ent.key.parent().string_id(): task_queues._sets_to_expiry_map(ent.sets)
-        for ent in task_queues.TaskDimensionsInfo.query()
-    }
-    self.assertEqual(all_expected, infos)
-
-    # Running it again doesn't touch anything.
-    stats = task_queues.BackfillStats()
-    task_queues.backfill_task_sets_async(stats).get_result()
-    self.assertEqual(stats.added, 0)
-    self.assertEqual(stats.updated, 0)
-    self.assertEqual(stats.untouched, 3)
-    self.assertEqual(stats.failures, 0)
-    self.assertEqual(stats.noop_txns, 0)
 
   @staticmethod
   def _create_task_dims_set(sets_id, *task_dims):

@@ -125,8 +125,6 @@ class BackendTest(test_env_handlers.AppTestBase):
          '/internal/taskqueue/important/pubsub/notify-task/abcabcabc'),
         ('buildbucket-notify',
          '/internal/taskqueue/important/buildbucket/notify-task/abcabcabc'),
-        ('rebuild-task-cache',
-         '/internal/taskqueue/important/task_queues/rebuild-cache'),
         ('update-bot-matches',
          '/internal/taskqueue/important/task_queues/update-bot-matches'),
         ('rescan-matching-task-sets',
@@ -160,18 +158,6 @@ class BackendTest(test_env_handlers.AppTestBase):
             url, headers={'X-AppEngine-QueueName': 'bogus name'}, status=403)
       except Exception as e:
         self.fail('%s: %s' % (url, e))
-
-  def test_taskqueue_important_task_queues_rebuild_cache_fail(self):
-    self.set_as_admin()
-
-    @ndb.tasklet
-    def rebuild_task_cache_async(_body):
-      raise ndb.Return(False)
-
-    self.mock(task_queues, 'rebuild_task_cache_async', rebuild_task_cache_async)
-    self.app.post(
-        '/internal/taskqueue/important/task_queues/rebuild-cache',
-        headers={'X-AppEngine-QueueName': 'rebuild-task-cache'}, status=429)
 
   def test_taskqueue_monitoring_bq_bots_events(self):
     self.set_as_admin()

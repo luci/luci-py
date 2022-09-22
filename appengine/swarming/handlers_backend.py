@@ -68,27 +68,6 @@ class CronAbortExpiredShardToRunHandler(_CronHandlerBase):
     task_scheduler.cron_abort_expired_task_to_run()
 
 
-class CronBackfillHandler(_CronHandlerBase):
-  """Backfills TaskDimensionsSets based on TaskDimensions."""
-
-  def run_cron(self):
-    task_queues.backfill_task_sets_async().get_result()
-
-
-class CronTidyTaskQueuesTasks(_CronHandlerBase):
-  """Removes unused 'dimensions sets' without active task flows."""
-
-  def run_cron(self):
-    task_queues.cron_tidy_tasks()
-
-
-class CronTidyTaskQueuesBots(_CronHandlerBase):
-  """Detaches bots from no longer active queues."""
-
-  def run_cron(self):
-    task_queues.cron_tidy_bots()
-
-
 class CronTidyTaskDimensionSets(_CronHandlerBase):
   """Removes expired task dimension sets from the datastore."""
 
@@ -306,21 +285,6 @@ class TaskDeleteTasksHandler(webapp2.RequestHandler):
     task_request.task_delete_tasks(payload['task_ids'])
 
 
-class TaskDimensionsHandler(webapp2.RequestHandler):
-  """Refreshes the active task queues."""
-
-  @decorators.silence(datastore_errors.Timeout)
-  @decorators.require_taskqueue('rebuild-task-cache')
-  def post(self):
-    f = task_queues.rebuild_task_cache_async(self.request.body)
-    if not f.get_result():
-      # The task likely failed due to DB transaction contention,
-      # so we can reply that the service has had too many requests (429).
-      # Using a 400-level response also prevents failures here from causing
-      # unactionable alerts due to a high rate of 500s.
-      self.response.set_status(429, 'Need to retry')
-
-
 class TaskUpdateBotMatchesHandler(webapp2.RequestHandler):
   """Assigns new task queues to existing bots."""
 
@@ -443,9 +407,6 @@ def get_routes():
        CronBotDiedHandler),
       ('/internal/cron/important/scheduler/abort_expired',
        CronAbortExpiredShardToRunHandler),
-      ('/internal/cron/important/backfill', CronBackfillHandler),
-      ('/internal/cron/cleanup/task_queues_tasks', CronTidyTaskQueuesTasks),
-      ('/internal/cron/cleanup/task_queues_bots', CronTidyTaskQueuesBots),
       ('/internal/cron/cleanup/task_dimension_sets', CronTidyTaskDimensionSets),
       ('/internal/cron/monitoring/bots/update_bot_info',
        CronUpdateBotInfoComposite),
@@ -480,8 +441,6 @@ def get_routes():
        TaskCancelChildrenTasksHandler),
       ('/internal/taskqueue/important/tasks/expire', TaskExpireTasksHandler),
       ('/internal/taskqueue/cleanup/tasks/delete', TaskDeleteTasksHandler),
-      ('/internal/taskqueue/important/task_queues/rebuild-cache',
-       TaskDimensionsHandler),
       ('/internal/taskqueue/important/task_queues/update-bot-matches',
        TaskUpdateBotMatchesHandler),
       ('/internal/taskqueue/important/task_queues/rescan-matching-task-sets',

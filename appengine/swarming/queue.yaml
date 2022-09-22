@@ -32,6 +32,7 @@ queue:
   bucket_size: 100
   rate: 500/s
 
+# TODO(vadimsh): Delete.
 # /internal/taskqueue/important/task_queues/rebuild-cache
 - name: rebuild-task-cache
   bucket_size: 100

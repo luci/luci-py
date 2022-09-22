@@ -636,7 +636,7 @@ def bot_event(
 
   if quarantined:
     # Make sure it is not in the queue since it can't reap anything.
-    task_queues.cleanup_after_bot(info_key.parent())
+    task_queues.cleanup_after_bot(bot_id)
 
   # Decide whether saving the event.
   # It's not much of an even worth saving a BotEvent for but it's worth
@@ -769,12 +769,10 @@ def cron_update_bot_info():
       stats['dead'] += 1
 
       # Unregister the bot from task queues since it can't reap anything.
-      task_queues.cleanup_after_bot(bot.key.parent())
+      task_queues.cleanup_after_bot(bot.id)
 
       # Note: this is best effort at this point. If it fails, there'll be no
-      # retry: the bot is already marked as dead. It is also a transaction over
-      # BotInfo entity, which we just mutated above, so it also has a higher
-      # chance to fail.
+      # retry: the bot is already marked as dead.
       logging.info('Sending bot_missing event: %s', bot.id)
       bot_event(
           event_type='bot_missing',

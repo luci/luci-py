@@ -658,19 +658,9 @@ class BotPollHandler(_BotBaseHandler):
     # The bot is in good shape.
 
     try:
-      # Prepare BotTaskDimensions and fetch queues matching bot's dimensions.
-      bot_root_key = bot_management.get_root_key(res.bot_id)
-      queues = task_queues.assert_bot(bot_root_key, res.dimensions)
+      # Fetch queues matching bot's dimensions.
+      queues = task_queues.assert_bot(res.dimensions)
     except self._TIMEOUT_EXCEPTIONS as e:
-      # TODO(crbug.com/1027431): assert_bot_async().get_result()
-      # takes longer than 60 sec which ends up with "DeadlineExceededError".
-      # Returning 429 for the bot to retry.
-      # Approaches to avoid ignoring the errors would be to
-      # - Move the assert_bot task to background rather than waiting at polling.
-      # - Execute assert_bot_async here (before bot_reap_task), and get_result()
-      # after reaping task.
-      # See discussion:
-      # https://crrev.com/c/1948022/2#message-15c7ac534cdc49794fcb66cd209e5d2272ea22a5
       self._abort_by_timeout('assert_bot', e)
 
     # Try to grab a task. Leave ~10s for bot_event(...) transaction below.
@@ -1251,8 +1241,7 @@ class BotTaskUpdateHandler(_BotApiHandler):
 
     # Tell the task queues management engine that the bot is still alive, and
     # it shall refresh the task queues.
-    bot_root_key = bot_management.get_root_key(bot_id)
-    task_queues.freshen_up_queues(bot_root_key)
+    task_queues.freshen_up_queues(bot_id)
 
     try:
       state = task_scheduler.bot_update_task(

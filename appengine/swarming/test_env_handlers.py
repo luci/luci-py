@@ -125,12 +125,6 @@ class AppTestBase(test_case.TestCase):
 
   @ndb.tasklet
   def _enqueue_mock_async(self, url, queue_name, payload, transactional=False):
-    if queue_name == 'rebuild-task-cache':
-      self.assertFalse(transactional)
-      self.assertFalse(ndb.in_transaction())
-      yield task_queues.rebuild_task_cache_async(payload)
-      raise ndb.Return(True)
-
     if queue_name == 'rescan-matching-task-sets':
       self.assertTrue(transactional)
       self.assertTrue(ndb.in_transaction())

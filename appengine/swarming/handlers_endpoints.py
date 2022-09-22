@@ -847,9 +847,9 @@ class SwarmingBotService(remote.Service):
 
     bot_info_key = bot_management.get_info_key(request.bot_id)
     get_or_raise(bot_info_key)  # raises 404 if there is no such bot
-    # BotRoot is parent to BotInfo. It is important to note that the bot is
-    # not there anymore, so it is not a member of any task queue.
-    task_queues.cleanup_after_bot(bot_info_key.parent())
+    # It is important to note that the bot is not there anymore, so it is not
+    # a member of any task queue.
+    task_queues.cleanup_after_bot(request.bot_id)
     bot_info_key.delete()
     return swarming_rpcs.DeletedResponse(deleted=True)
 
