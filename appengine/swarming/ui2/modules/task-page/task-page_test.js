@@ -3,6 +3,7 @@
 // that can be found in the LICENSE file.
 
 import 'modules/task-page';
+import fetchMock from 'fetch-mock';
 
 // Tip from https://stackoverflow.com/a/37348710
 // for catching "full page reload" errors.
@@ -20,8 +21,7 @@ describe('task-page', function() {
   // leak dependencies (e.g. bot-list's 'column' function to task-list) and
   // try to import things multiple times.
   const {$, $$} = require('common-sk/modules/dom');
-  const {customMatchers, expectNoUnmatchedCalls, mockAppGETs} = require('modules/test_util');
-  const {fetchMock, MATCHED, UNMATCHED} = require('fetch-mock');
+  const {customMatchers, expectNoUnmatchedCalls, mockAppGETs, MATCHED} = require('modules/test_util');
   const {taskOutput, taskResults, taskRequests} = require('modules/task-page/test_data');
   const {richLogsLink} = require('modules/task-page/task-page-helpers');
 

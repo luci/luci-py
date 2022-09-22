@@ -6,10 +6,9 @@ import 'elements-sk/error-toast-sk';
 
 import './index.js';
 import {mockAuthdAppGETs} from '../test_util';
+import fetchMock from 'fetch-mock';
 
 (function() {
-  const fetchMock = require('fetch-mock');
-
   mockAuthdAppGETs(fetchMock, {
     can_pet_dogs: true,
   });

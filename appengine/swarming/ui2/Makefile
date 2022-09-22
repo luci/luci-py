@@ -11,7 +11,7 @@ release: _packages-lock.json.done
 	npx webpack --mode=production
 
 serve: _packages-lock.json.done
-	npx webpack-dev-server --mode=development --watch-poll
+	npx webpack-dev-server --mode=development
 
 test: _packages-lock.json.done
 	npx karma start

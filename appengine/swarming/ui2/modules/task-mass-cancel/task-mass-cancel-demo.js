@@ -5,10 +5,9 @@ import './index.js';
 
 import {requireLogin, mockAuthdAppGETs} from '../test_util';
 import {$$} from 'common-sk/modules/dom';
+import fetchMock from 'fetch-mock';
 
 (function() {
-  const fetchMock = require('fetch-mock');
-
   mockAuthdAppGETs(fetchMock, {cancel_task: true});
 
   fetchMock.get('glob:/_ah/api/swarming/v1/tasks/count?*',

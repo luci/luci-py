@@ -11,7 +11,7 @@
  * </p>
  */
 
-import {UNMATCHED} from 'fetch-mock';
+export const UNMATCHED = false;
 
 export const customMatchers = {
   // see https://jasmine.github.io/tutorials/custom_matcher
@@ -217,4 +217,6 @@ export function getChildItemWithText(ele, value) {
   // fail(`Could not find child of ${ele} with text value ${value}`);
   return null;
 }
+
+export const MATCHED = true;
 

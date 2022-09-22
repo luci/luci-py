@@ -4,13 +4,9 @@
 
 import './index.js';
 import {requireLogin, mockAuthdAppGETs} from '../test_util';
+import fetchMock from 'fetch-mock';
 
 (function() {
-// Can't use import fetch-mock because the library isn't quite set up
-  // correctly for it, and we get strange errors about 'this' not being defined.
-  const fetchMock = require('fetch-mock');
-
-
   mockAuthdAppGETs(fetchMock, {
     get_bootstrap_token: true,
   });

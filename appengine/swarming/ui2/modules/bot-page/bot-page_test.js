@@ -3,6 +3,7 @@
 // that can be found in the LICENSE file.
 
 import 'modules/bot-page';
+import fetchMock from 'fetch-mock';
 
 describe('bot-page', function() {
   // Instead of using import, we use require. Otherwise,
@@ -10,10 +11,8 @@ describe('bot-page', function() {
   // leak dependencies (e.g. bot-list's 'column' function to task-list) and
   // try to import things multiple times.
   const {$, $$} = require('common-sk/modules/dom');
-  const {customMatchers, expectNoUnmatchedCalls, mockAppGETs} = require('modules/test_util');
-  const {fetchMock, MATCHED, UNMATCHED} = require('fetch-mock');
+  const {customMatchers, expectNoUnmatchedCalls, mockAppGETs, MATCHED} = require('modules/test_util');
   const {botDataMap, eventsMap, tasksMap} = require('modules/bot-page/test_data');
-
 
   const TEST_BOT_ID = 'example-gce-001';
 

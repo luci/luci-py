@@ -11,7 +11,10 @@ let webpackConfig = require('./webpack.config.js');
 if (typeof webpackConfig === 'function') {
   webpackConfig = webpackConfig({}, {mode: 'development'});
 }
-webpackConfig.entry = null;
+// Do not set this, webpack-karma automatically unsets and emits a WARNING if
+// it is there.
+webpackConfig.entry = undefined;
+webpackConfig.output = undefined;
 webpackConfig.mode = 'development';
 
 // Allows tests to import modules locally
@@ -25,16 +28,21 @@ module.exports = function(config) {
     // base path that will be used to resolve all patterns (eg. files, exclude)
     basePath: '',
 
+    // let our tests run for 5 seconds. Karma will wait for a message to be sent
+    // over a websocket for this amount of time. If no message is received,
+    // IE the browser is doing something else like running tests it will attempt
+    // to reconnect one more time.
+    browserDisconnectTimeout: 5000,
 
     // frameworks to use
     // available frameworks: https://npmjs.org/browse/keyword/karma-adapter
-    frameworks: ['jasmine'],
+    frameworks: ['jasmine', 'webpack'],
 
 
     // list of files / patterns to load in the browser
     files: [
       'node_modules/@webcomponents/custom-elements/custom-elements.min.js',
-      '_all_tests.js',
+      'modules/**/*_test.js',
     ],
 
 
@@ -54,23 +62,7 @@ module.exports = function(config) {
     // preprocess matching files before serving them to the browser
     // available preprocessors: https://npmjs.org/browse/keyword/karma-preprocessor
     preprocessors: {
-      'modules/**/*.js': ['concat'],
-      '_all_tests.js': ['webpack'],
-    },
-
-    concat: {
-      // By default, concat puts everything in a function(){}, but
-      // that doesn't work with imports.
-      header: '',
-      footer: '',
-      outputs: [
-        {
-          file: '_all_tests.js',
-          inputs: [
-            'modules/**/*_test.js',
-          ],
-        },
-      ],
+      'modules/**/*_test.js': ['webpack'],
     },
 
     // test results reporter to use

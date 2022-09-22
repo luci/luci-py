@@ -7,12 +7,11 @@ import './index.js';
 import {tasks_22} from './test_data';
 import {fleetDimensions} from '../bot-list/test_data';
 import {requireLogin, mockAuthdAppGETs} from '../test_util';
-
+import fetchMock from 'fetch-mock';
 
 (function() {
 // Can't use import fetch-mock because the library isn't quite set up
 // correctly for it, and we get strange errors about 'this' not being defined.
-  const fetchMock = require('fetch-mock');
 
   mockAuthdAppGETs(fetchMock, {
     cancel_task: true,

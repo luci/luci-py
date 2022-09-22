@@ -3,6 +3,7 @@
 // that can be found in the LICENSE file.
 
 import 'modules/bot-list';
+import fetchMock from 'fetch-mock';
 
 describe('bot-list', function() {
   // Instead of using import, we use require. Otherwise,
@@ -11,8 +12,7 @@ describe('bot-list', function() {
   // try to import things multiple times.
   const {deepCopy} = require('common-sk/modules/object');
   const {$, $$} = require('common-sk/modules/dom');
-  const {childrenAsArray, customMatchers, expectNoUnmatchedCalls, getChildItemWithText, mockAppGETs} = require('modules/test_util');
-  const {fetchMock, MATCHED, UNMATCHED} = require('fetch-mock');
+  const {childrenAsArray, customMatchers, expectNoUnmatchedCalls, getChildItemWithText, mockAppGETs, MATCHED} = require('modules/test_util');
 
   const {column, filterBots, getColHeader, listQueryParams, processBots, makePossibleColumns,
     processPrimaryMap} = require('modules/bot-list/bot-list-helpers');

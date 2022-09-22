@@ -6,12 +6,9 @@ import './index.js';
 import {taskOutput, taskResult, taskRequest} from './test_data';
 import {requireLogin, mockAuthdAppGETs} from '../test_util';
 import {$$} from 'common-sk/modules/dom';
+import fetchMock from 'fetch-mock';
 
 (function() {
-// Can't use import fetch-mock because the library isn't quite set up
-// correctly for it, and we get strange errors about 'this' not being defined.
-  const fetchMock = require('fetch-mock');
-
   const PERF_TEST_LOGS = true;
 
   mockAuthdAppGETs(fetchMock, {});

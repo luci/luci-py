@@ -6,11 +6,11 @@ import './index.js';
 
 import {bots_10, fleetCount, fleetDimensions, queryCount} from './test_data';
 import {requireLogin, mockAuthdAppGETs} from '../test_util';
+import fetchMock from 'fetch-mock';
 
 (function() {
 // Can't use import fetch-mock because the library isn't quite set up
 // correctly for it, and we get strange errors about 'this' not being defined.
-  const fetchMock = require('fetch-mock');
 
   // uncomment to stress test with 5120 items
   // bots_10.items.push(...bots_10.items);

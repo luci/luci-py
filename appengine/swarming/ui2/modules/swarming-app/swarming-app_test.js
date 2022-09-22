@@ -3,14 +3,14 @@
 // that can be found in the LICENSE file.
 
 import 'modules/swarming-app';
+import fetchMock from 'fetch-mock';
 
 describe('swarming-app', function() {
   // Instead of using import, we use require. Otherwise,
   // the concatenation trick we do doesn't play well with webpack, which would
   // leak dependencies (e.g. bot-list's 'column' function to task-list) and
   // try to import things multiple times.
-  const {expectNoUnmatchedCalls, mockAppGETs} = require('modules/test_util');
-  const {fetchMock, MATCHED, UNMATCHED} = require('fetch-mock');
+  const {expectNoUnmatchedCalls, mockAppGETs, MATCHED} = require('modules/test_util');
 
   beforeEach(function() {
     // These are the default responses to the expected API calls (aka 'matched')
