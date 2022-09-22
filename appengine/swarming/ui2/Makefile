@@ -22,7 +22,7 @@ browser_test:
 	# tests there, seeing the results. Unfortunately, due to how karma needs to
 	# concatenate the _test.js files and run them through webpack, it doesn't
 	# autodetect changes and needs to be re-run manually :(
-	npx karma start --no-single-run
+	npx karma start --single-run=false --autowatch=true
 
 continuous_test:
 	# Good for debugging/developing tests.

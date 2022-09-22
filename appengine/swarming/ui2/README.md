@@ -74,11 +74,9 @@ are present):
 
     make test
 
-If a test is failing, it can be difficult to debug w/o a browser given the fact
-that the code is bundled and minified before testing. To ease this a little bit,
-many assertions have been modified by adding an (undocumented) second param.
-This second param will be shown if the assertion fails and can make it a little
-easier to track down. For example:
+To ease this a little bit, many assertions have been modified by adding an
+(undocumented) second param. This second param will be shown if the assertion
+fails and can make it a little easier to track down. For example:
 `expect(...).toContain('foo', 'foo is very important to be in this string')`
 
 The easiest way to debug a failing test is to run it in a browser and use
@@ -87,10 +85,13 @@ To facilitate that, run:
 
     make browser_test
 
-and navigate to <http://localhost:9876/debug.html>. A suggested workflow to deal
-with the minified code is to add a few breakpoints, then use the log messages to
-access the lines inside the minified source (DevTools can unminify it, to a
-point). Then, add breakpoints and go from there.
+and navigate to <http://localhost:9876/debug.html>. If you are running on a
+CloudTop then you should repeat the ssh port forwarding steps mentioned in the
+`make serve` instructions.
+
+A suggested workflow to deal with the code is to add a few breakpoints, then
+use the log messages to access the lines inside the source.
+Then, add breakpoints and go from there.
 
 When debugging certain tests, it may be useful to prefix the `it` or `describe`
 statement with a letter 'f' (for force). Then, only tests with the 'f' prefix
