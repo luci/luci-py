@@ -40,7 +40,7 @@ class FrontendTest(test_env_handlers.AppTestBase):
 
   def test_root(self):
     response = self.app.get('/', status=200)
-    self.assertGreater(len(response.body), 600)
+    self.assertGreater(len(response.body), 590)
 
   def test_all_swarming_handlers_secured(self):
     # Test that all handlers are accessible only to authenticated user or
