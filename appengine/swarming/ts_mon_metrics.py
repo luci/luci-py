@@ -363,7 +363,7 @@ def _set_jobs_metrics():
   cursor = None
   more = True
   while more:
-    summaries, cursor, more = q.fetch_page(1000, start_cursor=cursor)
+    summaries, cursor, more = q.fetch_page(5000, start_cursor=cursor)
     for summary in summaries:
       jobs_total += 1
       status = state_map.get(summary.state, '')
@@ -412,7 +412,7 @@ def _set_executors_metrics():
   cursor = None
   more = True
   while more:
-    bots, cursor, more = q.fetch_page(1000, start_cursor=cursor)
+    bots, cursor, more = q.fetch_page(5000, start_cursor=cursor)
     for bot_info in bots:
       executors_count += 1
 
