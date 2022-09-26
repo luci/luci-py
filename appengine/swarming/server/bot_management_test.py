@@ -301,13 +301,14 @@ class BotManagementTest(test_case.TestCase):
         expected, bot_management.get_info_key('id1').get().to_dict())
 
   @parameterized.expand([
-      (u'task_completed', True, False),
-      (u'task_error', True, False),
-      (u'task_killed', True, False),
-      (u'request_sleep', True, True),
-      (u'task_update', False, True),
+      (u'task_completed', True, False, 0),
+      (u'task_error', True, False, 1),
+      (u'task_killed', True, False, 2),
+      (u'request_sleep', True, True, 3),
+      (u'task_update', False, True, 4),
   ])
-  def test_bot_event_reset_task(self, event, reset_task, skip_store_event):
+  def test_bot_event_reset_task(self, event, reset_task, skip_store_event,
+                                increment):
     bot_id = u'id1'
     task_id = u'12311'
     task_name = u'yo'
@@ -316,8 +317,13 @@ class BotManagementTest(test_case.TestCase):
         u'os': [u'Ubuntu', u'Ubuntu-16.04'],
         u'pool': [u'default'],
     }
+    # Create two timestamps because _ensure_bot_info might create a
+    # `request_sleep` event. Make sure that it is always behind the event we
+    # will test as the last created event.
+    t1 = self.mock_now(self.now, increment * 2)
     bot_info = _ensure_bot_info(
         bot_id=bot_id, dimensions=d, task_id=task_id, task_name=task_name)
+    t2 = self.mock_now(self.now, increment * 2 + 1)
     _bot_event(
         event_type=event,
         bot_id=bot_id,
@@ -333,32 +339,32 @@ class BotManagementTest(test_case.TestCase):
     ]
     if event == 'request_sleep':
       composite += [bot_management.BotInfo.IDLE]
-      idle_since_ts = self.now
+      idle_since_ts = t1
     else:
       composite += [bot_management.BotInfo.BUSY]
       idle_since_ts = None
 
     if reset_task:
       # bot_info.task_id and bot_info.task_name should be reset
-      expected = _gen_bot_info(
-          composite=composite,
-          id=bot_id,
-          task_name=None,
-          idle_since_ts=idle_since_ts)
+      expected = _gen_bot_info(first_seen_ts=t1,
+                               composite=composite,
+                               id=bot_id,
+                               task_name=None,
+                               idle_since_ts=idle_since_ts)
     else:
       # bot_info.task_id and bot_info.task_name should be kept
-      expected = _gen_bot_info(
-          composite=composite,
-          id=bot_id,
-          task_id=task_id,
-          task_name=task_name,
-          idle_since_ts=None)
+      expected = _gen_bot_info(first_seen_ts=t1,
+                               composite=composite,
+                               id=bot_id,
+                               task_id=task_id,
+                               task_name=task_name,
+                               idle_since_ts=None)
 
     self.assertEqual(expected, bot_info.key.get().to_dict())
 
     # bot_event should have task_id
     if not skip_store_event:
-      expected_event = _gen_bot_event(event_type=event, task_id=task_id)
+      expected_event = _gen_bot_event(event_type=event, task_id=task_id, ts=t2)
       last_event = bot_management.get_events_query(bot_id).get()
       self.assertEqual(expected_event, last_event.to_dict())
 
@@ -404,23 +410,27 @@ class BotManagementTest(test_case.TestCase):
     self.assertEqual([expected_event], [e.to_dict() for e in bot_events])
 
   def test_bot_event_busy(self):
+    ticker = test_case.Ticker(self.now)
+    t1 = self.mock_now(ticker())
     _bot_event(event_type='bot_connected')
+    t2 = self.mock_now(ticker())
     _bot_event(event_type='request_task', task_id='12311', task_name='yo')
-    expected = _gen_bot_info(
-        composite=[
-          bot_management.BotInfo.NOT_IN_MAINTENANCE,
-          bot_management.BotInfo.ALIVE,
-          bot_management.BotInfo.HEALTHY,
-          bot_management.BotInfo.BUSY,
-        ],
-        task_id=u'12311',
-        task_name=u'yo')
+    expected_events = [
+        bot_management.BotInfo.NOT_IN_MAINTENANCE,
+        bot_management.BotInfo.ALIVE,
+        bot_management.BotInfo.HEALTHY,
+        bot_management.BotInfo.BUSY,
+    ]
+    expected = _gen_bot_info(composite=expected_events,
+                             task_id=u'12311',
+                             task_name=u'yo',
+                             first_seen_ts=t1)
     bot_info = bot_management.get_info_key('id1').get()
     self.assertEqual(expected, bot_info.to_dict())
 
     expected = [
-        _gen_bot_event(event_type=u'request_task', task_id=u'12311'),
-        _gen_bot_event(event_type=u'bot_connected'),
+        _gen_bot_event(event_type=u'request_task', task_id=u'12311', ts=t2),
+        _gen_bot_event(event_type=u'bot_connected', ts=t1),
     ]
     self.assertEqual(
         expected, [e.to_dict() for e in bot_management.get_events_query('id1')])

@@ -30,6 +30,7 @@ import handlers_bot
 from components import auth
 from components import ereporter2
 from components import utils
+from components.test_support import test_case
 from proto.api import plugin_pb2
 from server import bot_archive
 from server import bot_auth
@@ -360,8 +361,8 @@ class BotApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(expected, response)
 
   def test_poll_bad_dimensions(self):
+    ticker = test_case.Ticker(self.now)
     errors = []
-
     def add_error(request, source, message):
       self.assertTrue(request)
       self.assertEqual('bot', source)
@@ -369,8 +370,10 @@ class BotApiTest(test_env_handlers.AppTestBase):
 
     self.mock(ereporter2, 'log_request', add_error)
 
+    self.mock_now(ticker())
     params = self.do_handshake()
     params['dimensions']['foo'] = [['bar']]  # list is invalid.
+    t1 = self.mock_now(ticker())
     response = self.post_json('/swarming/api/v1/bot/poll', params)
     self.assertTrue(response.pop(u'duration'))
     expected = {
@@ -412,7 +415,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
             u'started_ts': 1410990411.111,
         },
         'task_id': None,
-        'ts': self.now,
+        'ts': t1,
         'version': self.bot_version,
     }
     events = [e.to_dict() for e in bot_management.get_events_query('bot1')]
@@ -1248,9 +1251,11 @@ class BotApiTest(test_env_handlers.AppTestBase):
         })
     response = ereporter2_app.post_json('/ereporter2/api/v1/on_error',
                                         error_params)
+    self.assertTrue('id' in response.json)
+    error_id = response.json['id']
     expected = {
-        u'id': 1,
-        u'url': u'http://localhost/restricted/ereporter2/errors/1',
+        u'id': error_id,
+        u'url': u'http://localhost/restricted/ereporter2/errors/%s' % error_id,
     }
     self.assertEqual(expected, response.json)
 
@@ -1308,6 +1313,9 @@ class BotApiTest(test_env_handlers.AppTestBase):
 
   def test_bot_event(self):
     self.mock(random, 'getrandbits', lambda _: 0x88)
+    ticker = test_case.Ticker(self.now)
+    ticks = []
+    ticks.append(self.mock_now(ticker()))
     params = self.do_handshake()
     dimensions = params['dimensions']
     for e in handlers_bot.BotEventHandler.ALLOWED_EVENTS:
@@ -1316,38 +1324,47 @@ class BotApiTest(test_env_handlers.AppTestBase):
         continue
       params['event'] = e
       params['message'] = 'for the best'
+      ticks.append(self.mock_now(ticker()))
       response = self.post_json('/swarming/api/v1/bot/event', params)
       self.assertEqual({}, response)
 
     # TODO(maruel): Replace with client api to query last BotEvent.
     actual = [e.to_dict() for e in bot_management.get_events_query('bot1')]
-    expected = [{
-        'authenticated_as': u'bot:whitelisted-ip',
-        'dimensions': dimensions,
-        'event_type': unicode(e),
-        'external_ip': u'192.168.2.2',
-        'idle_since_ts': None,
-        'last_seen_ts': None,
-        'lease_id': None,
-        'lease_expiration_ts': None,
-        'leased_indefinitely': None,
-        'machine_type': None,
-        'machine_lease': None,
-        'message': u'for the best',
-        'quarantined': False,
-        'maintenance_msg': None,
-        'state': {
-            u'bot_group_cfg_version': u'default',
-            u'running_time': 1234.0,
-            u'sleep_streak': 0,
-            u'started_ts': 1410990411.111,
-        },
-        'task_id': None,
-        'ts': self.now,
-        'version': self.bot_version,
-    }
-                for e in reversed(handlers_bot.BotEventHandler.ALLOWED_EVENTS)
-                if e != 'bot_error']
+    events_to_check = reversed([
+        event for event in handlers_bot.BotEventHandler.ALLOWED_EVENTS
+        if event != "bot_error"
+    ])
+    expected = [
+        {
+            'authenticated_as': u'bot:whitelisted-ip',
+            'dimensions': dimensions,
+            'event_type': unicode(event),
+            'external_ip': u'192.168.2.2',
+            'idle_since_ts': None,
+            'last_seen_ts': None,
+            'lease_id': None,
+            'lease_expiration_ts': None,
+            'leased_indefinitely': None,
+            'machine_type': None,
+            'machine_lease': None,
+            'message': u'for the best',
+            'quarantined': False,
+            'maintenance_msg': None,
+            'state': {
+                u'bot_group_cfg_version': u'default',
+                u'running_time': 1234.0,
+                u'sleep_streak': 0,
+                u'started_ts': 1410990411.111,
+            },
+            'task_id': None,
+            # explanation of this index:
+            # ticks[0] is the timestamp for the bot_connected event so there
+            # will be len(ALLOWED_EVENTS)+1 in the ticks list.
+            # -(idx+1) is the same as reverse(ticks)[idx+1]
+            'ts': ticks[-(idx + 1)],
+            'version': self.bot_version,
+        } for idx, event in enumerate(events_to_check)
+    ]
     expected.append({
         'authenticated_as': u'bot:whitelisted-ip',
         'dimensions': dimensions,
@@ -1369,7 +1386,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
             u'started_ts': 1410990411.111,
         },
         'task_id': None,
-        'ts': self.now,
+        'ts': ticks[0],
         'version': u'123',
     })
 

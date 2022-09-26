@@ -526,6 +526,27 @@ def filter_availability(q, quarantined, in_maintenance, is_dead, is_busy):
   return q
 
 
+def _insert_bot_with_txn(root_key, event, bot_info):
+  def txn():
+    # TODO(jonahhooper) move bot_root.get() outside of the trasnaction after the
+    # migration is complete.
+    bot_root = root_key.get()
+    entities = [event, bot_info]
+    if not bot_root:
+      entities.append(BotRoot(key=root_key,
+                              current=datastore_utils.HIGH_KEY_ID))
+    ndb.put_multi(entities)
+
+  try:
+    logging.info("Attempting to insert event %s for bot_id %s", root_key,
+                 event.event_type)
+    datastore_utils.transaction(txn, retries=3)
+  except datastore_utils.CommitError as exc:
+    logging.warning("_insert_bot_with_txn: error inserting bot_event %s %s: %s",
+                    root_key, event.event_type, exc)
+    raise
+
+
 def bot_event(
     event_type, bot_id, external_ip, authenticated_as, dimensions, state,
     version, quarantined, maintenance_msg, task_id, task_name,
@@ -659,7 +680,9 @@ def bot_event(
   # aren't provided by the bot.
   event_dimensions_flat = dimensions_flat or bot_info.dimensions_flat
 
-  event = BotEvent(parent=get_root_key(bot_id),
+  root_key = get_root_key(bot_id)
+
+  event = BotEvent(parent=root_key,
                    event_type=event_type,
                    external_ip=external_ip,
                    authenticated_as=authenticated_as,
@@ -671,8 +694,7 @@ def bot_event(
                    version=bot_info.version,
                    **kwargs)
 
-  datastore_utils.store_new_version(event, BotRoot, [bot_info])
-
+  _insert_bot_with_txn(root_key, event, bot_info)
   return event.key
 
 
