@@ -62,6 +62,7 @@ import datetime
 import functools
 import hashlib
 import logging
+import random
 
 from google.appengine import runtime
 from google.appengine.api import app_identity
@@ -527,24 +528,30 @@ def filter_availability(q, quarantined, in_maintenance, is_dead, is_busy):
 
 
 def _insert_bot_with_txn(root_key, event, bot_info):
+  bot_root = root_key.get()
+  entities = [event, bot_info]
+  # TODO(jonahhooper) remove this later
+  # choose a random key for current to make collisions less likely during
+  # migration
+  if not bot_root:
+    key_id = random.randint(1000000, datastore_utils.HIGH_KEY_ID)
+    entities.append(BotRoot(key=root_key, current=key_id))
+  attempt = 1
+
   def txn():
-    # TODO(jonahhooper) move bot_root.get() outside of the trasnaction after the
-    # migration is complete.
-    bot_root = root_key.get()
-    entities = [event, bot_info]
-    if not bot_root:
-      entities.append(BotRoot(key=root_key,
-                              current=datastore_utils.HIGH_KEY_ID))
     ndb.put_multi(entities)
 
-  try:
-    logging.info("Attempting to insert event %s for bot_id %s", root_key,
-                 event.event_type)
-    datastore_utils.transaction(txn, retries=3)
-  except datastore_utils.CommitError as exc:
-    logging.warning("_insert_bot_with_txn: error inserting bot_event %s %s: %s",
-                    root_key, event.event_type, exc)
-    raise
+  while True:
+    try:
+      logging.info("Attempt %d to insert event %s for bot_id %s", attempt,
+                   event.event_type, root_key)
+      attempt += 1
+      datastore_utils.transaction(txn, retries=0)
+      break
+    except datastore_utils.CommitError as exc:
+      logging.warning(
+          "_insert_bot_with_txn: error inserting bot_event %s %s: %s", root_key,
+          event.event_type, exc)
 
 
 def bot_event(
