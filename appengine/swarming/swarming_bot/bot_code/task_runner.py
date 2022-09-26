@@ -486,14 +486,14 @@ class _OutputBuffer(object):
   self.should_post_update() is True.
   """
   # To be mocked in tests.
-  _MIN_PACKET_INTERVAL = 1
+  _MIN_PACKET_INTERVAL = 4
   _MAX_PACKET_INTERVAL = 10
 
   def __init__(self, task_details, start):
     self._task_details = task_details
     self._start = start
-    # Sends a maximum of 25kb of stdout per task_update packet.
-    self._max_chunk_size = 25600
+    # Sends a maximum of 250kb of stdout per task_update packet.
+    self._max_chunk_size = 250000
     # Minimum wait between task_update packet when there's output.
     self._min_packet_interval = self._MIN_PACKET_INTERVAL
     # Maximum wait between task_update packet when there's no output.
@@ -581,9 +581,7 @@ class _OutputBuffer(object):
       out = min(out, self._start + self._task_details.hard_timeout - now)
     if self._task_details.io_timeout:
       out = min(out, self._last_loop + self._task_details.io_timeout - now)
-    out = max(out, 0)
-    logging.debug('calc_yield_wait() = %d', out)
-    return out
+    return max(out, 0)
 
 
 def run_command(remote, task_details, work_dir, cost_usd_hour,
