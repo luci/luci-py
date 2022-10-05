@@ -208,26 +208,6 @@ _executors_status = gae_ts_mon.StringMetric(
 # 'dead'.
 # Note that 'running' will report data as long as the job is running,
 # so it is best to restrict data to status == 'pending.'
-_jobs_pending_durations = gae_ts_mon.NonCumulativeDistributionMetric(
-    'jobs/pending_durations',
-    'Pending times of active jobs, in seconds.', [
-        gae_ts_mon.StringField('spec_name'),
-        gae_ts_mon.StringField('project_id'),
-        gae_ts_mon.StringField('subproject_id'),
-        gae_ts_mon.StringField('pool'),
-        gae_ts_mon.StringField('status'),
-        gae_ts_mon.StringField('device_type'),
-    ],
-    bucketer=_bucketer)
-
-
-# Global metric. Target fields:
-# - hostname = 'autogen:<executor_id>' (bot id).
-# Status value must be 'ready', 'running', or anything else, possibly
-# swarming-specific, when it cannot run a job. E.g. 'quarantined' or
-# 'dead'.
-# Note that 'running' will report data as long as the job is running,
-# so it is best to restrict data to status == 'pending.'
 _jobs_max_pending_duration = gae_ts_mon.FloatMetric(
     'jobs/max_pending_duration', 'Maximum pending seconds of pending jobs.', [
         gae_ts_mon.StringField('spec_name'),
@@ -350,8 +330,6 @@ def _set_jobs_metrics():
   }
   jobs_counts = defaultdict(lambda: 0)
   jobs_total = 0
-  jobs_pending_distributions = defaultdict(
-      lambda: gae_ts_mon.Distribution(_bucketer))
   jobs_max_pending_durations = defaultdict(
       lambda: 0.0)
 
@@ -385,7 +363,6 @@ def _set_jobs_metrics():
 
       pending_duration = summary.pending_now(utils.utcnow())
       if pending_duration is not None:
-        jobs_pending_distributions[key].add(pending_duration.total_seconds())
         jobs_max_pending_durations[key] = max(jobs_max_pending_durations[key],
                                               pending_duration.total_seconds())
 
@@ -395,10 +372,6 @@ def _set_jobs_metrics():
 
   for key, count in jobs_counts.items():
     _jobs_active.set(count, target_fields=target_fields, fields=dict(key))
-
-  for key, distribution in jobs_pending_distributions.items():
-    _jobs_pending_durations.set(
-        distribution, target_fields=target_fields, fields=dict(key))
 
   for key, val in jobs_max_pending_durations.items():
     _jobs_max_pending_duration.set(
@@ -615,6 +588,5 @@ def initialize():
       _executors_status,
       _jobs_active,
       _jobs_max_pending_duration,
-      _jobs_pending_durations,
       _jobs_running,
   ])

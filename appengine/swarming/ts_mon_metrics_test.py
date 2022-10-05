@@ -270,11 +270,6 @@ class TestMetrics(test_case.TestCase):
 
     jobs_fields['device_type'] = 'some_device'
     self.assertEqual(
-        900,
-        ts_mon_metrics._jobs_pending_durations.get(
-            fields=jobs_fields,
-            target_fields=ts_mon_metrics._TARGET_FIELDS).sum)
-    self.assertEqual(
         600,
         ts_mon_metrics._jobs_max_pending_duration.get(
             fields=jobs_fields, target_fields=ts_mon_metrics._TARGET_FIELDS))
