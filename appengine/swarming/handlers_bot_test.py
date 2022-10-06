@@ -546,11 +546,6 @@ class BotApiTest(test_env_handlers.AppTestBase):
                 },
             },
             u'task_id': task_id,
-            u'bot_dimensions': {
-                'id': ['bot1'],
-                'os': ['Amiga'],
-                'pool': ['default'],
-            },
         },
     }
     self.assertEqual(expected, response)
@@ -623,11 +618,6 @@ class BotApiTest(test_env_handlers.AppTestBase):
                 },
             },
             u'task_id': task_id,
-            u'bot_dimensions': {
-                'id': ['bot1'],
-                'os': ['Amiga'],
-                'pool': ['default'],
-            },
         },
     }
     self.assertEqual(expected, response)
@@ -713,11 +703,6 @@ class BotApiTest(test_env_handlers.AppTestBase):
             },
             u'task_id':
             task_id,
-            u'bot_dimensions': {
-                'id': ['bot1'],
-                'os': ['Amiga'],
-                'pool': ['default'],
-            },
         },
     }
     self.assertEqual(expected, response)
@@ -779,7 +764,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
 
     self.set_as_user()
     _, task_id = self.client_create_task_cas_input_root()
-    task_id = task_id[:-1] + '1'  # convert to run_id.
+    task_id = task_id[:-1] + '1'  # conver to run_id.
 
     self.set_as_bot()
     response = self.post_json('/swarming/api/v1/bot/poll', params)
@@ -801,8 +786,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
                     u'path': u'bin',
                     u'version': u'git_revision:deadbeef',
                 }],
-                u'server':
-                u'https://pool.config.cipd.example.com',
+                u'server': u'https://pool.config.cipd.example.com',
             },
             u'command': [u'python', u'run_test.py'],
             u'containment': {
@@ -839,11 +823,6 @@ class BotApiTest(test_env_handlers.AppTestBase):
                 },
             },
             u'task_id': task_id,
-            u'bot_dimensions': {
-                'id': ['bot1'],
-                'os': ['Amiga'],
-                'pool': ['default'],
-            },
         },
     }
     self.assertEqual(expected, response)

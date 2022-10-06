@@ -191,7 +191,6 @@ class TaskDetails(object):
   """
   _EXPECTED = frozenset((
       'bot_authenticated_as',
-      'bot_dimensions',
       'bot_id',
       'caches',
       'cas_input_root',
@@ -223,7 +222,6 @@ class TaskDetails(object):
           'Unexpected keys: %s != %s' % (sorted(data), sorted(self._EXPECTED)))
 
     # Get all the data first so it fails early if the task details is invalid.
-    self.bot_dimensions = data['bot_dimensions']
     self.bot_id = data['bot_id']
 
     # Raw command.
@@ -325,22 +323,11 @@ def load_and_run(in_file, swarming_server, cost_usd_hour, start, out_file,
         },
       }
 
-      # Override LUCI_CONTEXT['swarming'].
-      bot_dimensions = []
-      for k, vs in task_details.bot_dimensions.items():
-        bot_dimensions.extend('%s:%s' % (k, v) for v in vs)
-      bot_dimensions.sort()
-      swarming = {
-          'task': {
-              'server': swarming_server,
-              # Uses the task_id instead of run_id in the context.
-              'task_id': task_details.task_id[:-1] + '0',
-              'bot_dimensions': bot_dimensions,
-          },
-      }
+      # Extend existing LUCI_CONTEXT['swarming'], if any.
       if task_details.secret_bytes is not None:
+        swarming = luci_context.read('swarming') or {}
         swarming['secret_bytes'] = task_details.secret_bytes
-      context_edits['swarming'] = swarming
+        context_edits['swarming'] = swarming
 
       # Extend existing LUCI_CONTEXT['realm'], if any.
       if task_details.realm is not None:

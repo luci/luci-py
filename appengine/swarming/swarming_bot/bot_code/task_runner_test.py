@@ -76,10 +76,6 @@ def get_manifest(script=None, **kwargs):
   out = {
       'bot_authenticated_as': 'foo',
       'bot_id': 'localhost',
-      'bot_dimensions': {
-          'id': ['localhost'],
-          'cpu': ['x86', 'x86-64'],
-      },
       'caches': [],
       'cipd_input': {},
       'command': [sys.executable, '-u', '-c', script],

@@ -696,10 +696,10 @@ class BotPollHandler(_BotBaseHandler):
                 task_id=run_result.task_id,
                 task_name=request.name)
       self._cmd_run(request, secret_bytes, run_result, res.bot_id, res.os,
-                    res.bot_group_cfg, res.dimensions)
+                    res.bot_group_cfg)
 
   def _cmd_run(self, request, secret_bytes, run_result, bot_id, oses,
-               bot_group_cfg, bot_dimensions):
+               bot_group_cfg):
     logging.info('Run: %s', request.task_id)
     props = request.task_slice(run_result.current_task_slice).properties
 
@@ -795,8 +795,6 @@ class BotPollHandler(_BotBaseHandler):
             },
             'task_id':
             task_pack.pack_run_result_key(run_result.key),
-            'bot_dimensions':
-            bot_dimensions,
         },
     }
     self.send_response(utils.to_json_encodable(out))
