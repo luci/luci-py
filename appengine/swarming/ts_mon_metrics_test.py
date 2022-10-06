@@ -251,12 +251,6 @@ class TestMetrics(test_case.TestCase):
     jobs_target_fields = dict(ts_mon_metrics._TARGET_FIELDS)
     jobs_target_fields['hostname'] = 'autogen:test_bot1'
 
-    self.assertTrue(ts_mon_metrics._jobs_running.get(
-        fields=jobs_fields, target_fields=jobs_target_fields))
-    jobs_target_fields['hostname'] = 'autogen:test_bot2'
-    self.assertFalse(
-        ts_mon_metrics._jobs_running.get(
-            fields=jobs_fields, target_fields=jobs_target_fields))
     jobs_fields['status'] = 'running'
     self.assertEqual(
         1,

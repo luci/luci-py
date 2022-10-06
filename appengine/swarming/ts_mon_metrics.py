@@ -147,24 +147,6 @@ _tasks_slice_expiration_delay = gae_ts_mon.CumulativeDistributionMetric(
 )
 
 
-# Global metric. Metric fields:.
-# - project_id: e.g. 'chromium'.
-# - subproject_id: e.g. 'blink'. Set to empty string if not used.
-# - pool: e.g. 'Chrome'.
-# - spec_name: name of a job specification.
-# Override target field:
-# - hostname: 'autogen:<executor_id>': name of the bot that executed a job,
-#     or an empty string. e.g. 'autogen:swarm42-m4'.
-# Value should be 'pending' or 'running'. Completed / canceled jobs should not
-# send this metric.
-_jobs_running = gae_ts_mon.BooleanMetric(
-    'jobs/running', 'Presence metric for a running job.', [
-        gae_ts_mon.StringField('spec_name'),
-        gae_ts_mon.StringField('project_id'),
-        gae_ts_mon.StringField('subproject_id'),
-        gae_ts_mon.StringField('pool'),
-    ])
-
 # Global metric. Metric fields:
 # - project_id: e.g. 'chromium'.
 # - subproject_id: e.g. 'blink'. Set to empty string if not used.
@@ -347,15 +329,9 @@ def _set_jobs_metrics():
       status = state_map.get(summary.state, '')
       tags_dict = _tags_to_dict(summary.tags)
       fields = _extract_job_fields(tags_dict)
-      target_fields = dict(_TARGET_FIELDS)
-      if summary.bot_id:
-        target_fields['hostname'] = 'autogen:' + summary.bot_id
-        if status == 'running':
-          _jobs_running.set(True, target_fields=target_fields, fields=fields)
       fields['status'] = status
 
       key = tuple(sorted(fields.items()))
-
       jobs_counts[key] += 1
 
       fields['device_type'] = tags_dict.get('device_type', '')
@@ -597,5 +573,4 @@ def initialize():
       _executors_status,
       _jobs_active,
       _jobs_max_pending_duration,
-      _jobs_running,
   ])
