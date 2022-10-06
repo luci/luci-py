@@ -5,8 +5,6 @@
 """Timeseries metrics."""
 
 from collections import defaultdict
-import datetime
-import json
 import logging
 
 from components import utils
@@ -263,6 +261,7 @@ _dead_task_detection_latencies = \
 
 # Instance metric. Metric fields:
 # - pool: e.g. 'skia'.
+# - spec_name: 'linux_chromium_tsan_rel_ng'
 # - status: e.g. 'No resource available'.
 _task_state_change_schedule_latencies = \
   gae_ts_mon.CumulativeDistributionMetric(
@@ -270,6 +269,7 @@ _task_state_change_schedule_latencies = \
     'Latency (in ms) of task scheduling request',
     [
         gae_ts_mon.StringField('pool'),
+        gae_ts_mon.StringField('spec_name'),
         gae_ts_mon.StringField('status')
     ],
     bucketer=_scheduler_bucketer,
@@ -439,8 +439,8 @@ def _extract_given_job_fields(tags, tag_names):
   return fields
 
 
-def _extract_job_fields(tags_dict):
-  """Extracts common job's metric fields from TaskResultSummary.
+def _extract_spec_name_field(tags_dict):
+  """Extracts spec_name metric field from TaskResultSummary.
 
   Args:
     tags_dict: tags dictionary.
@@ -450,12 +450,20 @@ def _extract_job_fields(tags_dict):
     spec_name = tags_dict.get('buildername', '')
     if tags_dict.get('build_is_experimental') == 'true':
       spec_name += ':experimental'
+  return spec_name
 
+
+def _extract_job_fields(tags_dict):
+  """Extracts common job's metric fields from TaskResultSummary.
+
+  Args:
+    tags_dict: tags dictionary.
+  """
   fields = {
       'project_id': tags_dict.get('project', ''),
       'subproject_id': tags_dict.get('subproject', ''),
       'pool': tags_dict.get('pool', ''),
-      'spec_name': spec_name,
+      'spec_name': _extract_spec_name_field(tags_dict),
   }
   return fields
 
@@ -538,6 +546,7 @@ def on_task_status_change_scheduler_latency(summary):
   fields = _extract_given_job_fields(summary.tags, [
       'pool',
   ])
+  fields['spec_name'] = _extract_spec_name_field(_tags_to_dict(summary.tags))
   fields['status'] = task_result.State.to_string(summary.state)
   latency = summary.pending_now(utils.utcnow())
   _task_state_change_schedule_latencies.add(round(latency.total_seconds() *

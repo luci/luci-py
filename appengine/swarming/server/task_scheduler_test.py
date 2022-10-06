@@ -115,7 +115,17 @@ def _get_results(request_key):
   return result_summary, q.fetch()
 
 
-def _get_fields(**kwargs):
+def _update_fields_schedule(**kwargs):
+  fields = {
+      u'pool': 'default',
+      u'spec_name': '',
+      u'status': State.to_string(State.COMPLETED),
+  }
+  fields.update(kwargs)
+  return fields
+
+
+def _update_fields_pubsub(**kwargs):
   fields = {
       u'pool': 'default',
       u'status': State.to_string(State.COMPLETED),
@@ -568,7 +578,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     status = State.to_string(State.PENDING)
     self.assertIsNone(
         ts_mon_metrics._task_state_change_pubsub_notify_latencies.get(
-            fields=_get_fields(status=status, http_status_code=200)))
+            fields=_update_fields_pubsub(status=status, http_status_code=200)))
 
   def test_schedule_request_new_key(self):
     # Ensure that _gen_new_keys work by generating deterministic key.
@@ -645,7 +655,8 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertLessEqual(
         0,
         ts_mon_metrics._task_state_change_pubsub_notify_latencies.get(
-            fields=_get_fields(status=status, http_status_code=200)).sum)
+            fields=_update_fields_pubsub(status=status,
+                                         http_status_code=200)).sum)
 
 
   def test_schedule_request_no_capacity(self):
@@ -672,7 +683,8 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertLessEqual(
         0,
         ts_mon_metrics._task_state_change_pubsub_notify_latencies.get(
-            fields=_get_fields(status=status, http_status_code=200)).sum)
+            fields=_update_fields_pubsub(status=status,
+                                         http_status_code=200)).sum)
 
   def test_schedule_request_no_check_capacity(self):
     # No capacity, but check disabled, allowed.
@@ -735,7 +747,8 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(
         latency,
         ts_mon_metrics._task_state_change_schedule_latencies.get(
-            fields=_get_fields(status=State.to_string(State.EXPIRED))).sum)
+            fields=_update_fields_schedule(
+                status=State.to_string(State.EXPIRED))).sum)
 
   def test_bot_reap_task_6_expired_fifo(self):
     cfg = config.settings()
@@ -1090,16 +1103,17 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(created_ts, result_summary.completed_ts)
     self.assertIsNone(result_summary.try_number)
     self.assertEqual(0, result_summary.current_task_slice)
-    self.assertEqual(
-        (self.now - created_ts).total_seconds() * 1000.0,
-        ts_mon_metrics._task_state_change_schedule_latencies.get(
-            fields=_get_fields(status=State.to_string(State.NO_RESOURCE))).sum)
+    self.assertEqual((self.now - created_ts).total_seconds() * 1000.0,
+                     ts_mon_metrics._task_state_change_schedule_latencies.get(
+                         fields=_update_fields_schedule(
+                             status=State.to_string(State.NO_RESOURCE))).sum)
 
     status = State.to_string(State.NO_RESOURCE)
     self.assertLessEqual(
         0,
         ts_mon_metrics._task_state_change_pubsub_notify_latencies.get(
-            fields=_get_fields(status=status, http_status_code=200)).sum)
+            fields=_update_fields_pubsub(status=status,
+                                         http_status_code=200)).sum)
 
   def test_schedule_request_slice_wait_for_capacity(self):
     result_summary = self._quick_schedule(
@@ -1290,7 +1304,8 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(
         1000.0,
         ts_mon_metrics._task_state_change_schedule_latencies.get(
-            fields=_get_fields(status=State.to_string(State.COMPLETED))).sum)
+            fields=_update_fields_schedule(
+                status=State.to_string(State.COMPLETED))).sum)
 
   def test_task_idempotent_old(self):
     # First task is idempotent.
@@ -1325,7 +1340,8 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(
         1000.0,
         ts_mon_metrics._task_state_change_schedule_latencies.get(
-            fields=_get_fields(status=State.to_string(State.COMPLETED))).sum)
+            fields=_update_fields_schedule(
+                status=State.to_string(State.COMPLETED))).sum)
     # Third task is scheduled, second task is not dedupable, first task is too
     # old.
     new_ts = self.mock_now(self.now, config.settings().reusable_task_age_secs)
@@ -1399,7 +1415,8 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(
         1000.0,
         ts_mon_metrics._task_state_change_schedule_latencies.get(
-            fields=_get_fields(status=State.to_string(State.COMPLETED))).sum)
+            fields=_update_fields_schedule(
+                status=State.to_string(State.COMPLETED))).sum)
 
   def test_task_invalid_parent(self):
     parent_id = self._task_ran_successfully()
@@ -1455,7 +1472,8 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertLessEqual(
         0,
         ts_mon_metrics._task_state_change_pubsub_notify_latencies.get(
-            fields=_get_fields(status=status, http_status_code=200)).sum)
+            fields=_update_fields_pubsub(status=status,
+                                         http_status_code=200)).sum)
 
   def test_get_results(self):
     # TODO(maruel): Split in more focused tests.
@@ -1497,10 +1515,10 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(expected, [i.to_dict() for i in run_results])
 
     # The bot completes the task.
-    self.assertEqual(
-        (reaped_ts - self.now).total_seconds() * 1000.0,
-        ts_mon_metrics._task_state_change_schedule_latencies.get(
-            fields=_get_fields(status=State.to_string(State.RUNNING))).sum)
+    self.assertEqual((reaped_ts - self.now).total_seconds() * 1000.0,
+                     ts_mon_metrics._task_state_change_schedule_latencies.get(
+                         fields=_update_fields_schedule(
+                             status=State.to_string(State.RUNNING))).sum)
 
     done_ts = self.now + datetime.timedelta(seconds=120)
     self.mock_now(done_ts)
@@ -1638,7 +1656,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertLessEqual(
         0,
         ts_mon_metrics._task_state_change_pubsub_notify_latencies.get(
-            fields=_get_fields(http_status_code=200)).sum)
+            fields=_update_fields_pubsub(http_status_code=200)).sum)
 
     self.assertEqual('hihey', run_result.key.get().get_output(0, 0))
     self.assertEqual(1, self.execute_tasks())
@@ -1668,7 +1686,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
 
     self.assertIsNone(
         ts_mon_metrics._task_state_change_pubsub_notify_latencies.get(
-            fields=_get_fields(http_status_code=200)))
+            fields=_update_fields_pubsub(http_status_code=200)))
 
   def test_bot_update_pubsub_negative_latency(self):
     pub_sub_calls = self.mock_pub_sub()
@@ -1681,7 +1699,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertLessEqual(
         0,
         ts_mon_metrics._task_state_change_pubsub_notify_latencies.get(
-            fields=_get_fields(http_status_code=200)).sum)
+            fields=_update_fields_pubsub(http_status_code=200)).sum)
 
   def test_bot_update_pubsub_error(self):
     pub_sub_calls = self.mock_pub_sub()
@@ -1694,7 +1712,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertLessEqual(
         0,
         ts_mon_metrics._task_state_change_pubsub_notify_latencies.get(
-            fields=_get_fields(http_status_code=404)).sum)
+            fields=_update_fields_pubsub(http_status_code=404)).sum)
 
     # Bot retries bot_update, now PubSub works and notification is sent.
     self.publish_successful = True
@@ -1707,7 +1725,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertLessEqual(
         0,
         ts_mon_metrics._task_state_change_pubsub_notify_latencies.get(
-            fields=_get_fields(http_status_code=200)).sum)
+            fields=_update_fields_pubsub(http_status_code=200)).sum)
 
   def _bot_update_timeouts(self, hard, io):
     run_result = self._quick_reap()
@@ -1896,7 +1914,8 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertLessEqual(
         0,
         ts_mon_metrics._task_state_change_pubsub_notify_latencies.get(
-            fields=_get_fields(status=status, http_status_code=200)).sum)
+            fields=_update_fields_pubsub(status=status,
+                                         http_status_code=200)).sum)
 
   def test_bot_terminate_canceled_task(self):
     pub_sub_calls = self.mock_pub_sub()
@@ -1953,7 +1972,8 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertLessEqual(
         0,
         ts_mon_metrics._task_state_change_pubsub_notify_latencies.get(
-            fields=_get_fields(status=status, http_status_code=200)).sum)
+            fields=_update_fields_pubsub(status=status,
+                                         http_status_code=200)).sum)
     self.assertLessEqual(
         0,
         ts_mon_metrics._dead_task_detection_latencies.get(fields={
@@ -2023,7 +2043,8 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertLessEqual(
         0,
         ts_mon_metrics._task_state_change_pubsub_notify_latencies.get(
-            fields=_get_fields(status=status, http_status_code=200)).sum)
+            fields=_update_fields_pubsub(status=status,
+                                         http_status_code=200)).sum)
 
   def test_bot_terminate_task_missing_cipd(self):
     pub_sub_calls = self.mock_pub_sub()
@@ -2080,7 +2101,8 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertLessEqual(
         0,
         ts_mon_metrics._task_state_change_pubsub_notify_latencies.get(
-            fields=_get_fields(status=status, http_status_code=200)).sum)
+            fields=_update_fields_pubsub(status=status,
+                                         http_status_code=200)).sum)
 
   def test_bot_terminate_task_wrong_bot(self):
     run_result = self._quick_reap()
@@ -2117,7 +2139,8 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertLessEqual(
         0,
         ts_mon_metrics._task_state_change_pubsub_notify_latencies.get(
-            fields=_get_fields(status=status, http_status_code=200)).sum)
+            fields=_update_fields_pubsub(status=status,
+                                         http_status_code=200)).sum)
     # Make sure the TaskToRunShard is claimed.
     request = result_summary.request_key.get()
     to_run_key = task_to_run.request_to_task_to_run_key(request, 0)
@@ -2143,7 +2166,8 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertLessEqual(
         0,
         ts_mon_metrics._task_state_change_pubsub_notify_latencies.get(
-            fields=_get_fields(status=status, http_status_code=200)).sum)
+            fields=_update_fields_pubsub(status=status,
+                                         http_status_code=200)).sum)
 
     result_summary = result_summary.key.get()
     self.assertEqual(State.CANCELED, result_summary.state)
@@ -2218,7 +2242,8 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertLessEqual(
         0,
         ts_mon_metrics._task_state_change_pubsub_notify_latencies.get(
-            fields=_get_fields(status=status, http_status_code=200)).sum)
+            fields=_update_fields_pubsub(status=status,
+                                         http_status_code=200)).sum)
 
   def test_cancel_task_bot_id(self):
     # Cancel a running task.
@@ -2315,7 +2340,8 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertLessEqual(
         0,
         ts_mon_metrics._task_state_change_pubsub_notify_latencies.get(
-            fields=_get_fields(status=status, http_status_code=200)).sum)
+            fields=_update_fields_pubsub(status=status,
+                                         http_status_code=200)).sum)
 
   def test_cancel_tasks(self):
     # Create RUNNING task
@@ -2377,7 +2403,8 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(
         1000.0,
         ts_mon_metrics._task_state_change_schedule_latencies.get(
-            fields=_get_fields(status=State.to_string(State.CANCELED))).sum)
+            fields=_update_fields_schedule(
+                status=State.to_string(State.CANCELED))).sum)
 
   def test_cancel_tasks_conditions(self):
     # Create PENDING tasks
@@ -2442,13 +2469,15 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(
         latency,
         ts_mon_metrics._task_state_change_schedule_latencies.get(
-            fields=_get_fields(status=State.to_string(State.EXPIRED))).sum)
+            fields=_update_fields_schedule(
+                status=State.to_string(State.EXPIRED))).sum)
     self.assertEqual(1, len(pub_sub_calls))  # pubsub completion notification
     status = State.to_string(State.EXPIRED)
     self.assertLessEqual(
         0,
         ts_mon_metrics._task_state_change_pubsub_notify_latencies.get(
-            fields=_get_fields(status=status, http_status_code=200)).sum)
+            fields=_update_fields_pubsub(status=status,
+                                         http_status_code=200)).sum)
 
   def test_cron_abort_expired_fallback(self):
     # 1 and 4 have capacity.
@@ -2570,7 +2599,8 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(
         latency,
         ts_mon_metrics._task_state_change_schedule_latencies.get(
-            fields=_get_fields(status=State.to_string(State.EXPIRED))).sum)
+            fields=_update_fields_schedule(
+                status=State.to_string(State.EXPIRED))).sum)
 
   def test_cron_handle_bot_died(self):
     pub_sub_calls = self.mock_pub_sub()
@@ -2606,7 +2636,8 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertLessEqual(
         0,
         ts_mon_metrics._task_state_change_pubsub_notify_latencies.get(
-            fields=_get_fields(status=status, http_status_code=200)).sum)
+            fields=_update_fields_pubsub(status=status,
+                                         http_status_code=200)).sum)
 
     # Refresh and compare:
     expected = self._gen_result_summary_reaped(
@@ -2656,7 +2687,8 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertLessEqual(
         0,
         ts_mon_metrics._task_state_change_pubsub_notify_latencies.get(
-            fields=_get_fields(status=status, http_status_code=200)).sum)
+            fields=_update_fields_pubsub(status=status,
+                                         http_status_code=200)).sum)
 
     now_0 = self.now
     # Bot becomes MIA.
@@ -2671,7 +2703,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertLessEqual(
         0,
         ts_mon_metrics._task_state_change_pubsub_notify_latencies.get(
-            fields=_get_fields(status=status, http_status_code=200)))
+            fields=_update_fields_pubsub(status=status, http_status_code=200)))
     self.assertLessEqual(
         0,
         ts_mon_metrics._dead_task_detection_latencies.get(fields={
@@ -3101,14 +3133,16 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(
         expiration_secs * 1000.0,
         ts_mon_metrics._task_state_change_schedule_latencies.get(
-            fields=_get_fields(status=State.to_string(State.EXPIRED))).sum)
+            fields=_update_fields_schedule(
+                status=State.to_string(State.EXPIRED))).sum)
 
     self.execute_tasks()
     status = State.to_string(State.EXPIRED)
     self.assertLessEqual(
         0,
         ts_mon_metrics._task_state_change_pubsub_notify_latencies.get(
-            fields=_get_fields(status=status, http_status_code=200)).sum)
+            fields=_update_fields_pubsub(status=status,
+                                         http_status_code=200)).sum)
 
   def test_task_cancel_running_children_tasks(self):
     # Tested indirectly via test_bot_update_child_with_cancelled_parent.

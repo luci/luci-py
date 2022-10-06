@@ -325,6 +325,7 @@ class TestMetrics(test_case.TestCase):
 
     fields = {
         'pool': 'test_pool',
+        'spec_name': 'test_builder:experimental',
         'status': task_result.State.to_string(task_result.State.KILLED)
     }
     self.assertEqual(
@@ -350,6 +351,7 @@ class TestMetrics(test_case.TestCase):
     ts_mon_metrics.on_task_status_change_scheduler_latency(summary)
     fields = {
         'pool': 'test_pool',
+        'spec_name': 'test_builder:experimental',
         'status': task_result.State.to_string(task_result.State.KILLED)
     }
     self.assertEqual(
