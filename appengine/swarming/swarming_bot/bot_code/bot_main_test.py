@@ -828,22 +828,13 @@ class TestBotMain(TestBotBase):
                                        'task_runner_out.json')
         cmd = cmd[:]
         expected = [
-            sys.executable,
-            bot_main.THIS_FILE,
-            'task_runner',
-            '--swarming-server',
-            url,
-            '--default-swarming-server',
-            'https://localhost:1',
-            '--in-file',
-            os.path.join(self.root_dir, 'w', 'task_runner_in.json'),
-            '--out-file',
-            self2._out_file,
-            '--cost-usd-hour',
-            '3600.0',
-            '--start',
-            '100.0',
-            '--bot-file',
+          sys.executable, bot_main.THIS_FILE, 'task_runner',
+          '--swarming-server', url,
+          '--in-file',
+          os.path.join(self.root_dir, 'w', 'task_runner_in.json'),
+          '--out-file', self2._out_file,
+          '--cost-usd-hour', '3600.0', '--start', '100.0',
+          '--bot-file',
         ]
         # After than there may be --bot-file and --auth-params-file. Then --
         # will be used to mark the separation of flags meant to be sent to

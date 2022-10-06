@@ -128,8 +128,7 @@ def load_and_run(server_url, work_dir, manifest, auth_params_file):
   with open(in_file, 'w') as f:
     json.dump(manifest, f)
   out_file = os.path.join(work_dir, 'task_runner_out.json')
-  task_runner.load_and_run(in_file, server_url, server_url, 3600., time.time(),
-                           out_file,
+  task_runner.load_and_run(in_file, server_url, 3600., time.time(), out_file,
                            ['--min-free-space', '1'] + DISABLE_CIPD_FOR_TESTS,
                            None, auth_params_file)
   with open(out_file, 'rb') as f:
@@ -798,12 +797,11 @@ class TestTaskRunner(TestTaskRunnerBase):
 
   def test_main(self):
 
-    def _load_and_run(manifest, swarming_server, default_swarming_server,
-                      cost_usd_hour, start, json_file, run_isolated_flags,
-                      bot_file, auth_params_file):
+    def _load_and_run(manifest, swarming_server, cost_usd_hour, start,
+                      json_file, run_isolated_flags, bot_file,
+                      auth_params_file):
       self.assertEqual('foo', manifest)
       self.assertEqual(self.server.url, swarming_server)
-      self.assertEqual(self.server.url, default_swarming_server)
       self.assertEqual(3600., cost_usd_hour)
       self.assertGreaterEqual(time.time(), start)
       self.assertEqual('task_summary.json', json_file)
@@ -814,8 +812,6 @@ class TestTaskRunner(TestTaskRunnerBase):
     self.mock(task_runner, 'load_and_run', _load_and_run)
     cmd = [
         '--swarming-server',
-        self.server.url,
-        '--default-swarming-server',
         self.server.url,
         '--in-file',
         'foo',
