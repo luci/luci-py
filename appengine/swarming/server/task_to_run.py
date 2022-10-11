@@ -445,27 +445,6 @@ class _ActiveQuery(object):
           available.append(fresh[i])
       self._stats.claimed += len(fresh) - len(available)
 
-    # Older TaskToRunShard entities don't have `dimensions` populated. Back fill
-    # them based on TaskRequest. This should be relatively rare and eventually
-    # can be removed.
-    #
-    # TODO(vadimsh): Remove when there are no more hits in production,
-    # approximately Sep 7 2022.
-    request_keys = [
-        task_to_run_key_to_request_key(ttr.key) for ttr in available
-        if not ttr.dimensions
-    ]
-    if request_keys:
-      self._log('missing_dims: %r',
-                [ttr.task_id for ttr in available if not ttr.dimensions])
-      requests = yield ndb.get_multi_async(request_keys)
-      idx = 0
-      for ttr in available:
-        if not ttr.dimensions:
-          props = requests[idx].task_slice(ttr.task_slice_index).properties
-          ttr.dimensions = props.dimensions
-          idx += 1
-
     # The queue_number hash may have conflicts or the queues being polled aren't
     # matching the bot anymore (if this cache is stale). Filter out all requests
     # that don't match bot dimensions.
@@ -479,12 +458,11 @@ class _ActiveQuery(object):
     self._stats.mismatch += len(available) - len(matched)
 
     if fetched:
-      self._log(
-          'got %d items (%d stale, %d already claimed, '
-          '%d mismatch, %d backfilled dims)', len(fetched),
-          len(fetched) - len(fresh),
-          len(fresh) - len(available),
-          len(available) - len(matched), len(request_keys))
+      self._log('got %d items (%d stale, %d already claimed, %d mismatch)',
+                len(fetched),
+                len(fetched) - len(fresh),
+                len(fresh) - len(available),
+                len(available) - len(matched))
     if not more:
       self._log('exhausted')
     raise ndb.Return((matched, cursor, more))

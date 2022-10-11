@@ -32,12 +32,6 @@ queue:
   bucket_size: 100
   rate: 500/s
 
-# TODO(vadimsh): Delete.
-# /internal/taskqueue/important/task_queues/rebuild-cache
-- name: rebuild-task-cache
-  bucket_size: 100
-  rate: 500/s
-
 # /internal/taskqueue/important/task_queues/update-bot-matches
 - name: update-bot-matches
   bucket_size: 100
@@ -119,17 +113,3 @@ queue:
 # /internal/taskqueue/monitoring/bq/bots/events/<timestamp:\d{4}-\d\d-\d\dT\d\d:\d\d>
 - name: monitoring-bq-bots-events
   rate: 10/s
-
-
-## General
-
-# /internal/taskqueue/monitoring/tsmon/<kind:[0-9A-Za-z_]+>
-- name: tsmon
-  bucket_size: 10
-  rate: 10/s
-  max_concurrent_requests: 10
-  # Cron will reschedule, so don't retry on failure.
-  # Need both limits, since AE semantics is "AND", not "OR".
-  retry_parameters:
-    task_retry_limit: 0
-    task_age_limit: 1s
