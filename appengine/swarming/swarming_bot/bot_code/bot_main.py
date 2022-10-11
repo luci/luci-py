@@ -950,6 +950,8 @@ def _run_manifest(botobj, manifest, start):
         'task_runner',
         '--swarming-server',
         url,
+        '--default-swarming-server',
+        botobj.server,
         '--in-file',
         task_in_file,
         '--out-file',
