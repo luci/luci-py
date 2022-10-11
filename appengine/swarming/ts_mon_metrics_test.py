@@ -306,7 +306,7 @@ class TestMetrics(test_case.TestCase):
     tags = [
         'project:test_project', 'subproject:test_subproject', 'pool:test_pool',
         'buildername:test_builder', 'name:some_tests',
-        'build_is_experimental:true'
+        'build_is_experimental:true', 'device_type:some_device',
     ]
 
     summary = _gen_task_result_summary(self.now,
@@ -320,7 +320,8 @@ class TestMetrics(test_case.TestCase):
     fields = {
         'pool': 'test_pool',
         'spec_name': 'test_builder:experimental',
-        'status': task_result.State.to_string(task_result.State.KILLED)
+        'status': task_result.State.to_string(task_result.State.KILLED),
+        'device_type': 'some_device',
     }
     self.assertEqual(
         1000,
@@ -331,7 +332,7 @@ class TestMetrics(test_case.TestCase):
     tags = [
         'project:test_project', 'subproject:test_subproject', 'pool:test_pool',
         'buildername:test_builder', 'name:some_tests',
-        'build_is_experimental:true'
+        'build_is_experimental:true', 'device_type:some_device',
     ]
     self.mock_now(self.now, 0)
     summary = _gen_task_result_summary(self.now,
@@ -346,7 +347,8 @@ class TestMetrics(test_case.TestCase):
     fields = {
         'pool': 'test_pool',
         'spec_name': 'test_builder:experimental',
-        'status': task_result.State.to_string(task_result.State.KILLED)
+        'status': task_result.State.to_string(task_result.State.KILLED),
+        'device_type': 'some_device',
     }
     self.assertEqual(
         0,

@@ -120,6 +120,7 @@ def _update_fields_schedule(**kwargs):
       u'pool': 'default',
       u'spec_name': '',
       u'status': State.to_string(State.COMPLETED),
+      u'device_type': '',
   }
   fields.update(kwargs)
   return fields

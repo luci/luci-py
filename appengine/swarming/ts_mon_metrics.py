@@ -252,7 +252,8 @@ _task_state_change_schedule_latencies = \
     [
         gae_ts_mon.StringField('pool'),
         gae_ts_mon.StringField('spec_name'),
-        gae_ts_mon.StringField('status')
+        gae_ts_mon.StringField('status'),
+        gae_ts_mon.StringField('device_type'),
     ],
     bucketer=_scheduler_bucketer,
 )
@@ -520,7 +521,7 @@ def on_task_status_change_pubsub_latency(tags, state, http_status_code,
 
 def on_task_status_change_scheduler_latency(summary):
   fields = _extract_given_job_fields(summary.tags, [
-      'pool',
+      'pool', 'device_type',
   ])
   fields['spec_name'] = _extract_spec_name_field(_tags_to_dict(summary.tags))
   fields['status'] = task_result.State.to_string(summary.state)
