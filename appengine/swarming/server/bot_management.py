@@ -18,28 +18,12 @@
         |  +-----------+  +-------+
         |
         +------+-----------+----- ... ----+
-        |      |           |              |
-        |      v           v              v
-        |  +--------+  +--------+     +--------+
-        |  |BotEvent|  |BotEvent| ... |BotEvent|
-        |  |id=fffff|  |if=ffffe| ... |id=00000|
-        |  +--------+  +--------+     +--------+
-        |
-        +------+
-        |      |
-        |      v
-        |  +-------------+
-        |  |BotDimensions|                                        task_queues.py
-        |  |id=1         |
-        |  +-------------+
-        |
-        +--------------- ... -----+
-        |                         |
-        v                         v
-    +-------------------+     +-------------------+
-    |BotTaskDimensions  | ... |BotTaskDimensions  |               task_queues.py
-    |id=<dimension_hash>| ... |id=<dimension_hash>|
-    +-------------------+     +-------------------+
+               |           |              |
+               v           v              v
+           +--------+  +--------+     +--------+
+           |BotEvent|  |BotEvent| ... |BotEvent|
+           |id=fffff|  |if=ffffe| ... |id=00000|
+           +--------+  +--------+     +--------+
 
     +--------Root---------+
     |DimensionAggregation |

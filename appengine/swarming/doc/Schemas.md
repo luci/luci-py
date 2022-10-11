@@ -158,29 +158,12 @@ This schema is about the audit of the events of bots.
         |  +-----------+  +-------+
         |
         +------+-----------+----- ... ----+
-        |      |           |              |
-        |      v           v              v
-        |  +--------+  +--------+     +--------+
-        |  |BotEvent|  |BotEvent| ... |BotEvent|               bot_management.py
-        |  |id=fffff|  |id=ffffe| ... |id=00000|
-        |  +--------+  +--------+     +--------+
-        |
-        +------+
-        |      |
-        |      v
-        |  +-------------+
-        |  |BotDimensions|                                        task_queues.py
-        |  |id=1         |
-        |  +-------------+
-        |
-        +---------------- ... ----+
-        |                         |
-        v                         v
-    +-------------------+     +-------------------+
-    |BotTaskDimensions  | ... |BotTaskDimensions  |               task_queues.py
-    |id=<dimension_hash>| ... |id=<dimension_hash>|
-    +-------------------+     +-------------------+
-
+               |           |              |
+               v           v              v
+           +--------+  +--------+     +--------+
+           |BotEvent|  |BotEvent| ... |BotEvent|               bot_management.py
+           |id=fffff|  |id=ffffe| ... |id=00000|
+           +--------+  +--------+     +--------+
 
     +--------Root---------+
     |DimensionAggregation |                                     bot_management.py
@@ -201,10 +184,6 @@ reduce DB contention.
   - TaskToRunShard has the key ID as `dimensions_hash` value is calculated as an
     int32 from the TaskRequest.properties.dimensions dictionary.
   - PerformanceStats has key ID = 1.
-  - BotTaskDimensions and TaskDimensions have key ID `dimensions_hash`. This
-    value is calculated as an int32 from the TaskRequest.properties.dimensions
-    dictionary.
-
 
 ## Notes
 
