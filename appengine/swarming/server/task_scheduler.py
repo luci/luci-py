@@ -1990,13 +1990,7 @@ def task_expire_tasks(task_to_runs):
   skipped = 0
 
   try:
-    for ttr in task_to_runs:
-      # TODO(jonahhooper) remove later
-      # see https://crbug.com/1065101 and https://crrev.com/c/3876524
-      if len(ttr) == 3:
-        task_id, _try_number, task_slice_index = ttr
-      else:
-        task_id, task_slice_index = ttr
+    for task_id, task_slice_index in task_to_runs:
       # retrieve request
       request_key, _ = task_pack.get_request_and_result_keys(task_id)
       request = request_key.get()
