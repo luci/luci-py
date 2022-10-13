@@ -220,11 +220,6 @@ class ClientPermissions(messages.Message):
   list_tasks = messages.StringField(9, repeated=True)
 
 
-class FileContentRequest(messages.Message):
-  """Content of a file."""
-  content = messages.StringField(1)
-
-
 class FileContent(messages.Message):
   """Content of a file."""
   content = messages.StringField(1)
