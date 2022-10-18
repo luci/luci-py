@@ -171,11 +171,12 @@ def api_routes(api_classes, base_path='/_ah/api'):
     for _, method in sorted(api_class.all_remote_methods().items()):
       info = method.method_info
       method_path = info.get_path(api_class.api_info)
-      method_path = method_path.replace('{', '<string:').replace('}', '>')
-      t = posixpath.join(api_base_path, method_path)
+      flask_method_path = method_path.replace('{', '<string:').replace('}', '>')
+      t = posixpath.join(api_base_path, flask_method_path)
       http_method = info.http_method.upper() or 'POST'
+      unique_endpoint = method_path + ' ' + http_method
       handler = path_handler_factory(api_class, method, api_base_path)
-      routes.append((t, method_path, handler, [http_method]))
+      routes.append((t, unique_endpoint, handler, [http_method]))
       templates.add(t)
 
       # Add routes for HTTP OPTIONS (to add CORS headers) for each method.
