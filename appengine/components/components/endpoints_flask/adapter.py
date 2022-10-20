@@ -46,7 +46,7 @@ def decode_field(field, value):
   return PROTOCOL.decode_field(field, value)
 
 
-def decode_message(remote_method_info, request):
+def decode_message(remote_method_info, request, route_kwargs):
   """Decodes a protorpc message from a Flask request.
 
   If method accepts a resource container, parses field values from URL too.
@@ -77,8 +77,8 @@ def decode_message(remote_method_info, request):
     else:
       param_fields = res_container.parameters_message_class.all_fields()
     for f in param_fields:
-      if f.name in request.args:
-        values = [request.args[f.name]]
+      if f.name in route_kwargs:
+        values = [route_kwargs[f.name]]
       else:
         values = request.values.getlist(f.name)
       if values:
@@ -90,14 +90,14 @@ def decode_message(remote_method_info, request):
   return result
 
 
-def cors_handler():
+def cors_handler(**_):
   return flask.Response(headers=CORS_HEADERS)
 
 
 def path_handler_factory(api_class, api_method, service_path):
   """Returns a Flask handler function for the API methods."""
 
-  def path_handler():
+  def path_handler(**route_kwargs):
     headers = CORS_HEADERS
 
     split_host = flask.request.host.split(':')
@@ -113,7 +113,7 @@ def path_handler_factory(api_class, api_method, service_path):
                                 service_path=service_path,
                                 headers=flask.request.headers.items()))
     try:
-      req = decode_message(api_method.remote, flask.request)
+      req = decode_message(api_method.remote, flask.request, route_kwargs)
       # Check that required fields are populated.
       req.check_initialized()
     except (messages.DecodeError, messages.ValidationError, ValueError) as ex:
@@ -128,18 +128,18 @@ def path_handler_factory(api_class, api_method, service_path):
       return '', http_client.NO_CONTENT, headers
     # Flask jsonifies Python dicts, so this format is more convenient.
     response = json.loads(PROTOCOL.encode_message(res))
-    if flask.request.get('fields'):
+    if flask.request.values.get('fields'):
       try:
         # PROTOCOL.encode_message checks that the message is initialized
         # before dumping it directly to JSON string. Therefore we can't
         # mask the protocol buffer (if masking removes a required field
         # then encode_message will fail). Instead, call encode_message
         # first, mask the dict,and dump it back to JSON.
-        response = partial.mask(response, flask.request.get('fields'))
+        response = partial.mask(response, flask.request.values.get('fields'))
       except (partial.ParsingError, ValueError) as e:
         # Log the error but return the full response.
         logging.warning('Ignoring erroneous field mask %r: %s',
-                        flask.request.get('fields'), e)
+                        flask.request.values.get('fields'), e)
     return flask.jsonify(response), http_client.OK, headers
 
   return path_handler

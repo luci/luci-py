@@ -32,7 +32,7 @@ CONTAINER = endpoints.ResourceContainer(Msg, x=messages.StringField(3))
 
 @endpoints.api('Service', 'v1')
 class EndpointsService(remote.Service):
-  @endpoints.method(Msg, Msg)
+  @endpoints.method(Msg, Msg, path='foo/{foo}/bar/{bar}/baz')
   def post(self, _request):
     return Msg()
 
@@ -54,7 +54,9 @@ class EndpointsFlaskTestCase(test_case.TestCase):
     request = mock.MagicMock()
     request.data = json.dumps({"s": "a"})
     request.method = 'POST'
-    msg = adapter.decode_message(EndpointsService.post.remote, request)
+    request_kwargs = {'foo': 'a', 'bar': 'b'}
+    msg = adapter.decode_message(EndpointsService.post.remote, request,
+                                 request_kwargs)
     self.assertEqual(msg.s, "a")
     self.assertEqual(msg.s2, None)  # because it is not a ResourceContainer.
 
@@ -67,7 +69,7 @@ class EndpointsFlaskTestCase(test_case.TestCase):
     request.values = datastructures.CombinedMultiDict(
         [request.args, request.form])
     request.method = 'GET'
-    msg = adapter.decode_message(EndpointsService.get.remote, request)
+    msg = adapter.decode_message(EndpointsService.get.remote, request, {})
     self.assertEqual(msg.s, 'a')
     self.assertEqual(msg.s2, 'b')
     self.assertEqual(msg.r, ['x', 'y'])
@@ -80,7 +82,8 @@ class EndpointsFlaskTestCase(test_case.TestCase):
     request.values = datastructures.CombinedMultiDict(
         [request.args, request.form])
     request.method = 'GET'
-    rc = adapter.decode_message(EndpointsService.get_container.remote, request)
+    rc = adapter.decode_message(EndpointsService.get_container.remote, request,
+                                {})
     self.assertEqual(rc.s, 'a')
     self.assertEqual(rc.s2, 'b')
     self.assertEqual(rc.x, 'c')
@@ -104,12 +107,12 @@ class EndpointsFlaskTestCase(test_case.TestCase):
         routes,
         [
             # Flask URLs must be unique
+            '/_ah/api/Service/v1/foo/<string:foo>/bar/<string:bar>/baz',
+            '/_ah/api/Service/v1/foo/<string:foo>/bar/<string:bar>/baz',
             '/_ah/api/Service/v1/get',
             '/_ah/api/Service/v1/get',
             '/_ah/api/Service/v1/get_container',
             '/_ah/api/Service/v1/get_container',
-            '/_ah/api/Service/v1/post',
-            '/_ah/api/Service/v1/post',
             '/_ah/api/Service/v1/post_403',
             '/_ah/api/Service/v1/post_403',
             '/_ah/api/discovery/v1/apis',
