@@ -12,6 +12,7 @@ details on the presubmit API built into gclient.
 def CommonChecks(input_api, output_api):
   files_to_skip = list(input_api.DEFAULT_FILES_TO_SKIP) + [
       r'.*_pb2\.py$',
+      r'.*compile_proto\.py$',  # it is python3, while pylint is still python2
   ]
   disabled_warnings = [
     # Pylint fails to recognize lazy module loading in components.auth.config,

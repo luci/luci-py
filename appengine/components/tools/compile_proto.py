@@ -5,8 +5,6 @@
 
 """Compiles all *.proto files it finds into *_pb2.py."""
 
-from __future__ import print_function
-
 import logging
 import optparse
 import os
@@ -19,21 +17,8 @@ import tempfile
 
 # Directory with this file.
 THIS_DIR = os.path.dirname(os.path.abspath(__file__))
-
-
-# Minimally required protoc version.
-MIN_SUPPORTED_PROTOC_VERSION = (3, 17, 3)
-# Maximally supported protoc version.
-MAX_SUPPORTED_PROTOC_VERSION = (3, 17, 3)
-
-
-# Printed if protoc is missing or too old.
-PROTOC_INSTALL_HELP = (
-    "Could not find working protoc (%s <= ver <= %s) in PATH." %
-    (
-      '.'.join(map(str, MIN_SUPPORTED_PROTOC_VERSION)),
-      '.'.join(map(str, MAX_SUPPORTED_PROTOC_VERSION)),
-    ))
+# Version of protoc CIPD package to install.
+PROTOC_PKG_VERSION = 'version:2@3.17.3'
 
 
 # Paths that should not be searched for *.proto.
@@ -64,15 +49,25 @@ def find_proto_files(path):
         yield os.path.join(dirpath, name)
 
 
-def get_protoc():
-  """Returns protoc executable path (maybe relative to PATH)."""
-  return 'protoc.exe' if sys.platform == 'win32' else 'protoc'
+def install_protoc():
+  """Installs protoc from CIPD and returns an absolute path to it."""
+  root = os.path.join(THIS_DIR, '.protoc')
+  cipd = subprocess.Popen(
+      ['cipd', 'ensure', '-ensure-file', '-', '-root', root],
+      stdin=subprocess.PIPE,
+      text=True)
+  cipd.communicate('infra/3pp/tools/protoc/${platform} %s' % PROTOC_PKG_VERSION)
+  if cipd.returncode:
+    raise subprocess.SubprocessError('Failed to install protoc')
+  return os.path.join(root, 'bin',
+                      'protoc.exe' if sys.platform == 'win32' else 'protoc')
 
 
-def compile_proto(proto_file, proto_path, output_path=None):
+def compile_proto(protoc, proto_file, proto_path, output_path=None):
   """Invokes 'protoc', compiling single *.proto file into *_pb2.py file.
 
   Args:
+    protoc: path to `protoc` to use.
     proto_file: the file to compile.
     proto_path: the root of proto file directory tree.
     output_path: the root of the output directory tree.
@@ -82,7 +77,7 @@ def compile_proto(proto_file, proto_path, output_path=None):
     The path of the generated _pb2.py file.
   """
   output_path = output_path or proto_path
-  cmd = [get_protoc()]
+  cmd = [protoc]
   cmd.append('--proto_path=%s' % proto_path)
   # Reuse embedded google protobuf.
   root = os.path.dirname(os.path.dirname(os.path.dirname(THIS_DIR)))
@@ -98,7 +93,7 @@ def compile_proto(proto_file, proto_path, output_path=None):
                                                          output_path)
 
 
-def check_proto_compiled(proto_file, proto_path):
+def check_proto_compiled(protoc, proto_file, proto_path):
   """Return True if *_pb2.py on disk is up to date."""
   # Missing?
   expected_path = proto_file.replace('.proto', '_pb2.py')
@@ -114,7 +109,10 @@ def check_proto_compiled(proto_file, proto_path):
   tmp_dir = tempfile.mkdtemp()
   try:
     try:
-      compiled = compile_proto(proto_file, proto_path, output_path=tmp_dir)
+      compiled = compile_proto(protoc,
+                               proto_file,
+                               proto_path,
+                               output_path=tmp_dir)
     except subprocess.CalledProcessError:
       return False
     return read(compiled) == read(expected_path)
@@ -122,52 +120,30 @@ def check_proto_compiled(proto_file, proto_path):
     shutil.rmtree(tmp_dir)
 
 
-def compile_all_files(root_dir, proto_path):
+def compile_all_files(protoc, root_dir, proto_path):
   """Compiles all *.proto files it recursively finds in |root_dir|."""
   root_dir = os.path.abspath(root_dir)
   success = True
   for path in find_proto_files(root_dir):
     try:
-      compile_proto(path, proto_path)
+      compile_proto(protoc, path, proto_path)
     except subprocess.CalledProcessError:
       print('Failed to compile: %s' % path[len(root_dir) + 1:], file=sys.stderr)
       success = False
   return success
 
 
-def check_all_files(root_dir, proto_path):
+def check_all_files(protoc, root_dir, proto_path):
   """Returns True if all *_pb2.py files on disk are up to date."""
   root_dir = os.path.abspath(root_dir)
   success = True
   for path in find_proto_files(root_dir):
-    if not check_proto_compiled(path, proto_path):
+    if not check_proto_compiled(protoc, path, proto_path):
       print(
           'Need to recompile file: %s' % path[len(root_dir) + 1:],
           file=sys.stderr)
       success = False
   return success
-
-
-def get_protoc_version():
-  """Returns the version of installed 'protoc', or None if not found."""
-  cmd = [get_protoc(), '--version']
-  try:
-    logging.debug('Running %s', cmd)
-    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE)
-    out, _ = proc.communicate()
-    if proc.returncode:
-      logging.debug('protoc --version returned %d', proc.returncode)
-      return None
-  except OSError as err:
-    logging.debug('Failed to run protoc --version: %s', err)
-    return None
-  if not isinstance(out, str):
-    out = out.decode('ascii')
-  match = re.match('libprotoc (.*)', out)
-  if not match:
-    logging.debug('Unexpected output of protoc --version: %s', out)
-    return None
-  return tuple(map(int, match.group(1).split('.')))
 
 
 def main(args, app_dir=None):
@@ -197,36 +173,13 @@ def main(args, app_dir=None):
       parser.error('Unexpected arguments')
     root_dir = app_dir
 
-  # Ensure protoc compiler is up-to-date.
-  protoc_version = get_protoc_version()
-  if protoc_version is None or protoc_version < MIN_SUPPORTED_PROTOC_VERSION:
-    if protoc_version:
-      existing = '.'.join(map(str, protoc_version))
-      expected = '.'.join(map(str, MIN_SUPPORTED_PROTOC_VERSION))
-      print(
-          'protoc version is too old (%s), expecting at least %s.\n' %
-          (existing, expected),
-          file=sys.stderr)
-    sys.stderr.write(PROTOC_INSTALL_HELP)
-    return 1
-
-  # Make sure protoc produces code compatible with vendored libprotobuf.
-  if protoc_version > MAX_SUPPORTED_PROTOC_VERSION:
-    existing = '.'.join(map(str, protoc_version))
-    expected = '.'.join(map(str, MAX_SUPPORTED_PROTOC_VERSION))
-    print(
-        'protoc version is too new (%s), expecting at most %s.\n' % (existing,
-                                                                     expected),
-        file=sys.stderr)
-    sys.stderr.write(PROTOC_INSTALL_HELP)
-    return 1
-
+  protoc = install_protoc()
   proto_path = os.path.abspath(options.proto_path or root_dir)
 
   if options.check:
-    success = check_all_files(root_dir, proto_path)
+    success = check_all_files(protoc, root_dir, proto_path)
   else:
-    success = compile_all_files(root_dir, proto_path)
+    success = compile_all_files(protoc, root_dir, proto_path)
 
   return int(not success)
 
