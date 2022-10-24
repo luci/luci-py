@@ -41,7 +41,10 @@ TEST_CONFIG = bots_pb2.BotsCfg(
             auth=[bots_pb2.BotAuth(require_service_account=['a@example.com'])],
             bot_config_script='foo.py',
             system_service_account='bot',
-            logs_cloud_project='chrome-infra-logs'),
+            logs_cloud_project='chrome-infra-logs',
+            rbe_migration=bots_pb2.BotGroup.RBEMigration(
+                rbe_mode_percent=35,
+            )),
         bots_pb2.BotGroup(
             auth=[bots_pb2.BotAuth(ip_whitelist='bots')],
             dimensions=['pool:default']),
@@ -81,8 +84,9 @@ EXPECTED_GROUP_1 = bot_groups_config._make_bot_group_config(
     bot_config_script_rev='',
     bot_config_script_content='',
     system_service_account='',
-    is_default=False,
-    logs_cloud_project='google.com:chromecompute')
+    logs_cloud_project='google.com:chromecompute',
+    rbe_migration=None,
+    is_default=False)
 
 EXPECTED_GROUP_2 = bot_groups_config._make_bot_group_config(
     owners=(),
@@ -98,8 +102,9 @@ EXPECTED_GROUP_2 = bot_groups_config._make_bot_group_config(
     bot_config_script_rev='',
     bot_config_script_content='print("Hi")',
     system_service_account='bot',
-    is_default=False,
-    logs_cloud_project='chrome-infra-logs')
+    logs_cloud_project='chrome-infra-logs',
+    rbe_migration=bots_pb2.BotGroup.RBEMigration(rbe_mode_percent=35),
+    is_default=False)
 
 EXPECTED_GROUP_3 = bot_groups_config._make_bot_group_config(
     owners=(),
@@ -115,8 +120,9 @@ EXPECTED_GROUP_3 = bot_groups_config._make_bot_group_config(
     bot_config_script_rev='',
     bot_config_script_content='',
     system_service_account='',
-    is_default=True,
-    logs_cloud_project=None)
+    logs_cloud_project=None,
+    rbe_migration=None,
+    is_default=True)
 
 
 DEFAULT_AUTH_CFG = [bots_pb2.BotAuth(ip_whitelist='bots')]

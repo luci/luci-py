@@ -55,6 +55,7 @@ TEST_CONFIG = pools_pb2.PoolsCfg(
                     allow_es_fallback=True,
                 )
             ],
+            rbe_migration=pools_pb2.Pool.RBEMigration(rbe_mode_percent=23),
         ),
     ],
     default_external_services=pools_pb2.ExternalServices(
@@ -127,6 +128,7 @@ class PoolsConfigTest(test_case.TestCase):
             enabled=True,
             allow_es_fallback=True,
         ),),
+        rbe_migration=pools_pb2.Pool.RBEMigration(rbe_mode_percent=23),
     )
     expected2 = expected1._replace(name='another_name')
 

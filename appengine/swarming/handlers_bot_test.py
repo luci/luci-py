@@ -877,6 +877,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
         bot_config_script_content=None,
         system_service_account=None,
         logs_cloud_project=None,
+        rbe_migration=None,
         is_default=True)
 
     # Bot sends 'default' pool, but server config defined it as 'server-side'.
@@ -904,8 +905,9 @@ class BotApiTest(test_env_handlers.AppTestBase):
         bot_config_script_rev='abcd',
         bot_config_script_content='print("Hi");import sys; sys.exit(1)',
         system_service_account=None,
-        is_default=True,
-        logs_cloud_project='chrome-infra-logs')
+        logs_cloud_project='chrome-infra-logs',
+        rbe_migration=None,
+        is_default=True)
     params = self.do_handshake()
     self.assertEqual(u'print("Hi");import sys; sys.exit(1)',
                      params['bot_config'])
@@ -1975,8 +1977,9 @@ class BotApiTest(test_env_handlers.AppTestBase):
         bot_config_script_rev=None,
         bot_config_script_content=None,
         system_service_account='system@example.com',
-        is_default=True,
-        logs_cloud_project=None)
+        logs_cloud_project=None,
+        rbe_migration=None,
+        is_default=True)
 
     calls = []
 

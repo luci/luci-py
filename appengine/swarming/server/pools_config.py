@@ -57,6 +57,8 @@ PoolConfig = collections.namedtuple(
         'external_schedulers',
         # resolved default CipdServer
         'default_cipd',
+        # Controls RBE migration parameters, pools_pb2.Pool.RBEMigration.
+        'rbe_migration',
     ])
 
 
@@ -75,6 +77,7 @@ def init_pool_config(**kwargs):
       'bot_monitoring': None,
       'external_schedulers': None,
       'default_cipd': None,
+      'rbe_migration': None,
   }
   args.update(kwargs)
   return PoolConfig(**args)
@@ -607,7 +610,10 @@ def _fetch_pools_config():
           bot_monitoring=bot_monitorings.get(name),
           external_schedulers=_resolve_external_schedulers(
               msg.external_schedulers),
-          default_cipd=default_cipd)
+          default_cipd=default_cipd,
+          rbe_migration=(
+              msg.rbe_migration if msg.HasField('rbe_migration') else None),
+          )
   return _PoolsCfg(pools, (default_cipd))
 
 
