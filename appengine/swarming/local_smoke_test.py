@@ -39,8 +39,6 @@ sys.path.insert(0, os.path.join(CLIENT_DIR, 'third_party'))
 
 # client/
 from utils import large
-from tools import start_bot
-from tools import start_servers
 
 # client/tests
 import cas_util
@@ -53,6 +51,12 @@ sys.path.pop(0)
 sys.path.insert(0, BOT_DIR)
 import test_env_bot
 test_env_bot.setup_test_env()
+
+# swarming/
+sys.path.insert(0, APP_DIR)
+from tools import start_bot
+from tools import start_servers
+
 
 CAS_CLI = os.path.join(LUCI_DIR, 'luci-go', 'cas')
 ISOLATE_CLI = os.path.join(LUCI_DIR, 'luci-go', 'isolate')
