@@ -95,6 +95,7 @@ class Bot(object):
     self._server_side_dimensions = {}
     self._bot_restart_msg = None
     self._bot_config = {}
+    self._rbe_state = None
 
   @property
   def base_dir(self):
@@ -312,7 +313,7 @@ class Bot(object):
   def _update_bot_config(self, name, rev):
     """ Update bot_config script name and revision.
 
-    This is called at start, and aftre handshake if a custom script is injected.
+    This is called at start, and after handshake if a custom script is injected.
     """
     with self._lock:
       self._bot_config = {
@@ -324,7 +325,7 @@ class Bot(object):
       self._update_state(self._attributes.get('state', {}))
 
   def _update_dimensions(self, new_dimensions):
-    """Called internally to update Bot.dimensions."""
+    """Called under lock to update Bot.dimensions."""
     dimensions = new_dimensions.copy()
     dimensions.update(self._server_side_dimensions)
     bot_config_name = self._bot_config.get('name')
@@ -333,9 +334,17 @@ class Bot(object):
     self._attributes['dimensions'] = dimensions
 
   def _update_state(self, new_state):
-    """Called internally to update Bot.state."""
+    """Called under lock to update Bot.state."""
     state = new_state.copy()
     state['bot_group_cfg_version'] = self._bot_group_cfg_ver
     if self._bot_config:
       state['bot_config'] = self._bot_config
     self._attributes['state'] = state
+
+  def _update_rbe_state(self, rbe_state):
+    """Called under lock to update RBE state used by the bot."""
+    old_inst = (self._rbe_state or {}).get('instance') or 'none'
+    new_inst = (rbe_state or {}).get('instance') or 'none'
+    if old_inst != new_inst:
+      logging.info('RBE instance change: %s => %s', old_inst, new_inst)
+    self._rbe_state = rbe_state

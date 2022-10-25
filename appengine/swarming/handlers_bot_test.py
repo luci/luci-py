@@ -32,6 +32,8 @@ from components import ereporter2
 from components import utils
 from components.test_support import test_case
 from proto.api import plugin_pb2
+from proto.config import bots_pb2
+from proto.config import pools_pb2
 from server import bot_archive
 from server import bot_auth
 from server import bot_code
@@ -79,9 +81,21 @@ class BotApiTest(test_env_handlers.AppTestBase):
     mock.patch.stopall()
 
   def mock_bot_group_config(self, **kwargs):
+    kwargs = kwargs.copy()
+    for f in bot_groups_config.BotGroupConfig._fields:
+      if f not in kwargs:
+        kwargs[f] = None
     cfg = bot_groups_config.BotGroupConfig(**kwargs)
     self.mock(bot_auth,
               'validate_bot_id_and_fetch_config', lambda *args, **kwargs: cfg)
+
+  def mock_pool_config(self, pool, **kwargs):
+    def mocked_get_pool_config(name):
+      if name == pool:
+        return pools_config.init_pool_config(name=name, rev='rev', **kwargs)
+      return None
+
+    self.mock(pools_config, 'get_pool_config', mocked_get_pool_config)
 
   def test_handshake(self):
     errors = []
@@ -445,6 +459,29 @@ class BotApiTest(test_env_handlers.AppTestBase):
     expected = {
         u'cmd': u'sleep',
         u'quarantined': False,
+    }
+    self.assertEqual(expected, response)
+
+  def test_poll_sleep_rbe(self):
+    self.mock_bot_group_config(
+        version='default',
+        dimensions={u'pool': [u'default']},
+        rbe_migration=bots_pb2.BotGroup.RBEMigration(rbe_mode_percent=100),
+        is_default=True)
+    self.mock_pool_config(
+        pool='default',
+        rbe_migration=pools_pb2.Pool.RBEMigration(rbe_instance='some-instance'),
+    )
+    # A bot polls, gets sleep with RBE parameters.
+    params = self.do_handshake()
+    response = self.post_json('/swarming/api/v1/bot/poll', params)
+    self.assertTrue(response.pop(u'duration'))
+    expected = {
+        u'cmd': u'sleep',
+        u'quarantined': False,
+        u'rbe': {
+            u'instance': u'some-instance'
+        },
     }
     self.assertEqual(expected, response)
 
@@ -863,7 +900,6 @@ class BotApiTest(test_env_handlers.AppTestBase):
 
     self.mock_bot_group_config(
         version='default',
-        owners=None,
         auth=(bot_groups_config.BotAuth(
             log_if_failed=False,
             require_luci_machine_token=False,
@@ -872,12 +908,6 @@ class BotApiTest(test_env_handlers.AppTestBase):
             ip_whitelist=None,
         ),),
         dimensions={u'pool': [u'server-side']},
-        bot_config_script=None,
-        bot_config_script_rev=None,
-        bot_config_script_content=None,
-        system_service_account=None,
-        logs_cloud_project=None,
-        rbe_migration=None,
         is_default=True)
 
     # Bot sends 'default' pool, but server config defined it as 'server-side'.
@@ -892,7 +922,6 @@ class BotApiTest(test_env_handlers.AppTestBase):
   def test_poll_extra_bot_config(self):
     self.mock_bot_group_config(
         version='default',
-        owners=None,
         auth=(bot_groups_config.BotAuth(
             log_if_failed=False,
             require_luci_machine_token=False,
@@ -904,9 +933,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
         bot_config_script='foo.py',
         bot_config_script_rev='abcd',
         bot_config_script_content='print("Hi");import sys; sys.exit(1)',
-        system_service_account=None,
         logs_cloud_project='chrome-infra-logs',
-        rbe_migration=None,
         is_default=True)
     params = self.do_handshake()
     self.assertEqual(u'print("Hi");import sys; sys.exit(1)',
@@ -1964,7 +1991,6 @@ class BotApiTest(test_env_handlers.AppTestBase):
     self.set_as_bot()
     self.mock_bot_group_config(
         version='default',
-        owners=None,
         auth=(bot_groups_config.BotAuth(
             log_if_failed=False,
             require_luci_machine_token=False,
@@ -1973,12 +1999,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
             ip_whitelist=None,
         ),),
         dimensions={},
-        bot_config_script=None,
-        bot_config_script_rev=None,
-        bot_config_script_content=None,
         system_service_account='system@example.com',
-        logs_cloud_project=None,
-        rbe_migration=None,
         is_default=True)
 
     calls = []

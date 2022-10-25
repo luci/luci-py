@@ -337,7 +337,7 @@ class RemoteClientNative(object):
 
     cmd = resp['cmd']
     if cmd == 'sleep':
-      return (cmd, resp['duration'])
+      return (cmd, {'duration': resp['duration'], 'rbe': resp.get('rbe')})
     if cmd == 'terminate':
       return (cmd, resp['task_id'])
     if cmd == 'run':

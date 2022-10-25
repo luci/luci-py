@@ -1265,14 +1265,16 @@ def _poll_server(botobj, quit_bit, last_action):
   logging.debug('Server response:\n%s: %s', cmd, value)
 
   if cmd == 'sleep':
-    # Value is duration
+    # Value is {'duration': float, 'rbe': {'instance': '...'}}.
     _call_hook_safe(
         True, botobj, 'on_bot_idle', max(0, time.time() - last_action))
     _maybe_update_lkgbc(botobj)
+    with botobj._lock:
+      botobj._update_rbe_state(value['rbe'])
     try:
       # Sometimes throw with "[Errno 4] Interrupted function call", especially
       # on Windows upon system shutdown.
-      quit_bit.wait(value)
+      quit_bit.wait(value['duration'])
     except IOError:
       # Act as it if were set as this likely mean a system shutdown.
       quit_bit.set()

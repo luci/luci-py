@@ -31,6 +31,7 @@ from server import bot_code
 from server import bot_management
 from server import config
 from server import named_caches
+from server import rbe
 from server import resultdb
 from server import service_accounts
 from server import task_pack
@@ -382,7 +383,7 @@ class _BotBaseHandler(_BotApiHandler):
     # Make sure bot self-reported ID matches the authentication token. Raises
     # auth.AuthorizationError if not.
     bot_group_cfg = bot_auth.validate_bot_id_and_fetch_config(bot_id)
-    logging.debug('Feched bot_group_cfg for %s: %s', bot_id, bot_group_cfg)
+    logging.debug('Fetched bot_group_cfg for %s: %s', bot_id, bot_group_cfg)
 
     # The server side dimensions from bot_group_cfg override bot-provided ones.
     # If both server side config and bot report some dimension, server side
@@ -566,7 +567,7 @@ class BotPollHandler(_BotBaseHandler):
       # Ignore everything, just sleep. Tell the bot it is quarantined to inform
       # it that it won't be running anything anyway. Use a large streak so it
       # will sleep for 60s.
-      self._cmd_sleep(1000, True)
+      self._cmd_sleep(1000, True, None)
       return
 
     deadline = utils.utcnow() + datetime.timedelta(seconds=60)
@@ -624,9 +625,24 @@ class BotPollHandler(_BotBaseHandler):
       self._cmd_bot_restart('Restarting to pick up new bots.cfg config')
       return
 
+    # TODO(crbug.com/1377118): Temporary add RBE parameters to the `sleep`
+    # command. At some later point, there will be a new command dedicated to
+    # "pull from RBE". For now we'll piggy-back on `sleep` to develop the code
+    # path that talks to the RBE Workers API without breaking any other
+    # functionality (like "terminate" commands).
+    rbe_bot_params = None
+    if res.bot_id:
+      rbe_instance = rbe.get_rbe_instance(res.bot_id,
+                                          res.dimensions.get('pool'),
+                                          res.bot_group_cfg)
+      if rbe_instance:
+        # TODO(crbug.com/1377118): Cryptographically bind the RBE parameters to
+        # this particular bot credentials (to be verified by the Go side).
+        rbe_bot_params = {'instance': rbe_instance}
+
     if quarantined:
       bot_event('request_sleep')
-      self._cmd_sleep(sleep_streak, quarantined)
+      self._cmd_sleep(sleep_streak, quarantined, rbe_bot_params)
       return
 
     #
@@ -645,7 +661,7 @@ class BotPollHandler(_BotBaseHandler):
     if res.state.get('maintenance'):
       bot_event('request_sleep')
       # Tell the bot it's considered quarantined.
-      self._cmd_sleep(sleep_streak, True)
+      self._cmd_sleep(sleep_streak, True, rbe_bot_params)
       return
 
     bot_info = bot_management.get_info_key(res.bot_id).get()
@@ -682,7 +698,7 @@ class BotPollHandler(_BotBaseHandler):
     if not request:
       # No task found, tell it to sleep a bit.
       bot_event('request_sleep')
-      self._cmd_sleep(sleep_streak, quarantined)
+      self._cmd_sleep(sleep_streak, quarantined, rbe_bot_params)
       return
 
     # This part is tricky since it intentionally runs a transaction after
@@ -801,15 +817,17 @@ class BotPollHandler(_BotBaseHandler):
     }
     self.send_response(utils.to_json_encodable(out))
 
-  def _cmd_sleep(self, sleep_streak, quarantined):
+  def _cmd_sleep(self, sleep_streak, quarantined, rbe_bot_params):
     duration = task_scheduler.exponential_backoff(sleep_streak)
     logging.debug('Sleep: streak: %d; duration: %ds; quarantined: %s',
                   sleep_streak, duration, quarantined)
     out = {
         'cmd': 'sleep',
         'duration': duration,
-        'quarantined': quarantined,
+        'quarantined': quarantined,  # TODO(vadimsh): Appears to be ignored.
     }
+    if rbe_bot_params:
+      out['rbe'] = rbe_bot_params
     self.send_response(out)
 
   def _cmd_terminate(self, task_id):
