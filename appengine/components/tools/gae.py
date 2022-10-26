@@ -1,30 +1,28 @@
-#!/usr/bin/env vpython
+#!/usr/bin/env vpython3
 # Copyright 2014 The LUCI Authors. All rights reserved.
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
 
 """Wrapper around GAE SDK tools to simplify working with multi-service apps."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
+# [VPYTHON:BEGIN]
+# python_version: "3.8"
+# wheel: <
+#   name: "infra/python/wheels/pyyaml-py3"
+#   version: "version:5.3.1"
+# >
+# [VPYTHON:END]
 
-__version__ = '2.1'
+__version__ = '3.0'
 
 import atexit
-import code
 import optparse
 import os
 import signal
 import sys
 import tempfile
 
-from six.moves import urllib
-
-try:
-  import readline
-except ImportError:
-  readline = None
+assert sys.version_info.major >= 3
 
 # In case gae.py was run via symlink, find the original file since it's where
 # third_party libs are. Handle a chain of symlinks too.
@@ -38,13 +36,17 @@ while True:
   except OSError:
     break
 
-# It's appengine/components
+# It's appengine/components.
 COMPONENTS_DIR = os.path.dirname(os.path.dirname(SCRIPT_PATH))
-# For tools/
-sys.path.insert(0, COMPONENTS_DIR)
-# For depot_tools/
-sys.path.insert(
-    0, os.path.join(COMPONENTS_DIR, '..', '..', 'client', 'third_party'))
+# For tool_support/ and tools/.
+if COMPONENTS_DIR not in sys.path:
+  sys.path.insert(0, COMPONENTS_DIR)
+
+THIRD_PARTY = os.path.join(COMPONENTS_DIR, '..', '..', 'client', 'third_party')
+DEPOT_TOOLS = os.path.join(THIRD_PARTY, 'depot_tools')
+
+sys.path.insert(0, THIRD_PARTY)
+sys.path.insert(0, DEPOT_TOOLS)
 
 import colorama
 from depot_tools import subcommand
@@ -52,6 +54,9 @@ from depot_tools import subcommand
 from tool_support import gae_sdk_utils
 from tools import calculate_version
 from tools import log_since
+
+assert sys.path.pop(0) == DEPOT_TOOLS
+assert sys.path.pop(0) == THIRD_PARTY
 
 
 def _print_version_log(app, to_version):
@@ -114,15 +119,15 @@ def CMDactive(parser, args):
 
 def CMDapp_dir(parser, args):
   """Prints a root directory of the application."""
-  # parser.app_dir is None if app root directory discovery fails. Fail the
-  # command even before invoking CLI parser, or it will ask to pass --app_dir to
-  # 'app-dir' subcommand, which is ridiculous.
-  if not parser.app_dir:
+  # parser.default_app_dir is None if app root directory discovery fails. Fail
+  # the command even before invoking CLI parser, or it will ask to pass
+  # --app_dir to 'app-dir' subcommand, which is ridiculous.
+  if not parser.default_app_dir:
     print('Can\'t discover an application root directory.', file=sys.stderr)
     return 1
-  parser.add_tag_option()
-  app, _, _ = parser.parse_args(args)
-  print(app.app_dir)
+  # Validate the command line doesn't have unrecognized junk.
+  _ = parser.parse_args(args, parse_only=True)
+  print(parser.default_app_dir)
   return 0
 
 
@@ -207,101 +212,6 @@ def CMDdevserver(parser, args):
   return app.run_dev_appserver(args, options.open)
 
 
-@subcommand.usage('[service_id version_id]')
-def CMDshell(parser, args):
-  """Opens interactive remote shell with app's GAE environment.
-
-  Connects to a specific version of a specific service (an active version of
-  'default' service by default). The app must have 'remote_api: on' builtin
-  enabled in app.yaml.
-
-  Always uses password based authentication.
-  """
-  parser.allow_positional_args = True
-  parser.add_option(
-      '-H', '--host', help='Only necessary if not hosted on .appspot.com')
-  parser.add_option(
-      '--local', action='store_true',
-      help='Operates locally on an empty dev instance')
-  app, options, args = parser.parse_args(args)
-
-  service = 'default'
-  version = None
-  if len(args) == 2:
-    service, version = args
-  elif len(args) == 1:
-    service = args[0]
-  elif args:
-    parser.error('Unknown args: %s' % args)
-
-  if service not in app.services:
-    parser.error('No such service: %s' % service)
-
-  if not options.host and not options.local:
-    prefixes = list(filter(None, (version, service, app.app_id)))
-    options.host = '%s.appspot.com' % '-dot-'.join(prefixes)
-
-  # Ensure remote_api is initialized and GAE sys.path is set.
-  gae_sdk_utils.setup_env(
-      app.app_dir, app.app_id, version, service, remote_api=True)
-
-  if options.host:
-    # Open the connection.
-    from google.appengine.ext.remote_api import remote_api_stub
-    try:
-      print('If asked to login, run:\n')
-      print(
-          'gcloud auth application-default login '
-          '--scopes=https://www.googleapis.com/auth/appengine.apis,'
-          'https://www.googleapis.com/auth/userinfo.email\n')
-      remote_api_stub.ConfigureRemoteApiForOAuth(
-          options.host, '/_ah/remote_api')
-    except urllib.error.URLError:
-      print('Failed to access %s' % options.host, file=sys.stderr)
-      return 1
-    remote_api_stub.MaybeInvokeAuthentication()
-
-  def register_sys_path(*path):
-    abs_path = os.path.abspath(os.path.join(*path))
-    if os.path.isdir(abs_path) and not abs_path in sys.path:
-      sys.path.insert(0, abs_path)
-
-  # Simplify imports of app services (with dependencies). This code is optimized
-  # for layout of apps that use 'components'.
-  register_sys_path(app.app_dir)
-  register_sys_path(app.app_dir, 'third_party')
-  register_sys_path(app.app_dir, 'components', 'third_party')
-
-  # Import some common services into interactive console namespace.
-  def setup_context():
-    # pylint: disable=unused-variable
-    from google.appengine.api import app_identity
-    from google.appengine.api import memcache
-    from google.appengine.api import urlfetch
-    from google.appengine.ext import ndb
-    return locals().copy()
-  context = setup_context()
-
-  # Fancy readline support.
-  if readline is not None:
-    readline.parse_and_bind('tab: complete')
-    history_file = os.path.expanduser(
-        '~/.config/gae_tool/remote_api_%s' % app.app_id)
-    if not os.path.exists(os.path.dirname(history_file)):
-      os.makedirs(os.path.dirname(history_file))
-    atexit.register(lambda: readline.write_history_file(history_file))
-    if os.path.exists(history_file):
-      readline.read_history_file(history_file)
-
-  prompt = [
-    'App Engine interactive console for "%s".' % app.app_id,
-    'Available symbols:',
-  ]
-  prompt.extend(sorted('  %s' % symbol for symbol in context))
-  code.interact('\n'.join(prompt), None, context)
-  return 0
-
-
 @subcommand.usage('[version_id]')
 def CMDswitch(parser, args):
   """Switches default version of all app services.
@@ -329,7 +239,7 @@ def CMDswitch(parser, args):
       print('  %s' % version)
 
     prompt = 'Switch to version [%s]: ' % versions[-1]
-    version = _raw_input(prompt) or versions[-1]
+    version = input(prompt) or versions[-1]
     if version not in versions:
       print('No such version.')
       return 1
@@ -468,11 +378,14 @@ class OptionParser(optparse.OptionParser):
         help='Do not ask for confirmation')
 
   def parse_args(self, *args, **kwargs):
+    parse_only = kwargs.pop('parse_only', False)
     gae_sdk_utils.add_sdk_options(self, self.default_app_dir)
     options, args = optparse.OptionParser.parse_args(self, *args, **kwargs)
     if not self.allow_positional_args and args:
       self.error('Unknown arguments: %s' % args)
-    app = gae_sdk_utils.process_sdk_options(self, options)
+    app = None
+    if not parse_only:
+      app = gae_sdk_utils.process_sdk_options(self, options)
     return app, options, args
 
 
@@ -518,15 +431,6 @@ def _find_app_dir(search_dir):
       return search_dir
     search_dir = parent
   return None
-
-
-def _raw_input(prompt):
-  """Get raw input in a Python 2&3 compatible way."""
-  # pylint: disable=input-builtin,raw_input-builtin
-  if sys.version_info.major >= 3:
-    return input(prompt)
-  else:
-    return raw_input(prompt)
 
 
 def main(args):

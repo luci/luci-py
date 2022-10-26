@@ -117,3 +117,8 @@ wheel: <
     platform: "win32"
   >
 >
+
+wheel: <
+  name: "infra/python/wheels/pyyaml-py3"
+  version: "version:5.3.1"
+>

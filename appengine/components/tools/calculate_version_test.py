@@ -1,12 +1,21 @@
-#!/usr/bin/env vpython
+#!/usr/bin/env python3
 # Copyright 2018 The LUCI Authors. All rights reserved.
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
 
+import os
 import sys
 import unittest
 
-import calculate_version
+SCRIPT_PATH = os.path.abspath(__file__)
+
+# It's appengine/components.
+COMPONENTS_DIR = os.path.dirname(os.path.dirname(SCRIPT_PATH))
+# For tool_support/ and tools/.
+if COMPONENTS_DIR not in sys.path:
+  sys.path.insert(0, COMPONENTS_DIR)
+
+from tools import calculate_version
 
 
 class CalculateVersionTest(unittest.TestCase):

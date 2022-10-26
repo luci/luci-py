@@ -14,6 +14,7 @@ import subprocess
 import sys
 import tempfile
 
+assert sys.version_info.major >= 3
 
 # Directory with this file.
 THIS_DIR = os.path.dirname(os.path.abspath(__file__))

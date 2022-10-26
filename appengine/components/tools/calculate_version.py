@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # Copyright 2013 The LUCI Authors. All rights reserved.
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
@@ -15,10 +15,16 @@ import subprocess
 import sys
 
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, os.path.join(ROOT_DIR, '..', '..', 'client', 'third_party'))
 
+THIRD_PARTY = os.path.join(ROOT_DIR, '..', '..', 'client', 'third_party')
+DEPOT_TOOLS = os.path.join(THIRD_PARTY, 'depot_tools')
+
+sys.path.insert(0, THIRD_PARTY)
+sys.path.insert(0, DEPOT_TOOLS)
 from depot_tools import git_number
 from depot_tools import git_common
+assert sys.path.pop(0) == DEPOT_TOOLS
+assert sys.path.pop(0) == THIRD_PARTY
 
 
 # Defines an error when generating the version for app engine.
@@ -27,7 +33,7 @@ class VersionError(Exception):
 
 
 def git(cmd, cwd):
-  return subprocess.check_output(['git'] + cmd, cwd=cwd)
+  return subprocess.check_output(['git'] + cmd, cwd=cwd, text=True)
 
 
 @contextlib.contextmanager
