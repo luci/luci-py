@@ -2,9 +2,6 @@
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
 
-# Pylint doesn't like endpoints.
-# pylint: disable=C0322,R0201
-
 import endpoints
 from protorpc import message_types
 from protorpc import messages

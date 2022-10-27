@@ -307,7 +307,6 @@ class ServerBase(object):
       response.headers['Content-Type'] = 'text/plain; charset=utf-8'
       self._response_body_and_status_writer(response, body=context._details)
 
-  # pylint: disable=unused-argument
   def _response_body_and_status_writer(self, response, body=None, status=None):
     raise NotImplementedError(
         "response body and status writer must be implemented")

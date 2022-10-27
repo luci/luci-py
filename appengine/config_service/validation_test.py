@@ -406,7 +406,6 @@ class ValidationTestCase(test_case.TestCase):
                 )],
                 url='https://ultimate.verifier',
               )))
-      return None
     self.mock(services, 'get_metadata_async', mock.Mock())
     services.get_metadata_async.side_effect = get_metadata_async
 

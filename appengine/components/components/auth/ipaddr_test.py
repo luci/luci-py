@@ -42,9 +42,8 @@ class IpAddrTest(test_case.TestCase):
         ipaddr.ip_from_string('ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff'))
     self.assertEqual(
         ipaddr.IP(128, 1), ipaddr.ip_from_string('0:0:0:0:0:0:0:1'))
-    self.assertEqual(
-        ipaddr.IP(128, 0xffff0000000000000000000000000000L),
-        ipaddr.ip_from_string('ffff:0:0:0:0:0:0:0'))
+    self.assertEqual(ipaddr.IP(128, 0xffff0000000000000000000000000000),
+                     ipaddr.ip_from_string('ffff:0:0:0:0:0:0:0'))
 
   def test_ip_from_string_v6_bad(self):
     with self.assertRaises(ValueError):
@@ -91,8 +90,8 @@ class IpAddrTest(test_case.TestCase):
     self.assertEqual('0:0:0:0:0:0:0:0', call(0))
     self.assertEqual('ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff', call(2**128-1))
     self.assertEqual('0:0:0:0:0:0:0:ffff', call(0xffff))
-    self.assertEqual(
-        'ffff:0:0:0:0:0:0:0', call(0xffff0000000000000000000000000000L))
+    self.assertEqual('ffff:0:0:0:0:0:0:0',
+                     call(0xffff0000000000000000000000000000))
 
   def test_ip_to_string_v6_bad(self):
     with self.assertRaises(ValueError):
@@ -115,21 +114,16 @@ class IpAddrTest(test_case.TestCase):
         ipaddr.subnet_from_string('255.254.253.252/24'))
 
   def test_subnet_from_string_v6(self):
+    self.assertEqual(ipaddr.Subnet(128, 1, 0xffffffffffffffffffffffffffffffff),
+                     ipaddr.subnet_from_string('0:0:0:0:0:0:0:1'))
     self.assertEqual(
-        ipaddr.Subnet(128, 1, 0xffffffffffffffffffffffffffffffffL),
-        ipaddr.subnet_from_string('0:0:0:0:0:0:0:1'))
-    self.assertEqual(
-        ipaddr.Subnet(
-            128,
-            0xfffffffefffdfffcfffbfffafff0fff9L,
-            0xffffffffffffffffffffffffffffffffL),
+        ipaddr.Subnet(128, 0xfffffffefffdfffcfffbfffafff0fff9,
+                      0xffffffffffffffffffffffffffffffff),
         ipaddr.subnet_from_string(
             'ffff:fffe:fffd:fffc:fffb:fffa:fff0:fff9/128'))
     self.assertEqual(
-        ipaddr.Subnet(
-            128,
-            0xfffffffefffdfffcfffbfffa00000000L,
-            0xffffffffffffffffffffffff00000000L),
+        ipaddr.Subnet(128, 0xfffffffefffdfffcfffbfffa00000000,
+                      0xffffffffffffffffffffffff00000000),
         ipaddr.subnet_from_string('ffff:fffe:fffd:fffc:fffb:fffa:fff0:fff9/96'))
 
   def test_subnet_from_string_bad(self):
@@ -152,19 +146,16 @@ class IpAddrTest(test_case.TestCase):
   def test_subnet_to_string_v6(self):
     call = lambda base, mask: (
         ipaddr.subnet_to_string(ipaddr.Subnet(128, base, mask)))
-    self.assertEqual(
-        '0:0:0:0:0:0:0:1/128',
-        call(1, 0xffffffffffffffffffffffffffffffffL))
+    self.assertEqual('0:0:0:0:0:0:0:1/128',
+                     call(1, 0xffffffffffffffffffffffffffffffff))
     self.assertEqual(
         'ffff:fffe:fffd:fffc:fffb:fffa:fff0:fff9/128',
-        call(
-            0xfffffffefffdfffcfffbfffafff0fff9L,
-            0xffffffffffffffffffffffffffffffffL))
+        call(0xfffffffefffdfffcfffbfffafff0fff9,
+             0xffffffffffffffffffffffffffffffff))
     self.assertEqual(
         'ffff:fffe:fffd:fffc:fffb:fffa:0:0/96',
-        call(
-            0xfffffffefffdfffcfffbfffa00000000L,
-            0xffffffffffffffffffffffff00000000L))
+        call(0xfffffffefffdfffcfffbfffa00000000,
+             0xffffffffffffffffffffffff00000000))
 
   def test_subnet_to_string_bad(self):
     with self.assertRaises(ValueError):

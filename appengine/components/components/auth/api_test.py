@@ -3,10 +3,6 @@
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
 
-# Disable 'Access to a protected member', Unused argument', 'Unused variable'.
-# pylint: disable=W0212,W0612,W0613
-# pylint: disable=redefined-outer-name
-
 import datetime
 import sys
 import threading
@@ -943,14 +939,14 @@ class ApiTest(test_case.TestCase):
     with self.assertRaises(TypeError):
       @api.public
       @api.require(lambda: True)
-      def func():
+      def _func():
         pass
 
   def test_require_then_public_fails(self):
     with self.assertRaises(TypeError):
       @api.require(lambda: True)
       @api.public
-      def func():
+      def _func():
         pass
 
   def test_is_decorated(self):
@@ -1295,6 +1291,7 @@ class RealmsTest(test_case.TestCase):
         any(msg in m for m in self.logs[lvl]),
         '%r not in %r' % (msg, self.logs[lvl]))
 
+  # pylint: disable=redefined-outer-name
   def assert_check(self, db, perm, realms, ident, attrs, outcome):
     self.assertEqual(
         outcome, db.has_permission(perm, realms, ident, attributes=attrs),

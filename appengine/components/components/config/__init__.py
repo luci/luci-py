@@ -32,9 +32,6 @@ Example usage:
 For more info, read docstrings in api.py.
 """
 
-# Pylint doesn't like relative wildcard imports.
-# pylint: disable=W0401,W0403
-
 from .api import *
 from .common import *
 from .endpoint import ConfigApi

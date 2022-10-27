@@ -74,7 +74,7 @@ def ip_from_string(ipstr):
       raise ValueError('not IPv4 or IPv6 address')
   except ValueError as e:
     raise ValueError('%r is not an IP address (%s)' % (ipstr, e))
-  value = 0L
+  value = long(0)
   for i in values:
     value = value * factor + i
   return IP(bits, value)

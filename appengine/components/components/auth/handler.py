@@ -4,9 +4,6 @@
 
 """Integration with webapp2."""
 
-# Disable 'Method could be a function.'
-# pylint: disable=R0201
-
 import functools
 import json
 import logging
@@ -200,7 +197,7 @@ class AuthenticatingHandler(webapp2.RequestHandler):
       self.authorization_error(err)
 
   @classmethod
-  def get_auth_methods(cls, conf):  # pylint: disable=unused-argument
+  def get_auth_methods(cls, conf):
     """Returns an enumerable of functions to use to authenticate request.
 
     The handler will try to apply auth methods sequentially one by one by until
@@ -592,16 +589,16 @@ class CurrentUser(object):
 
 class GAEUsersAPI(object):
   @staticmethod
-  def get_current_user(request):  # pylint: disable=unused-argument
+  def get_current_user(request):
     user = users.get_current_user()
     return CurrentUser(user.user_id(), user.email(), None) if user else None
 
   @staticmethod
-  def create_login_url(request, dest_url):  # pylint: disable=unused-argument
+  def create_login_url(request, dest_url):
     return users.create_login_url(dest_url)
 
   @staticmethod
-  def create_logout_url(request, dest_url):  # pylint: disable=unused-argument
+  def create_logout_url(request, dest_url):
     return users.create_logout_url(dest_url)
 
 

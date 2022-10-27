@@ -16,9 +16,6 @@ from components.ereporter2 import formatter
 from test_support import test_case
 
 
-# Access to a protected member XXX of a client class - pylint: disable=W0212
-
-
 class Ereporter2FormatterTest(test_case.TestCase):
   def test_re_stack_trace(self):
     data = [

@@ -29,9 +29,6 @@ Advantages over regular ndb.Entity with predefined key:
   2. In-memory process-wide cache.
 """
 
-# Pylint fails to recognize that ndb.Model.key is defined in ndb.Model.
-# pylint: disable=attribute-defined-outside-init
-
 import datetime
 import threading
 
@@ -119,6 +116,7 @@ class GlobalConfig(ndb.Model):
   def store_async(self, updated_by):
     """Stores a new version of the config entity."""
     # Create an incomplete key, to be completed by 'store_new_version'.
+    # pylint: disable=attribute-defined-outside-init
     self.key = ndb.Key(self.__class__, None, parent=self._get_root_key())
     self.updated_by = updated_by
     self.updated_ts = utils.utcnow()

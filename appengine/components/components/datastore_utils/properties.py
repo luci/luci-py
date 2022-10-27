@@ -18,10 +18,6 @@ __all__ = [
   'ProtobufProperty',
 ]
 
-# Some methods below don't use self because they implement an interface of their
-# base class.
-# pylint: disable=no-self-use
-
 
 ### Other specialized properties.
 

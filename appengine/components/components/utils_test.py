@@ -3,9 +3,6 @@
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
 
-# Disable 'Access to a protected member ...'. NDB uses '_' for other purposes.
-# pylint: disable=W0212
-
 import datetime
 import sys
 import threading
@@ -218,7 +215,6 @@ class FakeNdbContext(object):
     self.get_calls.append(key)
     raise ndb.Return(self.cached_value)
 
-  # pylint: disable=redefined-outer-name
   @ndb.tasklet
   def memcache_set(self, key, value, time=None):
     self.cached_value = value
@@ -339,7 +335,6 @@ class MemcacheTest(test_case.TestCase):
   def test_empty_key_arg(self):
     @utils.memcache('f')
     def f(a):
-      # pylint: disable=unused-argument
       return 1
 
     f(1)
@@ -350,10 +345,8 @@ class MemcacheTest(test_case.TestCase):
 
   def test_nonexisting_arg(self):
     with self.assertRaises(KeyError):
-      # pylint: disable=unused-variable
       @utils.memcache('f', ['b'])
-      def f(a):
-        # pylint: disable=unused-argument
+      def _f(a):
         pass
 
   def test_invalid_args(self):
@@ -371,18 +364,14 @@ class MemcacheTest(test_case.TestCase):
 
   def test_args_prohibited(self):
     with self.assertRaises(NotImplementedError):
-      # pylint: disable=unused-variable
       @utils.memcache('f', [])
-      def f(a, *args):
-        # pylint: disable=unused-argument
+      def _f(a, *args):
         pass
 
   def test_kwargs_prohibited(self):
     with self.assertRaises(NotImplementedError):
-      # pylint: disable=unused-variable
       @utils.memcache('f', [])
-      def f(**kwargs):
-        # pylint: disable=unused-argument
+      def _f(**kwargs):
         pass
 
 

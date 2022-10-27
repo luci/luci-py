@@ -8,9 +8,6 @@ Exports public API of 'auth' component. Each module in 'auth' package can
 export a portion of public API by specifying exported symbols in its __all__.
 """
 
-# Pylint doesn't like relative wildcard imports.
-# pylint: disable=W0401,W0403
-
 from .version import __version__
 
 try:

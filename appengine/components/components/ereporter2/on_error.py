@@ -30,7 +30,6 @@ ERROR_TIME_TO_LIVE = datetime.timedelta(days=30)
 
 
 # Keys that can be specified by the client.
-# pylint: disable=W0212
 VALID_ERROR_KEYS = frozenset(models.Error._properties) - frozenset(
     ['created_ts', 'identity'])
 

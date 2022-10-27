@@ -30,8 +30,6 @@ from test_support import test_case
 class EndpointsAuthTest(testing.TestCase):
   """Tests for auth.endpoints_support.initialize_request_auth function."""
 
-  # pylint: disable=unused-argument
-
   def call(self, remote_address, email, headers=None):
     """Mocks current user in initialize_request_auth."""
     headers = (headers or {}).copy()

@@ -238,6 +238,8 @@ class LocalApplication(object):
 
 class CustomHTTPErrorHandler(urllib.request.HTTPDefaultErrorHandler):
   """Swallows exceptions that would be thrown on >30x HTTP status."""
+
+  # pylint: disable=arguments-differ
   def http_error_default(self, _request, response, _code, _msg, _hdrs):
     return response
 

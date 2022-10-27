@@ -155,11 +155,11 @@ class AuthDBChange(polymodel.PolyModel):
     def simplify(v):
       if isinstance(v, list):
         return [simplify(i) for i in v]
-      elif isinstance(v, datastore_utils.BytesSerializable):
+      if isinstance(v, datastore_utils.BytesSerializable):
         return v.to_bytes()
-      elif isinstance(v, datastore_utils.JsonSerializable):
+      if isinstance(v, datastore_utils.JsonSerializable):
         return v.to_jsonish()
-      elif isinstance(v, datetime.datetime):
+      if isinstance(v, datetime.datetime):
         return utils.datetime_to_timestamp(v)
       return v
     as_dict = self.to_dict(exclude=['class_'])

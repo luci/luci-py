@@ -38,12 +38,11 @@ def get_decoder(encoding):
   """
   if encoding == Encoding.BINARY:
     return lambda string, proto: proto.ParseFromString(string)
-  elif encoding == Encoding.JSON:
+  if encoding == Encoding.JSON:
     return json_format.Parse
-  elif encoding == Encoding.TEXT:
+  if encoding == Encoding.TEXT:
     return text_format.Merge
-  else:
-    assert False, 'Argument |encoding| was not a value of the Encoding enum.'
+  assert False, 'Argument |encoding| was not a value of the Encoding enum.'
 
 
 def get_encoder(encoding):
@@ -58,12 +57,11 @@ def get_encoder(encoding):
   """
   if encoding == Encoding.BINARY:
     return lambda proto: proto.SerializeToString()
-  elif encoding == Encoding.JSON:
+  if encoding == Encoding.JSON:
     return lambda proto: ')]}\'\n' + json_format.MessageToJson(proto)
-  elif encoding == Encoding.TEXT:
+  if encoding == Encoding.TEXT:
     return lambda proto: text_format.MessageToString(proto, as_utf8=True)
-  else:
-    assert False, 'Argument |encoding| was not a value of the Encoding enum.'
+  assert False, 'Argument |encoding| was not a value of the Encoding enum.'
 
 
 def encode_bin_metadata(mutable_metadata_dict):

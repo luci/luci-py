@@ -121,6 +121,5 @@ class ServicerContext(object):
     different results and may have different timeouts.
     """
     ret = ServicerContext()
-    # pylint: disable=attribute-defined-outside-init
     ret.__dict__ = self.__dict__.copy()
     return ret

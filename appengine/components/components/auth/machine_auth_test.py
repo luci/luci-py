@@ -51,7 +51,7 @@ class MachineAuthTest(test_case.TestCase):
     bundle = signature.CertificateBundle(GOOD_CERTS)
     def mocked_check_sig(**_kwargs):
       if exc:
-        raise exc  # pylint: disable=raising-bad-type
+        raise exc
       return is_valid
     self.mock(bundle, 'check_signature', mocked_check_sig)
     def get(asked):

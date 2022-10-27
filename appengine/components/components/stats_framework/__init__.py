@@ -665,8 +665,6 @@ def accumulate(lhs, rhs, skip):
   assert isinstance(lhs, ndb.Model), lhs
   assert isinstance(rhs, ndb.Model), rhs
 
-  # Access to a protected member NNN of a client class
-  # pylint: disable=W0212
   for key in set(lhs._properties).intersection(rhs._properties):
     if key in skip:
       continue

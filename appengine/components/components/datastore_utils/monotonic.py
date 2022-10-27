@@ -201,7 +201,6 @@ def store_new_version_async(entity, root_cls, extra=None):
   assert not ndb.in_transaction()
   assert isinstance(entity, ndb.Model), entity
   assert entity.key and entity.key.parent(), 'entity.key.parent() must be set.'
-  # Access to a protected member _XX of a client class - pylint: disable=W0212
   assert root_cls._properties.keys() == ['current'], (
       'This function is unsafe for root entity, use store_new_version_safe '
       'which is not yet implemented')

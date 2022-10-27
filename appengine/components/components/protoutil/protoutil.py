@@ -39,7 +39,7 @@ def merge_dict(data, msg):
     scalar_f = f.type in SCALAR_TYPES
     msg_f = f.type == descriptor.FieldDescriptor.TYPE_MESSAGE
     if not scalar_f and not msg_f:  # pragma: no cover
-      raise TypeError('field %s has unsupported type %r', name, f.type)
+      raise TypeError('field %s has unsupported type %r' % (name, f.type))
 
     try:
       if f.label == descriptor.FieldDescriptor.LABEL_REPEATED:

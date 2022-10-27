@@ -245,7 +245,7 @@ def validate_identity_predicate(access, ctx):
   if not access:
     ctx.error('not specified')
     return
-  elif access.startswith('group:'):
+  if access.startswith('group:'):
     group = access.split(':', 2)[1]
     validate_group(group, ctx)
   elif ':' in access:

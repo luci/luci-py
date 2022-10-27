@@ -8,9 +8,10 @@ See http://dev.chromium.org/developers/how-tos/depottools/presubmit-scripts for
 details on the presubmit API built into gclient.
 """
 
+USE_PYTHON3 = True
+
 
 def CommonChecks(input_api, output_api):
-
   files_to_skip = list(input_api.DEFAULT_FILES_TO_SKIP) + [
       r'ui2/node_modules/.*',
       r'ui2/nodejs/.*',
@@ -26,8 +27,7 @@ def CommonChecks(input_api, output_api):
                                            disabled_warnings=disabled_warnings,
                                            pylintrc=input_api.os_path.join(
                                                input_api.PresubmitLocalPath(),
-                                               '../../', 'pylintrc'),
-                                           version='2.7')
+                                               '../../', 'pylintrc'))
 
 
 # pylint: disable=unused-argument

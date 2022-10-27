@@ -29,9 +29,6 @@ from components.ereporter2 import ui
 from test_support import test_case
 
 
-# Access to a protected member XXX of a client class - pylint: disable=W0212
-
-
 def ErrorRecord(**kwargs):
   """Returns an ErrorRecord filled with default dummy values."""
   vals = {

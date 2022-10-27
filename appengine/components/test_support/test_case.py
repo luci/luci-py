@@ -19,9 +19,6 @@ from components import endpoints_webapp2
 from components import utils
 from depot_tools import auto_stub
 
-# W0212: Access to a protected member XXX of a client class
-# pylint: disable=W0212
-
 
 def mock_now(test, now, seconds):
   """Mocks utcnow() and ndb properties.

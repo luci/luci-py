@@ -56,7 +56,6 @@ class Webapp2Server(ServerBase):
         server._post_handler(service, method, self.request, self.response)
         return self.response
 
-      # pylint: disable=unused-argument
       def options(self, service, method):
         """Sends an empty response with CORS headers for origins, if allowed."""
         server._options_handler(self.request, self.response)

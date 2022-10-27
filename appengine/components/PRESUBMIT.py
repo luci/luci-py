@@ -8,26 +8,27 @@ See http://dev.chromium.org/developers/how-tos/depottools/presubmit-scripts for
 details on the presubmit API built into gclient.
 """
 
+USE_PYTHON3 = True
+
 
 def CommonChecks(input_api, output_api):
   files_to_skip = list(input_api.DEFAULT_FILES_TO_SKIP) + [
       r'.*_pb2\.py$',
-      r'.*tools[\\/].*$',  # python3, while pylint is still python2
   ]
   disabled_warnings = [
-    # Pylint fails to recognize lazy module loading in components.auth.config,
-    # no local disables work, so had to kill it globally.
-    'cyclic-import',
-    'relative-import',
+      'chained-comparison',
+      'cyclic-import',
+      'keyword-arg-before-vararg',
+      'relative-import',
+      'unused-argument',
   ]
-  pylintrc = input_api.os_path.join(input_api.PresubmitLocalPath(), '../../',
-                                    'pylintrc')
   return input_api.canned_checks.RunPylint(input_api,
                                            output_api,
                                            files_to_skip=files_to_skip,
                                            disabled_warnings=disabled_warnings,
-                                           pylintrc=pylintrc,
-                                           version='1.5')
+                                           pylintrc=input_api.os_path.join(
+                                               input_api.PresubmitLocalPath(),
+                                               '../../', 'pylintrc'))
 
 
 # pylint: disable=unused-argument

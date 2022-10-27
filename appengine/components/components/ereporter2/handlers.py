@@ -27,9 +27,6 @@ from . import on_error
 from . import ui
 
 
-# Access to a protected member XXX of a client class - pylint: disable=W0212
-
-
 ### Admin pages.
 
 

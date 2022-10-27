@@ -283,12 +283,11 @@ class Client(object):
     assert response_py_type, 'response type for %s.%s not found' % (
         self._full_service_name, method_desc.name)
 
-    def method_async(  # pylint: disable=redefined-outer-name
-        request,
-        timeout=None,
-        metadata=None,
-        credentials=None,
-        response_metadata=None):
+    def method_async(request,
+                     timeout=None,
+                     metadata=None,
+                     credentials=None,
+                     response_metadata=None):
       # The signature of this function was originally supposed to match
       # https://grpc.io/grpc/python/grpc.html#grpc.UnaryUnaryMultiCallable.__call__
       # But a new optional argument has been added to return the response's

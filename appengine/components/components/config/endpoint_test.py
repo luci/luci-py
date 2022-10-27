@@ -68,7 +68,7 @@ class EndpointTestCase(test_case.EndpointsTestCase):
     self.mock(validation, 'DEFAULT_RULE_SET', rule_set)
 
     @validation.rule('projects/foo', 'bar.cfg', rule_set=rule_set)
-    def validate(cfg, ctx):  # pylint: disable=unused-argument, unused-variable
+    def _validate(cfg, ctx):
       ctx.error('a\x80b')
 
     self.mock(auth, 'is_admin', lambda: True)

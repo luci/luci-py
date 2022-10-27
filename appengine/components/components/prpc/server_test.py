@@ -3,8 +3,6 @@
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
 
-# pylint: disable=unused-argument
-
 import httplib
 import json
 import sys
@@ -101,16 +99,16 @@ class PRPCServerTestCaseBase(test_case.TestCase):
                         data=None,
                         headers='',
                         expect_errors=False):
-    return None
+    raise NotImplementedError()
 
   def get_options_response(self, app, url, headers=''):
-    return None
+    raise NotImplementedError()
 
   def get_response_body(self, response):
-    return None
+    raise NotImplementedError()
 
   def get_response_status(self, response):
-    return None
+    raise NotImplementedError()
 
   # when adding new test case please add the function as check_XXX and add it
   # check_all_test()

@@ -21,9 +21,6 @@ __all__ = [
   'register_converter',
 ]
 
-# Access to a protected member _XX of a client class - pylint: disable=W0212
-# Method could be a function - pylint: disable=R0201
-
 
 # Use field when converting entity to a serializable dict.
 READABLE = 1 << 0
@@ -191,8 +188,8 @@ class _ModelDictConverter(object):
     if isinstance(prop, (ndb.StructuredProperty, ndb.LocalStructuredProperty)):
       return lambda prop, x: self.convert_dict(prop._modelclass, x)
     # For other properties consult the registry of converters.
+    # pylint: disable=unidiomatic-typecheck
     for prop_cls, include_subclasses, conv in self.property_converters:
-      # pylint: disable=unidiomatic-typecheck
       if (include_subclasses and isinstance(prop, prop_cls) or
           not include_subclasses and type(prop) == prop_cls):
         return conv
@@ -348,6 +345,7 @@ class BytesSerializableProperty(ndb.BlobProperty):
   _value_type = None
 
   def _validate(self, value):
+    # pylint: disable=isinstance-second-argument-not-valid-type
     if not isinstance(value, self._value_type):
       raise TypeError(
           'Expecting %s, got %r' % (self._value_type.__name__, value))
@@ -360,6 +358,7 @@ class BytesSerializableProperty(ndb.BlobProperty):
   def _from_base_type(self, value):
     assert isinstance(value, str)
     result = self._value_type.from_bytes(value)
+    # pylint: disable=isinstance-second-argument-not-valid-type
     assert isinstance(result, self._value_type)
     return result
 
@@ -387,6 +386,7 @@ class JsonSerializableProperty(ndb.JsonProperty):
   _value_type = None
 
   def _validate(self, value):
+    # pylint: disable=isinstance-second-argument-not-valid-type
     if not isinstance(value, self._value_type):
       raise TypeError(
           'Expecting %s, got %r' % (self._value_type.__name__, value))

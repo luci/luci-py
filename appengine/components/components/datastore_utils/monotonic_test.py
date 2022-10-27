@@ -16,18 +16,17 @@ from components.datastore_utils import txn
 from test_support import test_case
 
 
-# Access to a protected member _XX of a client class - pylint: disable=W0212
-
-
 class EntityX(ndb.Model):
   a = ndb.IntegerProperty()
 
   def _pre_put_hook(self):
+    # pylint: disable=useless-super-delegation
     super(EntityX, self)._pre_put_hook()
 
 
 class EntityY(ndb.Model):
   def _pre_put_hook(self):
+    # pylint: disable=useless-super-delegation
     super(EntityY, self)._pre_put_hook()
 
 

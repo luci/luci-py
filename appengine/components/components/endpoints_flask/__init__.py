@@ -3,8 +3,5 @@
 # that can be found in the LICENSE file.
 """Implements Cloud Endpoints v1 over webapp2 routes."""
 
-# Pylint doesn't like relative wildcard imports.
-# pylint: disable=relative-import, wildcard-import
-
 from adapter import *
 from discovery import *

@@ -29,7 +29,7 @@ def naticasecmp(a, b):
   return natcmp(try_lower(a), try_lower(b))
 
 
-def natsort(seq, cmp=natcmp, *args, **kwargs):  # pylint: disable=W0622
+def natsort(seq, cmp=natcmp, *args, **kwargs):
   """In-place natural string sort.
   >>> a = ['3A2', '3a1']
   >>> natsort(a, key=try_lower)
@@ -51,7 +51,7 @@ def natsort(seq, cmp=natcmp, *args, **kwargs):  # pylint: disable=W0622
   seq.sort(cmp=cmp, *args, **kwargs)
 
 
-def natsorted(seq, cmp=natcmp, *args, **kwargs):  # pylint: disable=W0622
+def natsorted(seq, cmp=natcmp, *args, **kwargs):
   """Returns a copy of seq, sorted by natural string sort.
 
   >>> natsorted(i for i in [4, '3a', '2', 1])

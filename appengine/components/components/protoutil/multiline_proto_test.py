@@ -74,7 +74,6 @@ class MultilineProtoTest(unittest.TestCase):
     self.assertEqual(textwrap.dedent(poem), msg.str)
 
   def test_go_compatibility(self):
-    # pylint: disable=line-too-long
     """Replicate tests from luci-go to ensure identical results.
 
     See https://github.com/luci/luci-go/blob/main/common/proto/multiline_test.go

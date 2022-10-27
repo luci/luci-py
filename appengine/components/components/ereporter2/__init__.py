@@ -10,7 +10,6 @@ using the DB. This makes this service works even if the DB is broken, as the
 only dependency is logservice.
 """
 
-# Wildcard import - pylint: disable=W0401
 from .formatter import *
 from .handlers import *
 from .models import *

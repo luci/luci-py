@@ -3,8 +3,6 @@
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
 
-# pylint: disable=unused-argument
-
 import sys
 import unittest
 
@@ -17,9 +15,6 @@ from components.prpc import codes
 
 
 class PRPCCodeTestCase(test_case.TestCase):
-  def setUp(self):
-    super(PRPCCodeTestCase, self).setUp()
-
   def test_all_statusCode_valid(self):
     for k in dir(codes.StatusCode):
       if isinstance(getattr(codes.StatusCode, k), codes.StatusCodeBase):

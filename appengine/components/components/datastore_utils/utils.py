@@ -21,12 +21,12 @@ def fetch_page(query, batch_size, cursor_str, **kwargs):
   """
   assert isinstance(query, ndb.Query), query
   if not 0 < batch_size <= 1000 or not isinstance(batch_size, int):
-    raise ValueError(
-        'batch_size must be between 1 and 1000, got %r', batch_size)
+    raise ValueError('batch_size must be between 1 and 1000, got %r' %
+                     batch_size)
   if cursor_str:
     if not isinstance(cursor_str, basestring):
-      raise ValueError(
-          'cursor must be between valid string, got %r', cursor_str)
+      raise ValueError('cursor must be between valid string, got %r' %
+                       cursor_str)
     cursor = datastore_query.Cursor(urlsafe=cursor_str)
   else:
     cursor = None

@@ -24,9 +24,6 @@ ABS_PATH = os.path.abspath(__file__)
 ROOT_DIR = os.path.dirname(ABS_PATH)
 
 
-# Access to a protected member XXX of a client class - pylint: disable=W0212
-# Method could be a function - pylint: disable=R0201
-
 def ErrorRecord(**kwargs):
   """Returns an ErrorRecord filled with default dummy values."""
   vals = {

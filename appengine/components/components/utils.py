@@ -317,8 +317,10 @@ class _EternalCache(object):
     It's basically self.get_value, updated by functools.wraps to look more like
     original function.
     """
-    # functools.wraps doesn't like 'instancemethod', use lambda as a proxy.
-    # pylint: disable=W0108
+    # Wrapping self.get_value directly fails since it is "instancemethod", not
+    # a regular function.
+    #
+    # pylint: disable=unnecessary-lambda
     wrapper = functools.wraps(self.func)(lambda: self.get_value())
     wrapper.__parent_cache__ = self
     return wrapper
@@ -366,8 +368,10 @@ class _ExpiringCache(object):
     It's basically self.get_value, updated by functools.wraps to look more like
     original function.
     """
-    # functools.wraps doesn't like 'instancemethod', use lambda as a proxy.
-    # pylint: disable=W0108
+    # Wrapping self.get_value directly fails since it is "instancemethod", not
+    # a regular function.
+    #
+    # pylint: disable=unnecessary-lambda
     wrapper = functools.wraps(self.func)(lambda: self.get_value())
     wrapper.__parent_cache__ = self
     return wrapper
@@ -394,7 +398,6 @@ def clear_cache(func):
   func.__parent_cache__.clear()
 
 
-# ignore time parameter warning | pylint: disable=redefined-outer-name
 def memcache_async(key, key_args=None, time=None):
   """Decorator that implements memcache-based cache for a function.
 

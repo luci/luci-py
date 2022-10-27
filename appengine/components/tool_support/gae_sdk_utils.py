@@ -922,8 +922,7 @@ def confirm(text, app, version, services=None, default_yes=False):
   print('  Services:  %s' % ', '.join(services or app.services))
   if default_yes:
     return ask('Continue? [Y/n] ') not in ('n', 'N')
-  else:
-    return ask('Continue? [y/N] ') in ('y', 'Y')
+  return ask('Continue? [y/N] ') in ('y', 'Y')
 
 
 def is_gcloud_auth_set():
@@ -1082,7 +1081,7 @@ def _prep_go_deployment(services, app_dir):
       staged_services.append(ModuleFile(path=yaml_path, data=m.data))
 
     # Scrub Go environ to set it up to use staged _gopath only.
-    for k in os.environ.keys():
+    for k in list(os.environ):
       if k.startswith('GO') or k.startswith('CGO'):
         os.environ.pop(k)
 

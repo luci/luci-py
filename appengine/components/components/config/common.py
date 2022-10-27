@@ -122,4 +122,4 @@ def self_config_set():
 def config_service_hostname():
   """Returns hostname of the config service, or None."""
   settings = ConfigSettings.cached()
-  return settings and settings.service_hostname or None
+  return settings.service_hostname if settings else None

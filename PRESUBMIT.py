@@ -8,6 +8,8 @@ See http://dev.chromium.org/developers/how-tos/depottools/presubmit-scripts for
 details on the presubmit API built into gclient.
 """
 
+USE_PYTHON3 = True
+
 
 def header(input_api):
   """Returns the expected license header regexp for this project."""
@@ -15,28 +17,26 @@ def header(input_api):
   allowed_years = (str(s) for s in reversed(range(2011, current_year + 1)))
   years_re = '(' + '|'.join(allowed_years) + ')'
   license_header = (
-    r'.*? Copyright %(year)s The LUCI Authors\. '
+      r'.*? Copyright %(year)s The LUCI Authors\. '
       r'All rights reserved\.\n'
-    r'.*? Use of this source code is governed under the Apache License, '
+      r'.*? Use of this source code is governed under the Apache License, '
       r'Version 2\.0\n'
-    r'.*? that can be found in the LICENSE file\.(?: \*/)?\n'
-  ) % {
-    'year': years_re,
-  }
+      r'.*? that can be found in the LICENSE file\.(?: \*/)?\n') % {
+          'year': years_re,
+      }
   return license_header
 
 
 def CommonChecks(input_api, output_api):
   excluded = [
-    r'.+-build\.(js|html)$',
-    r'.+/build/.+(js|html)$',
-    r'.+/dist/.+(js|html|css)$',
-    r'/test',
-    r'.+_pb2\.py$',
-    r'.*third_party.*',
-    # These are a symlink to third_party, so it shouldn't be checked.
-    r'appengine/isolate/bqh\.py$',
-    r'appengine/swarming/bqh\.py$',
+      r'.+-build\.(js|html)$',
+      r'.+/build/.+(js|html)$',
+      r'.+/dist/.+(js|html|css)$',
+      r'/test',
+      r'.+_pb2\.py$',
+      r'.*third_party.*',
+      # This is a symlink to third_party, so it shouldn't be checked.
+      r'appengine/swarming/bqh\.py$',
   ]
 
 

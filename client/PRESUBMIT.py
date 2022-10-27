@@ -8,6 +8,9 @@ See http://dev.chromium.org/developers/how-tos/depottools/presubmit-scripts for
 details on the presubmit API built into gcl.
 """
 
+USE_PYTHON3 = True
+
+
 def CommonChecks(input_api, output_api):
   import sys
 
@@ -29,8 +32,7 @@ def CommonChecks(input_api, output_api):
         input_api.canned_checks.RunPylint(input_api,
                                           output_api,
                                           files_to_skip=files_to_skip,
-                                          pylintrc=join('../', 'pylintrc'),
-                                          version='2.7'), )
+                                          pylintrc=join('../', 'pylintrc')))
   finally:
     sys.path = sys_path_backup
 

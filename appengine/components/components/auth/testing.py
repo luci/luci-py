@@ -23,8 +23,6 @@ _MockedConfig = collections.namedtuple('_MockedConfig', [
 class TestCase(test_case.TestCase):
   """Test case with a separate auth context and captured logging."""
 
-  # pylint: disable=unused-argument
-
   def setUp(self):
     super(TestCase, self).setUp()
     api.reset_local_state()
@@ -47,7 +45,8 @@ class TestCase(test_case.TestCase):
 
   def mock_config(self, **kwargs):
     """Mocks result of config.ensure_configured() call."""
-    self.mock(config, 'ensure_configured', lambda: _MockedConfig(**kwargs))
+    cfg = _MockedConfig(**kwargs)
+    self.mock(config, 'ensure_configured', lambda: cfg)
 
   @staticmethod
   def mock_group(group, members):

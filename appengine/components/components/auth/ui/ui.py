@@ -328,13 +328,13 @@ class UIHandler(handler.AuthenticatingHandler):
     # This goes to both Jinja2 env and Javascript config object.
     user = self.get_current_user()
     common = {
-      'account_picture': user.picture() if user else None,
-      'auth_service_config_locked': False, # overridden in auth_service
-      'is_admin': api.is_admin(),
-      'login_url': self.create_login_url(self.request.url),
-      'logout_url': self.create_logout_url('/'),
-      'using_gae_auth': self.auth_method == handler.gae_cookie_authentication,
-      'xsrf_token': self.generate_xsrf_token(),
+        'account_picture': user.picture() if user else None,
+        'auth_service_config_locked': False,  # overridden in auth_service
+        'is_admin': api.is_admin(),
+        'login_url': self.create_login_url(self.request.url),
+        'logout_url': self.create_logout_url('/'),
+        'using_gae_auth': self.auth_method is handler.gae_cookie_authentication,
+        'xsrf_token': self.generate_xsrf_token(),
     }
     if _ui_data_callback:
       common.update(_ui_data_callback())
@@ -670,7 +670,7 @@ class ApiDocHandler(UINavbarTabHandler):
 
   @redirect_ui_on_replica
   @api.require(acl.has_access)
-  def get(self):
+  def get(self, **_params):
     """Extracts API doc for registered webapp2 API routes."""
     doc_types = []
 

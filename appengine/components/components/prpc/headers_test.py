@@ -18,9 +18,6 @@ from components.prpc import headers
 
 
 class PRPCHeadersTestCase(test_case.TestCase):
-  def setUp(self):
-    super(PRPCHeadersTestCase, self).setUp()
-
   def parse_headers(self, h, expect_content_type=None, expect_accept=None):
     res = headers.parse_headers(collections.OrderedDict(h))
     if expect_content_type is not None:

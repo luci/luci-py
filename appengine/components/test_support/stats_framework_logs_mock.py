@@ -78,5 +78,4 @@ def reset_timestamp(handler, timestamp):
   """
   timestamp = timestamp - datetime.timedelta(seconds=10*60)
   timestamp = datetime.datetime(*timestamp.timetuple()[:5], second=0)
-  # pylint: disable=W0212
   handler._set_last_processed_time(timestamp)

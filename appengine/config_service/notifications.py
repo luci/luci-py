@@ -119,7 +119,7 @@ def notify_gitiles_rejection(config_set, location, validation_result):
     logging.info('Emailing %s', ', '.join(msg.to))
     _send(msg)
   except mail_errors.Error as ex:
-    raise FailedToNotify(ex.message), None, sys.exc_info()[2]
+    raise FailedToNotify(ex.message)
 
   Notification(id=str(location)).put()
 

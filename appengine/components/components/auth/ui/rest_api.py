@@ -179,7 +179,7 @@ class EntityHandlerBase(handler.ApiHandler):
     return entity.to_serializable_dict(with_id_as='name')
 
   @classmethod
-  def do_get(cls, name, request):  # pylint: disable=unused-argument
+  def do_get(cls, name, request):
     """Returns an entity given its name or None if no such entity.
 
     Can be called in any mode (including on replicas).
@@ -207,7 +207,7 @@ class EntityHandlerBase(handler.ApiHandler):
     raise NotImplementedError()
 
   @classmethod
-  def can_update(cls, entity):  # pylint: disable=unused-argument
+  def can_update(cls, entity):
     """True if the caller is allowed to update a given entity."""
     return acl.is_admin()
 
@@ -223,7 +223,7 @@ class EntityHandlerBase(handler.ApiHandler):
     raise NotImplementedError()
 
   @classmethod
-  def can_delete(cls, entity):  # pylint: disable=unused-argument
+  def can_delete(cls, entity):
     """True if the caller is allowed to delete a given entity."""
     return acl.is_admin()
 
@@ -412,9 +412,8 @@ class EntityHandlerBase(handler.ApiHandler):
                 '%s was deleted by someone else' %
                 self.entity_kind_title.capitalize(),
           }
-        else:
-          # Unconditionally deleting it, and it's already gone -> success.
-          return None, None
+        # Unconditionally deleting it, and it's already gone -> success.
+        return None, None
       if (expected_ts and
           utils.datetime_to_rfc2822(entity.modified_ts) != expected_ts):
         return None, {

@@ -56,8 +56,6 @@ class MockContext(object):
 
 
 class PrpcAuthTest(testing.TestCase):
-  # pylint: disable=unused-argument
-
   def call(self, peer_id, email, headers=None):
     """Mocks pRPC environment and calls the interceptor.
 

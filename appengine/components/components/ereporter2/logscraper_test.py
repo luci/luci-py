@@ -17,9 +17,6 @@ from components.ereporter2 import models
 from test_support import test_case
 
 
-# Access to a protected member XXX of a client class - pylint: disable=W0212
-
-
 class ErrorRecordStub(object):
   """Intentionally thin stub to test should_ignore_error_record()."""
   def __init__(self, message, exception_type, version='v1'):

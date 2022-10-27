@@ -11,10 +11,6 @@ Functions that operate on the latest state of the DB are in model.py. And they
 generally should not be used outside of Auth components implementation.
 """
 
-# Pylint doesn't like ndb.transactional(...).
-# pylint: disable=E1120
-# pylint: disable=redefined-outer-name
-
 import collections
 import functools
 import json
@@ -852,6 +848,7 @@ class AuthDB(object):
         self._internal_domains_re and
         self._internal_domains_re.match(domain))
 
+  # pylint: disable=redefined-outer-name
   def has_permission(self, permission, realms, identity, attributes=None):
     """Returns True if the identity has the given permission in any of `realms`.
 
@@ -2249,6 +2246,7 @@ def validate_realm_name(name):
         (name, _REALM_NAME_RE.pattern, ' or '.join(_SPECIAL_REALMS)))
 
 
+# pylint: disable=redefined-outer-name
 def has_permission(permission, realms, identity=None, attributes=None):
   """Returns True if the identity has the given permission in any of the realms.
 
@@ -2280,6 +2278,7 @@ def has_permission(permission, realms, identity=None, attributes=None):
       permission, realms, identity or get_current_identity(), attributes)
 
 
+# pylint: disable=redefined-outer-name
 def has_permission_dryrun(
       permission,
       realms,

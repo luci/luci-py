@@ -3,9 +3,6 @@
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
 
-# Disable 'Unused variable', 'Unused argument' and 'Method could be a function'.
-# pylint: disable=W0612,W0613,R0201
-
 import json
 import os
 import sys
@@ -35,18 +32,18 @@ class AuthenticatingHandlerMetaclassTest(test_case.TestCase):
 
   def test_good(self):
     # No request handling methods defined at all.
-    class TestHandler1(handler.AuthenticatingHandler):
+    class _TestHandler1(handler.AuthenticatingHandler):
       def some_other_method(self):
         pass
 
     # @public is used.
-    class TestHandler2(handler.AuthenticatingHandler):
+    class _TestHandler2(handler.AuthenticatingHandler):
       @api.public
       def get(self):
         pass
 
     # @require is used.
-    class TestHandler3(handler.AuthenticatingHandler):
+    class _TestHandler3(handler.AuthenticatingHandler):
       @api.require(lambda: True)
       def get(self):
         pass
@@ -54,15 +51,14 @@ class AuthenticatingHandlerMetaclassTest(test_case.TestCase):
   def test_bad(self):
     # @public or @require is missing.
     with self.assertRaises(TypeError):
-      class TestHandler1(handler.AuthenticatingHandler):
+
+      class _TestHandler1(handler.AuthenticatingHandler):
         def get(self):
           pass
 
 
 class AuthenticatingHandlerTest(testing.TestCase):
   """Tests for AuthenticatingHandler class."""
-
-  # pylint: disable=unused-argument
 
   def make_test_app(self, path, request_handler):
     """Returns webtest.TestApp with single route."""
@@ -244,11 +240,10 @@ class AuthenticatingHandlerTest(testing.TestCase):
       def get(self):
         test.fail('Handler code should not be called')
 
-      def authentication_error(self, err):
-        test.assertEqual('Too bad', err.message)
+      def authentication_error(self, error):
+        test.assertEqual('Too bad', error.message)
         calls.append('authentication_error')
-        # pylint: disable=bad-super-call
-        super(Handler, self).authentication_error(err)
+        super(Handler, self).authentication_error(error)
 
     app = self.make_test_app('/request', Handler)
     response = app.get('/request', expect_errors=True)
@@ -270,10 +265,9 @@ class AuthenticatingHandlerTest(testing.TestCase):
       def get(self):
         test.fail('Handler code should not be called')
 
-      def authorization_error(self, err):
+      def authorization_error(self, error):
         calls.append('authorization_error')
-        # pylint: disable=bad-super-call
-        super(Handler, self).authorization_error(err)
+        super(Handler, self).authorization_error(error)
 
     app = self.make_test_app('/request', Handler)
     response = app.get('/request', expect_errors=True)

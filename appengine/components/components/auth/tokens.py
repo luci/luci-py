@@ -201,7 +201,7 @@ def to_encoding(string, encoding):
   """
   if isinstance(string, str):
     return string
-  elif isinstance(string, unicode):
+  if isinstance(string, unicode):
     return string.encode(encoding)
   raise TypeError('Expecting str or unicode')
 

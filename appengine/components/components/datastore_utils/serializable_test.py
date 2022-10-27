@@ -16,9 +16,6 @@ from components.datastore_utils import serializable
 from test_support import test_case
 
 
-# Access to a protected member _XX of a client class - pylint: disable=W0212
-
-
 class SerializableModelTest(test_case.TestCase):
   """Tests for datastore_utils.serializable.SerializableModelMixin and related
   property converters.
@@ -323,7 +320,7 @@ class SerializableModelTest(test_case.TestCase):
 
 
 class BytesSerializableObject(serializable.BytesSerializable):
-  def __init__(self, payload):  # pylint: disable=W0231
+  def __init__(self, payload):
     self.payload = payload
 
   def to_bytes(self):
@@ -357,7 +354,7 @@ class BytesSerializableTest(test_case.TestCase):
 
 
 class JsonSerializableObject(serializable.JsonSerializable):
-  def __init__(self, payload):  # pylint: disable=W0231
+  def __init__(self, payload):
     self.payload = payload
 
   def to_jsonish(self):

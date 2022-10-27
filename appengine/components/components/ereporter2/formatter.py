@@ -97,7 +97,6 @@ def register_formatter():
   encouraged.
   """
   for handler in logging.getLogger().handlers:
-    # pylint: disable=W0212
     formatter = handler.formatter or logging._defaultFormatter
     if not isinstance(formatter, _Formatter):
       # Prevent immediate recursion.

@@ -3,9 +3,6 @@
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
 
-# Disable 'Method could be a function.'
-# pylint: disable=R0201
-
 import json
 import logging
 import sys

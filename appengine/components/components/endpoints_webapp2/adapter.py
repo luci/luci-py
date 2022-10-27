@@ -34,10 +34,9 @@ def decode_field(field, value):
     value = value.lower()
     if value == 'true':
       return True
-    elif value == 'false':
+    if value == 'false':
       return False
-    else:
-      raise ValueError('boolean field must be either "true" or "false"')
+    raise ValueError('boolean field must be either "true" or "false"')
   return PROTOCOL.decode_field(field, value)
 
 

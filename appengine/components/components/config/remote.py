@@ -339,8 +339,6 @@ def _get_last_good_async(config_set, path, dest_type):
       not last_good.last_access_ts or
       _maybe_update_last_access_ts(now-last_good.last_access_ts) or
       last_good.proto_message_name != proto_message_name):
-    # pylint does not like this usage of transactional_tasklet
-    # pylint: disable=no-value-for-parameter
     @ndb.transactional_tasklet
     def update():
       last_good = yield LastGoodConfig.get_by_id_async(last_good_id)
