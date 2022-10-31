@@ -286,11 +286,23 @@ def db():
       permission('buildbucket.builders.list'),
       permission('buildbucket.buckets.get'),  # used by v1 API only
   ])
-  role('role/buildbucket.triggerer', [
-      include('role/buildbucket.reader'),
-      permission('buildbucket.builds.add'),
-      permission('buildbucket.builds.cancel'),
-  ])
+  role(
+      'role/buildbucket.creator',
+      [
+          include('role/buildbucket.reader'),
+          # Permission to call buildbucket's CreateBuild RPC with a provided
+          # Build proto.
+          permission('buildbucket.builds.create'),
+          permission('buildbucket.builds.cancel'),
+      ])
+  role(
+      'role/buildbucket.triggerer',
+      [
+          include('role/buildbucket.reader'),
+          # Permission to call buildbucket's ScheduleBuild RPC.
+          permission('buildbucket.builds.add'),
+          permission('buildbucket.builds.cancel'),
+      ])
   role('role/buildbucket.owner', [
       include('role/buildbucket.reader'),
       include('role/buildbucket.triggerer'),
