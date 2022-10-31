@@ -57,9 +57,12 @@ class SimpleMainTest(TestCase):
         subprocess42.check_output(
             [sys.executable, self._zip_file, 'attributes'],
             stderr=subprocess42.PIPE))
+
+    botobj = bot_main.get_bot(bot_main.get_config())
+    expected = bot_main.get_attributes(botobj)
+
     # get_config() doesn't work when called outside of a zip, so patch the
     # server_version manually with the default value in config/config.json.
-    expected = bot_main.get_attributes(None)
     self.assertEqual(['N/A'], expected['dimensions']['server_version'])
     expected['dimensions']['server_version'] = ['1']
 

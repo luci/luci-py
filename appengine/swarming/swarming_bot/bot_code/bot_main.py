@@ -332,14 +332,14 @@ def _call_hook_safe(chained, botobj, name, *args):
     msg = '%s\n%s' % (e, traceback.format_exc()[-2048:])
     if botobj:
       botobj.post_error('Failed to call hook %s(): %s' % (name, msg))
-    # TODO(maruel): Disabled because of https://crbug.com/694327
-    #_set_quarantined(msg)
+    return None
 
 
 def _get_dimensions(botobj):
-  """Returns bot_config.py's get_dimensions() dict."""
-  # Importing this administrator provided script could have side-effects on
-  # startup. That is why it is imported late.
+  """Returns bot_config.py's get_dimensions() dict.
+
+  Traps exceptions, quarantining the bot if they happen.
+  """
   out = _call_hook_safe(False, botobj, 'get_dimensions')
   if isinstance(out, dict):
     out = out.copy()
@@ -351,13 +351,13 @@ def _get_dimensions(botobj):
     out['quarantined'] = ['1']
     out['server_version'] = [_get_server_version_safe()]
     return out
-  except Exception as e:
+  except Exception:
     logging.exception('os.utilities.get_dimensions() failed')
     return {
-      'error': ['%s\n%s' % (e, traceback.format_exc()[-2048:])],
-      'id': [_get_botid_safe()],
-      'quarantined': ['1'],
-      'server_version': [_get_server_version_safe()],
+        'bot_error': ['bot_main:_get_dimensions'],
+        'id': [_get_botid_safe()],
+        'quarantined': ['1'],
+        'server_version': [_get_server_version_safe()],
     }
 
 
@@ -398,6 +398,8 @@ def _get_settings(botobj):
 
 def _get_state(botobj, sleep_streak):
   """Returns dict with a state of the bot reported to the server with each poll.
+
+  Traps exceptions, quarantining the bot if they happen.
   """
   state = _call_hook_safe(False, botobj, 'get_state')
   if not isinstance(state, dict):
@@ -411,14 +413,19 @@ def _get_state(botobj, sleep_streak):
     if _QUARANTINED:
       state['quarantined'] = _QUARANTINED
 
+  if not state.get('quarantined'):
+    try:
+      # Reuse the data from 'state/disks'.
+      disks = state.get('disks', {})
+      err = _get_disks_quarantine(botobj, disks)
+      if err:
+        state['quarantined'] = err
+        _cleanup_purgeable_space(botobj)
+    except Exception as e:
+      logging.exception('checking free or purgeable space failed')
+      state['quarantined'] = '%s\n%s' % (e, traceback.format_exc()[-2048:])
+
   state['sleep_streak'] = sleep_streak
-  if not state.get('quarantined') and botobj:
-    # Reuse the data from 'state/disks'
-    disks = state.get('disks', {})
-    err = _get_disks_quarantine(botobj, disks)
-    if err:
-      state['quarantined'] = err
-      _cleanup_purgeable_space(botobj)
   return state
 
 
@@ -1173,16 +1180,15 @@ def _run_bot_inner(arg_error, quit_bit):
 
   # This environment variable is accessible to the tasks executed by this bot.
   os.environ['SWARMING_BOT_ID'] = botobj.id
-
   # bot_id is used in 'X-Luci-Swarming-Bot-ID' header.
   botobj.remote.bot_id = botobj.id
 
   consecutive_sleeps = 0
   last_action = time.time()
   while not quit_bit.is_set():
+    _call_hook_safe(False, botobj, 'on_before_poll')
+    _update_bot_attributes(botobj, consecutive_sleeps)
     try:
-      _call_hook_safe(False, botobj, 'on_before_poll')
-      _update_bot_attributes(botobj, consecutive_sleeps)
       did_something = _poll_server(botobj, quit_bit, last_action)
       if did_something:
         last_action = time.time()
@@ -1196,6 +1202,7 @@ def _run_bot_inner(arg_error, quit_bit):
       consecutive_sleeps = 0
       # Sleep a bit as a precaution to avoid hammering the server.
       quit_bit.wait(10)
+
   # Tell the server we are going away.
   botobj.post_event('bot_shutdown', 'Signal was received')
   return 0

@@ -391,8 +391,8 @@ class TestBotMain(TestBotBase):
     self.mock(
         bot_main, 'get_config',
         lambda: {'server': self.url, 'server_version': '1'})
-    expected_attribs = bot_main.get_attributes(None)
     botobj = bot_main.get_bot(bot_main.get_config())
+    expected_attribs = bot_main.get_attributes(botobj)
     self.expected_requests([
         (
             'https://localhost:1/swarming/api/v1/bot/task_error/23',
