@@ -464,6 +464,20 @@ def _get_disks_quarantine(botobj, disks):
     return '\n'.join(errors)
 
 
+def _update_bot_attributes(botobj, sleep_streak):
+  """Queries environment and hooks for dimensions and state and updates Bot.
+
+  This is generally pretty slow.
+  """
+  dims = _get_dimensions(botobj)
+  state = _get_state(botobj, sleep_streak)
+  logging.debug('Dimensions %s', dims)
+  logging.debug('State %s', state)
+  with botobj.mutate_internals() as mut:
+    mut.update_dimensions(dims)
+    mut.update_state(state)
+
+
 def _cleanup_purgeable_space(botobj):
   """Frees up purgeable space by creating large files and removing them.
 
@@ -473,8 +487,7 @@ def _cleanup_purgeable_space(botobj):
   recognize purgeable space.
   """
   # Skip if it's not ARM MMac.
-  dims = botobj._attributes.get('dimensions') or {}
-  mac_model = dims.get('mac_model')
+  mac_model = botobj.dimensions.get('mac_model')
   if not mac_model or mac_model[0] != 'Macmini9,1':
     return
 
@@ -619,7 +632,7 @@ def get_attributes(botobj):
   these and help the admin fix the swarming_bot code more quickly.
 
   Arguments:
-  - botobj: bot.Bot instance or None
+  - botobj: bot.Bot instance.
   """
   return {
     'dimensions': _get_dimensions(botobj),
@@ -1136,12 +1149,7 @@ def _run_bot_inner(arg_error, quit_bit):
   # have fully initialize bot.Bot object. Note that 'get_dimensions' and
   # 'get_state' may depend on actions done by 'on_bot_startup' hook, that's why
   # we do it here and not in 'get_bot'.
-  dims = _get_dimensions(botobj)
-  states = _get_state(botobj, 0)
-  with botobj._lock:
-    botobj._update_dimensions(dims)
-    botobj._update_state(states)
-
+  _update_bot_attributes(botobj, 0)
   if quit_bit.is_set():
     logging.info('Early quit 3')
     return 0
@@ -1174,13 +1182,7 @@ def _run_bot_inner(arg_error, quit_bit):
   while not quit_bit.is_set():
     try:
       _call_hook_safe(False, botobj, 'on_before_poll')
-      dims = _get_dimensions(botobj)
-      states = _get_state(botobj, consecutive_sleeps)
-      logging.debug('Dimensions %s', dims)
-      logging.debug('States %s', states)
-      with botobj._lock:
-        botobj._update_dimensions(dims)
-        botobj._update_state(states)
+      _update_bot_attributes(botobj, consecutive_sleeps)
       did_something = _poll_server(botobj, quit_bit, last_action)
       if did_something:
         last_action = time.time()
@@ -1216,27 +1218,29 @@ def _do_handshake(botobj, quit_bit):
   # generate error reports, so bots stuck in this state are discoverable.
   sleep_time = 5
   while not quit_bit.is_set():
-    resp = botobj.remote.do_handshake(botobj._attributes)
+    resp = botobj.remote.do_handshake(botobj.attributes)
     if resp:
       logging.info('Connected to %s', resp.get('server_version'))
-      if resp.get('bot_version') != botobj._attributes['version']:
+      if resp.get('bot_version') != botobj.bot_version:
         logging.warning(
             'Found out we\'ll need to update: server said %s; we\'re %s',
-            resp.get('bot_version'), botobj._attributes['version'])
-      # Remember the server-provided per-bot configuration. '/handshake' is
-      # the only place where the server returns it. The bot will be sending
-      # the 'bot_group_cfg_version' back in each /poll (as part of 'state'),
-      # so that the server can instruct the bot to restart itself when
-      # config changes.
-      cfg_version = resp.get('bot_group_cfg_version')
-      if cfg_version:
-        botobj._update_bot_group_cfg(cfg_version, resp.get('bot_group_cfg'))
+            resp.get('bot_version'), botobj.bot_version)
+      # Register the Python module with bot hooks.
       content = resp.get('bot_config')
       rev = resp.get('bot_config_rev')
       script = resp.get('bot_config_name')
       if content:
         _register_extra_bot_config(content, rev, script)
-      botobj._update_bot_config(script, rev)
+      # Remember the server-provided per-bot configuration. '/handshake' is
+      # the only place where the server returns it. The bot will be sending
+      # the 'bot_group_cfg_version' back in each /poll (as part of 'state'),
+      # so that the server can instruct the bot to restart itself when
+      # config changes.
+      with botobj.mutate_internals() as mut:
+        mut.update_bot_config(script, rev)
+        cfg_version = resp.get('bot_group_cfg_version')
+        if cfg_version:
+          mut.update_bot_group_cfg(cfg_version, resp.get('bot_group_cfg'))
       break
     logging.error(
         'Failed to contact for handshake, retrying in %d sec...', sleep_time)
@@ -1252,7 +1256,7 @@ def _poll_server(botobj, quit_bit, last_action):
   start = time.time()
   cmd = None
   try:
-    cmd, value = botobj.remote.poll(botobj._attributes)
+    cmd, value = botobj.remote.poll(botobj.attributes)
   except remote_client_errors.PollError as e:
     # Back off on failure.
     delay = max(1, min(60, botobj.state.get('sleep_streak', 10) * 2))
@@ -1269,8 +1273,8 @@ def _poll_server(botobj, quit_bit, last_action):
     _call_hook_safe(
         True, botobj, 'on_bot_idle', max(0, time.time() - last_action))
     _maybe_update_lkgbc(botobj)
-    with botobj._lock:
-      botobj._update_rbe_state(value['rbe'])
+    with botobj.mutate_internals() as mut:
+      mut.update_rbe_state(value['rbe'])
     try:
       # Sometimes throw with "[Errno 4] Interrupted function call", especially
       # on Windows upon system shutdown.

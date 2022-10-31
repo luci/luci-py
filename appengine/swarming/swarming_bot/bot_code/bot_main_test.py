@@ -74,6 +74,7 @@ class TestBotBase(net_utils.TestCase):
         'state': {
             'bot_group_cfg_version': None,
             'cost_usd_hour': 3600.,
+            'rbe_instance': None,
             'sleep_streak': 0,
         },
         'version': '123',
@@ -680,7 +681,7 @@ class TestBotMain(TestBotBase):
     self.mock(bot_main, '_update_bot', self.fail)
     self.mock(uuid, 'uuid4', lambda: uuid.UUID(REQUEST_UUID))
 
-    data = self.bot._attributes.copy()
+    data = self.bot.attributes
     data['request_uuid'] = REQUEST_UUID
     self.expected_requests([
         (
