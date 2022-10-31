@@ -12,6 +12,8 @@ import unittest
 # Mutates sys.path.
 import test_env
 
+from parameterized import parameterized
+
 # third_party/
 from depot_tools import auto_stub
 
@@ -281,14 +283,15 @@ class HttpServiceTest(RetryLoopMockedTest):
     self.assertEqual(result.read(), response)
     self.assertAttempts(2, net.URL_OPEN_TIMEOUT)
 
-  def test_request_HTTP_error_with_retry(self):
+  @parameterized.expand([(408, ), (429, ), (500, ), (503, ), (599, )])
+  def test_request_HTTP_error_with_retry(self, status_code):
     response = b'response'
     attempts = []
 
     def mock_perform_request(request):
       attempts.append(request)
       if len(attempts) == 1:
-        raise net_utils.make_fake_error(500, request.get_full_url())
+        raise net_utils.make_fake_error(status_code, request.get_full_url())
       return net_utils.make_fake_response(response, request.get_full_url())
 
     service = self.mocked_http_service(perform_request=mock_perform_request)

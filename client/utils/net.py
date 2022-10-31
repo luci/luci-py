@@ -371,10 +371,12 @@ class HttpService:
     self.authenticator = authenticator
 
   @staticmethod
-  def is_transient_http_error(resp, retry_50x, suburl):
+  def is_transient_http_error(resp, suburl):
     """Returns True if given HTTP response indicates a transient error."""
-    # Google Storage can return this and it should be retried.
-    if resp.code == 408:
+    # Google Storage can return HTTP 408 and it should be retried. HTTP 429 can
+    # be returned by Google Cloud, Gerrit and Swarming and it is also should be
+    # retried.
+    if resp.code in (408, 429):
       return True
     if resp.code == 404:
       # Transparently retry 404 IIF it is a CloudEndpoints API call *and* the
@@ -382,11 +384,8 @@ class HttpService:
       # is workaround for known Cloud Endpoints bug.
       return ('/api/' in suburl and
               not resp.content_type.startswith('application/json'))
-    # All other 4** errors are fatal.
-    if resp.code < 500:
-      return False
-    # Retry >= 500 error only if allowed by the caller.
-    return retry_50x
+    # All other 4** errors are fatal. All 5** errors are transient.
+    return resp.code >= 500
 
   @staticmethod
   def encode_request_body(body, content_type):
@@ -432,7 +431,6 @@ class HttpService:
       data=None,
       content_type=None,
       max_attempts=URL_OPEN_MAX_ATTEMPTS,
-      retry_50x=True,
       expected_error_codes=None,
       timeout=URL_OPEN_TIMEOUT,
       read_timeout=URL_READ_TIMEOUT,
@@ -450,7 +448,7 @@ class HttpService:
       - list for data to be form-encoded
       - dict for data to be form-encoded
 
-    - Optionally retries HTTP 404 and 50x.
+    - Optionally retries on transient errors.
     - Retries up to |max_attempts| times. If None or 0, there's no limit in the
       number of retries.
     - Retries up to |timeout| duration in seconds. If None or 0, there's no
@@ -575,7 +573,7 @@ class HttpService:
           return None
 
         # Hit a error that can not be retried -> stop retry loop.
-        if not self.is_transient_http_error(e.response, retry_50x, parsed.path):
+        if not self.is_transient_http_error(e.response, parsed.path):
           # This HttpError means we reached the server and there was a problem
           # with the request, so don't retry. Dump entire reply to debug log and
           # only a friendly error message to error log.
