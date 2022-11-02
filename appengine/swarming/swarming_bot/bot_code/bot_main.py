@@ -412,6 +412,13 @@ def _get_state(botobj, sleep_streak):
     _set_quarantined('get_state(): expected a dict, got %r' % state)
     state = {'broken': state}
 
+  # TODO(vadimsh): This is temporary to detect bots that dynamically change ID.
+  # This env var is set before the poll loop and never changes after that
+  # (unlike botobj.id which can potentially change). The server compares this
+  # to the bot ID and logs a warning if they are different.
+  if 'SWARMING_BOT_ID' in os.environ:
+    state['original_bot_id'] = os.environ['SWARMING_BOT_ID']
+
   if not state.get('quarantined'):
     if not _is_base_dir_ok(botobj):
       # Use super hammer in case of dangerous environment.
@@ -1566,6 +1573,11 @@ def main(argv):
   # Add SWARMING_HEADLESS into environ so subcommands know that they are running
   # in a headless (non-interactive) mode.
   os.environ['SWARMING_HEADLESS'] = '1'
+
+  # Kick out any lingering env vars that will be set later.
+  os.environ.pop('SWARMING_SERVER', None)
+  os.environ.pop('SWARMING_BOT_ID', None)
+  os.environ.pop('SWARMING_TASK_ID', None)
 
   # The only reason this is kept is to enable the unit test to use --help to
   # quit the process.

@@ -576,6 +576,13 @@ class BotPollHandler(_BotBaseHandler):
     sleep_streak = res.state.get('sleep_streak', 0)
     quarantined = bool(res.quarantined_msg)
 
+    # TODO(vadimsh): This is temporary to detect bots that dynamically change
+    # ID. See bot_main._get_state.
+    original_bot_id = res.state.get('original_bot_id')
+    if original_bot_id and original_bot_id != res.bot_id:
+      logging.error('bot_id_mismatch: original=%s, reported=%s' %
+                    (original_bot_id, res.bot_id))
+
     # Note bot existence at two places, one for stats at 1 minute resolution,
     # the other for the list of known bots.
 

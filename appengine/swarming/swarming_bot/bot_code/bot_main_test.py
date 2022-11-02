@@ -562,6 +562,7 @@ class TestBotMain(TestBotBase):
           'cost_usd_hour': 3600.0,
           'rbe_instance': None,
           'sleep_streak': sleep_streak,
+          'original_bot_id': 'localhost',
       }
       attrs.update(extra)
       return attrs
