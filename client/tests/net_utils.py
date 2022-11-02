@@ -101,8 +101,6 @@ class TestCase(auto_stub.TestCase):
   def _url_read_json(self, url, **kwargs):
     logging.warning('url_read_json(%s, %s)', url[:500], str(kwargs)[:500])
     with self._lock:
-      if not self._requests:
-        return None
       # Ignore 'stream' argument, it's not important for these tests.
       kwargs.pop('stream', None)
       for i, n in enumerate(self._requests):
@@ -115,8 +113,5 @@ class TestCase(auto_stub.TestCase):
             expected_kwargs(kwargs)
           else:
             self.assertEqual(expected_kwargs, kwargs)
-          if result is not None:
-            return result
-          return None
+          return result
     self.fail('Unknown request %s %s' % (url, kwargs))
-    return None

@@ -70,6 +70,12 @@ from utils import zip_package
 _ERROR_HANDLER_WAS_REGISTERED = False
 
 
+# If False (happens in tests), avoid catching broad Exception in the bot loop.
+# Otherwise failed test assertions are also getting trapped, which makes tests
+# hard to debug.
+_TRAP_ALL_EXCEPTIONS = True
+
+
 # Set to the zip's name containing this file. This is set to the absolute path
 # to swarming_bot.zip when run as part of swarming_bot.zip. This value is
 # overriden in unit tests.
@@ -857,7 +863,7 @@ def _post_error_task(botobj, error, task_id):
   return botobj.remote.post_task_error(task_id, error)
 
 
-def _run_manifest(botobj, manifest, start):
+def _run_manifest(botobj, manifest):
   """Defers to task_runner.py.
 
   Return True if the task succeeded.
@@ -891,23 +897,6 @@ def _run_manifest(botobj, manifest, start):
     # the old data (the new server will only ever have to read it, which is
     # much simpler) while new bots won't accidentally contact an old server
     # which the GAE engine hasn't gotten around to updating yet.
-    #
-    # With a gRPC proxy, we could theoretically run into the same problem
-    # if we change the meaning of some data without changing the protos.
-    # However, if we *do* change the protos, we already need to make the
-    # change in a few steps:
-    #    1. Modify the Swarming server to accept the new data
-    #    2. Modify the protos and the proxy to accept the new data
-    #       in gRPC calls and translate it to "native" Swarming calls.
-    #    3. Update the bots to transmit the new protos.
-    # Throughout all this, the proto format itself irons out minor differences
-    # and additions. But because we deploy in three steps, the odds of a
-    # newer bot contacting an older server is very low.
-    #
-    # None of this applies if we don't actually update the protos but just
-    # change the semantics. If this becomes a significant problem, we could
-    # start transmitting the expected server version using gRPC metadata.
-    #    - aludwin, Nov 2016
     url = manifest['host']
 
   task_dimensions = manifest['dimensions']
@@ -979,8 +968,10 @@ def _run_manifest(botobj, manifest, start):
         '--cost-usd-hour',
         str(botobj.state.get('cost_usd_hour') or 0.),
         # Include the time taken to poll the task in the cost.
+        # TODO(vadimsh): Remove this, it doesn't add much value, just
+        # complicates code.
         '--start',
-        str(start),
+        str(time.time()),
         '--bot-file',
         bot_file,
         '--auth-params-file',
@@ -1050,7 +1041,7 @@ def _run_manifest(botobj, manifest, start):
     # Failures include IOError when writing if the disk is full, OSError if
     # swarming_bot.zip doesn't exist anymore, etc.
     logging.exception('_run_manifest failed')
-    msg = 'Internal exception occured: %s\n%s' % (
+    msg = 'Internal exception occurred: %s\n%s' % (
         e, traceback.format_exc()[-2048:])
     internal_failure = True
   finally:
@@ -1180,40 +1171,197 @@ def _run_bot_inner(arg_error, quit_bit):
 
   # This environment variable is accessible to the tasks executed by this bot.
   os.environ['SWARMING_BOT_ID'] = botobj.id
-  # bot_id is used in 'X-Luci-Swarming-Bot-ID' header.
-  botobj.remote.bot_id = botobj.id
 
-  consecutive_sleeps = 0
-  last_action = time.time()
-  while not quit_bit.is_set():
-    _call_hook_safe(False, botobj, 'on_before_poll')
-    _update_bot_attributes(botobj, consecutive_sleeps)
-    try:
-      did_something = _poll_server(botobj, quit_bit, last_action)
-      if did_something:
-        last_action = time.time()
-        consecutive_sleeps = 0
-      else:
-        consecutive_sleeps += 1
-    except Exception as e:
-      logging.exception('_poll_server failed in a completely unexpected way')
-      msg = '%s\n%s' % (e, traceback.format_exc()[-2048:])
-      botobj.post_error(msg)
-      consecutive_sleeps = 0
-      # Sleep a bit as a precaution to avoid hammering the server.
-      quit_bit.wait(10)
+  # Spin until getting a termination signal.
+  _BotLoopState(botobj, quit_bit).run()
 
   # Tell the server we are going away.
   botobj.post_event('bot_shutdown', 'Signal was received')
   return 0
 
 
-def _should_have_exited_but_didnt(reason):
-  """Something super sad happened, set the sticky quarantine bit before polling
-  again and sleep a bit to prevent busy-loop/DDoS.
+def _sleep_until_signaled(quit_bit, timeout):
+  """Sleeps until the threading.Event is signaled or the duration expires.
+
+  Returns True if quit_bit is signaled upon return.
   """
-  time.sleep(2)
-  _set_quarantined(reason)
+  # TODO(vadimsh): On Python 3.4 and older wait(...) may raise an exception if
+  # it is interrupted by a signal. When this happens we should resume sleeping,
+  # but this requires a monotonic clock to be precise. Monotonic clocks also
+  # appeared on all platforms only in Python 3.5. Instead use time.time() and
+  # just make sure we never sleep longer than the originally requested
+  # `timeout`. That way the function will at least terminate fast enough, even
+  # if the clock jumps. It may be grossly inaccurate, but we don't need accuracy
+  # and clock shifts should be rare anyway.
+  while timeout > 0:
+    start = time.time()
+    try:
+      quit_bit.wait(timeout)
+      break
+    except IOError:
+      logging.exception('IOError while waiting in threading.Event')
+      timeout -= max(0, time.time() - start)
+  return quit_bit.is_set()
+
+
+class _BotLoopState:
+  """The state of the main bot poll loop."""
+
+  def __init__(self, botobj, quit_bit):
+    # Instance of Bot.
+    self._bot = botobj
+    # threading.Event signaled when the bot should gracefully exit.
+    self._quit_bit = quit_bit
+    # Number of consecutive Swarming poll failures (either remote or local).
+    self._consecutive_errors = 0
+    # Number of consecutive times the server asked the bot to sleep.
+    self._consecutive_sleeps = 0
+    # Sleep duration requested by the Swarming server the last time.
+    self._requested_sleep_duration = 0.0
+    # When the last task finished running (successfully or not).
+    self._last_task_time = time.time()
+    # Number of times the bot failed to exit when asked. Never resets.
+    self._bad_bot_state_errors = 0
+
+  def run(self):
+    """Spins executing Swarming commands until getting a termination signal."""
+    while not _sleep_until_signaled(self._quit_bit, self.sleep_duration):
+      # Note: on_before_poll should always be called before get_state and
+      # get_dimensions (i.e. before _update_bot_attributes). It's part of the
+      # bot hooks API contract.
+      _call_hook_safe(False, self._bot, 'on_before_poll')
+      _update_bot_attributes(self._bot, self._consecutive_sleeps)
+      cmd, param, error = None, None, None
+      try:
+        cmd, param = self._bot.remote.poll(self._bot.attributes)
+        logging.debug('Swarming server response:\n%s: %s', cmd, param)
+      except remote_client_errors.PollError as e:
+        error = 'poll RPC failed: %s' % e
+      _call_hook_safe(False, self._bot, 'on_after_poll', cmd)
+
+      try:
+        if cmd == 'sleep':
+          self.cmd_sleep(param['duration'], param['rbe'])
+        elif cmd == 'terminate':
+          self.cmd_terminate(param)
+        elif cmd == 'run':
+          self.cmd_run(param)
+        elif cmd == 'update':
+          self.cmd_update(param)
+        elif cmd in ('host_reboot', 'restart'):
+          self.cmd_host_reboot(param)
+        elif cmd == 'bot_restart':
+          self.cmd_bot_restart(param)
+        elif cmd:
+          error = 'unrecognized Swarming command %s' % cmd
+      except Exception as e:
+        if not _TRAP_ALL_EXCEPTIONS:
+          raise
+        logging.exception('Unexpected error executing Swarming command %s', cmd)
+        msg = '%s\n%s' % (e, traceback.format_exc()[-2048:])
+        self.bot.post_error(msg)
+        error = 'unexpected error executing Swarming command %s' % cmd
+
+      # This manages the state of the error retry loop.
+      self.handler_done(error)
+
+      # Call `on_bot_idle` hook only if the bot didn't execute any task this
+      # cycle. This is part of `on_bot_idle` hook API contract: if the bot
+      # executes tasks back to back with no idle time in-between, the hook
+      # should **not** be called.
+      if self.idle:
+        _call_hook_safe(True, self._bot, 'on_bot_idle', self.idle_duration)
+
+  @property
+  def idle(self):
+    """True if the bot didn't execute any tasks the last poll cycle."""
+    return (self._consecutive_sleeps or self._consecutive_errors
+            or self._bad_bot_state_errors)
+
+  @property
+  def idle_duration(self):
+    """Duration since the bot finished executing the last task."""
+    return max(0, time.time() - self._last_task_time)
+
+  @property
+  def sleep_duration(self):
+    """Calculates how long to wait between Swarming polls."""
+    if self._bad_bot_state_errors:
+      # Something super sad happened. The bot is quarantined already, but if it
+      # doesn't help, reduce the poll frequency to avoid busy-looping and DDoS
+      # of the server. This state is reset only upon bot process restart.
+      return 2**min(self._bad_bot_state_errors, 8)
+    if self._consecutive_errors:
+      # There are transient errors polling the server. Slow down. This is reset
+      # on a successful poll.
+      return 1.4**min(self._consecutive_errors, 16)
+    # If there were no errors, just sleep as long as the server asked us.
+    return self._requested_sleep_duration
+
+  def handler_done(self, error):
+    """Called whenever a command is finished processing."""
+    if error:
+      logging.error('Poll loop error: %s', error)
+      self._consecutive_errors += 1
+    else:
+      self._consecutive_errors = 0
+
+  def cmd_sleep(self, duration, rbe):
+    """Called when Swarming asks the bot to sleep."""
+    self._consecutive_sleeps += 1
+    self._requested_sleep_duration = duration
+    _maybe_update_lkgbc(self._bot)
+    # TODO(vadimsh): Move RBE state management elsewhere.
+    with self._bot.mutate_internals() as mut:
+      mut.update_rbe_state(rbe)
+
+  def cmd_terminate(self, task_id):
+    """Called when Swarming asks the bot to gracefully terminate."""
+    self._quit_bit.set()
+    try:
+      # Duration must be set or server IEs. For that matter, we've never cared
+      # if there's an error here before, so let's preserve that behavior
+      # (though anything that's not a remote_client.InternalError will make
+      # it through, again preserving prior behavior).
+      self._bot.remote.post_task_update(task_id, {'duration': 0}, None, 0)
+    except remote_client_errors.InternalError:
+      pass
+
+  def cmd_run(self, manifest):
+    """Called when Swarming asks the bot to execute a task."""
+    # Actually execute the task. This can block for many hours.
+    success = _run_manifest(self._bot, manifest)
+    # Unconditionally clean up cache after each task. This is done *after* the
+    # task is terminated, so that:
+    # - there's no task overhead
+    # - if there's an exception while cleaning, it's not logged in the task
+    _clean_cache(self._bot)
+    if success:
+      # Completed a task successfully so update swarming_bot.zip if necessary.
+      _update_lkgbc(self._bot)
+    # This is used to track the bot idleness.
+    self._consecutive_sleeps = 0
+    self._requested_sleep_duration = 0.0
+    self._last_task_time = time.time()
+
+  def cmd_update(self, version):
+    """Called when Swarming asks the bot to self-update."""
+    _update_bot(self._bot, version)
+    self._should_have_exited_but_didnt('Failed to self-update the bot')
+
+  def cmd_host_reboot(self, message):
+    """Called when Swarming asks the bot to reboot the host machine."""
+    self._bot.host_reboot(message)
+    self._should_have_exited_but_didnt('Failed to reboot the host')
+
+  def cmd_bot_restart(self, message):
+    """Called when Swarming asks the bot to restart its own process."""
+    _bot_restart(self._bot, message)
+    self._should_have_exited_but_didnt('Failed to restart the bot process')
+
+  def _should_have_exited_but_didnt(self, message):
+    _set_quarantined(message)
+    self._bad_bot_state_errors += 1
 
 
 def _do_handshake(botobj, quit_bit):
@@ -1223,8 +1371,8 @@ def _do_handshake(botobj, quit_bit):
   # dying right away, spin in a loop, hoping the bot will "fix itself"
   # eventually. Authentication errors in /handshake are logged on the server and
   # generate error reports, so bots stuck in this state are discoverable.
-  sleep_time = 5
-  while not quit_bit.is_set():
+  sleep_time = 0
+  while not _sleep_until_signaled(quit_bit, sleep_time):
     resp = botobj.remote.do_handshake(botobj.attributes)
     if resp:
       logging.info('Connected to %s', resp.get('server_version'))
@@ -1249,91 +1397,9 @@ def _do_handshake(botobj, quit_bit):
         if cfg_version:
           mut.update_bot_group_cfg(cfg_version, resp.get('bot_group_cfg'))
       break
+    sleep_time = min(300, sleep_time * 2) if sleep_time else 5
     logging.error(
         'Failed to contact for handshake, retrying in %d sec...', sleep_time)
-    quit_bit.wait(sleep_time)
-    sleep_time = min(300, sleep_time * 2)
-
-
-def _poll_server(botobj, quit_bit, last_action):
-  """Polls the server to run one loop.
-
-  Returns True if executed some action, False if server asked the bot to sleep.
-  """
-  start = time.time()
-  cmd = None
-  try:
-    cmd, value = botobj.remote.poll(botobj.attributes)
-  except remote_client_errors.PollError as e:
-    # Back off on failure.
-    delay = max(1, min(60, botobj.state.get('sleep_streak', 10) * 2))
-    logging.warning('Poll failed (%s), sleeping %.1f sec', e, delay)
-    quit_bit.wait(delay)
-    return False
-  finally:
-    _call_hook_safe(False, botobj, 'on_after_poll', cmd)
-
-  logging.debug('Server response:\n%s: %s', cmd, value)
-
-  if cmd == 'sleep':
-    # Value is {'duration': float, 'rbe': {'instance': '...'}}.
-    _call_hook_safe(
-        True, botobj, 'on_bot_idle', max(0, time.time() - last_action))
-    _maybe_update_lkgbc(botobj)
-    with botobj.mutate_internals() as mut:
-      mut.update_rbe_state(value['rbe'])
-    try:
-      # Sometimes throw with "[Errno 4] Interrupted function call", especially
-      # on Windows upon system shutdown.
-      quit_bit.wait(value['duration'])
-    except IOError:
-      # Act as it if were set as this likely mean a system shutdown.
-      quit_bit.set()
-    return False
-
-  if cmd == 'terminate':
-    # The value is the task ID to serve as the special termination command.
-    quit_bit.set()
-    try:
-      # Duration must be set or server IEs. For that matter, we've never cared
-      # if there's an error here before, so let's preserve that behaviour
-      # (though anything that's not a remote_client.InternalError will make
-      # it through, again preserving prior behaviour).
-      botobj.remote.post_task_update(value, {'duration': 0}, None, 0)
-    except remote_client_errors.InternalError:
-      pass
-    return False
-
-  if cmd == 'run':
-    # Value is the manifest
-    success = _run_manifest(botobj, value, start)
-    # Unconditionally clean up cache after each task. This is done *after* the
-    # task is terminated, so that:
-    # - there's no task overhead
-    # - if there's an exception while cleaning, it's not logged in the task
-    _clean_cache(botobj)
-    if success:
-      # Completed a task successfully so update swarming_bot.zip if necessary.
-      _update_lkgbc(botobj)
-    # TODO(maruel): Handle the case where quit_bit.is_set() happens here. This
-    # is concerning as this means a signal (often SIGTERM) was received while
-    # running the task. Make sure the host is properly restarting.
-  elif cmd == 'update':
-    # Value is the version
-    _update_bot(botobj, value)
-    _should_have_exited_but_didnt('Failed to self-update the bot')
-  elif cmd in ('host_reboot', 'restart'):
-    # Value is the message to display while rebooting the host
-    botobj.host_reboot(value)
-    _should_have_exited_but_didnt('Failed to reboot the host')
-  elif cmd == 'bot_restart':
-    # Value is the message to display while restarting
-    _bot_restart(botobj, value)
-    _should_have_exited_but_didnt('Failed to restart the bot process')
-  else:
-    raise ValueError('Unexpected command: %s\n%s' % (cmd, value))
-
-  return True
 
 
 def _update_bot(botobj, version):

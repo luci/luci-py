@@ -13,9 +13,7 @@ import unittest
 import test_env_bot_code
 test_env_bot_code.setup_test_env()
 
-# TODO(github.com/wolever/parameterized/issues/91)
-# use parameterized after the bug is resolved.
-from nose2.tools import params
+from parameterized import parameterized
 
 from depot_tools import auto_stub
 
@@ -120,7 +118,7 @@ class TestRemoteClient(auto_stub.TestCase):
                                          'localhost', '/')
     c.bot_id = 'bot_id'
 
-    def mocked_call(url_path, data, expected_error_codes):
+    def mocked_call(url_path, data, expected_error_codes, retry_transient=True):
       self.assertEqual('/swarming/api/v1/bot/oauth_token', url_path)
       self.assertEqual({
           'account_id': 'account_id',
@@ -129,6 +127,7 @@ class TestRemoteClient(auto_stub.TestCase):
           'task_id': 'task_id',
       }, data)
       self.assertEqual((400,), expected_error_codes)
+      self.assertTrue(retry_transient)
       return fake_resp
     self.mock(c, '_url_read_json', mocked_call)
 
@@ -161,10 +160,10 @@ class TestRemoteClient(auto_stub.TestCase):
     resp = c.mint_id_token('task_id', 'account_id', 'https://example.com')
     self.assertEqual(fake_resp, resp)
 
-  @params(
+  @parameterized.expand([
       ('mint_oauth_token', ['scope-a', 'scope-b']),
       ('mint_id_token', 'https://audience.example.com'),
-  )
+  ])
   def test_mint_token_transient_err(self, method, arg):
     c = remote_client.RemoteClientNative('http://localhost:1', None,
                                          'localhost', '/')
@@ -175,10 +174,10 @@ class TestRemoteClient(auto_stub.TestCase):
     with self.assertRaises(remote_client.InternalError):
       getattr(c, method)('task_id', 'account_id', arg)
 
-  @params(
+  @parameterized.expand([
       ('mint_oauth_token', ['scope-a', 'scope-b']),
       ('mint_id_token', 'https://audience.example.com'),
-  )
+  ])
   def test_mint_token_fatal_err(self, method, arg):
     c = remote_client.RemoteClientNative('http://localhost:1', None,
                                          'localhost', '/')

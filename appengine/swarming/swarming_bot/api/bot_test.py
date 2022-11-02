@@ -48,7 +48,10 @@ class TestBot(unittest.TestCase):
                   'id': ['bot1'],
                   'pool': ['private']
               },
-              'state': {},
+              'state': {
+                  'bot_group_cfg_version': None,
+                  'rbe_instance': None,
+              },
               'version': 'unknown',
           }
           self.assertEqual(expected, attributes)
