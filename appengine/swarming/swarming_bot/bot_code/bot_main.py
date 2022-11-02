@@ -149,6 +149,10 @@ _IGNORED_DIMENSIONS = (
 # TODO(1099655): Remove once we have fully enabled CIPD in both prod and tests.
 _IN_TEST_MODE = False
 
+# TODO(vadimsh): This is temporary to detect bots that dynamically change ID.
+_ORIGINAL_BOT_ID = None
+
+
 ### Monitoring
 
 
@@ -413,11 +417,11 @@ def _get_state(botobj, sleep_streak):
     state = {'broken': state}
 
   # TODO(vadimsh): This is temporary to detect bots that dynamically change ID.
-  # This env var is set before the poll loop and never changes after that
+  # This global var is set before the poll loop and never changes after that
   # (unlike botobj.id which can potentially change). The server compares this
   # to the bot ID and logs a warning if they are different.
-  if 'SWARMING_BOT_ID' in os.environ:
-    state['original_bot_id'] = os.environ['SWARMING_BOT_ID']
+  if _ORIGINAL_BOT_ID:
+    state['original_bot_id'] = _ORIGINAL_BOT_ID
 
   if not state.get('quarantined'):
     if not _is_base_dir_ok(botobj):
@@ -1102,6 +1106,12 @@ def _run_bot_inner(arg_error, quit_bit):
   - bot process restarts (this includes self-update)
   - bot process shuts down (this includes a signal is received)
   """
+  # If Swarming bot inherited SWARMING_BOT_ID env var, it must eventually use
+  # it for all communications with the server. We capture it very early because
+  # hooks may potentially modify it, we want to detect this.
+  global _ORIGINAL_BOT_ID
+  _ORIGINAL_BOT_ID = os.environ.get('SWARMING_BOT_ID')
+
   config = get_config()
   if config.get('enable_ts_monitoring'):
     _init_ts_mon()
@@ -1178,6 +1188,8 @@ def _run_bot_inner(arg_error, quit_bit):
 
   # This environment variable is accessible to the tasks executed by this bot.
   os.environ['SWARMING_BOT_ID'] = botobj.id
+  if not _ORIGINAL_BOT_ID:
+    _ORIGINAL_BOT_ID = botobj.id
 
   # Spin until getting a termination signal.
   _BotLoopState(botobj, quit_bit).run()
@@ -1576,7 +1588,6 @@ def main(argv):
 
   # Kick out any lingering env vars that will be set later.
   os.environ.pop('SWARMING_SERVER', None)
-  os.environ.pop('SWARMING_BOT_ID', None)
   os.environ.pop('SWARMING_TASK_ID', None)
 
   # The only reason this is kept is to enable the unit test to use --help to

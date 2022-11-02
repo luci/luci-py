@@ -67,12 +67,11 @@ class SimpleMainTest(TestCase):
     expected['dimensions']['server_version'] = ['1']
 
     NON_DETERMINISTIC = ('cwd', 'disks', 'nb_files_in_temp', 'pid',
-                         'running_time', 'started_ts', 'uptime')
+                         'running_time', 'started_ts', 'uptime', 'temp',
+                         'original_bot_id')
     for key in NON_DETERMINISTIC:
-      del actual['state'][key]
-      del expected['state'][key]
-    actual['state'].pop('temp', None)
-    expected['state'].pop('temp', None)
+      actual['state'].pop(key, None)
+      expected['state'].pop(key, None)
     del actual['version']
     del expected['version']
     self.assertAlmostEqual(
