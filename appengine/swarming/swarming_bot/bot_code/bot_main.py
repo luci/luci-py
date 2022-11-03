@@ -1278,7 +1278,7 @@ class _BotLoopState:
           raise
         logging.exception('Unexpected error executing Swarming command %s', cmd)
         msg = '%s\n%s' % (e, traceback.format_exc()[-2048:])
-        self.bot.post_error(msg)
+        self._bot.post_error(msg)
         error = 'unexpected error executing Swarming command %s' % cmd
 
       # This manages the state of the error retry loop.
