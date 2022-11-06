@@ -181,24 +181,6 @@ _executors_status = gae_ts_mon.StringMetric(
     None)
 
 
-# Global metric. Target fields:
-# - hostname = 'autogen:<executor_id>' (bot id).
-# Status value must be 'ready', 'running', or anything else, possibly
-# swarming-specific, when it cannot run a job. E.g. 'quarantined' or
-# 'dead'.
-# Note that 'running' will report data as long as the job is running,
-# so it is best to restrict data to status == 'pending.'
-_jobs_max_pending_duration = gae_ts_mon.FloatMetric(
-    'jobs/max_pending_duration', 'Maximum pending seconds of pending jobs.', [
-        gae_ts_mon.StringField('spec_name'),
-        gae_ts_mon.StringField('project_id'),
-        gae_ts_mon.StringField('subproject_id'),
-        gae_ts_mon.StringField('pool'),
-        gae_ts_mon.StringField('status'),
-        gae_ts_mon.StringField('device_type'),
-    ])
-
-
 # Instance metric. Metric fields:
 # - auth_method = one of 'luci_token', 'service_account', 'ip_whitelist'.
 # - condition = depends on the auth method (e.g. email for 'service_account').
@@ -313,8 +295,6 @@ def _set_jobs_metrics():
   }
   jobs_counts = defaultdict(lambda: 0)
   jobs_total = 0
-  jobs_max_pending_durations = defaultdict(
-      lambda: 0.0)
 
   q = task_result.get_result_summaries_query(start=None,
                                              end=None,
@@ -338,21 +318,12 @@ def _set_jobs_metrics():
       fields['device_type'] = tags_dict.get('device_type', '')
       key = tuple(sorted(fields.items()))
 
-      pending_duration = summary.pending_now(utils.utcnow())
-      if pending_duration is not None:
-        jobs_max_pending_durations[key] = max(jobs_max_pending_durations[key],
-                                              pending_duration.total_seconds())
-
     logging.debug('_set_jobs_metrics: processed %d jobs', jobs_total)
 
   target_fields = dict(_TARGET_FIELDS)
 
   for key, count in jobs_counts.items():
     _jobs_active.set(count, target_fields=target_fields, fields=dict(key))
-
-  for key, val in jobs_max_pending_durations.items():
-    _jobs_max_pending_duration.set(
-        val, target_fields=target_fields, fields=dict(key))
 
 
 def _set_executors_metrics():
@@ -573,5 +544,4 @@ def initialize():
       _executors_pool,
       _executors_status,
       _jobs_active,
-      _jobs_max_pending_duration,
   ])
