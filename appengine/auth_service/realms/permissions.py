@@ -354,6 +354,10 @@ def db():
       # invocations.
       permission('resultdb.invocations.setProducerResource', internal=True),
       permission('resultdb.invocations.exportToBigQuery', internal=True),
+      # Allow LUCI Analysis to read buildbucket builds (and their
+      # ResultDB invocations) for ingestion.
+      permission('buildbucket.builds.get'),
+      include('role/resultdb.reader'),
   ])
 
   # Allows to see the list of builders and read builds in a LUCI project.
@@ -365,6 +369,14 @@ def db():
       permission('buildbucket.builders.get'),
       permission('buildbucket.builders.list'),
       permission('buildbucket.builds.get'),
+  ])
+
+  # Allows to read ResultDB invocations in a LUCI Project (but not their
+  # test results).
+  # Used by LUCI Analysis to check whether a build's ResultDB invocation
+  # is included in the ResultDB invocation of its ancestor build (if any).
+  role('role/luci.internal.resultdb.reader', [
+      permission('resultdb.invocations.get'),
   ])
 
   # UFS permissions and roles.
@@ -501,6 +513,10 @@ def db():
       realms_config_pb2.Binding(
           role='role/luci.internal.buildbucket.reader',
           principals=['group:buildbucket-internal-readers'],
+      ),
+      realms_config_pb2.Binding(
+          role='role/luci.internal.resultdb.reader',
+          principals=['group:resultdb-internal-readers'],
       ),
   ]
 
