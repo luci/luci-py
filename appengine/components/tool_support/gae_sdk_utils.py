@@ -952,7 +952,12 @@ def setup_gae_env():
 
 
 def _parse_version(v):
-  return tuple(map(int, (v.split('.'))))
+  """Takes e.g. "1.20-pre3" and returns e.g. (1, 20, 0)."""
+  v = v.split('-', 1)[0]
+  v = tuple(map(int, (v.split('.'))))
+  while len(v) < 3:
+    v += (0,)
+  return v
 
 
 def _check_output(cmd):
