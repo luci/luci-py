@@ -146,6 +146,7 @@ def get_dimensions(devices):
   # build.product because the latter is deprecated.
   # https://android.googlesource.com/platform/build/+/master/tools/buildinfo.sh
   dimension_properties = {
+      'device_abi': ['product.cpu.abi'],
       'device_os': ['build.id'],
       'device_os_flavor': ['product.brand', 'product.system.brand'],
       'device_os_type': ['build.type'],

@@ -140,6 +140,7 @@ class TestGetDimensions(unittest.TestCase):
     self.assertEqual(
         {
             'android_devices': ['1'],
+            'device_abi': ['arm64-v8a'],
             'device_gms_core_version': ['unknown'],
             'device_os': ['N', 'NRD90M'],
             'device_os_flavor': ['nvidia'],
@@ -152,6 +153,7 @@ class TestGetDimensions(unittest.TestCase):
     self.assertEqual(
         {
             'android_devices': ['1'],
+            'device_abi': ['arm64-v8a'],
             'device_gms_core_version': ['8.1.86'],
             'device_os': ['M', 'MMB29Q'],
             'device_os_flavor': ['google'],
@@ -165,6 +167,7 @@ class TestGetDimensions(unittest.TestCase):
     self.assertEqual(
         {
             'android_devices': ['1'],
+            'device_abi': ['arm64-v8a'],
             'device_gms_core_version': ['12.8.62'],
             'device_os': ['P', 'PPR1.180610.009'],
             'device_os_flavor': ['google'],
@@ -178,6 +181,7 @@ class TestGetDimensions(unittest.TestCase):
     self.assertEqual(
         {
             'android_devices': ['1'],
+            'device_abi': ['arm64-v8a'],
             'device_gms_core_version': ['11.5.09'],
             'device_os': ['N', 'NRD90M'],
             'device_os_flavor': ['samsung'],
