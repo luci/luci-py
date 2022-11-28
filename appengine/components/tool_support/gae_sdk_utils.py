@@ -491,7 +491,13 @@ class Application(object):
         stdout=subprocess.PIPE)
     output, _ = proc.communicate()
     if proc.returncode:
-      sys.stderr.write('\n' + output + '\n')
+      if output:
+        sys.stderr.write('\n')
+        if sys.version_info.major >= 3:
+          sys.stderr.buffer.write(output)
+        else:
+          sys.stderr.write(output)
+        sys.stderr.write('\n')
       raise subprocess.CalledProcessError(proc.returncode, cmd, output)
     return output
 
