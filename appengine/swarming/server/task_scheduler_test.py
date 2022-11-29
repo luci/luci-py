@@ -193,7 +193,6 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         u'id': [u'localhost'],
         u'os': [u'Windows', u'Windows-3.1.1'],
         u'pool': [u'default'],
-        u'device_type': u'device'
     }
     self._known_pools = None
     self._last_registered_bot_dims = self.bot_dimensions.copy()
@@ -1306,9 +1305,8 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(
         1000.0,
         ts_mon_metrics._task_state_change_schedule_latencies.get(
-            fields=_update_fields_schedule(device_type='device',
-                                           status=State.to_string(
-                                               State.COMPLETED))).sum)
+            fields=_update_fields_schedule(
+                status=State.to_string(State.COMPLETED))).sum)
 
   def test_task_idempotent_old(self):
     # First task is idempotent.
@@ -1344,9 +1342,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         1000.0,
         ts_mon_metrics._task_state_change_schedule_latencies.get(
             fields=_update_fields_schedule(
-                device_type='device',
-                status=State.to_string(State.COMPLETED),
-            )).sum)
+                status=State.to_string(State.COMPLETED))).sum)
     # Third task is scheduled, second task is not dedupable, first task is too
     # old.
     new_ts = self.mock_now(self.now, config.settings().reusable_task_age_secs)
@@ -1421,9 +1417,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         1000.0,
         ts_mon_metrics._task_state_change_schedule_latencies.get(
             fields=_update_fields_schedule(
-                device_type='device',
-                status=State.to_string(State.COMPLETED),
-            )).sum)
+                status=State.to_string(State.COMPLETED))).sum)
 
   def test_task_invalid_parent(self):
     parent_id = self._task_ran_successfully()
@@ -1525,7 +1519,6 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual((reaped_ts - self.now).total_seconds() * 1000.0,
                      ts_mon_metrics._task_state_change_schedule_latencies.get(
                          fields=_update_fields_schedule(
-                             device_type='device',
                              status=State.to_string(State.RUNNING))).sum)
 
     done_ts = self.now + datetime.timedelta(seconds=120)
