@@ -33,7 +33,7 @@
 *   Windows
     * [pywin32](https://pypi.org/project/pywin32/)
 *   macOS
-    * [PyObjC](https://pypi.org/project/pyobjc/)
+    * [PyObjC](https://pypi.org/project/pyobjc/). Currently pybojc versions `pyobjc==8.5.1` are required. See this [issue](https://bugs.chromium.org/p/chromium/issues/detail?id=1393124).
 *   Android
     *   On an Debian desktop host, the current user must be a member
         of `plugdev` so it can open USB ports.
