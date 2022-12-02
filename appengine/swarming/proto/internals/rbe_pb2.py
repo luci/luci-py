@@ -20,7 +20,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   syntax='proto3',
   serialized_options=b'Z9go.chromium.org/luci/swarming/proto/internals;internalspb',
   create_key=_descriptor._internal_create_key,
-  serialized_pb=b'\n\x19proto/internals/rbe.proto\x12\x16swarming.internals.rbe\x1a\x1fgoogle/protobuf/timestamp.proto\"\xbb\x01\n\rTaggedMessage\x12G\n\x0cpayload_type\x18\x01 \x01(\x0e\x32\x31.swarming.internals.rbe.TaggedMessage.PayloadType\x12\x0f\n\x07payload\x18\x02 \x01(\x0c\x12\x13\n\x0bhmac_sha256\x18\x03 \x01(\x0c\";\n\x0bPayloadType\x12\x1c\n\x18PAYLOAD_TYPE_UNSPECIFIED\x10\x00\x12\x0e\n\nPOLL_STATE\x10\x01\"\xc9\x06\n\tPollState\x12\x14\n\x0crbe_instance\x18\x01 \x01(\t\x12H\n\x13\x65nforced_dimensions\x18\x02 \x03(\x0b\x32+.swarming.internals.rbe.PollState.Dimension\x12?\n\ndebug_info\x18\x03 \x01(\x0b\x32+.swarming.internals.rbe.PollState.DebugInfo\x12\x14\n\x0cip_allowlist\x18\n \x01(\t\x12=\n\x08gce_auth\x18\x0b \x01(\x0b\x32).swarming.internals.rbe.PollState.GCEAuthH\x00\x12T\n\x14service_account_auth\x18\x0c \x01(\x0b\x32\x34.swarming.internals.rbe.PollState.ServiceAccountAuthH\x00\x12Y\n\x17luci_machine_token_auth\x18\r \x01(\x0b\x32\x36.swarming.internals.rbe.PollState.LUCIMachineTokenAuthH\x00\x12N\n\x11ip_allowlist_auth\x18\x0e \x01(\x0b\x32\x31.swarming.internals.rbe.PollState.IPAllowlistAuthH\x00\x1a(\n\tDimension\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\x0e\n\x06values\x18\x02 \x03(\t\x1a\x66\n\tDebugInfo\x12+\n\x07\x63reated\x18\x01 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x18\n\x10swarming_version\x18\x02 \x01(\t\x12\x12\n\nrequest_id\x18\x03 \x01(\t\x1a\x34\n\x07GCEAuth\x12\x13\n\x0bgce_project\x18\x01 \x01(\t\x12\x14\n\x0cgce_instance\x18\x02 \x01(\t\x1a-\n\x12ServiceAccountAuth\x12\x17\n\x0fservice_account\x18\x01 \x01(\t\x1a,\n\x14LUCIMachineTokenAuth\x12\x14\n\x0cmachine_fqdn\x18\x01 \x01(\t\x1a\x11\n\x0fIPAllowlistAuthB\r\n\x0b\x61uth_methodB;Z9go.chromium.org/luci/swarming/proto/internals;internalspbb\x06proto3'
+  serialized_pb=b'\n\x19proto/internals/rbe.proto\x12\x16swarming.internals.rbe\x1a\x1fgoogle/protobuf/timestamp.proto\"\xbb\x01\n\rTaggedMessage\x12G\n\x0cpayload_type\x18\x01 \x01(\x0e\x32\x31.swarming.internals.rbe.TaggedMessage.PayloadType\x12\x0f\n\x07payload\x18\x02 \x01(\x0c\x12\x13\n\x0bhmac_sha256\x18\x03 \x01(\x0c\";\n\x0bPayloadType\x12\x1c\n\x18PAYLOAD_TYPE_UNSPECIFIED\x10\x00\x12\x0e\n\nPOLL_STATE\x10\x01\"\x81\x07\n\tPollState\x12\n\n\x02id\x18\x01 \x01(\t\x12*\n\x06\x65xpiry\x18\x02 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x14\n\x0crbe_instance\x18\x03 \x01(\t\x12H\n\x13\x65nforced_dimensions\x18\x04 \x03(\x0b\x32+.swarming.internals.rbe.PollState.Dimension\x12?\n\ndebug_info\x18\x05 \x01(\x0b\x32+.swarming.internals.rbe.PollState.DebugInfo\x12\x14\n\x0cip_allowlist\x18\n \x01(\t\x12=\n\x08gce_auth\x18\x0b \x01(\x0b\x32).swarming.internals.rbe.PollState.GCEAuthH\x00\x12T\n\x14service_account_auth\x18\x0c \x01(\x0b\x32\x34.swarming.internals.rbe.PollState.ServiceAccountAuthH\x00\x12Y\n\x17luci_machine_token_auth\x18\r \x01(\x0b\x32\x36.swarming.internals.rbe.PollState.LUCIMachineTokenAuthH\x00\x12N\n\x11ip_allowlist_auth\x18\x0e \x01(\x0b\x32\x31.swarming.internals.rbe.PollState.IPAllowlistAuthH\x00\x1a(\n\tDimension\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\x0e\n\x06values\x18\x02 \x03(\t\x1a\x66\n\tDebugInfo\x12+\n\x07\x63reated\x18\x01 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x18\n\x10swarming_version\x18\x02 \x01(\t\x12\x12\n\nrequest_id\x18\x03 \x01(\t\x1a\x34\n\x07GCEAuth\x12\x13\n\x0bgce_project\x18\x01 \x01(\t\x12\x14\n\x0cgce_instance\x18\x02 \x01(\t\x1a-\n\x12ServiceAccountAuth\x12\x17\n\x0fservice_account\x18\x01 \x01(\t\x1a,\n\x14LUCIMachineTokenAuth\x12\x14\n\x0cmachine_fqdn\x18\x01 \x01(\t\x1a\x11\n\x0fIPAllowlistAuthB\r\n\x0b\x61uth_methodB;Z9go.chromium.org/luci/swarming/proto/internals;internalspbb\x06proto3'
   ,
   dependencies=[google_dot_protobuf_dot_timestamp__pb2.DESCRIPTOR,])
 
@@ -133,8 +133,8 @@ _POLLSTATE_DIMENSION = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=793,
-  serialized_end=833,
+  serialized_start=849,
+  serialized_end=889,
 )
 
 _POLLSTATE_DEBUGINFO = _descriptor.Descriptor(
@@ -178,8 +178,8 @@ _POLLSTATE_DEBUGINFO = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=835,
-  serialized_end=937,
+  serialized_start=891,
+  serialized_end=993,
 )
 
 _POLLSTATE_GCEAUTH = _descriptor.Descriptor(
@@ -216,8 +216,8 @@ _POLLSTATE_GCEAUTH = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=939,
-  serialized_end=991,
+  serialized_start=995,
+  serialized_end=1047,
 )
 
 _POLLSTATE_SERVICEACCOUNTAUTH = _descriptor.Descriptor(
@@ -247,8 +247,8 @@ _POLLSTATE_SERVICEACCOUNTAUTH = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=993,
-  serialized_end=1038,
+  serialized_start=1049,
+  serialized_end=1094,
 )
 
 _POLLSTATE_LUCIMACHINETOKENAUTH = _descriptor.Descriptor(
@@ -278,8 +278,8 @@ _POLLSTATE_LUCIMACHINETOKENAUTH = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1040,
-  serialized_end=1084,
+  serialized_start=1096,
+  serialized_end=1140,
 )
 
 _POLLSTATE_IPALLOWLISTAUTH = _descriptor.Descriptor(
@@ -302,8 +302,8 @@ _POLLSTATE_IPALLOWLISTAUTH = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1086,
-  serialized_end=1103,
+  serialized_start=1142,
+  serialized_end=1159,
 )
 
 _POLLSTATE = _descriptor.Descriptor(
@@ -315,56 +315,70 @@ _POLLSTATE = _descriptor.Descriptor(
   create_key=_descriptor._internal_create_key,
   fields=[
     _descriptor.FieldDescriptor(
-      name='rbe_instance', full_name='swarming.internals.rbe.PollState.rbe_instance', index=0,
+      name='id', full_name='swarming.internals.rbe.PollState.id', index=0,
       number=1, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=b"".decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='enforced_dimensions', full_name='swarming.internals.rbe.PollState.enforced_dimensions', index=1,
-      number=2, type=11, cpp_type=10, label=3,
-      has_default_value=False, default_value=[],
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
-    _descriptor.FieldDescriptor(
-      name='debug_info', full_name='swarming.internals.rbe.PollState.debug_info', index=2,
-      number=3, type=11, cpp_type=10, label=1,
+      name='expiry', full_name='swarming.internals.rbe.PollState.expiry', index=1,
+      number=2, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='ip_allowlist', full_name='swarming.internals.rbe.PollState.ip_allowlist', index=3,
+      name='rbe_instance', full_name='swarming.internals.rbe.PollState.rbe_instance', index=2,
+      number=3, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"".decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='enforced_dimensions', full_name='swarming.internals.rbe.PollState.enforced_dimensions', index=3,
+      number=4, type=11, cpp_type=10, label=3,
+      has_default_value=False, default_value=[],
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='debug_info', full_name='swarming.internals.rbe.PollState.debug_info', index=4,
+      number=5, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='ip_allowlist', full_name='swarming.internals.rbe.PollState.ip_allowlist', index=5,
       number=10, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=b"".decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='gce_auth', full_name='swarming.internals.rbe.PollState.gce_auth', index=4,
+      name='gce_auth', full_name='swarming.internals.rbe.PollState.gce_auth', index=6,
       number=11, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='service_account_auth', full_name='swarming.internals.rbe.PollState.service_account_auth', index=5,
+      name='service_account_auth', full_name='swarming.internals.rbe.PollState.service_account_auth', index=7,
       number=12, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='luci_machine_token_auth', full_name='swarming.internals.rbe.PollState.luci_machine_token_auth', index=6,
+      name='luci_machine_token_auth', full_name='swarming.internals.rbe.PollState.luci_machine_token_auth', index=8,
       number=13, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='ip_allowlist_auth', full_name='swarming.internals.rbe.PollState.ip_allowlist_auth', index=7,
+      name='ip_allowlist_auth', full_name='swarming.internals.rbe.PollState.ip_allowlist_auth', index=9,
       number=14, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
@@ -388,7 +402,7 @@ _POLLSTATE = _descriptor.Descriptor(
     fields=[]),
   ],
   serialized_start=277,
-  serialized_end=1118,
+  serialized_end=1174,
 )
 
 _TAGGEDMESSAGE.fields_by_name['payload_type'].enum_type = _TAGGEDMESSAGE_PAYLOADTYPE
@@ -400,6 +414,7 @@ _POLLSTATE_GCEAUTH.containing_type = _POLLSTATE
 _POLLSTATE_SERVICEACCOUNTAUTH.containing_type = _POLLSTATE
 _POLLSTATE_LUCIMACHINETOKENAUTH.containing_type = _POLLSTATE
 _POLLSTATE_IPALLOWLISTAUTH.containing_type = _POLLSTATE
+_POLLSTATE.fields_by_name['expiry'].message_type = google_dot_protobuf_dot_timestamp__pb2._TIMESTAMP
 _POLLSTATE.fields_by_name['enforced_dimensions'].message_type = _POLLSTATE_DIMENSION
 _POLLSTATE.fields_by_name['debug_info'].message_type = _POLLSTATE_DEBUGINFO
 _POLLSTATE.fields_by_name['gce_auth'].message_type = _POLLSTATE_GCEAUTH

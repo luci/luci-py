@@ -49,8 +49,14 @@ message TaggedMessage {
 // that this message was not tampered with and was not "substituted" (i.e.
 // taken from one bot and replayed on another).
 message PollState {
+  // Unique ID of this message (primary to correlate logs that use it).
+  string id = 1;
+
+  // Expiration time of this message. It should not be used once it expires.
+  google.protobuf.Timestamp expiry = 2;
+
   // Full RBE instance name to use.
-  string rbe_instance = 1;
+  string rbe_instance = 3;
 
   // Override these particular dimensions when contacting RBE.
   //
@@ -62,7 +68,7 @@ message PollState {
     string key = 1;
     repeated string values = 2;
   }
-  repeated Dimension enforced_dimensions = 2;
+  repeated Dimension enforced_dimensions = 4;
 
   // Information for logs and debugging (not passed to RBE).
   message DebugInfo {
@@ -70,7 +76,7 @@ message PollState {
     string swarming_version = 2;            // version of the Swarming code
     string request_id = 3;                  // ID of the "/bot/poll" request
   }
-  DebugInfo debug_info = 3;
+  DebugInfo debug_info = 5;
 
   //////////////////////////////////////////////////////////////////////////////
   // Instructions for the Go server how to authenticate the bot.
