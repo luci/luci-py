@@ -1549,6 +1549,7 @@ class RunIsolatedTestOutputFiles(RunIsolatedTestBase):
 class RunIsolatedJsonTest(RunIsolatedTestBase):
   # Similar to RunIsolatedTest but adds the hacks to process ISOLATED_OUTDIR to
   # generate a json result file.
+
   def setUp(self):
     super(RunIsolatedJsonTest, self).setUp()
 
@@ -1607,7 +1608,9 @@ class RunIsolatedJsonTest(RunIsolatedTestBase):
                 'upload': {
                     'items_cold': [15, 81],
                     'items_hot': None,
-                    'result': 'success'
+                    'result': 'success',
+                    'size_cold': 96,
+                    'size_hot': 0,
                 },
             },
             'named_caches': {

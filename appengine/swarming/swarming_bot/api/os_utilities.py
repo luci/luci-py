@@ -1054,7 +1054,7 @@ def get_state():
       'audio': get_audio(),
       'cpu_name': get_cpuinfo().get('name'),
       'cost_usd_hour': get_cost_hour(),
-      'cwd': file_path.get_native_path_case(os.getcwd()),
+      'cwd': os.getcwd(),
       'disks': get_disks_info(),
       # Only including a subset of the environment variable, as state is not
       # designed to sustain large load at the moment.

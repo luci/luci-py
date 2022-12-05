@@ -38,8 +38,6 @@ if sys.platform == 'win32':
   import locale
   from ctypes import wintypes  # pylint: disable=ungrouped-imports
   from ctypes import windll  # pylint: disable=ungrouped-imports
-elif sys.platform == 'darwin':
-  from utils import macos
 
 if sys.platform == 'win32':
   class LUID(ctypes.Structure):
@@ -242,62 +240,6 @@ if sys.platform == 'win32':
     return os.path.isabs(path) or len(path) == 2 and path[1] == ':'
 
 
-  def find_item_native_case(root, item):
-    """Gets the native path case of a single item based at root_path."""
-    if item == '..':
-      return item
-
-    root = get_native_path_case(root)
-    return os.path.basename(get_native_path_case(os.path.join(root, item)))
-
-
-  @tools.profile
-  @tools.cached
-  def get_native_path_case(p):
-    """Returns the native path case for an existing file.
-
-    On Windows, removes any leading '\\?\'.
-    """
-    assert isinstance(p, str), repr(p)
-    if not isabs(p):
-      raise ValueError(
-          'get_native_path_case(%r): Require an absolute path' % p, p)
-
-    # Make sure it is normalized to os.path.sep. Do not do it here to keep the
-    # function fast
-    assert '/' not in p, p
-    suffix = ''
-    count = p.count(':')
-    if count > 1:
-      # This means it has an alternate-data stream. There could be 3 ':', since
-      # it could be the $DATA datastream of an ADS. Split the whole ADS suffix
-      # off and add it back afterward. There is no way to know the native path
-      # case of an alternate data stream.
-      items = p.split(':')
-      p = ':'.join(items[0:2])
-      suffix = ''.join(':' + i for i in items[2:])
-
-    # TODO(maruel): Use os.path.normpath?
-    if p.endswith('.\\'):
-      p = p[:-2]
-
-    # Windows used to have an option to turn on case sensitivity on non Win32
-    # subsystem but that's out of scope here and isn't supported anymore.
-    # Go figure why GetShortPathName() is needed.
-    try:
-      out = GetLongPathName(GetShortPathName(p))
-    except OSError as e:
-      if e.args[0] in (2, 3, 5):
-        # The path does not exist. Try to recurse and reconstruct the path.
-        base = os.path.dirname(p)
-        rest = os.path.basename(p)
-        return os.path.join(get_native_path_case(base), rest)
-      raise
-    # Always upper case the first letter since GetLongPathName() will return the
-    # drive letter in the case it was given.
-    return out[0].upper() + out[1:] + suffix
-
-
   def get_process_token():
     """Get the current process token."""
     TOKEN_ALL_ACCESS = 0xF01FF
@@ -485,152 +427,14 @@ elif sys.platform == 'darwin':
   # On non-windows, keep the stdlib behavior.
   isabs = os.path.isabs
 
-
-  def find_item_native_case(root_path, item):
-    """Gets the native path case of a single item based at root_path.
-
-    There is no API to get the native path case of symlinks on OSX. So it
-    needs to be done the slow way.
-    """
-    if item == '..':
-      return item
-
-    item = item.lower()
-    for element in fs.listdir(root_path):
-      if element.lower() == item:
-        return element
-    return None
-
-
-  @tools.profile
-  @tools.cached
-  def get_native_path_case(path):
-    """Returns the native path case for an existing file.
-
-    Technically, it's only HFS+ on OSX that is case preserving and
-    insensitive. It's the default setting on HFS+ but can be changed.
-    """
-    assert isinstance(path, str), repr(path)
-    if not isabs(path):
-      raise ValueError(
-          'get_native_path_case(%r): Require an absolute path' % path, path)
-    if path.startswith('/dev'):
-      # /dev is not visible from Carbon, causing an exception.
-      return path
-
-    # Starts assuming there is no symlink along the path.
-    resolved = _native_case(path)
-    if path.lower() in (resolved.lower(), resolved.lower() + './'):
-      # This code path is incredibly faster.
-      #logging.debug('get_native_path_case(%s) = %s' % (path, resolved))
-      return resolved
-
-    # There was a symlink, process it.
-    base, symlink, rest = _split_at_symlink_native(None, path)
-    if not symlink:
-      # TODO(maruel): This can happen on OSX because we use stale APIs on OSX.
-      # Fixing the APIs usage will likely fix this bug. The bug occurs due to
-      # hardlinked files, where the API may return one file path or the other
-      # depending on how it feels.
-      return base
-    prev = base
-    base = safe_join(_native_case(base), symlink)
-    assert len(base) > len(prev)
-    while rest:
-      prev = base
-      relbase, symlink, rest = _split_at_symlink_native(base, rest)
-      base = safe_join(base, relbase)
-      assert len(base) > len(prev), (prev, base, symlink)
-      if symlink:
-        base = safe_join(base, symlink)
-      assert len(base) > len(prev), (prev, base, symlink)
-    # Make sure no symlink was resolved.
-    assert base.lower() == path.lower(), (base, path)
-    #logging.debug('get_native_path_case(%s) = %s' % (path, base))
-    return base
-
-
   def enable_symlink():
     return True
-
-
-  ## OSX private code.
-
-
-  def _native_case(p):
-    """Gets the native path case. Warning: this function resolves symlinks."""
-    try:
-      out = macos.native_case(p)
-      if p.endswith(os.path.sep) and not out.endswith(os.path.sep):
-        return out + os.path.sep
-      return out
-    except macos.Error as e:
-      if macos.get_errno(e) in (-43, -120):
-        # The path does not exist. Try to recurse and reconstruct the path.
-        # -43 means file not found.
-        # -120 means directory not found.
-        base = os.path.dirname(p)
-        rest = os.path.basename(p)
-        return os.path.join(_native_case(base), rest)
-      raise OSError(
-          macos.get_errno(e), 'Failed to get native path for %s' % p, p, str(e))
-
-
-  def _split_at_symlink_native(base_path, rest):
-    """Returns the native path for a symlink."""
-    base, symlink, rest = split_at_symlink(base_path, rest)
-    if symlink:
-      if not base_path:
-        base_path = base
-      else:
-        base_path = safe_join(base_path, base)
-      symlink = find_item_native_case(base_path, symlink)
-    return base, symlink, rest
-
 
 else:  # OSes other than Windows and OSX.
 
 
   # On non-windows, keep the stdlib behavior.
   isabs = os.path.isabs
-
-
-  def find_item_native_case(root, item):
-    """Gets the native path case of a single item based at root_path."""
-    if item == '..':
-      return item
-
-    root = get_native_path_case(root)
-    return os.path.basename(get_native_path_case(os.path.join(root, item)))
-
-
-  @tools.profile
-  @tools.cached
-  def get_native_path_case(path):
-    """Returns the native path case for an existing file.
-
-    On OSes other than OSX and Windows, assume the file system is
-    case-sensitive.
-
-    TODO(maruel): This is not strictly true. Implement if necessary.
-    """
-    assert isinstance(path, str), repr(path)
-    if not isabs(path):
-      raise ValueError(
-          'get_native_path_case(%r): Require an absolute path' % path, path)
-    # Give up on cygwin, as GetLongPathName() can't be called.
-    # Linux traces tends to not be normalized so use this occasion to normalize
-    # it. This function implementation already normalizes the path on the other
-    # OS so this needs to be done here to be coherent between OSes.
-    out = os.path.normpath(path)
-    if path.endswith(os.path.sep) and not out.endswith(os.path.sep):
-      out = out + os.path.sep
-    # In 99.99% of cases on Linux out == path. Since a return value is cached
-    # forever, reuse (also cached) |path| object. It safes approx 7MB of ram
-    # when isolating Chromium tests. It's important on memory constrained
-    # systems running ARM.
-    return path if out == path else out
-
 
   def enable_symlink():
     return True
@@ -768,29 +572,6 @@ def path_starts_with(prefix, path):
   prefix = prefix.rstrip(os.path.sep) + os.path.sep
   path = path.rstrip(os.path.sep) + os.path.sep
   return path.startswith(prefix)
-
-
-@tools.profile
-def fix_native_path_case(root, path):
-  """Ensures that each component of |path| has the proper native case.
-
-  It does so by iterating slowly over the directory elements of |path|. The file
-  must exist.
-  """
-  native_case_path = root
-  for raw_part in path.split(os.sep):
-    if not raw_part or raw_part == '.':
-      break
-
-    part = find_item_native_case(native_case_path, raw_part)
-    if not part:
-      raise OSError(
-          'File %s doesn\'t exist' %
-          os.path.join(native_case_path, raw_part))
-    native_case_path = os.path.join(native_case_path, part)
-
-  return os.path.normpath(native_case_path)
-
 
 def ensure_command_has_abs_path(command, cwd):
   """Ensures that an isolate command uses absolute path.
