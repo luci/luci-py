@@ -21,11 +21,6 @@ from api.platforms import common
 from api.platforms import gpu
 
 try:
-  from Foundation import NSBundle
-except ImportError:
-  NSBundle = None
-
-try:
   import Quartz
 except ImportError:
   Quartz = None
