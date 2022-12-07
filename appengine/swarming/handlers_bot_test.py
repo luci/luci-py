@@ -85,9 +85,16 @@ class BotApiTest(test_env_handlers.AppTestBase):
     for f in bot_groups_config.BotGroupConfig._fields:
       if f not in kwargs:
         kwargs[f] = None
-    cfg = bot_groups_config.BotGroupConfig(**kwargs)
+    group_cfg = bot_groups_config.BotGroupConfig(**kwargs)
+    auth_cfg = bot_groups_config.BotAuth(
+        log_if_failed=False,
+        require_luci_machine_token=True,
+        require_service_account=None,
+        require_gce_vm_token=None,
+        ip_whitelist=None,
+    )
     self.mock(bot_auth,
-              'validate_bot_id_and_fetch_config', lambda *args, **kwargs: cfg)
+              'authenticate_bot', lambda *args, **kwargs: (group_cfg, auth_cfg))
 
   def mock_pool_config(self, pool, **kwargs):
     def mocked_get_pool_config(name):

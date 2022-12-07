@@ -24,13 +24,13 @@ def is_authenticated_bot(bot_id):
   bot with given ID.
   """
   try:
-    validate_bot_id_and_fetch_config(bot_id)
+    authenticate_bot(bot_id)
     return True
   except auth.AuthorizationError:
     return False
 
 
-def validate_bot_id_and_fetch_config(bot_id):
+def authenticate_bot(bot_id):
   """Verifies ID reported by a bot matches the credentials being used.
 
   Expected to be called in a context of some bot API request handler. Uses
@@ -40,8 +40,8 @@ def validate_bot_id_and_fetch_config(bot_id):
   Raises auth.AuthorizationError if bot_id is unknown or bot is using invalid
   credentials.
 
-  On success returns the configuration for this bot (BotGroupConfig tuple), as
-  defined in bots.cfg.
+  Returns:
+    (BotGroupConfig with bot config, BotAuth with auth method used).
   """
   if not bot_id:
     raise auth.AuthorizationError('Bot ID is not specified')
@@ -69,7 +69,7 @@ def validate_bot_id_and_fetch_config(bot_id):
     err, details = _check_bot_auth(bot_auth, auth_bot_id, peer_ident, ip)
     if not err:
       logging.debug('Using auth method: %s', bot_auth)
-      return cfg
+      return cfg, bot_auth
     auth_errs.append(err)
     if bot_auth.log_if_failed:
       logging.error('Preferred auth method failed: %s', err)
