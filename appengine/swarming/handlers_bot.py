@@ -645,9 +645,17 @@ class BotPollHandler(_BotBaseHandler):
                                           res.dimensions.get('pool'),
                                           res.bot_group_cfg)
       if rbe_instance:
-        # TODO(crbug.com/1377118): Cryptographically bind the RBE parameters to
-        # this particular bot credentials (to be verified by the Go side).
-        rbe_bot_params = {'instance': rbe_instance}
+        rbe_bot_params = {
+            'instance':
+            rbe_instance,
+            'poll_token':
+            rbe.generate_poll_token(
+                bot_id=res.bot_id,
+                rbe_instance=rbe_instance,
+                enforced_dimensions=res.bot_group_cfg.dimensions,
+                bot_auth_cfg=res.bot_auth_cfg,
+            ),
+        }
 
     if quarantined:
       bot_event('request_sleep')

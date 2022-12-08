@@ -41,6 +41,7 @@ from server import bot_groups_config
 from server import bot_management
 from server import external_scheduler
 from server import pools_config
+from server import rbe
 from server import realms
 from server import service_accounts
 from server import task_pack
@@ -95,6 +96,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
     )
     self.mock(bot_auth,
               'authenticate_bot', lambda *args, **kwargs: (group_cfg, auth_cfg))
+    return group_cfg, auth_cfg
 
   def mock_pool_config(self, pool, **kwargs):
     def mocked_get_pool_config(name):
@@ -470,7 +472,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(expected, response)
 
   def test_poll_sleep_rbe(self):
-    self.mock_bot_group_config(
+    _, bot_auth_cfg = self.mock_bot_group_config(
         version='default',
         dimensions={u'pool': [u'default']},
         rbe_migration=bots_pb2.BotGroup.RBEMigration(rbe_mode_percent=100),
@@ -479,6 +481,9 @@ class BotApiTest(test_env_handlers.AppTestBase):
         pool='default',
         rbe_migration=pools_pb2.Pool.RBEMigration(rbe_instance='some-instance'),
     )
+    self.mock(rbe, 'generate_poll_token', mock.Mock())
+    rbe.generate_poll_token.return_value = 'mocked-poll-token'
+
     # A bot polls, gets sleep with RBE parameters.
     params = self.do_handshake()
     response = self.post_json('/swarming/api/v1/bot/poll', params)
@@ -487,10 +492,18 @@ class BotApiTest(test_env_handlers.AppTestBase):
         u'cmd': u'sleep',
         u'quarantined': False,
         u'rbe': {
-            u'instance': u'some-instance'
+            u'instance': u'some-instance',
+            u'poll_token': u'mocked-poll-token',
         },
     }
     self.assertEqual(expected, response)
+
+    # The poll token was generated with correct parameters.
+    rbe.generate_poll_token.assert_called_once_with(
+        bot_id='bot1',
+        rbe_instance='some-instance',
+        enforced_dimensions={u'pool': [u'default']},
+        bot_auth_cfg=bot_auth_cfg)
 
   def test_poll_update(self):
     params = self.do_handshake()
