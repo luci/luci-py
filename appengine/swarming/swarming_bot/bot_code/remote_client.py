@@ -377,6 +377,24 @@ class RemoteClientNative(object):
           'Unexpected response format for command %s: missing key %s' %
           (cmd, e))
 
+  def ping_swarming_rbe(self, attributes, rbe_state):
+    """Sends a ping request to the RBE-aware Swarming endpoint.
+
+    This is a temporary helper to setup routing and authentication for the
+    RBE-aware Swarming endpoints.
+
+    Errors are logged and ignored.
+    """
+    data = attributes.copy()
+    data['rbe_state'] = rbe_state
+    resp = self._url_read_json('/swarming/api/v1/bot/rbe/ping',
+                               data=data,
+                               retry_transient=False)
+    if not resp:
+      logging.error('RBE ping: failed to contact the server')
+    elif resp.get('error'):
+      logging.error('RBE ping: %s' % resp['error'])
+
   def get_bot_code(self, new_zip_path, bot_version):
     """Downloads code into the file specified by new_zip_fn (a string).
 

@@ -1261,6 +1261,11 @@ class _BotLoopState:
       try:
         if cmd == 'sleep':
           self.cmd_sleep(param['duration'], param['rbe'])
+          # TODO(vadimsh): This is temporary to develop Swarming RBE calls
+          # routing and authentication.
+          rbe_state = self._bot.rbe_state
+          if rbe_state.get('instance'):
+            self._bot.remote.ping_swarming_rbe(self._bot.attributes, rbe_state)
         elif cmd == 'terminate':
           self.cmd_terminate(param)
         elif cmd == 'run':

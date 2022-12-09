@@ -159,6 +159,17 @@ class Bot(object):
       }
 
   @property
+  def rbe_state(self):
+    """A copy of the dict with RBE-related state of the bot (or {}).
+
+    The dict has keys:
+      `instance`: the full RBE instance to use.
+      `poll_token` a token to send to the Swarming RBE endpoints.
+    """
+    with self._lock:
+      return self._rbe_state.copy() if self._rbe_state else {}
+
+  @property
   def swarming_bot_zip(self):
     """Absolute path to the swarming_bot.zip file.
 
