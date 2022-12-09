@@ -1652,12 +1652,11 @@ def main(args):
   cipd.validate_cipd_options(parser, options)
 
   install_packages_fn = copy_local_packages
-  tmp_cipd_cache_dir = None
   if options.cipd_enabled:
-    cache_dir = options.cipd_cache
-    if not cache_dir:
-      tmp_cipd_cache_dir = tempfile.mkdtemp()
-      cache_dir = tmp_cipd_cache_dir
+    if options.cipd_cache:
+      cipd_cache_dir = options.cipd_cache
+    else:
+      cipd_cache_dir = os.path.join(options.root_dir, 'cipd_cache')
     install_packages_fn = (
         lambda run_dir, cas_dir, nsjail_dir: install_client_and_packages(
             run_dir,
@@ -1665,7 +1664,7 @@ def main(args):
             options.cipd_server,
             options.cipd_client_package,
             options.cipd_client_version,
-            cache_dir=cache_dir,
+            cache_dir=cipd_cache_dir,
             cas_dir=cas_dir,
             nsjail_dir=nsjail_dir,
         ))
@@ -1769,15 +1768,6 @@ def main(args):
     print(ex.message, file=sys.stderr)
     on_error.report(None)
     return 1
-  finally:
-    if tmp_cipd_cache_dir is not None:
-      try:
-        file_path.rmtree(tmp_cipd_cache_dir)
-      except OSError:
-        logging.exception('Remove tmp_cipd_cache_dir=%s failed',
-                          tmp_cipd_cache_dir)
-        # Best effort clean up. Failed to do so doesn't affect the outcome.
-
 
 if __name__ == '__main__':
   subprocess42.inhibit_os_error_reporting()

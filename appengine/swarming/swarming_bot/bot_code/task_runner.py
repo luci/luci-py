@@ -113,11 +113,9 @@ def get_isolated_args(work_dir, task_details, isolated_result,
     for pkg in task_details.cipd_input.get('packages', []):
       cmd.extend([
           '--cipd-package',
-          '%s:%s:%s' % (pkg['path'], pkg['package_name'], pkg['version'])
+          '%s:%s:%s' % (pkg['path'], pkg['package_name'], pkg['version']),
       ])
     cmd.extend([
-        '--cipd-cache',
-        os.path.join(bot_dir, 'cipd_cache'),
         '--cipd-client-package',
         task_details.cipd_input['client_package']['package_name'],
         '--cipd-client-version',

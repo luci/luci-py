@@ -95,7 +95,9 @@ def add_cipd_options(parser):
       '--cipd-cache',
       help='CIPD cache directory, separate from isolate cache. '
       'Only relevant with --cipd-enabled or --cipd-package. '
-      'Default: "%default".',
+      'Default: "%default". Is only actually set in unit tests. '
+      '`run_isolated.py` sets this as $bot_dir/cipd_cache if `--cipd-enabled` '
+      'is set. ',
       default='')
   parser.add_option_group(group)
 
