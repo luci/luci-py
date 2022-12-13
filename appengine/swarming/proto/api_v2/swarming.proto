@@ -5,9 +5,12 @@
 syntax = "proto3";
 
 package swarming.v2;
+option go_package = "go.chromium.org/luci/swarming/proto/api_v2;apipb";
 
 import "google/protobuf/empty.proto";
 import "google/protobuf/timestamp.proto";
+
+
 
 service Bots {
   // GetBot returns information on a single bot
