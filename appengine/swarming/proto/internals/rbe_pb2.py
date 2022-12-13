@@ -20,7 +20,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   syntax='proto3',
   serialized_options=b'Z9go.chromium.org/luci/swarming/proto/internals;internalspb',
   create_key=_descriptor._internal_create_key,
-  serialized_pb=b'\n\x19proto/internals/rbe.proto\x12\x16swarming.internals.rbe\x1a\x1fgoogle/protobuf/timestamp.proto\"\xbb\x01\n\rTaggedMessage\x12G\n\x0cpayload_type\x18\x01 \x01(\x0e\x32\x31.swarming.internals.rbe.TaggedMessage.PayloadType\x12\x0f\n\x07payload\x18\x02 \x01(\x0c\x12\x13\n\x0bhmac_sha256\x18\x03 \x01(\x0c\";\n\x0bPayloadType\x12\x1c\n\x18PAYLOAD_TYPE_UNSPECIFIED\x10\x00\x12\x0e\n\nPOLL_STATE\x10\x01\"\x81\x07\n\tPollState\x12\n\n\x02id\x18\x01 \x01(\t\x12*\n\x06\x65xpiry\x18\x02 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x14\n\x0crbe_instance\x18\x03 \x01(\t\x12H\n\x13\x65nforced_dimensions\x18\x04 \x03(\x0b\x32+.swarming.internals.rbe.PollState.Dimension\x12?\n\ndebug_info\x18\x05 \x01(\x0b\x32+.swarming.internals.rbe.PollState.DebugInfo\x12\x14\n\x0cip_allowlist\x18\n \x01(\t\x12=\n\x08gce_auth\x18\x0b \x01(\x0b\x32).swarming.internals.rbe.PollState.GCEAuthH\x00\x12T\n\x14service_account_auth\x18\x0c \x01(\x0b\x32\x34.swarming.internals.rbe.PollState.ServiceAccountAuthH\x00\x12Y\n\x17luci_machine_token_auth\x18\r \x01(\x0b\x32\x36.swarming.internals.rbe.PollState.LUCIMachineTokenAuthH\x00\x12N\n\x11ip_allowlist_auth\x18\x0e \x01(\x0b\x32\x31.swarming.internals.rbe.PollState.IPAllowlistAuthH\x00\x1a(\n\tDimension\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\x0e\n\x06values\x18\x02 \x03(\t\x1a\x66\n\tDebugInfo\x12+\n\x07\x63reated\x18\x01 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x18\n\x10swarming_version\x18\x02 \x01(\t\x12\x12\n\nrequest_id\x18\x03 \x01(\t\x1a\x34\n\x07GCEAuth\x12\x13\n\x0bgce_project\x18\x01 \x01(\t\x12\x14\n\x0cgce_instance\x18\x02 \x01(\t\x1a-\n\x12ServiceAccountAuth\x12\x17\n\x0fservice_account\x18\x01 \x01(\t\x1a,\n\x14LUCIMachineTokenAuth\x12\x14\n\x0cmachine_fqdn\x18\x01 \x01(\t\x1a\x11\n\x0fIPAllowlistAuthB\r\n\x0b\x61uth_methodB;Z9go.chromium.org/luci/swarming/proto/internals;internalspbb\x06proto3'
+  serialized_pb=b'\n\x19proto/internals/rbe.proto\x12\x16swarming.internals.rbe\x1a\x1fgoogle/protobuf/timestamp.proto\"\xcc\x01\n\rTaggedMessage\x12G\n\x0cpayload_type\x18\x01 \x01(\x0e\x32\x31.swarming.internals.rbe.TaggedMessage.PayloadType\x12\x0f\n\x07payload\x18\x02 \x01(\x0c\x12\x13\n\x0bhmac_sha256\x18\x03 \x01(\x0c\"L\n\x0bPayloadType\x12\x1c\n\x18PAYLOAD_TYPE_UNSPECIFIED\x10\x00\x12\x0e\n\nPOLL_STATE\x10\x01\x12\x0f\n\x0b\x42OT_SESSION\x10\x02\"\x81\x07\n\tPollState\x12\n\n\x02id\x18\x01 \x01(\t\x12*\n\x06\x65xpiry\x18\x02 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x14\n\x0crbe_instance\x18\x03 \x01(\t\x12H\n\x13\x65nforced_dimensions\x18\x04 \x03(\x0b\x32+.swarming.internals.rbe.PollState.Dimension\x12?\n\ndebug_info\x18\x05 \x01(\x0b\x32+.swarming.internals.rbe.PollState.DebugInfo\x12\x14\n\x0cip_allowlist\x18\n \x01(\t\x12=\n\x08gce_auth\x18\x0b \x01(\x0b\x32).swarming.internals.rbe.PollState.GCEAuthH\x00\x12T\n\x14service_account_auth\x18\x0c \x01(\x0b\x32\x34.swarming.internals.rbe.PollState.ServiceAccountAuthH\x00\x12Y\n\x17luci_machine_token_auth\x18\r \x01(\x0b\x32\x36.swarming.internals.rbe.PollState.LUCIMachineTokenAuthH\x00\x12N\n\x11ip_allowlist_auth\x18\x0e \x01(\x0b\x32\x31.swarming.internals.rbe.PollState.IPAllowlistAuthH\x00\x1a(\n\tDimension\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\x0e\n\x06values\x18\x02 \x03(\t\x1a\x66\n\tDebugInfo\x12+\n\x07\x63reated\x18\x01 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x18\n\x10swarming_version\x18\x02 \x01(\t\x12\x12\n\nrequest_id\x18\x03 \x01(\t\x1a\x34\n\x07GCEAuth\x12\x13\n\x0bgce_project\x18\x01 \x01(\t\x12\x14\n\x0cgce_instance\x18\x02 \x01(\t\x1a-\n\x12ServiceAccountAuth\x12\x17\n\x0fservice_account\x18\x01 \x01(\t\x1a,\n\x14LUCIMachineTokenAuth\x12\x14\n\x0cmachine_fqdn\x18\x01 \x01(\t\x1a\x11\n\x0fIPAllowlistAuthB\r\n\x0b\x61uth_method\"\x8b\x01\n\nBotSession\x12\x1a\n\x12rbe_bot_session_id\x18\x01 \x01(\t\x12\x35\n\npoll_state\x18\x02 \x01(\x0b\x32!.swarming.internals.rbe.PollState\x12*\n\x06\x65xpiry\x18\x03 \x01(\x0b\x32\x1a.google.protobuf.TimestampB;Z9go.chromium.org/luci/swarming/proto/internals;internalspbb\x06proto3'
   ,
   dependencies=[google_dot_protobuf_dot_timestamp__pb2.DESCRIPTOR,])
 
@@ -43,11 +43,16 @@ _TAGGEDMESSAGE_PAYLOADTYPE = _descriptor.EnumDescriptor(
       serialized_options=None,
       type=None,
       create_key=_descriptor._internal_create_key),
+    _descriptor.EnumValueDescriptor(
+      name='BOT_SESSION', index=2, number=2,
+      serialized_options=None,
+      type=None,
+      create_key=_descriptor._internal_create_key),
   ],
   containing_type=None,
   serialized_options=None,
   serialized_start=215,
-  serialized_end=274,
+  serialized_end=291,
 )
 _sym_db.RegisterEnumDescriptor(_TAGGEDMESSAGE_PAYLOADTYPE)
 
@@ -95,7 +100,7 @@ _TAGGEDMESSAGE = _descriptor.Descriptor(
   oneofs=[
   ],
   serialized_start=87,
-  serialized_end=274,
+  serialized_end=291,
 )
 
 
@@ -133,8 +138,8 @@ _POLLSTATE_DIMENSION = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=849,
-  serialized_end=889,
+  serialized_start=866,
+  serialized_end=906,
 )
 
 _POLLSTATE_DEBUGINFO = _descriptor.Descriptor(
@@ -178,8 +183,8 @@ _POLLSTATE_DEBUGINFO = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=891,
-  serialized_end=993,
+  serialized_start=908,
+  serialized_end=1010,
 )
 
 _POLLSTATE_GCEAUTH = _descriptor.Descriptor(
@@ -216,8 +221,8 @@ _POLLSTATE_GCEAUTH = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=995,
-  serialized_end=1047,
+  serialized_start=1012,
+  serialized_end=1064,
 )
 
 _POLLSTATE_SERVICEACCOUNTAUTH = _descriptor.Descriptor(
@@ -247,8 +252,8 @@ _POLLSTATE_SERVICEACCOUNTAUTH = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1049,
-  serialized_end=1094,
+  serialized_start=1066,
+  serialized_end=1111,
 )
 
 _POLLSTATE_LUCIMACHINETOKENAUTH = _descriptor.Descriptor(
@@ -278,8 +283,8 @@ _POLLSTATE_LUCIMACHINETOKENAUTH = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1096,
-  serialized_end=1140,
+  serialized_start=1113,
+  serialized_end=1157,
 )
 
 _POLLSTATE_IPALLOWLISTAUTH = _descriptor.Descriptor(
@@ -302,8 +307,8 @@ _POLLSTATE_IPALLOWLISTAUTH = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1142,
-  serialized_end=1159,
+  serialized_start=1159,
+  serialized_end=1176,
 )
 
 _POLLSTATE = _descriptor.Descriptor(
@@ -401,8 +406,54 @@ _POLLSTATE = _descriptor.Descriptor(
       create_key=_descriptor._internal_create_key,
     fields=[]),
   ],
-  serialized_start=277,
-  serialized_end=1174,
+  serialized_start=294,
+  serialized_end=1191,
+)
+
+
+_BOTSESSION = _descriptor.Descriptor(
+  name='BotSession',
+  full_name='swarming.internals.rbe.BotSession',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  create_key=_descriptor._internal_create_key,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='rbe_bot_session_id', full_name='swarming.internals.rbe.BotSession.rbe_bot_session_id', index=0,
+      number=1, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"".decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='poll_state', full_name='swarming.internals.rbe.BotSession.poll_state', index=1,
+      number=2, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='expiry', full_name='swarming.internals.rbe.BotSession.expiry', index=2,
+      number=3, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=1194,
+  serialized_end=1333,
 )
 
 _TAGGEDMESSAGE.fields_by_name['payload_type'].enum_type = _TAGGEDMESSAGE_PAYLOADTYPE
@@ -433,8 +484,11 @@ _POLLSTATE.fields_by_name['luci_machine_token_auth'].containing_oneof = _POLLSTA
 _POLLSTATE.oneofs_by_name['auth_method'].fields.append(
   _POLLSTATE.fields_by_name['ip_allowlist_auth'])
 _POLLSTATE.fields_by_name['ip_allowlist_auth'].containing_oneof = _POLLSTATE.oneofs_by_name['auth_method']
+_BOTSESSION.fields_by_name['poll_state'].message_type = _POLLSTATE
+_BOTSESSION.fields_by_name['expiry'].message_type = google_dot_protobuf_dot_timestamp__pb2._TIMESTAMP
 DESCRIPTOR.message_types_by_name['TaggedMessage'] = _TAGGEDMESSAGE
 DESCRIPTOR.message_types_by_name['PollState'] = _POLLSTATE
+DESCRIPTOR.message_types_by_name['BotSession'] = _BOTSESSION
 _sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
 TaggedMessage = _reflection.GeneratedProtocolMessageType('TaggedMessage', (_message.Message,), {
@@ -498,6 +552,13 @@ _sym_db.RegisterMessage(PollState.GCEAuth)
 _sym_db.RegisterMessage(PollState.ServiceAccountAuth)
 _sym_db.RegisterMessage(PollState.LUCIMachineTokenAuth)
 _sym_db.RegisterMessage(PollState.IPAllowlistAuth)
+
+BotSession = _reflection.GeneratedProtocolMessageType('BotSession', (_message.Message,), {
+  'DESCRIPTOR' : _BOTSESSION,
+  '__module__' : 'proto.internals.rbe_pb2'
+  # @@protoc_insertion_point(class_scope:swarming.internals.rbe.BotSession)
+  })
+_sym_db.RegisterMessage(BotSession)
 
 
 DESCRIPTOR._options = None
