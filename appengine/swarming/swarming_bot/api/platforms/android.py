@@ -178,8 +178,11 @@ def get_dimensions(devices):
       # Update device OS for Android Go Wembley devices to the version we
       # install, which is Android U as of now
       if 'wembley_2GB' in dimensions.get('device_type', []):
-        if 'Master' in dimensions.get('device_os', []):
-          dimensions['device_os'].remove('Master')
+        dimensions['device_os'] = {
+            key
+            for key in dimensions.get('device_os', [])
+            if key.lower() != 'master'
+        }
         dimensions['device_os'].add('Android U')
 
   # Add the first character of each device_os to the dimension.
