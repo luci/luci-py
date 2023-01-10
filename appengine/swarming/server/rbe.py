@@ -30,9 +30,9 @@ POLL_TOKEN_EXPIRY = datetime.timedelta(hours=1)
 def warmup():
   """Warms up local in-memory caches, best effort."""
   try:
-    _get_poll_token_hmac_secret().access()
+    _get_shared_hmac_secret().access()
   except Exception:
-    logging.exception('Failed to warmup up RBE poll token HMAC key')
+    logging.exception('Failed to warmup up RBE HMAC key')
 
 
 def get_rbe_instance(bot_id, pools, bot_group_cfg):
@@ -165,7 +165,7 @@ def generate_poll_token(bot_id, rbe_instance, enforced_dimensions,
   state_blob = state.SerializeToString()
 
   # Calculate the HMAC of serialized PollState. See rbe_pb2.TaggedMessage.
-  key = _get_poll_token_hmac_secret().access()
+  key = _get_shared_hmac_secret().access()
   mac = hmac.new(key, digestmod=hashlib.sha256)
   mac.update("%d\n" % rbe_pb2.TaggedMessage.POLL_STATE)
   mac.update(state_blob)
@@ -190,10 +190,10 @@ def _quasi_random_100(s):
 
 
 @utils.cache
-def _get_poll_token_hmac_secret():
-  """A gsm.Secret with a key used to HMAC-tag poll tokens."""
+def _get_shared_hmac_secret():
+  """A gsm.Secret with a key used to HMAC-tag tokens."""
   return gsm.Secret(
       project=app_identity.get_application_id(),
-      secret='poll-token-hmac',
+      secret='shared-hmac',
       version='current',
   )

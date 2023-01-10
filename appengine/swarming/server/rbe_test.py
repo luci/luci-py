@@ -128,7 +128,7 @@ class PollTokenTest(test_case.TestCase):
       def access(_self):
         return self.SECRET
 
-    self.mock(rbe, '_get_poll_token_hmac_secret', MockedSecret)
+    self.mock(rbe, '_get_shared_hmac_secret', MockedSecret)
 
   def mock_auth_identity(self, kind, name):
     auth.get_peer_identity.return_value = auth.Identity(kind, name)
