@@ -22,7 +22,7 @@ from server import service_accounts_utils
 from server import task_request
 
 
-def process_task_request(tr, template_apply):
+def process_task_request(tr, template_apply, pool_cfg):
   # type: (task_request.TaskRequest, task_request.TemplateApplyEnum)
   #     -> None
   """Initializes the given TaskRequest and does acl checking.
@@ -44,8 +44,7 @@ def process_task_request(tr, template_apply):
     logging.warning('Incorrect new task request', exc_info=True)
     raise handlers_exceptions.BadRequestException(e.message)
 
-  # Retrieve pool_cfg, and check the existence.
-  pool_cfg = pools_config.get_pool_config(tr.pool)
+  # Check the existence of pool_cfg.
   if not pool_cfg:
     logging.warning('Pool "%s" is not in pools.cfg', tr.pool)
     raise handlers_exceptions.PermissionException(

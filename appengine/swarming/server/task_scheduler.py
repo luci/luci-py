@@ -1176,7 +1176,8 @@ def check_schedule_request_acl_service_account(request):
 def schedule_request(request,
                      enable_resultdb=False,
                      secret_bytes=None,
-                     build_token=None):
+                     build_token=None,
+                     scheduling_algorithm=None):
   """Creates and stores all the entities to schedule a new task request.
 
   Assumes ACL check has already happened (see
@@ -1195,6 +1196,8 @@ def schedule_request(request,
              will be set and the entity will be stored by this function.
   - build_token: Optional BuildToken entity to be saved in the DB. It's key will
              be set and the entity will be stored by this function.
+  - scheduling_algorithm: The pools_pb2 Pool.SchedulingAlgorithm value used to
+             determine how the task will be scheduled.
   Returns:
     TaskResultSummary. TaskToRunShard is not returned.
   """
@@ -1235,7 +1238,7 @@ def schedule_request(request,
     index = 0
     while index < request.num_task_slices:
       # This needs to be extremely fast.
-      to_run = task_to_run.new_task_to_run(request, index)
+      to_run = task_to_run.new_task_to_run(request, index, scheduling_algorithm)
       logging.debug('TODO(crbug.com/1186759): expiration_ts %s',
                     to_run.expiration_ts)
       #  Make sure there's capacity if desired.

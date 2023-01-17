@@ -26,6 +26,7 @@ from test_support import test_case
 from components import utils
 from proto.api import plugin_pb2
 from proto.api import swarming_pb2
+from proto.config import pools_pb2
 from server import config
 from server import external_scheduler
 from server import pools_config
@@ -149,6 +150,7 @@ class ExternalSchedulerApiTest(test_env_handlers.AppTestBase):
     self._enqueue_async_orig = self.mock(utils, 'enqueue_task_async',
                                          self._enqueue_async)
 
+    self.mock_pool_config('default')
     cfg = config.settings()
     cfg.enable_batch_es_notifications = False
     self.mock(config, 'settings', lambda: cfg)
@@ -165,6 +167,17 @@ class ExternalSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertFalse(self._client)
     self._client = FakeExternalScheduler(self)
     return self._client
+
+  def mock_pool_config(self, name):
+    def mocked_get_pool_config(pool):
+      if pool == name:
+        return pools_config.init_pool_config(
+            name=name,
+            scheduling_algorithm=(pools_pb2.Pool.SchedulingAlgorithm.
+                                  Value('SCHEDULING_ALGORITHM_FIFO')),
+        )
+      return None
+    self.mock(pools_config, 'get_pool_config', mocked_get_pool_config)
 
   def test_all_apis_are_tested(self):
     actual = frozenset(i[5:] for i in dir(self) if i.startswith('test_'))
@@ -281,6 +294,7 @@ class ExternalSchedulerApiTestBatchMode(test_env_handlers.AppTestBase):
           'SERVER_SOFTWARE': os.environ['SERVER_SOFTWARE'],
         })
 
+    self.mock_pool_config('default')
     self.cfg = config.settings()
     self.cfg.enable_batch_es_notifications = True
     self.mock(config, 'settings', lambda: self.cfg)
@@ -298,6 +312,17 @@ class ExternalSchedulerApiTestBatchMode(test_env_handlers.AppTestBase):
 
   def _setup_client(self):
     self._client = FakeExternalScheduler(self)
+
+  def mock_pool_config(self, name):
+    def mocked_get_pool_config(pool):
+      if pool == name:
+        return pools_config.init_pool_config(
+            name=name,
+            scheduling_algorithm=(pools_pb2.Pool.SchedulingAlgorithm.
+                                  Value('SCHEDULING_ALGORITHM_FIFO')),
+        )
+      return None
+    self.mock(pools_config, 'get_pool_config', mocked_get_pool_config)
 
   def test_notify_request_with_tq_batch_mode(self):
     request = _gen_request()

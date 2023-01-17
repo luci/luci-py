@@ -201,7 +201,8 @@ class TaskBackendAPIServiceTest(test_env_handlers.AppTestBase):
     def mocked_schedule_request(_,
                                 start_time=0,
                                 secret_bytes=None,
-                                build_token=None):
+                                build_token=None,
+                                scheduling_algorithm=None):
       raise TypeError('chicken')
 
     self.mock(task_scheduler, 'schedule_request', mocked_schedule_request)
