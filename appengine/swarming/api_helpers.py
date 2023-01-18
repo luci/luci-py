@@ -22,7 +22,7 @@ from server import service_accounts_utils
 from server import task_request
 
 
-def process_task_request(tr, template_apply, pool_cfg):
+def process_task_request(tr, template_apply):
   # type: (task_request.TaskRequest, task_request.TemplateApplyEnum)
   #     -> None
   """Initializes the given TaskRequest and does acl checking.
@@ -44,11 +44,16 @@ def process_task_request(tr, template_apply, pool_cfg):
     logging.warning('Incorrect new task request', exc_info=True)
     raise handlers_exceptions.BadRequestException(e.message)
 
-  # Check the existence of pool_cfg.
+  # Retrieve pool_cfg, and check the existence.
+  pool_cfg = pools_config.get_pool_config(tr.pool)
   if not pool_cfg:
     logging.warning('Pool "%s" is not in pools.cfg', tr.pool)
     raise handlers_exceptions.PermissionException(
         'No such pool or no permission to use it: %s' % tr.pool)
+
+  # Use the scheduling algorithm configured for the pool.
+  assert pool_cfg.scheduling_algorithm is not None
+  tr.scheduling_algorithm = pool_cfg.scheduling_algorithm
 
   # TODO(crbug.com/1109378): Check ACLs before calling init_new_request to
   # avoid leaking information about pool templates to unauthorized callers.

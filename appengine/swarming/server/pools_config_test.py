@@ -37,7 +37,7 @@ TEST_CONFIG = pools_pb2.PoolsCfg(
                     pools_pb2.TrustedDelegation(
                         peer_id='delegatee@example.com',
                         require_any_of=pools_pb2.TrustedDelegation.TagList(
-                            tag=['k:tag1', 'k:tag2'],),
+                            tag=['k:tag1', 'k:tag2'], ),
                     ),
                 ],
             ),
@@ -56,8 +56,7 @@ TEST_CONFIG = pools_pb2.PoolsCfg(
                 )
             ],
             rbe_migration=pools_pb2.Pool.RBEMigration(rbe_mode_percent=23),
-            scheduling_algorithm=(pools_pb2.Pool.SchedulingAlgorithm.
-                                  Value('SCHEDULING_ALGORITHM_FIFO')),
+            scheduling_algorithm=pools_pb2.Pool.SCHEDULING_ALGORITHM_FIFO,
         ),
     ],
     default_external_services=pools_pb2.ExternalServices(
@@ -108,10 +107,10 @@ class PoolsConfigTest(test_case.TestCase):
         scheduling_groups=frozenset([u'group2', u'group1']),
         trusted_delegatees={
             auth.Identity('user', 'delegatee@example.com'):
-                pools_config.TrustedDelegatee(
-                    peer_id=auth.Identity('user', 'delegatee@example.com'),
-                    required_delegation_tags=frozenset([u'k:tag1', u'k:tag2']),
-                ),
+            pools_config.TrustedDelegatee(
+                peer_id=auth.Identity('user', 'delegatee@example.com'),
+                required_delegation_tags=frozenset([u'k:tag1', u'k:tag2']),
+            ),
         },
         realm='test:pool/realm',
         enforced_realm_permissions=frozenset(
@@ -129,10 +128,9 @@ class PoolsConfigTest(test_case.TestCase):
             any_dimensions=frozenset(),
             enabled=True,
             allow_es_fallback=True,
-        ),),
+        ), ),
         rbe_migration=pools_pb2.Pool.RBEMigration(rbe_mode_percent=23),
-        scheduling_algorithm=(pools_pb2.Pool.SchedulingAlgorithm.
-                              Value('SCHEDULING_ALGORITHM_FIFO')),
+        scheduling_algorithm=pools_pb2.Pool.SCHEDULING_ALGORITHM_FIFO,
     )
     expected2 = expected1._replace(name='another_name')
 
@@ -358,19 +356,17 @@ class PoolsConfigTest(test_case.TestCase):
   def test_no_scheduling_algorithm(self):
     cfg = pools_pb2.PoolsCfg(pool=[pools_pb2.Pool(name=['abc'])])
     self.mock_config(cfg)
-    self.assertEqual((pools_pb2.Pool.SchedulingAlgorithm.
-                      Value('SCHEDULING_ALGORITHM_UNKNOWN')),
+    self.assertEqual(pools_pb2.Pool.SCHEDULING_ALGORITHM_UNKNOWN,
                      pools_config.get_pool_config('abc').scheduling_algorithm)
 
   def test_lifo_scheduling_algorithm(self):
-    cfg = pools_pb2.PoolsCfg(
-        pool=[pools_pb2.Pool(name=['abc'],
-                             scheduling_algorithm=(
-                                 pools_pb2.Pool.SchedulingAlgorithm.
-                                 Value('SCHEDULING_ALGORITHM_LIFO')))])
+    cfg = pools_pb2.PoolsCfg(pool=[
+        pools_pb2.Pool(
+            name=['abc'],
+            scheduling_algorithm=pools_pb2.Pool.SCHEDULING_ALGORITHM_LIFO),
+    ], )
     self.mock_config(cfg)
-    self.assertEqual((pools_pb2.Pool.SchedulingAlgorithm.
-                      Value('SCHEDULING_ALGORITHM_LIFO')),
+    self.assertEqual(pools_pb2.Pool.SCHEDULING_ALGORITHM_LIFO,
                      pools_config.get_pool_config('abc').scheduling_algorithm)
 
 

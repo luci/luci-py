@@ -47,7 +47,6 @@ from components import utils
 from proto.config import pools_pb2
 from server import bot_management
 from server import config
-from server import pools_config
 from server import task_pack
 from server import task_queues
 from server import task_request
@@ -197,21 +196,6 @@ def get_shard_kind(shard):
 
 ### Private functions.
 
-def _get_scheduling_algorithm(dimensions):
-  """Returns pool scheduling algorithm given a TaskRequest's dimensions.
-
-  Checking the existence of fields is necessary as they may not be present,
-  e.g termination tasks (see is_terminate() in task_request.py).
-  """
-  if (dimensions.get(u'pool') is not None and
-      len(dimensions.get(u'pool')) > 0 and
-      dimensions[u'pool'][0] is not None):
-    pool = pools_config.get_pool_config(dimensions[u'pool'][0])
-    if getattr(pool, 'scheduling_algorithm', None) is not None:
-      return pool.scheduling_algorithm
-  return (pools_pb2.Pool.SchedulingAlgorithm.
-          Value('SCHEDULING_ALGORITHM_UNKNOWN'))
-
 
 def _gen_queue_number(dimensions_hash, timestamp, priority,
                       scheduling_algorithm):
@@ -237,24 +221,20 @@ def _gen_queue_number(dimensions_hash, timestamp, priority,
   assert 0 < dimensions_hash <= 0xFFFFFFFF, hex(dimensions_hash)
   assert isinstance(timestamp, datetime.datetime), repr(timestamp)
   task_request.validate_priority(priority)
-  scheduling_algorithms = frozenset([
-      pools_pb2.Pool.SchedulingAlgorithm.Value('SCHEDULING_ALGORITHM_UNKNOWN'),
-      pools_pb2.Pool.SchedulingAlgorithm.Value('SCHEDULING_ALGORITHM_FIFO'),
-      pools_pb2.Pool.SchedulingAlgorithm.Value('SCHEDULING_ALGORITHM_LIFO'),
-  ])
-  assert scheduling_algorithm in scheduling_algorithms, (
-      'Unknown Pool.SchedulingAlgorithm: %d' % (scheduling_algorithm))
 
   # Ignore the year.
 
-  if scheduling_algorithm == (pools_pb2.Pool.SchedulingAlgorithm.
-                              Value('SCHEDULING_ALGORITHM_LIFO')):
+  if scheduling_algorithm == pools_pb2.Pool.SCHEDULING_ALGORITHM_LIFO:
     next_year = datetime.datetime(timestamp.year + 1, 1, 1)
     # It is guaranteed to fit 32 bits but upgrade to long right away to ensure
     # assert works.
     t = long(round((next_year - timestamp).total_seconds() * 10.))
-  # Default scheduling algorithm is FIFO to avoid confusion.
   else:
+    # Default scheduling algorithm is FIFO to avoid confusion.
+    assert scheduling_algorithm in (
+        pools_pb2.Pool.SCHEDULING_ALGORITHM_UNKNOWN,
+        pools_pb2.Pool.SCHEDULING_ALGORITHM_FIFO,
+    ), ('Unknown Pool.SchedulingAlgorithm: %d' % scheduling_algorithm)
     year_start = datetime.datetime(timestamp.year, 1, 1)
     # It is guaranteed to fit 32 bits but upgrade to long right away to ensure
     # assert works.
@@ -704,13 +684,14 @@ def task_to_run_key_slice_index(to_run_key):
   return to_run_key.integer_id() >> 4
 
 
-def new_task_to_run(request, task_slice_index, scheduling_algorithm=None):
+def new_task_to_run(request, task_slice_index):
   """Returns a fresh new TaskToRunShard for the task ready to be scheduled.
 
   Returns:
     Unsaved TaskToRunShard entity.
   """
   assert 0 <= task_slice_index < 64, task_slice_index
+  assert request.scheduling_algorithm is not None
   created = request.created_ts
   if task_slice_index:
     created = utils.utcnow()
@@ -721,11 +702,9 @@ def new_task_to_run(request, task_slice_index, scheduling_algorithm=None):
     offset += request.task_slice(i).expiration_secs
   exp = request.created_ts + datetime.timedelta(seconds=offset)
   dims = request.task_slice(task_slice_index).properties.dimensions
-  if scheduling_algorithm is None:
-    scheduling_algorithm = _get_scheduling_algorithm(dims)
   h = task_queues.hash_dimensions(dims)
   qn = _gen_queue_number(h, request.created_ts, request.priority,
-                         scheduling_algorithm)
+                         request.scheduling_algorithm)
   kind = get_shard_kind(h % N_SHARDS)
   key = request_to_task_to_run_key(request, task_slice_index)
   return kind(key=key,
