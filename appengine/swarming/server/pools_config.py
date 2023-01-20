@@ -614,11 +614,13 @@ def _fetch_pools_config():
           external_schedulers=_resolve_external_schedulers(
               msg.external_schedulers),
           default_cipd=default_cipd,
-          rbe_migration=(msg.rbe_migration
-                         if msg.HasField('rbe_migration') else None),
-          scheduling_algorithm=(msg.scheduling_algorithm
-                                or pools_pb2.Pool.SCHEDULING_ALGORITHM_UNKNOWN),
-      )
+          rbe_migration=(
+              msg.rbe_migration if msg.HasField('rbe_migration') else None),
+          scheduling_algorithm=(
+              msg.scheduling_algorithm if msg.scheduling_algorithm else
+              (pools_pb2.Pool.SchedulingAlgorithm.
+               Value('SCHEDULING_ALGORITHM_UNKNOWN')))
+          )
   return _PoolsCfg(pools, (default_cipd))
 
 
@@ -713,15 +715,15 @@ def bootstrap_dev_server_acls():
   _LOCAL_FAKE_CONFIG = _PoolsCfg(
       {
           'default':
-          init_pool_config(
-              name='default',
-              rev='pools_cfg_rev',
-              scheduling_users=frozenset([
-                  auth.Identity(auth.IDENTITY_USER, 'smoke-test@example.com'),
-                  auth.Identity(auth.IDENTITY_BOT, 'whitelisted-ip'),
-              ]),
-              scheduling_algorithm=pools_pb2.Pool.SCHEDULING_ALGORITHM_LIFO,
-          ),
+              init_pool_config(
+                  name='default',
+                  rev='pools_cfg_rev',
+                  scheduling_users=frozenset([
+                      auth.Identity(auth.IDENTITY_USER,
+                                    'smoke-test@example.com'),
+                      auth.Identity(auth.IDENTITY_BOT, 'whitelisted-ip'),
+                  ]),
+              ),
       },
       (None, None),
   )

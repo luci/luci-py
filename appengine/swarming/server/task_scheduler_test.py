@@ -731,38 +731,44 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
   def test_schedule_request_scheduling_algorithm(self):
     self.mock_now(self.now, 60)
 
-    request = _gen_request_slices(
-        task_slices=[
-            task_request.TaskSlice(expiration_secs=60,
-                                   properties=_gen_properties(),
-                                   wait_for_capacity=True),
-        ],
-        scheduling_algorithm=pools_pb2.Pool.SCHEDULING_ALGORITHM_UNKNOWN)
-    result_summary = task_scheduler.schedule_request(request)
+    request = _gen_request_slices(task_slices=[
+        task_request.TaskSlice(
+            expiration_secs=60,
+            properties=_gen_properties(),
+            wait_for_capacity=True),
+    ])
+    result_summary = task_scheduler.schedule_request(
+        request,
+        scheduling_algorithm=(pools_pb2.Pool.SchedulingAlgorithm.
+                              Value('SCHEDULING_ALGORITHM_UNKNOWN')))
     to_run_key = task_to_run.request_to_task_to_run_key(
         result_summary.request_key.get(), 0)
     self.assertEqual(to_run_key.get().queue_number, 0x1a3aa6630c8ee0ca)
 
-    request = _gen_request_slices(
-        task_slices=[
-            task_request.TaskSlice(expiration_secs=60,
-                                   properties=_gen_properties(),
-                                   wait_for_capacity=True),
-        ],
-        scheduling_algorithm=pools_pb2.Pool.SCHEDULING_ALGORITHM_FIFO)
-    result_summary = task_scheduler.schedule_request(request)
+    request = _gen_request_slices(task_slices=[
+        task_request.TaskSlice(
+            expiration_secs=60,
+            properties=_gen_properties(),
+            wait_for_capacity=True),
+    ])
+    result_summary = task_scheduler.schedule_request(
+        request,
+        scheduling_algorithm=(pools_pb2.Pool.SchedulingAlgorithm.
+                              Value('SCHEDULING_ALGORITHM_FIFO')))
     to_run_key = task_to_run.request_to_task_to_run_key(
         result_summary.request_key.get(), 0)
     self.assertEqual(to_run_key.get().queue_number, 0x1a3aa6630c8ee0ca)
 
-    request = _gen_request_slices(
-        task_slices=[
-            task_request.TaskSlice(expiration_secs=60,
-                                   properties=_gen_properties(),
-                                   wait_for_capacity=True),
-        ],
-        scheduling_algorithm=pools_pb2.Pool.SCHEDULING_ALGORITHM_LIFO)
-    result_summary = task_scheduler.schedule_request(request)
+    request = _gen_request_slices(task_slices=[
+        task_request.TaskSlice(
+            expiration_secs=60,
+            properties=_gen_properties(),
+            wait_for_capacity=True),
+    ])
+    result_summary = task_scheduler.schedule_request(
+        request,
+        scheduling_algorithm=(pools_pb2.Pool.SchedulingAlgorithm.
+                              Value('SCHEDULING_ALGORITHM_LIFO')))
     to_run_key = task_to_run.request_to_task_to_run_key(
         result_summary.request_key.get(), 0)
     self.assertEqual(to_run_key.get().queue_number, 0x1a3aa6631f3d2236)
@@ -799,9 +805,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     result_summaries = []
     for i in range(6):
       self.mock_now(self.now, i)
-      result_summaries.append(
-          self._quick_schedule(
-              scheduling_algorithm=pools_pb2.Pool.SCHEDULING_ALGORITHM_FIFO))
+      result_summaries.append(self._quick_schedule())
     # Forwards clock to get past expiration.
     self.mock_now(result_summaries[-1].request_key.get().expiration_ts, 1)
 
@@ -820,14 +824,18 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(State.PENDING, result_summary.state)
 
   def test_bot_reap_task_6_expired_lifo(self):
+    # Make sure pool uses LIFO.
+    self.mock_pool_config(
+        'default',
+        scheduling_algorithm=(pools_pb2.Pool.SchedulingAlgorithm.
+                              Value('SCHEDULING_ALGORITHM_LIFO')))
+
     # A lot of tasks are expired, eventually stop expiring them.
     self._register_bot(self.bot_dimensions)
     result_summaries = []
     for i in range(6):
       self.mock_now(self.now, i)
-      result_summaries.append(
-          self._quick_schedule(
-              scheduling_algorithm=pools_pb2.Pool.SCHEDULING_ALGORITHM_LIFO))
+      result_summaries.append(self._quick_schedule())
     # Forwards clock to get past expiration.
     self.mock_now(result_summaries[-1].request_key.get().expiration_ts, 1)
 
@@ -2524,28 +2532,31 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self._register_bot(self.bot_dimensions)
     result_summary = self._quick_schedule(
         task_slices=[
-            task_request.TaskSlice(expiration_secs=600,
-                                   properties=_gen_properties(dimensions={
-                                       u'pool': [u'default'],
-                                       u'item': [u'1']
-                                   })),
-            task_request.TaskSlice(expiration_secs=600,
-                                   properties=_gen_properties(dimensions={
-                                       u'pool': [u'default'],
-                                       u'item': [u'2']
-                                   })),
-            task_request.TaskSlice(expiration_secs=600,
-                                   properties=_gen_properties(dimensions={
-                                       u'pool': [u'default'],
-                                       u'item': [u'3']
-                                   })),
-            task_request.TaskSlice(expiration_secs=600,
-                                   properties=_gen_properties(dimensions={
-                                       u'pool': [u'default'],
-                                       u'item': [u'4']
-                                   })),
-        ],
-        scheduling_algorithm=pools_pb2.Pool.SCHEDULING_ALGORITHM_FIFO)
+            task_request.TaskSlice(
+                expiration_secs=600,
+                properties=_gen_properties(dimensions={
+                    u'pool': [u'default'],
+                    u'item': [u'1']
+                })),
+            task_request.TaskSlice(
+                expiration_secs=600,
+                properties=_gen_properties(dimensions={
+                    u'pool': [u'default'],
+                    u'item': [u'2']
+                })),
+            task_request.TaskSlice(
+                expiration_secs=600,
+                properties=_gen_properties(dimensions={
+                    u'pool': [u'default'],
+                    u'item': [u'3']
+                })),
+            task_request.TaskSlice(
+                expiration_secs=600,
+                properties=_gen_properties(dimensions={
+                    u'pool': [u'default'],
+                    u'item': [u'4']
+                })),
+        ])
     self.assertEqual(State.PENDING, result_summary.state)
     self.assertEqual(0, result_summary.current_task_slice)
 
@@ -2566,10 +2577,6 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     request = result_summary.request_key.get()
     to_run_1 = task_to_run.request_to_task_to_run_key(request, 0).get()
     self.assertEqual(to_run_1.expiration_delay, 601 - 600)
-
-    # The active task slice should be scheduling with the correct algo.
-    to_run_4 = task_to_run.request_to_task_to_run_key(request, 3).get()
-    self.assertEqual(to_run_4.queue_number, 0x35747db70c8ede72)
 
   def test_cron_abort_expired_fallback_wait_for_capacity(self):
     # 1 has capacity.
@@ -3068,8 +3075,9 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
                 for peer, tags in (trusted_delegatees or {}).items()
             },
             external_schedulers=external_schedulers,
-            scheduling_algorithm=(scheduling_algorithm
-                                  or pools_pb2.Pool.SCHEDULING_ALGORITHM_FIFO),
+            scheduling_algorithm=(scheduling_algorithm if scheduling_algorithm
+                                  else (pools_pb2.Pool.SchedulingAlgorithm.
+                                        Value('SCHEDULING_ALGORITHM_FIFO'))),
         )
       return None
 
