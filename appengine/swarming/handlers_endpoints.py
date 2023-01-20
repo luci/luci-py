@@ -438,11 +438,8 @@ class SwarmingTasksService(remote.Service):
     except (datastore_errors.BadValueError, ValueError) as e:
       raise endpoints.BadRequestException(e.message)
 
-    pool_cfg = (pools_config.get_pool_config(request_obj.pool)
-                if request_obj.pool else None)
-
     try:
-      api_helpers.process_task_request(request_obj, template_apply, pool_cfg)
+      api_helpers.process_task_request(request_obj, template_apply)
     except (handlers_exceptions.BadRequestException) as e:
       raise endpoints.BadRequestException(e.message)
     except handlers_exceptions.PermissionException as e:
@@ -466,8 +463,7 @@ class SwarmingTasksService(remote.Service):
         result_summary = task_scheduler.schedule_request(
             request_obj,
             request_obj.resultdb and request_obj.resultdb.enable,
-            secret_bytes=secret_bytes,
-            scheduling_algorithm=pool_cfg.scheduling_algorithm)
+            secret_bytes=secret_bytes)
       except (datastore_errors.BadValueError, TypeError, ValueError) as e:
         logging.exception(
             "got exception around task_scheduler.schedule_request")

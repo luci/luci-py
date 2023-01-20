@@ -29,7 +29,6 @@ from proto.api import swarming_prpc_pb2  # pylint: disable=no-name-in-module
 from proto.api import swarming_pb2  # pylint: disable=no-name-in-module
 from server import acl
 from server import bot_management
-from server import pools_config
 from server import realms
 from server import task_pack
 from server import task_request
@@ -58,17 +57,13 @@ class TaskBackendAPIService(prpc_helpers.SwarmingPRPCService):
     tr, secret_bytes, build_token = backend_conversions.compute_task_request(
         request)
 
-    pool_cfg = pools_config.get_pool_config(tr.pool) if tr.pool else None
-    # An error will be raised in process_task_request if pool_cfg is None.
-    api_helpers.process_task_request(tr, task_request.TEMPLATE_AUTO, pool_cfg)
+    api_helpers.process_task_request(tr, task_request.TEMPLATE_AUTO)
 
     def _schedule_request():
       try:
-        return task_scheduler.schedule_request(
-            tr,
-            secret_bytes=secret_bytes,
-            build_token=build_token,
-            scheduling_algorithm=pool_cfg.scheduling_algorithm)
+        return task_scheduler.schedule_request(tr,
+                                               secret_bytes=secret_bytes,
+                                               build_token=build_token)
       except (TypeError, ValueError) as e:
         raise handlers_exceptions.BadRequestException(e.message)
 

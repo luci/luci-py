@@ -20,7 +20,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   syntax='proto3',
   serialized_options=b'Z3go.chromium.org/luci/swarming/proto/config;configpb',
   create_key=_descriptor._internal_create_key,
-  serialized_pb=b'\n\x19proto/config/config.proto\x12\x0fswarming.config\x1a\x19proto/config/realms.proto\"\xe5\x04\n\x0bSettingsCfg\x12\x18\n\x10google_analytics\x18\x01 \x01(\t\x12\x1e\n\x16reusable_task_age_secs\x18\x02 \x01(\x05\x12\x1e\n\x16\x62ot_death_timeout_secs\x18\x03 \x01(\x05\x12\x1c\n\x14\x65nable_ts_monitoring\x18\x04 \x01(\x08\x12+\n\x04\x63ipd\x18\x06 \x01(\x0b\x32\x1d.swarming.config.CipdSettings\x12,\n$force_bots_to_sleep_and_not_run_task\x18\x08 \x01(\x08\x12\x14\n\x0cui_client_id\x18\t \x01(\t\x12#\n\x1b\x64isplay_server_url_template\x18\x0b \x01(\t\x12\x1a\n\x12max_bot_sleep_time\x18\x0c \x01(\x05\x12+\n\x04\x61uth\x18\r \x01(\x0b\x32\x1d.swarming.config.AuthSettings\x12\x1e\n\x16\x62ot_isolate_grpc_proxy\x18\x0e \x01(\t\x12\x1f\n\x17\x62ot_swarming_grpc_proxy\x18\x0f \x01(\t\x12\x1f\n\x17\x65xtra_child_src_csp_url\x18\x10 \x03(\t\x12%\n\x1d\x65nable_batch_es_notifications\x18\x12 \x01(\x08\x12\x33\n\x08resultdb\x18\x13 \x01(\x0b\x32!.swarming.config.ResultDBSettings\x12)\n\x03\x63\x61s\x18\x14 \x01(\x0b\x32\x1c.swarming.config.CASSettingsJ\x04\x08\x07\x10\x08J\x04\x08\n\x10\x0bJ\x04\x08\x05\x10\x06J\x04\x08\x11\x10\x12\"4\n\x0b\x43ipdPackage\x12\x14\n\x0cpackage_name\x18\x01 \x01(\t\x12\x0f\n\x07version\x18\x02 \x01(\t\"d\n\x0c\x43ipdSettings\x12\x16\n\x0e\x64\x65\x66\x61ult_server\x18\x01 \x01(\t\x12<\n\x16\x64\x65\x66\x61ult_client_package\x18\x02 \x01(\x0b\x32\x1c.swarming.config.CipdPackage\"\xf7\x01\n\x0c\x41uthSettings\x12\x14\n\x0c\x61\x64mins_group\x18\x01 \x01(\t\x12\x1b\n\x13\x62ot_bootstrap_group\x18\x02 \x01(\t\x12\x1e\n\x16privileged_users_group\x18\x03 \x01(\t\x12\x13\n\x0busers_group\x18\x04 \x01(\t\x12\x1b\n\x13view_all_bots_group\x18\x05 \x01(\t\x12\x1c\n\x14view_all_tasks_group\x18\x06 \x01(\t\x12\x44\n\x1a\x65nforced_realm_permissions\x18\x07 \x03(\x0e\x32 .swarming.config.RealmPermission\"\"\n\x10ResultDBSettings\x12\x0e\n\x06server\x18\x01 \x01(\t\"$\n\x0b\x43\x41SSettings\x12\x15\n\rviewer_server\x18\x01 \x01(\tB5Z3go.chromium.org/luci/swarming/proto/config;configpbb\x06proto3'
+  serialized_pb=b'\n\x19proto/config/config.proto\x12\x0fswarming.config\x1a\x19proto/config/realms.proto\"\xf1\x04\n\x0bSettingsCfg\x12\x18\n\x10google_analytics\x18\x01 \x01(\t\x12\x1e\n\x16reusable_task_age_secs\x18\x02 \x01(\x05\x12\x1e\n\x16\x62ot_death_timeout_secs\x18\x03 \x01(\x05\x12\x1c\n\x14\x65nable_ts_monitoring\x18\x04 \x01(\x08\x12+\n\x04\x63ipd\x18\x06 \x01(\x0b\x32\x1d.swarming.config.CipdSettings\x12,\n$force_bots_to_sleep_and_not_run_task\x18\x08 \x01(\x08\x12\x14\n\x0cui_client_id\x18\t \x01(\t\x12#\n\x1b\x64isplay_server_url_template\x18\x0b \x01(\t\x12\x1a\n\x12max_bot_sleep_time\x18\x0c \x01(\x05\x12+\n\x04\x61uth\x18\r \x01(\x0b\x32\x1d.swarming.config.AuthSettings\x12\x1e\n\x16\x62ot_isolate_grpc_proxy\x18\x0e \x01(\t\x12\x1f\n\x17\x62ot_swarming_grpc_proxy\x18\x0f \x01(\t\x12\x1f\n\x17\x65xtra_child_src_csp_url\x18\x10 \x03(\t\x12\x10\n\x08use_lifo\x18\x11 \x01(\x08\x12%\n\x1d\x65nable_batch_es_notifications\x18\x12 \x01(\x08\x12\x33\n\x08resultdb\x18\x13 \x01(\x0b\x32!.swarming.config.ResultDBSettings\x12)\n\x03\x63\x61s\x18\x14 \x01(\x0b\x32\x1c.swarming.config.CASSettingsJ\x04\x08\x07\x10\x08J\x04\x08\n\x10\x0bJ\x04\x08\x05\x10\x06\"4\n\x0b\x43ipdPackage\x12\x14\n\x0cpackage_name\x18\x01 \x01(\t\x12\x0f\n\x07version\x18\x02 \x01(\t\"d\n\x0c\x43ipdSettings\x12\x16\n\x0e\x64\x65\x66\x61ult_server\x18\x01 \x01(\t\x12<\n\x16\x64\x65\x66\x61ult_client_package\x18\x02 \x01(\x0b\x32\x1c.swarming.config.CipdPackage\"\xf7\x01\n\x0c\x41uthSettings\x12\x14\n\x0c\x61\x64mins_group\x18\x01 \x01(\t\x12\x1b\n\x13\x62ot_bootstrap_group\x18\x02 \x01(\t\x12\x1e\n\x16privileged_users_group\x18\x03 \x01(\t\x12\x13\n\x0busers_group\x18\x04 \x01(\t\x12\x1b\n\x13view_all_bots_group\x18\x05 \x01(\t\x12\x1c\n\x14view_all_tasks_group\x18\x06 \x01(\t\x12\x44\n\x1a\x65nforced_realm_permissions\x18\x07 \x03(\x0e\x32 .swarming.config.RealmPermission\"\"\n\x10ResultDBSettings\x12\x0e\n\x06server\x18\x01 \x01(\t\"$\n\x0b\x43\x41SSettings\x12\x15\n\rviewer_server\x18\x01 \x01(\tB5Z3go.chromium.org/luci/swarming/proto/config;configpbb\x06proto3'
   ,
   dependencies=[proto_dot_config_dot_realms__pb2.DESCRIPTOR,])
 
@@ -127,21 +127,28 @@ _SETTINGSCFG = _descriptor.Descriptor(
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='enable_batch_es_notifications', full_name='swarming.config.SettingsCfg.enable_batch_es_notifications', index=13,
+      name='use_lifo', full_name='swarming.config.SettingsCfg.use_lifo', index=13,
+      number=17, type=8, cpp_type=7, label=1,
+      has_default_value=False, default_value=False,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='enable_batch_es_notifications', full_name='swarming.config.SettingsCfg.enable_batch_es_notifications', index=14,
       number=18, type=8, cpp_type=7, label=1,
       has_default_value=False, default_value=False,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='resultdb', full_name='swarming.config.SettingsCfg.resultdb', index=14,
+      name='resultdb', full_name='swarming.config.SettingsCfg.resultdb', index=15,
       number=19, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='cas', full_name='swarming.config.SettingsCfg.cas', index=15,
+      name='cas', full_name='swarming.config.SettingsCfg.cas', index=16,
       number=20, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
@@ -160,7 +167,7 @@ _SETTINGSCFG = _descriptor.Descriptor(
   oneofs=[
   ],
   serialized_start=74,
-  serialized_end=687,
+  serialized_end=699,
 )
 
 
@@ -198,8 +205,8 @@ _CIPDPACKAGE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=689,
-  serialized_end=741,
+  serialized_start=701,
+  serialized_end=753,
 )
 
 
@@ -237,8 +244,8 @@ _CIPDSETTINGS = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=743,
-  serialized_end=843,
+  serialized_start=755,
+  serialized_end=855,
 )
 
 
@@ -311,8 +318,8 @@ _AUTHSETTINGS = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=846,
-  serialized_end=1093,
+  serialized_start=858,
+  serialized_end=1105,
 )
 
 
@@ -343,8 +350,8 @@ _RESULTDBSETTINGS = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1095,
-  serialized_end=1129,
+  serialized_start=1107,
+  serialized_end=1141,
 )
 
 
@@ -375,8 +382,8 @@ _CASSETTINGS = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1131,
-  serialized_end=1167,
+  serialized_start=1143,
+  serialized_end=1179,
 )
 
 _SETTINGSCFG.fields_by_name['cipd'].message_type = _CIPDSETTINGS

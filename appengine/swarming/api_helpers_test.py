@@ -66,32 +66,30 @@ class TestProcessTaskRequest(test_case.TestCase):
     # Catch init_new_request() ValueError exceptions.
     with self.assertRaisesRegexp(handlers_exceptions.BadRequestException,
                                  'missing expiration_secs'):
-      api_helpers.process_task_request(tr, task_request.TEMPLATE_AUTO, None)
+      api_helpers.process_task_request(tr, task_request.TEMPLATE_AUTO)
     tr.task_slices[0].expiration_secs = 60
 
     # Catch datastore.BadValueErrors.
     with self.assertRaisesRegexp(handlers_exceptions.BadRequestException,
                                  'name is missing'):
-      api_helpers.process_task_request(tr, task_request.TEMPLATE_AUTO, None)
+      api_helpers.process_task_request(tr, task_request.TEMPLATE_AUTO)
     tr = self.basic_task_request()
 
     # Catch no such pool.
     with self.assertRaisesRegexp(handlers_exceptions.PermissionException,
                                  'No such pool'):
-      api_helpers.process_task_request(tr, task_request.TEMPLATE_AUTO, None)
+      api_helpers.process_task_request(tr, task_request.TEMPLATE_AUTO)
 
     # Catch inconsistent enabling of realms and resultDB.
     self.mock(realms, 'check_tasks_create_in_realm', lambda *_: False)
     self.mock_pool_config('default')
-    pool_cfg = pools_config.get_pool_config('default')
     tr.resultdb = task_request.ResultDBCfg(enable=True)
     with self.assertRaisesRegexp(handlers_exceptions.BadRequestException,
                                  'ResultDB is enabled, but realm is not'):
-      api_helpers.process_task_request(tr, task_request.TEMPLATE_AUTO, pool_cfg)
+      api_helpers.process_task_request(tr, task_request.TEMPLATE_AUTO)
 
   def test_process_task_request(self):
     self.mock_pool_config('default')
-    pool_cfg = pools_config.get_pool_config('default')
     tr = self.basic_task_request()
 
     expected_tr = self.basic_task_request()
@@ -103,12 +101,11 @@ class TestProcessTaskRequest(test_case.TestCase):
     self.mock(realms, 'check_tasks_create_in_realm', lambda *_: True)
     self.mock(realms, 'check_pools_create_task', lambda *_: True)
 
-    api_helpers.process_task_request(tr, task_request.TEMPLATE_AUTO, pool_cfg)
+    api_helpers.process_task_request(tr, task_request.TEMPLATE_AUTO)
     self.assertEqual(expected_tr, tr)
 
   def test_process_task_request_service_account(self):
     self.mock_pool_config('default')
-    pool_cfg = pools_config.get_pool_config('default')
 
     tr = self.basic_task_request()
     tr.service_account = 'service-account@example.com'
@@ -125,13 +122,12 @@ class TestProcessTaskRequest(test_case.TestCase):
     self.mock(realms, 'check_tasks_act_as', lambda *_: True)
     self.mock(service_accounts, 'has_token_server', lambda: True)
 
-    api_helpers.process_task_request(tr, task_request.TEMPLATE_AUTO, pool_cfg)
+    api_helpers.process_task_request(tr, task_request.TEMPLATE_AUTO)
 
     self.assertEqual(expected_tr, tr)
 
   def test_process_task_request_service_account_legacy(self):
     self.mock_pool_config('default')
-    pool_cfg = pools_config.get_pool_config('default')
 
     tr = self.basic_task_request()
     tr.service_account = 'service-account@example.com'
@@ -145,7 +141,7 @@ class TestProcessTaskRequest(test_case.TestCase):
     self.mock(service_accounts, 'has_token_server', lambda: True)
 
     with self.assertRaises(handlers_exceptions.BadRequestException) as exc:
-      api_helpers.process_task_request(tr, task_request.TEMPLATE_AUTO, pool_cfg)
+      api_helpers.process_task_request(tr, task_request.TEMPLATE_AUTO)
     self.assertIn(
         'only if the task is associated with a realm', exc.exception.message)
 
