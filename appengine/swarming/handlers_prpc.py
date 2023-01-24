@@ -29,6 +29,7 @@ from proto.api import swarming_prpc_pb2  # pylint: disable=no-name-in-module
 from proto.api import swarming_pb2  # pylint: disable=no-name-in-module
 from server import acl
 from server import bot_management
+from server import pools_config
 from server import realms
 from server import task_pack
 from server import task_request

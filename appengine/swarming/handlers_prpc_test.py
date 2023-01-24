@@ -198,8 +198,8 @@ class TaskBackendAPIServiceTest(test_env_handlers.AppTestBase):
     self.mock(service_accounts, 'has_token_server', lambda: True)
 
     # pylint: disable=unused-argument
-    def mocked_schedule_request(_,
-                                start_time=0,
+    def mocked_schedule_request(request,
+                                enable_resultdb=False,
                                 secret_bytes=None,
                                 build_token=None):
       raise TypeError('chicken')

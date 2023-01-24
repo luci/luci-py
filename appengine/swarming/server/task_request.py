@@ -71,6 +71,7 @@ from components import utils
 from components.config import validation
 
 from proto.api import swarming_pb2
+from proto.config import pools_pb2
 from server import bq_state
 from server import config
 from server import directory_occlusion
@@ -1156,6 +1157,14 @@ class TaskRequest(ndb.Model):
   priority = ndb.IntegerProperty(
       indexed=False, validator=_validate_priority, required=True)
 
+  # Scheduling algorithm set in pools.cfg at the time the request was created.
+  #
+  # The value is pools_pb2.Pool.SchedulingAlgorithm enum (including UNKNOWN).
+  scheduling_algorithm = ndb.IntegerProperty(
+      indexed=False,
+      required=False,
+      default=pools_pb2.Pool.SCHEDULING_ALGORITHM_UNKNOWN)
+
   # Tags that specify the category of the task. This property contains both the
   # tags specified by the user and the tags for every TaskSlice.
   tags = ndb.StringProperty(repeated=True, validator=_validate_tags)
@@ -1290,8 +1299,12 @@ class TaskRequest(ndb.Model):
     # to_dict() doesn't recurse correctly into ndb.LocalStructuredProperty! It
     # will call the default method and not the overridden one. :(
     out = super(TaskRequest, self).to_dict(exclude=[
-        'manual_tags', 'properties_old', 'pubsub_auth_token',
-        'resultdb_update_token', 'task_slice'
+        'manual_tags',
+        'properties_old',
+        'pubsub_auth_token',
+        'resultdb_update_token',
+        'task_slice',
+        'scheduling_algorithm',
     ])
     if self.properties_old:
       out['properties'] = self.properties_old.to_dict()
@@ -1500,11 +1513,11 @@ def create_termination_task(bot_id, wait_for_capacity):
       expiration_ts=now + datetime.timedelta(days=1),
       name=u'Terminate %s' % bot_id,
       priority=0,
+      scheduling_algorithm=pools_pb2.Pool.SCHEDULING_ALGORITHM_FIFO,
       task_slices=[
-          TaskSlice(
-              expiration_secs=24 * 60 * 60,
-              properties=properties,
-              wait_for_capacity=wait_for_capacity),
+          TaskSlice(expiration_secs=24 * 60 * 60,
+                    properties=properties,
+                    wait_for_capacity=wait_for_capacity),
       ],
       manual_tags=[u'terminate:1'])
   assert request.task_slice(0).properties.is_terminate

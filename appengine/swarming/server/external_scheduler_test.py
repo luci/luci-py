@@ -26,6 +26,7 @@ from test_support import test_case
 from components import utils
 from proto.api import plugin_pb2
 from proto.api import swarming_pb2
+from proto.config import pools_pb2
 from server import config
 from server import external_scheduler
 from server import pools_config
@@ -152,6 +153,7 @@ class ExternalSchedulerApiTest(test_env_handlers.AppTestBase):
     cfg = config.settings()
     cfg.enable_batch_es_notifications = False
     self.mock(config, 'settings', lambda: cfg)
+    self.mock_default_pool_acl([])
 
   def _enqueue(self, *args, **kwargs):
     return self._enqueue_orig(*args, use_dedicated_module=False, **kwargs)
@@ -284,6 +286,7 @@ class ExternalSchedulerApiTestBatchMode(test_env_handlers.AppTestBase):
     self.cfg = config.settings()
     self.cfg.enable_batch_es_notifications = True
     self.mock(config, 'settings', lambda: self.cfg)
+    self.mock_default_pool_acl([])
 
   def _enqueue(self, *args, **kwargs):
     return self._enqueue_orig(*args, use_dedicated_module=False, **kwargs)

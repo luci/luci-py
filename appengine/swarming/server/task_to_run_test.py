@@ -26,8 +26,9 @@ from components import auth_testing
 from components import utils
 from test_support import test_case
 
+from proto.config import pools_pb2
 from server import bot_management
-from server import config
+from server import pools_config
 from server import task_queues
 from server import task_request
 from server import task_to_run
@@ -93,11 +94,12 @@ def _gen_request_slices(**kwargs):
   """Creates a TaskRequest."""
   now = utils.utcnow()
   args = {
-      u'created_ts': now,
-      u'manual_tags': [u'tag:1'],
-      u'name': u'Request name',
-      u'priority': 50,
-      u'user': u'Jesus',
+      'created_ts': now,
+      'manual_tags': [u'tag:1'],
+      'name': u'Request name',
+      'priority': 50,
+      'user': u'Jesus',
+      'scheduling_algorithm': pools_pb2.Pool.SCHEDULING_ALGORITHM_LIFO,
   }
   args.update(kwargs)
   req = task_request.TaskRequest(**args)
@@ -130,9 +132,7 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
             'SERVER_SOFTWARE': os.environ['SERVER_SOFTWARE'],
         })
     self._enqueue_orig = self.mock(utils, 'enqueue_task_async', self._enqueue)
-    cfg = config.settings()
-    cfg.use_lifo = True
-    self.mock(config, 'settings', lambda: cfg)
+    self.mock_pool_config('default')
 
   def _enqueue(self, *args, **kwargs):
     return self._enqueue_orig(*args, use_dedicated_module=False, **kwargs)
@@ -183,6 +183,18 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
     to_run = task_to_run.new_task_to_run(request, 0)
     to_run.put()
     return request, to_run
+
+  def mock_pool_config(self, name, scheduling_algorithm=None):
+    """Mocks up a pool with the given scheduling algorithm."""
+    def mocked_get_pool_config(pool):
+      if pool == name:
+        return pools_config.init_pool_config(
+            name=name,
+            scheduling_algorithm=(scheduling_algorithm
+                                  or pools_pb2.Pool.SCHEDULING_ALGORITHM_LIFO),
+        )
+      return None
+    self.mock(pools_config, 'get_pool_config', mocked_get_pool_config)
 
   def test_all_apis_are_tested(self):
     actual = frozenset(i[5:] for i in dir(self) if i.startswith('test_'))
@@ -243,7 +255,9 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
     for i, ((dimensions_hash, timestamp, priority),
             (expected_v, expected_p)) in enumerate(data):
       d = datetime.datetime.strptime(timestamp, '%Y-%m-%d %H:%M:%S.%f')
-      actual = task_to_run._gen_queue_number(dimensions_hash, d, priority)
+      actual = task_to_run._gen_queue_number(
+          dimensions_hash, d, priority,
+          pools_pb2.Pool.SCHEDULING_ALGORITHM_LIFO)
       self.assertEqual((i, '0x%016x' % expected_v), (i, '0x%016x' % actual))
       # Ensure we can extract the priority back. That said, it is corrupted by
       # time.
@@ -391,6 +405,36 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
           task_to_run._TaskToRunBase.queue_number).fetch()
       actual.extend(to_runs)
     self.assertEqual(expected, map(flatten, actual))
+
+  def test_new_task_to_run_scheduling_algorithm(self):
+    self.mock_now(self.now, 60)
+
+    # LIFO.
+    request = self.mkreq(
+        _gen_request(
+            properties=_gen_properties(),
+            scheduling_algorithm=pools_pb2.Pool.SCHEDULING_ALGORITHM_LIFO,
+        ))
+    shard = task_to_run.new_task_to_run(request, 0).put()
+    self.assertEqual(shard.get().queue_number, 0x4bef13b79f3d2236)
+
+    # FIFO.
+    request = self.mkreq(
+        _gen_request(
+            properties=_gen_properties(),
+            scheduling_algorithm=pools_pb2.Pool.SCHEDULING_ALGORITHM_FIFO,
+        ))
+    shard = task_to_run.new_task_to_run(request, 0).put()
+    self.assertEqual(shard.get().queue_number, 0x4bef13b78c8ee0ca)
+
+    # UNKNOWN is interpreted as FIFO.
+    request = self.mkreq(
+        _gen_request(
+            properties=_gen_properties(),
+            scheduling_algorithm=pools_pb2.Pool.SCHEDULING_ALGORITHM_UNKNOWN,
+        ))
+    shard = task_to_run.new_task_to_run(request, 0).put()
+    self.assertEqual(shard.get().queue_number, 0x4bef13b78c8ee0ca)
 
   def test_dimensions_matcher(self):
     def match_dimensions(request_dimensions, bot_dimensions):
@@ -692,20 +736,18 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(expected, actual)
 
   def test_yield_next_available_task_to_dispatch_fifo(self):
-    cfg = config.settings()
-    cfg.use_lifo = False
-    self.mock(config, 'settings', lambda: cfg)
-
     request_dimensions = {u'os': [u'Windows-3.1.1'], u'pool': [u'default']}
     self._gen_new_task_to_run(
         properties=_gen_properties(dimensions=request_dimensions),
-        priority=50)
+        priority=50,
+        scheduling_algorithm=pools_pb2.Pool.SCHEDULING_ALGORITHM_FIFO)
 
     self.mock_now(self.now, 60)
     request = self.mkreq(
         _gen_request(
             properties=_gen_properties(dimensions=request_dimensions),
-            priority=50))
+            priority=50,
+            scheduling_algorithm=pools_pb2.Pool.SCHEDULING_ALGORITHM_FIFO))
     task_to_run.new_task_to_run(request, 0).put()
 
     # It should return them all, in the expected order: first in, first out.
@@ -737,13 +779,15 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
     request_dimensions = {u'os': [u'Windows-3.1.1'], u'pool': [u'default']}
     self._gen_new_task_to_run(
         properties=_gen_properties(dimensions=request_dimensions),
-        priority=50)
+        priority=50,
+        scheduling_algorithm=pools_pb2.Pool.SCHEDULING_ALGORITHM_LIFO)
 
     self.mock_now(self.now, 60)
     request = self.mkreq(
         _gen_request(
             properties=_gen_properties(dimensions=request_dimensions),
-            priority=50))
+            priority=50,
+            scheduling_algorithm=pools_pb2.Pool.SCHEDULING_ALGORITHM_LIFO))
     task_to_run.new_task_to_run(request, 0).put()
 
     # It should return them all, in the expected order: last in, first out.
@@ -818,14 +862,14 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
     request_dimensions = {u'id': [u'fake-id']}
     _request, task = self._gen_new_task_to_run(
         priority=0,
-        properties=_gen_properties(
-            cipd_input=None,
-            command=[],
-            dimensions=request_dimensions,
-            env=None,
-            env_prefixes=None,
-            execution_timeout_secs=0,
-            grace_period_secs=0))
+        scheduling_algorithm=pools_pb2.Pool.SCHEDULING_ALGORITHM_FIFO,
+        properties=_gen_properties(cipd_input=None,
+                                   command=[],
+                                   dimensions=request_dimensions,
+                                   env=None,
+                                   env_prefixes=None,
+                                   execution_timeout_secs=0,
+                                   grace_period_secs=0))
     self.assertTrue(
         task.key.parent().get().task_slice(0).properties.is_terminate)
     # Bot declares exactly same dimensions so it matches.
@@ -837,7 +881,7 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
             'created_ts': self.now,
             'expiration_ts': self.now + datetime.timedelta(minutes=1),
             'expiration_delay': None,
-            'queue_number': '0x54795e3c92bd248e',
+            'queue_number': '0x54795e3c800ede72',
             'task_slice_index': 0,
         },
     ]

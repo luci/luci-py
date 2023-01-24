@@ -51,6 +51,10 @@ def process_task_request(tr, template_apply):
     raise handlers_exceptions.PermissionException(
         'No such pool or no permission to use it: %s' % tr.pool)
 
+  # Use the scheduling algorithm configured for the pool.
+  assert pool_cfg.scheduling_algorithm is not None
+  tr.scheduling_algorithm = pool_cfg.scheduling_algorithm
+
   # TODO(crbug.com/1109378): Check ACLs before calling init_new_request to
   # avoid leaking information about pool templates to unauthorized callers.
 

@@ -313,7 +313,8 @@ def new_task_request_from_rpc(msg, now):
       resultdb_update_token=None,
       resultdb=resultdb,
       pool_task_template=None,  # handled out of band
-      has_build_token=False)
+      has_build_token=False,
+      scheduling_algorithm=None)
 
   return req, secret_bytes, template_apply
 

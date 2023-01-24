@@ -18,6 +18,7 @@ from components import auth_testing
 from components import utils
 import handlers_exceptions
 from proto.config import config_pb2
+from proto.config import pools_pb2
 from server import acl
 from server import config
 from server import pools_config
@@ -89,7 +90,7 @@ class TestProcessTaskRequest(test_case.TestCase):
       api_helpers.process_task_request(tr, task_request.TEMPLATE_AUTO)
 
   def test_process_task_request(self):
-    self.mock_pool_config('default')
+    pool_cfg = self.mock_pool_config('default')
     tr = self.basic_task_request()
 
     expected_tr = self.basic_task_request()
@@ -97,6 +98,7 @@ class TestProcessTaskRequest(test_case.TestCase):
                                   acl.can_schedule_high_priority_tasks(),
                                   task_request.TEMPLATE_AUTO)
     expected_tr.realms_enabled = True
+    expected_tr.scheduling_algorithm = pool_cfg.scheduling_algorithm
 
     self.mock(realms, 'check_tasks_create_in_realm', lambda *_: True)
     self.mock(realms, 'check_pools_create_task', lambda *_: True)
@@ -105,7 +107,7 @@ class TestProcessTaskRequest(test_case.TestCase):
     self.assertEqual(expected_tr, tr)
 
   def test_process_task_request_service_account(self):
-    self.mock_pool_config('default')
+    pool_cfg = self.mock_pool_config('default')
 
     tr = self.basic_task_request()
     tr.service_account = 'service-account@example.com'
@@ -116,6 +118,7 @@ class TestProcessTaskRequest(test_case.TestCase):
                                   acl.can_schedule_high_priority_tasks(),
                                   task_request.TEMPLATE_AUTO)
     expected_tr.realms_enabled = True
+    expected_tr.scheduling_algorithm = pool_cfg.scheduling_algorithm
 
     self.mock(realms, 'check_tasks_create_in_realm', lambda *_: True)
     self.mock(realms, 'check_pools_create_task', lambda *_: True)
@@ -123,7 +126,6 @@ class TestProcessTaskRequest(test_case.TestCase):
     self.mock(service_accounts, 'has_token_server', lambda: True)
 
     api_helpers.process_task_request(tr, task_request.TEMPLATE_AUTO)
-
     self.assertEqual(expected_tr, tr)
 
   def test_process_task_request_service_account_legacy(self):
@@ -146,16 +148,19 @@ class TestProcessTaskRequest(test_case.TestCase):
         'only if the task is associated with a realm', exc.exception.message)
 
   def mock_pool_config(self, name):
+    mocked = pools_config.init_pool_config(
+        name=name,
+        rev='rev',
+        scheduling_algorithm=pools_pb2.Pool.SCHEDULING_ALGORITHM_LIFO,
+    )
 
     def mocked_get_pool_config(pool):
       if pool == name:
-        return pools_config.init_pool_config(
-            name=name,
-            rev='rev',
-        )
+        return mocked
       return None
 
     self.mock(pools_config, 'get_pool_config', mocked_get_pool_config)
+    return mocked
 
 
 class TestCheckIdenticalRequest(test_case.TestCase):

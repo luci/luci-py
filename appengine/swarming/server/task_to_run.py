@@ -43,6 +43,8 @@ from google.appengine.ext import ndb
 
 from components import datastore_utils
 from components import utils
+
+from proto.config import pools_pb2
 from server import bot_management
 from server import config
 from server import task_pack
@@ -195,7 +197,8 @@ def get_shard_kind(shard):
 ### Private functions.
 
 
-def _gen_queue_number(dimensions_hash, timestamp, priority):
+def _gen_queue_number(dimensions_hash, timestamp, priority,
+                      scheduling_algorithm):
   """Generates a 63 bit packed value used for TaskToRunShard.queue_number.
 
   Arguments:
@@ -205,6 +208,8 @@ def _gen_queue_number(dimensions_hash, timestamp, priority):
         100ms granularity; the year is ignored.
   - priority: priority of the TaskRequest. It's a 8 bit integer. Lower is higher
         priority.
+  - scheduling_algorithm: The algorithm to use to schedule this task,
+        using the Pool.SchedulingAlgorithm enum in pools.proto.
 
   Returns:
     queue_number is a 63 bit integer with dimension_hash, timestamp at 100ms
@@ -219,12 +224,17 @@ def _gen_queue_number(dimensions_hash, timestamp, priority):
 
   # Ignore the year.
 
-  if config.settings().use_lifo:
+  if scheduling_algorithm == pools_pb2.Pool.SCHEDULING_ALGORITHM_LIFO:
     next_year = datetime.datetime(timestamp.year + 1, 1, 1)
     # It is guaranteed to fit 32 bits but upgrade to long right away to ensure
     # assert works.
     t = long(round((next_year - timestamp).total_seconds() * 10.))
   else:
+    # Default scheduling algorithm is FIFO to avoid confusion.
+    assert scheduling_algorithm in (
+        pools_pb2.Pool.SCHEDULING_ALGORITHM_UNKNOWN,
+        pools_pb2.Pool.SCHEDULING_ALGORITHM_FIFO,
+    ), ('Unknown Pool.SchedulingAlgorithm: %d' % scheduling_algorithm)
     year_start = datetime.datetime(timestamp.year, 1, 1)
     # It is guaranteed to fit 32 bits but upgrade to long right away to ensure
     # assert works.
@@ -673,6 +683,7 @@ def task_to_run_key_slice_index(to_run_key):
   """
   return to_run_key.integer_id() >> 4
 
+
 def new_task_to_run(request, task_slice_index):
   """Returns a fresh new TaskToRunShard for the task ready to be scheduled.
 
@@ -680,6 +691,7 @@ def new_task_to_run(request, task_slice_index):
     Unsaved TaskToRunShard entity.
   """
   assert 0 <= task_slice_index < 64, task_slice_index
+  assert request.scheduling_algorithm is not None
   created = request.created_ts
   if task_slice_index:
     created = utils.utcnow()
@@ -691,7 +703,8 @@ def new_task_to_run(request, task_slice_index):
   exp = request.created_ts + datetime.timedelta(seconds=offset)
   dims = request.task_slice(task_slice_index).properties.dimensions
   h = task_queues.hash_dimensions(dims)
-  qn = _gen_queue_number(h, request.created_ts, request.priority)
+  qn = _gen_queue_number(h, request.created_ts, request.priority,
+                         request.scheduling_algorithm)
   kind = get_shard_kind(h % N_SHARDS)
   key = request_to_task_to_run_key(request, task_slice_index)
   return kind(key=key,

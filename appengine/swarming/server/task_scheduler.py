@@ -1179,8 +1179,10 @@ def schedule_request(request,
                      build_token=None):
   """Creates and stores all the entities to schedule a new task request.
 
-  Assumes ACL check has already happened (see
-  'api_helpers.process_task_request').
+  Assumes the request was already processed by api_helpers.process_task_request
+  and the ACL check already happened there.
+
+  Uses the scheduling algorithm specified by request.scheduling_algorithm field.
 
   The number of entities created is ~4: TaskRequest, TaskToRunShard and
   TaskResultSummary and (optionally) SecretBytes. They are in single entity

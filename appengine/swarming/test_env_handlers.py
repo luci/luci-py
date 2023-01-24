@@ -34,6 +34,7 @@ from test_support import test_case
 
 from proto.api import plugin_pb2
 from proto.config import config_pb2
+from proto.config import pools_pb2
 from proto.config import realms_pb2
 from server import config
 from server import external_scheduler
@@ -224,62 +225,60 @@ class AppTestBase(test_case.TestCase):
       return pools_config._PoolsCfg(
           {
               "template":
-                  pools_config.init_pool_config(
-                      name='template',
-                      rev='pools_cfg_rev',
-                      scheduling_users=frozenset([
-                          # See setUp above. We just duplicate the first ACL
-                          # layer here
-                          auth.Identity(auth.IDENTITY_USER,
-                                        'super-admin@example.com'),
-                          auth.Identity(auth.IDENTITY_USER,
-                                        'admin@example.com'),
-                          auth.Identity(auth.IDENTITY_USER, 'priv@example.com'),
-                          auth.Identity(auth.IDENTITY_USER, 'user@example.com'),
-                      ]),
-                      realm='test:pool/default',
-                      default_task_realm=default_task_realm,
-                      enforced_realm_permissions=enforced_realm_permissions or
-                      {},
-                      task_template_deployment=pools_config
-                      .TaskTemplateDeployment(
-                          prod=pools_config.TaskTemplate(
-                              cache=(),
-                              cipd_package=(pools_config.CipdPackage(
-                                  '.', 'some-pkg', 'prod-version'),),
-                              env=(pools_config.Env('VAR', 'prod', (), False),),
-                              inclusions=()),
-                          canary=pools_config.TaskTemplate(
-                              cache=(),
-                              cipd_package=(pools_config.CipdPackage(
-                                  '.', 'some-pkg', 'canary-version'),),
-                              env=(pools_config.Env('VAR', 'canary',
-                                                    (), False),),
-                              inclusions=()),
-                          canary_chance=0.5,
-                      ),
-                      default_cipd=default_cipd,
+              pools_config.init_pool_config(
+                  name='template',
+                  rev='pools_cfg_rev',
+                  scheduling_users=frozenset([
+                      # See setUp above. We just duplicate the first ACL
+                      # layer here
+                      auth.Identity(auth.IDENTITY_USER,
+                                    'super-admin@example.com'),
+                      auth.Identity(auth.IDENTITY_USER, 'admin@example.com'),
+                      auth.Identity(auth.IDENTITY_USER, 'priv@example.com'),
+                      auth.Identity(auth.IDENTITY_USER, 'user@example.com'),
+                  ]),
+                  realm='test:pool/default',
+                  default_task_realm=default_task_realm,
+                  enforced_realm_permissions=enforced_realm_permissions or {},
+                  task_template_deployment=pools_config.TaskTemplateDeployment(
+                      prod=pools_config.TaskTemplate(
+                          cache=(),
+                          cipd_package=(pools_config.CipdPackage(
+                              '.', 'some-pkg', 'prod-version'), ),
+                          env=(pools_config.Env('VAR', 'prod', (), False), ),
+                          inclusions=()),
+                      canary=pools_config.TaskTemplate(
+                          cache=(),
+                          cipd_package=(pools_config.CipdPackage(
+                              '.', 'some-pkg', 'canary-version'), ),
+                          env=(pools_config.Env('VAR', 'canary', (), False), ),
+                          inclusions=()),
+                      canary_chance=0.5,
                   ),
+                  default_cipd=default_cipd,
+                  scheduling_algorithm=(
+                      pools_pb2.Pool.SCHEDULING_ALGORITHM_UNKNOWN),
+              ),
               "default":
-                  pools_config.init_pool_config(
-                      name='default',
-                      rev='pools_cfg_rev',
-                      scheduling_users=frozenset([
-                          # See setUp above. We just duplicate the first ACL
-                          # layer here
-                          auth.Identity(auth.IDENTITY_USER,
-                                        'super-admin@example.com'),
-                          auth.Identity(auth.IDENTITY_USER,
-                                        'admin@example.com'),
-                          auth.Identity(auth.IDENTITY_USER, 'priv@example.com'),
-                          auth.Identity(auth.IDENTITY_USER, 'user@example.com'),
-                      ]),
-                      realm='test:pool/default',
-                      default_task_realm=default_task_realm,
-                      enforced_realm_permissions=enforced_realm_permissions or
-                      {},
-                      default_cipd=default_cipd,
-                  ),
+              pools_config.init_pool_config(
+                  name='default',
+                  rev='pools_cfg_rev',
+                  scheduling_users=frozenset([
+                      # See setUp above. We just duplicate the first ACL
+                      # layer here
+                      auth.Identity(auth.IDENTITY_USER,
+                                    'super-admin@example.com'),
+                      auth.Identity(auth.IDENTITY_USER, 'admin@example.com'),
+                      auth.Identity(auth.IDENTITY_USER, 'priv@example.com'),
+                      auth.Identity(auth.IDENTITY_USER, 'user@example.com'),
+                  ]),
+                  realm='test:pool/default',
+                  default_task_realm=default_task_realm,
+                  enforced_realm_permissions=enforced_realm_permissions or {},
+                  default_cipd=default_cipd,
+                  scheduling_algorithm=(
+                      pools_pb2.Pool.SCHEDULING_ALGORITHM_UNKNOWN),
+              ),
           },
           (default_cipd))
 
