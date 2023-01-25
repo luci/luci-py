@@ -29,7 +29,7 @@ deps = {
       },
       {
         'package': 'infra/tools/luci/isolate/${{platform}}',
-        'version': 'git_revision:81e5cdad29bb4c7aaad98c843637513db3155b0d',
+        'version': 'git_revision:36cf4b54527c49aca7ed3023995a081e14f1852a',
       },
       {
         'package': 'infra/tools/luci/swarming/${{platform}}',
