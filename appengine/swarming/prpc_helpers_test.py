@@ -18,18 +18,17 @@ import handlers_exceptions
 from test_support import test_case
 
 
-class TestableService(prpc_helpers.SwarmingPRPCService):
-
-  @prpc_helpers.PRPCMethod
+class TestableService(object):
+  @prpc_helpers.method
   def SuccessHandler(self, request, _ctx):
     return request
 
-  @prpc_helpers.PRPCMethod
+  @prpc_helpers.method
   def BadHandler(self, _request, _ctx):
     raise handlers_exceptions.BadRequestException(
         'Bad request: no `chicken` found')
 
-  @prpc_helpers.PRPCMethod
+  @prpc_helpers.method
   def UnrecognizedErrorHandler(self, _request, _ctx):
     raise ValueError('whoops')
 
@@ -57,7 +56,7 @@ class SwarmingPRPCServiceTest(test_case.TestCase):
       self.service.UnrecognizedErrorHandler('fake_req', ctx)
 
     self.assertEqual(codes.StatusCode.INTERNAL, ctx._code)
-    self.assertEqual('Potential programming error.', ctx._details)
+    self.assertEqual('Internal Server Error', ctx._details)
 
 
 if __name__ == '__main__':

@@ -47,6 +47,7 @@ def run_tests_sequential():
       [abs_path('server/bot_groups_config_test.py')],
       [abs_path('server/resultdb_test.py')],
       [abs_path('local_smoke_test.py')],
+      [abs_path('api_common_test.py')],
   ]
 
   # execute test runner

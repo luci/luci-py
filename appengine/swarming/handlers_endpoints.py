@@ -5,6 +5,7 @@
 """This module defines Swarming Server endpoints handlers."""
 
 import datetime
+import functools
 import json
 import logging
 import os
@@ -27,6 +28,7 @@ from components import endpoints_webapp2
 from components import utils
 
 import api_helpers
+import api_common
 import handlers_exceptions
 import message_conversion
 import swarming_rpcs
@@ -68,6 +70,28 @@ def _to_keys(task_id):
     return task_pack.get_request_and_result_keys(task_id)
   except ValueError:
     raise endpoints.BadRequestException('%s is an invalid key.' % task_id)
+
+
+def _convert_to_endpoints_exception(func):
+  @functools.wraps(func)
+  def wrapper(*args, **kwargs):
+    try:
+      return func(*args, **kwargs)
+    except handlers_exceptions.NotFoundException as e:
+      raise endpoints.NotFoundException(e.message)
+    except handlers_exceptions.BadRequestException as e:
+      raise endpoints.BadRequestException(e.message)
+
+  return wrapper
+
+
+def endpoint(*args, **kwargs):
+  def decorator(func):
+    instrument = gae_ts_mon.instrument_endpoint()
+    endpoints_method = auth.endpoints_method(*args, **kwargs)
+    return endpoints_method(instrument(_convert_to_endpoints_exception(func)))
+
+  return decorator
 
 
 @ndb.tasklet
@@ -164,10 +188,9 @@ PermissionsRequest = endpoints.ResourceContainer(
 
 @swarming_api.api_class(resource_name='server', path='server')
 class SwarmingServerService(remote.Service):
-  @gae_ts_mon.instrument_endpoint()
-  @auth.endpoints_method(
-      message_types.VoidMessage, swarming_rpcs.ServerDetails,
-      http_method='GET')
+  @endpoint(message_types.VoidMessage,
+            swarming_rpcs.ServerDetails,
+            http_method='GET')
   @auth.require(acl.can_access, log_identity=True)
   def details(self, _request):
     """Returns information about the server."""
@@ -183,9 +206,7 @@ class SwarmingServerService(remote.Service):
         luci_config=config.config.config_service_hostname(),
         cas_viewer_server=cfg.cas.viewer_server)
 
-  @gae_ts_mon.instrument_endpoint()
-  @auth.endpoints_method(
-      message_types.VoidMessage, swarming_rpcs.BootstrapToken)
+  @endpoint(message_types.VoidMessage, swarming_rpcs.BootstrapToken)
   @auth.require(acl.can_create_bot, log_identity=True)
   def token(self, _request):
     """Returns a token to bootstrap a new bot.
@@ -198,9 +219,9 @@ class SwarmingServerService(remote.Service):
         bootstrap_token = bot_code.generate_bootstrap_token(),
       )
 
-  @gae_ts_mon.instrument_endpoint()
-  @auth.endpoints_method(
-      PermissionsRequest, swarming_rpcs.ClientPermissions, http_method='GET')
+  @endpoint(PermissionsRequest,
+            swarming_rpcs.ClientPermissions,
+            http_method='GET')
   @auth.public
   def permissions(self, request):
     """Returns the caller's permissions."""
@@ -235,10 +256,9 @@ class SwarmingServerService(remote.Service):
       raise endpoints.NotFoundException('%s not found.' % task_id)
     return realms.can_cancel_task(task)
 
-  @gae_ts_mon.instrument_endpoint()
-  @auth.endpoints_method(
-      message_types.VoidMessage, swarming_rpcs.FileContent,
-      http_method='GET')
+  @endpoint(message_types.VoidMessage,
+            swarming_rpcs.FileContent,
+            http_method='GET')
   @auth.require(acl.can_view_config, log_identity=True)
   def get_bootstrap(self, _request):
     """Retrieves the current version of bootstrap.py."""
@@ -249,10 +269,9 @@ class SwarmingServerService(remote.Service):
         when=obj.when,
         version=obj.version)
 
-  @gae_ts_mon.instrument_endpoint()
-  @auth.endpoints_method(
-      message_types.VoidMessage, swarming_rpcs.FileContent,
-      http_method='GET')
+  @endpoint(message_types.VoidMessage,
+            swarming_rpcs.FileContent,
+            http_method='GET')
   @auth.require(acl.can_view_config, log_identity=True)
   def get_bot_config(self, _request):
     """Retrieves the current version of bot_config.py."""
@@ -290,12 +309,12 @@ TaskIdWithOffset = endpoints.ResourceContainer(
 @swarming_api.api_class(resource_name='task', path='task')
 class SwarmingTaskService(remote.Service):
   """Swarming's task-related API."""
-  @gae_ts_mon.instrument_endpoint()
-  @auth.endpoints_method(
-      TaskIdWithPerf, swarming_rpcs.TaskResult,
-      name='result',
-      path='{task_id}/result',
-      http_method='GET')
+
+  @endpoint(TaskIdWithPerf,
+            swarming_rpcs.TaskResult,
+            name='result',
+            path='{task_id}/result',
+            http_method='GET')
   @auth.require(acl.can_access, log_identity=True)
   def result(self, request):
     """Reports the result of the task corresponding to a task ID.
@@ -319,12 +338,11 @@ class SwarmingTaskService(remote.Service):
     return message_conversion.task_result_to_rpc(
         result, request.include_performance_stats)
 
-  @gae_ts_mon.instrument_endpoint()
-  @auth.endpoints_method(
-      TaskId, swarming_rpcs.TaskRequest,
-      name='request',
-      path='{task_id}/request',
-      http_method='GET')
+  @endpoint(TaskId,
+            swarming_rpcs.TaskRequest,
+            name='request',
+            path='{task_id}/request',
+            http_method='GET')
   @auth.require(acl.can_access, log_identity=True)
   def request(self, request):
     """Returns the task request corresponding to a task ID."""
@@ -334,11 +352,10 @@ class SwarmingTaskService(remote.Service):
         request.task_id, request_key, _VIEW).get_result()
     return message_conversion.task_request_to_rpc(request_obj)
 
-  @gae_ts_mon.instrument_endpoint()
-  @auth.endpoints_method(
-      TaskCancel, swarming_rpcs.CancelResponse,
-      name='cancel',
-      path='{task_id}/cancel')
+  @endpoint(TaskCancel,
+            swarming_rpcs.CancelResponse,
+            name='cancel',
+            path='{task_id}/cancel')
   @auth.require(acl.can_access, log_identity=True)
   def cancel(self, request):
     """Cancels a task.
@@ -354,12 +371,11 @@ class SwarmingTaskService(remote.Service):
                                                  None)
     return swarming_rpcs.CancelResponse(ok=ok, was_running=was_running)
 
-  @gae_ts_mon.instrument_endpoint()
-  @auth.endpoints_method(
-      TaskIdWithOffset, swarming_rpcs.TaskOutput,
-      name='stdout',
-      path='{task_id}/stdout',
-      http_method='GET')
+  @endpoint(TaskIdWithOffset,
+            swarming_rpcs.TaskOutput,
+            name='stdout',
+            path='{task_id}/stdout',
+            http_method='GET')
   @auth.require(acl.can_access, log_identity=True)
   def stdout(self, request):
     """Returns the output of the task corresponding to a task ID."""
@@ -412,9 +428,8 @@ TasksCountRequest = endpoints.ResourceContainer(
 @swarming_api.api_class(resource_name='tasks', path='tasks')
 class SwarmingTasksService(remote.Service):
   """Swarming's tasks-related API."""
-  @gae_ts_mon.instrument_endpoint()
-  @auth.endpoints_method(
-      swarming_rpcs.NewTaskRequest, swarming_rpcs.TaskRequestMetadata)
+
+  @endpoint(swarming_rpcs.NewTaskRequest, swarming_rpcs.TaskRequestMetadata)
   @auth.require(
       acl.can_create_task, 'User cannot create tasks.', log_identity=True)
   def new(self, request):
@@ -499,10 +514,7 @@ class SwarmingTasksService(remote.Service):
 
     return request_metadata
 
-  @gae_ts_mon.instrument_endpoint()
-  @auth.endpoints_method(
-      TasksRequest, swarming_rpcs.TaskList,
-      http_method='GET')
+  @endpoint(TasksRequest, swarming_rpcs.TaskList, http_method='GET')
   @auth.require(acl.can_access, log_identity=True)
   def list(self, request):
     """Returns full task results based on the filters.
@@ -544,10 +556,7 @@ class SwarmingTasksService(remote.Service):
         ],
         now=now)
 
-  @gae_ts_mon.instrument_endpoint()
-  @auth.endpoints_method(
-      TaskStatesRequest, swarming_rpcs.TaskStates,
-      http_method='GET')
+  @endpoint(TaskStatesRequest, swarming_rpcs.TaskStates, http_method='GET')
   # TODO(martiniss): users should be able to view their state. This requires
   # looking up each TaskRequest.
   @auth.require(acl.can_view_all_tasks, log_identity=True)
@@ -564,10 +573,7 @@ class SwarmingTasksService(remote.Service):
     return swarming_rpcs.TaskStates(
         states=[swarming_rpcs.TaskState(state) for state in states])
 
-  @gae_ts_mon.instrument_endpoint()
-  @auth.endpoints_method(
-      TasksRequest, swarming_rpcs.TaskRequests,
-      http_method='GET')
+  @endpoint(TasksRequest, swarming_rpcs.TaskRequests, http_method='GET')
   @auth.require(acl.can_view_all_tasks, log_identity=True)
   def requests(self, request):
     """Returns tasks requests based on the filters.
@@ -604,10 +610,9 @@ class SwarmingTasksService(remote.Service):
         items=[message_conversion.task_request_to_rpc(i) for i in items],
         now=now)
 
-  @gae_ts_mon.instrument_endpoint()
-  @auth.endpoints_method(
-      swarming_rpcs.TasksCancelRequest, swarming_rpcs.TasksCancelResponse,
-      http_method='POST')
+  @endpoint(swarming_rpcs.TasksCancelRequest,
+            swarming_rpcs.TasksCancelResponse,
+            http_method='POST')
   @auth.require(acl.can_access, log_identity=True)
   def cancel(self, request):
     """Cancel a subset of pending tasks based on the tags.
@@ -646,10 +651,7 @@ class SwarmingTasksService(remote.Service):
     return swarming_rpcs.TasksCancelResponse(
         cursor=cursor, matched=len(results), now=now)
 
-  @gae_ts_mon.instrument_endpoint()
-  @auth.endpoints_method(
-      TasksCountRequest, swarming_rpcs.TasksCount,
-      http_method='GET')
+  @endpoint(TasksCountRequest, swarming_rpcs.TasksCount, http_method='GET')
   @auth.require(acl.can_access, log_identity=True)
   def count(self, request):
     """Counts number of tasks in a given state."""
@@ -704,10 +706,7 @@ TaskQueuesRequest = endpoints.ResourceContainer(
 
 @swarming_api.api_class(resource_name='queues', path='queues')
 class SwarmingQueuesService(remote.Service):
-  @gae_ts_mon.instrument_endpoint()
-  @auth.endpoints_method(
-      TaskQueuesRequest, swarming_rpcs.TaskQueueList,
-      http_method='GET')
+  @endpoint(TaskQueuesRequest, swarming_rpcs.TaskQueueList, http_method='GET')
   @auth.require(acl.can_view_all_tasks, log_identity=True)
   def list(self, request):
     logging.debug('%s', request)
@@ -770,12 +769,12 @@ BotTasksRequest = endpoints.ResourceContainer(
 @swarming_api.api_class(resource_name='bot', path='bot')
 class SwarmingBotService(remote.Service):
   """Bot-related API. Permits querying information about the bot's properties"""
-  @gae_ts_mon.instrument_endpoint()
-  @auth.endpoints_method(
-      BotId, swarming_rpcs.BotInfo,
-      name='get',
-      path='{bot_id}/get',
-      http_method='GET')
+
+  @endpoint(BotId,
+            swarming_rpcs.BotInfo,
+            name='get',
+            path='{bot_id}/get',
+            http_method='GET')
   @auth.require(acl.can_access, log_identity=True)
   def get(self, request):
     """Returns information about a known bot.
@@ -785,48 +784,14 @@ class SwarmingBotService(remote.Service):
     """
     logging.debug('%s', request)
     bot_id = request.bot_id
-
-    # Check permission.
-    # The caller needs to have global permission, or any permissions of the
-    # pools that the bot belongs to.
     realms.check_bot_get_acl(bot_id)
-
-    bot = bot_management.get_info_key(bot_id).get()
-    deleted = False
-    if not bot:
-      # If there is not BotInfo, look if there are BotEvent child of this
-      # entity. If this is the case, it means the bot was deleted but it's
-      # useful to show information about it to the user even if the bot was
-      # deleted.
-      events = bot_management.get_events_query(bot_id).fetch(1)
-      if not events:
-        raise endpoints.NotFoundException('%s not found.' % bot_id)
-      bot = bot_management.BotInfo(
-          key=bot_management.get_info_key(bot_id),
-          dimensions_flat=task_queues.bot_dimensions_to_flat(
-              events[0].dimensions),
-          state=events[0].state,
-          external_ip=events[0].external_ip,
-          authenticated_as=events[0].authenticated_as,
-          version=events[0].version,
-          quarantined=events[0].quarantined,
-          maintenance_msg=events[0].maintenance_msg,
-          task_id=events[0].task_id,
-          last_seen_ts=events[0].ts)
-      # message_conversion.bot_info_to_rpc calls `is_dead` and this property
-      # require `composite` to be calculated. The calculation is done in
-      # _pre_put_hook usually. But the BotInfo shouldn't be stored in this case,
-      # as it's already deleted.
-      bot.composite = bot._calc_composite()
-      deleted = True
-
+    bot, deleted = api_common.get_bot(bot_id)
     return message_conversion.bot_info_to_rpc(bot, deleted=deleted)
 
-  @gae_ts_mon.instrument_endpoint()
-  @auth.endpoints_method(
-      BotId, swarming_rpcs.DeletedResponse,
-      name='delete',
-      path='{bot_id}/delete')
+  @endpoint(BotId,
+            swarming_rpcs.DeletedResponse,
+            name='delete',
+            path='{bot_id}/delete')
   @auth.require(acl.can_access, log_identity=True)
   def delete(self, request):
     """Deletes the bot corresponding to a provided bot_id.
@@ -840,26 +805,16 @@ class SwarmingBotService(remote.Service):
     still alive.
     """
     logging.debug('%s', request)
-
-    # Check permission.
-    # The caller needs to have global permission, or a permission in any pools
-    # that the bot belongs to.
-    realms.check_bot_delete_acl(request.bot_id)
-
-    bot_info_key = bot_management.get_info_key(request.bot_id)
-    get_or_raise(bot_info_key)  # raises 404 if there is no such bot
-    # It is important to note that the bot is not there anymore, so it is not
-    # a member of any task queue.
-    task_queues.cleanup_after_bot(request.bot_id)
-    bot_info_key.delete()
+    bot_id = request.bot_id
+    realms.check_bot_get_acl(bot_id)
+    api_common.delete_bot(bot_id)
     return swarming_rpcs.DeletedResponse(deleted=True)
 
-  @gae_ts_mon.instrument_endpoint()
-  @auth.endpoints_method(
-      BotEventsRequest, swarming_rpcs.BotEvents,
-      name='events',
-      path='{bot_id}/events',
-      http_method='GET')
+  @endpoint(BotEventsRequest,
+            swarming_rpcs.BotEvents,
+            name='events',
+            path='{bot_id}/events',
+            http_method='GET')
   @auth.require(acl.can_access, log_identity=True)
   def events(self, request):
     """Returns events that happened on a bot."""
@@ -875,13 +830,10 @@ class SwarmingBotService(remote.Service):
       now = utils.utcnow()
       start = message_conversion.epoch_to_datetime(request.start)
       end = message_conversion.epoch_to_datetime(request.end)
-      q = bot_management.get_events_query(bot_id)
-      if start:
-        q = q.filter(bot_management.BotEvent.ts >= start)
-      if end:
-        q = q.filter(bot_management.BotEvent.ts < end)
-      items, cursor = datastore_utils.fetch_page(
-          q, request.limit, request.cursor)
+      limit = request.limit
+      cursor = request.cursor
+      items, cursor = api_common.get_bot_events(bot_id, start, end, limit,
+                                                cursor)
     except ValueError as e:
       raise endpoints.BadRequestException(
           'Inappropriate filter for bot.events: %s' % e)
@@ -890,11 +842,10 @@ class SwarmingBotService(remote.Service):
         items=[message_conversion.bot_event_to_rpc(r) for r in items],
         now=now)
 
-  @gae_ts_mon.instrument_endpoint()
-  @auth.endpoints_method(
-      BotId, swarming_rpcs.TerminateResponse,
-      name='terminate',
-      path='{bot_id}/terminate')
+  @endpoint(BotId,
+            swarming_rpcs.TerminateResponse,
+            name='terminate',
+            path='{bot_id}/terminate')
   @auth.require(acl.can_access, log_identity=True)
   def terminate(self, request):
     """Asks a bot to terminate itself gracefully.
@@ -913,31 +864,15 @@ class SwarmingBotService(remote.Service):
     # minutes.
     logging.debug('%s', request)
     bot_id = unicode(request.bot_id)
-
-    # Check permission.
-    # The caller needs to have global permission, or a permission in any pools
-    # that the bot belongs to.
     realms.check_bot_terminate_acl(bot_id)
+    task_id = api_common.terminate_bot(bot_id)
+    return swarming_rpcs.TerminateResponse(task_id=task_id)
 
-    bot_key = bot_management.get_info_key(bot_id)
-    get_or_raise(bot_key)  # raises 404 if there is no such bot
-    try:
-      # Craft a special priority 0 task to tell the bot to shutdown.
-      request = task_request.create_termination_task(
-          bot_id, wait_for_capacity=True)
-    except (datastore_errors.BadValueError, TypeError, ValueError) as e:
-      raise endpoints.BadRequestException(e.message)
-
-    result_summary = task_scheduler.schedule_request(request)
-    return swarming_rpcs.TerminateResponse(
-        task_id=task_pack.pack_result_summary_key(result_summary.key))
-
-  @gae_ts_mon.instrument_endpoint()
-  @auth.endpoints_method(
-      BotTasksRequest, swarming_rpcs.BotTasks,
-      name='tasks',
-      path='{bot_id}/tasks',
-      http_method='GET')
+  @endpoint(BotTasksRequest,
+            swarming_rpcs.BotTasks,
+            name='tasks',
+            path='{bot_id}/tasks',
+            http_method='GET')
   @auth.require(acl.can_access, log_identity=True)
   def tasks(self, request):
     """Lists a given bot's tasks within the specified date range.
@@ -1007,10 +942,7 @@ BotsDimensionsRequest = endpoints.ResourceContainer(
 class SwarmingBotsService(remote.Service):
   """Bots-related API."""
 
-  @gae_ts_mon.instrument_endpoint()
-  @auth.endpoints_method(
-      BotsRequest, swarming_rpcs.BotList,
-      http_method='GET')
+  @endpoint(BotsRequest, swarming_rpcs.BotList, http_method='GET')
   @auth.require(acl.can_access, log_identity=True)
   def list(self, request):
     """Provides list of known bots.
@@ -1057,10 +989,7 @@ class SwarmingBotsService(remote.Service):
       raise endpoints.BadRequestException(
           'Inappropriate filter for tasks/list: %s' % e)
 
-  @gae_ts_mon.instrument_endpoint()
-  @auth.endpoints_method(
-      BotsCountRequest, swarming_rpcs.BotsCount,
-      http_method='GET')
+  @endpoint(BotsCountRequest, swarming_rpcs.BotsCount, http_method='GET')
   @auth.require(acl.can_access, log_identity=True)
   def count(self, request):
     """Counts number of bots with given dimensions."""
@@ -1096,9 +1025,9 @@ class SwarmingBotsService(remote.Service):
         busy=f_busy.get_result(),
         now=now)
 
-  @gae_ts_mon.instrument_endpoint()
-  @auth.endpoints_method(
-      BotsDimensionsRequest, swarming_rpcs.BotsDimensions, http_method='GET')
+  @endpoint(BotsDimensionsRequest,
+            swarming_rpcs.BotsDimensions,
+            http_method='GET')
   @auth.require(acl.can_access, log_identity=True)
   def dimensions(self, request):
     """Returns the cached set of dimensions currently in use in the fleet."""

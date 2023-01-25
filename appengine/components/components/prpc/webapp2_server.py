@@ -12,6 +12,7 @@ https://github.com/grpc/grpc/tree/master/src/python/grpcio/grpc
 """
 
 import webapp2
+import cgi
 
 from components.prpc.server_base import ServerBase
 
@@ -31,7 +32,10 @@ class Webapp2Server(ServerBase):
     ]
 
   def _response_body_and_status_writer(self, response, body=None, status=None):
+    """Implementation will apply `cgi.escape` to any text based inputs."""
     if body is not None:
+      if response.content_type == 'text/plain':
+        body = cgi.escape(body, quote=True)
       response.out.write(body)
     if status is not None:
       response.status = status
@@ -63,5 +67,4 @@ class Webapp2Server(ServerBase):
     return Handler
 
 
-# TODO: remove Server
 Server = Webapp2Server
