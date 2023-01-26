@@ -1778,7 +1778,6 @@ def main(args):
                           tmp_cipd_cache_dir)
         # Best effort clean up. Failed to do so doesn't affect the outcome.
 
-
 if __name__ == '__main__':
   subprocess42.inhibit_os_error_reporting()
   # Ensure that we are always running with the correct encoding.

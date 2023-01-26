@@ -95,7 +95,10 @@ def add_cipd_options(parser):
       '--cipd-cache',
       help='CIPD cache directory, separate from isolate cache. '
       'Only relevant with --cipd-enabled or --cipd-package. '
-      'Default: "%default".',
+      'Default is a path to tempdir. '
+      '`task_runner.py` always sets this as $bot_dir/cipd_cache '
+      'if `--cipd-enabled` so it would only be tmpdir during testing'
+      'scenarios. ',
       default='')
   parser.add_option_group(group)
 
