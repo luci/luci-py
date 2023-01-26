@@ -103,7 +103,7 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
 
     self.mock(task_queues, '_random_timedelta_mins', random_dt)
 
-  def _assert_bot(self, bot_id=u'bot1', dimensions=None):
+  def _assert_bot(self, bot_id=u'bot1', dimensions=None, bot_queues_only=False):
     bot_dimensions = {
         u'cpu': [u'x86-64', u'x64'],
         u'id': [bot_id],
@@ -122,8 +122,9 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
                              None,
                              None,
                              register_dimensions=True)
-    task_queues.assert_bot(bot_dimensions)
-    return self.execute_tasks()
+    queues = task_queues.assert_bot(bot_dimensions,
+                                    bot_queues_only=bot_queues_only)
+    return self.execute_tasks(), queues
 
   def _assert_task(self, dimensions=None):
     """Creates one pending TaskRequest and asserts it in task_queues."""
@@ -434,6 +435,43 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
 
     # It is no longer matched to the task.
     self.assertEqual([], task_queues.freshen_up_queues('bot1'))
+
+  def test_assert_bot_queue_numbers(self):
+    self._assert_task({
+        u'os': [u'Ubuntu'],
+        u'pool': [u'default'],
+    })
+    self._assert_task({
+        u'os': [u'Ubuntu'],
+        u'id': [u'bot-id'],
+        u'pool': [u'default'],
+    })
+
+    # This registers the bot for the first time and executes TQ tasks to match
+    # it to available tasks. Since TQ tasks happen after assert_bot call, there
+    # are no matching queues yet.
+    tq, queues = self._assert_bot('bot-id')
+    self.assertEqual(1, tq)
+    self.assertEqual([], queues)
+
+    # Now all datastore structures are up-to-date and we can check what
+    # queues are actually matching the bot.
+
+    # Matches both submitted tasks.
+    tq, queues = self._assert_bot('bot-id', bot_queues_only=False)
+    self.assertEqual(0, tq)
+    self.assertEqual([203088291, 3402762422], queues)
+
+    # Matches only the task with `id` dimension.
+    tq, queues = self._assert_bot('bot-id', bot_queues_only=True)
+    self.assertEqual(0, tq)
+    self.assertEqual([3402762422], queues)
+
+    # Verify this mysterious magic number is indeed "bot:..." queue.
+    s = task_queues.TaskDimensionsSets.get_by_id('bot:bot-id:3402762422')
+    self.assertEqual([{
+        u'dimensions': [u'id:bot-id', u'os:Ubuntu', u'pool:default']
+    }], s.sets)
 
   def test_task_dimensions_expiry(self):
     now = datetime.datetime(2010, 1, 2, 3, 4, 5)
@@ -853,7 +891,7 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
 
     # The first call ever, no queues are assigned yet.
     queues = task_queues._assert_bot_dimensions_async(dims).get_result()
-    self.assertEqual(queues, [])
+    self.assertEqual(queues, set())
 
     # Created the entity.
     bot_matches = bot_matches_key.get()
@@ -897,14 +935,28 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
 
     # The next call discovers them and doesn't submit any TQ tasks.
     queues = task_queues._assert_bot_dimensions_async(dims).get_result()
-    self.assertEqual(queues, [1, 2, 3, 4, 5])
+    self.assertEqual(
+        queues, {
+            'bot:bot-id:1',
+            'pool:pool1:2',
+            'pool:pool1:3',
+            'pool:pool2:4',
+            'pool:pool2:5',
+        })
     assert_no_tq_tasks()
 
     # Some time later the rescan is triggered.
     now += datetime.timedelta(minutes=31)
     self.mock_now(now)
     queues = task_queues._assert_bot_dimensions_async(dims).get_result()
-    self.assertEqual(queues, [1, 2, 3, 4, 5])
+    self.assertEqual(
+        queues, {
+            'bot:bot-id:1',
+            'pool:pool1:2',
+            'pool:pool1:3',
+            'pool:pool2:4',
+            'pool:pool2:5',
+        })
 
     # Enqueued the rescan task.
     assert_tq_task({
@@ -916,7 +968,11 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
     # Bots dimensions change. Unmatching queues are no longer reported.
     dims['dim'] = ['1']
     queues = task_queues._assert_bot_dimensions_async(dims).get_result()
-    self.assertEqual(queues, [1, 2, 4])
+    self.assertEqual(queues, {
+        'bot:bot-id:1',
+        'pool:pool1:2',
+        'pool:pool2:4',
+    })
 
     # Enqueued the rescan task.
     assert_tq_task({
@@ -951,7 +1007,10 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
 
     # It is no longer assigned to the bot. This doesn't enqueue a task.
     queues = task_queues._assert_bot_dimensions_async(dims).get_result()
-    self.assertEqual(queues, [1, 2])
+    self.assertEqual(queues, {
+        'bot:bot-id:1',
+        'pool:pool1:2',
+    })
     assert_no_tq_tasks()
 
     # Changes are reflected in the entity.

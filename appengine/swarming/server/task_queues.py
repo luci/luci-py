@@ -771,7 +771,7 @@ def _assert_bot_dimensions_async(bot_dimensions):
       `{key: [value]}`.
 
   Returns:
-    A list of integers with queues to poll.
+    A set of string IDs of TaskDimensionsSets that match the bot.
   """
   bot_id = bot_dimensions[u'id'][0]
   bot_dimensions_flat = bot_dimensions_to_flat(bot_dimensions)
@@ -854,10 +854,11 @@ def _assert_bot_dimensions_async(bot_dimensions):
     except _TXN_EXCEPTIONS:
       log.warning('error when cleaning matches, ignoring')
 
-  # Convert IDs that look like `pool:xxx:<number>` into integers.
+  # Log integer IDs of all matching queues.
   queue_numbers = TaskDimensionsSets.ids_to_queue_numbers(alive)
   log.info('queues (%d): %s', len(queue_numbers), queue_numbers)
-  raise ndb.Return(queue_numbers)
+
+  raise ndb.Return(alive)
 
 
 @ndb.tasklet
@@ -1342,20 +1343,39 @@ def hash_dimensions(dimensions):
   return int(struct.unpack('<L', digest[:4])[0]) or 1
 
 
-def assert_bot(bot_dimensions):
+def assert_bot(bot_dimensions, bot_queues_only=False):
   """Registers the bot in the task queues system, fetches matching queues.
 
   Coupled with assert_task_async(), enables assignment of tasks to bots by
   putting tasks into logical queues (represented by queue numbers), and
   assigning each bot a list of queues it needs to poll tasks from.
 
+  TODO(crbug.com/1377118): Switch to use RBE for Termination tasks and get rid
+  of `bot_queues_only`.
+
   Arguments:
     bot_dimensions: dictionary of the bot dimensions.
+    bot_queues_only: if True, only return queue numbers of "bot:<...>" queues.
+        The bot is still subscribed to all matching queues though. This is
+        used by bots in the RBE mode during the migration to allow them to
+        poll termination tasks and other bot-specific tasks from Swarming.
 
   Returns:
     A list of integers with queues to poll.
   """
-  queues = _assert_bot_dimensions_async(bot_dimensions).get_result()
+  # Get a set of matching TaskDimensionsSets IDs.
+  matches = _assert_bot_dimensions_async(bot_dimensions).get_result()
+
+  # Keep only `bot:...` sets if the caller is interested only in bot-specific
+  # queues. These queues contain tasks that have `id: <bot-id>` constraint.
+  if bot_queues_only:
+    matches = (m for m in matches if m.startswith('bot:'))
+
+  # Convert IDs that look like `<kind>:xxx:<number>` into integers.
+  queues = TaskDimensionsSets.ids_to_queue_numbers(matches)
+
+  # Update queues' TTL in memcache. This acts as a signal there's still a bot
+  # that polls these particular queues.
   _freshen_up_queues_memcache(queues)
   return queues
 
