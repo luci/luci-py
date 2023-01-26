@@ -125,7 +125,7 @@ def _gen_bot_event(**kwargs):
       },
       'external_ip': u'8.8.4.4',
       'idle_since_ts': None,
-      'last_seen_ts': None,
+      'last_seen_ts': kwargs.get('ts') or utils.utcnow(),
       'lease_id': None,
       'lease_expiration_ts': None,
       'leased_indefinitely': None,
@@ -391,7 +391,8 @@ class BotManagementTest(test_case.TestCase):
     self.assertEqual(expected, bot_info.to_dict())
 
     # BotEvent is registered for poll when BotInfo creates
-    expected_event = _gen_bot_event(event_type=u'request_sleep')
+    expected_event = _gen_bot_event(event_type=u'request_sleep',
+                                    idle_since_ts=utils.utcnow())
     bot_events = bot_management.get_events_query('id1')
     self.assertEqual([expected_event], [e.to_dict() for e in bot_events])
 

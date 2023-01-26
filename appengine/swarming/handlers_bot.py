@@ -497,10 +497,7 @@ class BotHandshakeHandler(_BotBaseHandler):
         version=res.version,
         quarantined=bool(res.quarantined_msg),
         maintenance_msg=res.maintenance_msg,
-        task_id=None,
-        task_name=None,
-        message=res.quarantined_msg,
-        register_dimensions=False)
+        event_msg=res.quarantined_msg)
 
     bot_ver, _, bot_config_rev = bot_code.get_bot_version(self.request.host_url)
     data = {
@@ -600,9 +597,9 @@ class BotPollHandler(_BotBaseHandler):
             version=res.version,
             quarantined=quarantined,
             maintenance_msg=res.maintenance_msg,
+            event_msg=res.quarantined_msg,
             task_id=task_id,
             task_name=task_name,
-            message=res.quarantined_msg,
             register_dimensions=True)
       except self._TIMEOUT_EXCEPTIONS as e:
         self._abort_by_timeout('bot_event:%s' % event_type, e)
@@ -901,10 +898,7 @@ class BotEventHandler(_BotBaseHandler):
           version=res.version,
           quarantined=bool(res.quarantined_msg),
           maintenance_msg=res.maintenance_msg,
-          task_id=None,
-          task_name=None,
-          message=message,
-          register_dimensions=False)
+          event_msg=message)
     except datastore_errors.BadValueError as e:
       logging.warning('Invalid BotInfo or BotEvent values', exc_info=True)
       return self.abort_with_error(400, error=e.message)
@@ -1312,14 +1306,7 @@ class BotTaskUpdateHandler(_BotApiHandler):
           bot_id=bot_id,
           external_ip=self.request.remote_addr,
           authenticated_as=auth.get_peer_identity().to_bytes(),
-          dimensions=None,
-          state=None,
-          version=None,
-          quarantined=None,
-          maintenance_msg=None,
-          task_id=task_id,
-          task_name=None,
-          register_dimensions=False)
+          task_id=task_id)
     except ValueError as e:
       ereporter2.log_request(
           request=self.request,
@@ -1376,15 +1363,8 @@ class BotTaskErrorHandler(_BotApiHandler):
         bot_id=bot_id,
         external_ip=self.request.remote_addr,
         authenticated_as=auth.get_peer_identity().to_bytes(),
-        dimensions=None,
-        state=None,
-        version=None,
-        quarantined=None,
-        maintenance_msg=None,
-        task_id=task_id,
-        task_name=None,
-        message=message,
-        register_dimensions=False)
+        event_msg=message,
+        task_id=task_id)
     line = ('Bot: https://%s/restricted/bot/%s\n'
             'Task failed: https://%s/user/task/%s\n'
             '%s') % (app_identity.get_default_version_hostname(), bot_id,

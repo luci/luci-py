@@ -44,10 +44,6 @@ def _bot_event(bot_id, pool, caches, oses):
       dimensions=dimensions,
       state=state or {'ram': 65},
       version=unicode(hashlib.sha256().hexdigest()),
-      quarantined=False,
-      maintenance_msg=None,
-      task_id=None,
-      task_name=None,
       register_dimensions=True)
 
 

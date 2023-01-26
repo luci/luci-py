@@ -369,18 +369,14 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     """
     self.assertEqual(0, self.execute_tasks())
     bot_id = bot_dimensions[u'id'][0]
-    bot_management.bot_event(
-        'request_sleep',
-        bot_id,
-        '1.2.3.4',
-        'joe@localhost',
-        bot_dimensions, {'state': 'real'},
-        '1234',
-        False,
-        None,
-        None,
-        None,
-        register_dimensions=True)
+    bot_management.bot_event(event_type='request_sleep',
+                             bot_id=bot_id,
+                             external_ip='1.2.3.4',
+                             authenticated_as='joe@localhost',
+                             dimensions=bot_dimensions,
+                             state={'state': 'real'},
+                             version='1234',
+                             register_dimensions=True)
     task_queues.assert_bot(bot_dimensions)
     self.execute_tasks()
     self._last_registered_bot_dims = bot_dimensions.copy()

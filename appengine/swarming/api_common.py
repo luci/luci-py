@@ -63,7 +63,7 @@ def get_bot(bot_id):
       # require `composite` to be calculated. The calculation is done in
       # _pre_put_hook usually. But the BotInfo shouldn't be stored in this case,
       # as it's already deleted.
-      bot.composite = bot._calc_composite()
+      bot.composite = bot.calc_composite()
       deleted = True
     if not bot:
       raise handlers_exceptions.NotFoundException("%s not found." % bot_id)

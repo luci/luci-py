@@ -248,7 +248,7 @@ class BotInfo(_BotCommon):
   # Avoid having huge amounts of indices to query by quarantined/idle.
   composite = ndb.IntegerProperty(repeated=True)
 
-  def _calc_composite(self):
+  def calc_composite(self):
     """Returns the value for BotInfo.composite, which permits quick searches."""
     return [
         self.IN_MAINTENANCE
@@ -290,7 +290,7 @@ class BotInfo(_BotCommon):
     super(BotInfo, self)._pre_put_hook()
     if not self.task_id:
       self.task_name = None
-    self.composite = self._calc_composite()
+    self.composite = self.calc_composite()
 
   @classmethod
   def yield_alive_bots(cls):
@@ -510,8 +510,106 @@ def filter_availability(q, quarantined, in_maintenance, is_dead, is_busy):
   return q
 
 
-def _insert_bot_with_txn(root_key, event, bot_info):
-  entities = [event, bot_info]
+def _apply_event_updates(bot_info, event_type, task_id, task_name, external_ip,
+                         authenticated_as, dimensions_flat, state, version,
+                         quarantined, maintenance_msg, register_dimensions):
+  """Mutates BotInfo based on event details passed to bot_event(...)."""
+  now = utils.utcnow()
+
+  # `bot_missing` event is created by the server (see cron_update_bot_info), not
+  # a bot. So it shouldn't update fields that are reported by the bot itself.
+  #
+  # If the `last_seen_ts` gets updated, it would change the bot composite
+  # to alive. And if it clears `maintenance_msg`, it would change the composite
+  # to NOT_IN_MAINTENANCE and lose the message.
+  if event_type != 'bot_missing':
+    bot_info.last_seen_ts = now
+    if external_ip is not None:
+      bot_info.external_ip = external_ip
+    if authenticated_as is not None:
+      bot_info.authenticated_as = authenticated_as
+    bot_info.maintenance_msg = maintenance_msg
+
+  # Override values in BotInfo only if we have newer values.
+  if state is not None:
+    bot_info.state = state
+  if version is not None:
+    bot_info.version = version
+  if quarantined is not None:
+    bot_info.quarantined = quarantined
+  if task_id is not None:
+    bot_info.task_id = task_id
+  if task_name is not None:
+    bot_info.task_name = task_name
+
+  # Remove the task from the BotInfo summary in the following cases
+  # 1) When the task finishes (event_type=task_XXX)
+  #    In these cases, the BotEvent shall have the task
+  #    since the event still refers to it
+  # 2) When the bot is polling (event_type=request_sleep)
+  #    The bot has already finished the previous task.
+  #    But it could have forgotten to remove the task from the BotInfo.
+  #    So ensure the task is removed.
+  # 3) When the bot is missing
+  #    We assume it can't process assigned task anymore.
+  if event_type in ('task_completed', 'task_error', 'task_killed',
+                    'request_sleep', 'bot_missing'):
+    bot_info.task_id = None
+    bot_info.task_name = None
+
+  # idle_since_ts is updated only when bot starts polling with healthy state.
+  is_idle = (event_type == 'request_sleep' and not bot_info.quarantined
+             and not bot_info.maintenance_msg)
+  if is_idle:
+    bot_info.idle_since_ts = bot_info.idle_since_ts or now
+  else:
+    bot_info.idle_since_ts = None
+
+  # Update dimensions only if they are given and `register_dimensions` is True.
+  if (dimensions_flat and register_dimensions
+      and bot_info.dimensions_flat != dimensions_flat):
+    logging.debug('bot_event: Updating dimensions. from: %s, to: %s',
+                  bot_info.dimensions_flat, dimensions_flat)
+    bot_info.dimensions_flat = dimensions_flat
+
+
+def _snapshot_bot_info(bot_info):
+  """Captures a subset of BotInfo used to detect it we need to emit an event."""
+  return (
+      bot_info.calc_composite(),
+      bot_info.dimensions_flat,
+  )
+
+
+def _should_store_event(event_type, before, after):
+  """Decides if we should store a new BotEvent entity.
+
+  Arguments:
+    event_type: event type, one of BotEvent.ALLOWED_EVENTS.
+    before: a result of _snapshot_bot_info() before any changes.
+    after: a result of _snapshot_bot_info() after all changes has been applied.
+
+  Returns:
+    True or False.
+  """
+  return (
+      # Record all "rare" events.
+      event_type not in ('request_sleep', 'task_update')
+      # Record status changing events (crbug.com/952984, crbug.com/1040345).
+      or before[0] != after[0]
+      # Record changes to dimensions (crbug.com/1015365).
+      or before[1] != after[1])
+
+
+def _insert_bot_with_txn(bot_info, event):
+  """Stores BotInfo and (if given) BotEvent."""
+  root_key = bot_info.key.root()
+
+  entities = [bot_info]
+  if event:
+    assert event.key.root() == root_key
+    entities.append(event)
+
   # This is intentionally kept outside of the txn.
   # Worst case for a race condition on creating BotRoot will be that we end up
   # overriding existing bot_root.
@@ -522,172 +620,145 @@ def _insert_bot_with_txn(root_key, event, bot_info):
   bot_root = root_key.get()
   if not bot_root:
     entities.append(BotRoot(key=root_key))
-  attempt = 1
-  def txn():
-    ndb.put_multi(entities)
 
+  attempt = 1
+  what = 'event %s' % event.event_type if event else 'bot info'
   while True:
     try:
-      logging.info("Attempt %d to insert event %s for bot_id %s", attempt,
-                   event.event_type, root_key)
+      logging.info('Attempt %d to insert %s for bot_id %s', attempt, what,
+                   root_key)
       attempt += 1
-      datastore_utils.transaction(txn, retries=0)
+      datastore_utils.transaction(lambda: ndb.put_multi(entities), retries=0)
       break
     except datastore_utils.CommitError as exc:
-      logging.warning(
-          "_insert_bot_with_txn: error inserting bot_event %s %s: %s", root_key,
-          event.event_type, exc)
+      logging.warning('_insert_bot_with_txn: error inserting %s for %s: %s',
+                      what, root_key, exc)
 
 
-def bot_event(
-    event_type, bot_id, external_ip, authenticated_as, dimensions, state,
-    version, quarantined, maintenance_msg, task_id, task_name,
-    register_dimensions, **kwargs):
-  """Records when a bot has queried for work.
+def bot_event(event_type,
+              bot_id,
+              task_id=None,
+              task_name=None,
+              external_ip=None,
+              authenticated_as=None,
+              dimensions=None,
+              state=None,
+              version=None,
+              quarantined=None,
+              maintenance_msg=None,
+              event_msg=None,
+              register_dimensions=False):
+  """Updates the state of the bot in the datastore.
 
-  This event happening usually means the bot is alive (not dead), except for
-  'bot_missing' event which is created by server. It may be quarantined, and
-  in this case, it will be evicted from the task queues.
+  This call usually means the bot is alive (not dead), except for `bot_missing`
+  event which is created by server. The bot may be quarantined, in which case it
+  will be unregistered from the task queues.
 
-  If it's declaring maintenance, it will not be evicted from the task queues, as
+  If the bot is declaring maintenance, it will be kept in the task queues, as
   maintenance is supposed to be temporary and expected to complete within a
   reasonable time frame.
 
   Arguments:
-  - event_type: event type, one of BotEvent.ALLOWED_EVENTS.
-  - bot_id: bot id.
-  - external_ip: IP address as seen by the HTTP handler.
-  - authenticated_as: bot identity as seen by the HTTP handler.
-  - dimensions: Bot's dimensions as self-reported. If not provided, keep
+    event_type: event type, one of BotEvent.ALLOWED_EVENTS. Required.
+    bot_id: bot id. Required.
+    task_id: packed task id if relevant. Set to '' to zap the stored value. If
+        None, keep the previous value.
+    task_name: task name if relevant. Zapped when task_id is zapped. If None,
+        keep the previous value.
+    external_ip: IP address as seen by the HTTP handler. If None, keep the
         previous value.
-  - state: ephemeral state of the bot. It is expected to change constantly. If
-        not provided, keep previous value.
-  - version: swarming_bot.zip version as self-reported. Used to spot if a bot
-        failed to update promptly. If not provided, keep previous value.
-  - quarantined: bool to determine if the bot was declared quarantined.
-  - maintenance_msg: string describing why the bot is in maintenance.
-  - task_id: packed task id if relevant. Set to '' to zap the stored value.
-  - task_name: task name if relevant. Zapped when task_id is zapped.
-  - register_dimensions: bool to specify whether to register dimensions to
-    BotInfo.
-  - kwargs: optional values to add to BotEvent relevant to event_type.
+    authenticated_as: bot identity as seen by the HTTP handler. If None, keep
+        the previous value.
+    dimensions: bot's dimensions as self-reported. If None, keep the previous
+        value.
+    state: a dict with ephemeral state of the bot. It is expected to change
+        constantly. If None or empty, keep the previous value.
+    version: swarming_bot.zip version as self-reported. Used to spot if a bot
+        failed to update promptly. If None, keep the previous value.
+    quarantined: bool to determine if the bot was declared quarantined. If None,
+        keep the previous value.
+    maintenance_msg: string describing why the bot is in maintenance. If None
+        or empty, the bot is not considered in maintenance.
+    event_msg: an optional informational message to store in BotEvent. Doesn't
+        affect bot state.
+    register_dimensions: bool to specify whether to update dimensions stored in
+        BotInfo. This affects discoverability of this bot by the scheduler. If
+        `dimensions` is empty, `register_dimensions` is ignored.
 
   Returns:
     ndb.Key to BotEvent entity if one was added.
   """
   assert event_type in BotEvent.ALLOWED_EVENTS, event_type
   if not bot_id:
-    return
+    return None
 
-  # Retrieve the previous BotInfo and update it.
+  # BotInfo and BotEvent operate with flattened dimensions.
+  dimensions_flat = task_queues.bot_dimensions_to_flat(dimensions or {})
+
+  # Retrieve the previous BotInfo to update it. Note that events are ultimately
+  # produced by a single serial bot process and there should not be concurrent
+  # events from the same bot, therefore there are no transactions here. In the
+  # worst case some intermediary state changes won't be properly recorded.
   info_key = get_info_key(bot_id)
   bot_info = info_key.get()
   if not bot_info:
-    bot_info = BotInfo(key=info_key)
-    if dimensions:
-      dimensions_flat = task_queues.bot_dimensions_to_flat(dimensions)
-      # Register only id and pool dimensions at the first handshake.
-      bot_info.dimensions_flat = [
-          d for d in dimensions_flat
-          if d.startswith('id:') or d.startswith('pool:')
-      ]
-  # Store previous composite to detect status change.
-  prev_composite = bot_info._calc_composite()
+    # Register only id and pool dimensions at the first handshake.
+    bot_info = BotInfo(
+        key=info_key,
+        dimensions_flat=[
+            d for d in dimensions_flat
+            if d.startswith('id:') or d.startswith('pool:')
+        ],
+    )
 
-  now = utils.utcnow()
-  # bot_missing event is created by a server, not a bot.
-  # So it shouldn't update last_seen_ts, external_ip, authenticated_as,
-  # maintenance_msg.
-  # If the last_seen_ts gets updated, it would change the bot composite
-  # to alive. And if it clears maintenance_msg, it would change the composite
-  # to NOT_IN_MAINTENANCE and lose the message.
-  if event_type != 'bot_missing':
-    bot_info.last_seen_ts = now
-    bot_info.external_ip = external_ip
-    bot_info.authenticated_as = authenticated_as
-    bot_info.maintenance_msg = maintenance_msg
-  # idle_since_ts is updated only when bot starts polling with healthy state.
-  is_idle = (
-      event_type == 'request_sleep' and not quarantined and not maintenance_msg)
-  if is_idle:
-    bot_info.idle_since_ts = bot_info.idle_since_ts or now
-  else:
-    bot_info.idle_since_ts = None
-  dimensions_updated = False
-  dimensions_flat = []
-  if dimensions:
-    dimensions_flat = task_queues.bot_dimensions_to_flat(dimensions)
-    if register_dimensions and bot_info.dimensions_flat != dimensions_flat:
-      logging.debug('bot_event: Updating dimensions. from: %s, to: %s',
-                    bot_info.dimensions_flat, dimensions_flat)
-      bot_info.dimensions_flat = dimensions_flat
-      dimensions_updated = True
-  if state:
-    bot_info.state = state
-  if quarantined is not None:
-    bot_info.quarantined = quarantined
-  if task_id is not None:
-    bot_info.task_id = task_id
-  # Remove the task from the BotInfo summary in the following cases
-  # 1) When the task finishes (event_type=task_XXX)
-  #    In these cases, the BotEvent shall have the task
-  #    since the event still refers to it
-  # 2) When the bot is pooling (event_type=request_sleep)
-  #    The bot has already finished the previous task.
-  #    But it could have forgotten to remove the task from the BotInfo.
-  #    So ensure the task is removed.
-  # 3) When the bot is missing
-  #    We assume it can't process assigned task anymore.
-  if event_type in ('task_completed', 'task_error', 'task_killed',
-                    'request_sleep', 'bot_missing'):
-    bot_info.task_id = None
-    bot_info.task_name = None
-  if task_name:
-    bot_info.task_name = task_name
-  if version is not None:
-    bot_info.version = version
+  # Snapshot the state before any changes, used in _should_store_event.
+  state_before = _snapshot_bot_info(bot_info)
 
+  # Mutate BotInfo in place based on the event details.
+  _apply_event_updates(bot_info=bot_info,
+                       event_type=event_type,
+                       task_id=task_id,
+                       task_name=task_name,
+                       external_ip=external_ip,
+                       authenticated_as=authenticated_as,
+                       dimensions_flat=dimensions_flat,
+                       state=state,
+                       version=version,
+                       quarantined=quarantined,
+                       maintenance_msg=maintenance_msg,
+                       register_dimensions=register_dimensions)
+
+  # Snapshot the state after changes, used in _should_store_event.
+  state_after = _snapshot_bot_info(bot_info)
+
+  # If the bot is quarantined, unregister it from scheduler queues.
   if quarantined:
-    # Make sure it is not in the queue since it can't reap anything.
     task_queues.cleanup_after_bot(bot_id)
 
-  # Decide whether saving the event.
-  # It's not much of an even worth saving a BotEvent for but it's worth
-  # updating BotInfo. The only reason BotInfo is GET is to keep first_seen_ts.
-  # It's not necessary to use a transaction here since no BotEvent is being
-  # added, only last_seen_ts is really updated.
-  # crbug.com/1015365: It's useful saving BotEvent when dimensions updates.
-  # crbug.com/952984, crbug.com/1040345: It needs to save BotEvent when
-  # changing status.
-  status_updated = prev_composite != bot_info._calc_composite()
-  skip_save_event = (not dimensions_updated and not status_updated and
-                     event_type in ('request_sleep', 'task_update'))
-  if skip_save_event:
-    bot_info.put()
-    return
+  # We always need to save BotInfo (in particular `last_seen_ts`) to keep the
+  # bot alive in the datastore, but we should record BotEvent only in case
+  # something interesting happens.
+  if _should_store_event(event_type, state_before, state_after):
+    event = BotEvent(parent=bot_info.key.parent(),
+                     event_type=event_type,
+                     external_ip=bot_info.external_ip,
+                     authenticated_as=bot_info.authenticated_as,
+                     dimensions_flat=(dimensions_flat
+                                      or bot_info.dimensions_flat),
+                     quarantined=bot_info.quarantined,
+                     maintenance_msg=bot_info.maintenance_msg,
+                     state=bot_info.state,
+                     task_id=task_id or bot_info.task_id,
+                     version=bot_info.version,
+                     last_seen_ts=bot_info.last_seen_ts,
+                     idle_since_ts=bot_info.idle_since_ts,
+                     message=event_msg)
+    _insert_bot_with_txn(bot_info, event)
+    return event.key
 
-  # When it's a 'bot_*' or 'request_*' event, use the dimensions provided
-  # by the bot.
-  # When it's a 'task_*' event, use BotInfo.dimensios_flat since dimensions
-  # aren't provided by the bot.
-  event_dimensions_flat = dimensions_flat or bot_info.dimensions_flat
-
-  root_key = get_root_key(bot_id)
-
-  event = BotEvent(parent=root_key,
-                   event_type=event_type,
-                   external_ip=external_ip,
-                   authenticated_as=authenticated_as,
-                   dimensions_flat=event_dimensions_flat,
-                   quarantined=bot_info.quarantined,
-                   maintenance_msg=bot_info.maintenance_msg,
-                   state=bot_info.state,
-                   task_id=task_id or bot_info.task_id,
-                   version=bot_info.version,
-                   **kwargs)
-
-  _insert_bot_with_txn(root_key, event, bot_info)
-  return event.key
+  # No need to emit an event. Just update BotInfo (and BotRoot) on its own.
+  _insert_bot_with_txn(bot_info, None)
+  return None
 
 
 def has_capacity(dimensions):
@@ -788,21 +859,7 @@ def cron_update_bot_info():
       # Note: this is best effort at this point. If it fails, there'll be no
       # retry: the bot is already marked as dead.
       logging.info('Sending bot_missing event: %s', bot.id)
-      bot_event(
-          event_type='bot_missing',
-          bot_id=bot.id,
-          message=None,
-          external_ip=None,
-          authenticated_as=None,
-          dimensions=None,
-          state=None,
-          version=None,
-          quarantined=None,
-          maintenance_msg=None,
-          task_id=None,
-          task_name=None,
-          register_dimensions=False,
-          last_seen_ts=bot.last_seen_ts)
+      bot_event('bot_missing', bot.id)
     except datastore_utils.CommitError:
       logging.warning('Failed to commit a Tx')
       stats['failed'] += 1

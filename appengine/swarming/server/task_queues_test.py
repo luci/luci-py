@@ -111,16 +111,13 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
         u'pool': [u'default'],
     }
     bot_dimensions.update(dimensions or {})
-    bot_management.bot_event('request_sleep',
-                             bot_id,
-                             '1.2.3.4',
-                             bot_id,
-                             bot_dimensions, {},
-                             '1234',
-                             False,
-                             None,
-                             None,
-                             None,
+    bot_management.bot_event(event_type='request_sleep',
+                             bot_id=bot_id,
+                             external_ip='1.2.3.4',
+                             authenticated_as=bot_id,
+                             dimensions=bot_dimensions,
+                             state={},
+                             version='1234',
                              register_dimensions=True)
     queues = task_queues.assert_bot(bot_dimensions,
                                     bot_queues_only=bot_queues_only)

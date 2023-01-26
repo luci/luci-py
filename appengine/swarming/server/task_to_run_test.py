@@ -139,16 +139,13 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
 
   def _yield_next_available_task_to_dispatch(self, bot_dimensions):
     bot_id = bot_dimensions[u'id'][0]
-    bot_management.bot_event('bot_connected',
-                             bot_id,
-                             '1.2.3.4',
-                             'joe@localhost',
-                             bot_dimensions, {'state': 'real'},
-                             '1234',
-                             False,
-                             None,
-                             None,
-                             None,
+    bot_management.bot_event(event_type='bot_connected',
+                             bot_id=bot_id,
+                             external_ip='1.2.3.4',
+                             authenticated_as='joe@localhost',
+                             dimensions=bot_dimensions,
+                             state={'state': 'real'},
+                             version='1234',
                              register_dimensions=False)
     task_queues.assert_bot(bot_dimensions)
     self.execute_tasks()
