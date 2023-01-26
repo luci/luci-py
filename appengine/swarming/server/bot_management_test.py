@@ -34,7 +34,8 @@ from server import task_queues
 _VERSION = unicode(hashlib.sha256().hexdigest())
 
 
-def _bot_event(bot_id=None,
+def _bot_event(event_type,
+               bot_id=None,
                external_ip='8.8.4.4',
                authenticated_as=None,
                dimensions=None,
@@ -56,20 +57,23 @@ def _bot_event(bot_id=None,
     }
   if not authenticated_as:
     authenticated_as = u'bot:%s.domain' % bot_id
-  register_dimensions = kwargs.get('event_type').startswith('request_')
-  return bot_management.bot_event(
-      bot_id=bot_id,
-      external_ip=external_ip,
-      authenticated_as=authenticated_as,
-      dimensions=dimensions,
-      state=state or {'ram': 65},
-      version=version,
-      quarantined=quarantined,
-      maintenance_msg=maintenance_msg,
-      task_id=task_id,
-      task_name=task_name,
-      register_dimensions=register_dimensions,
-      **kwargs)
+  register_dimensions = event_type.startswith('request_') or event_type in (
+      'bot_idle',
+      'bot_polling',
+  )
+  return bot_management.bot_event(event_type=event_type,
+                                  bot_id=bot_id,
+                                  external_ip=external_ip,
+                                  authenticated_as=authenticated_as,
+                                  dimensions=dimensions,
+                                  state=state or {'ram': 65},
+                                  version=version,
+                                  quarantined=quarantined,
+                                  maintenance_msg=maintenance_msg,
+                                  task_id=task_id,
+                                  task_name=task_name,
+                                  register_dimensions=register_dimensions,
+                                  **kwargs)
 
 
 def _ensure_bot_info(bot_id=u'id1', **kwargs):
@@ -202,7 +206,7 @@ class BotManagementTest(test_case.TestCase):
     for name in bot_management.BotEvent.ALLOWED_EVENTS:
       event_key = _bot_event(
           event_type=name, bot_id=u'id1', dimensions=dimensions)
-      if name == u'task_update':
+      if name in (u'task_update', u'bot_polling'):
         # TODO(maruel): Store request_sleep IFF the state changed.
         self.assertIsNone(event_key, name)
         continue
@@ -374,8 +378,12 @@ class BotManagementTest(test_case.TestCase):
     self.assertEqual(
         expected, [i.to_dict() for i in bot_management.get_events_query('id1')])
 
-  def test_bot_event_poll_sleep(self):
-    _bot_event(event_type='request_sleep')
+  @parameterized.expand([
+      (u'request_sleep', ),
+      (u'bot_idle', ),
+  ])
+  def test_bot_event_poll_sleep(self, event_type):
+    _bot_event(event_type=event_type)
 
     # Assert that BotInfo was updated too.
     expected = _gen_bot_info(
@@ -391,7 +399,7 @@ class BotManagementTest(test_case.TestCase):
     self.assertEqual(expected, bot_info.to_dict())
 
     # BotEvent is registered for poll when BotInfo creates
-    expected_event = _gen_bot_event(event_type=u'request_sleep',
+    expected_event = _gen_bot_event(event_type=event_type,
                                     idle_since_ts=utils.utcnow())
     bot_events = bot_management.get_events_query('id1')
     self.assertEqual([expected_event], [e.to_dict() for e in bot_events])
@@ -400,12 +408,12 @@ class BotManagementTest(test_case.TestCase):
     ndb.delete_multi(e.key for e in bot_events)
 
     # BotEvent is not registered for poll when no dimensions change
-    _bot_event(event_type='request_sleep')
+    _bot_event(event_type=event_type)
     self.assertEqual([], bot_management.get_events_query('id1').fetch())
 
     # BotEvent is registered for poll when dimensions change
     dims = {u'foo': [u'bar']}
-    _bot_event(event_type='request_sleep', dimensions=dims)
+    _bot_event(event_type=event_type, dimensions=dims)
     expected_event['dimensions'] = dims
     bot_events = bot_management.get_events_query('id1').fetch()
     self.assertEqual([expected_event], [e.to_dict() for e in bot_events])

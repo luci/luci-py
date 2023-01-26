@@ -341,6 +341,10 @@ class BotMutator(object):
     """Updates `bot.state` by merging-in automatically set keys."""
     state = new_state.copy()
     state['rbe_instance'] = self.rbe_instance
+    if self.rbe_instance:
+      # TODO(crbug.com/1377118): Populate correctly.
+      state['rbe_session'] = None
+      state['rbe_idle'] = True
     state['bot_group_cfg_version'] = self._bot._bot_group_cfg_ver
     if self._bot._bot_config:
       state['bot_config'] = self._bot._bot_config

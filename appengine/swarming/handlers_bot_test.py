@@ -471,7 +471,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
     }
     self.assertEqual(expected, response)
 
-  def test_poll_sleep_rbe(self):
+  def test_poll_rbe(self):
     _, bot_auth_cfg = self.mock_bot_group_config(
         version='default',
         dimensions={u'pool': [u'default']},
@@ -484,13 +484,11 @@ class BotApiTest(test_env_handlers.AppTestBase):
     self.mock(rbe, 'generate_poll_token', mock.Mock())
     rbe.generate_poll_token.return_value = 'mocked-poll-token'
 
-    # A bot polls, gets sleep with RBE parameters.
+    # A bot polls, gets RBE parameters.
     params = self.do_handshake()
     response = self.post_json('/swarming/api/v1/bot/poll', params)
-    self.assertTrue(response.pop(u'duration'))
     expected = {
-        u'cmd': u'sleep',
-        u'quarantined': False,
+        u'cmd': u'rbe',
         u'rbe': {
             u'instance': u'some-instance',
             u'poll_token': u'mocked-poll-token',
@@ -504,6 +502,23 @@ class BotApiTest(test_env_handlers.AppTestBase):
         rbe_instance='some-instance',
         enforced_dimensions={u'pool': [u'default']},
         bot_auth_cfg=bot_auth_cfg)
+
+    # The bot is idle, since it didn't report `rbe_idle`.
+    bot_info = bot_management.get_info_key('bot1').get()
+    self.assertEqual(bot_info.last_seen_ts, self.now)
+    self.assertEqual(bot_info.idle_since_ts, self.now)
+
+    self.now += datetime.timedelta(seconds=1)
+    self.mock_now(self.now)
+
+    # The bot is reporting that is it busy now.
+    params['state']['rbe_idle'] = False
+    self.post_json('/swarming/api/v1/bot/poll', params)
+
+    # It is indeed marked as busy in datastore.
+    bot_info = bot_management.get_info_key('bot1').get()
+    self.assertEqual(bot_info.last_seen_ts, self.now)
+    self.assertIsNone(bot_info.idle_since_ts)
 
   def test_poll_update(self):
     params = self.do_handshake()

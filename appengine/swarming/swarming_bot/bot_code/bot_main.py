@@ -1260,12 +1260,9 @@ class _BotLoopState:
 
       try:
         if cmd == 'sleep':
-          self.cmd_sleep(param['duration'], param['rbe'])
-          # TODO(vadimsh): This is temporary to develop Swarming RBE calls
-          # routing and authentication.
-          rbe_state = self._bot.rbe_state
-          if rbe_state.get('instance'):
-            self._bot.remote.ping_swarming_rbe(self._bot.attributes, rbe_state)
+          self.cmd_sleep(param)
+        elif cmd == 'rbe':
+          self.cmd_rbe(param)
         elif cmd == 'terminate':
           self.cmd_terminate(param)
         elif cmd == 'run':
@@ -1330,14 +1327,25 @@ class _BotLoopState:
     else:
       self._consecutive_errors = 0
 
-  def cmd_sleep(self, duration, rbe):
+  def cmd_sleep(self, duration):
     """Called when Swarming asks the bot to sleep."""
     self._consecutive_sleeps += 1
     self._requested_sleep_duration = duration
     _maybe_update_lkgbc(self._bot)
-    # TODO(vadimsh): Move RBE state management elsewhere.
+
+  def cmd_rbe(self, rbe_state):
+    """Called when Swarming instructs the bot to poll tasks from the RBE.
+
+    This happens as an alternative to "sleep" command for RBE-enabled bots.
+    """
+    # TODO(vadimsh): This is temporary. Full RBE session management will be
+    # implemented later.
     with self._bot.mutate_internals() as mut:
-      mut.update_rbe_state(rbe)
+      mut.update_rbe_state(rbe_state)
+    self._bot.remote.ping_swarming_rbe(self._bot.attributes, rbe_state)
+    # Do not busy-loop while in (unfinished) RBE mode. Sleep 30s between polls.
+    self._consecutive_sleeps += 1
+    self._requested_sleep_duration = 30
 
   def cmd_terminate(self, task_id):
     """Called when Swarming asks the bot to gracefully terminate."""
