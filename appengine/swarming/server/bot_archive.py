@@ -52,6 +52,7 @@ FILES = (
     'bot_code/__init__.py',
     'bot_code/bot_auth.py',
     'bot_code/bot_main.py',
+    'bot_code/clock.py',
     'bot_code/common.py',
     'bot_code/file_reader.py',
     'bot_code/file_refresher.py',
