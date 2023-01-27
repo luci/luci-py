@@ -144,7 +144,10 @@ class TaskState(messages.Enum):
 
 class TaskSort(messages.Enum):
   """Flag to sort returned tasks. The natural sort is CREATED_TS."""
-  CREATED_TS, MODIFIED_TS, COMPLETED_TS, ABANDONED_TS, STARTED_TS = range(5)
+  CREATED_TS = 0
+  COMPLETED_TS = 2
+  ABANDONED_TS = 3
+  STARTED_TS =  4
 
 
 class PoolTaskTemplateField(messages.Enum):

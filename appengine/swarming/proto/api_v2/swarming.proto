@@ -172,7 +172,8 @@ enum StateQuery {
 // Flag to sort returned tasks. The natural sort is CREATED_TS.
 enum SortQuery {
   QUERY_CREATED_TS = 0;
-  QUERY_MODIFIED_TS = 1;
+  // Used to be QUERY_MODIFIED_TS which cannot be used to sort task results.
+  reserved 1;
   QUERY_COMPLETED_TS = 2;
   QUERY_ABANDONED_TS = 3;
   QUERY_STARTED_TS = 4;
