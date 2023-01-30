@@ -68,11 +68,12 @@ class ApiCommonTest(test_case.TestCase):
       ("ValueError", ValueError),
   ])
   def test_correct_error_handling_terminate_bot(self, _name, error_type):
-    _bot_event(bot_id='bot1', event_type='bot_connected')
-    with mock.patch('server.task_request.create_termination_task') as m:
-      m.side_effect = error_type
-      with self.assertRaises(handlers_exceptions.BadRequestException):
-        api_common.terminate_bot('bot1')
+    with mock.patch('server.realms.check_bot_terminate_acl'):
+      _bot_event(bot_id='bot1', event_type='bot_connected')
+      with mock.patch('server.task_request.create_termination_task') as m:
+        m.side_effect = error_type
+        with self.assertRaises(handlers_exceptions.BadRequestException):
+          api_common.terminate_bot('bot1')
 
 
 if __name__ == '__main__':

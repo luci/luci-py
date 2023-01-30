@@ -22,7 +22,6 @@ class BotsService(object):
   @auth.require(acl.can_access, log_identity=True)
   def GetBot(self, request, _context):
     bot_id = request.bot_id
-    realms.check_bot_get_acl(bot_id)
     bot, deleted = api_common.get_bot(bot_id)
     return message_conversion_prpc.bot_info_to_proto(bot, deleted)
 
@@ -30,7 +29,6 @@ class BotsService(object):
   @auth.require(acl.can_access, log_identity=True)
   def DeleteBot(self, request, _context):
     bot_id = request.bot_id
-    realms.check_bot_delete_acl(bot_id)
     api_common.delete_bot(bot_id)
     return swarming_pb2.DeleteResponse(deleted=True)
 
@@ -38,7 +36,6 @@ class BotsService(object):
   @auth.require(acl.can_access, log_identity=True)
   def ListBotEvents(self, request, _context):
     bot_id = request.bot_id
-    realms.check_bot_get_acl(bot_id)
     start = request.start.ToDatetime()
     end = request.end.ToDatetime()
     limit = request.limit
@@ -50,7 +47,6 @@ class BotsService(object):
   @auth.require(acl.can_access, log_identity=True)
   def TerminateBot(self, request, _context):
     bot_id = request.bot_id
-    realms.check_bot_terminate_acl(bot_id)
     task_id = api_common.terminate_bot(bot_id)
     return swarming_pb2.TerminateResponse(task_id=task_id)
 

@@ -28,7 +28,6 @@ def _get_or_raise(key):
 
 def get_bot(bot_id):
   """Retrieves a bot for a given bot_id.
-  Expects that caller will perform realm check.
 
   Returns:
     (bot_management.BotInfo, deleted) Deleted is true if a bot with this bot_id
@@ -36,7 +35,9 @@ def get_bot(bot_id):
 
   Raises:
     handlers_exceptions.NotFoundException if the bot_id has never existed.
+    auth.AuthorizationError if bot fails realm authorization test.
   """
+  realms.check_bot_get_acl(bot_id)
   bot = bot_management.get_info_key(bot_id).get()
   deleted = False
 
@@ -74,8 +75,6 @@ def get_bot(bot_id):
 def delete_bot(bot_id):
   """Deletes the bot corresponding to a provided bot_id.
 
-  Expects that caller will perform realm check.
-
   The bot will be considered "deleted" by swarming but information about it
   will still be available to calls of `get_bot`.
 
@@ -85,7 +84,9 @@ def delete_bot(bot_id):
 
   Raises:
     handlers_exceptions.NotFoundException if there is no such bot.
+    auth.AuthorizationError if bot fails realm authorization test.
   """
+  realms.check_bot_delete_acl(bot_id)
   bot_info_key = bot_management.get_info_key(bot_id)
   _get_or_raise(bot_info_key)  # raises 404 if there is no such bot
   # It is important to note that the bot is not there anymore, so it is not
@@ -96,11 +97,11 @@ def delete_bot(bot_id):
 
 def get_bot_events(bot_id, start, end, limit, cursor):
   """Retrieves a list of bot_management.BotEvent within a specific time range.
-  Expects that caller will perform realm check.
 
   Returns:
     (items, cursor) where items is a list of BotEvent entities and a cursor to
     next group of results."""
+  realms.check_bot_get_acl(bot_id)
   q = bot_management.get_events_query(bot_id)
   if start:
     q = q.filter(bot_management.BotEvent.ts >= start)
@@ -111,7 +112,6 @@ def get_bot_events(bot_id, start, end, limit, cursor):
 
 def terminate_bot(bot_id):
   """Terminates a bot with a given bot_id.
-  Expects that caller will perform realm check.
 
   Returns:
     task_id of the task to terminate the bot.
@@ -120,7 +120,9 @@ def terminate_bot(bot_id):
     handlers_exceptions.BadRequestException if error occurs when creating the
       termination task.
     handlers_exceptions.NotFoundException if there is no such bot.
+    auth.AuthorizationError if bot fails realm authorization test.
   """
+  realms.check_bot_terminate_acl(bot_id)
   bot_key = bot_management.get_info_key(bot_id)
   _get_or_raise(bot_key)  # raises 404 if there is no such bot
   try:

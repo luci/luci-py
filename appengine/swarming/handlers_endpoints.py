@@ -784,7 +784,6 @@ class SwarmingBotService(remote.Service):
     """
     logging.debug('%s', request)
     bot_id = request.bot_id
-    realms.check_bot_get_acl(bot_id)
     bot, deleted = api_common.get_bot(bot_id)
     return message_conversion.bot_info_to_rpc(bot, deleted=deleted)
 
@@ -806,7 +805,6 @@ class SwarmingBotService(remote.Service):
     """
     logging.debug('%s', request)
     bot_id = request.bot_id
-    realms.check_bot_get_acl(bot_id)
     api_common.delete_bot(bot_id)
     return swarming_rpcs.DeletedResponse(deleted=True)
 
@@ -820,11 +818,6 @@ class SwarmingBotService(remote.Service):
     """Returns events that happened on a bot."""
     logging.debug('%s', request)
     bot_id = request.bot_id
-
-    # Check permission.
-    # The caller needs to have global permission, or any permissions of the
-    # pools that the bot belongs to.
-    realms.check_bot_get_acl(bot_id)
 
     try:
       now = utils.utcnow()
@@ -864,7 +857,6 @@ class SwarmingBotService(remote.Service):
     # minutes.
     logging.debug('%s', request)
     bot_id = unicode(request.bot_id)
-    realms.check_bot_terminate_acl(bot_id)
     task_id = api_common.terminate_bot(bot_id)
     return swarming_rpcs.TerminateResponse(task_id=task_id)
 
