@@ -94,6 +94,14 @@ class TestBot(unittest.TestCase):
       mut.update_dimensions({'foo': ['baz'], 'pool': ['B']})
     self.assertEqual({'foo': ['baz'], 'pool': ['A']}, obj.dimensions)
 
+  def test_exit_hook_update(self):
+    obj = make_bot()
+    hook = lambda _: None
+    with obj.mutate_internals() as mut:
+      mut.set_exit_hook(hook)
+    with obj.mutate_internals() as mut:
+      self.assertEqual(hook, mut.get_exit_hook())
+
 
 if __name__ == '__main__':
   if '-v' in sys.argv:

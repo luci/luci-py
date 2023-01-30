@@ -1196,6 +1196,10 @@ def _run_bot_inner(arg_error, quit_bit):
 
   # Tell the server we are going away.
   botobj.post_event('bot_shutdown', 'Signal was received')
+
+  # Do the final cleanup, if any.
+  _bot_exit_hook(botobj)
+
   return 0
 
 
@@ -1485,6 +1489,9 @@ def _bot_restart(botobj, message, filepath=None):
 
   botobj.post_event('bot_shutdown', 'About to restart: %s' % message)
 
+  # Do the final cleanup, if any.
+  _bot_exit_hook(botobj)
+
   # Sleep a bit to make sure new bot process connects to a GAE instance with
   # the fresh bot group config cache (it gets refreshed each second). This makes
   # sure the bot doesn't accidentally pick up the old config after restarting
@@ -1515,6 +1522,17 @@ def _bot_restart(botobj, message, filepath=None):
   elif ret:
     botobj.post_error('Bot failed to respawn after update: %s' % ret)
   sys.exit(ret)
+
+
+def _bot_exit_hook(botobj):
+  """Calls the registered bot exit hook."""
+  with botobj.mutate_internals() as mut:
+    exit_hook = mut.get_exit_hook()
+  if exit_hook:
+    try:
+      exit_hook(botobj)
+    except Exception as e:
+      logging.exception('exit hook failed: %s', e)
 
 
 def _update_lkgbc(botobj):

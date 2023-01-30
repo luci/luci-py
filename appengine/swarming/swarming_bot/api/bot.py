@@ -36,6 +36,7 @@ class Bot(object):
 
     # Mutable, see BotMutator.
     self._lock = threading.Lock()
+    self._exit_hook = None
     self._dimensions = (attributes or {}).get('dimensions') or {}
     self._state = (attributes or {}).get('state') or {}
     self._bot_version = (attributes or {}).get('version') or 'unknown'
@@ -225,11 +226,23 @@ class Bot(object):
     quarantined mode.
     """
     self.post_event('bot_rebooting', message)
+
+    # The shutdown hook is called when the host machine is restarting.
     if self._shutdown_hook:
       try:
         self._shutdown_hook(self)
       except Exception as e:
         logging.exception('shutdown hook failed: %s', e)
+
+    # The exit hook is called when the bot process itself is exiting (which
+    # also happens when the machine is restarting).
+    exit_hook = self._exit_hook
+    if exit_hook:
+      try:
+        exit_hook(self)
+      except Exception as e:
+        logging.exception('exit hook failed: %s', e)
+
     # os_utilities.host_reboot should never return, unless the reboot is not
     # happening (e.g. sudo shutdown requires a password). If rebooting the host
     # is taking longer than N minutes, it probably not going to finish at all.
@@ -349,6 +362,18 @@ class BotMutator(object):
     if self._bot._bot_config:
       state['bot_config'] = self._bot._bot_config
     self._bot._state = state
+
+  def set_exit_hook(self, hook):
+    """Registers a hook called before the bot process terminates.
+
+    If the bot is very broken (e.g. can't reboot), this hook can be called
+    multiple times or even periodically. It must be idempotent.
+    """
+    self._bot._exit_hook = hook
+
+  def get_exit_hook(self):
+    """Returns the registered exit hook."""
+    return self._bot._exit_hook
 
   def _refresh_attributes(self):
     """Updates automatically set keys in `bot.dimensions` and `bot.state`."""
