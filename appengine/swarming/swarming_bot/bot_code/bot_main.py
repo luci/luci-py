@@ -25,10 +25,12 @@ import argparse
 import collections
 import contextlib
 import fnmatch
+import functools
 import json
 import logging
 import os
 import platform
+import random
 import shutil
 import sys
 import tempfile
@@ -47,6 +49,7 @@ from api import bot
 from api import os_utilities
 from api import platforms
 from bot_code import bot_auth
+from bot_code import clock
 from bot_code import common
 from bot_code import file_refresher
 from bot_code import remote_client
@@ -1203,92 +1206,102 @@ def _run_bot_inner(arg_error, quit_bit):
   return 0
 
 
-def _sleep_until_signaled(quit_bit, timeout):
-  """Sleeps until the threading.Event is signaled or the duration expires.
+def _trap_all_exceptions(method):
+  """A decorator for catching totally unexpected exceptions in _BotLoopState.
 
-  Returns True if quit_bit is signaled upon return.
+  The bot loop must never fully stop, even if the code is broken. If it does,
+  the bot will not be able to self-update to a healthy state.
   """
-  # TODO(vadimsh): On Python 3.4 and older wait(...) may raise an exception if
-  # it is interrupted by a signal. When this happens we should resume sleeping,
-  # but this requires a monotonic clock to be precise. Monotonic clocks also
-  # appeared on all platforms only in Python 3.5. Instead use time.time() and
-  # just make sure we never sleep longer than the originally requested
-  # `timeout`. That way the function will at least terminate fast enough, even
-  # if the clock jumps. It may be grossly inaccurate, but we don't need accuracy
-  # and clock shifts should be rare anyway.
-  while timeout > 0:
-    start = time.time()
+
+  @functools.wraps(method)
+  def wrapper(self, *args, **kwargs):
     try:
-      quit_bit.wait(timeout)
-      break
-    except IOError:
-      logging.exception('IOError while waiting in threading.Event')
-      timeout -= max(0, time.time() - start)
-  return quit_bit.is_set()
+      return method(self, *args, **kwargs)
+    except Exception as e:
+      if not _TRAP_ALL_EXCEPTIONS:
+        raise
+      self._loop_iteration_had_errors = True
+      self.report_exception('%s in %s: %s' %
+                            (e.__class__.__name__, method.__name__, e))
+    return None
+
+  return wrapper
+
+
+def _backoff(cycle, exponent, max_val=300.0):
+  """Calculates randomized exponential retry delay."""
+  # Do the first retry ASAP.
+  cycle -= 1
+  if cycle <= 0:
+    return 0.0
+  # Avoid overflows when calculating the power function.
+  if cycle > 100:
+    return max_val
+  dur = float(exponent)**cycle
+  if dur > max_val:
+    return max_val
+  return random.uniform(dur * 0.8, dur * 1.2)
 
 
 class _BotLoopState:
   """The state of the main bot poll loop."""
 
-  def __init__(self, botobj, quit_bit):
+  def __init__(self, botobj, quit_bit, clock_impl=None):
     # Instance of Bot.
     self._bot = botobj
     # threading.Event signaled when the bot should gracefully exit.
     self._quit_bit = quit_bit
-    # Number of consecutive Swarming poll failures (either remote or local).
-    self._consecutive_errors = 0
-    # Number of consecutive times the server asked the bot to sleep.
-    self._consecutive_sleeps = 0
-    # Sleep duration requested by the Swarming server the last time.
-    self._requested_sleep_duration = 0.0
-    # When the last task finished running (successfully or not).
-    self._last_task_time = time.time()
+    # Tracks time and can sleep.
+    self._clock = clock_impl or clock.Clock(quit_bit)
+
+    # True if the current loop iteration had an unexpected error.
+    self._loop_iteration_had_errors = False
+    # Number of consecutive loop iterations with errors.
+    self._loop_consecutive_errors = 0
     # Number of times the bot failed to exit when asked. Never resets.
     self._bad_bot_state_errors = 0
+    # The last reported error message.
+    self._error_last_msg = None
+    # When it was reported the last time.
+    self._error_last_time = None
+
+    # Number of consecutive Swarming poll failures.
+    self._swarming_consecutive_errors = 0
+    # When we should poll Swarming next time. Initially set to ASAP.
+    self._swarming_poll_timer = self._clock.timer(0.0)
+
+    # Number of consecutive poll cycles when bot did no tasks.
+    self._consecutive_idle_cycles = 0
+    # When the last task finished running (successfully or not).
+    self._last_task_time = self._clock.now()
 
   def run(self):
     """Spins executing Swarming commands until getting a termination signal."""
-    while not _sleep_until_signaled(self._quit_bit, self.sleep_duration):
+    while not self._quit_bit.is_set():
       # Note: on_before_poll should always be called before get_state and
       # get_dimensions (i.e. before _update_bot_attributes). It's part of the
       # bot hooks API contract.
       _call_hook_safe(False, self._bot, 'on_before_poll')
-      _update_bot_attributes(self._bot, self._consecutive_sleeps)
-      cmd, param, error = None, None, None
-      try:
-        cmd, param = self._bot.remote.poll(self._bot.attributes)
-        logging.debug('Swarming server response:\n%s: %s', cmd, param)
-      except remote_client_errors.PollError as e:
-        error = 'poll RPC failed: %s' % e
+      _update_bot_attributes(self._bot, self._consecutive_idle_cycles)
+
+      # Periodically call Python Swarming server to know when to update,
+      # restart, pick up new config, etc.
+      cmd, param = None, None
+      if self._swarming_poll_timer.firing:
+        cmd, param = self.swarming_poll()
+        # Call again no matter what. Note this timer may be rescheduled below,
+        # e.g. in cmd_sleep(...).
+        self._swarming_poll_timer.reset(
+            _backoff(self._swarming_consecutive_errors, 1.4))
+
+      # TODO(crbug.com/1377118): Poll RBE.
+
+      # The polling operation is done.
       _call_hook_safe(False, self._bot, 'on_after_poll', cmd)
 
-      try:
-        if cmd == 'sleep':
-          self.cmd_sleep(param)
-        elif cmd == 'rbe':
-          self.cmd_rbe(param)
-        elif cmd == 'terminate':
-          self.cmd_terminate(param)
-        elif cmd == 'run':
-          self.cmd_run(param)
-        elif cmd == 'update':
-          self.cmd_update(param)
-        elif cmd in ('host_reboot', 'restart'):
-          self.cmd_host_reboot(param)
-        elif cmd == 'bot_restart':
-          self.cmd_bot_restart(param)
-        elif cmd:
-          error = 'unrecognized Swarming command %s' % cmd
-      except Exception as e:
-        if not _TRAP_ALL_EXCEPTIONS:
-          raise
-        logging.exception('Unexpected error executing Swarming command %s', cmd)
-        msg = '%s\n%s' % (e, traceback.format_exc()[-2048:])
-        self._bot.post_error(msg)
-        error = 'unexpected error executing Swarming command %s' % cmd
-
-      # This manages the state of the error retry loop.
-      self.handler_done(error)
+      # Execute the Swarming instruction. `cmd` can be None if the poll failed.
+      if cmd:
+        self.swarming_handle_cmd(cmd, param)
 
       # Call `on_bot_idle` hook only if the bot didn't execute any task this
       # cycle. This is part of `on_bot_idle` hook API contract: if the bot
@@ -1297,46 +1310,130 @@ class _BotLoopState:
       if self.idle:
         _call_hook_safe(True, self._bot, 'on_bot_idle', self.idle_duration)
 
+      # If there are "global" unexpected errors, throttle the loop. This is
+      # a precaution against accidentally DDoS the server if there are bugs in
+      # the bot code or configuration.
+      self.maybe_throttle_on_errors()
+      # Wait until there's something we need to do.
+      self._clock.wait_next_timer()
+
+  ##############################################################################
+  ## Loop state helpers.
+
   @property
   def idle(self):
     """True if the bot didn't execute any tasks the last poll cycle."""
-    return (self._consecutive_sleeps or self._consecutive_errors
-            or self._bad_bot_state_errors)
+    return (self._consecutive_idle_cycles or self._loop_consecutive_errors
+            or self._swarming_consecutive_errors or self._bad_bot_state_errors)
 
   @property
   def idle_duration(self):
     """Duration since the bot finished executing the last task."""
-    return max(0, time.time() - self._last_task_time)
+    return self._clock.now() - self._last_task_time
 
-  @property
-  def sleep_duration(self):
-    """Calculates how long to wait between Swarming polls."""
-    if self._bad_bot_state_errors:
-      # Something super sad happened. The bot is quarantined already, but if it
-      # doesn't help, reduce the poll frequency to avoid busy-looping and DDoS
-      # of the server. This state is reset only upon bot process restart.
-      return 2**min(self._bad_bot_state_errors, 8)
-    if self._consecutive_errors:
-      # There are transient errors polling the server. Slow down. This is reset
-      # on a successful poll.
-      return 1.4**min(self._consecutive_errors, 16)
-    # If there were no errors, just sleep as long as the server asked us.
-    return self._requested_sleep_duration
+  def on_task_completed(self):
+    """Called after finishing running a task."""
+    self._consecutive_idle_cycles = 0
+    self._last_task_time = self._clock.now()
 
-  def handler_done(self, error):
-    """Called whenever a command is finished processing."""
-    if error:
-      logging.error('Poll loop error: %s', error)
-      self._consecutive_errors += 1
+  def report_exception(self, msg):
+    """Called to report an unexpected exception to Swarming server."""
+    logging.exception('%s', msg)
+    body = '%s\n%s' % (msg, traceback.format_exc()[-2048:])
+    # Skip reporting the same error over and over again. Report it at most once
+    # every 10 min.
+    now = self._clock.now()
+    if body != self._error_last_msg or now > self._error_last_time + 600:
+      self._bot.post_error(body)
+      self._error_last_msg = body
+      self._error_last_time = now
+
+  def maybe_throttle_on_errors(self):
+    """Called at the end of every iteration to throttle looping on errors."""
+    if self._loop_iteration_had_errors:
+      self._loop_consecutive_errors += 1
     else:
-      self._consecutive_errors = 0
+      self._loop_consecutive_errors = 0
+    self._loop_iteration_had_errors = False
 
+    worst_error_count = max([
+        # If not zero, something super sad happened. The bot is quarantined
+        # already, but if it doesn't help, reduce the poll frequency to avoid
+        # busy-looping and DDoS of the server. This state is reset only upon bot
+        # process restart.
+        self._bad_bot_state_errors,
+        # If not zero, there was some unexpected errors in the loop and they
+        # were reported. Slow down if they keep happening, the bot is not
+        # healthy. This is reset on a successful poll cycle.
+        self._loop_consecutive_errors,
+    ])
+
+    # If there are errors, throttle the looping frequency.
+    if worst_error_count:
+      delay = _backoff(worst_error_count, 2.0)
+      logging.warning('Loop throttling: sleeping %.1f sec due to errors', delay)
+      self._clock.sleep(delay)
+
+  ##############################################################################
+  ## Python Swarming.
+
+  def swarming_poll(self):
+    """Polls Python Swarming for an instruction.
+
+    Returns:
+      (cmd string, params dict) on success.
+      (None, None) on error.
+    """
+    # Note that using @_trap_all_exceptions decorator here may be dangerous,
+    # since it reports the trapped exceptions to Python Swarming server. But
+    # the most common reason for remote.poll(...) to fail is unavailability of
+    # the Python Swarming server! Using @_trap_all_exceptions may result in
+    # undesirable amplification of requests to the server in case it is down.
+    # We'll just log errors locally instead.
+    try:
+      cmd, param = self._bot.remote.poll(self._bot.attributes)
+      logging.debug('Swarming poll response:\n%s: %s', cmd, param)
+      self._swarming_consecutive_errors = 0
+      return cmd, param
+    except remote_client_errors.PollError as e:
+      logging.error('Swarming poll error: %s' % e)
+      self._swarming_consecutive_errors += 1
+      return None, None
+
+  def swarming_handle_cmd(self, cmd, param):
+    """Executes a command returned by swarming_poll(...)."""
+    if cmd == 'sleep':
+      self.cmd_sleep(param)
+    elif cmd == 'rbe':
+      self.cmd_rbe(param)
+    elif cmd == 'terminate':
+      self.cmd_terminate(param)
+    elif cmd == 'run':
+      self.cmd_run(param)
+    elif cmd == 'update':
+      self.cmd_update(param)
+    elif cmd in ('host_reboot', 'restart'):
+      self.cmd_host_reboot(param)
+    elif cmd == 'bot_restart':
+      self.cmd_bot_restart(param)
+    else:
+      self.cmd_unknown(cmd)
+
+  @_trap_all_exceptions
+  def cmd_unknown(self, cmd):
+    """Called if the Swarming command is unrecognized."""
+    # Just report it via _trap_all_exceptions mechanism. It needs an exception
+    # context for a stack trace.
+    raise ValueError('Unexpected Swarming command %s' % cmd)
+
+  @_trap_all_exceptions
   def cmd_sleep(self, duration):
     """Called when Swarming asks the bot to sleep."""
-    self._consecutive_sleeps += 1
-    self._requested_sleep_duration = duration
+    self._consecutive_idle_cycles += 1
+    self._swarming_poll_timer.reset(duration)
     _maybe_update_lkgbc(self._bot)
 
+  @_trap_all_exceptions
   def cmd_rbe(self, rbe_state):
     """Called when Swarming instructs the bot to poll tasks from the RBE.
 
@@ -1348,9 +1445,10 @@ class _BotLoopState:
       mut.update_rbe_state(rbe_state)
     self._bot.remote.ping_swarming_rbe(self._bot.attributes, rbe_state)
     # Do not busy-loop while in (unfinished) RBE mode. Sleep 30s between polls.
-    self._consecutive_sleeps += 1
-    self._requested_sleep_duration = 30
+    self._consecutive_idle_cycles += 1
+    self._swarming_poll_timer.reset(30.0)
 
+  @_trap_all_exceptions
   def cmd_terminate(self, task_id):
     """Called when Swarming asks the bot to gracefully terminate."""
     self._quit_bit.set()
@@ -1363,10 +1461,13 @@ class _BotLoopState:
     except remote_client_errors.InternalError:
       pass
 
+  @_trap_all_exceptions
   def cmd_run(self, manifest):
     """Called when Swarming asks the bot to execute a task."""
     # Actually execute the task. This can block for many hours.
     success = _run_manifest(self._bot, manifest)
+    # This is used to track the bot idleness.
+    self.on_task_completed()
     # Unconditionally clean up cache after each task. This is done *after* the
     # task is terminated, so that:
     # - there's no task overhead
@@ -1375,21 +1476,20 @@ class _BotLoopState:
     if success:
       # Completed a task successfully so update swarming_bot.zip if necessary.
       _update_lkgbc(self._bot)
-    # This is used to track the bot idleness.
-    self._consecutive_sleeps = 0
-    self._requested_sleep_duration = 0.0
-    self._last_task_time = time.time()
 
+  @_trap_all_exceptions
   def cmd_update(self, version):
     """Called when Swarming asks the bot to self-update."""
     _update_bot(self._bot, version)
     self._should_have_exited_but_didnt('Failed to self-update the bot')
 
+  @_trap_all_exceptions
   def cmd_host_reboot(self, message):
     """Called when Swarming asks the bot to reboot the host machine."""
     self._bot.host_reboot(message)
     self._should_have_exited_but_didnt('Failed to reboot the host')
 
+  @_trap_all_exceptions
   def cmd_bot_restart(self, message):
     """Called when Swarming asks the bot to restart its own process."""
     _bot_restart(self._bot, message)
@@ -1407,8 +1507,9 @@ def _do_handshake(botobj, quit_bit):
   # dying right away, spin in a loop, hoping the bot will "fix itself"
   # eventually. Authentication errors in /handshake are logged on the server and
   # generate error reports, so bots stuck in this state are discoverable.
-  sleep_time = 0
-  while not _sleep_until_signaled(quit_bit, sleep_time):
+  loop_clock = clock.Clock(quit_bit)
+  attempt = 0
+  while not quit_bit.is_set():
     resp = botobj.remote.do_handshake(botobj.attributes)
     if resp:
       logging.info('Connected to %s', resp.get('server_version'))
@@ -1433,9 +1534,11 @@ def _do_handshake(botobj, quit_bit):
         if cfg_version:
           mut.update_bot_group_cfg(cfg_version, resp.get('bot_group_cfg'))
       break
-    sleep_time = min(300, sleep_time * 2) if sleep_time else 5
+    attempt += 1
+    sleep_time = _backoff(attempt, 2.0)
     logging.error(
         'Failed to contact for handshake, retrying in %d sec...', sleep_time)
+    loop_clock.sleep(sleep_time)
 
 
 def _update_bot(botobj, version):

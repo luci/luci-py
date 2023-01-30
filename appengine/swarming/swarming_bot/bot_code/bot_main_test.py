@@ -27,6 +27,7 @@ from api import bot
 from api import os_utilities
 from api.platforms import gce
 from bot_code import bot_main
+from bot_code import clock
 from bot_code import remote_client
 from depot_tools import fix_encoding
 from utils import file_path
@@ -47,12 +48,14 @@ class FakeThreadingEvent(object):
   def __init__(self):
     self.signaled = False
     self.slept = []
+    self.now = 1234.0
 
   def is_set(self):
     return self.signaled
 
-  def wait(self, timeout=None):
+  def wait(self, timeout):
     self.slept.append(timeout)
+    self.now += max(0.0, timeout)
     return self.signaled
 
   def set(self):
@@ -104,6 +107,7 @@ class TestBotBase(net_utils.TestCase):
     self.mock(bot_main, '_TRAP_ALL_EXCEPTIONS', False)
     self.quit_bit = None  # see make_bot
     self.bot = None  # see make_bot
+    self.clock = None  # see make_bot
     self.loop_state = None  # see make_bot
     self.make_bot()
 
@@ -120,12 +124,15 @@ class TestBotBase(net_utils.TestCase):
         self.url,
         bot_main.get_config()['server_version'], self.root_dir, self.fail)
     bot_main._update_bot_attributes(self.bot, 0)
-    self.loop_state = bot_main._BotLoopState(self.bot, self.quit_bit)
+    self.clock = clock.Clock(self.quit_bit)
+    self.clock._now_impl = lambda: self.quit_bit.now
+    self.loop_state = bot_main._BotLoopState(self.bot, self.quit_bit,
+                                             self.clock)
 
   def poll_once(self):
     self.quit_bit.reset()
     self.mock(self.loop_state,
-              'handler_done', lambda *_args: self.quit_bit.set())
+              'maybe_throttle_on_errors', lambda *_args: self.quit_bit.set())
     self.loop_state.run()
 
   def expected_poll_request(self, response):
@@ -714,6 +721,58 @@ class TestBotMain(TestBotBase):
             'server_version': ['version1'],
         }, botobj[0].dimensions)
 
+  def test_poll_server_unexpected_exception(self):
+    # Enable it back, we want to test it now.
+    self.mock(bot_main, '_TRAP_ALL_EXCEPTIONS', True)
+
+    self.mock(bot_main, '_run_manifest', self.fail)
+    self.mock(bot_main, '_update_bot', self.fail)
+    self.mock(self.bot, 'host_reboot', self.fail)
+
+    def mocked_restart(*_args):
+      raise Exception('Totally random exception')
+
+    self.mock(bot_main, '_bot_restart', mocked_restart)
+
+    errs = []
+    self.mock(self.bot, 'post_error', errs.append)
+
+    self.expected_requests([
+        self.expected_poll_request({
+            'cmd': 'bot_restart',
+            'message': 'Restart now',
+        }),
+    ])
+    self.poll_once()
+
+    # Reported the error.
+    self.assertEqual(1, len(errs))
+    self.assertTrue(errs[0].startswith(
+        'Exception in cmd_bot_restart: Totally random exception\n'))
+    del errs[:]
+
+    # Do it again. The error should be dedupped.
+    self.expected_requests([
+        self.expected_poll_request({
+            'cmd': 'bot_restart',
+            'message': 'Restart now',
+        }),
+    ])
+    self.poll_once()
+    self.assertEqual(0, len(errs))
+
+    # >10 min later, the error is reported again.
+    self.quit_bit.reset()
+    self.clock.sleep(601)
+    self.expected_requests([
+        self.expected_poll_request({
+            'cmd': 'bot_restart',
+            'message': 'Restart now',
+        }),
+    ])
+    self.poll_once()
+    self.assertEqual(1, len(errs))
+
   def test_poll_server_sleep(self):
     self.mock(bot_main, '_run_manifest', self.fail)
     self.mock(bot_main, '_update_bot', self.fail)
@@ -725,12 +784,12 @@ class TestBotMain(TestBotBase):
     self.expected_requests([
         self.expected_poll_request({
             'cmd': 'sleep',
-            'duration': 1.24,
+            'duration': 123,
         }),
     ])
 
     self.poll_once()
-    self.assertEqual([1.24], self.quit_bit.slept)
+    self.assertEqual([123], self.quit_bit.slept)
     self.assertEqual([1], called)
 
   def test_poll_server_sleep_with_auth(self):
@@ -741,14 +800,14 @@ class TestBotMain(TestBotBase):
 
     req = self.expected_poll_request({
         'cmd': 'sleep',
-        'duration': 1.24,
+        'duration': 123,
     })
     # Expect the additional header.
     req[1]['headers']['A'] = 'a'
 
     self.expected_requests([req])
     self.poll_once()
-    self.assertEqual([1.24], self.quit_bit.slept)
+    self.assertEqual([123], self.quit_bit.slept)
 
   def test_poll_server_run(self):
     manifest = []
