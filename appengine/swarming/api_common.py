@@ -48,27 +48,33 @@ def get_bot(bot_id):
     # deleted.
     events = bot_management.get_events_query(bot_id).fetch(1)
     if events:
-      bot = bot_management.BotInfo(
-          key=bot_management.get_info_key(bot_id),
-          dimensions_flat=task_queues.bot_dimensions_to_flat(
-              events[0].dimensions),
-          state=events[0].state,
-          external_ip=events[0].external_ip,
-          authenticated_as=events[0].authenticated_as,
-          version=events[0].version,
-          quarantined=events[0].quarantined,
-          maintenance_msg=events[0].maintenance_msg,
-          task_id=events[0].task_id,
-          last_seen_ts=events[0].ts)
-      # message_conversion.bot_info_to_rpc calls `is_dead` and this property
-      # require `composite` to be calculated. The calculation is done in
-      # _pre_put_hook usually. But the BotInfo shouldn't be stored in this case,
-      # as it's already deleted.
-      bot.composite = bot.calc_composite()
-      deleted = True
-    if not bot:
-      raise handlers_exceptions.NotFoundException("%s not found." % bot_id)
-
+      # Between the first call to get_info_key and get_events_query a bot may
+      # have handshaked, meaning that it is online and not deleted.
+      # Here, another call is made to get_info_key to make sure the bot is still
+      # deleted.
+      # See - https://crbug.com/1407381 for more information.
+      bot = bot_management.get_info_key(bot_id).get(use_cache=False)
+      if not bot:
+        bot = bot_management.BotInfo(
+            key=bot_management.get_info_key(bot_id),
+            dimensions_flat=task_queues.bot_dimensions_to_flat(
+                events[0].dimensions),
+            state=events[0].state,
+            external_ip=events[0].external_ip,
+            authenticated_as=events[0].authenticated_as,
+            version=events[0].version,
+            quarantined=events[0].quarantined,
+            maintenance_msg=events[0].maintenance_msg,
+            task_id=events[0].task_id,
+            last_seen_ts=events[0].ts)
+        # message_conversion.bot_info_to_rpc calls `is_dead` and this property
+        # require `composite` to be calculated. The calculation is done in
+        # _pre_put_hook usually. But the BotInfo shouldn't be stored in this
+        # case, as it's already deleted.
+        bot.composite = bot.calc_composite()
+        deleted = True
+  if not bot:
+    raise handlers_exceptions.NotFoundException("%s not found." % bot_id)
   return (bot, deleted)
 
 

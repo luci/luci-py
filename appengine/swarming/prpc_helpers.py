@@ -3,7 +3,6 @@
 # that can be found in the LICENSE file.
 """This module implements base functionality of Swarming prpc services."""
 
-import cgi
 import functools
 import logging
 
