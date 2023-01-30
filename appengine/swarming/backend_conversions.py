@@ -16,9 +16,10 @@ from components import utils
 from server import task_request
 from server import task_result
 
-from proto.api.internal.bb import backend_pb2
-from proto.api.internal.bb import common_pb2
-from proto.api.internal.bb import swarming_bb_pb2
+from bb.go.chromium.org.luci.buildbucket.proto import backend_pb2
+from bb.go.chromium.org.luci.buildbucket.proto import common_pb2
+from bb.go.chromium.org.luci.buildbucket.proto import task_pb2
+from proto.api_v2 import swarming_pb2
 
 # This is the path, relative to the swarming run dir, to the directory that
 # contains the mounted swarming named caches. It will be prepended to paths of
@@ -77,14 +78,18 @@ def compute_task_request(run_task_req):
 
 
 def ingest_backend_config(req_backend_config):
-  # type: (struct_pb2.Struct) -> swarming_bb_pb2.SwarmingBackendConfig
+  # type: (struct_pb2.Struct) -> swarming_pb2.SwarmingTaskBackendConfig
   json_config = json_format.MessageToJson(req_backend_config)
-  return json_format.Parse(json_config, swarming_bb_pb2.SwarmingBackendConfig())
+  return json_format.Parse(
+    json_config,
+    swarming_pb2.SwarmingTaskBackendConfig()
+  )
 
 
 def _compute_task_slices(run_task_req, backend_config, has_secret_bytes):
-  # type: (backend_pb2.RunTaskRequest, swarming_bb_pb2.SwarmingBackendConfig,
-  #     bool) -> Sequence[task_request.TaskSlice]
+  # type: (backend_pb2.RunTaskRequest,
+  #        swarming_pb2.SwarmingTaskBackendConfig, bool) ->
+  #        Sequence[task_request.TaskSlice]
   """
   Raises:
     handlers_exceptions.BadRequestException if any `run_task_req` fields are
@@ -104,12 +109,13 @@ def _compute_task_slices(run_task_req, backend_config, has_secret_bytes):
         '`grace_period.nanos` must be 0')
 
   for cache in run_task_req.caches:
-    if cache.wait_for_warm_cache.nanos:
-      raise handlers_exceptions.BadRequestException(
-          'cache\'s `wait_for_warm_cache.nanos` must be 0')
-    if cache.wait_for_warm_cache.seconds:
-      dims_by_exp[cache.wait_for_warm_cache.seconds]['caches'].append(
-          cache.name)
+    if cache.wait_for_warm_cache_secs:
+      if cache.wait_for_warm_cache_secs % 60 == 0:
+        dims_by_exp[cache.wait_for_warm_cache_secs][u'caches'].append(
+            cache.name)
+      else:
+        raise handlers_exceptions.BadRequestException(
+          'cache\'s `wait_for_warm_cache_secs` must be a multiple of 60')
 
   for dim in run_task_req.dimensions:
     if dim.expiration.nanos:
@@ -190,7 +196,7 @@ def _compute_command(run_task_req, agent_binary_name):
 
 def convert_results_to_tasks(task_results, task_ids):
   # type: (Sequence[Union[task_result._TaskResultCommon, None]], Sequence[str])
-  #     -> Sequence[backend_pb2.Task]
+  #     -> Sequence[task_pb2.Task]
   """Converts the given task results to a backend Tasks
 
   The length and order of `task_results` is expected to match those of
@@ -203,8 +209,8 @@ def convert_results_to_tasks(task_results, task_ids):
   tasks = []
 
   for i, result in enumerate(task_results):
-    task = backend_pb2.Task(
-        id=backend_pb2.TaskID(
+    task = task_pb2.Task(
+        id=task_pb2.TaskID(
             target='swarming://%s' % app_identity.get_application_id(),
             id=task_ids[i],
         ))

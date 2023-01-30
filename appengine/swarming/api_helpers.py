@@ -140,7 +140,7 @@ def cache_request(namespace, request_uuid, func):
 
 
 def validate_backend_configs(configs):
-  # type: (Sequence[swarming_bb_pb2.SwarmingBackendConfig]) ->
+  # type: (Sequence[swarming_bb_pb2.SwarmingTaskBackendConfig]) ->
   #     Sequence[Tuple[int, str]]
   """Checks the validity of each config.
 

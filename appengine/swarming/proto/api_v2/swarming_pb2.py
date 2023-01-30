@@ -111,8 +111,8 @@ _STATEQUERY = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   serialized_options=None,
-  serialized_start=8839,
-  serialized_end=9174,
+  serialized_start=9089,
+  serialized_end=9424,
 )
 _sym_db.RegisterEnumDescriptor(_STATEQUERY)
 
@@ -360,8 +360,8 @@ _NEWTASKREQUEST_POOLTASKTEMPLATEFIELD = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   serialized_options=None,
-  serialized_start=2413,
-  serialized_end=2493,
+  serialized_start=2663,
+  serialized_end=2743,
 )
 _sym_db.RegisterEnumDescriptor(_NEWTASKREQUEST_POOLTASKTEMPLATEFIELD)
 
@@ -1147,6 +1147,87 @@ _TASKSLICE = _descriptor.Descriptor(
 )
 
 
+_SWARMINGTASKBACKENDCONFIG = _descriptor.Descriptor(
+  name='SwarmingTaskBackendConfig',
+  full_name='swarming.v2.SwarmingTaskBackendConfig',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  create_key=_descriptor._internal_create_key,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='priority', full_name='swarming.v2.SwarmingTaskBackendConfig.priority', index=0,
+      number=1, type=5, cpp_type=1, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='bot_ping_tolerance', full_name='swarming.v2.SwarmingTaskBackendConfig.bot_ping_tolerance', index=1,
+      number=2, type=3, cpp_type=2, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='parent_run_id', full_name='swarming.v2.SwarmingTaskBackendConfig.parent_run_id', index=2,
+      number=3, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"".decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='service_account', full_name='swarming.v2.SwarmingTaskBackendConfig.service_account', index=3,
+      number=4, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"".decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='wait_for_capacity', full_name='swarming.v2.SwarmingTaskBackendConfig.wait_for_capacity', index=4,
+      number=5, type=8, cpp_type=7, label=1,
+      has_default_value=False, default_value=False,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='agent_binary_cipd_pkg', full_name='swarming.v2.SwarmingTaskBackendConfig.agent_binary_cipd_pkg', index=5,
+      number=6, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"".decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='agent_binary_cipd_vers', full_name='swarming.v2.SwarmingTaskBackendConfig.agent_binary_cipd_vers', index=6,
+      number=7, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"".decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='agent_binary_cipd_filename', full_name='swarming.v2.SwarmingTaskBackendConfig.agent_binary_cipd_filename', index=7,
+      number=8, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"".decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=1925,
+  serialized_end=2172,
+)
+
+
 _RESULTDBCFG = _descriptor.Descriptor(
   name='ResultDBCfg',
   full_name='swarming.v2.ResultDBCfg',
@@ -1174,8 +1255,8 @@ _RESULTDBCFG = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1924,
-  serialized_end=1953,
+  serialized_start=2174,
+  serialized_end=2203,
 )
 
 
@@ -1319,8 +1400,8 @@ _NEWTASKREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1956,
-  serialized_end=2493,
+  serialized_start=2206,
+  serialized_end=2743,
 )
 
 
@@ -1463,8 +1544,8 @@ _TASKREQUESTRESPONSE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=2496,
-  serialized_end=2972,
+  serialized_start=2746,
+  serialized_end=3222,
 )
 
 
@@ -1502,8 +1583,8 @@ _TASKCANCELREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=2974,
-  serialized_end=3032,
+  serialized_start=3224,
+  serialized_end=3282,
 )
 
 
@@ -1569,8 +1650,8 @@ _TASKSCANCELREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=3035,
-  serialized_end=3206,
+  serialized_start=3285,
+  serialized_end=3456,
 )
 
 
@@ -1601,8 +1682,8 @@ _OPERATIONSTATS = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=3208,
-  serialized_end=3242,
+  serialized_start=3458,
+  serialized_end=3492,
 )
 
 
@@ -1689,8 +1770,8 @@ _CASOPERATIONSTATS = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=3245,
-  serialized_end=3483,
+  serialized_start=3495,
+  serialized_end=3733,
 )
 
 
@@ -1770,8 +1851,8 @@ _PERFORMANCESTATS = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=3486,
-  serialized_end=3916,
+  serialized_start=3736,
+  serialized_end=4166,
 )
 
 
@@ -1809,8 +1890,8 @@ _CANCELRESPONSE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=3918,
-  serialized_end=3973,
+  serialized_start=4168,
+  serialized_end=4223,
 )
 
 
@@ -1855,8 +1936,8 @@ _TASKSCANCELRESPONSE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=3975,
-  serialized_end=4070,
+  serialized_start=4225,
+  serialized_end=4320,
 )
 
 
@@ -1894,8 +1975,8 @@ _TASKOUTPUTRESPONSE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=4072,
-  serialized_end=4147,
+  serialized_start=4322,
+  serialized_end=4397,
 )
 
 
@@ -1933,8 +2014,8 @@ _RESULTDBINFO = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=4149,
-  serialized_end=4201,
+  serialized_start=4399,
+  serialized_end=4451,
 )
 
 
@@ -2182,8 +2263,8 @@ _TASKRESULTRESPONSE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=4204,
-  serialized_end=5283,
+  serialized_start=4454,
+  serialized_end=5533,
 )
 
 
@@ -2214,8 +2295,8 @@ _TASKSTATES = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=5285,
-  serialized_end=5337,
+  serialized_start=5535,
+  serialized_end=5587,
 )
 
 
@@ -2260,8 +2341,8 @@ _TASKLISTRESPONSE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=5339,
-  serialized_end=5462,
+  serialized_start=5589,
+  serialized_end=5712,
 )
 
 
@@ -2306,8 +2387,8 @@ _TASKREQUESTSRESPONSE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=5465,
-  serialized_end=5593,
+  serialized_start=5715,
+  serialized_end=5843,
 )
 
 
@@ -2345,8 +2426,8 @@ _TASKSCOUNT = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=5595,
-  serialized_end=5663,
+  serialized_start=5845,
+  serialized_end=5913,
 )
 
 
@@ -2391,8 +2472,8 @@ _TASKREQUESTMETADATARESPONSE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=5666,
-  serialized_end=5817,
+  serialized_start=5916,
+  serialized_end=6067,
 )
 
 
@@ -2430,8 +2511,8 @@ _TASKQUEUE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=5819,
-  serialized_end=5902,
+  serialized_start=6069,
+  serialized_end=6152,
 )
 
 
@@ -2476,8 +2557,8 @@ _TASKQUEUELIST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=5904,
-  serialized_end=6015,
+  serialized_start=6154,
+  serialized_end=6265,
 )
 
 
@@ -2599,8 +2680,8 @@ _BOTINFO = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=6018,
-  serialized_end=6388,
+  serialized_start=6268,
+  serialized_end=6638,
 )
 
 
@@ -2652,8 +2733,8 @@ _BOTINFOLISTRESPONSE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=6391,
-  serialized_end=6529,
+  serialized_start=6641,
+  serialized_end=6779,
 )
 
 
@@ -2719,8 +2800,8 @@ _BOTSCOUNT = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=6532,
-  serialized_end=6669,
+  serialized_start=6782,
+  serialized_end=6919,
 )
 
 
@@ -2758,8 +2839,8 @@ _BOTSDIMENSIONS = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=6671,
-  serialized_end=6781,
+  serialized_start=6921,
+  serialized_end=7031,
 )
 
 
@@ -2860,8 +2941,8 @@ _BOTEVENTRESPONSE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=6784,
-  serialized_end=7070,
+  serialized_start=7034,
+  serialized_end=7320,
 )
 
 
@@ -2906,8 +2987,8 @@ _BOTEVENTSRESPONSE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=7072,
-  serialized_end=7194,
+  serialized_start=7322,
+  serialized_end=7444,
 )
 
 
@@ -2938,8 +3019,8 @@ _DELETERESPONSE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=7196,
-  serialized_end=7229,
+  serialized_start=7446,
+  serialized_end=7479,
 )
 
 
@@ -2970,8 +3051,8 @@ _TERMINATERESPONSE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=7231,
-  serialized_end=7267,
+  serialized_start=7481,
+  serialized_end=7517,
 )
 
 
@@ -3002,8 +3083,8 @@ _BOTREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=7269,
-  serialized_end=7297,
+  serialized_start=7519,
+  serialized_end=7547,
 )
 
 
@@ -3062,8 +3143,8 @@ _BOTEVENTSREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=7300,
-  serialized_end=7449,
+  serialized_start=7550,
+  serialized_end=7699,
 )
 
 
@@ -3143,8 +3224,8 @@ _BOTTASKSREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=7452,
-  serialized_end=7713,
+  serialized_start=7702,
+  serialized_end=7963,
 )
 
 
@@ -3217,8 +3298,8 @@ _BOTSREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=7716,
-  serialized_end=7992,
+  serialized_start=7966,
+  serialized_end=8242,
 )
 
 
@@ -3249,8 +3330,8 @@ _BOTSCOUNTREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=7994,
-  serialized_end=8032,
+  serialized_start=8244,
+  serialized_end=8282,
 )
 
 
@@ -3281,8 +3362,8 @@ _BOTSDIMENSIONSREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=8034,
-  serialized_end=8071,
+  serialized_start=8284,
+  serialized_end=8321,
 )
 
 
@@ -3327,8 +3408,8 @@ _PERMISSIONSREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=8073,
-  serialized_end=8140,
+  serialized_start=8323,
+  serialized_end=8390,
 )
 
 
@@ -3359,8 +3440,8 @@ _TASKSTATESREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=8142,
-  serialized_end=8178,
+  serialized_start=8392,
+  serialized_end=8428,
 )
 
 
@@ -3440,8 +3521,8 @@ _TASKSREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=8181,
-  serialized_end=8437,
+  serialized_start=8431,
+  serialized_end=8687,
 )
 
 
@@ -3493,8 +3574,8 @@ _TASKSCOUNTREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=8440,
-  serialized_end=8597,
+  serialized_start=8690,
+  serialized_end=8847,
 )
 
 
@@ -3525,8 +3606,8 @@ _TASKIDREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=8599,
-  serialized_end=8631,
+  serialized_start=8849,
+  serialized_end=8881,
 )
 
 
@@ -3571,8 +3652,8 @@ _TASKIDWITHOFFSETREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=8633,
-  serialized_end=8707,
+  serialized_start=8883,
+  serialized_end=8957,
 )
 
 
@@ -3610,8 +3691,8 @@ _TASKIDWITHPERFREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=8709,
-  serialized_end=8784,
+  serialized_start=8959,
+  serialized_end=9034,
 )
 
 
@@ -3649,8 +3730,8 @@ _TASKQUEUESREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=8786,
-  serialized_end=8836,
+  serialized_start=9036,
+  serialized_end=9086,
 )
 
 _FILECONTENT.fields_by_name['when'].message_type = google_dot_protobuf_dot_timestamp__pb2._TIMESTAMP
@@ -3757,6 +3838,7 @@ DESCRIPTOR.message_types_by_name['CacheEntry'] = _CACHEENTRY
 DESCRIPTOR.message_types_by_name['Containment'] = _CONTAINMENT
 DESCRIPTOR.message_types_by_name['TaskProperties'] = _TASKPROPERTIES
 DESCRIPTOR.message_types_by_name['TaskSlice'] = _TASKSLICE
+DESCRIPTOR.message_types_by_name['SwarmingTaskBackendConfig'] = _SWARMINGTASKBACKENDCONFIG
 DESCRIPTOR.message_types_by_name['ResultDBCfg'] = _RESULTDBCFG
 DESCRIPTOR.message_types_by_name['NewTaskRequest'] = _NEWTASKREQUEST
 DESCRIPTOR.message_types_by_name['TaskRequestResponse'] = _TASKREQUESTRESPONSE
@@ -3910,6 +3992,13 @@ TaskSlice = _reflection.GeneratedProtocolMessageType('TaskSlice', (_message.Mess
   # @@protoc_insertion_point(class_scope:swarming.v2.TaskSlice)
   })
 _sym_db.RegisterMessage(TaskSlice)
+
+SwarmingTaskBackendConfig = _reflection.GeneratedProtocolMessageType('SwarmingTaskBackendConfig', (_message.Message,), {
+  'DESCRIPTOR' : _SWARMINGTASKBACKENDCONFIG,
+  '__module__' : 'proto.api.swarming_v2_pb2'
+  # @@protoc_insertion_point(class_scope:swarming.v2.SwarmingTaskBackendConfig)
+  })
+_sym_db.RegisterMessage(SwarmingTaskBackendConfig)
 
 ResultDBCfg = _reflection.GeneratedProtocolMessageType('ResultDBCfg', (_message.Message,), {
   'DESCRIPTOR' : _RESULTDBCFG,

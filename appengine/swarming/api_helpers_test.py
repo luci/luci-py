@@ -27,7 +27,7 @@ from server import service_accounts
 from server import task_request
 from test_support import test_case
 
-from proto.api.internal.bb import swarming_bb_pb2
+from proto.api_v2 import swarming_pb2
 
 class TestProcessTaskRequest(test_case.TestCase):
 
@@ -235,7 +235,7 @@ class TestCheckIdenticalRequest(test_case.TestCase):
 
   def test_validate_configs(self):
     configs = [
-        swarming_bb_pb2.SwarmingBackendConfig(
+        swarming_pb2.SwarmingTaskBackendConfig(
             priority=task_request.MAXIMUM_PRIORITY + 1,
             bot_ping_tolerance=task_request._MAX_BOT_PING_TOLERANCE_SECS + 1,
             service_account='bokbok',
@@ -243,7 +243,7 @@ class TestCheckIdenticalRequest(test_case.TestCase):
             agent_binary_cipd_filename='agent',
             agent_binary_cipd_pkg='agent/package/${platform}??',
             agent_binary_cipd_vers='3'),
-        swarming_bb_pb2.SwarmingBackendConfig(priority=0)
+        swarming_pb2.SwarmingTaskBackendConfig(priority=0)
         ]
     errors = api_helpers.validate_backend_configs(configs)
 

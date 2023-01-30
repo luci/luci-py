@@ -11,6 +11,11 @@ See SUB_PATHS for the specific list of protos needed to compile
 the protos in NEEDED_PROTOS.
 This script only compiles buildbucket/proto protos.
 Other protos are needed because they're imported by buildbucket/proto files.
+
+Instructions for Running this script:
+
+1. make sure you are in the bb dir: infra/luci/appengine/swarming/bb
+2. run ./update_taskbackend_protos.py
 """
 
 from __future__ import print_function
@@ -46,6 +51,23 @@ NEEDED_PROTOS = {
     'resultdb/proto/v1/predicate_pb2.py', 'common/proto/options_pb2.py'
 }
 
+def add_bb_prefix_to_import(file_path):
+  with open(file_path, "r") as file:
+    contents = file.readlines()
+
+  updated_contents = []
+  was_modified = False
+  for line in contents:
+    if "from go.chromium.org.luci" in line:
+        line = line.replace(
+          "from go.chromium.org.luci",
+          "from bb.go.chromium.org.luci")
+        was_modified = True
+    updated_contents.append(line)
+  if not was_modified:
+    return
+  with open(file_path, "w") as file:
+    file.writelines(updated_contents)
 
 def main():
   """Updates all .proto files and compiles buildbucket/proto/*.proto."""
@@ -111,6 +133,11 @@ def main():
     else:
       os.remove(os.path.join(base_dir_py_protos, filename))
 
+  # adding "bb."" to import
+  for filename in seen:
+    file_path = os.path.join(base_dir_py_protos, filename)
+    add_bb_prefix_to_import(file_path)
+
   # Cleanup time :)
   print("Cleaning up...")
 
@@ -124,7 +151,7 @@ def main():
       shutil.rmtree(path)
 
   # adding __init__.py files to directories
-  walk = list(os.walk(os.path.join(base, "go")))
+  walk = list(os.walk(os.path.join(base)))
   for path, _, _ in walk[::-1]:
     init_file = os.path.join(path, "__init__.py")
     f = open(init_file, 'w')

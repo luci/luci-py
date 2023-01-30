@@ -22,7 +22,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   syntax='proto3',
   serialized_options=b'Z4go.chromium.org/luci/buildbucket/proto;buildbucketpb',
   create_key=_descriptor._internal_create_key,
-  serialized_pb=b'\n3go.chromium.org/luci/buildbucket/proto/common.proto\x12\x0e\x62uildbucket.v2\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"V\n\nExecutable\x12\x14\n\x0c\x63ipd_package\x18\x01 \x01(\t\x12\x14\n\x0c\x63ipd_version\x18\x02 \x01(\t\x12\x0b\n\x03\x63md\x18\x03 \x03(\t\x12\x0f\n\x07wrapper\x18\x04 \x03(\t\"\xc3\x01\n\rStatusDetails\x12M\n\x13resource_exhaustion\x18\x03 \x01(\x0b\x32\x30.buildbucket.v2.StatusDetails.ResourceExhaustion\x12\x36\n\x07timeout\x18\x04 \x01(\x0b\x32%.buildbucket.v2.StatusDetails.Timeout\x1a\x14\n\x12ResourceExhaustion\x1a\t\n\x07TimeoutJ\x04\x08\x01\x10\x02J\x04\x08\x02\x10\x03\"2\n\x03Log\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x10\n\x08view_url\x18\x02 \x01(\t\x12\x0b\n\x03url\x18\x03 \x01(\t\"O\n\x0cGerritChange\x12\x0c\n\x04host\x18\x01 \x01(\t\x12\x0f\n\x07project\x18\x02 \x01(\t\x12\x0e\n\x06\x63hange\x18\x03 \x01(\x03\x12\x10\n\x08patchset\x18\x04 \x01(\x03\"Y\n\rGitilesCommit\x12\x0c\n\x04host\x18\x01 \x01(\t\x12\x0f\n\x07project\x18\x02 \x01(\t\x12\n\n\x02id\x18\x03 \x01(\t\x12\x0b\n\x03ref\x18\x04 \x01(\t\x12\x10\n\x08position\x18\x05 \x01(\r\"(\n\nStringPair\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t\"i\n\tTimeRange\x12.\n\nstart_time\x18\x01 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12,\n\x08\x65nd_time\x18\x02 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\"_\n\x12RequestedDimension\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t\x12-\n\nexpiration\x18\x03 \x01(\x0b\x32\x19.google.protobuf.Duration*\x87\x01\n\x06Status\x12\x16\n\x12STATUS_UNSPECIFIED\x10\x00\x12\r\n\tSCHEDULED\x10\x01\x12\x0b\n\x07STARTED\x10\x02\x12\x0e\n\nENDED_MASK\x10\x04\x12\x0b\n\x07SUCCESS\x10\x0c\x12\x0b\n\x07\x46\x41ILURE\x10\x14\x12\x11\n\rINFRA_FAILURE\x10$\x12\x0c\n\x08\x43\x41NCELED\x10\x44*%\n\x07Trinary\x12\t\n\x05UNSET\x10\x00\x12\x07\n\x03YES\x10\x01\x12\x06\n\x02NO\x10\x02\x42\x36Z4go.chromium.org/luci/buildbucket/proto;buildbucketpbb\x06proto3'
+  serialized_pb=b'\n3go.chromium.org/luci/buildbucket/proto/common.proto\x12\x0e\x62uildbucket.v2\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"V\n\nExecutable\x12\x14\n\x0c\x63ipd_package\x18\x01 \x01(\t\x12\x14\n\x0c\x63ipd_version\x18\x02 \x01(\t\x12\x0b\n\x03\x63md\x18\x03 \x03(\t\x12\x0f\n\x07wrapper\x18\x04 \x03(\t\"\xc3\x01\n\rStatusDetails\x12M\n\x13resource_exhaustion\x18\x03 \x01(\x0b\x32\x30.buildbucket.v2.StatusDetails.ResourceExhaustion\x12\x36\n\x07timeout\x18\x04 \x01(\x0b\x32%.buildbucket.v2.StatusDetails.Timeout\x1a\x14\n\x12ResourceExhaustion\x1a\t\n\x07TimeoutJ\x04\x08\x01\x10\x02J\x04\x08\x02\x10\x03\"2\n\x03Log\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x10\n\x08view_url\x18\x02 \x01(\t\x12\x0b\n\x03url\x18\x03 \x01(\t\"O\n\x0cGerritChange\x12\x0c\n\x04host\x18\x01 \x01(\t\x12\x0f\n\x07project\x18\x02 \x01(\t\x12\x0e\n\x06\x63hange\x18\x03 \x01(\x03\x12\x10\n\x08patchset\x18\x04 \x01(\x03\"Y\n\rGitilesCommit\x12\x0c\n\x04host\x18\x01 \x01(\t\x12\x0f\n\x07project\x18\x02 \x01(\t\x12\n\n\x02id\x18\x03 \x01(\t\x12\x0b\n\x03ref\x18\x04 \x01(\t\x12\x10\n\x08position\x18\x05 \x01(\r\"(\n\nStringPair\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t\"i\n\tTimeRange\x12.\n\nstart_time\x18\x01 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12,\n\x08\x65nd_time\x18\x02 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\"_\n\x12RequestedDimension\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t\x12-\n\nexpiration\x18\x03 \x01(\x0b\x32\x19.google.protobuf.Duration*\x87\x01\n\x06Status\x12\x16\n\x12STATUS_UNSPECIFIED\x10\x00\x12\r\n\tSCHEDULED\x10\x01\x12\x0b\n\x07STARTED\x10\x02\x12\x0e\n\nENDED_MASK\x10\x04\x12\x0b\n\x07SUCCESS\x10\x0c\x12\x0b\n\x07\x46\x41ILURE\x10\x14\x12\x11\n\rINFRA_FAILURE\x10$\x12\x0c\n\x08\x43\x41NCELED\x10\x44*%\n\x07Trinary\x12\t\n\x05UNSET\x10\x00\x12\x07\n\x03YES\x10\x01\x12\x06\n\x02NO\x10\x02*!\n\x0b\x43ompression\x12\x08\n\x04ZLIB\x10\x00\x12\x08\n\x04ZSTD\x10\x01\x42\x36Z4go.chromium.org/luci/buildbucket/proto;buildbucketpbb\x06proto3'
   ,
   dependencies=[google_dot_protobuf_dot_duration__pb2.DESCRIPTOR,google_dot_protobuf_dot_timestamp__pb2.DESCRIPTOR,])
 
@@ -113,6 +113,32 @@ _TRINARY = _descriptor.EnumDescriptor(
 _sym_db.RegisterEnumDescriptor(_TRINARY)
 
 Trinary = enum_type_wrapper.EnumTypeWrapper(_TRINARY)
+_COMPRESSION = _descriptor.EnumDescriptor(
+  name='Compression',
+  full_name='buildbucket.v2.Compression',
+  filename=None,
+  file=DESCRIPTOR,
+  create_key=_descriptor._internal_create_key,
+  values=[
+    _descriptor.EnumValueDescriptor(
+      name='ZLIB', index=0, number=0,
+      serialized_options=None,
+      type=None,
+      create_key=_descriptor._internal_create_key),
+    _descriptor.EnumValueDescriptor(
+      name='ZSTD', index=1, number=1,
+      serialized_options=None,
+      type=None,
+      create_key=_descriptor._internal_create_key),
+  ],
+  containing_type=None,
+  serialized_options=None,
+  serialized_start=1069,
+  serialized_end=1102,
+)
+_sym_db.RegisterEnumDescriptor(_COMPRESSION)
+
+Compression = enum_type_wrapper.EnumTypeWrapper(_COMPRESSION)
 STATUS_UNSPECIFIED = 0
 SCHEDULED = 1
 STARTED = 2
@@ -124,6 +150,8 @@ CANCELED = 68
 UNSET = 0
 YES = 1
 NO = 2
+ZLIB = 0
+ZSTD = 1
 
 
 
@@ -566,6 +594,7 @@ DESCRIPTOR.message_types_by_name['TimeRange'] = _TIMERANGE
 DESCRIPTOR.message_types_by_name['RequestedDimension'] = _REQUESTEDDIMENSION
 DESCRIPTOR.enum_types_by_name['Status'] = _STATUS
 DESCRIPTOR.enum_types_by_name['Trinary'] = _TRINARY
+DESCRIPTOR.enum_types_by_name['Compression'] = _COMPRESSION
 _sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
 Executable = _reflection.GeneratedProtocolMessageType('Executable', (_message.Message,), {

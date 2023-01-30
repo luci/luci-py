@@ -27,10 +27,12 @@ from server import task_request
 from server import task_result
 from server import task_pack
 
-from proto.api.internal.bb import backend_pb2
-from proto.api.internal.bb import common_pb2
-from proto.api.internal.bb import launcher_pb2
-from proto.api.internal.bb import swarming_bb_pb2
+from bb.go.chromium.org.luci.buildbucket.proto import backend_pb2
+from bb.go.chromium.org.luci.buildbucket.proto import common_pb2
+from bb.go.chromium.org.luci.buildbucket.proto import launcher_pb2
+from bb.go.chromium.org.luci.buildbucket.proto import project_config_pb2
+from bb.go.chromium.org.luci.buildbucket.proto import task_pb2
+from proto.api_v2 import swarming_pb2
 
 
 def req_dim_prpc(key, value, exp_secs=None):
@@ -151,11 +153,14 @@ class TestBackendConversions(test_case.TestCase):
                     struct_pb2.Value(string_value='latest'),
             }),
         caches=[
-            swarming_bb_pb2.CacheEntry(name='name_1', path='path_1'),
-            swarming_bb_pb2.CacheEntry(
+            project_config_pb2.BuilderConfig.CacheEntry(
+                name='name_1',
+                path='path_1'
+            ),
+            project_config_pb2.BuilderConfig.CacheEntry(
                 name='name_2',
                 path='path_2',
-                wait_for_warm_cache=duration_pb2.Duration(seconds=180))
+                wait_for_warm_cache_secs=180)
         ],
         grace_period=duration_pb2.Duration(seconds=grace_secs),
         execution_timeout=duration_pb2.Duration(seconds=exec_secs),
@@ -227,11 +232,9 @@ class TestBackendConversions(test_case.TestCase):
     }
 
     expected_slices = [slice_1, slice_2, base_slice]
-
-    self.assertEqual(
-        expected_slices,
-        backend_conversions._compute_task_slices(
-            run_task_req, backend_config, True))
+    actual_slices = backend_conversions._compute_task_slices(
+            run_task_req, backend_config, True)
+    self.assertEqual(expected_slices, actual_slices)
 
   def test_compute_task_slices_base_slice_only(self):
     exec_secs = 180
@@ -289,7 +292,7 @@ class TestBackendConversions(test_case.TestCase):
                          run_task_req, backend_config, False))
 
   def test_compute_task_slices_exceptions(self):
-    backend_config = swarming_bb_pb2.SwarmingBackendConfig()
+    backend_config = swarming_pb2.SwarmingTaskBackendConfig()
 
     run_task_req = backend_pb2.RunTaskRequest(
         grace_period=duration_pb2.Duration(nanos=42))
@@ -306,11 +309,11 @@ class TestBackendConversions(test_case.TestCase):
                                                False)
 
     run_task_req = backend_pb2.RunTaskRequest(caches=[
-        swarming_bb_pb2.CacheEntry(
-            wait_for_warm_cache=duration_pb2.Duration(nanos=42))
+        project_config_pb2.BuilderConfig.CacheEntry(
+            wait_for_warm_cache_secs=1)
     ])
     with self.assertRaisesRegexp(handlers_exceptions.BadRequestException,
-                                 'wait_for_warm_cache.nanos'):
+                                 'wait_for_warm_cache_secs'):
       backend_conversions._compute_task_slices(run_task_req, backend_config,
                                                False)
 
@@ -326,8 +329,8 @@ class TestBackendConversions(test_case.TestCase):
   def test_convert_results_to_tasks(self):
     def test_task(status, task_id=None, summary=None, set_timeout=False,
                   set_exhaustion=False):
-      task = backend_pb2.Task(
-          id=backend_pb2.TaskID(target='swarming://%s' %
+      task = task_pb2.Task(
+          id=task_pb2.TaskID(target='swarming://%s' %
                                 app_identity.get_application_id()),
           status=status)
       if task_id is not None:

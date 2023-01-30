@@ -3,13 +3,12 @@
 # that can be found in the LICENSE file.
 
 """This module defines Swarming Server frontend pRPC handlers."""
-
-from components import prpc
 from components import auth
-import proto.api_v2.swarming_prpc_pb2 as swarming_prpc_pb2
+from components import prpc
 import proto.api_v2.swarming_pb2 as swarming_pb2
-from server import realms
+import proto.api_v2.swarming_prpc_pb2 as swarming_prpc_pb2
 from server import acl
+from server import realms
 import api_common
 import message_conversion_prpc
 import prpc_helpers
