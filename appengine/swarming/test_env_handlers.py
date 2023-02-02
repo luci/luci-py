@@ -180,6 +180,13 @@ class AppTestBase(test_case.TestCase):
     auth_testing.mock_get_current_identity(
         self, auth.Identity.from_bytes('user:' + os.environ['USER_EMAIL']))
 
+  def set_as_project(self):
+    self.set_as_anonymous()
+    self.testbed.setup_env(PROJECT='luci-project', overwrite=True)
+    auth_testing.reset_local_state()
+    auth_testing.mock_get_current_identity(
+        self, auth.Identity.from_bytes('project:' + os.environ['PROJECT']))
+
   def set_as_user(self):
     self.set_as_anonymous()
     self.testbed.setup_env(USER_EMAIL='user@example.com', overwrite=True)

@@ -12,6 +12,7 @@ from server import realms
 import api_common
 import message_conversion_prpc
 import prpc_helpers
+from handlers_task_backend import TaskBackendAPIService
 
 
 class BotsService(object):
@@ -57,5 +58,6 @@ class BotsService(object):
 def get_routes():
   s = prpc.Server()
   s.add_service(BotsService())
+  s.add_service(TaskBackendAPIService())
   s.add_interceptor(auth.prpc_interceptor)
   return s.get_routes()

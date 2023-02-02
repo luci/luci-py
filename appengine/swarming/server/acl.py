@@ -190,6 +190,11 @@ def can_view_all_tasks():
 ### Other
 
 
+def can_use_task_backend():
+  """Can call TaskBackend API methods."""
+  return _is_project()
+
+
 def bootstrap_dev_server_acls():
   """Adds localhost to IP allowlist and Swarming groups."""
   assert utils.is_local_dev_server()
