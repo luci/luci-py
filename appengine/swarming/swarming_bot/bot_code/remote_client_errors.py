@@ -29,3 +29,7 @@ class PollError(Exception):
 
 class MintTokenError(Exception):
   """Raised on unrecoverable errors in RemoteClient.mint_*_token."""
+
+
+class RBEServerError(Exception):
+  """Raised on errors from Swarming RBE backend."""

@@ -4,7 +4,10 @@
 # that can be found in the LICENSE file.
 
 import base64
+import collections
+import copy
 import datetime
+import enum
 import hashlib
 import logging
 import os
@@ -20,6 +23,7 @@ from bot_code.remote_client_errors import InitializationError
 from bot_code.remote_client_errors import InternalError
 from bot_code.remote_client_errors import MintTokenError
 from bot_code.remote_client_errors import PollError
+from bot_code.remote_client_errors import RBEServerError
 
 
 # RemoteClient will attempt to refresh the authentication headers once they are
@@ -489,3 +493,523 @@ class RemoteClientNative(object):
     if resp.get('error'):
       raise MintTokenError(resp['error'])
     return resp
+
+  def rbe_create_session(self, dimensions, poll_token, retry_transient=False):
+    """Creates a new RBE session via Swarming RBE backend.
+
+    Parameters of the new session are provided by the Swarming Python backend
+    via the `poll_token` returned by poll(...) with `rbe` command. The swarming
+    bot process doesn't need to know them and can't interfere with them.
+
+    Arguments:
+      dimensions: a dict with bot dimensions as {str => [str]}.
+      poll_token: a token reported by `rbe` poll(...) command.
+      retry_transient: True to retry many times on transient errors. This is
+          a very crude retry mechanism intended to be used only if there's no
+          better retry loop already.
+
+    Returns:
+      RBECreateSessionResponse tuple.
+
+    Raises:
+      RBEServerError if the RPC fails for whatever reason.
+    """
+    data = {'dimensions': dimensions, 'poll_token': poll_token}
+    resp = self._url_read_json('/swarming/api/v1/bot/rbe/session/create',
+                               data=data,
+                               retry_transient=retry_transient)
+    if not resp:
+      raise RBEServerError('Failed to create RBE session, see bot logs')
+    if not isinstance(resp, dict):
+      raise RBEServerError('Unexpected response: %s' % (resp, ))
+
+    def get_str(key):
+      val = resp.get(key)
+      if not isinstance(val, str) or not val:
+        raise RBEServerError('Missing or incorrect `%s` in %s' % (key, resp))
+      return val
+
+    return RBECreateSessionResponse(session_token=get_str('session_token'),
+                                    session_id=get_str('session_id'))
+
+  def rbe_update_session(self,
+                         session_token,
+                         status,
+                         dimensions,
+                         lease=None,
+                         poll_token=None,
+                         retry_transient=False):
+    """Updates the state of an RBE session.
+
+    The backend will update the state of the RBE session and refresh the session
+    token (perhaps using the data in the given `poll_token` returned by Python
+    Swarming backend).
+
+    Arguments:
+      session_token: the session token returned by the previous update call.
+      status: the desired bot session status as RBESessionStatus enum.
+      dimensions: a dict with bot dimensions as {str => [str]}.
+      lease: an optional RBELease the bot is or was working on.
+      poll_token: a token reported by latest `rbe` poll(...) command, optional.
+      retry_transient: True to retry many times on transient errors. This is
+          a very crude retry mechanism intended to be used only if there's no
+          better retry loop already.
+
+    Returns:
+      RBEUpdateSessionResponse tuple.
+
+    Raises:
+      RBEServerError if the RPC fails for whatever reason.
+    """
+    assert status in RBESessionStatus, status
+    data = {
+        'session_token': session_token,
+        'status': status.name,
+        'dimensions': dimensions,
+    }
+    if lease:
+      assert isinstance(lease, RBELease), lease
+      data['lease'] = lease.to_dict(omit_payload=True)
+    if poll_token:
+      data['poll_token'] = poll_token
+
+    resp = self._url_read_json('/swarming/api/v1/bot/rbe/session/update',
+                               data=data,
+                               retry_transient=retry_transient)
+    if not resp:
+      raise RBEServerError('Failed to update RBE session, see bot logs')
+    if not isinstance(resp, dict):
+      raise RBEServerError('Unexpected response: %s' % (resp, ))
+
+    def get_str(key):
+      val = resp.get(key)
+      if not isinstance(val, str) or not val:
+        raise RBEServerError('Missing or incorrect `%s` in %s' % (key, resp))
+      return val
+
+    try:
+      status = RBESessionStatus[get_str('status')]
+    except KeyError as e:
+      raise RBEServerError('Unrecognized status in response: %s' % e)
+
+    lease = None
+    if 'lease' in resp:
+      try:
+        lease = RBELease.from_dict(resp['lease'])
+      except (ValueError, TypeError):
+        raise RBEServerError('Invalid `lease` in %s' % (resp, ))
+
+    return RBEUpdateSessionResponse(session_token=get_str('session_token'),
+                                    status=status,
+                                    lease=lease)
+
+
+################################################################################
+## RBE wrappers.
+
+
+class RBESessionException(Exception):
+  """Raised on violation of RBESession protocol."""
+
+
+class RBESessionStatus(enum.Enum):
+  """RBE bot session statuses matching remoteworkers.BotStatus protobuf enum."""
+  OK = 1
+  UNHEALTHY = 2
+  HOST_REBOOTING = 3
+  BOT_TERMINATING = 4
+  INITIALIZING = 5
+
+
+class RBELeaseState(enum.Enum):
+  """RBE lease state matching remoteworkers.LeaseState protobuf enum."""
+  PENDING = 1
+  ACTIVE = 2
+  COMPLETED = 3
+  CANCELLED = 4
+
+
+# Returned by rbe_create_session(...)
+RBECreateSessionResponse = collections.namedtuple(
+    'RBECreateSessionResponse',
+    [
+        # A base64-encoded string that encodes the RBE bot session ID and bot
+        # configuration provided via the poll token.
+        #
+        # The session token is needed to call rbe_update_session(...). This call
+        # also will periodically refresh it.
+        'session_token',
+
+        # An RBE bot session ID as encoded in the session token.
+        #
+        # Primarily for the bot debug log. It is not used directly by anything.
+        'session_id',
+    ])
+
+# Returned by rbe_update_session(...).
+RBEUpdateSessionResponse = collections.namedtuple(
+    'RBEUpdateSessionResponse',
+    [
+        # An up-to-date session token which should be passed to the next
+        # rbe_update_session(...) call.
+        'session_token',
+
+        # The bot session status as the RBE backend sees it.
+        #
+        # It is one of RBESessionStatus enum variants. In particular, a non-OK
+        # status means the session is no longer healthy and the bot should stop
+        # using it.
+        'status',
+
+        # An optional lease assigned to the bot session, as RBELease instance.
+        'lease',
+    ])
+
+
+class RBELease:
+  """Represents a work assigned to a bot."""
+
+  def __init__(self, lease_id, state, payload=None, result=None):
+    """Constructs a lease given its details.
+
+    Arguments:
+      lease_id: a string lease ID.
+      state: a RBELeaseState enum.
+      payload: a dict with lease payload, if available.
+      result: a dict with lease result, if available.
+    """
+    assert state in RBELeaseState, state
+    self.id = lease_id
+    self.state = state
+    self.payload = payload
+    self.result = result
+
+  def clone(self):
+    """Returns a copy of this object."""
+    return RBELease(self.id, self.state, copy.deepcopy(self.payload),
+                    copy.deepcopy(self.result))
+
+  @staticmethod
+  def from_dict(d):
+    """Constructs RBELease given its dict representation.
+
+    Raises:
+      ValueError if the format is wrong.
+      TypeError if types are wrong.
+    """
+    if not isinstance(d, dict):
+      raise TypeError('Not a dict')
+
+    def get_str(key):
+      val = d.get(key, '')
+      if not isinstance(val, str):
+        raise TypeError('Invalid %s' % key)
+      if not val:
+        raise ValueError('Missing %s' % key)
+      return val
+
+    def get_optional_dict(key):
+      val = d.get(key)
+      if val is None:
+        return None
+      if not isinstance(val, dict):
+        raise TypeError('Invalid %s' % key)
+      return val
+
+    try:
+      state = RBELeaseState[get_str('state')]
+    except KeyError as e:
+      raise ValueError('Invalid state %s' % e)
+
+    return RBELease(get_str('id'), state, get_optional_dict('payload'),
+                    get_optional_dict('result'))
+
+  def to_dict(self, omit_payload=False):
+    """Converts RBELease to a dict representation.
+
+    Arguments:
+      omit_payload: if True, omit `payload` key.
+    """
+    d = {'id': self.id, 'state': self.state.name}
+    if not omit_payload and self.payload is not None:
+      d['payload'] = self.payload
+    if self.result is not None:
+      d['result'] = self.result
+    return d
+
+
+class RBESession:
+  """A single RBE bot session with a concrete session ID."""
+
+  def __init__(self, remote, instance, dimensions, poll_token):
+    """Creates a new RBE session via Swarming RBE backend.
+
+    Arguments:
+      remote: an instance of RemoteClientNative to use to call Swarming RBE.
+      instance: an RBE instance this session will be running on.
+      dimensions: a dict with bot dimensions as {str => [str]}.
+      poll_token: a token reported by `rbe` poll(...) command.
+
+    Raises:
+      RBEServerError if the RPC fails for whatever reason.
+    """
+    resp = remote.rbe_create_session(dimensions, poll_token)
+    self._remote = remote
+    self._instance = instance
+    self._dimensions = copy.deepcopy(dimensions)
+    self._poll_token = poll_token
+    self._session_token = resp.session_token
+    self._session_id = resp.session_id
+    self._last_acked_status = RBESessionStatus.OK
+    self._active_lease = None
+    self._finished_lease = None
+
+  @property
+  def instance(self):
+    """The RBE instance this session is running on."""
+    return self._instance
+
+  @property
+  def session_id(self):
+    """The RBE session ID for logs."""
+    return self._session_id
+
+  @property
+  def healthy(self):
+    """True if this session exists and is healthy."""
+    return self._last_acked_status == RBESessionStatus.OK
+
+  @property
+  def active_lease(self):
+    """An RBELease the bot should be working on now."""
+    return self._active_lease
+
+  def update(self, status, dimensions, poll_token):
+    """Updates the state of the session, picks up a new lease, if any.
+
+    Should be called in the outer bot loop, when the bot is waiting for new
+    tasks. This method reports the result of the last finished lease (if any)
+    to the server and picks up a new lease (if any). It also recognizes when
+    the session is closed by the server and updates `healthy` property
+    accordingly.
+
+    When this method is called the session must be healthy and must not have
+    `active_lease` set, otherwise RBESessionException is raised.
+
+    Calling this methods may update `healthy` and `active_lease` properties
+    as side effects:
+      * A session may become unhealthy if it is gone on the backend side.
+      * There may be a new active lease assigned to the session after this call.
+
+    Arguments:
+      status: the new RBE session status to report as RBESessionStatus enum.
+      dimensions: up-to-date bot dimensions as a dict {str => [str]}.
+      poll_token: the most recent poll token from Python Swarming.
+
+    Returns:
+      A new active RBELease, if any. Also available via `active_lease` property.
+
+    Raises:
+      RBESessionException if the local session is in a wrong state.
+      RBEServerError if the RPC fails for whatever reason.
+    """
+    if not self.healthy:
+      raise RBESessionException('Calling update(...) with unhealthy session')
+    if self.active_lease:
+      raise RBESessionException('Calling update(...) with an active lease')
+
+    # Refresh the "last known" values to use in other methods.
+    self._poll_token = poll_token
+    self._dimensions = copy.deepcopy(dimensions)
+
+    # Report the result of the finished lease (if any), and get a new lease.
+    assert (not self._finished_lease
+            or self._finished_lease.state == RBELeaseState.COMPLETED
+            ), self._finished_lease
+    lease = self._update(status=status,
+                         dimensions=self._dimensions,
+                         lease=self._finished_lease,
+                         poll_token=self._poll_token)
+    self._finished_lease = None  # flushed the result successfully
+
+    # An unhealthy session should not be producing new leases.
+    if not self.healthy:
+      if lease:
+        logging.error('Ignoring a lease from unhealthy session: %s', lease.id)
+      return None
+
+    # A new lease should be in PENDING state and have a payload.
+    if lease:
+      if lease.state != RBELeaseState.PENDING:
+        logging.error('Got a non-PENDING lease: %s', lease.id)
+      if lease.payload is None:
+        logging.error('Got a lease without payload: %s', lease.id)
+
+    self._active_lease = lease
+    return lease
+
+  def ping_active_lease(self):
+    """Notifies the backend the bot is still working on the active lease.
+
+    This method "pings" the lease (making the RBE server know the bot is not
+    dead yet) and polls its cancellation status. Must be called only if
+    `active_lease` is set, otherwise RBESessionException is raised.
+
+    Calling this methods may update `healthy` property as a side effect:
+    a session may become unhealthy if it is gone on the backend side. The active
+    lease is considered canceled in that case. If the local session was already
+    unhealthy when the method was called, the active lease is considered
+    canceled as well.
+
+    Doesn't unset `active_lease` itself even if the lease was canceled. Use
+    finish_active_lease(...) to mark it as complete.
+
+    Returns:
+      True to keep working on the active lease, False to stop. On False, the
+      caller must eventually call finish_active_lease(...) before calling
+      the next update(...) or terminate(...).
+
+    Raises:
+      RBESessionException if the local session is in a wrong state.
+      RBEServerError if the RPC fails for whatever reason.
+    """
+    if not self.active_lease:
+      raise RBESessionException('ping_active_lease(...) without a lease')
+    if not self.healthy:
+      logging.warning('The session is already gone, canceling the lease')
+      return False
+
+    # Report the lease as ACTIVE. Do not use a poll token, it might have expired
+    # already (also we are not polling for new tasks anyway). The session token
+    # must still be good, since it is refreshed by _update. Report the latest
+    # snapshot of the dimensions though, since the API always wants dimensions.
+    self._active_lease.state = RBELeaseState.ACTIVE
+    lease = self._update(status=RBESessionStatus.OK,
+                         dimensions=self._dimensions,
+                         lease=self._active_lease)
+
+    # If the session is gone, treat it as if the lease was canceled.
+    if not self.healthy:
+      logging.warning('The session is gone now, canceling the lease')
+      return False
+
+    # This must not be happening, but treat it as if the lease was canceled.
+    if not lease:
+      logging.error('The lease is unexpectedly gone, canceling it')
+      return False
+
+    # This must not be happening either, but also treat it as a cancellation.
+    if lease.id != self._active_lease.id:
+      logging.error('Got unexpected lease ID: want %s, got %s',
+                    self._active_lease.id, lease.id)
+      return False
+
+    # Keep working on the lease if the server tells it is still ACTIVE.
+    return lease.state == RBELeaseState.ACTIVE
+
+  def finish_active_lease(self, result):
+    """Marks the current active lease as done.
+
+    Must be called only if `active_lease` is set. This method unsets it, thus
+    signifying the session is ready to pick up a new lease in update(...). Must
+    be called even if the lease was canceled by the server.
+
+    The result of the finished lease will be reported to the backend with the
+    next update(...) or terminate(...) calls, whenever they happen. If the
+    session is unhealthy, the result will be lost.
+
+    This is a purely local state change, it doesn't do any RPCs.
+
+    Arguments:
+      result: a dict with task execution results or None if not available.
+
+    Raises:
+      RBESessionException if the local session is in a wrong state.
+    """
+    if not self.active_lease:
+      raise RBESessionException('finish_active_lease(...) without a lease')
+
+    lease, self._active_lease = self._active_lease, None
+    lease.state = RBELeaseState.COMPLETED
+    lease.result = copy.deepcopy(result)
+
+    assert not self._finished_lease
+    self._finished_lease = lease
+
+  def terminate(self):
+    """Terminates this RBE session.
+
+    Does nothing if the session is unhealthy (in particular was already
+    terminated). Ignores `active_lease`.
+
+    Retries the call a bunch of times on transient RPC errors to increase
+    chances of successfully reporting results of the last finished lease. If
+    errors are still happening, eventually just gives up. Session termination
+    usually happens when the process is exiting, there's no time left to retry
+    forever.
+    """
+    if self._active_lease:
+      logging.error('Ignoring active lease %s', self._active_lease.id)
+
+    if not self.healthy:
+      if self._finished_lease:
+        logging.error('Losing results of %s', self._finished_lease.id)
+      return
+
+    try:
+      lease = self._update(status=RBESessionStatus.BOT_TERMINATING,
+                           dimensions=self._dimensions,
+                           lease=self._finished_lease,
+                           retry_transient=True)
+      if lease:
+        logging.error('Ignoring a lease from terminated session: %s', lease.id)
+      self._finished_lease = None  # flushed the result
+    except RBEServerError as e:
+      logging.error('Error terminating RBE session: %s', e)
+
+  def _update(self,
+              status,
+              dimensions,
+              poll_token=None,
+              lease=None,
+              retry_transient=False):
+    """Used internally by other methods.
+
+    Updates `healthy` property based on the server response. Doesn't touch
+    the state related to leases.
+
+    Arguments:
+      status: the desired bot session status as RBESessionStatus enum.
+      dimensions: a dict with bot dimensions as {str => [str]}.
+      poll_token: a token reported by latest `rbe` poll(...) command, optional.
+      lease: an optional RBELease the bot is or was working on.
+      retry_transient: True to retry many times on transient errors.
+
+    Returns:
+      RBELease returned by the backend, if any.
+
+    Raises:
+      RBEServerError if the RPC fails for whatever reason.
+    """
+    assert status in RBESessionStatus, status
+
+    # Update the session on the backend side, flush the finished lease result,
+    # refresh the session token, pick up a new lease.
+    resp = self._remote.rbe_update_session(
+        self._session_token,
+        status,
+        dimensions,
+        lease,
+        poll_token,
+        retry_transient,
+    )
+    self._session_token = resp.session_token
+
+    if resp.status != RBESessionStatus.OK:
+      # The server told us the session is gone.
+      self._last_acked_status = resp.status
+    else:
+      # Use whatever we told the server. The server accepted this status.
+      self._last_acked_status = status
+
+    return resp.lease
