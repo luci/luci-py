@@ -392,6 +392,8 @@ def get_cpu_type_with_wmi():
         arch_level = min(cpu.Level, 6)
         return 'i%d86' % arch_level  # e.g. i386, i686
 
+      if cpu.Architecture == 12:  # PROCESSOR_ARCHITECTURE_ARM64
+        return 'arm64'
       if cpu.Architecture == 10:  # PROCESSOR_ARCHITECTURE_IA32_ON_WIN64
         return 'i686'
       if cpu.Architecture == 9:  # PROCESSOR_ARCHITECTURE_AMD64
