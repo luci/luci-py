@@ -174,6 +174,20 @@ def find_stderr(root=None):
       return log
 
 
+def new_rotating_file_handler(
+    filename,
+    utc_formatter=UTCFormatter(
+        '%(process)d %(asctime)s %(severity)s: %(message)s')):
+  file_path.ensure_tree(os.path.dirname(os.path.abspath(filename)))
+  rotating_file = NoInheritRotatingFileHandler(filename,
+                                               maxBytes=10 * 1024 * 1024,
+                                               backupCount=5,
+                                               encoding='utf-8')
+  rotating_file.setLevel(logging.DEBUG)
+  rotating_file.setFormatter(utc_formatter)
+  rotating_file.addFilter(SeverityFilter())
+  return rotating_file
+
 
 def prepare_logging(filename, root=None):
   """Prepare logging for scripts.
@@ -204,15 +218,8 @@ def prepare_logging(filename, root=None):
   # Setup up logging to a constant file so we can debug issues where
   # the results aren't properly sent to the result URL.
   if filename:
-    file_path.ensure_tree(os.path.dirname(os.path.abspath(filename)))
     try:
-      rotating_file = NoInheritRotatingFileHandler(
-          filename, maxBytes=10 * 1024 * 1024, backupCount=5,
-          encoding='utf-8')
-      rotating_file.setLevel(logging.DEBUG)
-      rotating_file.setFormatter(utc_formatter)
-      rotating_file.addFilter(SeverityFilter())
-      logger.addHandler(rotating_file)
+      logger.addHandler(new_rotating_file_handler(filename, utc_formatter))
     except Exception:
       # May happen on cygwin. Do not crash.
       logging.exception('Failed to open %s', filename)
