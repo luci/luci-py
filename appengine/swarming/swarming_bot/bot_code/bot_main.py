@@ -1443,10 +1443,40 @@ class _BotLoopState:
     # implemented later.
     with self._bot.mutate_internals() as mut:
       mut.update_rbe_state(rbe_state)
-    self._bot.remote.ping_swarming_rbe(self._bot.attributes, rbe_state)
-    # Do not busy-loop while in (unfinished) RBE mode. Sleep 30s between polls.
+
+    # Do not busy-loop while in (unfinished) RBE mode. Sleep 2m between polls.
     self._consecutive_idle_cycles += 1
-    self._swarming_poll_timer.reset(30.0)
+    self._swarming_poll_timer.reset(120.0)
+
+    # Go on a little adventure to test RBE session wrappers are working for
+    # real. This is temporary. Also there are only 2 bots that have RBE mode on,
+    # it should be OK if they keep creating and terminating sessions every 2m.
+    logging.info('RBE: opening session at %s', rbe_state['instance'])
+    cycle = 0
+    session = remote_client.RBESession(self._bot.remote, rbe_state['instance'],
+                                       self._bot.dimensions,
+                                       rbe_state['poll_token'])
+    logging.info('RBE: got session %s', session.session_id)
+    try:
+      while cycle < 5 and session.healthy and not self._quit_bit.is_set():
+        cycle += 1
+        logging.info('RBE: cycle %d', cycle)
+        lease = session.update(remote_client.RBESessionStatus.OK,
+                               self._bot.dimensions, rbe_state['poll_token'])
+        if not lease:
+          logging.info('RBE: idle')
+          continue
+        logging.info('RBE: got lease %s: %s', lease.id, lease.payload)
+        time.sleep(5.0)
+        logging.info('RBE: pinging the lease %s', lease.id)
+        session.ping_active_lease()
+        time.sleep(5.0)
+        logging.info('RBE: completing the lease %s', lease.id)
+        session.finish_active_lease({})
+    finally:
+      logging.info('RBE: terminating session')
+      session.terminate()
+      logging.info('RBE: session terminated')
 
   @_trap_all_exceptions
   def cmd_terminate(self, task_id):
