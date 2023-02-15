@@ -5,7 +5,7 @@
 """Definition of possible RPC response status codes."""
 
 import collections
-import httplib
+from six.moves import http_client
 
 StatusCodeBase = collections.namedtuple('StatusCodeBase', ['value', 'name'])
 
@@ -48,21 +48,21 @@ ALL_CODES = frozenset(
 INT_TO_CODE = {c[0]: c for c in ALL_CODES}
 
 _PRPC_TO_HTTP_STATUS = {
-    StatusCode.OK: httplib.OK,
-    StatusCode.CANCELLED: httplib.NO_CONTENT,
-    StatusCode.UNKNOWN: httplib.INTERNAL_SERVER_ERROR,
-    StatusCode.INVALID_ARGUMENT: httplib.BAD_REQUEST,
-    StatusCode.DEADLINE_EXCEEDED: httplib.SERVICE_UNAVAILABLE,
-    StatusCode.NOT_FOUND: httplib.NOT_FOUND,
-    StatusCode.ALREADY_EXISTS: httplib.CONFLICT,
-    StatusCode.PERMISSION_DENIED: httplib.FORBIDDEN,
-    StatusCode.RESOURCE_EXHAUSTED: httplib.SERVICE_UNAVAILABLE,
-    StatusCode.FAILED_PRECONDITION: httplib.PRECONDITION_FAILED,
-    StatusCode.ABORTED: httplib.CONFLICT,
-    StatusCode.OUT_OF_RANGE: httplib.BAD_REQUEST,
-    StatusCode.UNIMPLEMENTED: httplib.NOT_IMPLEMENTED,
-    StatusCode.INTERNAL: httplib.INTERNAL_SERVER_ERROR,
-    StatusCode.UNAVAILABLE: httplib.SERVICE_UNAVAILABLE,
-    StatusCode.DATA_LOSS: httplib.GONE,
-    StatusCode.UNAUTHENTICATED: httplib.UNAUTHORIZED,
+    StatusCode.OK: http_client.OK,
+    StatusCode.CANCELLED: http_client.NO_CONTENT,
+    StatusCode.UNKNOWN: http_client.INTERNAL_SERVER_ERROR,
+    StatusCode.INVALID_ARGUMENT: http_client.BAD_REQUEST,
+    StatusCode.DEADLINE_EXCEEDED: http_client.SERVICE_UNAVAILABLE,
+    StatusCode.NOT_FOUND: http_client.NOT_FOUND,
+    StatusCode.ALREADY_EXISTS: http_client.CONFLICT,
+    StatusCode.PERMISSION_DENIED: http_client.FORBIDDEN,
+    StatusCode.RESOURCE_EXHAUSTED: http_client.SERVICE_UNAVAILABLE,
+    StatusCode.FAILED_PRECONDITION: http_client.PRECONDITION_FAILED,
+    StatusCode.ABORTED: http_client.CONFLICT,
+    StatusCode.OUT_OF_RANGE: http_client.BAD_REQUEST,
+    StatusCode.UNIMPLEMENTED: http_client.NOT_IMPLEMENTED,
+    StatusCode.INTERNAL: http_client.INTERNAL_SERVER_ERROR,
+    StatusCode.UNAVAILABLE: http_client.SERVICE_UNAVAILABLE,
+    StatusCode.DATA_LOSS: http_client.GONE,
+    StatusCode.UNAUTHENTICATED: http_client.UNAUTHORIZED,
 }
