@@ -154,6 +154,7 @@ const OS_ALIASES = {
   'Ubuntu-16.04': 'Ubuntu 16.04 Xenial Xerus',
   'Ubuntu-18.04': 'Ubuntu 18.04 Bionic Beaver',
   'Ubuntu-20.04': 'Ubuntu 20.04 Focal Fossa',
+  'Ubuntu-22.04': 'Ubuntu 22.04 Jammy Jellyfish',
   'Windows-10-10240': 'Windows 10 version 1507',
   'Windows-10-10586': 'Windows 10 version 1511',
   'Windows-10-14393': 'Windows 10 version 1607',
