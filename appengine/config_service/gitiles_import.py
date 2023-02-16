@@ -178,8 +178,8 @@ def _import_revision(config_set, base_location, commit, project_id):
         config_set, rev_key, archive, location)
     if validation_result.has_errors:
       logging.warning('Invalid revision %s@%s', config_set, revision)
-      notifications.notify_gitiles_rejection(
-          config_set, location, validation_result)
+      notifications.notify_gitiles_rejection(config_set, location,
+                                             validation_result, project_id)
 
       attempt.success = False
       attempt.message = 'Validation errors'

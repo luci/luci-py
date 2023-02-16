@@ -59,7 +59,8 @@ def get_recipients(commit):
   ]
 
 
-def notify_gitiles_rejection(config_set, location, validation_result):
+def notify_gitiles_rejection(config_set, location, validation_result,
+                             project_id):
   """Notifies interested parties about an error in a config set revision.
 
   Sends a notification per location only once.
@@ -68,6 +69,7 @@ def notify_gitiles_rejection(config_set, location, validation_result):
     location (gitiles.Location): an absolute gitiles location of the config set
       that could not be imported.
     validation_result (components.config.validation_context.Result).
+    project_id (str): name of the LUCI project related to this config set.
   """
   assert RE_GIT_HASH.match(location.treeish), location
 
@@ -75,7 +77,7 @@ def notify_gitiles_rejection(config_set, location, validation_result):
     logging.debug('Notification was already sent.')
     return
 
-  log = location.get_log(limit=1)
+  log = location.get_log(project_id=project_id, limit=1)
   if not log or not log.commits:
     logging.error('could not load commit %s', location)
     return

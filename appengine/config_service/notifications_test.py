@@ -58,7 +58,8 @@ class NotificationsTestCase(test_case.TestCase):
 
     # Notify.
 
-    notifications.notify_gitiles_rejection('projects/x', new_loc, ctx.result())
+    notifications.notify_gitiles_rejection('projects/x', new_loc, ctx.result(),
+                                           'x')
 
     self.assertTrue(notifications._send.called)
     email = notifications._send.call_args[0][0]
@@ -86,7 +87,8 @@ class NotificationsTestCase(test_case.TestCase):
 
     # Do not send second time.
     notifications._send.reset_mock()
-    notifications.notify_gitiles_rejection('projects/x', new_loc, ctx.result())
+    notifications.notify_gitiles_rejection('projects/x', new_loc, ctx.result(),
+                                           'x')
     self.assertFalse(notifications._send.called)
 
     # Now with config set.
@@ -101,7 +103,8 @@ class NotificationsTestCase(test_case.TestCase):
     ).put()
 
     template.render.reset_mock()
-    notifications.notify_gitiles_rejection('projects/x', new_loc, ctx.result())
+    notifications.notify_gitiles_rejection('projects/x', new_loc, ctx.result(),
+                                           'x')
     template.render.assert_called_with(
         'templates/validation_notification.html',
         {
