@@ -11,7 +11,10 @@ application to call.
 https://github.com/grpc/grpc/tree/master/src/python/grpcio/grpc
 """
 
-import webapp2
+try:
+  import webapp2
+except ImportError:
+  webapp2 = None
 import cgi
 
 from components.prpc.server_base import ServerBase

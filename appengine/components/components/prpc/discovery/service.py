@@ -4,8 +4,8 @@
 
 """Discovery service implementation."""
 
-import service_pb2
-import service_prpc_pb2
+from . import service_pb2
+from . import service_prpc_pb2
 
 
 class Discovery(object):
