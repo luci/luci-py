@@ -8,6 +8,7 @@ import datetime
 import json
 import logging
 import os
+import random
 import sys
 import tempfile
 import textwrap
@@ -55,7 +56,9 @@ class FakeThreadingEvent(object):
 
   def wait(self, timeout):
     self.slept.append(timeout)
-    self.now += max(0.0, timeout)
+    # Add extra time to emulate "real" sleeps and avoid floating point epsilon
+    # issues when comparing how long we slept.
+    self.now += max(0.0, timeout) + 0.0001
     return self.signaled
 
   def set(self):
@@ -131,24 +134,92 @@ class TestBotBase(net_utils.TestCase):
 
   def poll_once(self):
     self.quit_bit.reset()
-    self.mock(self.loop_state,
-              'maybe_throttle_on_errors', lambda *_args: self.quit_bit.set())
-    self.loop_state.run()
+    self.loop_state.run(test_hook=lambda: False)
 
-  def expected_poll_request(self, response):
+  def expected_poll_request(self,
+                            response,
+                            rbe_idle=None,
+                            sleep_streak=None,
+                            extra_headers=None):
     data = self.bot.attributes
-    data['request_uuid'] = REQUEST_UUID
-    return ('https://localhost:1/swarming/api/v1/bot/poll', {
-        'data': data,
-        'expected_error_codes': None,
-        'follow_redirects': False,
-        'headers': {
-            'Cookie': 'GOOGAPPUID=42',
-            'X-Luci-Swarming-Bot-ID': 'localhost',
+
+    def on_request(kwargs):
+      self.assertEqual(kwargs['data']['request_uuid'], REQUEST_UUID)
+      self.assertEqual(kwargs['data']['dimensions'], data['dimensions'])
+      if rbe_idle is not None:
+        self.assertEqual(kwargs['data']['state']['rbe_idle'], rbe_idle)
+      if sleep_streak is not None:
+        self.assertEqual(kwargs['data']['state']['sleep_streak'], sleep_streak)
+      if extra_headers is not None:
+        with_extra = dict(kwargs['headers'])
+        with_extra.update(extra_headers)
+        self.assertEqual(kwargs['headers'], with_extra)
+
+    return 'https://localhost:1/swarming/api/v1/bot/poll', on_request, response
+
+  def expected_task_update_request(self, task_id):
+    def on_request(kwargs):
+      self.assertEqual(kwargs['data']['task_id'], task_id)
+
+    return (
+        'https://localhost:1/swarming/api/v1/bot/task_update/' + task_id,
+        on_request,
+        {},
+    )
+
+  def expected_rbe_create_request(self, poll_token, session_token, fail=False):
+    data = {
+        'dimensions': self.bot.attributes['dimensions'],
+        'poll_token': poll_token,
+    }
+
+    def on_request(kwargs):
+      self.assertEqual(kwargs['data'], data)
+
+    return (
+        'https://localhost:1/swarming/api/v1/bot/rbe/session/create',
+        on_request,
+        None if fail else {
+            'session_token': session_token,
+            'session_id': 'fake-rbe-session-id',
         },
-        'timeout': remote_client.NET_CONNECTION_TIMEOUT_SEC,
-        'max_attempts': 1,
-    }, response)
+    )
+
+  def expected_rbe_update_request(self,
+                                  poll_token,
+                                  session_token,
+                                  status_in='OK',
+                                  status_out='OK',
+                                  lease_in=None,
+                                  lease_out=None):
+    data = {
+        'status': status_in,
+        'dimensions': self.bot.attributes['dimensions'],
+        'session_token': session_token,
+    }
+    if lease_in:
+      data['lease'] = lease_in
+    # Shutdown requests and pings skip poll tokens.
+    if poll_token:
+      data['poll_token'] = poll_token
+
+    def on_request(kwargs):
+      self.assertEqual(kwargs['data'], data)
+      # Emulate RBE blocking waiting for a lease.
+      self.clock.sleep(10.0)
+
+    response = {
+        'session_token': session_token,
+        'status': status_out,
+    }
+    if lease_out:
+      response['lease'] = lease_out
+
+    return (
+        'https://localhost:1/swarming/api/v1/bot/rbe/session/update',
+        on_request,
+        response,
+    )
 
 
 class TestBotMain(TestBotBase):
@@ -162,6 +233,7 @@ class TestBotMain(TestBotBase):
     self.mock(subprocess42, 'call', self.fail)
     self.mock(time, 'time', lambda: 100.)
     self.mock(remote_client, 'make_appengine_id', lambda *a: 42)
+    self.mock(random, 'uniform', lambda a, _b: a)
     self.mock(bot_main, '_bot_restart', self.fail)
     self.mock(bot_main, 'THIS_FILE',
               os.path.join(test_env_bot_code.BOT_DIR, 'swarming_bot.zip'))
@@ -520,8 +592,12 @@ class TestBotMain(TestBotBase):
 
   def test_run_bot(self):
     # Test the run_bot() loop. Does not use self.bot.
-    self.mock(threading, 'Event', FakeThreadingEvent)
-    self.mock(time, 'time', lambda: 126.0)
+    fake_event = FakeThreadingEvent()
+    fake_clock = clock.Clock(fake_event)
+    fake_clock._now_impl = lambda: fake_event.now
+    self.mock(threading, 'Event', lambda: fake_event)
+    self.mock(clock, 'Clock', lambda _: fake_clock)
+    self.mock(time, 'time', lambda: fake_event.now)
 
     # pylint: disable=unused-argument
     class Popen(object):
@@ -798,14 +874,14 @@ class TestBotMain(TestBotBase):
 
     self.make_bot(lambda: ({'A': 'a'}, time.time() + 3600))
 
-    req = self.expected_poll_request({
+    # Expect the additional header.
+    req = {
         'cmd': 'sleep',
         'duration': 123,
-    })
-    # Expect the additional header.
-    req[1]['headers']['A'] = 'a'
-
-    self.expected_requests([req])
+    }
+    self.expected_requests([
+        self.expected_poll_request(req, extra_headers={'A': 'a'}),
+    ])
     self.poll_once()
     self.assertEqual([123], self.quit_bit.slept)
 
@@ -886,6 +962,329 @@ class TestBotMain(TestBotBase):
 
     self.assertEqual([('Please die now',)], reboots)
     self.assertEqual(None, self.bot.bot_restart_msg())
+
+  def test_rbe_mode_idle(self):
+    # Switches into the RBE mode, creates and polls the session. Gets nothing.
+    self.expected_requests([
+        self.expected_poll_request({
+            'cmd': 'rbe',
+            'rbe': {
+                'poll_token': 'pt0',
+                'instance': 'instance_0',
+            },
+        }),
+        self.expected_rbe_create_request('pt0', 'st0'),
+        self.expected_rbe_update_request('pt0', 'st0'),
+    ])
+    self.poll_once()
+
+    # Wants to report the idle status to Swarming right away. Also polls RBE
+    # as always.
+    self.assertTrue(self.loop_state._swarming_poll_timer.firing)
+    self.expected_requests([
+        self.expected_poll_request(
+            {
+                'cmd': 'rbe',
+                'rbe': {
+                    'poll_token': 'pt0',
+                    'instance': 'instance_0',
+                },
+            },
+            rbe_idle=True,
+            sleep_streak=1),
+        self.expected_rbe_update_request('pt0', 'st0'),
+    ])
+    self.poll_once()
+
+    # Does a bunch of RBE polls until it is time to poll Swarming again. The
+    # exact number depends on sleep timings (which are all mocked in the test).
+    polls = 0
+    while not self.loop_state._swarming_poll_timer.firing:
+      self.assertTrue(self.loop_state._rbe_poll_timer.firing)
+      polls += 1
+      self.expected_requests([
+          self.expected_rbe_update_request('pt0', 'st0'),
+      ])
+      self.poll_once()
+    self.assertEqual(polls, 9)
+
+    # Reports the idle state again, but gets the command to terminate.
+    self.expected_requests([
+        self.expected_poll_request(
+            {
+                'cmd': 'terminate',
+                'task_id': 'terminate-id',
+            },
+            rbe_idle=True,
+            sleep_streak=11),
+        self.expected_rbe_update_request('pt0', 'st0', 'BOT_TERMINATING'),
+        self.expected_task_update_request('terminate-id'),
+    ])
+    self.poll_once()
+
+    # When the bot shuts down, rbe_disable doesn't do anything, since the
+    # session is already closed.
+    self.loop_state.rbe_disable()
+
+  def test_rbe_mode_swarming_task(self):
+    self.mock(bot_main, '_run_manifest', lambda *_args: True)
+    self.mock(bot_main, '_clean_cache', lambda *_args: None)
+    self.mock(bot_main, '_update_lkgbc', lambda *_args: None)
+
+    # Switches into the RBE mode, creates and polls the session. Gets nothing.
+    self.expected_requests([
+        self.expected_poll_request({
+            'cmd': 'rbe',
+            'rbe': {
+                'poll_token': 'pt0',
+                'instance': 'instance_0',
+            },
+        }),
+        self.expected_rbe_create_request('pt0', 'st0'),
+        self.expected_rbe_update_request('pt0', 'st0'),
+    ])
+    self.poll_once()
+
+    # Reports the idle status to Swarming right away but suddenly gets a task.
+    # This forces the bot to shutdown the session.
+    self.assertTrue(self.loop_state._swarming_poll_timer.firing)
+    self.expected_requests([
+        self.expected_poll_request(
+            {
+                'cmd': 'run',
+                'manifest': {
+                    'task_id': 'task-id',
+                },
+            },
+            rbe_idle=True,
+            sleep_streak=1),
+        self.expected_rbe_update_request(None, 'st0', 'BOT_TERMINATING'),
+    ])
+    self.poll_once()
+
+    # On the next poll the bot is still in the Swarming mode.
+    self.assertTrue(self.loop_state._swarming_poll_timer.firing)
+    self.expected_requests([
+        self.expected_poll_request({
+            'cmd': 'sleep',
+            'duration': 5.0,
+        }),
+    ])
+    self.poll_once()
+
+    # On the next poll opens a new RBE session.
+    self.expected_requests([
+        self.expected_poll_request({
+            'cmd': 'rbe',
+            'rbe': {
+                'poll_token': 'pt1',
+                'instance': 'instance_1',
+            },
+        }),
+        self.expected_rbe_create_request('pt1', 'st1'),
+        self.expected_rbe_update_request('pt1', 'st1'),
+    ])
+    self.poll_once()
+
+  def test_rbe_mode_unhealthy_session(self):
+    self.mock(self.loop_state, 'report_exception', lambda *_args: None)
+
+    # Switches into the RBE mode. Tries to open a session and fails.
+    self.expected_requests([
+        self.expected_poll_request({
+            'cmd': 'rbe',
+            'rbe': {
+                'poll_token': 'pt0',
+                'instance': 'instance_0',
+            },
+        }),
+        self.expected_rbe_create_request('pt0', 'st0', fail=True),
+    ])
+    self.poll_once()
+
+    # This is recognized as an error.
+    self.assertEqual(self.loop_state._rbe_consecutive_errors, 1)
+
+    # On the next poll tries to open the session again. It succeeds, but then
+    # the poll reports the session is gone.
+    self.expected_requests([
+        self.expected_poll_request({
+            'cmd': 'rbe',
+            'rbe': {
+                'poll_token': 'pt1',
+                'instance': 'instance_0',
+            },
+        }),
+        self.expected_rbe_create_request('pt1', 'st1'),  # resets cons. errors
+        self.expected_rbe_update_request('pt1', 'st1', status_out='UNHEALTHY'),
+    ])
+    self.poll_once()
+
+    # This is also recognized as an error.
+    self.assertEqual(self.loop_state._rbe_consecutive_errors, 1)
+
+    # Termination doesn't do anything, there's no session.
+    self.loop_state.rbe_disable()
+
+  def test_rbe_mode_switching_instance(self):
+    # Switches into the RBE mode, creates and polls the session. Gets nothing.
+    self.expected_requests([
+        self.expected_poll_request({
+            'cmd': 'rbe',
+            'rbe': {
+                'poll_token': 'pt0',
+                'instance': 'instance_0',
+            },
+        }),
+        self.expected_rbe_create_request('pt0', 'st0'),
+        self.expected_rbe_update_request('pt0', 'st0'),
+    ])
+    self.poll_once()
+
+    # Wants to report it as idle, but suddenly told to use another instance.
+    # Closes the old session and opens the new one.
+    self.expected_requests([
+        self.expected_poll_request(
+            {
+                'cmd': 'rbe',
+                'rbe': {
+                    'poll_token': 'pt1',
+                    'instance': 'instance_1',
+                },
+            },
+            rbe_idle=True,
+            sleep_streak=1),
+        self.expected_rbe_update_request(None, 'st0', 'BOT_TERMINATING'),
+        self.expected_rbe_create_request('pt1', 'st1'),
+        self.expected_rbe_update_request('pt1', 'st1'),
+    ])
+    self.poll_once()
+
+  def test_rbe_mode_handling_noop_leases(self):
+    finished = []
+    self.mock(self.loop_state, 'on_task_completed', finished.append)
+
+    # Switches into the RBE mode, creates and polls the session. Gets a lease
+    # right away.
+    cur_lease_id = 0
+    self.expected_requests([
+        self.expected_poll_request({
+            'cmd': 'rbe',
+            'rbe': {
+                'poll_token': 'pt0',
+                'instance': 'instance_0',
+            },
+        }),
+        self.expected_rbe_create_request('pt0', 'st0'),
+        self.expected_rbe_update_request('pt0',
+                                         'st0',
+                                         lease_out={
+                                             'id': 'lease-%d' % cur_lease_id,
+                                             'payload': {
+                                                 'noop': True
+                                             },
+                                             'state': 'PENDING',
+                                         }),
+    ])
+    self.poll_once()
+
+    # Did something.
+    self.assertEqual(len(finished), 1)
+    self.assertFalse(self.loop_state.idle)
+
+    # Keeps spinning finishing leases back to back until it is time to call
+    # Swarming to see what to do next.
+    while not self.loop_state._swarming_poll_timer.firing:
+      self.assertTrue(self.loop_state._rbe_poll_timer.firing)
+      self.assertEqual(len(finished), cur_lease_id + 1)
+      self.assertFalse(self.loop_state.idle)
+      self.expected_requests([
+          self.expected_rbe_update_request(
+              'pt0',
+              'st0',
+              lease_in={
+                  'id': 'lease-%d' % cur_lease_id,
+                  'result': {},
+                  'state': 'COMPLETED',
+              },
+              lease_out={
+                  'id': 'lease-%d' % (cur_lease_id + 1),
+                  'payload': {
+                      'noop': True
+                  },
+                  'state': 'PENDING',
+              },
+          ),
+      ])
+      self.poll_once()
+      cur_lease_id += 1
+
+    # This number depends on mocked sleep timings.
+    self.assertEqual(cur_lease_id, 9)
+
+    # Tells Swarming the bot is busy doing RBE leases. Also reports the result
+    # of the last lease and gets the next one.
+    self.expected_requests([
+        self.expected_poll_request(
+            {
+                'cmd': 'rbe',
+                'rbe': {
+                    'poll_token': 'pt0',
+                    'instance': 'instance_0',
+                },
+            },
+            rbe_idle=False,
+            sleep_streak=0),
+        self.expected_rbe_update_request(
+            'pt0',
+            'st0',
+            lease_in={
+                'id': 'lease-%d' % cur_lease_id,
+                'result': {},
+                'state': 'COMPLETED',
+            },
+            lease_out={
+                'id': 'lease-%d' % (cur_lease_id + 1),
+                'payload': {
+                    'noop': True
+                },
+                'state': 'PENDING',
+            },
+        ),
+    ])
+    self.poll_once()
+    cur_lease_id += 1
+
+    # Finally RBE tells there are no more leases.
+    self.expected_requests([
+        self.expected_rbe_update_request(
+            'pt0',
+            'st0',
+            lease_in={
+                'id': 'lease-%d' % cur_lease_id,
+                'result': {},
+                'state': 'COMPLETED',
+            },
+        ),
+    ])
+    self.poll_once()
+
+    # The bot is idle now and want to report this to Swarming ASAP.
+    self.assertTrue(self.loop_state.idle)
+    self.expected_requests([
+        self.expected_poll_request(
+            {
+                'cmd': 'rbe',
+                'rbe': {
+                    'poll_token': 'pt0',
+                    'instance': 'instance_0',
+                },
+            },
+            rbe_idle=True,
+            sleep_streak=1),
+        self.expected_rbe_update_request('pt0', 'st0'),
+    ])
+    self.poll_once()
 
   def _mock_popen(self,
                   returncode=0,
@@ -1237,6 +1636,7 @@ class TestBotNotMocked(TestBotBase):
       calls.append(args)
       return 23
     self.mock(bot_main.common, 'exec_python', exec_python)
+
     # pylint: disable=unused-argument
     class Popen(object):
       def __init__(self2, cmd, cwd, stdin, stdout, stderr, detached, **kwargs):
@@ -1260,6 +1660,7 @@ class TestBotNotMocked(TestBotBase):
         return '', None
     self.mock(subprocess42, 'Popen', Popen)
 
+    self.mock(time, 'sleep', lambda _: None)
     self.mock(self.bot, 'post_event', lambda *_args: None)
 
     with self.assertRaises(SystemExit) as e:

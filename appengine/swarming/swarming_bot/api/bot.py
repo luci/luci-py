@@ -37,6 +37,7 @@ class Bot(object):
     # Mutable, see BotMutator.
     self._lock = threading.Lock()
     self._exit_hook = None
+    self._idle = False
     self._dimensions = (attributes or {}).get('dimensions') or {}
     self._state = (attributes or {}).get('state') or {}
     self._bot_version = (attributes or {}).get('version') or 'unknown'
@@ -44,7 +45,8 @@ class Bot(object):
     self._server_side_dimensions = {}
     self._bot_restart_msg = None
     self._bot_config = {}
-    self._rbe_state = None
+    self._rbe_instance = None
+    self._rbe_session = None
 
     # Populate parts of self._dimensions and self._state that depend on other
     # fields with default values.
@@ -158,17 +160,6 @@ class Bot(object):
           'state': copy.deepcopy(self._state),
           'version': self._bot_version,
       }
-
-  @property
-  def rbe_state(self):
-    """A copy of the dict with RBE-related state of the bot (or {}).
-
-    The dict has keys:
-      `instance`: the full RBE instance to use.
-      `poll_token` a token to send to the Swarming RBE endpoints.
-    """
-    with self._lock:
-      return self._rbe_state.copy() if self._rbe_state else {}
 
   @property
   def swarming_bot_zip(self):
@@ -302,11 +293,6 @@ class BotMutator(object):
   def __init__(self, bot):
     self._bot = bot
 
-  @property
-  def rbe_instance(self):
-    """The currently used RBE instance or None if not using RBE."""
-    return (self._bot._rbe_state or {}).get('instance')
-
   def update_bot_group_cfg(self, cfg_version, cfg):
     """Picks up the server-provided per-bot config.
 
@@ -330,13 +316,18 @@ class BotMutator(object):
     self._bot._bot_config = {'name': name, 'revision': rev}
     self._refresh_attributes()
 
-  def update_rbe_state(self, rbe_state):
-    """Changes the RBE mode parameters."""
-    old_inst = self.rbe_instance or 'none'
-    self._bot._rbe_state = (rbe_state or {}).copy()
-    new_inst = self.rbe_instance or 'none'
-    if old_inst != new_inst:
-      logging.info('RBE instance change: %s => %s', old_inst, new_inst)
+  def update_idleness(self, idle):
+    """Changes the idleness state of the bot, returns the previous value."""
+    idle = bool(idle)
+    if self._bot._idle == idle:
+      return idle
+    prev, self._bot._idle = self._bot._idle, idle
+    self._refresh_attributes()
+    return prev
+
+  def update_rbe_state(self, instance, session):
+    self._bot._rbe_instance = instance
+    self._bot._rbe_session = session
     self._refresh_attributes()
 
   def update_dimensions(self, new_dimensions):
@@ -353,11 +344,13 @@ class BotMutator(object):
   def update_state(self, new_state):
     """Updates `bot.state` by merging-in automatically set keys."""
     state = new_state.copy()
-    state['rbe_instance'] = self.rbe_instance
-    if self.rbe_instance:
-      # TODO(crbug.com/1377118): Populate correctly.
-      state['rbe_session'] = None
-      state['rbe_idle'] = True
+    state['rbe_instance'] = self._bot._rbe_instance
+    if self._bot._rbe_instance:
+      state['rbe_session'] = self._bot._rbe_session
+      state['rbe_idle'] = self._bot._idle
+    else:
+      state.pop('rbe_session', None)
+      state.pop('rbe_idle', None)
     state['bot_group_cfg_version'] = self._bot._bot_group_cfg_ver
     if self._bot._bot_config:
       state['bot_config'] = self._bot._bot_config
