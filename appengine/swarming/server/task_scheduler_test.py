@@ -578,84 +578,27 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         ts_mon_metrics._task_state_change_pubsub_notify_latencies.get(
             fields=_update_fields_pubsub(status=status, http_status_code=200)))
 
-  def test_schedule_request_new_key(self):
-    # Ensure that _gen_new_keys work by generating deterministic key.
-    self.mock(random, 'getrandbits', lambda _bits: 42)
-    old_gen_new_keys = self.mock(task_scheduler, '_gen_new_keys', self.fail)
+  def test_schedule_request_task_id_collision(self):
     self._register_bot(self.bot_dimensions)
+
+    key1 = task_request.new_request_key()
+    key2 = task_request.new_request_key()
+    self.assertNotEqual(key1, key2)
+
+    keys = []
+    self.mock(task_request, 'new_request_key', lambda: keys.pop(0))
+
+    # Creates the request without any collisions.
+    keys[:] = [key1]
     result_summary_1 = self._quick_schedule()
-    self.assertEqual('1d69b9f088002a10', result_summary_1.task_id)
+    self.assertEqual(key1, result_summary_1.request_key)
+    self.assertFalse(keys)
 
-    def _gen_new_keys(result_summary, to_run, secret_bytes, build_token):
-      self.assertTrue(result_summary)
-      self.assertTrue(to_run)
-      self.assertIsNone(secret_bytes)
-      self.assertIsNone(build_token)
-      # Change the random bits to give a chance to get a new key ID.
-      self.mock(random, 'getrandbits', lambda _bits: 43)
-      return old_gen_new_keys(result_summary, to_run, secret_bytes, build_token)
-
-    old_gen_new_keys = self.mock(task_scheduler, '_gen_new_keys', _gen_new_keys)
-    # In this case, _gen_new_keys is called because:
-    # - Time is exactly the same, as utils.utcnow() is mocked.
-    # - random.getrandbits() always return the same value.
-    # This leads into a constant TaskRequest key id, leading to conflict in
-    # datastore_utils.insert(), which causes a call to _gen_new_keys().
+    # Collides on the existing key, but switches to the next one.
+    keys[:] = [key1, key2]
     result_summary_2 = self._quick_schedule()
-    self.assertEqual('1d69b9f088002b10', result_summary_2.task_id)
-
-  def test_schedule_request_new_key_idempotent(self):
-    # Ensure that _gen_new_keys work by generating deterministic key, but in the
-    # case of task deduplication.
-    pub_sub_calls = self.mock_pub_sub()
-    self.mock(random, 'getrandbits', lambda _bits: 42)
-    task_id_1 = self._task_ran_successfully()
-    self.assertEqual('1d69b9f088002a11', task_id_1)
-
-    def _gen_new_keys(result_summary, to_run, secret_bytes, build_token):
-      self.assertTrue(result_summary)
-      self.assertIsNone(to_run)
-      self.assertIsNone(secret_bytes)
-      self.assertIsNone(build_token)
-      # Change the random bits to give a chance to get a new key ID.
-      self.mock(random, 'getrandbits', lambda _bits: 43)
-      return old_gen_new_keys(result_summary, to_run, secret_bytes, build_token)
-
-    old_gen_new_keys = self.mock(task_scheduler, '_gen_new_keys', _gen_new_keys)
-    # In this case, _gen_new_keys is called because:
-    # - Time is exactly the same, as utils.utcnow() is mocked.
-    # - random.getrandbits() always return the same value.
-    # This leads into a constant TaskRequest key id, leading to conflict in
-    # datastore_utils.insert(), which causes a call to _gen_new_keys().
-    result_summary_2 = self._quick_schedule(
-        task_slices=[
-            task_request.TaskSlice(
-                expiration_secs=60,
-                properties=_gen_properties(idempotent=True),
-                wait_for_capacity=False),
-        ],
-        pubsub_topic='projects/abc/topics/def')
-    self.assertEqual('1d69b9f088002b10', result_summary_2.task_id)
-    self.assertEqual(State.COMPLETED, result_summary_2.state)
-    self.assertEqual(task_id_1, result_summary_2.deduped_from)
-    expected = [
-        (
-            'directly',
-            {
-                'attributes': None,
-                'message': '{"task_id":"1d69b9f088002b10"}',
-                'topic': u'projects/abc/topics/def',
-            },
-        ),
-    ]
-    self.assertEqual(expected, pub_sub_calls)
-    status = State.to_string(State.COMPLETED)
-    self.assertLessEqual(
-        0,
-        ts_mon_metrics._task_state_change_pubsub_notify_latencies.get(
-            fields=_update_fields_pubsub(status=status,
-                                         http_status_code=200)).sum)
-
+    self.assertEqual(key2, result_summary_2.request_key)
+    self.assertFalse(keys)
 
   def test_schedule_request_no_capacity(self):
     # No capacity, denied. That's the default.

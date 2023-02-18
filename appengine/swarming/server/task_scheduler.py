@@ -15,6 +15,7 @@ import math
 import random
 import time
 import urlparse
+import uuid
 
 from google.appengine.api import app_identity
 from google.appengine.api import datastore_errors
@@ -1106,38 +1107,6 @@ def _should_allow_es_fallback(es_cfg, request):
   return task_es_cfg == es_cfg
 
 
-def _gen_new_keys(result_summary,
-                  to_run=None,
-                  secret_bytes=None,
-                  build_token=None):
-  """Creates new keys for the entities and returns the TaskRequest key.
-
-  Warning: this assumes knowledge about the hierarchy of each entity.
-
-  Arguments:
-    - result_summary: a task_result.TaskResultSummary instance.
-    - to_run: a task_to_run.TaskToRunShard instance.
-    - secret_bytes: Optional SecretBytes entity to be saved in the DB. It's key
-              will be set and the entity will be stored by this function.
-    - build_token: Optional BuildToken entity to be saved in the DB. It's key
-              will be set and the entity will be stored by this function.
-
-  Returns:
-    A valid ndb.Key.
-  """
-  key = task_request.new_request_key()
-  if to_run:
-    to_run.key = ndb.Key(to_run.key.kind(), to_run.key.id(), parent=key)
-  if secret_bytes:
-    secret_bytes.key = task_pack.request_key_to_secret_bytes_key(key)
-  if build_token:
-    build_token.key = task_pack.request_key_to_build_token_key(key)
-  old = result_summary.task_id
-  result_summary.key = task_pack.request_key_to_result_summary_key(key)
-  logging.info('%s conflicted, using %s', old, result_summary.task_id)
-  return key
-
-
 ### Public API.
 
 
@@ -1205,12 +1174,14 @@ def schedule_request(request,
 
   task_asserted_future = task_queues.assert_task_async(request)
   now = utils.utcnow()
+
+  # Note: this key is not final. We may need to change it in the transaction
+  # below if it is already occupied.
   request.key = task_request.new_request_key()
   result_summary = task_result.new_result_summary(request)
   result_summary.modified_ts = now
-  to_run = None
-  resultdb_update_token_future = None
 
+  # If have results for any idempotent slice, reuse it. No need to run anything.
   dupe_summary = None
   for i in range(request.num_task_slices):
     t = request.task_slice(i)
@@ -1224,46 +1195,43 @@ def schedule_request(request,
         # Since the task is never scheduled, TaskToRunShard is not stored.
         # Since the has_secret_bytes/has_build_token property is already set
         # for UI purposes, and the task itself will never be run, we skip
-        # storing storing the SecretBytes/BuildToken, as they would never be
-        # read and will just consume space in the datastore (and the task we
-        # deduplicated with will have them stored anyway, if we really want to
-        # get them again).
+        # storing the SecretBytes/BuildToken, as they would never be read and
+        # will just consume space in the datastore (and the task we deduplicated
+        # with will have them stored anyway, if we really want to get them
+        # again).
         secret_bytes = None
         build_token = None
         break
 
+  to_run = None
+  resultdb_update_token_future = None
+
   if not dupe_summary:
-    # The task has to run.
-    index = 0
-    while index < request.num_task_slices:
-      # This needs to be extremely fast.
-      to_run = task_to_run.new_task_to_run(request, index)
-      logging.debug('TODO(crbug.com/1186759): expiration_ts %s',
-                    to_run.expiration_ts)
-      #  Make sure there's capacity if desired.
+    # The task has to run. Find a slice index that should be launched based
+    # on available capacity.
+    for index in range(request.num_task_slices):
       t = request.task_slice(index)
       if (t.wait_for_capacity or
           bot_management.has_capacity(t.properties.dimensions)):
-        # It's pending at this index now.
+        # Pick this slice as the current.
         result_summary.current_task_slice = index
+        to_run = task_to_run.new_task_to_run(request, index)
+        if enable_resultdb:
+          # TODO(vadimsh): The invocation may end up associated with wrong
+          # task ID if we end up changing `request.key` in the transaction
+          # below due to a collision.
+          resultdb_update_token_future = resultdb.create_invocation_async(
+              task_pack.pack_run_result_key(to_run.run_result_key),
+              request.realm, request.execution_deadline)
         break
-      index += 1
-
-    if index == request.num_task_slices:
-      # Skip to_run since it's not enqueued.
+    else:
+      # No available capacity for any slice. Fail the task right away.
       to_run = None
-      # Same rationale as deduped task.
       secret_bytes = None
       build_token = None
-      # Instantaneously denied.
       result_summary.abandoned_ts = result_summary.created_ts
       result_summary.completed_ts = result_summary.created_ts
       result_summary.state = task_result.State.NO_RESOURCE
-
-    elif enable_resultdb:
-      resultdb_update_token_future = resultdb.create_invocation_async(
-          task_pack.pack_run_result_key(to_run.run_result_key), request.realm,
-          request.execution_deadline)
 
   # Determine external scheduler (if relevant) prior to making task live, to
   # make HTTP handler return as fast as possible after making task live.
@@ -1273,6 +1241,7 @@ def schedule_request(request,
   # user but it is safe as the task request wasn't stored yet.
   task_asserted_future.get_result()
 
+  # Wait until ResultDB invocation is created to get its update token.
   if resultdb_update_token_future:
     request.resultdb_update_token = resultdb_update_token_future.get_result()
     result_summary.resultdb_info = task_result.ResultDBInfo(
@@ -1281,29 +1250,64 @@ def schedule_request(request,
             task_pack.pack_run_result_key(to_run.run_result_key)),
     )
 
-  # Note: keys must be set before calling `datastore_utils.insert()`.
-  # _gen_new_keys() is only called if the existing TaskRequest.key already
-  # exists and a new one needs to be generated.
-  if secret_bytes:
-    secret_bytes.key = request.secret_bytes_key
-  if build_token:
-    build_token.key = request.build_token_key
-  # Storing these entities makes this task live. It is important at this point
-  # that the HTTP handler returns as fast as possible, otherwise the task will
-  # be run but the client will not know about it.
-  _gen_key = lambda: _gen_new_keys(
-      result_summary,
-      to_run=to_run,
-      secret_bytes=secret_bytes,
-      build_token=build_token)
-  extra = filter(bool, [result_summary, to_run, secret_bytes, build_token])
-  datastore_utils.insert(request, new_key_callback=_gen_key, extra=extra)
+  def reparent(key):
+    """Changes entity group key for all entities being stored."""
+    request.key = key
+    result_summary.key = task_pack.request_key_to_result_summary_key(key)
+    if to_run:
+      to_run.key = ndb.Key(to_run.key.kind(), to_run.key.id(), parent=key)
+    if secret_bytes:
+      secret_bytes.key = request.secret_bytes_key
+    if build_token:
+      build_token.key = request.build_token_key
+
+  # Populate all initial keys.
+  reparent(request.key)
+
+  # This is used to detect if we actually already stored entities in `txn`
+  # on a retry after a transient error.
+  request.txn_uuid = str(uuid.uuid4())
+
+  def txn():
+    """Returns True if stored everything, False on an ID collision."""
+    existing = request.key.get()
+    if existing:
+      return existing.txn_uuid == request.txn_uuid
+    ndb.put_multi(
+        filter(bool, [
+            request,
+            result_summary,
+            to_run,
+            secret_bytes,
+            build_token,
+        ]))
+    return True
+
+  # Try to transactionally insert the request retrying on task ID collisions
+  # (which should be rare).
+  attempt = 0
+  while True:
+    attempt += 1
+    try:
+      if datastore_utils.transaction(txn, retries=3):
+        break
+      # There was an existing *different* entity. We need a new root key.
+      prev = result_summary.task_id
+      reparent(task_request.new_request_key())
+      logging.warning('Task ID collision: %s already exists, using %s instead',
+                      prev, result_summary.task_id)
+    except datastore_utils.CommitError:
+      # The transaction likely failed. Retry with the same key to confirm.
+      pass
+  logging.debug('Committed txn on attempt %d', attempt)
 
   # Note: This external_scheduler call is blocking, and adds risk
   # of the HTTP handler being slow or dying after the task was already made
   # live. On the other hand, this call is only being made for tasks in a pool
   # that use an external scheduler, and which are not effectively live unless
   # the external scheduler is aware of them.
+  #
+  # TODO(vadimsh): This should happen via a transactionally enqueued TQ task.
   if es_cfg:
     external_scheduler.notify_requests(es_cfg, [(request, result_summary)],
                                        False, False)
@@ -1323,6 +1327,7 @@ def schedule_request(request,
 
   # Either the task was deduped, or forcibly refused. Notify through PubSub.
   if result_summary.state != task_result.State.PENDING:
+    # TODO(vadimsh): This should be moved into txn() above.
     _maybe_taskupdate_notify_via_tq(result_summary,
                                     request,
                                     es_cfg,

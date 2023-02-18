@@ -1115,6 +1115,11 @@ class TaskRequest(ndb.Model):
   # to this property.
   created_ts = ndb.DateTimeProperty(required=True)
 
+  # Used to make the transaction that creates TaskRequest idempotent.
+  # Just a random string. Should not be used for anything else. Should not show
+  # up anywhere.
+  txn_uuid = ndb.StringProperty(required=False)
+
   ## What
 
   # The TaskSlice describes what to run. When the list has more than one item,
@@ -1310,6 +1315,7 @@ class TaskRequest(ndb.Model):
         'resultdb_update_token',
         'task_slice',
         'scheduling_algorithm',
+        'txn_uuid',
     ])
     if self.properties_old:
       out['properties'] = self.properties_old.to_dict()
