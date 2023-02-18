@@ -551,14 +551,22 @@ class TaskRequestApiTest(TestCase):
         'outputs': [],
     }
     expected_request = {
-        'authenticated': auth_testing.DEFAULT_MOCKED_IDENTITY,
-        'has_build_token': False,
-        'name': u'Request name',
-        'parent_task_id': unicode(parent_id),
-        'priority': 50,
-        'pubsub_topic': None,
-        'pubsub_userdata': None,
-        'service_account': u'none',
+        'authenticated':
+        auth_testing.DEFAULT_MOCKED_IDENTITY,
+        'has_build_token':
+        False,
+        'name':
+        u'Request name',
+        'parent_task_id':
+        unicode(parent_id),
+        'priority':
+        50,
+        'pubsub_topic':
+        None,
+        'pubsub_userdata':
+        None,
+        'service_account':
+        u'none',
         'tags': [
             u'OS:Windows-3.1.1',
             u'authenticated:user:mocked@example.com',
@@ -572,16 +580,25 @@ class TaskRequestApiTest(TestCase):
             u'tag:1',
             u'user:Jesus',
         ],
-        'task_slices': [{
-            'expiration_secs': 30,
-            'properties': expected_properties,
-            'wait_for_capacity': False,
-        },],
-        'user': u'Jesus',
-        'realm': None,
-        'realms_enabled': False,
-        'bot_ping_tolerance_secs': 120,
-        'resultdb': None,
+        'task_slices': [
+            {
+                'expiration_secs': 30,
+                'properties': expected_properties,
+                'wait_for_capacity': False,
+            },
+        ],
+        'user':
+        u'Jesus',
+        'realm':
+        None,
+        'realms_enabled':
+        False,
+        'bot_ping_tolerance_secs':
+        120,
+        'resultdb':
+        None,
+        'rbe_instance':
+        None,
     }
     actual = req.to_dict()
     actual.pop('created_ts')
@@ -666,14 +683,22 @@ class TaskRequestApiTest(TestCase):
         'has_secret_bytes': True,
     }
     expected_request = {
-        'authenticated': auth_testing.DEFAULT_MOCKED_IDENTITY,
-        'has_build_token': False,
-        'name': u'Request name',
-        'parent_task_id': parent_id,
-        'priority': 50,
-        'pubsub_topic': None,
-        'pubsub_userdata': None,
-        'service_account': u'none',
+        'authenticated':
+        auth_testing.DEFAULT_MOCKED_IDENTITY,
+        'has_build_token':
+        False,
+        'name':
+        u'Request name',
+        'parent_task_id':
+        parent_id,
+        'priority':
+        50,
+        'pubsub_topic':
+        None,
+        'pubsub_userdata':
+        None,
+        'service_account':
+        u'none',
         'tags': [
             u'OS:Windows-3.1.1',
             u'authenticated:user:mocked@example.com',
@@ -687,16 +712,25 @@ class TaskRequestApiTest(TestCase):
             u'tag:1',
             u'user:Jesus',
         ],
-        'task_slices': [{
-            'expiration_secs': 30,
-            'properties': expected_properties,
-            'wait_for_capacity': False,
-        },],
-        'user': u'Jesus',
-        'realm': None,
-        'realms_enabled': False,
-        'bot_ping_tolerance_secs': 120,
-        'resultdb': None,
+        'task_slices': [
+            {
+                'expiration_secs': 30,
+                'properties': expected_properties,
+                'wait_for_capacity': False,
+            },
+        ],
+        'user':
+        u'Jesus',
+        'realm':
+        None,
+        'realms_enabled':
+        False,
+        'bot_ping_tolerance_secs':
+        120,
+        'resultdb':
+        None,
+        'rbe_instance':
+        None,
     }
     actual = req.to_dict()
     # expiration_ts - created_ts == scheduling_expiration_secs.

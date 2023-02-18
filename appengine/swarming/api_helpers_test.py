@@ -147,10 +147,28 @@ class TestProcessTaskRequest(test_case.TestCase):
     self.assertIn(
         'only if the task is associated with a realm', exc.exception.message)
 
-  def mock_pool_config(self, name):
+  def test_process_task_request_rbe_mode(self):
+    self.mock(realms, 'check_tasks_create_in_realm', lambda *_: True)
+    self.mock(realms, 'check_pools_create_task', lambda *_: True)
+
+    self.mock_pool_config(
+        'default',
+        pools_pb2.Pool.RBEMigration(
+            rbe_instance='rbe-inst',
+            rbe_mode_percent=100,
+        ))
+
+    tr = self.basic_task_request()
+    api_helpers.process_task_request(tr, task_request.TEMPLATE_AUTO)
+
+    self.assertEqual(tr.rbe_instance, 'rbe-inst')
+    self.assertIn(u'rbe:rbe-inst', tr.tags)
+
+  def mock_pool_config(self, name, rbe_migration=None):
     mocked = pools_config.init_pool_config(
         name=name,
         rev='rev',
+        rbe_migration=rbe_migration,
         scheduling_algorithm=pools_pb2.Pool.SCHEDULING_ALGORITHM_LIFO,
     )
 

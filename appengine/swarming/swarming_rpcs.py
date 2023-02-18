@@ -572,6 +572,9 @@ class TaskRequest(messages.Message):
   pubsub_userdata = messages.StringField(12)
   bot_ping_tolerance_secs = messages.IntegerField(14)
 
+  # RBE migration fields.
+  rbe_instance = messages.StringField(18)
+
 
 class TaskCancelRequest(messages.Message):
   """Request to cancel one task."""

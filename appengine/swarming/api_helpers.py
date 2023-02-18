@@ -3,6 +3,7 @@
 # that can be found in the LICENSE file.
 """Functions that do common acl checking/processing on internal ndb objects."""
 
+import bisect
 import datetime
 import logging
 import re
@@ -16,6 +17,7 @@ import handlers_exceptions
 from server import acl
 from server import config
 from server import pools_config
+from server import rbe
 from server import realms
 from server import service_accounts
 from server import service_accounts_utils
@@ -54,6 +56,17 @@ def process_task_request(tr, template_apply):
   # Use the scheduling algorithm configured for the pool.
   assert pool_cfg.scheduling_algorithm is not None
   tr.scheduling_algorithm = pool_cfg.scheduling_algorithm
+
+  # Decide if the task should use the RBE Scheduler.
+  tr.rbe_instance = rbe.get_rbe_instance_for_task(tr.tags, pool_cfg)
+  if tr.rbe_instance:
+    logging.info('RBE: scheduling through %s', tr.rbe_instance)
+
+  # For tasks in pools that have the RBE config, add an extra tag useful to see
+  # what tasks are *actually* scheduled through RBE. Note that init_new_request
+  # sorted tags already.
+  if pool_cfg.rbe_migration and pool_cfg.rbe_migration.rbe_instance:
+    bisect.insort(tr.tags, u'rbe:%s' % (tr.rbe_instance or 'none'))
 
   # TODO(crbug.com/1109378): Check ACLs before calling init_new_request to
   # avoid leaking information about pool templates to unauthorized callers.

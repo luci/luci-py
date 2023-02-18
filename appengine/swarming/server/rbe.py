@@ -9,6 +9,7 @@ import hashlib
 import hmac
 import logging
 import os
+import random
 import uuid
 
 from google.appengine.api import app_identity
@@ -35,7 +36,7 @@ def warmup():
     logging.exception('Failed to warmup up RBE HMAC key')
 
 
-def get_rbe_instance(bot_id, pools, bot_group_cfg):
+def get_rbe_instance_for_bot(bot_id, pools, bot_group_cfg):
   """Returns an RBE instance to use for the given bot.
 
   If the bot should not be using RBE, returns None.
@@ -177,6 +178,36 @@ def generate_poll_token(bot_id, rbe_instance, enforced_dimensions,
       payload=state_blob,
       hmac_sha256=hmac_digest)
   return base64.b64encode(envelope.SerializeToString())
+
+
+def get_rbe_instance_for_task(task_tags, pool_cfg):
+  """Returns RBE instance to use for a task or None to use native scheduler.
+
+  Args:
+    task_tags: a list of string tags (as 'k:v' pairs).
+    pool_cfg: pools_config.PoolConfig with the target pool config.
+
+  Returns:
+    A string with RBE instance name to use by the bot or None.
+  """
+  rbe_cfg = pool_cfg.rbe_migration
+  if not rbe_cfg or not rbe_cfg.rbe_instance:
+    return None
+
+  # Per-task overrides useful for one-off experiments.
+  if 'rbe:prevent' in task_tags:
+    return None
+  if 'rbe:require' in task_tags:
+    return rbe_cfg.rbe_instance
+
+  # Random dice.
+  if rbe_cfg.rbe_mode_percent <= 0:
+    return None
+  if rbe_cfg.rbe_mode_percent >= 100:
+    return rbe_cfg.rbe_instance
+  if random.uniform(0, 100) < rbe_cfg.rbe_mode_percent:
+    return rbe_cfg.rbe_instance
+  return None
 
 
 ### Private stuff.

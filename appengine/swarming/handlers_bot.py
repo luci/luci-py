@@ -419,8 +419,8 @@ class _BotBaseHandler(_BotApiHandler):
       dimensions[dim_key] = from_cfg
 
     # Check the config to see if this bot is in the RBE mode.
-    rbe_instance = rbe.get_rbe_instance(bot_id, dimensions.get('pool'),
-                                        bot_group_cfg)
+    rbe_instance = rbe.get_rbe_instance_for_bot(bot_id, dimensions.get('pool'),
+                                                bot_group_cfg)
 
     # Fill in all result fields except 'quarantined_msg'.
     result = _ProcessResult(request=request,

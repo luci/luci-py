@@ -47,15 +47,16 @@ class RBETest(test_case.TestCase):
     return bot_groups_config.BotGroupConfig(**kwargs)
 
   @staticmethod
-  def pool_config(rbe_instance):
+  def pool_config(rbe_instance, rbe_mode_percent=100):
     rbe_mgration = None
     if rbe_instance is not None:
-      rbe_mgration = pools_pb2.Pool.RBEMigration(rbe_instance=rbe_instance)
+      rbe_mgration = pools_pb2.Pool.RBEMigration(
+          rbe_instance=rbe_instance, rbe_mode_percent=rbe_mode_percent)
     return pools_config.init_pool_config(rbe_migration=rbe_mgration)
 
   @mock.patch('server.pools_config.get_pool_config')
   @mock.patch('server.rbe._quasi_random_100')
-  def test_get_rbe_instance(self, quasi_random_100, pool_config):
+  def test_get_rbe_instance_for_bot(self, quasi_random_100, pool_config):
     pools = {
         'pool-1-a': self.pool_config('instance-1'),
         'pool-1-b': self.pool_config('instance-1'),
@@ -68,42 +69,58 @@ class RBETest(test_case.TestCase):
     quasi_random_100.return_value = 30.0
 
     # Randomizer.
-    instance = rbe.get_rbe_instance('bot-id', ['pool-1-a'],
-                                    self.bot_groups_config(rbe_mode_percent=25))
+    instance = rbe.get_rbe_instance_for_bot(
+        'bot-id', ['pool-1-a'], self.bot_groups_config(rbe_mode_percent=25))
     self.assertIsNone(instance)
-    instance = rbe.get_rbe_instance('bot-id', ['pool-1-a'],
-                                    self.bot_groups_config(rbe_mode_percent=30))
+    instance = rbe.get_rbe_instance_for_bot(
+        'bot-id', ['pool-1-a'], self.bot_groups_config(rbe_mode_percent=30))
     self.assertEqual(instance, 'instance-1')
 
     # Explicitly enabled.
-    instance = rbe.get_rbe_instance(
+    instance = rbe.get_rbe_instance_for_bot(
         'bot-id', ['pool-1-a'],
         self.bot_groups_config(rbe_mode_percent=25, enable_rbe_on=['bot-id']))
     self.assertEqual(instance, 'instance-1')
 
     # Explicitly disabled.
-    instance = rbe.get_rbe_instance(
+    instance = rbe.get_rbe_instance_for_bot(
         'bot-id', ['pool-1-a'],
         self.bot_groups_config(rbe_mode_percent=30, disable_rbe_on=['bot-id']))
     self.assertIsNone(instance)
 
     # The pool is not using RBE.
-    instance = rbe.get_rbe_instance(
+    instance = rbe.get_rbe_instance_for_bot(
         'bot-id', ['pool-no-rbe-1', 'pool-no-rbe-1'],
         self.bot_groups_config(enable_rbe_on=['bot-id']))
     self.assertIsNone(instance)
 
     # Pools agree on RBE instance.
-    instance = rbe.get_rbe_instance(
+    instance = rbe.get_rbe_instance_for_bot(
         'bot-id', ['pool-1-a', 'pool-1-b'],
         self.bot_groups_config(enable_rbe_on=['bot-id']))
     self.assertEqual(instance, 'instance-1')
 
     # Pools disagree on RBE instance.
-    instance = rbe.get_rbe_instance(
+    instance = rbe.get_rbe_instance_for_bot(
         'bot-id', ['pool-1-a', 'pool-2'],
         self.bot_groups_config(enable_rbe_on=['bot-id']))
     self.assertIsNone(instance)
+
+  @mock.patch('random.uniform')
+  def test_get_rbe_instance_for_task(self, uniform):
+    call = rbe.get_rbe_instance_for_task
+
+    self.assertIsNone(call([], self.pool_config(None)))
+    self.assertIsNone(call([], self.pool_config('')))
+
+    self.assertEqual(call(['rbe:require'], self.pool_config('inst', 0)), 'inst')
+    self.assertIsNone(call(['rbe:prevent'], self.pool_config('inst', 100)))
+    self.assertIsNone(
+        call(['rbe:require', 'rbe:prevent'], self.pool_config('inst', 100)))
+
+    uniform.return_value = 5.0
+    self.assertEqual(call([], self.pool_config('inst', 6)), 'inst')
+    self.assertIsNone(call([], self.pool_config('inst', 4)))
 
   def test_quasi_random_100(self):
     for i in range(1000):

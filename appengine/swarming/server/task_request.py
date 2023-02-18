@@ -1165,6 +1165,11 @@ class TaskRequest(ndb.Model):
       required=False,
       default=pools_pb2.Pool.SCHEDULING_ALGORITHM_UNKNOWN)
 
+  # RBE instance to send the task to or None to use Swarming native scheduler.
+  #
+  # Initialized in process_task_request based on the target pool config.
+  rbe_instance = ndb.StringProperty(indexed=False, required=False)
+
   # Tags that specify the category of the task. This property contains both the
   # tags specified by the user and the tags for every TaskSlice.
   tags = ndb.StringProperty(repeated=True, validator=_validate_tags)
@@ -1462,7 +1467,7 @@ def _get_automatic_tags_from_slice(task_slice):
 def _get_automatic_tags(request):
   """Returns tags that should automatically be added to the TaskRequest.
 
-  This includes geneated tags from all TaskSlice.
+  This includes generated tags from all TaskSlice.
   """
   tags = set((
       u'priority:%s' % request.priority,
@@ -1502,6 +1507,8 @@ def create_termination_task(bot_id, wait_for_capacity):
   Returns:
     TaskRequest for priority 0 (highest) termination task.
   """
+  # TODO(vadimsh): If `bot_id` is in full RBE mode, schedule this task via
+  # RBE as well.
   properties = TaskProperties(
       dimensions_data={u'id': [unicode(bot_id)]},
       execution_timeout_secs=0,
