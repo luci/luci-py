@@ -13,14 +13,18 @@ import random
 import uuid
 
 from google.appengine.api import app_identity
+from google.appengine.ext import ndb
+from google.protobuf import json_format
 from google.protobuf import timestamp_pb2
 
 from components import auth
+from components import datastore_utils
 from components import gsm
 from components import utils
 
 from proto.internals import rbe_pb2
 from server import pools_config
+from server.constants import OR_DIM_SEP
 
 
 # How long a poll token should be considered valid. Should be larger than the
@@ -208,6 +212,118 @@ def get_rbe_instance_for_task(task_tags, pool_cfg):
   if random.uniform(0, 100) < rbe_cfg.rbe_mode_percent:
     return rbe_cfg.rbe_instance
   return None
+
+
+def gen_rbe_reservation_id(task_request, task_slice_index):
+  """Generates an RBE reservation ID representing a particular slice.
+
+  It needs to globally (potentially across Swarming instances) identify
+  a particular task slice. Used to idempotently submit RBE reservations.
+
+  Args:
+    task_request: an original TaskRequest with all task details.
+    task_slice_index: the index of the slice to represent.
+  """
+  return '%s-%s-%d' % (
+      app_identity.get_application_id(),
+      task_request.task_id,
+      task_slice_index,
+  )
+
+
+def enqueue_rbe_task(task_request, task_to_run):
+  """Transactionally enqueues a TQ task that eventually submits RBE reservation.
+
+  This is a fire-and-forget operation. If RBE refuses to accept the reservation
+  (e.g. fatal errors, no bots available, etc) Swarming will be asynchronously
+  notified later.
+
+  Args:
+    task_request: an original TaskRequest with all task details.
+    task_to_run: a TaskToRunShard representing a single task slice to execute.
+
+  Raises:
+    datastore_utils.CommitError if the TQ enqueuing failed.
+  """
+  assert ndb.in_transaction()
+  assert task_request.rbe_instance
+  assert task_to_run.rbe_reservation
+  assert task_to_run.key.parent() == task_request.key
+  assert task_to_run.is_reapable, task_to_run
+
+  # For tracing how long the TQ task is stuck.
+  now = timestamp_pb2.Timestamp()
+  now.FromDatetime(utils.utcnow())
+
+  # This is always populated for slices with `is_reapable == True`.
+  expiry = timestamp_pb2.Timestamp()
+  expiry.FromDatetime(task_to_run.expiration_ts)
+
+  dims = task_request.task_slice(
+      task_to_run.task_slice_index).properties.dimensions
+
+  # Convert dimensions to a format closer to what RBE wants. They are already
+  # validated to be correct by that point by _validate_dimensions.
+  requested_bot_id = None
+  constraints = []
+  for k, v in sorted(dims.items()):
+    assert isinstance(v, list), dims
+    if u'id' == k:
+      assert len(v) == 1, dims
+      assert OR_DIM_SEP not in v[0], dims
+      requested_bot_id = v[0]
+    else:
+      # {k: [a, b|c]} => k:a AND (k:b | k:c).
+      for alternatives in v:
+        constraints.append(
+            rbe_pb2.EnqueueRBETask.Constraint(
+                key=k,
+                allowed_values=alternatives.split(OR_DIM_SEP),
+            ))
+
+  # This is format recognized by go.chromium.org/luci/server/tq. It routes
+  # based on `class`.
+  payload = {
+      'class':
+      'rbe-enqueue',
+      'body':
+      json_format.MessageToDict(
+          rbe_pb2.EnqueueRBETask(
+              payload=rbe_pb2.TaskPayload(
+                  reservation_id=task_to_run.rbe_reservation,
+                  task_id=task_request.task_id,
+                  slice_index=task_to_run.task_slice_index,
+                  task_to_run_shard=task_to_run.shard_index,
+                  task_to_run_id=task_to_run.key.integer_id(),
+                  debug_info=rbe_pb2.TaskPayload.DebugInfo(
+                      created=now,
+                      py_swarming_version=utils.get_app_version(),
+                      task_name=task_request.name,
+                  ),
+              ),
+              rbe_instance=task_request.rbe_instance,
+              expiry=expiry,
+              requested_bot_id=requested_bot_id,
+              constraints=constraints,
+              priority=task_request.priority,
+              scheduling_algorithm=task_request.scheduling_algorithm,
+          )),
+  }
+
+  logging.info('RBE: enqueuing task to launch %s', task_to_run.rbe_reservation)
+  ok = utils.enqueue_task(
+      # The last path components are informational for nicer logs. All data is
+      # transferred through `payload`.
+      '/internal/tasks/t/rbe-enqueue/%s-%d' % (
+          task_request.task_id,
+          task_to_run.task_slice_index,
+      ),
+      'rbe-enqueue',
+      transactional=True,
+      use_dedicated_module=False,  # let dispatch.yaml decide
+      payload=utils.encode_to_json(payload))
+  if not ok:
+    raise datastore_utils.CommitError('Failed to enqueue RBE reservation')
 
 
 ### Private stuff.

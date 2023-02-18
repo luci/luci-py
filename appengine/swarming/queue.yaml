@@ -66,6 +66,15 @@ queue:
   rate: 1/s
 
 
+# RBE migration
+
+# /internal/tasks/t/rbe-enqueue/.*
+# This is served by Swarming Go via go.chromium.org/luci/server/tq.
+- name: rbe-enqueue
+  bucket_size: 100
+  rate: 500/s
+
+
 ## External Scheduler
 
 # /internal/taskqueue/important/external_scheduler/notify-tasks

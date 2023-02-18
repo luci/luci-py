@@ -55,19 +55,21 @@ class FrontendTest(test_env_handlers.AppTestBase):
     )
 
     public_urls = frozenset([
-      '/',
-      '/oldui',
-      '/_ah/warmup',
-      '/api/config/v1/validate',
-      '/auth',
-      '/ereporter2/api/v1/on_error',
-      '/api/discovery/v1/apis',
-      '/api/static/proxy.html',
-      '/api/swarming/v1/server/permissions',
-      '/swarming/api/v1/client/list',
-      '/swarming/api/v1/bot/server_ping',
-      '/user/tasks',
-      '/restricted/bots',
+        '/',
+        '/oldui',
+        '/_ah/warmup',
+        '/api/config/v1/validate',
+        '/auth',
+        '/ereporter2/api/v1/on_error',
+        '/api/discovery/v1/apis',
+        '/api/static/proxy.html',
+        '/api/swarming/v1/server/permissions',
+        '/swarming/api/v1/client/list',
+        '/swarming/api/v1/bot/server_ping',
+        '/user/tasks',
+        '/restricted/bots',
+        # TODO(vadimsh): This is temporary, it doesn't do anything at all.
+        '/internal/tasks/t/rbe-enqueue',
     ])
 
     # Grab the set of all routes.

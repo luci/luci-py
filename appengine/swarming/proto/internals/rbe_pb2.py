@@ -12,6 +12,7 @@ _sym_db = _symbol_database.Default()
 
 
 from google.protobuf import timestamp_pb2 as google_dot_protobuf_dot_timestamp__pb2
+from proto.config import pools_pb2 as proto_dot_config_dot_pools__pb2
 
 
 DESCRIPTOR = _descriptor.FileDescriptor(
@@ -20,9 +21,9 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   syntax='proto3',
   serialized_options=b'Z9go.chromium.org/luci/swarming/proto/internals;internalspb',
   create_key=_descriptor._internal_create_key,
-  serialized_pb=b'\n\x19proto/internals/rbe.proto\x12\x16swarming.internals.rbe\x1a\x1fgoogle/protobuf/timestamp.proto\"\xcc\x01\n\rTaggedMessage\x12G\n\x0cpayload_type\x18\x01 \x01(\x0e\x32\x31.swarming.internals.rbe.TaggedMessage.PayloadType\x12\x0f\n\x07payload\x18\x02 \x01(\x0c\x12\x13\n\x0bhmac_sha256\x18\x03 \x01(\x0c\"L\n\x0bPayloadType\x12\x1c\n\x18PAYLOAD_TYPE_UNSPECIFIED\x10\x00\x12\x0e\n\nPOLL_STATE\x10\x01\x12\x0f\n\x0b\x42OT_SESSION\x10\x02\"\x81\x07\n\tPollState\x12\n\n\x02id\x18\x01 \x01(\t\x12*\n\x06\x65xpiry\x18\x02 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x14\n\x0crbe_instance\x18\x03 \x01(\t\x12H\n\x13\x65nforced_dimensions\x18\x04 \x03(\x0b\x32+.swarming.internals.rbe.PollState.Dimension\x12?\n\ndebug_info\x18\x05 \x01(\x0b\x32+.swarming.internals.rbe.PollState.DebugInfo\x12\x14\n\x0cip_allowlist\x18\n \x01(\t\x12=\n\x08gce_auth\x18\x0b \x01(\x0b\x32).swarming.internals.rbe.PollState.GCEAuthH\x00\x12T\n\x14service_account_auth\x18\x0c \x01(\x0b\x32\x34.swarming.internals.rbe.PollState.ServiceAccountAuthH\x00\x12Y\n\x17luci_machine_token_auth\x18\r \x01(\x0b\x32\x36.swarming.internals.rbe.PollState.LUCIMachineTokenAuthH\x00\x12N\n\x11ip_allowlist_auth\x18\x0e \x01(\x0b\x32\x31.swarming.internals.rbe.PollState.IPAllowlistAuthH\x00\x1a(\n\tDimension\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\x0e\n\x06values\x18\x02 \x03(\t\x1a\x66\n\tDebugInfo\x12+\n\x07\x63reated\x18\x01 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x18\n\x10swarming_version\x18\x02 \x01(\t\x12\x12\n\nrequest_id\x18\x03 \x01(\t\x1a\x34\n\x07GCEAuth\x12\x13\n\x0bgce_project\x18\x01 \x01(\t\x12\x14\n\x0cgce_instance\x18\x02 \x01(\t\x1a-\n\x12ServiceAccountAuth\x12\x17\n\x0fservice_account\x18\x01 \x01(\t\x1a,\n\x14LUCIMachineTokenAuth\x12\x14\n\x0cmachine_fqdn\x18\x01 \x01(\t\x1a\x11\n\x0fIPAllowlistAuthB\r\n\x0b\x61uth_method\"\x8b\x01\n\nBotSession\x12\x1a\n\x12rbe_bot_session_id\x18\x01 \x01(\t\x12\x35\n\npoll_state\x18\x02 \x01(\x0b\x32!.swarming.internals.rbe.PollState\x12*\n\x06\x65xpiry\x18\x03 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\",\n\x0bTaskPayload\x12\x0f\n\x07task_id\x18\x01 \x01(\t\x12\x0c\n\x04noop\x18\x02 \x01(\x08\"\x0c\n\nTaskResultB;Z9go.chromium.org/luci/swarming/proto/internals;internalspbb\x06proto3'
+  serialized_pb=b'\n\x19proto/internals/rbe.proto\x12\x16swarming.internals.rbe\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x18proto/config/pools.proto\"\xcc\x01\n\rTaggedMessage\x12G\n\x0cpayload_type\x18\x01 \x01(\x0e\x32\x31.swarming.internals.rbe.TaggedMessage.PayloadType\x12\x0f\n\x07payload\x18\x02 \x01(\x0c\x12\x13\n\x0bhmac_sha256\x18\x03 \x01(\x0c\"L\n\x0bPayloadType\x12\x1c\n\x18PAYLOAD_TYPE_UNSPECIFIED\x10\x00\x12\x0e\n\nPOLL_STATE\x10\x01\x12\x0f\n\x0b\x42OT_SESSION\x10\x02\"\x81\x07\n\tPollState\x12\n\n\x02id\x18\x01 \x01(\t\x12*\n\x06\x65xpiry\x18\x02 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x14\n\x0crbe_instance\x18\x03 \x01(\t\x12H\n\x13\x65nforced_dimensions\x18\x04 \x03(\x0b\x32+.swarming.internals.rbe.PollState.Dimension\x12?\n\ndebug_info\x18\x05 \x01(\x0b\x32+.swarming.internals.rbe.PollState.DebugInfo\x12\x14\n\x0cip_allowlist\x18\n \x01(\t\x12=\n\x08gce_auth\x18\x0b \x01(\x0b\x32).swarming.internals.rbe.PollState.GCEAuthH\x00\x12T\n\x14service_account_auth\x18\x0c \x01(\x0b\x32\x34.swarming.internals.rbe.PollState.ServiceAccountAuthH\x00\x12Y\n\x17luci_machine_token_auth\x18\r \x01(\x0b\x32\x36.swarming.internals.rbe.PollState.LUCIMachineTokenAuthH\x00\x12N\n\x11ip_allowlist_auth\x18\x0e \x01(\x0b\x32\x31.swarming.internals.rbe.PollState.IPAllowlistAuthH\x00\x1a(\n\tDimension\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\x0e\n\x06values\x18\x02 \x03(\t\x1a\x66\n\tDebugInfo\x12+\n\x07\x63reated\x18\x01 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x18\n\x10swarming_version\x18\x02 \x01(\t\x12\x12\n\nrequest_id\x18\x03 \x01(\t\x1a\x34\n\x07GCEAuth\x12\x13\n\x0bgce_project\x18\x01 \x01(\t\x12\x14\n\x0cgce_instance\x18\x02 \x01(\t\x1a-\n\x12ServiceAccountAuth\x12\x17\n\x0fservice_account\x18\x01 \x01(\t\x1a,\n\x14LUCIMachineTokenAuth\x12\x14\n\x0cmachine_fqdn\x18\x01 \x01(\t\x1a\x11\n\x0fIPAllowlistAuthB\r\n\x0b\x61uth_method\"\x8b\x01\n\nBotSession\x12\x1a\n\x12rbe_bot_session_id\x18\x01 \x01(\t\x12\x35\n\npoll_state\x18\x02 \x01(\x0b\x32!.swarming.internals.rbe.PollState\x12*\n\x06\x65xpiry\x18\x03 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\"\xf8\x02\n\x0e\x45nqueueRBETask\x12\x34\n\x07payload\x18\x01 \x01(\x0b\x32#.swarming.internals.rbe.TaskPayload\x12\x14\n\x0crbe_instance\x18\x02 \x01(\t\x12*\n\x06\x65xpiry\x18\x03 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x18\n\x10requested_bot_id\x18\x04 \x01(\t\x12\x46\n\x0b\x63onstraints\x18\x05 \x03(\x0b\x32\x31.swarming.internals.rbe.EnqueueRBETask.Constraint\x12\x10\n\x08priority\x18\x06 \x01(\x05\x12G\n\x14scheduling_algorithm\x18\x07 \x01(\x0e\x32).swarming.config.Pool.SchedulingAlgorithm\x1a\x31\n\nConstraint\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\x16\n\x0e\x61llowed_values\x18\x02 \x03(\t\"\xd7\x02\n\x0bTaskPayload\x12\x16\n\x0ereservation_id\x18\x01 \x01(\t\x12\x0f\n\x07task_id\x18\x02 \x01(\t\x12\x13\n\x0bslice_index\x18\x03 \x01(\x05\x12\x19\n\x11task_to_run_shard\x18\x04 \x01(\x05\x12\x16\n\x0etask_to_run_id\x18\x05 \x01(\x03\x12\x41\n\ndebug_info\x18\x06 \x01(\x0b\x32-.swarming.internals.rbe.TaskPayload.DebugInfo\x12\x0c\n\x04noop\x18\x07 \x01(\x08\x1a\x85\x01\n\tDebugInfo\x12+\n\x07\x63reated\x18\x01 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x1b\n\x13py_swarming_version\x18\x02 \x01(\t\x12\x1b\n\x13go_swarming_version\x18\x03 \x01(\t\x12\x11\n\ttask_name\x18\x04 \x01(\t\"\x0c\n\nTaskResultB;Z9go.chromium.org/luci/swarming/proto/internals;internalspbb\x06proto3'
   ,
-  dependencies=[google_dot_protobuf_dot_timestamp__pb2.DESCRIPTOR,])
+  dependencies=[google_dot_protobuf_dot_timestamp__pb2.DESCRIPTOR,proto_dot_config_dot_pools__pb2.DESCRIPTOR,])
 
 
 
@@ -51,8 +52,8 @@ _TAGGEDMESSAGE_PAYLOADTYPE = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   serialized_options=None,
-  serialized_start=215,
-  serialized_end=291,
+  serialized_start=241,
+  serialized_end=317,
 )
 _sym_db.RegisterEnumDescriptor(_TAGGEDMESSAGE_PAYLOADTYPE)
 
@@ -99,8 +100,8 @@ _TAGGEDMESSAGE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=87,
-  serialized_end=291,
+  serialized_start=113,
+  serialized_end=317,
 )
 
 
@@ -138,8 +139,8 @@ _POLLSTATE_DIMENSION = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=866,
-  serialized_end=906,
+  serialized_start=892,
+  serialized_end=932,
 )
 
 _POLLSTATE_DEBUGINFO = _descriptor.Descriptor(
@@ -183,8 +184,8 @@ _POLLSTATE_DEBUGINFO = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=908,
-  serialized_end=1010,
+  serialized_start=934,
+  serialized_end=1036,
 )
 
 _POLLSTATE_GCEAUTH = _descriptor.Descriptor(
@@ -221,8 +222,8 @@ _POLLSTATE_GCEAUTH = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1012,
-  serialized_end=1064,
+  serialized_start=1038,
+  serialized_end=1090,
 )
 
 _POLLSTATE_SERVICEACCOUNTAUTH = _descriptor.Descriptor(
@@ -252,8 +253,8 @@ _POLLSTATE_SERVICEACCOUNTAUTH = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1066,
-  serialized_end=1111,
+  serialized_start=1092,
+  serialized_end=1137,
 )
 
 _POLLSTATE_LUCIMACHINETOKENAUTH = _descriptor.Descriptor(
@@ -283,8 +284,8 @@ _POLLSTATE_LUCIMACHINETOKENAUTH = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1113,
-  serialized_end=1157,
+  serialized_start=1139,
+  serialized_end=1183,
 )
 
 _POLLSTATE_IPALLOWLISTAUTH = _descriptor.Descriptor(
@@ -307,8 +308,8 @@ _POLLSTATE_IPALLOWLISTAUTH = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1159,
-  serialized_end=1176,
+  serialized_start=1185,
+  serialized_end=1202,
 )
 
 _POLLSTATE = _descriptor.Descriptor(
@@ -406,8 +407,8 @@ _POLLSTATE = _descriptor.Descriptor(
       create_key=_descriptor._internal_create_key,
     fields=[]),
   ],
-  serialized_start=294,
-  serialized_end=1191,
+  serialized_start=320,
+  serialized_end=1217,
 )
 
 
@@ -452,30 +453,30 @@ _BOTSESSION = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1194,
-  serialized_end=1333,
+  serialized_start=1220,
+  serialized_end=1359,
 )
 
 
-_TASKPAYLOAD = _descriptor.Descriptor(
-  name='TaskPayload',
-  full_name='swarming.internals.rbe.TaskPayload',
+_ENQUEUERBETASK_CONSTRAINT = _descriptor.Descriptor(
+  name='Constraint',
+  full_name='swarming.internals.rbe.EnqueueRBETask.Constraint',
   filename=None,
   file=DESCRIPTOR,
   containing_type=None,
   create_key=_descriptor._internal_create_key,
   fields=[
     _descriptor.FieldDescriptor(
-      name='task_id', full_name='swarming.internals.rbe.TaskPayload.task_id', index=0,
+      name='key', full_name='swarming.internals.rbe.EnqueueRBETask.Constraint.key', index=0,
       number=1, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=b"".decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='noop', full_name='swarming.internals.rbe.TaskPayload.noop', index=1,
-      number=2, type=8, cpp_type=7, label=1,
-      has_default_value=False, default_value=False,
+      name='allowed_values', full_name='swarming.internals.rbe.EnqueueRBETask.Constraint.allowed_values', index=1,
+      number=2, type=9, cpp_type=9, label=3,
+      has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
@@ -491,8 +492,207 @@ _TASKPAYLOAD = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1335,
-  serialized_end=1379,
+  serialized_start=1689,
+  serialized_end=1738,
+)
+
+_ENQUEUERBETASK = _descriptor.Descriptor(
+  name='EnqueueRBETask',
+  full_name='swarming.internals.rbe.EnqueueRBETask',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  create_key=_descriptor._internal_create_key,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='payload', full_name='swarming.internals.rbe.EnqueueRBETask.payload', index=0,
+      number=1, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='rbe_instance', full_name='swarming.internals.rbe.EnqueueRBETask.rbe_instance', index=1,
+      number=2, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"".decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='expiry', full_name='swarming.internals.rbe.EnqueueRBETask.expiry', index=2,
+      number=3, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='requested_bot_id', full_name='swarming.internals.rbe.EnqueueRBETask.requested_bot_id', index=3,
+      number=4, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"".decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='constraints', full_name='swarming.internals.rbe.EnqueueRBETask.constraints', index=4,
+      number=5, type=11, cpp_type=10, label=3,
+      has_default_value=False, default_value=[],
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='priority', full_name='swarming.internals.rbe.EnqueueRBETask.priority', index=5,
+      number=6, type=5, cpp_type=1, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='scheduling_algorithm', full_name='swarming.internals.rbe.EnqueueRBETask.scheduling_algorithm', index=6,
+      number=7, type=14, cpp_type=8, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+  ],
+  extensions=[
+  ],
+  nested_types=[_ENQUEUERBETASK_CONSTRAINT, ],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=1362,
+  serialized_end=1738,
+)
+
+
+_TASKPAYLOAD_DEBUGINFO = _descriptor.Descriptor(
+  name='DebugInfo',
+  full_name='swarming.internals.rbe.TaskPayload.DebugInfo',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  create_key=_descriptor._internal_create_key,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='created', full_name='swarming.internals.rbe.TaskPayload.DebugInfo.created', index=0,
+      number=1, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='py_swarming_version', full_name='swarming.internals.rbe.TaskPayload.DebugInfo.py_swarming_version', index=1,
+      number=2, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"".decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='go_swarming_version', full_name='swarming.internals.rbe.TaskPayload.DebugInfo.go_swarming_version', index=2,
+      number=3, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"".decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='task_name', full_name='swarming.internals.rbe.TaskPayload.DebugInfo.task_name', index=3,
+      number=4, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"".decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=1951,
+  serialized_end=2084,
+)
+
+_TASKPAYLOAD = _descriptor.Descriptor(
+  name='TaskPayload',
+  full_name='swarming.internals.rbe.TaskPayload',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  create_key=_descriptor._internal_create_key,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='reservation_id', full_name='swarming.internals.rbe.TaskPayload.reservation_id', index=0,
+      number=1, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"".decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='task_id', full_name='swarming.internals.rbe.TaskPayload.task_id', index=1,
+      number=2, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"".decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='slice_index', full_name='swarming.internals.rbe.TaskPayload.slice_index', index=2,
+      number=3, type=5, cpp_type=1, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='task_to_run_shard', full_name='swarming.internals.rbe.TaskPayload.task_to_run_shard', index=3,
+      number=4, type=5, cpp_type=1, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='task_to_run_id', full_name='swarming.internals.rbe.TaskPayload.task_to_run_id', index=4,
+      number=5, type=3, cpp_type=2, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='debug_info', full_name='swarming.internals.rbe.TaskPayload.debug_info', index=5,
+      number=6, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='noop', full_name='swarming.internals.rbe.TaskPayload.noop', index=6,
+      number=7, type=8, cpp_type=7, label=1,
+      has_default_value=False, default_value=False,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+  ],
+  extensions=[
+  ],
+  nested_types=[_TASKPAYLOAD_DEBUGINFO, ],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=1741,
+  serialized_end=2084,
 )
 
 
@@ -516,8 +716,8 @@ _TASKRESULT = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1381,
-  serialized_end=1393,
+  serialized_start=2086,
+  serialized_end=2098,
 )
 
 _TAGGEDMESSAGE.fields_by_name['payload_type'].enum_type = _TAGGEDMESSAGE_PAYLOADTYPE
@@ -550,9 +750,18 @@ _POLLSTATE.oneofs_by_name['auth_method'].fields.append(
 _POLLSTATE.fields_by_name['ip_allowlist_auth'].containing_oneof = _POLLSTATE.oneofs_by_name['auth_method']
 _BOTSESSION.fields_by_name['poll_state'].message_type = _POLLSTATE
 _BOTSESSION.fields_by_name['expiry'].message_type = google_dot_protobuf_dot_timestamp__pb2._TIMESTAMP
+_ENQUEUERBETASK_CONSTRAINT.containing_type = _ENQUEUERBETASK
+_ENQUEUERBETASK.fields_by_name['payload'].message_type = _TASKPAYLOAD
+_ENQUEUERBETASK.fields_by_name['expiry'].message_type = google_dot_protobuf_dot_timestamp__pb2._TIMESTAMP
+_ENQUEUERBETASK.fields_by_name['constraints'].message_type = _ENQUEUERBETASK_CONSTRAINT
+_ENQUEUERBETASK.fields_by_name['scheduling_algorithm'].enum_type = proto_dot_config_dot_pools__pb2._POOL_SCHEDULINGALGORITHM
+_TASKPAYLOAD_DEBUGINFO.fields_by_name['created'].message_type = google_dot_protobuf_dot_timestamp__pb2._TIMESTAMP
+_TASKPAYLOAD_DEBUGINFO.containing_type = _TASKPAYLOAD
+_TASKPAYLOAD.fields_by_name['debug_info'].message_type = _TASKPAYLOAD_DEBUGINFO
 DESCRIPTOR.message_types_by_name['TaggedMessage'] = _TAGGEDMESSAGE
 DESCRIPTOR.message_types_by_name['PollState'] = _POLLSTATE
 DESCRIPTOR.message_types_by_name['BotSession'] = _BOTSESSION
+DESCRIPTOR.message_types_by_name['EnqueueRBETask'] = _ENQUEUERBETASK
 DESCRIPTOR.message_types_by_name['TaskPayload'] = _TASKPAYLOAD
 DESCRIPTOR.message_types_by_name['TaskResult'] = _TASKRESULT
 _sym_db.RegisterFileDescriptor(DESCRIPTOR)
@@ -626,12 +835,35 @@ BotSession = _reflection.GeneratedProtocolMessageType('BotSession', (_message.Me
   })
 _sym_db.RegisterMessage(BotSession)
 
+EnqueueRBETask = _reflection.GeneratedProtocolMessageType('EnqueueRBETask', (_message.Message,), {
+
+  'Constraint' : _reflection.GeneratedProtocolMessageType('Constraint', (_message.Message,), {
+    'DESCRIPTOR' : _ENQUEUERBETASK_CONSTRAINT,
+    '__module__' : 'proto.internals.rbe_pb2'
+    # @@protoc_insertion_point(class_scope:swarming.internals.rbe.EnqueueRBETask.Constraint)
+    })
+  ,
+  'DESCRIPTOR' : _ENQUEUERBETASK,
+  '__module__' : 'proto.internals.rbe_pb2'
+  # @@protoc_insertion_point(class_scope:swarming.internals.rbe.EnqueueRBETask)
+  })
+_sym_db.RegisterMessage(EnqueueRBETask)
+_sym_db.RegisterMessage(EnqueueRBETask.Constraint)
+
 TaskPayload = _reflection.GeneratedProtocolMessageType('TaskPayload', (_message.Message,), {
+
+  'DebugInfo' : _reflection.GeneratedProtocolMessageType('DebugInfo', (_message.Message,), {
+    'DESCRIPTOR' : _TASKPAYLOAD_DEBUGINFO,
+    '__module__' : 'proto.internals.rbe_pb2'
+    # @@protoc_insertion_point(class_scope:swarming.internals.rbe.TaskPayload.DebugInfo)
+    })
+  ,
   'DESCRIPTOR' : _TASKPAYLOAD,
   '__module__' : 'proto.internals.rbe_pb2'
   # @@protoc_insertion_point(class_scope:swarming.internals.rbe.TaskPayload)
   })
 _sym_db.RegisterMessage(TaskPayload)
+_sym_db.RegisterMessage(TaskPayload.DebugInfo)
 
 TaskResult = _reflection.GeneratedProtocolMessageType('TaskResult', (_message.Message,), {
   'DESCRIPTOR' : _TASKRESULT,

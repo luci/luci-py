@@ -39,6 +39,7 @@ from server import bot_management
 from server import config
 from server import external_scheduler
 from server import pools_config
+from server import rbe
 from server import resultdb
 from server import task_pack
 from server import task_queues
@@ -707,6 +708,22 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(to_run_key.get().queue_number, 0x1a3aa6631f3d2236)
 
     self.execute_tasks()
+
+  def test_schedule_request_rbe_mode(self):
+    args = []
+
+    def mocked_enqueue_rbe_task(request, to_run):
+      args[:] = [request, to_run]
+
+    self.mock(rbe, 'enqueue_rbe_task', mocked_enqueue_rbe_task)
+
+    request = _gen_request_slices(rbe_instance='some-instance')
+    result_summary = task_scheduler.schedule_request(request)
+    self.assertEqual(State.PENDING, result_summary.state)
+
+    self.assertEqual(request.key, args[0].key)
+    self.assertEqual('sample-app-1d69b9f088008910-0',
+                     args[1].key.get().rbe_reservation)
 
   def test_bot_reap_task_expired(self):
     self._register_bot(self.bot_dimensions)
@@ -2557,6 +2574,8 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     to_run_key = task_to_run.request_to_task_to_run_key(request, 0)
     to_run = to_run_key.get()
     to_run.queue_number = None
+    # Disarm the check that prevents from storing such entity.
+    to_run._pre_put_hook = lambda: None
     to_run.put()
 
     task_scheduler.cron_abort_expired_task_to_run()

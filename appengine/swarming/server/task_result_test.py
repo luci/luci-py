@@ -511,7 +511,7 @@ class TaskResultApiTest(TestCase):
     # Task is reaped after 2 seconds (4 secs total).
     reap_ts = self.now + datetime.timedelta(seconds=4)
     self.mock_now(reap_ts)
-    to_run.queue_number = None
+    to_run.consume()
     to_run.put()
     bot_details = task_scheduler.BotDetails(u'abc', 'test_project')
     run_result = task_result.new_run_result(request, to_run, u'localhost',

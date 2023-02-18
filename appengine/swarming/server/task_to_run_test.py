@@ -1054,8 +1054,7 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
         1, len(self._yield_next_available_task_to_dispatch(bot_dimensions)))
 
     self.assertEqual(True, to_run.is_reapable)
-    to_run.queue_number = None
-    to_run.expiration_ts = None
+    to_run.consume()
     to_run.put()
     self.assertEqual(False, to_run.is_reapable)
 

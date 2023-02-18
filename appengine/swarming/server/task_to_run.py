@@ -37,9 +37,9 @@ import random
 import time
 
 from google.appengine.api import datastore_errors
-from google.appengine.runtime import apiproxy_errors
 from google.appengine.api import memcache
 from google.appengine.ext import ndb
+from google.appengine.runtime import apiproxy_errors
 
 from components import datastore_utils
 from components import utils
@@ -47,6 +47,7 @@ from components import utils
 from proto.config import pools_pb2
 from server import bot_management
 from server import config
+from server import rbe
 from server import task_pack
 from server import task_queues
 from server import task_request
@@ -73,9 +74,21 @@ class _TaskToRunBase(ndb.Model):
   a bot for execution or expires. Each TaskToRunShard picked up for execution
   has an associated task_result.TaskResult entity (expired ones don't).
 
-  A TaskToRunShard can be in two states:
-  - reapable: queue_number and expiration_ts are both not None.
-  - consumed: queue_number and expiration_ts are both None.
+  A TaskToRunShard can either be in "native mode" (dispatched via the native
+  Swarming scheduler implemented in this code base) or in "RBE mode" (dispatched
+  via the remote RBE scheduler service). This is controlled by rbe_reservation
+  field.
+
+  TODO(vadimsh): Does it make sense to support "whichever scheduler grabs first"
+  mode for tasks? It isn't too hard to implemented.
+
+  A TaskToRunShard (regardless of mode) can be in two states:
+  - reapable
+    - Native mode: queue_number and expiration_ts are both not None.
+    - RBE mode: claim_id is None and expiration_ts is not None.
+  - consumed:
+    - Native mode: queue_number and expiration_ts are both None.
+    - RBE mode: claim_id is not None and expiration_ts is None.
 
   The entity starts its life in reapable state and then transitions to consumed
   state either by being picked up by a bot for execution or when it expires.
@@ -100,37 +113,88 @@ class _TaskToRunBase(ndb.Model):
   _use_cache = False
   _use_memcache = False
 
-  # Used to know when the entity is enqueued. The very first TaskToRunShard
-  # has the same value as TaskRequest.created_ts, but following ones (when using
-  # task slices) have created_ts set at the time the new entity is created.
+  # Used to know when the entity is enqueued.
+  #
+  # The very first TaskToRunShard has the same value as TaskRequest.created_ts,
+  # but following ones (when using task slices) have created_ts set at the time
+  # the new entity is created.
+  #
+  # Used in both native and RBE mode.
   created_ts = ndb.DateTimeProperty(indexed=False)
 
   # Copy of dimensions from the corresponding task slice of TaskRequest.
+  #
   # Used to quickly check if a bot can reap this TaskToRunShard right after
   # fetching it from a datastore query.
+  #
+  # Used in both native and RBE mode.
   dimensions = datastore_utils.DeterministicJsonProperty(json_type=dict,
                                                          indexed=False)
+
+  # RBE reservation name that is (or will be) handling this TaskToRunShard.
+  #
+  # If set, then TaskToRunShard is in RBE mode. If not, then in native
+  # mode. TaskToRunShard in RBE mode are always (transactionally) created with
+  # a Task Queue task to actually dispatch them to RBE scheduler.
+  #
+  # It is derived from TaskRequest and slice index in new_task_to_run.
+  rbe_reservation = ndb.StringProperty(required=False, indexed=False)
 
   # Everything above is immutable, everything below is mutable.
 
   # Moment by which this TaskToRunShard has to be claimed by a bot.
+  #
+  # Used in both native and RBE mode.
+  #
   # It is based on TaskSlice.expiration_ts. It is used to figure out when to
   # fallback on the next task slice. It is scanned by a cron job and thus needs
   # to be indexed.
+  #
   # Reset to None when the TaskToRunShard is consumed.
   expiration_ts = ndb.DateTimeProperty()
 
   # Delay from the expiration_ts to the actual expired time in seconds.
+  #
+  # Used in both native and RBE mode.
+  #
   # This is set at expiration process. Exclusively for monitoring.
   expiration_delay = ndb.FloatProperty(indexed=False)
 
+  # A magical number by which bots and tasks find one another.
+  #
+  # Used only in native mode. Always None and unused in RBE mode.
+  #
   # Priority and request creation timestamp are mixed together to allow queries
   # to order the results by this field to allow sorting by priority first, and
   # then timestamp. See _gen_queue_number() for details. This value is only set
   # when the task is available to run, i.e.
   # ndb.TaskResult.query(ancestor=self.key).get().state==AVAILABLE.
+  #
   # Reset to None when the TaskToRunShard is consumed.
   queue_number = ndb.IntegerProperty()
+
+  # A non-None if some bot claimed this TaskToRunShard and will execute it.
+  #
+  # Used only in RBE mode. Always None in native mode.
+  #
+  # The exact meaning is TBD. Either a bot ID or a bot session or just some
+  # UUID (for idempotency of the claiming transaction) or some combination of
+  # all of these.
+  #
+  # Never reset once set.
+  claim_id = ndb.StringProperty(required=False, indexed=False)
+
+  def consume(self):
+    """Moves TaskToRun into non-reapable state (e.g. when canceling)."""
+    self.expiration_ts = None
+    self.queue_number = None
+
+  @property
+  def shard_index(self):
+    """Returns the index of TaskToRunShard extracting it from the key."""
+    kind = self.key.kind()
+    assert kind.startswith('TaskToRunShard'), kind
+    return int(kind[14:])
 
   @property
   def task_slice_index(self):
@@ -139,8 +203,8 @@ class _TaskToRunBase(ndb.Model):
 
   @property
   def is_reapable(self):
-    """Returns True if the task is ready to be scheduled."""
-    return bool(self.queue_number)
+    """Returns True if the task is ready to be picked up for execution."""
+    return self.expiration_ts is not None
 
   @property
   def request_key(self):
@@ -164,7 +228,9 @@ class _TaskToRunBase(ndb.Model):
 
   def to_dict(self):
     """Purely used for unit testing."""
-    out = super(_TaskToRunBase, self).to_dict(exclude=['dimensions'])
+    out = super(
+        _TaskToRunBase,
+        self).to_dict(exclude=['claim_id', 'dimensions', 'rbe_reservation'])
     # Consistent formatting makes it easier to reason about.
     if out['queue_number']:
       out['queue_number'] = '0x%016x' % out['queue_number']
@@ -173,11 +239,13 @@ class _TaskToRunBase(ndb.Model):
 
   def _pre_put_hook(self):
     super(_TaskToRunBase, self)._pre_put_hook()
-
-    if self.expiration_ts is None and self.queue_number:
-      raise datastore_errors.BadValueError(
-          ('%s.queue_number must be None when expiration_ts is None' %
-           self.__class__.__name__))
+    if self.rbe_reservation is None:
+      ex = self.expiration_ts is not None
+      qn = self.queue_number is not None
+      if ex != qn:
+        raise datastore_errors.BadValueError(
+            'TaskToRun: queue_number and expiration_ts should either be both '
+            'set or unset')
 
 
 # Instantiate all TaskToRunShard<X> classes.
@@ -692,26 +760,42 @@ def new_task_to_run(request, task_slice_index):
   """
   assert 0 <= task_slice_index < 64, task_slice_index
   assert request.scheduling_algorithm is not None
+
+  # TODO(vadimsh): Is TaskToRun.created_ts actually used anywhere?
   created = request.created_ts
   if task_slice_index:
     created = utils.utcnow()
-  # TODO(maruel): expiration_ts is based on request.created_ts but it could be
-  # enqueued sooner or later. crbug.com/781021
+
+  # TODO(vadimsh): These expiration timestamps may end up significantly larger
+  # than expected if slices are skipped quickly without waiting due to
+  # "no capacity" condition. For example, if 4 slices with 1h expiration all
+  # were skipped quickly, the fifth one ends up with effectively +4h of extra
+  # expiration time.
   offset = 0
   for i in range(task_slice_index + 1):
     offset += request.task_slice(i).expiration_secs
   exp = request.created_ts + datetime.timedelta(seconds=offset)
+
   dims = request.task_slice(task_slice_index).properties.dimensions
   h = task_queues.hash_dimensions(dims)
-  qn = _gen_queue_number(h, request.created_ts, request.priority,
-                         request.scheduling_algorithm)
   kind = get_shard_kind(h % N_SHARDS)
   key = request_to_task_to_run_key(request, task_slice_index)
+
+  # Queue number and RBE reservation ID are mutually exclusive.
+  queue_number = None
+  rbe_reservation = None
+  if request.rbe_instance:
+    rbe_reservation = rbe.gen_rbe_reservation_id(request, task_slice_index)
+  else:
+    queue_number = _gen_queue_number(h, request.created_ts, request.priority,
+                                     request.scheduling_algorithm)
+
   return kind(key=key,
               created_ts=created,
               dimensions=dims,
-              queue_number=qn,
-              expiration_ts=exp)
+              rbe_reservation=rbe_reservation,
+              expiration_ts=exp,
+              queue_number=queue_number)
 
 
 def dimensions_matcher(bot_dimensions):

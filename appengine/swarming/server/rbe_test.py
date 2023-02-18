@@ -7,6 +7,7 @@ import base64
 import datetime
 import hashlib
 import hmac
+import json
 import logging
 import sys
 import unittest
@@ -23,10 +24,13 @@ from test_support import test_case
 
 from components import auth
 from components import utils
+from components import datastore_utils
 
 from server import bot_groups_config
 from server import pools_config
 from server import rbe
+from server import task_request
+from server import task_to_run
 
 from proto.config import bots_pb2
 from proto.config import pools_pb2
@@ -338,6 +342,103 @@ class PollTokenTest(test_case.TestCase):
             ip_allowlist='ip-list',
             ip_allowlist_auth=rbe_pb2.PollState.IPAllowlistAuth(),
         ))
+
+
+class EnqueueTest(test_case.TestCase):
+  maxDiff = None
+
+  @mock.patch('components.utils.enqueue_task')
+  @mock.patch('components.utils.utcnow')
+  @mock.patch('random.getrandbits')
+  def test_works(self, getrandbits, utcnow, enqueue_task):
+    getrandbits.return_value = 42
+    utcnow.return_value = datetime.datetime(2112, 1, 1, 1, 1, 1)
+    enqueue_task.return_value = True
+
+    def make_slice(name):
+      return task_request.TaskSlice(
+          properties=task_request.TaskProperties(dimensions_data={
+              u'id': [u'bot-id'],
+              u'dim1': [u'val1', u'val2|val3'],
+              u'dim2': [u'val4'],
+              u'name': [name],
+          }, ),
+          expiration_secs=123,
+      )
+
+    req = task_request.TaskRequest(
+        key=task_request.new_request_key(),
+        created_ts=utils.utcnow(),
+        name='some-name',
+        rbe_instance='some-instance',
+        priority=123,
+        scheduling_algorithm=pools_pb2.Pool.SCHEDULING_ALGORITHM_LIFO,
+        task_slices=[
+            make_slice(u'0'),
+            make_slice(u'1'),
+            make_slice(u'2'),
+        ],
+    )
+
+    ttr = task_to_run.new_task_to_run(req, 2)
+    datastore_utils.transaction(lambda: rbe.enqueue_rbe_task(req, ttr))
+
+    args, kwargs = enqueue_task.call_args
+    kwargs['payload'] = json.loads(kwargs['payload'])
+
+    self.assertEqual(
+        args,
+        ('/internal/tasks/t/rbe-enqueue/2ed6c6804c8002a10-2', 'rbe-enqueue'))
+    self.assertEqual(
+        kwargs, {
+            'payload': {
+                u'body': {
+                    u'payload': {
+                        u'reservationId': u'sample-app-2ed6c6804c8002a10-2',
+                        u'taskId': u'2ed6c6804c8002a10',
+                        u'sliceIndex': 2,
+                        u'taskToRunId': u'33',
+                        u'taskToRunShard': 15,
+                        u'debugInfo': {
+                            u'created': u'2112-01-01T01:01:01Z',
+                            u'pySwarmingVersion': u'v1a',
+                            u'taskName': u'some-name',
+                        },
+                    },
+                    u'rbeInstance':
+                    u'some-instance',
+                    u'expiry':
+                    u'2112-01-01T01:07:10Z',
+                    u'requestedBotId':
+                    u'bot-id',
+                    u'constraints': [
+                        {
+                            u'key': u'dim1',
+                            u'allowedValues': [u'val1']
+                        },
+                        {
+                            u'key': u'dim1',
+                            u'allowedValues': [u'val2', u'val3']
+                        },
+                        {
+                            u'key': u'dim2',
+                            u'allowedValues': [u'val4']
+                        },
+                        {
+                            u'key': u'name',
+                            u'allowedValues': [u'2']
+                        },
+                    ],
+                    u'priority':
+                    123,
+                    u'schedulingAlgorithm':
+                    u'SCHEDULING_ALGORITHM_LIFO',
+                },
+                u'class': u'rbe-enqueue',
+            },
+            'transactional': True,
+            'use_dedicated_module': False,
+        })
 
 
 if __name__ == '__main__':

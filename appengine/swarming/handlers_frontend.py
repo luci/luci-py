@@ -9,6 +9,8 @@ implemented using the webapp2 framework.
 """
 
 import collections
+import json
+import logging
 import os
 
 import webapp2
@@ -164,10 +166,18 @@ class EmailHandler(webapp2.RequestHandler):
     pass
 
 
+class TempTQPlaceholderHandler(webapp2.RequestHandler):
+  def post(self, title):
+    logging.info('Task %s:\n%r', title, json.loads(self.request.body))
+
+
 def get_routes():
   routes = [
       ('/_ah/mail/<to:.+>', EmailHandler),
       ('/_ah/warmup', WarmupHandler),
+
+      # TODO(vadimsh): This is temporary until there's a Go handler.
+      ('/internal/tasks/t/rbe-enqueue/<title:.+>', TempTQPlaceholderHandler),
   ]
 
   if not utils.should_disable_ui_routes():
