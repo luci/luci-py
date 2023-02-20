@@ -310,6 +310,12 @@ def get_platform():
   if os_name == 'linux' and arch == 'amd64' and python_bits == 32:
     arch = '386'
 
+  # On windows-amd64, check if we are running on arm64 in emulated mode.
+  # If so, fetch native arm64 packages.
+  if (os_name == 'windows' and arch == 'amd64'
+      and os.getenv('PROCESSOR_ARCHITECTURE', '').startswith('ARM')):
+    arch = 'arm64'
+
   return '%s-%s' % (os_name, arch)
 
 
