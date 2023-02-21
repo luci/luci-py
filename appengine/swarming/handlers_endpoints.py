@@ -877,25 +877,21 @@ class SwarmingBotService(remote.Service):
     """
     logging.debug('%s', request)
 
-    # Check permission.
-    # The caller needs to have global permission, or any permissions of the
-    # pools that the bot belongs to.
-    realms.check_bot_tasks_acl(request.bot_id)
-
     try:
       start = message_conversion.epoch_to_datetime(request.start)
       end = message_conversion.epoch_to_datetime(request.end)
-      now = utils.utcnow()
-      q = task_result.get_run_results_query(
-          start, end,
-          request.sort.name.lower(),
-          request.state.name.lower(),
-          request.bot_id)
-      items, cursor = datastore_utils.fetch_page(
-          q, request.limit, request.cursor)
     except ValueError as e:
-      raise endpoints.BadRequestException(
-          'Inappropriate filter for bot.tasks: %s' % e)
+      raise endpoints.BadRequestException('Invalid timestamp: %s' % e)
+    now = utils.utcnow()
+    items, cursor = api_common.list_bot_tasks(
+        request.bot_id,
+        start,
+        end,
+        request.sort.name.lower(),
+        request.state.name.lower(),
+        request.cursor,
+        request.limit,
+    )
     return swarming_rpcs.BotTasks(
         cursor=cursor,
         items=[

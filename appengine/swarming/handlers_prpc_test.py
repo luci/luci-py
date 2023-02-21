@@ -84,6 +84,60 @@ class PrpcTest(test_env_handlers.AppTestBase):
   no_run = 1
   service = None
 
+  def apply_defaults_for_run_result(self, result):
+    """Returns a serialized swarming_rpcs.TaskResult initialized from a
+    TaskRunResult.
+
+    To be used for expectations.
+    """
+    result.bot_dimensions.extend([
+        swarming_pb2.StringListPair(key='id', value=['bot1']),
+        swarming_pb2.StringListPair(key='os', value=['Amiga']),
+        swarming_pb2.StringListPair(key='pool', value=['default'])
+    ])
+    result.bot_id = 'bot1'
+    result.bot_version = self.bot_version
+    result.costs_usd.extend([0.0])
+    result.current_task_slice = 0
+    result.failure = False
+    result.internal_failure = False
+    result.name = 'job1'
+    result.run_id = '5cee488008811'
+    result.server_versions.extend(['v1a'])
+    result.state = swarming_pb2.TaskState.RUNNING
+    result.task_id = '5cee488008811'
+    return result
+
+  def gen_perf_stats_prpc(self, stats):
+    """Returns a serialized swarming_rpcs.PerformanceStats.
+
+    To be used for expectations.
+    """
+    stats.bot_overhead = 0.1
+    stats.cache_trim.duration = 0.1
+    stats.isolated_download.duration = 1.0
+    stats.isolated_download.initial_size = 100000
+    stats.isolated_download.initial_number_items = 10
+    stats.isolated_download.items_cold = b'x\234\023\001\000\000\025\000\025'
+    stats.isolated_download.items_hot = b'x\234\223\343\002\000\000H\000)'
+    stats.isolated_download.num_items_cold = 1
+    stats.isolated_download.total_bytes_items_cold = 20
+    stats.isolated_download.num_items_hot = 2
+    stats.isolated_download.total_bytes_items_hot = 70
+
+    stats.isolated_upload.duration = 2.0
+    stats.isolated_upload.items_cold = b'x\234cdT\003\000\000.\000)'
+    stats.isolated_upload.items_hot = b'x\234cdd\324\007\000\000<\0003'
+    stats.isolated_upload.num_items_cold = 3
+    stats.isolated_upload.total_bytes_items_cold = 43
+    stats.isolated_upload.num_items_hot = 4
+    stats.isolated_upload.total_bytes_items_hot = 56
+
+    stats.cleanup.duration = 0.1
+    stats.package_installation.duration = 3.0
+    stats.named_caches_install.duration = 0.1
+    stats.named_caches_uninstall.duration = 0.1
+
   def post_prpc(self, rpc, request, expect_errors=False):
     assert self.service, "Child classes must define service"
 
@@ -425,6 +479,121 @@ class BotServicePrpcTest(PrpcTest):
     _decode(resp.body, actual)
     expected = swarming_pb2.TerminateResponse(task_id='5cee488008810')
     self.assertEqual(expected, actual)
+
+  def test_tasks_ok(self):
+    """Asserts that tasks produces bot information."""
+    self.mock(random, 'getrandbits', lambda _: 0x88)
+
+    self.set_as_bot()
+    self.bot_poll()
+    self.set_as_user()
+    self.client_create_task_raw()
+    self.set_as_bot()
+    res = self.bot_poll()
+    response = self.bot_complete_task(task_id=res['manifest']['task_id'])
+    self.assertEqual({u'must_stop': False, u'ok': True}, response)
+
+    now_1 = self.mock_now(self.now, 1)
+    self.mock(random, 'getrandbits', lambda _: 0x55)
+    self.set_as_user()
+    self.client_create_task_raw(name='philbert')
+    self.set_as_bot()
+    res = self.bot_poll()
+    response = self.bot_complete_task(exit_code=1,
+                                      task_id=res['manifest']['task_id'])
+    self.assertEqual({u'must_stop': False, u'ok': True}, response)
+
+    start = self.now + datetime.timedelta(seconds=0.5)
+    end = now_1 + datetime.timedelta(seconds=0.5)
+
+    self.set_as_privileged_user()
+    request = swarming_pb2.BotTasksRequest()
+    request.bot_id = 'bot1'
+    request.start.FromDatetime(start)
+    request.end.FromDatetime(end)
+    request.sort = swarming_pb2.QUERY_CREATED_TS
+    request.state = swarming_pb2.QUERY_ALL
+    request.include_performance_stats = True
+    request.limit = 100
+    response = self.post_prpc('ListBotTasks', request)
+    actual = swarming_pb2.TaskListResponse()
+    _decode(response.body, actual)
+
+    expected = swarming_pb2.TaskResultResponse()
+    self.apply_defaults_for_run_result(expected)
+    expected.bot_idle_since_ts.FromDatetime(now_1)
+    expected.completed_ts.FromDatetime(now_1)
+    expected.modified_ts.FromDatetime(now_1)
+    expected.started_ts.FromDatetime(now_1)
+    expected.created_ts.FromDatetime(now_1)
+    expected.duration = 0.1
+    expected.name = 'philbert'
+    expected.exit_code = 1
+    expected.failure = True
+    expected.run_id = '5cee870005511'
+    expected.state = swarming_pb2.TaskState.COMPLETED
+    expected.task_id = '5cee870005511'
+    expected.costs_usd[:] = [0.1]
+    self.gen_perf_stats_prpc(expected.performance_stats)
+    self.assertEqual(expected, actual.items[0])
+
+  def test_all_task_sorts(self):
+    self.set_as_privileged_user()
+    for sort in (swarming_pb2.QUERY_CREATED_TS, swarming_pb2.QUERY_STARTED_TS,
+                 swarming_pb2.QUERY_COMPLETED_TS):
+      request = swarming_pb2.BotTasksRequest()
+      request.bot_id = 'bot1'
+      request.sort = sort
+      request.state = swarming_pb2.QUERY_ALL
+      request.include_performance_stats = True
+      request.limit = 100
+      response = self.post_prpc('ListBotTasks', request)
+      self.assertEqual(response.status, '200 OK')
+
+  def test_abandoned_has_error(self):
+    """abandoned_ts does not have an index with bot_id. So we test that it
+    specifically will return a 400 bad request.
+    """
+    self.set_as_privileged_user()
+    request = swarming_pb2.BotTasksRequest()
+    request.bot_id = 'bot1'
+    request.sort = swarming_pb2.QUERY_ABANDONED_TS
+    request.state = swarming_pb2.QUERY_ALL
+    request.include_performance_stats = True
+    request.limit = 100
+    response = self.post_prpc('ListBotTasks', request, expect_errors=True)
+    self.assertEqual(response.status, '400 Bad Request')
+
+  def test_all_task_state_filters(self):
+    self.set_as_privileged_user()
+    for state in swarming_pb2.StateQuery.DESCRIPTOR.values_by_number.keys():
+      # state cannot be pending since it is a disallowed state for
+      # a TaskRunResult. See task_result._validate_state_not_pending
+      if state not in (swarming_pb2.QUERY_PENDING,
+                       swarming_pb2.QUERY_PENDING_RUNNING,
+                       swarming_pb2.QUERY_DEDUPED):
+        request = swarming_pb2.BotTasksRequest()
+        request.bot_id = 'bot1'
+        request.state = state
+        request.include_performance_stats = True
+        request.limit = 100
+        response = self.post_prpc('ListBotTasks', request)
+        self.assertEqual(response.status, '200 OK')
+
+  def test_all_task_state_filters_disallowed_states(self):
+    self.set_as_privileged_user()
+    # State cannot be any of these states, since for `bot.list_tasks`
+    # a TaskRunResult. See task_result._DISALLOWED_STATES
+    for state in (swarming_pb2.QUERY_PENDING,
+                  swarming_pb2.QUERY_PENDING_RUNNING,
+                  swarming_pb2.QUERY_DEDUPED):
+      request = swarming_pb2.BotTasksRequest()
+      request.bot_id = 'bot1'
+      request.state = state
+      request.include_performance_stats = True
+      request.limit = 100
+      response = self.post_prpc('ListBotTasks', request, expect_errors=True)
+      self.assertEqual(response.status, '400 Bad Request')
 
 
 if __name__ == '__main__':

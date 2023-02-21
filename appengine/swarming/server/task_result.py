@@ -88,6 +88,15 @@ from server import task_pack
 from server import task_request
 from server.constants import OR_DIM_SEP
 
+# These are the fields which we are allowed to sort TaskRunResult by.
+# They are the only states which have a composite index with bot_id field.
+_BOT_TASK_ALLOWED_SORTS = {'created_ts', 'started_ts', 'completed_ts'}
+# These states are not allowed to be used to filter TaskRunResult.
+# - pending is an invalid state for a task_run_result. See _validate_not_pending
+# - pending_running is either the pending state (invalid) or running.
+# - deduped relies on try_number which is not part of `task_run_result`.
+_BOT_TASK_DISALLOWED_STATES = {'pending', 'pending_running', 'deduped'}
+
 
 class State(object):
   """Represents the current task state.
@@ -1514,7 +1523,7 @@ def filter_query(cls, q, start, end, sort, state):
   if state == 'no_resource':
     return q.filter(cls.state == State.NO_RESOURCE)
 
-  raise ValueError('Invalid state')
+  raise ValueError('Invalid state %s' % state)
 
 
 def state_to_string(state_obj):
@@ -1593,9 +1602,20 @@ def get_run_results_query(start, end, sort, state, bot_id):
         be used along start and end.
     state: One of State enum value as str. Use 'all' to get all tasks.
     bot_id: (required) bot id to filter on.
+
+  Raises:
+    ValueError: If the sort or state filter is not valid.
   """
   if not bot_id:
     raise ValueError('bot_id is required')
+  # Check is required since there is only a composite
+  # index for bot_id for created_ts, started_ts and completed_ts
+  if sort not in _BOT_TASK_ALLOWED_SORTS:
+    raise ValueError('invalid sort %s' % sort)
+
+  # TODO(jonahhooper) improve proto docs for this specific route.
+  if state in _BOT_TASK_DISALLOWED_STATES:
+    raise ValueError("invalid state %s" % state)
   # Disable the in-process local cache. This is important, as there can be up to
   # a thousand entities loaded in memory, and this is a pure memory leak, as
   # there's no chance this specific instance will need these again, therefore
