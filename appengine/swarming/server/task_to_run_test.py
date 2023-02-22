@@ -1054,7 +1054,7 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
         1, len(self._yield_next_available_task_to_dispatch(bot_dimensions)))
 
     self.assertEqual(True, to_run.is_reapable)
-    to_run.consume()
+    to_run.consume(None)
     to_run.put()
     self.assertEqual(False, to_run.is_reapable)
 
@@ -1100,6 +1100,16 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
     actual = task_to_run.get_task_to_runs(request, 0)
     expected = [to_run]
     self.assertEqual(expected, actual)
+
+  def test_task_to_run_key_from_parts(self):
+    request = self.mkreq(_gen_request())
+    to_run = task_to_run.new_task_to_run(request, 0)
+
+    from_parts = task_to_run.task_to_run_key_from_parts(request.key,
+                                                        to_run.shard_index,
+                                                        to_run.key.id())
+
+    self.assertEqual(from_parts, to_run.key)
 
 
 if __name__ == '__main__':

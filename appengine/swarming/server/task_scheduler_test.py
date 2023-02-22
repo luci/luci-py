@@ -347,7 +347,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     expected.update(**kwargs)
     return expected
 
-  def _quick_schedule(self, **kwargs):
+  def _quick_schedule(self, secret_bytes=None, **kwargs):
     """Schedules a task.
 
     Arguments:
@@ -355,7 +355,8 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     """
     self.execute_tasks()
     request = _gen_request_slices(**kwargs)
-    result_summary = task_scheduler.schedule_request(request)
+    result_summary = task_scheduler.schedule_request(request,
+                                                     secret_bytes=secret_bytes)
     # State will be either PENDING or COMPLETED (for deduped task)
     self.execute_tasks()
     self.assertEqual(0, self.execute_tasks())
@@ -564,6 +565,82 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         _bot_update_task(
             run_result.key, bot_id=test_bot_id, exit_code=0, duration=0.1))
     self.assertEqual(1, self.execute_tasks())
+
+  def test_bot_claim_slice(self):
+    self.mock(rbe, 'enqueue_rbe_task', lambda *_args: None)
+
+    result_summary = self._quick_schedule(
+        secret_bytes=task_request.SecretBytes(secret_bytes='blob'),
+        properties=_gen_properties(has_secret_bytes=True),
+        rbe_instance='some-instance',
+    )
+    to_run_key = task_to_run.request_to_task_to_run_key(
+        result_summary.request_key.get(), 0)
+
+    self._register_bot(self.bot_dimensions)
+
+    def claim(claim_id):
+      return task_scheduler.bot_claim_slice(
+          self.bot_dimensions,
+          task_scheduler.BotDetails(None, None),
+          to_run_key,
+          claim_id,
+      )
+
+    def claim_txn(claim_id):
+      request = to_run.request_key.get()
+      run_result, secret_bytes = task_scheduler._reap_task(
+          self.bot_dimensions, task_scheduler.BotDetails(None, None),
+          to_run_key, request, claim_id, 3, False)
+      return request, secret_bytes, run_result
+
+    # The first call actually makes the change.
+    request, secret_bytes, run_result = claim('some-claim-id')
+    self.assertEqual(request.key, result_summary.request_key)
+    self.assertEqual(secret_bytes.secret_bytes, 'blob')
+    self.assertEqual(run_result.bot_dimensions, self.bot_dimensions)
+
+    # TaskToRun is updated.
+    to_run = to_run_key.get()
+    self.assertFalse(to_run.is_reapable)
+    self.assertEqual(to_run.claim_id, 'some-claim-id')
+
+    # The second call with the same claim ID is noop.
+    request_dup, secret_bytes_dup, run_result_dup = claim('some-claim-id')
+    self.assertEqual(request_dup, request)
+    self.assertEqual(secret_bytes_dup, secret_bytes)
+    self.assertEqual(run_result_dup, run_result)
+
+    # If _reap_task is called due to a race, it notices the claim as well.
+    request_dup, secret_bytes_dup, run_result_dup = claim_txn('some-claim-id')
+    self.assertEqual(request_dup, request)
+    self.assertEqual(secret_bytes_dup, secret_bytes)
+    self.assertEqual(run_result_dup, run_result)
+
+    # A call with a different claim ID results in an error.
+    with self.assertRaises(task_scheduler.ClaimError):
+      claim('another-claim-id')
+    with self.assertRaises(task_scheduler.ClaimError):
+      claim_txn('another-claim-id')
+
+  def test_bot_claim_slice_dimensions_mismatch(self):
+    self.mock(rbe, 'enqueue_rbe_task', lambda *_args: None)
+
+    result_summary = self._quick_schedule(rbe_instance='some-instance')
+    to_run_key = task_to_run.request_to_task_to_run_key(
+        result_summary.request_key.get(), 0)
+
+    bot_dimensions = self.bot_dimensions.copy()
+    bot_dimensions['pool'] = ['another']
+    self._register_bot(bot_dimensions)
+
+    with self.assertRaises(task_scheduler.ClaimError):
+      task_scheduler.bot_claim_slice(
+          bot_dimensions,
+          task_scheduler.BotDetails(None, None),
+          to_run_key,
+          'some-claim-id',
+      )
 
   def test_schedule_request(self):
     # It is tested indirectly in the other functions.

@@ -177,15 +177,17 @@ class _TaskToRunBase(ndb.Model):
   #
   # Used only in RBE mode. Always None in native mode.
   #
-  # The exact meaning is TBD. Either a bot ID or a bot session or just some
-  # UUID (for idempotency of the claiming transaction) or some combination of
-  # all of these.
+  # It is an opaque ID supplied by the bot when it attempts to claim this
+  # entity. If TaskToRunShard is already claimed and `claim_id` matches the one
+  # supplied by the bot, then it means this bot has actually claimed the entity
+  # already and now just retries the call.
   #
   # Never reset once set.
   claim_id = ndb.StringProperty(required=False, indexed=False)
 
-  def consume(self):
+  def consume(self, claim_id):
     """Moves TaskToRun into non-reapable state (e.g. when canceling)."""
+    self.claim_id = claim_id
     self.expiration_ts = None
     self.queue_number = None
 
@@ -270,13 +272,13 @@ def _gen_queue_number(dimensions_hash, timestamp, priority,
   """Generates a 63 bit packed value used for TaskToRunShard.queue_number.
 
   Arguments:
-  - dimensions_hash: 32 bit integer to classify in a queue.
-  - timestamp: datetime.datetime when the TaskRequest was filed in. This value
+    dimensions_hash: 32 bit integer to classify in a queue.
+    timestamp: datetime.datetime when the TaskRequest was filed in. This value
         is used for FIFO or LIFO ordering (depending on configuration) with a
         100ms granularity; the year is ignored.
-  - priority: priority of the TaskRequest. It's a 8 bit integer. Lower is higher
+    priority: priority of the TaskRequest. It's a 8 bit integer. Lower is higher
         priority.
-  - scheduling_algorithm: The algorithm to use to schedule this task,
+    scheduling_algorithm: The algorithm to use to schedule this task,
         using the Pool.SchedulingAlgorithm enum in pools.proto.
 
   Returns:
@@ -560,13 +562,13 @@ def _yield_potential_tasks(bot_id, pool, queues, stats, bot_dims_matcher,
   latency. The number of queries is unbounded.
 
   Arguments:
-  - bot_id: id of the bot to poll tasks for.
-  - pool: this bot's pool for monitoring metrics.
-  - queues: a list of integers with dimensions hashes of queues to poll.
-  - stats: a _QueryStats object to update in-place.
-  - bot_dims_matcher: a predicate that checks if task dimensions match bot's
-      dimensions.
-  - deadline: datetime.datetime when to give up.
+    bot_id: id of the bot to poll tasks for.
+    pool: this bot's pool for monitoring metrics.
+    queues: a list of integers with dimensions hashes of queues to poll.
+    stats: a _QueryStats object to update in-place.
+    bot_dims_matcher: a predicate that checks if task dimensions match bot's
+        dimensions.
+    deadline: datetime.datetime when to give up.
 
   Yields:
     TaskToRunShard entities, trying to yield the highest priority one first.
@@ -752,6 +754,18 @@ def task_to_run_key_slice_index(to_run_key):
   return to_run_key.integer_id() >> 4
 
 
+def task_to_run_key_from_parts(request_key, shard_index, entity_id):
+  """Returns TaskToRun key given its parts.
+
+  Arguments:
+    request_key: parent TaskRequest entity key.
+    shard_index: index of TaskToRunShard entity class.
+    entity_id: int64 with TaskToRunShard entity key.
+  """
+  assert request_key.kind() == 'TaskRequest', request_key
+  return ndb.Key(get_shard_kind(shard_index), entity_id, parent=request_key)
+
+
 def new_task_to_run(request, task_slice_index):
   """Returns a fresh new TaskToRunShard for the task ready to be scheduled.
 
@@ -912,12 +926,12 @@ def yield_next_available_task_to_dispatch(bot_id, pool, queues,
   TaskToRunShard from the queue.
 
   Arguments:
-  - bot_id: id of the bot to poll tasks for.
-  - pool: this bot's pool for monitoring metrics.
-  - queues: a list of integers with dimensions hashes of queues to poll.
-  - bot_dims_matcher: a predicate that checks if task dimensions match bot's
-      dimensions.
-  - deadline: datetime.datetime when to give up.
+    bot_id: id of the bot to poll tasks for.
+    pool: this bot's pool for monitoring metrics.
+    queues: a list of integers with dimensions hashes of queues to poll.
+    bot_dims_matcher: a predicate that checks if task dimensions match bot's
+        dimensions.
+    deadline: datetime.datetime when to give up.
 
   Raises:
     ScanDeadlineError if reached the deadline before clearing queues.

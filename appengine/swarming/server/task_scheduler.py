@@ -63,6 +63,10 @@ class Error(Exception):
   pass
 
 
+class ClaimError(Error):
+  pass
+
+
 def _secs_to_ms(value):
   """Converts a seconds value in float to the number of ms as an integer."""
   return int(round(value * 1000.))
@@ -98,7 +102,7 @@ def _expire_task_tx(now, request, to_run_key, result_summary_key, capacity,
   to_run.expiration_delay = delay
 
   # In any case, dequeue the TaskToRunShard.
-  to_run.consume()
+  to_run.consume(None)
   result_summary = result_summary_future.get_result()
   orig_summary_state = result_summary.state
   to_put = [to_run, result_summary]
@@ -247,10 +251,14 @@ def _expire_task(to_run_key, request, inline):
   return summary, new_to_run
 
 
-def _reap_task(bot_dimensions, bot_details, to_run_key, request):
+def _reap_task(bot_dimensions,
+               bot_details,
+               to_run_key,
+               request,
+               claim_id=None,
+               txn_retries=0,
+               txn_catch_errors=True):
   """Reaps a task and insert the results entity.
-
-  TODO(vadimsh): Pass `claim_id` and use it to idempotently claim TaskToRun.
 
   Returns:
     (TaskRunResult, SecretBytes) if successful, (None, None) otherwise.
@@ -260,46 +268,64 @@ def _reap_task(bot_dimensions, bot_details, to_run_key, request):
   bot_id = bot_dimensions[u'id'][0]
   bot_info = bot_management.get_info_key(bot_id).get()
   if not bot_info:
-    raise Error("Bot %s doesn't exist." % bot_id)
+    raise ClaimError('Bot %s doesn\'t exist.' % bot_id)
 
   now = utils.utcnow()
   # Log before the task id in case the function fails in a bad state where the
   # DB TX ran but the reply never comes to the bot. This is the worst case as
   # this leads to a task that results in BOT_DIED without ever starting. This
   # case is specifically handled in cron_handle_bot_died().
-  logging.info(
-      '_reap_task(%s)', task_pack.pack_result_summary_key(result_summary_key))
+  logging.info('_reap_task(%s, %s)',
+               task_pack.pack_result_summary_key(result_summary_key), claim_id)
 
   es_cfg = external_scheduler.config_for_task(request)
 
+  keys_to_fetch = [to_run_key, result_summary_key]
+
+  # Fetch SecretBytes as well if the slice uses secrets.
+  slice_index = task_to_run.task_to_run_key_slice_index(to_run_key)
+  if request.task_slice(slice_index).properties.has_secret_bytes:
+    keys_to_fetch.append(request.secret_bytes_key)
+
   def run():
-    # 3 GET, 1 PUT at the end.
-    to_run_future = to_run_key.get_async()
-    result_summary_future = result_summary_key.get_async()
-    to_run = to_run_future.get_result()
-    t = request.task_slice(to_run.task_slice_index)
-    if t.properties.has_secret_bytes:
-      secret_bytes_future = request.secret_bytes_key.get_async()
-    result_summary = result_summary_future.get_result()
+    entities = ndb.get_multi(keys_to_fetch)
+    to_run, result_summary = entities[0], entities[1]
+    secret_bytes = entities[2] if len(entities) == 3 else None
     orig_summary_state = result_summary.state
-    secret_bytes = None
-    if t.properties.has_secret_bytes:
-      secret_bytes = secret_bytes_future.get_result()
+
     if not to_run:
       logging.error('Missing TaskToRunShard?\n%s', result_summary.task_id)
+      if claim_id:
+        raise ClaimError('No task slice')
       return None, None, None, False
+
     if not to_run.is_reapable:
+      if claim_id:
+        if to_run.claim_id != claim_id:
+          raise ClaimError('No longer available')
+        # The caller already holds the claim and this is a retry. Just fetch all
+        # entities that should already exist.
+        run_result = task_pack.result_summary_key_to_run_result_key(
+            result_summary_key).get()
+        if not run_result:
+          raise Error('TaskRunResult unexpectedly missing on retry')
+        if run_result.current_task_slice != to_run.task_slice_index:
+          raise ClaimError('Obsolete')
+        return run_result, secret_bytes, result_summary, False
       logging.info('%s is not reapable', result_summary.task_id)
       return None, None, None, False
+
     if result_summary.bot_id == bot_id:
       # This means two things, first it's a retry, second it's that the first
       # try failed and the retry is being reaped by the same bot. Deny that, as
       # the bot may be deeply broken and could be in a killing spree.
       # TODO(maruel): Allow retry for bot locked task using 'id' dimension.
+      # TODO(vadimsh): This should not be possible, retries were removed.
       logging.warning('%s can\'t retry its own internal failure task',
                       result_summary.task_id)
       return None, None, None, False
-    to_run.consume()
+
+    to_run.consume(claim_id)
     run_result = task_result.new_run_result(request, to_run, bot_id,
                                             bot_details, bot_dimensions,
                                             result_summary.resultdb_info)
@@ -329,8 +355,10 @@ def _reap_task(bot_dimensions, bot_details, to_run_key, request):
   state_changed = False
   try:
     run_result, secret_bytes, summary, state_changed = \
-      datastore_utils.transaction(run, retries=0, deadline=30)
+      datastore_utils.transaction(run, retries=txn_retries, deadline=30)
   except datastore_utils.CommitError:
+    if not txn_catch_errors:
+      raise
     # The challenge here is that the transaction may have failed because:
     # - The DB had an hickup and the TaskToRunShard, TaskRunResult and
     #   TaskResultSummary haven't been updated.
@@ -922,7 +950,7 @@ def _cancel_task_tx(request,
       #
       # TODO(vadimsh): This should be done before the transaction.
       task_to_run.Claim.obtain(to_run.key)
-      to_run.consume()
+      to_run.consume(None)
       entities.append(to_run)
   else:
     if not kill_running:
@@ -1037,7 +1065,7 @@ def _ensure_active_slice(request, task_slice_index):
         return to_run, False
 
       # Deactivate old TaskToRunShard, create new one.
-      to_run.consume()
+      to_run.consume(None)
       new_to_run = task_to_run.new_task_to_run(request, task_slice_index)
       ndb.put_multi([to_run, new_to_run])
       logging.debug('_ensure_active_slice: added new TaskToRunShard')
@@ -1076,7 +1104,7 @@ def _bot_reap_task_external_scheduler(bot_dimensions, bot_details, es_cfg):
   Arguments:
     - bot_dimensions: The dimensions of the bot as a dictionary in
           {string key: list of string values} format.
-    - bot_details: a BotDetails tuple, non-essential but would be porpagated to
+    - bot_details: a BotDetails tuple, non-essential but would be propagated to
           the task.
     - es_cfg: ExternalSchedulerConfig for this bot.
   """
@@ -1275,6 +1303,7 @@ def schedule_request(request,
     if to_run:
       to_run.key = ndb.Key(to_run.key.kind(), to_run.key.id(), parent=key)
     if secret_bytes:
+      assert request.secret_bytes_key
       secret_bytes.key = request.secret_bytes_key
     if build_token:
       build_token.key = request.build_token_key
@@ -1366,7 +1395,7 @@ def bot_reap_task(bot_dimensions, queues, bot_details, deadline):
   - bot_dimensions: The dimensions of the bot as a dictionary in
           {string key: list of string values} format.
   - queues: a list of integers with dimensions hashes of queues to poll.
-  - bot_details: a BotDetails tuple, non-essential but would be porpagated to
+  - bot_details: a BotDetails tuple, non-essential but would be propagated to
           the task.
   - deadline: datetime.datetime of when to give up.
 
@@ -1500,6 +1529,69 @@ def bot_reap_task(bot_dimensions, queues, bot_details, deadline):
         '%d stale_index, %d failed', bot_id,
         time.time() - start, iterated, reenqueued, expired, stale_index,
         failures)
+
+
+def bot_claim_slice(bot_dimensions, bot_details, to_run_key, claim_id):
+  """Transactionally assigns the given task slice to the given bot.
+
+  Unlike bot_reap_task, this function doesn't try to find a matching task
+  in Swarming scheduler queues and instead accepts a candidate TaskToRun as
+  input.
+
+  TODO(vadimsh): Stop returning TaskRunResult, it doesn't really carry any
+  new information (`task_id` and task slice index are already available in
+  `to_run_key`). This will require more refactorings in handlers_bot.py.
+
+  Arguments:
+    bot_dimensions: The dimensions of the bot as a dictionary in
+        {string key: list of string values} format.
+    bot_details: a BotDetails tuple, non-essential but would be propagated to
+        the task.
+    to_run_key: a key of TaskToRunShardXXX entity identifying a slice to claim.
+    claim_id: a string identifying this claim operation, for idempotency.
+
+  Returns:
+    Tuple of (TaskRequest, SecretBytes, TaskRunResult) on success.
+
+  Raises:
+    ClaimError on fatal errors (e.g. the slice was already claimed or expired).
+    CommitError etc. on transient datastore errors.
+  """
+  assert claim_id
+
+  to_run = to_run_key.get()
+  if not to_run:
+    raise ClaimError('No task slice')
+
+  # Check dimensions match before trusting any other inputs. This is a security
+  # check. A bot must not be able to claim slices it doesn't match even if the
+  # bot knows their IDs.
+  match_bot_dimensions = task_to_run.dimensions_matcher(bot_dimensions)
+  if not match_bot_dimensions(to_run.dimensions):
+    raise ClaimError('Dimensions mismatch')
+
+  # Check the slice is still available before running the transaction.
+  if not to_run.is_reapable:
+    if to_run.claim_id != claim_id:
+      raise ClaimError('No longer available')
+    # The caller already holds the claim and this is a retry. Just fetch all
+    # entities that should already exist.
+    run_result_key = task_pack.request_key_to_run_result_key(to_run.request_key)
+    request, run_result = ndb.get_multi([to_run.request_key, run_result_key])
+    if not run_result:
+      raise Error('TaskRunResult is unexpectedly missing')
+    if run_result.current_task_slice != to_run.task_slice_index:
+      raise ClaimError('Obsolete')
+    secret_bytes = None
+    if request.task_slice(to_run.task_slice_index).properties.has_secret_bytes:
+      secret_bytes = request.secret_bytes_key.get()
+    return request, secret_bytes, run_result
+
+  # Transactionally claim the slice. This can raise ClaimError or CommitError.
+  request = to_run.request_key.get()
+  run_result, secret_bytes = _reap_task(bot_dimensions, bot_details, to_run_key,
+                                        request, claim_id, 3, False)
+  return request, secret_bytes, run_result
 
 
 def bot_update_task(run_result_key, bot_id, output, output_chunk_start,

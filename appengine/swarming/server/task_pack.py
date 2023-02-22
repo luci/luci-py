@@ -40,6 +40,12 @@ def request_key_to_build_token_key(request_key):
   return ndb.Key('BuildToken', 1, parent=request_key)
 
 
+def request_key_to_run_result_key(request_key):
+  """Returns the TaskRunResult ndb.Key for this TaskRequest.key."""
+  return result_summary_key_to_run_result_key(
+      request_key_to_result_summary_key(request_key))
+
+
 def result_summary_key_to_request_key(result_summary_key):
   """Returns the TaskRequest ndb.Key for this TaskResultSummmary key."""
   assert result_summary_key.kind() == 'TaskResultSummary', result_summary_key
@@ -47,28 +53,19 @@ def result_summary_key_to_request_key(result_summary_key):
 
 
 def result_summary_key_to_run_result_key(result_summary_key):
-  """Returns the TaskRunResult ndb.Key for this TaskResultSummary.key.
-
-  Arguments:
-    result_summary_key: ndb.Key for a TaskResultSummary entity.
-
-  Returns:
-    ndb.Key for the corresponding TaskRunResult entity.
-  """
+  """Returns the TaskRunResult ndb.Key for this TaskResultSummary.key."""
   assert result_summary_key.kind() == 'TaskResultSummary', result_summary_key
   return ndb.Key('TaskRunResult', 1, parent=result_summary_key)
 
 
 def run_result_key_to_result_summary_key(run_result_key):
-  """Returns the TaskResultSummary ndb.Key for this TaskRunResult.key.
-  """
+  """Returns the TaskResultSummary ndb.Key for this TaskRunResult.key."""
   assert run_result_key.kind() == 'TaskRunResult', run_result_key
   return run_result_key.parent()
 
 
 def run_result_key_to_performance_stats_key(run_result_key):
-  """Returns the PerformanceStats ndb.Key for this TaskRunResult.key.
-  """
+  """Returns the PerformanceStats ndb.Key for this TaskRunResult.key."""
   assert run_result_key.kind() == 'TaskRunResult', run_result_key
   return ndb.Key('PerformanceStats', 1, parent=run_result_key)
 

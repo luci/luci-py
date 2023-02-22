@@ -101,7 +101,11 @@ class BotApiTest(test_env_handlers.AppTestBase):
   def mock_pool_config(self, pool, **kwargs):
     def mocked_get_pool_config(name):
       if name == pool:
-        return pools_config.init_pool_config(name=name, rev='rev', **kwargs)
+        return pools_config.init_pool_config(
+            name=name,
+            rev='rev',
+            scheduling_algorithm=pools_pb2.Pool.SCHEDULING_ALGORITHM_UNKNOWN,
+            **kwargs)
       return None
 
     self.mock(pools_config, 'get_pool_config', mocked_get_pool_config)
@@ -1145,6 +1149,123 @@ class BotApiTest(test_env_handlers.AppTestBase):
 
     res2 = self.post_json('/swarming/api/v1/bot/poll', params)
     self.assertEqual(res1, res2)
+
+  def test_claim_run(self):
+    self.mock_pool_config(
+        pool='default',
+        rbe_migration=pools_pb2.Pool.RBEMigration(
+            rbe_instance='some-instance',
+            rbe_mode_percent=100,
+        ),
+    )
+    self.mock(realms, 'check_tasks_create_in_realm', lambda *_: True)
+    self.mock(realms, 'check_pools_create_task', lambda *_: True)
+    self.mock(realms, 'check_tasks_act_as', lambda *_: True)
+
+    to_run = []
+
+    def mocked_rbe_enqueue(_request, task_to_run):
+      to_run.append(task_to_run)
+
+    self.mock(rbe, 'enqueue_rbe_task', mocked_rbe_enqueue)
+
+    self.set_as_user()
+    _, task_id = self.client_create_task_raw()
+    run_result_id = task_id[:-1] + '1'
+    self.assertEqual(len(to_run), 1)
+
+    self.set_as_bot()
+    params = self.do_handshake()
+    params[u'claim_id'] = 'some-claim-id'
+    params[u'task_id'] = task_id
+    params[u'task_to_run_shard'] = to_run[0].shard_index
+    params[u'task_to_run_id'] = to_run[0].key.id()
+    response = self.post_json('/swarming/api/v1/bot/claim', params)
+    self.assertEqual(
+        response, {
+            u'cmd': u'run',
+            u'manifest': {
+                u'bot_authenticated_as': u'bot:whitelisted-ip',
+                u'bot_dimensions': {
+                    u'id': [u'bot1'],
+                    u'os': [u'Amiga'],
+                    u'pool': [u'default']
+                },
+                u'bot_id': u'bot1',
+                u'caches': [],
+                u'cas_input_root': None,
+                u'cipd_input': {
+                    u'client_package': {
+                        u'package_name': u'infra/tools/cipd/${platform}',
+                        u'path': None,
+                        u'version': u'git_revision:deadbeef'
+                    },
+                    u'packages': [{
+                        u'package_name': u'rm',
+                        u'path': u'bin',
+                        u'version': u'git_revision:deadbeef'
+                    }],
+                    u'server':
+                    u'https://pool.config.cipd.example.com'
+                },
+                u'command': [u'python', u'run_test.py'],
+                u'containment': {
+                    u'containment_type': 2
+                },
+                u'dimensions': {
+                    u'os': [u'Amiga'],
+                    u'pool': [u'default']
+                },
+                u'env': {},
+                u'env_prefixes': {},
+                u'grace_period': 30,
+                u'hard_timeout': 3600,
+                u'host': u'http://localhost:8080',
+                u'io_timeout': 1200,
+                u'outputs': [u'foo', u'path/to/foobar'],
+                u'realm': {},
+                u'relative_cwd': None,
+                u'resultdb': None,
+                u'secret_bytes': None,
+                u'service_accounts': {
+                    u'system': {
+                        u'service_account': u'none'
+                    },
+                    u'task': {
+                        u'service_account': u'none'
+                    }
+                },
+                u'task_id': run_result_id,
+            },
+        })
+
+    # Submitted the bot event.
+    events = list(bot_management.get_events_query('bot1'))
+    self.assertEqual(events[-1].event_type, 'request_task')
+    self.assertEqual(events[-1].task_id, run_result_id)
+
+  def test_claim_skip(self):
+    params = self.do_handshake()
+    params[u'claim_id'] = 'some-claim-id'
+    params[u'task_id'] = '5cee400000010'  # doesn't exist
+    params[u'task_to_run_shard'] = 1
+    params[u'task_to_run_id'] = 1
+    response = self.post_json('/swarming/api/v1/bot/claim', params)
+    self.assertEqual(response, {
+        u'cmd': u'skip',
+        u'reason': u'No task slice',
+    })
+
+  def test_claim_bad_task_to_run(self):
+    params = self.do_handshake()
+    params[u'claim_id'] = 'some-claim-id'
+    params[u'task_id'] = '?????'
+    params[u'task_to_run_shard'] = 1
+    params[u'task_to_run_id'] = 1
+    response = self.app.post_json('/swarming/api/v1/bot/claim',
+                                  params,
+                                  expect_errors=True)
+    self.assertEqual(response.status_code, 400)
 
   def test_complete_task_cas_output_root(self):
     # Successfully poll a task.
