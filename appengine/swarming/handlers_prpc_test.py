@@ -28,6 +28,7 @@ import proto.api_v2.swarming_pb2 as swarming_pb2
 
 from server import bot_management
 from server import acl
+from server import service_accounts
 
 import handlers_bot
 import handlers_prpc
@@ -78,6 +79,57 @@ def _bot_event(event_type, bot_id, **kwargs):
   }
   args.update(kwargs)
   return bot_management.bot_event(event_type, bot_id, **args)
+
+
+def apply_default_for_task_props(props):
+  props.cipd_input.client_package.package_name = 'infra/tools/cipd/${platform}'
+  props.cipd_input.client_package.version = 'git_revision:deadbeef'
+  props.cipd_input.packages.extend([
+      swarming_pb2.CipdPackage(package_name='rm',
+                               path='bin',
+                               version='git_revision:deadbeef')
+  ])
+  props.cipd_input.server = 'https://pool.config.cipd.example.com'
+  props.command[:] = ['python', '-c', 'print(1)']
+  props.containment.containment_type = swarming_pb2.ContainmentType.AUTO
+  props.dimensions.extend([
+      swarming_pb2.StringPair(key='os', value='Amiga'),
+      swarming_pb2.StringPair(key='pool', value='default')
+  ])
+  props.execution_timeout_secs = 3600
+  props.grace_period_secs = 30
+  props.idempotent = False
+  props.io_timeout_secs = 1200
+  props.outputs[:] = ['foo', 'path/to/foobar']
+
+
+def apply_defaults_for_request(request):
+  """Applies some default expectations to a TaskRequestResponse
+
+  To be used for expectations.
+  """
+  # This assumes:
+  # self.mock(random, 'getrandbits', lambda _: 0x88)
+  request.authenticated = 'user:user@example.com'
+  request.expiration_secs = 86400
+  request.task_id = '5cee488008810'
+  request.name = 'job1'
+  request.priority = 20
+  request.service_account = 'none'
+  request.tags[:] = [
+      u'a:tag',
+      u'authenticated:user:user@example.com',
+      u'os:Amiga',
+      u'pool:default',
+      u'priority:20',
+      u'realm:none',
+      u'service_account:none',
+      u'swarming.pool.template:none',
+      u'swarming.pool.version:pools_cfg_rev',
+      u'user:joe@localhost',
+  ]
+  request.user = 'joe@localhost'
+  request.bot_ping_tolerance_secs = 600
 
 
 class PrpcTest(test_env_handlers.AppTestBase):
@@ -616,6 +668,7 @@ class TaskServicePrpcTest(PrpcTest):
     self.mock_now(self.now)
     self.mock_default_pool_acl([])
     self.mock_tq_tasks()
+    self.mock(service_accounts, 'has_token_server', lambda: True)
 
   def test_result_unknown(self):
     """Asserts that result raises 404 for unknown task IDs."""
@@ -727,6 +780,64 @@ class TaskServicePrpcTest(PrpcTest):
     expected.task_id = task_id
     expected.duration = 0.1
     actual = swarming_pb2.TaskResultResponse()
+    _decode(response.body, actual)
+    self.assertEqual(expected, actual)
+
+  def test_request_unknown(self):
+    """Asserts that 404 is raised for unknown tasks."""
+    self.set_as_user()
+    response = self.post_prpc('GetRequest',
+                              swarming_pb2.TaskIdRequest(task_id='12310'),
+                              expect_errors=True)
+    self.assertEqual(response.status, '404 Not Found')
+
+  def test_request_ok(self):
+    """Asserts that request produces a task request."""
+    self.set_as_user()
+    self.mock(random, 'getrandbits', lambda _: 0x88)
+    self.mock_default_pool_acl(['service-account@example.com'])
+    self.mock_auth_db([
+        auth.Permission('swarming.pools.createTask'),
+        auth.Permission('swarming.tasks.createInRealm'),
+    ])
+
+    _, task_id = self.client_create_task_raw(
+        properties={'secret_bytes': 'zekret'},
+        service_account='service-account@example.com',
+        realm='test:task_realm')
+
+    expected_props = swarming_pb2.TaskProperties()
+    apply_default_for_task_props(expected_props)
+    expected_props.secret_bytes = b'<REDACTED>'
+    expected_props.command[:] = ['python', 'run_test.py']
+    expected = swarming_pb2.TaskRequestResponse(
+        properties=expected_props,
+        task_slices=[
+            swarming_pb2.TaskSlice(expiration_secs=86400,
+                                   properties=expected_props,
+                                   wait_for_capacity=False)
+        ])
+    apply_defaults_for_request(expected)
+    expected.created_ts.FromDatetime(self.now)
+    expected.service_account = 'service-account@example.com'
+    expected.bot_ping_tolerance_secs = 600
+    expected.expiration_secs = 86400
+    expected.realm = 'test:task_realm'
+    expected.tags[:] = [
+        u'a:tag',
+        u'authenticated:user:user@example.com',
+        u'os:Amiga',
+        u'pool:default',
+        u'priority:20',
+        u'realm:test:task_realm',
+        u'service_account:service-account@example.com',
+        u'swarming.pool.template:none',
+        u'swarming.pool.version:pools_cfg_rev',
+        u'user:joe@localhost',
+    ]
+    response = self.post_prpc('GetRequest',
+                              swarming_pb2.TaskIdRequest(task_id=task_id))
+    actual = swarming_pb2.TaskRequestResponse()
     _decode(response.body, actual)
     self.assertEqual(expected, actual)
 
