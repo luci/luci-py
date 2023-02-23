@@ -47,13 +47,6 @@ from server import task_scheduler
 
 ### Helper Methods
 
-
-# Used by _get_task_request_async(), clearer than using True/False and important
-# as this is part of the security boundary.
-_CANCEL = object()
-_VIEW = object()
-
-
 # Add support for BooleanField in protorpc in endpoints GET requests.
 _old_decode_field = protojson.ProtoJson.decode_field
 def _decode_field(self, field, value):
@@ -62,14 +55,6 @@ def _decode_field(self, field, value):
     return value.lower() == 'true'
   return _old_decode_field(self, field, value)
 protojson.ProtoJson.decode_field = _decode_field
-
-
-def _to_keys(task_id):
-  """Returns request and result keys, handling failure."""
-  try:
-    return task_pack.get_request_and_result_keys(task_id)
-  except ValueError:
-    raise endpoints.BadRequestException('%s is an invalid key.' % task_id)
 
 
 def _convert_to_endpoints_exception(func):
@@ -81,6 +66,8 @@ def _convert_to_endpoints_exception(func):
       raise endpoints.NotFoundException(e.message)
     except handlers_exceptions.BadRequestException as e:
       raise endpoints.BadRequestException(e.message)
+    except handlers_exceptions.InternalException as e:
+      raise endpoints.InternalServerErrorException(e.message)
 
   return wrapper
 
@@ -92,71 +79,6 @@ def endpoint(*args, **kwargs):
     return endpoints_method(instrument(_convert_to_endpoints_exception(func)))
 
   return decorator
-
-
-@ndb.tasklet
-def _get_task_request_async(task_id, request_key, viewing):
-  """Returns the TaskRequest corresponding to a task ID.
-
-  Enforces the ACL for users. Allows bots all access for the moment.
-
-  Returns:
-    TaskRequest instance.
-  """
-  request = yield request_key.get_async()
-  if not request:
-    raise endpoints.NotFoundException('%s not found.' % task_id)
-  if viewing == _VIEW:
-    realms.check_task_get_acl(request)
-  elif viewing == _CANCEL:
-    realms.check_task_cancel_acl(request)
-  else:
-    raise endpoints.InternalServerErrorException('_get_task_request_async()')
-  raise ndb.Return(request)
-
-
-def _get_request_and_result(task_id, viewing, trust_memcache):
-  """Returns the TaskRequest and task result corresponding to a task ID.
-
-  For the task result, first do an explict lookup of the caches, and then decide
-  if it is necessary to fetch from the DB.
-
-  Arguments:
-    task_id: task ID as provided by the user.
-    viewing: one of _CANCEL or _VIEW
-    trust_memcache: bool to state if memcache should be trusted for running
-        task. If False, when a task is still pending/running, do a DB fetch.
-
-  Returns:
-    tuple(TaskRequest, result): result can be either for a TaskRunResult or a
-                                TaskResultSummay.
-  """
-  request_key, result_key = _to_keys(task_id)
-  # The task result has a very high odd of taking much more time to fetch than
-  # the TaskRequest, albeit it is the TaskRequest that enforces ACL. Do the task
-  # result fetch first, the worst that will happen is unnecessarily fetching the
-  # task result.
-  result_future = result_key.get_async(
-      use_cache=True, use_memcache=True, use_datastore=False)
-
-  # The TaskRequest has P(99.9%) chance of being fetched from memcache since it
-  # is immutable.
-  request_future = _get_task_request_async(task_id, request_key, viewing)
-
-  result = result_future.get_result()
-  if (not result or
-      (result.state in task_result.State.STATES_RUNNING and not
-        trust_memcache)):
-    # Either the entity is not in cache, or we don't trust memcache for a
-    # running task result. Do the DB fetch, which is slow.
-    result = result_key.get(
-        use_cache=False, use_memcache=False, use_datastore=True)
-
-  request = request_future.get_result()
-
-  if not result:
-    raise endpoints.NotFoundException('%s not found.' % task_id)
-  return request, result
 
 
 def get_or_raise(key):
@@ -250,7 +172,7 @@ class SwarmingServerService(remote.Service):
       # This is for the compatibility until Web clients send task_id.
       # return False if task_id is not given.
       return acl._is_privileged_user()
-    task_key, _ = _to_keys(task_id)
+    task_key, _ = api_common.to_keys(task_id)
     task = task_key.get()
     if not task:
       raise endpoints.NotFoundException('%s not found.' % task_id)
@@ -332,7 +254,8 @@ class SwarmingTaskService(remote.Service):
     # completed, and that the DB store succeeds *but* the memcache update fails,
     # this API will *always* return the stale version.
     try:
-      _, result = _get_request_and_result(request.task_id, _VIEW, False)
+      _, result = api_common.get_request_and_result(request.task_id,
+                                                    api_common.VIEW, False)
     except ValueError:
       raise endpoints.BadRequestException('Invalid task ID')
     return message_conversion.task_result_to_rpc(
@@ -347,9 +270,9 @@ class SwarmingTaskService(remote.Service):
   def request(self, request):
     """Returns the task request corresponding to a task ID."""
     logging.debug('%s', request)
-    request_key, _ = _to_keys(request.task_id)
-    request_obj = _get_task_request_async(
-        request.task_id, request_key, _VIEW).get_result()
+    request_key, _ = api_common.to_keys(request.task_id)
+    request_obj = api_common.get_task_request_async(
+        request.task_id, request_key, api_common.VIEW).get_result()
     return message_conversion.task_request_to_rpc(request_obj)
 
   @endpoint(TaskCancel,
@@ -363,9 +286,9 @@ class SwarmingTaskService(remote.Service):
     If a bot was running the task, the bot will forcibly cancel the task.
     """
     logging.debug('request %s', request)
-    request_key, result_key = _to_keys(request.task_id)
-    request_obj = _get_task_request_async(request.task_id, request_key,
-                                          _CANCEL).get_result()
+    request_key, result_key = api_common.to_keys(request.task_id)
+    request_obj = api_common.get_task_request_async(
+        request.task_id, request_key, api_common.CANCEL).get_result()
     ok, was_running = task_scheduler.cancel_task(request_obj, result_key,
                                                  request.kill_running or False,
                                                  None)
@@ -385,7 +308,8 @@ class SwarmingTaskService(remote.Service):
       # behavior. pRPC implementation should limit to a multiple of CHUNK_SIZE
       # (one or two?) for efficiency.
       request.length = 16*1000*1024
-    _, result = _get_request_and_result(request.task_id, _VIEW, True)
+    _, result = api_common.get_request_and_result(request.task_id,
+                                                  api_common.VIEW, True)
     output = result.get_output(request.offset or 0, request.length)
     if output:
       # That was an error, don't do that in pRPC:

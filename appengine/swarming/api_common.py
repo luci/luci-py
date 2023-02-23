@@ -4,9 +4,9 @@
 """Contains code which is common between bot the prpc API and the protorpc api.
 """
 from google.appengine.api import datastore_errors
+from google.appengine.ext import ndb
 
 import handlers_exceptions
-
 from components import datastore_utils
 from server import task_queues
 from server import bot_management
@@ -36,7 +36,7 @@ def get_bot(bot_id):
 
   Raises:
     handlers_exceptions.NotFoundException if the bot_id has never existed.
-    auth.AuthorizationError if bot fails realm authorization test.
+    auth.AuthorizationError if caller fails realm authorization test.
   """
   realms.check_bot_get_acl(bot_id)
   bot = bot_management.get_info_key(bot_id).get()
@@ -174,3 +174,112 @@ def list_bot_tasks(bot_id, start, end, sort, state, cursor, limit):
   except ValueError as e:
     raise handlers_exceptions.BadRequestException(
         'Inappropriate filter for bot.tasks: %s' % e)
+
+
+def to_keys(task_id):
+  """Converts task_id into task request and task_result keys.
+
+  Arguments:
+    task_id: a string task_id.
+
+  Returns:
+    TaskRequest and TaskResultSummary ndb keys.
+
+  Raises:
+    handlers_exceptions.BadRequestException if the key is invalid.
+  """
+  try:
+    return task_pack.get_request_and_result_keys(task_id)
+  except ValueError as e:
+    raise handlers_exceptions.BadRequestException('invalid task_id %s:%s' %
+                                                  (task_id, e))
+
+
+# Used by get_task_request_async(), clearer than using True/False and important
+# as this is part of the security boundary.
+CANCEL = object()
+VIEW = object()
+
+
+@ndb.tasklet
+def get_task_request_async(task_id, request_key, permission):
+  """Returns the TaskRequest corresponding to a task ID.
+
+  Enforces the ACL for users. Allows bots all access for the moment.
+
+  Arguments:
+    task_id: task_id of TaskRequest to search for. Caller must ensure that
+      request_key is generated from this task_id.
+    request_key: request_key generated from task_id to search for.
+    permission: Can be either CANCEL or VIEW: determines whether task_cancel_acl
+      or get_task_acl realm checks should be used.
+
+  Returns:
+    TaskRequest ndb entity.
+
+  Raises:
+    auth.AuthorizationError if bot fails realm authorization test.
+  """
+  request = yield request_key.get_async()
+  if not request:
+    raise handlers_exceptions.NotFoundException('%s not found.' % task_id)
+  if permission == VIEW:
+    realms.check_task_get_acl(request)
+  elif permission == CANCEL:
+    realms.check_task_cancel_acl(request)
+  else:
+    raise handlers_exceptions.InternalException('get_task_request_async()')
+  raise ndb.Return(request)
+
+
+def get_request_and_result(task_id, permission, trust_memcache):
+  """Returns the task request and task result corresponding to a task ID.
+
+  For the task result, first do an explict lookup of the caches, and then decide
+  if it is necessary to fetch from the DB.
+
+  Arguments:
+    task_id: task ID as provided by the user.
+    permission: Can be either CANCEL or VIEW: determines whether task_cancel_acl
+      or get_task_acl realm checks should be used.
+    trust_memcache: bool to state if memcache should be trusted for running
+        task. If False, when a task is still pending/running, do a DB fetch.
+
+  Returns:
+    tuple(TaskRequest, result): result can be either for a TaskRunResult or a
+                                TaskResultSummay.
+
+  Raises:
+    handlers_exceptions.BadRequestException: if task_id is invalid.
+    handlers_exceptions.NotFoundException: if task_id is missing.
+  """
+  request_key, result_key = to_keys(task_id)
+  try:
+    # The task result has a very high odd of taking much more time to fetch than
+    # the TaskRequest, albeit it is the TaskRequest that enforces ACL. Do the
+    # task result fetch first, the worst that will happen is unnecessarily
+    # fetching the task result.
+    result_future = result_key.get_async(use_cache=True,
+                                         use_memcache=True,
+                                         use_datastore=False)
+
+    # The TaskRequest has P(99.9%) chance of being fetched from memcache since
+    # it is immutable.
+    request_future = get_task_request_async(task_id, request_key, permission)
+
+    result = result_future.get_result()
+    if (not result or (result.state in task_result.State.STATES_RUNNING
+                       and not trust_memcache)):
+      # Either the entity is not in cache, or we don't trust memcache for a
+      # running task result. Do the DB fetch, which is slow.
+      result = result_key.get(use_cache=False,
+                              use_memcache=False,
+                              use_datastore=True)
+
+    request = request_future.get_result()
+    if not result:
+      raise handlers_exceptions.NotFoundException('%s not found.' % task_id)
+    return request, result
+  except ValueError as e:
+    raise handlers_exceptions.BadRequestException('invalid task_id %s: %s' %
+                                                  (task_id, e))

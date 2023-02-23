@@ -10,9 +10,8 @@ from datetime import datetime
 from google.protobuf.timestamp_pb2 import Timestamp
 import proto.api_v2.swarming_pb2 as swarming_pb2
 
-from server import task_pack
 from server import task_result
-from server import task_request
+from server import task_pack
 
 
 def _string_pairs_from_dict(dictionary):
@@ -239,8 +238,12 @@ def task_result_response(result, include_performance_stats=True):
     run_id = task_pack.pack_run_result_key(k) if k else None
     if run_id:
       out.run_id = run_id
-    out.user = result.user
-    out.tags.extend(result.tags)
+    if result.user:
+      out.user = result.user
+    if result.tags:
+      out.tags.extend(result.tags)
+    if result.costs_usd:
+      out.costs_usd.extend(result.costs_usd)
   return out
 
 
