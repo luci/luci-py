@@ -118,6 +118,8 @@ class TaskBackendAPIServiceTest(test_env_handlers.AppTestBase):
                 struct_pb2.Value(string_value='agent/package/${platform}'),
                 'agent_binary_cipd_vers':
                 struct_pb2.Value(string_value='latest'),
+                'agent_binary_cipd_server':
+                struct_pb2.Value(string_value='cipdserver'),
             }),
         grace_period=duration_pb2.Duration(seconds=60),
         execution_timeout=duration_pb2.Duration(seconds=60),
@@ -457,6 +459,8 @@ class TaskBackendAPIServiceTest(test_env_handlers.AppTestBase):
                         string_value='agent/package/${platform}'),
                     'agent_binary_cipd_vers':
                         struct_pb2.Value(string_value='3'),
+                    'agent_binary_cipd_server':
+                        struct_pb2.Value(string_value='cipdserver'),
                 })),
     ])
 
