@@ -918,6 +918,7 @@ def _run_manifest(botobj, manifest):
 
   failure = False
   internal_failure = False
+  internal_error_reported = False
   msg = None
   auth_params_dumper = None
   must_reboot_reason = None
@@ -1031,7 +1032,9 @@ def _run_manifest(botobj, manifest):
     if fs.exists(task_result_file):
       with fs.open(task_result_file, 'rb') as fd:
         task_result = json.load(fd)
-
+        if task_result:
+          internal_error_reported = task_result.get('internal_error_reported',
+                                                    False)
     if proc.returncode:
       # STATUS_DLL_INIT_FAILED generally means that something bad happened, and
       # a reboot magically clears things out. :(
@@ -1044,9 +1047,8 @@ def _run_manifest(botobj, manifest):
       logging.warning('task_runner failed to write metadata')
       msg = 'Execution failed: internal error (no metadata).'
       internal_failure = True
-    elif task_result['must_signal_internal_failure']:
-      msg = (
-        'Execution failed: %s' % task_result['must_signal_internal_failure'])
+    elif task_result['internal_error']:
+      msg = ('Execution failed: %s' % task_result['internal_error'])
       internal_failure = True
 
     failure = bool(task_result.get('exit_code')) if task_result else False
@@ -1061,14 +1063,14 @@ def _run_manifest(botobj, manifest):
   finally:
     if auth_params_dumper:
       auth_params_dumper.stop()
-    if internal_failure:
+    if internal_failure and not internal_error_reported:
       _post_error_task(botobj, msg, task_id)
-    logging.info('calling on_after_task: failure=%s, internal_failure=%s, '
-                 'task_dimensions=%s, task_result=%s',
-                 failure, internal_failure, task_dimensions, task_result)
-    _call_hook_safe(
-        True, botobj, 'on_after_task', failure, internal_failure,
+    logging.info(
+        'calling on_after_task: failure=%s, internal_failure=%s, '
+        'task_dimensions=%s, task_result=%s', failure, internal_failure,
         task_dimensions, task_result)
+    _call_hook_safe(True, botobj, 'on_after_task', failure, internal_failure,
+                    task_dimensions, task_result)
     if fs.isdir(work_dir):
       try:
         file_path.rmtree(work_dir)

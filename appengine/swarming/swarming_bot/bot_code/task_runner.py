@@ -397,7 +397,8 @@ def load_and_run(in_file, swarming_server, default_swarming_server,
           'exit_code': -1,
           'hard_timeout': False,
           'io_timeout': False,
-          'must_signal_internal_failure': str(e) or 'unknown error',
+          'internal_error': str(e) or 'unknown error',
+          'internal_error_reported': False,
           'version': OUT_VERSION,
       }
   finally:
@@ -437,7 +438,8 @@ def fail_without_command(remote, task_id, params, cost_usd_hour, task_start,
       'exit_code': exit_code,
       'hard_timeout': False,
       'io_timeout': False,
-      'must_signal_internal_failure': None,
+      'internal_error': None,
+      'internal_error_reported': False,
       'version': OUT_VERSION,
   }
 
@@ -636,7 +638,8 @@ def run_command(remote, task_details, work_dir, cost_usd_hour,
         'exit_code': -1,
         'hard_timeout': False,
         'io_timeout': False,
-        'must_signal_internal_failure': None,
+        'internal_error_reported': False,
+        'internal_error': None,
         'version': OUT_VERSION,
     }
 
@@ -663,9 +666,10 @@ def run_command(remote, task_details, work_dir, cost_usd_hour,
     # Monitor the task
     exit_code = None
     had_io_timeout = False
-    must_signal_internal_failure = None
     missing_cas = []
     missing_cipd = []
+    internal_error = None
+    internal_error_reported = False
     term_sent = False
     kill_sent = False
     timed_out = None
@@ -731,7 +735,7 @@ def run_command(remote, task_details, work_dir, cost_usd_hour,
         OSError, remote_client.InternalError) as e:
       logging.exception('got some exception, killing process')
       # Something wrong happened, try to kill the child process.
-      must_signal_internal_failure = str(e) or 'unknown error'
+      internal_error = str(e) or 'unknown error'
       exit_code = kill_and_wait(proc, task_details.grace_period, str(e))
 
     logging.info('Subprocess for run_isolated was completed or killed')
@@ -768,21 +772,19 @@ def run_command(remote, task_details, work_dir, cost_usd_hour,
         missing_cas = run_isolated_result.get('missing_cas', [])
         missing_cipd = run_isolated_result.get('missing_cipd', [])
         if missing_cipd or missing_cas:
-          must_signal_internal_failure = run_isolated_result['internal_failure']
+          internal_error = run_isolated_result['internal_failure']
         else:
           if run_isolated_result['cas_output_root']:
             params['cas_output_root'] = run_isolated_result['cas_output_root']
           had_hard_timeout = run_isolated_result['had_hard_timeout']
           if not had_io_timeout and not had_hard_timeout:
             if run_isolated_result['internal_failure']:
-              must_signal_internal_failure = (
-                  run_isolated_result['internal_failure'])
-              logging.error('%s', must_signal_internal_failure)
+              internal_error = (run_isolated_result['internal_failure'])
+              logging.error('%s', internal_error)
             elif exit_code:
               # TODO(maruel): Grab stdout from run_isolated.
-              must_signal_internal_failure = (
-                  'run_isolated internal failure %d' % exit_code)
-              logging.error('%s', must_signal_internal_failure)
+              internal_error = ('run_isolated internal failure %d' % exit_code)
+              logging.error('%s', internal_error)
           exit_code = run_isolated_result['exit_code']
           params['bot_overhead'] = 0.
           if run_isolated_result.get('duration') is not None:
@@ -814,9 +816,8 @@ def run_command(remote, task_details, work_dir, cost_usd_hour,
             params['cleanup_stats'] = cleanup_stats
     except (IOError, OSError, ValueError) as e:
       logging.error('Swallowing error: %s', e)
-      if not must_signal_internal_failure:
-        must_signal_internal_failure = '%s\n%s' % (
-            e, traceback.format_exc()[-2048:])
+      if not internal_error:
+        internal_error = '%s\n%s' % (e, traceback.format_exc()[-2048:])
 
     # If no exit code has been set, something went wrong with run_isolated.py.
     # Set exit code to -1 to indicate a generic error occurred.
@@ -827,7 +828,7 @@ def run_command(remote, task_details, work_dir, cost_usd_hour,
     # Ignore server reply to stop. Also ignore internal errors here if we are
     # already handling some.
     try:
-      if must_signal_internal_failure:
+      if internal_error:
         # We need to update the task and then send task error. However, we
         # should *not* send the exit_code since doing so would cause the task
         # to be marked as COMPLETED until the subsequent post_task_error call
@@ -836,7 +837,7 @@ def run_command(remote, task_details, work_dir, cost_usd_hour,
         # stats as the server prints errors if either are set in this case.
         # TODO(sethkoehler): Come up with some way to still send the exit_code
         # (and thus also duration/stats) without marking the task COMPLETED.
-        logging.debug('must_signal_internal_failure: True. '
+        logging.debug('internal_error: True. '
                       'Resetting exit_code and params.')
         exit_code = None
         params.pop('duration', None)
@@ -851,25 +852,24 @@ def run_command(remote, task_details, work_dir, cost_usd_hour,
                               exit_code)
       logging.debug('Last task update finished. task_id: %s, exit_code: %s, '
                     'params: %s.', task_details.task_id, exit_code, params)
-      if must_signal_internal_failure:
+      if internal_error:
         remote.post_task_error(task_details.task_id,
-                               must_signal_internal_failure,
+                               internal_error,
                                missing_cas=missing_cas,
                                missing_cipd=missing_cipd)
-        # Clear out this error as we've posted it now (we already cleared out
-        # exit_code above). Note: another error could arise after this point,
-        # which is fine, since bot_main.py will post it).
-        must_signal_internal_failure = ''
+        # We've reported the error, bot_main.py should not report it again
+        internal_error_reported = True
     except remote_client.InternalError as e:
       logging.error('Internal error while finishing the task: %s', e)
-      if not must_signal_internal_failure:
-        must_signal_internal_failure = str(e) or 'unknown error'
+      if not internal_error:
+        internal_error = str(e) or 'unknown error'
 
     return {
         'exit_code': exit_code,
         'hard_timeout': had_hard_timeout,
         'io_timeout': had_io_timeout,
-        'must_signal_internal_failure': must_signal_internal_failure,
+        'internal_error_reported': internal_error_reported,
+        'internal_error': internal_error,
         'version': OUT_VERSION,
     }
   finally:

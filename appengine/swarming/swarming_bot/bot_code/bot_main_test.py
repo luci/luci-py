@@ -1290,10 +1290,13 @@ class TestBotMain(TestBotBase):
                   returncode=0,
                   exit_code=0,
                   url='https://localhost:1',
-                  expected_auth_params_json=None):
+                  expected_auth_params_json=None,
+                  internal_error=None,
+                  internal_error_reported=False):
     result = {
         'exit_code': exit_code,
-        'must_signal_internal_failure': None,
+        'internal_error': internal_error,
+        'internal_error_reported': internal_error_reported,
         'version': 3,
     }
     # Method should have "self" as first argument - pylint: disable=E0213
@@ -1360,7 +1363,8 @@ class TestBotMain(TestBotBase):
 
   def test_run_manifest(self):
     self.mock(bot_main, '_post_error_task', self.print_err_and_fail)
-    def call_hook(botobj, name, *args):
+
+    def call_hook(_chained, botobj, name, *args):
       if name == 'on_after_task':
         failure, internal_failure, dimensions, summary = args
         self.assertEqual(self.attributes['dimensions'], botobj.dimensions)
@@ -1391,7 +1395,7 @@ class TestBotMain(TestBotBase):
 
     self.mock(bot_main, '_post_error_task', self.print_err_and_fail)
 
-    def call_hook(botobj, name, *args):
+    def call_hook(_chained, botobj, name, *args):
       if name == 'on_after_task':
         failure, internal_failure, dimensions, summary = args
         self.assertEqual(self.attributes['dimensions'], botobj.dimensions)
@@ -1441,7 +1445,7 @@ class TestBotMain(TestBotBase):
   def test_run_manifest_task_failure(self):
     self.mock(bot_main, '_post_error_task', self.print_err_and_fail)
 
-    def call_hook(_botobj, name, *args):
+    def call_hook(_chained, _botobj, name, *args):
       if name == 'on_after_task':
         failure, internal_failure, dimensions, summary = args
         self.assertEqual(True, failure)
@@ -1467,7 +1471,8 @@ class TestBotMain(TestBotBase):
   def test_run_manifest_internal_failure(self):
     posted = []
     self.mock(bot_main, '_post_error_task', lambda *args: posted.append(args))
-    def call_hook(_botobj, name, *args):
+
+    def call_hook(_chained, _botobj, name, *args):
       if name == 'on_after_task':
         failure, internal_failure, dimensions, summary = args
         self.assertEqual(False, failure)
@@ -1492,6 +1497,35 @@ class TestBotMain(TestBotBase):
     expected = [(self.bot, 'Execution failed: internal error (1).', '24')]
     self.assertEqual(expected, posted)
 
+  def test_run_manifest_internal_error_reported(self):
+    posted = []
+    self.mock(bot_main, '_post_error_task', lambda *args: posted.append(args))
+
+    def call_hook(_chained, _botobj, name, *args):
+      if name == 'on_after_task':
+        failure, internal_failure, dimensions, summary = args
+        self.assertEqual(False, failure)
+        self.assertEqual(True, internal_failure)
+        self.assertEqual({'pool': 'default'}, dimensions)
+        self.assertEqual(result, summary)
+
+    self.mock(bot_main, '_call_hook', call_hook)
+    result = self._mock_popen(returncode=0,
+                              internal_error='there is an error',
+                              internal_error_reported=True)
+
+    manifest = {
+        'command': ['echo', 'hi'],
+        'dimensions': {
+            'pool': 'default'
+        },
+        'grace_period': 30,
+        'hard_timeout': 60,
+        'io_timeout': 60,
+        'task_id': '24',
+    }
+    bot_main._run_manifest(self.bot, manifest)
+
   def test_run_manifest_exception(self):
     posted = []
 
@@ -1500,7 +1534,7 @@ class TestBotMain(TestBotBase):
 
     self.mock(bot_main, '_post_error_task', post_error_task)
 
-    def call_hook(_botobj, name, *args):
+    def call_hook(_chained, _botobj, name, *args):
       if name == 'on_after_task':
         failure, internal_failure, dimensions, summary = args
         self.assertEqual(False, failure)
