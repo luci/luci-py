@@ -248,7 +248,7 @@ message TaskPayload {
 
 // TaskResult is used as an RBE task result.
 //
-// TaskResult represents an outcome of a reservation that was completed by a bot
+// TaskResult represents an outcome of a reservation that was processed by a bot
 // (successfully or not). If a bot never saw the reservation, or crashed midway,
 // TaskResult is not available. There's more generic Reservation.status field
 // for these cases in the RBE API.
@@ -260,5 +260,7 @@ message TaskPayload {
 // Reservation proto that contains TaskResult, so TaskPayload fields are not
 // duplicated in the TaskResult.
 message TaskResult {
-  // Empty for now.
+  // Set to a human readable string if the bot skipped executing the
+  // reservation. Used for debugging only.
+  string skip_reason = 1;
 }

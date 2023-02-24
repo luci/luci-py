@@ -19,6 +19,7 @@ import uuid
 from utils import net
 
 from bot_code.remote_client_errors import BotCodeError
+from bot_code.remote_client_errors import ClaimError
 from bot_code.remote_client_errors import InitializationError
 from bot_code.remote_client_errors import InternalError
 from bot_code.remote_client_errors import MintTokenError
@@ -381,6 +382,55 @@ class RemoteClientNative(object):
     except KeyError as e:
       raise PollError(
           'Unexpected response format for command %s: missing key %s' %
+          (cmd, e))
+
+  def claim(self, attributes, claim_id, task_id, task_to_run_shard,
+            task_to_run_id):
+    """Attempts to mark a pending task slice as being worked on by this bot.
+
+    This is used by bots in RBE mode to transactionally claim tasks they receive
+    via RBE. This call can be retried safely as long as all parameters (in
+    particular `claim_id`) are the same in every call.
+
+    Arguments:
+      claim_id: an opaque string used to make the request idempotent.
+      task_id: a TaskResultSummary packed ID identifying a task to claim.
+      task_to_run_shard: integer with TaskToRun shard index.
+      task_to_run_id: integer ID of the TaskToRun entity to claim.
+
+    Returns one of:
+      ('skip', 'Textual reason why') if the slice is no longer pending.
+      ('terminate', '<task-id>') if picked up the special termination task.
+      ('run', <manifest dict>) if successfully claimed the slice.
+
+    Raises:
+      ClaimError if can't contact the server, the server replies with an error
+      or the returned dict does not have the correct values set.
+    """
+    data = attributes.copy()
+    data['claim_id'] = claim_id
+    data['task_id'] = task_id
+    data['task_to_run_shard'] = task_to_run_shard
+    data['task_to_run_id'] = task_to_run_id
+
+    resp = self._url_read_json('/swarming/api/v1/bot/claim', data=data)
+    if not resp or resp.get('error'):
+      raise ClaimError(
+          resp.get('error') if resp else 'Failed to contact server')
+
+    cmd = '<unknown>'
+    try:
+      cmd = resp['cmd']
+      if cmd == 'skip':
+        return (cmd, resp['reason'])
+      if cmd == 'terminate':
+        return (cmd, resp['task_id'])
+      if cmd == 'run':
+        return (cmd, resp['manifest'])
+      raise ClaimError('Unexpected outcome: %s\n%s' % (cmd, resp))
+    except KeyError as e:
+      raise ClaimError(
+          'Unexpected response format for outcome %s: missing key %s' %
           (cmd, e))
 
   def get_bot_code(self, new_zip_path, bot_version):

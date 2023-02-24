@@ -19,6 +19,10 @@ class BotCodeError(Exception):
                          % (new_zip, url, version))
 
 
+class ClaimError(Exception):
+  """Raised on unrecoverable errors in RemoteClient.claim."""
+
+
 class InternalError(Exception):
   """Raised on unrecoverable errors that abort task with 'internal error'."""
 

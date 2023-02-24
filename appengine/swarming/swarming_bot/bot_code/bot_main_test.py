@@ -157,6 +157,20 @@ class TestBotBase(net_utils.TestCase):
 
     return 'https://localhost:1/swarming/api/v1/bot/poll', on_request, response
 
+  def expected_claim_request(self, claim_id, task_id, task_to_run_shard,
+                             task_to_run_id, response):
+    data = self.bot.attributes
+
+    def on_request(kwargs):
+      self.assertEqual(kwargs['data']['dimensions'], data['dimensions'])
+      self.assertEqual(kwargs['data']['state'], data['state'])
+      self.assertEqual(kwargs['data']['claim_id'], claim_id)
+      self.assertEqual(kwargs['data']['task_id'], task_id)
+      self.assertEqual(kwargs['data']['task_to_run_shard'], task_to_run_shard)
+      self.assertEqual(kwargs['data']['task_to_run_id'], task_to_run_id)
+
+    return 'https://localhost:1/swarming/api/v1/bot/claim', on_request, response
+
   def expected_task_update_request(self, task_id):
     def on_request(kwargs):
       self.assertEqual(kwargs['data']['task_id'], task_id)
@@ -1283,6 +1297,134 @@ class TestBotMain(TestBotBase):
             rbe_idle=True,
             sleep_streak=1),
         self.expected_rbe_update_request('pt0', 'st0'),
+    ])
+    self.poll_once()
+
+  def expected_rbe_poll_and_claim(self, poll_token, session_token, lease_id,
+                                  claim_resp):
+    return [
+        self.expected_poll_request({
+            'cmd': 'rbe',
+            'rbe': {
+                'poll_token': poll_token,
+                'instance': 'instance',
+            },
+        }),
+        self.expected_rbe_create_request(poll_token, session_token),
+        self.expected_rbe_update_request(poll_token,
+                                         session_token,
+                                         lease_out={
+                                             'id': lease_id,
+                                             'payload': {
+                                                 'task_id': 'some-task-id',
+                                                 'task_to_run_shard': 5,
+                                                 'task_to_run_id': 6,
+                                             },
+                                             'state': 'PENDING',
+                                         }),
+        self.expected_claim_request(lease_id, 'some-task-id', 5, 6, claim_resp),
+    ]
+
+  def test_rbe_mode_claim_skip(self):
+    finished = []
+    self.mock(self.loop_state, 'on_task_completed', finished.append)
+
+    # Switches into the RBE mode, creates and polls the session. Gets a lease
+    # right away, proceeds to claiming it, discovers it should be skipped.
+    self.expected_requests(
+        self.expected_rbe_poll_and_claim('pt', 'st', 'lease-id', {
+            'cmd': 'skip',
+            'reason': 'Just skip',
+        }))
+    self.poll_once()
+
+    # On the next cycle reports the lease was skipped.
+    self.expected_requests([
+        self.expected_rbe_update_request(
+            'pt',
+            'st',
+            lease_in={
+                'id': 'lease-id',
+                'result': {
+                    'skip_reason': 'Just skip'
+                },
+                'state': 'COMPLETED',
+            },
+        ),
+    ])
+    self.poll_once()
+
+    # This doesn't count as a completed task.
+    self.assertFalse(finished)
+
+  def test_rbe_mode_claim_terminate(self):
+    # Switches into the RBE mode, creates and polls the session. Gets a lease
+    # right away, proceeds to claiming it, discovers it is termination, executes
+    # it.
+    self.expected_requests(
+        self.expected_rbe_poll_and_claim('pt', 'st', 'lease-id', {
+            'cmd': 'terminate',
+            'task_id': 'terminate-id',
+        }) + [self.expected_task_update_request('terminate-id')])
+    self.poll_once()
+
+    # Stopped now.
+    self.assertTrue(self.quit_bit.is_set())
+
+    # On shutdown reports the reservation as completed.
+    self.expected_requests([
+        self.expected_rbe_update_request(
+            None,
+            'st',
+            status_in='BOT_TERMINATING',
+            lease_in={
+                'id': 'lease-id',
+                'result': {},
+                'state': 'COMPLETED',
+            },
+        ),
+    ])
+    self.loop_state.rbe_disable()
+
+  def test_rbe_mode_claim_run(self):
+    ran = []
+
+    def run_manifest(_bot, manifest):
+      ran.append(manifest)
+      return True
+
+    self.mock(bot_main, '_run_manifest', run_manifest)
+
+    finished = []
+    self.mock(self.loop_state, 'on_task_completed', finished.append)
+
+    # Switches into the RBE mode, creates and polls the session. Gets a lease
+    # right away, proceeds to claiming it, discovers it is a real task, executes
+    # it.
+    self.expected_requests(
+        self.expected_rbe_poll_and_claim('pt', 'st', 'lease-id', {
+            'cmd': 'run',
+            'manifest': {
+                'fake': 'manifest'
+            },
+        }))
+    self.poll_once()
+
+    # Ran the task.
+    self.assertEqual(ran, [{'fake': 'manifest'}])
+    self.assertEqual(finished, [True])
+
+    # Reports the lease is finished on completion.
+    self.expected_requests([
+        self.expected_rbe_update_request(
+            'pt',
+            'st',
+            lease_in={
+                'id': 'lease-id',
+                'result': {},
+                'state': 'COMPLETED',
+            },
+        ),
     ])
     self.poll_once()
 
