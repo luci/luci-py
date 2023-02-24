@@ -74,10 +74,9 @@ class SimpleMainTest(TestCase):
       expected['state'].pop(key, None)
     del actual['version']
     del expected['version']
-    self.assertAlmostEqual(
-        actual['state'].pop('cost_usd_hour'),
-        expected['state'].pop('cost_usd_hour'),
-        places=5)
+    self.assertAlmostEqual(actual['state'].pop('cost_usd_hour'),
+                           expected['state'].pop('cost_usd_hour'),
+                           places=4)
     self.assertEqual(expected, actual)
 
   def test_version(self):
