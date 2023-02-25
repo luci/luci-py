@@ -9,6 +9,7 @@ import json
 import logging
 import os
 import posixpath
+import zlib
 
 from endpoints import protojson
 from protorpc import message_types
@@ -53,6 +54,8 @@ def decode_message(remote_method_info, request):
     res_container = None
     body_type = remote_method_info.request_type
 
+  if request.content_type == 'application/json-zlib':
+    request.body = zlib.decompress(request.body)
   body = PROTOCOL.decode_message(body_type, request.body)
   if res_container:
     result = res_container.combined_message_class()
@@ -120,7 +123,8 @@ def path_handler(api_class, api_method, service_path):
         req = decode_message(api_method.remote, self.request)
         # Check that required fields are populated.
         req.check_initialized()
-      except (messages.DecodeError, messages.ValidationError, ValueError) as ex:
+      except (messages.DecodeError, messages.ValidationError, ValueError,
+              zlib.error) as ex:
         response_body = json.dumps({'error': {'message': ex.message}})
         self.response.set_status(httplib.BAD_REQUEST)
       else:

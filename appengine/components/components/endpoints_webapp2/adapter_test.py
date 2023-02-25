@@ -14,6 +14,7 @@ from protorpc import messages
 from protorpc import remote
 import endpoints
 import webapp2
+import zlib
 
 from test_support import test_case
 import adapter
@@ -60,6 +61,19 @@ class EndpointsWebapp2TestCase(test_case.TestCase):
     self.assertEqual(msg.s, 'a')
     self.assertEqual(msg.s2, None)  # because it is not a ResourceContainer.
 
+  def test_decode_message_post_with_compressed_json(self):
+    request = webapp2.Request(
+        {
+            'QUERY_STRING': 's2=b',
+        },
+        method='POST',
+        body=zlib.compress('{"s": "a"}'),
+        headers={'Content-Type': 'application/json-zlib'},
+    )
+    msg = adapter.decode_message(EndpointsService.post.remote, request)
+    self.assertEqual(msg.s, 'a')
+    self.assertEqual(msg.s2, None)  # because it is not a ResourceContainer.
+
   def test_decode_message_get(self):
     request = webapp2.Request(
         {
@@ -98,6 +112,23 @@ class EndpointsWebapp2TestCase(test_case.TestCase):
         'message': 'access denied',
       },
     })
+
+  def test_handle_bad_zlib_compressed_json_request(self):
+    app = webapp2.WSGIApplication(
+        adapter.api_routes([EndpointsService], '/_ah/api'), debug=True)
+    request = webapp2.Request.blank('/_ah/api/Service/v1/post')
+    request.method = 'POST'
+    request.body = 'asb'
+    request.headers = {'Content-Type': 'application/json-zlib'}
+    response = request.get_response(app)
+    self.assertEqual(response.status_int, 400)
+    self.assertEqual(
+        json.loads(response.body), {
+            'error': {
+                'message':
+                'Error -3 while decompressing data: incorrect header check',
+            },
+        })
 
   def test_api_routes(self):
     routes = sorted([
