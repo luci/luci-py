@@ -18,8 +18,8 @@ import flask
 
 from components import template
 
-import discovery
-import partial
+from . import discovery
+from . import partial
 
 PROTOCOL = protojson.EndpointsProtoJson()
 
@@ -110,18 +110,18 @@ def path_handler_factory(api_class, api_method, service_path):
                                 server_port=port,
                                 http_method=flask.request.method,
                                 service_path=service_path,
-                                headers=flask.request.headers.items()))
+                                headers=list(flask.request.headers.items())))
     try:
       req = decode_message(api_method.remote, flask.request, route_kwargs)
       # Check that required fields are populated.
       req.check_initialized()
     except (messages.DecodeError, messages.ValidationError, ValueError) as ex:
-      response = {'error': {'message': ex.message}}
+      response = {'error': {'message': str(ex)}}
       return flask.jsonify(response), http_client.BAD_REQUEST, headers
     try:
       res = api_method(api, req)
     except endpoints.ServiceException as ex:
-      response = {'error': {'message': ex.message}}
+      response = {'error': {'message': str(ex)}}
       return flask.jsonify(response), ex.http_status, headers
     if isinstance(res, message_types.VoidMessage):
       return '', http_client.NO_CONTENT, headers
@@ -162,8 +162,10 @@ def api_routes(api_classes, base_path='/_ah/api'):
 
   # Add routes for each class.
   for api_class in api_classes:
-    api_base_path = '%s/%s/%s' % (base_path, api_class.api_info.name,
-                                  api_class.api_info.version)
+    api_info = api_class.api_info
+    path_version = (api_info.path_version
+                    if hasattr(api_info, 'path_version') else api_info.version)
+    api_base_path = '%s/%s/%s' % (base_path, api_info.name, path_version)
     templates = set()
 
     # Add routes for each method of each class.
@@ -227,8 +229,10 @@ def discovery_handler_factory(api_classes, base_path):
   # Create a map of (name, version) => [services...].
   service_map = collections.defaultdict(list)
   for api_class in api_classes:
-    service_map[(api_class.api_info.name,
-                 api_class.api_info.version)].append(api_class)
+    api_info = api_class.api_info
+    path_version = (api_info.path_version
+                    if hasattr(api_info, 'path_version') else api_info.version)
+    service_map[(api_info.name, path_version)].append(api_class)
 
   def discovery_handler(name, version):
     host = flask.request.headers['Host']

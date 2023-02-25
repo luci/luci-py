@@ -3,5 +3,5 @@
 # that can be found in the LICENSE file.
 """Implements Cloud Endpoints v1 over webapp2 routes."""
 
-from adapter import *
-from discovery import *
+from .adapter import *
+from .discovery import *

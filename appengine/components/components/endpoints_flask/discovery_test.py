@@ -15,7 +15,7 @@ from protorpc import remote
 import endpoints
 
 from test_support import test_case
-import discovery
+from . import discovery
 
 
 class Enum(messages.Enum):

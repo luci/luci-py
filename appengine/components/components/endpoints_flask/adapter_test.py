@@ -18,7 +18,7 @@ import mock
 
 from test_support import test_case
 from werkzeug import datastructures
-import adapter
+from . import adapter
 
 
 class Msg(messages.Message):

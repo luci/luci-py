@@ -11,7 +11,7 @@ from test_support import test_env
 test_env.setup_test_env()
 
 from test_support import test_case
-import partial
+from . import partial
 
 
 class ApplyTestCase(test_case.TestCase):

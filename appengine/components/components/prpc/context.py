@@ -2,6 +2,7 @@
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
 
+import six
 import time
 
 from components.prpc import codes
@@ -101,7 +102,8 @@ class ServicerContext(object):
       details: The details string of the RPC to be transmitted to
         the invocation side of the RPC.
     """
-    assert isinstance(details, basestring), '%r is not string' % (details,)
+    assert isinstance(details,
+                      six.string_types), ('%r is not string' % (details, ))
     self._details = details
 
   @property
