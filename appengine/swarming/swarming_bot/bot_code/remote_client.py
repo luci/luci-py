@@ -9,6 +9,7 @@ import copy
 import datetime
 import enum
 import hashlib
+import json
 import logging
 import os
 import threading
@@ -716,6 +717,10 @@ class RBELease:
     self.payload = payload
     self.result = result
 
+  def __eq__(self, other):
+    return (self.id == other.id and self.state == other.state
+            and self.payload == other.payload and self.result == other.result)
+
   def clone(self):
     """Returns a copy of this object."""
     return RBELease(self.id, self.state, copy.deepcopy(self.payload),
@@ -773,7 +778,13 @@ class RBELease:
 class RBESession:
   """A single RBE bot session with a concrete session ID."""
 
-  def __init__(self, remote, instance, dimensions, poll_token):
+  def __init__(self,
+               remote,
+               instance,
+               dimensions,
+               poll_token,
+               session_token=None,
+               session_id=None):
     """Creates a new RBE session via Swarming RBE backend.
 
     Arguments:
@@ -781,20 +792,110 @@ class RBESession:
       instance: an RBE instance this session will be running on.
       dimensions: a dict with bot dimensions as {str => [str]}.
       poll_token: a token reported by `rbe` poll(...) command.
+      session_token: if set, do not call rbe_create_session, use this token.
+      session_id: if set, do not call rbe_create_session, use this ID.
 
     Raises:
       RBEServerError if the RPC fails for whatever reason.
     """
-    resp = remote.rbe_create_session(dimensions, poll_token)
+    if not session_token or not session_id:
+      resp = remote.rbe_create_session(dimensions, poll_token)
+      session_token = resp.session_token
+      session_id = resp.session_id
     self._remote = remote
     self._instance = instance
     self._dimensions = copy.deepcopy(dimensions)
     self._poll_token = poll_token
-    self._session_token = resp.session_token
-    self._session_id = resp.session_id
+    self._session_token = session_token
+    self._session_id = session_id
     self._last_acked_status = RBESessionStatus.OK
     self._active_lease = None
     self._finished_lease = None
+
+  def to_dict(self):
+    """Returns the state of the session as a dict."""
+    return {
+        'instance':
+        self._instance,
+        'dimensions':
+        self._dimensions,
+        'poll_token':
+        self._poll_token,
+        'session_token':
+        self._session_token,
+        'session_id':
+        self._session_id,
+        'last_acked_status':
+        self._last_acked_status.name,
+        'active_lease':
+        self._active_lease.to_dict() if self._active_lease else None,
+        'finished_lease':
+        self._finished_lease.to_dict() if self._finished_lease else None,
+    }
+
+  def dump(self, path):
+    """Dumps the state of the session to a JSON file on disk.
+
+    Raises:
+      OSError if can't open or write the file.
+    """
+    with open(path, 'w') as f:
+      json.dump(self.to_dict(), f)
+
+  @staticmethod
+  def load(remote, path):
+    """Constructs RBESession from a dump created by dump().
+
+    Raises:
+      OSError if can't open or read the file.
+      ValueError if the dump doesn't appear to be valid.
+    """
+    with open(path, 'r') as f:
+      try:
+        dump = json.load(f)
+      except ValueError as e:
+        raise ValueError('Not a valid JSON: %s' % e)
+    try:
+      session = RBESession(remote, dump['instance'], dump['dimensions'],
+                           dump['poll_token'], dump['session_token'],
+                           dump['session_id'])
+      last_acked_status = dump['last_acked_status']
+      active_lease = dump['active_lease']
+      finished_lease = dump['finished_lease']
+    except KeyError as e:
+      raise ValueError('Missing key %s' % e)
+    try:
+      session._last_acked_status = RBESessionStatus[last_acked_status]
+    except KeyError as e:
+      raise ValueError('Invalid RBESessionStatus: %s' % e)
+    try:
+      if active_lease:
+        session._active_lease = RBELease.from_dict(active_lease)
+      if finished_lease:
+        session._finished_lease = RBELease.from_dict(finished_lease)
+    except TypeError:
+      raise ValueError('Invalid lease dict')
+    return session
+
+  def restore(self, path):
+    """Update this session (in-place) with the state stored by dump().
+
+    Raises:
+      OSError if can't open or read the file.
+      ValueError if the dump doesn't appear to be valid.
+      RBESessionException if the dump was generated for another session.
+    """
+    loaded = RBESession.load(self._remote, path)
+    if loaded._instance != self._instance:
+      raise RBESessionException('Wrong instance ID')
+    if loaded._session_id != self._session_id:
+      raise RBESessionException('Wrong session ID')
+    self._dimensions = loaded._dimensions
+    self._poll_token = loaded._poll_token
+    self._session_token = loaded._session_token
+    self._last_acked_status = loaded._last_acked_status
+    self._active_lease = loaded._active_lease
+    self._finished_lease = loaded._finished_lease
 
   @property
   def instance(self):

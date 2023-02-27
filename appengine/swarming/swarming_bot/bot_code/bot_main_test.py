@@ -917,7 +917,7 @@ class TestBotMain(TestBotBase):
     ])
     self.poll_once()
 
-    expected = [(self.bot, {'foo': 'bar'})]
+    expected = [(self.bot, {'foo': 'bar'}, None)]
     self.assertEqual(expected, manifest)
     expected = [(self.bot,)]
     self.assertEqual(expected, clean)
@@ -1389,7 +1389,8 @@ class TestBotMain(TestBotBase):
   def test_rbe_mode_claim_run(self):
     ran = []
 
-    def run_manifest(_bot, manifest):
+    def run_manifest(_bot, manifest, rbe_session):
+      rbe_session.finish_active_lease({})
       ran.append(manifest)
       return True
 
@@ -1433,6 +1434,7 @@ class TestBotMain(TestBotBase):
                   exit_code=0,
                   url='https://localhost:1',
                   expected_auth_params_json=None,
+                  expected_rbe_session_json=None,
                   internal_error=None,
                   internal_error_reported=False):
     result = {
@@ -1466,21 +1468,28 @@ class TestBotMain(TestBotBase):
             '3600.0',
             '--start',
             '100.0',
-            '--bot-file',
         ]
+
+        self.assertEqual(cmd[:len(expected)], expected)
+        del cmd[:len(expected)]
+
         # After than there may be --bot-file and --auth-params-file. Then --
         # will be used to mark the separation of flags meant to be sent to
         # run_isolated.
-        self.assertEqual(cmd[:len(expected)], expected)
-        del cmd[:len(expected)]
-        self.assertTrue(cmd.pop(0).endswith('.json'))
-        if expected_auth_params_json:
-          auth_params_file = os.path.join(self.root_dir, 'w',
-                                          'bot_auth_params.json')
-          with open(auth_params_file, 'rb') as f:
-            actual_auth_params = json.load(f)
-          self.assertEqual(expected_auth_params_json, actual_auth_params)
-          self.assertEqual(cmd[:2], ['--auth-params-file', auth_params_file])
+        while cmd and cmd[0] != '--':
+          flag = cmd.pop(0)
+          self.assertIn(
+              flag, ('--bot-file', '--auth-params-file', '--rbe-session-state'))
+          with open(cmd[0], 'rb') as f:
+            body = f.read()
+          cmd.pop(0)
+          if flag == '--bot-file':
+            self.assertEqual(b'', body)
+          if flag == '--auth-params-file' and expected_auth_params_json:
+            self.assertEqual(expected_auth_params_json, json.loads(body))
+          if flag == '--rbe-session-state' and expected_rbe_session_json:
+            self.assertEqual(expected_rbe_session_json, json.loads(body))
+
         self.assertEqual(True, detached)
         self.assertEqual(self.bot.base_dir, cwd)
         self.assertEqual('24', env['SWARMING_TASK_ID'])
@@ -1530,7 +1539,7 @@ class TestBotMain(TestBotBase):
         'task_id': '24',
     }
     self.assertEqual(self.root_dir, self.bot.base_dir)
-    bot_main._run_manifest(self.bot, manifest)
+    bot_main._run_manifest(self.bot, manifest, None)
 
   def test_run_manifest_with_auth_headers(self):
     self.make_bot(auth_headers_cb=lambda: ({'A': 'a'}, time.time() + 3600))
@@ -1582,7 +1591,38 @@ class TestBotMain(TestBotBase):
         'task_id': '24',
     }
     self.assertEqual(self.root_dir, self.bot.base_dir)
-    bot_main._run_manifest(self.bot, manifest)
+    bot_main._run_manifest(self.bot, manifest, None)
+
+  def test_run_manifest_with_rbe(self):
+    self.mock(bot_main, '_post_error_task', self.print_err_and_fail)
+
+    rbe_session = remote_client.RBESession(self.bot.remote, 'rbe-instance',
+                                           self.bot.dimensions, 'poll-token',
+                                           'session-token', 'session-id')
+    rbe_results = []
+    self.mock(rbe_session, 'finish_active_lease', rbe_results.append)
+
+    self._mock_popen(
+        url='https://localhost:3',
+        expected_rbe_session_json=rbe_session.to_dict(),
+    )
+
+    manifest = {
+        'command': ['echo', 'hi'],
+        'dimensions': {
+            'os': 'Amiga',
+            'pool': 'default'
+        },
+        'grace_period': 30,
+        'hard_timeout': 60,
+        'io_timeout': None,
+        'host': 'https://localhost:3',
+        'task_id': '24',
+    }
+    self.assertEqual(self.root_dir, self.bot.base_dir)
+    bot_main._run_manifest(self.bot, manifest, rbe_session)
+
+    self.assertTrue(rbe_results)
 
   def test_run_manifest_task_failure(self):
     self.mock(bot_main, '_post_error_task', self.print_err_and_fail)
@@ -1608,7 +1648,7 @@ class TestBotMain(TestBotBase):
         'io_timeout': 60,
         'task_id': '24',
     }
-    bot_main._run_manifest(self.bot, manifest)
+    bot_main._run_manifest(self.bot, manifest, None)
 
   def test_run_manifest_internal_failure(self):
     posted = []
@@ -1635,7 +1675,7 @@ class TestBotMain(TestBotBase):
         'io_timeout': 60,
         'task_id': '24',
     }
-    bot_main._run_manifest(self.bot, manifest)
+    bot_main._run_manifest(self.bot, manifest, None)
     expected = [(self.bot, 'Execution failed: internal error (1).', '24')]
     self.assertEqual(expected, posted)
 
@@ -1666,7 +1706,7 @@ class TestBotMain(TestBotBase):
         'io_timeout': 60,
         'task_id': '24',
     }
-    bot_main._run_manifest(self.bot, manifest)
+    bot_main._run_manifest(self.bot, manifest, None)
 
   def test_run_manifest_exception(self):
     posted = []
@@ -1701,7 +1741,7 @@ class TestBotMain(TestBotBase):
         'io_timeout': None,
         'task_id': '24',
     }
-    bot_main._run_manifest(self.bot, manifest)
+    bot_main._run_manifest(self.bot, manifest, None)
     expected = [(self.bot, 'Internal exception occurred: Dang', '24')]
     self.assertEqual(expected, posted)
 

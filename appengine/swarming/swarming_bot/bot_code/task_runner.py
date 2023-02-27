@@ -18,6 +18,7 @@ import json
 import logging
 import optparse
 import os
+import random
 import signal
 import sys
 import time
@@ -165,7 +166,7 @@ def get_isolated_args(work_dir, task_details, isolated_result,
   return cmd
 
 
-class Containment(object):
+class Containment:
   """Containment details."""
   _EXPECTED = frozenset((
       'containment_type',
@@ -185,7 +186,7 @@ class Containment(object):
     return out
 
 
-class TaskDetails(object):
+class TaskDetails:
   """A task_runner specific view of the server's TaskProperties.
 
   It only contains what the bot needs to know.
@@ -272,7 +273,7 @@ class InternalError(Exception):
 
 def load_and_run(in_file, swarming_server, default_swarming_server,
                  cost_usd_hour, start, out_file, run_isolated_flags, bot_file,
-                 auth_params_file):
+                 auth_params_file, rbe_session_state):
   """Loads the task's metadata, prepares auth environment and executes the task.
 
   This may throw all sorts of exceptions in case of failure. It's up to the
@@ -281,6 +282,7 @@ def load_and_run(in_file, swarming_server, default_swarming_server,
   """
   auth_system = None
   local_auth_context = None
+  rbe_session = None
   task_result = None
   work_dir = os.path.dirname(out_file)
 
@@ -356,7 +358,6 @@ def load_and_run(in_file, swarming_server, default_swarming_server,
         resultdb.update(task_details.resultdb)
         context_edits['resultdb'] = resultdb
 
-
       # Returns bot authentication headers dict or raises InternalError.
       def headers_cb():
         try:
@@ -374,6 +375,11 @@ def load_and_run(in_file, swarming_server, default_swarming_server,
       remote.initialize()
       remote.bot_id = task_details.bot_id
 
+      # If running in RBE mode, deserialize the RBESession object to use it to
+      # send pings to RBE.
+      if rbe_session_state:
+        rbe_session = remote_client.RBESession.load(remote, rbe_session_state)
+
       # Let AuthSystem know it can now send RPCs to Swarming (to grab OAuth
       # tokens). There's a circular dependency here! AuthSystem will be
       # indirectly relying on its own 'get_bot_headers' method to authenticate
@@ -384,9 +390,9 @@ def load_and_run(in_file, swarming_server, default_swarming_server,
       # Auth environment is up, start the command. task_result is dumped to
       # disk in 'finally' block.
       with luci_context.stage(_tmpdir=work_dir, **context_edits) as ctx_file:
-        task_result = run_command(
-            remote, task_details, work_dir, cost_usd_hour,
-            start, run_isolated_flags, bot_file, ctx_file)
+        task_result = run_command(remote, rbe_session, task_details, work_dir,
+                                  cost_usd_hour, start, run_isolated_flags,
+                                  bot_file, ctx_file)
   except (ExitSignal, InternalError, remote_client.InternalError) as e:
     # This normally means run_command() didn't get the chance to run, as it
     # itself traps exceptions and will report accordingly. In this case, we want
@@ -410,6 +416,9 @@ def load_and_run(in_file, swarming_server, default_swarming_server,
       auth_system.stop()
     with open(out_file, 'w') as f:
       json.dump(task_result, f)
+    # Store updates to the session (like the most recent session token).
+    if rbe_session:
+      rbe_session.dump(rbe_session_state)
 
 
 def kill_and_wait(proc, grace_period, reason):
@@ -496,7 +505,7 @@ def _start_task_runner(args, work_dir, ctx_file):
   return proc
 
 
-class _OutputBuffer(object):
+class _OutputBuffer:
   """_OutputBuffer implements stdout (and eventually stderr) buffering.
 
   This data is buffered and must be sent to the Swarming server when
@@ -601,7 +610,44 @@ class _OutputBuffer(object):
     return max(out, 0)
 
 
-def run_command(remote, task_details, work_dir, cost_usd_hour,
+class _RBEPinger:
+  """Knows when and how to ping the RBE lease to keep it alive.
+
+  Currently ignores lease cancellation signals: cancellations still happen
+  exclusively through Swarming.
+  """
+
+  def __init__(self, rbe_session):
+    assert rbe_session.active_lease
+    self._rbe_session = rbe_session
+    self._active = True
+    self._next_ping_time = monotonic_time()  # ASAP
+
+  def time_until_next_ping(self):
+    """Returns how many seconds to wait until the next ping.
+
+    If pings are disabled, returns None.
+    """
+    if not self._active:
+      return None
+    return max(0.0, self._next_ping_time - monotonic_time())
+
+  def ping(self):
+    """Sends a ping to RBE, keeping the lease alive, if it's time."""
+    if not self._active or monotonic_time() < self._next_ping_time:
+      return
+    # TODO(vadimsh): Figure out the optimal frequency for pings. The native RBE
+    # bot does something more complicated here (e.g. slows down with time).
+    self._next_ping_time = monotonic_time() + random.uniform(10.0, 15.0)
+    try:
+      self._active = self._rbe_session.ping_active_lease()
+      if not self._active:
+        logging.warning('RBE lease is no longer active, stopping pings')
+    except remote_client.RBEServerError as e:
+      logging.error('Failed to ping RBE lease: %s', e)
+
+
+def run_command(remote, rbe_session, task_details, work_dir, cost_usd_hour,
                 task_start, run_isolated_flags, bot_file, ctx_file):
   """Runs a command and sends packets to the server to stream results back.
 
@@ -653,6 +699,11 @@ def run_command(remote, task_details, work_dir, cost_usd_hour,
   if task_details.grace_period:
     task_details.grace_period *= 2
 
+  # Send the initial ping to RBE to let it know we have started.
+  rbe_pinger = _RBEPinger(rbe_session) if rbe_session else None
+  if rbe_pinger:
+    rbe_pinger.ping()
+
   try:
     proc = _start_task_runner(args, work_dir, ctx_file)
     logging.info('Subprocess for run_isolated started')
@@ -674,8 +725,16 @@ def run_command(remote, task_details, work_dir, cost_usd_hour,
     kill_sent = False
     timed_out = None
     try:
-      for channel, new_data in proc.yield_any(
-          maxsize=buf.maxsize, timeout=lambda: buf.calc_yield_wait(timed_out)):
+      # Calculates how soon to unblock in proc.yield_any(...).
+      def yield_timeout():
+        buf_wait = buf.calc_yield_wait(timed_out)
+        rbe_wait = rbe_pinger.time_until_next_ping() if rbe_pinger else None
+        if rbe_wait is None:
+          return buf_wait
+        return min(buf_wait, rbe_wait)
+
+      for channel, new_data in proc.yield_any(maxsize=buf.maxsize,
+                                              timeout=yield_timeout):
         buf.add(channel, new_data)
 
         # Post update if necessary.
@@ -692,6 +751,10 @@ def run_command(remote, task_details, work_dir, cost_usd_hour,
               term_sent = True
               proc.terminate()
               timed_out = monotonic_time()
+
+        # Keep RBE updated as well.
+        if rbe_pinger:
+          rbe_pinger.ping()
 
         # Send signal on timeout if necessary. Both are failures, not
         # internal_failures.
@@ -895,11 +958,14 @@ def main(args):
   parser.add_option(
       '--cost-usd-hour', type='float', help='Cost of this VM in $/h')
   parser.add_option('--start', type='float', help='Time this task was started')
-  parser.add_option(
-      '--bot-file', help='Path to a file describing the state of the host.')
+  parser.add_option('--bot-file',
+                    help='Path to a file describing the state of the host')
   parser.add_option(
       '--auth-params-file',
       help='Path to a file with bot authentication parameters')
+  parser.add_option(
+      '--rbe-session-state',
+      help='Path to a JSON file with the state of the current RBE session')
 
   options, args = parser.parse_args(args)
   if not options.in_file or not options.out_file:
@@ -916,7 +982,7 @@ def main(args):
     load_and_run(options.in_file, options.swarming_server,
                  options.default_swarming_server, options.cost_usd_hour,
                  options.start, options.out_file, args, options.bot_file,
-                 options.auth_params_file)
+                 options.auth_params_file, options.rbe_session_state)
     return 0
   finally:
     logging.info('quitting')

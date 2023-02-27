@@ -110,13 +110,14 @@ def get_task_details(*args, **kwargs):
   return task_runner.TaskDetails(get_manifest(*args, **kwargs))
 
 
-def run_command(server_url, work_dir, task_details, headers_cb):
+def run_command(server_url, work_dir, task_details, headers_cb, rbe_session):
   """Runs a command with an initialized client."""
   remote = remote_client.createRemoteClient(server_url, headers_cb, 'localhost',
                                             work_dir)
   remote.bot_id = task_details.bot_id
   with luci_context.stage(local_auth=None) as ctx_file:
-    return task_runner.run_command(remote, task_details, work_dir, 3600.,
+    return task_runner.run_command(remote,
+                                   rbe_session, task_details, work_dir, 3600.,
                                    time.time(), ['--min-free-space', '1'] +
                                    DISABLE_CIPD_FOR_TESTS, '/path/to/file',
                                    ctx_file)
@@ -131,7 +132,7 @@ def load_and_run(server_url, work_dir, manifest, auth_params_file):
   task_runner.load_and_run(in_file, server_url, server_url, 3600., time.time(),
                            out_file,
                            ['--min-free-space', '1'] + DISABLE_CIPD_FOR_TESTS,
-                           None, auth_params_file)
+                           None, auth_params_file, None)
   with open(out_file, 'rb') as f:
     return json.load(f)
 
@@ -310,8 +311,9 @@ class TestTaskRunnerBase(auto_stub.TestCase):
     self.assertEqual(expected, actual)
     return out
 
-  def _run_command(self, task_details):
-    return run_command(self.server.url, self.work_dir, task_details, None)
+  def _run_command(self, task_details, rbe_session=None):
+    return run_command(self.server.url, self.work_dir, task_details, None,
+                       rbe_session)
 
 
 class TestTaskRunner(TestTaskRunnerBase):
@@ -348,6 +350,33 @@ class TestTaskRunner(TestTaskRunnerBase):
     self.assertEqual(expected, self._run_command(task_details))
     # Now look at the updates sent by the bot as seen by the server.
     self.expectTask(task_details.task_id)
+
+  def test_run_command_raw_with_rbe(self):
+    task_details = get_task_details('print(\'hi\')')
+    expected = {
+        'exit_code': 0,
+        'hard_timeout': False,
+        'io_timeout': False,
+        'internal_error': None,
+        'internal_error_reported': False,
+        'version': task_runner.OUT_VERSION,
+    }
+
+    class _FakeRBESession:
+      def __init__(self):
+        self.pings = 0
+        self.active_lease = True
+
+      def ping_active_lease(self):
+        self.pings += 1
+        return True
+
+    rbe_session = _FakeRBESession()
+    self.assertEqual(expected, self._run_command(task_details, rbe_session))
+    # Now look at the updates sent by the bot as seen by the server.
+    self.expectTask(task_details.task_id)
+    # Pinged RBE as well.
+    self.assertEqual(rbe_session.pings, 1)
 
   def test_run_command_env_prefix_one(self):
     task_details = get_task_details(
@@ -809,7 +838,7 @@ class TestTaskRunner(TestTaskRunnerBase):
 
     def _load_and_run(manifest, swarming_server, default_swarming_server,
                       cost_usd_hour, start, json_file, run_isolated_flags,
-                      bot_file, auth_params_file):
+                      bot_file, auth_params_file, rbe_session_state):
       self.assertEqual('foo', manifest)
       self.assertEqual(self.server.url, swarming_server)
       self.assertEqual(self.server.url, default_swarming_server)
@@ -819,6 +848,7 @@ class TestTaskRunner(TestTaskRunnerBase):
       self.assertEqual(['--min-free-space', '1'], run_isolated_flags)
       self.assertEqual('/path/to/bot-file', bot_file)
       self.assertEqual('/path/to/auth-params-file', auth_params_file)
+      self.assertEqual('/path/to/rbe/session', rbe_session_state)
 
     self.mock(task_runner, 'load_and_run', _load_and_run)
     cmd = [
@@ -838,6 +868,8 @@ class TestTaskRunner(TestTaskRunnerBase):
         '/path/to/bot-file',
         '--auth-params-file',
         '/path/to/auth-params-file',
+        '--rbe-session-state',
+        '/path/to/rbe/session',
         '--',
         '--min-free-space',
         '1',
@@ -1377,9 +1409,10 @@ class TaskRunnerNoServer(auto_stub.TestCase):
   def test_load_and_run_isolated(self):
     self.mock(bot_auth, 'AuthSystem', FakeAuthSystem)
 
-    def _run_command(remote, task_details, work_dir, cost_usd_hour, start,
-                     run_isolated_flags, bot_file, ctx_file):
+    def _run_command(remote, rbe_session, task_details, work_dir, cost_usd_hour,
+                     start, run_isolated_flags, bot_file, ctx_file):
       self.assertTrue(remote.uses_auth) # mainly to avoid unused arg warning
+      self.assertIsNone(rbe_session)
       self.assertTrue(isinstance(task_details, task_runner.TaskDetails))
       # Necessary for OSX.
       self.assertEqual(
@@ -1437,10 +1470,10 @@ class TaskRunnerNoServer(auto_stub.TestCase):
     }
     realm_ctx = {'name': 'test:realm'}
 
-    def _run_command(
-        remote, task_details, work_dir,
-        cost_usd_hour, start, run_isolated_flags, bot_file, ctx_file):
+    def _run_command(remote, rbe_session, task_details, work_dir, cost_usd_hour,
+                     start, run_isolated_flags, bot_file, ctx_file):
       self.assertTrue(remote.uses_auth) # mainly to avoid "unused arg" warning
+      self.assertIsNone(rbe_session)
       self.assertTrue(isinstance(task_details, task_runner.TaskDetails))
       # Necessary for OSX.
       self.assertEqual(

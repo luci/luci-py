@@ -5,7 +5,10 @@
 
 import datetime
 import logging
+import os
+import shutil
 import sys
+import tempfile
 import threading
 import time
 import unittest
@@ -556,6 +559,29 @@ class MockedRBERemote:
 
 
 class TestRBESession(unittest.TestCase):
+  def setUp(self):
+    super().setUp()
+    self.temp_dir = tempfile.mkdtemp(prefix='swarming')
+
+  def tearDown(self):
+    shutil.rmtree(self.temp_dir)
+    super().tearDown()
+
+  def check_serialization_works(self, session):
+    dump = os.path.join(self.temp_dir, 'dump.json')
+    session.dump(dump)
+    loaded = remote_client.RBESession.load(session._remote, dump)
+    self.assertEqual(session._instance, loaded._instance)
+    self.assertEqual(session._dimensions, loaded._dimensions)
+    self.assertEqual(session._poll_token, loaded._poll_token)
+    self.assertEqual(session._session_token, loaded._session_token)
+    self.assertEqual(session._session_id, loaded._session_id)
+    self.assertEqual(session._last_acked_status, loaded._last_acked_status)
+    self.assertEqual(session._active_lease, loaded._active_lease)
+    self.assertEqual(session._finished_lease, loaded._finished_lease)
+    # Just confirm `restore` doesn't crash.
+    loaded.restore(dump)
+
   def test_full_flow(self):
     remote = MockedRBERemote()
     dims = lambda x: {'dim': ['v1', str(x)]}
@@ -570,6 +596,9 @@ class TestRBESession(unittest.TestCase):
     # Called `rbe_create_session`.
     self.assertEqual(dims(0), remote.last_dimensions)
     self.assertEqual('poll_tok:0', remote.last_poll_token)
+
+    # Can be serialized/restored in this state.
+    self.check_serialization_works(s)
 
     # Calling ping_active_lease without a lease is not allowed.
     with self.assertRaises(remote_client.RBESessionException):
@@ -612,11 +641,14 @@ class TestRBESession(unittest.TestCase):
         }, lease.to_dict())
     self.assertTrue(s.healthy)
 
+    # Can be serialized/restored in this state.
+    self.check_serialization_works(s)
+
     # Calling update while holding onto a lease is not allowed.
     with self.assertRaises(remote_client.RBESessionException):
       s.update(remote_client.RBESessionStatus.OK, dims(2), 'poll_tok:2')
 
-    # Ping the active lease, keep a singled to keep working on it.
+    # Ping the active lease, keep it ACTIVE to keep working on it.
     remote.mock_next_response(
         remote_client.RBESessionStatus.OK,
         remote_client.RBELease(
@@ -643,6 +675,9 @@ class TestRBESession(unittest.TestCase):
     s.finish_active_lease({'result': 'xxx'})
     self.assertIsNone(s.active_lease)
     self.assertTrue(s.healthy)
+
+    # Can be serialized/restored in this state.
+    self.check_serialization_works(s)
 
     # Finishing the least twice is not allowed.
     with self.assertRaises(remote_client.RBESessionException):
@@ -691,6 +726,9 @@ class TestRBESession(unittest.TestCase):
     # Calling update with unhealthy session is not allowed.
     with self.assertRaises(remote_client.RBESessionException):
       s.update(remote_client.RBESessionStatus.OK, dims(5), 'poll_tok:5')
+
+    # Can be serialized/restored in this state.
+    self.check_serialization_works(s)
 
     # This doesn't actually do much, since the session is already closed.
     # There's a separate test for it.
