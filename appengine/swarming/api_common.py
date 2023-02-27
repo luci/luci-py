@@ -191,7 +191,7 @@ def to_keys(task_id):
   try:
     return task_pack.get_request_and_result_keys(task_id)
   except ValueError as e:
-    raise handlers_exceptions.BadRequestException('invalid task_id %s:%s' %
+    raise handlers_exceptions.BadRequestException('invalid task_id %s: %s' %
                                                   (task_id, e))
 
 
@@ -220,7 +220,11 @@ def get_task_request_async(task_id, request_key, permission):
   Raises:
     auth.AuthorizationError if bot fails realm authorization test.
   """
-  request = yield request_key.get_async()
+  try:
+    request = yield request_key.get_async()
+  except ValueError as e:
+    raise handlers_exceptions.BadRequestException("invalid task_id %s: %s" %
+                                                  (task_id, e))
   if not request:
     raise handlers_exceptions.NotFoundException('%s not found.' % task_id)
   if permission == VIEW:
@@ -251,7 +255,7 @@ def get_request_and_result(task_id, permission, trust_memcache):
 
   Raises:
     handlers_exceptions.BadRequestException: if task_id is invalid.
-    handlers_exceptions.NotFoundException: if task_id is missing.
+    handlers_exceptions.NotFoundException: if no task is found for task_id.
   """
   request_key, result_key = to_keys(task_id)
   try:
@@ -277,9 +281,43 @@ def get_request_and_result(task_id, permission, trust_memcache):
                               use_datastore=True)
 
     request = request_future.get_result()
-    if not result:
-      raise handlers_exceptions.NotFoundException('%s not found.' % task_id)
-    return request, result
   except ValueError as e:
     raise handlers_exceptions.BadRequestException('invalid task_id %s: %s' %
                                                   (task_id, e))
+  if not result:
+    raise handlers_exceptions.NotFoundException('%s not found.' % task_id)
+  return request, result
+
+
+def cancel_task(task_id, kill_running):
+  """Initiates the cancellation of a swarming task.
+
+  Arguments:
+    task_id: task_id to be cancelled.
+    kill_running: if False, this will not kill tasks in a state of RUNNING. If
+      True then running tasks and their "child tasks" will be killed.
+
+  Returns:
+    tuple(cancelled, was_running): cancelled=True implies that the operation
+      completed successfully, which has a different meaning depending on
+      whether the task was in RUNNING state. If the task was not in RUNNING
+      state then the state of the task changes was changed to CANCELLED with no
+      further work needed. If kill_running=True and the task is in RUNNING state
+      (implying that it is being executed on a bot) then the bot still needs to
+      cancel the actual task process. The state of the task will be set to
+      CANCELLED after the bot has killed the process and reported this to
+      swarming service.
+      was_running=True implies that the task was running when cancellation was
+      initiated and further work needs to take place on the bot before this
+      the task changes state state to CANCELLED.
+
+  Raises:
+    auth.AuthorizationError if realm check fails.
+    handlers_exceptions.BadRequestException: if task_id is invalid.
+    handlers_exceptions.NotFoundException: if no task is found for task_id.
+  """
+  request_key, result_key = to_keys(task_id)
+  request_obj = get_task_request_async(task_id, request_key,
+                                       CANCEL).get_result()
+  return task_scheduler.cancel_task(request_obj, result_key, kill_running
+                                    or False, None)

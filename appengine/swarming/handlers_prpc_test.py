@@ -12,6 +12,7 @@ import unittest
 import json
 import cgi
 import mock
+import base64
 from parameterized import parameterized
 
 import test_env_handlers
@@ -135,6 +136,42 @@ def apply_defaults_for_request(request):
 class PrpcTest(test_env_handlers.AppTestBase):
   no_run = 1
   service = None
+
+  def apply_defaults_for_result_summary(self, result):
+    """Applies default expectations to a TaskResultResponse initialized from a
+    TaskResultSummary ndb entity.
+
+    To be used for expectations.
+    """
+    # This assumes:
+    # self.mock(random, 'getrandbits', lambda _: 0x88)
+    del result.bot_dimensions[:]
+    result.bot_dimensions.extend([
+        swarming_pb2.StringListPair(key='id', value=['bot1']),
+        swarming_pb2.StringListPair(key='os', value=['Amiga']),
+        swarming_pb2.StringListPair(key='pool', value=['default'])
+    ])
+    result.bot_id = 'bot1'
+    result.bot_version = self.bot_version
+    result.current_task_slice = 0
+    result.failure = False
+    result.internal_failure = False
+    result.name = 'job1'
+    result.run_id = '5cee488008811'
+    result.server_versions[:] = [u'v1a']
+    result.state = swarming_pb2.TaskState.COMPLETED
+    result.tags[:] = [
+        'a:tag',
+        'os:Amiga',
+        'pool:default',
+        'priority:20',
+        'realm:none',
+        'service_account:none',
+        'swarming.pool.template:no_config',
+        'user:joe@localhost',
+    ]
+    result.task_id = '5cee488008810'
+    result.user = 'joe@localhost'
 
   def apply_defaults_for_run_result(self, result):
     """Returns a serialized swarming_rpcs.TaskResult initialized from a
@@ -840,6 +877,281 @@ class TaskServicePrpcTest(PrpcTest):
     actual = swarming_pb2.TaskRequestResponse()
     _decode(response.body, actual)
     self.assertEqual(expected, actual)
+
+  def test_cancel_pending(self):
+    """Asserts that task cancellation goes smoothly."""
+    # catch PubSub notification
+    # Create and cancel a task as a non-privileged user.
+    self.mock(random, 'getrandbits', lambda _: 0x88)
+    self.set_as_bot()
+    self.bot_poll()
+    self.set_as_user()
+    _, task_id = self.client_create_task_raw(
+        pubsub_topic='projects/abc/topics/def', pubsub_userdata='blah')
+    expected = swarming_pb2.CancelResponse(canceled=True, was_running=False)
+    response = self.post_prpc(
+        'CancelTask',
+        swarming_pb2.TaskCancelRequest(task_id=task_id, kill_running=False))
+    actual = swarming_pb2.CancelResponse()
+    _decode(response.body, actual)
+    self.assertEqual(expected, actual)
+
+    # determine that the task's state updates correctly
+    expected = swarming_pb2.TaskResultResponse(
+        abandoned_ts=message_conversion_prpc.date(self.now),
+        completed_ts=message_conversion_prpc.date(self.now),
+        created_ts=message_conversion_prpc.date(self.now),
+        current_task_slice=0,
+        failure=False,
+        internal_failure=False,
+        modified_ts=message_conversion_prpc.date(self.now),
+        name='job1',
+        server_versions=['v1a'],
+        state='CANCELED',
+        tags=[
+            'a:tag',
+            'authenticated:user:user@example.com',
+            'os:Amiga',
+            'pool:default',
+            'priority:20',
+            'realm:none',
+            'service_account:none',
+            'swarming.pool.template:none',
+            'swarming.pool.version:pools_cfg_rev',
+            'user:joe@localhost',
+        ],
+        task_id=task_id,
+        user=u'joe@localhost',
+    )
+    response = self.post_prpc(
+        'GetResult',
+        swarming_pb2.TaskIdWithPerfRequest(task_id=task_id,
+                                           include_performance_stats=False))
+    actual = swarming_pb2.TaskResultResponse()
+    _decode(response.body, actual)
+    self.assertEqual(expected, actual)
+
+  def test_cancel_forbidden(self):
+    """Asserts that non-privileged non-owner can't cancel tasks."""
+    # Create a task as an admin.
+    self.mock(random, 'getrandbits', lambda _: 0x88)
+    self.set_as_admin()
+    _, task_id = self.client_create_task_raw(
+        pubsub_topic='projects/abc/topics/def', pubsub_userdata='blah')
+
+    # Attempt to cancel as non-privileged user -> HTTP 403.
+    self.set_as_user()
+    self.mock_auth_db([])
+    response = self.post_prpc('CancelTask',
+                              swarming_pb2.TaskCancelRequest(
+                                  task_id=task_id, kill_running=False),
+                              expect_errors=True)
+    self.assertEqual(response.status, '403 Forbidden')
+
+  def test_cancel_with_realm_permission(self):
+    # someone creates tasks with/without realm.
+    self.set_as_privileged_user()
+    self.mock_auth_db([
+        auth.Permission('swarming.pools.createTask'),
+        auth.Permission('swarming.tasks.createInRealm'),
+    ])
+    _, task_id_with_realm = self.client_create_task_raw(realm='test:task_realm')
+    _, task_id_without_realm = self.client_create_task_raw(realm=None)
+
+    def assertTaskIsNotAccessible(task_id):
+      response = self.post_prpc('CancelTask',
+                                swarming_pb2.TaskCancelRequest(
+                                    task_id=task_id, kill_running=False),
+                                expect_errors=True)
+      self.assertEqual(response.status, '403 Forbidden')
+      self.assertEqual(
+          cgi.escape('Task "%s" is not accessible' % task_id, quote=True),
+          response.body)
+
+    # non-privileged user can't cancel the both tasks without permission.
+    self.set_as_user()
+    assertTaskIsNotAccessible(task_id_with_realm)
+    assertTaskIsNotAccessible(task_id_without_realm)
+
+    # the user can cancel to the both tasks with swarming.pools.cancelTask
+    # permission.
+    self.mock_auth_db([auth.Permission('swarming.pools.cancelTask')])
+    self.post_prpc(
+        'CancelTask',
+        swarming_pb2.TaskCancelRequest(task_id=task_id_with_realm,
+                                       kill_running=False))
+    self.post_prpc(
+        'CancelTask',
+        swarming_pb2.TaskCancelRequest(task_id=task_id_without_realm,
+                                       kill_running=False))
+    # the user can cancel with swarming.tasks.cancel permission.
+    self.mock_auth_db([auth.Permission('swarming.tasks.cancel')])
+    self.post_prpc(
+        'CancelTask',
+        swarming_pb2.TaskCancelRequest(task_id=task_id_with_realm,
+                                       kill_running=False))
+    # but, not accessible to the task without realm.
+    assertTaskIsNotAccessible(task_id_without_realm)
+
+  def test_cancel_running(self):
+    self.mock(random, 'getrandbits', lambda _: 0x88)
+    self.set_as_bot()
+    self.bot_poll()
+    self.set_as_user()
+    _, task_id = self.client_create_task_raw(properties=dict(
+        command=['python', 'runtest.py']))
+
+    self.set_as_bot()
+    params = self.do_handshake()
+    data = self.post_json('/swarming/api/v1/bot/poll', params)
+    run_id = data['manifest']['task_id']
+
+    def _params(**kwargs):
+      out = {
+          'cost_usd': 0.1,
+          'duration': None,
+          'exit_code': None,
+          'id': 'bot1',
+          'output': None,
+          'output_chunk_start': 0,
+          'task_id': run_id,
+      }
+      out.update(**kwargs)
+      return out
+
+    self.set_as_bot()
+    params = _params(output=base64.b64encode('Oh '))
+    response = self.post_json('/swarming/api/v1/bot/task_update', params)
+    self.assertEqual({u'must_stop': False, u'ok': True}, response)
+    self.set_as_user()
+    expected = swarming_pb2.TaskResultResponse()
+    self.apply_defaults_for_result_summary(expected)
+    expected.bot_idle_since_ts.FromDatetime(self.now)
+    expected.costs_usd[:] = [0.1]
+    expected.created_ts.FromDatetime(self.now)
+    expected.modified_ts.FromDatetime(self.now)
+    expected.started_ts.FromDatetime(self.now)
+    expected.state = swarming_pb2.TaskState.RUNNING
+    expected.tags[:] = [
+        u'a:tag', u'authenticated:user:user@example.com', u'os:Amiga',
+        u'pool:default', u'priority:20', u'realm:none', u'service_account:none',
+        u'swarming.pool.template:none', u'swarming.pool.version:pools_cfg_rev',
+        u'user:joe@localhost'
+    ]
+    actual = swarming_pb2.TaskResultResponse()
+    response = self.post_prpc(
+        'GetResult',
+        swarming_pb2.TaskIdWithPerfRequest(task_id=task_id,
+                                           include_performance_stats=False))
+    _decode(response.body, actual)
+    self.assertEqual(expected, actual)
+
+    # Denied if kill_running == False.
+    response = self.post_prpc('CancelTask',
+                              swarming_pb2.TaskCancelRequest(
+                                  task_id=task_id, kill_running=False),
+                              expect_errors=True)
+    actual = swarming_pb2.CancelResponse()
+    _decode(response.body, actual)
+    self.assertEqual(
+        swarming_pb2.CancelResponse(canceled=False, was_running=True), actual)
+
+    # Works if kill_running == True.
+    response = self.post_prpc('CancelTask',
+                              swarming_pb2.TaskCancelRequest(task_id=task_id,
+                                                             kill_running=True),
+                              expect_errors=True)
+    actual = swarming_pb2.CancelResponse()
+    _decode(response.body, actual)
+    self.assertEqual(
+        swarming_pb2.CancelResponse(canceled=True, was_running=True), actual)
+
+    self.set_as_bot()
+    params = _params(output=base64.b64encode('hi'), output_chunk_start=3)
+    response = self.post_json('/swarming/api/v1/bot/task_update', params)
+    self.assertEqual({u'must_stop': True, u'ok': True}, response)
+
+    # abandoned_ts is set but state isn't changed yet.
+    self.set_as_user()
+    expected = swarming_pb2.TaskResultResponse()
+    self.apply_defaults_for_result_summary(expected)
+    expected.abandoned_ts.FromDatetime(self.now)
+    expected.bot_idle_since_ts.FromDatetime(self.now)
+    expected.costs_usd[:] = [0.1]
+    expected.created_ts.FromDatetime(self.now)
+    expected.modified_ts.FromDatetime(self.now)
+    expected.started_ts.FromDatetime(self.now)
+    expected.state = swarming_pb2.TaskState.RUNNING
+    expected.tags[:] = [
+        'a:tag',
+        'authenticated:user:user@example.com',
+        'os:Amiga',
+        'pool:default',
+        'priority:20',
+        'realm:none',
+        'service_account:none',
+        'swarming.pool.template:none',
+        'swarming.pool.version:pools_cfg_rev',
+        'user:joe@localhost',
+    ]
+    actual = swarming_pb2.TaskResultResponse()
+    response = self.post_prpc(
+        'GetResult',
+        swarming_pb2.TaskIdWithPerfRequest(task_id=task_id,
+                                           include_performance_stats=False))
+    _decode(response.body, actual)
+    self.assertEqual(expected, actual)
+
+    # Bot terminates the task.
+    self.set_as_bot()
+    params = _params(output=base64.b64encode(' again'),
+                     output_chunk_start=6,
+                     duration=0.1,
+                     exit_code=0)
+    response = self.post_json('/swarming/api/v1/bot/task_update', params)
+    self.assertEqual({u'must_stop': True, u'ok': True}, response)
+
+    self.set_as_user()
+    expected = swarming_pb2.TaskResultResponse()
+    self.apply_defaults_for_result_summary(expected)
+    expected.abandoned_ts.FromDatetime(self.now)
+    expected.bot_idle_since_ts.FromDatetime(self.now)
+    expected.completed_ts.FromDatetime(self.now)
+    expected.costs_usd[:] = [0.1]
+    expected.created_ts.FromDatetime(self.now)
+    expected.duration = 0.1
+    expected.exit_code = 0
+    expected.modified_ts.FromDatetime(self.now)
+    expected.started_ts.FromDatetime(self.now)
+    expected.state = swarming_pb2.TaskState.KILLED
+    expected.tags[:] = [
+        u'a:tag',
+        u'authenticated:user:user@example.com',
+        u'os:Amiga',
+        u'pool:default',
+        u'priority:20',
+        u'realm:none',
+        u'service_account:none',
+        u'swarming.pool.template:none',
+        u'swarming.pool.version:pools_cfg_rev',
+        u'user:joe@localhost',
+    ]
+    actual = swarming_pb2.TaskResultResponse()
+    response = self.post_prpc(
+        'GetResult',
+        swarming_pb2.TaskIdWithPerfRequest(task_id=task_id,
+                                           include_performance_stats=False))
+    _decode(response.body, actual)
+    self.assertEqual(expected, actual)
+
+  def test_cancel_with_too_long_key(self):
+    """Asserts that result raises 400 for wildly invalid task IDs."""
+    self.set_as_privileged_user()
+    resp = self.post_prpc('CancelTask',
+                          swarming_pb2.TaskCancelRequest(task_id='12310' * 10,
+                                                         kill_running=False),
+                          expect_errors=True)
+    self.assertEqual(resp.status, '400 Bad Request')
 
 
 if __name__ == '__main__':

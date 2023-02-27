@@ -286,12 +286,8 @@ class SwarmingTaskService(remote.Service):
     If a bot was running the task, the bot will forcibly cancel the task.
     """
     logging.debug('request %s', request)
-    request_key, result_key = api_common.to_keys(request.task_id)
-    request_obj = api_common.get_task_request_async(
-        request.task_id, request_key, api_common.CANCEL).get_result()
-    ok, was_running = task_scheduler.cancel_task(request_obj, result_key,
-                                                 request.kill_running or False,
-                                                 None)
+    ok, was_running = api_common.cancel_task(request.task_id,
+                                             request.kill_running)
     return swarming_rpcs.CancelResponse(ok=ok, was_running=was_running)
 
   @endpoint(TaskIdWithOffset,

@@ -116,6 +116,14 @@ class TasksService(object):
         request.task_id, request_key, api_common.VIEW).get_result()
     return message_conversion_prpc.task_request_response(request_obj)
 
+  @prpc_helpers.method
+  @auth.require(acl.can_access, log_identity=True)
+  def CancelTask(self, request, _context):
+    canceled, was_running = api_common.cancel_task(request.task_id,
+                                                   request.kill_running)
+    return swarming_pb2.CancelResponse(canceled=canceled,
+                                       was_running=was_running)
+
 
 def get_routes():
   s = prpc.Server()
