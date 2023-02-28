@@ -3,12 +3,16 @@
 # that can be found in the LICENSE file.
 
 """This module defines Swarming Server frontend pRPC handlers."""
+
 import datetime
+
+from google.protobuf import empty_pb2
 
 from components import auth
 from components import prpc
-import proto.api_v2.swarming_pb2 as swarming_pb2
-import proto.api_v2.swarming_prpc_pb2 as swarming_prpc_pb2
+from proto.api_v2 import swarming_pb2
+from proto.api_v2 import swarming_prpc_pb2
+from proto.internals import rbe_prpc_pb2
 from server import acl
 from server import realms
 import api_common
@@ -125,10 +129,21 @@ class TasksService(object):
                                        was_running=was_running)
 
 
+class InternalsService(object):
+  DESCRIPTION = rbe_prpc_pb2.InternalsServiceDescription
+
+  @prpc_helpers.method
+  @auth.require(acl.is_swarming_itself, log_identity=True)
+  def ExpireSlice(self, request, _context):
+    logging.info('%s', request)
+    return empty_pb2.Empty()
+
+
 def get_routes():
   s = prpc.Server()
   s.add_service(BotsService())
   s.add_service(TaskBackendAPIService())
   s.add_service(TasksService())
+  s.add_service(InternalsService())
   s.add_interceptor(auth.prpc_interceptor)
   return s.get_routes()

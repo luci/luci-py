@@ -195,6 +195,12 @@ def can_use_task_backend():
   return _is_project()
 
 
+def is_swarming_itself():
+  """True if the call is made by Swarming backend itself (for internal RPCs)."""
+  return (auth.get_current_identity() ==
+          auth.Identity(auth.IDENTITY_USER, utils.get_service_account_name()))
+
+
 def bootstrap_dev_server_acls():
   """Adds localhost to IP allowlist and Swarming groups."""
   assert utils.is_local_dev_server()
