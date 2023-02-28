@@ -1583,15 +1583,6 @@ def yield_result_summary_by_parent_task_id(parent_task_id):
     yield result_summary_key.get()
 
 
-def yield_active_run_result_keys():
-  """Yields all the TaskRunResult ndb.Key of running tasks.
-
-  In practice it is returning a ndb.QueryIterator but this is equivalent.
-  """
-  q = TaskRunResult.query(TaskRunResult.completed_ts == None)
-  return q.iter(keys_only=True)
-
-
 def get_run_results_query(start, end, sort, state, bot_id):
   """Returns TaskRunResult.query() with these filters.
 

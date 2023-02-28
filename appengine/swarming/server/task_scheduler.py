@@ -2000,12 +2000,24 @@ def cron_handle_bot_died():
       futs = _futs
     return futs
 
+  start = utils.utcnow()
+  # Timeout at 9.5 mins, we want to gracefully terminate prior to App Engine
+  # handler expiry. This will reduce the deadline exceeded 500 errors arising
+  # from the endpoint.
+  time_to_stop = start + datetime.timedelta(seconds=int(9.5 * 60))
   try:
-    try:
-      for run_result_key in task_result.yield_active_run_result_keys():
-        count['total'] += 1
-        if count['total'] % 500 == 0:
-          logging.info('Fetched %d keys', count['total'])
+    cursor = None
+    q = task_result.TaskRunResult.query(
+        task_result.TaskRunResult.completed_ts == None)
+    while utils.utcnow() <= time_to_stop:
+      keys, cursor, more = q.fetch_page(500,
+                                        keys_only=True,
+                                        start_cursor=cursor)
+      if not keys:
+        break
+      count['total'] += len(keys)
+      logging.info('Fetched %d keys', count['total'])
+      for run_result_key in keys:
         f = _detect_dead_task_async(run_result_key)
         if f:
           futures.append(f)
@@ -2015,21 +2027,21 @@ def cron_handle_bot_died():
         futures = _wait_futures(futures, 5)
       # wait the remaining ones.
       _wait_futures(futures, 0)
-    finally:
-      if killed:
-        logging.warning('BOT_DIED!\n%d tasks:\n%s', count['killed'],
-                        '\n'.join('  %s' % i for i in killed))
-      logging.info('total %d, killed %d, ignored: %d', count['total'],
-                   count['killed'], count['ignored'])
-    # These are returned primarily for unit testing verification.
-    return killed, count['ignored']
-  except datastore_errors.NeedIndexError as e:
-    # When a fresh new instance is deployed, it takes a few minutes for the
-    # composite indexes to be created even if they are empty. Ignore the case
-    # where the index is defined but still being created by AppEngine.
-    if not str(e).startswith(
-        'NeedIndexError: The index for this query is not ready to serve.'):
-      raise
+      if not more:
+        break
+  finally:
+    now = utils.utcnow()
+    logging.info('cron_handle_bot_died time elapsed: %ss',
+                 (now - start).total_seconds())
+    if now > time_to_stop:
+      logging.warning('Terminating cron_handle_bot_died early')
+    if killed:
+      logging.warning('BOT_DIED!\n%d tasks:\n%s', count['killed'],
+                      '\n'.join('  %s' % i for i in killed))
+    logging.info('total %d, killed %d, ignored: %d', count['total'],
+                 count['killed'], count['ignored'])
+  # These are returned primarily for unit testing verification.
+  return killed, count['ignored']
 
 
 def cron_handle_external_cancellations():

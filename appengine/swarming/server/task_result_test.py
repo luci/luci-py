@@ -659,31 +659,6 @@ class TaskResultApiTest(TestCase):
     expected = [child_summary_1, child_summary_2]
     self.assertEqual(sorted(expected), sorted(s for s in result_summary_iter))
 
-  def test_yield_active_run_result_keys(self):
-    request = _gen_request()
-    result_summary = task_result.new_result_summary(request)
-    result_summary.modified_ts = utils.utcnow()
-    ndb.transaction(result_summary.put)
-    to_run = task_to_run.new_task_to_run(request, 0)
-    bot_details = task_scheduler.BotDetails('abc', 'test_project')
-    run_result = task_result.new_run_result(request, to_run, 'localhost',
-                                            bot_details, {},
-                                            result_summary.resultdb_info)
-    run_result.started_ts = utils.utcnow()
-    run_result.modified_ts = run_result.started_ts
-    run_result.dead_after_ts = run_result.started_ts + datetime.timedelta(
-        seconds=1)
-    ndb.transaction(lambda: result_summary.set_from_run_result(
-        run_result, request))
-    ndb.transaction(lambda: ndb.put_multi((run_result, result_summary)))
-
-    self.assertEqual([run_result.key],
-                     list(task_result.yield_active_run_result_keys()))
-
-    run_result.completed_ts = run_result.started_ts
-    run_result.put()
-    self.assertEqual([], list(task_result.yield_active_run_result_keys()))
-
   def test_set_from_run_result(self):
     request = _gen_request()
     result_summary = task_result.new_result_summary(request)
