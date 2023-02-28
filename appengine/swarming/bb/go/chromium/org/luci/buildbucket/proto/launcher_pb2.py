@@ -20,7 +20,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   syntax='proto3',
   serialized_options=b'Z4go.chromium.org/luci/buildbucket/proto;buildbucketpb',
   create_key=_descriptor._internal_create_key,
-  serialized_pb=b'\n5go.chromium.org/luci/buildbucket/proto/launcher.proto\x12\x0e\x62uildbucket.v2\x1a\x32go.chromium.org/luci/buildbucket/proto/build.proto\"M\n\x0c\x42uildSecrets\x12\x13\n\x0b\x62uild_token\x18\x01 \x01(\t\x12(\n resultdb_invocation_update_token\x18\x02 \x01(\t\"\x98\x01\n\x0b\x42\x42\x41gentArgs\x12\x17\n\x0f\x65xecutable_path\x18\x01 \x01(\t\x12\x14\n\x0cpayload_path\x18\x05 \x01(\t\x12\x11\n\tcache_dir\x18\x02 \x01(\t\x12!\n\x19known_public_gerrit_hosts\x18\x03 \x03(\t\x12$\n\x05\x62uild\x18\x04 \x01(\x0b\x32\x15.buildbucket.v2.BuildB6Z4go.chromium.org/luci/buildbucket/proto;buildbucketpbb\x06proto3'
+  serialized_pb=b'\n5go.chromium.org/luci/buildbucket/proto/launcher.proto\x12\x0e\x62uildbucket.v2\x1a\x32go.chromium.org/luci/buildbucket/proto/build.proto\"h\n\x0c\x42uildSecrets\x12\x13\n\x0b\x62uild_token\x18\x01 \x01(\t\x12(\n resultdb_invocation_update_token\x18\x02 \x01(\t\x12\x19\n\x11start_build_token\x18\x03 \x01(\t\"\x98\x01\n\x0b\x42\x42\x41gentArgs\x12\x17\n\x0f\x65xecutable_path\x18\x01 \x01(\t\x12\x14\n\x0cpayload_path\x18\x05 \x01(\t\x12\x11\n\tcache_dir\x18\x02 \x01(\t\x12!\n\x19known_public_gerrit_hosts\x18\x03 \x03(\t\x12$\n\x05\x62uild\x18\x04 \x01(\x0b\x32\x15.buildbucket.v2.BuildB6Z4go.chromium.org/luci/buildbucket/proto;buildbucketpbb\x06proto3'
   ,
   dependencies=[go_dot_chromium_dot_org_dot_luci_dot_buildbucket_dot_proto_dot_build__pb2.DESCRIPTOR,])
 
@@ -49,6 +49,13 @@ _BUILDSECRETS = _descriptor.Descriptor(
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='start_build_token', full_name='buildbucket.v2.BuildSecrets.start_build_token', index=2,
+      number=3, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"".decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
   ],
   extensions=[
   ],
@@ -62,7 +69,7 @@ _BUILDSECRETS = _descriptor.Descriptor(
   oneofs=[
   ],
   serialized_start=125,
-  serialized_end=202,
+  serialized_end=229,
 )
 
 
@@ -121,8 +128,8 @@ _BBAGENTARGS = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=205,
-  serialized_end=357,
+  serialized_start=232,
+  serialized_end=384,
 )
 
 _BBAGENTARGS.fields_by_name['build'].message_type = go_dot_chromium_dot_org_dot_luci_dot_buildbucket_dot_proto_dot_build__pb2._BUILD

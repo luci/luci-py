@@ -41,7 +41,7 @@ def compute_task_request(run_task_req):
 
   build_token = task_request.BuildToken(
       build_id=run_task_req.build_id,
-      token=run_task_req.backend_token,
+      token=run_task_req.register_backend_task_token,
       buildbucket_host=run_task_req.buildbucket_host)
 
   # NOTE: secret_bytes cannot be passed via `-secret_bytes` in `command`
@@ -109,13 +109,13 @@ def _compute_task_slices(run_task_req, backend_config, has_secret_bytes):
         '`grace_period.nanos` must be 0')
 
   for cache in run_task_req.caches:
-    if cache.wait_for_warm_cache_secs:
-      if cache.wait_for_warm_cache_secs % 60 == 0:
-        dims_by_exp[cache.wait_for_warm_cache_secs][u'caches'].append(
+    if cache.wait_for_warm_cache and cache.wait_for_warm_cache.seconds != 0:
+      if cache.wait_for_warm_cache.seconds % 60 == 0:
+        dims_by_exp[cache.wait_for_warm_cache.seconds][u'caches'].append(
             cache.name)
       else:
         raise handlers_exceptions.BadRequestException(
-          'cache\'s `wait_for_warm_cache_secs` must be a multiple of 60')
+            'cache\'s `wait_for_warm_cache` must be a multiple of 60 seconds')
 
   for dim in run_task_req.dimensions:
     if dim.expiration.nanos:

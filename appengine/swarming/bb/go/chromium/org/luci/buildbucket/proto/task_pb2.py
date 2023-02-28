@@ -22,7 +22,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   syntax='proto3',
   serialized_options=b'Z4go.chromium.org/luci/buildbucket/proto;buildbucketpb',
   create_key=_descriptor._internal_create_key,
-  serialized_pb=b'\n1go.chromium.org/luci/buildbucket/proto/task.proto\x12\x0e\x62uildbucket.v2\x1a\x1cgoogle/protobuf/struct.proto\x1a\x33go.chromium.org/luci/buildbucket/proto/common.proto\x1a\x39go.chromium.org/luci/buildbucket/proto/field_option.proto\"\xd7\x01\n\x04Task\x12\"\n\x02id\x18\x01 \x01(\x0b\x32\x16.buildbucket.v2.TaskID\x12\x0c\n\x04link\x18\x02 \x01(\t\x12&\n\x06status\x18\x03 \x01(\x0e\x32\x16.buildbucket.v2.Status\x12\x35\n\x0estatus_details\x18\x04 \x01(\x0b\x32\x1d.buildbucket.v2.StatusDetails\x12\x14\n\x0csummary_html\x18\x05 \x01(\t\x12(\n\x07\x64\x65tails\x18\x06 \x01(\x0b\x32\x17.google.protobuf.Struct\",\n\x06TaskID\x12\x16\n\x06target\x18\x01 \x01(\tB\x06\x8a\xc3\x1a\x02\x08\x02\x12\n\n\x02id\x18\x02 \x01(\tB6Z4go.chromium.org/luci/buildbucket/proto;buildbucketpbb\x06proto3'
+  serialized_pb=b'\n1go.chromium.org/luci/buildbucket/proto/task.proto\x12\x0e\x62uildbucket.v2\x1a\x1cgoogle/protobuf/struct.proto\x1a\x33go.chromium.org/luci/buildbucket/proto/common.proto\x1a\x39go.chromium.org/luci/buildbucket/proto/field_option.proto\"\xdf\x01\n\x04Task\x12*\n\x02id\x18\x01 \x01(\x0b\x32\x16.buildbucket.v2.TaskIDB\x06\x92\xc3\x1a\x02\x08\x02\x12\x0c\n\x04link\x18\x02 \x01(\t\x12&\n\x06status\x18\x03 \x01(\x0e\x32\x16.buildbucket.v2.Status\x12\x35\n\x0estatus_details\x18\x04 \x01(\x0b\x32\x1d.buildbucket.v2.StatusDetails\x12\x14\n\x0csummary_html\x18\x05 \x01(\t\x12(\n\x07\x64\x65tails\x18\x06 \x01(\x0b\x32\x17.google.protobuf.Struct\":\n\x06TaskID\x12\x1c\n\x06target\x18\x01 \x01(\tB\x0c\x8a\xc3\x1a\x02\x08\x02\x92\xc3\x1a\x02\x08\x02\x12\x12\n\x02id\x18\x02 \x01(\tB\x06\x92\xc3\x1a\x02\x08\x02\x42\x36Z4go.chromium.org/luci/buildbucket/proto;buildbucketpbb\x06proto3'
   ,
   dependencies=[google_dot_protobuf_dot_struct__pb2.DESCRIPTOR,go_dot_chromium_dot_org_dot_luci_dot_buildbucket_dot_proto_dot_common__pb2.DESCRIPTOR,go_dot_chromium_dot_org_dot_luci_dot_buildbucket_dot_proto_dot_field__option__pb2.DESCRIPTOR,])
 
@@ -43,7 +43,7 @@ _TASK = _descriptor.Descriptor(
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+      serialized_options=b'\222\303\032\002\010\002', file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
       name='link', full_name='buildbucket.v2.Task.link', index=1,
       number=2, type=9, cpp_type=9, label=1,
@@ -92,7 +92,7 @@ _TASK = _descriptor.Descriptor(
   oneofs=[
   ],
   serialized_start=212,
-  serialized_end=427,
+  serialized_end=435,
 )
 
 
@@ -110,14 +110,14 @@ _TASKID = _descriptor.Descriptor(
       has_default_value=False, default_value=b"".decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=b'\212\303\032\002\010\002', file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+      serialized_options=b'\212\303\032\002\010\002\222\303\032\002\010\002', file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
       name='id', full_name='buildbucket.v2.TaskID.id', index=1,
       number=2, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=b"".decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+      serialized_options=b'\222\303\032\002\010\002', file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
   ],
   extensions=[
   ],
@@ -130,8 +130,8 @@ _TASKID = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=429,
-  serialized_end=473,
+  serialized_start=437,
+  serialized_end=495,
 )
 
 _TASK.fields_by_name['id'].message_type = _TASKID
@@ -158,5 +158,7 @@ _sym_db.RegisterMessage(TaskID)
 
 
 DESCRIPTOR._options = None
+_TASK.fields_by_name['id']._options = None
 _TASKID.fields_by_name['target']._options = None
+_TASKID.fields_by_name['id']._options = None
 # @@protoc_insertion_point(module_scope)

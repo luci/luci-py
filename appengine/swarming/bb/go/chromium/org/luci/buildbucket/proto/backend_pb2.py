@@ -17,7 +17,6 @@ from google.protobuf import struct_pb2 as google_dot_protobuf_dot_struct__pb2
 from google.protobuf import empty_pb2 as google_dot_protobuf_dot_empty__pb2
 from bb.go.chromium.org.luci.buildbucket.proto import common_pb2 as go_dot_chromium_dot_org_dot_luci_dot_buildbucket_dot_proto_dot_common__pb2
 from bb.go.chromium.org.luci.buildbucket.proto import launcher_pb2 as go_dot_chromium_dot_org_dot_luci_dot_buildbucket_dot_proto_dot_launcher__pb2
-from bb.go.chromium.org.luci.buildbucket.proto import project_config_pb2 as go_dot_chromium_dot_org_dot_luci_dot_buildbucket_dot_proto_dot_project__config__pb2
 from bb.go.chromium.org.luci.buildbucket.proto import task_pb2 as go_dot_chromium_dot_org_dot_luci_dot_buildbucket_dot_proto_dot_task__pb2
 
 
@@ -27,9 +26,9 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   syntax='proto3',
   serialized_options=b'Z4go.chromium.org/luci/buildbucket/proto;buildbucketpb',
   create_key=_descriptor._internal_create_key,
-  serialized_pb=b'\n4go.chromium.org/luci/buildbucket/proto/backend.proto\x12\x0e\x62uildbucket.v2\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1egoogle/protobuf/duration.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x33go.chromium.org/luci/buildbucket/proto/common.proto\x1a\x35go.chromium.org/luci/buildbucket/proto/launcher.proto\x1a;go.chromium.org/luci/buildbucket/proto/project_config.proto\x1a\x31go.chromium.org/luci/buildbucket/proto/task.proto\"\xe3\x06\n\x0eRunTaskRequest\x12\x0e\n\x06target\x18\x01 \x01(\t\x12\x15\n\rbackend_token\x18\x02 \x01(\t\x12\r\n\x05realm\x18\x03 \x01(\t\x12=\n\x05\x61gent\x18\x04 \x01(\x0b\x32..buildbucket.v2.RunTaskRequest.AgentExecutable\x12\x12\n\nagent_args\x18\x05 \x03(\t\x12-\n\x07secrets\x18\x06 \x01(\x0b\x32\x1c.buildbucket.v2.BuildSecrets\x12\x18\n\x10\x62uildbucket_host\x18\x07 \x01(\t\x12\x10\n\x08\x62uild_id\x18\x08 \x01(\t\x12\x36\n\ndimensions\x18\t \x03(\x0b\x32\".buildbucket.v2.RequestedDimension\x12\x32\n\x0estart_deadline\x18\n \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x34\n\x11\x65xecution_timeout\x18\x0b \x01(\x0b\x32\x19.google.protobuf.Duration\x12/\n\x0cgrace_period\x18\x0c \x01(\x0b\x32\x19.google.protobuf.Duration\x12\x35\n\x06\x63\x61\x63hes\x18\r \x03(\x0b\x32%.buildbucket.BuilderConfig.CacheEntry\x12/\n\x0e\x62\x61\x63kend_config\x18\x0e \x01(\x0b\x32\x17.google.protobuf.Struct\x12\x13\n\x0b\x65xperiments\x18\x0f \x03(\t\x12\x12\n\nrequest_id\x18\x10 \x01(\t\x1a\x88\x02\n\x0f\x41gentExecutable\x12J\n\x06source\x18\x01 \x03(\x0b\x32:.buildbucket.v2.RunTaskRequest.AgentExecutable.SourceEntry\x1a>\n\x0b\x41gentSource\x12\x0e\n\x06sha256\x18\x01 \x01(\t\x12\x12\n\nsize_bytes\x18\x02 \x01(\x03\x12\x0b\n\x03url\x18\x03 \x01(\t\x1ai\n\x0bSourceEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12I\n\x05value\x18\x02 \x01(\x0b\x32:.buildbucket.v2.RunTaskRequest.AgentExecutable.AgentSource:\x02\x38\x01\"=\n\x11\x46\x65tchTasksRequest\x12(\n\x08task_ids\x18\x01 \x03(\x0b\x32\x16.buildbucket.v2.TaskID\"9\n\x12\x46\x65tchTasksResponse\x12#\n\x05tasks\x18\x01 \x03(\x0b\x32\x14.buildbucket.v2.Task\">\n\x12\x43\x61ncelTasksRequest\x12(\n\x08task_ids\x18\x01 \x03(\x0b\x32\x16.buildbucket.v2.TaskID\":\n\x13\x43\x61ncelTasksResponse\x12#\n\x05tasks\x18\x01 \x03(\x0b\x32\x14.buildbucket.v2.Task\"\xae\x01\n\x16ValidateConfigsRequest\x12\x45\n\x07\x63onfigs\x18\x01 \x03(\x0b\x32\x34.buildbucket.v2.ValidateConfigsRequest.ConfigContext\x1aM\n\rConfigContext\x12\x0e\n\x06target\x18\x01 \x01(\t\x12,\n\x0b\x63onfig_json\x18\x02 \x01(\x0b\x32\x17.google.protobuf.Struct\"\x92\x01\n\x17ValidateConfigsResponse\x12J\n\rconfig_errors\x18\x01 \x03(\x0b\x32\x33.buildbucket.v2.ValidateConfigsResponse.ErrorDetail\x1a+\n\x0b\x45rrorDetail\x12\r\n\x05index\x18\x01 \x01(\x05\x12\r\n\x05\x65rror\x18\x02 \x01(\t2\xe9\x02\n\x0bTaskBackend\x12\x43\n\x07RunTask\x12\x1e.buildbucket.v2.RunTaskRequest\x1a\x16.google.protobuf.Empty\"\x00\x12U\n\nFetchTasks\x12!.buildbucket.v2.FetchTasksRequest\x1a\".buildbucket.v2.FetchTasksResponse\"\x00\x12X\n\x0b\x43\x61ncelTasks\x12\".buildbucket.v2.CancelTasksRequest\x1a#.buildbucket.v2.CancelTasksResponse\"\x00\x12\x64\n\x0fValidateConfigs\x12&.buildbucket.v2.ValidateConfigsRequest\x1a\'.buildbucket.v2.ValidateConfigsResponse\"\x00\x42\x36Z4go.chromium.org/luci/buildbucket/proto;buildbucketpbb\x06proto3'
+  serialized_pb=b'\n4go.chromium.org/luci/buildbucket/proto/backend.proto\x12\x0e\x62uildbucket.v2\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1egoogle/protobuf/duration.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x33go.chromium.org/luci/buildbucket/proto/common.proto\x1a\x35go.chromium.org/luci/buildbucket/proto/launcher.proto\x1a\x31go.chromium.org/luci/buildbucket/proto/task.proto\"\xe6\x06\n\x0eRunTaskRequest\x12\x0e\n\x06target\x18\x01 \x01(\t\x12#\n\x1bregister_backend_task_token\x18\x02 \x01(\t\x12\r\n\x05realm\x18\x03 \x01(\t\x12=\n\x05\x61gent\x18\x04 \x01(\x0b\x32..buildbucket.v2.RunTaskRequest.AgentExecutable\x12\x12\n\nagent_args\x18\x05 \x03(\t\x12-\n\x07secrets\x18\x06 \x01(\x0b\x32\x1c.buildbucket.v2.BuildSecrets\x12\x18\n\x10\x62uildbucket_host\x18\x07 \x01(\t\x12\x10\n\x08\x62uild_id\x18\x08 \x01(\t\x12\x36\n\ndimensions\x18\t \x03(\x0b\x32\".buildbucket.v2.RequestedDimension\x12\x32\n\x0estart_deadline\x18\n \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x34\n\x11\x65xecution_timeout\x18\x0b \x01(\x0b\x32\x19.google.protobuf.Duration\x12/\n\x0cgrace_period\x18\x0c \x01(\x0b\x32\x19.google.protobuf.Duration\x12*\n\x06\x63\x61\x63hes\x18\r \x03(\x0b\x32\x1a.buildbucket.v2.CacheEntry\x12/\n\x0e\x62\x61\x63kend_config\x18\x0e \x01(\x0b\x32\x17.google.protobuf.Struct\x12\x13\n\x0b\x65xperiments\x18\x0f \x03(\t\x12\x12\n\nrequest_id\x18\x10 \x01(\t\x1a\x88\x02\n\x0f\x41gentExecutable\x12J\n\x06source\x18\x01 \x03(\x0b\x32:.buildbucket.v2.RunTaskRequest.AgentExecutable.SourceEntry\x1a>\n\x0b\x41gentSource\x12\x0e\n\x06sha256\x18\x01 \x01(\t\x12\x12\n\nsize_bytes\x18\x02 \x01(\x03\x12\x0b\n\x03url\x18\x03 \x01(\t\x1ai\n\x0bSourceEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12I\n\x05value\x18\x02 \x01(\x0b\x32:.buildbucket.v2.RunTaskRequest.AgentExecutable.AgentSource:\x02\x38\x01\"=\n\x11\x46\x65tchTasksRequest\x12(\n\x08task_ids\x18\x01 \x03(\x0b\x32\x16.buildbucket.v2.TaskID\"9\n\x12\x46\x65tchTasksResponse\x12#\n\x05tasks\x18\x01 \x03(\x0b\x32\x14.buildbucket.v2.Task\">\n\x12\x43\x61ncelTasksRequest\x12(\n\x08task_ids\x18\x01 \x03(\x0b\x32\x16.buildbucket.v2.TaskID\":\n\x13\x43\x61ncelTasksResponse\x12#\n\x05tasks\x18\x01 \x03(\x0b\x32\x14.buildbucket.v2.Task\"\xae\x01\n\x16ValidateConfigsRequest\x12\x45\n\x07\x63onfigs\x18\x01 \x03(\x0b\x32\x34.buildbucket.v2.ValidateConfigsRequest.ConfigContext\x1aM\n\rConfigContext\x12\x0e\n\x06target\x18\x01 \x01(\t\x12,\n\x0b\x63onfig_json\x18\x02 \x01(\x0b\x32\x17.google.protobuf.Struct\"\x92\x01\n\x17ValidateConfigsResponse\x12J\n\rconfig_errors\x18\x01 \x03(\x0b\x32\x33.buildbucket.v2.ValidateConfigsResponse.ErrorDetail\x1a+\n\x0b\x45rrorDetail\x12\r\n\x05index\x18\x01 \x01(\x05\x12\r\n\x05\x65rror\x18\x02 \x01(\t2\xe9\x02\n\x0bTaskBackend\x12\x43\n\x07RunTask\x12\x1e.buildbucket.v2.RunTaskRequest\x1a\x16.google.protobuf.Empty\"\x00\x12U\n\nFetchTasks\x12!.buildbucket.v2.FetchTasksRequest\x1a\".buildbucket.v2.FetchTasksResponse\"\x00\x12X\n\x0b\x43\x61ncelTasks\x12\".buildbucket.v2.CancelTasksRequest\x1a#.buildbucket.v2.CancelTasksResponse\"\x00\x12\x64\n\x0fValidateConfigs\x12&.buildbucket.v2.ValidateConfigsRequest\x1a\'.buildbucket.v2.ValidateConfigsResponse\"\x00\x42\x36Z4go.chromium.org/luci/buildbucket/proto;buildbucketpbb\x06proto3'
   ,
-  dependencies=[google_dot_protobuf_dot_timestamp__pb2.DESCRIPTOR,google_dot_protobuf_dot_duration__pb2.DESCRIPTOR,google_dot_protobuf_dot_struct__pb2.DESCRIPTOR,google_dot_protobuf_dot_empty__pb2.DESCRIPTOR,go_dot_chromium_dot_org_dot_luci_dot_buildbucket_dot_proto_dot_common__pb2.DESCRIPTOR,go_dot_chromium_dot_org_dot_luci_dot_buildbucket_dot_proto_dot_launcher__pb2.DESCRIPTOR,go_dot_chromium_dot_org_dot_luci_dot_buildbucket_dot_proto_dot_project__config__pb2.DESCRIPTOR,go_dot_chromium_dot_org_dot_luci_dot_buildbucket_dot_proto_dot_task__pb2.DESCRIPTOR,])
+  dependencies=[google_dot_protobuf_dot_timestamp__pb2.DESCRIPTOR,google_dot_protobuf_dot_duration__pb2.DESCRIPTOR,google_dot_protobuf_dot_struct__pb2.DESCRIPTOR,google_dot_protobuf_dot_empty__pb2.DESCRIPTOR,go_dot_chromium_dot_org_dot_luci_dot_buildbucket_dot_proto_dot_common__pb2.DESCRIPTOR,go_dot_chromium_dot_org_dot_luci_dot_buildbucket_dot_proto_dot_launcher__pb2.DESCRIPTOR,go_dot_chromium_dot_org_dot_luci_dot_buildbucket_dot_proto_dot_task__pb2.DESCRIPTOR,])
 
 
 
@@ -75,8 +74,8 @@ _RUNTASKREQUEST_AGENTEXECUTABLE_AGENTSOURCE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1115,
-  serialized_end=1177,
+  serialized_start=1057,
+  serialized_end=1119,
 )
 
 _RUNTASKREQUEST_AGENTEXECUTABLE_SOURCEENTRY = _descriptor.Descriptor(
@@ -113,8 +112,8 @@ _RUNTASKREQUEST_AGENTEXECUTABLE_SOURCEENTRY = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1179,
-  serialized_end=1284,
+  serialized_start=1121,
+  serialized_end=1226,
 )
 
 _RUNTASKREQUEST_AGENTEXECUTABLE = _descriptor.Descriptor(
@@ -144,8 +143,8 @@ _RUNTASKREQUEST_AGENTEXECUTABLE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1020,
-  serialized_end=1284,
+  serialized_start=962,
+  serialized_end=1226,
 )
 
 _RUNTASKREQUEST = _descriptor.Descriptor(
@@ -164,7 +163,7 @@ _RUNTASKREQUEST = _descriptor.Descriptor(
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='backend_token', full_name='buildbucket.v2.RunTaskRequest.backend_token', index=1,
+      name='register_backend_task_token', full_name='buildbucket.v2.RunTaskRequest.register_backend_task_token', index=1,
       number=2, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=b"".decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
@@ -280,8 +279,8 @@ _RUNTASKREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=417,
-  serialized_end=1284,
+  serialized_start=356,
+  serialized_end=1226,
 )
 
 
@@ -312,8 +311,8 @@ _FETCHTASKSREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1286,
-  serialized_end=1347,
+  serialized_start=1228,
+  serialized_end=1289,
 )
 
 
@@ -344,8 +343,8 @@ _FETCHTASKSRESPONSE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1349,
-  serialized_end=1406,
+  serialized_start=1291,
+  serialized_end=1348,
 )
 
 
@@ -376,8 +375,8 @@ _CANCELTASKSREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1408,
-  serialized_end=1470,
+  serialized_start=1350,
+  serialized_end=1412,
 )
 
 
@@ -408,8 +407,8 @@ _CANCELTASKSRESPONSE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1472,
-  serialized_end=1530,
+  serialized_start=1414,
+  serialized_end=1472,
 )
 
 
@@ -447,8 +446,8 @@ _VALIDATECONFIGSREQUEST_CONFIGCONTEXT = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1630,
-  serialized_end=1707,
+  serialized_start=1572,
+  serialized_end=1649,
 )
 
 _VALIDATECONFIGSREQUEST = _descriptor.Descriptor(
@@ -478,8 +477,8 @@ _VALIDATECONFIGSREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1533,
-  serialized_end=1707,
+  serialized_start=1475,
+  serialized_end=1649,
 )
 
 
@@ -517,8 +516,8 @@ _VALIDATECONFIGSRESPONSE_ERRORDETAIL = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1813,
-  serialized_end=1856,
+  serialized_start=1755,
+  serialized_end=1798,
 )
 
 _VALIDATECONFIGSRESPONSE = _descriptor.Descriptor(
@@ -548,8 +547,8 @@ _VALIDATECONFIGSRESPONSE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1710,
-  serialized_end=1856,
+  serialized_start=1652,
+  serialized_end=1798,
 )
 
 _RUNTASKREQUEST_AGENTEXECUTABLE_AGENTSOURCE.containing_type = _RUNTASKREQUEST_AGENTEXECUTABLE
@@ -563,7 +562,7 @@ _RUNTASKREQUEST.fields_by_name['dimensions'].message_type = go_dot_chromium_dot_
 _RUNTASKREQUEST.fields_by_name['start_deadline'].message_type = google_dot_protobuf_dot_timestamp__pb2._TIMESTAMP
 _RUNTASKREQUEST.fields_by_name['execution_timeout'].message_type = google_dot_protobuf_dot_duration__pb2._DURATION
 _RUNTASKREQUEST.fields_by_name['grace_period'].message_type = google_dot_protobuf_dot_duration__pb2._DURATION
-_RUNTASKREQUEST.fields_by_name['caches'].message_type = go_dot_chromium_dot_org_dot_luci_dot_buildbucket_dot_proto_dot_project__config__pb2._BUILDERCONFIG_CACHEENTRY
+_RUNTASKREQUEST.fields_by_name['caches'].message_type = go_dot_chromium_dot_org_dot_luci_dot_buildbucket_dot_proto_dot_common__pb2._CACHEENTRY
 _RUNTASKREQUEST.fields_by_name['backend_config'].message_type = google_dot_protobuf_dot_struct__pb2._STRUCT
 _FETCHTASKSREQUEST.fields_by_name['task_ids'].message_type = go_dot_chromium_dot_org_dot_luci_dot_buildbucket_dot_proto_dot_task__pb2._TASKID
 _FETCHTASKSRESPONSE.fields_by_name['tasks'].message_type = go_dot_chromium_dot_org_dot_luci_dot_buildbucket_dot_proto_dot_task__pb2._TASK
@@ -683,8 +682,8 @@ _TASKBACKEND = _descriptor.ServiceDescriptor(
   index=0,
   serialized_options=None,
   create_key=_descriptor._internal_create_key,
-  serialized_start=1859,
-  serialized_end=2220,
+  serialized_start=1801,
+  serialized_end=2162,
   methods=[
   _descriptor.MethodDescriptor(
     name='RunTask',

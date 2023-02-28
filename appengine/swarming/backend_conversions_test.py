@@ -30,7 +30,6 @@ from server import task_pack
 from bb.go.chromium.org.luci.buildbucket.proto import backend_pb2
 from bb.go.chromium.org.luci.buildbucket.proto import common_pb2
 from bb.go.chromium.org.luci.buildbucket.proto import launcher_pb2
-from bb.go.chromium.org.luci.buildbucket.proto import project_config_pb2
 from bb.go.chromium.org.luci.buildbucket.proto import task_pb2
 from proto.api_v2 import swarming_pb2
 
@@ -66,27 +65,27 @@ class TestBackendConversions(test_case.TestCase):
         backend_config=struct_pb2.Struct(
             fields={
                 'wait_for_capacity':
-                    struct_pb2.Value(bool_value=True),
+                struct_pb2.Value(bool_value=True),
                 'priority':
-                    struct_pb2.Value(number_value=5),
+                struct_pb2.Value(number_value=5),
                 'bot_ping_tolerance':
-                    struct_pb2.Value(number_value=70),
+                struct_pb2.Value(number_value=70),
                 'service_account':
-                    struct_pb2.Value(string_value='who@serviceaccount.com'),
+                struct_pb2.Value(string_value='who@serviceaccount.com'),
                 'parent_run_id':
-                    struct_pb2.Value(string_value=parent_task_id),
+                struct_pb2.Value(string_value=parent_task_id),
                 'agent_binary_cipd_filename':
-                    struct_pb2.Value(string_value='agent'),
+                struct_pb2.Value(string_value='agent'),
                 'agent_binary_cipd_pkg':
-                    struct_pb2.Value(string_value='agent/package/${platform}'),
+                struct_pb2.Value(string_value='agent/package/${platform}'),
                 'agent_binary_cipd_vers':
-                    struct_pb2.Value(string_value='latest'),
+                struct_pb2.Value(string_value='latest'),
             }),
         grace_period=duration_pb2.Duration(seconds=grace_secs),
         execution_timeout=duration_pb2.Duration(seconds=exec_secs),
         start_deadline=timestamp_pb2.Timestamp(seconds=start_deadline_secs),
         dimensions=[req_dim_prpc('required-1', 'req-1')],
-        backend_token='token-token-token',
+        register_backend_task_token='token-token-token',
         buildbucket_host='cow-buildbucket.appspot.com',
     )
 
@@ -144,23 +143,20 @@ class TestBackendConversions(test_case.TestCase):
         backend_config=struct_pb2.Struct(
             fields={
                 'wait_for_capacity':
-                    struct_pb2.Value(bool_value=True),
+                struct_pb2.Value(bool_value=True),
                 'agent_binary_cipd_filename':
-                    struct_pb2.Value(string_value='agent'),
+                struct_pb2.Value(string_value='agent'),
                 'agent_binary_cipd_pkg':
-                    struct_pb2.Value(string_value='agent/package/${platform}'),
+                struct_pb2.Value(string_value='agent/package/${platform}'),
                 'agent_binary_cipd_vers':
-                    struct_pb2.Value(string_value='latest'),
+                struct_pb2.Value(string_value='latest'),
             }),
         caches=[
-            project_config_pb2.BuilderConfig.CacheEntry(
-                name='name_1',
-                path='path_1'
-            ),
-            project_config_pb2.BuilderConfig.CacheEntry(
+            common_pb2.CacheEntry(name='name_1', path='path_1'),
+            common_pb2.CacheEntry(
                 name='name_2',
                 path='path_2',
-                wait_for_warm_cache_secs=180)
+                wait_for_warm_cache=duration_pb2.Duration(seconds=180))
         ],
         grace_period=duration_pb2.Duration(seconds=grace_secs),
         execution_timeout=duration_pb2.Duration(seconds=exec_secs),
@@ -309,11 +305,11 @@ class TestBackendConversions(test_case.TestCase):
                                                False)
 
     run_task_req = backend_pb2.RunTaskRequest(caches=[
-        project_config_pb2.BuilderConfig.CacheEntry(
-            wait_for_warm_cache_secs=1)
+        common_pb2.CacheEntry(wait_for_warm_cache=duration_pb2.Duration(
+            seconds=1))
     ])
     with self.assertRaisesRegexp(handlers_exceptions.BadRequestException,
-                                 'wait_for_warm_cache_secs'):
+                                 'wait_for_warm_cache'):
       backend_conversions._compute_task_slices(run_task_req, backend_config,
                                                False)
 
