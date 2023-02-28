@@ -591,6 +591,7 @@ message NewTaskRequest {
     CANARY_NEVER = 2;
     SKIP = 3;
   }
+  PoolTaskTemplateField pool_task_template = 14;
 
   // Maximum delay between bot pings before the bot is considered dead
   // while running a task.
