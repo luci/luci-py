@@ -33,7 +33,7 @@ deps = {
       },
       {
         'package': 'infra/tools/luci/swarming/${{platform}}',
-        'version': 'git_revision:7e6f58526a67f1cd9808d99beeb86e07a5346dfa',
+        'version': 'git_revision:71c76e1b651e70c3deb46131252559da29f78fdc',
       }
     ],
     'dep_type': 'cipd',
