@@ -26,6 +26,7 @@ _VENDOR_MAPPING = {
             '6821':
             'Radeon R8 M370X',  # 'HD 8800M' or 'R7 M380' based on rev_id
             '683d': 'Radeon HD 7700',
+            '7340': 'Radeon RX 5500 XT',
             '9830': 'Radeon HD 8400',
             '9874': 'Carrizo',
         }),
