@@ -224,8 +224,7 @@ class _TaskToRunBase(ndb.Model):
 
   @property
   def task_id(self):
-    """Returns an encoded task id for this TaskToRunShard.
-    """
+    """Returns an encoded task id for this TaskToRunShard."""
     return task_pack.pack_run_result_key(self.run_result_key)
 
   def to_dict(self):
@@ -978,9 +977,14 @@ def yield_expired_task_to_run():
                       kind.expiration_ts > cut_off,
                       default_options=ndb.QueryOptions(batch_size=256))
 
+  # Shuffle the order in which we visit shards to give all shards equal chance
+  # to be visited first (matters if there's a backlog).
+  shards = list(range(N_SHARDS))
+  random.shuffle(shards)
+
   total = 0
   try:
-    for shard in range(N_SHARDS):
+    for shard in shards:
       for task in _query(get_shard_kind(shard)):
         yield task
         total += 1

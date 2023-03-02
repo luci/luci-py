@@ -1922,10 +1922,20 @@ def cron_abort_expired_task_to_run():
     reconnect them.
   - Server has internal failures causing it to fail to either distribute the
     tasks or properly receive results from the bots.
+
+  This cron job just emits Task Queue tasks handled by task_expire_tasks(...).
   """
   enqueued = []
+
   def _enqueue_task(to_runs):
-    payload = {'task_to_runs': to_runs}
+    payload = {
+        # New format that has pointers to concrete TaskToRunShardXXX entities.
+        'entities': [(ttr.task_id, ttr.shard_index, ttr.key.integer_id())
+                     for ttr in to_runs],
+        # Legacy format for compatibility with older code. Will be removed soon.
+        'task_to_runs':
+        [(ttr.task_id[:-1] + '0', ttr.task_slice_index) for ttr in to_runs],
+    }
     ok = utils.enqueue_task(
         '/internal/taskqueue/important/tasks/expire',
         'task-expire',
@@ -1938,20 +1948,15 @@ def cron_abort_expired_task_to_run():
   task_to_runs = []
   try:
     for to_run in task_to_run.yield_expired_task_to_run():
-      summary_key = task_pack.request_key_to_result_summary_key(
-          to_run.request_key)
-      task_id = task_pack.pack_result_summary_key(summary_key)
-      task_to_runs.append((task_id, to_run.task_slice_index))
-
+      task_to_runs.append(to_run)
       # Enqueue every 50 TaskToRunShards.
       if len(task_to_runs) == 50:
-        logging.debug("expire tasks: %s", task_to_runs)
+        logging.debug('Expire tasks: %s', task_to_runs)
         _enqueue_task(task_to_runs)
         task_to_runs = []
-
     # Enqueue remaining TaskToRunShards.
     if task_to_runs:
-      logging.debug("expire tasks: %s", task_to_runs)
+      logging.debug('Expire tasks: %s', task_to_runs)
       _enqueue_task(task_to_runs)
   finally:
     logging.debug('Enqueued %d task for %d tasks', len(enqueued), sum(enqueued))
@@ -2115,7 +2120,57 @@ def task_handle_pubsub_task(payload):
 
 
 def task_expire_tasks(task_to_runs):
-  """Expire tasks enqueued by cron_abort_expired_task_to_run."""
+  """Expires TaskToRunShardXXX enqueued by cron_abort_expired_task_to_run.
+
+  Arguments:
+    task_to_runs: a list of (<task ID>, <TaskToRunShard index>, <entity ID>).
+  """
+  expired = []
+  reenqueued = 0
+  skipped = 0
+
+  try:
+    for task_id, shard_index, entity_id in task_to_runs:
+      # Convert arguments to TaskToRunShardXXX key.
+      request_key, _ = task_pack.get_request_and_result_keys(task_id)
+      to_run_key = task_to_run.task_to_run_key_from_parts(
+          request_key, shard_index, entity_id)
+
+      # Retrieve the request to know what slice to enqueue next (if any).
+      request = request_key.get()
+      if not request:
+        logging.error('Task %s was not found.', task_id)
+        continue
+
+      # Expire the slice and schedule the next one (if any).
+      summary, new_to_run = _expire_task(to_run_key, request, inline=False)
+      if new_to_run:
+        # The next slice was enqueued.
+        reenqueued += 1
+      elif summary:
+        # The task was updated, but there's no new slice => the task expired.
+        slice_index = task_to_run.task_to_run_key_slice_index(to_run_key)
+        expired.append(
+            (task_id, request.task_slice(slice_index).properties.dimensions))
+      else:
+        # The task was not updated => the slice already was expired.
+        skipped += 1
+  finally:
+    if expired:
+      logging.info(
+          'EXPIRED!\n%d tasks:\n%s', len(expired),
+          '\n'.join('  %s  %s' % (task_id, dims) for task_id, dims in expired))
+    logging.info('Reenqueued %d tasks, expired %d, skipped %d', reenqueued,
+                 len(expired), skipped)
+
+
+def task_expire_tasks_legacy(task_to_runs):
+  """Expire tasks enqueued by cron_abort_expired_task_to_run.
+
+  TODO(vadimsh): Delete when no longer called.
+  """
+  logging.warning('task_expire_tasks_legacy called')
+
   killed = []
   reenqueued = 0
   skipped = 0

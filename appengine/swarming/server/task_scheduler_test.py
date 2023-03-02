@@ -3,9 +3,10 @@
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
 
+import base64
 import datetime
-import logging
 import json
+import logging
 import os
 import random
 import sys
@@ -166,6 +167,10 @@ def _bot_update_task(run_result_key, **kwargs):
 
 def _deadline():
   return utils.utcnow() + datetime.timedelta(seconds=60)
+
+
+def _decode_tq_task_body(body):
+  return json.loads(base64.b64decode(body))
 
 
 class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
@@ -2526,6 +2531,15 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     task_scheduler.cron_abort_expired_task_to_run()
     tasks = self._taskqueue_stub.GetTasks('task-expire')
     self.assertEqual(1, len(tasks))
+    self.assertEqual(
+        {
+            u'entities': [
+                [u'1d69b9f088008911', 6, 1],
+            ],
+            u'task_to_runs': [
+                [u'1d69b9f088008910', 0],
+            ],
+        }, _decode_tq_task_body(tasks[0]['body']))
     self.assertEqual(2, self.execute_tasks())  # +1 for a notify task execution
     self.assertEqual([], task_result.TaskRunResult.query().fetch())
     expected = self._gen_result_summary_pending(
@@ -3181,6 +3195,10 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     # Tested indirectly via test_cron_abort_expired_*
     pass
 
+  def test_task_expire_tasks_legacy(self):
+    # Tested indirectly via test_cron_abort_expired_*
+    pass
+
   def test_task_expire_with_invalid_slice_index(self):
     self.mock_pub_sub()
     self._register_bot(self.bot_dimensions)
@@ -3198,12 +3216,12 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         pubsub_topic='projects/abc/topics/def')
     # activate a non-current slice forcebly.
     invalid_slice_index = 1
-    task_scheduler._ensure_active_slice(result_summary.request,
-                                        invalid_slice_index)
+    ttr, _ = task_scheduler._ensure_active_slice(result_summary.request,
+                                                 invalid_slice_index)
     self.assertEqual(State.PENDING, result_summary.state)
     self.assertEqual(0, result_summary.current_task_slice)
 
-    to_runs = [(result_summary.task_id, invalid_slice_index)]
+    to_runs = [(ttr.task_id, ttr.shard_index, ttr.key.integer_id())]
     expiration_secs = 1200
     self.mock_now(self.now, expiration_secs)
     task_scheduler.task_expire_tasks(to_runs)
