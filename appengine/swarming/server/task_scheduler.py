@@ -67,98 +67,98 @@ class ClaimError(Error):
   pass
 
 
-def _secs_to_ms(value):
-  """Converts a seconds value in float to the number of ms as an integer."""
-  return int(round(value * 1000.))
+def _expire_slice_tx(request, to_run_key, capacity, es_cfg):
+  """Expires a TaskToRunShardXXX and enqueues the next one, if necessary.
 
+  Called as a ndb transaction by _expire_slice().
 
-def _expire_task_tx(now, request, to_run_key, result_summary_key, capacity,
-                    es_cfg):
-  """Expires a to_run_key and look for a TaskSlice fallback.
+  Arguments:
+    request: the TaskRequest instance with all slices.
+    to_run_key: the TaskToRunShard to expire.
+    capacity: dict {slice index => True if can run it}.
+    es_cfg: ExternalSchedulerConfig for this task.
 
-  Called as a ndb transaction by _expire_task().
-
-  2 concurrent GET, one PUT. Optionally with an additional serialized GET.
+  Returns:
+    (
+        TaskResultSummary if updated it,
+        TaskToRunShardXXX matching to_run_key if expired it,
+        TaskToRunShardXXX with new enqueued slice if created it,
+        True if TaskResultSummary.state has changed by these actions,
+    )
   """
-  to_run_future = to_run_key.get_async()
-  result_summary_future = result_summary_key.get_async()
-  to_run = to_run_future.get_result()
-  if not to_run or not to_run.is_reapable:
-    if not to_run.expiration_ts:
-      result_summary_future.get_result()
-      return None, None, False
-    # TODO(vadimsh): But why? May end up doing weird things for RBE tasks.
-    logging.info('%s/%s: not reapable. but continuing expiration.',
-                 to_run.task_id, to_run.task_slice_index)
+  assert ndb.in_transaction()
+  assert to_run_key.parent() == request.key
 
-  # record expiration delay
+  now = utils.utcnow()
+  slice_index = task_to_run.task_to_run_key_slice_index(to_run_key)
+  result_summary_key = task_pack.request_key_to_result_summary_key(request.key)
+
+  # Check the TaskToRunShardXXX is pending. Fetch TaskResultSummary while at it.
+  to_run, result_summary = ndb.get_multi([to_run_key, result_summary_key])
+  if not to_run or not result_summary:
+    logging.warning('%s/%s: already gone', request.task_id, slice_index)
+    return None, None, None, False
+  if not to_run.is_reapable:
+    logging.info('%s/%s: already processed', request.task_id, slice_index)
+    return None, None, None, False
+
+  # TaskResultSummary always "tracks" the current slice and there can be only
+  # one current slice (i.e. with is_reapable==True), and it is `to_run`.
+  #
+  # TODO(vadimsh): Unfortunately these invariants are violated by
+  # _ensure_active_slice used with External Scheduler flow. Not sure if this is
+  # intentional or it is a bug. Either way, these asserts will fire for tasks
+  # scheduled through the external scheduler, so skip them. The rest should be
+  # fine.
+  if not es_cfg:
+    assert to_run.task_slice_index == slice_index, to_run
+    assert result_summary.current_task_slice == slice_index, result_summary
+    assert not result_summary.try_number, result_summary
+
+  # Will accumulate all entities that need to be stored at the end.
+  to_put = []
+
+  # Record the expiration delay. It may end up negative if there's a clock drift
+  # between the process that ran yield_expired_task_to_run() and the process
+  # that runs this transaction. This should be rare.
   delay = (now - to_run.expiration_ts).total_seconds()
   if delay < 0:
     logging.warning(
-        '_expire_task_tx: the task is not expired. task_id=%s slice=%d '
-        'expiration_ts=%s', to_run.task_id, to_run.task_slice_index,
-        to_run.expiration_ts)
-    return None, None, False
+        '_expire_slice_tx: the task is not expired. task_id=%s slice=%d '
+        'expiration_ts=%s, delay=%f', to_run.task_id, to_run.task_slice_index,
+        to_run.expiration_ts, delay)
+    delay = 0.0
   to_run.expiration_delay = delay
 
-  # In any case, dequeue the TaskToRunShard.
+  # Mark the current TaskToRunShardXXX as consumed.
   to_run.consume(None)
-  result_summary = result_summary_future.get_result()
-  orig_summary_state = result_summary.state
-  to_put = [to_run, result_summary]
-  # Check if there's a TaskSlice fallback that could be reenqueued.
+  to_put.append(to_run)
+
+  # Check if there's a fallback slice we have capacity to run.
   new_to_run = None
-  offset = result_summary.current_task_slice+1
-  rest = request.num_task_slices - offset
-  for index in range(rest):
-    # Use the lookup created just before the transaction. There's a small race
-    # condition in here but we're willing to accept it.
-    #
-    # TODO(vadimsh): This is broken for RBE tasks currently. Also just broken
-    # in general: "a small race condition" means it is broken. It's the root
-    # cause of crbug.com/1030504.
-    if len(capacity) > index and capacity[index]:
-      # Enqueue a new TasktoRunShard for this next TaskSlice, it has capacity!
-      new_to_run = task_to_run.new_task_to_run(request, index + offset)
-      result_summary.current_task_slice = index+offset
+  for idx in range(slice_index + 1, request.num_task_slices):
+    if capacity[idx]:
+      new_to_run = task_to_run.new_task_to_run(request, idx)
       to_put.append(new_to_run)
       break
-    if len(capacity) <= index:
-      # crbug.com/1030504
-      # This invalid situation probably come from the invalid task-expire task
-      # parameters (task_id, try_number, task_slice_index), and the task-expire
-      # task will be enqueued with a valid parameters in a cron job later.
-      # So ignoring here should not be a problem.
-      logging.warning(
-          'crbug.com/1030504: invalid capacity length or slice index. '
-          'index=%d, capacity=%s\n'
-          'TaskResultSummary: task_id=%s, current_task_slice=%d, '
-          'num_task_slices=%d\n'
-          'TaskToRunShard: task_id=%s, task_slice_index=%d', index, capacity,
-          result_summary.task_id, result_summary.current_task_slice,
-          request.num_task_slices, to_run.task_id, to_run.task_slice_index)
 
-  if not new_to_run:
+  orig_summary_state = result_summary.state
+  to_put.append(result_summary)
+
+  if new_to_run:
+    # Start "tracking" the new slice.
+    result_summary.current_task_slice = new_to_run.task_slice_index
+    result_summary.modified_ts = now
+  else:
     # There's no fallback, giving up.
-    if result_summary.try_number:
-      # It's a retry that is being expired, i.e. the first try had BOT_DIED.
-      # Keep the old state. That requires an additional pipelined GET but that
-      # shouldn't be the common case.
-      run_result = result_summary.run_result_key.get()
-      result_summary.set_from_run_result(run_result, request)
-    else:
-      result_summary.state = task_result.State.EXPIRED
+    result_summary.state = task_result.State.EXPIRED
+    result_summary.modified_ts = now
     result_summary.abandoned_ts = now
     result_summary.completed_ts = now
+    # This may be negative if some slices have been skipped without waiting due
+    # to lack of capacity.
     delay = (now - request.expiration_ts).total_seconds()
-    result_summary.expiration_delay = max(0, delay)
-    if delay <= 0:
-      logging.warning(
-          '_expire_task_tx: expiration_delay is expected to be > 0, '
-          'but was %s sec. task_id=%s, now=%s, expiration_ts=%s', delay,
-          result_summary.task_id, now, request.expiration_ts)
-
-  result_summary.modified_ts = now
+    result_summary.expiration_delay = max(0.0, delay)
 
   futures = ndb.put_multi_async(to_put)
   _maybe_taskupdate_notify_via_tq(result_summary,
@@ -167,88 +167,74 @@ def _expire_task_tx(now, request, to_run_key, result_summary_key, capacity,
                                   transactional=True)
   for f in futures:
     f.check_success()
+
   state_changed = result_summary.state != orig_summary_state
+  return result_summary, to_run, new_to_run, state_changed
 
-  return result_summary, new_to_run, state_changed
 
+def _expire_slice(request, to_run_key, claim, txn_retries, txn_catch_errors):
+  """Expires a single TaskToRunShard if it is still pending.
 
-def _expire_task(to_run_key, request, inline):
-  """Expires a TaskResultSummary and unschedules the TaskToRunShard.
-
-  This function is only meant to process PENDING tasks.
+  If the task has more slices, enqueues the next slice. Otherwise marks the
+  whole task as expired by updating TaskResultSummary.
 
   Arguments:
-    to_run_key: the TaskToRunShard to expire
-    request: the corresponding TaskRequest instance
-    inline: True if this is done as part of a bot polling for a task to run,
-            in this case it should abort as quickly as possible
-
-  If a follow up TaskSlice is available, reenqueue a new TaskToRunShard instead
-  of expiring the TaskResultSummary.
+    request: the TaskRequest instance with all slices.
+    to_run_key: the TaskToRunShard to expire.
+    claim: if True, obtain task_to_run.Claim before touching the task.
+    txn_retries: how many times to retry the transaction on collisions.
+    txn_catch_errors: if True, ignore datastore_utils.CommitError.
 
   Returns:
-    tuple of
-    - TaskResultSummary on success
-    - TaskToRunShard if a new TaskSlice was reenqueued
+    (TaskResultSummary if updated it, new TaskToRunShard if enqueued a slice).
   """
-  # If running from a cron (inline==False), claim the task as non-reapable to
-  # make sure bot_reap_task doesn't try to pick it up. Don't do it when running
-  # from bot_reap_task (inline==True): the caller already holds the claim.
-  if not inline:
-    if not task_to_run.Claim.obtain(to_run_key):
-      logging.warning('%s/%s is marked as claimed, proceeding anyway',
-                      request.task_id,
-                      task_to_run.task_to_run_key_slice_index(to_run_key))
+  assert to_run_key.parent() == request.key
+  slice_index = task_to_run.task_to_run_key_slice_index(to_run_key)
+
+  # Obtain a claim if asked. This prevents other concurrent calls from touching
+  # this task. This is a best effort mechanism to reduce datastore contention.
+  if claim and not task_to_run.Claim.obtain(to_run_key):
+    logging.warning('%s/%s is marked as claimed, proceeding anyway',
+                    request.task_id, slice_index)
 
   # Look if the TaskToRunShard is reapable once before doing the check inside
-  # the transaction. This reduces the likelihood of failing this check inside
-  # the transaction, which is an order of magnitude more costly.
+  # the transaction. This allows to skip the transaction completely if the
+  # entity was already reaped.
   to_run = to_run_key.get()
+  if not to_run:
+    logging.warning('%s/%s: already gone', request.task_id, slice_index)
+    return None, None
   if not to_run.is_reapable:
-    if not to_run.expiration_ts:
-      logging.info('Not reapable anymore')
-      return None, None
-    # TODO(vadimsh): But why? May end up doing weird things for RBE tasks.
-    logging.info('%s/%s: not reapable. but continuing expiration.',
-                 to_run.task_id, to_run.task_slice_index)
+    logging.info('%s/%s: already processed', request.task_id, slice_index)
+    return None, None
 
-  result_summary_key = task_pack.request_key_to_result_summary_key(request.key)
-  now = utils.utcnow()
-
-  # Do a quick check for capacity for the remaining TaskSlice (if any) before
-  # the transaction runs, as has_capacity() cannot be called while the
-  # transaction runs.
-  index = task_to_run.task_to_run_key_slice_index(to_run_key)
-  slices = [
-      request.task_slice(i) for i in range(index + 1, request.num_task_slices)
-  ]
-  capacity = [
-    t.wait_for_capacity or bot_management.has_capacity(t.properties.dimensions)
-    for t in slices
-  ]
-
-  # When running inline, do not retry too much.
-  retries = 1 if inline else 4
+  # Do a check for capacity for the remaining slices (if any) before the
+  # transaction, as has_capacity() cannot be called within a transaction.
+  capacity = {}
+  for idx in range(slice_index + 1, request.num_task_slices):
+    ts = request.task_slice(idx)
+    capacity[idx] = ts.wait_for_capacity or bot_management.has_capacity(
+        ts.properties.dimensions)
 
   es_cfg = external_scheduler.config_for_task(request)
 
-  # It'll be caught by next cron job execution in case of failure.
-  run = lambda: _expire_task_tx(now, request, to_run_key, result_summary_key,
-                                capacity, es_cfg)
-  state_changed = False
   try:
-    summary, new_to_run, state_changed = datastore_utils.transaction(
-        run, retries=retries)
-  except datastore_utils.CommitError:
-    summary = None
-    new_to_run = None
+    summary, old_ttr, new_ttr, state_changed = datastore_utils.transaction(
+        lambda: _expire_slice_tx(request, to_run_key, capacity, es_cfg),
+        retries=txn_retries)
+  except datastore_utils.CommitError as exc:
+    if not txn_catch_errors:
+      raise
+    logging.warning('_expire_slice_tx failed: %s', exc)
+    return None, None
+
   if summary:
-    logging.info(
-        'Expired %s', task_pack.pack_result_summary_key(result_summary_key))
-    ts_mon_metrics.on_task_expired(summary, to_run_key.get())
+    logging.info('Expired %s/%s', request.task_id, slice_index)
+    ts_mon_metrics.on_task_expired(summary, old_ttr)
   if state_changed:
     ts_mon_metrics.on_task_status_change_scheduler_latency(summary)
-  return summary, new_to_run
+
+  return summary, new_ttr
 
 
 def _reap_task(bot_dimensions,
@@ -1474,8 +1460,12 @@ def bot_reap_task(bot_dimensions, queues, bot_details, deadline):
           continue
 
         # Expiring a TaskToRunShard for TaskSlice may reenqueue a new
-        # TaskToRunShard.
-        summary, new_to_run = _expire_task(to_run.key, request, inline=True)
+        # TaskToRunShard. Don't try to grab a claim: we already hold it.
+        summary, new_to_run = _expire_slice(request,
+                                            to_run.key,
+                                            claim=False,
+                                            txn_retries=1,
+                                            txn_catch_errors=True)
         if not new_to_run:
           if summary:
             expired += 1
@@ -2142,8 +2132,15 @@ def task_expire_tasks(task_to_runs):
         logging.error('Task %s was not found.', task_id)
         continue
 
-      # Expire the slice and schedule the next one (if any).
-      summary, new_to_run = _expire_task(to_run_key, request, inline=False)
+      # Expire the slice and schedule the next one (if any). Obtain a claim
+      # to make sure bot_reap_task doesn't try to pick it up.
+      summary, new_to_run = _expire_slice(
+          request,
+          to_run_key,
+          claim=True,
+          txn_retries=4,
+          txn_catch_errors=True,
+      )
       if new_to_run:
         # The next slice was enqueued.
         reenqueued += 1
@@ -2153,7 +2150,8 @@ def task_expire_tasks(task_to_runs):
         expired.append(
             (task_id, request.task_slice(slice_index).properties.dimensions))
       else:
-        # The task was not updated => the slice already was expired.
+        # The task was not updated => the slice already expired or the
+        # transaction failed.
         skipped += 1
   finally:
     if expired:
@@ -2187,7 +2185,7 @@ def task_expire_tasks_legacy(task_to_runs):
       to_runs = [
           r for r in task_to_run.get_task_to_runs(request, task_slice_index)
           # task_to_run.get_task_to_runs() may include expired TaskToRunShards
-          # or TaskToRunShards for other silce indexes. _expire_task() will
+          # or TaskToRunShards for other slice indexes. _expire_slice() will
           # ignore them, but it's better to filter them out here.
           if r.expiration_ts and r.task_slice_index == task_slice_index
       ]
@@ -2198,7 +2196,13 @@ def task_expire_tasks_legacy(task_to_runs):
 
       for to_run in to_runs:
         # execute task expiration
-        summary, new_to_run = _expire_task(to_run.key, request, inline=False)
+        summary, new_to_run = _expire_slice(
+            request,
+            to_run.key,
+            claim=True,
+            txn_retries=4,
+            txn_catch_errors=True,
+        )
         if new_to_run:
           # Expiring a TaskToRunShard for TaskSlice may reenqueue a new
           # TaskToRunShard.

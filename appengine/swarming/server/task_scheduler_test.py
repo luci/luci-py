@@ -903,7 +903,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
                     mock.Mock(side_effect=self.nop_async)) as mock_call:
       to_run_key = task_to_run.request_to_task_to_run_key(request, 0)
       self.mock_now(self.now, 60)
-      task_scheduler._expire_task(to_run_key, request, True)
+      task_scheduler._expire_slice(request, to_run_key, False, 1, True)
       mock_call.assert_called_once_with('1d69b9f088008911',
                                         u'resultdb-update-token')
 
@@ -3201,17 +3201,23 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
 
   def test_task_expire_with_invalid_slice_index(self):
     self.mock_pub_sub()
+    self._setup_es(False)
+    self._mock_es_notify()
     self._register_bot(self.bot_dimensions)
     result_summary = self._quick_schedule(
         task_slices=[
-            task_request.TaskSlice(
-                expiration_secs=600,
-                properties=_gen_properties(dimensions={u'pool': [u'default']})),
             task_request.TaskSlice(expiration_secs=600,
                                    properties=_gen_properties(dimensions={
                                        u'pool': [u'default'],
-                                       u'foo': [u'bar']
+                                       u'foo': [u'bar'],
                                    })),
+            task_request.TaskSlice(
+                expiration_secs=600,
+                properties=_gen_properties(dimensions={
+                    u'pool': [u'default'],
+                    u'foo': [u'bar'],
+                    u'extra': [u'1'],
+                })),
         ],
         pubsub_topic='projects/abc/topics/def')
     # activate a non-current slice forcebly.

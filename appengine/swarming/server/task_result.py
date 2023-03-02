@@ -1101,7 +1101,12 @@ class TaskResultSummary(_TaskResultCommon):
   # State of this task. The value from TaskRunResult will be copied over.
   state = StateProperty(default=State.PENDING)
 
-  # Is 1 EXCEPT when the results were deduped. If deduped it is 0.
+  # Possible values:
+  #   None: if the task is still pending, has expired or was canceled.
+  #   1: if the task was assigned to a bot and either currently runs or has
+  #      finished or crashed already.
+  #   0: if the task was dedupped.
+  #
   # This field is left over from when swarming had internal retries.
   # See https://crbug.com/1065101
   try_number = ndb.IntegerProperty()
