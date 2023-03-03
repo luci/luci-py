@@ -321,3 +321,26 @@ def cancel_task(task_id, kill_running):
                                        CANCEL).get_result()
   return task_scheduler.cancel_task(request_obj, result_key, kill_running
                                     or False, None)
+
+# Maximum content fetched at once, mostly for compatibility with previous
+# behavior. pRPC implementation should limit to a multiple of CHUNK_SIZE
+# (one or two?) for efficiency.
+# Technically this is 160 CHUNKS - see task_result.TaskOutput.CHUNK_SIZE.
+RECOMMENDED_OUTPUT_LENGTH = 16 * 1000 * 1024
+
+
+def get_output(task_id, offset, length):
+  """Returns the output of the task corresponding to a task ID.
+
+  Arguments:
+    task_id: ID of task to return output of.
+    offset: byte offset to start fetching.
+    length: number of bytes from offset to fetch.
+
+  Returns:
+    tuple(output, state): output is a bytearray ('str') of task output. state is
+      the current TaskState of the task.
+  """
+  _, result = get_request_and_result(task_id, VIEW, True)
+  output = result.get_output(offset or 0, length or RECOMMENDED_OUTPUT_LENGTH)
+  return output, result.state

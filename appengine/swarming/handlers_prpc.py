@@ -128,6 +128,13 @@ class TasksService(object):
     return swarming_pb2.CancelResponse(canceled=canceled,
                                        was_running=was_running)
 
+  @prpc_helpers.method
+  @auth.require(acl.can_access, log_identity=True)
+  def GetStdout(self, request, _context):
+    output, state = api_common.get_output(request.task_id, request.offset,
+                                          request.length)
+    return swarming_pb2.TaskOutputResponse(output=output, state=state)
+
 
 class InternalsService(object):
   DESCRIPTION = rbe_prpc_pb2.InternalsServiceDescription

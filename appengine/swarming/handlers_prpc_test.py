@@ -1,4 +1,5 @@
 #!/usr/bin/env vpython
+# coding=utf-8
 # Copyright 2018 The LUCI Authors. All rights reserved.
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
@@ -1152,6 +1153,154 @@ class TaskServicePrpcTest(PrpcTest):
                                                          kill_running=False),
                           expect_errors=True)
     self.assertEqual(resp.status, '400 Bad Request')
+
+  def test_stdout_ok(self):
+    """Asserts that stdout reports a task's output."""
+    self.set_as_bot()
+    self.bot_poll()
+    self.set_as_user()
+    self.client_create_task_raw()
+
+    # task_id determined by bot run
+    self.set_as_bot()
+    task_id = self.bot_run_task()
+
+    self.set_as_privileged_user()
+    run_id = task_id[:-1] + '1'
+    expected = swarming_pb2.TaskOutputResponse(
+        output=u'rÉsult string'.encode('utf-8'),
+        state=swarming_pb2.TaskState.COMPLETED)
+    for i in (task_id, run_id):
+      response = self.post_prpc('GetStdout',
+                                swarming_pb2.TaskIdWithOffsetRequest(task_id=i))
+      actual = swarming_pb2.TaskOutputResponse()
+      _decode(response.body, actual)
+      self.assertEqual(expected, actual)
+
+    # Partial fetch.
+    response = self.post_prpc(
+        'GetStdout',
+        swarming_pb2.TaskIdWithOffsetRequest(task_id=task_id,
+                                             offset=1,
+                                             length=2))
+    actual = swarming_pb2.TaskOutputResponse()
+    _decode(response.body, actual)
+    # This is because it's counting in bytes, not in unicode characters:
+    expected = swarming_pb2.TaskOutputResponse(
+        output=u'É'.encode('utf-8'), state=swarming_pb2.TaskState.COMPLETED)
+    self.assertEqual(expected, actual)
+
+    response = self.post_prpc(
+        'GetStdout',
+        swarming_pb2.TaskIdWithOffsetRequest(task_id=task_id,
+                                             offset=3,
+                                             length=5))
+    actual = swarming_pb2.TaskOutputResponse()
+    _decode(response.body, actual)
+    expected = swarming_pb2.TaskOutputResponse(
+        output=u'sult '.encode('utf-8'), state=swarming_pb2.TaskState.COMPLETED)
+    self.assertEqual(expected, actual)
+
+  def test_stdout_empty(self):
+    """Asserts that incipient tasks produce no output."""
+    self.set_as_user()
+    _, task_id = self.client_create_task_raw()
+    response = self.post_prpc(
+        'GetStdout', swarming_pb2.TaskIdWithOffsetRequest(task_id=task_id))
+    actual = swarming_pb2.TaskOutputResponse()
+    _decode(response.body, actual)
+    expected = swarming_pb2.TaskOutputResponse(
+        state=swarming_pb2.TaskState.NO_RESOURCE)
+    self.assertEqual(expected, actual)
+
+  def test_result_run_not_found(self):
+    self.set_as_user()
+    _, task_id = self.client_create_task_raw()
+    run_id = task_id[:-1] + '1'
+    response = self.post_prpc(
+        'GetStdout',
+        swarming_pb2.TaskIdWithOffsetRequest(task_id=run_id),
+        expect_errors=True)
+    self.assertEqual(response.status, '404 Not Found')
+
+  def test_task_deduped(self):
+    """Asserts that task deduplication works as expected."""
+    self.set_as_user()
+    self.set_as_bot()
+    self.bot_poll()
+    self.set_as_user()
+    _, task_id_1 = self.client_create_task_raw(properties=dict(idempotent=True))
+
+    self.set_as_bot()
+    task_id_bot = self.bot_run_task()
+    self.assertEqual(task_id_1, task_id_bot[:-1] + '0')
+    self.assertEqual('1', task_id_bot[-1:])
+
+    # second task; this one's results should be returned immediately
+    self.set_as_user()
+    _, task_id_2 = self.client_create_task_raw(name='second',
+                                               user='jack@localhost',
+                                               properties=dict(idempotent=True))
+
+    self.set_as_bot()
+    resp = self.bot_poll()
+    self.assertEqual('sleep', resp['cmd'])
+
+    self.set_as_user()
+
+    # results shouldn't change, even if the second task wasn't executed
+    response = self.post_prpc(
+        'GetStdout', swarming_pb2.TaskIdWithOffsetRequest(task_id=task_id_2))
+    actual = swarming_pb2.TaskOutputResponse()
+    _decode(response.body, actual)
+    expected = swarming_pb2.TaskOutputResponse(
+        output=u'rÉsult string'.encode('utf-8'),
+        state=swarming_pb2.TaskState.COMPLETED)
+    self.assertEqual(expected, actual)
+
+  @parameterized.expand(['GetRequest', 'GetResult', 'GetStdout'])
+  def test_get_with_realm_permission(self, api):
+    # someone creates tasks with/without realm.
+    self.set_as_privileged_user()
+    self.mock_auth_db([
+        auth.Permission('swarming.pools.createTask'),
+        auth.Permission('swarming.tasks.createInRealm'),
+    ])
+    _, task_id_with_realm = self.client_create_task_raw(realm='test:task_realm')
+    _, task_id_without_realm = self.client_create_task_raw(realm=None)
+
+    def create_request(task_id):
+      if api == 'GetRequest':
+        return swarming_pb2.TaskIdRequest(task_id=task_id)
+      if api == 'GetResult':
+        return swarming_pb2.TaskIdWithPerfRequest(task_id=task_id)
+      if api == 'GetStdout':
+        return swarming_pb2.TaskIdWithOffsetRequest(task_id=task_id)
+      raise Exception('Unknown api %s' % api)
+
+    def assertTaskIsNotAccessible(task_id):
+      request = create_request(task_id)
+      response = self.post_prpc(api, request, expect_errors=True)
+      self.assertEqual(
+          cgi.escape('Task "%s" is not accessible' % task_id, quote=True),
+          response.body)
+
+    # non-privileged user can't access to the both tasks without permission.
+    self.set_as_user()
+    assertTaskIsNotAccessible(task_id_with_realm)
+    assertTaskIsNotAccessible(task_id_without_realm)
+
+    # the user can access to the both tasks with swarming.pools.listTasks
+    # permission.
+    self.mock_auth_db([auth.Permission('swarming.pools.listTasks')])
+    self.post_prpc(api, create_request(task_id_with_realm))
+    self.post_prpc(api, create_request(task_id_without_realm))
+
+    # the user can access with swarming.tasks.get permission.
+    self.mock_auth_db([auth.Permission('swarming.tasks.get')])
+    self.post_prpc(api, create_request(task_id_with_realm))
+    # but, not accessible to the task with no realm.
+    assertTaskIsNotAccessible(task_id_without_realm)
 
 
 if __name__ == '__main__':
