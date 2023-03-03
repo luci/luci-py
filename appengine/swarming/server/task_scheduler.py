@@ -1919,13 +1919,10 @@ def cron_abort_expired_task_to_run():
 
   def _enqueue_task(to_runs):
     payload = {
-        # New format that has pointers to concrete TaskToRunShardXXX entities.
         'entities': [(ttr.task_id, ttr.shard_index, ttr.key.integer_id())
                      for ttr in to_runs],
-        # Legacy format for compatibility with older code. Will be removed soon.
-        'task_to_runs':
-        [(ttr.task_id[:-1] + '0', ttr.task_slice_index) for ttr in to_runs],
     }
+    logging.debug('Expire tasks: %s', payload['entities'])
     ok = utils.enqueue_task(
         '/internal/taskqueue/important/tasks/expire',
         'task-expire',
@@ -1941,12 +1938,10 @@ def cron_abort_expired_task_to_run():
       task_to_runs.append(to_run)
       # Enqueue every 50 TaskToRunShards.
       if len(task_to_runs) == 50:
-        logging.debug('Expire tasks: %s', task_to_runs)
         _enqueue_task(task_to_runs)
         task_to_runs = []
     # Enqueue remaining TaskToRunShards.
     if task_to_runs:
-      logging.debug('Expire tasks: %s', task_to_runs)
       _enqueue_task(task_to_runs)
   finally:
     logging.debug('Enqueued %d task for %d tasks', len(enqueued), sum(enqueued))
@@ -2160,69 +2155,6 @@ def task_expire_tasks(task_to_runs):
           '\n'.join('  %s  %s' % (task_id, dims) for task_id, dims in expired))
     logging.info('Reenqueued %d tasks, expired %d, skipped %d', reenqueued,
                  len(expired), skipped)
-
-
-def task_expire_tasks_legacy(task_to_runs):
-  """Expire tasks enqueued by cron_abort_expired_task_to_run.
-
-  TODO(vadimsh): Delete when no longer called.
-  """
-  logging.warning('task_expire_tasks_legacy called')
-
-  killed = []
-  reenqueued = 0
-  skipped = 0
-
-  try:
-    for task_id, task_slice_index in task_to_runs:
-      # retrieve request
-      request_key, _ = task_pack.get_request_and_result_keys(task_id)
-      request = request_key.get()
-      if not request:
-        logging.error('Task for %s was not found.', task_id)
-        continue
-
-      to_runs = [
-          r for r in task_to_run.get_task_to_runs(request, task_slice_index)
-          # task_to_run.get_task_to_runs() may include expired TaskToRunShards
-          # or TaskToRunShards for other slice indexes. _expire_slice() will
-          # ignore them, but it's better to filter them out here.
-          if r.expiration_ts and r.task_slice_index == task_slice_index
-      ]
-      if len(to_runs) != 1:
-        # There should not be multiple TaskToRunShards. But it needs to expire
-        # all of them.
-        logging.warning('Too many TaskToRunShards. %s', to_runs)
-
-      for to_run in to_runs:
-        # execute task expiration
-        summary, new_to_run = _expire_slice(
-            request,
-            to_run.key,
-            claim=True,
-            txn_retries=4,
-            txn_catch_errors=True,
-        )
-        if new_to_run:
-          # Expiring a TaskToRunShard for TaskSlice may reenqueue a new
-          # TaskToRunShard.
-          reenqueued += 1
-        elif summary:
-          killed.append(request)
-        else:
-          # It's not a big deal, the bot will continue running.
-          skipped += 1
-  finally:
-    if killed:
-      logging.info(
-          'EXPIRED!\n%d tasks:\n%s',
-          len(killed),
-          '\n'.join(
-            '  %s  %s' % (
-              i.task_id, i.task_slice(0).properties.dimensions)
-            for i in killed))
-    logging.info('Reenqueued %d tasks, killed %d, skipped %d', reenqueued,
-                 len(killed), skipped)
 
 
 def task_cancel_running_children_tasks(parent_result_summary_id):

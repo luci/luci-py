@@ -2536,9 +2536,6 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
             u'entities': [
                 [u'1d69b9f088008911', 6, 1],
             ],
-            u'task_to_runs': [
-                [u'1d69b9f088008910', 0],
-            ],
         }, _decode_tq_task_body(tasks[0]['body']))
     self.assertEqual(2, self.execute_tasks())  # +1 for a notify task execution
     self.assertEqual([], task_result.TaskRunResult.query().fetch())
@@ -3192,10 +3189,6 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     assertNumberOfActiveRuns(1)
 
   def test_task_expire_tasks(self):
-    # Tested indirectly via test_cron_abort_expired_*
-    pass
-
-  def test_task_expire_tasks_legacy(self):
     # Tested indirectly via test_cron_abort_expired_*
     pass
 

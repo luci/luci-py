@@ -273,10 +273,7 @@ class TaskExpireTasksHandler(webapp2.RequestHandler):
   @decorators.require_taskqueue('task-expire')
   def post(self):
     payload = json.loads(self.request.body)
-    if 'entities' in payload:
-      task_scheduler.task_expire_tasks(payload['entities'])
-    else:
-      task_scheduler.task_expire_tasks_legacy(payload['task_to_runs'])
+    task_scheduler.task_expire_tasks(payload['entities'])
 
 
 class TaskDeleteTasksHandler(webapp2.RequestHandler):
