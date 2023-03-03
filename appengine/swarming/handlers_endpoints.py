@@ -68,6 +68,8 @@ def _convert_to_endpoints_exception(func):
       raise endpoints.BadRequestException(e.message)
     except handlers_exceptions.InternalException as e:
       raise endpoints.InternalServerErrorException(e.message)
+    except handlers_exceptions.PermissionException as e:
+      raise auth.AuthorizationError(e.message)
 
   return wrapper
 
@@ -373,66 +375,16 @@ class SwarmingTasksService(remote.Service):
     except (datastore_errors.BadValueError, ValueError) as e:
       raise endpoints.BadRequestException(e.message)
 
-    try:
-      api_helpers.process_task_request(request_obj, template_apply)
-    except (handlers_exceptions.BadRequestException) as e:
-      raise endpoints.BadRequestException(e.message)
-    except handlers_exceptions.PermissionException as e:
-      raise auth.AuthorizationError(e.message)
-    except handlers_exceptions.InternalException as e:
-      raise endpoints.InternalServerErrorException(e.message)
+    ntr = api_common.new_task(request_obj, secret_bytes, template_apply,
+                              request.evaluate_only, request.request_uuid)
 
-    # If the user only wanted to evaluate scheduling the task, but not actually
-    # schedule it, return early without a task_id.
-    if request.evaluate_only:
-      request_obj._pre_put_hook()
-      return swarming_rpcs.TaskRequestMetadata(
-          request=message_conversion.task_request_to_rpc(request_obj))
+    return swarming_rpcs.TaskRequestMetadata(
+        request=message_conversion.task_request_to_rpc(ntr.request)
+        if ntr.request else None,
+        task_id=ntr.task_id,
+        task_result=message_conversion.task_result_to_rpc(
+            ntr.task_result, False) if ntr.task_result else None)
 
-    # This check is for idempotency when creating new tasks.
-    # TODO(crbug.com/997221): Make idempotency robust.
-    # There is still possibility of duplicate task creation if requests with
-    # the same uuid are sent in a short period of time.
-    def _schedule_request():
-      try:
-        result_summary = task_scheduler.schedule_request(
-            request_obj,
-            enable_resultdb=(request_obj.resultdb
-                             and request_obj.resultdb.enable),
-            secret_bytes=secret_bytes)
-      except (datastore_errors.BadValueError, TypeError, ValueError) as e:
-        logging.exception(
-            "got exception around task_scheduler.schedule_request")
-        raise endpoints.BadRequestException(e.message)
-
-      returned_result = message_conversion.task_result_to_rpc(
-          result_summary, False)
-
-      return swarming_rpcs.TaskRequestMetadata(
-          request=message_conversion.task_request_to_rpc(request_obj),
-          task_id=task_pack.pack_result_summary_key(result_summary.key),
-          task_result=returned_result)
-
-    request_metadata, is_deduped = api_helpers.cache_request(
-        'task_new', request.request_uuid, _schedule_request)
-
-    if is_deduped:
-      # The returned metadata may have been fetched from cache.
-      # Compare it with request_obj.
-      # Since request_obj does not have task_id, it needs to be excluded for
-      # validation.
-      task_id_orig = request_metadata.request.task_id
-      request_metadata.request.task_id = None
-      if request_metadata.request != message_conversion.task_request_to_rpc(
-          request_obj):
-        logging.warning(
-            'the same request_uuid value was reused for different task '
-            'requests')
-      request_metadata.request.task_id = task_id_orig
-      logging.info('Reusing task %s with uuid %s', task_id_orig,
-                   request.request_uuid)
-
-    return request_metadata
 
   @endpoint(TasksRequest, swarming_rpcs.TaskList, http_method='GET')
   @auth.require(acl.can_access, log_identity=True)

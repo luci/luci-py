@@ -3,10 +3,15 @@
 # that can be found in the LICENSE file.
 """Contains code which is common between bot the prpc API and the protorpc api.
 """
+import logging
+from collections import namedtuple
+
 from google.appengine.api import datastore_errors
 from google.appengine.ext import ndb
 
+import api_helpers
 import handlers_exceptions
+from components import auth
 from components import datastore_utils
 from server import task_queues
 from server import bot_management
@@ -344,3 +349,81 @@ def get_output(task_id, offset, length):
   _, result = get_request_and_result(task_id, VIEW, True)
   output = result.get_output(offset or 0, length or RECOMMENDED_OUTPUT_LENGTH)
   return output, result.state
+
+
+NewTaskResult = namedtuple('NewTaskResult',
+                           ['request', 'task_id', 'task_result'])
+
+
+def new_task(request, secret_bytes, template_apply, evaluate_only,
+             request_uuid):
+  """Schedules a new task for a bot with given dimensions.
+
+  Arguments:
+    request: ndb TaskRequest entity representing the new task.
+    secret_bytes: bytestring representing the secret bytes.
+    template_apply: swarming_rpcs.PoolTaskTemplateField which determines how
+      to apply templates to the new task.
+    evaluate_only: evaluate whether task can be scheduled but don't actually
+      schedule it. Basically a dry run.
+    request_uuid: a str uuid used to make the request idempotent
+
+  Returns:
+    NewTaskResult(task_request, task_id, task_result) where
+      task_request is the TaskRequest object which would result from this
+        routine. Only stored in datastore if evaluate_only=False.
+      task_id identifies the new task, will be None if evaluate_only=True.
+      task_result initial TaskResultSummary entity in datastore. Will only be
+        created if evaluate_only=False.
+
+  Raises:
+    auth.AuthorizationError if acl checks fail.
+    handlers_exceptions.BadRequestException if creating the task fails for an
+      expected reason.
+  """
+  api_helpers.process_task_request(request, template_apply)
+
+  # If the user only wanted to evaluate scheduling the task, but not actually
+  # schedule it, return early without a task_id.
+  if evaluate_only:
+    request._pre_put_hook()
+    return NewTaskResult(request=request, task_id=None, task_result=None)
+
+  # This check is for idempotency when creating new tasks.
+  # TODO(crbug.com/997221): Make idempotency robust.
+  # There is still possibility of duplicate task creation if requests with
+  # the same uuid are sent in a short period of time.
+  def _schedule_request():
+    try:
+      result_summary = task_scheduler.schedule_request(
+          request,
+          enable_resultdb=(request.resultdb and request.resultdb.enable),
+          secret_bytes=secret_bytes)
+    except (datastore_errors.BadValueError, TypeError, ValueError) as e:
+      logging.exception("got exception around task_scheduler.schedule_request")
+      raise handlers_exceptions.BadRequestException(e.message)
+
+    return NewTaskResult(request=request,
+                         task_id=task_pack.pack_result_summary_key(
+                             result_summary.key),
+                         task_result=result_summary)
+
+  new_task_result, cache_hit = api_helpers.cache_request(
+      'task_new', request_uuid, _schedule_request)
+
+  if cache_hit:
+    # The returned metadata may have been fetched from cache.
+    # Compare it with original request
+    # Since request does not have key yet, it needs to be excluded for
+    # validation.
+    original_key = new_task_result.request.key
+    new_task_result.request.key = None
+    if new_task_result.request != request:
+      logging.warning(
+          'the same request_uuid value was reused for different task '
+          'requests')
+    new_task_result.request.key = original_key
+    logging.info('Reusing task %s with uuid %s',
+                 new_task_result.request.task_id, request_uuid)
+
+  return new_task_result
