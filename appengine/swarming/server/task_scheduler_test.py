@@ -2224,11 +2224,6 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         ts_mon_metrics._task_state_change_pubsub_notify_latencies.get(
             fields=_update_fields_pubsub(status=status,
                                          http_status_code=200)).sum)
-    # Make sure the TaskToRunShard is claimed.
-    request = result_summary.request_key.get()
-    to_run_key = task_to_run.request_to_task_to_run_key(request, 0)
-    actual = task_to_run.Claim.check(to_run_key)
-    self.assertEqual(True, actual)
 
   def test_cancel_task_with_id(self):
     # Cancel a pending task.
@@ -2255,12 +2250,6 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     result_summary = result_summary.key.get()
     self.assertEqual(State.CANCELED, result_summary.state)
     self.assertEqual(1, len(pub_sub_calls))  # No other message.
-
-    # Make sure the TaskToRunShard is claimed.
-    request = result_summary.request_key.get()
-    to_run_key = task_to_run.request_to_task_to_run_key(request, 0)
-    actual = task_to_run.Claim.check(to_run_key)
-    self.assertEqual(True, actual)
 
   def test_cancel_task_running(self):
     # Cancel a running task.
