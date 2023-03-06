@@ -228,8 +228,13 @@ def get_os_name():
 def get_cpu_type():
   """Returns the type of processor: armv6l, armv7l, arm64 or x86."""
   machine = platform.machine().lower()
-  if sys.platform == 'win32' and not machine:
-    machine = platforms.win.get_cpu_type_with_wmi()
+  if sys.platform == 'win32':
+    if machine == 'amd64':
+      # Check if we are running under emulation on ARM64.
+      if os.getenv('PROCESSOR_ARCHITECTURE', '').startswith('ARM'):
+        machine = 'arm64'
+    elif not machine:
+      machine = platforms.win.get_cpu_type_with_wmi()
   if machine in ('amd64', 'x86_64', 'i386', 'i686'):
     return 'x86'
   if machine == 'aarch64':
