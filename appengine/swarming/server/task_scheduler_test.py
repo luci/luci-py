@@ -235,6 +235,15 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.mock(pubsub, 'publish', pubsub_publish)
     return calls
 
+  def mock_enqueue_rbe_task(self):
+    calls = []
+
+    def mocked_enqueue_rbe_task(request, to_run):
+      calls.append((request, to_run))
+
+    self.mock(rbe, 'enqueue_rbe_task', mocked_enqueue_rbe_task)
+    return calls
+
   def _gen_result_summary_pending(self, **kwargs):
     """Returns the dict for a TaskResultSummary for a pending task."""
     expected = {
@@ -572,7 +581,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(1, self.execute_tasks())
 
   def test_bot_claim_slice(self):
-    self.mock(rbe, 'enqueue_rbe_task', lambda *_args: None)
+    self.mock_enqueue_rbe_task()
 
     result_summary = self._quick_schedule(
         secret_bytes=task_request.SecretBytes(secret_bytes='blob'),
@@ -629,7 +638,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
       claim_txn('another-claim-id')
 
   def test_bot_claim_slice_dimensions_mismatch(self):
-    self.mock(rbe, 'enqueue_rbe_task', lambda *_args: None)
+    self.mock_enqueue_rbe_task()
 
     result_summary = self._quick_schedule(rbe_instance='some-instance')
     to_run_key = task_to_run.request_to_task_to_run_key(
@@ -792,20 +801,16 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.execute_tasks()
 
   def test_schedule_request_rbe_mode(self):
-    args = []
-
-    def mocked_enqueue_rbe_task(request, to_run):
-      args[:] = [request, to_run]
-
-    self.mock(rbe, 'enqueue_rbe_task', mocked_enqueue_rbe_task)
+    enqueued = self.mock_enqueue_rbe_task()
 
     request = _gen_request_slices(rbe_instance='some-instance')
     result_summary = task_scheduler.schedule_request(request)
     self.assertEqual(State.PENDING, result_summary.state)
 
-    self.assertEqual(request.key, args[0].key)
+    self.assertEqual(len(enqueued), 1)
+    self.assertEqual(request.key, enqueued[0][0].key)
     self.assertEqual('sample-app-1d69b9f088008910-0',
-                     args[1].key.get().rbe_reservation)
+                     enqueued[0][1].key.get().rbe_reservation)
 
   def test_bot_reap_task_expired(self):
     self._register_bot(self.bot_dimensions)
@@ -903,7 +908,8 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
                     mock.Mock(side_effect=self.nop_async)) as mock_call:
       to_run_key = task_to_run.request_to_task_to_run_key(request, 0)
       self.mock_now(self.now, 60)
-      task_scheduler._expire_slice(request, to_run_key, False, 1, True)
+      task_scheduler._expire_slice(request, to_run_key, State.EXPIRED, False, 1,
+                                   True)
       mock_call.assert_called_once_with('1d69b9f088008911',
                                         u'resultdb-update-token')
 
@@ -2517,6 +2523,65 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertItemsEqual([res.task_id for res in results],
                           [res.task_id for res in pending_results])
     self.execute_tasks()
+
+  def test_expire_slice(self):
+    enqueued = self.mock_enqueue_rbe_task()
+
+    # Scheduler RBE task with two slices.
+    request = _gen_request_slices(
+        rbe_instance='some-instance',
+        task_slices=[
+            task_request.TaskSlice(expiration_secs=180,
+                                   properties=_gen_properties(dimensions={
+                                       u'prop': [u'a'],
+                                       u'pool': [u'default'],
+                                   }),
+                                   wait_for_capacity=False),
+            task_request.TaskSlice(expiration_secs=180,
+                                   properties=_gen_properties(dimensions={
+                                       u'prop': [u'b'],
+                                       u'pool': [u'default'],
+                                   }),
+                                   wait_for_capacity=False),
+        ],
+    )
+
+    # The first slice is pending now.
+    result_summary = task_scheduler.schedule_request(request)
+    self.assertEqual(result_summary.state, State.PENDING)
+    self.assertEqual(result_summary.current_task_slice, 0)
+
+    # The first slice was submitted to RBE.
+    self.assertEqual(len(enqueued), 1)
+    ttr = enqueued[0][1]
+    self.assertEqual(ttr.task_slice_index, 0)
+    self.assertEqual(ttr.dimensions, {u'pool': [u'default'], u'prop': [u'a']})
+    del enqueued[:]
+
+    # Expire this pending slice.
+    task_scheduler.expire_slice(ttr.key, task_result.State.NO_RESOURCE)
+
+    # The second slice is pending now.
+    result_summary = result_summary.key.get()
+    self.assertEqual(result_summary.state, State.PENDING)
+    self.assertEqual(result_summary.current_task_slice, 1)
+
+    # The second slice was submitted to RBE.
+    self.assertEqual(len(enqueued), 1)
+    ttr = enqueued[0][1]
+    self.assertEqual(ttr.task_slice_index, 1)
+    self.assertEqual(ttr.dimensions, {u'pool': [u'default'], u'prop': [u'b']})
+    del enqueued[:]
+
+    # Expire this pending slice as well.
+    task_scheduler.expire_slice(ttr.key, task_result.State.NO_RESOURCE)
+
+    # The task is fully expired now.
+    result_summary = result_summary.key.get()
+    self.assertEqual(result_summary.state, State.NO_RESOURCE)
+
+    # Didn't enqueues any new RBE tasks.
+    self.assertFalse(enqueued)
 
   def test_cron_abort_expired_task_to_run(self):
 

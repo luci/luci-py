@@ -5,16 +5,22 @@
 """This module defines Swarming Server frontend pRPC handlers."""
 
 import datetime
+import logging
 
 from google.protobuf import empty_pb2
 
 from components import auth
+from components import ereporter2
 from components import prpc
 from proto.api_v2 import swarming_pb2
 from proto.api_v2 import swarming_prpc_pb2
+from proto.internals import rbe_pb2
 from proto.internals import rbe_prpc_pb2
 from server import acl
 from server import realms
+from server import task_result
+from server import task_scheduler
+from server import task_to_run
 import api_common
 import message_conversion_prpc
 import prpc_helpers
@@ -143,6 +149,33 @@ class InternalsService(object):
   @auth.require(acl.is_swarming_itself, log_identity=True)
   def ExpireSlice(self, request, _context):
     logging.info('%s', request)
+
+    task_request_key, _ = api_common.to_keys(request.task_id)
+    to_run_key = task_to_run.task_to_run_key_from_parts(
+        task_request_key, request.task_to_run_shard, request.task_to_run_id)
+
+    # Only NO_RESOURCE is expected to happen. All other conditions are internal
+    # failures due to server misconfiguration. Unfortunately there's no good
+    # task state to represent them, so just use EXPIRED + report the error via
+    # ereporter (it eventually results in a notification to admins).
+    terminal_state = task_result.State.EXPIRED
+    if request.reason == rbe_pb2.ExpireSliceRequest.NO_RESOURCE:
+      terminal_state = task_result.State.NO_RESOURCE
+    task_scheduler.expire_slice(to_run_key, terminal_state)
+
+    # Submit the report only after expiring the slice, in case this is slow.
+    if request.reason != rbe_pb2.ExpireSliceRequest.NO_RESOURCE:
+      ereporter2.log(source='rbe',
+                     category=rbe_pb2.ExpireSliceRequest.Reason.Name(
+                         request.reason),
+                     message=request.details,
+                     params={
+                         'task_id':
+                         request.task_id,
+                         'slice_index':
+                         task_to_run.task_to_run_key_slice_index(to_run_key),
+                     })
+
     return empty_pb2.Empty()
 
 

@@ -67,7 +67,7 @@ class ClaimError(Error):
   pass
 
 
-def _expire_slice_tx(request, to_run_key, capacity, es_cfg):
+def _expire_slice_tx(request, to_run_key, terminal_state, capacity, es_cfg):
   """Expires a TaskToRunShardXXX and enqueues the next one, if necessary.
 
   Called as a ndb transaction by _expire_slice().
@@ -75,7 +75,8 @@ def _expire_slice_tx(request, to_run_key, capacity, es_cfg):
   Arguments:
     request: the TaskRequest instance with all slices.
     to_run_key: the TaskToRunShard to expire.
-    capacity: dict {slice index => True if can run it}.
+    terminal_state: the task state to set if this slice is the last one.
+    capacity: dict {slice index => True if can run it}, None to skip the check.
     es_cfg: ExternalSchedulerConfig for this task.
 
   Returns:
@@ -137,7 +138,7 @@ def _expire_slice_tx(request, to_run_key, capacity, es_cfg):
   # Check if there's a fallback slice we have capacity to run.
   new_to_run = None
   for idx in range(slice_index + 1, request.num_task_slices):
-    if capacity[idx]:
+    if capacity is None or capacity[idx]:
       new_to_run = task_to_run.new_task_to_run(request, idx)
       to_put.append(new_to_run)
       break
@@ -151,7 +152,7 @@ def _expire_slice_tx(request, to_run_key, capacity, es_cfg):
     result_summary.modified_ts = now
   else:
     # There's no fallback, giving up.
-    result_summary.state = task_result.State.EXPIRED
+    result_summary.state = terminal_state
     result_summary.modified_ts = now
     result_summary.abandoned_ts = now
     result_summary.completed_ts = now
@@ -165,6 +166,8 @@ def _expire_slice_tx(request, to_run_key, capacity, es_cfg):
                                   request,
                                   es_cfg,
                                   transactional=True)
+  if new_to_run and request.rbe_instance:
+    rbe.enqueue_rbe_task(request, new_to_run)
   for f in futures:
     f.check_success()
 
@@ -172,7 +175,8 @@ def _expire_slice_tx(request, to_run_key, capacity, es_cfg):
   return result_summary, to_run, new_to_run, state_changed
 
 
-def _expire_slice(request, to_run_key, claim, txn_retries, txn_catch_errors):
+def _expire_slice(request, to_run_key, terminal_state, claim, txn_retries,
+                  txn_catch_errors):
   """Expires a single TaskToRunShard if it is still pending.
 
   If the task has more slices, enqueues the next slice. Otherwise marks the
@@ -181,6 +185,7 @@ def _expire_slice(request, to_run_key, claim, txn_retries, txn_catch_errors):
   Arguments:
     request: the TaskRequest instance with all slices.
     to_run_key: the TaskToRunShard to expire.
+    terminal_state: the task state to set if this slice is the last one.
     claim: if True, obtain task_to_run.Claim before touching the task.
     txn_retries: how many times to retry the transaction on collisions.
     txn_catch_errors: if True, ignore datastore_utils.CommitError.
@@ -208,19 +213,28 @@ def _expire_slice(request, to_run_key, claim, txn_retries, txn_catch_errors):
     logging.info('%s/%s: already processed', request.task_id, slice_index)
     return None, None
 
-  # Do a check for capacity for the remaining slices (if any) before the
-  # transaction, as has_capacity() cannot be called within a transaction.
-  capacity = {}
-  for idx in range(slice_index + 1, request.num_task_slices):
-    ts = request.task_slice(idx)
-    capacity[idx] = ts.wait_for_capacity or bot_management.has_capacity(
-        ts.properties.dimensions)
+  # None means "skip the check and always try to schedule the task".
+  capacity = None
 
-  es_cfg = external_scheduler.config_for_task(request)
+  # For tasks scheduled through native Swarming scheduler do a check for
+  # capacity for the remaining slices (if any) before the
+  # transaction, as has_capacity() cannot be called within a transaction.
+  if not request.rbe_instance:
+    capacity = {}
+    for idx in range(slice_index + 1, request.num_task_slices):
+      ts = request.task_slice(idx)
+      capacity[idx] = ts.wait_for_capacity or bot_management.has_capacity(
+          ts.properties.dimensions)
+
+  # RBE tasks don't use the external scheduler, don't need to check the config.
+  es_cfg = None
+  if not request.rbe_instance:
+    es_cfg = external_scheduler.config_for_task(request)
 
   try:
     summary, old_ttr, new_ttr, state_changed = datastore_utils.transaction(
-        lambda: _expire_slice_tx(request, to_run_key, capacity, es_cfg),
+        lambda: _expire_slice_tx(request, to_run_key, terminal_state, capacity,
+                                 es_cfg),
         retries=txn_retries)
   except datastore_utils.CommitError as exc:
     if not txn_catch_errors:
@@ -1463,6 +1477,7 @@ def bot_reap_task(bot_dimensions, queues, bot_details, deadline):
         # TaskToRunShard. Don't try to grab a claim: we already hold it.
         summary, new_to_run = _expire_slice(request,
                                             to_run.key,
+                                            task_result.State.EXPIRED,
                                             claim=False,
                                             txn_retries=1,
                                             txn_catch_errors=True)
@@ -1896,6 +1911,36 @@ def cancel_tasks(limit, query, cursor=None):
   return cursor, results
 
 
+def expire_slice(to_run_key, terminal_state):
+  """Expires a slice represented by the given TaskToRunShard entity.
+
+  Schedules the next slice, if possible, or terminates the task with the given
+  terminal_state if there are no more slices that can run. Intended to be used
+  for RBE tasks.
+
+  Does nothing if the slice is not in pending state anymore or the task was
+  deleted already.
+
+  Arguments:
+    to_run_key: an entity key of TaskToRunShard entity to expire.
+    terminal_state: the task state to set if this slice is the last one.
+
+  Raises:
+    datastore_utils.CommitError on transaction errors.
+  """
+  request_key = task_to_run.task_to_run_key_to_request_key(to_run_key)
+  request = request_key.get()
+  if not request:
+    logging.warning('TaskRequest doesn\'t exist')
+    return
+  _expire_slice(request,
+                to_run_key,
+                terminal_state,
+                claim=False,
+                txn_retries=4,
+                txn_catch_errors=False)
+
+
 ### Cron job.
 
 
@@ -2132,6 +2177,7 @@ def task_expire_tasks(task_to_runs):
       summary, new_to_run = _expire_slice(
           request,
           to_run_key,
+          task_result.State.EXPIRED,
           claim=True,
           txn_retries=4,
           txn_catch_errors=True,

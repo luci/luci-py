@@ -23,14 +23,20 @@ import webtest
 
 from test_support import test_case
 
-from components.prpc import encoding
 from components import auth
+from components import ereporter2
+from components.prpc import encoding
 
-import proto.api_v2.swarming_pb2 as swarming_pb2
+from proto.api_v2 import swarming_pb2
+from proto.internals import rbe_pb2
 
-from server import bot_management
 from server import acl
+from server import bot_management
 from server import service_accounts
+from server import task_pack
+from server import task_request
+from server import task_result
+from server import task_to_run
 
 import handlers_bot
 import handlers_prpc
@@ -138,6 +144,21 @@ class PrpcTest(test_env_handlers.AppTestBase):
   no_run = 1
   service = None
 
+  def setUp(self):
+    super(PrpcTest, self).setUp()
+    routes = handlers_prpc.get_routes() + handlers_bot.get_routes()
+    self.app = webtest.TestApp(
+        webapp2.WSGIApplication(routes, debug=True),
+        extra_environ={
+            'REMOTE_ADDR': self.source_ip,
+            'SERVER_SOFTWARE': os.environ['SERVER_SOFTWARE'],
+        },
+    )
+    self._headers = {
+        'Content-Type': encoding.Encoding.JSON[1],
+        'Accept': encoding.Encoding.JSON[1],
+    }
+
   def apply_defaults_for_result_summary(self, result):
     """Applies default expectations to a TaskResultResponse initialized from a
     TaskResultSummary ndb entity.
@@ -242,18 +263,6 @@ class BotServicePrpcTest(PrpcTest):
   def setUp(self):
     super(BotServicePrpcTest, self).setUp()
     self.service = "swarming.v2.Bots"
-    routes = handlers_prpc.get_routes() + handlers_bot.get_routes()
-    self.app = webtest.TestApp(
-        webapp2.WSGIApplication(routes, debug=True),
-        extra_environ={
-          'REMOTE_ADDR': self.source_ip,
-          'SERVER_SOFTWARE': os.environ['SERVER_SOFTWARE'],
-        },
-    )
-    self._headers = {
-      'Content-Type': encoding.Encoding.JSON[1],
-      'Accept': encoding.Encoding.JSON[1],
-    }
     self.now = datetime.datetime(2010, 1, 2, 3, 4, 5)
     self.mock_now(self.now)
     self.mock_default_pool_acl([])
@@ -690,18 +699,6 @@ class TaskServicePrpcTest(PrpcTest):
   def setUp(self):
     super(TaskServicePrpcTest, self).setUp()
     self.service = "swarming.v2.Tasks"
-    routes = handlers_prpc.get_routes() + handlers_bot.get_routes()
-    self.app = webtest.TestApp(
-        webapp2.WSGIApplication(routes, debug=True),
-        extra_environ={
-            'REMOTE_ADDR': self.source_ip,
-            'SERVER_SOFTWARE': os.environ['SERVER_SOFTWARE'],
-        },
-    )
-    self._headers = {
-        'Content-Type': encoding.Encoding.JSON[1],
-        'Accept': encoding.Encoding.JSON[1],
-    }
     self.now = datetime.datetime(2010, 1, 2, 3, 4, 5)
     self.mock_now(self.now)
     self.mock_default_pool_acl([])
@@ -1301,6 +1298,67 @@ class TaskServicePrpcTest(PrpcTest):
     self.post_prpc(api, create_request(task_id_with_realm))
     # but, not accessible to the task with no realm.
     assertTaskIsNotAccessible(task_id_without_realm)
+
+
+class InternalsServicePrpcTest(PrpcTest):
+  def setUp(self):
+    super(InternalsServicePrpcTest, self).setUp()
+    self.service = 'swarming.internals.rbe.Internals'
+
+  @mock.patch('server.task_scheduler.expire_slice')
+  def test_expire_slice_no_resource(self, expire_slice_mock):
+    req_key = task_request.new_request_key()
+    task_id = task_pack.pack_result_summary_key(
+        task_pack.request_key_to_result_summary_key(req_key))
+
+    self.set_as_swarming_itself()
+    self.post_prpc(
+        'ExpireSlice',
+        rbe_pb2.ExpireSliceRequest(
+            task_id=task_id,
+            task_to_run_shard=15,
+            task_to_run_id=32,  # slice #2
+            reason=rbe_pb2.ExpireSliceRequest.NO_RESOURCE,
+        ))
+
+    expire_slice_mock.assert_called_once_with(
+        task_to_run.task_to_run_key_from_parts(req_key, 15, 32),
+        task_result.State.NO_RESOURCE,
+    )
+
+  @mock.patch('server.task_scheduler.expire_slice')
+  def test_expire_slice_no_internal(self, expire_slice_mock):
+    req_key = task_request.new_request_key()
+    task_id = task_pack.pack_result_summary_key(
+        task_pack.request_key_to_result_summary_key(req_key))
+
+    self.set_as_swarming_itself()
+    self.post_prpc(
+        'ExpireSlice',
+        rbe_pb2.ExpireSliceRequest(
+            task_id=task_id,
+            task_to_run_shard=15,
+            task_to_run_id=32,  # slice #2
+            reason=rbe_pb2.ExpireSliceRequest.PERMISSION_DENIED,
+            details='Boo',
+        ))
+
+    expire_slice_mock.assert_called_once_with(
+        task_to_run.task_to_run_key_from_parts(req_key, 15, 32),
+        task_result.State.EXPIRED,
+    )
+
+    errs = list(ereporter2.Error.query())
+    self.assertEqual(len(errs), 1)
+    self.assertEqual(
+        errs[0].to_dict(include=['category', 'message', 'params']), {
+            'category': u'PERMISSION_DENIED',
+            'message': u'Boo',
+            'params': {
+                u'slice_index': 2,
+                u'task_id': task_id,
+            },
+        })
 
 
 if __name__ == '__main__':

@@ -200,6 +200,14 @@ class AppTestBase(test_case.TestCase):
     auth_testing.reset_local_state()
     auth_testing.mock_get_current_identity(self, auth.IP_WHITELISTED_BOT_ID)
 
+  def set_as_swarming_itself(self):
+    self.set_as_anonymous()
+    self.testbed.setup_env(USER_EMAIL=utils.get_service_account_name(),
+                           overwrite=True)
+    auth_testing.reset_local_state()
+    auth_testing.mock_get_current_identity(
+        self, auth.Identity.from_bytes('user:' + os.environ['USER_EMAIL']))
+
   # Web or generic
 
   def get_xsrf_token(self):
