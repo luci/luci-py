@@ -74,6 +74,12 @@ queue:
   bucket_size: 100
   rate: 500/s
 
+# /internal/tasks/t/rbe-cancel/.*
+# This is served by Swarming Go via go.chromium.org/luci/server/tq.
+- name: rbe-cancel
+  bucket_size: 100
+  rate: 500/s
+
 
 ## External Scheduler
 

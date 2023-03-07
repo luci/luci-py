@@ -947,6 +947,7 @@ def _cancel_task_tx(request,
   result_summary.abandoned_ts = now
   result_summary.modified_ts = now
 
+  to_runs = []
   if not was_running:
     # The task is in PENDING state now and can be canceled right away.
     result_summary.state = task_result.State.CANCELED
@@ -975,8 +976,16 @@ def _cancel_task_tx(request,
                                   request,
                                   es_cfg,
                                   transactional=True)
+
+  # Enqueue TQ tasks to cancel RBE reservations if in the RBE mode.
+  if request.rbe_instance:
+    for ttr in to_runs:
+      if ttr.rbe_reservation:
+        rbe.enqueue_rbe_cancel(request, ttr)
+
   for f in futures:
     f.check_success()
+
   return True, was_running
 
 

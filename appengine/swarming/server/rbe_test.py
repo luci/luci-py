@@ -347,14 +347,7 @@ class PollTokenTest(test_case.TestCase):
 class EnqueueTest(test_case.TestCase):
   maxDiff = None
 
-  @mock.patch('components.utils.enqueue_task')
-  @mock.patch('components.utils.utcnow')
-  @mock.patch('random.getrandbits')
-  def test_works(self, getrandbits, utcnow, enqueue_task):
-    getrandbits.return_value = 42
-    utcnow.return_value = datetime.datetime(2112, 1, 1, 1, 1, 1)
-    enqueue_task.return_value = True
-
+  def make_request(self):
     def make_slice(name):
       return task_request.TaskSlice(
           properties=task_request.TaskProperties(dimensions_data={
@@ -365,7 +358,6 @@ class EnqueueTest(test_case.TestCase):
           }, ),
           expiration_secs=123,
       )
-
     req = task_request.TaskRequest(
         key=task_request.new_request_key(),
         created_ts=utils.utcnow(),
@@ -379,8 +371,17 @@ class EnqueueTest(test_case.TestCase):
             make_slice(u'2'),
         ],
     )
+    return req, task_to_run.new_task_to_run(req, 2)
 
-    ttr = task_to_run.new_task_to_run(req, 2)
+  @mock.patch('components.utils.enqueue_task')
+  @mock.patch('components.utils.utcnow')
+  @mock.patch('random.getrandbits')
+  def test_enqueue_rbe_task(self, getrandbits, utcnow, enqueue_task):
+    getrandbits.return_value = 42
+    utcnow.return_value = datetime.datetime(2112, 1, 1, 1, 1, 1)
+    enqueue_task.return_value = True
+
+    req, ttr = self.make_request()
     datastore_utils.transaction(lambda: rbe.enqueue_rbe_task(req, ttr))
 
     args, kwargs = enqueue_task.call_args
@@ -435,6 +436,41 @@ class EnqueueTest(test_case.TestCase):
                     u'SCHEDULING_ALGORITHM_LIFO',
                 },
                 u'class': u'rbe-enqueue',
+            },
+            'transactional': True,
+            'use_dedicated_module': False,
+        })
+
+  @mock.patch('components.utils.enqueue_task')
+  @mock.patch('components.utils.utcnow')
+  @mock.patch('random.getrandbits')
+  def test_enqueue_rbe_cancel(self, getrandbits, utcnow, enqueue_task):
+    getrandbits.return_value = 42
+    utcnow.return_value = datetime.datetime(2112, 1, 1, 1, 1, 1)
+    enqueue_task.return_value = True
+
+    req, ttr = self.make_request()
+    datastore_utils.transaction(lambda: rbe.enqueue_rbe_cancel(req, ttr))
+
+    args, kwargs = enqueue_task.call_args
+    kwargs['payload'] = json.loads(kwargs['payload'])
+
+    self.assertEqual(
+        args,
+        ('/internal/tasks/t/rbe-cancel/2ed6c6804c8002a10-2', 'rbe-cancel'))
+    self.assertEqual(
+        kwargs, {
+            'payload': {
+                u'body': {
+                    u'rbeInstance': u'some-instance',
+                    u'reservationId': u'sample-app-2ed6c6804c8002a10-2',
+                    u'debugInfo': {
+                        u'created': u'2112-01-01T01:01:01Z',
+                        u'pySwarmingVersion': u'v1a',
+                        u'taskName': u'some-name'
+                    },
+                },
+                u'class': u'rbe-cancel',
             },
             'transactional': True,
             'use_dedicated_module': False,

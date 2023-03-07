@@ -244,6 +244,15 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.mock(rbe, 'enqueue_rbe_task', mocked_enqueue_rbe_task)
     return calls
 
+  def mock_enqueue_rbe_cancel(self):
+    calls = []
+
+    def mocked_enqueue_rbe_cancel(request, to_run):
+      calls.append((request, to_run))
+
+    self.mock(rbe, 'enqueue_rbe_cancel', mocked_enqueue_rbe_cancel)
+    return calls
+
   def _gen_result_summary_pending(self, **kwargs):
     """Returns the dict for a TaskResultSummary for a pending task."""
     expected = {
@@ -2414,6 +2423,27 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         ts_mon_metrics._task_state_change_pubsub_notify_latencies.get(
             fields=_update_fields_pubsub(status=status,
                                          http_status_code=200)).sum)
+
+  def test_cancel_task_rbe_mode(self):
+    self.mock_enqueue_rbe_task()
+    cancels = self.mock_enqueue_rbe_cancel()
+
+    self._register_bot(self.bot_dimensions)
+    result_summary = self._quick_schedule(rbe_instance='some-instance')
+
+    ok, was_running = task_scheduler.cancel_task(
+        result_summary.request_key.get(), result_summary.key, False, None)
+    self.assertEqual(True, ok)
+    self.assertEqual(False, was_running)
+
+    result_summary = result_summary.key.get()
+    self.assertEqual(State.CANCELED, result_summary.state)
+
+    # Enqueued a TQ task to cancel the reservation.
+    self.assertEqual(1, len(cancels))
+    req, ttr = cancels[0]
+    self.assertEqual('some-instance', req.rbe_instance)
+    self.assertEqual('sample-app-1d69b9f088008910-0', ttr.rbe_reservation)
 
   def test_cancel_tasks(self):
     # Create RUNNING task

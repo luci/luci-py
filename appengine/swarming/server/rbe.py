@@ -326,6 +326,59 @@ def enqueue_rbe_task(task_request, task_to_run):
     raise datastore_utils.CommitError('Failed to enqueue RBE reservation')
 
 
+def enqueue_rbe_cancel(task_request, task_to_run):
+  """Transactionally enqueues a TQ task that cancels an RBE reservation.
+
+  Args:
+    task_request: an original TaskRequest with all task details.
+    task_to_run: a TaskToRunShard representing a reservation to cancel.
+
+  Raises:
+    datastore_utils.CommitError if the TQ enqueuing failed.
+  """
+  assert ndb.in_transaction()
+  assert task_request.rbe_instance
+  assert task_to_run.rbe_reservation
+  assert task_to_run.key.parent() == task_request.key
+
+  # For tracing how long the TQ task is stuck.
+  now = timestamp_pb2.Timestamp()
+  now.FromDatetime(utils.utcnow())
+
+  # This is format recognized by go.chromium.org/luci/server/tq. It routes
+  # based on `class`.
+  payload = {
+      'class':
+      'rbe-cancel',
+      'body':
+      json_format.MessageToDict(
+          rbe_pb2.CancelRBETask(
+              rbe_instance=task_request.rbe_instance,
+              reservation_id=task_to_run.rbe_reservation,
+              debug_info=rbe_pb2.CancelRBETask.DebugInfo(
+                  created=now,
+                  py_swarming_version=utils.get_app_version(),
+                  task_name=task_request.name,
+              ),
+          ), ),
+  }
+
+  logging.info('RBE: enqueuing cancellation %s', task_to_run.rbe_reservation)
+  ok = utils.enqueue_task(
+      # The last path components are informational for nicer logs. All data is
+      # transferred through `payload`.
+      '/internal/tasks/t/rbe-cancel/%s-%d' % (
+          task_request.task_id,
+          task_to_run.task_slice_index,
+      ),
+      'rbe-cancel',
+      transactional=True,
+      use_dedicated_module=False,  # let dispatch.yaml decide
+      payload=utils.encode_to_json(payload))
+  if not ok:
+    raise datastore_utils.CommitError('Failed to enqueue RBE cancellation')
+
+
 ### Private stuff.
 
 
