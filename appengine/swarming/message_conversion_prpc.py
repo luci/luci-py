@@ -1,15 +1,20 @@
 # Copyright 2022 The LUCI Authors. All rights reserved.
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
-"""Converts database entities to and from swarming api prpc objects to ndb
-database objects.
+"""Converts between ndb database entities and pRPC swarming api objects.
 """
 
-import json
+from collections import defaultdict
 from datetime import datetime
-from google.protobuf.timestamp_pb2 import Timestamp
-import proto.api_v2.swarming_pb2 as swarming_pb2
+import json
+import logging
 
+from google.protobuf.timestamp_pb2 import Timestamp
+
+import api_common
+from components import utils
+from proto.api_v2 import swarming_pb2
+from server import task_request
 from server import task_result
 from server import task_pack
 
@@ -58,6 +63,12 @@ def _string_list_pairs_from_dict(dictionary):
 
 def date(ts):
   """Converts datetime.timestamp into google.protobuf.timestamp_pb2.Timestamp
+
+  Args:
+    ts: datetime.timestamp or None
+
+  Returns:
+    google.protobuf.timestamp_pb2.Timestamp or None if ts is None
   """
   if ts is None:
     return None
@@ -67,11 +78,20 @@ def date(ts):
 
 
 def _state(state_dict):
+  # type: (dict) -> str
   return json.dumps(state_dict or {}, sort_keys=True, separators=(',', ':'))
 
 
 def bot_info_to_proto(bot_info, deleted=False):
   """Converts a ndb BotInfo object into a BotInfoResponse for pRPC api
+
+  Args:
+    bot_info: bot_management.BotInfo
+    deleted: True if this bot_info object was created from a BotInfo object
+      due to earlier ones being deleted.
+
+  Returns:
+    swarming_pb2.BotInfo
   """
   return swarming_pb2.BotInfo(external_ip=bot_info.external_ip,
                               authenticated_as=bot_info.authenticated_as,
@@ -91,6 +111,7 @@ def bot_info_to_proto(bot_info, deleted=False):
 
 
 def _bot_event_response(event):
+  # type: (bot_management.BotEvent) -> swarming_pb2.BotEventResponse
   """Converts a ndb BotEvent entity to a BotEvent response of pRPC"""
   # must have a value because ts is indexed on
   assert event.ts
@@ -110,6 +131,7 @@ def _bot_event_response(event):
 
 
 def bot_events_response(items, cursor):
+  # type: (List[bot_management.BotEvent], str) -> swarming_pb2.BotEventsResponse
   return swarming_pb2.BotEventsResponse(
       now=date(datetime.utcnow()),
       items=[_bot_event_response(event) for event in items],
@@ -117,6 +139,8 @@ def bot_events_response(items, cursor):
 
 
 def _cas_op_stats(stat):
+  # type: (Optional[task_result.CASOperationStats]) ->
+  #   Optional[swarming_pb2.CASOperationStats]
   if stat is None:
     return None
   return swarming_pb2.CASOperationStats(
@@ -133,12 +157,16 @@ def _cas_op_stats(stat):
 
 
 def _op_stats(stat):
+  # type: (Optional[task_result.OperationStats]) ->
+  #   Optional[swarming_pb2.OperationStats]
   if stat is None:
     return None
   return swarming_pb2.OperationStats(duration=stat.duration)
 
 
 def _perf_stats(stats):
+  # type: (Optional[task_result.PerformanceStats]) ->
+  #   Optional[swarming_pb2.PerformanceStats]
   if stats is None:
     return None
   return swarming_pb2.PerformanceStats(
@@ -154,6 +182,8 @@ def _perf_stats(stats):
 
 
 def _cas_reference(ref):
+  # type: (Optional[task_result.CASReference]) ->
+  #   Optional[swarming_pb2.CASReference]
   if ref is None:
     return None
   return swarming_pb2.CASReference(cas_instance=ref.cas_instance,
@@ -163,6 +193,8 @@ def _cas_reference(ref):
 
 
 def _cipd_package(package):
+  # type: (Optional[task_request.CipdPackage]) ->
+  #   Optional[swarming_pb2.CipdPackage]
   if package is None:
     return None
   return swarming_pb2.CipdPackage(
@@ -173,6 +205,8 @@ def _cipd_package(package):
 
 
 def _cipd_pins(cipd_pins):
+  # type: (Optional[task_request.CipdPins]) ->
+  #   Optional[swarming_pb2.CipdPins]
   if cipd_pins is None:
     return None
   return swarming_pb2.CipdPins(
@@ -181,6 +215,8 @@ def _cipd_pins(cipd_pins):
 
 
 def _resultdb_info(info):
+  # type: (Optional[task_request.ResultDBInfo]) ->
+  #   Optional[swarming_pb2.ResultDBInfo]
   if info is None:
     return None
   return swarming_pb2.ResultDBInfo(hostname=info.hostname,
@@ -194,6 +230,9 @@ def task_result_response(result, include_performance_stats=True):
     result: TaskRunResult or TaskResultSummary ndb entity.
     include_performance_stats: If true, this will return a non-empty
       swarming_pb2.PerformanceStats for the performance_stats protobuf field.
+
+  Returns:
+    task_result.TaskResultResponse.
   """
   out = swarming_pb2.TaskResultResponse(
       bot_id=result.bot_id,
@@ -246,6 +285,7 @@ def task_result_response(result, include_performance_stats=True):
 
 
 def bot_tasks_response(items, cursor):
+  # type(List[task_result.TaskResultResponse], str -> TaskListResponse
   out = swarming_pb2.TaskListResponse()
   out.cursor = cursor or ''
   out.items.extend([task_result_response(item) for item in items])
@@ -254,6 +294,8 @@ def bot_tasks_response(items, cursor):
 
 
 def _cache_entry(entry):
+  # type: (Optional[task_request.CacheEntry]) ->
+  #   Optional[swarming_pb2.CipdInput]
   if entry is None:
     return None
   return swarming_pb2.CacheEntry(
@@ -263,6 +305,7 @@ def _cache_entry(entry):
 
 
 def _cipd_input(cipd_input):
+  # type: (Optional[task_request.CipdInput]) -> Optional[swarming_pb2.CipdInput]
   if cipd_input is None:
     return None
   return swarming_pb2.CipdInput(
@@ -273,6 +316,8 @@ def _cipd_input(cipd_input):
 
 
 def _task_properties(props):
+  # type: Optional[task_request.TaskProperties]) ->
+  #   Optional[swarming_pb2.TaskProperties]
   if props is None:
     return None
   return swarming_pb2.TaskProperties(
@@ -297,6 +342,7 @@ def _task_properties(props):
 
 
 def _task_slice(task_slice):
+  # type: (Optional[task_request.TaskSlice]) -> Optional[swarming_pb2.TaskSlice]
   if task_slice is None:
     return None
   return swarming_pb2.TaskSlice(
@@ -306,7 +352,16 @@ def _task_slice(task_slice):
   )
 
 
+def _resultdb_cfg(resultdb_cfg):
+  # type: (Optional[task_request.ResultDBCfg]) ->
+  #   Optional[swarming_pb2.ResultDBCfg]
+  if resultdb_cfg is None:
+    return None
+  return swarming_pb2.ResultDBCfg(enable=resultdb_cfg.enable)
+
+
 def task_request_response(request):
+  # type: (task_request.TaskRequest) -> swarming_pb2.TaskRequestResponse
   """Converts a TaskRequest ndb entity into a TaskRequestResponse.
   """
   slices = [
@@ -315,7 +370,7 @@ def task_request_response(request):
   return swarming_pb2.TaskRequestResponse(
       created_ts=date(request.created_ts),
       properties=slices[0].properties if slices else None,
-      resultdb=_resultdb_info(request.resultdb),
+      resultdb=_resultdb_cfg(request.resultdb),
       tags=request.tags,
       user=request.user,
       authenticated=request.authenticated.to_bytes(),
@@ -331,3 +386,196 @@ def task_request_response(request):
       bot_ping_tolerance_secs=request.bot_ping_tolerance_secs,
       task_slices=slices,
   )
+
+
+def _resultdb_from_rpc(request):
+  # type: (swarming_pb2.NewTaskRequest) -> task_request.ResultDBCfg
+  return task_request.ResultDBCfg(enable=request.resultdb.enable)
+
+
+def _cipd_package_from_rpc(package):
+  # type: (swarming_pb2.CipdPackage) -> task_request.CipdPackage
+  return task_request.CipdPackage(
+      # For an ndb.Model, setting a kwarg value to None is the same as leaving
+      # it unset. Prefer that behaviour than setting the default empty value.
+      # The idea here is to mimic the protorpc implementation which will
+      # avoid setting a value if a given attribute is Falsy.
+      package_name=package.package_name or None,
+      version=package.version or None,
+      path=package.path or None,
+  )
+
+
+def _digest_from_rpc(digest):
+  # type: (swarming_pb2.Digest) -> task_request.Digest
+  return task_request.Digest(
+      hash=digest.hash or None,
+      size_bytes=digest.size_bytes or None,
+  )
+
+
+def _cache_entry_from_rpc(cache_entry):
+  # type: (swarming_pb2.CacheEntry) -> task_request.CacheEntry
+  return task_request.CacheEntry(
+      name=cache_entry.name or None,
+      path=cache_entry.path or None,
+  )
+
+
+def _task_properties_from_rpc(props):
+  # type: (swarming_pb2.TaskProperties) ->
+  #   tuple(task_request.TaskProperties, task_request.SecretBytes)
+  cipd_input = None
+  if props.HasField('cipd_input'):
+    client_package = None
+    if props.cipd_input.HasField('client_package'):
+      client_package = _cipd_package_from_rpc(props.cipd_input.client_package)
+    cipd_input = task_request.CipdInput(
+        client_package=client_package,
+        packages=[
+            _cipd_package_from_rpc(pack)
+            for pack in (props.cipd_input.packages or [])
+        ])
+
+  # Default value for swarming_pb2.ContainmentType is NOT_SPECIFIED which is 0.
+  containment = task_request.Containment(
+      containment_type=int(props.containment.containment_type))
+
+  cas_input_root = None
+  if props.HasField('cas_input_root'):
+    if (props.cas_input_root.HasField('digest')
+        and props.cas_input_root.HasField('cas_instance')):
+      digest = _digest_from_rpc(props.cas_input_root.digest)
+      cas_input_root = task_request.CASReference(
+          cas_instance=props.cas_input_root.cas_instance,
+          digest=digest,
+      )
+
+  secret_bytes = None
+  # if unset, this will be empty str
+  if props.secret_bytes:
+    secret_bytes = task_request.SecretBytes(secret_bytes=props.secret_bytes)
+
+  if len(set(i.key for i in props.env)) != len(props.env):
+    raise ValueError('same environment variable key cannot be specified twice')
+  if len(set(i.key for i in props.env_prefixes)) != len(props.env_prefixes):
+    raise ValueError('same environment prefix key cannot be specified twice')
+
+  dims = defaultdict(lambda: [])
+  for i in props.dimensions:
+    dims[i.key].append(i.value)
+
+  caches = [_cache_entry_from_rpc(c) for c in props.caches]
+  env = {i.key: i.value for i in props.env}
+  env_prefixes = {i.key: i.value for i in props.env_prefixes}
+
+  out = task_request.TaskProperties(
+      caches=caches,
+      # TaskProperties ndb entity expects a list so we must convert the proto3
+      # collection to a list.
+      command=list(props.command) or [],
+      relative_cwd=props.relative_cwd,
+      inputs_ref=None,
+      cas_input_root=cas_input_root,
+      cipd_input=cipd_input,
+      dimensions_data=dict(dims),
+      env=env,
+      env_prefixes=env_prefixes,
+      execution_timeout_secs=props.execution_timeout_secs,
+      grace_period_secs=props.grace_period_secs,
+      io_timeout_secs=props.io_timeout_secs,
+      idempotent=props.idempotent,
+      outputs=list(props.outputs),
+      has_secret_bytes=secret_bytes is not None,
+      containment=containment,
+  )
+  return out, secret_bytes
+
+
+def _task_slice_from_rpc(task_slice):
+  # type: (swarming_pb2.TaskSlice) ->
+  #   tuple(task_request.TaskSlice, task_request.SecretBytes)
+  props, secret_bytes = _task_properties_from_rpc(task_slice.properties)
+  out = task_request.TaskSlice(
+      expiration_secs=task_slice.expiration_secs,
+      wait_for_capacity=task_slice.wait_for_capacity,
+      properties=props,
+  )
+  return out, secret_bytes
+
+
+def new_task_request_from_rpc(request):
+  # type: (swarming_pb2.NewTaskRequest) ->
+  #   tuple(task_request.TaskRequest,
+  #         task_request.SecretBytes,
+  #         task_request.TemplateApplyEnum)
+  """Converts swarming_pb2.NewTaskRequest object to the ndb entity,
+  task_request.TaskRequest required to schedule a new task.
+
+  Args:
+    request: swarming_pb2.NewTaskRequest
+
+  Returns:
+    task_request.TaskRequest
+
+  Raises:
+    ValueError when the task request is invalid.
+  """
+  if request.task_slices and request.HasField('properties'):
+    raise ValueError('Specify one of properties or task_slices, not both')
+
+  # TODO(https://crbug.com/1422082) This code path will likely never occur.
+  if request.HasField('properties'):
+    logging.info('Properties is still used')
+    if not request.expiration_secs:
+      raise ValueError('missing expiration_secs')
+    props, secret_bytes = _task_properties_from_rpc(request.properties)
+    slices = [
+        task_request.TaskSlice(properties=props,
+                               expiration_secs=request.expiration_secs),
+    ]
+  elif request.task_slices:
+    if request.expiration_secs:
+      raise ValueError(
+          'When using task_slices, do not specify a global expiration_secs')
+    secret_bytes = None
+    slices = []
+    for t in (request.task_slices or []):
+      sl, se = _task_slice_from_rpc(t)
+      slices.append(sl)
+      if se:
+        if secret_bytes and se != secret_bytes:
+          raise ValueError(
+              'When using secret_bytes multiple times, all values must match')
+        secret_bytes = se
+  else:
+    raise ValueError('Specify one of properties or task_slices')
+
+  pttf = swarming_pb2.NewTaskRequest.PoolTaskTemplateField
+  template_apply = {
+      pttf.AUTO: task_request.TEMPLATE_AUTO,
+      pttf.CANARY_PREFER: task_request.TEMPLATE_CANARY_PREFER,
+      pttf.CANARY_NEVER: task_request.TEMPLATE_CANARY_NEVER,
+      pttf.SKIP: task_request.TEMPLATE_SKIP,
+  }[request.pool_task_template]
+
+  out = task_request.TaskRequest(
+      name=request.name,
+      created_ts=utils.utcnow(),
+      task_slices=slices,
+      # 'tags' is now generated from manual_tags plus automatic tags.
+      manual_tags=list(request.tags),
+      user=request.user,
+      priority=request.priority,
+      realm=request.realm,
+      service_account=request.service_account,
+      # prefer to unset this if protobuf default value is used.
+      # ndb has its own default of 1200.
+      bot_ping_tolerance_secs=request.bot_ping_tolerance_secs or None,
+      resultdb=_resultdb_from_rpc(request),
+      has_build_token=False,
+      scheduling_algorithm=None,
+      rbe_instance=None,
+      txn_uuid=None)
+
+  return out, secret_bytes, template_apply

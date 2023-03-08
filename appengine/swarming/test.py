@@ -44,6 +44,7 @@ def run_tests_sequential():
       [abs_path('handlers_backend_test.py')],
       [abs_path('handlers_endpoints_test.py')],
       [abs_path('handlers_prpc_test.py')],
+      [abs_path('message_conversion_prpc_test.py')],
       [abs_path('server/bot_groups_config_test.py')],
       [abs_path('server/resultdb_test.py')],
       [abs_path('local_smoke_test.py')],
