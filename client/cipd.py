@@ -271,11 +271,7 @@ class CipdClient:
 
 
 def get_platform():
-  """Returns ${platform} parameter value.
-
-  The logic is similar to
-  https://chromium.googlesource.com/chromium/tools/build/+/6c5c7e9c/scripts/slave/infra_platform.py
-  """
+  """Returns ${platform} parameter value."""
   # linux, mac or windows.
   os_name = {
       'darwin': 'mac',
@@ -284,6 +280,11 @@ def get_platform():
   }.get(sys.platform)
   if not os_name:
     raise Error('Unknown OS: %s' % sys.platform)
+
+  # Use a specific architecture if told to. Happens on Swarming bots.
+  arch_override = os.getenv('CIPD_ARCHITECTURE')
+  if arch_override:
+    return '%s-%s' % (os_name, arch_override)
 
   # Normalize machine architecture. Some architectures are identical or
   # compatible with others. We collapse them into one.
@@ -309,12 +310,6 @@ def get_platform():
   python_bits = 64 if sys.maxsize > 2**32 else 32
   if os_name == 'linux' and arch == 'amd64' and python_bits == 32:
     arch = '386'
-
-  # On windows-amd64, check if we are running on arm64 in emulated mode.
-  # If so, fetch native arm64 packages.
-  if (os_name == 'windows' and arch == 'amd64'
-      and os.getenv('PROCESSOR_ARCHITECTURE', '').startswith('ARM')):
-    arch = 'arm64'
 
   return '%s-%s' % (os_name, arch)
 

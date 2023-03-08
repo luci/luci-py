@@ -255,6 +255,25 @@ def get_cpu_bitness():
   return '64' if sys.maxsize > 2**32 else '32'
 
 
+@tools.cached
+def get_cipd_architecture():
+  """Returns the CPU architecture (e.g. `amd64`, `arm64`) of CIPD packages
+  native to the bot host platform.
+
+  Note it might be different from the python executable architecture if the
+  bot is running through an emulation layer.
+  """
+  cpu_type = get_cpu_type()
+  if cpu_type == 'x86':
+    return 'amd64' if get_cpu_bitness() == '64' else '386'
+  if cpu_type.startswith('armv') and cpu_type.endswith('l'):
+    # 32-bit ARM: Standardize on ARM v6 baseline.
+    return 'armv6l'
+  # TODO(vadimsh): Detection of following architectures is likely broken:
+  #   mips64, mips64le, mipsle, ppc64, ppc64le, riscv64, s390x.
+  return cpu_type
+
+
 def _parse_intel_model(name):
   """Tries to extract the CPU model name from the display name.
 

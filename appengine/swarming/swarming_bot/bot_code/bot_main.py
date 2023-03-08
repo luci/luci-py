@@ -944,6 +944,7 @@ def _run_manifest(botobj, manifest, rbe_session):
         work_dir = tempfile.mkdtemp(dir=botobj.base_dir, prefix='w')
 
     env = os.environ.copy()
+    env['CIPD_ARCHITECTURE'] = os_utilities.get_cipd_architecture()
     env['SWARMING_TASK_ID'] = task_id
     env['SWARMING_SERVER'] = botobj.server
 

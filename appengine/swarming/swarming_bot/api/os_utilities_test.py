@@ -17,9 +17,6 @@ import time
 import unittest
 
 import mock
-# TODO(github.com/wolever/parameterized/issues/91)
-# use parameterized after the bug is resolved.
-from nose2.tools import params
 
 import test_env_api
 test_env_api.setup_test_env()
@@ -37,30 +34,39 @@ import os_utilities
 
 class TestOsUtilities(auto_stub.TestCase):
 
-  def setUp(self):
-    super(TestOsUtilities, self).setUp()
-    tools.clear_cache_all()
-
-  def tearDown(self):
-    super(TestOsUtilities, self).tearDown()
-    tools.clear_cache_all()
-
   def test_get_os_name(self):
     expected = ('Debian', 'Linux', 'Mac', 'Raspbian', 'Ubuntu', 'Windows')
     self.assertIn(os_utilities.get_os_name(), expected)
 
-  @params(
-      ('x86_64', 'x86'),
-      ('amd64', 'x86'),
-      ('i386', 'x86'),
-      ('i686', 'x86'),
-      ('aarch64', 'arm64'),
-      ('mips64', 'mips'),
-      ('arm64', 'arm64'),
-  )
-  def test_get_cpu_type(self, machine, expected):
-    self.mock(platform, 'machine', lambda: machine)
-    self.assertEqual(os_utilities.get_cpu_type(), expected)
+  def test_get_cpu_type(self):
+    cases = [
+        ('x86_64', 'x86'),
+        ('amd64', 'x86'),
+        ('i386', 'x86'),
+        ('i686', 'x86'),
+        ('aarch64', 'arm64'),
+        ('mips64', 'mips'),
+        ('arm64', 'arm64'),
+    ]
+    for machine, expected in cases:
+      self.mock(platform, 'machine', lambda: machine)
+      self.assertEqual(os_utilities.get_cpu_type(), expected)
+
+  def test_get_cipd_architecture(self):
+    cases = [
+        ('x86_64', '64', 'amd64'),
+        ('amd64', '64', 'amd64'),
+        ('i386', '32', '386'),
+        ('i686', '64', 'amd64'),
+        ('i686', '32', '386'),  # 32-bit Linux userland
+        ('aarch64', '64', 'arm64'),
+        ('arm64', '64', 'arm64'),
+        ('armv7l', '32', 'armv6l'),
+    ]
+    for machine, bitness, expected in cases:
+      self.mock(platform, 'machine', lambda: machine)
+      self.mock(os_utilities, 'get_cpu_bitness', lambda: bitness)
+      self.assertEqual(os_utilities.get_cipd_architecture(), expected)
 
   @unittest.skipUnless(sys.platform == 'linux', 'this is only for linux')
   def test_get_os_values_linux(self):
