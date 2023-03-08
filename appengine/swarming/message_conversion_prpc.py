@@ -11,7 +11,6 @@ import logging
 
 from google.protobuf.timestamp_pb2 import Timestamp
 
-import api_common
 from components import utils
 from proto.api_v2 import swarming_pb2
 from server import task_request
