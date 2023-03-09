@@ -1589,7 +1589,8 @@ class _BotLoopState:
         self.on_idle_poll_cycle()
       return lease
     except remote_client_errors.RBEServerError as e:
-      self.report_exception('Failed to update RBE Session: %s' % e)
+      if self._rbe_consecutive_errors > 3:
+        self.report_exception('Failed to update RBE Session: %s' % e)
       self._rbe_consecutive_errors += 1
       return None
 
