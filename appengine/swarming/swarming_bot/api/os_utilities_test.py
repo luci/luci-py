@@ -245,6 +245,7 @@ class TestOsUtilities(auto_stub.TestCase):
     }
     if sys.platform in ('cygwin', 'win32'):
       expected.add('cygwin')
+      expected.add('wmi_cpu_type')
     if sys.platform == 'darwin':
       expected.add('xcode')
     if 'quarantined' in actual:

@@ -1104,6 +1104,7 @@ def get_state():
     state['named_caches'] = cache
   if sys.platform in ('cygwin', 'win32'):
     state['cygwin'] = [sys.platform == 'cygwin']
+    state['wmi_cpu_type'] = platforms.win.get_cpu_type_with_wmi()
   if sys.platform == 'darwin':
     state['xcode'] = platforms.osx.get_xcode_state()
     temp = platforms.osx.get_temperatures()
