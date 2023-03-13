@@ -493,35 +493,16 @@ class SwarmingTasksService(remote.Service):
     cancellations will not have completed yet.
     """
     logging.debug('request %s', request)
-    if not request.tags:
-      # Prevent accidental cancellation of everything.
-      raise endpoints.BadRequestException(
-          'You must specify tags when cancelling multiple tasks.')
-
-    # Check permission.
-    # If the caller has global permission, it can access all tasks.
-    # Otherwise, it requires a pool tag to check ACL.
-    pools = bot_management.get_pools_from_dimensions_flat(request.tags)
-    realms.check_tasks_cancel_acl(pools)
-
-    now = utils.utcnow()
-
     try:
       start = message_conversion.epoch_to_datetime(request.start)
       end = message_conversion.epoch_to_datetime(request.end)
-      query = task_result.get_result_summaries_query(
-          start, end, 'created_ts',
-          'pending_running' if request.kill_running else 'pending',
-          request.tags)
-      cursor, results = task_scheduler.cancel_tasks(request.limit,
-                                                    query=query,
-                                                    cursor=request.cursor)
     except ValueError as e:
-      raise endpoints.BadRequestException(
-          'Inappropriate filter for tasks/list: %s' % e)
-
-    return swarming_rpcs.TasksCancelResponse(
-        cursor=cursor, matched=len(results), now=now)
+      raise endpoints.BadRequestException('Invalid timestamp: %s' % e)
+    tcr = api_common.cancel_tasks(request.tags, start, end, request.limit,
+                                  request.cursor, request.kill_running)
+    return swarming_rpcs.TasksCancelResponse(cursor=tcr.cursor,
+                                             matched=tcr.matched,
+                                             now=tcr.now)
 
   @endpoint(TasksCountRequest, swarming_rpcs.TasksCount, http_method='GET')
   @auth.require(acl.can_access, log_identity=True)

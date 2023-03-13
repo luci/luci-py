@@ -13,6 +13,7 @@ import api_helpers
 import handlers_exceptions
 from components import auth
 from components import datastore_utils
+from components import utils
 from server import task_queues
 from server import bot_management
 from server import realms
@@ -427,3 +428,55 @@ def new_task(request, secret_bytes, template_apply, evaluate_only,
                  new_task_result.request.task_id, request_uuid)
 
   return new_task_result
+
+
+TasksCancelResult = namedtuple('TasksCancelResponse',
+                               ['cursor', 'matched', 'now'])
+
+
+def cancel_tasks(tags, start, end, limit, cursor, kill_running):
+  """Mass cancels tasks which match the filter.
+
+  Args:
+    tags: list of 'key:value' strings. Tasks matching these tags will be queued
+      for cancellation.
+    start: datetime.datetime. only tasks created after start will be cancelled.
+    end: datetime.datetime. only tasks created before end will be cancelled.
+    limit: number of tasks to cancel per request.
+    cursor: str representing cursor from previous request.
+    kill_running: if True, tasks which are running at time of request will be
+      scheduled for cancellation. If False they are ignored.
+
+  Returns:
+    TasksCancelResponse(cursor, matched, now): matched is the number of tasks
+      queued for cancellation. now is time before cancellation was scheduled.
+      cursor is used to continue query for future requests.
+
+  Raises:
+    auth.AuthorizationError if acl checks fail.
+    handlers_exceptions.BadRequestException if limit is not in [1, 1000]
+  """
+  if not tags:
+    # Prevent accidental cancellation of everything.
+    raise handlers_exceptions.BadRequestException(
+        'You must specify tags when cancelling multiple tasks.')
+
+  # Check permission.
+  # If the caller has global permission, it can access all tasks.
+  # Otherwise, it requires a pool tag to check ACL.
+  pools = bot_management.get_pools_from_dimensions_flat(tags)
+  realms.check_tasks_cancel_acl(pools)
+
+  now = utils.utcnow()
+
+  query = task_result.get_result_summaries_query(
+      start, end, 'created_ts',
+      'pending_running' if kill_running else 'pending', tags)
+  try:
+    cursor, results = task_scheduler.cancel_tasks(limit,
+                                                  query=query,
+                                                  cursor=cursor)
+  except ValueError as e:
+    raise handlers_exceptions.BadRequestException(str(e))
+
+  return TasksCancelResult(cursor=cursor, matched=len(results), now=now)
