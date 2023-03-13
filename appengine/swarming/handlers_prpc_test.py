@@ -1305,13 +1305,41 @@ class TaskServicePrpcTest(PrpcTest):
     # but, not accessible to the task with no realm.
     assertTaskIsNotAccessible(task_id_without_realm)
 
-  def _new_task_request(self):
-    return swarming_pb2.NewTaskRequest(expiration_secs=24 * 60 * 60,
-                                       name='job1',
-                                       priority=20,
-                                       tags=[u'a:tag'],
-                                       user='joe@localhost',
-                                       bot_ping_tolerance_secs=600)
+  def _new_task_request(self, use_default_slice=False):
+    ntr = swarming_pb2.NewTaskRequest(expiration_secs=24 * 60 * 60,
+                                      name='job1',
+                                      priority=20,
+                                      tags=[u'a:tag'],
+                                      user='joe@localhost',
+                                      bot_ping_tolerance_secs=600)
+    if use_default_slice:
+      ts = swarming_pb2.TaskSlice(expiration_secs=180, wait_for_capacity=True)
+      # Hack to get min line length.
+      props = ts.properties
+      props.cipd_input.client_package.package_name = ('infra/tools/'
+                                                      'cipd/${platform}')
+      props.cipd_input.client_package.version = 'git_revision:deadbeef'
+      props.cipd_input.packages.extend([
+          swarming_pb2.CipdPackage(package_name='rm',
+                                   path='bin',
+                                   version='git_revision:deadbeef')
+      ])
+      props.cipd_input.server = 'https://pool.config.cipd.example.com'
+      props.command[:] = ['python', '-c', 'print(1)']
+      props.containment.containment_type = swarming_pb2.ContainmentType.AUTO
+      props.dimensions.extend([
+          swarming_pb2.StringPair(key='os', value='Amiga'),
+          swarming_pb2.StringPair(key='pool', value='default')
+      ])
+      props.execution_timeout_secs = 3600
+      props.grace_period_secs = 30
+      props.idempotent = False
+      props.io_timeout_secs = 1200
+      props.outputs[:] = ['foo', 'path/to/foobar']
+      props.command[:] = ['python', 'run_test.py']
+      ntr.task_slices.extend([ts])
+      ntr.ClearField('expiration_secs')
+    return ntr
 
   def test_new_ok(self):
     self.mock(random, 'getrandbits', lambda _: 0x88)
@@ -1525,6 +1553,138 @@ class TaskServicePrpcTest(PrpcTest):
     self.assertEqual('test:task_realm', request.realm)
     self.assertEqual('invocations/task-test-swarming.appspot.com-5cee488008811',
                      summary.resultdb_info.invocation)
+
+  def _prepare_mass_cancel(self):
+    # Create 3 tasks: one pending, one running, one complete.
+    self.mock(random, 'getrandbits', lambda _: 0x88)
+    self.set_as_bot()
+    self.do_handshake(do_first_poll=True)
+
+    # Completed.
+    self.set_as_user()
+    ntr = self._new_task_request(use_default_slice=True)
+    ntr.name = "first"
+    ntr.tags[:] = ['project:yay', 'commit:abcd', 'os:Win']
+    _, _ = self._client_create_task(ntr)
+    self.set_as_bot()
+    self.bot_run_task()
+
+    # Running.
+    self.set_as_user()
+    self.mock_now(self.now, 60)
+    ntr = self._new_task_request(use_default_slice=True)
+    ntr.name = 'second'
+    ntr.user = 'jack@localhost'
+    ntr.tags[:] = ['project:yay', 'commit:efgh', 'os:Win']
+    _, running_id = self._client_create_task(ntr)
+    self.set_as_bot()
+    self.bot_poll()
+
+    # Pending.
+    self.set_as_user()
+    now_120 = self.mock_now(self.now, 120)
+
+    ntr = self._new_task_request(use_default_slice=True)
+    ntr.name = 'third'
+    ntr.user = 'jack@localhost'
+    ntr.tags[:] = ['project:yay', 'commit:ijkhl', 'os:Linux']
+    _, pending_id = self._client_create_task(ntr)
+
+    return running_id, pending_id, now_120
+
+  def test_mass_cancel_pending(self):
+    _, pending_id, now_120 = self._prepare_mass_cancel()
+
+    def enqueue_task(url, name, payload):
+      self.assertEqual('/internal/taskqueue/important/tasks/cancel', url)
+      self.assertEqual('cancel-tasks', name)
+      e = {'tasks': [pending_id], 'kill_running': True}
+      self.assertEqual(e, json.loads(payload))
+      return True
+
+    self.mock(utils, 'enqueue_task', enqueue_task)
+
+    self.set_as_admin()
+    tcr = swarming_pb2.TasksCancelRequest(
+        limit=100,
+        tags=['project:yay'],
+        start=message_conversion_prpc.date(self.now -
+                                           datetime.timedelta(seconds=1)),
+        end=message_conversion_prpc.date(now_120 +
+                                         datetime.timedelta(seconds=1)),
+    )
+    resp = self.post_prpc('CancelTasks', tcr)
+    actual = swarming_pb2.TasksCancelResponse()
+    _decode(resp.body, actual)
+    expected = swarming_pb2.TasksCancelResponse(
+        matched=1, now=message_conversion_prpc.date(now_120))
+    self.assertEqual(expected, actual)
+
+  def test_mass_cancel_running(self):
+    running_id, pending_id, now_120 = self._prepare_mass_cancel()
+
+    def enqueue_task(url, name, payload):
+      self.assertEqual('/internal/taskqueue/important/tasks/cancel', url)
+      self.assertEqual('cancel-tasks', name)
+      e = {'tasks': [pending_id, running_id], 'kill_running': True}
+      self.assertEqual(e, json.loads(payload))
+      return True
+
+    self.mock(utils, 'enqueue_task', enqueue_task)
+
+    self.set_as_admin()
+    tcr = swarming_pb2.TasksCancelRequest(
+        limit=100,
+        tags=['project:yay'],
+        kill_running=True,
+        start=message_conversion_prpc.date(self.now -
+                                           datetime.timedelta(seconds=1)),
+        end=message_conversion_prpc.date(now_120 +
+                                         datetime.timedelta(seconds=1)),
+    )
+    resp = self.post_prpc('CancelTasks', tcr)
+    actual = swarming_pb2.TasksCancelResponse()
+    _decode(resp.body, actual)
+    expected = swarming_pb2.TasksCancelResponse(
+        matched=2, now=message_conversion_prpc.date(now_120))
+    self.assertEqual(expected, actual)
+
+  def test_mass_cancel_realm_permission(self):
+    # non-privileged user without realm permission.
+    self.set_as_user()
+    self.mock_auth_db([])
+
+    # the user needs to specify a pool filter.
+    tcr = swarming_pb2.TasksCancelRequest(
+        limit=100,
+        tags=['project:yay'],
+        kill_running=True,
+    )
+    resp = self.post_prpc('CancelTasks', tcr, expect_errors=True)
+    self.assertEqual(resp.status, '403 Forbidden')
+    self.assertEqual(u'No pool is specified', resp.body)
+
+    # the user can't access the tasks without permission.
+    tcr.tags[:] = ['pool:default']
+    resp = self.post_prpc('CancelTasks', tcr, expect_errors=True)
+    self.assertEqual(resp.status, '403 Forbidden')
+    self.assertEqual(
+        cgi.escape((u'user "user@example.com" does not have '
+                    u'permission "swarming.pools.cancelTask"'),
+                   quote=True), resp.body)
+
+    # give permission to the user.
+    self.mock_auth_db([auth.Permission('swarming.pools.cancelTask')])
+
+    # the user still needs to specify a pool filter.
+    tcr.tags[:] = ['foo:bar']
+    resp = self.post_prpc('CancelTasks', tcr, expect_errors=True)
+    self.assertEqual(resp.status, '403 Forbidden')
+    self.assertEqual(u'No pool is specified', resp.body)
+
+    # ok if the user has a permission of the specified pool.
+    tcr.tags[:] = ['pool:default']
+    self.post_prpc('CancelTasks', tcr)
 
 
 class InternalsServicePrpcTest(PrpcTest):

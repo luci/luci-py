@@ -163,6 +163,22 @@ class TasksService(object):
             ntr.task_result, False) if ntr.task_result else None,
     )
 
+  @prpc_helpers.method
+  @auth.require(acl.can_access, log_identity=True)
+  def CancelTasks(self, request, _context):
+    start = request.start.ToDatetime()
+    if not request.HasField("start"):
+      start = None
+    end = request.end.ToDatetime()
+    if not request.HasField("end"):
+      end = None
+    tcr = api_common.cancel_tasks(request.tags, start, end, request.limit,
+                                  request.cursor, request.kill_running)
+    now = message_conversion_prpc.date(tcr.now)
+    return swarming_pb2.TasksCancelResponse(cursor=tcr.cursor,
+                                            matched=tcr.matched,
+                                            now=now)
+
 
 class InternalsService(object):
   DESCRIPTION = rbe_prpc_pb2.InternalsServiceDescription
