@@ -480,3 +480,33 @@ def cancel_tasks(tags, start, end, limit, cursor, kill_running):
     raise handlers_exceptions.BadRequestException(str(e))
 
   return TasksCancelResult(cursor=cursor, matched=len(results), now=now)
+
+
+DimensionsResponse = namedtuple('DimensionsResponse', ['bots_dimensions', 'ts'])
+
+
+def get_dimensions(pool):
+  """Returns an aggregated list of all dimensions for a specific pool.
+
+  Args:
+    pool: pool to find dimensions for.
+
+  Returns: DimensionsResponse(bots_dimensions, ts) where ts is the time
+    the query was made and bot_dimensions is a dictionary with they type
+    dict[str, list[str]] with the key being a dimension and the values being
+    a list of values associated with that dimension.
+
+  Raises:
+    auth.AuthorizationError if acl checks fail.
+    handlers_exceptions.NotFoundException if a DimensionsAggregation is not
+      found for pool.
+
+  """
+  realms.check_bots_list_acl([pool] if pool else None)
+
+  # TODO(jwata): change 'current' to 'all' once the entity is ready.
+  agg = bot_management.get_aggregation_key(pool or 'current').get()
+  if not agg:
+    raise handlers_exceptions.NotFoundException(
+        'Dimension aggregation for pool %s does not exit' % pool)
+  return DimensionsResponse(bots_dimensions=agg.dimensions, ts=agg.ts)

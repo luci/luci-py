@@ -872,21 +872,12 @@ class SwarmingBotsService(remote.Service):
   @auth.require(acl.can_access, log_identity=True)
   def dimensions(self, request):
     """Returns the cached set of dimensions currently in use in the fleet."""
-    # The caller should be allowed to list bots in the specified pool or all
-    # pools.
-    realms.check_bots_list_acl([request.pool] if request.pool else None)
-
-    # TODO(jwata): change 'current' to 'all' once the entity is ready.
-    agg = bot_management.get_aggregation_key(request.pool or 'current').get()
-    if not agg:
-      raise endpoints.NotFoundException(
-          'Dimension aggregation for pool %s does not exit' % request.pool)
-    return swarming_rpcs.BotsDimensions(
-        bots_dimensions=[
-            swarming_rpcs.StringListPair(key=d.dimension, value=d.values)
-            for d in agg.dimensions
-        ],
-        ts=agg.ts)
+    dr = api_common.get_dimensions(request.pool)
+    dimensions = [
+        swarming_rpcs.StringListPair(key=d.dimension, value=d.values)
+        for d in dr.bots_dimensions
+    ]
+    return swarming_rpcs.BotsDimensions(bots_dimensions=dimensions, ts=dr.ts)
 
 
 def get_routes():
