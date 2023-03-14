@@ -55,6 +55,8 @@ _STATE_MAP = {
 
 
 class BotsService(object):
+  """Module implements the Bots service defined in proto/api_v2/swarming.proto
+  """
   DESCRIPTION = swarming_prpc_pb2.BotsServiceDescription
 
   @prpc_helpers.method
@@ -107,8 +109,21 @@ class BotsService(object):
                                               cursor, limit)
     return message_conversion_prpc.bot_tasks_response(items, cursor)
 
+  @prpc_helpers.method
+  @auth.require(acl.can_access, log_identity=True)
+  def GetBotDimensions(self, request, _context):
+    dr = api_common.get_dimensions(request.pool)
+    ts = message_conversion_prpc.date(dr.ts)
+    bd = [
+        swarming_pb2.StringListPair(key=d.dimension, value=d.values)
+        for d in dr.bots_dimensions
+    ]
+    return swarming_pb2.BotsDimensions(bots_dimensions=bd, ts=ts)
+
 
 class TasksService(object):
+  """Module implements the Tasks service defined in proto/api_v2/swarming.proto
+  """
   DESCRIPTION = swarming_prpc_pb2.TasksServiceDescription
 
   @prpc_helpers.method
@@ -181,6 +196,9 @@ class TasksService(object):
 
 
 class InternalsService(object):
+  """Module implements the Internals service defined in
+  proto/internals/rbe.proto"""
+
   DESCRIPTION = rbe_prpc_pb2.InternalsServiceDescription
 
   @prpc_helpers.method

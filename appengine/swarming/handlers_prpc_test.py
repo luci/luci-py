@@ -700,6 +700,88 @@ class BotServicePrpcTest(PrpcTest):
       response = self.post_prpc('ListBotTasks', request, expect_errors=True)
       self.assertEqual(response.status, '400 Bad Request')
 
+  def test_dimensions_not_found(self):
+    self.set_as_privileged_user()
+    request = swarming_pb2.BotsDimensionsRequest(pool='unknown')
+    response = self.post_prpc('GetBotDimensions', request, expect_errors=True)
+    self.assertEqual(response.status, '404 Not Found')
+
+  def test_dimensions_forbidden(self):
+    self.set_as_user()
+    self.mock_auth_db([])
+
+    # the user doesn't have permission to get dimensions.
+    request = swarming_pb2.BotsDimensionsRequest()
+    response = self.post_prpc('GetBotDimensions', request, expect_errors=True)
+    self.assertEqual(response.status, '403 Forbidden')
+
+    request = swarming_pb2.BotsDimensionsRequest(pool='default')
+    response = self.post_prpc('GetBotDimensions', request, expect_errors=True)
+    self.assertEqual(response.status, '403 Forbidden')
+
+    # pool permission isn't sufficient to get all dimensions.
+    self.mock_auth_db([
+        auth.Permission('swarming.pools.listBots'),
+    ])
+    request = swarming_pb2.BotsDimensionsRequest()
+    response = self.post_prpc('GetBotDimensions', request, expect_errors=True)
+    self.assertEqual(response.status, '403 Forbidden')
+
+  def test_dimensions_pool(self):
+    self.set_as_user()
+    self.mock_auth_db([
+        auth.Permission('swarming.pools.listBots'),
+    ])
+
+    bot_management.DimensionAggregation(
+        key=bot_management.get_aggregation_key('default'),
+        dimensions=[
+            bot_management.DimensionValues(dimension='foo',
+                                           values=['alpha', 'beta']),
+        ],
+        ts=self.now).put()
+
+    expected = swarming_pb2.BotsDimensions(
+        bots_dimensions=[
+            swarming_pb2.StringListPair(key='foo', value=['alpha', 'beta']),
+        ],
+        ts=message_conversion_prpc.date(self.now),
+    )
+    request = swarming_pb2.BotsDimensionsRequest(pool='default')
+    response = self.post_prpc('GetBotDimensions', request)
+    actual = swarming_pb2.BotsDimensions()
+    _decode(response.body, actual)
+    self.assertEqual(expected, actual)
+
+  def test_dimensions_all(self):
+    """Asserts that BotsDimensions is returned with the right data."""
+    self.set_as_privileged_user()
+
+    bot_management.DimensionAggregation(
+        key=bot_management.DimensionAggregation.KEY,
+        dimensions=[
+            bot_management.DimensionValues(dimension='foo',
+                                           values=['alpha', 'beta']),
+            bot_management.DimensionValues(dimension='bar',
+                                           values=['gamma', 'delta',
+                                                   'epsilon']),
+        ],
+        ts=self.now).put()
+    expected = swarming_pb2.BotsDimensions(
+        bots_dimensions=[
+            swarming_pb2.StringListPair(key='foo', value=['alpha', 'beta']),
+            swarming_pb2.StringListPair(key='bar',
+                                        value=['gamma', 'delta', 'epsilon']),
+        ],
+        ts=message_conversion_prpc.date(self.now),
+    )
+
+    request = swarming_pb2.BotsDimensionsRequest()
+    response = self.post_prpc('GetBotDimensions', request)
+    actual = swarming_pb2.BotsDimensions()
+    _decode(response.body, actual)
+    self.assertEqual(expected, actual)
+
 
 class TaskServicePrpcTest(PrpcTest):
   def setUp(self):
