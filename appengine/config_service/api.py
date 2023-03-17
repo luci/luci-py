@@ -49,6 +49,11 @@ class File(messages.Message):
   """Describes a file."""
   path = messages.StringField(1)
 
+# The GFE limit is 32 MiB. Give 2MiB of buffer in the get_config endpoint
+# response.
+_GET_CONFIG_RESPONSE_SIZE_LIMIT = 30 * 1024 * 1024
+
+
 class ConfigSet(messages.Message):
   """Describes a config set."""
 
@@ -307,6 +312,7 @@ class ConfigApi(remote.Service):
     # This field is only populated if the latest revision is requested.
     # TODO(jchinlee): populate in case of specific revision requested.
     url = messages.StringField(4)
+    is_zlib_compressed = messages.BooleanField(5)
 
   @auth.endpoints_method(
       endpoints.ResourceContainer(
@@ -315,6 +321,7 @@ class ConfigApi(remote.Service):
           path=messages.StringField(2, required=True),
           revision=messages.StringField(3),
           hash_only=messages.BooleanField(4),
+          use_zlib=messages.BooleanField(5),
       ),
       GetConfigResponseMessage,
       http_method='GET',
@@ -354,7 +361,22 @@ class ConfigApi(remote.Service):
             'File: "%s:%s:%s". Hash: %s', request.config_set,
             request.revision, request.path, res.content_hash)
         raise_config_not_found()
-
+      if request.use_zlib:
+        logging.info(
+            'Trying to compress the content (original size is %d bytes).',
+            len(res.content))
+        res.content = zlib.compress(res.content)
+        res.is_zlib_compressed = True
+      if len(res.content) > _GET_CONFIG_RESPONSE_SIZE_LIMIT:
+        if res.is_zlib_compressed:
+          raise endpoints.InternalServerErrorException(
+              ('Cannot service the request. Content size (%d bytes) is still '
+               'larger than the limit (%d bytes) even after compression.') %
+              (len(res.content), _GET_CONFIG_RESPONSE_SIZE_LIMIT))
+        raise endpoints.BadRequestException(
+            ('The config content you requested is too large (%d bytes). '
+             'Please add `use_zlib=true` in url params') %
+            len(res.content))
     return res
 
   ##############################################################################

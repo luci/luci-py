@@ -5,6 +5,8 @@
 
 import base64
 import datetime
+import zlib
+
 import httplib
 
 import test_env
@@ -55,7 +57,10 @@ class ApiTest(test_case.EndpointsTestCase):
           projects.RepositoryType.GITILES, 'https://v8.example.com'),
     })))
 
-  def mock_config(self, config_set='services/x', mock_content=True):
+  def mock_config(self,
+                  config_set='services/x',
+                  mock_content=True,
+                  mock_large_content=False):
     mocked_cs = storage.ConfigSet(
         id=config_set,
         location='https://x.googlesource.com/x',
@@ -79,9 +84,16 @@ class ApiTest(test_case.EndpointsTestCase):
       })
 
       self.mock(storage, 'get_configs_by_hashes_async', mock.Mock())
-      storage.get_configs_by_hashes_async.return_value = future({
-        'abc0123': 'config text',
-      })
+      if mock_large_content:
+        storage.get_configs_by_hashes_async.return_value = future({
+            'abc0123':
+            '01234567890' * 3 * 1024 * 1024,
+        })
+      else:
+        storage.get_configs_by_hashes_async.return_value = future({
+            'abc0123':
+            'config text',
+        })
 
   def mock_refs(self):
     self.mock(projects, 'get_refs', mock.Mock())
@@ -491,6 +503,44 @@ class ApiTest(test_case.EndpointsTestCase):
       'revision': 'deadbeef',
       'url': 'https://x.com/+/deadbeef',
     })
+    storage.get_config_hashes_async.assert_called_once_with(
+        {'services/x': 'deadbeef'}, 'my.cfg')
+    storage.get_configs_by_hashes_async.assert_called_once_with(['abc0123'])
+
+  def test_get_config_large_without_use_zlib(self):
+    self.mock_config(mock_large_content=True)
+
+    req = {
+        'config_set': 'services/x',
+        'path': 'my.cfg',
+        'revision': 'deadbeef',
+    }
+
+    with self.call_should_fail(httplib.BAD_REQUEST):
+      self.call_api('get_config', req)
+
+  def test_get_config_use_zlib_param(self):
+    self.mock_config()
+
+    req = {
+        'config_set': 'services/x',
+        'path': 'my.cfg',
+        'revision': 'deadbeef',
+        'use_zlib': True,
+    }
+    resp = self.call_api('get_config', req).json_body
+
+    self.assertTrue(resp['is_zlib_compressed'])
+    actual_content = zlib.decompress(base64.b64decode(resp['content']))
+    self.assertEqual(actual_content, 'config text')
+    del resp['content']
+    self.assertEqual(
+        resp, {
+            'content_hash': 'abc0123',
+            'revision': 'deadbeef',
+            'url': 'https://x.com/+/deadbeef',
+            'is_zlib_compressed': True,
+        })
     storage.get_config_hashes_async.assert_called_once_with(
         {'services/x': 'deadbeef'}, 'my.cfg')
     storage.get_configs_by_hashes_async.assert_called_once_with(['abc0123'])
