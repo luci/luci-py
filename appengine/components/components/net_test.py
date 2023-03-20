@@ -270,6 +270,14 @@ class NetTest(test_case.TestCase):
     with self.assertRaises(net.MethodNotAllowed):
       net.request('http://localhost/123')
 
+  def test_308_expected(self):
+    self.mock_urlfetch([
+        ({
+            'url': 'http://localhost/123'
+        }, Response(308, 'incomplete', {})),
+    ])
+    _ = net.request('http://localhost/123', expected_codes=[308])
+
   def test_json_request_works(self):
     self.mock_urlfetch([
         ({

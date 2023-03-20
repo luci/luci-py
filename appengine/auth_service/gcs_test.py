@@ -27,7 +27,12 @@ class GCSTest(test_case.TestCase):
     self.expected_update_calls = 0
 
     self.requests = []
-    def _net_request(**kwargs):
+    self.response_headers = []
+
+    def _net_request(response_headers=None, **kwargs):
+      if self.response_headers:
+        self.assertEqual(response_headers, {})
+        response_headers.update(self.response_headers.pop(0))
       self.requests.append(kwargs)
     self.mock(net, 'request', _net_request)
 
@@ -102,6 +107,7 @@ class GCSTest(test_case.TestCase):
     self.assertEqual(['keep@example.com'], gcs._list_authorized_readers())
 
   def test_upload_auth_db(self):
+    self.mock(gcs, '_GCS_CHUNK_SIZE', 7)
     self.mock_update_gcs_acls()
     self.mock_config(auth_db_gs_path='bucket/dir')
     self.assertTrue(gcs.is_upload_enabled())
@@ -110,55 +116,95 @@ class GCSTest(test_case.TestCase):
       self.expect_update_gcs_acls()
       gcs.authorize_reader(email)
 
+    # Mock the GCS resumable upload URL.
+    upload_url = 'https://mocked_upload_url'
+    self.response_headers.append({'Location': upload_url})
+
     gcs.upload_auth_db('signed blob', 'revision json')
 
     # Should upload two files and set ACLs to match authorized readers.
-    self.assertEqual(2, len(self.requests))
-    self.assertEqual({
-        'deadline': 30,
-        'headers': {'Content-Type': 'multipart/related; boundary=BOUNDARY'},
-        'method': 'POST',
-        'params': {'uploadType': 'multipart'},
-        'payload': '\r\n'.join([
-            '--BOUNDARY',
-            'Content-Type: application/json; charset=UTF-8',
-            '',
-            '{"acl":[{"entity":"user-a@example.com","role":"READER"},'
-                + '{"entity":"user-b@example.com","role":"READER"}],'
-                + '"name":"dir/latest.db"}',
-            '--BOUNDARY',
-            'Content-Type: application/protobuf',
-            '',
-            'signed blob',
-            '--BOUNDARY--',
-            '',
-        ]),
-        'scopes': ['https://www.googleapis.com/auth/cloud-platform'],
-        'url': u'https://www.googleapis.com/upload/storage/v1/b/bucket/o',
-    }, self.requests[0])
+    self.assertEqual(4, len(self.requests))
 
-    self.assertEqual({
-        'deadline': 30,
-        'headers': {'Content-Type': 'multipart/related; boundary=BOUNDARY'},
-        'method': 'POST',
-        'params': {'uploadType': 'multipart'},
-        'payload': '\r\n'.join([
-            '--BOUNDARY',
-            'Content-Type: application/json; charset=UTF-8',
-            '',
-            '{"acl":[{"entity":"user-a@example.com","role":"READER"},'
-                + '{"entity":"user-b@example.com","role":"READER"}],'
-                + '"name":"dir/latest.json"}',
-            '--BOUNDARY',
-            'Content-Type: application/json',
-            '',
-            'revision json',
-            '--BOUNDARY--',
-            '',
-        ]),
-        'scopes': ['https://www.googleapis.com/auth/cloud-platform'],
-        'url': u'https://www.googleapis.com/upload/storage/v1/b/bucket/o',
-    }, self.requests[1])
+    # latest.db is "big" and uploaded via multiple requests.
+    self.assertEqual(
+        {
+            'deadline':
+            30,
+            'headers': {
+                'Content-Type': 'application/json; charset=utf-8',
+                'X-Upload-Content-Length': '11',
+                'X-Upload-Content-Type': 'application/protobuf',
+            },
+            'method':
+            'POST',
+            'params': {
+                'uploadType': 'resumable'
+            },
+            'payload':
+            '{"acl":[{"entity":"user-a@example.com","role":"READER"},' +
+            '{"entity":"user-b@example.com","role":"READER"}],' +
+            '"name":"dir/latest.db"}',
+            'scopes': ['https://www.googleapis.com/auth/cloud-platform'],
+            'url':
+            u'https://www.googleapis.com/upload/storage/v1/b/bucket/o',
+        }, self.requests[0])
+    self.assertEqual(
+        {
+            'deadline': 30,
+            'expected_codes': [308],
+            'headers': {
+                'Content-Range': 'bytes 0-6/11'
+            },
+            'method': 'PUT',
+            'params': net.PARAMS_IN_URL,
+            'payload': 'signed ',
+            'url': upload_url,
+        }, self.requests[1])
+    self.assertEqual(
+        {
+            'deadline': 30,
+            'expected_codes': [308],
+            'headers': {
+                'Content-Range': 'bytes 7-10/11'
+            },
+            'method': 'PUT',
+            'params': net.PARAMS_IN_URL,
+            'payload': 'blob',
+            'url': upload_url,
+        }, self.requests[2])
+
+    # latest.json is "small" and uploaded in a single request.
+    self.assertEqual(
+        {
+            'deadline':
+            30,
+            'headers': {
+                'Content-Type': 'multipart/related; boundary=BOUNDARY'
+            },
+            'method':
+            'POST',
+            'params': {
+                'uploadType': 'multipart'
+            },
+            'payload':
+            '\r\n'.join([
+                '--BOUNDARY',
+                'Content-Type: application/json; charset=UTF-8',
+                '',
+                '{"acl":[{"entity":"user-a@example.com","role":"READER"},' +
+                '{"entity":"user-b@example.com","role":"READER"}],' +
+                '"name":"dir/latest.json"}',
+                '--BOUNDARY',
+                'Content-Type: application/json',
+                '',
+                'revision json',
+                '--BOUNDARY--',
+                '',
+            ]),
+            'scopes': ['https://www.googleapis.com/auth/cloud-platform'],
+            'url':
+            u'https://www.googleapis.com/upload/storage/v1/b/bucket/o',
+        }, self.requests[3])
 
   def test_update_gcs_acls(self):
     self.mock_config(auth_db_gs_path='bucket/dir')

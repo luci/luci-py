@@ -29,6 +29,13 @@ import config
 # See https://cloud.google.com/storage/quotas.
 _MAX_ACL_ENTRIES = 80
 
+# Max size of a single GCS request when uploading a file in multiple chunks.
+#
+# Must be under 10 MB to avoid hitting GAE URL Fetch request size limits and
+# must be larger than 262144 bytes to satisfy GCS requirements. Recommended by
+# GCS to be a multiple of 262144.
+_GCS_CHUNK_SIZE = 262144 * 34  # ~= 9 MB
+
 
 class Error(Exception):
   """Raised on fatal errors when calling Google Storage."""
@@ -114,16 +121,16 @@ def upload_auth_db(signed_auth_db, revision_json):
     return
   assert not gs_path.endswith('/'), gs_path
   readers = _list_authorized_readers()
-  _upload_file(
-      path=gs_path+'/latest.db',
-      data=signed_auth_db,
-      content_type='application/protobuf',
-      readers=readers)
-  _upload_file(
-      path=gs_path+'/latest.json',
-      data=revision_json,
-      content_type='application/json',
-      readers=readers)
+  _upload_file(path=gs_path + '/latest.db',
+               data=signed_auth_db,
+               content_type='application/protobuf',
+               readers=readers,
+               streaming=True)
+  _upload_file(path=gs_path + '/latest.json',
+               data=revision_json,
+               content_type='application/json',
+               readers=readers,
+               streaming=False)
 
 
 ### Private stuff.
@@ -184,38 +191,103 @@ def _update_gcs_acls():
       {'acl': acls, 'contentType': 'application/json'})
 
 
-def _upload_file(path, data, content_type, readers):
+def _upload_file(path, data, content_type, readers, streaming=False):
   """Overwrites a file in GCS, makes it readable to all authorized readers.
-
-  Doesn't use streaming uploads currently. Data is limited by URL Fetch request
-  size (10 MB).
 
   Args:
     path: "<bucket>/<object>" string.
     data: buffer with data to upload.
     content_type: MIME content type of 'data', to put into GCS metadata.
     readers: list of emails that should have read access to the file.
+    streaming: if True, use streaming upload protocol, uploading the file in
+       multiple requests to avoid hitting 10 MB URL Fetch request size limit.
 
   Raises:
     Error if Google Storage writes fail.
   """
-  # We upload both metadata and body in a single request, see:
-  # https://cloud.google.com/storage/docs/json_api/v1/how-tos/multipart-upload.
   bucket, name = path.split('/', 1)
-  payload, boundary = _multipart_payload(
-      data, content_type,
-      {'name': name, 'acl': _gcs_acls(readers)})
+  metadata = {'name': name, 'acl': _gcs_acls(readers)}
   try:
-    net.request(
-        url='https://www.googleapis.com/upload/storage/v1/b/%s/o' % bucket,
-        method='POST',
-        payload=payload,
-        params={'uploadType': 'multipart'},
-        headers={'Content-Type': 'multipart/related; boundary=%s' % boundary},
-        scopes=['https://www.googleapis.com/auth/cloud-platform'],
-        deadline=30)
+    if streaming:
+      _streaming_upload(bucket, data, content_type, metadata)
+    else:
+      _multipart_upload(bucket, data, content_type, metadata)
   except net.Error as exc:
     raise Error(str(exc))
+
+
+def _streaming_upload(bucket, data, content_type, metadata):
+  """Uploads a GCS file via multiple requests.
+
+  https://cloud.google.com/storage/docs/resumable-uploads
+  """
+
+  def log(msg, *args):
+    logging.info('%s: ' + msg, metadata['name'], *args)
+
+  log('initiating upload of %d bytes', len(data))
+
+  # Will be mutated by net.request(...) to contain the response headers.
+  response_headers = {}
+  net.request(url='https://www.googleapis.com/upload/storage/v1/b/%s/o' %
+              bucket,
+              method='POST',
+              payload=utils.encode_to_json(metadata),
+              params={'uploadType': 'resumable'},
+              headers={
+                  'Content-Type': 'application/json; charset=utf-8',
+                  'X-Upload-Content-Type': content_type,
+                  'X-Upload-Content-Length': '%d' % len(data),
+              },
+              scopes=['https://www.googleapis.com/auth/cloud-platform'],
+              response_headers=response_headers,
+              deadline=30)
+
+  # GCS should have replied with a redirect to an upload URL.
+  upload_url = None
+  for k, v in response_headers.items():
+    if k.lower() == 'location':
+      upload_url = v
+      break
+  else:
+    raise Error('Failed to initiate upload session, no redirect location')
+
+  total = len(data)
+  offset = 0
+  while data:
+    chunk, data = data[:_GCS_CHUNK_SIZE], data[_GCS_CHUNK_SIZE:]
+    log('uploading %d bytes...', len(chunk))
+    net.request(
+        url=upload_url,
+        method='PUT',
+        payload=chunk,
+        params=net.PARAMS_IN_URL,  # `upload_url` from GCS has query params
+        headers={
+            'Content-Range':
+            'bytes %d-%d/%d' % (offset, offset + len(chunk) - 1, total),
+        },
+        expected_codes=[308],  # "308 Resume Incomplete"
+        deadline=30,
+    )
+    offset += len(chunk)
+  log('upload complete')
+
+
+def _multipart_upload(bucket, data, content_type, metadata):
+  """Uploads a GCS file using a single request.
+
+  https://cloud.google.com/storage/docs/json_api/v1/how-tos/multipart-upload.
+  """
+  logging.info('%s: uploading %d bytes at once', metadata['name'], len(data))
+  payload, boundary = _multipart_payload(data, content_type, metadata)
+  net.request(
+      url='https://www.googleapis.com/upload/storage/v1/b/%s/o' % bucket,
+      method='POST',
+      payload=payload,
+      params={'uploadType': 'multipart'},
+      headers={'Content-Type': 'multipart/related; boundary=%s' % boundary},
+      scopes=['https://www.googleapis.com/auth/cloud-platform'],
+      deadline=30)
 
 
 def _set_gcs_metadata(path, metadata):
