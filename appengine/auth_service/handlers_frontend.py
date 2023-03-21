@@ -50,12 +50,6 @@ class WarmupHandler(webapp2.RequestHandler):
     self.response.write('ok')
 
 
-class EmailHandler(webapp2.RequestHandler):
-  """Blackhole any email sent."""
-  def post(self, to):
-    pass
-
-
 class ConfigHandler(ui.UINavbarTabHandler):
   """Page with simple UI for service-global configuration."""
   navbar_tab_url = '/auth/config'
@@ -429,7 +423,6 @@ def get_routes():
     # UI routes.
     webapp2.Route(
         r'/', webapp2.RedirectHandler, defaults={'_uri': '/auth/groups'}),
-    webapp2.Route(r'/_ah/mail/<to:.+>', EmailHandler),
     webapp2.Route(r'/_ah/warmup', WarmupHandler),
 
     # API routes.

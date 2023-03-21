@@ -42,15 +42,10 @@ handlers:
   script: main_frontend.frontend_app
   secure: always
 
-builtins:
-- remote_api: on
-
 includes:
-- components/ereporter2
 - components/static_third_party.yaml
 
 inbound_services:
-- mail
 - warmup
 
 # https://developers.google.com/appengine/docs/python/tools/libraries27

@@ -17,12 +17,6 @@ handlers:
   secure: always
   login: admin
 
-builtins:
-- remote_api: on
-
-includes:
-- components/ereporter2
-
 # https://developers.google.com/appengine/docs/python/tools/libraries27
 # As the doc says, serious applications should specify the third party versions.
 libraries:

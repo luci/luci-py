@@ -304,10 +304,10 @@ def update_realms(db, revs, comment):
       expanded.append((r, rules.expand_realms(db, r.project_id, parsed)))
     except (text_format.ParseError, ValueError) as exc:
       # We end up here if realms.cfg could not be parsed or it fails validation.
-      # This logging line should surface in ereporter2.
-      logging.error('Failed to process realms of "%s": %s', r.project_id, exc)
+      # This logging line should surface in Cloud Error Reporting.
+      logging.exception('Failed to process realms of "%s": %s', r.project_id,
+                        exc)
 
-    # Cheesy, but effective. These errors should surface in ereporter2 alerts.
     # We can't really setup effective time series metrics since this code path
     # is hit very infrequently (only when configs change, so only a few times
     # per day).
