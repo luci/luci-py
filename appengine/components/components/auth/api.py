@@ -548,6 +548,11 @@ class AuthDB(object):
     """URL of a token server to use to generate tokens, provided by Primary."""
     return self._token_server_url
 
+  @property
+  def group_count(self):
+    """Number of groups in the auth DB."""
+    return len(self._groups)
+
   def is_group_member(self, group_name, identity):
     """Returns True if |identity| belongs to group |group_name|.
 
@@ -1591,7 +1596,7 @@ def get_process_auth_db():
     # on the lock.
     _auth_db_fetching_thread = threading.current_thread()
     known_auth_db = _auth_db
-    logging.debug('Refetching AuthDB')
+    logging.debug('Refetching AuthDB (cur rev is %d)', _auth_db.auth_db_rev)
 
   # Do the actual fetch outside the lock. Be careful to handle any unexpected
   # exception by 'fixing' the global state before leaving this function.
@@ -1675,7 +1680,8 @@ def _initialize_auth_db_cache():
   logging.info('Initial fetch of AuthDB')
   _auth_db = fetch_auth_db()
   _auth_db_expiration = time.time() + _process_cache_expiration_sec
-  logging.info('Fetched AuthDB at rev %d', _auth_db.auth_db_rev)
+  logging.info('Fetched AuthDB at rev %d (%d groups)', _auth_db.auth_db_rev,
+               _auth_db.group_count)
 
   return _auth_db
 
@@ -1720,10 +1726,12 @@ def _roll_auth_db_cache(candidate):
   # some internal caches we want to keep. So update _auth_db only if candidate
   # is strictly fresher.
   if candidate.auth_db_rev > _auth_db.auth_db_rev:
+    logging.info('Updated cached AuthDB: rev %d->%d (%d groups)',
+                 _auth_db.auth_db_rev, candidate.auth_db_rev,
+                 candidate.group_count)
     _auth_db = candidate
-    logging.info(
-        'Updated cached AuthDB: rev %d->%d',
-        _auth_db.auth_db_rev, candidate.auth_db_rev)
+  else:
+    logging.info('Reusing cached AuthDB rev %d', _auth_db.auth_db_rev)
 
   # Bump the expiration time even if the candidate's version is same as the
   # current cached one. We've just confirmed it is still fresh, we can keep
