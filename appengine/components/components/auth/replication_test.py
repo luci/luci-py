@@ -501,10 +501,14 @@ class SnapshotToProtoConversionTest(test_case.TestCase):
 
 
 class ShardedAuthDBTest(test_case.TestCase):
-  def test_works(self):
-    PRIMARY_URL = 'https://primary'
-    AUTH_DB_REV = 1234
+  PRIMARY_URL = 'https://primary'
+  AUTH_DB_REV = 1234
 
+  def test_no_shards(self):
+    with self.assertRaises(ValueError):
+      replication.load_sharded_auth_db(self.PRIMARY_URL, self.AUTH_DB_REV, [])
+
+  def test_works(self):
     # Make some non-empty snapshot, its contents is not important.
     auth_db = replication.auth_db_snapshot_to_proto(
         make_snapshot_obj(
@@ -517,19 +521,20 @@ class ShardedAuthDBTest(test_case.TestCase):
                 security_config='security config blob')))
 
     # Store in 50-byte shards.
-    shard_ids = replication.store_sharded_auth_db(
-        auth_db, PRIMARY_URL, AUTH_DB_REV, 50)
+    shard_ids = replication.store_sharded_auth_db(auth_db, self.PRIMARY_URL,
+                                                  self.AUTH_DB_REV, 50)
     self.assertEqual(2, len(shard_ids))
 
     # Verify keys look OK and the shard size is respected.
     for shard_id in shard_ids:
       self.assertEqual(len(shard_id), 16)
-      shard = model.snapshot_shard_key(PRIMARY_URL, AUTH_DB_REV, shard_id).get()
+      shard = model.snapshot_shard_key(self.PRIMARY_URL, self.AUTH_DB_REV,
+                                       shard_id).get()
       self.assertTrue(len(shard.blob) <= 50)
 
     # Verify it can be reassembled back.
-    reassembled = replication.load_sharded_auth_db(
-        PRIMARY_URL, AUTH_DB_REV, shard_ids)
+    reassembled = replication.load_sharded_auth_db(self.PRIMARY_URL,
+                                                   self.AUTH_DB_REV, shard_ids)
     self.assertEqual(reassembled, auth_db)
 
 

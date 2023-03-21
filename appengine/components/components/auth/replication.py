@@ -333,7 +333,7 @@ def load_sharded_auth_db(primary_url, auth_db_rev, shard_ids):
   Runs in performance critical and memory-constrained code path.
 
   Logs an error and returns None if some shard is missing. Any other unexpected
-  errors are raised as corresponding exceptions (there should be none).
+  errors are raised as corresponding exceptions.
 
   Args:
     primary_url: URL of the primary auth service that pushed the DB.
@@ -342,7 +342,15 @@ def load_sharded_auth_db(primary_url, auth_db_rev, shard_ids):
 
   Returns:
     replication_pb2.AuthDB message.
+
+  Raises:
+    ValueError if primary_url or shard_ids are empty.
   """
+  if not primary_url:
+    raise ValueError('Primary URL is required')
+  if not shard_ids:
+    raise ValueError('The list of shards is empty')
+
   shards = ndb.get_multi(
       model.snapshot_shard_key(primary_url, auth_db_rev, shard_id)
       for shard_id in shard_ids)
