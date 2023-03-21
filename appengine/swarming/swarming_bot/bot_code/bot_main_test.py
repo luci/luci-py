@@ -141,7 +141,7 @@ class TestBotBase(net_utils.TestCase):
                             rbe_idle=None,
                             sleep_streak=None,
                             extra_headers=None):
-    data = self.bot.attributes
+    data = self.attributes
 
     def on_request(kwargs):
       self.assertEqual(kwargs['data']['request_uuid'], REQUEST_UUID)
@@ -159,7 +159,7 @@ class TestBotBase(net_utils.TestCase):
 
   def expected_claim_request(self, claim_id, task_id, task_to_run_shard,
                              task_to_run_id, response):
-    data = self.bot.attributes
+    data = self.attributes
 
     def on_request(kwargs):
       self.assertEqual(kwargs['data']['dimensions'], data['dimensions'])
@@ -183,7 +183,7 @@ class TestBotBase(net_utils.TestCase):
 
   def expected_rbe_create_request(self, poll_token, session_token, fail=False):
     data = {
-        'dimensions': self.bot.attributes['dimensions'],
+        'dimensions': self.attributes['dimensions'],
         'poll_token': poll_token,
     }
 
@@ -208,7 +208,7 @@ class TestBotBase(net_utils.TestCase):
                                   lease_out=None):
     data = {
         'status': status_in,
-        'dimensions': self.bot.attributes['dimensions'],
+        'dimensions': self.attributes['dimensions'],
         'session_token': session_token,
     }
     if lease_in:
@@ -1039,6 +1039,64 @@ class TestBotMain(TestBotBase):
     # When the bot shuts down, rbe_disable doesn't do anything, since the
     # session is already closed.
     self.loop_state.rbe_disable()
+
+  def test_rbe_mode_idle_dimensions_change(self):
+    # Switches into the RBE mode, creates and polls the session. Gets nothing.
+    self.expected_requests([
+        self.expected_poll_request({
+            'cmd': 'rbe',
+            'rbe': {
+                'poll_token': 'pt0',
+                'instance': 'instance_0',
+            },
+        }),
+        self.expected_rbe_create_request('pt0', 'st0'),
+        self.expected_rbe_update_request('pt0', 'st0'),
+    ])
+    self.poll_once()
+
+    # Wants to report the idle status to Swarming right away. Also polls RBE
+    # as always.
+    self.assertTrue(self.loop_state._swarming_poll_timer.firing)
+    self.expected_requests([
+        self.expected_poll_request(
+            {
+                'cmd': 'rbe',
+                'rbe': {
+                    'poll_token': 'pt0',
+                    'instance': 'instance_0',
+                },
+            },
+            rbe_idle=True,
+            sleep_streak=1),
+        self.expected_rbe_update_request('pt0', 'st0'),
+    ])
+    self.poll_once()
+
+    # Swarming is scheduled to be called at some later time.
+    self.assertFalse(self.loop_state._swarming_poll_timer.firing)
+
+    # Dimensions suddenly change.
+    self.attributes['dimensions']['extra'] = ['1']
+
+    # Swarming should be called right away (followed by an RBE poll).
+    self.expected_requests([
+        self.expected_poll_request(
+            {
+                'cmd': 'rbe',
+                'rbe': {
+                    'poll_token': 'pt0',
+                    'instance': 'instance_0',
+                },
+            },
+            rbe_idle=True,
+            sleep_streak=2),
+        self.expected_rbe_update_request('pt0', 'st0'),
+    ])
+    self.poll_once()
+
+    # Swarming is again scheduled to be called at some later time.
+    self.assertFalse(self.loop_state._swarming_poll_timer.firing)
 
   def test_rbe_mode_swarming_task(self):
     self.mock(bot_main, '_run_manifest', lambda *_args: True)

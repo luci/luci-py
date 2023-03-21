@@ -1277,6 +1277,8 @@ class _BotLoopState:
     # Tracks time and can sleep.
     self._clock = clock_impl or clock.Clock(quit_bit)
 
+    # Snapshot of the dimensions dict used in the last poll cycle.
+    self._prev_dimensions = {}
     # True if the current loop iteration had an unexpected error.
     self._loop_iteration_had_errors = False
     # Number of consecutive loop iterations with errors.
@@ -1323,6 +1325,15 @@ class _BotLoopState:
       # bot hooks API contract.
       _call_hook_safe(False, self._bot, 'on_before_poll')
       _update_bot_attributes(self._bot, self._consecutive_idle_cycles)
+
+      # If dimensions has changed, notify Swarming to update the bot listing.
+      # This matters in the RBE mode when Swarming is not otherwise contacted
+      # on every loop cycle.
+      dims = self._bot.dimensions
+      if dims != self._prev_dimensions:
+        logging.info('Dimensions has changed, need to notify Swarming')
+        self._prev_dimensions = dims
+        self._swarming_poll_timer.reset(0.0)
 
       # Periodically call Python Swarming server to know when to update,
       # restart, pick up new config, etc.
