@@ -15,6 +15,11 @@ automatic_scaling:
   max_pending_latency: 10000ms
 
 handlers:
+# GAE warmup handler.
+- url: /_ah/warmup
+  script: main_backend.app
+  secure: always
+
 # Cron jobs, task queues.
 - url: /internal/.+
   script: main_backend.app
