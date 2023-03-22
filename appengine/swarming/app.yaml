@@ -59,9 +59,6 @@ handlers:
   script: main_frontend.app
   secure: always
 
-builtins:
-- remote_api: on
-
 inbound_services:
 - mail # This is for 'reply all' to the mail from ereporter2.
 - warmup

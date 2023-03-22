@@ -21,6 +21,9 @@ handlers:
   secure: always
   login: admin
 
+inbound_services:
+- warmup
+
 includes:
 - components/auth
 - components/config

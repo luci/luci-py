@@ -35,6 +35,12 @@ from server import task_scheduler
 import ts_mon_metrics
 
 
+class WarmupHandler(webapp2.RequestHandler):
+  def get(self):
+    self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
+    self.response.write('ok')
+
+
 ## Cron jobs.
 
 
@@ -402,6 +408,8 @@ class TaskMonitoringTasksResultsSummaryBQ(webapp2.RequestHandler):
 def get_routes():
   """Returns internal urls that should only be accessible via the backend."""
   routes = [
+      ('/_ah/warmup', WarmupHandler),
+
       # Cron jobs.
       ('/internal/cron/important/scheduler/abort_bot_missing',
        CronBotDiedHandler),
