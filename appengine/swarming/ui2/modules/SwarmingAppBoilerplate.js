@@ -128,6 +128,24 @@ export default class SwarmingAppBoilerplate extends HTMLElement {
     }
   }
 
+  /** Handles handles an error from prpc client, possibly signaling the user
+   * isn't authorized to see this page.
+      @param {Object} e - The error given prpc client.
+      @param {String} loadingWhat - A short string to describe what failed.
+                      (e.g. bots/list if the bots/list endpoint was queried)
+      @param {boolean} ignoreAuthError - A flag to ignore 403 error.
+   */
+  prpcError(e, loadingWhat, ignoreAuthError) {
+    if (e.codeName === 'PERMISSION_DENIED') {
+      this._message = 'User unauthorized - try logging in '+
+                      'with a different account';
+      this._notAuthorized = true;
+      this.render();
+    } else {
+      this.fetchError(e, loadingWhat, ignoreAuthError);
+    }
+  }
+
   /** Handles a fetch error, possibly signaling the user isn't authorized to
       see this page.
       @param {Object} e - The error given by fetch.
