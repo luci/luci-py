@@ -10,7 +10,7 @@ export function botData(url, opts) {
 
 export const botDataMap = {
   'running': {
-    'authenticated_as': 'bot:running.chromium.org',
+    'authenticatedAs': 'bot:running.chromium.org',
     'dimensions': [
       {
         'value': [
@@ -113,20 +113,20 @@ export const botDataMap = {
         'key': 'zone',
       },
     ],
-    'task_id': '42fb00e06d95be11',
-    'external_ip': '70.32.137.220',
-    'is_dead': false,
+    'taskId': '42fb00e06d95be11',
+    'externalIp': '70.32.137.220',
+    'isDead': false,
     'quarantined': false,
     'deleted': false,
     'state': '{"audio":["NVIDIA High Definition Audio"],"bot_group_cfg_version":"hash:d50e0a198b5ee4","cost_usd_hour":0.7575191297743056,"cpu_name":"Intel(R) Xeon(R) CPU E3-1230 v5 @ 3.40GHz","cwd":"C:\\\\b\\\\s","cygwin":[false],"disks":{"c:\\\\":{"free_mb":690166.5,"size_mb":763095.0}},"env":{"PATH":"C:\\\\Windows\\\\system32;C:\\\\Windows;C:\\\\Windows\\\\System32\\\\Wbem;C:\\\\Windows\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\;c:\\\\Tools;C:\\\\CMake\\\\bin;C:\\\\Program Files\\\\Puppet Labs\\\\Puppet\\\\bin;C:\\\\Users\\\\chrome-bot\\\\AppData\\\\Local\\\\Microsoft\\\\WindowsApps"},"files":{"c:\\\\Users\\\\chrome-bot\\\\ntuser.dat":1310720},"gpu":["Nvidia Quadro P400 25.21.14.1678"],"hostname":"build16-a9.labs.chromium.org","ip":"192.168.216.26","named_caches":{"vpython":[["qp",50935560],1549982906.0]},"nb_files_in_temp":2,"pid":7940,"python":{"executable":"c:\\\\infra-system\\\\bin\\\\python.exe","packages":null,"version":"2.7.13 (v2.7.13:a06454b1afa1, Dec 17 2016, 20:53:40) [MSC v.1500 64 bit (AMD64)]"},"ram":32726,"running_time":21321,"sleep_streak":8,"ssd":[],"started_ts":1549961665,"top_windows":[],"uptime":21340,"user":"chrome-bot"}',
     'version': '8ea94136c96de7396fda8587d8e40cbc2d0c20ec01ce6b45c68d42a526d02316',
-    'first_seen_ts': '2017-08-02T23:12:16.365500',
-    'task_name': 'Test-Win10-Clang-Golo-GPU-QuadroP400-x86_64-Debug-All-ANGLE',
-    'last_seen_ts': '2019-02-12T14:54:12.335408',
-    'bot_id': 'running',
+    'firstSeenTs': '2017-08-02T23:12:16.365500',
+    'taskName': 'Test-Win10-Clang-Golo-GPU-QuadroP400-x86_64-Debug-All-ANGLE',
+    'lastSeenTs': '2019-02-12T14:54:12.335408',
+    'botId': 'running',
   },
   'quarantined': {
-    'authenticated_as': 'bot-with-really-long-service-account-name:running.chromium.org',
+    'authenticatedAs': 'bot-with-really-long-service-account-name:running.chromium.org',
     'dimensions': [
       {
         'value': [
@@ -234,20 +234,20 @@ export const botDataMap = {
         'key': 'zone',
       },
     ],
-    'task_id': '',
-    'external_ip': '100.115.95.143',
-    'is_dead': false,
+    'taskId': '',
+    'externalIp': '100.115.95.143',
+    'isDead': false,
     'quarantined': true,
     'deleted': false,
     'state': '{"audio":null,"bot_group_cfg_version":"hash:0d12ff88393b4d","cost_usd_hour":0.15235460069444445,"cpu_name":"BCM2709","cwd":"/b/s","devices":{"3BE9F057":{"battery":{"current":null,"health":2,"level":100,"power":["AC"],"status":2,"temperature":424,"voltage":0},"build":{"board.platform":"<missing>","build.fingerprint":"google/fugu/fugu:8.0.0/OPR2.170623.027/4397545:userdebug/dev-keys","build.id":"OPR2.170623.027","build.product":"fugu","build.version.sdk":"26","product.board":"fugu","product.cpu.abi":"x86","product.device":"fugu"},"cpu":{"cur":"1833000","governor":"interactive"},"disk":{},"imei":null,"ip":[],"max_uid":null,"mem":{},"other_packages":["com.intel.thermal","android.autoinstalls.config.google.fugu"],"port_path":"1/4","processes":2,"state":"still booting (sys.boot_completed)","temp":{},"uptime":129027.39}},"disks":{"/b":{"free_mb":4314.0,"size_mb":26746.5},"/boot":{"free_mb":40.4,"size_mb":59.9},"/home/chrome-bot":{"free_mb":986.2,"size_mb":988.9},"/tmp":{"free_mb":974.6,"size_mb":975.9},"/var":{"free_mb":223.6,"size_mb":975.9}},"env":{"PATH":"/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/local/games:/usr/games"},"gpu":null,"host_dimensions":{"caches":["vpython"],"cores":["4"],"cpu":["arm","arm-32","armv7l","armv7l-32","armv7l-32-BCM2709"],"cpu_governor":["ondemand"],"device_tree_compatible":["brcm"],"gce":["0"],"gpu":["none"],"id":["quarantined"],"inside_docker":["0"],"kvm":["0"],"machine_type":["n1-highcpu-4"],"os":["Linux","Raspbian","Raspbian-8.0"],"python":["2.7.9"],"ssd":["1"]},"hostname":"quarantined","ip":"192.168.1.152","named_caches":{"vpython":[["sQ",92420605],1550019574.0]},"nb_files_in_temp":6,"pid":499,"python":{"executable":"/usr/bin/python","packages":["M2Crypto==0.21.1","RPi.GPIO==0.6.3","argparse==1.2.1","chardet==2.3.0","colorama==0.3.2","html5lib==0.999","libusb1==1.5.0","ndg-httpsclient==0.3.2","pyOpenSSL==0.13.1","pyasn1==0.1.7","requests==2.4.3","rsa==3.4.2","six==1.8.0","urllib3==1.9.1","wheel==0.24.0","wsgiref==0.1.2"],"version":"2.7.9 (default, Sep 17 2016, 20:26:04) \\n[GCC 4.9.2]"},"quarantined":"No available devices.","ram":926,"running_time":23283,"sleep_streak":63,"ssd":["mmcblk0"],"started_ts":1550125333,"temp":{"thermal_zone0":47.774},"uptime":23954,"user":"chrome-bot"}',
     'version': 'f775dd9893167e6fee31b96ef20f7218f07fa437ea9d6fc44496208784108545',
-    'first_seen_ts': '2016-09-09T21:05:34.439930',
-    'last_seen_ts': '2019-02-12T12:50:20.961462',
-    'bot_id': 'quarantined',
+    'firstSeenTs': '2016-09-09T21:05:34.439930',
+    'lastSeenTs': '2019-02-12T12:50:20.961462',
+    'botId': 'quarantined',
   },
   'dead': {
     'lease_id': 'f69394d5f68b1f1e6c5f13e82ba4ccf72de7e6a0',
-    'authenticated_as': 'bot:running.chromium.org',
+    'authenticatedAs': 'bot:running.chromium.org',
     'dimensions': [
       {
         'value': [
@@ -348,19 +348,19 @@ export const botDataMap = {
         'key': 'zone',
       },
     ],
-    'task_id': '',
-    'external_ip': '35.229.11.33',
+    'taskId': '',
+    'externalIp': '35.229.11.33',
     'machine_lease': 'gce-trusty-176',
-    'is_dead': true,
+    'isDead': true,
     'deleted': false,
     'quarantined': false,
     'lease_expiration_ts': '2019-01-15T00:39:04',
     'state': '{"audio":[],"bot_group_cfg_version":"hash:5bbd7d8f05c65e","cost_usd_hour":0.41316150716145833,"cpu_name":"Intel(R) Xeon(R) CPU Broadwell GCE","cwd":"/b/s","disks":{"/":{"free_mb":246117.8,"size_mb":302347.0}},"env":{"PATH":"/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin"},"files":{"/usr/share/fonts/truetype/":["Gubbi","Navilu","dejavu","fonts-japanese-gothic.ttf","fonts-japanese-mincho.ttf","kochi","liberation","msttcorefonts","pagul","tlwg","ttf-bengali-fonts","ttf-dejavu","ttf-devanagari-fonts","ttf-gujarati-fonts","ttf-indic-fonts-core","ttf-kannada-fonts","ttf-malayalam-fonts","ttf-oriya-fonts","ttf-punjabi-fonts","ttf-tamil-fonts","ttf-telugu-fonts"]},"gpu":[],"hostname":"dead.us-east1-b.c.chromecompute.google.com.internal","ip":"10.0.8.219","named_caches":{"swarming_module_cache_vpython":[["kL",887763447],1547511540.0]},"nb_files_in_temp":8,"pid":1117,"python":{"executable":"/usr/bin/python","packages":["Cheetah==2.4.4","CherryPy==3.2.2","Landscape-Client==14.12","PAM==0.4.2","PyYAML==3.10","Routes==2.0","Twisted-Core==13.2.0","Twisted-Names==13.2.0","Twisted-Web==13.2.0","WebOb==1.3.1","apt-xapian-index==0.45","argparse==1.2.1","boto==2.20.1","chardet==2.0.1","cloud-init==0.7.5","colorama==0.2.5","configobj==4.7.2","coverage==3.7.1","crcmod==1.7","google-compute-engine==2.2.4","html5lib==0.999","iotop==0.6","jsonpatch==1.3","jsonpointer==1.0","numpy==1.8.2","oauth==1.0.1","pexpect==3.1","prettytable==0.7.2","psutil==1.2.1","pyOpenSSL==0.13","pycrypto==2.6.1","pycurl==7.19.3","pyserial==2.6","python-apt==0.9.3.5ubuntu2","python-debian==0.1.21-nmu2ubuntu2","pyxdg==0.25","repoze.lru==0.6","requests==2.2.1","six==1.5.2","ssh-import-id==3.21","urllib3==1.7.1","wheel==0.24.0","wsgiref==0.1.2","zope.interface==4.0.5"],"version":"2.7.6 (default, Nov 13 2018, 12:45:42) \\n[GCC 4.8.4]"},"ram":30159,"running_time":7309,"sleep_streak":22,"ssd":[],"started_ts":1547505598,"uptime":7321,"user":"chrome-bot"}',
     'version': '9644ba2fcbeafe7628828602251e5405db3d79b9cd230523bdf7927e204d664e',
-    'first_seen_ts': '2019-01-14T00:40:11.400947',
-    'last_seen_ts': '2019-01-15T00:42:19.613017',
+    'firstSeenTs': '2019-01-14T00:40:11.400947',
+    'lastSeenTs': '2019-01-15T00:42:19.613017',
     'machine_type': 'gce-trusty',
-    'bot_id': 'dead',
+    'botId': 'dead',
   },
 };
 

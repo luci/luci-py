@@ -22,6 +22,7 @@ import {EVENTS_QUERY_PARAMS, mpLink, parseBotData, parseEvents,
 import {stateClass as taskClass} from '../task-page/task-page-helpers';
 import {timeDiffApprox, timeDiffExact, taskPageLink} from '../util';
 import SwarmingAppBoilerplate from '../SwarmingAppBoilerplate';
+import {BotsService} from '../services/bots.js';
 
 /**
  * @module swarming-ui/modules/bot-page
@@ -66,17 +67,17 @@ const statusAndTask = (ele, bot) => {
     title="This bot was deleted.">
   <td colspan=3>THIS BOT WAS DELETED</td>
 </tr>
-<tr class=${bot.is_dead ? 'dead': ''}>
+<tr class=${bot.isDead ? 'dead': ''}>
   <td>Last Seen</td>
-  <td title=${bot.human_last_seen_ts}>${timeDiffExact(bot.last_seen_ts)} ago</td>
+  <td title=${bot.human_lastSeenTs}>${timeDiffExact(bot.lastSeenTs)} ago</td>
   <td>
-    <button class='shut_down ${(!bot.is_dead && bot.first_seen_ts) ? '' : 'hidden'}'
-          ?hidden=${bot.is_dead}
+    <button class='shut_down ${(!bot.isDead && bot.firstSeenTs) ? '' : 'hidden'}'
+          ?hidden=${bot.isDead}
           ?disabled=${!ele.permissions.terminate_bot}
           @click=${ele._promptShutdown}>
       Stop the bot gracefully
     </button>
-    <button class='delete ${bot.is_dead && !bot.deleted ? '' : 'hidden'}'
+    <button class='delete ${bot.isDead && !bot.deleted ? '' : 'hidden'}'
           ?disabled=${!ele.permissions.delete_bot}
           @click=${ele._promptDelete}>
       Delete
@@ -89,25 +90,25 @@ const statusAndTask = (ele, bot) => {
     ${quarantineMessage(bot)}
   </td>
 </tr>
-<tr class="dead ${(bot.is_dead && !bot.deleted) ? '' : 'hidden'}">
+<tr class="dead ${(bot.isDead && !bot.deleted) ? '' : 'hidden'}">
   <td>Dead</td>
   <td colspan=2 class=code>Bot has been missing longer than 10 minutes</td>
 </tr>
-<tr class="maintenance ${bot.maintenance_msg ? '' : 'hidden'}">
+<tr class="maintenance ${bot.maintenanceMsg ? '' : 'hidden'}">
   <td>In Maintenance</td>
-  <td colspan=2 class=code>${bot.maintenance_msg}</td>
+  <td colspan=2 class=code>${bot.maintenanceMsg}</td>
 </tr>
 <tr>
-  <td>${bot.is_dead ? 'Died on Task': 'Current Task'}</td>
+  <td>${bot.isDead ? 'Died on Task': 'Current Task'}</td>
   <td>
     <a target=_blank rel=noopener
-        href=${ifDefined(taskPageLink(bot.task_id))}>
-      ${bot.task_id || 'idle'}
+        href=${ifDefined(taskPageLink(bot.taskId))}>
+      ${bot.taskId || 'idle'}
     </a>
   </td>
   <td>
     <button class=kill
-            ?hidden=${!bot.task_id || bot.is_dead}
+            ?hidden=${!bot.taskId || bot.isDead}
             ?disabled=${!ele.permissions.cancel_task}
             @click=${ele._promptKill}>
         Kill task
@@ -137,7 +138,7 @@ const dimensionRow = (dimension) => html`
 const dataAndMPBlock = (ele, bot) => html`
 <tr title="IP address that the server saw the connection from.">
   <td>External IP</td>
-  <td colspan=2><a href=${'http://'+bot.external_ip}>${bot.external_ip}</a></td>
+  <td colspan=2><a href=${'http://'+bot.externalIp}>${bot.externalIp}</a></td>
 </tr>
 <tr class=${ele.server_details.bot_version === bot.version ? '' : 'old_version'}
     title="Version is based on the content of swarming_bot.zip which is the swarming bot code.
@@ -152,13 +153,13 @@ const dataAndMPBlock = (ele, bot) => html`
 </tr>
 <tr title="First time ever a bot with this id contacted the server.">
   <td>First seen</td>
-  <td colspan=2 title=${bot.human_first_seen_ts}>
-    ${timeDiffApprox(bot.first_seen_ts)} ago
+  <td colspan=2 title=${bot.human_firstSeenTs}>
+    ${timeDiffApprox(bot.firstSeenTs)} ago
   </td>
 </tr>
 <tr title="How the bot is authenticated by the server.">
   <td>Authenticated as</td>
-  <td colspan=2>${bot.authenticated_as}</td>
+  <td colspan=2>${bot.authenticatedAs}</td>
 </tr>
 <tr ?hidden=${!bot.lease_id}>
   <td>Machine Provider Lease ID</td>
@@ -171,6 +172,7 @@ const dataAndMPBlock = (ele, bot) => html`
 <tr ?hidden=${!bot.lease_id}>
   <td>Machine Provider Lease Expires</td>
   <td colspan=2>${bot.human_lease_expiration_ts}</td>
+  <td colspan=2>${bot.authenticatedAs}</td>
 </tr>
 `;
 
@@ -497,21 +499,22 @@ window.customElements.define('bot-page', class extends SwarmingAppBoilerplate {
     // re-fetch permissions with the bot ID.
     this.app._fetchPermissions(extra, {bot_id: this._botId});
     this.app.addBusyTasks(1);
-    fetch(`/_ah/api/swarming/v1/bot/${this._botId}/get`, extra)
-        .then(jsonOrThrow)
-        .then((json) => {
+    const botService =
+      new BotsService(this.auth_header, this._fetchController.signal);
+    botService.getBot(this._botId)
+        .then((resp) => {
           this._notFound = false;
-          this._bot = parseBotData(json);
+          this._bot = parseBotData(resp);
           this.render();
           this.app.finishedTask();
         })
         .catch((e) => {
-          if (e.status === 404) {
+          if (e.codeName === 'NOT_FOUND') {
             this._bot = {};
             this._notFound = true;
             this.render();
           }
-          this.fetchError(e, 'bot/data');
+          this.prpcError(e, 'bot/data');
         });
     if (!this._taskCursor) {
       this.app.addBusyTasks(1);
@@ -545,7 +548,7 @@ window.customElements.define('bot-page', class extends SwarmingAppBoilerplate {
       kill_running: true,
     };
     this.app.addBusyTasks(1);
-    fetch(`/_ah/api/swarming/v1/task/${this._bot.task_id}/cancel`, {
+    fetch(`/_ah/api/swarming/v1/task/${this._bot.taskId}/cancel`, {
       method: 'POST',
       headers: {
         'authorization': this.auth_header,
@@ -618,7 +621,7 @@ window.customElements.define('bot-page', class extends SwarmingAppBoilerplate {
   }
 
   _promptKill() {
-    this._prompt = `kill running task '${this._bot.task_id}'`;
+    this._prompt = `kill running task '${this._bot.taskId}'`;
     this._promptCallback = this._killTask;
     this.render();
 

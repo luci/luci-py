@@ -172,7 +172,7 @@ export function siblingBotsLink(dimensions) {
   return botListLink(dimensions, cols);
 }
 
-const BOT_TIMES = ['first_seen_ts', 'last_seen_ts', 'lease_expiration_ts'];
+const BOT_TIMES = ['firstSeenTs', 'lastSeenTs', 'leaseExpirationTs'];
 const TASK_TIMES = ['started_ts', 'completed_ts', 'abandoned_ts', 'modified_ts'];
 
 // These field filters trim down the data we get per task, which

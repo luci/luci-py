@@ -11,7 +11,7 @@ describe('bot-page', function() {
   // leak dependencies (e.g. bot-list's 'column' function to task-list) and
   // try to import things multiple times.
   const {$, $$} = require('common-sk/modules/dom');
-  const {customMatchers, expectNoUnmatchedCalls, mockAppGETs, MATCHED} = require('modules/test_util');
+  const {customMatchers, expectNoUnmatchedCalls, mockAppGETs, MATCHED, mockGetBot} = require('modules/test_util');
   const {botDataMap, eventsMap, tasksMap} = require('modules/bot-page/test_data');
 
   const TEST_BOT_ID = 'example-gce-001';
@@ -106,9 +106,9 @@ describe('bot-page', function() {
     const events = {items: eventsMap['SkiaGPU']};
 
     fetchMock.get(new RegExp('/_ah/api/swarming/v1/server/permissions\??.*'), {});
-    fetchMock.get(`/_ah/api/swarming/v1/bot/${TEST_BOT_ID}/get`, data);
     fetchMock.get(`glob:/_ah/api/swarming/v1/bot/${TEST_BOT_ID}/tasks*`, tasks);
     fetchMock.get(`glob:/_ah/api/swarming/v1/bot/${TEST_BOT_ID}/events*`, events);
+    mockGetBot(fetchMock, data);
   }
 
 
@@ -483,10 +483,10 @@ describe('bot-page', function() {
       });
     }); // describe('quarantined android bot')
 
-    describe('dead machine provider bot', function() {
+    describe('dead bot', function() {
       beforeEach(() => serveBot('dead'));
 
-      it('displays dead and mp related info', function(done) {
+      it('dead machine provider bot', function(done) {
         loggedInBotPage((ele) => {
           const dataTable = $$('table.data_table', ele);
           expect(dataTable).toBeTruthy();
@@ -587,15 +587,12 @@ describe('bot-page', function() {
       });
     });
 
-    function checkAuthorizationAndNoPosts(calls) {
+    function checkAuthorization(calls) {
       // check authorization headers are set
       calls.forEach((c) => {
         expect(c[1].headers).toBeDefined();
         expect(c[1].headers.authorization).toContain('Bearer ');
       });
-
-      const postCalls = fetchMock.calls(MATCHED, 'POST');
-      expect(postCalls).toHaveSize(0, 'no POSTs on bot-page');
 
       expectNoUnmatchedCalls(fetchMock);
     }
@@ -603,15 +600,23 @@ describe('bot-page', function() {
     it('makes auth\'d API calls when a logged in user views landing page', function(done) {
       serveBot('running');
       loggedInBotPage((ele) => {
-        const calls = fetchMock.calls(MATCHED, 'GET');
-        expect(calls).toHaveSize(2+4, '2 GETs from swarming-app, 4 from bot-page');
+        const protoRpcCalls = fetchMock.calls(MATCHED, 'GET');
+        expect(protoRpcCalls).toHaveSize(2+3, '2 GETs from swarming-app, 3 from bot-page');
+        checkAuthorization(protoRpcCalls);
+        // At the moment, only GetBot is used.
+        const prpcCalls = fetchMock.calls(MATCHED, 'POST');
+        expect(prpcCalls).toHaveSize(1);
         // calls is an array of 2-length arrays with the first element
         // being the string of the url and the second element being
         // the options that were passed in
-        const gets = calls.map((c) => c[0]);
-
-        expect(gets).toContain(`/_ah/api/swarming/v1/bot/${TEST_BOT_ID}/get`);
-        checkAuthorizationAndNoPosts(calls);
+        const expectedBody = JSON.stringify({bot_id: TEST_BOT_ID});
+        const predicate = (call) => {
+          return call[0].endsWith('prpc/swarming.v2.Bots/GetBot') &&
+            call[1].body === expectedBody;
+        };
+        const getBotsCall = prpcCalls.filter(predicate);
+        expect(getBotsCall).toHaveSize(1);
+        checkAuthorization(prpcCalls);
         done();
       });
     });
@@ -827,8 +832,10 @@ describe('bot-page', function() {
           // MATCHED calls are calls that we expect and specified in the
           // beforeEach at the top of this file.
           expectNoUnmatchedCalls(fetchMock);
-          const calls = fetchMock.calls(MATCHED, 'GET');
-          expect(calls).toHaveSize(4);
+          const protoRpcCalls = fetchMock.calls(MATCHED, 'GET');
+          expect(protoRpcCalls).toHaveSize(3);
+          const prpcCalls = fetchMock.calls(MATCHED, 'POST');
+          expect(prpcCalls).toHaveSize(1);
 
           done();
         });
