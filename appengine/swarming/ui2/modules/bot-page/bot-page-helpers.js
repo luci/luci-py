@@ -5,19 +5,6 @@
 import {applyAlias} from '../alias';
 import {botListLink, humanDuration, sanitizeAndHumanizeTime, timeDiffExact} from '../util';
 
-
-/** mpLink produces a machine provider link for this bot
- *  @param {Object} bot - The bot object
- *  @param {Object} serverDetails - The server details returned via the API.
- */
-export function mpLink(bot, serverDetails) {
-  const template = serverDetails.machine_provider_template;
-  if (!bot.lease_id || !template) {
-    return undefined;
-  }
-  return template.replace('%s', bot.lease_id);
-}
-
 /** parseBotData pre-processes any data in the bot data object.
  *  @param {Object} bot - The raw bot object
  */

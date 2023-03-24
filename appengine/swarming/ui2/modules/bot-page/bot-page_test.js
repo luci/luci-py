@@ -486,7 +486,7 @@ describe('bot-page', function() {
     describe('dead bot', function() {
       beforeEach(() => serveBot('dead'));
 
-      it('dead machine provider bot', function(done) {
+      it('displays buttons and table items indicating bot death', function(done) {
         loggedInBotPage((ele) => {
           const dataTable = $$('table.data_table', ele);
           expect(dataTable).toBeTruthy();
@@ -510,13 +510,6 @@ describe('bot-page', function() {
           expect(rows[3]).not.toHaveClass('hidden', 'dead');
           expect(rows[4]).toHaveClass('hidden', 'not in maintenance');
           expect(cell(5, 0)).toMatchTextContent('Died on Task');
-          expect(rows[27]).not.toHaveAttribute('hidden');
-          expect(cell(27, 0)).toMatchTextContent('Machine Provider Lease ID');
-          expect(cell(27, 1)).toMatchTextContent('f69394d5f68b1f1e6c5f13e82ba4ccf72de7e6a0');
-          expect(cell(27, 1).innerHTML).toContain('<a ', 'has a link');
-          expect(cell(27, 1).innerHTML).toContain('href="https://example.com/leases/'+
-                                                  'f69394d5f68b1f1e6c5f13e82ba4ccf72de7e6a0"');
-
           done();
         });
       });

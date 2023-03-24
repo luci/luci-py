@@ -246,7 +246,6 @@ export const botDataMap = {
     'botId': 'quarantined',
   },
   'dead': {
-    'lease_id': 'f69394d5f68b1f1e6c5f13e82ba4ccf72de7e6a0',
     'authenticatedAs': 'bot:running.chromium.org',
     'dimensions': [
       {
@@ -350,16 +349,13 @@ export const botDataMap = {
     ],
     'taskId': '',
     'externalIp': '35.229.11.33',
-    'machine_lease': 'gce-trusty-176',
     'isDead': true,
     'deleted': false,
     'quarantined': false,
-    'lease_expiration_ts': '2019-01-15T00:39:04',
     'state': '{"audio":[],"bot_group_cfg_version":"hash:5bbd7d8f05c65e","cost_usd_hour":0.41316150716145833,"cpu_name":"Intel(R) Xeon(R) CPU Broadwell GCE","cwd":"/b/s","disks":{"/":{"free_mb":246117.8,"size_mb":302347.0}},"env":{"PATH":"/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin"},"files":{"/usr/share/fonts/truetype/":["Gubbi","Navilu","dejavu","fonts-japanese-gothic.ttf","fonts-japanese-mincho.ttf","kochi","liberation","msttcorefonts","pagul","tlwg","ttf-bengali-fonts","ttf-dejavu","ttf-devanagari-fonts","ttf-gujarati-fonts","ttf-indic-fonts-core","ttf-kannada-fonts","ttf-malayalam-fonts","ttf-oriya-fonts","ttf-punjabi-fonts","ttf-tamil-fonts","ttf-telugu-fonts"]},"gpu":[],"hostname":"dead.us-east1-b.c.chromecompute.google.com.internal","ip":"10.0.8.219","named_caches":{"swarming_module_cache_vpython":[["kL",887763447],1547511540.0]},"nb_files_in_temp":8,"pid":1117,"python":{"executable":"/usr/bin/python","packages":["Cheetah==2.4.4","CherryPy==3.2.2","Landscape-Client==14.12","PAM==0.4.2","PyYAML==3.10","Routes==2.0","Twisted-Core==13.2.0","Twisted-Names==13.2.0","Twisted-Web==13.2.0","WebOb==1.3.1","apt-xapian-index==0.45","argparse==1.2.1","boto==2.20.1","chardet==2.0.1","cloud-init==0.7.5","colorama==0.2.5","configobj==4.7.2","coverage==3.7.1","crcmod==1.7","google-compute-engine==2.2.4","html5lib==0.999","iotop==0.6","jsonpatch==1.3","jsonpointer==1.0","numpy==1.8.2","oauth==1.0.1","pexpect==3.1","prettytable==0.7.2","psutil==1.2.1","pyOpenSSL==0.13","pycrypto==2.6.1","pycurl==7.19.3","pyserial==2.6","python-apt==0.9.3.5ubuntu2","python-debian==0.1.21-nmu2ubuntu2","pyxdg==0.25","repoze.lru==0.6","requests==2.2.1","six==1.5.2","ssh-import-id==3.21","urllib3==1.7.1","wheel==0.24.0","wsgiref==0.1.2","zope.interface==4.0.5"],"version":"2.7.6 (default, Nov 13 2018, 12:45:42) \\n[GCC 4.8.4]"},"ram":30159,"running_time":7309,"sleep_streak":22,"ssd":[],"started_ts":1547505598,"uptime":7321,"user":"chrome-bot"}',
     'version': '9644ba2fcbeafe7628828602251e5405db3d79b9cd230523bdf7927e204d664e',
     'firstSeenTs': '2019-01-14T00:40:11.400947',
     'lastSeenTs': '2019-01-15T00:42:19.613017',
-    'machine_type': 'gce-trusty',
     'botId': 'dead',
   },
 };

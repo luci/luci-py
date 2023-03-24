@@ -693,8 +693,6 @@ export const bots_10 = {
       'authenticated_as': 'bot:somebot18-a9.fleet.example.com',
       'bot_id': 'somebot18-a9',
       'deleted': false,
-      'lease_id': '22596363b3de40b06f981fb85d82312e8c0ed511',
-      'lease_expiration_ts': '2019-10-24T16:01:02',
       'dimensions': [
         {
           'key': 'caches',

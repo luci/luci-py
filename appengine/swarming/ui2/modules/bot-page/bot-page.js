@@ -17,7 +17,7 @@ import '../bot-page-summary';
 import '../dialog-pop-over';
 import '../swarming-app';
 
-import {EVENTS_QUERY_PARAMS, mpLink, parseBotData, parseEvents,
+import {EVENTS_QUERY_PARAMS, parseBotData, parseEvents,
   parseTasks, quarantineMessage, siblingBotsLink, TASKS_QUERY_PARAMS} from './bot-page-helpers';
 import {stateClass as taskClass} from '../task-page/task-page-helpers';
 import {timeDiffApprox, timeDiffExact, taskPageLink} from '../util';
@@ -159,19 +159,6 @@ const dataAndMPBlock = (ele, bot) => html`
 </tr>
 <tr title="How the bot is authenticated by the server.">
   <td>Authenticated as</td>
-  <td colspan=2>${bot.authenticatedAs}</td>
-</tr>
-<tr ?hidden=${!bot.lease_id}>
-  <td>Machine Provider Lease ID</td>
-  <td colspan=2>
-    <a href=${ifDefined(mpLink(bot, ele.server_details))}>
-      ${bot.lease_id}
-    </a>
-  </td>
-</tr>
-<tr ?hidden=${!bot.lease_id}>
-  <td>Machine Provider Lease Expires</td>
-  <td colspan=2>${bot.human_lease_expiration_ts}</td>
   <td colspan=2>${bot.authenticatedAs}</td>
 </tr>
 `;
