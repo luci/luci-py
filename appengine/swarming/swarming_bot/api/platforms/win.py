@@ -116,8 +116,13 @@ def _get_wmi_wbem(namespace=_WMI_DEFAULT_NS):
   client, pythoncom = _get_win32com()
   if not client:
     return None
-  wmi_service = client.Dispatch('WbemScripting.SWbemLocator')
-  return _WbemScripting(wmi_service.ConnectServer('.', namespace), pythoncom)
+  try:
+    wmi_service = client.Dispatch('WbemScripting.SWbemLocator')
+    return _WbemScripting(wmi_service.ConnectServer('.', namespace), pythoncom)
+  except pythoncom.com_error as e:
+    logging.error(
+        'Cannot construct WMI client for namespace %s: %s', namespace, e)
+    return None
 
 
 # Regexp for _get_os_numbers()
