@@ -131,17 +131,17 @@ class TestWin(auto_stub.TestCase):
                                  ['8.1', '8.1-SP0'])
 
   @params(
-      (0, 3, 32, 'i386'),
-      (9, None, 64, 'amd64'),
-      (9, 6, 32, 'i686'),
-      (10, 6, 32, 'i686'),
-      (999, None, None, None),
+      (0, 32, 'i686'),
+      (9, 64, 'amd64'),
+      (9, 32, 'i686'),
+      (10, 32, 'i686'),
+      (12, 64, 'arm64'),
+      (999, None, None),
   )
-  def test_get_cpu_type_with_wmi(self, arch, level, addr_width, expected):
-    SWbemObjectSet = mock.Mock(
-        Architecture=arch, Level=level, AddressWidth=addr_width)
+  def test_get_cpu_type_with_wmi(self, arch, addr_width, expected):
+    SWbemObjectSet = mock.Mock(Architecture=arch, AddressWidth=addr_width)
     SWbemServices = mock.Mock()
-    SWbemServices.ExecQuery.return_value = [SWbemObjectSet]
+    SWbemServices.query.return_value = [SWbemObjectSet]
     with mock.patch(
         'api.platforms.win._get_wmi_wbem', return_value=SWbemServices):
       self.assertEqual(win.get_cpu_type_with_wmi(), expected)
@@ -153,11 +153,11 @@ class TestWin(auto_stub.TestCase):
         VideoProcessor='GGA',
         DriverVersion='1.1.1.18')
     SWbemServices = mock.Mock()
-    SWbemServices.ExecQuery.return_value = [SWbemObjectSet]
+    SWbemServices.query.return_value = [SWbemObjectSet]
     with mock.patch(
       'api.platforms.win._get_wmi_wbem', return_value=SWbemServices):
       actual = win.get_gpu()
-      SWbemServices.ExecQuery.assert_called_once_with(
+      SWbemServices.query.assert_called_once_with(
         'SELECT * FROM Win32_VideoController')
       expected = (
         ['1ae0', '1ae0:a002', '1ae0:a002-1.1.1.18'], ['Unknown GGA 1.1.1.18'])

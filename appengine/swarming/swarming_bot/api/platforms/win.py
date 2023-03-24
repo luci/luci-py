@@ -70,6 +70,31 @@ def _get_disk_info(mount_point):
   }
 
 
+# WMI namespaces we query, see
+# https://learn.microsoft.com/en-us/windows/win32/winrm/windows-remote-management-and-wmi
+_WMI_DEFAULT_NS = 'root\\cimv2'
+_WMI_STORAGE_NS = 'Root\\Microsoft\\Windows\\Storage'
+
+
+class _WbemScriptingError(Exception):
+  pass
+
+
+class _WbemScripting:
+  """Wraps a WbemScripting WMI client connected to a localhost namespace."""
+
+  def __init__(self, client, pythoncom):
+    self._client = client
+    self._pythoncom = pythoncom
+
+  def query(self, query):
+    try:
+      return self._client.ExecQuery(query)
+    except self._pythoncom.com_error as e:
+      # This generally happens when this is called as the host is shutting down.
+      raise _WbemScriptingError(e)
+
+
 @tools.cached
 def _get_win32com():
   """Returns an uninitialized WMI client."""
@@ -86,28 +111,13 @@ def _get_win32com():
 
 
 @tools.cached
-def _get_wmi_wbem():
+def _get_wmi_wbem(namespace=_WMI_DEFAULT_NS):
   """Returns a WMI client connected to localhost ready to do queries."""
-  client, _ = _get_win32com()
-  if not client:
-    return None
-  wmi_service = client.Dispatch('WbemScripting.SWbemLocator')
-  return wmi_service.ConnectServer('.', 'root\\cimv2')
-
-
-@tools.cached
-def _get_wmi_wbem_for_storage():
-  """
-  Returns a WMI client connected to localhost ready to do queries for storage.
-  """
   client, pythoncom = _get_win32com()
   if not client:
     return None
   wmi_service = client.Dispatch('WbemScripting.SWbemLocator')
-  try:
-    return wmi_service.ConnectServer('.', 'Root\\Microsoft\\Windows\\Storage')
-  except pythoncom.com_error:
-    return None
+  return _WbemScripting(wmi_service.ConnectServer('.', namespace), pythoncom)
 
 
 # Regexp for _get_os_numbers()
@@ -309,8 +319,7 @@ def get_audio():
     return None
   # https://msdn.microsoft.com/library/aa394463.aspx
   return [
-      device.Name
-      for device in wbem.ExecQuery('SELECT * FROM Win32_SoundDevice')
+      device.Name for device in wbem.query('SELECT * FROM Win32_SoundDevice')
       if device.Status == 'OK'
   ]
 
@@ -375,39 +384,40 @@ def get_cpuinfo():
     k.Close()
 
 
+@tools.cached
 def get_cpu_type_with_wmi():
-  # Get CPU architecture type using WMI.
-  # This is a fallback for when platform.machine() returns None.
-  # References:
-  # https://docs.microsoft.com/en-us/windows/win32/cimwin32prov/win32-processor#properties
-  # https://source.winehq.org/source/include/winnt.h#L680
-  # https://github.com/puppetlabs/facter/blob/2.x/lib/facter/hardwaremodel.rb#L28
+  """Get CPU architecture type using WMI.
+
+  Returns one of amd64, arm64, i686 or None if can't detect.
+
+  References:
+    https://docs.microsoft.com/en-us/windows/win32/cimwin32prov/win32-processor#properties
+    https://source.winehq.org/source/include/winnt.h#L680
+    https://github.com/puppetlabs/facter/blob/2.x/lib/facter/hardwaremodel.rb#L28
+  """
   wbem = _get_wmi_wbem()
   if not wbem:
     return None
-  _, pythoncom = _get_win32com()
-  try:
-    q = 'SELECT Architecture, Level, AddressWidth FROM Win32_Processor'
-    for cpu in wbem.ExecQuery(q):
 
-      def intel_arch():
-        arch_level = min(cpu.Level, 6)
-        return 'i%d86' % arch_level  # e.g. i386, i686
-
-      if cpu.Architecture == 12:  # PROCESSOR_ARCHITECTURE_ARM64
-        return 'arm64'
-      if cpu.Architecture == 10:  # PROCESSOR_ARCHITECTURE_IA32_ON_WIN64
+  q = 'SELECT Architecture, AddressWidth FROM Win32_Processor'
+  for cpu in wbem.query(q):
+    if cpu.Architecture == 12:  # PROCESSOR_ARCHITECTURE_ARM64
+      return 'arm64'
+    if cpu.Architecture == 10:  # PROCESSOR_ARCHITECTURE_IA32_ON_WIN64
+      return 'i686'
+    if cpu.Architecture == 9:  # PROCESSOR_ARCHITECTURE_AMD64
+      if cpu.AddressWidth == 32:
         return 'i686'
-      if cpu.Architecture == 9:  # PROCESSOR_ARCHITECTURE_AMD64
-        if cpu.AddressWidth == 32:
-          return intel_arch()
-        return 'amd64'
-      if cpu.Architecture == 0:  # PROCESSOR_ARCHITECTURE_INTEL
-        return intel_arch()
-  except pythoncom.com_error as e:
-    # This generally happens when this is called as the host is shutting down.
-    logging.error('get_cpu_type_with_wmi(): %s', e)
-  # Unknown or exception.
+      return 'amd64'
+    if cpu.Architecture == 0:  # PROCESSOR_ARCHITECTURE_INTEL
+      # PROCESSOR_ARCHITECTURE_INTEL indicates older Pentium (and pre Pentium)
+      # Intel processors. They should all be 32-bit. Skip if something is wrong.
+      # Note that we assume at least Pentium CPU.
+      if cpu.AddressWidth == 32:
+        return 'i686'
+    logging.warning('Unknown CPU: %s', cpu)
+
+  # Unknown.
   return None
 
 
@@ -420,12 +430,12 @@ def get_gpu():
   if not wbem:
     return None, None
 
-  _, pythoncom = _get_win32com()
   dimensions = set()
   state = set()
+
   # https://msdn.microsoft.com/library/aa394512.aspx
   try:
-    for device in wbem.ExecQuery('SELECT * FROM Win32_VideoController'):
+    for device in wbem.query('SELECT * FROM Win32_VideoController'):
       # The string looks like:
       #  PCI\VEN_15AD&DEV_0405&SUBSYS_040515AD&REV_00\3&2B8E0B4B&0&78
       pnp_string = device.PNPDeviceID
@@ -449,9 +459,10 @@ def get_gpu():
         state.add('%s %s %s' % (ven_name, dev_name, version))
       else:
         state.add('%s %s' % (ven_name, dev_name))
-  except pythoncom.com_error as e:
+  except _WbemScriptingError as e:
     # This generally happens when this is called as the host is shutting down.
     logging.error('get_gpu(): %s', e)
+
   return sorted(dimensions), sorted(state)
 
 
@@ -629,15 +640,14 @@ def get_reboot_required():
 @tools.cached
 def get_ssd():
   """Returns a list of SSD disks."""
-  wbem = _get_wmi_wbem_for_storage()
+  wbem = _get_wmi_wbem(_WMI_STORAGE_NS)
   if not wbem:
     return ()
   # https://docs.microsoft.com/en-us/previous-versions/windows/desktop/stormgmt/msft-physicaldisk
   try:
-    return sorted(
-      d.DeviceId for d in wbem.ExecQuery('SELECT * FROM MSFT_PhysicalDisk')
-      if d.MediaType == 4
-    )
+    return sorted(d.DeviceId
+                  for d in wbem.query('SELECT * FROM MSFT_PhysicalDisk')
+                  if d.MediaType == 4)
   except AttributeError:
     return ()
 
@@ -701,7 +711,7 @@ def get_computer_system_info():
 
   info = None
   # https://msdn.microsoft.com/en-us/library/aa394105
-  for device in wbem.ExecQuery('SELECT * FROM Win32_ComputerSystemProduct'):
+  for device in wbem.query('SELECT * FROM Win32_ComputerSystemProduct'):
     info = common.ComputerSystemInfo(
         name=device.Name,
         vendor=device.Vendor,
