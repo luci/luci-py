@@ -105,17 +105,8 @@ describe('bot-page', function() {
     const tasks = {items: tasksMap['SkiaGPU']};
     const events = {items: eventsMap['SkiaGPU']};
 
-    const stringify = (data) => `)]}'${JSON.stringify(data)}`;
     fetchMock.get(new RegExp('/_ah/api/swarming/v1/server/permissions\??.*'), {});
-    fetchMock.post('path:/prpc/swarming.v2.Bots/GetBot',
-        new Response(stringify(data), {
-          status: 200,
-          headers: {
-            'x-prpc-grpc-code': '0',
-            'content-type': 'application/json',
-          },
-        }),
-    );
+    fetchMock.get(`/_ah/api/swarming/v1/bot/${TEST_BOT_ID}/get`, data);
     fetchMock.get(`glob:/_ah/api/swarming/v1/bot/${TEST_BOT_ID}/tasks*`, tasks);
     fetchMock.get(`glob:/_ah/api/swarming/v1/bot/${TEST_BOT_ID}/events*`, events);
   }
@@ -596,12 +587,15 @@ describe('bot-page', function() {
       });
     });
 
-    function checkAuthorization(calls) {
+    function checkAuthorizationAndNoPosts(calls) {
       // check authorization headers are set
       calls.forEach((c) => {
         expect(c[1].headers).toBeDefined();
         expect(c[1].headers.authorization).toContain('Bearer ');
       });
+
+      const postCalls = fetchMock.calls(MATCHED, 'POST');
+      expect(postCalls).toHaveSize(0, 'no POSTs on bot-page');
 
       expectNoUnmatchedCalls(fetchMock);
     }
@@ -609,23 +603,15 @@ describe('bot-page', function() {
     it('makes auth\'d API calls when a logged in user views landing page', function(done) {
       serveBot('running');
       loggedInBotPage((ele) => {
-        const protoRpcCalls = fetchMock.calls(MATCHED, 'GET');
-        expect(protoRpcCalls).toHaveSize(2+3, '2 GETs from swarming-app, 3 from bot-page');
-        checkAuthorization(protoRpcCalls);
-        // At the moment, only GetBot is used.
-        const prpcCalls = fetchMock.calls(MATCHED, 'POST');
-        expect(prpcCalls).toHaveSize(1);
+        const calls = fetchMock.calls(MATCHED, 'GET');
+        expect(calls).toHaveSize(2+4, '2 GETs from swarming-app, 4 from bot-page');
         // calls is an array of 2-length arrays with the first element
         // being the string of the url and the second element being
         // the options that were passed in
-        const expectedBody = JSON.stringify({bot_id: TEST_BOT_ID});
-        const predicate = (call) => {
-          return call[0].endsWith('prpc/swarming.v2.Bots/GetBot') &&
-            call[1].body === expectedBody;
-        };
-        const getBotsCall = prpcCalls.filter(predicate);
-        expect(getBotsCall).toHaveSize(1);
-        checkAuthorization(prpcCalls);
+        const gets = calls.map((c) => c[0]);
+
+        expect(gets).toContain(`/_ah/api/swarming/v1/bot/${TEST_BOT_ID}/get`);
+        checkAuthorizationAndNoPosts(calls);
         done();
       });
     });
@@ -841,10 +827,8 @@ describe('bot-page', function() {
           // MATCHED calls are calls that we expect and specified in the
           // beforeEach at the top of this file.
           expectNoUnmatchedCalls(fetchMock);
-          const protoRpcCalls = fetchMock.calls(MATCHED, 'GET');
-          expect(protoRpcCalls).toHaveSize(3);
-          const prpcCalls = fetchMock.calls(MATCHED, 'POST');
-          expect(prpcCalls).toHaveSize(1);
+          const calls = fetchMock.calls(MATCHED, 'GET');
+          expect(calls).toHaveSize(4);
 
           done();
         });
