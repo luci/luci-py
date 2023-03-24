@@ -40,31 +40,28 @@ class TestOsUtilities(auto_stub.TestCase):
 
   def test_get_cpu_type(self):
     cases = [
-        ('x86_64', 'x86'),
-        ('amd64', 'x86'),
-        ('i386', 'x86'),
-        ('i686', 'x86'),
-        ('aarch64', 'arm64'),
-        ('mips64', 'mips'),
-        ('arm64', 'arm64'),
+        ('x86_64', 'amd64', 'x86'),
+        ('amd64', 'amd64', 'x86'),
+        ('i686', 'i686', 'x86'),
+        ('aarch64', 'arm64', 'arm64'),
+        ('mips64', None, 'mips'),
+        ('arm64', None, 'arm64'),
     ]
-    for machine, expected in cases:
+    for machine, win_cpu_type, expected in cases:
       self.mock(platform, 'machine', lambda: machine)
+      if sys.platform == 'win32':
+        self.mock(platforms.win, 'get_cpu_type_with_wmi', lambda: win_cpu_type)
       self.assertEqual(os_utilities.get_cpu_type(), expected)
 
   def test_get_cipd_architecture(self):
     cases = [
-        ('x86_64', '64', 'amd64'),
-        ('amd64', '64', 'amd64'),
-        ('i386', '32', '386'),
-        ('i686', '64', 'amd64'),
-        ('i686', '32', '386'),  # 32-bit Linux userland
-        ('aarch64', '64', 'arm64'),
+        ('x86', '64', 'amd64'),
+        ('x86', '32', '386'),
         ('arm64', '64', 'arm64'),
         ('armv7l', '32', 'armv6l'),
     ]
-    for machine, bitness, expected in cases:
-      self.mock(platform, 'machine', lambda: machine)
+    for cpu_type, bitness, expected in cases:
+      self.mock(os_utilities, 'get_cpu_type', lambda: cpu_type)
       self.mock(os_utilities, 'get_cpu_bitness', lambda: bitness)
       self.assertEqual(os_utilities.get_cipd_architecture(), expected)
 
@@ -245,7 +242,6 @@ class TestOsUtilities(auto_stub.TestCase):
     }
     if sys.platform in ('cygwin', 'win32'):
       expected.add('cygwin')
-      expected.add('wmi_cpu_type')
     if sys.platform == 'darwin':
       expected.add('xcode')
     if 'quarantined' in actual:

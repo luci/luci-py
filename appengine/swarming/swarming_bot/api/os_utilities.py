@@ -227,9 +227,16 @@ def get_os_name():
 @tools.cached
 def get_cpu_type():
   """Returns the type of processor: armv6l, armv7l, arm64 or x86."""
+  # On Windows prefer to use WMI: it is more accurate. Fallback to
+  # platform.machine() if the WMI method is not available (e.g. pywin32 is
+  # missing).
+  if sys.platform == 'win32':
+    cpu_type = platforms.win.get_cpu_type_with_wmi()
+    if cpu_type in ('amd64', 'i686'):
+      return 'x86'
+    if cpu_type:
+      return cpu_type  # e.g. `arm64`
   machine = platform.machine().lower()
-  if sys.platform == 'win32' and not machine:
-    machine = platforms.win.get_cpu_type_with_wmi()
   if machine in ('amd64', 'x86_64', 'i386', 'i686'):
     return 'x86'
   if machine == 'aarch64':
@@ -250,6 +257,23 @@ def get_cpu_bitness():
   On other platforms (Linux), we explicitly want to report 32 bits userland,
   independent of the kernel bitness.
   """
+  # On Windows prefer to use WMI: it is more accurate. Fallback to
+  # platform.machine() if the WMI method is not available (e.g. pywin32 is
+  # missing).
+  if sys.platform == 'win32':
+    cpu_type = platforms.win.get_cpu_type_with_wmi()
+    try:
+      bitness = {
+          'amd64': '64',
+          'arm64': '64',
+          'i686': '32',
+          None: None,  # need to fallback to `platform.machine()`
+      }[cpu_type]
+      if bitness:
+        return bitness
+    except KeyError as e:
+      logging.error('Unrecognized Windows CPU type %s', e)
+
   if sys.platform in ('darwin', 'win32') and platform.machine().endswith('64'):
     return '64'
   return '64' if sys.maxsize > 2**32 else '32'
@@ -1104,7 +1128,6 @@ def get_state():
     state['named_caches'] = cache
   if sys.platform in ('cygwin', 'win32'):
     state['cygwin'] = [sys.platform == 'cygwin']
-    state['wmi_cpu_type'] = platforms.win.get_cpu_type_with_wmi()
   if sys.platform == 'darwin':
     state['xcode'] = platforms.osx.get_xcode_state()
     temp = platforms.osx.get_temperatures()
