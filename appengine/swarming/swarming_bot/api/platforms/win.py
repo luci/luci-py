@@ -372,7 +372,7 @@ def get_cpuinfo():
   try:
     identifier, _ = winreg.QueryValueEx(k, 'Identifier')
     match = re.match(
-        r'^.+ Family (\d+) Model (\d+) (?:Stepping|Revision) ([0-9A-Fa-f]+)$',
+        r'^.+\s+Family\s+(\d+)\s+Model\s+([0-9A-Fa-f]+)\s+(?:Stepping|Revision)\s+([0-9A-Fa-f]+)$',  # pylint: disable=line-too-long
         identifier)
     name, _ = winreg.QueryValueEx(k, 'ProcessorNameString')
     vendor, _ = winreg.QueryValueEx(k, 'VendorIdentifier')
@@ -380,10 +380,12 @@ def get_cpuinfo():
     return {
         'model':
         [int(match.group(1)),
-         int(match.group(2)),
+         int(match.group(2), 16),
          int(match.group(3), 16)],
-        'name': name,
-        'vendor': vendor,
+        'name':
+        name,
+        'vendor':
+        vendor,
     }
   finally:
     k.Close()
