@@ -1075,6 +1075,11 @@ def get_dimensions():
     windows_client_versions = platforms.win.get_client_versions()
     if windows_client_versions:
       dimensions['windows_client_version'] = windows_client_versions
+    display_attached = platforms.win.is_display_attached()
+    if display_attached:
+      dimensions['display_attached'] = ['1']
+    else:
+      dimensions['display_attached'] = ['0']
 
   return dimensions
 

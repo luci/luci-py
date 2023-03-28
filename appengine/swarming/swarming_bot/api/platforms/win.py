@@ -642,6 +642,32 @@ def get_reboot_required():
       k.Close()
 
 
+def is_display_attached():
+  """Returns whether a display is attached to the machine or not.
+
+  Returns:
+    None, True, or False. It is None when the presence of a display cannot be
+    determined, and a bool otherwise returning whether a display is attached.
+  """
+  # When a display is attached and functioning properly, a number of fields
+  # should have their values properly set (i.e. not be empty), including the
+  # ones for display resolution.
+  wbem = _get_wmi_wbem()
+  if not wbem:
+    return None
+  query = ('SELECT CurrentHorizontalResolution, CurrentVerticalResolution '
+           'FROM Win32_VideoController')
+  try:
+    for ctl in wbem.query(query):
+      if ctl.CurrentHorizontalResolution and ctl.CurrentVerticalResolution:
+        return True
+  except _WbemScriptingError as e:
+    # This generally happens when this is called as the host is shutting down.
+    logging.error('is_display_attached(): %s', e)
+    return None
+  return False
+
+
 @tools.cached
 def get_ssd():
   """Returns a list of SSD disks."""

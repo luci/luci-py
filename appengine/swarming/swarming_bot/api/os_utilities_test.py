@@ -203,6 +203,7 @@ class TestOsUtilities(auto_stub.TestCase):
       expected.add('kvm')
     if sys.platform == 'win32':
       expected.add('integrity')
+      expected.add('display_attached')
     self.assertEqual(expected, actual)
 
   def test_override_id_via_env(self):

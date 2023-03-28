@@ -175,6 +175,65 @@ class TestWin(auto_stub.TestCase):
     self.assertEqual(('10.0', '16299.19'), m.groups())
 
 
+class TestWinPlatformIndendent(auto_stub.TestCase):
+  """Like TestWin, but not limited to running on Windows."""
+  def setUp(self):
+    super().setUp()
+    tools.clear_cache_all()
+
+  def tearDown(self):
+    super().tearDown()
+    tools.clear_cache_all()
+
+  def test_is_display_attached_valid_display(self):
+    SWbemObject = mock.Mock(CurrentHorizontalResolution=1280,
+                            CurrentVerticalResolution=720)
+    SWbemServices = mock.Mock()
+    SWbemServices.query.return_value = [SWbemObject]
+    with mock.patch('api.platforms.win._get_wmi_wbem',
+                    return_value=SWbemServices):
+      self.assertTrue(win.is_display_attached())
+
+  def test_is_display_attached_missing_display(self):
+    # Both fields missing.
+    SWbemObject = mock.Mock(CurrentHorizontalResolution=None,
+                            CurrentVerticalResolution=None)
+    SWbemServices = mock.Mock()
+    SWbemServices.query.return_value = [SWbemObject]
+    with mock.patch('api.platforms.win._get_wmi_wbem',
+                    return_value=SWbemServices):
+      self.assertFalse(win.is_display_attached())
+
+    # First field missing.
+    SWbemObject = mock.Mock(CurrentHorizontalResolution=None,
+                            CurrentVerticalResolution=720)
+    SWbemServices = mock.Mock()
+    SWbemServices.query.return_value = [SWbemObject]
+    with mock.patch('api.platforms.win._get_wmi_wbem',
+                    return_value=SWbemServices):
+      self.assertFalse(win.is_display_attached())
+
+    # Second field missing.
+    SWbemObject = mock.Mock(CurrentHorizontalResolution=1280,
+                            CurrentVerticalResolution=None)
+    SWbemServices = mock.Mock()
+    SWbemServices.query.return_value = [SWbemObject]
+    with mock.patch('api.platforms.win._get_wmi_wbem',
+                    return_value=SWbemServices):
+      self.assertFalse(win.is_display_attached())
+
+  def test_is_display_attached_no_wbem(self):
+    with mock.patch('api.platforms.win._get_wmi_wbem', return_value=None):
+      self.assertIsNone(win.is_display_attached())
+
+  def test_is_display_attached_scripting_error_handled(self):
+    SWbemServices = mock.Mock()
+    SWbemServices.query.side_effect = win._WbemScriptingError()
+    with mock.patch('api.platforms.win._get_wmi_wbem',
+                    return_value=SWbemServices):
+      self.assertIsNone(win.is_display_attached())
+
+
 if __name__ == '__main__':
   if '-v' in sys.argv:
     unittest.TestCase.maxDiff = None
