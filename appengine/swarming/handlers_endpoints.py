@@ -398,27 +398,13 @@ class SwarmingTasksService(remote.Service):
     # TODO(maruel): Rename 'TaskList' to 'TaskResults'.
     logging.debug('%s', request)
 
-    # Check permission.
-    # If the caller has global permission, it can access all tasks.
-    # Otherwise, it requires pool dimension to check ACL.
-    pools = bot_management.get_pools_from_dimensions_flat(request.tags)
-    realms.check_tasks_list_acl(pools)
-
     now = utils.utcnow()
     try:
-      items, cursor = datastore_utils.fetch_page(
-          self._query_from_request(request), request.limit, request.cursor)
+      rsf = self._query_from_request(request)
     except ValueError as e:
-      raise endpoints.BadRequestException(
-          'Inappropriate filter for tasks/list: %s' % e)
-    except datastore_errors.NeedIndexError as e:
-      logging.error('%s', e)
-      raise endpoints.BadRequestException(
-          'Requires new index, ask admin to create one.')
-    except datastore_errors.BadArgumentError as e:
-      logging.error('%s', e)
-      raise endpoints.BadRequestException(
-          'This combination is unsupported, sorry.')
+      raise endpoints.BadRequestException("invalid datetime values %s" % str(e))
+    items, cursor = api_common.list_task_results(rsf, request.cursor,
+                                                 request.limit)
     return swarming_rpcs.TaskList(
         cursor=cursor,
         items=[
@@ -461,9 +447,14 @@ class SwarmingTasksService(remote.Service):
     try:
       # Get the TaskResultSummary keys, then fetch the corresponding
       # TaskRequest entities.
-      keys, cursor = datastore_utils.fetch_page(
-          self._query_from_request(request),
-          request.limit, request.cursor, keys_only=True)
+      rsf = self._query_from_request(request)
+      query = task_result.get_result_summaries_query(rsf.start, rsf.end,
+                                                     rsf.sort, rsf.state,
+                                                     rsf.tags)
+      keys, cursor = datastore_utils.fetch_page(query,
+                                                request.limit,
+                                                request.cursor,
+                                                keys_only=True)
       items = ndb.get_multi(
           task_pack.result_summary_key_to_request_key(k) for k in keys)
     except ValueError as e:
@@ -525,7 +516,10 @@ class SwarmingTasksService(remote.Service):
       return swarming_rpcs.TasksCount(count=count, now=now)
 
     try:
-      count = self._query_from_request(request, 'created_ts').count()
+      rsf = self._query_from_request(request, 'created_ts')
+      count = task_result.get_result_summaries_query(rsf.start, rsf.end,
+                                                     rsf.sort, rsf.state,
+                                                     rsf.tags).count()
       memcache.add(mem_key, count, 24*60*60, namespace='tasks_count')
     except ValueError as e:
       raise endpoints.BadRequestException(
@@ -539,14 +533,16 @@ class SwarmingTasksService(remote.Service):
     return '%s|%s|%s|%s' % (request.tags, request.state, request.start, end)
 
   def _query_from_request(self, request, sort=None):
-    """Returns a TaskResultSummary query."""
+    """Returns api_common.TaskFilters object."""
     start = message_conversion.epoch_to_datetime(request.start)
     end = message_conversion.epoch_to_datetime(request.end)
-    return task_result.get_result_summaries_query(
-        start, end,
-        sort or request.sort.name.lower(),
-        request.state.name.lower(),
-        request.tags)
+    return api_common.TaskFilters(
+        start=start,
+        end=end,
+        sort=sort or request.sort.name.lower(),
+        state=request.state.name.lower(),
+        tags=request.tags,
+    )
 
 
 TaskQueuesRequest = endpoints.ResourceContainer(
@@ -736,12 +732,16 @@ class SwarmingBotService(remote.Service):
     except ValueError as e:
       raise endpoints.BadRequestException('Invalid timestamp: %s' % e)
     now = utils.utcnow()
+    filters = api_common.TaskFilters(
+        start=start,
+        end=end,
+        sort=request.sort.name.lower(),
+        state=request.state.name.lower(),
+        tags=[],
+    )
     items, cursor = api_common.list_bot_tasks(
         request.bot_id,
-        start,
-        end,
-        request.sort.name.lower(),
-        request.state.name.lower(),
+        filters,
         request.cursor,
         request.limit,
     )

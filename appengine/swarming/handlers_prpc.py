@@ -54,6 +54,29 @@ _STATE_MAP = {
 }
 
 
+def _get_start_and_end_dates(request):
+  """Gets two fields `start` and `end` from  a request proto and converts
+  them into datetime.datetime. If neither of the fields are defined in the proto
+  then just return None for each.
+  """
+  start = None
+  if request.HasField("start"):
+    start = request.start.ToDatetime()
+  end = None
+  if request.HasField("end"):
+    end = request.end.ToDatetime()
+  return start, end
+
+
+def _get_sort_and_state(request):
+  """Converts `sort` and `state` into forms which are compatible
+  with the previous endpoints API.
+  """
+  sort = _SORT_MAP.get(request.sort)
+  state = _STATE_MAP.get(request.state)
+  return sort, state
+
+
 class BotsService(object):
   """Module implements the Bots service defined in proto/api_v2/swarming.proto
   """
@@ -77,11 +100,9 @@ class BotsService(object):
   @auth.require(acl.can_access, log_identity=True)
   def ListBotEvents(self, request, _context):
     bot_id = request.bot_id
-    start = request.start.ToDatetime()
-    end = request.end.ToDatetime()
-    limit = request.limit
-    cursor = request.cursor
-    items, cursor = api_common.get_bot_events(bot_id, start, end, limit, cursor)
+    start, end = _get_start_and_end_dates(request)
+    items, cursor = api_common.get_bot_events(bot_id, start, end, request.limit,
+                                              request.cursor)
     return message_conversion_prpc.bot_events_response(items, cursor)
 
   @prpc_helpers.method
@@ -95,18 +116,17 @@ class BotsService(object):
   @auth.require(acl.can_access, log_identity=True)
   def ListBotTasks(self, request, _context):
     bot_id = request.bot_id
-    start = request.start.ToDatetime()
-    if not request.HasField("start"):
-      start = None
-    end = request.end.ToDatetime()
-    if not request.HasField("end"):
-      end = None
-    sort = _SORT_MAP.get(request.sort)
-    state = _STATE_MAP.get(request.state)
-    limit = request.limit
-    cursor = request.cursor
-    items, cursor = api_common.list_bot_tasks(bot_id, start, end, sort, state,
-                                              cursor, limit)
+    start, end = _get_start_and_end_dates(request)
+    sort, state = _get_sort_and_state(request)
+    filters = api_common.TaskFilters(
+        sort=sort,
+        state=state,
+        start=start,
+        end=end,
+        tags=[],
+    )
+    items, cursor = api_common.list_bot_tasks(bot_id, filters, request.cursor,
+                                              request.limit)
     return message_conversion_prpc.bot_tasks_response(items, cursor)
 
   @prpc_helpers.method
@@ -181,12 +201,7 @@ class TasksService(object):
   @prpc_helpers.method
   @auth.require(acl.can_access, log_identity=True)
   def CancelTasks(self, request, _context):
-    start = request.start.ToDatetime()
-    if not request.HasField("start"):
-      start = None
-    end = request.end.ToDatetime()
-    if not request.HasField("end"):
-      end = None
+    start, end = _get_start_and_end_dates(request)
     tcr = api_common.cancel_tasks(request.tags, start, end, request.limit,
                                   request.cursor, request.kill_running)
     now = message_conversion_prpc.date(tcr.now)
