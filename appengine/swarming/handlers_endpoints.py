@@ -792,43 +792,24 @@ class SwarmingBotsService(remote.Service):
     """
     logging.debug('%s', request)
 
-    # Check permission.
-    # If the caller has global permission, it can access all bots.
-    # Otherwise, it requires pool dimension to check ACL.
-    pools = bot_management.get_pools_from_dimensions_flat(request.dimensions)
-    realms.check_bots_list_acl(pools)
-
     now = utils.utcnow()
-    # Disable the in-process local cache. This is important, as there can be up
-    # to a thousand entities loaded in memory, and this is a pure memory leak,
-    # as there's no chance this specific instance will need these again,
-    # therefore this leads to 'Exceeded soft memory limit' AppEngine errors.
-    q = bot_management.BotInfo.query(
-        default_options=ndb.QueryOptions(use_cache=False))
-    try:
-      q = bot_management.filter_dimensions(q, request.dimensions)
-      q = bot_management.filter_availability(
-          q, swarming_rpcs.to_bool(request.quarantined),
-          swarming_rpcs.to_bool(request.in_maintenance),
-          swarming_rpcs.to_bool(request.is_dead),
-          swarming_rpcs.to_bool(request.is_busy))
-    except ValueError as e:
-      raise endpoints.BadRequestException(str(e))
-
-    # this is required to request MultiQuery for OR dimension support.
-    q = q.order(bot_management.BotInfo._key)
-
-    try:
-      bots, cursor = datastore_utils.fetch_page(q, request.limit,
-                                                request.cursor)
-      return swarming_rpcs.BotList(
-          cursor=cursor,
-          death_timeout=config.settings().bot_death_timeout_secs,
-          items=[message_conversion.bot_info_to_rpc(bot) for bot in bots],
-          now=now)
-    except ValueError as e:
-      raise endpoints.BadRequestException(
-          'Inappropriate filter for tasks/list: %s' % e)
+    quarantined = swarming_rpcs.to_bool(request.quarantined)
+    in_maintenance = swarming_rpcs.to_bool(request.in_maintenance)
+    is_dead = swarming_rpcs.to_bool(request.is_dead)
+    is_busy = swarming_rpcs.to_bool(request.is_busy)
+    bf = api_common.BotFilters(
+        dimensions=request.dimensions,
+        quarantined=quarantined,
+        in_maintenance=in_maintenance,
+        is_dead=is_dead,
+        is_busy=is_busy,
+    )
+    bots, cursor = api_common.list_bots(bf, request.limit, request.cursor)
+    return swarming_rpcs.BotList(
+        cursor=cursor,
+        death_timeout=config.settings().bot_death_timeout_secs,
+        items=[message_conversion.bot_info_to_rpc(bot) for bot in bots],
+        now=now)
 
   @endpoint(BotsCountRequest, swarming_rpcs.BotsCount, http_method='GET')
   @auth.require(acl.can_access, log_identity=True)

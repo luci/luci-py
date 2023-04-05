@@ -559,3 +559,59 @@ def list_task_results(filters, cursor, limit):
   except datastore_errors.BadArgumentError as e:
     raise handlers_exceptions.BadRequestException(
         'This combination is unsupported, sorry.')
+
+
+BotFilters = namedtuple(
+    'BotFilters',
+    [
+        # List of 'key:value' strings representing the dimensions of the bot.
+        'dimensions',
+        # Bool, if true bots will be filtered if not quarantined.
+        'quarantined',
+        # Bool, if true bots will be filtered if not in maintenance mode.
+        'in_maintenance',
+        # Bool, if true, bots will be filtered if not dead.
+        'is_dead',
+        # Bool, if true, bots will be filtered if idle.
+        'is_busy',
+    ])
+
+
+def list_bots(filters, limit, cursor):
+  """Returns a list of bots which match the filters.
+
+  Args:
+    filters: BotFilters namedtuple.
+    limit: number of items to fetch.
+    cursor: cursor from previous request or None.
+
+  Returns:
+    A list of `BotInfo` ndb entities.
+  """
+  # Check permission.
+  # If the caller has global permission, it can access all bots.
+  # Otherwise, it requires pool dimension to check ACL.
+  pools = bot_management.get_pools_from_dimensions_flat(filters.dimensions)
+  realms.check_bots_list_acl(pools)
+
+  # Disable the in-process local cache. This is important, as there can be up
+  # to a thousand entities loaded in memory, and this is a pure memory leak,
+  # as there's no chance this specific instance will need these again,
+  # therefore this leads to 'Exceeded soft memory limit' AppEngine errors.
+  q = bot_management.BotInfo.query(default_options=ndb.QueryOptions(
+      use_cache=False))
+  try:
+    q = bot_management.filter_dimensions(q, filters.dimensions)
+    q = bot_management.filter_availability(q, filters.quarantined,
+                                           filters.in_maintenance,
+                                           filters.is_dead, filters.is_busy)
+  except ValueError as e:
+    raise handlers_exceptions.BadRequestException(str(e))
+  # this is required to request MultiQuery for OR dimension support.
+  q = q.order(bot_management.BotInfo._key)
+
+  try:
+    return datastore_utils.fetch_page(q, limit, cursor)
+  except ValueError as e:
+    raise handlers_exceptions.BadRequestException(
+        'Inappropriate filter for tasks/list: %s' % e)
