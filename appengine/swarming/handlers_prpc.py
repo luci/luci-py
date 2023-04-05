@@ -127,7 +127,7 @@ class BotsService(object):
     )
     items, cursor = api_common.list_bot_tasks(bot_id, filters, request.cursor,
                                               request.limit)
-    return message_conversion_prpc.bot_tasks_response(items, cursor)
+    return message_conversion_prpc.task_list_response(items, cursor)
 
   @prpc_helpers.method
   @auth.require(acl.can_access, log_identity=True)
@@ -208,6 +208,23 @@ class TasksService(object):
     return swarming_pb2.TasksCancelResponse(cursor=tcr.cursor,
                                             matched=tcr.matched,
                                             now=now)
+
+  @prpc_helpers.method
+  @auth.require(acl.can_access, log_identity=True)
+  def ListTasks(self, request, _context):
+    start, end = _get_start_and_end_dates(request)
+    sort, state = _get_sort_and_state(request)
+    rsf = api_common.TaskFilters(
+        start=start,
+        end=end,
+        sort=sort,
+        state=state,
+        tags=list(request.tags),
+    )
+    items, cursor = api_common.list_task_results(rsf, request.cursor,
+                                                 request.limit)
+    return message_conversion_prpc.task_list_response(
+        items, cursor, request.include_performance_stats)
 
 
 class InternalsService(object):

@@ -255,8 +255,8 @@ def task_result_response(result, include_performance_stats=True):
       bot_dimensions=_string_list_pairs_from_dict(result.bot_dimensions),
       children_task_ids=result.children_task_ids,
       server_versions=result.server_versions,
-      performance_stats=_perf_stats(result.performance_stats)
-      if include_performance_stats else None,
+      performance_stats=_perf_stats(result.performance_stats) if
+      include_performance_stats and result.performance_stats.is_valid else None,
       cas_output_root=_cas_reference(result.cas_output_root),
       missing_cas=[_cas_reference(ref) for ref in result.missing_cas],
       missing_cipd=[_cipd_package(package) for package in result.missing_cipd],
@@ -283,11 +283,12 @@ def task_result_response(result, include_performance_stats=True):
   return out
 
 
-def bot_tasks_response(items, cursor):
+def task_list_response(items, cursor, include_performance_stats=True):
   # type(List[task_result.TaskResultResponse], str -> TaskListResponse
   out = swarming_pb2.TaskListResponse()
   out.cursor = cursor or ''
-  out.items.extend([task_result_response(item) for item in items])
+  out.items.extend(
+      [task_result_response(item, include_performance_stats) for item in items])
   out.now.GetCurrentTime()
   return out
 

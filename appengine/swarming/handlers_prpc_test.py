@@ -1424,17 +1424,34 @@ class TaskServicePrpcTest(PrpcTest):
     return ntr
 
   def test_new_ok(self):
+    # It can create a new task.
     self.mock(random, 'getrandbits', lambda _: 0x88)
     self.set_as_privileged_user()
-    ntr = self._new_task_request()
-    ntr.properties.command.extend([u'echo', u'hi'])
-    ntr.properties.dimensions.extend(
-        [swarming_pb2.StringPair(key=u'pool', value=u'default')])
-    ntr.properties.execution_timeout_secs = 30
+    ntr = self._new_task_request(use_default_slice=True)
     response = self.post_prpc('NewTask', ntr)
     actual = swarming_pb2.TaskRequestMetadataResponse()
     _decode(response.body, actual)
     self.assertEqual(u'5cee488008810', actual.task_id)
+
+  def test_new_task_performance_stats_are_empty(self):
+    # first create a new task.
+    self.mock(random, 'getrandbits', lambda _: 0x88)
+    self.set_as_privileged_user()
+    ntr = self._new_task_request(use_default_slice=True)
+    response = self.post_prpc('NewTask', ntr)
+    actual = swarming_pb2.TaskRequestMetadataResponse()
+    _decode(response.body, actual)
+
+    # A task which has yet to run will have performance stats which
+    # are empty.
+    response = self.post_prpc(
+        'GetResult',
+        swarming_pb2.TaskIdWithPerfRequest(task_id=actual.task_id,
+                                           include_performance_stats=True))
+    actual = swarming_pb2.TaskResultResponse()
+    _decode(response.body, actual)
+    self.assertEqual(swarming_pb2.PENDING, actual.state)
+    self.assertFalse(actual.HasField('performance_stats'))
 
   def fail_on_using_legacy_acls(self):
     def err(*_args, **_kwargs):
@@ -1767,6 +1784,162 @@ class TaskServicePrpcTest(PrpcTest):
     # ok if the user has a permission of the specified pool.
     tcr.tags[:] = ['pool:default']
     self.post_prpc('CancelTasks', tcr)
+
+  def _gen_two_tasks(self):
+    self.mock_now(self.now)
+    self.mock(random, 'getrandbits', lambda _: 0x88)
+    self.set_as_bot()
+    self.bot_poll()
+    self.set_as_user()
+    ntr = self._new_task_request(use_default_slice=True)
+    ntr.name = "first"
+    ntr.tags[:] = ['project:yay', 'commit:post', 'pool:default']
+    ntr.task_slices[0].properties.idempotent = True
+    _, first_id = self._client_create_task(ntr)
+    self.set_as_bot()
+    self.bot_run_task()
+
+    # Hack the datastore so MODIFIED_TS returns in backward order compared to
+    # CREATED_TS.
+    now_120 = self.mock_now(self.now, 120)
+    entity = task_pack.unpack_result_summary_key(first_id).get()
+    entity.modified_ts = now_120
+    entity.put()
+
+    self.set_as_user()
+    self.mock(random, 'getrandbits', lambda _: 0x66)
+    now_60 = self.mock_now(self.now, 60)
+    ntr = self._new_task_request(use_default_slice=True)
+    ntr.name = 'second'
+    ntr.user = 'jack@localhost'
+    ntr.tags[:] = ['project:yay', 'commit:pre', 'pool:default']
+    ntr.task_slices[0].properties.idempotent = True
+    _, second_id = self._client_create_task(ntr)
+
+    first = swarming_pb2.TaskResultResponse()
+    self.apply_defaults_for_result_summary(first)
+    first.task_id = first_id
+    first.name = "first"
+    first.bot_idle_since_ts.FromDatetime(self.now)
+    first.completed_ts.FromDatetime(self.now)
+    first.costs_usd[:] = [0.1]
+    first.created_ts.FromDatetime(self.now)
+    first.duration = 0.1
+    first.exit_code = 0
+    first.modified_ts.FromDatetime(now_120)
+    self.gen_perf_stats_prpc(first.performance_stats)
+    first.started_ts.FromDatetime(self.now)
+    first.tags[:] = [
+        u'authenticated:user:user@example.com',
+        u'commit:post',
+        u'os:Amiga',
+        u'pool:default',
+        u'priority:20',
+        u'project:yay',
+        u'realm:none',
+        u'service_account:none',
+        u'swarming.pool.template:none',
+        u'swarming.pool.version:pools_cfg_rev',
+        u'user:joe@localhost',
+    ]
+    first.user = 'joe@localhost'
+
+    second = swarming_pb2.TaskResultResponse()
+    self.apply_defaults_for_result_summary(second)
+    second.name = "second"
+    second.bot_idle_since_ts.FromDatetime(self.now)
+    second.completed_ts.FromDatetime(self.now)
+    second.created_ts.FromDatetime(now_60)
+    second.deduped_from = '5cee488008811'
+    second.duration = 0.1
+    second.exit_code = 0
+    second.modified_ts.FromDatetime(now_60)
+    second.run_id = '5cee488008811'
+    second.started_ts.FromDatetime(self.now)
+    second.tags[:] = [
+        u'authenticated:user:user@example.com', u'commit:pre', u'os:Amiga',
+        u'pool:default', u'priority:20', u'project:yay', u'realm:none',
+        u'service_account:none', u'swarming.pool.template:none',
+        u'swarming.pool.version:pools_cfg_rev', u'user:jack@localhost'
+    ]
+    second.task_id = second_id
+    second.user = 'jack@localhost'
+    start = self.now - datetime.timedelta(days=1)
+    end = self.now + datetime.timedelta(days=1)
+    return first, second, now_120, message_conversion_prpc.date(
+        start), message_conversion_prpc.date(end)
+
+  def test_list_ok(self):
+    utils.clear_cache(config.settings)
+    first, second, now_120, start, end = self._gen_two_tasks()
+    # Basic request. Default sort is CREATED_TS
+    self.set_as_privileged_user()
+    request = swarming_pb2.TasksRequest(limit=100,
+                                        start=start,
+                                        end=end,
+                                        state=swarming_pb2.QUERY_COMPLETED,
+                                        include_performance_stats=True)
+    expected = swarming_pb2.TaskListResponse(
+        now=message_conversion_prpc.date(now_120), items=[second, first])
+    self.mock_now(self.now)
+    resp = self.post_prpc('ListTasks', request)
+    actual = swarming_pb2.TaskListResponse()
+    _decode(resp.body, actual)
+    self.assertEqual(expected.items, actual.items)
+
+    # Only return the second with specific tags
+    request = swarming_pb2.TasksRequest(limit=100,
+                                        start=start,
+                                        end=end,
+                                        state=swarming_pb2.QUERY_COMPLETED,
+                                        include_performance_stats=True,
+                                        tags=['project:yay', 'commit:pre'])
+    expected = swarming_pb2.TaskListResponse(items=[second])
+    resp = self.post_prpc('ListTasks', request)
+    actual = swarming_pb2.TaskListResponse()
+    _decode(resp.body, actual)
+    self.assertEqual(expected.items, actual.items)
+
+    # Return both since or tags are used
+    request = swarming_pb2.TasksRequest(
+        limit=100,
+        end=end,
+        start=start,
+        tags=['commit:post|pre'],
+        state=swarming_pb2.QUERY_COMPLETED,
+        include_performance_stats=False,
+    )
+    first.ClearField('performance_stats')
+    expected = swarming_pb2.TaskListResponse(items=[second, first])
+    resp = self.post_prpc('ListTasks', request)
+    actual = swarming_pb2.TaskListResponse()
+    _decode(resp.body, actual)
+    self.assertEqual(expected.items, actual.items)
+
+    request = swarming_pb2.TasksRequest(
+        limit=100,
+        state=swarming_pb2.QUERY_COMPLETED,
+        end=end,
+        start=start,
+        tags=['foo:bar'],
+    )
+    actual = swarming_pb2.TaskListResponse()
+    resp = self.post_prpc('ListTasks', request)
+    _decode(resp.body, actual)
+    self.assertEqual(0, len(actual.items))
+
+    # Both state and tag.
+    request = swarming_pb2.TasksRequest(
+        limit=100,
+        end=end,
+        start=start,
+        tags=['commit:pre'],
+        state=swarming_pb2.QUERY_COMPLETED_SUCCESS)
+    expected = swarming_pb2.TaskListResponse(items=[second])
+    resp = self.post_prpc('ListTasks', request)
+    actual = swarming_pb2.TaskListResponse()
+    _decode(resp.body, actual)
+    self.assertEqual(expected.items, actual.items)
 
 
 class InternalsServicePrpcTest(PrpcTest):
