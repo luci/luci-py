@@ -282,7 +282,7 @@ class BotServicePrpcTest(PrpcTest):
     resp = self.post_prpc("GetBot", request)
     actual_info = swarming_pb2.BotInfo()
     _decode(resp.body, actual_info)
-    expected = message_conversion_prpc.bot_info_to_proto(
+    expected = message_conversion_prpc.bot_info_response(
         bot_management.get_info_key('bot1').get())
     self.assertEqual(expected, actual_info)
 
@@ -293,7 +293,7 @@ class BotServicePrpcTest(PrpcTest):
     resp = self.post_prpc("GetBot", request)
     actual_info = swarming_pb2.BotInfo()
     _decode(resp.body, actual_info)
-    expected = message_conversion_prpc.bot_info_to_proto(
+    expected = message_conversion_prpc.bot_info_response(
         bot_management.get_info_key('bot1').get())
     self.assertTrue(actual_info.maintenance_msg)
     self.assertEqual(expected, actual_info)
@@ -781,6 +781,160 @@ class BotServicePrpcTest(PrpcTest):
     actual = swarming_pb2.BotsDimensions()
     _decode(response.body, actual)
     self.assertEqual(expected, actual)
+
+  def test_list_ok(self):
+    """Asserts that BotInfo is returned for the appropriate set of bots."""
+    self.set_as_privileged_user()
+    then = datetime.datetime(2009, 1, 2, 3, 4, 5)
+    self.mock_now(then)
+
+    # Add four bot events, corresponding to one dead bot, one quarantined bot,
+    # one bot in maintenance, and one good bot
+    _bot_event('request_sleep', bot_id='id3')
+    self.mock_now(self.now)
+    _bot_event('request_sleep', bot_id='id1')
+    _bot_event('request_sleep', bot_id='id2', quarantined=True)
+    _bot_event('request_sleep', bot_id='id4', maintenance_msg='very busy')
+
+    def _default_bot(bot_id, the_date):
+      out = swarming_pb2.BotInfo(
+          authenticated_as='bot:whitelisted-ip',
+          bot_id=bot_id,
+          deleted=False,
+          dimensions=[
+              swarming_pb2.StringListPair(
+                  key='id',
+                  value=[bot_id],
+              ),
+              swarming_pb2.StringListPair(
+                  key='pool',
+                  value=['default'],
+              )
+          ],
+          external_ip='8.8.4.4',
+          first_seen_ts=message_conversion_prpc.date(the_date),
+          is_dead=False,
+          last_seen_ts=message_conversion_prpc.date(the_date),
+          quarantined=False,
+          state='{"ram":65}',
+          version='123456789')
+      return out
+
+    # setup expected bots
+    bot1 = _default_bot('id1', self.now)
+    bot2 = _default_bot('id2', self.now)
+    bot2.quarantined = True
+    bot3 = _default_bot('id3', then)
+    bot4 = _default_bot('id4', self.now)
+    bot4.maintenance_msg = 'very busy'
+
+    expected = swarming_pb2.BotInfoListResponse(
+        items=[bot1, bot2, bot3, bot4],
+        death_timeout=config.settings().bot_death_timeout_secs,
+        now=message_conversion_prpc.date(self.now))
+
+    def _verify(items,
+                quarantined=swarming_pb2.NULL,
+                in_maintenance=swarming_pb2.NULL,
+                is_dead=swarming_pb2.NULL,
+                is_busy=swarming_pb2.NULL,
+                dimensions=None):
+      if dimensions is None:
+        dimensions = []
+      request = swarming_pb2.BotsRequest(limit=100,
+                                         quarantined=quarantined,
+                                         in_maintenance=in_maintenance,
+                                         is_dead=is_dead,
+                                         is_busy=is_busy,
+                                         dimensions=dimensions)
+      response = self.post_prpc('ListBots', request)
+      actual = swarming_pb2.BotInfoListResponse()
+      _decode(response.body, actual)
+      expected.ClearField('items')
+      expected.items.extend(items)
+      self.assertEqual(expected.items, actual.items)
+      self.assertEqual(expected.death_timeout, actual.death_timeout)
+
+    _verify([bot1, bot2, bot3, bot4])
+
+    # This will mark bot3 as dead since it was created before self.now
+    self.assertEqual(1, bot_management.cron_update_bot_info())
+    bot3.is_dead = True
+    expected.items[2].is_dead = True
+    _verify([bot1, bot2, bot3, bot4])
+
+    # All bots should be returned if we don't care about quarantined
+    _verify([bot1, bot2, bot3, bot4], quarantined=swarming_pb2.NULL)
+
+    # All bots should be returned if we don't care about is_dead
+    _verify([bot1, bot2, bot3, bot4], is_dead=swarming_pb2.NULL)
+
+    # Only bot1 corresponds to these two dimensions
+    _verify(items=[bot1],
+            dimensions=[
+                swarming_pb2.StringPair(key='pool', value='default'),
+                swarming_pb2.StringPair(key='id', value='id1'),
+            ])
+    # Only bot1 corresponds to being not dead and not quarantined and
+    # not in maintenance and this dimension
+    _verify(items=[bot1],
+            dimensions=[swarming_pb2.StringPair(key='pool', value='default')],
+            quarantined=swarming_pb2.FALSE,
+            in_maintenance=swarming_pb2.FALSE,
+            is_dead=swarming_pb2.FALSE)
+    # exclude bot2 only, which is quarantined
+    _verify(items=[bot1, bot3, bot4], quarantined=swarming_pb2.FALSE)
+    # exclude bot3 only, which is dead
+    _verify(items=[bot1, bot2, bot4], is_dead=swarming_pb2.FALSE)
+    # only bot2 is quarantined
+    _verify(items=[bot2], quarantined=swarming_pb2.TRUE)
+
+    # only bot4 is in maintenance
+    _verify(items=[bot4], in_maintenance=swarming_pb2.TRUE)
+    # quarantined:true can be paired with other dimensions and still work
+    _verify(items=[bot2],
+            quarantined=swarming_pb2.TRUE,
+            dimensions=[swarming_pb2.StringPair(key='pool', value='default')])
+    # in_maintenance:true can be paired with other dimensions and still work
+    _verify(items=[bot4],
+            in_maintenance=swarming_pb2.TRUE,
+            dimensions=[swarming_pb2.StringPair(key='pool', value='default')])
+
+    # only bot3 is dead
+    _verify(items=[bot3], is_dead=swarming_pb2.TRUE)
+
+    # is_dead:true can be paired with other dimensions and still work
+    _verify(items=[bot3],
+            is_dead=swarming_pb2.TRUE,
+            dimensions=[swarming_pb2.StringPair(key='pool', value='default')])
+    # only 1 bot is "ready for work"
+    _verify(items=[bot1],
+            is_busy=swarming_pb2.FALSE,
+            is_dead=swarming_pb2.FALSE,
+            quarantined=swarming_pb2.FALSE)
+    # not:existing is a dimension that doesn't exist, nothing returned.
+    _verify(items=[],
+            dimensions=[swarming_pb2.StringPair(key='not', value='existing')])
+    # quarantined:true can be paired with other non-existing dimensions and
+    # still work
+    _verify(items=[],
+            quarantined=swarming_pb2.TRUE,
+            dimensions=[swarming_pb2.StringPair(key='not', value='existing')])
+    # in_maintenance:true can be paired with other non-existing dimensions and
+    # still work
+    _verify(items=[],
+            in_maintenance=swarming_pb2.TRUE,
+            dimensions=[swarming_pb2.StringPair(key='not', value='existing')])
+    # is_dead:true can be paired with other non-existing dimensions and
+    # still work
+    _verify(items=[],
+            is_dead=swarming_pb2.TRUE,
+            dimensions=[swarming_pb2.StringPair(key='not', value='existing')])
+    # No bot is both dead and quarantined
+    _verify(items=[], is_dead=swarming_pb2.TRUE, quarantined=swarming_pb2.TRUE)
+    # OR dimension finds bot1 and bot2
+    _verify(items=[bot1, bot2],
+            dimensions=[swarming_pb2.StringPair(key='id', value='id1|id2')])
 
 
 class TaskServicePrpcTest(PrpcTest):

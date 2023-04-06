@@ -18,6 +18,7 @@ from proto.api_v2 import swarming_prpc_pb2
 from proto.internals import rbe_pb2
 from proto.internals import rbe_prpc_pb2
 from server import acl
+from server import config
 from server import realms
 from server import task_result
 from server import task_scheduler
@@ -51,6 +52,12 @@ _STATE_MAP = {
     swarming_pb2.QUERY_KILLED: 'killed',
     swarming_pb2.QUERY_NO_RESOURCE: 'no_resource',
     swarming_pb2.QUERY_CLIENT_ERROR: 'client_error',
+}
+
+_NULLABLE_BOOL_MAP = {
+    swarming_pb2.TRUE: True,
+    swarming_pb2.FALSE: False,
+    swarming_pb2.NULL: None,
 }
 
 
@@ -87,7 +94,7 @@ class BotsService(object):
   def GetBot(self, request, _context):
     bot_id = request.bot_id
     bot, deleted = api_common.get_bot(bot_id)
-    return message_conversion_prpc.bot_info_to_proto(bot, deleted)
+    return message_conversion_prpc.bot_info_response(bot, deleted)
 
   @prpc_helpers.method
   @auth.require(acl.can_access, log_identity=True)
@@ -139,6 +146,28 @@ class BotsService(object):
         for d in dr.bots_dimensions
     ]
     return swarming_pb2.BotsDimensions(bots_dimensions=bd, ts=ts)
+
+  @prpc_helpers.method
+  @auth.require(acl.can_access, log_identity=True)
+  def ListBots(self, request, _context):
+    quarantined = _NULLABLE_BOOL_MAP.get(request.quarantined)
+    in_maintenance = _NULLABLE_BOOL_MAP.get(request.in_maintenance)
+    is_dead = _NULLABLE_BOOL_MAP.get(request.is_dead)
+    is_busy = _NULLABLE_BOOL_MAP.get(request.is_busy)
+    dimensions = [
+        "%s:%s" % (pair.key, pair.value) for pair in request.dimensions
+    ]
+    bf = api_common.BotFilters(
+        dimensions=dimensions,
+        quarantined=quarantined,
+        in_maintenance=in_maintenance,
+        is_dead=is_dead,
+        is_busy=is_busy,
+    )
+    bots, cursor = api_common.list_bots(bf, request.limit, request.cursor)
+    return message_conversion_prpc.bots_response(
+        bots,
+        config.settings().bot_death_timeout_secs, cursor)
 
 
 class TasksService(object):

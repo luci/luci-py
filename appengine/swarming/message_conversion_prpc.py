@@ -81,7 +81,7 @@ def _state(state_dict):
   return json.dumps(state_dict or {}, sort_keys=True, separators=(',', ':'))
 
 
-def bot_info_to_proto(bot_info, deleted=False):
+def bot_info_response(bot_info, deleted=False):
   """Converts a ndb BotInfo object into a BotInfoResponse for pRPC api
 
   Args:
@@ -107,6 +107,29 @@ def bot_info_to_proto(bot_info, deleted=False):
                               dimensions=_string_list_pairs_from_dict(
                                   bot_info.dimensions),
                               deleted=deleted)
+
+
+def bots_response(bots, death_timeout, cursor):
+  """Converts a list of bot_management.BotInfo ndb entities to
+  protobuf objects for pRPC.
+
+  Args:
+    bots: List of bot_management.BotInfo ndb entities.
+    death_timeout: How long to wait, in seconds, from last communication with
+      bot to declare it dead.
+    cursor: cursor from previous request.
+
+  Returns:
+    swarming_pb2.BotInfoListResponse with bots converted to
+      swarming_pb2.BotInfo objects.
+  """
+  out = swarming_pb2.BotInfoListResponse(
+      cursor=cursor,
+      items=[bot_info_response(bot) for bot in bots],
+      death_timeout=death_timeout,
+  )
+  out.now.GetCurrentTime()
+  return out
 
 
 def _bot_event_response(event):
