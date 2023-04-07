@@ -54,7 +54,7 @@ describe('task-list', function() {
     container.innerHTML = '';
   });
   const now = Date.UTC(2018, 11, 19, 16, 46, 22, 1234);
-  const yesterday = new Date(now-24*60*60*1000);
+  const yesterday = new Date(now - 24 * 60 * 60 * 1000);
   beforeEach(function() {
     // Fix the time so all of our relative dates work.
     // Note, this turns off the default behavior of setTimeout and related.
@@ -71,7 +71,7 @@ describe('task-list', function() {
   // that doesn't work on Firefox (and possibly other places).
   function createElement(test) {
     return window.customElements.whenDefined('task-list').then(() => {
-      container.innerHTML = `<task-list client_id=for_test testing_offline=true></task-list>`;
+      container.innerHTML = `<task-list testing_offline=true></task-list>`;
       expect(container.firstElementChild).toBeTruthy();
       test(container.firstElementChild);
     });
@@ -216,7 +216,7 @@ describe('task-list', function() {
             expect(cells).toBeTruthy();
             expect(cells).toHaveSize(7 * 22, '7 columns * 22 rows');
             // little helper for readability
-            const cell = (r, c) => cells[7*r+c];
+            const cell = (r, c) => cells[7 * r + c];
             expect(rows[0]).toHaveClass('failed_task');
             expect(rows[0]).not.toHaveClass('exception');
             expect(rows[0]).not.toHaveClass('pending_task');
@@ -270,7 +270,7 @@ describe('task-list', function() {
           const value = new Date(date);
           value.setSeconds(0);
           value.setMilliseconds(0);
-          return value.getTime()/1000;
+          return value.getTime() / 1000;
         };
         it('supplies past 24 hours for the time pickers', function(done) {
           loggedInTasklist((ele) => {
@@ -299,15 +299,15 @@ describe('task-list', function() {
 
             const countRows = $('#query_counts tr', ele);
             expect(countRows).toBeTruthy();
-            expect(countRows).toHaveSize(1+7, '(num counts, displayed + 7 states)');
+            expect(countRows).toHaveSize(1 + 7, '(num counts, displayed + 7 states)');
 
             expect(countRows[0]).toMatchTextContent('Displayed: 22');
 
             expect(countRows[3].innerHTML).toContain('<a ', 'contains a link');
             const link = $$('a', countRows[3]);
             expect(link.href).toContain('/tasklist?at=false&c=name&c=created_ts&c=pending_time&' +
-                  'c=duration&c=bot&c=pool-tag&c=state&d=desc&et=1545237983234&' +
-                  'f=state%3ACOMPLETED_FAILURE&k=&n=true&s=created_ts&st=1545151583000&v=false');
+              'c=duration&c=bot&c=pool-tag&c=state&d=desc&et=1545237983234&' +
+              'f=state%3ACOMPLETED_FAILURE&k=&n=true&s=created_ts&st=1545151583000&v=false');
 
             // The true on flush waits for res.json() to resolve too
             fetchMock.flush(true).then(() => {
@@ -319,7 +319,7 @@ describe('task-list', function() {
 
         it('shows aliases on filter chips', function(done) {
           loggedInTasklist((ele) => {
-            ele._filters=['cpu-tag:x86-64-Haswell_GCE', 'gpu-tag:10de:1cb3-415.27',
+            ele._filters = ['cpu-tag:x86-64-Haswell_GCE', 'gpu-tag:10de:1cb3-415.27',
               'device_type-tag:flo'];
             ele.render();
 
@@ -474,8 +474,8 @@ describe('task-list', function() {
             break;
           }
         }
-        expect(checkbox).toBeTruthy('We expected to find a checkbox with header '+
-                                    getColHeader(keyToClick));
+        expect(checkbox).toBeTruthy('We expected to find a checkbox with header ' +
+          getColHeader(keyToClick));
 
         // click it again
         checkbox.click();
@@ -807,7 +807,7 @@ describe('task-list', function() {
 
         let countRows = $('#query_counts tr', ele);
         expect(countRows).toBeTruthy();
-        expect(countRows).toHaveSize(1+7, '(num counts, displayed + 7 states)');
+        expect(countRows).toHaveSize(1 + 7, '(num counts, displayed + 7 states)');
 
         let showMore = $$('.summary expand-more-icon-sk');
         let showMore2 = $$('.summary more-horiz-icon-sk');
@@ -820,7 +820,7 @@ describe('task-list', function() {
         expect(ele._allStates).toBeTruthy();
         countRows = $('#query_counts tr', ele);
         expect(countRows).toBeTruthy();
-        expect(countRows).toHaveSize(1+13, '(num counts, displayed + 12 states)');
+        expect(countRows).toHaveSize(1 + 13, '(num counts, displayed + 12 states)');
 
         showMore = $$('.summary expand-more-icon-sk');
         showMore2 = $$('.summary more-horiz-icon-sk');
@@ -833,7 +833,7 @@ describe('task-list', function() {
         expect(ele._allStates).toBeFalsy();
         countRows = $('#query_counts tr', ele);
         expect(countRows).toBeTruthy();
-        expect(countRows).toHaveSize(1+7, '(num counts, displayed + 7 states)');
+        expect(countRows).toHaveSize(1 + 7, '(num counts, displayed + 7 states)');
 
         showMore = $$('.summary expand-more-icon-sk');
         showMore2 = $$('.summary more-horiz-icon-sk');
@@ -860,9 +860,9 @@ describe('task-list', function() {
         expect(countRows[3].innerHTML).toContain('<a ', 'contains a link');
         const link = $$('a', countRows[3]);
         expect(link.href).toContain('/tasklist?at=false&c=name&c=created_ts&' +
-            'c=pending_time&c=duration&c=bot&c=pool-tag&c=state&d=desc&et=1545237981000&' +
-            'f=pool-tag%3AChrome&f=state%3ACOMPLETED_FAILURE&k=&n=true&s=completed_ts&' +
-            'st=1545151583000&v=false');
+          'c=pending_time&c=duration&c=bot&c=pool-tag&c=state&d=desc&et=1545237981000&' +
+          'f=pool-tag%3AChrome&f=state%3ACOMPLETED_FAILURE&k=&n=true&s=completed_ts&' +
+          'st=1545151583000&v=false');
 
         done();
       });
@@ -878,7 +878,7 @@ describe('task-list', function() {
         expect(link).toBeTruthy();
 
         expect(link.href).toContain('/botlist?c=id&c=os&c=task&c=status&c=device_type' +
-                                    '&f=device_type%3Anemo');
+          '&f=device_type%3Anemo');
 
         done();
       });
@@ -938,7 +938,7 @@ describe('task-list', function() {
         function(done) {
           loggedInTasklist((ele) => {
             const calls = fetchMock.calls(MATCHED, 'GET');
-            expect(calls).toHaveSize(2+3+13,
+            expect(calls).toHaveSize(2 + 3 + 13,
                 '2 GETs from swarming-app, 3 from task-list (13 counts)');
             // calls is an array of 2-length arrays with the first element
             // being the string of the url and the second element being
@@ -961,7 +961,7 @@ describe('task-list', function() {
         ele._addFilter('state:PENDING_RUNNING');
         fetchMock.flush(true).then(() => {
           const calls = fetchMock.calls(MATCHED, 'GET');
-          expect(calls).toHaveSize(4+12, '4 from task-list and 12 counts');
+          expect(calls).toHaveSize(4 + 12, '4 from task-list and 12 counts');
 
           const gets = calls.slice(1).map((c) => c[0])
               .filter((g) => !g.includes('pool='));
@@ -984,7 +984,7 @@ describe('task-list', function() {
         ele._addFilter('state:PENDING_RUNNING');
         fetchMock.flush(true).then(() => {
           const calls = fetchMock.calls(MATCHED, 'GET');
-          expect(calls).toHaveSize(3+13, '3 from task-list and 13 counts');
+          expect(calls).toHaveSize(3 + 13, '3 from task-list and 13 counts');
 
           const gets = calls.slice(1).map((c) => c[0])
               .filter((g) => !g.includes('pool='));
@@ -1016,10 +1016,10 @@ describe('task-list', function() {
           expect(calls).toHaveSize(2, '2 counts, 1 running, 1 pending');
 
           const gets = calls.map((c) => c[0]);
-          expect(gets).toContain('/_ah/api/swarming/v1/tasks/count?end=1545237983&'+
-                                 'start=1544633183&state=PENDING&tags=pool%3AChrome');
-          expect(gets).toContain('/_ah/api/swarming/v1/tasks/count?end=1545237983&'+
-                                 'start=1544633183&state=RUNNING&tags=pool%3AChrome');
+          expect(gets).toContain('/_ah/api/swarming/v1/tasks/count?end=1545237983&' +
+            'start=1544633183&state=PENDING&tags=pool%3AChrome');
+          expect(gets).toContain('/_ah/api/swarming/v1/tasks/count?end=1545237983&' +
+            'start=1544633183&state=RUNNING&tags=pool%3AChrome');
           done();
         });
       });
@@ -1197,7 +1197,7 @@ describe('task-list', function() {
       const testcase = expectations[0];
       testcase.extra.cursor = 'mock_cursor12345';
       const qp = listQueryParams(testcase.filters, testcase.extra);
-      expect(qp).toEqual('cursor=mock_cursor12345&'+testcase.output);
+      expect(qp).toEqual('cursor=mock_cursor12345&' + testcase.output);
     });
   }); // end describe('data parsing')
 });

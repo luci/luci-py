@@ -72,7 +72,7 @@ describe('bot-list', function() {
   // that doesn't work on Firefox (and possibly other places).
   function createElement(test) {
     return window.customElements.whenDefined('bot-list').then(() => {
-      container.innerHTML = `<bot-list client_id=for_test testing_offline=true></bot-list>`;
+      container.innerHTML = `<bot-list testing_offline=true></bot-list>`;
       expect(container.firstElementChild).toBeTruthy();
       test(container.firstElementChild);
     });
@@ -213,7 +213,7 @@ describe('bot-list', function() {
             expect(cells).toBeTruthy();
             expect(cells).toHaveSize(4 * 10, '4 columns * 10 rows');
             // little helper for readability
-            const cell = (r, c) => cells[4*r+c];
+            const cell = (r, c) => cells[4 * r + c];
 
             // Check the content of the first few rows (after sorting)
             expect(rows[0]).not.toHaveClass('dead');
@@ -837,7 +837,7 @@ describe('bot-list', function() {
         expect(cols).toBeTruthy();
         expect(cols).toHaveSize(2 * 10, '2 columns * 10 rows');
         // little helper for readability
-        const cell = (r, c) => cols[2*r+c];
+        const cell = (r, c) => cols[2 * r + c];
 
         // Check the content of the first few rows (after sorting)
         expect(cell(0, 0)).toMatchTextContent('somebot13-a2');
@@ -864,7 +864,7 @@ describe('bot-list', function() {
         expect(cols).toBeTruthy();
         expect(cols).toHaveSize(3 * 10, '3 columns * 10 rows');
         // little helper for readability
-        const cell = (r, c) => cols[3*r+c];
+        const cell = (r, c) => cols[3 * r + c];
 
         // Check the content of the first few rows (after sorting)
         expect(cell(0, 0)).toMatchTextContent('somebot11-a9');
@@ -949,7 +949,7 @@ describe('bot-list', function() {
     it('makes auth\'d API calls when a logged in user views landing page', function(done) {
       loggedInBotlist((ele) => {
         const calls = fetchMock.calls(MATCHED, 'GET');
-        expect(calls).toHaveSize(2+5,
+        expect(calls).toHaveSize(2 + 5,
             '2 GETs from swarming-app, 5 from bot-list');
         // calls is an array of 2-length arrays with the first element
         // being the string of the url and the second element being
@@ -973,7 +973,7 @@ describe('bot-list', function() {
         let calls = fetchMock.calls(MATCHED, 'GET');
         expect(calls).toHaveSize(4,
             '1 for the bots, 1 for the count, 1 for the permissions, ' +
-            '1 for the dimensions');
+          '1 for the dimensions');
         // calls is an array of 2-length arrays with the first element
         // being the string of the url and the second element being
         // the options that were passed in
@@ -1158,8 +1158,8 @@ describe('bot-list', function() {
         { // basic 'alive'
           'limit': 256,
           'filters': ['pool:Skia', 'os:Android', 'status:alive'],
-          'output': 'dimensions=pool%3ASkia&dimensions=os%3AAndroid'+
-                     '&is_dead=FALSE&limit=256',
+          'output': 'dimensions=pool%3ASkia&dimensions=os%3AAndroid' +
+            '&is_dead=FALSE&limit=256',
         },
         { // no filters
           'limit': 123,
@@ -1174,8 +1174,8 @@ describe('bot-list', function() {
         { // multiple of a filter
           'limit': 789,
           'filters': ['status:maintenance', 'device_type:bullhead', 'device_type:marlin'],
-          'output': 'dimensions=device_type%3Abullhead&dimensions=device_type%3Amarlin'+
-                     '&in_maintenance=TRUE&limit=789',
+          'output': 'dimensions=device_type%3Abullhead&dimensions=device_type%3Amarlin' +
+            '&in_maintenance=TRUE&limit=789',
         },
         { // is_busy
           'limit': 7,
@@ -1191,7 +1191,7 @@ describe('bot-list', function() {
 
       const testcase = expectations[0];
       const qp = listQueryParams(testcase.filters, testcase.limit, 'mock_cursor12345');
-      expect(qp).toEqual('cursor=mock_cursor12345&'+testcase.output);
+      expect(qp).toEqual('cursor=mock_cursor12345&' + testcase.output);
     });
   }); // end describe('data parsing')
 });

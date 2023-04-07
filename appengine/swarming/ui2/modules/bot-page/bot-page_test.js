@@ -64,7 +64,7 @@ describe('bot-page', function() {
   // calls the test callback with one element 'ele', a created <bot-page>.
   function createElement(test) {
     return window.customElements.whenDefined('bot-page').then(() => {
-      container.innerHTML = `<bot-page client_id=for_test testing_offline=true></bot-page>`;
+      container.innerHTML = `<bot-page testing_offline=true></bot-page>`;
       expect(container.firstElementChild).toBeTruthy();
       test(container.firstElementChild);
     });
@@ -312,7 +312,7 @@ describe('bot-page', function() {
           expect(cell(1, 4)).not.toHaveClass('old_version');
 
           expect(cell(15, 0)).toMatchTextContent('About to restart: ' +
-                'Updating to abcdoeraymeyouandme');
+            'Updating to abcdoeraymeyouandme');
           expect(cell(15, 1)).toMatchTextContent('bot_shutdown');
           expect(cell(15, 3)).toMatchTextContent('');
           expect(cell(15, 4)).toMatchTextContent('6fda8587d8');
@@ -338,7 +338,7 @@ describe('bot-page', function() {
 
           // row 0 is the header
           expect(cell(1, 0)).toMatchTextContent('About to restart: ' +
-                'Updating to abcdoeraymeyouandme');
+            'Updating to abcdoeraymeyouandme');
           expect(cell(1, 1)).toMatchTextContent('bot_shutdown');
           expect(cell(1, 3)).toMatchTextContent('');
           expect(cell(1, 4)).toMatchTextContent('6fda8587d8');
@@ -594,7 +594,7 @@ describe('bot-page', function() {
       serveBot('running');
       loggedInBotPage((ele) => {
         const protoRpcCalls = fetchMock.calls(MATCHED, 'GET');
-        expect(protoRpcCalls).toHaveSize(2+3, '2 GETs from swarming-app, 3 from bot-page');
+        expect(protoRpcCalls).toHaveSize(2 + 3, '2 GETs from swarming-app, 3 from bot-page');
         checkAuthorization(protoRpcCalls);
         // At the moment, only GetBot is used.
         const prpcCalls = fetchMock.calls(MATCHED, 'POST');
@@ -761,7 +761,7 @@ describe('bot-page', function() {
           // validate cursor
           expect(url).toContain('cursor=myCursor');
           expect(ele._taskCursor).toEqual('newCursor', 'cursor should update');
-          expect(ele._tasks).toHaveSize(30+30, '30 initial tasks, 30 new tasks');
+          expect(ele._tasks).toHaveSize(30 + 30, '30 initial tasks, 30 new tasks');
 
           done();
         });
@@ -801,7 +801,7 @@ describe('bot-page', function() {
           // validate cursor
           expect(url).toContain('cursor=myCursor');
           expect(ele._eventsCursor).toEqual('newCursor', 'cursor should update');
-          expect(ele._events).toHaveSize(50+50, '50 initial tasks, 50 new tasks');
+          expect(ele._events).toHaveSize(50 + 50, '50 initial tasks, 50 new tasks');
 
           done();
         });

@@ -46,7 +46,7 @@ describe('swarming-index', function() {
   function createElement(test) {
     return window.customElements.whenDefined('swarming-index').then(() => {
       container.innerHTML =
-          `<swarming-index client_id=for_test testing_offline=true>
+        `<swarming-index testing_offline=true>
           </swarming-index>`;
       expect(container.firstElementChild).toBeTruthy();
       test(container.firstElementChild);

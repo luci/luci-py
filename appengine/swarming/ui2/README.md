@@ -57,10 +57,7 @@ The list of all demo pages so far (for easy clicking):
   - [task-mass-cancel](http://localhost:8080/newres/task-mass-cancel.html)
   - [task-page](http://localhost:8080/newres/task-page.html)
 
-By default, the login is mocked so it works w/o an internet connection,
-but if testing the real OAuth 2.0 flow is desired, a client_id may be
-specified (see `swarming-index-demo.html` for an example). Be sure to also
-allow `localhost:8080` for that client_id.
+The login is mocked so it works w/o an internet connection.
 
 ## Running the tests
 

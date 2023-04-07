@@ -26,8 +26,8 @@ import '../swarming-app';
 
 // Don't use html for a straight string template, otherwise, it shows up
 // as [object Object] when used as the href attribute.
-const instancesURL = (ele) => `https://console.cloud.google.com/appengine/instances?`+
-    `project=${ele._project_id}&versionId=${ele.server_details.server_version}`;
+const instancesURL = (ele) => `https://console.cloud.google.com/appengine/instances?` +
+  `project=${ele._project_id}&versionId=${ele.server_details.server_version}`;
 
 const errorsURL = (project_id) =>
   `https://console.cloud.google.com/errors?project=${project_id}`;
@@ -61,7 +61,6 @@ python3 swarming_bot.zip</pre>
 
 const template = (ele) => html`
 <swarming-app id=swapp
-              client_id="${ele.client_id}"
               ?testing_offline="${ele.testing_offline}">
   <header>
     <div class=title>Swarming</div>
@@ -111,7 +110,7 @@ const template = (ele) => html`
         <a href="/auth/groups">View/edit user groups</a>
       </li>
     </ul>
-    ${ele.permissions.get_bootstrap_token ? bootstrapTemplate(ele): ''}
+    ${ele.permissions.get_bootstrap_token ? bootstrapTemplate(ele) : ''}
   </main>
   <footer></footer>
 </swarming-app>`;

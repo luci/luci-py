@@ -4,7 +4,7 @@
 
 /** @module swarming-ui/modules/oauth-login
  * @description <h2><code>oauth-login</code></h2>
- * oauth-login is a small widget that handles an OAuth 2.0 flow with Google.
+ * oauth-login is a small widget that handles the login flow.
  *
  * <p>
  *  This widget either a sign in button or displays the info of the
@@ -13,14 +13,7 @@
  *  authenticated requests.
  * </p>
  *
- * <p>
- *  Clients should include the following JS script to supply the Google OAuth
- *  code:
- *    <script src="https://apis.google.com/js/api.js" async defer></script>
- * </p>
- *
- * @prop client_id - The Client ID for authenticating via OAuth.
- * @prop testing_offline - If true, the real OAuth flow won't be used.
+ * @prop testing_offline - If true, the real login flow won't be used.
  *    Instead, dummy data will be used. Ideal for local testing.
  *
  * @evt log-in The event that is fired when the user has logged in
@@ -44,18 +37,9 @@ import {html, render} from 'lit-html';
 import {upgradeProperty} from 'elements-sk/upgradeProperty';
 import {errorMessage} from 'elements-sk/errorMessage';
 
-// gapiLoaded is a promise that resolves when the 'gapi' JS library is
-// finished loading.
-const gapiLoaded = new Promise((resolve, reject) => {
-  const check = () => {
-    if (window.gapi !== undefined) {
-      resolve();
-    } else {
-      setTimeout(check, 10);
-    }
-  };
-  setTimeout(check, 10);
-});
+import {jsonOrThrow} from 'common-sk/modules/jsonOrThrow';
+
+// TODO: Support refreshing the token when it expires.
 
 const template = (ele) => {
   if (ele.auth_header) {
@@ -74,54 +58,34 @@ const template = (ele) => {
   }
 };
 
+
 window.customElements.define('oauth-login', class extends HTMLElement {
   connectedCallback() {
-    upgradeProperty(this, 'client_id');
     upgradeProperty(this, 'testing_offline');
     this._auth_header = '';
-    if (this.testing_offline) {
-      // For local testing, set a profile here. A real profile would be null
-      // until the user logs in.
-      this._profile = {
-        email: 'missing@chromium.org',
-        imageURL: 'http://storage.googleapis.com/gd-wagtail-prod-assets/original_images/logo_google_fonts_color_2x_web_64dp.png',
-      };
-    } else {
-      this._profile = null;
-      gapiLoaded.then(() => {
-        gapi.load('auth2', () => {
-          gapi.auth2.init({
-            client_id: this.client_id,
-          }).then(() => {
-            this._maybeFireLoginEvent();
-            this.render();
-          }, (error) => {
-            console.error(error);
-            errorMessage(`Error initializing oauth: ${JSON.stringify(error)}`, 10000);
-          });
-        });
+    this._profile = null;
+    if (!this.testing_offline) {
+      this._fetchAuthState().then((authState) => {
+        if (authState.identity != 'anonymous:anonymous') {
+          this._fireLoginEvent(authState);
+          this.render();
+        }
+      }, (error) => {
+        console.error(error);
+        errorMessage(`Error getting auth state: ${JSON.stringify(error)}`, 10000);
       });
     }
     this.render();
   }
 
   static get observedAttributes() {
-    return ['client_id', 'testing_offline'];
+    return ['testing_offline'];
   }
 
   /** @prop {string} auth_header the "Authorization" header that should be used
   *                  for authenticated requests. Read-only. */
   get auth_header() {
     return this._auth_header;
-  }
-
-  /** @prop {string} client_id To be used in the OAuth 2.0 flow. This is generally
-                               supplied by the server. */
-  get client_id() {
-    return this.getAttribute('client_id');
-  }
-  set client_id(val) {
-    return this.setAttribute('client_id', val);
   }
 
   /** @prop {Object} profile An object with keys email and imageURL of the
@@ -142,78 +106,63 @@ window.customElements.define('oauth-login', class extends HTMLElement {
     }
   }
 
-  _maybeFireLoginEvent() {
-    const user = gapi.auth2.getAuthInstance().currentUser.get();
-    if (user.isSignedIn()) {
-      const profile = user.getBasicProfile();
-      this._profile = {
-        email: profile.getEmail(),
-        imageURL: profile.getImageUrl(),
-      };
-      // Need the true here to get an access_token on the response.
-      const auth = user.getAuthResponse(true);
-
-      const header = `${auth.token_type} ${auth.access_token}`;
-      this.dispatchEvent(new CustomEvent('log-in', {
-        detail: {
-          'auth_header': header,
-          'profile': this._profile,
-        },
-        bubbles: true,
-      }));
-      this._auth_header = header;
-      return true;
-    } else {
-      this._profile = null;
-      this._auth_header = '';
-      return false;
-    }
+  _fireLoginEvent(authState) {
+    this._profile = {
+      email: authState.email,
+      imageURL: authState.picture,
+    };
+    this._auth_header = `Bearer ${authState.accessToken}`;
+    this.dispatchEvent(new CustomEvent('log-in', {
+      detail: {
+        'auth_header': this._auth_header,
+        'profile': this._profile,
+      },
+      bubbles: true,
+    }));
   }
 
   _logIn() {
     if (this.testing_offline) {
-      this._auth_header = 'Bearer 12345678910-boomshakalaka';
-      this.dispatchEvent(new CustomEvent('log-in', {
-        detail: {
-          'auth_header': this._auth_header,
-          'profile': this._profile,
-        },
-        bubbles: true,
-      }));
+      this._fireLoginEvent({
+        email: 'missing@chromium.org',
+        picture: 'http://storage.googleapis.com/gd-wagtail-prod-assets/original_images/logo_google_fonts_color_2x_web_64dp.png',
+        accessToken: '12345678910-boomshakalaka',
+      });
       this.render();
     } else {
-      const auth = gapi.auth2.getAuthInstance();
-      if (auth) {
-        auth.signIn({
-          scope: 'email',
-          prompt: 'select_account',
-        }).then(() => {
-          if (!this._maybeFireLoginEvent()) {
-            console.warn('login was not successful; maybe user canceled');
-          }
-          this.render();
-        });
-      }
+      // This will eventually reload the page with the session cookie set.
+      this._nagivateTo('login');
     }
   }
 
   _logOut() {
     if (this.testing_offline) {
-      this._auth_header = '';
-      this.render();
-      // reload the page to clear any sensitive data being displayed.
+      // Just reload the page, it is logged out by default in offline mode.
       window.location.reload();
     } else {
-      const auth = gapi.auth2.getAuthInstance();
-      if (auth) {
-        auth.signOut().then(() => {
-          this._auth_header = '';
-          this._profile = null;
-          // reload the page to clear any sensitive data being displayed.
-          window.location.reload();
-        });
-      }
+      // Navigate to the endpoint that removes the session cookie.
+      this._nagivateTo('logout');
     }
+  }
+
+  _nagivateTo(action) {
+    const back = window.location.pathname + window.location.search;
+    if (back && back != '/') {
+      window.location = `/auth/openid/${action}?r=${encodeURIComponent(back)}`;
+    } else {
+      window.location = `/auth/openid/${action}`;
+    }
+  }
+
+  _fetchAuthState() {
+    // This backend will fetch the OAuth tokens using the session identified
+    // by the session cookie set during the login flow.
+    const options = {
+      mode: 'same-origin',
+      credentials: 'same-origin',
+      cache: 'no-store',
+    };
+    return fetch('/auth/openid/state', options).then(jsonOrThrow);
   }
 
   render() {

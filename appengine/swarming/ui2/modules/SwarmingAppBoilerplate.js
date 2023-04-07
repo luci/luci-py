@@ -29,12 +29,10 @@ import {upgradeProperty} from 'elements-sk/upgradeProperty';
  *
  *  connectedCallback() {
  *   super.connectedCallback();
- *   console.log('client_id is' + this.client_id);
  *  }
  *}
  *
- * @attr client_id - The Client ID for authenticating via OAuth.
- * @attr testing_offline - If true, the real OAuth flow won't be used.
+ * @attr testing_offline - If true, the real login flow won't be used.
  *    Instead, dummy data will be used. Ideal for local testing.
  *
  */
@@ -50,7 +48,6 @@ export default class SwarmingAppBoilerplate extends HTMLElement {
   }
 
   connectedCallback() {
-    upgradeProperty(this, 'client_id');
     upgradeProperty(this, 'testing_offline');
 
     this._authHeaderEvent = (e) => {
@@ -64,7 +61,7 @@ export default class SwarmingAppBoilerplate extends HTMLElement {
   }
 
   static get observedAttributes() {
-    return ['client_id', 'testing_offline'];
+    return ['testing_offline'];
   }
 
   /** @prop {HTMLElement} app - A reference to the embedded &lt;swarming-app&gt
@@ -108,14 +105,6 @@ export default class SwarmingAppBoilerplate extends HTMLElement {
     return (this._app && this._app.server_details) || {};
   }
 
-  /** @prop {string} client_id Mirrors the attribute 'client_id'. */
-  get client_id() {
-    return this.getAttribute('client_id');
-  }
-  set client_id(val) {
-    return this.setAttribute('client_id', val);
-  }
-
   /** @prop {bool} testing_offline Mirrors the attribute 'testing_offline'. */
   get testing_offline() {
     return this.hasAttribute('testing_offline');
@@ -137,8 +126,8 @@ export default class SwarmingAppBoilerplate extends HTMLElement {
    */
   prpcError(e, loadingWhat, ignoreAuthError) {
     if (e.codeName === 'PERMISSION_DENIED') {
-      this._message = 'User unauthorized - try logging in '+
-                      'with a different account';
+      this._message = 'User unauthorized - try logging in ' +
+        'with a different account';
       this._notAuthorized = true;
       this.render();
     } else {
@@ -155,8 +144,8 @@ export default class SwarmingAppBoilerplate extends HTMLElement {
    */
   fetchError(e, loadingWhat, ignoreAuthError) {
     if (e.status === 403 && !ignoreAuthError) {
-      this._message = 'User unauthorized - try logging in '+
-                      'with a different account';
+      this._message = 'User unauthorized - try logging in ' +
+        'with a different account';
       this._notAuthorized = true;
       this.render();
     } else if (e.name !== 'AbortError') {

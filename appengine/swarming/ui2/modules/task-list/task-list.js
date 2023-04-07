@@ -11,8 +11,7 @@
  *
  * <p>This is a top-level element.</p>
  *
- * @attr client_id - The Client ID for authenticating via OAuth.
- * @attr testing_offline - If true, the real OAuth flow won't be used.
+ * @attr testing_offline - If true, the real login flow won't be used.
  *    Instead, dummy data will be used. Ideal for local testing.
  */
 
@@ -45,14 +44,18 @@ import 'flatpickr/dist/flatpickr.css';
 import * as query from 'common-sk/modules/query';
 
 import {applyAlias, maybeApplyAlias} from '../alias';
-import {appendPossibleColumns, appendPrimaryMap, column, filterTasks,
+import {
+  appendPossibleColumns, appendPrimaryMap, column, filterTasks,
   floorSecond, getColHeader, humanizePrimaryKey, legacyTags, listQueryParams,
   processTasks, sortColumns, sortPossibleColumns, specialSortMap,
   stripTag, stripTagFromFilter, tagsOnly, taskClass,
-  useNaturalSort} from './task-list-helpers';
+  useNaturalSort,
+} from './task-list-helpers';
 import {botListLink, onSmallScreen} from '../util';
-import {filterPossibleColumns, filterPossibleKeys,
-  filterPossibleValues, makeFilter} from '../queryfilter';
+import {
+  filterPossibleColumns, filterPossibleKeys,
+  filterPossibleValues, makeFilter,
+} from '../queryfilter';
 import {moreOrLess} from '../templates';
 import SwarmingAppBoilerplate from '../SwarmingAppBoilerplate';
 import {COUNT_FILTERS} from '../task';
@@ -248,7 +251,6 @@ const header = (ele) => html`
 
 const template = (ele) => html`
 <swarming-app id=swapp
-              client_id=${ele.client_id}
               ?testing_offline=${ele.testing_offline}>
   <header>
     <div class=title>Swarming Task List</div>
@@ -292,7 +294,7 @@ const template = (ele) => html`
       <button class=goback tabindex=0
               @click=${ele._closePopup}
               ?disabled=${ele._startedCanceling && !ele._finishedCanceling}>
-        ${ele._startedCanceling ? 'DISMISS': 'GO BACK - DON\'T CANCEL ANYTHING'}
+        ${ele._startedCanceling ? 'DISMISS' : 'GO BACK - DON\'T CANCEL ANYTHING'}
       </button>
     </div>
   </dialog-pop-over>
@@ -347,7 +349,7 @@ window.customElements.define('task-list', class extends SwarmingAppBoilerplate {
             'v': this._verbose,
           };
         }, /* setState*/(newState) => {
-          // default values if not specified.
+        // default values if not specified.
           this._allStates = newState.at; // default to false
           this._cols = newState.c;
           if (!newState.c.length) {
@@ -367,7 +369,7 @@ window.customElements.define('task-list', class extends SwarmingAppBoilerplate {
             this._endTime = newState.et;
           }
           // default to 24 hours ago
-          this._startTime = newState.st || floorSecond(Date.now() - 24*60*60*1000);
+          this._startTime = newState.st || floorSecond(Date.now() - 24 * 60 * 60 * 1000);
           this._sort = newState.s || 'created_ts';
           this._verbose = newState.v; // default to false
           this._fetch();
@@ -496,7 +498,7 @@ window.customElements.define('task-list', class extends SwarmingAppBoilerplate {
         .map((f) => f.replace('-tag', ''));
     this.app._fetchPermissions(extra, {tags: tags})
         .then(() => {
-          // Users can select only pool dimension at this point.
+        // Users can select only pool dimension at this point.
           const dims = [{
             'key': 'pool',
             'value': this.permissions.list_tasks || [],
@@ -755,7 +757,7 @@ window.customElements.define('task-list', class extends SwarmingAppBoilerplate {
     // shown) or the first match.  This saves the user from having to click
     // the first result before seeing results.
     if (this._filterQuery && this._filteredPrimaryArr.length > 0 &&
-        this._filteredPrimaryArr.indexOf(this._primaryKey) === -1) {
+      this._filteredPrimaryArr.indexOf(this._primaryKey) === -1) {
       this._primaryKey = this._filteredPrimaryArr[0];
       this._stateChanged();
     }

@@ -17,8 +17,10 @@ import '../bot-page-summary';
 import '../dialog-pop-over';
 import '../swarming-app';
 
-import {EVENTS_QUERY_PARAMS, parseBotData, parseEvents,
-  parseTasks, quarantineMessage, siblingBotsLink, TASKS_QUERY_PARAMS} from './bot-page-helpers';
+import {
+  EVENTS_QUERY_PARAMS, parseBotData, parseEvents,
+  parseTasks, quarantineMessage, siblingBotsLink, TASKS_QUERY_PARAMS,
+} from './bot-page-helpers';
 import {stateClass as taskClass} from '../task-page/task-page-helpers';
 import {timeDiffApprox, timeDiffExact, taskPageLink} from '../util';
 import SwarmingAppBoilerplate from '../SwarmingAppBoilerplate';
@@ -34,8 +36,7 @@ import {BotsService} from '../services/bots.js';
  *
  * <p>This is a top-level element.</p>
  *
- * @attr client_id - The Client ID for authenticating via OAuth.
- * @attr testing_offline - If true, the real OAuth flow won't be used.
+ * @attr testing_offline - If true, the real login flow won't be used.
  *    Instead, dummy data will be used. Ideal for local testing.
  */
 
@@ -67,7 +68,7 @@ const statusAndTask = (ele, bot) => {
     title="This bot was deleted.">
   <td colspan=3>THIS BOT WAS DELETED</td>
 </tr>
-<tr class=${bot.isDead ? 'dead': ''}>
+<tr class=${bot.isDead ? 'dead' : ''}>
   <td>Last Seen</td>
   <td title=${bot.human_lastSeenTs}>${timeDiffExact(bot.lastSeenTs)} ago</td>
   <td>
@@ -99,7 +100,7 @@ const statusAndTask = (ele, bot) => {
   <td colspan=2 class=code>${bot.maintenanceMsg}</td>
 </tr>
 <tr>
-  <td>${bot.isDead ? 'Died on Task': 'Current Task'}</td>
+  <td>${bot.isDead ? 'Died on Task' : 'Current Task'}</td>
   <td>
     <a target=_blank rel=noopener
         href=${ifDefined(taskPageLink(bot.taskId))}>
@@ -119,7 +120,7 @@ const statusAndTask = (ele, bot) => {
 
 const dimensionBlock = (dimensions) => html`
 <tr>
-  <td rowspan=${dimensions.length+1}>
+  <td rowspan=${dimensions.length + 1}>
     <a href=${siblingBotsLink(dimensions)}>
       Dimensions
     </a>
@@ -138,7 +139,7 @@ const dimensionRow = (dimension) => html`
 const dataAndMPBlock = (ele, bot) => html`
 <tr title="IP address that the server saw the connection from.">
   <td>External IP</td>
-  <td colspan=2><a href=${'http://'+bot.externalIp}>${bot.externalIp}</a></td>
+  <td colspan=2><a href=${'http://' + bot.externalIp}>${bot.externalIp}</a></td>
 </tr>
 <tr class=${ele.server_details.bot_version === bot.version ? '' : 'old_version'}
     title="Version is based on the content of swarming_bot.zip which is the swarming bot code.
@@ -149,7 +150,7 @@ const dataAndMPBlock = (ele, bot) => html`
 <tr title="The version the server expects the bot to be using.">
   <td>Expected Bot Version</td>
   <td colspan=2>${ele.server_details.bot_version &&
-                  ele.server_details.bot_version.substring(0, 10)}</td>
+  ele.server_details.bot_version.substring(0, 10)}</td>
 </tr>
 <tr title="First time ever a bot with this id contacted the server.">
   <td>First seen</td>
@@ -312,7 +313,6 @@ const eventRow = (event, showAll, serverVersion) => {
 
 const template = (ele) => html`
 <swarming-app id=swapp
-              client_id=${ele.client_id}
               ?testing_offline=${ele.testing_offline}>
   <header>
     <div class=title>Swarming Bot Page</div>
@@ -403,7 +403,7 @@ window.customElements.define('bot-page', class extends SwarmingAppBoilerplate {
             'a': this._showAll,
           };
         }, /* setState*/(newState) => {
-          // default values if not specified.
+        // default values if not specified.
           this._botId = newState.id || this._botId;
           this._showState = newState.s; // default to false
           this._showEvents = newState.e; // default to false
@@ -566,7 +566,7 @@ window.customElements.define('bot-page', class extends SwarmingAppBoilerplate {
     };
     this.app.addBusyTasks(1);
     fetch(`/_ah/api/swarming/v1/bot/${this._botId}/events?cursor=${this._eventsCursor}&` +
-          EVENTS_QUERY_PARAMS, extra)
+      EVENTS_QUERY_PARAMS, extra)
         .then(jsonOrThrow)
         .then((json) => {
           this._eventsCursor = json.cursor;
@@ -587,7 +587,7 @@ window.customElements.define('bot-page', class extends SwarmingAppBoilerplate {
     };
     this.app.addBusyTasks(1);
     fetch(`/_ah/api/swarming/v1/bot/${this._botId}/tasks?cursor=${this._taskCursor}&` +
-          TASKS_QUERY_PARAMS, extra)
+      TASKS_QUERY_PARAMS, extra)
         .then(jsonOrThrow)
         .then((json) => {
           this._taskCursor = json.cursor;

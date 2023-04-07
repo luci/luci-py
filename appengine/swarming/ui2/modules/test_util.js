@@ -26,16 +26,16 @@ export const customMatchers = {
 
         if (!actual || !actual.length) {
           result.pass = false;
-          result.message = `Expected ${actual} to be a non-empty array `+
-                           `containing something matching ${regex}`;
+          result.message = `Expected ${actual} to be a non-empty array ` +
+            `containing something matching ${regex}`;
           return result;
         }
         for (const s of actual) {
           if (s.match && s.match(regex)) {
             result.pass = true;
             // craft the message for the negated version (i.e. using .not)
-            result.message = `Expected ${actual} not to have anyting `+
-                             `matching ${regex}, but ${s} did`;
+            result.message = `Expected ${actual} not to have anyting ` +
+              `matching ${regex}, but ${s} did`;
             return result;
           }
         }
@@ -76,14 +76,14 @@ export const customMatchers = {
         if (actualText === text) {
           return {
             // craft the message for the negated version
-            message: `Expected ${actualText} to not equal ${text} `+
-                     `(ignoring whitespace)`,
+            message: `Expected ${actualText} to not equal ${text} ` +
+              `(ignoring whitespace)`,
             pass: true,
           };
         }
         return {
-          message: `Expected ${actualText} to equal ${text} `+
-                   `(ignoring whitespace)`,
+          message: `Expected ${actualText} to equal ${text} ` +
+            `(ignoring whitespace)`,
           pass: false,
         };
       },
@@ -97,6 +97,10 @@ function isElement(ele) {
 }
 
 export function mockAppGETs(fetchMock, permissions) {
+  fetchMock.get('/auth/openid/state', {
+    identity: 'anonymous:anonymous',
+  });
+
   fetchMock.get('/_ah/api/swarming/v1/server/details', {
     server_version: '1234-abcdefg',
     bot_version: 'abcdoeraymeyouandme',
@@ -109,6 +113,13 @@ export function mockAppGETs(fetchMock, permissions) {
 }
 
 export function mockAuthdAppGETs(fetchMock, permissions) {
+  fetchMock.get('/auth/openid/state', {
+    identity: 'user:someone@example.com',
+    email: 'someone@example.com',
+    picture: 'http://example.com/picture.jpg',
+    accessToken: '12345-zzzzzz',
+  });
+
   fetchMock.get('/_ah/api/swarming/v1/server/details', requireLogin({
     server_version: '1234-abcdefg',
     bot_version: 'abcdoeraymeyouandme',
@@ -122,7 +133,7 @@ export function mockAuthdAppGETs(fetchMock, permissions) {
       requireLogin(permissions));
 }
 
-export function requireLogin(logged_in, delay=100) {
+export function requireLogin(logged_in, delay = 100) {
   const original_items = logged_in.items && logged_in.items.slice();
   return function(url, opts) {
     if (opts && opts.headers && opts.headers.authorization) {
@@ -134,11 +145,11 @@ export function requireLogin(logged_in, delay=100) {
           if (!logged_in.cursor) {
             // first page
             logged_in.cursor = 'fake_cursor12345';
-            logged_in.items = original_items.slice(0, original_items.length/2);
+            logged_in.items = original_items.slice(0, original_items.length / 2);
           } else {
             // second page
             logged_in.cursor = undefined;
-            logged_in.items = original_items.slice(original_items.length/2);
+            logged_in.items = original_items.slice(original_items.length / 2);
           }
         }
         if (logged_in instanceof Function) {

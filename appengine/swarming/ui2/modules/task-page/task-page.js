@@ -21,12 +21,16 @@ import * as human from 'common-sk/modules/human';
 import * as query from 'common-sk/modules/query';
 
 import {applyAlias} from '../alias';
-import {casLink, canRetry, cipdLink, durationChart, hasRichOutput, humanState,
+import {
+  casLink, canRetry, cipdLink, durationChart, hasRichOutput, humanState,
   firstDimension, parseRequest, parseResult, richLogsLink,
   sliceSchedulingDeadline, stateClass, taskCost, taskSchedulingDeadline,
-  taskInfoClass, wasDeduped, wasPickedUp} from './task-page-helpers';
-import {botListLink, botPageLink, humanDuration, parseDuration,
-  taskListLink, taskPageLink} from '../util';
+  taskInfoClass, wasDeduped, wasPickedUp,
+} from './task-page-helpers';
+import {
+  botListLink, botPageLink, humanDuration, parseDuration,
+  taskListLink, taskPageLink,
+} from '../util';
 
 import SwarmingAppBoilerplate from '../SwarmingAppBoilerplate';
 
@@ -40,8 +44,7 @@ import SwarmingAppBoilerplate from '../SwarmingAppBoilerplate';
  *
  * <p>This is a top-level element.</p>
  *
- * @attr client_id - The Client ID for authenticating via OAuth.
- * @attr testing_offline - If true, the real OAuth flow won't be used.
+ * @attr testing_offline - If true, the real login flow won't be used.
  *    Instead, dummy data will be used. Ideal for local testing.
  */
 
@@ -83,9 +86,9 @@ const serverLogBaseQuery = `resource.type="gae_app"\n` +
 
 const serverLogTimeRange = (request, result) => {
   if (!request.created_ts) return [null, null];
-  const timeStart = new Date(request.created_ts.getTime() - 60*1000);
+  const timeStart = new Date(request.created_ts.getTime() - 60 * 1000);
   const tsEnd = result.completed_ts || result.abandoned_ts;
-  const timeEnd = tsEnd ? new Date(tsEnd.getTime() + 60*1000) : new Date();
+  const timeEnd = tsEnd ? new Date(tsEnd.getTime() + 60 * 1000) : new Date();
   return [timeStart, timeEnd];
 };
 
@@ -106,13 +109,13 @@ const botLogsURL = (botProjectID, botZone, request, result) => {
   // limit logs that we care
   const host_name = extractPrimaryHostname(result.bot_id);
   const query =
-      `labels."compute.googleapis.com/resource_name":"${host_name}"`;
+    `labels."compute.googleapis.com/resource_name":"${host_name}"`;
   let timeStart;
   let timeEnd;
   if (result.started_ts) {
-    timeStart = new Date(result.started_ts.getTime() - 60*1000);
+    timeStart = new Date(result.started_ts.getTime() - 60 * 1000);
     const tsEnd = result.completed_ts || result.abandoned_ts;
-    timeEnd = tsEnd ? new Date(tsEnd.getTime() + 60*1000) : new Date();
+    timeEnd = tsEnd ? new Date(tsEnd.getTime() + 60 * 1000) : new Date();
   }
   return cloudLoggingURL(botProjectID, query, timeStart, timeEnd);
 };
@@ -150,7 +153,7 @@ const taskRow = (result, idx) => {
   }
   // Convert the summary id to the run id
   let taskId = result.task_id.substring(0, result.task_id.length - 1);
-  taskId += (idx+1);
+  taskId += (idx + 1);
   return html`
 <tr>
   <td>
@@ -185,7 +188,7 @@ const slicePicker = (ele) => {
 
 const sliceTab = (ele, idx) => html`
   <div class=tab ?selected=${ele._currentSliceIdx === idx}
-                 @click=${() => ele._setSlice(idx)}>Task Slice ${idx+1}</div>
+                 @click=${() => ele._setSlice(idx)}>Task Slice ${idx + 1}</div>
 `;
 
 const taskInfoTable = (ele, request, result, currentSlice) => {
@@ -283,7 +286,7 @@ ${countBlocks(result, ele._capacityCounts[ele._currentSliceIdx],
 const countBlocks = (result, capacityCount, pendingCount,
     runningCount, properties) => html`
 <tr ?hidden=${!capacityCount}>
-  <td class=${result.state === 'PENDING'? 'bold': ''}>
+  <td class=${result.state === 'PENDING' ? 'bold' : ''}>
     ${result.state === 'PENDING' ? 'Why Pending?' : 'Fleet Capacity'}
   </td>
   <td>
@@ -376,7 +379,7 @@ const requestBlock = (request, result, currentSlice) => html`
 
 const dimensionBlock = (dimensions) => html`
 <tr>
-  <td rowspan=${dimensions.length+1}>
+  <td rowspan=${dimensions.length + 1}>
     Dimensions <br/>
     <a  title="The list of bots that matches the list of dimensions"
         href=${botListLink(dimensions)}>Bots</a>
@@ -451,7 +454,7 @@ const arrayInTable = (array, label, keyFn) => {
   }
   return html`
 <tr>
-  <td rowspan=${array.length+1}>${label}</td>
+  <td rowspan=${array.length + 1}>${label}</td>
 </tr>
 ${array.map(arrayRow(keyFn))}`;
 };
@@ -567,7 +570,7 @@ const cipdBlock = (cipdInput, result) => {
   if (actualPackages.length) {
     cipdRowspan *= 3;
   } else {
-    cipdRowspan *=2;
+    cipdRowspan *= 2;
   }
   // Add one because rowSpan counts from 1.
   cipdRowspan += 1;
@@ -693,7 +696,7 @@ const logsSection = (ele, request, result) => {
       if (dim.key == 'gcp') botProjectID = dim.value[0];
       if (dim.key == 'zone') {
         botZone = dim.value.reduce(
-            (a, b) => a.length > b.length ? a : b );
+            (a, b) => a.length > b.length ? a : b);
       }
     }
     // Use result.bot_logs_cloud_project to fetch logs when it's not null
@@ -807,7 +810,7 @@ const taskExecutionSection = (ele, request, result, currentSlice) => {
     <td>${result.human_bot_idle_since_ts}</td>
   </tr>
   <tr>
-    <td rowspan=${botDimensions.length+1}>
+    <td rowspan=${botDimensions.length + 1}>
       Dimensions
     </td>
   </tr>
@@ -818,11 +821,11 @@ const taskExecutionSection = (ele, request, result, currentSlice) => {
   </tr>
   <tr>
     <td>Failure</td>
-    <td class=${result.failure ? 'failed_task': ''}>${!!result.failure}</td>
+    <td class=${result.failure ? 'failed_task' : ''}>${!!result.failure}</td>
   </tr>
   <tr>
     <td>Internal Failure</td>
-    <td class=${result.internal_failure ? 'exception': ''}>${result.internal_failure}</td>
+    <td class=${result.internal_failure ? 'exception' : ''}>${result.internal_failure}</td>
   </tr>
   <tr>
     <td>Cost (USD)</td>
@@ -849,17 +852,17 @@ const taskExecutionSection = (ele, request, result, currentSlice) => {
 
 const botDimensionRow = (dim, usedDimensions) => html`
 <tr>
-  <td class=${dim.highlight ? 'highlight': ''}>
+  <td class=${dim.highlight ? 'highlight' : ''}>
     <b class=dim_key>${dim.key}:</b>${dim.values.map(botDimensionValue)}
   </td>
 </tr>
 `;
 
 const botDimensionValue = (value) =>
-  html`<span class="break-all dim ${value.bold ? 'bold': ''}">${value.name}</span>`;
+  html`<span class="break-all dim ${value.bold ? 'bold' : ''}">${value.name}</span>`;
 
 const performanceStatsSection = (ele, performanceStats) => {
-  if (!ele._taskId || ele._notFound || !performanceStats ) {
+  if (!ele._taskId || ele._notFound || !performanceStats) {
     return '';
   }
   return html`
@@ -998,7 +1001,7 @@ const retryOrDebugPrompt = (ele, sliceProps) => {
   return html`
 <div class=prompt>
   <h2>
-    Are you sure you want to ${ele._isPromptDebug? 'debug': 'retry'}
+    Are you sure you want to ${ele._isPromptDebug ? 'debug' : 'retry'}
     task ${ele._taskId}?
   </h2>
   <div>
@@ -1041,7 +1044,6 @@ const promptRow = (dim) => html`
 
 const template = (ele) => html`
 <swarming-app id=swapp
-              client_id=${ele.client_id}
               ?testing_offline=${ele.testing_offline}>
   <header>
     <div class=title>Swarming Task Page</div>
@@ -1129,7 +1131,7 @@ window.customElements.define('task-page', class extends SwarmingAppBoilerplate {
             'w': this._wideLogs,
           };
         }, /* setState*/(newState) => {
-          // default values if not specified.
+        // default values if not specified.
           this._taskId = newState.id || this._taskId;
           this._showDetails = newState.d; // default to false
           this._wideLogs = newState.w; // default to false
@@ -1178,7 +1180,7 @@ window.customElements.define('task-page', class extends SwarmingAppBoilerplate {
     this._isPromptDebug = false;
     this._useSameBot = false;
 
-    this._logFetchPeriod = 10*1000; // default to 10s, overwritable for tests.
+    this._logFetchPeriod = 10 * 1000; // default to 10s, overwritable for tests.
   }
 
   connectedCallback() {
@@ -1374,8 +1376,8 @@ time.sleep(${leaseDuration})`];
     // unicode characters apart.
     let previousState = '';
     const fetchNextStdout = () => {
-      fetch(`/_ah/api/swarming/v1/task/${this._taskId}/stdout?offset=${this._stdoutOffset}&`+
-          `length=${STDOUT_REQUEST_SIZE}`, extra)
+      fetch(`/_ah/api/swarming/v1/task/${this._taskId}/stdout?offset=${this._stdoutOffset}&` +
+        `length=${STDOUT_REQUEST_SIZE}`, extra)
           .then(jsonOrThrow)
           .then((json) => {
             if (!previousState) {
@@ -1394,19 +1396,19 @@ time.sleep(${leaseDuration})`];
             let block = newLogs;
             let remainder = '';
             if (lastNewline !== -1) {
-              block = newLogs.substring(0, lastNewline+1);
-              remainder = newLogs.substring(lastNewline+1);
+              block = newLogs.substring(0, lastNewline + 1);
+              remainder = newLogs.substring(lastNewline + 1);
             }
             // If the previous block doesn't end in newline, we assume this block
             // should be appended to that one.
-            if (this._stdout.length && !this._stdout[this._stdout.length-1].endsWith('\n')) {
-              this._stdout[this._stdout.length-1] += block;
+            if (this._stdout.length && !this._stdout[this._stdout.length - 1].endsWith('\n')) {
+              this._stdout[this._stdout.length - 1] += block;
               if (remainder) {
                 this._stdout.push(remainder);
               }
             } else {
-              // otherwise, just push what we have as a new block (usually this
-              // is the first logs loaded).
+            // otherwise, just push what we have as a new block (usually this
+            // is the first logs loaded).
               this._stdout.push(block);
               if (remainder) {
                 this._stdout.push(remainder);
@@ -1421,18 +1423,18 @@ time.sleep(${leaseDuration})`];
 
             if (json.state === 'RUNNING' || json.state === 'PENDING') {
               if (sLengthBytes < STDOUT_REQUEST_SIZE) {
-                // wait for more input because no new input from last fetch
+              // wait for more input because no new input from last fetch
                 setTimeout(fetchNextStdout, this._logFetchPeriod);
               } else {
-                // fetch right away because we are not at the end of input
+              // fetch right away because we are not at the end of input
                 fetchNextStdout();
               }
             } else {
-              // no more
+            // no more
               if (sLengthBytes < STDOUT_REQUEST_SIZE) {
                 this.app.finishedTask();
               } else {
-                // fetch right away because we are not at the end of input
+              // fetch right away because we are not at the end of input
                 fetchNextStdout();
               }
             }
@@ -1469,9 +1471,9 @@ time.sleep(${leaseDuration})`];
       let start = new Date();
       start.setSeconds(0);
       // go back 24 hours, rounded to the nearest minute for better caching.
-      start = '' + (start.getTime() - 24*60*60*1000);
+      start = '' + (start.getTime() - 24 * 60 * 60 * 1000);
       // convert to seconds, because that's what the API expects.
-      start = start.substring(0, start.length-3);
+      start = start.substring(0, start.length - 3);
       const tParams = {
         start: [start],
         state: ['RUNNING'],
@@ -1502,7 +1504,7 @@ time.sleep(${leaseDuration})`];
     this.app.addBusyTasks(tries);
     const baseTaskId = taskId.substring(0, taskId.length - 1);
     for (let i = 0; i < tries; i++) {
-      fetch(`/_ah/api/swarming/v1/task/${taskId + (i+1)}/result`, extra)
+      fetch(`/_ah/api/swarming/v1/task/${taskId + (i + 1)}/result`, extra)
           .then(jsonOrThrow)
           .then((json) => {
             const result = parseResult(json);

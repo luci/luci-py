@@ -11,8 +11,7 @@
  *
  * <p>This is a top-level element.</p>
  *
- * @prop client_id - The Client ID for authenticating via OAuth.
- * @prop testing_offline - If true, the real OAuth flow won't be used.
+ * @prop testing_offline - If true, the real login flow won't be used.
  *    Instead, dummy data will be used. Ideal for local testing.
  */
 
@@ -39,14 +38,18 @@ import '../swarming-app';
 
 
 import {applyAlias, maybeApplyAlias} from '../alias';
-import {aggregateTemps, attribute, botLink, column, devices, dimensionsOnly,
+import {
+  aggregateTemps, attribute, botLink, column, devices, dimensionsOnly,
   filterBots, forcedColumns, fromDimension, fromState, getColHeader,
   initCounts, listQueryParams, longestOrAll, processBots, processCounts,
   makePossibleColumns, processPrimaryMap, sortColumns,
   sortPossibleColumns, specialFilters, specialSortMap,
-  useNaturalSort} from './bot-list-helpers';
-import {filterPossibleColumns, filterPossibleKeys,
-  filterPossibleValues, makeFilter} from '../queryfilter';
+  useNaturalSort,
+} from './bot-list-helpers';
+import {
+  filterPossibleColumns, filterPossibleKeys,
+  filterPossibleValues, makeFilter,
+} from '../queryfilter';
 import {moreOrLess} from '../templates';
 import {taskListLink} from '../util';
 
@@ -243,7 +246,6 @@ const col_options = (ele) => html`
 
 const template = (ele) => html`
 <swarming-app id=swapp
-              client_id=${ele.client_id}
               ?testing_offline=${ele.testing_offline}>
   <header>
     <div class=title>Swarming Bot List</div>
@@ -258,7 +260,7 @@ const template = (ele) => html`
   <main @click=${(e) => ele._showColSelector && ele._toggleColSelector(e)}>
     <h2 class=message ?hidden=${ele.loggedInAndAuthorized}>${ele._message}</h2>
 
-    ${ele.loggedInAndAuthorized ? header(ele): ''}
+    ${ele.loggedInAndAuthorized ? header(ele) : ''}
 
     <table class=bot-table ?hidden=${!ele.loggedInAndAuthorized}>
       <thead>
@@ -286,7 +288,7 @@ const template = (ele) => html`
       <button class=goback tabindex=0
               @click=${ele._closePopup}
               ?disabled=${ele._startedDeleting && !ele._finishedDeleting}>
-        ${ele._startedDeleting ? 'DISMISS': 'GO BACK - DON\'T DELETE ANYTHING'}
+        ${ele._startedDeleting ? 'DISMISS' : 'GO BACK - DON\'T DELETE ANYTHING'}
       </button>
     </div>
   </dialog-pop-over>
@@ -341,7 +343,7 @@ window.customElements.define('bot-list', class extends SwarmingAppBoilerplate {
             'v': this._verbose,
           };
         }, /* setState*/(newState) => {
-          // default values if not specified.
+        // default values if not specified.
           this._cols = newState.c;
           if (!newState.c.length) {
             this._cols = ['id', 'task', 'os', 'status'];
@@ -512,7 +514,7 @@ window.customElements.define('bot-list', class extends SwarmingAppBoilerplate {
     // Re-checks permissions with tags.
     this.app._fetchPermissions(extra, {tags: this._filters})
         .then(() => {
-          // Users can select only pool dimension at this point.
+        // Users can select only pool dimension at this point.
           this._primaryMap = {'pool': this.permissions.list_bots || []};
           this._primaryArr = ['pool'];
           this._filteredPrimaryArr = this._primaryArr.slice();
@@ -702,7 +704,7 @@ window.customElements.define('bot-list', class extends SwarmingAppBoilerplate {
     // shown) or the first match.  This saves the user from having to click
     // the first result before seeing results.
     if (this._filterQuery && this._filteredPrimaryArr.length > 0 &&
-        this._filteredPrimaryArr.indexOf(this._primaryKey) === -1) {
+      this._filteredPrimaryArr.indexOf(this._primaryKey) === -1) {
       this._primaryKey = this._filteredPrimaryArr[0];
       this._stateChanged();
     }

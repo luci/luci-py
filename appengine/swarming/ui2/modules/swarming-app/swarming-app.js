@@ -23,8 +23,7 @@
  * @evt busy-end This event is emitted whenever the app transitions from
  *               busy to not busy.
  *
- * @attr client_id - The Client ID for authenticating via OAuth.
- * @attr testing_offline - If true, the real OAuth flow won't be used.
+ * @attr testing_offline - If true, the real login flow won't be used.
  *    Instead, dummy data will be used. Ideal for local testing.
  *
  */
@@ -43,7 +42,7 @@ import {html, render} from 'lit-html';
 import {ifDefined} from 'lit-html/directives/if-defined';
 
 const button_template = document.createElement('template');
-button_template.innerHTML =`
+button_template.innerHTML = `
 <button class=toggle-button>
   <menu-icon-sk>
   </menu-icon-sk>
@@ -51,7 +50,7 @@ button_template.innerHTML =`
 `;
 
 const spinner_template = document.createElement('template');
-spinner_template.innerHTML =`
+spinner_template.innerHTML = `
 <div class=spinner-spacer>
   <spinner-sk></spinner-sk>
 </div>
@@ -59,10 +58,10 @@ spinner_template.innerHTML =`
 
 const pantheon_url = `https://console.cloud.google.com/appengine/versions?project=`;
 const version_filter_prefix = `&serviceId=default&pageState=(%22versionsTable` +
-    `%22:(%22f%22:%22%255B%257B_22k_22_3A_22Version` +
-    `_22_2C_22t_22_3A10_2C_22v_22_3A_22_5C_22`;
+  `%22:(%22f%22:%22%255B%257B_22k_22_3A_22Version` +
+  `_22_2C_22t_22_3A10_2C_22v_22_3A_22_5C_22`;
 const version_filter_postfix = `_5C_22_22_2C_22s_22_3Atrue_2C_22i_22_3A_22` +
-    `id_22%257D%255D%22))`;
+  `id_22%257D%255D%22))`;
 const version_default = 'You must log in to see more details';
 
 function serverLink(project_id, details) {
@@ -92,8 +91,7 @@ const dynamic_content_template = (ele) => html`
 <div class=server-version>
   AppEngine version: ${serverLink(ele._project_id, ele._server_details)} Git version:${gitLink(ele._server_details)}
 </div>
-<oauth-login client_id=${ele.client_id}
-             ?testing_offline=${ele.testing_offline}>
+<oauth-login ?testing_offline=${ele.testing_offline}>
 </oauth-login>`;
 
 const fab_template = document.createElement('template');
@@ -122,7 +120,6 @@ window.customElements.define('swarming-app', class extends HTMLElement {
   }
 
   connectedCallback() {
-    upgradeProperty(this, 'client_id');
     upgradeProperty(this, 'testing_offline');
     this._addHTML();
 
@@ -136,7 +133,7 @@ window.customElements.define('swarming-app', class extends HTMLElement {
   }
 
   static get observedAttributes() {
-    return ['client_id', 'testing_offline'];
+    return ['testing_offline'];
   }
 
 
@@ -165,15 +162,6 @@ window.customElements.define('swarming-app', class extends HTMLElement {
    *                 not authorized. Read-only. */
   get server_details() {
     return this._server_details;
-  }
-
-
-  /** @prop {string} client_id Mirrors the attribute 'client_id'. */
-  get client_id() {
-    return this.getAttribute('client_id');
-  }
-  set client_id(val) {
-    return this.setAttribute('client_id', val);
   }
 
   /** @prop {bool} testing_offline Mirrors the attribute 'testing_offline'. */
@@ -308,7 +296,7 @@ window.customElements.define('swarming-app', class extends HTMLElement {
           if (e.status === 403) {
             this._server_details = {
               server_version: 'User unauthorized - try logging in ' +
-                            'with a different account',
+              'with a different account',
               bot_version: '',
             };
             this.render();
