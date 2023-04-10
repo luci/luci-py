@@ -66,6 +66,7 @@ _detection_bucketer = gae_ts_mon.GeometricBucketer(growth_factor=10**0.01,
 # - project_id: e.g. 'chromium'.
 # - subproject_id: e.g. 'blink'. Set to empty string if not used.
 # - pool: e.g. 'Chrome'.
+# - rbe: RBE instance of the task or literal 'none'.
 # - spec_name: name of a job specification.
 # - result: one of 'success', 'failure', or 'infra-failure'.
 _jobs_completed = gae_ts_mon.CounterMetric(
@@ -75,6 +76,7 @@ _jobs_completed = gae_ts_mon.CounterMetric(
         gae_ts_mon.StringField('project_id'),
         gae_ts_mon.StringField('subproject_id'),
         gae_ts_mon.StringField('pool'),
+        gae_ts_mon.StringField('rbe'),
         gae_ts_mon.StringField('result'),
         gae_ts_mon.StringField('status'),
     ])
@@ -87,16 +89,18 @@ _jobs_durations = gae_ts_mon.CumulativeDistributionMetric(
         gae_ts_mon.StringField('project_id'),
         gae_ts_mon.StringField('subproject_id'),
         gae_ts_mon.StringField('pool'),
+        gae_ts_mon.StringField('rbe'),
         gae_ts_mon.StringField('result'),
     ],
     bucketer=_bucketer)
 
 
 # Similar to jobs/completed and jobs/duration, but with a dedup field.
+# - spec_name: name of a job specification.
 # - project_id: e.g. 'chromium'
 # - subproject_id: e.g. 'blink'. Set to empty string if not used.
-# - pool: e.g. 'Chrome'
-# - spec_name: name of a job specification.
+# - pool: e.g. 'Chrome'.
+# - rbe: RBE instance of the task or literal 'none'.
 # - deduped: boolean describing whether the job was deduped or not.
 _jobs_requested = gae_ts_mon.CounterMetric(
     'jobs/requested',
@@ -105,15 +109,17 @@ _jobs_requested = gae_ts_mon.CounterMetric(
         gae_ts_mon.StringField('project_id'),
         gae_ts_mon.StringField('subproject_id'),
         gae_ts_mon.StringField('pool'),
+        gae_ts_mon.StringField('rbe'),
         gae_ts_mon.BooleanField('deduped'),
     ])
 
 
 # Swarming-specific metric. Metric fields:
+# - spec_name: name of a job specification.
 # - project_id: e.g. 'chromium'.
 # - subproject_id: e.g. 'blink'. Set to empty string if not used.
 # - pool: e.g. 'Chrome'.
-# - spec_name: name of a job specification.
+# - rbe: RBE instance of the task or literal 'none'.
 # - priority: priority of a task.
 _tasks_expired = gae_ts_mon.CounterMetric(
     'swarming/tasks/expired', 'Number of expired tasks', [
@@ -121,26 +127,31 @@ _tasks_expired = gae_ts_mon.CounterMetric(
         gae_ts_mon.StringField('project_id'),
         gae_ts_mon.StringField('subproject_id'),
         gae_ts_mon.StringField('pool'),
+        gae_ts_mon.StringField('rbe'),
         gae_ts_mon.IntegerField('priority'),
     ])
 
 
 # Swarming-specific metric. Metric fields:
-# - project_id: e.g. 'chromium-swarm'
+# - project_id: e.g. 'chromium'.
+# - rbe: RBE instance of the task or literal 'none'.
 _tasks_expiration_delay = gae_ts_mon.CumulativeDistributionMetric(
     'swarming/tasks/expiration_delay',
     'Delay of task expiration, in seconds.', [
         gae_ts_mon.StringField('project_id'),
+        gae_ts_mon.StringField('rbe'),
     ])
 
 
 # Swarming-specific metric. Metric fields:
-# - project_id: e.g. 'chromium-swarm'
+# - project_id: e.g. 'chromium'.
+# - rbe: RBE instance of the task or literal 'none'.
 _tasks_slice_expiration_delay = gae_ts_mon.CumulativeDistributionMetric(
     'swarming/tasks/slice_expiration_delay',
     'Delay of task slice expiration, in seconds.',
     [
         gae_ts_mon.StringField('project_id'),
+        gae_ts_mon.StringField('rbe'),
         gae_ts_mon.IntegerField('slice_index'),
     ],
     bucketer=gae_ts_mon.FixedWidthBucketer(width=30),
@@ -148,10 +159,11 @@ _tasks_slice_expiration_delay = gae_ts_mon.CumulativeDistributionMetric(
 
 
 # Global metric. Metric fields:
+# - spec_name: name of a job specification.
 # - project_id: e.g. 'chromium'.
 # - subproject_id: e.g. 'blink'. Set to empty string if not used.
 # - pool: e.g. 'Chrome'.
-# - spec_name: name of a job specification.
+# - rbe: RBE instance of the task or literal 'none'.
 # - status: 'pending' or 'running'.
 _jobs_active = gae_ts_mon.GaugeMetric(
     'jobs/active', 'Number of running, pending or otherwise active jobs.', [
@@ -159,6 +171,7 @@ _jobs_active = gae_ts_mon.GaugeMetric(
         gae_ts_mon.StringField('project_id'),
         gae_ts_mon.StringField('subproject_id'),
         gae_ts_mon.StringField('pool'),
+        gae_ts_mon.StringField('rbe'),
         gae_ts_mon.StringField('status'),
     ])
 
@@ -412,6 +425,7 @@ def _extract_job_fields(tags_dict):
       'subproject_id': tags_dict.get('subproject', ''),
       'pool': tags_dict.get('pool', ''),
       'spec_name': _extract_spec_name_field(tags_dict),
+      'rbe': tags_dict.get('rbe', 'none'),
   }
   return fields
 
@@ -450,7 +464,10 @@ def on_task_completed(summary):
 def on_task_expired(summary, task_to_run):
   """When a task slice is expired."""
   tags_dict = _tags_to_dict(summary.tags)
-  fields = {'project_id': tags_dict.get('project', '')}
+  fields = {
+      'project_id': tags_dict.get('project', ''),
+      'rbe': tags_dict.get('rbe', 'none'),
+  }
 
   # slice expiration delay
   _tasks_slice_expiration_delay.add(

@@ -107,11 +107,13 @@ class TestMetrics(test_case.TestCase):
         'pool:test_pool',
         'buildername:test_builder',
         'name:some_tests',
+        'rbe:some/proj/some/inst',
     ]
     fields = {
         'project_id': 'test_project',
         'subproject_id': 'test_subproject',
         'pool': 'test_pool',
+        'rbe': 'some/proj/some/inst',
         'spec_name': 'test_builder',
     }
     summary = _gen_task_result_summary(self.now, 1, tags=tags)
@@ -155,6 +157,7 @@ class TestMetrics(test_case.TestCase):
         'project_id': 'test_project',
         'subproject_id': 'test_subproject',
         'pool': 'test_pool',
+        'rbe': 'none',
         'spec_name': 'my:custom:test:spec:name',
     }
     summary = _gen_task_result_summary(self.now, 1, tags=tags)
@@ -182,6 +185,7 @@ class TestMetrics(test_case.TestCase):
         'project_id': 'test_project',
         'subproject_id': 'test_subproject',
         'pool': 'test_pool',
+        'rbe': 'none',
         'spec_name': 'test_builder:experimental',
     }
     summary = _gen_task_result_summary(self.now, 1, tags=tags)
@@ -247,6 +251,7 @@ class TestMetrics(test_case.TestCase):
         'subproject_id': 'test_subproject',
         'pool': 'test_pool',
         'spec_name': 'test_builder',
+        'rbe': 'none',
     }
     jobs_target_fields = dict(ts_mon_metrics._TARGET_FIELDS)
     jobs_target_fields['hostname'] = 'autogen:test_bot1'
@@ -277,8 +282,9 @@ class TestMetrics(test_case.TestCase):
     tags = [
         'project:test_project',
         'slice_index:0',
+        'rbe:some/proj/some/inst',
     ]
-    fields = {'project_id': 'test_project'}
+    fields = {'project_id': 'test_project', 'rbe': 'some/proj/some/inst'}
     summary = _gen_task_result_summary(
         self.now,
         1,
