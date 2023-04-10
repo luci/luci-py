@@ -302,6 +302,35 @@ class TestMetrics(test_case.TestCase):
         ts_mon_metrics._tasks_slice_expiration_delay.get(
             fields=dict(fields, slice_index=0)).sum)
 
+  def test_on_task_to_run_consumed(self):
+    tags = [
+        'project:test_project',
+        'subproject:test_subproject',
+        'pool:test_pool',
+        'buildername:test_builder',
+        'name:some_tests',
+        'rbe:some/proj/some/inst',
+    ]
+    fields = {
+        'project_id': 'test_project',
+        'subproject_id': 'test_subproject',
+        'pool': 'test_pool',
+        'rbe': 'some/proj/some/inst',
+        'spec_name': 'test_builder',
+    }
+
+    before = self.now - datetime.timedelta(seconds=5)
+    summary = _gen_task_result_summary(before,
+                                       1,
+                                       tags=tags,
+                                       state=task_result.State.PENDING)
+    to_run = _get_task_to_run(before, 1, 2)
+
+    ts_mon_metrics.on_task_to_run_consumed(summary, to_run)
+    self.assertEqual(
+        5000.0,
+        ts_mon_metrics._ttr_consume_latencies.get(fields=fields).sum)
+
   def test_on_task_status_change_scheduler_latency(self):
     tags = [
         'project:test_project', 'subproject:test_subproject', 'pool:test_pool',

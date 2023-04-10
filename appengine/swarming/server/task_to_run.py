@@ -774,7 +774,7 @@ def new_task_to_run(request, task_slice_index):
   assert 0 <= task_slice_index < 64, task_slice_index
   assert request.scheduling_algorithm is not None
 
-  # TODO(vadimsh): Is TaskToRun.created_ts actually used anywhere?
+  # This is used to track how long TaskToRunShard was pending.
   created = request.created_ts
   if task_slice_index:
     created = utils.utcnow()

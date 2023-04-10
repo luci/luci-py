@@ -297,7 +297,7 @@ def _reap_task(bot_dimensions,
       logging.error('Missing TaskToRunShard?\n%s', result_summary.task_id)
       if claim_id:
         raise ClaimError('No task slice')
-      return None, None, None, False
+      return None, None, None, None, False
 
     if not to_run.is_reapable:
       if claim_id:
@@ -311,9 +311,9 @@ def _reap_task(bot_dimensions,
           raise Error('TaskRunResult unexpectedly missing on retry')
         if run_result.current_task_slice != to_run.task_slice_index:
           raise ClaimError('Obsolete')
-        return run_result, secret_bytes, result_summary, False
+        return run_result, secret_bytes, result_summary, None, False
       logging.info('%s is not reapable', result_summary.task_id)
-      return None, None, None, False
+      return None, None, None, None, False
 
     if result_summary.bot_id == bot_id:
       # This means two things, first it's a retry, second it's that the first
@@ -323,7 +323,7 @@ def _reap_task(bot_dimensions,
       # TODO(vadimsh): This should not be possible, retries were removed.
       logging.warning('%s can\'t retry its own internal failure task',
                       result_summary.task_id)
-      return None, None, None, False
+      return None, None, None, None, False
 
     to_run.consume(claim_id)
     run_result = task_result.new_run_result(request, to_run, bot_id,
@@ -350,11 +350,11 @@ def _reap_task(bot_dimensions,
                                       es_cfg,
                                       transactional=True)
       state_changed = True
-    return run_result, secret_bytes, result_summary, state_changed
+    return run_result, secret_bytes, result_summary, to_run, state_changed
 
   state_changed = False
   try:
-    run_result, secret_bytes, summary, state_changed = \
+    run_result, secret_bytes, summary, to_run, state_changed = \
       datastore_utils.transaction(run, retries=txn_retries, deadline=30)
   except datastore_utils.CommitError:
     if not txn_catch_errors:
@@ -382,6 +382,8 @@ def _reap_task(bot_dimensions,
     secret_bytes = None
   if state_changed:
     ts_mon_metrics.on_task_status_change_scheduler_latency(summary)
+  if to_run:
+    ts_mon_metrics.on_task_to_run_consumed(summary, to_run)
   return run_result, secret_bytes
 
 
