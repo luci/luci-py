@@ -327,6 +327,8 @@ def generate(classes, host, base_path):
   """
   assert classes, classes
   scheme = 'http:' if utils.is_local_dev_server() else 'https:'
+  path_version = (classes[0].api_info.path_version if hasattr(
+      classes[0].api_info, 'path_version') else classes[0].api_info.version)
   document = {
       'discoveryVersion':
       'v1',
@@ -340,11 +342,10 @@ def generate(classes, host, base_path):
           },
       },
       'basePath':
-      '%s/%s/%s' %
-      (base_path, classes[0].api_info.name, classes[0].api_info.version),
+      '%s/%s/%s' % (base_path, classes[0].api_info.name, path_version),
       'baseUrl':
-      '%s//%s%s/%s/%s' % (scheme, host, base_path, classes[0].api_info.name,
-                          classes[0].api_info.version),
+      '%s//%s%s/%s/%s' %
+      (scheme, host, base_path, classes[0].api_info.name, path_version),
       'batchPath':
       'batch',
       'icons': {
@@ -352,7 +353,7 @@ def generate(classes, host, base_path):
           'x32': 'https://www.google.com/images/icons/product/search-32.gif',
       },
       'id':
-      '%s:%s' % (classes[0].api_info.name, classes[0].api_info.version),
+      '%s:%s' % (classes[0].api_info.name, path_version),
       'kind':
       'discovery#restDescription',
       'name':
@@ -428,9 +429,9 @@ def generate(classes, host, base_path):
       'rootUrl':
       '%s//%s%s/' % (scheme, host, base_path),
       'servicePath':
-      '%s/%s/' % (classes[0].api_info.name, classes[0].api_info.version),
+      '%s/%s/' % (classes[0].api_info.name, path_version),
       'version':
-      classes[0].api_info.version,
+      path_version,
   }
   if classes[0].api_info.title:
     document['title'] = classes[0].api_info.title
@@ -476,15 +477,16 @@ def directory(classes, host, base_path):
 
   items = {}
   for service in classes:
+    path_version = (service.api_info.path_version if hasattr(
+        service.api_info, 'path_version') else service.api_info.version)
     item = {
         'discoveryLink':
-        './apis/%s/%s/rest' % (service.api_info.name, service.api_info.version),
+        './apis/%s/%s/rest' % (service.api_info.name, path_version),
         'discoveryRestUrl':
         '%s//%s%s/discovery/v1/apis/%s/%s/rest' %
-        (scheme, host, base_path, service.api_info.name,
-         service.api_info.version),
+        (scheme, host, base_path, service.api_info.name, path_version),
         'id':
-        '%s:%s' % (service.api_info.name, service.api_info.version),
+        '%s:%s' % (service.api_info.name, path_version),
         'icons': {
             'x16': 'https://www.google.com/images/icons/product/search-16.gif',
             'x32': 'https://www.google.com/images/icons/product/search-32.gif',
@@ -496,7 +498,7 @@ def directory(classes, host, base_path):
         'preferred':
         True,
         'version':
-        service.api_info.version,
+        path_version,
     }
     desc = _normalize_whitespace(service.api_info.description
                                  or service.__doc__)

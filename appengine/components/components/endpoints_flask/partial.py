@@ -224,7 +224,7 @@ def _apply(response, partial):
   Returns:
     The masked response.
   """
-  for key, value in response.items():
+  for key, value in list(response.items()):
     pointer = None
     if key in partial:
       if partial[key]:
