@@ -308,11 +308,11 @@ def explorer_proxy_route(base_path):
   def proxy_handler():
     """Returns a proxy capable of handling requests from API explorer."""
 
-    return template.render('adapter/proxy.html',
+    return template.render('endpoints_adapter/proxy.html',
                            params={'base_path': base_path})
 
   template.bootstrap({
-      'adapter': os.path.join(THIS_DIR, 'templates'),
+      'endpoints_adapter': os.path.join(THIS_DIR, 'templates'),
   })
 
   return ('%s/static/proxy.html' % base_path, 'proxy_handler', proxy_handler,
