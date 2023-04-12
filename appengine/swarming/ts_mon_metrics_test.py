@@ -243,6 +243,10 @@ class TestMetrics(test_case.TestCase):
         'bot_maintenance': 'maintenance'
     }
 
+    _gen_bot_info('rbe_bot', self.now, state={
+        'rbe_instance': 'some/inst'
+    }).put()
+
     ts_mon_metrics.set_global_metrics('jobs')
     ts_mon_metrics.set_global_metrics('executors')
 
@@ -277,6 +281,11 @@ class TestMetrics(test_case.TestCase):
       self.assertEqual(
           'bot_id:%s|os:Linux|os:Ubuntu' % bot_id,
           ts_mon_metrics._executors_pool.get(target_fields=target_fields))
+
+    self.assertEqual(
+        'some/inst',
+        ts_mon_metrics._executors_rbe.get(target_fields=dict(
+            ts_mon_metrics._TARGET_FIELDS, hostname='autogen:rbe_bot')))
 
   def test_on_task_expired(self):
     tags = [

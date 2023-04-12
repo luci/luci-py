@@ -183,6 +183,12 @@ _executors_pool = gae_ts_mon.StringMetric(
     None)
 
 
+# Global metric. Target field: hostname = 'autogen:<executor_id>' (bot id).
+_executors_rbe = gae_ts_mon.StringMetric('executors/rbe',
+                                         'RBE instance of a job executor.',
+                                         None)
+
+
 # Global metric. Target fields:
 # - hostname = 'autogen:<executor_id>' (bot id).
 # Status value must be 'ready', 'running', or anything else, possibly
@@ -380,12 +386,17 @@ def _set_executors_metrics():
       elif bot_info.state and bot_info.state.get('maintenance', False):
         status = 'maintenance'
 
+      rbe_instance = 'none'
+      if bot_info.state and 'rbe_instance' in bot_info.state:
+        rbe_instance = bot_info.state['rbe_instance']
+
       target_fields = dict(_TARGET_FIELDS)
       target_fields['hostname'] = 'autogen:' + bot_info.id
 
       _executors_status.set(status, target_fields=target_fields)
       _executors_pool.set(_pool_from_dimensions(bot_info.dimensions),
                           target_fields=target_fields)
+      _executors_rbe.set(rbe_instance, target_fields=target_fields)
 
     logging.debug('_set_executors_metrics: processed %d bots', executors_count)
 
@@ -586,6 +597,7 @@ def initialize():
   # These metrics are the ones that are reset everything they are flushed.
   gae_ts_mon.register_global_metrics([
       _executors_pool,
+      _executors_rbe,
       _executors_status,
       _jobs_active,
   ])
