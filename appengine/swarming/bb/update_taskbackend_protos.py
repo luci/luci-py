@@ -46,6 +46,8 @@ NEEDED_PROTOS = {
     'buildbucket/proto/task_pb2.py', 'buildbucket/proto/build_pb2.py',
     'buildbucket/proto/step_pb2.py', 'buildbucket/proto/field_option_pb2.py',
     'buildbucket/proto/builder_common_pb2.py',
+    'buildbucket/proto/builds_service_pb2.py',
+    'buildbucket/proto/builds_service_prpc_pb2.py',
     'buildbucket/proto/build_field_visibility_pb2.py',
     'resultdb/proto/v1/invocation_pb2.py', 'resultdb/proto/v1/common_pb2.py',
     'resultdb/proto/v1/predicate_pb2.py', 'common/proto/options_pb2.py'
@@ -59,10 +61,9 @@ def add_bb_prefix_to_import(file_path):
   was_modified = False
   for line in contents:
     if "from go.chromium.org.luci" in line:
-        line = line.replace(
-          "from go.chromium.org.luci",
-          "from bb.go.chromium.org.luci")
-        was_modified = True
+      line = line.replace("from go.chromium.org.luci",
+                          "from bb.go.chromium.org.luci")
+      was_modified = True
     updated_contents.append(line)
   if not was_modified:
     return
