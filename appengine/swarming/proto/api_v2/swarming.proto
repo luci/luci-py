@@ -929,7 +929,7 @@ message TaskRequestMetadataResponse {
 message TaskQueue {
   // Must be a list of 'key:value' strings to filter the returned list of bots
   // on.
-  repeated string dimensions = 1;
+  repeated StringPair dimensions = 1;
   google.protobuf.Timestamp valid_until_ts = 2;
 }
 
@@ -1063,7 +1063,7 @@ message BotsRequest {
 }
 
 message BotsCountRequest {
-  repeated string dimensions = 1;
+  repeated StringPair dimensions = 1;
 }
 
 message BotsDimensionsRequest {
