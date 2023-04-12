@@ -653,7 +653,7 @@ def _find_dupe_task(now, h):
   is equivalent to decreasing TaskRequest.created_ts, ordering by key works as
   well and doesn't require a composite index.
   """
-  logging.info("_find_dupe_task for properties_hash: %s", h)
+  logging.info("_find_dupe_task for properties_hash: %r", h)
   # TODO(maruel): Make a reverse map on successful task completion so this
   # becomes a simple ndb.get().
   cls = task_result.TaskResultSummary
@@ -1326,7 +1326,7 @@ def schedule_request(request,
     existing = request.key.get()
     if existing:
       return existing.txn_uuid == request.txn_uuid
-    if request.rbe_instance:
+    if to_run and request.rbe_instance:
       rbe.enqueue_rbe_task(request, to_run)
     ndb.put_multi(
         filter(bool, [
