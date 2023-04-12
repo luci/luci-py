@@ -615,3 +615,59 @@ def list_bots(filters, limit, cursor):
   except ValueError as e:
     raise handlers_exceptions.BadRequestException(
         'Inappropriate filter for tasks/list: %s' % e)
+
+
+BotsCount = namedtuple(
+    'BotCount',
+    [
+        # total number of bots.
+        'count',
+        # number of dead bots.
+        'dead',
+        # number of quarantined bots.
+        'quarantined',
+        # number of bots in maintenance.
+        'maintenance',
+        # number of non-idle bots.
+        'busy',
+    ])
+
+
+def count_bots(dimensions):
+  """Counts the number of bots in various states which match given dimensions.
+
+  Args:
+    dimensions: list of "key:value" strings.
+
+  Returns:
+    BotsCount named tuple.
+
+  Raises:
+    handlers_exceptions.BadRequestException if dimensions are invalid.
+  """
+  # Check permission.
+  # If the caller has global permission, it can access all bots.
+  # Otherwise, it requires pool dimension to check ACL.
+  pools = bot_management.get_pools_from_dimensions_flat(dimensions)
+  realms.check_bots_list_acl(pools)
+
+  q = bot_management.BotInfo.query()
+  try:
+    q = bot_management.filter_dimensions(q, dimensions)
+  except ValueError as e:
+    raise handlers_exceptions.BadRequestException(str(e))
+
+  f_count = q.count_async()
+  f_dead = bot_management.filter_availability(q, None, None, True,
+                                              None).count_async()
+  f_quarantined = bot_management.filter_availability(q, True, None, None,
+                                                     None).count_async()
+  f_maintenance = bot_management.filter_availability(q, None, True, None,
+                                                     None).count_async()
+  f_busy = bot_management.filter_availability(q, None, None, None,
+                                              True).count_async()
+  return BotsCount(count=f_count.get_result(),
+                   dead=f_dead.get_result(),
+                   quarantined=f_quarantined.get_result(),
+                   maintenance=f_maintenance.get_result(),
+                   busy=f_busy.get_result())

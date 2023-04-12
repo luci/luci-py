@@ -817,35 +817,14 @@ class SwarmingBotsService(remote.Service):
     """Counts number of bots with given dimensions."""
     logging.debug('%s', request)
 
-    # Check permission.
-    # If the caller has global permission, it can access all bots.
-    # Otherwise, it requires pool dimension to check ACL.
-    pools = bot_management.get_pools_from_dimensions_flat(request.dimensions)
-    realms.check_bots_list_acl(pools)
-
     now = utils.utcnow()
-    q = bot_management.BotInfo.query()
-    try:
-      q = bot_management.filter_dimensions(q, request.dimensions)
-    except ValueError as e:
-      raise endpoints.BadRequestException(str(e))
-
-    f_count = q.count_async()
-    f_dead = bot_management.filter_availability(
-        q, None, None, True, None).count_async()
-    f_quarantined = bot_management.filter_availability(
-        q, True, None, None, None).count_async()
-    f_maintenance = bot_management.filter_availability(
-        q, None, True, None, None).count_async()
-    f_busy = bot_management.filter_availability(
-        q, None, None, None, True).count_async()
-    return swarming_rpcs.BotsCount(
-        count=f_count.get_result(),
-        quarantined=f_quarantined.get_result(),
-        maintenance=f_maintenance.get_result(),
-        dead=f_dead.get_result(),
-        busy=f_busy.get_result(),
-        now=now)
+    bc = api_common.count_bots(request.dimensions)
+    return swarming_rpcs.BotsCount(count=bc.count,
+                                   quarantined=bc.quarantined,
+                                   maintenance=bc.maintenance,
+                                   dead=bc.dead,
+                                   busy=bc.busy,
+                                   now=now)
 
   @endpoint(BotsDimensionsRequest,
             swarming_rpcs.BotsDimensions,
