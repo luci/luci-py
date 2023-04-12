@@ -388,7 +388,7 @@ def _set_executors_metrics():
 
       rbe_instance = 'none'
       if bot_info.state and 'rbe_instance' in bot_info.state:
-        rbe_instance = bot_info.state['rbe_instance']
+        rbe_instance = bot_info.state['rbe_instance'] or 'none'
 
       target_fields = dict(_TARGET_FIELDS)
       target_fields['hostname'] = 'autogen:' + bot_info.id
