@@ -936,6 +936,128 @@ class BotServicePrpcTest(PrpcTest):
     _verify(items=[bot1, bot2],
             dimensions=[swarming_pb2.StringPair(key='id', value='id1|id2')])
 
+  def test_count_ok(self):
+    self.set_as_privileged_user()
+    then = datetime.datetime(2009, 1, 2, 3, 4, 5)
+    self.mock_now(then)
+    _bot_event('request_sleep', bot_id='id3', quarantined=True)
+    self.mock_now(self.now)
+    _bot_event('request_task', bot_id='id1', task_id='987')
+    _bot_event('request_sleep', bot_id='id2', quarantined=True)
+    _bot_event('request_sleep', bot_id='id4', maintenance_msg='very busy')
+
+    def _verify(dimensions,
+                count=0,
+                quarantined=0,
+                maintenance=0,
+                dead=0,
+                busy=0):
+      request = swarming_pb2.BotsCountRequest(dimensions=dimensions)
+      resp = self.post_prpc('CountBots', request)
+      actual = swarming_pb2.BotsCount()
+      _decode(resp.body, actual)
+      self.assertEqual(count, actual.count)
+      self.assertEqual(quarantined, actual.quarantined)
+      self.assertEqual(maintenance, actual.maintenance)
+      self.assertEqual(dead, actual.dead)
+      self.assertEqual(busy, actual.busy)
+
+    _verify(dimensions=[],
+            count=4,
+            quarantined=2,
+            maintenance=1,
+            dead=0,
+            busy=4)
+    self.assertEqual(1, bot_management.cron_update_bot_info())
+    _verify(dimensions=[],
+            count=4,
+            quarantined=2,
+            maintenance=1,
+            dead=1,
+            busy=4)
+    _verify(dimensions=[
+        swarming_pb2.StringPair(key='pool', value='default'),
+        swarming_pb2.StringPair(key='id', value='id1')
+    ],
+            count=1,
+            busy=1)
+    _verify(dimensions=[swarming_pb2.StringPair(key='id', value='id1|id2')],
+            count=2,
+            quarantined=1,
+            maintenance=0,
+            dead=0,
+            busy=2)
+    _verify(dimensions=[
+        swarming_pb2.StringPair(key='pool', value='default'),
+        swarming_pb2.StringPair(key='id', value='id3')
+    ],
+            count=1,
+            quarantined=1,
+            dead=1,
+            busy=1)
+    _verify(dimensions=[
+        swarming_pb2.StringPair(key='pool', value='default'),
+        swarming_pb2.StringPair(key='id', value='id4')
+    ],
+            busy=1,
+            maintenance=1,
+            count=1)
+    _verify(dimensions=[swarming_pb2.StringPair(key='non', value='existing')])
+
+  def test_count_bad_request(self):
+    self.set_as_privileged_user()
+
+    request = swarming_pb2.BotsCountRequest(
+        dimensions=[swarming_pb2.StringPair(key='a', value='')])
+    resp = self.post_prpc('CountBots', request, expect_errors=True)
+    self.assertEqual(resp.status, '400 Bad Request')
+
+  @parameterized.expand([
+      ('ListBots', swarming_pb2.BotsRequest(limit=10)),
+      ('CountBots', swarming_pb2.BotsCountRequest()),
+  ])
+  def test_ok_realm(self, rpc, request):
+    # non-privileged user, with realm permission.
+    self.set_as_user()
+    self.mock_auth_db([auth.Permission('swarming.pools.listBots')])
+    request.dimensions.extend(
+        [swarming_pb2.StringPair(key='pool', value='default')])
+    self.post_prpc(rpc, request)
+
+  @parameterized.expand([
+      ('ListBots', swarming_pb2.BotsRequest(limit=10)),
+      ('CountBots', swarming_pb2.BotsCountRequest()),
+  ])
+  def test_forbidden_realm(self, rpc, request):
+    # non-privileged user, with no permissions.
+    self.mock_auth_db([])
+    self.set_as_user()
+
+    # the user needs to specify a pool dimension.
+    resp = self.post_prpc(rpc, request, expect_errors=True)
+    self.assertEqual(resp.status, '403 Forbidden')
+
+    # the user needs to have permissions of the requested pools.
+    request.dimensions.extend(
+        [swarming_pb2.StringPair(key='pool', value='default')])
+    response = self.post_prpc(rpc, request, expect_errors=True)
+    self.assertEqual(resp.status, '403 Forbidden')
+    expected = cgi.escape(
+        'user "user@example.com" does not have permission '
+        '"swarming.pools.listBots"',
+        quote=True)
+    self.assertEqual(expected, response.body)
+
+    # the user needs to specify known pools.
+    request.ClearField('dimensions')
+    request.dimensions.extend(
+        [swarming_pb2.StringPair(key='pool', value='unknown')])
+    response = self.post_prpc(rpc, request, expect_errors=True)
+    self.assertEqual(resp.status, '403 Forbidden')
+    expected = cgi.escape('No such pool or no permission to use it: unknown',
+                          quote=True)
+    self.assertEqual(expected, response.body)
+
 
 class TaskServicePrpcTest(PrpcTest):
   def setUp(self):

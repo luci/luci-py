@@ -169,6 +169,23 @@ class BotsService(object):
         bots,
         config.settings().bot_death_timeout_secs, cursor)
 
+  @prpc_helpers.method
+  @auth.require(acl.can_access, log_identity=True)
+  def CountBots(self, request, _context):
+    dimensions = [
+        "%s:%s" % (pair.key, pair.value) for pair in request.dimensions
+    ]
+    bc = api_common.count_bots(dimensions)
+    out = swarming_pb2.BotsCount(
+        count=bc.count,
+        quarantined=bc.quarantined,
+        maintenance=bc.maintenance,
+        dead=bc.dead,
+        busy=bc.busy,
+    )
+    out.now.GetCurrentTime()
+    return out
+
 
 class TasksService(object):
   """Module implements the Tasks service defined in proto/api_v2/swarming.proto
