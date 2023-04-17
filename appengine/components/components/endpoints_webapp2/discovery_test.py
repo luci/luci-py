@@ -12,6 +12,10 @@ test_env.setup_test_env()
 from protorpc import message_types
 from protorpc import messages
 from protorpc import remote
+
+from components import utils
+
+utils.ensure_endpoints_on_path()
 import endpoints
 
 from test_support import test_case

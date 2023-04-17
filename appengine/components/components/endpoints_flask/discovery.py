@@ -5,6 +5,9 @@
 
 import re
 
+from components import utils
+
+utils.ensure_endpoints_on_path()
 import endpoints
 
 from protorpc import message_types

@@ -15,6 +15,10 @@ from google.appengine.api import datastore_errors
 from google.appengine.api import memcache
 from google.appengine.ext import ndb
 
+from components import utils
+
+utils.ensure_endpoints_on_path()
+
 import endpoints
 import gae_ts_mon
 from protorpc import messages

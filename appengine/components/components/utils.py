@@ -865,6 +865,44 @@ def import_jinja2():
   sys.path.append(os.path.join(THIS_DIR, 'third_party'))
 
 
+def ensure_endpoints_on_path():
+  """Makes sure that the correct 3rd party endpoints library will be loaded.
+
+  First checks to see whether endpoints can be imported, implying that it is
+  present on the sys.path already. appengine legacy will still vendor a
+  version of the endpoints library.
+
+  If the module import fails, add endpoints version for python2 or one for
+  python3 depending on which version of python we are using.
+
+  This assumes that the endpoints module is available with the following
+  directory structure:
+
+  - luci/appengine/components/components/third_party/endpoints
+    - 2/endpoints/
+    - 3/endpoints/
+
+  Where 2/endpoints contains the python2 version of endpoints
+  and 3/endpoints contains a newer python3 version.
+
+  """
+  # check whether we can already from endpoints as it may be provided
+  # by the appengine runtime environment.
+  # It probably will not be present during testing.
+  try:
+    import endpoints
+    return
+  except ImportError:
+    logging.info("endpoints module not found, adding vendored enpoints to path")
+  version = '2'
+  if sys.version_info.major != 2:
+    version = '3'
+  endpoints_path = os.path.join(THIS_DIR, 'third_party', 'endpoints', version)
+  sys.path.insert(0, endpoints_path)
+
+
+
+
 # NDB Futures
 
 

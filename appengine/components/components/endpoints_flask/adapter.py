@@ -3,6 +3,9 @@
 # that can be found in the LICENSE file.
 
 import collections
+from components import utils
+
+utils.ensure_endpoints_on_path()
 import endpoints
 from six.moves import http_client
 import json

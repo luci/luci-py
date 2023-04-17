@@ -10,14 +10,13 @@ export a portion of public API by specifying exported symbols in its __all__.
 
 from .version import __version__
 
-try:
-  import endpoints
-except ImportError:
-  endpoints = None
+from components import utils
+
+utils.ensure_endpoints_on_path()
+import endpoints
 
 # Auth component is using google.protobuf package, it requires some python
 # package magic hacking.
-from components import utils
 utils.fix_protobuf_package()
 
 from api import *
@@ -34,11 +33,8 @@ from signature import *
 from tokens import *
 from ui.app import *
 
-# Endpoints support is optional, enabled only when endpoints library is
-# specified in app.yaml.
-if endpoints:
-  from endpoints_support import *
-  from ui.endpoints_api import AuthService
+from endpoints_support import *
+from ui.endpoints_api import AuthService
 
 # Import 'config' to register lib_config hook.
 import config

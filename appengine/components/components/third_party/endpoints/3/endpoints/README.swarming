@@ -1,0 +1,40 @@
+Short Name: endpoints
+URL: https://github.com/cloudendpoints/endpoints-python
+Version: 4.8.0
+License: Apache 2.0
+License File: LICENSE.txt
+Security Critical: no
+Description:
+Google Cloud Endpoints is a solution for creating RESTful web APIs.
+Local Modifications:
+1. Retain only the endpoints/ directory and LICENSE.txt file.
+
+2. Remove dependency on semver and move endpoints_management and
+   protorpc.wsgi imports into the functions where they're being used.
+   Diff: https://crrev.com/c/4262198
+
+3. Update files for Python 3.
+   Diff: https://crrev.com/c/4262201
+
+   Syntax changes:
+   * except Exception, e: --> except Exception as e:
+
+   Import moves:
+   * import cStringIO --> from six.moves import cStringIO
+   * import httplib --> from six.moves import http_client
+   * import urllib --> from six.moves import urllib
+   * import urlparse --> from six.moves import urllib
+
+   String changes:
+   * basestring --> six.string_types
+   * if isinstance(s, unicode): s = s.encode() -> s = six.ensure_str(s)
+   * s.encode('ascii') --> six.ensure_binary(s, 'ascii')
+   * s.encode('hex') --> binascii.hexlify(s)
+
+   Integer changes:
+   * long() --> int()
+
+   Iterator changes:
+   * iteritems() --> items()
+   * iterkeys() -> keys()
+   * itervalues() --> values()
