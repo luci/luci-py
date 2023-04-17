@@ -7,5 +7,8 @@
 Used when 'auth' component is included via app.yaml includes.
 """
 
+from components import utils
+utils.import_third_party()
+
 from .ui import app
 APP = app.create_wsgi_application()

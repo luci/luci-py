@@ -4,5 +4,6 @@
 
 components_ereporter2_RECIPIENTS_AUTH_GROUP = 'config-ereporter2-reports'
 
-from components.utils import fix_protobuf_package
-fix_protobuf_package()
+from components import utils
+utils.import_third_party()
+utils.fix_protobuf_package()

@@ -11,6 +11,7 @@ a backend module, it must be included there.
 import webapp2
 
 from components import utils
+utils.import_third_party()
 
 from . import handlers
 

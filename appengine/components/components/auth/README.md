@@ -30,8 +30,8 @@ libraries:
   - Add to your `main.py`:
 
 ```
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, os.path.join(BASE_DIR, 'components', 'third_party'))
+from components import utils
+utils.import_third_party()
 ```
 
   - In your `acl.py`, implement your group ACL implementation by leveraging

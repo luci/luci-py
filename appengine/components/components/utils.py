@@ -849,9 +849,17 @@ def fix_protobuf_package():
   google.__path__.append(path)
 
   # six is needed for oauth2client and webtest (local testing).
+  # TODO(vadimsh): What do they have to do with protobuf?
   six_path = os.path.join(THIS_DIR, 'third_party', 'six')
   if six_path not in sys.path:
     sys.path.insert(0, six_path)
+
+
+def import_third_party():
+  """Adds vendored third party packages to sys.path."""
+  third_party = os.path.join(THIS_DIR, 'third_party')
+  if third_party not in sys.path:
+    sys.path.insert(0, third_party)
 
 
 def import_jinja2():
@@ -862,7 +870,7 @@ def import_jinja2():
   for i in sys.path[:]:
     if os.path.basename(i) == 'jinja2':
       sys.path.remove(i)
-  sys.path.append(os.path.join(THIS_DIR, 'third_party'))
+  import_third_party()
 
 
 # NDB Futures

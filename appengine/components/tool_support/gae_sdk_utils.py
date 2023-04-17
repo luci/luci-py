@@ -367,9 +367,12 @@ def setup_gae_sdk(sdk_path):
 
   import dev_appserver
   dev_appserver.fix_sys_path()
-  for i in sys.path[:]:
-    if 'jinja2-2.6' in i:
-      sys.path.remove(i)
+
+  # These packages are not actually available on real GAE, but dev_appserver
+  # still includes them. Remove them to make sure unit tests use an environment
+  # similar to the real one.
+  kick_out = {'endpoints-1.0', 'jinja2-2.6'}
+  sys.path = [p for p in sys.path if not any(x in p for x in kick_out)]
 
   # Make 'yaml' variable (defined on top of this module) point to loaded module.
   global yaml

@@ -15,4 +15,5 @@ components_auth_BACKEND_MODULE = 'backend'
 components_auth_PROCESS_CHANGE_TASK_QUEUE = 'process-auth-db-change'
 
 from components import utils
+utils.import_third_party()
 utils.fix_protobuf_package()

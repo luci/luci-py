@@ -9,6 +9,10 @@ https://developers.google.com/appengine/docs/python/tools/appengineconfig
 
 import os
 
+from components import utils
+utils.import_third_party()
+utils.fix_protobuf_package()
+
 from server import config
 
 

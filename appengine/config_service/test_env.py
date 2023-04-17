@@ -10,21 +10,12 @@ import unittest
 
 # config/
 APP_DIR = os.path.dirname(os.path.realpath(os.path.abspath(__file__)))
-# config/components/third_party
-THIRD_PARTY = os.path.join(APP_DIR, 'components', 'third_party')
 
 
 def setup_test_env():
   """Sets up App Engine test environment."""
-  sys.path.insert(0, APP_DIR)
-
   from test_support import test_env
-  test_env.setup_test_env()
-
-  sys.path.insert(0, THIRD_PARTY)
-
-  from components import utils
-  utils.fix_protobuf_package()
+  test_env.setup_test_env(APP_DIR)
 
 
 def main():

@@ -14,14 +14,13 @@ import sys
 
 import webapp2
 
-APP_DIR = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, os.path.join(APP_DIR, 'components', 'third_party'))
+from components import utils
+utils.import_third_party()
 
 from google.appengine.ext import ndb
 
 from components import endpoints_webapp2
 from components import ereporter2
-from components import utils
 
 import gae_ts_mon
 
