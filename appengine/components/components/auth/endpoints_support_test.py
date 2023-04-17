@@ -9,9 +9,7 @@ import unittest
 
 from test_support import test_env
 test_env.setup_test_env()
-from components import utils
 
-utils.ensure_endpoints_on_path()
 import endpoints
 from protorpc import message_types
 from protorpc import messages

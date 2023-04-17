@@ -13,6 +13,8 @@ from parameterized import parameterized
 import test_env
 test_env.setup_test_env()
 
+import endpoints
+
 from components import auth
 from components import utils
 from test_support import test_case

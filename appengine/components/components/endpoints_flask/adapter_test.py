@@ -12,9 +12,6 @@ import unittest
 
 from protorpc import messages
 from protorpc import remote
-from components import utils
-
-utils.ensure_endpoints_on_path()
 import endpoints
 import flask
 import mock
