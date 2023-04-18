@@ -2217,6 +2217,84 @@ class TaskServicePrpcTest(PrpcTest):
     _decode(resp.body, actual)
     self.assertEqual(expected.items, actual.items)
 
+  def test_count_indexes(self):
+    # Asserts that no combination crashes.
+    _, _, _, start, end = self._gen_two_tasks()
+    self.set_as_privileged_user()
+    for state in swarming_pb2.StateQuery.DESCRIPTOR.values_by_number:
+      for tags in ([], ['a:1'], ['a:1', 'b:2']):
+        request = swarming_pb2.TasksCountRequest(
+            start=start,
+            end=end,
+            state=state,
+            tags=tags,
+        )
+        self.post_prpc('CountTasks', request)
+
+  @parameterized.expand([
+      ('ListTasks', swarming_pb2.TasksRequest(limit=10)),
+      ('CountTasks', swarming_pb2.TasksCountRequest()),
+  ])
+  def test_realm_permissions_count(self, rpc, request):
+    # non-privileged user without realm permission.
+    self.set_as_user()
+    self.mock_auth_db([])
+    start = self.now - datetime.timedelta(days=1)
+
+    # the user needs to specify a pool filter.
+    request.start.FromDatetime(start)
+    expected = cgi.escape('No pool is specified', quote=True)
+    response = self.post_prpc(rpc, request, expect_errors=True)
+    self.assertEqual(expected, response.body)
+
+    # the user can't access the tasks without permission.
+    request.tags.extend(['pool:default'])
+    expected = cgi.escape(
+        'user "user@example.com" does not have '
+        'permission "swarming.pools.listTasks"',
+        quote=True)
+    response = self.post_prpc(rpc, request, expect_errors=True)
+    self.assertEqual(expected, response.body)
+
+    # give permission to the user.
+    self.mock_auth_db([auth.Permission('swarming.pools.listTasks')])
+    response = self.post_prpc(rpc, request)
+
+  def test_count(self):
+    _, _, _, the_start, the_end = self._gen_two_tasks()
+    self.set_as_privileged_user()
+
+    def _verify(count,
+                state=swarming_pb2.QUERY_COMPLETED_SUCCESS,
+                tags=None,
+                start=None,
+                end=None):
+      if start is None:
+        start = the_start
+      if end is None:
+        end = the_end
+      if tags is None:
+        tags = []
+      request = swarming_pb2.TasksCountRequest(
+          start=start,
+          end=end,
+          tags=tags,
+          state=state,
+      )
+      actual = swarming_pb2.TasksCount()
+      response = self.post_prpc('CountTasks', request)
+      _decode(response.body, actual)
+      self.assertEqual(count, actual.count)
+
+    _verify(2)
+    _verify(1, tags=['commit:pre'])
+    _verify(0, state=swarming_pb2.QUERY_PENDING)
+    new_start = message_conversion_prpc.date(
+        the_start.ToDatetime() + datetime.timedelta(days=5), )
+    new_end = message_conversion_prpc.date(
+        the_end.ToDatetime() + datetime.timedelta(days=10), )
+    _verify(0, start=new_start, end=new_end)
+
 
 class InternalsServicePrpcTest(PrpcTest):
   def setUp(self):

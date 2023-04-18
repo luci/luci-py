@@ -13,16 +13,17 @@ from google.protobuf import empty_pb2
 from components import auth
 from components import ereporter2
 from components import prpc
+from components import utils
 from proto.api_v2 import swarming_pb2
 from proto.api_v2 import swarming_prpc_pb2
 from proto.internals import rbe_pb2
 from proto.internals import rbe_prpc_pb2
 from server import acl
 from server import config
-from server import realms
 from server import task_result
 from server import task_scheduler
 from server import task_to_run
+
 import api_common
 import message_conversion_prpc
 import prpc_helpers
@@ -271,6 +272,26 @@ class TasksService(object):
                                                  request.limit)
     return message_conversion_prpc.task_list_response(
         items, cursor, request.include_performance_stats)
+
+  @prpc_helpers.method
+  @auth.require(acl.can_access, log_identity=True)
+  def CountTasks(self, request, _context):
+    now = utils.utcnow()
+    start, end = _get_start_and_end_dates(request)
+    state = _STATE_MAP.get(request.state)
+    sort = 'created_ts'
+    trf = api_common.TaskFilters(
+        start=start,
+        end=end,
+        state=state,
+        sort=sort,
+        tags=request.tags,
+    )
+    count = api_common.count_tasks(trf, now)
+    return swarming_pb2.TasksCount(
+        count=count,
+        now=message_conversion_prpc.date(now),
+    )
 
 
 class InternalsService(object):
