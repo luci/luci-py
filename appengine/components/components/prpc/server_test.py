@@ -536,7 +536,7 @@ class InterceptorsTestCase(test_case.TestCase):
         return cont(request, context, details)
       except Error as exc:
         context.set_code(server_base.StatusCode.PERMISSION_DENIED)
-        context.set_details(exc.message)
+        context.set_details(str(exc))
 
     def inner(request, context, details, cont):
       raise Error('FAIL')

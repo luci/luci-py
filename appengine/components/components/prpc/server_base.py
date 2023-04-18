@@ -175,7 +175,7 @@ class ServerBase(object):
     except ValueError as e:
       logging.warning('Error parsing headers: %s', e)
       context.set_code(StatusCode.INVALID_ARGUMENT)
-      context.set_details(e.message)
+      context.set_details(str(e))
       return None
 
     if service not in self._services:
@@ -202,7 +202,7 @@ class ServerBase(object):
     except Exception as e:
       logging.warning('Failed to decode request: %s', e, exc_info=True)
       context.set_code(StatusCode.INVALID_ARGUMENT)
-      context.set_details('Error parsing request: %s' % e.message)
+      context.set_details('Error parsing request: %s' % str(e))
       return None
 
     context._timeout = parsed_headers.timeout

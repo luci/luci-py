@@ -159,7 +159,7 @@ def rpc_async(req, response_metadata=None):
     # such cases.
     if 'X-Prpc-Grpc-Code' not in ex.headers:
       if ex.status_code is None:
-        raise RpcError(ex.message, codes.StatusCode.UNAVAILABLE, {})
+        raise RpcError(str(ex), codes.StatusCode.UNAVAILABLE, {})
       if ex.status_code == 500:
         raise RpcError(msg, codes.StatusCode.INTERNAL, ex.headers)
       if ex.status_code == 503:
@@ -181,7 +181,7 @@ def rpc_async(req, response_metadata=None):
   try:
     encoding.decode_bin_metadata(response_metadata)
   except ValueError as ve:
-    raise ProtocolError(ve.message)
+    raise ProtocolError(str(ve))
   raise ndb.Return(res)
 
 
