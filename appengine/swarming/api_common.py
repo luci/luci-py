@@ -8,6 +8,7 @@ from collections import namedtuple
 
 from google.appengine.api import datastore_errors
 from google.appengine.ext import ndb
+from google.appengine.api import memcache
 
 import api_helpers
 import handlers_exceptions
@@ -671,3 +672,50 @@ def count_bots(dimensions):
                    quarantined=f_quarantined.get_result(),
                    maintenance=f_maintenance.get_result(),
                    busy=f_busy.get_result())
+
+
+def _memcache_key(filters, now):
+  # Floor now to minute to account for empty "end"
+  end = filters.end or now.replace(second=0, microsecond=0)
+  filters.tags.sort()
+  return '%s|%s|%s|%s' % (filters.tags, filters.state, filters.start, end)
+
+
+def count_tasks(filters, now):
+  """Counts number of tasks which match the filter.
+  Operation creates a cache of the count matching the filters.
+  Args:
+    filters: A TaskFilters object.
+    now: datetime.datetime object representing current time. Used
+      to create cache key.
+
+  Returns:
+    int matching the number of filters.
+
+  Raises:
+    handlers_exceptions.BadRequestException if invalid filter is provided.
+  """
+  # Check permission.
+  # If the caller has global permission, it can access all tasks.
+  # Otherwise, it requires pool dimension to check ACL.
+  pools = bot_management.get_pools_from_dimensions_flat(filters.tags)
+  realms.check_tasks_list_acl(pools)
+
+  if not filters.start:
+    raise handlers_exceptions.BadRequestException(
+        'start (as epoch) is required')
+  now = utils.utcnow()
+  mem_key = _memcache_key(filters, now)
+  count = memcache.get(mem_key, namespace='tasks_count')
+  if count is not None:
+    return count
+
+  try:
+    count = task_result.get_result_summaries_query(filters.start, filters.end,
+                                                   filters.sort, filters.state,
+                                                   filters.tags).count()
+    memcache.add(mem_key, count, 24 * 60 * 60, namespace='tasks_count')
+  except ValueError as e:
+    raise handlers_exceptions.BadRequestException(
+        'Inappropriate filter for tasks/count: %s' % e)
+  return count

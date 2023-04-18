@@ -500,37 +500,11 @@ class SwarmingTasksService(remote.Service):
   def count(self, request):
     """Counts number of tasks in a given state."""
     logging.debug('%s', request)
-
-    # Check permission.
-    # If the caller has global permission, it can access all tasks.
-    # Otherwise, it requires pool dimension to check ACL.
-    pools = bot_management.get_pools_from_dimensions_flat(request.tags)
-    realms.check_tasks_list_acl(pools)
-
-    if not request.start:
-      raise endpoints.BadRequestException('start (as epoch) is required')
     now = utils.utcnow()
-    mem_key = self._memcache_key(request, now)
-    count = memcache.get(mem_key, namespace='tasks_count')
-    if count is not None:
-      return swarming_rpcs.TasksCount(count=count, now=now)
-
-    try:
-      rsf = self._query_from_request(request, 'created_ts')
-      count = task_result.get_result_summaries_query(rsf.start, rsf.end,
-                                                     rsf.sort, rsf.state,
-                                                     rsf.tags).count()
-      memcache.add(mem_key, count, 24*60*60, namespace='tasks_count')
-    except ValueError as e:
-      raise endpoints.BadRequestException(
-          'Inappropriate filter for tasks/count: %s' % e)
+    trf = self._query_from_request(request, 'created_ts')
+    count = api_common.count_tasks(trf, now)
     return swarming_rpcs.TasksCount(count=count, now=now)
 
-  def _memcache_key(self, request, now):
-    # Floor now to minute to account for empty "end"
-    end = request.end or now.replace(second=0, microsecond=0)
-    request.tags.sort()
-    return '%s|%s|%s|%s' % (request.tags, request.state, request.start, end)
 
   def _query_from_request(self, request, sort=None):
     """Returns api_common.TaskFilters object."""
