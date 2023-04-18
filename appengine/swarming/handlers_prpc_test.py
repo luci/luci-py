@@ -2150,7 +2150,7 @@ class TaskServicePrpcTest(PrpcTest):
     first, second, now_120, start, end = self._gen_two_tasks()
     # Basic request. Default sort is CREATED_TS
     self.set_as_privileged_user()
-    request = swarming_pb2.TasksRequest(limit=100,
+    request = swarming_pb2.TasksWithPerfRequest(limit=100,
                                         start=start,
                                         end=end,
                                         state=swarming_pb2.QUERY_COMPLETED,
@@ -2164,7 +2164,7 @@ class TaskServicePrpcTest(PrpcTest):
     self.assertEqual(expected.items, actual.items)
 
     # Only return the second with specific tags
-    request = swarming_pb2.TasksRequest(limit=100,
+    request = swarming_pb2.TasksWithPerfRequest(limit=100,
                                         start=start,
                                         end=end,
                                         state=swarming_pb2.QUERY_COMPLETED,
@@ -2177,7 +2177,7 @@ class TaskServicePrpcTest(PrpcTest):
     self.assertEqual(expected.items, actual.items)
 
     # Return both since or tags are used
-    request = swarming_pb2.TasksRequest(
+    request = swarming_pb2.TasksWithPerfRequest(
         limit=100,
         end=end,
         start=start,
@@ -2192,7 +2192,7 @@ class TaskServicePrpcTest(PrpcTest):
     _decode(resp.body, actual)
     self.assertEqual(expected.items, actual.items)
 
-    request = swarming_pb2.TasksRequest(
+    request = swarming_pb2.TasksWithPerfRequest(
         limit=100,
         state=swarming_pb2.QUERY_COMPLETED,
         end=end,
@@ -2205,7 +2205,7 @@ class TaskServicePrpcTest(PrpcTest):
     self.assertEqual(0, len(actual.items))
 
     # Both state and tag.
-    request = swarming_pb2.TasksRequest(
+    request = swarming_pb2.TasksWithPerfRequest(
         limit=100,
         end=end,
         start=start,
@@ -2232,7 +2232,7 @@ class TaskServicePrpcTest(PrpcTest):
         self.post_prpc('CountTasks', request)
 
   @parameterized.expand([
-      ('ListTasks', swarming_pb2.TasksRequest(limit=10)),
+      ('ListTasks', swarming_pb2.TasksWithPerfRequest(limit=10)),
       ('CountTasks', swarming_pb2.TasksCountRequest()),
   ])
   def test_realm_permissions_count(self, rpc, request):
