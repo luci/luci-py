@@ -352,6 +352,10 @@ def _reap_task(bot_dimensions,
       state_changed = True
     return run_result, secret_bytes, result_summary, to_run, state_changed
 
+  run_result = None
+  secret_bytes = None
+  summary = None
+  to_run = None
   state_changed = False
   try:
     run_result, secret_bytes, summary, to_run, state_changed = \
@@ -376,10 +380,9 @@ def _reap_task(bot_dimensions,
     # and the index becomes stale, it means the DB is *already* not in good
     # shape, so it is preferable to not put more stress on it, and skipping a
     # few tasks for 15s may even actively help the DB to stabilize.
-    logging.info('CommitError; reaping failed')
+    #
     # The bot will reap the next available task in case of failure, no big deal.
-    run_result = None
-    secret_bytes = None
+    logging.info('CommitError; reaping failed')
   if state_changed:
     ts_mon_metrics.on_task_status_change_scheduler_latency(summary)
   if to_run:
@@ -2013,7 +2016,7 @@ def cron_handle_bot_died():
   futures = []
 
   def _handle_future(f):
-    key = None
+    key, state_changed, latency, tags = None, False, None, None
     try:
       key, state_changed, latency, tags = f.get_result()
     except datastore_utils.CommitError as e:
