@@ -445,29 +445,11 @@ class SwarmingTasksService(remote.Service):
           'Can\'t set include_performance_stats for tasks/list')
     now = utils.utcnow()
     try:
-      # Get the TaskResultSummary keys, then fetch the corresponding
-      # TaskRequest entities.
       rsf = self._query_from_request(request)
-      query = task_result.get_result_summaries_query(rsf.start, rsf.end,
-                                                     rsf.sort, rsf.state,
-                                                     rsf.tags)
-      keys, cursor = datastore_utils.fetch_page(query,
-                                                request.limit,
-                                                request.cursor,
-                                                keys_only=True)
-      items = ndb.get_multi(
-          task_pack.result_summary_key_to_request_key(k) for k in keys)
     except ValueError as e:
-      raise endpoints.BadRequestException(
-          'Inappropriate filter for tasks/requests: %s' % e)
-    except datastore_errors.NeedIndexError as e:
-      logging.error('%s', e)
-      raise endpoints.BadRequestException(
-          'Requires new index, ask admin to create one.')
-    except datastore_errors.BadArgumentError as e:
-      logging.error('%s', e)
-      raise endpoints.BadRequestException(
-          'This combination is unsupported, sorry.')
+      raise endpoints.BadRequestException("invalid datetime values %s" % str(e))
+    items, cursor = api_common.list_task_requests_no_realm_check(
+        rsf, request.limit, request.cursor)
     return swarming_rpcs.TaskRequests(
         cursor=cursor,
         items=[message_conversion.task_request_to_rpc(i) for i in items],

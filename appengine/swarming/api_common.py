@@ -719,3 +719,47 @@ def count_tasks(filters, now):
     raise handlers_exceptions.BadRequestException(
         'Inappropriate filter for tasks/count: %s' % e)
   return count
+
+
+def list_task_requests_no_realm_check(filters, limit, cursor):
+  """Returns a list of task_request.TaskRequest items.
+
+  This method does NOT perform a realm check. The original endpoints method
+  allows consumers of the api to query for TaskRequests accross all realms
+  as long as they are part a more restrictive `can_view_all_tasks` acl.
+
+  Args:
+    filters: TaskFilters named tuple.
+    limit: number of items to return.
+    cursor: cursoro from previous request.
+
+  Returns:
+    list of task requests.
+
+  Raises:
+    handlers_exceptions.BadRequestException if invalid filter is provided.
+  """
+  try:
+    # Get the TaskResultSummary keys, then fetch the corresponding
+    # TaskRequest entities.
+    query = task_result.get_result_summaries_query(filters.start, filters.end,
+                                                   filters.sort, filters.state,
+                                                   filters.tags)
+    keys, cursor = datastore_utils.fetch_page(query,
+                                              limit,
+                                              cursor,
+                                              keys_only=True)
+    items = ndb.get_multi(
+        task_pack.result_summary_key_to_request_key(k) for k in keys)
+    return items, cursor
+  except ValueError as e:
+    raise handlers_exceptions.BadRequestException(
+        'Inappropriate filter for tasks/requests: %s' % e)
+  except datastore_errors.NeedIndexError as e:
+    logging.error('%s', e)
+    raise handlers_exceptions.BadRequestException(
+        'Requires new index, ask admin to create one.')
+  except datastore_errors.BadArgumentError as e:
+    logging.error('%s', e)
+    raise handlers_exceptions.BadRequestException(
+        'This combination is unsupported, sorry.')
