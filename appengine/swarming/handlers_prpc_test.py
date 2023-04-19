@@ -2295,6 +2295,97 @@ class TaskServicePrpcTest(PrpcTest):
         the_end.ToDatetime() + datetime.timedelta(days=10), )
     _verify(0, start=new_start, end=new_end)
 
+  def test_list_request(self):
+    self.mock_now(self.now)
+    self.mock(random, 'getrandbits', lambda _: 0x88)
+    names = ["foo", "bar", "baz"]
+    unique_tags = ["a:1", "b:2", "c:3"]
+    expected_requests = []
+    ntrs = []
+    ticker = test_case.Ticker(self.now, datetime.timedelta(seconds=60))
+    times = [ticker()]
+    for name, tag in zip(names, unique_tags):
+      tags = ['project:yay', 'commit:post', 'pool:default', tag]
+      ntr = self._new_task_request(use_default_slice=True)
+      ntr.name = name
+      ntr.tags[:] = tags
+      ntrs.append(ntr)
+      expected = swarming_pb2.TaskRequestResponse()
+      expected.properties.CopyFrom(ntr.task_slices[0].properties)
+      all_tags = sorted(tags + [
+          "priority:20",
+          "os:Amiga",
+          "realm:none",
+          "service_account:none",
+          "swarming.pool.template:none",
+          "swarming.pool.version:pools_cfg_rev",
+          "authenticated:user:priv@example.com",
+          "user:" + ntr.user,
+      ])
+
+      expected.tags[:] = all_tags
+      expected.task_slices.extend(ntr.task_slices)
+      expected.resultdb.CopyFrom(swarming_pb2.ResultDBCfg())
+      expected.name = name
+      expected.service_account = "none"
+      expected.user = ntr.user
+      expected.priority = ntr.priority
+      expected.authenticated = "user:priv@example.com"
+      expected.expiration_secs = ntr.task_slices[0].expiration_secs
+      expected.bot_ping_tolerance_secs = ntr.bot_ping_tolerance_secs
+      expected_requests.append(expected)
+
+    self.set_as_privileged_user()
+    _, first_id = self._client_create_task(ntrs[0])
+    expected_requests[0].created_ts.FromDatetime(self.now)
+    expected_requests[0].task_id = first_id
+    times.append(ticker())
+    self.mock_now(times[-1])
+    self.set_as_bot()
+    self.bot_poll()
+    self.bot_run_task()
+    self.set_as_privileged_user()
+
+    for i in range(1, len(ntrs)):
+      times.append(ticker())
+      self.mock_now(times[-1])
+      _, task_id = self._client_create_task(ntrs[i])
+      expected_requests[i].task_id = task_id
+      expected_requests[i].created_ts.FromDatetime(times[-1])
+
+    def _verify(present,
+                start=None,
+                end=None,
+                state=swarming_pb2.QUERY_ALL,
+                sort=swarming_pb2.QUERY_CREATED_TS,
+                tags=None,
+                timeoffset=None):
+      if timeoffset is None:
+        timeoffset = datetime.timedelta(seconds=1)
+      if start is None:
+        start = times[0] - timeoffset
+      if end is None:
+        end = times[-1] + timeoffset
+      if tags is None:
+        tags = []
+      request = swarming_pb2.TasksRequest(limit=10,
+                                          state=state,
+                                          sort=sort,
+                                          tags=tags)
+      request.start.FromDatetime(start)
+      request.end.FromDatetime(end)
+      response = self.post_prpc('ListTaskRequests', request)
+      actual = swarming_pb2.TaskRequestsResponse()
+      _decode(response.body, actual)
+      expected_items = [expected_requests[i] for i in present]
+      self.assertEqual(expected_items, list(actual.items))
+
+    _verify([0], end=times[1])
+    _verify([], tags=["e:1"])
+    _verify([0], state=swarming_pb2.QUERY_COMPLETED_SUCCESS)
+    _verify([2, 1, 0])
+    _verify([0], tags=["a:1"])
+
 
 class InternalsServicePrpcTest(PrpcTest):
   def setUp(self):

@@ -293,6 +293,22 @@ class TasksService(object):
         now=message_conversion_prpc.date(now),
     )
 
+  @prpc_helpers.method
+  @auth.require(acl.can_view_all_tasks, log_identity=True)
+  def ListTaskRequests(self, request, _context):
+    start, end = _get_start_and_end_dates(request)
+    sort, state = _get_sort_and_state(request)
+    trf = api_common.TaskFilters(
+        start=start,
+        end=end,
+        state=state,
+        sort=sort,
+        tags=list(request.tags),
+    )
+    items, cursor = api_common.list_task_requests_no_realm_check(
+        trf, request.limit, request.cursor)
+    return message_conversion_prpc.task_request_list_response(items, cursor)
+
 
 class InternalsService(object):
   """Module implements the Internals service defined in

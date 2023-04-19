@@ -307,11 +307,20 @@ def task_result_response(result, include_performance_stats=True):
 
 
 def task_list_response(items, cursor, include_performance_stats=True):
-  # type(List[task_result.TaskResultResponse], str -> TaskListResponse
+  # type(List[task_result.TaskResultResponse], str) -> TaskListResponse
   out = swarming_pb2.TaskListResponse()
   out.cursor = cursor or ''
   out.items.extend(
       [task_result_response(item, include_performance_stats) for item in items])
+  out.now.GetCurrentTime()
+  return out
+
+
+def task_request_list_response(items, cursor):
+  # type(List[task_request.TaskRequest], str) -> TasksRequestResponse
+  out = swarming_pb2.TaskRequestsResponse()
+  out.cursor = cursor or ''
+  out.items.extend([task_request_response(item) for item in items])
   out.now.GetCurrentTime()
   return out
 
