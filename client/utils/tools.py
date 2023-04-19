@@ -403,6 +403,10 @@ def get_cacerts_bundle():
   Python's ssl module needs a real file on disk, so if code is running from
   a zip archive, we need to extract the file first.
   """
+  os_certs = get_os_cacerts_bundle()
+  if os_certs and os.path.exists(os_certs):
+    return os_certs
+
   global _ca_certs
   with _ca_certs_lock:
     if _ca_certs is not None and os.path.exists(_ca_certs):
@@ -411,6 +415,14 @@ def get_cacerts_bundle():
     # to current directory instead. We use our own bundled copy of cacert.pem.
     _ca_certs = zip_package.extract_resource(utils, 'cacert.pem', temp_dir='.')
     return _ca_certs
+
+
+def get_os_cacerts_bundle():
+  """Returns paths to CA trust store location for different OS.
+  """
+  if sys.platform == 'linux':
+    return '/etc/ssl/certs/ca-certificates.crt'
+  return None
 
 
 def sliding_timeout(timeout):

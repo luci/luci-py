@@ -1326,16 +1326,26 @@ class TestTaskRunnerKilled(TestTaskRunnerBase):
     with open(task_runner_log, 'rb') as f:
       logging.info('task_runner.log:\n---\n%s---', f.read())
     self.assertEqual([], self.server.get_bot_events())
-    expected = {
-        'swarming_bot.1.zip',
-        '065eef161fd0db0753c811e430c8e537f2ce152fa2f14b99405430d49b1e95b0'
-        '-cacert.'
-        'pem',
-        'w',
-        'logs',
-        'c',
-        'cas-cache',
-    }
+    # linux machines use local cert instead of CA bundle
+    if sys.platform == "linux":
+      expected = {
+          'swarming_bot.1.zip',
+          'w',
+          'logs',
+          'c',
+          'cas-cache',
+      }
+    else:
+      expected = {
+          'swarming_bot.1.zip',
+          '065eef161fd0db0753c811e430c8e537f2ce152fa2f14b99405430d49b1e95b0'
+          '-cacert.'
+          'pem',
+          'w',
+          'logs',
+          'c',
+          'cas-cache',
+      }
     self.assertEqual(expected, set(os.listdir(self.root_dir)))
 
     expected = {
