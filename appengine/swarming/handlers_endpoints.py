@@ -422,11 +422,7 @@ class SwarmingTasksService(remote.Service):
     """Returns task state for a specific set of tasks."""
     logging.debug('%s', request)
 
-    task_results = task_result.fetch_task_results(list(request.task_id))
-    states = [
-        result.state if result else task_result.State.PENDING
-        for result in task_results
-    ]
+    states = api_common.get_states(request.task_id)
 
     return swarming_rpcs.TaskStates(
         states=[swarming_rpcs.TaskState(state) for state in states])

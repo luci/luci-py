@@ -763,3 +763,29 @@ def list_task_requests_no_realm_check(filters, limit, cursor):
     logging.error('%s', e)
     raise handlers_exceptions.BadRequestException(
         'This combination is unsupported, sorry.')
+
+
+def get_states(task_ids):
+  """Gets a list of task states for the given task_ids.
+
+  Will return PENDING for any task_id which is not associated with any task.
+
+  Args:
+    task_ids: list of str task_ids.
+
+  Returns:
+    list of task_result.TaskState for each task_id.
+
+  Raises:
+    handlers_exceptions.BadRequestException if any task_id is invalid.
+  """
+
+  try:
+    task_results = task_result.fetch_task_results(list(task_ids))
+  except ValueError as e:
+    raise handlers_exceptions.BadRequestException('Invalid task_id: %s' %
+                                                  str(e))
+  return [
+      result.state if result else task_result.State.PENDING
+      for result in task_results
+  ]
