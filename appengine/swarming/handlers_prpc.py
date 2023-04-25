@@ -309,6 +309,12 @@ class TasksService(object):
         trf, request.limit, request.cursor)
     return message_conversion_prpc.task_request_list_response(items, cursor)
 
+  @prpc_helpers.method
+  @auth.require(acl.can_view_all_tasks, log_identity=True)
+  def ListTaskStates(self, request, _context):
+    states = api_common.get_states(request.task_id)
+    return swarming_pb2.TaskStates(states=states)
+
 
 class InternalsService(object):
   """Module implements the Internals service defined in

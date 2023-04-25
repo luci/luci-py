@@ -2386,6 +2386,44 @@ class TaskServicePrpcTest(PrpcTest):
     _verify([2, 1, 0])
     _verify([0], tags=["a:1"])
 
+  def test_list_task_states_ok(self):
+    self.set_as_privileged_user()
+    ticker = test_case.Ticker(self.now)
+    self.mock_now(ticker())
+    ntr = self._new_task_request(use_default_slice=True)
+    ntr.tags[:] = ["t:1"]
+    ntr.name = "first"
+    _, first_id = self._client_create_task(ntr)
+    self.mock_now(ticker())
+    self.set_as_bot()
+    self.bot_poll()
+    self.bot_run_task()
+    self.set_as_privileged_user()
+    ntr = self._new_task_request(use_default_slice=True)
+    ntr.tags[:] = ["t:2"]
+    ntr.name = "second"
+    _, second_id = self._client_create_task(ntr)
+
+    request = swarming_pb2.TaskStatesRequest(
+        task_id=[first_id, second_id, '1d69b9f088008810'])
+    response = self.post_prpc('ListTaskStates', request)
+    actual = swarming_pb2.TaskStates()
+    _decode(response.body, actual)
+
+    expected = swarming_pb2.TaskStates(states=[
+        swarming_pb2.COMPLETED, swarming_pb2.PENDING, swarming_pb2.PENDING
+    ])
+    self.assertEqual(expected, actual)
+
+  def test_list_task_states_invalid(self):
+    self.set_as_privileged_user()
+    request = swarming_pb2.TaskStatesRequest(task_id=['invalid'])
+    response = self.post_prpc('ListTaskStates', request, True)
+    self.assertEqual(response.status, '400 Bad Request')
+    expected_error = cgi.escape("Invalid task_id: Invalid key u'invali'",
+                                quote=True)
+    self.assertEqual(expected_error, response.body)
+
 
 class InternalsServicePrpcTest(PrpcTest):
   def setUp(self):
