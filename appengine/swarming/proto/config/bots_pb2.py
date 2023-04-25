@@ -19,7 +19,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   syntax='proto3',
   serialized_options=b'Z3go.chromium.org/luci/swarming/proto/config;configpb',
   create_key=_descriptor._internal_create_key,
-  serialized_pb=b'\n\x17proto/config/bots.proto\x12\x0fswarming.config\"S\n\x07\x42otsCfg\x12\x1a\n\x12trusted_dimensions\x18\x01 \x03(\t\x12,\n\tbot_group\x18\x02 \x03(\x0b\x32\x19.swarming.config.BotGroup\"\xb4\x03\n\x08\x42otGroup\x12\x0e\n\x06\x62ot_id\x18\x01 \x03(\t\x12\x15\n\rbot_id_prefix\x18\x02 \x03(\t\x12&\n\x04\x61uth\x18\x14 \x03(\x0b\x32\x18.swarming.config.BotAuth\x12\x0e\n\x06owners\x18\x15 \x03(\t\x12\x12\n\ndimensions\x18\x16 \x03(\t\x12\x19\n\x11\x62ot_config_script\x18\x17 \x01(\t\x12\x1d\n\x15\x62ot_config_script_rev\x18\x1a \x01(\t\x12!\n\x19\x62ot_config_script_content\x18\x19 \x01(\x0c\x12\x1e\n\x16system_service_account\x18\x18 \x01(\t\x12\x1a\n\x12logs_cloud_project\x18\x1b \x01(\t\x12=\n\rrbe_migration\x18\x1c \x01(\x0b\x32&.swarming.config.BotGroup.RBEMigration\x1aW\n\x0cRBEMigration\x12\x18\n\x10rbe_mode_percent\x18\x01 \x01(\x05\x12\x15\n\renable_rbe_on\x18\x02 \x03(\t\x12\x16\n\x0e\x64isable_rbe_on\x18\x03 \x03(\tJ\x04\x08\x03\x10\x04\"\xcf\x01\n\x07\x42otAuth\x12\x15\n\rlog_if_failed\x18\x05 \x01(\x08\x12\"\n\x1arequire_luci_machine_token\x18\x01 \x01(\x08\x12\x1f\n\x17require_service_account\x18\x02 \x03(\t\x12:\n\x14require_gce_vm_token\x18\x04 \x01(\x0b\x32\x1c.swarming.config.BotAuth.GCE\x12\x14\n\x0cip_whitelist\x18\x03 \x01(\t\x1a\x16\n\x03GCE\x12\x0f\n\x07project\x18\x01 \x01(\tB5Z3go.chromium.org/luci/swarming/proto/config;configpbb\x06proto3'
+  serialized_pb=b'\n\x17proto/config/bots.proto\x12\x0fswarming.config\"S\n\x07\x42otsCfg\x12\x1a\n\x12trusted_dimensions\x18\x01 \x03(\t\x12,\n\tbot_group\x18\x02 \x03(\x0b\x32\x19.swarming.config.BotGroup\"\xc9\x03\n\x08\x42otGroup\x12\x0e\n\x06\x62ot_id\x18\x01 \x03(\t\x12\x15\n\rbot_id_prefix\x18\x02 \x03(\t\x12&\n\x04\x61uth\x18\x14 \x03(\x0b\x32\x18.swarming.config.BotAuth\x12\x0e\n\x06owners\x18\x15 \x03(\t\x12\x12\n\ndimensions\x18\x16 \x03(\t\x12\x19\n\x11\x62ot_config_script\x18\x17 \x01(\t\x12\x1d\n\x15\x62ot_config_script_rev\x18\x1a \x01(\t\x12!\n\x19\x62ot_config_script_content\x18\x19 \x01(\x0c\x12\x1e\n\x16system_service_account\x18\x18 \x01(\t\x12\x1a\n\x12logs_cloud_project\x18\x1b \x01(\t\x12=\n\rrbe_migration\x18\x1c \x01(\x0b\x32&.swarming.config.BotGroup.RBEMigration\x1al\n\x0cRBEMigration\x12\x18\n\x10rbe_mode_percent\x18\x01 \x01(\x05\x12\x15\n\renable_rbe_on\x18\x02 \x03(\t\x12\x16\n\x0e\x64isable_rbe_on\x18\x03 \x03(\t\x12\x13\n\x0bhybrid_mode\x18\x04 \x01(\x08J\x04\x08\x03\x10\x04\"\xcf\x01\n\x07\x42otAuth\x12\x15\n\rlog_if_failed\x18\x05 \x01(\x08\x12\"\n\x1arequire_luci_machine_token\x18\x01 \x01(\x08\x12\x1f\n\x17require_service_account\x18\x02 \x03(\t\x12:\n\x14require_gce_vm_token\x18\x04 \x01(\x0b\x32\x1c.swarming.config.BotAuth.GCE\x12\x14\n\x0cip_whitelist\x18\x03 \x01(\t\x1a\x16\n\x03GCE\x12\x0f\n\x07project\x18\x01 \x01(\tB5Z3go.chromium.org/luci/swarming/proto/config;configpbb\x06proto3'
 )
 
 
@@ -93,6 +93,13 @@ _BOTGROUP_RBEMIGRATION = _descriptor.Descriptor(
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='hybrid_mode', full_name='swarming.config.BotGroup.RBEMigration.hybrid_mode', index=3,
+      number=4, type=8, cpp_type=7, label=1,
+      has_default_value=False, default_value=False,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
   ],
   extensions=[
   ],
@@ -106,7 +113,7 @@ _BOTGROUP_RBEMIGRATION = _descriptor.Descriptor(
   oneofs=[
   ],
   serialized_start=473,
-  serialized_end=560,
+  serialized_end=581,
 )
 
 _BOTGROUP = _descriptor.Descriptor(
@@ -207,7 +214,7 @@ _BOTGROUP = _descriptor.Descriptor(
   oneofs=[
   ],
   serialized_start=130,
-  serialized_end=566,
+  serialized_end=587,
 )
 
 
@@ -238,8 +245,8 @@ _BOTAUTH_GCE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=754,
-  serialized_end=776,
+  serialized_start=775,
+  serialized_end=797,
 )
 
 _BOTAUTH = _descriptor.Descriptor(
@@ -297,8 +304,8 @@ _BOTAUTH = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=569,
-  serialized_end=776,
+  serialized_start=590,
+  serialized_end=797,
 )
 
 _BOTSCFG.fields_by_name['bot_group'].message_type = _BOTGROUP

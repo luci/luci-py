@@ -300,7 +300,11 @@ class AppTestBase(test_case.TestCase):
     self.mock(pools_config, '_fetch_pools_config', mocked_fetch_pools_config)
 
   def mock_auth_db(self, permissions):
-    cache_mock = mock.Mock(auth_db=self.auth_db(permissions))
+    peer_identity = auth.get_peer_identity()
+    cache_mock = mock.Mock(
+        auth_db=self.auth_db(permissions),
+        peer_identity=peer_identity,
+    )
     self.mock(auth_api, 'get_request_cache', lambda: cache_mock)
 
   @staticmethod

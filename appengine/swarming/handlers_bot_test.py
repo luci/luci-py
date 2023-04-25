@@ -524,6 +524,46 @@ class BotApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(bot_info.last_seen_ts, self.now)
     self.assertIsNone(bot_info.idle_since_ts)
 
+  def test_poll_rbe_in_hybrid_mode(self):
+    self.mock_bot_group_config(
+        version='default',
+        dimensions={u'pool': [u'default']},
+        rbe_migration=bots_pb2.BotGroup.RBEMigration(
+            rbe_mode_percent=100,
+            hybrid_mode=True,
+        ),
+        is_default=True)
+    self.mock_pool_config(
+        pool='default',
+        rbe_migration=pools_pb2.Pool.RBEMigration(rbe_instance='some-instance'),
+        realm='test:pool/default',
+    )
+    self.mock(rbe, 'generate_poll_token', mock.Mock())
+    rbe.generate_poll_token.return_value = 'mocked-poll-token'
+
+    # A bot polls, finds no Swarming tasks, switches into RBE mode.
+    self.set_as_bot()
+    params = self.do_handshake()
+    response = self.post_json('/swarming/api/v1/bot/poll', params)
+    self.assertEqual(response['cmd'], u'rbe')
+
+    # Enqueue a native Swarming task.
+    self.set_as_user()
+    self.mock_auth_db([
+        auth.Permission('swarming.pools.createTask'),
+        auth.Permission('swarming.tasks.createInRealm'),
+    ])
+    _, task_id = self.client_create_task_raw(
+        properties={u'relative_cwd': u'de/ep'}, realm='test:task_realm')
+    task_id = task_id[:-1] + '1'
+
+    # A bot polls again and gets this task.
+    self.set_as_bot()
+    params = self.do_handshake()
+    response = self.post_json('/swarming/api/v1/bot/poll', params)
+    self.assertEqual(response['cmd'], u'run')
+    self.assertEqual(response['manifest']['task_id'], task_id)
+
   def test_poll_update(self):
     params = self.do_handshake()
     old_version = params['version']

@@ -4,6 +4,7 @@
 """Functionality related to RBE Scheduler."""
 
 import base64
+import collections
 import datetime
 import hashlib
 import hmac
@@ -32,6 +33,17 @@ from server.constants import OR_DIM_SEP
 POLL_TOKEN_EXPIRY = datetime.timedelta(hours=1)
 
 
+# RBE related settings of some concrete bot.
+RBEBotConfig = collections.namedtuple(
+    'RBEBotConfig',
+    [
+        # Full RBE instance name to poll tasks from.
+        'instance',
+        # If True, check the Swarming scheduler queue before switching to RBE.
+        'hybrid_mode',
+    ])
+
+
 def warmup():
   """Warms up local in-memory caches, best effort."""
   try:
@@ -40,8 +52,8 @@ def warmup():
     logging.exception('Failed to warmup up RBE HMAC key')
 
 
-def get_rbe_instance_for_bot(bot_id, pools, bot_group_cfg):
-  """Returns an RBE instance to use for the given bot.
+def get_rbe_config_for_bot(bot_id, pools, bot_group_cfg):
+  """Returns an RBE instance (and related parameters) to use for the given bot.
 
   If the bot should not be using RBE, returns None.
 
@@ -51,7 +63,7 @@ def get_rbe_instance_for_bot(bot_id, pools, bot_group_cfg):
     bot_group_cfg: a BotGroupConfig tuple with bot's bot group config.
 
   Returns:
-    A string with RBE instance name to use by the bot or None.
+    An RBEBotConfig tuple or None if the bot should not be using RBE.
   """
   rbe_migration = bot_group_cfg.rbe_migration
   if not rbe_migration:
@@ -93,8 +105,10 @@ def get_rbe_instance_for_bot(bot_id, pools, bot_group_cfg):
         bot_id)
     return None
 
-  logging.info('RBE: bot %s is using RBE instance %s', bot_id, rbe_instance)
-  return rbe_instance
+  logging.info('RBE: bot %s is using RBE instance %s (hybrid_mode=%s)', bot_id,
+               rbe_instance, rbe_migration.hybrid_mode)
+  return RBEBotConfig(instance=rbe_instance,
+                      hybrid_mode=rbe_migration.hybrid_mode)
 
 
 def generate_poll_token(bot_id, rbe_instance, enforced_dimensions,

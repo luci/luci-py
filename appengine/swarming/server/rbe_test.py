@@ -60,7 +60,7 @@ class RBETest(test_case.TestCase):
 
   @mock.patch('server.pools_config.get_pool_config')
   @mock.patch('server.rbe._quasi_random_100')
-  def test_get_rbe_instance_for_bot(self, quasi_random_100, pool_config):
+  def test_get_rbe_config_for_bot(self, quasi_random_100, pool_config):
     pools = {
         'pool-1-a': self.pool_config('instance-1'),
         'pool-1-b': self.pool_config('instance-1'),
@@ -73,42 +73,42 @@ class RBETest(test_case.TestCase):
     quasi_random_100.return_value = 30.0
 
     # Randomizer.
-    instance = rbe.get_rbe_instance_for_bot(
+    cfg = rbe.get_rbe_config_for_bot(
         'bot-id', ['pool-1-a'], self.bot_groups_config(rbe_mode_percent=25))
-    self.assertIsNone(instance)
-    instance = rbe.get_rbe_instance_for_bot(
+    self.assertIsNone(cfg)
+    cfg = rbe.get_rbe_config_for_bot(
         'bot-id', ['pool-1-a'], self.bot_groups_config(rbe_mode_percent=30))
-    self.assertEqual(instance, 'instance-1')
+    self.assertEqual(cfg.instance, 'instance-1')
 
     # Explicitly enabled.
-    instance = rbe.get_rbe_instance_for_bot(
+    cfg = rbe.get_rbe_config_for_bot(
         'bot-id', ['pool-1-a'],
         self.bot_groups_config(rbe_mode_percent=25, enable_rbe_on=['bot-id']))
-    self.assertEqual(instance, 'instance-1')
+    self.assertEqual(cfg.instance, 'instance-1')
 
     # Explicitly disabled.
-    instance = rbe.get_rbe_instance_for_bot(
+    cfg = rbe.get_rbe_config_for_bot(
         'bot-id', ['pool-1-a'],
         self.bot_groups_config(rbe_mode_percent=30, disable_rbe_on=['bot-id']))
-    self.assertIsNone(instance)
+    self.assertIsNone(cfg)
 
     # The pool is not using RBE.
-    instance = rbe.get_rbe_instance_for_bot(
+    cfg = rbe.get_rbe_config_for_bot(
         'bot-id', ['pool-no-rbe-1', 'pool-no-rbe-1'],
         self.bot_groups_config(enable_rbe_on=['bot-id']))
-    self.assertIsNone(instance)
+    self.assertIsNone(cfg)
 
     # Pools agree on RBE instance.
-    instance = rbe.get_rbe_instance_for_bot(
+    cfg = rbe.get_rbe_config_for_bot(
         'bot-id', ['pool-1-a', 'pool-1-b'],
         self.bot_groups_config(enable_rbe_on=['bot-id']))
-    self.assertEqual(instance, 'instance-1')
+    self.assertEqual(cfg.instance, 'instance-1')
 
     # Pools disagree on RBE instance.
-    instance = rbe.get_rbe_instance_for_bot(
+    cfg = rbe.get_rbe_config_for_bot(
         'bot-id', ['pool-1-a', 'pool-2'],
         self.bot_groups_config(enable_rbe_on=['bot-id']))
-    self.assertIsNone(instance)
+    self.assertIsNone(cfg)
 
   @mock.patch('random.uniform')
   def test_get_rbe_instance_for_task(self, uniform):

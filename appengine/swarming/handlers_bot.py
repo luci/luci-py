@@ -293,6 +293,8 @@ class _ProcessResult(object):
   dimensions = None
   # An RBE instance the bot should be using (if any).
   rbe_instance = None
+  # If True, check the Swarming scheduler queue before switching to RBE mode.
+  rbe_hybrid_mode = None
   # Instance of BotGroupConfig with server-side bot config (from bots.cfg).
   bot_group_cfg = None
   # Instance of BotAuth with auth method details used to authenticate the bot.
@@ -443,24 +445,26 @@ class _BotBaseHandler(_BotApiHandler):
       dimensions[dim_key] = from_cfg
 
     # Check the config to see if this bot is in the RBE mode.
-    rbe_instance = rbe.get_rbe_instance_for_bot(bot_id, dimensions.get('pool'),
-                                                bot_group_cfg)
+    rbe_cfg = rbe.get_rbe_config_for_bot(bot_id, dimensions.get('pool'),
+                                         bot_group_cfg)
 
     # These are passed to the scheduler as is to be stored with the task.
     bot_details = task_scheduler.BotDetails(version,
                                             bot_group_cfg.logs_cloud_project)
 
     # Fill in all result fields except 'quarantined_msg'.
-    result = _ProcessResult(request=request,
-                            bot_id=bot_id,
-                            version=version,
-                            state=state,
-                            dimensions=dimensions,
-                            rbe_instance=rbe_instance,
-                            bot_group_cfg=bot_group_cfg,
-                            bot_auth_cfg=bot_auth_cfg,
-                            bot_details=bot_details,
-                            maintenance_msg=state.get('maintenance'))
+    result = _ProcessResult(
+        request=request,
+        bot_id=bot_id,
+        version=version,
+        state=state,
+        dimensions=dimensions,
+        rbe_instance=rbe_cfg.instance if rbe_cfg else None,
+        rbe_hybrid_mode=rbe_cfg.hybrid_mode if rbe_cfg else False,
+        bot_group_cfg=bot_group_cfg,
+        bot_auth_cfg=bot_auth_cfg,
+        bot_details=bot_details,
+        maintenance_msg=state.get('maintenance'))
 
     # The bot may decide to "self-quarantine" itself. Accept both via
     # dimensions or via state. See bot_management._BotCommon.quarantined for
@@ -810,16 +814,22 @@ class BotPollHandler(_BotBaseHandler):
     try:
       # Fetch queues matching bot's dimensions.
       #
-      # If this bot is configured to use RBE, check only queues targeting this
-      # concrete bot via `id` dimension. These queues usually contain
-      # termination tasks. This allows to keep reusing Swarming scheduler for
-      # termination process, while using RBE for other tasks. This simplifies
-      # the initial implementation of RBE bots running on GCE.
+      # If this bot is configured to use RBE there are two cases:
+      #
+      #   1. The bot is in "hybrid mode" where it should drain Swarming
+      #      scheduler queues before using RBE. In this case we check all queues
+      #      as usual (as if the bot is purely native Swarming bot).
+      #   2. The bot is not in the hybrid mode. In this case we check only
+      #      queues targeting this concrete bot via `id` dimension. These queues
+      #      usually contain termination tasks. This allows to keep reusing
+      #      Swarming scheduler for termination process, while using RBE for
+      #      other tasks. This simplifies the initial implementation of RBE
+      #      bots running on GCE.
       #
       # TODO(crbug.com/1377118): Switch to use RBE for Termination tasks and
       # get rid of `bot_queues_only`.
-      queues = task_queues.assert_bot(res.dimensions,
-                                      bot_queues_only=bool(res.rbe_instance))
+      bot_queues_only = bool(res.rbe_instance) and not res.rbe_hybrid_mode
+      queues = task_queues.assert_bot(res.dimensions, bot_queues_only)
     except self.TIMEOUT_EXCEPTIONS as e:
       self.abort_by_timeout('assert_bot', e)
 
@@ -866,9 +876,13 @@ class BotPollHandler(_BotBaseHandler):
     # another one.
     if request.task_slice(
         run_result.current_task_slice).properties.is_terminate:
+      if res.rbe_instance:
+        logging.warning('RBE: termination through Swarming scheduler')
       bot_event('bot_terminate', task_id=run_result.task_id)
       self._cmd_terminate(run_result.task_id)
     else:
+      if res.rbe_instance:
+        logging.warning('RBE: task through Swarming scheduler')
       bot_event('request_task',
                 task_id=run_result.task_id,
                 task_name=request.name)
