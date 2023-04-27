@@ -2492,7 +2492,7 @@ class SwarmingServicePrpcTest(PrpcTest):
     super(SwarmingServicePrpcTest, self).setUp()
     self.service = 'swarming.v2.Swarming'
 
-  @parameterized.expand(['GetDetails'])
+  @parameterized.expand(['GetDetails', 'GetToken'])
   def test_forbidden(self, rpc):
     self.set_as_anonymous()
     response = self.post_prpc(rpc, proto.empty_pb2.Empty(), expect_errors=True)
@@ -2510,6 +2510,17 @@ class SwarmingServicePrpcTest(PrpcTest):
     response = self.post_prpc('GetDetails', proto.empty_pb2.Empty())
     actual = swarming_pb2.ServerDetails()
     _decode(response.body, actual)
+    self.assertEqual(expected, actual)
+
+  @mock.patch('server.bot_code.generate_bootstrap_token')
+  def test_get_token_ok(self, token_mock):
+    self.set_as_admin()
+    token = 'the_token'
+    token_mock.return_value = token
+    response = self.post_prpc('GetToken', proto.empty_pb2.Empty())
+    actual = swarming_pb2.BootstrapToken()
+    _decode(response.body, actual)
+    expected = swarming_pb2.BootstrapToken(bootstrap_token=token)
     self.assertEqual(expected, actual)
 
 

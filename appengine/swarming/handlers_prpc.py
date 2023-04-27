@@ -19,6 +19,7 @@ from proto.api_v2 import swarming_prpc_pb2
 from proto.internals import rbe_pb2
 from proto.internals import rbe_prpc_pb2
 from server import acl
+from server import bot_code
 from server import config
 from server import task_result
 from server import task_scheduler
@@ -370,6 +371,12 @@ class SwarmingService(object):
         luci_config=details.luci_config,
         cas_viewer_server=details.cas_viewer_server,
     )
+
+  @prpc_helpers.method
+  @auth.require(acl.can_create_bot, log_identity=True)
+  def GetToken(self, _request, _context):
+    return swarming_pb2.BootstrapToken(
+        bootstrap_token=bot_code.generate_bootstrap_token())
 
 
 def get_routes():
