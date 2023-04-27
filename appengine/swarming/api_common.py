@@ -4,6 +4,7 @@
 """Contains code which is common between bot the prpc API and the protorpc api.
 """
 import logging
+import os
 from collections import namedtuple
 
 from google.appengine.api import datastore_errors
@@ -15,8 +16,10 @@ import handlers_exceptions
 from components import auth
 from components import datastore_utils
 from components import utils
-from server import task_queues
 from server import bot_management
+from server import bot_code
+from server import config
+from server import task_queues
 from server import realms
 from server import task_scheduler
 from server import task_request
@@ -789,3 +792,36 @@ def get_states(task_ids):
       result.state if result else task_result.State.PENDING
       for result in task_results
   ]
+
+
+ServerDetails = namedtuple(
+    'ServerDetails',
+    [
+        # str of commit hash of currently deployed swarming_bot.
+        'bot_version',
+        # str of commit hash of currently deployed swarming_server.
+        'server_version',
+        # A url to a task display server (e.g. milo).  This should have a %s
+        # where a task id can go.
+        'display_server_url_template',
+        # str hostname of luci_config server.
+        'luci_config',
+        # Host of RBE-CAS viewer server.
+        'cas_viewer_server',
+    ])
+
+
+def get_server_details():
+  """Returns a ServerDetails namedtuple describing information on the swarming
+  server environment"""
+  host = 'https://' + os.environ['HTTP_HOST']
+
+  cfg = config.settings()
+  server_version = utils.get_app_version()
+
+  return ServerDetails(
+      bot_version=bot_code.get_bot_version(host)[0],
+      server_version=server_version,
+      display_server_url_template=cfg.display_server_url_template,
+      luci_config=config.config.config_service_hostname(),
+      cas_viewer_server=cfg.cas.viewer_server)

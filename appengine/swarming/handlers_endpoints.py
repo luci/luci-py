@@ -118,17 +118,14 @@ class SwarmingServerService(remote.Service):
   @auth.require(acl.can_access, log_identity=True)
   def details(self, _request):
     """Returns information about the server."""
-    host = 'https://' + os.environ['HTTP_HOST']
-
-    cfg = config.settings()
-    server_version = utils.get_app_version()
-
+    details = api_common.get_server_details()
     return swarming_rpcs.ServerDetails(
-        bot_version=bot_code.get_bot_version(host)[0],
-        server_version=server_version,
-        display_server_url_template=cfg.display_server_url_template,
-        luci_config=config.config.config_service_hostname(),
-        cas_viewer_server=cfg.cas.viewer_server)
+        bot_version=details.bot_version,
+        server_version=details.server_version,
+        display_server_url_template=details.display_server_url_template,
+        luci_config=details.luci_config,
+        cas_viewer_server=details.cas_viewer_server,
+    )
 
   @endpoint(message_types.VoidMessage, swarming_rpcs.BootstrapToken)
   @auth.require(acl.can_create_bot, log_identity=True)
