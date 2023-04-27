@@ -36,6 +36,7 @@ from proto.internals import rbe_pb2
 from proto.config import realms_pb2
 
 from server import acl
+from server import bot_code
 from server import bot_management
 from server import bot_management
 from server import config
@@ -2484,6 +2485,32 @@ class InternalsServicePrpcTest(PrpcTest):
                 u'task_id': task_id,
             },
         })
+
+
+class SwarmingServicePrpcTest(PrpcTest):
+  def setUp(self):
+    super(SwarmingServicePrpcTest, self).setUp()
+    self.service = 'swarming.v2.Swarming'
+
+  @parameterized.expand(['GetDetails'])
+  def test_forbidden(self, rpc):
+    self.set_as_anonymous()
+    response = self.post_prpc(rpc, proto.empty_pb2.Empty(), expect_errors=True)
+    self.assertEqual(response.status, '403 Forbidden')
+
+  def test_details(self):
+    self.set_as_privileged_user()
+    self.mock(config.config, 'config_service_hostname', lambda: 'a.server')
+    expected = swarming_pb2.ServerDetails(
+        bot_version=bot_code.get_bot_version('https://testbed.example.com')[0],
+        luci_config='a.server',
+        server_version=utils.get_app_version(),
+        cas_viewer_server='https://test-cas-viewer-server.com',
+    )
+    response = self.post_prpc('GetDetails', proto.empty_pb2.Empty())
+    actual = swarming_pb2.ServerDetails()
+    _decode(response.body, actual)
+    self.assertEqual(expected, actual)
 
 
 if __name__ == '__main__':

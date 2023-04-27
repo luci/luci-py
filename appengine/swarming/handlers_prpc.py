@@ -356,11 +356,28 @@ class InternalsService(object):
     return empty_pb2.Empty()
 
 
+class SwarmingService(object):
+  DESCRIPTION = swarming_prpc_pb2.SwarmingServiceDescription
+
+  @prpc_helpers.method
+  @auth.require(acl.can_access, log_identity=True)
+  def GetDetails(self, _request, _context):
+    details = api_common.get_server_details()
+    return swarming_pb2.ServerDetails(
+        bot_version=details.bot_version,
+        server_version=details.server_version,
+        display_server_url_template=details.display_server_url_template,
+        luci_config=details.luci_config,
+        cas_viewer_server=details.cas_viewer_server,
+    )
+
+
 def get_routes():
   s = prpc.Server()
   s.add_service(BotsService())
   s.add_service(TaskBackendAPIService())
   s.add_service(TasksService())
   s.add_service(InternalsService())
+  s.add_service(SwarmingService())
   s.add_interceptor(auth.prpc_interceptor)
   return s.get_routes()
