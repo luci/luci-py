@@ -378,6 +378,15 @@ class SwarmingService(object):
     return swarming_pb2.BootstrapToken(
         bootstrap_token=bot_code.generate_bootstrap_token())
 
+  @prpc_helpers.method
+  @auth.require(acl.can_view_config, log_identity=True)
+  def GetBootstrap(self, _request, _context):
+    obj = bot_code.get_bootstrap('', '')
+    return swarming_pb2.FileContent(content=obj.content.decode('utf-8'),
+                                    who=obj.who,
+                                    when=obj.when,
+                                    version=obj.version)
+
 
 def get_routes():
   s = prpc.Server()

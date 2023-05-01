@@ -2492,7 +2492,7 @@ class SwarmingServicePrpcTest(PrpcTest):
     super(SwarmingServicePrpcTest, self).setUp()
     self.service = 'swarming.v2.Swarming'
 
-  @parameterized.expand(['GetDetails', 'GetToken'])
+  @parameterized.expand(['GetDetails', 'GetToken', 'GetBootstrap'])
   def test_forbidden(self, rpc):
     self.set_as_anonymous()
     response = self.post_prpc(rpc, proto.empty_pb2.Empty(), expect_errors=True)
@@ -2521,6 +2521,50 @@ class SwarmingServicePrpcTest(PrpcTest):
     actual = swarming_pb2.BootstrapToken()
     _decode(response.body, actual)
     expected = swarming_pb2.BootstrapToken(bootstrap_token=token)
+    self.assertEqual(expected, actual)
+
+  @parameterized.expand([('GetBootstrap', 'bootstrap', '#!/usr/bin/env python\n'
+                          '# coding: utf-8\n'
+                          'host_url = \'\'\n'
+                          'bootstrap_token = \'\'\n')])
+  def test_config_injection(self, rpc, name, header):
+    # Tests either get_bootstrap or get_bot_config.
+    self.set_as_admin()
+    path = os.path.join(self.APP_DIR, 'swarming_bot', 'config', name + '.py')
+    with open(path, 'rb') as f:
+      content = f.read().decode('utf-8')
+
+    expected = swarming_pb2.FileContent(content=header + content)
+    actual = swarming_pb2.FileContent()
+    response = self.post_prpc(rpc, proto.empty_pb2.Empty())
+    _decode(response.body, actual)
+    self.assertEqual(expected, actual)
+
+    # Define a script on the luci-config server.
+    def get_self_config_mock(path, revision=None, store_last_good=False):
+      self.assertEqual('scripts/%s.py' % name, path)
+      if revision:
+        self.assertEqual(False, store_last_good)
+        return revision, 'old code'
+      self.assertEqual(None, revision)
+      self.assertEqual(True, store_last_good)
+      return 'abc', 'foo bar'
+
+    def config_service_hostname_mock():
+      return 'localhost:1'
+
+    self.mock(bot_code.config, 'get_self_config', get_self_config_mock)
+    self.mock(bot_code.config, 'config_service_hostname',
+              config_service_hostname_mock)
+
+    expected = swarming_pb2.FileContent(
+        content=header + 'foo bar',
+        version='abc',
+        who='localhost:1',
+    )
+    actual = swarming_pb2.FileContent()
+    response = self.post_prpc(rpc, proto.empty_pb2.Empty())
+    _decode(response.body, actual)
     self.assertEqual(expected, actual)
 
 
