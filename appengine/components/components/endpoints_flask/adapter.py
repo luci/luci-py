@@ -115,7 +115,10 @@ def path_handler_factory(api_class, api_method, service_path):
       req = decode_message(api_method.remote, flask.request, route_kwargs)
       # Check that required fields are populated.
       req.check_initialized()
-    except (messages.DecodeError, messages.ValidationError, ValueError) as ex:
+    except (messages.DecodeError, messages.ValidationError, AttributeError,
+            ValueError) as ex:
+      logging.warning('Bad request data: ' + flask.request.data.decode())
+      logging.warning('Error was: ' + str(ex))
       response = {'error': {'message': str(ex)}}
       return flask.jsonify(response), http_client.BAD_REQUEST, headers
     try:
