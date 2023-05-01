@@ -387,6 +387,15 @@ class SwarmingService(object):
                                     when=obj.when,
                                     version=obj.version)
 
+  @prpc_helpers.method
+  @auth.require(acl.can_view_config, log_identity=True)
+  def GetBotConfig(self, _request, _context):
+    obj, _ = bot_code.get_bot_config()
+    return swarming_pb2.FileContent(content=obj.content.decode('utf-8'),
+                                    who=obj.who,
+                                    when=obj.when,
+                                    version=obj.version)
+
 
 def get_routes():
   s = prpc.Server()

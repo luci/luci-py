@@ -2492,7 +2492,8 @@ class SwarmingServicePrpcTest(PrpcTest):
     super(SwarmingServicePrpcTest, self).setUp()
     self.service = 'swarming.v2.Swarming'
 
-  @parameterized.expand(['GetDetails', 'GetToken', 'GetBootstrap'])
+  @parameterized.expand(
+      ['GetDetails', 'GetToken', 'GetBootstrap', 'GetBotConfig'])
   def test_forbidden(self, rpc):
     self.set_as_anonymous()
     response = self.post_prpc(rpc, proto.empty_pb2.Empty(), expect_errors=True)
