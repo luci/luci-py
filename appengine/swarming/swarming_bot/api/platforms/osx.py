@@ -533,59 +533,93 @@ def get_gpu():
   state = set()
   for card in _get_system_profiler('SPDisplaysDataType'):
     if not 'spdisplays_device-id' in card:
-      # TODO(crbug.com/1109628): the card plist is different format on some
-      # devices.
+      # Apple Silicon GPUs don't show up as PCI-e devices, so the normal GPU
+      # detection path does not work.
+      _handle_apple_gpu(card, dimensions, state)
       continue
-    dev_id = card['spdisplays_device-id'][2:]
-
-    # Warning: the value provided depends on the driver manufacturer.
-    # Other interesting values: spdisplays_vram, spdisplays_revision-id
-    ven_id = None
-    if 'spdisplays_vendor-id' in card:
-      # NVidia
-      ven_id = card['spdisplays_vendor-id'][2:]
-    elif 'spdisplays_vendor' in card:
-      # Intel and ATI
-      match = re.search(r'\(0x([0-9a-f]{4})\)', card['spdisplays_vendor'])
-      if match:
-        ven_id = match.group(1)
-
-    # Looks like: '4.0.20 [3.2.8]'
-    version = card.get('spdisplays_gmux-version', '')
-
-    # VMWare doesn't set it.
-    dev_name = card.get('sppci_model', '')
-    ven_name = ''
-    if dev_name:
-      # The first word is pretty much always the company name on OSX.
-      split_name = dev_name.split(' ', 1)
-      ven_name = split_name[0]
-      dev_name = split_name[1]
-
-    # macOS 10.13 stopped including the vendor ID in the spdisplays_vendor
-    # string. Infer it from the vendor name instead.
-    if not ven_id:
-      ven_id = gpu.vendor_name_to_id(ven_name)
-    if not ven_id and 'spdisplays_vendor' in card:
-      match = re.search(r'sppci_vendor_([a-z]+)$', card['spdisplays_vendor'])
-      if match:
-        ven_name = match.group(1)
-        ven_id = gpu.vendor_name_to_id(ven_name)
-    if not ven_id:
-      ven_id = 'UNKNOWN'
-    ven_name, dev_name = gpu.ids_to_names(ven_id, ven_name, dev_id, dev_name)
-
-    dimensions.add(ven_id)
-    dimensions.add('%s:%s' % (ven_id, dev_id))
-    if version:
-      match = re.search(r'([0-9.]+) \[([0-9.]+)\]', version)
-      if match:
-        dimensions.add('%s:%s-%s-%s' %
-                       (ven_id, dev_id, match.group(1), match.group(2)))
-      state.add('%s %s %s' % (ven_name, dev_name, version))
-    else:
-      state.add('%s %s' % (ven_name, dev_name))
+    _handle_non_apple_gpu(card, dimensions, state)
   return sorted(dimensions), sorted(state)
+
+
+def _handle_apple_gpu(card, dimensions, state):
+  """Helper function to add an Apple GPU to dimensions/state."""
+  if ('spdisplays_vendor' not in card
+      or card['spdisplays_vendor'] != 'sppci_vendor_Apple'):
+    # In practice, we shouldn't be hitting this case since we should always
+    # have an Apple GPU if this function ends up getting called.
+    logging.warning('Tried to handle an Apple GPU when one was not present')
+    return
+  if 'sppci_model' not in card:
+    # Should always be set in practice.
+    logging.warning('No model found for Apple GPU')
+    return
+
+  # Expected value is something like "Apple M2".
+  model = card['sppci_model'].lower()
+  ven_name, dev_name = model.split(maxsplit=1)
+  if ven_name != 'apple':
+    logging.warning('Got unexpected vendor name %s for Apple GPU', ven_name)
+    return
+  if not dev_name:
+    logging.warning('Did not get a device name for Apple GPU')
+    return
+
+  dimensions.add(ven_name)
+  dimensions.add('%s:%s' % (ven_name, dev_name))
+  state.add('%s %s' % (ven_name, dev_name))
+
+
+def _handle_non_apple_gpu(card, dimensions, state):
+  """Helper function to add a non-Apple GPU to dimensions/state."""
+  dev_id = card['spdisplays_device-id'][2:]
+
+  # Warning: the value provided depends on the driver manufacturer.
+  # Other interesting values: spdisplays_vram, spdisplays_revision-id
+  ven_id = None
+  if 'spdisplays_vendor-id' in card:
+    # NVidia
+    ven_id = card['spdisplays_vendor-id'][2:]
+  elif 'spdisplays_vendor' in card:
+    # Intel and ATI
+    match = re.search(r'\(0x([0-9a-f]{4})\)', card['spdisplays_vendor'])
+    if match:
+      ven_id = match.group(1)
+
+  # Looks like: '4.0.20 [3.2.8]'
+  version = card.get('spdisplays_gmux-version', '')
+
+  # VMWare doesn't set it.
+  dev_name = card.get('sppci_model', '')
+  ven_name = ''
+  if dev_name:
+    # The first word is pretty much always the company name on OSX.
+    split_name = dev_name.split(' ', 1)
+    ven_name = split_name[0]
+    dev_name = split_name[1]
+
+  # macOS 10.13 stopped including the vendor ID in the spdisplays_vendor
+  # string. Infer it from the vendor name instead.
+  if not ven_id:
+    ven_id = gpu.vendor_name_to_id(ven_name)
+  if not ven_id and 'spdisplays_vendor' in card:
+    match = re.search(r'sppci_vendor_([a-z]+)$', card['spdisplays_vendor'])
+    if match:
+      ven_name = match.group(1)
+      ven_id = gpu.vendor_name_to_id(ven_name)
+  if not ven_id:
+    ven_id = 'UNKNOWN'
+  ven_name, dev_name = gpu.ids_to_names(ven_id, ven_name, dev_id, dev_name)
+
+  dimensions.add(ven_id)
+  dimensions.add('%s:%s' % (ven_id, dev_id))
+  if version:
+    match = re.search(r'([0-9.]+) \[([0-9.]+)\]', version)
+    if match:
+      dimensions.add('%s:%s-%s-%s' %
+                     (ven_id, dev_id, match.group(1), match.group(2)))
+    state.add('%s %s %s' % (ven_name, dev_name, version))
+  else:
+    state.add('%s %s' % (ven_name, dev_name))
 
 
 @tools.cached
