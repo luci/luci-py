@@ -146,36 +146,19 @@ class SwarmingServerService(remote.Service):
   @auth.public
   def permissions(self, request):
     """Returns the caller's permissions."""
-    pools_list_bots = [
-        p for p in pools_config.known() if realms.can_list_bots(p)
-    ]
-    pools_list_tasks = [
-        p for p in pools_config.known() if realms.can_list_tasks(p)
-    ]
-    pool_tags = bot_management.get_pools_from_dimensions_flat(request.tags)
+    perms = api_common.get_permissions(request.bot_id, request.task_id,
+                                       request.tags)
     return swarming_rpcs.ClientPermissions(
-        delete_bot=realms.can_delete_bot(request.bot_id),
-        delete_bots=realms.can_delete_bots(pool_tags),
-        terminate_bot=realms.can_terminate_bot(request.bot_id),
-        get_configs=acl.can_view_config(),
-        put_configs=acl.can_edit_config(),
-        cancel_task=self._can_cancel_task(request.task_id),
-        cancel_tasks=realms.can_cancel_tasks(pool_tags),
-        get_bootstrap_token=acl.can_create_bot(),
-        list_bots=pools_list_bots,
-        list_tasks=pools_list_tasks)
-
-  def _can_cancel_task(self, task_id):
-    if not task_id:
-      # TODO(crbug.com/1066839):
-      # This is for the compatibility until Web clients send task_id.
-      # return False if task_id is not given.
-      return acl._is_privileged_user()
-    task_key, _ = api_common.to_keys(task_id)
-    task = task_key.get()
-    if not task:
-      raise endpoints.NotFoundException('%s not found.' % task_id)
-    return realms.can_cancel_task(task)
+        delete_bot=perms.delete_bot,
+        delete_bots=perms.delete_bots,
+        terminate_bot=perms.terminate_bot,
+        get_configs=perms.get_configs,
+        put_configs=perms.put_configs,
+        cancel_task=perms.cancel_task,
+        cancel_tasks=perms.cancel_tasks,
+        get_bootstrap_token=perms.get_bootstrap_token,
+        list_bots=perms.list_bots,
+        list_tasks=perms.list_tasks)
 
   @endpoint(message_types.VoidMessage,
             swarming_rpcs.FileContent,
