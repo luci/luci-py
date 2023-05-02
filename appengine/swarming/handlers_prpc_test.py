@@ -256,10 +256,56 @@ class PrpcTest(test_env_handlers.AppTestBase):
     stats.named_caches_install.duration = 0.1
     stats.named_caches_uninstall.duration = 0.1
 
-  def post_prpc(self, rpc, request, expect_errors=False):
-    assert self.service, "Child classes must define service"
+  def _new_task_request_prpc(self, use_default_slice=False):
+    ntr = swarming_pb2.NewTaskRequest(expiration_secs=24 * 60 * 60,
+                                      name='job1',
+                                      priority=20,
+                                      tags=[u'a:tag'],
+                                      user='joe@localhost',
+                                      bot_ping_tolerance_secs=600)
+    if use_default_slice:
+      ts = swarming_pb2.TaskSlice(expiration_secs=180, wait_for_capacity=True)
+      # Hack to get min line length.
+      props = ts.properties
+      props.cipd_input.client_package.package_name = ('infra/tools/'
+                                                      'cipd/${platform}')
+      props.cipd_input.client_package.version = 'git_revision:deadbeef'
+      props.cipd_input.packages.extend([
+          swarming_pb2.CipdPackage(package_name='rm',
+                                   path='bin',
+                                   version='git_revision:deadbeef')
+      ])
+      props.cipd_input.server = 'https://pool.config.cipd.example.com'
+      props.command[:] = ['python', '-c', 'print(1)']
+      props.containment.containment_type = swarming_pb2.ContainmentType.AUTO
+      props.dimensions.extend([
+          swarming_pb2.StringPair(key='os', value='Amiga'),
+          swarming_pb2.StringPair(key='pool', value='default')
+      ])
+      props.execution_timeout_secs = 3600
+      props.grace_period_secs = 30
+      props.idempotent = False
+      props.io_timeout_secs = 1200
+      props.outputs[:] = ['foo', 'path/to/foobar']
+      props.command[:] = ['python', 'run_test.py']
+      ntr.task_slices.extend([ts])
+      ntr.ClearField('expiration_secs')
+    return ntr
 
-    return self.app.post('/prpc/%s/%s' % (self.service, rpc),
+  def _client_create_task_prpc(self, request=None):
+    """Creates a minimal task request via the Cloud Endpoints API."""
+    request = request or self._new_task_request_prpc()
+    response = self.post_prpc('NewTask', request, service="swarming.v2.Tasks")
+    actual = swarming_pb2.TaskRequestMetadataResponse()
+    _decode(response.body, actual)
+    return actual, actual.task_id
+
+  def post_prpc(self, rpc, request, expect_errors=False, service=None):
+    if not service:
+      assert self.service, "Child classes must define service"
+      service = self.service
+
+    return self.app.post('/prpc/%s/%s' % (service, rpc),
                          _encode(request),
                          self._headers,
                          expect_errors=expect_errors)
@@ -1664,47 +1710,11 @@ class TaskServicePrpcTest(PrpcTest):
     # but, not accessible to the task with no realm.
     assertTaskIsNotAccessible(task_id_without_realm)
 
-  def _new_task_request(self, use_default_slice=False):
-    ntr = swarming_pb2.NewTaskRequest(expiration_secs=24 * 60 * 60,
-                                      name='job1',
-                                      priority=20,
-                                      tags=[u'a:tag'],
-                                      user='joe@localhost',
-                                      bot_ping_tolerance_secs=600)
-    if use_default_slice:
-      ts = swarming_pb2.TaskSlice(expiration_secs=180, wait_for_capacity=True)
-      # Hack to get min line length.
-      props = ts.properties
-      props.cipd_input.client_package.package_name = ('infra/tools/'
-                                                      'cipd/${platform}')
-      props.cipd_input.client_package.version = 'git_revision:deadbeef'
-      props.cipd_input.packages.extend([
-          swarming_pb2.CipdPackage(package_name='rm',
-                                   path='bin',
-                                   version='git_revision:deadbeef')
-      ])
-      props.cipd_input.server = 'https://pool.config.cipd.example.com'
-      props.command[:] = ['python', '-c', 'print(1)']
-      props.containment.containment_type = swarming_pb2.ContainmentType.AUTO
-      props.dimensions.extend([
-          swarming_pb2.StringPair(key='os', value='Amiga'),
-          swarming_pb2.StringPair(key='pool', value='default')
-      ])
-      props.execution_timeout_secs = 3600
-      props.grace_period_secs = 30
-      props.idempotent = False
-      props.io_timeout_secs = 1200
-      props.outputs[:] = ['foo', 'path/to/foobar']
-      props.command[:] = ['python', 'run_test.py']
-      ntr.task_slices.extend([ts])
-      ntr.ClearField('expiration_secs')
-    return ntr
-
   def test_new_ok(self):
     # It can create a new task.
     self.mock(random, 'getrandbits', lambda _: 0x88)
     self.set_as_privileged_user()
-    ntr = self._new_task_request(use_default_slice=True)
+    ntr = self._new_task_request_prpc(use_default_slice=True)
     response = self.post_prpc('NewTask', ntr)
     actual = swarming_pb2.TaskRequestMetadataResponse()
     _decode(response.body, actual)
@@ -1714,7 +1724,7 @@ class TaskServicePrpcTest(PrpcTest):
     # first create a new task.
     self.mock(random, 'getrandbits', lambda _: 0x88)
     self.set_as_privileged_user()
-    ntr = self._new_task_request(use_default_slice=True)
+    ntr = self._new_task_request_prpc(use_default_slice=True)
     response = self.post_prpc('NewTask', ntr)
     actual = swarming_pb2.TaskRequestMetadataResponse()
     _decode(response.body, actual)
@@ -1749,7 +1759,7 @@ class TaskServicePrpcTest(PrpcTest):
     # Legacy pool ACLs must no be used in this mode, only realm ACLs are used.
     self.fail_on_using_legacy_acls()
 
-    ntr = self._new_task_request()
+    ntr = self._new_task_request_prpc()
     ntr.properties.command.extend([u'echo', u'hi'])
     ntr.properties.dimensions.extend(
         [swarming_pb2.StringPair(key=u'pool', value=u'default')])
@@ -1781,7 +1791,7 @@ class TaskServicePrpcTest(PrpcTest):
     # dry run check results.
     self.mock(auth, 'has_permission', lambda *_args, **_kwargs: False)
 
-    ntr = self._new_task_request()
+    ntr = self._new_task_request_prpc()
     ntr.properties.command.extend([u'echo', u'hi'])
     ntr.properties.dimensions.extend(
         [swarming_pb2.StringPair(key=u'pool', value=u'default')])
@@ -1819,7 +1829,7 @@ class TaskServicePrpcTest(PrpcTest):
     # Legacy pool ACLs must no be used in this mode, only realm ACLs are used.
     self.fail_on_using_legacy_acls()
 
-    ntr = self._new_task_request()
+    ntr = self._new_task_request_prpc()
     ntr.properties.command.extend([u'echo', u'hi'])
     ntr.properties.dimensions.extend(
         [swarming_pb2.StringPair(key=u'pool', value=u'default')])
@@ -1839,17 +1849,9 @@ class TaskServicePrpcTest(PrpcTest):
     # Correctly initialized the service account state.
     self.assertEqual('service-account@example.com', req.service_account)
 
-  def _client_create_task(self, request=None):
-    """Creates a minimal task request via the Cloud Endpoints API."""
-    request = request or self._new_task_request()
-    response = self.post_prpc('NewTask', request)
-    actual = swarming_pb2.TaskRequestMetadataResponse()
-    _decode(response.body, actual)
-    return actual, actual.task_id
-
   def test_new_invalid_realm(self):
     self.set_as_user()
-    ntr = self._new_task_request()
+    ntr = self._new_task_request_prpc()
     ntr.properties.command.extend([u'echo', u'hi'])
     ntr.properties.dimensions.extend(
         [swarming_pb2.StringPair(key=u'pool', value=u'default')])
@@ -1876,7 +1878,7 @@ class TaskServicePrpcTest(PrpcTest):
 
     with mock.patch('server.resultdb.create_invocation_async',
                     side_effect=self._updateToken):
-      ntr = self._new_task_request()
+      ntr = self._new_task_request_prpc()
       ntr.ClearField('expiration_secs')
       task_slice = swarming_pb2.TaskSlice(expiration_secs=180,
                                           wait_for_capacity=True)
@@ -1885,7 +1887,7 @@ class TaskServicePrpcTest(PrpcTest):
       ntr.task_slices.extend([task_slice])
       ntr.realm = 'test:task_realm'
       ntr.resultdb.enable = True
-      _, task_id = self._client_create_task(ntr)
+      _, task_id = self._client_create_task_prpc(ntr)
 
     # Get the produced TaskRequest, and verify the realm and resultdb config.
     rKey, sKey = task_pack.get_request_and_result_keys(task_id)
@@ -1912,7 +1914,7 @@ class TaskServicePrpcTest(PrpcTest):
 
     with mock.patch('server.resultdb.create_invocation_async',
                     side_effect=self._updateToken):
-      ntr = self._new_task_request()
+      ntr = self._new_task_request_prpc()
       ntr.ClearField('expiration_secs')
       task_slice = swarming_pb2.TaskSlice(expiration_secs=180,
                                           wait_for_capacity=True)
@@ -1921,7 +1923,7 @@ class TaskServicePrpcTest(PrpcTest):
       ntr.task_slices.extend([task_slice])
       ntr.realm = 'test:task_realm'
       ntr.resultdb.enable = True
-      _, task_id = self._client_create_task(ntr)
+      _, task_id = self._client_create_task_prpc(ntr)
 
     # Get the produced TaskRequest, and verify the realm and resultdb config.
     rKey, sKey = task_pack.get_request_and_result_keys(task_id)
@@ -1938,21 +1940,21 @@ class TaskServicePrpcTest(PrpcTest):
 
     # Completed.
     self.set_as_user()
-    ntr = self._new_task_request(use_default_slice=True)
+    ntr = self._new_task_request_prpc(use_default_slice=True)
     ntr.name = "first"
     ntr.tags[:] = ['project:yay', 'commit:abcd', 'os:Win']
-    _, _ = self._client_create_task(ntr)
+    _, _ = self._client_create_task_prpc(ntr)
     self.set_as_bot()
     self.bot_run_task()
 
     # Running.
     self.set_as_user()
     self.mock_now(self.now, 60)
-    ntr = self._new_task_request(use_default_slice=True)
+    ntr = self._new_task_request_prpc(use_default_slice=True)
     ntr.name = 'second'
     ntr.user = 'jack@localhost'
     ntr.tags[:] = ['project:yay', 'commit:efgh', 'os:Win']
-    _, running_id = self._client_create_task(ntr)
+    _, running_id = self._client_create_task_prpc(ntr)
     self.set_as_bot()
     self.bot_poll()
 
@@ -1960,11 +1962,11 @@ class TaskServicePrpcTest(PrpcTest):
     self.set_as_user()
     now_120 = self.mock_now(self.now, 120)
 
-    ntr = self._new_task_request(use_default_slice=True)
+    ntr = self._new_task_request_prpc(use_default_slice=True)
     ntr.name = 'third'
     ntr.user = 'jack@localhost'
     ntr.tags[:] = ['project:yay', 'commit:ijkhl', 'os:Linux']
-    _, pending_id = self._client_create_task(ntr)
+    _, pending_id = self._client_create_task_prpc(ntr)
 
     return running_id, pending_id, now_120
 
@@ -2068,11 +2070,11 @@ class TaskServicePrpcTest(PrpcTest):
     self.set_as_bot()
     self.bot_poll()
     self.set_as_user()
-    ntr = self._new_task_request(use_default_slice=True)
+    ntr = self._new_task_request_prpc(use_default_slice=True)
     ntr.name = "first"
     ntr.tags[:] = ['project:yay', 'commit:post', 'pool:default']
     ntr.task_slices[0].properties.idempotent = True
-    _, first_id = self._client_create_task(ntr)
+    _, first_id = self._client_create_task_prpc(ntr)
     self.set_as_bot()
     self.bot_run_task()
 
@@ -2086,12 +2088,12 @@ class TaskServicePrpcTest(PrpcTest):
     self.set_as_user()
     self.mock(random, 'getrandbits', lambda _: 0x66)
     now_60 = self.mock_now(self.now, 60)
-    ntr = self._new_task_request(use_default_slice=True)
+    ntr = self._new_task_request_prpc(use_default_slice=True)
     ntr.name = 'second'
     ntr.user = 'jack@localhost'
     ntr.tags[:] = ['project:yay', 'commit:pre', 'pool:default']
     ntr.task_slices[0].properties.idempotent = True
-    _, second_id = self._client_create_task(ntr)
+    _, second_id = self._client_create_task_prpc(ntr)
 
     first = swarming_pb2.TaskResultResponse()
     self.apply_defaults_for_result_summary(first)
@@ -2307,7 +2309,7 @@ class TaskServicePrpcTest(PrpcTest):
     times = [ticker()]
     for name, tag in zip(names, unique_tags):
       tags = ['project:yay', 'commit:post', 'pool:default', tag]
-      ntr = self._new_task_request(use_default_slice=True)
+      ntr = self._new_task_request_prpc(use_default_slice=True)
       ntr.name = name
       ntr.tags[:] = tags
       ntrs.append(ntr)
@@ -2337,7 +2339,7 @@ class TaskServicePrpcTest(PrpcTest):
       expected_requests.append(expected)
 
     self.set_as_privileged_user()
-    _, first_id = self._client_create_task(ntrs[0])
+    _, first_id = self._client_create_task_prpc(ntrs[0])
     expected_requests[0].created_ts.FromDatetime(self.now)
     expected_requests[0].task_id = first_id
     times.append(ticker())
@@ -2350,7 +2352,7 @@ class TaskServicePrpcTest(PrpcTest):
     for i in range(1, len(ntrs)):
       times.append(ticker())
       self.mock_now(times[-1])
-      _, task_id = self._client_create_task(ntrs[i])
+      _, task_id = self._client_create_task_prpc(ntrs[i])
       expected_requests[i].task_id = task_id
       expected_requests[i].created_ts.FromDatetime(times[-1])
 
@@ -2391,19 +2393,19 @@ class TaskServicePrpcTest(PrpcTest):
     self.set_as_privileged_user()
     ticker = test_case.Ticker(self.now)
     self.mock_now(ticker())
-    ntr = self._new_task_request(use_default_slice=True)
+    ntr = self._new_task_request_prpc(use_default_slice=True)
     ntr.tags[:] = ["t:1"]
     ntr.name = "first"
-    _, first_id = self._client_create_task(ntr)
+    _, first_id = self._client_create_task_prpc(ntr)
     self.mock_now(ticker())
     self.set_as_bot()
     self.bot_poll()
     self.bot_run_task()
     self.set_as_privileged_user()
-    ntr = self._new_task_request(use_default_slice=True)
+    ntr = self._new_task_request_prpc(use_default_slice=True)
     ntr.tags[:] = ["t:2"]
     ntr.name = "second"
-    _, second_id = self._client_create_task(ntr)
+    _, second_id = self._client_create_task_prpc(ntr)
 
     request = swarming_pb2.TaskStatesRequest(
         task_id=[first_id, second_id, '1d69b9f088008810'])
@@ -2491,6 +2493,9 @@ class SwarmingServicePrpcTest(PrpcTest):
   def setUp(self):
     super(SwarmingServicePrpcTest, self).setUp()
     self.service = 'swarming.v2.Swarming'
+    self.now = datetime.datetime(2010, 1, 2, 3, 4, 5)
+    self.mock_now(self.now)
+    self.mock_tq_tasks()
 
   @parameterized.expand(
       ['GetDetails', 'GetToken', 'GetBootstrap', 'GetBotConfig'])
@@ -2565,6 +2570,160 @@ class SwarmingServicePrpcTest(PrpcTest):
     )
     actual = swarming_pb2.FileContent()
     response = self.post_prpc(rpc, proto.empty_pb2.Empty())
+    _decode(response.body, actual)
+    self.assertEqual(expected, actual)
+
+  def test_public_permissions(self):
+    self.set_as_anonymous()
+    expected = swarming_pb2.ClientPermissions(cancel_task=False,
+                                              cancel_tasks=False,
+                                              delete_bot=False,
+                                              delete_bots=False,
+                                              get_bootstrap_token=False,
+                                              get_configs=False,
+                                              put_configs=False,
+                                              terminate_bot=False)
+    actual = swarming_pb2.ClientPermissions()
+    response = self.post_prpc('GetPermissions',
+                              swarming_pb2.PermissionsRequest())
+    _decode(response.body, actual)
+    self.assertEqual(expected, actual)
+
+  def test_user_permissions(self):
+    self.set_as_user()
+    expected = swarming_pb2.ClientPermissions(cancel_task=False,
+                                              cancel_tasks=False,
+                                              delete_bot=False,
+                                              delete_bots=False,
+                                              get_bootstrap_token=False,
+                                              get_configs=False,
+                                              put_configs=False,
+                                              terminate_bot=False)
+    actual = swarming_pb2.ClientPermissions()
+    response = self.post_prpc('GetPermissions',
+                              swarming_pb2.PermissionsRequest())
+    _decode(response.body, actual)
+    self.assertEqual(expected, actual)
+
+  def test_user_permissions_with_bot_id(self):
+    self.mock_default_pool_acl([])
+
+    self.set_as_bot()
+    self.bot_poll()
+
+    self.set_as_user()
+    self.mock_auth_db([
+        auth.Permission('swarming.pools.deleteBot'),
+        auth.Permission('swarming.pools.listBots'),
+        auth.Permission('swarming.pools.terminateBot'),
+    ])
+
+    expected = swarming_pb2.ClientPermissions(cancel_task=False,
+                                              cancel_tasks=False,
+                                              delete_bot=True,
+                                              delete_bots=False,
+                                              get_bootstrap_token=False,
+                                              list_bots=['default', 'template'],
+                                              get_configs=False,
+                                              put_configs=False,
+                                              terminate_bot=True)
+    actual = swarming_pb2.ClientPermissions()
+    response = self.post_prpc('GetPermissions',
+                              swarming_pb2.PermissionsRequest(bot_id='bot1'))
+    _decode(response.body, actual)
+    self.assertEqual(expected, actual)
+
+  def test_user_permissions_with_task_id(self):
+    self.mock_default_pool_acl([])
+
+    self.set_as_admin()
+    ntr = self._new_task_request_prpc(use_default_slice=True)
+    _, task_id = self._client_create_task_prpc(ntr)
+
+    self.set_as_user()
+    self.mock_auth_db([
+        auth.Permission('swarming.pools.cancelTask'),
+        auth.Permission('swarming.pools.listTasks'),
+    ])
+
+    expected = swarming_pb2.ClientPermissions(
+        cancel_task=True,
+        cancel_tasks=False,
+        delete_bot=False,
+        delete_bots=False,
+        get_bootstrap_token=False,
+        list_tasks=['default', 'template'],
+        get_configs=False,
+        put_configs=False,
+        terminate_bot=False)
+    actual = swarming_pb2.ClientPermissions()
+    response = self.post_prpc('GetPermissions',
+                              swarming_pb2.PermissionsRequest(task_id=task_id))
+    _decode(response.body, actual)
+    self.assertEqual(expected, actual)
+
+  def test_user_permissions_with_pool_tags(self):
+    """Asserts that permissions respond correctly to a user has pool
+       permissions.
+    """
+    self.mock_default_pool_acl([])
+
+    # The user has realm permissions.
+    self.set_as_user()
+    self.mock_auth_db([
+        auth.Permission('swarming.pools.cancelTask'),
+        auth.Permission('swarming.pools.deleteBot'),
+        auth.Permission('swarming.pools.listBots'),
+        auth.Permission('swarming.pools.listTasks'),
+    ])
+
+    expected = swarming_pb2.ClientPermissions(
+        cancel_task=False,
+        cancel_tasks=True,
+        delete_bot=False,
+        delete_bots=True,
+        get_bootstrap_token=False,
+        list_tasks=['default', 'template'],
+        list_bots=['default', 'template'],
+        get_configs=False,
+        put_configs=False,
+        terminate_bot=False)
+    actual = swarming_pb2.ClientPermissions()
+    response = self.post_prpc(
+        'GetPermissions',
+        swarming_pb2.PermissionsRequest(tags=['pool:default']))
+    _decode(response.body, actual)
+    self.assertEqual(expected, actual)
+
+  def test_privileged_user_permissions(self):
+    self.set_as_privileged_user()
+    expected = swarming_pb2.ClientPermissions(cancel_task=True,
+                                              cancel_tasks=False,
+                                              delete_bot=False,
+                                              delete_bots=False,
+                                              get_bootstrap_token=False,
+                                              get_configs=False,
+                                              put_configs=False,
+                                              terminate_bot=True)
+    actual = swarming_pb2.ClientPermissions()
+    response = self.post_prpc('GetPermissions',
+                              swarming_pb2.PermissionsRequest())
+    _decode(response.body, actual)
+    self.assertEqual(expected, actual)
+
+  def test_admin_permissions(self):
+    self.set_as_admin()
+    expected = swarming_pb2.ClientPermissions(cancel_task=True,
+                                              cancel_tasks=True,
+                                              delete_bot=True,
+                                              delete_bots=True,
+                                              get_bootstrap_token=True,
+                                              get_configs=True,
+                                              put_configs=True,
+                                              terminate_bot=True)
+    actual = swarming_pb2.ClientPermissions()
+    response = self.post_prpc('GetPermissions',
+                              swarming_pb2.PermissionsRequest())
     _decode(response.body, actual)
     self.assertEqual(expected, actual)
 

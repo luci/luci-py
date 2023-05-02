@@ -396,6 +396,23 @@ class SwarmingService(object):
                                     when=obj.when,
                                     version=obj.version)
 
+  @prpc_helpers.method
+  @auth.public
+  def GetPermissions(self, request, _context):
+    perms = api_common.get_permissions(request.bot_id, request.task_id,
+                                       request.tags)
+    return swarming_pb2.ClientPermissions(
+        delete_bot=perms.delete_bot,
+        delete_bots=perms.delete_bots,
+        terminate_bot=perms.terminate_bot,
+        get_configs=perms.get_configs,
+        put_configs=perms.put_configs,
+        cancel_task=perms.cancel_task,
+        cancel_tasks=perms.cancel_tasks,
+        get_bootstrap_token=perms.get_bootstrap_token,
+        list_bots=perms.list_bots,
+        list_tasks=perms.list_tasks)
+
 
 def get_routes():
   s = prpc.Server()
