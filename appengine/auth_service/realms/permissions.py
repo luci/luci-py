@@ -158,6 +158,7 @@ def db():
       permission('resultdb.artifacts.get'),
       permission('resultdb.testExonerations.list'),
       permission('resultdb.testExonerations.get'),
+      permission('resultdb.testMetadata.list'),
   ])
 
   # Weetbix permissions and roles (b/239768873).
