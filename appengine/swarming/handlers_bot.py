@@ -293,7 +293,7 @@ class _ProcessResult(object):
   dimensions = None
   # An RBE instance the bot should be using (if any).
   rbe_instance = None
-  # If True, check the Swarming scheduler queue before switching to RBE mode.
+  # If True, consume tasks from both Swarming and RBE schedulers.
   rbe_hybrid_mode = None
   # Instance of BotGroupConfig with server-side bot config (from bots.cfg).
   bot_group_cfg = None
