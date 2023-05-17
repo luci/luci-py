@@ -316,6 +316,25 @@ class _ProcessResult(object):
   def os(self):
     return (self.dimensions or {}).get('os') or []
 
+  def rbe_params(self, sleep_streak):
+    """Generates a dict with RBE-related parameters for bots in RBE mode."""
+    assert self.rbe_instance
+    return {
+        'instance':
+        self.rbe_instance,
+        'hybrid_mode':
+        self.rbe_hybrid_mode,
+        'sleep':
+        task_scheduler.exponential_backoff(sleep_streak),
+        'poll_token':
+        rbe.generate_poll_token(
+            bot_id=self.bot_id,
+            rbe_instance=self.rbe_instance,
+            enforced_dimensions=self.bot_group_cfg.dimensions,
+            bot_auth_cfg=self.bot_auth_cfg,
+        ),
+    }
+
 
 def _validate_dimensions(dimensions):
   """Validates bot dimensions."""
@@ -640,6 +659,9 @@ class BotHandshakeHandler(_BotBaseHandler):
       "bot_group_cfg_version": "0123abcdef",
       "bot_group_cfg": {
         "dimensions": { <server-defined dimensions> },
+      },
+      "rbe": {
+        ...
       }
     }
   """
@@ -683,6 +705,8 @@ class BotHandshakeHandler(_BotBaseHandler):
       data['bot_config'] = res.bot_group_cfg.bot_config_script_content
       data['bot_config_rev'] = res.bot_group_cfg.bot_config_script_rev
       data['bot_config_name'] = res.bot_group_cfg.bot_config_script
+    if res.rbe_instance:
+      data['rbe'] = res.rbe_params(0)
     self.send_response(data)
 
 
@@ -862,14 +886,7 @@ class BotPollHandler(_BotBaseHandler):
           bot_event('bot_polling')  # the bot got a task from RBE recently
         else:
           bot_event('bot_idle')  # the bot is not seeing any RBE tasks
-        self._cmd_rbe(
-            res.rbe_instance,
-            rbe.generate_poll_token(
-                bot_id=res.bot_id,
-                rbe_instance=res.rbe_instance,
-                enforced_dimensions=res.bot_group_cfg.dimensions,
-                bot_auth_cfg=res.bot_auth_cfg,
-            ))
+        self._cmd_rbe(sleep_streak, res)
       return
 
     # This part is tricky since it intentionally runs a transaction after
@@ -896,6 +913,8 @@ class BotPollHandler(_BotBaseHandler):
         'cmd': 'run',
         'manifest': manifest,
     }
+    if bot_request_info.rbe_instance:
+      out['rbe'] = bot_request_info.rbe_params(0)
     self.send_response(out)
 
   def _cmd_sleep(self, sleep_streak, quarantined):
@@ -909,14 +928,12 @@ class BotPollHandler(_BotBaseHandler):
     }
     self.send_response(out)
 
-  def _cmd_rbe(self, rbe_instance, poll_token):
-    logging.info('RBE mode: %s', rbe_instance)
+  def _cmd_rbe(self, sleep_streak, bot_request_info):
+    logging.info('RBE mode: %s%s', bot_request_info.rbe_instance,
+                 ' (hybrid)' if bot_request_info.rbe_hybrid_mode else '')
     out = {
         'cmd': 'rbe',
-        'rbe': {
-            'instance': rbe_instance,
-            'poll_token': poll_token,
-        },
+        'rbe': bot_request_info.rbe_params(sleep_streak),
     }
     self.send_response(out)
 

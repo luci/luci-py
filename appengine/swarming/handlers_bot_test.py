@@ -46,6 +46,7 @@ from server import realms
 from server import service_accounts
 from server import task_pack
 from server import task_queues
+from server import task_scheduler
 
 
 def fmtdate(d):
@@ -487,21 +488,30 @@ class BotApiTest(test_env_handlers.AppTestBase):
     )
     self.mock(rbe, 'generate_poll_token', mock.Mock())
     rbe.generate_poll_token.return_value = 'mocked-poll-token'
+    self.mock(task_scheduler, 'exponential_backoff', lambda _: 1.23)
+
+    expected_rbe_params = {
+        u'instance': u'some-instance',
+        u'hybrid_mode': False,
+        u'sleep': 1.23,
+        u'poll_token': u'mocked-poll-token',
+    }
+
+    # A bot notifies Swarming of its existence, gets RBE parameters.
+    handshake_response = {}
+    params = self.do_handshake(response_copy=handshake_response)
+    self.assertEqual(expected_rbe_params, handshake_response['rbe'])
 
     # A bot polls, gets RBE parameters.
-    params = self.do_handshake()
     response = self.post_json('/swarming/api/v1/bot/poll', params)
     expected = {
         u'cmd': u'rbe',
-        u'rbe': {
-            u'instance': u'some-instance',
-            u'poll_token': u'mocked-poll-token',
-        },
+        u'rbe': expected_rbe_params,
     }
     self.assertEqual(expected, response)
 
     # The poll token was generated with correct parameters.
-    rbe.generate_poll_token.assert_called_once_with(
+    rbe.generate_poll_token.assert_called_with(
         bot_id='bot1',
         rbe_instance='some-instance',
         enforced_dimensions={u'pool': [u'default']},
