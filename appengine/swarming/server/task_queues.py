@@ -1366,17 +1366,24 @@ def assert_bot(bot_dimensions, bot_queues_only=False):
   # Get a set of matching TaskDimensionsSets IDs.
   matches = _assert_bot_dimensions_async(bot_dimensions).get_result()
 
-  # Keep only `bot:...` sets if the caller is interested only in bot-specific
+  # Update queues' TTL in memcache. This acts as a signal there's still a bot
+  # that polls these particular queues. Note there's no big harm in doing this
+  # for bots in pure RBE mode. Tasks submitted to such bots through Swarming
+  # scheduler will hang pending, but there should be no such tasks at this stage
+  # (all tasks should go through the RBE scheduler).
+  #
+  # TODO(vadimsh): Doing this more carefully is complicated, since the bot
+  # (even in RBE mode) calls freshen_up_queues(...) during task execution, which
+  # registers all matching queues all the time.
+  queues = TaskDimensionsSets.ids_to_queue_numbers(matches)
+  _freshen_up_queues_memcache(queues)
+
+  # Return only `bot:...` sets if the caller is interested only in bot-specific
   # queues. These queues contain tasks that have `id: <bot-id>` constraint.
   if bot_queues_only:
-    matches = (m for m in matches if m.startswith('bot:'))
+    queues = TaskDimensionsSets.ids_to_queue_numbers(m for m in matches
+                                                     if m.startswith('bot:'))
 
-  # Convert IDs that look like `<kind>:xxx:<number>` into integers.
-  queues = TaskDimensionsSets.ids_to_queue_numbers(matches)
-
-  # Update queues' TTL in memcache. This acts as a signal there's still a bot
-  # that polls these particular queues.
-  _freshen_up_queues_memcache(queues)
   return queues
 
 

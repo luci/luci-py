@@ -551,13 +551,15 @@ class BotApiTest(test_env_handlers.AppTestBase):
     self.mock(rbe, 'generate_poll_token', mock.Mock())
     rbe.generate_poll_token.return_value = 'mocked-poll-token'
 
-    # A bot polls, finds no Swarming tasks, switches into RBE mode.
+    # A bot polls and registers itself in Swarming scheduler.
     self.set_as_bot()
     params = self.do_handshake()
+    params['force'] = False
     response = self.post_json('/swarming/api/v1/bot/poll', params)
     self.assertEqual(response['cmd'], u'rbe')
 
-    # Enqueue a native Swarming task.
+    # Enqueue a native Swarming task. It should be accepted, there's a bot
+    # for it.
     self.set_as_user()
     self.mock_auth_db([
         auth.Permission('swarming.pools.createTask'),
@@ -567,9 +569,13 @@ class BotApiTest(test_env_handlers.AppTestBase):
         properties={u'relative_cwd': u'de/ep'}, realm='test:task_realm')
     task_id = task_id[:-1] + '1'
 
-    # A bot polls again and gets this task.
+    # A bot polls again, but still only to register itself.
     self.set_as_bot()
-    params = self.do_handshake()
+    response = self.post_json('/swarming/api/v1/bot/poll', params)
+    self.assertEqual(response['cmd'], u'rbe')
+
+    # A bot polls again asking to force-poll Swarming scheduler, gets the task.
+    params['force'] = True
     response = self.post_json('/swarming/api/v1/bot/poll', params)
     self.assertEqual(response['cmd'], u'run')
     self.assertEqual(response['manifest']['task_id'], task_id)

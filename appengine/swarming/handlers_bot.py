@@ -720,7 +720,7 @@ class BotPollHandler(_BotBaseHandler):
   assigned anymore.
   """
   TSMON_ENDPOINT_ID = 'bot/poll'
-  OPTIONAL_KEYS = {u'request_uuid'}
+  OPTIONAL_KEYS = {u'request_uuid', u'force'}
 
   @auth.public  # auth happens in self.process()
   def post(self):
@@ -835,24 +835,34 @@ class BotPollHandler(_BotBaseHandler):
 
     # The bot is in good shape.
 
+    # True if a hybrid RBE bot wants to poll from Swarming scheduler.
+    force_poll = res.request.get('force')
+    if res.rbe_instance and res.rbe_hybrid_mode and force_poll:
+      logging.info('Force-polling Swarming from an RBE bot')
+
+    # There are 4 kind of polling:
+    #
+    #   1. Polling from a native Swarming bot. We need to consume tasks from all
+    #      matching queues.
+    #   2. Polling from a pure RBE-mode bot. In this case we check only queues
+    #      targeting this concrete bot via `id` dimension. These queues usually
+    #      contain termination tasks. This allows to keep reusing Swarming
+    #      scheduler for termination process, while using RBE for other tasks.
+    #   3. Polling from a hybrid bot that just wants to "check in". This is
+    #      the same as (2).
+    #   4. Polling from a hybrid bot that wants to get a task from the Swarming
+    #      scheduler (indicated by force==True). This is the same as (1).
+    if not res.rbe_instance:
+      # Native Swarming bot. Need to poll all queues.
+      bot_queues_only = False
+    elif not res.rbe_hybrid_mode:
+      # Pure RBE-mode bot. Need to poll only bot queues.
+      bot_queues_only = True
+    else:
+      # Decide based on `force` request field.
+      bot_queues_only = not force_poll
+
     try:
-      # Fetch queues matching bot's dimensions.
-      #
-      # If this bot is configured to use RBE there are two cases:
-      #
-      #   1. The bot is in "hybrid mode" where it should drain Swarming
-      #      scheduler queues before using RBE. In this case we check all queues
-      #      as usual (as if the bot is purely native Swarming bot).
-      #   2. The bot is not in the hybrid mode. In this case we check only
-      #      queues targeting this concrete bot via `id` dimension. These queues
-      #      usually contain termination tasks. This allows to keep reusing
-      #      Swarming scheduler for termination process, while using RBE for
-      #      other tasks. This simplifies the initial implementation of RBE
-      #      bots running on GCE.
-      #
-      # TODO(crbug.com/1377118): Switch to use RBE for Termination tasks and
-      # get rid of `bot_queues_only`.
-      bot_queues_only = bool(res.rbe_instance) and not res.rbe_hybrid_mode
       queues = task_queues.assert_bot(res.dimensions, bot_queues_only)
     except self.TIMEOUT_EXCEPTIONS as e:
       self.abort_by_timeout('assert_bot', e)
