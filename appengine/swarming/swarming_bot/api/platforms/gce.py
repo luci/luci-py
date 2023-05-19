@@ -305,6 +305,10 @@ def get_machine_type():
 
 @tools.cached
 def get_cpuinfo():
+  return get_cpuinfo_uncached()
+
+
+def get_cpuinfo_uncached():
   """Returns the GCE CPU information as reported by GCE instance metadata."""
   metadata = get_metadata()
   if not metadata:
