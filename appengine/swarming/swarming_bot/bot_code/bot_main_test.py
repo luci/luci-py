@@ -129,7 +129,7 @@ class TestBotBase(net_utils.TestCase):
     bot_main._update_bot_attributes(self.bot, 0)
     self.clock = clock.Clock(self.quit_bit)
     self.clock._now_impl = lambda: self.quit_bit.now
-    self.loop_state = bot_main._BotLoopState(self.bot, self.quit_bit,
+    self.loop_state = bot_main._BotLoopState(self.bot, None, self.quit_bit,
                                              self.clock)
 
   def poll_once(self):
@@ -985,6 +985,7 @@ class TestBotMain(TestBotBase):
             'rbe': {
                 'poll_token': 'pt0',
                 'instance': 'instance_0',
+                'hybrid_mode': False,
             },
         }),
         self.expected_rbe_create_request('pt0', 'st0'),
@@ -1002,6 +1003,7 @@ class TestBotMain(TestBotBase):
                 'rbe': {
                     'poll_token': 'pt0',
                     'instance': 'instance_0',
+                    'hybrid_mode': False,
                 },
             },
             rbe_idle=True,
@@ -1048,6 +1050,7 @@ class TestBotMain(TestBotBase):
             'rbe': {
                 'poll_token': 'pt0',
                 'instance': 'instance_0',
+                'hybrid_mode': False,
             },
         }),
         self.expected_rbe_create_request('pt0', 'st0'),
@@ -1065,6 +1068,7 @@ class TestBotMain(TestBotBase):
                 'rbe': {
                     'poll_token': 'pt0',
                     'instance': 'instance_0',
+                    'hybrid_mode': False,
                 },
             },
             rbe_idle=True,
@@ -1087,6 +1091,7 @@ class TestBotMain(TestBotBase):
                 'rbe': {
                     'poll_token': 'pt0',
                     'instance': 'instance_0',
+                    'hybrid_mode': False,
                 },
             },
             rbe_idle=True,
@@ -1110,6 +1115,7 @@ class TestBotMain(TestBotBase):
             'rbe': {
                 'poll_token': 'pt0',
                 'instance': 'instance_0',
+                'hybrid_mode': False,
             },
         }),
         self.expected_rbe_create_request('pt0', 'st0'),
@@ -1151,6 +1157,7 @@ class TestBotMain(TestBotBase):
             'rbe': {
                 'poll_token': 'pt1',
                 'instance': 'instance_1',
+                'hybrid_mode': False,
             },
         }),
         self.expected_rbe_create_request('pt1', 'st1'),
@@ -1168,6 +1175,7 @@ class TestBotMain(TestBotBase):
             'rbe': {
                 'poll_token': 'pt0',
                 'instance': 'instance_0',
+                'hybrid_mode': False,
             },
         }),
         self.expected_rbe_create_request('pt0', 'st0', fail=True),
@@ -1185,6 +1193,7 @@ class TestBotMain(TestBotBase):
             'rbe': {
                 'poll_token': 'pt1',
                 'instance': 'instance_0',
+                'hybrid_mode': False,
             },
         }),
         self.expected_rbe_create_request('pt1', 'st1'),  # resets cons. errors
@@ -1206,6 +1215,7 @@ class TestBotMain(TestBotBase):
             'rbe': {
                 'poll_token': 'pt0',
                 'instance': 'instance_0',
+                'hybrid_mode': False,
             },
         }),
         self.expected_rbe_create_request('pt0', 'st0'),
@@ -1222,6 +1232,7 @@ class TestBotMain(TestBotBase):
                 'rbe': {
                     'poll_token': 'pt1',
                     'instance': 'instance_1',
+                    'hybrid_mode': False,
                 },
             },
             rbe_idle=True,
@@ -1245,6 +1256,7 @@ class TestBotMain(TestBotBase):
             'rbe': {
                 'poll_token': 'pt0',
                 'instance': 'instance_0',
+                'hybrid_mode': False,
             },
         }),
         self.expected_rbe_create_request('pt0', 'st0'),
@@ -1303,6 +1315,7 @@ class TestBotMain(TestBotBase):
                 'rbe': {
                     'poll_token': 'pt0',
                     'instance': 'instance_0',
+                    'hybrid_mode': False,
                 },
             },
             rbe_idle=False,
@@ -1350,6 +1363,7 @@ class TestBotMain(TestBotBase):
                 'rbe': {
                     'poll_token': 'pt0',
                     'instance': 'instance_0',
+                    'hybrid_mode': False,
                 },
             },
             rbe_idle=True,
@@ -1366,6 +1380,7 @@ class TestBotMain(TestBotBase):
             'rbe': {
                 'poll_token': poll_token,
                 'instance': 'instance',
+                'hybrid_mode': False,
             },
         }),
         self.expected_rbe_create_request(poll_token, session_token),

@@ -274,6 +274,7 @@ class TestRemoteClient(auto_stub.TestCase):
                   'id': 'lease-id',
                   'state': 'ACTIVE'
               },
+              'nonblocking': True,
           }, data)
       self.assertFalse(retry_transient)
       return {
@@ -293,6 +294,7 @@ class TestRemoteClient(auto_stub.TestCase):
         {'dim': ['v1', 'v2']},
         remote_client.RBELease('lease-id', remote_client.RBELeaseState.ACTIVE),
         'poll_tok',
+        False,
         False,
     )
 
@@ -330,6 +332,7 @@ class TestRemoteClient(auto_stub.TestCase):
         {'dim': ['v1', 'v2']},
         None,
         None,
+        True,
         False,
     )
 
@@ -386,6 +389,7 @@ class TestRemoteClient(auto_stub.TestCase):
           {'dim': ['v1', 'v2']},
           None,
           None,
+          True,
           False,
       )
 
@@ -510,6 +514,7 @@ class MockedRBERemote:
   def __init__(self):
     self.last_dimensions = None
     self.last_poll_token = None
+    self.last_blocking = None
     self.last_retry_transient = None
     self.last_session_token = None
     self.last_status = None
@@ -534,6 +539,7 @@ class MockedRBERemote:
                          dimensions,
                          lease=None,
                          poll_token=None,
+                         blocking=True,
                          retry_transient=False):
     if self.next_status is None:
       raise AssertionError('Unexpected rbe_update_session call')
@@ -543,6 +549,7 @@ class MockedRBERemote:
     self.last_dimensions = dimensions.copy()
     self.last_lease = lease.clone() if lease else None
     self.last_poll_token = poll_token
+    self.last_blocking = blocking
     self.last_retry_transient = retry_transient
 
     status, self.next_status = self.next_status, None
@@ -616,6 +623,7 @@ class TestRBESession(unittest.TestCase):
     self.assertEqual(dims(1), remote.last_dimensions)
     self.assertIsNone(remote.last_lease)
     self.assertEqual('poll_tok:1', remote.last_poll_token)
+    self.assertTrue(remote.last_blocking)
     self.assertFalse(remote.last_retry_transient)
 
     # Wait for a lease and get some!

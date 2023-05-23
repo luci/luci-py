@@ -333,18 +333,33 @@ class RemoteClientNative(object):
         '/swarming/api/v1/bot/handshake',
         data=attributes)
 
-  def poll(self, attributes):
+  def poll(self, attributes, force=False):
     """Polls Swarming server for commands; returns a (cmd, value) pair.
 
     Unlike other methods, this method doesn't retry on transient errors
     internally (it raises PollError instead). This allows the outer poll loop
     to do stuff (like ping RBE session) between `/bot/poll` attempts.
 
+    During the RBE migration, the caller should always expect *any* allowed
+    command to be returned, regardless if the bot is in RBE mode or not: the
+    server may decide to end the RBE mode based on its config and do a full
+    poll.
+
+    Arguments:
+      attributes: a dict with state and dimensions.
+      force: if True and the bot has an RBE instance assigned, do a full
+          Swarming poll that can pick up tasks (instead of a poll that just
+          picks up lifecycle commands). Used by bots in the hybrid mode when
+          they poll from both RBE and Swarming schedulers. Makes no effect on
+          bots that do not have RBE configured.
+
     Raises:
       PollError if can't contact the server, the server replies with an error or
       the returned dict does not have the correct values set.
     """
     data = attributes.copy()
+    if force:
+      data['force'] = True
 
     # This makes retry requests idempotent. See also crbug.com/1214700. Reuse
     # the UUID until we get a successful response.
@@ -372,7 +387,7 @@ class RemoteClientNative(object):
       if cmd == 'terminate':
         return (cmd, resp['task_id'])
       if cmd == 'run':
-        return (cmd, resp['manifest'])
+        return (cmd, (resp['manifest'], resp.get('rbe')))
       if cmd == 'update':
         return (cmd, resp['version'])
       if cmd in ('restart', 'host_reboot'):
@@ -571,6 +586,7 @@ class RemoteClientNative(object):
                          dimensions,
                          lease=None,
                          poll_token=None,
+                         blocking=True,
                          retry_transient=False):
     """Updates the state of an RBE session.
 
@@ -584,6 +600,7 @@ class RemoteClientNative(object):
       dimensions: a dict with bot dimensions as {str => [str]}.
       lease: an optional RBELease the bot is or was working on.
       poll_token: a token reported by latest `rbe` poll(...) command, optional.
+      blocking: if True, allow waiting for a bit for new leases to appear.
       retry_transient: True to retry many times on transient errors. This is
           a very crude retry mechanism intended to be used only if there's no
           better retry loop already.
@@ -605,6 +622,8 @@ class RemoteClientNative(object):
       data['lease'] = lease.to_dict(omit_payload=True)
     if poll_token:
       data['poll_token'] = poll_token
+    if not blocking:
+      data['nonblocking'] = True
 
     resp = self._url_read_json('/swarming/api/v1/bot/rbe/session/update',
                                data=data,
@@ -917,7 +936,7 @@ class RBESession:
     """An RBELease the bot should be working on now."""
     return self._active_lease
 
-  def update(self, status, dimensions, poll_token):
+  def update(self, status, dimensions, poll_token, blocking=True):
     """Updates the state of the session, picks up a new lease, if any.
 
     Should be called in the outer bot loop, when the bot is waiting for new
@@ -938,6 +957,7 @@ class RBESession:
       status: the new RBE session status to report as RBESessionStatus enum.
       dimensions: up-to-date bot dimensions as a dict {str => [str]}.
       poll_token: the most recent poll token from Python Swarming.
+      blocking: if True, allow waiting for a bit for new leases to appear.
 
     Returns:
       A new active RBELease, if any. Also available via `active_lease` property.
@@ -962,7 +982,8 @@ class RBESession:
     lease = self._update(status=status,
                          dimensions=self._dimensions,
                          lease=self._finished_lease,
-                         poll_token=self._poll_token)
+                         poll_token=self._poll_token,
+                         blocking=blocking)
     self._finished_lease = None  # flushed the result successfully
 
     # An unhealthy session should not be producing new leases.
@@ -1105,6 +1126,7 @@ class RBESession:
               dimensions,
               poll_token=None,
               lease=None,
+              blocking=True,
               retry_transient=False):
     """Used internally by other methods.
 
@@ -1116,6 +1138,7 @@ class RBESession:
       dimensions: a dict with bot dimensions as {str => [str]}.
       poll_token: a token reported by latest `rbe` poll(...) command, optional.
       lease: an optional RBELease the bot is or was working on.
+      blocking: if True, allow waiting for a bit for new leases to appear.
       retry_transient: True to retry many times on transient errors.
 
     Returns:
@@ -1134,6 +1157,7 @@ class RBESession:
         dimensions,
         lease,
         poll_token,
+        blocking,
         retry_transient,
     )
     self._session_token = resp.session_token

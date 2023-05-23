@@ -1192,7 +1192,7 @@ def _run_bot_inner(arg_error, quit_bit):
     logging.info('Early quit 3')
     return 0
 
-  _do_handshake(botobj, quit_bit)
+  rbe_params = _do_handshake(botobj, quit_bit)
 
   if quit_bit.is_set():
     logging.info('Early quit 4')
@@ -1215,7 +1215,7 @@ def _run_bot_inner(arg_error, quit_bit):
     _ORIGINAL_BOT_ID = botobj.id
 
   # Spin until getting a termination signal. Shutdown RBE on exit.
-  state = _BotLoopState(botobj, quit_bit)
+  state = _BotLoopState(botobj, rbe_params, quit_bit)
   with botobj.mutate_internals() as mut:
     mut.set_exit_hook(lambda _: state.rbe_disable())
   state.run()
@@ -1269,7 +1269,7 @@ def _backoff(cycle, exponent, max_val=300.0):
 class _BotLoopState:
   """The state of the main bot poll loop."""
 
-  def __init__(self, botobj, quit_bit, clock_impl=None):
+  def __init__(self, botobj, rbe_params, quit_bit, clock_impl=None):
     # Instance of Bot.
     self._bot = botobj
     # threading.Event signaled when the bot should gracefully exit.
@@ -1301,6 +1301,8 @@ class _BotLoopState:
     self._rbe_intended_instance = None
     # The intended status of the RBE session.
     self._rbe_intended_status = remote_client.RBESessionStatus.OK
+    # True to poll from both Swarming and RBE in an interleaved way.
+    self._rbe_hybrid_mode = rbe_params['hybrid_mode'] if rbe_params else False
     # The current healthy RBE session if we managed to open it.
     self._rbe_session = None
     # Number of consecutive RBE poll failures.
@@ -1391,7 +1393,7 @@ class _BotLoopState:
       with self._bot.mutate_internals() as mut:
         prev_idle = mut.update_idleness(currently_idle)
         mut.update_rbe_state(
-            self._rbe_intended_instance,
+            self._rbe_intended_instance, self._rbe_hybrid_mode,
             self._rbe_session.session_id if self._rbe_session else None)
 
       # If the RBE bot switched into the idle state just now, report this to
@@ -1510,6 +1512,7 @@ class _BotLoopState:
     self._rbe_poll_token = rbe_state['poll_token']
     self._rbe_intended_instance = rbe_state['instance']
     self._rbe_intended_status = remote_client.RBESessionStatus.OK
+    self._rbe_hybrid_mode = rbe_state['hybrid_mode']
 
     # Start the RBE polling loop if it was stopped before.
     if not self._rbe_poll_timer:
@@ -1531,6 +1534,7 @@ class _BotLoopState:
     self._rbe_poll_token = None
     self._rbe_intended_instance = None
     self._rbe_intended_status = remote_client.RBESessionStatus.BOT_TERMINATING
+    self._rbe_hybrid_mode = False
     self._rbe_consecutive_errors = 0
     if self._rbe_session:
       logging.info('RBE: terminating session %s', self._rbe_session.session_id)
@@ -1677,7 +1681,8 @@ class _BotLoopState:
     elif cmd == 'terminate':
       self.cmd_terminate(param)
     elif cmd == 'run':
-      self.cmd_run(param, None)
+      manifest, _rbe_params = param
+      self.cmd_run(manifest, None)
     elif cmd == 'update':
       self.cmd_update(param)
     elif cmd in ('host_reboot', 'restart'):
@@ -1744,7 +1749,12 @@ class _BotLoopState:
 
 
 def _do_handshake(botobj, quit_bit):
-  """Connects to /handshake and reads the bot_config if specified."""
+  """Connects to /handshake and reads the bot_config if specified.
+
+  Returns:
+    A dict with RBE parameters fetched from the server config or None if the bot
+    is not using RBE.
+  """
   # This is the first authenticated request to the server. If the bot is
   # misconfigured, the request may fail with HTTP 401 or HTTP 403. Instead of
   # dying right away, spin in a loop, hoping the bot will "fix itself"
@@ -1773,15 +1783,20 @@ def _do_handshake(botobj, quit_bit):
       # config changes.
       with botobj.mutate_internals() as mut:
         mut.update_bot_config(script, rev)
+        rbe_params = resp.get('rbe')
+        if rbe_params:
+          mut.update_rbe_state(rbe_params['instance'],
+                               rbe_params['hybrid_mode'], None)
         cfg_version = resp.get('bot_group_cfg_version')
         if cfg_version:
           mut.update_bot_group_cfg(cfg_version, resp.get('bot_group_cfg'))
-      break
+      return rbe_params
     attempt += 1
     sleep_time = _backoff(attempt, 2.0)
     logging.error(
         'Failed to contact for handshake, retrying in %d sec...', sleep_time)
     loop_clock.sleep(sleep_time)
+  return None
 
 
 def _update_bot(botobj, version):

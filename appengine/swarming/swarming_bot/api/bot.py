@@ -46,6 +46,7 @@ class Bot(object):
     self._bot_restart_msg = None
     self._bot_config = {}
     self._rbe_instance = None
+    self._rbe_hybrid_mode = False
     self._rbe_session = None
 
     # Populate parts of self._dimensions and self._state that depend on other
@@ -325,8 +326,9 @@ class BotMutator(object):
     self._refresh_attributes()
     return prev
 
-  def update_rbe_state(self, instance, session):
+  def update_rbe_state(self, instance, hybrid_mode, session):
     self._bot._rbe_instance = instance
+    self._bot._rbe_hybrid_mode = hybrid_mode
     self._bot._rbe_session = session
     self._refresh_attributes()
 
@@ -347,9 +349,11 @@ class BotMutator(object):
     state['rbe_instance'] = self._bot._rbe_instance
     if self._bot._rbe_instance:
       state['rbe_session'] = self._bot._rbe_session
+      state['rbe_hybrid_mode'] = self._bot._rbe_hybrid_mode
       state['rbe_idle'] = self._bot._idle
     else:
       state.pop('rbe_session', None)
+      state.pop('rbe_hybrid_mode', None)
       state.pop('rbe_idle', None)
     state['bot_group_cfg_version'] = self._bot._bot_group_cfg_ver
     if self._bot._bot_config:
