@@ -598,7 +598,7 @@ class TestRBESession(unittest.TestCase):
     # In the initial state.
     self.assertEqual('some-instance', s.instance)
     self.assertEqual('mocked_session_id', s.session_id)
-    self.assertTrue(s.healthy)
+    self.assertTrue(s.alive)
     self.assertIsNone(s.active_lease)
     # Called `rbe_create_session`.
     self.assertEqual(dims(0), remote.last_dimensions)
@@ -615,7 +615,7 @@ class TestRBESession(unittest.TestCase):
     remote.mock_next_response(remote_client.RBESessionStatus.OK, None)
     lease = s.update(remote_client.RBESessionStatus.OK, dims(1), 'poll_tok:1')
     self.assertIsNone(lease)
-    self.assertTrue(s.healthy)
+    self.assertTrue(s.alive)
     self.assertIsNone(s.active_lease)
     # Called `rbe_update_session`.
     self.assertEqual('session_tok:0', remote.last_session_token)
@@ -647,7 +647,7 @@ class TestRBESession(unittest.TestCase):
             },
             'state': 'PENDING'
         }, lease.to_dict())
-    self.assertTrue(s.healthy)
+    self.assertTrue(s.alive)
 
     # Can be serialized/restored in this state.
     self.check_serialization_works(s)
@@ -668,7 +668,7 @@ class TestRBESession(unittest.TestCase):
     )
     self.assertTrue(s.ping_active_lease())
     self.assertIsNotNone(s.active_lease)
-    self.assertTrue(s.healthy)
+    self.assertTrue(s.alive)
     # Called `rbe_update_session` correctly.
     self.assertEqual('session_tok:2', remote.last_session_token)
     self.assertEqual(remote_client.RBESessionStatus.OK, remote.last_status)
@@ -682,7 +682,7 @@ class TestRBESession(unittest.TestCase):
     # Mark the lease as done.
     s.finish_active_lease({'result': 'xxx'})
     self.assertIsNone(s.active_lease)
-    self.assertTrue(s.healthy)
+    self.assertTrue(s.alive)
 
     # Can be serialized/restored in this state.
     self.check_serialization_works(s)
@@ -695,7 +695,7 @@ class TestRBESession(unittest.TestCase):
     remote.mock_next_response(remote_client.RBESessionStatus.OK, None)
     lease = s.update(remote_client.RBESessionStatus.OK, dims(3), 'poll_tok:3')
     self.assertIsNone(lease)
-    self.assertTrue(s.healthy)
+    self.assertTrue(s.alive)
     self.assertIsNone(s.active_lease)
     # Passed the lease result to `rbe_update_session`.
     self.assertEqual(
@@ -714,7 +714,7 @@ class TestRBESession(unittest.TestCase):
     remote.mock_next_response(remote_client.RBESessionStatus.OK, None)
     lease = s.update(remote_client.RBESessionStatus.OK, dims(4), 'poll_tok:4')
     self.assertIsNone(lease)
-    self.assertTrue(s.healthy)
+    self.assertTrue(s.alive)
     self.assertIsNone(s.active_lease)
     # Passed no leases to `rbe_update_session`.
     self.assertIsNone(remote.last_lease)
@@ -726,12 +726,12 @@ class TestRBESession(unittest.TestCase):
     lease = s.update(remote_client.RBESessionStatus.BOT_TERMINATING, dims(5),
                      'poll_tok:5')
     self.assertIsNone(lease)
-    self.assertFalse(s.healthy)
+    self.assertFalse(s.alive)
     # Passed correct status to `rbe_update_session`.
     self.assertEqual(remote_client.RBESessionStatus.BOT_TERMINATING,
                      remote.last_status)
 
-    # Calling update with unhealthy session is not allowed.
+    # Calling update with dead session is not allowed.
     with self.assertRaises(remote_client.RBESessionException):
       s.update(remote_client.RBESessionStatus.OK, dims(5), 'poll_tok:5')
 
@@ -795,7 +795,7 @@ class TestRBESession(unittest.TestCase):
     # Terminate the session. This reports the last task result.
     remote.mock_next_response(remote_client.RBESessionStatus.OK, None)
     s.terminate()
-    self.assertFalse(s.healthy)
+    self.assertFalse(s.alive)
     # Called `rbe_update_session` correctly.
     self.assertEqual('session_tok:2', remote.last_session_token)
     self.assertEqual(remote_client.RBESessionStatus.BOT_TERMINATING,
@@ -824,7 +824,7 @@ class TestRBESession(unittest.TestCase):
                               None)
     s.update(remote_client.RBESessionStatus.OK, dims, 'poll_tok')
     self.assertIsNone(s.active_lease)
-    self.assertFalse(s.healthy)
+    self.assertFalse(s.alive)
 
     # Terminating doesn't really do anything, since the session is gone.
     s.terminate()
@@ -852,17 +852,17 @@ class TestRBESession(unittest.TestCase):
     remote.mock_next_response(remote_client.RBESessionStatus.BOT_TERMINATING,
                               None)
     self.assertFalse(s.ping_active_lease())
-    self.assertFalse(s.healthy)
+    self.assertFalse(s.alive)
     self.assertIsNotNone(s.active_lease)
 
     # Sending the ping again does nothing.
     self.assertFalse(s.ping_active_lease())
-    self.assertFalse(s.healthy)
+    self.assertFalse(s.alive)
     self.assertIsNotNone(s.active_lease)
 
     # "Finishing" the lease only update the local state.
     s.finish_active_lease({})
-    self.assertFalse(s.healthy)
+    self.assertFalse(s.alive)
     self.assertIsNone(s.active_lease)
 
     # Terminating the session doesn't really do anything.
@@ -898,7 +898,7 @@ class TestRBESession(unittest.TestCase):
         ),
     )
     self.assertFalse(s.ping_active_lease())
-    self.assertTrue(s.healthy)
+    self.assertTrue(s.alive)
     self.assertIsNotNone(s.active_lease)
 
     # Canceled leases still needs to be reported as finished though, perhaps

@@ -709,7 +709,7 @@ RBEUpdateSessionResponse = collections.namedtuple(
         # The bot session status as the RBE backend sees it.
         #
         # It is one of RBESessionStatus enum variants. In particular, a non-OK
-        # status means the session is no longer healthy and the bot should stop
+        # status means the session is no longer alive and the bot should stop
         # using it.
         'status',
 
@@ -927,9 +927,13 @@ class RBESession:
     return self._session_id
 
   @property
-  def healthy(self):
-    """True if this session exists and is healthy."""
-    return self._last_acked_status == RBESessionStatus.OK
+  def alive(self):
+    """True if this session exists and can process leases."""
+    return self._last_acked_status in (
+        RBESessionStatus.OK,
+        # TODO(vadimsh): Switch to MAINTENANCE when available.
+        RBESessionStatus.UNHEALTHY,
+    )
 
   @property
   def active_lease(self):
@@ -942,15 +946,15 @@ class RBESession:
     Should be called in the outer bot loop, when the bot is waiting for new
     tasks. This method reports the result of the last finished lease (if any)
     to the server and picks up a new lease (if any). It also recognizes when
-    the session is closed by the server and updates `healthy` property
+    the session is closed by the server and updates `alive` property
     accordingly.
 
-    When this method is called the session must be healthy and must not have
+    When this method is called the session must be alive and must not have
     `active_lease` set, otherwise RBESessionException is raised.
 
-    Calling this methods may update `healthy` and `active_lease` properties
+    Calling this methods may update `alive` and `active_lease` properties
     as side effects:
-      * A session may become unhealthy if it is gone on the backend side.
+      * A session may become dead if it is gone on the backend side.
       * There may be a new active lease assigned to the session after this call.
 
     Arguments:
@@ -966,8 +970,8 @@ class RBESession:
       RBESessionException if the local session is in a wrong state.
       RBEServerError if the RPC fails for whatever reason.
     """
-    if not self.healthy:
-      raise RBESessionException('Calling update(...) with unhealthy session')
+    if not self.alive:
+      raise RBESessionException('Calling update(...) with dead session')
     if self.active_lease:
       raise RBESessionException('Calling update(...) with an active lease')
 
@@ -986,10 +990,10 @@ class RBESession:
                          blocking=blocking)
     self._finished_lease = None  # flushed the result successfully
 
-    # An unhealthy session should not be producing new leases.
-    if not self.healthy:
+    # A dead session should not be producing new leases.
+    if not self.alive:
       if lease:
-        logging.error('Ignoring a lease from unhealthy session: %s', lease.id)
+        logging.error('Ignoring a lease from dead session: %s', lease.id)
       return None
 
     # A new lease should be in PENDING state and have a payload.
@@ -1009,11 +1013,10 @@ class RBESession:
     dead yet) and polls its cancellation status. Must be called only if
     `active_lease` is set, otherwise RBESessionException is raised.
 
-    Calling this methods may update `healthy` property as a side effect:
-    a session may become unhealthy if it is gone on the backend side. The active
-    lease is considered canceled in that case. If the local session was already
-    unhealthy when the method was called, the active lease is considered
-    canceled as well.
+    Calling this methods may update `alive` property as a side effect: a session
+    may become dead if it is gone on the backend side. The active lease is
+    considered canceled in that case. If the local session was already dead
+    when the method was called, the active lease is considered canceled as well.
 
     Doesn't unset `active_lease` itself even if the lease was canceled. Use
     finish_active_lease(...) to mark it as complete.
@@ -1029,7 +1032,7 @@ class RBESession:
     """
     if not self.active_lease:
       raise RBESessionException('ping_active_lease(...) without a lease')
-    if not self.healthy:
+    if not self.alive:
       logging.warning('The session is already gone, canceling the lease')
       return False
 
@@ -1043,7 +1046,7 @@ class RBESession:
                          lease=self._active_lease)
 
     # If the session is gone, treat it as if the lease was canceled.
-    if not self.healthy:
+    if not self.alive:
       logging.warning('The session is gone now, canceling the lease')
       return False
 
@@ -1070,7 +1073,7 @@ class RBESession:
 
     The result of the finished lease will be reported to the backend with the
     next update(...) or terminate(...) calls, whenever they happen. If the
-    session is unhealthy, the result will be lost.
+    session is dead, the result will be lost.
 
     This is a purely local state change, it doesn't do any RPCs.
 
@@ -1093,8 +1096,8 @@ class RBESession:
   def terminate(self):
     """Terminates this RBE session.
 
-    Does nothing if the session is unhealthy (in particular was already
-    terminated). Ignores `active_lease`.
+    Does nothing if the session is dead (in particular was already terminated).
+    Ignores `active_lease`.
 
     Retries the call a bunch of times on transient RPC errors to increase
     chances of successfully reporting results of the last finished lease. If
@@ -1105,7 +1108,7 @@ class RBESession:
     if self._active_lease:
       logging.error('Ignoring active lease %s', self._active_lease.id)
 
-    if not self.healthy:
+    if not self.alive:
       if self._finished_lease:
         logging.error('Losing results of %s', self._finished_lease.id)
       return
@@ -1130,8 +1133,8 @@ class RBESession:
               retry_transient=False):
     """Used internally by other methods.
 
-    Updates `healthy` property based on the server response. Doesn't touch
-    the state related to leases.
+    Updates `alive` property based on the server response. Doesn't touch the
+    state related to leases.
 
     Arguments:
       status: the desired bot session status as RBESessionStatus enum.

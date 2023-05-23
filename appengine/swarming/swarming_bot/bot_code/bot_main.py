@@ -1587,13 +1587,13 @@ class _BotLoopState:
       lease = self._rbe_session.update(self._rbe_intended_status,
                                        self._bot.dimensions,
                                        self._rbe_poll_token)
-      # A session can become unhealty either because we reported a terminal
-      # status (happens when exiting) or if the server closed it itself. Either
-      # way, we should abandon this session and create a new one later, if still
-      # necessary. This should not be happening on every loop cycle. As a
-      # precaution against busy-looping, treat session closure as a transient
-      # error to slow down spinning.
-      if not self._rbe_session.healthy:
+      # A session can die either because we reported a terminal status (happens
+      # when exiting) or if the server closed it itself. Either way, we should
+      # abandon this session and create a new one later, if still necessary.
+      # This should not be happening on every loop cycle. As a precaution
+      # against busy-looping, treat session closure as a transient error to slow
+      # down spinning.
+      if not self._rbe_session.alive:
         logging.info('RBE: session %s is closed', self._rbe_session.session_id)
         self._rbe_consecutive_errors += 1
         self._rbe_session = None

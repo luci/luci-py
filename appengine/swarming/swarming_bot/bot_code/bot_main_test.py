@@ -1197,7 +1197,9 @@ class TestBotMain(TestBotBase):
             },
         }),
         self.expected_rbe_create_request('pt1', 'st1'),  # resets cons. errors
-        self.expected_rbe_update_request('pt1', 'st1', status_out='UNHEALTHY'),
+        self.expected_rbe_update_request('pt1',
+                                         'st1',
+                                         status_out='BOT_TERMINATING'),
     ])
     self.poll_once()
 
