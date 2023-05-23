@@ -134,8 +134,8 @@ class BotsService(object):
         end=end,
         tags=[],
     )
-    items, cursor = api_common.list_bot_tasks(bot_id, filters, request.cursor,
-                                              request.limit)
+    items, cursor = api_common.list_bot_tasks(bot_id, filters, request.limit,
+                                              request.cursor)
     return message_conversion_prpc.task_list_response(items, cursor)
 
   @prpc_helpers.method
@@ -269,8 +269,8 @@ class TasksService(object):
         state=state,
         tags=list(request.tags),
     )
-    items, cursor = api_common.list_task_results(rsf, request.cursor,
-                                                 request.limit)
+    items, cursor = api_common.list_task_results(rsf, request.limit,
+                                                 request.cursor)
     return message_conversion_prpc.task_list_response(
         items, cursor, request.include_performance_stats)
 

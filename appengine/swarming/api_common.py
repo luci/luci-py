@@ -178,7 +178,7 @@ TaskFilters = namedtuple(
     ])
 
 
-def list_bot_tasks(bot_id, filters, cursor, limit):
+def list_bot_tasks(bot_id, filters, limit, cursor):
   """Lists all tasks which have been executed by a given bot which match the
   filters.
 
@@ -186,8 +186,8 @@ def list_bot_tasks(bot_id, filters, cursor, limit):
     bot_id: bot_id to filter tasks.
     filters: A TaskFilters object to generate query for
       task_result.TaskResult. Does not make use of the tags field.
-    cursor: Cursor returned by previous invocation of this request.
     limit: Number of items to return per request.
+    cursor: Cursor returned by previous invocation of this request.
 
   Returns:
     List of tasks results with filters applied.
@@ -536,7 +536,7 @@ def get_dimensions(pool):
   return DimensionsResponse(bots_dimensions=agg.dimensions, ts=agg.ts)
 
 
-def list_task_results(filters, cursor, limit):
+def list_task_results(filters, limit, cursor):
   """Returns a list of task results which match filters mentioned in
   ResultSummaryFilters.
 

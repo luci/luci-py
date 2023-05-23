@@ -383,8 +383,8 @@ class SwarmingTasksService(remote.Service):
       rsf = self._query_from_request(request)
     except ValueError as e:
       raise endpoints.BadRequestException("invalid datetime values %s" % str(e))
-    items, cursor = api_common.list_task_results(rsf, request.cursor,
-                                                 request.limit)
+    items, cursor = api_common.list_task_results(rsf, request.limit,
+                                                 request.cursor)
     return swarming_rpcs.TaskList(
         cursor=cursor,
         items=[
@@ -674,8 +674,8 @@ class SwarmingBotService(remote.Service):
     items, cursor = api_common.list_bot_tasks(
         request.bot_id,
         filters,
-        request.cursor,
         request.limit,
+        request.cursor,
     )
     return swarming_rpcs.BotTasks(
         cursor=cursor,
