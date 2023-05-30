@@ -203,13 +203,15 @@ class TestRemoteClient(auto_stub.TestCase):
                   'dim': ['v1', 'v2']
               },
               'poll_token': 'poll_tok',
+              'session_token': 'session_tok',
           }, data)
       self.assertFalse(retry_transient)
       return {'session_token': 'session_tok', 'session_id': 'sid'}
 
     self.mock(c, '_url_read_json', mocked_call)
 
-    resp = c.rbe_create_session({'dim': ['v1', 'v2']}, 'poll_tok', False)
+    resp = c.rbe_create_session({'dim': ['v1', 'v2']}, 'poll_tok',
+                                'session_tok', False)
 
     self.assertEqual('session_tok', resp.session_token)
     self.assertEqual('sid', resp.session_id)
@@ -255,7 +257,7 @@ class TestRemoteClient(auto_stub.TestCase):
     self.mock(c, '_url_read_json', lambda *_args, **_kwargs: dct)
 
     with self.assertRaises(remote_client.RBEServerError):
-      c.rbe_create_session({'dim': ['v1', 'v2']}, 'poll_tok', False)
+      c.rbe_create_session({'dim': ['v1', 'v2']}, 'poll_tok', None, False)
 
   def test_rbe_update_session_full_ok(self):
     c = remote_client.RemoteClientNative('http://localhost:1', None,
@@ -519,6 +521,7 @@ class MockedRBERemote:
     self.last_session_token = None
     self.last_status = None
     self.last_lease = None
+    self.next_session_id = 'mocked_session_id'
     self.next_status = None
     self.next_lease = None
 
@@ -526,12 +529,17 @@ class MockedRBERemote:
     self.next_status = status
     self.next_lease = lease
 
-  def rbe_create_session(self, dimensions, poll_token, retry_transient=False):
+  def rbe_create_session(self,
+                         dimensions,
+                         poll_token,
+                         session_token=None,
+                         retry_transient=False):
     self.last_dimensions = dimensions.copy()
     self.last_poll_token = poll_token
+    self.last_session_token = session_token
     self.last_retry_transient = retry_transient
     return remote_client.RBECreateSessionResponse('session_tok:0',
-                                                  'mocked_session_id')
+                                                  self.next_session_id)
 
   def rbe_update_session(self,
                          session_token,
@@ -741,6 +749,16 @@ class TestRBESession(unittest.TestCase):
     # This doesn't actually do much, since the session is already closed.
     # There's a separate test for it.
     s.terminate()
+
+    # Verify a session can be recreated.
+    remote.next_session_id = 'new_session_id'
+    remote.last_session_token = None
+    s.recreate()
+    self.assertEqual('session_tok:6', remote.last_session_token)
+    self.assertEqual('some-instance', s.instance)
+    self.assertEqual('new_session_id', s.session_id)
+    self.assertTrue(s.alive)
+    self.assertIsNone(s.active_lease)
 
   def test_no_idle_time(self):
     remote = MockedRBERemote()

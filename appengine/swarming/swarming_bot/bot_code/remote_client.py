@@ -542,16 +542,22 @@ class RemoteClientNative(object):
       raise MintTokenError(resp['error'])
     return resp
 
-  def rbe_create_session(self, dimensions, poll_token, retry_transient=False):
+  def rbe_create_session(self,
+                         dimensions,
+                         poll_token,
+                         session_token=None,
+                         retry_transient=False):
     """Creates a new RBE session via Swarming RBE backend.
 
     Parameters of the new session are provided by the Swarming Python backend
-    via the `poll_token` returned by poll(...) with `rbe` command. The swarming
+    via the `poll_token` returned by poll(...) with `rbe` command (or via
+    `session_token` if reopening a session that suddenly died). The swarming
     bot process doesn't need to know them and can't interfere with them.
 
     Arguments:
       dimensions: a dict with bot dimensions as {str => [str]}.
       poll_token: a token reported by `rbe` poll(...) command.
+      session_token: a session token of a previous session if reopening it.
       retry_transient: True to retry many times on transient errors. This is
           a very crude retry mechanism intended to be used only if there's no
           better retry loop already.
@@ -563,6 +569,8 @@ class RemoteClientNative(object):
       RBEServerError if the RPC fails for whatever reason.
     """
     data = {'dimensions': dimensions, 'poll_token': poll_token}
+    if session_token:
+      data['session_token'] = session_token
     resp = self._url_read_json('/swarming/api/v1/bot/rbe/session/create',
                                data=data,
                                retry_transient=retry_transient)
@@ -795,7 +803,11 @@ class RBELease:
 
 
 class RBESession:
-  """A single RBE bot session with a concrete session ID."""
+  """An RBE bot session.
+
+  It is created in the constructor and, once dead, can be recreated in-place via
+  recreate(). A recreated session has a different ID.
+  """
 
   def __init__(self,
                remote,
@@ -902,13 +914,10 @@ class RBESession:
     Raises:
       OSError if can't open or read the file.
       ValueError if the dump doesn't appear to be valid.
-      RBESessionException if the dump was generated for another session.
     """
     loaded = RBESession.load(self._remote, path)
-    if loaded._instance != self._instance:
-      raise RBESessionException('Wrong instance ID')
-    if loaded._session_id != self._session_id:
-      raise RBESessionException('Wrong session ID')
+    self._instance = loaded._instance
+    self._session_id = loaded._session_id
     self._dimensions = loaded._dimensions
     self._poll_token = loaded._poll_token
     self._session_token = loaded._session_token
@@ -920,6 +929,11 @@ class RBESession:
   def instance(self):
     """The RBE instance this session is running on."""
     return self._instance
+
+  @property
+  def dimensions(self):
+    """Last known dimensions of the session."""
+    return self._dimensions
 
   @property
   def session_id(self):
@@ -1123,6 +1137,38 @@ class RBESession:
       self._finished_lease = None  # flushed the result
     except RBEServerError as e:
       logging.error('Error terminating RBE session: %s', e)
+
+  def recreate(self):
+    """Opens a new session that replaces the current one.
+
+    Should be called only for dead sessions (`alive` is False). Raises
+    RBESessionException otherwise. Uses dimensions last passed to update(...).
+
+    On success updates `session_id` and `alive`.
+
+    Raises:
+      RBESessionException if the local session is in a wrong state.
+      RBEServerError if the RPC fails for whatever reason.
+    """
+    if self.alive:
+      raise RBESessionException('recreate(...) with a living session')
+
+    # The session that was maintaining these leases is gone. Forget them.
+    if self._active_lease:
+      logging.error('Ignoring active lease %s', self._active_lease.id)
+      self._active_lease = None
+    if self._finished_lease:
+      logging.error('Losing results of %s', self._finished_lease.id)
+      self._finished_lease = None
+
+    # Try to create a replacement session using the same parameters. We need to
+    # pass the previous session token to grab server-signed parameters from it
+    # in case the poll token is already stale.
+    resp = self._remote.rbe_create_session(self._dimensions, self._poll_token,
+                                           self._session_token)
+    self._session_id = resp.session_id
+    self._session_token = resp.session_token
+    self._last_acked_status = RBESessionStatus.OK
 
   def _update(self,
               status,
